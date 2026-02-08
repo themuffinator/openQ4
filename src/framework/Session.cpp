@@ -296,6 +296,13 @@ static void Session_DevMap_f( const idCmdArgs &args ) {
 		break;
 	}
 
+	const char *activeModule = cvarSystem->GetCVarString( "com_activeGameModule" );
+	if ( idStr::Icmp( activeModule, "game_mp" ) == 0 ) {
+		idAsyncNetwork::SetCheatsEnabled( true );
+		cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "spawnServer %s", map.c_str() ) );
+		return;
+	}
+
 	cvarSystem->SetCVarBool( "developer", true );
 	sessLocal.StartNewGame( map, true );
 }
@@ -570,19 +577,23 @@ void idSessionLocal::Shutdown() {
 
 	Stop();
 
-	if ( rw ) {
-		delete rw;
-		rw = NULL;
-	}
+	// Sound worlds must be released through soundSystem so the internal
+	// soundWorlds registry is updated before soundSystem shutdown walks it.
+	soundSystem->SetPlayingSoundWorld( NULL );
 
 	if ( sw ) {
-		delete sw;
+		soundSystem->FreeSoundWorld( sw );
 		sw = NULL;
 	}
 
 	if ( menuSoundWorld ) {
-		delete menuSoundWorld;
+		soundSystem->FreeSoundWorld( menuSoundWorld );
 		menuSoundWorld = NULL;
+	}
+
+	if ( rw ) {
+		delete rw;
+		rw = NULL;
 	}
 		
 	mapSpawnData.serverInfo.Clear();
@@ -1340,6 +1351,7 @@ void idSessionLocal::StartNewGame( const char *mapName, bool devmap ) {
 	const char *activeModule = cvarSystem->GetCVarString( "com_activeGameModule" );
 	if ( idStr::Icmp( activeModule, "game_sp" ) != 0 ) {
 		cvarSystem->SetCVarString( "si_gameType", "singleplayer" );
+		cvarSystem->SetCVarString( "com_nextGameModule", "game_sp" );
 		idCmdArgs reloadArgs;
 		reloadArgs.AppendArg( "openq4_startSingleplayer" );
 		reloadArgs.AppendArg( mapName );
@@ -2269,6 +2281,7 @@ bool idSessionLocal::LoadGame( const char *saveName ) {
 	const char *activeModule = cvarSystem->GetCVarString( "com_activeGameModule" );
 	if ( idStr::Icmp( activeModule, "game_sp" ) != 0 ) {
 		cvarSystem->SetCVarString( "si_gameType", "singleplayer" );
+		cvarSystem->SetCVarString( "com_nextGameModule", "game_sp" );
 		idCmdArgs reloadArgs;
 		reloadArgs.AppendArg( "loadGame" );
 		reloadArgs.AppendArg( saveName );

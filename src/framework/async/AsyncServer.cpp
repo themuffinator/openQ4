@@ -169,7 +169,7 @@ void idAsyncServer::Spawn( void ) {
 	}
 
 	// reset cheats cvars
-	if ( !idAsyncNetwork::allowCheats.GetBool() ) {
+	if ( !idAsyncNetwork::AreCheatsEnabled() ) {
 		cvarSystem->ResetFlaggedVariables( CVAR_CHEAT );
 	}
 

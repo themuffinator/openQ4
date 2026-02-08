@@ -318,7 +318,7 @@ void idInternalCVar::Set( const char *newValue, bool force, bool fromServer ) {
 #endif
 		}
 #endif
-		if ( ( flags & CVAR_CHEAT ) && !cvarSystem->GetCVarBool( "net_allowCheats" ) ) {
+		if ( ( flags & CVAR_CHEAT ) && !idAsyncNetwork::AreCheatsEnabled() ) {
 			common->Printf( "%s cannot be changed in multiplayer.\n", nameString.c_str() );
 #if ID_ALLOW_CHEATS
 			common->Printf( "ID_ALLOW_CHEATS override!\n" );

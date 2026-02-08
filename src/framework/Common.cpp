@@ -86,6 +86,7 @@ idCVar com_makingBuild( "com_makingBuild", "0", CVAR_BOOL | CVAR_SYSTEM, "1 when
 idCVar com_updateLoadSize( "com_updateLoadSize", "0", CVAR_BOOL | CVAR_SYSTEM | CVAR_NOCHEAT, "update the load size after loading a map" );
 idCVar com_videoRam( "com_videoRam", "64", CVAR_INTEGER | CVAR_SYSTEM | CVAR_NOCHEAT | CVAR_ARCHIVE, "holds the last amount of detected video ram" );
 idCVar com_activeGameModule( "com_activeGameModule", "", CVAR_SYSTEM, "active game module (game_sp/game_mp)" );
+idCVar com_nextGameModule( "com_nextGameModule", "", CVAR_SYSTEM, "internal one-shot game module override for reloadEngine" );
 
 idCVar com_product_lang_ext( "com_product_lang_ext", "1", CVAR_INTEGER | CVAR_SYSTEM | CVAR_ARCHIVE, "Extension to use when creating language files." );
 
@@ -2731,7 +2732,17 @@ static bool OpenQ4_IsMultiplayerGameType( const char *gameType ) {
 	return gameType && gameType[0] && idStr::Icmp( gameType, "singleplayer" ) != 0;
 }
 
+static bool OpenQ4_IsValidGameModuleName( const char *moduleName ) {
+	return moduleName
+		&& ( idStr::Icmp( moduleName, "game_sp" ) == 0 || idStr::Icmp( moduleName, "game_mp" ) == 0 );
+}
+
 static const char *OpenQ4_SelectGameModuleBaseName( void ) {
+	const char *nextModule = cvarSystem->GetCVarString( "com_nextGameModule" );
+	if ( OpenQ4_IsValidGameModuleName( nextModule ) ) {
+		return idStr::Icmp( nextModule, "game_mp" ) == 0 ? "game_mp" : "game_sp";
+	}
+
 	const char *gameType = cvarSystem->GetCVarString( "si_gameType" );
 	return OpenQ4_IsMultiplayerGameType( gameType ) ? "game_mp" : "game_sp";
 }
@@ -2799,6 +2810,7 @@ void idCommonLocal::LoadGameDLL( void ) {
 	game								= gameExport.game;
 	gameEdit							= gameExport.gameEdit;
 	com_activeGameModule.SetString( gameModuleBaseName );
+	com_nextGameModule.SetString( "" );
 
 #endif
 

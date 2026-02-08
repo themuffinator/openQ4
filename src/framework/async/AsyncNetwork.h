@@ -163,12 +163,15 @@ public:
 	static void				GetNETServers( );
 	
 	static void				ExecuteSessionCommand( const char *sessCmd );
+	static bool				AreCheatsEnabled( void );
+	static void				SetCheatsEnabled( bool enabled );
 
 	static idAsyncServer	server;
 	static idAsyncClient	client;
 	
 	static idCVar			verbose;						// verbose output
-	static idCVar			allowCheats;					// allow cheats
+	static idCVar			allowCheats;					// legacy cheats toggle
+	static idCVar			svCheats;						// Quake III style cheats toggle
 	static idCVar			serverDedicated;				// if set run a dedicated server
 	static idCVar			serverSnapshotDelay;			// number of milliseconds between snapshots
 	static idCVar			serverMaxClientRate;			// maximum outgoing rate to clients

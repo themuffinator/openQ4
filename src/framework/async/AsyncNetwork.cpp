@@ -35,7 +35,8 @@ idAsyncServer		idAsyncNetwork::server;
 idAsyncClient		idAsyncNetwork::client;
 
 idCVar				idAsyncNetwork::verbose( "net_verbose", "0", CVAR_SYSTEM | CVAR_INTEGER | CVAR_NOCHEAT, "1 = verbose output, 2 = even more verbose output", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
-idCVar				idAsyncNetwork::allowCheats( "net_allowCheats", "0", CVAR_SYSTEM | CVAR_BOOL | CVAR_NETWORKSYNC, "Allow cheats in network game" );
+idCVar				idAsyncNetwork::allowCheats( "net_allowCheats", "0", CVAR_SYSTEM | CVAR_BOOL | CVAR_NETWORKSYNC, "legacy multiplayer cheats toggle (use sv_cheats)" );
+idCVar				idAsyncNetwork::svCheats( "sv_cheats", "0", CVAR_SYSTEM | CVAR_BOOL | CVAR_NETWORKSYNC | CVAR_SERVERINFO, "Quake III style multiplayer cheats toggle" );
 #ifdef ID_DEDICATED
 // dedicated executable can only have a value of 1 for net_serverDedicated
 idCVar				idAsyncNetwork::serverDedicated( "net_serverDedicated", "1", CVAR_SERVERINFO | CVAR_SYSTEM | CVAR_INTEGER | CVAR_NOCHEAT | CVAR_ROM, "" );
@@ -290,6 +291,25 @@ bool idAsyncNetwork::UsercmdInputChanged( const usercmd_t &previousUserCmd, cons
 
 /*
 ==================
+idAsyncNetwork::AreCheatsEnabled
+==================
+*/
+bool idAsyncNetwork::AreCheatsEnabled( void ) {
+	return allowCheats.GetBool() || svCheats.GetBool();
+}
+
+/*
+==================
+idAsyncNetwork::SetCheatsEnabled
+==================
+*/
+void idAsyncNetwork::SetCheatsEnabled( bool enabled ) {
+	allowCheats.SetBool( enabled );
+	svCheats.SetBool( enabled );
+}
+
+/*
+==================
 idAsyncNetwork::SpawnServer_f
 ==================
 */
@@ -306,6 +326,7 @@ void idAsyncNetwork::SpawnServer_f( const idCmdArgs &args ) {
 
 	const char *activeModule = cvarSystem->GetCVarString( "com_activeGameModule" );
 	if ( idStr::Icmp( activeModule, "game_mp" ) != 0 ) {
+		cvarSystem->SetCVarString( "com_nextGameModule", "game_mp" );
 		idCmdArgs reloadArgs;
 		reloadArgs.AppendArg( "spawnServer" );
 		if ( args.Argc() > 1 ) {
@@ -368,6 +389,7 @@ void idAsyncNetwork::Connect_f( const idCmdArgs &args ) {
 	const char *activeModule = cvarSystem->GetCVarString( "com_activeGameModule" );
 	if ( idStr::Icmp( activeModule, "game_mp" ) != 0 ) {
 		cvarSystem->SetCVarString( "si_gameType", "dm" );
+		cvarSystem->SetCVarString( "com_nextGameModule", "game_mp" );
 		idCmdArgs reloadArgs;
 		reloadArgs.AppendArg( "connect" );
 		reloadArgs.AppendArg( args.Argv( 1 ) );
@@ -388,6 +410,7 @@ void idAsyncNetwork::Reconnect_f( const idCmdArgs &args ) {
 	const char *activeModule = cvarSystem->GetCVarString( "com_activeGameModule" );
 	if ( idStr::Icmp( activeModule, "game_mp" ) != 0 ) {
 		cvarSystem->SetCVarString( "si_gameType", "dm" );
+		cvarSystem->SetCVarString( "com_nextGameModule", "game_mp" );
 		idCmdArgs reloadArgs;
 		reloadArgs.AppendArg( "reconnect" );
 		cmdSystem->SetupReloadEngine( reloadArgs );

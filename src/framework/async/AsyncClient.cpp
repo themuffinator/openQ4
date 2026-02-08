@@ -985,7 +985,7 @@ void idAsyncClient::ProcessReliableServerMessages( void ) {
 				idDict &info = sessLocal.mapSpawnData.syncedCVars;
 				msg.ReadDeltaDict( info, &info );
 				cvarSystem->SetCVarsFromDict( info );
-				if ( !idAsyncNetwork::allowCheats.GetBool() ) {
+				if ( !idAsyncNetwork::AreCheatsEnabled() ) {
 					cvarSystem->ResetFlaggedVariables( CVAR_CHEAT );
 				}
 				break;
