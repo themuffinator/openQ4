@@ -901,6 +901,8 @@ idClip::Shutdown
 void idClip::Shutdown( void ) {
 	delete[] clipSectors;
 	clipSectors = NULL;
+	world = NULL;
+	worldBounds.Zero();
 
 	// free the trace model used for the temporaryClipModel
 	if ( temporaryClipModel.traceModelIndex != -1 ) {
@@ -1509,13 +1511,20 @@ bool idClip::Translation( trace_t &results, const idVec3 &start, const idVec3 &e
 	trm = TraceModelForClipModel( mdl );
 
 	if ( !passEntity || passEntity->entityNumber != ENTITYNUM_WORLD ) {
-		// test world
-		idClip::numTranslations++;
-		collisionModelManager->Translation( &results, start, end, trm, trmAxis, contentMask, world, vec3_origin, mat3_default );
-		results.c.entityNum = results.fraction != 1.0f ? ENTITYNUM_WORLD : ENTITYNUM_NONE;
-		if ( results.fraction == 0.0f ) {
-			EndClipProfile( CPT_TRANSLATION );
-			return true;		// blocked immediately by the world
+		if ( world ) {
+			// test world
+			idClip::numTranslations++;
+			collisionModelManager->Translation( &results, start, end, trm, trmAxis, contentMask, world, vec3_origin, mat3_default );
+			results.c.entityNum = results.fraction != 1.0f ? ENTITYNUM_WORLD : ENTITYNUM_NONE;
+			if ( results.fraction == 0.0f ) {
+				EndClipProfile( CPT_TRANSLATION );
+				return true;		// blocked immediately by the world
+			}
+		} else {
+			memset( &results, 0, sizeof( results ) );
+			results.fraction = 1.0f;
+			results.endpos = end;
+			results.endAxis = trmAxis;
 		}
 	} else {
 		memset( &results, 0, sizeof( results ) );
@@ -1548,13 +1557,20 @@ bool idClip::Translation( trace_t &results, const idVec3 &start, const idVec3 &e
 			idClip::numRenderModelTraces++;
 			TraceRenderModel( trace, start, end, radius, trmAxis, touch );
 		} else {
+			idCollisionModel *touchModel = touch->GetCollisionModel();
+			if ( touchModel == NULL ) {
+				continue;
+			}
 			idClip::numTranslations++;
 			collisionModelManager->Translation( &trace, start, end, trm, trmAxis, contentMask,
-									touch->GetCollisionModel(), touch->origin, touch->axis );
+									touchModel, touch->origin, touch->axis );
 		}
 
 		if ( trace.fraction < results.fraction ) {
 			results = trace;
+			if ( touch->entity == NULL ) {
+				continue;
+			}
 			results.c.entityNum = touch->entity->entityNumber;
 			results.c.id = touch->id;
 

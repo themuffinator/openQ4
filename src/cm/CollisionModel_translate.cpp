@@ -784,7 +784,19 @@ void idCollisionModelManagerLocal::Translation( trace_t *results, const idVec3 &
 	memset( results, 0, sizeof( *results ) );
 
 	if (model == NULL) {
-		common->FatalError("%s model passed was nullptr", __FUNCTION__);
+		static bool warnedNullModel = false;
+		if ( !warnedNullModel ) {
+			common->Warning( "%s: model passed was nullptr", __FUNCTION__ );
+			warnedNullModel = true;
+		}
+		results->fraction = 1.0f;
+		results->endpos = end;
+		results->endAxis = trmAxis;
+		results->c.type = CONTACT_NONE;
+		results->c.contents = 0;
+		results->c.material = NULL;
+		results->c.materialType = NULL;
+		return;
 	}
 
 	// if case special position test

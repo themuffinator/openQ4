@@ -555,6 +555,7 @@ R_AllocStaticTriSurfVerts
 void R_AllocStaticTriSurfVerts( srfTriangles_t *tri, int numVerts ) {
 	assert( tri->verts == NULL );
 	tri->verts = triVertexAllocator.Alloc( numVerts );
+	tri->numAllocedVerts = numVerts;
 }
 
 /*
@@ -565,6 +566,7 @@ R_AllocStaticTriSurfIndexes
 void R_AllocStaticTriSurfIndexes( srfTriangles_t *tri, int numIndexes ) {
 	assert( tri->indexes == NULL );
 	tri->indexes = triIndexAllocator.Alloc( numIndexes );
+	tri->numAllocedIndices = numIndexes;
 }
 
 /*
@@ -597,6 +599,7 @@ R_ResizeStaticTriSurfVerts
 void R_ResizeStaticTriSurfVerts( srfTriangles_t *tri, int numVerts ) {
 #ifdef USE_TRI_DATA_ALLOCATOR
 	tri->verts = triVertexAllocator.Resize( tri->verts, numVerts );
+	tri->numAllocedVerts = numVerts;
 #else
 	assert( false );
 #endif
@@ -610,6 +613,7 @@ R_ResizeStaticTriSurfIndexes
 void R_ResizeStaticTriSurfIndexes( srfTriangles_t *tri, int numIndexes ) {
 #ifdef USE_TRI_DATA_ALLOCATOR
 	tri->indexes = triIndexAllocator.Resize( tri->indexes, numIndexes );
+	tri->numAllocedIndices = numIndexes;
 #else
 	assert( false );
 #endif
@@ -635,6 +639,7 @@ R_ReferenceStaticTriSurfVerts
 */
 void R_ReferenceStaticTriSurfVerts( srfTriangles_t *tri, const srfTriangles_t *reference ) {
 	tri->verts = reference->verts;
+	tri->numAllocedVerts = reference->numAllocedVerts;
 }
 
 /*
@@ -644,6 +649,7 @@ R_ReferenceStaticTriSurfIndexes
 */
 void R_ReferenceStaticTriSurfIndexes( srfTriangles_t *tri, const srfTriangles_t *reference ) {
 	tri->indexes = reference->indexes;
+	tri->numAllocedIndices = reference->numAllocedIndices;
 }
 
 /*

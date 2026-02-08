@@ -6470,10 +6470,7 @@ void idGameLocal::SetCamera( idCamera *cam ) {
 	if ( camera ) {
 // RAVEN BEGIN
 // bdube: tool support
-		inCinematic = false;
-		//if( !( gameLocal.editors & ( EDITOR_MODVIEW | EDITOR_PLAYBACKS ) ) ) {
-		//	inCinematic = true;
-		//}
+		inCinematic = true;
 // RAVEN END
 
 		if ( skipCinematic && camera->spawnArgs.GetBool( "disconnect" ) ) {

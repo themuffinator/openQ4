@@ -12390,7 +12390,7 @@ windowDef Desktop
 					rect	222,75,390,93
 					visible	1
 					forecolor	1,1,1,0
-					text	"QUAKE 4 is an id Software game and is powered by id Software's DOOM 3® technology. Production, development, and technical assistance have been provided by id Software, with specific contributions by:"
+					text	"QUAKE 4 is an id Software game and is powered by id Software's DOOM 3ï¿½ technology. Production, development, and technical assistance have been provided by id Software, with specific contributions by:"
 					textscale	0.25
 					font	"fonts/lowpixel"
 				}
@@ -12561,7 +12561,7 @@ windowDef Desktop
 					rect	222,78,390,93
 					visible	1
 					forecolor	1,1,1,0
-					text	"QUAKE 4 is an id Software game and is powered by id Software's DOOM 3® technology. Production, development, and technical assistance have been provided by id Software, with specific contributions by:"
+					text	"QUAKE 4 is an id Software game and is powered by id Software's DOOM 3ï¿½ technology. Production, development, and technical assistance have been provided by id Software, with specific contributions by:"
 					textscale	0.28
 					font	"fonts/strogg"
 				}
@@ -14529,7 +14529,7 @@ windowDef Desktop
 					rect	103,355,542,72
 					visible	1
 					forecolor	1,1,1,0
-					text	"Quake 4 uses Miles Sound System.\nCopyright © 1991-2003 by RAD Game Tools, Inc."
+					text	"Quake 4 uses Miles Sound System.\nCopyright ï¿½ 1991-2003 by RAD Game Tools, Inc."
 					textscale	.31
 					font	"fonts/lowpixel"
 				}
@@ -18985,7 +18985,8 @@ windowDef Desktop
 		}
 
 		onNamedEvent showMpCreate {
-			set "mp_b_create_server::visible" "1" ;
+            set "p_btns::rect" "228,0,412,480" ;
+            set "mp_b_create_server::visible" "1" ;
 			set "mp_b_create_back::visible" "1" ;
 			set "mp_b_create_advanced::visible" "1" ;
 			set "mp_b_create_1::visible" "1" ;
@@ -19018,7 +19019,8 @@ windowDef Desktop
 		}
 
 		onNamedEvent hideMpCreate {
-			set "mp_b_create_server::visible" "0" ;
+            set "p_btns::rect" "0,0,640,480" ;
+            set "mp_b_create_server::visible" "0" ;
 			set "mp_b_create_back::visible" "0" ;
 			set "mp_b_create_advanced::visible" "0" ;
 			set "mp_b_create_1::visible" "0" ;

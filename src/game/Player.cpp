@@ -3817,9 +3817,10 @@ void idPlayer::EnterCinematic( void ) {
 	}
 	
    	// Have the cinematic hud start
-   	if ( cinematicHud ) {	
-   		cinematicHud->Activate ( true, gameLocal.time );
-   		cinematicHud->HandleNamedEvent ( "cinematicStart" );
+	if ( cinematicHud ) {	
+		cinematicHud->Activate ( true, gameLocal.time );
+		cinematicHud->HandleNamedEvent ( "cinematicStart" );
+		cinematicHud->HandleNamedEvent ( "showLetterbox" );
 // RAVEN BEGIN
 // jnewquist: Option to adjust vertical fov instead of horizontal for non 4:3 modes
 		bool hideLetterbox = false;
@@ -9365,6 +9366,15 @@ void idPlayer::Think( void ) {
 	usercmd = gameLocal.usercmds[ entityNumber ];
 	buttonMask &= usercmd.buttons;
 	usercmd.buttons &= ~buttonMask;
+
+#ifndef _XENON
+	if ( gameLocal.inCinematic && !gameLocal.skipCinematic ) {
+		const int cinematicSkipButtons = BUTTON_ATTACK | BUTTON_RUN | BUTTON_ZOOM | BUTTON_SCORES | BUTTON_MLOOK | BUTTON_STRAFE;
+		if ( ( usercmd.buttons & cinematicSkipButtons ) && !( oldButtons & cinematicSkipButtons ) ) {
+			SkipCinematic();
+		}
+	}
+#endif
 
 	HandleObjectiveInput();
 	if ( objectiveSystemOpen ) {

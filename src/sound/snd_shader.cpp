@@ -431,7 +431,12 @@ bool idSoundShader::ParseShader( idLexer& src )
 				return false;
 			}
 
-			token.SetFileExtension( ".wav" );
+			idStr sampleExtension;
+			token.ExtractFileExtension( sampleExtension );
+			if( sampleExtension.Length() == 0 )
+			{
+				token.SetFileExtension( ".wav" );
+			}
 
 			if( token.IcmpPrefixPath( "sound/vo/" ) == 0 || token.IcmpPrefixPath( "sound/guis/" ) == 0 )
 			{
@@ -450,7 +455,12 @@ bool idSoundShader::ParseShader( idLexer& src )
 		}
 		else 
 		{
-			token.SetFileExtension( ".wav" );
+			idStr sampleExtension;
+			token.ExtractFileExtension( sampleExtension );
+			if( sampleExtension.Length() == 0 )
+			{
+				token.SetFileExtension( ".wav" );
+			}
 			if( token.IcmpPrefixPath( "sound/vo/" ) == 0 || token.IcmpPrefixPath( "sound/guis/" ) == 0 )
 			{
 				parms.soundShaderFlags |= SSF_VO;

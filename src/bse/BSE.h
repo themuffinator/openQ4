@@ -61,6 +61,7 @@ typedef enum eBSESegment
 	SEG_DELAY,						// A control segment for looping
 	SEG_SHAKE,						// Triggers a screen shake
 	SEG_TUNNEL,						// Triggers the id tunnel vision effect
+	SEG_DOUBLEVISION,				// Triggers the id double-vision effect
 	SEG_COUNT
 };
 
@@ -467,6 +468,7 @@ public:
 
 	float					GetBrightness(void) const { return(mBrightness); }
 	void					SetBrightness(float bright) { mBrightness = bright; }
+	const idVec2& GetSpriteSize(void) const { return mSpriteSize; }
 
 	bool					CanInterpolate(void) { return(mCurrentTime - mLastTime > BSE_TIME_EPSILON); }
 	void					UpdateFromOwner(renderEffect_t* parms, float time, bool init = false);
@@ -535,6 +537,7 @@ private:
 	float					mShortestDistanceToCamera;	// Closest point on effects bounds to view origin
 	idVec4					mTint;						// Overridable tint
 	float					mBrightness;				// Overall brightness of effect
+	idVec2					mSpriteSize;				// Optional sprite size override from shader parms
 	float					mCost;						// Best guess at how expensive the effect is
 
 	idVec3					mViewOrg;

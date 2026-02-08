@@ -905,7 +905,6 @@ const char *idWindow::HandleEvent(const sysEvent_t *event, bool *updateVisuals) 
 							if ( childIsModal ) {
 								return "";
 							}
-							return "";
 						} else {
 							if (event->evValue2) {
 								SetFocus(child);
@@ -957,7 +956,6 @@ const char *idWindow::HandleEvent(const sysEvent_t *event, bool *updateVisuals) 
 							if ( childIsModal ) {
 								return "";
 							}
-							return "";
 						}
 					}
 				}
@@ -1420,7 +1418,21 @@ void idWindow::Redraw(float x, float y) {
 	DrawBorderAndCaption(drawRect);
 
 	if ( !( flags & WIN_NOCLIP) ) {
-		dc->PushClipRect(clientRect);
+		idRectangle clipRect = clientRect;
+		if ( flags & WIN_DESKTOP ) {
+			float xExpand = 0.0f;
+			float yExpand = 0.0f;
+			dc->GetVirtualScreenExpansion( forceAspectWidth, forceAspectHeight, xExpand, yExpand );
+			if ( xExpand > 0.0f ) {
+				clipRect.x -= xExpand;
+				clipRect.w += xExpand * 2.0f;
+			}
+			if ( yExpand > 0.0f ) {
+				clipRect.y -= yExpand;
+				clipRect.h += yExpand * 2.0f;
+			}
+		}
+		dc->PushClipRect( clipRect );
 	} 
 
 	if ( r_skipGuiShaders.GetInteger() < 5 ) {

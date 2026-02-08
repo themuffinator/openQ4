@@ -40,6 +40,9 @@ int BSE_ParseSegmentType(const idToken& token) {
 	if (token == "tunnel") {
 		return SEG_TUNNEL;
 	}
+	if (token == "doubleVision" || token == "doublevision") {
+		return SEG_DOUBLEVISION;
+	}
 	return SEG_NONE;
 }
 }

@@ -124,24 +124,20 @@ void rvEnvParms::Evaluate3(const float time, const float* start, const float* ra
 
 void rvEnvParms::Evaluate(class rvEnvParms1Particle& env, float time, float oneOverDuration, float* dest)
 {
-
-	const idDeclTable* v6; // ecx
-	float v7; // [esp+4h] [ebp-4h]
-	int result; // [esp+14h] [ebp+Ch]
-	float resulta; // [esp+14h] [ebp+Ch]
-
-	v6 = this->mTable;
-	if (v6)
-	{
-		v7 = this->mRate.x;
-		if (this->mIsCount)
-			v7 = v7 * oneOverDuration;
-		result = v7 * time + this->mEnvOffset.x;
-		resulta = v6->TableLookup(result);
-		*dest = (env.mEnd - env.mStart) * resulta + env.mStart;
+	if (!dest) {
+		return;
 	}
-	else
-	{
+
+	if (mTable) {
+		float rate = mRate.x;
+		if (mIsCount) {
+			rate *= oneOverDuration;
+		}
+		const float lookup = rate * time + mEnvOffset.x;
+		const float value = mTable->TableLookup(lookup);
+		*dest = (env.mEnd - env.mStart) * value + env.mStart;
+	}
+	else {
 		*dest = env.mStart;
 	}
 }

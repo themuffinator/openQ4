@@ -279,8 +279,81 @@ void idNetworkSystem::SetLoadingText( const char *loadingText ) {
 	sessLocal.guiLoading->SetStateString( "loading_message", text );
 	sessLocal.guiLoading->SetStateString( "server_loadinfo", text );
 
-	// New map load starts with a path (mp/... or game/...), so reset icon state once here.
-	if ( text[ 0 ] != '\0' && ( strchr( text, '/' ) || strchr( text, '\\' ) ) ) {
+	// Make sure MP loading metadata is eventually populated even if it wasn't available
+	// at initial loading GUI setup time.
+	const char *gameType = sessLocal.mapSpawnData.serverInfo.GetString( "si_gameType", cvarSystem->GetCVarString( "si_gameType" ) );
+	const char *spawnMapPath = sessLocal.mapSpawnData.serverInfo.GetString( "si_map", text );
+	const bool mapLooksMultiplayer = !idStr::Icmpn( spawnMapPath, "mp/", 3 ) || !idStr::Icmpn( text, "mp/", 3 );
+	const bool isMultiplayerLoad = mapLooksMultiplayer || ( gameType && gameType[ 0 ] && idStr::Icmp( gameType, "singleplayer" ) != 0 );
+	if ( isMultiplayerLoad ) {
+		const char *resolvedGameType = gameType;
+		if ( resolvedGameType == NULL || resolvedGameType[ 0 ] == '\0' ) {
+			resolvedGameType = cvarSystem->GetCVarString( "si_gameType" );
+		}
+		if ( resolvedGameType == NULL || resolvedGameType[ 0 ] == '\0' ) {
+			resolvedGameType = "DM";
+		}
+
+		const char *serverName = sessLocal.mapSpawnData.serverInfo.GetString( "si_name", cvarSystem->GetCVarString( "si_name" ) );
+		if ( serverName && serverName[ 0 ] && !sessLocal.guiLoading->State().GetString( "server_name", "" )[ 0 ] ) {
+			sessLocal.guiLoading->SetStateString( "server_name", serverName );
+		}
+
+		idStr serverAddress = GetServerAddress();
+		if ( !serverAddress.Length() ) {
+			const char *netIP = cvarSystem->GetCVarString( "net_ip" );
+			const int netPort = cvarSystem->GetCVarInteger( "net_port" );
+			if ( netIP && netIP[ 0 ] ) {
+				serverAddress = va( "%s:%d", idStr::Icmp( netIP, "0.0.0.0" ) ? netIP : "127.0.0.1", netPort );
+			} else if ( netPort > 0 ) {
+				serverAddress = va( "127.0.0.1:%d", netPort );
+			}
+		}
+		if ( serverAddress.Length() && !sessLocal.guiLoading->State().GetString( "server_ip", "" )[ 0 ] ) {
+			sessLocal.guiLoading->SetStateString( "server_ip", serverAddress.c_str() );
+		}
+
+		if ( !sessLocal.guiLoading->State().GetString( "server_gametype", "" )[ 0 ] ) {
+			const char *localizedGameType = resolvedGameType;
+			if ( !idStr::Icmp( resolvedGameType, "DM" ) ) {
+				localizedGameType = common->GetLocalizedString( "#str_110011" );
+			} else if ( !idStr::Icmp( resolvedGameType, "Tourney" ) ) {
+				localizedGameType = common->GetLocalizedString( "#str_110012" );
+			} else if ( !idStr::Icmp( resolvedGameType, "Team DM" ) ) {
+				localizedGameType = common->GetLocalizedString( "#str_110013" );
+			} else if ( !idStr::Icmp( resolvedGameType, "CTF" ) ) {
+				localizedGameType = common->GetLocalizedString( "#str_110014" );
+			} else if ( !idStr::Icmp( resolvedGameType, "Arena CTF" ) ) {
+				localizedGameType = common->GetLocalizedString( "#str_110015" );
+			} else if ( !idStr::Icmp( resolvedGameType, "DeadZone" ) ) {
+				localizedGameType = common->GetLocalizedString( "#str_122001" );
+			}
+			sessLocal.guiLoading->SetStateString( "server_gametype", localizedGameType );
+		}
+
+		if ( !sessLocal.guiLoading->State().GetString( "server_limit", "" )[ 0 ] ) {
+			const bool useCaptureLimit = !idStr::Icmp( resolvedGameType, "CTF" ) || !idStr::Icmp( resolvedGameType, "Arena CTF" );
+			const char *limitKey = useCaptureLimit ? "si_captureLimit" : "si_fragLimit";
+			int limit = sessLocal.mapSpawnData.serverInfo.GetInt( limitKey );
+			if ( limit <= 0 ) {
+				limit = cvarSystem->GetCVarInteger( limitKey );
+			}
+			if ( limit > 0 ) {
+				const char *limitLabel = useCaptureLimit ? common->GetLocalizedString( "#str_107661" ) : common->GetLocalizedString( "#str_107660" );
+				sessLocal.guiLoading->SetStateString( "server_limit", va( "%s %d", limitLabel, limit ) );
+			}
+		}
+	}
+
+	// New map load starts with map path text, so clear icon state once at map start.
+	const bool isMapPathText =
+		!idStr::Icmpn( text, "mp/", 3 ) ||
+		!idStr::Icmpn( text, "game/", 5 ) ||
+		!idStr::Icmpn( text, "maps/", 5 ) ||
+		!idStr::Icmpn( text, "mp\\", 3 ) ||
+		!idStr::Icmpn( text, "game\\", 5 ) ||
+		!idStr::Icmpn( text, "maps\\", 5 );
+	if ( isMapPathText ) {
 		sessLocal.guiLoading->SetStateInt( "load_icons", 0 );
 		for ( int i = 1; i <= 20; i++ ) {
 			sessLocal.guiLoading->SetStateInt( va( "load_icon_%d", i ), 0 );

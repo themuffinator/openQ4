@@ -200,7 +200,12 @@ qhandle_t idRenderWorldLocal::AddEffectDef(const renderEffect_t* reffect, int ti
 	def->dynamicModelFrameCount = 0;
 	def->referenceBounds.Clear();
 
-	if (!bse->PlayEffect(def, tr.frameShaderTime)) {
+	// Use game-time seconds for effect simulation start to keep segment timing
+	// consistent across level transitions and loading screens.
+	const float startTimeSeconds = (reffect && reffect->startTime > 0.0f)
+		? reffect->startTime
+		: (static_cast<float>(time) * 0.001f);
+	if (!bse->PlayEffect(def, startTimeSeconds)) {
 		def->expired = true;
 	}
 

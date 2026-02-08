@@ -435,69 +435,58 @@ bool rvSegment::Check(rvBSE* effect, float time, float offset) {
 	if (st->DetailCull()) {
 		return false;
 	}
+	if (GetExpired() || effect->GetStopped()) {
+		return true;
+	}
 	if (time < mSegStartTime) {
 		return false;
 	}
 
 	const bool infinite = st->GetInfiniteDuration() || st->GetSoundLooping();
-	const bool oneShotSegment =
-		(st->mSegType == SEG_SPAWNER) ||
-		(st->mSegType == SEG_EFFECT) ||
-		(st->mSegType == SEG_DECAL);
-
-	// Spawner/effect/decal segments are one-shot triggers and can legitimately
-	// execute after their nominal end-time if first serviced late.
-	if (!oneShotSegment && !infinite && time > (mSegEndTime + BSE_TIME_EPSILON)) {
-		if (GetSoundPlaying() && effect->GetReferenceSound()) {
-			effect->GetReferenceSound()->StopSound(static_cast<s_channelType>(mSegmentTemplateHandle + SCHANNEL_ONE));
-			SetSoundPlaying(false);
-		}
-		SetExpired(true);
-		return false;
-	}
 
 	switch (st->mSegType) {
-	case SEG_EMITTER:
-	case SEG_TRAIL: {
+	case SEG_EMITTER: {
 		if (!st->GetHasParticles()) {
 			return true;
 		}
-
-		const float spawnEnd = infinite ? (time + BSE_FUTURE) : Min(time + BSE_FUTURE, mSegEndTime);
-		if (spawnEnd <= mSegStartTime + BSE_TIME_EPSILON) {
+		if (!effect->CanInterpolate()) {
 			return true;
 		}
 
-		float interval = AttenuateInterval(effect, st);
-		interval = Max(BSE_TIME_EPSILON, interval);
+		float spawnTime = mLastTime;
+		mLastTime = time;
 
-		float spawnTime = Max(mLastTime, mSegStartTime);
-		if (spawnTime > mSegStartTime) {
-			const float relative = spawnTime - mSegStartTime;
-			const int steps = Max(0, static_cast<int>(idMath::Floor(relative / interval)));
-			spawnTime = mSegStartTime + steps * interval;
-			while (spawnTime + BSE_TIME_EPSILON < Max(mLastTime, mSegStartTime)) {
-				spawnTime += interval;
-			}
+		float spawnEnd = time + BSE_FUTURE;
+		if (!infinite && mSegEndTime - BSE_TIME_EPSILON <= spawnEnd) {
+			spawnEnd = mSegEndTime;
 		}
 
-		const int maxSpawn = Max(1, effect->GetLooping() ? mLoopParticleCount : mParticleCount);
 		int spawned = 0;
-		while (spawnTime <= spawnEnd + BSE_TIME_EPSILON && spawned < maxSpawn) {
-			if (st->mSegType == SEG_TRAIL) {
-				const idVec3 localOffset = effect->GetCurrentAxisTransposed() * effect->GetInterpolatedOffset(spawnTime);
-				SpawnParticle(effect, st, spawnTime, localOffset, mat3_identity);
+		const int maxSpawnPerService = GetSegmentParticleCap();
+		if (spawnTime < spawnEnd) {
+			while (spawnTime < spawnEnd && spawned < maxSpawnPerService) {
+				if (spawnTime >= mSegStartTime) {
+					SpawnParticle(effect, st, spawnTime, vec3_origin, mat3_identity);
+				}
+
+				const float interval = Max(BSE_TIME_EPSILON, AttenuateInterval(effect, st));
+				spawnTime += interval;
+				++spawned;
 			}
-			else {
-				SpawnParticle(effect, st, spawnTime, vec3_origin, mat3_identity);
-			}
-			spawnTime += interval;
-			++spawned;
 		}
 
-		mLastTime = Max(mLastTime, time);
+		if (!infinite && mSegEndTime - BSE_TIME_EPSILON <= spawnEnd) {
+			SetExpired(true);
+		}
+		mLastTime = spawnTime;
+		if (spawned >= maxSpawnPerService && spawnTime < spawnEnd && bse_debug.GetInteger() > 0) {
+			common->Warning("^4BSE:^1 spawn service cap hit for '%s' segment %d", effect->GetDeclName(), mSegmentTemplateHandle);
+		}
 		return true;
 	}
+	case SEG_TRAIL:
+		SetExpired(true);
+		return true;
 	case SEG_SPAWNER:
 		if (!GetExpired() && st->GetHasParticles()) {
 			const int particleCap = GetSegmentParticleCap();
@@ -506,7 +495,7 @@ bool rvSegment::Check(rvBSE* effect, float time, float offset) {
 				particleCap,
 				static_cast<int>(idMath::Ceil(AttenuateCount(effect, st, mCount.x, mCount.y))));
 			if (count > 0) {
-				SpawnParticles(effect, st, time, count);
+				SpawnParticles(effect, st, mSegStartTime, count);
 			}
 			SetExpired(true);
 		}
@@ -545,27 +534,40 @@ bool rvSegment::Check(rvBSE* effect, float time, float offset) {
 			mFreqShift = st->GetFreqShift();
 			effect->UpdateSoundEmitter(st, this);
 		}
+		SetExpired(true);
 		return true;
 	case SEG_DECAL:
 		if (!GetExpired()) {
-			CreateDecal(effect, time);
+			CreateDecal(effect, mSegStartTime);
 			SetExpired(true);
 		}
 		return true;
 	case SEG_DELAY:
-		// Delay segments are timing controls only; no direct runtime output.
+		SetExpired(true);
 		return true;
 	case SEG_SHAKE:
 	case SEG_TUNNEL:
+	case SEG_DOUBLEVISION:
 		if (!GetExpired() && game) {
-			const int viewEffect = (st->mSegType == SEG_SHAKE) ? VIEWEFFECT_SHAKE : VIEWEFFECT_TUNNEL;
-			const float duration = Max(0.0f, mSegEndTime - mSegStartTime);
-			game->StartViewEffect(viewEffect, duration, Max(0.0f, st->mScale));
+			int viewEffect = VIEWEFFECT_SHAKE;
+			if (st->mSegType == SEG_TUNNEL) {
+				viewEffect = VIEWEFFECT_TUNNEL;
+			}
+			else if (st->mSegType == SEG_DOUBLEVISION) {
+				viewEffect = VIEWEFFECT_DOUBLEVISION;
+			}
+			const float finishTime = mSegStartTime + AttenuateDuration(effect, st);
+			const float scale = Max(0.0f, effect->GetOriginAttenuation(st));
+			game->StartViewEffect(viewEffect, finishTime, scale);
 			SetExpired(true);
 		}
 		return true;
 	case SEG_LIGHT:
-		return HandleLight(effect, st, time);
+		if (!GetExpired() && st->GetEnabled()) {
+			InitLight(effect, st, mSegStartTime);
+			SetExpired(true);
+		}
+		return true;
 	default:
 		return true;
 	}
@@ -601,35 +603,59 @@ void rvSegment::CalcCounts(rvBSE* effect, float time) {
 		return;
 	}
 
-	const float segmentDuration = Max(0.0f, mSegEndTime - mSegStartTime);
-	const float particleDuration = st->mParticleTemplate.GetMaxDuration() + 0.016f;
-	const float effectiveDuration = Max(segmentDuration, particleDuration);
+	const int particleType = st->mParticleTemplate.GetType();
+	const float particleMaxDuration = st->mParticleTemplate.GetMaxDuration() + 0.016f;
+	const float effectMinDuration = mEffectDecl ? mEffectDecl->GetMinDuration() : 0.0f;
 	const int particleCap = GetSegmentParticleCap();
+	float trailDuration = 0.0f;
 
 	int count = 0;
+	int loopCount = 0;
 	switch (st->mSegType) {
-	case SEG_SPAWNER:
-		count = idMath::ClampInt(0, particleCap, static_cast<int>(idMath::Ceil(mCount.y)));
-		break;
 	case SEG_EMITTER:
-	case SEG_TRAIL:
-		if (mSecondsPerParticle.y > BSE_TIME_EPSILON) {
-			count = idMath::ClampInt(
-				0,
-				particleCap,
-				static_cast<int>(idMath::Ceil(effectiveDuration / mSecondsPerParticle.y)) + 1);
+		if (particleType == PTYPE_DEBRIS) {
+			count = 1;
+			loopCount = 1;
+		}
+		else if (mSecondsPerParticle.y > BSE_TIME_EPSILON) {
+			const float baseDuration = Min(particleMaxDuration, st->mLocalDuration.y) + 0.016f;
+			trailDuration = baseDuration;
+			count = static_cast<int>(idMath::Ceil(baseDuration / mSecondsPerParticle.y)) + 1;
+			loopCount = count;
+			if (effectMinDuration > BSE_TIME_EPSILON && effectMinDuration < particleMaxDuration) {
+				loopCount = static_cast<int>(idMath::Ceil((static_cast<float>(count) / effectMinDuration) * particleMaxDuration)) + 1;
+			}
+		}
+		break;
+	case SEG_SPAWNER:
+		if (particleType == PTYPE_DEBRIS) {
+			count = 1;
+			loopCount = 1;
+		}
+		else {
+			count = static_cast<int>(idMath::Ceil(mCount.y));
+			loopCount = count;
+			if (!st->GetInfiniteDuration() && effectMinDuration > BSE_TIME_EPSILON && effectMinDuration < particleMaxDuration) {
+				const int extraLoops = static_cast<int>(idMath::Ceil(particleMaxDuration / effectMinDuration)) + 1;
+				loopCount = count * extraLoops + 1;
+			}
 		}
 		break;
 	case SEG_DECAL:
 	case SEG_LIGHT:
 		count = 1;
+		loopCount = 1;
 		break;
 	default:
 		break;
 	}
 
-	mParticleCount = count;
-	mLoopParticleCount = count;
+	mParticleCount = idMath::ClampInt(0, particleCap, count);
+	mLoopParticleCount = idMath::ClampInt(0, particleCap, loopCount);
+
+	if (st->mSegType == SEG_EMITTER || st->mSegType == SEG_SPAWNER) {
+		CalcTrailCounts(effect, st, &st->mParticleTemplate, trailDuration);
+	}
 
 	if (!effect->GetLooping()) {
 		effect->SetDuration((mSegEndTime - time) + st->mParticleTemplate.GetMaxDuration());

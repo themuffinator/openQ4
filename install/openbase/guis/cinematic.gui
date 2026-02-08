@@ -24,6 +24,14 @@ windowDef Desktop
 		set "anim_bars::visible" "0";
 	}
 
+	onNamedEvent showLetterbox {
+		set "blackbar_top::visible" "1";
+		set "blackbar_bottom::visible" "1";
+		set "anim_bars::visible" "1";
+		set "blackbar_top::rect" "0,0,640,60";
+		set "blackbar_bottom::rect" "0,420,640,60";
+	}
+
 	onNamedEvent corporateLogoStart {
 		set "p_intrologos::visible" "1" ;
 		resetTime "anim_textintro" "0";
@@ -36,12 +44,14 @@ windowDef Desktop
 	windowDef blackbar_top
 	{
 		rect	0,0,640,60
+		screenAlignY	top
 		visible	1
 		backcolor	0,0,0,1
 	}
 	windowDef blackbar_bottom
 	{
 		rect	0,420,640,60
+		screenAlignY	bottom
 		visible	1
 		backcolor	0,0,0,1
 	}

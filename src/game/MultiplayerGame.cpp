@@ -185,6 +185,31 @@ static int PopulateMapListForGameType( idUserInterface *gui, const char *listNam
 
 /*
 ================
+ResolveListSelectionFromUI
+================
+*/
+static int ResolveListSelectionFromUI( idUserInterface *gui, const char *listName, bool preferHover ) {
+	if ( !gui || !listName || !listName[ 0 ] ) {
+		return -1;
+	}
+
+	int selection = gui->State().GetInt( va( "%s_sel_0", listName ) );
+	if ( preferHover ) {
+		const int hover = gui->State().GetInt( va( "%s_hover", listName ), "-1" );
+		if ( hover >= 0 ) {
+			const char *hoverMapId = gui->State().GetString( va( "%s_item_%d_id", listName, hover ), "" );
+			if ( hoverMapId[ 0 ] ) {
+				selection = hover;
+				gui->SetStateInt( va( "%s_sel_0", listName ), selection );
+			}
+		}
+	}
+
+	return selection;
+}
+
+/*
+================
 GetSelectedMapDeclFromList
 ================
 */
@@ -195,7 +220,7 @@ static bool GetSelectedMapDeclFromList( idUserInterface *gui, const char *listNa
 		return false;
 	}
 
-	const int selection = gui->State().GetInt( va( "%s_sel_0", listName ) );
+	const int selection = ResolveListSelectionFromUI( gui, listName, false );
 	if ( selection < 0 ) {
 		return false;
 	}
@@ -4302,7 +4327,7 @@ const char* idMultiplayerGame::HandleGuiCommands( const char *_menuCommand ) {
 			}
 			continue;
 		} else if ( !idStr::Icmp( cmd, "click_voteMapList" ) ) {
-			int sel = mainGui->GetStateInt( "mapList_sel_0" );
+			int sel = ResolveListSelectionFromUI( mainGui, "mapList", true );
 			if ( -1 == sel ) {
 				mainGui->SetStateString( "mapName", "" );
 			} else {
@@ -4692,7 +4717,7 @@ const char* idMultiplayerGame::HandleGuiCommands( const char *_menuCommand ) {
 #endif
 			return "continue";
 		} else if (	!idStr::Icmp( cmd, "click_maplist" ) ) {
-			int mapSelection = mainGui->GetStateInt( "mapList_sel_0" );
+			int mapSelection = ResolveListSelectionFromUI( mainGui, "mapList", true );
 			if ( mapSelection < 0 ) {
 				mainGui->SetStateString( "mapName", "" );
 			} else {

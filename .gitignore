@@ -42,3 +42,5 @@
 /subprojects/.wraplock
 /subprojects/packagecache/
 /subprojects/SDL3-*/
+/install/crashes/
+_tmp_*

@@ -745,7 +745,8 @@ void idSessionLocal::HandleMainMenuCommands( const char *menuCommand ) {
 					mapName = dict->GetString( "path" );
 				}
 				mapName = common->GetLanguageDict()->GetString( mapName );
-				guiMainMenu->SetStateString( va( "mapList_item_%d", numMapsAdded ), mapName );
+				const idStr displayName = va( "\t%s", mapName );
+				guiMainMenu->SetStateString( va( "mapList_item_%d", numMapsAdded ), displayName );
 				guiMainMenu->SetStateInt( va( "mapList_item_%d_id", numMapsAdded ), i );
 				if ( !si_map.Icmp( dict->GetString( "path" ) ) ) {
 					selectedIndex = numMapsAdded;
@@ -766,7 +767,8 @@ void idSessionLocal::HandleMainMenuCommands( const char *menuCommand ) {
 						mapName = dict->GetString( "path" );
 					}
 					mapName = common->GetLanguageDict()->GetString( mapName );
-					guiMainMenu->SetStateString( va( "mapList_item_%d", numMapsAdded ), mapName );
+					const idStr displayName = va( "\t%s", mapName );
+					guiMainMenu->SetStateString( va( "mapList_item_%d", numMapsAdded ), displayName );
 					guiMainMenu->SetStateInt( va( "mapList_item_%d_id", numMapsAdded ), i );
 					if ( !si_map.Icmp( dict->GetString( "path" ) ) ) {
 						selectedIndex = numMapsAdded;
@@ -790,6 +792,7 @@ void idSessionLocal::HandleMainMenuCommands( const char *menuCommand ) {
 				dict = NULL;
 			}
 			cvarSystem->SetCVarString( "si_map", ( dict ? dict->GetString( "path" ) : "" ) );
+			guiMainMenu->SetStateInt( "mapList_num", numMapsAdded );
 
 			// set the current level shot
 			UpdateMPLevelShot();
@@ -799,6 +802,14 @@ void idSessionLocal::HandleMainMenuCommands( const char *menuCommand ) {
 
 		if ( !idStr::Icmp( cmd, "click_mapList" ) ) {
 			int uiMapSelection = guiMainMenu->State().GetInt( "mapList_sel_0" );
+			const int uiMapHover = guiMainMenu->State().GetInt( "mapList_hover", "-1" );
+			if ( uiMapHover >= 0 ) {
+				const char *hoverMapId = guiMainMenu->State().GetString( va( "mapList_item_%d_id", uiMapHover ), "" );
+				if ( hoverMapId[ 0 ] ) {
+					uiMapSelection = uiMapHover;
+					guiMainMenu->SetStateInt( "mapList_sel_0", uiMapSelection );
+				}
+			}
 			if ( uiMapSelection >= 0 ) {
 				int mapNum = guiMainMenu->State().GetInt( va( "mapList_item_%d_id", uiMapSelection ) );
 				const idDict *dict = fileSystem->GetMapDecl( mapNum );

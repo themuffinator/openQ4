@@ -48,6 +48,7 @@ idCVar	idSessionLocal::com_aviDemoHeight( "com_aviDemoHeight", "256", CVAR_SYSTE
 idCVar	idSessionLocal::com_aviDemoTics( "com_aviDemoTics", "2", CVAR_SYSTEM | CVAR_INTEGER, "", 1, 60 );
 idCVar	idSessionLocal::com_wipeSeconds( "com_wipeSeconds", "1", CVAR_SYSTEM, "" );
 idCVar	idSessionLocal::com_guid( "com_guid", "", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_ROM, "" );
+idCVar	com_skipLoadingContinue( "com_skipLoadingContinue", "0", CVAR_SYSTEM | CVAR_BOOL, "skip the single-player loading-screen continue gate (testing)" );
 
 idSessionLocal		sessLocal;
 idSession			*session = &sessLocal;
@@ -243,6 +244,19 @@ static idStr Session_GetMPLoadLimitString( const idDict &serverInfo ) {
 
 	const char *label = common->GetLocalizedString( useCaptureLimit ? "#str_107661" : "#str_107660" );
 	return va( "%s %d", label, limit );
+}
+
+static bool Session_IsLoadingContinueKey( int key ) {
+	if ( key == K_MOUSE1 || key == K_MOUSE2 || key == K_ESCAPE || key == K_ENTER || key == K_KP_ENTER || key == K_SPACE ) {
+		return true;
+	}
+	if ( key >= K_JOY1 && key <= K_JOY32 ) {
+		return true;
+	}
+	if ( key >= K_AUX1 && key <= K_AUX16 ) {
+		return true;
+	}
+	return false;
 }
 
 void RandomizeStack( void ) {
@@ -1679,6 +1693,10 @@ void idSessionLocal::LoadLoadingGui( const char *mapName ) {
 	const char *loadingObjectives = "";
 	const char *loadingBackground = "gfx/guis/loadscreens/generic";
 	const char *loadGuiOverride = "";
+	const char *spawnGameType = mapSpawnData.serverInfo.GetString( "si_gameType", cvarSystem->GetCVarString( "si_gameType" ) );
+	const char *spawnMapPath = mapSpawnData.serverInfo.GetString( "si_map", mapName );
+	const bool mapLooksMultiplayer = !idStr::Icmpn( spawnMapPath, "mp/", 3 );
+	const bool isMultiplayerLoad = mapLooksMultiplayer || ( spawnGameType[ 0 ] != '\0' && idStr::Icmp( spawnGameType, "singleplayer" ) != 0 );
 
 	const idDecl *mapDecl = declManager->FindType( DECL_MAPDEF, mapName, false );
 	const idDeclEntityDef *mapDef = static_cast<const idDeclEntityDef *>( mapDecl );
@@ -1703,7 +1721,7 @@ void idSessionLocal::LoadLoadingGui( const char *mapName ) {
 		guiLoading = uiManager->FindGui( loadGuiOverride, true, false, true );
 	} else if ( uiManager->CheckGui( guiMap ) ) {
 		guiLoading = uiManager->FindGui( guiMap, true, false, true );
-	} else if ( idAsyncNetwork::IsActive() && uiManager->CheckGui( "guis/loading/mplevel.gui" ) ) {
+	} else if ( isMultiplayerLoad && uiManager->CheckGui( "guis/loading/mplevel.gui" ) ) {
 		guiLoading = uiManager->FindGui( "guis/loading/mplevel.gui", true, false, true );
 	} else if ( loadingObjectives[0] && uiManager->CheckGui( "guis/loading/splevel.gui" ) ) {
 		guiLoading = uiManager->FindGui( "guis/loading/splevel.gui", true, false, true );
@@ -1723,18 +1741,27 @@ void idSessionLocal::LoadLoadingGui( const char *mapName ) {
 		guiLoading->SetStateString( "server_gametype", "" );
 		guiLoading->SetStateString( "server_limit", "" );
 
-		if ( idAsyncNetwork::IsActive() ) {
-			const char *serverName = mapSpawnData.serverInfo.GetString( "si_name", "" );
-			const char *serverAddress = networkSystem->GetServerAddress();
-			const char *gameType = mapSpawnData.serverInfo.GetString( "si_gameType", "" );
+		if ( isMultiplayerLoad ) {
+			const char *serverName = mapSpawnData.serverInfo.GetString( "si_name", cvarSystem->GetCVarString( "si_name" ) );
+			idStr serverAddress = networkSystem->GetServerAddress();
+			if ( !serverAddress.Length() ) {
+				const char *netIP = cvarSystem->GetCVarString( "net_ip" );
+				const int netPort = cvarSystem->GetCVarInteger( "net_port" );
+				if ( netIP && netIP[ 0 ] ) {
+					serverAddress = va( "%s:%d", idStr::Icmp( netIP, "0.0.0.0" ) ? netIP : "127.0.0.1", netPort );
+				} else if ( netPort > 0 ) {
+					serverAddress = va( "127.0.0.1:%d", netPort );
+				}
+			}
+			const char *gameType = mapSpawnData.serverInfo.GetString( "si_gameType", cvarSystem->GetCVarString( "si_gameType" ) );
 			const char *localizedGameType = Session_GetLongMPGameTypeName( gameType );
 			const idStr limitText = Session_GetMPLoadLimitString( mapSpawnData.serverInfo );
 
 			if ( serverName && serverName[ 0 ] ) {
 				guiLoading->SetStateString( "server_name", serverName );
 			}
-			if ( serverAddress && serverAddress[ 0 ] ) {
-				guiLoading->SetStateString( "server_ip", serverAddress );
+			if ( serverAddress.Length() ) {
+				guiLoading->SetStateString( "server_ip", serverAddress.c_str() );
 			}
 			if ( localizedGameType && localizedGameType[ 0 ] ) {
 				guiLoading->SetStateString( "server_gametype", localizedGameType );
@@ -1997,6 +2024,56 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 			UpdateScreen();
 			pct += 0.05f;
 		}
+	}
+
+	const bool waitForSPContinue =
+		guiLoading &&
+		!IsMultiplayer() &&
+		!idAsyncNetwork::IsActive() &&
+		!loadingSaveGame &&
+		!com_skipLoadingContinue.GetBool();
+	if ( waitForSPContinue ) {
+		guiLoading->HandleNamedEvent( "FinishedLoading" );
+		guiLoading->StateChanged( com_frameTime );
+		UpdateScreen();
+
+		bool waitingForContinue = true;
+		bool acceptContinueInput = false;
+		while ( waitingForContinue ) {
+			Sys_GenerateEvents();
+
+			while ( waitingForContinue ) {
+				sysEvent_t ev = eventLoop->GetEvent();
+				if ( ev.evType == SE_NONE ) {
+					break;
+				}
+
+				if ( ev.evType == SE_KEY ) {
+					idKeyInput::PreliminaryKeyEvent( ev.evValue, ( ev.evValue2 != 0 ) );
+				}
+
+				if ( ev.evType == SE_CONSOLE ) {
+					cmdSystem->BufferCommandText( CMD_EXEC_APPEND, (char *)ev.evPtr );
+					cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "\n" );
+				} else if ( waitingForContinue && acceptContinueInput && ev.evType == SE_KEY && ev.evValue2 && Session_IsLoadingContinueKey( ev.evValue ) ) {
+					waitingForContinue = false;
+				}
+
+				if ( ev.evPtr ) {
+					Mem_Free( ev.evPtr );
+				}
+			}
+
+			if ( waitingForContinue ) {
+				UpdateScreen();
+				Sys_Sleep( 16 );
+				acceptContinueInput = true;
+			}
+		}
+
+		// The same key/button used to continue would otherwise remain latched into
+		// the first gameplay frame and can immediately trigger cinematic skip.
+		idKeyInput::ClearStates();
 	}
 
 	// capture the current screen and start a wipe

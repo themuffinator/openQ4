@@ -468,7 +468,13 @@ idSoundSample* idSoundSystemLocal::LoadSample( const char* name )
 	idStr canonical = name;
 	canonical.ToLower();
 	canonical.BackSlashesToSlashes();
-	canonical.StripFileExtension();
+	idStr extension;
+	canonical.ExtractFileExtension( extension );
+	extension.ToLower();
+	if( extension.Icmp( "roq" ) != 0 )
+	{
+		canonical.StripFileExtension();
+	}
 	int hashKey = idStr::Hash( canonical );
 	for( int i = sampleHash.First( hashKey ); i != -1; i = sampleHash.Next( i ) )
 	{

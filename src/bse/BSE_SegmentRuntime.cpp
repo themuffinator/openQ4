@@ -141,7 +141,9 @@ rvParticle* rvSegment::InitParticleArray(rvBSE* effect) {
 	mFreeHead = NULL;
 	mUsedHead = NULL;
 
-	int particleCount = effect->GetLooping() ? mLoopParticleCount : mParticleCount;
+	const rvSegmentTemplate* st = GetSegmentTemplate();
+	const int requestedCount = effect->GetLooping() ? mLoopParticleCount : mParticleCount;
+	int particleCount = requestedCount;
 	const int particleCap = GetSegmentParticleCap();
 	if (particleCount > particleCap) {
 		common->Warning("^4BSE:^1 '%s' exceeded particle cap (%d > %d), clamping", effect->GetDeclName(), particleCount, particleCap);
@@ -149,7 +151,6 @@ rvParticle* rvSegment::InitParticleArray(rvBSE* effect) {
 	particleCount = idMath::ClampInt(0, particleCap, particleCount);
 	if (particleCount <= 0) {
 		if (BSESpawnTraceEnabled()) {
-			const rvSegmentTemplate* st = GetSegmentTemplate();
 			BSESpawnTrace(
 				"BSE spawn init: decl=%s segType=%d handle=%d particleCount=%d loopCount=%d (clamped<=0)\n",
 				effect ? effect->GetDeclName() : "<null>",
@@ -279,8 +280,8 @@ void rvSegment::SpawnParticles(rvBSE* effect, rvSegmentTemplate* st, float birth
 		}
 
 		float fraction = 0.0f;
-		if (count > 1) {
-			fraction = static_cast<float>(i) / static_cast<float>(count - 1);
+		if (count > 0) {
+			fraction = static_cast<float>(i) / static_cast<float>(count);
 		}
 		particle->FinishSpawn(effect, this, birthTime, fraction, vec3_origin, mat3_identity);
 		BSE_AddSpawned(1);

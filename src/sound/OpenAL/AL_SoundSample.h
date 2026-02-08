@@ -158,6 +158,7 @@ protected:
 
 	bool			LoadWav( const idStr& name );
 	bool			LoadOgg( const idStr& name );
+	bool			LoadRoQ( const idStr& name );
 	bool			LoadAmplitude( const idStr& name );
 	void			WriteAllSamples( const idStr& sampleName );
 	bool			LoadGeneratedSample( const idStr& name );

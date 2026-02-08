@@ -126,6 +126,10 @@ void rvBSE::Init(const rvDeclEffect* declEffect, renderEffect_s* parms, float ti
 	this->mCurrentVelocity.z = 0.0;
 	this->mCurrentVelocity.y = 0.0;
 	this->mCurrentVelocity.x = 0.0;
+	this->mCurrentWorldBounds.Clear();
+	this->mCurrentWorldBounds.AddPoint(this->mCurrentOrigin + this->mCurrentLocalBounds[0]);
+	this->mCurrentWorldBounds.AddPoint(this->mCurrentOrigin + this->mCurrentLocalBounds[1]);
+	this->mSpriteSize.Zero();
 	UpdateFromOwner(parms, time, 1);
 	this->mReferenceSound = 0;
 	if (parms->referenceSoundHandle > 0) {
@@ -698,7 +702,6 @@ void __thiscall rvBSE::UpdateFromOwner(renderEffect_s* parms, float time, bool i
 
 	const idVec3 halfSize(mDeclEffect->mSize, mDeclEffect->mSize, mDeclEffect->mSize);
 
-	mCurrentWorldBounds.Clear();
 	mCurrentWorldBounds.AddPoint(mCurrentOrigin + halfSize);
 	mCurrentWorldBounds.AddPoint(mCurrentOrigin - halfSize);
 
@@ -751,6 +754,8 @@ void __thiscall rvBSE::UpdateFromOwner(renderEffect_s* parms, float time, bool i
 	mCurrentWindVector.Zero();
 	mTint.Set(parms->shaderParms[0], parms->shaderParms[1], parms->shaderParms[2], parms->shaderParms[3]);
 	mBrightness = parms->shaderParms[6];
+	mSpriteSize.x = parms->shaderParms[8];
+	mSpriteSize.y = parms->shaderParms[9];
 	if (mTint == vec4_zero && mBrightness == 0.0f) {
 		// Some legacy/game-network paths can feed zero-initialized shader parms.
 		// Match vanilla-visible defaults instead of rendering fully black.

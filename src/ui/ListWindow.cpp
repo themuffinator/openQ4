@@ -51,7 +51,7 @@ static const idMaterial *OpenQ4_ListMaterial( const char *name ) {
 		return NULL;
 	}
 	const idMaterial *mat = declManager->FindMaterial( name );
-	if ( mat && !mat->TestMaterialFlag( MF_DEFAULTED ) ) {
+	if ( mat ) {
 		mat->SetSort( SS_GUI );
 	}
 	return mat;
@@ -105,9 +105,6 @@ bool idListWindow::IsSelected( int index ) {
 }
 
 const char *idListWindow::HandleEvent(const sysEvent_t *event, bool *updateVisuals) {
-	// need to call this to allow proper focus and capturing on embedded children
-	const char *ret = idWindow::HandleEvent(event, updateVisuals);
-
 	float lineHeight = Max( GetMaxCharHeight(), static_cast<float>( itemheight ) );
 	if ( lineHeight <= 0.0f ) {
 		lineHeight = 1.0f;
@@ -118,6 +115,38 @@ const char *idListWindow::HandleEvent(const sysEvent_t *event, bool *updateVisua
 	}
 
 	int key = event->evValue;
+
+	// Update selection before ON_ACTION runs so scripts receive the clicked row immediately.
+	if ( event->evType == SE_KEY && event->evValue2 && key == K_MOUSE1 && Contains( gui->CursorX(), gui->CursorY() ) ) {
+		if ( !scroller->Contains( gui->CursorX(), gui->CursorY() ) ) {
+			const int cur = static_cast<int>( ( gui->CursorY() - actualY - pixelOffset ) / lineHeight ) + top;
+			if ( cur >= 0 && cur < listItems.Num() ) {
+				if ( multipleSel && idKeyInput::IsDown( K_CTRL ) ) {
+					if ( IsSelected( cur ) ) {
+						ClearSelection( cur );
+					} else {
+						AddCurrentSel( cur );
+					}
+				} else {
+					SetCurrentSel( cur );
+				}
+			} else {
+				SetCurrentSel( listItems.Num() - 1 );
+			}
+
+			if ( currentSel.Num() > 0 ) {
+				for ( int i = 0; i < currentSel.Num(); i++ ) {
+					gui->SetStateInt( va( "%s_sel_%i", listName.c_str(), i ), currentSel[ i ] );
+				}
+			} else {
+				gui->SetStateInt( va( "%s_sel_0", listName.c_str() ), 0 );
+			}
+			gui->SetStateInt( va( "%s_numsel", listName.c_str() ), currentSel.Num() );
+		}
+	}
+
+	// need to call this to allow proper focus and capturing on embedded children
+	const char *ret = idWindow::HandleEvent(event, updateVisuals);
 
 	if ( event->evType == SE_KEY ) {
 		if ( !event->evValue2 ) {
@@ -218,21 +247,26 @@ const char *idListWindow::HandleEvent(const sysEvent_t *event, bool *updateVisua
 
 	if ( scroller->GetHigh() > 0.0f ) {
 		if ( !idKeyInput::IsDown( K_CTRL ) ) {
-			if ( top > GetCurrentSel() - 1 ) {
-				top = GetCurrentSel() - 1;
+			if ( GetCurrentSel() < top ) {
+				top = GetCurrentSel();
 			}
-			if ( top < GetCurrentSel() - numVisibleLines + 2 ) {
-				top = GetCurrentSel() - numVisibleLines + 2;
+			if ( GetCurrentSel() >= top + numVisibleLines ) {
+				top = GetCurrentSel() - numVisibleLines + 1;
 			}
 		}
 
-		if ( top > listItems.Num() - 2 ) {
-			top = listItems.Num() - 2;
+		int maxTop = listItems.Num() - numVisibleLines;
+		if ( maxTop < 0 ) {
+			maxTop = 0;
+		}
+		if ( top > maxTop ) {
+			top = maxTop;
 		}
 		if ( top < 0 ) {
 			top = 0;
 		}
-		scroller->SetValue(top);
+		scroller->SetValue( static_cast<float>( top ) );
+		top = idMath::Ftoi( scroller->GetValue() );
 	} else {
 		top = 0;
 		scroller->SetValue(0.0f);
@@ -521,16 +555,14 @@ void idListWindow::Draw(int time, float x, float y) {
 	const idMaterial *matHover = OpenQ4_ListMaterial( backgroundHover.c_str() );
 	const idMaterial *matGreyed = OpenQ4_ListMaterial( backgroundGreyed.c_str() );
 	gui->SetStateInt( va( "%s_hover", listName.c_str() ), -1 );
-
-	if ( noEvents || !Contains(gui->CursorX(), gui->CursorY()) ) {
-		hover = false;
-	}
+	const bool listContainsCursor = !noEvents && Contains( gui->CursorX(), gui->CursorY() );
+	hover = listContainsCursor;
 
 	for (int i = top; i < count; i++) {
 		idRectangle rowRect = rect;
 		rowRect.h = lineHeight;
 		const bool selected = IsSelected( i );
-		const bool rowHovered = hover && !noEvents && Contains( rowRect, gui->CursorX(), gui->CursorY() );
+		const bool rowHovered = listContainsCursor && Contains( rowRect, gui->CursorX(), gui->CursorY() );
 		if ( rowHovered ) {
 			gui->SetStateInt( va( "%s_hover", listName.c_str() ), i );
 		}
@@ -570,6 +602,14 @@ void idListWindow::Draw(int time, float x, float y) {
 			int start = 0;
 			int tab = 0;
 			int stop = listItems[i].Find('\t', 0);
+			if ( stop < 0 ) {
+				stop = listItems[i].Length();
+				// Some legacy listDefs reserve the first tab as a narrow spacer column.
+				// If there are no tabs in the source text, render into the first usable column.
+				if ( tabInfo.Num() > 1 && tabInfo[0].w <= tabBorder ) {
+					tab = 1;
+				}
+			}
 			while ( start < listItems[i].Length() ) {
 				if ( tab >= tabInfo.Num() ) {
 					common->Warning( "idListWindow::Draw: gui '%s' window '%s' tabInfo.Num() exceeded", gui->GetSourceFile(), name.c_str() );
@@ -685,14 +725,18 @@ void idListWindow::UpdateList() {
 	SetCurrentSel( gui->State().GetInt( va( "%s_sel_0", listName.c_str() ) ) );
 
 	float value = scroller->GetValue();
-	if ( value > listItems.Num() - 1 ) {
-		value = listItems.Num() - 1;
+	int maxTop = listItems.Num() - fit;
+	if ( maxTop < 0 ) {
+		maxTop = 0;
+	}
+	if ( value > maxTop ) {
+		value = static_cast<float>( maxTop );
 	}
 	if ( value < 0.0f ) {
 		value = 0.0f;
 	}
 	scroller->SetValue(value);
-	top = value;
+	top = idMath::Ftoi( value );
 
 	typedTime = 0;
 	clickTime = 0;

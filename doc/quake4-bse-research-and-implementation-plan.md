@@ -497,6 +497,10 @@ This order minimizes hidden coupling: parse/template correctness first, then run
 - Phase 4 debris parity: `rvDebrisParticle::FinishSpawn` now follows the client-moveable path (`game->SpawnClientMoveable`) when `entityDef` is provided, and immediately retires CPU-side particle rendering for those debris particles.
 - Phase 5 robustness: client-effect shader parm defaults (RGBA/brightness/time offset) are now initialized in `rvClientEffect::Init`, and `rvBSE::UpdateFromOwner` now applies a safe fallback to unit tint/brightness when render effects arrive with fully zeroed shader parms.
 - Phase 7 hardening: implemented missing `rvParticleTemplate` utility methods declared in headers (`Compare`, `GetTraceModel`, `GetTrailCount`, `ShutdownStatic`) to remove remaining declaration/implementation gaps in the template runtime contract.
+- Phase 4 timing/lifecycle parity follow-up: `rvSegment::Check` now short-circuits on expired/stopped segments (decompiled behavior), removes the global end-time rejection path that could suppress late-serviced short emitters, and marks `SEG_SOUND` as one-shot-expired after initial trigger so sounds are not restarted every service pass.
+- Phase 4/5 spawn/detail parity follow-up: spawner batch fraction was aligned to decompiled semantics (`i / count`), and effect sprite-size shader overrides (`shaderParms[8]`/`[9]`) are now propagated through `rvBSE::UpdateFromOwner` and honored by `rvSpriteParticle::Render`.
+- Phase 3/4 bounds parity follow-up: effect world bounds are now initialized once in `rvBSE::Init` and grown in `UpdateFromOwner` instead of being cleared each frame, matching decompiled accumulation behavior used by attenuation/local-bounds derivation.
+- Validation (2026-02-08): rebuild + staged install succeeded, and long diagnostic pass (`_save/q4base/logs/bse_repro_long_1770579479.log`) shows improved frame metrics versus the prior two runs (`1770578957`, `1770579353`): average rendered effects `60.91` (up from `57.33`/`52.47`), average effect `noIndexed` `6.09` (down from `10.55`/`14.53`), and zero spawn miss/service-cap warnings.
 
 ### Implementation Reference Mapping (OpenQ4 <-> Quake4BSE-master)
 

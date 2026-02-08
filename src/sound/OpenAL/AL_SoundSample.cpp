@@ -42,8 +42,26 @@ extern idCVar s_noSound;
 #define GPU_CONVERT_CPU_TO_CPU_CACHED_READONLY_ADDRESS( x ) x
 
 const uint32 SOUND_MAGIC_IDMSA = 0x6D7A7274;
+static const int ROQ_FILE_MAGIC = 0x1084;
+static const int ROQ_SOUND_MONO = 0x1020;
+static const int ROQ_SOUND_STEREO = 0x1021;
+static const int ROQ_AUDIO_SAMPLE_RATE = 22050;
+static const int ROQ_AUDIO_MIN_SAMPLE = -32768;
+static const int ROQ_AUDIO_MAX_SAMPLE = 32767;
 
 extern idCVar sys_lang;
+
+/*
+========================
+RoQAudioDelta
+========================
+*/
+static ID_INLINE int RoQAudioDelta( byte sampleCode )
+{
+	const int magnitude = sampleCode & 0x7F;
+	const int delta = magnitude * magnitude;
+	return ( sampleCode & 0x80 ) ? -delta : delta;
+}
 
 /*
 ========================
@@ -214,13 +232,37 @@ void idSoundSample_OpenAL::LoadResource()
 
 	loaded = false;
 
-	for( int i = 0; i < 2; i++ )
+	idList< idStr > sampleVariants;
+	idStr baseSampleName = GetName();
+	if( baseSampleName.Find( "/vo/" ) >= 0 )
 	{
-		idStr sampleName = GetName();
-		if( ( i == 0 ) && !sampleName.Replace( "/vo/", va( "/vo/%s/", sys_lang.GetString() ) ) )
-		{
-			i++;
+		const char *language = sys_lang.GetString();
+		if( language && language[ 0 ] ) {
+			idStr localizedSampleName = baseSampleName;
+			if( localizedSampleName.Replace( "/vo/", va( "/vo_%s/", language ) ) ) {
+				sampleVariants.Append( localizedSampleName );
+			}
+
+			localizedSampleName = baseSampleName;
+			if( localizedSampleName.Replace( "/vo/", va( "/vo/%s/", language ) ) ) {
+				bool duplicateVariant = false;
+				for ( int j = 0; j < sampleVariants.Num(); j++ ) {
+					if ( sampleVariants[ j ] == localizedSampleName ) {
+						duplicateVariant = true;
+						break;
+					}
+				}
+				if ( !duplicateVariant ) {
+					sampleVariants.Append( localizedSampleName );
+				}
+			}
 		}
+	}
+	sampleVariants.Append( baseSampleName );
+
+	for( int i = 0; i < sampleVariants.Num(); i++ )
+	{
+		idStr sampleName = sampleVariants[ i ];
 		idStr generatedName = "generated/";
 		generatedName.Append( sampleName );
 
@@ -228,6 +270,7 @@ void idSoundSample_OpenAL::LoadResource()
 			idStr ext;
 			sampleName.ExtractFileExtension( ext );
 			ext.ToLower();
+			const bool preferRoQ = ( ext.Icmp( "roq" ) == 0 );
 
 			idStr wavName = sampleName;
 			wavName.SetFileExtension( ".wav" );
@@ -235,12 +278,33 @@ void idSoundSample_OpenAL::LoadResource()
 			idStr oggName = sampleName;
 			oggName.SetFileExtension( ".ogg" );
 
+			idStr roqName = sampleName;
+			roqName.SetFileExtension( ".roq" );
+
 			generatedName.SetFileExtension( ".idwav" );
 
-			loaded = LoadOgg( oggName );
+			if( preferRoQ )
+			{
+				loaded = LoadRoQ( roqName );
+			}
+			else
+			{
+				loaded = false;
+			}
+
+			if( !loaded )
+			{
+				loaded = LoadOgg( oggName );
+			}
+
 			if( !loaded )
 			{
 				loaded = LoadGeneratedSample( generatedName ) || LoadWav( wavName );
+			}
+
+			if( !loaded && !preferRoQ )
+			{
+				loaded = LoadRoQ( roqName );
 			}
 		}
 
@@ -622,6 +686,161 @@ bool idSoundSample_OpenAL::LoadOgg( const idStr& filename )
 	buffers[0].buffer = GPU_CONVERT_CPU_TO_CPU_CACHED_READONLY_ADDRESS( buffers[0].buffer );
 
 	free( decoded );
+
+	return true;
+}
+
+/*
+========================
+idSoundSample_OpenAL::LoadRoQ
+========================
+*/
+bool idSoundSample_OpenAL::LoadRoQ( const idStr& filename )
+{
+	idFileLocal fileIn( fileSystem->OpenFileRead( filename ) );
+	if( fileIn == NULL )
+	{
+		return false;
+	}
+
+	const int fileLen = fileIn->Length();
+	if( fileLen < 16 )
+	{
+		return false;
+	}
+
+	byte* fileData = ( byte* )Mem_Alloc( fileLen );
+	if( fileData == NULL )
+	{
+		return false;
+	}
+
+	const int bytesRead = fileIn->Read( fileData, fileLen );
+	if( bytesRead != fileLen )
+	{
+		Mem_Free( fileData );
+		return false;
+	}
+
+	const int roqMagic = fileData[0] | ( fileData[1] << 8 );
+	if( roqMagic != ROQ_FILE_MAGIC )
+	{
+		Mem_Free( fileData );
+		return false;
+	}
+
+	timestamp = fileIn->Timestamp();
+
+	idStr ampName = filename;
+	ampName.SetFileExtension( "amp" );
+	LoadAmplitude( ampName );
+
+	int channels = 0;
+	idList<int16> pcmSamples;
+	pcmSamples.SetGranularity( 4096 );
+
+	int offset = 8;
+	while( offset + 8 <= fileLen )
+	{
+		const int chunkId = fileData[offset + 0] | ( fileData[offset + 1] << 8 );
+		const int chunkSize = fileData[offset + 2] | ( fileData[offset + 3] << 8 ) | ( fileData[offset + 4] << 16 );
+		const int chunkArg = fileData[offset + 6] | ( fileData[offset + 7] << 8 );
+
+		offset += 8;
+
+		if( chunkSize < 0 || offset + chunkSize > fileLen )
+		{
+			break;
+		}
+
+		const byte* chunkData = fileData + offset;
+
+		if( chunkId == ROQ_SOUND_MONO )
+		{
+			if( channels == 0 )
+			{
+				channels = 1;
+			}
+			else if( channels != 1 )
+			{
+				Mem_Free( fileData );
+				idLib::Warning( "LoadRoQ( %s ) : mixed mono/stereo RoQ audio chunks", filename.c_str() );
+				return false;
+			}
+
+			const int oldSamples = pcmSamples.Num();
+			pcmSamples.SetNum( oldSamples + chunkSize );
+
+			int32 predictor = static_cast<int16>( chunkArg );
+			for( int i = 0; i < chunkSize; ++i )
+			{
+				predictor += RoQAudioDelta( chunkData[i] );
+				predictor = idMath::ClampInt( ROQ_AUDIO_MIN_SAMPLE, ROQ_AUDIO_MAX_SAMPLE, predictor );
+				pcmSamples[ oldSamples + i ] = static_cast<int16>( predictor );
+			}
+		}
+		else if( chunkId == ROQ_SOUND_STEREO )
+		{
+			if( channels == 0 )
+			{
+				channels = 2;
+			}
+			else if( channels != 2 )
+			{
+				Mem_Free( fileData );
+				idLib::Warning( "LoadRoQ( %s ) : mixed mono/stereo RoQ audio chunks", filename.c_str() );
+				return false;
+			}
+
+			const int stereoBytes = chunkSize & ~1;
+			const int samplePairs = stereoBytes >> 1;
+			const int oldSamples = pcmSamples.Num();
+			pcmSamples.SetNum( oldSamples + samplePairs * 2 );
+
+			int32 leftPredictor = static_cast<int16>( chunkArg & 0xFF00 );
+			int32 rightPredictor = static_cast<int16>( ( chunkArg & 0x00FF ) << 8 );
+			int outIndex = oldSamples;
+
+			for( int i = 0; i < stereoBytes; i += 2 )
+			{
+				leftPredictor += RoQAudioDelta( chunkData[i + 0] );
+				rightPredictor += RoQAudioDelta( chunkData[i + 1] );
+				leftPredictor = idMath::ClampInt( ROQ_AUDIO_MIN_SAMPLE, ROQ_AUDIO_MAX_SAMPLE, leftPredictor );
+				rightPredictor = idMath::ClampInt( ROQ_AUDIO_MIN_SAMPLE, ROQ_AUDIO_MAX_SAMPLE, rightPredictor );
+
+				pcmSamples[ outIndex++ ] = static_cast<int16>( leftPredictor );
+				pcmSamples[ outIndex++ ] = static_cast<int16>( rightPredictor );
+			}
+		}
+
+		offset += chunkSize;
+	}
+
+	Mem_Free( fileData );
+
+	if( channels == 0 || pcmSamples.Num() == 0 )
+	{
+		return false;
+	}
+
+	memset( &format, 0, sizeof( format ) );
+	format.basic.formatTag = idWaveFile::FORMAT_PCM;
+	format.basic.numChannels = static_cast<uint16>( channels );
+	format.basic.samplesPerSec = ROQ_AUDIO_SAMPLE_RATE;
+	format.basic.bitsPerSample = 16;
+	format.basic.blockSize = static_cast<uint16>( format.basic.numChannels * format.basic.bitsPerSample / 8 );
+	format.basic.avgBytesPerSec = format.basic.samplesPerSec * format.basic.blockSize;
+
+	playBegin = 0;
+	playLength = pcmSamples.Num() / channels;
+	totalBufferSize = pcmSamples.Num() * sizeof( int16 );
+
+	buffers.SetNum( 1 );
+	buffers[0].bufferSize = totalBufferSize;
+	buffers[0].numSamples = playLength;
+	buffers[0].buffer = AllocBuffer( totalBufferSize, GetName() );
+	memcpy( buffers[0].buffer, pcmSamples.Ptr(), totalBufferSize );
+	buffers[0].buffer = GPU_CONVERT_CPU_TO_CPU_CACHED_READONLY_ADDRESS( buffers[0].buffer );
 
 	return true;
 }

@@ -147,6 +147,7 @@ ID_INLINE void BSETraceRenderDrop(const char* typeName, const rvParticle* partic
 		value1);
 	++bseRenderDropTraceCount;
 }
+
 }
 
 // ---------------------------------------------------------------------------
@@ -327,9 +328,6 @@ void rvParticle::SetLengthUsingEndOrigin(rvBSE* effect, rvParticleParms& parms, 
 	const idVec3 endLocal = effect->GetCurrentAxisTransposed() * (effect->GetCurrentEndOrigin() - effect->GetCurrentOrigin());
 	idVec3 forward = endLocal;
 	if (forward.LengthSqr() <= 1e-8f) {
-		length[0] = 0.0f;
-		length[1] = 0.0f;
-		length[2] = 0.0f;
 		return;
 	}
 	forward.NormalizeFast();
@@ -338,7 +336,9 @@ void rvParticle::SetLengthUsingEndOrigin(rvBSE* effect, rvParticleParms& parms, 
 	idVec3 up;
 	BuildPerpBasis(forward, right, up);
 
-	const idVec3 out = endLocal * length[0] + right * length[1] + up * length[2];
+	// `useEndOrigin` lengths are authored as offsets around the baseline
+	// vector from origin to end-origin.
+	const idVec3 out = endLocal + forward * length[0] + right * length[1] + up * length[2];
 	length[0] = out.x;
 	length[1] = out.y;
 	length[2] = out.z;
@@ -630,13 +630,13 @@ void rvLineParticle::Refresh(rvBSE* effect, rvSegmentTemplate* st, rvParticleTem
 // ---------------------------------------------------------------------------
 bool rvParticle::GetEvaluationTime(float time, float& evalTime, bool infinite) {
 	evalTime = time - mStartTime;
-	if (evalTime < 0.0f) {
-		return false;
+	if (time >= mEndTime - BSE_TIME_EPSILON) {
+		evalTime = (mEndTime - mStartTime) - BSE_TIME_EPSILON;
 	}
-	if (!infinite && time > mEndTime - BSE_TIME_EPSILON) {
-		return false;
+	if (infinite) {
+		return true;
 	}
-	return true;
+	return (time > mStartTime - BSE_TIME_EPSILON) && (time < mEndTime);
 }
 
 void rvParticle::EvaluateVelocity(const rvBSE* effect, idVec3& velocity, float time) {
@@ -1075,6 +1075,11 @@ bool rvSpriteParticle::Render(const rvBSE* effect, rvParticleTemplate* pt, const
 
 	float size[2] = { 1.0f, 1.0f };
 	EvaluateSize(pt->mpSizeEnvelope, evalTime, oneOverDuration, size);
+	const idVec2& spriteSize = effect->GetSpriteSize();
+	if (idMath::Fabs(spriteSize.x) > BSE_TIME_EPSILON || idMath::Fabs(spriteSize.y) > BSE_TIME_EPSILON) {
+		size[0] = spriteSize.x;
+		size[1] = spriteSize.y;
+	}
 	float rotation = 0.0f;
 	EvaluateRotation(pt->mpRotateEnvelope, evalTime, oneOverDuration, &rotation);
 

@@ -361,8 +361,9 @@ bool rvSegmentTemplate::Finish(rvDeclEffect* effect)
 	case 6:
 		mFlags = mFlags & 0xFFFFFFFB | 0x100;
 		goto LABEL_25;
-	case 9:
-	case 0xA:
+	case SEG_SHAKE:
+	case SEG_TUNNEL:
+	case SEG_DOUBLEVISION:
 		if (mAttenuation.y > 0.0)
 			mFlags |= 0x40u;
 		goto LABEL_24;
