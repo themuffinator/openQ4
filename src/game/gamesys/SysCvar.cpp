@@ -162,6 +162,11 @@ idCVar g_gravity(					"g_gravity",		DEFAULT_GRAVITY_STRING, CVAR_GAME | CVAR_FLO
 idCVar g_mp_gravity(				"g_mp_gravity",		DEFAULT_MP_GRAVITY_STRING, CVAR_GAME | CVAR_FLOAT, "multiplayer gravity" );
 idCVar g_skipFX(					"g_skipFX",					"0",			CVAR_GAME | CVAR_BOOL, "" );
 idCVar g_skipParticles(				"g_skipParticles",			"0",			CVAR_GAME | CVAR_BOOL, "" );
+idCVar g_nailTrail(					"g_nailTrail",				"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "show smoke trails on nail projectiles" );
+idCVar g_grenadeTrail(				"g_grenadeTrail",			"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "show smoke trails on grenade projectiles" );
+idCVar g_rocketTrail(				"g_rocketTrail",			"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "show smoke trails on rocket projectiles" );
+idCVar g_railTrail(					"g_railTrail",				"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "show spiral fx on rail trail" );
+idCVar g_napalmTrail(				"g_napalmTrail",			"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "show fiery trails on napalm projectiles" );
 
 idCVar g_disasm(					"g_disasm",					"0",			CVAR_GAME | CVAR_BOOL, "disassemble script into base/script/disasm.txt on the local drive when script is compiled" );
 idCVar g_debugBounds(				"g_debugBounds",			"0",			CVAR_GAME | CVAR_BOOL, "checks for models with bounds > 2048" );

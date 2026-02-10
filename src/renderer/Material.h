@@ -186,6 +186,9 @@ typedef enum {
 
 static const int	MAX_FRAGMENT_IMAGES = 8;
 static const int	MAX_VERTEX_PARMS = 4;
+static const int	MAX_GLSL_SHADER_PARMS = 32;
+static const int	MAX_GLSL_SHADER_NAME = 256;
+static const int	MAX_GLSL_SHADER_PARM_NAME = 32;
 
 typedef struct {
 	int					vertexProgram;
@@ -195,6 +198,26 @@ typedef struct {
 	int					fragmentProgram;
 	int					numFragmentProgramImages;
 	idImage* fragmentProgramImages[MAX_FRAGMENT_IMAGES];
+
+	bool				glslProgram;
+	char				glslProgramName[MAX_GLSL_SHADER_NAME];
+	int					glslProgramObject;
+	int					glslVertexShaderObject;
+	int					glslFragmentShaderObject;
+	bool				glslProgramLoaded;
+	bool				glslProgramValid;
+	int					glslProgramGeneration;
+
+	int					numShaderParms;
+	char				shaderParmNames[MAX_GLSL_SHADER_PARMS][MAX_GLSL_SHADER_PARM_NAME];
+	int					shaderParmNumRegisters[MAX_GLSL_SHADER_PARMS];
+	int					shaderParmRegisters[MAX_GLSL_SHADER_PARMS][4];
+	int					shaderParmLocations[MAX_GLSL_SHADER_PARMS];
+
+	int					numShaderTextures;
+	char				shaderTextureNames[MAX_FRAGMENT_IMAGES][MAX_GLSL_SHADER_PARM_NAME];
+	int					shaderTextureLocations[MAX_FRAGMENT_IMAGES];
+	idImage* shaderTextureImages[MAX_FRAGMENT_IMAGES];
 } newShaderStage_t;
 
 typedef struct {
@@ -635,6 +658,8 @@ private:
 	void				ParseBlend(idLexer& src, shaderStage_t* stage);
 	void				ParseVertexParm(idLexer& src, newShaderStage_t* newStage);
 	void				ParseFragmentMap(idLexer& src, newShaderStage_t* newStage);
+	void				ParseShaderParm(idLexer& src, newShaderStage_t* newStage);
+	void				ParseShaderTexture(idLexer& src, newShaderStage_t* newStage);
 	void				ParseStage(idLexer& src, const textureRepeat_t trpDefault = TR_REPEAT);
 	void				ParseDeform(idLexer& src);
 	void				ParseDecalInfo(idLexer& src);

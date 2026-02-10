@@ -152,9 +152,10 @@ rvParticle* rvSegment::InitParticleArray(rvBSE* effect) {
 	if (particleCount <= 0) {
 		if (BSESpawnTraceEnabled()) {
 			BSESpawnTrace(
-				"BSE spawn init: decl=%s segType=%d handle=%d particleCount=%d loopCount=%d (clamped<=0)\n",
+				"BSE spawn init: decl=%s segType=%d pType=%d handle=%d particleCount=%d loopCount=%d (clamped<=0)\n",
 				effect ? effect->GetDeclName() : "<null>",
 				st ? st->GetType() : -1,
+				st ? st->GetParticleTemplate()->GetType() : -1,
 				mSegmentTemplateHandle,
 				mParticleCount,
 				mLoopParticleCount);
@@ -229,9 +230,10 @@ rvParticle* rvSegment::SpawnParticle(rvBSE* effect, rvSegmentTemplate* st, float
 	BSE_AddSpawned(1);
 	if (BSESpawnTraceEnabled()) {
 		BSESpawnTrace(
-			"BSE spawn ok: decl=%s segType=%d handle=%d birth=%.4f end=%.4f dur=%.4f fraction=%.4f\n",
+			"BSE spawn ok: decl=%s segType=%d pType=%d handle=%d birth=%.4f end=%.4f dur=%.4f fraction=%.4f\n",
 			effect ? effect->GetDeclName() : "<null>",
 			st ? st->GetType() : -1,
+			st ? st->GetParticleTemplate()->GetType() : -1,
 			mSegmentTemplateHandle,
 			birthTime,
 			particle->GetEndTime(),
@@ -287,9 +289,10 @@ void rvSegment::SpawnParticles(rvBSE* effect, rvSegmentTemplate* st, float birth
 		BSE_AddSpawned(1);
 		if (BSESpawnTraceEnabled()) {
 			BSESpawnTrace(
-				"BSE spawn batch ok: decl=%s segType=%d handle=%d birth=%.4f idx=%d count=%d end=%.4f dur=%.4f fraction=%.4f\n",
+				"BSE spawn batch ok: decl=%s segType=%d pType=%d handle=%d birth=%.4f idx=%d count=%d end=%.4f dur=%.4f fraction=%.4f\n",
 				effect ? effect->GetDeclName() : "<null>",
 				st ? st->GetType() : -1,
+				st ? st->GetParticleTemplate()->GetType() : -1,
 				mSegmentTemplateHandle,
 				birthTime,
 				i,

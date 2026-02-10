@@ -214,7 +214,10 @@ enum {
 	GAME_RELIABLE_MESSAGE_VOICEDATA_CLIENT,
 	GAME_RELIABLE_MESSAGE_VOICEDATA_CLIENT_ECHO,
 	GAME_RELIABLE_MESSAGE_VOICEDATA_CLIENT_TEST,
-	GAME_RELIABLE_MESSAGE_VOICEDATA_CLIENT_ECHO_TEST
+	GAME_RELIABLE_MESSAGE_VOICEDATA_CLIENT_ECHO_TEST,
+	GAME_RELIABLE_MESSAGE_CHEAT_GIVE,
+	GAME_RELIABLE_MESSAGE_CHEAT_GOD,
+	GAME_RELIABLE_MESSAGE_CHEAT_NOCLIP
 // RAVEN END	
 };
 
@@ -323,6 +326,7 @@ struct rvmGameRender_t {
 	idRenderTexture* forwardRenderPassResolvedRT;
 	const idMaterial* noPostProcessMaterial;
 	const idMaterial* casPostProcessMaterial;
+	const idMaterial* blurPostProcessMaterial;
 	const idMaterial* blackPostProcessMaterial;
 	const idMaterial* resolvePostProcessMaterial;
 	const idMaterial* smaaEdgePostProcessMaterial;
@@ -375,6 +379,8 @@ public:
 
 	// can be used to automatically effect every material in the world that references globalParms
 	float					globalShaderParms[ MAX_GLOBAL_SHADER_PARMS ];	
+	int						specialEffectsEnabled;
+	float					specialEffectParms[ SPECIAL_EFFECT_MAX ][ MAX_ENTITY_SHADER_PARMS ];
 
 	idRandom				random;					// random number generator used throughout the game
 
@@ -843,6 +849,10 @@ public:
 
 	void					SetGlobalMaterial( const idMaterial *mat );
 	const idMaterial *		GetGlobalMaterial();
+	void					SetSpecialEffect( ESpecialEffectType which, bool enabled );
+	void					SetSpecialEffectParm( ESpecialEffectType which, int parm, float value );
+	bool					IsSpecialEffectEnabled( ESpecialEffectType which ) const;
+	void					ApplySpecialEffectsToRenderView( renderView_t *view ) const;
 
 	void					SetGibTime( int _time ) { nextGibTime = _time; }
 	int						GetGibTime() { return nextGibTime; }
@@ -1002,6 +1012,7 @@ private:
 
 	idCamera *				camera;
 	const idMaterial *		globalMaterial;			// for overriding everything
+	void					ResetSpecialEffects();
 
 // RAVEN BEGIN
 // jscott: for portal skies

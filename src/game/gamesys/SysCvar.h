@@ -23,6 +23,11 @@ extern idCVar	g_skipParticles;
 extern idCVar	g_projectileLights;
 extern idCVar	g_doubleVision;
 extern idCVar	g_muzzleFlash;
+extern idCVar	g_nailTrail;
+extern idCVar	g_grenadeTrail;
+extern idCVar	g_rocketTrail;
+extern idCVar	g_railTrail;
+extern idCVar	g_napalmTrail;
 
 extern idCVar	g_disasm;
 extern idCVar	g_debugBounds;

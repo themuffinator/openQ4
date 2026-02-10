@@ -267,6 +267,7 @@ void idGameLocal::Clear( void ) {
 	sortTeamMasters = false;
 	persistentLevelInfo.Clear();
 	memset( globalShaderParms, 0, sizeof( globalShaderParms ) );
+	ResetSpecialEffects();
 	random.SetSeed( 0 );
 	world = NULL;
 	frameCommandThread = NULL;
@@ -278,6 +279,7 @@ void idGameLocal::Clear( void ) {
 	gameRender.forwardRenderPassResolvedRT = NULL;
 	gameRender.noPostProcessMaterial = NULL;
 	gameRender.casPostProcessMaterial = NULL;
+	gameRender.blurPostProcessMaterial = NULL;
 	gameRender.blackPostProcessMaterial = NULL;
 	gameRender.resolvePostProcessMaterial = NULL;
 	gameRender.smaaEdgePostProcessMaterial = NULL;
@@ -923,6 +925,12 @@ void idGameLocal::SaveGame( idFile *f, saveType_t saveType ) {
 	for( i = 0; i < MAX_GLOBAL_SHADER_PARMS; i++ ) {
 		savegame.WriteFloat( globalShaderParms[ i ] );
 	}
+	savegame.WriteInt( specialEffectsEnabled );
+	for ( int effect = 0; effect < SPECIAL_EFFECT_MAX; effect++ ) {
+		for ( int parm = 0; parm < MAX_ENTITY_SHADER_PARMS; parm++ ) {
+			savegame.WriteFloat( specialEffectParms[ effect ][ parm ] );
+		}
+	}
 
 	savegame.WriteInt( random.GetSeed() );
 	savegame.WriteObject( frameCommandThread );
@@ -1439,6 +1447,7 @@ void idGameLocal::LoadMap( const char *mapName, int randseed ) {
 	globalMaterial = NULL;
 
 	memset( globalShaderParms, 0, sizeof( globalShaderParms ) );
+	ResetSpecialEffects();
 
 	// always leave room for the max number of clients,
 	// even if they aren't all used, so numbers inside that
@@ -2231,6 +2240,12 @@ bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWo
 	for( i = 0; i < MAX_GLOBAL_SHADER_PARMS; i++ ) {
 		savegame.ReadFloat( globalShaderParms[ i ] );
 	}
+	savegame.ReadInt( specialEffectsEnabled );
+	for ( int effect = 0; effect < SPECIAL_EFFECT_MAX; effect++ ) {
+		for ( int parm = 0; parm < MAX_ENTITY_SHADER_PARMS; parm++ ) {
+			savegame.ReadFloat( specialEffectParms[ effect ][ parm ] );
+		}
+	}
 
 	savegame.ReadInt( i );
 	random.SetSeed( i );
@@ -2552,7 +2567,7 @@ void idGameLocal::MapShutdown( void ) {
 
 // RAVEN BEGIN
 // rjohnson: new blur special effect
-	//renderSystem->ShutdownSpecialEffects();
+	ResetSpecialEffects();
 // RAVEN END
 
 	// clear out camera if we're in a cinematic
@@ -4077,8 +4092,13 @@ void idGameLocal::CheckAutoMachinegunImpact( void ) {
 	trace_t tr;
 	TracePoint( player, tr, viewOrigin, traceEnd, MASK_SHOT_RENDERMODEL | CONTENTS_WATER | CONTENTS_PROJECTILE, player );
 
-	const idVec3 impactPos = ( tr.fraction < 1.0f ) ? tr.c.point : tr.endpos;
-	const idMat3 impactAxis = ( tr.fraction < 1.0f ) ? tr.c.normal.ToMat3() : viewAxis;
+	idVec3 impactPos = tr.endpos;
+	idMat3 impactAxis = viewAxis;
+	if ( tr.fraction < 1.0f ) {
+		impactPos = tr.c.point - ( tr.c.normal * tr.c.point - tr.c.dist ) * tr.c.normal;
+		impactPos += tr.c.normal * 0.5f;
+		impactAxis = tr.c.normal.ToMat3();
+	}
 
 	if ( effect ) {
 		PlayEffect( effect, impactPos, impactAxis, false, traceEnd, false, false, EC_IMPACT );
@@ -7591,6 +7611,26 @@ void idGameLocal::SetGameType( void ) {
 
 /*
 ================
+idGameLocal::ResetSpecialEffects
+================
+*/
+void idGameLocal::ResetSpecialEffects() {
+	specialEffectsEnabled = 0;
+	memset( specialEffectParms, 0, sizeof( specialEffectParms ) );
+
+	// Stock Quake 4 blur defaults from rvBlurTexture.
+	specialEffectParms[ SPECIAL_EFFECT_BLUR ][0] = 0.694f;
+	specialEffectParms[ SPECIAL_EFFECT_BLUR ][1] = 0.694f;
+	specialEffectParms[ SPECIAL_EFFECT_BLUR ][2] = 0.694f;
+	specialEffectParms[ SPECIAL_EFFECT_BLUR ][3] = 1.0f;
+	specialEffectParms[ SPECIAL_EFFECT_BLUR ][4] = 4.0f;
+	specialEffectParms[ SPECIAL_EFFECT_BLUR ][5] = 0.31f;
+	specialEffectParms[ SPECIAL_EFFECT_BLUR ][6] = 0.5f;
+	specialEffectParms[ SPECIAL_EFFECT_BLUR ][7] = 500.0f;
+}
+
+/*
+================
 idGameLocal::SetGlobalMaterial
 ================
 */
@@ -7605,6 +7645,69 @@ idGameLocal::GetGlobalMaterial
 */
 const idMaterial *idGameLocal::GetGlobalMaterial() {
 	return globalMaterial;
+}
+
+/*
+================
+idGameLocal::SetSpecialEffect
+================
+*/
+void idGameLocal::SetSpecialEffect( ESpecialEffectType which, bool enabled ) {
+	if ( which <= SPECIAL_EFFECT_NONE || which >= SPECIAL_EFFECT_MAX ) {
+		return;
+	}
+
+	if ( enabled ) {
+		specialEffectsEnabled |= which;
+	} else {
+		specialEffectsEnabled &= ~which;
+	}
+}
+
+/*
+================
+idGameLocal::SetSpecialEffectParm
+================
+*/
+void idGameLocal::SetSpecialEffectParm( ESpecialEffectType which, int parm, float value ) {
+	if ( which <= SPECIAL_EFFECT_NONE || which >= SPECIAL_EFFECT_MAX ) {
+		return;
+	}
+	if ( parm < 0 || parm >= MAX_ENTITY_SHADER_PARMS ) {
+		return;
+	}
+
+	specialEffectParms[ which ][ parm ] = value;
+}
+
+/*
+================
+idGameLocal::IsSpecialEffectEnabled
+================
+*/
+bool idGameLocal::IsSpecialEffectEnabled( ESpecialEffectType which ) const {
+	if ( which <= SPECIAL_EFFECT_NONE || which >= SPECIAL_EFFECT_MAX ) {
+		return false;
+	}
+
+	return ( specialEffectsEnabled & which ) != 0;
+}
+
+/*
+================
+idGameLocal::ApplySpecialEffectsToRenderView
+================
+*/
+void idGameLocal::ApplySpecialEffectsToRenderView( renderView_t *view ) const {
+	if ( view == NULL ) {
+		return;
+	}
+
+	if ( IsSpecialEffectEnabled( SPECIAL_EFFECT_BLUR ) ) {
+		for ( int i = 0; i < MAX_ENTITY_SHADER_PARMS; i++ ) {
+			view->shaderParms[ i ] = specialEffectParms[ SPECIAL_EFFECT_BLUR ][ i ];
+		}
+	}
 }
 
 /*
@@ -7693,6 +7796,7 @@ Get the handle of the effect with the given name
 */
 const idDecl *idGameLocal::GetEffect ( const idDict& args, const char* effectName, const rvDeclMatType* materialType ) {
 	const char *effectFile = NULL;
+	const idDecl* effectDecl = NULL;
 
 	float chance = args.GetFloat ( idStr("effectchance ") + effectName, "1" );	
 	if ( random.RandomFloat ( ) > chance ) {
@@ -7722,20 +7826,67 @@ const idDecl *idGameLocal::GetEffect ( const idDict& args, const char* effectNam
 			result = args.GetString( temp );
 		}
 		if ( result && *result) {
-			return( ( const idDecl * )declManager->FindEffect( result ) );
+			effectDecl = ( const idDecl * )declManager->FindEffect( result, false );
+			if ( effectDecl ) {
+				return effectDecl;
+			}
 		}
 	}	
 
 	// grab the non material effect name
 	if ( isMultiplayer ) {
-		idStr	testMP = effectName;
-		testMP += "_mp";
+		idStr alternateEffect = effectName;
+		alternateEffect += "_mp";
+	
+		idStr classname = args.GetString( "classname" );
+		if ( !alternateEffect.Icmp( "fx_fly_mp" ) ) {
+			if ( 
+				( !g_nailTrail.GetBool() && !classname.Icmpn( "projectile_nail", 15   ) ) ||
+				( !g_rocketTrail.GetBool() && !classname.Icmpn( "projectile_rocket", 17 ) ) || 
+				( !g_napalmTrail.GetBool() && !classname.Icmpn( "projectile_napalm", 17 ) ) ) 
+			{
+				alternateEffect += "_low";
+			} else if ( !g_grenadeTrail.GetBool() && !classname.Icmpn( "projectile_grenade", 18 ) ) 
+			{
+				return NULL;
+			}
+		} else if ( !alternateEffect.Icmp( "fx_path_mp" ) ) 
+		{
+			if ( !g_railTrail.GetBool() && !classname.Icmpn( "hitscan_railgun", 15 ) ) 
+			{
+				alternateEffect += "_low";
+			}
+		}
 
-		effectFile = args.GetString( testMP );
+		effectFile = args.GetString( alternateEffect );
+		if ( effectFile && *effectFile ) {
+			effectDecl = ( const idDecl * )declManager->FindEffect( effectFile, false );
+			if ( effectDecl ) {
+				return effectDecl;
+			}
+		}
 	}
 
-	if ( !effectFile || !*effectFile ) {
-		effectFile = args.GetString( effectName );
+	effectFile = args.GetString( effectName );
+	const idStr classname = args.GetString( "classname" );
+	if ( effectFile && *effectFile ) {
+		effectDecl = ( const idDecl * )declManager->FindEffect( effectFile, false );
+		if ( effectDecl ) {
+			return effectDecl;
+		}
+	}
+
+	// Compatibility fallback: keep grenade launcher smoke trails available even
+	// when projectile defs omit fx_fly/fx_fly_mp or point at a missing decl.
+	if ( !classname.Icmpn( "projectile_grenade", 18 ) &&
+		 ( !idStr::Icmp( effectName, "fx_fly" ) || !idStr::Icmp( effectName, "fx_fly_mp" ) ) ) {
+		effectDecl = ( const idDecl * )declManager->FindEffect( "effects/weapons/grenadelauncher/trail_mp", false );
+		if ( !effectDecl ) {
+			effectDecl = ( const idDecl * )declManager->FindEffect( "effects/weapons/grenadelauncher/trail", false );
+		}
+		if ( effectDecl ) {
+			return effectDecl;
+		}
 	}
 
 	if ( !effectFile || !*effectFile ) {
@@ -7938,6 +8089,7 @@ idEntity* idGameLocal::HitScan(
 	fxOrigin	 = origFxOrigin;
 	dir			 = origDir;
 	tracerChance = ((g_perfTest_weaponNoFX.GetBool())?0:hitscanDict.GetFloat( "tracerchance", "0" ));
+	const rvDeclMatType* waterMaterialType = declManager->FindMaterialType( "water", false );
 
 	// Apply player powerups
 	if ( owner && owner->IsType( idPlayer::GetClassType() ) ) {
@@ -8045,10 +8197,12 @@ idEntity* idGameLocal::HitScan(
 
 				if ( !g_perfTest_weaponNoFX.GetBool() ) {
 					if ( ent->CanPlayImpactEffect( owner, ent ) ) {
+						const rvDeclMatType* impactMatType = tr.c.materialType ? tr.c.materialType : waterMaterialType;
+						const idDecl* impactEffect = GetEffect( hitscanDict, "fx_impact", impactMatType );
 						if ( ent->IsType( idMover::GetClassType( ) ) ) {
-							ent->PlayEffect( GetEffect( hitscanDict, "fx_impact", tr.c.materialType ), collisionPoint, tr.c.normal.ToMat3(), false, vec3_origin, false, EC_IMPACT, hitscanTint );
+							ent->PlayEffect( impactEffect, collisionPoint, tr.c.normal.ToMat3(), false, vec3_origin, false, EC_IMPACT, hitscanTint );
 						} else {
-							gameLocal.PlayEffect( GetEffect( hitscanDict, "fx_impact", tr.c.materialType ), collisionPoint, tr.c.normal.ToMat3(), false, vec3_origin, false, false, EC_IMPACT, hitscanTint );
+							gameLocal.PlayEffect( impactEffect, collisionPoint, tr.c.normal.ToMat3(), false, vec3_origin, false, false, EC_IMPACT, hitscanTint );
 						}
 					}
 				}
@@ -8183,10 +8337,11 @@ idEntity* idGameLocal::HitScan(
 			
 			if ( !g_perfTest_weaponNoFX.GetBool() ) {
 				if ( ent->CanPlayImpactEffect( owner, ent ) ) {
+					const idDecl* impactEffect = GetEffect( hitscanDict, "fx_impact", tr.c.materialType );
 					if ( ent->IsType( idMover::GetClassType( ) ) ) {
-						ent->PlayEffect( GetEffect( hitscanDict, "fx_impact", tr.c.materialType ), collisionPoint, axis, false, vec3_origin, false, EC_IMPACT, hitscanTint );					
+						ent->PlayEffect( impactEffect, collisionPoint, axis, false, vec3_origin, false, EC_IMPACT, hitscanTint );					
 					} else {
-						gameLocal.PlayEffect( GetEffect( hitscanDict, "fx_impact", tr.c.materialType ), collisionPoint, axis, false, vec3_origin, false, false, EC_IMPACT, hitscanTint );
+						gameLocal.PlayEffect( impactEffect, collisionPoint, axis, false, vec3_origin, false, false, EC_IMPACT, hitscanTint );
 					}
 				}
 			}

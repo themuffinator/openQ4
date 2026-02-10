@@ -165,6 +165,21 @@ void idMaterial::FreeData() {
 				stages[i].texture.cinematic = NULL;
 			}
 			if ( stages[i].newStage != NULL ) {
+				if ( stages[i].newStage->glslProgramObject != 0 ) {
+					if ( stages[i].newStage->glslVertexShaderObject != 0 ) {
+						glDetachObjectARB(
+							(GLhandleARB)stages[i].newStage->glslProgramObject,
+							(GLhandleARB)stages[i].newStage->glslVertexShaderObject );
+						glDeleteObjectARB( (GLhandleARB)stages[i].newStage->glslVertexShaderObject );
+					}
+					if ( stages[i].newStage->glslFragmentShaderObject != 0 ) {
+						glDetachObjectARB(
+							(GLhandleARB)stages[i].newStage->glslProgramObject,
+							(GLhandleARB)stages[i].newStage->glslFragmentShaderObject );
+						glDeleteObjectARB( (GLhandleARB)stages[i].newStage->glslFragmentShaderObject );
+					}
+					glDeleteObjectARB( (GLhandleARB)stages[i].newStage->glslProgramObject );
+				}
 				Mem_Free( stages[i].newStage );
 				stages[i].newStage = NULL;
 			}
@@ -643,8 +658,26 @@ int idMaterial::ParseTerm( idLexer &src ) {
 		return GetExpressionConstant( (float) glConfig.ARBFragmentProgramAvailable );
 	}
 	if ( !token.Icmp( "glslPrograms" ) ) {
-		// Quake 4 BSE/GLSL materials expect this; treat as disabled by default.
+		// Quake 4 content expects fixed-function/ARB fallback stages by default.
+		// Returning 0 keeps stock material branch selection until GLSL parity is complete.
 		return GetExpressionConstant( 0.0f );
+	}
+	if ( !token.Icmp( "POTCorrectionX" ) ) {
+		const int width = Max( 1, glConfig.vidWidth );
+		return GetExpressionConstant( width / (float)MakePowerOfTwo( width ) );
+	}
+	if ( !token.Icmp( "POTCorrectionY" ) ) {
+		const int height = Max( 1, glConfig.vidHeight );
+		return GetExpressionConstant( height / (float)MakePowerOfTwo( height ) );
+	}
+	if ( !token.Icmp( "VideoWidth" ) ) {
+		return GetExpressionConstant( (float)glConfig.vidWidth );
+	}
+	if ( !token.Icmp( "VideoHeight" ) ) {
+		return GetExpressionConstant( (float)glConfig.vidHeight );
+	}
+	if ( !token.Icmp( "IsMultiplayer" ) ) {
+		return GetExpressionConstant( session->IsMultiplayer() ? 1.0f : 0.0f );
 	}
 
 	if ( !token.Icmp( "sound" ) ) {
@@ -1064,6 +1097,173 @@ void idMaterial::ParseFragmentMap( idLexer &src, newShaderStage_t *newStage ) {
 		globalImages->ImageFromFile( str, tf, trp, td, cubeMap );
 	if ( !newStage->fragmentProgramImages[unit] ) {
 		newStage->fragmentProgramImages[unit] = globalImages->defaultImage;
+	}
+}
+
+/*
+================
+idMaterial::ParseShaderParm
+
+GLSL shader parameter parser used by Quake 4 style "shaderParm" tokens.
+================
+*/
+void idMaterial::ParseShaderParm( idLexer &src, newShaderStage_t *newStage ) {
+	idToken token;
+
+	if ( !newStage->glslProgram ) {
+		common->Warning( "shaderParm specified before glslProgram in material '%s'", GetName() );
+		SetMaterialFlag( MF_DEFAULTED );
+		return;
+	}
+
+	if ( newStage->numShaderParms >= MAX_GLSL_SHADER_PARMS ) {
+		common->Warning( "material '%s' exceeded MAX_GLSL_SHADER_PARMS", GetName() );
+		SetMaterialFlag( MF_DEFAULTED );
+		return;
+	}
+
+	if ( !src.ReadTokenOnLine( &token ) ) {
+		common->Warning( "missing shaderParm name in material '%s'", GetName() );
+		SetMaterialFlag( MF_DEFAULTED );
+		return;
+	}
+
+	const int slot = newStage->numShaderParms++;
+	idStr::Copynz( newStage->shaderParmNames[slot], token.c_str(), MAX_GLSL_SHADER_PARM_NAME );
+
+	int count = 0;
+	while ( count < 4 ) {
+		newStage->shaderParmRegisters[slot][count] = ParseExpression( src );
+		count++;
+
+		if ( count == 4 ) {
+			break;
+		}
+
+		if ( !src.ReadTokenOnLine( &token ) ) {
+			break;
+		}
+
+		if ( token != "," ) {
+			src.UnreadToken( &token );
+			break;
+		}
+	}
+
+	newStage->shaderParmNumRegisters[slot] = count;
+}
+
+/*
+================
+idMaterial::ParseShaderTexture
+
+GLSL shader texture parser used by Quake 4 style "shaderTexture" tokens.
+================
+*/
+void idMaterial::ParseShaderTexture( idLexer &src, newShaderStage_t *newStage ) {
+	const char			*str;
+	textureFilter_t		tf;
+	textureRepeat_t		trp;
+	textureUsage_t		td;
+	cubeFiles_t			cubeMap;
+	bool				allowPicmip;
+	idToken				token;
+
+	if ( !newStage->glslProgram ) {
+		common->Warning( "shaderTexture specified before glslProgram in material '%s'", GetName() );
+		SetMaterialFlag( MF_DEFAULTED );
+		return;
+	}
+
+	if ( newStage->numShaderTextures >= MAX_FRAGMENT_IMAGES ) {
+		common->Warning( "material '%s' exceeded shaderTexture limit (%d)", GetName(), MAX_FRAGMENT_IMAGES );
+		SetMaterialFlag( MF_DEFAULTED );
+		return;
+	}
+
+	if ( !src.ReadTokenOnLine( &token ) ) {
+		common->Warning( "missing shaderTexture name in material '%s'", GetName() );
+		SetMaterialFlag( MF_DEFAULTED );
+		return;
+	}
+
+	const int slot = newStage->numShaderTextures++;
+	idStr::Copynz( newStage->shaderTextureNames[slot], token.c_str(), MAX_GLSL_SHADER_PARM_NAME );
+
+	tf = TF_DEFAULT;
+	trp = TR_REPEAT;
+	td = TD_DEFAULT;
+	allowPicmip = true;
+	cubeMap = CF_2D;
+
+	while( 1 ) {
+		if ( !src.ReadTokenOnLine( &token ) ) {
+			common->Warning( "missing shaderTexture image for '%s' in material '%s'",
+				newStage->shaderTextureNames[slot], GetName() );
+			SetMaterialFlag( MF_DEFAULTED );
+			return;
+		}
+
+		if ( !token.Icmp( "cubeMap" ) ) {
+			cubeMap = CF_NATIVE;
+			continue;
+		}
+		if ( !token.Icmp( "cameraCubeMap" ) ) {
+			cubeMap = CF_CAMERA;
+			continue;
+		}
+		if ( !token.Icmp( "nearest" ) ) {
+			tf = TF_NEAREST;
+			continue;
+		}
+		if ( !token.Icmp( "linear" ) ) {
+			tf = TF_LINEAR;
+			continue;
+		}
+		if ( !token.Icmp( "clamp" ) ) {
+			trp = TR_CLAMP;
+			continue;
+		}
+		if ( !token.Icmp( "noclamp" ) ) {
+			trp = TR_REPEAT;
+			continue;
+		}
+		if ( !token.Icmp( "zeroclamp" ) ) {
+			trp = TR_CLAMP_TO_ZERO;
+			continue;
+		}
+		if ( !token.Icmp( "alphazeroclamp" ) ) {
+			trp = TR_CLAMP_TO_ZERO_ALPHA;
+			continue;
+		}
+		if ( !token.Icmp( "mirroredrepeat" ) ) {
+			trp = TR_MIRRORED_REPEAT;
+			continue;
+		}
+		if ( !token.Icmp( "forceHighQuality" ) ) {
+			continue;
+		}
+		if ( !token.Icmp( "uncompressed" ) || !token.Icmp( "highquality" ) ) {
+			continue;
+		}
+		if ( !token.Icmp( "nopicmip" ) ) {
+			allowPicmip = false;
+			continue;
+		}
+		if ( !token.Icmp( "nomips" ) ) {
+			continue;
+		}
+
+		// assume anything else is the image name
+		src.UnreadToken( &token );
+		break;
+	}
+
+	str = R_ParsePastImageProgram( src );
+	newStage->shaderTextureImages[slot] =
+		globalImages->ImageFromFile( str, tf, trp, td, cubeMap );
+	if ( !newStage->shaderTextureImages[slot] ) {
+		newStage->shaderTextureImages[slot] = globalImages->defaultImage;
 	}
 }
 
@@ -1605,29 +1805,30 @@ void idMaterial::ParseStage( idLexer &src, const textureRepeat_t trpDefault ) {
 		// Quake 4 GLSL material tokens (ignored if GLSL isn't supported)
 		if ( !token.Icmp( "glslProgram" ) ) {
 			stageHasShaderTokens = true;
-			src.SkipRestOfLine();
+			if ( src.ReadTokenOnLine( &token ) ) {
+				if ( !newStage.glslProgram ) {
+					newStage.glslProgram = true;
+					idStr::Copynz( newStage.glslProgramName, token.c_str(), sizeof( newStage.glslProgramName ) );
+				} else {
+					common->Warning( "multiple glslProgram declarations in material '%s'", GetName() );
+					SetMaterialFlag( MF_DEFAULTED );
+					return;
+				}
+			} else {
+				common->Warning( "missing glslProgram name in material '%s'", GetName() );
+				SetMaterialFlag( MF_DEFAULTED );
+				return;
+			}
 			continue;
 		}
 		if ( !token.Icmp( "shaderParm" ) ) {
 			stageHasShaderTokens = true;
-			src.SkipRestOfLine();
+			ParseShaderParm( src, &newStage );
 			continue;
 		}
 		if ( !token.Icmp( "shaderTexture" ) ) {
 			stageHasShaderTokens = true;
-
-			idToken texToken;
-			idStr lastImageToken;
-			while ( src.ReadTokenOnLine( &texToken ) ) {
-				const char *value = texToken.c_str();
-				if ( value[0] == '_' || idStr::FindText( value, "/" ) != -1 || idStr::FindText( value, "." ) != -1 ) {
-					lastImageToken = value;
-				}
-			}
-
-			if ( lastImageToken.Length() > 0 && !imageName[0] ) {
-				idStr::Copynz( imageName, lastImageToken.c_str(), sizeof( imageName ) );
-			}
+			ParseShaderTexture( src, &newStage );
 			continue;
 		}
 
@@ -1640,7 +1841,7 @@ void idMaterial::ParseStage( idLexer &src, const textureRepeat_t trpDefault ) {
 
 
 	// if we are using newStage, allocate a copy of it
-	if ( newStage.fragmentProgram || newStage.vertexProgram ) {
+	if ( newStage.fragmentProgram || newStage.vertexProgram || newStage.glslProgram ) {
 		ss->newStage = (newShaderStage_t *)Mem_Alloc( sizeof( newStage ) );
 		*(ss->newStage) = newStage;
 	}
@@ -2480,6 +2681,16 @@ bool idMaterial::Parse( const char *text, const int textLength ) {
 					break;
 				}
 			}
+			for ( int j = 0 ; j < pStage->newStage->numShaderTextures ; j++ ) {
+				if ( pStage->newStage->shaderTextureImages[j] == globalImages->currentRenderImage ) {
+					if ( sort != SS_PORTAL_SKY ) {
+						sort = SS_POST_PROCESS;
+						coverage = MC_TRANSLUCENT;
+					}
+					i = numStages;
+					break;
+				}
+			}
 		}
 	}
 
@@ -2979,6 +3190,11 @@ void idMaterial::ReloadImages( bool force ) const
 			for ( int j = 0 ; j < stages[i].newStage->numFragmentProgramImages ; j++ ) {
 				if ( stages[i].newStage->fragmentProgramImages[j] ) {
 					stages[i].newStage->fragmentProgramImages[j]->Reload( force );
+				}
+			}
+			for ( int j = 0 ; j < stages[i].newStage->numShaderTextures ; j++ ) {
+				if ( stages[i].newStage->shaderTextureImages[j] ) {
+					stages[i].newStage->shaderTextureImages[j]->Reload( force );
 				}
 			}
 		} else if ( stages[i].texture.image ) {

@@ -1223,11 +1223,11 @@ void idThread::Event_RandomInt( float range ) const {
 
 // rjohnson: new blur special effect
 void idThread::Event_SetSpecialEffect( int Effect, int Enabled ) {
-	//renderSystem->SetSpecialEffect( (ESpecialEffectType)Effect, !!Enabled );
+	gameLocal.SetSpecialEffect( (ESpecialEffectType)Effect, Enabled != 0 );
 }
 
 void idThread::Event_SetSpecialEffectParm( int Effect, int Parm, float Value ) {
-	//renderSystem->SetSpecialEffectParm( (ESpecialEffectType)Effect, Parm, Value );
+	gameLocal.SetSpecialEffectParm( (ESpecialEffectType)Effect, Parm, Value );
 }
 
 // RAVEN END

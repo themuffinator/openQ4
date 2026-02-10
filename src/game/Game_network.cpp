@@ -38,6 +38,41 @@ int net_snapshotSize;
 extern const int ASYNC_PLAYER_FRAG_BITS;
 // RAVEN END
 
+void GiveStuffToPlayer( idPlayer* player, const char* name, const char* value );
+
+static idPlayer* GetPlayerForClientNum( int clientNum ) {
+	if ( clientNum < 0 || clientNum >= gameLocal.numClients ) {
+		return NULL;
+	}
+
+	idEntity* ent = gameLocal.entities[ clientNum ];
+	if ( !ent || !ent->IsType( idPlayer::GetClassType() ) ) {
+		return NULL;
+	}
+
+	return static_cast<idPlayer*>( ent );
+}
+
+static bool CheatsOkForServerClientCommand( int clientNum, bool requirePlayer = true ) {
+	idPlayer* player = GetPlayerForClientNum( clientNum );
+
+	if ( gameLocal.isMultiplayer && !( cvarSystem->GetCVarBool( "sv_cheats" ) || cvarSystem->GetCVarBool( "net_allowCheats" ) ) ) {
+		gameLocal.mpGame.PrintMessage( clientNum, "Not allowed in multiplayer." );
+		return false;
+	}
+
+	if ( developer.GetBool() ) {
+		return true;
+	}
+
+	if ( !requirePlayer || ( player && ( player->health > 0 ) ) ) {
+		return true;
+	}
+
+	gameLocal.mpGame.PrintMessage( clientNum, "You must be alive to use this command." );
+	return false;
+}
+
 /*
 ================
 idGameLocal::InitAsyncNetwork
@@ -808,6 +843,42 @@ void idGameLocal::ServerProcessReliableMessage( int clientNum, const idBitMsg &m
 		}
 		case GAME_RELIABLE_MESSAGE_KILL: {
 			mpGame.WantKilled( clientNum );
+			break;
+		}
+		case GAME_RELIABLE_MESSAGE_CHEAT_GIVE: {
+			char giveName[ MAX_STRING_CHARS ];
+			char giveValue[ MAX_STRING_CHARS ];
+			idPlayer* player;
+
+			msg.ReadString( giveName, sizeof( giveName ) );
+			msg.ReadString( giveValue, sizeof( giveValue ) );
+
+			player = GetPlayerForClientNum( clientNum );
+			if ( !player || !CheatsOkForServerClientCommand( clientNum ) ) {
+				break;
+			}
+
+			GiveStuffToPlayer( player, giveName, giveValue );
+			break;
+		}
+		case GAME_RELIABLE_MESSAGE_CHEAT_GOD: {
+			idPlayer* player = GetPlayerForClientNum( clientNum );
+			if ( !player || !CheatsOkForServerClientCommand( clientNum ) ) {
+				break;
+			}
+
+			player->godmode = !player->godmode;
+			mpGame.PrintMessage( clientNum, player->godmode ? "godmode ON" : "godmode OFF" );
+			break;
+		}
+		case GAME_RELIABLE_MESSAGE_CHEAT_NOCLIP: {
+			idPlayer* player = GetPlayerForClientNum( clientNum );
+			if ( !player || !CheatsOkForServerClientCommand( clientNum ) ) {
+				break;
+			}
+
+			player->noclip = !player->noclip;
+			mpGame.PrintMessage( clientNum, player->noclip ? "noclip ON" : "noclip OFF" );
 			break;
 		}
 		case GAME_RELIABLE_MESSAGE_DROPWEAPON: {

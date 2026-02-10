@@ -384,8 +384,8 @@ public:
 	friend		class			rvParticleTemplate;
 
 				int				GetBoltCount( float length );
-				void			RenderBranch( const rvBSE *effect, struct SElecWork *work, idVec3 start, idVec3 end );
-				void			RenderLineSegment( const rvBSE *effect, struct SElecWork *work, idVec3 start, float startFraction );
+				void			RenderBranch( const rvBSE *effect, struct SElecWork *work, idVec3 start, idVec3 end, const idDeclTable *jitterTable );
+				bool			RenderLineSegment( const rvBSE *effect, struct SElecWork *work, idVec3 start, float startFraction );
 				void			ApplyShape( const rvBSE *effect, struct SElecWork *work, idVec3 start, idVec3 end, int count, float startFraction, float endFraction );
 
 	virtual		rvParticle		*GetArrayEntry( int i ) const;
@@ -425,7 +425,7 @@ public:
 	}
 	virtual		void			EvaluateLength( rvEnvParms *length, const float time, float oneOverDuration, idVec3 &dest ) {}
 
-	virtual		void			InitSizeEnv( rvEnvParms &env, float duration ) {}
+	virtual		void			InitSizeEnv( rvEnvParms &env, float duration ) { mSizeEnv.Init( env, duration ); }
 	virtual		float			*GetInitSize( void ) { return( mSizeEnv.GetStart() ); }
 	virtual		float			*GetDestSize( void ) { return( mSizeEnv.GetEnd() ); }
 	virtual		void			InitRotationEnv( rvEnvParms &env, float duration ) {}
@@ -436,7 +436,7 @@ public:
 
 	virtual		void			GetSpawnInfo( idVec4 &tint, idVec3 &size, idVec3 &rotate );
 private:
-		rvEnvParms3Particle		mSizeEnv;
+		rvEnvParms2Particle		mSizeEnv;
 		rvEnvParms1Particle		mRotationEnv;
 
 };
@@ -484,7 +484,7 @@ class rvLightParticle : public rvParticle
 public:
 	friend		class			rvParticleTemplate;
 
-								rvLightParticle( void ) { mLightDefHandle = -1; }
+								rvLightParticle( void ) { mLightDefHandle = -1; mLightRenderWorld = NULL; }
 								~rvLightParticle( void ) { Destroy(); }
 
 	virtual		rvParticle		*GetArrayEntry( int i ) const;
@@ -517,6 +517,7 @@ private:
 				// Alterable
 				qhandle_t		mLightDefHandle;
 				renderLight_t	mLight;
+				idRenderWorld* mLightRenderWorld;
 };
 
 class rvLinkedParticle : public rvParticle
@@ -606,6 +607,7 @@ struct rvElectricityInfo {
 	idVec3					mForkSizeMaxs;
 	idVec3					mJitterSize;							// Amount of jitter for the electricity
 	float					mJitterRate;
+	idStr					mJitterTableName;						// Stable table name used to resolve jitter table pointers
 	const idDeclTable		*mJitterTable;							// The envelope for the jitter in the lightning bolt
 
 	rvElectricityInfo() : mStatic(0) {

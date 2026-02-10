@@ -484,6 +484,13 @@ void idRenderModelDecal::AddDecalDrawSurf( viewEntity_t *space ) {
 		float shaderParms[MAX_ENTITY_SHADER_PARMS];
 
 		memset( shaderParms, 0, sizeof( shaderParms ) );
+		// Match stock render-entity defaults so decal stages that rely on Parm0..3
+		// (without explicit rgb/rgba terms) still evaluate to visible colors.
+		shaderParms[SHADERPARM_RED] = 1.0f;
+		shaderParms[SHADERPARM_GREEN] = 1.0f;
+		shaderParms[SHADERPARM_BLUE] = 1.0f;
+		shaderParms[SHADERPARM_ALPHA] = 1.0f;
+		shaderParms[SHADERPARM_BRIGHTNESS] = 1.0f;
 
 		for ( int v = 0; v < tri.numVerts; v++ ) {
 			float life = (float)( tr.viewDef->renderView.time - vertStartTime[v] ) / (float)stayTime;

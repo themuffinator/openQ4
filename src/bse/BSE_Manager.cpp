@@ -53,7 +53,7 @@ void BSE_AddRendered(int count) {
 	}
 }
 
-float effectCosts[EC_MAX] = { 0, 2, 0.1 }; // dd 0.0, 2 dup(0.1)
+float effectCosts[EC_MAX] = { 0.0f, 0.1f, 0.1f };
 
 idBlockAlloc<rvBSE, 256, 0>	rvBSEManagerLocal::effects;
 idVec3						rvBSEManagerLocal::mCubeNormals[6];
@@ -170,6 +170,7 @@ bool rvBSEManagerLocal::PlayEffect(class rvRenderEffectLocal* def, float time) {
 	def->effect = effectState;
 	def->expired = false;
 	def->newEffect = true;
+	effectState->SetRenderWorld( reinterpret_cast<idRenderWorld*>(def->world) );
 	effectState->Init(v3, &def->parms, time);
 	return true;
 }
@@ -200,6 +201,8 @@ bool rvBSEManagerLocal::ServiceEffect(class rvRenderEffectLocal* def, float time
 		def->expired = true;
 		return true;
 	}
+
+	def->effect->SetRenderWorld( reinterpret_cast<idRenderWorld*>(def->world) );
 
 	if (def->effect->Service(&def->parms, time, def->gameTime > def->serviceTime, forcePush)) {
 		def->expired = true;

@@ -491,6 +491,18 @@ void idProjectile::Launch( const idVec3 &start, const idVec3 &dir, const idVec3 
 	PlayEffect( "fx_launch", renderEntity.origin, renderEntity.axis );
 	
 	flyEffect = PlayEffect( "fx_fly", renderEntity.origin, renderEntity.axis, true );
+	if ( !flyEffect ) {
+		const char* classname = spawnArgs.GetString( "classname" );
+		if ( g_grenadeTrail.GetBool() && !idStr::Icmpn( classname, "projectile_grenade", 18 ) ) {
+			const idDecl* grenadeTrail = ( const idDecl * )declManager->FindEffect( "effects/weapons/grenadelauncher/trail_mp", false );
+			if ( !grenadeTrail ) {
+				grenadeTrail = ( const idDecl * )declManager->FindEffect( "effects/weapons/grenadelauncher/trail", false );
+			}
+			if ( grenadeTrail ) {
+				flyEffect = PlayEffect( grenadeTrail, renderEntity.origin, renderEntity.axis, true );
+			}
+		}
+	}
 	flyEffectAttenuateSpeed = spawnArgs.GetFloat( "flyEffectAttenuateSpeed", "0" );
 
 	state = LAUNCHED;
@@ -777,6 +789,13 @@ bool idProjectile::Collide( const trace_t &collision, const idVec3 &velocity, bo
 			if( flyEffect)	{
 				//flyEffect->Event_Remove();
 			}
+
+			// Match stock behavior by preferring an explicit water impact effect.
+			const rvDeclMatType* waterMaterialType = collision.c.materialType;
+			if ( waterMaterialType == NULL ) {
+				waterMaterialType = declManager->FindMaterialType( "water", false );
+			}
+			gameLocal.PlayEffect( gameLocal.GetEffect( spawnArgs, "fx_impact", waterMaterialType ), collision.c.point, collision.c.normal.ToMat3(), false, vec3_origin, true );
 		}
 		// Pass through water
 		return false;

@@ -548,6 +548,17 @@ void Cmd_Give_f( const idCmdArgs &args ) {
 		return;
 	}
 
+	if ( gameLocal.isMultiplayer && gameLocal.isClient ) {
+		idBitMsg	outMsg;
+		byte		msgBuf[ MAX_GAME_MESSAGE_SIZE ];
+		outMsg.Init( msgBuf, sizeof( msgBuf ) );
+		outMsg.WriteByte( GAME_RELIABLE_MESSAGE_CHEAT_GIVE );
+		outMsg.WriteString( args.Argc() > 1 ? args.Argv( 1 ) : "" );
+		outMsg.WriteString( args.Argc() > 2 ? args.Argv( 2 ) : "" );
+		networkSystem->ClientSendReliableMessage( outMsg );
+		return;
+	}
+
 	GiveStuffToPlayer( player, args.Argv(1), args.Argv(2) );
 }
 // RITUAL END
@@ -588,6 +599,15 @@ void Cmd_God_f( const idCmdArgs &args ) {
 
 	player = gameLocal.GetLocalPlayer();
 	if ( !player || !gameLocal.CheatsOk() ) {
+		return;
+	}
+
+	if ( gameLocal.isMultiplayer && gameLocal.isClient ) {
+		idBitMsg	outMsg;
+		byte		msgBuf[ MAX_GAME_MESSAGE_SIZE ];
+		outMsg.Init( msgBuf, sizeof( msgBuf ) );
+		outMsg.WriteByte( GAME_RELIABLE_MESSAGE_CHEAT_GOD );
+		networkSystem->ClientSendReliableMessage( outMsg );
 		return;
 	}
 
@@ -673,6 +693,15 @@ void Cmd_Noclip_f( const idCmdArgs &args ) {
 
 	player = gameLocal.GetLocalPlayer();
 	if ( !player || !gameLocal.CheatsOk() ) {
+		return;
+	}
+
+	if ( gameLocal.isMultiplayer && gameLocal.isClient ) {
+		idBitMsg	outMsg;
+		byte		msgBuf[ MAX_GAME_MESSAGE_SIZE ];
+		outMsg.Init( msgBuf, sizeof( msgBuf ) );
+		outMsg.WriteByte( GAME_RELIABLE_MESSAGE_CHEAT_NOCLIP );
+		networkSystem->ClientSendReliableMessage( outMsg );
 		return;
 	}
 

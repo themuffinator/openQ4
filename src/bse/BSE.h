@@ -25,6 +25,7 @@ class rvRenderModelBSE;
 class idRenderModel;
 class rvParticle;
 class idPlayerView;
+class idRenderWorld;
 
 const float WORLD_SIZE = (128.0f * 1024.0f);
 const float BSE_LARGEST = (512.0f);
@@ -427,7 +428,7 @@ const int LIGHTID_EFFECT_LIGHT = 300;
 class rvBSE
 {
 public:
-	rvBSE(void) { mFlags = 0; }
+	rvBSE(void) { mFlags = 0; mRenderWorld = NULL; }
 	~rvBSE(void) {}
 
 	void					Init(const rvDeclEffect* declEffect, struct renderEffect_s* parms, float time);
@@ -504,6 +505,8 @@ public:
 	virtual const idBounds& GetCurrentLocalBounds(void) const { return(mCurrentLocalBounds); }
 	const idBounds& GetLastRenderBounds(void) const { return(mLastRenderBounds); }
 	const idVec3& GetCurrentWindVector(void) const { return(mCurrentWindVector); }
+	void					SetRenderWorld( idRenderWorld *renderWorld ) { mRenderWorld = renderWorld; }
+	idRenderWorld* GetRenderWorld( void ) const { return mRenderWorld; }
 
 	void					UpdateSegments(float time);
 	virtual int				GetValidFrames(void) const { return mValidFrames; };
@@ -517,6 +520,7 @@ private:
 	// Fixed at spawn time
 	const rvDeclEffect* mDeclEffect;
 	idSoundEmitter* mReferenceSound;
+	idRenderWorld* mRenderWorld;
 
 	idVec3					mOriginalOrigin;			// Origin in world space
 	idVec3					mOriginalEndOrigin;

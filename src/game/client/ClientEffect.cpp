@@ -234,10 +234,7 @@ bool rvClientEffect::Play ( int _startTime, bool _loop, const idVec3& endOrigin 
 		// Copy suppress values from parent entity
 		renderEffect.allowSurfaceInViewID	 = renderEnt->allowSurfaceInViewID;
 		renderEffect.suppressSurfaceInViewID = renderEnt->suppressSurfaceInViewID;
-		// View-model depth hack on the parent should not be inherited by default;
-		// most attached FX (muzzle flashes/impacts) must still depth-test against
-		// the weapon model to match retail layering.
-		renderEffect.weaponDepthHackInViewID = 0;
+		renderEffect.weaponDepthHackInViewID = renderEnt->weaponDepthHackInViewID;
   	}
 
 	renderEffect.shaderParms[SHADERPARM_RED] = 1.0f;

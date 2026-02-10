@@ -726,7 +726,15 @@ void rvSegment::AllocateSurface(rvBSE* effect, idRenderModel* model) {
 }
 
 void rvSegment::CreateDecal(rvBSE* effect, float time) {
-	if (!effect || !session || !session->rw || !bse_render.GetBool()) {
+	if (!effect || !bse_render.GetBool()) {
+		return;
+	}
+
+	idRenderWorld* renderWorld = effect->GetRenderWorld();
+	if (!renderWorld && session) {
+		renderWorld = session->rw;
+	}
+	if (!renderWorld) {
 		return;
 	}
 
@@ -778,9 +786,12 @@ void rvSegment::CreateDecal(rvBSE* effect, float time) {
 	axis[0] = tangent[0] * c + tangent[1] * -s;
 	axis[1] = tangent[0] * -s + tangent[1] * -c;
 
-	const float halfWidth = Max(1.0f, idMath::Fabs(size.x) * 0.5f);
-	const float halfHeight = Max(1.0f, (idMath::Fabs(size.y) > BSE_TIME_EPSILON) ? idMath::Fabs(size.y) * 0.5f : halfWidth);
-	const float depth = Max(8.0f, idMath::Fabs(size.z));
+	const float decalWidth = Max(1.0f, idMath::Fabs(size.x));
+	const float decalHeight = (idMath::Fabs(size.y) > BSE_TIME_EPSILON) ? Max(1.0f, idMath::Fabs(size.y)) : decalWidth;
+	const float halfWidth = decalWidth * 0.5f;
+	const float halfHeight = decalHeight * 0.5f;
+	const float depthSource = (idMath::Fabs(size.z) > BSE_TIME_EPSILON) ? idMath::Fabs(size.z) : Max(decalWidth, decalHeight);
+	const float depth = idMath::ClampFloat(1.0f, 512.0f, depthSource);
 
 	const idVec3 windingOrigin = origin + normal * depth;
 	idFixedWinding winding;
@@ -792,11 +803,11 @@ void rvSegment::CreateDecal(rvBSE* effect, float time) {
 
 	const idVec3 projectionOrigin = origin - normal * depth;
 	const int startTimeMs = static_cast<int>(time * 1000.0f);
-	session->rw->ProjectDecalOntoWorld(
+	renderWorld->ProjectDecalOntoWorld(
 		winding,
 		projectionOrigin,
 		true,
-		depth,
+		depth * 0.5f,
 		pt->GetMaterial(),
 		startTimeMs);
 }

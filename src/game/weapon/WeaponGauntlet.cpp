@@ -271,12 +271,19 @@ void rvWeaponGauntlet::Attack ( void ) {
 
 	}
 	
+	idVec3 impactOrigin = tr.endpos;
+	if ( tr.fraction < 1.0f ) {
+		impactOrigin = tr.c.point - ( tr.c.normal * tr.c.point - tr.c.dist ) * tr.c.normal;
+		impactOrigin += tr.c.normal * 0.5f;
+	}
+	const idMat3 impactAxis = tr.c.normal.ToMat3();
+
 	if ( !impactEffect ) {
 		impactMaterial = tr.c.materialType ? tr.c.materialType->Index() : -1;
-		impactEffect = gameLocal.PlayEffect ( gameLocal.GetEffect ( spawnArgs, "fx_impact", tr.c.materialType ), tr.endpos, tr.c.normal.ToMat3(), true );
+		impactEffect = gameLocal.PlayEffect ( gameLocal.GetEffect ( spawnArgs, "fx_impact", tr.c.materialType ), impactOrigin, impactAxis, true );
 	} else {
-		impactEffect->SetOrigin ( tr.endpos );
-		impactEffect->SetAxis ( tr.c.normal.ToMat3() );
+		impactEffect->SetOrigin ( impactOrigin );
+		impactEffect->SetAxis ( impactAxis );
 	}
 	
 	// Do damage?

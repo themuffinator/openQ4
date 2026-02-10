@@ -65,6 +65,248 @@ static bool RB_UseAlphaToCoverage( const idMaterial *shader ) {
 	return colorImage->GetOpts().numMSAASamples > 1;
 }
 
+static void RB_FreeGLSLProgram( newShaderStage_t *stage ) {
+	if ( stage == NULL ) {
+		return;
+	}
+
+	if ( stage->glslProgramObject != 0 ) {
+		if ( stage->glslVertexShaderObject != 0 ) {
+			glDetachObjectARB(
+				(GLhandleARB)stage->glslProgramObject,
+				(GLhandleARB)stage->glslVertexShaderObject );
+			glDeleteObjectARB( (GLhandleARB)stage->glslVertexShaderObject );
+		}
+		if ( stage->glslFragmentShaderObject != 0 ) {
+			glDetachObjectARB(
+				(GLhandleARB)stage->glslProgramObject,
+				(GLhandleARB)stage->glslFragmentShaderObject );
+			glDeleteObjectARB( (GLhandleARB)stage->glslFragmentShaderObject );
+		}
+		glDeleteObjectARB( (GLhandleARB)stage->glslProgramObject );
+	}
+
+	stage->glslProgramObject = 0;
+	stage->glslVertexShaderObject = 0;
+	stage->glslFragmentShaderObject = 0;
+	stage->glslProgramLoaded = false;
+	stage->glslProgramValid = false;
+	stage->glslProgramGeneration = 0;
+}
+
+static void RB_PrintGLSLInfoLog( GLhandleARB object, const char *label, const char *name ) {
+	GLint logLength = 0;
+	glGetObjectParameterivARB( object, GL_OBJECT_INFO_LOG_LENGTH_ARB, &logLength );
+	if ( logLength <= 1 ) {
+		common->Warning( "GLSL %s error in '%s' (no info log)", label, name );
+		return;
+	}
+
+	char *logBuffer = (char *)_alloca( logLength );
+	GLsizei written = 0;
+	glGetInfoLogARB( object, logLength, &written, logBuffer );
+	common->Warning( "GLSL %s error in '%s':\n%s", label, name, logBuffer );
+}
+
+static bool RB_PathHasGlprogsPrefix( const idStr &path ) {
+	return idStr::Icmpn( path.c_str(), "glprogs/", 8 ) == 0;
+}
+
+static idStr RB_NormalizeGLSLPath( const idStr &path ) {
+	idStr result = path;
+	result.BackSlashesToSlashes();
+	if ( !RB_PathHasGlprogsPrefix( result ) ) {
+		idStr prefixed = "glprogs/";
+		prefixed += result;
+		return prefixed;
+	}
+	return result;
+}
+
+static bool RB_ReadGLSLSourcePair( const idStr &vertexPath, const idStr &fragmentPath, char **vertexBuffer, char **fragmentBuffer ) {
+	*vertexBuffer = NULL;
+	*fragmentBuffer = NULL;
+
+	fileSystem->ReadFile( vertexPath.c_str(), (void **)vertexBuffer, NULL );
+	if ( *vertexBuffer == NULL ) {
+		return false;
+	}
+
+	fileSystem->ReadFile( fragmentPath.c_str(), (void **)fragmentBuffer, NULL );
+	if ( *fragmentBuffer == NULL ) {
+		fileSystem->FreeFile( *vertexBuffer );
+		*vertexBuffer = NULL;
+		return false;
+	}
+
+	return true;
+}
+
+static bool RB_FindGLSLSourcePair( const char *programName, idStr &vertexPath, idStr &fragmentPath, char **vertexBuffer, char **fragmentBuffer ) {
+	idStr name = programName;
+	name.BackSlashesToSlashes();
+
+	idStr stripped = name;
+	stripped.StripFileExtension();
+
+	idStr ext;
+	const char *dot = strrchr( name.c_str(), '.' );
+	if ( dot != NULL ) {
+		ext = dot + 1;
+		ext.ToLower();
+	}
+
+	idStr vertexCandidates[10];
+	idStr fragmentCandidates[10];
+	int numCandidates = 0;
+
+	if ( ext.Length() > 0 ) {
+		if ( ext == "glsl" ) {
+			vertexCandidates[numCandidates] = stripped + ".glslvp";
+			fragmentCandidates[numCandidates++] = stripped + ".glslfp";
+			vertexCandidates[numCandidates] = stripped + ".vs";
+			fragmentCandidates[numCandidates++] = stripped + ".fs";
+		} else if ( ext == "fs" ) {
+			vertexCandidates[numCandidates] = stripped + ".vs";
+			fragmentCandidates[numCandidates++] = name;
+		} else if ( ext == "vs" ) {
+			vertexCandidates[numCandidates] = name;
+			fragmentCandidates[numCandidates++] = stripped + ".fs";
+		} else if ( ext == "fp" ) {
+			vertexCandidates[numCandidates] = stripped + ".vp";
+			fragmentCandidates[numCandidates++] = name;
+		} else if ( ext == "vp" ) {
+			vertexCandidates[numCandidates] = name;
+			fragmentCandidates[numCandidates++] = stripped + ".fp";
+		}
+	}
+
+	vertexCandidates[numCandidates] = name + ".vs";
+	fragmentCandidates[numCandidates++] = name + ".fs";
+	vertexCandidates[numCandidates] = name + ".glslvp";
+	fragmentCandidates[numCandidates++] = name + ".glslfp";
+	vertexCandidates[numCandidates] = name + ".vp";
+	fragmentCandidates[numCandidates++] = name + ".fp";
+	vertexCandidates[numCandidates] = stripped + ".vs";
+	fragmentCandidates[numCandidates++] = stripped + ".fs";
+	vertexCandidates[numCandidates] = stripped + ".glslvp";
+	fragmentCandidates[numCandidates++] = stripped + ".glslfp";
+	vertexCandidates[numCandidates] = stripped + ".vp";
+	fragmentCandidates[numCandidates++] = stripped + ".fp";
+
+	for ( int i = 0; i < numCandidates; i++ ) {
+		const idStr candidateVertex = RB_NormalizeGLSLPath( vertexCandidates[i] );
+		const idStr candidateFragment = RB_NormalizeGLSLPath( fragmentCandidates[i] );
+		if ( RB_ReadGLSLSourcePair( candidateVertex, candidateFragment, vertexBuffer, fragmentBuffer ) ) {
+			vertexPath = candidateVertex;
+			fragmentPath = candidateFragment;
+			return true;
+		}
+	}
+
+	return false;
+}
+
+static bool RB_ResolveGLSLProgram( newShaderStage_t *stage ) {
+	if ( !stage->glslProgram ) {
+		return false;
+	}
+
+	if ( !glConfig.GLSLProgramAvailable ) {
+		stage->glslProgramLoaded = true;
+		stage->glslProgramValid = false;
+		return false;
+	}
+
+	if ( stage->glslProgramLoaded && stage->glslProgramGeneration == tr.videoRestartCount ) {
+		return stage->glslProgramValid;
+	}
+
+	RB_FreeGLSLProgram( stage );
+
+	char *vertexBuffer = NULL;
+	char *fragmentBuffer = NULL;
+	idStr vertexPath;
+	idStr fragmentPath;
+	if ( !RB_FindGLSLSourcePair( stage->glslProgramName, vertexPath, fragmentPath, &vertexBuffer, &fragmentBuffer ) ) {
+		stage->glslProgramLoaded = true;
+		stage->glslProgramValid = false;
+		common->Warning( "Couldn't find GLSL sources for program '%s'", stage->glslProgramName );
+		return false;
+	}
+
+	GLhandleARB vertexShader = glCreateShaderObjectARB( GL_VERTEX_SHADER_ARB );
+	GLhandleARB fragmentShader = glCreateShaderObjectARB( GL_FRAGMENT_SHADER_ARB );
+
+	const GLcharARB *vertexSource = (const GLcharARB *)vertexBuffer;
+	const GLcharARB *fragmentSource = (const GLcharARB *)fragmentBuffer;
+	glShaderSourceARB( vertexShader, 1, &vertexSource, NULL );
+	glShaderSourceARB( fragmentShader, 1, &fragmentSource, NULL );
+	glCompileShaderARB( vertexShader );
+	glCompileShaderARB( fragmentShader );
+
+	fileSystem->FreeFile( vertexBuffer );
+	fileSystem->FreeFile( fragmentBuffer );
+
+	GLint status = GL_FALSE;
+	glGetObjectParameterivARB( vertexShader, GL_OBJECT_COMPILE_STATUS_ARB, &status );
+	if ( status == GL_FALSE ) {
+		RB_PrintGLSLInfoLog( vertexShader, "vertex shader compile", stage->glslProgramName );
+		glDeleteObjectARB( vertexShader );
+		glDeleteObjectARB( fragmentShader );
+		stage->glslProgramLoaded = true;
+		stage->glslProgramValid = false;
+		return false;
+	}
+
+	glGetObjectParameterivARB( fragmentShader, GL_OBJECT_COMPILE_STATUS_ARB, &status );
+	if ( status == GL_FALSE ) {
+		RB_PrintGLSLInfoLog( fragmentShader, "fragment shader compile", stage->glslProgramName );
+		glDeleteObjectARB( vertexShader );
+		glDeleteObjectARB( fragmentShader );
+		stage->glslProgramLoaded = true;
+		stage->glslProgramValid = false;
+		return false;
+	}
+
+	GLhandleARB programObject = glCreateProgramObjectARB();
+	glAttachObjectARB( programObject, vertexShader );
+	glAttachObjectARB( programObject, fragmentShader );
+	glLinkProgramARB( programObject );
+
+	glGetObjectParameterivARB( programObject, GL_OBJECT_LINK_STATUS_ARB, &status );
+	if ( status == GL_FALSE ) {
+		RB_PrintGLSLInfoLog( programObject, "program link", stage->glslProgramName );
+		glDetachObjectARB( programObject, vertexShader );
+		glDetachObjectARB( programObject, fragmentShader );
+		glDeleteObjectARB( vertexShader );
+		glDeleteObjectARB( fragmentShader );
+		glDeleteObjectARB( programObject );
+		stage->glslProgramLoaded = true;
+		stage->glslProgramValid = false;
+		return false;
+	}
+
+	stage->glslProgramObject = (int)programObject;
+	stage->glslVertexShaderObject = (int)vertexShader;
+	stage->glslFragmentShaderObject = (int)fragmentShader;
+	stage->glslProgramLoaded = true;
+	stage->glslProgramValid = true;
+	stage->glslProgramGeneration = tr.videoRestartCount;
+
+	for ( int i = 0; i < stage->numShaderParms; i++ ) {
+		stage->shaderParmLocations[i] = glGetUniformLocationARB( programObject, stage->shaderParmNames[i] );
+	}
+	for ( int i = 0; i < stage->numShaderTextures; i++ ) {
+		stage->shaderTextureLocations[i] = glGetUniformLocationARB( programObject, stage->shaderTextureNames[i] );
+	}
+
+	common->Printf( "Loaded GLSL program '%s' (%s, %s)\n",
+		stage->glslProgramName, vertexPath.c_str(), fragmentPath.c_str() );
+
+	return true;
+}
+
 /*
 =====================
 RB_BakeTextureMatrixIntoTexgen
@@ -835,7 +1077,90 @@ void RB_STD_T_RenderShaderPasses( const drawSurf_t *surf ) {
 			//
 			//--------------------------
 
-			// completely skip the stage if we don't have the capability
+			if ( newStage->glslProgram ) {
+				if ( !RB_ResolveGLSLProgram( newStage ) ) {
+					continue;
+				}
+
+				// GLSL stages in Quake 4 decal materials often rely on gl_Color
+				// from per-vertex stage colors (for DecalLife/depth fade).
+				float stageColor[4];
+				stageColor[0] = regs[ pStage->color.registers[0] ];
+				stageColor[1] = regs[ pStage->color.registers[1] ];
+				stageColor[2] = regs[ pStage->color.registers[2] ];
+				stageColor[3] = regs[ pStage->color.registers[3] ];
+				bool useColorArray = false;
+				if ( pStage->vertexColor == SVC_IGNORE ) {
+					glColor4fv( stageColor );
+				} else {
+					RB_SetStageVertexColorPointer( surf, stage, ac );
+					glEnableClientState( GL_COLOR_ARRAY );
+					useColorArray = true;
+				}
+
+				GL_State( pStage->drawStateBits );
+				glUseProgramObjectARB( (GLhandleARB)newStage->glslProgramObject );
+
+				for ( int i = 0; i < newStage->numShaderParms; i++ ) {
+					const int location = newStage->shaderParmLocations[i];
+					const int numRegisters = newStage->shaderParmNumRegisters[i];
+					if ( location < 0 || numRegisters <= 0 ) {
+						continue;
+					}
+
+					float parm[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+					for ( int j = 0; j < numRegisters && j < 4; j++ ) {
+						parm[j] = regs[ newStage->shaderParmRegisters[i][j] ];
+					}
+
+					switch ( numRegisters ) {
+					case 1:
+						glUniform1fvARB( location, 1, parm );
+						break;
+					case 2:
+						glUniform2fvARB( location, 1, parm );
+						break;
+					case 3:
+						glUniform3fvARB( location, 1, parm );
+						break;
+					default:
+						glUniform4fvARB( location, 1, parm );
+						break;
+					}
+				}
+
+				for ( int i = 0; i < newStage->numShaderTextures; i++ ) {
+					idImage *image = newStage->shaderTextureImages[i];
+					if ( image == NULL ) {
+						continue;
+					}
+					GL_SelectTexture( i );
+					image->Bind();
+					if ( newStage->shaderTextureLocations[i] >= 0 ) {
+						glUniform1iARB( newStage->shaderTextureLocations[i], i );
+					}
+				}
+
+				RB_PrepareStageTexturing( pStage, surf, ac );
+				RB_DrawElementsWithCounters( tri );
+				RB_FinishStageTexturing( pStage, surf, ac );
+
+				for ( int i = 1; i < newStage->numShaderTextures; i++ ) {
+					if ( newStage->shaderTextureImages[i] ) {
+						GL_SelectTexture( i );
+						globalImages->BindNull();
+					}
+				}
+
+				GL_SelectTexture( 0 );
+				glUseProgramObjectARB( 0 );
+				if ( useColorArray ) {
+					glDisableClientState( GL_COLOR_ARRAY );
+				}
+				continue;
+			}
+
+			// completely skip ARB program stages if we don't have the capability
 			if ( tr.backEndRenderer != BE_ARB2 ) {
 				continue;
 			}
@@ -872,6 +1197,7 @@ void RB_STD_T_RenderShaderPasses( const drawSurf_t *surf ) {
 				parm[2] = regs[ newStage->vertexParms[i][2] ];
 				parm[3] = regs[ newStage->vertexParms[i][3] ];
 				glProgramLocalParameter4fvARB( GL_VERTEX_PROGRAM_ARB, i, parm );
+				glProgramLocalParameter4fvARB( GL_FRAGMENT_PROGRAM_ARB, i, parm );
 			}
 
 			for ( int i = 0 ; i < newStage->numFragmentProgramImages ; i++ ) {

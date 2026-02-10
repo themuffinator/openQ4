@@ -1563,9 +1563,8 @@ void idPlayer::Init( void ) {
 	SetupWeaponEntity( );
 	currentWeapon = -1;
 	previousWeapon = -1;
-// jmarshall - engine pushed IMPULSE_50 to force on the flashlight, makes more sense just to enable it here(since it was on initially). 
-	flashlightOn	  = true;
-// jmarshall end
+	// Flashlight is a single-player mechanic.
+	flashlightOn	  = !gameLocal.isMultiplayer;
 	idealLegsYaw = 0.0f;
 	legsYaw = 0.0f;
 	legsForward = true;
@@ -9145,7 +9144,7 @@ void idPlayer::UpdateIntentDir ( void ) {
         newIntentDir = viewDir*50.0f;
 	} else {
 		newIntentDir = viewDir*intentDir.Length();
-		if ( flashlightOn ) {
+		if ( IsFlashlightOn() ) {
 			//bias them more heavily to looking where I'm looking
 			prevBias = 19.0f;
 		}
@@ -11047,6 +11046,7 @@ void idPlayer::CalculateRenderView( void ) {
 	for( i = 0; i < MAX_GLOBAL_SHADER_PARMS; i++ ) {
 		renderView->shaderParms[ i ] = gameLocal.globalShaderParms[ i ];
 	}
+	gameLocal.ApplySpecialEffectsToRenderView( renderView );
 	renderView->globalMaterial = gameLocal.GetGlobalMaterial();
 	renderView->time = gameLocal.time;
 
@@ -12927,6 +12927,11 @@ idPlayer::ToggleFlashlight
 ================
 */
 void idPlayer::ToggleFlashlight ( void ) {
+	if ( gameLocal.isMultiplayer ) {
+		flashlightOn = false;
+		return;
+	}
+
 	// Dead people can use flashlights
 // RAVEN BEGIN
 // mekberg: check to see if the weapon is enabled.
@@ -12976,7 +12981,7 @@ idPlayer::Flashlight
 ================
 */
 void idPlayer::Flashlight ( bool on ) {
-	flashlightOn = on;	
+	flashlightOn = !gameLocal.isMultiplayer && on;
 }
 
 /*
@@ -13431,40 +13436,74 @@ idPlayer::SetupHead
 void idPlayer::SetupHead( const char* headModel, idVec3 headOffset ) {
 	if( gameLocal.isMultiplayer ) {
 		// player's don't use idActor's real head entities - uses clientEntities instead
-		if( clientHead.GetEntity() ) {
-			delete clientHead.GetEntity();
-			clientHead = NULL;
-		}
-
-
-		if( spectating || (gameLocal.GetLocalPlayer() && instance != gameLocal.GetLocalPlayer()->GetInstance()) ) {
+		if( spectating || ( gameLocal.GetLocalPlayer() && instance != gameLocal.GetLocalPlayer()->GetInstance() ) ) {
+			if( clientHead.GetEntity() ) {
+				delete clientHead.GetEntity();
+				clientHead = NULL;
+			}
+			headSkin = NULL;
 			return;
 		}
 
-		const idDict* headDict = gameLocal.FindEntityDefDict( headModel, false );
+		const char* resolvedHeadModel = headModel;
+		if ( !resolvedHeadModel || !resolvedHeadModel[ 0 ] ) {
+			resolvedHeadModel = spawnArgs.GetString( "def_head", "" );
+			resolvedHeadModel = spawnArgs.GetString( "override_head", resolvedHeadModel );
+		}
+
+		if ( !resolvedHeadModel || !resolvedHeadModel[ 0 ] ) {
+			if( clientHead.GetEntity() ) {
+				delete clientHead.GetEntity();
+				clientHead = NULL;
+			}
+			headSkin = NULL;
+			return;
+		}
+
+		const idDict* headDict = gameLocal.FindEntityDefDict( resolvedHeadModel, false );
 		if ( !headDict ) {
+			gameLocal.Warning( "idPlayer::SetupHead() - Unknown head model '%s' on '%s'", resolvedHeadModel, name.c_str() );
+			return;
+		}
+
+		idStr jointName = spawnArgs.GetString( "joint_head" );
+		jointHandle_t joint = animator.GetJointHandle( jointName );
+		if ( joint == INVALID_JOINT ) {
+			gameLocal.Warning( "idPlayer::SetupHead() - Joint '%s' not found for 'joint_head' on '%s'", jointName.c_str(), name.c_str() );
 			return;
 		}
 
 		rvClientAFAttachment* headEnt = clientHead.GetEntity();
-		gameLocal.SpawnClientEntityDef( *headDict, (rvClientEntity**)&headEnt, false );
-		if( headEnt ) {
-			idStr jointName = spawnArgs.GetString( "joint_head" );
-			jointHandle_t joint = animator.GetJointHandle( jointName );
-			if ( joint == INVALID_JOINT ) {
+		if ( headEnt && idStr::Icmp( headEnt->spawnArgs.GetString( "classname", "" ), resolvedHeadModel ) ) {
+			delete headEnt;
+			headEnt = NULL;
+			clientHead = NULL;
+		}
+
+		if ( !headEnt ) {
+			gameLocal.SpawnClientEntityDef( *headDict, (rvClientEntity**)&headEnt, false );
+			if ( !headEnt ) {
 				return;
 			}
 
-			headEnt->SetBody ( this, headDict->GetString ( "model" ), joint );
-
-			headEnt->SetOrigin( vec3_origin );		
-			headEnt->SetAxis( mat3_identity );		
-			headEnt->Bind( this, joint, true );
-			headEnt->InitCopyJoints();
-
-			// Spawn might have parsed a skin from the spawnargs, save it for future use here
-			headSkin = headEnt->GetRenderEntity()->customSkin;
+			headEnt->spawnArgs.Set( "classname", resolvedHeadModel );
 			clientHead = headEnt;
+		}
+
+		headEnt->SetBody ( this, headDict->GetString ( "model" ), joint );
+		headEnt->SetOrigin( vec3_origin + headOffset );
+		headEnt->SetAxis( mat3_identity );
+		headEnt->Bind( this, joint, true );
+		headEnt->InitCopyJoints();
+
+		if ( headEnt->GetRenderEntity() ) {
+			headEnt->GetRenderEntity()->suppressSurfaceInViewID = entityNumber + 1;
+			headEnt->GetRenderEntity()->noSelfShadow = true;
+
+			// Spawn might have parsed a skin from the spawnargs, save it for future use here.
+			headSkin = headEnt->GetRenderEntity()->customSkin;
+		} else {
+			headSkin = NULL;
 		}
 	} else {
 		idActor::SetupHead( headModel, headOffset );

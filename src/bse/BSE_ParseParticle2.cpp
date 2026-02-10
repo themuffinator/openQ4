@@ -97,6 +97,16 @@ static void BSE_DeleteOwnedEnv(rvEnvParms*& value, rvEnvParms** seen, int& seenC
 }
 
 namespace {
+ID_INLINE const char* BSE_ResolveEffectCompatAlias(const char* effectName) {
+	// Stock splash FX reference "effects/ambient/drip_ring", but the shipped
+	// data only provides "effects/ambient/drip_splash". Remap at parse-time to
+	// preserve vanilla secondary splash behavior without shipping replacement data.
+	if (!idStr::Icmp(effectName, "effects/ambient/drip_ring")) {
+		return "effects/ambient/drip_splash";
+	}
+	return effectName;
+}
+
 ID_INLINE void BSE_UpdateExtents(const idVec3& sample, idVec3& mins, idVec3& maxs) {
 	mins.x = Min(mins.x, sample.x);
 	mins.y = Min(mins.y, sample.y);
@@ -407,7 +417,7 @@ bool rvParticleTemplate::ParseImpact(rvDeclEffect* effect, idParser* src)
 			//	v6,
 			//	1);
 
-			v4->mImpactEffects[v4->mNumImpactEffects++] = declManager->FindEffect(token);
+			v4->mImpactEffects[v4->mNumImpactEffects++] = declManager->FindEffect(BSE_ResolveEffectCompatAlias(token));
 		}
 	LABEL_29:
 		if (!src->ReadToken(&token))
@@ -1369,6 +1379,7 @@ bool rvParticleTemplate::Parse(rvDeclEffect* effect, idParser* src) {
 			if (!src->ReadToken(&token)) {
 				return false;
 			}
+			mElecInfo->mJitterTableName = token;
 			mElecInfo->mJitterTable = declManager->FindTable(token, false);
 		}
 		else if (token == "gravity") {
@@ -1763,6 +1774,7 @@ void rvParticleTemplate::InitStatic()
 		rvParticleTemplate::sElectricityInfo.mJitterSize.y = 7.0;
 		rvParticleTemplate::sElectricityInfo.mJitterSize.z = 7.0;
 		rvParticleTemplate::sElectricityInfo.mJitterRate = 0.0;
+		rvParticleTemplate::sElectricityInfo.mJitterTableName = "halfsintable";
 		//v2 = sdSingleton<sdDeclTypeHolder>::GetInstance();
 		rvParticleTemplate::sElectricityInfo.mJitterTable = declManager->FindTable("halfsintable", false);
 		rvParticleTemplate::sDefaultEnvelope.Init(); //rvEnvParms::Init(&rvParticleTemplate::sDefaultEnvelope);		
@@ -2189,7 +2201,7 @@ bool rvParticleTemplate::Compare(const rvParticleTemplate& a) const {
 			mElecInfo->mForkSizeMaxs != a.mElecInfo->mForkSizeMaxs ||
 			mElecInfo->mJitterSize != a.mElecInfo->mJitterSize ||
 			mElecInfo->mJitterRate != a.mElecInfo->mJitterRate ||
-			mElecInfo->mJitterTable != a.mElecInfo->mJitterTable) {
+			mElecInfo->mJitterTableName != a.mElecInfo->mJitterTableName) {
 			return false;
 		}
 	}
@@ -2271,6 +2283,7 @@ void rvParticleTemplate::ShutdownStatic(void) {
 	sElectricityInfo.mForkSizeMaxs.Zero();
 	sElectricityInfo.mJitterSize.Zero();
 	sElectricityInfo.mJitterRate = 0.0f;
+	sElectricityInfo.mJitterTableName = "";
 	sElectricityInfo.mJitterTable = NULL;
 
 	sDefaultEnvelope.Init();

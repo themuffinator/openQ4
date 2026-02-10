@@ -63,3 +63,27 @@ postprocess/openq4_smaa_blend
 		fragmentMap 1 clamp _postProcessAlbedo1
 	}
 }
+
+postprocess/openq4_blur
+{
+	sort postProcess
+	noShadows
+	{
+		if ( glslPrograms ) == 1
+		blend gl_one, gl_zero
+		glslProgram blur.fs
+		shaderParm invTexSize 1.0 / VideoWidth, 1.0 / VideoHeight
+		shaderParm range global4
+		shaderParm focus global5
+		shaderParm approachColor global0, global1, global2, global3
+		shaderParm approachPercent global6
+		shaderParm distanceScale global7
+		shaderTexture Scene clamp _postProcessAlbedo0
+	}
+	{
+		if ( glslPrograms ) == 0
+		blend gl_one, gl_zero
+		map _postProcessAlbedo0
+		clamp
+	}
+}

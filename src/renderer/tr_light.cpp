@@ -1442,6 +1442,15 @@ static void R_AddAmbientDrawsurfs( viewEntity_t *vEntity ) {
 			// add the surface for drawing
 			R_AddDrawSurf( tri, vEntity, &vEntity->entityDef->parms, shader, vEntity->scissorRect );
 
+			// powerup shells/overlays render as a second pass on top of the base surface.
+			const idMaterial *overlayShader = def->parms.overlayShader;
+			if ( overlayShader != NULL ) {
+				R_GlobalShaderOverride( &overlayShader );
+				if ( overlayShader != NULL && overlayShader->IsDrawn() ) {
+					R_AddDrawSurf( tri, vEntity, &vEntity->entityDef->parms, overlayShader, vEntity->scissorRect );
+				}
+			}
+
 			// ambientViewCount is used to allow light interactions to be rejected
 			// if the ambient surface isn't visible at all
 			tri->ambientViewCount = tr.viewCount;
@@ -1603,10 +1612,10 @@ void R_AddEffectSurfaces(void) {
 			}
 		}
 
-		idBounds projectionBounds;
-		tr.viewDef->viewFrustum.ProjectionBounds(idBox(localBounds, def->parms.origin, def->parms.axis), projectionBounds);
-		vEffect->scissorRect = R_ScreenRectFromViewFrustumBounds(projectionBounds);
-		vEffect->scissorRect.Intersect(tr.viewDef->scissor);
+		// Stock Quake 4 effects are portal-scissored from area visibility, not
+		// tightly projected from dynamic-model bounds. Bound-based scissors can
+		// clip deformed/sprite effect geometry (for example rocket flare cards).
+		vEffect->scissorRect = tr.viewDef->scissor;
 		if (vEffect->scissorRect.IsEmpty()) {
 			++dropScissor;
 			continue;

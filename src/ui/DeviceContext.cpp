@@ -281,6 +281,27 @@ void idDeviceContext::AdjustCoords(float *x, float *y, float *w, float *h) {
 	}
 }
 
+static ID_INLINE void TransformVertInVirtualSpace( idDrawVert &vert, const idVec3 &origin, const idMat3 &mat, float xScale, float yScale, float xOffset, float yOffset ) {
+	if ( xScale == 0.0f || yScale == 0.0f ) {
+		vert.xyz -= origin;
+		vert.xyz *= mat;
+		vert.xyz += origin;
+		return;
+	}
+
+	// UI transforms are authored in virtual GUI space, so map to virtual space,
+	// apply transform, then map back to the current draw-space viewport.
+	idVec3 virtualPos = vert.xyz;
+	virtualPos[0] = ( virtualPos[0] - xOffset ) / xScale;
+	virtualPos[1] = ( virtualPos[1] - yOffset ) / yScale;
+	virtualPos -= origin;
+	virtualPos *= mat;
+	virtualPos += origin;
+	vert.xyz[0] = ( virtualPos[0] * xScale ) + xOffset;
+	vert.xyz[1] = ( virtualPos[1] * yScale ) + yOffset;
+	vert.xyz[2] = virtualPos[2];
+}
+
 void idDeviceContext::DrawStretchPic(float x, float y, float w, float h, float s1, float t1, float s2, float t2, const idMaterial *shader) {
 	idDrawVert verts[4];
 	glIndex_t indexes[6];
@@ -347,20 +368,11 @@ void idDeviceContext::DrawStretchPic(float x, float y, float w, float h, float s
 	verts[3].tangents[1][1] = 1;
 	verts[3].tangents[1][2] = 0;
 	
-	bool ident = !mat.IsIdentity();
+	const bool ident = !mat.IsIdentity();
 	if ( ident ) {
-		verts[0].xyz -= origin;
-		verts[0].xyz *= mat;
-		verts[0].xyz += origin;
-		verts[1].xyz -= origin;
-		verts[1].xyz *= mat;
-		verts[1].xyz += origin;
-		verts[2].xyz -= origin;
-		verts[2].xyz *= mat;
-		verts[2].xyz += origin;
-		verts[3].xyz -= origin;
-		verts[3].xyz *= mat;
-		verts[3].xyz += origin;
+		for ( int i = 0; i < 4; i++ ) {
+			TransformVertInVirtualSpace( verts[i], origin, mat, xScale, yScale, xOffset, yOffset );
+		}
 	}
 
 	tr.DrawStretchPic( &verts[0], &indexes[0], 4, 6, shader, ident );
@@ -529,20 +541,11 @@ void idDeviceContext::DrawStretchPicRotated(float x, float y, float w, float h, 
 	verts[3].tangents[1][1] = 1;
 	verts[3].tangents[1][2] = 0;
 
-	bool ident = !mat.IsIdentity();
+	const bool ident = !mat.IsIdentity();
 	if ( ident ) {
-		verts[0].xyz -= origin;
-		verts[0].xyz *= mat;
-		verts[0].xyz += origin;
-		verts[1].xyz -= origin;
-		verts[1].xyz *= mat;
-		verts[1].xyz += origin;
-		verts[2].xyz -= origin;
-		verts[2].xyz *= mat;
-		verts[2].xyz += origin;
-		verts[3].xyz -= origin;
-		verts[3].xyz *= mat;
-		verts[3].xyz += origin;
+		for ( int i = 0; i < 4; i++ ) {
+			TransformVertInVirtualSpace( verts[i], origin, mat, xScale, yScale, xOffset, yOffset );
+		}
 	}
 
 	//Generate a translation so we can translate to the center of the image rotate and draw
@@ -651,9 +654,11 @@ void idDeviceContext::DrawCursor(float *x, float *y, float size) {
 	// Keep GUI cursor state in virtual coordinates; only transform local draw coords.
 	float drawX = *x;
 	float drawY = *y;
-	float drawSize = size;
-	AdjustCoords(&drawX, &drawY, &drawSize, &drawSize);
-	DrawStretchPic(drawX, drawY, drawSize, drawSize, 0, 0, 1, 1, cursorImages[cursor]);
+	float drawWidth = size;
+	float drawHeight = size;
+	// Scale dimensions independently for aspect correction while keeping the hotspot at drawX/drawY.
+	AdjustCoords(&drawX, &drawY, &drawWidth, &drawHeight);
+	DrawStretchPic(drawX, drawY, drawWidth, drawHeight, 0, 0, 1, 1, cursorImages[cursor]);
 }
 /*
  =======================================================================================================================

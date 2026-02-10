@@ -4,7 +4,7 @@
 
 
 rvDeclPlayerModel::rvDeclPlayerModel() {
-
+	FreeData();
 }
 
 /*
@@ -22,7 +22,7 @@ rvDeclPlayerModel::DefaultDefinition
 ===================
 */
 const char* rvDeclPlayerModel::DefaultDefinition() const {
-	return "{\n\t\"model\"\t\"model_player_marine\"\n\t\"def_head\"\t\"char_marinehead_kane2_client\"\n}";
+	return "{\n\t\"model\"\t\"model_player_marine\"\n\t\"def_head\"\t\"char_marinehead_kane2_client\"\n\t\"def_head_ui\"\t\"char_marinehead_kane2_mp\"\n\t\"skin\"\t\"skins/multiplayer/marine\"\n}";
 }
 
 /*
@@ -32,7 +32,9 @@ rvDeclPlayerModel::FreeData
 */
 bool rvDeclPlayerModel::Parse(const char* text, const int textLength) {
 	idLexer src;
-	idToken	token, token2;
+	idToken	token;
+
+	FreeData();
 
 	src.LoadMemory(text, textLength, GetFileName(), GetLineNum());
 	src.SetFlags(DECL_LEXER_FLAGS);
@@ -43,57 +45,50 @@ bool rvDeclPlayerModel::Parse(const char* text, const int textLength) {
 			break;
 		}
 
-		if (!token.Icmp("}")) {
+		if ( !token.Icmp( "}" ) ) {
 			break;
 		}
-		else if (token == "head_offset")
-		{
-			src.Parse1DMatrix(3, headOffset.ToFloatPtr());
+
+		if ( !token.Icmp( "head_offset" ) ) {
+			src.Parse1DMatrix( 3, headOffset.ToFloatPtr() );
 			continue;
 		}
-		else if (token == "description")
-		{
-			src.ReadToken(&token);
-			description = token;
-			continue;
-		}
-		else if (token == "team")
-		{
-			src.ReadToken(&token);
-			team = token;
-			continue;
-		}
-		else if (token == "def_head_ui")
-		{
-			src.ReadToken(&token);
-			head = token;
-			continue;
-		}
-		else if (token == "def_head")
-		{
-			src.ReadToken(&token);
-			uiHead = token;
-			continue;
-		}
-		else if (token == "model")
-		{
-			src.ReadToken(&token);
-			model = token;
-			continue;
-		}
-		else
-		{
-			src.Error("Invalid or unexpected token %s\n", token.c_str());
+
+		idToken value;
+		if ( !src.ReadToken( &value ) ) {
+			src.Error( "Unexpected end of file parsing key '%s' in playerModel decl '%s'", token.c_str(), GetName() );
 			return false;
+		}
+
+		if ( !token.Icmp( "model" ) ) {
+			model = value;
+		} else if ( !token.Icmp( "def_head" ) || !token.Icmp( "head" ) ) {
+			head = value;
+		} else if ( !token.Icmp( "def_head_ui" ) || !token.Icmp( "ui_head" ) ) {
+			uiHead = value;
+		} else if ( !token.Icmp( "skin" ) ) {
+			skin = value;
+		} else if ( !token.Icmp( "team" ) ) {
+			team = value;
+		} else if ( !token.Icmp( "description" ) ) {
+			description = value;
+		} else if ( !idStr::Cmpn( token.c_str(), "snd_", 4 ) ) {
+			sounds.Set( token.c_str(), value.c_str() );
 		}
 	}
 
-	if (model.Length() <= 0)
-	{
-		src.Error("playerModel decl '%s' without model declaration", token.c_str());
+	if ( model.Length() <= 0 ) {
+		src.Error( "playerModel decl '%s' without model declaration", GetName() );
 		return false;
 	}
 
+	if ( !head.Length() ) {
+		head = uiHead;
+	}
+
+	if ( !uiHead.Length() ) {
+		uiHead = head;
+	}
 
 
 	return true;
@@ -105,7 +100,14 @@ rvDeclPlayerModel::FreeData
 ===================
 */
 void rvDeclPlayerModel::FreeData(void) {
-
+	model.Clear();
+	head.Clear();
+	headOffset.Zero();
+	uiHead.Clear();
+	team.Clear();
+	skin.Clear();
+	description.Clear();
+	sounds.Clear();
 }
 
 /*

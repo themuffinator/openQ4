@@ -38,6 +38,7 @@ void idGameLocal::ShutdownGameRenderSystem( void ) {
 
 	gameRender.noPostProcessMaterial = NULL;
 	gameRender.casPostProcessMaterial = NULL;
+	gameRender.blurPostProcessMaterial = NULL;
 	gameRender.blackPostProcessMaterial = NULL;
 	gameRender.resolvePostProcessMaterial = NULL;
 	gameRender.smaaEdgePostProcessMaterial = NULL;
@@ -135,6 +136,7 @@ void idGameLocal::InitGameRenderSystem(void) {
 	gameRender.blackPostProcessMaterial = FindPostProcessMaterial( "postprocess/black", "postprocess/openq4_black" );
 	gameRender.noPostProcessMaterial = FindPostProcessMaterial( "postprocess/nopostprocess", "postprocess/openq4_nopostprocess" );
 	gameRender.casPostProcessMaterial = FindPostProcessMaterial( "postprocess/casupscale", "postprocess/openq4_casupscale" );
+	gameRender.blurPostProcessMaterial = FindPostProcessMaterial( "postprocess/blur", "postprocess/openq4_blur" );
 	gameRender.resolvePostProcessMaterial = FindPostProcessMaterial( "postprocess/resolvepostprocess", "postprocess/openq4_resolvepostprocess" );
 	gameRender.smaaEdgePostProcessMaterial = FindPostProcessMaterial( "postprocess/smaa_edge", "postprocess/openq4_smaa_edge" );
 	gameRender.smaaBlendPostProcessMaterial = FindPostProcessMaterial( "postprocess/smaa_blend", "postprocess/openq4_smaa_blend" );
@@ -274,8 +276,13 @@ void idGameLocal::RenderScene(const renderView_t *view, idRenderWorld *renderWor
 		renderSystem->BindRenderTexture( nullptr, nullptr );
 	}
 
+	const bool blurEnabled = IsSpecialEffectEnabled( SPECIAL_EFFECT_BLUR ) &&
+		( gameRender.blurPostProcessMaterial != NULL );
+
 	const idMaterial* finalMaterial = gameRender.noPostProcessMaterial;
-	if ( g_renderCasUpscale.GetBool() && gameRender.casPostProcessMaterial != NULL ) {
+	if ( blurEnabled ) {
+		finalMaterial = gameRender.blurPostProcessMaterial;
+	} else if ( g_renderCasUpscale.GetBool() && gameRender.casPostProcessMaterial != NULL ) {
 		finalMaterial = gameRender.casPostProcessMaterial;
 	}
 	if ( finalMaterial != NULL ) {

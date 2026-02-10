@@ -69,6 +69,19 @@ ID_INLINE void SetDrawVert(idDrawVert& vert, const idVec3& xyz, float s, float t
 	vert.color[3] = color[3];
 }
 
+ID_INLINE bool HasTriCapacity(const srfTriangles_t* tri, int addVerts, int addIndexes) {
+	if (!tri || addVerts < 0 || addIndexes < 0) {
+		return false;
+	}
+	if (tri->numAllocedVerts > 0 && tri->numVerts + addVerts > tri->numAllocedVerts) {
+		return false;
+	}
+	if (tri->numAllocedIndices > 0 && tri->numIndexes + addIndexes > tri->numAllocedIndices) {
+		return false;
+	}
+	return true;
+}
+
 ID_INLINE void AppendQuad(srfTriangles_t* tri, const idVec3& p0, const idVec3& p1, const idVec3& p2, const idVec3& p3, dword rgba) {
 	const int base = tri->numVerts;
 	SetDrawVert(tri->verts[base + 0], p0, 0.0f, 0.0f, rgba);
@@ -1077,6 +1090,16 @@ dword rvParticle::HandleTint(const rvBSE* effect, idVec4& colour, float alpha) {
 		out[2] *= effect->GetBlue() * bright;
 		out[3] *= effect->GetAlpha();
 	}
+
+	// Additive stages author fade in the alpha envelope, but blend-add paths
+	// do not consume destination alpha for attenuation. Premultiply RGB so
+	// additive particles fade over time like stock BSE.
+	if (GetAdditive()) {
+		out[0] *= out[3];
+		out[1] *= out[3];
+		out[2] *= out[3];
+	}
+
 	return PackColorLocal(out);
 }
 
@@ -1146,7 +1169,8 @@ void rvParticle::RenderMotion(rvBSE* effect, rvParticleTemplate* pt, srfTriangle
 	if (motionDir.LengthSqr() > 1e-6f) {
 		motionDir.NormalizeFast();
 	}
-	const idVec3 halfWidth = motionDir * (idMath::Fabs(width) * 0.5f * Max(0.001f, trailScale));
+	const float motionTrailScale = (trailScale > BSE_TIME_EPSILON) ? trailScale : 1.0f;
+	const idVec3 halfWidth = motionDir * (idMath::Fabs(width) * 0.5f * motionTrailScale);
 
 	for (int segment = 0; segment < mTrailCount; ++segment) {
 		const float t = static_cast<float>(segment) / static_cast<float>(mTrailCount);
@@ -1222,7 +1246,8 @@ void rvLightParticle::GetSpawnInfo(idVec4& tint, idVec3& size, idVec3& rotate) {
 void rvDecalParticle::GetSpawnInfo(idVec4& tint, idVec3& size, idVec3& rotate) {
 	const float* tintStart = mTintEnv.GetStart();
 	tint.Set(tintStart[0], tintStart[1], tintStart[2], mFadeEnv.GetStart()[0]);
-	size.Set(mSizeEnv.GetStart()[0], mSizeEnv.GetStart()[1], mSizeEnv.GetStart()[2]);
+	const float* sizeStart = mSizeEnv.GetStart();
+	size.Set(sizeStart[0], sizeStart[1], Max(idMath::Fabs(sizeStart[0]), idMath::Fabs(sizeStart[1])));
 	rotate.Set(mRotationEnv.GetStart()[0], 0.0f, 0.0f);
 }
 
@@ -1453,6 +1478,23 @@ bool rvOrientedParticle::Render(const rvBSE* effect, rvParticleTemplate* pt, con
 	EvaluateSize(pt->mpSizeEnvelope, evalTime, oneOverDuration, size);
 	EvaluateRotation(pt->mpRotateEnvelope, evalTime, oneOverDuration, rotation);
 
+	if (bse_frameCounters.GetInteger() >= 2) {
+		static int orientedRenderTraceCount = 0;
+		if (orientedRenderTraceCount < 64) {
+			common->Printf(
+				"BSE oriented render %d: eval=%.4f size=(%.3f %.3f) rot=(%.3f %.3f %.3f) tint=(%.3f %.3f %.3f %.3f) pos=(%.2f %.2f %.2f) locked=%d material='%s'\n",
+				orientedRenderTraceCount,
+				evalTime,
+				size[0], size[1],
+				rotation[0], rotation[1], rotation[2],
+				tint[0], tint[1], tint[2], tint[3],
+				position.x, position.y, position.z,
+				GetLocked() ? 1 : 0,
+				(pt->GetMaterial() != NULL) ? pt->GetMaterial()->GetName() : "<null>");
+			++orientedRenderTraceCount;
+		}
+	}
+
 	idMat3 transform;
 	rvAngles(rotation[0], rotation[1], rotation[2]).ToMat3(transform);
 	const idVec3 right = transform[1] * size[0];
@@ -1460,10 +1502,14 @@ bool rvOrientedParticle::Render(const rvBSE* effect, rvParticleTemplate* pt, con
 
 	dword rgba = HandleTint(effect, tint, 1.0f);
 	const int base = tri->numVerts;
-	SetDrawVert(tri->verts[base + 0], position - right, 0.0f, 0.0f, rgba);
+	SetDrawVert(tri->verts[base + 0], position + right, 0.0f, 0.0f, rgba);
 	SetDrawVert(tri->verts[base + 1], position - up, 1.0f, 0.0f, rgba);
-	SetDrawVert(tri->verts[base + 2], position + right, 1.0f, 1.0f, rgba);
+	SetDrawVert(tri->verts[base + 2], position - right, 1.0f, 1.0f, rgba);
 	SetDrawVert(tri->verts[base + 3], position + up, 0.0f, 1.0f, rgba);
+	tri->verts[base + 0].normal = position;
+	tri->verts[base + 1].normal = position;
+	tri->verts[base + 2].normal = position;
+	tri->verts[base + 3].normal = position;
 
 	const int indexBase = tri->numIndexes;
 	tri->indexes[indexBase + 0] = base + 0;
@@ -1557,7 +1603,7 @@ int rvElectricityParticle::GetBoltCount(float length) {
 	return idMath::ClampInt(3, static_cast<int>(BSE_ELEC_MAX_BOLTS), bolts);
 }
 
-void rvElectricityParticle::RenderBranch(const rvBSE* effect, struct SElecWork* work, idVec3 start, idVec3 end) {
+void rvElectricityParticle::RenderBranch(const rvBSE* effect, struct SElecWork* work, idVec3 start, idVec3 end, const idDeclTable* jitterTable) {
 	if (!effect || !work || !work->tri || !work->coords) {
 		return;
 	}
@@ -1592,7 +1638,7 @@ void rvElectricityParticle::RenderBranch(const rvBSE* effect, struct SElecWork* 
 
 	while (fraction < 1.0f - work->step * 0.5f && outCount < 254) {
 		fraction += work->step;
-		const float noise = mJitterTable ? mJitterTable->TableLookup(fraction) : 0.0f;
+		const float noise = jitterTable ? jitterTable->TableLookup(fraction) : 0.0f;
 
 		idVec3 jitter(
 			rvRandom::flrand(-mJitterSize.x, mJitterSize.x),
@@ -1609,11 +1655,16 @@ void rvElectricityParticle::RenderBranch(const rvBSE* effect, struct SElecWork* 
 
 	float vCoord = 0.0f;
 	for (int i = 0; i < outCount - 1; ++i) {
-		RenderLineSegment(effect, work, work->coords[i], vCoord);
+		if (!RenderLineSegment(effect, work, work->coords[i], vCoord)) {
+			break;
+		}
 		vCoord += work->step;
 	}
 
-	for (int base = segmentVertStart; base < work->tri->numVerts - 2; base += 2) {
+	for (int base = segmentVertStart; base + 3 < work->tri->numVerts; base += 2) {
+		if (!HasTriCapacity(work->tri, 0, 6)) {
+			break;
+		}
 		const int indexBase = work->tri->numIndexes;
 		work->tri->indexes[indexBase + 0] = base;
 		work->tri->indexes[indexBase + 1] = base + 1;
@@ -1625,9 +1676,12 @@ void rvElectricityParticle::RenderBranch(const rvBSE* effect, struct SElecWork* 
 	}
 }
 
-void rvElectricityParticle::RenderLineSegment(const rvBSE* effect, struct SElecWork* work, idVec3 start, float startFraction) {
+bool rvElectricityParticle::RenderLineSegment(const rvBSE* effect, struct SElecWork* work, idVec3 start, float startFraction) {
 	if (!effect || !work || !work->tri) {
-		return;
+		return false;
+	}
+	if (!HasTriCapacity(work->tri, 2, 0)) {
+		return false;
 	}
 
 	idVec3 offset = work->length.Cross(work->viewPos);
@@ -1646,6 +1700,7 @@ void rvElectricityParticle::RenderLineSegment(const rvBSE* effect, struct SElecW
 	SetDrawVert(work->tri->verts[baseVert + 0], start + offset, s, 0.0f, color);
 	SetDrawVert(work->tri->verts[baseVert + 1], start - offset, s, 1.0f, color);
 	work->tri->numVerts += 2;
+	return true;
 }
 
 void rvElectricityParticle::ApplyShape(const rvBSE* effect, struct SElecWork* work, idVec3 start, idVec3 end, int count, float startFraction, float endFraction) {
@@ -1794,7 +1849,18 @@ bool rvElectricityParticle::Render(const rvBSE* effect, rvParticleTemplate* pt, 
 	}
 
 	const idVec3 endPos = position + length;
-	RenderBranch(effect, &work, position, endPos);
+	const idDeclTable* jitterTable = NULL;
+	if (pt->mElecInfo != NULL && !pt->mElecInfo->mJitterTableName.IsEmpty()) {
+		jitterTable = declManager->FindTable(pt->mElecInfo->mJitterTableName, false);
+	}
+	if (!jitterTable) {
+		jitterTable = mJitterTable;
+	}
+	if (!jitterTable) {
+		jitterTable = declManager->FindTable("halfsintable", false);
+	}
+	mJitterTable = jitterTable;
+	RenderBranch(effect, &work, position, endPos, jitterTable);
 
 	idVec3 forkBases[BSE_MAX_FORKS];
 	const int forks = idMath::ClampInt(0, BSE_MAX_FORKS, mNumForks);
@@ -1824,7 +1890,7 @@ bool rvElectricityParticle::Render(const rvBSE* effect, rvParticleTemplate* pt, 
 		work.length = dir;
 		work.forward = dir;
 		work.step = 1.0f / static_cast<float>(GetBoltCount(forkLength));
-		RenderBranch(effect, &work, forkBases[i], forkEnd);
+		RenderBranch(effect, &work, forkBases[i], forkEnd, jitterTable);
 	}
 
 	return true;
@@ -1844,19 +1910,34 @@ void rvElectricityParticle::SetupElectricity(rvParticleTemplate* pt) {
 		return;
 	}
 
+	const rvElectricityInfo* info = pt->mElecInfo;
 	mNumBolts = 0;
-	mNumForks = pt->mElecInfo->mNumForks;
+	mNumForks = info->mNumForks;
 	mSeed = rvRandom::irand(1, 0x7FFFFFFF);
-	mForkSizeMins = pt->mElecInfo->mForkSizeMins;
-	mForkSizeMaxs = pt->mElecInfo->mForkSizeMaxs;
-	mJitterSize = pt->mElecInfo->mJitterSize;
+	mForkSizeMins = info->mForkSizeMins;
+	mForkSizeMaxs = info->mForkSizeMaxs;
+	mJitterSize = info->mJitterSize;
 	mLastJitter = 0.0f;
-	mJitterRate = pt->mElecInfo->mJitterRate;
-	mJitterTable = pt->mElecInfo->mJitterTable;
+	mJitterRate = info->mJitterRate;
+
+	mJitterTable = NULL;
+	if (!info->mJitterTableName.IsEmpty()) {
+		mJitterTable = declManager->FindTable(info->mJitterTableName, false);
+	}
+	if (!mJitterTable) {
+		mJitterTable = info->mJitterTable;
+	}
+	if (!mJitterTable) {
+		mJitterTable = declManager->FindTable("halfsintable", false);
+	}
 }
 
 bool rvLightParticle::InitLight(rvBSE* effect, rvSegmentTemplate* st, float time) {
-	if (!effect || !st || !session || !session->rw) {
+	idRenderWorld* renderWorld = effect ? effect->GetRenderWorld() : NULL;
+	if (!renderWorld && session) {
+		renderWorld = session->rw;
+	}
+	if (!effect || !st || !renderWorld) {
 		return false;
 	}
 
@@ -1896,12 +1977,20 @@ bool rvLightParticle::InitLight(rvBSE* effect, rvSegmentTemplate* st, float time
 	mLight.lightId = LIGHTID_EFFECT_LIGHT;
 	mLight.shader = pt->GetMaterial() ? pt->GetMaterial() : declManager->FindMaterial("_default");
 
-	mLightDefHandle = session->rw->AddLightDef(&mLight);
+	mLightDefHandle = renderWorld->AddLightDef(&mLight);
+	mLightRenderWorld = renderWorld;
 	return mLightDefHandle != -1;
 }
 
 bool rvLightParticle::PresentLight(rvBSE* effect, rvParticleTemplate* pt, float time, bool infinite) {
-	if (!effect || !pt || !session || !session->rw) {
+	idRenderWorld* renderWorld = effect ? effect->GetRenderWorld() : NULL;
+	if (!renderWorld) {
+		renderWorld = mLightRenderWorld;
+	}
+	if (!renderWorld && session) {
+		renderWorld = session->rw;
+	}
+	if (!effect || !pt || !renderWorld) {
 		return false;
 	}
 
@@ -1910,11 +1999,15 @@ bool rvLightParticle::PresentLight(rvBSE* effect, rvParticleTemplate* pt, float 
 		return false;
 	}
 
-	if (mLightDefHandle == -1) {
-		mLightDefHandle = session->rw->AddLightDef(&mLight);
+	if (mLightDefHandle == -1 || mLightRenderWorld != renderWorld) {
+		if (mLightDefHandle != -1 && mLightRenderWorld != NULL) {
+			mLightRenderWorld->FreeLightDef(mLightDefHandle);
+		}
+		mLightDefHandle = renderWorld->AddLightDef(&mLight);
 		if (mLightDefHandle == -1) {
 			return false;
 		}
+		mLightRenderWorld = renderWorld;
 	}
 
 	const float oneOverDuration = 1.0f / Max(BSE_TIME_EPSILON, GetDuration());
@@ -1935,15 +2028,20 @@ bool rvLightParticle::PresentLight(rvBSE* effect, rvParticleTemplate* pt, float 
 	mLight.shaderParms[2] = tint.z;
 	mLight.shaderParms[3] = tint.w;
 	mLight.suppressLightInViewID = effect->GetSuppressLightsInViewID();
-	session->rw->UpdateLightDef(mLightDefHandle, &mLight);
+	renderWorld->UpdateLightDef(mLightDefHandle, &mLight);
 	return true;
 }
 
 bool rvLightParticle::Destroy(void) {
-	if (mLightDefHandle != -1 && session && session->rw) {
-		session->rw->FreeLightDef(mLightDefHandle);
+	idRenderWorld* renderWorld = mLightRenderWorld;
+	if (!renderWorld && session) {
+		renderWorld = session->rw;
+	}
+	if (mLightDefHandle != -1 && renderWorld) {
+		renderWorld->FreeLightDef(mLightDefHandle);
 	}
 	mLightDefHandle = -1;
+	mLightRenderWorld = NULL;
 	memset(&mLight, 0, sizeof(mLight));
 	return true;
 }

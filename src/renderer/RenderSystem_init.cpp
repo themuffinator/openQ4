@@ -402,6 +402,18 @@ static void R_CheckPortableExtensions( void ) {
 
 	}
 
+	// GL_ARB shader objects / GLSL
+	glConfig.GLSLProgramAvailable =
+		R_CheckExtension( "GL_ARB_shader_objects" ) &&
+		R_CheckExtension( "GL_ARB_vertex_shader" ) &&
+		R_CheckExtension( "GL_ARB_fragment_shader" ) &&
+		R_CheckExtension( "GL_ARB_shading_language_100" );
+	if ( glConfig.GLSLProgramAvailable ) {
+		common->Printf( "...using GL_ARB shader objects + GLSL\n" );
+	} else {
+		common->Printf( "X..GLSL shader objects not found\n" );
+	}
+
 	// check for minimum set
 	if ( !glConfig.multitextureAvailable || !glConfig.textureEnvCombineAvailable || !glConfig.cubeMapAvailable
 		|| !glConfig.envDot3Available ) {

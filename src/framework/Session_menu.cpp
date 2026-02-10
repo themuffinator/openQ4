@@ -73,6 +73,46 @@ static bool MapSupportsAnyMPGameType( const idDict *dict ) {
 		dict->GetBool( "DeadZone" );
 }
 
+/*
+=================
+CommitStartServerMapSelection
+=================
+*/
+static void CommitStartServerMapSelection( idUserInterface *gui ) {
+	if ( gui == NULL ) {
+		return;
+	}
+
+	int uiMapSelection = gui->State().GetInt( "mapList_sel_0" );
+	const int uiMapHover = gui->State().GetInt( "mapList_hover", "-1" );
+	if ( uiMapHover >= 0 ) {
+		const char *hoverMapId = gui->State().GetString( va( "mapList_item_%d_id", uiMapHover ), "" );
+		if ( hoverMapId[ 0 ] ) {
+			uiMapSelection = uiMapHover;
+			gui->SetStateInt( "mapList_sel_0", uiMapSelection );
+		}
+	}
+
+	if ( uiMapSelection < 0 ) {
+		const char *firstMapId = gui->State().GetString( "mapList_item_0_id", "" );
+		if ( firstMapId[ 0 ] == '\0' ) {
+			return;
+		}
+		uiMapSelection = 0;
+		gui->SetStateInt( "mapList_sel_0", uiMapSelection );
+	}
+
+	const int mapNum = gui->State().GetInt( va( "mapList_item_%d_id", uiMapSelection ), "-1" );
+	if ( mapNum < 0 ) {
+		return;
+	}
+
+	const idDict *dict = fileSystem->GetMapDecl( mapNum );
+	if ( dict ) {
+		cvarSystem->SetCVarString( "si_map", dict->GetString( "path" ) );
+	}
+}
+
 // implements the setup for, and commands from, the main menu
 
 /*
@@ -801,22 +841,7 @@ void idSessionLocal::HandleMainMenuCommands( const char *menuCommand ) {
 		}
 
 		if ( !idStr::Icmp( cmd, "click_mapList" ) ) {
-			int uiMapSelection = guiMainMenu->State().GetInt( "mapList_sel_0" );
-			const int uiMapHover = guiMainMenu->State().GetInt( "mapList_hover", "-1" );
-			if ( uiMapHover >= 0 ) {
-				const char *hoverMapId = guiMainMenu->State().GetString( va( "mapList_item_%d_id", uiMapHover ), "" );
-				if ( hoverMapId[ 0 ] ) {
-					uiMapSelection = uiMapHover;
-					guiMainMenu->SetStateInt( "mapList_sel_0", uiMapSelection );
-				}
-			}
-			if ( uiMapSelection >= 0 ) {
-				int mapNum = guiMainMenu->State().GetInt( va( "mapList_item_%d_id", uiMapSelection ) );
-				const idDict *dict = fileSystem->GetMapDecl( mapNum );
-				if ( dict ) {
-					cvarSystem->SetCVarString( "si_map", dict->GetString( "path" ) );
-				}
-			}
+			CommitStartServerMapSelection( guiMainMenu );
 			UpdateMPLevelShot();
 			guiMainMenu->StateChanged( com_frameTime );
 			continue;
@@ -835,6 +860,7 @@ void idSessionLocal::HandleMainMenuCommands( const char *menuCommand ) {
 		}
 
 		if ( !idStr::Icmp( cmd, "startMultiplayer" ) ) {
+			CommitStartServerMapSelection( guiMainMenu );
 			int dedicated = guiActive->State().GetInt( "dedicated" );
 			cvarSystem->SetCVarBool( "net_LANServer", guiActive->State().GetBool( "server_type" ) );
 			if ( gui_configServerRate.GetInteger() > 0 ) {

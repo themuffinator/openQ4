@@ -1982,21 +1982,81 @@ intptr_t idWindow::GetWinVarOffset( idWinVar *wv, drawWin_t* owner) {
 	if ( wv == &backColor ) {
 		ret = (intptr_t)&( ( idWindow * ) 0 )->backColor;
 	}
+	if ( wv == &backColor_r ) {
+		ret = (intptr_t)&( ( idWindow * ) 0 )->backColor_r;
+	}
+	if ( wv == &backColor_g ) {
+		ret = (intptr_t)&( ( idWindow * ) 0 )->backColor_g;
+	}
+	if ( wv == &backColor_b ) {
+		ret = (intptr_t)&( ( idWindow * ) 0 )->backColor_b;
+	}
+	if ( wv == &backColor_w ) {
+		ret = (intptr_t)&( ( idWindow * ) 0 )->backColor_w;
+	}
 
 	if ( wv == &matColor ) {
 		ret = (intptr_t)&( ( idWindow * ) 0 )->matColor;
+	}
+	if ( wv == &matColor_r ) {
+		ret = (intptr_t)&( ( idWindow * ) 0 )->matColor_r;
+	}
+	if ( wv == &matColor_g ) {
+		ret = (intptr_t)&( ( idWindow * ) 0 )->matColor_g;
+	}
+	if ( wv == &matColor_b ) {
+		ret = (intptr_t)&( ( idWindow * ) 0 )->matColor_b;
+	}
+	if ( wv == &matColor_w ) {
+		ret = (intptr_t)&( ( idWindow * ) 0 )->matColor_w;
 	}
 
 	if ( wv == &foreColor ) {
 		ret = (intptr_t)&( ( idWindow * ) 0 )->foreColor;
 	}
+	if ( wv == &foreColor_r ) {
+		ret = (intptr_t)&( ( idWindow * ) 0 )->foreColor_r;
+	}
+	if ( wv == &foreColor_g ) {
+		ret = (intptr_t)&( ( idWindow * ) 0 )->foreColor_g;
+	}
+	if ( wv == &foreColor_b ) {
+		ret = (intptr_t)&( ( idWindow * ) 0 )->foreColor_b;
+	}
+	if ( wv == &foreColor_w ) {
+		ret = (intptr_t)&( ( idWindow * ) 0 )->foreColor_w;
+	}
 
 	if ( wv == &hoverColor ) {
 		ret = (intptr_t)&( ( idWindow * ) 0 )->hoverColor;
 	}
+	if ( wv == &hoverColor_r ) {
+		ret = (intptr_t)&( ( idWindow * ) 0 )->hoverColor_r;
+	}
+	if ( wv == &hoverColor_g ) {
+		ret = (intptr_t)&( ( idWindow * ) 0 )->hoverColor_g;
+	}
+	if ( wv == &hoverColor_b ) {
+		ret = (intptr_t)&( ( idWindow * ) 0 )->hoverColor_b;
+	}
+	if ( wv == &hoverColor_w ) {
+		ret = (intptr_t)&( ( idWindow * ) 0 )->hoverColor_w;
+	}
 
 	if ( wv == &borderColor ) {
 		ret = (intptr_t)&( ( idWindow * ) 0 )->borderColor;
+	}
+	if ( wv == &borderColor_r ) {
+		ret = (intptr_t)&( ( idWindow * ) 0 )->borderColor_r;
+	}
+	if ( wv == &borderColor_g ) {
+		ret = (intptr_t)&( ( idWindow * ) 0 )->borderColor_g;
+	}
+	if ( wv == &borderColor_b ) {
+		ret = (intptr_t)&( ( idWindow * ) 0 )->borderColor_b;
+	}
+	if ( wv == &borderColor_w ) {
+		ret = (intptr_t)&( ( idWindow * ) 0 )->borderColor_w;
 	}
 
 	if ( wv == &textScale ) {
@@ -2810,17 +2870,30 @@ bool idWindow::Parse( idParser *src, bool rebuild) {
 				src->Error( "Unexpected end of file" );
 				return false;
 			}
-// jmarshall - quake 4 guis
-			if (token == "+")
-			{
-				if (!src->ReadToken(&token)) {
-					src->Error("Unexpected end of file");
+
+			bool relativeTime = false;
+			const char *timeToken = token.c_str();
+			if ( token == "+" ) {
+				if ( !src->ReadToken( &token ) ) {
+					src->Error( "Unexpected end of file" );
 					return false;
 				}
+				relativeTime = true;
+				timeToken = token.c_str();
+			} else if ( timeToken[0] == '+' ) {
+				relativeTime = true;
+				timeToken++;
 			}
-// jmarshall end
+			if ( timeToken[0] == '\0' ) {
+				src->Error( "Invalid onTime value" );
+				return false;
+			}
 
-			ev->time = atoi(token.c_str());
+			ev->time = atoi( timeToken );
+			if ( relativeTime ) {
+				const int previousTime = ( timeLineEvents.Num() > 0 ) ? timeLineEvents[ timeLineEvents.Num() - 1 ]->time : 0;
+				ev->time += previousTime;
+			}
 			
 			// reset the mark since we dont want it to include the time
 			src->SetMarker ( );
@@ -4245,36 +4318,79 @@ void idWindow::FixupTransitions() {
 		delete transitions[i].data;
 		transitions[i].data = NULL;
 		if ( dw && ( dw->win || dw->simp ) ){
+			const intptr_t transitionOffset = (intptr_t)transitions[i].offset;
 			if ( dw->win ) {
-				if ( transitions[i].offset == (int)&( ( idWindow * ) 0 )->rect ) {
+				if ( transitionOffset == (intptr_t)&( ( idWindow * ) 0 )->rect ) {
 					transitions[i].data = &dw->win->rect;
-				} else if ( transitions[i].offset == (int)&( ( idWindow * ) 0 )->backColor ) {
+				} else if ( transitionOffset == (intptr_t)&( ( idWindow * ) 0 )->backColor ) {
 					transitions[i].data = &dw->win->backColor;
-				} else if ( transitions[i].offset == (int)&( ( idWindow * ) 0 )->matColor ) {
+				} else if ( transitionOffset == (intptr_t)&( ( idWindow * ) 0 )->backColor_r ) {
+					transitions[i].data = &dw->win->backColor_r;
+				} else if ( transitionOffset == (intptr_t)&( ( idWindow * ) 0 )->backColor_g ) {
+					transitions[i].data = &dw->win->backColor_g;
+				} else if ( transitionOffset == (intptr_t)&( ( idWindow * ) 0 )->backColor_b ) {
+					transitions[i].data = &dw->win->backColor_b;
+				} else if ( transitionOffset == (intptr_t)&( ( idWindow * ) 0 )->backColor_w ) {
+					transitions[i].data = &dw->win->backColor_w;
+				} else if ( transitionOffset == (intptr_t)&( ( idWindow * ) 0 )->matColor ) {
 					transitions[i].data = &dw->win->matColor;
-				} else if ( transitions[i].offset == (int)&( ( idWindow * ) 0 )->foreColor ) {
+				} else if ( transitionOffset == (intptr_t)&( ( idWindow * ) 0 )->matColor_r ) {
+					transitions[i].data = &dw->win->matColor_r;
+				} else if ( transitionOffset == (intptr_t)&( ( idWindow * ) 0 )->matColor_g ) {
+					transitions[i].data = &dw->win->matColor_g;
+				} else if ( transitionOffset == (intptr_t)&( ( idWindow * ) 0 )->matColor_b ) {
+					transitions[i].data = &dw->win->matColor_b;
+				} else if ( transitionOffset == (intptr_t)&( ( idWindow * ) 0 )->matColor_w ) {
+					transitions[i].data = &dw->win->matColor_w;
+				} else if ( transitionOffset == (intptr_t)&( ( idWindow * ) 0 )->foreColor ) {
 					transitions[i].data = &dw->win->foreColor;
-				} else if ( transitions[i].offset == (int)&( ( idWindow * ) 0 )->borderColor ) {
+				} else if ( transitionOffset == (intptr_t)&( ( idWindow * ) 0 )->foreColor_r ) {
+					transitions[i].data = &dw->win->foreColor_r;
+				} else if ( transitionOffset == (intptr_t)&( ( idWindow * ) 0 )->foreColor_g ) {
+					transitions[i].data = &dw->win->foreColor_g;
+				} else if ( transitionOffset == (intptr_t)&( ( idWindow * ) 0 )->foreColor_b ) {
+					transitions[i].data = &dw->win->foreColor_b;
+				} else if ( transitionOffset == (intptr_t)&( ( idWindow * ) 0 )->foreColor_w ) {
+					transitions[i].data = &dw->win->foreColor_w;
+				} else if ( transitionOffset == (intptr_t)&( ( idWindow * ) 0 )->hoverColor ) {
+					transitions[i].data = &dw->win->hoverColor;
+				} else if ( transitionOffset == (intptr_t)&( ( idWindow * ) 0 )->hoverColor_r ) {
+					transitions[i].data = &dw->win->hoverColor_r;
+				} else if ( transitionOffset == (intptr_t)&( ( idWindow * ) 0 )->hoverColor_g ) {
+					transitions[i].data = &dw->win->hoverColor_g;
+				} else if ( transitionOffset == (intptr_t)&( ( idWindow * ) 0 )->hoverColor_b ) {
+					transitions[i].data = &dw->win->hoverColor_b;
+				} else if ( transitionOffset == (intptr_t)&( ( idWindow * ) 0 )->hoverColor_w ) {
+					transitions[i].data = &dw->win->hoverColor_w;
+				} else if ( transitionOffset == (intptr_t)&( ( idWindow * ) 0 )->borderColor ) {
 					transitions[i].data = &dw->win->borderColor;
-				} else if ( transitions[i].offset == (int)&( ( idWindow * ) 0 )->textScale ) {
+				} else if ( transitionOffset == (intptr_t)&( ( idWindow * ) 0 )->borderColor_r ) {
+					transitions[i].data = &dw->win->borderColor_r;
+				} else if ( transitionOffset == (intptr_t)&( ( idWindow * ) 0 )->borderColor_g ) {
+					transitions[i].data = &dw->win->borderColor_g;
+				} else if ( transitionOffset == (intptr_t)&( ( idWindow * ) 0 )->borderColor_b ) {
+					transitions[i].data = &dw->win->borderColor_b;
+				} else if ( transitionOffset == (intptr_t)&( ( idWindow * ) 0 )->borderColor_w ) {
+					transitions[i].data = &dw->win->borderColor_w;
+				} else if ( transitionOffset == (intptr_t)&( ( idWindow * ) 0 )->textScale ) {
 					transitions[i].data = &dw->win->textScale;
-				} else if ( transitions[i].offset == (int)&( ( idWindow * ) 0 )->rotate ) {
+				} else if ( transitionOffset == (intptr_t)&( ( idWindow * ) 0 )->rotate ) {
 					transitions[i].data = &dw->win->rotate;
 				}
 			} else {
-				if ( transitions[i].offset == (int)&( ( idSimpleWindow * ) 0 )->rect ) {
+				if ( transitionOffset == (intptr_t)&( ( idSimpleWindow * ) 0 )->rect ) {
 					transitions[i].data = &dw->simp->rect;
-				} else if ( transitions[i].offset == (int)&( ( idSimpleWindow * ) 0 )->backColor ) {
+				} else if ( transitionOffset == (intptr_t)&( ( idSimpleWindow * ) 0 )->backColor ) {
 					transitions[i].data = &dw->simp->backColor;
-				} else if ( transitions[i].offset == (int)&( ( idSimpleWindow * ) 0 )->matColor ) {
+				} else if ( transitionOffset == (intptr_t)&( ( idSimpleWindow * ) 0 )->matColor ) {
 					transitions[i].data = &dw->simp->matColor;
-				} else if ( transitions[i].offset == (int)&( ( idSimpleWindow * ) 0 )->foreColor ) {
+				} else if ( transitionOffset == (intptr_t)&( ( idSimpleWindow * ) 0 )->foreColor ) {
 					transitions[i].data = &dw->simp->foreColor;
-				} else if ( transitions[i].offset == (int)&( ( idSimpleWindow * ) 0 )->borderColor ) {
+				} else if ( transitionOffset == (intptr_t)&( ( idSimpleWindow * ) 0 )->borderColor ) {
 					transitions[i].data = &dw->simp->borderColor;
-				} else if ( transitions[i].offset == (int)&( ( idSimpleWindow * ) 0 )->textScale ) {
+				} else if ( transitionOffset == (intptr_t)&( ( idSimpleWindow * ) 0 )->textScale ) {
 					transitions[i].data = &dw->simp->textScale;
-				} else if ( transitions[i].offset == (int)&( ( idSimpleWindow * ) 0 )->rotate ) {
+				} else if ( transitionOffset == (intptr_t)&( ( idSimpleWindow * ) 0 )->rotate ) {
 					transitions[i].data = &dw->simp->rotate;
 				}
 			}
