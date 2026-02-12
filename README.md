@@ -23,7 +23,7 @@
 
 ## About
 
-**OpenQ4** is a complete replacement for the Quake 4 engine and game binaries. Built on the foundation of [Quake4Doom](https://github.com/idSoftware/Quake4Doom), this project aims to modernize and preserve the classic id Tech 4 title for current and future generations of gamers and provide a platform for future development.
+**OpenQ4** is a complete replacement for the Quake 4 engine and game binaries. Built on the foundation of [Quake4Doom](https://github.com/idSoftware/Quake4Doom), this project aims to modernize and preserve the classic id Tech 4 title for current and future generations of gamers and provide a platform for future development. Whilst the project aims to be as open-source as possible, the BSE library will remain closed-source.
 
 ### What You Need
 
