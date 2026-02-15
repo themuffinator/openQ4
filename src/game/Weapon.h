@@ -250,6 +250,7 @@ protected:
 	bool				StartSound					( const char *soundName, const s_channelType channel, int soundShaderFlags, bool broadcast, int *length );
 	void				StopSound					( const s_channelType channel, bool broadcast );
 	rvClientEffect*		PlayEffect					( const char* effectName, jointHandle_t joint, bool loop = false, const idVec3& endOrigin = vec3_origin, bool broadcast = false );
+	void				DisableViewEffectWeaponDepthHack	( rvClientEffect* effect );
 
 	void				FindViewModelPositionStyle	( idVec3& viewOffset, idAngles& viewAngles ) const;
 

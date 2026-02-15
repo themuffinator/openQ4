@@ -75,6 +75,43 @@ static bool MapSupportsAnyMPGameType( const idDict *dict ) {
 
 /*
 =================
+GetListenServerPlayerWarningLimit
+=================
+*/
+static int GetListenServerPlayerWarningLimit( const int serverRatePreset, const int maxClientRate ) {
+	switch ( serverRatePreset ) {
+		case 1:
+			// Low Upload
+			return 3;
+		case 2:
+			// Balanced Upload
+			return 4;
+		case 3:
+			// High Upload
+			return 5;
+		case 4:
+		case 5:
+			// Fiber/Modern and LAN presets should not trigger the legacy 4-player listen warning.
+			return 16;
+		default:
+			break;
+	}
+
+	// Manual mode: infer a safe listen target from net_serverMaxClientRate.
+	if ( maxClientRate <= 8000 ) {
+		return 3;
+	}
+	if ( maxClientRate <= 9500 ) {
+		return 4;
+	}
+	if ( maxClientRate <= 10500 ) {
+		return 5;
+	}
+	return 16;
+}
+
+/*
+=================
 CommitStartServerMapSelection
 =================
 */
@@ -911,9 +948,16 @@ void idSessionLocal::HandleMainMenuCommands( const char *menuCommand ) {
 				}
 			}
 
-			if ( !dedicated && !cvarSystem->GetCVarBool( "net_LANServer" ) && cvarSystem->GetCVarInteger("si_maxPlayers") > 4 ) {
+			const int listenWarningLimit = GetListenServerPlayerWarningLimit(
+				gui_configServerRate.GetInteger(),
+				cvarSystem->GetCVarInteger( "net_serverMaxClientRate" ) );
+
+			if ( !dedicated &&
+				!cvarSystem->GetCVarBool( "net_LANServer" ) &&
+				listenWarningLimit < 16 &&
+				cvarSystem->GetCVarInteger( "si_maxPlayers" ) > listenWarningLimit ) {
 				// "Dedicated server mode is recommended for internet servers with more than 4 players. Continue in listen mode?"
-				if ( !MessageBox( MSG_YESNO, va( common->GetLanguageDict()->GetString( "#str_100625" ), 4 ), common->GetLanguageDict()->GetString ( "#str_100626" ), true, "yes" )[ 0 ] ) {
+				if ( !MessageBox( MSG_YESNO, va( common->GetLanguageDict()->GetString( "#str_100625" ), listenWarningLimit ), common->GetLanguageDict()->GetString ( "#str_100626" ), true, "yes" )[ 0 ] ) {
 					continue;
 				}
 			}

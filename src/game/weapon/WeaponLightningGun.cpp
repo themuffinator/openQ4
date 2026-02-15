@@ -824,7 +824,7 @@ stateResult_t rvWeaponLightningGun::State_Fire( const stateParms_t& parms ) {
 			viewModel->SetShaderParm( 6, 0 );
 
 			viewModel->PlayEffect( "fx_spire", spireJointView, true );
-			viewModel->PlayEffect( "fx_flash", barrelJointView, true );
+			DisableViewEffectWeaponDepthHack( viewModel->PlayEffect( "fx_flash", barrelJointView, true ) );
 
 			if ( worldModel && flashJointWorld != INVALID_JOINT ) {
   				worldModel->PlayEffect( gameLocal.GetEffect( weaponDef->dict,"fx_flash_world"), flashJointWorld, vec3_origin, mat3_identity, true );

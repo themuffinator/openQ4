@@ -2575,7 +2575,8 @@ void rvWeapon::Attack( bool altAttack, int num_attacks, float spread, float fuse
 
 	// Muzzle flash effect
 	bool muzzleTint = spawnArgs.GetBool( "muzzleTint" );
-	viewModel->PlayEffect( "fx_muzzleflash", flashJointView, false, vec3_origin, false, EC_IGNORE, muzzleTint ? owner->GetHitscanTint() : vec4_one );
+	rvClientEffect* muzzleFlashEffect = viewModel->PlayEffect( "fx_muzzleflash", flashJointView, false, vec3_origin, false, EC_IGNORE, muzzleTint ? owner->GetHitscanTint() : vec4_one );
+	DisableViewEffectWeaponDepthHack( muzzleFlashEffect );
 
 	if ( worldModel && flashJointWorld != INVALID_JOINT ) {
 		worldModel->PlayEffect( gameLocal.GetEffect( weaponDef->dict, "fx_muzzleflash_world" ), flashJointWorld, vec3_origin, mat3_identity, false, vec3_origin, false, EC_IGNORE, muzzleTint ? owner->GetHitscanTint() : vec4_one );
@@ -3160,6 +3161,19 @@ rvClientEffect* rvWeapon::PlayEffect( const char* effectName, jointHandle_t join
 	
 	common->Warning( "NULL viewmodel %s\n", __FUNCTION__ );
 	return 0;
+}
+
+/*
+===============
+rvWeapon::DisableViewEffectWeaponDepthHack
+===============
+*/
+void rvWeapon::DisableViewEffectWeaponDepthHack( rvClientEffect* effect ) {
+	if ( !effect ) {
+		return;
+	}
+
+	effect->GetRenderEffect()->weaponDepthHackInViewID = 0;
 }
 
 /*
