@@ -1,0 +1,34 @@
+name: Cleanup install/openbase cfg files
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup-cfg:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Remove install/openbase cfg files
+        run: |
+          set -euo pipefail
+          rm -f install/openbase/*.cfg
+
+      - name: Commit and push cleanup
+        run: |
+          set -euo pipefail
+
+          if git diff --quiet -- install/openbase; then
+            echo "No cfg files found to remove."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add install/openbase
+          git commit -m "chore: remove install/openbase cfg files"
+          git push

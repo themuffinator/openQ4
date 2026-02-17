@@ -774,11 +774,6 @@ void RB_CreateSingleDrawInteractions( const drawSurf_t *surf, void (*DrawInterac
 	for ( int i = 0 ; i < 4 ; i++ ) {
 		R_GlobalPlaneToLocal( surf->space->modelMatrix, backEnd.vLight->lightProject[i], lightProject[i] );
 	}
-	// Keep a stable projection for shadow map lookups independent of light-stage texture transforms.
-	inter.shadowProjection[0] = lightProject[0].ToVec4();
-	inter.shadowProjection[1] = lightProject[1].ToVec4();
-	inter.shadowProjection[2] = lightProject[3].ToVec4();
-	inter.shadowProjection[3] = lightProject[2].ToVec4();
 
 	for ( int lightStageNum = 0 ; lightStageNum < lightShader->GetNumStages() ; lightStageNum++ ) {
 		const shaderStage_t	*lightStage = lightShader->GetStage( lightStageNum );

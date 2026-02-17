@@ -148,21 +148,6 @@ idCVar r_offsetFactor( "r_offsetfactor", "0", CVAR_RENDERER | CVAR_FLOAT, "polyg
 idCVar r_offsetUnits( "r_offsetunits", "-600", CVAR_RENDERER | CVAR_FLOAT, "polygon offset parameter" );
 idCVar r_shadowPolygonOffset( "r_shadowPolygonOffset", "-1", CVAR_RENDERER | CVAR_FLOAT, "bias value added to depth test for stencil shadow drawing" );
 idCVar r_shadowPolygonFactor( "r_shadowPolygonFactor", "0", CVAR_RENDERER | CVAR_FLOAT, "scale value for stencil shadow drawing" );
-idCVar r_useShadowMapping( "r_useShadowMapping", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "use shadow maps instead of stencil shadows where supported" );
-idCVar r_shadowMapImageSize( "r_shadowMapImageSize", "1024", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "shadow map resolution for each light", 128, 4096 );
-idCVar r_shadowMapSoftShadows( "r_shadowMapSoftShadows", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "use linear-filtered PCF shadow lookups" );
-idCVar r_shadowMapPolygonFactor( "r_shadowMapPolygonFactor", "1.5", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "polygon offset factor while rendering shadow maps" );
-idCVar r_shadowMapPolygonOffset( "r_shadowMapPolygonOffset", "2.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "polygon offset units while rendering shadow maps" );
-idCVar r_shadowMapDepthBiasScale( "r_shadowMapDepthBiasScale", "0.9995", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "depth compare bias scale to reduce acne" );
-idCVar r_shadowMapOccluderFacing( "r_shadowMapOccluderFacing", "2", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "0 = front faces, 1 = back faces, 2 = two-sided", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
-idCVar r_shadowMapPerforatedCasters( "r_shadowMapPerforatedCasters", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "include perforated materials as shadow map casters" );
-idCVar r_shadowMapPointLight( "r_shadowMapPointLight", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "enable point-light shadow mapping via depth cubemaps (experimental)" );
-idCVar r_shadowMapPointMaxRadius( "r_shadowMapPointMaxRadius", "1024", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT,
-	"point lights above this radius fall back to stencil shadows (<=0 disables radius cap)" );
-idCVar r_shadowMapDebugForceVisibility( "r_shadowMapDebugForceVisibility", "-1", CVAR_RENDERER | CVAR_FLOAT,
-	"debug shadow visibility override for ARB2 shadow shaders: <0 normal, 0..1 forced visibility" );
-idCVar r_shadowMapDebugStats( "r_shadowMapDebugStats", "0", CVAR_RENDERER | CVAR_INTEGER,
-	"debug shadow-map stats: 0 off, 1 periodic summary, 2 per-light detail", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
 idCVar r_frontBuffer( "r_frontBuffer", "0", CVAR_RENDERER | CVAR_BOOL, "draw to front buffer for debugging" );
 idCVar r_skipSubviews( "r_skipSubviews", "0", CVAR_RENDERER | CVAR_INTEGER, "1 = don't render any gui elements on surfaces" );
 idCVar r_skipGuiShaders( "r_skipGuiShaders", "0", CVAR_RENDERER | CVAR_INTEGER, "1 = skip all gui elements on surfaces, 2 = skip drawing but still handle events, 3 = draw but skip events", 0, 3, idCmdSystem::ArgCompletion_Integer<0,3> );

@@ -44,5 +44,7 @@
 /subprojects/packagecache/
 /subprojects/SDL3-*/
 /install/crashes/
+/install/openbase/*.cfg
 _tmp_*
 /tmp/
+*.pdb

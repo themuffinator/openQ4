@@ -460,7 +460,6 @@ typedef struct {
 	idVec4				localLightOrigin;
 	idVec4				localViewOrigin;
 	idVec4				lightProjection[4];	// in local coordinates, possibly with a texture matrix baked in
-	idVec4				shadowProjection[4]; // local shadow projection (S, T, depth, Q)
 	idVec4				bumpMatrix[2];
 	idVec4				diffuseMatrix[2];
 	idVec4				specularMatrix[2];
@@ -1035,18 +1034,6 @@ extern idCVar r_singleArea;				// only draw the portal area the view is actually
 extern idCVar r_singleSurface;			// suppress all but one surface on each entity
 extern idCVar r_shadowPolygonOffset;	// bias value added to depth test for stencil shadow drawing
 extern idCVar r_shadowPolygonFactor;	// scale value for stencil shadow drawing
-extern idCVar r_useShadowMapping;		// use shadow maps instead of stencil where supported
-extern idCVar r_shadowMapImageSize;		// shadow map resolution
-extern idCVar r_shadowMapSoftShadows;	// use linear-filtered shadow map comparisons
-extern idCVar r_shadowMapPolygonFactor;	// polygon offset factor while rendering shadow maps
-extern idCVar r_shadowMapPolygonOffset;	// polygon offset units while rendering shadow maps
-extern idCVar r_shadowMapDepthBiasScale; // comparison depth scale to reduce acne
-extern idCVar r_shadowMapOccluderFacing; // 0 = front, 1 = back, 2 = two-sided
-extern idCVar r_shadowMapPerforatedCasters; // include perforated casters as opaque silhouettes
-extern idCVar r_shadowMapPointLight;	// enable point-light shadow mapping via depth cubemap (experimental)
-extern idCVar r_shadowMapPointMaxRadius; // point lights above this radius use stencil shadows (<=0 disables cap)
-extern idCVar r_shadowMapDebugForceVisibility; // < 0 = normal, 0..1 forces shadow visibility in ARB2 shadow shaders
-extern idCVar r_shadowMapDebugStats; // 0 = off, 1 = periodic summary, 2 = per-light detail
 
 extern idCVar r_jitter;					// randomly subpixel jitter the projection matrix
 extern idCVar r_lightSourceRadius;		// for soft-shadow sampling
@@ -1400,11 +1387,6 @@ typedef enum {
 	FPROG_AMBIENT,
 	VPROG_GLASSWARP,
 	FPROG_GLASSWARP,
-	VPROG_INTERACTION_SHADOW,
-	FPROG_INTERACTION_SHADOW,
-	VPROG_INTERACTION_SHADOW_POINT,
-	FPROG_INTERACTION_SHADOW_POINT,
-	VPROG_SHADOWMAP_DEPTH,
 	PROG_USER
 } program_t;
 
@@ -1435,7 +1417,6 @@ c[20]	light falloff tq constant
 // texture 4 is the per-surface diffuse map
 // texture 5 is the per-surface specular map
 // texture 6 is the specular half angle cube map
-// texture 7 is the light shadow map
 
 */
 
@@ -1454,16 +1435,6 @@ typedef enum {
 	PP_SPECULAR_MATRIX_T,
 	PP_COLOR_MODULATE,
 	PP_COLOR_ADD,
-
-	PP_SHADOW_PROJECT_S = 18,
-	PP_SHADOW_PROJECT_T,
-	PP_SHADOW_PROJECT_R,
-	PP_SHADOW_PROJECT_Q,
-	PP_SHADOW_DEPTH_BIAS = 22,
-	PP_SHADOW_CUBE_X = 32,
-	PP_SHADOW_CUBE_Y,
-	PP_SHADOW_CUBE_Z,
-	PP_SHADOW_CUBE_PARAMS,
 
 	PP_LIGHT_FALLOFF_TQ = 20	// only for NV programs
 } programParameter_t;
