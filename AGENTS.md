@@ -26,9 +26,11 @@ This file describes project goals, rules, and upstream credits for anyone workin
 - Do not target compatibility with the proprietary Quake 4 game DLLs; OpenQ4 ships its own game modules and keeps full freedom to evolve the project.
 - Treat `E:\Repositories\OpenQ4-GameLibs` as part of the same development workspace for planning, edits, and validation.
 - For SDK/game-library work, make canonical source edits in `OpenQ4-GameLibs` first; OpenQ4 `src/game` is synchronized from that repo via `tools/build/sync_gamelibs.ps1`.
+- **CRITICAL: NEVER commit SDK game code to OpenQ4 repository** - it violates license separation and creates legal issues.
 - Treat `E:\Repositories\OpenQ4-BSE` as the canonical BSE source location.
 - For BSE work, make canonical edits in `OpenQ4-BSE` first; OpenQ4 builds BSE directly from that repo and does not mirror BSE implementation sources in-tree.
 - OpenQ4 may only contain BSE API wiring (`src/bse_api/`); do not add closed-source BSE implementation code to this repository.
+- **CRITICAL: NEVER commit BSE implementation to OpenQ4 repository** - only API headers belong here.
 - Use Meson option `-Dbuild_libbse=true|false` (default `true`) to control whether `libbse-q4` is built in OpenQ4.
 - Use `OPENQ4_BSE_REPO=<path>` to override the default companion BSE repository location (`../OpenQ4-BSE`) when configuring/building OpenQ4.
 - Keep `openbase/` as the single unified game directory; do not split SP/MP into separate mod folders.
@@ -77,6 +79,18 @@ This file describes project goals, rules, and upstream credits for anyone workin
 
 **Planned Review**
 - Strong preference to review and reduce `q4base/` usage, file-by-file, until the engine runs cleanly without any repo content overrides.
+
+**License Compliance**
+- OpenQ4 is GPLv3 licensed - engine code only
+- SDK game code is Quake 4 SDK EULA - incompatible with GPLv3
+- BSE implementation is closed-source proprietary
+- **NEVER mix these in one repository** - it creates license violations
+- If you find SDK code committed to OpenQ4:
+  1. Run `.\tools\sanitize-history.ps1 -Mode analyze`
+  2. Run `.\tools\sanitize-history.ps1 -Mode clean`
+  3. Review `doc/git-history-sanitization-guide.md`
+- The `.gitignore` is configured to prevent accidental commits of `src/game/`
+- Game code appears in `src/game/` during builds but is NOT committed to git
 
 **References (Local, Not Included In Repo)**
 - Quake 4 SDK: `E:\_SOURCE\_CODE\Quake4-1.4.2-SDK`
