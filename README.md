@@ -184,6 +184,52 @@ No need for separate mod folders or manual switching!
 
 ---
 
+## Repository Structure and Licensing
+
+**IMPORTANT:** The OpenQ4 project consists of three separate repositories with different licenses:
+
+### 1. OpenQ4 (This Repository) - GPLv3
+**License:** [GNU General Public License v3.0](LICENSE)
+
+Contains:
+- Engine code (framework, renderer, sound, etc.)
+- Build system and tools
+- BSE API headers (`src/bse_api/` - interface only)
+- Documentation
+
+Does NOT contain:
+- SDK game code (maintained separately)
+- BSE implementation (maintained separately)
+
+### 2. OpenQ4-GameLibs - Quake 4 SDK EULA
+**License:** [id Software EULA](https://github.com/themuffinator/OpenQ4-GameLibs/blob/main/doc/legacy/EULA.Development%20Kit.rtf)  
+**Repository:** [OpenQ4-GameLibs](https://github.com/themuffinator/OpenQ4-GameLibs)
+
+Contains:
+- All SDK-derived game code
+- Single-player and multiplayer game logic
+- AI, physics, weapons, entities, etc.
+
+### 3. OpenQ4-BSE - Closed Source
+**License:** Proprietary/Closed Source  
+**Repository:** Private (closed-source)
+
+Contains:
+- BSE (Basic Set of Effects) implementation
+- Reverse-engineered Quake 4 effects system
+
+### Why Separate Repositories?
+
+The separation is **required** to maintain license compliance:
+
+- **GPLv3** (OpenQ4): Allows free use, modification, and distribution
+- **SDK EULA** (GameLibs): Restricts use to Quake 4, non-commercial only
+- **Closed Source** (BSE): Proprietary implementation not for public distribution
+
+Mixing these in one repository would create license violations. The build system automatically integrates code from all three repositories.
+
+---
+
 ## SDK and Game Library
 
 The game code in OpenQ4 is derived from the [Quake 4 SDK](https://www.moddb.com/games/quake-4/downloads/quake-4-sdk-v15), which is distributed under id Software's End User License Agreement. The SDK source code is maintained in the companion [OpenQ4-GameLibs](https://github.com/themuffinator/OpenQ4-GameLibs) repository.
@@ -357,6 +403,25 @@ The game library source code is maintained separately in [OpenQ4-GameLibs](https
 - Visual Studio environment auto-detected and loaded
 - Use `OPENQ4_SKIP_GAMELIBS_SYNC=1` to skip game library sync
 - Use `OPENQ4_GAMELIBS_REPO=<path>` to override repository location
+
+### Git History and License Compliance
+
+⚠️ **Important:** The OpenQ4 repository should NOT contain SDK game code or BSE implementation in its git history.
+
+If you encounter SDK code in `src/game/` that's committed to git (not just synchronized during build), this is a license violation. Use the sanitization tools:
+
+```powershell
+# Analyze what would be removed
+.\tools\sanitize-history.ps1 -Mode analyze
+
+# Remove from current state
+.\tools\sanitize-history.ps1 -Mode clean
+
+# Rewrite git history (advanced)
+.\tools\sanitize-history.ps1 -Mode filter
+```
+
+See [Git History Sanitization Guide](doc/git-history-sanitization-guide.md) for complete documentation.
 
 ---
 

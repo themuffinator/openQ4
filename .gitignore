@@ -46,3 +46,16 @@
 /install/crashes/
 _tmp_*
 /tmp/
+
+# SDK Game Code (synchronized from OpenQ4-GameLibs during build)
+# This code is subject to Quake 4 SDK EULA, not GPLv3
+# Do NOT commit this directory - it's synced from companion repo
+src/game/
+!src/game/.gitkeep
+!src/game/README.md
+
+# BSE Implementation (built from OpenQ4-BSE during build)
+# This is closed-source code maintained in separate repository
+# Only BSE API headers (src/bse_api/) belong in this repo
+src/bse/
+!src/bse_api/
