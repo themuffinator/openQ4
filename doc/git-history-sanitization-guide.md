@@ -29,7 +29,7 @@ The OpenQ4 project consists of three repositories with different licenses:
 ## Problem Statement
 
 The current OpenQ4 repository contains:
-- SDK-derived game code in `src/game/` (~7.2MB, 293 files)
+- SDK-derived game code in `src/game/` (~6.56 MB, 295 files)
 - This code is subject to id Software's EULA, not GPLv3
 - Having this code in the git history creates a license violation
 
@@ -37,7 +37,7 @@ The current OpenQ4 repository contains:
 
 ### Option 1: Fresh Start (Recommended for New Repositories)
 
-Since OpenQ4 currently has only 2 commits, the cleanest approach is:
+Since OpenQ4 currently has only 3 commits, the cleanest approach is:
 
 1. **Create the companion repositories first**
    ```bash
@@ -173,7 +173,7 @@ After sanitization:
 
 ## Timeline for Sanitization
 
-For the current OpenQ4 repository (2 commits):
+For the current OpenQ4 repository (3 commits):
 - **Estimated time**: 1-2 hours
 - **Recommended approach**: Option 1 (Fresh Start)
 - **Risk**: Low (minimal history to preserve)

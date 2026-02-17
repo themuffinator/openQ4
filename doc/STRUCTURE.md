@@ -6,7 +6,7 @@
 OpenQ4/  (GPLv3)
 ├── src/
 │   ├── game/           ❌ SDK CODE (Quake 4 EULA) - LICENSE VIOLATION!
-│   │   ├── ai/         ❌ 295 files, 6.56 MB
+│   │   ├── ai/         ❌ Total: 295 files, 6.56 MB
 │   │   ├── physics/    ❌ Should NOT be here
 │   │   └── ...         ❌ Should be in OpenQ4-GameLibs
 │   ├── bse_api/        ✅ OK (API headers only)
