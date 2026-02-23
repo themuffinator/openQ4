@@ -551,7 +551,7 @@ void *idHeap::Allocate16( const dword bytes, byte tag ) {
 //amccarthy: Added allocation tag
 #ifdef  _DEBUG
 	ptr = (byte *) Allocate(bytes+16, tag);
-	alignedPtr = (byte *) ( ( (int) ptr ) + 15 & ~15 );
+	alignedPtr = (byte *)( ( (uintptr_t)ptr + 15 ) & ~(uintptr_t)15 );
 	int padSize = alignedPtr - ptr;
 	if ( padSize == 0 ) {
 		alignedPtr += 16;
@@ -559,14 +559,14 @@ void *idHeap::Allocate16( const dword bytes, byte tag ) {
 	}
 	*((byte *)(alignedPtr - 1)) = (byte) padSize;
 
-	assert( ( unsigned int )alignedPtr < 0xff000000 );
+	assert( (uintptr_t)alignedPtr < (uintptr_t)0xff000000 );
 
 	return (void *) alignedPtr;
 #else
 //RAVEN END
 // RAVEN BEGIN
 // jnewquist: send all allocations through one place on the Xenon
-	ptr = (byte *) local_malloc( bytes + 16 + 4 );
+	ptr = (byte *) local_malloc( bytes + 16 + sizeof( uintptr_t ) );
 // RAVEN END
 	if ( !ptr ) {
 		if ( defragBlock ) {
@@ -578,7 +578,7 @@ void *idHeap::Allocate16( const dword bytes, byte tag ) {
 			defragBlock = NULL;
 // RAVEN BEGIN
 // jnewquist: send all allocations through one place on the Xenon
-			ptr = (byte *) local_malloc( bytes + 16 + 4 );			
+			ptr = (byte *) local_malloc( bytes + 16 + sizeof( uintptr_t ) );			
 // RAVEN END
 			AllocDefragBlock();
 		}
@@ -587,13 +587,13 @@ void *idHeap::Allocate16( const dword bytes, byte tag ) {
 		}
 	}
 
-	alignedPtr = (byte *) ( ( (int) ptr ) + 15 & ~15 );
-  	if ( alignedPtr - ptr < 4 ) {
+	alignedPtr = (byte *)( ( (uintptr_t)ptr + 15 ) & ~(uintptr_t)15 );
+  	if ( alignedPtr - ptr < sizeof( uintptr_t ) ) {
    		alignedPtr += 16;
 
    	}
-  	*((int *)(alignedPtr - 4)) = (int) ptr;
-   	assert( ( unsigned int )alignedPtr < 0xff000000 );
+  	*((uintptr_t *)(alignedPtr - sizeof( uintptr_t ))) = (uintptr_t)ptr;
+   	assert( (uintptr_t)alignedPtr < (uintptr_t)0xff000000 );
    	return (void *) alignedPtr;
 
 //RAVEN BEGIN
@@ -617,7 +617,7 @@ void idHeap::Free16( void *p ) {
 	ptr -= padSize;
 	Free( ptr );
 #else
-	local_free( (void *) *((int *) (( (byte *) p ) - 4)) );
+	local_free( (void *) *((uintptr_t *) (( (byte *) p ) - sizeof( uintptr_t ))) );
 #endif
 //RAVEN END
 }
@@ -670,7 +670,7 @@ dword idHeap::Msize( void *p ) {
 			return ((mediumHeapEntry_s *)(((byte *)(p)) - ALIGN_SIZE( MEDIUM_HEADER_SIZE )))->size - ALIGN_SIZE( MEDIUM_HEADER_SIZE );
 		}
 		case LARGE_ALLOC: {
-			return ((idHeap::page_s*)(*((dword *)(((byte *)p) - ALIGN_SIZE( LARGE_HEADER_SIZE )))))->dataSize - ALIGN_SIZE( LARGE_HEADER_SIZE );
+			return ((idHeap::page_s*)(*((uintptr_t *)(((byte *)p) - ALIGN_SIZE( LARGE_HEADER_SIZE )))))->dataSize - ALIGN_SIZE( LARGE_HEADER_SIZE );
 		}
 		default: {
 			idLib::common->FatalError( "idHeap::Msize: invalid memory block (%s)", idLib::sys->GetCallStackCurStr( 4 ) );
@@ -790,7 +790,7 @@ idHeap::page_s* idHeap::AllocatePage( dword bytes ) {
 			}
 		}
 
-		p->data		= (void *) ALIGN_SIZE( (int)((byte *)(p)) + sizeof( idHeap::page_s ) );
+		p->data		= (void *) ALIGN_SIZE( (uintptr_t)((byte *)(p)) + sizeof( idHeap::page_s ) );
 		p->dataSize	= size - sizeof(idHeap::page_s);
 		p->firstFree = NULL;
 		p->largestFree = 0;
@@ -845,9 +845,9 @@ idHeap::SmallAllocate
 //amccarthy:  Added allocation tag
 void *idHeap::SmallAllocate( dword bytes, byte tag ) {
 //RAVEN END
-	// we need the at least sizeof( dword ) bytes for the free list
-	if ( bytes < sizeof( dword ) ) {
-		bytes = sizeof( dword );
+	// we need at least a pointer-sized payload for the free-list link
+	if ( bytes < sizeof( uintptr_t ) ) {
+		bytes = sizeof( uintptr_t );
 	}
 
 	// increase the number of bytes if necessary to make sure the next small allocation is aligned
@@ -855,7 +855,7 @@ void *idHeap::SmallAllocate( dword bytes, byte tag ) {
 
 	byte *smallBlock = (byte *)(smallFirstFree[bytes / ALIGN]);
 	if ( smallBlock ) {
-		dword *link = (dword *)(smallBlock + SMALL_HEADER_SIZE);
+		uintptr_t *link = (uintptr_t *)(smallBlock + SMALL_HEADER_SIZE);
 //RAVEN BEGIN
 //amccarthy:  Added allocation tag
 #ifdef _DEBUG
@@ -943,7 +943,7 @@ void idHeap::SmallFree( void *ptr ) {
 //RAVEN END
 
 	byte *d = ( (byte *)ptr ) - SMALL_HEADER_SIZE;
-	dword *dt = (dword *)ptr;
+	uintptr_t *dt = (uintptr_t *)ptr;
 	// index into the table with free small memory blocks
 	dword ix = *d;
 
@@ -952,7 +952,7 @@ void idHeap::SmallFree( void *ptr ) {
 		idLib::common->FatalError( "SmallFree: invalid memory block" );
 	}
 
-	*dt = (dword)smallFirstFree[ix];	// write next index
+	*dt = (uintptr_t)smallFirstFree[ix];	// write next index
 	smallFirstFree[ix] = (void *)d;		// link
 }
 
@@ -1320,8 +1320,8 @@ void *idHeap::LargeAllocate( dword bytes, byte tag ) {
 	}
 
 	byte *	d	= (byte*)(p->data) + ALIGN_SIZE( LARGE_HEADER_SIZE );
-	dword *	dw	= (dword*)(d - ALIGN_SIZE( LARGE_HEADER_SIZE ));
-	dw[0]		= (dword)p;				// write pointer back to page table
+	uintptr_t *	dw	= (uintptr_t*)(d - ALIGN_SIZE( LARGE_HEADER_SIZE ));
+	dw[0]		= (uintptr_t)p;				// write pointer back to page table
 //RAVEN BEGIN
 //amccarthy:  Added allocation tag
 #ifdef _DEBUG
@@ -1363,7 +1363,7 @@ void idHeap::LargeFree( void *ptr) {
 	((byte *)(ptr))[-1] = INVALID_ALLOC;
 
 	// get page pointer
-	pg = (idHeap::page_s *)(*((dword *)(((byte *)ptr) - ALIGN_SIZE( LARGE_HEADER_SIZE ))));
+	pg = (idHeap::page_s *)(*((uintptr_t *)(((byte *)ptr) - ALIGN_SIZE( LARGE_HEADER_SIZE ))));
 
 	//RAVEN BEGIN
 //amccarthy:  allocation tracking
@@ -1546,7 +1546,7 @@ void *Mem_Alloc16( const int size, byte tag ) {
 // amccarthy: Added allocation tag
 	void *mem = mem_heap->Allocate16( size, tag );
 	// make sure the memory is 16 byte aligned
-	assert( ( ((int)mem) & 15) == 0 );
+	assert( ( ((uintptr_t)mem) & 15 ) == 0 );
 	return mem;
 }
 // RAVEN END
@@ -1571,7 +1571,7 @@ void Mem_Free16( void *ptr ) {
 		return;
 	}
 	// make sure the memory is 16 byte aligned
-	assert( ( ((int)ptr) & 15) == 0 );
+	assert( ( ((uintptr_t)ptr) & 15 ) == 0 );
  	mem_heap->Free16( ptr );
 }
 
@@ -2194,7 +2194,7 @@ void *Mem_Alloc16( const int size, const char *fileName, const int lineNumber, b
 	}
 	void *mem = Mem_AllocDebugMemory( size, fileName, lineNumber, true, tag );
 	// make sure the memory is 16 byte aligned
-	assert( ( ((int)mem) & 15) == 0 );
+	assert( ( ((uintptr_t)mem) & 15 ) == 0 );
 	return mem;
 }
 
@@ -2208,7 +2208,7 @@ void Mem_Free16( void *ptr, const char *fileName, const int lineNumber ) {
 		return;
 	}
 	// make sure the memory is 16 byte aligned
-	assert( ( ((int)ptr) & 15) == 0 );
+	assert( ( ((uintptr_t)ptr) & 15 ) == 0 );
 	Mem_FreeDebugMemory( ptr, fileName, lineNumber, true );
 }
 

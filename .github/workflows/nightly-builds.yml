@@ -71,16 +71,19 @@ jobs:
           - os: windows-latest
             platform: windows
             label: Windows
+            binary_arch: x64
             archive_format: zip
             archive_ext: .zip
           - os: ubuntu-latest
             platform: linux
             label: Linux
+            binary_arch: x64
             archive_format: tar.xz
             archive_ext: .tar.xz
           - os: macos-latest
             platform: macos
             label: macOS
+            binary_arch: arm64
             archive_format: tar.gz
             archive_ext: .tar.gz
 
@@ -177,6 +180,7 @@ jobs:
 
           python tools/build/package_nightly.py \
             --platform "${{ matrix.platform }}" \
+            --arch "${{ matrix.binary_arch }}" \
             --version "${{ needs.metadata.outputs.version }}" \
             --version-tag "${{ needs.metadata.outputs.version_tag }}" \
             --archive-format "${{ matrix.archive_format }}" \

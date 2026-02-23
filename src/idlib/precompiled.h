@@ -317,7 +317,7 @@ public:
 // framework
 #include "../framework/BuildVersion.h"
 #include "../framework/BuildDefines.h"
-#include "../framework/Licensee.h"
+#include "../framework/licensee.h"
 #include "../framework/CmdSystem.h"
 #include "../framework/CVarSystem.h"
 #include "../framework/Common.h"
