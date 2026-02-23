@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import shutil
 import sys
+import tarfile
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
@@ -25,13 +26,25 @@ PLATFORM_BSE_BINARY = {
     "macos": "libbse-q4.dylib",
 }
 
+DEFAULT_ARCHIVE_FORMAT = {
+    "windows": "zip",
+    "linux": "tar.xz",
+    "macos": "tar.gz",
+}
+
+ARCHIVE_SUFFIX = {
+    "zip": ".zip",
+    "tar.gz": ".tar.gz",
+    "tar.xz": ".tar.xz",
+}
+
 OPENQ4_EXCLUDED_DIRS = {"logs", "screenshots"}
 OPENQ4_EXCLUDED_SUFFIXES = {".pdb", ".lib", ".exp", ".ilk"}
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Package OpenQ4 nightly artifacts into a release zip."
+        description="Package OpenQ4 nightly artifacts into a release archive."
     )
     parser.add_argument(
         "--platform",
@@ -70,6 +83,23 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         required=True,
         help="Output directory for the generated package artifacts.",
     )
+    parser.add_argument(
+        "--archive-format",
+        choices=sorted(ARCHIVE_SUFFIX.keys()),
+        default=None,
+        help=(
+            "Archive format for the top-level package (default: platform-specific; "
+            "windows=zip, linux=tar.xz, macos=tar.gz)."
+        ),
+    )
+    parser.add_argument(
+        "--allow-missing-binaries",
+        action="store_true",
+        help=(
+            "Allow packaging to continue when required platform binaries are missing. "
+            "Useful for host bring-up/nightly previews."
+        ),
+    )
     return parser.parse_args(argv[1:])
 
 
@@ -82,13 +112,21 @@ def get_required_root_binaries(platform: str, arch: str) -> tuple[str, str]:
 
 
 def copy_required_binaries(
-    platform: str, arch: str, install_dir: Path, package_root: Path
-) -> list[str]:
+    platform: str,
+    arch: str,
+    install_dir: Path,
+    package_root: Path,
+    allow_missing_binaries: bool,
+) -> tuple[list[str], list[str]]:
     copied_optional: list[str] = []
+    missing_required: list[str] = []
 
     for filename in get_required_root_binaries(platform, arch):
         source = install_dir / filename
         if not source.is_file():
+            if allow_missing_binaries:
+                missing_required.append(filename)
+                continue
             raise FileNotFoundError(f"required distributable not found: {source}")
         shutil.copy2(source, package_root / filename)
 
@@ -98,7 +136,7 @@ def copy_required_binaries(
         shutil.copy2(optional_bse_source, package_root / optional_bse)
         copied_optional.append(optional_bse)
 
-    return copied_optional
+    return copied_optional, missing_required
 
 
 def create_openq4_pk4(
@@ -131,19 +169,35 @@ def create_openq4_pk4(
     return added_files, skipped_samples
 
 
-def create_release_zip(package_root: Path, zip_path: Path) -> None:
-    if zip_path.exists():
-        zip_path.unlink()
+def create_release_archive(
+    package_root: Path, archive_path: Path, archive_format: str
+) -> None:
+    if archive_path.exists():
+        archive_path.unlink()
 
-    with ZipFile(zip_path, "w", compression=ZIP_DEFLATED, compresslevel=9) as archive:
+    if archive_format == "zip":
+        with ZipFile(archive_path, "w", compression=ZIP_DEFLATED, compresslevel=9) as archive:
+            for path in sorted(package_root.rglob("*")):
+                if not path.is_file():
+                    continue
+                arcname = (Path(package_root.name) / path.relative_to(package_root)).as_posix()
+                archive.write(path, arcname=arcname)
+        return
+
+    mode = {"tar.gz": "w:gz", "tar.xz": "w:xz"}[archive_format]
+    with tarfile.open(archive_path, mode) as archive:
         for path in sorted(package_root.rglob("*")):
             if not path.is_file():
                 continue
-            archive.write(path, arcname=path.relative_to(package_root).as_posix())
+            arcname = (Path(package_root.name) / path.relative_to(package_root)).as_posix()
+            archive.add(path, arcname=arcname, recursive=False)
 
 
 def main(argv: list[str]) -> int:
     args = parse_args(argv)
+
+    archive_format = args.archive_format or DEFAULT_ARCHIVE_FORMAT[args.platform]
+    archive_suffix = ARCHIVE_SUFFIX[archive_format]
 
     source_root = Path(args.source_root).resolve()
     install_dir = (
@@ -176,7 +230,13 @@ def main(argv: list[str]) -> int:
     package_root.mkdir(parents=True, exist_ok=True)
 
     shutil.copy2(readme_path, package_root / "README.md")
-    copied_optional = copy_required_binaries(args.platform, args.arch, install_dir, package_root)
+    copied_optional, missing_required = copy_required_binaries(
+        args.platform,
+        args.arch,
+        install_dir,
+        package_root,
+        args.allow_missing_binaries,
+    )
 
     openq4_package_dir = package_root / "openq4"
     openq4_package_dir.mkdir(parents=True, exist_ok=True)
@@ -193,13 +253,18 @@ def main(argv: list[str]) -> int:
         )
         return 1
 
-    zip_path = output_dir / f"{package_stem}.zip"
-    create_release_zip(package_root, zip_path)
+    archive_path = output_dir / f"{package_stem}{archive_suffix}"
+    create_release_archive(package_root, archive_path, archive_format)
 
     print(f"Packaged OpenQ4 nightly {args.version} for {args.platform}")
     print(f"Package directory: {package_root}")
-    print(f"Release archive: {zip_path}")
+    print(f"Release archive: {archive_path}")
+    print(f"Archive format: {archive_format}")
     print(f"OpenQ4 pk4: {openq4_pk4_path} ({added_files} files)")
+    if missing_required:
+        print("Missing required runtime binaries:")
+        for filename in missing_required:
+            print(f"  - {filename}")
     if not copied_optional:
         print("Optional runtime omitted: libbse-q4 was not present in install directory.")
     if skipped_samples:
