@@ -1509,6 +1509,6 @@ ID_INLINE idEntityPtr<type>::operator type * ( void ) const {
 
 #include "../idlib/containers/ListGame.h"
 
-#include "bots/bot.h"
+#include "bots/Bot.h"
 
 #endif	/* !__GAME_LOCAL_H__ */
