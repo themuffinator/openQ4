@@ -116,13 +116,16 @@ class ThreadedAlloc;		// class that is only used to expand the AutoCrit template
 	#pragma warning( disable : 4458 )			//  hides class member
 // jmarshall end
 
-	class AlignmentChecker
-	{
-	public:
-		static void UpdateCount(void const * const ptr) {}
-		static void ClearCount() {}
-		static void Print() {}
-	};
+	#ifndef ID_ALIGNMENTCHECKER_DEFINED
+#define ID_ALIGNMENTCHECKER_DEFINED
+class AlignmentChecker
+{
+public:
+	static void UpdateCount(void const * const ptr) {}
+	static void ClearCount() {}
+	static void Print() {}
+};
+#endif
 
 #endif // _WINDOWS
 
@@ -147,13 +150,16 @@ class ThreadedAlloc;		// class that is only used to expand the AutoCrit template
 
 	#define _GLVAS_SUPPPORT
 
-	class AlignmentChecker
-	{
-	public:
-		static void UpdateCount(void const * const ptr) {}
-		static void ClearCount() {}
-		static void Print() {}
-	};
+	#ifndef ID_ALIGNMENTCHECKER_DEFINED
+#define ID_ALIGNMENTCHECKER_DEFINED
+class AlignmentChecker
+{
+public:
+	static void UpdateCount(void const * const ptr) {}
+	static void ClearCount() {}
+	static void Print() {}
+};
+#endif
 
 	#define RESTRICT
 	#define TIME_THIS_SCOPE(x)
@@ -198,13 +204,16 @@ class ThreadedAlloc;		// class that is only used to expand the AutoCrit template
 
 	#define _GLVAS_SUPPPORT
 
-	class AlignmentChecker
-	{
-	public:
-		static void UpdateCount(void const * const ptr) {}
-		static void ClearCount() {}
-		static void Print() {}
-	};
+	#ifndef ID_ALIGNMENTCHECKER_DEFINED
+#define ID_ALIGNMENTCHECKER_DEFINED
+class AlignmentChecker
+{
+public:
+	static void UpdateCount(void const * const ptr) {}
+	static void ClearCount() {}
+	static void Print() {}
+};
+#endif
 
 	#define RESTRICT
 	#define TIME_THIS_SCOPE(x)
@@ -428,3 +437,4 @@ const float MAX_BOUND_SIZE = 65536.0f;
 #endif	/* __cplusplus */
 
 #endif /* !__PRECOMPILED_H__ */
+

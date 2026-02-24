@@ -20,6 +20,16 @@ class idMat3;
 class rvAngles;
 // RAVEN END
 
+#ifndef ID_ALIGNMENTCHECKER_DEFINED
+#define ID_ALIGNMENTCHECKER_DEFINED
+class AlignmentChecker {
+public:
+	static void UpdateCount( void const * const ptr ) {}
+	static void ClearCount() {}
+	static void Print() {}
+};
+#endif
+
 //===============================================================
 //
 //	idVec2 - 2D vector
