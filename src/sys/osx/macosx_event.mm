@@ -83,7 +83,7 @@ int	vkeyToOpenQ4Key_French[256] = {
 	/*0x08*/	'c',	'v',		'?',	'b',		'a',		'z',		'e',		'r',
 	/*0x10*/	'y',	't',		'1',	'2',		'3',		'4',		'6',		'5',
 	/*0x18*/	'-',	'9',		'7',	')',		'8',		'0',		'$',		'o',
-	/*0x20*/	'u',	'^',		'i',	'p',		K_ENTER,	'l',		'j',		'�',
+	/*0x20*/	'u',	'^',		'i',	'p',		K_ENTER,	'l',		'j',		'?',
 	/*0x28*/	'k',	'm',		0x60,	';',			'=',	'n',		',',			':',
 	/*0x30*/	K_TAB, K_SPACE, '<', K_BACKSPACE, '?', K_ESCAPE, '?', K_COMMAND,
 	/*0x38*/	K_SHIFT, K_CAPSLOCK, K_ALT, K_CTRL, '?', '?', '?', '?',
@@ -101,7 +101,7 @@ int	vkeyToOpenQ4Key_German[256] = {
 	/*0x00*/	'a',	's',		'd',	'f',		'h',		'g',		'y',		'x',
 	/*0x08*/	'c',	'v',		'?',	'b',		'q',		'w',		'e',		'r',
 	/*0x10*/	'z',	't',		'1',	'2',		'3',		'4',		'6',		'5',
-	/*0x18*/	'�',	'9',		'7',	'-',		'8',		'0',		'+',		'o',
+	/*0x18*/	'?',	'9',		'7',	'-',		'8',		'0',		'+',		'o',
 	/*0x20*/	'u',	'[',		'i',	'p',		K_ENTER,	'l',		'j',		'\'',
 	/*0x28*/	'k',	';',		'#',	',',		'-',		'n',		'm',		'.',
 	/*0x30*/	K_TAB, K_SPACE, '`', K_BACKSPACE, '?', K_ESCAPE, '?', K_COMMAND,
@@ -139,16 +139,7 @@ void Sys_InitScanTable( void ) {
 		vkeyTable = vkeyToOpenQ4Key_German;
 	}
 
-	if ( KLGetCurrentKeyboardLayout( &kbLayout )  == 0 ) {
-		if ( KLGetKeyboardLayoutProperty( kbLayout, kKLuchrData, &sKLuchrData ) ) {
-			common->Warning("KLGetKeyboardLayoutProperty failed");
-		}
-		if ( !sKLuchrData ) {
-			if ( KLGetKeyboardLayoutProperty( kbLayout, kKLKCHRData, &sKLKCHRData ) ) {
-				common->Warning("KLGetKeyboardLayoutProperty failed");
-			}
-		}
-	}
+	(void)kbLayout;
 	if ( !sKLuchrData && !sKLKCHRData ) {
 		common->Warning("Keyboard input initialziation failed");
 	}
@@ -181,7 +172,7 @@ void Sys_ShutdownInput( void ) {
 }
 
 void processMouseMovedEvent( NSEvent *mouseMovedEvent ) {
-    CGMouseDelta dx, dy;
+    int32_t dx, dy;
     
     if ( !mouseActive ) {
         return;
@@ -213,7 +204,7 @@ void processMouseMovedEvent( NSEvent *mouseMovedEvent ) {
     
     if ( dx || dy ) {
   #if 0 // this is be handled by the mouse driver clean me out later       
-      CGMouseDelta distSqr;
+      int32_t distSqr;
         float m0, N;
         
         distSqr = dx * dx + dy * dy;
@@ -262,13 +253,7 @@ inline bool OSX_LookupCharacter(unsigned short vkey, unsigned int modifiers, boo
 			return true;
 		}
 	}
-	else if ( sKLKCHRData ) {
-		translated = KeyTranslate( sKLKCHRData, vkey, &keyTranslateState );
-		if ( ( translated & 0x00ff0000 ) == 0 ) {
-			*outChar = translated & 0xff;
-			return true;
-		}
-	}
+	(void)translated;
 	return false;
 }
 

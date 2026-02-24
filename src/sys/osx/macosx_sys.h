@@ -26,7 +26,7 @@ bool Sys_Unhide();
 
 typedef struct {
     CGDirectDisplayID     display;
-    CGTableCount          tableSize;
+    uint32_t              tableSize;
     CGGammaValue	 *red;
     CGGammaValue	 *blue;
     CGGammaValue	 *green;

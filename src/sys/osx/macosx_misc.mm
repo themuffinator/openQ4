@@ -26,10 +26,10 @@ If you have questions concerning this license or the applicable additional terms
 ===========================================================================
 */
 
+#include "../../idlib/precompiled.h"
 #define GL_GLEXT_LEGACY // AppKit.h include pulls in gl.h already
 #import <AppKit/AppKit.h>
 #import <Foundation/Foundation.h>
-#include "../../idlib/precompiled.h"
 #include "../sys_local.h"
 
 /*

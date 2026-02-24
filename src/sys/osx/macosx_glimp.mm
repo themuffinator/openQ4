@@ -400,9 +400,13 @@ static bool CreateGameWindow(  glimpParms_t parms ) {
 #endif
 
 	// Store off the pixel format attributes that we actually got
-	[pixelFormat getValues: (long *) &glConfig.colorBits forAttribute: NSOpenGLPFAColorSize forVirtualScreen: 0];
-	[pixelFormat getValues: (long *) &glConfig.depthBits forAttribute: NSOpenGLPFADepthSize forVirtualScreen: 0];
-	[pixelFormat getValues: (long *) &glConfig.stencilBits forAttribute: NSOpenGLPFAStencilSize forVirtualScreen: 0];
+	GLint pixelAttrib = 0;
+	[pixelFormat getValues: &pixelAttrib forAttribute: NSOpenGLPFAColorSize forVirtualScreen: 0];
+	glConfig.colorBits = pixelAttrib;
+	[pixelFormat getValues: &pixelAttrib forAttribute: NSOpenGLPFADepthSize forVirtualScreen: 0];
+	glConfig.depthBits = pixelAttrib;
+	[pixelFormat getValues: &pixelAttrib forAttribute: NSOpenGLPFAStencilSize forVirtualScreen: 0];
+	glConfig.stencilBits = pixelAttrib;
 
 	glConfig.displayFrequency = [[glw_state.gameMode objectForKey: (id)kCGDisplayRefreshRate] intValue];
     
@@ -632,7 +636,7 @@ void GLimp_SetGamma(unsigned short red[256],
                     unsigned short green[256],
                     unsigned short blue[256]) {
 	CGGammaValue redGamma[256], greenGamma[256], blueGamma[256];
-	CGTableCount i;
+	uint32_t i;
 	CGDisplayErr err;
         
 	for (i = 0; i < 256; i++) {
@@ -654,6 +658,8 @@ void GLimp_SetGamma(unsigned short red[256],
 
 #pragma mark -
 #pragma mark ? ATI_fragment_shader
+
+#if 0
 
 static GLuint sGeneratingProgram = 0;
 static int sCurrentPass;
@@ -1137,6 +1143,7 @@ void glAlphaFragmentOp2ATI (GLenum op, GLuint dst, GLuint dstMod, GLuint arg1, G
 void glAlphaFragmentOp3ATI (GLenum op, GLuint dst, GLuint dstMod, GLuint arg1, GLuint arg1Rep, GLuint arg1Mod, GLuint arg2, GLuint arg2Rep, GLuint arg2Mod, GLuint arg3, GLuint arg3Rep, GLuint arg3Mod) {
 	glColorFragmentOp3ATI ( op, dst, GL_ALPHA, dstMod, arg1, arg1Rep, arg1Mod, arg2, arg2Rep, arg2Mod, arg3, arg3Rep, arg3Mod);
 }
+#endif
 #pragma mark -
 
 GLExtension_t GLimp_ExtensionPointer(const char *name) {
@@ -1500,7 +1507,7 @@ NSDictionary *Sys_GetMatchingDisplayMode( glimpParms_t parms ) {
 #define MAX_DISPLAYS 128
 
 void Sys_GetGammaTable(glwgamma_t *table) {
-	CGTableCount tableSize = 512;
+	uint32_t tableSize = 512;
 	CGDisplayErr err;
     
 	table->tableSize = tableSize;
@@ -1546,9 +1553,9 @@ void Sys_StoreGammaTables() {
 
 //  This isn't a mathematically correct fade, but we don't care that much.
 void Sys_SetScreenFade(glwgamma_t *table, float fraction) {
-	CGTableCount tableSize;
+	uint32_t tableSize;
 	CGGammaValue *red, *blue, *green;
-	CGTableCount gammaIndex;
+	uint32_t gammaIndex;
     
 	//    if (!glConfig.deviceSupportsGamma)
 
@@ -1683,7 +1690,7 @@ void Sys_UnfadeScreen(CGDirectDisplayID display, glwgamma_t *table) {
 	common->Printf("Unfading display 0x%08x\n", display);
 
 	if (table) {
-		CGTableCount i;
+		uint32_t i;
         
 		common->Printf("Given table:\n");
 		for (i = 0; i < table->tableSize; i++) {
