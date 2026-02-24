@@ -705,9 +705,9 @@ void TestDot( void ) {
 	ALIGN16( float fsrc1[COUNT] );
 	ALIGN16( idVec3 v3src0[COUNT] );
 	ALIGN16( idVec3 v3src1[COUNT] );
-	ALIGN16( idVec3 v3constant( 1.0f, 2.0f, 3.0f ) );
+	ALIGN16( idVec3 v3constant );
 	ALIGN16( idPlane v4src0[COUNT] );
-	ALIGN16( idPlane v4constant(1.0f, 2.0f, 3.0f, 4.0f) );
+	ALIGN16( idPlane v4constant );
 	ALIGN16( idDrawVert drawVerts[COUNT] );
 	const char *result;
 
@@ -724,6 +724,9 @@ void TestDot( void ) {
 		v4src0[i][3] = srnd.CRandomFloat() * 10.0f;
 		drawVerts[i].xyz = v3src0[i];
 	}
+
+	v3constant = idVec3( 1.0f, 2.0f, 3.0f );
+	v4constant = idPlane( 1.0f, 2.0f, 3.0f, 4.0f );
 
 	idLib::common->Printf("====================================\n" );
 

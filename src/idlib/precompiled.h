@@ -326,11 +326,11 @@ public:
 #include "../framework/UsercmdGen.h"
 
 // decls
-#include "../framework/DeclManager.h"
-#include "../framework/DeclTable.h"
-#include "../framework/DeclSkin.h"
-#include "../framework/DeclEntityDef.h"
-#include "../framework/DeclAF.h"
+#include "../framework/declManager.h"
+#include "../framework/declTable.h"
+#include "../framework/declSkin.h"
+#include "../framework/declEntityDef.h"
+#include "../framework/declAF.h"
 // RAVEN BEGIN
 // jscott: new decl types
 #include "../framework/DeclPlayerModel.h"
