@@ -3,7 +3,7 @@
 
 
 #include "../Game_local.h"
-#include "../weapon.h"
+#include "../Weapon.h"
 
 idCVar bot_pathdebug( "bot_pathdebug", "0", CVAR_BOOL | CVAR_CHEAT, "force the bot to path to player" );
 idCVar bot_goaldist( "bot_goaldist", "20", CVAR_INTEGER | CVAR_CHEAT, "" );
