@@ -119,6 +119,7 @@ DARWIN_PLATFORM_SOURCES = (
     "sys/posix/posix_net.cpp",
     "sys/posix/posix_signal.cpp",
     "sys/posix/posix_threads.cpp",
+    "sys/osx/macosx_compat.mm",
     "sys/osx/macosx_event.mm",
     "sys/osx/macosx_glimp.mm",
     "sys/osx/macosx_misc.mm",
