@@ -301,13 +301,19 @@ jobs:
               --repo "${GITHUB_REPOSITORY}" \
               --title "${name}" \
               --notes-file "${notes}" \
-              --prerelease
+              --latest=false
             gh release upload "${tag}" "${assets[@]}" --repo "${GITHUB_REPOSITORY}" --clobber
           else
             gh release create "${tag}" "${assets[@]}" \
               --repo "${GITHUB_REPOSITORY}" \
               --title "${name}" \
               --notes-file "${notes}" \
-              --prerelease \
               --latest=false
           fi
+
+          release_id="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag}" --jq .id)"
+          gh api \
+            --method PATCH \
+            "repos/${GITHUB_REPOSITORY}/releases/${release_id}" \
+            -f prerelease=false \
+            -f draft=false >/dev/null

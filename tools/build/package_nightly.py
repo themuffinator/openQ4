@@ -26,6 +26,12 @@ PLATFORM_BSE_BINARY = {
     "macos": "libbse-q4.dylib",
 }
 
+PLATFORM_GAME_MODULE_EXT = {
+    "windows": ".dll",
+    "linux": ".so",
+    "macos": ".dylib",
+}
+
 DEFAULT_ARCHIVE_FORMAT = {
     "windows": "zip",
     "linux": "tar.xz",
@@ -39,7 +45,15 @@ ARCHIVE_SUFFIX = {
 }
 
 OPENQ4_EXCLUDED_DIRS = {"logs", "screenshots"}
-OPENQ4_EXCLUDED_SUFFIXES = {".pdb", ".lib", ".exp", ".ilk"}
+OPENQ4_PK4_EXCLUDED_SUFFIXES = {
+    ".dll",
+    ".so",
+    ".dylib",
+    ".pdb",
+    ".lib",
+    ".exp",
+    ".ilk",
+}
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -111,6 +125,14 @@ def get_required_root_binaries(platform: str, arch: str) -> tuple[str, str]:
     )
 
 
+def get_required_game_module_binaries(platform: str, arch: str) -> tuple[str, str]:
+    module_ext = PLATFORM_GAME_MODULE_EXT[platform]
+    return (
+        f"game-sp_{arch}{module_ext}",
+        f"game-mp_{arch}{module_ext}",
+    )
+
+
 def copy_required_binaries(
     platform: str,
     arch: str,
@@ -139,6 +161,27 @@ def copy_required_binaries(
     return copied_optional, missing_required
 
 
+def copy_required_game_binaries(
+    platform: str,
+    arch: str,
+    install_openq4_dir: Path,
+    package_openq4_dir: Path,
+    allow_missing_binaries: bool,
+) -> list[str]:
+    missing_required: list[str] = []
+
+    for filename in get_required_game_module_binaries(platform, arch):
+        source = install_openq4_dir / filename
+        if not source.is_file():
+            if allow_missing_binaries:
+                missing_required.append(filename)
+                continue
+            raise FileNotFoundError(f"required game module not found: {source}")
+        shutil.copy2(source, package_openq4_dir / filename)
+
+    return missing_required
+
+
 def create_openq4_pk4(
     install_openq4_dir: Path, destination_pk4: Path
 ) -> tuple[int, list[str]]:
@@ -158,7 +201,7 @@ def create_openq4_pk4(
                     skipped_samples.append(rel.as_posix())
                 continue
 
-            if path.suffix.lower() in OPENQ4_EXCLUDED_SUFFIXES:
+            if path.suffix.lower() in OPENQ4_PK4_EXCLUDED_SUFFIXES:
                 if len(skipped_samples) < 5:
                     skipped_samples.append(rel.as_posix())
                 continue
@@ -240,6 +283,14 @@ def main(argv: list[str]) -> int:
 
     openq4_package_dir = package_root / "openq4"
     openq4_package_dir.mkdir(parents=True, exist_ok=True)
+    missing_game_modules = copy_required_game_binaries(
+        args.platform,
+        args.arch,
+        install_openq4_dir,
+        openq4_package_dir,
+        args.allow_missing_binaries,
+    )
+
     openq4_pk4_name = f"openq4-openq4-{args.version_tag}.pk4"
     openq4_pk4_path = openq4_package_dir / openq4_pk4_name
 
@@ -264,6 +315,10 @@ def main(argv: list[str]) -> int:
     if missing_required:
         print("Missing required runtime binaries:")
         for filename in missing_required:
+            print(f"  - {filename}")
+    if missing_game_modules:
+        print("Missing required game modules:")
+        for filename in missing_game_modules:
             print(f"  - {filename}")
     if not copied_optional:
         print("Optional runtime omitted: libbse-q4 was not present in install directory.")
