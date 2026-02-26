@@ -238,6 +238,7 @@ OpenQ4 maintains complete freedom to evolve independently while preserving compa
 
 - [Platform Support](docs-dev/platform-support.md) - Cross-platform roadmap and status
 - [Display Settings](docs-user/display-settings.md) - Multi-monitor and display configuration
+- [Multiplayer Networking](docs-user/multiplayer-networking.md) - MP lag compensation and prediction cvars
 - [Input Key Matrix](docs-dev/input-key-matrix.md) - Keyboard and controller input reference
 - [Release Completion](docs-dev/release-completion.md) - Release checklist and changelog
 - [Project TODO](TODO.md) - Known issues and upcoming features

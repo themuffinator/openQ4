@@ -57,6 +57,9 @@ Process:
 - [x] BSE owner-kinematics parity improved: `rvBSE::UpdateFromOwner` now preserves last valid owner velocity across same-timestamp updates instead of zeroing `mCurrentVelocity` on tiny frame deltas.
 - [x] BSE oriented-particle matrix parity improved: oriented quad corner ordering/signs now match decompiled transform basis usage, removing mirrored orientation in rotated oriented-particle paths.
 - [x] Startup command parsing hardening completed: oversized `+wait` stress launches no longer crash during early `StartupVariable` cvar processing (command-line overflow/drop handling and `idCmdArgs::AppendArg` bounds checks tightened).
+- [x] Multiplayer server-side hitscan lag compensation added with configurable rewind controls (`net_mpLagCompensation`, `net_mpLagCompMaxMS`, `net_mpLagCompBiasMS`) and server diagnostics (`net_mpLagCompDebug`).
+- [x] Multiplayer non-local prediction mode is now runtime-selectable through `net_mpPredictMode` (`0` legacy limited behavior, `1` enhanced per-frame prediction).
+- [x] Scope/zoom handling documentation updated to reflect multiplayer zoom stability and scope yaw alignment behavior.
 
 ## Carry Forward
 

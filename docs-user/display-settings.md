@@ -70,6 +70,8 @@ Notes:
 
 - `r_aspectRatio` is **deprecated/ignored**. Aspect ratio and FOV behavior are derived automatically from the current render size, so the game follows any aspect ratio without manual selection.
 - Weapon gameplay zoom uses the same gameplay FOV conversion path as normal view FOV, so authored weapon zoom values keep consistent framing/magnification across aspect ratios.
+- In multiplayer, zoomed first-person view suppresses view bob while scoped so reticle tracking stays stable during movement.
+- Scope GUI yaw tracking for zoom overlays follows the weapon/player view axis path, improving scope alignment while turning.
 
 ## View Weapon FOV and Placement (New)
 
