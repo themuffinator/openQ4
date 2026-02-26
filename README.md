@@ -32,7 +32,12 @@ To play OpenQ4, you need:
 - The latest OpenQ4 release (from this repository)
 - A modern 64-bit operating system
 
-> **Note:** OpenQ4 does NOT include game assets. You must own Quake 4 to play. The engine will automatically detect your Quake 4 installation from Steam or GOG. OpenQ4 is not compatible with legacy Quake 4 game mods.
+---
+
+> [!NOTE]
+> **OpenQ4** does NOT include game assets. You must own Quake 4 to play. The engine will automatically detect your Quake 4 installation from Steam or GOG. OpenQ4 is not compatible with legacy Quake 4 game mods.
+
+---
 
 <p align="center">
   <img src="assets/img/shot1.png" alt="OpenQ4 gameplay screenshot showing in-engine combat" width="92%">
