@@ -1313,6 +1313,133 @@ void idWindow::DrawBackground(const idRectangle &drawRect) {
 	}
 
 	if ( background && matColor.w() ) {
+		if ( flags & WIN_MATCANVASFILL ) {
+			const float imageWidth = background->GetImageWidth();
+			const float imageHeight = background->GetImageHeight();
+			if ( imageWidth > 0.0f && imageHeight > 0.0f && drawRect.w > 0.0f && drawRect.h > 0.0f ) {
+				float s0 = 0.0f;
+				float s1 = 1.0f;
+				float t0 = 0.0f;
+				float t1 = 1.0f;
+
+				const float imageAspect = imageWidth / imageHeight;
+				const float canvasAspect = ( dc != NULL ) ? dc->GetCanvasAspect() : ( drawRect.w / drawRect.h );
+				if ( imageAspect > canvasAspect ) {
+					// Uniform fill on canvas: crop equally from left/right.
+					const float keptWidth = canvasAspect / imageAspect;
+					s0 = ( 1.0f - keptWidth ) * 0.5f;
+					s1 = s0 + keptWidth;
+				} else if ( imageAspect < canvasAspect ) {
+					// Uniform fill on canvas: crop equally from top/bottom.
+					const float keptHeight = imageAspect / canvasAspect;
+					t0 = ( 1.0f - keptHeight ) * 0.5f;
+					t1 = t0 + keptHeight;
+				}
+
+				float drawX = drawRect.x;
+				float drawY = drawRect.y;
+				float drawW = drawRect.w;
+				float drawH = drawRect.h;
+				if ( dc->ClippedCoords( &drawX, &drawY, &drawW, &drawH, &s0, &t0, &s1, &t1 ) ) {
+					return;
+				}
+				dc->AdjustCoords( &drawX, &drawY, &drawW, &drawH );
+
+				renderSystem->SetColor( matColor );
+				dc->DrawStretchPic( drawX, drawY, drawW, drawH, s0, t0, s1, t1, background );
+				return;
+			}
+		}
+
+		float axisScaleX = 1.0f;
+		float axisScaleY = 1.0f;
+		if ( dc != NULL ) {
+			dc->AdjustCoords( NULL, NULL, &axisScaleX, &axisScaleY );
+		}
+		if ( axisScaleX <= 0.0f ) {
+			axisScaleX = 1.0f;
+		}
+		if ( axisScaleY <= 0.0f ) {
+			axisScaleY = 1.0f;
+		}
+
+		if ( flags & WIN_MATCOVER ) {
+			const float imageWidth = background->GetImageWidth();
+			const float imageHeight = background->GetImageHeight();
+			if ( imageWidth > 0.0f && imageHeight > 0.0f && drawRect.w > 0.0f && drawRect.h > 0.0f ) {
+				float s0 = 0.0f;
+				float s1 = 1.0f;
+				float t0 = 0.0f;
+				float t1 = 1.0f;
+
+				const float imageAspect = imageWidth / imageHeight;
+				const float rectAspect = ( drawRect.w * axisScaleX ) / ( drawRect.h * axisScaleY );
+				if ( imageAspect > rectAspect ) {
+					// Image is wider than the destination: crop equally from left/right.
+					const float keptWidth = rectAspect / imageAspect;
+					s0 = ( 1.0f - keptWidth ) * 0.5f;
+					s1 = s0 + keptWidth;
+				} else if ( imageAspect < rectAspect ) {
+					// Image is taller than the destination: crop equally from top/bottom.
+					const float keptHeight = imageAspect / rectAspect;
+					t0 = ( 1.0f - keptHeight ) * 0.5f;
+					t1 = t0 + keptHeight;
+				}
+
+				float drawX = drawRect.x;
+				float drawY = drawRect.y;
+				float drawW = drawRect.w;
+				float drawH = drawRect.h;
+				if ( dc->ClippedCoords( &drawX, &drawY, &drawW, &drawH, &s0, &t0, &s1, &t1 ) ) {
+					return;
+				}
+				dc->AdjustCoords( &drawX, &drawY, &drawW, &drawH );
+
+				renderSystem->SetColor( matColor );
+				dc->DrawStretchPic( drawX, drawY, drawW, drawH, s0, t0, s1, t1, background );
+				return;
+			}
+		}
+		if ( flags & WIN_MATFIT ) {
+			const float imageWidth = background->GetImageWidth();
+			const float imageHeight = background->GetImageHeight();
+			if ( imageWidth > 0.0f && imageHeight > 0.0f && drawRect.w > 0.0f && drawRect.h > 0.0f ) {
+				float fitX = drawRect.x;
+				float fitY = drawRect.y;
+				float fitW = drawRect.w;
+				float fitH = drawRect.h;
+
+				const float imageAspect = imageWidth / imageHeight;
+				const float rectAspect = ( drawRect.w * axisScaleX ) / ( drawRect.h * axisScaleY );
+				if ( imageAspect > rectAspect ) {
+					// Fit to width; center vertically.
+					fitH = ( drawRect.w * axisScaleX ) / ( imageAspect * axisScaleY );
+					fitY = drawRect.y + ( ( drawRect.h - fitH ) * 0.5f );
+				} else if ( imageAspect < rectAspect ) {
+					// Fit to height; center horizontally.
+					fitW = ( drawRect.h * axisScaleY * imageAspect ) / axisScaleX;
+					fitX = drawRect.x + ( ( drawRect.w - fitW ) * 0.5f );
+				}
+
+				float drawX = fitX;
+				float drawY = fitY;
+				float drawW = fitW;
+				float drawH = fitH;
+				float s0 = 0.0f;
+				float t0 = 0.0f;
+				float s1 = 1.0f;
+				float t1 = 1.0f;
+				if ( dc->ClippedCoords( &drawX, &drawY, &drawW, &drawH, &s0, &t0, &s1, &t1 ) ) {
+					return;
+				}
+				dc->AdjustCoords( &drawX, &drawY, &drawW, &drawH );
+
+				renderSystem->SetColor( matColor );
+				dc->DrawStretchPic( drawX, drawY, drawW, drawH, s0, t0, s1, t1, background );
+				return;
+			}
+		}
+
 		float scalex, scaley;
 		if ( flags & WIN_NATURALMAT ) {
 			scalex = drawRect.w / background->GetImageWidth();
@@ -2457,6 +2584,30 @@ bool idWindow::ParseInternalVar(const char *_name, idParser *src) {
 	if (idStr::Icmp(_name, "naturalmatscale") == 0) {
 		if ( src->ParseBool() ) {
 			flags |= WIN_NATURALMAT;
+		}
+		return true;
+	}
+	if ( idStr::Icmp( _name, "matcover" ) == 0 ) {
+		if ( src->ParseBool() ) {
+			flags |= WIN_MATCOVER;
+		} else {
+			flags &= ~WIN_MATCOVER;
+		}
+		return true;
+	}
+	if ( idStr::Icmp( _name, "matfit" ) == 0 ) {
+		if ( src->ParseBool() ) {
+			flags |= WIN_MATFIT;
+		} else {
+			flags &= ~WIN_MATFIT;
+		}
+		return true;
+	}
+	if ( idStr::Icmp( _name, "matcanvasfill" ) == 0 ) {
+		if ( src->ParseBool() ) {
+			flags |= WIN_MATCANVASFILL;
+		} else {
+			flags &= ~WIN_MATCANVASFILL;
 		}
 		return true;
 	}

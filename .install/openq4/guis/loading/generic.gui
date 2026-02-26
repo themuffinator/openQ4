@@ -12,12 +12,21 @@ windowDef Desktop
 		set "p_load_bar::visible" "0" ;		
 	}
 
-	windowDef loadimg
+	windowDef loadimg_wide
 	{
-		rect	0,0,640,480
-		visible	1
+		rect	( 0 - "gui::virtual_screen_x_expand" ),( 0 - "gui::virtual_screen_y_expand" ),( 640 + ( "gui::virtual_screen_x_expand" * 2 ) ),( 480 + ( "gui::virtual_screen_y_expand" * 2 ) )
+		visible	("gui::loading_bkgnd_wide" == 1)
 		background	"gui::loading_bkgnd"
 		matcolor	1,1,1,1
+		matcanvasfill	1
+	}
+	windowDef loadimg_legacy
+	{
+		rect	0,0,640,480
+		visible	("gui::loading_bkgnd_wide" == 0)
+		background	"gui::loading_bkgnd"
+		matcolor	1,1,1,1
+		matfit	1
 	}
 	windowDef top_edge
 	{

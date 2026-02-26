@@ -99,6 +99,46 @@ function Test-MesonBuildDirectory {
     return (Test-Path $coreData) -and (Test-Path $ninjaFile)
 }
 
+function Stop-OpenQ4RuntimeProcesses {
+    [OutputType([bool])]
+    param()
+
+    $processNames = @(
+        "OpenQ4-client_x64",
+        "OpenQ4-ded_x64"
+    )
+
+    $running = @(Get-Process -Name $processNames -ErrorAction SilentlyContinue)
+    if ($running.Count -eq 0) {
+        return $false
+    }
+
+    Write-Host "Stopping running OpenQ4 processes before install: $($running.ProcessName -join ', ')"
+
+    foreach ($proc in $running) {
+        try {
+            if ($proc.MainWindowHandle -ne 0) {
+                $null = $proc.CloseMainWindow()
+            }
+        } catch {
+            # Ignore close-window failures and fall back to force stop below.
+        }
+    }
+
+    Start-Sleep -Milliseconds 500
+
+    $stillRunning = @(Get-Process -Name $processNames -ErrorAction SilentlyContinue)
+    if ($stillRunning.Count -gt 0) {
+        try {
+            $stillRunning | Stop-Process -Force -ErrorAction Stop
+        } catch {
+            throw "Failed to stop running OpenQ4 processes. Close them manually and retry install. Details: $($_.Exception.Message)"
+        }
+    }
+
+    return $true
+}
+
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $scriptDir "..\.."))
 $defaultBuildDir = Join-Path $repoRoot "builddir"
@@ -197,6 +237,19 @@ if ($effectiveArgs.Length -gt 0 -and ($effectiveArgs[0] -eq "compile" -or $effec
     }
 }
 
+if ($commandName -eq "install" -and $env:OPENQ4_INSTALL_CLOSE_RUNNING -ne "0") {
+    Stop-OpenQ4RuntimeProcesses | Out-Null
+}
+
 Invoke-Meson -MesonArgs $effectiveArgs -VsDevCmdPath $vsDevCmd
 $exitCode = [int]$LASTEXITCODE
+
+if ($commandName -eq "install" -and $exitCode -ne 0 -and $env:OPENQ4_INSTALL_RETRY_ON_FAILURE -ne "0") {
+    Write-Host "Meson install failed; retrying once after ensuring OpenQ4 processes are stopped..."
+    Stop-OpenQ4RuntimeProcesses | Out-Null
+    Start-Sleep -Milliseconds 500
+    Invoke-Meson -MesonArgs $effectiveArgs -VsDevCmdPath $vsDevCmd
+    $exitCode = [int]$LASTEXITCODE
+}
+
 exit $exitCode

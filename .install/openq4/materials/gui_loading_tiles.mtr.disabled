@@ -1,0 +1,21 @@
+gfx/guis/mainmenu/load_top_edgetile
+{
+	{
+		blend blend
+		colored
+		map "gfx/guis/mainmenu/load_top_edgetile.tga"
+		noclamp
+		nopicmip
+	}
+}
+
+gfx/guis/mainmenu/load_btm_edgetile
+{
+	{
+		blend blend
+		colored
+		map "gfx/guis/mainmenu/load_btm_edgetile.tga"
+		noclamp
+		nopicmip
+	}
+}

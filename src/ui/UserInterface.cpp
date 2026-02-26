@@ -402,6 +402,12 @@ void idUserInterfaceLocal::Redraw( int _time ) {
 		const bool aspectCorrect = ui_aspectCorrection.GetBool();
 		uiManagerLocal.SetAspectCorrection( aspectCorrect );
 		uiManagerLocal.SetSize( desktop->forceAspectWidth, desktop->forceAspectHeight );
+		float xExpand = 0.0f;
+		float yExpand = 0.0f;
+		uiManagerLocal.dc.GetVirtualScreenExpansion( desktop->forceAspectWidth, desktop->forceAspectHeight, xExpand, yExpand );
+		SetStateFloat( "virtual_screen_x_expand", xExpand );
+		SetStateFloat( "virtual_screen_y_expand", yExpand );
+
 		if ( gui_debugScript.GetInteger() > 4 ) {
 			static int lastDebugRedrawTime = -10000;
 			if ( _time - lastDebugRedrawTime >= 250 ) {

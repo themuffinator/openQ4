@@ -37,6 +37,16 @@ windowDef Desktop
 		screenalignx	right
 		screenaligny	bottom
 	}
+	windowDef top_edgetile
+	{
+		rect	640,0,( "gui::virtual_screen_x_expand" * 2 ),119
+		visible	1
+		background	"gfx/guis/mainmenu/load_top_edgetile"
+		matcolor	0.0941,0.113,0.0392,1
+		naturalmatscale	1
+		screenalignx	left
+		screenaligny	top
+	}
 	windowDef top_edgeadd
 	{
 		rect	0,0,640,119
@@ -45,6 +55,16 @@ windowDef Desktop
 		matcolor	0.0941,0.113,0.0392,1
 		screenalignx	left
 		screenaligny	top
+	}
+	windowDef btm_edgetile
+	{
+		rect	( 0 - ( "gui::virtual_screen_x_expand" * 2 ) ),345,( "gui::virtual_screen_x_expand" * 2 ),253
+		visible	1
+		background	"gfx/guis/mainmenu/load_btm_edgetile"
+		matcolor	0.0941,0.113,0.0392,1
+		naturalmatscale	1
+		screenalignx	right
+		screenaligny	bottom
 	}
 	windowDef btm_edgeadd
 	{

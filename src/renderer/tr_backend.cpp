@@ -50,6 +50,7 @@ may touch, including the editor.
 */
 void RB_SetDefaultGLState( void ) {
 	int		i;
+	const int maxStateUnits = Max( 0, Min( MAX_MULTITEXTURE_UNITS, Min( glConfig.maxTextureUnits, glConfig.maxTextureImageUnits ) ) );
 
 	RB_LogComment( "--- R_SetDefaultGLState ---\n" );
 
@@ -89,7 +90,7 @@ void RB_SetDefaultGLState( void ) {
 		glScissor( 0, 0, glConfig.vidWidth, glConfig.vidHeight );
 	}
 
-	for ( i = glConfig.maxTextureUnits - 1 ; i >= 0 ; i-- ) {
+	for ( i = maxStateUnits - 1 ; i >= 0 ; i-- ) {
 		GL_SelectTexture( i );
 
 		// object linear texgen is our default
@@ -143,8 +144,14 @@ void GL_SelectTexture( int unit ) {
 		return;
 	}
 
-	if ( unit < 0 || unit >= glConfig.maxTextureUnits && unit >= glConfig.maxTextureImageUnits ) {
-		common->Warning( "GL_SelectTexture: unit = %i", unit );
+	if ( unit < 0 || unit >= MAX_MULTITEXTURE_UNITS || unit >= glConfig.maxTextureUnits || unit >= glConfig.maxTextureImageUnits ) {
+		common->Warning(
+			"GL_SelectTexture: unit = %i (max tracked = %i, max texture units = %i, max image units = %i)",
+			unit,
+			MAX_MULTITEXTURE_UNITS,
+			glConfig.maxTextureUnits,
+			glConfig.maxTextureImageUnits
+		);
 		return;
 	}
 

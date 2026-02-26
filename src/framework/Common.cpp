@@ -2864,7 +2864,7 @@ static void OpenQ4_BuildGameModuleBinaryName( const char *moduleName, char outNa
 	idStr::snPrintf( outName, MAX_OSPATH, "game-%s_%s", variant, OPENQ4_MODULE_ARCH_TAG );
 }
 
-static void OpenQ4_DisableBSEWithWarning( const char *reason ) {
+static void OpenQ4_DisableBSEWithWarning( const char *reason, bool showDialog = true ) {
 	static bool warnedConsole = false;
 	if ( !warnedConsole ) {
 		warnedConsole = true;
@@ -2873,7 +2873,7 @@ static void OpenQ4_DisableBSEWithWarning( const char *reason ) {
 
 #if defined( _WIN32 ) && !defined( ID_DEDICATED )
 	static bool warnedDialog = false;
-	if ( !warnedDialog ) {
+	if ( showDialog && !warnedDialog ) {
 		warnedDialog = true;
 
 		char message[1024];
@@ -2890,6 +2890,89 @@ static void OpenQ4_DisableBSEWithWarning( const char *reason ) {
 	::declEffectEdit = NULL;
 	::bse = &bseDisabledLocal;
 }
+
+#if defined( _WIN32 ) && !defined( _DEBUG )
+static bool OpenQ4_BufferContainsTokenNoCase( const unsigned char *buffer, const size_t bufferSize, const char *token ) {
+	if ( !buffer || !token || !token[0] ) {
+		return false;
+	}
+
+	const size_t tokenLength = strlen( token );
+	if ( tokenLength == 0 || tokenLength > bufferSize ) {
+		return false;
+	}
+
+	for ( size_t i = 0; i + tokenLength <= bufferSize; ++i ) {
+		size_t j = 0;
+		for ( ; j < tokenLength; ++j ) {
+			unsigned char a = buffer[ i + j ];
+			unsigned char b = static_cast<unsigned char>( token[ j ] );
+			if ( a >= 'A' && a <= 'Z' ) {
+				a = static_cast<unsigned char>( a + ( 'a' - 'A' ) );
+			}
+			if ( b >= 'A' && b <= 'Z' ) {
+				b = static_cast<unsigned char>( b + ( 'a' - 'A' ) );
+			}
+			if ( a != b ) {
+				break;
+			}
+		}
+		if ( j == tokenLength ) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+static bool OpenQ4_DllImageMentionsDebugCRT( const char *dllPath ) {
+	if ( !dllPath || !dllPath[ 0 ] ) {
+		return false;
+	}
+
+	FILE *file = fopen( dllPath, "rb" );
+	if ( !file ) {
+		return false;
+	}
+
+	bool hasDebugCRTImport = false;
+	if ( fseek( file, 0, SEEK_END ) == 0 ) {
+		const long fileSize = ftell( file );
+		if ( fileSize > 0 && fileSize <= ( 64L * 1024L * 1024L ) && fseek( file, 0, SEEK_SET ) == 0 ) {
+			unsigned char *fileData = static_cast<unsigned char *>( malloc( static_cast<size_t>( fileSize ) ) );
+			if ( fileData ) {
+				const size_t bytesRead = fread( fileData, 1, static_cast<size_t>( fileSize ), file );
+				if ( bytesRead == static_cast<size_t>( fileSize ) ) {
+					static const char *debugCRTImports[] = {
+						"ucrtbased.dll",
+						"vcruntime140d.dll",
+						"vcruntime140_1d.dll",
+						"msvcp140d.dll"
+					};
+					for ( int i = 0; i < static_cast<int>( sizeof( debugCRTImports ) / sizeof( debugCRTImports[0] ) ); ++i ) {
+						if ( OpenQ4_BufferContainsTokenNoCase( fileData, bytesRead, debugCRTImports[ i ] ) ) {
+							hasDebugCRTImport = true;
+							break;
+						}
+					}
+				}
+				free( fileData );
+			}
+		}
+	}
+
+	fclose( file );
+	return hasDebugCRTImport;
+}
+
+static bool OpenQ4_IsDebugCRTLoaded( void ) {
+	// Mixing a release engine with a debug-built module can corrupt allocator state.
+	return	::GetModuleHandleA( "ucrtbased.dll" ) != NULL ||
+			::GetModuleHandleA( "vcruntime140d.dll" ) != NULL ||
+			::GetModuleHandleA( "vcruntime140_1d.dll" ) != NULL ||
+			::GetModuleHandleA( "msvcp140d.dll" ) != NULL;
+}
+#endif
 
 /*
 =================
@@ -2923,11 +3006,22 @@ void idCommonLocal::LoadBSEDLL( void ) {
 	::declEffectEdit = NULL;
 	::bseAllocDeclEffect = NULL;
 
+#if defined( _WIN32 ) && !defined( _DEBUG )
+	const bool hadDebugCRTBeforeBSE = OpenQ4_IsDebugCRTLoaded();
+#endif
+
 	fileSystem->FindDLL( "libbse-q4", dllPath, false );
 	if ( !dllPath[ 0 ] ) {
 		OpenQ4_DisableBSEWithWarning( "couldn't find dynamic library 'libbse-q4'" );
 		return;
 	}
+
+#if defined( _WIN32 ) && !defined( _DEBUG )
+	if ( OpenQ4_DllImageMentionsDebugCRT( dllPath ) ) {
+		OpenQ4_DisableBSEWithWarning( "libbse-q4 depends on the MSVC debug CRT in a non-debug engine build", false );
+		return;
+	}
+#endif
 
 	common->DPrintf( "Loading BSE DLL: '%s'\n", dllPath );
 	bseDLL = sys->DLL_Load( dllPath );
@@ -2935,6 +3029,15 @@ void idCommonLocal::LoadBSEDLL( void ) {
 		OpenQ4_DisableBSEWithWarning( "couldn't load dynamic library 'libbse-q4'" );
 		return;
 	}
+
+#if defined( _WIN32 ) && !defined( _DEBUG )
+	if ( !hadDebugCRTBeforeBSE && OpenQ4_IsDebugCRTLoaded() ) {
+		Sys_DLL_Unload( bseDLL );
+		bseDLL = NULL;
+		OpenQ4_DisableBSEWithWarning( "libbse-q4 depends on the MSVC debug CRT in a non-debug engine build", false );
+		return;
+	}
+#endif
 
 	GetBSEAPI = (GetBSEAPI_t) Sys_DLL_GetProcAddress( bseDLL, "GetBSEAPI" );
 	if ( !GetBSEAPI ) {

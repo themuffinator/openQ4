@@ -2,12 +2,21 @@ windowDef Desktop
 {
 	rect	0,0,640,480
 	definefloat	"iconOffset"	(640-(24*"gui::load_icons"+24))/2
-	windowDef loadimg
+	windowDef loadimg_wide
 	{
-		rect	0,0,640,480
-		visible	1
+		rect	( 0 - "gui::virtual_screen_x_expand" ),( 0 - "gui::virtual_screen_y_expand" ),( 640 + ( "gui::virtual_screen_x_expand" * 2 ) ),( 480 + ( "gui::virtual_screen_y_expand" * 2 ) )
+		visible	("gui::loading_bkgnd_wide" == 1)
 		background	"gui::loading_bkgnd"
 		matcolor	1,1,1,1
+		matcanvasfill	1
+	}
+	windowDef loadimg_legacy
+	{
+		rect	0,0,640,480
+		visible	("gui::loading_bkgnd_wide" == 0)
+		background	"gui::loading_bkgnd"
+		matcolor	1,1,1,1
+		matfit	1
 	}
 	windowDef top_edge
 	{
@@ -15,6 +24,16 @@ windowDef Desktop
 		visible	1
 		background	"gfx/guis/mainmenu/load_top_edge"
 		matcolor	0,0,0,0.8
+		screenalignx	left
+		screenaligny	top
+	}
+	windowDef top_edge2
+	{
+		rect	640,0,( "gui::virtual_screen_x_expand" * 2 ),120
+		visible	1
+		background	"gfx/guis/mainmenu/load_top_edge2"
+		matcolor	0,0,0,0.8
+		naturalmatscale	1
 		screenalignx	left
 		screenaligny	top
 	}
@@ -27,6 +46,26 @@ windowDef Desktop
 		screenalignx	right
 		screenaligny	bottom
 	}
+	windowDef btm_edge2
+	{
+		rect	( 0 - ( "gui::virtual_screen_x_expand" * 2 ) ),227,( "gui::virtual_screen_x_expand" * 2 ),253
+		visible	1
+		background	"gfx/guis/mainmenu/load_btm_edge2"
+		matcolor	0,0,0,0.8
+		//naturalmatscale	1
+		screenalignx	right
+		screenaligny	bottom
+	}
+	windowDef top_edgetile
+	{
+		rect	640,0,( "gui::virtual_screen_x_expand" * 2 ),120
+		visible	1
+		background	"gfx/guis/mainmenu/load_top_edgetile"
+		matcolor	0.0941,0.113,0.0392,1
+		naturalmatscale	1
+		screenalignx	left
+		screenaligny	top
+	}
 	windowDef top_edgeadd
 	{
 		rect	0,0,640,120
@@ -35,6 +74,16 @@ windowDef Desktop
 		matcolor	0.0941,0.113,0.0392,1
 		screenalignx	left
 		screenaligny	top
+	}
+	windowDef btm_edgetile
+	{
+		rect	( 0 - ( "gui::virtual_screen_x_expand" * 2 ) ),227,( "gui::virtual_screen_x_expand" * 2 ),253
+		visible	1
+		background	"gfx/guis/mainmenu/load_btm_edgetile"
+		matcolor	0.0941,0.113,0.0392,1
+		//naturalmatscale	1
+		screenalignx	right
+		screenaligny	bottom
 	}
 	windowDef btm_edgeadd
 	{

@@ -87,3 +87,28 @@ postprocess/openq4_blur
 		clamp
 	}
 }
+
+
+gfx/guis/mainmenu/load_top_edgetile
+{
+	noshadows
+	translucent
+	{
+		nopicmip
+		blend add
+		map gfx/guis/mainmenu/load_top_edgetile.tga
+		colored
+	}
+}
+
+gfx/guis/mainmenu/load_btm_edgetile
+{
+	noshadows
+	translucent
+	{
+		nopicmip
+		blend add
+		map gfx/guis/mainmenu/load_btm_edgetile.tga
+		colored
+	}
+}

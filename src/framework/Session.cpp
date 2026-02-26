@@ -126,6 +126,82 @@ static void Session_DrawScaledSmallString( float x, float y, float charWidth, fl
 	renderSystem->SetColor( colorWhite );
 }
 
+static bool Session_FileExistsInSearchPaths( const char *path ) {
+	if ( path == NULL || path[0] == '\0' ) {
+		return false;
+	}
+
+	return ( fileSystem->ReadFile( path, NULL, NULL ) != -1 );
+}
+
+static bool Session_LevelshotImageExists( const idStr &imageBasePath ) {
+	if ( imageBasePath.Length() <= 0 ) {
+		return false;
+	}
+
+	idStr tgaPath = imageBasePath;
+	tgaPath.DefaultFileExtension( ".tga" );
+	if ( Session_FileExistsInSearchPaths( tgaPath.c_str() ) ) {
+		return true;
+	}
+
+	idStr jpgPath = imageBasePath;
+	jpgPath.DefaultFileExtension( ".jpg" );
+	return Session_FileExistsInSearchPaths( jpgPath.c_str() );
+}
+
+static void Session_ResolveWideLoadingBackground( idStr &backgroundPath, bool &isWide ) {
+	isWide = false;
+	if ( backgroundPath.Length() <= 0 ) {
+		return;
+	}
+
+	idStr backgroundNoExt = backgroundPath;
+	backgroundNoExt.StripFileExtension();
+
+	idStr lowerPath = backgroundNoExt;
+	lowerPath.ToLower();
+	lowerPath.BackSlashesToSlashes();
+
+	static const char loadscreensPrefix[] = "gfx/guis/loadscreens/";
+	if ( idStr::Icmpn( lowerPath.c_str(), loadscreensPrefix, sizeof( loadscreensPrefix ) - 1 ) != 0 ) {
+		return;
+	}
+
+	if ( lowerPath.Find( "/wide/", false ) >= 0 ) {
+		isWide = Session_LevelshotImageExists( backgroundNoExt );
+		return;
+	}
+
+	idStr mapName = backgroundNoExt;
+	mapName.StripPath();
+	if ( mapName.Length() <= 0 ) {
+		return;
+	}
+
+	idStr basePath;
+	backgroundNoExt.ExtractFilePath( basePath );
+	if ( basePath.Length() > 0 ) {
+		idStr siblingWidePath = basePath;
+		if ( siblingWidePath[ siblingWidePath.Length() - 1 ] != '/' ) {
+			siblingWidePath += "/";
+		}
+		siblingWidePath += "wide/";
+		siblingWidePath += mapName;
+		if ( Session_LevelshotImageExists( siblingWidePath ) ) {
+			backgroundPath = siblingWidePath;
+			isWide = true;
+			return;
+		}
+	}
+
+	idStr widePath = va( "gfx/guis/loadscreens/wide/%s", mapName.c_str() );
+	if ( Session_LevelshotImageExists( widePath ) ) {
+		backgroundPath = widePath;
+		isWide = true;
+	}
+}
+
 static void Session_DrawFallbackLoadingScreen() {
 	static const idVec4 loadingTextColor( 0.94f, 0.62f, 0.05f, 1.0f );
 
@@ -1693,7 +1769,8 @@ void idSessionLocal::LoadLoadingGui( const char *mapName ) {
 	const char *loadingLevelName = mapName;
 	const char *loadingObjectives = "";
 	const char *loadingAuthor = "";
-	const char *loadingBackground = "gfx/guis/loadscreens/generic";
+	idStr loadingBackground = "gfx/guis/loadscreens/generic";
+	bool loadingBackgroundWide = false;
 	const char *loadGuiOverride = "";
 	const char *spawnGameType = mapSpawnData.serverInfo.GetString( "si_gameType", cvarSystem->GetCVarString( "si_gameType" ) );
 	const char *spawnMapPath = mapSpawnData.serverInfo.GetString( "si_map", mapName );
@@ -1715,6 +1792,8 @@ void idSessionLocal::LoadLoadingGui( const char *mapName ) {
 		loadGuiOverride = mapDef->dict.GetString( "loadgui", "" );
 	}
 
+	Session_ResolveWideLoadingBackground( loadingBackground, loadingBackgroundWide );
+
 	char guiMap[ MAX_STRING_CHARS ];
 	strncpy( guiMap, va( "guis/map/%s.gui", stripped.c_str() ), MAX_STRING_CHARS );
 	// give the gamecode a chance to override
@@ -1734,7 +1813,8 @@ void idSessionLocal::LoadLoadingGui( const char *mapName ) {
 
 	if ( guiLoading ) {
 		guiLoading->SetStateFloat( "map_loading", 0.0f );
-		guiLoading->SetStateString( "loading_bkgnd", loadingBackground );
+		guiLoading->SetStateString( "loading_bkgnd", loadingBackground.c_str() );
+		guiLoading->SetStateInt( "loading_bkgnd_wide", loadingBackgroundWide ? 1 : 0 );
 		guiLoading->SetStateString( "loading_levelname", loadingLevelName );
 		guiLoading->SetStateString( "loading_objectives", loadingObjectives );
 		guiLoading->SetStateString( "loading_author", loadingAuthor );
@@ -1783,7 +1863,7 @@ void idSessionLocal::LoadLoadingGui( const char *mapName ) {
 		}
 		guiLoading->StateChanged( com_frameTime );
 
-		const idMaterial *mat = declManager->FindMaterial( loadingBackground );
+		const idMaterial *mat = declManager->FindMaterial( loadingBackground.c_str() );
 		mat->SetSort( SS_GUI );
 	}
 }

@@ -838,6 +838,21 @@ void idDeviceContext::GetVirtualScreenExpansion( float width, float height, floa
 	}
 }
 
+float idDeviceContext::GetCanvasAspect() const {
+	float windowWidth = static_cast<float>( glConfig.uiViewportWidth );
+	float windowHeight = static_cast<float>( glConfig.uiViewportHeight );
+	if ( windowWidth <= 0.0f || windowHeight <= 0.0f ) {
+		windowWidth = static_cast<float>( glConfig.vidWidth );
+		windowHeight = static_cast<float>( glConfig.vidHeight );
+	}
+
+	if ( windowWidth <= 0.0f || windowHeight <= 0.0f ) {
+		return static_cast<float>( VIRTUAL_WIDTH ) / static_cast<float>( VIRTUAL_HEIGHT );
+	}
+
+	return windowWidth / windowHeight;
+}
+
 void idDeviceContext::SetSize(float width, float height) {
 	vidWidth = VIRTUAL_WIDTH;
 	vidHeight = VIRTUAL_HEIGHT;
