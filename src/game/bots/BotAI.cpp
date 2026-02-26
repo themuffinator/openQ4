@@ -100,6 +100,8 @@ rvmBot::BotGetItemLongTermGoal
 */
 int rvmBot::BotGetItemLongTermGoal( bot_state_t* bs, int tfl, bot_goal_t* goal )
 {
+	const float invalidGoalAvoidTime = 5.0f;
+
 	//if the bot has no goal
 	if( !botGoalManager.BotGetTopGoal( bs->gs, goal ) )
 	{
@@ -111,6 +113,18 @@ int rvmBot::BotGetItemLongTermGoal( bot_state_t* bs, int tfl, bot_goal_t* goal )
 	{
 		BotChooseWeapon( bs );
 		bs->ltg_time = 0;
+	}
+	else
+	{
+		const int travelTime = gameLocal.TravelTimeToGoal( bs->origin, goal->origin, tfl );
+		if( travelTime <= 0 )
+		{
+			if( ( goal->flags & GFL_ITEM ) && goal->number > 0 )
+			{
+				botGoalManager.BotSetAvoidGoalTime( bs->gs, goal->number, invalidGoalAvoidTime );
+			}
+			bs->ltg_time = 0;
+		}
 	}
 
 	// Check to see that we can get to our goal, if not get a new goal.
@@ -1263,6 +1277,7 @@ void rvmBot::MoveToCoverPoint(void)
 	if (aas->FindNearestGoal(goal, areaNum, origin, target, TFL_WALK | TFL_AIR, 0.0f, 0.0f, obstacles, numObstacles, findCover))
 	{
 		bs.currentGoal.origin = goal.origin;
+		bs.currentGoal.framenum = gameLocal.framenum;
 	}
 }
 

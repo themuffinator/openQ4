@@ -535,7 +535,7 @@ public:
 
 // jmarshall
 	virtual void			GetRandomBotName(int clientNum, idStr& name);
-	virtual int				TravelTimeToGoal(const idVec3& origin, const idVec3& goal);
+	virtual int				TravelTimeToGoal(const idVec3& origin, const idVec3& goal, int travelFlags = 0);
 	virtual int				GetBotItemEntry(const char* name);
 
 	void					AddBot(const char* botName);

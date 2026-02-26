@@ -272,38 +272,90 @@ void rvmBot::ServerThink( void )
 
 	stateThread.Execute();
 
-	// If we are moving along a set of waypoints, let's move along.
+	if( aas == NULL )
+	{
+		bs.botinput.dir.Zero();
+		bs.botinput.speed = 0;
+		bs.viewangles = bs.botinput.viewangles;
+		bs.useRandomPosition = false;
+		bs.attackerEntity = NULL;
+		bs.botinput.weapon = bs.weaponnum;
+		BotInputFrame();
+		return;
+	}
+
+	const float invalidGoalAvoidTime = 5.0f;
+	const int travelFlags = TFL_WALK | TFL_AIR;
+
+	bool wantsRandomGoal = bs.useRandomPosition;
+	idVec3 navigationGoal = wantsRandomGoal ? bs.random_move_position : bs.currentGoal.origin;
+
+	// If no goal is active yet, keep moving with a temporary random point.
+	if( !wantsRandomGoal && bs.currentGoal.framenum < 0 )
+	{
+		BotMoveInRandomDirection( &bs );
+		wantsRandomGoal = true;
+		navigationGoal = bs.random_move_position;
+	}
+
 	aasPath_t path;
-	//int myArea = aas->PointAreaNum(GetOrigin());
-	int goalArea = aas->PointAreaNum( bs.currentGoal.origin );
 	idVec3 org = bs.origin;
 	int curAreaNum = aas->AdjustPositionAndGetArea( org );
+	idVec3 goalPos = navigationGoal;
+	int goalArea = aas->AdjustPositionAndGetArea( goalPos );
+	bool hasPath = false;
+
+	if( curAreaNum > 0 && goalArea > 0 )
+	{
+		hasPath = aas->WalkPathToGoal( path, curAreaNum, org, goalArea, goalPos, travelFlags );
+	}
+
+	// If the current LTG cannot be pathed, invalidate it and force a short random detour.
+	if( !hasPath && !wantsRandomGoal )
+	{
+		if( ( bs.currentGoal.flags & GFL_ITEM ) && bs.currentGoal.number > 0 )
+		{
+			botGoalManager.BotSetAvoidGoalTime( bs.gs, bs.currentGoal.number, invalidGoalAvoidTime );
+		}
+		bs.ltg_time = 0;
+		bs.nbg_time = 0;
+
+		BotMoveInRandomDirection( &bs );
+		wantsRandomGoal = true;
+		navigationGoal = bs.random_move_position;
+
+		org = bs.origin;
+		curAreaNum = aas->AdjustPositionAndGetArea( org );
+		goalPos = navigationGoal;
+		goalArea = aas->AdjustPositionAndGetArea( goalPos );
+		if( curAreaNum > 0 && goalArea > 0 )
+		{
+			hasPath = aas->WalkPathToGoal( path, curAreaNum, org, goalArea, goalPos, travelFlags );
+		}
+	}
 
 	if( bot_debug.GetBool() )
 	{
-		if (bs.useRandomPosition)
+		if( goalArea > 0 )
 		{
-			aas->ShowWalkPath(GetOrigin(), goalArea, bs.random_move_position);
+			aas->ShowWalkPath( GetOrigin(), goalArea, goalPos );
 		}
-		else
-		{
-			aas->ShowWalkPath(GetOrigin(), goalArea, bs.currentGoal.origin);
-		}
-
 		aas->ShowArea( GetOrigin() );
 	}
 
-	if (bs.useRandomPosition)
+	if( hasPath )
 	{
-		aas->WalkPathToGoal(path, curAreaNum, org, goalArea, bs.random_move_position, TFL_WALK | TFL_AIR);
+		BotMoveToGoalOrigin( path.moveGoal );
+	}
+	else if( goalArea > 0 )
+	{
+		BotMoveToGoalOrigin( goalPos );
 	}
 	else
 	{
-		aas->WalkPathToGoal(path, curAreaNum, org, goalArea, bs.currentGoal.origin, TFL_WALK | TFL_AIR);
+		bs.botinput.dir.Zero();
+		bs.botinput.speed = 0;
 	}
-	
-	idVec3 moveGoal = path.moveGoal;
-	BotMoveToGoalOrigin(path.moveGoal);
 
 	bs.viewangles = bs.botinput.viewangles;
 

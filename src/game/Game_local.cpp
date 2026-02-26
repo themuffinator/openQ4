@@ -3059,14 +3059,25 @@ void idGameLocal::SpawnPlayer(int clientNum, bool isBot, const char* botName) {
 	if (gameLocal.IsMultiplayer())
 	{
 // jmarshall
+		const char* playerSpawnClassname = idPlayer::GetSpawnClassname();
+
 		if (isBot)
 		{
-			args.Set("classname", va("%s_bot", idPlayer::GetSpawnClassname()));
-			args.Set("botname", botName);
+			idStr botClassname = va( "%s_bot", playerSpawnClassname );
+			if ( FindEntityDef( botClassname.c_str(), false ) ) {
+				args.Set( "classname", botClassname.c_str() );
+			}
+			else
+			{
+				// Fallback for base assets that do not provide a dedicated *_bot entityDef.
+				args.Set( "classname", playerSpawnClassname );
+				args.Set( "spawnclass", "rvmBot" );
+			}
+			args.Set( "botname", botName ? botName : "bot" );
 		}
 		else
 		{
-			args.Set("classname", idPlayer::GetSpawnClassname());
+			args.Set( "classname", playerSpawnClassname );
 		}
 // jmarshall end
 	}
@@ -9255,34 +9266,40 @@ void idGameLocal::Trace(trace_t& results, const idVec3& start, const idVec3& end
 idGameLocal::TravelTimeToGoal
 ================
 */
-int idGameLocal::TravelTimeToGoal( const idVec3& origin, const idVec3& goal )
+int idGameLocal::TravelTimeToGoal( const idVec3& origin, const idVec3& goal, int travelFlags )
 {
 	idAAS* aas = GetBotAAS();
 
 	if( aas == NULL )
 	{
-		gameLocal.Error( "idGameLocal::TraveTimeToGoal: No AAS loaded...\n" );
 		return 0;
 	}
-	//int originArea = aas->PointAreaNum(origin);
-	//idVec3 _goal = goal;
-	//int goalArea = aas->AdjustPositionAndGetArea(_goal);
-	//return aas->TravelTimeToGoalArea(originArea, origin, goalArea, TFL_WALK);
 
 	idVec3 org = origin;
 	int curAreaNum = aas->AdjustPositionAndGetArea( org );
-	int goalArea = aas->PointAreaNum( goal );
-	int travelTime;
-	idReachability* reach;
-	if( !aas->RouteToGoalArea( curAreaNum, org, goalArea, TFL_WALK | TFL_AIR, travelTime, &reach ) )
+	idVec3 goalPos = goal;
+	int goalArea = aas->AdjustPositionAndGetArea( goalPos );
+
+	if( curAreaNum <= 0 || goalArea <= 0 )
 	{
 		return 0;
 	}
 
-	//int goalArea = aas->PointAreaNum(goal);
-	//aas->ShowWalkPath(origin, goalArea, goal);
+	if( curAreaNum == goalArea )
+	{
+		const float sameAreaDistance = ( goalPos - org ).LengthFast();
+		const int sameAreaTravelTime = idMath::FtoiFast( sameAreaDistance );
+		return ( sameAreaTravelTime > 0 ) ? sameAreaTravelTime : 1;
+	}
 
-	return travelTime;
+	const int resolvedTravelFlags = ( travelFlags != 0 ) ? travelFlags : ( TFL_WALK | TFL_AIR );
+	int travelTime;
+	idReachability* reach;
+	if( !aas->RouteToGoalArea( curAreaNum, org, goalArea, resolvedTravelFlags, travelTime, &reach ) )
+	{
+		return 0;
+	}
+	return ( travelTime > 0 ) ? travelTime : 1;
 }
 
 /*
@@ -9317,9 +9334,40 @@ idGameLocal::AddBot
 */
 void idGameLocal::AddBot(const char *botName) {
 	int clientNum;
+	const char* requestedBotName = ( botName && botName[0] ) ? botName : "bot";
 
-	if (aasList.Num() == 0) {
-		common->Warning("idGameLocal::AddBot: No AAS file loaded for map\n");
+	if( !isServer ) {
+		common->Warning( "idGameLocal::AddBot: Bots can only be added on the server\n" );
+		return;
+	}
+
+	idAAS* botAAS = GetBotAAS();
+	if( botAAS == NULL || !botAAS->IsValid() ) {
+		idStr expectedAASPaths;
+		if( !mapFileName.IsEmpty() ) {
+			for( int i = 0; i < aasNames.Num(); i++ ) {
+				idStr aasPath = mapFileName;
+				aasPath.SetFileExtension( aasNames[i] );
+				if( i > 0 ) {
+					expectedAASPaths += ", ";
+				}
+				expectedAASPaths += aasPath;
+			}
+		}
+
+		common->Warning(
+			"idGameLocal::AddBot: Bot '%s' was not added because no valid AAS is loaded for map '%s'\n",
+			requestedBotName,
+			mapFileName.IsEmpty() ? "<unknown>" : mapFileName.c_str()
+		);
+
+		if( !expectedAASPaths.IsEmpty() ) {
+			common->Warning(
+				"idGameLocal::AddBot: Expected one of these AAS files to be present: %s\n",
+				expectedAASPaths.c_str()
+			);
+		}
+
 		return;
 	}
 

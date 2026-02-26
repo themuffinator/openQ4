@@ -941,10 +941,9 @@ idBotGoalManager::BotFindEntityForLevelItem
 */
 void idBotGoalManager::BotFindEntityForLevelItem( levelitem_t* li )
 {
-	int ent, modelindex;
+	int modelindex;
 	itemconfig_t* ic;
 	//aas_entityinfo_t entinfo;
-	idVec3 dir;
 
 	ic = itemconfig;
 	if( !itemconfig )
@@ -986,6 +985,8 @@ void idBotGoalManager::BotFindEntityForLevelItem( levelitem_t* li )
 			{
 				//found an entity for this level item
 				li->item = ent;
+				li->origin = ent->GetPhysics()->GetOrigin();
+				li->goalorigin = li->origin;
 			}
 		}
 	}
@@ -1086,6 +1087,7 @@ void idBotGoalManager::UpdateEntityItems( void )
 					//		li->goalorigin);
 					//} //end if
 					li->origin = ent->GetPhysics()->GetOrigin();
+					li->goalorigin = li->origin;
 					break;
 				}
 			}
@@ -1151,6 +1153,7 @@ void idBotGoalManager::UpdateEntityItems( void )
 					//update the level item origin
 					//VectorCopy(ent->r.currentOrigin, li->origin);
 					li->origin = ent->GetPhysics()->GetOrigin();
+					li->goalorigin = li->origin;
 					break;
 				}
 			}
@@ -1194,6 +1197,7 @@ void idBotGoalManager::UpdateEntityItems( void )
 		//origin of the item
 		//VectorCopy(ent->r.currentOrigin, li->origin);
 		li->origin = ent->GetPhysics()->GetOrigin();
+		li->goalorigin = li->origin;
 
 		// jmarshall - fix this, bots, jump pads, and droppable items, bad combo.
 		//get the item goal area and goal origin
@@ -1364,7 +1368,7 @@ int idBotGoalManager::BotChooseLTGItem( int goalstate, idVec3 origin, int* inven
 	{
 		return false;
 	}
-	if( !gs->itemweightconfig )
+	if( !gs->itemweightconfig || !gs->itemweightindex )
 	{
 		return false;
 	}
@@ -1459,7 +1463,7 @@ int idBotGoalManager::BotChooseLTGItem( int goalstate, idVec3 origin, int* inven
 			//get the travel time towards the goal area
 // jmarshall
 			//t = AAS_AreaTravelTimeToGoalArea(areanum, origin, li->goalareanum, travelflags);
-			t = gameLocal.TravelTimeToGoal( origin, li->goalorigin );
+			t = gameLocal.TravelTimeToGoal( origin, li->goalorigin, travelflags );
 			// jmarshall end
 
 			//if the goal is reachable
@@ -1563,7 +1567,7 @@ idBotGoalManager::BotChooseNBGItem
 */
 int idBotGoalManager::BotChooseNBGItem( int goalstate, idVec3 origin, int* inventory, int travelflags, bot_goal_t* ltg, float maxtime )
 {
-	int areanum, t, weightnum, ltg_time;
+	int t, weightnum, ltg_time;
 	float weight, bestweight, avoidtime;
 	iteminfo_t* iteminfo;
 	itemconfig_t* ic;
@@ -1576,38 +1580,28 @@ int idBotGoalManager::BotChooseNBGItem( int goalstate, idVec3 origin, int* inven
 	{
 		return false;
 	}
-	if( !gs->itemweightconfig )
+	if( !gs->itemweightconfig || !gs->itemweightindex )
 	{
 		return false;
 	}
-	//get the area the bot is in
-// jmarshall
-	areanum = 1; // BotReachabilityArea(origin, gs->client);
-// jmarshall end
-	//if the bot is in solid or if the area the bot is in has no reachability links
-	//if (!areanum || !AAS_AreaReachability(areanum))
-	//{
-	//	//use the last valid area the bot was in
-	//	areanum = gs->lastreachabilityarea;
-	//} //end if
-	//remember the last area with reachabilities the bot was in
-	gs->lastreachabilityarea = areanum;
-	//if still in solid
-	if( !areanum )
+	if( maxtime <= 0.0f )
 	{
 		return false;
 	}
-	// jmarshall
+
 	if( ltg )
 	{
 		//ltg_time = AAS_AreaTravelTimeToGoalArea(areanum, origin, ltg->areanum, travelflags);
-		ltg_time = gameLocal.TravelTimeToGoal( origin, ltg->origin );
+		ltg_time = gameLocal.TravelTimeToGoal( origin, ltg->origin, travelflags );
+		if( ltg_time <= 0 )
+		{
+			ltg_time = 99999;
+		}
 	}
 	else
 	{
 		ltg_time = 99999;
 	}
-	// jmarshall end
 	//the item configuration
 	ic = itemconfig;
 	if( !itemconfig )
@@ -1684,7 +1678,7 @@ int idBotGoalManager::BotChooseNBGItem( int goalstate, idVec3 origin, int* inven
 		{
 			//get the travel time towards the goal area
 			//t = AAS_AreaTravelTimeToGoalArea(areanum, origin, li->goalareanum, travelflags);
-			t = gameLocal.TravelTimeToGoal( origin, li->goalorigin );
+			t = gameLocal.TravelTimeToGoal( origin, li->goalorigin, travelflags );
 
 			//if the goal is reachable
 			if( t > 0 && t < maxtime )
@@ -1706,7 +1700,7 @@ int idBotGoalManager::BotChooseNBGItem( int goalstate, idVec3 origin, int* inven
 						//get the travel time from the goal to the long term goal
 // jmarshall
 						//t = AAS_AreaTravelTimeToGoalArea(li->goalareanum, li->goalorigin, ltg->areanum, travelflags);
-						t = gameLocal.TravelTimeToGoal( li->goalorigin, ltg->origin );
+						t = gameLocal.TravelTimeToGoal( li->goalorigin, ltg->origin, travelflags );
 						// jmarshall end
 					} //end if
 					//if the travel back is possible and doesn't take too long
