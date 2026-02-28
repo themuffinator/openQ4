@@ -1984,9 +1984,7 @@ void idRestoreGame::ReadUsercmd( usercmd_t &usercmd ) {
 	ReadInt( usercmd.duplicateCount );
 // RAVEN BEGIN
 // ddynerman: larger button bitfield
-	short savedButtons;
-	ReadShort( savedButtons );
-	usercmd.buttons = static_cast<byte>( savedButtons );
+	ReadShort( usercmd.buttons );
 // RAVEN END
 	ReadSignedChar( usercmd.forwardmove );
 	ReadSignedChar( usercmd.rightmove );

@@ -10,7 +10,7 @@
 
 **A modern, full binary replacement for Quake 4**
 
-[Features](#features) • [Quick Start](#quick-start) • [Building](#building-from-source) • [Documentation](#documentation) • [TODO](TODO.md) • [Credits](#credits)
+[Features](#features) • [Compatibility](#quake-4-compatibility-status) • [Quick Start](#quick-start) • [Building](#building-from-source) • [Documentation](#documentation) • [TODO](TODO.md) • [Credits](#credits)
 
 </div>
 
@@ -73,6 +73,24 @@ To play OpenQ4, you need:
   <img src="assets/img/shot3.png" alt="OpenQ4 gameplay screenshot showing environment detail and lighting" width="49%">
 </p>
 <p align="center"><sub>Modernized engine behavior while preserving classic Quake 4 gameplay.</sub></p>
+
+---
+
+## Quake 4 Compatibility Status
+
+This status focuses on compatibility with official Quake 4 assets (`q4base` PK4s), not proprietary game DLL compatibility.
+
+### Compatible
+- ✅ **Basic Set of Effects (BSE) Reconstruction**: Core BSE runtime behavior has been rebuilt and integrated so stock effects execute through the OpenQ4 engine/game pipeline.
+- ✅ **Sound Shaders**: Effect-driven sound shader paths are restored, including effect sound capability checks and runtime playback behavior.
+- ✅ **Screen Effects**: BSE-driven screen/camera effect paths used by stock content are operational in current OpenQ4 builds.
+- ✅ **Material Shaders**: Material handling compatibility has been restored to remove startup reliance on custom repo-side `q4base` material overrides.
+- ✅ **Stock-Asset Validation Path**: Repeated validation loops with stock assets have been used to keep parser/runtime compatibility regressions visible and actionable.
+
+### Unresolved
+- ❌ **Triggering Issues (Doors, Scripted Interactions)**: A known inherited issue still causes some trigger/door logic to fail in gameplay, and root-cause parity work is still in progress.
+
+Current known compatibility regressions and follow-up work are tracked in [TODO.md](TODO.md) and [docs-dev/release-completion.md](docs-dev/release-completion.md).
 
 ---
 

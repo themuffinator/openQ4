@@ -159,8 +159,9 @@ typedef enum {
 	UB_IMPULSE61,
 	UB_IMPULSE62,
 	UB_IMPULSE63,
+	UB_IMPULSE127 = UB_IMPULSE0 + IMPULSE_127,
 
-	UB_MAX_BUTTONS
+	UB_MAX_BUTTONS = UB_IMPULSE127 + 1
 } usercmdButton_t;
 
 typedef struct {
@@ -186,6 +187,9 @@ userCmdString_t	userCmdStrings[] = {
 	{ "_zoom",			UB_ZOOM },
 	{ "_showScores",	UB_SHOWSCORES },
 	{ "_mlook",			UB_MLOOK },
+	{ "_ingameStats",	UB_BUTTON5 },
+	{ "_voiceChat",		UB_BUTTON6 },
+	{ "_tourney",		UB_BUTTON7 },
 
 	{ "_button0",		UB_BUTTON0 },
 	{ "_button1",		UB_BUTTON1 },
@@ -744,6 +748,11 @@ void idUsercmdGenLocal::CmdButtons( void ) {
 		cmd.buttons |= BUTTON_SCORES;
 	}
 
+	// explicitly expose strafe as a button bit for vehicle/gameplay consumers.
+	if ( ButtonState( UB_STRAFE ) ) {
+		cmd.buttons |= BUTTON_STRAFE;
+	}
+
 	// check the mouse look button
 	if ( ButtonState( UB_MLOOK ) ^ in_freeLook.GetInteger() ) {
 		cmd.buttons |= BUTTON_MLOOK;
@@ -838,6 +847,27 @@ int	idUsercmdGenLocal::CommandStringUsercmdData( const char *cmdString ) {
 			return ucs->button;
 		}
 	}
+
+	if ( idStr::Icmpn( cmdString, "_impulse", 8 ) == 0 ) {
+		const char* impulseSuffix = cmdString + 8;
+		if ( impulseSuffix[0] != '\0' ) {
+			bool validDigits = true;
+			for ( const char* c = impulseSuffix; *c != '\0'; ++c ) {
+				if ( *c < '0' || *c > '9' ) {
+					validDigits = false;
+					break;
+				}
+			}
+
+			if ( validDigits ) {
+				const int impulseNum = atoi( impulseSuffix );
+				if ( impulseNum >= IMPULSE_0 && impulseNum <= IMPULSE_127 ) {
+					return UB_IMPULSE0 + impulseNum;
+				}
+			}
+		}
+	}
+
 	return UB_NONE;
 }
 
@@ -947,13 +977,16 @@ void idUsercmdGenLocal::Key( int keyNum, bool down ) {
 	keyState[ keyNum ] = down;
 
 	int action = idKeyInput::GetUsercmdAction( keyNum );
+	if ( action < 0 || action >= UB_MAX_BUTTONS ) {
+		return;
+	}
 
 	if ( down ) {
 
 		buttonState[ action ]++;
 
 		if ( !Inhibited()  ) {
-			if ( action >= UB_IMPULSE0 && action <= UB_IMPULSE61 ) {
+			if ( action >= UB_IMPULSE0 && action <= UB_IMPULSE127 ) {
 				cmd.impulse = action - UB_IMPULSE0;
 				cmd.flags ^= UCF_IMPULSE_SEQUENCE;
 			}

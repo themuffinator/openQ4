@@ -80,7 +80,7 @@ const int IMPULSE_17			= 17;			// ready to play ( toggles ui_ready )
 const int IMPULSE_18			= 18;			// center view
 const int IMPULSE_19			= 19;			// show PDA/INV/MAP
 const int IMPULSE_20			= 20;			// toggle team ( toggles ui_team )
-const int IMPULSE_21			= 21;			// <unused>
+const int IMPULSE_21			= 21;			// tourney toggle waiting room/spec
 const int IMPULSE_22			= 22;			// spectate
 const int IMPULSE_23			= 23;			// <unused>
 const int IMPULSE_24			= 24;			// <unused>
@@ -89,7 +89,12 @@ const int IMPULSE_26			= 26;			// <unused>
 const int IMPULSE_27			= 27;			// <unused>
 const int IMPULSE_28			= 28;			// vote yes
 const int IMPULSE_29			= 29;			// vote no
-const int IMPULSE_40			= 40;			// use vehicle
+const int IMPULSE_40			= 40;			// repeat last radio chatter
+const int IMPULSE_50			= 50;			// toggle flashlight
+const int IMPULSE_51			= 51;			// switch to last weapon
+const int IMPULSE_52			= 52;			// multiplayer stats
+const int IMPULSE_100			= 100;			// buy menu impulse range
+const int IMPULSE_127			= 127;			// buy menu impulse range
 
 // usercmd_t->flags
 const int UCF_IMPULSE_SEQUENCE	= 0x0001;		// toggled every time an impulse command is sent
@@ -99,7 +104,7 @@ public:
 	int			gameFrame;						// frame number
 	int			gameTime;						// game time
 	int			duplicateCount;					// duplication count for networking
-	byte		buttons;						// buttons
+	short		buttons;						// buttons
 	signed char	forwardmove;					// forward/backward movement
 	signed char	rightmove;						// left/right movement
 	signed char	upmove;							// up/down movement

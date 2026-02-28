@@ -10,7 +10,7 @@ idCVar bot_goaldist( "bot_goaldist", "20", CVAR_INTEGER | CVAR_CHEAT, "" );
 idCVar bot_debugnav( "bot_debugnav", "0", CVAR_BOOL | CVAR_CHEAT, "draws navmesh paths for the bot" );
 idCVar bot_showstate( "bot_showstate", "0", CVAR_BOOL | CVAR_CHEAT, "draws the bot state above the bot" );
 idCVar bot_debug( "bot_debug", "1", CVAR_BOOL, "shows debug info for the bot" );
-idCVar bot_skill("bot_skill", "3", CVAR_INTEGER, "");
+idCVar bot_skill( "bot_skill", "3", CVAR_INTEGER | CVAR_ARCHIVE, "bot skill depth (1-5)", 1, 5 );
 
 CLASS_DECLARATION( idPlayer, rvmBot )
 END_CLASS
@@ -120,8 +120,10 @@ rvmBot::Spawn
 void rvmBot::Spawn( void )
 {
 	idStr botName;
+	idStr botCharacterFile;
 	char filename[256];
 	int errnum;
+	int requestedSkill;
 
 	stateThread.SetOwner(this);
 
@@ -140,6 +142,8 @@ void rvmBot::Spawn( void )
 		WP_ROCKET_LAUNCHER = weapon_rocketlauncher;
 
 		botName = spawnArgs.GetString( "botname" );
+		botCharacterFile = va( "bots/%s_c.c", botName.c_str() );
+		requestedSkill = idMath::ClampInt( 1, 5, bot_skill.GetInteger() );
 
 		aas = gameLocal.GetBotAAS();
 		if( aas == NULL )
@@ -149,7 +153,31 @@ void rvmBot::Spawn( void )
 		}
 
 		// Load in the bot character.
-		bs.character = botCharacterStatsManager.BotLoadCharacterFromFile( va( "bots/%s_c.c", botName.c_str() ), 1 );
+		bs.character = botCharacterStatsManager.BotLoadCharacterFromFile( botCharacterFile.c_str(), requestedSkill );
+		if( !bs.character ) {
+			for( int fallbackSkill = requestedSkill - 1; fallbackSkill >= 1; fallbackSkill-- ) {
+				bs.character = botCharacterStatsManager.BotLoadCharacterFromFile( botCharacterFile.c_str(), fallbackSkill );
+				if( bs.character ) {
+					common->Warning(
+						"Bot '%s': requested skill %d not found, using skill %d\n",
+						botName.c_str(),
+						requestedSkill,
+						fallbackSkill
+					);
+					break;
+				}
+			}
+		}
+		if( !bs.character ) {
+			bs.character = botCharacterStatsManager.BotLoadCharacterFromFile( botCharacterFile.c_str(), -1 );
+			if( bs.character ) {
+				common->Warning(
+					"Bot '%s': no explicit skill tier found, using first available tier in %s\n",
+					botName.c_str(),
+					botCharacterFile.c_str()
+				);
+			}
+		}
 		if( !bs.character )
 		{
 			gameLocal.Error( "Failed to load character file for bot %s\n", botName.c_str() );
