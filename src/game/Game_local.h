@@ -1223,7 +1223,9 @@ private:
 // RAVEN END
 
 // jmarshall
+#ifdef GAME_MPAPI
 	void					AlertBots(idPlayer* player, idVec3 alert_position);
+#endif
 
 	const idDeclEntityDef* botItemTable;;
 
@@ -1535,6 +1537,8 @@ ID_INLINE idEntityPtr<type>::operator type * ( void ) const {
 
 #include "../idlib/containers/ListGame.h"
 
+#ifdef GAME_MPAPI
 #include "bots/Bot.h"
+#endif
 
 #endif	/* !__GAME_LOCAL_H__ */

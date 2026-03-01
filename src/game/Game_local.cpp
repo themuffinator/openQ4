@@ -594,6 +594,7 @@ void idGameLocal::Init( void ) {
 // jmarshall end
 
 // jmarshall
+#ifdef GAME_MPAPI
 	// 	   
 	// load in the bot itemtable.
 	botItemTable = FindEntityDef("bot_itemtable", false);
@@ -609,6 +610,7 @@ void idGameLocal::Init( void ) {
 		botWeaponInfoManager.Init();
 		botGoalManager.BotSetupGoalAI();
 	}
+#endif
 // jmarshall end
 
 	Printf( "...%d aas types\n", aasList.Num() );
@@ -2059,10 +2061,12 @@ void idGameLocal::InitFromNewMap( const char *mapName, idRenderWorld *renderWorl
 // RAVEN END
 
 // jmarshall
+#ifdef GAME_MPAPI
 	if (botItemTable && gameLocal.IsMultiplayer() && gameLocal.isServer)
 	{
 		botGoalManager.InitLevelItems();
 	}
+#endif
 // jmarshall end
 
 
@@ -3857,10 +3861,12 @@ TIME_THIS_SCOPE("idGameLocal::RunFrame - gameDebug.BeginFrame()");
 
 		// do multiplayer related stuff
 		if ( isMultiplayer ) {
+#ifdef GAME_MPAPI
 			// Keep bot level-item/entity links current for item goals in DM/MP modes.
 			if ( isServer && botItemTable && registeredBots.Num() > 0 ) {
 				botGoalManager.UpdateEntityItems();
 			}
+#endif
 			mpGame.Run();
 		}
 
@@ -6027,6 +6033,7 @@ idGameLocal::AlertBots
 ===================
 */
 // jmarshall
+#ifdef GAME_MPAPI
 void idGameLocal::AlertBots(idPlayer* player, idVec3 alert_position)
 {
 	for (int i = 0; i < MAX_CLIENTS; i++)
@@ -6053,6 +6060,7 @@ void idGameLocal::AlertBots(idPlayer* player, idVec3 alert_position)
 		}
 	}
 }
+#endif
 // jmarshall end
 
 /*
@@ -6066,6 +6074,7 @@ void idGameLocal::AlertAI( idEntity *ent ) {
 	if ( ent ) {
 // jmarshall
 		// Alert any bots near were we just exploded.
+#ifdef GAME_MPAPI
 		if (gameLocal.IsMultiplayer() && gameLocal.isServer)
 		{
 			idPlayer* player = ent->Cast<idPlayer>();
@@ -6075,6 +6084,7 @@ void idGameLocal::AlertAI( idEntity *ent ) {
 			}
 
 		}
+#endif
 // jmarshall end
 
 // RAVEN BEGIN

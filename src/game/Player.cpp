@@ -10325,12 +10325,14 @@ void idPlayer::Damage( idEntity *inflictor, idEntity *attacker, const idVec3 &di
  	// inform the attacker that they hit someone
  	attacker->DamageFeedback( this, inflictor, damage );
 // jmarshall
+#ifdef GAME_MPAPI
 	if (gameLocal.IsMultiplayer() && gameLocal.isServer) {
 		if (attacker->IsType(rvmBot::GetClassType()) || attacker->IsType(idPlayer::GetClassType()))
 		{
 			InflictedDamageEvent(attacker);
 		}
 	}
+#endif
 // jmarshall end
 	
 //RAVEN BEGIN

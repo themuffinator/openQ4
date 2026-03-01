@@ -1429,7 +1429,9 @@ void idClass::RegisterClasses( void )
 // RITUAL END
 
 // jmarshall
+#ifdef GAME_MPAPI
 	REGISTER(rvmBot);
+#endif
 // jmarshall end
 #undef REGISTER
 }

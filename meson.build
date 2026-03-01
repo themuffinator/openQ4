@@ -120,6 +120,7 @@ endif
 openq4_engine_sources = files(engine_source_paths)
 
 game_sources = []
+game_sp_sources = []
 bse_sources = []
 game_idlib_sources = []
 if build_games
@@ -137,6 +138,22 @@ if build_games
     error('tools/build/list_sources.py returned no game source files.')
   endif
   game_sources = files(game_source_paths)
+
+  game_sp_source_discovery = run_command(
+    py,
+    meson.project_source_root() / 'tools' / 'build' / 'list_sources.py',
+    meson.project_source_root(),
+    'src/game',
+    '--exclude-subdirs=bots',
+    'src/game/Callbacks.cpp',
+    'src/game/gamesys/Callbacks.cpp',
+    check: true,
+  )
+  game_sp_source_paths = game_sp_source_discovery.stdout().strip().split('\n')
+  if game_sp_source_paths.length() == 0
+    error('tools/build/list_sources.py returned no SP game source files.')
+  endif
+  game_sp_sources = files(game_sp_source_paths)
 endif
 
 if build_libbse

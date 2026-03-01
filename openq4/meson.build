@@ -2,7 +2,7 @@ if build_games and build_game_sp
   if host_system == 'windows'
     shared_module(
       game_sp_binary_name,
-      game_sources,
+      game_sp_sources,
       include_directories: src_include_dir,
       link_with: game_idlib_library,
       cpp_args: game_common_cpp_args,
@@ -17,7 +17,7 @@ if build_games and build_game_sp
   else
     shared_module(
       game_sp_binary_name,
-      game_sources,
+      game_sp_sources,
       include_directories: src_include_dir,
       link_with: game_idlib_library,
       cpp_args: game_common_cpp_args,
