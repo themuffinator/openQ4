@@ -86,7 +86,7 @@ idCVar com_autoScreenshot( "com_autoScreenshot", "0", CVAR_SYSTEM | CVAR_BOOL | 
 idCVar com_makingBuild( "com_makingBuild", "0", CVAR_BOOL | CVAR_SYSTEM, "1 when making a build" );
 idCVar com_updateLoadSize( "com_updateLoadSize", "0", CVAR_BOOL | CVAR_SYSTEM | CVAR_NOCHEAT, "update the load size after loading a map" );
 idCVar com_videoRam( "com_videoRam", "64", CVAR_INTEGER | CVAR_SYSTEM | CVAR_NOCHEAT | CVAR_ARCHIVE, "holds the last amount of detected video ram" );
-idCVar com_activeGameModule( "com_activeGameModule", "", CVAR_SYSTEM, "active game module (game_sp/game_mp)" );
+idCVar com_activeGameModule( "com_activeGameModule", "", CVAR_SYSTEM, "active game module (game/game_sp/game_mp)" );
 idCVar com_nextGameModule( "com_nextGameModule", "", CVAR_SYSTEM, "internal one-shot game module override for reloadEngine" );
 
 idCVar com_product_lang_ext( "com_product_lang_ext", "1", CVAR_INTEGER | CVAR_SYSTEM | CVAR_ARCHIVE, "Extension to use when creating language files." );
@@ -2834,9 +2834,14 @@ static bool OpenQ4_IsMultiplayerGameType( const char *gameType ) {
 	return gameType && gameType[0] && idStr::Icmp( gameType, "singleplayer" ) != 0;
 }
 
+// Base name for the unified game module binary that handles both SP and MP without a DLL reload.
+#define OPENQ4_UNIFIED_MODULE_BASE_NAME "game"
+
 static bool OpenQ4_IsValidGameModuleName( const char *moduleName ) {
 	return moduleName
-		&& ( idStr::Icmp( moduleName, "game_sp" ) == 0 || idStr::Icmp( moduleName, "game_mp" ) == 0 );
+		&& ( idStr::Icmp( moduleName, OPENQ4_UNIFIED_MODULE_BASE_NAME ) == 0
+			|| idStr::Icmp( moduleName, "game_sp" ) == 0
+			|| idStr::Icmp( moduleName, "game_mp" ) == 0 );
 }
 
 static const char *OpenQ4_SelectGameModuleBaseName( void ) {
@@ -2862,6 +2867,10 @@ static const char *OpenQ4_SelectGameModuleBaseName( void ) {
 static void OpenQ4_BuildGameModuleBinaryName( const char *moduleName, char outName[ MAX_OSPATH ] ) {
 	const char *variant = ( moduleName && idStr::Icmp( moduleName, "game_mp" ) == 0 ) ? "mp" : "sp";
 	idStr::snPrintf( outName, MAX_OSPATH, "game-%s_%s", variant, OPENQ4_MODULE_ARCH_TAG );
+}
+
+static void OpenQ4_BuildUnifiedModuleBinaryName( char outName[ MAX_OSPATH ] ) {
+	idStr::snPrintf( outName, MAX_OSPATH, "%s_%s", OPENQ4_UNIFIED_MODULE_BASE_NAME, OPENQ4_MODULE_ARCH_TAG );
 }
 
 static void OpenQ4_DisableBSEWithWarning( const char *reason, bool showDialog = true ) {
@@ -3116,29 +3125,42 @@ void idCommonLocal::LoadGameDLL( void ) {
 	char			dllPath[ MAX_OSPATH ];
 	char			preferredGameModuleBinary[ MAX_OSPATH ];
 	const char *	selectedModuleBinary;
+	const char *	gameModuleBaseName;
 
 	gameImport_t	gameImport;
 	gameExport_t	gameExport;
 	GetGameAPI_t	GetGameAPI;
 
-	const char *gameModuleBaseName = OpenQ4_SelectGameModuleBaseName();
-	OpenQ4_BuildGameModuleBinaryName( gameModuleBaseName, preferredGameModuleBinary );
-	selectedModuleBinary = preferredGameModuleBinary;
-	fileSystem->FindDLL( selectedModuleBinary, dllPath, true );
+	// Prefer the unified game binary (game_<arch>) which handles both SP and MP
+	// without a DLL reload between modes.
+	char unifiedBinaryName[ MAX_OSPATH ];
+	OpenQ4_BuildUnifiedModuleBinaryName( unifiedBinaryName );
+	fileSystem->FindDLL( unifiedBinaryName, dllPath, true );
 
-	if ( !dllPath[ 0 ] ) {
-		// Legacy fallback for existing installs that still ship game_sp/game_mp.
-		selectedModuleBinary = gameModuleBaseName;
+	if ( dllPath[ 0 ] ) {
+		selectedModuleBinary = unifiedBinaryName;
+		gameModuleBaseName = OPENQ4_UNIFIED_MODULE_BASE_NAME;
+	} else {
+		// Fall back to the split SP/MP binaries.
+		gameModuleBaseName = OpenQ4_SelectGameModuleBaseName();
+		OpenQ4_BuildGameModuleBinaryName( gameModuleBaseName, preferredGameModuleBinary );
+		selectedModuleBinary = preferredGameModuleBinary;
 		fileSystem->FindDLL( selectedModuleBinary, dllPath, true );
-	}
 
-	if ( !dllPath[ 0 ] ) {
-		common->FatalError(
-			"couldn't find game dynamic library '%s' (or legacy '%s')",
-			preferredGameModuleBinary,
-			gameModuleBaseName
-		);
-		return;
+		if ( !dllPath[ 0 ] ) {
+			// Legacy fallback for existing installs that still ship game_sp/game_mp.
+			selectedModuleBinary = gameModuleBaseName;
+			fileSystem->FindDLL( selectedModuleBinary, dllPath, true );
+		}
+
+		if ( !dllPath[ 0 ] ) {
+			common->FatalError(
+				"couldn't find game dynamic library '%s' (or legacy '%s')",
+				preferredGameModuleBinary,
+				gameModuleBaseName
+			);
+			return;
+		}
 	}
 	common->DPrintf( "Loading game DLL: '%s'\n", dllPath );
 	gameDLL = sys->DLL_Load( dllPath );

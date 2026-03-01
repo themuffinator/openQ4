@@ -16,21 +16,28 @@ option(
   'build_games',
   type: 'boolean',
   value: true,
-  description: 'Build game modules (game-sp_<arch>/game-mp_<arch>) from the synchronized game source mirror.',
+  description: 'Build game modules from the synchronized game source mirror.',
+)
+
+option(
+  'build_game_unified',
+  type: 'boolean',
+  value: true,
+  description: 'Build the unified game module (game_<arch>) that handles both SP and MP without a DLL reload.',
 )
 
 option(
   'build_game_sp',
   type: 'boolean',
-  value: true,
-  description: 'Build the single-player game module (game-sp_<arch>).',
+  value: false,
+  description: 'Build the standalone single-player game module (game-sp_<arch>). Prefer build_game_unified for new builds.',
 )
 
 option(
   'build_game_mp',
   type: 'boolean',
-  value: true,
-  description: 'Build the multiplayer game module (game-mp_<arch>).',
+  value: false,
+  description: 'Build the standalone multiplayer game module (game-mp_<arch>). Prefer build_game_unified for new builds.',
 )
 
 option(

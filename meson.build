@@ -22,6 +22,7 @@ elif host_cpu_family == 'aarch64'
 endif
 game_sp_binary_name = 'game-sp_' + binary_arch
 game_mp_binary_name = 'game-mp_' + binary_arch
+game_unified_binary_name = 'game_' + binary_arch
 engine_client_binary_name = meson.project_name() + '-client_' + binary_arch
 engine_ded_binary_name = meson.project_name() + '-ded_' + binary_arch
 
@@ -65,6 +66,7 @@ endif
 
 build_engine = get_option('build_engine')
 build_games = get_option('build_games')
+build_game_unified = get_option('build_game_unified')
 build_game_sp = get_option('build_game_sp')
 build_game_mp = get_option('build_game_mp')
 build_libbse = build_engine and get_option('build_libbse')
@@ -440,6 +442,7 @@ endif
 
 game_common_cpp_args = shared_cpp_args + ['-DGAME_DLL']
 game_common_c_args = shared_c_args
+game_unified_cpp_args = game_common_cpp_args + ['-DGAME_MPAPI']
 bse_common_cpp_args = shared_cpp_args + ['-DGAME_DLL', '-DBSE_DLL']
 bse_common_c_args = shared_c_args
 game_module_link_args = []
@@ -487,7 +490,7 @@ if build_libbse
   )
 endif
 
-if build_engine or (build_games and (build_game_sp or build_game_mp))
+if build_engine or (build_games and (build_game_sp or build_game_mp or build_game_unified))
   subdir('openq4')
 endif
 
@@ -506,8 +509,10 @@ summary(
     'Build BSE DLL': build_libbse,
     'BSE source repo': bse_repo_summary,
     'Build games': build_games,
+    'Build game (unified)': build_games and build_game_unified,
     'Build game_sp': build_games and build_game_sp,
     'Build game_mp': build_games and build_game_mp,
+    'game (unified) binary': game_unified_binary_name,
     'game_sp binary': game_sp_binary_name,
     'game_mp binary': game_mp_binary_name,
     'Resource compiler': resource_compiler.found(),

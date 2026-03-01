@@ -1490,7 +1490,7 @@ void idSessionLocal::StartNewGame( const char *mapName, bool devmap ) {
 	}
 
 	const char *activeModule = cvarSystem->GetCVarString( "com_activeGameModule" );
-	if ( idStr::Icmp( activeModule, "game_sp" ) != 0 ) {
+	if ( idStr::Icmp( activeModule, "game_sp" ) != 0 && idStr::Icmp( activeModule, "game" ) != 0 ) {
 		cvarSystem->SetCVarString( "si_gameType", "singleplayer" );
 		cvarSystem->SetCVarString( "com_nextGameModule", "game_sp" );
 		idCmdArgs reloadArgs;
@@ -2538,7 +2538,7 @@ bool idSessionLocal::LoadGame( const char *saveName ) {
 	}
 
 	const char *activeModule = cvarSystem->GetCVarString( "com_activeGameModule" );
-	if ( idStr::Icmp( activeModule, "game_sp" ) != 0 ) {
+	if ( idStr::Icmp( activeModule, "game_sp" ) != 0 && idStr::Icmp( activeModule, "game" ) != 0 ) {
 		cvarSystem->SetCVarString( "si_gameType", "singleplayer" );
 		cvarSystem->SetCVarString( "com_nextGameModule", "game_sp" );
 		idCmdArgs reloadArgs;

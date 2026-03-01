@@ -325,7 +325,7 @@ void idAsyncNetwork::SpawnServer_f( const idCmdArgs &args ) {
 	}
 
 	const char *activeModule = cvarSystem->GetCVarString( "com_activeGameModule" );
-	if ( idStr::Icmp( activeModule, "game_mp" ) != 0 ) {
+	if ( idStr::Icmp( activeModule, "game_mp" ) != 0 && idStr::Icmp( activeModule, "game" ) != 0 ) {
 		cvarSystem->SetCVarString( "com_nextGameModule", "game_mp" );
 		idCmdArgs reloadArgs;
 		reloadArgs.AppendArg( "spawnServer" );
@@ -387,7 +387,7 @@ void idAsyncNetwork::Connect_f( const idCmdArgs &args ) {
 	}
 
 	const char *activeModule = cvarSystem->GetCVarString( "com_activeGameModule" );
-	if ( idStr::Icmp( activeModule, "game_mp" ) != 0 ) {
+	if ( idStr::Icmp( activeModule, "game_mp" ) != 0 && idStr::Icmp( activeModule, "game" ) != 0 ) {
 		cvarSystem->SetCVarString( "si_gameType", "dm" );
 		cvarSystem->SetCVarString( "com_nextGameModule", "game_mp" );
 		idCmdArgs reloadArgs;
@@ -408,7 +408,7 @@ idAsyncNetwork::Reconnect_f
 */
 void idAsyncNetwork::Reconnect_f( const idCmdArgs &args ) {
 	const char *activeModule = cvarSystem->GetCVarString( "com_activeGameModule" );
-	if ( idStr::Icmp( activeModule, "game_mp" ) != 0 ) {
+	if ( idStr::Icmp( activeModule, "game_mp" ) != 0 && idStr::Icmp( activeModule, "game" ) != 0 ) {
 		cvarSystem->SetCVarString( "si_gameType", "dm" );
 		cvarSystem->SetCVarString( "com_nextGameModule", "game_mp" );
 		idCmdArgs reloadArgs;
