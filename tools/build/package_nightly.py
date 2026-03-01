@@ -291,7 +291,7 @@ def main(argv: list[str]) -> int:
         args.allow_missing_binaries,
     )
 
-    openq4_pk4_name = f"openq4-openq4-{args.version_tag}.pk4"
+    openq4_pk4_name = "pak0.pk4"
     openq4_pk4_path = openq4_package_dir / openq4_pk4_name
 
     added_files, skipped_samples = create_openq4_pk4(
