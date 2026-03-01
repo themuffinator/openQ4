@@ -100,6 +100,8 @@ Current known compatibility regressions and follow-up work are tracked in [TODO.
 ### Prerequisites
 - **Quake 4** installed ([Steam](https://store.steampowered.com/app/2210/) or [GOG](https://www.gog.com/game/quake_iv))
 - **Windows**: Visual Studio 2026+ (or MSVC 19.46+)
+- **Linux**: GCC 13+ or Clang 17+
+- **macOS**: Xcode 16+ (Clang 17+)
 - **Build Tools**: [Meson](https://mesonbuild.com/) and [Ninja](https://ninja-build.org/)
 
 ### Installation
@@ -110,21 +112,42 @@ Current known compatibility regressions and follow-up work are tracked in [TODO.
    cd OpenQ4
    ```
 
-2. **Build the engine** (Windows)
+2. **Build the engine**
+
+   **Windows (PowerShell)**
    ```powershell
    # Setup the build
    powershell -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 setup --wipe builddir . --backend ninja --buildtype=debug --wrap-mode=forcefallback
-   
+
    # Compile
    powershell -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 compile -C builddir
-   
+
    # Install (optional - creates distributable package)
    powershell -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 install -C builddir --no-rebuild --skip-subprojects
    ```
 
+   **Linux / macOS (Terminal)**
+   ```bash
+   # Setup the build
+   meson setup --wipe builddir . --backend ninja --buildtype=debug --wrap-mode=forcefallback
+
+   # Compile
+   meson compile -C builddir
+
+   # Install (optional - creates distributable package)
+   meson install -C builddir --no-rebuild --skip-subprojects
+   ```
+
 3. **Run the game**
+
+   **Windows**
    ```powershell
    builddir/OpenQ4-client_x64.exe
+   ```
+
+   **Linux / macOS**
+   ```bash
+   builddir/OpenQ4-client_x64
    ```
 
 The engine will automatically find your Quake 4 installation and validate the game files.
@@ -139,8 +162,10 @@ The engine will automatically find your Quake 4 installation and validate the ga
 ### Requirements
 - **Meson** (>= 1.2.0)
 - **Ninja** build system
-- **Visual Studio 2026** or MSVC 19.46+ (Windows)
-- **C++23** compatible compiler
+- **C++23** compatible compiler:
+  - **Windows**: Visual Studio 2026 (MSVC 19.46+)
+  - **Linux**: GCC 13+ or Clang 17+
+  - **macOS**: Xcode 16+ (Clang 17+)
 
 ### Build Options
 ```
@@ -148,7 +173,7 @@ The engine will automatically find your Quake 4 installation and validate the ga
 -Dbuild_games=true|false      # Build game modules
 -Dbuild_game_sp=true|false    # Build single-player module
 -Dbuild_game_mp=true|false    # Build multiplayer module
--Denforce_msvc_2026=true      # Enforce MSVC 2026+ requirement (optional)
+-Denforce_msvc_2026=true      # Enforce MSVC 2026+ requirement (Windows only, optional)
 ```
 
 ### Build Commands
@@ -171,13 +196,25 @@ meson setup builddir . --backend ninja --buildtype=release
 meson compile -C builddir
 ```
 
+**Linux / macOS (Terminal)**
+```bash
+# Configure
+meson setup builddir . --backend ninja --buildtype=release
+
+# Build
+meson compile -C builddir
+
+# Create distributable package
+meson install -C builddir --no-rebuild --skip-subprojects
+```
+
 ### Output Files
 
 **Build directory** (`builddir/`):
-- `OpenQ4-client_x64.exe` - Main engine executable
-- `OpenQ4-ded_x64.exe` - Dedicated server
-- `openq4/game-sp_x64.dll` - Single-player game module
-- `openq4/game-mp_x64.dll` - Multiplayer game module
+- `OpenQ4-client_x64` (`.exe` on Windows) - Main engine executable
+- `OpenQ4-ded_x64` (`.exe` on Windows) - Dedicated server
+- `openq4/game-sp_x64` (`.dll` / `.so` / `.dylib`) - Single-player game module
+- `openq4/game-mp_x64` (`.dll` / `.so` / `.dylib`) - Multiplayer game module
 
 **Install directory** (`.install/`):
 - Complete distributable package with all binaries
@@ -193,16 +230,16 @@ OpenQ4 uses a unified game directory approach:
 
 ```
 OpenQ4/
-├── OpenQ4-client_x64.exe   # Main executable
-├── OpenQ4-ded_x64.exe      # Dedicated server
-└── openq4/               # Unified game directory
-    ├── game-sp_x64.dll     # Single-player module
-    └── game-mp_x64.dll     # Multiplayer module
+├── OpenQ4-client_x64      # Main executable (.exe on Windows)
+├── OpenQ4-ded_x64         # Dedicated server (.exe on Windows)
+└── openq4/                # Unified game directory
+    ├── game-sp_x64        # Single-player module (.dll / .so / .dylib)
+    └── game-mp_x64        # Multiplayer module (.dll / .so / .dylib)
 ```
 
 The engine automatically selects the correct module based on game mode:
-- **Single-player**: Loads `game-sp_<arch>.dll` (for example `game-sp_x64.dll`)
-- **Multiplayer**: Loads `game-mp_<arch>.dll` (for example `game-mp_x64.dll`)
+- **Single-player**: Loads `game-sp_<arch>` (for example `game-sp_x64`)
+- **Multiplayer**: Loads `game-mp_<arch>` (for example `game-mp_x64`)
 
 No need for separate mod folders or manual switching!
 
@@ -374,12 +411,13 @@ Debug builds (`buildtype=debug`) include automatic crash handling:
 ### Companion Repository
 The game library source code is maintained separately in [OpenQ4-GameLibs](https://github.com/themuffinator/OpenQ4-GameLibs):
 - Expected location: `../OpenQ4-GameLibs`
-- Automatic sync via `tools/build/meson_setup.ps1`
+- Automatic sync on Windows via `tools/build/meson_setup.ps1`; on Linux/macOS, clone or sync manually before configuring
 - Optional game library builds with `OPENQ4_BUILD_GAMELIBS=1`
 
 ### Build Automation
-- Missing or stale build directories are auto-regenerated
-- Visual Studio environment auto-detected and loaded
+- Missing or stale build directories are auto-regenerated (Windows wrapper)
+- Visual Studio environment auto-detected and loaded (Windows only)
+- On Linux/macOS, use `meson` commands directly (no wrapper required)
 - Use `OPENQ4_SKIP_GAMELIBS_SYNC=1` to skip game library sync
 - Use `OPENQ4_GAMELIBS_REPO=<path>` to override repository location
 
