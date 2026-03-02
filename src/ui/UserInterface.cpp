@@ -367,12 +367,13 @@ const char *idUserInterfaceLocal::HandleEvent( const sysEvent_t *event, int _tim
 		cursorX += event->evValue;
 		cursorY += event->evValue2;
 
-		if (cursorX < 0) {
-			cursorX = 0;
-		}
-		if (cursorY < 0) {
-			cursorY = 0;
-		}
+		float minX = 0.0f;
+		float maxX = static_cast<float>( VIRTUAL_WIDTH );
+		float minY = 0.0f;
+		float maxY = static_cast<float>( VIRTUAL_HEIGHT );
+		uiManagerLocal.dc.GetCursorBounds( minX, maxX, minY, maxY );
+		cursorX = idMath::ClampFloat( minX, maxX, cursorX );
+		cursorY = idMath::ClampFloat( minY, maxY, cursorY );
 	}
 
 	if ( desktop ) {
@@ -717,7 +718,12 @@ idUserInterfaceLocal::SetCursor
 ==============
 */
 void idUserInterfaceLocal::SetCursor( float x, float y ) {
-	cursorX = x;
-	cursorY = y;
+	float minX = 0.0f;
+	float maxX = static_cast<float>( VIRTUAL_WIDTH );
+	float minY = 0.0f;
+	float maxY = static_cast<float>( VIRTUAL_HEIGHT );
+	uiManagerLocal.dc.GetCursorBounds( minX, maxX, minY, maxY );
+	cursorX = idMath::ClampFloat( minX, maxX, x );
+	cursorY = idMath::ClampFloat( minY, maxY, y );
 }
 

@@ -316,6 +316,33 @@ typedef struct {
 	float yOffset;
 } sdl3GuiMouseTransform_t;
 
+static void SDL3_GetGuiCursorBounds(const sdl3GuiMouseTransform_t &transform, float &minX, float &maxX, float &minY, float &maxY) {
+	minX = 0.0f;
+	maxX = transform.guiWidth;
+	minY = 0.0f;
+	maxY = transform.guiHeight;
+
+	if (transform.xScale != 0.0f) {
+		minX = (0.0f - transform.xOffset) / transform.xScale;
+		maxX = (transform.guiWidth - transform.xOffset) / transform.xScale;
+		if (minX > maxX) {
+			const float tmp = minX;
+			minX = maxX;
+			maxX = tmp;
+		}
+	}
+
+	if (transform.yScale != 0.0f) {
+		minY = (0.0f - transform.yOffset) / transform.yScale;
+		maxY = (transform.guiHeight - transform.yOffset) / transform.yScale;
+		if (minY > maxY) {
+			const float tmp = minY;
+			minY = maxY;
+			maxY = tmp;
+		}
+	}
+}
+
 static bool SDL3_BuildGuiMouseTransform(sdl3GuiMouseTransform_t &transform) {
 	if (!s_sdlWindow) {
 		return false;
@@ -414,8 +441,13 @@ static bool SDL3_MapWindowMouseToGuiCursor(float windowMouseX, float windowMouse
 
 	cursorX = (drawX - transform.xOffset) / transform.xScale;
 	cursorY = (drawY - transform.yOffset) / transform.yScale;
-	cursorX = idMath::ClampFloat(0.0f, transform.guiWidth, cursorX);
-	cursorY = idMath::ClampFloat(0.0f, transform.guiHeight, cursorY);
+	float minX = 0.0f;
+	float maxX = transform.guiWidth;
+	float minY = 0.0f;
+	float maxY = transform.guiHeight;
+	SDL3_GetGuiCursorBounds(transform, minX, maxX, minY, maxY);
+	cursorX = idMath::ClampFloat(minX, maxX, cursorX);
+	cursorY = idMath::ClampFloat(minY, maxY, cursorY);
 	return true;
 }
 
@@ -434,8 +466,13 @@ static void SDL3_SyncSystemMouseToActiveGUICursor(void) {
 		return;
 	}
 
-	const float clampedCursorX = idMath::ClampFloat(0.0f, transform.guiWidth, activeGui->CursorX());
-	const float clampedCursorY = idMath::ClampFloat(0.0f, transform.guiHeight, activeGui->CursorY());
+	float minX = 0.0f;
+	float maxX = transform.guiWidth;
+	float minY = 0.0f;
+	float maxY = transform.guiHeight;
+	SDL3_GetGuiCursorBounds(transform, minX, maxX, minY, maxY);
+	const float clampedCursorX = idMath::ClampFloat(minX, maxX, activeGui->CursorX());
+	const float clampedCursorY = idMath::ClampFloat(minY, maxY, activeGui->CursorY());
 	const float drawX = (clampedCursorX * transform.xScale) + transform.xOffset;
 	const float drawY = (clampedCursorY * transform.yScale) + transform.yOffset;
 	const float pixelMouseX = transform.drawAreaX + drawX * (transform.drawAreaWidth / transform.guiWidth);

@@ -76,6 +76,7 @@ public:
 	void				SetAspectCorrection( bool enabled );
 	float				GetCanvasAspect() const;
 	void				GetVirtualScreenExpansion( float width, float height, float &xExpand, float &yExpand ) const;
+	void				GetCursorBounds( float &minX, float &maxX, float &minY, float &maxY ) const;
 
 	const idMaterial	*GetScrollBarImage(int index);
 
