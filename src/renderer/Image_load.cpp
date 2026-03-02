@@ -530,20 +530,6 @@ void idImage::CopyFramebuffer( int x, int y, int imageWidth, int imageHeight ) {
 
 	const bool readingFromRenderTexture = ( backEnd.renderTexture != NULL ) && ( backEnd.renderTexture->GetNumColorImages() > 0 );
 	const GLenum readAttachment = GL_COLOR_ATTACHMENT0;
-	static int cfdbgPrints = 0;
-	if ( cfdbgPrints < 64 ) {
-		const char *name = GetName();
-		const int rtWidth = readingFromRenderTexture ? backEnd.renderTexture->GetWidth() : 0;
-		const int rtHeight = readingFromRenderTexture ? backEnd.renderTexture->GetHeight() : 0;
-		common->Printf( "CFDBG copy '%s': fromRT=%d src=(%d,%d %dx%d) rt=%dx%d viewport=(%d,%d %d,%d)\n",
-			name != NULL ? name : "<null>",
-			readingFromRenderTexture ? 1 : 0,
-			x, y, imageWidth, imageHeight,
-			rtWidth, rtHeight,
-			backEnd.viewDef->viewport.x1, backEnd.viewDef->viewport.y1,
-			backEnd.viewDef->viewport.x2, backEnd.viewDef->viewport.y2 );
-		cfdbgPrints++;
-	}
 
 	opts.width = imageWidth;
 	opts.height = imageHeight;

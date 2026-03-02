@@ -728,8 +728,11 @@ void idInterpreter::CallEvent( const function_t *func, int argsize ) {
 			//check the last script variable.
 			if(!!LastScriptVariable)	{
 				//if it's $null_entity, then we should ignore this.
-				if(idStr::Cmp( "$null_entity", LastScriptVariable->Name()) ) {
-					Warning( "Entity '%s' is a null entity", LastScriptVariable->Name() );
+				const char *lastVarName = LastScriptVariable->Name();
+				// Map-authored entity symbols use '$name'. Local script vars (for example
+				// function args like 'vehicle') may legitimately be null in guard logic.
+				if ( lastVarName != NULL && lastVarName[0] == '$' && idStr::Cmp( "$null_entity", lastVarName ) ) {
+					Warning( "Entity '%s' is a null entity", lastVarName );
 				}
 			} else {
 				Warning( "Null entity referenced -- check entity name spelling.");

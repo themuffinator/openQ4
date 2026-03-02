@@ -490,24 +490,6 @@ void R_CreateLightRefs( idRenderLightLocal *light ) {
 		light->world->PushVolumeIntoTree( NULL, light, tri->numVerts, points );
 	}
 
-	static int s_lightRefLogCount = 0;
-	if ( s_lightRefLogCount < 16 ) {
-		int refCount = 0;
-		for ( areaReference_t *ref = light->references; ref; ref = ref->ownerNext ) {
-			++refCount;
-		}
-		common->Printf( "LightRefs: index=%d area=%d numAreas=%d frustumVerts=%d refs=%d shader='%s' point=%d radius=(%.1f %.1f %.1f) origin=(%.1f %.1f %.1f)\n",
-			light->index,
-			light->areaNum,
-			light->world ? light->world->NumAreas() : -1,
-			tri ? tri->numVerts : -1,
-			refCount,
-			light->lightShader ? light->lightShader->GetName() : "<null>",
-			light->parms.pointLight ? 1 : 0,
-			light->parms.lightRadius[0], light->parms.lightRadius[1], light->parms.lightRadius[2],
-			light->parms.origin[0], light->parms.origin[1], light->parms.origin[2] );
-		++s_lightRefLogCount;
-	}
 }
 
 /*

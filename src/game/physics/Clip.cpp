@@ -1290,6 +1290,18 @@ int idClip::GetTraceClipModels( const idBounds &bounds, int contentMask, const i
 
 	num = ClipModelsTouchingBounds( bounds, contentMask, clipModelList, MAX_GENTITIES );
 
+	// Some entities may carry placeholder clip models with bounds/contents but no
+	// collision or trace model backing. They can never collide, so skip them here.
+	for ( i = 0; i < num; i++ ) {
+		cm = clipModelList[ i ];
+		if ( cm == NULL ) {
+			continue;
+		}
+		if ( !cm->IsRenderModel() && !cm->HasCollisionModel() ) {
+			clipModelList[ i ] = NULL;
+		}
+	}
+
 	if ( !passEntity ) {
 		return num;
 	}
@@ -1303,6 +1315,9 @@ int idClip::GetTraceClipModels( const idBounds &bounds, int contentMask, const i
 	for ( i = 0; i < num; i++ ) {
 
 		cm = clipModelList[i];
+		if ( cm == NULL ) {
+			continue;
+		}
 
 		// check if we should ignore this entity
 		if ( cm->entity == passEntity ) {

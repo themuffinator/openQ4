@@ -5180,7 +5180,6 @@ bool idGameLocal::SpawnEntityDef( const idDict &args, idEntity **ent, bool setDe
 	idClass		*obj;
 	idStr		error;
 	const char  *name;
-	static int	s_lightSpawnDefLogCount = 0;
 
 	TIME_THIS_SCOPE( __FUNCLINE__);
 	
@@ -5202,7 +5201,6 @@ bool idGameLocal::SpawnEntityDef( const idDict &args, idEntity **ent, bool setDe
 // RAVEN END
 	}
 	spawnArgs.GetString( "classname", NULL, &classname );
-	const bool isLight = ( classname && !idStr::Icmpn( classname, "light", 5 ) );
 
 	const idDeclEntityDef *def = FindEntityDef( classname, false );
 	if ( !def ) {
@@ -5212,18 +5210,10 @@ bool idGameLocal::SpawnEntityDef( const idDict &args, idEntity **ent, bool setDe
 			Warning( "Unknown classname '%s'%s.", classname, error.c_str() );
 		}
 // RAVEN END
-		if ( isLight && s_lightSpawnDefLogCount < 32 ) {
-			common->Printf( "LightSpawnEntityDef: name='%s' classname='%s' def=missing\n", name ? name : "", classname ? classname : "<null>" );
-			++s_lightSpawnDefLogCount;
-		}
 		return false;
 	}
 
 	spawnArgs.SetDefaults( &def->dict );
-	if ( isLight && s_lightSpawnDefLogCount < 32 ) {
-		common->Printf( "LightSpawnEntityDef: name='%s' classname='%s' def=ok\n", name ? name : "", classname ? classname : "<null>" );
-		++s_lightSpawnDefLogCount;
-	}
 
 // RAVEN BEGIN
 // rjohnson: entity usage stats
@@ -5262,11 +5252,6 @@ bool idGameLocal::SpawnEntityDef( const idDict &args, idEntity **ent, bool setDe
 	// check if we should spawn a class object
 	spawnArgs.GetString( "spawnclass", NULL, &spawn );
 	if ( spawn ) {
-		if ( isLight && s_lightSpawnDefLogCount < 32 ) {
-			common->Printf( "LightSpawnEntityDef: name='%s' spawnclass='%s'\n", name ? name : "", spawn );
-			++s_lightSpawnDefLogCount;
-		}
-
 		cls = idClass::GetClass( spawn );
 		if ( !cls ) {
 			Warning( "Could not spawn '%s'.  Class '%s' not found%s.", classname, spawn, error.c_str() );
@@ -5294,10 +5279,6 @@ bool idGameLocal::SpawnEntityDef( const idDict &args, idEntity **ent, bool setDe
 	// check if we should call a script function to spawn
 	spawnArgs.GetString( "spawnfunc", NULL, &spawn );
 	if ( spawn ) {
-		if ( isLight && s_lightSpawnDefLogCount < 32 ) {
-			common->Printf( "LightSpawnEntityDef: name='%s' spawnfunc='%s'\n", name ? name : "", spawn );
-			++s_lightSpawnDefLogCount;
-		}
 		const function_t *func = program.FindFunction( spawn );
 		if ( !func ) {
 			Warning( "Could not spawn '%s'.  Script function '%s' not found%s.", classname, spawn, error.c_str() );
@@ -5309,10 +5290,6 @@ bool idGameLocal::SpawnEntityDef( const idDict &args, idEntity **ent, bool setDe
 		return true;
 	}
 
-	if ( isLight && s_lightSpawnDefLogCount < 32 ) {
-		common->Printf( "LightSpawnEntityDef: name='%s' no spawnclass/spawnfunc\n", name ? name : "" );
-		++s_lightSpawnDefLogCount;
-	}
 	Warning( "%s doesn't include a spawnfunc or spawnclass%s.", classname, error.c_str() );
 	return false;
 }
@@ -5382,31 +5359,15 @@ idGameLocal::InhibitEntitySpawn
 bool idGameLocal::InhibitEntitySpawn( idDict &spawnArgs ) {
 	
 	bool result = false;
-	static int	s_lightInhibitLogCount = 0;
-	const char *entClassname = spawnArgs.GetString( "classname" );
-	const bool isLight = ( entClassname && !idStr::Icmpn( entClassname, "light", 5 ) );
-	const char *lightReason = NULL;
 
 	if ( isMultiplayer ) {
 		spawnArgs.GetBool( "not_multiplayer", "0", result );
-		if ( result ) {
-			lightReason = "not_multiplayer";
-		}
 	} else if ( g_skill.GetInteger() == 0 ) {
 		spawnArgs.GetBool( "not_easy", "0", result );
-		if ( result ) {
-			lightReason = "not_easy";
-		}
 	} else if ( g_skill.GetInteger() == 1 ) {
 		spawnArgs.GetBool( "not_medium", "0", result );
-		if ( result ) {
-			lightReason = "not_medium";
-		}
 	} else {
 		spawnArgs.GetBool( "not_hard", "0", result );
-		if ( result ) {
-			lightReason = "not_hard";
-		}
 	}
 
 	const char *name;
@@ -5424,10 +5385,6 @@ bool idGameLocal::InhibitEntitySpawn( idDict &spawnArgs ) {
 	const char* entityFilter;
 	if ( serverInfo.GetString( "si_entityFilter", "", &entityFilter ) && *entityFilter ) {
 		if ( spawnArgs.MatchPrefix ( "filter_" ) && !spawnArgs.GetBool ( va("filter_%s", entityFilter) ) ) {
-			if ( isLight && s_lightInhibitLogCount < 32 ) {
-				common->Printf( "LightInhibit: reason=filter_%s\n", entityFilter );
-				++s_lightInhibitLogCount;
-			}
 			return true;
 		}
 	}
@@ -5437,10 +5394,6 @@ bool idGameLocal::InhibitEntitySpawn( idDict &spawnArgs ) {
 // squirrel: suppress ents that aren't supported in Buying modes (if that's the mode we're in)
 	if ( mpGame.IsBuyingAllowedInTheCurrentGameMode() ) {
 		if ( spawnArgs.GetBool( "disableSpawnInBuying", "0" ) ) {
-			if ( isLight && s_lightInhibitLogCount < 32 ) {
-				common->Printf( "LightInhibit: reason=disableSpawnInBuying\n" );
-				++s_lightInhibitLogCount;
-			}
 			return true;
 		}
 
@@ -5451,10 +5404,6 @@ bool idGameLocal::InhibitEntitySpawn( idDict &spawnArgs ) {
 			idStr::FindText( classname, "ammo_" ) == 0 ||
 			idStr::FindText( classname, "item_armor_large" ) == 0 )
 		{
-			if ( isLight && s_lightInhibitLogCount < 32 ) {
-				common->Printf( "LightInhibit: reason=buyingModeSuppression\n" );
-				++s_lightInhibitLogCount;
-			}
 			return true;
 		}
 	}
@@ -5465,11 +5414,6 @@ bool idGameLocal::InhibitEntitySpawn( idDict &spawnArgs ) {
 		if ( idStr::Icmp( spawnArgs.GetString( "classname" ), "trigger_controlzone" ) == 0 ) {
 			return true;
 		}
-	}
-
-	if ( isLight && s_lightInhibitLogCount < 32 ) {
-		common->Printf( "LightInhibit: result=%d reason=%s\n", result ? 1 : 0, lightReason ? lightReason : ( result ? "other" : "none" ) );
-		++s_lightInhibitLogCount;
 	}
 	return result;
 }

@@ -3387,6 +3387,18 @@ idCollisionModel* idCollisionModelManagerLocal::FindModel( const char *name ) {
 	return NULL;
 }
 
+static bool CM_ModelNamesMatchIgnoreExtension( const char *lhs, const char *rhs ) {
+	idStr lhsNormalized = lhs;
+	idStr rhsNormalized = rhs;
+
+	lhsNormalized.BackSlashesToSlashes();
+	rhsNormalized.BackSlashesToSlashes();
+	lhsNormalized.StripFileExtension();
+	rhsNormalized.StripFileExtension();
+
+	return lhsNormalized.Icmp( rhsNormalized ) == 0;
+}
+
 /*
 ==================
 idCollisionModelManagerLocal::PrintModelInfo
@@ -3567,6 +3579,7 @@ idCollisionModelManagerLocal::LoadModel
 */
 idCollisionModel *idCollisionModelManagerLocal::LoadModel(const char* mapName, const char *modelName, const bool precache ) {
 	idCollisionModel *handle;
+	int firstLoadedModel;
 
 	// LoadModel can be called before LoadMap initializes the model table.
 	if ( models == NULL ) {
@@ -3585,12 +3598,25 @@ idCollisionModel *idCollisionModelManagerLocal::LoadModel(const char* mapName, c
 		return NULL;
 	}
 
+	firstLoadedModel = numModels;
+
 	// try to load a .cm file
 	if ( LoadCollisionModelFile( modelName, 0 ) ) {
 		handle = FindModel( modelName );
 		if ( handle != NULL ) {
 			return handle;
 		} else {
+			// Quake 4 ships some collision models authored against source render formats
+			// (.lwo/.ase) while runtime entities may request .md5mesh.
+			for ( int i = firstLoadedModel; i < numModels; i++ ) {
+				if ( models[ i ] == NULL ) {
+					continue;
+				}
+				if ( CM_ModelNamesMatchIgnoreExtension( models[ i ]->name.c_str(), modelName ) ) {
+					models[ i ]->name = modelName;
+					return models[ i ];
+				}
+			}
 			common->Warning( "idCollisionModelManagerLocal::LoadModel: collision file for '%s' contains different model", modelName );
 		}
 	}

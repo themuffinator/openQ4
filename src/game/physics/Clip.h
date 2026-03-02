@@ -80,6 +80,7 @@ public:
 	bool					IsLinked( void ) const;				// returns true if the clip model is linked
 	bool					IsEnabled( void ) const;			// returns true if enabled for collision detection
 	bool					IsEqual( const idTraceModel &trm ) const;
+	bool					HasCollisionModel( void ) const;	// true if this clip model can be tested by collisionModelManager
 	idCollisionModel *		GetCollisionModel( void ) const;	// returns handle used to collide vs this model
 	const idTraceModel *	GetTraceModel( void ) const;
 	void					GetMassProperties( const float density, float &mass, idVec3 &centerOfMass, idMat3 &inertiaTensor ) const;
@@ -213,6 +214,10 @@ ID_INLINE bool idClipModel::IsEnabled( void ) const {
 
 ID_INLINE bool idClipModel::IsEqual( const idTraceModel &trm ) const {
 	return ( traceModelIndex != -1 && *GetCachedTraceModel( traceModelIndex ) == trm );
+}
+
+ID_INLINE bool idClipModel::HasCollisionModel( void ) const {
+	return ( collisionModel != NULL || traceModelIndex != -1 );
 }
 
 ID_INLINE const idTraceModel *idClipModel::GetTraceModel( void ) const {
