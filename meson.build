@@ -475,6 +475,38 @@ if build_engine or (build_games and (build_game_sp or build_game_mp))
   subdir('openq4')
 endif
 
+install_data(
+  'assets/icons/quake4.ico',
+  install_dir: install_root_dir,
+  rename: 'OpenQ4.ico',
+)
+
+install_data(
+  'assets/icons/quake4.icns',
+  install_dir: install_root_dir,
+  rename: 'OpenQ4.icns',
+)
+
+if fs_mod.is_file('assets/icons/quake4.svg')
+  install_data(
+    'assets/icons/quake4.svg',
+    install_dir: install_root_dir / 'share' / 'icons' / 'hicolor' / 'scalable' / 'apps',
+    rename: 'openq4.svg',
+  )
+endif
+
+icon_sizes = ['16', '20', '24', '32', '40', '48', '64', '128', '256', '512', '1024']
+foreach icon_size : icon_sizes
+  icon_png = 'assets/icons/quake4_' + icon_size + '.png'
+  if fs_mod.is_file(icon_png)
+    install_data(
+      icon_png,
+      install_dir: install_root_dir / 'share' / 'icons' / 'hicolor' / (icon_size + 'x' + icon_size) / 'apps',
+      rename: 'openq4.png',
+    )
+  endif
+endforeach
+
 summary(
   {
     'Host system': host_system,

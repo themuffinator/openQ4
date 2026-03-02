@@ -1513,13 +1513,18 @@ void Com_ExecMachineSpec_f( const idCmdArgs &args ) {
 		cvarSystem->SetCVarInteger( "image_usePrecompressedTextures", 0, CVAR_ARCHIVE );
 		cvarSystem->SetCVarInteger( "image_downsize", 0			, CVAR_ARCHIVE );
 		cvarSystem->SetCVarString( "image_filter", "GL_LINEAR_MIPMAP_LINEAR", CVAR_ARCHIVE );
-		cvarSystem->SetCVarInteger( "image_anisotropy", 8, CVAR_ARCHIVE );
+		cvarSystem->SetCVarInteger( "image_anisotropy", 16, CVAR_ARCHIVE );
 		cvarSystem->SetCVarInteger( "image_useCompression", 0, CVAR_ARCHIVE );
 		cvarSystem->SetCVarInteger( "image_ignoreHighQuality", 0, CVAR_ARCHIVE );
 		cvarSystem->SetCVarInteger( "s_maxSoundsPerShader", 0, CVAR_ARCHIVE );
 		cvarSystem->SetCVarInteger( "r_mode", 5, CVAR_ARCHIVE );
 		cvarSystem->SetCVarInteger( "image_useNormalCompression", 0, CVAR_ARCHIVE );
-		cvarSystem->SetCVarInteger( "r_multiSamples", 0, CVAR_ARCHIVE );
+		cvarSystem->SetCVarInteger( "r_multiSamples", 8, CVAR_ARCHIVE );
+		cvarSystem->SetCVarInteger( "r_postAA", 1, CVAR_ARCHIVE );
+		cvarSystem->SetCVarInteger( "r_screenFraction", 125, CVAR_ARCHIVE );
+		cvarSystem->SetCVarInteger( "r_swapInterval", 0, CVAR_ARCHIVE );
+		cvarSystem->SetCVarInteger( "r_forceAmbientOn", 0, CVAR_ARCHIVE );
+		cvarSystem->SetCVarFloat( "r_forceAmbient", 0.0f, CVAR_ARCHIVE );
 	} else if ( com_machineSpec.GetInteger() == 2 ) {
 		cvarSystem->SetCVarString( "image_filter", "GL_LINEAR_MIPMAP_LINEAR", CVAR_ARCHIVE );
 		cvarSystem->SetCVarInteger( "image_anisotropy", 1, CVAR_ARCHIVE );
@@ -1540,10 +1545,15 @@ void Com_ExecMachineSpec_f( const idCmdArgs &args ) {
 		cvarSystem->SetCVarInteger( "s_maxSoundsPerShader", 0, CVAR_ARCHIVE );
 		cvarSystem->SetCVarInteger( "image_useNormalCompression", 0, CVAR_ARCHIVE );
 		cvarSystem->SetCVarInteger( "r_mode", 4, CVAR_ARCHIVE );
-		cvarSystem->SetCVarInteger( "r_multiSamples", 0, CVAR_ARCHIVE );
+		cvarSystem->SetCVarInteger( "r_multiSamples", 4, CVAR_ARCHIVE );
+		cvarSystem->SetCVarInteger( "r_postAA", 1, CVAR_ARCHIVE );
+		cvarSystem->SetCVarInteger( "r_screenFraction", 100, CVAR_ARCHIVE );
+		cvarSystem->SetCVarInteger( "r_swapInterval", 0, CVAR_ARCHIVE );
+		cvarSystem->SetCVarInteger( "r_forceAmbientOn", 0, CVAR_ARCHIVE );
+		cvarSystem->SetCVarFloat( "r_forceAmbient", 0.0f, CVAR_ARCHIVE );
 	} else if ( com_machineSpec.GetInteger() == 1 ) {
 		cvarSystem->SetCVarString( "image_filter", "GL_LINEAR_MIPMAP_LINEAR", CVAR_ARCHIVE );
-		cvarSystem->SetCVarInteger( "image_anisotropy", 1, CVAR_ARCHIVE );
+		cvarSystem->SetCVarInteger( "image_anisotropy", 4, CVAR_ARCHIVE );
 		cvarSystem->SetCVarInteger( "image_lodbias", 0, CVAR_ARCHIVE );
 		cvarSystem->SetCVarInteger( "image_downSize", 0, CVAR_ARCHIVE );
 		cvarSystem->SetCVarInteger( "image_forceDownSize", 0, CVAR_ARCHIVE );
@@ -1558,7 +1568,12 @@ void Com_ExecMachineSpec_f( const idCmdArgs &args ) {
 		cvarSystem->SetCVarInteger( "image_downSizeBumpLimit", 256, CVAR_ARCHIVE );
 		cvarSystem->SetCVarInteger( "image_useNormalCompression", 2, CVAR_ARCHIVE );
 		cvarSystem->SetCVarInteger( "r_mode", 3, CVAR_ARCHIVE );
-		cvarSystem->SetCVarInteger( "r_multiSamples", 0, CVAR_ARCHIVE );
+		cvarSystem->SetCVarInteger( "r_multiSamples", 2, CVAR_ARCHIVE );
+		cvarSystem->SetCVarInteger( "r_postAA", 1, CVAR_ARCHIVE );
+		cvarSystem->SetCVarInteger( "r_screenFraction", 100, CVAR_ARCHIVE );
+		cvarSystem->SetCVarInteger( "r_swapInterval", 0, CVAR_ARCHIVE );
+		cvarSystem->SetCVarInteger( "r_forceAmbientOn", 0, CVAR_ARCHIVE );
+		cvarSystem->SetCVarFloat( "r_forceAmbient", 0.0f, CVAR_ARCHIVE );
 	} else {
 		cvarSystem->SetCVarString( "image_filter", "GL_LINEAR_MIPMAP_LINEAR", CVAR_ARCHIVE );
 		cvarSystem->SetCVarInteger( "image_anisotropy", 1, CVAR_ARCHIVE );
@@ -1568,7 +1583,7 @@ void Com_ExecMachineSpec_f( const idCmdArgs &args ) {
 		cvarSystem->SetCVarInteger( "image_useAllFormats", 1, CVAR_ARCHIVE );
 		cvarSystem->SetCVarInteger( "image_usePrecompressedTextures", 1, CVAR_ARCHIVE );
 		cvarSystem->SetCVarInteger( "image_downSize", 1, CVAR_ARCHIVE );
-		cvarSystem->SetCVarInteger( "image_anisotropy", 0, CVAR_ARCHIVE );
+		cvarSystem->SetCVarInteger( "image_anisotropy", 2, CVAR_ARCHIVE );
 		cvarSystem->SetCVarInteger( "image_useCompression", 1, CVAR_ARCHIVE );
 		cvarSystem->SetCVarInteger( "image_ignoreHighQuality", 1, CVAR_ARCHIVE );
 		cvarSystem->SetCVarInteger( "s_maxSoundsPerShader", 1, CVAR_ARCHIVE );
@@ -1579,6 +1594,11 @@ void Com_ExecMachineSpec_f( const idCmdArgs &args ) {
 		cvarSystem->SetCVarInteger( "r_mode", 3	, CVAR_ARCHIVE );
 		cvarSystem->SetCVarInteger( "image_useNormalCompression", 2, CVAR_ARCHIVE );
 		cvarSystem->SetCVarInteger( "r_multiSamples", 0, CVAR_ARCHIVE );
+		cvarSystem->SetCVarInteger( "r_postAA", 0, CVAR_ARCHIVE );
+		cvarSystem->SetCVarInteger( "r_screenFraction", 85, CVAR_ARCHIVE );
+		cvarSystem->SetCVarInteger( "r_swapInterval", 0, CVAR_ARCHIVE );
+		cvarSystem->SetCVarInteger( "r_forceAmbientOn", 0, CVAR_ARCHIVE );
+		cvarSystem->SetCVarFloat( "r_forceAmbient", 0.0f, CVAR_ARCHIVE );
 	}
 
 	if ( Sys_GetVideoRam() < 128 ) {
@@ -3247,13 +3267,13 @@ void idCommonLocal::SetMachineSpec( void ) {
 
 	Printf( "Detected\n \t%.2f GHz CPU\n\t%i MB of System memory\n\t%i MB of Video memory on %s\n\n", ghz, sysRam, vidRam, ( oldCard ) ? "a less than optimal video architecture" : "an optimal video architecture" );
 
-	if ( ghz >= 2.75f && vidRam >= 512 && sysRam >= 1024 && !oldCard ) {
+	if ( ghz >= 3.0f && vidRam >= 6144 && sysRam >= 16384 && !oldCard ) {
 		Printf( "This system qualifies for Ultra quality!\n" );
 		com_machineSpec.SetInteger( 3 );
-	} else if ( ghz >= ( ( cpu & CPUID_AMD ) ? 1.9f : 2.19f ) && vidRam >= 256 && sysRam >= 512 && !oldCard ) {
+	} else if ( ghz >= 2.5f && vidRam >= 4096 && sysRam >= 8192 && !oldCard ) {
 		Printf( "This system qualifies for High quality!\n" );
 		com_machineSpec.SetInteger( 2 );
-	} else if ( ghz >= ( ( cpu & CPUID_AMD ) ? 1.1f : 1.25f ) && vidRam >= 128 && sysRam >= 384 ) {
+	} else if ( ghz >= 2.0f && vidRam >= 2048 && sysRam >= 6144 ) {
 		Printf( "This system qualifies for Medium quality.\n" );
 		com_machineSpec.SetInteger( 1 );
 	} else {

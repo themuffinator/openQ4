@@ -47,6 +47,7 @@ This file describes project goals, rules, and upstream credits for anyone workin
 - Keep Meson as the primary build entry point and keep dependency management through Meson subprojects.
 - Treat x64 as the baseline architecture for active support while staging additional modern architectures incrementally.
 - Keep credits accurate and add new attributions when incorporating upstream work.
+- Localize all user-facing UI text: never introduce hardcoded display strings in GUIs/UI code when a `#str_*` lookup is possible; add/update language-table entries whenever new text is needed.
 - Avoid adding engine-side content files (e.g., custom material scripts) unless absolutely required for compatibility; the goal is to run with the original game assets and only OpenQ4 binaries (engine + game modules, plus minimal external libs).
 - Any existing custom `q4base/` content is treated as an expedient bootstrap, not a long-term solution. The goal is to remove this reliance by fixing engine compatibility issues rather than shipping replacement assets.
 - For investigations, reference the log file written by `logFileName` (VS Code launch uses `logs/openq4.log`), located under `fs_savepath\<gameDir>\` (e.g. `${workspaceFolder}\\.home\\openq4\\logs\\openq4.log`).

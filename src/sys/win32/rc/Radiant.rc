@@ -53,7 +53,7 @@ END
 
 // Icon with lowest ID value placed first to ensure application icon
 // remains consistent on all systems.
-IDR_MAINFRAME           ICON                    "res\\quake4.ico"
+IDR_MAINFRAME           ICON                    "..\\..\\..\\..\\assets\\icons\\quake4.ico"
 
 /////////////////////////////////////////////////////////////////////////////
 //

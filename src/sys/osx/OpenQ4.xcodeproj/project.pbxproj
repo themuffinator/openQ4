@@ -664,7 +664,7 @@
 		812259A60912BFDC005D34B9 /* OpenGL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenGL.framework; path = /Developer/SDKs/MacOSX10.4u.sdk/System/Library/Frameworks/OpenGL.framework; sourceTree = "<absolute>"; };
 		812259B40912C056005D34B9 /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = /Developer/SDKs/MacOSX10.4u.sdk/System/Library/Frameworks/CoreAudio.framework; sourceTree = "<absolute>"; };
 		812259FD0912C27C005D34B9 /* OpenQ4.rsrc */ = {isa = PBXFileReference; lastKnownFileType = archive.rsrc; path = "OpenQ4.rsrc"; sourceTree = "<group>"; };
-		812259FE0912C27C005D34B9 /* OpenQ4.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = OpenQ4.icns; sourceTree = "<group>"; };
+		812259FE0912C27C005D34B9 /* OpenQ4.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = ../../../../assets/icons/quake4.icns; sourceTree = "<group>"; };
 		81225A0C0912C2D3005D34B9 /* English */ = {isa = PBXFileReference; lastKnownFileType = wrapper.nib; name = English; path = English.lproj/ASLCore.nib; sourceTree = "<group>"; };
 		81225A0F0912C2E9005D34B9 /* English */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = text.plist.strings; name = English; path = English.lproj/Localizable.strings; sourceTree = "<group>"; };
 		81225A110912C300005D34B9 /* French */ = {isa = PBXFileReference; lastKnownFileType = wrapper.nib; name = French; path = French.lproj/ASLCore.nib; sourceTree = "<group>"; };

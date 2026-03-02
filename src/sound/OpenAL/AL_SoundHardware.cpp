@@ -40,6 +40,7 @@ idCVar s_device( "s_device", "-1", CVAR_INTEGER | CVAR_ARCHIVE, "Which audio dev
 idCVar s_showPerfData( "s_showPerfData", "0", CVAR_BOOL, "Show XAudio2 Performance data" );
 extern idCVar s_volume;
 extern idCVar s_useEAXReverb;
+extern idCVar s_deviceName;
 
 #if defined( AL_EFFECTSLOT_EFFECT ) && defined( AL_EFFECT_NULL ) && defined( AL_AUXILIARY_SEND_FILTER )
 	#define OPENQ4_OPENAL_EFX_SUPPORTED 1
@@ -223,7 +224,20 @@ void idSoundHardware_OpenAL::Init()
 
 	common->Printf( "Setup OpenAL device and context... " );
 
-	openalDevice = alcOpenDevice( NULL );
+	const char* requestedDeviceName = s_deviceName.GetString();
+	if( requestedDeviceName != NULL && requestedDeviceName[0] != '\0' )
+	{
+		openalDevice = alcOpenDevice( requestedDeviceName );
+		if( openalDevice == NULL )
+		{
+			common->Warning( "OpenAL device '%s' unavailable, falling back to default device.", requestedDeviceName );
+		}
+	}
+
+	if( openalDevice == NULL )
+	{
+		openalDevice = alcOpenDevice( NULL );
+	}
 	if( openalDevice == NULL )
 	{
 		common->FatalError( "idSoundHardware_OpenAL::Init: alcOpenDevice() failed\n" );
@@ -239,16 +253,51 @@ void idSoundHardware_OpenAL::Init()
 
 	common->Printf( "Done.\n" );
 
+	ALCint alcMajor = 0;
+	ALCint alcMinor = 0;
+	bool openALVersionSupported = true;
+	alcGetIntegerv( openalDevice, ALC_MAJOR_VERSION, 1, &alcMajor );
+	alcGetIntegerv( openalDevice, ALC_MINOR_VERSION, 1, &alcMinor );
+	if( CheckALCErrors( openalDevice ) == ALC_NO_ERROR )
+	{
+		common->Printf( "OpenAL ALC version: %d.%d\n", alcMajor, alcMinor );
+		if( alcMajor < 1 || ( alcMajor == 1 && alcMinor < 1 ) )
+		{
+			openALVersionSupported = false;
+			common->Warning( "OpenAL runtime reports unsupported ALC version %d.%d (expected 1.1+).", alcMajor, alcMinor );
+		}
+	}
+
 	common->Printf( "OpenAL vendor: %s\n", alGetString( AL_VENDOR ) );
 	common->Printf( "OpenAL renderer: %s\n", alGetString( AL_RENDERER ) );
 	common->Printf( "OpenAL version: %s\n", alGetString( AL_VERSION ) );
 	common->Printf( "OpenAL extensions: %s\n", alGetString( AL_EXTENSIONS ) );
 
+	const ALCchar* activeDeviceName = NULL;
+	if( alcIsExtensionPresent( openalDevice, "ALC_ENUMERATE_ALL_EXT" ) != AL_FALSE )
+	{
+		activeDeviceName = alcGetString( openalDevice, ALC_ALL_DEVICES_SPECIFIER );
+	}
+	if( CheckALCErrors( openalDevice ) != ALC_NO_ERROR || activeDeviceName == NULL || activeDeviceName[0] == '\0' )
+	{
+		activeDeviceName = alcGetString( openalDevice, ALC_DEVICE_SPECIFIER );
+		CheckALCErrors( openalDevice );
+	}
+	if( activeDeviceName != NULL )
+	{
+		common->Printf( "OpenAL active device: %s\n", activeDeviceName );
+		idStr configuredDevice = s_deviceName.GetString();
+		if( configuredDevice.Icmp( activeDeviceName ) != 0 )
+		{
+			s_deviceName.SetString( activeDeviceName );
+		}
+	}
+
 	efxEnabled = false;
 	auxEffectSlot = 0;
 	auxReverbEffect = 0;
 #if OPENQ4_OPENAL_EFX_SUPPORTED
-	if( s_useEAXReverb.GetBool() && alcIsExtensionPresent( openalDevice, "ALC_EXT_EFX" ) == AL_TRUE && OpenQ4_LoadHardwareEfxProcs() )
+	if( s_useEAXReverb.GetBool() && openALVersionSupported && alcIsExtensionPresent( openalDevice, "ALC_EXT_EFX" ) == AL_TRUE && OpenQ4_LoadHardwareEfxProcs() )
 	{
 		qalGenEffects( 1, &auxReverbEffect );
 		if( CheckALErrors() == AL_NO_ERROR && auxReverbEffect != 0 )
@@ -291,6 +340,10 @@ void idSoundHardware_OpenAL::Init()
 			CheckALErrors();
 			common->Warning( "OpenAL EFX requested but unavailable; wet send disabled." );
 		}
+	}
+	else if( s_useEAXReverb.GetBool() && !openALVersionSupported )
+	{
+		common->Warning( "OpenAL EFX requested, but the runtime OpenAL version is older than 1.1; wet send disabled." );
 	}
 	else if( s_useEAXReverb.GetBool() && alcIsExtensionPresent( openalDevice, "ALC_EXT_EFX" ) == AL_TRUE )
 	{

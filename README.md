@@ -152,6 +152,9 @@ Current known compatibility regressions and follow-up work are tracked in [TODO.
 
 The engine will automatically find your Quake 4 installation and validate the game files.
 
+> [!NOTE]
+> `tools/build/meson_setup.ps1` automatically runs `tools/build/sync_icons.py` before `setup`, `compile`, and `install` to validate and generate the canonical icon set in `assets/icons/` (including required PNG sizes). Set `OPENQ4_SKIP_ICON_SYNC=1` to bypass this in local workflows.
+
 ---
 
 ## Building from Source

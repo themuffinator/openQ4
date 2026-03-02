@@ -164,6 +164,7 @@ $commandName = $effectiveArgs[0].ToLowerInvariant()
 $gameLibsRepo = if ([string]::IsNullOrWhiteSpace($env:OPENQ4_GAMELIBS_REPO)) { "" } else { $env:OPENQ4_GAMELIBS_REPO }
 $syncGameLibsScript = Join-Path $scriptDir "sync_gamelibs.ps1"
 $buildGameLibsScript = Join-Path $scriptDir "build_gamelibs.ps1"
+$syncIconsScript = Join-Path $scriptDir "sync_icons.py"
 
 if (@("setup", "compile", "install").Contains($commandName) -and $env:OPENQ4_SKIP_GAMELIBS_SYNC -ne "1") {
     if (-not (Test-Path $syncGameLibsScript)) {
@@ -239,6 +240,18 @@ if ($effectiveArgs.Length -gt 0 -and ($effectiveArgs[0] -eq "compile" -or $effec
 
 if ($commandName -eq "install" -and $env:OPENQ4_INSTALL_CLOSE_RUNNING -ne "0") {
     Stop-OpenQ4RuntimeProcesses | Out-Null
+}
+
+if (@("setup", "compile", "install").Contains($commandName) -and $env:OPENQ4_SKIP_ICON_SYNC -ne "1") {
+    if (-not (Test-Path $syncIconsScript)) {
+        throw "Icon sync script not found: '$syncIconsScript'."
+    }
+
+    & python $syncIconsScript "--source-root" $repoRoot
+    $syncIconExit = [int]$LASTEXITCODE
+    if ($syncIconExit -ne 0) {
+        exit $syncIconExit
+    }
 }
 
 Invoke-Meson -MesonArgs $effectiveArgs -VsDevCmdPath $vsDevCmd

@@ -617,5 +617,24 @@
 				}
 
 			}
+			windowDef set_game_language_hover
+			{
+				rect	245,435,361,20
+				visible	0
+
+				onMouseEnter {
+					if ("desktop::active" == 0) {
+						stoptransitions "set_game_language_background" ;
+						set "set_game_language_background::matcolor_w" "1" ;
+						set "cmd" "play main_menu_mouseover" ;
+					}
+				}
+
+				onMouseExit {
+					if ("desktop::active" == 0) {
+						transition "set_game_language_background::matcolor_w" "1" "0.4" "300" ;
+					}
+				}
+			}
 		}
 	//==============================================================//

@@ -6,6 +6,15 @@
 			{
 				rect	0,0,640,480
 				visible	0
+				windowDef set_game_canvas
+				{
+					rect	0,104,640,280
+					visible	1
+					noclip	0
+					windowDef set_game_content
+					{
+						rect	-24,-47,640,560
+						visible	1
 
 	//--------------------------------------------------------------//
 	// Settings->Game Options->Free Look
@@ -827,6 +836,159 @@
 					}
 				}
 	//==============================================================//
+				
+	//==============================================================//
+	// Settings->Game Options->Language
+	//==============================================================//
+
+				windowDef set_game_language
+				{
+					rect  228,433,377,25
+					visible 1
+											
+					windowDef set_game_language_background
+					{
+						rect	0,0,377,25
+						visible	1
+						background	"gfx/guis/mainmenu/b3_light"
+						matcolor	0.545,0.588,0.294,0.4
+					}
+					windowDef set_game_language_description
+					{
+						rect	31,3,210,18
+						visible	1
+						forecolor	1,1,1,0.8
+						text	"#str_229907"
+						textscale	0.24
+						font	"fonts/lowpixel"
+					}
+					choiceDef set_game_language_value
+					{
+						rect	240,3,162,18
+						visible	1
+						forecolor	1,0.745,0.137,0.8
+						textscale	0.24
+						font	"fonts/lowpixel"
+						cvar	sys_lang
+						choices	"#str_229908"
+						choiceType	1
+						values	"english;spanish;french;italian"
+
+						onAction {
+							set "cmd" "play main_menu_selection" ;
+						}
+
+						onActionRelease {
+							set "cmd" "reloadLanguage ; reloadGuis ; CVarStrcmp sys_lang curr_lang English Spanish French Italian" ;
+						}
+					}
+				}
+	//==============================================================//
+				#include "guis/menu/settings/game_hovers.gui"
+					}
+				}
+				windowDef set_game_scroll_up
+				{
+					rect	613,104,16,16
+					visible	0
+					background	"gfx/guis/common/arrow6"
+					matcolor	1,0.501,0,0.8
+					matscaley	-1
+
+					onMouseEnter {
+						set "matcolor_w" "1" ;
+					}
+					onMouseExit {
+						set "matcolor_w" "0.8" ;
+					}
+					onAction {
+						if ( "gui::gui_set_game_scroll" == 1 ) {
+							set "gui_set_game_scroll" "0" ;
+							set "cmd" "set gui_set_game_scroll 0 ; play main_menu_selection" ;
+						} else if ( "gui::gui_set_game_scroll" == 2 ) {
+							set "gui_set_game_scroll" "1" ;
+							set "cmd" "set gui_set_game_scroll 1 ; play main_menu_selection" ;
+						} else if ( "gui::gui_set_game_scroll" == 3 ) {
+							set "gui_set_game_scroll" "2" ;
+							set "cmd" "set gui_set_game_scroll 2 ; play main_menu_selection" ;
+						} else if ( "gui::gui_set_game_scroll" == 4 ) {
+							set "gui_set_game_scroll" "3" ;
+							set "cmd" "set gui_set_game_scroll 3 ; play main_menu_selection" ;
+						} else if ( "gui::gui_set_game_scroll" == 5 ) {
+							set "gui_set_game_scroll" "4" ;
+							set "cmd" "set gui_set_game_scroll 4 ; play main_menu_selection" ;
+						} else if ( "gui::gui_set_game_scroll" == 6 ) {
+							set "gui_set_game_scroll" "5" ;
+							set "cmd" "set gui_set_game_scroll 5 ; play main_menu_selection" ;
+						}
+						namedevent "applySetGameScroll" ;
+					}
+				}
+				windowDef set_game_scroll_track
+				{
+					rect	611,122,20,244
+					visible	0
+					background	"gfx/guis/common/32_sqsolid"
+					matcolor	0,0,0,0.4
+					noevents	1
+				}
+				sliderDef set_game_scroll_thumb
+				{
+					rect	614,124,14,240
+					visible	0
+					forecolor	1,0.501,0,0.8
+					matcolor	1,0.501,0,0.8
+					low	0
+					high	6
+					step	1
+					vertical	1
+					scrollbar	1
+					thumbShader	"gfx/guis/common/32_sqsolid"
+					cvar	gui_set_game_scroll
+
+					onAction {
+						namedevent "applySetGameScroll" ;
+					}
+					onActionRelease {
+						namedevent "applySetGameScroll" ;
+					}
+				}
+				windowDef set_game_scroll_down
+				{
+					rect	613,368,16,16
+					visible	0
+					background	"gfx/guis/common/arrow6"
+					matcolor	1,0.501,0,0.8
+
+					onMouseEnter {
+						set "matcolor_w" "1" ;
+					}
+					onMouseExit {
+						set "matcolor_w" "0.8" ;
+					}
+					onAction {
+						if ( "gui::gui_set_game_scroll" == 0 ) {
+							set "gui_set_game_scroll" "1" ;
+							set "cmd" "set gui_set_game_scroll 1 ; play main_menu_selection" ;
+						} else if ( "gui::gui_set_game_scroll" == 1 ) {
+							set "gui_set_game_scroll" "2" ;
+							set "cmd" "set gui_set_game_scroll 2 ; play main_menu_selection" ;
+						} else if ( "gui::gui_set_game_scroll" == 2 ) {
+							set "gui_set_game_scroll" "3" ;
+							set "cmd" "set gui_set_game_scroll 3 ; play main_menu_selection" ;
+						} else if ( "gui::gui_set_game_scroll" == 3 ) {
+							set "gui_set_game_scroll" "4" ;
+							set "cmd" "set gui_set_game_scroll 4 ; play main_menu_selection" ;
+						} else if ( "gui::gui_set_game_scroll" == 4 ) {
+							set "gui_set_game_scroll" "5" ;
+							set "cmd" "set gui_set_game_scroll 5 ; play main_menu_selection" ;
+						} else if ( "gui::gui_set_game_scroll" == 5 ) {
+							set "gui_set_game_scroll" "6" ;
+							set "cmd" "set gui_set_game_scroll 6 ; play main_menu_selection" ;
+						}
+						namedevent "applySetGameScroll" ;
+					}
+				}
 
 			}
 

@@ -430,6 +430,48 @@ void* idSoundSystemLocal::GetOpenALDevice() const
 
 /*
 ========================
+idSoundSystemLocal::IsEAXAvailable
+========================
+*/
+int idSoundSystemLocal::IsEAXAvailable() const
+{
+	if( !s_useEAXReverb.GetBool() || !s_useOpenAL.GetBool() )
+	{
+		return -1;
+	}
+
+#if defined(USE_OPENAL)
+	ALCdevice* device = hardware.GetOpenALDevice();
+	if( device == NULL )
+	{
+		return 2;
+	}
+
+	ALCint major = 0;
+	ALCint minor = 0;
+	alcGetIntegerv( device, ALC_MAJOR_VERSION, 1, &major );
+	alcGetIntegerv( device, ALC_MINOR_VERSION, 1, &minor );
+	if( CheckALCErrors( device ) != ALC_NO_ERROR )
+	{
+		return 0;
+	}
+	if( major < 1 || ( major == 1 && minor < 1 ) )
+	{
+		return 0;
+	}
+	if( alcIsExtensionPresent( device, "ALC_EXT_EFX" ) != AL_TRUE )
+	{
+		return 0;
+	}
+
+	return hardware.HasEFX() ? 1 : 0;
+#else
+	return 0;
+#endif
+}
+
+/*
+========================
 idSoundSystemLocal::SoundTime
 ========================
 */

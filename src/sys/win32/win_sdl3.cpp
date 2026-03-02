@@ -72,6 +72,7 @@ static idCVar in_joystick("in_joystick", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_
 static idCVar in_joystickDeadZone("in_joystickDeadZone", "0.18", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "joystick axis dead zone", 0.0f, 0.95f);
 static idCVar in_joystickTriggerThreshold("in_joystickTriggerThreshold", "0.35", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "trigger button press threshold", 0.0f, 1.0f);
 static idCVar r_screen("r_screen", "-1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "SDL3 display index to target (-1 = auto/current display)");
+static idCVar r_multiScreen("r_multiScreen", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "multi-screen mode (0 = single display, 1 = span all displays)", 0, 1);
 
 static const unsigned char s_scantokey[128] = {
 	0,          27,    '1',       '2',        '3',    '4',         '5',      '6',
@@ -1213,6 +1214,44 @@ static bool SDL3_GetDisplayWindowedPlacementBounds(SDL_DisplayID display, SDL_Re
 	return false;
 }
 
+static bool SDL3_GetVirtualDisplayBounds(SDL_Rect &bounds) {
+	int displayCount = 0;
+	SDL_DisplayID *displays = SDL_GetDisplays(&displayCount);
+	if (displays == NULL || displayCount <= 0) {
+		if (displays != NULL) {
+			SDL_free(displays);
+		}
+		return false;
+	}
+
+	bool hasBounds = false;
+	for (int i = 0; i < displayCount; ++i) {
+		SDL_Rect displayBounds;
+		if (!SDL_GetDisplayBounds(displays[i], &displayBounds)) {
+			continue;
+		}
+
+		if (!hasBounds) {
+			bounds = displayBounds;
+			hasBounds = true;
+			continue;
+		}
+
+		const int left = (displayBounds.x < bounds.x) ? displayBounds.x : bounds.x;
+		const int top = (displayBounds.y < bounds.y) ? displayBounds.y : bounds.y;
+		const int right = ((displayBounds.x + displayBounds.w) > (bounds.x + bounds.w)) ? (displayBounds.x + displayBounds.w) : (bounds.x + bounds.w);
+		const int bottom = ((displayBounds.y + displayBounds.h) > (bounds.y + bounds.h)) ? (displayBounds.y + displayBounds.h) : (bounds.y + bounds.h);
+
+		bounds.x = left;
+		bounds.y = top;
+		bounds.w = right - left;
+		bounds.h = bottom - top;
+	}
+
+	SDL_free(displays);
+	return hasBounds;
+}
+
 static bool SDL3_RectsOverlap(const SDL_Rect &a, const SDL_Rect &b) {
 	const int overlapLeft = (a.x > b.x) ? a.x : b.x;
 	const int overlapTop = (a.y > b.y) ? a.y : b.y;
@@ -1654,6 +1693,7 @@ static bool SDL3_ApplyScreenParms(glimpParms_t parms) {
 	SDL3_DisableWindowAspectSnap();
 
 	const bool useBorderlessWindow = !parms.fullScreen && parms.borderless;
+	const bool spanDisplays = (r_multiScreen.GetInteger() == 1);
 	const sdl3DisplaySelection_t selectedDisplay = SDL3_ResolveTargetDisplay(true);
 	SDL_DisplayID display = selectedDisplay.id;
 	if (display == 0) {
@@ -1671,7 +1711,23 @@ static bool SDL3_ApplyScreenParms(glimpParms_t parms) {
 		int targetX = 0;
 		int targetY = 0;
 
-		if (useDesktopFullscreen) {
+		if (useDesktopFullscreen && spanDisplays) {
+			if (!SDL_SetWindowFullscreen(s_sdlWindow, false)) {
+				common->Printf("SDL3: failed to leave fullscreen before spanned desktop mode: %s\n", SDL_GetError());
+			}
+			if (!SDL_SetWindowBordered(s_sdlWindow, false)) {
+				common->Printf("SDL3: failed to disable window borders for spanned desktop mode: %s\n", SDL_GetError());
+			}
+
+			SDL_Rect bounds;
+			if (SDL3_GetVirtualDisplayBounds(bounds)) {
+				(void)SDL_SetWindowPosition(s_sdlWindow, bounds.x, bounds.y);
+				(void)SDL_SetWindowSize(s_sdlWindow, bounds.w, bounds.h);
+			} else {
+				(void)SDL_SetWindowPosition(s_sdlWindow, targetX, targetY);
+				(void)SDL_SetWindowSize(s_sdlWindow, parms.width, parms.height);
+			}
+		} else if (useDesktopFullscreen) {
 			SDL_Rect bounds;
 			if (display != 0 && SDL_GetDisplayBounds(display, &bounds)) {
 				targetX = bounds.x;
@@ -1711,10 +1767,12 @@ static bool SDL3_ApplyScreenParms(glimpParms_t parms) {
 			}
 		}
 
-		if (!SDL_SetWindowFullscreen(s_sdlWindow, true)) {
-			common->Printf("SDL3: failed to enter fullscreen: %s\n", SDL_GetError());
-			s_screenParmTransitionActive = false;
-			return false;
+		if (!(useDesktopFullscreen && spanDisplays)) {
+			if (!SDL_SetWindowFullscreen(s_sdlWindow, true)) {
+				common->Printf("SDL3: failed to enter fullscreen: %s\n", SDL_GetError());
+				s_screenParmTransitionActive = false;
+				return false;
+			}
 		}
 	} else {
 		if (!SDL3_LeaveFullscreenAndRestoreDesktopMode()) {
@@ -1729,7 +1787,14 @@ static bool SDL3_ApplyScreenParms(glimpParms_t parms) {
 
 		if (useBorderlessWindow) {
 			SDL_Rect bounds;
-			if (display != 0 && SDL_GetDisplayBounds(display, &bounds)) {
+			if (spanDisplays && SDL3_GetVirtualDisplayBounds(bounds)) {
+				if (!SDL_SetWindowSize(s_sdlWindow, bounds.w, bounds.h)) {
+					common->Printf("SDL3: failed to resize borderless spanned window: %s\n", SDL_GetError());
+				}
+				if (!SDL_SetWindowPosition(s_sdlWindow, bounds.x, bounds.y)) {
+					common->Printf("SDL3: failed to place borderless spanned window: %s\n", SDL_GetError());
+				}
+			} else if (display != 0 && SDL_GetDisplayBounds(display, &bounds)) {
 				if (!SDL_SetWindowSize(s_sdlWindow, bounds.w, bounds.h)) {
 					common->Printf("SDL3: failed to resize borderless window: %s\n", SDL_GetError());
 				}

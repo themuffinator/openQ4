@@ -364,6 +364,7 @@ public:
 #if defined(USE_OPENAL)
 	virtual void*			GetOpenALDevice() const = 0;
 #endif
+	virtual int				IsEAXAvailable() const = 0;
 
 	// for the sound level meter window
 	virtual cinData_t		ImageForTime( const int milliseconds, const bool waveform ) = 0;

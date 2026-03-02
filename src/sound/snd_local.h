@@ -513,6 +513,7 @@ public:
 	// RB begin
 	virtual void*			GetOpenALDevice() const;
 	// RB end
+	virtual int				IsEAXAvailable() const;
 
 	// for the sound level meter window
 	virtual cinData_t		ImageForTime( const int milliseconds, const bool waveform );

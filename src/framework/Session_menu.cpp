@@ -30,8 +30,84 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #include "Session_local.h"
+#include "../sound/snd_local.h"
+
+#if defined( _WIN32 )
+#include <SDL3/SDL.h>
+#endif
 
 idCVar	idSessionLocal::gui_configServerRate( "gui_configServerRate", "0", CVAR_GUI | CVAR_ARCHIVE | CVAR_ROM | CVAR_INTEGER, "" );
+idCVar gui_set_sys_scroll( "gui_set_sys_scroll", "0", CVAR_GUI | CVAR_INTEGER, "display menu scroll step", 0, 9 );
+idCVar gui_set_audio_scroll( "gui_set_audio_scroll", "0", CVAR_GUI | CVAR_INTEGER, "audio menu scroll step", 0, 2 );
+idCVar gui_set_game_scroll( "gui_set_game_scroll", "0", CVAR_GUI | CVAR_INTEGER, "game menu scroll step", 0, 6 );
+
+/*
+=================
+BuildMainMenuAudioDeviceChoices
+=================
+*/
+static void BuildMainMenuAudioDeviceChoices( idStr &choiceNames, idStr &choiceValues ) {
+	choiceNames = common->GetLanguageDict()->GetString( "#str_229913" );
+	choiceValues = "";
+
+#if defined( USE_OPENAL )
+	const ALCenum listToken = ( alcIsExtensionPresent( NULL, "ALC_ENUMERATE_ALL_EXT" ) != AL_FALSE ) ? ALC_ALL_DEVICES_SPECIFIER : ALC_DEVICE_SPECIFIER;
+	const ALCchar *deviceList = alcGetString( NULL, listToken );
+	if ( deviceList == NULL || deviceList[0] == '\0' ) {
+		return;
+	}
+
+	for ( const ALCchar *it = deviceList; *it != '\0'; it += strlen( it ) + 1 ) {
+		idStr deviceName = reinterpret_cast<const char *>( it );
+		deviceName.Replace( ";", "," );
+		if ( !deviceName.Length() ) {
+			continue;
+		}
+
+		choiceNames += ";";
+		choiceNames += deviceName;
+		choiceValues += ";";
+		choiceValues += deviceName;
+	}
+#endif
+}
+
+/*
+=================
+BuildMainMenuDisplayChoices
+=================
+*/
+static void BuildMainMenuDisplayChoices( idStr &choiceNames, idStr &choiceValues ) {
+	choiceNames = common->GetLanguageDict()->GetString( "#str_229914" );
+	choiceValues = "-1";
+
+#if defined( _WIN32 )
+	int displayCount = 0;
+	SDL_DisplayID *displays = SDL_GetDisplays( &displayCount );
+	if ( displays == NULL || displayCount <= 0 ) {
+		if ( displays != NULL ) {
+			SDL_free( displays );
+		}
+		return;
+	}
+
+	for ( int i = 0; i < displayCount; ++i ) {
+		const char *displayName = SDL_GetDisplayName( displays[i] );
+		if ( displayName == NULL || displayName[0] == '\0' ) {
+			displayName = "Display";
+		}
+
+		idStr label = va( "%d: %s", i + 1, displayName );
+		label.Replace( ";", "," );
+		choiceNames += ";";
+		choiceNames += label;
+		choiceValues += ";";
+		choiceValues += va( "%d", i );
+	}
+
+	SDL_free( displays );
+#endif
+}
 
 /*
 =================
@@ -750,6 +826,24 @@ void idSessionLocal::SetMainMenuGuiVars( void ) {
 #endif
 	guiMainMenu->SetStateString( "browser_levelshot", "gfx/guis/loadscreens/generic" );
 
+	idStr audioDeviceNames;
+	idStr audioDeviceValues;
+	BuildMainMenuAudioDeviceChoices( audioDeviceNames, audioDeviceValues );
+	guiMainMenu->SetStateString( "device_name", audioDeviceNames.c_str() );
+	guiMainMenu->SetStateString( "device_value", audioDeviceValues.c_str() );
+
+	idStr displayNames;
+	idStr displayValues;
+	BuildMainMenuDisplayChoices( displayNames, displayValues );
+	guiMainMenu->SetStateString( "display_names", displayNames.c_str() );
+	guiMainMenu->SetStateString( "display_values", displayValues.c_str() );
+	guiMainMenu->SetStateInt( "gui_set_sys_scroll", 0 );
+	guiMainMenu->SetStateInt( "gui_set_audio_scroll", 0 );
+	guiMainMenu->SetStateInt( "gui_set_game_scroll", 0 );
+	gui_set_sys_scroll.SetInteger( 0 );
+	gui_set_audio_scroll.SetInteger( 0 );
+	gui_set_game_scroll.SetInteger( 0 );
+
 	SetMainMenuSkin();
 	// Mods Menu
 	SetModsMenuGuiVars();
@@ -1376,30 +1470,36 @@ void idSessionLocal::HandleMainMenuCommands( const char *menuCommand ) {
 			}
 			if ( !vcmd.Icmp( "eax" ) ) {
 				if ( cvarSystem->GetCVarBool( "s_useEAXReverb" ) ) {
-					//int eax = soundSystem->IsEAXAvailable();
-					//switch ( eax ) {
-					//case 2:
-					//	// OpenAL subsystem load failed
-					//	MessageBox( MSG_OK, common->GetLanguageDict()->GetString( "#str_07238" ), common->GetLanguageDict()->GetString( "#str_07231" ), true );
-					//	break;
-					//case 1:
-					//	// when you restart
-					//	MessageBox( MSG_OK, common->GetLanguageDict()->GetString( "#str_04137" ), common->GetLanguageDict()->GetString( "#str_07231" ), true );
-					//	break;
-					//case -1:
-					//	cvarSystem->SetCVarBool( "s_useEAXReverb", false );
-					//	// disabled
-					//	MessageBox( MSG_OK, common->GetLanguageDict()->GetString( "#str_07233" ), common->GetLanguageDict()->GetString( "#str_07231" ), true );
-					//	break;
-					//case 0:
-					//	cvarSystem->SetCVarBool( "s_useEAXReverb", false );
-					//	// not available
-					//	MessageBox( MSG_OK, common->GetLanguageDict()->GetString( "#str_07232" ), common->GetLanguageDict()->GetString( "#str_07231" ), true );
-					//	break;
-					//}
+					// EAX requires the OpenAL backend; force it on when requested from the menu.
+					cvarSystem->SetCVarBool( "s_useOpenAL", true );
+					cmdSystem->BufferCommandText( CMD_EXEC_NOW, "s_restart\n" );
+
+					const int eax = soundSystem->IsEAXAvailable();
+					switch ( eax ) {
+					case 2:
+						// OpenAL subsystem load failed.
+						MessageBox( MSG_OK, common->GetLanguageDict()->GetString( "#str_07238" ), common->GetLanguageDict()->GetString( "#str_07231" ), true );
+						break;
+					case 1:
+						// Enabled and active on current device.
+						MessageBox( MSG_OK, common->GetLanguageDict()->GetString( "#str_04137" ), common->GetLanguageDict()->GetString( "#str_07231" ), true );
+						break;
+					case -1:
+						cvarSystem->SetCVarBool( "s_useEAXReverb", false );
+						// Explicitly disabled.
+						MessageBox( MSG_OK, common->GetLanguageDict()->GetString( "#str_07233" ), common->GetLanguageDict()->GetString( "#str_07231" ), true );
+						break;
+					case 0:
+					default:
+						cvarSystem->SetCVarBool( "s_useEAXReverb", false );
+						// Unsupported by OpenAL version/device or EFX unavailable.
+						MessageBox( MSG_OK, common->GetLanguageDict()->GetString( "#str_07232" ), common->GetLanguageDict()->GetString( "#str_07231" ), true );
+						break;
+					}
 				} else {
 					// also turn off OpenAL so we fully go back to legacy mixer
 					cvarSystem->SetCVarBool( "s_useOpenAL", false );
+					cmdSystem->BufferCommandText( CMD_EXEC_NOW, "s_restart\n" );
 					// when you restart
 					MessageBox( MSG_OK, common->GetLanguageDict()->GetString( "#str_04137" ), common->GetLanguageDict()->GetString( "#str_07231" ), true );
 				}

@@ -1114,4 +1114,23 @@
 	"#str_223007"	"Gun Position"
 	"#str_223008"	"Right;Centered;Lower Right"
 	"#str_223009"	"Enable detailed sky"
+
+	// OpenQ4 GUI strings : #str_229900 - #str_229999
+	"#str_229900"	"DISPLAY"
+	"#str_229901"	"AUDIO"
+	"#str_229902"	"Basics"
+	"#str_229903"	"Rendering"
+	"#str_229904"	"Supersampling"
+	"#str_229905"	"SETTINGS - DISPLAY"
+	"#str_229906"	"SETTINGS - AUDIO"
+	"#str_229907"	"Language"
+	"#str_229908"	"English;Spanish;French;Italian"
+	"#str_229909"	"Borderless Window"
+	"#str_229910"	"Fullscreen Policy"
+	"#str_229911"	"Desktop;Exclusive"
+	"#str_229912"	"Display Device"
+	"#str_229913"	"Default Device"
+	"#str_229914"	"Auto"
+	"#str_229915"	"Expand Across Displays"
+	"#str_229916"	"Primary Display Only;Span All Displays"
 }
