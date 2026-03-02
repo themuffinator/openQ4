@@ -258,6 +258,9 @@ public:
 	bool				msgRunning;
 	int					msgRetIndex;
 	bool				msgIgnoreButtons;
+	bool				menuIntroBlackoutActive;
+	bool				menuIntroBlackoutAwaitMenuMusic;
+	int					menuIntroBlackoutFadeStart;
 	
 	bool				waitingOnBind;
 

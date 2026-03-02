@@ -563,6 +563,9 @@ void idSessionLocal::Clear() {
 	msgRunning = false;
 	guiMsgRestore = NULL;
 	msgIgnoreButtons = false;
+	menuIntroBlackoutActive = false;
+	menuIntroBlackoutAwaitMenuMusic = false;
+	menuIntroBlackoutFadeStart = -1;
 
 	bytesNeededForMapLoad = 0;
 
@@ -2891,6 +2894,7 @@ idSessionLocal::Draw
 */
 void idSessionLocal::Draw() {
 	bool fullConsole = false;
+	float menuIntroBlackoutAlpha = 0.0f;
 
 	if ( insideExecuteMapChange ) {
 		if ( guiLoading ) {
@@ -2932,6 +2936,34 @@ void idSessionLocal::Draw() {
 		}
 
 		guiActive->Redraw( com_frameTime );
+
+		if ( guiActive == guiMainMenu ) {
+			if ( menuIntroBlackoutActive ) {
+				if ( menuIntroBlackoutAwaitMenuMusic ) {
+					menuIntroBlackoutAlpha = 1.0f;
+				} else {
+				if ( menuIntroBlackoutFadeStart < 0 ) {
+					menuIntroBlackoutFadeStart = com_frameTime;
+				}
+
+				const float fadeElapsed = static_cast<float>( com_frameTime - menuIntroBlackoutFadeStart );
+				const float fadeDurationMs = 350.0f;
+				const float t = idMath::ClampFloat( 0.0f, 1.0f, fadeElapsed / fadeDurationMs );
+				menuIntroBlackoutAlpha = 1.0f - t;
+
+				if ( t >= 1.0f ) {
+					menuIntroBlackoutActive = false;
+					menuIntroBlackoutAwaitMenuMusic = false;
+					menuIntroBlackoutFadeStart = -1;
+					menuIntroBlackoutAlpha = 0.0f;
+				}
+				}
+			}
+		} else {
+			menuIntroBlackoutActive = false;
+			menuIntroBlackoutAwaitMenuMusic = false;
+			menuIntroBlackoutFadeStart = -1;
+		}
 	} else if ( readDemo ) {
 		rw->RenderScene( &currentDemoRenderView );
 		renderSystem->DrawDemoPics();
@@ -2975,6 +3007,17 @@ void idSessionLocal::Draw() {
 		Session_DrawFallbackLoadingScreen();
 #endif
 		fullConsole = true;
+	}
+
+	if ( menuIntroBlackoutAlpha > 0.0f ) {
+		const bool previousUIViewportMode = renderSystem->GetUseUIViewportFor2D();
+		const float screenW = static_cast<float>( renderSystem->GetScreenWidth() );
+		const float screenH = static_cast<float>( renderSystem->GetScreenHeight() );
+		renderSystem->SetUseUIViewportFor2D( false );
+		renderSystem->SetColor4( 0.0f, 0.0f, 0.0f, menuIntroBlackoutAlpha );
+		renderSystem->DrawStretchPic( 0.0f, 0.0f, screenW, screenH, 0.0f, 0.0f, 1.0f, 1.0f, whiteMaterial );
+		renderSystem->SetColor( colorWhite );
+		renderSystem->SetUseUIViewportFor2D( previousUIViewportMode );
 	}
 
 #if ID_CONSOLE_LOCK

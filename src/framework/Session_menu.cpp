@@ -503,6 +503,9 @@ void idSessionLocal::StartMenu( bool playIntro ) {
 
 	SetGUI( guiMainMenu, NULL );
 	guiMainMenu->HandleNamedEvent( playIntro ? "playIntro" : "noIntro" );
+	menuIntroBlackoutActive = playIntro;
+	menuIntroBlackoutAwaitMenuMusic = playIntro;
+	menuIntroBlackoutFadeStart = -1;
 	if ( !playIntro ) {
 		// Ensure menu music always restarts when returning from gameplay.
 		guiMainMenu->HandleNamedEvent( "MusicRestart" );
@@ -1344,6 +1347,11 @@ void idSessionLocal::HandleMainMenuCommands( const char *menuCommand ) {
 			if ( args.Argc() - icmd >= 1 ) {
 				idStr snd = args.Argv( icmd++ );
 				menuSoundWorld->PlayShaderDirectly( snd, 2 );
+				if ( menuIntroBlackoutActive && menuIntroBlackoutAwaitMenuMusic &&
+					( snd.Icmp( "main_menu" ) == 0 || snd.Icmp( "main_menu_gameplay" ) == 0 ) ) {
+					menuIntroBlackoutAwaitMenuMusic = false;
+					menuIntroBlackoutFadeStart = -1;
+				}
 			}
 			continue;
 		}

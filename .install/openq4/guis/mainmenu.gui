@@ -646,6 +646,7 @@ windowDef Desktop
 	{
 		rect	0,0,640,480
 		visible	1
+		noclip	1
 		windowDef bg_temp
 		{
 			rect	0,0,640,480
@@ -693,15 +694,53 @@ windowDef Desktop
 		{
 			rect	0,24,640,480
 			visible	1
+			noclip	1
 			background	"gfx/guis/mainmenu/screen"
 			matcolor	0.7,0.7,0.7,1
+			windowDef screen_tile_left
+			{
+				rect	-4096,0,4096,480
+				visible	1
+				background	"gfx/guis/mainmenu/screen"
+				matscalex	6.4
+				matcolor	0.7,0.7,0.7,1
+				noevents	1
+			}
+			windowDef screen_tile_right
+			{
+				rect	640,0,4096,480
+				visible	1
+				background	"gfx/guis/mainmenu/screen"
+				matscalex	6.4
+				matcolor	0.7,0.7,0.7,1
+				noevents	1
+			}
 		}
 		windowDef screen2
 		{
 			rect	0,294,640,349
 			visible	1
+			noclip	1
 			background	"gfx/guis/mainmenu/screen"
 			matcolor	0,0,0,1
+			windowDef screen2_tile_left
+			{
+				rect	-4096,0,4096,349
+				visible	1
+				background	"gfx/guis/mainmenu/screen"
+				matscalex	6.4
+				matcolor	0,0,0,1
+				noevents	1
+			}
+			windowDef screen2_tile_right
+			{
+				rect	640,0,4096,349
+				visible	1
+				background	"gfx/guis/mainmenu/screen"
+				matscalex	6.4
+				matcolor	0,0,0,1
+				noevents	1
+			}
 		}
 		windowDef grad2
 		{
@@ -774,6 +813,7 @@ windowDef Desktop
 		{
 			rect	-400,0,1045,129
 			visible	1
+			noclip	1
 			background	"gfx/guis/mainmenu/topbar"
 			matcolor	1,1,1,1
 			windowDef topbar_tile_left
@@ -799,6 +839,7 @@ windowDef Desktop
 		{
 			rect	-399,351,1045,129
 			visible	1
+			noclip	1
 			background	"gfx/guis/mainmenu/btmbar"
 			matcolor	1,1,1,1
 			windowDef btmbar_tile_left
@@ -15108,14 +15149,21 @@ windowDef Desktop
 			notime	1
 
 			onTime 0 {
-				transition "videoBlack::backcolor_w" "1" "0" "250" ;
+				if ( "desktop::video_check" == 1 ) {
+					set "videoBlack::visible" "1" ;
+					set "videoBlack::backcolor_w" "1" ;
+				} else {
+					transition "videoBlack::backcolor_w" "1" "0" "250" ;
+				}
 			}
 
 			onTime 250 {	
-				set "videoBlack::visible" "0" ;
-				
-				if ("desktop::motd" == 1) {
-					set "cmd" "getMOTD" ;
+				if ( "desktop::video_check" == 0 ) {
+					set "videoBlack::visible" "0" ;
+					
+					if ("desktop::motd" == 1) {
+						set "cmd" "getMOTD" ;
+					}
 				}
 			}
 

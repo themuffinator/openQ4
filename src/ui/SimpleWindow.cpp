@@ -35,14 +35,28 @@ If you have questions concerning this license or the applicable additional terms
 #include "SimpleWindow.h"
 
 namespace {
-static bool ShouldDrawSplashUnderlay( const idMaterial *background, const idRectangle &drawRect ) {
-	if ( background == NULL ) {
+static bool IsFullscreenBackdropRect( const idRectangle &drawRect ) {
+	const float epsilon = 0.01f;
+	if ( idMath::Fabs( drawRect.x ) > epsilon || idMath::Fabs( drawRect.y ) > epsilon ||
+		 idMath::Fabs( drawRect.w - 640.0f ) > epsilon ) {
+		return false;
+	}
+	// Some intro videos are authored as 640x479.
+	return idMath::Fabs( drawRect.h - 480.0f ) <= 1.01f;
+}
+
+static bool ShouldDrawCinematicUnderlay( const idMaterial *background, const idRectangle &drawRect ) {
+	if ( background == NULL || !IsFullscreenBackdropRect( drawRect ) ) {
 		return false;
 	}
 
-	const float epsilon = 0.01f;
-	if ( idMath::Fabs( drawRect.x ) > epsilon || idMath::Fabs( drawRect.y ) > epsilon ||
-		 idMath::Fabs( drawRect.w - 640.0f ) > epsilon || idMath::Fabs( drawRect.h - 480.0f ) > epsilon ) {
+	const char *materialName = background->GetName();
+	const bool isVideoMaterial = ( materialName != NULL && idStr::Icmpn( materialName, "video/", 6 ) == 0 );
+	return isVideoMaterial || ( background->CinematicLength() > 0 );
+}
+
+static bool ShouldDrawSplashUnderlay( const idMaterial *background, const idRectangle &drawRect ) {
+	if ( background == NULL || !IsFullscreenBackdropRect( drawRect ) ) {
 		return false;
 	}
 
@@ -56,6 +70,15 @@ static bool ShouldDrawSplashUnderlay( const idMaterial *background, const idRect
 		idStr::Icmp( materialName, "gfx/splashScreen" ) == 0 ||
 		idStr::Icmp( materialName, "gfx/guis/loadscreens/generic" ) == 0 ||
 		idStr::Icmp( materialName, "gfx/guis/loadscreens/generic.dds" ) == 0;
+}
+
+static void DrawCinematicUnderlay( idDeviceContext *dc ) {
+	const bool previousUIViewportMode = renderSystem->GetUseUIViewportFor2D();
+	renderSystem->SetUseUIViewportFor2D( false );
+	renderSystem->SetColor( colorBlack );
+	renderSystem->DrawStretchPic( 0.0f, 0.0f, SCREEN_WIDTH, SCREEN_HEIGHT, 0.0f, 0.0f, 1.0f, 1.0f, declManager->FindMaterial( "_white" ) );
+	renderSystem->SetColor( colorWhite );
+	renderSystem->SetUseUIViewportFor2D( previousUIViewportMode );
 }
 
 static void DrawSplashUnderlay( idDeviceContext *dc ) {
@@ -194,7 +217,9 @@ void idSimpleWindow::DrawBackground(const idRectangle &drawRect) {
 
 	if (background) {
 		if (matColor.w() > 0) {
-			if ( ShouldDrawSplashUnderlay( background, drawRect ) ) {
+			if ( ShouldDrawCinematicUnderlay( background, drawRect ) ) {
+				DrawCinematicUnderlay( dc );
+			} else if ( ShouldDrawSplashUnderlay( background, drawRect ) ) {
 				DrawSplashUnderlay( dc );
 			}
 
