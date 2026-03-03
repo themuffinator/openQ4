@@ -300,6 +300,10 @@ foreach ($scene in $suite.scenes) {
             r_useSSAO         = $variantCvars["r_useSSAO"]
             r_useTAA          = $variantCvars["r_useTAA"]
             r_useTonemap      = $variantCvars["r_useTonemap"]
+            r_useHiZ          = $variantCvars["r_useHiZ"]
+            r_useSSR          = $variantCvars["r_useSSR"]
+            r_ssrStrength     = $variantCvars["r_ssrStrength"]
+            r_useMaskedOcclusionCulling = $variantCvars["r_useMaskedOcclusionCulling"]
             r_postAA          = $variantCvars["r_postAA"]
             status            = $status
             exit_code         = $proc.ExitCode

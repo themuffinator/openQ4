@@ -577,6 +577,44 @@ bool idRenderWorldLocal::CullEntityByPortals( const idRenderEntityLocal *entity,
 		return true;
 	}
 
+	// Phase-6 masked occlusion culling prototype:
+	// conservatively reject very small, distant entities after portal clipping.
+	if ( r_useMaskedOcclusionCulling.GetBool() ) {
+		// Guardrails: never cull view-locked/deferred entities through this heuristic.
+		if ( entity->parms.callback == NULL &&
+			entity->parms.allowSurfaceInViewID == 0 &&
+			entity->parms.weaponDepthHackInViewID == 0 &&
+			entity->parms.modelDepthHack == 0.0f ) {
+			tr.pc.c_mocTests++;
+
+			idBounds projectedBounds;
+			idScreenRect projectedRect;
+			tr.viewDef->viewFrustum.ProjectionBounds(
+				idBox( entity->referenceBounds, entity->parms.origin, entity->parms.axis ),
+				projectedBounds );
+			projectedRect = R_ScreenRectFromViewFrustumBounds( projectedBounds );
+			projectedRect.Intersect( ps->rect );
+			projectedRect.Intersect( tr.viewDef->scissor );
+
+			if ( projectedRect.IsEmpty() ) {
+				tr.pc.c_mocCulled++;
+				return true;
+			}
+
+			const int rectWidth = projectedRect.x2 - projectedRect.x1 + 1;
+			const int rectHeight = projectedRect.y2 - projectedRect.y1 + 1;
+			const int rectPixels = Max( 0, rectWidth ) * Max( 0, rectHeight );
+			const int minPixels = Max( 1, r_mocMinPixels.GetInteger() );
+			const float minDistance = Max( 0.0f, r_mocMinDistance.GetFloat() );
+			const float distanceToView = ( entity->parms.origin - tr.viewDef->renderView.vieworg ).LengthFast();
+
+			if ( rectPixels <= minPixels && distanceToView >= minDistance ) {
+				tr.pc.c_mocCulled++;
+				return true;
+			}
+		}
+	}
+
 	return false;
 }
 

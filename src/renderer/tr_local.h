@@ -648,6 +648,7 @@ const idMaterial *R_RemapShaderBySkin( const idMaterial *shader, const idDeclSki
 typedef struct {
 	int		c_sphere_cull_in, c_sphere_cull_clip, c_sphere_cull_out;
 	int		c_box_cull_in, c_box_cull_out;
+	int		c_mocTests, c_mocCulled;	// phase-6 masked occlusion culling counters
 	int		c_createInteractions;	// number of calls to idInteraction::CreateInteraction
 	int		c_createLightTris;
 	int		c_createShadowVolumes;
@@ -986,6 +987,10 @@ extern idCVar r_useLightCulling;		// 0 = none, 1 = box, 2 = exact clip of polyhe
 extern idCVar r_useLightScissors;		// 1 = use custom scissor rectangle for each light
 extern idCVar r_useClippedLightScissors;// 0 = full screen when near clipped, 1 = exact when near clipped, 2 = exact always
 extern idCVar r_useEntityCulling;		// 0 = none, 1 = box
+extern idCVar r_useMaskedOcclusionCulling; // phase-6 conservative masked occlusion culling gate
+extern idCVar r_mocMinPixels;			// minimum projected pixel coverage before MOC considers culling
+extern idCVar r_mocMinDistance;		// minimum view distance before MOC can cull tiny entities
+extern idCVar r_showOcclusionCulling;	// print masked occlusion culling counters
 extern idCVar r_useEntityScissors;		// 1 = use custom scissor rectangle for each entity
 extern idCVar r_useInteractionCulling;	// 1 = cull interactions
 extern idCVar r_useInteractionScissors;	// 1 = use a custom scissor rectangle for each interaction
@@ -1050,6 +1055,12 @@ extern idCVar r_tonemapExposure;		// tonemap exposure scalar
 extern idCVar r_tonemapGamma;			// display gamma for tonemap output
 extern idCVar r_tonemapShoulder;		// tonemap shoulder compression scale
 extern idCVar r_showPostPassTiming;		// print phase-5 pass timings periodically
+extern idCVar r_useHiZ;				// enable phase-6 hierarchical depth generation
+extern idCVar r_useSSR;				// enable phase-6 SSR pass
+extern idCVar r_ssrStrength;			// SSR blend strength
+extern idCVar r_ssrRayStep;			// SSR ray step scale in texel units
+extern idCVar r_ssrDepthScale;			// SSR depth-match scaling factor
+extern idCVar r_ssrEdgeFade;			// SSR edge fade multiplier
 extern idCVar r_skipFrontEnd;			// bypasses all front end work, but 2D gui rendering still draws
 extern idCVar r_skipBackEnd;			// don't draw anything
 extern idCVar r_skipCopyTexture;		// do all rendering, but don't actually copyTexSubImage2D

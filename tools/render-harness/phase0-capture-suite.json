@@ -66,6 +66,27 @@
           "r_useTonemap": 1,
           "r_postAA": 1
         }
+      },
+      {
+        "name": "mapped_parallel_cascades_pbr_indirect_phase6",
+        "r_useShadowMapping": 1,
+        "suffix": "parallel_csm_pbr_indirect_phase6",
+        "cvars": {
+          "r_useParallelShadowMaps": 1,
+          "r_shadowMapSplits": 3,
+          "r_shadowMapCascadeBlend": 0.08,
+          "r_usePBR": 1,
+          "r_useIndirectLighting": 1,
+          "r_usePostLightingStack": 1,
+          "r_useSSAO": 1,
+          "r_useTAA": 1,
+          "r_useTonemap": 1,
+          "r_useHiZ": 1,
+          "r_useSSR": 1,
+          "r_ssrStrength": 0.2,
+          "r_useMaskedOcclusionCulling": 1,
+          "r_postAA": 0
+        }
       }
     ]
   },

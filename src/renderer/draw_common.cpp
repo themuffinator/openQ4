@@ -2316,6 +2316,138 @@ static int RB_STD_ApplyTemporalAA( void ) {
 	return Sys_Milliseconds() - startMsec;
 }
 
+static int RB_STD_BuildHiZ( void ) {
+	if ( !r_usePostLightingStack.GetBool() || ( !r_useHiZ.GetBool() && !r_useSSR.GetBool() ) ) {
+		return 0;
+	}
+
+	if ( !glConfig.ARBFragmentProgramAvailable ) {
+		return 0;
+	}
+
+	int viewWidth = 0;
+	int viewHeight = 0;
+	RB_STD_GetViewportSize( viewWidth, viewHeight );
+	if ( viewWidth <= 0 || viewHeight <= 0 ) {
+		return 0;
+	}
+
+	const int startMsec = Sys_Milliseconds();
+	const int x = backEnd.viewDef->viewport.x1;
+	const int y = backEnd.viewDef->viewport.y1;
+	const float invWidth = 1.0f / static_cast<float>( Max( 1, viewWidth ) );
+	const float invHeight = 1.0f / static_cast<float>( Max( 1, viewHeight ) );
+
+	// Preserve scene color because HiZ generation renders a temporary fullscreen pass.
+	globalImages->currentRenderImage->CopyFramebuffer( x, y, viewWidth, viewHeight );
+	globalImages->currentDepthImage->CopyDepthbuffer( x, y, viewWidth, viewHeight );
+
+	if ( RB_STD_EnableFragmentProgram( "openq4_phase6_hiz.fp" ) ) {
+		float depthS = 1.0f;
+		float depthT = 1.0f;
+		RB_STD_GetImageScale( globalImages->currentDepthImage, depthS, depthT );
+
+		RB_STD_BeginFullscreenPass();
+		GL_State( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO );
+		GL_SelectTexture( 0 );
+		globalImages->currentDepthImage->Bind();
+		glProgramLocalParameter4fARB( GL_FRAGMENT_PROGRAM_ARB, 0, invWidth, invHeight, 0.0f, 0.0f );
+		glProgramLocalParameter4fARB( GL_FRAGMENT_PROGRAM_ARB, 1, invWidth * 2.0f, invHeight * 2.0f, 0.0f, 0.0f );
+		glProgramLocalParameter4fARB( GL_FRAGMENT_PROGRAM_ARB, 2, invWidth * 4.0f, invHeight * 4.0f, 0.0f, 0.0f );
+		glColor4f( 1.0f, 1.0f, 1.0f, 1.0f );
+		RB_STD_DrawFullscreenQuad( depthS, depthT );
+		glDisable( GL_FRAGMENT_PROGRAM_ARB );
+		GL_SelectTexture( 0 );
+		globalImages->BindNull();
+		RB_STD_EndFullscreenPass();
+	}
+
+	// Capture packed HiZ data for SSR consumers.
+	globalImages->scratchImage2->CopyFramebuffer( x, y, viewWidth, viewHeight );
+
+	// Restore preserved scene color.
+	float sceneS = 1.0f;
+	float sceneT = 1.0f;
+	RB_STD_GetImageScale( globalImages->currentRenderImage, sceneS, sceneT );
+	RB_STD_BeginFullscreenPass();
+	GL_State( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO );
+	GL_SelectTexture( 0 );
+	globalImages->currentRenderImage->Bind();
+	glColor4f( 1.0f, 1.0f, 1.0f, 1.0f );
+	RB_STD_DrawFullscreenQuad( sceneS, sceneT );
+	GL_SelectTexture( 0 );
+	globalImages->BindNull();
+	RB_STD_EndFullscreenPass();
+
+	return Sys_Milliseconds() - startMsec;
+}
+
+static int RB_STD_ApplySSR( void ) {
+	if ( !r_usePostLightingStack.GetBool() || !r_useSSR.GetBool() ) {
+		return 0;
+	}
+
+	if ( !glConfig.ARBFragmentProgramAvailable ) {
+		return 0;
+	}
+
+	int viewWidth = 0;
+	int viewHeight = 0;
+	RB_STD_GetViewportSize( viewWidth, viewHeight );
+	if ( viewWidth <= 0 || viewHeight <= 0 ) {
+		return 0;
+	}
+
+	const int startMsec = Sys_Milliseconds();
+	const int x = backEnd.viewDef->viewport.x1;
+	const int y = backEnd.viewDef->viewport.y1;
+	const float invWidth = 1.0f / static_cast<float>( Max( 1, viewWidth ) );
+	const float invHeight = 1.0f / static_cast<float>( Max( 1, viewHeight ) );
+
+	globalImages->currentRenderImage->CopyFramebuffer( x, y, viewWidth, viewHeight );
+
+	if ( !RB_STD_EnableFragmentProgram( "openq4_phase6_ssr.fp" ) ) {
+		return 0;
+	}
+
+	float sourceS = 1.0f;
+	float sourceT = 1.0f;
+	RB_STD_GetImageScale( globalImages->currentRenderImage, sourceS, sourceT );
+
+	const float strength = idMath::ClampFloat( 0.0f, 1.0f, r_ssrStrength.GetFloat() );
+	const float rayStep = Max( 0.1f, r_ssrRayStep.GetFloat() );
+	const float depthScale = Max( 0.1f, r_ssrDepthScale.GetFloat() );
+	const float edgeFade = Max( 0.0f, r_ssrEdgeFade.GetFloat() );
+
+	RB_STD_BeginFullscreenPass();
+	GL_State( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO );
+	GL_SelectTexture( 2 );
+	if ( r_useHiZ.GetBool() ) {
+		globalImages->scratchImage2->Bind();
+	} else {
+		globalImages->currentDepthImage->Bind();
+	}
+	GL_SelectTexture( 1 );
+	globalImages->currentDepthImage->Bind();
+	GL_SelectTexture( 0 );
+	globalImages->currentRenderImage->Bind();
+	glProgramLocalParameter4fARB( GL_FRAGMENT_PROGRAM_ARB, 0, strength, rayStep * invWidth, rayStep * invHeight, depthScale );
+	glProgramLocalParameter4fARB( GL_FRAGMENT_PROGRAM_ARB, 1, edgeFade, 0.001f, 1.0f, 64.0f );
+	glProgramLocalParameter4fARB( GL_FRAGMENT_PROGRAM_ARB, 2, invWidth, invHeight, 0.0f, 0.0f );
+	glColor4f( 1.0f, 1.0f, 1.0f, 1.0f );
+	RB_STD_DrawFullscreenQuad( sourceS, sourceT );
+	glDisable( GL_FRAGMENT_PROGRAM_ARB );
+	GL_SelectTexture( 2 );
+	globalImages->BindNull();
+	GL_SelectTexture( 1 );
+	globalImages->BindNull();
+	GL_SelectTexture( 0 );
+	globalImages->BindNull();
+	RB_STD_EndFullscreenPass();
+
+	return Sys_Milliseconds() - startMsec;
+}
+
 static int RB_STD_ApplyTonemap( void ) {
 	if ( !r_useTonemap.GetBool() || !r_usePostLightingStack.GetBool() ) {
 		return 0;
@@ -2494,6 +2626,8 @@ static void RB_STD_ApplyModernPostLightingStack( void ) {
 	const int startMsec = Sys_Milliseconds();
 	const int ssaoMsec = RB_STD_ApplySSAO();
 	const int taaMsec = RB_STD_ApplyTemporalAA();
+	const int hizMsec = RB_STD_BuildHiZ();
+	const int ssrMsec = RB_STD_ApplySSR();
 	const int tonemapMsec = RB_STD_ApplyTonemap();
 	const int smaaMsec = RB_STD_ApplySMAA1x();
 	const int totalMsec = Sys_Milliseconds() - startMsec;
@@ -2502,8 +2636,8 @@ static void RB_STD_ApplyModernPostLightingStack( void ) {
 		const int now = Sys_Milliseconds();
 		if ( now - rbPhase5TimingPrintMsec >= 1000 ) {
 			rbPhase5TimingPrintMsec = now;
-			common->Printf( "phase5_post: total=%dms ssao=%dms taa=%dms tonemap=%dms smaa=%dms\n",
-				totalMsec, ssaoMsec, taaMsec, tonemapMsec, smaaMsec );
+			common->Printf( "phase5_post: total=%dms ssao=%dms taa=%dms hiz=%dms ssr=%dms tonemap=%dms smaa=%dms\n",
+				totalMsec, ssaoMsec, taaMsec, hizMsec, ssrMsec, tonemapMsec, smaaMsec );
 		}
 	}
 }
@@ -2630,7 +2764,7 @@ void	RB_STD_DrawView( void ) {
 	RB_STD_FogAllLights();
 	RB_STD_ApplyModernPostLightingStack();
 
-	// When phase-5 stack is active, it owns SSAO/TAA/tonemap/SMAA ordering and
+	// When phase-5/6 stack is active, it owns SSAO/TAA/HiZ/SSR/tonemap/SMAA ordering and
 	// legacy material post-process surfaces must not run afterwards.
 	const bool runLegacyPostMaterials = !r_usePostLightingStack.GetBool();
 

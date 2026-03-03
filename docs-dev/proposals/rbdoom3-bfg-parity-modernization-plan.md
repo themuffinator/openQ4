@@ -33,7 +33,10 @@ Bring OpenQ4 to the same technical standard as modern RBDOOM-3-BFG, with special
   - renderer-native pass chain for SSAO -> TAA -> tonemap with optional SMAA (`r_postAA 1`)
   - phase-5 ARB programs: `openq4_phase5_ssao.fp`, `openq4_phase5_tonemap.fp`
   - phase-5 stack owns post ordering when enabled (`r_usePostLightingStack 1`) and suppresses legacy material post chain to avoid edge-mask presentation regressions
-- Phase 6 is now the next implementation stage.
+- Phase 6 SSR/HiZ/occlusion foundations are now integrated on the OpenGL path:
+  - renderer-native HiZ generation + SSR pass integration in post-light stack order
+  - phase-6 ARB programs: `openq4_phase6_hiz.fp`, `openq4_phase6_ssr.fp`
+  - conservative masked occlusion culling prototype (`r_useMaskedOcclusionCulling`) with diagnostics and default-safe runtime gating
 
 ## 2. Baseline and Evidence
 
@@ -367,6 +370,7 @@ Status update (2026-03-03):
 2. Harness coverage expanded with indirect-light variant (`mapped_parallel_cascades_pbr_indirect`).
 3. Phase 5 post-light stack integrated with phase-owned ordering (`r_usePostLightingStack`).
 4. Validation evidence run `20260303-120222` (phase-5 focused SP/MP suite): `3/3` variants `ok`, `0` logged `GL_PROGRAM_ERROR` lines, `0` summary `errors`.
+5. Phase 6 integration landed with HiZ/SSR post passes, masked occlusion culling prototype, and harness variant/cvar coverage updates.
 
 ## 11) End-to-End Progress Checklist (Execution View)
 
@@ -378,7 +382,7 @@ Status update (2026-03-03):
 - [x] Phase 3: PBR interaction path is implemented on OpenQ4 legacy OpenGL with legacy fallback + harness coverage.
 - [x] Phase 4: env-probe/light-grid indirect-light cache stack is implemented with runtime fallback + bake/reload commands.
 - [x] Phase 5: SSAO/TAA/modern tonemap stack is implemented with optional SMAA and post-stack ownership over legacy post materials.
-- [ ] Phase 6: SSR/HiZ/Occlusion Culling is not yet implemented.
+- [x] Phase 6: SSR/HiZ/Occlusion Culling is implemented on the OpenGL path with conservative runtime defaults.
 - [ ] Phase 7: backend abstraction + Vulkan/DX12/NVRHI bring-up is not yet implemented.
 
 ### NVRHI status and positioning

@@ -59,6 +59,11 @@ static void R_PerformanceCounters( void ) {
 			tr.pc.c_sphere_cull_in, tr.pc.c_sphere_cull_clip, tr.pc.c_sphere_cull_out, 
 			tr.pc.c_box_cull_in, tr.pc.c_box_cull_out );
 	}
+
+	if ( r_showOcclusionCulling.GetBool() ) {
+		common->Printf( "phase6_moc: tests:%i culled:%i\n",
+			tr.pc.c_mocTests, tr.pc.c_mocCulled );
+	}
 	
 	if ( r_showAlloc.GetBool() ) {
 		common->Printf( "alloc:%i free:%i\n", tr.pc.c_alloc, tr.pc.c_free );

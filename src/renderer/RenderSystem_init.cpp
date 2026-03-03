@@ -154,6 +154,12 @@ idCVar r_tonemapExposure( "r_tonemapExposure", "1.0", CVAR_RENDERER | CVAR_FLOAT
 idCVar r_tonemapGamma( "r_tonemapGamma", "1.0", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "phase-5 tonemap output gamma (1.0 = neutral/no gamma remap)", 0.1f, 4.0f );
 idCVar r_tonemapShoulder( "r_tonemapShoulder", "0.0", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "phase-5 tonemap shoulder compression scale (0.0 = neutral/no compression)", 0.0f, 4.0f );
 idCVar r_showPostPassTiming( "r_showPostPassTiming", "0", CVAR_RENDERER | CVAR_BOOL, "print phase-5 pass timing summary every second" );
+idCVar r_useHiZ( "r_useHiZ", "1", CVAR_RENDERER | CVAR_BOOL | CVAR_ARCHIVE, "enable phase-6 hierarchical depth generation for SSR/occlusion consumers" );
+idCVar r_useSSR( "r_useSSR", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_ARCHIVE, "enable phase-6 screen-space reflections pass" );
+idCVar r_ssrStrength( "r_ssrStrength", "0.20", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "phase-6 SSR blend strength", 0.0f, 1.0f );
+idCVar r_ssrRayStep( "r_ssrRayStep", "1.5", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "phase-6 SSR ray step scale in texels", 0.1f, 8.0f );
+idCVar r_ssrDepthScale( "r_ssrDepthScale", "12.0", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "phase-6 SSR depth matching scale", 0.1f, 64.0f );
+idCVar r_ssrEdgeFade( "r_ssrEdgeFade", "6.0", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "phase-6 SSR edge fade multiplier", 0.0f, 16.0f );
 idCVar r_skipROQ( "r_skipROQ", "0", CVAR_RENDERER | CVAR_BOOL, "skip ROQ decoding" );
 
 idCVar r_ignore( "r_ignore", "0", CVAR_RENDERER, "used for random debugging without defining new vars" );
@@ -176,6 +182,10 @@ idCVar r_showShadowMaps( "r_showShadowMaps", "0", CVAR_RENDERER | CVAR_BOOL, "re
 idCVar r_showShadowMapLODs( "r_showShadowMapLODs", "0", CVAR_RENDERER | CVAR_INTEGER, "show shadow map LOD levels", 0, 3, idCmdSystem::ArgCompletion_Integer<0,3> );
 idCVar r_useClippedLightScissors( "r_useClippedLightScissors", "1", CVAR_RENDERER | CVAR_INTEGER, "0 = full screen when near clipped, 1 = exact when near clipped, 2 = exact always", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
 idCVar r_useEntityCulling( "r_useEntityCulling", "1", CVAR_RENDERER | CVAR_BOOL, "0 = none, 1 = box" );
+idCVar r_useMaskedOcclusionCulling( "r_useMaskedOcclusionCulling", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_ARCHIVE, "enable conservative phase-6 masked occlusion culling heuristic for entity refs" );
+idCVar r_mocMinPixels( "r_mocMinPixels", "24", CVAR_RENDERER | CVAR_INTEGER | CVAR_ARCHIVE, "minimum projected pixel coverage before phase-6 masked occlusion culling can reject an entity", 1, 4096, idCmdSystem::ArgCompletion_Integer<1,4096> );
+idCVar r_mocMinDistance( "r_mocMinDistance", "1536", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "minimum distance from view origin before phase-6 masked occlusion culling can reject tiny entities", 0.0f, 65536.0f );
+idCVar r_showOcclusionCulling( "r_showOcclusionCulling", "0", CVAR_RENDERER | CVAR_BOOL, "print phase-6 masked occlusion culling counters" );
 idCVar r_useEntityScissors( "r_useEntityScissors", "0", CVAR_RENDERER | CVAR_BOOL, "1 = use custom scissor rectangle for each entity" );
 idCVar r_useInteractionCulling( "r_useInteractionCulling", "1", CVAR_RENDERER | CVAR_BOOL, "1 = cull interactions" );
 idCVar r_useInteractionScissors( "r_useInteractionScissors", "2", CVAR_RENDERER | CVAR_INTEGER, "1 = use a custom scissor rectangle for each shadow interaction, 2 = also crop using portal scissors", -2, 2, idCmdSystem::ArgCompletion_Integer<-2,2> );
