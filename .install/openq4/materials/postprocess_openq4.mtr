@@ -59,7 +59,7 @@ postprocess/openq4_smaa_blend
 	{
 		blend gl_one, gl_zero
 		program openq4_smaa_blend.vfp
-		fragmentMap 0 clamp _postProcessAlbedo0
+		fragmentMap 0 clamp _currentRender
 		fragmentMap 1 clamp _postProcessAlbedo1
 	}
 }

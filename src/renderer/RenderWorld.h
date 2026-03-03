@@ -559,6 +559,14 @@ public:
 	virtual void			RenderScene( const renderView_t *renderView ) = 0;
 // jscott: for portal skies
 	virtual bool			HasSkybox( int areaNum ) = 0;
+	// Phase 4: indirect-light cache hooks (default no-op for non-local implementations).
+	virtual void			BakeEnvironmentProbes( bool forceRebuild = false ) { }
+	virtual void			BakeLightGrids( bool forceRebuild = false ) { }
+	virtual void			ReloadIndirectLightCache( void ) { }
+	virtual bool			GetIndirectAmbientSample( const idVec3 &origin, int areaNum, idVec3 &outAmbient ) const {
+		outAmbient.Zero();
+		return false;
+	}
 	//virtual void			FindVisibleAreas( idVec3 origin, int areaNum, bool *visibleAreas ) = 0;
 // AReis: This is where we draw the portal fadeout polygon
 	//virtual void			RenderPortalFades( void ) = 0;

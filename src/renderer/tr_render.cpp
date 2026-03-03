@@ -712,6 +712,256 @@ static void RB_SubmittInteraction( drawInteraction_t *din, void (*DrawInteractio
 	}
 }
 
+typedef struct {
+	bool	hasShadowMap;
+	int		cascadeIndex;
+	float	weight;
+	idVec4	shadowMapProjection[3];
+	idVec4	shadowMapAtlasRect;
+} shadowMapCascadePass_t;
+
+static void RB_InitShadowMapCascadePass( shadowMapCascadePass_t &pass ) {
+	pass.hasShadowMap = false;
+	pass.cascadeIndex = 0;
+	pass.weight = 1.0f;
+	pass.shadowMapProjection[0][0] = pass.shadowMapProjection[0][1] = pass.shadowMapProjection[0][2] = pass.shadowMapProjection[0][3] = 0.0f;
+	pass.shadowMapProjection[1][0] = pass.shadowMapProjection[1][1] = pass.shadowMapProjection[1][2] = pass.shadowMapProjection[1][3] = 0.0f;
+	pass.shadowMapProjection[2][0] = pass.shadowMapProjection[2][1] = pass.shadowMapProjection[2][2] = pass.shadowMapProjection[2][3] = 0.0f;
+	pass.shadowMapAtlasRect[0] = pass.shadowMapAtlasRect[1] = pass.shadowMapAtlasRect[2] = pass.shadowMapAtlasRect[3] = 0.0f;
+}
+
+static bool RB_SetupShadowMapCascadePass( const viewLight_t *vLight, const idPlane lightProject[4],
+		const idVec3 &localViewOrigin, const int cascadeIndex, const float weight, shadowMapCascadePass_t &pass ) {
+	RB_InitShadowMapCascadePass( pass );
+	pass.cascadeIndex = cascadeIndex;
+	pass.weight = weight;
+
+	if ( vLight == NULL || !vLight->useShadowMap || vLight->shadowMapAtlas == NULL ||
+		 vLight->shadowMapAtlasSize <= 0 || vLight->shadowMapTileSize <= 0 ) {
+		return false;
+	}
+
+	int tileX = vLight->shadowMapTileX;
+	int tileY = vLight->shadowMapTileY;
+	if ( cascadeIndex > 0 && cascadeIndex < MAX_SHADOW_MAP_CASCADES ) {
+		tileX = vLight->shadowMapCascadeTileX[cascadeIndex];
+		tileY = vLight->shadowMapCascadeTileY[cascadeIndex];
+	}
+
+	if ( tileX < 0 || tileY < 0 ) {
+		return false;
+	}
+
+	const float invAtlasSize = 1.0f / ( float )vLight->shadowMapAtlasSize;
+	const float tileSize = ( float )vLight->shadowMapTileSize;
+
+	pass.shadowMapAtlasRect[0] = tileX * tileSize * invAtlasSize;
+	pass.shadowMapAtlasRect[1] = tileY * tileSize * invAtlasSize;
+	pass.shadowMapAtlasRect[2] = tileSize * invAtlasSize;
+	pass.shadowMapAtlasRect[3] = tileSize * invAtlasSize;
+
+	R_BuildShadowMapProjectionForCascade( vLight, lightProject, localViewOrigin,
+		cascadeIndex, pass.shadowMapProjection, NULL );
+
+	pass.hasShadowMap = true;
+	return true;
+}
+
+static int RB_SelectShadowMapCascadePasses( const drawSurf_t *surf, const viewLight_t *vLight,
+		const idPlane lightProject[4], const idVec3 &localViewOrigin,
+		shadowMapCascadePass_t outPasses[2] ) {
+	RB_InitShadowMapCascadePass( outPasses[0] );
+	RB_InitShadowMapCascadePass( outPasses[1] );
+
+	if ( surf == NULL || vLight == NULL || outPasses == NULL ) {
+		return 0;
+	}
+
+	if ( !vLight->useShadowMap || vLight->shadowMapAtlas == NULL ||
+		 vLight->shadowMapAtlasSize <= 0 || vLight->shadowMapTileSize <= 0 ) {
+		outPasses[0].weight = 1.0f;
+		return 1;
+	}
+
+	const int cascadeCount = idMath::ClampInt( 1, MAX_SHADOW_MAP_CASCADES,
+		( vLight->shadowMapCascadeCount > 1 ) ? vLight->shadowMapCascadeCount : 1 );
+	int primaryCascade = 0;
+	float depthNormalized = 0.0f;
+
+	if ( vLight->parallel && cascadeCount > 1 && surf->geo != NULL && backEnd.viewDef != NULL ) {
+		idVec3 surfaceCenter = surf->geo->bounds.GetCenter();
+		if ( surf->space != NULL ) {
+			R_LocalPointToGlobal( surf->space->modelMatrix, surfaceCenter, surfaceCenter );
+		}
+		const idVec3 viewDelta = surfaceCenter - backEnd.viewDef->renderView.vieworg;
+		const float viewDepth = viewDelta * backEnd.viewDef->renderView.viewaxis[0];
+		float viewNear = backEnd.viewDef->viewFrustum.GetNearDistance();
+		if ( viewNear < 0.01f ) {
+			viewNear = 0.01f;
+		}
+		float viewFar = backEnd.viewDef->viewFrustum.GetFarDistance();
+		if ( viewFar < viewNear + 1.0f ) {
+			viewFar = viewNear + 1.0f;
+		}
+		depthNormalized = idMath::ClampFloat( 0.0f, 1.0f, ( viewDepth - viewNear ) / ( viewFar - viewNear ) );
+
+		primaryCascade = cascadeCount - 1;
+		for ( int i = 0 ; i < cascadeCount ; i++ ) {
+			if ( depthNormalized <= vLight->shadowMapCascadeFar[i] ) {
+				primaryCascade = i;
+				break;
+			}
+		}
+	}
+
+	const float blendRange = idMath::ClampFloat( 0.0f, 0.25f, r_shadowMapCascadeBlend.GetFloat() );
+	if ( vLight->parallel && cascadeCount > 1 && blendRange > 0.0f ) {
+		int blendSplit = -1;
+		float bestSplitDelta = idMath::INFINITY;
+		for ( int i = 0 ; i < cascadeCount - 1 ; i++ ) {
+			const float splitDepth = vLight->shadowMapCascadeFar[i];
+			const float splitDelta = idMath::Fabs( depthNormalized - splitDepth );
+			if ( splitDelta <= blendRange && splitDelta < bestSplitDelta ) {
+				bestSplitDelta = splitDelta;
+				blendSplit = i;
+			}
+		}
+
+		if ( blendSplit >= 0 ) {
+			const float splitDepth = vLight->shadowMapCascadeFar[blendSplit];
+			float upperWeight = idMath::ClampFloat( 0.0f, 1.0f,
+				0.5f + 0.5f * ( depthNormalized - splitDepth ) / blendRange );
+			float lowerWeight = 1.0f - upperWeight;
+
+			int passCount = 0;
+			if ( lowerWeight > 0.001f &&
+				 RB_SetupShadowMapCascadePass( vLight, lightProject, localViewOrigin, blendSplit, lowerWeight, outPasses[passCount] ) ) {
+				passCount++;
+			}
+			if ( upperWeight > 0.001f &&
+				 RB_SetupShadowMapCascadePass( vLight, lightProject, localViewOrigin, blendSplit + 1, upperWeight, outPasses[passCount] ) ) {
+				passCount++;
+			}
+
+			if ( passCount > 0 ) {
+				if ( passCount == 1 ) {
+					outPasses[0].weight = 1.0f;
+				} else {
+					float totalWeight = outPasses[0].weight + outPasses[1].weight;
+					if ( totalWeight < 0.001f ) {
+						totalWeight = 0.001f;
+					}
+					outPasses[0].weight /= totalWeight;
+					outPasses[1].weight /= totalWeight;
+				}
+				return passCount;
+			}
+		}
+	}
+
+	if ( !RB_SetupShadowMapCascadePass( vLight, lightProject, localViewOrigin, primaryCascade, 1.0f, outPasses[0] ) ) {
+		RB_InitShadowMapCascadePass( outPasses[0] );
+		outPasses[0].weight = 1.0f;
+	}
+
+	return 1;
+}
+
+static void RB_SubmitInteractionWithShadowMapPasses( const drawInteraction_t &baseInter,
+		const shadowMapCascadePass_t *passes, const int passCount,
+		void (*DrawInteraction)(const drawInteraction_t *) ) {
+	if ( passCount <= 0 || passes == NULL ) {
+		drawInteraction_t fallback = baseInter;
+		fallback.hasShadowMap = false;
+		fallback.shadowMapCascadeIndex = 0;
+		fallback.shadowMapAtlas = NULL;
+		fallback.shadowMapProjection[0][0] = fallback.shadowMapProjection[0][1] = fallback.shadowMapProjection[0][2] = fallback.shadowMapProjection[0][3] = 0.0f;
+		fallback.shadowMapProjection[1][0] = fallback.shadowMapProjection[1][1] = fallback.shadowMapProjection[1][2] = fallback.shadowMapProjection[1][3] = 0.0f;
+		fallback.shadowMapProjection[2][0] = fallback.shadowMapProjection[2][1] = fallback.shadowMapProjection[2][2] = fallback.shadowMapProjection[2][3] = 0.0f;
+		fallback.shadowMapAtlasRect[0] = fallback.shadowMapAtlasRect[1] = fallback.shadowMapAtlasRect[2] = fallback.shadowMapAtlasRect[3] = 0.0f;
+		fallback.shadowMapDepthScale = 0.0f;
+		fallback.shadowMapDepthBiasScale = 1.0f;
+		fallback.shadowMapSampleCount = 1;
+		RB_SubmittInteraction( &fallback, DrawInteraction );
+		return;
+	}
+
+	float totalWeight = 0.0f;
+	for ( int i = 0 ; i < passCount ; i++ ) {
+		totalWeight += ( passes[i].weight > 0.0f ) ? passes[i].weight : 0.0f;
+	}
+	if ( totalWeight < 0.001f ) {
+		totalWeight = 0.001f;
+	}
+
+	bool submitted = false;
+	const int debugMode = r_showShadowMapLODs.GetInteger();
+	for ( int i = 0 ; i < passCount ; i++ ) {
+		const float passWeight = ( ( passes[i].weight > 0.0f ) ? passes[i].weight : 0.0f ) / totalWeight;
+		if ( passWeight <= 0.001f ) {
+			continue;
+		}
+
+		drawInteraction_t interaction = baseInter;
+		interaction.diffuseColor *= passWeight;
+		interaction.specularColor *= passWeight;
+		interaction.shadowMapCascadeIndex = passes[i].cascadeIndex;
+
+		if ( passes[i].hasShadowMap && baseInter.shadowMapAtlas != NULL ) {
+			interaction.hasShadowMap = true;
+			interaction.shadowMapAtlas = baseInter.shadowMapAtlas;
+			interaction.shadowMapProjection[0] = passes[i].shadowMapProjection[0];
+			interaction.shadowMapProjection[1] = passes[i].shadowMapProjection[1];
+			interaction.shadowMapProjection[2] = passes[i].shadowMapProjection[2];
+			interaction.shadowMapAtlasRect = passes[i].shadowMapAtlasRect;
+		} else {
+			interaction.hasShadowMap = false;
+			interaction.shadowMapAtlas = NULL;
+			interaction.shadowMapProjection[0][0] = interaction.shadowMapProjection[0][1] = interaction.shadowMapProjection[0][2] = interaction.shadowMapProjection[0][3] = 0.0f;
+			interaction.shadowMapProjection[1][0] = interaction.shadowMapProjection[1][1] = interaction.shadowMapProjection[1][2] = interaction.shadowMapProjection[1][3] = 0.0f;
+			interaction.shadowMapProjection[2][0] = interaction.shadowMapProjection[2][1] = interaction.shadowMapProjection[2][2] = interaction.shadowMapProjection[2][3] = 0.0f;
+			interaction.shadowMapAtlasRect[0] = interaction.shadowMapAtlasRect[1] = interaction.shadowMapAtlasRect[2] = interaction.shadowMapAtlasRect[3] = 0.0f;
+			interaction.shadowMapDepthScale = 0.0f;
+			interaction.shadowMapDepthBiasScale = 1.0f;
+			interaction.shadowMapSampleCount = 1;
+		}
+
+		if ( debugMode > 0 && interaction.hasShadowMap ) {
+			static const idVec3 cascadeTint[4] = {
+				idVec3( 1.0f, 0.45f, 0.45f ),
+				idVec3( 0.45f, 1.0f, 0.45f ),
+				idVec3( 0.45f, 0.70f, 1.0f ),
+				idVec3( 1.0f, 0.95f, 0.40f )
+			};
+			const idVec3 tint = cascadeTint[interaction.shadowMapCascadeIndex & 3];
+			const float tintStrength = ( debugMode > 1 ) ? 0.85f : 0.6f;
+			for ( int c = 0 ; c < 3 ; c++ ) {
+				const float tintFactor = ( 1.0f - tintStrength ) + tintStrength * tint[c];
+				interaction.diffuseColor[c] *= tintFactor;
+				interaction.specularColor[c] *= tintFactor;
+			}
+		}
+
+		RB_SubmittInteraction( &interaction, DrawInteraction );
+		submitted = true;
+	}
+
+	if ( !submitted ) {
+		drawInteraction_t fallback = baseInter;
+		fallback.hasShadowMap = false;
+		fallback.shadowMapCascadeIndex = 0;
+		fallback.shadowMapAtlas = NULL;
+		fallback.shadowMapProjection[0][0] = fallback.shadowMapProjection[0][1] = fallback.shadowMapProjection[0][2] = fallback.shadowMapProjection[0][3] = 0.0f;
+		fallback.shadowMapProjection[1][0] = fallback.shadowMapProjection[1][1] = fallback.shadowMapProjection[1][2] = fallback.shadowMapProjection[1][3] = 0.0f;
+		fallback.shadowMapProjection[2][0] = fallback.shadowMapProjection[2][1] = fallback.shadowMapProjection[2][2] = fallback.shadowMapProjection[2][3] = 0.0f;
+		fallback.shadowMapAtlasRect[0] = fallback.shadowMapAtlasRect[1] = fallback.shadowMapAtlasRect[2] = fallback.shadowMapAtlasRect[3] = 0.0f;
+		fallback.shadowMapDepthScale = 0.0f;
+		fallback.shadowMapDepthBiasScale = 1.0f;
+		fallback.shadowMapSampleCount = 1;
+		RB_SubmittInteraction( &fallback, DrawInteraction );
+	}
+}
+
 /*
 =============
 RB_CreateSingleDrawInteractions
@@ -727,6 +977,8 @@ void RB_CreateSingleDrawInteractions( const drawSurf_t *surf, void (*DrawInterac
 	const idMaterial	*lightShader = vLight->lightShader;
 	const float			*lightRegs = vLight->shaderRegisters;
 	drawInteraction_t	inter;
+	shadowMapCascadePass_t shadowMapPasses[2];
+	int					shadowMapPassCount;
 
 	if ( r_skipInteractions.GetBool() || !surf->geo || !surf->geo->ambientCache ) {
 		return;
@@ -768,12 +1020,35 @@ void RB_CreateSingleDrawInteractions( const drawSurf_t *surf, void (*DrawInterac
 	inter.localLightOrigin[3] = 0;
 	inter.localViewOrigin[3] = 1;
 	inter.ambientLight = lightShader->IsAmbientLight();
+	inter.usePBR = r_usePBR.GetBool() && surfaceShader != NULL && surfaceShader->TestMaterialFlag( MF_PBR_RMAO );
+	inter.pbrParams0[0] = inter.usePBR ? 1.0f : 0.0f;
+	inter.pbrParams0[1] = r_pbrRoughnessScale.GetFloat();
+	inter.pbrParams0[2] = r_pbrMetalnessScale.GetFloat();
+	inter.pbrParams0[3] = r_pbrAOScale.GetFloat();
+	inter.pbrParams1[0] = r_pbrMinRoughness.GetFloat();
+	inter.pbrParams1[1] = r_pbrDielectricF0.GetFloat();
+	inter.pbrParams1[2] = 0.0f;
+	inter.pbrParams1[3] = 0.0f;
 
 	// the base projections may be modified by texture matrix on light stages
 	idPlane lightProject[4];
 	for ( int i = 0 ; i < 4 ; i++ ) {
 		R_GlobalPlaneToLocal( surf->space->modelMatrix, backEnd.vLight->lightProject[i], lightProject[i] );
 	}
+
+	shadowMapPassCount = RB_SelectShadowMapCascadePasses( surf, vLight, lightProject,
+		inter.localViewOrigin.ToVec3(), shadowMapPasses );
+
+	inter.hasShadowMap = false;
+	inter.shadowMapCascadeIndex = 0;
+	inter.shadowMapAtlas = vLight->shadowMapAtlas;
+	inter.shadowMapProjection[0][0] = inter.shadowMapProjection[0][1] = inter.shadowMapProjection[0][2] = inter.shadowMapProjection[0][3] = 0.0f;
+	inter.shadowMapProjection[1][0] = inter.shadowMapProjection[1][1] = inter.shadowMapProjection[1][2] = inter.shadowMapProjection[1][3] = 0.0f;
+	inter.shadowMapProjection[2][0] = inter.shadowMapProjection[2][1] = inter.shadowMapProjection[2][2] = inter.shadowMapProjection[2][3] = 0.0f;
+		inter.shadowMapAtlasRect[0] = inter.shadowMapAtlasRect[1] = inter.shadowMapAtlasRect[2] = inter.shadowMapAtlasRect[3] = 0.0f;
+		inter.shadowMapDepthScale = ( vLight->shadowMapAtlasSize > 0 ) ? ( 1.0f / ( float )vLight->shadowMapAtlasSize ) : 0.0f;
+		inter.shadowMapDepthBiasScale = backEnd.vLight->shadowMapDepthBiasScale;
+		inter.shadowMapSampleCount = backEnd.vLight->shadowMapSampleCount;
 
 	for ( int lightStageNum = 0 ; lightStageNum < lightShader->GetNumStages() ; lightStageNum++ ) {
 		const shaderStage_t	*lightStage = lightShader->GetStage( lightStageNum );
@@ -822,7 +1097,7 @@ void RB_CreateSingleDrawInteractions( const drawSurf_t *surf, void (*DrawInterac
 						break;
 					}
 					// draw any previous interaction
-					RB_SubmittInteraction( &inter, DrawInteraction );
+					RB_SubmitInteractionWithShadowMapPasses( inter, shadowMapPasses, shadowMapPassCount, DrawInteraction );
 					inter.diffuseImage = NULL;
 					inter.specularImage = NULL;
 					R_SetDrawInteraction( surfaceStage, surfaceRegs, &inter.bumpImage, inter.bumpMatrix, NULL );
@@ -834,7 +1109,7 @@ void RB_CreateSingleDrawInteractions( const drawSurf_t *surf, void (*DrawInterac
 						break;
 					}
 					if ( inter.diffuseImage ) {
-						RB_SubmittInteraction( &inter, DrawInteraction );
+						RB_SubmitInteractionWithShadowMapPasses( inter, shadowMapPasses, shadowMapPassCount, DrawInteraction );
 					}
 					R_SetDrawInteraction( surfaceStage, surfaceRegs, &inter.diffuseImage,
 											inter.diffuseMatrix, inter.diffuseColor.ToFloatPtr() );
@@ -851,7 +1126,7 @@ void RB_CreateSingleDrawInteractions( const drawSurf_t *surf, void (*DrawInterac
 						break;
 					}
 					if ( inter.specularImage ) {
-						RB_SubmittInteraction( &inter, DrawInteraction );
+						RB_SubmitInteractionWithShadowMapPasses( inter, shadowMapPasses, shadowMapPassCount, DrawInteraction );
 					}
 					R_SetDrawInteraction( surfaceStage, surfaceRegs, &inter.specularImage,
 											inter.specularMatrix, inter.specularColor.ToFloatPtr() );
@@ -866,7 +1141,7 @@ void RB_CreateSingleDrawInteractions( const drawSurf_t *surf, void (*DrawInterac
 		}
 
 		// draw the final interaction
-		RB_SubmittInteraction( &inter, DrawInteraction );
+		RB_SubmitInteractionWithShadowMapPasses( inter, shadowMapPasses, shadowMapPassCount, DrawInteraction );
 	}
 
 	// unhack depth range if needed

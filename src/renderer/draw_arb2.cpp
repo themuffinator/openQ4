@@ -208,6 +208,49 @@ void	RB_ARB2_DrawInteraction( const drawInteraction_t *din ) {
 	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_LIGHT_PROJECT_T, din->lightProjection[1].ToFloatPtr() );
 	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_LIGHT_PROJECT_Q, din->lightProjection[2].ToFloatPtr() );
 	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_LIGHT_FALLOFF_S, din->lightProjection[3].ToFloatPtr() );
+	static const float shadowZero[4] = { 0, 0, 0, 0 };
+	static const float pbrDisabledParams0[4] = { 0, 1, 1, 1 };
+	static const float pbrDisabledParams1[4] = { 0.04f, 0.04f, 0, 0 };
+	if ( din->hasShadowMap && din->shadowMapAtlas ) {
+		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_SHADOWMAP_MATRIX_S, din->shadowMapProjection[0].ToFloatPtr() );
+		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_SHADOWMAP_MATRIX_T, din->shadowMapProjection[1].ToFloatPtr() );
+		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_SHADOWMAP_MATRIX_Q, din->shadowMapProjection[2].ToFloatPtr() );
+		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_SHADOWMAP_ATLAS_RECT, din->shadowMapAtlasRect.ToFloatPtr() );
+		const float shadowMapParams[4] = {
+			din->shadowMapDepthScale,
+			din->shadowMapDepthBiasScale,
+			( float )( ( din->shadowMapSampleCount > 1 ) ? din->shadowMapSampleCount : 1 ),
+			0.0f
+		};
+		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_SHADOWMAP_DEPTH_SCALE, shadowMapParams );
+		glProgramEnvParameter4fvARB( GL_FRAGMENT_PROGRAM_ARB, PP_SHADOWMAP_MATRIX_S, din->shadowMapProjection[0].ToFloatPtr() );
+		glProgramEnvParameter4fvARB( GL_FRAGMENT_PROGRAM_ARB, PP_SHADOWMAP_MATRIX_T, din->shadowMapProjection[1].ToFloatPtr() );
+		glProgramEnvParameter4fvARB( GL_FRAGMENT_PROGRAM_ARB, PP_SHADOWMAP_MATRIX_Q, din->shadowMapProjection[2].ToFloatPtr() );
+		glProgramEnvParameter4fvARB( GL_FRAGMENT_PROGRAM_ARB, PP_SHADOWMAP_ATLAS_RECT, din->shadowMapAtlasRect.ToFloatPtr() );
+		glProgramEnvParameter4fvARB( GL_FRAGMENT_PROGRAM_ARB, PP_SHADOWMAP_DEPTH_SCALE, shadowMapParams );
+	} else {
+		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_SHADOWMAP_MATRIX_S, shadowZero );
+		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_SHADOWMAP_MATRIX_T, shadowZero );
+		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_SHADOWMAP_MATRIX_Q, shadowZero );
+		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_SHADOWMAP_ATLAS_RECT, shadowZero );
+		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_SHADOWMAP_DEPTH_SCALE, shadowZero );
+		glProgramEnvParameter4fvARB( GL_FRAGMENT_PROGRAM_ARB, PP_SHADOWMAP_MATRIX_S, shadowZero );
+		glProgramEnvParameter4fvARB( GL_FRAGMENT_PROGRAM_ARB, PP_SHADOWMAP_MATRIX_T, shadowZero );
+		glProgramEnvParameter4fvARB( GL_FRAGMENT_PROGRAM_ARB, PP_SHADOWMAP_MATRIX_Q, shadowZero );
+		glProgramEnvParameter4fvARB( GL_FRAGMENT_PROGRAM_ARB, PP_SHADOWMAP_ATLAS_RECT, shadowZero );
+		glProgramEnvParameter4fvARB( GL_FRAGMENT_PROGRAM_ARB, PP_SHADOWMAP_DEPTH_SCALE, shadowZero );
+	}
+	if ( din->usePBR ) {
+		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_PBR_PARAMS0, din->pbrParams0.ToFloatPtr() );
+		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_PBR_PARAMS1, din->pbrParams1.ToFloatPtr() );
+		glProgramEnvParameter4fvARB( GL_FRAGMENT_PROGRAM_ARB, PP_PBR_PARAMS0, din->pbrParams0.ToFloatPtr() );
+		glProgramEnvParameter4fvARB( GL_FRAGMENT_PROGRAM_ARB, PP_PBR_PARAMS1, din->pbrParams1.ToFloatPtr() );
+	} else {
+		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_PBR_PARAMS0, pbrDisabledParams0 );
+		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_PBR_PARAMS1, pbrDisabledParams1 );
+		glProgramEnvParameter4fvARB( GL_FRAGMENT_PROGRAM_ARB, PP_PBR_PARAMS0, pbrDisabledParams0 );
+		glProgramEnvParameter4fvARB( GL_FRAGMENT_PROGRAM_ARB, PP_PBR_PARAMS1, pbrDisabledParams1 );
+	}
 	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_BUMP_MATRIX_S, din->bumpMatrix[0].ToFloatPtr() );
 	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_BUMP_MATRIX_T, din->bumpMatrix[1].ToFloatPtr() );
 	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_DIFFUSE_MATRIX_S, din->diffuseMatrix[0].ToFloatPtr() );
@@ -277,6 +320,13 @@ void	RB_ARB2_DrawInteraction( const drawInteraction_t *din ) {
 	// texture 5 is the per-surface specular map
 	GL_SelectTextureNoClient( 5 );
 	din->specularImage->Bind();
+
+	GL_SelectTextureNoClient( 7 );
+	if ( din->hasShadowMap && din->shadowMapAtlas ) {
+		din->shadowMapAtlas->Bind();
+	} else {
+		globalImages->BindNull();
+	}
 
 	// Quake 4 applies decal polygon offset in interaction passes as well.
 	const idMaterial *surfaceMaterial = din->surf->material;
@@ -363,6 +413,9 @@ void RB_ARB2_CreateDrawInteractions( const drawSurf_t *surf ) {
 	glDisableClientState( GL_COLOR_ARRAY );
 
 	// disable features
+	GL_SelectTextureNoClient( 7 );
+	globalImages->BindNull();
+
 	GL_SelectTextureNoClient( 6 );
 	globalImages->BindNull();
 
@@ -423,6 +476,10 @@ void RB_ARB2_DrawInteractions( void ) {
 			continue;
 		}
 
+		const bool useMappedShadows = ( vLight->globalShadows || vLight->localShadows )
+			&& R_ShouldUseShadowMapForLight( vLight->lightDef )
+			&& R_RenderShadowMapForViewLight( vLight );
+
 		// clear the stencil buffer if needed
 		if ( vLight->globalShadows || vLight->localShadows ) {
 			backEnd.currentScissor = vLight->scissorRect;
@@ -432,7 +489,11 @@ void RB_ARB2_DrawInteractions( void ) {
 					backEnd.currentScissor.x2 + 1 - backEnd.currentScissor.x1,
 					backEnd.currentScissor.y2 + 1 - backEnd.currentScissor.y1 );
 			}
-			glClear( GL_STENCIL_BUFFER_BIT );
+			if ( !useMappedShadows ) {
+				glClear( GL_STENCIL_BUFFER_BIT );
+			} else {
+				glStencilFunc( GL_ALWAYS, 128, 255 );
+			}
 		} else {
 			// no shadows, so no need to read or write the stencil buffer
 			// we might in theory want to use GL_ALWAYS instead of disabling
@@ -440,7 +501,10 @@ void RB_ARB2_DrawInteractions( void ) {
 			glStencilFunc( GL_ALWAYS, 128, 255 );
 		}
 
-		if ( r_useShadowVertexProgram.GetBool() ) {
+		if ( useMappedShadows ) {
+			RB_ARB2_CreateDrawInteractions( vLight->localInteractions );
+			RB_ARB2_CreateDrawInteractions( vLight->globalInteractions );
+		} else if ( r_useShadowVertexProgram.GetBool() ) {
 			glEnable( GL_VERTEX_PROGRAM_ARB );
 			glBindProgramARB( GL_VERTEX_PROGRAM_ARB, VPROG_STENCIL_SHADOW );
 			RB_StencilShadowPass( vLight->globalShadows );

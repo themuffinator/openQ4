@@ -1,0 +1,288 @@
+!!ARBvp1.0 OPTION ARB_position_invariant ;
+
+# VPROG_INTERACTION
+# 
+# input:
+# 
+# attrib[8] TEX0	texture coordinates
+# attrib[9] TEX1	normal
+# attrib[10] TEX2	tangent[0]
+# attrib[11] TEX3	tangent[1]
+# COL			vertex color
+#
+# c[4]	localLightOrigin
+# c[5]	localViewOrigin
+# c[6]	lightProjection S
+# c[7]	lightProjection T
+# c[8]	lightProjection Q
+# c[9]	lightFalloff S
+# c[10]	bumpMatrix S
+# c[11]	bumpMatrix T
+# c[12]	diffuseMatrix S
+# c[13]	diffuseMatrix T
+# c[14]	specularMatrix S
+# c[15]	specularMatrix T
+# c[16]	vertex color modulate
+# c[17]	vertex color add
+# 
+# output:
+# 
+# texture 0 is the cube map
+# texture 1 is the per-surface bump map
+# texture 2 is the light falloff texture
+# texture 3 is the light projection texture
+# texture 4 is the per-surface diffuse map
+# texture 5 is the per-surface specular map
+# texture 6 is the specular lookup table
+# texture 7 is the shadow map atlas
+
+TEMP	R0, R1, R2;
+
+PARAM	defaultTexCoord = { 0, 0.5, 0, 1 };
+
+
+# calculate vector to light in R0
+SUB		R0, program.env[4], vertex.position;
+
+# put into texture space for TEX0
+DP3		result.texcoord[0].x, vertex.attrib[9], R0;
+DP3		result.texcoord[0].y, vertex.attrib[10], R0;
+DP3		result.texcoord[0].z, vertex.attrib[11], R0;
+
+# textures 1 takes the base coordinates by the texture matrix
+MOV		result.texcoord[1], defaultTexCoord;
+DP4		result.texcoord[1].x, vertex.attrib[8], program.env[10];
+DP4		result.texcoord[1].y, vertex.attrib[8], program.env[11];
+
+# texture 2 has one texgen
+MOV		result.texcoord[2], defaultTexCoord;
+DP4		result.texcoord[2].x, vertex.position, program.env[9];
+
+# texture 3 has three texgens
+DP4		result.texcoord[3].x, vertex.position, program.env[6];
+DP4		result.texcoord[3].y, vertex.position, program.env[7];
+DP4		result.texcoord[3].w, vertex.position, program.env[8];
+
+# textures 4 takes the base coordinates by the texture matrix
+MOV		result.texcoord[4], defaultTexCoord;
+DP4		result.texcoord[4].x, vertex.attrib[8], program.env[12];
+DP4		result.texcoord[4].y, vertex.attrib[8], program.env[13];
+
+# textures 5 takes the base coordinates by the texture matrix
+MOV		result.texcoord[5], defaultTexCoord;
+DP4		result.texcoord[5].x, vertex.attrib[8], program.env[14];
+DP4		result.texcoord[5].y, vertex.attrib[8], program.env[15];
+
+# texture 6's texcoords will be the halfangle in texture space
+
+# calculate normalized vector to light in R0
+SUB		R0, program.env[4], vertex.position;
+DP3		R1, R0, R0;
+RSQ		R1, R1.x;
+MUL		R0, R0, R1.x;
+
+# calculate normalized vector to viewer in R1
+SUB		R1, program.env[5], vertex.position;
+DP3		R2, R1, R1;
+RSQ		R2, R2.x;
+MUL		R1, R1, R2.x;
+
+# add together to become the half angle vector in object space (non-normalized)
+ADD		R0, R0, R1;
+
+# put into texture space
+DP3		result.texcoord[6].x, vertex.attrib[9], R0;
+DP3		result.texcoord[6].y, vertex.attrib[10], R0;
+DP3		result.texcoord[6].z, vertex.attrib[11], R0;
+
+# texture 7: shadow-map projected position
+DP4		result.texcoord[7].x, vertex.position, program.env[21];
+DP4		result.texcoord[7].y, vertex.position, program.env[22];
+DP4		result.texcoord[7].z, vertex.position, program.env[23];
+DP4		result.texcoord[7].w, vertex.position, program.env[8];
+
+# generate the vertex color, which can be 1.0, color, or 1.0 - color
+# for 1.0 : env[16] = 0, env[17] = 1
+# for color : env[16] = 1, env[17] = 0
+# for 1.0-color : env[16] = -1, env[17] = 1
+MAD		result.color, vertex.color, program.env[16], program.env[17];
+
+END
+
+
+#======================================================================
+
+!!ARBfp1.0 
+OPTION ARB_precision_hint_fastest;
+
+# texture 0 is the cube map
+# texture 1 is the per-surface bump map
+# texture 2 is the light falloff texture
+# texture 3 is the light projection texture
+# texture 4 is the per-surface diffuse map
+# texture 5 is the per-surface specular map
+# texture 6 is the specular lookup table
+
+# env[0] is the diffuse modifier
+# env[1] is the specular modifier
+# env[21] shadow matrix S
+# env[22] shadow matrix T
+# env[23] shadow matrix Q
+# env[24] shadow atlas rect: x, y, w, h
+# env[25] shadow params: texScale, depthBiasScale, sampleCount, unused
+# env[26] pbr params0: x enable, y roughnessScale, z metalnessScale, w aoScale
+# env[27] pbr params1: x minRoughness, y dielectricF0, z reserved, w reserved
+
+TEMP	light, color, R1, R2, localNormal, specular, R3, R4, R5, R6, R7;
+
+PARAM	subOne = { -1, -1, -1, -1 };
+PARAM	scaleTwo = { 2, 2, 2, 2 };
+PARAM	zero = { 0, 0, 0, 0 };
+PARAM	one = { 1, 1, 1, 1 };
+PARAM	half = { 0.5, 0.5, 0.5, 0.5 };
+
+# load the specular half angle first, because
+# the ATI shader gives a "too many indirections" error
+# if this is done right before the texture indirection
+
+#-----------------
+#TEX	specular, fragment.texcoord[6], texture[0], CUBE;
+#MAD	specular, specular, scaleTwo, subOne;
+
+
+# instead of using the normalization cube map, normalize with math
+DP3		specular, fragment.texcoord[6],fragment.texcoord[6];
+RSQ		specular, specular.x;
+MUL		specular, specular.x, fragment.texcoord[6];
+#-----------------
+
+
+#
+# the amount of light contacting the fragment is the
+# product of the two light projections and the surface
+# bump mapping
+#
+
+# perform the diffuse bump mapping
+
+#-----------------
+TEX	light, fragment.texcoord[0], texture[0], CUBE;
+MAD	light, light, scaleTwo, subOne;
+
+# instead of using the normalization cube map, normalize with math
+#DP3		light, fragment.texcoord[0],fragment.texcoord[0];
+#RSQ		light, light.x;
+#MUL		light, light.x, fragment.texcoord[0];
+#-----------------
+
+TEX	localNormal, fragment.texcoord[1], texture[1], 2D;
+# MOV localNormal.x, localNormal.a;
+MAD	localNormal, localNormal, scaleTwo, subOne;
+DP3	light, light, localNormal;
+
+# modulate by the light projection
+TXP	R1, fragment.texcoord[3], texture[3], 2D;
+MUL	light, light, R1;
+
+# modulate by the light falloff
+TXP	R1, fragment.texcoord[2], texture[2], 2D;
+MUL	light, light, R1;
+
+#
+# the light will be modulated by the diffuse and
+# specular surface characteristics
+#
+
+# modulate by the diffuse map and constant diffuse factor
+TEX	R1, fragment.texcoord[4], texture[4], 2D;
+MUL	color, R1, program.env[0];
+
+# perform the specular bump mapping
+DP3	specular, specular, localNormal;
+
+# perform a dependent table read for the specular falloff
+TEX	R1, specular, texture[6], 2D;
+
+# modulate by the constant specular factor
+MUL	R1, R1, program.env[1];
+
+# modulate by the specular map * 2
+TEX	R2, fragment.texcoord[5], texture[5], 2D;
+ADD	R2, R2, R2;
+MAD	color, R1, R2, color;
+
+# legacy final lighting
+MOV	R6, color;
+MUL	R6, light, R6;
+
+# optional PBR interaction path (gated by env[26].x)
+MOV	R3, program.env[26];
+MOV	R4, program.env[27];
+
+TEX	R7, fragment.texcoord[4], texture[4], 2D;
+TEX	R2, fragment.texcoord[5], texture[5], 2D;
+
+MUL	R2.x, R2.x, R3.y;
+MAX	R2.x, R2.x, R4.x;
+MIN	R2.x, R2.x, one.x;
+
+MUL	R2.y, R2.y, R3.z;
+MAX	R2.y, R2.y, zero.x;
+MIN	R2.y, R2.y, one.x;
+
+SUB	R5.x, one.x, R3.w;
+MAD	R2.z, R2.z, R3.w, R5.x;
+
+SUB	R4.z, one.x, R2.y;
+MUL	R4.z, R4.z, R4.y;
+MUL	R5, R7, R2.y;
+ADD	R5.x, R5.x, R4.z;
+ADD	R5.y, R5.y, R4.z;
+ADD	R5.z, R5.z, R4.z;
+MUL	R5, R5, R1;
+
+SUB	R4.z, one.x, R2.y;
+MUL	R7, R7, R4.z;
+MUL	R7, R7, program.env[0];
+ADD	R5, R5, R7;
+MUL	R5, R5, R2.z;
+MUL	R5, light, R5;
+
+SUB	R4.z, one.x, R3.x;
+MUL	R6, R6, R4.z;
+MUL	R5, R5, R3.x;
+ADD	color, R6, R5;
+
+# mapped-shadow modulation (single sample fallback path)
+MOV	R3, program.env[24];
+MOV	R4, program.env[25];
+RCP	R5.x, fragment.texcoord[7].w;
+MUL	R5, fragment.texcoord[7], R5.x;
+MAD	R5.x, R5.x, half.x, half.x;
+MAD	R5.y, R5.y, half.x, half.x;
+MAD	R5.z, R5.z, half.x, half.x;
+MUL	R5.z, R5.z, R4.y;
+MUL	R5.x, R5.x, R3.z;
+MUL	R5.y, R5.y, R3.w;
+ADD	R5.x, R5.x, R3.x;
+ADD	R5.y, R5.y, R3.y;
+MAX	R5.x, R5.x, zero.x;
+MIN	R5.x, R5.x, one.x;
+MAX	R5.y, R5.y, zero.x;
+MIN	R5.y, R5.y, one.x;
+TEX	R7, R5, texture[7], 2D;
+SGE	R7.x, R7.x, R5.z;
+SLT	R4.x, zero.x, R4.x;
+SUB	R7.y, one.x, R4.x;
+MAD	R7.x, R7.x, R4.x, R7.y;
+MUL	color, color, R7.x;
+
+# modify by the vertex color
+
+MUL result.color, color, fragment.color;
+
+# this should be better on future hardware, but current drivers make it slower
+#MUL result.color.xyz, color, fragment.color;
+
+
+END

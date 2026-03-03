@@ -33,6 +33,723 @@ If you have questions concerning this license or the applicable additional terms
 
 // tr_stencilShadow.c -- creaton of stencil shadow volumes
 
+struct shadowMapAtlasState_t {
+	int		viewCount;
+	int		atlasSize;
+	int		tileSize;
+	int		tilesPerRow;
+	int		maxTiles;
+	int		tilesUsed;
+	idImage			*atlasImage;
+	idRenderTexture	*atlasRenderTexture;
+	bool			useAtlas;
+};
+
+static const char * const SHADOW_MAP_ATLAS_IMAGE_NAME = "_rbdoom_shadowMapAtlas";
+
+static shadowMapAtlasState_t g_shadowMapAtlas = { -1, 0, 0, 0, 0, 0, NULL, NULL, false };
+
+static bool R_InitShadowMapAtlasRenderTarget( void ) {
+	idImageOpts atlasImageOpts;
+
+	atlasImageOpts.format		= FMT_DEPTH;
+	atlasImageOpts.width		= g_shadowMapAtlas.atlasSize;
+	atlasImageOpts.height		= g_shadowMapAtlas.atlasSize;
+	atlasImageOpts.numLevels	= 1;
+	atlasImageOpts.textureType	= TT_2D;
+
+	if ( g_shadowMapAtlas.atlasImage == NULL ||
+		 g_shadowMapAtlas.atlasImage->GetOpts().width != g_shadowMapAtlas.atlasSize ||
+		 g_shadowMapAtlas.atlasImage->GetOpts().height != g_shadowMapAtlas.atlasSize ||
+		 g_shadowMapAtlas.atlasImage->GetOpts().format != FMT_DEPTH ||
+		 !g_shadowMapAtlas.atlasImage->IsLoaded() ) {
+		g_shadowMapAtlas.atlasImage = renderSystem->CreateImage(
+			SHADOW_MAP_ATLAS_IMAGE_NAME, &atlasImageOpts, TF_NEAREST );
+	}
+
+	if ( g_shadowMapAtlas.atlasImage == NULL || !g_shadowMapAtlas.atlasImage->IsLoaded() ) {
+		return false;
+	}
+
+	if ( g_shadowMapAtlas.atlasRenderTexture == NULL ) {
+		g_shadowMapAtlas.atlasRenderTexture = renderSystem->CreateRenderTexture(
+			NULL, g_shadowMapAtlas.atlasImage );
+		return g_shadowMapAtlas.atlasRenderTexture != NULL;
+	}
+
+	renderSystem->ResizeRenderTexture( g_shadowMapAtlas.atlasRenderTexture,
+		g_shadowMapAtlas.atlasSize, g_shadowMapAtlas.atlasSize );
+
+	return true;
+}
+
+static void R_LogParallelShadowCascadePreview( int requestedSplits ) {
+	static bool warned = false;
+	if ( warned || requestedSplits <= 0 ) {
+		return;
+	}
+	warned = true;
+	common->Warning( "r_shadowMapSplits is set to %d; using cascaded parallel/sun-light shadow-map allocations.", requestedSplits );
+}
+
+static void R_ComputeShadowMapCascadeRanges( viewLight_t *vLight ) {
+	if ( vLight == NULL || vLight->shadowMapCascadeCount <= 0 ) {
+		return;
+	}
+
+	if ( !vLight->parallel || vLight->shadowMapCascadeCount == 1 || tr.viewDef == NULL ) {
+		const float cascadeStep = 1.0f / ( float )vLight->shadowMapCascadeCount;
+		for ( int i = 0 ; i < vLight->shadowMapCascadeCount ; i++ ) {
+			vLight->shadowMapCascadeNear[i] = i * cascadeStep;
+			vLight->shadowMapCascadeFar[i] = ( i == vLight->shadowMapCascadeCount - 1 ) ? 1.0f : ( i + 1 ) * cascadeStep;
+		}
+		return;
+	}
+
+	float viewNear = tr.viewDef->viewFrustum.GetNearDistance();
+	if ( viewNear < 0.01f ) {
+		viewNear = 0.01f;
+	}
+	float viewFar = tr.viewDef->viewFrustum.GetFarDistance();
+	if ( viewFar < viewNear + 1.0f ) {
+		viewFar = viewNear + 1.0f;
+	}
+	const float viewRange = viewFar - viewNear;
+	const float logRange = viewFar / viewNear;
+	const float splitWeight = 0.65f;
+
+	float previousSplit = viewNear;
+	for ( int i = 0 ; i < vLight->shadowMapCascadeCount ; i++ ) {
+		const float p = ( float )( i + 1 ) / ( float )vLight->shadowMapCascadeCount;
+		const float linearSplit = viewNear + viewRange * p;
+		const float logarithmicSplit = viewNear * idMath::Pow( logRange, p );
+		const float cascadeSplit = splitWeight * logarithmicSplit + ( 1.0f - splitWeight ) * linearSplit;
+
+		const float nearNorm = ( previousSplit - viewNear ) / viewRange;
+		const float farNorm = ( cascadeSplit - viewNear ) / viewRange;
+
+		vLight->shadowMapCascadeNear[i] = idMath::ClampFloat( 0.0f, 1.0f, nearNorm );
+		vLight->shadowMapCascadeFar[i] = idMath::ClampFloat( 0.0f, 1.0f, farNorm );
+		previousSplit = cascadeSplit;
+	}
+
+	vLight->shadowMapCascadeNear[0] = 0.0f;
+	vLight->shadowMapCascadeFar[vLight->shadowMapCascadeCount - 1] = 1.0f;
+}
+
+void R_BuildShadowMapProjectionForCascade( const viewLight_t *vLight, const idPlane lightProject[4],
+		const idVec3 &viewOrigin, int cascadeIndex, idVec4 shadowProjection[3], idVec4 *shadowClipW ) {
+	if ( lightProject == NULL || shadowProjection == NULL ) {
+		return;
+	}
+
+	idVec4 row0;
+	idVec4 row1;
+	idVec4 row2;
+	idVec4 clipW;
+
+	row0[0] = ( float )( 2.0f * lightProject[0][0] - lightProject[2][0] );
+	row0[1] = ( float )( 2.0f * lightProject[0][1] - lightProject[2][1] );
+	row0[2] = ( float )( 2.0f * lightProject[0][2] - lightProject[2][2] );
+	row0[3] = ( float )( 2.0f * lightProject[0][3] - lightProject[2][3] );
+
+	row1[0] = ( float )( 2.0f * lightProject[1][0] - lightProject[2][0] );
+	row1[1] = ( float )( 2.0f * lightProject[1][1] - lightProject[2][1] );
+	row1[2] = ( float )( 2.0f * lightProject[1][2] - lightProject[2][2] );
+	row1[3] = ( float )( 2.0f * lightProject[1][3] - lightProject[2][3] );
+
+	row2[0] = ( float )lightProject[3][0];
+	row2[1] = ( float )lightProject[3][1];
+	row2[2] = ( float )lightProject[3][2];
+	row2[3] = ( float )lightProject[3][3];
+
+	clipW[0] = ( float )lightProject[2][0];
+	clipW[1] = ( float )lightProject[2][1];
+	clipW[2] = ( float )lightProject[2][2];
+	clipW[3] = ( float )lightProject[2][3];
+
+	if ( vLight != NULL && vLight->parallel && vLight->shadowMapCascadeCount > 1 ) {
+		const int clampedCascade = idMath::ClampInt( 0, vLight->shadowMapCascadeCount - 1, cascadeIndex );
+		const float cascadeNear = idMath::ClampFloat( 0.0f, 1.0f, vLight->shadowMapCascadeNear[clampedCascade] );
+		const float cascadeFar = idMath::ClampFloat( 0.0f, 1.0f, vLight->shadowMapCascadeFar[clampedCascade] );
+		const float cascadeRange = idMath::ClampFloat( 0.02f, 1.0f, cascadeFar - cascadeNear );
+		const float cascadeScale = idMath::ClampFloat( 0.2f, 1.0f, cascadeRange * 2.4f );
+
+		row0 *= cascadeScale;
+		row1 *= cascadeScale;
+
+		const float focusS = row0[0] * viewOrigin[0] + row0[1] * viewOrigin[1] + row0[2] * viewOrigin[2] + row0[3];
+		const float focusT = row1[0] * viewOrigin[0] + row1[1] * viewOrigin[1] + row1[2] * viewOrigin[2] + row1[3];
+		row0[3] -= focusS;
+		row1[3] -= focusT;
+
+		if ( vLight->shadowMapTileSize > 0 ) {
+			const float texelStep = 2.0f / ( float )vLight->shadowMapTileSize;
+			row0[3] = idMath::Floor( row0[3] / texelStep + 0.5f ) * texelStep;
+			row1[3] = idMath::Floor( row1[3] / texelStep + 0.5f ) * texelStep;
+		}
+	}
+
+	shadowProjection[0] = row0;
+	shadowProjection[1] = row1;
+	shadowProjection[2] = row2;
+
+	if ( shadowClipW != NULL ) {
+		*shadowClipW = clipW;
+	}
+}
+
+static void R_InitShadowMapAtlasState( void ) {
+	g_shadowMapAtlas.viewCount = tr.viewCount;
+	g_shadowMapAtlas.atlasSize = r_shadowMapAtlasSize.GetInteger();
+	g_shadowMapAtlas.tileSize = r_shadowMapImageSize.GetInteger();
+	g_shadowMapAtlas.tilesUsed = 0;
+	g_shadowMapAtlas.tilesPerRow = 0;
+	g_shadowMapAtlas.maxTiles = 0;
+	g_shadowMapAtlas.useAtlas = false;
+
+	if ( !r_useShadowMapping.GetBool() || !r_useShadowAtlas.GetBool() ||
+		 g_shadowMapAtlas.atlasSize <= 0 || g_shadowMapAtlas.tileSize <= 0 || !glConfig.isInitialized ) {
+		g_shadowMapAtlas.maxTiles = 0;
+		return;
+	}
+
+	g_shadowMapAtlas.tilesPerRow = g_shadowMapAtlas.atlasSize / g_shadowMapAtlas.tileSize;
+	if ( g_shadowMapAtlas.tilesPerRow <= 0 ) {
+		g_shadowMapAtlas.maxTiles = 0;
+		return;
+	}
+
+	g_shadowMapAtlas.maxTiles = g_shadowMapAtlas.tilesPerRow * g_shadowMapAtlas.tilesPerRow;
+	g_shadowMapAtlas.useAtlas = R_InitShadowMapAtlasRenderTarget();
+}
+
+void R_ShutdownShadowMapAtlas( void ) {
+	if ( g_shadowMapAtlas.atlasRenderTexture != NULL ) {
+		renderSystem->DestroyRenderTexture( g_shadowMapAtlas.atlasRenderTexture );
+		g_shadowMapAtlas.atlasRenderTexture = NULL;
+	}
+	g_shadowMapAtlas.atlasImage = NULL;
+	g_shadowMapAtlas.tilesPerRow = 0;
+	g_shadowMapAtlas.maxTiles = 0;
+	g_shadowMapAtlas.tilesUsed = 0;
+	g_shadowMapAtlas.atlasSize = 0;
+	g_shadowMapAtlas.tileSize = 0;
+	g_shadowMapAtlas.useAtlas = false;
+}
+
+void R_GetShadowMapAtlasStats( int &tilesUsed, int &maxTiles, int &tileSize,
+							  int &atlasSize, int &tilesPerRow ) {
+	if ( g_shadowMapAtlas.viewCount != tr.viewCount ) {
+		R_InitShadowMapAtlasState();
+	}
+
+	tilesUsed = g_shadowMapAtlas.tilesUsed;
+	maxTiles = g_shadowMapAtlas.maxTiles;
+	tileSize = g_shadowMapAtlas.tileSize;
+	atlasSize = g_shadowMapAtlas.atlasSize;
+	tilesPerRow = g_shadowMapAtlas.tilesPerRow;
+}
+
+bool R_ShadowMappingAvailable( void ) {
+	if ( !glConfig.isInitialized ) {
+		return false;
+	}
+
+	if ( !r_useShadowMapping.GetBool() || !r_useShadowAtlas.GetBool() ) {
+		if ( g_shadowMapAtlas.useAtlas || g_shadowMapAtlas.atlasRenderTexture != NULL ) {
+			R_ShutdownShadowMapAtlas();
+		}
+		return false;
+	}
+
+	if ( g_shadowMapAtlas.viewCount != tr.viewCount ||
+		 g_shadowMapAtlas.atlasImage == NULL ||
+		 !g_shadowMapAtlas.atlasImage->IsLoaded() ||
+		 g_shadowMapAtlas.atlasImage->GetOpts().width != g_shadowMapAtlas.atlasSize ||
+		 g_shadowMapAtlas.atlasImage->GetOpts().height != g_shadowMapAtlas.atlasSize ||
+		 g_shadowMapAtlas.atlasRenderTexture == NULL ||
+		 !g_shadowMapAtlas.useAtlas ) {
+		R_InitShadowMapAtlasState();
+	}
+
+	return g_shadowMapAtlas.useAtlas &&
+		g_shadowMapAtlas.atlasImage != NULL &&
+		g_shadowMapAtlas.atlasImage->IsLoaded() &&
+		g_shadowMapAtlas.atlasRenderTexture != NULL;
+}
+
+void R_LogShadowMappingFallback( void ) {
+	static bool warned = false;
+	if ( warned ) {
+		return;
+	}
+	warned = true;
+	common->Warning( "r_useShadowMapping is enabled, but shadow-map backend is not active; falling back to legacy stencil shadows." );
+}
+
+bool R_ShouldUseShadowMapForLight( const idRenderLightLocal *light ) {
+	if ( light == NULL || light->viewLight == NULL ) {
+		return false;
+	}
+
+	return light->viewLight->useShadowMap;
+}
+
+void R_SelectShadowMapForViewLight( idRenderLightLocal *light, viewLight_t *vLight ) {
+	if ( light == NULL || vLight == NULL ) {
+		return;
+	}
+
+	vLight->useShadowMap = false;
+	vLight->shadowMapFallbackReason = SHADOW_MAP_FALLBACK_NONE;
+	vLight->shadowMapTile = -1;
+	vLight->shadowMapTileX = -1;
+	vLight->shadowMapTileY = -1;
+	vLight->shadowMapTileSize = 0;
+	vLight->shadowMapAtlasSize = 0;
+	vLight->shadowMapAtlas = NULL;
+
+	if ( light->parms.noShadows || light->lightShader == NULL || !light->lightShader->LightCastsShadows() ) {
+		vLight->shadowMapFallbackReason = SHADOW_MAP_FALLBACK_NO_SHADOWS;
+		tr.pc.c_shadowMapFallbackNoShadows++;
+		tr.pc.c_shadowMapFallbacks++;
+		return;
+	}
+
+	if ( !r_useShadowMapping.GetBool() ) {
+		vLight->shadowMapFallbackReason = SHADOW_MAP_FALLBACK_DISABLED;
+		tr.pc.c_shadowMapFallbackDisabled++;
+		tr.pc.c_shadowMapFallbacks++;
+		return;
+	}
+
+	tr.pc.c_shadowMapCandidates++;
+
+	// Keep directional/sun lights in this path gated behind an explicit phase-2 switch.
+	if ( light->parms.parallel && !r_useParallelShadowMaps.GetBool() ) {
+		vLight->shadowMapFallbackReason = SHADOW_MAP_FALLBACK_PARALLEL;
+		tr.pc.c_shadowMapAtlasMisses++;
+		tr.pc.c_shadowMapFallbacks++;
+		tr.pc.c_shadowMapFallbackParallel++;
+		return;
+	}
+
+	if ( light->parms.parallel ) {
+		const int rawRequestedSplits = r_shadowMapSplits.GetInteger();
+		const int requestedSplits = ( rawRequestedSplits > 0 ) ? rawRequestedSplits : 0;
+		if ( requestedSplits > 0 ) {
+			tr.pc.c_shadowMapSplitRequests++;
+			if ( requestedSplits > MAX_SHADOW_MAP_CASCADES ) {
+				tr.pc.c_shadowMapCascadeUnsupported++;
+			}
+			vLight->shadowMapCascadeCount = ( requestedSplits < MAX_SHADOW_MAP_CASCADES ) ? requestedSplits : MAX_SHADOW_MAP_CASCADES;
+			R_LogParallelShadowCascadePreview( vLight->shadowMapCascadeCount );
+		} else {
+			vLight->shadowMapCascadeCount = 1;
+		}
+	} else {
+		vLight->shadowMapCascadeCount = 1;
+	}
+
+	if ( !R_ShadowMappingAvailable() ) {
+		vLight->shadowMapFallbackReason = SHADOW_MAP_FALLBACK_BACKEND_UNAVAILABLE;
+		tr.pc.c_shadowMapUnavailable++;
+		tr.pc.c_shadowMapFallbacks++;
+		tr.pc.c_shadowMapFallbackBackendUnavailable++;
+		R_LogShadowMappingFallback();
+		return;
+	}
+
+	if ( g_shadowMapAtlas.maxTiles <= 0 ) {
+		vLight->shadowMapFallbackReason = SHADOW_MAP_FALLBACK_ATLAS_INVALID;
+		tr.pc.c_shadowMapAtlasMisses++;
+		tr.pc.c_shadowMapFallbacks++;
+		tr.pc.c_shadowMapFallbackAtlasInvalid++;
+		return;
+	}
+
+	if ( g_shadowMapAtlas.tilesUsed >= g_shadowMapAtlas.maxTiles ) {
+		vLight->shadowMapFallbackReason = SHADOW_MAP_FALLBACK_ATLAS_FULL;
+		tr.pc.c_shadowMapOverflows++;
+		tr.pc.c_shadowMapAtlasMisses++;
+		tr.pc.c_shadowMapFallbacks++;
+		tr.pc.c_shadowMapFallbackAtlasFull++;
+		return;
+	}
+
+	for ( int i = 0 ; i < vLight->shadowMapCascadeCount ; i++ ) {
+		if ( g_shadowMapAtlas.tilesUsed >= g_shadowMapAtlas.maxTiles ) {
+			break;
+		}
+		const int tile = g_shadowMapAtlas.tilesUsed++;
+		vLight->shadowMapCascadeTile[i] = tile;
+		vLight->shadowMapCascadeTileX[i] = tile % g_shadowMapAtlas.tilesPerRow;
+		vLight->shadowMapCascadeTileY[i] = tile / g_shadowMapAtlas.tilesPerRow;
+		tr.pc.c_shadowMapAllocations++;
+	}
+
+	int allocatedSplitCount = 0;
+	while ( allocatedSplitCount < vLight->shadowMapCascadeCount
+		&& vLight->shadowMapCascadeTile[allocatedSplitCount] >= 0 ) {
+		allocatedSplitCount++;
+	}
+	vLight->shadowMapCascadeCount = allocatedSplitCount;
+
+	if ( vLight->shadowMapCascadeCount <= 0 ) {
+		vLight->shadowMapFallbackReason = SHADOW_MAP_FALLBACK_ATLAS_FULL;
+		tr.pc.c_shadowMapAtlasMisses++;
+		tr.pc.c_shadowMapFallbacks++;
+		return;
+	}
+
+	R_ComputeShadowMapCascadeRanges( vLight );
+
+	vLight->useShadowMap = true;
+	vLight->shadowMapTile = vLight->shadowMapCascadeTile[0];
+	vLight->shadowMapTileX = vLight->shadowMapCascadeTileX[0];
+	vLight->shadowMapTileY = vLight->shadowMapCascadeTileY[0];
+	vLight->shadowMapTileSize = g_shadowMapAtlas.tileSize;
+	vLight->shadowMapAtlasSize = g_shadowMapAtlas.atlasSize;
+	vLight->shadowMapAtlas = g_shadowMapAtlas.atlasImage;
+}
+
+// Renders depth information for mapped shadowing into the atlas tile for this view-light.
+bool R_RenderShadowMapForViewLight( viewLight_t *vLight ) {
+	idRenderLightLocal *lightDef;
+	const drawSurf_s *drawSurf;
+	int tileX, tileY, tileSize, atlasSize;
+	GLint oldViewport[4], oldScissor[4];
+	GLboolean oldScissorEnabled;
+	GLboolean oldBlendEnabled;
+	GLboolean oldAlphaEnabled;
+	GLboolean oldStencilEnabled;
+	GLboolean oldDepthEnabled;
+	GLboolean oldCullEnabled;
+	GLboolean oldPolygonOffsetEnabled;
+	GLboolean oldDepthMask;
+	GLboolean oldColorMask[4];
+	GLfloat oldDepthRange[2];
+	GLfloat oldPolygonOffsetFactor;
+	GLfloat oldPolygonOffsetUnits;
+	GLint oldCullMode;
+	GLint oldDepthFunc;
+	GLint oldMatrixMode;
+	GLboolean oldVertexArrayEnabled;
+	GLboolean oldTexCoordArrayEnabled;
+	GLboolean oldColorArrayEnabled;
+	GLboolean oldNormalArrayEnabled;
+	int occluderCount = 0;
+
+	if ( !vLight || !vLight->lightDef || !vLight->lightDef->lightShader ) {
+		return false;
+	}
+
+	lightDef = vLight->lightDef;
+	vLight->shadowMapFallbackReason = SHADOW_MAP_FALLBACK_NONE;
+
+	if ( !vLight->useShadowMap || vLight->shadowMapTile < 0 || !vLight->shadowMapAtlas
+		|| vLight->shadowMapTileSize <= 0 || vLight->shadowMapAtlasSize <= 0 ) {
+		vLight->shadowMapFallbackReason = SHADOW_MAP_FALLBACK_MISSING_TILE;
+		vLight->useShadowMap = false;
+		tr.pc.c_shadowMapFallbackMissingTile++;
+		tr.pc.c_shadowMapFallbacks++;
+		return false;
+	}
+
+	if ( g_shadowMapAtlas.atlasRenderTexture == NULL || g_shadowMapAtlas.atlasImage != vLight->shadowMapAtlas ) {
+		vLight->shadowMapFallbackReason = SHADOW_MAP_FALLBACK_ATLAS_INVALID;
+		vLight->useShadowMap = false;
+		tr.pc.c_shadowMapFallbackAtlasInvalid++;
+		tr.pc.c_shadowMapFallbacks++;
+		return false;
+	}
+
+	if ( !R_ShadowMappingAvailable() ) {
+		vLight->shadowMapFallbackReason = SHADOW_MAP_FALLBACK_BACKEND_UNAVAILABLE;
+		vLight->useShadowMap = false;
+		tr.pc.c_shadowMapFallbackBackendUnavailable++;
+		tr.pc.c_shadowMapFallbacks++;
+		return false;
+	}
+
+	const idPlane		*lightProject = lightDef->lightProject;
+	const drawSurf_s	*globalShadows = vLight->globalShadows;
+	const drawSurf_s	*localShadows = vLight->localShadows;
+	float				shadowProj[16];
+	bool				drawnAny = false;
+	int					cascadeCount;
+	int					validCascadeCount = 0;
+	idVec4				shadowProjection[3];
+	idVec4				shadowClipW;
+
+	if ( !globalShadows && !localShadows ) {
+		vLight->shadowMapFallbackReason = SHADOW_MAP_FALLBACK_NO_GEOMETRY;
+		vLight->useShadowMap = false;
+		tr.pc.c_shadowMapFallbackNoGeometry++;
+		tr.pc.c_shadowMapFallbacks++;
+		return false;
+	}
+
+	tileSize = vLight->shadowMapTileSize;
+	atlasSize = vLight->shadowMapAtlasSize;
+	cascadeCount = idMath::ClampInt( 1, MAX_SHADOW_MAP_CASCADES, vLight->shadowMapCascadeCount );
+
+	if ( tileSize <= 0 || atlasSize <= 0 ) {
+		vLight->shadowMapFallbackReason = SHADOW_MAP_FALLBACK_MISSING_TILE;
+		vLight->useShadowMap = false;
+		tr.pc.c_shadowMapFallbackMissingTile++;
+		tr.pc.c_shadowMapFallbacks++;
+		return false;
+	}
+
+	for ( int cascadeIndex = 0 ; cascadeIndex < cascadeCount ; cascadeIndex++ ) {
+		const int cascadeTileX = ( cascadeIndex == 0 ) ? vLight->shadowMapTileX : vLight->shadowMapCascadeTileX[cascadeIndex];
+		const int cascadeTileY = ( cascadeIndex == 0 ) ? vLight->shadowMapTileY : vLight->shadowMapCascadeTileY[cascadeIndex];
+		if ( cascadeTileX < 0 || cascadeTileY < 0 ) {
+			continue;
+		}
+
+		tileX = cascadeTileX * tileSize;
+		tileY = cascadeTileY * tileSize;
+		if ( tileX < 0 || tileY < 0 || tileX + tileSize > atlasSize || tileY + tileSize > atlasSize ) {
+			continue;
+		}
+
+		validCascadeCount++;
+	}
+
+	if ( validCascadeCount <= 0 ) {
+		vLight->shadowMapFallbackReason = SHADOW_MAP_FALLBACK_MISSING_TILE;
+		vLight->useShadowMap = false;
+		tr.pc.c_shadowMapFallbackMissingTile++;
+		tr.pc.c_shadowMapFallbacks++;
+		return false;
+	}
+
+	glGetIntegerv( GL_VIEWPORT, oldViewport );
+	glGetIntegerv( GL_SCISSOR_BOX, oldScissor );
+	oldScissorEnabled = glIsEnabled( GL_SCISSOR_TEST );
+	oldBlendEnabled = glIsEnabled( GL_BLEND );
+	oldAlphaEnabled = glIsEnabled( GL_ALPHA_TEST );
+	oldStencilEnabled = glIsEnabled( GL_STENCIL_TEST );
+	oldDepthEnabled = glIsEnabled( GL_DEPTH_TEST );
+	oldCullEnabled = glIsEnabled( GL_CULL_FACE );
+	glGetIntegerv( GL_CULL_FACE_MODE, &oldCullMode );
+	glGetIntegerv( GL_DEPTH_FUNC, &oldDepthFunc );
+	oldPolygonOffsetEnabled = glIsEnabled( GL_POLYGON_OFFSET_FILL );
+	glGetFloatv( GL_POLYGON_OFFSET_FACTOR, &oldPolygonOffsetFactor );
+	glGetFloatv( GL_POLYGON_OFFSET_UNITS, &oldPolygonOffsetUnits );
+	glGetFloatv( GL_DEPTH_RANGE, oldDepthRange );
+	glGetBooleanv( GL_DEPTH_WRITEMASK, &oldDepthMask );
+	glGetBooleanv( GL_COLOR_WRITEMASK, oldColorMask );
+	glGetIntegerv( GL_MATRIX_MODE, &oldMatrixMode );
+	glGetBooleanv( GL_VERTEX_ARRAY, &oldVertexArrayEnabled );
+	glGetBooleanv( GL_TEXTURE_COORD_ARRAY, &oldTexCoordArrayEnabled );
+	glGetBooleanv( GL_COLOR_ARRAY, &oldColorArrayEnabled );
+	glGetBooleanv( GL_NORMAL_ARRAY, &oldNormalArrayEnabled );
+
+	const int occluderFacing = r_shadowMapOccluderFacing.GetInteger();
+
+	g_shadowMapAtlas.atlasRenderTexture->MakeCurrent();
+
+	if ( occluderFacing == 0 ) {
+		glEnable( GL_CULL_FACE );
+		glCullFace( GL_FRONT );
+	} else if ( occluderFacing == 1 ) {
+		glEnable( GL_CULL_FACE );
+		glCullFace( GL_BACK );
+	} else {
+		glDisable( GL_CULL_FACE );
+	}
+
+	glDisable( GL_BLEND );
+	glDisable( GL_ALPHA_TEST );
+	glDisable( GL_STENCIL_TEST );
+	glEnable( GL_DEPTH_TEST );
+	glDepthFunc( GL_LEQUAL );
+	glDepthMask( GL_TRUE );
+	glColorMask( GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE );
+	glEnableClientState( GL_VERTEX_ARRAY );
+	glDisableClientState( GL_TEXTURE_COORD_ARRAY );
+	glDisableClientState( GL_COLOR_ARRAY );
+	glDisableClientState( GL_NORMAL_ARRAY );
+
+	for ( int cascadeIndex = 0 ; cascadeIndex < cascadeCount ; cascadeIndex++ ) {
+		const int cascadeTileX = ( cascadeIndex == 0 ) ? vLight->shadowMapTileX : vLight->shadowMapCascadeTileX[cascadeIndex];
+		const int cascadeTileY = ( cascadeIndex == 0 ) ? vLight->shadowMapTileY : vLight->shadowMapCascadeTileY[cascadeIndex];
+		if ( cascadeTileX < 0 || cascadeTileY < 0 ) {
+			continue;
+		}
+
+		tileX = cascadeTileX * tileSize;
+		tileY = cascadeTileY * tileSize;
+		if ( tileX < 0 || tileY < 0 || tileX + tileSize > atlasSize || tileY + tileSize > atlasSize ) {
+			continue;
+		}
+
+		R_BuildShadowMapProjectionForCascade( vLight, lightProject, tr.viewDef->renderView.vieworg,
+			cascadeIndex, shadowProjection, &shadowClipW );
+
+		shadowProj[0] = shadowProjection[0][0];
+		shadowProj[4] = shadowProjection[0][1];
+		shadowProj[8] = shadowProjection[0][2];
+		shadowProj[12] = shadowProjection[0][3];
+
+		shadowProj[1] = shadowProjection[1][0];
+		shadowProj[5] = shadowProjection[1][1];
+		shadowProj[9] = shadowProjection[1][2];
+		shadowProj[13] = shadowProjection[1][3];
+
+		shadowProj[2] = shadowProjection[2][0];
+		shadowProj[6] = shadowProjection[2][1];
+		shadowProj[10] = shadowProjection[2][2];
+		shadowProj[14] = shadowProjection[2][3];
+
+		shadowProj[3] = shadowClipW[0];
+		shadowProj[7] = shadowClipW[1];
+		shadowProj[11] = shadowClipW[2];
+		shadowProj[15] = shadowClipW[3];
+
+		glViewport( tileX, tileY, tileSize, tileSize );
+		glScissor( tileX, tileY, tileSize, tileSize );
+		glEnable( GL_SCISSOR_TEST );
+		glDepthRange( 0.0f, 1.0f );
+		glClearDepth( 1.0f );
+		glClear( GL_DEPTH_BUFFER_BIT );
+
+		glMatrixMode( GL_PROJECTION );
+		glPushMatrix();
+		glLoadMatrixf( shadowProj );
+		glMatrixMode( GL_MODELVIEW );
+		glPushMatrix();
+		glLoadIdentity();
+
+		for ( drawSurf = globalShadows; drawSurf; drawSurf = drawSurf->nextOnLight ) {
+			occluderCount++;
+			const srfTriangles_t *tri = drawSurf->geo;
+			if ( !tri || !tri->ambientCache ) {
+				continue;
+			}
+			if ( drawSurf->space != backEnd.currentSpace ) {
+				backEnd.currentSpace = drawSurf->space;
+				glLoadMatrixf( drawSurf->space->modelMatrix );
+			}
+			idDrawVert *ac = (idDrawVert *)vertexCache.Position( tri->ambientCache );
+			glVertexPointer( 3, GL_FLOAT, sizeof( idDrawVert ), ac->xyz.ToFloatPtr() );
+			RB_DrawElementsWithCounters( tri );
+			drawnAny = true;
+		}
+
+		for ( drawSurf = localShadows; drawSurf; drawSurf = drawSurf->nextOnLight ) {
+			occluderCount++;
+			const srfTriangles_t *tri = drawSurf->geo;
+			if ( !tri || !tri->ambientCache ) {
+				continue;
+			}
+			if ( drawSurf->space != backEnd.currentSpace ) {
+				backEnd.currentSpace = drawSurf->space;
+				glLoadMatrixf( drawSurf->space->modelMatrix );
+			}
+			idDrawVert *ac = (idDrawVert *)vertexCache.Position( tri->ambientCache );
+			glVertexPointer( 3, GL_FLOAT, sizeof( idDrawVert ), ac->xyz.ToFloatPtr() );
+			RB_DrawElementsWithCounters( tri );
+			drawnAny = true;
+		}
+
+		glPopMatrix();
+		glMatrixMode( GL_PROJECTION );
+		glPopMatrix();
+	}
+
+	if ( oldNormalArrayEnabled ) {
+		glEnableClientState( GL_NORMAL_ARRAY );
+	} else {
+		glDisableClientState( GL_NORMAL_ARRAY );
+	}
+	if ( oldColorArrayEnabled ) {
+		glEnableClientState( GL_COLOR_ARRAY );
+	} else {
+		glDisableClientState( GL_COLOR_ARRAY );
+	}
+	if ( oldTexCoordArrayEnabled ) {
+		glEnableClientState( GL_TEXTURE_COORD_ARRAY );
+	} else {
+		glDisableClientState( GL_TEXTURE_COORD_ARRAY );
+	}
+	if ( oldVertexArrayEnabled ) {
+		glEnableClientState( GL_VERTEX_ARRAY );
+	} else {
+		glDisableClientState( GL_VERTEX_ARRAY );
+	}
+
+	if ( oldBlendEnabled ) {
+		glEnable( GL_BLEND );
+	} else {
+		glDisable( GL_BLEND );
+	}
+	if ( oldAlphaEnabled ) {
+		glEnable( GL_ALPHA_TEST );
+	} else {
+		glDisable( GL_ALPHA_TEST );
+	}
+	if ( oldStencilEnabled ) {
+		glEnable( GL_STENCIL_TEST );
+	} else {
+		glDisable( GL_STENCIL_TEST );
+	}
+	if ( oldDepthEnabled ) {
+		glEnable( GL_DEPTH_TEST );
+	} else {
+		glDisable( GL_DEPTH_TEST );
+	}
+	if ( oldCullEnabled ) {
+		glEnable( GL_CULL_FACE );
+		glCullFace( oldCullMode );
+	} else {
+		glDisable( GL_CULL_FACE );
+	}
+	if ( oldPolygonOffsetEnabled ) {
+		glEnable( GL_POLYGON_OFFSET_FILL );
+		glPolygonOffset( oldPolygonOffsetFactor, oldPolygonOffsetUnits );
+	} else {
+		glDisable( GL_POLYGON_OFFSET_FILL );
+	}
+	glDepthFunc( oldDepthFunc );
+	glDepthRange( oldDepthRange[0], oldDepthRange[1] );
+	glDepthMask( oldDepthMask );
+	glColorMask( oldColorMask[0], oldColorMask[1], oldColorMask[2], oldColorMask[3] );
+	glViewport( oldViewport[0], oldViewport[1], oldViewport[2], oldViewport[3] );
+	glScissor( oldScissor[0], oldScissor[1], oldScissor[2], oldScissor[3] );
+	if ( oldScissorEnabled ) {
+		glEnable( GL_SCISSOR_TEST );
+	} else {
+		glDisable( GL_SCISSOR_TEST );
+	}
+	glMatrixMode( oldMatrixMode );
+
+	// restore original render target
+	if ( backEnd.renderTexture ) {
+		backEnd.renderTexture->MakeCurrent();
+	} else {
+		idRenderTexture::BindNull();
+	}
+
+	if ( !drawnAny ) {
+		if ( occluderCount == 0 ) {
+			vLight->shadowMapFallbackReason = SHADOW_MAP_FALLBACK_NO_GEOMETRY;
+			tr.pc.c_shadowMapFallbackNoGeometry++;
+		} else {
+			vLight->shadowMapFallbackReason = SHADOW_MAP_FALLBACK_RENDER_FAILED;
+			tr.pc.c_shadowMapFallbackRenderFailed++;
+		}
+		tr.pc.c_shadowMapFallbacks++;
+		vLight->useShadowMap = false;
+	}
+
+	return drawnAny;
+}
+
 /*
 
   Should we split shadow volume surfaces when they exceed max verts

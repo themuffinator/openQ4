@@ -32,6 +32,32 @@ If you have questions concerning this license or the applicable additional terms
 #include "tr_local.h"
 
 static const float CHECK_BOUNDS_EPSILON = 1.0f;
+
+static int R_GetShadowMapPcfSampleCount( void ) {
+	const int quality = idMath::ClampInt( 0, 3, r_shadowMapQuality.GetInteger() );
+	switch ( quality ) {
+	case 1:
+		return 4;
+	case 2:
+		return 8;
+	case 3:
+		return 16;
+	default:
+		break;
+	}
+
+	const int requested = idMath::ClampInt( 1, 64, r_shadowMapSamples.GetInteger() );
+	if ( requested <= 1 ) {
+		return 1;
+	}
+	if ( requested <= 4 ) {
+		return 4;
+	}
+	if ( requested <= 8 ) {
+		return 8;
+	}
+	return 16;
+}
 idCVar bse_frameCounters(
 	"bse_frameCounters",
 	"0",
@@ -518,6 +544,27 @@ viewLight_t *R_SetLightDefViewLight( idRenderLightLocal *light ) {
 	vLight->falloffImage = light->falloffImage;
 	vLight->lightShader = light->lightShader;
 	vLight->shaderRegisters = NULL;		// allocated and evaluated in R_AddLightSurfaces
+	vLight->useShadowMap = false;
+	vLight->shadowMapFallbackReason = SHADOW_MAP_FALLBACK_NONE;
+	vLight->shadowMapCascadeCount = 0;
+	for ( int i = 0 ; i < MAX_SHADOW_MAP_CASCADES ; i++ ) {
+		vLight->shadowMapCascadeTile[i] = -1;
+		vLight->shadowMapCascadeTileX[i] = -1;
+		vLight->shadowMapCascadeTileY[i] = -1;
+		vLight->shadowMapCascadeNear[i] = 0.0f;
+		vLight->shadowMapCascadeFar[i] = 0.0f;
+	}
+	vLight->shadowMapTile = -1;
+	vLight->shadowMapTileX = -1;
+	vLight->shadowMapTileY = -1;
+	vLight->shadowMapTileSize = 0;
+	vLight->shadowMapAtlasSize = 0;
+	vLight->shadowMapAtlas = NULL;
+	vLight->shadowMapDepthBiasScale = light->parms.parallel ? r_shadowMapSunDepthBiasScale.GetFloat() : r_shadowMapRegularDepthBiasScale.GetFloat();
+	vLight->shadowMapSampleCount = R_GetShadowMapPcfSampleCount();
+
+	// Evaluate mapped-shadow eligibility for this view-light before backend traversal.
+	R_SelectShadowMapForViewLight( light, vLight );
 
 	// link the view light
 	vLight->next = tr.viewDef->viewLights;

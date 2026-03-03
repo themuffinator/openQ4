@@ -12,6 +12,29 @@ Bring OpenQ4 to the same technical standard as modern RBDOOM-3-BFG, with special
 - unified `openq4/` runtime layout
 - Meson + SDL3 cross platform direction
 
+## 1.5 Current Status (2026-03-03)
+
+- Phase 0 is now operationalized with a concrete capture harness.
+- Phase 1 shadow-mapping core is implemented and validated behind runtime controls.
+- Phase 2 parallel/sun cascades are now implemented as the production mapped-shadow path:
+  - `r_useParallelShadowMaps` defaults to enabled
+  - cascaded split selection + transition blending are active
+  - capture harness variants now treat parallel cascades as first-class (not preview)
+- Phase 3 PBR interaction path is now implemented on the OpenGL renderer:
+  - material parser support for `basecolormap` + `rmaomap`/`pbrmap` style tokens
+  - optional GGX/PBR interaction branch gated by `r_usePBR` with conservative defaults
+  - Stage-0 harness now includes a mapped-shadow PBR capture variant for SP/MP regression
+- Phase 4 indirect-lighting foundations are now implemented:
+  - per-area environment probes + light-grid samples with runtime fallback generation
+  - savepath cache load/save path (`openq4/indirect/*.indirect`)
+  - bake commands: `bakeEnvironmentProbes`, `bakeLightGrids`, `reloadIndirectLightCache`
+  - per-view sampled indirect ambient pass integrated into frame rendering
+- Phase 5 modern post-lighting stack is now integrated on the OpenGL path:
+  - renderer-native pass chain for SSAO -> TAA -> tonemap with optional SMAA (`r_postAA 1`)
+  - phase-5 ARB programs: `openq4_phase5_ssao.fp`, `openq4_phase5_tonemap.fp`
+  - phase-5 stack owns post ordering when enabled (`r_usePostLightingStack 1`) and suppresses legacy material post chain to avoid edge-mask presentation regressions
+- Phase 6 is now the next implementation stage.
+
 ## 2. Baseline and Evidence
 
 ### OpenQ4 / Quake4Doom baseline state
@@ -195,6 +218,14 @@ Exit criteria:
 - No regressions on stock Quake 4 assets.
 - Optional PBR overrides function through `openq4` staged content without requiring repo `q4base`.
 
+Implementation notes (2026-03-03):
+
+- `Material.cpp` accepts `basecolormap` as diffuse alias and `rmaomap`/`pbrmap` as specular payload aliases.
+- PBR metadata is carried in interactions and uploaded through new program params (`PP_PBR_PARAMS0/1`).
+- `interaction.vfp` includes a compatibility-gated PBR branch plus mapped-shadow modulation while preserving legacy fallback behavior when `r_usePBR = 0`.
+- Regression validation runs through `tools/render-harness/Phase0Capture.ps1` including SP + MP maps and PBR variants.
+- Validation evidence run `20260303-105303`: `12/12` scene variants `ok`, `0` GL program errors, `0` logged `ERROR:` lines (warnings remain at baseline levels).
+
 ## Phase 4: Indirect Lighting Stack (Env Probes + Light Grids) (8-12 weeks)
 
 Deliverables:
@@ -325,15 +356,38 @@ Mitigation:
 
 ## 9. Immediate Next Steps (Recommended Order)
 
-1. Create `docs-dev/proposals/rbdoom-shadow-modernization-spec.md` with Phase 1 technical design:
-   - atlas layout
-   - pass ordering
-   - cvar contract
-   - material/shader impact
-2. Implement Phase 0 capture+telemetry harness and commit it before renderer changes.
-3. Start Phase 1 behind `r_useShadowMapping` (default off) and run Procedure 1 loop for each milestone.
+1. Author Phase 4 indirect-lighting implementation spec (env probes + light grids + fallback policy + cvar gating).
+2. Begin Phase 4 implementation on OpenGL renderer with graceful fallback when no baked data exists.
+3. Keep Phase 0 harness as a regression gate after each Phase 4 milestone and diff `summary.json` output.
+4. Keep Procedure 1 runtime loop active for both SP and MP map coverage after renderer changes.
 
-## 10. Primary Source References
+Status update (2026-03-03):
+
+1. Phase 4 spec/implementation delivered on OpenGL path with savepath caches + fallback generation.
+2. Harness coverage expanded with indirect-light variant (`mapped_parallel_cascades_pbr_indirect`).
+3. Phase 5 post-light stack integrated with phase-owned ordering (`r_usePostLightingStack`).
+4. Validation evidence run `20260303-120222` (phase-5 focused SP/MP suite): `3/3` variants `ok`, `0` logged `GL_PROGRAM_ERROR` lines, `0` summary `errors`.
+
+## 11) End-to-End Progress Checklist (Execution View)
+
+### Current progression
+
+- [x] Phase 0 complete (harness + deterministic suite + baseline capture + summary reporting).
+- [x] Phase 1 foundational work active/completed for shadow-mapping migration.
+- [x] Phase 2: parallel/sun shadow path is productionized with cascades + transition blending on mapped shadows.
+- [x] Phase 3: PBR interaction path is implemented on OpenQ4 legacy OpenGL with legacy fallback + harness coverage.
+- [x] Phase 4: env-probe/light-grid indirect-light cache stack is implemented with runtime fallback + bake/reload commands.
+- [x] Phase 5: SSAO/TAA/modern tonemap stack is implemented with optional SMAA and post-stack ownership over legacy post materials.
+- [ ] Phase 6: SSR/HiZ/Occlusion Culling is not yet implemented.
+- [ ] Phase 7: backend abstraction + Vulkan/DX12/NVRHI bring-up is not yet implemented.
+
+### NVRHI status and positioning
+
+- [ ] `src/renderer/NVRHI` is not present in OpenQ4.
+- [ ] NVRHI is in the plan as **Phase 7** (backend modernization), not Phase 1.
+- [ ] Current strategy remains: stabilize core visual parity on OpenGL first, then port validated rendering features into NVRHI/Vulkan path.
+
+## 12. Primary Source References
 
 - `E:/_SOURCE/_CODE/_tmp/RBDOOM-3-BFG-full2/RELEASE-NOTES.md`
 - `E:/_SOURCE/_CODE/_tmp/RBDOOM-3-BFG-full2/README.md`

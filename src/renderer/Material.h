@@ -285,7 +285,8 @@ typedef enum {
 	MF_FORCESHADOWS = BIT(3),
 	MF_NOSELFSHADOW = BIT(4),
 	MF_NOPORTALFOG = BIT(5),	// this fog volume won't ever consider a portal fogged out
-	MF_EDITOR_VISIBLE = BIT(6)	// in use (visible) per editor
+	MF_EDITOR_VISIBLE = BIT(6),	// in use (visible) per editor
+	MF_PBR_RMAO = BIT(7)		// material defines rmaomap/pbrmap style specular payload
 } materialFlags_t;
 
 // contents flags, NOTE: make sure to keep the defines in doom_defs.script up to date with these!

@@ -922,12 +922,15 @@ void idMaterial::ParseBlend( idLexer &src, shaderStage_t *stage ) {
 		stage->lighting = SL_BUMP;
 		return;
 	}
-	if ( !token.Icmp( "diffusemap" ) ) {
+	if ( !token.Icmp( "diffusemap" ) || !token.Icmp( "basecolormap" ) ) {
 		stage->lighting = SL_DIFFUSE;
 		return;
 	}
-	if ( !token.Icmp( "specularmap" ) ) {
+	if ( !token.Icmp( "specularmap" ) || !token.Icmp( "rmaomap" ) || !token.Icmp( "pbrmap" ) ) {
 		stage->lighting = SL_SPECULAR;
+		if ( !token.Icmp( "rmaomap" ) || !token.Icmp( "pbrmap" ) ) {
+			SetMaterialFlag( MF_PBR_RMAO );
+		}
 		return;
 	}
 
@@ -2367,8 +2370,8 @@ void idMaterial::ParseMaterial( idLexer &src ) {
 			}
 			continue;
 		}
-		// diffusemap for stage shortcut
-		else if ( !token.Icmp( "diffusemap" ) ) {
+		// diffusemap/basecolormap stage shortcut
+		else if ( !token.Icmp( "diffusemap" ) || !token.Icmp( "basecolormap" ) ) {
 			idStr str;
 			src.ReadRestOfLine(str);
 			int parenDepth = 0;
@@ -2395,7 +2398,7 @@ void idMaterial::ParseMaterial( idLexer &src ) {
 				str = R_ParsePastImageProgram( src );
 			}
 			if ( str.Length() == 0 ) {
-				src.Warning( "diffusemap expects an image program in '%s'", GetName() );
+				src.Warning( "%s expects an image program in '%s'", token.c_str(), GetName() );
 				continue;
 			}
 			idStr::snPrintf( buffer, sizeof( buffer ), "blend diffusemap\nmap %s\n}\n", str.c_str());
@@ -2438,6 +2441,44 @@ void idMaterial::ParseMaterial( idLexer &src ) {
 			}
 			idStr::snPrintf( buffer, sizeof( buffer ), "blend specularmap\nmap %s\n}\n", str.c_str());
 			newSrc.LoadMemory( buffer, strlen(buffer), "specularmap" );
+			newSrc.SetFlags( LEXFL_NOFATALERRORS | LEXFL_NOSTRINGCONCAT | LEXFL_NOSTRINGESCAPECHARS | LEXFL_ALLOWPATHNAMES );
+			ParseStage( newSrc, trpDefault );
+			newSrc.FreeSource();
+			continue;
+		}
+		// rmaomap/reflectionmap/pbrmap stage shortcut
+		else if ( !token.Icmp( "rmaomap" ) || !token.Icmp( "reflectionmap" ) || !token.Icmp( "pbrmap" ) ) {
+			idStr str;
+			src.ReadRestOfLine(str);
+			int parenDepth = 0;
+			for ( int i = 0; i < str.Length(); i++ ) {
+				if ( str[i] == '(' ) {
+					parenDepth++;
+				} else if ( str[i] == ')' && parenDepth > 0 ) {
+					parenDepth--;
+				}
+			}
+			if ( str.Length() > 0 && parenDepth > 0 ) {
+				idToken continuation;
+				while ( parenDepth > 0 && src.ReadToken( &continuation ) ) {
+					str += " ";
+					str += continuation;
+					if ( continuation == "(" ) {
+						parenDepth++;
+					} else if ( continuation == ")" ) {
+						parenDepth--;
+					}
+				}
+			}
+			if ( str.Length() == 0 ) {
+				str = R_ParsePastImageProgram( src );
+			}
+			if ( str.Length() == 0 ) {
+				src.Warning( "%s expects an image program in '%s'", token.c_str(), GetName() );
+				continue;
+			}
+			idStr::snPrintf( buffer, sizeof( buffer ), "blend rmaomap\nmap %s\n}\n", str.c_str() );
+			newSrc.LoadMemory( buffer, strlen(buffer), "rmaomap" );
 			newSrc.SetFlags( LEXFL_NOFATALERRORS | LEXFL_NOSTRINGCONCAT | LEXFL_NOSTRINGESCAPECHARS | LEXFL_ALLOWPATHNAMES );
 			ParseStage( newSrc, trpDefault );
 			newSrc.FreeSource();

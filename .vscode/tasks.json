@@ -71,6 +71,17 @@
         "isDefault": true
       },
       "problemMatcher": []
+    },
+    {
+      "label": "Rebuild OpenQ4 (Meson Debug, Clean)",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "Configure OpenQ4 (Meson Debug)",
+        "Compile OpenQ4 (Meson Debug)",
+        "Stage OpenQ4 Install Tree (Meson Debug)"
+      ],
+      "group": "build",
+      "problemMatcher": []
     }
   ]
 }

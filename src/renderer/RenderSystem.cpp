@@ -67,7 +67,35 @@ static void R_PerformanceCounters( void ) {
 	if ( r_showInteractions.GetBool() ) {
 		common->Printf( "createInteractions:%i createLightTris:%i createShadowVolumes:%i\n",
 			tr.pc.c_createInteractions, tr.pc.c_createLightTris, tr.pc.c_createShadowVolumes );
- 	}
+		common->Printf( "shadowMaps:req:%i alloc:%i overflow:%i misses:%i unavailable:%i fallback:%i\n",
+			tr.pc.c_shadowMapCandidates,
+			tr.pc.c_shadowMapAllocations,
+			tr.pc.c_shadowMapOverflows,
+			tr.pc.c_shadowMapAtlasMisses,
+			tr.pc.c_shadowMapUnavailable,
+			tr.pc.c_shadowMapFallbacks );
+		common->Printf( "shadowMapFallbacks:%i [noShadows:%i disabled:%i parallel:%i backend:%i atlasInvalid:%i atlasFull:%i noGeometry:%i missingTile:%i renderFailed:%i]\n",
+			tr.pc.c_shadowMapFallbacks,
+			tr.pc.c_shadowMapFallbackNoShadows,
+			tr.pc.c_shadowMapFallbackDisabled,
+			tr.pc.c_shadowMapFallbackParallel,
+			tr.pc.c_shadowMapFallbackBackendUnavailable,
+			tr.pc.c_shadowMapFallbackAtlasInvalid,
+			tr.pc.c_shadowMapFallbackAtlasFull,
+			tr.pc.c_shadowMapFallbackNoGeometry,
+			tr.pc.c_shadowMapFallbackMissingTile,
+			tr.pc.c_shadowMapFallbackRenderFailed );
+		common->Printf( "shadowMapSplitsRequested:%i unsupportedCascadeCount:%i\n",
+			tr.pc.c_shadowMapSplitRequests,
+			tr.pc.c_shadowMapCascadeUnsupported );
+	}
+	if ( r_showShadowMaps.GetBool() ) {
+		int smUsed, smMax, smTile, smAtlas, smRow;
+		R_GetShadowMapAtlasStats( smUsed, smMax, smTile, smAtlas, smRow );
+		int occupancy = ( smMax <= 0 ) ? 0 : ( smUsed * 100 / smMax );
+		common->Printf( "shadowMapAtlas: atlas=%i tile=%i used=%i/%i (%i%%) perRow=%i\n",
+			smAtlas, smTile, smUsed, smMax, occupancy, smRow );
+	}
 	if ( r_showDefs.GetBool() ) {
 		common->Printf( "viewEntities:%i  shadowEntities:%i  viewLights:%i\n", tr.pc.c_visibleViewEntities,
 			tr.pc.c_shadowViewEntities, tr.pc.c_viewLights );

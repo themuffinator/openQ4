@@ -1,0 +1,102 @@
+{
+  "name": "openq4_rbdoom_phase0",
+  "description": "Phase 0 harness scenes for renderer parity baseline capture.",
+  "notes": "Update this file with additional scenes as you expand coverage.",
+  "common": {
+    "capture_delay_ms": 4500,
+    "screenshot": "screenshots/auto_%s.tga",
+    "post_timeout_ms": 120000,
+    "capture_variants": [
+      {
+        "name": "legacy_stencil",
+        "r_useShadowMapping": 0,
+        "suffix": "legacy"
+      },
+      {
+        "name": "mapped_shadow",
+        "r_useShadowMapping": 1,
+        "suffix": "mapped"
+      },
+      {
+        "name": "mapped_parallel_cascades",
+        "r_useShadowMapping": 1,
+        "suffix": "parallel_csm",
+        "cvars": {
+          "r_useParallelShadowMaps": 1,
+          "r_shadowMapSplits": 3,
+          "r_shadowMapCascadeBlend": 0.08
+        }
+      },
+      {
+        "name": "mapped_parallel_cascades_pbr",
+        "r_useShadowMapping": 1,
+        "suffix": "parallel_csm_pbr",
+        "cvars": {
+          "r_useParallelShadowMaps": 1,
+          "r_shadowMapSplits": 3,
+          "r_shadowMapCascadeBlend": 0.08,
+          "r_usePBR": 1
+        }
+      },
+      {
+        "name": "mapped_parallel_cascades_pbr_indirect",
+        "r_useShadowMapping": 1,
+        "suffix": "parallel_csm_pbr_indirect",
+        "cvars": {
+          "r_useParallelShadowMaps": 1,
+          "r_shadowMapSplits": 3,
+          "r_shadowMapCascadeBlend": 0.08,
+          "r_usePBR": 1,
+          "r_useIndirectLighting": 1
+        }
+      },
+      {
+        "name": "mapped_parallel_cascades_pbr_indirect_phase5",
+        "r_useShadowMapping": 1,
+        "suffix": "parallel_csm_pbr_indirect_phase5",
+        "cvars": {
+          "r_useParallelShadowMaps": 1,
+          "r_shadowMapSplits": 3,
+          "r_shadowMapCascadeBlend": 0.08,
+          "r_usePBR": 1,
+          "r_useIndirectLighting": 1,
+          "r_usePostLightingStack": 1,
+          "r_useSSAO": 1,
+          "r_useTAA": 1,
+          "r_useTonemap": 1,
+          "r_postAA": 1
+        }
+      }
+    ]
+  },
+  "scenes": [
+    {
+      "name": "sp_convoy1_base",
+      "mode": "sp",
+      "map": "game/convoy1",
+      "capture_delay_ms": 4500,
+      "post_timeout_ms": 120000,
+      "extra_commands": []
+    },
+    {
+      "name": "sp_airdefense2_base",
+      "mode": "sp",
+      "map": "game/airdefense2",
+      "capture_delay_ms": 5000,
+      "post_timeout_ms": 120000,
+      "extra_commands": []
+    },
+    {
+      "name": "mp_q4dm2_base",
+      "mode": "mp",
+      "map": "mp/q4dm2",
+      "capture_delay_ms": 6000,
+      "post_timeout_ms": 150000,
+      "extra_commands": [
+        "+set",
+        "net_serverDedicated",
+        "0"
+      ]
+    }
+  ]
+}

@@ -72,6 +72,8 @@ idCVar r_useNodeCommonChildren( "r_useNodeCommonChildren", "1", CVAR_RENDERER | 
 idCVar r_useShadowProjectedCull( "r_useShadowProjectedCull", "1", CVAR_RENDERER | CVAR_BOOL, "discard triangles outside light volume before shadowing" );
 idCVar r_useShadowVertexProgram( "r_useShadowVertexProgram", "1", CVAR_RENDERER | CVAR_BOOL, "do the shadow projection in the vertex program on capable cards" );
 idCVar r_useShadowSurfaceScissor( "r_useShadowSurfaceScissor", "1", CVAR_RENDERER | CVAR_BOOL, "scissor shadows by the scissor rect of the interaction surfaces" );
+idCVar r_useShadowMapping( "r_useShadowMapping", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_ARCHIVE, "1 = use shadow maps, 0 = legacy stencil shadows" );
+idCVar r_useParallelShadowMaps( "r_useParallelShadowMaps", "1", CVAR_RENDERER | CVAR_BOOL | CVAR_ARCHIVE, "1 = map parallel/sun lights into shadow maps, 0 = keep sun/parallel lights on stencil fallback" );
 idCVar r_useInteractionTable( "r_useInteractionTable", "1", CVAR_RENDERER | CVAR_BOOL, "create a full entityDefs * lightDefs table to make finding interactions faster" );
 idCVar r_useTurboShadow( "r_useTurboShadow", "1", CVAR_RENDERER | CVAR_BOOL, "use the infinite projection with W technique for dynamic shadows" );
 idCVar r_useTwoSidedStencil( "r_useTwoSidedStencil", "1", CVAR_RENDERER | CVAR_BOOL, "do stencil shadows in one pass with different ops on each side" );
@@ -127,6 +129,31 @@ idCVar r_skipOverlays( "r_skipOverlays", "0", CVAR_RENDERER | CVAR_BOOL, "skip o
 idCVar r_skipSpecular( "r_skipSpecular", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_CHEAT | CVAR_ARCHIVE, "use black for specular1" );
 idCVar r_skipBump( "r_skipBump", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_ARCHIVE, "uses a flat surface instead of the bump map" );
 idCVar r_skipDiffuse( "r_skipDiffuse", "0", CVAR_RENDERER | CVAR_BOOL, "use black for diffuse" );
+idCVar r_usePBR( "r_usePBR", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_ARCHIVE, "enable GGX/PBR interaction shading for materials authored with rmaomap" );
+idCVar r_pbrRoughnessScale( "r_pbrRoughnessScale", "1.0", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "roughness scalar for rmaomap red channel" );
+idCVar r_pbrMetalnessScale( "r_pbrMetalnessScale", "1.0", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "metalness scalar for rmaomap green channel" );
+idCVar r_pbrAOScale( "r_pbrAOScale", "1.0", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "ambient-occlusion scalar for rmaomap blue channel" );
+idCVar r_pbrMinRoughness( "r_pbrMinRoughness", "0.04", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "minimum roughness clamp for GGX interactions" );
+idCVar r_pbrDielectricF0( "r_pbrDielectricF0", "0.04", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "dielectric F0 for GGX interactions" );
+idCVar r_useIndirectLighting( "r_useIndirectLighting", "1", CVAR_RENDERER | CVAR_BOOL | CVAR_ARCHIVE, "enable phase-4 indirect ambient sampling + fallback" );
+idCVar r_indirectLightIntensity( "r_indirectLightIntensity", "0.08", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "intensity scalar for sampled indirect ambient lighting" );
+idCVar r_indirectMinAmbient( "r_indirectMinAmbient", "0.02", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "minimum fallback ambient for phase-4 indirect lighting cache" );
+idCVar r_indirectGridCellSize( "r_indirectGridCellSize", "512", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "target cell size (units) when baking indirect light-grid points" );
+idCVar r_indirectFullscreenPass( "r_indirectFullscreenPass", "1", CVAR_RENDERER | CVAR_BOOL | CVAR_ARCHIVE, "apply sampled indirect ambient as additive fullscreen pass" );
+idCVar r_usePostLightingStack( "r_usePostLightingStack", "1", CVAR_RENDERER | CVAR_BOOL | CVAR_ARCHIVE, "enable phase-5 post-lighting stack (SSAO/TAA/tonemap)" );
+idCVar r_useSSAO( "r_useSSAO", "1", CVAR_RENDERER | CVAR_BOOL | CVAR_ARCHIVE, "enable phase-5 SSAO pass" );
+idCVar r_ssaoStrength( "r_ssaoStrength", "0.35", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "phase-5 SSAO strength scalar", 0.0f, 1.0f );
+idCVar r_ssaoRadius( "r_ssaoRadius", "1.5", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "phase-5 SSAO sample radius in pixels", 0.25f, 8.0f );
+idCVar r_ssaoDepthBias( "r_ssaoDepthBias", "0.002", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "phase-5 SSAO depth bias before occlusion accumulation", 0.0f, 0.1f );
+idCVar r_ssaoDepthScale( "r_ssaoDepthScale", "4.0", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "phase-5 SSAO depth delta scale", 0.1f, 32.0f );
+idCVar r_useTAA( "r_useTAA", "1", CVAR_RENDERER | CVAR_BOOL | CVAR_ARCHIVE, "enable phase-5 temporal resolve pass" );
+idCVar r_taaBlend( "r_taaBlend", "0.10", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "phase-5 temporal history blend", 0.0f, 0.95f );
+idCVar r_taaReset( "r_taaReset", "0", CVAR_RENDERER | CVAR_BOOL, "reset phase-5 temporal history on next frame" );
+idCVar r_useTonemap( "r_useTonemap", "1", CVAR_RENDERER | CVAR_BOOL | CVAR_ARCHIVE, "enable phase-5 tonemap pass" );
+idCVar r_tonemapExposure( "r_tonemapExposure", "1.0", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "phase-5 tonemap exposure", 0.1f, 8.0f );
+idCVar r_tonemapGamma( "r_tonemapGamma", "1.0", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "phase-5 tonemap output gamma (1.0 = neutral/no gamma remap)", 0.1f, 4.0f );
+idCVar r_tonemapShoulder( "r_tonemapShoulder", "0.0", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "phase-5 tonemap shoulder compression scale (0.0 = neutral/no compression)", 0.0f, 4.0f );
+idCVar r_showPostPassTiming( "r_showPostPassTiming", "0", CVAR_RENDERER | CVAR_BOOL, "print phase-5 pass timing summary every second" );
 idCVar r_skipROQ( "r_skipROQ", "0", CVAR_RENDERER | CVAR_BOOL, "skip ROQ decoding" );
 
 idCVar r_ignore( "r_ignore", "0", CVAR_RENDERER, "used for random debugging without defining new vars" );
@@ -135,6 +162,18 @@ idCVar r_usePreciseTriangleInteractions( "r_usePreciseTriangleInteractions", "0"
 idCVar r_useCulling( "r_useCulling", "2", CVAR_RENDERER | CVAR_INTEGER, "0 = none, 1 = sphere, 2 = sphere + box", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
 idCVar r_useLightCulling( "r_useLightCulling", "3", CVAR_RENDERER | CVAR_INTEGER, "0 = none, 1 = box, 2 = exact clip of polyhedron faces, 3 = also areas", 0, 3, idCmdSystem::ArgCompletion_Integer<0,3> );
 idCVar r_useLightScissors( "r_useLightScissors", "1", CVAR_RENDERER | CVAR_BOOL, "1 = use custom scissor rectangle for each light" );
+idCVar r_useShadowAtlas( "r_useShadowAtlas", "1", CVAR_RENDERER | CVAR_BOOL | CVAR_ARCHIVE, "pack shadow maps into a single atlas when shadow mapping is used" );
+idCVar r_shadowMapAtlasSize( "r_shadowMapAtlasSize", "2048", CVAR_RENDERER | CVAR_INTEGER | CVAR_ARCHIVE, "shadow map atlas size in pixels", 256, 8192, idCmdSystem::ArgCompletion_Integer<256,8192> );
+idCVar r_shadowMapImageSize( "r_shadowMapImageSize", "1024", CVAR_RENDERER | CVAR_INTEGER | CVAR_ARCHIVE, "base shadow map tile resolution", 64, 4096, idCmdSystem::ArgCompletion_Integer<64,4096> );
+idCVar r_shadowMapSamples( "r_shadowMapSamples", "16", CVAR_RENDERER | CVAR_INTEGER | CVAR_ARCHIVE, "PCF sample count", 1, 64, idCmdSystem::ArgCompletion_Integer<1,64> );
+idCVar r_shadowMapQuality( "r_shadowMapQuality", "0", CVAR_RENDERER | CVAR_INTEGER | CVAR_ARCHIVE, "shadow-map quality preset: 0=compat/custom, 1=low (4), 2=medium (8), 3=high (16)", 0, 3, idCmdSystem::ArgCompletion_Integer<0,3> );
+idCVar r_shadowMapRegularDepthBiasScale( "r_shadowMapRegularDepthBiasScale", "0.999", CVAR_RENDERER | CVAR_FLOAT, "depth bias scale for regular point/spot shadow maps" );
+idCVar r_shadowMapSunDepthBiasScale( "r_shadowMapSunDepthBiasScale", "0.999", CVAR_RENDERER | CVAR_FLOAT, "depth bias scale for parallel light shadow maps" );
+idCVar r_shadowMapSplits( "r_shadowMapSplits", "3", CVAR_RENDERER | CVAR_INTEGER | CVAR_ARCHIVE, "number of cascaded splits for parallel/sun lights", 0, 4, idCmdSystem::ArgCompletion_Integer<0,4> );
+idCVar r_shadowMapCascadeBlend( "r_shadowMapCascadeBlend", "0.08", CVAR_RENDERER | CVAR_FLOAT | CVAR_ARCHIVE, "normalized blend width between adjacent shadow-map cascades for parallel/sun lights" );
+idCVar r_shadowMapOccluderFacing( "r_shadowMapOccluderFacing", "2", CVAR_RENDERER | CVAR_INTEGER | CVAR_ARCHIVE, "occluder face cull mode for shadow map render (0 front, 1 back, 2 both)", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
+idCVar r_showShadowMaps( "r_showShadowMaps", "0", CVAR_RENDERER | CVAR_BOOL, "render atlas + light shadow map debug overlays" );
+idCVar r_showShadowMapLODs( "r_showShadowMapLODs", "0", CVAR_RENDERER | CVAR_INTEGER, "show shadow map LOD levels", 0, 3, idCmdSystem::ArgCompletion_Integer<0,3> );
 idCVar r_useClippedLightScissors( "r_useClippedLightScissors", "1", CVAR_RENDERER | CVAR_INTEGER, "0 = full screen when near clipped, 1 = exact when near clipped, 2 = exact always", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
 idCVar r_useEntityCulling( "r_useEntityCulling", "1", CVAR_RENDERER | CVAR_BOOL, "0 = none, 1 = box" );
 idCVar r_useEntityScissors( "r_useEntityScissors", "0", CVAR_RENDERER | CVAR_BOOL, "1 = use custom scissor rectangle for each entity" );
@@ -1815,6 +1854,8 @@ static void R_PerformFullVidRestart( bool forceWindow ) {
 	tr.activeRenderTexture = NULL;
 	idRenderTexture::BindNull();
 	tr.ProcessPendingRenderTextureDeletes();
+	R_ShutdownShadowMapAtlas();
+	tr.ProcessPendingRenderTextureDeletes();
 
 	// Input is tied to the native window/context lifecycle.
 	Sys_ShutdownInput();
@@ -2009,6 +2050,30 @@ void R_TouchGui_f( const idCmdArgs &args ) {
 	uiManager->Touch( gui );
 }
 
+static void R_BakeEnvironmentProbes_f( const idCmdArgs &args ) {
+	if ( !tr.primaryWorld ) {
+		common->Printf( "bakeEnvironmentProbes: no active render world\n" );
+		return;
+	}
+	tr.primaryWorld->BakeEnvironmentProbes( true );
+}
+
+static void R_BakeLightGrids_f( const idCmdArgs &args ) {
+	if ( !tr.primaryWorld ) {
+		common->Printf( "bakeLightGrids: no active render world\n" );
+		return;
+	}
+	tr.primaryWorld->BakeLightGrids( true );
+}
+
+static void R_ReloadIndirectLightCache_f( const idCmdArgs &args ) {
+	if ( !tr.primaryWorld ) {
+		common->Printf( "reloadIndirectLightCache: no active render world\n" );
+		return;
+	}
+	tr.primaryWorld->ReloadIndirectLightCache();
+}
+
 /*
 =================
 R_InitCvars
@@ -2040,6 +2105,9 @@ void R_InitCommands( void ) {
 	cmdSystem->AddCommand( "reportSurfaceAreas", R_ReportSurfaceAreas_f, CMD_FL_RENDERER, "lists all used materials sorted by surface area" );
 	cmdSystem->AddCommand( "reportImageDuplication", R_ReportImageDuplication_f, CMD_FL_RENDERER, "checks all referenced images for duplications" );
 	cmdSystem->AddCommand( "regenerateWorld", R_RegenerateWorld_f, CMD_FL_RENDERER, "regenerates all interactions" );
+	cmdSystem->AddCommand( "bakeEnvironmentProbes", R_BakeEnvironmentProbes_f, CMD_FL_RENDERER | CMD_FL_CHEAT, "bake phase-4 environment probes into fs_savepath cache" );
+	cmdSystem->AddCommand( "bakeLightGrids", R_BakeLightGrids_f, CMD_FL_RENDERER | CMD_FL_CHEAT, "bake phase-4 area light-grid points into fs_savepath cache" );
+	cmdSystem->AddCommand( "reloadIndirectLightCache", R_ReloadIndirectLightCache_f, CMD_FL_RENDERER, "reload phase-4 indirect-light cache (or rebuild fallback)" );
 	cmdSystem->AddCommand( "showInteractionMemory", R_ShowInteractionMemory_f, CMD_FL_RENDERER, "shows memory used by interactions" );
 	cmdSystem->AddCommand( "showTriSurfMemory", R_ShowTriSurfMemory_f, CMD_FL_RENDERER, "shows memory used by triangle surfaces" );
 	cmdSystem->AddCommand( "vid_restart", R_VidRestart_f, CMD_FL_RENDERER, "restarts renderSystem" );
@@ -2069,6 +2137,8 @@ void idRenderSystemLocal::Clear( void ) {
 	backEndRendererHasVertexPrograms = false;
 	backEndRendererMaxLight = 1.0f;
 	ambientLightVector.Zero();
+	indirectAmbientColor.Zero();
+	indirectAmbientColor.w = 1.0f;
 	sortOffset = 0;
 	worlds.Clear();
 	primaryWorld = NULL;
@@ -2260,6 +2330,7 @@ idRenderSystemLocal::ShutdownOpenGL
 ========================
 */
 void idRenderSystemLocal::ShutdownOpenGL( void ) {
+	R_ShutdownShadowMapAtlas();
 	ProcessPendingRenderTextureDeletes();
 
 	// free the context and close the window

@@ -41,6 +41,7 @@ class idRenderWorldLocal;
 const int SMP_FRAMES = 1;
 
 const int FALLOFF_TEXTURE_SIZE =	64;
+const int MAX_SHADOW_MAP_CASCADES = 4;
 
 const float	DEFAULT_FOG_DISTANCE = 500.0f;
 
@@ -299,6 +300,19 @@ public:
 // which the front end may be modifying simultaniously if running in SMP mode.
 // a viewLight may exist even without any surfaces, and may be relevent for fogging,
 // but should never exist if its volume does not intersect the view frustum
+typedef enum {
+	SHADOW_MAP_FALLBACK_NONE = 0,
+	SHADOW_MAP_FALLBACK_NO_SHADOWS,
+	SHADOW_MAP_FALLBACK_DISABLED,
+	SHADOW_MAP_FALLBACK_PARALLEL,
+	SHADOW_MAP_FALLBACK_BACKEND_UNAVAILABLE,
+	SHADOW_MAP_FALLBACK_ATLAS_INVALID,
+	SHADOW_MAP_FALLBACK_ATLAS_FULL,
+	SHADOW_MAP_FALLBACK_NO_GEOMETRY,
+	SHADOW_MAP_FALLBACK_MISSING_TILE,
+	SHADOW_MAP_FALLBACK_RENDER_FAILED
+} shadowMapFallbackReason_t;
+
 typedef struct viewLight_s {
 	struct viewLight_s *	next;
 
@@ -339,6 +353,24 @@ typedef struct viewLight_s {
 	const struct drawSurf_s	*localShadows;				// don't shadow local Surfaces
 	const struct drawSurf_s	*globalInteractions;		// get shadows from everything
 	const struct drawSurf_s	*translucentInteractions;	// get shadows from everything
+
+	// shadow-map metadata for this view-light
+	shadowMapFallbackReason_t shadowMapFallbackReason;
+	float				shadowMapDepthBiasScale;
+	int					shadowMapSampleCount;
+	bool					useShadowMap;
+	int						shadowMapCascadeCount;
+	int						shadowMapCascadeTile[MAX_SHADOW_MAP_CASCADES];
+	int						shadowMapCascadeTileX[MAX_SHADOW_MAP_CASCADES];
+	int						shadowMapCascadeTileY[MAX_SHADOW_MAP_CASCADES];
+	float					shadowMapCascadeNear[MAX_SHADOW_MAP_CASCADES];
+	float					shadowMapCascadeFar[MAX_SHADOW_MAP_CASCADES];
+	int						shadowMapTile;
+	int						shadowMapTileX;
+	int						shadowMapTileY;
+	int						shadowMapTileSize;
+	int						shadowMapAtlasSize;
+	idImage *				shadowMapAtlas;
 } viewLight_t;
 
 
@@ -463,6 +495,18 @@ typedef struct {
 	idVec4				bumpMatrix[2];
 	idVec4				diffuseMatrix[2];
 	idVec4				specularMatrix[2];
+
+	bool				hasShadowMap;
+	idVec4				shadowMapProjection[3];
+	int					shadowMapCascadeIndex;
+	idImage *			shadowMapAtlas;
+	idVec4				shadowMapAtlasRect;
+	float				shadowMapDepthScale;
+	float				shadowMapDepthBiasScale;
+	int					shadowMapSampleCount;
+	bool				usePBR;
+	idVec4				pbrParams0;		// x enable, y roughnessScale, z metalnessScale, w aoScale
+	idVec4				pbrParams1;		// x minRoughness, y dielectricF0, z reserved, w reserved
 } drawInteraction_t;
 
 
@@ -607,6 +651,23 @@ typedef struct {
 	int		c_createInteractions;	// number of calls to idInteraction::CreateInteraction
 	int		c_createLightTris;
 	int		c_createShadowVolumes;
+	int		c_shadowMapCandidates;	// lights considered for shadow-map path
+	int		c_shadowMapAllocations;	// shadow-map tiles allocated
+	int		c_shadowMapAtlasMisses;	// atlas had no free tile for this light
+	int		c_shadowMapOverflows;	// atlas ran out of free tiles
+	int		c_shadowMapUnavailable;	// shadow-map backend not available
+	int		c_shadowMapFallbacks;	// lights forced back to legacy shadows
+	int		c_shadowMapFallbackNoShadows;	// light had no shadowing state for mapped path
+	int		c_shadowMapFallbackDisabled;	// disabled by cvar gate
+	int		c_shadowMapFallbackParallel;	// directional/parallel shadow maps disabled by cvar gate
+	int		c_shadowMapFallbackBackendUnavailable;	// backend not active
+	int		c_shadowMapFallbackAtlasInvalid;	// atlas invalid/missing
+	int		c_shadowMapFallbackAtlasFull;	// atlas had no free tile
+	int		c_shadowMapFallbackNoGeometry;	// no occluders to render
+	int		c_shadowMapFallbackMissingTile;	// tile geometry out-of-range
+	int		c_shadowMapFallbackRenderFailed;	// map render rejected/no pixels
+	int		c_shadowMapSplitRequests;		// parallel light split requests seen
+	int		c_shadowMapCascadeUnsupported;	// parallel splits truncated to supported max
 	int		c_generateMd5;
 	int		c_entityDefCallbacks;
 	int		c_alloc, c_free;	// counts for R_StaticAllc/R_StaticFree
@@ -813,6 +874,7 @@ public:
 														// to be done post-process
 
 	idVec4					ambientLightVector;	// used for "ambient bump mapping"
+	idVec4					indirectAmbientColor;	// phase-4 sampled indirect ambient applied per-view
 
 	float					sortOffset;				// for determinist sorting of equal sort materials
 
@@ -917,6 +979,8 @@ extern idCVar r_useConstantMaterials;	// 1 = use pre-calculated material registe
 extern idCVar r_useInteractionTable;	// create a full entityDefs * lightDefs table to make finding interactions faster
 extern idCVar r_useNodeCommonChildren;	// stop pushing reference bounds early when possible
 extern idCVar r_useSilRemap;			// 1 = consider verts with the same XYZ, but different ST the same for shadows
+extern idCVar r_useShadowMapping;       // 1 = use shadow-map path, 0 = legacy stencil shadows
+extern idCVar r_useParallelShadowMaps;  // 1 = map parallel/sun lights into shadow maps, 0 = fallback to stencil
 extern idCVar r_useCulling;				// 0 = none, 1 = sphere, 2 = sphere + box
 extern idCVar r_useLightCulling;		// 0 = none, 1 = box, 2 = exact clip of polyhedron faces
 extern idCVar r_useLightScissors;		// 1 = use custom scissor rectangle for each light
@@ -938,6 +1002,16 @@ extern idCVar r_useCachedDynamicModels;	// 1 = cache snapshots of dynamic models
 extern idCVar r_useTwoSidedStencil;		// 1 = do stencil shadows in one pass with different ops on each side
 extern idCVar r_useInfiniteFarZ;		// 1 = use the no-far-clip-plane trick
 extern idCVar r_useScissor;				// 1 = scissor clip as portals and lights are processed
+extern idCVar r_useShadowAtlas;         // 1 = pack shadow maps into atlas when mapping path is active
+extern idCVar r_shadowMapAtlasSize;     // shadow map atlas edge size
+extern idCVar r_shadowMapImageSize;     // shadow map tile size
+extern idCVar r_shadowMapSamples;       // number of PCF samples
+extern idCVar r_shadowMapQuality;       // shadow-map quality preset (0 custom, 1 low, 2 medium, 3 high)
+extern idCVar r_shadowMapRegularDepthBiasScale;   // bias scale for regular point/spot maps
+extern idCVar r_shadowMapSunDepthBiasScale;       // bias scale for parallel/sun maps
+extern idCVar r_shadowMapSplits;       // cascaded split count for parallel/sun light partitioning
+extern idCVar r_shadowMapCascadeBlend; // normalized blend range between adjacent cascades
+extern idCVar r_shadowMapOccluderFacing;         // face cull mode for occluders
 extern idCVar r_usePortals;				// 1 = use portals to perform area culling, otherwise draw everything
 extern idCVar r_portalsDistanceCull;	// 1 = enable distance-cull checks from portal fade data
 extern idCVar r_useStateCaching;		// avoid redundant state changes in GL_*() calls
@@ -951,6 +1025,31 @@ extern idCVar r_useDepthBoundsTest;     // use depth bounds test to reduce shado
 extern idCVar r_skipPostProcess;		// skip all post-process renderings
 extern idCVar r_skipSuppress;			// ignore the per-view suppressions
 extern idCVar r_skipInteractions;		// skip all light/surface interaction drawing
+extern idCVar r_usePBR;				// enable GGX/PBR interaction shading for rmaomap materials
+extern idCVar r_pbrRoughnessScale;		// scales roughness (r channel of rmaomap)
+extern idCVar r_pbrMetalnessScale;		// scales metalness (g channel of rmaomap)
+extern idCVar r_pbrAOScale;			// scales ambient occlusion contribution (b channel of rmaomap)
+extern idCVar r_pbrMinRoughness;		// lower clamp for roughness to avoid singular highlights
+extern idCVar r_pbrDielectricF0;		// base F0 reflectance for non-metal surfaces
+extern idCVar r_useIndirectLighting;		// enable phase-4 indirect ambient sampling + application
+extern idCVar r_indirectLightIntensity;	// scalar for sampled indirect lighting
+extern idCVar r_indirectMinAmbient;		// minimum ambient floor for indirect fallback
+extern idCVar r_indirectGridCellSize;	// bake cell size for area light-grid sampling
+extern idCVar r_indirectFullscreenPass;	// apply indirect ambient as fullscreen additive pass
+extern idCVar r_usePostLightingStack;	// enable phase-5 post-lighting chain (SSAO/TAA/tonemap)
+extern idCVar r_useSSAO;				// enable phase-5 SSAO pass
+extern idCVar r_ssaoStrength;			// SSAO darkening strength
+extern idCVar r_ssaoRadius;			// SSAO sample radius in texels
+extern idCVar r_ssaoDepthBias;			// SSAO depth delta bias
+extern idCVar r_ssaoDepthScale;			// SSAO depth delta scaling factor
+extern idCVar r_useTAA;				// enable phase-5 temporal resolve
+extern idCVar r_taaBlend;				// temporal history blend factor
+extern idCVar r_taaReset;				// force temporal history reset on next frame
+extern idCVar r_useTonemap;			// enable phase-5 tonemap pass
+extern idCVar r_tonemapExposure;		// tonemap exposure scalar
+extern idCVar r_tonemapGamma;			// display gamma for tonemap output
+extern idCVar r_tonemapShoulder;		// tonemap shoulder compression scale
+extern idCVar r_showPostPassTiming;		// print phase-5 pass timings periodically
 extern idCVar r_skipFrontEnd;			// bypasses all front end work, but 2D gui rendering still draws
 extern idCVar r_skipBackEnd;			// don't draw anything
 extern idCVar r_skipCopyTexture;		// do all rendering, but don't actually copyTexSubImage2D
@@ -1005,6 +1104,8 @@ extern idCVar r_showTextureVectors;		// draw each triangles texture (tangent) ve
 extern idCVar r_showLights;				// 1 = print light info, 2 = also draw volumes
 extern idCVar r_showLightCount;			// colors surfaces based on light count
 extern idCVar r_showShadows;			// visualize the stencil shadow volumes
+extern idCVar r_showShadowMaps;         // debug shadow map visualization (atlas/sampler state)
+extern idCVar r_showShadowMapLODs;      // debug shadow map LOD visualization
 extern idCVar r_showShadowCount;		// colors screen based on shadow volume depth complexity
 extern idCVar r_showLightScissors;		// show light scissor rectangles
 extern idCVar r_showEntityScissors;		// show entity scissor rectangles
@@ -1436,7 +1537,14 @@ typedef enum {
 	PP_COLOR_MODULATE,
 	PP_COLOR_ADD,
 
-	PP_LIGHT_FALLOFF_TQ = 20	// only for NV programs
+	PP_LIGHT_FALLOFF_TQ = 20,	// only for NV programs
+	PP_SHADOWMAP_MATRIX_S = 21,
+	PP_SHADOWMAP_MATRIX_T = 22,
+	PP_SHADOWMAP_MATRIX_Q = 23,
+	PP_SHADOWMAP_ATLAS_RECT = 24,
+	PP_SHADOWMAP_DEPTH_SCALE = 25,
+	PP_PBR_PARAMS0 = 26,
+	PP_PBR_PARAMS1 = 27
 } programParameter_t;
 
 
@@ -1461,6 +1569,20 @@ typedef enum {
 srfTriangles_t *R_CreateShadowVolume( const idRenderEntityLocal *ent,
 									 const srfTriangles_t *tri, const idRenderLightLocal *light,
 									 shadowGen_t optimize, srfCullInfo_t &cullInfo );
+
+// Migration gate: runtime switch between legacy stencil and future mapped shadows.
+// Returns true once the shadow-map renderer path is wired in.
+bool R_ShadowMappingAvailable( void );
+// Warn once if user requested mapped shadows before the implementation is active.
+void R_LogShadowMappingFallback( void );
+void R_SelectShadowMapForViewLight( idRenderLightLocal *light, viewLight_t *vLight );
+bool R_ShouldUseShadowMapForLight( const idRenderLightLocal *light );
+bool R_RenderShadowMapForViewLight( viewLight_t *vLight );
+void R_BuildShadowMapProjectionForCascade( const viewLight_t *vLight, const idPlane lightProject[4],
+	const idVec3 &viewOrigin, int cascadeIndex, idVec4 shadowProjection[3], idVec4 *shadowClipW );
+void R_ShutdownShadowMapAtlas( void );
+void R_GetShadowMapAtlasStats( int &tilesUsed, int &maxTiles, int &tileSize,
+							  int &atlasSize, int &tilesPerRow );
 
 /*
 ============================================================

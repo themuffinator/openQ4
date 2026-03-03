@@ -31,6 +31,8 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "tr_local.h"
 
+static void R_UpdateAmbientNormalMapFromIndirectColor( const idVec3 &ambientColor );
+
 /*
 ===================
 R_ListRenderLightDefs_f
@@ -142,6 +144,8 @@ idRenderWorldLocal::idRenderWorldLocal() {
 	interactionTable = 0;
 	interactionTableWidth = 0;
 	interactionTableHeight = 0;
+
+	indirectCacheLoaded = false;
 }
 
 /*
@@ -833,6 +837,21 @@ void idRenderWorldLocal::RenderScene( const renderView_t *renderView ) {
 	parms->initialViewAreaOrigin = renderView->vieworg;
 	parms->floatTime = parms->renderView.time * 0.001f;
 	parms->renderWorld = this;
+	tr.indirectAmbientColor.Zero();
+	tr.indirectAmbientColor.w = 1.0f;
+	if ( r_useIndirectLighting.GetBool() ) {
+		int viewAreaNum = PointInArea( renderView->vieworg );
+		idVec3 sampledAmbient;
+		if ( GetIndirectAmbientSample( renderView->vieworg, viewAreaNum, sampledAmbient ) ) {
+			const float intensity = Max( 0.0f, r_indirectLightIntensity.GetFloat() );
+			sampledAmbient *= intensity;
+			sampledAmbient.x = idMath::ClampFloat( 0.0f, 1.0f, sampledAmbient.x );
+			sampledAmbient.y = idMath::ClampFloat( 0.0f, 1.0f, sampledAmbient.y );
+			sampledAmbient.z = idMath::ClampFloat( 0.0f, 1.0f, sampledAmbient.z );
+			tr.indirectAmbientColor.Set( sampledAmbient.x, sampledAmbient.y, sampledAmbient.z, 1.0f );
+		}
+	}
+	R_UpdateAmbientNormalMapFromIndirectColor( tr.indirectAmbientColor.ToVec3() );
 
 	// use this time for any subsequent 2D rendering, so damage blobs/etc 
 	// can use level time
@@ -2204,6 +2223,448 @@ void idRenderWorldLocal::RegenerateWorld() {
 
 /*
 ===============
+idRenderWorldLocal::ClearIndirectLightingData
+===============
+*/
+void idRenderWorldLocal::ClearIndirectLightingData() {
+	indirectAreaBounds.Clear();
+	indirectAreaFallback.Clear();
+	indirectProbes.Clear();
+	indirectLightGrid.Clear();
+	indirectCacheLoaded = false;
+}
+
+/*
+===============
+idRenderWorldLocal::GetIndirectLightCachePath
+===============
+*/
+idStr idRenderWorldLocal::GetIndirectLightCachePath() const {
+	idStr safeMap = mapName;
+	safeMap.StripFileExtension();
+	safeMap.Replace( "/", "_" );
+	safeMap.Replace( "\\", "_" );
+	if ( safeMap.IsEmpty() ) {
+		safeMap = "unnamed_world";
+	}
+	return va( "openq4/indirect/%s.indirect", safeMap.c_str() );
+}
+
+/*
+===============
+idRenderWorldLocal::BuildIndirectAreaBounds
+===============
+*/
+void idRenderWorldLocal::BuildIndirectAreaBounds() {
+	indirectAreaBounds.SetNum( numPortalAreas );
+	indirectAreaFallback.SetNum( numPortalAreas );
+	const float minAmbient = idMath::ClampFloat( 0.0f, 1.0f, r_indirectMinAmbient.GetFloat() );
+
+	for ( int i = 0; i < numPortalAreas; i++ ) {
+		idBounds areaBounds;
+		idRenderModel *areaModel = renderModelManager->FindModel( va( "_area%i", i ) );
+		if ( areaModel && !areaModel->IsDefaultModel() ) {
+			areaBounds = areaModel->Bounds();
+		} else {
+			areaBounds.Clear();
+			areaBounds.AddPoint( idVec3( -256.0f, -256.0f, -128.0f ) );
+			areaBounds.AddPoint( idVec3( 256.0f, 256.0f, 128.0f ) );
+		}
+
+		if ( areaBounds[0].Compare( areaBounds[1], 0.001f ) ) {
+			areaBounds.ExpandSelf( 64.0f );
+		}
+
+		indirectAreaBounds[i] = areaBounds;
+		indirectAreaFallback[i].Set( minAmbient, minAmbient, minAmbient );
+	}
+}
+
+/*
+===============
+idRenderWorldLocal::EstimateIndirectIrradianceAtPoint
+===============
+*/
+idVec3 idRenderWorldLocal::EstimateIndirectIrradianceAtPoint( const idVec3 &origin, int areaNum ) const {
+	idVec3 irradiance( 0.0f, 0.0f, 0.0f );
+
+	for ( int i = 0; i < lightDefs.Num(); i++ ) {
+		idRenderLightLocal *light = lightDefs[i];
+		if ( !light ) {
+			continue;
+		}
+		if ( !light->lightShader || light->lightShader->IsFogLight() || light->lightShader->IsBlendLight() ) {
+			continue;
+		}
+
+		float lightRadius = idMath::Fabs( light->parms.lightRadius[0] );
+		lightRadius = Max( lightRadius, idMath::Fabs( light->parms.lightRadius[1] ) );
+		lightRadius = Max( lightRadius, idMath::Fabs( light->parms.lightRadius[2] ) );
+		if ( lightRadius < 32.0f ) {
+			lightRadius = 256.0f;
+		}
+
+		const float distance = ( origin - light->globalLightOrigin ).Length();
+		const float normalizedDistance = distance / ( lightRadius * 1.5f );
+		if ( normalizedDistance >= 1.0f ) {
+			continue;
+		}
+
+		float attenuation = 1.0f - normalizedDistance;
+		attenuation *= attenuation;
+		if ( areaNum >= 0 && light->areaNum >= 0 && areaNum != light->areaNum ) {
+			attenuation *= 0.35f;
+		}
+
+		idVec3 lightColor(
+			idMath::Fabs( light->parms.shaderParms[0] ),
+			idMath::Fabs( light->parms.shaderParms[1] ),
+			idMath::Fabs( light->parms.shaderParms[2] ) );
+		if ( lightColor.LengthSqr() <= 0.0001f ) {
+			lightColor.Set( 1.0f, 1.0f, 1.0f );
+		}
+
+		irradiance += lightColor * attenuation;
+	}
+
+	irradiance *= 0.2f;
+	irradiance.x = idMath::ClampFloat( 0.0f, 1.0f, irradiance.x );
+	irradiance.y = idMath::ClampFloat( 0.0f, 1.0f, irradiance.y );
+	irradiance.z = idMath::ClampFloat( 0.0f, 1.0f, irradiance.z );
+	return irradiance;
+}
+
+/*
+===============
+idRenderWorldLocal::LoadIndirectLightCacheFromSavePath
+===============
+*/
+bool idRenderWorldLocal::LoadIndirectLightCacheFromSavePath() {
+	idFile *f = fileSystem->OpenFileRead( GetIndirectLightCachePath().c_str() );
+	if ( !f ) {
+		return false;
+	}
+
+	int magic = 0;
+	int version = 0;
+	int areaCount = 0;
+	int probeCount = 0;
+	int gridCount = 0;
+	f->ReadInt( magic );
+	f->ReadInt( version );
+	f->ReadInt( areaCount );
+	f->ReadInt( probeCount );
+	f->ReadInt( gridCount );
+
+	const int kIndirectMagic = 0x4F51344C; // OQ4L
+	const int kIndirectVersion = 1;
+	if ( magic != kIndirectMagic || version != kIndirectVersion || areaCount != numPortalAreas || probeCount < 0 || gridCount < 0 ) {
+		delete f;
+		return false;
+	}
+
+	indirectAreaFallback.SetNum( areaCount );
+	for ( int i = 0; i < areaCount; i++ ) {
+		f->ReadFloat( indirectAreaFallback[i].x );
+		f->ReadFloat( indirectAreaFallback[i].y );
+		f->ReadFloat( indirectAreaFallback[i].z );
+	}
+
+	indirectProbes.SetNum( probeCount );
+	for ( int i = 0; i < probeCount; i++ ) {
+		f->ReadInt( indirectProbes[i].areaNum );
+		f->ReadFloat( indirectProbes[i].origin.x );
+		f->ReadFloat( indirectProbes[i].origin.y );
+		f->ReadFloat( indirectProbes[i].origin.z );
+		f->ReadFloat( indirectProbes[i].irradiance.x );
+		f->ReadFloat( indirectProbes[i].irradiance.y );
+		f->ReadFloat( indirectProbes[i].irradiance.z );
+	}
+
+	indirectLightGrid.SetNum( gridCount );
+	for ( int i = 0; i < gridCount; i++ ) {
+		f->ReadInt( indirectLightGrid[i].areaNum );
+		f->ReadFloat( indirectLightGrid[i].origin.x );
+		f->ReadFloat( indirectLightGrid[i].origin.y );
+		f->ReadFloat( indirectLightGrid[i].origin.z );
+		f->ReadFloat( indirectLightGrid[i].irradiance.x );
+		f->ReadFloat( indirectLightGrid[i].irradiance.y );
+		f->ReadFloat( indirectLightGrid[i].irradiance.z );
+	}
+
+	delete f;
+	indirectCacheLoaded = true;
+	return true;
+}
+
+/*
+===============
+idRenderWorldLocal::SaveIndirectLightCacheToSavePath
+===============
+*/
+bool idRenderWorldLocal::SaveIndirectLightCacheToSavePath() const {
+	idFile *f = fileSystem->OpenFileWrite( GetIndirectLightCachePath().c_str(), "fs_savepath" );
+	if ( !f ) {
+		common->Warning( "SaveIndirectLightCacheToSavePath: failed to open cache file for write" );
+		return false;
+	}
+
+	const int kIndirectMagic = 0x4F51344C; // OQ4L
+	const int kIndirectVersion = 1;
+	f->WriteInt( kIndirectMagic );
+	f->WriteInt( kIndirectVersion );
+	f->WriteInt( numPortalAreas );
+	f->WriteInt( indirectProbes.Num() );
+	f->WriteInt( indirectLightGrid.Num() );
+
+	for ( int i = 0; i < indirectAreaFallback.Num(); i++ ) {
+		f->WriteFloat( indirectAreaFallback[i].x );
+		f->WriteFloat( indirectAreaFallback[i].y );
+		f->WriteFloat( indirectAreaFallback[i].z );
+	}
+
+	for ( int i = 0; i < indirectProbes.Num(); i++ ) {
+		const indirectProbe_t &probe = indirectProbes[i];
+		f->WriteInt( probe.areaNum );
+		f->WriteFloat( probe.origin.x );
+		f->WriteFloat( probe.origin.y );
+		f->WriteFloat( probe.origin.z );
+		f->WriteFloat( probe.irradiance.x );
+		f->WriteFloat( probe.irradiance.y );
+		f->WriteFloat( probe.irradiance.z );
+	}
+
+	for ( int i = 0; i < indirectLightGrid.Num(); i++ ) {
+		const indirectLightGridPoint_t &gp = indirectLightGrid[i];
+		f->WriteInt( gp.areaNum );
+		f->WriteFloat( gp.origin.x );
+		f->WriteFloat( gp.origin.y );
+		f->WriteFloat( gp.origin.z );
+		f->WriteFloat( gp.irradiance.x );
+		f->WriteFloat( gp.irradiance.y );
+		f->WriteFloat( gp.irradiance.z );
+	}
+
+	delete f;
+	return true;
+}
+
+/*
+===============
+idRenderWorldLocal::BakeEnvironmentProbes
+===============
+*/
+void idRenderWorldLocal::BakeEnvironmentProbes( bool forceRebuild ) {
+	if ( !forceRebuild && indirectProbes.Num() > 0 ) {
+		return;
+	}
+	if ( indirectAreaBounds.Num() != numPortalAreas ) {
+		BuildIndirectAreaBounds();
+	}
+
+	const float minAmbient = idMath::ClampFloat( 0.0f, 1.0f, r_indirectMinAmbient.GetFloat() );
+	indirectProbes.Clear();
+
+	for ( int areaNum = 0; areaNum < numPortalAreas; areaNum++ ) {
+		indirectProbe_t probe;
+		probe.areaNum = areaNum;
+		probe.origin = indirectAreaBounds[areaNum].GetCenter();
+		probe.irradiance = EstimateIndirectIrradianceAtPoint( probe.origin, areaNum );
+		probe.irradiance.x = Max( probe.irradiance.x, minAmbient );
+		probe.irradiance.y = Max( probe.irradiance.y, minAmbient );
+		probe.irradiance.z = Max( probe.irradiance.z, minAmbient );
+		indirectAreaFallback[areaNum] = probe.irradiance;
+		indirectProbes.Append( probe );
+	}
+
+	indirectCacheLoaded = true;
+	if ( forceRebuild ) {
+		SaveIndirectLightCacheToSavePath();
+		common->Printf( "bakeEnvironmentProbes: baked %i probes for %s\n", indirectProbes.Num(), mapName.c_str() );
+	}
+}
+
+/*
+===============
+idRenderWorldLocal::BakeLightGrids
+===============
+*/
+void idRenderWorldLocal::BakeLightGrids( bool forceRebuild ) {
+	if ( !forceRebuild && indirectLightGrid.Num() > 0 ) {
+		return;
+	}
+	if ( indirectAreaBounds.Num() != numPortalAreas ) {
+		BuildIndirectAreaBounds();
+	}
+
+	const float minAmbient = idMath::ClampFloat( 0.0f, 1.0f, r_indirectMinAmbient.GetFloat() );
+	const float cellSize = Max( 64.0f, r_indirectGridCellSize.GetFloat() );
+	indirectLightGrid.Clear();
+
+	for ( int areaNum = 0; areaNum < numPortalAreas; areaNum++ ) {
+		const idBounds &bounds = indirectAreaBounds[areaNum];
+		const idVec3 size = bounds[1] - bounds[0];
+		const int nx = idMath::ClampInt( 1, 4, idMath::Ftoi( size.x / cellSize ) + 1 );
+		const int ny = idMath::ClampInt( 1, 4, idMath::Ftoi( size.y / cellSize ) + 1 );
+		const int nz = idMath::ClampInt( 1, 3, idMath::Ftoi( size.z / cellSize ) + 1 );
+
+		idVec3 sum( 0.0f, 0.0f, 0.0f );
+		int sampleCount = 0;
+
+		for ( int z = 0; z < nz; z++ ) {
+			const float fz = ( nz == 1 ) ? 0.5f : (float)z / (float)( nz - 1 );
+			for ( int y = 0; y < ny; y++ ) {
+				const float fy = ( ny == 1 ) ? 0.5f : (float)y / (float)( ny - 1 );
+				for ( int x = 0; x < nx; x++ ) {
+					const float fx = ( nx == 1 ) ? 0.5f : (float)x / (float)( nx - 1 );
+					indirectLightGridPoint_t gp;
+					gp.areaNum = areaNum;
+					gp.origin.x = bounds[0].x + fx * size.x;
+					gp.origin.y = bounds[0].y + fy * size.y;
+					gp.origin.z = bounds[0].z + fz * size.z;
+					gp.irradiance = EstimateIndirectIrradianceAtPoint( gp.origin, areaNum );
+					gp.irradiance.x = Max( gp.irradiance.x, minAmbient );
+					gp.irradiance.y = Max( gp.irradiance.y, minAmbient );
+					gp.irradiance.z = Max( gp.irradiance.z, minAmbient );
+					indirectLightGrid.Append( gp );
+					sum += gp.irradiance;
+					sampleCount++;
+				}
+			}
+		}
+
+		if ( sampleCount > 0 ) {
+			indirectAreaFallback[areaNum] = sum * ( 1.0f / (float)sampleCount );
+		}
+	}
+
+	indirectCacheLoaded = true;
+	if ( forceRebuild ) {
+		SaveIndirectLightCacheToSavePath();
+		common->Printf( "bakeLightGrids: baked %i grid points for %s\n", indirectLightGrid.Num(), mapName.c_str() );
+	}
+}
+
+/*
+===============
+idRenderWorldLocal::ReloadIndirectLightCache
+===============
+*/
+void idRenderWorldLocal::ReloadIndirectLightCache( void ) {
+	BuildIndirectAreaBounds();
+	if ( LoadIndirectLightCacheFromSavePath() ) {
+		common->Printf( "reloadIndirectLightCache: loaded %i probes + %i grid points (%s)\n",
+			indirectProbes.Num(), indirectLightGrid.Num(), GetIndirectLightCachePath().c_str() );
+		return;
+	}
+
+	BakeEnvironmentProbes( false );
+	BakeLightGrids( false );
+	common->Printf( "reloadIndirectLightCache: cache missing, using runtime fallback (%i probes, %i grid points)\n",
+		indirectProbes.Num(), indirectLightGrid.Num() );
+}
+
+/*
+===============
+idRenderWorldLocal::GetIndirectAmbientSample
+===============
+*/
+bool idRenderWorldLocal::GetIndirectAmbientSample( const idVec3 &origin, int areaNum, idVec3 &outAmbient ) const {
+	outAmbient.Zero();
+	if ( !r_useIndirectLighting.GetBool() || numPortalAreas <= 0 ) {
+		return false;
+	}
+
+	if ( areaNum < 0 || areaNum >= numPortalAreas ) {
+		areaNum = PointInArea( origin );
+	}
+	if ( areaNum < 0 || areaNum >= numPortalAreas ) {
+		areaNum = 0;
+	}
+
+	const float minAmbient = idMath::ClampFloat( 0.0f, 1.0f, r_indirectMinAmbient.GetFloat() );
+	idVec3 result( minAmbient, minAmbient, minAmbient );
+	if ( areaNum < indirectAreaFallback.Num() ) {
+		result = indirectAreaFallback[areaNum];
+	}
+
+	float bestGridDist = 1e30f;
+	idVec3 bestGrid = result;
+	for ( int i = 0; i < indirectLightGrid.Num(); i++ ) {
+		const indirectLightGridPoint_t &gp = indirectLightGrid[i];
+		if ( gp.areaNum != areaNum ) {
+			continue;
+		}
+		const float d = ( gp.origin - origin ).LengthSqr();
+		if ( d < bestGridDist ) {
+			bestGridDist = d;
+			bestGrid = gp.irradiance;
+		}
+	}
+	if ( bestGridDist < 1e29f ) {
+		result = result * 0.35f + bestGrid * 0.65f;
+	}
+
+	float bestProbeDist = 1e30f;
+	idVec3 bestProbe = result;
+	for ( int i = 0; i < indirectProbes.Num(); i++ ) {
+		const indirectProbe_t &probe = indirectProbes[i];
+		if ( probe.areaNum != areaNum ) {
+			continue;
+		}
+		const float d = ( probe.origin - origin ).LengthSqr();
+		if ( d < bestProbeDist ) {
+			bestProbeDist = d;
+			bestProbe = probe.irradiance;
+		}
+	}
+	if ( bestProbeDist < 1e29f ) {
+		result = result * 0.6f + bestProbe * 0.4f;
+	}
+
+	result.x = idMath::ClampFloat( minAmbient, 1.0f, result.x );
+	result.y = idMath::ClampFloat( minAmbient, 1.0f, result.y );
+	result.z = idMath::ClampFloat( minAmbient, 1.0f, result.z );
+	outAmbient = result;
+	return true;
+}
+
+/*
+===============
+R_UpdateAmbientNormalMapFromIndirectColor
+===============
+*/
+static void R_UpdateAmbientNormalMapFromIndirectColor( const idVec3 &ambientColor ) {
+	static idVec3 lastColor( -1.0f, -1.0f, -1.0f );
+	if ( !globalImages || !globalImages->ambientNormalMap ) {
+		return;
+	}
+	if ( ( ambientColor - lastColor ).LengthSqr() < 0.000001f ) {
+		return;
+	}
+	lastColor = ambientColor;
+
+	const float r = idMath::ClampFloat( 0.0f, 1.0f, ambientColor.x );
+	const float g = idMath::ClampFloat( 0.0f, 1.0f, ambientColor.y );
+	const float b = idMath::ClampFloat( 0.0f, 1.0f, ambientColor.z );
+	tr.ambientLightVector.Set( r, g, b, 1.0f );
+
+	byte face[2 * 2 * 4];
+	for ( int i = 0; i < 4; i++ ) {
+		face[i * 4 + 0] = (byte)( r * 255.0f );
+		face[i * 4 + 1] = (byte)( g * 255.0f );
+		face[i * 4 + 2] = (byte)( b * 255.0f );
+		face[i * 4 + 3] = 255;
+	}
+	const byte *pics[6];
+	for ( int i = 0; i < 6; i++ ) {
+		pics[i] = face;
+	}
+	globalImages->ambientNormalMap->GenerateCubeImage( pics, 2, TF_DEFAULT, TD_DEFAULT );
+}
+
+/*
+===============
 R_GlobalShaderOverride
 ===============
 */
@@ -2257,3 +2718,4 @@ const idMaterial *R_RemapShaderBySkin( const idMaterial *shader, const idDeclSki
 
 	return skin->RemapShaderBySkin( shader );
 }
+

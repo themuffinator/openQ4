@@ -39,6 +39,7 @@ idRenderWorldLocal::FreeWorld
 */
 void idRenderWorldLocal::FreeWorld() {
 	int i;
+	ClearIndirectLightingData();
 
 	// this will free all the lightDefs and entityDefs
 	FreeDefs();
@@ -475,6 +476,10 @@ void idRenderWorldLocal::ClearWorld() {
 	areaNodes[0].plane[3] = 1;
 	areaNodes[0].children[0] = -1;
 	areaNodes[0].children[1] = -1;
+
+	BuildIndirectAreaBounds();
+	BakeEnvironmentProbes( false );
+	BakeLightGrids( false );
 }
 
 /*
@@ -660,6 +665,8 @@ bool idRenderWorldLocal::InitFromMap( const char *name ) {
 
 	AddWorldModelEntities();
 	ClearPortalStates();
+	BuildIndirectAreaBounds();
+	ReloadIndirectLightCache();
 
 	// done!
 	return true;

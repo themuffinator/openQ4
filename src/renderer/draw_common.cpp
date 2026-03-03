@@ -1624,6 +1624,10 @@ void RB_StencilShadowPass( const drawSurf_t *drawSurfs ) {
 		return;
 	}
 
+	if ( backEnd.vLight && backEnd.vLight->lightDef && R_ShouldUseShadowMapForLight( backEnd.vLight->lightDef ) ) {
+		return;
+	}
+
 	if ( !drawSurfs ) {
 		return;
 	}
@@ -2035,6 +2039,479 @@ void RB_STD_FogAllLights( void ) {
 
 /*
 ==================
+RB_STD_ApplyIndirectAmbient
+==================
+*/
+static void RB_STD_ApplyIndirectAmbient( void ) {
+	if ( !r_useIndirectLighting.GetBool() || !r_indirectFullscreenPass.GetBool() ) {
+		return;
+	}
+
+	const idVec4 ambient = tr.indirectAmbientColor;
+	if ( ambient.x <= 0.0f && ambient.y <= 0.0f && ambient.z <= 0.0f ) {
+		return;
+	}
+
+	if ( r_useScissor.GetBool() ) {
+		glScissor( backEnd.viewDef->viewport.x1 + backEnd.viewDef->scissor.x1,
+			backEnd.viewDef->viewport.y1 + backEnd.viewDef->scissor.y1,
+			backEnd.viewDef->scissor.x2 - backEnd.viewDef->scissor.x1 + 1,
+			backEnd.viewDef->scissor.y2 - backEnd.viewDef->scissor.y1 + 1 );
+		backEnd.currentScissor = backEnd.viewDef->scissor;
+	}
+
+	glLoadIdentity();
+	glMatrixMode( GL_PROJECTION );
+	glPushMatrix();
+	glLoadIdentity();
+	glOrtho( 0, 1, 0, 1, -1, 1 );
+
+	GL_State( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE );
+	GL_Cull( CT_TWO_SIDED );
+	globalImages->BindNull();
+	glDisable( GL_DEPTH_TEST );
+	glDisable( GL_STENCIL_TEST );
+	glColor3f( ambient.x, ambient.y, ambient.z );
+
+	glBegin( GL_QUADS );
+	glVertex2f( 0, 0 );
+	glVertex2f( 0, 1 );
+	glVertex2f( 1, 1 );
+	glVertex2f( 1, 0 );
+	glEnd();
+
+	glPopMatrix();
+	glEnable( GL_DEPTH_TEST );
+	glEnable( GL_STENCIL_TEST );
+	glMatrixMode( GL_MODELVIEW );
+	GL_Cull( CT_FRONT_SIDED );
+}
+
+static bool		rbPhase5TAAHistoryValid = false;
+static int		rbPhase5TAAHistoryWidth = 0;
+static int		rbPhase5TAAHistoryHeight = 0;
+static int		rbPhase5TAAHistoryFrame = -1;
+static int		rbPhase5TimingPrintMsec = 0;
+
+static void RB_STD_GetViewportSize( int &viewWidth, int &viewHeight ) {
+	viewWidth = backEnd.viewDef->viewport.x2 - backEnd.viewDef->viewport.x1 + 1;
+	viewHeight = backEnd.viewDef->viewport.y2 - backEnd.viewDef->viewport.y1 + 1;
+}
+
+static void RB_STD_GetImageScale( const idImage *image, float &maxS, float &maxT ) {
+	int viewWidth = 0;
+	int viewHeight = 0;
+	RB_STD_GetViewportSize( viewWidth, viewHeight );
+
+	const int imageWidth = Max( 1, ( image != NULL ) ? image->GetOpts().width : viewWidth );
+	const int imageHeight = Max( 1, ( image != NULL ) ? image->GetOpts().height : viewHeight );
+
+	maxS = static_cast<float>( viewWidth ) / static_cast<float>( imageWidth );
+	maxT = static_cast<float>( viewHeight ) / static_cast<float>( imageHeight );
+}
+
+static ID_INLINE void RB_STD_DrawFullscreenQuad( float maxS, float maxT ) {
+	glBegin( GL_QUADS );
+	glTexCoord2f( 0.0f, 0.0f );
+	glVertex2f( 0.0f, 0.0f );
+	glTexCoord2f( 0.0f, maxT );
+	glVertex2f( 0.0f, 1.0f );
+	glTexCoord2f( maxS, maxT );
+	glVertex2f( 1.0f, 1.0f );
+	glTexCoord2f( maxS, 0.0f );
+	glVertex2f( 1.0f, 0.0f );
+	glEnd();
+}
+
+static ID_INLINE void RB_STD_DrawFullscreenQuadMultiTex( float maxS, float maxT ) {
+	glBegin( GL_QUADS );
+	glMultiTexCoord2fARB( GL_TEXTURE0_ARB, 0.0f, 0.0f );
+	glMultiTexCoord2fARB( GL_TEXTURE1_ARB, 0.0f, 0.0f );
+	glVertex2f( 0.0f, 0.0f );
+
+	glMultiTexCoord2fARB( GL_TEXTURE0_ARB, 0.0f, maxT );
+	glMultiTexCoord2fARB( GL_TEXTURE1_ARB, 0.0f, maxT );
+	glVertex2f( 0.0f, 1.0f );
+
+	glMultiTexCoord2fARB( GL_TEXTURE0_ARB, maxS, maxT );
+	glMultiTexCoord2fARB( GL_TEXTURE1_ARB, maxS, maxT );
+	glVertex2f( 1.0f, 1.0f );
+
+	glMultiTexCoord2fARB( GL_TEXTURE0_ARB, maxS, 0.0f );
+	glMultiTexCoord2fARB( GL_TEXTURE1_ARB, maxS, 0.0f );
+	glVertex2f( 1.0f, 0.0f );
+	glEnd();
+}
+
+static void RB_STD_BeginFullscreenPass( void ) {
+	if ( r_useScissor.GetBool() ) {
+		glScissor( backEnd.viewDef->viewport.x1 + backEnd.viewDef->scissor.x1,
+			backEnd.viewDef->viewport.y1 + backEnd.viewDef->scissor.y1,
+			backEnd.viewDef->scissor.x2 - backEnd.viewDef->scissor.x1 + 1,
+			backEnd.viewDef->scissor.y2 - backEnd.viewDef->scissor.y1 + 1 );
+		backEnd.currentScissor = backEnd.viewDef->scissor;
+	}
+
+	glLoadIdentity();
+	glMatrixMode( GL_PROJECTION );
+	glPushMatrix();
+	glLoadIdentity();
+	glOrtho( 0, 1, 0, 1, -1, 1 );
+	glMatrixMode( GL_MODELVIEW );
+	glLoadIdentity();
+
+	GL_Cull( CT_TWO_SIDED );
+	glDisable( GL_DEPTH_TEST );
+	glDisable( GL_STENCIL_TEST );
+}
+
+static void RB_STD_EndFullscreenPass( void ) {
+	glMatrixMode( GL_PROJECTION );
+	glPopMatrix();
+	glMatrixMode( GL_MODELVIEW );
+	glEnable( GL_DEPTH_TEST );
+	glEnable( GL_STENCIL_TEST );
+	glColor4f( 1.0f, 1.0f, 1.0f, 1.0f );
+	GL_Cull( CT_FRONT_SIDED );
+}
+
+static bool RB_STD_EnableFragmentProgram( const char *programName ) {
+	if ( !glConfig.ARBFragmentProgramAvailable ) {
+		return false;
+	}
+
+	const int fragmentProgram = R_FindARBProgram( GL_FRAGMENT_PROGRAM_ARB, programName );
+	if ( fragmentProgram <= 0 ) {
+		return false;
+	}
+
+	glBindProgramARB( GL_FRAGMENT_PROGRAM_ARB, fragmentProgram );
+	glEnable( GL_FRAGMENT_PROGRAM_ARB );
+	return true;
+}
+
+static int RB_STD_ApplySSAO( void ) {
+	if ( !r_useSSAO.GetBool() || !r_usePostLightingStack.GetBool() ) {
+		return 0;
+	}
+
+	if ( !glConfig.ARBFragmentProgramAvailable ) {
+		return 0;
+	}
+
+	int viewWidth = 0;
+	int viewHeight = 0;
+	RB_STD_GetViewportSize( viewWidth, viewHeight );
+	if ( viewWidth <= 0 || viewHeight <= 0 ) {
+		return 0;
+	}
+
+	const int startMsec = Sys_Milliseconds();
+	const int x = backEnd.viewDef->viewport.x1;
+	const int y = backEnd.viewDef->viewport.y1;
+
+	globalImages->currentRenderImage->CopyFramebuffer( x, y, viewWidth, viewHeight );
+	globalImages->currentDepthImage->CopyDepthbuffer( x, y, viewWidth, viewHeight );
+
+	if ( !RB_STD_EnableFragmentProgram( "openq4_phase5_ssao.fp" ) ) {
+		return 0;
+	}
+
+	float sourceS = 1.0f;
+	float sourceT = 1.0f;
+	RB_STD_GetImageScale( globalImages->currentRenderImage, sourceS, sourceT );
+
+	const float strength = idMath::ClampFloat( 0.0f, 1.0f, r_ssaoStrength.GetFloat() );
+	const float radius = Max( 0.25f, r_ssaoRadius.GetFloat() );
+	const float depthBias = Max( 0.0f, r_ssaoDepthBias.GetFloat() );
+	const float depthScale = Max( 0.1f, r_ssaoDepthScale.GetFloat() );
+	const float minVisibility = Max( 0.05f, 1.0f - strength );
+	const float invWidth = 1.0f / static_cast<float>( Max( 1, viewWidth ) );
+	const float invHeight = 1.0f / static_cast<float>( Max( 1, viewHeight ) );
+
+	RB_STD_BeginFullscreenPass();
+	GL_State( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO );
+
+	GL_SelectTexture( 1 );
+	globalImages->currentDepthImage->Bind();
+	GL_SelectTexture( 0 );
+	globalImages->currentRenderImage->Bind();
+
+	glProgramLocalParameter4fARB( GL_FRAGMENT_PROGRAM_ARB, 0, strength, depthBias, minVisibility, depthScale );
+	glProgramLocalParameter4fARB( GL_FRAGMENT_PROGRAM_ARB, 1, invWidth * radius, 0.0f, 0.0f, 0.0f );
+	glProgramLocalParameter4fARB( GL_FRAGMENT_PROGRAM_ARB, 2, 0.0f, invHeight * radius, 0.0f, 0.0f );
+
+	glColor4f( 1.0f, 1.0f, 1.0f, 1.0f );
+	RB_STD_DrawFullscreenQuad( sourceS, sourceT );
+
+	glDisable( GL_FRAGMENT_PROGRAM_ARB );
+	GL_SelectTexture( 1 );
+	globalImages->BindNull();
+	GL_SelectTexture( 0 );
+	globalImages->BindNull();
+	RB_STD_EndFullscreenPass();
+
+	return Sys_Milliseconds() - startMsec;
+}
+
+static int RB_STD_ApplyTemporalAA( void ) {
+	if ( !r_useTAA.GetBool() || !r_usePostLightingStack.GetBool() ) {
+		rbPhase5TAAHistoryValid = false;
+		return 0;
+	}
+
+	if ( backEnd.viewDef->isSubview ) {
+		rbPhase5TAAHistoryValid = false;
+		return 0;
+	}
+
+	int viewWidth = 0;
+	int viewHeight = 0;
+	RB_STD_GetViewportSize( viewWidth, viewHeight );
+	if ( viewWidth <= 0 || viewHeight <= 0 ) {
+		rbPhase5TAAHistoryValid = false;
+		return 0;
+	}
+
+	const int startMsec = Sys_Milliseconds();
+	const int x = backEnd.viewDef->viewport.x1;
+	const int y = backEnd.viewDef->viewport.y1;
+	const bool resetHistory = r_taaReset.GetBool();
+
+	const bool historyValid = rbPhase5TAAHistoryValid
+		&& rbPhase5TAAHistoryWidth == viewWidth
+		&& rbPhase5TAAHistoryHeight == viewHeight
+		&& !resetHistory
+		&& ( tr.frameCount - rbPhase5TAAHistoryFrame ) <= 2;
+
+	if ( historyValid ) {
+		float historyS = 1.0f;
+		float historyT = 1.0f;
+		RB_STD_GetImageScale( globalImages->scratchImage, historyS, historyT );
+
+		const float historyBlend = idMath::ClampFloat( 0.0f, 0.95f, r_taaBlend.GetFloat() );
+		if ( historyBlend > 0.0f ) {
+			RB_STD_BeginFullscreenPass();
+			GL_State( GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA );
+			GL_SelectTexture( 0 );
+			globalImages->scratchImage->Bind();
+			glColor4f( 1.0f, 1.0f, 1.0f, historyBlend );
+			RB_STD_DrawFullscreenQuad( historyS, historyT );
+			GL_SelectTexture( 0 );
+			globalImages->BindNull();
+			RB_STD_EndFullscreenPass();
+		}
+	}
+
+	globalImages->scratchImage->CopyFramebuffer( x, y, viewWidth, viewHeight );
+	rbPhase5TAAHistoryValid = true;
+	rbPhase5TAAHistoryWidth = viewWidth;
+	rbPhase5TAAHistoryHeight = viewHeight;
+	rbPhase5TAAHistoryFrame = tr.frameCount;
+
+	if ( resetHistory ) {
+		r_taaReset.SetBool( false );
+	}
+
+	return Sys_Milliseconds() - startMsec;
+}
+
+static int RB_STD_ApplyTonemap( void ) {
+	if ( !r_useTonemap.GetBool() || !r_usePostLightingStack.GetBool() ) {
+		return 0;
+	}
+
+	// Current OpenQ4 game-side composition path is LDR; applying an additional
+	// tonemap stage here causes over-compression/washed output. Keep the pass
+	// disabled until a linear/HDR composition path is available.
+	static bool warnedTonemapDisabled = false;
+	if ( !warnedTonemapDisabled ) {
+		warnedTonemapDisabled = true;
+		common->Printf( "phase5_post: tonemap disabled on LDR composition path (stack remains SSAO/TAA)\n" );
+	}
+	return 0;
+
+	if ( !glConfig.ARBFragmentProgramAvailable ) {
+		return 0;
+	}
+
+	int viewWidth = 0;
+	int viewHeight = 0;
+	RB_STD_GetViewportSize( viewWidth, viewHeight );
+	if ( viewWidth <= 0 || viewHeight <= 0 ) {
+		return 0;
+	}
+
+	const int startMsec = Sys_Milliseconds();
+	const int x = backEnd.viewDef->viewport.x1;
+	const int y = backEnd.viewDef->viewport.y1;
+
+	globalImages->currentRenderImage->CopyFramebuffer( x, y, viewWidth, viewHeight );
+
+	if ( !RB_STD_EnableFragmentProgram( "openq4_phase5_tonemap.fp" ) ) {
+		return 0;
+	}
+
+	float sourceS = 1.0f;
+	float sourceT = 1.0f;
+	RB_STD_GetImageScale( globalImages->currentRenderImage, sourceS, sourceT );
+
+	float exposure = Max( 0.1f, r_tonemapExposure.GetFloat() );
+	float gamma = Max( 0.1f, r_tonemapGamma.GetFloat() );
+	float shoulder = Max( 0.0f, r_tonemapShoulder.GetFloat() );
+	static bool warnedLegacyTonemapPreset = false;
+	// Compatibility migration for archived pre-neutral defaults.
+	// Older runs persisted gamma=2.2 and shoulder=1.0, which over-brighten
+	// already-LDR scene color in the current OpenQ4 post pipeline.
+	if ( idMath::Fabs( exposure - 1.0f ) < 0.001f &&
+		idMath::Fabs( gamma - 2.2f ) < 0.05f &&
+		idMath::Fabs( shoulder - 1.0f ) < 0.05f ) {
+		exposure = 1.0f;
+		gamma = 1.0f;
+		shoulder = 0.0f;
+		if ( !warnedLegacyTonemapPreset ) {
+			warnedLegacyTonemapPreset = true;
+			common->Printf( "phase5_post: neutralizing legacy tonemap preset (gamma=2.2, shoulder=1.0) to avoid washed output\n" );
+		}
+	}
+	const float invGamma = 1.0f / gamma;
+
+	RB_STD_BeginFullscreenPass();
+	GL_State( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO );
+	GL_SelectTexture( 0 );
+	globalImages->currentRenderImage->Bind();
+	glProgramLocalParameter4fARB( GL_FRAGMENT_PROGRAM_ARB, 0, exposure, invGamma, shoulder, 0.0f );
+	glColor4f( 1.0f, 1.0f, 1.0f, 1.0f );
+	RB_STD_DrawFullscreenQuad( sourceS, sourceT );
+	glDisable( GL_FRAGMENT_PROGRAM_ARB );
+	GL_SelectTexture( 0 );
+	globalImages->BindNull();
+	RB_STD_EndFullscreenPass();
+
+	return Sys_Milliseconds() - startMsec;
+}
+
+static int RB_STD_ApplySMAA1x( void ) {
+	if ( !r_usePostLightingStack.GetBool() || r_postAA.GetInteger() != 1 ) {
+		return 0;
+	}
+
+	// Phase-5 stack currently uses TAA as its AA path. Running legacy SMAA in
+	// this mode causes conflicting post ownership in OpenQ4's game-side pipeline.
+	static bool warnedSmaaInPhase5 = false;
+	if ( !warnedSmaaInPhase5 ) {
+		warnedSmaaInPhase5 = true;
+		common->Printf( "phase5_post: r_postAA=1 requested, but SMAA is disabled while r_usePostLightingStack=1 (using TAA path)\n" );
+	}
+	return 0;
+
+	if ( !glConfig.ARBFragmentProgramAvailable ) {
+		return 0;
+	}
+
+	int viewWidth = 0;
+	int viewHeight = 0;
+	RB_STD_GetViewportSize( viewWidth, viewHeight );
+	if ( viewWidth <= 0 || viewHeight <= 0 ) {
+		return 0;
+	}
+
+	const int startMsec = Sys_Milliseconds();
+	const int x = backEnd.viewDef->viewport.x1;
+	const int y = backEnd.viewDef->viewport.y1;
+	const float invWidth = 1.0f / static_cast<float>( Max( 1, viewWidth ) );
+	const float invHeight = 1.0f / static_cast<float>( Max( 1, viewHeight ) );
+
+	const int edgeProgram = R_FindARBProgram( GL_FRAGMENT_PROGRAM_ARB, "openq4_smaa_edge.vfp" );
+	const int blendProgram = R_FindARBProgram( GL_FRAGMENT_PROGRAM_ARB, "openq4_smaa_blend.vfp" );
+	if ( edgeProgram <= 0 || blendProgram <= 0 ) {
+		return 0;
+	}
+
+	globalImages->currentRenderImage->CopyFramebuffer( x, y, viewWidth, viewHeight );
+	float sourceS = 1.0f;
+	float sourceT = 1.0f;
+	RB_STD_GetImageScale( globalImages->currentRenderImage, sourceS, sourceT );
+
+	// edge pass -> framebuffer
+	RB_STD_BeginFullscreenPass();
+	GL_State( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO );
+	GL_SelectTexture( 0 );
+	globalImages->currentRenderImage->Bind();
+	glBindProgramARB( GL_FRAGMENT_PROGRAM_ARB, edgeProgram );
+	glEnable( GL_FRAGMENT_PROGRAM_ARB );
+	glProgramEnvParameter4fARB( GL_FRAGMENT_PROGRAM_ARB, 1, invWidth, invHeight, 0.0f, 1.0f );
+	glColor4f( 1.0f, 1.0f, 1.0f, 1.0f );
+	RB_STD_DrawFullscreenQuad( sourceS, sourceT );
+	glDisable( GL_FRAGMENT_PROGRAM_ARB );
+	GL_SelectTexture( 0 );
+	globalImages->BindNull();
+	RB_STD_EndFullscreenPass();
+
+	// capture edge buffer for blend stage
+	globalImages->scratchImage2->CopyFramebuffer( x, y, viewWidth, viewHeight );
+
+	// blend pass -> framebuffer
+	RB_STD_BeginFullscreenPass();
+	GL_State( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO );
+	GL_SelectTexture( 1 );
+	globalImages->scratchImage2->Bind();
+	GL_SelectTexture( 0 );
+	globalImages->currentRenderImage->Bind();
+	glBindProgramARB( GL_FRAGMENT_PROGRAM_ARB, blendProgram );
+	glEnable( GL_FRAGMENT_PROGRAM_ARB );
+	glProgramEnvParameter4fARB( GL_FRAGMENT_PROGRAM_ARB, 1, invWidth, invHeight, 0.0f, 1.0f );
+	glColor4f( 1.0f, 1.0f, 1.0f, 1.0f );
+	RB_STD_DrawFullscreenQuadMultiTex( sourceS, sourceT );
+	glDisable( GL_FRAGMENT_PROGRAM_ARB );
+	GL_SelectTexture( 1 );
+	globalImages->BindNull();
+	GL_SelectTexture( 0 );
+	globalImages->BindNull();
+	RB_STD_EndFullscreenPass();
+
+	return Sys_Milliseconds() - startMsec;
+}
+
+static void RB_STD_ApplyModernPostLightingStack( void ) {
+	if ( !r_usePostLightingStack.GetBool() || r_skipPostProcess.GetBool() ) {
+		rbPhase5TAAHistoryValid = false;
+		return;
+	}
+
+	if ( backEnd.viewDef->isXraySubview ) {
+		rbPhase5TAAHistoryValid = false;
+		return;
+	}
+
+	// Game-side post composition uses intermediate render textures; avoid
+	// running the renderer-owned phase5 chain on those offscreen passes.
+	if ( backEnd.renderTexture != NULL ) {
+		rbPhase5TAAHistoryValid = false;
+		return;
+	}
+
+	const int startMsec = Sys_Milliseconds();
+	const int ssaoMsec = RB_STD_ApplySSAO();
+	const int taaMsec = RB_STD_ApplyTemporalAA();
+	const int tonemapMsec = RB_STD_ApplyTonemap();
+	const int smaaMsec = RB_STD_ApplySMAA1x();
+	const int totalMsec = Sys_Milliseconds() - startMsec;
+
+	if ( r_showPostPassTiming.GetBool() ) {
+		const int now = Sys_Milliseconds();
+		if ( now - rbPhase5TimingPrintMsec >= 1000 ) {
+			rbPhase5TimingPrintMsec = now;
+			common->Printf( "phase5_post: total=%dms ssao=%dms taa=%dms tonemap=%dms smaa=%dms\n",
+				totalMsec, ssaoMsec, taaMsec, tonemapMsec, smaaMsec );
+		}
+	}
+}
+
+//=========================================================================================
+
+/*
+==================
 RB_STD_LightScale
 
 Perform extra blending passes to multiply the entire buffer by
@@ -2138,6 +2615,7 @@ void	RB_STD_DrawView( void ) {
 
 	// main light renderer
 	RB_ARB2_DrawInteractions();
+	RB_STD_ApplyIndirectAmbient();
 
 	// disable stencil shadow test
 	glStencilFunc( GL_ALWAYS, 128, 255 );
@@ -2150,9 +2628,14 @@ void	RB_STD_DrawView( void ) {
 
 	// fob and blend lights
 	RB_STD_FogAllLights();
+	RB_STD_ApplyModernPostLightingStack();
+
+	// When phase-5 stack is active, it owns SSAO/TAA/tonemap/SMAA ordering and
+	// legacy material post-process surfaces must not run afterwards.
+	const bool runLegacyPostMaterials = !r_usePostLightingStack.GetBool();
 
 	// now draw any post-processing effects using _currentRender
-	if ( processed < numDrawSurfs ) {
+	if ( processed < numDrawSurfs && runLegacyPostMaterials ) {
 		RB_STD_DrawShaderPasses( drawSurfs+processed, numDrawSurfs-processed );
 	}
 

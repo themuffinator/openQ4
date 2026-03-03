@@ -300,9 +300,13 @@ void idGameLocal::RenderScene(const renderView_t *view, idRenderWorld *renderWor
 	renderSystem->BindRenderTexture(gameRender.postProcessRT[0], nullptr);
 		renderSystem->ClearRenderTarget( true, true, 1.0f, 0.0f, 0.0f, 0.0f );
 		renderSystem->DrawStretchPic(0.0f, 0.0f, SCREEN_WIDTH, SCREEN_HEIGHT, 0.0f, 1.0f, 1.0f, 0.0f, gameRender.resolvePostProcessMaterial);
+		// Preserve resolved scene color in _currentRender before SMAA edge/blend passes.
+		// This avoids undefined feedback from sampling and writing the same RT in blend pass.
+		renderSystem->CaptureRenderToImage("_currentRender");
 	renderSystem->BindRenderTexture( nullptr, nullptr );
 
 	const bool useSMAA = ( cvarSystem->GetCVarInteger( "r_postAA" ) == 1 ) &&
+		!cvarSystem->GetCVarBool( "r_usePostLightingStack" ) &&
 		gameRender.smaaAvailable &&
 		gameRender.postProcessRT[1] != NULL;
 	if ( useSMAA ) {
