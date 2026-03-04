@@ -95,7 +95,35 @@ function Resolve-CaptureVariants([pscustomobject]$scene, [pscustomobject]$common
     return ,@([pscustomobject]@{ name = "default"; r_useShadowMapping = $null; suffix = "default" })
 }
 
-function New-ArgList([pscustomobject]$scene, [pscustomobject]$common, [object]$rUseShadowMapping = $null, [hashtable]$variantCvars = $null, [int]$captureDelayMs = 4000, [psobject[]]$variantCommands = @()) {
+function New-RunCfgName([string]$sceneName, [string]$variantSuffix) {
+    $sceneSafe = if ([string]::IsNullOrWhiteSpace($sceneName)) { "scene" } else { $sceneName }
+    $variantSafe = if ([string]::IsNullOrWhiteSpace($variantSuffix)) { "variant" } else { $variantSuffix }
+    $raw = "__phase0_{0}_{1}.cfg" -f $sceneSafe, $variantSafe
+    return ([regex]::Replace($raw, "[^A-Za-z0-9_.-]", "_"))
+}
+
+function Write-RunCfg([string]$cfgPath, [hashtable]$cvars) {
+    if ([string]::IsNullOrWhiteSpace($cfgPath)) {
+        return
+    }
+
+    $lines = New-Object System.Collections.Generic.List[string]
+    if ($null -ne $cvars -and $cvars.Count -gt 0) {
+        foreach ($name in $cvars.Keys | Sort-Object) {
+            $value = [string]$cvars[[string]$name]
+            $escaped = $value.Replace("\", "\\").Replace('"', '\"')
+            $lines.Add(('set {0} "{1}"' -f [string]$name, $escaped))
+        }
+    }
+
+    if ($lines.Count -eq 0) {
+        $lines.Add("echo phase0 cfg: no cvars")
+    }
+
+    Set-Content -Path $cfgPath -Value $lines -Encoding ascii
+}
+
+function New-ArgList([pscustomobject]$scene, [pscustomobject]$common, [string]$runCfgName = $null, [int]$captureDelayMs = 4000, [psobject[]]$variantCommands = @()) {
     $args = @(
         "+set", "logFile", "2",
         "+set", "logFileName", "logs/openq4.log",
@@ -115,14 +143,10 @@ function New-ArgList([pscustomobject]$scene, [pscustomobject]$common, [object]$r
         "+set", "sv_cheats", "1"
     )
 
-    if ($rUseShadowMapping -ne $null) {
+    if (-not [string]::IsNullOrWhiteSpace($runCfgName)) {
         $args += @(
-            "+set", "r_useShadowMapping", $rUseShadowMapping.ToString()
+            "+exec", $runCfgName
         )
-    }
-
-    if ($null -ne $variantCvars -and $variantCvars.Count -gt 0) {
-        $args = Add-CvarsToArgs -cvars $variantCvars -argBuffer $args
     }
 
     $sceneExtraCommands = Get-Property -source $scene -propertyName "extra_commands" -defaultValue $null
@@ -232,6 +256,9 @@ foreach ($scene in $suite.scenes) {
             $variantCvars = @{}
             Merge-Cvars -source (Get-Property -source $scene -propertyName "cvars" -defaultValue $null) -into $variantCvars
             Merge-Cvars -source (Get-Property -source $variant -propertyName "cvars" -defaultValue $null) -into $variantCvars
+            if ($shadowMapMode -ne $null) {
+                $variantCvars["r_useShadowMapping"] = $shadowMapMode.ToString()
+            }
 
             Write-Host "Running scene $sceneName ($($scene.mode)) -> $($scene.map) [variant=$variantName]"
         $sceneDir = Join-Path $runDir "${sceneName}_${variantSuffix}"
@@ -250,7 +277,11 @@ foreach ($scene in $suite.scenes) {
         $timeoutMs = Resolve-Int (Get-Property -source $variant -propertyName "post_timeout_ms" -defaultValue $null) $(Resolve-Int (Get-Property -source $scene -propertyName "post_timeout_ms" -defaultValue $null) $(Resolve-Int (Get-Property -source $suite.common -propertyName "post_timeout_ms" -defaultValue $null) 120000))
         if ($timeoutMs -lt 15000) { $timeoutMs = 15000 }
 
-        $args = New-ArgList -scene $scene -common $suite.common -rUseShadowMapping $shadowMapMode -variantCvars $variantCvars -captureDelayMs $captureDelayMs -variantCommands (Get-Property -source $variant -propertyName "extra_commands" -defaultValue @())
+        $runCfgName = New-RunCfgName -sceneName $sceneName -variantSuffix $variantSuffix
+        $runCfgPath = Join-Path (Join-Path $SavePath "openq4") $runCfgName
+        Write-RunCfg -cfgPath $runCfgPath -cvars $variantCvars
+
+        $args = New-ArgList -scene $scene -common $suite.common -runCfgName $runCfgName -captureDelayMs $captureDelayMs -variantCommands (Get-Property -source $variant -propertyName "extra_commands" -defaultValue @())
         $startTime = Get-Date
         $proc = Start-Process -FilePath $engineExe -ArgumentList $args -WorkingDirectory $InstallDir -PassThru -NoNewWindow
         $timedOut = -not $proc.WaitForExit($timeoutMs)
@@ -274,13 +305,27 @@ foreach ($scene in $suite.scenes) {
 
         $autoShot = Get-AutoScreenshotPath -logPath (Join-Path $sceneDir "openq4.log")
         $autoShotFile = $null
-        if ($autoShot -and $logSource) {
-            $gameSaveRoot = Split-Path -Parent (Split-Path -Parent $logSource)
-            $autoShotFull = Join-Path $gameSaveRoot ($autoShot -replace "/", "\")
-            if (Test-Path $autoShotFull) {
+        if ($autoShot) {
+            $autoShotRelative = ($autoShot -replace "/", "\")
+            $shotRoots = New-Object System.Collections.Generic.List[string]
+            if ($logSource) {
+                $shotRoots.Add((Split-Path -Parent (Split-Path -Parent $logSource)))
+            }
+            foreach ($path in $saveGamePaths) {
+                if (-not [string]::IsNullOrWhiteSpace($path)) {
+                    $shotRoots.Add($path)
+                }
+            }
+
+            foreach ($root in ($shotRoots | Select-Object -Unique)) {
+                $autoShotFull = Join-Path $root $autoShotRelative
+                if (-not (Test-Path $autoShotFull)) {
+                    continue
+                }
                 $autoShotFile = Join-Path $sceneDir "screenshot.tga"
                 Copy-Item -Path $autoShotFull -Destination $autoShotFile -Force
                 Copy-Item -Path $autoShotFull -Destination (Join-Path $sceneDir "${sceneName}_${variantSuffix}.tga") -Force
+                break
             }
         }
 
@@ -294,6 +339,12 @@ foreach ($scene in $suite.scenes) {
             r_useShadowMapping = $shadowMapMode
             r_useParallelShadowMaps = $variantCvars["r_useParallelShadowMaps"]
             r_shadowMapSplits = $variantCvars["r_shadowMapSplits"]
+            r_shadowMapOccluderFacing = $variantCvars["r_shadowMapOccluderFacing"]
+            r_shadowMapOccluderSource = $variantCvars["r_shadowMapOccluderSource"]
+            r_shadowMapDebugFlow = $variantCvars["r_shadowMapDebugFlow"]
+            r_shadowMapDebugLight = $variantCvars["r_shadowMapDebugLight"]
+            r_shadowMapDebugLogInterval = $variantCvars["r_shadowMapDebugLogInterval"]
+            r_shadowMapStrictMappedPath = $variantCvars["r_shadowMapStrictMappedPath"]
             r_usePBR          = $variantCvars["r_usePBR"]
             r_useIndirectLighting = $variantCvars["r_useIndirectLighting"]
             r_usePostLightingStack = $variantCvars["r_usePostLightingStack"]

@@ -498,6 +498,7 @@ typedef struct {
 
 	bool				hasShadowMap;
 	idVec4				shadowMapProjection[3];
+	idVec4				shadowMapClipW;
 	int					shadowMapCascadeIndex;
 	idImage *			shadowMapAtlas;
 	idVec4				shadowMapAtlasRect;
@@ -669,6 +670,13 @@ typedef struct {
 	int		c_shadowMapFallbackRenderFailed;	// map render rejected/no pixels
 	int		c_shadowMapSplitRequests;		// parallel light split requests seen
 	int		c_shadowMapCascadeUnsupported;	// parallel splits truncated to supported max
+	int		c_shadowMapLightsSeen;			// lights visited in interaction backend
+	int		c_shadowMapLightsWithShadowSurfs;	// lights that had stencil-shadow surfaces
+	int		c_shadowMapLightsSelected;		// lights selected for mapped shadowing
+	int		c_shadowMapRenderAttempts;		// mapped shadow render attempts
+	int		c_shadowMapRenderSuccess;		// mapped shadow render success
+	int		c_shadowMapMappedPathLights;	// lights rendered through mapped path
+	int		c_shadowMapStencilPathLights;	// lights rendered through legacy stencil path
 	int		c_generateMd5;
 	int		c_entityDefCallbacks;
 	int		c_alloc, c_free;	// counts for R_StaticAllc/R_StaticFree
@@ -1018,9 +1026,17 @@ extern idCVar r_shadowMapSamples;       // number of PCF samples
 extern idCVar r_shadowMapQuality;       // shadow-map quality preset (0 custom, 1 low, 2 medium, 3 high)
 extern idCVar r_shadowMapRegularDepthBiasScale;   // bias scale for regular point/spot maps
 extern idCVar r_shadowMapSunDepthBiasScale;       // bias scale for parallel/sun maps
+extern idCVar r_shadowMapPolygonFactor; // polygon offset factor for shadow-map depth rendering
+extern idCVar r_shadowMapPolygonOffset; // polygon offset units for shadow-map depth rendering
 extern idCVar r_shadowMapSplits;       // cascaded split count for parallel/sun light partitioning
+extern idCVar r_shadowMapSplitWeight;  // blend between logarithmic and linear cascade split placement
 extern idCVar r_shadowMapCascadeBlend; // normalized blend range between adjacent cascades
 extern idCVar r_shadowMapOccluderFacing;         // face cull mode for occluders
+extern idCVar r_shadowMapOccluderSource;         // occluder source policy (0 auto/interactions-first, 1 shadow-surfs-first, 2 interactions-only)
+extern idCVar r_shadowMapDebugFlow;     // shadow-map debug flow verbosity (0 off, 1 summary, 2 per-light, 3 + invalid occluder details)
+extern idCVar r_shadowMapDebugLight;    // light filter for shadow-map debug flow (-1 all, else light index/lightId)
+extern idCVar r_shadowMapDebugLogInterval; // frame interval for per-light debug logs when flow=2
+extern idCVar r_shadowMapStrictMappedPath; // keep mapped interaction path on render fallback (debug)
 extern idCVar r_usePortals;				// 1 = use portals to perform area culling, otherwise draw everything
 extern idCVar r_portalsDistanceCull;	// 1 = enable distance-cull checks from portal fade data
 extern idCVar r_useStateCaching;		// avoid redundant state changes in GL_*() calls
@@ -1568,7 +1584,8 @@ typedef enum {
 	PP_SHADOWMAP_ATLAS_RECT = 24,
 	PP_SHADOWMAP_DEPTH_SCALE = 25,
 	PP_PBR_PARAMS0 = 26,
-	PP_PBR_PARAMS1 = 27
+	PP_PBR_PARAMS1 = 27,
+	PP_SHADOWMAP_CLIP_W = 28
 } programParameter_t;
 
 
@@ -1602,6 +1619,7 @@ void R_LogShadowMappingFallback( void );
 void R_SelectShadowMapForViewLight( idRenderLightLocal *light, viewLight_t *vLight );
 bool R_ShouldUseShadowMapForLight( const idRenderLightLocal *light );
 bool R_RenderShadowMapForViewLight( viewLight_t *vLight );
+const char *R_ShadowMapFallbackReasonName( shadowMapFallbackReason_t reason );
 void R_BuildShadowMapProjectionForCascade( const viewLight_t *vLight, const idPlane lightProject[4],
 	const idVec3 &viewOrigin, int cascadeIndex, idVec4 shadowProjection[3], idVec4 *shadowClipW );
 void R_ShutdownShadowMapAtlas( void );

@@ -717,6 +717,7 @@ typedef struct {
 	int		cascadeIndex;
 	float	weight;
 	idVec4	shadowMapProjection[3];
+	idVec4	shadowMapClipW;
 	idVec4	shadowMapAtlasRect;
 } shadowMapCascadePass_t;
 
@@ -727,6 +728,7 @@ static void RB_InitShadowMapCascadePass( shadowMapCascadePass_t &pass ) {
 	pass.shadowMapProjection[0][0] = pass.shadowMapProjection[0][1] = pass.shadowMapProjection[0][2] = pass.shadowMapProjection[0][3] = 0.0f;
 	pass.shadowMapProjection[1][0] = pass.shadowMapProjection[1][1] = pass.shadowMapProjection[1][2] = pass.shadowMapProjection[1][3] = 0.0f;
 	pass.shadowMapProjection[2][0] = pass.shadowMapProjection[2][1] = pass.shadowMapProjection[2][2] = pass.shadowMapProjection[2][3] = 0.0f;
+	pass.shadowMapClipW[0] = pass.shadowMapClipW[1] = pass.shadowMapClipW[2] = pass.shadowMapClipW[3] = 0.0f;
 	pass.shadowMapAtlasRect[0] = pass.shadowMapAtlasRect[1] = pass.shadowMapAtlasRect[2] = pass.shadowMapAtlasRect[3] = 0.0f;
 }
 
@@ -761,7 +763,7 @@ static bool RB_SetupShadowMapCascadePass( const viewLight_t *vLight, const idPla
 	pass.shadowMapAtlasRect[3] = tileSize * invAtlasSize;
 
 	R_BuildShadowMapProjectionForCascade( vLight, lightProject, localViewOrigin,
-		cascadeIndex, pass.shadowMapProjection, NULL );
+		cascadeIndex, pass.shadowMapProjection, &pass.shadowMapClipW );
 
 	pass.hasShadowMap = true;
 	return true;
@@ -878,6 +880,7 @@ static void RB_SubmitInteractionWithShadowMapPasses( const drawInteraction_t &ba
 		fallback.shadowMapProjection[0][0] = fallback.shadowMapProjection[0][1] = fallback.shadowMapProjection[0][2] = fallback.shadowMapProjection[0][3] = 0.0f;
 		fallback.shadowMapProjection[1][0] = fallback.shadowMapProjection[1][1] = fallback.shadowMapProjection[1][2] = fallback.shadowMapProjection[1][3] = 0.0f;
 		fallback.shadowMapProjection[2][0] = fallback.shadowMapProjection[2][1] = fallback.shadowMapProjection[2][2] = fallback.shadowMapProjection[2][3] = 0.0f;
+		fallback.shadowMapClipW[0] = fallback.shadowMapClipW[1] = fallback.shadowMapClipW[2] = fallback.shadowMapClipW[3] = 0.0f;
 		fallback.shadowMapAtlasRect[0] = fallback.shadowMapAtlasRect[1] = fallback.shadowMapAtlasRect[2] = fallback.shadowMapAtlasRect[3] = 0.0f;
 		fallback.shadowMapDepthScale = 0.0f;
 		fallback.shadowMapDepthBiasScale = 1.0f;
@@ -913,6 +916,7 @@ static void RB_SubmitInteractionWithShadowMapPasses( const drawInteraction_t &ba
 			interaction.shadowMapProjection[0] = passes[i].shadowMapProjection[0];
 			interaction.shadowMapProjection[1] = passes[i].shadowMapProjection[1];
 			interaction.shadowMapProjection[2] = passes[i].shadowMapProjection[2];
+			interaction.shadowMapClipW = passes[i].shadowMapClipW;
 			interaction.shadowMapAtlasRect = passes[i].shadowMapAtlasRect;
 		} else {
 			interaction.hasShadowMap = false;
@@ -920,6 +924,7 @@ static void RB_SubmitInteractionWithShadowMapPasses( const drawInteraction_t &ba
 			interaction.shadowMapProjection[0][0] = interaction.shadowMapProjection[0][1] = interaction.shadowMapProjection[0][2] = interaction.shadowMapProjection[0][3] = 0.0f;
 			interaction.shadowMapProjection[1][0] = interaction.shadowMapProjection[1][1] = interaction.shadowMapProjection[1][2] = interaction.shadowMapProjection[1][3] = 0.0f;
 			interaction.shadowMapProjection[2][0] = interaction.shadowMapProjection[2][1] = interaction.shadowMapProjection[2][2] = interaction.shadowMapProjection[2][3] = 0.0f;
+			interaction.shadowMapClipW[0] = interaction.shadowMapClipW[1] = interaction.shadowMapClipW[2] = interaction.shadowMapClipW[3] = 0.0f;
 			interaction.shadowMapAtlasRect[0] = interaction.shadowMapAtlasRect[1] = interaction.shadowMapAtlasRect[2] = interaction.shadowMapAtlasRect[3] = 0.0f;
 			interaction.shadowMapDepthScale = 0.0f;
 			interaction.shadowMapDepthBiasScale = 1.0f;
@@ -954,6 +959,7 @@ static void RB_SubmitInteractionWithShadowMapPasses( const drawInteraction_t &ba
 		fallback.shadowMapProjection[0][0] = fallback.shadowMapProjection[0][1] = fallback.shadowMapProjection[0][2] = fallback.shadowMapProjection[0][3] = 0.0f;
 		fallback.shadowMapProjection[1][0] = fallback.shadowMapProjection[1][1] = fallback.shadowMapProjection[1][2] = fallback.shadowMapProjection[1][3] = 0.0f;
 		fallback.shadowMapProjection[2][0] = fallback.shadowMapProjection[2][1] = fallback.shadowMapProjection[2][2] = fallback.shadowMapProjection[2][3] = 0.0f;
+		fallback.shadowMapClipW[0] = fallback.shadowMapClipW[1] = fallback.shadowMapClipW[2] = fallback.shadowMapClipW[3] = 0.0f;
 		fallback.shadowMapAtlasRect[0] = fallback.shadowMapAtlasRect[1] = fallback.shadowMapAtlasRect[2] = fallback.shadowMapAtlasRect[3] = 0.0f;
 		fallback.shadowMapDepthScale = 0.0f;
 		fallback.shadowMapDepthBiasScale = 1.0f;
@@ -1045,6 +1051,7 @@ void RB_CreateSingleDrawInteractions( const drawSurf_t *surf, void (*DrawInterac
 	inter.shadowMapProjection[0][0] = inter.shadowMapProjection[0][1] = inter.shadowMapProjection[0][2] = inter.shadowMapProjection[0][3] = 0.0f;
 	inter.shadowMapProjection[1][0] = inter.shadowMapProjection[1][1] = inter.shadowMapProjection[1][2] = inter.shadowMapProjection[1][3] = 0.0f;
 	inter.shadowMapProjection[2][0] = inter.shadowMapProjection[2][1] = inter.shadowMapProjection[2][2] = inter.shadowMapProjection[2][3] = 0.0f;
+	inter.shadowMapClipW[0] = inter.shadowMapClipW[1] = inter.shadowMapClipW[2] = inter.shadowMapClipW[3] = 0.0f;
 		inter.shadowMapAtlasRect[0] = inter.shadowMapAtlasRect[1] = inter.shadowMapAtlasRect[2] = inter.shadowMapAtlasRect[3] = 0.0f;
 		inter.shadowMapDepthScale = ( vLight->shadowMapAtlasSize > 0 ) ? ( 1.0f / ( float )vLight->shadowMapAtlasSize ) : 0.0f;
 		inter.shadowMapDepthBiasScale = backEnd.vLight->shadowMapDepthBiasScale;

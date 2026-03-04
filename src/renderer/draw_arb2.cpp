@@ -215,6 +215,7 @@ void	RB_ARB2_DrawInteraction( const drawInteraction_t *din ) {
 		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_SHADOWMAP_MATRIX_S, din->shadowMapProjection[0].ToFloatPtr() );
 		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_SHADOWMAP_MATRIX_T, din->shadowMapProjection[1].ToFloatPtr() );
 		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_SHADOWMAP_MATRIX_Q, din->shadowMapProjection[2].ToFloatPtr() );
+		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_SHADOWMAP_CLIP_W, din->shadowMapClipW.ToFloatPtr() );
 		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_SHADOWMAP_ATLAS_RECT, din->shadowMapAtlasRect.ToFloatPtr() );
 		const float shadowMapParams[4] = {
 			din->shadowMapDepthScale,
@@ -226,17 +227,20 @@ void	RB_ARB2_DrawInteraction( const drawInteraction_t *din ) {
 		glProgramEnvParameter4fvARB( GL_FRAGMENT_PROGRAM_ARB, PP_SHADOWMAP_MATRIX_S, din->shadowMapProjection[0].ToFloatPtr() );
 		glProgramEnvParameter4fvARB( GL_FRAGMENT_PROGRAM_ARB, PP_SHADOWMAP_MATRIX_T, din->shadowMapProjection[1].ToFloatPtr() );
 		glProgramEnvParameter4fvARB( GL_FRAGMENT_PROGRAM_ARB, PP_SHADOWMAP_MATRIX_Q, din->shadowMapProjection[2].ToFloatPtr() );
+		glProgramEnvParameter4fvARB( GL_FRAGMENT_PROGRAM_ARB, PP_SHADOWMAP_CLIP_W, din->shadowMapClipW.ToFloatPtr() );
 		glProgramEnvParameter4fvARB( GL_FRAGMENT_PROGRAM_ARB, PP_SHADOWMAP_ATLAS_RECT, din->shadowMapAtlasRect.ToFloatPtr() );
 		glProgramEnvParameter4fvARB( GL_FRAGMENT_PROGRAM_ARB, PP_SHADOWMAP_DEPTH_SCALE, shadowMapParams );
 	} else {
 		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_SHADOWMAP_MATRIX_S, shadowZero );
 		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_SHADOWMAP_MATRIX_T, shadowZero );
 		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_SHADOWMAP_MATRIX_Q, shadowZero );
+		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_SHADOWMAP_CLIP_W, shadowZero );
 		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_SHADOWMAP_ATLAS_RECT, shadowZero );
 		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_SHADOWMAP_DEPTH_SCALE, shadowZero );
 		glProgramEnvParameter4fvARB( GL_FRAGMENT_PROGRAM_ARB, PP_SHADOWMAP_MATRIX_S, shadowZero );
 		glProgramEnvParameter4fvARB( GL_FRAGMENT_PROGRAM_ARB, PP_SHADOWMAP_MATRIX_T, shadowZero );
 		glProgramEnvParameter4fvARB( GL_FRAGMENT_PROGRAM_ARB, PP_SHADOWMAP_MATRIX_Q, shadowZero );
+		glProgramEnvParameter4fvARB( GL_FRAGMENT_PROGRAM_ARB, PP_SHADOWMAP_CLIP_W, shadowZero );
 		glProgramEnvParameter4fvARB( GL_FRAGMENT_PROGRAM_ARB, PP_SHADOWMAP_ATLAS_RECT, shadowZero );
 		glProgramEnvParameter4fvARB( GL_FRAGMENT_PROGRAM_ARB, PP_SHADOWMAP_DEPTH_SCALE, shadowZero );
 	}
@@ -446,6 +450,14 @@ void RB_ARB2_CreateDrawInteractions( const drawSurf_t *surf ) {
 RB_ARB2_DrawInteractions
 ==================
 */
+static int RB_CountLightSurfs( const drawSurf_t *surf ) {
+	int count = 0;
+	for ( ; surf != NULL; surf = surf->nextOnLight ) {
+		count++;
+	}
+	return count;
+}
+
 void RB_ARB2_DrawInteractions( void ) {
 	viewLight_t		*vLight;
 
@@ -462,6 +474,7 @@ void RB_ARB2_DrawInteractions( void ) {
 	//
 	for ( vLight = backEnd.viewDef->viewLights ; vLight ; vLight = vLight->next ) {
 		backEnd.vLight = vLight;
+		tr.pc.c_shadowMapLightsSeen++;
 
 		// do fogging later
 		if ( vLight->lightShader->IsFogLight() ) {
@@ -476,9 +489,50 @@ void RB_ARB2_DrawInteractions( void ) {
 			continue;
 		}
 
-		const bool useMappedShadows = ( vLight->globalShadows || vLight->localShadows )
-			&& R_ShouldUseShadowMapForLight( vLight->lightDef )
-			&& R_RenderShadowMapForViewLight( vLight );
+		const bool hasShadowSurfaces = ( vLight->globalShadows || vLight->localShadows );
+		if ( hasShadowSurfaces ) {
+			tr.pc.c_shadowMapLightsWithShadowSurfs++;
+		}
+		const bool shadowMapSelected = hasShadowSurfaces
+			&& R_ShouldUseShadowMapForLight( vLight->lightDef );
+		if ( shadowMapSelected ) {
+			tr.pc.c_shadowMapLightsSelected++;
+			tr.pc.c_shadowMapRenderAttempts++;
+		}
+		const bool shadowMapRendered = shadowMapSelected && R_RenderShadowMapForViewLight( vLight );
+		if ( shadowMapRendered ) {
+			tr.pc.c_shadowMapRenderSuccess++;
+		}
+		const bool keepMappedOnFallback = hasShadowSurfaces &&
+			r_useShadowMapping.GetBool() &&
+			r_shadowMapStrictMappedPath.GetBool();
+		const bool useMappedShadows = shadowMapRendered || keepMappedOnFallback;
+		if ( useMappedShadows ) {
+			tr.pc.c_shadowMapMappedPathLights++;
+		} else if ( hasShadowSurfaces ) {
+			tr.pc.c_shadowMapStencilPathLights++;
+		}
+		const int shadowMapLogInterval = ( r_shadowMapDebugLogInterval.GetInteger() > 1 ) ? r_shadowMapDebugLogInterval.GetInteger() : 1;
+		const bool logShadowMapPathThisFrame = ( shadowMapLogInterval <= 1 ) || ( ( tr.frameCount % shadowMapLogInterval ) == 0 );
+		if ( logShadowMapPathThisFrame && r_shadowMapDebugFlow.GetInteger() >= 2 && hasShadowSurfaces && vLight->lightDef != NULL ) {
+			const int filter = r_shadowMapDebugLight.GetInteger();
+			if ( filter < 0 || vLight->lightDef->index == filter || vLight->lightDef->parms.lightId == filter ) {
+				common->Printf(
+					"smdbg.path idx:%i id:%i reason:%s selected:%i rendered:%i mapped:%i keepFallback:%i shadowSurfs[g:%i l:%i] interactions[g:%i l:%i]\n",
+					vLight->lightDef->index,
+					vLight->lightDef->parms.lightId,
+					R_ShadowMapFallbackReasonName( vLight->shadowMapFallbackReason ),
+					shadowMapSelected ? 1 : 0,
+					shadowMapRendered ? 1 : 0,
+					useMappedShadows ? 1 : 0,
+					keepMappedOnFallback ? 1 : 0,
+					RB_CountLightSurfs( vLight->globalShadows ),
+					RB_CountLightSurfs( vLight->localShadows ),
+					RB_CountLightSurfs( vLight->globalInteractions ),
+					RB_CountLightSurfs( vLight->localInteractions )
+				);
+			}
+		}
 
 		// clear the stencil buffer if needed
 		if ( vLight->globalShadows || vLight->localShadows ) {

@@ -49,6 +49,78 @@ static const char * const SHADOW_MAP_ATLAS_IMAGE_NAME = "_rbdoom_shadowMapAtlas"
 
 static shadowMapAtlasState_t g_shadowMapAtlas = { -1, 0, 0, 0, 0, 0, NULL, NULL, false };
 
+const char *R_ShadowMapFallbackReasonName( shadowMapFallbackReason_t reason ) {
+	switch ( reason ) {
+		case SHADOW_MAP_FALLBACK_NONE: return "none";
+		case SHADOW_MAP_FALLBACK_NO_SHADOWS: return "noShadows";
+		case SHADOW_MAP_FALLBACK_DISABLED: return "disabled";
+		case SHADOW_MAP_FALLBACK_PARALLEL: return "parallel";
+		case SHADOW_MAP_FALLBACK_BACKEND_UNAVAILABLE: return "backendUnavailable";
+		case SHADOW_MAP_FALLBACK_ATLAS_INVALID: return "atlasInvalid";
+		case SHADOW_MAP_FALLBACK_ATLAS_FULL: return "atlasFull";
+		case SHADOW_MAP_FALLBACK_NO_GEOMETRY: return "noGeometry";
+		case SHADOW_MAP_FALLBACK_MISSING_TILE: return "missingTile";
+		case SHADOW_MAP_FALLBACK_RENDER_FAILED: return "renderFailed";
+		default: return "unknown";
+	}
+}
+
+static bool R_ShouldLogShadowMapDebugLight( const idRenderLightLocal *light ) {
+	if ( r_shadowMapDebugFlow.GetInteger() < 2 || light == NULL ) {
+		return false;
+	}
+	const int logInterval = ( r_shadowMapDebugLogInterval.GetInteger() > 1 ) ? r_shadowMapDebugLogInterval.GetInteger() : 1;
+	if ( logInterval > 1 && ( tr.frameCount % logInterval ) != 0 ) {
+		return false;
+	}
+	const int filter = r_shadowMapDebugLight.GetInteger();
+	return ( filter < 0 || light->index == filter || light->parms.lightId == filter );
+}
+
+static void R_LogShadowMapSelectDebug( const idRenderLightLocal *light, const viewLight_t *vLight ) {
+	if ( !R_ShouldLogShadowMapDebugLight( light ) || vLight == NULL ) {
+		return;
+	}
+	const char *shaderName = ( light->lightShader != NULL ) ? light->lightShader->GetName() : "<null>";
+	const int castsShadows = ( light->lightShader != NULL && light->lightShader->LightCastsShadows() ) ? 1 : 0;
+	common->Printf(
+		"smdbg.select idx:%i id:%i shader:%s use:%i reason:%s noShadowsFlag:%i shaderCasts:%i parallel:%i cascades:%i tile:%i\n",
+		light->index,
+		light->parms.lightId,
+		shaderName,
+		vLight->useShadowMap ? 1 : 0,
+		R_ShadowMapFallbackReasonName( vLight->shadowMapFallbackReason ),
+		light->parms.noShadows ? 1 : 0,
+		castsShadows,
+		light->parms.parallel ? 1 : 0,
+		vLight->shadowMapCascadeCount,
+		vLight->shadowMapTile
+	);
+}
+
+static void R_LogShadowMapRenderDebug( const viewLight_t *vLight, const int validCascadeCount,
+		const int occluderCount, const int submittedCount, const bool drawnAny ) {
+	if ( vLight == NULL || vLight->lightDef == NULL || !R_ShouldLogShadowMapDebugLight( vLight->lightDef ) ) {
+		return;
+	}
+	const idRenderLightLocal *light = vLight->lightDef;
+	const char *shaderName = ( light->lightShader != NULL ) ? light->lightShader->GetName() : "<null>";
+	common->Printf(
+		"smdbg.render idx:%i id:%i shader:%s use:%i reason:%s validCascades:%i occluders:%i submitted:%i drawn:%i tile:%i atlas:%i\n",
+		light->index,
+		light->parms.lightId,
+		shaderName,
+		vLight->useShadowMap ? 1 : 0,
+		R_ShadowMapFallbackReasonName( vLight->shadowMapFallbackReason ),
+		validCascadeCount,
+		occluderCount,
+		submittedCount,
+		drawnAny ? 1 : 0,
+		vLight->shadowMapTile,
+		vLight->shadowMapAtlasSize
+	);
+}
+
 static bool R_InitShadowMapAtlasRenderTarget( void ) {
 	idImageOpts atlasImageOpts;
 
@@ -116,7 +188,7 @@ static void R_ComputeShadowMapCascadeRanges( viewLight_t *vLight ) {
 	}
 	const float viewRange = viewFar - viewNear;
 	const float logRange = viewFar / viewNear;
-	const float splitWeight = 0.65f;
+	const float splitWeight = idMath::ClampFloat( 0.0f, 1.0f, r_shadowMapSplitWeight.GetFloat() );
 
 	float previousSplit = viewNear;
 	for ( int i = 0 ; i < vLight->shadowMapCascadeCount ; i++ ) {
@@ -200,6 +272,8 @@ void R_BuildShadowMapProjectionForCascade( const viewLight_t *vLight, const idPl
 }
 
 static void R_InitShadowMapAtlasState( void ) {
+	const int MIN_SHADOW_MAP_TILES = 8;
+	const int MIN_SHADOW_MAP_TILE_SIZE = 64;
 	g_shadowMapAtlas.viewCount = tr.viewCount;
 	g_shadowMapAtlas.atlasSize = r_shadowMapAtlasSize.GetInteger();
 	g_shadowMapAtlas.tileSize = r_shadowMapImageSize.GetInteger();
@@ -214,6 +288,10 @@ static void R_InitShadowMapAtlasState( void ) {
 		return;
 	}
 
+	if ( g_shadowMapAtlas.tileSize > g_shadowMapAtlas.atlasSize ) {
+		g_shadowMapAtlas.tileSize = g_shadowMapAtlas.atlasSize;
+	}
+
 	g_shadowMapAtlas.tilesPerRow = g_shadowMapAtlas.atlasSize / g_shadowMapAtlas.tileSize;
 	if ( g_shadowMapAtlas.tilesPerRow <= 0 ) {
 		g_shadowMapAtlas.maxTiles = 0;
@@ -221,6 +299,26 @@ static void R_InitShadowMapAtlasState( void ) {
 	}
 
 	g_shadowMapAtlas.maxTiles = g_shadowMapAtlas.tilesPerRow * g_shadowMapAtlas.tilesPerRow;
+	if ( g_shadowMapAtlas.maxTiles < MIN_SHADOW_MAP_TILES ) {
+		const int originalTileSize = g_shadowMapAtlas.tileSize;
+		while ( g_shadowMapAtlas.tileSize > MIN_SHADOW_MAP_TILE_SIZE
+				&& g_shadowMapAtlas.maxTiles < MIN_SHADOW_MAP_TILES ) {
+			const int halfTileSize = g_shadowMapAtlas.tileSize / 2;
+			g_shadowMapAtlas.tileSize = ( halfTileSize < MIN_SHADOW_MAP_TILE_SIZE ) ? MIN_SHADOW_MAP_TILE_SIZE : halfTileSize;
+			g_shadowMapAtlas.tilesPerRow = g_shadowMapAtlas.atlasSize / g_shadowMapAtlas.tileSize;
+			g_shadowMapAtlas.maxTiles = g_shadowMapAtlas.tilesPerRow * g_shadowMapAtlas.tilesPerRow;
+		}
+		if ( r_shadowMapDebugFlow.GetInteger() > 0 && g_shadowMapAtlas.tileSize != originalTileSize ) {
+			common->Printf(
+				"smdbg.atlasAutoScale atlas:%i tile:%i->%i tiles:%i target:%i\n",
+				g_shadowMapAtlas.atlasSize,
+				originalTileSize,
+				g_shadowMapAtlas.tileSize,
+				g_shadowMapAtlas.maxTiles,
+				MIN_SHADOW_MAP_TILES
+			);
+		}
+	}
 	g_shadowMapAtlas.useAtlas = R_InitShadowMapAtlasRenderTarget();
 }
 
@@ -313,7 +411,7 @@ void R_SelectShadowMapForViewLight( idRenderLightLocal *light, viewLight_t *vLig
 	if ( light->parms.noShadows || light->lightShader == NULL || !light->lightShader->LightCastsShadows() ) {
 		vLight->shadowMapFallbackReason = SHADOW_MAP_FALLBACK_NO_SHADOWS;
 		tr.pc.c_shadowMapFallbackNoShadows++;
-		tr.pc.c_shadowMapFallbacks++;
+		R_LogShadowMapSelectDebug( light, vLight );
 		return;
 	}
 
@@ -321,6 +419,7 @@ void R_SelectShadowMapForViewLight( idRenderLightLocal *light, viewLight_t *vLig
 		vLight->shadowMapFallbackReason = SHADOW_MAP_FALLBACK_DISABLED;
 		tr.pc.c_shadowMapFallbackDisabled++;
 		tr.pc.c_shadowMapFallbacks++;
+		R_LogShadowMapSelectDebug( light, vLight );
 		return;
 	}
 
@@ -332,6 +431,7 @@ void R_SelectShadowMapForViewLight( idRenderLightLocal *light, viewLight_t *vLig
 		tr.pc.c_shadowMapAtlasMisses++;
 		tr.pc.c_shadowMapFallbacks++;
 		tr.pc.c_shadowMapFallbackParallel++;
+		R_LogShadowMapSelectDebug( light, vLight );
 		return;
 	}
 
@@ -358,6 +458,7 @@ void R_SelectShadowMapForViewLight( idRenderLightLocal *light, viewLight_t *vLig
 		tr.pc.c_shadowMapFallbacks++;
 		tr.pc.c_shadowMapFallbackBackendUnavailable++;
 		R_LogShadowMappingFallback();
+		R_LogShadowMapSelectDebug( light, vLight );
 		return;
 	}
 
@@ -366,6 +467,7 @@ void R_SelectShadowMapForViewLight( idRenderLightLocal *light, viewLight_t *vLig
 		tr.pc.c_shadowMapAtlasMisses++;
 		tr.pc.c_shadowMapFallbacks++;
 		tr.pc.c_shadowMapFallbackAtlasInvalid++;
+		R_LogShadowMapSelectDebug( light, vLight );
 		return;
 	}
 
@@ -375,6 +477,7 @@ void R_SelectShadowMapForViewLight( idRenderLightLocal *light, viewLight_t *vLig
 		tr.pc.c_shadowMapAtlasMisses++;
 		tr.pc.c_shadowMapFallbacks++;
 		tr.pc.c_shadowMapFallbackAtlasFull++;
+		R_LogShadowMapSelectDebug( light, vLight );
 		return;
 	}
 
@@ -400,6 +503,7 @@ void R_SelectShadowMapForViewLight( idRenderLightLocal *light, viewLight_t *vLig
 		vLight->shadowMapFallbackReason = SHADOW_MAP_FALLBACK_ATLAS_FULL;
 		tr.pc.c_shadowMapAtlasMisses++;
 		tr.pc.c_shadowMapFallbacks++;
+		R_LogShadowMapSelectDebug( light, vLight );
 		return;
 	}
 
@@ -412,12 +516,182 @@ void R_SelectShadowMapForViewLight( idRenderLightLocal *light, viewLight_t *vLig
 	vLight->shadowMapTileSize = g_shadowMapAtlas.tileSize;
 	vLight->shadowMapAtlasSize = g_shadowMapAtlas.atlasSize;
 	vLight->shadowMapAtlas = g_shadowMapAtlas.atlasImage;
+	R_LogShadowMapSelectDebug( light, vLight );
+}
+
+struct shadowMapOccluderDebug_t {
+	int missingDrawSurf;
+	int missingGeo;
+	int missingSourceTri;
+	int invalidSourceTri;
+	int skippedNoShadowEntity;
+	int skippedNoShadowMaterial;
+	int ambientCacheMisses;
+	int ambientCacheAllocFails;
+};
+
+static void R_LogShadowMapInvalidOccluderTri( const idRenderLightLocal *light, const drawSurf_t *drawSurf,
+		const srfTriangles_t *sourceTri, const char *reason ) {
+	if ( r_shadowMapDebugFlow.GetInteger() < 3 || !R_ShouldLogShadowMapDebugLight( light ) ) {
+		return;
+	}
+	const srfTriangles_t *geo = ( drawSurf != NULL ) ? drawSurf->geo : NULL;
+	const int geoHasAmbientSurface = ( geo != NULL && geo->ambientSurface != NULL ) ? 1 : 0;
+	const int geoHasAmbientCache = ( geo != NULL && geo->ambientCache != NULL ) ? 1 : 0;
+	const int geoHasIndexCache = ( geo != NULL && geo->indexCache != NULL ) ? 1 : 0;
+	const int geoHasVerts = ( geo != NULL && geo->verts != NULL ) ? 1 : 0;
+	const int geoHasIndexes = ( geo != NULL && geo->indexes != NULL ) ? 1 : 0;
+	const int srcHasAmbientCache = ( sourceTri != NULL && sourceTri->ambientCache != NULL ) ? 1 : 0;
+	const int srcHasIndexCache = ( sourceTri != NULL && sourceTri->indexCache != NULL ) ? 1 : 0;
+	const int srcHasVerts = ( sourceTri != NULL && sourceTri->verts != NULL ) ? 1 : 0;
+	const int srcHasIndexes = ( sourceTri != NULL && sourceTri->indexes != NULL ) ? 1 : 0;
+	const int srcHasSilIndexes = ( sourceTri != NULL && sourceTri->silIndexes != NULL ) ? 1 : 0;
+	common->Printf(
+		"smdbg.occluderInvalid reason:%s geoAmbient:%i "
+		"geo[v:%i i:%i aCache:%i iCache:%i vPtr:%i iPtr:%i] "
+		"src[v:%i i:%i aCache:%i iCache:%i vPtr:%i iPtr:%i sil:%i]\n",
+		( reason != NULL ) ? reason : "unknown",
+		geoHasAmbientSurface,
+		( geo != NULL ) ? geo->numVerts : -1,
+		( geo != NULL ) ? geo->numIndexes : -1,
+		geoHasAmbientCache,
+		geoHasIndexCache,
+		geoHasVerts,
+		geoHasIndexes,
+		( sourceTri != NULL ) ? sourceTri->numVerts : -1,
+		( sourceTri != NULL ) ? sourceTri->numIndexes : -1,
+		srcHasAmbientCache,
+		srcHasIndexCache,
+		srcHasVerts,
+		srcHasIndexes,
+		srcHasSilIndexes
+	);
+}
+
+static const srfTriangles_t *R_GetShadowMapOccluderTri( const idRenderLightLocal *light,
+		const drawSurf_t *drawSurf, shadowMapOccluderDebug_t *debugInfo ) {
+	if ( drawSurf == NULL ) {
+		if ( debugInfo != NULL ) {
+			debugInfo->missingDrawSurf++;
+		}
+		return NULL;
+	}
+	if ( drawSurf->geo == NULL ) {
+		if ( debugInfo != NULL ) {
+			debugInfo->missingGeo++;
+		}
+		return NULL;
+	}
+
+	const bool isShadowVolumeSurf = ( drawSurf->material == NULL );
+	const srfTriangles_t *sourceTri = drawSurf->geo;
+
+	if ( isShadowVolumeSurf ) {
+		// Shadow draw-surfs are volume geometry; use the source ambient tris for map rendering.
+		sourceTri = drawSurf->geo->ambientSurface;
+		if ( sourceTri == NULL ) {
+			if ( debugInfo != NULL ) {
+				debugInfo->missingSourceTri++;
+			}
+			R_LogShadowMapInvalidOccluderTri( light, drawSurf, sourceTri, "shadowVolumeNoAmbientSource" );
+			return NULL;
+		}
+	} else {
+		// Interaction draw-surfs already carry light-clipped triangle/index lists.
+		// Keep source geometry aligned with those lists and skip known non-shadow casters.
+		if ( drawSurf->space != NULL && drawSurf->space->entityDef != NULL &&
+			 drawSurf->space->entityDef->parms.noShadow ) {
+			if ( debugInfo != NULL ) {
+				debugInfo->skippedNoShadowEntity++;
+			}
+			return NULL;
+		}
+		if ( drawSurf->material != NULL && !drawSurf->material->SurfaceCastsShadow() ) {
+			if ( debugInfo != NULL ) {
+				debugInfo->skippedNoShadowMaterial++;
+			}
+			return NULL;
+		}
+	}
+
+	if ( sourceTri == NULL ) {
+		if ( debugInfo != NULL ) {
+			debugInfo->missingSourceTri++;
+		}
+		R_LogShadowMapInvalidOccluderTri( light, drawSurf, sourceTri, "missingSourceTri" );
+		return NULL;
+	}
+	if ( sourceTri->numIndexes <= 0 || sourceTri->numVerts <= 0 ) {
+		if ( debugInfo != NULL ) {
+			debugInfo->invalidSourceTri++;
+		}
+		R_LogShadowMapInvalidOccluderTri( light, drawSurf, sourceTri, "nonPositiveCounts" );
+		return NULL;
+	}
+	if ( sourceTri->ambientCache == NULL ) {
+		if ( sourceTri->verts == NULL ) {
+			if ( debugInfo != NULL ) {
+				debugInfo->invalidSourceTri++;
+			}
+			R_LogShadowMapInvalidOccluderTri( light, drawSurf, sourceTri, "noAmbientCacheOrVerts" );
+			return NULL;
+		}
+		if ( debugInfo != NULL ) {
+			debugInfo->ambientCacheMisses++;
+		}
+		if ( !R_CreateAmbientCache( const_cast<srfTriangles_t *>( sourceTri ), false ) ) {
+			if ( debugInfo != NULL ) {
+				debugInfo->ambientCacheAllocFails++;
+			}
+			return NULL;
+		}
+	}
+	if ( sourceTri->indexCache == NULL && sourceTri->indexes == NULL ) {
+		if ( debugInfo != NULL ) {
+			debugInfo->invalidSourceTri++;
+		}
+		R_LogShadowMapInvalidOccluderTri( light, drawSurf, sourceTri, "noIndexSource" );
+		return NULL;
+	}
+
+	vertexCache.Touch( sourceTri->ambientCache );
+	if ( sourceTri->indexCache != NULL ) {
+		vertexCache.Touch( sourceTri->indexCache );
+	}
+	return sourceTri;
+}
+
+static int R_SubmitShadowMapOccluderList( const idRenderLightLocal *light, const drawSurf_t *occluders,
+		shadowMapOccluderDebug_t *debugInfo, int *occluderCount, bool *drawnAny ) {
+	int submitted = 0;
+
+	for ( const drawSurf_t *drawSurf = occluders; drawSurf; drawSurf = drawSurf->nextOnLight ) {
+		if ( occluderCount != NULL ) {
+			( *occluderCount )++;
+		}
+		const srfTriangles_t *tri = R_GetShadowMapOccluderTri( light, drawSurf, debugInfo );
+		if ( tri == NULL ) {
+			continue;
+		}
+		if ( drawSurf->space != backEnd.currentSpace ) {
+			backEnd.currentSpace = drawSurf->space;
+			glLoadMatrixf( drawSurf->space->modelMatrix );
+		}
+		idDrawVert *ac = ( idDrawVert * )vertexCache.Position( tri->ambientCache );
+		glVertexPointer( 3, GL_FLOAT, sizeof( idDrawVert ), ac->xyz.ToFloatPtr() );
+		RB_DrawElementsWithCounters( tri );
+		if ( drawnAny != NULL ) {
+			*drawnAny = true;
+		}
+		submitted++;
+	}
+
+	return submitted;
 }
 
 // Renders depth information for mapped shadowing into the atlas tile for this view-light.
 bool R_RenderShadowMapForViewLight( viewLight_t *vLight ) {
 	idRenderLightLocal *lightDef;
-	const drawSurf_s *drawSurf;
 	int tileX, tileY, tileSize, atlasSize;
 	GLint oldViewport[4], oldScissor[4];
 	GLboolean oldScissorEnabled;
@@ -440,8 +714,11 @@ bool R_RenderShadowMapForViewLight( viewLight_t *vLight ) {
 	GLboolean oldColorArrayEnabled;
 	GLboolean oldNormalArrayEnabled;
 	int occluderCount = 0;
+	int submittedOccluders = 0;
+	shadowMapOccluderDebug_t occluderDebug = { 0, 0, 0, 0, 0, 0, 0, 0 };
 
 	if ( !vLight || !vLight->lightDef || !vLight->lightDef->lightShader ) {
+		R_LogShadowMapRenderDebug( vLight, 0, 0, 0, false );
 		return false;
 	}
 
@@ -454,6 +731,7 @@ bool R_RenderShadowMapForViewLight( viewLight_t *vLight ) {
 		vLight->useShadowMap = false;
 		tr.pc.c_shadowMapFallbackMissingTile++;
 		tr.pc.c_shadowMapFallbacks++;
+		R_LogShadowMapRenderDebug( vLight, 0, 0, 0, false );
 		return false;
 	}
 
@@ -462,6 +740,7 @@ bool R_RenderShadowMapForViewLight( viewLight_t *vLight ) {
 		vLight->useShadowMap = false;
 		tr.pc.c_shadowMapFallbackAtlasInvalid++;
 		tr.pc.c_shadowMapFallbacks++;
+		R_LogShadowMapRenderDebug( vLight, 0, 0, 0, false );
 		return false;
 	}
 
@@ -470,12 +749,16 @@ bool R_RenderShadowMapForViewLight( viewLight_t *vLight ) {
 		vLight->useShadowMap = false;
 		tr.pc.c_shadowMapFallbackBackendUnavailable++;
 		tr.pc.c_shadowMapFallbacks++;
+		R_LogShadowMapRenderDebug( vLight, 0, 0, 0, false );
 		return false;
 	}
 
 	const idPlane		*lightProject = lightDef->lightProject;
-	const drawSurf_s	*globalShadows = vLight->globalShadows;
-	const drawSurf_s	*localShadows = vLight->localShadows;
+	const drawSurf_s	*globalOccluders = vLight->globalShadows;
+	const drawSurf_s	*localOccluders = vLight->localShadows;
+	const drawSurf_s	*globalInteractionOccluders = vLight->globalInteractions;
+	const drawSurf_s	*localInteractionOccluders = vLight->localInteractions;
+	const int			occluderSourceMode = idMath::ClampInt( 0, 2, r_shadowMapOccluderSource.GetInteger() );
 	float				shadowProj[16];
 	bool				drawnAny = false;
 	int					cascadeCount;
@@ -483,12 +766,31 @@ bool R_RenderShadowMapForViewLight( viewLight_t *vLight ) {
 	idVec4				shadowProjection[3];
 	idVec4				shadowClipW;
 
-	if ( !globalShadows && !localShadows ) {
+	const bool hasShadowSurfaceOccluders = ( globalOccluders != NULL || localOccluders != NULL );
+	const bool hasInteractionOccluders = ( globalInteractionOccluders != NULL || localInteractionOccluders != NULL );
+	const bool hasConfiguredOccluders = ( occluderSourceMode == 2 )
+		? hasInteractionOccluders
+		: ( hasShadowSurfaceOccluders || hasInteractionOccluders );
+
+	if ( !hasConfiguredOccluders ) {
 		vLight->shadowMapFallbackReason = SHADOW_MAP_FALLBACK_NO_GEOMETRY;
 		vLight->useShadowMap = false;
 		tr.pc.c_shadowMapFallbackNoGeometry++;
 		tr.pc.c_shadowMapFallbacks++;
+		R_LogShadowMapRenderDebug( vLight, 0, 0, 0, false );
 		return false;
+	}
+
+	if ( R_ShouldLogShadowMapDebugLight( lightDef ) ) {
+		common->Printf(
+			"smdbg.occluderPolicy idx:%i id:%i mode:%i facing:%i hasShadow:%i hasInteractions:%i\n",
+			lightDef->index,
+			lightDef->parms.lightId,
+			occluderSourceMode,
+			r_shadowMapOccluderFacing.GetInteger(),
+			hasShadowSurfaceOccluders ? 1 : 0,
+			hasInteractionOccluders ? 1 : 0
+		);
 	}
 
 	tileSize = vLight->shadowMapTileSize;
@@ -500,6 +802,7 @@ bool R_RenderShadowMapForViewLight( viewLight_t *vLight ) {
 		vLight->useShadowMap = false;
 		tr.pc.c_shadowMapFallbackMissingTile++;
 		tr.pc.c_shadowMapFallbacks++;
+		R_LogShadowMapRenderDebug( vLight, 0, 0, 0, false );
 		return false;
 	}
 
@@ -524,6 +827,7 @@ bool R_RenderShadowMapForViewLight( viewLight_t *vLight ) {
 		vLight->useShadowMap = false;
 		tr.pc.c_shadowMapFallbackMissingTile++;
 		tr.pc.c_shadowMapFallbacks++;
+		R_LogShadowMapRenderDebug( vLight, 0, 0, 0, false );
 		return false;
 	}
 
@@ -550,17 +854,25 @@ bool R_RenderShadowMapForViewLight( viewLight_t *vLight ) {
 	glGetBooleanv( GL_NORMAL_ARRAY, &oldNormalArrayEnabled );
 
 	const int occluderFacing = r_shadowMapOccluderFacing.GetInteger();
+	const float polygonFactor = r_shadowMapPolygonFactor.GetFloat();
+	const float polygonOffset = r_shadowMapPolygonOffset.GetFloat();
 
 	g_shadowMapAtlas.atlasRenderTexture->MakeCurrent();
 
 	if ( occluderFacing == 0 ) {
 		glEnable( GL_CULL_FACE );
 		glCullFace( GL_FRONT );
+		glEnable( GL_POLYGON_OFFSET_FILL );
+		glPolygonOffset( polygonFactor, polygonOffset );
 	} else if ( occluderFacing == 1 ) {
 		glEnable( GL_CULL_FACE );
 		glCullFace( GL_BACK );
+		glEnable( GL_POLYGON_OFFSET_FILL );
+		glPolygonOffset( -polygonFactor, -polygonOffset );
 	} else {
 		glDisable( GL_CULL_FACE );
+		glEnable( GL_POLYGON_OFFSET_FILL );
+		glPolygonOffset( polygonFactor, polygonOffset );
 	}
 
 	glDisable( GL_BLEND );
@@ -624,38 +936,51 @@ bool R_RenderShadowMapForViewLight( viewLight_t *vLight ) {
 		glMatrixMode( GL_MODELVIEW );
 		glPushMatrix();
 		glLoadIdentity();
+		// We loaded identity above, so force the first occluder to restore its space matrix.
+		backEnd.currentSpace = NULL;
 
-		for ( drawSurf = globalShadows; drawSurf; drawSurf = drawSurf->nextOnLight ) {
-			occluderCount++;
-			const srfTriangles_t *tri = drawSurf->geo;
-			if ( !tri || !tri->ambientCache ) {
-				continue;
-			}
-			if ( drawSurf->space != backEnd.currentSpace ) {
-				backEnd.currentSpace = drawSurf->space;
-				glLoadMatrixf( drawSurf->space->modelMatrix );
-			}
-			idDrawVert *ac = (idDrawVert *)vertexCache.Position( tri->ambientCache );
-			glVertexPointer( 3, GL_FLOAT, sizeof( idDrawVert ), ac->xyz.ToFloatPtr() );
-			RB_DrawElementsWithCounters( tri );
-			drawnAny = true;
-		}
+		int submittedThisCascade = 0;
 
-		for ( drawSurf = localShadows; drawSurf; drawSurf = drawSurf->nextOnLight ) {
-			occluderCount++;
-			const srfTriangles_t *tri = drawSurf->geo;
-			if ( !tri || !tri->ambientCache ) {
-				continue;
+		// Parity with RBDOOM3-BFG: prefer interaction geometry for mapped shadow-map occluders.
+		if ( occluderSourceMode != 1 ) {
+			submittedThisCascade += R_SubmitShadowMapOccluderList( lightDef, globalInteractionOccluders, &occluderDebug, &occluderCount, &drawnAny );
+			submittedThisCascade += R_SubmitShadowMapOccluderList( lightDef, localInteractionOccluders, &occluderDebug, &occluderCount, &drawnAny );
+
+			// Auto mode can still fall back to shadow-surface chains if interaction chains were empty.
+			if ( submittedThisCascade == 0 && occluderSourceMode == 0 && hasShadowSurfaceOccluders ) {
+				const int submittedBeforeFallback = submittedThisCascade;
+				submittedThisCascade += R_SubmitShadowMapOccluderList( lightDef, globalOccluders, &occluderDebug, &occluderCount, &drawnAny );
+				submittedThisCascade += R_SubmitShadowMapOccluderList( lightDef, localOccluders, &occluderDebug, &occluderCount, &drawnAny );
+				if ( submittedThisCascade > submittedBeforeFallback && R_ShouldLogShadowMapDebugLight( lightDef ) ) {
+					common->Printf(
+						"smdbg.occludersFallback idx:%i id:%i source:shadowSurfs submitted:%i mode:%i\n",
+						lightDef->index,
+						lightDef->parms.lightId,
+						submittedThisCascade - submittedBeforeFallback,
+						occluderSourceMode
+					);
+				}
 			}
-			if ( drawSurf->space != backEnd.currentSpace ) {
-				backEnd.currentSpace = drawSurf->space;
-				glLoadMatrixf( drawSurf->space->modelMatrix );
+		} else {
+			// Legacy behavior for explicit debug mode: shadow-surface chains first, interactions as fallback.
+			submittedThisCascade += R_SubmitShadowMapOccluderList( lightDef, globalOccluders, &occluderDebug, &occluderCount, &drawnAny );
+			submittedThisCascade += R_SubmitShadowMapOccluderList( lightDef, localOccluders, &occluderDebug, &occluderCount, &drawnAny );
+			if ( submittedThisCascade == 0 && hasInteractionOccluders ) {
+				const int submittedBeforeFallback = submittedThisCascade;
+				submittedThisCascade += R_SubmitShadowMapOccluderList( lightDef, globalInteractionOccluders, &occluderDebug, &occluderCount, &drawnAny );
+				submittedThisCascade += R_SubmitShadowMapOccluderList( lightDef, localInteractionOccluders, &occluderDebug, &occluderCount, &drawnAny );
+				if ( submittedThisCascade > submittedBeforeFallback && R_ShouldLogShadowMapDebugLight( lightDef ) ) {
+					common->Printf(
+						"smdbg.occludersFallback idx:%i id:%i source:interactions submitted:%i mode:%i\n",
+						lightDef->index,
+						lightDef->parms.lightId,
+						submittedThisCascade - submittedBeforeFallback,
+						occluderSourceMode
+					);
+				}
 			}
-			idDrawVert *ac = (idDrawVert *)vertexCache.Position( tri->ambientCache );
-			glVertexPointer( 3, GL_FLOAT, sizeof( idDrawVert ), ac->xyz.ToFloatPtr() );
-			RB_DrawElementsWithCounters( tri );
-			drawnAny = true;
 		}
+		submittedOccluders += submittedThisCascade;
 
 		glPopMatrix();
 		glMatrixMode( GL_PROJECTION );
@@ -746,6 +1071,26 @@ bool R_RenderShadowMapForViewLight( viewLight_t *vLight ) {
 		tr.pc.c_shadowMapFallbacks++;
 		vLight->useShadowMap = false;
 	}
+
+	if ( R_ShouldLogShadowMapDebugLight( lightDef ) && occluderCount > submittedOccluders ) {
+		common->Printf(
+			"smdbg.occluders idx:%i id:%i considered:%i submitted:%i misses[drawSurf:%i geo:%i src:%i invalid:%i noShadowEntity:%i noShadowMaterial:%i cacheMiss:%i cacheAllocFail:%i]\n",
+			lightDef->index,
+			lightDef->parms.lightId,
+			occluderCount,
+			submittedOccluders,
+			occluderDebug.missingDrawSurf,
+			occluderDebug.missingGeo,
+			occluderDebug.missingSourceTri,
+			occluderDebug.invalidSourceTri,
+			occluderDebug.skippedNoShadowEntity,
+			occluderDebug.skippedNoShadowMaterial,
+			occluderDebug.ambientCacheMisses,
+			occluderDebug.ambientCacheAllocFails
+		);
+	}
+
+	R_LogShadowMapRenderDebug( vLight, validCascadeCount, occluderCount, submittedOccluders, drawnAny );
 
 	return drawnAny;
 }
