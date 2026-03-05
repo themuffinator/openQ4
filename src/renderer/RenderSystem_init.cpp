@@ -40,11 +40,9 @@ If you have questions concerning this license or the applicable additional terms
 
 glconfig_t	glConfig;
 
-static void GfxInfo_f( const idCmdArgs &args );
-static void R_RenderBackendInfo_f( const idCmdArgs &args );
+static void GfxInfo_f( void );
 
 const char *r_rendererArgs[] = { "best", "arb", "arb2", "Cg", "exp", "nv10", "nv20", "r200", NULL };
-const char *r_graphicsAPIArgs[] = { "auto", "opengl", "vulkan", NULL };
 
 idCVar r_inhibitFragmentProgram( "r_inhibitFragmentProgram", "0", CVAR_RENDERER | CVAR_BOOL, "ignore the fragment program extension" );
 idCVar r_glDriver( "r_glDriver", "", CVAR_RENDERER, "\"opengl32\", etc." );
@@ -104,10 +102,6 @@ idCVar r_gamma( "r_gamma", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "chan
 idCVar r_brightness( "r_brightness", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "changes gamma tables", 0.5f, 2.0f );
 
 idCVar r_renderer( "r_renderer", "best", CVAR_RENDERER | CVAR_ARCHIVE, "hardware specific renderer path to use", r_rendererArgs, idCmdSystem::ArgCompletion_String<r_rendererArgs> );
-idCVar r_graphicsAPI( "r_graphicsAPI", "auto", CVAR_RENDERER | CVAR_ARCHIVE, "phase-7 backend preference: auto, opengl, vulkan", r_graphicsAPIArgs, idCmdSystem::ArgCompletion_String<r_graphicsAPIArgs> );
-idCVar r_requireVulkanBootstrap( "r_requireVulkanBootstrap", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "if 1, startup fails when r_graphicsAPI=vulkan and no Vulkan runtime is available" );
-idCVar r_showRenderBackend( "r_showRenderBackend", "0", CVAR_RENDERER | CVAR_BOOL, "print phase-7 backend selection diagnostics" );
-idCVar r_activeGraphicsAPI( "r_activeGraphicsAPI", "uninitialized", CVAR_RENDERER | CVAR_ROM, "active graphics backend label" );
 idCVar r_interactionColorMode( "r_interactionColorMode", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "interaction vertex-color mode: 0 = auto, 1 = packed env16.xy, 2 = vector env16/env17", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
 
 idCVar r_jitter( "r_jitter", "0", CVAR_RENDERER | CVAR_BOOL, "randomly subpixel jitter the projection matrix" );
@@ -683,7 +677,7 @@ void R_InitOpenGL( void ) {
 		parms.multiSamples = r_multiSamples.GetInteger();
 		parms.stereo = false;
 
-		if ( R_InitGraphicsBackend( parms ) ) {
+		if ( GLimp_Init( parms ) ) {
 			// it worked
 			break;
 		}
@@ -1776,7 +1770,7 @@ void R_SetColorMappings( void ) {
 GfxInfo_f
 ================
 */
-static void GfxInfo_f( const idCmdArgs &args ) {
+void GfxInfo_f( const idCmdArgs &args ) {
 	const char *fsstrings[] =
 	{
 		"windowed",
@@ -1788,10 +1782,7 @@ static void GfxInfo_f( const idCmdArgs &args ) {
 	}
 	const char *fullscreenPolicy = r_fullscreenDesktop.GetBool() ? "desktop" : "exclusive";
 
-	common->Printf( "\nR_BACKEND_REQUESTED: %s\n", R_GetGraphicsBackendRequested() );
-	common->Printf( "R_BACKEND_ACTIVE: %s\n", R_GetGraphicsBackendName() );
-	common->Printf( "R_VULKAN_BOOTSTRAP: %s\n", R_IsVulkanBootstrapActive() ? "enabled" : "disabled" );
-	common->Printf( "GL_VENDOR: %s\n", glConfig.vendor_string );
+	common->Printf( "\nGL_VENDOR: %s\n", glConfig.vendor_string );
 	common->Printf( "GL_RENDERER: %s\n", glConfig.renderer_string );
 	common->Printf( "GL_VERSION: %s\n", glConfig.version_string );
 	common->Printf( "GL_EXTENSIONS: %s\n", glConfig.extensions_string );
@@ -1863,10 +1854,6 @@ extern	PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT;
 	}
 }
 
-static void R_RenderBackendInfo_f( const idCmdArgs &args ) {
-	R_PrintGraphicsBackendInfo();
-}
-
 /*
 =================
 R_VidRestart_f
@@ -1885,7 +1872,7 @@ static void R_PerformFullVidRestart( bool forceWindow ) {
 
 	// Force image/object handles to rebuild against the new context.
 	globalImages->PurgeAllImages();
-	R_ShutdownGraphicsBackend();
+	GLimp_Shutdown();
 	glConfig.isInitialized = false;
 
 	const bool latchedFullscreen = cvarSystem->GetCVarBool( "r_fullscreen" );
@@ -2122,7 +2109,6 @@ void R_InitCommands( void ) {
 	cmdSystem->AddCommand( "makeAmbientMap", R_MakeAmbientMap_f, CMD_FL_RENDERER|CMD_FL_CHEAT, "makes an ambient map" );
 	cmdSystem->AddCommand( "benchmark", R_Benchmark_f, CMD_FL_RENDERER, "benchmark" );
 	cmdSystem->AddCommand( "gfxInfo", GfxInfo_f, CMD_FL_RENDERER, "show graphics info" );
-	cmdSystem->AddCommand( "renderBackendInfo", R_RenderBackendInfo_f, CMD_FL_RENDERER, "print phase-7 render backend selection state" );
 	cmdSystem->AddCommand( "modulateLights", R_ModulateLights_f, CMD_FL_RENDERER | CMD_FL_CHEAT, "modifies shader parms on all lights" );
 	cmdSystem->AddCommand( "testImage", R_TestImage_f, CMD_FL_RENDERER | CMD_FL_CHEAT, "displays the given image centered on screen", idCmdSystem::ArgCompletion_ImageName );
 	cmdSystem->AddCommand( "testVideo", R_TestVideo_f, CMD_FL_RENDERER | CMD_FL_CHEAT, "displays the given cinematic", idCmdSystem::ArgCompletion_VideoName );
@@ -2212,7 +2198,6 @@ void idRenderSystemLocal::Init( void ) {
 	memset( &backEnd, 0, sizeof( backEnd ) );
 
 	R_InitCvars();
-	R_ResetGraphicsBackendState();
 
 	R_InitCommands();
 
@@ -2360,7 +2345,7 @@ void idRenderSystemLocal::ShutdownOpenGL( void ) {
 
 	// free the context and close the window
 	R_ShutdownFrameData();
-	R_ShutdownGraphicsBackend();
+	GLimp_Shutdown();
 	glConfig.isInitialized = false;
 	backEnd.renderTexture = NULL;
 	activeRenderTexture = NULL;

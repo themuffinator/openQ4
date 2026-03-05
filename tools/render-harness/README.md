@@ -66,8 +66,6 @@ pwsh .\tools\render-harness\Phase0Capture.ps1 `
   - `r_useSSR`
   - `r_ssrStrength`
   - `r_useMaskedOcclusionCulling`
-  - `r_graphicsAPI`
-  - `r_requireVulkanBootstrap`
   - `r_postAA`
 - `extra_commands`: optional additional console tokens for this variant
 - `capture_delay_ms` / `post_timeout_ms`: optional per-variant timing overrides
@@ -84,11 +82,9 @@ For each run, output lands in:
 The summary now includes `variant`, `r_useShadowMapping`, `r_useParallelShadowMaps`,
 `r_shadowMapSplits`, `r_usePBR`, `r_useIndirectLighting`, `r_usePostLightingStack`,
 `r_useSSAO`, `r_useTAA`, `r_useTonemap`, `r_useHiZ`, `r_useSSR`,
-`r_ssrStrength`, `r_useMaskedOcclusionCulling`, `r_graphicsAPI`,
-`r_requireVulkanBootstrap`, and `r_postAA` columns to support paired
+`r_ssrStrength`, `r_useMaskedOcclusionCulling`, and `r_postAA` columns to support paired
 diff checks, including Stage-2 parallel/sun cascade production runs, Stage-3 PBR captures,
-Stage-4 indirect-light captures, Stage-5 post-light stack captures, Stage-6 SSR/HiZ/occlusion captures,
-and Stage-7 backend-selection/bootstrap coverage.
+Stage-4 indirect-light captures, Stage-5 post-light stack captures, and Stage-6 SSR/HiZ/occlusion captures.
 
 ## Acceptance checklist for this stage
 
@@ -102,6 +98,5 @@ and Stage-7 backend-selection/bootstrap coverage.
 - [ ] Indirect-light capture variants (`r_useIndirectLighting 1`) complete without regressions in SP and MP runs.
 - [ ] Phase-5 post-light variants (`r_usePostLightingStack 1`, `r_useSSAO 1`, `r_useTAA 1`, `r_useTonemap 1`) complete without new runtime or shader errors.
 - [ ] Phase-6 variants (`r_useHiZ 1`, `r_useSSR 1`, `r_useMaskedOcclusionCulling 1`) complete without new runtime or shader errors.
-- [ ] Phase-7 backend variants (`r_graphicsAPI vulkan`, `r_requireVulkanBootstrap 0`) complete and report backend selection state without crashes.
 - [ ] For `r_shadowMapQuality` checkpoints (`0`, `1`, `2`, `3`) the map sample counts read as `1`, `4`, `8`, `16` in light logs (or equivalent cvar-derived confirmation).
 - [ ] With `r_useShadowMapping 1` and forced mapped shadows, output screenshots demonstrate non-flat penumbras and no full-black artifacts in at least one SP/MP scene.

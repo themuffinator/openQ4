@@ -965,10 +965,6 @@ extern idCVar r_gamma;					// changes gamma tables
 extern idCVar r_brightness;				// changes gamma tables
 
 extern idCVar r_renderer;				// arb, nv10, nv20, r200, gl2, etc
-extern idCVar r_graphicsAPI;			// graphics backend preference: auto/opengl/vulkan
-extern idCVar r_requireVulkanBootstrap;	// fail startup if vulkan bootstrap is requested but unavailable
-extern idCVar r_showRenderBackend;		// print backend selection diagnostics
-extern idCVar r_activeGraphicsAPI;		// active backend label (runtime-updated)
 extern idCVar r_interactionColorMode;	// interaction color mode: 0 auto, 1 packed env16.xy, 2 vector env16/env17
 
 extern idCVar r_cgVertexProfile;		// arbvp1, vp20, vp30
@@ -1277,15 +1273,6 @@ void		GLimp_SwapBuffers( void );
 void		GLimp_SetGamma( unsigned short red[256], 
 						    unsigned short green[256],
 							unsigned short blue[256] );
-
-bool		R_InitGraphicsBackend( glimpParms_t parms );
-void		R_ShutdownGraphicsBackend( void );
-void		R_SwapGraphicsBackendBuffers( void );
-void		R_ResetGraphicsBackendState( void );
-const char *R_GetGraphicsBackendName( void );
-const char *R_GetGraphicsBackendRequested( void );
-bool		R_IsVulkanBootstrapActive( void );
-void		R_PrintGraphicsBackendInfo( void );
 // Sets the hardware gamma ramps for gamma and brightness adjustment.
 // These are now taken as 16 bit values, so we can take full advantage
 // of dacs with >8 bits of precision

@@ -304,8 +304,6 @@ foreach ($scene in $suite.scenes) {
             r_useSSR          = $variantCvars["r_useSSR"]
             r_ssrStrength     = $variantCvars["r_ssrStrength"]
             r_useMaskedOcclusionCulling = $variantCvars["r_useMaskedOcclusionCulling"]
-            r_graphicsAPI     = $variantCvars["r_graphicsAPI"]
-            r_requireVulkanBootstrap = $variantCvars["r_requireVulkanBootstrap"]
             r_postAA          = $variantCvars["r_postAA"]
             status            = $status
             exit_code         = $proc.ExitCode

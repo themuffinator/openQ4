@@ -37,10 +37,6 @@ Bring OpenQ4 to the same technical standard as modern RBDOOM-3-BFG, with special
   - renderer-native HiZ generation + SSR pass integration in post-light stack order
   - phase-6 ARB programs: `openq4_phase6_hiz.fp`, `openq4_phase6_ssr.fp`
   - conservative masked occlusion culling prototype (`r_useMaskedOcclusionCulling`) with diagnostics and default-safe runtime gating
-- Phase 7 backend abstraction seam and Vulkan-first bootstrap are now integrated:
-  - renderer backend API seam (`R_InitGraphicsBackend`/`R_ShutdownGraphicsBackend`/`R_SwapGraphicsBackendBuffers`) isolates platform backend entry points from render-pipeline call sites
-  - Vulkan runtime bootstrap detection path (`r_graphicsAPI`) with safe OpenGL compatibility fallback and optional strict requirement (`r_requireVulkanBootstrap`)
-  - backend diagnostics exposed via `renderBackendInfo`, `gfxInfo`, and runtime status cvar `r_activeGraphicsAPI`
 
 ## 2. Baseline and Evidence
 
@@ -375,7 +371,6 @@ Status update (2026-03-03):
 3. Phase 5 post-light stack integrated with phase-owned ordering (`r_usePostLightingStack`).
 4. Validation evidence run `20260303-120222` (phase-5 focused SP/MP suite): `3/3` variants `ok`, `0` logged `GL_PROGRAM_ERROR` lines, `0` summary `errors`.
 5. Phase 6 integration landed with HiZ/SSR post passes, masked occlusion culling prototype, and harness variant/cvar coverage updates.
-6. Phase 7 integration landed with backend abstraction seam, Vulkan runtime bootstrap path, and harness backend variant/cvar coverage updates.
 
 ## 11) End-to-End Progress Checklist (Execution View)
 
@@ -388,13 +383,13 @@ Status update (2026-03-03):
 - [x] Phase 4: env-probe/light-grid indirect-light cache stack is implemented with runtime fallback + bake/reload commands.
 - [x] Phase 5: SSAO/TAA/modern tonemap stack is implemented with optional SMAA and post-stack ownership over legacy post materials.
 - [x] Phase 6: SSR/HiZ/Occlusion Culling is implemented on the OpenGL path with conservative runtime defaults.
-- [x] Phase 7: backend abstraction seam + Vulkan-first bootstrap path are implemented on the OpenGL compatibility renderer.
+- [ ] Phase 7: backend abstraction + Vulkan/DX12/NVRHI bring-up is not yet implemented.
 
 ### NVRHI status and positioning
 
 - [ ] `src/renderer/NVRHI` is not present in OpenQ4.
-- [x] Phase-7 backend abstraction seam is in-tree without importing NVRHI.
-- [x] Current strategy remains: stabilize core visual parity on OpenGL first, then port validated rendering features into a full Vulkan/NVRHI renderer path.
+- [ ] NVRHI is in the plan as **Phase 7** (backend modernization), not Phase 1.
+- [ ] Current strategy remains: stabilize core visual parity on OpenGL first, then port validated rendering features into NVRHI/Vulkan path.
 
 ## 12. Primary Source References
 

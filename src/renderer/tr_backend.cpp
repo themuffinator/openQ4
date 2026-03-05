@@ -532,7 +532,7 @@ const void	RB_SwapBuffers( const void *data ) {
 
 	// don't flip if drawing to front buffer
 	if ( !r_frontBuffer.GetBool() ) {
-	    R_SwapGraphicsBackendBuffers();
+	    GLimp_SwapBuffers();
 	}
 }
 
