@@ -912,9 +912,6 @@ void idInteraction::CreateInteraction( const idRenderModel *model ) {
 				// this is the only place during gameplay (outside the utilities) that R_CreateShadowVolume() is called
 				sint->shadowTris = R_CreateShadowVolume( entityDef, tri, lightDef, shadowGen, sint->cullInfo );
 				if ( sint->shadowTris ) {
-					// Keep a link back to the source ambient surface so shadow-map
-					// rendering can reuse the original caster geometry.
-					sint->shadowTris->ambientSurface = tri;
 					if ( shader->Coverage() != MC_OPAQUE || ( !r_skipSuppress.GetBool() && entityDef->parms.suppressSurfaceInViewID ) ) {
 						// if any surface is a shadow-casting perforated or translucent surface, or the
 						// base surface is suppressed in the view (world weapon shadows) we can't use

@@ -55,14 +55,7 @@ pwsh .\tools\render-harness\Phase0Capture.ps1 `
 - `cvars`: optional object of console variable overrides (string/number values), for example:
   - `r_useParallelShadowMaps`
   - `r_shadowMapSplits`
-  - `r_shadowMapSplitWeight`
   - `r_shadowMapCascadeBlend`
-  - `r_shadowMapOccluderFacing`
-  - `r_shadowMapOccluderSource`
-  - `r_shadowMapDebugFlow`
-  - `r_shadowMapDebugLight`
-  - `r_shadowMapDebugLogInterval`
-  - `r_shadowMapStrictMappedPath`
   - `r_usePBR`
   - `r_useIndirectLighting`
   - `r_usePostLightingStack`
@@ -79,10 +72,6 @@ pwsh .\tools\render-harness\Phase0Capture.ps1 `
 - `extra_commands`: optional additional console tokens for this variant
 - `capture_delay_ms` / `post_timeout_ms`: optional per-variant timing overrides
 
-The harness writes variant/scene cvars to a per-run cfg under
-`.home/openq4/__phase0_<scene>_<variant>.cfg` and executes it via `+exec`.
-This avoids command-line token limits when debug variants need many `+set` values.
-
 ## Outputs
 
 For each run, output lands in:
@@ -93,10 +82,7 @@ For each run, output lands in:
 - `.tmp/rbdoom-phase0-runs/<timestamp>/summary.json`
 
 The summary now includes `variant`, `r_useShadowMapping`, `r_useParallelShadowMaps`,
-`r_shadowMapSplits`, `r_shadowMapOccluderFacing`, `r_shadowMapOccluderSource`,
-`r_shadowMapDebugFlow`, `r_shadowMapDebugLight`,
-`r_shadowMapDebugLogInterval`, `r_shadowMapStrictMappedPath`,
-`r_usePBR`, `r_useIndirectLighting`, `r_usePostLightingStack`,
+`r_shadowMapSplits`, `r_usePBR`, `r_useIndirectLighting`, `r_usePostLightingStack`,
 `r_useSSAO`, `r_useTAA`, `r_useTonemap`, `r_useHiZ`, `r_useSSR`,
 `r_ssrStrength`, `r_useMaskedOcclusionCulling`, `r_graphicsAPI`,
 `r_requireVulkanBootstrap`, and `r_postAA` columns to support paired

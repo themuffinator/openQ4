@@ -52,7 +52,6 @@ This file describes project goals, rules, and upstream credits for anyone workin
 - Any existing custom `q4base/` content is treated as an expedient bootstrap, not a long-term solution. The goal is to remove this reliance by fixing engine compatibility issues rather than shipping replacement assets.
 - For investigations, reference the log file written by `logFileName` (VS Code launch uses `logs/openq4.log`), located under `fs_savepath\<gameDir>\` (e.g. `${workspaceFolder}\\.home\\openq4\\logs\\openq4.log`).
 - For runtime validation, use mode-specific launch tasks: use the SP launch task for single-player testing and the MP launch task for multiplayer testing.
-- Never launch a multiplayer map while running in single-player mode; multiplayer maps must only be launched via multiplayer mode/tasks.
 - Do not treat main-menu startup as sufficient validation; enter in-game/map gameplay relevant to the change before concluding tests.
 - Use `.tmp/` directory in repository for any temporary files required for tasks.
 

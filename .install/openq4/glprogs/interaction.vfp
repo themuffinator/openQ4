@@ -99,13 +99,13 @@ DP3		result.texcoord[6].z, vertex.attrib[11], R0;
 DP4		result.texcoord[7].x, vertex.position, program.env[21];
 DP4		result.texcoord[7].y, vertex.position, program.env[22];
 DP4		result.texcoord[7].z, vertex.position, program.env[23];
-DP4		result.texcoord[7].w, vertex.position, program.env[28];
+DP4		result.texcoord[7].w, vertex.position, program.env[8];
 
 # generate the vertex color, which can be 1.0, color, or 1.0 - color
 # for 1.0 : env[16] = 0, env[17] = 1
 # for color : env[16] = 1, env[17] = 0
 # for 1.0-color : env[16] = -1, env[17] = 1
-MAD		result.color, vertex.color, program.env[16].x, program.env[16].y;
+MAD		result.color, vertex.color, program.env[16], program.env[17];
 
 END
 
@@ -130,7 +130,6 @@ OPTION ARB_precision_hint_fastest;
 # env[23] shadow matrix Q
 # env[24] shadow atlas rect: x, y, w, h
 # env[25] shadow params: texScale, depthBiasScale, sampleCount, unused
-# env[28] shadow clip W
 # env[26] pbr params0: x enable, y roughnessScale, z metalnessScale, w aoScale
 # env[27] pbr params1: x minRoughness, y dielectricF0, z reserved, w reserved
 
@@ -152,9 +151,9 @@ PARAM	half = { 0.5, 0.5, 0.5, 0.5 };
 
 
 # instead of using the normalization cube map, normalize with math
-DP3		specular.w, fragment.texcoord[6], fragment.texcoord[6];
-RSQ		specular.w, specular.w;
-MUL		specular.xyz, specular.w, fragment.texcoord[6];
+DP3		specular, fragment.texcoord[6],fragment.texcoord[6];
+RSQ		specular, specular.x;
+MUL		specular, specular.x, fragment.texcoord[6];
 #-----------------
 
 
@@ -168,7 +167,7 @@ MUL		specular.xyz, specular.w, fragment.texcoord[6];
 
 #-----------------
 TEX	light, fragment.texcoord[0], texture[0], CUBE;
-MAD	light.xyz, light, scaleTwo, subOne;
+MAD	light, light, scaleTwo, subOne;
 
 # instead of using the normalization cube map, normalize with math
 #DP3		light, fragment.texcoord[0],fragment.texcoord[0];
@@ -177,17 +176,17 @@ MAD	light.xyz, light, scaleTwo, subOne;
 #-----------------
 
 TEX	localNormal, fragment.texcoord[1], texture[1], 2D;
-MOV	localNormal.x, localNormal.a;
-MAD	localNormal.xyz, localNormal, scaleTwo, subOne;
-DP3	light.w, light, localNormal;
+# MOV localNormal.x, localNormal.a;
+MAD	localNormal, localNormal, scaleTwo, subOne;
+DP3	light, light, localNormal;
 
 # modulate by the light projection
 TXP	R1, fragment.texcoord[3], texture[3], 2D;
-MUL	light.xyz, light.w, R1;
+MUL	light, light, R1;
 
 # modulate by the light falloff
 TXP	R1, fragment.texcoord[2], texture[2], 2D;
-MUL	light.xyz, light, R1;
+MUL	light, light, R1;
 
 #
 # the light will be modulated by the diffuse and
@@ -196,25 +195,25 @@ MUL	light.xyz, light, R1;
 
 # modulate by the diffuse map and constant diffuse factor
 TEX	R1, fragment.texcoord[4], texture[4], 2D;
-MUL	color.xyz, R1, program.env[0];
+MUL	color, R1, program.env[0];
 
 # perform the specular bump mapping
-DP3	specular.w, specular, localNormal;
+DP3	specular, specular, localNormal;
 
 # perform a dependent table read for the specular falloff
 TEX	R1, specular, texture[6], 2D;
 
 # modulate by the constant specular factor
-MUL	R1.xyz, R1, program.env[1];
+MUL	R1, R1, program.env[1];
 
 # modulate by the specular map * 2
 TEX	R2, fragment.texcoord[5], texture[5], 2D;
 ADD	R2, R2, R2;
-MAD	color.xyz, R1, R2, color;
+MAD	color, R1, R2, color;
 
 # legacy final lighting
-MOV	R6.xyz, color;
-MUL	R6.xyz, light, R6;
+MOV	R6, color;
+MUL	R6, light, R6;
 
 # optional PBR interaction path (gated by env[26].x)
 MOV	R3, program.env[26];
@@ -236,23 +235,23 @@ MAD	R2.z, R2.z, R3.w, R5.x;
 
 SUB	R4.z, one.x, R2.y;
 MUL	R4.z, R4.z, R4.y;
-MUL	R5.xyz, R7, R2.y;
+MUL	R5, R7, R2.y;
 ADD	R5.x, R5.x, R4.z;
 ADD	R5.y, R5.y, R4.z;
 ADD	R5.z, R5.z, R4.z;
-MUL	R5.xyz, R5, R1;
+MUL	R5, R5, R1;
 
 SUB	R4.z, one.x, R2.y;
-MUL	R7.xyz, R7, R4.z;
-MUL	R7.xyz, R7, program.env[0];
-ADD	R5.xyz, R5, R7;
-MUL	R5.xyz, R5, R2.z;
-MUL	R5.xyz, light, R5;
+MUL	R7, R7, R4.z;
+MUL	R7, R7, program.env[0];
+ADD	R5, R5, R7;
+MUL	R5, R5, R2.z;
+MUL	R5, light, R5;
 
 SUB	R4.z, one.x, R3.x;
-MUL	R6.xyz, R6, R4.z;
-MUL	R5.xyz, R5, R3.x;
-ADD	color.xyz, R6, R5;
+MUL	R6, R6, R4.z;
+MUL	R5, R5, R3.x;
+ADD	color, R6, R5;
 
 # mapped-shadow modulation (single sample fallback path)
 MOV	R3, program.env[24];
@@ -263,41 +262,24 @@ MAD	R5.x, R5.x, half.x, half.x;
 MAD	R5.y, R5.y, half.x, half.x;
 MAD	R5.z, R5.z, half.x, half.x;
 MUL	R5.z, R5.z, R4.y;
-SUB	R5.z, R5.z, R4.x;
-MAX	R5.z, R5.z, zero.x;
-MUL	R1.x, R5.x, R3.z;
-MUL	R1.y, R5.y, R3.w;
-ADD	R1.x, R1.x, R3.x;
-ADD	R1.y, R1.y, R3.y;
-ADD	R2.x, R3.x, R3.z;
-ADD	R2.y, R3.y, R3.w;
-SGE	R2.z, R1.x, R3.x;
-SLT	R2.w, R1.x, R2.x;
-MUL	R2.z, R2.z, R2.w;
-SGE	R2.w, R1.y, R3.y;
-SLT	R7.y, R1.y, R2.y;
-MUL	R2.w, R2.w, R7.y;
-MUL	R2.z, R2.z, R2.w;
-SLT	R2.w, R5.z, one.x;
-MUL	R2.z, R2.z, R2.w;
-SLT	R2.w, zero.x, fragment.texcoord[7].w;
-MUL	R2.z, R2.z, R2.w;
-MAX	R5.x, R1.x, R3.x;
-MIN	R5.x, R5.x, R2.x;
-MAX	R5.y, R1.y, R3.y;
-MIN	R5.y, R5.y, R2.y;
+MUL	R5.x, R5.x, R3.z;
+MUL	R5.y, R5.y, R3.w;
+ADD	R5.x, R5.x, R3.x;
+ADD	R5.y, R5.y, R3.y;
+MAX	R5.x, R5.x, zero.x;
+MIN	R5.x, R5.x, one.x;
+MAX	R5.y, R5.y, zero.x;
+MIN	R5.y, R5.y, one.x;
 TEX	R7, R5, texture[7], 2D;
 SGE	R7.x, R7.x, R5.z;
 SLT	R4.x, zero.x, R4.x;
 SUB	R7.y, one.x, R4.x;
 MAD	R7.x, R7.x, R4.x, R7.y;
-SUB	R7.y, one.x, R2.z;
-MAD	R7.x, R7.x, R2.z, R7.y;
-MUL	color.xyz, color, R7.x;
+MUL	color, color, R7.x;
 
 # modify by the vertex color
 
-MUL result.color.xyz, color, fragment.color;
+MUL result.color, color, fragment.color;
 
 # this should be better on future hardware, but current drivers make it slower
 #MUL result.color.xyz, color, fragment.color;

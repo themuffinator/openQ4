@@ -18,16 +18,6 @@
         "suffix": "mapped"
       },
       {
-        "name": "mapped_shadow_debug_flow",
-        "r_useShadowMapping": 1,
-        "suffix": "mapped_debug_flow",
-        "cvars": {
-          "r_shadowMapDebugFlow": 2,
-          "r_shadowMapDebugLight": -1,
-          "r_shadowMapDebugLogInterval": 30
-        }
-      },
-      {
         "name": "mapped_parallel_cascades",
         "r_useShadowMapping": 1,
         "suffix": "parallel_csm",

@@ -93,16 +93,6 @@ static void R_PerformanceCounters( void ) {
 		common->Printf( "shadowMapSplitsRequested:%i unsupportedCascadeCount:%i\n",
 			tr.pc.c_shadowMapSplitRequests,
 			tr.pc.c_shadowMapCascadeUnsupported );
-		if ( r_shadowMapDebugFlow.GetInteger() > 0 ) {
-			common->Printf( "shadowMapFlow: lights:%i shadowSurfs:%i selected:%i renderAttempts:%i renderSuccess:%i mappedPath:%i stencilPath:%i\n",
-				tr.pc.c_shadowMapLightsSeen,
-				tr.pc.c_shadowMapLightsWithShadowSurfs,
-				tr.pc.c_shadowMapLightsSelected,
-				tr.pc.c_shadowMapRenderAttempts,
-				tr.pc.c_shadowMapRenderSuccess,
-				tr.pc.c_shadowMapMappedPathLights,
-				tr.pc.c_shadowMapStencilPathLights );
-		}
 	}
 	if ( r_showShadowMaps.GetBool() ) {
 		int smUsed, smMax, smTile, smAtlas, smRow;
