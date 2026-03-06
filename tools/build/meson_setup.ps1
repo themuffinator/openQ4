@@ -99,6 +99,73 @@ function Test-MesonBuildDirectory {
     return (Test-Path $coreData) -and (Test-Path $ninjaFile)
 }
 
+function Get-MesonBuildOptionValue {
+    param(
+        [string]$BuildDir,
+        [string]$OptionName
+    )
+
+    $introOptionsPath = Join-Path $BuildDir "meson-info\intro-buildoptions.json"
+    if (-not (Test-Path $introOptionsPath)) {
+        return $null
+    }
+
+    $introOptions = Get-Content $introOptionsPath -Raw | ConvertFrom-Json
+    foreach ($option in $introOptions) {
+        if ($option.name -eq $OptionName) {
+            return $option.value
+        }
+    }
+
+    return $null
+}
+
+function Remove-BSEArtifacts {
+    param([string]$DirectoryPath)
+
+    if ([string]::IsNullOrWhiteSpace($DirectoryPath) -or -not (Test-Path $DirectoryPath)) {
+        return
+    }
+
+    $patterns = @(
+        "OpenQ4-BSE_*.dll",
+        "OpenQ4-BSE_*.dylib",
+        "OpenQ4-BSE_*.so",
+        "OpenQ4-BSE_*.lib",
+        "OpenQ4-BSE_*.pdb"
+    )
+
+    foreach ($pattern in $patterns) {
+        $matches = @(Get-ChildItem -Path $DirectoryPath -Filter $pattern -File -ErrorAction SilentlyContinue)
+        foreach ($match in $matches) {
+            Write-Host "Removing stale BSE artifact '$($match.FullName)'"
+            Remove-Item -LiteralPath $match.FullName -Force
+        }
+    }
+}
+
+function Sync-BSEArtifactsForCurrentConfig {
+    param(
+        [string]$BuildDir,
+        [string]$RepoRoot,
+        [bool]$IncludeInstallRoot
+    )
+
+    if (-not (Test-MesonBuildDirectory $BuildDir)) {
+        return
+    }
+
+    $buildLibBSE = Get-MesonBuildOptionValue -BuildDir $BuildDir -OptionName "build_libbse"
+    if ($buildLibBSE -ne $false) {
+        return
+    }
+
+    Remove-BSEArtifacts -DirectoryPath $BuildDir
+    if ($IncludeInstallRoot) {
+        Remove-BSEArtifacts -DirectoryPath (Join-Path $RepoRoot ".install")
+    }
+}
+
 function Stop-OpenQ4RuntimeProcesses {
     [OutputType([bool])]
     param()
@@ -245,6 +312,12 @@ if ($commandName -eq "install" -and $exitCode -ne 0 -and $env:OPENQ4_INSTALL_RET
     Start-Sleep -Milliseconds 500
     Invoke-Meson -MesonArgs $effectiveArgs -VsDevCmdPath $vsDevCmd
     $exitCode = [int]$LASTEXITCODE
+}
+
+if ($exitCode -eq 0 -and ($commandName -eq "compile" -or $commandName -eq "install")) {
+    $includeInstallRoot = $commandName -eq "install"
+    $buildInfo = Get-CompileBuildDirInfo -MesonArgs $effectiveArgs -DefaultBuildDir $defaultBuildDir
+    Sync-BSEArtifactsForCurrentConfig -BuildDir $buildInfo.BuildDir -RepoRoot $repoRoot -IncludeInstallRoot:$includeInstallRoot
 }
 
 exit $exitCode

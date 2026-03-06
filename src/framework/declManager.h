@@ -237,7 +237,8 @@ public:
 	// The manager will have called FreeData() before issuing a Parse().
 	// The subclass can call MakeDefault() internally at any point if
 	// there are parse errors.
-	virtual bool			Parse(const char* text, const int textLength) { return base->Parse(text, textLength, false); }
+	virtual bool			Parse(const char* text, const int textLength) { return Parse(text, textLength, false); }
+	virtual bool			Parse(const char* text, const int textLength, bool noCaching) { return base->Parse(text, textLength, noCaching); }
 
 	// Frees any pointers held by the subclass. This may be called before
 	// any Parse(), so the constructor must have set sane values. The decl will be
