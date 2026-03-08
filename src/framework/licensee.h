@@ -7,19 +7,22 @@
 ===============================================================================
 */
 
+#include "openq4_version_generated.h"
+
 // RAVEN BEGIN
 // rjohnson: this is the name of the game we are making
 #define PROJECT_NAME					"OpenQ4"
 #define PROJECT_AUTHOR					"themuffinator"
 #define PROJECT_COMPANY				"DarkMatter Productions"
-#define PROJECT_VERSION				"0.0.1"
+#define PROJECT_VERSION				OPENQ4_VERSION_SHORT
+#define PROJECT_VERSION_FULL			OPENQ4_VERSION
 #define PROJECT_WEBSITE				"www.darkmatter-quake.com"
 #define PROJECT_REPO					"https://github.com/themuffinator/OpenQ4"
 
 #define GAME_NAME						PROJECT_NAME			// appears on window titles and errors
 #define GAME_ICON						"q4icon.bmp"
 
-#define ENGINE_VERSION					PROJECT_NAME "-" PROJECT_VERSION
+#define ENGINE_VERSION					PROJECT_NAME " " PROJECT_VERSION
 
 // jnewquist: build type
 #if defined(_DEBUG)

@@ -1387,7 +1387,7 @@ void idConsoleLocal::DrawSolidConsole( float frac ) {
 
 	renderSystem->SetColor( kConsoleVersionColor );
 
-	idStr version = va("%s.%i", ENGINE_VERSION, BUILD_NUMBER);
+	idStr version = PROJECT_VERSION;
 	i = version.Length();
 
 	for ( x = 0; x < i; x++ ) {

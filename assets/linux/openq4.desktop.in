@@ -1,6 +1,5 @@
 [Desktop Entry]
 Type=Application
-Version=@OPENQ4_PROJECT_VERSION@
 Name=OpenQ4
 GenericName=First-person shooter
 Comment=Modern open-source engine and game-code replacement for Quake 4
@@ -10,3 +9,4 @@ Terminal=false
 Categories=Game;ActionGame;Shooter;
 Keywords=quake;idtech;fps;multiplayer;
 StartupNotify=true
+X-OpenQ4-Version=@OPENQ4_PROJECT_VERSION_FULL@

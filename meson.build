@@ -68,6 +68,70 @@ if host_system == 'darwin'
   add_languages('objc', 'objcpp', required: true)
 endif
 
+version_track = get_option('version_track').strip()
+version_iteration = get_option('version_iteration').strip()
+generated_version_header = meson.current_build_dir() / 'openq4_version_generated.h'
+version_metadata_command = [
+  py,
+  meson.project_source_root() / 'tools' / 'build' / 'openq4_version.py',
+  '--source-root',
+  meson.project_source_root(),
+  '--base-version',
+  meson.project_version(),
+  '--track',
+  version_track,
+  '--header-out',
+  generated_version_header,
+]
+if version_iteration != ''
+  version_metadata_command += ['--iteration', version_iteration]
+endif
+version_metadata_result = run_command(version_metadata_command, check: true)
+
+openq4_version_short = meson.project_version()
+openq4_version_full = meson.project_version()
+openq4_version_tag = meson.project_version()
+openq4_product_version = meson.project_name() + ' ' + meson.project_version()
+openq4_product_version_full = openq4_product_version
+openq4_version_resource_dotted = meson.project_version() + '.0'
+openq4_git_sha = ''
+openq4_git_dirty = '0'
+openq4_commit_count = '0'
+root_include_dir = include_directories('.')
+
+foreach version_line : version_metadata_result.stdout().strip().split('\n')
+  if version_line == ''
+    continue
+  endif
+
+  version_pair = version_line.split('=')
+  if version_pair.length() != 2
+    continue
+  endif
+
+  version_key = version_pair[0]
+  version_value = version_pair[1]
+  if version_key == 'version_short'
+    openq4_version_short = version_value
+  elif version_key == 'version'
+    openq4_version_full = version_value
+  elif version_key == 'version_tag'
+    openq4_version_tag = version_value
+  elif version_key == 'product_version'
+    openq4_product_version = version_value
+  elif version_key == 'product_version_full'
+    openq4_product_version_full = version_value
+  elif version_key == 'resource_dotted'
+    openq4_version_resource_dotted = version_value
+  elif version_key == 'git_sha'
+    openq4_git_sha = version_value
+  elif version_key == 'git_dirty'
+    openq4_git_dirty = version_value
+  elif version_key == 'commit_count'
+    openq4_commit_count = version_value
+  endif
+endforeach
+
 build_engine = get_option('build_engine')
 build_games = get_option('build_games')
 build_game_sp = get_option('build_game_sp')
@@ -242,7 +306,10 @@ endif
 resource_compiler = find_program('rc', 'windres', required: false)
 if host_system == 'windows' and resource_compiler.found()
   windows_mod = import('windows')
-  openq4_engine_sources += windows_mod.compile_resources('src/sys/win32/rc/OpenQ4Version.rc')
+  openq4_engine_sources += windows_mod.compile_resources(
+    'src/sys/win32/rc/OpenQ4Version.rc',
+    include_directories: [root_include_dir],
+  )
 endif
 
 cc = meson.get_compiler('c')
@@ -413,6 +480,7 @@ src_sys_include_dir = include_directories('src/sys')
 src_bse_api_include_dir = include_directories('src/bse_api')
 src_maya_import_include_dir = include_directories('src/MayaImport')
 game_include_dirs = [
+  root_include_dir,
   src_include_dir,
   src_idlib_include_dir,
   src_renderer_include_dir,
@@ -421,9 +489,9 @@ game_include_dirs = [
   src_bse_api_include_dir,
   src_maya_import_include_dir,
 ]
-engine_include_dirs = [src_include_dir]
-game_idlib_include_dirs = [src_include_dir]
-bse_module_include_dirs = [src_include_dir]
+engine_include_dirs = [root_include_dir, src_include_dir]
+game_idlib_include_dirs = [root_include_dir, src_include_dir]
+bse_module_include_dirs = [root_include_dir, src_include_dir]
 
 if needs_game_headers
   staged_game_include_dir = include_directories(game_stage_game_include_rel)
@@ -577,7 +645,8 @@ install_data(
 if host_system == 'linux'
   linux_desktop_conf = configuration_data()
   linux_desktop_conf.set('OPENQ4_CLIENT_BINARY', engine_client_binary_name)
-  linux_desktop_conf.set('OPENQ4_PROJECT_VERSION', meson.project_version())
+  linux_desktop_conf.set('OPENQ4_PROJECT_VERSION', openq4_version_short)
+  linux_desktop_conf.set('OPENQ4_PROJECT_VERSION_FULL', openq4_version_full)
   linux_desktop_entry = configure_file(
     input: 'assets/linux/openq4.desktop.in',
     output: 'openq4.desktop',
@@ -609,10 +678,29 @@ if host_system == 'linux'
   endforeach
 endif
 
+version_iteration_summary = version_iteration
+if version_iteration_summary == ''
+  version_iteration_summary = 'none'
+endif
+
+openq4_git_sha_summary = openq4_git_sha
+if openq4_git_sha_summary == ''
+  openq4_git_sha_summary = 'unavailable'
+endif
+
 summary(
   {
     'Host system': host_system,
     'Host cpu family': host_cpu_family,
+    'Version track': version_track,
+    'Version iteration': version_iteration_summary,
+    'Version short': openq4_version_short,
+    'Version full': openq4_version_full,
+    'Version tag': openq4_version_tag,
+    'Version resource': openq4_version_resource_dotted,
+    'Git short SHA': openq4_git_sha_summary,
+    'Git dirty': openq4_git_dirty,
+    'Git commit count': openq4_commit_count,
     'MSVC toolchain': is_msvc,
     'MSVC version': cpp.version(),
     'MSVC 2026 baseline enforced': get_option('enforce_msvc_2026'),

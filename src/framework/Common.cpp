@@ -42,18 +42,22 @@ typedef enum {
 	ERP_DISCONNECT					// don't kill server
 } errorParm_t;
 
-#if defined( _DEBUG )
-	#define BUILD_DEBUG "-debug"
-#else
-	#define BUILD_DEBUG ""
-#endif
-
 struct version_s {
-			version_s( void ) { sprintf( string, "%s.%d%s %s %s %s", ENGINE_VERSION, BUILD_NUMBER, BUILD_DEBUG, BUILD_STRING, __DATE__, __TIME__ ); }
+			version_s( void ) { idStr::snPrintf( string, sizeof( string ), "%s", OPENQ4_PRODUCT_VERSION_FULL ); }
 	char	string[256];
 } version;
 
+struct build_info_s {
+#if defined( _DEBUG )
+			build_info_s( void ) { idStr::snPrintf( string, sizeof( string ), "%s (debug, %s, %s %s)", OPENQ4_PRODUCT_VERSION_FULL, BUILD_STRING, __DATE__, __TIME__ ); }
+#else
+			build_info_s( void ) { idStr::snPrintf( string, sizeof( string ), "%s (%s, %s %s)", OPENQ4_PRODUCT_VERSION_FULL, BUILD_STRING, __DATE__, __TIME__ ); }
+#endif
+	char	string[256];
+} buildInfo;
+
 idCVar com_version( "si_version", version.string, CVAR_SYSTEM|CVAR_ROM|CVAR_SERVERINFO, "engine version" );
+idCVar com_buildInfo( "com_buildInfo", buildInfo.string, CVAR_SYSTEM|CVAR_ROM, "detailed engine build information" );
 idCVar com_skipRenderer( "com_skipRenderer", "0", CVAR_BOOL|CVAR_SYSTEM, "skip the renderer completely" );
 idCVar com_machineSpec( "com_machineSpec", "-1", CVAR_INTEGER | CVAR_ARCHIVE | CVAR_SYSTEM, "hardware classification, -1 = not detected, 0 = low quality, 1 = medium quality, 2 = high quality, 3 = ultra quality" );
 idCVar com_purgeAll( "com_purgeAll", "0", CVAR_BOOL | CVAR_ARCHIVE | CVAR_SYSTEM, "purge everything between level loads" );
@@ -3357,7 +3361,7 @@ void idCommonLocal::Init( int argc, const char **argv, const char *cmdline ) {
 		idCVar::RegisterStaticVars();
 
 		// print engine version
-		Printf( "%s\n", version.string );
+		Printf( "%s\n", buildInfo.string );
 
 		// initialize key input/binding, done early so bind command exists
 		idKeyInput::Init();

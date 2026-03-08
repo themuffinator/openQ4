@@ -585,7 +585,12 @@ BOOL CALLBACK AboutDlgProc( HWND hwndDlg,
 	case WM_INITDIALOG:
 		{
 			char buffer[1024];
-			idStr::snPrintf(buffer, 1024, "OpenQ4 Radiant Build %d\nCopyright (C) 1999-2004 id Software, Inc. and 2026 DarkMatter Productions\n", BUILD_NUMBER);
+			idStr::snPrintf(
+				buffer,
+				1024,
+				"OpenQ4 Radiant %s\nCopyright (C) 1999-2004 id Software, Inc. and 2026 DarkMatter Productions\n",
+				OPENQ4_VERSION
+			);
 //			SetDlgItemText( hwndDlg, IDC_ABOUT_INFO, buffer);
 
 			idStr::snPrintf( buffer, 1024, "Renderer:\t%s", qglGetString( GL_RENDERER ) );

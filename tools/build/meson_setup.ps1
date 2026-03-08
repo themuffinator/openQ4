@@ -120,6 +120,131 @@ function Get-MesonBuildOptionValue {
     return $null
 }
 
+function Test-GitHubActionsEnvironment {
+    return $env:GITHUB_ACTIONS -eq "true"
+}
+
+function Get-DesiredBuildLibBSEValue {
+    if (Test-GitHubActionsEnvironment) {
+        return $false
+    }
+
+    return $true
+}
+
+function Get-DesiredBuildLibBSEMesonValue {
+    if (Get-DesiredBuildLibBSEValue) {
+        return "true"
+    }
+
+    return "false"
+}
+
+function Set-BuildLibBSEMesonArg {
+    param([string[]]$MesonArgs)
+
+    $desiredArg = "-Dbuild_libbse=$(Get-DesiredBuildLibBSEMesonValue)"
+    $result = @()
+    foreach ($arg in $MesonArgs) {
+        if ($arg -like "-Dbuild_libbse=*") {
+            continue
+        }
+
+        $result += $arg
+    }
+
+    $result += $desiredArg
+    return $result
+}
+
+function Get-LatestFileWriteTimeUtc {
+    param([string]$DirectoryPath)
+
+    if ([string]::IsNullOrWhiteSpace($DirectoryPath) -or -not (Test-Path $DirectoryPath)) {
+        return $null
+    }
+
+    $latest = $null
+    foreach ($file in Get-ChildItem -Path $DirectoryPath -Recurse -File -ErrorAction SilentlyContinue) {
+        if ($null -eq $latest -or $file.LastWriteTimeUtc -gt $latest) {
+            $latest = $file.LastWriteTimeUtc
+        }
+    }
+
+    return $latest
+}
+
+function Get-OpenQ4GameLibsRepoPath {
+    param(
+        [string]$RepoRoot,
+        [string]$ConfiguredRepo
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($ConfiguredRepo)) {
+        return [System.IO.Path]::GetFullPath($ConfiguredRepo)
+    }
+
+    return [System.IO.Path]::GetFullPath((Join-Path $RepoRoot "..\OpenQ4-GameLibs"))
+}
+
+function Test-GamelibsStageRefreshNeeded {
+    param(
+        [string]$BuildDir,
+        [string]$RepoRoot,
+        [string]$GameLibsRepo
+    )
+
+    if (-not (Test-MesonBuildDirectory $BuildDir)) {
+        return $false
+    }
+
+    $buildEngine = Get-MesonBuildOptionValue -BuildDir $BuildDir -OptionName "build_engine"
+    $buildGames = Get-MesonBuildOptionValue -BuildDir $BuildDir -OptionName "build_games"
+    if ($buildEngine -ne $true -and $buildGames -ne $true) {
+        return $false
+    }
+
+    $resolvedGameLibsRepo = Get-OpenQ4GameLibsRepoPath -RepoRoot $RepoRoot -ConfiguredRepo $GameLibsRepo
+    $sourceGameDir = Join-Path $resolvedGameLibsRepo "src\game"
+    $stagedGameDir = Join-Path $RepoRoot ".tmp\gamelibs_stage\src\game"
+
+    if (-not (Test-Path $sourceGameDir)) {
+        return $false
+    }
+
+    if (-not (Test-Path $stagedGameDir)) {
+        return $true
+    }
+
+    $sourceLatest = Get-LatestFileWriteTimeUtc -DirectoryPath $sourceGameDir
+    $stageLatest = Get-LatestFileWriteTimeUtc -DirectoryPath $stagedGameDir
+
+    if ($null -eq $sourceLatest) {
+        return $false
+    }
+
+    if ($null -eq $stageLatest) {
+        return $true
+    }
+
+    return $sourceLatest -gt $stageLatest
+}
+
+function Test-BSEConfigRefreshNeeded {
+    param([string]$BuildDir)
+
+    if (-not (Test-MesonBuildDirectory $BuildDir)) {
+        return $false
+    }
+
+    $currentValue = Get-MesonBuildOptionValue -BuildDir $BuildDir -OptionName "build_libbse"
+    if ($null -eq $currentValue) {
+        return $false
+    }
+
+    return [bool]$currentValue -ne (Get-DesiredBuildLibBSEValue)
+}
+
 function Remove-BSEArtifacts {
     param([string]$DirectoryPath)
 
@@ -232,6 +357,10 @@ $gameLibsRepo = if ([string]::IsNullOrWhiteSpace($env:OPENQ4_GAMELIBS_REPO)) { "
 $buildGameLibsScript = Join-Path $scriptDir "build_gamelibs.ps1"
 $syncIconsScript = Join-Path $scriptDir "sync_icons.py"
 
+if ($commandName -eq "setup") {
+    $effectiveArgs = Set-BuildLibBSEMesonArg -MesonArgs $effectiveArgs
+}
+
 $buildGameLibs = $env:OPENQ4_BUILD_GAMELIBS -eq "1"
 if ($commandName -eq "compile" -and $buildGameLibs -and $env:OPENQ4_SKIP_GAMELIBS_BUILD -ne "1") {
     if (-not (Test-Path $buildGameLibsScript)) {
@@ -267,10 +396,34 @@ if ($effectiveArgs.Length -gt 0 -and ($effectiveArgs[0] -eq "compile" -or $effec
             "--buildtype=debug",
             "--wrap-mode=forcefallback"
         )
+        $setupArgs = Set-BuildLibBSEMesonArg -MesonArgs $setupArgs
         Invoke-Meson -MesonArgs $setupArgs -VsDevCmdPath $vsDevCmd
         $setupCode = [int]$LASTEXITCODE
         if ($setupCode -ne 0) {
             exit $setupCode
+        }
+    }
+
+    $needsGameLibsRefresh = Test-GamelibsStageRefreshNeeded -BuildDir $buildInfo.BuildDir -RepoRoot $repoRoot -GameLibsRepo $gameLibsRepo
+    $needsBSERefresh = Test-BSEConfigRefreshNeeded -BuildDir $buildInfo.BuildDir
+    if ($needsGameLibsRefresh -or $needsBSERefresh) {
+        if ($needsGameLibsRefresh) {
+            Write-Host "OpenQ4-GameLibs sources changed since the last staged snapshot. Reconfiguring '$($buildInfo.BuildDir)'..."
+        }
+        if ($needsBSERefresh) {
+            Write-Host "Applying local/CI BSE policy to '$($buildInfo.BuildDir)' (build_libbse=$(Get-DesiredBuildLibBSEMesonValue))..."
+        }
+        $reconfigureArgs = @(
+            "setup",
+            "--reconfigure",
+            $buildInfo.BuildDir,
+            $repoRoot
+        )
+        $reconfigureArgs = Set-BuildLibBSEMesonArg -MesonArgs $reconfigureArgs
+        Invoke-Meson -MesonArgs $reconfigureArgs -VsDevCmdPath $vsDevCmd
+        $reconfigureCode = [int]$LASTEXITCODE
+        if ($reconfigureCode -ne 0) {
+            exit $reconfigureCode
         }
     }
 

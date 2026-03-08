@@ -49,6 +49,20 @@ option(
 )
 
 option(
+  'version_track',
+  type: 'string',
+  value: 'dev',
+  description: 'Version track embedded into the build. Use stable for release builds, dev for local builds, or labels such as nightly/beta/rc for prerelease builds.',
+)
+
+option(
+  'version_iteration',
+  type: 'string',
+  value: '',
+  description: 'Optional dot-separated track iteration (for example 20260307.1). Only used for prerelease tracks.',
+)
+
+option(
   'enforce_msvc_2026',
   type: 'boolean',
   value: false,

@@ -25,6 +25,16 @@
 
 The **OpenQ4 Project** is a complete replacement for the Quake 4 engine and game binaries. Built on the foundation of [Quake4Doom](https://github.com/idSoftware/Quake4Doom), this project aims to provide enhanced compaitibility and QoL to the classic id Tech 4 title for current and future generations of gamers. It provides a platform for future development. Whilst the project aims to be as open-source as possible, the BSE library will remain closed-source for legal reasons.
 
+## Versioning
+
+OpenQ4 uses semantic base versions from `meson.build` and appends an explicit build track:
+
+- `stable`: release builds such as `0.0.1`
+- `dev`: default local builds such as `0.0.1-dev+gabcdef12`
+- prerelease labels like `nightly`, `beta`, or `rc`: for example `0.0.1-nightly.20260307.1+gabcdef12`
+
+Meson exposes this through `-Dversion_track=<label>` and `-Dversion_iteration=<dot-separated-iteration>`. Local builds default to `dev`; CI nightlies set `version_track=nightly`.
+
 ### What You Need
 
 To play OpenQ4, you need:
@@ -132,13 +142,13 @@ Current known compatibility regressions and follow-up work are tracked in [TODO.
    **Linux / macOS (Terminal)**
    ```bash
    # Setup the build
-   meson setup --wipe builddir . --backend ninja --buildtype=debug --wrap-mode=forcefallback
+   bash tools/build/meson_setup.sh setup --wipe builddir . --backend ninja --buildtype=debug --wrap-mode=forcefallback
 
    # Compile
-   meson compile -C builddir
+   bash tools/build/meson_setup.sh compile -C builddir
 
    # Install (optional - creates distributable package)
-   meson install -C builddir --no-rebuild --skip-subprojects
+   bash tools/build/meson_setup.sh install -C builddir --no-rebuild --skip-subprojects
    ```
 
 3. **Run the game**
@@ -157,6 +167,7 @@ The engine will automatically find your Quake 4 installation and validate the ga
 
 > [!NOTE]
 > `tools/build/meson_setup.ps1` automatically runs `tools/build/sync_icons.py` before `setup`, `compile`, and `install` to validate and generate the canonical icon set in `assets/icons/` (including required PNG sizes). Set `OPENQ4_SKIP_ICON_SYNC=1` to bypass this in local workflows.
+> Local wrapper-driven builds always enable `build_libbse`; GitHub Actions builds always force it off.
 
 ---
 
@@ -205,13 +216,13 @@ meson compile -C builddir
 **Linux / macOS (Terminal)**
 ```bash
 # Configure
-meson setup builddir . --backend ninja --buildtype=release
+bash tools/build/meson_setup.sh setup builddir . --backend ninja --buildtype=release
 
 # Build
-meson compile -C builddir
+bash tools/build/meson_setup.sh compile -C builddir
 
 # Create distributable package
-meson install -C builddir --no-rebuild --skip-subprojects
+bash tools/build/meson_setup.sh install -C builddir --no-rebuild --skip-subprojects
 ```
 
 ### Output Files

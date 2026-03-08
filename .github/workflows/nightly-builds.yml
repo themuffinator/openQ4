@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       base_version: ${{ steps.version.outputs.base_version }}
+      version_iteration: ${{ steps.version.outputs.iteration }}
       version: ${{ steps.version.outputs.version }}
       version_tag: ${{ steps.version.outputs.version_tag }}
       release_tag: ${{ steps.version.outputs.release_tag }}
@@ -34,29 +35,18 @@ jobs:
         run: |
           set -euo pipefail
 
-          base_version="$(python - <<'PY'
-          import pathlib
-          import re
-
-          text = pathlib.Path("meson.build").read_text(encoding="utf-8")
-          match = re.search(r"version:\s*'([^']+)'", text)
-          if not match:
-              raise SystemExit("failed to parse project version from meson.build")
-          print(match.group(1))
-          PY
-          )"
           nightly_date="$(date -u +%Y%m%d)"
-          short_sha="$(git rev-parse --short=8 HEAD)"
           run_id="${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}"
 
-          version="${base_version}-nightly.${nightly_date}.${run_id}+${short_sha}"
-          version_tag="${base_version}-nightly.${nightly_date}.${run_id}-${short_sha}"
+          python tools/build/openq4_version.py \
+            --source-root . \
+            --track nightly \
+            --iteration "${nightly_date}.${run_id}" >> "$GITHUB_OUTPUT"
+
+          version_tag="$(grep '^version_tag=' "$GITHUB_OUTPUT" | tail -n 1 | cut -d= -f2-)"
           release_tag="nightly-${version_tag}"
           release_name="OpenQ4 Nightly ${version_tag}"
 
-          echo "base_version=${base_version}" >> "$GITHUB_OUTPUT"
-          echo "version=${version}" >> "$GITHUB_OUTPUT"
-          echo "version_tag=${version_tag}" >> "$GITHUB_OUTPUT"
           echo "release_tag=${release_tag}" >> "$GITHUB_OUTPUT"
           echo "release_name=${release_name}" >> "$GITHUB_OUTPUT"
 
@@ -139,7 +129,7 @@ jobs:
           $ErrorActionPreference = "Stop"
           $env:OPENQ4_SKIP_GAMELIBS_SYNC = "1"
 
-          powershell -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 setup --wipe builddir . --backend ninja --buildtype=release --wrap-mode=forcefallback -Dbuild_libbse=false -Dplatform_backend=${{ matrix.platform_backend }}
+          powershell -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 setup --wipe builddir . --backend ninja --buildtype=release --wrap-mode=forcefallback -Dbuild_libbse=false -Dplatform_backend=${{ matrix.platform_backend }} -Dversion_track=nightly -Dversion_iteration=${{ needs.metadata.outputs.version_iteration }}
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
           powershell -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 compile -C builddir
@@ -155,7 +145,7 @@ jobs:
           set -euo pipefail
           export OPENQ4_SKIP_GAMELIBS_SYNC=1
 
-          bash tools/build/meson_setup.sh setup --wipe builddir . --backend ninja --buildtype=release --wrap-mode=default -Dbuild_libbse=false -Dplatform_backend=${{ matrix.platform_backend }}
+          bash tools/build/meson_setup.sh setup --wipe builddir . --backend ninja --buildtype=release --wrap-mode=default -Dbuild_libbse=false -Dplatform_backend=${{ matrix.platform_backend }} -Dversion_track=nightly -Dversion_iteration=${{ needs.metadata.outputs.version_iteration }}
           bash tools/build/meson_setup.sh compile -C builddir
           bash tools/build/meson_setup.sh install -C builddir --no-rebuild --skip-subprojects
 
