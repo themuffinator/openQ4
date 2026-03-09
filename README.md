@@ -442,6 +442,11 @@ The game library source code is maintained separately in [OpenQ4-GameLibs](https
 - On Linux/macOS, use `meson` commands directly (no wrapper required)
 - Use `OPENQ4_GAMELIBS_REPO=<path>` to override repository location
 
+### Levelshot Capture
+- Use `levelshot [basename] [size] [blends]` in-game to capture a loading-screen tile set.
+- The command writes `basename`, `basename_left`, `basename_right`, `basename_top`, and `basename_bottom` as both `.tga` and `.dds`.
+- If `basename` is omitted, OpenQ4 uses the current map name under `gfx/guis/loadscreens/`; `size` defaults to `512`.
+
 ---
 
 ## Contributing

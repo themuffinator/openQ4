@@ -30,6 +30,10 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #include "Session_local.h"
+#include "../renderer/Image.h"
+
+void *R_StaticAlloc( int bytes );
+void R_StaticFree( void *data );
 
 #define RENDERDEMO_VERSION 1 
 #define USERCMD_MSEC common->GetUserCmdMSec()
@@ -134,20 +138,423 @@ static bool Session_FileExistsInSearchPaths( const char *path ) {
 	return ( fileSystem->ReadFile( path, NULL, NULL ) != -1 );
 }
 
-static bool Session_LevelshotImageExists( const idStr &imageBasePath ) {
-	if ( imageBasePath.Length() <= 0 ) {
+static bool Session_ResolveImageFilePath( const idStr &imagePath, idStr &resolvedPath ) {
+	if ( imagePath.Length() <= 0 ) {
 		return false;
 	}
 
-	idStr tgaPath = imageBasePath;
-	tgaPath.DefaultFileExtension( ".tga" );
-	if ( Session_FileExistsInSearchPaths( tgaPath.c_str() ) ) {
-		return true;
+	idStr canonicalPath = imagePath;
+	canonicalPath.BackSlashesToSlashes();
+
+	idStr basePath = canonicalPath;
+	idStr requestedExtension;
+	basePath.ExtractFileExtension( requestedExtension );
+	requestedExtension.ToLower();
+
+	if ( requestedExtension.Length() > 0 ) {
+		if ( Session_FileExistsInSearchPaths( canonicalPath.c_str() ) ) {
+			resolvedPath = canonicalPath;
+			return true;
+		}
+		basePath.StripFileExtension();
 	}
 
-	idStr jpgPath = imageBasePath;
-	jpgPath.DefaultFileExtension( ".jpg" );
-	return Session_FileExistsInSearchPaths( jpgPath.c_str() );
+	static const char *supportedExtensions[] = { "tga", "dds", "jpg", NULL };
+
+	if ( requestedExtension.Length() > 0 ) {
+		idStr requestedCandidate = basePath;
+		requestedCandidate += ".";
+		requestedCandidate += requestedExtension;
+		if ( Session_FileExistsInSearchPaths( requestedCandidate.c_str() ) ) {
+			resolvedPath = requestedCandidate;
+			return true;
+		}
+	}
+
+	for ( int i = 0; supportedExtensions[ i ] != NULL; i++ ) {
+		if ( requestedExtension.Length() > 0 && requestedExtension == supportedExtensions[ i ] ) {
+			continue;
+		}
+
+		idStr candidate = basePath;
+		candidate += ".";
+		candidate += supportedExtensions[ i ];
+		if ( Session_FileExistsInSearchPaths( candidate.c_str() ) ) {
+			resolvedPath = candidate;
+			return true;
+		}
+	}
+
+	return false;
+}
+
+static bool Session_LevelshotImageExists( const idStr &imageBasePath ) {
+	idStr resolvedPath;
+	return Session_ResolveImageFilePath( imageBasePath, resolvedPath );
+}
+
+static bool Session_ResolveSiblingImageFilePath( const idStr &resolvedBasePath, const char *suffix, idStr &resolvedPath ) {
+	if ( resolvedBasePath.Length() <= 0 || suffix == NULL || suffix[ 0 ] == '\0' ) {
+		return false;
+	}
+
+	idStr baseNoExt = resolvedBasePath;
+	idStr preferredExtension;
+	baseNoExt.ExtractFileExtension( preferredExtension );
+	preferredExtension.ToLower();
+	baseNoExt.StripFileExtension();
+	baseNoExt += suffix;
+
+	if ( preferredExtension.Length() > 0 ) {
+		idStr preferredCandidate = baseNoExt;
+		preferredCandidate += ".";
+		preferredCandidate += preferredExtension;
+		if ( Session_FileExistsInSearchPaths( preferredCandidate.c_str() ) ) {
+			resolvedPath = preferredCandidate;
+			return true;
+		}
+	}
+
+	static const char *supportedExtensions[] = { "tga", "dds", "jpg", NULL };
+	for ( int i = 0; supportedExtensions[ i ] != NULL; i++ ) {
+		if ( preferredExtension.Length() > 0 && preferredExtension == supportedExtensions[ i ] ) {
+			continue;
+		}
+
+		idStr candidate = baseNoExt;
+		candidate += ".";
+		candidate += supportedExtensions[ i ];
+		if ( Session_FileExistsInSearchPaths( candidate.c_str() ) ) {
+			resolvedPath = candidate;
+			return true;
+		}
+	}
+
+	return false;
+}
+
+static bool Session_LoadResolvedImageRGBA( const idStr &resolvedPath, byte *&pic, int &width, int &height ) {
+	pic = NULL;
+	width = 0;
+	height = 0;
+
+	R_LoadImage( resolvedPath.c_str(), &pic, &width, &height, NULL, false );
+	return ( pic != NULL && width > 0 && height > 0 );
+}
+
+static byte *Session_CreateResampledImageRegion( const byte *src, int srcWidth, int srcHeight,
+	int srcX, int srcY, int regionWidth, int regionHeight, int destWidth, int destHeight ) {
+	if ( src == NULL || srcWidth <= 0 || srcHeight <= 0 || destWidth <= 0 || destHeight <= 0 ) {
+		return NULL;
+	}
+
+	srcX = idMath::ClampInt( 0, srcWidth - 1, srcX );
+	srcY = idMath::ClampInt( 0, srcHeight - 1, srcY );
+	regionWidth = idMath::ClampInt( 1, srcWidth - srcX, regionWidth );
+	regionHeight = idMath::ClampInt( 1, srcHeight - srcY, regionHeight );
+
+	byte *cropped = (byte *)R_StaticAlloc( regionWidth * regionHeight * 4 );
+	for ( int y = 0; y < regionHeight; y++ ) {
+		const byte *srcRow = src + ( ( srcY + y ) * srcWidth + srcX ) * 4;
+		byte *dstRow = cropped + y * regionWidth * 4;
+		memcpy( dstRow, srcRow, regionWidth * 4 );
+	}
+
+	if ( regionWidth == destWidth && regionHeight == destHeight ) {
+		return cropped;
+	}
+
+	byte *resampled = R_ResampleTexture( cropped, regionWidth, regionHeight, destWidth, destHeight );
+	R_StaticFree( cropped );
+	return resampled;
+}
+
+static void Session_BlitRGBA( byte *dest, int destWidth, int destHeight, int destX, int destY,
+	const byte *src, int srcWidth, int srcHeight ) {
+	if ( dest == NULL || src == NULL || destWidth <= 0 || destHeight <= 0 || srcWidth <= 0 || srcHeight <= 0 ) {
+		return;
+	}
+
+	if ( destX < 0 || destY < 0 || destX + srcWidth > destWidth || destY + srcHeight > destHeight ) {
+		return;
+	}
+
+	for ( int y = 0; y < srcHeight; y++ ) {
+		byte *destRow = dest + ( ( destY + y ) * destWidth + destX ) * 4;
+		const byte *srcRow = src + y * srcWidth * 4;
+		memcpy( destRow, srcRow, srcWidth * 4 );
+	}
+}
+
+static void Session_ReplicateColumnIntoRect( byte *dest, int destWidth, int destHeight,
+	int sourceX, int rectX, int rectY, int rectWidth, int rectHeight ) {
+	if ( dest == NULL || destWidth <= 0 || destHeight <= 0 || rectWidth <= 0 || rectHeight <= 0 ) {
+		return;
+	}
+
+	sourceX = idMath::ClampInt( 0, destWidth - 1, sourceX );
+	rectX = idMath::ClampInt( 0, destWidth, rectX );
+	rectY = idMath::ClampInt( 0, destHeight, rectY );
+	rectWidth = idMath::ClampInt( 0, destWidth - rectX, rectWidth );
+	rectHeight = idMath::ClampInt( 0, destHeight - rectY, rectHeight );
+
+	for ( int y = 0; y < rectHeight; y++ ) {
+		const byte *sourcePixel = dest + ( ( rectY + y ) * destWidth + sourceX ) * 4;
+		byte *destPixel = dest + ( ( rectY + y ) * destWidth + rectX ) * 4;
+		for ( int x = 0; x < rectWidth; x++, destPixel += 4 ) {
+			destPixel[ 0 ] = sourcePixel[ 0 ];
+			destPixel[ 1 ] = sourcePixel[ 1 ];
+			destPixel[ 2 ] = sourcePixel[ 2 ];
+			destPixel[ 3 ] = sourcePixel[ 3 ];
+		}
+	}
+}
+
+static void Session_ReplicateRowIntoRect( byte *dest, int destWidth, int destHeight,
+	int sourceY, int rectX, int rectY, int rectWidth, int rectHeight ) {
+	if ( dest == NULL || destWidth <= 0 || destHeight <= 0 || rectWidth <= 0 || rectHeight <= 0 ) {
+		return;
+	}
+
+	sourceY = idMath::ClampInt( 0, destHeight - 1, sourceY );
+	rectX = idMath::ClampInt( 0, destWidth, rectX );
+	rectY = idMath::ClampInt( 0, destHeight, rectY );
+	rectWidth = idMath::ClampInt( 0, destWidth - rectX, rectWidth );
+	rectHeight = idMath::ClampInt( 0, destHeight - rectY, rectHeight );
+
+	for ( int y = 0; y < rectHeight; y++ ) {
+		byte *destRow = dest + ( ( rectY + y ) * destWidth + rectX ) * 4;
+		const byte *sourceRow = dest + ( sourceY * destWidth + rectX ) * 4;
+		memcpy( destRow, sourceRow, rectWidth * 4 );
+	}
+}
+
+static bool Session_GetLoadingCanvasExpansion( float &windowAspect, bool &expandHorizontally, bool &expandVertically ) {
+	windowAspect = static_cast<float>( SCREEN_WIDTH ) / static_cast<float>( SCREEN_HEIGHT );
+	expandHorizontally = false;
+	expandVertically = false;
+
+	if ( !cvarSystem->GetCVarBool( "ui_aspectCorrection" ) ) {
+		return false;
+	}
+
+	float viewportWidth = static_cast<float>( glConfig.uiViewportWidth );
+	float viewportHeight = static_cast<float>( glConfig.uiViewportHeight );
+	if ( viewportWidth <= 0.0f || viewportHeight <= 0.0f ) {
+		viewportWidth = static_cast<float>( glConfig.vidWidth );
+		viewportHeight = static_cast<float>( glConfig.vidHeight );
+	}
+
+	if ( viewportWidth <= 0.0f || viewportHeight <= 0.0f ) {
+		return false;
+	}
+
+	const float targetAspect = static_cast<float>( SCREEN_WIDTH ) / static_cast<float>( SCREEN_HEIGHT );
+	const float aspectEpsilon = 0.0001f;
+
+	windowAspect = viewportWidth / viewportHeight;
+	if ( windowAspect > targetAspect + aspectEpsilon ) {
+		expandHorizontally = true;
+	} else if ( windowAspect + aspectEpsilon < targetAspect ) {
+		expandVertically = true;
+	}
+
+	return expandHorizontally || expandVertically;
+}
+
+static idStr Session_MakeExpandedLoadingBackgroundPath( const char *mapName, int width, int height ) {
+	idStr safeName = mapName;
+	safeName.BackSlashesToSlashes();
+	safeName.StripPath();
+	safeName.StripFileExtension();
+	if ( safeName.Length() <= 0 ) {
+		safeName = "generated";
+	}
+
+	return va( "guis/assets/generated/loadscreens/%s_%dx%d.tga", safeName.c_str(), width, height );
+}
+
+static bool Session_PrepareExpandedLoadingBackground( const idStr &backgroundPath, const char *mapName, idStr &generatedPath ) {
+	float windowAspect = 0.0f;
+	bool expandHorizontally = false;
+	bool expandVertically = false;
+	if ( !Session_GetLoadingCanvasExpansion( windowAspect, expandHorizontally, expandVertically ) ) {
+		return false;
+	}
+
+	idStr resolvedCenterPath;
+	if ( !Session_ResolveImageFilePath( backgroundPath, resolvedCenterPath ) ) {
+		return false;
+	}
+
+	idStr resolvedLeftPath;
+	idStr resolvedRightPath;
+	idStr resolvedTopPath;
+	idStr resolvedBottomPath;
+
+	bool hasLeft = Session_ResolveSiblingImageFilePath( resolvedCenterPath, "_left", resolvedLeftPath );
+	bool hasRight = Session_ResolveSiblingImageFilePath( resolvedCenterPath, "_right", resolvedRightPath );
+	bool hasTop = Session_ResolveSiblingImageFilePath( resolvedCenterPath, "_top", resolvedTopPath );
+	bool hasBottom = Session_ResolveSiblingImageFilePath( resolvedCenterPath, "_bottom", resolvedBottomPath );
+
+	if ( expandHorizontally && !( hasLeft || hasRight ) ) {
+		return false;
+	}
+	if ( expandVertically && !( hasTop || hasBottom ) ) {
+		return false;
+	}
+
+	byte *centerPic = NULL;
+	int centerWidth = 0;
+	int centerHeight = 0;
+	if ( !Session_LoadResolvedImageRGBA( resolvedCenterPath, centerPic, centerWidth, centerHeight ) ) {
+		return false;
+	}
+
+	byte *leftPic = NULL;
+	byte *rightPic = NULL;
+	byte *topPic = NULL;
+	byte *bottomPic = NULL;
+	int leftWidth = 0, leftHeight = 0;
+	int rightWidth = 0, rightHeight = 0;
+	int topWidth = 0, topHeight = 0;
+	int bottomWidth = 0, bottomHeight = 0;
+
+	if ( hasLeft && !Session_LoadResolvedImageRGBA( resolvedLeftPath, leftPic, leftWidth, leftHeight ) ) {
+		hasLeft = false;
+	}
+	if ( hasRight && !Session_LoadResolvedImageRGBA( resolvedRightPath, rightPic, rightWidth, rightHeight ) ) {
+		hasRight = false;
+	}
+	if ( hasTop && !Session_LoadResolvedImageRGBA( resolvedTopPath, topPic, topWidth, topHeight ) ) {
+		hasTop = false;
+	}
+	if ( hasBottom && !Session_LoadResolvedImageRGBA( resolvedBottomPath, bottomPic, bottomWidth, bottomHeight ) ) {
+		hasBottom = false;
+	}
+
+	const int centerDisplayHeight = centerHeight;
+	const int centerDisplayWidth = Max( 1, idMath::Ftoi( centerDisplayHeight * ( static_cast<float>( SCREEN_WIDTH ) / static_cast<float>( SCREEN_HEIGHT ) ) + 0.5f ) );
+
+	int outputWidth = centerDisplayWidth;
+	int outputHeight = centerDisplayHeight;
+	int centerX = 0;
+	int centerY = 0;
+
+	if ( expandHorizontally ) {
+		outputWidth = Max( centerDisplayWidth, idMath::Ftoi( windowAspect * centerDisplayHeight + 0.5f ) );
+		centerX = ( outputWidth - centerDisplayWidth ) / 2;
+	} else {
+		outputHeight = Max( centerDisplayHeight, idMath::Ftoi( centerDisplayWidth / windowAspect + 0.5f ) );
+		centerY = ( outputHeight - centerDisplayHeight ) / 2;
+	}
+
+	idTempArray<byte> composite( outputWidth * outputHeight * 4 );
+	memset( composite.Ptr(), 0, outputWidth * outputHeight * 4 );
+
+	byte *centerResampled = Session_CreateResampledImageRegion( centerPic, centerWidth, centerHeight, 0, 0, centerWidth, centerHeight, centerDisplayWidth, centerDisplayHeight );
+	if ( centerResampled == NULL ) {
+		R_StaticFree( centerPic );
+		if ( leftPic ) {
+			R_StaticFree( leftPic );
+		}
+		if ( rightPic ) {
+			R_StaticFree( rightPic );
+		}
+		if ( topPic ) {
+			R_StaticFree( topPic );
+		}
+		if ( bottomPic ) {
+			R_StaticFree( bottomPic );
+		}
+		return false;
+	}
+
+	Session_BlitRGBA( composite.Ptr(), outputWidth, outputHeight, centerX, centerY, centerResampled, centerDisplayWidth, centerDisplayHeight );
+	R_StaticFree( centerResampled );
+
+	if ( expandHorizontally ) {
+		const int leftWidthPixels = centerX;
+		const int rightWidthPixels = outputWidth - centerX - centerDisplayWidth;
+
+		if ( leftWidthPixels > 0 ) {
+			Session_ReplicateColumnIntoRect( composite.Ptr(), outputWidth, outputHeight, centerX, 0, 0, leftWidthPixels, outputHeight );
+			if ( hasLeft && leftPic != NULL ) {
+				const int cropWidth = Max( 1, idMath::Ftoi( leftWidth * ( static_cast<float>( leftWidthPixels ) / static_cast<float>( centerDisplayWidth ) ) + 0.5f ) );
+				byte *leftResampled = Session_CreateResampledImageRegion( leftPic, leftWidth, leftHeight,
+					Max( 0, leftWidth - cropWidth ), 0, cropWidth, leftHeight, leftWidthPixels, outputHeight );
+				if ( leftResampled != NULL ) {
+					Session_BlitRGBA( composite.Ptr(), outputWidth, outputHeight, 0, 0, leftResampled, leftWidthPixels, outputHeight );
+					R_StaticFree( leftResampled );
+				}
+			}
+		}
+
+		if ( rightWidthPixels > 0 ) {
+			Session_ReplicateColumnIntoRect( composite.Ptr(), outputWidth, outputHeight, centerX + centerDisplayWidth - 1,
+				centerX + centerDisplayWidth, 0, rightWidthPixels, outputHeight );
+			if ( hasRight && rightPic != NULL ) {
+				const int cropWidth = Max( 1, idMath::Ftoi( rightWidth * ( static_cast<float>( rightWidthPixels ) / static_cast<float>( centerDisplayWidth ) ) + 0.5f ) );
+				byte *rightResampled = Session_CreateResampledImageRegion( rightPic, rightWidth, rightHeight,
+					0, 0, cropWidth, rightHeight, rightWidthPixels, outputHeight );
+				if ( rightResampled != NULL ) {
+					Session_BlitRGBA( composite.Ptr(), outputWidth, outputHeight, centerX + centerDisplayWidth, 0,
+						rightResampled, rightWidthPixels, outputHeight );
+					R_StaticFree( rightResampled );
+				}
+			}
+		}
+	} else {
+		const int topHeightPixels = centerY;
+		const int bottomHeightPixels = outputHeight - centerY - centerDisplayHeight;
+
+		if ( topHeightPixels > 0 ) {
+			Session_ReplicateRowIntoRect( composite.Ptr(), outputWidth, outputHeight, centerY, 0, 0, outputWidth, topHeightPixels );
+			if ( hasTop && topPic != NULL ) {
+				const int cropHeight = Max( 1, idMath::Ftoi( topHeight * ( static_cast<float>( topHeightPixels ) / static_cast<float>( centerDisplayHeight ) ) + 0.5f ) );
+				byte *topResampled = Session_CreateResampledImageRegion( topPic, topWidth, topHeight,
+					0, Max( 0, topHeight - cropHeight ), topWidth, cropHeight, outputWidth, topHeightPixels );
+				if ( topResampled != NULL ) {
+					Session_BlitRGBA( composite.Ptr(), outputWidth, outputHeight, 0, 0, topResampled, outputWidth, topHeightPixels );
+					R_StaticFree( topResampled );
+				}
+			}
+		}
+
+		if ( bottomHeightPixels > 0 ) {
+			Session_ReplicateRowIntoRect( composite.Ptr(), outputWidth, outputHeight, centerY + centerDisplayHeight - 1,
+				0, centerY + centerDisplayHeight, outputWidth, bottomHeightPixels );
+			if ( hasBottom && bottomPic != NULL ) {
+				const int cropHeight = Max( 1, idMath::Ftoi( bottomHeight * ( static_cast<float>( bottomHeightPixels ) / static_cast<float>( centerDisplayHeight ) ) + 0.5f ) );
+				byte *bottomResampled = Session_CreateResampledImageRegion( bottomPic, bottomWidth, bottomHeight,
+					0, 0, bottomWidth, cropHeight, outputWidth, bottomHeightPixels );
+				if ( bottomResampled != NULL ) {
+					Session_BlitRGBA( composite.Ptr(), outputWidth, outputHeight, 0, centerY + centerDisplayHeight,
+						bottomResampled, outputWidth, bottomHeightPixels );
+					R_StaticFree( bottomResampled );
+				}
+			}
+		}
+	}
+
+	generatedPath = Session_MakeExpandedLoadingBackgroundPath( mapName, outputWidth, outputHeight );
+	R_WriteTGA( generatedPath.c_str(), composite.Ptr(), outputWidth, outputHeight );
+
+	R_StaticFree( centerPic );
+	if ( leftPic ) {
+		R_StaticFree( leftPic );
+	}
+	if ( rightPic ) {
+		R_StaticFree( rightPic );
+	}
+	if ( topPic ) {
+		R_StaticFree( topPic );
+	}
+	if ( bottomPic ) {
+		R_StaticFree( bottomPic );
+	}
+
+	return true;
 }
 
 static void Session_ResolveWideLoadingBackground( idStr &backgroundPath, bool &isWide ) {
@@ -1689,6 +2096,7 @@ void idSessionLocal::LoadLoadingGui( const char *mapName ) {
 	const char *loadingObjectives = "";
 	const char *loadingAuthor = "";
 	idStr loadingBackground = "gfx/guis/loadscreens/generic";
+	bool loadingBackgroundCanvasFill = false;
 	bool loadingBackgroundWide = false;
 	const char *loadGuiOverride = "";
 	const char *spawnGameType = mapSpawnData.serverInfo.GetString( "si_gameType", cvarSystem->GetCVarString( "si_gameType" ) );
@@ -1721,7 +2129,14 @@ void idSessionLocal::LoadLoadingGui( const char *mapName ) {
 		loadingBackground = screenshot;
 	}
 
-	Session_ResolveWideLoadingBackground( loadingBackground, loadingBackgroundWide );
+	idStr expandedLoadingBackground;
+	if ( Session_PrepareExpandedLoadingBackground( loadingBackground, stripped.c_str(), expandedLoadingBackground ) ) {
+		loadingBackground = expandedLoadingBackground;
+		loadingBackgroundCanvasFill = true;
+	} else {
+		Session_ResolveWideLoadingBackground( loadingBackground, loadingBackgroundWide );
+		loadingBackgroundCanvasFill = loadingBackgroundWide;
+	}
 
 	char guiMap[ MAX_STRING_CHARS ];
 	strncpy( guiMap, va( "guis/map/%s.gui", stripped.c_str() ), MAX_STRING_CHARS );
@@ -1743,6 +2158,7 @@ void idSessionLocal::LoadLoadingGui( const char *mapName ) {
 	if ( guiLoading ) {
 		guiLoading->SetStateFloat( "map_loading", 0.0f );
 		guiLoading->SetStateString( "loading_bkgnd", loadingBackground.c_str() );
+		guiLoading->SetStateInt( "loading_bkgnd_canvasfill", loadingBackgroundCanvasFill ? 1 : 0 );
 		guiLoading->SetStateInt( "loading_bkgnd_wide", loadingBackgroundWide ? 1 : 0 );
 		guiLoading->SetStateString( "loading_levelname", loadingLevelName );
 		guiLoading->SetStateString( "loading_objectives", loadingObjectives );

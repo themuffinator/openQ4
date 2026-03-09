@@ -30,6 +30,7 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #include "tr_local.h"
+#include "DXT/DXTCodec.h"
 
 // Vista OpenGL wrapper check
 #ifdef _WIN32
@@ -1292,6 +1293,250 @@ void R_ScreenshotFilename( int &lastNumber, const char *base, idStr &fileName ) 
 	cvarSystem->SetCVarBool( "fs_restrict", restrict );
 }
 
+static ID_INLINE void R_WriteLittleUInt32( byte *buffer, int offset, uint32 value ) {
+	buffer[ offset + 0 ] = value & 0xFF;
+	buffer[ offset + 1 ] = ( value >> 8 ) & 0xFF;
+	buffer[ offset + 2 ] = ( value >> 16 ) & 0xFF;
+	buffer[ offset + 3 ] = ( value >> 24 ) & 0xFF;
+}
+
+static void R_WriteDDS( const char *fileName, const byte *rgba, int width, int height ) {
+	if ( fileName == NULL || rgba == NULL || width <= 0 || height <= 0 ) {
+		return;
+	}
+
+	bool hasAlpha = false;
+	for ( int i = 0; i < width * height; i++ ) {
+		if ( rgba[ i * 4 + 3 ] != 255 ) {
+			hasAlpha = true;
+			break;
+		}
+	}
+
+	const bool useDXT5 = hasAlpha;
+	const int paddedWidth = ( width + 3 ) & ~3;
+	const int paddedHeight = ( height + 3 ) & ~3;
+	const int blockSize = useDXT5 ? 16 : 8;
+	const int blockCount = Max( 1, ( width + 3 ) >> 2 ) * Max( 1, ( height + 3 ) >> 2 );
+	const int compressedSize = blockCount * blockSize;
+
+	idTempArray<byte> paddedPixels( paddedWidth * paddedHeight * 4 );
+	for ( int y = 0; y < paddedHeight; y++ ) {
+		const int srcY = idMath::ClampInt( 0, height - 1, y );
+		for ( int x = 0; x < paddedWidth; x++ ) {
+			const int srcX = idMath::ClampInt( 0, width - 1, x );
+			const byte *srcPixel = rgba + ( srcY * width + srcX ) * 4;
+			byte *dstPixel = paddedPixels.Ptr() + ( y * paddedWidth + x ) * 4;
+			dstPixel[ 0 ] = srcPixel[ 0 ];
+			dstPixel[ 1 ] = srcPixel[ 1 ];
+			dstPixel[ 2 ] = srcPixel[ 2 ];
+			dstPixel[ 3 ] = srcPixel[ 3 ];
+		}
+	}
+
+	idTempArray<byte> compressedPixels( compressedSize );
+	idDxtEncoder encoder;
+	if ( useDXT5 ) {
+		encoder.CompressImageDXT5Fast( paddedPixels.Ptr(), compressedPixels.Ptr(), paddedWidth, paddedHeight );
+	} else {
+		encoder.CompressImageDXT1Fast( paddedPixels.Ptr(), compressedPixels.Ptr(), paddedWidth, paddedHeight );
+	}
+
+	idTempArray<byte> fileBuffer( 128 + compressedSize );
+	memset( fileBuffer.Ptr(), 0, 128 + compressedSize );
+
+	fileBuffer[ 0 ] = 'D';
+	fileBuffer[ 1 ] = 'D';
+	fileBuffer[ 2 ] = 'S';
+	fileBuffer[ 3 ] = ' ';
+	R_WriteLittleUInt32( fileBuffer.Ptr(), 4, 124 );
+	R_WriteLittleUInt32( fileBuffer.Ptr(), 8, 0x00000001 | 0x00000002 | 0x00000004 | 0x00001000 | 0x00080000 );
+	R_WriteLittleUInt32( fileBuffer.Ptr(), 12, height );
+	R_WriteLittleUInt32( fileBuffer.Ptr(), 16, width );
+	R_WriteLittleUInt32( fileBuffer.Ptr(), 20, compressedSize );
+	R_WriteLittleUInt32( fileBuffer.Ptr(), 76, 32 );
+	R_WriteLittleUInt32( fileBuffer.Ptr(), 80, 0x00000004 );
+	R_WriteLittleUInt32( fileBuffer.Ptr(), 84,
+		( (uint32)'D' ) | ( (uint32)'X' << 8 ) | ( (uint32)'T' << 16 ) | ( (uint32)( useDXT5 ? '5' : '1' ) << 24 ) );
+	R_WriteLittleUInt32( fileBuffer.Ptr(), 108, 0x00001000 );
+
+	memcpy( fileBuffer.Ptr() + 128, compressedPixels.Ptr(), compressedSize );
+	fileSystem->WriteFile( fileName, fileBuffer.Ptr(), 128 + compressedSize );
+}
+
+static void R_CaptureTiledPixelsRGBA( int width, int height, int blends, renderView_t *ref, byte *rgbaOut ) {
+	const int pixelCount = width * height;
+	byte *rgbBuffer = (byte *)R_StaticAlloc( pixelCount * 3 );
+
+	if ( blends <= 1 ) {
+		R_ReadTiledPixels( width, height, rgbBuffer, ref );
+	} else {
+		unsigned short *accumBuffer = (unsigned short *)R_StaticAlloc( pixelCount * 3 * sizeof( unsigned short ) );
+		memset( accumBuffer, 0, pixelCount * 3 * sizeof( unsigned short ) );
+
+		r_jitter.SetBool( true );
+		for ( int i = 0; i < blends; i++ ) {
+			R_ReadTiledPixels( width, height, rgbBuffer, ref );
+			for ( int j = 0; j < pixelCount * 3; j++ ) {
+				accumBuffer[ j ] += rgbBuffer[ j ];
+			}
+		}
+		r_jitter.SetBool( false );
+
+		for ( int i = 0; i < pixelCount * 3; i++ ) {
+			rgbBuffer[ i ] = accumBuffer[ i ] / blends;
+		}
+
+		R_StaticFree( accumBuffer );
+	}
+
+	for ( int y = 0; y < height; y++ ) {
+		const byte *srcRow = rgbBuffer + ( ( height - 1 - y ) * width ) * 3;
+		byte *dstRow = rgbaOut + y * width * 4;
+		for ( int x = 0; x < width; x++ ) {
+			dstRow[ x * 4 + 0 ] = srcRow[ x * 3 + 0 ];
+			dstRow[ x * 4 + 1 ] = srcRow[ x * 3 + 1 ];
+			dstRow[ x * 4 + 2 ] = srcRow[ x * 3 + 2 ];
+			dstRow[ x * 4 + 3 ] = 255;
+		}
+	}
+
+	R_StaticFree( rgbBuffer );
+}
+
+static void R_ExtractTileRGBA( const byte *src, int srcWidth, int srcX, int srcY, int tileSize, byte *dst ) {
+	for ( int y = 0; y < tileSize; y++ ) {
+		const byte *srcRow = src + ( ( srcY + y ) * srcWidth + srcX ) * 4;
+		byte *dstRow = dst + y * tileSize * 4;
+		memcpy( dstRow, srcRow, tileSize * 4 );
+	}
+}
+
+static float R_LevelShotExpandedFov( float baseFov, float scale ) {
+	return RAD2DEG( 2.0f * idMath::ATan( idMath::Tan( DEG2RAD( baseFov * 0.5f ) ) * scale ) );
+}
+
+static void R_NormalizeLevelShotBaseName( const char *requestedBase, idStr &baseName ) {
+	baseName = requestedBase;
+	baseName.BackSlashesToSlashes();
+	baseName.StripFileExtension();
+
+	if ( baseName.Length() <= 0 ) {
+		idStr mapName = cvarSystem->GetCVarString( "si_map" );
+		mapName.StripPath();
+		mapName.StripFileExtension();
+		if ( mapName.Length() > 0 ) {
+			baseName = va( "gfx/guis/loadscreens/%s", mapName.c_str() );
+			return;
+		}
+
+		static int lastLevelshotNumber = 0;
+		R_ScreenshotFilename( lastLevelshotNumber, "screenshots/levelshot", baseName );
+		baseName.StripFileExtension();
+		return;
+	}
+
+	if ( baseName.Find( "/", false ) < 0 && baseName.Find( ":", false ) < 0 ) {
+		baseName = va( "gfx/guis/loadscreens/%s", baseName.c_str() );
+	}
+}
+
+static void R_WriteLevelShotTile( const idStr &baseName, const char *suffix, const byte *rgba, int tileSize ) {
+	idStr tgaName = baseName;
+	tgaName += suffix;
+	tgaName += ".tga";
+	R_WriteTGA( tgaName.c_str(), rgba, tileSize, tileSize );
+
+	idStr ddsName = baseName;
+	ddsName += suffix;
+	ddsName += ".dds";
+	R_WriteDDS( ddsName.c_str(), rgba, tileSize, tileSize );
+}
+
+void R_LevelShot_f( const idCmdArgs &args ) {
+	idStr baseName;
+	int size = 512;
+	int blends = 1;
+	const int maxBlends = 256;
+
+	switch ( args.Argc() ) {
+	case 1:
+		R_NormalizeLevelShotBaseName( "", baseName );
+		break;
+	case 2:
+		R_NormalizeLevelShotBaseName( args.Argv( 1 ), baseName );
+		break;
+	case 3:
+		R_NormalizeLevelShotBaseName( args.Argv( 1 ), baseName );
+		size = atoi( args.Argv( 2 ) );
+		break;
+	case 4:
+		R_NormalizeLevelShotBaseName( args.Argv( 1 ), baseName );
+		size = atoi( args.Argv( 2 ) );
+		blends = atoi( args.Argv( 3 ) );
+		break;
+	default:
+		common->Printf( "usage: levelshot\n       levelshot <basename>\n       levelshot <basename> <size>\n       levelshot <basename> <size> <blends>\n" );
+		return;
+	}
+
+	if ( size < 1 ) {
+		size = 1;
+	}
+	if ( blends < 1 ) {
+		blends = 1;
+	}
+	if ( blends > maxBlends ) {
+		blends = maxBlends;
+	}
+
+	if ( !tr.primaryView || !tr.primaryWorld ) {
+		common->Printf( "No primary view.\n" );
+		return;
+	}
+
+	const int wideWidth = size * 3;
+	const int tallHeight = size * 3;
+
+	renderView_t baseRef = tr.primaryView->renderView;
+	baseRef.x = 0;
+	baseRef.y = 0;
+	baseRef.width = SCREEN_WIDTH;
+	baseRef.height = SCREEN_HEIGHT;
+
+	renderView_t wideRef = baseRef;
+	renderView_t tallRef = baseRef;
+	wideRef.fov_x = R_LevelShotExpandedFov( baseRef.fov_x, 3.0f );
+	tallRef.fov_y = R_LevelShotExpandedFov( baseRef.fov_y, 3.0f );
+
+	idTempArray<byte> wideStrip( wideWidth * size * 4 );
+	idTempArray<byte> tallStrip( size * tallHeight * 4 );
+	idTempArray<byte> centerTile( size * size * 4 );
+	idTempArray<byte> leftTile( size * size * 4 );
+	idTempArray<byte> rightTile( size * size * 4 );
+	idTempArray<byte> topTile( size * size * 4 );
+	idTempArray<byte> bottomTile( size * size * 4 );
+
+	console->Close();
+
+	R_CaptureTiledPixelsRGBA( wideWidth, size, blends, &wideRef, wideStrip.Ptr() );
+	R_CaptureTiledPixelsRGBA( size, tallHeight, blends, &tallRef, tallStrip.Ptr() );
+
+	R_ExtractTileRGBA( wideStrip.Ptr(), wideWidth, 0, 0, size, leftTile.Ptr() );
+	R_ExtractTileRGBA( wideStrip.Ptr(), wideWidth, size, 0, size, centerTile.Ptr() );
+	R_ExtractTileRGBA( wideStrip.Ptr(), wideWidth, size * 2, 0, size, rightTile.Ptr() );
+	R_ExtractTileRGBA( tallStrip.Ptr(), size, 0, 0, size, topTile.Ptr() );
+	R_ExtractTileRGBA( tallStrip.Ptr(), size, 0, size * 2, size, bottomTile.Ptr() );
+
+	R_WriteLevelShotTile( baseName, "", centerTile.Ptr(), size );
+	R_WriteLevelShotTile( baseName, "_left", leftTile.Ptr(), size );
+	R_WriteLevelShotTile( baseName, "_right", rightTile.Ptr(), size );
+	R_WriteLevelShotTile( baseName, "_top", topTile.Ptr(), size );
+	R_WriteLevelShotTile( baseName, "_bottom", bottomTile.Ptr(), size );
+
+	common->Printf( "Wrote %s(.tga/.dds) and _left/_right/_top/_bottom tiles\n", baseName.c_str() );
+}
+
 /*
 ================== 
 R_BlendedScreenShot
@@ -2038,6 +2283,7 @@ void R_InitCommands( void ) {
 	cmdSystem->AddCommand( "listGuis", R_ListGuis_f, CMD_FL_RENDERER, "lists guis" );
 	cmdSystem->AddCommand( "touchGui", R_TouchGui_f, CMD_FL_RENDERER, "touches a gui" );
 	cmdSystem->AddCommand( "screenshot", R_ScreenShot_f, CMD_FL_RENDERER, "takes a screenshot" );
+	cmdSystem->AddCommand( "levelshot", R_LevelShot_f, CMD_FL_RENDERER, "captures a 5-tile levelshot set" );
 	cmdSystem->AddCommand( "envshot", R_EnvShot_f, CMD_FL_RENDERER, "takes an environment shot" );
 	cmdSystem->AddCommand( "makeAmbientMap", R_MakeAmbientMap_f, CMD_FL_RENDERER|CMD_FL_CHEAT, "makes an ambient map" );
 	cmdSystem->AddCommand( "benchmark", R_Benchmark_f, CMD_FL_RENDERER, "benchmark" );
