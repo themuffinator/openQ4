@@ -4,6 +4,45 @@ set -euo pipefail
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd -- "${script_dir}/../.." && pwd)"
 default_builddir="${repo_root}/builddir"
+declare -a MESON_CMD=()
+
+resolve_python() {
+    if command -v python3 >/dev/null 2>&1; then
+        command -v python3
+        return 0
+    fi
+
+    if command -v python >/dev/null 2>&1; then
+        command -v python
+        return 0
+    fi
+
+    return 1
+}
+
+resolve_meson_cmd() {
+    local python_cmd=""
+    python_cmd="$(resolve_python || true)"
+
+    if [[ -n "${python_cmd}" ]] && "${python_cmd}" -c 'import mesonbuild.mesonmain' >/dev/null 2>&1; then
+        MESON_CMD=("${python_cmd}" -m mesonbuild.mesonmain)
+        return
+    fi
+
+    if command -v meson >/dev/null 2>&1; then
+        MESON_CMD=("$(command -v meson)")
+        return
+    fi
+
+    echo "Meson was not found. Install it into the active Python environment or make 'meson' available on PATH." >&2
+    exit 1
+}
+
+run_meson() {
+    "${MESON_CMD[@]}" "$@"
+}
+
+resolve_meson_cmd
 
 test_meson_build_directory() {
     local build_dir="$1"
@@ -132,7 +171,7 @@ if [[ "${command_name}" == "compile" || "${command_name}" == "install" ]]; then
             --wrap-mode=forcefallback
         )
         mapfile -d '' -t setup_args < <(set_build_libbse_arg "${setup_args[@]}")
-        meson "${setup_args[@]}"
+        run_meson "${setup_args[@]}"
     fi
 
     if test_meson_build_directory "${BUILD_DIR}"; then
@@ -147,7 +186,7 @@ if [[ "${command_name}" == "compile" || "${command_name}" == "install" ]]; then
                 "${repo_root}"
             )
             mapfile -d '' -t reconfigure_args < <(set_build_libbse_arg "${reconfigure_args[@]}")
-            meson "${reconfigure_args[@]}"
+            run_meson "${reconfigure_args[@]}"
         fi
     fi
 
@@ -173,4 +212,4 @@ if [[ "${command_name}" == "compile" || "${command_name}" == "install" ]]; then
     fi
 fi
 
-exec meson "${effective_args[@]}"
+exec "${MESON_CMD[@]}" "${effective_args[@]}"

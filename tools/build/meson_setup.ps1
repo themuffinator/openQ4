@@ -45,18 +45,49 @@ function Quote-CmdArg([string]$Value) {
     return $Value
 }
 
+function Get-MesonCommand {
+    $pythonCandidates = @("python", "python3")
+    foreach ($candidate in $pythonCandidates) {
+        $pythonCommand = Get-Command $candidate -ErrorAction SilentlyContinue
+        if ($null -eq $pythonCommand) {
+            continue
+        }
+
+        & $pythonCommand.Source -c "import mesonbuild.mesonmain" *> $null
+        if ($LASTEXITCODE -eq 0) {
+            return [PSCustomObject]@{
+                Executable = $pythonCommand.Source
+                Arguments  = @("-m", "mesonbuild.mesonmain")
+            }
+        }
+    }
+
+    $mesonCommand = Get-Command "meson" -ErrorAction SilentlyContinue
+    if ($null -ne $mesonCommand) {
+        return [PSCustomObject]@{
+            Executable = $mesonCommand.Source
+            Arguments  = @()
+        }
+    }
+
+    throw "Could not find Meson. Install it into the active Python environment or make 'meson' available on PATH."
+}
+
 function Invoke-Meson {
     param(
         [string[]]$MesonArgs,
-        [string]$VsDevCmdPath
+        [string]$VsDevCmdPath,
+        [pscustomobject]$MesonCommand
     )
 
+    $mesonInvocation = @($MesonCommand.Arguments) + $MesonArgs
     if ([string]::IsNullOrWhiteSpace($VsDevCmdPath)) {
-        & meson @MesonArgs
+        & $MesonCommand.Executable @mesonInvocation
         return
     }
 
-    $mesonCmd = "meson " + (($MesonArgs | ForEach-Object { Quote-CmdArg $_ }) -join " ")
+    $mesonCommandLine = @($MesonCommand.Executable) + $MesonCommand.Arguments + $MesonArgs
+    $mesonCmd = ($mesonCommandLine | ForEach-Object { Quote-CmdArg $_ }) -join " "
     $fullCmd = 'call "' + $VsDevCmdPath + '" -arch=x64 -host_arch=x64 >nul && ' + $mesonCmd
     & $env:ComSpec /d /c $fullCmd
 }
@@ -346,6 +377,7 @@ $vsDevCmd = $null
 if ($null -eq (Get-Command cl -ErrorAction SilentlyContinue)) {
     $vsDevCmd = Get-VsDevCmdPath
 }
+$mesonCommand = Get-MesonCommand
 
 $effectiveArgs = @($args)
 if ($effectiveArgs.Count -eq 0) {
@@ -397,7 +429,7 @@ if ($effectiveArgs.Length -gt 0 -and ($effectiveArgs[0] -eq "compile" -or $effec
             "--wrap-mode=forcefallback"
         )
         $setupArgs = Set-BuildLibBSEMesonArg -MesonArgs $setupArgs
-        Invoke-Meson -MesonArgs $setupArgs -VsDevCmdPath $vsDevCmd
+        Invoke-Meson -MesonArgs $setupArgs -VsDevCmdPath $vsDevCmd -MesonCommand $mesonCommand
         $setupCode = [int]$LASTEXITCODE
         if ($setupCode -ne 0) {
             exit $setupCode
@@ -420,7 +452,7 @@ if ($effectiveArgs.Length -gt 0 -and ($effectiveArgs[0] -eq "compile" -or $effec
             $repoRoot
         )
         $reconfigureArgs = Set-BuildLibBSEMesonArg -MesonArgs $reconfigureArgs
-        Invoke-Meson -MesonArgs $reconfigureArgs -VsDevCmdPath $vsDevCmd
+        Invoke-Meson -MesonArgs $reconfigureArgs -VsDevCmdPath $vsDevCmd -MesonCommand $mesonCommand
         $reconfigureCode = [int]$LASTEXITCODE
         if ($reconfigureCode -ne 0) {
             exit $reconfigureCode
@@ -456,14 +488,14 @@ if (@("setup", "compile", "install").Contains($commandName) -and $env:OPENQ4_SKI
     }
 }
 
-Invoke-Meson -MesonArgs $effectiveArgs -VsDevCmdPath $vsDevCmd
+Invoke-Meson -MesonArgs $effectiveArgs -VsDevCmdPath $vsDevCmd -MesonCommand $mesonCommand
 $exitCode = [int]$LASTEXITCODE
 
 if ($commandName -eq "install" -and $exitCode -ne 0 -and $env:OPENQ4_INSTALL_RETRY_ON_FAILURE -ne "0") {
     Write-Host "Meson install failed; retrying once after ensuring OpenQ4 processes are stopped..."
     Stop-OpenQ4RuntimeProcesses | Out-Null
     Start-Sleep -Milliseconds 500
-    Invoke-Meson -MesonArgs $effectiveArgs -VsDevCmdPath $vsDevCmd
+    Invoke-Meson -MesonArgs $effectiveArgs -VsDevCmdPath $vsDevCmd -MesonCommand $mesonCommand
     $exitCode = [int]$LASTEXITCODE
 }
 

@@ -137,7 +137,7 @@ jobs:
           $ErrorActionPreference = "Stop"
           $env:OPENQ4_SKIP_GAMELIBS_SYNC = "1"
 
-          powershell -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 setup --wipe builddir . --backend ninja --buildtype=release --wrap-mode=forcefallback -Dbuild_libbse=false -Dplatform_backend=${{ matrix.platform_backend }} -Dversion_track=nightly -Dversion_iteration=${{ needs.metadata.outputs.version_iteration }}
+          powershell -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 setup --wipe builddir . --backend ninja --buildtype=release --wrap-mode=forcefallback "-Dbuild_libbse=false" "-Dplatform_backend=${{ matrix.platform_backend }}" "-Dversion_track=nightly" "-Dversion_iteration=${{ needs.metadata.outputs.version_iteration }}"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
           powershell -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 compile -C builddir
