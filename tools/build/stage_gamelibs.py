@@ -7,6 +7,15 @@ import shutil
 import sys
 from pathlib import Path
 
+OPENQ4_SUPPORT_DIRS = (
+    "idlib",
+    "renderer",
+    "ui",
+    "sys",
+    "bse_api",
+    "MayaImport",
+)
+
 
 def copy_game_sources(source_game_dir: Path, dest_game_dir: Path) -> None:
     if dest_game_dir.exists():
@@ -28,6 +37,14 @@ def mirror_support_dir(source_dir: Path, dest_dir: Path) -> None:
         shutil.rmtree(dest_dir)
     if source_dir.is_dir():
         shutil.copytree(source_dir, dest_dir)
+
+
+def mirror_openq4_support_dirs(openq4_root: Path, stage_root: Path) -> None:
+    source_root = openq4_root / "src"
+    stage_src_root = stage_root / "src"
+
+    for dir_name in OPENQ4_SUPPORT_DIRS:
+        mirror_support_dir(source_root / dir_name, stage_src_root / dir_name)
 
 
 def main(argv: list[str]) -> int:
@@ -53,7 +70,7 @@ def main(argv: list[str]) -> int:
 
     dest_game_dir = stage_root / "src" / "game"
     copy_game_sources(source_game_dir, dest_game_dir)
-    mirror_support_dir(openq4_root / "src" / "MayaImport", stage_root / "src" / "MayaImport")
+    mirror_openq4_support_dirs(openq4_root, stage_root)
 
     print(stage_root.as_posix())
     return 0

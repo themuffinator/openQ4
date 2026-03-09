@@ -6,6 +6,7 @@ repo_root="$(cd -- "${script_dir}/../.." && pwd)"
 default_builddir="${repo_root}/builddir"
 declare -a MESON_CMD=()
 PYTHON_CMD=""
+declare -a READ_ARRAY_RESULT=()
 
 resolve_meson_cmd() {
     local candidate=""
@@ -43,6 +44,24 @@ resolve_meson_cmd() {
 
 run_meson() {
     "${MESON_CMD[@]}" "$@"
+}
+
+read_line_array() {
+    READ_ARRAY_RESULT=()
+    local item=""
+
+    while IFS= read -r item; do
+        READ_ARRAY_RESULT+=("${item}")
+    done
+}
+
+read_nul_array() {
+    READ_ARRAY_RESULT=()
+    local item=""
+
+    while IFS= read -r -d '' item; do
+        READ_ARRAY_RESULT+=("${item}")
+    done
 }
 
 resolve_meson_cmd
@@ -140,22 +159,25 @@ set_build_libbse_arg() {
 }
 
 load_build_dir_info() {
-    local info
-    mapfile -t info < <(get_compile_build_dir "$@")
-    BUILD_DIR="${info[0]}"
-    BUILD_DIR_HAS_EXPLICIT="${info[1]}"
+    read_line_array < <(get_compile_build_dir "$@")
+    BUILD_DIR="${READ_ARRAY_RESULT[0]}"
+    BUILD_DIR_HAS_EXPLICIT="${READ_ARRAY_RESULT[1]}"
 }
 
-command_name="${1:-}"
+declare -a effective_args=()
+for arg in "$@"; do
+    effective_args+=("${arg%$'\r'}")
+done
+
+command_name="${effective_args[0]:-}"
 if [[ -z "${command_name}" ]]; then
     echo "No Meson arguments were provided to meson_setup.sh." >&2
     exit 1
 fi
 
-declare -a effective_args=("$@")
-
 if [[ "${command_name}" == "setup" ]]; then
-    mapfile -d '' -t effective_args < <(set_build_libbse_arg "${effective_args[@]}")
+    read_nul_array < <(set_build_libbse_arg "${effective_args[@]}")
+    effective_args=("${READ_ARRAY_RESULT[@]}")
 fi
 
 if [[ "${command_name}" == "compile" || "${command_name}" == "install" ]]; then
@@ -173,7 +195,8 @@ if [[ "${command_name}" == "compile" || "${command_name}" == "install" ]]; then
             --buildtype=debug
             --wrap-mode=forcefallback
         )
-        mapfile -d '' -t setup_args < <(set_build_libbse_arg "${setup_args[@]}")
+        read_nul_array < <(set_build_libbse_arg "${setup_args[@]}")
+        setup_args=("${READ_ARRAY_RESULT[@]}")
         run_meson "${setup_args[@]}"
     fi
 
@@ -188,7 +211,8 @@ if [[ "${command_name}" == "compile" || "${command_name}" == "install" ]]; then
                 "${BUILD_DIR}"
                 "${repo_root}"
             )
-            mapfile -d '' -t reconfigure_args < <(set_build_libbse_arg "${reconfigure_args[@]}")
+            read_nul_array < <(set_build_libbse_arg "${reconfigure_args[@]}")
+            reconfigure_args=("${READ_ARRAY_RESULT[@]}")
             run_meson "${reconfigure_args[@]}"
         fi
     fi
