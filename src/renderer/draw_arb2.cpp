@@ -1634,14 +1634,29 @@ static bool RB_GLSLShadowMap_CreateDrawInteractions( const drawSurf_t *surf ) {
 		return false;
 	}
 
-	GL_State( GLS_DEPTHMASK | GLS_COLORMASK | GLS_ALPHAMASK | backEnd.depthFunc );
+	GL_State( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE | GLS_DEPTHMASK | backEnd.depthFunc );
 
 	glDisable( GL_VERTEX_PROGRAM_ARB );
 	glDisable( GL_FRAGMENT_PROGRAM_ARB );
 	glUseProgramObjectARB( g_shadowMapProgram.programObject );
 
+	if ( g_shadowMapProgram.bumpMap >= 0 ) {
+		glUniform1iARB( g_shadowMapProgram.bumpMap, 0 );
+	}
+	if ( g_shadowMapProgram.lightFalloffMap >= 0 ) {
+		glUniform1iARB( g_shadowMapProgram.lightFalloffMap, 1 );
+	}
+	if ( g_shadowMapProgram.lightProjectionMap >= 0 ) {
+		glUniform1iARB( g_shadowMapProgram.lightProjectionMap, 2 );
+	}
+	if ( g_shadowMapProgram.diffuseMap >= 0 ) {
+		glUniform1iARB( g_shadowMapProgram.diffuseMap, 3 );
+	}
+	if ( g_shadowMapProgram.specularMap >= 0 ) {
+		glUniform1iARB( g_shadowMapProgram.specularMap, 4 );
+	}
 	if ( g_shadowMapProgram.shadowMap >= 0 ) {
-		glUniform1iARB( g_shadowMapProgram.shadowMap, 0 );
+		glUniform1iARB( g_shadowMapProgram.shadowMap, 5 );
 	}
 	if ( g_shadowMapProgram.shadowTexelSize >= 0 ) {
 		const float texelSize[2] = {
@@ -1657,84 +1672,51 @@ static bool RB_GLSLShadowMap_CreateDrawInteractions( const drawSurf_t *surf ) {
 		glUniform1fARB( g_shadowMapProgram.shadowFilterRadius, r_shadowMapFilterRadius.GetFloat() );
 	}
 
-	glEnable( GL_STENCIL_TEST );
 	glStencilMask( 255 );
-	glStencilOp( GL_KEEP, GL_KEEP, GL_REPLACE );
+	glStencilOp( GL_KEEP, GL_KEEP, GL_KEEP );
 	glStencilFunc( GL_ALWAYS, 128, 255 );
-	backEnd.currentScissor = backEnd.vLight->scissorRect;
-	if ( r_useScissor.GetBool() ) {
-		glScissor( backEnd.viewDef->viewport.x1 + backEnd.currentScissor.x1,
-			backEnd.viewDef->viewport.y1 + backEnd.currentScissor.y1,
-			backEnd.currentScissor.x2 + 1 - backEnd.currentScissor.x1,
-			backEnd.currentScissor.y2 + 1 - backEnd.currentScissor.y1 );
-	}
-	glClearStencil( 0 );
-	glClear( GL_STENCIL_BUFFER_BIT );
-	glClearStencil( RB_ShadowMapSafeStencilClearValue() );
 
-	GL_SelectTextureNoClient( 0 );
-	g_shadowMapDepthImage->Bind();
-	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE );
-
-	idPlane shadowClipGlobal[4];
-	RB_ShadowMapBuildClipPlanes( backEnd.vLight->lightProject, shadowClipGlobal );
-
-	backEnd.currentSpace = NULL;
+	glEnableVertexAttribArrayARB( 8 );
+	glEnableVertexAttribArrayARB( 9 );
+	glEnableVertexAttribArrayARB( 10 );
+	glEnableVertexAttribArrayARB( 11 );
+	glEnableClientState( GL_COLOR_ARRAY );
 
 	for ( ; surf != NULL; surf = surf->nextOnLight ) {
 		if ( surf->geo == NULL || surf->geo->ambientCache == NULL ) {
 			continue;
 		}
 
-		if ( surf->space != backEnd.currentSpace ) {
-			backEnd.currentSpace = surf->space;
-			glLoadMatrixf( surf->space->modelViewMatrix );
-		}
-
-		if ( r_useScissor.GetBool() && !backEnd.currentScissor.Equals( surf->scissorRect ) ) {
-			backEnd.currentScissor = surf->scissorRect;
-			glScissor( backEnd.viewDef->viewport.x1 + backEnd.currentScissor.x1,
-				backEnd.viewDef->viewport.y1 + backEnd.currentScissor.y1,
-				backEnd.currentScissor.x2 + 1 - backEnd.currentScissor.x1,
-				backEnd.currentScissor.y2 + 1 - backEnd.currentScissor.y1 );
-		}
-
-		if ( surf->space->weaponDepthHack ) {
-			RB_EnterWeaponDepthHack();
-		}
-		if ( surf->space->modelDepthHack != 0.0f ) {
-			RB_EnterModelDepthHack( surf->space->modelDepthHack );
-		}
-
-		idPlane shadowClipLocal[4];
-		for ( int i = 0; i < 4; i++ ) {
-			R_GlobalPlaneToLocal( surf->space->modelMatrix, shadowClipGlobal[i], shadowClipLocal[i] );
-		}
-		glUniform4fvARB( g_shadowMapProgram.shadowRow[0], 1, shadowClipLocal[0].ToFloatPtr() );
-		glUniform4fvARB( g_shadowMapProgram.shadowRow[1], 1, shadowClipLocal[1].ToFloatPtr() );
-		glUniform4fvARB( g_shadowMapProgram.shadowRow[2], 1, shadowClipLocal[2].ToFloatPtr() );
-		glUniform4fvARB( g_shadowMapProgram.shadowRow[3], 1, shadowClipLocal[3].ToFloatPtr() );
-
 		idDrawVert *ac = (idDrawVert *)vertexCache.Position( surf->geo->ambientCache );
+		glColorPointer( 4, GL_UNSIGNED_BYTE, sizeof( idDrawVert ), ac->color );
+		glVertexAttribPointerARB( 11, 3, GL_FLOAT, false, sizeof( idDrawVert ), ac->normal.ToFloatPtr() );
+		glVertexAttribPointerARB( 10, 3, GL_FLOAT, false, sizeof( idDrawVert ), ac->tangents[1].ToFloatPtr() );
+		glVertexAttribPointerARB( 9, 3, GL_FLOAT, false, sizeof( idDrawVert ), ac->tangents[0].ToFloatPtr() );
+		glVertexAttribPointerARB( 8, 2, GL_FLOAT, false, sizeof( idDrawVert ), ac->st.ToFloatPtr() );
 		glVertexPointer( 3, GL_FLOAT, sizeof( idDrawVert ), ac->xyz.ToFloatPtr() );
-		const idMaterial *surfaceMaterial = surf->material;
-		if ( surfaceMaterial && surfaceMaterial->TestMaterialFlag( MF_POLYGONOFFSET ) ) {
-			glEnable( GL_POLYGON_OFFSET_FILL );
-			glPolygonOffset( r_offsetFactor.GetFloat(), r_offsetUnits.GetFloat() * surfaceMaterial->GetPolygonOffset() );
-		}
-		RB_DrawElementsWithCounters( surf->geo );
-		if ( surfaceMaterial && surfaceMaterial->TestMaterialFlag( MF_POLYGONOFFSET ) ) {
-			glDisable( GL_POLYGON_OFFSET_FILL );
-		}
 
-		if ( surf->space->weaponDepthHack || surf->space->modelDepthHack != 0.0f ) {
-			RB_LeaveDepthHack();
-		}
+		RB_CreateSingleDrawInteractions( surf, RB_GLSLShadowMap_DrawInteraction );
 	}
 
-	glStencilOp( GL_KEEP, GL_KEEP, GL_KEEP );
-	glStencilFunc( GL_EQUAL, 128, 255 );
+	glDisableVertexAttribArrayARB( 8 );
+	glDisableVertexAttribArrayARB( 9 );
+	glDisableVertexAttribArrayARB( 10 );
+	glDisableVertexAttribArrayARB( 11 );
+	glDisableClientState( GL_COLOR_ARRAY );
+
+	GL_SelectTextureNoClient( 5 );
 	globalImages->BindNull();
+	GL_SelectTextureNoClient( 4 );
+	globalImages->BindNull();
+	GL_SelectTextureNoClient( 3 );
+	globalImages->BindNull();
+	GL_SelectTextureNoClient( 2 );
+	globalImages->BindNull();
+	GL_SelectTextureNoClient( 1 );
+	globalImages->BindNull();
+	GL_SelectTextureNoClient( 0 );
+	globalImages->BindNull();
+
 	glUseProgramObjectARB( 0 );
 	backEnd.glState.currenttmu = -1;
 	GL_SelectTexture( 0 );
@@ -1746,14 +1728,29 @@ static bool RB_GLSLPointShadowMap_CreateDrawInteractions( const drawSurf_t *surf
 		return false;
 	}
 
-	GL_State( GLS_DEPTHMASK | GLS_COLORMASK | GLS_ALPHAMASK | backEnd.depthFunc );
+	GL_State( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE | GLS_DEPTHMASK | backEnd.depthFunc );
 
 	glDisable( GL_VERTEX_PROGRAM_ARB );
 	glDisable( GL_FRAGMENT_PROGRAM_ARB );
 	glUseProgramObjectARB( g_pointShadowMapProgram.programObject );
 
+	if ( g_pointShadowMapProgram.bumpMap >= 0 ) {
+		glUniform1iARB( g_pointShadowMapProgram.bumpMap, 0 );
+	}
+	if ( g_pointShadowMapProgram.lightFalloffMap >= 0 ) {
+		glUniform1iARB( g_pointShadowMapProgram.lightFalloffMap, 1 );
+	}
+	if ( g_pointShadowMapProgram.lightProjectionMap >= 0 ) {
+		glUniform1iARB( g_pointShadowMapProgram.lightProjectionMap, 2 );
+	}
+	if ( g_pointShadowMapProgram.diffuseMap >= 0 ) {
+		glUniform1iARB( g_pointShadowMapProgram.diffuseMap, 3 );
+	}
+	if ( g_pointShadowMapProgram.specularMap >= 0 ) {
+		glUniform1iARB( g_pointShadowMapProgram.specularMap, 4 );
+	}
 	if ( g_pointShadowMapProgram.pointShadowMap >= 0 ) {
-		glUniform1iARB( g_pointShadowMapProgram.pointShadowMap, 0 );
+		glUniform1iARB( g_pointShadowMapProgram.pointShadowMap, 5 );
 	}
 	if ( g_pointShadowMapProgram.shadowBias >= 0 ) {
 		glUniform1fARB( g_pointShadowMapProgram.shadowBias, r_shadowMapPointBias.GetFloat() );
@@ -1774,83 +1771,55 @@ static bool RB_GLSLPointShadowMap_CreateDrawInteractions( const drawSurf_t *surf
 		glUniform1fARB( g_pointShadowMapProgram.pointShadowFar, RB_PointShadowMapLightFar( backEnd.vLight ) );
 	}
 	if ( g_pointShadowMapProgram.pointShadowTexelScale >= 0 ) {
-		const float texelScale = ( 2.0f * r_shadowMapPointFilterRadius.GetFloat() ) / Max( 1, g_pointShadowMapRenderTexture->GetWidth() );
+		const float texelScale = 2.0f / Max( 1, g_pointShadowMapRenderTexture->GetWidth() );
 		glUniform1fARB( g_pointShadowMapProgram.pointShadowTexelScale, texelScale );
 	}
 
-	glEnable( GL_STENCIL_TEST );
 	glStencilMask( 255 );
-	glStencilOp( GL_KEEP, GL_KEEP, GL_REPLACE );
+	glStencilOp( GL_KEEP, GL_KEEP, GL_KEEP );
 	glStencilFunc( GL_ALWAYS, 128, 255 );
-	backEnd.currentScissor = backEnd.vLight->scissorRect;
-	if ( r_useScissor.GetBool() ) {
-		glScissor( backEnd.viewDef->viewport.x1 + backEnd.currentScissor.x1,
-			backEnd.viewDef->viewport.y1 + backEnd.currentScissor.y1,
-			backEnd.currentScissor.x2 + 1 - backEnd.currentScissor.x1,
-			backEnd.currentScissor.y2 + 1 - backEnd.currentScissor.y1 );
-	}
-	glClearStencil( 0 );
-	glClear( GL_STENCIL_BUFFER_BIT );
-	glClearStencil( RB_ShadowMapSafeStencilClearValue() );
 
-	GL_SelectTextureNoClient( 0 );
-	g_pointShadowMapColorImage->Bind();
-
-	backEnd.currentSpace = NULL;
+	glEnableVertexAttribArrayARB( 8 );
+	glEnableVertexAttribArrayARB( 9 );
+	glEnableVertexAttribArrayARB( 10 );
+	glEnableVertexAttribArrayARB( 11 );
+	glEnableClientState( GL_COLOR_ARRAY );
 
 	for ( ; surf != NULL; surf = surf->nextOnLight ) {
 		if ( surf->geo == NULL || surf->geo->ambientCache == NULL ) {
 			continue;
 		}
 
-		if ( surf->space != backEnd.currentSpace ) {
-			backEnd.currentSpace = surf->space;
-			glLoadMatrixf( surf->space->modelViewMatrix );
-		}
-
-		if ( r_useScissor.GetBool() && !backEnd.currentScissor.Equals( surf->scissorRect ) ) {
-			backEnd.currentScissor = surf->scissorRect;
-			glScissor( backEnd.viewDef->viewport.x1 + backEnd.currentScissor.x1,
-				backEnd.viewDef->viewport.y1 + backEnd.currentScissor.y1,
-				backEnd.currentScissor.x2 + 1 - backEnd.currentScissor.x1,
-				backEnd.currentScissor.y2 + 1 - backEnd.currentScissor.y1 );
-		}
-
-		if ( surf->space->weaponDepthHack ) {
-			RB_EnterWeaponDepthHack();
-		}
-		if ( surf->space->modelDepthHack != 0.0f ) {
-			RB_EnterModelDepthHack( surf->space->modelDepthHack );
-		}
-
-		float row0[4];
-		float row1[4];
-		float row2[4];
-		RB_ShadowMapModelMatrixRows( surf->space->modelMatrix, row0, row1, row2 );
-		glUniform4fvARB( g_pointShadowMapProgram.modelMatrixRow0, 1, row0 );
-		glUniform4fvARB( g_pointShadowMapProgram.modelMatrixRow1, 1, row1 );
-		glUniform4fvARB( g_pointShadowMapProgram.modelMatrixRow2, 1, row2 );
-
 		idDrawVert *ac = (idDrawVert *)vertexCache.Position( surf->geo->ambientCache );
+		glColorPointer( 4, GL_UNSIGNED_BYTE, sizeof( idDrawVert ), ac->color );
+		glVertexAttribPointerARB( 11, 3, GL_FLOAT, false, sizeof( idDrawVert ), ac->normal.ToFloatPtr() );
+		glVertexAttribPointerARB( 10, 3, GL_FLOAT, false, sizeof( idDrawVert ), ac->tangents[1].ToFloatPtr() );
+		glVertexAttribPointerARB( 9, 3, GL_FLOAT, false, sizeof( idDrawVert ), ac->tangents[0].ToFloatPtr() );
+		glVertexAttribPointerARB( 8, 2, GL_FLOAT, false, sizeof( idDrawVert ), ac->st.ToFloatPtr() );
 		glVertexPointer( 3, GL_FLOAT, sizeof( idDrawVert ), ac->xyz.ToFloatPtr() );
-		const idMaterial *surfaceMaterial = surf->material;
-		if ( surfaceMaterial && surfaceMaterial->TestMaterialFlag( MF_POLYGONOFFSET ) ) {
-			glEnable( GL_POLYGON_OFFSET_FILL );
-			glPolygonOffset( r_offsetFactor.GetFloat(), r_offsetUnits.GetFloat() * surfaceMaterial->GetPolygonOffset() );
-		}
-		RB_DrawElementsWithCounters( surf->geo );
-		if ( surfaceMaterial && surfaceMaterial->TestMaterialFlag( MF_POLYGONOFFSET ) ) {
-			glDisable( GL_POLYGON_OFFSET_FILL );
-		}
 
-		if ( surf->space->weaponDepthHack || surf->space->modelDepthHack != 0.0f ) {
-			RB_LeaveDepthHack();
-		}
+		RB_CreateSingleDrawInteractions( surf, RB_GLSLPointShadowMap_DrawInteraction );
 	}
 
-	glStencilOp( GL_KEEP, GL_KEEP, GL_KEEP );
-	glStencilFunc( GL_EQUAL, 128, 255 );
+	glDisableVertexAttribArrayARB( 8 );
+	glDisableVertexAttribArrayARB( 9 );
+	glDisableVertexAttribArrayARB( 10 );
+	glDisableVertexAttribArrayARB( 11 );
+	glDisableClientState( GL_COLOR_ARRAY );
+
+	GL_SelectTextureNoClient( 5 );
 	globalImages->BindNull();
+	GL_SelectTextureNoClient( 4 );
+	globalImages->BindNull();
+	GL_SelectTextureNoClient( 3 );
+	globalImages->BindNull();
+	GL_SelectTextureNoClient( 2 );
+	globalImages->BindNull();
+	GL_SelectTextureNoClient( 1 );
+	globalImages->BindNull();
+	GL_SelectTextureNoClient( 0 );
+	globalImages->BindNull();
+
 	glUseProgramObjectARB( 0 );
 	backEnd.glState.currenttmu = -1;
 	GL_SelectTexture( 0 );
@@ -1924,7 +1893,6 @@ static void RB_ShadowMapRunPass( const viewLight_t *vLight, shadowMapPassKind_t 
 			g_shadowMapStats.mappedGlobalPasses++;
 		}
 		RB_ShadowMapPassReport( vLight, passKind, pointLight, passResult, primaryCasters, secondaryCasters, tertiaryCasters, quaternaryCasters, primaryShadowSurfs, secondaryShadowSurfs, interactions );
-		RB_ARB2_CreateDrawInteractions( interactions );
 		return;
 	}
 
