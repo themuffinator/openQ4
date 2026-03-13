@@ -162,6 +162,8 @@ void idRenderTexture::InitRenderTexture(void) {
 		if (colorImages.Num() > 0)
 		{
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X, colorImages[0]->GetDeviceHandle(), 0);
+			glDrawBuffer( GL_COLOR_ATTACHMENT0 );
+			glReadBuffer( GL_COLOR_ATTACHMENT0 );
 		}
 		else
 		{
@@ -204,6 +206,11 @@ void idRenderTexture::MakeCurrent( int cubeFace ) {
 	const GLenum faceTarget = R_CubeFaceTarget( cubeFace );
 	if ( colorImages.Num() > 0 && colorImages[0]->GetOpts().textureType == TT_CUBIC ) {
 		glFramebufferTexture2D( GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, faceTarget, colorImages[0]->GetDeviceHandle(), 0 );
+		glDrawBuffer( GL_COLOR_ATTACHMENT0 );
+		glReadBuffer( GL_COLOR_ATTACHMENT0 );
+	} else {
+		glDrawBuffer( GL_NONE );
+		glReadBuffer( GL_NONE );
 	}
 
 	if ( depthImage != nullptr && depthImage->GetOpts().textureType == TT_CUBIC ) {

@@ -976,6 +976,9 @@ extern idCVar r_useExternalShadows;		// 1 = skip drawing caps when outside the l
 extern idCVar r_useOptimizedShadows;	// 1 = use the dmap generated static shadow volumes
 extern idCVar r_useShadowVertexProgram;	// 1 = do the shadow projection in the vertex program on capable cards
 extern idCVar r_useShadowProjectedCull;	// 1 = discard triangles outside light volume before shadowing
+extern idCVar r_useShadowMap;			// 1 = use a simple shadow-map path for projected and point lights when supported
+extern idCVar r_shadowMapReport;		// 0 = off, 1 = per-view summary, 2 = per-light decisions
+extern idCVar r_shadowMapReportInterval;	// frames between shadow-map diagnostic reports
 extern idCVar r_useDeferredTangents;	// 1 = don't always calc tangents after deform
 extern idCVar r_useCachedDynamicModels;	// 1 = cache snapshots of dynamic models
 extern idCVar r_useTwoSidedStencil;		// 1 = do stencil shadows in one pass with different ops on each side
@@ -1081,6 +1084,14 @@ extern idCVar r_singleArea;				// only draw the portal area the view is actually
 extern idCVar r_singleSurface;			// suppress all but one surface on each entity
 extern idCVar r_shadowPolygonOffset;	// bias value added to depth test for stencil shadow drawing
 extern idCVar r_shadowPolygonFactor;	// scale value for stencil shadow drawing
+extern idCVar r_shadowMapSize;			// square resolution used for simple shadow maps
+extern idCVar r_shadowMapBias;			// receiver depth bias used by projected shadow maps
+extern idCVar r_shadowMapPointBias;		// receiver depth bias used by point-light shadow maps
+extern idCVar r_shadowMapFilterRadius;	// projected-light PCF radius in texels used by simple shadow maps
+extern idCVar r_shadowMapPointFilterRadius;	// point-light PCF radius in texels used by simple shadow maps
+extern idCVar r_shadowMapPointFarScale;	// range padding multiplier used by point-light shadow maps
+extern idCVar r_shadowMapPolygonFactor;	// slope-scale bias used when rendering simple shadow maps
+extern idCVar r_shadowMapPolygonOffset;	// constant bias used when rendering simple shadow maps
 
 extern idCVar r_jitter;					// randomly subpixel jitter the projection matrix
 extern idCVar r_lightSourceRadius;		// for soft-shadow sampling
