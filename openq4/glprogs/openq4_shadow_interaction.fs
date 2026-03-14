@@ -11,6 +11,10 @@ uniform vec2 uShadowTexelSize;
 uniform float uShadowBias;
 uniform float uShadowNormalBias;
 uniform float uShadowFilterRadius;
+uniform vec4 uShadowAtlasRect[4];
+uniform float uShadowSplitDepths[4];
+uniform int uShadowCascadeCount;
+uniform float uShadowCascadeBlend;
 
 varying vec2 vBumpTexCoord;
 varying vec2 vDiffuseTexCoord;
@@ -19,9 +23,13 @@ varying vec4 vLightFalloffTexCoord;
 varying vec4 vLightProjectionTexCoord;
 varying vec3 vLightVector;
 varying vec3 vHalfAngleVector;
-varying vec4 vShadowCoord;
+varying vec4 vShadowCoord0;
+varying vec4 vShadowCoord1;
+varying vec4 vShadowCoord2;
+varying vec4 vShadowCoord3;
 varying vec3 vVertexColor;
 varying float vShadowLightCos;
+varying float vViewDepth;
 
 vec3 SafeNormalize( vec3 value ) {
 	return value * inversesqrt( max( dot( value, value ), 1.0e-8 ) );
@@ -39,21 +47,29 @@ float SampleShadowCompare( vec2 uv, float depth ) {
 	return ( depth - bias <= storedDepth ) ? 1.0 : 0.0;
 }
 
-float SampleShadow( vec4 shadowCoord ) {
+float SampleShadowCascade( vec4 shadowCoord, vec4 atlasRect ) {
 	if ( shadowCoord.w <= 0.0 ) {
 		return 1.0;
 	}
 
 	vec3 projected = shadowCoord.xyz / shadowCoord.w;
-	vec2 uv = projected.xy * 0.5 + 0.5;
+	vec2 localUv = projected.xy * 0.5 + 0.5;
 	float depth = projected.z * 0.5 + 0.5;
 
-	if ( uv.x <= 0.0 || uv.x >= 1.0 || uv.y <= 0.0 || uv.y >= 1.0 ) {
+	if ( localUv.x <= 0.0 || localUv.x >= 1.0 || localUv.y <= 0.0 || localUv.y >= 1.0 ) {
 		return 1.0;
 	}
 	if ( depth <= 0.0 || depth >= 1.0 ) {
 		return 1.0;
 	}
+
+	vec2 atlasMin = atlasRect.xy;
+	vec2 atlasMax = atlasRect.zw;
+	vec2 uv = atlasMin + localUv * ( atlasMax - atlasMin );
+	vec2 clampMin = atlasMin + uShadowTexelSize * 1.5;
+	vec2 clampMax = atlasMax - uShadowTexelSize * 1.5;
+	clampMin = min( clampMin, clampMax );
+	uv = clamp( uv, clampMin, clampMax );
 
 	if ( uShadowFilterRadius <= 0.0 ) {
 		return SampleShadowCompare( uv, depth );
@@ -62,19 +78,79 @@ float SampleShadow( vec4 shadowCoord ) {
 	vec2 tap = uShadowTexelSize * uShadowFilterRadius;
 	float shadow = 0.0;
 	shadow += SampleShadowCompare( uv, depth );
-	shadow += SampleShadowCompare( uv + vec2( -0.326212, -0.405805 ) * tap, depth );
-	shadow += SampleShadowCompare( uv + vec2( -0.840144, -0.073580 ) * tap, depth );
-	shadow += SampleShadowCompare( uv + vec2( -0.695914, 0.457137 ) * tap, depth );
-	shadow += SampleShadowCompare( uv + vec2( -0.203345, 0.620716 ) * tap, depth );
-	shadow += SampleShadowCompare( uv + vec2( 0.962340, -0.194983 ) * tap, depth );
-	shadow += SampleShadowCompare( uv + vec2( 0.473434, -0.480026 ) * tap, depth );
-	shadow += SampleShadowCompare( uv + vec2( 0.519456, 0.767022 ) * tap, depth );
-	shadow += SampleShadowCompare( uv + vec2( 0.185461, -0.893124 ) * tap, depth );
-	shadow += SampleShadowCompare( uv + vec2( 0.507431, 0.064425 ) * tap, depth );
-	shadow += SampleShadowCompare( uv + vec2( 0.896420, 0.412458 ) * tap, depth );
-	shadow += SampleShadowCompare( uv + vec2( -0.321940, -0.932615 ) * tap, depth );
-	shadow += SampleShadowCompare( uv + vec2( -0.791559, -0.597705 ) * tap, depth );
+	shadow += SampleShadowCompare( clamp( uv + vec2( -0.326212, -0.405805 ) * tap, clampMin, clampMax ), depth );
+	shadow += SampleShadowCompare( clamp( uv + vec2( -0.840144, -0.073580 ) * tap, clampMin, clampMax ), depth );
+	shadow += SampleShadowCompare( clamp( uv + vec2( -0.695914, 0.457137 ) * tap, clampMin, clampMax ), depth );
+	shadow += SampleShadowCompare( clamp( uv + vec2( -0.203345, 0.620716 ) * tap, clampMin, clampMax ), depth );
+	shadow += SampleShadowCompare( clamp( uv + vec2( 0.962340, -0.194983 ) * tap, clampMin, clampMax ), depth );
+	shadow += SampleShadowCompare( clamp( uv + vec2( 0.473434, -0.480026 ) * tap, clampMin, clampMax ), depth );
+	shadow += SampleShadowCompare( clamp( uv + vec2( 0.519456, 0.767022 ) * tap, clampMin, clampMax ), depth );
+	shadow += SampleShadowCompare( clamp( uv + vec2( 0.185461, -0.893124 ) * tap, clampMin, clampMax ), depth );
+	shadow += SampleShadowCompare( clamp( uv + vec2( 0.507431, 0.064425 ) * tap, clampMin, clampMax ), depth );
+	shadow += SampleShadowCompare( clamp( uv + vec2( 0.896420, 0.412458 ) * tap, clampMin, clampMax ), depth );
+	shadow += SampleShadowCompare( clamp( uv + vec2( -0.321940, -0.932615 ) * tap, clampMin, clampMax ), depth );
+	shadow += SampleShadowCompare( clamp( uv + vec2( -0.791559, -0.597705 ) * tap, clampMin, clampMax ), depth );
 	return shadow * ( 1.0 / 13.0 );
+}
+
+float CascadeSplitDepth( int index ) {
+	if ( index <= 0 ) {
+		return uShadowSplitDepths[0];
+	}
+	if ( index == 1 ) {
+		return uShadowSplitDepths[1];
+	}
+	if ( index == 2 ) {
+		return uShadowSplitDepths[2];
+	}
+	return uShadowSplitDepths[3];
+}
+
+float SampleCascadeByIndex( int index ) {
+	if ( index <= 0 ) {
+		return SampleShadowCascade( vShadowCoord0, uShadowAtlasRect[0] );
+	}
+	if ( index == 1 ) {
+		return SampleShadowCascade( vShadowCoord1, uShadowAtlasRect[1] );
+	}
+	if ( index == 2 ) {
+		return SampleShadowCascade( vShadowCoord2, uShadowAtlasRect[2] );
+	}
+	return SampleShadowCascade( vShadowCoord3, uShadowAtlasRect[3] );
+}
+
+int SelectCascade( float viewDepth ) {
+	if ( uShadowCascadeCount <= 1 || viewDepth < uShadowSplitDepths[0] ) {
+		return 0;
+	}
+	if ( uShadowCascadeCount <= 2 || viewDepth < uShadowSplitDepths[1] ) {
+		return 1;
+	}
+	if ( uShadowCascadeCount <= 3 || viewDepth < uShadowSplitDepths[2] ) {
+		return 2;
+	}
+	return 3;
+}
+
+float SampleShadow() {
+	int cascadeIndex = SelectCascade( vViewDepth );
+	float shadow = SampleCascadeByIndex( cascadeIndex );
+
+	if ( cascadeIndex >= uShadowCascadeCount - 1 || uShadowCascadeBlend <= 0.0 ) {
+		return shadow;
+	}
+
+	float previousSplit = ( cascadeIndex == 0 ) ? 0.0 : CascadeSplitDepth( cascadeIndex - 1 );
+	float currentSplit = CascadeSplitDepth( cascadeIndex );
+	float blendWidth = max( 1.0, ( currentSplit - previousSplit ) * uShadowCascadeBlend );
+	float blendStart = currentSplit - blendWidth;
+	if ( vViewDepth <= blendStart ) {
+		return shadow;
+	}
+
+	float nextShadow = SampleCascadeByIndex( cascadeIndex + 1 );
+	float blend = clamp( ( vViewDepth - blendStart ) / blendWidth, 0.0, 1.0 );
+	return mix( shadow, nextShadow, blend );
 }
 
 void main() {
@@ -88,7 +164,7 @@ void main() {
 	vec3 light = vec3( ndotl );
 	light *= texture2DProj( uLightFalloffMap, vLightFalloffTexCoord ).rgb;
 	light *= texture2DProj( uLightProjectionMap, vLightProjectionTexCoord ).rgb;
-	light *= SampleShadow( vShadowCoord );
+	light *= SampleShadow();
 
 	vec3 diffuse = texture2D( uDiffuseMap, vDiffuseTexCoord ).rgb * uDiffuseColor.rgb;
 

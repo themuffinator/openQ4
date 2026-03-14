@@ -15,10 +15,10 @@ uniform vec4 uDiffuseMatrixS;
 uniform vec4 uDiffuseMatrixT;
 uniform vec4 uSpecularMatrixS;
 uniform vec4 uSpecularMatrixT;
-uniform vec4 uShadowRow0;
-uniform vec4 uShadowRow1;
-uniform vec4 uShadowRow2;
-uniform vec4 uShadowRow3;
+uniform vec4 uShadowRow0[4];
+uniform vec4 uShadowRow1[4];
+uniform vec4 uShadowRow2[4];
+uniform vec4 uShadowRow3[4];
 uniform vec2 uVertexColorParams;
 
 varying vec2 vBumpTexCoord;
@@ -28,9 +28,13 @@ varying vec4 vLightFalloffTexCoord;
 varying vec4 vLightProjectionTexCoord;
 varying vec3 vLightVector;
 varying vec3 vHalfAngleVector;
-varying vec4 vShadowCoord;
+varying vec4 vShadowCoord0;
+varying vec4 vShadowCoord1;
+varying vec4 vShadowCoord2;
+varying vec4 vShadowCoord3;
 varying vec3 vVertexColor;
 varying float vShadowLightCos;
+varying float vViewDepth;
 
 vec3 TangentSpaceVector( vec3 objectVector ) {
 	return vec3(
@@ -39,9 +43,18 @@ vec3 TangentSpaceVector( vec3 objectVector ) {
 		dot( attr_Normal, objectVector ) );
 }
 
+vec4 BuildShadowCoord( vec4 position, int index ) {
+	return vec4(
+		dot( position, uShadowRow0[index] ),
+		dot( position, uShadowRow1[index] ),
+		dot( position, uShadowRow2[index] ),
+		dot( position, uShadowRow3[index] ) );
+}
+
 void main() {
 	vec4 position = gl_Vertex;
 	vec4 texCoord = vec4( attr_TexCoord0.xy, 0.0, 1.0 );
+	vec4 viewPosition = gl_ModelViewMatrix * position;
 
 	vec3 toLight = uLocalLightOrigin.xyz - position.xyz;
 	vec3 toView = uLocalViewOrigin.xyz - position.xyz;
@@ -60,14 +73,14 @@ void main() {
 		dot( position, uLightProjectionT ),
 		0.0,
 		dot( position, uLightProjectionQ ) );
-	vShadowCoord = vec4(
-		dot( position, uShadowRow0 ),
-		dot( position, uShadowRow1 ),
-		dot( position, uShadowRow2 ),
-		dot( position, uShadowRow3 ) );
+	vShadowCoord0 = BuildShadowCoord( position, 0 );
+	vShadowCoord1 = BuildShadowCoord( position, 1 );
+	vShadowCoord2 = BuildShadowCoord( position, 2 );
+	vShadowCoord3 = BuildShadowCoord( position, 3 );
 
 	vVertexColor = gl_Color.rgb * uVertexColorParams.x + vec3( uVertexColorParams.y );
 	vShadowLightCos = max( dot( normalize( attr_Normal ), localLightDir ), 0.0 );
+	vViewDepth = max( -viewPosition.z, 0.0 );
 
 	gl_Position = ftransform();
 }

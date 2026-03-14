@@ -227,6 +227,10 @@ typedef struct {
 	GLint			shadowBias;
 	GLint			shadowNormalBias;
 	GLint			shadowFilterRadius;
+	GLint			shadowAtlasRect;
+	GLint			shadowSplitDepths;
+	GLint			shadowCascadeCount;
+	GLint			shadowCascadeBlend;
 
 	GLint			bumpMap;
 	GLint			lightFalloffMap;
@@ -290,6 +294,18 @@ typedef struct {
 	GLint			pointShadowFar;
 } pointShadowCasterProgram_t;
 
+static const int SHADOWMAP_MAX_CASCADES = 4;
+
+typedef struct {
+	bool			valid;
+	int				cascadeCount;
+	int				atlasDiv;
+	int				tileSize;
+	float			splitDepths[SHADOWMAP_MAX_CASCADES];
+	idPlane			clipPlanes[SHADOWMAP_MAX_CASCADES][4];
+	idVec4			atlasRect[SHADOWMAP_MAX_CASCADES];
+} projectedShadowMapState_t;
+
 static shadowMapProgram_t	g_shadowMapProgram = { 0 };
 static pointShadowMapProgram_t	g_pointShadowMapProgram = { 0 };
 static pointShadowCasterProgram_t	g_pointShadowCasterProgram = { 0 };
@@ -298,6 +314,7 @@ static idRenderTexture *	g_shadowMapRenderTexture = NULL;
 static idImage *			g_pointShadowMapColorImage = NULL;
 static idImage *			g_pointShadowMapDepthImage = NULL;
 static idRenderTexture *	g_pointShadowMapRenderTexture = NULL;
+static projectedShadowMapState_t	g_projectedShadowMapState = { 0 };
 
 typedef enum {
 	SHADOWMAP_SUPPORT_OK = 0,
@@ -418,6 +435,224 @@ static bool RB_ShadowMapShouldReport( void ) {
 		return false;
 	}
 	return true;
+}
+
+static void RB_ShadowMapResetProjectedState( void ) {
+	memset( &g_projectedShadowMapState, 0, sizeof( g_projectedShadowMapState ) );
+	g_projectedShadowMapState.cascadeCount = 1;
+	g_projectedShadowMapState.atlasDiv = 1;
+	g_projectedShadowMapState.atlasRect[0].Set( 0.0f, 0.0f, 1.0f, 1.0f );
+	for ( int i = 0; i < SHADOWMAP_MAX_CASCADES; i++ ) {
+		g_projectedShadowMapState.splitDepths[i] = 1.0e30f;
+	}
+}
+
+static bool RB_ShadowMapUseCSM( const viewLight_t *vLight ) {
+	if ( vLight == NULL || vLight->pointLight ) {
+		return false;
+	}
+	return r_shadowMapCSM.GetBool() && idMath::ClampInt( 1, SHADOWMAP_MAX_CASCADES, r_shadowMapCascadeCount.GetInteger() ) > 1;
+}
+
+static int RB_ShadowMapCascadeCountForLight( const viewLight_t *vLight ) {
+	if ( !RB_ShadowMapUseCSM( vLight ) ) {
+		return 1;
+	}
+	return idMath::ClampInt( 1, SHADOWMAP_MAX_CASCADES, r_shadowMapCascadeCount.GetInteger() );
+}
+
+static int RB_ShadowMapAtlasDivForLight( const viewLight_t *vLight ) {
+	return RB_ShadowMapCascadeCountForLight( vLight ) > 1 ? 2 : 1;
+}
+
+static int RB_ShadowMapTileSizeForLight( const viewLight_t *vLight ) {
+	const int atlasDiv = RB_ShadowMapAtlasDivForLight( vLight );
+	const int maxTileSize = glConfig.maxTextureSize / atlasDiv;
+	if ( maxTileSize < 128 ) {
+		return 0;
+	}
+	return idMath::ClampInt( 128, maxTileSize, r_shadowMapSize.GetInteger() );
+}
+
+static float RB_ShadowMapViewNear( const viewDef_t *viewDef ) {
+	float zNear = r_znear.GetFloat();
+	if ( viewDef != NULL && viewDef->renderView.cramZNear ) {
+		zNear *= 0.25f;
+	}
+	return Max( zNear, 0.25f );
+}
+
+static float RB_ShadowMapCascadeDistanceForView( const viewDef_t *viewDef ) {
+	const float zNear = RB_ShadowMapViewNear( viewDef );
+	return Max( r_shadowMapCascadeDistance.GetFloat(), zNear + 32.0f );
+}
+
+static void RB_ShadowMapBuildSliceCorners( const viewDef_t *viewDef, const float sliceNear, const float sliceFar, idVec3 corners[8] ) {
+	const renderView_t &renderView = viewDef->renderView;
+	const float tanHalfFovX = tan( renderView.fov_x * idMath::PI / 360.0f );
+	const float tanHalfFovY = tan( renderView.fov_y * idMath::PI / 360.0f );
+	const idVec3 &origin = renderView.vieworg;
+	const idVec3 &forward = renderView.viewaxis[0];
+	const idVec3 &left = renderView.viewaxis[1];
+	const idVec3 &up = renderView.viewaxis[2];
+
+	const float depths[2] = { sliceNear, sliceFar };
+	for ( int depthIndex = 0; depthIndex < 2; depthIndex++ ) {
+		const float depth = depths[depthIndex];
+		const idVec3 center = origin + forward * depth;
+		const float halfWidth = tanHalfFovX * depth;
+		const float halfHeight = tanHalfFovY * depth;
+		const int baseIndex = depthIndex * 4;
+
+		corners[baseIndex + 0] = center + left * halfWidth + up * halfHeight;
+		corners[baseIndex + 1] = center - left * halfWidth + up * halfHeight;
+		corners[baseIndex + 2] = center - left * halfWidth - up * halfHeight;
+		corners[baseIndex + 3] = center + left * halfWidth - up * halfHeight;
+	}
+}
+
+static void RB_ShadowMapTransformPointToClip( const idVec3 &point, const idPlane clipPlanes[4], idVec4 &clip ) {
+	for ( int i = 0; i < 4; i++ ) {
+		clip[i] = point[0] * clipPlanes[i][0] + point[1] * clipPlanes[i][1] + point[2] * clipPlanes[i][2] + clipPlanes[i][3];
+	}
+}
+
+static bool RB_ShadowMapBuildCascadeBounds( const idPlane baseClipPlanes[4], const viewDef_t *viewDef, const float sliceNear, const float sliceFar, const int tileSize, idVec3 &ndcMins, idVec3 &ndcMaxs ) {
+	idVec3 corners[8];
+	RB_ShadowMapBuildSliceCorners( viewDef, sliceNear, sliceFar, corners );
+
+	int validPoints = 0;
+	ndcMins.Set( 1.0e30f, 1.0e30f, 1.0e30f );
+	ndcMaxs.Set( -1.0e30f, -1.0e30f, -1.0e30f );
+
+	for ( int i = 0; i < 8; i++ ) {
+		idVec4 clip;
+		RB_ShadowMapTransformPointToClip( corners[i], baseClipPlanes, clip );
+		if ( idMath::Fabs( clip.w ) <= 1.0e-5f ) {
+			continue;
+		}
+
+		const float invW = 1.0f / clip.w;
+		idVec3 ndc( clip.x * invW, clip.y * invW, clip.z * invW );
+
+		for ( int axis = 0; axis < 3; axis++ ) {
+			ndcMins[axis] = Min( ndcMins[axis], ndc[axis] );
+			ndcMaxs[axis] = Max( ndcMaxs[axis], ndc[axis] );
+		}
+		validPoints++;
+	}
+
+	if ( validPoints < 4 ) {
+		return false;
+	}
+
+	const float pad = Max( 0.0f, r_shadowMapProjectionPad.GetFloat() * 0.5f );
+	idVec3 center = ( ndcMins + ndcMaxs ) * 0.5f;
+	idVec3 extent = ( ndcMaxs - ndcMins ) * 0.5f;
+
+	extent.x = Max( extent.x * ( 1.0f + pad * 2.0f ), 2.0f / Max( 1, tileSize ) );
+	extent.y = Max( extent.y * ( 1.0f + pad * 2.0f ), 2.0f / Max( 1, tileSize ) );
+	extent.z = Max( extent.z * ( 1.0f + pad ), 0.02f );
+
+	if ( r_shadowMapCascadeStabilize.GetBool() ) {
+		const float texelStep = 2.0f / Max( 1, tileSize );
+		center.x = floor( center.x / texelStep + 0.5f ) * texelStep;
+		center.y = floor( center.y / texelStep + 0.5f ) * texelStep;
+		extent.x = Max( texelStep, float( ceil( extent.x / texelStep ) ) * texelStep );
+		extent.y = Max( texelStep, float( ceil( extent.y / texelStep ) ) * texelStep );
+	}
+
+	ndcMins = center - extent;
+	ndcMaxs = center + extent;
+
+	for ( int axis = 0; axis < 3; axis++ ) {
+		ndcMins[axis] = idMath::ClampFloat( -1.0f, 1.0f, ndcMins[axis] );
+		ndcMaxs[axis] = idMath::ClampFloat( -1.0f, 1.0f, ndcMaxs[axis] );
+	}
+
+	if ( ndcMaxs.x - ndcMins.x <= 1.0e-4f || ndcMaxs.y - ndcMins.y <= 1.0e-4f || ndcMaxs.z - ndcMins.z <= 1.0e-4f ) {
+		return false;
+	}
+
+	return true;
+}
+
+static void RB_ShadowMapBuildCascadeClipPlanes( const idPlane baseClipPlanes[4], const idVec3 &ndcMins, const idVec3 &ndcMaxs, idPlane cascadeClipPlanes[4] ) {
+	const float scaleX = 2.0f / ( ndcMaxs.x - ndcMins.x );
+	const float scaleY = 2.0f / ( ndcMaxs.y - ndcMins.y );
+	const float scaleZ = 2.0f / ( ndcMaxs.z - ndcMins.z );
+	const float offsetX = -( ndcMaxs.x + ndcMins.x ) / ( ndcMaxs.x - ndcMins.x );
+	const float offsetY = -( ndcMaxs.y + ndcMins.y ) / ( ndcMaxs.y - ndcMins.y );
+	const float offsetZ = -( ndcMaxs.z + ndcMins.z ) / ( ndcMaxs.z - ndcMins.z );
+
+	for ( int i = 0; i < 4; i++ ) {
+		cascadeClipPlanes[0][i] = baseClipPlanes[0][i] * scaleX + baseClipPlanes[3][i] * offsetX;
+		cascadeClipPlanes[1][i] = baseClipPlanes[1][i] * scaleY + baseClipPlanes[3][i] * offsetY;
+		cascadeClipPlanes[2][i] = baseClipPlanes[2][i] * scaleZ + baseClipPlanes[3][i] * offsetZ;
+		cascadeClipPlanes[3][i] = baseClipPlanes[3][i];
+	}
+}
+
+static idVec4 RB_ShadowMapBuildAtlasRect( const int cascadeIndex, const int atlasDiv ) {
+	if ( atlasDiv <= 1 ) {
+		return idVec4( 0.0f, 0.0f, 1.0f, 1.0f );
+	}
+
+	const float invAtlasDiv = 1.0f / atlasDiv;
+	const int tileX = cascadeIndex % atlasDiv;
+	const int tileY = cascadeIndex / atlasDiv;
+	return idVec4(
+		tileX * invAtlasDiv,
+		tileY * invAtlasDiv,
+		( tileX + 1 ) * invAtlasDiv,
+		( tileY + 1 ) * invAtlasDiv );
+}
+
+static void RB_ShadowMapBuildProjectedState( const viewLight_t *vLight, const idPlane baseClipPlanes[4], const int tileSize ) {
+	RB_ShadowMapResetProjectedState();
+
+	const int cascadeCount = RB_ShadowMapCascadeCountForLight( vLight );
+	g_projectedShadowMapState.valid = true;
+	g_projectedShadowMapState.cascadeCount = cascadeCount;
+	g_projectedShadowMapState.atlasDiv = cascadeCount > 1 ? 2 : 1;
+	g_projectedShadowMapState.tileSize = tileSize;
+
+	for ( int cascadeIndex = 0; cascadeIndex < SHADOWMAP_MAX_CASCADES; cascadeIndex++ ) {
+		for ( int planeIndex = 0; planeIndex < 4; planeIndex++ ) {
+			g_projectedShadowMapState.clipPlanes[cascadeIndex][planeIndex] = baseClipPlanes[planeIndex];
+		}
+		g_projectedShadowMapState.atlasRect[cascadeIndex] = RB_ShadowMapBuildAtlasRect( cascadeIndex, g_projectedShadowMapState.atlasDiv );
+		g_projectedShadowMapState.splitDepths[cascadeIndex] = 1.0e30f;
+	}
+
+	if ( cascadeCount <= 1 || backEnd.viewDef == NULL ) {
+		return;
+	}
+
+	const viewDef_t *viewDef = backEnd.viewDef;
+	const float zNear = RB_ShadowMapViewNear( viewDef );
+	const float maxDistance = RB_ShadowMapCascadeDistanceForView( viewDef );
+	const float lambda = idMath::ClampFloat( 0.0f, 1.0f, r_shadowMapCascadeLambda.GetFloat() );
+	const float range = maxDistance - zNear;
+	const float ratio = maxDistance / zNear;
+
+	for ( int splitIndex = 0; splitIndex < cascadeCount - 1; splitIndex++ ) {
+		const float p = float( splitIndex + 1 ) / float( cascadeCount - 1 );
+		const float uniformSplit = zNear + range * p;
+		const float logSplit = zNear * pow( ratio, p );
+		g_projectedShadowMapState.splitDepths[splitIndex] = uniformSplit + ( logSplit - uniformSplit ) * lambda;
+	}
+
+	float sliceNear = zNear;
+	for ( int cascadeIndex = 0; cascadeIndex < cascadeCount - 1; cascadeIndex++ ) {
+		const float sliceFar = Max( g_projectedShadowMapState.splitDepths[cascadeIndex], sliceNear + 1.0f );
+		idVec3 ndcMins;
+		idVec3 ndcMaxs;
+		if ( RB_ShadowMapBuildCascadeBounds( baseClipPlanes, viewDef, sliceNear, sliceFar, tileSize, ndcMins, ndcMaxs ) ) {
+			RB_ShadowMapBuildCascadeClipPlanes( baseClipPlanes, ndcMins, ndcMaxs, g_projectedShadowMapState.clipPlanes[cascadeIndex] );
+		}
+		sliceNear = sliceFar;
+	}
 }
 
 static void RB_ShadowMapFreeProgram( void ) {
@@ -588,10 +823,10 @@ static bool RB_ShadowMapLoadProgram( void ) {
 	g_shadowMapProgram.diffuseMatrixT = glGetUniformLocationARB( programObject, "uDiffuseMatrixT" );
 	g_shadowMapProgram.specularMatrixS = glGetUniformLocationARB( programObject, "uSpecularMatrixS" );
 	g_shadowMapProgram.specularMatrixT = glGetUniformLocationARB( programObject, "uSpecularMatrixT" );
-	g_shadowMapProgram.shadowRow[0] = glGetUniformLocationARB( programObject, "uShadowRow0" );
-	g_shadowMapProgram.shadowRow[1] = glGetUniformLocationARB( programObject, "uShadowRow1" );
-	g_shadowMapProgram.shadowRow[2] = glGetUniformLocationARB( programObject, "uShadowRow2" );
-	g_shadowMapProgram.shadowRow[3] = glGetUniformLocationARB( programObject, "uShadowRow3" );
+	g_shadowMapProgram.shadowRow[0] = glGetUniformLocationARB( programObject, "uShadowRow0[0]" );
+	g_shadowMapProgram.shadowRow[1] = glGetUniformLocationARB( programObject, "uShadowRow1[0]" );
+	g_shadowMapProgram.shadowRow[2] = glGetUniformLocationARB( programObject, "uShadowRow2[0]" );
+	g_shadowMapProgram.shadowRow[3] = glGetUniformLocationARB( programObject, "uShadowRow3[0]" );
 	g_shadowMapProgram.vertexColorParams = glGetUniformLocationARB( programObject, "uVertexColorParams" );
 	g_shadowMapProgram.diffuseColor = glGetUniformLocationARB( programObject, "uDiffuseColor" );
 	g_shadowMapProgram.specularColor = glGetUniformLocationARB( programObject, "uSpecularColor" );
@@ -599,6 +834,10 @@ static bool RB_ShadowMapLoadProgram( void ) {
 	g_shadowMapProgram.shadowBias = glGetUniformLocationARB( programObject, "uShadowBias" );
 	g_shadowMapProgram.shadowNormalBias = glGetUniformLocationARB( programObject, "uShadowNormalBias" );
 	g_shadowMapProgram.shadowFilterRadius = glGetUniformLocationARB( programObject, "uShadowFilterRadius" );
+	g_shadowMapProgram.shadowAtlasRect = glGetUniformLocationARB( programObject, "uShadowAtlasRect[0]" );
+	g_shadowMapProgram.shadowSplitDepths = glGetUniformLocationARB( programObject, "uShadowSplitDepths[0]" );
+	g_shadowMapProgram.shadowCascadeCount = glGetUniformLocationARB( programObject, "uShadowCascadeCount" );
+	g_shadowMapProgram.shadowCascadeBlend = glGetUniformLocationARB( programObject, "uShadowCascadeBlend" );
 	g_shadowMapProgram.bumpMap = glGetUniformLocationARB( programObject, "uBumpMap" );
 	g_shadowMapProgram.lightFalloffMap = glGetUniformLocationARB( programObject, "uLightFalloffMap" );
 	g_shadowMapProgram.lightProjectionMap = glGetUniformLocationARB( programObject, "uLightProjectionMap" );
@@ -873,12 +1112,18 @@ static void RB_ShadowMapClipPlanesToGLMatrix( const idPlane clipPlanes[4], float
 	matrix[15] = clipPlanes[3][3];
 }
 
-static bool RB_ShadowMapEnsureResources( void ) {
+static bool RB_ShadowMapEnsureResources( const viewLight_t *vLight ) {
 	if ( !RB_ShadowMapLoadProgram() ) {
 		return false;
 	}
 
-	const int shadowMapSize = idMath::ClampInt( 128, 4096, r_shadowMapSize.GetInteger() );
+	const int shadowMapTileSize = RB_ShadowMapTileSizeForLight( vLight );
+	if ( shadowMapTileSize <= 0 ) {
+		return false;
+	}
+
+	const int shadowMapAtlasDiv = RB_ShadowMapAtlasDivForLight( vLight );
+	const int shadowMapSize = shadowMapTileSize * shadowMapAtlasDiv;
 
 	if ( g_shadowMapDepthImage == NULL ) {
 		idImageOpts opts;
@@ -976,7 +1221,7 @@ static shadowMapLightSupportReason_t RB_ShadowMapLightSupportReason( const viewL
 		}
 		return RB_PointShadowMapEnsureResources() ? SHADOWMAP_SUPPORT_OK : SHADOWMAP_SUPPORT_RESOURCE_FAILURE;
 	}
-	return RB_ShadowMapEnsureResources() ? SHADOWMAP_SUPPORT_OK : SHADOWMAP_SUPPORT_RESOURCE_FAILURE;
+	return RB_ShadowMapEnsureResources( vLight ) ? SHADOWMAP_SUPPORT_OK : SHADOWMAP_SUPPORT_RESOURCE_FAILURE;
 }
 
 static void RB_ShadowMapStatsReset( void ) {
@@ -1295,28 +1540,22 @@ static void RB_PointShadowMapDrawCasterChain( const drawSurf_t *surf, const floa
 }
 
 static bool RB_RenderShadowMap( const drawSurf_t *primaryCasters, const drawSurf_t *secondaryCasters, const drawSurf_t *tertiaryCasters, const drawSurf_t *quaternaryCasters ) {
-	if ( !RB_ShadowMapEnsureResources() ) {
+	if ( !RB_ShadowMapEnsureResources( backEnd.vLight ) ) {
 		return false;
 	}
 
 	const GLboolean blendWasEnabled = glIsEnabled( GL_BLEND );
+	const GLboolean scissorWasEnabled = glIsEnabled( GL_SCISSOR_TEST );
 	const int savedFaceCulling = backEnd.glState.faceCulling;
 
-	idPlane clipPlanes[4];
-	float clipMatrix[16];
-	RB_ShadowMapBuildClipPlanes( backEnd.vLight->lightProject, clipPlanes );
-	RB_ShadowMapClipPlanesToGLMatrix( clipPlanes, clipMatrix );
+	idPlane baseClipPlanes[4];
+	RB_ShadowMapBuildClipPlanes( backEnd.vLight->lightProject, baseClipPlanes );
+	RB_ShadowMapBuildProjectedState( backEnd.vLight, baseClipPlanes, RB_ShadowMapTileSizeForLight( backEnd.vLight ) );
+	if ( !g_projectedShadowMapState.valid ) {
+		return false;
+	}
 
 	g_shadowMapRenderTexture->MakeCurrent();
-
-	const int shadowMapWidth = g_shadowMapRenderTexture->GetWidth();
-	const int shadowMapHeight = g_shadowMapRenderTexture->GetHeight();
-	glViewport( 0, 0, shadowMapWidth, shadowMapHeight );
-	glScissor( 0, 0, shadowMapWidth, shadowMapHeight );
-
-	glMatrixMode( GL_PROJECTION );
-	glLoadMatrixf( clipMatrix );
-	glMatrixMode( GL_MODELVIEW );
 
 	glUseProgramObjectARB( 0 );
 	glDisable( GL_VERTEX_PROGRAM_ARB );
@@ -1328,18 +1567,32 @@ static bool RB_RenderShadowMap( const drawSurf_t *primaryCasters, const drawSurf
 	glDepthFunc( GL_LEQUAL );
 	glDisable( GL_BLEND );
 	glDisable( GL_STENCIL_TEST );
+	glEnable( GL_SCISSOR_TEST );
 	glEnable( GL_CULL_FACE );
 	glCullFace( GL_BACK );
 	glEnable( GL_POLYGON_OFFSET_FILL );
 	glPolygonOffset( r_shadowMapPolygonFactor.GetFloat(), r_shadowMapPolygonOffset.GetFloat() );
 
-	glClear( GL_DEPTH_BUFFER_BIT );
+	for ( int cascadeIndex = 0; cascadeIndex < g_projectedShadowMapState.cascadeCount; cascadeIndex++ ) {
+		float clipMatrix[16];
+		const int tileX = ( g_projectedShadowMapState.atlasDiv > 1 ) ? ( cascadeIndex % g_projectedShadowMapState.atlasDiv ) * g_projectedShadowMapState.tileSize : 0;
+		const int tileY = ( g_projectedShadowMapState.atlasDiv > 1 ) ? ( cascadeIndex / g_projectedShadowMapState.atlasDiv ) * g_projectedShadowMapState.tileSize : 0;
 
-	backEnd.currentSpace = NULL;
-	RB_ShadowMapDrawCasterChain( primaryCasters );
-	RB_ShadowMapDrawCasterChain( secondaryCasters );
-	RB_ShadowMapDrawCasterChain( tertiaryCasters );
-	RB_ShadowMapDrawCasterChain( quaternaryCasters );
+		RB_ShadowMapClipPlanesToGLMatrix( g_projectedShadowMapState.clipPlanes[cascadeIndex], clipMatrix );
+		glViewport( tileX, tileY, g_projectedShadowMapState.tileSize, g_projectedShadowMapState.tileSize );
+		glScissor( tileX, tileY, g_projectedShadowMapState.tileSize, g_projectedShadowMapState.tileSize );
+		glClear( GL_DEPTH_BUFFER_BIT );
+
+		glMatrixMode( GL_PROJECTION );
+		glLoadMatrixf( clipMatrix );
+		glMatrixMode( GL_MODELVIEW );
+
+		backEnd.currentSpace = NULL;
+		RB_ShadowMapDrawCasterChain( primaryCasters );
+		RB_ShadowMapDrawCasterChain( secondaryCasters );
+		RB_ShadowMapDrawCasterChain( tertiaryCasters );
+		RB_ShadowMapDrawCasterChain( quaternaryCasters );
+	}
 
 	glDisable( GL_POLYGON_OFFSET_FILL );
 
@@ -1363,6 +1616,11 @@ static bool RB_RenderShadowMap( const drawSurf_t *primaryCasters, const drawSurf
 	glMatrixMode( GL_MODELVIEW );
 
 	glColorMask( GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE );
+	if ( scissorWasEnabled ) {
+		glEnable( GL_SCISSOR_TEST );
+	} else {
+		glDisable( GL_SCISSOR_TEST );
+	}
 	if ( blendWasEnabled ) {
 		glEnable( GL_BLEND );
 	} else {
@@ -1488,11 +1746,27 @@ static bool RB_RenderPointShadowMap( const drawSurf_t *primaryCasters, const dra
 }
 
 static void RB_GLSLShadowMap_DrawInteraction( const drawInteraction_t *din ) {
-	idPlane shadowClipGlobal[4];
-	idPlane shadowClipLocal[4];
-	RB_ShadowMapBuildClipPlanes( backEnd.vLight->lightProject, shadowClipGlobal );
-	for ( int i = 0; i < 4; i++ ) {
-		R_GlobalPlaneToLocal( din->surf->space->modelMatrix, shadowClipGlobal[i], shadowClipLocal[i] );
+	idPlane shadowClipLocal[SHADOWMAP_MAX_CASCADES][4];
+	float shadowRow0[SHADOWMAP_MAX_CASCADES * 4];
+	float shadowRow1[SHADOWMAP_MAX_CASCADES * 4];
+	float shadowRow2[SHADOWMAP_MAX_CASCADES * 4];
+	float shadowRow3[SHADOWMAP_MAX_CASCADES * 4];
+	const int cascadeCount = idMath::ClampInt( 1, SHADOWMAP_MAX_CASCADES, g_projectedShadowMapState.cascadeCount );
+
+	memset( shadowRow0, 0, sizeof( shadowRow0 ) );
+	memset( shadowRow1, 0, sizeof( shadowRow1 ) );
+	memset( shadowRow2, 0, sizeof( shadowRow2 ) );
+	memset( shadowRow3, 0, sizeof( shadowRow3 ) );
+
+	for ( int cascadeIndex = 0; cascadeIndex < cascadeCount; cascadeIndex++ ) {
+		for ( int planeIndex = 0; planeIndex < 4; planeIndex++ ) {
+			R_GlobalPlaneToLocal( din->surf->space->modelMatrix, g_projectedShadowMapState.clipPlanes[cascadeIndex][planeIndex], shadowClipLocal[cascadeIndex][planeIndex] );
+		}
+
+		memcpy( shadowRow0 + cascadeIndex * 4, shadowClipLocal[cascadeIndex][0].ToFloatPtr(), 4 * sizeof( float ) );
+		memcpy( shadowRow1 + cascadeIndex * 4, shadowClipLocal[cascadeIndex][1].ToFloatPtr(), 4 * sizeof( float ) );
+		memcpy( shadowRow2 + cascadeIndex * 4, shadowClipLocal[cascadeIndex][2].ToFloatPtr(), 4 * sizeof( float ) );
+		memcpy( shadowRow3 + cascadeIndex * 4, shadowClipLocal[cascadeIndex][3].ToFloatPtr(), 4 * sizeof( float ) );
 	}
 
 	glUniform4fvARB( g_shadowMapProgram.localLightOrigin, 1, din->localLightOrigin.ToFloatPtr() );
@@ -1507,10 +1781,10 @@ static void RB_GLSLShadowMap_DrawInteraction( const drawInteraction_t *din ) {
 	glUniform4fvARB( g_shadowMapProgram.diffuseMatrixT, 1, din->diffuseMatrix[1].ToFloatPtr() );
 	glUniform4fvARB( g_shadowMapProgram.specularMatrixS, 1, din->specularMatrix[0].ToFloatPtr() );
 	glUniform4fvARB( g_shadowMapProgram.specularMatrixT, 1, din->specularMatrix[1].ToFloatPtr() );
-	glUniform4fvARB( g_shadowMapProgram.shadowRow[0], 1, shadowClipLocal[0].ToFloatPtr() );
-	glUniform4fvARB( g_shadowMapProgram.shadowRow[1], 1, shadowClipLocal[1].ToFloatPtr() );
-	glUniform4fvARB( g_shadowMapProgram.shadowRow[2], 1, shadowClipLocal[2].ToFloatPtr() );
-	glUniform4fvARB( g_shadowMapProgram.shadowRow[3], 1, shadowClipLocal[3].ToFloatPtr() );
+	glUniform4fvARB( g_shadowMapProgram.shadowRow[0], cascadeCount, shadowRow0 );
+	glUniform4fvARB( g_shadowMapProgram.shadowRow[1], cascadeCount, shadowRow1 );
+	glUniform4fvARB( g_shadowMapProgram.shadowRow[2], cascadeCount, shadowRow2 );
+	glUniform4fvARB( g_shadowMapProgram.shadowRow[3], cascadeCount, shadowRow3 );
 	glUniform4fvARB( g_shadowMapProgram.diffuseColor, 1, din->diffuseColor.ToFloatPtr() );
 	glUniform4fvARB( g_shadowMapProgram.specularColor, 1, din->specularColor.ToFloatPtr() );
 
@@ -1637,7 +1911,7 @@ static void RB_GLSLPointShadowMap_DrawInteraction( const drawInteraction_t *din 
 }
 
 static bool RB_GLSLShadowMap_CreateDrawInteractions( const drawSurf_t *surf ) {
-	if ( surf == NULL || !RB_ShadowMapLoadProgram() ) {
+	if ( surf == NULL || !RB_ShadowMapLoadProgram() || !g_projectedShadowMapState.valid ) {
 		return false;
 	}
 
@@ -1680,6 +1954,18 @@ static bool RB_GLSLShadowMap_CreateDrawInteractions( const drawSurf_t *surf ) {
 	}
 	if ( g_shadowMapProgram.shadowFilterRadius >= 0 ) {
 		glUniform1fARB( g_shadowMapProgram.shadowFilterRadius, r_shadowMapFilterRadius.GetFloat() );
+	}
+	if ( g_shadowMapProgram.shadowAtlasRect >= 0 ) {
+		glUniform4fvARB( g_shadowMapProgram.shadowAtlasRect, SHADOWMAP_MAX_CASCADES, g_projectedShadowMapState.atlasRect[0].ToFloatPtr() );
+	}
+	if ( g_shadowMapProgram.shadowSplitDepths >= 0 ) {
+		glUniform1fvARB( g_shadowMapProgram.shadowSplitDepths, SHADOWMAP_MAX_CASCADES, g_projectedShadowMapState.splitDepths );
+	}
+	if ( g_shadowMapProgram.shadowCascadeCount >= 0 ) {
+		glUniform1iARB( g_shadowMapProgram.shadowCascadeCount, g_projectedShadowMapState.cascadeCount );
+	}
+	if ( g_shadowMapProgram.shadowCascadeBlend >= 0 ) {
+		glUniform1fARB( g_shadowMapProgram.shadowCascadeBlend, idMath::ClampFloat( 0.0f, 0.5f, r_shadowMapCascadeBlend.GetFloat() ) );
 	}
 
 	glStencilMask( 255 );
