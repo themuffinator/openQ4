@@ -22,10 +22,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.x'
 
@@ -88,7 +88,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Fetch OpenQ4-GameLibs
         shell: bash
@@ -97,13 +97,60 @@ jobs:
           git clone --depth 1 https://github.com/themuffinator/OpenQ4-GameLibs.git OpenQ4-GameLibs
 
       - name: Fetch OpenQ4-BSE
+        id: fetch_bse
+        env:
+          OPENQ4_BSE_REPO_TOKEN: ${{ secrets.OPENQ4_BSE_REPO_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
-          git clone --depth 1 https://github.com/themuffinator/OpenQ4-BSE.git OpenQ4-BSE
+
+          clone_bse_repo() {
+            local auth_header="${1:-}"
+            if [ -n "${auth_header}" ]; then
+              git -c "http.extraheader=AUTHORIZATION: basic ${auth_header}" clone --depth 1 https://github.com/themuffinator/OpenQ4-BSE.git OpenQ4-BSE
+              return
+            fi
+
+            git clone --depth 1 https://github.com/themuffinator/OpenQ4-BSE.git OpenQ4-BSE
+          }
+
+          bse_available=false
+          if [ -n "${OPENQ4_BSE_REPO_TOKEN:-}" ]; then
+            auth_header="$(printf 'x-access-token:%s' "${OPENQ4_BSE_REPO_TOKEN}" | base64 | tr -d '\n')"
+            if clone_bse_repo "${auth_header}"; then
+              bse_available=true
+            else
+              echo "OpenQ4-BSE fetch with OPENQ4_BSE_REPO_TOKEN failed; continuing without BSE." >&2
+              rm -rf OpenQ4-BSE
+            fi
+          elif clone_bse_repo ""; then
+            bse_available=true
+          else
+            echo "OpenQ4-BSE repository is not accessible from this workflow run; continuing without BSE." >&2
+            rm -rf OpenQ4-BSE
+          fi
+
+          echo "available=${bse_available}" >> "$GITHUB_OUTPUT"
+
+      - name: Configure BSE build policy
+        id: bse_policy
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${{ steps.fetch_bse.outputs.available }}" = "true" ]; then
+            echo "OPENQ4_BUILD_LIBBSE=true" >> "$GITHUB_ENV"
+            echo "build_libbse=true" >> "$GITHUB_OUTPUT"
+            echo "Nightly build will include OpenQ4-BSE."
+            exit 0
+          fi
+
+          echo "OPENQ4_BUILD_LIBBSE=false" >> "$GITHUB_ENV"
+          echo "build_libbse=false" >> "$GITHUB_OUTPUT"
+          echo "Nightly build will skip OpenQ4-BSE because the companion repository was unavailable."
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.x'
 
@@ -147,7 +194,7 @@ jobs:
           $ErrorActionPreference = "Stop"
           $env:OPENQ4_SKIP_GAMELIBS_SYNC = "1"
 
-          powershell -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 setup --wipe builddir . --backend ninja --buildtype=release --wrap-mode=forcefallback "-Dbuild_libbse=true" "-Dplatform_backend=${{ matrix.platform_backend }}" "-Dversion_track=nightly" "-Dversion_iteration=${{ needs.metadata.outputs.version_iteration }}"
+          powershell -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 setup --wipe builddir . --backend ninja --buildtype=release --wrap-mode=forcefallback "-Dplatform_backend=${{ matrix.platform_backend }}" "-Dversion_track=nightly" "-Dversion_iteration=${{ needs.metadata.outputs.version_iteration }}"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
           powershell -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 compile -C builddir
@@ -163,7 +210,7 @@ jobs:
           set -euo pipefail
           export OPENQ4_SKIP_GAMELIBS_SYNC=1
 
-          bash tools/build/meson_setup.sh setup --wipe builddir . --backend ninja --buildtype=release --wrap-mode=default -Dbuild_libbse=true -Dplatform_backend=${{ matrix.platform_backend }} -Dversion_track=nightly -Dversion_iteration=${{ needs.metadata.outputs.version_iteration }}
+          bash tools/build/meson_setup.sh setup --wipe builddir . --backend ninja --buildtype=release --wrap-mode=default -Dplatform_backend=${{ matrix.platform_backend }} -Dversion_track=nightly -Dversion_iteration=${{ needs.metadata.outputs.version_iteration }}
           bash tools/build/meson_setup.sh compile -C builddir
           bash tools/build/meson_setup.sh install -C builddir --no-rebuild --skip-subprojects
 
@@ -183,10 +230,14 @@ jobs:
             exit 1
           fi
 
-          expected_bse=".install/OpenQ4-BSE_${{ matrix.binary_arch }}${{ matrix.bse_ext }}"
-          if [ ! -f "${expected_bse}" ]; then
-            echo "Missing staged BSE runtime: ${expected_bse}"
-            exit 1
+          if [ "${OPENQ4_BUILD_LIBBSE:-true}" = "true" ]; then
+            expected_bse=".install/OpenQ4-BSE_${{ matrix.binary_arch }}${{ matrix.bse_ext }}"
+            if [ ! -f "${expected_bse}" ]; then
+              echo "Missing staged BSE runtime: ${expected_bse}"
+              exit 1
+            fi
+          else
+            echo "Skipping staged BSE validation because build_libbse=false."
           fi
 
           if [ "${{ matrix.platform }}" = "linux" ]; then
@@ -225,10 +276,14 @@ jobs:
             echo "Expected package directory not found: ${package_dir}"
             exit 1
           fi
-          expected_packaged_bse="${package_dir}/OpenQ4-BSE_${{ matrix.binary_arch }}${{ matrix.bse_ext }}"
-          if [ ! -f "${expected_packaged_bse}" ]; then
-            echo "Expected packaged BSE runtime not found: ${expected_packaged_bse}"
-            exit 1
+          if [ "${OPENQ4_BUILD_LIBBSE:-true}" = "true" ]; then
+            expected_packaged_bse="${package_dir}/OpenQ4-BSE_${{ matrix.binary_arch }}${{ matrix.bse_ext }}"
+            if [ ! -f "${expected_packaged_bse}" ]; then
+              echo "Expected packaged BSE runtime not found: ${expected_packaged_bse}"
+              exit 1
+            fi
+          else
+            echo "BSE runtime was not packaged because build_libbse=false."
           fi
           echo "archive_path=${archive_path}" >> "$GITHUB_OUTPUT"
           echo "package_dir=${package_dir}" >> "$GITHUB_OUTPUT"
@@ -273,7 +328,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -284,7 +339,7 @@ jobs:
           git fetch --force --tags origin
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.x'
 
