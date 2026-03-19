@@ -227,19 +227,6 @@ def copy_required_windows_runtime(
             "Public OpenQ4 packages must be built with the static CRT policy."
         )
 
-    required_names = {"OpenAL32.dll"}
-
-    for filename in sorted(required_names):
-        source = runtime_by_name.get(filename.lower())
-        if source is None:
-            if allow_missing_binaries:
-                missing_required.append(filename)
-                continue
-            raise FileNotFoundError(f"required Windows runtime file not found: {install_dir / filename}")
-
-        shutil.copy2(source, package_root / source.name)
-        copied_names.add(source.name.lower())
-
     for source in runtime_files:
         source_name_lower = source.name.lower()
         if source_name_lower in copied_names:

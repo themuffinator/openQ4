@@ -260,8 +260,6 @@ def stage_runtime_payloads(
             openal_dll = source_root / OPENAL_RUNTIME_RELATIVE
             if openal_dll.is_file():
                 copied_files.append(str(_copy_file(openal_dll, target)))
-            else:
-                raise FileNotFoundError(f"Bundled OpenAL runtime not found: {openal_dll}")
 
     return {
         "arch": arch,
