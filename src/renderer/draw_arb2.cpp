@@ -49,6 +49,10 @@ typedef enum {
 static interactionColorMode_t g_interactionVertexProgramAutoColorMode = ICM_PACKED;
 static interactionColorMode_t g_interactionVertexProgramColorMode = ICM_PACKED;
 static int g_interactionVertexProgramOverride = 0;
+static bool g_interactionShaderRescueWarned = false;
+
+static GLuint RB_CurrentInteractionProgramIdent( GLenum target );
+static void RB_WarnInteractionShaderRescueMode( void );
 
 static const char *RB_InteractionColorModeName( interactionColorMode_t mode ) {
 	switch ( mode ) {
@@ -311,9 +315,9 @@ typedef struct {
 	idVec4			atlasRect[SHADOWMAP_MAX_CASCADES];
 } projectedShadowMapState_t;
 
-static shadowMapProgram_t	g_shadowMapProgram = { 0 };
-static pointShadowMapProgram_t	g_pointShadowMapProgram = { 0 };
-static pointShadowCasterProgram_t	g_pointShadowCasterProgram = { 0 };
+static shadowMapProgram_t	g_shadowMapProgram = { 0, 0, 0, -1, false };
+static pointShadowMapProgram_t	g_pointShadowMapProgram = { 0, 0, 0, -1, false };
+static pointShadowCasterProgram_t	g_pointShadowCasterProgram = { 0, 0, 0, -1, false };
 static idImage *			g_shadowMapDepthImage = NULL;
 static idRenderTexture *	g_shadowMapRenderTexture = NULL;
 static idImage *			g_pointShadowMapColorImage = NULL;
@@ -2356,9 +2360,8 @@ static void RB_ShadowMapStencilFallback( const drawSurf_t *primaryShadowSurfs, c
 		}
 		glClear( GL_STENCIL_BUFFER_BIT );
 
-		if ( r_useShadowVertexProgram.GetBool() ) {
+		if ( r_useShadowVertexProgram.GetBool() && R_BindARBProgram( GL_VERTEX_PROGRAM_ARB, VPROG_STENCIL_SHADOW, "stencil shadow fallback vertex program", false ) ) {
 			glEnable( GL_VERTEX_PROGRAM_ARB );
-			glBindProgramARB( GL_VERTEX_PROGRAM_ARB, VPROG_STENCIL_SHADOW );
 			RB_StencilShadowPass( primaryShadowSurfs );
 			RB_StencilShadowPass( secondaryShadowSurfs );
 			RB_ARB2_CreateDrawInteractions( interactions );
@@ -2542,13 +2545,12 @@ void RB_ARB2_CreateDrawInteractions( const drawSurf_t *surf ) {
 	// perform setup here that will be constant for all interactions
 	GL_State( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE | GLS_DEPTHMASK | backEnd.depthFunc );
 
-	// bind the vertex program
-	if ( r_testARBProgram.GetBool() ) {
-		glBindProgramARB( GL_VERTEX_PROGRAM_ARB, VPROG_TEST );
-		glBindProgramARB( GL_FRAGMENT_PROGRAM_ARB, FPROG_TEST );
-	} else {
-		glBindProgramARB( GL_VERTEX_PROGRAM_ARB, VPROG_INTERACTION );
-		glBindProgramARB( GL_FRAGMENT_PROGRAM_ARB, FPROG_INTERACTION );
+	const GLuint vertexProgram = RB_CurrentInteractionProgramIdent( GL_VERTEX_PROGRAM_ARB );
+	const GLuint fragmentProgram = RB_CurrentInteractionProgramIdent( GL_FRAGMENT_PROGRAM_ARB );
+	if ( !R_BindARBProgram( GL_VERTEX_PROGRAM_ARB, vertexProgram, "interaction vertex program", true ) ||
+		!R_BindARBProgram( GL_FRAGMENT_PROGRAM_ARB, fragmentProgram, "interaction fragment program", true ) ) {
+		RB_WarnInteractionShaderRescueMode();
+		return;
 	}
 
 	glEnable(GL_VERTEX_PROGRAM_ARB);
@@ -2716,13 +2718,12 @@ void RB_ARB2_DrawInteractions( void ) {
 			glStencilFunc( GL_ALWAYS, 128, 255 );
 		}
 
-		if ( r_useShadowVertexProgram.GetBool() ) {
+		if ( r_useShadowVertexProgram.GetBool() && R_BindARBProgram( GL_VERTEX_PROGRAM_ARB, VPROG_STENCIL_SHADOW, "stencil shadow vertex program", false ) ) {
 			glEnable( GL_VERTEX_PROGRAM_ARB );
-			glBindProgramARB( GL_VERTEX_PROGRAM_ARB, VPROG_STENCIL_SHADOW );
 			RB_StencilShadowPass( vLight->globalShadows );
 			RB_ARB2_CreateDrawInteractions( vLight->localInteractions );
 			glEnable( GL_VERTEX_PROGRAM_ARB );
-			glBindProgramARB( GL_VERTEX_PROGRAM_ARB, VPROG_STENCIL_SHADOW );
+			R_BindARBProgram( GL_VERTEX_PROGRAM_ARB, VPROG_STENCIL_SHADOW, "stencil shadow vertex program", false );
 			RB_StencilShadowPass( vLight->localShadows );
 			RB_ARB2_CreateDrawInteractions( vLight->globalInteractions );
 			glDisable( GL_VERTEX_PROGRAM_ARB );	// if there weren't any globalInteractions, it would have stayed on
@@ -2761,6 +2762,12 @@ typedef struct {
 	GLenum			target;
 	GLuint			ident;
 	char			name[64];
+	bool			valid;
+	bool			warnedOnUse;
+	bool			requiredForLighting;
+	int				errorPosition;
+	char			failureReason[256];
+	char			normalizedPath[96];
 } progDef_t;
 
 static	const int	MAX_GLPROGS = 200;
@@ -2789,19 +2796,148 @@ static progDef_t	progs[MAX_GLPROGS] = {
 	// additional programs can be dynamically specified in materials
 };
 
+static const char *RB_ARBProgramTargetName( GLenum target ) {
+	switch ( target ) {
+	case GL_VERTEX_PROGRAM_ARB:
+		return "vertex";
+	case GL_FRAGMENT_PROGRAM_ARB:
+		return "fragment";
+	default:
+		return "unknown";
+	}
+}
+
+static bool RB_IsRequiredLightingARBProgram( const progDef_t &prog ) {
+	return prog.ident == VPROG_INTERACTION ||
+		prog.ident == FPROG_INTERACTION ||
+		idStr::Icmp( prog.name, "interaction.vfp" ) == 0;
+}
+
+static void RB_SetARBProgramPath( progDef_t &prog ) {
+	idStr fullPath = "glprogs/";
+	fullPath += prog.name;
+	fullPath.BackSlashesToSlashes();
+	idStr::Copynz( prog.normalizedPath, fullPath.c_str(), sizeof( prog.normalizedPath ) );
+}
+
+static void RB_ResetARBProgramStatus( progDef_t &prog ) {
+	prog.valid = false;
+	prog.warnedOnUse = false;
+	prog.requiredForLighting = RB_IsRequiredLightingARBProgram( prog );
+	prog.errorPosition = -1;
+	prog.failureReason[0] = '\0';
+	RB_SetARBProgramPath( prog );
+}
+
+static void RB_SetARBProgramFailure( progDef_t &prog, const char *reason, int errorPosition = -1 ) {
+	prog.valid = false;
+	prog.errorPosition = errorPosition;
+	idStr::Copynz( prog.failureReason, reason ? reason : "unknown failure", sizeof( prog.failureReason ) );
+}
+
+static progDef_t *RB_FindARBProgramRecord( GLenum target, GLuint ident ) {
+	if ( ident == 0 ) {
+		return NULL;
+	}
+
+	for ( int i = 0; i < MAX_GLPROGS && progs[i].name[0]; i++ ) {
+		if ( progs[i].target == target && progs[i].ident == ident ) {
+			return &progs[i];
+		}
+	}
+
+	return NULL;
+}
+
+static GLuint RB_CurrentInteractionProgramIdent( GLenum target ) {
+	if ( r_testARBProgram.GetBool() ) {
+		return ( target == GL_VERTEX_PROGRAM_ARB ) ? VPROG_TEST : FPROG_TEST;
+	}
+
+	return ( target == GL_VERTEX_PROGRAM_ARB ) ? VPROG_INTERACTION : FPROG_INTERACTION;
+}
+
+static void RB_WarnInvalidARBProgramUse( progDef_t *prog, GLenum target, GLuint ident, const char *usage, bool required ) {
+	if ( !required && r_shaderReport.GetInteger() < 2 ) {
+		return;
+	}
+
+	if ( prog != NULL ) {
+		if ( prog->warnedOnUse ) {
+			return;
+		}
+		prog->warnedOnUse = true;
+		common->Warning( "Skipping %s: ARB %s program '%s' is invalid (%s%s%s)",
+			usage ? usage : "ARB program use",
+			RB_ARBProgramTargetName( target ),
+			prog->normalizedPath[0] ? prog->normalizedPath : prog->name,
+			prog->failureReason[0] ? prog->failureReason : "unknown failure",
+			( prog->errorPosition >= 0 ) ? ", errorPosition=" : "",
+			( prog->errorPosition >= 0 ) ? va( "%d", prog->errorPosition ) : "" );
+		return;
+	}
+
+	common->Warning( "Skipping %s: ARB %s program id %u is not registered", usage ? usage : "ARB program use", RB_ARBProgramTargetName( target ), ident );
+}
+
+static bool RB_CurrentInteractionProgramsValid( void ) {
+	const GLuint vertexProgram = RB_CurrentInteractionProgramIdent( GL_VERTEX_PROGRAM_ARB );
+	const GLuint fragmentProgram = RB_CurrentInteractionProgramIdent( GL_FRAGMENT_PROGRAM_ARB );
+	return R_IsARBProgramValid( GL_VERTEX_PROGRAM_ARB, vertexProgram ) &&
+		R_IsARBProgramValid( GL_FRAGMENT_PROGRAM_ARB, fragmentProgram );
+}
+
+static void RB_WarnInteractionShaderRescueMode( void ) {
+	if ( g_interactionShaderRescueWarned ) {
+		return;
+	}
+
+	const GLuint vertexProgram = RB_CurrentInteractionProgramIdent( GL_VERTEX_PROGRAM_ARB );
+	const GLuint fragmentProgram = RB_CurrentInteractionProgramIdent( GL_FRAGMENT_PROGRAM_ARB );
+	const progDef_t *vertexRecord = RB_FindARBProgramRecord( GL_VERTEX_PROGRAM_ARB, vertexProgram );
+	const progDef_t *fragmentRecord = RB_FindARBProgramRecord( GL_FRAGMENT_PROGRAM_ARB, fragmentProgram );
+
+	common->Warning( "ARB interaction rescue mode active: skipping interaction rendering because required programs are invalid (%s: %s, %s: %s)",
+		vertexRecord != NULL ? vertexRecord->name : "vertex",
+		( vertexRecord != NULL && vertexRecord->failureReason[0] ) ? vertexRecord->failureReason : "unavailable",
+		fragmentRecord != NULL ? fragmentRecord->name : "fragment",
+		( fragmentRecord != NULL && fragmentRecord->failureReason[0] ) ? fragmentRecord->failureReason : "unavailable" );
+	g_interactionShaderRescueWarned = true;
+}
+
 /*
 =================
 R_LoadARBProgram
 =================
 */
+bool R_IsARBProgramValid( GLenum target, GLuint ident ) {
+	const progDef_t *prog = RB_FindARBProgramRecord( target, ident );
+	return prog != NULL && prog->valid;
+}
+
+bool R_BindARBProgram( GLenum target, GLuint ident, const char *usage, bool required ) {
+	progDef_t *prog = RB_FindARBProgramRecord( target, ident );
+	if ( prog == NULL || !prog->valid ) {
+		RB_WarnInvalidARBProgramUse( prog, target, ident, usage, required );
+		return false;
+	}
+
+	glBindProgramARB( target, ident );
+	return true;
+}
+
 void R_LoadARBProgram( int progIndex ) {
 	int		ofs;
 	int		err;
+	progDef_t &prog = progs[progIndex];
 	idStr	fullPath = "glprogs/";
-	fullPath += progs[progIndex].name;
+	fullPath += prog.name;
+	fullPath.BackSlashesToSlashes();
 	char	*fileBuffer;
 	char	*buffer;
 	char	*start, *end;
+
+	RB_ResetARBProgramStatus( prog );
 
 	common->Printf( "%s", fullPath.c_str() );
 
@@ -2810,6 +2946,7 @@ void R_LoadARBProgram( int progIndex ) {
 	fileSystem->ReadFile( fullPath.c_str(), (void **)&fileBuffer, NULL );
 	if ( !fileBuffer ) {
 		common->Printf( ": File not found\n" );
+		RB_SetARBProgramFailure( prog, "file not found" );
 		return;
 	}
 
@@ -2819,47 +2956,53 @@ void R_LoadARBProgram( int progIndex ) {
 	fileSystem->FreeFile( fileBuffer );
 
 	if ( !glConfig.isInitialized ) {
+		RB_SetARBProgramFailure( prog, "pending GL initialization" );
 		return;
 	}
 
 	//
 	// submit the program string at start to GL
 	//
-	if ( progs[progIndex].ident == 0 ) {
+	if ( prog.ident == 0 ) {
 		// allocate a new identifier for this program
-		progs[progIndex].ident = PROG_USER + progIndex;
+		prog.ident = PROG_USER + progIndex;
+		prog.requiredForLighting = RB_IsRequiredLightingARBProgram( prog );
 	}
 
 	// vertex and fragment programs can both be present in a single file, so
 	// scan for the proper header to be the start point, and stamp a 0 in after the end
 
-	if ( progs[progIndex].target == GL_VERTEX_PROGRAM_ARB ) {
+	if ( prog.target == GL_VERTEX_PROGRAM_ARB ) {
 		if ( !glConfig.ARBVertexProgramAvailable ) {
 			common->Printf( ": GL_VERTEX_PROGRAM_ARB not available\n" );
+			RB_SetARBProgramFailure( prog, "GL_VERTEX_PROGRAM_ARB not available" );
 			return;
 		}
 		start = strstr( (char *)buffer, "!!ARBvp" );
 	}
-	if ( progs[progIndex].target == GL_FRAGMENT_PROGRAM_ARB ) {
+	if ( prog.target == GL_FRAGMENT_PROGRAM_ARB ) {
 		if ( !glConfig.ARBFragmentProgramAvailable ) {
 			common->Printf( ": GL_FRAGMENT_PROGRAM_ARB not available\n" );
+			RB_SetARBProgramFailure( prog, "GL_FRAGMENT_PROGRAM_ARB not available" );
 			return;
 		}
 		start = strstr( (char *)buffer, "!!ARBfp" );
 	}
 	if ( !start ) {
 		common->Printf( ": !!ARB not found\n" );
+		RB_SetARBProgramFailure( prog, ( prog.target == GL_VERTEX_PROGRAM_ARB ) ? "missing !!ARBvp header" : "missing !!ARBfp header" );
 		return;
 	}
 	end = strstr( start, "END" );
 
 	if ( !end ) {
 		common->Printf( ": END not found\n" );
+		RB_SetARBProgramFailure( prog, "missing END terminator" );
 		return;
 	}
 	end[3] = 0;
 
-	if ( progs[progIndex].ident == VPROG_INTERACTION ) {
+	if ( prog.ident == VPROG_INTERACTION ) {
 		interactionColorMode_t detectedMode = ICM_PACKED;
 		if ( !RB_DetectInteractionColorMode( start, detectedMode ) ) {
 			common->Warning( "R_LoadARBProgram: failed to infer interaction color mode from %s, defaulting auto mode to %s",
@@ -2870,17 +3013,19 @@ void R_LoadARBProgram( int progIndex ) {
 		RB_UpdateInteractionColorMode( true );
 	}
 
-	glBindProgramARB( progs[progIndex].target, progs[progIndex].ident );
+	glBindProgramARB( prog.target, prog.ident );
 	glGetError();
 
-	glProgramStringARB( progs[progIndex].target, GL_PROGRAM_FORMAT_ASCII_ARB,
+	glProgramStringARB( prog.target, GL_PROGRAM_FORMAT_ASCII_ARB,
 		strlen( start ), (unsigned char *)start );
 
 	err = glGetError();
 	glGetIntegerv( GL_PROGRAM_ERROR_POSITION_ARB, (GLint *)&ofs );
 	if ( err == GL_INVALID_OPERATION ) {
 		const GLubyte *str = glGetString( GL_PROGRAM_ERROR_STRING_ARB );
-		common->Printf( "\nGL_PROGRAM_ERROR_STRING_ARB: %s\n", str );
+		idStr failure = "GL_PROGRAM_ERROR_STRING_ARB: ";
+		failure += ( str != NULL ) ? (const char *)str : "unknown";
+		common->Printf( "\nGL_PROGRAM_ERROR_STRING_ARB: %s\n", ( str != NULL ) ? (const char *)str : "unknown" );
 		if ( ofs < 0 ) {
 			common->Printf( "GL_PROGRAM_ERROR_POSITION_ARB < 0 with error\n" );
 		} else if ( ofs >= (int)strlen( (char *)start ) ) {
@@ -2888,13 +3033,16 @@ void R_LoadARBProgram( int progIndex ) {
 		} else {
 			common->Printf( "error at %i:\n%s", ofs, start + ofs );
 		}
+		RB_SetARBProgramFailure( prog, failure.c_str(), ofs );
 		return;
 	}
 	if ( ofs != -1 ) {
 		common->Printf( "\nGL_PROGRAM_ERROR_POSITION_ARB != -1 without error\n" );
+		RB_SetARBProgramFailure( prog, "driver reported GL_PROGRAM_ERROR_POSITION_ARB without GL error", ofs );
 		return;
 	}
 
+	prog.valid = true;
 	common->Printf( "\n" );
 }
 
@@ -2933,7 +3081,8 @@ int R_FindARBProgram( GLenum target, const char *program ) {
 	// add it to the list and load it
 	progs[i].ident = (program_t)0;	// will be gen'd by R_LoadARBProgram
 	progs[i].target = target;
-	strncpy( progs[i].name, program, sizeof( progs[i].name ) - 1 );
+	idStr::Copynz( progs[i].name, program, sizeof( progs[i].name ) );
+	RB_ResetARBProgramStatus( progs[i] );
 
 	R_LoadARBProgram( i );
 
@@ -2948,11 +3097,64 @@ R_ReloadARBPrograms_f
 void R_ReloadARBPrograms_f( const idCmdArgs &args ) {
 	int		i;
 
+	g_interactionShaderRescueWarned = false;
 	common->Printf( "----- R_ReloadARBPrograms -----\n" );
 	for ( i = 0 ; progs[i].name[0] ; i++ ) {
 		R_LoadARBProgram( i );
 	}
 	common->Printf( "-------------------------------\n" );
+	if ( r_shaderReport.GetInteger() >= 1 ) {
+		R_ReportShaderPrograms_f( idCmdArgs() );
+	}
+}
+
+static const char *RB_ShadowProgramStatusName( GLhandleARB programObject, bool programValid, int programGeneration ) {
+	if ( programObject == 0 && programGeneration != tr.videoRestartCount ) {
+		return "unloaded";
+	}
+
+	return programValid ? "valid" : "invalid";
+}
+
+void R_ReportShaderPrograms_f( const idCmdArgs &args ) {
+	int validCount = 0;
+	int invalidCount = 0;
+
+	common->Printf( "----- R_ReportShaderPrograms -----\n" );
+	for ( int i = 0; i < MAX_GLPROGS && progs[i].name[0]; i++ ) {
+		const progDef_t &prog = progs[i];
+		if ( prog.valid ) {
+			validCount++;
+		} else {
+			invalidCount++;
+		}
+
+		common->Printf( "ARB %-8s id=%3u required=%s status=%s path=%s",
+			RB_ARBProgramTargetName( prog.target ),
+			prog.ident,
+			prog.requiredForLighting ? "yes" : "no",
+			prog.valid ? "valid" : "invalid",
+			prog.normalizedPath[0] ? prog.normalizedPath : prog.name );
+		if ( !prog.valid ) {
+			common->Printf( " reason=%s", prog.failureReason[0] ? prog.failureReason : "unknown failure" );
+			if ( prog.errorPosition >= 0 ) {
+				common->Printf( " errorPosition=%d", prog.errorPosition );
+			}
+		}
+		common->Printf( "\n" );
+	}
+
+	common->Printf( "ARB summary: valid=%d invalid=%d rescueMode=%s\n",
+		validCount,
+		invalidCount,
+		RB_CurrentInteractionProgramsValid() ? "off" : "on" );
+	common->Printf( "GLSL shadow projected: %s\n",
+		RB_ShadowProgramStatusName( g_shadowMapProgram.programObject, g_shadowMapProgram.programValid, g_shadowMapProgram.programGeneration ) );
+	common->Printf( "GLSL shadow point: %s\n",
+		RB_ShadowProgramStatusName( g_pointShadowMapProgram.programObject, g_pointShadowMapProgram.programValid, g_pointShadowMapProgram.programGeneration ) );
+	common->Printf( "GLSL shadow caster: %s\n",
+		RB_ShadowProgramStatusName( g_pointShadowCasterProgram.programObject, g_pointShadowCasterProgram.programValid, g_pointShadowCasterProgram.programGeneration ) );
+	common->Printf( "----------------------------------\n" );
 }
 
 /*

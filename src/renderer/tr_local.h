@@ -948,6 +948,7 @@ extern idCVar r_brightness;				// changes gamma tables
 
 extern idCVar r_renderer;				// arb, nv10, nv20, r200, gl2, etc
 extern idCVar r_interactionColorMode;	// interaction color mode: 0 auto, 1 packed env16.xy, 2 vector env16/env17
+extern idCVar r_shaderReport;			// shader diagnostics: 0 off, 1 summaries, 2 invalid-use warnings
 
 extern idCVar r_cgVertexProfile;		// arbvp1, vp20, vp30
 extern idCVar r_cgFragmentProfile;		// arbfp1, fp30
@@ -1447,7 +1448,10 @@ DRAW_*
 void	R_ARB2_Init( void );
 void	RB_ARB2_DrawInteractions( void );
 void	R_ReloadARBPrograms_f( const idCmdArgs &args );
+void	R_ReportShaderPrograms_f( const idCmdArgs &args );
 int		R_FindARBProgram( GLenum target, const char *program );
+bool	R_IsARBProgramValid( GLenum target, GLuint ident );
+bool	R_BindARBProgram( GLenum target, GLuint ident, const char *usage, bool required );
 
 typedef enum {
 	PROG_INVALID,

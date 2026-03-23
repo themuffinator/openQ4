@@ -393,6 +393,14 @@ OpenQ4 automatically validates your Quake 4 installation to ensure you have legi
   - `0` - Auto-detect from interaction.vfp
   - `1` - Packed env16.xy
   - `2` - Vector env16/env17
+- `r_shaderReport`
+  - `0` - Off (default)
+  - `1` - Print shader summaries after startup and `vid_restart` / `reloadARBprograms`
+  - `2` - Also warn when invalid ARB programs are skipped at runtime
+- `reportShaderPrograms` - Print current ARB program validity plus shadow GLSL load state
+- If a required interaction shader fails to load, OpenQ4 enters a rescue path:
+  - interaction passes are skipped instead of binding the invalid program
+  - the final scene gets a small ambient floor lift to avoid a flat-black world while you diagnose the shader failure
 - Screen-fraction scaling (`r_screenFraction`)
   - Values below `100` reduce internal resolution for performance
   - Values above `100` are exposed as supersample-style presets in the video settings for image-quality tuning
@@ -432,6 +440,11 @@ OpenQ4 automatically validates your Quake 4 installation to ensure you have legi
 - `fs_homepath` - Writable user directory
 - `fs_savepath` - Save games and configs (defaults to `fs_homepath`)
 - `fs_cdpath` - Locked runtime overlay path (current working directory; use `.install/` as launch dir for testing)
+
+### Shader Triage
+- Debug launches in this repo write `logs/openq4.log` under the active save path; with the current launch configs that is typically `${workspaceFolder}\\.home\\q4base\\logs\\openq4.log`
+- For flat-black world rendering, start with `reloadARBprograms` and then `reportShaderPrograms`
+- `r_shaderReport 2` enables one-shot warnings when invalid ARB programs are skipped during gameplay
 
 </details>
 

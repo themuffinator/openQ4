@@ -1184,7 +1184,7 @@ void RB_BakeTextureMatrixIntoTexgen( idPlane lightProject[3], const float *textu
 RB_PrepareStageTexturing
 ================
 */
-void RB_PrepareStageTexturing( const shaderStage_t *pStage,  const drawSurf_t *surf, idDrawVert *ac ) {
+bool RB_PrepareStageTexturing( const shaderStage_t *pStage,  const drawSurf_t *surf, idDrawVert *ac ) {
 	// set privatePolygonOffset if necessary
 	if ( pStage->privatePolygonOffset ) {
 		glEnable( GL_POLYGON_OFFSET_FILL );
@@ -1259,7 +1259,9 @@ void RB_PrepareStageTexturing( const shaderStage_t *pStage,  const drawSurf_t *s
 
 	if ( pStage->texture.texgen == TG_GLASSWARP ) {
 		if ( tr.backEndRenderer == BE_ARB2 /*|| tr.backEndRenderer == BE_NV30*/ ) {
-			glBindProgramARB( GL_FRAGMENT_PROGRAM_ARB, FPROG_GLASSWARP );
+			if ( !R_BindARBProgram( GL_FRAGMENT_PROGRAM_ARB, FPROG_GLASSWARP, "glasswarp fragment program", false ) ) {
+				return false;
+			}
 			glEnable( GL_FRAGMENT_PROGRAM_ARB );
 
 			GL_SelectTexture( 2 );
@@ -1302,6 +1304,11 @@ void RB_PrepareStageTexturing( const shaderStage_t *pStage,  const drawSurf_t *s
 			// see if there is also a bump map specified
 			const shaderStage_t *bumpStage = surf->material->GetBumpStage();
 			if ( bumpStage ) {
+				if ( !R_BindARBProgram( GL_FRAGMENT_PROGRAM_ARB, FPROG_BUMPY_ENVIRONMENT, "bumpy environment fragment program", false ) ||
+					!R_BindARBProgram( GL_VERTEX_PROGRAM_ARB, VPROG_BUMPY_ENVIRONMENT, "bumpy environment vertex program", false ) ) {
+					return false;
+				}
+
 				// per-pixel reflection mapping with bump mapping
 				GL_SelectTexture( 1 );
 				bumpStage->texture.image->Bind();
@@ -1317,18 +1324,19 @@ void RB_PrepareStageTexturing( const shaderStage_t *pStage,  const drawSurf_t *s
 
 				// Program env 5, 6, 7, 8 have been set in RB_SetProgramEnvironmentSpace
 
-				glBindProgramARB( GL_FRAGMENT_PROGRAM_ARB, FPROG_BUMPY_ENVIRONMENT );
 				glEnable( GL_FRAGMENT_PROGRAM_ARB );
-				glBindProgramARB( GL_VERTEX_PROGRAM_ARB, VPROG_BUMPY_ENVIRONMENT );
 				glEnable( GL_VERTEX_PROGRAM_ARB );
 			} else {
+				if ( !R_BindARBProgram( GL_FRAGMENT_PROGRAM_ARB, FPROG_ENVIRONMENT, "environment fragment program", false ) ||
+					!R_BindARBProgram( GL_VERTEX_PROGRAM_ARB, VPROG_ENVIRONMENT, "environment vertex program", false ) ) {
+					return false;
+				}
+
 				// per-pixel reflection mapping without a normal map
 				glNormalPointer( GL_FLOAT, sizeof( idDrawVert ), ac->normal.ToFloatPtr() );
 				glEnableClientState( GL_NORMAL_ARRAY );
 
-				glBindProgramARB( GL_FRAGMENT_PROGRAM_ARB, FPROG_ENVIRONMENT );
 				glEnable( GL_FRAGMENT_PROGRAM_ARB );
-				glBindProgramARB( GL_VERTEX_PROGRAM_ARB, VPROG_ENVIRONMENT );
 				glEnable( GL_VERTEX_PROGRAM_ARB );
 			}
 		} else {
@@ -1350,6 +1358,8 @@ void RB_PrepareStageTexturing( const shaderStage_t *pStage,  const drawSurf_t *s
 			glMatrixMode( GL_MODELVIEW );
 		}
 	}
+
+	return true;
 }
 
 /*
@@ -1588,7 +1598,10 @@ void RB_T_FillDepthBuffer( const drawSurf_t *surf ) {
 			pStage->texture.image->Bind();
 
 			// set texture matrix and texGens
-			RB_PrepareStageTexturing( pStage, surf, ac );
+			if ( !RB_PrepareStageTexturing( pStage, surf, ac ) ) {
+				RB_FinishStageTexturing( pStage, surf, ac );
+				continue;
+			}
 
 			// draw it
 			RB_DrawElementsWithCounters( tri );
@@ -1985,7 +1998,13 @@ void RB_STD_T_RenderShaderPasses( const drawSurf_t *surf ) {
 					}
 				}
 
-				RB_PrepareStageTexturing( pStage, surf, ac );
+				if ( !RB_PrepareStageTexturing( pStage, surf, ac ) ) {
+					RB_FinishStageTexturing( pStage, surf, ac );
+					if ( useColorArray ) {
+						glDisableClientState( GL_COLOR_ARRAY );
+					}
+					continue;
+				}
 				RB_DrawElementsWithCounters( tri );
 				RB_FinishStageTexturing( pStage, surf, ac );
 
@@ -2019,9 +2038,20 @@ void RB_STD_T_RenderShaderPasses( const drawSurf_t *surf ) {
 			glEnableClientState( GL_NORMAL_ARRAY );
 
 			GL_State( pStage->drawStateBits );
-			
-			glBindProgramARB( GL_VERTEX_PROGRAM_ARB, newStage->vertexProgram );
-			glEnable( GL_VERTEX_PROGRAM_ARB );
+
+			bool vertexProgramEnabled = false;
+			bool fragmentProgramEnabled = false;
+			if ( newStage->vertexProgram != 0 ) {
+				if ( !R_BindARBProgram( GL_VERTEX_PROGRAM_ARB, newStage->vertexProgram, "material stage vertex program", false ) ) {
+					glDisableClientState( GL_COLOR_ARRAY );
+					glDisableVertexAttribArrayARB( 9 );
+					glDisableVertexAttribArrayARB( 10 );
+					glDisableClientState( GL_NORMAL_ARRAY );
+					continue;
+				}
+				glEnable( GL_VERTEX_PROGRAM_ARB );
+				vertexProgramEnabled = true;
+			}
 
 			// megaTextures bind a lot of images and set a lot of parameters
 			//if ( newStage->megaTexture ) {
@@ -2031,32 +2061,62 @@ void RB_STD_T_RenderShaderPasses( const drawSurf_t *surf ) {
 			//	newStage->megaTexture->BindForViewOrigin( localViewer );
 			//}
 
+			if ( newStage->fragmentProgram != 0 ) {
+				if ( !R_BindARBProgram( GL_FRAGMENT_PROGRAM_ARB, newStage->fragmentProgram, "material stage fragment program", false ) ) {
+					if ( vertexProgramEnabled ) {
+						glDisable( GL_VERTEX_PROGRAM_ARB );
+						glBindProgramARB( GL_VERTEX_PROGRAM_ARB, 0 );
+					}
+					glDisableClientState( GL_COLOR_ARRAY );
+					glDisableVertexAttribArrayARB( 9 );
+					glDisableVertexAttribArrayARB( 10 );
+					glDisableClientState( GL_NORMAL_ARRAY );
+					continue;
+				}
+				glEnable( GL_FRAGMENT_PROGRAM_ARB );
+				fragmentProgramEnabled = true;
+			}
+
+			if ( !vertexProgramEnabled && !fragmentProgramEnabled ) {
+				glDisableClientState( GL_COLOR_ARRAY );
+				glDisableVertexAttribArrayARB( 9 );
+				glDisableVertexAttribArrayARB( 10 );
+				glDisableClientState( GL_NORMAL_ARRAY );
+				continue;
+			}
+
 			for ( int i = 0 ; i < newStage->numVertexParms ; i++ ) {
 				float	parm[4];
 				parm[0] = regs[ newStage->vertexParms[i][0] ];
 				parm[1] = regs[ newStage->vertexParms[i][1] ];
 				parm[2] = regs[ newStage->vertexParms[i][2] ];
 				parm[3] = regs[ newStage->vertexParms[i][3] ];
-				glProgramLocalParameter4fvARB( GL_VERTEX_PROGRAM_ARB, i, parm );
-				glProgramLocalParameter4fvARB( GL_FRAGMENT_PROGRAM_ARB, i, parm );
-			}
-
-			for ( int i = 0 ; i < newStage->numFragmentProgramImages ; i++ ) {
-				if ( newStage->fragmentProgramImages[i] ) {
-					GL_SelectTexture( i );
-					newStage->fragmentProgramImages[i]->Bind();
+				if ( vertexProgramEnabled ) {
+					glProgramLocalParameter4fvARB( GL_VERTEX_PROGRAM_ARB, i, parm );
+				}
+				if ( fragmentProgramEnabled ) {
+					glProgramLocalParameter4fvARB( GL_FRAGMENT_PROGRAM_ARB, i, parm );
 				}
 			}
-			glBindProgramARB( GL_FRAGMENT_PROGRAM_ARB, newStage->fragmentProgram );
-			glEnable( GL_FRAGMENT_PROGRAM_ARB );
+
+			if ( fragmentProgramEnabled ) {
+				for ( int i = 0 ; i < newStage->numFragmentProgramImages ; i++ ) {
+					if ( newStage->fragmentProgramImages[i] ) {
+						GL_SelectTexture( i );
+						newStage->fragmentProgramImages[i]->Bind();
+					}
+				}
+			}
 
 			// draw it
 			RB_DrawElementsWithCounters( tri );
 
-			for ( int i = 1 ; i < newStage->numFragmentProgramImages ; i++ ) {
-				if ( newStage->fragmentProgramImages[i] ) {
-					GL_SelectTexture( i );
-					globalImages->BindNull();
+			if ( fragmentProgramEnabled ) {
+				for ( int i = 1 ; i < newStage->numFragmentProgramImages ; i++ ) {
+					if ( newStage->fragmentProgramImages[i] ) {
+						GL_SelectTexture( i );
+						globalImages->BindNull();
+					}
 				}
 			}
 			//if ( newStage->megaTexture ) {
@@ -2065,8 +2125,12 @@ void RB_STD_T_RenderShaderPasses( const drawSurf_t *surf ) {
 
 			GL_SelectTexture( 0 );
 
-			glDisable( GL_VERTEX_PROGRAM_ARB );
-			glDisable( GL_FRAGMENT_PROGRAM_ARB );
+			if ( vertexProgramEnabled ) {
+				glDisable( GL_VERTEX_PROGRAM_ARB );
+			}
+			if ( fragmentProgramEnabled ) {
+				glDisable( GL_FRAGMENT_PROGRAM_ARB );
+			}
 			// Fixme: Hack to get around an apparent bug in ATI drivers.  Should remove as soon as it gets fixed.
 			glBindProgramARB( GL_VERTEX_PROGRAM_ARB, 0 );
 
@@ -2156,7 +2220,10 @@ void RB_STD_T_RenderShaderPasses( const drawSurf_t *surf ) {
 		// set the state
 		GL_State( pStage->drawStateBits );
 		
-		RB_PrepareStageTexturing( pStage, surf, ac );
+		if ( !RB_PrepareStageTexturing( pStage, surf, ac ) ) {
+			RB_FinishStageTexturing( pStage, surf, ac );
+			continue;
+		}
 
 		// draw it
 		RB_DrawElementsWithCounters( tri );
@@ -2894,7 +2961,14 @@ Lift the final scene toward a minimum brightness floor.
 ==================
 */
 static void RB_STD_ForceAmbient( void ) {
-	const float ambient = idMath::ClampFloat( 0.0f, 1.0f, r_forceAmbient.GetFloat() );
+	const GLuint interactionVertexProgram = r_testARBProgram.GetBool() ? VPROG_TEST : VPROG_INTERACTION;
+	const GLuint interactionFragmentProgram = r_testARBProgram.GetBool() ? FPROG_TEST : FPROG_INTERACTION;
+	const bool interactionRescueActive =
+		tr.backEndRenderer == BE_ARB2 &&
+		( !R_IsARBProgramValid( GL_VERTEX_PROGRAM_ARB, interactionVertexProgram ) ||
+			!R_IsARBProgramValid( GL_FRAGMENT_PROGRAM_ARB, interactionFragmentProgram ) );
+	const float ambientFloor = interactionRescueActive ? 0.20f : 0.0f;
+	const float ambient = idMath::ClampFloat( 0.0f, 1.0f, Max( r_forceAmbient.GetFloat(), ambientFloor ) );
 	if ( ambient <= 0.0f || !backEnd.viewDef->viewEntitys ) {
 		return;
 	}
