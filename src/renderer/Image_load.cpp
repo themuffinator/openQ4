@@ -40,6 +40,7 @@ int BitsForFormat( textureFormat_t format ) {
 		case FMT_NONE:		return 0;
 		case FMT_RGBA8:		return 32;
 		case FMT_XRGB8:		return 32;
+		case FMT_RGBA16F:	return 64;
 		case FMT_RGB565:	return 16;
 		case FMT_L8A8:		return 16;
 		case FMT_ALPHA:		return 8;
@@ -553,6 +554,7 @@ void idImage::CopyFramebuffer( int x, int y, int imageWidth, int imageHeight ) {
 
 	const bool readingFromRenderTexture = ( backEnd.renderTexture != NULL ) && ( backEnd.renderTexture->GetNumColorImages() > 0 );
 	const GLenum readAttachment = GL_COLOR_ATTACHMENT0;
+	const bool needsStorageResize = ( opts.width != imageWidth ) || ( opts.height != imageHeight );
 
 	opts.width = imageWidth;
 	opts.height = imageHeight;
@@ -573,11 +575,14 @@ void idImage::CopyFramebuffer( int x, int y, int imageWidth, int imageHeight ) {
 			glGenFramebuffers( 1, &copyFbo );
 		}
 
-		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA8, imageWidth, imageHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL );
-		glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
-		glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
-		glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
-		glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+		if ( needsStorageResize ) {
+			glTexImage2D( GL_TEXTURE_2D, 0, internalFormat != 0 ? internalFormat : GL_RGBA8, imageWidth, imageHeight, 0,
+				dataFormat != 0 ? dataFormat : GL_RGBA, dataType != 0 ? dataType : GL_UNSIGNED_BYTE, NULL );
+			glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+			glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+			glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+			glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+		}
 
 		glBindFramebuffer( GL_READ_FRAMEBUFFER, backEnd.renderTexture->GetDeviceHandle() );
 		glReadBuffer( readAttachment );
@@ -627,7 +632,11 @@ void idImage::CopyFramebuffer( int x, int y, int imageWidth, int imageHeight ) {
 			glDisable( GL_SCISSOR_TEST );
 		}
 
-		glCopyTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA8, x, y, imageWidth, imageHeight, 0 );
+		if ( needsStorageResize ) {
+			glCopyTexImage2D( GL_TEXTURE_2D, 0, internalFormat != 0 ? internalFormat : GL_RGBA8, x, y, imageWidth, imageHeight, 0 );
+		} else {
+			glCopyTexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, x, y, imageWidth, imageHeight );
+		}
 
 		if ( scissorWasEnabled ) {
 			glScissor( previousScissorBox[0], previousScissorBox[1], previousScissorBox[2], previousScissorBox[3] );
@@ -637,11 +646,12 @@ void idImage::CopyFramebuffer( int x, int y, int imageWidth, int imageHeight ) {
 		glBindFramebuffer( GL_READ_FRAMEBUFFER, previousReadFbo );
 		glReadBuffer( previousReadBuffer );
 
-		// these shouldn't be necessary if the image was initialized properly
-		glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
-		glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
-		glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
-		glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+		if ( needsStorageResize ) {
+			glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+			glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+			glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+			glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+		}
 	}
 
 //	backEnd.pc.c_copyFrameBuffer++;
@@ -655,6 +665,7 @@ CopyDepthbuffer
 void idImage::CopyDepthbuffer( int x, int y, int imageWidth, int imageHeight ) {
 	glBindTexture( ( opts.textureType == TT_CUBIC ) ? GL_TEXTURE_CUBE_MAP_EXT : GL_TEXTURE_2D, texnum );
 
+	const bool needsStorageResize = ( opts.width != imageWidth ) || ( opts.height != imageHeight );
 	opts.width = imageWidth;
 	opts.height = imageHeight;
 
@@ -683,11 +694,14 @@ void idImage::CopyDepthbuffer( int x, int y, int imageWidth, int imageHeight ) {
 			glGenFramebuffers( 1, &copyDepthFbo );
 		}
 
-		glTexImage2D( GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, imageWidth, imageHeight, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL );
-		glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
-		glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
-		glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
-		glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+		if ( needsStorageResize ) {
+			glTexImage2D( GL_TEXTURE_2D, 0, internalFormat != 0 ? internalFormat : GL_DEPTH_COMPONENT24, imageWidth, imageHeight, 0,
+				dataFormat != 0 ? dataFormat : GL_DEPTH_COMPONENT, dataType != 0 ? dataType : GL_FLOAT, NULL );
+			glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
+			glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
+			glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+			glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+		}
 
 		if ( readingFromRenderTexture ) {
 			glBindFramebuffer( GL_READ_FRAMEBUFFER, backEnd.renderTexture->GetDeviceHandle() );
@@ -768,11 +782,17 @@ void idImage::CopyDepthbuffer( int x, int y, int imageWidth, int imageHeight ) {
 			glEnable( GL_SCISSOR_TEST );
 		}
 
-		glTexImage2D( GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, imageWidth, imageHeight, 0, GL_DEPTH_COMPONENT, GL_FLOAT, resolvedDepthBuffer.Ptr() );
-		glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
-		glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
-		glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
-		glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+		if ( needsStorageResize ) {
+			glTexImage2D( GL_TEXTURE_2D, 0, internalFormat != 0 ? internalFormat : GL_DEPTH_COMPONENT24, imageWidth, imageHeight, 0,
+				dataFormat != 0 ? dataFormat : GL_DEPTH_COMPONENT, dataType != 0 ? dataType : GL_FLOAT, resolvedDepthBuffer.Ptr() );
+			glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
+			glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
+			glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+			glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+		} else {
+			glTexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, imageWidth, imageHeight,
+				dataFormat != 0 ? dataFormat : GL_DEPTH_COMPONENT, dataType != 0 ? dataType : GL_FLOAT, resolvedDepthBuffer.Ptr() );
+		}
 
 		glBindFramebuffer( GL_READ_FRAMEBUFFER, previousReadFbo );
 		glBindFramebuffer( GL_DRAW_FRAMEBUFFER, previousDrawFbo );
@@ -797,7 +817,11 @@ void idImage::CopyDepthbuffer( int x, int y, int imageWidth, int imageHeight ) {
 			glDisable( GL_SCISSOR_TEST );
 		}
 
-		glCopyTexImage2D( GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, x, y, imageWidth, imageHeight, 0 );
+		if ( needsStorageResize ) {
+			glCopyTexImage2D( GL_TEXTURE_2D, 0, internalFormat != 0 ? internalFormat : GL_DEPTH_COMPONENT, x, y, imageWidth, imageHeight, 0 );
+		} else {
+			glCopyTexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, x, y, imageWidth, imageHeight );
+		}
 
 		if ( scissorWasEnabled ) {
 			glScissor( previousScissorBox[0], previousScissorBox[1], previousScissorBox[2], previousScissorBox[3] );

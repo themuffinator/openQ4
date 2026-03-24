@@ -84,6 +84,7 @@ public:
 	virtual void				ReadFromDemoFile( class idDemoFile *f );
 	virtual void				WriteToDemoFile( class idDemoFile *f );
 	virtual float				DepthHack() const;
+	virtual int					GetSurfaceMask( const char *surface ) const;
 
 	void						MakeDefaultModel();
 	
@@ -182,6 +183,7 @@ public:
 	virtual const char *		GetJointName( jointHandle_t handle ) const;
 	virtual const idJointQuat *	GetDefaultPose( void ) const;
 	virtual int					NearestJoint( int surfaceNum, int a, int b, int c ) const;
+	virtual int					GetSurfaceMask( const char *surface ) const;
 
 private:
 	idList<idMD5Joint>			joints;

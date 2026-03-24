@@ -897,7 +897,7 @@ extern idCVar r_multiSamples;			// number of antialiasing samples
 extern idCVar r_postAA;					// post AA mode: 0 = off, 1 = SMAA 1x
 extern idCVar r_bloom;					// enable bloom post-process
 extern idCVar r_bloomThreshold;			// bloom bright-pass threshold
-extern idCVar r_bloomSoftKnee;			// bloom soft threshold knee
+extern idCVar r_bloomSoftKnee;			// relative bloom soft threshold knee
 extern idCVar r_bloomIntensity;			// bloom contribution scale
 extern idCVar r_bloomRadius;			// bloom sample radius scale
 extern idCVar r_ssao;					// enable SSAO post-process
@@ -908,15 +908,15 @@ extern idCVar r_ssaoPower;				// SSAO response curve
 extern idCVar r_ssaoMaxDistance;		// SSAO far-distance fade
 extern idCVar r_ssaoSamples;			// SSAO spiral sample count
 extern idCVar r_ssaoDebug;				// visualize SSAO only
-extern idCVar r_hdrToneMap;				// enable HDR tonemapping and color correction
-extern idCVar r_hdrExposure;			// HDR tonemap exposure
-extern idCVar r_hdrWhitePoint;			// filmic white point for HDR tonemapping
-extern idCVar r_hdrLift;				// post-process shadow lift
-extern idCVar r_hdrPostGamma;			// post-process gamma curve
-extern idCVar r_hdrGain;				// post-process gain
-extern idCVar r_hdrVibrance;			// post-process vibrance
-extern idCVar r_hdrSaturation;			// post-process saturation
-extern idCVar r_hdrContrast;			// post-process contrast
+extern idCVar r_hdrToneMap;				// enable filmic tone mapping and color correction
+extern idCVar r_hdrExposure;			// tone-mapping exposure
+extern idCVar r_hdrWhitePoint;			// filmic white point for tone mapping
+extern idCVar r_hdrLift;				// post-process shadow lift when tone mapping is enabled
+extern idCVar r_hdrPostGamma;			// post-process gamma curve when tone mapping is enabled
+extern idCVar r_hdrGain;				// post-process gain when tone mapping is enabled
+extern idCVar r_hdrVibrance;			// post-process vibrance when tone mapping is enabled
+extern idCVar r_hdrSaturation;			// post-process saturation when tone mapping is enabled
+extern idCVar r_hdrContrast;			// post-process contrast when tone mapping is enabled
 extern idCVar r_crt;					// enable CRT monitor post-process
 extern idCVar r_crtAmount;				// overall CRT blend amount
 extern idCVar r_crtScanlineStrength;	// scanline intensity

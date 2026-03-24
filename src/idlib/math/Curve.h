@@ -185,9 +185,11 @@ ID_INLINE float idCurve<type>::RombergIntegral( const float t0, const float t1, 
 	int i, j, k, m, n;
 	float sum, delta;
 	float *temp[2];
+	idTempArray<float> temp0( order );
+	idTempArray<float> temp1( order );
 
-	temp[0] = (float *) _alloca16( order * sizeof( float ) );
-	temp[1] = (float *) _alloca16( order * sizeof( float ) );
+	temp[0] = temp0.Ptr();
+	temp[1] = temp1.Ptr();
 
 	delta = t1 - t0;
 	temp[0][0] = 0.5f * delta * ( GetSpeed( t0 ) + GetSpeed( t1 ) );
@@ -251,13 +253,13 @@ idCurve::GetTimeForLength
 template< class type >
 ID_INLINE float idCurve<type>::GetTimeForLength( const float length, const float epsilon ) const {
 	int i, index;
-	float *accumLength, totalLength, len0, len1, t, diff;
+	float totalLength, len0, len1, t, diff;
+	idTempArray<float> accumLength( values.Num() );
 
 	if ( length <= 0.0f ) {
 		return times[0];
 	}
 
-	accumLength = (float *) _alloca16( values.Num() * sizeof( float ) );
 	totalLength = 0.0f;
 	for ( index = 0; index < values.Num() - 1; index++ ) {
 		totalLength += GetLengthBetweenKnots( index, index + 1 );

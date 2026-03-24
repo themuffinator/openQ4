@@ -1643,6 +1643,119 @@ void idRenderWorldLocal::FreeInteractions() {
 
 /*
 ==================
+PushPolytopeIntoTree
+
+Quake 4 uses an oriented-box BSP walk for entity refs. The older
+bounding-sphere path can drop thin inline models entirely when all of the
+derived AABB corner points classify into solid space.
+==================
+*/
+void idRenderWorldLocal::PushPolytopeIntoTree_r( idRenderEntityLocal *def, idRenderLightLocal *light, const idBox &box, const idVec3 *points, int numPoints, int nodeNum ) {
+	while ( nodeNum >= 0 ) {
+		areaNode_t *node = areaNodes + nodeNum;
+
+		if ( r_useNodeCommonChildren.GetBool() &&
+			node->commonChildrenArea != CHILDREN_HAVE_MULTIPLE_AREAS &&
+			portalAreas[ node->commonChildrenArea ].viewCount == tr.viewCount ) {
+			return;
+		}
+
+		const idVec3 normal = node->plane.Normal();
+		const idMat3 &axis = box.GetAxis();
+		const idVec3 &extents = box.GetExtents();
+		const float distance = box.GetCenter() * normal + node->plane[3];
+		const float radius =
+			idMath::Fabs( ( axis[0] * normal ) * extents[0] ) +
+			idMath::Fabs( ( axis[1] * normal ) * extents[1] ) +
+			idMath::Fabs( ( axis[2] * normal ) * extents[2] );
+
+		if ( distance - radius >= 0.0f ) {
+			nodeNum = node->children[0];
+			if ( !nodeNum ) {
+				return;
+			}
+			continue;
+		}
+
+		if ( distance + radius <= 0.0f ) {
+			nodeNum = node->children[1];
+			if ( !nodeNum ) {
+				return;
+			}
+			continue;
+		}
+
+		if ( points != NULL && numPoints > 0 ) {
+			bool front = false;
+			bool back = false;
+
+			for ( int i = 0; i < numPoints; ++i ) {
+				const float d = points[i] * normal + node->plane[3];
+				if ( d > 0.0f ) {
+					front = true;
+				} else if ( d < 0.0f ) {
+					back = true;
+				}
+
+				if ( front && back ) {
+					break;
+				}
+			}
+
+			if ( front && back ) {
+				if ( node->children[0] ) {
+					PushPolytopeIntoTree_r( def, light, box, points, numPoints, node->children[0] );
+				}
+				nodeNum = node->children[1];
+				if ( !nodeNum ) {
+					return;
+				}
+				continue;
+			}
+
+			if ( front ) {
+				nodeNum = node->children[0];
+				if ( !nodeNum ) {
+					return;
+				}
+				continue;
+			}
+		} else {
+			if ( node->children[0] ) {
+				PushPolytopeIntoTree_r( def, light, box, points, numPoints, node->children[0] );
+			}
+		}
+
+		nodeNum = node->children[1];
+		if ( !nodeNum ) {
+			return;
+		}
+	}
+
+	portalArea_t *area = &portalAreas[ -1 - nodeNum ];
+	if ( area->viewCount == tr.viewCount ) {
+		return;
+	}
+	area->viewCount = tr.viewCount;
+
+	if ( def ) {
+		AddEntityRefToArea( def, area );
+	}
+	if ( light ) {
+		AddLightRefToArea( light, area );
+	}
+}
+
+void idRenderWorldLocal::PushPolytopeIntoTree( idRenderEntityLocal *def, idRenderLightLocal *light, const idBox &box, const idVec3 *points, int numPoints ) {
+	if ( areaNodes == NULL ) {
+		return;
+	}
+
+	PushPolytopeIntoTree_r( def, light, box, points, numPoints, 0 );
+}
+
+/*
+==================
 PushVolumeIntoTree
 
 Used for both light volumes and model volumes.

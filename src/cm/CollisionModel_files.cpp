@@ -240,8 +240,9 @@ void idCollisionModelManagerLocal::WriteCollisionModelsToFile( const char *filen
 	name.SetFileExtension( CM_FILE_EXT );
 
 	common->Printf( "writing %s\n", name.c_str() );
-	// _D3XP was saving to fs_cdpath
-	fp = fileSystem->OpenFileWrite( name, "fs_cdpath" );
+	// Keep runtime-generated collision caches out of fs_cdpath so packaged
+	// collision assets remain authoritative on subsequent runs.
+	fp = fileSystem->OpenFileWrite( name, "fs_savepath" );
 	if ( !fp ) {
 		common->Warning( "idCollisionModelManagerLocal::WriteCollisionModelsToFile: Error opening file %s\n", name.c_str() );
 		return;
@@ -633,33 +634,59 @@ bool idCollisionModelManagerLocal::LoadCollisionModelFile( const char *name, uns
 	idStr fileName;
 	idToken token;
 	idLexer *src;
+	idFile *pakFile;
+	char *pakBuffer;
 	unsigned int crc;
 
 	// load it
 	fileName = name;
 	fileName.SetFileExtension( CM_FILE_EXT );
-	src = new idLexer( fileName );
-	src->SetFlags( LEXFL_NOSTRINGCONCAT | LEXFL_NODOLLARPRECOMPILE );
-	if ( !src->IsLoaded() ) {
-		delete src;
-		return false;
+	pakFile = fileSystem->OpenFileReadFromPak( fileName, false );
+	pakBuffer = NULL;
+	if ( pakFile != NULL ) {
+		const int length = pakFile->Length();
+		pakBuffer = (char *) Mem_Alloc( length + 1 );
+		if ( pakFile->Read( pakBuffer, length ) != length ) {
+			fileSystem->CloseFile( pakFile );
+			Mem_Free( pakBuffer );
+			common->Warning( "Failed to read packed collision model %s", fileName.c_str() );
+			return false;
+		}
+		pakBuffer[ length ] = '\0';
+		fileSystem->CloseFile( pakFile );
+		src = new idLexer( pakBuffer, length, fileName, LEXFL_NOSTRINGCONCAT | LEXFL_NODOLLARPRECOMPILE );
+	} else {
+		src = new idLexer( fileName, LEXFL_NOSTRINGCONCAT | LEXFL_NODOLLARPRECOMPILE );
+		if ( !src->IsLoaded() ) {
+			delete src;
+			return false;
+		}
 	}
 
 	if ( !src->ExpectTokenString( CM_FILEID ) ) {
 		common->Warning( "%s is not an CM file.", fileName.c_str() );
 		delete src;
+		if ( pakBuffer != NULL ) {
+			Mem_Free( pakBuffer );
+		}
 		return false;
 	}
 
 	if ( !src->ReadToken( &token ) || ( token != CM_FILEVERSION && token.Icmp( "3" ) != 0 && token.Icmp( "3.00" ) != 0 ) ) {
 		common->Warning( "%s has version %s instead of %s", fileName.c_str(), token.c_str(), CM_FILEVERSION );
 		delete src;
+		if ( pakBuffer != NULL ) {
+			Mem_Free( pakBuffer );
+		}
 		return false;
 	}
 
 	if ( !src->ExpectTokenType( TT_NUMBER, TT_INTEGER, &token ) ) {
 		common->Warning( "%s has no map file CRC", fileName.c_str() );
 		delete src;
+		if ( pakBuffer != NULL ) {
+			Mem_Free( pakBuffer );
+		}
 		return false;
 	}
 
@@ -667,6 +694,9 @@ bool idCollisionModelManagerLocal::LoadCollisionModelFile( const char *name, uns
 	if ( mapFileCRC && crc != mapFileCRC ) {
 		common->Printf( "%s is out of date\n", fileName.c_str() );
 		delete src;
+		if ( pakBuffer != NULL ) {
+			Mem_Free( pakBuffer );
+		}
 		return false;
 	}
 
@@ -679,6 +709,9 @@ bool idCollisionModelManagerLocal::LoadCollisionModelFile( const char *name, uns
 		if ( token == "collisionModel" ) {
 			if ( !ParseCollisionModel( src ) ) {
 				delete src;
+				if ( pakBuffer != NULL ) {
+					Mem_Free( pakBuffer );
+				}
 				return false;
 			}
 			continue;
@@ -688,6 +721,9 @@ bool idCollisionModelManagerLocal::LoadCollisionModelFile( const char *name, uns
 	}
 
 	delete src;
+	if ( pakBuffer != NULL ) {
+		Mem_Free( pakBuffer );
+	}
 
 	return true;
 }

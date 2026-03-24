@@ -232,6 +232,8 @@ public:
 	virtual void			RemoveFile( const char *relativePath ) = 0;
 							// Opens a file for reading.
 	virtual idFile *		OpenFileRead( const char *relativePath, bool allowCopyFiles = true, const char* gamedir = NULL ) = 0;
+							// Opens a file for reading from pak files only.
+	virtual idFile *		OpenFileReadFromPak( const char *relativePath, bool allowCopyFiles = true, const char* gamedir = NULL ) = 0;
 							// Opens a file for writing, will create any needed subdirectories.
 	virtual idFile *		OpenFileWrite( const char *relativePath, const char *basePath = "fs_savepath" ) = 0;
 							// Opens a file for writing at the end.

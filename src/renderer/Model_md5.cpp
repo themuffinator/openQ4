@@ -772,6 +772,13 @@ idRenderModel *idRenderModelMD5::InstantiateDynamicModel( const struct renderEnt
 
 	// create all the surfaces
 	for( mesh = meshes.Ptr(), i = 0; i < meshes.Num(); i++, mesh++ ) {
+		if ( ent != NULL && i < static_cast<int>( sizeof( unsigned int ) * 8 )
+			&& ( static_cast<unsigned int>( ent->suppressSurfaceMask ) & ( 1u << i ) ) != 0 ) {
+			staticModel->DeleteSurfaceWithId( i );
+			mesh->surfaceNum = -1;
+			continue;
+		}
+
 		// avoid deforming the surface if it will be a nodraw due to a skin remapping
 		// FIXME: may have to still deform clipping hulls
 		const idMaterial *shader = mesh->shader;
@@ -959,4 +966,25 @@ int	idRenderModelMD5::Memory() const {
 		total += R_DeformInfoMemoryUsed( mesh->deformInfo );
 	}
 	return total;
+}
+
+/*
+====================
+idRenderModelMD5::GetSurfaceMask
+====================
+*/
+int idRenderModelMD5::GetSurfaceMask( const char *surface ) const {
+	if ( surface == NULL || surface[0] == '\0' ) {
+		return 0;
+	}
+
+	int mask = 0;
+	for ( int i = 0; i < meshes.Num() && i < static_cast<int>( sizeof( unsigned int ) * 8 ); ++i ) {
+		const idMaterial *shader = meshes[i].shader;
+		if ( shader != NULL && idStr::Icmp( shader->GetName(), surface ) == 0 ) {
+			mask |= ( 1u << i );
+		}
+	}
+
+	return mask;
 }

@@ -300,6 +300,11 @@ void idImage::AllocImage() {
 		dataFormat = GL_RGBA;
 		dataType = GL_UNSIGNED_BYTE;
 		break;
+	case FMT_RGBA16F:
+		internalFormat = GL_RGBA16F;
+		dataFormat = GL_RGBA;
+		dataType = GL_HALF_FLOAT;
+		break;
 	case FMT_XRGB8:
 		internalFormat = GL_RGB;
 		dataFormat = GL_RGBA;

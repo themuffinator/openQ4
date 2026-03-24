@@ -542,7 +542,7 @@ public:
 
 // RAVEN BEGIN
 // bdube: surface flag manipulation
-//	virtual int					GetSurfaceMask ( const char* surface ) const = 0;;
+	virtual int					GetSurfaceMask( const char *surface ) const = 0;
 //
 //// jscott: for portal skies
 //	virtual void				SetHasSky( bool on ) = 0;

@@ -2326,3 +2326,28 @@ bool idRenderModelStatic::FindSurfaceWithId( int id, int &surfaceNum ) {
 	}
 	return false;
 }
+
+/*
+====================
+idRenderModelStatic::GetSurfaceMask
+====================
+*/
+int idRenderModelStatic::GetSurfaceMask( const char *surface ) const {
+	if ( surface == NULL || surface[0] == '\0' ) {
+		return 0;
+	}
+
+	const idMaterial *material = declManager->FindMaterial( surface, false );
+	if ( material == NULL ) {
+		return 0;
+	}
+
+	int mask = 0;
+	for ( int i = 0; i < surfaces.Num() && i < static_cast<int>( sizeof( unsigned int ) * 8 ); ++i ) {
+		if ( surfaces[i].shader == material ) {
+			mask |= ( 1u << i );
+		}
+	}
+
+	return mask;
+}

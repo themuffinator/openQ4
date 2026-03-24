@@ -362,14 +362,20 @@ bool R_ValidateGLSLProgram( newShaderStage_t *stage ) {
 }
 
 static bool RB_IsMainScenePostProcessView( void ) {
-	if ( !backEnd.viewDef || backEnd.viewDef->isSubview ) {
+	if ( !backEnd.viewDef ) {
 		return false;
 	}
 
 	// Fullscreen 2D GUI/menu passes are emitted as standalone views without
 	// view entities. Skip scene post-process passes on those views so menu
-	// assets stay unfiltered while in-world GUIs remain part of 3D views.
-	return backEnd.viewDef->viewEntitys != NULL;
+	// assets stay unfiltered while mirrors, cameras, and other 3D subviews
+	// follow the same scene post stack as the main world view.
+	if ( backEnd.viewDef->viewEntitys == NULL ) {
+		return false;
+	}
+
+	// X-ray subviews intentionally diverge from the normal scene shading path.
+	return !backEnd.viewDef->isXraySubview;
 }
 
 static void RB_BeginFullscreenPostProcessPass( int scissorX, int scissorY, int scissorWidth, int scissorHeight ) {
@@ -660,43 +666,89 @@ static void RB_STD_SSAO( void ) {
 	RB_EndFullscreenPostProcessPass();
 }
 
-enum rbBloomUniformIndex_t {
-	RB_BLOOM_UNIFORM_INV_TEX_SIZE = 0,
-	RB_BLOOM_UNIFORM_THRESHOLD,
-	RB_BLOOM_UNIFORM_SOFT_KNEE,
-	RB_BLOOM_UNIFORM_INTENSITY,
-	RB_BLOOM_UNIFORM_RADIUS,
-	RB_BLOOM_UNIFORM_BLOOM_ENABLED,
-	RB_BLOOM_UNIFORM_TONEMAP_ENABLED,
-	RB_BLOOM_UNIFORM_HDR_EXPOSURE,
-	RB_BLOOM_UNIFORM_HDR_WHITE_POINT,
-	RB_BLOOM_UNIFORM_HDR_LIFT,
-	RB_BLOOM_UNIFORM_HDR_POST_GAMMA,
-	RB_BLOOM_UNIFORM_HDR_GAIN,
-	RB_BLOOM_UNIFORM_HDR_VIBRANCE,
-	RB_BLOOM_UNIFORM_HDR_SATURATION,
-	RB_BLOOM_UNIFORM_HDR_CONTRAST,
-	RB_BLOOM_UNIFORM_COUNT
+enum rbBloomExtractUniformIndex_t {
+	RB_BLOOM_EXTRACT_UNIFORM_INV_TEX_SIZE = 0,
+	RB_BLOOM_EXTRACT_UNIFORM_THRESHOLD,
+	RB_BLOOM_EXTRACT_UNIFORM_SOFT_KNEE,
+	RB_BLOOM_EXTRACT_UNIFORM_COUNT
 };
 
-static newShaderStage_t rbBloomStage;
-static bool rbBloomStageInitialized = false;
+enum rbBloomBlurUniformIndex_t {
+	RB_BLOOM_BLUR_UNIFORM_INV_TEX_SIZE = 0,
+	RB_BLOOM_BLUR_UNIFORM_BLUR_AXIS,
+	RB_BLOOM_BLUR_UNIFORM_BLUR_RADIUS,
+	RB_BLOOM_BLUR_UNIFORM_COUNT
+};
 
-static void RB_InitBloomStage( void ) {
-	if ( rbBloomStageInitialized ) {
+enum rbBloomCompositeUniformIndex_t {
+	RB_BLOOM_COMPOSITE_UNIFORM_INTENSITY = 0,
+	RB_BLOOM_COMPOSITE_UNIFORM_BLOOM_ENABLED,
+	RB_BLOOM_COMPOSITE_UNIFORM_TONEMAP_ENABLED,
+	RB_BLOOM_COMPOSITE_UNIFORM_HDR_EXPOSURE,
+	RB_BLOOM_COMPOSITE_UNIFORM_HDR_WHITE_POINT,
+	RB_BLOOM_COMPOSITE_UNIFORM_HDR_LIFT,
+	RB_BLOOM_COMPOSITE_UNIFORM_HDR_POST_GAMMA,
+	RB_BLOOM_COMPOSITE_UNIFORM_HDR_GAIN,
+	RB_BLOOM_COMPOSITE_UNIFORM_HDR_VIBRANCE,
+	RB_BLOOM_COMPOSITE_UNIFORM_HDR_SATURATION,
+	RB_BLOOM_COMPOSITE_UNIFORM_HDR_CONTRAST,
+	RB_BLOOM_COMPOSITE_UNIFORM_COUNT
+};
+
+static newShaderStage_t rbBloomExtractStage;
+static newShaderStage_t rbBloomBlurStage;
+static newShaderStage_t rbBloomCompositeStage;
+static bool rbBloomStagesInitialized = false;
+static idImage *rbBloomImages[2] = { NULL, NULL };
+static idRenderTexture *rbBloomRenderTextures[2] = { NULL, NULL };
+
+static void RB_InitBloomStages( void ) {
+	if ( rbBloomStagesInitialized ) {
 		return;
 	}
 
-	memset( &rbBloomStage, 0, sizeof( rbBloomStage ) );
-	rbBloomStage.glslProgram = true;
-	idStr::Copynz( rbBloomStage.glslProgramName, "openprey_bloom.fs", sizeof( rbBloomStage.glslProgramName ) );
+	memset( &rbBloomExtractStage, 0, sizeof( rbBloomExtractStage ) );
+	rbBloomExtractStage.glslProgram = true;
+	idStr::Copynz( rbBloomExtractStage.glslProgramName, "openprey_bloom_extract.fs", sizeof( rbBloomExtractStage.glslProgramName ) );
 
-	static const rbBuiltinUniformDef_t uniforms[RB_BLOOM_UNIFORM_COUNT] = {
+	static const rbBuiltinUniformDef_t extractUniforms[RB_BLOOM_EXTRACT_UNIFORM_COUNT] = {
 		{ "invTexSize", 2 },
 		{ "bloomThreshold", 1 },
-		{ "bloomSoftKnee", 1 },
+		{ "bloomSoftKnee", 1 }
+	};
+
+	rbBloomExtractStage.numShaderParms = RB_BLOOM_EXTRACT_UNIFORM_COUNT;
+	for ( int i = 0; i < RB_BLOOM_EXTRACT_UNIFORM_COUNT; i++ ) {
+		idStr::Copynz( rbBloomExtractStage.shaderParmNames[i], extractUniforms[i].name, sizeof( rbBloomExtractStage.shaderParmNames[i] ) );
+		rbBloomExtractStage.shaderParmNumRegisters[i] = extractUniforms[i].components;
+	}
+	rbBloomExtractStage.numShaderTextures = 1;
+	idStr::Copynz( rbBloomExtractStage.shaderTextureNames[0], "Scene", sizeof( rbBloomExtractStage.shaderTextureNames[0] ) );
+
+	memset( &rbBloomBlurStage, 0, sizeof( rbBloomBlurStage ) );
+	rbBloomBlurStage.glslProgram = true;
+	idStr::Copynz( rbBloomBlurStage.glslProgramName, "openprey_bloom_blur.fs", sizeof( rbBloomBlurStage.glslProgramName ) );
+
+	static const rbBuiltinUniformDef_t blurUniforms[RB_BLOOM_BLUR_UNIFORM_COUNT] = {
+		{ "invTexSize", 2 },
+		{ "blurAxis", 2 },
+		{ "blurRadius", 1 }
+	};
+
+	rbBloomBlurStage.numShaderParms = RB_BLOOM_BLUR_UNIFORM_COUNT;
+	for ( int i = 0; i < RB_BLOOM_BLUR_UNIFORM_COUNT; i++ ) {
+		idStr::Copynz( rbBloomBlurStage.shaderParmNames[i], blurUniforms[i].name, sizeof( rbBloomBlurStage.shaderParmNames[i] ) );
+		rbBloomBlurStage.shaderParmNumRegisters[i] = blurUniforms[i].components;
+	}
+	rbBloomBlurStage.numShaderTextures = 1;
+	idStr::Copynz( rbBloomBlurStage.shaderTextureNames[0], "Scene", sizeof( rbBloomBlurStage.shaderTextureNames[0] ) );
+
+	memset( &rbBloomCompositeStage, 0, sizeof( rbBloomCompositeStage ) );
+	rbBloomCompositeStage.glslProgram = true;
+	idStr::Copynz( rbBloomCompositeStage.glslProgramName, "openprey_bloom.fs", sizeof( rbBloomCompositeStage.glslProgramName ) );
+
+	static const rbBuiltinUniformDef_t compositeUniforms[RB_BLOOM_COMPOSITE_UNIFORM_COUNT] = {
 		{ "bloomIntensity", 1 },
-		{ "bloomRadius", 1 },
 		{ "bloomEnabled", 1 },
 		{ "toneMapEnabled", 1 },
 		{ "hdrExposure", 1 },
@@ -709,16 +761,83 @@ static void RB_InitBloomStage( void ) {
 		{ "hdrContrast", 1 }
 	};
 
-	rbBloomStage.numShaderParms = RB_BLOOM_UNIFORM_COUNT;
-	for ( int i = 0; i < RB_BLOOM_UNIFORM_COUNT; i++ ) {
-		idStr::Copynz( rbBloomStage.shaderParmNames[i], uniforms[i].name, sizeof( rbBloomStage.shaderParmNames[i] ) );
-		rbBloomStage.shaderParmNumRegisters[i] = uniforms[i].components;
+	rbBloomCompositeStage.numShaderParms = RB_BLOOM_COMPOSITE_UNIFORM_COUNT;
+	for ( int i = 0; i < RB_BLOOM_COMPOSITE_UNIFORM_COUNT; i++ ) {
+		idStr::Copynz( rbBloomCompositeStage.shaderParmNames[i], compositeUniforms[i].name, sizeof( rbBloomCompositeStage.shaderParmNames[i] ) );
+		rbBloomCompositeStage.shaderParmNumRegisters[i] = compositeUniforms[i].components;
+	}
+	rbBloomCompositeStage.numShaderTextures = 2;
+	idStr::Copynz( rbBloomCompositeStage.shaderTextureNames[0], "Scene", sizeof( rbBloomCompositeStage.shaderTextureNames[0] ) );
+	idStr::Copynz( rbBloomCompositeStage.shaderTextureNames[1], "BloomTex", sizeof( rbBloomCompositeStage.shaderTextureNames[1] ) );
+
+	rbBloomStagesInitialized = true;
+}
+
+static bool RB_EnsureBloomRenderTextures( int viewportWidth, int viewportHeight ) {
+	const int bloomWidth = idMath::ClampInt( 1, viewportWidth, ( viewportWidth + 1 ) / 2 );
+	const int bloomHeight = idMath::ClampInt( 1, viewportHeight, ( viewportHeight + 1 ) / 2 );
+	static const char *imageNames[2] = { "_bloomPing0", "_bloomPing1" };
+
+	for ( int i = 0; i < 2; i++ ) {
+		if ( rbBloomImages[i] == NULL ) {
+			idImageOpts opts;
+			opts.textureType = TT_2D;
+			opts.format = FMT_RGBA16F;
+			opts.width = bloomWidth;
+			opts.height = bloomHeight;
+			opts.numLevels = 1;
+			opts.isPersistant = true;
+			rbBloomImages[i] = globalImages->ScratchImage( imageNames[i], &opts, TF_LINEAR, TR_CLAMP, TD_DEFAULT );
+		}
+
+		if ( rbBloomRenderTextures[i] == NULL ) {
+			if ( rbBloomImages[i] == NULL ) {
+				return false;
+			}
+			if ( rbBloomImages[i]->GetOpts().width != bloomWidth || rbBloomImages[i]->GetOpts().height != bloomHeight ) {
+				tr.ResizeImage( rbBloomImages[i], bloomWidth, bloomHeight );
+			}
+			rbBloomRenderTextures[i] = tr.CreateRenderTexture( rbBloomImages[i], NULL );
+		} else if ( rbBloomRenderTextures[i]->GetWidth() != bloomWidth || rbBloomRenderTextures[i]->GetHeight() != bloomHeight ) {
+			tr.ResizeRenderTexture( rbBloomRenderTextures[i], bloomWidth, bloomHeight );
+		}
+
+		if ( rbBloomImages[i] == NULL || rbBloomRenderTextures[i] == NULL ) {
+			return false;
+		}
 	}
 
-	rbBloomStage.numShaderTextures = 1;
-	idStr::Copynz( rbBloomStage.shaderTextureNames[0], "Scene", sizeof( rbBloomStage.shaderTextureNames[0] ) );
+	return true;
+}
 
-	rbBloomStageInitialized = true;
+static void RB_BindBloomRenderTexture( idRenderTexture *renderTexture, int width, int height ) {
+	backEnd.renderTexture = renderTexture;
+	renderTexture->MakeCurrent();
+	glViewport( 0, 0, width, height );
+	glScissor( 0, 0, width, height );
+}
+
+static void RB_RestoreBloomTarget( idRenderTexture *renderTexture, int viewportWidth, int viewportHeight ) {
+	backEnd.renderTexture = renderTexture;
+	if ( renderTexture != NULL ) {
+		renderTexture->MakeCurrent();
+	} else {
+		idRenderTexture::BindNull();
+		glDrawBuffer( GL_BACK );
+		glReadBuffer( GL_BACK );
+	}
+
+	glViewport(
+		tr.viewportOffset[0] + backEnd.viewDef->viewport.x1,
+		tr.viewportOffset[1] + backEnd.viewDef->viewport.y1,
+		viewportWidth,
+		viewportHeight );
+	glScissor(
+		tr.viewportOffset[0] + backEnd.viewDef->viewport.x1 + backEnd.viewDef->scissor.x1,
+		tr.viewportOffset[1] + backEnd.viewDef->viewport.y1 + backEnd.viewDef->scissor.y1,
+		backEnd.viewDef->scissor.x2 - backEnd.viewDef->scissor.x1 + 1,
+		backEnd.viewDef->scissor.y2 - backEnd.viewDef->scissor.y1 + 1 );
+	backEnd.currentScissor = backEnd.viewDef->scissor;
 }
 
 static void RB_STD_Bloom( void ) {
@@ -726,23 +845,10 @@ static void RB_STD_Bloom( void ) {
 		return;
 	}
 
-	const bool bloomEnabled = r_bloom.GetBool() && !r_skipGlowOverlay.GetBool();
+	const bool bloomRequested = r_bloom.GetBool() && !r_skipGlowOverlay.GetBool();
 	const bool toneMapEnabled = r_hdrToneMap.GetBool();
-	const float hdrLift = r_hdrLift.GetFloat();
-	const float hdrPostGamma = r_hdrPostGamma.GetFloat();
-	const float hdrGain = r_hdrGain.GetFloat();
-	const float hdrVibrance = r_hdrVibrance.GetFloat();
-	const float hdrSaturation = r_hdrSaturation.GetFloat();
-	const float hdrContrast = r_hdrContrast.GetFloat();
-	const bool colorAdjustEnabled =
-		idMath::Fabs( hdrLift ) > 0.001f ||
-		idMath::Fabs( hdrPostGamma - 1.0f ) > 0.001f ||
-		idMath::Fabs( hdrGain - 1.0f ) > 0.001f ||
-		idMath::Fabs( hdrVibrance ) > 0.001f ||
-		idMath::Fabs( hdrSaturation - 1.0f ) > 0.001f ||
-		idMath::Fabs( hdrContrast - 1.0f ) > 0.001f;
 
-	if ( !bloomEnabled && !toneMapEnabled && !colorAdjustEnabled ) {
+	if ( !bloomRequested && !toneMapEnabled ) {
 		return;
 	}
 
@@ -754,8 +860,8 @@ static void RB_STD_Bloom( void ) {
 		return;
 	}
 
-	RB_InitBloomStage();
-	if ( !R_ValidateGLSLProgram( &rbBloomStage ) ) {
+	RB_InitBloomStages();
+	if ( !R_ValidateGLSLProgram( &rbBloomCompositeStage ) ) {
 		return;
 	}
 
@@ -784,85 +890,179 @@ static void RB_STD_Bloom( void ) {
 		return;
 	}
 
-	backEnd.currentScissor = backEnd.viewDef->scissor;
+	const GLfloat hdrExposure = r_hdrExposure.GetFloat();
+	const GLfloat hdrWhitePoint = r_hdrWhitePoint.GetFloat();
+	const GLfloat hdrLift = r_hdrLift.GetFloat();
+	const GLfloat hdrPostGamma = r_hdrPostGamma.GetFloat();
+	const GLfloat hdrGain = r_hdrGain.GetFloat();
+	const GLfloat hdrVibrance = r_hdrVibrance.GetFloat();
+	const GLfloat hdrSaturation = r_hdrSaturation.GetFloat();
+	const GLfloat hdrContrast = r_hdrContrast.GetFloat();
+	const GLfloat bloomIntensity = bloomRequested ? r_bloomIntensity.GetFloat() : 0.0f;
+	const GLfloat bloomRadius = Max( r_bloomRadius.GetFloat(), 0.1f );
+	const GLfloat bloomThreshold = r_bloomThreshold.GetFloat();
+	const GLfloat bloomSoftKnee = r_bloomSoftKnee.GetFloat();
+	const GLfloat toneMapToggle = toneMapEnabled ? 1.0f : 0.0f;
 
+	idImage *bloomImage = globalImages->blackImage;
+	const idRenderTexture *originalRenderTexture = backEnd.renderTexture;
+	bool bloomEnabled = false;
+
+	if ( bloomRequested ) {
+		RB_InitBloomStages();
+		if ( R_ValidateGLSLProgram( &rbBloomExtractStage ) &&
+			R_ValidateGLSLProgram( &rbBloomBlurStage ) &&
+			RB_EnsureBloomRenderTextures( viewportWidth, viewportHeight ) ) {
+			const int bloomWidth = rbBloomRenderTextures[0]->GetWidth();
+			const int bloomHeight = rbBloomRenderTextures[0]->GetHeight();
+			const GLfloat sceneInvTexSize[2] = {
+				1.0f / static_cast<GLfloat>( Max( 1, textureWidth ) ),
+				1.0f / static_cast<GLfloat>( Max( 1, textureHeight ) )
+			};
+			const GLfloat bloomInvTexSize[2] = {
+				1.0f / static_cast<GLfloat>( Max( 1, bloomWidth ) ),
+				1.0f / static_cast<GLfloat>( Max( 1, bloomHeight ) )
+			};
+
+			RB_BindBloomRenderTexture( rbBloomRenderTextures[0], bloomWidth, bloomHeight );
+			RB_BeginFullscreenPostProcessPass( 0, 0, bloomWidth, bloomHeight );
+			GL_SelectTexture( 0 );
+			sceneImage->Bind();
+			glUseProgramObjectARB( (GLhandleARB)rbBloomExtractStage.glslProgramObject );
+			if ( rbBloomExtractStage.shaderTextureLocations[0] >= 0 ) {
+				glUniform1iARB( rbBloomExtractStage.shaderTextureLocations[0], 0 );
+			}
+			if ( rbBloomExtractStage.shaderParmLocations[RB_BLOOM_EXTRACT_UNIFORM_INV_TEX_SIZE] >= 0 ) {
+				glUniform2fvARB( rbBloomExtractStage.shaderParmLocations[RB_BLOOM_EXTRACT_UNIFORM_INV_TEX_SIZE], 1, sceneInvTexSize );
+			}
+			if ( rbBloomExtractStage.shaderParmLocations[RB_BLOOM_EXTRACT_UNIFORM_THRESHOLD] >= 0 ) {
+				glUniform1fARB( rbBloomExtractStage.shaderParmLocations[RB_BLOOM_EXTRACT_UNIFORM_THRESHOLD], bloomThreshold );
+			}
+			if ( rbBloomExtractStage.shaderParmLocations[RB_BLOOM_EXTRACT_UNIFORM_SOFT_KNEE] >= 0 ) {
+				glUniform1fARB( rbBloomExtractStage.shaderParmLocations[RB_BLOOM_EXTRACT_UNIFORM_SOFT_KNEE], bloomSoftKnee );
+			}
+			RB_DrawFullscreenPostProcessQuadUnitUV();
+			glUseProgramObjectARB( 0 );
+			RB_EndFullscreenPostProcessPass();
+
+			RB_BindBloomRenderTexture( rbBloomRenderTextures[1], bloomWidth, bloomHeight );
+			RB_BeginFullscreenPostProcessPass( 0, 0, bloomWidth, bloomHeight );
+			GL_SelectTexture( 0 );
+			rbBloomImages[0]->Bind();
+			glUseProgramObjectARB( (GLhandleARB)rbBloomBlurStage.glslProgramObject );
+			if ( rbBloomBlurStage.shaderTextureLocations[0] >= 0 ) {
+				glUniform1iARB( rbBloomBlurStage.shaderTextureLocations[0], 0 );
+			}
+			if ( rbBloomBlurStage.shaderParmLocations[RB_BLOOM_BLUR_UNIFORM_INV_TEX_SIZE] >= 0 ) {
+				glUniform2fvARB( rbBloomBlurStage.shaderParmLocations[RB_BLOOM_BLUR_UNIFORM_INV_TEX_SIZE], 1, bloomInvTexSize );
+			}
+			if ( rbBloomBlurStage.shaderParmLocations[RB_BLOOM_BLUR_UNIFORM_BLUR_AXIS] >= 0 ) {
+				const GLfloat blurAxisX[2] = { 1.0f, 0.0f };
+				glUniform2fvARB( rbBloomBlurStage.shaderParmLocations[RB_BLOOM_BLUR_UNIFORM_BLUR_AXIS], 1, blurAxisX );
+			}
+			if ( rbBloomBlurStage.shaderParmLocations[RB_BLOOM_BLUR_UNIFORM_BLUR_RADIUS] >= 0 ) {
+				glUniform1fARB( rbBloomBlurStage.shaderParmLocations[RB_BLOOM_BLUR_UNIFORM_BLUR_RADIUS], bloomRadius );
+			}
+			RB_DrawFullscreenPostProcessQuadUnitUV();
+			glUseProgramObjectARB( 0 );
+			RB_EndFullscreenPostProcessPass();
+
+			RB_BindBloomRenderTexture( rbBloomRenderTextures[0], bloomWidth, bloomHeight );
+			RB_BeginFullscreenPostProcessPass( 0, 0, bloomWidth, bloomHeight );
+			GL_SelectTexture( 0 );
+			rbBloomImages[1]->Bind();
+			glUseProgramObjectARB( (GLhandleARB)rbBloomBlurStage.glslProgramObject );
+			if ( rbBloomBlurStage.shaderTextureLocations[0] >= 0 ) {
+				glUniform1iARB( rbBloomBlurStage.shaderTextureLocations[0], 0 );
+			}
+			if ( rbBloomBlurStage.shaderParmLocations[RB_BLOOM_BLUR_UNIFORM_INV_TEX_SIZE] >= 0 ) {
+				glUniform2fvARB( rbBloomBlurStage.shaderParmLocations[RB_BLOOM_BLUR_UNIFORM_INV_TEX_SIZE], 1, bloomInvTexSize );
+			}
+			if ( rbBloomBlurStage.shaderParmLocations[RB_BLOOM_BLUR_UNIFORM_BLUR_AXIS] >= 0 ) {
+				const GLfloat blurAxisY[2] = { 0.0f, 1.0f };
+				glUniform2fvARB( rbBloomBlurStage.shaderParmLocations[RB_BLOOM_BLUR_UNIFORM_BLUR_AXIS], 1, blurAxisY );
+			}
+			if ( rbBloomBlurStage.shaderParmLocations[RB_BLOOM_BLUR_UNIFORM_BLUR_RADIUS] >= 0 ) {
+				glUniform1fARB( rbBloomBlurStage.shaderParmLocations[RB_BLOOM_BLUR_UNIFORM_BLUR_RADIUS], bloomRadius );
+			}
+			RB_DrawFullscreenPostProcessQuadUnitUV();
+			glUseProgramObjectARB( 0 );
+			RB_EndFullscreenPostProcessPass();
+
+			bloomImage = rbBloomImages[0];
+			bloomEnabled = true;
+		}
+	}
+
+	RB_RestoreBloomTarget( const_cast<idRenderTexture *>( originalRenderTexture ), viewportWidth, viewportHeight );
 	RB_BeginFullscreenPostProcessPass(
 		backEnd.viewDef->viewport.x1 + backEnd.viewDef->scissor.x1,
 		backEnd.viewDef->viewport.y1 + backEnd.viewDef->scissor.y1,
 		backEnd.viewDef->scissor.x2 - backEnd.viewDef->scissor.x1 + 1,
 		backEnd.viewDef->scissor.y2 - backEnd.viewDef->scissor.y1 + 1 );
+
 	GL_SelectTexture( 0 );
 	sceneImage->Bind();
+	GL_SelectTexture( 1 );
+	bloomImage->Bind();
+	GL_SelectTexture( 0 );
 
-	glUseProgramObjectARB( (GLhandleARB)rbBloomStage.glslProgramObject );
-
-	const int sceneLocation = rbBloomStage.shaderTextureLocations[0];
-	if ( sceneLocation >= 0 ) {
-		glUniform1iARB( sceneLocation, 0 );
+	glUseProgramObjectARB( (GLhandleARB)rbBloomCompositeStage.glslProgramObject );
+	if ( rbBloomCompositeStage.shaderTextureLocations[0] >= 0 ) {
+		glUniform1iARB( rbBloomCompositeStage.shaderTextureLocations[0], 0 );
 	}
-
-	const GLfloat invTexSize[2] = {
-		1.0f / static_cast<GLfloat>( textureWidth ),
-		1.0f / static_cast<GLfloat>( textureHeight )
-	};
-	const GLfloat threshold = r_bloomThreshold.GetFloat();
-	const GLfloat softKnee = r_bloomSoftKnee.GetFloat();
-	const GLfloat intensity = bloomEnabled ? r_bloomIntensity.GetFloat() : 0.0f;
-	const GLfloat radius = r_bloomRadius.GetFloat();
-	const GLfloat bloomToggle = bloomEnabled ? 1.0f : 0.0f;
-	const GLfloat toneMapToggle = toneMapEnabled ? 1.0f : 0.0f;
-	const GLfloat hdrExposure = r_hdrExposure.GetFloat();
-	const GLfloat hdrWhitePoint = r_hdrWhitePoint.GetFloat();
-
-	if ( rbBloomStage.shaderParmLocations[RB_BLOOM_UNIFORM_INV_TEX_SIZE] >= 0 ) {
-		glUniform2fvARB( rbBloomStage.shaderParmLocations[RB_BLOOM_UNIFORM_INV_TEX_SIZE], 1, invTexSize );
+	if ( rbBloomCompositeStage.shaderTextureLocations[1] >= 0 ) {
+		glUniform1iARB( rbBloomCompositeStage.shaderTextureLocations[1], 1 );
 	}
-	if ( rbBloomStage.shaderParmLocations[RB_BLOOM_UNIFORM_THRESHOLD] >= 0 ) {
-		glUniform1fARB( rbBloomStage.shaderParmLocations[RB_BLOOM_UNIFORM_THRESHOLD], threshold );
+	if ( rbBloomCompositeStage.shaderParmLocations[RB_BLOOM_COMPOSITE_UNIFORM_INTENSITY] >= 0 ) {
+		glUniform1fARB( rbBloomCompositeStage.shaderParmLocations[RB_BLOOM_COMPOSITE_UNIFORM_INTENSITY], bloomIntensity );
 	}
-	if ( rbBloomStage.shaderParmLocations[RB_BLOOM_UNIFORM_SOFT_KNEE] >= 0 ) {
-		glUniform1fARB( rbBloomStage.shaderParmLocations[RB_BLOOM_UNIFORM_SOFT_KNEE], softKnee );
+	if ( rbBloomCompositeStage.shaderParmLocations[RB_BLOOM_COMPOSITE_UNIFORM_BLOOM_ENABLED] >= 0 ) {
+		glUniform1fARB( rbBloomCompositeStage.shaderParmLocations[RB_BLOOM_COMPOSITE_UNIFORM_BLOOM_ENABLED], bloomEnabled ? 1.0f : 0.0f );
 	}
-	if ( rbBloomStage.shaderParmLocations[RB_BLOOM_UNIFORM_INTENSITY] >= 0 ) {
-		glUniform1fARB( rbBloomStage.shaderParmLocations[RB_BLOOM_UNIFORM_INTENSITY], intensity );
+	if ( rbBloomCompositeStage.shaderParmLocations[RB_BLOOM_COMPOSITE_UNIFORM_TONEMAP_ENABLED] >= 0 ) {
+		glUniform1fARB( rbBloomCompositeStage.shaderParmLocations[RB_BLOOM_COMPOSITE_UNIFORM_TONEMAP_ENABLED], toneMapToggle );
 	}
-	if ( rbBloomStage.shaderParmLocations[RB_BLOOM_UNIFORM_RADIUS] >= 0 ) {
-		glUniform1fARB( rbBloomStage.shaderParmLocations[RB_BLOOM_UNIFORM_RADIUS], radius );
+	if ( rbBloomCompositeStage.shaderParmLocations[RB_BLOOM_COMPOSITE_UNIFORM_HDR_EXPOSURE] >= 0 ) {
+		glUniform1fARB( rbBloomCompositeStage.shaderParmLocations[RB_BLOOM_COMPOSITE_UNIFORM_HDR_EXPOSURE], hdrExposure );
 	}
-	if ( rbBloomStage.shaderParmLocations[RB_BLOOM_UNIFORM_BLOOM_ENABLED] >= 0 ) {
-		glUniform1fARB( rbBloomStage.shaderParmLocations[RB_BLOOM_UNIFORM_BLOOM_ENABLED], bloomToggle );
+	if ( rbBloomCompositeStage.shaderParmLocations[RB_BLOOM_COMPOSITE_UNIFORM_HDR_WHITE_POINT] >= 0 ) {
+		glUniform1fARB( rbBloomCompositeStage.shaderParmLocations[RB_BLOOM_COMPOSITE_UNIFORM_HDR_WHITE_POINT], hdrWhitePoint );
 	}
-	if ( rbBloomStage.shaderParmLocations[RB_BLOOM_UNIFORM_TONEMAP_ENABLED] >= 0 ) {
-		glUniform1fARB( rbBloomStage.shaderParmLocations[RB_BLOOM_UNIFORM_TONEMAP_ENABLED], toneMapToggle );
+	if ( rbBloomCompositeStage.shaderParmLocations[RB_BLOOM_COMPOSITE_UNIFORM_HDR_LIFT] >= 0 ) {
+		glUniform1fARB( rbBloomCompositeStage.shaderParmLocations[RB_BLOOM_COMPOSITE_UNIFORM_HDR_LIFT], hdrLift );
 	}
-	if ( rbBloomStage.shaderParmLocations[RB_BLOOM_UNIFORM_HDR_EXPOSURE] >= 0 ) {
-		glUniform1fARB( rbBloomStage.shaderParmLocations[RB_BLOOM_UNIFORM_HDR_EXPOSURE], hdrExposure );
+	if ( rbBloomCompositeStage.shaderParmLocations[RB_BLOOM_COMPOSITE_UNIFORM_HDR_POST_GAMMA] >= 0 ) {
+		glUniform1fARB( rbBloomCompositeStage.shaderParmLocations[RB_BLOOM_COMPOSITE_UNIFORM_HDR_POST_GAMMA], hdrPostGamma );
 	}
-	if ( rbBloomStage.shaderParmLocations[RB_BLOOM_UNIFORM_HDR_WHITE_POINT] >= 0 ) {
-		glUniform1fARB( rbBloomStage.shaderParmLocations[RB_BLOOM_UNIFORM_HDR_WHITE_POINT], hdrWhitePoint );
+	if ( rbBloomCompositeStage.shaderParmLocations[RB_BLOOM_COMPOSITE_UNIFORM_HDR_GAIN] >= 0 ) {
+		glUniform1fARB( rbBloomCompositeStage.shaderParmLocations[RB_BLOOM_COMPOSITE_UNIFORM_HDR_GAIN], hdrGain );
 	}
-	if ( rbBloomStage.shaderParmLocations[RB_BLOOM_UNIFORM_HDR_LIFT] >= 0 ) {
-		glUniform1fARB( rbBloomStage.shaderParmLocations[RB_BLOOM_UNIFORM_HDR_LIFT], hdrLift );
+	if ( rbBloomCompositeStage.shaderParmLocations[RB_BLOOM_COMPOSITE_UNIFORM_HDR_VIBRANCE] >= 0 ) {
+		glUniform1fARB( rbBloomCompositeStage.shaderParmLocations[RB_BLOOM_COMPOSITE_UNIFORM_HDR_VIBRANCE], hdrVibrance );
 	}
-	if ( rbBloomStage.shaderParmLocations[RB_BLOOM_UNIFORM_HDR_POST_GAMMA] >= 0 ) {
-		glUniform1fARB( rbBloomStage.shaderParmLocations[RB_BLOOM_UNIFORM_HDR_POST_GAMMA], hdrPostGamma );
+	if ( rbBloomCompositeStage.shaderParmLocations[RB_BLOOM_COMPOSITE_UNIFORM_HDR_SATURATION] >= 0 ) {
+		glUniform1fARB( rbBloomCompositeStage.shaderParmLocations[RB_BLOOM_COMPOSITE_UNIFORM_HDR_SATURATION], hdrSaturation );
 	}
-	if ( rbBloomStage.shaderParmLocations[RB_BLOOM_UNIFORM_HDR_GAIN] >= 0 ) {
-		glUniform1fARB( rbBloomStage.shaderParmLocations[RB_BLOOM_UNIFORM_HDR_GAIN], hdrGain );
-	}
-	if ( rbBloomStage.shaderParmLocations[RB_BLOOM_UNIFORM_HDR_VIBRANCE] >= 0 ) {
-		glUniform1fARB( rbBloomStage.shaderParmLocations[RB_BLOOM_UNIFORM_HDR_VIBRANCE], hdrVibrance );
-	}
-	if ( rbBloomStage.shaderParmLocations[RB_BLOOM_UNIFORM_HDR_SATURATION] >= 0 ) {
-		glUniform1fARB( rbBloomStage.shaderParmLocations[RB_BLOOM_UNIFORM_HDR_SATURATION], hdrSaturation );
-	}
-	if ( rbBloomStage.shaderParmLocations[RB_BLOOM_UNIFORM_HDR_CONTRAST] >= 0 ) {
-		glUniform1fARB( rbBloomStage.shaderParmLocations[RB_BLOOM_UNIFORM_HDR_CONTRAST], hdrContrast );
+	if ( rbBloomCompositeStage.shaderParmLocations[RB_BLOOM_COMPOSITE_UNIFORM_HDR_CONTRAST] >= 0 ) {
+		glUniform1fARB( rbBloomCompositeStage.shaderParmLocations[RB_BLOOM_COMPOSITE_UNIFORM_HDR_CONTRAST], hdrContrast );
 	}
 
 	RB_DrawFullscreenPostProcessQuad( viewportWidth, viewportHeight, textureWidth, textureHeight );
 	glUseProgramObjectARB( 0 );
+	GL_SelectTexture( 1 );
+	globalImages->BindNull();
+	GL_SelectTexture( 0 );
 	RB_EndFullscreenPostProcessPass();
+
+	if ( originalRenderTexture != NULL ) {
+		sceneImage->CopyFramebuffer(
+			backEnd.viewDef->viewport.x1,
+			backEnd.viewDef->viewport.y1,
+			viewportWidth,
+			viewportHeight );
+		backEnd.currentRenderCopied = true;
+	}
 }
 
 enum rbResolutionScaleUniformIndex_t {

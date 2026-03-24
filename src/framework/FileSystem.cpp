@@ -955,6 +955,7 @@ public:
 	virtual void			RemoveFile( const char *relativePath );	
 	virtual idFile *		OpenFileReadFlags( const char *relativePath, int searchFlags, pack_t **foundInPak = NULL, bool allowCopyFiles = true, const char* gamedir = NULL );
 	virtual idFile *		OpenFileRead( const char *relativePath, bool allowCopyFiles = true, const char* gamedir = NULL );
+	virtual idFile *		OpenFileReadFromPak( const char *relativePath, bool allowCopyFiles = true, const char* gamedir = NULL );
 	virtual idFile *		OpenFileWrite( const char *relativePath, const char *basePath = "fs_savepath" );
 	virtual idFile *		OpenFileAppend( const char *relativePath, bool sync = false, const char *basePath = "fs_basepath"   );
 	virtual idFile *		OpenFileByMode( const char *relativePath, fsMode_t mode );
@@ -4099,6 +4100,15 @@ idFileSystemLocal::OpenFileRead
 */
 idFile *idFileSystemLocal::OpenFileRead( const char *relativePath, bool allowCopyFiles, const char* gamedir ) {
 	return OpenFileReadFlags( relativePath, FSFLAG_SEARCH_DIRS | FSFLAG_SEARCH_PAKS, NULL, allowCopyFiles, gamedir );
+}
+
+/*
+===========
+idFileSystemLocal::OpenFileReadFromPak
+===========
+*/
+idFile *idFileSystemLocal::OpenFileReadFromPak( const char *relativePath, bool allowCopyFiles, const char* gamedir ) {
+	return OpenFileReadFlags( relativePath, FSFLAG_SEARCH_PAKS, NULL, allowCopyFiles, gamedir );
 }
 
 /*

@@ -23,7 +23,7 @@
 
 ## About
 
-The **OpenQ4 Project** is a complete replacement for the Quake 4 engine and game binaries. Built on the foundation of [Quake4Doom](https://github.com/idSoftware/Quake4Doom), OpenQ4 is focused on making Quake 4 feel native on modern hardware without losing stock-asset compatibility. Current work already brings in bloom, HDR tone mapping, SSAO, automatic aspect-ratio handling, multi-monitor support, and an in-progress shadow-mapping path with CSM work underway, alongside broader platform and tooling modernization.
+The **OpenQ4 Project** is a complete replacement for the Quake 4 engine and game binaries. Built on the foundation of [Quake4Doom](https://github.com/idSoftware/Quake4Doom), OpenQ4 is focused on making Quake 4 feel native on modern hardware without losing stock-asset compatibility. Current work already brings in bloom, filmic tone mapping with FP16 scene targets, SSAO, automatic aspect-ratio handling, multi-monitor support, and an in-progress shadow-mapping path with CSM work underway, alongside broader platform and tooling modernization.
 
 ## Versioning
 
@@ -67,8 +67,8 @@ To play OpenQ4, you need:
 - **Auto-Discovery and Validation**: Smart Steam/GOG detection plus official asset verification
 
 ### Rendering Upgrades
-- **Bloom**: Tunable post-process bloom for stronger highlights and a more modern presentation
-- **HDR Tone Mapping**: Filmic-style HDR tonemapping and color controls for exposure, contrast, saturation, and vibrance
+- **Bloom**: Tunable separable half-resolution bloom for stronger highlights with lower full-screen cost
+- **Filmic Tone Mapping**: Filmic tone mapping and color controls for exposure, contrast, saturation, and vibrance on FP16 scene/post-process targets
 - **SSAO**: Screen-space ambient occlusion for added depth and contact shadowing in the final frame
 - **CRT Emulation**: Optional CRT post-process with scanlines, mask, curvature, and chromatic offset controls
 - **Shadow Mapping Pipeline**: Experimental shadow-map support for projected and point lights, with cascaded shadow maps (CSM) actively under development
@@ -385,7 +385,7 @@ OpenQ4 automatically validates your Quake 4 installation to ensure you have legi
 
 ### Advanced Graphics
 - `r_bloom 0|1` - Toggle bloom post-processing
-- `r_hdrToneMap 0|1` - Toggle HDR tonemapping and color correction
+- `r_hdrToneMap 0|1` - Toggle filmic tone mapping and color correction
 - `r_ssao 0|1` - Toggle screen-space ambient occlusion
 - `r_crt 0|1` - Toggle CRT emulation post-processing
 - `r_useShadowMap 0|1` - Enable the experimental shadow-map path
@@ -545,6 +545,9 @@ OpenQ4 builds upon the work of many talented developers and projects:
 - **themuffinator** - OpenQ4 development and maintenance
 - **Justin Marshall** - [Quake4Doom](https://github.com/idSoftware/Quake4Doom), BSE reverse engineering
 - **Robert Backebans** - [RBDOOM3](https://github.com/RobertBeckebans/RBDOOM-3-BFG) modernization work
+
+### Playtesters
+Papaya (`papayathebun` on Discord), JohnnyBoy (`johnnyboy.2000` on Discord)
 
 ### Original Developers
 - **id Software** - idTech 4 engine and Quake 4

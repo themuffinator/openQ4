@@ -1383,6 +1383,11 @@ static void R_AddAmbientDrawsurfs( viewEntity_t *vEntity ) {
 	for ( i = 0 ; i < total ; i++ ) {
 		const modelSurface_t	*surf = model->Surface( i );
 
+		if ( surf->id >= 0 && surf->id < static_cast<int>( sizeof( unsigned int ) * 8 )
+			&& ( static_cast<unsigned int>( def->parms.suppressSurfaceMask ) & ( 1u << surf->id ) ) != 0 ) {
+			continue;
+		}
+
 		// for debugging, only show a single surface at a time
 		if ( r_singleSurface.GetInteger() >= 0 && i != r_singleSurface.GetInteger() ) {
 			continue;

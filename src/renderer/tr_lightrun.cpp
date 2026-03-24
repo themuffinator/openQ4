@@ -166,10 +166,6 @@ Bumps tr.viewCount.
 ===============
 */
 void R_CreateEntityRefs( idRenderEntityLocal *def ) {
-	int			i;
-	idVec3		transformed[8];
-	idVec3		v;
-
 	if ( !def->parms.hModel ) {
 		def->parms.hModel = renderModelManager->DefaultModel();
 	}
@@ -194,20 +190,20 @@ void R_CreateEntityRefs( idRenderEntityLocal *def ) {
 						def->referenceBounds[1][1] - def->referenceBounds[0][1] );
 	}
 
-	for (i = 0 ; i < 8 ; i++) {
-		v[0] = def->referenceBounds[i&1][0];
-		v[1] = def->referenceBounds[(i>>1)&1][1];
-		v[2] = def->referenceBounds[(i>>2)&1][2];
-
-		R_LocalPointToGlobal( def->modelMatrix, v, transformed[i] ); 
-	}
-
 	// bump the view count so we can tell if an
 	// area already has a reference
 	tr.viewCount++;
 
-	// push these points down the BSP tree into areas
-	def->world->PushVolumeIntoTree( def, NULL, 8, transformed );
+	idBounds placementBounds = def->referenceBounds;
+	for ( int axis = 0; axis < 3; ++axis ) {
+		if ( placementBounds[1][axis] - placementBounds[0][axis] <= 0.0f ) {
+			placementBounds[0][axis] -= 0.001f;
+			placementBounds[1][axis] += 0.001f;
+		}
+	}
+
+	// Quake 4 places entity refs with an oriented-box walk through the BSP.
+	def->world->PushPolytopeIntoTree( def, NULL, idBox( placementBounds, def->parms.origin, def->parms.axis ), NULL, 0 );
 }
 
 

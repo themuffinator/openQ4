@@ -313,29 +313,37 @@ idLCP_Square::CalcForceDelta
 ============
 */
 ID_INLINE void idLCP_Square::CalcForceDelta( int d, float dir ) {
-	int i;
-	float *ptr;
+	int i, j;
+	float sum;
+	float *deltaPtr = delta_f.ToFloatPtr();
 
-	delta_f[d] = dir;
+	deltaPtr[d] = dir;
 
 	if ( numClamped == 0 ) {
 		return;
 	}
 
-	// get column d of matrix
-	ptr = (float *) _alloca16( numClamped * sizeof( float ) );
+	// solve force delta using column d of the matrix as the right-hand side
 	for ( i = 0; i < numClamped; i++ ) {
-		ptr[i] = rowPtrs[i][d];
+		sum = rowPtrs[i][d];
+		for ( j = 0; j < i; j++ ) {
+			sum -= clamped[i][j] * deltaPtr[j];
+		}
+		deltaPtr[i] = sum;
 	}
 
-	// solve force delta
-	SolveClamped( delta_f, ptr );
+	for ( i = numClamped - 1; i >= 0; i-- ) {
+		sum = deltaPtr[i];
+		for ( j = i + 1; j < numClamped; j++ ) {
+			sum -= clamped[i][j] * deltaPtr[j];
+		}
+		deltaPtr[i] = sum * diagonal[i];
+	}
 
 	// flip force delta based on direction
 	if ( dir > 0.0f ) {
-		ptr = delta_f.ToFloatPtr();
 		for ( i = 0; i < numClamped; i++ ) {
-			ptr[i] = - ptr[i];
+			deltaPtr[i] = -deltaPtr[i];
 		}
 	}
 }

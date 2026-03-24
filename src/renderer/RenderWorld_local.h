@@ -277,6 +277,10 @@ public:
 
 	void					FreeInteractions();
 
+	void					PushPolytopeIntoTree_r( idRenderEntityLocal *def, idRenderLightLocal *light, const idBox &box, const idVec3 *points, int numPoints, int nodeNum );
+
+	void					PushPolytopeIntoTree( idRenderEntityLocal *def, idRenderLightLocal *light, const idBox &box, const idVec3 *points, int numPoints );
+
 	void					PushVolumeIntoTree_r( idRenderEntityLocal *def, idRenderLightLocal *light, const idSphere *sphere, int numPoints, const idVec3 (*points), int nodeNum );
 
 	void					PushVolumeIntoTree( idRenderEntityLocal *def, idRenderLightLocal *light, int numPoints, const idVec3 (*points) );

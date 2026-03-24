@@ -477,24 +477,13 @@ idImage * idImageManager::ScratchImage( const char *_name, idImageOpts *imgOpts,
 	for ( int i = imageHash.First( hash ); i != -1; i = imageHash.Next( i ) ) {
 		idImage	* image = images[i];
 		if ( name.Icmp( image->GetName() ) == 0 ) {
-			// the built in's, like _white and _flat always match the other options
-			if ( name[0] == '_' ) {
-				return image;
-			}
-
-			if ( image->filter != filter || image->repeat != repeat ) {
-				// we might want to have the system reset these parameters on every bind and
-				// share the image data
-				continue;
-			}
-			if ( image->usage != usage ) {
-				// If an image is used differently then we need 2 copies of it because usage affects the way it's compressed and swizzled
-				continue;
-			}
-
 			image->usage = usage;
 			image->levelLoadReferenced = true;
 			image->referencedOutsideLevelLoad = true;
+
+			if ( image->GetFilter() != filter || image->GetRepeat() != repeat || !( image->GetOpts() == *imgOpts ) || !image->IsLoaded() ) {
+				image->AllocImage( *imgOpts, filter, repeat );
+			}
 			return image;
 		}
 	}
@@ -509,7 +498,10 @@ idImage * idImageManager::ScratchImage( const char *_name, idImageOpts *imgOpts,
 	// create a new image
 	//
 	idImage* newImage = AllocImage( name );
-	if ( newImage != NULL ) {	
+	if ( newImage != NULL ) {
+		newImage->usage = usage;
+		newImage->levelLoadReferenced = true;
+		newImage->referencedOutsideLevelLoad = true;
 		newImage->AllocImage( *imgOpts, filter, repeat );
 	}
 	return newImage;
@@ -738,7 +730,7 @@ void idImageManager::BeginLevelLoad() {
 		idImage	*image = images[ i ];
 
 		// generator function images are always kept around
-		if ( image->generatorFunction ) {
+		if ( image->generatorFunction || image->GetOpts().isPersistant ) {
 			continue;
 		}
 

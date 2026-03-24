@@ -2446,12 +2446,18 @@ ID_INLINE void idMatX::Clamp( float min, float max ) {
 }
 
 ID_INLINE idMatX &idMatX::SwapRows( int r1, int r2 ) {
-	float *ptr;
+	float *row1, *row2;
+	int i;
 
-	ptr = (float *) _alloca16( numColumns * sizeof( float ) );
-	memcpy( ptr, mat + r1 * numColumns, numColumns * sizeof( float ) );
-	memcpy( mat + r1 * numColumns, mat + r2 * numColumns, numColumns * sizeof( float ) );
-	memcpy( mat + r2 * numColumns, ptr, numColumns * sizeof( float ) );
+	if ( r1 == r2 ) {
+		return *this;
+	}
+
+	row1 = mat + r1 * numColumns;
+	row2 = mat + r2 * numColumns;
+	for ( i = 0; i < numColumns; i++ ) {
+		idSwap( row1[i], row2[i] );
+	}
 
 	return *this;
 }
