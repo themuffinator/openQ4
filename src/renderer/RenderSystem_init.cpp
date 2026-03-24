@@ -1249,9 +1249,24 @@ void R_ReadTiledPixels( int width, int height, byte *buffer, renderView_t *ref =
 			if ( ref ) {
 				tr.BeginFrame( oldWidth, oldHeight );
 				tr.primaryWorld->RenderScene( ref );
-				tr.EndFrame( NULL, NULL );
+
+				// Match CaptureRenderToFile's direct back-buffer readback path instead of
+				// swapping and reading GL_FRONT. Front-buffer tiled captures are fragile in
+				// windowed/composited environments and can produce partially black strips.
+				tr.guiModel->EmitFullScreen();
+				tr.guiModel->Clear();
+
+				if ( frameData->cmdHead->commandId != RC_NOP || frameData->cmdHead->next != NULL ) {
+					if ( !r_skipBackEnd.GetBool() ) {
+						RB_ExecuteBackEndCommands( frameData->cmdHead );
+					}
+					R_ClearCommandChain();
+				}
+
+				glReadBuffer( GL_BACK );
 			} else {
 				session->UpdateScreen();
+				glReadBuffer( GL_FRONT );
 			}
 
 			int w = oldWidth;
@@ -1263,7 +1278,6 @@ void R_ReadTiledPixels( int width, int height, byte *buffer, renderView_t *ref =
 				h = height - yo;
 			}
 
-			glReadBuffer( GL_FRONT );
 			glReadPixels( 0, 0, w, h, GL_RGB, GL_UNSIGNED_BYTE, temp ); 
 
 			int	row = ( w * 3 + 3 ) & ~3;		// OpenGL pads to dword boundaries
@@ -1524,14 +1538,6 @@ static void R_CaptureTiledPixelsRGBA( int width, int height, int blends, renderV
 	R_StaticFree( rgbBuffer );
 }
 
-static void R_ExtractRectRGBA( const byte *src, int srcWidth, int srcX, int srcY, int rectWidth, int rectHeight, byte *dst ) {
-	for ( int y = 0; y < rectHeight; y++ ) {
-		const byte *srcRow = src + ( ( srcY + y ) * srcWidth + srcX ) * 4;
-		byte *dstRow = dst + y * rectWidth * 4;
-		memcpy( dstRow, srcRow, rectWidth * 4 );
-	}
-}
-
 static bool R_ResampleLevelShotTileRGBA( const byte *src, int srcWidth, int srcHeight, int tileSize, byte *dst ) {
 	byte *resampled = R_ResampleTexture( src, srcWidth, srcHeight, tileSize, tileSize );
 	if ( resampled == NULL ) {
@@ -1543,8 +1549,16 @@ static bool R_ResampleLevelShotTileRGBA( const byte *src, int srcWidth, int srcH
 	return true;
 }
 
-static float R_LevelShotExpandedFov( float baseFov, float scale ) {
-	return RAD2DEG( 2.0f * idMath::ATan( idMath::Tan( DEG2RAD( baseFov * 0.5f ) ) * scale ) );
+static void R_CaptureLevelShotTileRGBA( int width, int height, int blends, const renderView_t &sourceView,
+	float projectionShiftX, float projectionShiftY, byte *rgbaOut ) {
+	tr_levelshotProjectionShiftActive = true;
+	tr_levelshotProjectionShiftX = projectionShiftX;
+	tr_levelshotProjectionShiftY = projectionShiftY;
+	renderView_t captureView = sourceView;
+	R_CaptureTiledPixelsRGBA( width, height, blends, &captureView, rgbaOut );
+	tr_levelshotProjectionShiftActive = false;
+	tr_levelshotProjectionShiftX = 0.0f;
+	tr_levelshotProjectionShiftY = 0.0f;
 }
 
 static void R_LevelShotNormalizeFovToAspect( const renderView_t &sourceView, float currentAspect, float targetAspect, float &fovX, float &fovY ) {
@@ -1641,8 +1655,6 @@ void R_LevelShot_f( const idCmdArgs &args ) {
 	const int rawTileHeight = size;
 	const float tileAspect = static_cast<float>( SCREEN_WIDTH ) / static_cast<float>( SCREEN_HEIGHT );
 	const int rawTileWidth = Max( 1, idMath::Ftoi( rawTileHeight * tileAspect + 0.5f ) );
-	const int wideWidth = rawTileWidth * 3;
-	const int tallHeight = rawTileHeight * 3;
 
 	renderView_t baseRef = tr.primaryView->renderView;
 	float currentAspect = tileAspect;
@@ -1655,13 +1667,6 @@ void R_LevelShot_f( const idCmdArgs &args ) {
 	baseRef.width = SCREEN_WIDTH;
 	baseRef.height = SCREEN_HEIGHT;
 
-	renderView_t wideRef = baseRef;
-	renderView_t tallRef = baseRef;
-	wideRef.fov_x = R_LevelShotExpandedFov( baseRef.fov_x, 3.0f );
-	tallRef.fov_y = R_LevelShotExpandedFov( baseRef.fov_y, 3.0f );
-
-	idTempArray<byte> wideStrip( wideWidth * rawTileHeight * 4 );
-	idTempArray<byte> tallStrip( rawTileWidth * tallHeight * 4 );
 	idTempArray<byte> centerRawTile( rawTileWidth * rawTileHeight * 4 );
 	idTempArray<byte> leftRawTile( rawTileWidth * rawTileHeight * 4 );
 	idTempArray<byte> rightRawTile( rawTileWidth * rawTileHeight * 4 );
@@ -1678,16 +1683,15 @@ void R_LevelShot_f( const idCmdArgs &args ) {
 	const bool previousSuppressLevelshotViewModels = tr.suppressLevelshotViewModels;
 	tr.suppressLevelshotViewModels = true;
 
-	R_CaptureTiledPixelsRGBA( wideWidth, rawTileHeight, blends, &wideRef, wideStrip.Ptr() );
-	R_CaptureTiledPixelsRGBA( rawTileWidth, tallHeight, blends, &tallRef, tallStrip.Ptr() );
+	// Capture each tile directly as an off-axis 4:3 view. This avoids depending on
+	// oversized stitched strips, which are fragile on some drivers/window systems.
+	R_CaptureLevelShotTileRGBA( rawTileWidth, rawTileHeight, blends, baseRef, 0.0f, 0.0f, centerRawTile.Ptr() );
+	R_CaptureLevelShotTileRGBA( rawTileWidth, rawTileHeight, blends, baseRef, -2.0f, 0.0f, leftRawTile.Ptr() );
+	R_CaptureLevelShotTileRGBA( rawTileWidth, rawTileHeight, blends, baseRef, 2.0f, 0.0f, rightRawTile.Ptr() );
+	R_CaptureLevelShotTileRGBA( rawTileWidth, rawTileHeight, blends, baseRef, 0.0f, 2.0f, topRawTile.Ptr() );
+	R_CaptureLevelShotTileRGBA( rawTileWidth, rawTileHeight, blends, baseRef, 0.0f, -2.0f, bottomRawTile.Ptr() );
 
 	tr.suppressLevelshotViewModels = previousSuppressLevelshotViewModels;
-
-	R_ExtractRectRGBA( wideStrip.Ptr(), wideWidth, 0, 0, rawTileWidth, rawTileHeight, leftRawTile.Ptr() );
-	R_ExtractRectRGBA( wideStrip.Ptr(), wideWidth, rawTileWidth, 0, rawTileWidth, rawTileHeight, centerRawTile.Ptr() );
-	R_ExtractRectRGBA( wideStrip.Ptr(), wideWidth, rawTileWidth * 2, 0, rawTileWidth, rawTileHeight, rightRawTile.Ptr() );
-	R_ExtractRectRGBA( tallStrip.Ptr(), rawTileWidth, 0, 0, rawTileWidth, rawTileHeight, topRawTile.Ptr() );
-	R_ExtractRectRGBA( tallStrip.Ptr(), rawTileWidth, 0, rawTileHeight * 2, rawTileWidth, rawTileHeight, bottomRawTile.Ptr() );
 
 	if ( !R_ResampleLevelShotTileRGBA( leftRawTile.Ptr(), rawTileWidth, rawTileHeight, size, leftTile.Ptr() ) ||
 		!R_ResampleLevelShotTileRGBA( centerRawTile.Ptr(), rawTileWidth, rawTileHeight, size, centerTile.Ptr() ) ||

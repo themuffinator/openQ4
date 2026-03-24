@@ -195,11 +195,6 @@ static bool Session_ResolveImageFilePath( const idStr &imagePath, idStr &resolve
 	return false;
 }
 
-static bool Session_LevelshotImageExists( const idStr &imageBasePath ) {
-	idStr resolvedPath;
-	return Session_ResolveImageFilePath( imageBasePath, resolvedPath );
-}
-
 static bool Session_ResolveSiblingImageFilePath( const idStr &resolvedBasePath, const char *suffix, idStr &resolvedPath ) {
 	if ( resolvedBasePath.Length() <= 0 || suffix == NULL || suffix[ 0 ] == '\0' ) {
 		return false;
@@ -487,16 +482,17 @@ static bool Session_PrepareExpandedLoadingBackground( const idStr &backgroundPat
 	idStr resolvedTopPath;
 	idStr resolvedBottomPath;
 
-	bool hasLeft = Session_ResolveSiblingImageFilePath( resolvedCenterPath, "_left", resolvedLeftPath );
-	bool hasRight = Session_ResolveSiblingImageFilePath( resolvedCenterPath, "_right", resolvedRightPath );
-	bool hasTop = Session_ResolveSiblingImageFilePath( resolvedCenterPath, "_top", resolvedTopPath );
-	bool hasBottom = Session_ResolveSiblingImageFilePath( resolvedCenterPath, "_bottom", resolvedBottomPath );
-
-	if ( expandHorizontally && !( hasLeft || hasRight ) ) {
-		return false;
+	bool hasLeft = false;
+	bool hasRight = false;
+	bool hasTop = false;
+	bool hasBottom = false;
+	if ( expandHorizontally ) {
+		hasLeft = Session_ResolveSiblingImageFilePath( resolvedCenterPath, "_left", resolvedLeftPath );
+		hasRight = Session_ResolveSiblingImageFilePath( resolvedCenterPath, "_right", resolvedRightPath );
 	}
-	if ( expandVertically && !( hasTop || hasBottom ) ) {
-		return false;
+	if ( expandVertically ) {
+		hasTop = Session_ResolveSiblingImageFilePath( resolvedCenterPath, "_top", resolvedTopPath );
+		hasBottom = Session_ResolveSiblingImageFilePath( resolvedCenterPath, "_bottom", resolvedBottomPath );
 	}
 
 	byte *centerPic = NULL;
@@ -528,9 +524,10 @@ static bool Session_PrepareExpandedLoadingBackground( const idStr &backgroundPat
 		hasBottom = false;
 	}
 
+	// Levelshots are authored as square textures, but the stock loading GUI first stretches
+	// them into the 4:3 virtual canvas and only then uniformly scales that canvas to the
+	// current screen. Compose the expanded background in that same display space.
 	const int centerDisplayHeight = centerHeight;
-	// Levelshots are authored as square textures, but the stock loading GUI stretches them
-	// into the 640x480 virtual canvas before the canvas is uniformly scaled to the window.
 	const int centerDisplayWidth = Max( 1, idMath::Ftoi( centerDisplayHeight * ( static_cast<float>( SCREEN_WIDTH ) / static_cast<float>( SCREEN_HEIGHT ) ) + 0.5f ) );
 
 	int outputWidth = centerDisplayWidth;
@@ -652,58 +649,6 @@ static bool Session_PrepareExpandedLoadingBackground( const idStr &backgroundPat
 	}
 
 	return true;
-}
-
-static void Session_ResolveWideLoadingBackground( idStr &backgroundPath, bool &isWide ) {
-	isWide = false;
-	if ( backgroundPath.Length() <= 0 ) {
-		return;
-	}
-
-	idStr backgroundNoExt = backgroundPath;
-	backgroundNoExt.StripFileExtension();
-
-	idStr lowerPath = backgroundNoExt;
-	lowerPath.ToLower();
-	lowerPath.BackSlashesToSlashes();
-
-	static const char loadscreensPrefix[] = "gfx/guis/loadscreens/";
-	if ( idStr::Icmpn( lowerPath.c_str(), loadscreensPrefix, sizeof( loadscreensPrefix ) - 1 ) != 0 ) {
-		return;
-	}
-
-	if ( lowerPath.Find( "/wide/", false ) >= 0 ) {
-		isWide = Session_LevelshotImageExists( backgroundNoExt );
-		return;
-	}
-
-	idStr mapName = backgroundNoExt;
-	mapName.StripPath();
-	if ( mapName.Length() <= 0 ) {
-		return;
-	}
-
-	idStr basePath;
-	backgroundNoExt.ExtractFilePath( basePath );
-	if ( basePath.Length() > 0 ) {
-		idStr siblingWidePath = basePath;
-		if ( siblingWidePath[ siblingWidePath.Length() - 1 ] != '/' ) {
-			siblingWidePath += "/";
-		}
-		siblingWidePath += "wide/";
-		siblingWidePath += mapName;
-		if ( Session_LevelshotImageExists( siblingWidePath ) ) {
-			backgroundPath = siblingWidePath;
-			isWide = true;
-			return;
-		}
-	}
-
-	idStr widePath = va( "gfx/guis/loadscreens/wide/%s", mapName.c_str() );
-	if ( Session_LevelshotImageExists( widePath ) ) {
-		backgroundPath = widePath;
-		isWide = true;
-	}
 }
 
 static void Session_DrawFallbackLoadingScreen() {
@@ -2235,7 +2180,6 @@ void idSessionLocal::LoadLoadingGui( const char *mapName ) {
 	const char *loadingAuthor = "";
 	idStr loadingBackground = "gfx/guis/loadscreens/generic";
 	bool loadingBackgroundCanvasFill = false;
-	bool loadingBackgroundWide = false;
 	const char *loadGuiOverride = "";
 	const char *spawnGameType = mapSpawnData.serverInfo.GetString( "si_gameType", cvarSystem->GetCVarString( "si_gameType" ) );
 	const char *spawnMapPath = mapSpawnData.serverInfo.GetString( "si_map", mapName );
@@ -2271,9 +2215,6 @@ void idSessionLocal::LoadLoadingGui( const char *mapName ) {
 	if ( Session_PrepareExpandedLoadingBackground( loadingBackground, stripped.c_str(), expandedLoadingBackground ) ) {
 		loadingBackground = expandedLoadingBackground;
 		loadingBackgroundCanvasFill = true;
-	} else {
-		Session_ResolveWideLoadingBackground( loadingBackground, loadingBackgroundWide );
-		loadingBackgroundCanvasFill = loadingBackgroundWide;
 	}
 
 	char guiMap[ MAX_STRING_CHARS ];
@@ -2298,7 +2239,7 @@ void idSessionLocal::LoadLoadingGui( const char *mapName ) {
 		guiLoading->SetStateString( "loading_bkgnd", loadingBackground.c_str() );
 		guiLoading->SetStateInt( "loading_bkgnd_canvasfill", loadingBackgroundCanvasFill ? 1 : 0 );
 		// Preserve compatibility with GUIs that still key off the old "wide" state to select
-		// the full-canvas branch used by wide and dynamically expanded levelshots.
+		// the full-canvas branch used by dynamically expanded levelshots.
 		guiLoading->SetStateInt( "loading_bkgnd_wide", loadingBackgroundCanvasFill ? 1 : 0 );
 		guiLoading->SetStateString( "loading_levelname", loadingLevelName );
 		guiLoading->SetStateString( "loading_objectives", loadingObjectives );

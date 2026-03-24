@@ -864,6 +864,9 @@ public:
 extern backEndState_t		backEnd;
 extern idRenderSystemLocal	tr;
 extern glconfig_t			glConfig;		// outside of TR since it shouldn't be cleared during ref re-init
+extern bool					tr_levelshotProjectionShiftActive;
+extern float				tr_levelshotProjectionShiftX;
+extern float				tr_levelshotProjectionShiftY;
 
 static ID_INLINE bool R_ShouldSuppressViewModelForLevelshot( int viewID, int allowSurfaceInViewID, int weaponDepthHackInViewID ) {
 	return tr.suppressLevelshotViewModels

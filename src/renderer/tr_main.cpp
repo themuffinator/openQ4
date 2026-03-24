@@ -828,6 +828,10 @@ void R_TransposeGLMatrix( const float in[16], float out[16] ) {
 	}
 }
 
+bool tr_levelshotProjectionShiftActive = false;
+float tr_levelshotProjectionShiftX = 0.0f;
+float tr_levelshotProjectionShiftY = 0.0f;
+
 /*
 =================
 R_SetViewMatrix
@@ -925,6 +929,15 @@ void R_SetupProjection( void ) {
 
 	width = xmax - xmin;
 	height = ymax - ymin;
+
+	if ( tr_levelshotProjectionShiftActive ) {
+		const float xShift = 0.5f * width * tr_levelshotProjectionShiftX;
+		const float yShift = 0.5f * height * tr_levelshotProjectionShiftY;
+		xmin += xShift;
+		xmax += xShift;
+		ymin += yShift;
+		ymax += yShift;
+	}
 
 	jitterx = jitterx * width / ( tr.viewDef->viewport.x2 - tr.viewDef->viewport.x1 + 1 );
 	xmin += jitterx;
