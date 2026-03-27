@@ -78,6 +78,7 @@ This file describes project goals, rules, and upstream credits for anyone workin
 
 **References (Local, Not Included In Repo)**
 - Quake 4 SDK: `E:\_SOURCE\_CODE\Quake4-1.4.2-SDK`
+- Quake 4 asset source: `E:\_SOURCE\_ASSETS\Q4`
 - Upstream engine base (local folder name retained): `E:\_SOURCE\_CODE\Quake4Doom-master`
 - Quake 4 BSE (Basic Set of Effects): `E:\_SOURCE\_CODE\Quake4BSE-master`
 - Quake 4 engine decompiled (Hex-Rays): `E:\_SOURCE\_CODE\Quake4Decompiled-main`

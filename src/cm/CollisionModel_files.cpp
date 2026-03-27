@@ -119,7 +119,13 @@ void idCollisionModelManagerLocal::WritePolygons( idFile *fp, cm_node_t *node ) 
 		fp->WriteFloatString( " ) ( %f %f %f ) %f", p->plane.Normal()[0], p->plane.Normal()[1], p->plane.Normal()[2], p->plane.Dist() );
 		fp->WriteFloatString( " ( %f %f %f )", p->bounds[0][0], p->bounds[0][1], p->bounds[0][2] );
 		fp->WriteFloatString( " ( %f %f %f )", p->bounds[1][0], p->bounds[1][1], p->bounds[1][2] );
-		fp->WriteFloatString( " \"%s\"\n", p->material->GetName() );
+		fp->WriteFloatString( " \"%s\"", p->material->GetName() );
+		if ( p->texBounds[0] != vec2_origin || p->texBounds[1] != vec2_origin || p->texBounds[2] != vec2_origin ) {
+			fp->WriteFloatString( " ( %f %f )", p->texBounds[0][0], p->texBounds[0][1] );
+			fp->WriteFloatString( " ( %f %f )", p->texBounds[1][0], p->texBounds[1][1] );
+			fp->WriteFloatString( " ( %f %f ) %d", p->texBounds[2][0], p->texBounds[2][1], 0 );
+		}
+		fp->WriteFloatString( "\n" );
 	}
 	if ( node->planeType != -1 ) {
 		WritePolygons( fp, node->children[0] );
@@ -446,11 +452,10 @@ void idCollisionModelManagerLocal::ParsePolygons( idLexer *src, idCollisionModel
 		p->checkcount = 0;
 		if ( src->ReadToken( &token ) ) {
 			if ( token == "(" ) {
-				idVec2 texBounds[3];
 				src->UnreadToken( &token );
-				src->Parse1DMatrix( 2, texBounds[0].ToFloatPtr() );
-				src->Parse1DMatrix( 2, texBounds[1].ToFloatPtr() );
-				src->Parse1DMatrix( 2, texBounds[2].ToFloatPtr() );
+				src->Parse1DMatrix( 2, p->texBounds[0].ToFloatPtr() );
+				src->Parse1DMatrix( 2, p->texBounds[1].ToFloatPtr() );
+				src->Parse1DMatrix( 2, p->texBounds[2].ToFloatPtr() );
 				src->ParseInt(); // primitive num
 			} else {
 				src->UnreadToken( &token );

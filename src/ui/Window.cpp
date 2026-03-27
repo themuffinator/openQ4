@@ -101,6 +101,39 @@ static void DrawSplashUnderlay( idDeviceContext *dc ) {
 	const idVec4 underlayColor( 24.0f / 255.0f, 26.0f / 255.0f, 8.0f / 255.0f, 1.0f );
 	dc->DrawFilledRect( 0.0f, 0.0f, 640.0f, 480.0f, underlayColor );
 }
+
+static rvNamedEvent *OpenQ4_CreateLegacyCinematicNamedEvent( idWindow *window, const char *eventName ) {
+	if ( window == NULL || window->GetGui() == NULL ) {
+		return NULL;
+	}
+
+	if ( idStr::Icmp( window->GetGui()->GetSourceFile(), "guis/cinematic.gui" ) != 0 ||
+		 idStr::Icmp( eventName, "showLetterbox" ) != 0 ) {
+		return NULL;
+	}
+
+	static const char legacyShowLetterboxScript[] =
+		"{ "
+		"set \"blackbar_top::visible\" \"1\"; "
+		"set \"blackbar_bottom::visible\" \"1\"; "
+		"set \"anim_bars::visible\" \"1\"; "
+		"set \"blackbar_top::rect\" \"0,0,640,60\"; "
+		"set \"blackbar_bottom::rect\" \"0,420,640,60\"; "
+		"}";
+
+	idParser src( legacyShowLetterboxScript, sizeof( legacyShowLetterboxScript ) - 1,
+		"legacy_cinematic_showLetterbox",
+		LEXFL_NOFATALERRORS | LEXFL_NOSTRINGCONCAT | LEXFL_ALLOWMULTICHARLITERALS | LEXFL_ALLOWBACKSLASHSTRINGCONCAT );
+
+	rvNamedEvent *event = new rvNamedEvent( eventName );
+	if ( !window->ParseScript( &src, *event->mEvent ) ) {
+		delete event;
+		return NULL;
+	}
+	event->mEvent->FixupParms( window );
+
+	return event;
+}
 }
 
 bool idWindow::registerIsTemporary[MAX_EXPRESSION_REGISTERS];		// statics to assist during parsing
@@ -4382,10 +4415,15 @@ idWindow::ReadSaveGameString
 */
 void idWindow::ReadSaveGameString( idStr &string, idFile *savefile ) {
 	int len;
+	const int offset = savefile->Tell();
 
 	savefile->Read( &len, sizeof( len ) );
-	if ( len < 0 ) {
-		common->Warning( "idWindow::ReadSaveGameString: invalid length" );
+	const int remainingBytes = Max( 0, savefile->Length() - savefile->Tell() );
+	if ( len < 0 || len > remainingBytes ) {
+		common->Warning( "idWindow::ReadSaveGameString: invalid length %d at offset %d (remaining %d)",
+			len, offset, remainingBytes );
+		string.Clear();
+		return;
 	}
 
 	string.Fill( ' ', len );
@@ -4445,12 +4483,9 @@ void idWindow::ReadFromSaveGame( idFile *savefile ) {
 	rotate.ReadFromSaveGame( savefile );
 	text.ReadFromSaveGame( savefile );
 	backGroundName.ReadFromSaveGame( savefile );
-
-	if ( session->GetSaveGameVersion() >= 17 ) {
-		hideCursor.ReadFromSaveGame(savefile);
-	} else {
-		hideCursor = false;
-	}
+	// Quake 4 GUI save streams serialize hideCursor unconditionally.
+	// Skipping this read desynchronizes the restore stream and eventually crashes object restore.
+	hideCursor.ReadFromSaveGame( savefile );
 
 	// Defined Vars
 	for ( i = 0; i < definedVars.Num(); i++ ) {
@@ -4515,11 +4550,44 @@ void idWindow::ReadFromSaveGame( idFile *savefile ) {
 
 	// Named Events
 	for ( i = 0; i < namedEvents.Num(); i++ ) {
-		if ( namedEvents[i] ) {
-			ReadSaveGameString( namedEvents[i]->mName, savefile );
-			if ( namedEvents[i]->mEvent ) {
-				namedEvents[i]->mEvent->ReadFromSaveGame( savefile );
+		if ( namedEvents[i] == NULL ) {
+			continue;
+		}
+
+		idStr savedEventName;
+		ReadSaveGameString( savedEventName, savefile );
+
+		int matchedIndex = -1;
+		for ( int j = i; j < namedEvents.Num(); j++ ) {
+			if ( namedEvents[j] != NULL && namedEvents[j]->mName.Icmp( savedEventName ) == 0 ) {
+				matchedIndex = j;
+				break;
 			}
+		}
+
+		if ( matchedIndex == -1 ) {
+			rvNamedEvent *legacyEvent = OpenQ4_CreateLegacyCinematicNamedEvent( this, savedEventName );
+			if ( legacyEvent != NULL ) {
+				namedEvents.Insert( legacyEvent, i );
+				matchedIndex = i;
+			}
+		}
+
+		if ( matchedIndex == -1 ) {
+			common->Warning( "idWindow::ReadFromSaveGame: missing named event '%s' for window '%s' in gui '%s'",
+				savedEventName.c_str(), name.c_str(), gui ? gui->GetSourceFile() : "<null>" );
+			return;
+		}
+
+		if ( matchedIndex != i ) {
+			rvNamedEvent *swap = namedEvents[i];
+			namedEvents[i] = namedEvents[matchedIndex];
+			namedEvents[matchedIndex] = swap;
+		}
+
+		namedEvents[i]->mName = savedEventName;
+		if ( namedEvents[i]->mEvent ) {
+			namedEvents[i]->mEvent->ReadFromSaveGame( savefile );
 		}
 	}
 

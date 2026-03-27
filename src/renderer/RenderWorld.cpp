@@ -200,11 +200,7 @@ qhandle_t idRenderWorldLocal::AddEffectDef(const renderEffect_t* reffect, int ti
 	def->dynamicModelFrameCount = 0;
 	def->referenceBounds.Clear();
 
-	// Use game-time seconds for effect simulation start to keep segment timing
-	// consistent across level transitions and loading screens.
-	const float startTimeSeconds = (reffect && reffect->startTime > 0.0f)
-		? reffect->startTime
-		: (static_cast<float>(time) * 0.001f);
+	const float startTimeSeconds = static_cast<float>(time) * 0.001f;
 	if (!bse->PlayEffect(def, startTimeSeconds)) {
 		def->expired = true;
 	}
@@ -1159,6 +1155,35 @@ guiPoint_t	idRenderWorldLocal::GuiTrace( qhandle_t entityHandle, const idVec3 st
 idRenderWorldLocal::ModelTrace
 ===================
 */
+static const rvDeclMatType *R_GetMaterialTypeForTrace( const idMaterial *shader, const srfTriangles_t *tri, const localTrace_t &localTrace ) {
+	if ( shader == NULL ) {
+		return NULL;
+	}
+
+	if ( shader->GetMaterialTypeArray() == NULL ) {
+		return shader->GetMaterialType();
+	}
+
+	const idVec3 points[3] = {
+		tri->verts[ localTrace.indexes[0] ].xyz,
+		tri->verts[ localTrace.indexes[1] ].xyz,
+		tri->verts[ localTrace.indexes[2] ].xyz
+	};
+	const idVec2 texCoords[3] = {
+		tri->verts[ localTrace.indexes[0] ].st,
+		tri->verts[ localTrace.indexes[1] ].st,
+		tri->verts[ localTrace.indexes[2] ].st
+	};
+	const float area = idMath::BarycentricTriangleArea( localTrace.normal, points[0], points[1], points[2] );
+	if ( area == 0.0f ) {
+		return shader->GetMaterialType();
+	}
+
+	idVec2 collisionTexCoord;
+	idMath::BarycentricEvaluate( collisionTexCoord, localTrace.point, localTrace.normal, area, points, texCoords );
+	return shader->GetMaterialType( collisionTexCoord );
+}
+
 bool idRenderWorldLocal::ModelTrace( modelTrace_t &trace, qhandle_t entityHandle, const idVec3 &start, const idVec3 &end, const float radius ) const {
 	int i;
 	bool collisionSurface;
@@ -1242,7 +1267,7 @@ bool idRenderWorldLocal::ModelTrace( modelTrace_t &trace, qhandle_t entityHandle
 			trace.material = shader;
 			trace.entity = &def->parms;
 // jmarshall
-			trace.materialType = trace.material->GetMaterialType();
+			trace.materialType = R_GetMaterialTypeForTrace( trace.material, surf->geometry, localTrace );
 // jmarshall end
 			trace.jointNumber = refEnt->hModel->NearestJoint( i, localTrace.indexes[0], localTrace.indexes[1], localTrace.indexes[2] );
 		}
@@ -1284,6 +1309,7 @@ bool idRenderWorldLocal::Trace( modelTrace_t &trace, const idVec3 &start, const 
 
 	trace.fraction = 1.0f;
 	trace.point = end;
+	trace.materialType = NULL;
 
 	// bounds for the whole trace
 	traceBounds.Clear();
@@ -1399,6 +1425,7 @@ bool idRenderWorldLocal::Trace( modelTrace_t &trace, const idVec3 &start, const 
 					R_LocalPointToGlobal( modelMatrix, localTrace.point, trace.point );
 					trace.normal = localTrace.normal * def->parms.axis;
 					trace.material = shader;
+					trace.materialType = R_GetMaterialTypeForTrace( trace.material, surf->geometry, localTrace );
 					trace.entity = &def->parms;
 					trace.jointNumber = model->NearestJoint( j, localTrace.indexes[0], localTrace.indexes[1], localTrace.indexes[2] );
 

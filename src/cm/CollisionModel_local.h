@@ -106,6 +106,7 @@ typedef struct cm_polygon_s {
 	int						contents;			// contents behind polygon
 	const idMaterial *		material;			// material
 	idPlane					plane;				// polygon plane
+	idVec2					texBounds[3];		// texture coordinates used for hit material lookups
 	int						numEdges;			// number of edges
 	int						edges[1];			// variable sized, indexes into cm_edge_t list
 } cm_polygon_t;

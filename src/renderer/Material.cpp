@@ -150,6 +150,32 @@ idMaterial::~idMaterial() {
 }
 
 /*
+==============
+idMaterial::GetMaterialType
+==============
+*/
+const rvDeclMatType* idMaterial::GetMaterialType( idVec2& tc ) const {
+	if ( materialTypeArray == NULL || MTAWidth <= 0 || MTAHeight <= 0 ) {
+		return materialType;
+	}
+
+	idVec2 wrapped = tc;
+	wrapped.x = fmodf( wrapped.x, 1.0f );
+	wrapped.y = fmodf( wrapped.y, 1.0f );
+	if ( wrapped.x < 0.0f ) {
+		wrapped.x += 1.0f;
+	}
+	if ( wrapped.y < 0.0f ) {
+		wrapped.y += 1.0f;
+	}
+
+	const int x = idMath::ClampInt( 0, MTAWidth - 1, idMath::FtoiFast( wrapped.x * MTAWidth ) );
+	const int y = idMath::ClampInt( 0, MTAHeight - 1, idMath::FtoiFast( wrapped.y * MTAHeight ) );
+	const rvDeclMatType *resolvedMaterialType = declManager->MaterialTypeByIndex( materialTypeArray[ y * MTAWidth + x ], true );
+	return resolvedMaterialType != NULL ? resolvedMaterialType : materialType;
+}
+
+/*
 ===============
 idMaterial::FreeData
 ===============
@@ -199,6 +225,13 @@ void idMaterial::FreeData() {
 		R_StaticFree( ops );
 		ops = NULL;
 	}
+	if ( materialTypeArray != NULL ) {
+		Mem_Free( materialTypeArray );
+		materialTypeArray = NULL;
+	}
+	materialTypeArrayName.Clear();
+	MTAWidth = 0;
+	MTAHeight = 0;
 }
 
 /*
@@ -2127,6 +2160,9 @@ void idMaterial::ParseMaterial( idLexer &src ) {
 // jmarshall - quake 4 materials.
 		else if (!token.Icmp("materialImage")) {
 			src.ReadTokenOnLine(&token);
+			idStr hitImage = token;
+			materialTypeArray = MT_GetMaterialTypeArray( hitImage, MTAWidth, MTAHeight );
+			materialTypeArrayName = token;
 			continue;
 		}
 // jmarshall end

@@ -181,6 +181,43 @@ ID_INLINE int idCollisionModelManagerLocal::TranslateEdgeThroughEdge( idVec3 &cr
 CM_AddContact
 ================
 */
+ID_INLINE void CM_GetCollisionPointTexCoords( idVec2 &tc, const cm_traceWork_t *tw, const cm_polygon_t *poly ) {
+	tc.x = 0.5f;
+	tc.y = 0.5f;
+
+	idVec3 extents = poly->bounds[1] - poly->bounds[0];
+	int dominantAxis = ( extents[1] > extents[0] ) ? 1 : 0;
+	if ( extents[2] > extents[ dominantAxis ] ) {
+		dominantAxis = 2;
+	}
+
+	idVec3 triangle[3];
+	triangle[0] = poly->bounds[0];
+	triangle[1] = poly->bounds[1];
+	triangle[2] = poly->bounds[0];
+	triangle[2][ dominantAxis ] = poly->bounds[1][ dominantAxis ];
+
+	const float area = idMath::BarycentricTriangleArea( poly->plane.Normal(), triangle[0], triangle[1], triangle[2] );
+	if ( area != 0.0f ) {
+		idMath::BarycentricEvaluate( tc, tw->trace.c.point, poly->plane.Normal(), area, triangle, poly->texBounds );
+	}
+}
+
+ID_INLINE void CM_GetMaterialType( cm_traceWork_t *tw, const cm_polygon_t *poly ) {
+	tw->trace.c.materialType = NULL;
+	if ( tw->trace.c.material == NULL ) {
+		return;
+	}
+
+	if ( poly != NULL && tw->trace.c.material->GetMaterialTypeArray() != NULL ) {
+		idVec2 texCoord;
+		CM_GetCollisionPointTexCoords( texCoord, tw, poly );
+		tw->trace.c.materialType = tw->trace.c.material->GetMaterialType( texCoord );
+	} else {
+		tw->trace.c.materialType = tw->trace.c.material->GetMaterialType();
+	}
+}
+
 ID_INLINE void CM_AddContact( cm_traceWork_t *tw ) {
 
 	if ( tw->numContacts >= tw->maxContacts ) {
@@ -321,6 +358,7 @@ void idCollisionModelManagerLocal::TranslateTrmEdgeThroughPolygon( cm_traceWork_
 			f1 = d1 / ( d1 - d2 );
 			//assert( f1 >= 0.0f && f1 <= 1.0f );
 			tw->trace.c.point = start + f1 * ( end - start );
+			CM_GetMaterialType( tw, poly );
 			// if retrieving contacts
 			if ( tw->getContacts ) {
 				CM_AddContact( tw );
@@ -422,6 +460,7 @@ void idCollisionModelManagerLocal::TranslateTrmVertexThroughPolygon( cm_traceWor
 		tw->trace.c.modelFeature = *reinterpret_cast<int *>(&poly);
 		tw->trace.c.trmFeature = v - tw->vertices;
 		tw->trace.c.point = v->p + tw->trace.fraction * ( v->endp - v->p );
+		CM_GetMaterialType( tw, poly );
 		// if retrieving contacts
 		if ( tw->getContacts ) {
 			CM_AddContact( tw );
@@ -475,6 +514,7 @@ void idCollisionModelManagerLocal::TranslatePointThroughPolygon( cm_traceWork_t 
 		tw->trace.c.modelFeature = *reinterpret_cast<int *>(&poly);
 		tw->trace.c.trmFeature = v - tw->vertices;
 		tw->trace.c.point = v->p + tw->trace.fraction * ( v->endp - v->p );
+		CM_GetMaterialType( tw, poly );
 		// if retrieving contacts
 		if ( tw->getContacts ) {
 			CM_AddContact( tw );
@@ -519,6 +559,7 @@ void idCollisionModelManagerLocal::TranslateVertexThroughTrmPolygon( cm_traceWor
 		tw->trace.c.modelFeature = v - tw->model->vertices;
 		tw->trace.c.trmFeature = trmpoly - tw->polys;
 		tw->trace.c.point = v->p + tw->trace.fraction * ( endp - v->p );
+		CM_GetMaterialType( tw, poly );
 		// if retrieving contacts
 		if ( tw->getContacts ) {
 			CM_AddContact( tw );
@@ -902,11 +943,11 @@ void idCollisionModelManagerLocal::Translation( trace_t *results, const idVec3 &
 			results->c.dist += modelOrigin * results->c.normal;
 		}
 // jmarshall - quake 4
-		if (results->c.material)
+		if ( results->c.materialType == NULL && results->c.material )
 		{
 			results->c.materialType = results->c.material->GetMaterialType();
 		}
-		else
+		else if ( results->c.material == NULL )
 		{
 			results->c.materialType = NULL;
 		}
@@ -1125,11 +1166,11 @@ void idCollisionModelManagerLocal::Translation( trace_t *results, const idVec3 &
 	}
 
 // jmarshall - quake 4
-	if (results->c.material)
+	if ( results->c.materialType == NULL && results->c.material )
 	{
 		results->c.materialType = results->c.material->GetMaterialType();
 	}
-	else
+	else if ( results->c.material == NULL )
 	{
 		results->c.materialType = NULL;
 	}

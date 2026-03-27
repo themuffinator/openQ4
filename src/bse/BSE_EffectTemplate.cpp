@@ -233,9 +233,7 @@ void rvDeclEffect::Finish() {
 		}
 	}
 
-	// Keep authored size as a lower bound but ensure runtime culling/spawn
-	// has a sane envelope derived from actual segment parameters.
-	mSize = Max(mSize, CalculateBounds());
+	mSize = CalculateBounds();
 }
 
 bool rvDeclEffect::Parse(const char* text, const int textLength) {

@@ -49,7 +49,7 @@ void rvBSE::Init(const rvDeclEffect* declEffect, renderEffect_s* parms, float ti
 	//float v22[5]; // [esp+34h] [ebp-14h] BYREF
 	float parmsa; // [esp+50h] [ebp+8h]
 
-	this->mStartTime = time;
+	this->mStartTime = parms->startTime;
 	this->mDeclEffect = declEffect;
 	this->mLastTime = time;
 	this->mFlags = 0;
@@ -775,16 +775,11 @@ void rvBSE::UpdateFromOwner(renderEffect_s* parms, float time, bool init)
 	}
 
 	mCurrentWindVector.Zero();
+	memcpy( mShaderParms, parms->shaderParms, sizeof( mShaderParms ) );
 	mTint.Set(parms->shaderParms[0], parms->shaderParms[1], parms->shaderParms[2], parms->shaderParms[3]);
 	mBrightness = parms->shaderParms[6];
 	mSpriteSize.x = parms->shaderParms[8];
 	mSpriteSize.y = parms->shaderParms[9];
-	if (mTint == vec4_zero && mBrightness == 0.0f) {
-		// Some legacy/game-network paths can feed zero-initialized shader parms.
-		// Match vanilla-visible defaults instead of rendering fully black.
-		mTint.Set(1.0f, 1.0f, 1.0f, 1.0f);
-		mBrightness = 1.0f;
-	}
 	mAttenuation = parms->attenuation;
 	mSuppressLightsInViewID = parms->suppressSurfaceInViewID;
 }

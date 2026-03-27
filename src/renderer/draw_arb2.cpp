@@ -438,6 +438,7 @@ typedef enum {
 	SHADOWMAP_SUPPORT_AMBIENT_LIGHT,
 	SHADOWMAP_SUPPORT_TEXTURE_LIMIT,
 	SHADOWMAP_SUPPORT_NO_INTERACTIONS,
+	SHADOWMAP_SUPPORT_LOCAL_INTERACTION_FALLBACK,
 	SHADOWMAP_SUPPORT_CUBEMAP_UNAVAILABLE,
 	SHADOWMAP_SUPPORT_RESOURCE_FAILURE,
 	SHADOWMAP_SUPPORT_COUNT
@@ -498,6 +499,8 @@ static const char *RB_ShadowMapSupportReasonName( shadowMapLightSupportReason_t 
 		return "texture-limit";
 	case SHADOWMAP_SUPPORT_NO_INTERACTIONS:
 		return "no-interactions";
+	case SHADOWMAP_SUPPORT_LOCAL_INTERACTION_FALLBACK:
+		return "local-interaction-fallback";
 	case SHADOWMAP_SUPPORT_CUBEMAP_UNAVAILABLE:
 		return "cubemap-unavailable";
 	case SHADOWMAP_SUPPORT_RESOURCE_FAILURE:
@@ -2017,6 +2020,12 @@ static shadowMapLightSupportReason_t RB_ShadowMapLightSupportReason( const viewL
 	}
 	if ( vLight->globalInteractions == NULL && vLight->localInteractions == NULL ) {
 		return SHADOWMAP_SUPPORT_NO_INTERACTIONS;
+	}
+	// MF_NOSELFSHADOW surfaces rely on the legacy local/global shadow split.
+	// Until the shadow-map path matches retail behavior here, keep those lights
+	// on the stencil path instead of risking self-shadow artifacts.
+	if ( vLight->localInteractions != NULL || vLight->localShadowMapCasters != NULL || vLight->localTranslucentShadowMapCasters != NULL ) {
+		return SHADOWMAP_SUPPORT_LOCAL_INTERACTION_FALLBACK;
 	}
 	if ( vLight->pointLight ) {
 		if ( !glConfig.cubeMapAvailable ) {

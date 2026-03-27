@@ -75,6 +75,28 @@ const int PREVIEW_Y = 31;
 const int PREVIEW_WIDTH = 398;
 const int PREVIEW_HEIGHT = 298;
 
+static bool Session_IsRetailSaveGameName( const idStr &gameName ) {
+	return gameName.Icmp( SAVEGAME_GAME_NAME_RETAIL ) == 0;
+}
+
+static bool Session_IsLegacyOpenQ4SaveGameName( const idStr &gameName ) {
+	return gameName.Icmp( SAVEGAME_GAME_NAME_LEGACY_OPENQ4 ) == 0;
+}
+
+static bool Session_IsSupportedSaveGameName( const idStr &gameName ) {
+	return Session_IsRetailSaveGameName( gameName ) || Session_IsLegacyOpenQ4SaveGameName( gameName );
+}
+
+static bool Session_SaveGameHeaderUsesEntityFilter( const idStr &gameName ) {
+	return Session_IsRetailSaveGameName( gameName );
+}
+
+static bool Session_IsCompatibleSaveGameVersion( const int version ) {
+	return version == SAVEGAME_VERSION ||
+		version == LEGACY_OPENQ4_SAVEGAME_VERSION ||
+		version == LEGACY_OPENQ4_SAVEGAME_VERSION_ALT;
+}
+
 static int Session_CountVisibleSmallChars( const char *string ) {
 	if ( !( string && *string ) ) {
 		return 0;
@@ -2864,11 +2886,11 @@ bool idSessionLocal::SaveGame( const char *saveName, bool autosave ) {
 		return false;
 	}
 
-	// Write SaveGame Header: 
-	// Game Name / Version / Map Name / Persistant Player Info
+	// Write SaveGame Header:
+	// Game Name / Version / Map Name / Entity Filter / Persistent Player Info
 
 	// game
-	const char *gamename = GAME_NAME;
+	const char *gamename = SAVEGAME_GAME_NAME_RETAIL;
 	fileOut->WriteString( gamename );
 
 	// version
@@ -2877,6 +2899,9 @@ bool idSessionLocal::SaveGame( const char *saveName, bool autosave ) {
 	// map
 	mapName = mapSpawnData.serverInfo.GetString( "si_map" );
 	fileOut->WriteString( mapName );
+
+	// retail Quake 4 also stores the active entity filter in the header.
+	fileOut->WriteString( mapSpawnData.serverInfo.GetString( "si_entityFilter" ) );
 
 	// persistent player info
 	for ( i = 0; i < MAX_ASYNC_CLIENTS; i++ ) {
@@ -2956,7 +2981,7 @@ bool idSessionLocal::LoadGame( const char *saveName ) {
 	return false;
 #else
 	int i;
-	idStr in, loadFile, saveMap, gamename;
+	idStr in, loadFile, saveMap, gamename, entityFilter;
 
 	if ( IsMultiplayer() ) {
 		common->Printf( "Can't load during net play.\n" );
@@ -2997,14 +3022,15 @@ bool idSessionLocal::LoadGame( const char *saveName ) {
 	loadingSaveGame = true;
 
 	// Read in save game header
-	// Game Name / Version / Map Name / Persistant Player Info
+	// Game Name / Version / Map Name / [Entity Filter] / Persistent Player Info
 
 	// game
 	savegameFile->ReadString( gamename );
 
-	// if this isn't a savegame for the correct game, abort loadgame
-	if ( gamename != GAME_NAME ) {
-		common->Warning( "Attempted to load an invalid savegame: %s", in.c_str() );
+	// Accept both the retail Quake 4 save header and older OpenQ4-branded headers.
+	if ( !Session_IsSupportedSaveGameName( gamename ) ) {
+		common->Warning( "Attempted to load an invalid savegame header '%s' from %s",
+			gamename.c_str(), in.c_str() );
 
 		loadingSaveGame = false;
 		fileSystem->CloseFile( savegameFile );
@@ -3018,6 +3044,14 @@ bool idSessionLocal::LoadGame( const char *saveName ) {
 	// map
 	savegameFile->ReadString( saveMap );
 
+	// retail Quake 4 stores an entity filter after the map name.
+	// Older OpenQ4 saves omitted it, so only consume it from retail-style headers.
+	if ( Session_SaveGameHeaderUsesEntityFilter( gamename ) ) {
+		savegameFile->ReadString( entityFilter );
+	} else {
+		entityFilter.Clear();
+	}
+
 	// persistent player info
 	for ( i = 0; i < MAX_ASYNC_CLIENTS; i++ ) {
 		mapSpawnData.persistentPlayerInfo[i].ReadFromFileHandle( savegameFile );
@@ -3026,9 +3060,7 @@ bool idSessionLocal::LoadGame( const char *saveName ) {
 	// check the version, if it doesn't match, cancel the loadgame,
 	// but still load the map with the persistant playerInfo from the header
 	// so that the player doesn't lose too much progress.
-	if ( savegameVersion != SAVEGAME_VERSION &&
-		 savegameVersion != LEGACY_OPENQ4_SAVEGAME_VERSION &&
-		 !( savegameVersion == 16 && SAVEGAME_VERSION == 17 ) ) {	// handle savegame v16 in v17
+	if ( !Session_IsCompatibleSaveGameVersion( savegameVersion ) ) {
 		common->Warning( "Savegame Version mismatch: aborting loadgame and starting level with persistent data" );
 		loadingSaveGame = false;
 		fileSystem->CloseFile( savegameFile );
@@ -3046,6 +3078,7 @@ bool idSessionLocal::LoadGame( const char *saveName ) {
 		mapSpawnData.serverInfo.Set( "si_gameType", "singleplayer" );
 
 		mapSpawnData.serverInfo.Set( "si_map", saveMap );
+		mapSpawnData.serverInfo.Set( "si_entityFilter", entityFilter );
 
 		mapSpawnData.syncedCVars.Clear();
 		mapSpawnData.syncedCVars = *cvarSystem->MoveCVarsToDict( CVAR_NETWORKSYNC );

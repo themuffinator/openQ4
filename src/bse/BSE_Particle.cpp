@@ -538,9 +538,6 @@ void rvParticle::FinishSpawn(rvBSE* effect, rvSegment* segment, float birthTime,
 		if (normal.LengthSqr() > 1e-8f) {
 			normal.NormalizeFast();
 		}
-		else {
-			normal.Set(0.0f, 0.0f, 1.0f);
-		}
 
 		const idMat3 normalAxis = normal.ToMat3();
 		mVelocity = normalAxis * mVelocity;
@@ -553,13 +550,7 @@ void rvParticle::FinishSpawn(rvBSE* effect, rvSegment* segment, float birthTime,
 
 	if (normal.LengthSqr() <= 1e-8f) {
 		normal = mVelocity;
-		if (normal.LengthSqr() <= 1e-8f) {
-			normal = mAcceleration;
-		}
-		if (normal.LengthSqr() <= 1e-8f) {
-			normal.Set(0.0f, 0.0f, 1.0f);
-		}
-		else {
+		if (normal.LengthSqr() > 1e-8f) {
 			normal.NormalizeFast();
 		}
 	}
@@ -805,37 +796,43 @@ bool rvParticle::GetEvaluationTime(float time, float& evalTime, bool infinite) {
 }
 
 void rvParticle::EvaluateVelocity(const rvBSE* effect, idVec3& velocity, float time) {
-	// Vanilla updates particle kinematics in segments anchored to mMotionStartTime.
+	(void)effect;
+
 	const float t = Max(0.0f, time - mMotionStartTime);
+	if (GetStationary()) {
+		velocity.Set(1.0f, 0.0f, 0.0f);
+		return;
+	}
+
 	const float damp = Max(0.0f, 1.0f - mFriction * t);
-	idVec3 localVelocity = (mVelocity + mAcceleration * t) * damp;
-	if (effect && !GetLocked()) {
-		// Keep unlocked velocity conversion in matrix-divide space (init/current),
-		// matching vanilla transform semantics used by length/model/electricity paths.
-		const idMat3 initToCurrent = BuildInitToCurrentAxis(effect, mInitAxis);
-		velocity = initToCurrent * localVelocity;
-	}
-	else {
-		velocity = localVelocity;
-	}
+	velocity = (mVelocity + mAcceleration * t) * damp;
 }
 
 void rvParticle::EvaluatePosition(const rvBSE* effect, rvParticleTemplate* pt, idVec3& pos, float time) {
-	// Vanilla updates particle kinematics in segments anchored to mMotionStartTime.
 	const float t = Max(0.0f, time - mMotionStartTime);
-	const float damp = Max(0.0f, 1.0f - mFriction * t);
-	pos = mInitPos + (mVelocity * t + mAcceleration * (0.5f * t * t)) * damp;
+	if (GetStationary()) {
+		pos = mInitPos;
+		mPosition = pos;
+		return;
+	}
 
-	if (GetHasOffset() && pt && pt->mpOffsetEnvelope) {
+	const float halfT2 = 0.5f * t * t;
+	const float damp = Max(0.0f, 1.0f - mFriction * t);
+	pos = mInitPos + (mVelocity * t + mAcceleration * halfT2) * damp;
+
+	if (GetHasOffset() && pt && pt->mpAngleEnvelope && pt->mpOffsetEnvelope) {
 		const float oneOverDuration = 1.0f / Max(BSE_TIME_EPSILON, GetDuration());
-		idVec3 offs;
-		EvaluateOffset(pt->mpOffsetEnvelope, t, oneOverDuration, offs);
-		pos += offs;
+		rvAngles angle;
+		idVec3 offset;
+		EvaluateAngle(pt->mpAngleEnvelope, t, oneOverDuration, angle);
+		EvaluateOffset(pt->mpOffsetEnvelope, t, oneOverDuration, offset);
+
+		idMat3 rotation;
+		angle.ToMat3(rotation);
+		pos += rotation * offset;
 	}
 
 	if (effect && !GetLocked()) {
-		// Avoid world-space add/subtract rebasing here; convert directly with
-		// matrix-divide semantics plus explicit origin delta, as in vanilla.
 		const idMat3 initToCurrent = BuildInitToCurrentAxis(effect, mInitAxis);
 		pos = initToCurrent * pos;
 
@@ -1337,7 +1334,6 @@ bool rvLineParticle::Render(const rvBSE* effect, rvParticleTemplate* pt, const i
 
 	float width = 1.0f;
 	EvaluateSize(pt->mpSizeEnvelope, evalTime, oneOverDuration, &width);
-	width = Max(0.01f, idMath::Fabs(width));
 
 	idVec3 length(0.0f, 0.0f, 1.0f);
 	EvaluateLength(pt->mpLengthEnvelope, evalTime, oneOverDuration, length);
@@ -1354,30 +1350,13 @@ bool rvLineParticle::Render(const rvBSE* effect, rvParticleTemplate* pt, const i
 			length = velocity * length.LengthFast();
 		}
 	}
-	if (length.LengthSqr() < 1e-6f) {
-		length = mVelocity;
-	}
-	if (length.LengthSqr() < 1e-6f) {
-		length.Set(0.0f, 0.0f, 4.0f);
-	}
 
 	const idVec3 end = pos + length;
 	const idVec3 toView = view[0] - (pos + length * 0.5f);
 	idVec3 side = length.Cross(toView);
 	float sideLenSqr = side.LengthSqr();
-	if (sideLenSqr <= 1e-8f) {
-		side = length.Cross(view[2]);
-		sideLenSqr = side.LengthSqr();
-		if (sideLenSqr <= 1e-8f) {
-			side = length.Cross(view[1]);
-			sideLenSqr = side.LengthSqr();
-		}
-	}
 	if (sideLenSqr > 1e-8f) {
 		side *= idMath::InvSqrt(sideLenSqr);
-	}
-	else {
-		side.Set(0.0f, 1.0f, 0.0f);
 	}
 	side *= width;
 
@@ -1982,10 +1961,10 @@ bool rvLightParticle::InitLight(rvBSE* effect, rvSegmentTemplate* st, float time
 	mLight.lightRadius.y = Max(1.0f, idMath::Fabs(size.y));
 	mLight.lightRadius.z = Max(1.0f, idMath::Fabs(size.z));
 	mLight.axis = effect->GetCurrentAxis();
+	memcpy( mLight.shaderParms, effect->GetShaderParms(), sizeof( mLight.shaderParms ) );
 	mLight.shaderParms[0] = tint.x * fade;
 	mLight.shaderParms[1] = tint.y * fade;
 	mLight.shaderParms[2] = tint.z * fade;
-	mLight.shaderParms[3] = fade;
 	mLight.pointLight = true;
 	mLight.detailLevel = 10.0f;
 	mLight.noShadows = !pt->GetShadows();
@@ -2050,10 +2029,10 @@ bool rvLightParticle::PresentLight(rvBSE* effect, rvParticleTemplate* pt, float 
 	mLight.lightRadius.y = Max(1.0f, idMath::Fabs(size.y));
 	mLight.lightRadius.z = Max(1.0f, idMath::Fabs(size.z));
 	mLight.axis = effect->GetCurrentAxis();
+	memcpy( mLight.shaderParms, effect->GetShaderParms(), sizeof( mLight.shaderParms ) );
 	mLight.shaderParms[0] = tint.x * fade;
 	mLight.shaderParms[1] = tint.y * fade;
 	mLight.shaderParms[2] = tint.z * fade;
-	mLight.shaderParms[3] = fade;
 	mLight.suppressLightInViewID = effect->GetSuppressLightsInViewID();
 	renderWorld->UpdateLightDef(mLightDefHandle, &mLight);
 	return true;

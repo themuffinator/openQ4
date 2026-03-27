@@ -34,9 +34,6 @@ ID_INLINE void SpawnGetNormalInternal(idVec3* normal, const idVec3& point, const
 	if (lenSqr > 1e-6f) {
 		normal->NormalizeFast();
 	}
-	else {
-		normal->Set(0.0f, 0.0f, 1.0f);
-	}
 }
 
 ID_INLINE idVec3 SpawnBoxPoint(const rvParticleParms& parms) {

@@ -866,6 +866,7 @@ cm_polygon_t *idCollisionModelManagerLocal::AllocPolygon( idCollisionModelLocal 
 	} else {
 		poly = (cm_polygon_t *) Mem_Alloc( size );
 	}
+	memset( poly, 0, size );
 	return poly;
 }
 

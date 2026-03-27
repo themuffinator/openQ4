@@ -119,10 +119,14 @@
 #define ASYNC_PROTOCOL_MAJOR			2
 // RAVEN END
 
-// Savegame Version
-// Match Quake 4's engine-side savegame header version. Older OpenQ4 builds wrote 1.
-#define SAVEGAME_VERSION				0
-#define LEGACY_OPENQ4_SAVEGAME_VERSION	1
+// Savegame header compatibility:
+// - New OpenQ4 saves use Quake 4's retail engine header name/version.
+// - Older OpenQ4 builds wrote OpenQ4-branded headers with versions 0 and 1.
+#define SAVEGAME_GAME_NAME_RETAIL				"Quake4"
+#define SAVEGAME_GAME_NAME_LEGACY_OPENQ4		PROJECT_NAME
+#define SAVEGAME_VERSION						1834
+#define LEGACY_OPENQ4_SAVEGAME_VERSION			0
+#define LEGACY_OPENQ4_SAVEGAME_VERSION_ALT		1
 
 // editor info
 #define EDITOR_WINDOWTEXT				"QuakeEdit"
