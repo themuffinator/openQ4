@@ -8,6 +8,9 @@ on:
 permissions:
   contents: read
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   metadata:
     name: Nightly Metadata
@@ -115,15 +118,26 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y \
-            libdbus-1-dev \
-            libglew-dev \
-            libopenal-dev \
-            libudev-dev \
-            libx11-dev \
-            libxext-dev \
-            libxxf86vm-dev
+          for attempt in 1 2 3; do
+            if sudo apt-get update && sudo apt-get install -y \
+              libdbus-1-dev \
+              libglew-dev \
+              libopenal-dev \
+              libudev-dev \
+              libx11-dev \
+              libxext-dev \
+              libxxf86vm-dev; then
+              exit 0
+            fi
+
+            if [ "${attempt}" -eq 3 ]; then
+              echo "Failed to install Linux native dependencies after ${attempt} attempts."
+              exit 1
+            fi
+
+            echo "Linux dependency installation attempt ${attempt} failed; retrying in 10 seconds..."
+            sleep 10
+          done
 
       - name: Install macOS native dependencies
         if: matrix.platform == 'macos'
@@ -238,7 +252,7 @@ jobs:
           fi
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: openq4-nightly-${{ needs.metadata.outputs.version_tag }}-${{ matrix.platform }}
           path: ${{ steps.package.outputs.archive_path }}
@@ -270,7 +284,7 @@ jobs:
           python-version: '3.x'
 
       - name: Download packaged artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           pattern: openq4-nightly-${{ needs.metadata.outputs.version_tag }}-*
           path: ${{ runner.temp }}/nightly-artifacts
