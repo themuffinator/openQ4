@@ -1653,6 +1653,65 @@ void RB_ShowPortals( void ) {
 }
 
 /*
+=====================
+RB_ShowLightGrid
+=====================
+*/
+static void RB_ShowLightGrid( void ) {
+	const int showMode = r_showLightGrid.GetInteger();
+	if ( showMode <= 0 ) {
+		return;
+	}
+
+	idRenderWorldLocal *world = backEnd.viewDef ? backEnd.viewDef->renderWorld : NULL;
+	if ( world == NULL || world->portalAreas == NULL ) {
+		return;
+	}
+
+	RB_SimpleWorldSetup();
+	globalImages->BindNull();
+	GL_State( GLS_DEFAULT );
+	GL_Cull( CT_TWO_SIDED );
+
+	glPointSize( 5.0f );
+	glBegin( GL_POINTS );
+	for ( int areaIndex = 0; areaIndex < world->numPortalAreas; areaIndex++ ) {
+		if ( showMode == 1 && areaIndex != backEnd.viewDef->areaNum ) {
+			continue;
+		}
+
+		const LightGrid &lightGrid = world->portalAreas[ areaIndex ].lightGrid;
+		if ( lightGrid.lightGridPoints.Num() <= 0 ) {
+			continue;
+		}
+
+		const int gridStepY = Max( lightGrid.lightGridBounds[0], 1 );
+		const int gridStepZ = Max( lightGrid.lightGridBounds[0] * lightGrid.lightGridBounds[1], 1 );
+
+		for ( int probeIndex = 0; probeIndex < lightGrid.lightGridPoints.Num(); probeIndex++ ) {
+			const lightGridPoint_t &gridPoint = lightGrid.lightGridPoints[ probeIndex ];
+			if ( gridPoint.valid == 0 && showMode < 3 ) {
+				continue;
+			}
+
+			idVec3 color( 0.35f, 0.0f, 0.0f );
+			if ( gridPoint.valid != 0 ) {
+				int gridCoord[3];
+				gridCoord[0] = probeIndex % gridStepY;
+				gridCoord[1] = ( probeIndex / gridStepY ) % Max( lightGrid.lightGridBounds[1], 1 );
+				gridCoord[2] = probeIndex / gridStepZ;
+				color = lightGrid.GetGridCoordDebugColor( gridCoord );
+			}
+
+			glColor3fv( color.ToFloatPtr() );
+			glVertex3fv( gridPoint.origin.ToFloatPtr() );
+		}
+	}
+	glEnd();
+	glPointSize( 1.0f );
+}
+
+/*
 ================
 RB_ClearDebugText
 ================
@@ -2354,6 +2413,7 @@ void RB_RenderDebugTools( drawSurf_t **drawSurfs, int numDrawSurfs ) {
 	RB_ShowNormals( drawSurfs, numDrawSurfs );
 	RB_ShowViewEntitys( backEnd.viewDef->viewEntitys );
 	RB_ShowLights();
+	RB_ShowLightGrid();
 	RB_ShowTextureVectors( drawSurfs, numDrawSurfs );
 	RB_ShowDominantTris( drawSurfs, numDrawSurfs );
 	if ( r_testGamma.GetInteger() > 0 ) {	// test here so stack check isn't so damn slow on debug builds

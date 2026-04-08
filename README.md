@@ -49,21 +49,22 @@ Single-player and multiplayer live under one `openq4/` directory with `game-sp` 
 
 ### Rendering and presentation
 
-- Multi-scale bloom with luminance-based extraction
-- FP16 HDR scene targets, filmic tone mapping, color controls, and log-average auto exposure
-- SSAO and optional CRT post-processing
-- Experimental shadow mapping for projected and point lights, projected-light CSM, alpha-tested transparency shadows, and optional translucent shadow accumulation
-- Screen-fraction scaling, supersample-style presets, MSAA, and SMAA
+- Multi-scale **bloom** with luminance-based extraction
+- **FP16 HDR** scene targets, filmic tone mapping, color controls, and log-average auto exposure
+- **SSAO** and optional **CRT** post-processing
+- Experimental **shadow mapping** for projected and point lights, projected-light CSM, alpha-tested transparency shadows, and optional translucent shadow accumulation
+- Experimental **irradiance-volume** indirect diffuse from [RBDOOM-3-BFG](https://github.com/RobertBeckebans/RBDOOM-3-BFG)-inspired `.lightgrid` data and per-area atlases, including native `bakeLightGrids` generation for OpenQ4-compatible assets with batch/CLI map loading and live console progress. See the [Light Grid Guide](docs-user/light-grids.md).
+- Screen-fraction scaling, supersample-style presets, **MSAA**, and **SMAA**
 
 ### Modern usability
 
-- Automatic aspect-ratio, FOV, zoom, and view-weapon framing from live render size
+- **Automatic aspect-ratio**, FOV, zoom, and view-weapon framing from live render size
 - Single-player weapon wheel currently under development, including slow-motion audio/presentation treatment on hold
-- Multi-monitor targeting plus borderless, desktop fullscreen, and exclusive fullscreen paths
-- Controller hotplug and analog input support
-- SDL3-first Linux runtime with an explicit `OpenQ4-steamdeck` launcher/profile for Steam Deck
+- **Multi-monitor** targeting plus borderless, desktop fullscreen, and exclusive fullscreen paths
+- **Controller** hotplug and analog input support
+- **SDL3-first Linux runtime** with an explicit `OpenQ4-steamdeck` launcher/profile for **Steam Deck**
 - Meson-based builds, `builddir/` for local artifacts, and `.install/` for staged runtime packages
-- Windows, Linux, and macOS targets with x64 as the current active baseline
+- **Windows**, **Linux**, and **macOS** targets with x64 as the current active baseline
 
 <p align="center">
   <img src="assets/img/shot2.png" alt="OpenQ4 gameplay screenshot showing combat and bloom" width="49%">
@@ -99,6 +100,7 @@ OpenQ4 is developed against the shipped Quake 4 assets, not replacement repo-sid
 - Effect-driven sound shader behavior
 - BSE screen and camera effect paths
 - Material and shader compatibility work needed to reduce custom override dependence
+- Runtime irradiance-volume sampling plus a native `bakeLightGrids` command that writes `.lightgrid` metadata and `env/<map>/area*_lightgrid_amb.tga` atlases to `fs_savepath`, can auto-load named maps, `all`, or `all-mp`, skips already-complete targets unless `force` is used, reports bake progress through the console/log instead of leaving a static frame up, parallelizes CPU probe integration with configurable worker threads, and uses async GPU readback where supported
 - Modern display handling for widescreen, ultrawide, and multi-monitor setups
 - Official asset validation through `fs_validateOfficialPaks 1`
 
@@ -109,6 +111,9 @@ Project scope is intentionally explicit:
 - Dedicated server builds keep the disabled BSE manager path unless that changes by design
 - Canonical SDK/game-library edits belong in `../OpenQ4-GameLibs`, not a mirrored `src/game` tree
 - Compatibility with proprietary Quake 4 game DLLs is a non-goal
+- The current irradiance-volume path is intentionally non-PBR and LDR: it adds indirect diffuse only, bakes OpenQ4-native `.tga` atlases, and does not bring over the BFG EXR/environment-probe reflection stack
+
+For unattended baking, run the client with startup commands such as `+bakeLightGrids all -quit`, `+bakeLightGrids all-mp -quit`, or `+bakeLightGrids force game/tram1 -quit`. OpenQ4 will switch modules as needed, load each map automatically, skip already-complete targets unless `force` is present, and stream progress to the console/log while writing outputs to `fs_savepath`.
 
 Gameplay parity work is still ongoing. For current follow-up items, see [TODO.md](TODO.md) and [docs-dev/release-completion.md](docs-dev/release-completion.md).
 
@@ -139,6 +144,7 @@ Set `OPENQ4_BUILD_GAMELIBS=1` if you want the wrapper to trigger game-library bu
 - [BUILDING.md](BUILDING.md) - platform requirements and build workflow
 - [TECHNICAL.md](TECHNICAL.md) - advanced configuration, file layout, dependencies, and compatibility notes
 - [docs-user/display-settings.md](docs-user/display-settings.md) - display, fullscreen, and multi-monitor behavior
+- [docs-user/light-grids.md](docs-user/light-grids.md) - light-grid baking, runtime toggles, output paths, and troubleshooting
 - [docs-user/steam-deck.md](docs-user/steam-deck.md) - Steam Deck launcher, controls, and asset discovery notes
 - [docs-user/shadow-mapping.md](docs-user/shadow-mapping.md) - shadow-map settings, presets, and troubleshooting
 - [docs-user/multiplayer-networking.md](docs-user/multiplayer-networking.md) - multiplayer networking and lag compensation
@@ -171,7 +177,7 @@ OpenQ4 welcomes code, documentation, testing, and compatibility reports. Keep st
 ### Upstream and reference work
 
 - **Justin Marshall** - [Quake4Doom](https://github.com/jmarshall23/Quake4Doom) and initial BSE reverse engineering
-- **Robert Backebans** - renderer modernization reference work
+- **Robert Beckebans** - renderer modernization reference work, including irradiance-volume integration reference material from [RBDOOM-3-BFG](https://github.com/RobertBeckebans/RBDOOM-3-BFG)
 - **id Software** - idTech 4 engine and Quake 4
 - **Raven Software** - Quake 4 game development
 

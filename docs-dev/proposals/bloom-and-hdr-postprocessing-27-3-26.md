@@ -16,7 +16,7 @@ Key findings:
 
 ### Where bloom/HDR live in the repo (best-effort map)
 
-- **Main orchestration (CPU side):** `src/renderer/draw_common.cpp` (look for the bloom/tone-map post step and references to `openprey_bloom*` programs).  
+- **Main orchestration (CPU side):** `src/renderer/draw_common.cpp` (look for the bloom/tone-map post step and references to `bloom*` programs).  
 - **CVar surface / feature toggles:** `src/renderer/tr_local.h` declares bloom and “HDR tone map” knobs (`r_bloom*`, `r_hdr*`).  
 - **Scene capture and texture plumbing:**  
   - `src/renderer/Image.h` declares `currentRenderImage` / `originalCurrentRenderImage` and scene-copy usage.  
@@ -25,11 +25,11 @@ Key findings:
 
 ### Shaders (bloom + “HDR” tonemap + grade)
 
-- `openq4/glprogs/openprey_bloom_extract.fs`  
+- `openq4/glprogs/bloom_extract.fs`  
   Downsampled prefilter + soft-knee threshold extraction.
-- `openq4/glprogs/openprey_bloom_blur.fs`  
+- `openq4/glprogs/bloom_blur.fs`  
   7-sample separable blur pass (horizontal/vertical via a uniform direction).
-- `openq4/glprogs/openprey_bloom.fs`  
+- `openq4/glprogs/bloom.fs`  
   Composite bloom + filmic tone map + color adjustments.
 
 Note: The repo also contains `.install/openq4/glprogs/...` duplicates; these can cause “edited the wrong file” workflow errors if your build/package step sources the `.install` tree for shipping.
@@ -241,10 +241,10 @@ For static test images (if you ingest screenshots as textures):
 ```mermaid
 flowchart TD
   A[Main scene render] --> B[CopyFramebuffer -> currentRenderImage (RGBA16F)]
-  B --> C[Downsample + tent prefilter + soft-knee bright-pass\nopenprey_bloom_extract.fs]
-  C --> D[Separable blur (H)\nopenprey_bloom_blur.fs]
-  D --> E[Separable blur (V)\nopenprey_bloom_blur.fs]
-  E --> F[Composite bloom + filmic tonemap + grade\nopenprey_bloom.fs]
+  B --> C[Downsample + tent prefilter + soft-knee bright-pass\nbloom_extract.fs]
+  C --> D[Separable blur (H)\nbloom_blur.fs]
+  D --> E[Separable blur (V)\nbloom_blur.fs]
+  E --> F[Composite bloom + filmic tonemap + grade\nbloom.fs]
   F --> G[Back buffer / output]
 ```
 

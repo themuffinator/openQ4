@@ -56,6 +56,7 @@ public:
 	virtual void		Draw(int time, float x, float y);
 	virtual void		Activate(bool activate, idStr &act);
 	virtual void		HandleBuddyUpdate(idWindow *buddy);
+	virtual void		MouseEnter();
 	virtual void		StateChanged( bool redraw = false );
 	virtual size_t		Allocated(){return idWindow::Allocated();};
 	virtual idWinVar*	GetWinVarByName(const char *_name, bool winLookup = false, drawWin_t** owner = NULL);

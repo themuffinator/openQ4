@@ -97,6 +97,11 @@ ID_INLINE void idImage::DeriveOpts() {
 			opts.format = FMT_RGB565;
 			opts.gammaMips = true;
 			break;
+		case TD_LIGHTGRID:
+			opts.gammaMips = false;
+			opts.colorFormat = CFM_DEFAULT;
+			opts.format = glConfig.textureCompressionAvailable ? FMT_DXT1 : FMT_RGB565;
+			break;
 		case TD_LOOKUP_TABLE_MONO:
 			opts.format = FMT_INT8;
 			break;

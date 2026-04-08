@@ -620,6 +620,65 @@ struct rbBuiltinUniformDef_t {
 	int components;
 };
 
+enum rbLightGridUniformIndex_t {
+	RB_LIGHTGRID_UNIFORM_BUMP_MATRIX_S = 0,
+	RB_LIGHTGRID_UNIFORM_BUMP_MATRIX_T,
+	RB_LIGHTGRID_UNIFORM_DIFFUSE_MATRIX_S,
+	RB_LIGHTGRID_UNIFORM_DIFFUSE_MATRIX_T,
+	RB_LIGHTGRID_UNIFORM_MODEL_MATRIX_ROW0,
+	RB_LIGHTGRID_UNIFORM_MODEL_MATRIX_ROW1,
+	RB_LIGHTGRID_UNIFORM_MODEL_MATRIX_ROW2,
+	RB_LIGHTGRID_UNIFORM_LIGHTGRID_ORIGIN,
+	RB_LIGHTGRID_UNIFORM_LIGHTGRID_SIZE,
+	RB_LIGHTGRID_UNIFORM_LIGHTGRID_BOUNDS,
+	RB_LIGHTGRID_UNIFORM_ATLAS_INFO,
+	RB_LIGHTGRID_UNIFORM_DIFFUSE_COLOR,
+	RB_LIGHTGRID_UNIFORM_VERTEX_COLOR_PARAMS,
+	RB_LIGHTGRID_UNIFORM_COUNT
+};
+
+static newShaderStage_t rbLightGridIndirectStage;
+static bool rbLightGridIndirectStageInitialized = false;
+
+static void RB_InitLightGridIndirectStage( void ) {
+	if ( rbLightGridIndirectStageInitialized ) {
+		return;
+	}
+
+	memset( &rbLightGridIndirectStage, 0, sizeof( rbLightGridIndirectStage ) );
+	rbLightGridIndirectStage.glslProgram = true;
+	idStr::Copynz( rbLightGridIndirectStage.glslProgramName, "lightgrid_indirect.fs", sizeof( rbLightGridIndirectStage.glslProgramName ) );
+
+	static const rbBuiltinUniformDef_t uniforms[RB_LIGHTGRID_UNIFORM_COUNT] = {
+		{ "uBumpMatrixS", 4 },
+		{ "uBumpMatrixT", 4 },
+		{ "uDiffuseMatrixS", 4 },
+		{ "uDiffuseMatrixT", 4 },
+		{ "uModelMatrixRow0", 4 },
+		{ "uModelMatrixRow1", 4 },
+		{ "uModelMatrixRow2", 4 },
+		{ "uLightGridOrigin", 4 },
+		{ "uLightGridSize", 4 },
+		{ "uLightGridBounds", 4 },
+		{ "uAtlasInfo", 4 },
+		{ "uDiffuseColor", 4 },
+		{ "uVertexColorParams", 2 }
+	};
+
+	rbLightGridIndirectStage.numShaderParms = RB_LIGHTGRID_UNIFORM_COUNT;
+	for ( int i = 0; i < RB_LIGHTGRID_UNIFORM_COUNT; i++ ) {
+		idStr::Copynz( rbLightGridIndirectStage.shaderParmNames[i], uniforms[i].name, sizeof( rbLightGridIndirectStage.shaderParmNames[i] ) );
+		rbLightGridIndirectStage.shaderParmNumRegisters[i] = uniforms[i].components;
+	}
+
+	rbLightGridIndirectStage.numShaderTextures = 3;
+	idStr::Copynz( rbLightGridIndirectStage.shaderTextureNames[0], "uBumpMap", sizeof( rbLightGridIndirectStage.shaderTextureNames[0] ) );
+	idStr::Copynz( rbLightGridIndirectStage.shaderTextureNames[1], "uDiffuseMap", sizeof( rbLightGridIndirectStage.shaderTextureNames[1] ) );
+	idStr::Copynz( rbLightGridIndirectStage.shaderTextureNames[2], "uLightGridAtlas", sizeof( rbLightGridIndirectStage.shaderTextureNames[2] ) );
+
+	rbLightGridIndirectStageInitialized = true;
+}
+
 enum rbSSAOUniformIndex_t {
 	RB_SSAO_UNIFORM_INV_TEX_SIZE = 0,
 	RB_SSAO_UNIFORM_PROJECTION_INFO,
@@ -645,7 +704,7 @@ static void RB_InitSSAOStage( void ) {
 
 	memset( &rbSSAOStage, 0, sizeof( rbSSAOStage ) );
 	rbSSAOStage.glslProgram = true;
-	idStr::Copynz( rbSSAOStage.glslProgramName, "openprey_ssao.fs", sizeof( rbSSAOStage.glslProgramName ) );
+	idStr::Copynz( rbSSAOStage.glslProgramName, "ssao.fs", sizeof( rbSSAOStage.glslProgramName ) );
 
 	static const rbBuiltinUniformDef_t uniforms[RB_SSAO_UNIFORM_COUNT] = {
 		{ "invTexSize", 2 },
@@ -894,7 +953,7 @@ static void RB_InitBloomStages( void ) {
 
 	memset( &rbBloomExtractStage, 0, sizeof( rbBloomExtractStage ) );
 	rbBloomExtractStage.glslProgram = true;
-	idStr::Copynz( rbBloomExtractStage.glslProgramName, "openprey_bloom_extract.fs", sizeof( rbBloomExtractStage.glslProgramName ) );
+	idStr::Copynz( rbBloomExtractStage.glslProgramName, "bloom_extract.fs", sizeof( rbBloomExtractStage.glslProgramName ) );
 
 	static const rbBuiltinUniformDef_t extractUniforms[RB_BLOOM_EXTRACT_UNIFORM_COUNT] = {
 		{ "invTexSize", 2 },
@@ -912,7 +971,7 @@ static void RB_InitBloomStages( void ) {
 
 	memset( &rbBloomDownsampleStage, 0, sizeof( rbBloomDownsampleStage ) );
 	rbBloomDownsampleStage.glslProgram = true;
-	idStr::Copynz( rbBloomDownsampleStage.glslProgramName, "openprey_bloom_downsample.fs", sizeof( rbBloomDownsampleStage.glslProgramName ) );
+	idStr::Copynz( rbBloomDownsampleStage.glslProgramName, "bloom_downsample.fs", sizeof( rbBloomDownsampleStage.glslProgramName ) );
 
 	static const rbBuiltinUniformDef_t downsampleUniforms[RB_BLOOM_DOWNSAMPLE_UNIFORM_COUNT] = {
 		{ "invTexSize", 2 }
@@ -928,7 +987,7 @@ static void RB_InitBloomStages( void ) {
 
 	memset( &rbBloomBlurStage, 0, sizeof( rbBloomBlurStage ) );
 	rbBloomBlurStage.glslProgram = true;
-	idStr::Copynz( rbBloomBlurStage.glslProgramName, "openprey_bloom_blur.fs", sizeof( rbBloomBlurStage.glslProgramName ) );
+	idStr::Copynz( rbBloomBlurStage.glslProgramName, "bloom_blur.fs", sizeof( rbBloomBlurStage.glslProgramName ) );
 
 	static const rbBuiltinUniformDef_t blurUniforms[RB_BLOOM_BLUR_UNIFORM_COUNT] = {
 		{ "invTexSize", 2 },
@@ -946,7 +1005,7 @@ static void RB_InitBloomStages( void ) {
 
 	memset( &rbHDRLuminanceStage, 0, sizeof( rbHDRLuminanceStage ) );
 	rbHDRLuminanceStage.glslProgram = true;
-	idStr::Copynz( rbHDRLuminanceStage.glslProgramName, "openprey_hdr_luminance.fs", sizeof( rbHDRLuminanceStage.glslProgramName ) );
+	idStr::Copynz( rbHDRLuminanceStage.glslProgramName, "hdr_luminance.fs", sizeof( rbHDRLuminanceStage.glslProgramName ) );
 
 	static const rbBuiltinUniformDef_t luminanceUniforms[RB_HDR_LUMINANCE_UNIFORM_COUNT] = {
 		{ "invTexSize", 2 },
@@ -963,7 +1022,7 @@ static void RB_InitBloomStages( void ) {
 
 	memset( &rbBloomCompositeStage, 0, sizeof( rbBloomCompositeStage ) );
 	rbBloomCompositeStage.glslProgram = true;
-	idStr::Copynz( rbBloomCompositeStage.glslProgramName, "openprey_bloom.fs", sizeof( rbBloomCompositeStage.glslProgramName ) );
+	idStr::Copynz( rbBloomCompositeStage.glslProgramName, "bloom.fs", sizeof( rbBloomCompositeStage.glslProgramName ) );
 
 	static const rbBuiltinUniformDef_t compositeUniforms[RB_BLOOM_COMPOSITE_UNIFORM_COUNT] = {
 		{ "bloomIntensity", 1 },
@@ -1563,7 +1622,7 @@ static void RB_InitResolutionScaleStage( void ) {
 
 	memset( &rbResolutionScaleStage, 0, sizeof( rbResolutionScaleStage ) );
 	rbResolutionScaleStage.glslProgram = true;
-	idStr::Copynz( rbResolutionScaleStage.glslProgramName, "openq4_resolutionscale.fs", sizeof( rbResolutionScaleStage.glslProgramName ) );
+	idStr::Copynz( rbResolutionScaleStage.glslProgramName, "resolutionscale.fs", sizeof( rbResolutionScaleStage.glslProgramName ) );
 
 	static const rbBuiltinUniformDef_t uniforms[RB_RES_SCALE_UNIFORM_COUNT] = {
 		{ "invTexSize", 2 },
@@ -1707,7 +1766,7 @@ static void RB_InitCRTStage( void ) {
 
 	memset( &rbCRTStage, 0, sizeof( rbCRTStage ) );
 	rbCRTStage.glslProgram = true;
-	idStr::Copynz( rbCRTStage.glslProgramName, "openprey_crt.fs", sizeof( rbCRTStage.glslProgramName ) );
+	idStr::Copynz( rbCRTStage.glslProgramName, "crt.fs", sizeof( rbCRTStage.glslProgramName ) );
 
 	static const rbBuiltinUniformDef_t uniforms[RB_CRT_UNIFORM_COUNT] = {
 		{ "invTexSize", 2 },
@@ -3709,6 +3768,308 @@ static void RB_STD_ForceAmbient( void ) {
 	GL_Cull( CT_FRONT_SIDED );
 }
 
+static void RB_LightGridModelMatrixRows( const float modelMatrix[16], float row0[4], float row1[4], float row2[4] ) {
+	row0[0] = modelMatrix[0];
+	row0[1] = modelMatrix[4];
+	row0[2] = modelMatrix[8];
+	row0[3] = modelMatrix[12];
+
+	row1[0] = modelMatrix[1];
+	row1[1] = modelMatrix[5];
+	row1[2] = modelMatrix[9];
+	row1[3] = modelMatrix[13];
+
+	row2[0] = modelMatrix[2];
+	row2[1] = modelMatrix[6];
+	row2[2] = modelMatrix[10];
+	row2[3] = modelMatrix[14];
+}
+
+static void RB_LightGridVertexColorParams( const stageVertexColor_t vertexColor, float params[2] ) {
+	params[0] = 0.0f;
+	params[1] = 1.0f;
+
+	if ( vertexColor == SVC_MODULATE ) {
+		params[0] = 1.0f;
+		params[1] = 0.0f;
+	} else if ( vertexColor == SVC_INVERSE_MODULATE ) {
+		params[0] = -1.0f;
+		params[1] = 1.0f;
+	}
+}
+
+static bool RB_SurfaceHasLightGrid( const drawSurf_t *surf, const LightGrid *&lightGrid ) {
+	lightGrid = NULL;
+
+	if ( surf == NULL || surf->area == NULL ) {
+		return false;
+	}
+	if ( surf->material == NULL || surf->space == NULL || surf->geo == NULL ) {
+		return false;
+	}
+	if ( !surf->material->ReceivesLighting() || surf->material->IsPortalSky() ) {
+		return false;
+	}
+	if ( surf->material->Coverage() == MC_TRANSLUCENT ) {
+		return false;
+	}
+
+	const LightGrid &candidate = surf->area->lightGrid;
+	if ( candidate.lightGridPoints.Num() <= 0 || !candidate.HasImage() ) {
+		return false;
+	}
+	if ( candidate.lightGridBounds[0] <= 0 || candidate.lightGridBounds[1] <= 0 || candidate.lightGridBounds[2] <= 0 ) {
+		return false;
+	}
+
+	lightGrid = &candidate;
+	return true;
+}
+
+static void RB_UpdateLightGridImageResidency( idRenderWorldLocal *world ) {
+	if ( world == NULL || world->portalAreas == NULL ) {
+		return;
+	}
+
+	for ( int areaIndex = 0; areaIndex < world->numPortalAreas; areaIndex++ ) {
+		portalArea_t &area = world->portalAreas[ areaIndex ];
+		LightGrid &lightGrid = area.lightGrid;
+		idImage *irradianceImage = lightGrid.irradianceImage;
+		if ( irradianceImage == NULL || !irradianceImage->IsLoaded() ) {
+			continue;
+		}
+
+		if ( area.viewCount == tr.viewCount ) {
+			continue;
+		}
+
+		irradianceImage->PurgeImage();
+	}
+}
+
+static void RB_STD_DrawLightGridSurface( const drawSurf_t *surf, const LightGrid &lightGrid ) {
+	const srfTriangles_t *tri = surf->geo;
+	const idMaterial *shader = surf->material;
+	const float *regs = surf->shaderRegisters;
+	if ( tri == NULL || shader == NULL || regs == NULL ) {
+		return;
+	}
+	if ( tri->numIndexes <= 0 || tri->ambientCache == NULL ) {
+		return;
+	}
+
+	idImage *irradianceImage = lightGrid.irradianceImage;
+	if ( irradianceImage == NULL ) {
+		return;
+	}
+
+	if ( !irradianceImage->IsLoaded() ) {
+		irradianceImage->ActuallyLoadImage( true );
+	}
+	if ( irradianceImage->IsDefaulted() ) {
+		return;
+	}
+
+	const int atlasWidth = irradianceImage->GetOpts().width;
+	const int atlasHeight = irradianceImage->GetOpts().height;
+	if ( atlasWidth <= 0 || atlasHeight <= 0 ) {
+		return;
+	}
+
+	const shaderStage_t *bumpStage = shader->GetBumpStage();
+	idImage *bumpImage = globalImages->flatNormalMap;
+	idVec4 bumpMatrix[2];
+	bumpMatrix[0].Set( 1.0f, 0.0f, 0.0f, 0.0f );
+	bumpMatrix[1].Set( 0.0f, 1.0f, 0.0f, 0.0f );
+	if ( bumpStage != NULL && regs[ bumpStage->conditionRegister ] != 0 && !r_skipBump.GetBool() ) {
+		R_SetDrawInteraction( bumpStage, regs, &bumpImage, bumpMatrix, NULL );
+		if ( bumpImage == NULL ) {
+			bumpImage = globalImages->flatNormalMap;
+		}
+	}
+
+	float row0[4];
+	float row1[4];
+	float row2[4];
+	RB_LightGridModelMatrixRows( surf->space->modelMatrix, row0, row1, row2 );
+
+	const float lightGridOrigin[4] = {
+		lightGrid.lightGridOrigin[0], lightGrid.lightGridOrigin[1], lightGrid.lightGridOrigin[2], 0.0f
+	};
+	const float lightGridSize[4] = {
+		lightGrid.lightGridSize[0], lightGrid.lightGridSize[1], lightGrid.lightGridSize[2], 0.0f
+	};
+	const float lightGridBounds[4] = {
+		static_cast<float>( lightGrid.lightGridBounds[0] ),
+		static_cast<float>( lightGrid.lightGridBounds[1] ),
+		static_cast<float>( lightGrid.lightGridBounds[2] ),
+		0.0f
+	};
+	const float atlasInfo[4] = {
+		1.0f / static_cast<float>( atlasWidth ),
+		1.0f / static_cast<float>( atlasHeight ),
+		static_cast<float>( lightGrid.imageBorderSize ),
+		static_cast<float>( Max( lightGrid.imageSingleProbeSize - lightGrid.imageBorderSize, 1 ) ) / static_cast<float>( Max( lightGrid.imageSingleProbeSize, 1 ) )
+	};
+
+	const bool useAlphaToCoverage = RB_UseAlphaToCoverage( shader );
+	if ( useAlphaToCoverage ) {
+		glEnable( GL_SAMPLE_ALPHA_TO_COVERAGE );
+	}
+
+	GL_Cull( shader->GetCullType() );
+	if ( shader->TestMaterialFlag( MF_POLYGONOFFSET ) ) {
+		glEnable( GL_POLYGON_OFFSET_FILL );
+		glPolygonOffset( r_offsetFactor.GetFloat(), r_offsetUnits.GetFloat() * shader->GetPolygonOffset() );
+	}
+
+	if ( surf->space->weaponDepthHack ) {
+		RB_EnterWeaponDepthHack();
+	}
+	if ( surf->space->modelDepthHack != 0.0f ) {
+		RB_EnterModelDepthHack( surf->space->modelDepthHack );
+	}
+
+	idDrawVert *ac = (idDrawVert *)vertexCache.Position( tri->ambientCache );
+	glVertexPointer( 3, GL_FLOAT, sizeof( idDrawVert ), ac->xyz.ToFloatPtr() );
+	glNormalPointer( GL_FLOAT, sizeof( idDrawVert ), ac->normal.ToFloatPtr() );
+	glEnableClientState( GL_NORMAL_ARRAY );
+	glEnableClientState( GL_COLOR_ARRAY );
+
+	GL_SelectTexture( 0 );
+	glEnableClientState( GL_TEXTURE_COORD_ARRAY );
+	glTexCoordPointer( 2, GL_FLOAT, sizeof( idDrawVert ), reinterpret_cast<void *>( &ac->st ) );
+	GL_SelectTexture( 1 );
+	glEnableClientState( GL_TEXTURE_COORD_ARRAY );
+	glTexCoordPointer( 3, GL_FLOAT, sizeof( idDrawVert ), ac->tangents[0].ToFloatPtr() );
+	GL_SelectTexture( 2 );
+	glEnableClientState( GL_TEXTURE_COORD_ARRAY );
+	glTexCoordPointer( 3, GL_FLOAT, sizeof( idDrawVert ), ac->tangents[1].ToFloatPtr() );
+	GL_SelectTexture( 0 );
+
+	glUniform4fvARB( rbLightGridIndirectStage.shaderParmLocations[RB_LIGHTGRID_UNIFORM_BUMP_MATRIX_S], 1, bumpMatrix[0].ToFloatPtr() );
+	glUniform4fvARB( rbLightGridIndirectStage.shaderParmLocations[RB_LIGHTGRID_UNIFORM_BUMP_MATRIX_T], 1, bumpMatrix[1].ToFloatPtr() );
+	glUniform4fvARB( rbLightGridIndirectStage.shaderParmLocations[RB_LIGHTGRID_UNIFORM_MODEL_MATRIX_ROW0], 1, row0 );
+	glUniform4fvARB( rbLightGridIndirectStage.shaderParmLocations[RB_LIGHTGRID_UNIFORM_MODEL_MATRIX_ROW1], 1, row1 );
+	glUniform4fvARB( rbLightGridIndirectStage.shaderParmLocations[RB_LIGHTGRID_UNIFORM_MODEL_MATRIX_ROW2], 1, row2 );
+	glUniform4fvARB( rbLightGridIndirectStage.shaderParmLocations[RB_LIGHTGRID_UNIFORM_LIGHTGRID_ORIGIN], 1, lightGridOrigin );
+	glUniform4fvARB( rbLightGridIndirectStage.shaderParmLocations[RB_LIGHTGRID_UNIFORM_LIGHTGRID_SIZE], 1, lightGridSize );
+	glUniform4fvARB( rbLightGridIndirectStage.shaderParmLocations[RB_LIGHTGRID_UNIFORM_LIGHTGRID_BOUNDS], 1, lightGridBounds );
+	glUniform4fvARB( rbLightGridIndirectStage.shaderParmLocations[RB_LIGHTGRID_UNIFORM_ATLAS_INFO], 1, atlasInfo );
+
+	GL_SelectTextureNoClient( 0 );
+	bumpImage->Bind();
+	GL_SelectTextureNoClient( 2 );
+	irradianceImage->SetSamplerState( TF_LINEAR, TR_CLAMP );
+	irradianceImage->Bind();
+
+	for ( int stageIndex = 0; stageIndex < shader->GetNumStages(); stageIndex++ ) {
+		const shaderStage_t *diffuseStage = shader->GetStage( stageIndex );
+		if ( diffuseStage->lighting != SL_DIFFUSE || regs[ diffuseStage->conditionRegister ] == 0 ) {
+			continue;
+		}
+
+		idImage *diffuseImage = globalImages->whiteImage;
+		idVec4 diffuseMatrix[2];
+		float diffuseColor[4];
+		R_SetDrawInteraction( diffuseStage, regs, &diffuseImage, diffuseMatrix, diffuseColor );
+		if ( diffuseImage == NULL ) {
+			diffuseImage = globalImages->whiteImage;
+		}
+
+		float vertexColorParams[2];
+		RB_LightGridVertexColorParams( diffuseStage->vertexColor, vertexColorParams );
+
+		RB_SetStageVertexColorPointer( surf, stageIndex, ac );
+		glUniform4fvARB( rbLightGridIndirectStage.shaderParmLocations[RB_LIGHTGRID_UNIFORM_DIFFUSE_MATRIX_S], 1, diffuseMatrix[0].ToFloatPtr() );
+		glUniform4fvARB( rbLightGridIndirectStage.shaderParmLocations[RB_LIGHTGRID_UNIFORM_DIFFUSE_MATRIX_T], 1, diffuseMatrix[1].ToFloatPtr() );
+		glUniform4fvARB( rbLightGridIndirectStage.shaderParmLocations[RB_LIGHTGRID_UNIFORM_DIFFUSE_COLOR], 1, diffuseColor );
+		glUniform2fvARB( rbLightGridIndirectStage.shaderParmLocations[RB_LIGHTGRID_UNIFORM_VERTEX_COLOR_PARAMS], 1, vertexColorParams );
+
+		GL_SelectTextureNoClient( 1 );
+		diffuseImage->Bind();
+
+		RB_DrawElementsWithCounters( tri );
+	}
+
+	GL_SelectTextureNoClient( 2 );
+	globalImages->BindNull();
+	GL_SelectTextureNoClient( 1 );
+	globalImages->BindNull();
+	GL_SelectTextureNoClient( 0 );
+	globalImages->BindNull();
+
+	GL_SelectTexture( 2 );
+	glDisableClientState( GL_TEXTURE_COORD_ARRAY );
+	GL_SelectTexture( 1 );
+	glDisableClientState( GL_TEXTURE_COORD_ARRAY );
+	GL_SelectTexture( 0 );
+	glDisableClientState( GL_COLOR_ARRAY );
+	glDisableClientState( GL_NORMAL_ARRAY );
+
+	if ( surf->space->weaponDepthHack || surf->space->modelDepthHack != 0.0f ) {
+		RB_LeaveDepthHack();
+	}
+	if ( shader->TestMaterialFlag( MF_POLYGONOFFSET ) ) {
+		glDisable( GL_POLYGON_OFFSET_FILL );
+	}
+	if ( useAlphaToCoverage ) {
+		glDisable( GL_SAMPLE_ALPHA_TO_COVERAGE );
+	}
+}
+
+static void RB_STD_LightGridIndirect( void ) {
+	if ( !r_useLightGrid.GetBool() || r_skipDiffuse.GetBool() ) {
+		return;
+	}
+	if ( !glConfig.GLSLProgramAvailable || backEnd.viewDef == NULL || !backEnd.viewDef->viewEntitys ) {
+		return;
+	}
+
+	RB_InitLightGridIndirectStage();
+	if ( !R_ValidateGLSLProgram( &rbLightGridIndirectStage ) ) {
+		return;
+	}
+
+	RB_LogComment( "---------- RB_STD_LightGridIndirect ----------\n" );
+
+	GL_State( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE | GLS_DEPTHFUNC_EQUAL );
+	glEnable( GL_DEPTH_TEST );
+	glDisable( GL_STENCIL_TEST );
+	glUseProgramObjectARB( (GLhandleARB)rbLightGridIndirectStage.glslProgramObject );
+
+	for ( int i = 0; i < rbLightGridIndirectStage.numShaderTextures; i++ ) {
+		if ( rbLightGridIndirectStage.shaderTextureLocations[i] >= 0 ) {
+			glUniform1iARB( rbLightGridIndirectStage.shaderTextureLocations[i], i );
+		}
+	}
+
+	RB_UpdateLightGridImageResidency( backEnd.viewDef->renderWorld );
+
+	backEnd.currentSpace = NULL;
+	for ( int i = 0; i < backEnd.viewDef->numDrawSurfs; i++ ) {
+		drawSurf_t *surf = backEnd.viewDef->drawSurfs[i];
+		if ( surf == NULL || surf->material == NULL ) {
+			continue;
+		}
+		if ( surf->material->GetSort() >= SS_POST_PROCESS || surf->material->SuppressInSubview() ) {
+			continue;
+		}
+
+		const LightGrid *lightGrid = NULL;
+		if ( !RB_SurfaceHasLightGrid( surf, lightGrid ) ) {
+			continue;
+		}
+
+		RB_SimpleSurfaceSetup( surf );
+		RB_STD_DrawLightGridSurface( surf, *lightGrid );
+	}
+
+	glUseProgramObjectARB( 0 );
+	GL_SelectTexture( 0 );
+	GL_Cull( CT_FRONT_SIDED );
+}
+
 //=========================================================================================
 
 /*
@@ -3753,6 +4114,9 @@ void	RB_STD_DrawView( void ) {
 
 	// disable stencil shadow test
 	glStencilFunc( GL_ALWAYS, 128, 255 );
+
+	// add precomputed indirect diffuse from irradiance-volume atlases
+	RB_STD_LightGridIndirect();
 
 	// uplight the entire screen to crutch up not having better blending range
 	RB_STD_LightScale();

@@ -513,8 +513,9 @@ void idEditWindow::EnsureCursorVisible()
 		} else {
 			int i = 0;
 			while ( i < text.Length() && i < cursorPos ) {
-				if ( idStr::IsColor( &text[i] ) ) {
-					i += 2;
+				const int colorEscapeLength = idStr::ColorEscapeLength( &text[i] );
+				if ( colorEscapeLength > 0 ) {
+					i += colorEscapeLength;
 				} else {
 					cursorX += dc->CharWidth( text[i], textScale );
 					i++;

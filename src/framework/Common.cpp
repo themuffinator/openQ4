@@ -2551,8 +2551,9 @@ static int Common_CountVisibleSmallChars( const char *string ) {
 	int count = 0;
 	const unsigned char *s = reinterpret_cast<const unsigned char *>( string );
 	while ( *s ) {
-		if ( idStr::IsColor( reinterpret_cast<const char *>( s ) ) ) {
-			s += 2;
+		const int colorEscapeLength = idStr::ColorEscapeLength( reinterpret_cast<const char *>( s ) );
+		if ( colorEscapeLength > 0 ) {
+			s += colorEscapeLength;
 			continue;
 		}
 		count++;
@@ -2573,17 +2574,20 @@ static void Common_DrawScaledSmallString( float x, float y, float charWidth, flo
 	renderSystem->SetColor( setColor );
 
 	while ( *s ) {
-		if ( idStr::IsColor( reinterpret_cast<const char *>( s ) ) ) {
+		idVec4 parsedColor;
+		bool resetToDefault = false;
+		const int colorEscapeLength = idStr::ColorEscapeLength( reinterpret_cast<const char *>( s ), &parsedColor, &resetToDefault );
+		if ( colorEscapeLength > 0 ) {
 			if ( !forceColor ) {
-				if ( *( s + 1 ) == C_COLOR_DEFAULT ) {
+				if ( resetToDefault ) {
 					renderSystem->SetColor( setColor );
 				} else {
-					color = idStr::ColorForIndex( *( s + 1 ) );
+					color = parsedColor;
 					color[3] = setColor[3];
 					renderSystem->SetColor( color );
 				}
 			}
-			s += 2;
+			s += colorEscapeLength;
 			continue;
 		}
 

@@ -706,26 +706,18 @@ int idDeviceContext::DrawText(float x, float y, float scale, idVec4 color, const
 		}
 
 		while (s && *s && count < len) {
-			if ( *s < GLYPH_START || *s > GLYPH_END ) {
-				s++;
-				continue;
-			}
-			glyph = &useFont->glyphs[*s];
-
-			//
-			// int yadj = Assets.textFont.glyphs[text[i]].bottom +
-			// Assets.textFont.glyphs[text[i]].top; float yadj = scale *
-			// (Assets.textFont.glyphs[text[i]].imageHeight -
-			// Assets.textFont.glyphs[text[i]].height);
-			//
-			if ( idStr::IsColor((const char*)s) ) {
-				if ( *(s+1) == C_COLOR_DEFAULT ) {
+			idVec4 parsedColor;
+			bool resetToDefault = false;
+			const int colorEscapeLength = idStr::ColorEscapeLength( reinterpret_cast<const char *>( s ), &parsedColor, &resetToDefault );
+			if ( colorEscapeLength > 0 ) {
+				if ( resetToDefault ) {
 					newColor = color;
 				} else {
-					newColor = idStr::ColorForIndex( *(s+1) );
+					newColor = parsedColor;
 					newColor[3] = color[3];
 				}
 				if (cursor == count || cursor == count+1) {
+					glyph = &useFont->glyphs[*s];
 					float partialSkip = ((glyph->xSkip * useScale) + adjust) / 5.0f;
 					if ( cursor == count ) {
 						partialSkip *= 2.0f;
@@ -735,20 +727,33 @@ int idDeviceContext::DrawText(float x, float y, float scale, idVec4 color, const
 					DrawEditCursor(x - partialSkip, y, scale);
 				}
 				renderSystem->SetColor(newColor);
-				s += 2;
-				count += 2;
+				s += colorEscapeLength;
+				count += colorEscapeLength;
 				continue;
-			} else {
-				float yadj = useScale * glyph->top;
-				PaintChar(x,y - yadj,glyph->imageWidth,glyph->imageHeight,useScale,glyph->s,glyph->t,glyph->s2,glyph->t2,glyph->glyph);
-
-				if (cursor == count) {
-					DrawEditCursor(x, y, scale);
-				}
-				x += (glyph->xSkip * useScale) + adjust;
-				s++;
-				count++;
 			}
+
+			if ( *s < GLYPH_START || *s > GLYPH_END ) {
+				s++;
+				continue;
+			}
+
+			glyph = &useFont->glyphs[*s];
+
+			//
+			// int yadj = Assets.textFont.glyphs[text[i]].bottom +
+			// Assets.textFont.glyphs[text[i]].top; float yadj = scale *
+			// (Assets.textFont.glyphs[text[i]].imageHeight -
+			// Assets.textFont.glyphs[text[i]].height);
+			//
+			float yadj = useScale * glyph->top;
+			PaintChar(x,y - yadj,glyph->imageWidth,glyph->imageHeight,useScale,glyph->s,glyph->t,glyph->s2,glyph->t2,glyph->glyph);
+
+			if (cursor == count) {
+				DrawEditCursor(x, y, scale);
+			}
+			x += (glyph->xSkip * useScale) + adjust;
+			s++;
+			count++;
 		}
 		if (cursor == len) {
 			DrawEditCursor(x, y, scale);
@@ -903,16 +908,18 @@ int idDeviceContext::TextWidth( const char *text, float scale, int limit ) {
 	width = 0;
 	if ( limit > 0 ) {
 		for ( i = 0; text[i] != '\0' && i < limit; i++ ) {
-			if ( idStr::IsColor( text + i ) ) {
-				i++;
+			const int colorEscapeLength = idStr::ColorEscapeLength( text + i );
+			if ( colorEscapeLength > 0 ) {
+				i += colorEscapeLength - 1;
 			} else {
 				width += glyphs[((const unsigned char *)text)[i]].xSkip;
 			}
 		}
 	} else {
 		for ( i = 0; text[i] != '\0'; i++ ) {
-			if ( idStr::IsColor( text + i ) ) {
-				i++;
+			const int colorEscapeLength = idStr::ColorEscapeLength( text + i );
+			if ( colorEscapeLength > 0 ) {
+				i += colorEscapeLength - 1;
 			} else {
 				width += glyphs[((const unsigned char *)text)[i]].xSkip;
 			}
@@ -940,8 +947,10 @@ int idDeviceContext::TextHeight(const char *text, float scale, int limit) {
 
 		count = 0;
 		while (s && *s && count < len) {
-			if ( idStr::IsColor(s) ) {
-				s += 2;
+			const int colorEscapeLength = idStr::ColorEscapeLength( s );
+			if ( colorEscapeLength > 0 ) {
+				s += colorEscapeLength;
+				count += colorEscapeLength;
 				continue;
 			}
 			else {
@@ -1110,6 +1119,17 @@ int idDeviceContext::DrawText( const char *text, float textScale, int textAlign,
 			if ((*p == '\n' && *(p + 1) == '\r') || (*p == '\r' && *(p + 1) == '\n')) {
 				p++;
 			}
+		}
+
+		const int escapeLength = idStr::IsEscape( p );
+		if ( escapeLength > 0 ) {
+			if ( len + escapeLength < static_cast<int>( sizeof( buff ) ) ) {
+				idStr::Copynz( &buff[len], p, escapeLength + 1 );
+				len += escapeLength;
+				p += escapeLength;
+				textWidth = TextWidth( buff, textScale, -1 );
+			}
+			continue;
 		}
 
 		int nextCharWidth = ( idStr::CharIsPrintable(*p) ? CharWidth( *p, textScale ) : cursorSkip );

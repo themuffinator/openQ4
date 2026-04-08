@@ -475,6 +475,12 @@ void idSoundHardware_OpenAL::Init()
 	}
 
 	openalContext = alcCreateContext( openalDevice, NULL );
+	if( openalContext == NULL )
+	{
+		common->FatalError( "idSoundHardware_OpenAL::Init: alcCreateContext() failed\n" );
+		return;
+	}
+
 	if( alcMakeContextCurrent( openalContext ) == 0 )
 	{
 		common->FatalError( "idSoundHardware_OpenAL::Init: alcMakeContextCurrent( %p) failed\n", openalContext );

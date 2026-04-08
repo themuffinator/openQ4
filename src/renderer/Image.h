@@ -48,6 +48,7 @@ typedef enum {
 	TD_BUMP,				// may be compressed with 8 bit lookup
 	TD_FONT,				// Font image
 	TD_LIGHT,				// Light image
+	TD_LIGHTGRID,			// Light-grid irradiance atlas
 	TD_LOOKUP_TABLE_MONO,	// Mono lookup table (including alpha)
 	TD_LOOKUP_TABLE_ALPHA,	// Alpha lookup table with a white color channel
 	TD_LOOKUP_TABLE_RGB1,	// RGB lookup table with a solid white alpha
@@ -113,6 +114,7 @@ public:
 	int			GetUploadHeight() const { return opts.height; }
 	textureFilter_t GetFilter() const { return filter; }
 	textureRepeat_t GetRepeat() const { return repeat; }
+	bool		IsDefaulted() const { return defaulted; }
 
 	void		SetReferencedOutsideLevelLoad() { referencedOutsideLevelLoad = true; }
 	void		SetReferencedInsideLevelLoad() { levelLoadReferenced = true; }
@@ -240,6 +242,11 @@ public:
 	// grid pattern.
 	// Will automatically execute image programs if needed.
 	idImage* ImageFromFile(const char* name,
+		textureFilter_t filter, textureRepeat_t repeat, textureUsage_t usage, cubeFiles_t cubeMap = CF_2D);
+
+	// Returns an image handle without forcing an immediate file load or level-load preload.
+	// The texture will be loaded on first use or an explicit Reload().
+	idImage* ImageHandleDeferred(const char* name,
 		textureFilter_t filter, textureRepeat_t repeat, textureUsage_t usage, cubeFiles_t cubeMap = CF_2D);
 
 	// look for a loaded image, whatever the parameters

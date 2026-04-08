@@ -83,6 +83,29 @@ static void FreeBuffer( void* p )
 	return Mem_Free( p );
 }
 
+static bool OpenQ4_CanUploadSampleToOpenAL()
+{
+	ALCcontext* const expectedContext = soundSystemLocal.hardware.GetOpenALContext();
+	if( expectedContext == NULL )
+	{
+		// Sound samples can be parsed before the OpenAL device is initialized.
+		return false;
+	}
+
+	ALCcontext* const currentContext = alcGetCurrentContext();
+	if( currentContext == expectedContext )
+	{
+		return true;
+	}
+
+	if( currentContext == NULL )
+	{
+		return alcMakeContextCurrent( expectedContext ) != 0;
+	}
+
+	return false;
+}
+
 /*
 ========================
 idSoundSample_OpenAL::idSoundSample_OpenAL
@@ -348,6 +371,11 @@ void idSoundSample_OpenAL::LoadResource()
 
 void idSoundSample_OpenAL::CreateOpenALBuffer()
 {
+	if( !OpenQ4_CanUploadSampleToOpenAL() )
+	{
+		return;
+	}
+
 	// build OpenAL buffer
 	CheckALErrors();
 	alGenBuffers( 1, &openalBuffer );
@@ -893,6 +921,10 @@ void idSoundSample_OpenAL::MakeDefault()
 	playBegin = 0;
 	playLength = DEFAULT_NUM_SAMPLES;
 
+	if( !OpenQ4_CanUploadSampleToOpenAL() )
+	{
+		return;
+	}
 
 	CheckALErrors();
 	alGenBuffers( 1, &openalBuffer );

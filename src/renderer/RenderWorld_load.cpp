@@ -49,6 +49,7 @@ void idRenderWorldLocal::FreeWorld() {
 		portal_t		*portal, *nextPortal;
 
 		area = &portalAreas[i];
+		area->lightGrid.Clear();
 		for ( portal = area->portals ; portal ; portal = nextPortal ) {
 			nextPortal = portal->next;
 			delete portal->w;
@@ -282,6 +283,9 @@ void idRenderWorldLocal::SetupAreaRefs() {
 	connectedAreaNum = 0;
 	for ( i = 0 ; i < numPortalAreas ; i++ ) {
 		portalAreas[i].areaNum = i;
+		portalAreas[i].globalBounds.Clear();
+		portalAreas[i].lightGrid.Clear();
+		portalAreas[i].lightGrid.area = i;
 		portalAreas[i].lightRefs.areaNext =
 		portalAreas[i].lightRefs.areaPrev =
 			&portalAreas[i].lightRefs;
@@ -565,6 +569,7 @@ bool idRenderWorldLocal::InitFromMap( const char *name ) {
 			FreeDefs();
 			TouchWorldModels();
 			AddWorldModelEntities();
+			SetupLightGrid();
 			ClearPortalStates();
 			return true;
 		}
@@ -658,6 +663,7 @@ bool idRenderWorldLocal::InitFromMap( const char *name ) {
 	CommonChildrenArea_r( &areaNodes[0] );
 
 	AddWorldModelEntities();
+	SetupLightGrid();
 	ClearPortalStates();
 
 	// done!
@@ -720,6 +726,7 @@ void idRenderWorldLocal::AddWorldModelEntities() {
 		}
 
 		idRenderModel *hModel = def->parms.hModel;
+		portalAreas[i].globalBounds = hModel->Bounds();
 
 		for ( int j = 0; j < hModel->NumSurfaces(); j++ ) {
 			const modelSurface_t *surf = hModel->Surface( j );

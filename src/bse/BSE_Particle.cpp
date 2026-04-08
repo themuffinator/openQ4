@@ -1944,8 +1944,9 @@ bool rvLightParticle::InitLight(rvBSE* effect, rvSegmentTemplate* st, float time
 	EvaluateSize(pt->mpSizeEnvelope, evalTime, oneOverDuration, size.ToFloatPtr());
 	EvaluatePosition(effect, pt, position, time);
 
-	// Light materials consume RGB for energy; fold authored fade/alpha into RGB so
-	// light segments dim consistently with particle segments.
+	// Light shaders consume Parm0..Parm2 for RGB energy. Keep authored fade on
+	// Parm3 instead of premultiplying it into RGB so stock effect lights match
+	// Quake 4's light-material behavior.
 	if (effect) {
 		const float bright = effect->GetBrightness();
 		tint.x *= effect->GetRed() * bright;
@@ -1953,7 +1954,6 @@ bool rvLightParticle::InitLight(rvBSE* effect, rvSegmentTemplate* st, float time
 		tint.z *= effect->GetBlue() * bright;
 		tint.w *= effect->GetAlpha();
 	}
-	const float fade = Max(0.0f, tint.w);
 
 	memset(&mLight, 0, sizeof(mLight));
 	mLight.origin = effect->GetCurrentOrigin() + effect->GetCurrentAxis() * position;
@@ -1962,9 +1962,10 @@ bool rvLightParticle::InitLight(rvBSE* effect, rvSegmentTemplate* st, float time
 	mLight.lightRadius.z = Max(1.0f, idMath::Fabs(size.z));
 	mLight.axis = effect->GetCurrentAxis();
 	memcpy( mLight.shaderParms, effect->GetShaderParms(), sizeof( mLight.shaderParms ) );
-	mLight.shaderParms[0] = tint.x * fade;
-	mLight.shaderParms[1] = tint.y * fade;
-	mLight.shaderParms[2] = tint.z * fade;
+	mLight.shaderParms[ SHADERPARM_RED ] = tint.x;
+	mLight.shaderParms[ SHADERPARM_GREEN ] = tint.y;
+	mLight.shaderParms[ SHADERPARM_BLUE ] = tint.z;
+	mLight.shaderParms[ SHADERPARM_ALPHA ] = tint.w;
 	mLight.pointLight = true;
 	mLight.detailLevel = 10.0f;
 	mLight.noShadows = !pt->GetShadows();
@@ -2022,7 +2023,6 @@ bool rvLightParticle::PresentLight(rvBSE* effect, rvParticleTemplate* pt, float 
 		tint.z *= effect->GetBlue() * bright;
 		tint.w *= effect->GetAlpha();
 	}
-	const float fade = Max(0.0f, tint.w);
 
 	mLight.origin = effect->GetCurrentOrigin() + effect->GetCurrentAxis() * position;
 	mLight.lightRadius.x = Max(1.0f, idMath::Fabs(size.x));
@@ -2030,9 +2030,10 @@ bool rvLightParticle::PresentLight(rvBSE* effect, rvParticleTemplate* pt, float 
 	mLight.lightRadius.z = Max(1.0f, idMath::Fabs(size.z));
 	mLight.axis = effect->GetCurrentAxis();
 	memcpy( mLight.shaderParms, effect->GetShaderParms(), sizeof( mLight.shaderParms ) );
-	mLight.shaderParms[0] = tint.x * fade;
-	mLight.shaderParms[1] = tint.y * fade;
-	mLight.shaderParms[2] = tint.z * fade;
+	mLight.shaderParms[ SHADERPARM_RED ] = tint.x;
+	mLight.shaderParms[ SHADERPARM_GREEN ] = tint.y;
+	mLight.shaderParms[ SHADERPARM_BLUE ] = tint.z;
+	mLight.shaderParms[ SHADERPARM_ALPHA ] = tint.w;
 	mLight.suppressLightInViewID = effect->GetSuppressLightsInViewID();
 	renderWorld->UpdateLightDef(mLightDefHandle, &mLight);
 	return true;

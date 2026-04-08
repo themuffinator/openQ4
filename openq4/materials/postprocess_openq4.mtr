@@ -1,4 +1,4 @@
-postprocess/openq4_black
+postprocess/black
 {
 	sort postProcess
 	noShadows
@@ -8,7 +8,7 @@ postprocess/openq4_black
 	}
 }
 
-postprocess/openq4_resolvepostprocess
+postprocess/resolvepostprocess
 {
 	sort postProcess
 	noShadows
@@ -19,7 +19,7 @@ postprocess/openq4_resolvepostprocess
 	}
 }
 
-postprocess/openq4_nopostprocess
+postprocess/nopostprocess
 {
 	sort postProcess
 	noShadows
@@ -30,7 +30,7 @@ postprocess/openq4_nopostprocess
 	}
 }
 
-postprocess/openq4_casupscale
+postprocess/casupscale
 {
 	sort postProcess
 	noShadows
@@ -41,25 +41,25 @@ postprocess/openq4_casupscale
 	}
 }
 
-postprocess/openq4_smaa_edge
+postprocess/smaa_edge
 {
 	sort postProcess
 	noShadows
 	{
 		blend gl_one, gl_zero
-		glslProgram openq4_smaa_edge.fs
+		glslProgram smaa_edge.fs
 		shaderParm invTexSize 1.0 / VideoWidth, 1.0 / VideoHeight
 		shaderTexture ColorTex nearest clamp _forwardRenderResolvedAlbedo
 	}
 }
 
-postprocess/openq4_smaa_weights
+postprocess/smaa_weights
 {
 	sort postProcess
 	noShadows
 	{
 		blend gl_one, gl_zero
-		glslProgram openq4_smaa_weights.fs
+		glslProgram smaa_weights.fs
 		shaderParm invTexSize 1.0 / VideoWidth, 1.0 / VideoHeight
 		shaderTexture EdgesTex linear clamp _postProcessAlbedo1
 		shaderTexture AreaTex linear clamp _smaaArea
@@ -67,20 +67,20 @@ postprocess/openq4_smaa_weights
 	}
 }
 
-postprocess/openq4_smaa_blend
+postprocess/smaa_blend
 {
 	sort postProcess
 	noShadows
 	{
 		blend gl_one, gl_zero
-		glslProgram openq4_smaa_blend.fs
+		glslProgram smaa_blend.fs
 		shaderParm invTexSize 1.0 / VideoWidth, 1.0 / VideoHeight
 		shaderTexture ColorTex linear clamp _forwardRenderResolvedAlbedo
 		shaderTexture BlendTex linear clamp _postProcessAlbedo0
 	}
 }
 
-postprocess/openq4_blur
+postprocess/blur
 {
 	sort postProcess
 	noShadows

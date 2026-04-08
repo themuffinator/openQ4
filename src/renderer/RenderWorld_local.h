@@ -56,11 +56,41 @@ typedef struct doublePortal_s {
 	struct doublePortal_s *	nextFoggedPortal;
 } doublePortal_t;
 
+typedef struct lightGridPoint_s {
+	idVec3					origin;
+	byte					valid;
+} lightGridPoint_t;
+
+class LightGrid {
+public:
+	idVec3					lightGridOrigin;
+	idVec3					lightGridSize;
+	int						lightGridBounds[3];
+	idList<lightGridPoint_t> lightGridPoints;
+	int						area;
+	idImage *				irradianceImage;
+	int						imageSingleProbeSize;
+	int						imageBorderSize;
+
+	void					Clear();
+	bool					HasImage() const;
+	int						CountValidGridPoints() const;
+	void					SetupGrid( const idBounds &bounds, const idRenderWorld *world, const idVec3 &preferredSize, int areaIndex, int totalAreas, int maxProbes, bool printToConsole );
+	void					GetBaseGridCoord( const idVec3 &origin, int gridCoord[3] ) const;
+	int						GridCoordToProbeIndex( const int gridCoord[3] ) const;
+	idVec3					GetGridCoordDebugColor( const int gridCoord[3] ) const;
+
+private:
+	void					CalculateGridPointPositions( const idRenderWorld *world, int totalAreas, bool printToConsole );
+};
+
 
 typedef struct portalArea_s {
 	int				areaNum;
 	int				connectedAreaNum[NUM_PORTAL_ATTRIBUTES];	// if two areas have matching connectedAreaNum, they are
 									// not separated by a portal with the apropriate PS_BLOCK_* blockingBits
+	idBounds		globalBounds;
+	LightGrid		lightGrid;
 	int				viewCount;		// set by R_FindViewLightsAndEntities
 	portal_t *		portals;		// never changes after load
 	areaReference_t	entityRefs;		// head/tail of doubly linked list, may change
@@ -213,6 +243,11 @@ public:
 	void					AddWorldModelEntities();
 	void					ClearPortalStates();
 	virtual	bool			InitFromMap( const char *mapName );
+	void					SetupLightGrid();
+	void					LoadLightGridImages( bool forceReloadLoaded = false );
+	bool					LoadLightGridFile( const char *name );
+	void					ParseLightGridPoints( idLexer *src );
+	void					WriteLightGridsToFile( const char *name ) const;
 
 	//--------------------------
 	// RenderWorld_portals.cpp

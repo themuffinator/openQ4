@@ -35,7 +35,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "Game_local.h"
 #undef protected
 #undef private
-#include "../renderer/Image.h"
+#include "../renderer/tr_local.h"
 
 void *R_StaticAlloc( int bytes );
 void R_StaticFree( void *data );
@@ -105,8 +105,9 @@ static int Session_CountVisibleSmallChars( const char *string ) {
 	int count = 0;
 	const unsigned char *s = reinterpret_cast<const unsigned char *>( string );
 	while ( *s ) {
-		if ( idStr::IsColor( reinterpret_cast<const char *>( s ) ) ) {
-			s += 2;
+		const int colorEscapeLength = idStr::ColorEscapeLength( reinterpret_cast<const char *>( s ) );
+		if ( colorEscapeLength > 0 ) {
+			s += colorEscapeLength;
 			continue;
 		}
 		count++;
@@ -127,17 +128,20 @@ static void Session_DrawScaledSmallString( float x, float y, float charWidth, fl
 	renderSystem->SetColor( setColor );
 
 	while ( *s ) {
-		if ( idStr::IsColor( reinterpret_cast<const char *>( s ) ) ) {
+		idVec4 parsedColor;
+		bool resetToDefault = false;
+		const int colorEscapeLength = idStr::ColorEscapeLength( reinterpret_cast<const char *>( s ), &parsedColor, &resetToDefault );
+		if ( colorEscapeLength > 0 ) {
 			if ( !forceColor ) {
-				if ( *( s + 1 ) == C_COLOR_DEFAULT ) {
+				if ( resetToDefault ) {
 					renderSystem->SetColor( setColor );
 				} else {
-					color = idStr::ColorForIndex( *( s + 1 ) );
+					color = parsedColor;
 					color[3] = setColor[3];
 					renderSystem->SetColor( color );
 				}
 			}
-			s += 2;
+			s += colorEscapeLength;
 			continue;
 		}
 
@@ -865,6 +869,588 @@ void Session_RescanSI_f( const idCmdArgs &args ) {
 	if ( game && idAsyncNetwork::server.IsActive() ) {
 		game->SetServerInfo( sessLocal.mapSpawnData.serverInfo );
 	}
+}
+
+static bool Session_IsLightGridBakeMultiplayerMap( const idStr &mapName ) {
+	return idStr::Icmpn( mapName.c_str(), "mp/", 3 ) == 0;
+}
+
+static void Session_NormalizeLightGridMapName( idStr &mapName ) {
+	mapName.BackSlashesToSlashes();
+	mapName.StripLeading( "maps/" );
+	mapName.StripFileExtension();
+}
+
+static bool Session_LightGridMapListContains( const idList<idStr> &mapTargets, const idStr &mapName ) {
+	for ( int i = 0; i < mapTargets.Num(); i++ ) {
+		if ( mapTargets[ i ].Icmp( mapName ) == 0 ) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+static bool Session_LightGridMapExists( const idStr &mapName ) {
+	idStr mapFile = "maps/";
+	mapFile += mapName;
+	mapFile.SetFileExtension( ".map" );
+	return fileSystem->FindFile( mapFile, true ) != FIND_NO;
+}
+
+static void Session_AppendAllLightGridMaps( idList<idStr> &mapTargets ) {
+	idList<idStr> singleplayerMaps;
+	idList<idStr> multiplayerMaps;
+
+	const int numMaps = fileSystem->GetNumMaps();
+	for ( int i = 0; i < numMaps; i++ ) {
+		const idDict *mapDecl = fileSystem->GetMapDecl( i );
+		if ( mapDecl == NULL ) {
+			continue;
+		}
+
+		idStr mapName = mapDecl->GetString( "path" );
+		Session_NormalizeLightGridMapName( mapName );
+		if ( mapName.Length() <= 0 ) {
+			continue;
+		}
+
+		idList<idStr> &targetList = Session_IsLightGridBakeMultiplayerMap( mapName ) ? multiplayerMaps : singleplayerMaps;
+		if ( !Session_LightGridMapListContains( targetList, mapName ) ) {
+			targetList.Append( mapName );
+		}
+	}
+
+	for ( int i = 0; i < singleplayerMaps.Num(); i++ ) {
+		mapTargets.Append( singleplayerMaps[ i ] );
+	}
+	for ( int i = 0; i < multiplayerMaps.Num(); i++ ) {
+		mapTargets.Append( multiplayerMaps[ i ] );
+	}
+}
+
+static void Session_AppendAllMultiplayerLightGridMaps( idList<idStr> &mapTargets ) {
+	idList<idStr> multiplayerMaps;
+
+	const int numMaps = fileSystem->GetNumMaps();
+	for ( int i = 0; i < numMaps; i++ ) {
+		const idDict *mapDecl = fileSystem->GetMapDecl( i );
+		if ( mapDecl == NULL ) {
+			continue;
+		}
+
+		idStr mapName = mapDecl->GetString( "path" );
+		Session_NormalizeLightGridMapName( mapName );
+		if ( mapName.Length() <= 0 || !Session_IsLightGridBakeMultiplayerMap( mapName ) ) {
+			continue;
+		}
+
+		if ( !Session_LightGridMapListContains( multiplayerMaps, mapName ) ) {
+			multiplayerMaps.Append( mapName );
+		}
+	}
+
+	for ( int i = 0; i < multiplayerMaps.Num(); i++ ) {
+		mapTargets.Append( multiplayerMaps[ i ] );
+	}
+}
+
+static void Session_BuildLightGridOutputPaths( const idStr &mapName, idStr &lightGridPath, idStr &atlasDir ) {
+	lightGridPath = "maps/";
+	lightGridPath += mapName;
+	lightGridPath.SetFileExtension( ".lightgrid" );
+
+	atlasDir = "env/maps/";
+	atlasDir += mapName;
+}
+
+static bool Session_IsLightGridAtlasArtifact( const idStr &relativePath ) {
+	idStr fileName = relativePath;
+	fileName.StripPath();
+	if ( fileName.Icmpn( "area", 4 ) != 0 ) {
+		return false;
+	}
+	return idStr::FindText( fileName.c_str(), "_lightgrid_amb" ) >= 0;
+}
+
+static void Session_RemoveLightGridAtlasArtifacts( const idStr &atlasDir, const char *extension ) {
+	idFileList *fileList = fileSystem->ListFiles( atlasDir.c_str(), extension, true, true );
+	if ( fileList == NULL ) {
+		return;
+	}
+
+	for ( int i = 0; i < fileList->GetNumFiles(); i++ ) {
+		idStr relativePath = fileList->GetFile( i );
+		if ( !Session_IsLightGridAtlasArtifact( relativePath ) ) {
+			continue;
+		}
+
+		fileSystem->RemoveFile( relativePath.c_str() );
+	}
+
+	fileSystem->FreeFileList( fileList );
+}
+
+static void Session_RemoveLightGridBakeOutputsForMap( const idStr &mapName ) {
+	idStr lightGridPath;
+	idStr atlasDir;
+	Session_BuildLightGridOutputPaths( mapName, lightGridPath, atlasDir );
+
+	fileSystem->RemoveFile( lightGridPath.c_str() );
+	Session_RemoveLightGridAtlasArtifacts( atlasDir, ".tga" );
+	Session_RemoveLightGridAtlasArtifacts( atlasDir, ".prev" );
+}
+
+static bool Session_CurrentLightGridOutputsComplete( const lightGridBakeOptions_t &options, idStr &mapName, int &requiredAtlasCount ) {
+	requiredAtlasCount = 0;
+
+	if ( tr.primaryWorld == NULL ) {
+		return false;
+	}
+
+	idRenderWorldLocal *world = tr.primaryWorld;
+	mapName = world->mapName;
+	Session_NormalizeLightGridMapName( mapName );
+	if ( mapName.Length() <= 0 ) {
+		return false;
+	}
+
+	for ( int areaIndex = 0; areaIndex < world->numPortalAreas; areaIndex++ ) {
+		world->portalAreas[ areaIndex ].lightGrid.SetupGrid(
+			world->portalAreas[ areaIndex ].globalBounds,
+			world,
+			options.gridSize,
+			areaIndex,
+			world->numPortalAreas,
+			options.maxProbes,
+			true );
+		if ( world->portalAreas[ areaIndex ].lightGrid.CountValidGridPoints() > 0 ) {
+			requiredAtlasCount++;
+		}
+	}
+
+	idStr lightGridPath;
+	idStr atlasDir;
+	Session_BuildLightGridOutputPaths( mapName, lightGridPath, atlasDir );
+	if ( fileSystem->FindFile( lightGridPath.c_str(), true ) == FIND_NO ) {
+		return false;
+	}
+
+	for ( int areaIndex = 0; areaIndex < world->numPortalAreas; areaIndex++ ) {
+		const LightGrid &lightGrid = world->portalAreas[ areaIndex ].lightGrid;
+		if ( lightGrid.CountValidGridPoints() <= 0 ) {
+			continue;
+		}
+
+		idStr atlasPath = va( "%s/area%i_lightgrid_amb.tga", atlasDir.c_str(), areaIndex );
+		if ( fileSystem->FindFile( atlasPath.c_str(), true ) == FIND_NO ) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+static void Session_PrintLightGridBakeUsage() {
+	common->Printf( "usage: bakeLightGrids [all | all-mp | <map> ...] [force] [-quit] [limit<num>] [bounce<num>] [size<num>] [blends<num>] [samples<num>] [grid ( x y z )]\n" );
+	common->Printf( "If no map names are given, the currently loaded map is baked.\n" );
+	common->Printf( "Without 'force', maps whose required .lightgrid metadata and area*_lightgrid_amb.tga atlases already exist are skipped.\n" );
+	common->Printf( "When map names, 'all', or 'all-mp' are given, OpenQ4 loads each map automatically, prints live progress to the console/log, and writes .lightgrid metadata plus area*_lightgrid_amb.tga atlases to fs_savepath.\n" );
+	common->Printf( "This bake is diffuse-only and LDR. It does not output the BFG EXR/PBR light-grid data path.\n" );
+}
+
+static bool Session_ParseLightGridBakeArgs( const idCmdArgs &args, lightGridBakeOptions_t &options,
+	idList<idStr> &mapTargets, bool &bakeAll, bool &bakeAllMultiplayer, bool &forceBake, bool &autoQuit, int &resumeIndex, bool &helpRequested, bool &requestedTargets ) {
+	R_SetDefaultLightGridBakeOptions( options );
+	bakeAll = false;
+	bakeAllMultiplayer = false;
+	forceBake = false;
+	autoQuit = false;
+	resumeIndex = 0;
+	helpRequested = false;
+	requestedTargets = false;
+	mapTargets.Clear();
+
+	for ( int i = 1; i < args.Argc(); i++ ) {
+		idStr rawToken = args.Argv( i );
+		idStr option = rawToken;
+		option.StripLeading( "-" );
+
+		if ( option.Icmp( "h" ) == 0 || option.Icmp( "help" ) == 0 ) {
+			helpRequested = true;
+			return true;
+		}
+
+		if ( option.Icmp( "all" ) == 0 ) {
+			bakeAll = true;
+			requestedTargets = true;
+			continue;
+		}
+		if ( option.Icmp( "all-mp" ) == 0 || option.Icmp( "allmp" ) == 0 ) {
+			bakeAllMultiplayer = true;
+			requestedTargets = true;
+			continue;
+		}
+		if ( option.Icmp( "force" ) == 0 ) {
+			forceBake = true;
+			continue;
+		}
+
+		if ( option.Icmp( "quit" ) == 0 || option.Icmp( "autoquit" ) == 0 ) {
+			autoQuit = true;
+			continue;
+		}
+
+		if ( option.IcmpPrefix( "resumeIndex" ) == 0 ) {
+			idStr value = option;
+			value.StripLeading( "resumeIndex" );
+			if ( value.Length() <= 0 ) {
+				if ( i + 1 >= args.Argc() ) {
+					common->Printf( "bakeLightGrids: missing value for %s\n", rawToken.c_str() );
+					return false;
+				}
+				value = args.Argv( ++i );
+			}
+			resumeIndex = Max( 0, atoi( value.c_str() ) );
+			continue;
+		}
+
+		if ( option.IcmpPrefix( "limit" ) == 0 ) {
+			idStr value = option;
+			value.StripLeading( "limit" );
+			if ( value.Length() <= 0 ) {
+				if ( i + 1 >= args.Argc() ) {
+					common->Printf( "bakeLightGrids: missing value for %s\n", rawToken.c_str() );
+					return false;
+				}
+				value = args.Argv( ++i );
+			}
+			options.maxProbes = idMath::ClampInt( 1, 16384, atoi( value.c_str() ) );
+			continue;
+		}
+
+		if ( option.IcmpPrefix( "bounce" ) == 0 ) {
+			idStr value = option;
+			value.StripLeading( "bounce" );
+			if ( value.Length() <= 0 ) {
+				if ( i + 1 >= args.Argc() ) {
+					common->Printf( "bakeLightGrids: missing value for %s\n", rawToken.c_str() );
+					return false;
+				}
+				value = args.Argv( ++i );
+			}
+			options.bounces = Max( 1, atoi( value.c_str() ) );
+			continue;
+		}
+
+		if ( option.IcmpPrefix( "size" ) == 0 ) {
+			idStr value = option;
+			value.StripLeading( "size" );
+			if ( value.Length() <= 0 ) {
+				if ( i + 1 >= args.Argc() ) {
+					common->Printf( "bakeLightGrids: missing value for %s\n", rawToken.c_str() );
+					return false;
+				}
+				value = args.Argv( ++i );
+			}
+			options.captureSize = idMath::ClampInt( 16, 1024, atoi( value.c_str() ) );
+			continue;
+		}
+
+		if ( option.IcmpPrefix( "blends" ) == 0 ) {
+			idStr value = option;
+			value.StripLeading( "blends" );
+			if ( value.Length() <= 0 ) {
+				if ( i + 1 >= args.Argc() ) {
+					common->Printf( "bakeLightGrids: missing value for %s\n", rawToken.c_str() );
+					return false;
+				}
+				value = args.Argv( ++i );
+			}
+			options.blends = idMath::ClampInt( 1, 32, atoi( value.c_str() ) );
+			continue;
+		}
+
+		if ( option.IcmpPrefix( "samples" ) == 0 ) {
+			idStr value = option;
+			value.StripLeading( "samples" );
+			if ( value.Length() <= 0 ) {
+				if ( i + 1 >= args.Argc() ) {
+					common->Printf( "bakeLightGrids: missing value for %s\n", rawToken.c_str() );
+					return false;
+				}
+				value = args.Argv( ++i );
+			}
+			options.samples = idMath::ClampInt( 1, 4096, atoi( value.c_str() ) );
+			continue;
+		}
+
+		if ( option.IcmpPrefix( "grid" ) == 0 ) {
+			if ( i + 5 < args.Argc() && idStr::Icmp( args.Argv( i + 1 ), "(" ) == 0 && idStr::Icmp( args.Argv( i + 5 ), ")" ) == 0 ) {
+				options.gridSize.x = Max( 1.0f, static_cast<float>( atof( args.Argv( i + 2 ) ) ) );
+				options.gridSize.y = Max( 1.0f, static_cast<float>( atof( args.Argv( i + 3 ) ) ) );
+				options.gridSize.z = Max( 1.0f, static_cast<float>( atof( args.Argv( i + 4 ) ) ) );
+				i += 5;
+				continue;
+			}
+			if ( i + 3 < args.Argc() ) {
+				options.gridSize.x = Max( 1.0f, static_cast<float>( atof( args.Argv( i + 1 ) ) ) );
+				options.gridSize.y = Max( 1.0f, static_cast<float>( atof( args.Argv( i + 2 ) ) ) );
+				options.gridSize.z = Max( 1.0f, static_cast<float>( atof( args.Argv( i + 3 ) ) ) );
+				i += 3;
+				continue;
+			}
+
+			common->Printf( "bakeLightGrids: expected 'grid x y z' or 'grid ( x y z )'\n" );
+			return false;
+		}
+
+		if ( rawToken.Length() > 0 && rawToken[ 0 ] == '-' ) {
+			common->Printf( "bakeLightGrids: unknown option '%s'\n", rawToken.c_str() );
+			return false;
+		}
+
+		idStr mapName = rawToken;
+		Session_NormalizeLightGridMapName( mapName );
+		if ( mapName.Length() > 0 && !Session_LightGridMapListContains( mapTargets, mapName ) ) {
+			requestedTargets = true;
+			mapTargets.Append( mapName );
+		}
+	}
+
+	if ( bakeAll && bakeAllMultiplayer ) {
+		common->Printf( "bakeLightGrids: ignoring 'all-mp' because 'all' was requested\n" );
+		bakeAllMultiplayer = false;
+	}
+
+	if ( bakeAll || bakeAllMultiplayer ) {
+		if ( mapTargets.Num() > 0 ) {
+			common->Printf( "bakeLightGrids: ignoring explicit map names because '%s' was requested\n", bakeAll ? "all" : "all-mp" );
+		}
+		mapTargets.Clear();
+		if ( bakeAll ) {
+			Session_AppendAllLightGridMaps( mapTargets );
+		} else {
+			Session_AppendAllMultiplayerLightGridMaps( mapTargets );
+		}
+	} else {
+		idList<idStr> validatedTargets;
+		for ( int i = 0; i < mapTargets.Num(); i++ ) {
+			if ( !Session_LightGridMapExists( mapTargets[ i ] ) ) {
+				common->Printf( "bakeLightGrids: skipping missing map '%s'\n", mapTargets[ i ].c_str() );
+				continue;
+			}
+			validatedTargets.Append( mapTargets[ i ] );
+		}
+		mapTargets = validatedTargets;
+	}
+
+	return true;
+}
+
+static void Session_BuildLightGridBakeResumeArgs( const lightGridBakeOptions_t &options, const idList<idStr> &mapTargets,
+	bool bakeAll, bool bakeAllMultiplayer, bool forceBake, bool autoQuit, int resumeIndex, idCmdArgs &reloadArgs ) {
+	reloadArgs.AppendArg( "openq4_resumeBakeLightGrids" );
+
+	if ( bakeAll ) {
+		reloadArgs.AppendArg( "all" );
+	} else if ( bakeAllMultiplayer ) {
+		reloadArgs.AppendArg( "all-mp" );
+	} else {
+		for ( int i = 0; i < mapTargets.Num(); i++ ) {
+			reloadArgs.AppendArg( mapTargets[ i ].c_str() );
+		}
+	}
+
+	if ( forceBake ) {
+		reloadArgs.AppendArg( "force" );
+	}
+
+	if ( autoQuit ) {
+		reloadArgs.AppendArg( "-quit" );
+	}
+
+	reloadArgs.AppendArg( "-limit" );
+	reloadArgs.AppendArg( va( "%i", options.maxProbes ) );
+	reloadArgs.AppendArg( "-bounce" );
+	reloadArgs.AppendArg( va( "%i", options.bounces ) );
+	reloadArgs.AppendArg( "-size" );
+	reloadArgs.AppendArg( va( "%i", options.captureSize ) );
+	reloadArgs.AppendArg( "-blends" );
+	reloadArgs.AppendArg( va( "%i", options.blends ) );
+	reloadArgs.AppendArg( "-samples" );
+	reloadArgs.AppendArg( va( "%i", options.samples ) );
+	reloadArgs.AppendArg( "-grid" );
+	reloadArgs.AppendArg( va( "%.3f", options.gridSize.x ) );
+	reloadArgs.AppendArg( va( "%.3f", options.gridSize.y ) );
+	reloadArgs.AppendArg( va( "%.3f", options.gridSize.z ) );
+	reloadArgs.AppendArg( "-resumeIndex" );
+	reloadArgs.AppendArg( va( "%i", resumeIndex ) );
+}
+
+static void Session_ReloadLightGridBakeBatch( const lightGridBakeOptions_t &options, const idList<idStr> &mapTargets,
+	bool bakeAll, bool bakeAllMultiplayer, bool forceBake, bool autoQuit, int resumeIndex, bool useMultiplayerModule ) {
+	cvarSystem->SetCVarString( "si_gameType", useMultiplayerModule ? "dm" : "singleplayer" );
+	cvarSystem->SetCVarString( "com_nextGameModule", useMultiplayerModule ? "game_mp" : "game_sp" );
+
+	idCmdArgs reloadArgs;
+	Session_BuildLightGridBakeResumeArgs( options, mapTargets, bakeAll, bakeAllMultiplayer, forceBake, autoQuit, resumeIndex, reloadArgs );
+
+	common->Printf(
+		"bakeLightGrids: reloading engine into %s to continue at map %i of %i\n",
+		useMultiplayerModule ? "game_mp" : "game_sp",
+		resumeIndex + 1,
+		mapTargets.Num() );
+	cmdSystem->SetupReloadEngine( reloadArgs );
+}
+
+static bool Session_LoadLightGridBakeMap( const idStr &mapName ) {
+	sessLocal.Stop();
+
+	if ( Session_IsLightGridBakeMultiplayerMap( mapName ) ) {
+		if ( cvarSystem->GetCVarInteger( "net_serverDedicated" ) != 0 ) {
+			common->Printf( "bakeLightGrids: forcing net_serverDedicated 0 so multiplayer maps can render during baking\n" );
+			cvarSystem->SetCVarInteger( "net_serverDedicated", 0 );
+		}
+
+		cvarSystem->SetCVarString( "si_gameType", "dm" );
+		cvarSystem->SetCVarString( "si_map", mapName.c_str() );
+
+		idCmdArgs spawnArgs;
+		spawnArgs.AppendArg( "spawnServer" );
+		spawnArgs.AppendArg( mapName.c_str() );
+		cmdSystem->BufferCommandArgs( CMD_EXEC_NOW, spawnArgs );
+	} else {
+		sessLocal.StartNewGame( mapName.c_str(), true );
+	}
+
+	if ( !sessLocal.mapSpawned ) {
+		common->Printf( "bakeLightGrids: failed to load map '%s'\n", mapName.c_str() );
+		return false;
+	}
+
+	sessLocal.UpdateScreen();
+	return true;
+}
+
+static bool Session_BakeLightGridCurrentMap( const lightGridBakeOptions_t &options, bool forceBake, bool *wasSkipped = NULL ) {
+	if ( wasSkipped != NULL ) {
+		*wasSkipped = false;
+	}
+
+	if ( sessLocal.mapSpawned && ( !tr.primaryWorld || !tr.primaryView ) ) {
+		sessLocal.UpdateScreen();
+	}
+
+	idStr mapName;
+	int requiredAtlasCount = 0;
+	const bool outputsComplete = Session_CurrentLightGridOutputsComplete( options, mapName, requiredAtlasCount );
+	if ( outputsComplete ) {
+		if ( forceBake ) {
+			common->Printf( "bakeLightGrids: force requested; cleaning existing outputs for %s\n", mapName.c_str() );
+			Session_RemoveLightGridBakeOutputsForMap( mapName );
+		} else {
+			common->Printf( "bakeLightGrids: skipping %s because %i required atlas file(s) and the .lightgrid metadata already exist\n", mapName.c_str(), requiredAtlasCount );
+			if ( wasSkipped != NULL ) {
+				*wasSkipped = true;
+			}
+			return true;
+		}
+	} else if ( forceBake && mapName.Length() > 0 ) {
+		common->Printf( "bakeLightGrids: force requested; removing any stale outputs for %s before baking\n", mapName.c_str() );
+		Session_RemoveLightGridBakeOutputsForMap( mapName );
+	}
+
+	const char *jobName = cvarSystem->GetCVarString( "si_map" );
+	return R_BakeCurrentLightGrids( options, ( jobName != NULL && jobName[ 0 ] != '\0' ) ? jobName : NULL );
+}
+
+static void Session_RunLightGridBake( const idCmdArgs &args ) {
+	lightGridBakeOptions_t options;
+	idList<idStr> mapTargets;
+	bool bakeAll = false;
+	bool bakeAllMultiplayer = false;
+	bool forceBake = false;
+	bool autoQuit = false;
+	int resumeIndex = 0;
+	bool helpRequested = false;
+	bool requestedTargets = false;
+
+	if ( !Session_ParseLightGridBakeArgs( args, options, mapTargets, bakeAll, bakeAllMultiplayer, forceBake, autoQuit, resumeIndex, helpRequested, requestedTargets ) ) {
+		Session_PrintLightGridBakeUsage();
+		return;
+	}
+
+	if ( helpRequested ) {
+		Session_PrintLightGridBakeUsage();
+		return;
+	}
+
+	Sys_ShowConsole( 1, false );
+
+	if ( mapTargets.Num() <= 0 ) {
+		if ( requestedTargets ) {
+			common->Printf( "bakeLightGrids: no valid map targets were found.\n" );
+			return;
+		}
+
+		if ( !Session_BakeLightGridCurrentMap( options, forceBake ) ) {
+			if ( !sessLocal.mapSpawned ) {
+				common->Printf( "bakeLightGrids: no map target was provided and no current map is loaded.\n" );
+				Session_PrintLightGridBakeUsage();
+			}
+			return;
+		}
+
+		if ( autoQuit ) {
+			cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "quit\n" );
+		}
+		return;
+	}
+
+	if ( resumeIndex >= mapTargets.Num() ) {
+		common->Printf( "bakeLightGrids: all requested maps are already complete.\n" );
+		if ( autoQuit ) {
+			cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "quit\n" );
+		}
+		return;
+	}
+
+	common->Printf( "bakeLightGrids: batch mode with %i map(s), starting at %i\n", mapTargets.Num(), resumeIndex + 1 );
+
+	for ( int mapIndex = resumeIndex; mapIndex < mapTargets.Num(); mapIndex++ ) {
+		const idStr &mapName = mapTargets[ mapIndex ];
+		const bool needsMultiplayerModule = Session_IsLightGridBakeMultiplayerMap( mapName );
+		const char *requiredModule = needsMultiplayerModule ? "game_mp" : "game_sp";
+		const char *activeModule = cvarSystem->GetCVarString( "com_activeGameModule" );
+
+		if ( idStr::Icmp( activeModule, requiredModule ) != 0 ) {
+			Session_ReloadLightGridBakeBatch( options, mapTargets, bakeAll, bakeAllMultiplayer, forceBake, autoQuit, mapIndex, needsMultiplayerModule );
+			return;
+		}
+
+		common->Printf( "bakeLightGrids: [%i/%i] loading %s\n", mapIndex + 1, mapTargets.Num(), mapName.c_str() );
+		if ( !Session_LoadLightGridBakeMap( mapName ) ) {
+			return;
+		}
+
+		if ( !Session_BakeLightGridCurrentMap( options, forceBake ) ) {
+			return;
+		}
+	}
+
+	common->Printf( "bakeLightGrids: batch completed for %i map(s)\n", mapTargets.Num() );
+	if ( autoQuit ) {
+		cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "quit\n" );
+	}
+}
+
+static void Session_BakeLightGrids_f( const idCmdArgs &args ) {
+	Session_RunLightGridBake( args );
+}
+
+static void Session_OpenQ4ResumeBakeLightGrids_f( const idCmdArgs &args ) {
+	Session_RunLightGridBake( args );
 }
 
 /*
@@ -3939,6 +4525,8 @@ void idSessionLocal::Init() {
 
 #ifndef	ID_DEDICATED
 	cmdSystem->AddCommand( "openq4_startSingleplayer", Session_OpenQ4StartSingleplayer_f, CMD_FL_SYSTEM, "internal helper to start singleplayer after game-module switches" );
+	cmdSystem->AddCommand( "openq4_resumeBakeLightGrids", Session_OpenQ4ResumeBakeLightGrids_f, CMD_FL_SYSTEM, "internal helper to continue light-grid baking after game-module switches" );
+	cmdSystem->AddCommand( "bakeLightGrids", Session_BakeLightGrids_f, CMD_FL_SYSTEM|CMD_FL_CHEAT, "bakes OpenQ4-compatible lightgrid metadata and irradiance atlases for the current map or a batch of maps" );
 	cmdSystem->AddCommand( "map", Session_Map_f, CMD_FL_SYSTEM, "loads a map", idCmdSystem::ArgCompletion_MapName );
 	cmdSystem->AddCommand( "devmap", Session_DevMap_f, CMD_FL_SYSTEM, "loads a map in developer mode", idCmdSystem::ArgCompletion_MapName );
 	cmdSystem->AddCommand( "testmap", Session_TestMap_f, CMD_FL_SYSTEM, "tests a map", idCmdSystem::ArgCompletion_MapName );

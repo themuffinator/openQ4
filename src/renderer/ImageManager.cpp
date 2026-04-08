@@ -452,6 +452,61 @@ idImage	*idImageManager::ImageFromFile( const char *_name, textureFilter_t filte
 }
 
 /*
+===============
+ImageHandleDeferred
+
+Returns an image handle without forcing file IO or level-load residency.
+The texture can then be streamed in lazily on first bind.
+===============
+*/
+idImage *idImageManager::ImageHandleDeferred( const char *_name, textureFilter_t filter,
+						 textureRepeat_t repeat, textureUsage_t usage, cubeFiles_t cubeMap ) {
+
+	if ( !_name || !_name[0] || idStr::Icmp( _name, "default" ) == 0 || idStr::Icmp( _name, "_default" ) == 0 ) {
+		declManager->MediaPrint( "DEFAULTED\n" );
+		return globalImages->defaultImage;
+	}
+	if ( idStr::Icmpn( _name, "fonts", 5 ) == 0 || idStr::Icmpn( _name, "newfonts", 8 ) == 0 ) {
+		usage = TD_FONT;
+	}
+	if ( idStr::Icmpn( _name, "lights", 6 ) == 0 ) {
+		usage = TD_LIGHT;
+	}
+
+	idStr name = _name;
+	name.Replace( ".tga", "" );
+	name.BackSlashesToSlashes();
+	R_NormalizeInternalImageName( name );
+
+	int hash = name.FileNameHash();
+	for ( int i = imageHash.First( hash ); i != -1; i = imageHash.Next( i ) ) {
+		idImage *image = images[i];
+		if ( name.Icmp( image->GetName() ) == 0 ) {
+			if ( name[0] == '_' ) {
+				return image;
+			}
+			if ( image->cubeFiles != cubeMap ) {
+				common->Error( "Image '%s' has been referenced with conflicting cube map states", _name );
+			}
+			if ( image->filter != filter || image->repeat != repeat ) {
+				continue;
+			}
+			if ( image->usage != usage ) {
+				continue;
+			}
+			return image;
+		}
+	}
+
+	idImage *image = AllocImage( name );
+	image->cubeFiles = cubeMap;
+	image->usage = usage;
+	image->filter = filter;
+	image->repeat = repeat;
+	return image;
+}
+
+/*
 ========================
 idImageManager::ScratchImage
 ========================

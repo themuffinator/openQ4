@@ -163,6 +163,54 @@ const char idStr::lowerCaseCharacter[256] =
 
 /*
 ================
+idStr::ColorEscapeLength
+================
+*/
+int idStr::ColorEscapeLength( const char *s, idVec4 *outColor, bool *resetToDefault ) {
+	if ( resetToDefault ) {
+		*resetToDefault = false;
+	}
+
+	int type = 0;
+	const int escapeLength = idStr::IsEscape( s, &type );
+	if ( escapeLength == 0 || ( type & ( S_ESCAPE_COLOR | S_ESCAPE_COLORINDEX ) ) == 0 ) {
+		return 0;
+	}
+
+	switch ( s[1] ) {
+		case C_COLOR_DEFAULT:
+			if ( resetToDefault ) {
+				*resetToDefault = true;
+			}
+			return escapeLength;
+
+		case '1': case '2': case '3': case '4':
+		case '5': case '6': case '7': case '8':
+		case '9': case C_COLOR_CONSOLE:
+			if ( outColor ) {
+				*outColor = idStr::ColorForIndex( s[1] );
+			}
+			return escapeLength;
+
+		case 'c': case 'C':
+			if ( !idStr::CharIsNumeric( s[2] ) || !idStr::CharIsNumeric( s[3] ) || !idStr::CharIsNumeric( s[4] ) ) {
+				return 0;
+			}
+			if ( outColor ) {
+				static const float digitToChannel = 1.0f / 9.0f;
+				( *outColor )[0] = ( s[2] - '0' ) * digitToChannel;
+				( *outColor )[1] = ( s[3] - '0' ) * digitToChannel;
+				( *outColor )[2] = ( s[4] - '0' ) * digitToChannel;
+				( *outColor )[3] = 1.0f;
+			}
+			return escapeLength;
+	}
+
+	return 0;
+}
+
+/*
+================
 idStr::RemoveColors
 ================
 */
@@ -174,12 +222,12 @@ char* idStr::RemoveColors(char* string) {
 	s = string;
 	d = string;
 	while ((c = *s) != 0) {
-		if (idStr::IsColor(s)) {
-			s++;
+		const int escapeLength = idStr::ColorEscapeLength( s );
+		if ( escapeLength > 0 ) {
+			s += escapeLength;
+			continue;
 		}
-		else {
-			*d++ = c;
-		}
+		*d++ = c;
 		s++;
 	}
 	*d = '\0';

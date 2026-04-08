@@ -290,6 +290,23 @@ const char *idListWindow::HandleEvent(const sysEvent_t *event, bool *updateVisua
 	return ret;
 }
 
+void idListWindow::MouseEnter() {
+	idWindow::MouseEnter();
+
+	if ( noEvents || gui == NULL ) {
+		return;
+	}
+
+	idWindow *desktop = gui->GetDesktop();
+	if ( desktop == NULL || desktop->GetCaptureChild() != NULL ) {
+		return;
+	}
+
+	if ( desktop->GetFocusedChild() != this ) {
+		desktop->SetFocus( this, false );
+	}
+}
+
 
 bool idListWindow::ParseInternalVar(const char *_name, idParser *src) {
 	if (idStr::Icmp(_name, "horizontal") == 0) {

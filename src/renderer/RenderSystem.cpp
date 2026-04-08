@@ -424,17 +424,20 @@ void idRenderSystemLocal::DrawSmallStringExt( int x, int y, const char *string, 
 	xx = x;
 	SetColor( setColor );
 	while ( *s ) {
-		if (idStr::IsColor((const char*)s)) {
+		idVec4 parsedColor;
+		bool resetToDefault = false;
+		const int colorEscapeLength = idStr::ColorEscapeLength( reinterpret_cast<const char *>( s ), &parsedColor, &resetToDefault );
+		if ( colorEscapeLength > 0 ) {
 			if ( !forceColor ) {
-				if ( *(s+1) == C_COLOR_DEFAULT ) {
+				if ( resetToDefault ) {
 					SetColor( setColor );
 				} else {
-					color = idStr::ColorForIndex( *(s+1) );
+					color = parsedColor;
 					color[3] = setColor[3];
 					SetColor( color );
 				}
 			}
-			s += 2;
+			s += colorEscapeLength;
 			continue;
 		}
 		DrawSmallChar( xx, y, *s, material );
@@ -497,17 +500,20 @@ void idRenderSystemLocal::DrawBigStringExt( int x, int y, const char *string, co
 	xx = x;
 	SetColor( setColor );
 	while ( *s ) {
-		{
+		idVec4 parsedColor;
+		bool resetToDefault = false;
+		const int colorEscapeLength = idStr::ColorEscapeLength( s, &parsedColor, &resetToDefault );
+		if ( colorEscapeLength > 0 ) {
 			if ( !forceColor ) {
-				if ( *(s+1) == C_COLOR_DEFAULT ) {
+				if ( resetToDefault ) {
 					SetColor( setColor );
 				} else {
-					color = idStr::ColorForIndex( *(s+1) );
+					color = parsedColor;
 					color[3] = setColor[3];
 					SetColor( color );
 				}
 			}
-			s += 2;
+			s += colorEscapeLength;
 			continue;
 		}
 		DrawBigChar( xx, y, *s, material );

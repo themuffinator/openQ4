@@ -218,6 +218,11 @@ idCVar r_skipTranslucent( "r_skipTranslucent", "0", CVAR_RENDERER | CVAR_BOOL, "
 idCVar r_skipAmbient( "r_skipAmbient", "0", CVAR_RENDERER | CVAR_BOOL, "bypasses all non-interaction drawing" );
 idCVar r_skipNewAmbient( "r_skipNewAmbient", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_ARCHIVE, "bypasses all vertex/fragment program ambient drawing" );
 idCVar r_forceAmbient( "r_forceAmbient", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "force ambient lighting level", 0.0f, 1.0f );
+idCVar r_useLightGrid( "r_useLightGrid", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "use precomputed irradiance-volume atlases when present" );
+idCVar r_lightGridBakeWorkers( "r_lightGridBakeWorkers", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "worker threads for light-grid probe integration (-1 = disabled, 0 = auto, 1..8 = explicit)", -1, 8, idCmdSystem::ArgCompletion_Integer<-1,8> );
+idCVar r_lightGridBakeAsyncReadback( "r_lightGridBakeAsyncReadback", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "use async pixel-pack-buffer readback for light-grid baking when supported" );
+idCVar r_lightGridBakeMemoryMB( "r_lightGridBakeMemoryMB", "12", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "transient memory budget in MB for in-flight light-grid bake jobs (lower reduces RAM/pagefile use)", 4, 256, idCmdSystem::ArgCompletion_Integer<4,256> );
+idCVar r_lightGridBakeReadbackSlots( "r_lightGridBakeReadbackSlots", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "async readback slots for light-grid baking (0 = auto, 1..16 = explicit; lower reduces driver/GPU memory use)", 0, 16, idCmdSystem::ArgCompletion_Integer<0,16> );
 idCVar r_skipBlendLights( "r_skipBlendLights", "0", CVAR_RENDERER | CVAR_BOOL, "skip all blend lights" );
 idCVar r_skipFogLights( "r_skipFogLights", "0", CVAR_RENDERER | CVAR_BOOL, "skip all fog lights" );
 idCVar r_skipDeforms( "r_skipDeforms", "0", CVAR_RENDERER | CVAR_BOOL, "leave all deform materials in their original state" );
@@ -320,6 +325,7 @@ idCVar r_showIntensity( "r_showIntensity", "0", CVAR_RENDERER | CVAR_BOOL, "draw
 idCVar r_showImages( "r_showImages", "0", CVAR_RENDERER | CVAR_INTEGER, "1 = show all images instead of rendering, 2 = show in proportional size", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
 idCVar r_showSmp( "r_showSmp", "0", CVAR_RENDERER | CVAR_BOOL, "show which end (front or back) is blocking" );
 idCVar r_showLights( "r_showLights", "0", CVAR_RENDERER | CVAR_INTEGER, "1 = just print volumes numbers, highlighting ones covering the view, 2 = also draw planes of each volume, 3 = also draw edges of each volume", 0, 3, idCmdSystem::ArgCompletion_Integer<0,3> );
+idCVar r_showLightGrid( "r_showLightGrid", "0", CVAR_RENDERER | CVAR_INTEGER, "irradiance-volume debug: 0 = off, 1 = current area valid probes, 2 = all valid probes, 3 = include invalid probes", 0, 3, idCmdSystem::ArgCompletion_Integer<0,3> );
 idCVar r_showShadows( "r_showShadows", "0", CVAR_RENDERER | CVAR_INTEGER, "1 = visualize the stencil shadow volumes, 2 = draw filled in", 0, 3, idCmdSystem::ArgCompletion_Integer<0,3> );
 idCVar r_showShadowCount( "r_showShadowCount", "0", CVAR_RENDERER | CVAR_INTEGER, "colors screen based on shadow volume depth complexity, >= 2 = print overdraw count based on stencil index values, 3 = only show turboshadows, 4 = only show static shadows", 0, 4, idCmdSystem::ArgCompletion_Integer<0,4> );
 idCVar r_showLightScissors( "r_showLightScissors", "0", CVAR_RENDERER | CVAR_BOOL, "show light scissor rectangles" );
@@ -536,6 +542,8 @@ static void R_CheckPortableExtensions( void ) {
 
 	// ARB_vertex_buffer_object
 	glConfig.ARBVertexBufferObjectAvailable = R_CheckExtension( "GL_ARB_vertex_buffer_object" );
+	glConfig.pixelBufferObjectAvailable =
+		( GLEW_ARB_pixel_buffer_object || GLEW_EXT_pixel_buffer_object || GLEW_VERSION_2_1 );
 
 	// ARB_vertex_program
 	glConfig.ARBVertexProgramAvailable = R_CheckRequiredExtension( "GL_ARB_vertex_program" );

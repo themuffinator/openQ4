@@ -7265,7 +7265,7 @@ windowDef Desktop
 				}
 				windowDef set_sys_vsync
 				{
-					rect	259,386,172,18
+					rect	259,430,172,18
 					visible	1
 					forecolor	1,1,1,0.8
 					text	"#str_41092"
@@ -7274,7 +7274,7 @@ windowDef Desktop
 				}
 				choiceDef set_sys_vsync_val
 				{
-					rect	468,386,160,15
+					rect	468,430,160,15
 					visible	1
 					forecolor	1,0.745,0.137,0.8
 					choiceType	0
@@ -7301,7 +7301,7 @@ windowDef Desktop
 				}
 				windowDef set_sys_msaa
 				{
-					rect	259,408,172,18
+					rect	259,386,172,18
 					visible	1
 					forecolor	1,1,1,0.8
 					text	"#str_41093"
@@ -7310,7 +7310,7 @@ windowDef Desktop
 				}
 				choiceDef set_sys_msaa_val
 				{
-					rect	468,408,160,15
+					rect	468,386,160,15
 					visible	1
 					forecolor	1,0.745,0.137,0.8
 					choiceType	1
@@ -7338,7 +7338,7 @@ windowDef Desktop
 				}
 				windowDef set_sys_postaa
 				{
-					rect	259,430,172,18
+					rect	259,408,172,18
 					visible	1
 					forecolor	1,1,1,0.8
 					text	"#str_41094"
@@ -7347,7 +7347,7 @@ windowDef Desktop
 				}
 				choiceDef set_sys_postaa_val
 				{
-					rect	468,430,160,15
+					rect	468,408,160,15
 					visible	1
 					forecolor	1,0.745,0.137,0.8
 					choiceType	1
@@ -7559,7 +7559,7 @@ windowDef Desktop
 				}
 				windowDef set_sys_bloom
 				{
-					rect	259,624,172,18
+					rect	259,646,172,18
 					visible	1
 					forecolor	1,1,1,0.8
 					text	"#str_41082"
@@ -7568,7 +7568,7 @@ windowDef Desktop
 				}
 				choiceDef set_sys_bloom_val
 				{
-					rect	468,624,160,15
+					rect	468,646,160,15
 					visible	1
 					forecolor	1,0.745,0.137,0.8
 					choiceType	0
@@ -7590,7 +7590,7 @@ windowDef Desktop
 				}
 				windowDef set_sys_ssao
 				{
-					rect	259,646,172,18
+					rect	259,668,172,18
 					visible	1
 					forecolor	1,1,1,0.8
 					text	"#str_41088"
@@ -7599,7 +7599,7 @@ windowDef Desktop
 				}
 				choiceDef set_sys_ssao_val
 				{
-					rect	468,646,160,15
+					rect	468,668,160,15
 					visible	1
 					forecolor	1,0.745,0.137,0.8
 					choiceType	0
@@ -7621,7 +7621,7 @@ windowDef Desktop
 				}
 				windowDef set_sys_tonemap
 				{
-					rect	259,668,172,18
+					rect	259,690,172,18
 					visible	1
 					forecolor	1,1,1,0.8
 					text	"#str_41084"
@@ -7630,7 +7630,7 @@ windowDef Desktop
 				}
 				choiceDef set_sys_tonemap_val
 				{
-					rect	468,668,160,15
+					rect	468,690,160,15
 					visible	1
 					forecolor	1,0.745,0.137,0.8
 					choiceType	0
@@ -7652,7 +7652,7 @@ windowDef Desktop
 				}
 				windowDef set_sys_crt
 				{
-					rect	259,690,172,18
+					rect	259,712,172,18
 					visible	1
 					forecolor	1,1,1,0.8
 					text	"#str_41090"
@@ -7661,12 +7661,43 @@ windowDef Desktop
 				}
 				choiceDef set_sys_crt_val
 				{
-					rect	468,690,160,15
+					rect	468,712,160,15
 					visible	1
 					forecolor	1,0.745,0.137,0.8
 					choiceType	0
 					choices	"#str_200059"
 					cvar	"r_crt"
+					textscale	0.24
+					font	"fonts/lowpixel"
+
+					onAction {
+						set "cmd" "play main_menu_selection" ;
+					}
+				}
+				windowDef set_sys_b24
+				{
+					rect	228,710,377,25
+					visible	1
+					background	"gfx/guis/mainmenu/b3_light"
+					matcolor	0.545,0.588,0.294,0.4
+				}
+				windowDef set_sys_irradiance
+				{
+					rect	259,624,172,18
+					visible	1
+					forecolor	1,1,1,0.8
+					text	"#str_41107"
+					textscale	0.24
+					font	"fonts/lowpixel"
+				}
+				choiceDef set_sys_irradiance_val
+				{
+					rect	468,624,160,15
+					visible	1
+					forecolor	1,0.745,0.137,0.8
+					choiceType	0
+					choices	"#str_200059"
+					cvar	"r_useLightGrid"
 					textscale	0.24
 					font	"fonts/lowpixel"
 
@@ -7717,7 +7748,7 @@ windowDef Desktop
 					forecolor	1,1,1,0.8
 					matcolor	1,1,1,0.4
 					low	0
-					high	17
+					high	18
 					step	1
 					vertical	1
 					scrollbar	1
@@ -19799,6 +19830,7 @@ windowDef Desktop
 			set "set_sys_ssao_val::noevents" "0" ;
 			set "set_sys_tonemap_val::noevents" "0" ;
 			set "set_sys_crt_val::noevents" "0" ;
+			set "set_sys_irradiance_val::noevents" "0" ;
 			set "gui_set_sys_scroll" "0" ;
 			set "cmd" "set gui_set_sys_scroll 0" ;
 			namedevent "applySetSystemScroll" ;
@@ -19867,6 +19899,7 @@ windowDef Desktop
 			set "set_sys_ssao_val::noevents" "1" ;
 			set "set_sys_tonemap_val::noevents" "1" ;
 			set "set_sys_crt_val::noevents" "1" ;
+			set "set_sys_irradiance_val::noevents" "1" ;
 			set "set_sys_scroll_thumb::visible" "0" ;
 			set "set_sys_scroll_thumb::noevents" "1" ;
 		}
@@ -19952,8 +19985,10 @@ windowDef Desktop
 				set "set_sys_content::rect" "-24,-418,640,760" ;
 			} else if ( "gui::gui_set_sys_scroll" < 16.5 ) {
 				set "set_sys_content::rect" "-24,-440,640,760" ;
-			} else {
+			} else if ( "gui::gui_set_sys_scroll" < 17.5 ) {
 				set "set_sys_content::rect" "-24,-462,640,760" ;
+			} else {
+				set "set_sys_content::rect" "-24,-484,640,760" ;
 			}
 		}
 
@@ -21608,6 +21643,7 @@ windowDef Desktop
 				set "set_sys_b21::matcolor_w" "0.4" ;
 				set "set_sys_b22::matcolor_w" "0.4" ;
 				set "set_sys_b23::matcolor_w" "0.4" ;
+				set "set_sys_b24::matcolor_w" "0.4" ;
 				set "set_sys_auto::matcolor_w" "0.4" ;
 				set "set_sys_t_auto::forecolor" "$desktop::white_8" ; 
 				set "set_sys_auto_corner::matcolor" "$desktop::corner" ; 

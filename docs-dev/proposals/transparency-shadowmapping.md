@@ -354,7 +354,7 @@ A key practical point from bias literature: **tight near/far planes** reduce bot
 #### Projected/CSM caster: add alpha discard support (conceptual diff)
 
 ```diff
-+ // glprogs/openq4_shadow_proj_caster.vs
++ // glprogs/shadow_proj_caster.vs
 + attribute vec2 attr_TexCoord0;
 + varying vec2 vTexCoord;
 + void main() {
@@ -362,7 +362,7 @@ A key practical point from bias literature: **tight near/far planes** reduce bot
 +     gl_Position = ftransform();
 + }
 
-+ // glprogs/openq4_shadow_proj_caster.fs
++ // glprogs/shadow_proj_caster.fs
 + uniform sampler2D uAlphaMap;
 + uniform float uAlphaRef;
 + uniform float uAlphaScale;

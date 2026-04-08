@@ -71,6 +71,48 @@
         "isDefault": true
       },
       "problemMatcher": []
+    },
+    {
+      "label": "Bake Light Grids (All MP)",
+      "type": "shell",
+      "command": "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+      "args": [
+        "+set",
+        "logFile",
+        "2",
+        "+set",
+        "logFileName",
+        "logs/openq4_lightgrids.log",
+        "+set",
+        "developer",
+        "1",
+        "+set",
+        "fs_basepath",
+        "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Quake 4",
+        "+set",
+        "fs_savepath",
+        "${workspaceFolder}\\.home",
+        "+set",
+        "fs_devpath",
+        "${workspaceFolder}\\.install",
+        "+set",
+        "fs_game",
+        "openq4",
+        "+set",
+        "net_serverDedicated",
+        "0",
+        "+bakeLightGrids",
+        "all-mp",
+        "-quit"
+      ],
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "Build OpenQ4 (Meson Debug)"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}\\.install"
+      },
+      "problemMatcher": []
     }
   ]
 }

@@ -268,6 +268,7 @@ void idRenderModelDecal::AddWinding( const idWinding &w, const idMaterial *decal
 			fade = 1.0f - fade;
 			vertDepthFade[tri.numVerts + i] = fade;
 			vertStartTime[tri.numVerts + i] = (float)startTime;
+			tri.verts[tri.numVerts + i].Clear();
 			tri.verts[tri.numVerts + i].xyz = w[i].ToVec3();
 			tri.verts[tri.numVerts + i].st[0] = w[i].s;
 			tri.verts[tri.numVerts + i].st[1] = w[i].t;
@@ -286,6 +287,8 @@ void idRenderModelDecal::AddWinding( const idWinding &w, const idMaterial *decal
 			tri.numIndexes += 3;
 		}
 		tri.numVerts += w.GetNumPoints();
+		tri.tangentsCalculated = false;
+		tri.facePlanesCalculated = false;
 		return;
 	}
 
@@ -484,6 +487,9 @@ idRenderModelDecal *idRenderModelDecal::RemoveFadedDecals( idRenderModelDecal *d
 		decals->tri.indexes[i] = inUse[decals->tri.indexes[i]];
 	}
 
+	decals->tri.tangentsCalculated = false;
+	decals->tri.facePlanesCalculated = false;
+
 	return decals;
 }
 
@@ -502,6 +508,13 @@ void idRenderModelDecal::AddDecalDrawSurf( viewEntity_t *space ) {
 	const int numStages = material->GetNumStages();
 	vertCache_s *decalColorCache = NULL;
 	int decalColorStride = 0;
+
+	// Projected decals are built from clipped positions/UVs only. Rebuild the
+	// tangent basis from that projected mesh so direct-light and shadow-map
+	// receivers don't use stale or undefined normals/tangents.
+	if ( tri.numVerts > 0 && tri.numIndexes > 0 && !tri.tangentsCalculated ) {
+		R_DeriveTangents( &tri, false );
+	}
 
 	if ( numStages > 0 && tri.numVerts > 0 ) {
 		const int numRegisters = ( material->GetNumRegisters() > EXP_REG_NUM_PREDEFINED ) ? material->GetNumRegisters() : EXP_REG_NUM_PREDEFINED;

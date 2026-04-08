@@ -37,6 +37,7 @@ idCVar s_centerFractionVO( "s_centerFractionVO", "0.75", CVAR_FLOAT, "Portion of
 
 extern idCVar s_playDefaultSound;
 extern idCVar s_noSound;
+extern idCVar s_musicVolume;
 
 static ID_INLINE float VolumeScaleToDB( const float volumeScale )
 {
@@ -305,6 +306,11 @@ void idSoundChannel::UpdateVolume( int currentTime )
 			float f = ( distance - mindist ) / ( maxdist - mindist );
 			newVolumeDB += LinearToDB( Square( 1.0f - f ) );
 		}
+	}
+
+	if( ( parms.soundShaderFlags & SSF_MUSIC ) != 0 )
+	{
+		newVolumeDB += VolumeScaleToDB( idMath::ClampFloat( 0.0f, 1.0f, s_musicVolume.GetFloat() ) );
 	}
 
 	if( soundSystemLocal.musicMuted && ( parms.soundShaderFlags & SSF_MUSIC ) != 0 )

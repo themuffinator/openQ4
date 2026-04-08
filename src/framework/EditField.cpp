@@ -65,17 +65,20 @@ static void DrawScaledSmallStringExt( float x, float y, float charWidth, const c
 	renderSystem->SetColor( setColor );
 
 	while ( *s ) {
-		if ( idStr::IsColor( reinterpret_cast<const char *>( s ) ) ) {
+		idVec4 parsedColor;
+		bool resetToDefault = false;
+		const int colorEscapeLength = idStr::ColorEscapeLength( reinterpret_cast<const char *>( s ), &parsedColor, &resetToDefault );
+		if ( colorEscapeLength > 0 ) {
 			if ( !forceColor ) {
-				if ( *( s + 1 ) == C_COLOR_DEFAULT ) {
+				if ( resetToDefault ) {
 					renderSystem->SetColor( setColor );
 				} else {
-					color = idStr::ColorForIndex( *( s + 1 ) );
+					color = parsedColor;
 					color[3] = setColor[3];
 					renderSystem->SetColor( color );
 				}
 			}
-			s += 2;
+			s += colorEscapeLength;
 			continue;
 		}
 

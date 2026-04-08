@@ -62,6 +62,10 @@ public:
 	{
 		return openalDevice;
 	};
+	ALCcontext*		GetOpenALContext() const
+	{
+		return openalContext;
+	}
 
 	int				GetNumZombieVoices() const
 	{

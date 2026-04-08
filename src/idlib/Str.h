@@ -292,6 +292,7 @@ public:
 	static char *		ToLower( char *s );
 	static char *		ToUpper( char *s );
 	static bool			IsColor(const char* s);
+	static int			ColorEscapeLength( const char *s, idVec4 *outColor = NULL, bool *resetToDefault = NULL );
 	static char*		RemoveColors(char* s);
 	static bool			IsNumeric( const char *s );
 	static bool			HasLower( const char *s );

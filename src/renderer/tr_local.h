@@ -35,6 +35,18 @@ If you have questions concerning this license or the applicable additional terms
 
 class idRenderWorldLocal;
 
+typedef struct lightGridBakeOptions_s {
+	int					maxProbes;
+	int					bounces;
+	int					captureSize;
+	int					blends;
+	int					samples;
+	idVec3				gridSize;
+} lightGridBakeOptions_t;
+
+void					R_SetDefaultLightGridBakeOptions( lightGridBakeOptions_t &options );
+bool					R_BakeCurrentLightGrids( const lightGridBakeOptions_t &options, const char *jobName = NULL );
+
 // everything that is needed by the backend needs
 // to be double buffered to allow it to run in
 // parallel on a dual cpu machine
@@ -117,6 +129,7 @@ typedef struct drawSurf_s {
 	const float				*shaderRegisters;	// evaluated and adjusted for referenceShaders
 	const struct drawSurf_s	*nextOnLight;	// viewLight chains
 	idScreenRect			scissorRect;	// for scissor clipping, local inside renderView viewport
+	const struct portalArea_s *area;	// portal area used for light-grid lookup, if available
 	int						dsFlags;			// DSF_VIEW_INSIDE_SHADOW, etc
 	struct vertCache_s		*dynamicTexCoords;	// float * in vertex cache memory
 	struct vertCache_s		*decalColorCache;	// optional per-stage color blocks for decals
@@ -1036,6 +1049,11 @@ extern idCVar r_skipTranslucent;		// skip the translucent interaction rendering
 extern idCVar r_skipAmbient;			// bypasses all non-interaction drawing
 extern idCVar r_skipNewAmbient;			// bypasses all vertex/fragment program ambients
 extern idCVar r_forceAmbient;			// lifts the final scene toward a minimum brightness
+extern idCVar r_useLightGrid;			// enable indirect diffuse from precomputed irradiance volumes
+extern idCVar r_lightGridBakeWorkers;	// worker thread count for CPU probe integration (-1 = disabled, 0 = auto)
+extern idCVar r_lightGridBakeAsyncReadback;	// use async pixel-pack-buffer readback during light-grid baking when supported
+extern idCVar r_lightGridBakeMemoryMB;	// transient memory budget for in-flight light-grid bake jobs
+extern idCVar r_lightGridBakeReadbackSlots;	// async readback slot count for light-grid baking (0 = auto)
 extern idCVar r_skipBlendLights;		// skip all blend lights
 extern idCVar r_skipFogLights;			// skip all fog lights
 extern idCVar r_skipSubviews;			// 1 = don't render any mirrors / cameras / etc
@@ -1082,6 +1100,7 @@ extern idCVar r_showTangentSpace;		// shade triangles by tangent space
 extern idCVar r_showDominantTri;		// draw lines from vertexes to center of dominant triangles
 extern idCVar r_showTextureVectors;		// draw each triangles texture (tangent) vectors
 extern idCVar r_showLights;				// 1 = print light info, 2 = also draw volumes
+extern idCVar r_showLightGrid;			// show loaded irradiance-volume probe positions
 extern idCVar r_showLightCount;			// colors surfaces based on light count
 extern idCVar r_showShadows;			// visualize the stencil shadow volumes
 extern idCVar r_showShadowCount;		// colors screen based on shadow volume depth complexity
@@ -1436,6 +1455,8 @@ void RB_DrawShaderPasses( drawSurf_t **drawSurfs, int numDrawSurfs );
 void RB_LoadShaderTextureMatrix( const float *shaderRegisters, const textureStage_t *texture );
 void RB_GetShaderTextureMatrix( const float *shaderRegisters, const textureStage_t *texture, float matrix[16] );
 void RB_CreateSingleDrawInteractions( const drawSurf_t *surf, void (*DrawInteraction)(const drawInteraction_t *) );
+void R_SetDrawInteraction( const shaderStage_t *surfaceStage, const float *surfaceRegs,
+						  idImage **image, idVec4 matrix[2], float color[4] );
 
 const shaderStage_t *RB_SetLightTexture( const idRenderLightLocal *light );
 
@@ -1762,6 +1783,7 @@ void RB_ClearDebugLines( int time );
 void RB_AddDebugPolygon( const idVec4 &color, const idWinding &winding, const int lifeTime, const bool depthTest );
 void RB_ClearDebugPolygons( int time );
 void RB_DrawBounds( const idBounds &bounds );
+void RB_SimpleSurfaceSetup( const drawSurf_t *drawSurf );
 void RB_ShowLights( drawSurf_t **drawSurfs, int numDrawSurfs );
 void RB_ShowLightCount( drawSurf_t **drawSurfs, int numDrawSurfs );
 void RB_PolygonClear( void );

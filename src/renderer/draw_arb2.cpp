@@ -1185,7 +1185,7 @@ static void RB_ShadowMapPrintInfoLog( GLhandleARB object, const char *label, con
 }
 
 static bool RB_ShadowMapLoadProgram( void ) {
-	static const char *programBaseName = "glprogs/openq4_shadow_interaction";
+static const char *programBaseName = "glprogs/shadow_interaction";
 
 	if ( !glConfig.GLSLProgramAvailable ) {
 		return false;
@@ -1324,7 +1324,7 @@ static bool RB_ShadowMapLoadProgram( void ) {
 }
 
 static bool RB_ShadowMapLoadCasterProgram( void ) {
-	static const char *programBaseName = "glprogs/openq4_shadow_proj_caster";
+static const char *programBaseName = "glprogs/shadow_proj_caster";
 
 	if ( !glConfig.GLSLProgramAvailable ) {
 		return false;
@@ -1425,7 +1425,7 @@ static bool RB_ShadowMapLoadCasterProgram( void ) {
 }
 
 static bool RB_TranslucentShadowMapLoadCasterProgram( void ) {
-	static const char *programBaseName = "glprogs/openq4_shadow_proj_translucent_caster";
+static const char *programBaseName = "glprogs/shadow_proj_translucent_caster";
 
 	if ( !glConfig.GLSLProgramAvailable ) {
 		return false;
@@ -1540,7 +1540,7 @@ static bool RB_TranslucentShadowMapLoadCasterProgram( void ) {
 }
 
 static bool RB_PointShadowMapLoadProgram( void ) {
-	static const char *programBaseName = "glprogs/openq4_shadow_point_interaction";
+static const char *programBaseName = "glprogs/shadow_point_interaction";
 
 	if ( !glConfig.GLSLProgramAvailable ) {
 		return false;
@@ -1674,7 +1674,7 @@ static bool RB_PointShadowMapLoadProgram( void ) {
 }
 
 static bool RB_PointShadowMapLoadCasterProgram( void ) {
-	static const char *programBaseName = "glprogs/openq4_shadow_point_caster";
+static const char *programBaseName = "glprogs/shadow_point_caster";
 
 	if ( !glConfig.GLSLProgramAvailable ) {
 		return false;
@@ -1781,7 +1781,7 @@ static bool RB_PointShadowMapLoadCasterProgram( void ) {
 }
 
 static bool RB_PointTranslucentShadowMapLoadCasterProgram( void ) {
-	static const char *programBaseName = "glprogs/openq4_shadow_point_translucent_caster";
+static const char *programBaseName = "glprogs/shadow_point_translucent_caster";
 
 	if ( !glConfig.GLSLProgramAvailable ) {
 		return false;
@@ -1898,7 +1898,7 @@ static bool RB_PointTranslucentShadowMapLoadCasterProgram( void ) {
 }
 
 static bool RB_ShadowMapDebugOverlayLoadProgram( void ) {
-	static const char *programBaseName = "glprogs/openq4_shadow_debug_overlay";
+static const char *programBaseName = "glprogs/shadow_debug_overlay";
 
 	if ( !glConfig.GLSLProgramAvailable ) {
 		return false;
