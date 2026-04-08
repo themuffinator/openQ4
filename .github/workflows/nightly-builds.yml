@@ -8,9 +8,6 @@ on:
 permissions:
   contents: read
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   metadata:
     name: Nightly Metadata
@@ -121,6 +118,7 @@ jobs:
           for attempt in 1 2 3; do
             if sudo apt-get update && sudo apt-get install -y \
               libdbus-1-dev \
+              libgl1-mesa-dev \
               libglew-dev \
               libopenal-dev \
               libudev-dev \
@@ -252,7 +250,7 @@ jobs:
           fi
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: openq4-nightly-${{ needs.metadata.outputs.version_tag }}-${{ matrix.platform }}
           path: ${{ steps.package.outputs.archive_path }}
