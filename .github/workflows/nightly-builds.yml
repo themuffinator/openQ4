@@ -124,6 +124,7 @@ jobs:
               libudev-dev \
               libx11-dev \
               libxext-dev \
+              libxxf86dga-dev \
               libxxf86vm-dev; then
               exit 0
             fi
@@ -167,7 +168,7 @@ jobs:
           set -euo pipefail
           export OPENQ4_SKIP_GAMELIBS_SYNC=1
 
-          bash tools/build/meson_setup.sh setup --wipe builddir . --backend ninja --buildtype=release --wrap-mode=default -Dplatform_backend=${{ matrix.platform_backend }} -Dversion_track=nightly -Dversion_iteration=${{ needs.metadata.outputs.version_iteration }}
+          bash tools/build/meson_setup.sh setup --wipe builddir . --backend ninja --buildtype=release --wrap-mode=forcefallback -Dplatform_backend=${{ matrix.platform_backend }} -Dversion_track=nightly -Dversion_iteration=${{ needs.metadata.outputs.version_iteration }}
           bash tools/build/meson_setup.sh compile -C builddir
           bash tools/build/meson_setup.sh install -C builddir --no-rebuild --skip-subprojects
 
