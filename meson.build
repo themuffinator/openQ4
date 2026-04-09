@@ -315,16 +315,12 @@ openal_dep = disabler()
 sdl3_dep = disabler()
 deps = []
 if build_engine
-  if host_system == 'windows'
-    glew_dep = dependency(
-      'glew',
-      required: true,
-      fallback: ['glew', 'glew_dep'],
-      default_options: fallback_opt,
-    )
-  else
-    glew_dep = dependency('glew', required: true)
-  endif
+  glew_dep = dependency(
+    'glew',
+    required: true,
+    fallback: ['glew', 'glew_dep'],
+    default_options: fallback_opt,
+  )
 
   stb_vorbis_dep = dependency(
     'stb_vorbis',
