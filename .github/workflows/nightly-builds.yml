@@ -120,6 +120,7 @@ jobs:
               libdbus-1-dev \
               libgl1-mesa-dev \
               libopenal-dev \
+              libpipewire-0.3-dev \
               libudev-dev \
               libx11-dev \
               libxext-dev \

@@ -85,7 +85,7 @@ To rebuild the game libraries as part of the OpenQ4 build, set `OPENQ4_BUILD_GAM
 
 ## Build Setup
 
-All dependencies (SDL3, GLEW, OpenAL Soft, stb_vorbis) are managed as Meson subprojects — no manual dependency installation is required. The first configure step downloads and builds them automatically.
+Third-party libraries such as SDL3, GLEW, OpenAL Soft, and stb_vorbis are managed as Meson subprojects. Linux still requires the usual native development packages for X11/OpenGL plus SDL3 runtime integrations (for example `libdbus-1-dev`, `libpipewire-0.3-dev`, `libudev-dev`, `libx11-dev`, `libxext-dev`, and `libxxf86vm-dev` on Debian/Ubuntu) before the first configure step.
 
 ---
 
