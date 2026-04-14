@@ -211,6 +211,7 @@ const char *		cheatCodes[] = {
 	"idspispopd",	// Walk through walls
 	"idclip",		// Walk through walls
 	"idchoppers",	// Chainsaw
+	"iamtheduke",	// Snow terrain and giant text
 /*
 	"idbeholds",	// Berserker strength
 	"idbeholdv",	// Temporary invincibility
@@ -715,7 +716,11 @@ void idKeyInput::PreliminaryKeyEvent( int keynum, bool down ) {
 			int l = strlen( cheatCodes[i] );
 			assert( l <= 16 );
 			if ( idStr::Icmpn( lastKeys + 16 + ( lastKeyIndex & 15 ) - l, cheatCodes[i], l ) == 0 ) {
-				common->Printf( "your memory serves you well!\n" );
+				if ( idStr::Icmp( cheatCodes[i], "iamtheduke" ) == 0 ) {
+					cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "openq4_iamtheduke\n" );
+				} else {
+					common->Printf( "your memory serves you well!\n" );
+				}
 				break;
 			}
 		}

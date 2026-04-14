@@ -196,13 +196,13 @@ All dependencies are automatically fetched and built during the Meson configure 
 
 ## Versioning
 
-OpenQ4 uses semantic base versions from `meson.build` and appends an explicit build track:
+OpenQ4 uses numeric release versions from `meson.build` and appends an explicit build track when the build is not stable:
 
 - `stable` — release builds, e.g. `X.Y.Z`
 - `dev` — default local builds, e.g. `X.Y.Z-dev+gabcdef12`
-- `nightly` / `beta` / `rc` — pre-release labels, e.g. `X.Y.Z-nightly.20260307.1+gabcdef12`
+- `beta` / `rc` — optional pre-release labels, e.g. `X.Y.Z-beta.1+gabcdef12`
 
-The base version is bumped manually in `meson.build` when advancing to the next release line; track labels, iterations, git metadata, and resource build numbers are generated automatically. The manual GitHub prerelease workflow increments `nightly.YYYYMMDD.N` by counting existing published tags for that UTC date instead of using workflow run numbers.
+The current beta release line is `0.1.010`. The manual GitHub release workflow treats the repo version as the minimum next release version, then consults existing stable `v*` tags plus the scale of changes since the previous release to decide whether to emit the next serial release or advance the middle release milestone. Track labels, git metadata, and Windows/macOS resource/build numbers are generated automatically.
 
 ---
 

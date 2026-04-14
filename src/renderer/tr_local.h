@@ -41,6 +41,7 @@ typedef struct lightGridBakeOptions_s {
 	int					captureSize;
 	int					blends;
 	int					samples;
+	bool				separateAreas;
 	idVec3				gridSize;
 } lightGridBakeOptions_t;
 
@@ -120,6 +121,7 @@ SURFACES
 
 // drawSurf_t are always allocated and freed every frame, they are never cached
 static const int	DSF_VIEW_INSIDE_SHADOW	= 1;
+static const int	DSF_IAMTHEDUKE_TERRAIN	= 2;
 
 typedef struct drawSurf_s {
 	const srfTriangles_t	*geo;

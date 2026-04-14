@@ -654,7 +654,7 @@ void idListWindow::Draw(int time, float x, float y) {
 					} else if ( tabInfo[tab].valign == 2 ) {
 						textRect.y += lineHeight - textHeight;
 					}
-					dc->DrawText(work, tabScale, tabInfo[tab].align, color, textRect, false, -1);
+					dc->DrawText( work, tabScale, tabInfo[tab].align, color, textRect, false, -1, false, NULL, 0, static_cast<int>( textspacing ), static_cast<int>( textstyle ) );
 				} else if (tabInfo[tab].type == TAB_TYPE_ICON) {
 					
 					const idMaterial	**hashMat;
@@ -711,7 +711,7 @@ void idListWindow::Draw(int time, float x, float y) {
 			idRectangle textRect = rect;
 			const float textHeight = dc->MaxCharHeight( scale );
 			textRect.y += ( lineHeight - textHeight ) * 0.5f + 1.0f;
-			dc->DrawText(listItems[i], scale, 0, color, textRect, false, -1);
+			dc->DrawText( listItems[i], scale, 0, color, textRect, false, -1, false, NULL, 0, static_cast<int>( textspacing ), static_cast<int>( textstyle ) );
 		}
 		rect.y += lineHeight;
 		if ( rect.y > bottom ) {

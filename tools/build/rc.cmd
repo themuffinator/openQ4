@@ -29,6 +29,10 @@ if %ERRORLEVEL%==0 (
 
 if defined ProgramFiles(x86) (
   for /f "delims=" %%D in ('dir /b /ad /o-n "%ProgramFiles(x86)%\Windows Kits\10\bin" 2^>nul') do (
+    if exist "%ProgramFiles(x86)%\Windows Kits\10\bin\%%D\arm64\rc.exe" (
+      "%ProgramFiles(x86)%\Windows Kits\10\bin\%%D\arm64\rc.exe" %*
+      exit /b %ERRORLEVEL%
+    )
     if exist "%ProgramFiles(x86)%\Windows Kits\10\bin\%%D\x64\rc.exe" (
       "%ProgramFiles(x86)%\Windows Kits\10\bin\%%D\x64\rc.exe" %*
       exit /b %ERRORLEVEL%

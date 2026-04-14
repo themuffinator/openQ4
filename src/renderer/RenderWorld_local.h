@@ -67,6 +67,8 @@ public:
 	idVec3					lightGridSize;
 	int						lightGridBounds[3];
 	idList<lightGridPoint_t> lightGridPoints;
+	int						totalGridPointCount;
+	int						validGridPointCount;
 	int						area;
 	idImage *				irradianceImage;
 	int						imageSingleProbeSize;
@@ -74,7 +76,10 @@ public:
 
 	void					Clear();
 	bool					HasImage() const;
+	int						GridPointCount() const;
 	int						CountValidGridPoints() const;
+	bool					HasPointData() const;
+	void					DiscardPointData();
 	void					SetupGrid( const idBounds &bounds, const idRenderWorld *world, const idVec3 &preferredSize, int areaIndex, int totalAreas, int maxProbes, bool printToConsole );
 	void					GetBaseGridCoord( const idVec3 &origin, int gridCoord[3] ) const;
 	int						GridCoordToProbeIndex( const int gridCoord[3] ) const;

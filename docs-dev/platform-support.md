@@ -10,11 +10,13 @@ This document defines the long-term platform direction for OpenQ4 and how SDL3 +
   - macOS
 - First-class support for modern 64-bit desktop architecture:
   - x64 (`x86_64`)
+  - arm64 (`aarch64`)
 - Keep original Quake 4 gameplay/module behavior compatible while modernizing platform and build layers.
 
-## Current Baseline (0.0.1 era)
+## Current Baseline (0.1.010 beta line)
 
 - Primary actively validated build target: Windows x64.
+- Hosted release automation now covers Windows x64/arm64, Linux x64/arm64, and macOS arm64 package generation.
 - Build system: Meson + Ninja.
 - Dependency model: Meson subprojects/wraps.
 - Platform backend direction: SDL3-first (legacy Win32 backend is transitional only).
@@ -23,6 +25,7 @@ This document defines the long-term platform direction for OpenQ4 and how SDL3 +
 - As of March 30, 2026, Linux defaults to the SDL3 backend and keeps `-Dplatform_backend=native` as a fallback path.
 - Steam Deck support is delivered through the explicit `OpenQ4-steamdeck` launcher/profile, not hardware auto-detection.
 - When both `WAYLAND_DISPLAY` and `DISPLAY` are available, the Steam Deck launcher prefers XWayland by exporting `SDL_VIDEODRIVER=x11` unless the user already set an SDL video driver.
+- Windows arm64 currently uses a custom OpenAL Soft package path during bring-up because the in-repo bundled Windows runtime payload is still x64-only.
 
 ## SDL3 Direction
 
@@ -45,8 +48,8 @@ This document defines the long-term platform direction for OpenQ4 and how SDL3 +
 ## Bring-Up Staging
 
 1. Keep Windows x64 stable with SDL3 default backend.
-2. Keep Linux on the SDL3 backend by default and retain `native` as the rollback path while validation broadens.
-3. Incrementally wire macOS build/source selection and validation into Meson.
+2. Keep Linux on the SDL3 backend by default and validate both x64 and arm64 release paths.
+3. Validate Windows arm64 beyond compile/package bring-up, especially runtime audio and in-game coverage.
 4. Promote Linux and macOS to first-class once they pass consistent compile/link/runtime validation loops.
 
 ## SDL3 Migration Staging (Linux/macOS)

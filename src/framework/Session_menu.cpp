@@ -857,20 +857,64 @@ idSessionLocal::SetModsMenuGuiVars
 ===============
 */
 void idSessionLocal::SetModsMenuGuiVars( void ) {
-	int i;
+	if ( !guiActive ) {
+		return;
+	}
+
 	idModList *list = fileSystem->ListMods();
+	const idStr currentGameDir = cvarSystem->GetCVarString( "fs_game" );
+	int selectedIndex = -1;
 
 	modsList.SetNum( list->GetNumMods() );
 
 	// Build the gui list
-	for ( i = 0; i < list->GetNumMods(); i++ ) {
+	for ( int i = 0; i < list->GetNumMods(); i++ ) {
+		modsList[ i ] = list->GetInfo( i );
 		guiActive->SetStateString( va("modsList_item_%i", i), list->GetDescription( i ) );
-		modsList[i] = list->GetMod( i );
+		if ( !currentGameDir.Icmp( modsList[ i ].directory ) ) {
+			selectedIndex = i;
+		}
 	}
 	guiActive->DeleteStateVar( va("modsList_item_%i", list->GetNumMods()) );
-	guiActive->SetStateString( "modsList_sel_0", "-1" );
+	if ( selectedIndex < 0 && modsList.Num() > 0 ) {
+		selectedIndex = 0;
+	}
+	guiActive->SetStateInt( "modsList_sel_0", selectedIndex );
+	UpdateModsMenuGuiVars();
 
 	fileSystem->FreeModList( list );
+}
+
+/*
+===============
+idSessionLocal::UpdateModsMenuGuiVars
+===============
+*/
+void idSessionLocal::UpdateModsMenuGuiVars( void ) {
+	if ( !guiActive ) {
+		return;
+	}
+
+	const int choice = guiActive->State().GetInt( "modsList_sel_0" );
+	if ( choice < 0 || choice >= modsList.Num() ) {
+		guiActive->SetStateString( "mod_name", "" );
+		guiActive->SetStateString( "mod_version", "" );
+		guiActive->SetStateString( "mod_release_date", "" );
+		guiActive->SetStateString( "mod_author", "" );
+		guiActive->SetStateString( "mod_website", "" );
+		guiActive->SetStateString( "mod_required_engine_version", "" );
+		guiActive->SetStateString( "mod_directory", "" );
+		return;
+	}
+
+	const idModInfo &modInfo = modsList[ choice ];
+	guiActive->SetStateString( "mod_name", modInfo.displayName.c_str() );
+	guiActive->SetStateString( "mod_version", modInfo.version.c_str() );
+	guiActive->SetStateString( "mod_release_date", modInfo.releaseDate.c_str() );
+	guiActive->SetStateString( "mod_author", modInfo.author.c_str() );
+	guiActive->SetStateString( "mod_website", modInfo.website.c_str() );
+	guiActive->SetStateString( "mod_required_engine_version", modInfo.requiredOpenQ4Version.c_str() );
+	guiActive->SetStateString( "mod_directory", modInfo.directory.c_str() );
 }
 
 
@@ -1255,9 +1299,16 @@ void idSessionLocal::HandleMainMenuCommands( const char *menuCommand ) {
 		if ( !idStr::Icmp( cmd, "loadMod" ) ) {
 			int choice = guiActive->State().GetInt( "modsList_sel_0" );
 			if ( choice >= 0 && choice < modsList.Num() ) {
-				cvarSystem->SetCVarString( "fs_game", modsList[ choice ] );
+				cvarSystem->SetCVarString( "fs_game", modsList[ choice ].directory.c_str() );
 				cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "reloadEngine menu\n" );
 			}
+			continue;
+		}
+
+		if ( !idStr::Icmp( cmd, "updateModInfo" ) ) {
+			UpdateModsMenuGuiVars();
+			guiActive->StateChanged( com_frameTime );
+			continue;
 		}
 
 		if ( !idStr::Icmp( cmd, "UpdateServers" ) ) {

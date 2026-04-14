@@ -1,10 +1,25 @@
-name: Manual Builds
+name: Manual Releases
 
 on:
   workflow_dispatch:
+    inputs:
+      bump_mode:
+        description: Release bump policy
+        required: true
+        default: auto
+        type: choice
+        options:
+          - auto
+          - serial
+          - minor
+      version_override:
+        description: Optional explicit release version (for example 0.1.011)
+        required: false
+        default: ""
+        type: string
 
 concurrency:
-  group: openq4-manual-builds
+  group: openq4-manual-releases
   cancel-in-progress: false
 
 permissions:
@@ -12,19 +27,25 @@ permissions:
 
 jobs:
   metadata:
-    name: Build Metadata
+    name: Release Metadata
     runs-on: ubuntu-latest
     outputs:
-      base_version: ${{ steps.version.outputs.base_version }}
-      version_iteration: ${{ steps.version.outputs.iteration }}
+      current_version: ${{ steps.version.outputs.current_version }}
+      latest_release_tag: ${{ steps.version.outputs.latest_release_tag }}
+      latest_release_version: ${{ steps.version.outputs.latest_release_version }}
       version: ${{ steps.version.outputs.version }}
       version_tag: ${{ steps.version.outputs.version_tag }}
       release_tag: ${{ steps.version.outputs.release_tag }}
       release_name: ${{ steps.version.outputs.release_name }}
+      release_scale: ${{ steps.version.outputs.release_scale }}
+      release_reason: ${{ steps.version.outputs.release_reason }}
+      bump_mode: ${{ steps.version.outputs.bump_mode }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Fetch tags
         shell: bash
@@ -35,25 +56,27 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.x'
+          python-version: "3.x"
 
-      - name: Compute build version
+      - name: Compute release version
         id: version
+        env:
+          INPUT_BUMP_MODE: ${{ inputs.bump_mode }}
+          INPUT_VERSION_OVERRIDE: ${{ inputs.version_override }}
         shell: bash
         run: |
           set -euo pipefail
 
-          python tools/build/openq4_version.py \
-            --source-root . \
-            --track nightly \
-            --auto-iteration >> "$GITHUB_OUTPUT"
+          args=(
+            --source-root .
+            --bump-mode "${INPUT_BUMP_MODE}"
+          )
 
-          version_tag="$(grep '^version_tag=' "$GITHUB_OUTPUT" | tail -n 1 | cut -d= -f2-)"
-          release_tag="nightly-${version_tag}"
-          release_name="OpenQ4 Nightly ${version_tag}"
+          if [ -n "${INPUT_VERSION_OVERRIDE}" ]; then
+            args+=(--version-override "${INPUT_VERSION_OVERRIDE}")
+          fi
 
-          echo "release_tag=${release_tag}" >> "$GITHUB_OUTPUT"
-          echo "release_name=${release_name}" >> "$GITHUB_OUTPUT"
+          python tools/build/openq4_release_version.py "${args[@]}" >> "$GITHUB_OUTPUT"
 
   builds:
     name: ${{ matrix.label }}
@@ -67,21 +90,35 @@ jobs:
         include:
           - os: windows-latest
             platform: windows
-            label: Windows
+            label: Windows x64
             binary_arch: x64
+            platform_backend: sdl3
+            archive_format: zip
+            archive_ext: .zip
+          - os: windows-11-arm
+            platform: windows
+            label: Windows ARM64
+            binary_arch: arm64
             platform_backend: sdl3
             archive_format: zip
             archive_ext: .zip
           - os: ubuntu-latest
             platform: linux
-            label: Linux
+            label: Linux x64
             binary_arch: x64
+            platform_backend: sdl3
+            archive_format: tar.xz
+            archive_ext: .tar.xz
+          - os: ubuntu-24.04-arm
+            platform: linux
+            label: Linux ARM64
+            binary_arch: arm64
             platform_backend: sdl3
             archive_format: tar.xz
             archive_ext: .tar.xz
           - os: macos-latest
             platform: macos
-            label: macOS
+            label: macOS ARM64
             binary_arch: arm64
             platform_backend: sdl3
             archive_format: tar.gz
@@ -100,20 +137,23 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.x'
+          python-version: "3.x"
 
       - name: Install Meson and Ninja
         run: |
           python -m pip install --upgrade pip
-          python -m pip install meson ninja
+          python -m pip install meson ninja markdown
 
-      - name: Compute nightly version
-        id: version_echo
+      - name: Show release metadata
         shell: bash
         run: |
           set -euo pipefail
-          echo "Nightly version: ${{ needs.metadata.outputs.version }}"
-          echo "Nightly version tag: ${{ needs.metadata.outputs.version_tag }}"
+          echo "Configured repo version: ${{ needs.metadata.outputs.current_version }}"
+          echo "Latest release tag: ${{ needs.metadata.outputs.latest_release_tag }}"
+          echo "Release version: ${{ needs.metadata.outputs.version }}"
+          echo "Release tag: ${{ needs.metadata.outputs.release_tag }}"
+          echo "Release scale: ${{ needs.metadata.outputs.release_scale }}"
+          echo "Release reason: ${{ needs.metadata.outputs.release_reason }}"
 
       - name: Install Linux native dependencies
         if: matrix.platform == 'linux'
@@ -169,14 +209,42 @@ jobs:
           set -euo pipefail
           echo "Using bundled Meson fallbacks for macOS third-party libraries."
 
+      - name: Prepare OpenAL Soft (Windows ARM64)
+        if: matrix.platform == 'windows' && matrix.binary_arch == 'arm64'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $outputRoot = Join-Path $env:GITHUB_WORKSPACE ".tmp/openal-soft-${{ matrix.binary_arch }}"
+          $env:OPENQ4_VS_TARGET_ARCH = "${{ matrix.binary_arch }}"
+          powershell -ExecutionPolicy Bypass -File tools/build/prepare_windows_openal.ps1 -Architecture "${{ matrix.binary_arch }}" -OutputRoot $outputRoot
+          "OPENQ4_OPENAL_ROOT=$outputRoot" >> $env:GITHUB_ENV
+
       - name: Build and install (Windows)
         if: matrix.platform == 'windows'
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           $env:OPENQ4_SKIP_GAMELIBS_SYNC = "1"
+          $env:OPENQ4_VS_TARGET_ARCH = "${{ matrix.binary_arch }}"
 
-          powershell -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 setup --wipe builddir . --backend ninja --buildtype=release --wrap-mode=forcefallback "-Dplatform_backend=${{ matrix.platform_backend }}" "-Dversion_track=nightly" "-Dversion_iteration=${{ needs.metadata.outputs.version_iteration }}"
+          $setupArgs = @(
+            "setup",
+            "--wipe",
+            "builddir",
+            ".",
+            "--backend",
+            "ninja",
+            "--buildtype=release",
+            "--wrap-mode=forcefallback",
+            "-Dplatform_backend=${{ matrix.platform_backend }}",
+            "-Dversion_track=stable",
+            "-Dversion_base_override=${{ needs.metadata.outputs.version }}"
+          )
+          if (-not [string]::IsNullOrWhiteSpace($env:OPENQ4_OPENAL_ROOT)) {
+            $setupArgs += "-Dopenal_root_override=$env:OPENQ4_OPENAL_ROOT"
+          }
+
+          powershell -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 @setupArgs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
           powershell -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 compile -C builddir
@@ -192,7 +260,7 @@ jobs:
           set -euo pipefail
           export OPENQ4_SKIP_GAMELIBS_SYNC=1
 
-          bash tools/build/meson_setup.sh setup --wipe builddir . --backend ninja --buildtype=release --wrap-mode=forcefallback -Dplatform_backend=${{ matrix.platform_backend }} -Dversion_track=nightly -Dversion_iteration=${{ needs.metadata.outputs.version_iteration }}
+          bash tools/build/meson_setup.sh setup --wipe builddir . --backend ninja --buildtype=release --wrap-mode=forcefallback -Dplatform_backend=${{ matrix.platform_backend }} -Dversion_track=stable -Dversion_base_override=${{ needs.metadata.outputs.version }}
           bash tools/build/meson_setup.sh compile -C builddir
           bash tools/build/meson_setup.sh install -C builddir --no-rebuild --skip-subprojects
 
@@ -229,7 +297,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          python tools/build/package_nightly.py \
+          python tools/build/package_release.py \
             --platform "${{ matrix.platform }}" \
             --arch "${{ matrix.binary_arch }}" \
             --version "${{ needs.metadata.outputs.version }}" \
@@ -238,8 +306,8 @@ jobs:
             --source-root "${GITHUB_WORKSPACE}" \
             --output-dir "${RUNNER_TEMP}"
 
-          archive_path="${RUNNER_TEMP}/openq4-${{ needs.metadata.outputs.version_tag }}-${{ matrix.platform }}${{ matrix.archive_ext }}"
-          package_dir="${RUNNER_TEMP}/openq4-${{ needs.metadata.outputs.version_tag }}-${{ matrix.platform }}"
+          archive_path="${RUNNER_TEMP}/openq4-${{ needs.metadata.outputs.version_tag }}-${{ matrix.platform }}-${{ matrix.binary_arch }}${{ matrix.archive_ext }}"
+          package_dir="${RUNNER_TEMP}/openq4-${{ needs.metadata.outputs.version_tag }}-${{ matrix.platform }}-${{ matrix.binary_arch }}"
           if [ ! -f "${archive_path}" ]; then
             echo "Expected package archive not found: ${archive_path}"
             exit 1
@@ -250,6 +318,38 @@ jobs:
           fi
           echo "archive_path=${archive_path}" >> "$GITHUB_OUTPUT"
           echo "package_dir=${package_dir}" >> "$GITHUB_OUTPUT"
+
+      - name: Install Inno Setup
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
+            throw "Chocolatey is not available on this Windows runner, so Inno Setup could not be installed."
+          }
+          choco install innosetup --no-progress -y
+
+      - name: Build Windows installer
+        if: matrix.platform == 'windows'
+        id: windows_installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          python tools/build/build_windows_installer.py `
+            --package-dir "${{ steps.package.outputs.package_dir }}" `
+            --version "${{ needs.metadata.outputs.version }}" `
+            --version-tag "${{ needs.metadata.outputs.version_tag }}" `
+            --arch "${{ matrix.binary_arch }}" `
+            --source-root "${env:GITHUB_WORKSPACE}" `
+            --output-dir "${env:RUNNER_TEMP}"
+
+          $installerPath = Join-Path $env:RUNNER_TEMP "openq4-${{ needs.metadata.outputs.version_tag }}-windows-${{ matrix.binary_arch }}-setup.exe"
+          if (-not (Test-Path -LiteralPath $installerPath)) {
+            throw "Expected Windows installer not found: $installerPath"
+          }
+
+          "installer_path=$installerPath" >> $env:GITHUB_OUTPUT
 
       - name: Validate macOS app bundle
         if: matrix.platform == 'macos'
@@ -277,12 +377,20 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v6
         with:
-          name: openq4-nightly-${{ needs.metadata.outputs.version_tag }}-${{ matrix.platform }}
+          name: openq4-release-${{ needs.metadata.outputs.version_tag }}-${{ matrix.platform }}-${{ matrix.binary_arch }}
           path: ${{ steps.package.outputs.archive_path }}
           if-no-files-found: error
 
+      - name: Upload Windows installer
+        if: matrix.platform == 'windows'
+        uses: actions/upload-artifact@v6
+        with:
+          name: openq4-release-${{ needs.metadata.outputs.version_tag }}-windows-${{ matrix.binary_arch }}-installer
+          path: ${{ steps.windows_installer.outputs.installer_path }}
+          if-no-files-found: error
+
   release:
-    name: Publish Nightly Release
+    name: Publish Release
     needs: [metadata, builds]
     if: ${{ needs.builds.result == 'success' }}
     runs-on: ubuntu-latest
@@ -304,13 +412,13 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.x'
+          python-version: "3.x"
 
       - name: Download packaged artifacts
         uses: actions/download-artifact@v5
         with:
-          pattern: openq4-nightly-${{ needs.metadata.outputs.version_tag }}-*
-          path: ${{ runner.temp }}/nightly-artifacts
+          pattern: openq4-release-${{ needs.metadata.outputs.version_tag }}-*
+          path: ${{ runner.temp }}/release-artifacts
           merge-multiple: true
 
       - name: Verify platform archives
@@ -318,7 +426,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          artifact_dir="${RUNNER_TEMP}/nightly-artifacts"
+          artifact_dir="${RUNNER_TEMP}/release-artifacts"
           if [ ! -d "${artifact_dir}" ]; then
             echo "Artifact directory is missing: ${artifact_dir}"
             exit 1
@@ -327,9 +435,13 @@ jobs:
           ls -lah "${artifact_dir}"
 
           expected=(
-            "openq4-${{ needs.metadata.outputs.version_tag }}-windows.zip"
-            "openq4-${{ needs.metadata.outputs.version_tag }}-linux.tar.xz"
-            "openq4-${{ needs.metadata.outputs.version_tag }}-macos.tar.gz"
+            "openq4-${{ needs.metadata.outputs.version_tag }}-windows-x64.zip"
+            "openq4-${{ needs.metadata.outputs.version_tag }}-windows-x64-setup.exe"
+            "openq4-${{ needs.metadata.outputs.version_tag }}-windows-arm64.zip"
+            "openq4-${{ needs.metadata.outputs.version_tag }}-windows-arm64-setup.exe"
+            "openq4-${{ needs.metadata.outputs.version_tag }}-linux-x64.tar.xz"
+            "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64.tar.xz"
+            "openq4-${{ needs.metadata.outputs.version_tag }}-macos-arm64.tar.gz"
           )
 
           missing=0
@@ -349,16 +461,18 @@ jobs:
         run: |
           set -euo pipefail
 
-          python tools/build/generate_nightly_changelog.py \
+          python tools/build/generate_release_changelog.py \
             --version "${{ needs.metadata.outputs.version }}" \
             --version-tag "${{ needs.metadata.outputs.version_tag }}" \
             --release-tag "${{ needs.metadata.outputs.release_tag }}" \
+            --release-scale "${{ needs.metadata.outputs.release_scale }}" \
+            --release-reason "${{ needs.metadata.outputs.release_reason }}" \
             --repo "${GITHUB_REPOSITORY}" \
             --run-id "${GITHUB_RUN_ID}" \
             --run-url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
-            --output "${RUNNER_TEMP}/nightly-changelog.md"
+            --output "${RUNNER_TEMP}/release-changelog.md"
 
-      - name: Create or update nightly release
+      - name: Create or update release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
@@ -367,8 +481,8 @@ jobs:
 
           tag="${{ needs.metadata.outputs.release_tag }}"
           name="${{ needs.metadata.outputs.release_name }}"
-          notes="${RUNNER_TEMP}/nightly-changelog.md"
-          assets_dir="${RUNNER_TEMP}/nightly-artifacts"
+          notes="${RUNNER_TEMP}/release-changelog.md"
+          assets_dir="${RUNNER_TEMP}/release-artifacts"
           mapfile -t assets < <(find "${assets_dir}" -maxdepth 1 -type f | sort)
 
           if [ "${#assets[@]}" -eq 0 ]; then
@@ -380,15 +494,13 @@ jobs:
             gh release edit "${tag}" \
               --repo "${GITHUB_REPOSITORY}" \
               --title "${name}" \
-              --notes-file "${notes}" \
-              --latest=false
+              --notes-file "${notes}"
             gh release upload "${tag}" "${assets[@]}" --repo "${GITHUB_REPOSITORY}" --clobber
           else
             gh release create "${tag}" "${assets[@]}" \
               --repo "${GITHUB_REPOSITORY}" \
               --title "${name}" \
-              --notes-file "${notes}" \
-              --latest=false
+              --notes-file "${notes}"
           fi
 
           release_id="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag}" --jq .id)"

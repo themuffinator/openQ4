@@ -5,7 +5,7 @@ This document defines the implementation plan for migrating non-Windows platform
 ## Goals
 
 - Reduce backend divergence between Windows and non-Windows hosts.
-- Keep Linux/macOS builds and nightly packaging stable during migration.
+- Keep Linux/macOS builds and release packaging stable during migration.
 - Avoid regressions in stock-asset compatibility while platform code is modernized.
 
 ## Current State

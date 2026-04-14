@@ -17,7 +17,7 @@
 	<key>CFBundleSignature</key>
 	<string>OQ4</string>
 	<key>CFBundleVersion</key>
-	<string>0.0.1</string>
+	<string>0.1.010</string>
 	<key>NSMainNibFile</key>
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>

@@ -1,6 +1,6 @@
 /* Localized versions of Info.plist keys */
 
 CFBundleName = "OpenQ4";
-CFBundleShortVersionString = "0.0.1";
-CFBundleGetInfoString = "OpenQ4 version 0.0.1, Copyright 2026 DarkMatter Productions";
+CFBundleShortVersionString = "0.1.010";
+CFBundleGetInfoString = "OpenQ4 version 0.1.010, Copyright 2026 DarkMatter Productions";
 NSHumanReadableCopyright = "Copyright 2026 DarkMatter Productions";

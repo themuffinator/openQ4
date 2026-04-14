@@ -75,7 +75,7 @@ If the blend pass ever samples the same texture it is rendering to, the build st
 
 ## Release Package Audit
 
-`tools/build/package_nightly.py` now fails packaging if `pak0.pk4` is missing any of these required runtime files:
+`tools/build/package_release.py` now fails packaging if `pak0.pk4` is missing any of these required runtime files:
 
 - `materials/postprocess_openq4.mtr`
 - `glprogs/smaa_edge.vs`

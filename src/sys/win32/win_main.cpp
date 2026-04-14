@@ -79,6 +79,176 @@ Win32Vars_t	win32;
 
 static char		sys_cmdline[MAX_STRING_CHARS];
 
+static int Sys_OpenQ4ProtocolHexValue( const char c ) {
+	if ( c >= '0' && c <= '9' ) {
+		return c - '0';
+	}
+	if ( c >= 'a' && c <= 'f' ) {
+		return 10 + ( c - 'a' );
+	}
+	if ( c >= 'A' && c <= 'F' ) {
+		return 10 + ( c - 'A' );
+	}
+	return -1;
+}
+
+static void Sys_DecodeOpenQ4ProtocolComponent( const idStr &source, idStr &decoded ) {
+	decoded.Clear();
+
+	for ( int i = 0; i < source.Length(); ++i ) {
+		const char c = source[ i ];
+		if ( c == '%' && ( i + 2 ) < source.Length() ) {
+			const int hi = Sys_OpenQ4ProtocolHexValue( source[ i + 1 ] );
+			const int lo = Sys_OpenQ4ProtocolHexValue( source[ i + 2 ] );
+			if ( hi >= 0 && lo >= 0 ) {
+				decoded.Append( static_cast<char>( ( hi << 4 ) | lo ) );
+				i += 2;
+				continue;
+			}
+		}
+		decoded.Append( c );
+	}
+}
+
+static bool Sys_IsValidOpenQ4ConnectTarget( const idStr &target ) {
+	if ( target.Length() <= 0 || target.Length() > 255 ) {
+		return false;
+	}
+
+	for ( int i = 0; i < target.Length(); ++i ) {
+		const char c = target[ i ];
+		const bool isAlphaNumeric =
+			( c >= 'a' && c <= 'z' ) ||
+			( c >= 'A' && c <= 'Z' ) ||
+			( c >= '0' && c <= '9' );
+		if ( isAlphaNumeric ) {
+			continue;
+		}
+
+		switch ( c ) {
+		case '.':
+		case ':':
+		case '-':
+		case '_':
+		case '[':
+		case ']':
+			break;
+		default:
+			return false;
+		}
+	}
+
+	return true;
+}
+
+static bool Sys_TryReadOpenQ4ProtocolQueryValue( const idStr &query, const char *key, idStr &value ) {
+	int start = 0;
+
+	value.Clear();
+
+	while ( start <= query.Length() ) {
+		const int end = query.Find( '&', start );
+		const int pairLength = ( end >= 0 ) ? end - start : query.Length() - start;
+		if ( pairLength > 0 ) {
+			const idStr pair = query.Mid( start, pairLength );
+			const int equalsPos = pair.Find( '=' );
+			if ( equalsPos > 0 ) {
+				idStr pairKey = pair.Left( equalsPos );
+				if ( pairKey.Icmp( key ) == 0 ) {
+					value = pair.Mid( equalsPos + 1, pair.Length() - equalsPos - 1 );
+					return true;
+				}
+			}
+		}
+
+		if ( end < 0 ) {
+			break;
+		}
+		start = end + 1;
+	}
+
+	return false;
+}
+
+static bool Sys_TryTranslateOpenQ4ProtocolCommandLine( const char *rawCmdLine, idStr &translatedCmdLine ) {
+	idCmdArgs args;
+	idStr uriPayload;
+	idStr path;
+	idStr query;
+	idStr encodedTarget;
+	idStr decodedTarget;
+	idStr verb;
+
+	translatedCmdLine.Clear();
+
+	if ( rawCmdLine == NULL || rawCmdLine[ 0 ] == '\0' ) {
+		return false;
+	}
+
+	args.TokenizeString( rawCmdLine, true );
+	if ( args.Argc() <= 0 ) {
+		return false;
+	}
+
+	if ( idStr::Icmpn( args.Argv( 0 ), "openq4://", 9 ) != 0 ) {
+		return false;
+	}
+
+	uriPayload = args.Argv( 0 );
+	uriPayload = uriPayload.Mid( 9, uriPayload.Length() - 9 );
+	uriPayload.StripLeading( '/' );
+
+	if ( uriPayload.Length() == 0 ) {
+		return true;
+	}
+
+	const int queryPos = uriPayload.Find( '?' );
+	if ( queryPos >= 0 ) {
+		path = uriPayload.Left( queryPos );
+		query = uriPayload.Mid( queryPos + 1, uriPayload.Length() - queryPos - 1 );
+	} else {
+		path = uriPayload;
+		query.Clear();
+	}
+
+	const int slashPos = path.Find( '/' );
+	if ( slashPos >= 0 ) {
+		verb = path.Left( slashPos );
+		encodedTarget = path.Mid( slashPos + 1, path.Length() - slashPos - 1 );
+	} else {
+		verb = path;
+	}
+
+	if ( encodedTarget.Length() == 0 ) {
+		if ( !Sys_TryReadOpenQ4ProtocolQueryValue( query, "server", encodedTarget ) ) {
+			if ( !Sys_TryReadOpenQ4ProtocolQueryValue( query, "target", encodedTarget ) ) {
+				Sys_TryReadOpenQ4ProtocolQueryValue( query, "address", encodedTarget );
+			}
+		}
+	}
+
+	if ( slashPos < 0 && query.Length() == 0 ) {
+		encodedTarget = path;
+		verb = "connect";
+	}
+
+	if ( verb.Icmp( "connect" ) != 0 &&
+		verb.Icmp( "join" ) != 0 &&
+		verb.Icmp( "server" ) != 0 ) {
+		return true;
+	}
+
+	Sys_DecodeOpenQ4ProtocolComponent( encodedTarget, decodedTarget );
+	if ( !Sys_IsValidOpenQ4ConnectTarget( decodedTarget ) ) {
+		return true;
+	}
+
+	translatedCmdLine = "+connect \"";
+	translatedCmdLine.Append( decodedTarget );
+	translatedCmdLine.Append( '"' );
+	return true;
+}
+
 int g_thread_count = 0;
 
 static sysMemoryStats_t exeLaunchMemoryStats;
@@ -1391,13 +1561,18 @@ DoomMain
 */
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
 	const HCURSOR hcurSave = ::SetCursor(LoadCursor(0, IDC_WAIT));
+	idStr translatedCmdLine;
+	const char *effectiveCmdLine = lpCmdLine;
 
 	Sys_SetPhysicalWorkMemory(192 << 20, 1024 << 20);
 
 	Sys_GetCurrentMemoryStatus(exeLaunchMemoryStats);
 
 	win32.hInstance = hInstance;
-	idStr::Copynz(sys_cmdline, lpCmdLine, sizeof(sys_cmdline));
+	if ( Sys_TryTranslateOpenQ4ProtocolCommandLine( lpCmdLine, translatedCmdLine ) ) {
+		effectiveCmdLine = translatedCmdLine.c_str();
+	}
+	idStr::Copynz(sys_cmdline, effectiveCmdLine, sizeof(sys_cmdline));
 
 	// done before Com/Sys_Init since we need this for error output
 	Sys_CreateConsole();
@@ -1423,7 +1598,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	//	Sys_FPU_EnableExceptions( TEST_FPU_EXCEPTIONS );
 	Sys_FPU_SetPrecision(FPU_PRECISION_DOUBLE_EXTENDED);
 
-	common->Init(0, NULL, lpCmdLine);
+	common->Init(0, NULL, effectiveCmdLine);
 
 #if TEST_FPU_EXCEPTIONS != 0
 	common->Printf(Sys_FPU_GetState());

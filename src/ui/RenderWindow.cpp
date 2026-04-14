@@ -30,6 +30,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "Window.h"
 #include "UserInterfaceLocal.h"
 #include "RenderWindow.h"
+#include "../renderer/tr_local.h"
 
 namespace {
 
@@ -77,6 +78,25 @@ static bool RenderWindowResolveViewport( idDeviceContext *dc, const idRectangle 
 
 	if ( dc != NULL ) {
 		dc->AdjustCoords( &viewportX, &viewportY, &viewportW, &viewportH );
+
+		const float uiViewportWidth = static_cast<float>( glConfig.uiViewportWidth );
+		const float uiViewportHeight = static_cast<float>( glConfig.uiViewportHeight );
+		const float framebufferWidth = static_cast<float>( glConfig.vidWidth );
+		const float framebufferHeight = static_cast<float>( glConfig.vidHeight );
+		if ( uiViewportWidth > 0.0f && uiViewportHeight > 0.0f && framebufferWidth > 0.0f && framebufferHeight > 0.0f ) {
+			const float uiScaleX = uiViewportWidth / static_cast<float>( VIRTUAL_WIDTH );
+			const float uiScaleY = uiViewportHeight / static_cast<float>( VIRTUAL_HEIGHT );
+
+			const float physicalX = static_cast<float>( glConfig.uiViewportX ) + ( viewportX * uiScaleX );
+			const float physicalY = static_cast<float>( glConfig.uiViewportY ) + ( viewportY * uiScaleY );
+			const float physicalW = viewportW * uiScaleX;
+			const float physicalH = viewportH * uiScaleY;
+
+			viewportX = physicalX * ( static_cast<float>( VIRTUAL_WIDTH ) / framebufferWidth );
+			viewportY = physicalY * ( static_cast<float>( VIRTUAL_HEIGHT ) / framebufferHeight );
+			viewportW = physicalW * ( static_cast<float>( VIRTUAL_WIDTH ) / framebufferWidth );
+			viewportH = physicalH * ( static_cast<float>( VIRTUAL_HEIGHT ) / framebufferHeight );
+		}
 	}
 
 	width = Max( 1, idMath::Ftoi( viewportW + 0.5f ) );

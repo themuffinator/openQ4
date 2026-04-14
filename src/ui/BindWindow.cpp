@@ -103,6 +103,8 @@ void idBindWindow::PostParse() {
 
 void idBindWindow::Draw(int time, float x, float y) {
 	idVec4 color = foreColor;
+	const int textAdjust = static_cast<int>( textspacing );
+	const int style = static_cast<int>( textstyle );
 
 	idStr str;
 	if ( waitingOnKey ) {
@@ -119,7 +121,7 @@ void idBindWindow::Draw(int time, float x, float y) {
 		hover = false;
 	}
 
-	dc->DrawText(str, textScale, textAlign, color, textRect, false, -1);
+	dc->DrawText( str, textScale, textAlign, color, textRect, false, -1, false, NULL, 0, textAdjust, style );
 }
 
 void idBindWindow::Activate( bool activate, idStr &act ) {

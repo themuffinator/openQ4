@@ -49,6 +49,23 @@ idCVar gui_mediumFontLimit( "gui_mediumFontLimit", "0.60", CVAR_GUI | CVAR_ARCHI
 
 idList<fontInfoEx_t> idDeviceContext::fonts;
 
+namespace {
+
+static bool OpenQ4_ExtractIconCode( const char *escape, char code[4] ) {
+	int escapeType = 0;
+	if ( idStr::IsEscape( escape, &escapeType ) != 5 || escapeType != S_ESCAPE_ICON ) {
+		return false;
+	}
+
+	code[0] = escape[2];
+	code[1] = escape[3];
+	code[2] = escape[4];
+	code[3] = '\0';
+	return true;
+}
+
+}
+
 int idDeviceContext::FindFont( const char *name ) {
 	int c = fonts.Num();
 
@@ -98,6 +115,102 @@ void idDeviceContext::SetFont( int num ) {
 	}
 }
 
+void idDeviceContext::SizeIcon( embeddedIcon_t &icon ) {
+	if ( icon.material == NULL ) {
+		return;
+	}
+
+	const float imageWidth = static_cast<float>( icon.material->GetImageWidth() );
+	const float imageHeight = static_cast<float>( icon.material->GetImageHeight() );
+	if ( imageWidth <= 0.0f || imageHeight <= 0.0f ) {
+		icon.width = 0.0f;
+		icon.height = 0.0f;
+		return;
+	}
+
+	const float x = icon.s1;
+	const float y = icon.t1;
+	float width = icon.width;
+	float height = icon.height;
+
+	if ( width < 0.0f ) {
+		width = imageWidth - Max( x, 0.0f );
+	}
+	if ( height < 0.0f ) {
+		height = imageHeight - Max( y, 0.0f );
+	}
+
+	icon.s1 = ( x < 0.0f ) ? 0.0f : ( x / imageWidth );
+	icon.t1 = ( y < 0.0f ) ? 0.0f : ( y / imageHeight );
+	icon.s2 = ( x < 0.0f ) ? 1.0f : ( ( x + width ) / imageWidth );
+	icon.t2 = ( y < 0.0f ) ? 1.0f : ( ( y + height ) / imageHeight );
+	icon.width = width;
+	icon.height = height;
+}
+
+bool idDeviceContext::FindIcon( const char *code, const embeddedIcon_t **icon ) const {
+	embeddedIcon_t *foundIcon = NULL;
+	const bool found = icons.Get( code, &foundIcon );
+	if ( icon != NULL ) {
+		*icon = foundIcon;
+	}
+	return found && foundIcon != NULL;
+}
+
+float idDeviceContext::GetIconDisplayWidth( const embeddedIcon_t &icon, float referenceHeight ) const {
+	if ( referenceHeight <= 0.0f || icon.width <= 0.0f || icon.height <= 0.0f ) {
+		return 0.0f;
+	}
+
+	return icon.width * ( referenceHeight / icon.height );
+}
+
+void idDeviceContext::RegisterIcon( const char *code, const char *shader, int x, int y, int w, int h ) {
+	if ( code == NULL || shader == NULL || code[0] == '\0' || shader[0] == '\0' ) {
+		return;
+	}
+
+	embeddedIcon_t icon;
+	idStr::Copynz( icon.code, code, sizeof( icon.code ) );
+	icon.material = declManager->FindMaterial( shader );
+	if ( icon.material == NULL ) {
+		return;
+	}
+
+	icon.material->SetSort( SS_GUI );
+	icon.s1 = static_cast<float>( x );
+	icon.t1 = static_cast<float>( y );
+	icon.width = static_cast<float>( w );
+	icon.height = static_cast<float>( h );
+	SizeIcon( icon );
+	icons.Set( icon.code, icon );
+}
+
+void idDeviceContext::RegisterBuiltinIcons() {
+	static const struct {
+		const char *code;
+		const char *shader;
+	} builtinIcons[] = {
+		{ "vce", "gfx/guis/hud/icons/icon_speaker" },
+		{ "vcd", "gfx/guis/hud/icons/icon_speaker_disabled" },
+		{ "fde", "gfx/guis/hud/icons/icon_friend" },
+		{ "fdd", "gfx/guis/hud/icons/icon_friend_disabled" },
+		{ "flm", "gfx/guis/hud/icons/sb_flag_marine" },
+		{ "fls", "gfx/guis/hud/icons/sb_flag_strogg" },
+		{ "yrd", "gfx/guis/hud/icons/icon_ready" },
+		{ "nrd", "gfx/guis/hud/icons/icon_notready" },
+		{ "qad", "gfx/guis/hud/icons/item_quadkill_colored" },
+		{ "ds0", "gfx/guis/mainmenu/icon_dedserver" },
+		{ "dsp", "gfx/guis/mainmenu/icon_pb" },
+		{ "sl0", "gfx/guis/mainmenu/icon_locked" },
+		{ "sf0", "gfx/guis/mainmenu/icon_favorite" }
+	};
+
+	for ( int i = 0; i < static_cast<int>( sizeof( builtinIcons ) / sizeof( builtinIcons[0] ) ); ++i ) {
+		RegisterIcon( builtinIcons[i].code, builtinIcons[i].shader );
+	}
+}
+
 
 void idDeviceContext::Init() {
 	xScale = 0.0;
@@ -108,6 +221,8 @@ void idDeviceContext::Init() {
 	mbcs = false;
 	SetupFonts();
 	activeFont = &fonts[0];
+	icons.Clear();
+	RegisterBuiltinIcons();
 	colorPurple = idVec4(1, 0, 1, 1);
 	colorOrange = idVec4(1, 1, 0, 1);
 	colorYellow = idVec4(0, 1, 1, 1);
@@ -156,6 +271,7 @@ void idDeviceContext::Clear() {
 	activeFont = NULL;
 	mbcs = false;
 	aspectCorrect = true;
+	icons.Clear();
 }
 
 idDeviceContext::idDeviceContext() {
@@ -718,7 +834,8 @@ int idDeviceContext::DrawText(float x, float y, float scale, idVec4 color, const
 				}
 				if (cursor == count || cursor == count+1) {
 					glyph = &useFont->glyphs[*s];
-					float partialSkip = ((glyph->xSkip * useScale) + adjust) / 5.0f;
+					const float advance = idMath::Ceil( ( glyph->xSkip + adjust ) * useScale );
+					float partialSkip = advance / 5.0f;
 					if ( cursor == count ) {
 						partialSkip *= 2.0f;
 					} else {
@@ -729,6 +846,33 @@ int idDeviceContext::DrawText(float x, float y, float scale, idVec4 color, const
 				renderSystem->SetColor(newColor);
 				s += colorEscapeLength;
 				count += colorEscapeLength;
+				continue;
+			}
+
+			int escapeType = 0;
+			const int escapeLength = idStr::IsEscape( reinterpret_cast<const char *>( s ), &escapeType );
+			if ( escapeLength > 0 ) {
+				if ( escapeType == S_ESCAPE_ICON ) {
+					char iconCode[4];
+					if ( OpenQ4_ExtractIconCode( reinterpret_cast<const char *>( s ), iconCode ) ) {
+						const embeddedIcon_t *icon = NULL;
+						if ( FindIcon( iconCode, &icon ) ) {
+							const glyphInfo_t *referenceGlyph = &useFont->glyphs[(const unsigned char)'W'];
+							const float referenceHeight = ( referenceGlyph->height > 0.0f ) ? referenceGlyph->height : activeFont->maxHeight;
+							const float iconWidth = GetIconDisplayWidth( *icon, referenceHeight );
+							if ( iconWidth > 0.0f ) {
+								const float yadj = useScale * referenceGlyph->top;
+								PaintChar( x, y - yadj, iconWidth, referenceHeight, useScale, icon->s1, icon->t1, icon->s2, icon->t2, icon->material );
+								if (cursor == count) {
+									DrawEditCursor(x, y, scale);
+								}
+								x += idMath::Ceil( iconWidth * useScale );
+							}
+						}
+					}
+				}
+				s += escapeLength;
+				count += escapeLength;
 				continue;
 			}
 
@@ -751,7 +895,7 @@ int idDeviceContext::DrawText(float x, float y, float scale, idVec4 color, const
 			if (cursor == count) {
 				DrawEditCursor(x, y, scale);
 			}
-			x += (glyph->xSkip * useScale) + adjust;
+			x += idMath::Ceil( ( glyph->xSkip + adjust ) * useScale );
 			s++;
 			count++;
 		}
@@ -885,47 +1029,53 @@ void idDeviceContext::GetCursorBounds( float &minX, float &maxX, float &minY, fl
 	}
 }
 
-int idDeviceContext::CharWidth( const char c, float scale ) {
+int idDeviceContext::CharWidth( const char c, float scale, int adjust ) {
 	glyphInfo_t *glyph;
 	float		useScale;
 	SetFontByScale(scale);
 	fontInfo_t	*font = useFont;
 	useScale = scale * font->glyphScale;
 	glyph = &font->glyphs[(const unsigned char)c];
-	return idMath::FtoiFast( glyph->xSkip * useScale );
+	return idMath::FtoiFast( ( glyph->xSkip + adjust ) * useScale );
 }
 
-int idDeviceContext::TextWidth( const char *text, float scale, int limit ) {
-	int i, width;
-
+int idDeviceContext::TextWidth( const char *text, float scale, int limit, int adjust ) {
 	SetFontByScale( scale );
+	const float useScale = scale * useFont->glyphScale;
 	const glyphInfo_t *glyphs = useFont->glyphs;
+	const glyphInfo_t *referenceGlyph = &glyphs[(const unsigned char)'W'];
+	const float referenceHeight = ( referenceGlyph->height > 0.0f ) ? referenceGlyph->height : activeFont->maxHeight;
 
 	if ( text == NULL ) {
 		return 0;
 	}
 
-	width = 0;
-	if ( limit > 0 ) {
-		for ( i = 0; text[i] != '\0' && i < limit; i++ ) {
-			const int colorEscapeLength = idStr::ColorEscapeLength( text + i );
-			if ( colorEscapeLength > 0 ) {
-				i += colorEscapeLength - 1;
-			} else {
-				width += glyphs[((const unsigned char *)text)[i]].xSkip;
+	int width = 0;
+	int count = 0;
+	const unsigned char *s = reinterpret_cast<const unsigned char *>( text );
+	while ( *s != '\0' && ( limit <= 0 || count < limit ) ) {
+		int escapeType = 0;
+		const int escapeLength = idStr::IsEscape( reinterpret_cast<const char *>( s ), &escapeType );
+		if ( escapeLength > 0 ) {
+			if ( escapeType == S_ESCAPE_ICON ) {
+				char iconCode[4];
+				if ( OpenQ4_ExtractIconCode( reinterpret_cast<const char *>( s ), iconCode ) ) {
+					const embeddedIcon_t *icon = NULL;
+					if ( FindIcon( iconCode, &icon ) ) {
+						width += idMath::Ceil( GetIconDisplayWidth( *icon, referenceHeight ) * useScale );
+					}
+				}
 			}
+			s += escapeLength;
+			count += escapeLength;
+			continue;
 		}
-	} else {
-		for ( i = 0; text[i] != '\0'; i++ ) {
-			const int colorEscapeLength = idStr::ColorEscapeLength( text + i );
-			if ( colorEscapeLength > 0 ) {
-				i += colorEscapeLength - 1;
-			} else {
-				width += glyphs[((const unsigned char *)text)[i]].xSkip;
-			}
-		}
+
+		width += idMath::Ceil( ( glyphs[*s].xSkip + adjust ) * useScale );
+		s++;
+		count++;
 	}
-	return idMath::FtoiFast( scale * useFont->glyphScale * width );
+	return width;
 }
 
 int idDeviceContext::TextHeight(const char *text, float scale, int limit) {
@@ -945,12 +1095,20 @@ int idDeviceContext::TextHeight(const char *text, float scale, int limit) {
 			len = limit;
 		}
 
-		count = 0;
-		while (s && *s && count < len) {
-			const int colorEscapeLength = idStr::ColorEscapeLength( s );
-			if ( colorEscapeLength > 0 ) {
-				s += colorEscapeLength;
-				count += colorEscapeLength;
+	count = 0;
+	while (s && *s && count < len) {
+			int escapeType = 0;
+			const int escapeLength = idStr::IsEscape( s, &escapeType );
+			if ( escapeLength > 0 ) {
+				if ( escapeType == S_ESCAPE_ICON ) {
+					const glyphInfo_t *referenceGlyph = &font->glyphs[(const unsigned char)'W'];
+					const float referenceHeight = ( referenceGlyph->height > 0.0f ) ? referenceGlyph->height : activeFont->maxHeight;
+					if ( max < referenceHeight ) {
+						max = referenceHeight;
+					}
+				}
+				s += escapeLength;
+				count += escapeLength;
 				continue;
 			}
 			else {
@@ -1069,7 +1227,7 @@ void idDeviceContext::DrawEditCursor( float x, float y, float scale ) {
  	PaintChar(x, y - yadj,glyph2->imageWidth,glyph2->imageHeight,useScale,glyph2->s,glyph2->t,glyph2->s2,glyph2->t2,glyph2->glyph);
 }
 
-int idDeviceContext::DrawText( const char *text, float textScale, int textAlign, idVec4 color, idRectangle rectDraw, bool wrap, int cursor, bool calcOnly, idList<int> *breaks, int limit ) {
+int idDeviceContext::DrawText( const char *text, float textScale, int textAlign, idVec4 color, idRectangle rectDraw, bool wrap, int cursor, bool calcOnly, idList<int> *breaks, int limit, int adjust, int style ) {
 	const char	*p, *textPtr, *newLinePtr;
 	char		buff[1024];
 	int			len, newLine, newLineWidth, count;
@@ -1084,6 +1242,7 @@ int idDeviceContext::DrawText( const char *text, float textScale, int textAlign,
 	bool		lineBreak, wordBreak;
 
 	SetFontByScale( textScale );
+	(void)style;
 
 	textWidth = 0;
 	newLinePtr = NULL;
@@ -1127,12 +1286,12 @@ int idDeviceContext::DrawText( const char *text, float textScale, int textAlign,
 				idStr::Copynz( &buff[len], p, escapeLength + 1 );
 				len += escapeLength;
 				p += escapeLength;
-				textWidth = TextWidth( buff, textScale, -1 );
+				textWidth = TextWidth( buff, textScale, -1, adjust );
 			}
 			continue;
 		}
 
-		int nextCharWidth = ( idStr::CharIsPrintable(*p) ? CharWidth( *p, textScale ) : cursorSkip );
+		int nextCharWidth = ( idStr::CharIsPrintable(*p) ? CharWidth( *p, textScale, adjust ) : cursorSkip );
 		// FIXME: this is a temp hack until the guis can be fixed not not overflow the bounding rectangles
 		//		  the side-effect is that list boxes and edit boxes will draw over their scroll bars
 		//	The following line and the !linebreak in the if statement below should be removed
@@ -1175,7 +1334,7 @@ int idDeviceContext::DrawText( const char *text, float textScale, int textAlign,
 			}
 
 			if (!calcOnly) {
-				count += DrawText(x, y, textScale, color, buff, 0, 0, 0, cursor);
+				count += DrawText(x, y, textScale, color, buff, static_cast<float>( adjust ), 0, style, cursor);
 			}
 
 			if ( cursor < newLine ) {
@@ -1215,10 +1374,7 @@ int idDeviceContext::DrawText( const char *text, float textScale, int textAlign,
 
 		buff[len++] = *p++;
 		buff[len] = '\0';
-		// update the width
-		if ( *( buff + len - 1 ) != C_COLOR_ESCAPE && (len <= 1 || *( buff + len - 2 ) != C_COLOR_ESCAPE)) {
-			textWidth += textScale * useFont->glyphScale * useFont->glyphs[ (const unsigned char)*( buff + len - 1 ) ].xSkip;
-		}
+		textWidth = TextWidth( buff, textScale, -1, adjust );
 	}
 
 	return idMath::FtoiFast( rectDraw.w / charSkip );

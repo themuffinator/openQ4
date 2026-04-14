@@ -85,6 +85,46 @@ static void DrawSplashUnderlay( idDeviceContext *dc ) {
 	const idVec4 underlayColor( 24.0f / 255.0f, 26.0f / 255.0f, 8.0f / 255.0f, 1.0f );
 	dc->DrawFilledRect( 0.0f, 0.0f, 640.0f, 480.0f, underlayColor );
 }
+
+static bool IsLegacyVehicleDamageOverlay( const idUserInterfaceLocal *gui, const char *windowName, const idMaterial *background, const idRectangle &drawRect ) {
+	if ( gui == NULL || background == NULL || windowName == NULL || !IsFullscreenBackdropRect( drawRect ) ) {
+		return false;
+	}
+
+	if ( idStr::Icmp( windowName, "damage" ) != 0 ) {
+		return false;
+	}
+
+	const char *materialName = background->GetName();
+	if ( materialName == NULL || idStr::Icmp( materialName, "gfx/guis/common/add_box2" ) != 0 ) {
+		return false;
+	}
+
+	const char *sourceFile = gui->GetSourceFile();
+	return idStr::Icmp( sourceFile, "guis/vehicles/hud.gui" ) == 0 ||
+		idStr::Icmp( sourceFile, "guis/vehicles/medchange.gui" ) == 0;
+}
+
+static bool ShouldDrawNativeScreenOverlay( const idUserInterfaceLocal *gui, const char *windowName, const idMaterial *background, const idRectangle &drawRect, int flags ) {
+	if ( ( flags & WIN_NATIVESCREENOVERLAY ) != 0 ) {
+		return IsFullscreenBackdropRect( drawRect );
+	}
+
+	return IsLegacyVehicleDamageOverlay( gui, windowName, background, drawRect );
+}
+
+static void DrawNativeScreenOverlay( const idMaterial *background, const idVec4 &matColor ) {
+	if ( background == NULL ) {
+		return;
+	}
+
+	const bool previousUIViewportMode = renderSystem->GetUseUIViewportFor2D();
+	renderSystem->SetUseUIViewportFor2D( false );
+	renderSystem->SetColor( matColor );
+	renderSystem->DrawStretchPic( 0.0f, 0.0f, SCREEN_WIDTH, SCREEN_HEIGHT, 0.0f, 0.0f, 1.0f, 1.0f, background );
+	renderSystem->SetColor( colorWhite );
+	renderSystem->SetUseUIViewportFor2D( previousUIViewportMode );
+}
 }
 
 
@@ -221,6 +261,10 @@ void idSimpleWindow::DrawBackground(const idRectangle &drawRect) {
 				DrawCinematicUnderlay( dc );
 			} else if ( ShouldDrawSplashUnderlay( background, drawRect ) ) {
 				DrawSplashUnderlay( dc );
+			}
+			if ( ShouldDrawNativeScreenOverlay( gui, name.c_str(), background, drawRect, flags ) ) {
+				DrawNativeScreenOverlay( background, matColor );
+				return;
 			}
 
 			if ( flags & WIN_MATCANVASFILL ) {

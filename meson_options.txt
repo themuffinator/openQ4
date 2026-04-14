@@ -45,7 +45,7 @@ option(
   'version_track',
   type: 'string',
   value: 'dev',
-  description: 'Version track embedded into the build. Use stable for release builds, dev for local builds, or labels such as nightly/beta/rc for prerelease builds.',
+  description: 'Version track embedded into the build. Use stable for release builds, dev for local builds, or labels such as beta/rc for prerelease builds.',
 )
 
 option(
@@ -53,6 +53,20 @@ option(
   type: 'string',
   value: '',
   description: 'Optional dot-separated track iteration (for example 20260307.1). Only used for prerelease tracks.',
+)
+
+option(
+  'version_base_override',
+  type: 'string',
+  value: '',
+  description: 'Optional release version override used for generated build metadata without changing meson.build.',
+)
+
+option(
+  'openal_root_override',
+  type: 'string',
+  value: '',
+  description: 'Optional Windows OpenAL Soft root containing include/, lib/, and bin/ payloads. Useful for ARM64 builds that provide a custom OpenAL package.',
 )
 
 option(

@@ -7,7 +7,7 @@
 This guide covers everything required to compile OpenQ4 from source on Windows, Linux, and macOS.
 
 > [!NOTE]
-> **Regular players do not need to build from source.** Download the latest release from the [Releases page](https://github.com/themuffinator/OpenQ4/releases) and follow the [Installation instructions](README.md#installation) instead.
+> **Regular players do not need to build from source.** Download the latest release from the [Releases page](https://github.com/themuffinator/OpenQ4/releases) and follow the [Quick Start instructions](README.md#quick-start) instead.
 
 ---
 
@@ -43,6 +43,8 @@ This guide covers everything required to compile OpenQ4 from source on Windows, 
 ### Windows Note
 
 On Windows, always invoke Meson through `tools/build/meson_setup.ps1` rather than calling `meson` directly from an arbitrary shell. The wrapper ensures MSVC tools (`cl.exe`, `link.exe`, etc.) are on `PATH` and performs automatic icon-set synchronisation before setup, compile, and install steps.
+
+For Windows `arm64` builds, OpenQ4 also needs an ARM64 OpenAL Soft package. The release workflow prepares that automatically. For local builds, use `tools/build/prepare_windows_openal.ps1` to create one under `.tmp/`, then pass `-Dopenal_root_override=<path>` during `meson setup`.
 
 ```powershell
 # Open a regular PowerShell window and use the wrapper:
@@ -100,8 +102,9 @@ Pass any of these with `-D<option>=<value>` on the `meson setup` command line:
 | `build_game_sp` | `true` | Build single-player game module |
 | `build_game_mp` | `true` | Build multiplayer game module |
 | `platform_backend` | platform-dependent | `sdl3` or `legacy_win32` on Windows, `sdl3` or `native` on Linux, `native` on macOS |
-| `version_track` | `dev` | Build track label (`stable`, `dev`, `nightly`, `beta`, `rc`) |
-| `version_iteration` | *(auto)* | Dot-separated iteration counter for pre-release builds |
+| `version_track` | `dev` | Build track label (`stable`, `dev`, `beta`, `rc`) |
+| `version_iteration` | *(empty)* | Dot-separated iteration counter for pre-release builds |
+| `version_base_override` | *(empty)* | Override the generated release version without editing `meson.build` |
 | `enforce_msvc_2026` | `false` | Enforce MSVC 2026+ requirement (Windows only) |
 
 ---
@@ -121,7 +124,7 @@ powershell -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 setup --wip
 powershell -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 compile -C builddir
 
 # 3. Run directly from builddir
-builddir\OpenQ4-client_x64.exe
+builddir\OpenQ4-client_<arch>.exe
 ```
 
 ### Release Build
@@ -163,7 +166,7 @@ bash tools/build/meson_setup.sh setup --wipe builddir . --backend ninja --buildt
 bash tools/build/meson_setup.sh compile -C builddir
 
 # 3. Run directly from builddir
-./builddir/OpenQ4-client_x64
+./builddir/OpenQ4-client_<arch>
 ```
 
 Use `-Dplatform_backend=native` during setup if you need to compare against the legacy Linux X11/GLX backend.
@@ -189,13 +192,13 @@ bash tools/build/meson_setup.sh install -C builddir --no-rebuild --skip-subproje
 
 | File | Description |
 |------|-------------|
-| `OpenQ4-client_x64[.exe]` | Main engine executable |
-| `OpenQ4-ded_x64[.exe]` | Dedicated server |
-| `baseoq4/game-sp_x64[.dll/.so/.dylib]` | Single-player game module |
-| `baseoq4/game-mp_x64[.dll/.so/.dylib]` | Multiplayer game module |
+| `OpenQ4-client_<arch>[.exe]` | Main engine executable |
+| `OpenQ4-ded_<arch>[.exe]` | Dedicated server |
+| `baseoq4/game-sp_<arch>[.dll/.so/.dylib]` | Single-player game module |
+| `baseoq4/game-mp_<arch>[.dll/.so/.dylib]` | Multiplayer game module |
 
-- BSE (Basic Set of Effects) is linked directly into `OpenQ4-client_x64`; the dedicated server keeps a disabled/stub path.
-- On Windows, the wrapper also stages `OpenAL32.dll` and the MSVC/UCRT runtime DLLs next to the executables so the tree is runnable without extra redistributables.
+- BSE (Basic Set of Effects) is linked directly into `OpenQ4-client_<arch>`; the dedicated server keeps a disabled/stub path.
+- On Windows, the wrapper stages `OpenAL32.dll` next to the executables and rejects builds that still depend on external MSVC/UCRT runtime DLLs.
 
 ### Install directory (`.install/`)
 
@@ -203,14 +206,14 @@ After running the install step, `.install/` is a self-contained distributable pa
 
 ```
 .install/
-├── OpenQ4-client_x64[.exe]     # Main executable
-├── OpenQ4-ded_x64[.exe]        # Dedicated server
+├── OpenQ4-client_<arch>[.exe]  # Main executable
+├── OpenQ4-ded_<arch>[.exe]     # Dedicated server
 ├── OpenQ4-steamdeck            # (Linux) Steam Deck launcher
 ├── OpenAL32.dll                # (Windows) runtime dependency
 ├── share/applications/         # (Linux) desktop entries
 └── baseoq4/
-    ├── game-sp_x64[.dll/.so/.dylib]   # Single-player module
-    ├── game-mp_x64[.dll/.so/.dylib]   # Multiplayer module
+    ├── game-sp_<arch>[.dll/.so/.dylib]   # Single-player module
+    ├── game-mp_<arch>[.dll/.so/.dylib]   # Multiplayer module
     ├── openq4_defaults.cfg            # OpenQ4-owned default binds
     └── openq4_profile_steamdeck.cfg   # Steam Deck profile overrides
 ```
@@ -226,6 +229,16 @@ Repo-authored runtime overrides live under `content/baseoq4/`. The install step 
 
 The `meson install` step (via the wrapper) stages all required binaries into `.install/`. This directory can be zipped and distributed as a release archive.
 
+Release archives also generate a packaged offline HTML documentation site under `docs/`. If you run the release packager manually instead of using GitHub Actions, make sure `python -m pip install markdown` is available in the same environment.
+
+The manually dispatched GitHub release workflow publishes architecture-qualified release assets such as `openq4-<version>-windows-x64.zip`, `openq4-<version>-windows-arm64.zip`, `openq4-<version>-linux-x64.tar.xz`, `openq4-<version>-linux-arm64.tar.xz`, and `openq4-<version>-macos-arm64.tar.gz`. Windows release payloads also get native installer executables such as `openq4-<version>-windows-x64-setup.exe` and `openq4-<version>-windows-arm64-setup.exe`. Each installer is compiled from the already-packaged Windows release directory so its file set matches the archive instead of diverging from it, writes install metadata to the registry for upgrade detection, registers a normal Windows uninstaller entry, and can optionally register `openq4://` browser links.
+
+If you want to build that installer manually on Windows after packaging a release directory, install [Inno Setup](https://jrsoftware.org/isinfo.php) and run:
+
+```powershell
+python tools/build/build_windows_installer.py --package-dir .tmp\openq4-0.1.010-windows-arm64 --version 0.1.010 --version-tag 0.1.010 --arch arm64 --output-dir .tmp\release-artifacts
+```
+
 To include the icon set synchronisation step before building (validated and generated by the wrapper automatically):
 
 ```powershell
@@ -233,7 +246,7 @@ To include the icon set synchronisation step before building (validated and gene
 $env:OPENQ4_SKIP_ICON_SYNC = "1"
 ```
 
-The manually dispatched GitHub prerelease workflow sets `version_track=nightly` and derives `version_iteration` from existing published tags for the current UTC date. That produces versions such as `X.Y.Z-nightly.20260307.1+gabcdef12`, `X.Y.Z-nightly.20260307.2+gabcdef12`, and so on without depending on GitHub run numbers.
+The manually dispatched GitHub release workflow builds with `version_track=stable` and injects `version_base_override` from `tools/build/openq4_release_version.py`. That helper uses the repo version in `meson.build` as the release floor and, once stable `v*` tags exist, automatically chooses between a serial bump (`0.1.010` -> `0.1.011`) and a milestone bump (`0.1.010` -> `0.2.000`) based on the scale of changes since the previous release. The workflow also accepts manual `bump_mode` and `version_override` inputs when a release needs an explicit decision.
 
 ---
 

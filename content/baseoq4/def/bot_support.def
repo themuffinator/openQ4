@@ -1,0 +1,6 @@
+entityDef bot_itemtable
+{
+	// Minimal bot support bootstrap.
+	// Stock Quake 4 item defs do not currently populate a modelindex key,
+	// but the multiplayer bot systems require this decl to exist before they initialize.
+}

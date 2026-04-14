@@ -1078,6 +1078,24 @@ void idAsyncClient::ProcessChallengeResponseMessage( const netadr_t from, const 
 			cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "disconnect\n" );
 			return;
 		}
+
+		idStr modReason;
+		idModInfo modInfo;
+		if ( serverGameBase[ 0 ] &&
+			 idStr::Icmp( serverGameBase, BASE_GAMEDIR ) &&
+			 !fileSystem->GetModInfo( serverGameBase, modInfo, &modReason ) ) {
+			common->Printf( "The server requires base mod '%s', but it is not runnable on this client: %s\n", serverGameBase, modReason.c_str() );
+			cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "disconnect\n" );
+			return;
+		}
+		if ( serverGame[ 0 ] &&
+			 idStr::Icmp( serverGame, BASE_GAMEDIR ) &&
+			 !fileSystem->GetModInfo( serverGame, modInfo, &modReason ) ) {
+			common->Printf( "The server requires mod '%s', but it is not runnable on this client: %s\n", serverGame, modReason.c_str() );
+			cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "disconnect\n" );
+			return;
+		}
+
 		common->Printf( "The server is running a different mod (%s-%s). Restarting..\n", serverGameBase, serverGame );
 		cvarSystem->SetCVarString( "fs_game_base", serverGameBase );
 		cvarSystem->SetCVarString( "fs_game", serverGame );

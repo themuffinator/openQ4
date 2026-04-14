@@ -181,7 +181,7 @@ build_setup_args_for_existing_build_dir() {
 
     local option_name=""
     local option_value=""
-    for option_name in platform_backend version_track version_iteration use_pch build_engine build_games build_game_sp build_game_mp enforce_msvc_2026; do
+    for option_name in platform_backend version_track version_iteration version_base_override openal_root_override use_pch build_engine build_games build_game_sp build_game_mp enforce_msvc_2026; do
         option_value="$(get_meson_build_option_value "${build_dir}" "${option_name}" || true)"
         if [[ -n "${option_value}" ]]; then
             SETUP_ARGS_RESULT+=("-D${option_name}=${option_value}")

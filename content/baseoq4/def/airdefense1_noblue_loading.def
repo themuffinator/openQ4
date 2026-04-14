@@ -1,0 +1,11 @@
+// Test override map without the stock overwhelmingly blue global effects.
+mapDef game/airdefense1_noblue {
+	"name"		"#str_107613"
+	"size0"		"484219104"
+	"size1"		"484219104"
+	"size2"		"484257236"
+	"size3"		"1220386185"
+	"loadgui"		"guis/loading/intro.gui"
+	"loadimage"		"gfx/guis/loadscreens/e3_load"
+	"savethumb"		"gfx/guis/mainmenu/save_airdefense"
+}

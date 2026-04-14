@@ -2,6 +2,8 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 function Get-VsDevCmdPath {
+    param([string]$TargetArch)
+
     if ($env:VSINSTALLDIR) {
         $candidate = Join-Path $env:VSINSTALLDIR "Common7\Tools\VsDevCmd.bat"
         if (Test-Path $candidate) {
@@ -14,7 +16,11 @@ function Get-VsDevCmdPath {
         throw "Could not locate vswhere.exe."
     }
 
-    $component = "Microsoft.VisualStudio.Component.VC.Tools.x86.x64"
+    $component = if ($TargetArch -eq "arm64") {
+        "Microsoft.VisualStudio.Component.VC.Tools.ARM64"
+    } else {
+        "Microsoft.VisualStudio.Component.VC.Tools.x86.x64"
+    }
     # Prefer Visual Studio 2026+ (major 18) when installed.
     $installPathRaw = & $vswhere -latest -prerelease -version "[18.0,19.0)" -products * -requires $component -property installationPath
     $installPath = if ($null -eq $installPathRaw) { "" } else { "$installPathRaw".Trim() }
@@ -43,6 +49,32 @@ function Quote-CmdArg([string]$Value) {
         return '"' + ($Value -replace '"', '\"') + '"'
     }
     return $Value
+}
+
+function Get-OpenQ4VsProcessArch {
+    $arch = [System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString().ToLowerInvariant()
+    switch ($arch) {
+        "x64" { return "x64" }
+        "x86" { return "x86" }
+        "arm64" { return "arm64" }
+        default { return "x64" }
+    }
+}
+
+function Get-OpenQ4VsTargetArch {
+    if (-not [string]::IsNullOrWhiteSpace($env:OPENQ4_VS_TARGET_ARCH)) {
+        return $env:OPENQ4_VS_TARGET_ARCH.Trim().ToLowerInvariant()
+    }
+
+    return Get-OpenQ4VsProcessArch
+}
+
+function Get-OpenQ4VsHostArch {
+    if (-not [string]::IsNullOrWhiteSpace($env:OPENQ4_VS_HOST_ARCH)) {
+        return $env:OPENQ4_VS_HOST_ARCH.Trim().ToLowerInvariant()
+    }
+
+    return Get-OpenQ4VsProcessArch
 }
 
 function Get-MesonCommand {
@@ -77,7 +109,9 @@ function Invoke-Meson {
     param(
         [string[]]$MesonArgs,
         [string]$VsDevCmdPath,
-        [pscustomobject]$MesonCommand
+        [pscustomobject]$MesonCommand,
+        [string]$VsTargetArch,
+        [string]$VsHostArch
     )
 
     $mesonInvocation = @($MesonCommand.Arguments) + $MesonArgs
@@ -88,7 +122,7 @@ function Invoke-Meson {
 
     $mesonCommandLine = @($MesonCommand.Executable) + $MesonCommand.Arguments + $MesonArgs
     $mesonCmd = ($mesonCommandLine | ForEach-Object { Quote-CmdArg $_ }) -join " "
-    $fullCmd = 'call "' + $VsDevCmdPath + '" -arch=x64 -host_arch=x64 >nul && ' + $mesonCmd
+    $fullCmd = 'call "' + $VsDevCmdPath + '" -arch=' + $VsTargetArch + ' -host_arch=' + $VsHostArch + ' >nul && ' + $mesonCmd
     & $env:ComSpec /d /c $fullCmd
 }
 
@@ -292,6 +326,8 @@ function Get-SetupArgsForExistingBuildDir {
         "platform_backend",
         "version_track",
         "version_iteration",
+        "version_base_override",
+        "openal_root_override",
         "use_pch",
         "build_engine",
         "build_games",
@@ -329,7 +365,7 @@ function Recreate-MesonBuildDirectory {
         Remove-Item -LiteralPath $BuildDir -Recurse -Force
     }
 
-    Invoke-Meson -MesonArgs $SetupArgs -VsDevCmdPath $VsDevCmdPath -MesonCommand $MesonCommand
+    Invoke-Meson -MesonArgs $SetupArgs -VsDevCmdPath $VsDevCmdPath -MesonCommand $MesonCommand -VsTargetArch $vsTargetArch -VsHostArch $vsHostArch
     return [int]$LASTEXITCODE
 }
 
@@ -496,7 +532,11 @@ function Stop-OpenQ4RuntimeProcesses {
 
     $processNames = @(
         "OpenQ4-client_x64",
-        "OpenQ4-ded_x64"
+        "OpenQ4-client_x86",
+        "OpenQ4-client_arm64",
+        "OpenQ4-ded_x64",
+        "OpenQ4-ded_x86",
+        "OpenQ4-ded_arm64"
     )
 
     $running = @(Get-Process -Name $processNames -ErrorAction SilentlyContinue)
@@ -541,9 +581,11 @@ if (-not (Test-Path $rcWrapper)) {
 
 $env:WINDRES = $rcWrapper
 
+$vsTargetArch = Get-OpenQ4VsTargetArch
+$vsHostArch = Get-OpenQ4VsHostArch
 $vsDevCmd = $null
-if ($null -eq (Get-Command cl -ErrorAction SilentlyContinue)) {
-    $vsDevCmd = Get-VsDevCmdPath
+if (Test-WindowsHost) {
+    $vsDevCmd = Get-VsDevCmdPath -TargetArch $vsTargetArch
 }
 $mesonCommand = Get-MesonCommand
 
@@ -620,7 +662,7 @@ if ($effectiveArgs.Length -gt 0 -and ($effectiveArgs[0] -eq "compile" -or $effec
         if (Test-ObsoleteBSEBuildOptionPresent -BuildDir $buildInfo.BuildDir) {
             $setupCode = Recreate-MesonBuildDirectory -BuildDir $buildInfo.BuildDir -SetupArgs $setupArgs -VsDevCmdPath $vsDevCmd -MesonCommand $mesonCommand
         } else {
-            Invoke-Meson -MesonArgs $setupArgs -VsDevCmdPath $vsDevCmd -MesonCommand $mesonCommand
+            Invoke-Meson -MesonArgs $setupArgs -VsDevCmdPath $vsDevCmd -MesonCommand $mesonCommand -VsTargetArch $vsTargetArch -VsHostArch $vsHostArch
             $setupCode = [int]$LASTEXITCODE
         }
         $setupCode = [int]$LASTEXITCODE
@@ -662,7 +704,7 @@ if ($effectiveArgs.Length -gt 0 -and ($effectiveArgs[0] -eq "compile" -or $effec
             $repoRoot
         )
         $reconfigureArgs = Ensure-WindowsStaticCRTSetupArgs -MesonArgs $reconfigureArgs
-        Invoke-Meson -MesonArgs $reconfigureArgs -VsDevCmdPath $vsDevCmd -MesonCommand $mesonCommand
+        Invoke-Meson -MesonArgs $reconfigureArgs -VsDevCmdPath $vsDevCmd -MesonCommand $mesonCommand -VsTargetArch $vsTargetArch -VsHostArch $vsHostArch
         $reconfigureCode = [int]$LASTEXITCODE
         if ($reconfigureCode -ne 0) {
             exit $reconfigureCode
@@ -698,14 +740,14 @@ if (@("setup", "compile", "install").Contains($commandName) -and $env:OPENQ4_SKI
     }
 }
 
-Invoke-Meson -MesonArgs $effectiveArgs -VsDevCmdPath $vsDevCmd -MesonCommand $mesonCommand
+Invoke-Meson -MesonArgs $effectiveArgs -VsDevCmdPath $vsDevCmd -MesonCommand $mesonCommand -VsTargetArch $vsTargetArch -VsHostArch $vsHostArch
 $exitCode = [int]$LASTEXITCODE
 
 if ($commandName -eq "install" -and $exitCode -ne 0 -and $env:OPENQ4_INSTALL_RETRY_ON_FAILURE -ne "0") {
     Write-Host "Meson install failed; retrying once after ensuring OpenQ4 processes are stopped..."
     Stop-OpenQ4RuntimeProcesses | Out-Null
     Start-Sleep -Milliseconds 500
-    Invoke-Meson -MesonArgs $effectiveArgs -VsDevCmdPath $vsDevCmd -MesonCommand $mesonCommand
+    Invoke-Meson -MesonArgs $effectiveArgs -VsDevCmdPath $vsDevCmd -MesonCommand $mesonCommand -VsTargetArch $vsTargetArch -VsHostArch $vsHostArch
     $exitCode = [int]$LASTEXITCODE
 }
 

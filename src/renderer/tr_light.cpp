@@ -770,6 +770,29 @@ static const portalArea_t *R_ResolveDrawSurfArea( const srfTriangles_t *tri, con
 	return R_FallbackDrawSurfArea( space );
 }
 
+static bool R_DrawSurfLooksLikeTerrain( const viewEntity_t *space, const renderEntity_t *renderEntity, const idMaterial *shader ) {
+	if ( shader != NULL ) {
+		const char *shaderName = shader->GetName();
+		if ( shaderName != NULL && idStr::FindText( shaderName, "terrain", false ) >= 0 ) {
+			return true;
+		}
+	}
+
+	const renderEntity_t *entity = renderEntity;
+	if ( entity == NULL && space != NULL && space->entityDef != NULL ) {
+		entity = &space->entityDef->parms;
+	}
+
+	if ( entity != NULL && entity->hModel != NULL ) {
+		const char *modelName = entity->hModel->Name();
+		if ( modelName != NULL && idStr::FindText( modelName, "terrain", false ) >= 0 ) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 /*
 ======================
 R_ClippedLightScissorRectangle
@@ -1335,6 +1358,9 @@ void R_AddDrawSurf( const srfTriangles_t *tri, const viewEntity_t *space, const 
 	drawSurf->decalColorCache = NULL;
 	drawSurf->decalColorStride = 0;
 	drawSurf->decalColorStageCount = 0;
+	if ( session != NULL && session->IsIAmTheDukeActive() && R_DrawSurfLooksLikeTerrain( space, renderEntity, shader ) ) {
+		drawSurf->dsFlags |= DSF_IAMTHEDUKE_TERRAIN;
+	}
 
 	// bumping this offset each time causes surfaces with equal sort orders to still
 	// deterministically draw in the order they are added

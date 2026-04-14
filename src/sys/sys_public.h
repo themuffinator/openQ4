@@ -43,9 +43,20 @@ If you have questions concerning this license or the applicable additional terms
 // Win32
 #if defined(WIN32) || defined(_WIN32)
 
-#define	BUILD_STRING					"win-x64"
 #define BUILD_OS_ID						0
-#define	CPUSTRING						"x64"
+#if defined( _M_X64 ) || defined( __x86_64__ )
+	#define	BUILD_STRING				"win-x64"
+	#define	CPUSTRING					"x64"
+#elif defined( _M_IX86 ) || defined( __i386__ )
+	#define	BUILD_STRING				"win-x86"
+	#define	CPUSTRING					"x86"
+#elif defined( _M_ARM64 ) || defined( __aarch64__ )
+	#define	BUILD_STRING				"win-arm64"
+	#define	CPUSTRING					"arm64"
+#else
+	#define	BUILD_STRING				"win-unknown"
+	#define	CPUSTRING					"unknown"
+#endif
 #define CPU_EASYARGS					1
 
 #define ALIGN16( x )					__declspec(align(16)) x

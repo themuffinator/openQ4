@@ -776,7 +776,9 @@ static void SDL3_UpdateGamepadAxes(int eventTime) {
 	Sys_EnterCriticalSection(CRITICAL_SECTION_ONE);
 	s_joystickAxisState[AXIS_SIDE] = lookX;
 	s_joystickAxisState[AXIS_FORWARD] = lookY;
-	s_joystickAxisState[AXIS_UP] = SDL3_ClampJoystickValue(rightTrigger - leftTrigger);
+	// Keep SDL gamepad triggers available as modern digital binds (LT/RT) instead of
+	// also folding them into the legacy vertical movement axis.
+	s_joystickAxisState[AXIS_UP] = 0;
 	s_joystickAxisState[AXIS_ROLL] = 127;
 	s_joystickAxisState[AXIS_YAW] = moveX;
 	s_joystickAxisState[AXIS_PITCH] = moveY;

@@ -75,12 +75,13 @@ void idFieldWindow::CalcPaintOffset(int len) {
 	lastCursorPos = cursorPos;
 	lastTextLength = len;
 	paintOffset = 0;
-	int tw = dc->TextWidth(text, textScale, -1);
+	const int textAdjust = static_cast<int>( textspacing );
+	int tw = dc->TextWidth( text, textScale, -1, textAdjust );
 	if (tw < textRect.w) {
 		return;
 	}
 	while (tw > textRect.w && len > 0) {
-		tw = dc->TextWidth(text, textScale, --len);
+		tw = dc->TextWidth( text, textScale, --len, textAdjust );
 		paintOffset++;
 	}
 }
@@ -89,6 +90,8 @@ void idFieldWindow::CalcPaintOffset(int len) {
 void idFieldWindow::Draw(int time, float x, float y) {
 	float scale = textScale;
 	int len = text.Length();
+	const int textAdjust = static_cast<int>( textspacing );
+	const int style = static_cast<int>( textstyle );
 	cursorPos = gui->State().GetInt( cursorVar );
 	if (len != lastTextLength || cursorPos != lastCursorPos) {
 		CalcPaintOffset(len);
@@ -100,6 +103,6 @@ void idFieldWindow::Draw(int time, float x, float y) {
 	if (cursorPos > len) {
 		cursorPos = len;
 	}
-	dc->DrawText(&text[paintOffset], scale, 0, foreColor, rect, false, ((flags & WIN_FOCUS) || showCursor) ? cursorPos - paintOffset : -1);
+	dc->DrawText( &text[paintOffset], scale, 0, foreColor, rect, false, (( flags & WIN_FOCUS ) || showCursor ) ? cursorPos - paintOffset : -1, false, NULL, 0, textAdjust, style );
 }
 

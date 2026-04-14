@@ -369,6 +369,8 @@ void idChoiceWindow::PostParse() {
 
 void idChoiceWindow::Draw(int time, float x, float y) {
 	idVec4 color = foreColor;
+	const int textAdjust = static_cast<int>( textspacing );
+	const int style = static_cast<int>( textstyle );
 
 	UpdateChoicesAndVals();
 	UpdateChoice();
@@ -384,7 +386,7 @@ void idChoiceWindow::Draw(int time, float x, float y) {
 		shadowRect.x += textShadow;
 		shadowRect.y += textShadow;
 
-		dc->DrawText( shadowText, textScale, textAlign, colorBlack, shadowRect, false, -1 );
+		dc->DrawText( shadowText, textScale, textAlign, colorBlack, shadowRect, false, -1, false, NULL, 0, textAdjust, style );
 	}
 
 	if ( hover && !noEvents && Contains(gui->CursorX(), gui->CursorY()) ) {
@@ -397,7 +399,7 @@ void idChoiceWindow::Draw(int time, float x, float y) {
 	}
 
 	if (choices.Num() > 0 && currentChoice < choices.Num()) {
-		dc->DrawText(choices[currentChoice], textScale, textAlign, color, textRect, false, -1);
+		dc->DrawText( choices[currentChoice], textScale, textAlign, color, textRect, false, -1, false, NULL, 0, textAdjust, style );
 	}
 }
 

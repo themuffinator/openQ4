@@ -102,6 +102,7 @@ public:
 	virtual void		Frame();
 
 	virtual bool		IsMultiplayer();
+	virtual bool		IsIAmTheDukeActive() const;
 	virtual bool		IsLoadingSaveGame() const { return loadingSaveGame; }
 	virtual bool		IsGUIActive() const { return ( guiActive != NULL ) || ( guiTest != NULL ); }
 	virtual idUserInterface *GetActiveGUI() const { return ( guiTest != NULL ) ? guiTest : guiActive; }
@@ -195,6 +196,7 @@ public:
 	int					loadingAssetQueueTotal;
 	int					loadingAssetQueueLoaded;
 	float				loadingAssetQueueStartPct;
+	bool				iamTheDukeActive;
 
 	// this is the information required to be set before ExecuteMapChange() is called,
 	// which can be saved off at any time with the following commands so it can all be played back
@@ -313,6 +315,7 @@ public:
 
 	void				ExecuteMapChange( bool noFadeWipe = false );
 	void				UnloadMap();
+	void				ToggleIAmTheDuke( void );
 
 	// return true if we actually waiting on an auth reply
 	bool				MaybeWaitOnCDKey( void );
@@ -321,7 +324,7 @@ public:
 	// Session_menu.cpp
 
 	idStrList			loadGameList;
-	idStrList			modsList;
+	idList<idModInfo>	modsList;
 
 	idUserInterface *	GetActiveMenu();
 
@@ -342,11 +345,13 @@ public:
 	void				SetSaveGameGuiVars( void );
 	void				SetMainMenuGuiVars( void );
 	void				SetModsMenuGuiVars( void );
+	void				UpdateModsMenuGuiVars( void );
 	void				SetMainMenuSkin( void );
 	
 private:
 	bool				BoxDialogSanityCheck( void );
 	void				EmitGameAuth( void );
+	void				DrawIAmTheDukeOverlay( void ) const;
 	
 	typedef enum {
 		CDKEY_UNKNOWN,	// need to perform checks on the key

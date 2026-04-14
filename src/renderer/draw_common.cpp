@@ -622,6 +622,99 @@ static void RB_EndFullscreenPostProcessPass( void ) {
 	GL_Cull( CT_FRONT_SIDED );
 }
 
+static void RB_T_MarkIAmTheDukeTerrainStencil( const drawSurf_t *surf ) {
+	if ( surf == NULL || ( surf->dsFlags & DSF_IAMTHEDUKE_TERRAIN ) == 0 ) {
+		return;
+	}
+
+	const srfTriangles_t *tri = surf->geo;
+	const idMaterial *shader = surf->material;
+	if ( tri == NULL || shader == NULL || !shader->IsDrawn() ) {
+		return;
+	}
+	if ( !tri->numIndexes || shader->Coverage() == MC_TRANSLUCENT ) {
+		return;
+	}
+	if ( !tri->ambientCache ) {
+		common->Printf( "RB_T_MarkIAmTheDukeTerrainStencil: !tri->ambientCache\n" );
+		return;
+	}
+
+	const float *regs = surf->shaderRegisters;
+	if ( regs == NULL ) {
+		return;
+	}
+
+	int stage = 0;
+	for ( ; stage < shader->GetNumStages(); stage++ ) {
+		const shaderStage_t *pStage = shader->GetStage( stage );
+		if ( regs[ pStage->conditionRegister ] != 0 ) {
+			break;
+		}
+	}
+	if ( stage == shader->GetNumStages() ) {
+		return;
+	}
+
+	RB_SimpleSurfaceSetup( surf );
+	GL_Cull( shader->GetCullType() );
+
+	if ( shader->TestMaterialFlag( MF_POLYGONOFFSET ) ) {
+		glEnable( GL_POLYGON_OFFSET_FILL );
+		glPolygonOffset( r_offsetFactor.GetFloat(), r_offsetUnits.GetFloat() * shader->GetPolygonOffset() );
+	}
+
+	idDrawVert *ac = (idDrawVert *)vertexCache.Position( tri->ambientCache );
+	glVertexPointer( 3, GL_FLOAT, sizeof( idDrawVert ), ac->xyz.ToFloatPtr() );
+	glTexCoordPointer( 2, GL_FLOAT, sizeof( idDrawVert ), reinterpret_cast<void *>( &ac->st ) );
+
+	bool drawSolid = ( shader->Coverage() == MC_OPAQUE );
+
+	if ( shader->Coverage() == MC_PERFORATED ) {
+		bool drewAlphaStage = false;
+		glEnable( GL_ALPHA_TEST );
+
+		for ( stage = 0; stage < shader->GetNumStages(); stage++ ) {
+			const shaderStage_t *pStage = shader->GetStage( stage );
+			if ( !pStage->hasAlphaTest || regs[ pStage->conditionRegister ] == 0 ) {
+				continue;
+			}
+
+			drewAlphaStage = true;
+			const float stageAlpha = regs[ pStage->color.registers[3] ];
+			if ( stageAlpha <= 0.0f ) {
+				continue;
+			}
+
+			glColor4f( 1.0f, 1.0f, 1.0f, stageAlpha );
+			glAlphaFunc( GL_GREATER, regs[ pStage->alphaTestRegister ] );
+			pStage->texture.image->Bind();
+
+			if ( !RB_PrepareStageTexturing( pStage, surf, ac ) ) {
+				RB_FinishStageTexturing( pStage, surf, ac );
+				continue;
+			}
+
+			RB_DrawElementsWithCounters( tri );
+			RB_FinishStageTexturing( pStage, surf, ac );
+		}
+
+		glDisable( GL_ALPHA_TEST );
+		if ( !drewAlphaStage ) {
+			drawSolid = true;
+		}
+	}
+
+	if ( drawSolid ) {
+		globalImages->whiteImage->Bind();
+		RB_DrawElementsWithCounters( tri );
+	}
+
+	if ( shader->TestMaterialFlag( MF_POLYGONOFFSET ) ) {
+		glDisable( GL_POLYGON_OFFSET_FILL );
+	}
+}
+
 struct rbBuiltinUniformDef_t {
 	const char *name;
 	int components;
@@ -1795,6 +1888,120 @@ static void RB_InitCRTStage( void ) {
 	idStr::Copynz( rbCRTStage.shaderTextureNames[0], "Scene", sizeof( rbCRTStage.shaderTextureNames[0] ) );
 
 	rbCRTStageInitialized = true;
+}
+
+static newShaderStage_t rbIAmTheDukeSnowStage;
+static bool rbIAmTheDukeSnowStageInitialized = false;
+
+static void RB_InitIAmTheDukeSnowStage( void ) {
+	if ( rbIAmTheDukeSnowStageInitialized ) {
+		return;
+	}
+
+	memset( &rbIAmTheDukeSnowStage, 0, sizeof( rbIAmTheDukeSnowStage ) );
+	rbIAmTheDukeSnowStage.glslProgram = true;
+	idStr::Copynz( rbIAmTheDukeSnowStage.glslProgramName, "duke_snow.fs", sizeof( rbIAmTheDukeSnowStage.glslProgramName ) );
+	rbIAmTheDukeSnowStage.numShaderTextures = 1;
+	idStr::Copynz( rbIAmTheDukeSnowStage.shaderTextureNames[0], "Scene", sizeof( rbIAmTheDukeSnowStage.shaderTextureNames[0] ) );
+	rbIAmTheDukeSnowStageInitialized = true;
+}
+
+static void RB_STD_ApplyIAmTheDukeTerrainSnow( drawSurf_t **drawSurfs, const int numDrawSurfs ) {
+	if ( !session || !session->IsIAmTheDukeActive() || !glConfig.GLSLProgramAvailable || !backEnd.viewDef->viewEntitys ) {
+		return;
+	}
+	if ( drawSurfs == NULL || numDrawSurfs <= 0 ) {
+		return;
+	}
+
+	bool hasTerrain = false;
+	for ( int i = 0; i < numDrawSurfs; i++ ) {
+		if ( drawSurfs[i] != NULL && ( drawSurfs[i]->dsFlags & DSF_IAMTHEDUKE_TERRAIN ) != 0 ) {
+			hasTerrain = true;
+			break;
+		}
+	}
+	if ( !hasTerrain ) {
+		return;
+	}
+
+	RB_InitIAmTheDukeSnowStage();
+	if ( !R_ValidateGLSLProgram( &rbIAmTheDukeSnowStage ) ) {
+		return;
+	}
+
+	const int viewportWidth = backEnd.viewDef->viewport.x2 - backEnd.viewDef->viewport.x1 + 1;
+	const int viewportHeight = backEnd.viewDef->viewport.y2 - backEnd.viewDef->viewport.y1 + 1;
+	if ( viewportWidth <= 0 || viewportHeight <= 0 ) {
+		return;
+	}
+
+	idImage *sceneImage = globalImages->currentRenderImage;
+	if ( sceneImage == NULL ) {
+		return;
+	}
+
+	RB_LogComment( "---------- RB_STD_ApplyIAmTheDukeTerrainSnow ----------\n" );
+
+	GL_SelectTexture( 0 );
+	glEnableClientState( GL_VERTEX_ARRAY );
+	glEnableClientState( GL_TEXTURE_COORD_ARRAY );
+	glEnable( GL_DEPTH_TEST );
+	backEnd.currentSpace = NULL;
+
+	glColorMask( GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE );
+	glDepthMask( GL_FALSE );
+	glEnable( GL_STENCIL_TEST );
+	glStencilMask( 0xFF );
+	glClear( GL_STENCIL_BUFFER_BIT );
+	glStencilFunc( GL_ALWAYS, 1, 0xFF );
+	glStencilOp( GL_KEEP, GL_KEEP, GL_REPLACE );
+	GL_State( GLS_DEPTHFUNC_EQUAL );
+
+	RB_RenderDrawSurfListWithFunction( drawSurfs, numDrawSurfs, RB_T_MarkIAmTheDukeTerrainStencil );
+
+	glColorMask( GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE );
+	glDepthMask( GL_TRUE );
+	glStencilOp( GL_KEEP, GL_KEEP, GL_KEEP );
+
+	sceneImage->CopyFramebuffer( 0, 0, viewportWidth, viewportHeight );
+
+	const int textureWidth = sceneImage->GetOpts().width;
+	const int textureHeight = sceneImage->GetOpts().height;
+	if ( textureWidth <= 0 || textureHeight <= 0 ) {
+		glStencilMask( 0xFF );
+		glStencilFunc( GL_ALWAYS, 128, 255 );
+		return;
+	}
+
+	RB_BeginFullscreenPostProcessPass(
+		backEnd.viewDef->viewport.x1 + backEnd.viewDef->scissor.x1,
+		backEnd.viewDef->viewport.y1 + backEnd.viewDef->scissor.y1,
+		backEnd.viewDef->scissor.x2 - backEnd.viewDef->scissor.x1 + 1,
+		backEnd.viewDef->scissor.y2 - backEnd.viewDef->scissor.y1 + 1 );
+
+	GL_SelectTexture( 0 );
+	sceneImage->Bind();
+	glUseProgramObjectARB( (GLhandleARB)rbIAmTheDukeSnowStage.glslProgramObject );
+
+	const int sceneLocation = rbIAmTheDukeSnowStage.shaderTextureLocations[0];
+	if ( sceneLocation >= 0 ) {
+		glUniform1iARB( sceneLocation, 0 );
+	}
+
+	glEnable( GL_STENCIL_TEST );
+	glStencilMask( 0x00 );
+	glStencilFunc( GL_EQUAL, 1, 0xFF );
+	glStencilOp( GL_KEEP, GL_KEEP, GL_KEEP );
+
+	RB_DrawFullscreenPostProcessQuad( viewportWidth, viewportHeight, textureWidth, textureHeight );
+
+	glUseProgramObjectARB( 0 );
+	globalImages->BindNull();
+	RB_EndFullscreenPostProcessPass();
+
+	glStencilMask( 0xFF );
+	glStencilFunc( GL_ALWAYS, 128, 255 );
 }
 
 void RB_ApplyCRTToBackBuffer( void ) {
@@ -3820,9 +4027,21 @@ static bool RB_SurfaceHasLightGrid( const drawSurf_t *surf, const LightGrid *&li
 	if ( surf->material->Coverage() == MC_TRANSLUCENT ) {
 		return false;
 	}
+	// Keep the indirect light-grid pass on stable world/entity receivers only.
+	// Shot-created decals and depth-hacked weapon/effect surfaces use different
+	// color/depth paths and can leave this pass binding invalid state after fire.
+	if ( surf->decalColorCache != NULL ) {
+		return false;
+	}
+	if ( surf->material->TestMaterialFlag( MF_POLYGONOFFSET ) ) {
+		return false;
+	}
+	if ( surf->space->weaponDepthHack || surf->space->modelDepthHack != 0.0f ) {
+		return false;
+	}
 
 	const LightGrid &candidate = surf->area->lightGrid;
-	if ( candidate.lightGridPoints.Num() <= 0 || !candidate.HasImage() ) {
+	if ( candidate.GridPointCount() <= 0 || !candidate.HasImage() ) {
 		return false;
 	}
 	if ( candidate.lightGridBounds[0] <= 0 || candidate.lightGridBounds[1] <= 0 || candidate.lightGridBounds[2] <= 0 ) {
@@ -4147,6 +4366,8 @@ void	RB_STD_DrawView( void ) {
 	if ( processed < numDrawSurfs ) {
 		RB_STD_DrawShaderPasses( drawSurfs+processed, numDrawSurfs-processed );
 	}
+
+	RB_STD_ApplyIAmTheDukeTerrainSnow( drawSurfs, numDrawSurfs );
 
 	RB_RenderDebugTools( drawSurfs, numDrawSurfs );
 

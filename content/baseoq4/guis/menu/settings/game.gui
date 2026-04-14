@@ -319,19 +319,19 @@
 							
 							onAction {
 								if ("gui::g_gunXYZ" == 0) {
-								   consoleCMD "g_gunX 2";
+								   consoleCMD "g_gunX 1";
 								   consoleCMD "g_gunY 2";
-								   consoleCMD "g_gunZ -2";
+								   consoleCMD "g_gunZ -1";
 								   consoleCMD "g_weaponFovEffect 1";
 								} else if ("gui::g_gunXYZ" == 1) {
-								   consoleCMD "g_gunX 2";
+								   consoleCMD "g_gunX 1";
 								   consoleCMD "g_gunY -5";
-								   consoleCMD "g_gunZ -2";
+								   consoleCMD "g_gunZ -1";
 								   consoleCMD "g_weaponFovEffect 1";
 								} else {
-								   consoleCMD "g_gunX 0";
+								   consoleCMD "g_gunX 1";
 								   consoleCMD "g_gunY 0";
-								   consoleCMD "g_gunZ 0";
+								   consoleCMD "g_gunZ -1";
 								   consoleCMD "g_weaponFovEffect 1";
 								}
 								set "cmd" "play main_menu_selection" ; 
@@ -914,7 +914,8 @@
 						cvar	g_corpseSink
 						textscale	0.24
 						font	"fonts/lowpixel"
-						choices	"#str_200059"
+						choices	"#str_229921"
+						values	"0;1;2"
 						choiceType	0
 
 						onAction {

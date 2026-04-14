@@ -102,6 +102,48 @@ static void DrawSplashUnderlay( idDeviceContext *dc ) {
 	dc->DrawFilledRect( 0.0f, 0.0f, 640.0f, 480.0f, underlayColor );
 }
 
+static bool IsLegacyVehicleDamageOverlay( const idUserInterfaceLocal *gui, const char *windowName, const idMaterial *background, const idRectangle &drawRect ) {
+	if ( gui == NULL || background == NULL || windowName == NULL || !IsFullscreenBackdropRect( drawRect ) ) {
+		return false;
+	}
+
+	if ( idStr::Icmp( windowName, "damage" ) != 0 ) {
+		return false;
+	}
+
+	const char *materialName = background->GetName();
+	if ( materialName == NULL || idStr::Icmp( materialName, "gfx/guis/common/add_box2" ) != 0 ) {
+		return false;
+	}
+
+	const char *sourceFile = gui->GetSourceFile();
+	return idStr::Icmp( sourceFile, "guis/vehicles/hud.gui" ) == 0 ||
+		idStr::Icmp( sourceFile, "guis/vehicles/medchange.gui" ) == 0;
+}
+
+static bool ShouldDrawNativeScreenOverlay( const idUserInterfaceLocal *gui, const char *windowName, const idMaterial *background, const idRectangle &drawRect, int flags ) {
+	if ( ( flags & WIN_NATIVESCREENOVERLAY ) != 0 ) {
+		return IsFullscreenBackdropRect( drawRect );
+	}
+
+	// Preserve stock vehicle hit flashes across the full native render area even
+	// though the rest of the vehicle HUD remains constrained to the UI viewport.
+	return IsLegacyVehicleDamageOverlay( gui, windowName, background, drawRect );
+}
+
+static void DrawNativeScreenOverlay( const idMaterial *background, const idVec4 &matColor ) {
+	if ( background == NULL ) {
+		return;
+	}
+
+	const bool previousUIViewportMode = renderSystem->GetUseUIViewportFor2D();
+	renderSystem->SetUseUIViewportFor2D( false );
+	renderSystem->SetColor( matColor );
+	renderSystem->DrawStretchPic( 0.0f, 0.0f, SCREEN_WIDTH, SCREEN_HEIGHT, 0.0f, 0.0f, 1.0f, 1.0f, background );
+	renderSystem->SetColor( colorWhite );
+	renderSystem->SetUseUIViewportFor2D( previousUIViewportMode );
+}
+
 static rvNamedEvent *OpenQ4_CreateLegacyCinematicNamedEvent( idWindow *window, const char *eventName ) {
 	if ( window == NULL || window->GetGui() == NULL ) {
 		return NULL;
@@ -133,6 +175,126 @@ static rvNamedEvent *OpenQ4_CreateLegacyCinematicNamedEvent( idWindow *window, c
 	event->mEvent->FixupParms( window );
 
 	return event;
+}
+
+static bool TranslateControllerMenuKey( const sysEvent_t *sourceEvent, sysEvent_t &translatedEvent, int &focusDirection ) {
+	if ( sourceEvent == NULL || sourceEvent->evType != SE_KEY ) {
+		return false;
+	}
+
+	translatedEvent = *sourceEvent;
+	focusDirection = 0;
+
+	switch ( sourceEvent->evValue ) {
+		case K_JOY3:
+			translatedEvent.evValue = K_ENTER;
+			return true;
+		case K_JOY4:
+		case K_JOY7:
+		case K_JOY8:
+			translatedEvent.evValue = K_ESCAPE;
+			return true;
+		case K_JOY9:
+			translatedEvent.evValue = K_UPARROW;
+			focusDirection = -1;
+			return true;
+		case K_JOY10:
+			translatedEvent.evValue = K_DOWNARROW;
+			focusDirection = 1;
+			return true;
+		case K_JOY11:
+			translatedEvent.evValue = K_RIGHTARROW;
+			focusDirection = 1;
+			return true;
+		case K_JOY12:
+			translatedEvent.evValue = K_LEFTARROW;
+			focusDirection = -1;
+			return true;
+		default:
+			return false;
+	}
+}
+
+static bool WindowConsumesDirectionalNavigation( idWindow *window, int key ) {
+	if ( window == NULL ) {
+		return false;
+	}
+
+	if ( dynamic_cast<idChoiceWindow *>( window ) != NULL || dynamic_cast<idSliderWindow *>( window ) != NULL ) {
+		return key == K_LEFTARROW || key == K_KP_LEFTARROW || key == K_RIGHTARROW || key == K_KP_RIGHTARROW;
+	}
+
+	if ( dynamic_cast<idListWindow *>( window ) != NULL ) {
+		return key == K_UPARROW || key == K_KP_UPARROW || key == K_DOWNARROW || key == K_KP_DOWNARROW ||
+			key == K_PGUP || key == K_PGDN;
+	}
+
+	if ( dynamic_cast<idEditWindow *>( window ) != NULL ) {
+		return key == K_LEFTARROW || key == K_KP_LEFTARROW || key == K_RIGHTARROW || key == K_KP_RIGHTARROW ||
+			key == K_UPARROW || key == K_KP_UPARROW || key == K_DOWNARROW || key == K_KP_DOWNARROW ||
+			key == K_HOME || key == K_END || key == K_DEL || key == K_INS || key == K_BACKSPACE;
+	}
+
+	return false;
+}
+
+static bool NavigateFocus( idWindow *window, int direction ) {
+	if ( window == NULL || direction == 0 ) {
+		return false;
+	}
+
+	idWindow *currentFocus = window->GetFocusedChild();
+	idWindow *child = currentFocus;
+	idWindow *parent = child ? child->GetParent() : window;
+
+	while ( parent ) {
+		bool foundFocus = false;
+		bool recurse = false;
+		int index = 0;
+		if ( child ) {
+			index = parent->GetChildIndex( child ) + direction;
+		} else if ( direction < 0 ) {
+			index = parent->GetChildCount() - 1;
+		}
+		while ( index < parent->GetChildCount() && index >= 0 ) {
+			idWindow *testWindow = parent->GetChild( index );
+			if ( testWindow == currentFocus ) {
+				// we managed to wrap around and get back to our starting window
+				foundFocus = true;
+				break;
+			}
+			if ( testWindow && !testWindow->HasNoEvents() && testWindow->IsVisible() ) {
+				if ( testWindow->GetFlags() & WIN_CANFOCUS ) {
+					window->SetFocus( testWindow );
+					foundFocus = true;
+					break;
+				} else if ( testWindow->GetChildCount() > 0 ) {
+					parent = testWindow;
+					child = NULL;
+					recurse = true;
+					break;
+				}
+			}
+			index += direction;
+		}
+		if ( foundFocus ) {
+			return true;
+		}
+		if ( recurse ) {
+			continue;
+		}
+
+		// We didn't find anything, so go back up to our parent.
+		child = parent;
+		parent = child->GetParent();
+		if ( parent != NULL && parent->GetGui() != NULL && parent == parent->GetGui()->GetDesktop() ) {
+			// We got back to the desktop, so wrap around but don't actually go to the desktop.
+			parent = NULL;
+			child = NULL;
+		}
+	}
+
+	return false;
 }
 }
 
@@ -334,6 +496,8 @@ void idWindow::CommonInit() {
 	rotate = 0;
 	shear.Zero();
 	textScale = 0.35f;
+	textspacing = 0.0f;
+	textstyle = 0.0f;
 	backColor.Zero();
 	foreColor = idVec4(1, 1, 1, 1);
 	hoverColor = idVec4(1, 1, 1, 1);
@@ -554,6 +718,8 @@ void idWindow::Draw( int time, float x, float y ) {
 	if ( text.Length() == 0 ) {
 		return;
 	}
+	const int textAdjust = static_cast<int>( textspacing );
+	const int style = static_cast<int>( textstyle );
 	if ( textShadow ) {
 		idStr shadowText = text;
 		idRectangle shadowRect = textRect;
@@ -562,9 +728,9 @@ void idWindow::Draw( int time, float x, float y ) {
 		shadowRect.x += textShadow;
 		shadowRect.y += textShadow;
 
-		dc->DrawText( shadowText, textScale, textAlign, colorBlack, shadowRect, !( flags & WIN_NOWRAP ), -1 );
+		dc->DrawText( shadowText, textScale, textAlign, colorBlack, shadowRect, !( flags & WIN_NOWRAP ), -1, false, NULL, 0, textAdjust, style );
 	}
-	dc->DrawText( text, textScale, textAlign, foreColor, textRect, !( flags & WIN_NOWRAP ), -1 );
+	dc->DrawText( text, textScale, textAlign, foreColor, textRect, !( flags & WIN_NOWRAP ), -1, false, NULL, 0, textAdjust, style );
 
 	if ( gui_edit.GetBool() ) {
 		dc->EnableClipping( false );
@@ -974,12 +1140,18 @@ idWindow::HandleEvent
 const char *idWindow::HandleEvent(const sysEvent_t *event, bool *updateVisuals) {
 	static bool actionDownRun;
 	static bool actionUpRun;
+	sysEvent_t translatedEvent;
+	int controllerFocusDirection = 0;
 
 	if ( parent && parent->GetGui() && gui != parent->GetGui() ) {
 		gui = parent->GetGui();
 	}
 	if ( gui == NULL ) {
 		return "";
+	}
+
+	if ( TranslateControllerMenuKey( event, translatedEvent, controllerFocusDirection ) ) {
+		event = &translatedEvent;
 	}
 
 	cmd = "";
@@ -1121,66 +1293,9 @@ const char *idWindow::HandleEvent(const sysEvent_t *event, bool *updateVisuals) 
 					if (childRet && *childRet) {
 						return childRet;
 					}
-
-					// If the window didn't handle the tab, then move the focus to the next window
-					// or the previous window if shift is held down
-
-					int direction = 1;
-					if ( idKeyInput::IsDown( K_SHIFT ) ) {
-						direction = -1;
-					}
-
-					idWindow *currentFocus = GetFocusedChild();
-					idWindow *child = GetFocusedChild();
-					idWindow *parent = child->GetParent();
-					while ( parent ) {
-						bool foundFocus = false;
-						bool recurse = false;
-						int index = 0;
-						if ( child ) {
-							index = parent->GetChildIndex( child ) + direction;
-						} else if ( direction < 0 ) {
-							index = parent->GetChildCount() - 1;
-						}
-						while ( index < parent->GetChildCount() && index >= 0) {
-							idWindow *testWindow = parent->GetChild( index );
-							if ( testWindow == currentFocus ) {
-								// we managed to wrap around and get back to our starting window
-								foundFocus = true;
-								break;
-							}
-							if ( testWindow && !testWindow->noEvents && testWindow->visible ) {
-								if ( testWindow->flags & WIN_CANFOCUS ) {
-									SetFocus( testWindow );
-									foundFocus = true;
-									break;
-								} else if ( testWindow->GetChildCount() > 0 ) {
-									parent = testWindow;
-									child = NULL;
-									recurse = true;
-									break;
-								}
-							}
-							index += direction;
-						}
-						if ( foundFocus ) {
-							// We found a child to focus on
-							break;
-						} else if ( recurse ) {
-							// We found a child with children
-							continue;
-						} else {
-							// We didn't find anything, so go back up to our parent
-							child = parent;
-							parent = child->GetParent();
-							if ( parent == gui->GetDesktop() ) {
-								// We got back to the desktop, so wrap around but don't actually go to the desktop
-								parent = NULL;
-								child = NULL;
-							}
-						}
-					}
 				}
+				int direction = idKeyInput::IsDown( K_SHIFT ) ? -1 : 1;
+				NavigateFocus( this, direction );
 			} else if (event->evValue == K_ESCAPE && event->evValue2) {
 				if (GetFocusedChild()) {
 					const char *childRet = GetFocusedChild()->HandleEvent(event, updateVisuals);
@@ -1203,6 +1318,19 @@ const char *idWindow::HandleEvent(const sysEvent_t *event, bool *updateVisuals) 
 						RunScript( ON_ACTIONRELEASE );
 					}
 				}
+			} else if (controllerFocusDirection != 0 && event->evValue2) {
+				idWindow *focusedChild = GetFocusedChild();
+				const bool childConsumesDirection = WindowConsumesDirectionalNavigation( focusedChild, event->evValue );
+				if (focusedChild) {
+					const char *childRet = focusedChild->HandleEvent(event, updateVisuals);
+					if (childRet && *childRet) {
+						return childRet;
+					}
+					if ( childConsumesDirection ) {
+						return "";
+					}
+				}
+				NavigateFocus( this, controllerFocusDirection );
 			} else {
 				if (GetFocusedChild()) {
 					const char *childRet = GetFocusedChild()->HandleEvent(event, updateVisuals);
@@ -1443,6 +1571,10 @@ void idWindow::DrawBackground(const idRectangle &drawRect) {
 			DrawCinematicUnderlay( dc );
 		} else if ( ShouldDrawSplashUnderlay( background, drawRect ) ) {
 			DrawSplashUnderlay( dc );
+		}
+		if ( ShouldDrawNativeScreenOverlay( gui, GetName(), background, drawRect, flags ) ) {
+			DrawNativeScreenOverlay( background, matColor );
+			return;
 		}
 
 		if ( flags & WIN_MATCANVASFILL ) {
@@ -2650,7 +2782,7 @@ bool idWindow::ParseInternalVar(const char *_name, idParser *src) {
 	}
 // jmarshall - quake 4
 	if (idStr::Icmp(_name, "textSpacing") == 0) {
-		src->ParseInt();
+		textspacing = src->ParseFloat();
 		return true;
 	}
 // jmarshall end
@@ -2703,7 +2835,7 @@ bool idWindow::ParseInternalVar(const char *_name, idParser *src) {
 	}
 // jmarshall - quake 4
 	if (idStr::Icmp(_name, "textStyle") == 0) {
-		src->ParseInt();
+		textstyle = src->ParseInt();
 		return true;
 	}
 // jmarshall end
@@ -2740,6 +2872,14 @@ bool idWindow::ParseInternalVar(const char *_name, idParser *src) {
 			flags |= WIN_MATCANVASFILL;
 		} else {
 			flags &= ~WIN_MATCANVASFILL;
+		}
+		return true;
+	}
+	if ( idStr::Icmp( _name, "nativescreenoverlay" ) == 0 ) {
+		if ( src->ParseBool() ) {
+			flags |= WIN_NATIVESCREENOVERLAY;
+		} else {
+			flags &= ~WIN_NATIVESCREENOVERLAY;
 		}
 		return true;
 	}
@@ -3266,9 +3406,40 @@ bool idWindow::Parse( idParser *src, bool rebuild) {
 		}
 // jmarshall - quake 4 guis
 		else if (token == "defineicon") {
-			// TODO needs implementation
-			src->ReadToken(&token); // key
-			src->ReadToken(&token); // value
+			idToken keyToken;
+			idToken valueToken;
+			idToken extraToken;
+			int iconX = -1;
+			int iconY = -1;
+			int iconW = -1;
+			int iconH = -1;
+
+			if ( !src->ReadToken( &keyToken ) || !src->ReadToken( &valueToken ) ) {
+				common->Warning( "Window '%s' in gui '%s': malformed defineicon", GetName(), gui ? gui->GetSourceFile() : "" );
+				continue;
+			}
+
+			if ( src->ReadToken( &extraToken ) ) {
+				if ( extraToken == "," ) {
+					src->ReadToken( &extraToken );
+					iconX = extraToken.GetIntValue();
+					src->ExpectTokenString( "," );
+					src->ReadToken( &extraToken );
+					iconY = extraToken.GetIntValue();
+					src->ExpectTokenString( "," );
+					src->ReadToken( &extraToken );
+					iconW = extraToken.GetIntValue();
+					src->ExpectTokenString( "," );
+					src->ReadToken( &extraToken );
+					iconH = extraToken.GetIntValue();
+				} else {
+					src->UnreadToken( &extraToken );
+				}
+			}
+
+			if ( dc != NULL ) {
+				dc->RegisterIcon( keyToken.c_str(), valueToken.c_str(), iconX, iconY, iconW, iconH );
+			}
 		}
 // jmarshall end
 		else if ( token == "float" ) {
@@ -5099,6 +5270,8 @@ void idWindow::SetDefaults ( void ) {
 	rotate = 0;
 	shear.Zero();
 	textScale = 0.35f;
+	textspacing = 0.0f;
+	textstyle = 0.0f;
 	backColor.Zero();
 	foreColor = idVec4(1, 1, 1, 1);
 	hoverColor = idVec4(1, 1, 1, 1);

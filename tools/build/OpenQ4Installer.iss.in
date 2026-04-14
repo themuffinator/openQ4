@@ -1,0 +1,142 @@
+#define MyAppName "OpenQ4"
+#define MyAppVersion "@@APP_VERSION@@"
+#define MyAppPublisher "DarkMatter Productions"
+#define MyAppURL "https://www.darkmatter-quake.com"
+#define MyAppExeName "OpenQ4-client_@@APP_ARCH@@.exe"
+#define MyAppServerExeName "OpenQ4-ded_@@APP_ARCH@@.exe"
+#define MyAppDocsFile "docs\\index.html"
+#define MyAppInstallRegKey "Software\\DarkMatter Productions\\OpenQ4"
+#define MyAppProtocolName "openq4"
+#define MyAppProtocolRegKey "Software\\Classes\\openq4"
+#define MyAppClientAppPathsKey "Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\{#MyAppExeName}"
+#define PackageSource "@@PACKAGE_SOURCE@@"
+
+[Setup]
+AppId={{8FD95F4F-3E38-4E18-8DB6-584E6D97C7E4}
+AppName={#MyAppName}
+AppVersion={#MyAppVersion}
+AppVerName={#MyAppName} {#MyAppVersion}
+AppPublisher={#MyAppPublisher}
+AppPublisherURL={#MyAppURL}
+AppSupportURL={#MyAppURL}
+AppUpdatesURL={#MyAppURL}
+AppMutex=OpenQ4
+AppReadmeFile={app}\README.html
+ChangesAssociations=yes
+DefaultDirName={code:GetDefaultInstallDir}
+DefaultGroupName=OpenQ4
+DisableProgramGroupPage=yes
+UsePreviousAppDir=yes
+LicenseFile=@@LICENSE_FILE@@
+OutputDir=@@OUTPUT_DIR@@
+OutputBaseFilename=@@OUTPUT_BASENAME@@
+SetupIconFile=@@SETUP_ICON_FILE@@
+UninstallDisplayName={#MyAppName}
+UninstallDisplayIcon={app}\{#MyAppExeName}
+Compression=lzma2/max
+SolidCompression=yes
+WizardStyle=modern
+PrivilegesRequired=lowest
+@@ARCH_ALLOWED_DIRECTIVE@@
+@@ARCH_INSTALL_MODE_DIRECTIVE@@
+VersionInfoVersion=@@APP_VERSION@@
+VersionInfoCompany={#MyAppPublisher}
+VersionInfoDescription=OpenQ4 Windows Installer
+VersionInfoProductName={#MyAppName}
+VersionInfoCopyright=Copyright 2026 DarkMatter Productions
+
+[Languages]
+Name: "english"; MessagesFile: "compiler:Default.isl"
+
+[Tasks]
+Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional options:"; Flags: unchecked
+Name: "protocol"; Description: "Register openq4:// browser links"; GroupDescription: "Browser integration:"; Flags: unchecked
+
+[Files]
+Source: "{#PackageSource}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+[Registry]
+Root: HKA; Subkey: "{#MyAppInstallRegKey}"; ValueType: string; ValueName: "InstallDir"; ValueData: "{app}"; Flags: uninsdeletekeyifempty
+Root: HKA; Subkey: "{#MyAppInstallRegKey}"; ValueType: string; ValueName: "InstallArch"; ValueData: "@@APP_ARCH@@"; Flags: uninsdeletekeyifempty
+Root: HKA; Subkey: "{#MyAppInstallRegKey}"; ValueType: string; ValueName: "InstallVersion"; ValueData: "{#MyAppVersion}"; Flags: uninsdeletekeyifempty
+Root: HKA; Subkey: "{#MyAppInstallRegKey}"; ValueType: string; ValueName: "ClientExe"; ValueData: "{app}\{#MyAppExeName}"; Flags: uninsdeletekeyifempty
+Root: HKA; Subkey: "{#MyAppInstallRegKey}"; ValueType: string; ValueName: "UninstallExe"; ValueData: "{uninstallexe}"; Flags: uninsdeletekeyifempty
+Root: HKA; Subkey: "{#MyAppInstallRegKey}"; ValueType: dword; ValueName: "ProtocolEnabled"; ValueData: "0"; Flags: uninsdeletekeyifempty
+Root: HKA; Subkey: "{#MyAppInstallRegKey}"; ValueType: dword; ValueName: "ProtocolEnabled"; ValueData: "1"; Tasks: protocol; Flags: uninsdeletekeyifempty
+Root: HKA; Subkey: "{#MyAppClientAppPathsKey}"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName}"; Flags: uninsdeletekey
+Root: HKA; Subkey: "{#MyAppClientAppPathsKey}"; ValueType: string; ValueName: "Path"; ValueData: "{app}"; Flags: uninsdeletekey
+Root: HKA; Subkey: "{#MyAppProtocolRegKey}"; ValueType: string; ValueName: ""; ValueData: "URL:OpenQ4 Protocol"; Tasks: protocol; Flags: uninsdeletekeyifempty
+Root: HKA; Subkey: "{#MyAppProtocolRegKey}"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""; Tasks: protocol; Flags: uninsdeletekeyifempty
+Root: HKA; Subkey: "{#MyAppProtocolRegKey}"; ValueType: string; ValueName: "FriendlyTypeName"; ValueData: "OpenQ4 Link"; Tasks: protocol; Flags: uninsdeletekeyifempty
+Root: HKA; Subkey: "{#MyAppProtocolRegKey}\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: protocol; Flags: uninsdeletekey
+Root: HKA; Subkey: "{#MyAppProtocolRegKey}\shell"; ValueType: string; ValueName: ""; ValueData: "open"; Tasks: protocol; Flags: uninsdeletekeyifempty
+Root: HKA; Subkey: "{#MyAppProtocolRegKey}\shell\open"; ValueType: string; ValueName: ""; ValueData: "Open in OpenQ4"; Tasks: protocol; Flags: uninsdeletekeyifempty
+Root: HKA; Subkey: "{#MyAppProtocolRegKey}\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: protocol; Flags: uninsdeletekey
+
+[Icons]
+Name: "{group}\OpenQ4"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"
+Name: "{group}\Dedicated Server"; Filename: "{app}\{#MyAppServerExeName}"; WorkingDir: "{app}"
+Name: "{group}\Documentation Portal"; Filename: "{app}\{#MyAppDocsFile}"
+Name: "{group}\Package Overview"; Filename: "{app}\README.html"
+Name: "{group}\Uninstall OpenQ4"; Filename: "{uninstallexe}"
+Name: "{autodesktop}\OpenQ4"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
+
+[Run]
+Filename: "{app}\docs\index.html"; Description: "Open the release documentation"; Flags: postinstall shellexec skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Description: "Launch OpenQ4"; WorkingDir: "{app}"; Flags: postinstall nowait skipifsilent unchecked
+
+[Code]
+const
+  OpenQ4InstallRegKey = '{#MyAppInstallRegKey}';
+  OpenQ4ProtocolRegKey = '{#MyAppProtocolRegKey}';
+  OpenQ4DefaultInstallDir = '{localappdata}\Programs\OpenQ4';
+
+function GetDefaultInstallDir(Param: String): String;
+var
+  InstallDir: String;
+begin
+  if RegQueryStringValue(HKEY_AUTO, OpenQ4InstallRegKey, 'InstallDir', InstallDir) and (InstallDir <> '') then
+    Result := InstallDir
+  else
+    Result := ExpandConstant(OpenQ4DefaultInstallDir);
+end;
+
+function FormatExistingInstallSummary: String;
+var
+  InstallDir: String;
+  InstallVersion: String;
+  InstallArch: String;
+begin
+  Result := '';
+  if not RegQueryStringValue(HKEY_AUTO, OpenQ4InstallRegKey, 'InstallDir', InstallDir) then
+    Exit;
+  if InstallDir = '' then
+    Exit;
+
+  RegQueryStringValue(HKEY_AUTO, OpenQ4InstallRegKey, 'InstallVersion', InstallVersion);
+  RegQueryStringValue(HKEY_AUTO, OpenQ4InstallRegKey, 'InstallArch', InstallArch);
+
+  Result := 'Existing OpenQ4 installation detected';
+  if InstallVersion <> '' then
+    Result := Result + ': version ' + InstallVersion;
+  if InstallArch <> '' then
+    Result := Result + ' (' + Uppercase(InstallArch) + ')';
+  Result := Result + '.' + #13#10 + InstallDir + #13#10 +
+    'Setup will reuse that install location unless you choose a different folder.';
+end;
+
+procedure InitializeWizard;
+var
+  ExistingInstallSummary: String;
+begin
+  ExistingInstallSummary := FormatExistingInstallSummary;
+  if ExistingInstallSummary <> '' then
+    WizardForm.WelcomeLabel2.Caption :=
+      WizardForm.WelcomeLabel2.Caption + #13#10#13#10 + ExistingInstallSummary;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if (CurStep = ssInstall) and (not WizardIsTaskSelected('protocol')) then
+    RegDeleteKeyIncludingSubkeys(HKEY_AUTO, OpenQ4ProtocolRegKey);
+end;

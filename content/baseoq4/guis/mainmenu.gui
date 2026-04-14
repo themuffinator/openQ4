@@ -9452,28 +9452,28 @@ windowDef Desktop
 			}
 			windowDef pop_mods_bg
 			{
-				rect	160,40,320,400
+				rect	110,40,420,400
 				visible	1
 				background	"gfx/guis/mainmenu/popup_bg"
 				matcolor	0,0,0,1
 			}
 			windowDef pop_mods_top
 			{
-				rect	160,133,320,19
+				rect	110,133,420,19
 				visible	1
 				background	"gfx/guis/mainmenu/popup_top"
 				matcolor	0,0,0,0
 			}
 			windowDef pop_mods_mid
 			{
-				rect	160,152,320,158
+				rect	110,152,420,210
 				visible	1
 				background	"gfx/guis/mainmenu/popup_mid"
 				matcolor	0,0,0,0
 			}
 			windowDef pop_mods_btm
 			{
-				rect	160,310,320,38
+				rect	110,362,420,38
 				visible	1
 				background	"gfx/guis/mainmenu/popup_btm"
 				matcolor	0,0,0,0
@@ -9485,7 +9485,7 @@ windowDef Desktop
 				noclip	1
 				windowDef pop_mods_title
 				{
-					rect	177,127,213,17
+					rect	127,127,176,17
 					visible	1
 					forecolor	1,1,1,0.8
 					text	"#str_200166"
@@ -9493,11 +9493,39 @@ windowDef Desktop
 					font	"fonts/marine"
 					textspacing	-1
 				}
+				windowDef pop_mods_detail_title
+				{
+					rect	333,127,164,17
+					visible	1
+					forecolor	1,1,1,0.8
+					text	"#str_41109"
+					textscale	.28
+					font	"fonts/marine"
+					textspacing	-1
+				}
+				windowDef pop_mods_list_name
+				{
+					rect	133,145,112,12
+					visible	1
+					forecolor	1,1,1,0.4
+					text	"#str_41110"
+					textscale	.18
+					font	"fonts/lowpixel"
+				}
+				windowDef pop_mods_list_version
+				{
+					rect	259,145,57,12
+					visible	1
+					forecolor	1,1,1,0.4
+					text	"#str_41111"
+					textscale	.18
+					font	"fonts/lowpixel"
+				}
 				listDef pop_mods_list
 				{
-					rect	182,155,274,147
+					rect	132,158,184,196
 					forecolor	1, 1, 1, 1
-					textscale	0.25
+					textscale	0.21
 					listname	"modsList"
 					font	"fonts/lowpixel"
 					visible	1
@@ -9505,18 +9533,158 @@ windowDef Desktop
 					backgroundHover	"gfx/guis/mainmenu/bg_hover"
 					backgroundFocus	"gfx/guis/mainmenu/bg_focus"
 					backgroundLine	"gfx/guis/mainmenu/bg_line"
-					itemheight	20
+					itemheight	22
+					tabValigns	"0,0"
+					tabaligns	"0,0"
+					tabstops	"0,132,182"
+
+					onMouseEnter {
+						set "bordercolor_w" "0.4" ;
+						set "cmd" "play main_menu_mouseover" ;
+					}
+
+					onMouseExit {
+						set "bordercolor_w" "0.2" ;
+					}
+
+					onAction {
+						set "cmd" "play main_menu_selection" ;
+						set "cmd" "updateModInfo" ;
+					}
+
+					onEnter {
+						set "cmd" "play main_menu_selection" ;
+						set "cmd" "updateModInfo" ;
+					}
+				}
+				windowDef pop_mods_name
+				{
+					rect	333,154,177,28
+					visible	1
+					forecolor	0.839,1,0.658,1
+					text	"gui::mod_name"
+					textscale	.23
+					font	"fonts/lowpixel"
+					textalignx	0
+				}
+				windowDef pop_mods_version_label
+				{
+					rect	333,190,170,12
+					visible	1
+					forecolor	1,1,1,0.4
+					text	"#str_41111"
+					textscale	.18
+					font	"fonts/lowpixel"
+				}
+				windowDef pop_mods_version
+				{
+					rect	333,202,177,16
+					visible	1
+					forecolor	1,1,1,0.8
+					text	"gui::mod_version"
+					textscale	.21
+					font	"fonts/lowpixel"
+				}
+				windowDef pop_mods_author_label
+				{
+					rect	333,224,170,12
+					visible	1
+					forecolor	1,1,1,0.4
+					text	"#str_41112"
+					textscale	.18
+					font	"fonts/lowpixel"
+				}
+				windowDef pop_mods_author
+				{
+					rect	333,236,177,16
+					visible	1
+					forecolor	1,1,1,0.8
+					text	"gui::mod_author"
+					textscale	.21
+					font	"fonts/lowpixel"
+				}
+				windowDef pop_mods_release_label
+				{
+					rect	333,258,170,12
+					visible	1
+					forecolor	1,1,1,0.4
+					text	"#str_41113"
+					textscale	.18
+					font	"fonts/lowpixel"
+				}
+				windowDef pop_mods_release
+				{
+					rect	333,270,177,16
+					visible	1
+					forecolor	1,1,1,0.8
+					text	"gui::mod_release_date"
+					textscale	.21
+					font	"fonts/lowpixel"
+				}
+				windowDef pop_mods_engine_label
+				{
+					rect	333,292,170,12
+					visible	1
+					forecolor	1,1,1,0.4
+					text	"#str_41114"
+					textscale	.18
+					font	"fonts/lowpixel"
+				}
+				windowDef pop_mods_engine
+				{
+					rect	333,304,177,16
+					visible	1
+					forecolor	1,1,1,0.8
+					text	"gui::mod_required_engine_version"
+					textscale	.21
+					font	"fonts/lowpixel"
+				}
+				windowDef pop_mods_directory_label
+				{
+					rect	333,326,170,12
+					visible	1
+					forecolor	1,1,1,0.4
+					text	"#str_41115"
+					textscale	.18
+					font	"fonts/lowpixel"
+				}
+				windowDef pop_mods_directory
+				{
+					rect	333,338,177,16
+					visible	1
+					forecolor	1,1,1,0.8
+					text	"gui::mod_directory"
+					textscale	.21
+					font	"fonts/lowpixel"
+				}
+				windowDef pop_mods_website_label
+				{
+					rect	333,360,170,12
+					visible	1
+					forecolor	1,1,1,0.4
+					text	"#str_41116"
+					textscale	.18
+					font	"fonts/lowpixel"
+				}
+				windowDef pop_mods_website
+				{
+					rect	333,372,177,16
+					visible	1
+					forecolor	1,1,1,0.8
+					text	"gui::mod_website"
+					textscale	.17
+					font	"fonts/lowpixel"
 				}
 				windowDef pop_mods_loadmod
 				{
-					rect	179,309,120,30
+					rect	132,366,120,30
 					visible	1
 					background	"gfx/guis/mainmenu/b4_light"
 					matcolor	0.545,0.588,0.294,0.4
 				}
 				windowDef pop_mods_t_loadmod
 				{
-					rect	199,311,141,17
+					rect	152,368,141,17
 					visible	1
 					forecolor	1,1,1,0.8
 					text	"#str_200167"
@@ -9525,21 +9693,21 @@ windowDef Desktop
 				}
 				windowDef pop_mods_loadmod_corner
 				{
-					rect	189,317,11,11
+					rect	142,374,11,11
 					visible	1
 					background	"gfx/guis/mainmenu/corner"
 					matcolor	0.564,0.603,0.286,0.4
 				}
 				windowDef pop_mods_cancel
 				{
-					rect	350,309,120,30
+					rect	299,366,120,30
 					visible	1
 					background	"gfx/guis/mainmenu/b4_light"
 					matcolor	0.545,0.588,0.294,0.4
 				}
 				windowDef pop_mods_t_cancel
 				{
-					rect	370,311,108,17
+					rect	319,368,108,17
 					visible	1
 					forecolor	1,1,1,0.8
 					text	"#str_200168"
@@ -9548,7 +9716,7 @@ windowDef Desktop
 				}
 				windowDef pop_mods_cancel_corner
 				{
-					rect	360,317,11,11
+					rect	309,374,11,11
 					visible	1
 					background	"gfx/guis/mainmenu/corner"
 					matcolor	0.564,0.603,0.286,0.4
@@ -24733,7 +24901,7 @@ windowDef Desktop
 		}
 		windowDef pop_b_mods_loadmod
 		{
-			rect	182,312,119,23
+			rect	135,369,119,23
 			visible	0
 
 			onMouseEnter {
@@ -24770,7 +24938,7 @@ windowDef Desktop
 		}
 		windowDef pop_b_mods_cancel
 		{
-			rect	354,312,119,23
+			rect	302,369,119,23
 			visible	0
 
 			onMouseEnter {

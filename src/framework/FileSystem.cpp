@@ -932,6 +932,7 @@ public:
 	virtual bool			IsInitialized( void ) const;
 	virtual bool			PerformingCopyFiles( void ) const;
 	virtual idModList *		ListMods( void );
+	virtual bool			GetModInfo( const char *modDir, idModInfo &modInfo, idStr *reason = NULL );
 	virtual void			FreeModList( idModList *modList );
 	virtual idFileList *	ListFiles( const char *relativePath, const char *extension, bool sort = false, bool fullRelativePath = false, const char* gamedir = NULL );
 	virtual idFileList *	ListFilesTree( const char *relativePath, const char *extension, bool sort = false, const char* gamedir = NULL );
@@ -1074,6 +1075,9 @@ private:
 	pureStatus_t			GetPackStatus( pack_t *pak );
 	addonInfo_t *			ParseAddonDef( const char *buf, const int len );
 	void					FollowAddonDependencies( pack_t *pak );
+	bool					ReadModManifestFromSearchPath( const char *searchPath, const char *modDir, idModInfo &modInfo, idStr *reason = NULL );
+	bool					ReadModManifestFile( const char *manifestPath, idModInfo &modInfo, idStr *reason = NULL );
+	bool					ValidateConfiguredGameDir( const char *gameDir, idStr *reason = NULL );
 
 	static size_t			CurlWriteFunction( void *ptr, size_t size, size_t nmemb, void *stream );
 							// curl_progress_callback in curl.h
@@ -2318,19 +2322,269 @@ void idFileSystemLocal::FreeFileList( idFileList *fileList ) {
 	delete fileList;
 }
 
+static const char *OPENQ4_MOD_MANIFEST_FILENAME = "mod.json";
+
+/*
+===============
+idModInfoCompare
+===============
+*/
+static int idModInfoCompare( const idModInfo *a, const idModInfo *b ) {
+	const int displayNameCompare = a->displayName.Icmp( b->displayName );
+	if ( displayNameCompare != 0 ) {
+		return displayNameCompare;
+	}
+
+	return a->directory.Icmp( b->directory );
+}
+
+/*
+===============
+FS_FindModDirectory
+===============
+*/
+static int FS_FindModDirectory( const idList<idModInfo> &mods, const char *directory ) {
+	for ( int i = 0; i < mods.Num(); ++i ) {
+		if ( !mods[i].directory.Icmp( directory ) ) {
+			return i;
+		}
+	}
+
+	return -1;
+}
+
+/*
+===============
+FS_SkipJsonWhitespace
+===============
+*/
+static const char *FS_SkipJsonWhitespace( const char *cursor ) {
+	while ( cursor != NULL && ( *cursor == ' ' || *cursor == '\t' || *cursor == '\r' || *cursor == '\n' ) ) {
+		++cursor;
+	}
+
+	return cursor;
+}
+
+/*
+===============
+FS_ParseJsonString
+===============
+*/
+static bool FS_ParseJsonString( const char *&cursor, idStr &value, idStr &errorOut ) {
+	value.Clear();
+
+	cursor = FS_SkipJsonWhitespace( cursor );
+	if ( cursor == NULL || *cursor != '"' ) {
+		errorOut = "expected JSON string";
+		return false;
+	}
+
+	++cursor;
+	while ( *cursor != '\0' ) {
+		if ( *cursor == '"' ) {
+			++cursor;
+			return true;
+		}
+
+		if ( *cursor == '\\' ) {
+			++cursor;
+			if ( *cursor == '\0' ) {
+				errorOut = "unterminated escape sequence in JSON string";
+				return false;
+			}
+
+			switch ( *cursor ) {
+				case '"':
+				case '\\':
+				case '/':
+					value += *cursor;
+					break;
+				case 'b':
+					value += '\b';
+					break;
+				case 'f':
+					value += '\f';
+					break;
+				case 'n':
+					value += '\n';
+					break;
+				case 'r':
+					value += '\r';
+					break;
+				case 't':
+					value += '\t';
+					break;
+				default:
+					errorOut = va( "unsupported JSON escape '\\%c'", *cursor );
+					return false;
+			}
+
+			++cursor;
+			continue;
+		}
+
+		value += *cursor;
+		++cursor;
+	}
+
+	errorOut = "unterminated JSON string";
+	return false;
+}
+
+/*
+===============
+FS_BuildModListLabel
+===============
+*/
+static idStr FS_BuildModListLabel( const idModInfo &modInfo ) {
+	idStr label = modInfo.displayName;
+	label.Replace( "\t", " " );
+	label.Replace( "\r", " " );
+	label.Replace( "\n", " " );
+
+	idStr version = modInfo.version;
+	version.Replace( "\t", " " );
+	version.Replace( "\r", " " );
+	version.Replace( "\n", " " );
+
+	return va( "%s\t%s", label.c_str(), version.c_str() );
+}
+
+/*
+===============
+FS_FinalizeModInfo
+===============
+*/
+static void FS_FinalizeModInfo( idModInfo &modInfo ) {
+	modInfo.listLabel = FS_BuildModListLabel( modInfo );
+}
+
+/*
+===============
+FS_ParseModManifest
+===============
+*/
+static bool FS_ParseModManifest( const char *jsonText, idModInfo &modInfo, idStr &errorOut ) {
+	errorOut.Clear();
+	modInfo.displayName.Clear();
+	modInfo.version.Clear();
+	modInfo.releaseDate.Clear();
+	modInfo.website.Clear();
+	modInfo.author.Clear();
+	modInfo.requiredOpenQ4Version.Clear();
+	modInfo.listLabel.Clear();
+
+	if ( jsonText == NULL ) {
+		errorOut = "manifest content is null";
+		return false;
+	}
+
+	const char *cursor = FS_SkipJsonWhitespace( jsonText );
+	if ( cursor == NULL || *cursor != '{' ) {
+		errorOut = "manifest must begin with '{'";
+		return false;
+	}
+
+	++cursor;
+	while ( true ) {
+		idStr key;
+		idStr value;
+
+		cursor = FS_SkipJsonWhitespace( cursor );
+		if ( cursor == NULL || *cursor == '\0' ) {
+			errorOut = "manifest ended before closing '}'";
+			return false;
+		}
+		if ( *cursor == '}' ) {
+			++cursor;
+			break;
+		}
+
+		if ( !FS_ParseJsonString( cursor, key, errorOut ) ) {
+			return false;
+		}
+
+		cursor = FS_SkipJsonWhitespace( cursor );
+		if ( *cursor != ':' ) {
+			errorOut = va( "missing ':' after '%s'", key.c_str() );
+			return false;
+		}
+		++cursor;
+
+		if ( !FS_ParseJsonString( cursor, value, errorOut ) ) {
+			errorOut = va( "invalid value for '%s': %s", key.c_str(), errorOut.c_str() );
+			return false;
+		}
+
+		if ( !key.Icmp( "name" ) ) {
+			modInfo.displayName = value;
+		} else if ( !key.Icmp( "version" ) ) {
+			modInfo.version = value;
+		} else if ( !key.Icmp( "releaseDate" ) ) {
+			modInfo.releaseDate = value;
+		} else if ( !key.Icmp( "website" ) ) {
+			modInfo.website = value;
+		} else if ( !key.Icmp( "author" ) ) {
+			modInfo.author = value;
+		} else if ( !key.Icmp( "requiredOpenQ4Version" ) ) {
+			modInfo.requiredOpenQ4Version = value;
+		}
+
+		cursor = FS_SkipJsonWhitespace( cursor );
+		if ( *cursor == ',' ) {
+			++cursor;
+			continue;
+		}
+		if ( *cursor == '}' ) {
+			++cursor;
+			break;
+		}
+		if ( *cursor == '\0' ) {
+			errorOut = "manifest ended before closing '}'";
+			return false;
+		}
+
+		errorOut = "expected ',' or '}' after manifest value";
+		return false;
+	}
+
+	if ( modInfo.displayName.IsEmpty() ) {
+		errorOut = "missing required field 'name'";
+		return false;
+	}
+	if ( modInfo.version.IsEmpty() ) {
+		errorOut = "missing required field 'version'";
+		return false;
+	}
+	if ( modInfo.releaseDate.IsEmpty() ) {
+		errorOut = "missing required field 'releaseDate'";
+		return false;
+	}
+	if ( modInfo.website.IsEmpty() ) {
+		errorOut = "missing required field 'website'";
+		return false;
+	}
+	if ( modInfo.author.IsEmpty() ) {
+		errorOut = "missing required field 'author'";
+		return false;
+	}
+	if ( modInfo.requiredOpenQ4Version.IsEmpty() ) {
+		errorOut = "missing required field 'requiredOpenQ4Version'";
+		return false;
+	}
+
+	FS_FinalizeModInfo( modInfo );
+	return true;
+}
+
 /*
 ===============
 idFileSystemLocal::ListMods
 ===============
 */
 idModList *idFileSystemLocal::ListMods( void ) {
-	int 		i;
-	const int 	MAX_DESCRIPTION = 256;
-	char 		desc[ MAX_DESCRIPTION ];
-
 	idStrList	dirs;
-	idStrList	pk4s;
-
 	idModList	*list = new idModList;
 
 	const char	*search[ 3 ];
@@ -2346,7 +2600,6 @@ idModList *idFileSystemLocal::ListMods( void ) {
 		}
 
 		dirs.Clear();
-		pk4s.Clear();
 
 		// scan for directories
 		ListOSFiles( search[ isearch ], "/", dirs );
@@ -2356,60 +2609,177 @@ idModList *idFileSystemLocal::ListMods( void ) {
 		dirs.Remove( "base" );
 		dirs.Remove( "pb" );
 
-		for ( i = dirs.Num() - 1; i >= 0; --i ) {
+		for ( int i = dirs.Num() - 1; i >= 0; --i ) {
 			if ( dirs[ i ].HasUpper() ) {
 				dirs.RemoveIndex( i );
 			}
 		}
 
-		// see if there are any pk4 files in each directory
-		for( i = 0; i < dirs.Num(); i++ ) {
-			idStr gamepath = BuildOSPath( search[ isearch ], dirs[ i ], "" );
-			ListOSFiles( gamepath, ".pk4", pk4s );
-			if ( pk4s.Num() ) {
-				if ( !list->mods.Find( dirs[ i ] ) ) {
-					// D3 1.3 #31, only list d3xp if the pak is present
-					if ( dirs[ i ].Icmp( "d3xp" ) || HasD3XP() ) {
-						list->mods.Append( dirs[ i ] );
-					}
-				}
+		for ( int i = 0; i < dirs.Num(); i++ ) {
+			if ( FS_FindModDirectory( list->mods, dirs[ i ] ) >= 0 ) {
+				continue;
+			}
+
+			idModInfo modInfo;
+			idStr reason;
+			if ( ReadModManifestFromSearchPath( search[ isearch ], dirs[ i ], modInfo, &reason ) ) {
+				list->mods.Append( modInfo );
+			} else if ( reason.Length() ) {
+				common->DWarning( "Skipping mod '%s': %s", dirs[ i ].c_str(), reason.c_str() );
 			}
 		}
 	}
-	   
-	list->mods.Sort();
 
-	// read the descriptions for each mod - search all paths
-	for ( i = 0; i < list->mods.Num(); i++ ) {
-
-		for ( isearch = 0; isearch < 3; isearch++ ) {
-
-			idStr descfile = BuildOSPath( search[ isearch ], list->mods[ i ], "description.txt" );
-			FILE *f = OpenOSFile( descfile, "r" );
-			if ( f ) {
-				if ( fgets( desc, MAX_DESCRIPTION, f ) ) {
-					list->descriptions.Append( desc );
-					fclose( f );
-					break;
-				} else {
-					common->DWarning( "Error reading %s", descfile.c_str() );
-					fclose( f );
-					continue;
-				}
-			}
-		}
-
-		if ( isearch == 3 ) {
-			list->descriptions.Append( list->mods[ i ] );
-		}
-	}
-
-	list->mods.Insert( "" );
-	list->descriptions.Insert( "OpenQ4" );
-
-	assert( list->mods.Num() == list->descriptions.Num() );
+	list->mods.Sort( idModInfoCompare );
 
 	return list;
+}
+
+/*
+===============
+idFileSystemLocal::ReadModManifestFile
+===============
+*/
+bool idFileSystemLocal::ReadModManifestFile( const char *manifestPath, idModInfo &modInfo, idStr *reason ) {
+	if ( reason != NULL ) {
+		reason->Clear();
+	}
+
+	FILE *file = OpenOSFile( manifestPath, "rb" );
+	if ( file == NULL ) {
+		return false;
+	}
+
+	const int length = DirectFileLength( file );
+	if ( length <= 0 ) {
+		if ( reason != NULL ) {
+			*reason = va( "manifest '%s' is empty", manifestPath );
+		}
+		fclose( file );
+		return false;
+	}
+
+	idList<char> buffer;
+	buffer.SetNum( length + 1 );
+	const int bytesRead = static_cast<int>( fread( buffer.Ptr(), 1, length, file ) );
+	buffer[ length ] = '\0';
+	fclose( file );
+
+	if ( bytesRead != length ) {
+		if ( reason != NULL ) {
+			*reason = va( "failed to read manifest '%s'", manifestPath );
+		}
+		return false;
+	}
+
+	idStr parseError;
+	if ( !FS_ParseModManifest( buffer.Ptr(), modInfo, parseError ) ) {
+		if ( reason != NULL ) {
+			*reason = va( "%s: %s", manifestPath, parseError.c_str() );
+		}
+		return false;
+	}
+
+	if ( modInfo.requiredOpenQ4Version.Icmp( OPENQ4_VERSION_BASE ) != 0 ) {
+		if ( reason != NULL ) {
+			*reason = va(
+				"%s requires OpenQ4 %s but this build is %s",
+				modInfo.displayName.c_str(),
+				modInfo.requiredOpenQ4Version.c_str(),
+				OPENQ4_VERSION_BASE );
+		}
+		return false;
+	}
+
+	return true;
+}
+
+/*
+===============
+idFileSystemLocal::ReadModManifestFromSearchPath
+===============
+*/
+bool idFileSystemLocal::ReadModManifestFromSearchPath( const char *searchPath, const char *modDir, idModInfo &modInfo, idStr *reason ) {
+	if ( !searchPath || !searchPath[ 0 ] || !modDir || !modDir[ 0 ] ) {
+		if ( reason != NULL ) {
+			reason->Clear();
+		}
+		return false;
+	}
+
+	const idStr manifestPath = BuildOSPath( searchPath, modDir, OPENQ4_MOD_MANIFEST_FILENAME );
+	if ( !ReadModManifestFile( manifestPath.c_str(), modInfo, reason ) ) {
+		return false;
+	}
+
+	modInfo.directory = modDir;
+	return true;
+}
+
+/*
+===============
+idFileSystemLocal::GetModInfo
+===============
+*/
+bool idFileSystemLocal::GetModInfo( const char *modDir, idModInfo &modInfo, idStr *reason ) {
+	if ( reason != NULL ) {
+		reason->Clear();
+	}
+
+	if ( modDir == NULL || modDir[ 0 ] == '\0' ) {
+		if ( reason != NULL ) {
+			*reason = "mod directory is empty";
+		}
+		return false;
+	}
+
+	const char *search[ 3 ];
+	search[ 0 ] = fs_cdpath.GetString();
+	search[ 1 ] = fs_basepath.GetString();
+	search[ 2 ] = fs_savepath.GetString();
+
+	idStr failureReason;
+	for ( int i = 0; i < 3; ++i ) {
+		idStr localReason;
+		if ( ReadModManifestFromSearchPath( search[ i ], modDir, modInfo, &localReason ) ) {
+			return true;
+		}
+		if ( localReason.Length() ) {
+			failureReason = localReason;
+		}
+	}
+
+	if ( reason != NULL ) {
+		if ( failureReason.Length() ) {
+			*reason = failureReason;
+		} else {
+			*reason = va( "missing %s", OPENQ4_MOD_MANIFEST_FILENAME );
+		}
+	}
+
+	return false;
+}
+
+/*
+===============
+idFileSystemLocal::ValidateConfiguredGameDir
+===============
+*/
+bool idFileSystemLocal::ValidateConfiguredGameDir( const char *gameDir, idStr *reason ) {
+	if ( reason != NULL ) {
+		reason->Clear();
+	}
+
+	if ( gameDir == NULL || gameDir[ 0 ] == '\0' ) {
+		return true;
+	}
+
+	if ( !idStr::Icmp( gameDir, BASE_GAMEDIR ) ) {
+		return true;
+	}
+
+	idModInfo modInfo;
+	return GetModInfo( gameDir, modInfo, reason );
 }
 
 /*
@@ -2929,6 +3299,25 @@ void idFileSystemLocal::Startup( void ) {
 	}
 	if ( addonChecksums.Num() ) {
 		common->Printf( "restarting filesystem with %d addon pak file(s) to include\n", addonChecksums.Num() );
+	}
+
+	idStr invalidReason;
+	if ( fs_game_base.GetString()[ 0 ] &&
+		 idStr::Icmp( fs_game_base.GetString(), BASE_GAMEDIR ) &&
+		 !ValidateConfiguredGameDir( fs_game_base.GetString(), &invalidReason ) ) {
+		common->Warning( "Ignoring fs_game_base '%s': %s", fs_game_base.GetString(), invalidReason.c_str() );
+		fs_game_base.SetString( "" );
+	}
+
+	if ( fs_game.GetString()[ 0 ] &&
+		 idStr::Icmp( fs_game.GetString(), BASE_GAMEDIR ) &&
+		 !ValidateConfiguredGameDir( fs_game.GetString(), &invalidReason ) ) {
+		if ( !idStr::Icmp( fs_game.GetString(), OPENQ4_GAMEDIR ) ) {
+			common->FatalError( "Required OpenQ4 mod manifest for '%s' is missing or incompatible: %s", fs_game.GetString(), invalidReason.c_str() );
+		}
+
+		common->Warning( "Ignoring fs_game '%s': %s", fs_game.GetString(), invalidReason.c_str() );
+		fs_game.SetString( "" );
 	}
 
 	SetupGameDirectories( BASE_GAMEDIR );

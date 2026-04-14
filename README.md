@@ -5,11 +5,13 @@
 <img src="assets/docs/img/banner.png" alt="OpenQ4 banner">
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Status](https://img.shields.io/badge/status-Beta%20Development-d97a1f.svg)](https://github.com/themuffinator/OpenQ4/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)](https://github.com/themuffinator/OpenQ4)
-[![Architecture](https://img.shields.io/badge/arch-x64-orange.svg)](https://github.com/themuffinator/OpenQ4)
+[![Architecture](https://img.shields.io/badge/arch-x64%20%7C%20ARM64-orange.svg)](https://github.com/themuffinator/OpenQ4)
+[![Windows Installer](https://img.shields.io/badge/windows-installer%20available-2d8f4e.svg)](https://github.com/themuffinator/OpenQ4/releases)
 [![Build System](https://img.shields.io/badge/build-Meson%20%2B%20Ninja-yellow.svg)](https://mesonbuild.com/)
 
-**Open-source Quake 4 engine and game-code replacement built for stock assets on modern systems**
+**Open-source Quake 4 source-port and game-code replacement built for modern systems**
 
 [Quick Start](#quick-start) | [Highlights](#highlights) | [Compatibility](#compatibility-and-scope) | [Building](BUILDING.md) | [Documentation](#documentation) | [Credits](#credits)
 
@@ -59,12 +61,15 @@ Single-player and multiplayer live under one `baseoq4/` directory with `game-sp`
 ### Modern usability
 
 - **Automatic aspect-ratio**, FOV, zoom, and view-weapon framing from live render size
+- Initial **multiplayer bot** content pack for AAS-enabled maps, currently seeded with one prototype character (`major`)
 - Single-player weapon wheel currently under development, including slow-motion audio/presentation treatment on hold
 - **Multi-monitor** targeting plus borderless, desktop fullscreen, and exclusive fullscreen paths
 - **Controller** hotplug and analog input support
 - **SDL3-first Linux runtime** with an explicit `OpenQ4-steamdeck` launcher/profile for **Steam Deck**
 - Meson-based builds, `builddir/` for local artifacts, and `.install/` for staged runtime packages
-- **Windows**, **Linux**, and **macOS** targets with x64 as the current active baseline
+- **Beta-stage** manual releases for **Windows**, **Linux**, and **macOS**
+- Architecture-qualified release assets for **x64** and **ARM64**
+- Native **Windows installers** ship alongside the Windows `.zip` release packages, with uninstall support and optional `openq4://` browser-link registration
 
 <p align="center">
   <img src="assets/docs/img/shot2.png" alt="OpenQ4 gameplay screenshot showing combat and bloom" width="49%">
@@ -77,10 +82,12 @@ Single-player and multiplayer live under one `baseoq4/` directory with `game-sp`
 ## Quick Start
 
 1. Install **Quake 4** from [Steam](https://store.steampowered.com/app/2210/Quake_4/) or [GOG](https://www.gog.com/en/game/quake_4).
-2. Download the latest OpenQ4 package from the [Releases page](https://github.com/themuffinator/OpenQ4/releases).
-3. Extract the archive to a folder of your choice.
-4. Launch `OpenQ4-client_x64` (`OpenQ4-client_x64.exe` on Windows).
-5. On Steam Deck, launch `OpenQ4-steamdeck` instead of the generic client entrypoint.
+2. Download the latest OpenQ4 release from the [Releases page](https://github.com/themuffinator/OpenQ4/releases).
+3. Choose the asset that matches your CPU architecture (`x64` or `arm64`, the ARM64 release label).
+4. On Windows, use the matching installer (`openq4-<version>-windows-<arch>-setup.exe`) or extract the matching `.zip` package manually. The installer detects existing OpenQ4 installs, registers a normal Windows uninstaller entry, and can optionally enable `openq4://` browser links.
+5. On Linux and macOS, extract the release archive to a folder of your choice.
+6. Launch `OpenQ4-client_<arch>` (`OpenQ4-client_<arch>.exe` on Windows).
+7. On Steam Deck, launch `OpenQ4-steamdeck` instead of the generic client entrypoint.
 
 OpenQ4 will try to locate your Quake 4 install automatically. If detection fails, set `fs_basepath` manually or see [TECHNICAL.md](TECHNICAL.md#advanced-configuration).
 
@@ -116,6 +123,34 @@ Project scope is intentionally explicit:
 For unattended baking, run the client with startup commands such as `+bakeLightGrids all -quit`, `+bakeLightGrids all-mp -quit`, or `+bakeLightGrids force game/tram1 -quit`. OpenQ4 will switch modules as needed, load each map automatically, skip already-complete targets unless `force` is present, and stream progress to the console/log while writing outputs to `fs_savepath`.
 
 Gameplay parity work is still ongoing. For current follow-up items, see [TODO.md](TODO.md) and [docs-dev/release-completion.md](docs-dev/release-completion.md).
+
+---
+
+## Mod Manifests
+
+Runnable OpenQ4 mods now require a `mod.json` file in the root of the mod directory. This applies to `baseoq4/` as well as any external mod folder selected through the mod menu or requested by multiplayer auto-restart.
+
+The manifest is a flat JSON object with these required string fields:
+
+- `name`
+- `version`
+- `releaseDate`
+- `website`
+- `author`
+- `requiredOpenQ4Version`
+
+`requiredOpenQ4Version` is matched against the current OpenQ4 engine version (for example `0.1.010`). Mods without a manifest, or with a mismatched required engine version, are hidden from the mod menu and rejected for automatic mod switching.
+
+```json
+{
+  "name": "OpenQ4",
+  "version": "0.1.010",
+  "releaseDate": "2026-04-14",
+  "website": "https://www.darkmatter-quake.com",
+  "author": "themuffinator / DarkMatter Productions",
+  "requiredOpenQ4Version": "0.1.010"
+}
+```
 
 ---
 

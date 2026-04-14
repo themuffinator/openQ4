@@ -1,0 +1,50 @@
+DewmAAS "1.08"
+
+4236787096
+
+settings
+{
+	bboxes
+	{
+		(-64 -64 -96)-(64 64 40)
+	}
+	usePatches = 0
+	writeBrushMap = 0
+	playerFlood = 0
+	allowSwimReachabilities = 0
+	allowFlyReachabilities = 0
+	generateTacticalFeatures = 0
+	fileExtension = "aas128"
+	gravity = (0 0 -1050)
+	maxStepHeight = 16
+	maxBarrierHeight = 0
+	maxWaterJumpHeight = 0
+	maxFallHeight = 0
+	minFloorCos = 0.3999999762
+	tt_barrierJump = 0
+	tt_startCrouching = 0
+	tt_waterJump = 0
+	tt_startWalkOffLedge = 0
+}
+planes 0 {
+}
+vertices 0 {
+}
+edges 0 {
+}
+edgeIndex 0 {
+}
+faces 0 {
+}
+faceIndex 0 {
+}
+areas 0 {
+}
+nodes 0 {
+}
+portals 0 {
+}
+portalIndex 0 {
+}
+clusters 0 {
+}

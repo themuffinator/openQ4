@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-SEMVER_RE = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
+NUMERIC_VERSION_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
 IDENTIFIER_RE = re.compile(r"^[0-9A-Za-z-]+$")
 DOT_IDENTIFIERS_RE = re.compile(r"^[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*$")
 DATE_STAMP_RE = re.compile(r"^\d{8}$")
@@ -84,10 +84,11 @@ def read_base_version(source_root: Path, explicit_base_version: str) -> str:
 
 
 def validate_base_version(base_version: str) -> tuple[int, int, int]:
-    match = SEMVER_RE.fullmatch(base_version)
+    match = NUMERIC_VERSION_RE.fullmatch(base_version)
     if match is None:
         raise SystemExit(
-            f"base version must be semantic version major.minor.patch, got: {base_version!r}"
+            "base version must be a numeric major.minor.patch string "
+            f"(leading zeroes are allowed), got: {base_version!r}"
         )
     return tuple(int(group) for group in match.groups())
 

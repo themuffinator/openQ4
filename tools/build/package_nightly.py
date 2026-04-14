@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create curated nightly distributable archives for OpenQ4."""
+"""Create curated release distributable archives for OpenQ4."""
 
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ from windows_runtime import (
     infer_runtime_flavor,
     list_staged_runtime_files,
 )
+from generate_release_docs import GeneratedDocSite, generate_release_docs_site
 
 
 PRODUCT_NAME = "OpenQ4"
@@ -75,7 +76,7 @@ OPENQ4_REQUIRED_PK4_FILES = {
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Package OpenQ4 nightly artifacts into a release archive."
+        description="Package OpenQ4 release artifacts into a release archive."
     )
     parser.add_argument(
         "--platform",
@@ -92,12 +93,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--version",
         required=True,
-        help="Human-readable nightly version string.",
+        help="Human-readable release version string.",
     )
     parser.add_argument(
         "--version-tag",
         required=True,
-        help="File-safe nightly version tag.",
+        help="File-safe release version tag.",
     )
     parser.add_argument(
         "--source-root",
@@ -128,7 +129,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         action="store_true",
         help=(
             "Allow packaging to continue when required platform binaries are missing. "
-            "Useful for host bring-up/nightly previews."
+            "Useful for host bring-up previews."
         ),
     )
     return parser.parse_args(argv[1:])
@@ -204,6 +205,23 @@ def copy_release_collateral(source_root: Path, package_root: Path) -> None:
         shutil.copy2(source, destination)
 
 
+def generate_release_documentation(
+    *,
+    source_root: Path,
+    package_root: Path,
+    version: str,
+    platform: str,
+    arch: str,
+) -> GeneratedDocSite:
+    return generate_release_docs_site(
+        source_root=source_root,
+        output_root=package_root / "docs",
+        version=version,
+        platform=platform,
+        arch=arch,
+    )
+
+
 def copy_required_binaries(
     platform: str,
     arch: str,
@@ -225,6 +243,7 @@ def copy_required_binaries(
     if platform == "windows":
         missing_required.extend(
             copy_required_windows_runtime(
+                arch=arch,
                 install_dir=install_dir,
                 package_root=package_root,
                 allow_missing_binaries=allow_missing_binaries,
@@ -235,6 +254,7 @@ def copy_required_binaries(
 
 
 def copy_required_windows_runtime(
+    arch: str,
     install_dir: Path,
     package_root: Path,
     allow_missing_binaries: bool,
@@ -251,6 +271,14 @@ def copy_required_windows_runtime(
 
     for source in runtime_files:
         shutil.copy2(source, package_root / source.name)
+
+    if not runtime_files:
+        if allow_missing_binaries:
+            missing_required.append("OpenAL32.dll")
+        else:
+            raise FileNotFoundError(
+                f"required Windows runtime not found for {arch}: {install_dir / 'OpenAL32.dll'}"
+            )
 
     return missing_required
 
@@ -473,7 +501,7 @@ def main(argv: list[str]) -> int:
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    package_stem = f"openq4-{args.version_tag}-{args.platform}"
+    package_stem = f"openq4-{args.version_tag}-{args.platform}-{args.arch}"
     package_root = output_dir / package_stem
     if package_root.exists():
         shutil.rmtree(package_root)
@@ -483,6 +511,20 @@ def main(argv: list[str]) -> int:
         copy_release_collateral(source_root, package_root)
     except FileNotFoundError as exc:
         print(f"error: {exc}", file=sys.stderr)
+        return 1
+    try:
+        generated_docs = generate_release_documentation(
+            source_root=source_root,
+            package_root=package_root,
+            version=args.version,
+            platform=args.platform,
+            arch=args.arch,
+        )
+    except RuntimeError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    if generated_docs.page_count <= 0 or not generated_docs.index_path.is_file():
+        print("error: release HTML documentation was not generated correctly", file=sys.stderr)
         return 1
 
     write_version_manifest(
@@ -548,11 +590,12 @@ def main(argv: list[str]) -> int:
     archive_path = output_dir / f"{package_stem}{archive_suffix}"
     create_release_archive(package_root, archive_path, archive_format)
 
-    print(f"Packaged OpenQ4 nightly {args.version} for {args.platform}")
+    print(f"Packaged OpenQ4 release {args.version} for {args.platform}")
     print(f"Package directory: {package_root}")
     print(f"Release archive: {archive_path}")
     print(f"Archive format: {archive_format}")
     print(f"Version manifest: {package_root / 'VERSION.txt'}")
+    print(f"Documentation portal: {generated_docs.index_path} ({generated_docs.page_count} pages)")
     print(f"OpenQ4 pk4: {game_pk4_path} ({added_files} files)")
     if copied_share:
         print(f"Share payload: {package_root / 'share'}")

@@ -65,6 +65,8 @@ if build_games and build_game_mp
 endif
 
 install_data(
+  'mod.json',
+  'default.cfg',
   'openq4_defaults.cfg',
   'openq4_profile_steamdeck.cfg',
   install_dir: install_game_dir,
@@ -77,6 +79,11 @@ install_subdir(
 
 install_subdir(
   'def',
+  install_dir: install_game_dir,
+)
+
+install_subdir(
+  'botfiles',
   install_dir: install_game_dir,
 )
 
@@ -97,5 +104,10 @@ install_subdir(
 
 install_subdir(
   'strings',
+  install_dir: install_game_dir,
+)
+
+install_subdir(
+  'maps',
   install_dir: install_game_dir,
 )

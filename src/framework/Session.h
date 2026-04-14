@@ -99,6 +99,8 @@ public:
 	// Returns true if a multiplayer game is running.
 	// CVars and commands are checked differently in multiplayer mode.
 	virtual bool	IsMultiplayer() = 0;
+	// Returns true when the SP-only iamtheduke cheat is actively affecting gameplay.
+	virtual bool	IsIAmTheDukeActive() const = 0;
 	// Returns true while a savegame is being loaded.
 	virtual bool	IsLoadingSaveGame() const = 0;
 	// Returns true when any fullscreen GUI (menu/message/test gui) is active.

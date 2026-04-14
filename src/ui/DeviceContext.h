@@ -47,6 +47,7 @@ public:
 	void				Shutdown();
 	bool				Initialized() { return initialized; }
 	void				EnableLocalization();
+	void				RegisterIcon( const char *code, const char *shader, int x = -1, int y = -1, int w = -1, int h = -1 );
 
 	void				GetTransformInfo(idVec3& origin, idMat3& mat );
 
@@ -54,15 +55,15 @@ public:
 	void				DrawMaterial(float x, float y, float w, float h, const idMaterial *mat, const idVec4 &color, float scalex = 1.0, float scaley = 1.0);
 	void				DrawRect(float x, float y, float width, float height, float size, const idVec4 &color);
 	void				DrawFilledRect(float x, float y, float width, float height, const idVec4 &color);
-	int					DrawText(const char *text, float textScale, int textAlign, idVec4 color, idRectangle rectDraw, bool wrap, int cursor = -1, bool calcOnly = false, idList<int> *breaks = NULL, int limit = 0 );
+	int					DrawText(const char *text, float textScale, int textAlign, idVec4 color, idRectangle rectDraw, bool wrap, int cursor = -1, bool calcOnly = false, idList<int> *breaks = NULL, int limit = 0, int adjust = 0, int style = 0 );
 	void				DrawMaterialRect( float x, float y, float w, float h, float size, const idMaterial *mat, const idVec4 &color);
 	void				DrawStretchPic(float x, float y, float w, float h, float s0, float t0, float s1, float t1, const idMaterial *mat);
 
 	void				DrawMaterialRotated(float x, float y, float w, float h, const idMaterial *mat, const idVec4 &color, float scalex = 1.0, float scaley = 1.0, float angle = 0.0f);
 	void				DrawStretchPicRotated(float x, float y, float w, float h, float s0, float t0, float s1, float t1, const idMaterial *mat, float angle = 0.0f);
 
-	int					CharWidth( const char c, float scale );
-	int					TextWidth(const char *text, float scale, int limit);
+	int					CharWidth( const char c, float scale, int adjust = 0 );
+	int					TextWidth(const char *text, float scale, int limit, int adjust = 0);
 	int					TextHeight(const char *text, float scale, int limit);
 	int					MaxCharHeight(float scale);
 	int					MaxCharWidth(float scale);
@@ -134,7 +135,33 @@ public:
 	static idVec4 colorNone;
 
 private:
+	struct embeddedIcon_t {
+		char				code[4];
+		const idMaterial	*material;
+		float				s1;
+		float				t1;
+		float				s2;
+		float				t2;
+		float				width;
+		float				height;
+
+		embeddedIcon_t() :
+			material( NULL ),
+			s1( 0.0f ),
+			t1( 0.0f ),
+			s2( 1.0f ),
+			t2( 1.0f ),
+			width( 0.0f ),
+			height( 0.0f ) {
+			code[0] = '\0';
+		}
+	};
+
 	void				CalcVirtualScaleOffset( float width, float height, float &outXScale, float &outYScale, float &outXOffset, float &outYOffset ) const;
+	void				RegisterBuiltinIcons();
+	void				SizeIcon( embeddedIcon_t &icon );
+	bool				FindIcon( const char *code, const embeddedIcon_t **icon ) const;
+	float				GetIconDisplayWidth( const embeddedIcon_t &icon, float referenceHeight ) const;
 	int					DrawText(float x, float y, float scale, idVec4 color, const char *text, float adjust, int limit, int style, int cursor = -1);
 	void				PaintChar(float x,float y,float width,float height,float scale,float	s,float	t,float	s2,float t2,const idMaterial *hShader);
 	void				SetFontByScale( float scale );
@@ -157,6 +184,7 @@ private:
 	int					cursor;
 
 	idList<idRectangle>	clipRects;
+	idHashTable<embeddedIcon_t> icons;
 	
 	static idList<fontInfoEx_t> fonts;
 	idStr fontLang;

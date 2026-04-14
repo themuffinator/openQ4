@@ -163,6 +163,22 @@ static void Session_DrawScaledSmallString( float x, float y, float charWidth, fl
 	renderSystem->SetColor( colorWhite );
 }
 
+static void Session_DrawOutlinedScaledString( float x, float y, float charWidth, float charHeight,
+	const char *string, const idVec4 &mainColor, const idVec4 &outlineColor, const idMaterial *material ) {
+	if ( !( string && *string ) ) {
+		return;
+	}
+
+	const float outlineOffsetX = idMath::ClampFloat( 2.0f, 8.0f, charWidth * 0.10f );
+	const float outlineOffsetY = idMath::ClampFloat( 2.0f, 10.0f, charHeight * 0.035f );
+
+	Session_DrawScaledSmallString( x - outlineOffsetX, y, charWidth, charHeight, string, outlineColor, true, material );
+	Session_DrawScaledSmallString( x + outlineOffsetX, y, charWidth, charHeight, string, outlineColor, true, material );
+	Session_DrawScaledSmallString( x, y - outlineOffsetY, charWidth, charHeight, string, outlineColor, true, material );
+	Session_DrawScaledSmallString( x, y + outlineOffsetY, charWidth, charHeight, string, outlineColor, true, material );
+	Session_DrawScaledSmallString( x, y, charWidth, charHeight, string, mainColor, true, material );
+}
+
 static bool Session_FileExistsInSearchPaths( const char *path ) {
 	if ( path == NULL || path[0] == '\0' ) {
 		return false;
@@ -400,6 +416,11 @@ static void OpenQ4_RemapSingleplayerFlashlightImpulse( usercmd_t &cmd ) {
 	// Consume the original flashlight impulse so the engine-side workaround
 	// remains the sole SP handler even if the game-side case is restored later.
 	cmd.impulse = IMPULSE_16;
+}
+
+static void Session_IAmTheDuke_f( const idCmdArgs &args ) {
+	(void)args;
+	sessLocal.ToggleIAmTheDuke();
 }
 
 static void Session_ReplicateColumnIntoRect( byte *dest, int destWidth, int destHeight,
@@ -1000,6 +1021,8 @@ static void Session_RemoveLightGridBakeOutputsForMap( const idStr &mapName ) {
 	Session_BuildLightGridOutputPaths( mapName, lightGridPath, atlasDir );
 
 	fileSystem->RemoveFile( lightGridPath.c_str() );
+	fileSystem->RemoveFile( va( "%s.prev", lightGridPath.c_str() ) );
+	fileSystem->RemoveFile( va( "%s.baking", lightGridPath.c_str() ) );
 	Session_RemoveLightGridAtlasArtifacts( atlasDir, ".tga" );
 	Session_RemoveLightGridAtlasArtifacts( atlasDir, ".prev" );
 }
@@ -1055,10 +1078,11 @@ static bool Session_CurrentLightGridOutputsComplete( const lightGridBakeOptions_
 }
 
 static void Session_PrintLightGridBakeUsage() {
-	common->Printf( "usage: bakeLightGrids [all | all-mp | <map> ...] [force] [-quit] [limit<num>] [bounce<num>] [size<num>] [blends<num>] [samples<num>] [grid ( x y z )]\n" );
+	common->Printf( "usage: bakeLightGrids [all | all-mp | <map> ...] [force] [-quit] [limit<num>] [bounce<num>] [size<num>] [blends<num>] [samples<num>] [separateAreas] [grid ( x y z )]\n" );
 	common->Printf( "If no map names are given, the currently loaded map is baked.\n" );
 	common->Printf( "Without 'force', maps whose required .lightgrid metadata and area*_lightgrid_amb.tga atlases already exist are skipped.\n" );
 	common->Printf( "When map names, 'all', or 'all-mp' are given, OpenQ4 loads each map automatically, prints live progress to the console/log, and writes .lightgrid metadata plus area*_lightgrid_amb.tga atlases to fs_savepath.\n" );
+	common->Printf( "'separateAreas' rebuilds one portal-area probe layout at a time and streams .lightgrid metadata during the bake to reduce peak CPU memory usage.\n" );
 	common->Printf( "This bake is diffuse-only and LDR. It does not output the BFG EXR/PBR light-grid data path.\n" );
 }
 
@@ -1101,6 +1125,10 @@ static bool Session_ParseLightGridBakeArgs( const idCmdArgs &args, lightGridBake
 
 		if ( option.Icmp( "quit" ) == 0 || option.Icmp( "autoquit" ) == 0 ) {
 			autoQuit = true;
+			continue;
+		}
+		if ( option.Icmp( "separateAreas" ) == 0 || option.Icmp( "separate" ) == 0 || option.Icmp( "streamAreas" ) == 0 ) {
+			options.separateAreas = true;
 			continue;
 		}
 
@@ -1660,6 +1688,7 @@ void idSessionLocal::Clear() {
 	loadingAssetQueueTotal = 0;
 	loadingAssetQueueLoaded = 0;
 	loadingAssetQueueStartPct = 0.0f;
+	iamTheDukeActive = false;
 	
 	msgRunning = false;
 	guiMsgRestore = NULL;
@@ -1797,6 +1826,67 @@ idSessionLocal::IsMultiplayer
 */
 bool	idSessionLocal::IsMultiplayer() {
 	return idAsyncNetwork::IsActive();
+}
+
+bool idSessionLocal::IsIAmTheDukeActive() const {
+	return iamTheDukeActive && mapSpawned && !idAsyncNetwork::IsActive();
+}
+
+void idSessionLocal::ToggleIAmTheDuke( void ) {
+	if ( !mapSpawned || idAsyncNetwork::IsActive() ) {
+		return;
+	}
+
+	iamTheDukeActive = !iamTheDukeActive;
+}
+
+void idSessionLocal::DrawIAmTheDukeOverlay( void ) const {
+	if ( !IsIAmTheDukeActive() ) {
+		return;
+	}
+
+	static const char *lines[] = {
+		"Mustin Jarshall",
+		"",
+		"NiceColdDuke"
+	};
+
+	const idMaterial *charSetMaterial = declManager->FindMaterial( "fonts/english/bigchars" );
+	if ( charSetMaterial == NULL ) {
+		return;
+	}
+
+	const float margin = 16.0f;
+	const float maxLineChars = static_cast<float>( Session_CountVisibleSmallChars( lines[0] ) );
+	if ( maxLineChars <= 0.0f ) {
+		return;
+	}
+
+	const float charWidth = idMath::Floor( ( SCREEN_WIDTH - margin * 2.0f ) / maxLineChars );
+	const float charHeight = idMath::Floor( Min( ( SCREEN_HEIGHT - margin * 2.0f ) / 3.0f, charWidth * 3.5f ) );
+	const float lineAdvance = charHeight;
+	const float totalHeight = lineAdvance * 3.0f;
+	const float startY = idMath::Floor( ( SCREEN_HEIGHT - totalHeight ) * 0.5f );
+	const idVec4 outlineColor( 0.0f, 0.0f, 0.0f, 0.95f );
+	const idVec4 mainColor( 0.96f, 0.99f, 1.0f, 1.0f );
+
+	const bool previousUIViewportMode = renderSystem->GetUseUIViewportFor2D();
+	renderSystem->SetUseUIViewportFor2D( false );
+
+	for ( int i = 0; i < 3; i++ ) {
+		const char *line = lines[ i ];
+		if ( line[ 0 ] == '\0' ) {
+			continue;
+		}
+
+		const float visibleChars = static_cast<float>( Session_CountVisibleSmallChars( line ) );
+		const float lineWidth = visibleChars * charWidth;
+		const float x = idMath::Floor( ( SCREEN_WIDTH - lineWidth ) * 0.5f );
+		const float y = startY + lineAdvance * static_cast<float>( i );
+		Session_DrawOutlinedScaledString( x, y, charWidth, charHeight, line, mainColor, outlineColor, charSetMaterial );
+	}
+
+	renderSystem->SetUseUIViewportFor2D( previousUIViewportMode );
 }
 
 /*
@@ -2772,6 +2862,7 @@ void idSessionLocal::UnloadMap() {
 		StopRecordingRenderDemo();
 	}
 
+	iamTheDukeActive = false;
 	mapSpawned = false;
 }
 
@@ -4149,6 +4240,7 @@ void idSessionLocal::Draw() {
 #endif
 
 	if ( mapSpawned && !insideExecuteMapChange && !guiActive && !readDemo ) {
+		DrawIAmTheDukeOverlay();
 		Session_DrawLevelshotBounds();
 	}
 
@@ -4529,6 +4621,7 @@ void idSessionLocal::Init() {
 #ifndef	ID_DEDICATED
 	cmdSystem->AddCommand( "openq4_startSingleplayer", Session_OpenQ4StartSingleplayer_f, CMD_FL_SYSTEM, "internal helper to start singleplayer after game-module switches" );
 	cmdSystem->AddCommand( "openq4_resumeBakeLightGrids", Session_OpenQ4ResumeBakeLightGrids_f, CMD_FL_SYSTEM, "internal helper to continue light-grid baking after game-module switches" );
+	cmdSystem->AddCommand( "openq4_iamtheduke", Session_IAmTheDuke_f, CMD_FL_SYSTEM, "toggles the SP-only iamtheduke cheat" );
 	cmdSystem->AddCommand( "bakeLightGrids", Session_BakeLightGrids_f, CMD_FL_SYSTEM|CMD_FL_CHEAT, "bakes OpenQ4-compatible lightgrid metadata and irradiance atlases for the current map or a batch of maps" );
 	cmdSystem->AddCommand( "map", Session_Map_f, CMD_FL_SYSTEM, "loads a map", idCmdSystem::ArgCompletion_MapName );
 	cmdSystem->AddCommand( "devmap", Session_DevMap_f, CMD_FL_SYSTEM, "loads a map in developer mode", idCmdSystem::ArgCompletion_MapName );

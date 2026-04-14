@@ -6,7 +6,10 @@ if host_machine.system() != 'windows'
 endif
 
 if host_machine.cpu_family() != 'x86_64'
-  error('Bundled OpenAL import library is only provided for x86_64 Windows.')
+  error(
+    'Bundled OpenAL import library is only provided for x86_64 Windows. '
+    + 'Provide a custom Windows OpenAL package with -Dopenal_root_override=<path>.'
+  )
 endif
 
 fs_mod = import('fs')

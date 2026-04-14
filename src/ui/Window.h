@@ -64,6 +64,7 @@ const int WIN_WANTENTER		= 0x01000000;
 const int WIN_MATCOVER		= 0x02000000;
 const int WIN_MATFIT		= 0x04000000;
 const int WIN_MATCANVASFILL	= 0x08000000;
+const int WIN_NATIVESCREENOVERLAY = 0x20000000;
 
 const int WIN_DESKTOP		= 0x10000000;
 
@@ -247,6 +248,8 @@ public:
 	void SetFlag(unsigned int f);
 	void ClearFlag(unsigned int f);
 	unsigned GetFlags() {return flags;};
+	bool IsVisible() const { return visible; }
+	bool HasNoEvents() const { return noEvents; }
 	unsigned char GetScreenAlignX() const { return screenAlignX; }
 	unsigned char GetScreenAlignY() const { return screenAlignY; }
 	void Move(float x, float y);

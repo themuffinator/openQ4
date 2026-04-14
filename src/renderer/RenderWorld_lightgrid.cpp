@@ -54,10 +54,10 @@ typedef struct lightGridBakeProgress_s {
 	int					globalProcessedProbes;
 } lightGridBakeProgress_t;
 
-typedef struct lightGridStagedAtlasWrite_s {
+typedef struct lightGridStagedWrite_s {
 	idStr				finalName;
 	idStr				tempName;
-} lightGridStagedAtlasWrite_t;
+} lightGridStagedWrite_t;
 
 typedef struct lightGridBakeProbeTask_s {
 	int					atlasX;
@@ -77,7 +77,7 @@ void R_ReadTiledPixels( int width, int height, byte *buffer, renderView_t *ref )
 static void LightGrid_CaptureViewRGB( int width, int height, int blends, renderView_t *ref, byte *rgbOut );
 static void LightGrid_BakeProbeTile( byte *outTile, int probeSize, int borderSize, byte *cubeFaces[6], int captureSize, int sampleCount );
 static void LightGrid_PrintBakeProbeProgress( lightGridBakeProgress_t &progress, int areaIndex, int areaProbeIndex, int areaProbeCount );
-static void LightGrid_RemoveStagedAtlasFile( const idStr &relativePath );
+static void LightGrid_RemoveStagedOutputFile( const idStr &relativePath );
 
 typedef struct lightGridBakeJob_s {
 	int					atlasX;
@@ -889,12 +889,12 @@ static void LightGrid_ProcessCapturedJobs(
 	capturedJobs.Clear();
 }
 
-static void LightGrid_RemoveStagedAtlasFile( const idStr &relativePath ) {
+static void LightGrid_RemoveStagedOutputFile( const idStr &relativePath ) {
 	idStr osPath = fileSystem->RelativePathToOSPath( relativePath.c_str(), "fs_savepath" );
 	remove( osPath.c_str() );
 }
 
-static bool LightGrid_CommitStagedAtlasFile( const lightGridStagedAtlasWrite_t &stagedWrite ) {
+static bool LightGrid_CommitStagedOutputFile( const lightGridStagedWrite_t &stagedWrite ) {
 	idStr tempOSPath = fileSystem->RelativePathToOSPath( stagedWrite.tempName.c_str(), "fs_savepath" );
 	idStr finalOSPath = fileSystem->RelativePathToOSPath( stagedWrite.finalName.c_str(), "fs_savepath" );
 	idStr backupOSPath = finalOSPath;
@@ -913,7 +913,7 @@ static bool LightGrid_CommitStagedAtlasFile( const lightGridStagedAtlasWrite_t &
 		rename( backupOSPath.c_str(), finalOSPath.c_str() );
 	}
 
-	common->Warning( "bakeLightGrids: failed to commit staged atlas %s -> %s", stagedWrite.tempName.c_str(), stagedWrite.finalName.c_str() );
+	common->Warning( "bakeLightGrids: failed to commit staged output %s -> %s", stagedWrite.tempName.c_str(), stagedWrite.finalName.c_str() );
 	return false;
 }
 
@@ -1018,6 +1018,7 @@ void R_SetDefaultLightGridBakeOptions( lightGridBakeOptions_t &options ) {
 	options.captureSize = LIGHTGRID_DEFAULT_CAPTURE_SIZE;
 	options.blends = LIGHTGRID_DEFAULT_BLENDS;
 	options.samples = LIGHTGRID_DEFAULT_SAMPLES;
+	options.separateAreas = false;
 	options.gridSize = LIGHTGRID_DEFAULT_SIZE;
 }
 
@@ -1028,6 +1029,8 @@ void LightGrid::Clear() {
 	lightGridBounds[1] = 0;
 	lightGridBounds[2] = 0;
 	lightGridPoints.Clear();
+	totalGridPointCount = 0;
+	validGridPointCount = 0;
 	area = -1;
 	irradianceImage = NULL;
 	imageSingleProbeSize = LIGHTGRID_DEFAULT_SINGLE_PROBE_SIZE;
@@ -1038,18 +1041,26 @@ bool LightGrid::HasImage() const {
 	return irradianceImage != NULL && !irradianceImage->IsDefaulted();
 }
 
+int LightGrid::GridPointCount() const {
+	return totalGridPointCount;
+}
+
 int LightGrid::CountValidGridPoints() const {
-	int validCount = 0;
-	for ( int i = 0; i < lightGridPoints.Num(); i++ ) {
-		if ( lightGridPoints[i].valid != 0 ) {
-			validCount++;
-		}
-	}
-	return validCount;
+	return validGridPointCount;
+}
+
+bool LightGrid::HasPointData() const {
+	return lightGridPoints.Num() > 0;
+}
+
+void LightGrid::DiscardPointData() {
+	lightGridPoints.Clear();
 }
 
 void LightGrid::SetupGrid( const idBounds &bounds, const idRenderWorld *world, const idVec3 &preferredSize, int areaIndex, int totalAreas, int maxProbes, bool printToConsole ) {
+	idImage *existingImage = irradianceImage;
 	Clear();
+	irradianceImage = existingImage;
 	area = areaIndex;
 	lightGridSize = preferredSize;
 
@@ -1086,6 +1097,7 @@ void LightGrid::SetupGrid( const idBounds &bounds, const idRenderWorld *world, c
 		const int atlasHeight = Max( lightGridBounds[1], 1 ) * imageSingleProbeSize;
 
 		if ( numGridPoints <= maxGridPoints && atlasWidth <= LIGHTGRID_MAX_ATLAS_SIZE && atlasHeight <= LIGHTGRID_MAX_ATLAS_SIZE ) {
+			totalGridPointCount = numGridPoints;
 			lightGridPoints.SetNum( numGridPoints );
 			CalculateGridPointPositions( world, totalAreas, printToConsole );
 			break;
@@ -1138,6 +1150,8 @@ void LightGrid::CalculateGridPointPositions( const idRenderWorld *world, int tot
 		}
 	}
 
+	validGridPointCount = lightGridPoints.Num() - invalidCount;
+
 	if ( printToConsole ) {
 		common->Printf(
 			"lightgrid area %i of %i: %i x %i x %i points, %i valid, grid size (%i %i %i)\n",
@@ -1146,7 +1160,7 @@ void LightGrid::CalculateGridPointPositions( const idRenderWorld *world, int tot
 			lightGridBounds[0],
 			lightGridBounds[1],
 			lightGridBounds[2],
-			lightGridPoints.Num() - invalidCount,
+			validGridPointCount,
 			static_cast<int>( lightGridSize.x ),
 			static_cast<int>( lightGridSize.y ),
 			static_cast<int>( lightGridSize.z ) );
@@ -1216,7 +1230,7 @@ void idRenderWorldLocal::LoadLightGridImages( bool forceReloadLoaded ) {
 
 	for ( int i = 0; i < numPortalAreas; i++ ) {
 		LightGrid &lightGrid = portalAreas[i].lightGrid;
-		if ( lightGrid.lightGridPoints.Num() <= 0 ) {
+		if ( lightGrid.GridPointCount() <= 0 ) {
 			continue;
 		}
 
@@ -1300,6 +1314,7 @@ void idRenderWorldLocal::ParseLightGridPoints( idLexer *src ) {
 	lightGrid.area = areaIndex;
 	lightGrid.imageSingleProbeSize = imageProbeSize;
 	lightGrid.imageBorderSize = imageBorderSize;
+	lightGrid.totalGridPointCount = numLightGridPoints;
 
 	src->Parse1DMatrix( 3, lightGrid.lightGridOrigin.ToFloatPtr() );
 	src->Parse1DMatrix( 3, lightGrid.lightGridSize.ToFloatPtr() );
@@ -1311,6 +1326,9 @@ void idRenderWorldLocal::ParseLightGridPoints( idLexer *src ) {
 	for ( int i = 0; i < numLightGridPoints; i++ ) {
 		lightGridPoint_t &gridPoint = lightGrid.lightGridPoints[i];
 		gridPoint.valid = static_cast<byte>( src->ParseInt() );
+		if ( gridPoint.valid != 0 ) {
+			lightGrid.validGridPointCount++;
+		}
 		src->Parse1DMatrix( 3, gridPoint.origin.ToFloatPtr() );
 
 		if ( src->PeekTokenString( "(" ) ) {
@@ -1357,18 +1375,51 @@ bool R_BakeCurrentLightGrids( const lightGridBakeOptions_t &options, const char 
 		bakeLabel = baseName;
 	}
 
+	const bool separateAreas = options.separateAreas;
+	lightGridStagedWrite_t stagedLightGridWrite;
+	idFile *stagedLightGridFile = NULL;
+	if ( separateAreas ) {
+		stagedLightGridWrite.finalName = world->mapName;
+		stagedLightGridWrite.finalName.SetFileExtension( "lightgrid" );
+		stagedLightGridWrite.tempName = stagedLightGridWrite.finalName;
+		stagedLightGridWrite.tempName += ".baking";
+		stagedLightGridFile = fileSystem->OpenFileWrite( stagedLightGridWrite.tempName.c_str(), "fs_savepath" );
+		if ( stagedLightGridFile == NULL ) {
+			common->Warning( "bakeLightGrids: failed to open %s for staged metadata", stagedLightGridWrite.tempName.c_str() );
+			return false;
+		}
+
+		stagedLightGridFile->WriteFloatString( "%s %i\n\n", LGRID_FILE_ID, LIGHTGRID_SUPPORTED_VERSION_B );
+		common->Printf( "bakeLightGrids: separateAreas enabled; probe layouts will be regenerated per area to reduce peak memory use\n" );
+	}
+
 	int totalAreas = 0;
 	int totalValidProbes = 0;
 	for ( int areaIndex = 0; areaIndex < world->numPortalAreas; areaIndex++ ) {
-		world->portalAreas[ areaIndex ].lightGrid.SetupGrid( world->portalAreas[ areaIndex ].globalBounds, world, options.gridSize, areaIndex, world->numPortalAreas, options.maxProbes, true );
-		const int validProbes = world->portalAreas[ areaIndex ].lightGrid.CountValidGridPoints();
+		LightGrid &lightGrid = world->portalAreas[ areaIndex ].lightGrid;
+		lightGrid.SetupGrid( world->portalAreas[ areaIndex ].globalBounds, world, options.gridSize, areaIndex, world->numPortalAreas, options.maxProbes, true );
+		const int validProbes = lightGrid.CountValidGridPoints();
+
+		if ( stagedLightGridFile != NULL ) {
+			LightGrid_WriteLightGridBlock( stagedLightGridFile, lightGrid );
+			lightGrid.DiscardPointData();
+		}
+
 		if ( validProbes > 0 ) {
 			totalAreas++;
 			totalValidProbes += validProbes;
 		}
 	}
 
+	if ( stagedLightGridFile != NULL ) {
+		fileSystem->CloseFile( stagedLightGridFile );
+		stagedLightGridFile = NULL;
+	}
+
 	if ( totalValidProbes <= 0 ) {
+		if ( separateAreas ) {
+			LightGrid_RemoveStagedOutputFile( stagedLightGridWrite.tempName );
+		}
 		common->Printf( "bakeLightGrids: no valid probes were generated for %s\n", world->mapName.c_str() );
 		return false;
 	}
@@ -1439,22 +1490,32 @@ bool R_BakeCurrentLightGrids( const lightGridBakeOptions_t &options, const char 
 		progress.areasProcessed = 0;
 		progress.globalProcessedProbes = 0;
 		progress.lastPrintTime = 0;
-		idList<lightGridStagedAtlasWrite_t> stagedAtlasWrites;
+		idList<lightGridStagedWrite_t> stagedAtlasWrites;
 		common->Printf( "bakeLightGrids: %s bounce %i of %i\n", bakeLabel.c_str(), bounce + 1, options.bounces );
 
 		for ( int areaIndex = 0; areaIndex < world->numPortalAreas; areaIndex++ ) {
 			LightGrid &lightGrid = world->portalAreas[ areaIndex ].lightGrid;
-			if ( lightGrid.lightGridPoints.Num() <= 0 || lightGrid.CountValidGridPoints() <= 0 ) {
+			if ( lightGrid.GridPointCount() <= 0 || lightGrid.CountValidGridPoints() <= 0 ) {
+				continue;
+			}
+
+			if ( separateAreas ) {
+				lightGrid.SetupGrid( world->portalAreas[ areaIndex ].globalBounds, world, options.gridSize, areaIndex, world->numPortalAreas, options.maxProbes, false );
+			}
+			if ( !lightGrid.HasPointData() ) {
 				continue;
 			}
 
 			lightGridBakeAreaPlan_t areaPlan;
 			LightGrid_BuildAreaBakePlan( lightGrid, areaPlan );
 			if ( areaPlan.validProbeCount <= 0 ) {
+				if ( separateAreas ) {
+					lightGrid.DiscardPointData();
+				}
 				continue;
 			}
 
-			lightGridStagedAtlasWrite_t stagedAtlasWrite;
+			lightGridStagedWrite_t stagedAtlasWrite;
 			stagedAtlasWrite.finalName = va( "env/%s/area%i_lightgrid_amb.tga", baseName.c_str(), areaIndex );
 			stagedAtlasWrite.tempName = va( "env/%s/area%i_lightgrid_amb.baking.tga", baseName.c_str(), areaIndex );
 			const int batchProbeCount = LightGrid_GetCaptureBatchProbeCount( lightGrid, faceBytes, bakeWorkerPool );
@@ -1490,12 +1551,18 @@ bool R_BakeCurrentLightGrids( const lightGridBakeOptions_t &options, const char 
 			idFile *atlasFile = fileSystem->OpenFileWrite( stagedAtlasWrite.tempName.c_str(), "fs_savepath" );
 			if ( atlasFile == NULL ) {
 				common->Warning( "bakeLightGrids: failed to open %s for writing", stagedAtlasWrite.tempName.c_str() );
+				if ( separateAreas ) {
+					lightGrid.DiscardPointData();
+				}
 				continue;
 			}
 			if ( !LightGrid_WriteTGA24Header( atlasFile, areaPlan.atlasWidth, areaPlan.atlasHeight ) ) {
 				common->Warning( "bakeLightGrids: failed to write TGA header for %s", stagedAtlasWrite.tempName.c_str() );
 				fileSystem->CloseFile( atlasFile );
-				LightGrid_RemoveStagedAtlasFile( stagedAtlasWrite.tempName );
+				LightGrid_RemoveStagedOutputFile( stagedAtlasWrite.tempName );
+				if ( separateAreas ) {
+					lightGrid.DiscardPointData();
+				}
 				continue;
 			}
 
@@ -1547,7 +1614,7 @@ bool R_BakeCurrentLightGrids( const lightGridBakeOptions_t &options, const char 
 			fileSystem->CloseFile( atlasFile );
 
 			if ( areaWriteFailed ) {
-				LightGrid_RemoveStagedAtlasFile( stagedAtlasWrite.tempName );
+				LightGrid_RemoveStagedOutputFile( stagedAtlasWrite.tempName );
 				common->Warning( "bakeLightGrids: area output is incomplete for %s", stagedAtlasWrite.finalName.c_str() );
 			} else {
 				stagedAtlasWrites.Append( stagedAtlasWrite );
@@ -1563,17 +1630,27 @@ bool R_BakeCurrentLightGrids( const lightGridBakeOptions_t &options, const char 
 					areaPlan.atlasHeight,
 					processedProbes );
 			}
+
+			if ( separateAreas ) {
+				lightGrid.DiscardPointData();
+			}
 		}
 
 		for ( int i = 0; i < stagedAtlasWrites.Num(); i++ ) {
-			LightGrid_CommitStagedAtlasFile( stagedAtlasWrites[i] );
+			LightGrid_CommitStagedOutputFile( stagedAtlasWrites[i] );
 		}
 		world->LoadLightGridImages( true );
 	}
 
-	idStr lightGridName = world->mapName;
-	lightGridName.SetFileExtension( "lightgrid" );
-	world->WriteLightGridsToFile( lightGridName.c_str() );
+	if ( separateAreas ) {
+		if ( LightGrid_CommitStagedOutputFile( stagedLightGridWrite ) ) {
+			common->Printf( "Wrote %s\n", stagedLightGridWrite.finalName.c_str() );
+		}
+	} else {
+		idStr lightGridName = world->mapName;
+		lightGridName.SetFileExtension( "lightgrid" );
+		world->WriteLightGridsToFile( lightGridName.c_str() );
+	}
 	world->LoadLightGridImages( true );
 
 	tr.suppressLevelshotViewModels = oldSuppressLevelshotViewModels;

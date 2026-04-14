@@ -90,6 +90,7 @@ Notes:
 - `cl_gunfov` values above `0` are clamped to a safe range internally for weapon projection.
 - Weapon projection is handled in renderer weapon-depth path, so narrow/wide aspect changes are handled consistently.
 - `cl_gun_x/y/z` are additive with legacy `g_gunX/Y/Z` offsets. Prefer `cl_gun_*` for user config.
+- OpenQ4's legacy baseline keeps `g_gunX` at `1` and `g_gunZ` at `-1` so the default widescreen viewmodel framing stays out of the viewport edge.
 
 ## UI Aspect Correction (New)
 

@@ -11,7 +11,11 @@ from pathlib import Path
 
 PRODUCT_NAME = "OpenQ4"
 GAME_DIR_NAME = "baseoq4"
-OPENAL_RUNTIME_RELATIVE = Path("src/external/openal-soft/bin/win64/OpenAL32.dll")
+OPENAL_RUNTIME_OVERRIDES = {
+    "x64": [Path("src/external/openal-soft/bin/win64/OpenAL32.dll")],
+    "x86": [Path("src/external/openal-soft/bin/win32/OpenAL32.dll")],
+    "arm64": [Path("src/external/openal-soft/bin/winarm64/OpenAL32.dll")],
+}
 WINDOWS_ROOT_RUNTIME_PATTERNS = (
     "OpenAL32.dll",
 )
@@ -221,6 +225,21 @@ def _copy_file(source_path: Path, target_dir: Path) -> Path:
 
 
 
+def resolve_openal_runtime_path(source_root: Path, arch: str) -> Path | None:
+    override_root_raw = os.environ.get("OPENQ4_OPENAL_ROOT", "").strip()
+    if override_root_raw:
+        override_path = Path(override_root_raw).resolve() / "bin" / "OpenAL32.dll"
+        if override_path.is_file():
+            return override_path
+
+    for relative in OPENAL_RUNTIME_OVERRIDES.get(arch, []):
+        candidate = source_root / relative
+        if candidate.is_file():
+            return candidate
+
+    return None
+
+
 def stage_runtime_payloads(
     source_root: Path,
     build_root: Path,
@@ -253,14 +272,13 @@ def stage_runtime_payloads(
         )
 
     copied_files: list[str] = []
+    openal_runtime = resolve_openal_runtime_path(source_root, arch)
     for target in targets:
         target.mkdir(parents=True, exist_ok=True)
         clear_staged_runtime_files(target)
 
-        if arch == "x64":
-            openal_dll = source_root / OPENAL_RUNTIME_RELATIVE
-            if openal_dll.is_file():
-                copied_files.append(str(_copy_file(openal_dll, target)))
+        if openal_runtime is not None:
+            copied_files.append(str(_copy_file(openal_runtime, target)))
 
     return {
         "arch": arch,

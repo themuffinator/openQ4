@@ -133,16 +133,33 @@ private:
 };
 
 // mod list
+struct idModInfo {
+	idStr					directory;
+	idStr					displayName;
+	idStr					version;
+	idStr					releaseDate;
+	idStr					website;
+	idStr					author;
+	idStr					requiredOpenQ4Version;
+	idStr					listLabel;
+};
+
 class idModList {
 	friend class idFileSystemLocal;
 public:
 	int						GetNumMods( void ) const { return mods.Num(); }
-	const char *			GetMod( int index ) const { return mods[index]; }
-	const char *			GetDescription( int index ) const { return descriptions[index]; }
+	const char *			GetMod( int index ) const { return mods[index].directory.c_str(); }
+	const char *			GetDescription( int index ) const { return mods[index].listLabel.c_str(); }
+	const char *			GetDisplayName( int index ) const { return mods[index].displayName.c_str(); }
+	const char *			GetVersion( int index ) const { return mods[index].version.c_str(); }
+	const char *			GetReleaseDate( int index ) const { return mods[index].releaseDate.c_str(); }
+	const char *			GetWebsite( int index ) const { return mods[index].website.c_str(); }
+	const char *			GetAuthor( int index ) const { return mods[index].author.c_str(); }
+	const char *			GetRequiredOpenQ4Version( int index ) const { return mods[index].requiredOpenQ4Version.c_str(); }
+	const idModInfo &		GetInfo( int index ) const { return mods[index]; }
 
 private:
-	idStrList				mods;
-	idStrList				descriptions;
+	idList<idModInfo>		mods;
 };
 
 class idFileSystem {
@@ -162,6 +179,7 @@ public:
 							// 'mods' contains the directory names to be passed to fs_game
 							// 'descriptions' contains a free form string to be used in the UI
 	virtual idModList *		ListMods( void ) = 0;
+	virtual bool			GetModInfo( const char *modDir, idModInfo &modInfo, idStr *reason = NULL ) = 0;
 							// Frees the given mod list
 	virtual void			FreeModList( idModList *modList ) = 0;
 							// Lists files with the given extension in the given directory.

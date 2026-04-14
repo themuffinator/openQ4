@@ -1,7 +1,7 @@
 project(
   'OpenQ4',
   ['c', 'cpp'],
-  version: '0.0.1',
+  version: '0.1.010',
   meson_version: '>=1.2.0',
   default_options: ['c_std=c11', 'cpp_std=c++20', 'b_vscrt=static_from_buildtype'],
 )
@@ -74,19 +74,24 @@ endif
 
 version_track = get_option('version_track').strip()
 version_iteration = get_option('version_iteration').strip()
+version_base_override = get_option('version_base_override').strip()
+openal_root_override = get_option('openal_root_override').strip()
 generated_version_header = meson.current_build_dir() / 'openq4_version_generated.h'
 version_metadata_command = [
   py,
   meson.project_source_root() / 'tools' / 'build' / 'openq4_version.py',
   '--source-root',
   meson.project_source_root(),
-  '--base-version',
-  meson.project_version(),
   '--track',
   version_track,
   '--header-out',
   generated_version_header,
 ]
+if version_base_override != ''
+  version_metadata_command += ['--base-version', version_base_override]
+else
+  version_metadata_command += ['--base-version', meson.project_version()]
+endif
 if version_iteration != ''
   version_metadata_command += ['--iteration', version_iteration]
 endif
@@ -332,12 +337,26 @@ if build_engine
   if host_system == 'darwin'
     openal_dep = dependency('appleframeworks', modules: ['OpenAL'], required: true)
   else
-    openal_dep = dependency(
-      'openal',
-      required: true,
-      fallback: ['openal-soft-prebuilt', 'openal_dep'],
-      default_options: fallback_opt,
-    )
+    if host_system == 'windows' and openal_root_override != ''
+      openal_override_root = openal_root_override
+      openal_override_include = include_directories(openal_override_root / 'include')
+      openal_override_lib = cc.find_library(
+        'OpenAL32',
+        dirs: [openal_override_root / 'lib'],
+        required: true,
+      )
+      openal_dep = declare_dependency(
+        include_directories: [openal_override_include],
+        dependencies: [openal_override_lib],
+      )
+    else
+      openal_dep = dependency(
+        'openal',
+        required: true,
+        fallback: ['openal-soft-prebuilt', 'openal_dep'],
+        default_options: fallback_opt,
+      )
+    endif
   endif
 
   if use_sdl3_backend
@@ -703,6 +722,7 @@ summary(
     'C++ standard': get_option('cpp_std'),
     'Platform backend requested': platform_backend_requested,
     'Platform backend': platform_backend,
+    'OpenAL override root': openal_root_override == '' ? 'bundled/default' : openal_root_override,
     'Build engine': build_engine,
     'engine client binary': engine_client_binary_name,
     'engine dedicated binary': engine_ded_binary_name,
