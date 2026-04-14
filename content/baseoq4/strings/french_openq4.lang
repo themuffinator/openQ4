@@ -48,4 +48,7 @@
 	"#str_229914"	"Auto"
 	"#str_229915"	"Etendre sur plusieurs ecrans"
 	"#str_229916"	"Ecran principal uniquement;Etendre sur tous les ecrans"
+	"#str_229917"	"Enfoncement des corps"
+	"#str_229918"	"Duree des corps"
+	"#str_229919"	"Standard;Jamais;5 sec;10 sec;15 sec;30 sec;60 sec;Personnalise"
 }

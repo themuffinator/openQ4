@@ -1,0 +1,54 @@
+// OpenQ4 napalm residue tuning.
+// Keep the stock napalm impact glob, but make the lingering flame a smaller touch hazard
+// and keep it active for twice as long.
+
+entityDef damage_openq4_napalmGlobResidueBurn
+{
+	"damage"					"4"
+	"radius"					"32"
+	"attackerDamageScale"		"1.0"
+	"knockback"					"0"
+	"gib"						"0"
+	"burn"						"1"
+}
+
+entityDef impact_napalm_projectile
+{
+	"spawnclass"				"idProjectile"
+	"size"						"1 1 1"
+	"noshadows"					"1"
+	"clipmask_largeshot"		"0"
+	"no_contents"				"0"
+
+	"model"						"models/weapons/napalmgun/flame_gun_globsmall.ase"
+
+	"fuse"						"12.0"
+	"fuse_random"				"0.8"
+	"speed"						"1"
+	"gravity"					"1.2"
+	"remove_time"				"100"
+
+	"angular_velocity"			"-10 5 1"
+
+	"linear_friction"			"0"
+	"angular_friction"			"0"
+	"contact_friction"			"10"
+
+	"detonate_on_fuse"			"0"
+	"detonate_on_death"			"0"
+	"detonate_on_world"			"0"
+	"detonate_on_actor"			"0"
+	"detonate_on_bounce"		"0"
+
+	"flyEffectAttenuateSpeed"	"200"
+	"fx_launch"					"effects/weapons/napalmgun/globburn.fx"
+	"fx_fly"					"effects/weapons/napalmgun/flyburn.fx"
+
+	"delay_emit_damage"			"0.75"
+	"def_emit_damage"			"damage_openq4_napalmGlobResidueBurn"
+
+	"fx_teleport_enter"			"effects/mp/item_teleport.fx"
+	"fx_teleport"				"effects/mp/item_teleport.fx"
+
+	"net_syncPhysics"			"1"
+}

@@ -48,4 +48,7 @@
 	"#str_229914"	"Auto"
 	"#str_229915"	"Expand Across Displays"
 	"#str_229916"	"Primary Display Only;Span All Displays"
+	"#str_229917"	"Corpse Sink"
+	"#str_229918"	"Corpse Time"
+	"#str_229919"	"Stock;Never;5 sec;10 sec;15 sec;30 sec;60 sec;Custom"
 }

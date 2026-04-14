@@ -2,6 +2,8 @@
 
 This guide covers a small set of gameplay and audio cvars that are useful for testing, accessibility, and personal preference.
 
+The corpse cleanup and corpse sink controls are also available in the in-game menu at `Settings -> Game Options`.
+
 ## Quick Reference
 
 | Setting | Default | Scope | What it does |

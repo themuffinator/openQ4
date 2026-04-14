@@ -76,6 +76,11 @@ install_subdir(
 )
 
 install_subdir(
+  'def',
+  install_dir: install_game_dir,
+)
+
+install_subdir(
   'glprogs',
   install_dir: install_game_dir,
 )
