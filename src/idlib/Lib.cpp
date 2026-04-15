@@ -6,8 +6,11 @@
 #include <windows.h>
 #endif
 
-#if defined( MACOS_X )
+#if defined( MACOS_X ) || defined( __linux__ )
 #include <signal.h>
+#endif
+
+#if defined( MACOS_X )
 #include <sys/types.h>
 #include <unistd.h>
 #endif
@@ -629,7 +632,7 @@ void AssertFailed( const char *file, int line, const char *expression ) {
 	}
 // RAVEN END
 #elif defined( __linux__ )
-	__asm__ __volatile__ ("int $0x03");
+	raise( SIGTRAP );
 #elif defined( MACOS_X )
 	kill( getpid(), SIGINT );
 #endif

@@ -339,14 +339,19 @@ if build_engine
   else
     if host_system == 'windows' and openal_root_override != ''
       openal_override_root = openal_root_override
-      openal_override_include = include_directories(openal_override_root / 'include')
+      openal_override_include_dir = openal_override_root / 'include'
+      if cc.get_argument_syntax() == 'msvc'
+        openal_override_include_args = ['/I', openal_override_include_dir]
+      else
+        openal_override_include_args = ['-I', openal_override_include_dir]
+      endif
       openal_override_lib = cc.find_library(
         'OpenAL32',
         dirs: [openal_override_root / 'lib'],
         required: true,
       )
       openal_dep = declare_dependency(
-        include_directories: [openal_override_include],
+        compile_args: openal_override_include_args,
         dependencies: [openal_override_lib],
       )
     else
