@@ -59,7 +59,6 @@ idCVar	idSessionLocal::com_wipeSeconds( "com_wipeSeconds", "1", CVAR_SYSTEM, "" 
 idCVar	idSessionLocal::com_guid( "com_guid", "", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_ROM, "" );
 idCVar	com_skipLoadingContinue( "com_skipLoadingContinue", "0", CVAR_SYSTEM | CVAR_BOOL, "skip the single-player loading-screen continue gate (testing)" );
 idCVar	com_showLevelshotBounds( "com_showLevelshotBounds", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "draw a centered 4:3 frame guide for levelshot composition" );
-idCVar	openq4_flashlightEngineWorkaround( "openq4_flashlightEngineWorkaround", "1", CVAR_ARCHIVE | CVAR_BOOL, "engine-side single-player flashlight fallback for game modules that ignore impulse 50" );
 idCVar	s_muteUnfocused( "s_muteUnfocused", "1", CVAR_ARCHIVE | CVAR_BOOL, "mute all audio when the application is out of focus" );
 
 #if defined( _WIN32 )
@@ -396,75 +395,6 @@ static idEntity *OpenQ4_FindSpawnedEntityByBaseClass( const char *className ) {
 	}
 
 	return NULL;
-}
-
-static int OpenQ4_FindFlashlightWeapon( const idPlayer *player ) {
-	if ( !player ) {
-		return -1;
-	}
-
-	int flashlightWeapon = player->currentWeapon;
-	if ( flashlightWeapon >= 0 && flashlightWeapon < MAX_WEAPONS
-		&& player->spawnArgs.GetBool( va( "weapon%d_flashlight", flashlightWeapon ), "0" ) ) {
-		return flashlightWeapon;
-	}
-
-	for ( flashlightWeapon = MAX_WEAPONS - 1; flashlightWeapon >= 0; --flashlightWeapon ) {
-		if ( 0 == ( player->inventory.weapons & ( 1 << flashlightWeapon ) ) ) {
-			continue;
-		}
-
-		if ( !player->spawnArgs.GetBool( va( "weapon%d_flashlight", flashlightWeapon ), "0" ) ) {
-			continue;
-		}
-
-		const int ammoIndex = player->inventory.ammoIndices[ flashlightWeapon ];
-		if ( ammoIndex >= 0 && player->inventory.ammo[ ammoIndex ] <= 0 ) {
-			continue;
-		}
-
-		return flashlightWeapon;
-	}
-
-	return -1;
-}
-
-// OpenQ4's current SP game module no longer consumes IMPULSE_50. Remap the
-// flashlight key to the stock idPlayer::ToggleFlashlight state changes so the
-// engine can restore usable flashlight behavior without touching GameLibs.
-static void OpenQ4_RemapSingleplayerFlashlightImpulse( usercmd_t &cmd ) {
-	if ( !openq4_flashlightEngineWorkaround.GetBool() || cmd.impulse != IMPULSE_50 ) {
-		return;
-	}
-
-	if ( !OpenQ4_IsSingleplayerGameType() || !gameEdit || !gameEdit->PlayerIsValid() ) {
-		return;
-	}
-
-	idPlayer *player = static_cast<idPlayer *>( OpenQ4_FindSpawnedEntityByBaseClass( "idPlayer" ) );
-	if ( !player || player->health <= 0 || !player->weaponEnabled ) {
-		return;
-	}
-
-	if ( ( cmd.flags & UCF_IMPULSE_SEQUENCE ) == ( player->oldFlags & UCF_IMPULSE_SEQUENCE ) ) {
-		return;
-	}
-
-	const int flashlightWeapon = OpenQ4_FindFlashlightWeapon( player );
-	if ( flashlightWeapon < 0 ) {
-		return;
-	}
-
-	if ( flashlightWeapon != player->idealWeapon ) {
-		player->flashlightOn = true;
-		player->idealWeapon = flashlightWeapon;
-	} else if ( player->weapon ) {
-		player->weapon->wsfl.flashlight = true;
-	}
-
-	// Consume the original flashlight impulse so the engine-side workaround
-	// remains the sole SP handler even if the game-side case is restored later.
-	cmd.impulse = IMPULSE_16;
 }
 
 static void Session_IAmTheDuke_f( const idCmdArgs &args ) {
@@ -4646,8 +4576,6 @@ void idSessionLocal::RunGameTic() {
 		}
 		lastGameTic++;
 	}
-
-	OpenQ4_RemapSingleplayerFlashlightImpulse( cmd );
 
 	// run the game logic every player move
 	int	start = Sys_Milliseconds();

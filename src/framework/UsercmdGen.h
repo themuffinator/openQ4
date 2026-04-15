@@ -160,6 +160,9 @@ public:
 	// Set a value that can safely be referenced by UsercmdInterrupt() for each key binding.
 	virtual	int			CommandStringUsercmdData( const char *cmdString ) = 0;
 
+	// Resolve a console token to an impulse number, or -1 if it is not an impulse alias.
+	virtual int			ResolveImpulseCommand( const char *cmdString ) const = 0;
+
 	// Returns the number of user commands.
 	virtual int			GetNumUserCommands( void ) = 0;
 
@@ -177,6 +180,9 @@ public:
 
 	// Directly sample a usercmd.
 	virtual usercmd_t	GetDirectUsercmd( void ) = 0;
+
+	// Queue a one-shot impulse for the next generated usercmd.
+	virtual void		TriggerImpulse( int impulseNum ) = 0;
 };
 
 extern idUsercmdGen	*usercmdGen;

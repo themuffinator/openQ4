@@ -72,6 +72,18 @@ OPENQ4_REQUIRED_PK4_FILES = {
     "glprogs/smaa_weights.vs",
     "materials/postprocess_openq4.mtr",
 }
+OPENQ4_REQUIRED_LOOSE_GAME_FILES = {
+    "mod.json",
+}
+OPENQ4_REQUIRED_LOOSE_GAME_DIRS = {
+    "gfx/guis/loadscreens",
+}
+OPENQ4_PK4_EXCLUDED_FILES = {
+    relative_path.lower() for relative_path in OPENQ4_REQUIRED_LOOSE_GAME_FILES
+}
+OPENQ4_PK4_EXCLUDED_SUBTREES = {
+    relative_path.lower() for relative_path in OPENQ4_REQUIRED_LOOSE_GAME_DIRS
+}
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -304,6 +316,61 @@ def copy_required_game_binaries(
     return missing_required
 
 
+def copy_required_loose_game_files(
+    install_game_dir: Path,
+    package_game_dir: Path,
+    allow_missing_binaries: bool,
+) -> list[str]:
+    missing_required: list[str] = []
+
+    for relative_path in sorted(OPENQ4_REQUIRED_LOOSE_GAME_FILES):
+        source = install_game_dir / Path(relative_path)
+        if not source.is_file():
+            if allow_missing_binaries:
+                missing_required.append(relative_path)
+                continue
+            raise FileNotFoundError(f"required loose game file not found: {source}")
+
+        destination = package_game_dir / Path(relative_path)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
+
+    return missing_required
+
+
+def copy_required_loose_game_dirs(
+    install_game_dir: Path,
+    package_game_dir: Path,
+) -> tuple[list[str], int]:
+    copied_dirs: list[str] = []
+    copied_files = 0
+
+    for relative_path in sorted(OPENQ4_REQUIRED_LOOSE_GAME_DIRS):
+        source_dir = install_game_dir / Path(relative_path)
+        if not source_dir.is_dir():
+            raise FileNotFoundError(f"required loose game directory not found: {source_dir}")
+
+        dir_file_count = 0
+        for source in sorted(source_dir.rglob("*")):
+            if not source.is_file():
+                continue
+
+            destination = package_game_dir / source.relative_to(install_game_dir)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, destination)
+            dir_file_count += 1
+
+        if dir_file_count <= 0:
+            raise FileNotFoundError(
+                f"required loose game directory has no files: {source_dir}"
+            )
+
+        copied_dirs.append(relative_path)
+        copied_files += dir_file_count
+
+    return copied_dirs, copied_files
+
+
 def create_game_pk4(
     install_game_dir: Path, destination_pk4: Path
 ) -> tuple[int, list[str], list[str]]:
@@ -318,8 +385,23 @@ def create_game_pk4(
 
             rel = path.relative_to(install_game_dir)
             rel_parts_lower = {part.lower() for part in rel.parts}
+            rel_posix_lower = rel.as_posix().lower()
 
             if rel_parts_lower & OPENQ4_EXCLUDED_DIRS:
+                if len(skipped_samples) < 5:
+                    skipped_samples.append(rel.as_posix())
+                continue
+
+            if rel_posix_lower in OPENQ4_PK4_EXCLUDED_FILES:
+                if len(skipped_samples) < 5:
+                    skipped_samples.append(rel.as_posix())
+                continue
+
+            if any(
+                rel_posix_lower == subtree
+                or rel_posix_lower.startswith(f"{subtree}/")
+                for subtree in OPENQ4_PK4_EXCLUDED_SUBTREES
+            ):
                 if len(skipped_samples) < 5:
                     skipped_samples.append(rel.as_posix())
                 continue
@@ -551,6 +633,19 @@ def main(argv: list[str]) -> int:
         package_game_dir,
         args.allow_missing_binaries,
     )
+    missing_loose_game_files = copy_required_loose_game_files(
+        install_game_dir,
+        package_game_dir,
+        args.allow_missing_binaries,
+    )
+    try:
+        copied_loose_game_dirs, copied_loose_game_dir_files = copy_required_loose_game_dirs(
+            install_game_dir,
+            package_game_dir,
+        )
+    except FileNotFoundError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
 
     game_pk4_path = package_game_dir / "pak0.pk4"
 
@@ -613,6 +708,14 @@ def main(argv: list[str]) -> int:
         print("Missing required game modules:")
         for filename in missing_game_modules:
             print(f"  - {filename}")
+    if missing_loose_game_files:
+        print("Missing required loose game files:")
+        for relative_path in missing_loose_game_files:
+            print(f"  - {relative_path}")
+    if copied_loose_game_dirs:
+        print(f"Loose game directories copied: {copied_loose_game_dir_files} files")
+        for relative_path in copied_loose_game_dirs:
+            print(f"  - {package_game_dir / Path(relative_path)}")
     if skipped_samples:
         print("Filtered sample paths:")
         for rel in skipped_samples:

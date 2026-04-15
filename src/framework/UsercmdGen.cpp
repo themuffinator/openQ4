@@ -360,7 +360,7 @@ static bool ParseImpulseCommand( const char *cmdString, const char *prefix, int 
 	return impulseNum >= IMPULSE_0 && impulseNum <= IMPULSE_127;
 }
 
-static int ResolveImpulseCommand( const char *cmdString ) {
+static int ResolveImpulseAction( const char *cmdString ) {
 	for ( const impulseAliasString_t *alias = impulseAliasStrings; alias->string != NULL; ++alias ) {
 		if ( idStr::Icmp( cmdString, alias->string ) == 0 ) {
 			return UB_IMPULSE0 + alias->impulse;
@@ -440,6 +440,7 @@ public:
 	void			UsercmdInterrupt( void );
 
 	int				CommandStringUsercmdData( const char *cmdString );
+	int				ResolveImpulseCommand( const char *cmdString ) const;
 
 	int				GetNumUserCommands( void );
 
@@ -451,6 +452,7 @@ public:
 	int				KeyState( int key );
 
 	usercmd_t		GetDirectUsercmd( void );
+	void			TriggerImpulse( int impulseNum );
 
 private:
 	void			MakeCurrent( void );
@@ -1018,7 +1020,21 @@ int	idUsercmdGenLocal::CommandStringUsercmdData( const char *cmdString ) {
 		}
 	}
 
-	return ResolveImpulseCommand( cmdString );
+	return ResolveImpulseAction( cmdString );
+}
+
+/*
+================
+idUsercmdGenLocal::ResolveImpulseCommand
+================
+*/
+int idUsercmdGenLocal::ResolveImpulseCommand( const char *cmdString ) const {
+	const int action = ResolveImpulseAction( cmdString );
+	if ( action < UB_IMPULSE0 || action > UB_IMPULSE127 ) {
+		return -1;
+	}
+
+	return action - UB_IMPULSE0;
 }
 
 /*
@@ -1326,4 +1342,29 @@ usercmd_t idUsercmdGenLocal::GetDirectUsercmd( void ) {
 	cmd.duplicateCount = 0;
 
 	return cmd;
+}
+
+/*
+================
+idUsercmdGenLocal::TriggerImpulse
+================
+*/
+void idUsercmdGenLocal::TriggerImpulse( int impulseNum ) {
+	if ( impulseNum < IMPULSE_0 || impulseNum > IMPULSE_127 ) {
+		return;
+	}
+
+	if ( !initialized || session == NULL ) {
+		return;
+	}
+
+	const char *currentMapName = session->GetCurrentMapName();
+	if ( currentMapName == NULL || currentMapName[0] == '\0' ) {
+		return;
+	}
+
+	impulse = impulseNum;
+	flags ^= UCF_IMPULSE_SEQUENCE;
+	cmd.impulse = impulse;
+	cmd.flags = flags;
 }

@@ -535,6 +535,19 @@ void idCmdSystemLocal::ExecuteTokenizedString( const idCmdArgs &args ) {
 		return;
 	}
 
+	if ( usercmdGen != NULL ) {
+		const int impulse = usercmdGen->ResolveImpulseCommand( cmdName );
+		if ( impulse >= 0 ) {
+			if ( args.Argc() != 1 ) {
+				common->Printf( "Command '%s' does not take arguments.\n", cmdName );
+				return;
+			}
+
+			usercmdGen->TriggerImpulse( impulse );
+			return;
+		}
+	}
+
 	common->Printf( "Unknown command '%s'\n", cmdName );
 }
 
