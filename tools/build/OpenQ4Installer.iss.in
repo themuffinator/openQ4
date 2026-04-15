@@ -8,7 +8,7 @@
 #define MyAppInstallRegKey "Software\\DarkMatter Productions\\OpenQ4"
 #define MyAppProtocolName "openq4"
 #define MyAppProtocolRegKey "Software\\Classes\\openq4"
-#define MyAppClientAppPathsKey "Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\{#MyAppExeName}"
+#define MyAppClientAppPathsKey "Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\" + MyAppExeName
 #define PackageSource "@@PACKAGE_SOURCE@@"
 
 [Setup]

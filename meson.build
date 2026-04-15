@@ -591,7 +591,7 @@ game_common_c_args = shared_c_args
 game_module_link_args = []
 if host_system == 'windows'
   game_module_link_args = ['/FIXED:NO', '/LARGEADDRESSAWARE']
-  if host_cpu_family == 'x86_64'
+  if ['x86_64', 'aarch64'].contains(host_cpu_family)
     game_module_link_args += ['/BASE:0x180000000']
   else
     game_module_link_args += ['/BASE:0x20000000']
