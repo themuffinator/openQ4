@@ -3,16 +3,19 @@ uniform vec2 invTexSize;
 uniform float bloomThreshold;
 uniform float bloomSoftKnee;
 
-float BrightContribution( vec3 color ) {
+float BrightMask( vec3 color ) {
 	float brightness = dot( color, vec3( 0.2126, 0.7152, 0.0722 ) );
-	float contribution = max( brightness - bloomThreshold, 0.0 );
 	float knee = max( bloomThreshold * bloomSoftKnee, 0.0 );
-	if ( knee > 0.0001 ) {
-		float soft = clamp( brightness - bloomThreshold + knee, 0.0, 2.0 * knee );
-		soft = ( soft * soft ) / ( 4.0 * knee + 0.0001 );
-		contribution = max( contribution, soft );
+	if ( bloomThreshold <= 0.0001 ) {
+		return 1.0;
 	}
-	return contribution / max( brightness, 0.0001 );
+
+	if ( knee > 0.0001 ) {
+		float kneeStart = max( bloomThreshold - knee, 0.0 );
+		return smoothstep( kneeStart, bloomThreshold, brightness );
+	}
+
+	return brightness >= bloomThreshold ? 1.0 : 0.0;
 }
 
 vec3 FilteredScene( vec2 uv ) {
@@ -35,5 +38,5 @@ vec3 FilteredScene( vec2 uv ) {
 void main() {
 	vec2 uv = gl_TexCoord[0].st;
 	vec3 color = FilteredScene( uv );
-	gl_FragColor = vec4( color * BrightContribution( color ), 1.0 );
+	gl_FragColor = vec4( color * BrightMask( color ), 1.0 );
 }

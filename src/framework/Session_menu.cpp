@@ -357,14 +357,12 @@ static int MainMenuResolveModelTeam( void ) {
 	}
 
 	const char *uiTeam = cvarSystem->GetCVarString( "ui_team" );
-	if ( !idStr::Icmp( uiTeam, "Marine" ) ) {
-		return 0;
-	}
 	if ( !idStr::Icmp( uiTeam, "Strogg" ) ) {
 		return 1;
 	}
 
-	return -1;
+	// The retail MP settings flow always has a valid active team in team games.
+	return 0;
 }
 
 static idStr MainMenuModelCVarName( const int menuModelTeam ) {
@@ -372,6 +370,35 @@ static idStr MainMenuModelCVarName( const int menuModelTeam ) {
 		return va( "ui_model_%s", mainMenuMPTeamNames[ menuModelTeam ] );
 	}
 	return "ui_model";
+}
+
+static int MainMenuMPSettingsGameTypeState( void ) {
+	const char *gameType = cvarSystem->GetCVarString( "si_gameType" );
+	if ( gameType == NULL || gameType[0] == '\0' || !idStr::Icmp( gameType, "singleplayer" ) || !idStr::Icmp( gameType, "DM" ) ) {
+		return 1;
+	}
+	if ( !idStr::Icmp( gameType, "Tourney" ) ) {
+		return 2;
+	}
+	if ( !idStr::Icmp( gameType, "Team DM" ) || !idStr::Icmp( gameType, "DeadZone" ) ) {
+		return 3;
+	}
+	if ( !idStr::Icmp( gameType, "CTF" ) || !idStr::Icmp( gameType, "Arena CTF" ) || !idStr::Icmp( gameType, "Arena One Flag CTF" ) ) {
+		return 4;
+	}
+	if ( !idStr::Icmp( gameType, "One Flag CTF" ) ) {
+		return 5;
+	}
+	return 1;
+}
+
+static void MainMenuSyncMPSettingsGuiState( idUserInterface *gui, const int menuModelTeam ) {
+	if ( !gui ) {
+		return;
+	}
+
+	gui->SetStateInt( "gametype", MainMenuMPSettingsGameTypeState() );
+	gui->SetStateInt( "player_team", menuModelTeam >= 0 ? menuModelTeam : 0 );
 }
 
 static bool MainMenuExtractPlayerModelInfo( const char *declName, idStr &modelOut, idStr &uiHeadOut, idStr &skinOut, idStr &descriptionOut, idStr &teamOut ) {
@@ -478,36 +505,6 @@ static bool MainMenuFirstModelFromList( const idStr &buildValues, const bool isT
 	return false;
 }
 
-static bool MainMenuModelDeclInList( const idStr &buildValues, const char *declName ) {
-	if ( !declName || !declName[0] ) {
-		return false;
-	}
-
-	idStr remaining = buildValues;
-	while ( remaining.Length() ) {
-		idStr token = remaining;
-		const int split = remaining.Find( ";" );
-		if ( split >= 0 ) {
-			token = remaining.Left( split );
-			remaining = remaining.Right( remaining.Length() - split - 1 );
-		} else {
-			remaining.Clear();
-		}
-
-		token.StripLeading( ' ' );
-		token.StripTrailing( ' ' );
-		if ( !token.Length() ) {
-			continue;
-		}
-
-		if ( idStr::Icmp( token.c_str(), declName ) == 0 ) {
-			return true;
-		}
-	}
-
-	return false;
-}
-
 static void MainMenuAppendModelChoice( idStr &buildValues, idStr &buildNames, const char *declName, const char *displayName ) {
 	if ( buildValues.Length() ) {
 		buildValues += ";";
@@ -518,34 +515,28 @@ static void MainMenuAppendModelChoice( idStr &buildValues, idStr &buildNames, co
 	buildNames += ( displayName && displayName[0] ) ? displayName : declName;
 }
 
-static void MainMenuBuildModelListFromDef( const idDeclEntityDef *def, const bool isTeamGame, const int menuModelTeam, idStr &buildValues, idStr &buildNames ) {
-	if ( !def ) {
-		return;
-	}
+static void MainMenuBuildModelList( const bool isTeamGame, const int menuModelTeam, idStr &buildValues, idStr &buildNames ) {
+	buildValues.Clear();
+	buildNames.Clear();
 
-	const idKeyValue *kv = def->dict.MatchPrefix( "def_model", NULL );
-	while ( kv ) {
-		const char *declName = kv->GetValue().c_str();
-		if ( !declName || !declName[0] || MainMenuModelDeclInList( buildValues, declName ) ) {
-			kv = def->dict.MatchPrefix( "def_model", kv );
+	const int numModels = declManager->GetNumDecls( DECL_PLAYER_MODEL );
+	for ( int i = 0; i < numModels; ++i ) {
+		const rvDeclPlayerModel *playerModel = static_cast<const rvDeclPlayerModel *>( declManager->DeclByIndex( DECL_PLAYER_MODEL, i, true ) );
+		if ( !playerModel ) {
 			continue;
 		}
 
-		idStr modelName;
-		idStr headName;
-		idStr skinName;
-		idStr description;
-		idStr team;
-		if ( !MainMenuExtractPlayerModelInfo( declName, modelName, headName, skinName, description, team ) ||
-			!MainMenuModelAllowedForTeam( team, isTeamGame, menuModelTeam ) ) {
-			kv = def->dict.MatchPrefix( "def_model", kv );
+		const char *declName = playerModel->GetName();
+		if ( !declName || !declName[0] ) {
 			continue;
 		}
 
-		const char *localizedName = description.Length() ? common->GetLocalizedString( description.c_str() ) : "";
+		if ( !MainMenuModelAllowedForTeam( playerModel->team, isTeamGame, menuModelTeam ) ) {
+			continue;
+		}
+
+		const char *localizedName = playerModel->description.Length() ? common->GetLocalizedString( playerModel->description.c_str() ) : "";
 		MainMenuAppendModelChoice( buildValues, buildNames, declName, localizedName );
-
-		kv = def->dict.MatchPrefix( "def_model", kv );
 	}
 }
 
@@ -556,6 +547,7 @@ static void SetMainMenuMPModelVars( idUserInterface *gui ) {
 
 	const bool isTeamGame = MainMenuIsTeamGame();
 	const int menuModelTeam = MainMenuResolveModelTeam();
+	MainMenuSyncMPSettingsGuiState( gui, menuModelTeam );
 
 	const idDeclEntityDef *menuDef = static_cast<const idDeclEntityDef *>( declManager->FindType( DECL_ENTITYDEF, "player_marine_mp_ui", false ) );
 	const idDeclEntityDef *fallbackDef = static_cast<const idDeclEntityDef *>( declManager->FindType( DECL_ENTITYDEF, "player_marine_mp", false ) );
@@ -563,35 +555,7 @@ static void SetMainMenuMPModelVars( idUserInterface *gui ) {
 
 	idStr buildValues;
 	idStr buildNames;
-	MainMenuBuildModelListFromDef( menuDef, isTeamGame, menuModelTeam, buildValues, buildNames );
-	MainMenuBuildModelListFromDef( fallbackDef, isTeamGame, menuModelTeam, buildValues, buildNames );
-
-	// Append any additional playerModel decls that are not listed in def_model*.
-	const int numModels = declManager->GetNumDecls( DECL_PLAYER_MODEL );
-	for ( int i = 0; i < numModels; i++ ) {
-		const rvDeclPlayerModel *playerModel = static_cast<const rvDeclPlayerModel *>( declManager->DeclByIndex( DECL_PLAYER_MODEL, i, true ) );
-		if ( !playerModel ) {
-			continue;
-		}
-
-		const char *declName = playerModel->GetName();
-		if ( !declName || !declName[0] || MainMenuModelDeclInList( buildValues, declName ) ) {
-			continue;
-		}
-
-		idStr modelName;
-		idStr headName;
-		idStr skinName;
-		idStr description;
-		idStr team;
-		if ( !MainMenuExtractPlayerModelInfo( declName, modelName, headName, skinName, description, team ) ||
-			!MainMenuModelAllowedForTeam( team, isTeamGame, menuModelTeam ) ) {
-			continue;
-		}
-
-		const char *localizedName = description.Length() ? common->GetLocalizedString( description.c_str() ) : "";
-		MainMenuAppendModelChoice( buildValues, buildNames, declName, localizedName );
-	}
+	MainMenuBuildModelList( isTeamGame, menuModelTeam, buildValues, buildNames );
 
 	gui->SetStateString( "model_values", buildValues.c_str() );
 	gui->SetStateString( "model_names", buildNames.c_str() );
@@ -1172,6 +1136,28 @@ void idSessionLocal::HandleRestartMenuCommands( const char *menuCommand ) {
 			if ( !LoadGame( GetAutoSaveName( mapSpawnData.serverInfo.GetString("si_map") ) ) ) {
 				// If we can't load the autosave then just restart the map
 				MoveToNewMap( mapSpawnData.serverInfo.GetString("si_map") );
+			}
+			continue;
+		}
+
+		if ( !idStr::Icmp( cmd, "disconnect" ) ) {
+			const char *target = args.Argc() - icmd >= 1 ? args.Argv( icmd ) : "";
+			if ( target[ 0 ] != '\0' && idStr::Icmp( target, "mainmenu" ) != 0 ) {
+				continue;
+			}
+
+			if ( !idStr::Icmp( target, "mainmenu" ) ) {
+				icmd++;
+			}
+
+			Stop();
+			StartMenu();
+
+			if ( guiMainMenu && args.Argc() - icmd >= 1 ) {
+				idStr mainMenuEvent = args.Argv( icmd++ );
+				if ( mainMenuEvent.Length() > 0 ) {
+					guiMainMenu->HandleNamedEvent( mainMenuEvent.c_str() );
+				}
 			}
 			continue;
 		}

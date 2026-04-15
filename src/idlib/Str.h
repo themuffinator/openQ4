@@ -55,6 +55,11 @@ const int C_COLOR_BLACK				= '9';
 const int C_COLOR_CONSOLE			= ':';
 // RAVEN END
 
+const int COLOR_INDEX_CONSOLE		= 10;
+const int COLOR_INDEX_RAINBOW_A		= 11;
+const int COLOR_INDEX_RAINBOW_Z		= COLOR_INDEX_RAINBOW_A + 25;
+const int COLOR_INDEX_COUNT			= COLOR_INDEX_RAINBOW_Z + 1;
+
 // color escape string
 #define S_COLOR_DEFAULT				"^0"
 #define S_COLOR_RED					"^1"
@@ -297,6 +302,8 @@ public:
 	static bool			IsNumeric( const char *s );
 	static bool			HasLower( const char *s );
 	static bool			HasUpper( const char *s );
+	static void			ClearIconEscapeCodes( void );
+	static void			RegisterIconEscapeCode( const char *code );
 // RAVEN BEGIN
 // bdube: escape codes
 	static int			IsEscape( const char *s, int* type = NULL );
@@ -395,7 +402,7 @@ ID_INLINE bool idStr::IsColor(void) const {
 }
 
 ID_INLINE bool idStr::IsColor(const char* s) {
-	return (s[0] == C_COLOR_ESCAPE && s[1] != '\0' && s[1] != ' ');
+	return ( s != NULL ) && ( idStr::ColorEscapeLength( s ) > 0 );
 }
 
 
@@ -1134,7 +1141,27 @@ ID_INLINE bool idStr::CharIsTab( byte c ) {
 }
 
 ID_INLINE int idStr::ColorIndex( int c ) {
-	return ( c & 15 );
+	if ( c >= 0 && c < COLOR_INDEX_COUNT ) {
+		return c;
+	}
+
+	if ( c >= '0' && c <= '9' ) {
+		return ( c - '0' );
+	}
+
+	if ( c == C_COLOR_CONSOLE ) {
+		return COLOR_INDEX_CONSOLE;
+	}
+
+	if ( c >= 'a' && c <= 'z' ) {
+		return COLOR_INDEX_RAINBOW_A + ( c - 'a' );
+	}
+
+	if ( c >= 'A' && c <= 'Z' ) {
+		return COLOR_INDEX_RAINBOW_A + ( c - 'A' );
+	}
+
+	return ( C_COLOR_WHITE - '0' );
 }
 
 ID_INLINE int idStr::DynamicMemoryUsed() const {

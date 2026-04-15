@@ -65,6 +65,8 @@ Single-player and multiplayer live under one `baseoq4/` directory with `game-sp`
 - Single-player weapon wheel currently under development, including slow-motion audio/presentation treatment on hold
 - **Multi-monitor** targeting plus borderless, desktop fullscreen, and exclusive fullscreen paths
 - **Controller** hotplug and analog input support
+- FnQuake3-inspired **enhanced console UX** with completion popup, smooth scrollback, mouse selection, clipboard editing, and draggable scroll bars
+- CPMA/CNQ3-style `^a`-`^z` **rainbow text color escapes**, including console rendering and live input preview
 - **SDL3-first Linux runtime** with an explicit `OpenQ4-steamdeck` launcher/profile for **Steam Deck**
 - Meson-based builds, `builddir/` for local artifacts, and `.install/` for staged runtime packages
 - **Beta-stage** manual releases for **Windows**, **Linux**, and **macOS**
@@ -214,6 +216,7 @@ OpenQ4 welcomes code, documentation, testing, and compatibility reports. Keep st
 ### Upstream and reference work
 
 - **Justin Marshall** - [Quake4Doom](https://github.com/jmarshall23/Quake4Doom) and initial BSE reverse engineering
+- **CPMADevs CNQ3** - reference for CPMA/CNQ3-style rainbow text color escape support, adapted via the local FnQ3 implementation
 - **Robert Beckebans** - renderer modernization reference work, including irradiance-volume integration reference material from [RBDOOM-3-BFG](https://github.com/RobertBeckebans/RBDOOM-3-BFG)
 - **id Software** - idTech 4 engine and Quake 4
 - **Raven Software** - Quake 4 game development

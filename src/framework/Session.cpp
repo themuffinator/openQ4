@@ -2070,6 +2070,26 @@ static void Session_TestGUI_f( const idCmdArgs &args ) {
 	sessLocal.TestGUI( args.Argv(1) );
 }
 
+#ifndef ID_DEDICATED
+static void Session_GuiEvent_f( const idCmdArgs &args ) {
+	if ( args.Argc() < 2 ) {
+		return;
+	}
+
+	idUserInterface *activeGui = session->GetActiveGUI();
+	if ( activeGui == NULL ) {
+		return;
+	}
+
+	const char *eventName = args.Args( 1, -1 );
+	if ( eventName == NULL || eventName[0] == '\0' ) {
+		return;
+	}
+
+	activeGui->HandleNamedEvent( eventName );
+}
+#endif
+
 /*
 ================
 idSessionLocal::TestGUI
@@ -4681,6 +4701,8 @@ void idSessionLocal::RunGameTic() {
 		} else if ( !idStr::Icmp( args.Argv(0), "devmap" ) ) {
 			mapSpawnData.serverInfo.Set( "devmap", "1" );
 			MoveToNewMap( args.Argv(1) );
+		} else if ( !idStr::Icmp( args.Argv(0), "nextMap" ) ) {
+			cmdSystem->BufferCommandText( CMD_EXEC_INSERT, "nextMap" );
 		} else if ( !idStr::Icmp( args.Argv(0), "died" ) ) {
 			// restart on the same map
 			UnloadMap();
@@ -4742,6 +4764,7 @@ void idSessionLocal::Init() {
 	cmdSystem->AddCommand( "testGUI", Session_TestGUI_f, CMD_FL_SYSTEM, "tests a gui" );
 
 #ifndef	ID_DEDICATED
+	cmdSystem->AddCommand( "GuiEvent", Session_GuiEvent_f, CMD_FL_SYSTEM, "sends a named event to the active gui" );
 	cmdSystem->AddCommand( "saveGame", SaveGame_f, CMD_FL_SYSTEM|CMD_FL_CHEAT, "saves a game" );
 	cmdSystem->AddCommand( "loadGame", LoadGame_f, CMD_FL_SYSTEM|CMD_FL_CHEAT, "loads a game", idCmdSystem::ArgCompletion_SaveGame );
 #endif

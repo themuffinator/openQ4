@@ -67,6 +67,29 @@ private:
 	virtual void			InternalSetFloat( const float newValue );
 };
 
+static void (*s_cvarNameArgCompletionCallback)( const char *s ) = NULL;
+static const char *s_cvarNameArgCompletionCommand = NULL;
+
+static void CVarNameArgCompletionForward( const char *name ) {
+	if ( s_cvarNameArgCompletionCallback == NULL || s_cvarNameArgCompletionCommand == NULL ) {
+		return;
+	}
+
+	s_cvarNameArgCompletionCallback( va( "%s %s", s_cvarNameArgCompletionCommand, name ) );
+}
+
+static void ArgCompletion_CvarName( const idCmdArgs &args, void(*callback)( const char *s ) ) {
+	if ( callback == NULL || args.Argc() < 1 || args.Argc() > 2 ) {
+		return;
+	}
+
+	s_cvarNameArgCompletionCallback = callback;
+	s_cvarNameArgCompletionCommand = args.Argv( 0 );
+	cvarSystem->CommandCompletion( CVarNameArgCompletionForward );
+	s_cvarNameArgCompletionCallback = NULL;
+	s_cvarNameArgCompletionCommand = NULL;
+}
+
 /*
 ============
 idInternalCVar::idInternalCVar
@@ -575,13 +598,13 @@ void idCVarSystemLocal::Init( void ) {
 
 	modifiedFlags = 0;
 
-	cmdSystem->AddCommand( "toggle", Toggle_f, CMD_FL_SYSTEM, "toggles a cvar" );
-	cmdSystem->AddCommand( "set", Set_f, CMD_FL_SYSTEM, "sets a cvar" );
-	cmdSystem->AddCommand( "sets", SetS_f, CMD_FL_SYSTEM, "sets a cvar and flags it as server info" );
-	cmdSystem->AddCommand( "setu", SetU_f, CMD_FL_SYSTEM, "sets a cvar and flags it as user info" );
-	cmdSystem->AddCommand( "sett", SetT_f, CMD_FL_SYSTEM, "sets a cvar and flags it as tool" );
-	cmdSystem->AddCommand( "seta", SetA_f, CMD_FL_SYSTEM, "sets a cvar and flags it as archive" );
-	cmdSystem->AddCommand( "reset", Reset_f, CMD_FL_SYSTEM, "resets a cvar" );
+	cmdSystem->AddCommand( "toggle", Toggle_f, CMD_FL_SYSTEM, "toggles a cvar", ArgCompletion_CvarName );
+	cmdSystem->AddCommand( "set", Set_f, CMD_FL_SYSTEM, "sets a cvar", ArgCompletion_CvarName );
+	cmdSystem->AddCommand( "sets", SetS_f, CMD_FL_SYSTEM, "sets a cvar and flags it as server info", ArgCompletion_CvarName );
+	cmdSystem->AddCommand( "setu", SetU_f, CMD_FL_SYSTEM, "sets a cvar and flags it as user info", ArgCompletion_CvarName );
+	cmdSystem->AddCommand( "sett", SetT_f, CMD_FL_SYSTEM, "sets a cvar and flags it as tool", ArgCompletion_CvarName );
+	cmdSystem->AddCommand( "seta", SetA_f, CMD_FL_SYSTEM, "sets a cvar and flags it as archive", ArgCompletion_CvarName );
+	cmdSystem->AddCommand( "reset", Reset_f, CMD_FL_SYSTEM, "resets a cvar", ArgCompletion_CvarName );
 	cmdSystem->AddCommand( "listCvars", List_f, CMD_FL_SYSTEM, "lists cvars" );
 	cmdSystem->AddCommand( "cvar_restart", Restart_f, CMD_FL_SYSTEM, "restart the cvar system" );
 
@@ -737,8 +760,14 @@ idCVarSystemLocal::Command
 */
 bool idCVarSystemLocal::Command( const idCmdArgs &args ) {
 	idInternalCVar *internal;
+	const char *name;
 
-	internal = FindInternal( args.Argv( 0 ) );
+	name = args.Argv( 0 );
+	if ( ( name[0] == '/' || name[0] == '\\' ) && name[1] != '\0' ) {
+		++name;
+	}
+
+	internal = FindInternal( name );
 
 	if ( internal == NULL ) {
 		return false;
@@ -776,14 +805,19 @@ idCVarSystemLocal::ArgCompletion
 */
 void idCVarSystemLocal::ArgCompletion( const char *cmdString, void(*callback)( const char *s ) ) {
 	idCmdArgs args;
+	const char *cmdName;
 
 	args.TokenizeString( cmdString, false );
+	cmdName = args.Argv( 0 );
+	if ( ( cmdName[0] == '/' || cmdName[0] == '\\' ) && cmdName[1] != '\0' ) {
+		++cmdName;
+	}
 
 	for( int i = 0; i < cvars.Num(); i++ ) {
 		if ( !cvars[i]->valueCompletion ) {
 			continue;
 		}
-		if ( idStr::Icmp( args.Argv( 0 ), cvars[i]->nameString.c_str() ) == 0 ) {
+		if ( idStr::Icmp( cmdName, cvars[i]->nameString.c_str() ) == 0 ) {
 			cvars[i]->valueCompletion( args, callback );
 			break;
 		}

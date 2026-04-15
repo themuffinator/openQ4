@@ -265,6 +265,29 @@ void idCmdSystemLocal::Vstr_f( const idCmdArgs &args ) {
 	cmdSystemLocal.BufferCommandText( CMD_EXEC_APPEND, va( "%s\n", v ) );
 }
 
+static void (*s_vstrArgCompletionCallback)( const char *s ) = NULL;
+static const char *s_vstrArgCompletionCommand = NULL;
+
+static void ArgCompletion_VstrCvarNameForward( const char *name ) {
+	if ( s_vstrArgCompletionCallback == NULL || s_vstrArgCompletionCommand == NULL ) {
+		return;
+	}
+
+	s_vstrArgCompletionCallback( va( "%s %s", s_vstrArgCompletionCommand, name ) );
+}
+
+static void ArgCompletion_VstrCvarName( const idCmdArgs &args, void(*callback)( const char *s ) ) {
+	if ( callback == NULL || args.Argc() < 1 || args.Argc() > 2 ) {
+		return;
+	}
+
+	s_vstrArgCompletionCallback = callback;
+	s_vstrArgCompletionCommand = args.Argv( 0 );
+	cvarSystem->CommandCompletion( ArgCompletion_VstrCvarNameForward );
+	s_vstrArgCompletionCallback = NULL;
+	s_vstrArgCompletionCommand = NULL;
+}
+
 /*
 ===============
 idCmdSystemLocal::Echo_f
@@ -325,7 +348,7 @@ void idCmdSystemLocal::Init( void ) {
 	AddCommand( "listGameCmds", GameList_f, CMD_FL_SYSTEM, "lists game commands" );
 	AddCommand( "listToolCmds", ToolList_f, CMD_FL_SYSTEM, "lists tool commands" );
 	AddCommand( "exec", Exec_f, CMD_FL_SYSTEM, "executes a config file", ArgCompletion_ConfigName );
-	AddCommand( "vstr", Vstr_f, CMD_FL_SYSTEM, "inserts the current value of a cvar as command text" );
+	AddCommand( "vstr", Vstr_f, CMD_FL_SYSTEM, "inserts the current value of a cvar as command text", ArgCompletion_VstrCvarName );
 	AddCommand( "echo", Echo_f, CMD_FL_SYSTEM, "prints text" );
 	AddCommand( "parse", Parse_f, CMD_FL_SYSTEM, "prints tokenized string" );
 	AddCommand( "wait", Wait_f, CMD_FL_SYSTEM, "delays remaining buffered commands one or more frames" );
@@ -445,14 +468,19 @@ idCmdSystemLocal::ArgCompletion
 void idCmdSystemLocal::ArgCompletion( const char *cmdString, void(*callback)( const char *s ) ) {
 	commandDef_t *cmd;
 	idCmdArgs args;
+	const char *cmdName;
 
 	args.TokenizeString( cmdString, false );
+	cmdName = args.Argv( 0 );
+	if ( ( cmdName[0] == '/' || cmdName[0] == '\\' ) && cmdName[1] != '\0' ) {
+		++cmdName;
+	}
 
 	for ( cmd = commands; cmd; cmd = cmd->next ) {
 		if ( !cmd->argCompletion ) {
 			continue;
 		}
-		if ( idStr::Icmp( args.Argv( 0 ), cmd->name ) == 0 ) {
+		if ( idStr::Icmp( cmdName, cmd->name ) == 0 ) {
 			cmd->argCompletion( args, callback );
 			break;
 		}
@@ -466,16 +494,22 @@ idCmdSystemLocal::ExecuteTokenizedString
 */
 void idCmdSystemLocal::ExecuteTokenizedString( const idCmdArgs &args ) {	
 	commandDef_t *cmd, **prev;
+	const char *cmdName;
 	
 	// execute the command line
 	if ( !args.Argc() ) {
 		return;		// no tokens
 	}
 
+	cmdName = args.Argv( 0 );
+	if ( ( cmdName[0] == '/' || cmdName[0] == '\\' ) && cmdName[1] != '\0' ) {
+		++cmdName;
+	}
+
 	// check registered command functions	
 	for ( prev = &commands; *prev; prev = &cmd->next ) {
 		cmd = *prev;
-		if ( idStr::Icmp( args.Argv( 0 ), cmd->name ) == 0 ) {
+		if ( idStr::Icmp( cmdName, cmd->name ) == 0 ) {
 			// rearrange the links so that the command will be
 			// near the head of the list next time it is used
 			*prev = cmd->next;
@@ -501,7 +535,7 @@ void idCmdSystemLocal::ExecuteTokenizedString( const idCmdArgs &args ) {
 		return;
 	}
 
-	common->Printf( "Unknown command '%s'\n", args.Argv( 0 ) );
+	common->Printf( "Unknown command '%s'\n", cmdName );
 }
 
 /*

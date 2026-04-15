@@ -22,15 +22,24 @@ def max_channel(color):
     return max(color[0], color[1], color[2])
 
 
-def bright_contribution(color, threshold, soft_knee):
+def smoothstep(edge0, edge1, value):
+    if edge1 <= edge0:
+        return 1.0 if value >= edge1 else 0.0
+    t = clamp((value - edge0) / (edge1 - edge0), 0.0, 1.0)
+    return t * t * (3.0 - 2.0 * t)
+
+
+def bright_mask(color, threshold, soft_knee):
     brightness = dot(color, LUMA)
-    contribution = max(brightness - threshold, 0.0)
+    if threshold <= 1.0e-4:
+        return 1.0
+
     knee = max(threshold * soft_knee, 0.0)
     if knee > 1.0e-4:
-        soft = clamp(brightness - threshold + knee, 0.0, 2.0 * knee)
-        soft = (soft * soft) / (4.0 * knee + 1.0e-4)
-        contribution = max(contribution, soft)
-    return contribution / max(brightness, 1.0e-4)
+        knee_start = max(threshold - knee, 0.0)
+        return smoothstep(knee_start, threshold, brightness)
+
+    return 1.0 if brightness >= threshold else 0.0
 
 
 def aces_film_scalar(value):
@@ -95,13 +104,24 @@ def assert_true(condition, message):
         raise AssertionError(message)
 
 
-def test_bright_contribution_monotonic():
+def test_bright_mask_monotonic():
     previous = -1.0
     for step in range(0, 200):
         value = step / 16.0
-        contribution = bright_contribution((value, value, value), 1.0, 0.25)
-        assert_true(contribution >= previous - 1.0e-6, "bright contribution must be monotonic")
-        previous = contribution
+        mask = bright_mask((value, value, value), 1.0, 0.25)
+        assert_true(mask >= previous - 1.0e-6, "bright mask must be monotonic")
+        previous = mask
+
+
+def test_bright_mask_reaches_full_strength_at_threshold():
+    mask = bright_mask((1.0, 1.0, 1.0), 1.0, 0.25)
+    assert_true(abs(mask - 1.0) < 1.0e-6, "bright mask should reach full strength at threshold")
+
+
+def test_bright_mask_preserves_above_threshold_energy():
+    color = (1.25, 1.25, 1.25)
+    extracted = tuple(channel * bright_mask(color, 1.0, 0.25) for channel in color)
+    assert_true(abs(extracted[0] - color[0]) < 1.0e-6, "above-threshold color should be preserved for bloom")
 
 
 def test_tone_map_monotonic():
@@ -133,7 +153,9 @@ def test_no_nan_edge_cases():
 
 def main():
     tests = [
-        test_bright_contribution_monotonic,
+        test_bright_mask_monotonic,
+        test_bright_mask_reaches_full_strength_at_threshold,
+        test_bright_mask_preserves_above_threshold_energy,
         test_tone_map_monotonic,
         test_white_point_near_one,
         test_no_nan_edge_cases,

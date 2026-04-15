@@ -30,6 +30,36 @@ If you have questions concerning this license or the applicable additional terms
 
 
 static autoComplete_t	globalAutoComplete;
+static bool				completionQueryMode;
+static bool				completionQueryCollectAll;
+static editFieldCompletionQueryCallback_t completionQueryCallback;
+static void *			completionQueryContext;
+static int				completionQueryTotalCount;
+
+static const char *FindCompletionSegmentStart( const char *cmd ) {
+	const char *segmentStart = cmd;
+	for ( const char *scan = cmd; *scan != '\0'; ++scan ) {
+		if ( *scan == ';' ) {
+			segmentStart = scan + 1;
+		}
+	}
+	return segmentStart;
+}
+
+static void NormalizeCompletionCommandString( const char *cmd, char *normalized, size_t normalizedSize ) {
+	const char *segmentStart = FindCompletionSegmentStart( cmd );
+
+	while ( *segmentStart != '\0' && *segmentStart <= ' ' ) {
+		++segmentStart;
+	}
+
+	idStr::Copynz( normalized, segmentStart, normalizedSize );
+	if ( normalized[0] == '/' || normalized[0] == '\\' ) {
+		memmove( normalized, normalized + 1, strlen( normalized ) );
+	}
+}
+
+static int QueryCompletionInternal( const char *cmd, bool *appendSpace, editFieldCompletionQueryCallback_t callback, void *context, bool collectAll );
 
 static void DrawScaledSmallChar( float x, float y, float charWidth, int ch, const idMaterial *shader ) {
 	int row, col;
@@ -97,8 +127,16 @@ FindMatches
 */
 static void FindMatches( const char *s ) {
 	int		i;
+	const bool prefixMatch = ( idStr::Icmpn( s, globalAutoComplete.completionString, strlen( globalAutoComplete.completionString ) ) == 0 );
 
-	if ( idStr::Icmpn( s, globalAutoComplete.completionString, strlen( globalAutoComplete.completionString ) ) != 0 ) {
+	if ( completionQueryMode && completionQueryCallback != NULL && ( prefixMatch || completionQueryCollectAll ) ) {
+		++completionQueryTotalCount;
+		if ( !completionQueryCallback( s, completionQueryContext ) ) {
+			completionQueryCallback = NULL;
+		}
+	}
+
+	if ( !prefixMatch ) {
 		return;
 	}
 	globalAutoComplete.matchCount++;
@@ -196,6 +234,7 @@ idEditField::SetWidthInChars
 void idEditField::SetWidthInChars( int w ) {
 	assert( w <= MAX_EDIT_LINE );
 	widthInChars = w;
+	ClampCursorAndScroll();
 }
 
 /*
@@ -206,6 +245,7 @@ idEditField::SetCursor
 void idEditField::SetCursor( int c ) {
 	assert( c <= MAX_EDIT_LINE );
 	cursor = c;
+	ClampCursorAndScroll();
 }
 
 /*
@@ -215,6 +255,77 @@ idEditField::GetCursor
 */
 int idEditField::GetCursor( void ) const {
 	return cursor;
+}
+
+/*
+===============
+idEditField::GetScroll
+===============
+*/
+int idEditField::GetScroll( void ) const {
+	return scroll;
+}
+
+/*
+===============
+idEditField::SetScroll
+===============
+*/
+void idEditField::SetScroll( int s ) {
+	scroll = s;
+	ClampCursorAndScroll();
+}
+
+/*
+===============
+idEditField::GetWidthInChars
+===============
+*/
+int idEditField::GetWidthInChars( void ) const {
+	return widthInChars;
+}
+
+/*
+===============
+idEditField::GetLength
+===============
+*/
+int idEditField::GetLength( void ) const {
+	return strlen( buffer );
+}
+
+/*
+===============
+idEditField::ClampCursorAndScroll
+===============
+*/
+void idEditField::ClampCursorAndScroll( void ) {
+	const int len = strlen( buffer );
+	const int drawLen = Max( 1, widthInChars );
+
+	if ( cursor < 0 ) {
+		cursor = 0;
+	} else if ( cursor > len ) {
+		cursor = len;
+	}
+
+	if ( scroll < 0 ) {
+		scroll = 0;
+	}
+
+	if ( cursor < scroll ) {
+		scroll = cursor;
+	} else if ( cursor >= scroll + drawLen ) {
+		scroll = cursor - drawLen + 1;
+	}
+
+	if ( len > drawLen && scroll > len - drawLen ) {
+		scroll = len - drawLen;
+	}
+
+	if ( scroll < 0 ) {
+		scroll = 0;
+	}
 }
 
 /*
@@ -252,8 +363,15 @@ void idEditField::AutoComplete( void ) {
 	idCmdArgs args;
 
 	if ( !autoComplete.valid ) {
+		const bool explicitCommandPrefix = ( buffer[0] == '/' || buffer[0] == '\\' );
+		const char commandPrefix = explicitCommandPrefix ? buffer[0] : '\0';
+
 		args.TokenizeString( buffer, false );
-		idStr::Copynz( autoComplete.completionString, args.Argv( 0 ), sizeof( autoComplete.completionString ) );
+		const char *completionBase = args.Argv( 0 );
+		if ( ( completionBase[0] == '/' || completionBase[0] == '\\' ) && completionBase[1] != '\0' ) {
+			++completionBase;
+		}
+		idStr::Copynz( autoComplete.completionString, completionBase, sizeof( autoComplete.completionString ) );
 		idStr::Copynz( completionArgString, args.Args(), sizeof( completionArgString ) );
 		autoComplete.matchCount = 0;
 		autoComplete.matchIndex = 0;
@@ -290,6 +408,10 @@ void idEditField::AutoComplete( void ) {
 			autoComplete = globalAutoComplete;
 
 			idStr::snPrintf( buffer, sizeof( buffer ), "%s", autoComplete.currentMatch );
+			if ( explicitCommandPrefix && buffer[0] != '/' && buffer[0] != '\\' && strlen( buffer ) + 1 < sizeof( buffer ) ) {
+				memmove( buffer + 1, buffer, strlen( buffer ) + 1 );
+				buffer[0] = commandPrefix;
+			}
 
 			if ( autoComplete.matchCount == 0 ) {
 				// no argument matches
@@ -302,6 +424,10 @@ void idEditField::AutoComplete( void ) {
 
 			// multiple matches, complete to shortest
 			idStr::snPrintf( buffer, sizeof( buffer ), "%s", autoComplete.currentMatch );
+			if ( explicitCommandPrefix && buffer[0] != '/' && buffer[0] != '\\' && strlen( buffer ) + 1 < sizeof( buffer ) ) {
+				memmove( buffer + 1, buffer, strlen( buffer ) + 1 );
+				buffer[0] = commandPrefix;
+			}
 			if ( strlen( completionArgString ) ) {
 				idStr::Append( buffer, sizeof( buffer ), " " );
 				idStr::Append( buffer, sizeof( buffer ), completionArgString );
@@ -323,6 +449,8 @@ void idEditField::AutoComplete( void ) {
 		cvarSystem->ArgCompletion( autoComplete.completionString, PrintMatches );
 
 	} else if ( autoComplete.matchCount != 1 ) {
+		const bool explicitCommandPrefix = ( buffer[0] == '/' || buffer[0] == '\\' );
+		const char commandPrefix = explicitCommandPrefix ? buffer[0] : '\0';
 
 		// get the next match and show instead
 		autoComplete.matchIndex++;
@@ -342,11 +470,106 @@ void idEditField::AutoComplete( void ) {
 
 		// and print it
 		idStr::snPrintf( buffer, sizeof( buffer ), autoComplete.currentMatch );
+		if ( explicitCommandPrefix && buffer[0] != '/' && buffer[0] != '\\' && strlen( buffer ) + 1 < sizeof( buffer ) ) {
+			memmove( buffer + 1, buffer, strlen( buffer ) + 1 );
+			buffer[0] = commandPrefix;
+		}
 		if ( autoComplete.length > (int)strlen( buffer ) ) {
 			autoComplete.length = strlen( buffer );
 		}
 		SetCursor( autoComplete.length );
 	}
+}
+
+static int QueryCompletionInternal( const char *cmd, bool *appendSpace, editFieldCompletionQueryCallback_t callback, void *context, bool collectAll ) {
+	char normalizedCmd[MAX_EDIT_LINE];
+	idCmdArgs args;
+	bool savedQueryMode;
+	bool savedCollectAll;
+	editFieldCompletionQueryCallback_t savedCallback;
+	void *savedContext;
+
+	if ( appendSpace != NULL ) {
+		*appendSpace = false;
+	}
+
+	if ( cmd == NULL || cmd[0] == '\0' ) {
+		return 0;
+	}
+
+	NormalizeCompletionCommandString( cmd, normalizedCmd, sizeof( normalizedCmd ) );
+	if ( normalizedCmd[0] == '\0' ) {
+		return 0;
+	}
+
+	args.TokenizeString( normalizedCmd, false );
+	if ( args.Argc() == 0 ) {
+		return 0;
+	}
+
+	globalAutoComplete.valid = false;
+	globalAutoComplete.length = 0;
+	globalAutoComplete.matchCount = 0;
+	globalAutoComplete.matchIndex = 0;
+	globalAutoComplete.findMatchIndex = 0;
+	globalAutoComplete.currentMatch[0] = '\0';
+
+	const int normalizedLength = strlen( normalizedCmd );
+	const bool trailingWhitespace = normalizedLength > 0 && normalizedCmd[normalizedLength - 1] <= ' ';
+	const bool completingArguments = ( args.Argc() > 1 ) || trailingWhitespace;
+	if ( completingArguments ) {
+		globalAutoComplete.completionString[0] = '\0';
+	} else {
+		idStr::Copynz( globalAutoComplete.completionString, args.Argv( args.Argc() - 1 ), sizeof( globalAutoComplete.completionString ) );
+	}
+
+	savedQueryMode = completionQueryMode;
+	savedCollectAll = completionQueryCollectAll;
+	savedCallback = completionQueryCallback;
+	savedContext = completionQueryContext;
+
+	completionQueryMode = true;
+	completionQueryCollectAll = collectAll;
+	completionQueryCallback = callback;
+	completionQueryContext = context;
+	completionQueryTotalCount = 0;
+
+	if ( completingArguments ) {
+		cmdSystem->ArgCompletion( normalizedCmd, FindMatches );
+		cvarSystem->ArgCompletion( normalizedCmd, FindMatches );
+	} else {
+		cmdSystem->CommandCompletion( FindMatches );
+		cvarSystem->CommandCompletion( FindMatches );
+	}
+
+	if ( appendSpace != NULL ) {
+		*appendSpace = ( globalAutoComplete.matchCount == 1 );
+	}
+
+	completionQueryMode = savedQueryMode;
+	completionQueryCollectAll = savedCollectAll;
+	completionQueryCallback = savedCallback;
+	completionQueryContext = savedContext;
+
+	return collectAll ? completionQueryTotalCount : globalAutoComplete.matchCount;
+}
+
+/*
+===============
+idEditField::QueryCompletionMatches
+===============
+*/
+int idEditField::QueryCompletionMatches( const char *cmd, bool *appendSpace, editFieldCompletionQueryCallback_t callback, void *context ) {
+	return QueryCompletionInternal( cmd, appendSpace, callback, context, false );
+}
+
+/*
+===============
+idEditField::QueryCompletionCandidates
+===============
+*/
+int idEditField::QueryCompletionCandidates( const char *cmd, editFieldCompletionQueryCallback_t callback, void *context ) {
+	return QueryCompletionInternal( cmd, NULL, callback, context, true );
 }
 
 /*
@@ -573,6 +796,15 @@ char *idEditField::GetBuffer( void ) {
 
 /*
 ===============
+idEditField::GetBuffer
+===============
+*/
+const char *idEditField::GetBuffer( void ) const {
+	return buffer;
+}
+
+/*
+===============
 idEditField::SetBuffer
 ===============
 */
@@ -580,6 +812,7 @@ void idEditField::SetBuffer( const char *buf ) {
 	Clear();
 	idStr::Copynz( buffer, buf, sizeof( buffer ) );
 	SetCursor( strlen( buffer ) );
+	ClampCursorAndScroll();
 }
 
 /*

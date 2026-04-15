@@ -125,6 +125,30 @@ static void DrawNativeScreenOverlay( const idMaterial *background, const idVec4 
 	renderSystem->SetColor( colorWhite );
 	renderSystem->SetUseUIViewportFor2D( previousUIViewportMode );
 }
+
+static void AdjustTournamentWarmupLayout( const idUserInterfaceLocal *gui, const char *windowName, const char *parentName, float xofs, float xExpand, idRectangle &drawRect ) {
+	if ( gui == NULL || windowName == NULL || xExpand <= 0.0f ) {
+		return;
+	}
+
+	if ( idStr::Icmp( gui->GetSourceFile(), "guis/mphud.gui" ) != 0 ) {
+		return;
+	}
+
+	// Stretch the tournament pre-game bar across the native render width while
+	// keeping its title centered in the middle 640-wide virtual HUD canvas.
+	if ( idStr::Icmp( windowName, "tourn_warmupbar" ) == 0 || idStr::Icmp( windowName, "d_tourn_warmupbar" ) == 0 ) {
+		drawRect.x = xofs - xExpand;
+		drawRect.w = 640.0f + ( xExpand * 2.0f );
+		return;
+	}
+
+	if ( parentName != NULL && idStr::Icmp( parentName, "tourn_warmupbar" ) == 0 &&
+		 idStr::Icmp( windowName, "tourn_warmup_title" ) == 0 ) {
+		drawRect.x = xofs + xExpand;
+		drawRect.w = 640.0f;
+	}
+}
 }
 
 
@@ -449,6 +473,8 @@ void idSimpleWindow::CalcClientRect(float xofs, float yofs) {
 				drawRect.y += yExpand;
 			}
 		}
+
+		AdjustTournamentWarmupLayout( gui, name.c_str(), mParent != NULL ? mParent->GetName() : NULL, xofs, xExpand, drawRect );
 	}
 
 	clientRect = drawRect;

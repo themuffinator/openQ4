@@ -595,6 +595,14 @@ static bool RB_IsMainScenePostProcessView( void ) {
 		return false;
 	}
 
+	// GUI renderDef previews allocate their own transient renderWorld with no
+	// loaded map. Those views must composite directly over the already drawn
+	// menu instead of being routed through the fullscreen scene-target present
+	// path, which would overwrite the menu with an opaque buffer.
+	if ( backEnd.viewDef->renderWorld != NULL && backEnd.viewDef->renderWorld->mapName.Length() == 0 ) {
+		return false;
+	}
+
 	// X-ray subviews intentionally diverge from the normal scene shading path.
 	return !backEnd.viewDef->isXraySubview;
 }
@@ -616,7 +624,7 @@ static float rbHDRLastAdaptationTime = -1.0f;
 static bool rbHDRExposureInitialized = false;
 
 static bool RB_PostProcessBloomRequested( void ) {
-	return r_bloom.GetBool() && !r_skipGlowOverlay.GetBool();
+	return r_bloom.GetBool();
 }
 
 static int RB_HDRDebugViewValue( void ) {
@@ -1310,7 +1318,7 @@ static void RB_GetBloomLevelSize( int viewportWidth, int viewportHeight, int lev
 	levelWidth = Max( 1, viewportWidth );
 	levelHeight = Max( 1, viewportHeight );
 
-	for ( int i = 0; i <= level; i++ ) {
+	for ( int i = 0; i < level; i++ ) {
 		levelWidth = Max( 1, ( levelWidth + 1 ) / 2 );
 		levelHeight = Max( 1, ( levelHeight + 1 ) / 2 );
 	}

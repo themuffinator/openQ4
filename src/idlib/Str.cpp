@@ -19,13 +19,32 @@
 static idDynamicBlockAlloc<char, 1<<18, 128, MA_STRING>	stringDataAllocator;
 #endif
 
-idVec4	g_color_table[16] =
+namespace {
+idList<idStr>	g_iconEscapeCodes;
+static bool OpenQ4_IsRegisteredIconEscapeCode( const char *code ) {
+	if ( code == NULL || code[0] == '\0' || code[1] == '\0' || code[2] == '\0' ) {
+		return false;
+	}
+	char iconCode[4];
+	iconCode[0] = code[0];
+	iconCode[1] = code[1];
+	iconCode[2] = code[2];
+	iconCode[3] = '\0';
+	for ( int i = 0; i < g_iconEscapeCodes.Num(); ++i ) {
+		if ( g_iconEscapeCodes[i].Cmp( iconCode ) == 0 ) {
+			return true;
+		}
+	}
+	return false;
+}
+}
+idVec4	g_color_table[COLOR_INDEX_COUNT] =
 {
 	idVec4(0.0f, 0.0f, 0.0f, 1.0f),
 	idVec4(1.0f, 0.0f, 0.0f, 1.0f), // S_COLOR_RED
 	idVec4(0.0f, 1.0f, 0.0f, 1.0f), // S_COLOR_GREEN
 	idVec4(1.0f, 1.0f, 0.0f, 1.0f), // S_COLOR_YELLOW
-	idVec4(0.0f, 0.0f, 1.0f, 1.0f), // S_COLOR_BLUE
+	idVec4(0.2f, 0.6f, 1.0f, 1.0f), // S_COLOR_BLUE, softened toward Quake Live UI blue
 	idVec4(0.0f, 1.0f, 1.0f, 1.0f), // S_COLOR_CYAN
 	idVec4(1.0f, 0.0f, 1.0f, 1.0f), // S_COLOR_MAGENTA
 	idVec4(1.0f, 1.0f, 1.0f, 1.0f), // S_COLOR_WHITE
@@ -35,13 +54,34 @@ idVec4	g_color_table[16] =
 // bdube: console color
 	idVec4(0.94f, 0.62f, 0.05f, 1.0f),	// S_COLOR_CONSOLE
 // RAVEN END	
-	idVec4(0.0f, 0.0f, 0.0f, 1.0f),
-	idVec4(0.0f, 0.0f, 0.0f, 1.0f),
-	idVec4(0.0f, 0.0f, 0.0f, 1.0f),
-	idVec4(0.0f, 0.0f, 0.0f, 1.0f),
-	idVec4(0.0f, 0.0f, 0.0f, 1.0f),
+	// CPMA/CNQ3 alphabet rainbow colors, adapted via the FnQ3 implementation.
+	idVec4(1.00000f, 0.00000f, 0.00000f, 1.00000f), // a
+	idVec4(1.00000f, 0.26795f, 0.00000f, 1.00000f), // b
+	idVec4(1.00000f, 0.50000f, 0.00000f, 1.00000f), // c
+	idVec4(1.00000f, 0.73205f, 0.00000f, 1.00000f), // d
+	idVec4(1.00000f, 1.00000f, 0.00000f, 1.00000f), // e
+	idVec4(0.73205f, 1.00000f, 0.00000f, 1.00000f), // f
+	idVec4(0.50000f, 1.00000f, 0.00000f, 1.00000f), // g
+	idVec4(0.26795f, 1.00000f, 0.00000f, 1.00000f), // h
+	idVec4(0.00000f, 1.00000f, 0.00000f, 1.00000f), // i
+	idVec4(0.00000f, 1.00000f, 0.26795f, 1.00000f), // j
+	idVec4(0.00000f, 1.00000f, 0.50000f, 1.00000f), // k
+	idVec4(0.00000f, 1.00000f, 0.73205f, 1.00000f), // l
+	idVec4(0.00000f, 1.00000f, 1.00000f, 1.00000f), // m
+	idVec4(0.00000f, 0.73205f, 1.00000f, 1.00000f), // n
+	idVec4(0.00000f, 0.50000f, 1.00000f, 1.00000f), // o
+	idVec4(0.00000f, 0.26795f, 1.00000f, 1.00000f), // p
+	idVec4(0.00000f, 0.00000f, 1.00000f, 1.00000f), // q
+	idVec4(0.26795f, 0.00000f, 1.00000f, 1.00000f), // r
+	idVec4(0.50000f, 0.00000f, 1.00000f, 1.00000f), // s
+	idVec4(0.73205f, 0.00000f, 1.00000f, 1.00000f), // t
+	idVec4(1.00000f, 0.00000f, 1.00000f, 1.00000f), // u
+	idVec4(1.00000f, 0.00000f, 0.73205f, 1.00000f), // v
+	idVec4(1.00000f, 0.00000f, 0.50000f, 1.00000f), // w
+	idVec4(1.00000f, 0.00000f, 0.26795f, 1.00000f), // x
+	idVec4(1.00000f, 1.00000f, 1.00000f, 1.00000f), // y
+	idVec4(0.50000f, 0.50000f, 0.50000f, 1.00000f), // z
 };
-
 const char *units[2][4] =
 {
 	{ "B", "KB", "MB", "GB" },
@@ -170,30 +210,22 @@ int idStr::ColorEscapeLength( const char *s, idVec4 *outColor, bool *resetToDefa
 	if ( resetToDefault ) {
 		*resetToDefault = false;
 	}
-
 	int type = 0;
 	const int escapeLength = idStr::IsEscape( s, &type );
 	if ( escapeLength == 0 || ( type & ( S_ESCAPE_COLOR | S_ESCAPE_COLORINDEX ) ) == 0 ) {
 		return 0;
 	}
-
 	switch ( s[1] ) {
 		case C_COLOR_DEFAULT:
 			if ( resetToDefault ) {
 				*resetToDefault = true;
 			}
 			return escapeLength;
-
-		case '1': case '2': case '3': case '4':
-		case '5': case '6': case '7': case '8':
-		case '9': case C_COLOR_CONSOLE:
-			if ( outColor ) {
-				*outColor = idStr::ColorForIndex( s[1] );
-			}
-			return escapeLength;
-
 		case 'c': case 'C':
-			if ( !idStr::CharIsNumeric( s[2] ) || !idStr::CharIsNumeric( s[3] ) || !idStr::CharIsNumeric( s[4] ) ) {
+			if ( escapeLength != 5 ||
+				!idStr::CharIsNumeric( s[2] ) ||
+				!idStr::CharIsNumeric( s[3] ) ||
+				!idStr::CharIsNumeric( s[4] ) ) {
 				return 0;
 			}
 			if ( outColor ) {
@@ -205,10 +237,14 @@ int idStr::ColorEscapeLength( const char *s, idVec4 *outColor, bool *resetToDefa
 			}
 			return escapeLength;
 	}
-
+	if ( type == S_ESCAPE_COLORINDEX ) {
+		if ( outColor ) {
+			*outColor = idStr::ColorForIndex( idStr::ColorIndex( s[1] ) );
+		}
+		return escapeLength;
+	}
 	return 0;
 }
-
 /*
 ================
 idStr::RemoveColors
@@ -241,9 +277,26 @@ idStr::ColorForIndex
 ============
 */
 idVec4 & idStr::ColorForIndex( int i ) {
-	return g_color_table[ i & 15 ];
+	const int index = idMath::ClampInt( 0, COLOR_INDEX_COUNT - 1, idStr::ColorIndex( i ) );
+	return g_color_table[ index ];
 }
-
+void idStr::ClearIconEscapeCodes( void ) {
+	g_iconEscapeCodes.Clear();
+}
+void idStr::RegisterIconEscapeCode( const char *code ) {
+	if ( code == NULL || code[0] == '\0' || code[1] == '\0' || code[2] == '\0' ) {
+		return;
+	}
+	char iconCode[4];
+	iconCode[0] = code[0];
+	iconCode[1] = code[1];
+	iconCode[2] = code[2];
+	iconCode[3] = '\0';
+	if ( OpenQ4_IsRegisteredIconEscapeCode( iconCode ) ) {
+		return;
+	}
+	g_iconEscapeCodes.Append( iconCode );
+}
 /*
 ============
 idStr::ReAllocate
@@ -1861,53 +1914,45 @@ int idStr::IsEscape( const char *s, int* type )  {
 				*type = S_ESCAPE_COLORINDEX;
 			}
 			return 2;
-
 		case '-': case '+':
 			if ( type ) {
 				*type = S_ESCAPE_COLOR;
 			}
 			return 2;
-			
-		case 'r': case 'R': 
-			if ( type ) {			
-				*type = S_ESCAPE_COMMAND;
+		case 'c': case 'C':
+			if ( *(s+2) && *(s+3) && *(s+4) &&
+				idStr::CharIsNumeric( s[2] ) &&
+				idStr::CharIsNumeric( s[3] ) &&
+				idStr::CharIsNumeric( s[4] ) ) {
+				if ( type ) {
+					*type = S_ESCAPE_COLOR;
+				}
+				return 5;
+			}
+			if ( type ) {
+				*type = S_ESCAPE_COLORINDEX;
 			}
 			return 2;
-			
-		case 'c': case 'C':
-			if ( *(s+2) ) {
-				if ( *(s+3) ) {
-					if ( *(s+4) ) {
-						if ( type ) {
-							*type = S_ESCAPE_COLOR;
-						}
-						return 5;
-					}
-				}
-			}
-			return 0;
-			
-		case 'n': case 'N':
-			if ( type ) {
-				*type = S_ESCAPE_COMMAND;
-			}
-			if ( *(s+2) ) {
-				return 3;
-			}
-			return 0;
-			
 		case 'i': case 'I':
-			if ( *(s+2) && *(s+3) && *(s+4) ) {
+			if ( *(s+2) && *(s+3) && *(s+4) && OpenQ4_IsRegisteredIconEscapeCode( s + 2 ) ) {
 				if ( type ) {
 					*type = S_ESCAPE_ICON;
 				}
 				return 5;
 			}
-			return 0;		
+			if ( type ) {
+				*type = S_ESCAPE_COLORINDEX;
+			}
+			return 2;
 	}			
+	if ( ( s[1] >= 'a' && s[1] <= 'z' ) || ( s[1] >= 'A' && s[1] <= 'Z' ) ) {
+		if ( type ) {
+			*type = S_ESCAPE_COLORINDEX;
+		}
+		return 2;
+	}
 	return 0;
 }
-
 // RAVEN END
 
 /*

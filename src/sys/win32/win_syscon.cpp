@@ -686,12 +686,15 @@ void Conbuf_AppendText(const char* pMsg)
 			b[1] = '\n';
 			b += 2;
 		}
-		else if (idStr::IsColor(&msg[i])) {
-			i++;
-		}
 		else {
-			*b = msg[i];
-			b++;
+			int escapeType = 0;
+			const int escapeLength = idStr::IsEscape( &msg[i], &escapeType );
+			if ( escapeLength > 0 ) {
+				i += escapeLength - 1;
+			} else {
+				*b = msg[i];
+				b++;
+			}
 		}
 		i++;
 	}

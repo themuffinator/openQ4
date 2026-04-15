@@ -29,6 +29,7 @@ along with Doom 3 Source Code.  If not, see <http://www.gnu.org/licenses/>.
 #include "win_local.h"
 #endif
 #include "../../framework/Common.h"
+#include "../../framework/Console.h"
 #include "../../framework/Session.h"
 #include "../../renderer/tr_local.h"
 
@@ -366,7 +367,7 @@ static void SDL3_QueueMouseInput(int action, int value, int time) {
 }
 
 static bool SDL3_ShouldRouteMenuMouse(void) {
-	return (session != NULL) && session->IsGUIActive();
+	return ( session != NULL && session->IsGUIActive() ) || ( console != NULL && console->Active() );
 }
 
 static bool SDL3_IsMouseCaptured(void) {
@@ -568,46 +569,68 @@ static bool SDL3_MapWindowMouseToGuiCursor(float windowMouseX, float windowMouse
 	return true;
 }
 
-static void SDL3_SyncSystemMouseToActiveGUICursor(void) {
+static void SDL3_SyncSystemMouseToActiveCursor(void) {
 	if (!SDL3_ShouldRouteMenuMouse() || !s_sdlWindow) {
 		return;
 	}
 
 	idUserInterface *activeGui = session->GetActiveGUI();
-	if (activeGui == NULL) {
+	if (activeGui != NULL) {
+		sdl3GuiMouseTransform_t transform;
+		if (!SDL3_BuildGuiMouseTransform(transform)) {
+			return;
+		}
+
+		float minX = 0.0f;
+		float maxX = transform.guiWidth;
+		float minY = 0.0f;
+		float maxY = transform.guiHeight;
+		SDL3_GetGuiCursorBounds(transform, minX, maxX, minY, maxY);
+		const float clampedCursorX = idMath::ClampFloat(minX, maxX, activeGui->CursorX());
+		const float clampedCursorY = idMath::ClampFloat(minY, maxY, activeGui->CursorY());
+		const float drawX = (clampedCursorX * transform.xScale) + transform.xOffset;
+		const float drawY = (clampedCursorY * transform.yScale) + transform.yOffset;
+		const float pixelMouseX = transform.drawAreaX + drawX * (transform.drawAreaWidth / transform.guiWidth);
+		const float pixelMouseY = transform.drawAreaY + drawY * (transform.drawAreaHeight / transform.guiHeight);
+		const float windowMouseX = pixelMouseX * transform.pixelToWindowX;
+		const float windowMouseY = pixelMouseY * transform.pixelToWindowY;
+
+		SDL_WarpMouseInWindow(s_sdlWindow, windowMouseX, windowMouseY);
+		s_ignoreNextMenuWarpMotion = true;
+		s_menuWarpWindowX = windowMouseX;
+		s_menuWarpWindowY = windowMouseY;
+		s_menuMouseInsideWindow = true;
+		s_haveMenuMousePosition = true;
+		s_menuMouseX = clampedCursorX;
+		s_menuMouseY = clampedCursorY;
+		s_menuMouseRemainderX = 0.0f;
+		s_menuMouseRemainderY = 0.0f;
+		activeGui->SetCursor(clampedCursorX, clampedCursorY);
 		return;
 	}
 
-	sdl3GuiMouseTransform_t transform;
-	if (!SDL3_BuildGuiMouseTransform(transform)) {
+	if (console == NULL || !console->Active()) {
 		return;
 	}
 
-	float minX = 0.0f;
-	float maxX = transform.guiWidth;
-	float minY = 0.0f;
-	float maxY = transform.guiHeight;
-	SDL3_GetGuiCursorBounds(transform, minX, maxX, minY, maxY);
-	const float clampedCursorX = idMath::ClampFloat(minX, maxX, activeGui->CursorX());
-	const float clampedCursorY = idMath::ClampFloat(minY, maxY, activeGui->CursorY());
-	const float drawX = (clampedCursorX * transform.xScale) + transform.xOffset;
-	const float drawY = (clampedCursorY * transform.yScale) + transform.yOffset;
-	const float pixelMouseX = transform.drawAreaX + drawX * (transform.drawAreaWidth / transform.guiWidth);
-	const float pixelMouseY = transform.drawAreaY + drawY * (transform.drawAreaHeight / transform.guiHeight);
-	const float windowMouseX = pixelMouseX * transform.pixelToWindowX;
-	const float windowMouseY = pixelMouseY * transform.pixelToWindowY;
+	float windowMouseX = 0.0f;
+	float windowMouseY = 0.0f;
+	(void)SDL_GetMouseState(&windowMouseX, &windowMouseY);
 
-	SDL_WarpMouseInWindow(s_sdlWindow, windowMouseX, windowMouseY);
-	s_ignoreNextMenuWarpMotion = true;
-	s_menuWarpWindowX = windowMouseX;
-	s_menuWarpWindowY = windowMouseY;
+	float consoleMouseX = 0.0f;
+	float consoleMouseY = 0.0f;
+	if (!SDL3_MapWindowMouseToGuiCursor(windowMouseX, windowMouseY, consoleMouseX, consoleMouseY)) {
+		return;
+	}
+
+	console->SetMousePosition(consoleMouseX, consoleMouseY);
+	s_ignoreNextMenuWarpMotion = false;
 	s_menuMouseInsideWindow = true;
 	s_haveMenuMousePosition = true;
-	s_menuMouseX = clampedCursorX;
-	s_menuMouseY = clampedCursorY;
+	s_menuMouseX = consoleMouseX;
+	s_menuMouseY = consoleMouseY;
 	s_menuMouseRemainderX = 0.0f;
 	s_menuMouseRemainderY = 0.0f;
-	activeGui->SetCursor(clampedCursorX, clampedCursorY);
 }
 
 static int SDL3_ClampJoystickValue(int value) {
@@ -2133,7 +2156,7 @@ static void SDL3_HandleWindowEvent(const SDL_WindowEvent &event, int eventTime) 
 		case SDL_EVENT_WINDOW_MOUSE_ENTER:
 			s_menuMouseInsideWindow = true;
 			if (SDL3_ShouldRouteMenuMouse() && !SDL3_IsMouseCaptured()) {
-				SDL3_SyncSystemMouseToActiveGUICursor();
+				SDL3_SyncSystemMouseToActiveCursor();
 			}
 			SDL3_UpdateCursorVisibility();
 			break;
@@ -2566,7 +2589,7 @@ void IN_DeactivateMouse(void) {
 	(void)SDL_SetWindowRelativeMouseMode(s_sdlWindow, false);
 	(void)SDL_SetWindowMouseGrab(s_sdlWindow, false);
 	if (SDL3_ShouldRouteMenuMouse()) {
-		SDL3_SyncSystemMouseToActiveGUICursor();
+		SDL3_SyncSystemMouseToActiveCursor();
 	} else {
 		SDL3_ResetMenuMouseTracking();
 	}
@@ -2631,9 +2654,9 @@ void IN_Frame(void) {
 		}
 	}
 
-	if (routeMenuMouse && !s_menuMouseRouteActive && !s_haveMenuMousePosition) {
-		// Match WORR-style behavior: align OS cursor to menu cursor when menu routing starts.
-		SDL3_SyncSystemMouseToActiveGUICursor();
+	if (routeMenuMouse && !s_haveMenuMousePosition) {
+		// Keep routed mouse state aligned whenever routing activates or is invalidated.
+		SDL3_SyncSystemMouseToActiveCursor();
 	} else if (!routeMenuMouse && s_menuMouseRouteActive) {
 		SDL3_ResetMenuMouseTracking();
 	}

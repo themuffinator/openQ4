@@ -38,6 +38,7 @@ If you have questions concerning this license or the applicable additional terms
 */
 
 const int MAX_EDIT_LINE = 256;
+typedef bool ( *editFieldCompletionQueryCallback_t )( const char *match, void *context );
 
 typedef struct autoComplete_s {
 	bool			valid;
@@ -58,13 +59,21 @@ public:
 	void			SetWidthInChars( int w );
 	void			SetCursor( int c );
 	int				GetCursor( void ) const;
+	int				GetScroll( void ) const;
+	void			SetScroll( int s );
+	int				GetWidthInChars( void ) const;
+	int				GetLength( void ) const;
+	void			ClampCursorAndScroll( void );
 	void			ClearAutoComplete( void );
 	int				GetAutoCompleteLength( void ) const;
 	void			AutoComplete( void );
+	static int		QueryCompletionMatches( const char *cmd, bool *appendSpace, editFieldCompletionQueryCallback_t callback, void *context );
+	static int		QueryCompletionCandidates( const char *cmd, editFieldCompletionQueryCallback_t callback, void *context );
 	void			CharEvent( int c );
 	void			KeyDownEvent( int key );
 	void			Paste( void );
 	char *			GetBuffer( void );
+	const char *	GetBuffer( void ) const;
 	void			Draw( int x, int y, int width, bool showCursor, const idMaterial *material );
 	void			SetBuffer( const char *buffer );
 

@@ -1065,7 +1065,7 @@ extern idCVar r_lightAllBackFaces;		// light all the back faces, even when they 
 extern idCVar r_useDepthBoundsTest;     // use depth bounds test to reduce shadow fill
 
 extern idCVar r_skipPostProcess;		// skip all post-process renderings
-extern idCVar r_skipGlowOverlay;		// skip glow overlay stages and bloom
+extern idCVar r_skipGlowOverlay;		// skip glow overlay material stages
 extern idCVar r_skipSuppress;			// ignore the per-view suppressions
 extern idCVar r_skipInteractions;		// skip all light/surface interaction drawing
 extern idCVar r_skipFrontEnd;			// bypasses all front end work, but 2D gui rendering still draws

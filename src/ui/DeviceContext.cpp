@@ -184,6 +184,7 @@ void idDeviceContext::RegisterIcon( const char *code, const char *shader, int x,
 	icon.height = static_cast<float>( h );
 	SizeIcon( icon );
 	icons.Set( icon.code, icon );
+	idStr::RegisterIconEscapeCode( icon.code );
 }
 
 void idDeviceContext::RegisterBuiltinIcons() {
@@ -222,6 +223,7 @@ void idDeviceContext::Init() {
 	SetupFonts();
 	activeFont = &fonts[0];
 	icons.Clear();
+	idStr::ClearIconEscapeCodes();
 	RegisterBuiltinIcons();
 	colorPurple = idVec4(1, 0, 1, 1);
 	colorOrange = idVec4(1, 1, 0, 1);
