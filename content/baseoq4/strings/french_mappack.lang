@@ -1,0 +1,9 @@
+// string table
+// french
+//
+
+{	
+	"#str_600001" 	"CAMPEMENTS"
+	"#str_600005" 	"SECOUSSES"
+	"#str_600007" 	"SNIPÉ"
+}
