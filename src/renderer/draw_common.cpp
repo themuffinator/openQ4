@@ -772,19 +772,19 @@ static bool RB_SceneRenderTargetRequested( void ) {
 	if ( !RB_IsMainScenePostProcessView() ) {
 		return false;
 	}
-	if ( !r_hdrSceneTarget.GetBool() ) {
+	const bool bloomRequested = RB_PostProcessBloomRequested();
+	if ( !bloomRequested && !r_hdrSceneTarget.GetBool() ) {
 		return false;
 	}
 	if ( backEnd.renderTexture != NULL ) {
 		return false;
 	}
 
-	// Plain bloom can run from a _currentRender capture of the resolved scene.
-	// Forcing the whole world view through the FP16 scene target just for bloom
-	// currently breaks some stock Quake 4 post/depth-aware effects during map
-	// transitions (for example the airdefense1 -> airdefense2 handoff). Keep the
-	// scene target reserved for passes that actually require an offscreen scene RT.
-	return r_ssao.GetBool()
+	// Bloom now always routes through the resolved scene target. The direct
+	// back-buffer capture path was fragile when toggling bloom live and during
+	// map handoffs, and it also clipped highlight energy before the bright-pass.
+	return bloomRequested
+		|| r_ssao.GetBool()
 		|| r_hdrToneMap.GetBool()
 		|| RB_HDRAutoExposureEnabled()
 		|| ( RB_HDRDebugViewValue() > 0 );

@@ -301,6 +301,7 @@ This should not be done during normal game-play, if you can avoid it.
 void idImage::AllocImage() {
 	GL_CheckErrors();
 	PurgeImage();
+	storageGeneration++;
 
 	// OpenQ4 still follows the stock Quake 4 renderer's legacy SDR lighting path.
 	// Enabling selective sRGB decode without a full renderer-wide linear workflow

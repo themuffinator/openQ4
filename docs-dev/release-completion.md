@@ -91,6 +91,8 @@ Process:
 - [x] Rigid-body physics timing-safe quality pass applied without changing the fixed simulation cadence: angular velocity handoff now respects world inertia, water is handled as drag instead of a one-time collision-state hack, rigid-body contacts keep richer deduplicated support points, and impacts now preserve time-of-impact momentum while consuming a small bounded amount of leftover fixed-step time.
 - [x] Script compiler x64 pointer-temp parity fix ported from OpenD3: right-associative indirect-expression retagging now guards 4-byte object-ref temp vs 8-byte pointer temp storage mismatch by allocating pointer-sized result defs when needed, preventing trigger/door script chain corruption.
 - [x] Retail AAS placeholder parity restored: stock dummy `.aas` files now load/discard like retail instead of warning-spamming and failing stock map init, and AAS tactical data is cleared correctly between loads.
+- [x] Bloom stability and quality improved: live `r_bloom`/`r_bloom*` changes now use the offscreen scene-target path immediately, scratch render targets rebuild their FBO attachments safely after runtime reallocations, map handoffs no longer rely on the fragile back-buffer bloom path, and bright-pass extraction now keeps only highlight energy so broad lights stop producing solid white bloom discs.
+- [x] Manual release packaging builds are healthy again: the engine restored the shared `idCommon` timing/error/tool accessors expected by the SP/MP game libs, fixing the cross-platform release-build break that stopped the `v0.1.011` workflow before artifacts were produced.
 
 ## Carry Forward
 

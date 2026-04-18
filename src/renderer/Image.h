@@ -155,6 +155,7 @@ public:
 	void		SetTexParameters();	// update aniso and trilinear
 
 	bool		IsLoaded() const { return texnum != TEXTURE_NOT_LOADED; }
+	uint64_t	GetStorageGeneration() const { return storageGeneration; }
 
 	static void			GetGeneratedName(idStr& _name, const textureUsage_t& _usage, const cubeFiles_t& _cube);
 
@@ -192,6 +193,7 @@ private:
 	GLuint				internalFormat;
 	GLuint				dataFormat;
 	GLuint				dataType;
+	uint64_t			storageGeneration;
 
 
 };
@@ -201,6 +203,7 @@ ID_INLINE idImage::idImage(const char* name) : imgName(name) {
 	internalFormat = 0;
 	dataFormat = 0;
 	dataType = 0;
+	storageGeneration = 0;
 	generatorFunction = NULL;
 	filter = TF_DEFAULT;
 	repeat = TR_REPEAT;

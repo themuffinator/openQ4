@@ -154,6 +154,8 @@ struct MemInfo_t {
 	int				soundAssetsTotal;
 };
 
+class rvISourceControl;
+
 struct openq4AsyncTimingStats_t {
 	bool			valid;
 	int				sampleCount;
@@ -203,8 +205,36 @@ public:
 	// set once to clear the cvar from +set for early init code
 	virtual void				StartupVariable(const char* match, bool once) = 0;
 
+	virtual int					GetUserCmdHz(void) const = 0;
+	virtual int					GetUserCmdMSec(void) const = 0;
+	virtual int					GetUserCmdTime(int ticNumber) const {
+		if ( ticNumber <= 0 ) {
+			return 0;
+		}
+		return static_cast<int>( ( static_cast<long long>( ticNumber ) * GetUserCmdMsecNumerator() ) / GetUserCmdMsecDenominator() );
+	}
+	virtual int					GetUserCmdDeltaMsec(int ticNumber) const {
+		return GetUserCmdTime( ticNumber ) - GetUserCmdTime( ticNumber - 1 );
+	}
+
+	// Returns com_frameTime - which is 0 if a command is added to the command line.
+	virtual int					GetFrameTime(void) const = 0;
+
+	// Returns whether the current game frame should present a renderable state.
+	virtual bool				IsRenderableGameFrame(void) const = 0;
+	virtual void				SetRenderableGameFrame(bool in) = 0;
+
+	// Returns the last message from common->Error.
+	virtual const char*			GetErrorMessage(void) const = 0;
+
 	// Initializes a tool with the given dictionary.
 	virtual void				InitTool(const toolFlag_t tool, const idDict* dict) = 0;
+
+	// Returns true if an editor currently has focus.
+	virtual bool				IsToolActive(void) const = 0;
+
+	// Returns an interface to source control when tool integrations provide one.
+	virtual rvISourceControl*	GetSourceControl(void) = 0;
 
 	// Activates or deactivates a tool.
 	virtual void				ActivateTool(bool active) = 0;
@@ -275,23 +305,12 @@ public:
 	const char* GetLocalizedString(const char* key, int langIndex) { return GetLanguageDict()->GetString(key); }
 	const char* GetLocalizedString(const char* key) { return GetLanguageDict()->GetString(key); }
 
-	int GetUserCmdMSec(void) const { return USERCMD_MSEC; }
-	int GetUserCmdHz(void) const { return USERCMD_HZ; }
 	int GetUserCmdMsecNumerator(void) const { return 1000; }
 	int GetUserCmdMsecDenominator(void) const { return GetUserCmdHz(); }
 	float GetUserCmdMsecFloat(void) const { return static_cast<float>( GetUserCmdMsecNumerator() ) / static_cast<float>( GetUserCmdMsecDenominator() ); }
 	float GetUserCmdSec(void) const { return 1.0f / static_cast<float>( GetUserCmdHz() ); }
 	int GetPresentationTime(void) const {
 		return ( com_frameRealTime > 0 ) ? com_frameRealTime : com_frameTime;
-	}
-	int GetUserCmdTime(int ticNumber) const {
-		if ( ticNumber <= 0 ) {
-			return 0;
-		}
-		return static_cast<int>( ( static_cast<long long>( ticNumber ) * GetUserCmdMsecNumerator() ) / GetUserCmdMsecDenominator() );
-	}
-	int GetUserCmdDeltaMsec(int ticNumber) const {
-		return GetUserCmdTime( ticNumber ) - GetUserCmdTime( ticNumber - 1 );
 	}
 	int GetUserCmdTicsForMsecFloor(int msec) const {
 		if ( msec <= 0 ) {

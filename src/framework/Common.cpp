@@ -315,7 +315,15 @@ public:
 	virtual void				GUIFrame( bool execCmd, bool network );
 	virtual void				Async( void );
 	virtual void				StartupVariable( const char *match, bool once );
+	virtual int					GetUserCmdHz( void ) const;
+	virtual int					GetUserCmdMSec( void ) const;
+	virtual int					GetFrameTime( void ) const;
+	virtual bool				IsRenderableGameFrame( void ) const;
+	virtual void				SetRenderableGameFrame( bool in );
+	virtual const char *		GetErrorMessage( void ) const;
 	virtual void				InitTool( const toolFlag_t tool, const idDict *dict );
+	virtual bool				IsToolActive( void ) const;
+	virtual rvISourceControl *	GetSourceControl( void );
 	virtual void				ActivateTool( bool active );
 	virtual void				WriteConfigToFile( const char *filename );
 	virtual void				WriteFlaggedCVarsToFile( const char *filename, int flags, const char *setCmd );
@@ -397,6 +405,7 @@ static idStr Common_BuildPlatformProfileConfigName( const char *profileName ) {
 	void						FilterLangList( idStrList* list, idStr lang );
 
 	bool						com_fullyInitialized;
+	bool						com_renderableGameFrame;
 	bool						com_refreshOnPrint;		// update the screen every print for dmap
 	int							com_errorEntered;		// 0, ERP_DROP, etc
 	bool						com_shuttingDown;
@@ -433,6 +442,7 @@ idCommonLocal::idCommonLocal
 */
 idCommonLocal::idCommonLocal( void ) {
 	com_fullyInitialized = false;
+	com_renderableGameFrame = true;
 	com_refreshOnPrint = false;
 	com_errorEntered = 0;
 	com_shuttingDown = false;
@@ -1294,6 +1304,78 @@ Activates or Deactivates a tool
 void idCommonLocal::ActivateTool( bool active ) {
 	com_editorActive = active;
 	Sys_GrabMouseCursor( !active );
+}
+
+/*
+==================
+idCommonLocal::GetUserCmdHz
+==================
+*/
+int idCommonLocal::GetUserCmdHz( void ) const {
+	return USERCMD_HZ;
+}
+
+/*
+==================
+idCommonLocal::GetUserCmdMSec
+==================
+*/
+int idCommonLocal::GetUserCmdMSec( void ) const {
+	return USERCMD_MSEC;
+}
+
+/*
+==================
+idCommonLocal::GetFrameTime
+==================
+*/
+int idCommonLocal::GetFrameTime( void ) const {
+	return com_frameTime;
+}
+
+/*
+==================
+idCommonLocal::IsRenderableGameFrame
+==================
+*/
+bool idCommonLocal::IsRenderableGameFrame( void ) const {
+	return com_renderableGameFrame;
+}
+
+/*
+==================
+idCommonLocal::SetRenderableGameFrame
+==================
+*/
+void idCommonLocal::SetRenderableGameFrame( bool in ) {
+	com_renderableGameFrame = in;
+}
+
+/*
+==================
+idCommonLocal::GetErrorMessage
+==================
+*/
+const char *idCommonLocal::GetErrorMessage( void ) const {
+	return errorMessage;
+}
+
+/*
+==================
+idCommonLocal::IsToolActive
+==================
+*/
+bool idCommonLocal::IsToolActive( void ) const {
+	return com_editorActive;
+}
+
+/*
+==================
+idCommonLocal::GetSourceControl
+==================
+*/
+rvISourceControl *idCommonLocal::GetSourceControl( void ) {
+	return NULL;
 }
 
 /*

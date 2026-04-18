@@ -62,15 +62,21 @@ public:
 	void					MakeCurrent( int cubeFace );
 	static void				BindNull(void);
 
-	GLuint					GetDeviceHandle(void) { return deviceHandle; }
+	GLuint					GetDeviceHandle(void);
 
 	void					AddRenderImage(idImage *image);
 	void					InitRenderTexture(void);
 private:
+	bool					NeedsAttachmentRefresh( void ) const;
+	void					CaptureAttachmentHandles( void );
 
 	idList<idImage *>	colorImages;
 	idImage *			depthImage;
 	GLuint				deviceHandle;
+	idList<GLuint>		cachedColorHandles;
+	GLuint				cachedDepthHandle;
+	idList<uint64_t>	cachedColorGenerations;
+	uint64_t			cachedDepthGeneration;
 };
 
 #endif //!__RENDERTEXTURE_H__

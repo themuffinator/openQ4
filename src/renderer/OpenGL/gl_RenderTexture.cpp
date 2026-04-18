@@ -22,6 +22,14 @@ static bool R_IsRenderTextureHandleValid( GLuint handle ) {
 	return glIsFramebuffer( handle ) == GL_TRUE;
 }
 
+static GLuint R_GetAttachmentHandle( idImage *image ) {
+	return ( image != nullptr ) ? image->GetDeviceHandle() : INVALID_RENDER_TEXTURE_HANDLE;
+}
+
+static uint64_t R_GetAttachmentGeneration( idImage *image ) {
+	return ( image != nullptr ) ? image->GetStorageGeneration() : 0;
+}
+
 /*
 ========================
 idRenderTexture::idRenderTexture
@@ -29,6 +37,8 @@ idRenderTexture::idRenderTexture
 */
 idRenderTexture::idRenderTexture(idImage *colorImage, idImage *depthImage) {
 	deviceHandle = INVALID_RENDER_TEXTURE_HANDLE;
+	cachedDepthHandle = INVALID_RENDER_TEXTURE_HANDLE;
+	cachedDepthGeneration = 0;
 	if (colorImage != nullptr)
 	{
 		AddRenderImage(colorImage);
@@ -61,6 +71,45 @@ void idRenderTexture::AddRenderImage(idImage *image) {
 	}
 
 	colorImages.Append(image);
+	cachedColorHandles.Append( INVALID_RENDER_TEXTURE_HANDLE );
+	cachedColorGenerations.Append( 0 );
+}
+
+/*
+================
+idRenderTexture::NeedsAttachmentRefresh
+================
+*/
+bool idRenderTexture::NeedsAttachmentRefresh( void ) const {
+	if ( cachedColorHandles.Num() != colorImages.Num() || cachedColorGenerations.Num() != colorImages.Num() ) {
+		return true;
+	}
+
+	for ( int i = 0; i < colorImages.Num(); i++ ) {
+		if ( cachedColorHandles[i] != R_GetAttachmentHandle( colorImages[i] ) ||
+			cachedColorGenerations[i] != R_GetAttachmentGeneration( colorImages[i] ) ) {
+			return true;
+		}
+	}
+
+	return cachedDepthHandle != R_GetAttachmentHandle( depthImage ) ||
+		cachedDepthGeneration != R_GetAttachmentGeneration( depthImage );
+}
+
+/*
+================
+idRenderTexture::CaptureAttachmentHandles
+================
+*/
+void idRenderTexture::CaptureAttachmentHandles( void ) {
+	cachedColorHandles.SetNum( colorImages.Num() );
+	cachedColorGenerations.SetNum( colorImages.Num() );
+	for ( int i = 0; i < colorImages.Num(); i++ ) {
+		cachedColorHandles[i] = R_GetAttachmentHandle( colorImages[i] );
+		cachedColorGenerations[i] = R_GetAttachmentGeneration( colorImages[i] );
+	}
+	cachedDepthHandle = R_GetAttachmentHandle( depthImage );
+	cachedDepthGeneration = R_GetAttachmentGeneration( depthImage );
 }
 
 /*
@@ -69,11 +118,13 @@ idRenderTexture::EnsureDeviceHandle
 ================
 */
 void idRenderTexture::EnsureDeviceHandle( void ) {
-	if ( R_IsRenderTextureHandleValid( deviceHandle ) ) {
+	// Scratch images can be purged/reallocated in place when runtime renderer settings
+	// change. Rebuild the FBO attachments when that happens, even if the dimensions match.
+	if ( R_IsRenderTextureHandleValid( deviceHandle ) && !NeedsAttachmentRefresh() ) {
 		return;
 	}
 
-	if ( deviceHandle != INVALID_RENDER_TEXTURE_HANDLE ) {
+	if ( deviceHandle != INVALID_RENDER_TEXTURE_HANDLE && R_IsRenderTextureHandleValid( deviceHandle ) ) {
 		glDeleteFramebuffers( 1, &deviceHandle );
 		deviceHandle = INVALID_RENDER_TEXTURE_HANDLE;
 	}
@@ -92,7 +143,9 @@ void idRenderTexture::InitRenderTexture(void) {
 	}
 
 	if ( deviceHandle != INVALID_RENDER_TEXTURE_HANDLE ) {
-		glDeleteFramebuffers( 1, &deviceHandle );
+		if ( R_IsRenderTextureHandleValid( deviceHandle ) ) {
+			glDeleteFramebuffers( 1, &deviceHandle );
+		}
 		deviceHandle = INVALID_RENDER_TEXTURE_HANDLE;
 	}
 
@@ -181,7 +234,18 @@ void idRenderTexture::InitRenderTexture(void) {
 		common->FatalError("idRenderTexture::InitRenderTexture: Failed to create rendertexture!");
 	}
 
+	CaptureAttachmentHandles();
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+/*
+================
+idRenderTexture::GetDeviceHandle
+================
+*/
+GLuint idRenderTexture::GetDeviceHandle(void) {
+	EnsureDeviceHandle();
+	return deviceHandle;
 }
 
 /*
