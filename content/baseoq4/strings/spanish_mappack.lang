@@ -1,0 +1,9 @@
+// string table
+// spanish
+//
+
+{	
+	"#str_600001" 	"LUGAR DE ACAMPE (REDUX)"
+	"#str_600005" 	"TEMBLORES"
+	"#str_600007" 	"RAILEADO"
+}
