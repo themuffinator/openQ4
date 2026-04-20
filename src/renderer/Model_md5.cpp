@@ -33,6 +33,57 @@ If you have questions concerning this license or the applicable additional terms
 #include "Model_local.h"
 
 static const char *MD5_SnapshotName = "_MD5_Snapshot_";
+static const int MD5_BackSideSurfaceIdOffset = 1000;
+
+/*
+====================
+R_CopyAndReverseTriangles
+
+Retail Quake 4 keeps a separate back-side surface for animated MD5 materials
+that request duplicated lighting geometry. Reuse the existing allocation when
+the topology matches so cached dynamic models stay cheap to update.
+====================
+*/
+static void R_CopyAndReverseTriangles( const srfTriangles_t *src, srfTriangles_t **dst ) {
+	if ( src == NULL ) {
+		return;
+	}
+
+	if ( *dst != NULL ) {
+		if ( ( *dst )->numVerts == src->numVerts && ( *dst )->numIndexes == src->numIndexes ) {
+			R_FreeStaticTriSurfVertexCaches( *dst );
+		} else {
+			R_FreeStaticTriSurf( *dst );
+			*dst = NULL;
+		}
+	}
+
+	if ( *dst == NULL ) {
+		*dst = R_AllocStaticTriSurf();
+		R_AllocStaticTriSurfVerts( *dst, src->numVerts );
+		R_AllocStaticTriSurfIndexes( *dst, src->numIndexes );
+		( *dst )->numVerts = src->numVerts;
+		( *dst )->numIndexes = src->numIndexes;
+	}
+
+	srfTriangles_t *tri = *dst;
+	tri->bounds = src->bounds;
+	tri->deformedSurface = false;
+	tri->tangentsCalculated = false;
+	tri->facePlanesCalculated = false;
+
+	memcpy( tri->verts, src->verts, src->numVerts * sizeof( tri->verts[0] ) );
+
+	for ( int i = 0; i < tri->numVerts; ++i ) {
+		tri->verts[i].normal = vec3_origin - tri->verts[i].normal;
+	}
+
+	for ( int i = 0; i < tri->numIndexes; i += 3 ) {
+		tri->indexes[i + 0] = src->indexes[i + 1];
+		tri->indexes[i + 1] = src->indexes[i + 0];
+		tri->indexes[i + 2] = src->indexes[i + 2];
+	}
+}
 
 
 /***********************************************************************
@@ -263,7 +314,7 @@ Special transform to make the mesh seem fat or skinny.  May be used for zombie d
 */
 void idMD5Mesh::TransformScaledVerts( idDrawVert *verts, const idJointMat *entJoints, float scale ) {
 	idVec4 *scaledWeights = (idVec4 *) _alloca16( numWeights * sizeof( scaledWeights[0] ) );
-	SIMDProcessor->Mul( scaledWeights[0].ToFloatPtr(), scale, scaledWeights[0].ToFloatPtr(), numWeights * 4 );
+	SIMDProcessor->Mul( scaledWeights[0].ToFloatPtr(), scale, this->scaledWeights[0].ToFloatPtr(), numWeights * 4 );
 	SIMDProcessor->TransformVerts( verts, texCoords.Num(), entJoints, scaledWeights, weightIndex, numWeights );
 }
 
@@ -775,6 +826,7 @@ idRenderModel *idRenderModelMD5::InstantiateDynamicModel( const struct renderEnt
 		if ( ent != NULL && i < static_cast<int>( sizeof( unsigned int ) * 8 )
 			&& ( static_cast<unsigned int>( ent->suppressSurfaceMask ) & ( 1u << i ) ) != 0 ) {
 			staticModel->DeleteSurfaceWithId( i );
+			staticModel->DeleteSurfaceWithId( i + MD5_BackSideSurfaceIdOffset );
 			mesh->surfaceNum = -1;
 			continue;
 		}
@@ -787,6 +839,7 @@ idRenderModel *idRenderModelMD5::InstantiateDynamicModel( const struct renderEnt
 		
 		if ( !shader || ( !shader->IsDrawn() && !shader->SurfaceCastsShadow() ) ) {
 			staticModel->DeleteSurfaceWithId( i );
+			staticModel->DeleteSurfaceWithId( i + MD5_BackSideSurfaceIdOffset );
 			mesh->surfaceNum = -1;
 			continue;
 		}
@@ -809,9 +862,28 @@ idRenderModel *idRenderModelMD5::InstantiateDynamicModel( const struct renderEnt
 		}
 
 		mesh->UpdateSurface( ent, ent->joints, surf );
+		srfTriangles_t *frontTri = surf->geometry;
 
-		staticModel->bounds.AddPoint( surf->geometry->bounds[0] );
-		staticModel->bounds.AddPoint( surf->geometry->bounds[1] );
+		if ( shader->ShouldCreateBackSides() ) {
+			modelSurface_t *backSurf;
+
+			if ( staticModel->FindSurfaceWithId( i + MD5_BackSideSurfaceIdOffset, surfaceNum ) ) {
+				backSurf = &staticModel->surfaces[surfaceNum];
+			} else {
+				backSurf = &staticModel->surfaces.Alloc();
+				backSurf->geometry = NULL;
+				backSurf->shader = NULL;
+				backSurf->id = i + MD5_BackSideSurfaceIdOffset;
+			}
+
+			backSurf->shader = mesh->shader;
+			R_CopyAndReverseTriangles( frontTri, &backSurf->geometry );
+		} else {
+			staticModel->DeleteSurfaceWithId( i + MD5_BackSideSurfaceIdOffset );
+		}
+
+		staticModel->bounds.AddPoint( frontTri->bounds[0] );
+		staticModel->bounds.AddPoint( frontTri->bounds[1] );
 	}
 
 	return staticModel;
