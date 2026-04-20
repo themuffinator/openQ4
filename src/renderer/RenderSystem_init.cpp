@@ -184,6 +184,16 @@ idCVar r_useTwoSidedStencil( "r_useTwoSidedStencil", "1", CVAR_RENDERER | CVAR_B
 idCVar r_stencilTranslucentShadows( "r_stencilTranslucentShadows", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "let translucent materials cast and receive stencil shadows (requires interaction rebuild when toggled)" );
 idCVar r_useDeferredTangents( "r_useDeferredTangents", "1", CVAR_RENDERER | CVAR_BOOL, "defer tangents calculations after deform" );
 idCVar r_useCachedDynamicModels( "r_useCachedDynamicModels", "1", CVAR_RENDERER | CVAR_BOOL, "cache snapshots of dynamic models" );
+idCVar r_useNewSkinning( "r_useNewSkinning", "1", CVAR_RENDERER | CVAR_BOOL, "use retail-style SIMD MD5 skinning data" );
+idCVar r_useFastSkinning( "r_useFastSkinning", "0", CVAR_RENDERER | CVAR_BOOL, "approximate MD5 tangent skinning with the dominant joint only" );
+idCVar r_deriveBiTangents( "r_deriveBiTangents", "0", CVAR_RENDERER | CVAR_BOOL, "derive bitangents from skinned normals and tangents" );
+idCVar r_forceConvertMD5R( "r_forceConvertMD5R", "0", CVAR_RENDERER | CVAR_BOOL, "prefer source md5/proc assets over any future prebuilt MD5R companions" );
+idCVar r_convertMD5toMD5R( "r_convertMD5toMD5R", "0", CVAR_RENDERER | CVAR_BOOL, "convert loaded MD5 meshes to packed MD5R form when the backend is available" );
+idCVar r_convertStaticToMD5R( "r_convertStaticToMD5R", "0", CVAR_RENDERER | CVAR_BOOL, "convert loaded static render models to packed MD5R form when the backend is available" );
+idCVar r_convertProcToMD5R( "r_convertProcToMD5R", "0", CVAR_RENDERER | CVAR_BOOL, "convert loaded classic proc worlds to packed MD5R form when the backend is available" );
+idCVar r_lod_animations_distance( "r_lod_animations_distance", "0", CVAR_RENDERER | CVAR_FLOAT, "distance threshold for MD5 animation-update LOD", 0.0f, 1000000.0f );
+idCVar r_lod_animations_wait( "r_lod_animations_wait", "0.25", CVAR_RENDERER | CVAR_FLOAT, "time before a low-coverage MD5 surface is forced to refresh", 0.0f, 10.0f );
+idCVar r_lod_animations_coverage( "r_lod_animations_coverage", "0.01", CVAR_RENDERER | CVAR_FLOAT, "screen-coverage threshold for MD5 animation-update LOD", 0.0f, 1.0f );
 
 idCVar r_useVertexBuffers( "r_useVertexBuffers", "1", CVAR_RENDERER | CVAR_INTEGER, "use ARB_vertex_buffer_object for vertexes", 0, 1, idCmdSystem::ArgCompletion_Integer<0,1>  );
 idCVar r_useIndexBuffers( "r_useIndexBuffers", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "use ARB_vertex_buffer_object for indexes", 0, 1, idCmdSystem::ArgCompletion_Integer<0,1>  );
@@ -2555,6 +2565,8 @@ void idRenderSystemLocal::Clear( void ) {
 	staticAllocCount = 0;
 	frameShaderTime = 0.0f;
 	frameShaderTimeMsec = 0;
+	deltaTime = 0.0f;
+	lastRenderTimeMsec = 0;
 	viewportOffset[0] = 0;
 	viewportOffset[1] = 0;
 	tiledViewport[0] = 0;
@@ -2620,6 +2632,8 @@ void idRenderSystemLocal::Init( void ) {
 	ambientLightVector[1] = 0.5f - 0.385f;
 	ambientLightVector[2] = 0.8925f;
 	ambientLightVector[3] = 1.0f;
+	deltaTime = 0.0f;
+	lastRenderTimeMsec = 0;
 
 	memset( &backEnd, 0, sizeof( backEnd ) );
 

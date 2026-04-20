@@ -558,6 +558,12 @@ bool idRenderWorldLocal::InitFromMap( const char *name ) {
 	filename = name;
 	filename.SetFileExtension( PROC_FILE_EXT );
 
+	// Retail can probe MD5RProc companions here or request proc->MD5R conversion.
+	// Keep the classic .proc path authoritative until the packed-world loader lands.
+	if ( r_convertProcToMD5R.GetBool() ) {
+		common->DPrintf( "r_convertProcToMD5R is not active yet; loading classic proc world '%s'\n", filename.c_str() );
+	}
+
 	// if we are reloading the same map, check the timestamp
 	// and try to skip all the work
 	ID_TIME_T currentTimeStamp;

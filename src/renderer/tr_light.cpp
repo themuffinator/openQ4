@@ -426,14 +426,14 @@ viewEntity_t *R_SetEntityDefViewEntity( idRenderEntityLocal *def ) {
 
 	// copy the model and weapon depth hack for back-end use
 	vModel->modelDepthHack = def->parms.modelDepthHack;
-// jmarshall
-	//vModel->weaponDepthHack = def->parms.weaponDepthHack;
-// jmarshall end
 	R_AxisToModelMatrix( def->parms.axis, def->parms.origin, vModel->modelMatrix );
 
 	// we may not have a viewDef if we are just creating shadows at entity creation time
 	if ( tr.viewDef ) {
 		myGlMultMatrix( vModel->modelMatrix, tr.viewDef->worldSpace.modelViewMatrix, vModel->modelViewMatrix );
+		vModel->weaponDepthHack = ( def->parms.weaponDepthHackInViewID != 0
+			&& def->parms.weaponDepthHackInViewID == tr.viewDef->renderView.viewID );
+		vModel->distanceToCamera = ( def->parms.origin - tr.viewDef->renderView.vieworg ).LengthSqr();
 
 		vModel->next = tr.viewDef->viewEntitys;
 		tr.viewDef->viewEntitys = vModel;
@@ -1172,7 +1172,7 @@ Returns the cached dynamic model if present, otherwise creates
 it and any necessary overlays
 ===================
 */
-idRenderModel *R_EntityDefDynamicModel( idRenderEntityLocal *def ) {
+idRenderModel *R_EntityDefDynamicModel( idRenderEntityLocal *def, bool collisionOnly ) {
 	bool callbackUpdate;
 
 	// allow deferred entities to construct themselves
@@ -1188,9 +1188,12 @@ idRenderModel *R_EntityDefDynamicModel( idRenderEntityLocal *def ) {
 		common->Error( "R_EntityDefDynamicModel: NULL model" );
 	}
 
+	model->SetViewEntity( def->viewEntity );
+
 	if ( model->IsDynamicModel() == DM_STATIC ) {
 		def->dynamicModel = NULL;
 		def->dynamicModelFrameCount = 0;
+		def->dynamicCollisionModel = NULL;
 		return model;
 	}
 
@@ -1199,11 +1202,21 @@ idRenderModel *R_EntityDefDynamicModel( idRenderEntityLocal *def ) {
 		R_ClearEntityDefDynamicModel( def );
 	}
 
+	if ( collisionOnly && model->HasCollisionSurface( &def->parms ) ) {
+		if ( !def->dynamicCollisionModel ) {
+			def->cachedDynamicCollisionModel = model->InstantiateDynamicModel( &def->parms, tr.viewDef,
+				def->cachedDynamicCollisionModel, SURF_COLLISION );
+			def->dynamicCollisionModel = def->cachedDynamicCollisionModel;
+		}
+		return def->dynamicCollisionModel;
+	}
+
 	// if we don't have a snapshot of the dynamic model, generate it now
 	if ( !def->dynamicModel ) {
 
 		// instantiate the snapshot of the dynamic model, possibly reusing memory from the cached snapshot
-		def->cachedDynamicModel = model->InstantiateDynamicModel( &def->parms, tr.viewDef, def->cachedDynamicModel );
+		def->cachedDynamicModel = model->InstantiateDynamicModel( &def->parms, tr.viewDef, def->cachedDynamicModel,
+			static_cast<dword>( ~SURF_COLLISION ) );
 
 		if ( def->cachedDynamicModel ) {
 
@@ -1866,6 +1879,14 @@ void R_AddModelSurfaces( void ) {
 			if ( r_showEntityScissors.GetBool() ) {
 				R_ShowColoredScreenRect( vEntity->scissorRect, vEntity->entityDef->index );
 			}
+		}
+
+		if ( vEntity->scissorRect.IsEmpty() || glConfig.vidWidth <= 0 || glConfig.vidHeight <= 0 ) {
+			vEntity->screenCoverage = 0.0f;
+		} else {
+			const float sizeY = static_cast<float>( vEntity->scissorRect.y2 - vEntity->scissorRect.y1 );
+			const float sizeX = static_cast<float>( vEntity->scissorRect.x2 - vEntity->scissorRect.x1 );
+			vEntity->screenCoverage = 0.5f * ( sizeY / glConfig.vidHeight + sizeX / glConfig.vidWidth );
 		}
 
 		float oldFloatTime;

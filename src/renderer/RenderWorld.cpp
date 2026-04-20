@@ -765,7 +765,7 @@ void idRenderWorldLocal::ProjectOverlay( qhandle_t entityHandle, const idPlane l
 	if ( model->IsDynamicModel() != DM_CACHED ) {	// FIXME: probably should be MD5 only
 		return;
 	}
-	model = R_EntityDefDynamicModel( def );
+	model = R_EntityDefDynamicModel( def, true );
 
 	if ( def->overlay == NULL ) {
 		def->overlay = idRenderModelOverlay::Alloc();
@@ -840,6 +840,13 @@ void idRenderWorldLocal::RenderScene( const renderView_t *renderView ) {
 	tr.guiModel->Clear();
 
 	int startTime = Sys_Milliseconds();
+	if ( tr.lastRenderTimeMsec > 0 ) {
+		const int elapsedMsec = startTime - tr.lastRenderTimeMsec;
+		tr.deltaTime = ( elapsedMsec > 0 ? elapsedMsec : 0 ) * 0.001f;
+	} else {
+		tr.deltaTime = 0.0f;
+	}
+	tr.lastRenderTimeMsec = startTime;
 
 	// setup view parms for the initial view
 	//

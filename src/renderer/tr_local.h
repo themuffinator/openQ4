@@ -287,6 +287,8 @@ public:
 	int						dynamicModelFrameCount;	// continuously animating dynamic models will recreate
 													// dynamicModel if this doesn't == tr.viewCount
 	idRenderModel *			cachedDynamicModel;
+	idRenderModel *			dynamicCollisionModel;	// collision-only dynamic snapshot for traces / sil-trace parity
+	idRenderModel *			cachedDynamicCollisionModel;
 
 	idBounds				referenceBounds;		// the local bounds used to place entityRefs, either from parms or a model
 
@@ -386,6 +388,8 @@ typedef struct viewEntity_s {
 
 	bool				weaponDepthHack;
 	float				modelDepthHack;
+	float				distanceToCamera;
+	float				screenCoverage;
 
 	float				modelMatrix[16];		// local coords to global coords
 	float				modelViewMatrix[16];	// local coords to eye coords
@@ -839,6 +843,8 @@ public:
 
 	float					frameShaderTime;	// shader time for all non-world 2D rendering
 	int						frameShaderTimeMsec;	// integer companion for GUI/cinematic/material timing
+	float					deltaTime;		// seconds since the previous top-level RenderScene call
+	int						lastRenderTimeMsec;	// host milliseconds of the previous top-level RenderScene call
 
 	int						viewportOffset[2];	// for doing larger-than-window tiled renderings
 	int						tiledViewport[2];
@@ -1063,6 +1069,16 @@ extern idCVar r_enhancedMaterialSpecularBoost;	// specular intensity scale when 
 extern idCVar r_enhancedMaterialFresnel;	// grazing-angle fresnel contribution when enhanced material shading is enabled
 extern idCVar r_useDeferredTangents;	// 1 = don't always calc tangents after deform
 extern idCVar r_useCachedDynamicModels;	// 1 = cache snapshots of dynamic models
+extern idCVar r_useNewSkinning;		// 1 = use retail Quake 4's SIMD-ready MD5 skinning path
+extern idCVar r_useFastSkinning;	// 1 = approximate MD5 skinning with single-joint tangent transforms
+extern idCVar r_deriveBiTangents;	// 1 = derive bitangents from normal/tangent after skinning
+extern idCVar r_forceConvertMD5R;	// 1 = force source-model / source-proc loading instead of prebuilt MD5R companions
+extern idCVar r_convertMD5toMD5R;	// 1 = convert authored MD5 meshes to packed MD5R form when supported
+extern idCVar r_convertStaticToMD5R;	// 1 = convert static renderer models to packed MD5R form when supported
+extern idCVar r_convertProcToMD5R;	// 1 = convert classic proc worlds to packed MD5R proc data when supported
+extern idCVar r_lod_animations_distance;	// distance gate for animation-update LOD
+extern idCVar r_lod_animations_wait;	// delay before reusing the last animated pose when LODing
+extern idCVar r_lod_animations_coverage;	// screen-coverage threshold for animation-update LOD
 extern idCVar r_useTwoSidedStencil;		// 1 = do stencil shadows in one pass with different ops on each side
 extern idCVar r_stencilTranslucentShadows;	// 1 = let translucent materials cast and receive stencil shadows in the stencil-volume path
 extern idCVar r_useInfiniteFarZ;		// 1 = use the no-far-clip-plane trick
@@ -1408,7 +1424,7 @@ void R_ListRenderLightDefs_f( const idCmdArgs &args );
 void R_ListRenderEntityDefs_f( const idCmdArgs &args );
 
 bool R_IssueEntityDefCallback( idRenderEntityLocal *def );
-idRenderModel *R_EntityDefDynamicModel( idRenderEntityLocal *def );
+idRenderModel *R_EntityDefDynamicModel( idRenderEntityLocal *def, bool collisionOnly = false );
 
 viewEntity_t *R_SetEntityDefViewEntity( idRenderEntityLocal *def );
 viewLight_t *R_SetLightDefViewLight( idRenderLightLocal *def );

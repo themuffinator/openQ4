@@ -144,7 +144,7 @@ public:
 								~idMD5Mesh();
 
  	void						ParseMesh( idLexer &parser, int numJoints, const idJointMat *joints );
-	void						UpdateSurface( const struct renderEntity_s *ent, const idJointMat *joints, modelSurface_t *surf );
+	void						UpdateSurface( const struct renderEntity_s *ent, const idJointMat *joints, modelSurface_t *surf, bool calculateTangents = true );
 	idBounds					CalcBounds( const idJointMat *joints );
 	int							NearestJoint( int a, int b, int c ) const;
 	int							NumVerts( void ) const;
@@ -154,19 +154,25 @@ public:
 private:
 	idList<idVec2>				texCoords;			// texture coordinates
 	int							numWeights;			// number of weights
+	jointWeight_t *				weights;			// retail-style joint weights for SIMD skinning
+	idVec4 *					scaledBaseVectors;	// weighted source-space positions
+	idVec4 *					baseVectors;		// source-space basis vectors for tangent-preserving skinning
 	idVec4 *					scaledWeights;		// joint weights
 	int *						weightIndex;		// pairs of: joint offset + bool true if next weight is for next vertex
 	const idMaterial *			shader;				// material applied to mesh
 	int							numTris;			// number of triangles
 	struct deformInfo_s *		deformInfo;			// used to create srfTriangles_t from base frames and new vertexes
 	int							surfaceNum;			// number of the static surface created for this mesh
+	float						currentTime;		// animation LOD timer
 
+	bool						UpdateLod( const struct renderEntity_s *ent, const struct viewEntity_s *viewEnt, const modelSurface_t *surf );
 	void						TransformVerts( idDrawVert *verts, const idJointMat *joints );
 	void						TransformScaledVerts( idDrawVert *verts, const idJointMat *joints, float scale );
 };
 
 class idRenderModelMD5 : public idRenderModelStatic {
 public:
+								idRenderModelMD5();
 	virtual void				InitFromFile( const char *fileName );
 	virtual dynamicModel_t		IsDynamicModel() const;
 	virtual idBounds			Bounds( const struct renderEntity_s *ent ) const;
@@ -177,18 +183,24 @@ public:
 	virtual void				LoadModel();
 	virtual int					Memory() const;
 	virtual idRenderModel *		InstantiateDynamicModel( const struct renderEntity_s *ent, const struct viewDef_s *view, idRenderModel *cachedModel );
+	virtual idRenderModel *		InstantiateDynamicModel( const struct renderEntity_s *ent, const struct viewDef_s *view, idRenderModel *cachedModel, dword surfMask );
+	virtual bool				HasCollisionSurface( const struct renderEntity_s *ent ) const;
+	virtual void				SetViewEntity( const struct viewEntity_s *ve );
 	virtual int					NumJoints( void ) const;
 	virtual const idMD5Joint *	GetJoints( void ) const;
 	virtual jointHandle_t		GetJointHandle( const char *name ) const;
 	virtual const char *		GetJointName( jointHandle_t handle ) const;
 	virtual const idJointQuat *	GetDefaultPose( void ) const;
+	virtual const idJointMat *	GetSkinSpaceToLocalMats( void ) const;
 	virtual int					NearestJoint( int surfaceNum, int a, int b, int c ) const;
 	virtual int					GetSurfaceMask( const char *surface ) const;
 
 private:
 	idList<idMD5Joint>			joints;
 	idList<idJointQuat>			defaultPose;
+	idList<idJointMat>			skinSpaceToLocalMats;
 	idList<idMD5Mesh>			meshes;
+	const struct viewEntity_s *	viewEnt;
 
 	void						CalculateBounds( const idJointMat *joints );
 	void						GetFrameBounds( const renderEntity_t *ent, idBounds &bounds ) const;

@@ -105,16 +105,29 @@ typedef struct vertexWeight_s {
 
 /*
 ====================
+idRenderModelMD5::idRenderModelMD5
+====================
+*/
+idRenderModelMD5::idRenderModelMD5() {
+	viewEnt = NULL;
+}
+
+/*
+====================
 idMD5Mesh::idMD5Mesh
 ====================
 */
 idMD5Mesh::idMD5Mesh() {
+	weights			= NULL;
+	scaledBaseVectors = NULL;
+	baseVectors		= NULL;
 	scaledWeights	= NULL;
 	weightIndex		= NULL;
 	shader			= NULL;
 	numTris			= 0;
 	deformInfo		= NULL;
 	surfaceNum		= 0;
+	currentTime		= 0.0f;
 }
 
 /*
@@ -123,6 +136,9 @@ idMD5Mesh::~idMD5Mesh
 ====================
 */
 idMD5Mesh::~idMD5Mesh() {
+	Mem_Free16( weights );
+	Mem_Free16( scaledBaseVectors );
+	Mem_Free16( baseVectors );
 	Mem_Free16( scaledWeights );
 	Mem_Free16( weightIndex );
 	if ( deformInfo ) {
@@ -152,26 +168,15 @@ void idMD5Mesh::ParseMesh( idLexer &parser, int numJoints, const idJointMat *joi
 
 	parser.ExpectTokenString( "{" );
 
-	//
-	// parse name
-	//
 	if ( parser.CheckTokenString( "name" ) ) {
 		parser.ReadToken( &name );
 	}
 
-	//
-	// parse shader
-	//
 	parser.ExpectTokenString( "shader" );
-
 	parser.ReadToken( &token );
 	shaderName = token;
+	shader = declManager->FindMaterial( shaderName );
 
-    shader = declManager->FindMaterial( shaderName );
-
-	//
-	// parse texture coordinates
-	//
 	parser.ExpectTokenString( "numverts" );
 	count = parser.ParseInt();
 	if ( count < 0 ) {
@@ -184,28 +189,24 @@ void idMD5Mesh::ParseMesh( idLexer &parser, int numJoints, const idJointMat *joi
 
 	numWeights = 0;
 	maxweight = 0;
-	for( i = 0; i < texCoords.Num(); i++ ) {
+	for ( i = 0; i < texCoords.Num(); i++ ) {
 		parser.ExpectTokenString( "vert" );
 		parser.ParseInt();
 
-		parser.Parse1DMatrix( 2, texCoords[ i ].ToFloatPtr() );
+		parser.Parse1DMatrix( 2, texCoords[i].ToFloatPtr() );
 
-		firstWeightForVertex[ i ]	= parser.ParseInt();
-		numWeightsForVertex[ i ]	= parser.ParseInt();
-
-		if ( !numWeightsForVertex[ i ] ) {
+		firstWeightForVertex[i] = parser.ParseInt();
+		numWeightsForVertex[i] = parser.ParseInt();
+		if ( !numWeightsForVertex[i] ) {
 			parser.Error( "Vertex without any joint weights." );
 		}
 
-		numWeights += numWeightsForVertex[ i ];
-		if ( numWeightsForVertex[ i ] + firstWeightForVertex[ i ] > maxweight ) {
-			maxweight = numWeightsForVertex[ i ] + firstWeightForVertex[ i ];
+		numWeights += numWeightsForVertex[i];
+		if ( numWeightsForVertex[i] + firstWeightForVertex[i] > maxweight ) {
+			maxweight = numWeightsForVertex[i] + firstWeightForVertex[i];
 		}
 	}
 
-	//
-	// parse tris
-	//
 	parser.ExpectTokenString( "numtris" );
 	count = parser.ParseInt();
 	if ( count < 0 ) {
@@ -214,54 +215,63 @@ void idMD5Mesh::ParseMesh( idLexer &parser, int numJoints, const idJointMat *joi
 
 	tris.SetNum( count * 3 );
 	numTris = count;
-	for( i = 0; i < count; i++ ) {
+	for ( i = 0; i < count; i++ ) {
 		parser.ExpectTokenString( "tri" );
 		parser.ParseInt();
-
-		tris[ i * 3 + 0 ] = parser.ParseInt();
-		tris[ i * 3 + 1 ] = parser.ParseInt();
-		tris[ i * 3 + 2 ] = parser.ParseInt();
+		tris[i * 3 + 0] = parser.ParseInt();
+		tris[i * 3 + 1] = parser.ParseInt();
+		tris[i * 3 + 2] = parser.ParseInt();
 	}
 
-	//
-	// parse weights
-	//
 	parser.ExpectTokenString( "numweights" );
 	count = parser.ParseInt();
 	if ( count < 0 ) {
 		parser.Error( "Invalid size: %d", count );
 	}
-
 	if ( maxweight > count ) {
 		parser.Warning( "Vertices reference out of range weights in model (%d of %d weights).", maxweight, count );
 	}
 
 	tempWeights.SetNum( count );
-
-	for( i = 0; i < count; i++ ) {
+	for ( i = 0; i < count; i++ ) {
 		parser.ExpectTokenString( "weight" );
 		parser.ParseInt();
 
 		jointnum = parser.ParseInt();
-		if ( ( jointnum < 0 ) || ( jointnum >= numJoints ) ) {
+		if ( jointnum < 0 || jointnum >= numJoints ) {
 			parser.Error( "Joint Index out of range(%d): %d", numJoints, jointnum );
 		}
 
-		tempWeights[ i ].joint			= jointnum;
-		tempWeights[ i ].jointWeight	= parser.ParseFloat();
-
-		parser.Parse1DMatrix( 3, tempWeights[ i ].offset.ToFloatPtr() );
+		tempWeights[i].joint = jointnum;
+		tempWeights[i].jointWeight = parser.ParseFloat();
+		parser.Parse1DMatrix( 3, tempWeights[i].offset.ToFloatPtr() );
 	}
 
-	// create pre-scaled weights and an index for the vertex/joint lookup
-	scaledWeights = (idVec4 *) Mem_Alloc16( numWeights * sizeof( scaledWeights[0] ) );
-	weightIndex = (int *) Mem_Alloc16( numWeights * 2 * sizeof( weightIndex[0] ) );
+	for ( i = 0; i < texCoords.Num(); ++i ) {
+		const int firstWeight = firstWeightForVertex[i];
+		const int vertexWeightCount = numWeightsForVertex[i];
+
+		for ( j = 1; j < vertexWeightCount; ++j ) {
+			vertexWeight_t sortedWeight = tempWeights[firstWeight + j];
+			int insertIndex = j - 1;
+
+			while ( insertIndex >= 0
+				&& tempWeights[firstWeight + insertIndex].jointWeight < sortedWeight.jointWeight ) {
+				tempWeights[firstWeight + insertIndex + 1] = tempWeights[firstWeight + insertIndex];
+				--insertIndex;
+			}
+			tempWeights[firstWeight + insertIndex + 1] = sortedWeight;
+		}
+	}
+
+	scaledWeights = (idVec4 *)Mem_Alloc16( numWeights * sizeof( scaledWeights[0] ) );
+	weightIndex = (int *)Mem_Alloc16( numWeights * 2 * sizeof( weightIndex[0] ) );
 	memset( weightIndex, 0, numWeights * 2 * sizeof( weightIndex[0] ) );
 
 	count = 0;
-	for( i = 0; i < texCoords.Num(); i++ ) {
+	for ( i = 0; i < texCoords.Num(); i++ ) {
 		num = firstWeightForVertex[i];
-		for( j = 0; j < numWeightsForVertex[i]; j++, num++, count++ ) {
+		for ( j = 0; j < numWeightsForVertex[i]; j++, num++, count++ ) {
 			scaledWeights[count].ToVec3() = tempWeights[num].offset * tempWeights[num].jointWeight;
 			scaledWeights[count].w = tempWeights[num].jointWeight;
 			weightIndex[count * 2 + 0] = tempWeights[num].joint * sizeof( idJointMat );
@@ -269,31 +279,95 @@ void idMD5Mesh::ParseMesh( idLexer &parser, int numJoints, const idJointMat *joi
 		weightIndex[count * 2 - 1] = 1;
 	}
 
-	tempWeights.Clear();
-	numWeightsForVertex.Clear();
-	firstWeightForVertex.Clear();
-
 	parser.ExpectTokenString( "}" );
 
-	// update counters
 	c_numVerts += texCoords.Num();
 	c_numWeights += numWeights;
 	c_numWeightJoints++;
 	for ( i = 0; i < numWeights; i++ ) {
-		c_numWeightJoints += weightIndex[i*2+1];
+		c_numWeightJoints += weightIndex[i * 2 + 1];
 	}
 
-	//
-	// build the information that will be common to all animations of this mesh:
-	// silhouette edge connectivity and normal / tangent generation information
-	//
-	idDrawVert *verts = (idDrawVert *) _alloca16( texCoords.Num() * sizeof( idDrawVert ) );
+	idDrawVert *verts = (idDrawVert *)_alloca16( texCoords.Num() * sizeof( idDrawVert ) );
 	for ( i = 0; i < texCoords.Num(); i++ ) {
 		verts[i].Clear();
 		verts[i].st = texCoords[i];
 	}
 	TransformVerts( verts, joints );
 	deformInfo = R_BuildDeformInfo( texCoords.Num(), verts, tris.Num(), tris.Ptr(), shader->UseUnsmoothedTangents() );
+
+	currentTime = 0.0f;
+
+	weights = (jointWeight_t *)Mem_Alloc16( numWeights * sizeof( weights[0] ) );
+	scaledBaseVectors = (idVec4 *)Mem_Alloc16( numWeights * sizeof( scaledBaseVectors[0] ) );
+
+	count = 0;
+	for ( i = 0; i < texCoords.Num(); ++i ) {
+		const int vertexWeightCount = numWeightsForVertex[i];
+		const int firstWeight = firstWeightForVertex[i];
+
+		for ( j = 0; j < vertexWeightCount; ++j, ++count ) {
+			const vertexWeight_t &tempWeight = tempWeights[firstWeight + j];
+
+			weights[count].weight = tempWeight.jointWeight;
+			weights[count].jointMatOffset = tempWeight.joint * sizeof( idJointMat );
+			weights[count].nextVertexOffset = ( vertexWeightCount - j ) * sizeof( weights[0] );
+
+			scaledBaseVectors[count].ToVec3() = tempWeight.offset * tempWeight.jointWeight;
+			scaledBaseVectors[count].w = tempWeight.jointWeight;
+		}
+	}
+
+	int mirroredWeightCount = 0;
+	for ( i = 0; i < deformInfo->numMirroredVerts; ++i ) {
+		mirroredWeightCount += numWeightsForVertex[deformInfo->mirroredVerts[i]];
+	}
+
+	if ( mirroredWeightCount > 0 ) {
+		idVec4 *newScaledBaseVectors = (idVec4 *)Mem_Alloc16( ( numWeights + mirroredWeightCount ) * sizeof( scaledBaseVectors[0] ) );
+		jointWeight_t *newWeights = (jointWeight_t *)Mem_Alloc16( ( numWeights + mirroredWeightCount ) * sizeof( weights[0] ) );
+
+		memcpy( newScaledBaseVectors, scaledBaseVectors, numWeights * sizeof( scaledBaseVectors[0] ) );
+		memcpy( newWeights, weights, numWeights * sizeof( weights[0] ) );
+		Mem_Free16( scaledBaseVectors );
+		Mem_Free16( weights );
+		scaledBaseVectors = newScaledBaseVectors;
+		weights = newWeights;
+
+		int appendWeight = numWeights;
+		for ( i = 0; i < deformInfo->numMirroredVerts; ++i ) {
+			const int mirroredVert = deformInfo->mirroredVerts[i];
+			const int vertexWeightCount = numWeightsForVertex[mirroredVert];
+			const int firstWeight = firstWeightForVertex[mirroredVert];
+
+			for ( j = 0; j < vertexWeightCount; ++j, ++appendWeight ) {
+				const vertexWeight_t &tempWeight = tempWeights[firstWeight + j];
+
+				weights[appendWeight].weight = tempWeight.jointWeight;
+				weights[appendWeight].jointMatOffset = tempWeight.joint * sizeof( idJointMat );
+				weights[appendWeight].nextVertexOffset = ( vertexWeightCount - j ) * sizeof( weights[0] );
+
+				scaledBaseVectors[appendWeight].ToVec3() = tempWeight.offset * tempWeight.jointWeight;
+				scaledBaseVectors[appendWeight].w = tempWeight.jointWeight;
+			}
+		}
+	}
+
+	baseVectors = (idVec4 *)Mem_Alloc16( deformInfo->numOutputVerts * 4 * sizeof( baseVectors[0] ) );
+	modelSurface_t tempSurf;
+	memset( &tempSurf, 0, sizeof( tempSurf ) );
+	UpdateSurface( NULL, joints, &tempSurf, false );
+	R_DeriveTangents( tempSurf.geometry, true );
+
+	for ( i = 0; i < deformInfo->numOutputVerts; ++i ) {
+		const idDrawVert &tempVert = tempSurf.geometry->verts[i];
+		baseVectors[i * 4 + 0].Set( tempVert.xyz.x, tempVert.xyz.y, tempVert.xyz.z, 1.0f );
+		baseVectors[i * 4 + 1].Set( tempVert.normal.x, tempVert.normal.y, tempVert.normal.z, 0.0f );
+		baseVectors[i * 4 + 2].Set( tempVert.tangents[0].x, tempVert.tangents[0].y, tempVert.tangents[0].z, 0.0f );
+		baseVectors[i * 4 + 3].Set( tempVert.tangents[1].x, tempVert.tangents[1].y, tempVert.tangents[1].z, 0.0f );
+	}
+
+	R_FreeStaticTriSurf( tempSurf.geometry );
 }
 
 /*
@@ -320,10 +394,33 @@ void idMD5Mesh::TransformScaledVerts( idDrawVert *verts, const idJointMat *entJo
 
 /*
 ====================
+idMD5Mesh::UpdateLod
+====================
+*/
+bool idMD5Mesh::UpdateLod( const struct renderEntity_s *ent, const struct viewEntity_s *viewEnt, const modelSurface_t *surf ) {
+	if ( surf->geometry == NULL ) {
+		return true;
+	}
+
+	if ( viewEnt != NULL && r_lod_animations_distance.GetInteger() != 0 && ent->suppressLOD != 1 ) {
+		if ( currentTime > r_lod_animations_wait.GetFloat()
+			|| viewEnt->distanceToCamera < r_lod_animations_distance.GetFloat() ) {
+			currentTime = 0.0f;
+		} else if ( viewEnt->screenCoverage < r_lod_animations_coverage.GetFloat() ) {
+			currentTime += tr.deltaTime;
+			return false;
+		}
+	}
+
+	return true;
+}
+
+/*
+====================
 idMD5Mesh::UpdateSurface
 ====================
 */
-void idMD5Mesh::UpdateSurface( const struct renderEntity_s *ent, const idJointMat *entJoints, modelSurface_t *surf ) {
+void idMD5Mesh::UpdateSurface( const struct renderEntity_s *ent, const idJointMat *entJoints, modelSurface_t *surf, bool calculateTangents ) {
 	int i, base;
 	srfTriangles_t *tri;
 
@@ -371,27 +468,62 @@ void idMD5Mesh::UpdateSurface( const struct renderEntity_s *ent, const idJointMa
 			tri->verts[i].Clear();
 			tri->verts[i].st = texCoords[i];
 		}
+		base = deformInfo->numOutputVerts - deformInfo->numMirroredVerts;
+		for ( i = 0; i < deformInfo->numMirroredVerts; ++i ) {
+			tri->verts[base + i] = tri->verts[deformInfo->mirroredVerts[i]];
+		}
 	}
 
-	if ( ent->shaderParms[ SHADERPARM_MD5_SKINSCALE ] != 0.0f ) {
+	const bool useLegacySkinScale = ( ent != NULL && ent->shaderParms[ SHADERPARM_MD5_SKINSCALE ] != 0.0f );
+
+	if ( useLegacySkinScale ) {
 		TransformScaledVerts( tri->verts, entJoints, ent->shaderParms[ SHADERPARM_MD5_SKINSCALE ] );
+		tri->tangentsCalculated = false;
+	} else if ( scaledBaseVectors != NULL && weights != NULL ) {
+		if ( r_useNewSkinning.GetBool() && calculateTangents && baseVectors != NULL ) {
+			if ( r_useFastSkinning.GetBool() ) {
+				SIMDProcessor->TransformVertsAndTangentsFast( tri->verts, deformInfo->numOutputVerts, tri->bounds,
+					entJoints, baseVectors, weights, numWeights );
+			} else {
+				SIMDProcessor->TransformVertsAndTangents( tri->verts, deformInfo->numOutputVerts, tri->bounds,
+					entJoints, baseVectors, weights, numWeights );
+			}
+			tri->tangentsCalculated = true;
+		} else {
+			SIMDProcessor->TransformVertsNew( tri->verts, deformInfo->numOutputVerts, tri->bounds,
+				entJoints, scaledBaseVectors, weights, numWeights );
+			tri->tangentsCalculated = false;
+		}
 	} else {
 		TransformVerts( tri->verts, entJoints );
+		tri->tangentsCalculated = false;
 	}
 
-	// replicate the mirror seam vertexes
-	base = deformInfo->numOutputVerts - deformInfo->numMirroredVerts;
-	for ( i = 0; i < deformInfo->numMirroredVerts; i++ ) {
-		tri->verts[base + i] = tri->verts[deformInfo->mirroredVerts[i]];
+	if ( useLegacySkinScale || scaledBaseVectors == NULL || weights == NULL ) {
+		// replicate the mirror seam vertexes for the legacy vertex path
+		base = deformInfo->numOutputVerts - deformInfo->numMirroredVerts;
+		for ( i = 0; i < deformInfo->numMirroredVerts; i++ ) {
+			tri->verts[base + i] = tri->verts[deformInfo->mirroredVerts[i]];
+		}
+
+		R_BoundTriSurf( tri );
 	}
 
-	R_BoundTriSurf( tri );
+	if ( r_deriveBiTangents.GetBool() && tri->tangentsCalculated ) {
+		for ( i = 0; i < deformInfo->numOutputVerts; ++i ) {
+			idVec3 bitangent = tri->verts[i].normal.Cross( tri->verts[i].tangents[0] );
+			if ( bitangent * tri->verts[i].tangents[1] < 0.0f ) {
+				bitangent = -bitangent;
+			}
+			tri->verts[i].tangents[1] = bitangent;
+		}
+	}
 
 	// If a surface is going to be have a lighting interaction generated, it will also have to call
 	// R_DeriveTangents() to get normals, tangents, and face planes.  If it only
 	// needs shadows generated, it will only have to generate face planes.  If it only
 	// has ambient drawing, or is culled, no additional work will be necessary
-	if ( !r_useDeferredTangents.GetBool() ) {
+	if ( !tri->tangentsCalculated && !r_useDeferredTangents.GetBool() ) {
 		// set face planes, vertex normals, tangents
 		R_DeriveTangents( tri );
 	}
@@ -404,11 +536,15 @@ idMD5Mesh::CalcBounds
 */
 idBounds idMD5Mesh::CalcBounds( const idJointMat *entJoints ) {
 	idBounds	bounds;
-	idDrawVert *verts = (idDrawVert *) _alloca16( texCoords.Num() * sizeof( idDrawVert ) );
+	if ( scaledBaseVectors != NULL && weights != NULL ) {
+		idDrawVert *verts = (idDrawVert *)_alloca16( deformInfo->numOutputVerts * sizeof( idDrawVert ) );
+		SIMDProcessor->TransformVertsNew( verts, deformInfo->numOutputVerts, bounds, entJoints, scaledBaseVectors, weights, numWeights );
+	} else {
+		idDrawVert *verts = (idDrawVert *)_alloca16( texCoords.Num() * sizeof( idDrawVert ) );
 
-	TransformVerts( verts, entJoints );
-
-	SIMDProcessor->MinMax( bounds[0], bounds[1], verts, texCoords.Num() );
+		TransformVerts( verts, entJoints );
+		SIMDProcessor->MinMax( bounds[0], bounds[1], verts, texCoords.Num() );
+	}
 
 	return bounds;
 }
@@ -610,6 +746,13 @@ void idRenderModelMD5::LoadModel() {
 	}
 	parser.ExpectTokenString( "}" );
 
+	skinSpaceToLocalMats.SetGranularity( 1 );
+	skinSpaceToLocalMats.SetNum( joints.Num() );
+	for ( i = 0; i < joints.Num(); ++i ) {
+		skinSpaceToLocalMats[i] = poseMat3[i];
+		skinSpaceToLocalMats[i].Invert();
+	}
+
 	for( i = 0; i < meshes.Num(); i++ ) {
 		parser.ExpectTokenString( "mesh" );
 		meshes[ i ].ParseMesh( parser, defaultPose.Num(), poseMat3 );
@@ -771,9 +914,20 @@ idRenderModelMD5::InstantiateDynamicModel
 ====================
 */
 idRenderModel *idRenderModelMD5::InstantiateDynamicModel( const struct renderEntity_s *ent, const struct viewDef_s *view, idRenderModel *cachedModel ) {
+	return InstantiateDynamicModel( ent, view, cachedModel, static_cast<dword>( ~SURF_COLLISION ) );
+}
+
+/*
+====================
+idRenderModelMD5::InstantiateDynamicModel
+====================
+*/
+idRenderModel *idRenderModelMD5::InstantiateDynamicModel( const struct renderEntity_s *ent, const struct viewDef_s *view, idRenderModel *cachedModel, dword surfMask ) {
 	int					i, surfaceNum;
 	idMD5Mesh			*mesh;
 	idRenderModelStatic	*staticModel;
+	const bool			collisionOnly = ( surfMask & SURF_COLLISION ) != 0;
+	const idJointMat *	entJoints = ent->joints;
 
 	if ( cachedModel && !r_useCachedDynamicModels.GetBool() ) {
 		delete cachedModel;
@@ -796,6 +950,12 @@ idRenderModel *idRenderModelMD5::InstantiateDynamicModel( const struct renderEnt
 	}
 
 	tr.pc.c_generateMd5++;
+
+	if ( r_useNewSkinning.GetBool() && !collisionOnly && skinSpaceToLocalMats.Num() == joints.Num() ) {
+		idJointMat *transformedJoints = (idJointMat *)_alloca16( joints.Num() * sizeof( transformedJoints[0] ) );
+		SIMDProcessor->MultiplyJoints( transformedJoints, ent->joints, skinSpaceToLocalMats.Ptr(), joints.Num() );
+		entJoints = transformedJoints;
+	}
 
 	if ( cachedModel ) {
 		assert( dynamic_cast<idRenderModelStatic *>(cachedModel) != NULL );
@@ -837,7 +997,14 @@ idRenderModel *idRenderModelMD5::InstantiateDynamicModel( const struct renderEnt
 		
 		shader = R_RemapShaderBySkin( shader, ent->customSkin, ent->customShader );
 		
-		if ( !shader || ( !shader->IsDrawn() && !shader->SurfaceCastsShadow() ) ) {
+		if ( collisionOnly ) {
+			if ( !shader || ( shader->GetSurfaceFlags() & SURF_COLLISION ) == 0 ) {
+				staticModel->DeleteSurfaceWithId( i );
+				staticModel->DeleteSurfaceWithId( i + MD5_BackSideSurfaceIdOffset );
+				mesh->surfaceNum = -1;
+				continue;
+			}
+		} else if ( !shader || ( !shader->IsDrawn() && !shader->SurfaceCastsShadow() ) ) {
 			staticModel->DeleteSurfaceWithId( i );
 			staticModel->DeleteSurfaceWithId( i + MD5_BackSideSurfaceIdOffset );
 			mesh->surfaceNum = -1;
@@ -861,10 +1028,12 @@ idRenderModel *idRenderModelMD5::InstantiateDynamicModel( const struct renderEnt
 			surf->id = i;
 		}
 
-		mesh->UpdateSurface( ent, ent->joints, surf );
+		if ( collisionOnly || mesh->UpdateLod( ent, viewEnt, surf ) ) {
+			mesh->UpdateSurface( ent, entJoints, surf, !collisionOnly );
+		}
 		srfTriangles_t *frontTri = surf->geometry;
 
-		if ( shader->ShouldCreateBackSides() ) {
+		if ( !collisionOnly && shader->ShouldCreateBackSides() ) {
 			modelSurface_t *backSurf;
 
 			if ( staticModel->FindSurfaceWithId( i + MD5_BackSideSurfaceIdOffset, surfaceNum ) ) {
@@ -887,6 +1056,46 @@ idRenderModel *idRenderModelMD5::InstantiateDynamicModel( const struct renderEnt
 	}
 
 	return staticModel;
+}
+
+/*
+====================
+idRenderModelMD5::HasCollisionSurface
+====================
+*/
+bool idRenderModelMD5::HasCollisionSurface( const renderEntity_t *ent ) const {
+	for ( int i = 0; i < meshes.Num(); ++i ) {
+		const idMaterial *shader = R_RemapShaderBySkin( meshes[i].shader, ent->customSkin, ent->customShader );
+		if ( shader == NULL ) {
+			continue;
+		}
+
+		if ( ( shader->GetSurfaceFlags() & SURF_COLLISION ) != 0
+			&& !shader->IsDrawn()
+			&& !shader->SurfaceCastsShadow() ) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+/*
+====================
+idRenderModelMD5::SetViewEntity
+====================
+*/
+void idRenderModelMD5::SetViewEntity( const struct viewEntity_s *ve ) {
+	viewEnt = ve;
+}
+
+/*
+====================
+idRenderModelMD5::GetSkinSpaceToLocalMats
+====================
+*/
+const idJointMat *idRenderModelMD5::GetSkinSpaceToLocalMats( void ) const {
+	return skinSpaceToLocalMats.Ptr();
 }
 
 /*
@@ -1008,7 +1217,9 @@ void idRenderModelMD5::PurgeModel() {
 	purged = true;
 	joints.Clear();
 	defaultPose.Clear();
+	skinSpaceToLocalMats.Clear();
 	meshes.Clear();
+	viewEnt = NULL;
 }
 
 /*
@@ -1020,7 +1231,7 @@ int	idRenderModelMD5::Memory() const {
 	int		total, i;
 
 	total = sizeof( *this );
-	total += joints.MemoryUsed() + defaultPose.MemoryUsed() + meshes.MemoryUsed();
+	total += joints.MemoryUsed() + defaultPose.MemoryUsed() + skinSpaceToLocalMats.MemoryUsed() + meshes.MemoryUsed();
 
 	// count up strings
 	for ( i = 0; i < joints.Num(); i++ ) {
@@ -1031,7 +1242,10 @@ int	idRenderModelMD5::Memory() const {
 	for ( i = 0 ; i < meshes.Num() ; i++ ) {
 		const idMD5Mesh *mesh = &meshes[i];
 
-		total += mesh->texCoords.MemoryUsed() + mesh->numWeights * ( sizeof( mesh->scaledWeights[0] ) + sizeof( mesh->weightIndex[0] ) * 2 );
+		total += mesh->texCoords.MemoryUsed();
+		total += mesh->numWeights * ( sizeof( mesh->scaledWeights[0] ) + sizeof( mesh->weightIndex[0] ) * 2 );
+		total += mesh->numWeights * ( sizeof( mesh->weights[0] ) + sizeof( mesh->scaledBaseVectors[0] ) );
+		total += mesh->deformInfo->numOutputVerts * 4 * sizeof( mesh->baseVectors[0] );
 
 		// sum up deform info
 		total += sizeof( mesh->deformInfo );

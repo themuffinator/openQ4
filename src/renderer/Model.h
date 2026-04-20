@@ -503,7 +503,7 @@ public:
 
 // RAVEN BEGIN
 // dluetscher: added call to determine if a collision surface exists within this model
-	//virtual bool				HasCollisionSurface( const struct renderEntity_s *ent ) const = 0;
+	virtual bool				HasCollisionSurface( const struct renderEntity_s *ent ) const;
 // RAVEN END
 
 	// returns a static model based on the definition and view
@@ -516,6 +516,7 @@ public:
 // RAVEN BEGIN
 // dluetscher: added surface mask parameter
 	virtual idRenderModel *		InstantiateDynamicModel( const struct renderEntity_s *ent, const struct viewDef_s *view, idRenderModel *cachedModel  ) = 0;
+	virtual idRenderModel *		InstantiateDynamicModel( const struct renderEntity_s *ent, const struct viewDef_s *view, idRenderModel *cachedModel, dword surfMask );
 // RAVEN END
 
 	// Returns the number of joints or 0 if the model is not an MD5
@@ -533,6 +534,9 @@ public:
 	// Returns the default animation pose or NULL if the model is not an MD5.
 	virtual const idJointQuat *	GetDefaultPose( void ) const = 0;
 
+	// Returns the skin-space to model-local transforms used by MD5R skinning, or NULL.
+	virtual const idJointMat *	GetSkinSpaceToLocalMats( void ) const;
+
 	// Returns number of the joint nearest to the given triangle.
 	virtual int					NearestJoint( int surfaceNum, int a, int c, int b ) const = 0;
 
@@ -548,7 +552,7 @@ public:
 //	virtual void				SetHasSky( bool on ) = 0;
 //	virtual bool				GetHasSky( void ) const = 0;
 //// ddynerman: Wolf LOD code
-//	virtual void				SetViewEntity( const struct viewEntity_s *ve ) = 0;
+	virtual void				SetViewEntity( const struct viewEntity_s *ve );
 // RAVEN END
 
 // RAVEN BEGIN 

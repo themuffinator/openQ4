@@ -42,6 +42,53 @@ idCVar idRenderModelStatic::r_slopNormal( "r_slopNormal", "0.02", CVAR_RENDERER,
 
 /*
 ================
+idRenderModel::HasCollisionSurface
+================
+*/
+bool idRenderModel::HasCollisionSurface( const struct renderEntity_s *ent ) const {
+	return false;
+}
+
+/*
+================
+idRenderModel::InstantiateDynamicModel
+================
+*/
+idRenderModel *idRenderModel::InstantiateDynamicModel( const struct renderEntity_s *ent, const struct viewDef_s *view,
+		idRenderModel *cachedModel, dword surfMask ) {
+	return InstantiateDynamicModel( ent, view, cachedModel );
+}
+
+/*
+================
+idRenderModel::GetSkinSpaceToLocalMats
+================
+*/
+const idJointMat *idRenderModel::GetSkinSpaceToLocalMats( void ) const {
+	return NULL;
+}
+
+/*
+================
+idRenderModel::SetViewEntity
+================
+*/
+void idRenderModel::SetViewEntity( const struct viewEntity_s *ve ) {
+}
+
+#if defined( _MD5R_SUPPORT )
+/*
+================
+idRenderModel::HasSeparateSilTraceMeshes
+================
+*/
+bool idRenderModel::HasSeparateSilTraceMeshes( void ) const {
+	return false;
+}
+#endif
+
+/*
+================
 idRenderModelStatic::idRenderModelStatic
 ================
 */

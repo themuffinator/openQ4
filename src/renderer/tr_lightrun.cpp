@@ -659,6 +659,9 @@ void R_FreeEntityDefDerivedData( idRenderEntityLocal *def, bool keepDecals, bool
 	if ( def->dynamicModel ) {
 		def->dynamicModel = NULL;
 	}
+	if ( def->dynamicCollisionModel ) {
+		def->dynamicCollisionModel = NULL;
+	}
 
 	if ( !keepDecals ) {
 		R_FreeEntityDefDecals( def );
@@ -668,6 +671,8 @@ void R_FreeEntityDefDerivedData( idRenderEntityLocal *def, bool keepDecals, bool
 	if ( !keepCachedDynamicModel ) {
 		delete def->cachedDynamicModel;
 		def->cachedDynamicModel = NULL;
+		delete def->cachedDynamicCollisionModel;
+		def->cachedDynamicCollisionModel = NULL;
 	}
 
 	// free the entityRefs from the areas
@@ -702,6 +707,9 @@ void R_ClearEntityDefDynamicModel( idRenderEntityLocal *def ) {
 	// clear the dynamic model if present
 	if ( def->dynamicModel ) {
 		def->dynamicModel = NULL;
+	}
+	if ( def->dynamicCollisionModel ) {
+		def->dynamicCollisionModel = NULL;
 	}
 }
 

@@ -78,6 +78,49 @@ idRenderModelManagerLocal	localModelManager;
 idRenderModelManager *		renderModelManager = &localModelManager;
 
 /*
+=================
+R_ModelManager_MaybeConvertMD5ToMD5R
+
+Retail Quake 4 can swap authored MD5 assets over to rvRenderModelMD5R here.
+Keep the loader seam explicit in OpenQ4 so the packed-mesh backend can drop
+in later without another control-flow rewrite.
+=================
+*/
+static idRenderModel *R_ModelManager_MaybeConvertMD5ToMD5R( idRenderModelMD5 *sourceModel ) {
+	if ( sourceModel == NULL ) {
+		return NULL;
+	}
+
+	if ( !r_convertMD5toMD5R.GetBool()
+		|| sourceModel->IsDefaultModel()
+		|| idAsyncNetwork::serverDedicated.GetInteger() != 0 ) {
+		return sourceModel;
+	}
+
+	return sourceModel;
+}
+
+/*
+=================
+R_ModelManager_MaybeConvertStaticToMD5R
+
+This mirrors the loader-side seam retail uses for static-model MD5R conversion.
+For now OpenQ4 keeps the original model until rvRenderModelMD5R exists in-tree.
+=================
+*/
+static idRenderModel *R_ModelManager_MaybeConvertStaticToMD5R( idRenderModelStatic *sourceModel ) {
+	if ( sourceModel == NULL ) {
+		return NULL;
+	}
+
+	if ( !r_convertStaticToMD5R.GetBool() || sourceModel->IsDefaultModel() ) {
+		return sourceModel;
+	}
+
+	return sourceModel;
+}
+
+/*
 ==============
 idRenderModelManagerLocal::idRenderModelManagerLocal
 ==============
@@ -291,14 +334,16 @@ idRenderModel *idRenderModelManagerLocal::GetModel( const char *modelName, bool 
 	canonical.ExtractFileExtension( extension );
 
 	if ( ( extension.Icmp( "ase" ) == 0 ) || ( extension.Icmp( "lwo" ) == 0 ) || ( extension.Icmp( "flt" ) == 0 ) ) {
-		model = new idRenderModelStatic;
-		model->InitFromFile( modelName );
+		idRenderModelStatic *staticModel = new idRenderModelStatic;
+		staticModel->InitFromFile( modelName );
+		model = R_ModelManager_MaybeConvertStaticToMD5R( staticModel );
 	} else if ( extension.Icmp( "ma" ) == 0 ) {
 		model = new idRenderModelStatic;
 		model->InitFromFile( modelName );
 	} else if ( extension.Icmp( MD5_MESH_EXT ) == 0 ) {
-		model = new idRenderModelMD5;
-		model->InitFromFile( modelName );
+		idRenderModelMD5 *md5Model = new idRenderModelMD5;
+		md5Model->InitFromFile( modelName );
+		model = R_ModelManager_MaybeConvertMD5ToMD5R( md5Model );
 	} else if ( extension.Icmp( "md3" ) == 0 ) {
 		model = new idRenderModelMD3;
 		model->InitFromFile( modelName );
