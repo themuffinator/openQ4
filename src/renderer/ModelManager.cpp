@@ -79,6 +79,58 @@ idRenderModelManager *		renderModelManager = &localModelManager;
 
 /*
 =================
+R_ModelManager_BuildMD5RName
+
+Retail Quake 4 derives prebuilt companions from the canonical source model
+name. Static authored assets get a "_static" suffix before the .md5r
+extension, skeletal assets keep the base stem unchanged.
+=================
+*/
+static void R_ModelManager_BuildMD5RName( idStr &md5rName, const idStr &canonical, const idStr &extension ) {
+	md5rName = canonical;
+	md5rName.StripAbsoluteFileExtension();
+
+	if ( extension.Icmp( "ase" ) == 0
+		|| extension.Icmp( "lwo" ) == 0
+		|| extension.Icmp( "flt" ) == 0 ) {
+		md5rName += "_static";
+	}
+
+	md5rName += ".md5r";
+}
+
+/*
+=================
+R_ModelManager_HasPrebuiltMD5R
+
+Retail prefers a compiled .md5rc companion when present, then falls back to
+the plain .md5r file. OpenQ4 keeps the same probe order even though the packed
+model loader has not landed yet.
+=================
+*/
+static bool R_ModelManager_HasPrebuiltMD5R( const idStr &md5rName ) {
+	if ( r_forceConvertMD5R.GetBool() ) {
+		return false;
+	}
+
+	idStr compiledName = md5rName;
+	compiledName += "c";
+
+	if ( idFile *compiledFile = fileSystem->OpenFileRead( compiledName ) ) {
+		fileSystem->CloseFile( compiledFile );
+		return true;
+	}
+
+	if ( idFile *sourceFile = fileSystem->OpenFileRead( md5rName ) ) {
+		fileSystem->CloseFile( sourceFile );
+		return true;
+	}
+
+	return false;
+}
+
+/*
+=================
 R_ModelManager_MaybeConvertMD5ToMD5R
 
 Retail Quake 4 can swap authored MD5 assets over to rvRenderModelMD5R here.
@@ -297,6 +349,7 @@ idRenderModelManagerLocal::GetModel
 idRenderModel *idRenderModelManagerLocal::GetModel( const char *modelName, bool createIfNotFound ) {
 	idStr		canonical;
 	idStr		extension;
+	idStr		md5rName;
 
 	if ( !modelName || !modelName[0] ) {
 		return NULL;
@@ -332,6 +385,35 @@ idRenderModel *idRenderModelManagerLocal::GetModel( const char *modelName, bool 
 	idRenderModel	*model;
 
 	canonical.ExtractFileExtension( extension );
+
+	if ( extension.Icmp( "ase" ) == 0
+		|| extension.Icmp( "lwo" ) == 0
+		|| extension.Icmp( "flt" ) == 0
+		|| extension.Icmp( MD5_MESH_EXT ) == 0 ) {
+		R_ModelManager_BuildMD5RName( md5rName, canonical, extension );
+
+		const int md5rKey = hash.GenerateKey( md5rName, false );
+		for ( int i = hash.First( md5rKey ); i != -1; i = hash.Next( i ) ) {
+			idRenderModel *cachedModel = models[i];
+
+			if ( md5rName.Icmp( cachedModel->Name() ) == 0 ) {
+				if ( !cachedModel->IsLoaded() ) {
+					cachedModel->LoadModel();
+				} else if ( insideLevelLoad && !cachedModel->IsLevelLoadReferenced() ) {
+					cachedModel->TouchData();
+				}
+				cachedModel->SetLevelLoadReferenced( true );
+				return cachedModel;
+			}
+		}
+
+		if ( R_ModelManager_HasPrebuiltMD5R( md5rName ) ) {
+			common->DPrintf(
+				"Found prebuilt MD5R companion '%s' for '%s', but rvRenderModelMD5R loading is not available yet; loading the source asset instead.\n",
+				md5rName.c_str(),
+				canonical.c_str() );
+		}
+	}
 
 	if ( ( extension.Icmp( "ase" ) == 0 ) || ( extension.Icmp( "lwo" ) == 0 ) || ( extension.Icmp( "flt" ) == 0 ) ) {
 		idRenderModelStatic *staticModel = new idRenderModelStatic;

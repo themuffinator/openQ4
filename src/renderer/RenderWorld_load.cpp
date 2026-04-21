@@ -533,6 +533,29 @@ void idRenderWorldLocal::FreeDefs() {
 
 /*
 =================
+R_RenderWorld_HasMD5RProcCompanion
+
+Retail probes for a prebuilt MD5RProc world before falling back to the classic
+.proc file. OpenQ4 keeps the same discovery step so the native MD5RProc loader
+can slot in later without changing map-init control flow again.
+=================
+*/
+static bool R_RenderWorld_HasMD5RProcCompanion( const char *mapName, idStr &md5rProcFilename ) {
+	if ( r_forceConvertMD5R.GetBool() ) {
+		md5rProcFilename.Clear();
+		return false;
+	}
+
+	md5rProcFilename = mapName;
+	md5rProcFilename.SetFileExtension( MD5R_PROC_FILE_EXT );
+
+	ID_TIME_T md5rProcTimeStamp;
+	fileSystem->ReadFile( md5rProcFilename, NULL, &md5rProcTimeStamp );
+	return md5rProcTimeStamp != FILE_NOT_FOUND_TIMESTAMP;
+}
+
+/*
+=================
 idRenderWorldLocal::InitFromMap
 
 A NULL or empty name will make a world without a map model, which
@@ -543,6 +566,7 @@ bool idRenderWorldLocal::InitFromMap( const char *name ) {
 	idLexer *		src;
 	idToken			token;
 	idStr			filename;
+	idStr			md5rProcFilename;
 	idRenderModel *	lastModel;
 
 	// if this is an empty world, initialize manually
@@ -558,9 +582,14 @@ bool idRenderWorldLocal::InitFromMap( const char *name ) {
 	filename = name;
 	filename.SetFileExtension( PROC_FILE_EXT );
 
-	// Retail can probe MD5RProc companions here or request proc->MD5R conversion.
-	// Keep the classic .proc path authoritative until the packed-world loader lands.
-	if ( r_convertProcToMD5R.GetBool() ) {
+	const bool hasMD5RProcCompanion = R_RenderWorld_HasMD5RProcCompanion( name, md5rProcFilename );
+	if ( hasMD5RProcCompanion ) {
+		common->DPrintf(
+			"Found MD5RProc companion '%s' for map '%s', but MD5RProc loading is not available yet; loading classic proc world '%s' instead.\n",
+			md5rProcFilename.c_str(),
+			name,
+			filename.c_str() );
+	} else if ( r_convertProcToMD5R.GetBool() ) {
 		common->DPrintf( "r_convertProcToMD5R is not active yet; loading classic proc world '%s'\n", filename.c_str() );
 	}
 
@@ -586,7 +615,14 @@ bool idRenderWorldLocal::InitFromMap( const char *name ) {
 
 	src = new idLexer( filename, LEXFL_NOSTRINGCONCAT | LEXFL_NODOLLARPRECOMPILE );
 	if ( !src->IsLoaded() ) {
-		common->Printf( "idRenderWorldLocal::InitFromMap: %s not found\n", filename.c_str() );
+		if ( hasMD5RProcCompanion ) {
+			common->Printf(
+				"idRenderWorldLocal::InitFromMap: classic proc '%s' not found, and MD5RProc companion '%s' can't be loaded yet\n",
+				filename.c_str(),
+				md5rProcFilename.c_str() );
+		} else {
+			common->Printf( "idRenderWorldLocal::InitFromMap: %s not found\n", filename.c_str() );
+		}
 		ClearWorld();
 		return false;
 	}
