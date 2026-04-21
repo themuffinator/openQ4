@@ -35,6 +35,48 @@ If you have questions concerning this license or the applicable additional terms
 idRenderSystemLocal	tr;
 idRenderSystem	*renderSystem = &tr;
 
+#ifdef Q4SDK_MD5R
+/*
+===============================
+idRenderSystemLocal::ExportMD5R
+===============================
+*/
+void idRenderSystemLocal::ExportMD5R( bool compressed ) {
+	common->Warning( "idRenderSystemLocal::ExportMD5R: MD5R export is not implemented in OpenQ4 yet" );
+}
+
+/*
+===========================================
+idRenderSystemLocal::CopyPrimBatchTriangles
+===========================================
+*/
+void idRenderSystemLocal::CopyPrimBatchTriangles( idDrawVert *destDrawVerts, glIndex_t *destIndices, void *primBatchMesh, void *silTraceVerts ) {
+	common->Error( "idRenderSystemLocal::CopyPrimBatchTriangles: MD5R prim-batch extraction is not implemented in OpenQ4 yet" );
+}
+#else
+#if defined( _MD5R_WRITE_SUPPORT ) && defined( _MD5R_SUPPORT )
+/*
+===============================
+idRenderSystemLocal::ExportMD5R
+===============================
+*/
+void idRenderSystemLocal::ExportMD5R( bool compressed ) {
+	common->Warning( "idRenderSystemLocal::ExportMD5R: MD5R export is not implemented in OpenQ4 yet" );
+}
+#endif
+
+#if defined( _MD5R_SUPPORT )
+/*
+===========================================
+idRenderSystemLocal::CopyPrimBatchTriangles
+===========================================
+*/
+void idRenderSystemLocal::CopyPrimBatchTriangles( idDrawVert *destDrawVerts, glIndex_t *destIndices, rvMesh *primBatchMesh, const rvSilTraceVertT *silTraceVerts ) {
+	common->Error( "idRenderSystemLocal::CopyPrimBatchTriangles: MD5R prim-batch extraction is not implemented in OpenQ4 yet" );
+}
+#endif
+#endif
+
 
 /*
 =====================

@@ -74,6 +74,58 @@ static ID_INLINE idVec3 R_DeformQuadVertexPosition( const srfTriangles_t *tri, i
 	return tri->verts[index].xyz;
 }
 
+#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
+/*
+========================
+R_CopyPrimBatchTriangles
+
+Packed MD5R surfaces keep the canonical draw geometry inside the prim batch.
+Deform code still needs a classic idDrawVert/index view, so materialize one
+through the renderer seam when the source surface doesn't expose tri->verts.
+========================
+*/
+static void R_CopyPrimBatchTriangles( const srfTriangles_t *geo, srfTriangles_t *newTri, idDrawVert *ac ) {
+	newTri->numVerts = geo->numVerts;
+	newTri->numIndexes = geo->numIndexes;
+	newTri->indexes = (glIndex_t *)R_FrameAlloc( newTri->numIndexes * sizeof( newTri->indexes[0] ) );
+	renderSystem->CopyPrimBatchTriangles( ac, newTri->indexes, geo->primBatchMesh, geo->silTraceVerts );
+}
+
+/*
+===============================
+R_MaterializePrimBatchTriangles
+===============================
+*/
+static void R_MaterializePrimBatchTriangles( const srfTriangles_t *geo, srfTriangles_t *tri, idDrawVert *tempVerts, glIndex_t *tempIndexes ) {
+	memset( tri, 0, sizeof( *tri ) );
+	tri->numVerts = geo->numVerts;
+	tri->numIndexes = geo->numIndexes;
+	tri->verts = tempVerts;
+	tri->indexes = tempIndexes;
+	renderSystem->CopyPrimBatchTriangles( tempVerts, tempIndexes, geo->primBatchMesh, geo->silTraceVerts );
+}
+
+/*
+===========================
+R_CopyDeformSourceTriangles
+===========================
+*/
+static void R_CopyDeformSourceTriangles( const srfTriangles_t *tri, srfTriangles_t *newTri, idDrawVert *ac ) {
+	if ( tri->primBatchMesh != NULL ) {
+		R_CopyPrimBatchTriangles( tri, newTri, ac );
+		return;
+	}
+
+	newTri->numVerts = tri->numVerts;
+	newTri->numIndexes = tri->numIndexes;
+	newTri->indexes = tri->indexes;
+
+	for ( int i = 0; i < tri->numVerts; ++i ) {
+		ac[i] = tri->verts[i];
+	}
+}
+#endif
+
 /*
 =====================
 R_SpriteDeform
@@ -94,6 +146,15 @@ static void R_SpriteDeform( drawSurf_t *surf, bool radiusDimension ) {
 	srfTriangles_t	*newTri;
 
 	tri = surf->geo;
+#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
+	srfTriangles_t	tempTri;
+	if ( tri->primBatchMesh != NULL ) {
+		idDrawVert *tempVerts = (idDrawVert *)_alloca16( tri->numVerts * sizeof( idDrawVert ) );
+		glIndex_t *tempIndexes = (glIndex_t *)_alloca16( tri->numIndexes * sizeof( tempIndexes[0] ) );
+		R_MaterializePrimBatchTriangles( tri, &tempTri, tempVerts, tempIndexes );
+		tri = &tempTri;
+	}
+#endif
 
 	if ( tri->numVerts & 3 ) {
 		common->Warning( "R_AutospriteDeform: shader had odd vertex count" );
@@ -211,6 +272,15 @@ static int edgeVerts[6][2] = {
 };
 
 	tri = surf->geo;
+#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
+	srfTriangles_t	tempTri;
+	if ( tri->primBatchMesh != NULL ) {
+		idDrawVert *tempVerts = (idDrawVert *)_alloca16( tri->numVerts * sizeof( idDrawVert ) );
+		glIndex_t *tempIndexes = (glIndex_t *)_alloca16( tri->numIndexes * sizeof( tempIndexes[0] ) );
+		R_MaterializePrimBatchTriangles( tri, &tempTri, tempVerts, tempIndexes );
+		tri = &tempTri;
+	}
+#endif
 
 	if ( tri->numVerts & 3 ) {
 		common->Error( "R_AutospriteDeform: shader had odd vertex count" );
@@ -414,6 +484,15 @@ static void R_FlareDeform( drawSurf_t *surf ) {
 	int		j;
 
 	tri = surf->geo;
+#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
+	srfTriangles_t	tempTri;
+	if ( tri->primBatchMesh != NULL ) {
+		idDrawVert *tempVerts = (idDrawVert *)_alloca16( tri->numVerts * sizeof( idDrawVert ) );
+		glIndex_t *tempIndexes = (glIndex_t *)_alloca16( tri->numIndexes * sizeof( tempIndexes[0] ) );
+		R_MaterializePrimBatchTriangles( tri, &tempTri, tempVerts, tempIndexes );
+		tri = &tempTri;
+	}
+#endif
 
 	if ( tri->numVerts != 4 || tri->numIndexes != 6 ) {
 		//FIXME: temp hack for flares on tripleted models
@@ -739,22 +818,36 @@ static void R_ExpandDeform( drawSurf_t *surf ) {
 	int		i;
 	const srfTriangles_t	*tri;
 	srfTriangles_t	*newTri;
+	idDrawVert *ac;
 
 	tri = surf->geo;
 
 	// this srfTriangles_t and all its indexes and caches are in frame
 	// memory, and will be automatically disposed of
 	newTri = (srfTriangles_t *)R_ClearedFrameAlloc( sizeof( *newTri ) );
+#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
+	ac = (idDrawVert *)_alloca16( tri->numVerts * sizeof( idDrawVert ) );
+	R_CopyDeformSourceTriangles( tri, newTri, ac );
+	if ( tri->primBatchMesh != NULL ) {
+		// Packed MD5R materialization reconstructs XYZ/ST/color data, so expand
+		// must rebuild the tangent basis before it can offset along normals.
+		newTri->verts = ac;
+		R_DeriveTangents( newTri, false );
+		newTri->verts = NULL;
+	}
+#else
 	newTri->numVerts = tri->numVerts;
 	newTri->numIndexes = tri->numIndexes;
 	newTri->indexes = tri->indexes;
-
-	idDrawVert *ac = (idDrawVert *)_alloca16( newTri->numVerts * sizeof( idDrawVert ) );
+	ac = (idDrawVert *)_alloca16( newTri->numVerts * sizeof( idDrawVert ) );
+#endif
 
 	float dist = surf->shaderRegisters[ surf->material->GetDeformRegister(0) ];
-	for ( i = 0 ; i < tri->numVerts ; i++ ) {
+	for ( i = 0 ; i < newTri->numVerts ; i++ ) {
+#if !defined( _MD5R_SUPPORT ) && !defined( Q4SDK_MD5R )
 		ac[i] = *(idDrawVert *)&tri->verts[i];
-		ac[i].xyz = tri->verts[i].xyz + tri->verts[i].normal * dist;
+#endif
+		ac[i].xyz += ac[i].normal * dist;
 	}
 
 	R_FinishDeform( surf, newTri, ac );
@@ -777,15 +870,21 @@ static void  R_MoveDeform( drawSurf_t *surf ) {
 	// this srfTriangles_t and all its indexes and caches are in frame
 	// memory, and will be automatically disposed of
 	newTri = (srfTriangles_t *)R_ClearedFrameAlloc( sizeof( *newTri ) );
+#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
+	idDrawVert *ac = (idDrawVert *)_alloca16( tri->numVerts * sizeof( idDrawVert ) );
+	R_CopyDeformSourceTriangles( tri, newTri, ac );
+#else
 	newTri->numVerts = tri->numVerts;
 	newTri->numIndexes = tri->numIndexes;
 	newTri->indexes = tri->indexes;
-
 	idDrawVert *ac = (idDrawVert *)_alloca16( newTri->numVerts * sizeof( idDrawVert ) );
+#endif
 
 	float dist = surf->shaderRegisters[ surf->material->GetDeformRegister(0) ];
-	for ( i = 0 ; i < tri->numVerts ; i++ ) {
+	for ( i = 0 ; i < newTri->numVerts ; i++ ) {
+#if !defined( _MD5R_SUPPORT ) && !defined( Q4SDK_MD5R )
 		ac[i] = *(idDrawVert *)&tri->verts[i];
+#endif
 		ac[i].xyz[0] += dist;
 	}
 
@@ -811,11 +910,15 @@ static void  R_TurbulentDeform( drawSurf_t *surf ) {
 	// this srfTriangles_t and all its indexes and caches are in frame
 	// memory, and will be automatically disposed of
 	newTri = (srfTriangles_t *)R_ClearedFrameAlloc( sizeof( *newTri ) );
+#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
+	idDrawVert *ac = (idDrawVert *)_alloca16( tri->numVerts * sizeof( idDrawVert ) );
+	R_CopyDeformSourceTriangles( tri, newTri, ac );
+#else
 	newTri->numVerts = tri->numVerts;
 	newTri->numIndexes = tri->numIndexes;
 	newTri->indexes = tri->indexes;
-
 	idDrawVert *ac = (idDrawVert *)_alloca16( newTri->numVerts * sizeof( idDrawVert ) );
+#endif
 
 	idDeclTable	*table = (idDeclTable *)surf->material->GetDeformDecl();
 	float range = surf->shaderRegisters[ surf->material->GetDeformRegister(0) ];
@@ -823,13 +926,11 @@ static void  R_TurbulentDeform( drawSurf_t *surf ) {
 	float domain = surf->shaderRegisters[ surf->material->GetDeformRegister(2) ];
 	float tOfs = 0.5;
 
-	for ( i = 0 ; i < tri->numVerts ; i++ ) {
-		float	f = tri->verts[i].xyz[0] * 0.003 + tri->verts[i].xyz[1] * 0.007 + tri->verts[i].xyz[2] * 0.011;
+	for ( i = 0 ; i < newTri->numVerts ; i++ ) {
+		float	f = ac[i].xyz[0] * 0.003 + ac[i].xyz[1] * 0.007 + ac[i].xyz[2] * 0.011;
 
 		f = timeOfs + domain * f;
 		f += timeOfs;
-
-		ac[i] = *(idDrawVert *)&tri->verts[i];
 
 		ac[i].st[0] += range * table->TableLookup( f );
 		ac[i].st[1] += range * table->TableLookup( f + tOfs );
@@ -913,6 +1014,15 @@ static void R_EyeballDeform( drawSurf_t *surf ) {
 	bool		triUsed[MAX_EYEBALL_ISLANDS*MAX_EYEBALL_TRIS];
 
 	tri = surf->geo;
+#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
+	srfTriangles_t	tempTri;
+	if ( tri->primBatchMesh != NULL ) {
+		idDrawVert *tempVerts = (idDrawVert *)_alloca16( tri->numVerts * sizeof( idDrawVert ) );
+		glIndex_t *tempIndexes = (glIndex_t *)_alloca16( tri->numIndexes * sizeof( tempIndexes[0] ) );
+		R_MaterializePrimBatchTriangles( tri, &tempTri, tempVerts, tempIndexes );
+		tri = &tempTri;
+	}
+#endif
 
 	// separate all the triangles into islands
 	int		numTri = tri->numIndexes / 3;

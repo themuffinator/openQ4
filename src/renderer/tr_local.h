@@ -768,6 +768,17 @@ public:
 	virtual void			FreeRenderWorld( idRenderWorld *rw );
 	virtual void			BeginLevelLoad( void );
 	virtual void			EndLevelLoad( void );
+#ifdef Q4SDK_MD5R
+	virtual void			ExportMD5R( bool compressed );
+	virtual void			CopyPrimBatchTriangles( idDrawVert *destDrawVerts, glIndex_t *destIndices, void *primBatchMesh, void *silTraceVerts );
+#else
+#if defined( _MD5R_WRITE_SUPPORT ) && defined( _MD5R_SUPPORT )
+	virtual void			ExportMD5R( bool compressed );
+#endif
+#if defined( _MD5R_SUPPORT )
+	virtual void			CopyPrimBatchTriangles( idDrawVert *destDrawVerts, glIndex_t *destIndices, rvMesh *primBatchMesh, const rvSilTraceVertT *silTraceVerts );
+#endif
+#endif
 	virtual bool			RegisterFont( const char *fontName, fontInfoEx_t &font );
 	virtual void			SetColor( const idVec4 &rgba );
 	virtual void			SetColor4( float r, float g, float b, float a );
