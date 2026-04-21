@@ -112,7 +112,5 @@ idCollisionModelLocal::ModelInfo
 ================
 */
 void idCollisionModelLocal::ModelInfo(void) {
-	idCollisionModelLocal modelInfo;
-
-//	collisionModelManagerLocal.PrintModelInfo(this);
+	// The manager exposes the supported reporting entry points.
 }

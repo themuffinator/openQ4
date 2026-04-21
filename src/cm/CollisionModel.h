@@ -94,6 +94,9 @@ typedef struct trace_s {
 #define CM_BOX_EPSILON		1.0f			// should always be larger than clip epsilon
 #define CM_MAX_TRACE_DIST	4096.0f			// maximum distance a trace model may be traced, point traces are unlimited
 
+class idRenderModel;
+class MemInfo;
+
 // collision model
 class idCollisionModel {
 public:
@@ -125,22 +128,37 @@ class idCollisionModelManager {
 public:
 	virtual					~idCollisionModelManager( void ) {}
 
+	virtual void			Init( void ) = 0;
+	virtual void			Shutdown( void ) = 0;
+
 	// Loads collision models from a map file.
 	virtual void			LoadMap( const idMapFile *mapFile, bool forceCreateMap = false ) = 0;
 	// Frees all the collision models.
 	virtual void			FreeMap(const char* mapName) = 0;
 
 	// Gets the clip handle for a model.
-	virtual idCollisionModel *LoadModel(const char* mapName, const char *modelName, const bool precache ) = 0;
+	virtual idCollisionModel *LoadModel(const char* mapName, const char *modelName, const bool precache = false ) = 0;
+
+	// Generates a collision model from an already-loaded render model.
+	virtual idCollisionModel *ExtractCollisionModel( idRenderModel *renderModel, const char *modelName ) = 0;
+
+	// Precaches a collision model without forcing render-model conversion.
+	virtual void			PreCacheModel( const char *mapName, const char *modelName ) = 0;
 
 	// Free the given model.
 	virtual void				FreeModel(idCollisionModel* model) = 0;
+
+	// Purges any unused render-model collision caches.
+	virtual void			PurgeModels( void ) = 0;
 	
 	// Sets up a trace model for collision with other trace models.
 	virtual idCollisionModel *ModelFromTrm(const char* mapName, const char* modelName, const idTraceModel &trm, const idMaterial *material ) = 0;
 
 	// Creates a trace model from a collision model, returns true if succesfull.
 	virtual bool			TrmFromModel(const char* mapName, const char *modelName, idTraceModel &trm ) = 0;
+
+	// Creates one trace model per source primitive, returns the number created.
+	virtual int				CompoundTrmFromModel( const char *mapName, const char *modelName, idTraceModel *trms, int maxTrms ) = 0;
 
 	// Translates a trace model and reports the first collision if any.
 	virtual void			Translation( trace_t *results, const idVec3 &start, const idVec3 &end,
@@ -164,6 +182,10 @@ public:
 
 	// Lists all loaded models.
 	virtual void			ListModels( void ) = 0;
+	// Prints model information, use -1 for accumulated model info.
+	virtual void			ModelInfo( int num ) = 0;
+	virtual void			PrintMemInfo( MemInfo *mi ) = 0;
+	virtual bool			IsLoaded( void ) = 0;
 	// Writes a collision model file for the given map entity.
 	virtual bool			WriteCollisionModelForMapEntity( const idMapEntity *mapEnt, const char *filename, const bool testTraceModel = true ) = 0;
 

@@ -1672,13 +1672,10 @@ int idFileSystemLocal::ReadFile( const char *relativePath, void **buffer, ID_TIM
 	byte *		buf;
 	int			len;
 	bool		isConfig;
+	static bool warnedEmptyReadPath = false;
 
 	if ( !searchPaths ) {
 		common->FatalError( "Filesystem call made without initialization\n" );
-	}
-
-	if ( !relativePath || !relativePath[0] ) {
-		common->FatalError( "idFileSystemLocal::ReadFile with empty name\n" );
 	}
 
 	if ( timestamp ) {
@@ -1687,6 +1684,14 @@ int idFileSystemLocal::ReadFile( const char *relativePath, void **buffer, ID_TIM
 
 	if ( buffer ) {
 		*buffer = NULL;
+	}
+
+	if ( !relativePath || !relativePath[0] ) {
+		if ( !warnedEmptyReadPath ) {
+			common->DWarning( "idFileSystemLocal::ReadFile called with empty name; treating as missing file" );
+			warnedEmptyReadPath = true;
+		}
+		return -1;
 	}
 
 	buf = NULL;	// quiet compiler warning

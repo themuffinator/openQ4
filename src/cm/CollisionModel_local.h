@@ -105,6 +105,7 @@ typedef struct cm_polygon_s {
 	int						checkcount;			// for multi-check avoidance
 	int						contents;			// contents behind polygon
 	const idMaterial *		material;			// material
+	int						primitiveNum;		// source primitive number
 	idPlane					plane;				// polygon plane
 	idVec2					texBounds[3];		// texture coordinates used for hit material lookups
 	int						numEdges;			// number of edges
@@ -180,6 +181,9 @@ public:
 
 	
 	idStr					name;				// model name
+	int						refCount;			// render-model cache references
+	ID_TIME_T				fileTime;			// source timestamp or map CRC
+	int						numPrimitives;		// number of source primitives
 	idBounds				bounds;				// model bounds
 	int						contents;			// all contents of the model ored together
 	bool					isConvex;			// set if model is convex
@@ -313,22 +317,28 @@ typedef struct cm_procNode_s {
 
 class idCollisionModelManagerLocal : public idCollisionModelManager {
 public:
+	void			Init( void );
+	void			Shutdown( void );
 	// load collision models from a map file
 	void			LoadMap( const idMapFile *mapFile, bool forceCreateMap);
 	// frees all the collision models
 	void			FreeMap(const char* mapName);
 
 	// get clip handle for model
-	virtual idCollisionModel *LoadModel(const char* mapName, const char *modelName, const bool precache );
+	virtual idCollisionModel *LoadModel(const char* mapName, const char *modelName, const bool precache = false );
+	virtual idCollisionModel *ExtractCollisionModel( idRenderModel *renderModel, const char *modelName );
+	virtual void	PreCacheModel( const char *mapName, const char *modelName );
 
 	// Frees a collision model.
 	virtual void	FreeModel(idCollisionModel* model);
+	virtual void	PurgeModels( void );
 
 	// sets up a trace model for collision with other trace models
 	idCollisionModel * ModelFromTrm(const char* mapName, const char* modelName, const idTraceModel &trm, const idMaterial *material );
 
 	// create trace model from a collision model, returns true if succesfull
 	bool			TrmFromModel( const char *mapName, const char *modelName, idTraceModel &trm );
+	int				CompoundTrmFromModel( const char *mapName, const char *modelName, idTraceModel *trms, int maxTrms );
 
 	// translates a trm and reports the first collision if any
 	void			Translation( trace_t *results, const idVec3 &start, const idVec3 &end,
@@ -351,6 +361,9 @@ public:
 
 	// list all loaded models
 	void			ListModels( void );
+	void			ModelInfo( int num );
+	void			PrintMemInfo( MemInfo *mi );
+	bool			IsLoaded( void ) { return loaded != 0; }
 	// write a collision model file for the map entity
 	bool			WriteCollisionModelForMapEntity( const idMapEntity *mapEnt, const char *filename, const bool testTraceModel = true );
 
@@ -418,6 +431,9 @@ private:			// CollisionMap_trace.cpp
 
 private:			// CollisionMap_load.cpp
 	void			Clear( void );
+	void			EnsureModelTable( void );
+	void			AddToMapModelReferenceCounts( const char *mapName, int add );
+	void			FreeProcClipModels( void );
 	void			FreeTrmModelStructure( void );
 	void			DestroyModel( idCollisionModelLocal *model );
 					// model deallocation
@@ -432,8 +448,8 @@ private:			// CollisionMap_load.cpp
 					// merging polygons
 	void			ReplacePolygons( idCollisionModelLocal *model, cm_node_t *node, cm_polygon_t *p1, cm_polygon_t *p2, cm_polygon_t *newp );
 	cm_polygon_t *	TryMergePolygons( idCollisionModelLocal *model, cm_polygon_t *p1, cm_polygon_t *p2 );
-	bool			MergePolygonWithTreePolygons( idCollisionModelLocal *model, cm_node_t *node, cm_polygon_t *polygon );
-	void			MergeTreePolygons( idCollisionModelLocal *model, cm_node_t *node );
+	bool			MergePolygonWithTreePolygons( idCollisionModelLocal *model, cm_node_t *node, cm_polygon_t *polygon, bool mergePrimitives );
+	void			MergeTreePolygons( idCollisionModelLocal *model, cm_node_t *node, bool mergePrimitives );
 					// finding internal edges
 	bool			PointInsidePolygon( idCollisionModelLocal *model, cm_polygon_t *p, idVec3 &v );
 	void			FindInternalEdgesOnPolygon( idCollisionModelLocal *model, cm_polygon_t *p1, cm_polygon_t *p2 );
@@ -442,7 +458,7 @@ private:			// CollisionMap_load.cpp
 	void			FindContainedEdges( idCollisionModelLocal *model, cm_polygon_t *p );
 					// loading of proc BSP tree
 	void			ParseProcNodes( idLexer *src );
-	void			LoadProcBSP( const char *name );
+	bool			LoadProcBSP( const char *name, unsigned int mapFileCRC );
 					// removal of contained polygons
 	int				R_ChoppedAwayByProcBSP( int nodeNum, idFixedWinding *w, const idVec3 &normal, const idVec3 &origin, const float radius );
 	int				ChoppedAwayByProcBSP( const idFixedWinding &w, const idPlane &plane, int contents );
@@ -451,6 +467,7 @@ private:			// CollisionMap_load.cpp
 	idFixedWinding *WindingOutsideBrushes( idFixedWinding *w, const idPlane &plane, int contents, int patch, cm_node_t *headNode );
 					// creation of axial BSP tree
 	idCollisionModelLocal *	AllocModel( void );
+	void			FreeModelMemory( idCollisionModelLocal *model );
 	cm_node_t *		AllocNode( idCollisionModelLocal *model, int blockSize );
 	cm_polygonRef_t*AllocPolygonReference( idCollisionModelLocal *model, int blockSize );
 	cm_brushRef_t *	AllocBrushReference( idCollisionModelLocal *model, int blockSize );
@@ -473,21 +490,32 @@ private:			// CollisionMap_load.cpp
 	void			CreatePolygon( idCollisionModelLocal *model, idFixedWinding *w, const idPlane &plane, const idMaterial *material, int primitiveNum );
 	void			PolygonFromWinding( idCollisionModelLocal *model, idFixedWinding *w, const idPlane &plane, const idMaterial *material, int primitiveNum );
 	void			CalculateEdgeNormals( idCollisionModelLocal *model, cm_node_t *node );
+	idCollisionModelLocal *	GenerateCollisionModel( idRenderModel *renderModel, const char *modelName );
 	void			CreatePatchPolygons( idCollisionModelLocal *model, idSurface_Patch &mesh, const idMaterial *material, int primitiveNum );
 	void			ConvertPatch( idCollisionModelLocal *model, const idMapPatch *patch, int primitiveNum );
 	void			ConvertBrushSides( idCollisionModelLocal *model, const idMapBrush *mapBrush, int primitiveNum );
 	void			ConvertBrush( idCollisionModelLocal *model, const idMapBrush *mapBrush, int primitiveNum );
+	void			UpdatePrimitiveCount_r( cm_node_t *node, int &maxPrimitive );
+	void			UpdateModelPrimitiveCount( idCollisionModelLocal *model );
 	void			PrintModelInfo( const idCollisionModelLocal *model );
 	void			AccumulateModelInfo( idCollisionModelLocal *model );
+	int				FindModelIndex( const char *name ) const;
+	int				FindAvailableModelIndex( int preferredIndex = -1, bool allowProcClipSlotReuse = false ) const;
+	int				StoreModel( idCollisionModelLocal *model, int preferredIndex = -1, bool allowProcClipSlotReuse = false );
+	idCollisionModelLocal * FindEquivalentRenderModel( const char *modelName ) const;
 	void			RemapEdges( cm_node_t *node, int *edgeRemap );
 	void			OptimizeArrays( idCollisionModelLocal *model );
-	void			FinishModel( idCollisionModelLocal *model );
+	void			FinishModel( idCollisionModelLocal *model, bool mergePrimitives );
 	void			BuildModels( const idMapFile *mapFile, bool forceCreateMap);
+	bool			IsRenderModelName( const char *modelName ) const;
+	const char *	GetFullModelName( const char *mapName, const char *modelName, idStr &fullName ) const;
+	const char *	GetModelLoadFileName( const char *mapName, const char *modelName, idStr &fileName ) const;
 	idCollisionModel* FindModel( const char *name );
-	idCollisionModelLocal *	CollisionModelForMapEntity( const idMapEntity *mapEnt );	// brush/patch model from .map
+	idCollisionModelLocal *	CollisionModelForMapEntity( const idMapFile *mapFile, const idMapEntity *mapEnt );	// brush/patch model from .map
 	idCollisionModelLocal *	LoadRenderModel( const char *fileName );					// ASE/LWO models
-	bool			TrmFromModel_r( idTraceModel &trm, cm_node_t *node );
+	bool			TrmFromModel_r( idTraceModel &trm, cm_node_t *node, int primitiveNum );
 	bool			TrmFromModel( const idCollisionModelLocal *model, idTraceModel &trm );
+	int				CompoundTrmFromModel( const idCollisionModelLocal *model, idTraceModel *trms, int maxTrms );
 
 private:			// CollisionMap_files.cpp
 					// writing
@@ -504,7 +532,7 @@ private:			// CollisionMap_files.cpp
 	void			ParseEdges( idLexer *src, idCollisionModelLocal *model );
 	void			ParsePolygons( idLexer *src, idCollisionModelLocal *model );
 	void			ParseBrushes( idLexer *src, idCollisionModelLocal *model );
-	bool			ParseCollisionModel( idLexer *src );
+	bool			ParseCollisionModel( idLexer *src, const char *fileName, unsigned int mapFileCRC );
 	bool			LoadCollisionModelFile( const char *name, unsigned int mapFileCRC );
 
 private:			// CollisionMap_debug
@@ -515,7 +543,7 @@ private:			// CollisionMap_debug
 								const idVec3 &viewOrigin );
 
 // jmarshall 
-	void			CheckProcModelSurfClip(bool isLegacyWorldFile, idLexer *src);
+	void			CheckProcModelSurfClip(bool isLegacyWorldFile, idLexer *src, unsigned int mapFileCRC);
 // jmarshall end
 private:			// collision map data
 	idStr			mapName;

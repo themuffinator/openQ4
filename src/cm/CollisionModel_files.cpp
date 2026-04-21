@@ -41,7 +41,7 @@ If you have questions concerning this license or the applicable additional terms
 
 #define CM_FILE_EXT			"cm"
 #define CM_FILEID			"CM"
-#define CM_FILEVERSION		"1.00"
+#define CM_FILEVERSION		"3"
 
 
 /*
@@ -54,6 +54,19 @@ Writing of collision model file
 
 void CM_GetNodeBounds( idBounds *bounds, cm_node_t *node );
 int CM_GetNodeContents( cm_node_t *node );
+
+static idStr CM_GetFileModelName( const idCollisionModelLocal *model ) {
+	idStr name = model->name;
+
+	if ( idStr::IcmpnPath( name.c_str(), "maps/", 5 ) == 0 ) {
+		const int slash = name.Last( '/' );
+		if ( slash != -1 ) {
+			name = name.c_str() + slash + 1;
+		}
+	}
+
+	return name;
+}
 
 
 /*
@@ -120,11 +133,9 @@ void idCollisionModelManagerLocal::WritePolygons( idFile *fp, cm_node_t *node ) 
 		fp->WriteFloatString( " ( %f %f %f )", p->bounds[0][0], p->bounds[0][1], p->bounds[0][2] );
 		fp->WriteFloatString( " ( %f %f %f )", p->bounds[1][0], p->bounds[1][1], p->bounds[1][2] );
 		fp->WriteFloatString( " \"%s\"", p->material->GetName() );
-		if ( p->texBounds[0] != vec2_origin || p->texBounds[1] != vec2_origin || p->texBounds[2] != vec2_origin ) {
-			fp->WriteFloatString( " ( %f %f )", p->texBounds[0][0], p->texBounds[0][1] );
-			fp->WriteFloatString( " ( %f %f )", p->texBounds[1][0], p->texBounds[1][1] );
-			fp->WriteFloatString( " ( %f %f ) %d", p->texBounds[2][0], p->texBounds[2][1], 0 );
-		}
+		fp->WriteFloatString( " ( %f %f )", p->texBounds[0][0], p->texBounds[0][1] );
+		fp->WriteFloatString( " ( %f %f )", p->texBounds[1][0], p->texBounds[1][1] );
+		fp->WriteFloatString( " ( %f %f ) %d", p->texBounds[2][0], p->texBounds[2][1], p->primitiveNum );
 		fp->WriteFloatString( "\n" );
 	}
 	if ( node->planeType != -1 ) {
@@ -181,7 +192,7 @@ void idCollisionModelManagerLocal::WriteBrushes( idFile *fp, cm_node_t *node ) {
 			fp->WriteFloatString( "\t\t( %f %f %f ) %f\n", b->planes[i].Normal()[0], b->planes[i].Normal()[1], b->planes[i].Normal()[2], b->planes[i].Dist() );
 		}
 		fp->WriteFloatString( "\t} ( %f %f %f )", b->bounds[0][0], b->bounds[0][1], b->bounds[0][2] );
-		fp->WriteFloatString( " ( %f %f %f ) \"%s\"\n", b->bounds[1][0], b->bounds[1][1], b->bounds[1][2], StringFromContents( b->contents ) );
+		fp->WriteFloatString( " ( %f %f %f ) \"%s\" %d\n", b->bounds[1][0], b->bounds[1][1], b->bounds[1][2], StringFromContents( b->contents ), b->primitiveNum );
 	}
 	if ( node->planeType != -1 ) {
 		WriteBrushes( fp, node->children[0] );
@@ -196,8 +207,9 @@ idCollisionModelManagerLocal::WriteCollisionModel
 */
 void idCollisionModelManagerLocal::WriteCollisionModel( idFile *fp, idCollisionModelLocal *model ) {
 	int i, polygonMemory, brushMemory;
+	const idStr name = CM_GetFileModelName( model );
 
-	fp->WriteFloatString( "collisionModel \"%s\" {\n", model->name.c_str() );
+	fp->WriteFloatString( "collisionModel \"%s\" %d {\n", name.c_str(), model->numPrimitives );
 	// vertices
 	fp->WriteFloatString( "\tvertices { /* numVertices = */ %d\n", model->numVertices );
 	for ( i = 0; i < model->numVertices; i++ ) {
@@ -241,9 +253,15 @@ void idCollisionModelManagerLocal::WriteCollisionModelsToFile( const char *filen
 	int i;
 	idFile *fp;
 	idStr name;
+	idStr mask;
 
 	name = filename;
 	name.SetFileExtension( CM_FILE_EXT );
+	mask = filename;
+	if ( !IsRenderModelName( mask.c_str() ) ) {
+		mask.StripFileExtension();
+		mask += "/";
+	}
 
 	common->Printf( "writing %s\n", name.c_str() );
 	// Keep runtime-generated collision caches out of fs_cdpath so packaged
@@ -261,6 +279,14 @@ void idCollisionModelManagerLocal::WriteCollisionModelsToFile( const char *filen
 
 	// write the collision models
 	for ( i = firstModel; i < lastModel; i++ ) {
+		if ( models[ i ] == NULL ) {
+			continue;
+		}
+		if ( !IsRenderModelName( filename ) &&
+			 idStr::IcmpnPath( models[ i ]->name.c_str(), mask.c_str(), mask.Length() ) != 0 &&
+			 models[ i ]->name.Cmpn( PROC_CLIPMODEL_STRING_PRFX, strlen( PROC_CLIPMODEL_STRING_PRFX ) ) != 0 ) {
+			continue;
+		}
 		WriteCollisionModel( fp, models[ i ] );
 	}
 
@@ -278,7 +304,7 @@ bool idCollisionModelManagerLocal::WriteCollisionModelForMapEntity( const idMapE
 	idCollisionModelLocal *model;
 
 	SetupHash();
-	model = CollisionModelForMapEntity( mapEnt );
+	model = CollisionModelForMapEntity( NULL, mapEnt );
 	model->name = filename;
 
 	name = filename;
@@ -450,13 +476,14 @@ void idCollisionModelManagerLocal::ParsePolygons( idLexer *src, idCollisionModel
 		p->material = declManager->FindMaterial( token );
 		p->contents = p->material->GetContentFlags();
 		p->checkcount = 0;
+		p->primitiveNum = 0;
 		if ( src->ReadToken( &token ) ) {
 			if ( token == "(" ) {
 				src->UnreadToken( &token );
 				src->Parse1DMatrix( 2, p->texBounds[0].ToFloatPtr() );
 				src->Parse1DMatrix( 2, p->texBounds[1].ToFloatPtr() );
 				src->Parse1DMatrix( 2, p->texBounds[2].ToFloatPtr() );
-				src->ParseInt(); // primitive num
+				p->primitiveNum = src->ParseInt();
 			} else {
 				src->UnreadToken( &token );
 			}
@@ -541,38 +568,43 @@ void idCollisionModelManagerLocal::ParseBrushes( idLexer *src, idCollisionModelL
 idCollisionModelManagerLocal::ParseCollisionModel
 ================
 */
-bool idCollisionModelManagerLocal::ParseCollisionModel( idLexer *src ) {
+bool idCollisionModelManagerLocal::ParseCollisionModel( idLexer *src, const char *fileName, unsigned int mapFileCRC ) {
 	idCollisionModelLocal *model;
 	idToken token;
+	idStr fullModelName;
+	bool newModel = false;
+	int modelIndex;
 
 	// LoadModel() can parse standalone .cm files before LoadMap() allocates
 	// the model pointer table.
-	if ( models == NULL ) {
-		maxModels = MAX_SUBMODELS;
-		models = (idCollisionModelLocal **) Mem_ClearedAlloc( (maxModels + 1) * sizeof( idCollisionModelLocal * ) );
-	}
+	EnsureModelTable();
 
-	if ( numModels >= MAX_SUBMODELS ) {
-		common->Error( "LoadModel: no free slots" );
-		return false;
-	}
-	model = AllocModel();
-	models[numModels ] = model;
-	numModels++;
-	// parse the file
 	src->ExpectTokenType( TT_STRING, 0, &token );
-	model->name = token;
+	GetFullModelName( fileName, token.c_str(), fullModelName );
+	modelIndex = FindModelIndex( fullModelName );
+	if ( modelIndex >= 0 ) {
+		model = models[ modelIndex ];
+		FreeModelMemory( model );
+	} else {
+		model = AllocModel();
+		model->name = fullModelName;
+		StoreModel( model );
+		newModel = true;
+	}
+	model->name = fullModelName;
+	model->fileTime = mapFileCRC;
+	model->refCount = 0;
 	
-	if (token.Cmpn(PROC_CLIPMODEL_STRING_PRFX, strlen(PROC_CLIPMODEL_STRING_PRFX)) == 0) {
+	if ( newModel && model->name.Cmpn( PROC_CLIPMODEL_STRING_PRFX, strlen( PROC_CLIPMODEL_STRING_PRFX ) ) == 0 ) {
 		numInlinedProcClipModels++;
 	}
-	// Quake 4 .cm files may include an extra numeric token after the model name (e.g. "1").
-	// Accept and ignore it to keep compatibility with shipped assets.
+	model->numPrimitives = 0;
 	if ( !src->ReadToken( &token ) ) {
 		src->Error( "ParseCollisionModel: unexpected end of file after model name" );
 	}
 	if ( token != "{" ) {
 		if ( token.type == TT_NUMBER ) {
+			model->numPrimitives = token.GetIntValue();
 			src->ExpectTokenString( "{" );
 		} else {
 			src->Error( "ParseCollisionModel: expected '{' but found '%s'", token.c_str() );
@@ -618,6 +650,9 @@ bool idCollisionModelManagerLocal::ParseCollisionModel( idLexer *src ) {
 	CM_GetNodeBounds( &model->bounds, model->node );
 	// get model contents
 	model->contents = CM_GetNodeContents( model->node );
+	if ( model->numPrimitives <= 0 ) {
+		UpdateModelPrimitiveCount( model );
+	}
 	// total memory used by this model
 	model->usedMemory = model->numVertices * sizeof(cm_vertex_t) +
 						model->numEdges * sizeof(cm_edge_t) +
@@ -712,7 +747,7 @@ bool idCollisionModelManagerLocal::LoadCollisionModelFile( const char *name, uns
 		}
 
 		if ( token == "collisionModel" ) {
-			if ( !ParseCollisionModel( src ) ) {
+			if ( !ParseCollisionModel( src, name, mapFileCRC ) ) {
 				delete src;
 				if ( pakBuffer != NULL ) {
 					Mem_Free( pakBuffer );

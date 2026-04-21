@@ -3325,6 +3325,25 @@ int Lexer::CheckTokenString(char const *string)
 	}
 }
 
+int Lexer::PeekTokenString(char const *string)
+{
+	if(mDelegate)
+	{
+		return mDelegate->PeekTokenString(string);
+	}
+	else
+	{
+		idToken tok;
+
+		if (!ReadToken( &tok )) {
+			return 0;
+		}
+
+		UnreadToken( &tok );
+		return tok == string;
+	}
+}
+
 int Lexer::ExpectAnyToken(idToken *token)
 {
 	if(mDelegate)

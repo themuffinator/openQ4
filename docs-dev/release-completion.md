@@ -10,6 +10,9 @@ Process:
 
 ## Ready For Changelog
 
+- [x] Collision-model parity improved for generated/runtime CM data: retail Quake 4 primitive tracking and polygon texture-basis data are now preserved during CM generation/serialization, render-model collision no longer over-merges across distinct source surfaces, and `.proc` CRC validation now matches retail CM load behavior more closely.
+- [x] Collision-model load parity improved for stock maps and SP entities: CM parsing now reuses existing model slots instead of exhausting submodel capacity, world/map submodel naming matches retail expectations more closely, retail-style SP clipmodel fallback no longer probes entity names, and stock `game/medlabs` map init no longer emits `contains different model`/`no free slots` CM failures.
+- [x] Collision-model lifetime parity now more closely matches retail Quake 4: map teardown drops CM reference counts instead of clearing the entire manager, purges free model geometry in place for slot reuse, and SP/MP map shutdown now purges unreferenced CM data before the next level load.
 - [x] MCC med-bed intro overlay now keeps its retail 128x128 ambient data/static layers tiled at native scale across the expanded GUI canvas, and edge-hugging detail widgets anchor to the appropriate wide/tall screen sides.
 - [x] Main menu placeholder art rotation now uses a randomized montage of eligible loadscreen levelshots, with proper wide/tall expansion-tile composition and slow zoom transitions per shot.
 - [x] Startup/loadscreen placeholder now hands off to the main menu automatically after 3 seconds, main-menu entry transitions use a short black fade-in stretched to native screen extents, and startup logo videos can be skipped with default-on `com_skipLogoVideos 1`.
@@ -100,6 +103,8 @@ Process:
 - [x] Phase 4 repeated-state rendering overhead reduced: SP/MP scene refresh no longer scans all spawned entities every redraw for projectile interpolation, and active entities now skip repeated-state transform/non-model refresh work unless they actually have presentation deltas or interpolation-sensitive auxiliary visuals, recovering a major `agame/airdefense1` FPS regression introduced during the high-refresh work.
 - [x] High-refresh BSE overhead reduced again: repeated-state client effects now keep renderer owner-time on authoritative game ticks instead of wall-clock presentation time, avoiding render-rate ambient effect spawning on maps like `agame/airdefense1`, and renderer effect servicing now runs once per rendered frame instead of repeating per view.
 - [x] Repeated-state client-entity work is now pruned more aggressively in SP/MP: static client models and client effects no longer rerun redraw-time presentation work by default, while bound client entities only stay on the high-refresh path when their owner actually has an interpolated transform delta and client moveables stay there only while their own transform/scale interpolation is active.
+- [x] Collision-model retail parity improved again: `.proc` loading now matches Quake 4's looser version-token behavior, CM precache requests stay on the `.cm`-only path instead of generating render-model collision data, and extension-mismatched authored collision caches (for example `.lwo`/`.ase` names requested through runtime render aliases) now reuse the existing loaded CM without renaming or duplicating cache entries.
+- [x] Level-load filesystem robustness improved: empty-path `ReadFile` probes now resolve as normal missing-file checks instead of raising a fatal dialog, which unblocks stock map startup paths such as `game/airdefense1` and keeps the runtime log alive for any follow-up diagnostics.
 
 ## Carry Forward
 
