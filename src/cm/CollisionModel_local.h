@@ -457,7 +457,7 @@ private:			// CollisionMap_load.cpp
 	void			FindInternalEdges( idCollisionModelLocal *model, cm_node_t *node );
 	void			FindContainedEdges( idCollisionModelLocal *model, cm_polygon_t *p );
 					// loading of proc BSP tree
-	void			ParseProcNodes( idLexer *src );
+	void			ParseProcNodes( Lexer *src );
 	bool			LoadProcBSP( const char *name, unsigned int mapFileCRC );
 					// removal of contained polygons
 	int				R_ChoppedAwayByProcBSP( int nodeNum, idFixedWinding *w, const idVec3 &normal, const idVec3 &origin, const float radius );
@@ -502,6 +502,7 @@ private:			// CollisionMap_load.cpp
 	int				FindModelIndex( const char *name ) const;
 	int				FindAvailableModelIndex( int preferredIndex = -1, bool allowProcClipSlotReuse = false ) const;
 	int				StoreModel( idCollisionModelLocal *model, int preferredIndex = -1, bool allowProcClipSlotReuse = false );
+	void			StoreProcClipModel( idCollisionModelLocal *model );
 	idCollisionModelLocal * FindEquivalentRenderModel( const char *modelName ) const;
 	void			RemapEdges( cm_node_t *node, int *edgeRemap );
 	void			OptimizeArrays( idCollisionModelLocal *model );
@@ -527,12 +528,12 @@ private:			// CollisionMap_files.cpp
 	void			WriteCollisionModel( idFile *fp, idCollisionModelLocal *model );
 	void			WriteCollisionModelsToFile( const char *filename, int firstModel, int lastModel, unsigned int mapFileCRC );
 					// loading
-	cm_node_t *		ParseNodes( idLexer *src, idCollisionModelLocal *model, cm_node_t *parent );
-	void			ParseVertices( idLexer *src, idCollisionModelLocal *model );
-	void			ParseEdges( idLexer *src, idCollisionModelLocal *model );
-	void			ParsePolygons( idLexer *src, idCollisionModelLocal *model );
-	void			ParseBrushes( idLexer *src, idCollisionModelLocal *model );
-	bool			ParseCollisionModel( idLexer *src, const char *fileName, unsigned int mapFileCRC );
+	cm_node_t *		ParseNodes( Lexer *src, idCollisionModelLocal *model, cm_node_t *parent );
+	void			ParseVertices( Lexer *src, idCollisionModelLocal *model );
+	void			ParseEdges( Lexer *src, idCollisionModelLocal *model );
+	void			ParsePolygons( Lexer *src, idCollisionModelLocal *model );
+	void			ParseBrushes( Lexer *src, idCollisionModelLocal *model );
+	bool			ParseCollisionModel( Lexer *src, const char *fileName, unsigned int mapFileCRC );
 	bool			LoadCollisionModelFile( const char *name, unsigned int mapFileCRC );
 
 private:			// CollisionMap_debug

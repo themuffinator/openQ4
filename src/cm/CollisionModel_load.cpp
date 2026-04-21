@@ -49,6 +49,7 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #include "CollisionModel_local.h"
+#include "../idlib/LexerFactory.h"
 
 
 idCollisionModelManagerLocal	collisionModelManagerLocal;
@@ -78,7 +79,7 @@ Proc BSP tree for data pruning
 idCollisionModelManagerLocal::ParseProcNodes
 ================
 */
-void idCollisionModelManagerLocal::ParseProcNodes( idLexer *src ) {
+void idCollisionModelManagerLocal::ParseProcNodes( Lexer *src ) {
 	int i;
 
 	src->ExpectTokenString( "{" );
@@ -265,8 +266,7 @@ void idCollisionModelManagerLocal::CheckProcModelSurfClip( bool isLegacyWorldFil
 		FinishModel( model, false );
 
 		//add our new clipmodel to the list
-		StoreModel( model, PROC_CLIPMODEL_INDEX_START + numInlinedProcClipModels, true );
-		numInlinedProcClipModels++;
+		StoreProcClipModel( model );
 	}
 }
 
@@ -280,27 +280,21 @@ idCollisionModelManagerLocal::LoadProcBSP
 bool idCollisionModelManagerLocal::LoadProcBSP( const char *name, unsigned int mapFileCRC ) {
 	idStr filename;
 	idToken token;
-	idLexer *src;
+	Lexer *src;
 	bool isLegacyWorldFile = false;
 
 	// load it
 	filename = name;
 	filename.SetFileExtension( PROC_FILE_EXT );
-	src = new idLexer( filename, LEXFL_NOSTRINGCONCAT | LEXFL_NODOLLARPRECOMPILE );
+	src = LexerFactory::MakeLexer( filename.c_str(), LEXFL_NOSTRINGCONCAT | LEXFL_NODOLLARPRECOMPILE, false );
 	if ( !src->IsLoaded() ) {
 		common->Warning( "idCollisionModelManagerLocal::LoadProcBSP: couldn't load %s", filename.c_str() );
 		delete src;
 		return false;
 	}
 
-	if ( !src->ReadToken( &token ) ) {
-		common->Printf( "idRenderWorldLocal::InitFromMap: Invalid EOF in world file\n" );
-		delete src;
-		return false;
-	}
-
-	if ( token.Icmp( PROC_FILE_ID ) ) {
-		common->Printf( "idRenderWorldLocal::InitFromMap: bad id '%s' instead of '%s'\n", token.c_str(), PROC_FILE_ID );
+	if ( !src->ReadToken( &token ) || token.Icmp( PROC_FILE_ID ) ) {
+		common->Warning( "idCollisionModelManagerLocal::LoadProcBSP: bad id '%s' instead of '%s'", token.c_str(), PROC_FILE_ID );
 		delete src;
 		return false;
 	}
@@ -319,7 +313,7 @@ bool idCollisionModelManagerLocal::LoadProcBSP( const char *name, unsigned int m
 
 	const unsigned int crc = token.GetUnsignedLongValue();
 	if ( mapFileCRC && crc != mapFileCRC ) {
-		common->Warning( "%s is out of date", filename.c_str() );
+		common->Printf( "%s is out of date\n", filename.c_str() );
 		mapFileTime = static_cast<ID_TIME_T>( -1 );
 	}
 
@@ -772,12 +766,14 @@ idCollisionModelManagerLocal::FreeProcClipModels
 ================
 */
 void idCollisionModelManagerLocal::FreeProcClipModels( void ) {
+	const int maxProcClipIndex = PROC_CLIPMODEL_INDEX_START + numInlinedProcClipModels;
+
 	if ( models == NULL ) {
 		numInlinedProcClipModels = 0;
 		return;
 	}
 
-	for ( int i = PROC_CLIPMODEL_INDEX_START; i < numModels; i++ ) {
+	for ( int i = PROC_CLIPMODEL_INDEX_START; i < Max( numModels, maxProcClipIndex ); i++ ) {
 		idCollisionModelLocal *model = models[i];
 		if ( model == NULL ) {
 			continue;
@@ -3737,6 +3733,33 @@ int idCollisionModelManagerLocal::StoreModel( idCollisionModelLocal *model, int 
 
 /*
 ================
+idCollisionModelManagerLocal::StoreProcClipModel
+================
+*/
+void idCollisionModelManagerLocal::StoreProcClipModel( idCollisionModelLocal *model ) {
+	const int index = PROC_CLIPMODEL_INDEX_START + numInlinedProcClipModels;
+
+	if ( model == NULL ) {
+		return;
+	}
+
+	EnsureModelTable();
+
+	if ( index < 0 || index >= maxModels ) {
+		common->Error( "idCollisionModelManagerLocal::StoreProcClipModel: no free slots" );
+		return;
+	}
+
+	if ( models[index] != NULL && models[index] != model ) {
+		DestroyModel( models[index] );
+	}
+
+	models[index] = model;
+	numInlinedProcClipModels++;
+}
+
+/*
+================
 idCollisionModelManagerLocal::FindModel
 ================
 */
@@ -4029,6 +4052,9 @@ void idCollisionModelManagerLocal::BuildModels( const idMapFile *mapFile, bool f
 			idCollisionModelLocal *collisionModel = CollisionModelForMapEntity( mapFile, mapEnt );
 			if ( collisionModel != NULL ) {
 				StoreModel( collisionModel, i == 0 ? 0 : -1 );
+				if ( numInlinedProcClipModels > 0 && numModels == PROC_CLIPMODEL_INDEX_START ) {
+					numModels += numInlinedProcClipModels;
+				}
 			}
 		}
 

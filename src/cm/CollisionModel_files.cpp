@@ -38,6 +38,7 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #include "CollisionModel_local.h"
+#include "../idlib/LexerFactory.h"
 
 #define CM_FILE_EXT			"cm"
 #define CM_FILEID			"CM"
@@ -283,8 +284,7 @@ void idCollisionModelManagerLocal::WriteCollisionModelsToFile( const char *filen
 			continue;
 		}
 		if ( !IsRenderModelName( filename ) &&
-			 idStr::IcmpnPath( models[ i ]->name.c_str(), mask.c_str(), mask.Length() ) != 0 &&
-			 models[ i ]->name.Cmpn( PROC_CLIPMODEL_STRING_PRFX, strlen( PROC_CLIPMODEL_STRING_PRFX ) ) != 0 ) {
+			 idStr::IcmpnPath( models[ i ]->name.c_str(), mask.c_str(), mask.Length() ) != 0 ) {
 			continue;
 		}
 		WriteCollisionModel( fp, models[ i ] );
@@ -352,7 +352,7 @@ Loading of collision model file
 idCollisionModelManagerLocal::ParseVertices
 ================
 */
-void idCollisionModelManagerLocal::ParseVertices( idLexer *src, idCollisionModelLocal *model ) {
+void idCollisionModelManagerLocal::ParseVertices( Lexer *src, idCollisionModelLocal *model ) {
 	int i;
 
 	src->ExpectTokenString( "{" );
@@ -373,7 +373,7 @@ void idCollisionModelManagerLocal::ParseVertices( idLexer *src, idCollisionModel
 idCollisionModelManagerLocal::ParseEdges
 ================
 */
-void idCollisionModelManagerLocal::ParseEdges( idLexer *src, idCollisionModelLocal *model ) {
+void idCollisionModelManagerLocal::ParseEdges( Lexer *src, idCollisionModelLocal *model ) {
 	int i;
 
 	src->ExpectTokenString( "{" );
@@ -401,7 +401,7 @@ void idCollisionModelManagerLocal::ParseEdges( idLexer *src, idCollisionModelLoc
 idCollisionModelManagerLocal::ParseNodes
 ================
 */
-cm_node_t *idCollisionModelManagerLocal::ParseNodes( idLexer *src, idCollisionModelLocal *model, cm_node_t *parent ) {
+cm_node_t *idCollisionModelManagerLocal::ParseNodes( Lexer *src, idCollisionModelLocal *model, cm_node_t *parent ) {
 	cm_node_t *node;
 
 	model->numNodes++;
@@ -425,7 +425,7 @@ cm_node_t *idCollisionModelManagerLocal::ParseNodes( idLexer *src, idCollisionMo
 idCollisionModelManagerLocal::ParsePolygons
 ================
 */
-void idCollisionModelManagerLocal::ParsePolygons( idLexer *src, idCollisionModelLocal *model ) {
+void idCollisionModelManagerLocal::ParsePolygons( Lexer *src, idCollisionModelLocal *model ) {
 	cm_polygon_t *p;
 	int i, numEdges;
 	idVec3 normal;
@@ -498,7 +498,7 @@ void idCollisionModelManagerLocal::ParsePolygons( idLexer *src, idCollisionModel
 idCollisionModelManagerLocal::ParseBrushes
 ================
 */
-void idCollisionModelManagerLocal::ParseBrushes( idLexer *src, idCollisionModelLocal *model ) {
+void idCollisionModelManagerLocal::ParseBrushes( Lexer *src, idCollisionModelLocal *model ) {
 	cm_brush_t *b;
 	int i, numPlanes;
 	idVec3 normal;
@@ -568,7 +568,7 @@ void idCollisionModelManagerLocal::ParseBrushes( idLexer *src, idCollisionModelL
 idCollisionModelManagerLocal::ParseCollisionModel
 ================
 */
-bool idCollisionModelManagerLocal::ParseCollisionModel( idLexer *src, const char *fileName, unsigned int mapFileCRC ) {
+bool idCollisionModelManagerLocal::ParseCollisionModel( Lexer *src, const char *fileName, unsigned int mapFileCRC ) {
 	idCollisionModelLocal *model;
 	idToken token;
 	idStr fullModelName;
@@ -673,60 +673,33 @@ idCollisionModelManagerLocal::LoadCollisionModelFile
 bool idCollisionModelManagerLocal::LoadCollisionModelFile( const char *name, unsigned int mapFileCRC ) {
 	idStr fileName;
 	idToken token;
-	idLexer *src;
-	idFile *pakFile;
-	char *pakBuffer;
+	Lexer *src;
 	unsigned int crc;
 
 	// load it
 	fileName = name;
 	fileName.SetFileExtension( CM_FILE_EXT );
-	pakFile = fileSystem->OpenFileReadFromPak( fileName, false );
-	pakBuffer = NULL;
-	if ( pakFile != NULL ) {
-		const int length = pakFile->Length();
-		pakBuffer = (char *) Mem_Alloc( length + 1 );
-		if ( pakFile->Read( pakBuffer, length ) != length ) {
-			fileSystem->CloseFile( pakFile );
-			Mem_Free( pakBuffer );
-			common->Warning( "Failed to read packed collision model %s", fileName.c_str() );
-			return false;
-		}
-		pakBuffer[ length ] = '\0';
-		fileSystem->CloseFile( pakFile );
-		src = new idLexer( pakBuffer, length, fileName, LEXFL_NOSTRINGCONCAT | LEXFL_NODOLLARPRECOMPILE );
-	} else {
-		src = new idLexer( fileName, LEXFL_NOSTRINGCONCAT | LEXFL_NODOLLARPRECOMPILE );
-		if ( !src->IsLoaded() ) {
-			delete src;
-			return false;
-		}
+	src = LexerFactory::MakeLexer( fileName.c_str(), LEXFL_NOSTRINGCONCAT | LEXFL_NODOLLARPRECOMPILE, false );
+	if ( !src->IsLoaded() ) {
+		delete src;
+		return false;
 	}
 
 	if ( !src->ExpectTokenString( CM_FILEID ) ) {
 		common->Warning( "%s is not an CM file.", fileName.c_str() );
 		delete src;
-		if ( pakBuffer != NULL ) {
-			Mem_Free( pakBuffer );
-		}
 		return false;
 	}
 
 	if ( !src->ReadToken( &token ) || ( token != CM_FILEVERSION && token.Icmp( "3" ) != 0 && token.Icmp( "3.00" ) != 0 ) ) {
 		common->Warning( "%s has version %s instead of %s", fileName.c_str(), token.c_str(), CM_FILEVERSION );
 		delete src;
-		if ( pakBuffer != NULL ) {
-			Mem_Free( pakBuffer );
-		}
 		return false;
 	}
 
 	if ( !src->ExpectTokenType( TT_NUMBER, TT_INTEGER, &token ) ) {
 		common->Warning( "%s has no map file CRC", fileName.c_str() );
 		delete src;
-		if ( pakBuffer != NULL ) {
-			Mem_Free( pakBuffer );
-		}
 		return false;
 	}
 
@@ -734,9 +707,6 @@ bool idCollisionModelManagerLocal::LoadCollisionModelFile( const char *name, uns
 	if ( mapFileCRC && crc != mapFileCRC ) {
 		common->Printf( "%s is out of date\n", fileName.c_str() );
 		delete src;
-		if ( pakBuffer != NULL ) {
-			Mem_Free( pakBuffer );
-		}
 		return false;
 	}
 
@@ -749,9 +719,6 @@ bool idCollisionModelManagerLocal::LoadCollisionModelFile( const char *name, uns
 		if ( token == "collisionModel" ) {
 			if ( !ParseCollisionModel( src, name, mapFileCRC ) ) {
 				delete src;
-				if ( pakBuffer != NULL ) {
-					Mem_Free( pakBuffer );
-				}
 				return false;
 			}
 			continue;
@@ -761,9 +728,5 @@ bool idCollisionModelManagerLocal::LoadCollisionModelFile( const char *name, uns
 	}
 
 	delete src;
-	if ( pakBuffer != NULL ) {
-		Mem_Free( pakBuffer );
-	}
-
 	return true;
 }
