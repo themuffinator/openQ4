@@ -1113,7 +1113,11 @@ void R_AddLightSurfaces( void ) {
 			}
 
 			srfTriangles_t	*tri = light->parms.prelightModel->Surface( 0 )->geometry;
+#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
+			if ( !tri->shadowVertexes && tri->primBatchMesh == NULL ) {
+#else
 			if ( !tri->shadowVertexes ) {
+#endif
 				common->Error( "R_AddLightSurfaces: prelight model '%s' without shadowVertexes", light->parms.prelightModel->Name() );
 			}
 
@@ -1124,23 +1128,30 @@ void R_AddLightSurfaces( void ) {
 				}
 			}
 
-			// if we have been purged, re-upload the shadowVertexes
-			if ( !tri->shadowCache ) {
-				R_CreatePrivateShadowCache( tri );
+			// Classic prelight shadows upload explicit shadow verts/indexes here.
+			// Packed MD5R prelight meshes keep those resources inside the prim-batch
+			// representation and bypass the legacy cache path.
+#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
+			if ( tri->primBatchMesh == NULL ) {
+#endif
 				if ( !tri->shadowCache ) {
-					continue;
+					R_CreatePrivateShadowCache( tri );
+					if ( !tri->shadowCache ) {
+						continue;
+					}
 				}
-			}
 
-			// touch the shadow surface so it won't get purged
-			vertexCache.Touch( tri->shadowCache );
+				vertexCache.Touch( tri->shadowCache );
 
-			if ( !tri->indexCache && r_useIndexBuffers.GetBool() && tri->numIndexes > 0 ) {
-				vertexCache.Alloc( tri->indexes, tri->numIndexes * sizeof( tri->indexes[0] ), &tri->indexCache, true );
+				if ( !tri->indexCache && r_useIndexBuffers.GetBool() && tri->numIndexes > 0 ) {
+					vertexCache.Alloc( tri->indexes, tri->numIndexes * sizeof( tri->indexes[0] ), &tri->indexCache, true );
+				}
+				if ( tri->indexCache ) {
+					vertexCache.Touch( tri->indexCache );
+				}
+#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
 			}
-			if ( tri->indexCache ) {
-				vertexCache.Touch( tri->indexCache );
-			}
+#endif
 
 			R_LinkLightSurf( &vLight->globalShadows, tri, NULL, light, NULL, vLight->scissorRect, true /* FIXME? */ );
 		}
@@ -1506,45 +1517,58 @@ static void R_AddAmbientDrawsurfs( viewEntity_t *vEntity ) {
 		}
 
 		// debugging tool to make sure we are have the correct pre-calculated bounds
-		if ( r_checkBounds.GetBool() ) {
-			int j, k;
-			for ( j = 0 ; j < tri->numVerts ; j++ ) {
-				for ( k = 0 ; k < 3 ; k++ ) {
-					if ( tri->verts[j].xyz[k] > tri->bounds[1][k] + CHECK_BOUNDS_EPSILON
-						|| tri->verts[j].xyz[k] < tri->bounds[0][k] - CHECK_BOUNDS_EPSILON ) {
-						common->Printf( "bad tri->bounds on %s:%s\n", def->parms.hModel->Name(), shader->GetName() );
+#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
+		if ( tri->primBatchMesh == NULL ) {
+#endif
+			if ( r_checkBounds.GetBool() ) {
+				int j, k;
+				for ( j = 0 ; j < tri->numVerts ; j++ ) {
+					for ( k = 0 ; k < 3 ; k++ ) {
+						if ( tri->verts[j].xyz[k] > tri->bounds[1][k] + CHECK_BOUNDS_EPSILON
+							|| tri->verts[j].xyz[k] < tri->bounds[0][k] - CHECK_BOUNDS_EPSILON ) {
+							common->Printf( "bad tri->bounds on %s:%s\n", def->parms.hModel->Name(), shader->GetName() );
+							break;
+						}
+						if ( tri->verts[j].xyz[k] > def->referenceBounds[1][k] + CHECK_BOUNDS_EPSILON
+							|| tri->verts[j].xyz[k] < def->referenceBounds[0][k] - CHECK_BOUNDS_EPSILON ) {
+							common->Printf( "bad referenceBounds on %s:%s\n", def->parms.hModel->Name(), shader->GetName() );
+							break;
+						}
+					}
+					if ( k != 3 ) {
 						break;
 					}
-					if ( tri->verts[j].xyz[k] > def->referenceBounds[1][k] + CHECK_BOUNDS_EPSILON
-						|| tri->verts[j].xyz[k] < def->referenceBounds[0][k] - CHECK_BOUNDS_EPSILON ) {
-						common->Printf( "bad referenceBounds on %s:%s\n", def->parms.hModel->Name(), shader->GetName() );
-						break;
-					}
-				}
-				if ( k != 3 ) {
-					break;
 				}
 			}
+#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
 		}
+#endif
 
 		if ( R_ShouldDisableEntityCullingForLevelshot() || !R_CullLocalBox( tri->bounds, vEntity->modelMatrix, 5, tr.viewDef->frustum ) ) {
 
 			def->visibleCount = tr.viewCount;
 
-			// make sure we have an ambient cache
-			if ( !R_CreateAmbientCache( tri, shader->ReceivesLighting() ) ) {
-				// don't add anything if the vertex cache was too full to give us an ambient cache
-				return;
-			}
-			// touch it so it won't get purged
-			vertexCache.Touch( tri->ambientCache );
+			// Classic surfaces still need ambient/index cache allocation before
+			// draw-surf submission. Packed MD5R surfaces keep that ownership in
+			// rvMesh and skip this materialization step entirely.
+#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
+			if ( tri->primBatchMesh == NULL ) {
+#endif
+				if ( !R_CreateAmbientCache( tri, shader->ReceivesLighting() ) ) {
+					// don't add anything if the vertex cache was too full to give us an ambient cache
+					return;
+				}
+				vertexCache.Touch( tri->ambientCache );
 
-			if ( r_useIndexBuffers.GetBool() && !tri->indexCache && tri->numIndexes > 0 ) {
-				vertexCache.Alloc( tri->indexes, tri->numIndexes * sizeof( tri->indexes[0] ), &tri->indexCache, true );
+				if ( r_useIndexBuffers.GetBool() && !tri->indexCache && tri->numIndexes > 0 ) {
+					vertexCache.Alloc( tri->indexes, tri->numIndexes * sizeof( tri->indexes[0] ), &tri->indexCache, true );
+				}
+				if ( tri->indexCache ) {
+					vertexCache.Touch( tri->indexCache );
+				}
+#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
 			}
-			if ( tri->indexCache ) {
-				vertexCache.Touch( tri->indexCache );
-			}
+#endif
 
 			// add the surface for drawing
 			R_AddDrawSurf( tri, vEntity, &vEntity->entityDef->parms, shader, vEntity->scissorRect );
@@ -1799,11 +1823,19 @@ void R_AddEffectSurfaces(void) {
 				continue;
 			}
 
-			if (!R_CreateAmbientCache(tri, shader->ReceivesLighting())) {
-				++surfaceCacheFail;
-				continue;
+			// Like ambient model submission, packed surfaces keep their draw data in
+			// rvMesh and do not need a transient classic ambient cache.
+#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
+			if ( tri->primBatchMesh == NULL ) {
+#endif
+				if (!R_CreateAmbientCache(tri, shader->ReceivesLighting())) {
+					++surfaceCacheFail;
+					continue;
+				}
+				vertexCache.Touch(tri->ambientCache);
+#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
 			}
-			vertexCache.Touch(tri->ambientCache);
+#endif
 
 			// BSE dynamic surfaces rebuild index data every frame; keep them on the CPU index path.
 			tri->indexCache = NULL;
