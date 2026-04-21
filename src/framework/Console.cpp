@@ -82,6 +82,8 @@ public:
 	virtual	bool		Active( void );
 	virtual	void		ClearNotifyLines( void );
 	virtual	void		Close( void );
+	virtual void		SetProcFileOutOfDate( bool state );
+	virtual void		SetAASFileOutOfDate( bool state );
 	virtual	void		SetMousePosition( float x, float y );
 	virtual void		ClampMousePosition( float &x, float &y ) const;
 	virtual	void		Print( const char *text );
@@ -233,6 +235,8 @@ private:
 	//============================
 
 	bool				keyCatching;
+	bool				procFileOutOfDate;
+	bool				aasFileOutOfDate;
 
 	short				text[CON_TEXTSIZE];
 	int					current;		// line where next message will be printed
@@ -1259,6 +1263,8 @@ void idConsoleLocal::Init( void ) {
 	int		i;
 
 	keyCatching = false;
+	procFileOutOfDate = false;
+	aasFileOutOfDate = false;
 
 	lastKeyEvent = -1;
 	nextKeyEvent = CONSOLE_FIRSTREPEAT;
@@ -1404,6 +1410,24 @@ void	idConsoleLocal::Close() {
 	ClearTextDragState();
 	InvalidateCompletionState();
 	ClearNotifyLines();
+}
+
+/*
+================
+idConsoleLocal::SetProcFileOutOfDate
+================
+*/
+void idConsoleLocal::SetProcFileOutOfDate( bool state ) {
+	procFileOutOfDate = state;
+}
+
+/*
+================
+idConsoleLocal::SetAASFileOutOfDate
+================
+*/
+void idConsoleLocal::SetAASFileOutOfDate( bool state ) {
+	aasFileOutOfDate = state;
 }
 
 /*
@@ -4774,5 +4798,13 @@ void	idConsoleLocal::Draw( bool forceFullScreen ) {
 
 	if ( com_showSoundDecoders.GetBool() ) {
 		y = SCR_DrawSoundDecoders( y );
+	}
+
+	if ( procFileOutOfDate ) {
+		SCR_DrawTextRightAlign( y, "PROC" );
+	}
+
+	if ( !idAsyncNetwork::client.IsActive() && !idAsyncNetwork::server.IsActive() && aasFileOutOfDate ) {
+		SCR_DrawTextRightAlign( y, "AAS" );
 	}
 }

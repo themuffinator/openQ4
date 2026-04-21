@@ -3570,6 +3570,7 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 
 	// shut down the existing game if it is running
 	UnloadMap();
+	console->SetProcFileOutOfDate( false );
 
 	// don't do the deferred caching if we are reloading the same map
 	if ( fullMapName == currentMapName ) {

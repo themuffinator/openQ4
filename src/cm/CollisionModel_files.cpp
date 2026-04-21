@@ -291,6 +291,10 @@ void idCollisionModelManagerLocal::WriteCollisionModelsToFile( const char *filen
 	}
 
 	fileSystem->CloseFile( fp );
+
+	if ( cvarSystem->GetCVarInteger( "com_BinaryWrite" ) ) {
+		idLexer::WriteBinaryFile( name.c_str() );
+	}
 }
 
 /*
@@ -311,7 +315,7 @@ bool idCollisionModelManagerLocal::WriteCollisionModelForMapEntity( const idMapE
 	name.SetFileExtension( CM_FILE_EXT );
 
 	common->Printf( "writing %s\n", name.c_str() );
-	fp = fileSystem->OpenFileWrite( name, "fs_cdpath" );
+	fp = fileSystem->OpenFileWrite( name, "fs_devpath" );
 	if ( !fp ) {
 		common->Printf( "idCollisionModelManagerLocal::WriteCollisionModelForMapEntity: Error opening file %s\n", name.c_str() );
 		FreeModel( model );
@@ -327,6 +331,10 @@ bool idCollisionModelManagerLocal::WriteCollisionModelForMapEntity( const idMapE
 	WriteCollisionModel( fp, model );
 
 	fileSystem->CloseFile( fp );
+
+	if ( cvarSystem->GetCVarInteger( "com_BinaryWrite" ) ) {
+		idLexer::WriteBinaryFile( name.c_str() );
+	}
 
 	if ( testTraceModel ) {
 		idTraceModel trm;

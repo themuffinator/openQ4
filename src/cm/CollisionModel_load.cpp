@@ -314,6 +314,7 @@ bool idCollisionModelManagerLocal::LoadProcBSP( const char *name, unsigned int m
 	const unsigned int crc = token.GetUnsignedLongValue();
 	if ( mapFileCRC && crc != mapFileCRC ) {
 		common->Printf( "%s is out of date\n", filename.c_str() );
+		console->SetProcFileOutOfDate( true );
 		mapFileTime = static_cast<ID_TIME_T>( -1 );
 	}
 
@@ -4032,6 +4033,7 @@ void idCollisionModelManagerLocal::BuildModels( const idMapFile *mapFile, bool f
 
 	idTimer timer;
 	timer.Start();
+	session->PacifierUpdate();
 
 	if (forceCreateMap || !LoadCollisionModelFile( mapFile->GetName(), mapFile->GetGeometryCRC() ) ) {
 
@@ -4041,7 +4043,7 @@ void idCollisionModelManagerLocal::BuildModels( const idMapFile *mapFile, bool f
 
 		// load the .proc file bsp for data optimisation
 		if ( !LoadProcBSP( mapFile->GetName(), mapFile->GetGeometryCRC() ) ) {
-			common->Warning( "Failed to load .PROC file for %s", mapFile->GetName() );
+			common->FatalError( "Failed to load .PROC file for %s", mapFile->GetName() );
 			return;
 		}
 
@@ -4065,6 +4067,8 @@ void idCollisionModelManagerLocal::BuildModels( const idMapFile *mapFile, bool f
 		// write the collision models to a file
 		WriteCollisionModelsToFile( mapFile->GetName(), 0, numModels, mapFile->GetGeometryCRC() );
 	}
+
+	session->PacifierUpdate();
 
 	timer.Stop();
 
