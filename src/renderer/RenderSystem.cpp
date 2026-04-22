@@ -29,6 +29,7 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #include "tr_local.h"
+#include "Model_local.h"
 #include "smaa/AreaTex.h"
 #include "smaa/SearchTex.h"
 
@@ -51,13 +52,18 @@ bool R_IsMD5RRuntimeAvailable( void ) {
 /*
 =======================
 R_IsMD5RWriteAvailable
+
+OpenQ4's text/binary MD5R model writer is now implemented in the parser-backed
+rvRenderModelMD5R path, so it no longer depends on the original retail
+_MD5R_WRITE_SUPPORT macro. Proc-world export still warns until the separate
+MD5RProc writer is ported, but the command itself is a valid capability again.
 =======================
 */
 bool R_IsMD5RWriteAvailable( void ) {
-#if defined( _MD5R_SUPPORT ) && defined( _MD5R_WRITE_SUPPORT )
-	return true;
-#else
+#if defined( Q4SDK )
 	return false;
+#else
+	return true;
 #endif
 }
 
@@ -95,7 +101,7 @@ void idRenderSystemLocal::ExportMD5R( bool compressed ) {
 		worlds[i]->WriteMD5R( compressed );
 	}
 
-	common->Warning( "idRenderSystemLocal::ExportMD5R: MD5R model export via rvRenderModelMD5R::WriteAll is not implemented in OpenQ4 yet" );
+	rvRenderModelMD5R::WriteAll( compressed );
 }
 
 #ifdef Q4SDK_MD5R
@@ -105,7 +111,13 @@ idRenderSystemLocal::CopyPrimBatchTriangles
 ===========================================
 */
 void idRenderSystemLocal::CopyPrimBatchTriangles( idDrawVert *destDrawVerts, glIndex_t *destIndices, void *primBatchMesh, void *silTraceVerts ) {
-	common->Error( "idRenderSystemLocal::CopyPrimBatchTriangles: packed MD5R prim-batch extraction is not available in this build" );
+	if ( !R_MD5R_CopyPrimBatchTriangles(
+		destDrawVerts,
+		destIndices,
+		reinterpret_cast<const rvMesh *>( primBatchMesh ),
+		reinterpret_cast<const rvSilTraceVertT *>( silTraceVerts ) ) ) {
+		common->Error( "idRenderSystemLocal::CopyPrimBatchTriangles: invalid packed MD5R prim-batch mesh state" );
+	}
 }
 #else
 #if defined( _MD5R_SUPPORT )
@@ -115,7 +127,9 @@ idRenderSystemLocal::CopyPrimBatchTriangles
 ===========================================
 */
 void idRenderSystemLocal::CopyPrimBatchTriangles( idDrawVert *destDrawVerts, glIndex_t *destIndices, rvMesh *primBatchMesh, const rvSilTraceVertT *silTraceVerts ) {
-	common->Error( "idRenderSystemLocal::CopyPrimBatchTriangles: packed MD5R prim-batch extraction is not available in this build" );
+	if ( !R_MD5R_CopyPrimBatchTriangles( destDrawVerts, destIndices, primBatchMesh, silTraceVerts ) ) {
+		common->Error( "idRenderSystemLocal::CopyPrimBatchTriangles: invalid packed MD5R prim-batch mesh state" );
+	}
 }
 #endif
 #endif

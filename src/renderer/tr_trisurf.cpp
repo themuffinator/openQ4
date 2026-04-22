@@ -366,12 +366,6 @@ R_FreeStaticTriSurfVertexCaches
 ==============
 */
 void R_FreeStaticTriSurfVertexCaches( srfTriangles_t *tri ) {
-#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
-	if ( tri->primBatchMesh != NULL ) {
-		tri->primBatchMesh = NULL;
-		tri->silEdges = NULL;
-	} else
-#endif
 	if ( tri->ambientSurface == NULL ) {
 		// this is a real model surface
 		vertexCache.Free( tri->ambientCache );

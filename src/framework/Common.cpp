@@ -2762,8 +2762,8 @@ void idCommonLocal::InitCommands( void ) {
 #endif
 
 	cmdSystem->AddCommand( "printMemInfo", PrintMemInfo_f, CMD_FL_SYSTEM, "prints memory debugging data" );
-	cmdSystem->AddCommand( "exportMD5R", Com_Export_MD5R_f, CMD_FL_SYSTEM, "exports all converted MD5R models when support is available" );
-	cmdSystem->AddCommand( "exportCmpMD5R", Com_Export_Cmp_MD5R_f, CMD_FL_SYSTEM, "exports all converted MD5R models in compressed form when support is available" );
+	cmdSystem->AddCommand( "exportMD5R", Com_Export_MD5R_f, CMD_FL_SYSTEM, "exports all supported loaded MD5R models when support is available" );
+	cmdSystem->AddCommand( "exportCmpMD5R", Com_Export_Cmp_MD5R_f, CMD_FL_SYSTEM, "exports all supported loaded MD5R models in compressed form when support is available" );
 
 	// idLib commands
 	cmdSystem->AddCommand( "memoryDump", Mem_Dump_f, CMD_FL_SYSTEM|CMD_FL_CHEAT, "creates a memory dump" );

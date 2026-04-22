@@ -1308,9 +1308,9 @@ void idInteraction::AddActiveInteraction( void ) {
 					srfTriangles_t *ambientTris = sint->ambientTris;
 					bool canAddLightSurf = true;
 
-#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
-					if ( ambientTris->primBatchMesh == NULL ) {
-#endif
+					if ( ambientTris->verts == NULL ) {
+						canAddLightSurf = false;
+					} else {
 						if ( !ambientTris->ambientCache ) {
 							if ( !R_CreateAmbientCache( ambientTris, sint->shader->ReceivesLighting() ) ) {
 								canAddLightSurf = false;
@@ -1334,7 +1334,7 @@ void idInteraction::AddActiveInteraction( void ) {
 								vertexCache.Touch( lightTris->lightingCache );
 							}
 
-							if ( !lightTris->indexCache && r_useIndexBuffers.GetBool() && lightTris->numIndexes > 0 ) {
+							if ( !lightTris->indexCache && r_useIndexBuffers.GetBool() && lightTris->indexes != NULL && lightTris->numIndexes > 0 ) {
 								vertexCache.Alloc(
 									lightTris->indexes,
 									lightTris->numIndexes * sizeof( lightTris->indexes[0] ),
@@ -1345,9 +1345,7 @@ void idInteraction::AddActiveInteraction( void ) {
 								vertexCache.Touch( lightTris->indexCache );
 							}
 						}
-#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
 					}
-#endif
 
 					if ( !canAddLightSurf ) {
 						// skip if we were out of vertex memory

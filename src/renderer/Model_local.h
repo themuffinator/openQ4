@@ -266,8 +266,12 @@ struct rvMD5RLevelOfDetail {
 	idList<int>					meshIndexes;
 };
 
+class rvRenderModelMD5R;
+class rvSilTraceVertT;
+
 struct rvMD5RMesh {
 								rvMD5RMesh() :
+									renderModel( NULL ),
 									material( NULL ),
 									levelOfDetail( -1 ),
 									surfaceNum( -1 ),
@@ -285,10 +289,12 @@ struct rvMD5RMesh {
 									numDrawVertices( 0 ),
 									numDrawIndices( 0 ),
 									numDrawPrimitives( 0 ),
-									numTransforms( 0 ) {
+									numTransforms( 0 ),
+									deformInfo( NULL ) {
 									bounds.Clear();
 								}
 
+	rvRenderModelMD5R *			renderModel;
 	const idMaterial *			material;
 	idStr						materialName;
 	idBounds					bounds;
@@ -310,6 +316,64 @@ struct rvMD5RMesh {
 	int							numDrawPrimitives;
 	int							numTransforms;
 	idList<rvMD5RPrimBatch>		primBatches;
+	struct deformInfo_s *		deformInfo;
+	idList<idDrawVert>			baseDrawVerts;
+};
+
+struct rvMD5RVertexFormatDesc {
+								rvMD5RVertexFormatDesc() :
+									hasPosition( false ),
+									positionSwizzled( false ),
+									positionDim( 0 ),
+									positionTokenType( 0 ),
+									hasBlendIndex( false ),
+									blendIndexTokenType( 0 ),
+									hasBlendWeight( false ),
+									blendWeightDim( 0 ),
+									blendWeightTransformCount( 0 ),
+									blendWeightTokenType( 0 ),
+									hasNormal( false ),
+									normalTokenType( 0 ),
+									hasTangent( false ),
+									tangentTokenType( 0 ),
+									hasBinormal( false ),
+									binormalTokenType( 0 ),
+									hasDiffuseColor( false ),
+									diffuseColorTokenType( 0 ),
+									hasSpecularColor( false ),
+									specularColorTokenType( 0 ),
+									hasPointSize( false ),
+									pointSizeTokenType( 0 ) {
+									memset( hasTexCoord, 0, sizeof( hasTexCoord ) );
+									memset( texCoordDim, 0, sizeof( texCoordDim ) );
+									memset( texCoordTokenType, 0, sizeof( texCoordTokenType ) );
+								}
+
+	bool						hasPosition;
+	bool						positionSwizzled;
+	int							positionDim;
+	int							positionTokenType;
+	bool						hasBlendIndex;
+	int							blendIndexTokenType;
+	bool						hasBlendWeight;
+	int							blendWeightDim;
+	int							blendWeightTransformCount;
+	int							blendWeightTokenType;
+	bool						hasNormal;
+	int							normalTokenType;
+	bool						hasTangent;
+	int							tangentTokenType;
+	bool						hasBinormal;
+	int							binormalTokenType;
+	bool						hasDiffuseColor;
+	int							diffuseColorTokenType;
+	bool						hasSpecularColor;
+	int							specularColorTokenType;
+	bool						hasPointSize;
+	int							pointSizeTokenType;
+	bool						hasTexCoord[7];
+	int							texCoordDim[7];
+	int							texCoordTokenType[7];
 };
 
 struct rvMD5RVertexBufferDesc {
@@ -328,6 +392,16 @@ struct rvMD5RVertexBufferDesc {
 	bool						soA;
 	bool						hasVertexFormat;
 	bool						hasLoadVertexFormat;
+	rvMD5RVertexFormatDesc		vertexFormat;
+	rvMD5RVertexFormatDesc		loadVertexFormat;
+	idList<idVec4>				positions;
+	idList<dword>				blendIndices;
+	idList<idVec4>				blendWeights;
+	idList<idVec3>				normals;
+	idList<idVec3>				tangents;
+	idList<idVec3>				binormals;
+	idList<idVec4>				texCoords[7];
+	idList<dword>				diffuseColors;
 };
 
 struct rvMD5RIndexBufferDesc {
@@ -342,7 +416,12 @@ struct rvMD5RIndexBufferDesc {
 	int							bitDepth;
 	bool						systemMemory;
 	bool						videoMemory;
+	idList<glIndex_t>			indices;
 };
+
+#if defined( _MD5R_SUPPORT )
+bool							R_MD5R_CopyPrimBatchTriangles( idDrawVert *destDrawVerts, glIndex_t *destIndices, const rvMesh *primBatchMesh, const rvSilTraceVertT *silTraceVerts );
+#endif
 
 class rvRenderModelMD5R : public idRenderModelStatic {
 public:
@@ -352,17 +431,42 @@ public:
 	virtual void				InitFromFile( const char *fileName );
 	virtual void				LoadModel();
 	virtual void				PurgeModel();
+	virtual void				Print() const;
+	virtual void				List() const;
+	virtual void				TouchData();
 	virtual dynamicModel_t		IsDynamicModel() const;
 	virtual idBounds			Bounds( const struct renderEntity_s *ent ) const;
+	virtual bool				HasCollisionSurface( const struct renderEntity_s *ent ) const;
+	virtual idRenderModel *		InstantiateDynamicModel( const struct renderEntity_s *ent, const struct viewDef_s *view, idRenderModel *cachedModel );
+	virtual idRenderModel *		InstantiateDynamicModel( const struct renderEntity_s *ent, const struct viewDef_s *view, idRenderModel *cachedModel, dword surfMask );
 	virtual int					NumJoints( void ) const;
 	virtual const idMD5Joint *	GetJoints( void ) const;
+	virtual jointHandle_t		GetJointHandle( const char *name ) const;
+	virtual const char *		GetJointName( jointHandle_t handle ) const;
 	virtual const idJointQuat *	GetDefaultPose( void ) const;
 	virtual const idJointMat *	GetSkinSpaceToLocalMats( void ) const;
+	virtual int					GetSurfaceMask( const char *surface ) const;
 	virtual int					Memory() const;
 
 	static void					WriteAll( bool compressed );
 
 private:
+	idStr						BuildExportFileName() const;
+	bool						CanWriteModelData( idStr &reason ) const;
+	bool						WriteFile( const char *fileName, bool compressed ) const;
+	void						WriteModel( idFile &outFile ) const;
+	void						WriteVertexFormat( idFile &outFile, const rvMD5RVertexFormatDesc &vertexFormat, const char *prepend ) const;
+	void						WriteVertexBuffer( idFile &outFile, const rvMD5RVertexBufferDesc &vertexBuffer, const char *prepend ) const;
+	void						WriteVertexBuffers( idFile &outFile, const char *prepend ) const;
+	void						WriteIndexBuffer( idFile &outFile, const rvMD5RIndexBufferDesc &indexBuffer, const char *prepend ) const;
+	void						WriteIndexBuffers( idFile &outFile, const char *prepend ) const;
+	void						WriteSilhouetteEdges( idFile &outFile, const char *prepend ) const;
+	void						WriteLevelsOfDetail( idFile &outFile, const char *prepend ) const;
+	void						WritePrimBatch( idFile &outFile, const rvMD5RPrimBatch &primBatch, const char *prepend ) const;
+	void						WriteMesh( idFile &outFile, const rvMD5RMesh &mesh, const char *prepend ) const;
+	void						WriteMeshes( idFile &outFile, const char *prepend ) const;
+	void						WriteJoints( idFile &outFile, const char *prepend ) const;
+	void						ParseVertexFormat( Lexer &parser, rvMD5RVertexFormatDesc &vertexFormat );
 	void						ParseVertexBuffers( Lexer &parser );
 	void						ParseVertexBuffer( Lexer &parser, rvMD5RVertexBufferDesc &vertexBuffer );
 	void						ParseIndexBuffers( Lexer &parser );
@@ -375,6 +479,15 @@ private:
 	void						ParseJoints( Lexer &parser );
 	void						ParseJoint( Lexer &parser, int jointIndex, idJointQuat &worldPose );
 	void						BuildLevelsOfDetail();
+	bool						BuildDynamicMeshTemplate( rvMD5RMesh &mesh );
+	bool						UpdateDynamicSurface( const rvMD5RMesh &mesh, const idJointMat *entJoints, modelSurface_t &surface, bool calculateTangents ) const;
+	bool						GenerateDynamicSurface( idRenderModelStatic &staticModel, rvMD5RMesh &mesh, const renderEntity_s &ent, const idJointMat *entJoints, dword surfMask );
+	bool						CopyPrimBatchTriangles( const rvMD5RMesh &mesh, idDrawVert *destDrawVerts, glIndex_t *destIndices, const rvSilTraceVertT *silTraceVerts ) const;
+	bool						GenerateStaticSurfaces();
+	srfTriangles_t *			GenerateStaticTriSurface( const rvMD5RMesh &mesh ) const;
+#if defined( _MD5R_SUPPORT )
+	friend bool					R_MD5R_CopyPrimBatchTriangles( idDrawVert *destDrawVerts, glIndex_t *destIndices, const rvMesh *primBatchMesh, const rvSilTraceVertT *silTraceVerts );
+#endif
 	static void					RemoveFromList( rvRenderModelMD5R &model );
 
 	idList<rvMD5RVertexBufferDesc>	vertexBuffers;
