@@ -57,24 +57,23 @@ int idCollisionModelManagerLocal::Contacts( contactInfo_t *contacts, const int m
 								idCollisionModel *model, const idVec3 &origin, const idMat3 &modelAxis ) {
 	trace_t results;
 	idVec3 end;
-
-	// If the model is NULL then assume we are checking the world model.
-	if (model == NULL) {
-		common->FatalError("%s model passed was nullptr", __FUNCTION__);
-	}
+	int numContacts;
 
 	// same as Translation but instead of storing the first collision we store all collisions as contacts
-	idCollisionModelManagerLocal::getContacts = true;
-	idCollisionModelManagerLocal::contacts = contacts;
 	idCollisionModelManagerLocal::maxContacts = maxContacts;
+	idCollisionModelManagerLocal::contacts = contacts;
+	idCollisionModelManagerLocal::getContacts = true;
 	idCollisionModelManagerLocal::numContacts = 0;
-	end = start + dir.SubVec3(0) * depth;
+
+	// Retail CM only uses the translational part of the contact direction here.
+	end.x = start.x + depth * dir[0];
+	end.y = start.y + depth * dir[1];
+	end.z = start.z + depth * dir[2];
+
 	idCollisionModelManagerLocal::Translation( &results, start, end, trm, trmAxis, contentMask, model, origin, modelAxis );
-	if ( dir.SubVec3(1).LengthSqr() != 0.0f ) {
-		// FIXME: rotational contacts
-	}
+	numContacts = idCollisionModelManagerLocal::numContacts;
 	idCollisionModelManagerLocal::getContacts = false;
 	idCollisionModelManagerLocal::maxContacts = 0;
 
-	return idCollisionModelManagerLocal::numContacts;
+	return numContacts;
 }

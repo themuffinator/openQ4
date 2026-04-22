@@ -112,5 +112,16 @@ idCollisionModelLocal::ModelInfo
 ================
 */
 void idCollisionModelLocal::ModelInfo(void) {
-	// The manager exposes the supported reporting entry points.
+	common->Printf( "%6i vertices (%i KB)\n", numVertices, ( numVertices * sizeof( cm_vertex_t ) ) >> 10 );
+	common->Printf( "%6i edges (%i KB)\n", numEdges, ( numEdges * sizeof( cm_edge_t ) ) >> 10 );
+	common->Printf( "%6i polygons (%i KB)\n", numPolygons, polygonMemory >> 10 );
+	common->Printf( "%6i brushes (%i KB)\n", numBrushes, brushMemory >> 10 );
+	common->Printf( "%6i nodes (%i KB)\n", numNodes, ( numNodes * sizeof( cm_node_t ) ) >> 10 );
+	common->Printf( "%6i polygon refs (%i KB)\n", numPolygonRefs, ( numPolygonRefs * sizeof( cm_polygonRef_t ) ) >> 10 );
+	common->Printf( "%6i brush refs (%i KB)\n", numBrushRefs, ( numBrushRefs * sizeof( cm_brushRef_t ) ) >> 10 );
+	common->Printf( "%6i internal edges\n", numInternalEdges );
+	common->Printf( "%6i sharp edges\n", numSharpEdges );
+	common->Printf( "%6i contained polygons removed\n", numRemovedPolys );
+	common->Printf( "%6i polygons merged\n", numMergedPolys );
+	common->Printf( "%6i KB total memory used\n", usedMemory >> 10 );
 }
