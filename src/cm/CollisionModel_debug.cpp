@@ -331,6 +331,18 @@ void idCollisionModelManagerLocal::DrawNodePolygons( idCollisionModelLocal *mode
 	}
 }
 
+void idCollisionModelManagerLocal::DrawModel( idCollisionModel *model, const idVec3 &modelOrigin, const idMat3 &modelAxis,
+									const idVec3 &viewOrigin, const idMat3 &viewAxis, const float radius ) {
+	if ( model == NULL ) {
+		return;
+	}
+
+	(void)viewAxis;
+
+	checkCount++;
+	static_cast<idCollisionModelLocal *>( model )->DrawModel( modelOrigin, modelAxis, viewOrigin, radius );
+}
+
 /*
 ===============================================================================
 
@@ -340,6 +352,8 @@ Speed test code
 */
 
 static idCVar cm_testCollision(		"cm_testCollision",		"0",					CVAR_GAME | CVAR_BOOL,		"" );
+static idCVar cm_debugTranslation(	"cm_debugTranslation",	"0",					CVAR_GAME | CVAR_BOOL,		"" );
+static idCVar cm_debugRotation(		"cm_debugRotation",		"0",					CVAR_GAME | CVAR_BOOL,		"" );
 static idCVar cm_testRotation(		"cm_testRotation",		"1",					CVAR_GAME | CVAR_BOOL,		"" );
 static idCVar cm_testModel(			"cm_testModel",			"0",					CVAR_GAME | CVAR_INTEGER,	"" );
 static idCVar cm_testTimes(			"cm_testTimes",			"1000",					CVAR_GAME | CVAR_INTEGER,	"" );
@@ -364,12 +378,159 @@ static int num_rotation = 0;
 static idVec3 start;
 static idVec3 *testend;
 
+static const float CM_DEBUG_DRAW_RADIUS = 1024.0f;
+
+struct cm_debugTranslationFailure_t {
+	bool				valid = false;
+	bool				hasTrm = false;
+	idCollisionModel *	trmModel = NULL;
+	idVec3				start;
+	idVec3				end;
+	idTraceModel		trm;
+	idMat3				trmAxis;
+	int					contentMask = 0;
+	idCollisionModel *	model = NULL;
+	idVec3				modelOrigin;
+	idMat3				modelAxis;
+};
+
+struct cm_debugRotationFailure_t {
+	bool				valid = false;
+	bool				hasTrm = false;
+	idCollisionModel *	trmModel = NULL;
+	idVec3				start;
+	idRotation			rotation;
+	idTraceModel		trm;
+	idMat3				trmAxis;
+	int					contentMask = 0;
+	idCollisionModel *	model = NULL;
+	idVec3				modelOrigin;
+	idMat3				modelAxis;
+};
+
+static cm_debugTranslationFailure_t translationFailure;
+static cm_debugRotationFailure_t rotationFailure;
+
+static void CM_FreeDebugTrmModel( idCollisionModel *&trmModel ) {
+	if ( trmModel == NULL ) {
+		return;
+	}
+
+	collisionModelManager->FreeModel( trmModel );
+	trmModel = NULL;
+}
+
 #include "../sys/sys_public.h"
 
-void idCollisionModelManagerLocal::DebugOutput( const idVec3 &origin ) {
+void idCollisionModelManagerLocal::ClearDebugFailures( void ) {
+	CM_FreeDebugTrmModel( translationFailure.trmModel );
+	translationFailure.valid = false;
+	translationFailure.hasTrm = false;
+	translationFailure.model = NULL;
+
+	CM_FreeDebugTrmModel( rotationFailure.trmModel );
+	rotationFailure.valid = false;
+	rotationFailure.hasTrm = false;
+	rotationFailure.model = NULL;
+}
+
+void idCollisionModelManagerLocal::CaptureTranslationFailure( const idVec3 &start, const idVec3 &end,
+													const idTraceModel *trm, const idMat3 &trmAxis, int contentMask,
+													idCollisionModel *model, const idVec3 &modelOrigin, const idMat3 &modelAxis ) {
+	CM_FreeDebugTrmModel( translationFailure.trmModel );
+
+	translationFailure.valid = true;
+	translationFailure.hasTrm = ( trm != NULL );
+	translationFailure.start = start;
+	translationFailure.end = end;
+	if ( trm != NULL ) {
+		translationFailure.trm = *trm;
+		translationFailure.trmModel = ModelFromTrm( NULL, "_cm_debug_translation", *trm, NULL );
+	}
+	translationFailure.trmAxis = trmAxis;
+	translationFailure.contentMask = contentMask;
+	translationFailure.model = model;
+	translationFailure.modelOrigin = modelOrigin;
+	translationFailure.modelAxis = modelAxis;
+}
+
+void idCollisionModelManagerLocal::CaptureRotationFailure( const idVec3 &start, const idRotation &rotation,
+												const idTraceModel *trm, const idMat3 &trmAxis, int contentMask,
+												idCollisionModel *model, const idVec3 &modelOrigin, const idMat3 &modelAxis ) {
+	CM_FreeDebugTrmModel( rotationFailure.trmModel );
+
+	rotationFailure.valid = true;
+	rotationFailure.hasTrm = ( trm != NULL );
+	rotationFailure.start = start;
+	rotationFailure.rotation = rotation;
+	if ( trm != NULL ) {
+		rotationFailure.trm = *trm;
+		rotationFailure.trmModel = ModelFromTrm( NULL, "_cm_debug_rotation", *trm, NULL );
+	}
+	rotationFailure.trmAxis = trmAxis;
+	rotationFailure.contentMask = contentMask;
+	rotationFailure.model = model;
+	rotationFailure.modelOrigin = modelOrigin;
+	rotationFailure.modelAxis = modelAxis;
+}
+
+void idCollisionModelManagerLocal::DebugTranslationFailure( const idVec3 &viewOrigin, const idMat3 &viewAxis ) {
+	if ( !translationFailure.valid || !cm_debugTranslation.GetBool() ) {
+		return;
+	}
+
+	const idTraceModel *debugTrm = translationFailure.hasTrm ? &translationFailure.trm : NULL;
+	trace_t trace;
+	const idVec4 oldColor = cm_color;
+
+	cm_color.Set( 1.0f, 0.0f, 0.0f, 0.5f );
+	if ( translationFailure.trmModel != NULL ) {
+		DrawModel( translationFailure.trmModel, translationFailure.start, translationFailure.trmAxis, viewOrigin, viewAxis, CM_DEBUG_DRAW_RADIUS );
+	}
+	DrawModel( translationFailure.model, translationFailure.modelOrigin, translationFailure.modelAxis, viewOrigin, viewAxis, CM_DEBUG_DRAW_RADIUS );
+
+	Translation( &trace, translationFailure.start, translationFailure.end, debugTrm, translationFailure.trmAxis,
+				translationFailure.contentMask, translationFailure.model, translationFailure.modelOrigin, translationFailure.modelAxis );
+	Contents( trace.endpos, debugTrm, trace.endAxis, -1, translationFailure.model, translationFailure.modelOrigin, translationFailure.modelAxis );
+
+	if ( translationFailure.trmModel != NULL ) {
+		cm_color.Set( 1.0f, 1.0f, 0.0f, 0.5f );
+		DrawModel( translationFailure.trmModel, trace.endpos, trace.endAxis, viewOrigin, viewAxis, CM_DEBUG_DRAW_RADIUS );
+	}
+
+	cm_color = oldColor;
+}
+
+void idCollisionModelManagerLocal::DebugRotationFailure( const idVec3 &viewOrigin, const idMat3 &viewAxis ) {
+	if ( !rotationFailure.valid || !cm_debugRotation.GetBool() ) {
+		return;
+	}
+
+	const idTraceModel *debugTrm = rotationFailure.hasTrm ? &rotationFailure.trm : NULL;
+	trace_t trace;
+	const idVec4 oldColor = cm_color;
+
+	cm_color.Set( 1.0f, 0.0f, 0.0f, 0.5f );
+	if ( rotationFailure.trmModel != NULL ) {
+		DrawModel( rotationFailure.trmModel, rotationFailure.start, rotationFailure.trmAxis, viewOrigin, viewAxis, CM_DEBUG_DRAW_RADIUS );
+	}
+	DrawModel( rotationFailure.model, rotationFailure.modelOrigin, rotationFailure.modelAxis, viewOrigin, viewAxis, CM_DEBUG_DRAW_RADIUS );
+
+	Rotation( &trace, rotationFailure.start, rotationFailure.rotation, debugTrm, rotationFailure.trmAxis,
+			rotationFailure.contentMask, rotationFailure.model, rotationFailure.modelOrigin, rotationFailure.modelAxis );
+	Contents( trace.endpos, debugTrm, trace.endAxis, -1, rotationFailure.model, rotationFailure.modelOrigin, rotationFailure.modelAxis );
+
+	if ( rotationFailure.trmModel != NULL ) {
+		cm_color.Set( 1.0f, 1.0f, 0.0f, 0.5f );
+		DrawModel( rotationFailure.trmModel, trace.endpos, trace.endAxis, viewOrigin, viewAxis, CM_DEBUG_DRAW_RADIUS );
+	}
+
+	cm_color = oldColor;
+}
+
+void idCollisionModelManagerLocal::SpeedTest( const idVec3 &origin ) {
 	int i, k, t;
 	char buf[128];
-	idVec3 end;
 	idAngles boxAngles;
 	idMat3 modelAxis, boxAxis;
 	idBounds bounds;
@@ -491,4 +652,10 @@ void idCollisionModelManagerLocal::DebugOutput( const idVec3 &origin ) {
 
 	Mem_Free( testend );
 	testend = NULL;
+}
+
+void idCollisionModelManagerLocal::DebugOutput( const idVec3 &viewOrigin, const idMat3 &viewAxis ) {
+	SpeedTest( viewOrigin );
+	DebugTranslationFailure( viewOrigin, viewAxis );
+	DebugRotationFailure( viewOrigin, viewAxis );
 }

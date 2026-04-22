@@ -106,6 +106,7 @@ bool idCollisionModelManagerLocal::TestTrmVertsInBrush( cm_traceWork_t *tw, cm_b
 			tw->trace.c.point = *p;
 			tw->trace.c.modelFeature = 0;
 			tw->trace.c.trmFeature = j;
+			CM_GetMaterialType( tw, NULL );
 			return true;
 		}
 	}
@@ -230,6 +231,7 @@ bool idCollisionModelManagerLocal::TestTrmInPolygon( cm_traceWork_t *tw, cm_poly
 					tw->trace.c.point = v->p;
 					tw->trace.c.modelFeature = edge->vertexNum[j];
 					tw->trace.c.trmFeature = 0;
+					CM_GetMaterialType( tw, p );
 					return true;
 				}
 			}
@@ -304,6 +306,7 @@ bool idCollisionModelManagerLocal::TestTrmInPolygon( cm_traceWork_t *tw, cm_poly
 			tw->trace.c.point = tw->vertices[tw->edges[i].vertexNum[ !flip ]].p;
 			tw->trace.c.modelFeature = *reinterpret_cast<int *>(&p);
 			tw->trace.c.trmFeature = i;
+			CM_GetMaterialType( tw, p );
 			return true;
 		}
 	}
@@ -381,6 +384,7 @@ bool idCollisionModelManagerLocal::TestTrmInPolygon( cm_traceWork_t *tw, cm_poly
 				tw->trace.c.point = tw->model->vertices[edge->vertexNum[ !flip ]].p;
 				tw->trace.c.modelFeature = edgeNum;
 				tw->trace.c.trmFeature = j;
+				CM_GetMaterialType( tw, p );
 				return true;
 			}
 		}
@@ -499,6 +503,8 @@ int idCollisionModelManagerLocal::ContentsTrm( trace_t *results, const idVec3 &s
 					trm->bounds[1][2] - trm->bounds[0][2] <= 0.0f ) ) {
 
 		results->c.contents = idCollisionModelManagerLocal::TransformedPointContents( start, model, modelOrigin, modelAxis );
+		results->c.material = NULL;
+		results->c.materialType = NULL;
 		results->fraction = ( results->c.contents == 0 );
 		results->endpos = start;
 		results->endAxis = trmAxis;
@@ -511,6 +517,8 @@ int idCollisionModelManagerLocal::ContentsTrm( trace_t *results, const idVec3 &s
 	tw.trace.fraction = 1.0f;
 	tw.trace.c.contents = 0;
 	tw.trace.c.type = CONTACT_NONE;
+	tw.trace.c.material = NULL;
+	tw.trace.c.materialType = NULL;
 	tw.contents = contentMask;
 	tw.isConvex = true;
 	tw.rotation = false;

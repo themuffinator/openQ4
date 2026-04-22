@@ -608,6 +608,7 @@ void idCollisionModelManagerLocal::RotateTrmEdgeThroughPolygon( cm_traceWork_t *
 		tw->trace.c.modelFeature = edgeNum;
 		tw->trace.c.trmFeature = trmEdge - tw->edges;
 		tw->trace.c.point = collisionPoint;
+		CM_GetMaterialType( tw, poly );
 		// if no collision can be closer
 		if ( tw->maxTan == 0.0f ) {
 			break;
@@ -973,6 +974,7 @@ void idCollisionModelManagerLocal::RotateTrmVertexThroughPolygon( cm_traceWork_t
 		tw->trace.c.modelFeature = *reinterpret_cast<int *>(&poly);
 		tw->trace.c.trmFeature = v - tw->vertices;
 		tw->trace.c.point = collisionPoint;
+		CM_GetMaterialType( tw, poly );
 	}
 }
 
@@ -1041,6 +1043,7 @@ void idCollisionModelManagerLocal::RotateVertexThroughTrmPolygon( cm_traceWork_t
 		tw->trace.c.modelFeature = v - tw->model->vertices;
 		tw->trace.c.trmFeature = trmpoly - tw->polys;
 		tw->trace.c.point = v->p;
+		CM_GetMaterialType( tw, poly );
 	}
 }
 
@@ -1270,6 +1273,9 @@ void idCollisionModelManagerLocal::Rotation180( trace_t *results, const idVec3 &
 	tw.trace.fraction = 1.0f;
 	tw.trace.c.contents = 0;
 	tw.trace.c.type = CONTACT_NONE;
+	tw.trace.c.id = 0;
+	tw.trace.c.material = NULL;
+	tw.trace.c.materialType = NULL;
 	tw.contents = contentMask;
 	tw.isConvex = true;
 	tw.rotation = true;
@@ -1676,12 +1682,9 @@ void idCollisionModelManagerLocal::Rotation( trace_t *results, const idVec3 &sta
 			entered = 1;
 			// if the trm is stuck in the model
 			if ( idCollisionModelManagerLocal::Contents( results->endpos, trm, results->endAxis, -1, model, modelOrigin, modelAxis ) & contentMask ) {
-				trace_t tr;
-
 				// test where the trm is stuck in the model
 				idCollisionModelManagerLocal::Contents( results->endpos, trm, results->endAxis, -1, model, modelOrigin, modelAxis );
-				// re-run collision detection to find out where it failed
-				idCollisionModelManagerLocal::Rotation( &tr, start, rotation, trm, trmAxis, contentMask, model, modelOrigin, modelAxis );
+				CaptureRotationFailure( start, rotation, trm, trmAxis, contentMask, model, modelOrigin, modelAxis );
 			}
 			entered = 0;
 		}

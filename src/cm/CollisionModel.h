@@ -178,7 +178,7 @@ public:
 									idCollisionModel *model, const idVec3 &modelOrigin, const idMat3 &modelAxis ) = 0;
 
 	// Tests collision detection.
-	virtual void			DebugOutput( const idVec3 &origin ) = 0;
+	virtual void			DebugOutput( const idVec3 &viewOrigin, const idMat3 &viewAxis ) = 0;
 
 	// Lists all loaded models.
 	virtual void			ListModels( void ) = 0;

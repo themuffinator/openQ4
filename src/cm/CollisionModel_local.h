@@ -302,6 +302,43 @@ typedef struct cm_traceWork_s {
 	idVec3 polygonRotationOriginCache[CM_MAX_POLYGON_EDGES];
 } cm_traceWork_t;
 
+ID_INLINE void CM_GetCollisionPointTexCoords( idVec2 &tc, const cm_traceWork_t *tw, const cm_polygon_t *poly ) {
+	tc.x = 0.5f;
+	tc.y = 0.5f;
+
+	idVec3 extents = poly->bounds[1] - poly->bounds[0];
+	int dominantAxis = ( extents[1] > extents[0] ) ? 1 : 0;
+	if ( extents[2] > extents[ dominantAxis ] ) {
+		dominantAxis = 2;
+	}
+
+	idVec3 triangle[3];
+	triangle[0] = poly->bounds[0];
+	triangle[1] = poly->bounds[1];
+	triangle[2] = poly->bounds[0];
+	triangle[2][ dominantAxis ] = poly->bounds[1][ dominantAxis ];
+
+	const float area = idMath::BarycentricTriangleArea( poly->plane.Normal(), triangle[0], triangle[1], triangle[2] );
+	if ( area != 0.0f ) {
+		idMath::BarycentricEvaluate( tc, tw->trace.c.point, poly->plane.Normal(), area, triangle, poly->texBounds );
+	}
+}
+
+ID_INLINE void CM_GetMaterialType( cm_traceWork_t *tw, const cm_polygon_t *poly ) {
+	tw->trace.c.materialType = NULL;
+	if ( tw->trace.c.material == NULL ) {
+		return;
+	}
+
+	if ( poly != NULL && tw->trace.c.material->GetMaterialTypeArray() != NULL ) {
+		idVec2 texCoord;
+		CM_GetCollisionPointTexCoords( texCoord, tw, poly );
+		tw->trace.c.materialType = tw->trace.c.material->GetMaterialType( texCoord );
+	} else {
+		tw->trace.c.materialType = tw->trace.c.material->GetMaterialType();
+	}
+}
+
 /*
 ===============================================================================
 
@@ -357,7 +394,7 @@ public:
 								const idTraceModel *trm, const idMat3 &trmAxis, int contentMask,
 								idCollisionModel *model, const idVec3 &modelOrigin, const idMat3 &modelAxis );
 	// test collision detection
-	void			DebugOutput( const idVec3 &origin );
+	void			DebugOutput( const idVec3 &viewOrigin, const idMat3 &viewAxis );
 
 	// list all loaded models
 	void			ListModels( void );
@@ -367,7 +404,7 @@ public:
 	// write a collision model file for the map entity
 	bool			WriteCollisionModelForMapEntity( const idMapEntity *mapEnt, const char *filename, const bool testTraceModel = true );
 
-	virtual  void	DrawModel(idCollisionModel* model, const idVec3& modelOrigin, const idMat3& modelAxis, const idVec3& viewOrigin, const idMat3& viewAxis, const float radius) {  }
+	virtual void	DrawModel(idCollisionModel* model, const idVec3& modelOrigin, const idMat3& modelAxis, const idVec3& viewOrigin, const idMat3& viewAxis, const float radius);
 
 	virtual idCollisionModel* GetCollisionModel(int index) { return models[index]; }
 
@@ -376,6 +413,16 @@ public:
 	virtual int		PointContents(const idVec3 p, idCollisionModel* model);
 
 	void			DrawNodePolygons(idCollisionModelLocal* model, cm_node_t* node, const idVec3& origin, const idMat3& axis, const idVec3& viewOrigin, const float radius);
+	void			SpeedTest( const idVec3 &origin );
+	void			DebugTranslationFailure( const idVec3 &viewOrigin, const idMat3 &viewAxis );
+	void			DebugRotationFailure( const idVec3 &viewOrigin, const idMat3 &viewAxis );
+	void			ClearDebugFailures( void );
+	void			CaptureTranslationFailure( const idVec3 &start, const idVec3 &end,
+								const idTraceModel *trm, const idMat3 &trmAxis, int contentMask,
+								idCollisionModel *model, const idVec3 &modelOrigin, const idMat3 &modelAxis );
+	void			CaptureRotationFailure( const idVec3 &start, const idRotation &rotation,
+								const idTraceModel *trm, const idMat3 &trmAxis, int contentMask,
+								idCollisionModel *model, const idVec3 &modelOrigin, const idMat3 &modelAxis );
 private:			// CollisionMap_translate.cpp
 	int				TranslateEdgeThroughEdge( idVec3 &cross, idPluecker &l1, idPluecker &l2, float *fraction );
 	void			TranslateTrmEdgeThroughPolygon( cm_traceWork_t *tw, cm_polygon_t *poly, cm_trmEdge_t *trmEdge );

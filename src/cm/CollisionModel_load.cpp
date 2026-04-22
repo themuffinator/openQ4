@@ -406,6 +406,7 @@ idCollisionModelManagerLocal::Init
 */
 void idCollisionModelManagerLocal::Init( void ) {
 	Clear();
+	ClearDebugFailures();
 }
 
 /*
@@ -414,6 +415,8 @@ idCollisionModelManagerLocal::Shutdown
 ================
 */
 void idCollisionModelManagerLocal::Shutdown( void ) {
+	ClearDebugFailures();
+
 	if ( models != NULL ) {
 		for ( int i = 0; i < numModels; i++ ) {
 			if ( models[i] == NULL ) {

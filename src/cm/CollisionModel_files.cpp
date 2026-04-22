@@ -566,6 +566,7 @@ void idCollisionModelManagerLocal::ParseBrushes( Lexer *src, idCollisionModelLoc
 			}
 		}
 		b->checkcount = 0;
+		b->material = NULL;
 		// filter brush into tree
 		R_FilterBrushIntoTree( model, model->node, NULL, b );
 	}

@@ -181,43 +181,6 @@ ID_INLINE int idCollisionModelManagerLocal::TranslateEdgeThroughEdge( idVec3 &cr
 CM_AddContact
 ================
 */
-ID_INLINE void CM_GetCollisionPointTexCoords( idVec2 &tc, const cm_traceWork_t *tw, const cm_polygon_t *poly ) {
-	tc.x = 0.5f;
-	tc.y = 0.5f;
-
-	idVec3 extents = poly->bounds[1] - poly->bounds[0];
-	int dominantAxis = ( extents[1] > extents[0] ) ? 1 : 0;
-	if ( extents[2] > extents[ dominantAxis ] ) {
-		dominantAxis = 2;
-	}
-
-	idVec3 triangle[3];
-	triangle[0] = poly->bounds[0];
-	triangle[1] = poly->bounds[1];
-	triangle[2] = poly->bounds[0];
-	triangle[2][ dominantAxis ] = poly->bounds[1][ dominantAxis ];
-
-	const float area = idMath::BarycentricTriangleArea( poly->plane.Normal(), triangle[0], triangle[1], triangle[2] );
-	if ( area != 0.0f ) {
-		idMath::BarycentricEvaluate( tc, tw->trace.c.point, poly->plane.Normal(), area, triangle, poly->texBounds );
-	}
-}
-
-ID_INLINE void CM_GetMaterialType( cm_traceWork_t *tw, const cm_polygon_t *poly ) {
-	tw->trace.c.materialType = NULL;
-	if ( tw->trace.c.material == NULL ) {
-		return;
-	}
-
-	if ( poly != NULL && tw->trace.c.material->GetMaterialTypeArray() != NULL ) {
-		idVec2 texCoord;
-		CM_GetCollisionPointTexCoords( texCoord, tw, poly );
-		tw->trace.c.materialType = tw->trace.c.material->GetMaterialType( texCoord );
-	} else {
-		tw->trace.c.materialType = tw->trace.c.material->GetMaterialType();
-	}
-}
-
 ID_INLINE void CM_AddContact( cm_traceWork_t *tw ) {
 
 	if ( tw->numContacts >= tw->maxContacts ) {
@@ -867,6 +830,7 @@ void idCollisionModelManagerLocal::Translation( trace_t *results, const idVec3 &
 	tw.trace.c.contents = 0;
 	tw.trace.c.type = CONTACT_NONE;
 	tw.trace.c.id = 0; // jmarshall: fix so we don't get garbage values.
+	tw.trace.c.material = NULL;
 // jmarshall - quake 4
 	tw.trace.c.materialType = NULL;
 // jmarshall end
@@ -1183,12 +1147,9 @@ void idCollisionModelManagerLocal::Translation( trace_t *results, const idVec3 &
 			entered = 1;
 			// if the trm is stuck in the model
 			if ( idCollisionModelManagerLocal::Contents( results->endpos, trm, trmAxis, -1, model, modelOrigin, modelAxis ) & contentMask ) {
-				trace_t tr;
-
 				// test where the trm is stuck in the model
 				idCollisionModelManagerLocal::Contents( results->endpos, trm, trmAxis, -1, model, modelOrigin, modelAxis );
-				// re-run collision detection to find out where it failed
-				idCollisionModelManagerLocal::Translation( &tr, start, end, trm, trmAxis, contentMask, model, modelOrigin, modelAxis );
+				CaptureTranslationFailure( start, end, trm, trmAxis, contentMask, model, modelOrigin, modelAxis );
 			}
 			entered = 0;
 		}
