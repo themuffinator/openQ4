@@ -1747,8 +1747,11 @@ void idMaterial::ParseStage( idLexer &src, const textureRepeat_t trpDefault ) {
 				texGenRegisters[1] = ParseExpression( src );
 				texGenRegisters[2] = ParseExpression( src );
 			} else if ( !token.Icmp( "potCorrection" ) ) {
-				// Quake 4 post-process shaders use this; treat as screen space.
-				ts->texgen = TG_SCREEN;
+				// Retail Quake 4 only needs explicit POT correction on hardware
+				// without NPOT textures; otherwise the stage stays on base coords.
+				if ( !glConfig.textureNonPowerOfTwoAvailable ) {
+					ts->texgen = TG_POT_CORRECTION;
+				}
 			} else {
 				common->Warning( "bad texGen '%s' in material %s", token.c_str(), GetName() );
 				SetMaterialFlag( MF_DEFAULTED );
@@ -1941,6 +1944,10 @@ void idMaterial::ParseStage( idLexer &src, const textureRepeat_t trpDefault ) {
 			if ( src.ReadTokenOnLine( &token ) ) {
 				newStage.vertexProgram = R_FindARBProgram( GL_VERTEX_PROGRAM_ARB, token.c_str() );
 				newStage.fragmentProgram = R_FindARBProgram( GL_FRAGMENT_PROGRAM_ARB, token.c_str() );
+
+				idStr md5rProgram = "md5r";
+				md5rProgram += token.c_str();
+				newStage.md5rVertexProgram = R_FindARBProgram( GL_VERTEX_PROGRAM_ARB, md5rProgram.c_str() );
 			}
 			continue;
 		}

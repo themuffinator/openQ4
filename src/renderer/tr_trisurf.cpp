@@ -447,7 +447,11 @@ void R_ReallyFreeStaticTriSurf( srfTriangles_t *tri ) {
 			triSilIndexAllocator.Free( tri->silIndexes );
 		}
 		if ( tri->silEdges != NULL ) {
-			triSilEdgeAllocator.Free( tri->silEdges );
+			const bool sharedAmbientSilEdges =
+				( tri->ambientSurface != NULL && tri->silEdges == tri->ambientSurface->silEdges );
+			if ( !sharedAmbientSilEdges ) {
+				triSilEdgeAllocator.Free( tri->silEdges );
+			}
 		}
 		if ( tri->dominantTris != NULL ) {
 			triDominantTrisAllocator.Free( tri->dominantTris );

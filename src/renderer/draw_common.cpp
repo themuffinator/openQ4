@@ -147,6 +147,14 @@ static const idVec4 RB_STOCK_COLOR_MATRIX_ROWS[3] = {
 	idVec4( 0.0f, 0.0f, 1.0f, 0.0f )
 };
 
+enum md5rFogProgramParameter_t {
+	MD5R_BASIC_FOG_VPROG_BASE = ARB2_MD5R_BASIC_FOG_VPROG_BASE,
+	MD5R_FOG_DISTANCE_PLANE_PARAM = 93,
+	MD5R_FOG_DISTANCE_BIAS_PARAM,
+	MD5R_FOG_ENTER_PLANE_T_PARAM,
+	MD5R_FOG_ENTER_PLANE_S_PARAM
+};
+
 static idVec4 rbStockGaussianSampleOffsets[RB_STOCK_GAUSSIAN_SAMPLE_COUNT];
 static idVec4 rbStockGaussianSampleWeights[RB_STOCK_GAUSSIAN_SAMPLE_COUNT];
 static idVec4 rbStockGaussianSampleOffsetsHorizontal[RB_STOCK_GAUSSIAN_SAMPLE_COUNT];
@@ -154,11 +162,20 @@ static idVec4 rbStockGaussianSampleOffsetsVertical[RB_STOCK_GAUSSIAN_SAMPLE_COUN
 static idVec4 rbStockGaussianSampleWeights2[RB_STOCK_GAUSSIAN_SAMPLE_COUNT];
 static int rbStockGaussianViewportWidth = -1;
 static int rbStockGaussianViewportHeight = -1;
+idPlane fogTexGenPlanes[4];
 
 static float RB_StockGaussian1D( float offset, float deviation ) {
 	const float variance = deviation * deviation;
 	const float normalization = 1.0f / idMath::Sqrt( 2.0f * idMath::PI * variance );
 	return normalization * idMath::Exp( -( offset * offset ) / ( 2.0f * variance ) );
+}
+
+static float RB_FogDistanceScale( float alpha ) {
+	if ( alpha <= 1.0f ) {
+		return -0.5f / DEFAULT_FOG_DISTANCE;
+	}
+
+	return -0.5f / alpha;
 }
 
 static void RB_CalculateStockGaussianCoefficients( int width, int height, float multiplier ) {
@@ -2190,7 +2207,17 @@ void RB_BakeTextureMatrixIntoTexgen( idPlane lightProject[3], const float *textu
 RB_PrepareStageTexturing
 ================
 */
-bool RB_PrepareStageTexturing( const shaderStage_t *pStage,  const drawSurf_t *surf, idDrawVert *ac ) {
+static bool RB_PrepareStageTexturing( const shaderStage_t *pStage, const drawSurf_t *surf, idDrawVert *ac,
+	bool fillingDepth ) {
+	if ( surf->geo->primBatchMesh != NULL ) {
+		if ( tr.backEndRenderer == BE_ARB2 ) {
+			RB_ARB2_PrepareStageTexturing( pStage, surf, fillingDepth );
+		}
+		return true;
+	}
+
+	(void)fillingDepth;
+
 	// set privatePolygonOffset if necessary
 	if ( pStage->privatePolygonOffset ) {
 		glEnable( GL_POLYGON_OFFSET_FILL );
@@ -2368,12 +2395,21 @@ bool RB_PrepareStageTexturing( const shaderStage_t *pStage,  const drawSurf_t *s
 	return true;
 }
 
+bool RB_PrepareStageTexturing( const shaderStage_t *pStage, const drawSurf_t *surf, idDrawVert *ac ) {
+	return RB_PrepareStageTexturing( pStage, surf, ac, false );
+}
+
 /*
 ================
 RB_FinishStageTexturing
 ================
 */
 void RB_FinishStageTexturing( const shaderStage_t *pStage, const drawSurf_t *surf, idDrawVert *ac ) {
+	if ( surf->geo->primBatchMesh != NULL ) {
+		RB_ARB2_DisableStageTexturing( pStage, surf );
+		return;
+	}
+
 	// unset privatePolygonOffset if necessary
 	if ( pStage->privatePolygonOffset && !surf->material->TestMaterialFlag(MF_POLYGONOFFSET) ) {
 		glDisable( GL_POLYGON_OFFSET_FILL );
@@ -3280,7 +3316,7 @@ static void RB_T_CaptureRVSpecialDepth( const drawSurf_t *surf ) {
 			glColor4fv( color );
 			glAlphaFunc( GL_GREATER, regs[ pStage->alphaTestRegister ] );
 			pStage->texture.image->Bind();
-			if ( !RB_PrepareStageTexturing( pStage, surf, ac ) ) {
+			if ( !RB_PrepareStageTexturing( pStage, surf, ac, true ) ) {
 				RB_FinishStageTexturing( pStage, surf, ac );
 				continue;
 			}
@@ -3299,7 +3335,11 @@ static void RB_T_CaptureRVSpecialDepth( const drawSurf_t *surf ) {
 		const shaderStage_t *diffuseStage = NULL;
 		glColor4fv( color );
 		if ( RB_RVSpecialPrepareSolidStageTexturing( surf, ac, &diffuseStage ) ) {
-			RB_DrawElementsWithCounters( tri );
+			if ( tri->primBatchMesh != NULL ) {
+				RB_ARB2_MD5R_DrawDepthElements( surf );
+			} else {
+				RB_DrawElementsWithCounters( tri );
+			}
 		}
 		if ( diffuseStage != NULL ) {
 			RB_FinishStageTexturing( diffuseStage, surf, ac );
@@ -3836,7 +3876,7 @@ void RB_T_FillDepthBuffer( const drawSurf_t *surf ) {
 			pStage->texture.image->Bind();
 
 			// set texture matrix and texGens
-			if ( !RB_PrepareStageTexturing( pStage, surf, ac ) ) {
+			if ( !RB_PrepareStageTexturing( pStage, surf, ac, true ) ) {
 				RB_FinishStageTexturing( pStage, surf, ac );
 				continue;
 			}
@@ -3858,7 +3898,11 @@ void RB_T_FillDepthBuffer( const drawSurf_t *surf ) {
 		globalImages->whiteImage->Bind();
 
 		// draw it
-		RB_DrawElementsWithCounters( tri );
+		if ( tri->primBatchMesh != NULL ) {
+			RB_ARB2_MD5R_DrawDepthElements( surf );
+		} else {
+			RB_DrawElementsWithCounters( tri );
+		}
 	}
 
 
@@ -4132,6 +4176,7 @@ void RB_STD_T_RenderShaderPasses( const drawSurf_t *surf ) {
 	idDrawVert *ac = (idDrawVert *)vertexCache.Position( tri->ambientCache );
 	glVertexPointer( 3, GL_FLOAT, sizeof( idDrawVert ), ac->xyz.ToFloatPtr() );
 	glTexCoordPointer( 2, GL_FLOAT, sizeof( idDrawVert ), reinterpret_cast<void *>(&ac->st) );
+	bool resetTexCoords = false;
 
 	for ( stage = 0; stage < shader->GetNumStages() ; stage++ ) {		
 		pStage = shader->GetStage(stage);
@@ -4149,6 +4194,16 @@ void RB_STD_T_RenderShaderPasses( const drawSurf_t *surf ) {
 		// skip if the stage is ( GL_ZERO, GL_ONE ), which is used for some alpha masks
 		if ( ( pStage->drawStateBits & (GLS_SRCBLEND_BITS|GLS_DSTBLEND_BITS) ) == ( GLS_SRCBLEND_ZERO | GLS_DSTBLEND_ONE ) ) {
 			continue;
+		}
+
+		if ( resetTexCoords ) {
+			glTexCoordPointer( 2, GL_FLOAT, sizeof( idDrawVert ), reinterpret_cast<void *>( &ac->st ) );
+			resetTexCoords = false;
+		}
+
+		if ( pStage->texture.texgen == TG_POT_CORRECTION && surf->dynamicTexCoords != NULL ) {
+			glTexCoordPointer( 2, GL_FLOAT, 0, vertexCache.Position( surf->dynamicTexCoords ) );
+			resetTexCoords = true;
 		}
 
 		// Fallback for materials that reference captured scene buffers but were not sorted as
@@ -4292,10 +4347,15 @@ void RB_STD_T_RenderShaderPasses( const drawSurf_t *surf ) {
 
 			GL_State( pStage->drawStateBits );
 
+			int stageVertexProgram = newStage->vertexProgram;
+			if ( tri->primBatchMesh != NULL && newStage->md5rVertexProgram != 0 ) {
+				stageVertexProgram = newStage->md5rVertexProgram;
+			}
+
 			bool vertexProgramEnabled = false;
 			bool fragmentProgramEnabled = false;
-			if ( newStage->vertexProgram != 0 ) {
-				if ( !R_BindARBProgram( GL_VERTEX_PROGRAM_ARB, newStage->vertexProgram, "material stage vertex program", false ) ) {
+			if ( stageVertexProgram != 0 ) {
+				if ( !R_BindARBProgram( GL_VERTEX_PROGRAM_ARB, stageVertexProgram, "material stage vertex program", false ) ) {
 					glDisableClientState( GL_COLOR_ARRAY );
 					glDisableVertexAttribArrayARB( 9 );
 					glDisableVertexAttribArrayARB( 10 );
@@ -4303,6 +4363,12 @@ void RB_STD_T_RenderShaderPasses( const drawSurf_t *surf ) {
 					continue;
 				}
 				glEnable( GL_VERTEX_PROGRAM_ARB );
+				if ( tri->primBatchMesh != NULL && stageVertexProgram == newStage->md5rVertexProgram ) {
+					RB_ARB2_LoadMD5RLocalViewOrigin( surf );
+					RB_ARB2_LoadMD5RMVPMatrix( surf );
+					RB_ARB2_LoadMD5RProjectionMatrix();
+					RB_ARB2_LoadMD5RModelViewMatrix( surf );
+				}
 				vertexProgramEnabled = true;
 			}
 
@@ -4625,7 +4691,7 @@ static void RB_T_Shadow( const drawSurf_t *surf ) {
 
 	// set the light position if we are using a vertex program to project the rear surfaces
 	if ( tr.backEndRendererHasVertexPrograms && r_useShadowVertexProgram.GetBool()
-		&& surf->space != backEnd.currentSpace ) {
+		&& surf->space != backEnd.currentSpace && surf->geo->primBatchMesh == NULL ) {
 		idVec4 localLight;
 
 		R_GlobalPointToLocal( surf->space->modelMatrix, backEnd.vLight->globalLightOrigin, localLight.ToVec3() );
@@ -4713,7 +4779,7 @@ static void RB_T_Shadow( const drawSurf_t *surf ) {
 		glStencilOp( GL_KEEP, GL_KEEP, GL_KEEP );
 		glDisable( GL_STENCIL_TEST );
 		GL_Cull( CT_TWO_SIDED );
-		RB_DrawShadowElementsWithCounters( tri, numIndexes );
+		RB_DrawShadowElementsWithCounters( surf, numIndexes );
 		GL_Cull( CT_FRONT_SIDED );
 		glEnable( GL_STENCIL_TEST );
 
@@ -4726,20 +4792,20 @@ static void RB_T_Shadow( const drawSurf_t *surf ) {
 		// that get clipped by the near or far clip plane
 		glStencilOp( GL_KEEP, tr.stencilDecr, tr.stencilDecr );
 		GL_Cull( CT_FRONT_SIDED );
-		RB_DrawShadowElementsWithCounters( tri, numIndexes );
+		RB_DrawShadowElementsWithCounters( surf, numIndexes );
 		glStencilOp( GL_KEEP, tr.stencilIncr, tr.stencilIncr );
 		GL_Cull( CT_BACK_SIDED );
-		RB_DrawShadowElementsWithCounters( tri, numIndexes );
+		RB_DrawShadowElementsWithCounters( surf, numIndexes );
 	}
 
 	// traditional depth-pass stencil shadows
 	glStencilOp( GL_KEEP, GL_KEEP, tr.stencilIncr );
 	GL_Cull( CT_FRONT_SIDED );
-	RB_DrawShadowElementsWithCounters( tri, numIndexes );
+	RB_DrawShadowElementsWithCounters( surf, numIndexes );
 
 	glStencilOp( GL_KEEP, GL_KEEP, tr.stencilDecr );
 	GL_Cull( CT_BACK_SIDED );
-	RB_DrawShadowElementsWithCounters( tri, numIndexes );
+	RB_DrawShadowElementsWithCounters( surf, numIndexes );
 }
 
 /*
@@ -4944,8 +5010,6 @@ static void RB_BlendLight( const drawSurf_t *drawSurfs,  const drawSurf_t *drawS
 
 //========================================================================
 
-static idPlane	fogPlanes[4];
-
 /*
 =====================
 RB_T_BasicFog
@@ -4958,11 +5022,11 @@ static void RB_T_BasicFog( const drawSurf_t *surf ) {
 
 		GL_SelectTexture( 0 );
 
-		R_GlobalPlaneToLocal( surf->space->modelMatrix, fogPlanes[0], local );
+		R_GlobalPlaneToLocal( surf->space->modelMatrix, fogTexGenPlanes[FOG_DISTANCE_PLANE_S], local );
 		local[3] += 0.5;
 		glTexGenfv( GL_S, GL_OBJECT_PLANE, local.ToFloatPtr() );
 
-//		R_GlobalPlaneToLocal( surf->space->modelMatrix, fogPlanes[1], local );
+//		R_GlobalPlaneToLocal( surf->space->modelMatrix, fogTexGenPlanes[FOG_DISTANCE_PLANE_T], local );
 //		local[3] += 0.5;
 local[0] = local[1] = local[2] = 0; local[3] = 0.5;
 		glTexGenfv( GL_T, GL_OBJECT_PLANE, local.ToFloatPtr() );
@@ -4970,15 +5034,19 @@ local[0] = local[1] = local[2] = 0; local[3] = 0.5;
 		GL_SelectTexture( 1 );
 
 		// GL_S is constant per viewer
-		R_GlobalPlaneToLocal( surf->space->modelMatrix, fogPlanes[2], local );
+		R_GlobalPlaneToLocal( surf->space->modelMatrix, fogTexGenPlanes[FOG_ENTER_PLANE_T], local );
 		local[3] += FOG_ENTER;
 		glTexGenfv( GL_T, GL_OBJECT_PLANE, local.ToFloatPtr() );
 
-		R_GlobalPlaneToLocal( surf->space->modelMatrix, fogPlanes[3], local );
+		R_GlobalPlaneToLocal( surf->space->modelMatrix, fogTexGenPlanes[FOG_ENTER_PLANE_S], local );
 		glTexGenfv( GL_S, GL_OBJECT_PLANE, local.ToFloatPtr() );
 	}
 
-	RB_T_RenderTriangleSurface( surf );
+	if ( surf->geo->primBatchMesh != NULL ) {
+		RB_ARB2_MD5R_DrawBasicFog( surf );
+	} else {
+		RB_T_RenderTriangleSurface( surf );
+	}
 }
 
 
@@ -5023,58 +5091,69 @@ static void RB_FogPass( const drawSurf_t *drawSurfs,  const drawSurf_t *drawSurf
 	glColor3fv( backEnd.lightColor );
 
 	// calculate the falloff planes
-	float	a;
-
-	// if they left the default value on, set a fog distance of 500
-	if ( backEnd.lightColor[3] <= 1.0 ) {
-		a = -0.5f / DEFAULT_FOG_DISTANCE;
-	} else {
-		// otherwise, distance = alpha color
-		a = -0.5f / backEnd.lightColor[3];
-	}
+	const float a = RB_FogDistanceScale( backEnd.lightColor[3] );
 
 	GL_State( GLS_DEPTHMASK | GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA | GLS_DEPTHFUNC_EQUAL );
 
+	// The fog pass is fixed-function. Reassert the classic state here so
+	// hybrid ARB2 / MD5R stage work can't leak texture-combine or program
+	// bindings that turn colored fog volumes black or invisible.
+	glUseProgramObjectARB( 0 );
+	glDisable( GL_VERTEX_PROGRAM_ARB );
+	glDisable( GL_FRAGMENT_PROGRAM_ARB );
+	glBindProgramARB( GL_VERTEX_PROGRAM_ARB, 0 );
+	glBindProgramARB( GL_FRAGMENT_PROGRAM_ARB, 0 );
+
 	// texture 0 is the falloff image
 	GL_SelectTexture( 0 );
+	GL_TexEnv( GL_MODULATE );
 	globalImages->fogImage->Bind();
 	//GL_Bind( tr.whiteImage );
 	glDisableClientState( GL_TEXTURE_COORD_ARRAY );
+	// Fog uses the light's current color; stale per-vertex color arrays can
+	// zero the fog contribution and turn colored fog volumes black.
+	glDisableClientState( GL_COLOR_ARRAY );
+	glDisable( GL_TEXTURE_GEN_R );
+	glDisable( GL_TEXTURE_GEN_Q );
 	glEnable( GL_TEXTURE_GEN_S );
 	glEnable( GL_TEXTURE_GEN_T );
 	glTexCoord2f( 0.5f, 0.5f );		// make sure Q is set
 
-	fogPlanes[0][0] = a * backEnd.viewDef->worldSpace.modelViewMatrix[2];
-	fogPlanes[0][1] = a * backEnd.viewDef->worldSpace.modelViewMatrix[6];
-	fogPlanes[0][2] = a * backEnd.viewDef->worldSpace.modelViewMatrix[10];
-	fogPlanes[0][3] = a * backEnd.viewDef->worldSpace.modelViewMatrix[14];
+	fogTexGenPlanes[FOG_DISTANCE_PLANE_S][0] = a * backEnd.viewDef->worldSpace.modelViewMatrix[2];
+	fogTexGenPlanes[FOG_DISTANCE_PLANE_S][1] = a * backEnd.viewDef->worldSpace.modelViewMatrix[6];
+	fogTexGenPlanes[FOG_DISTANCE_PLANE_S][2] = a * backEnd.viewDef->worldSpace.modelViewMatrix[10];
+	fogTexGenPlanes[FOG_DISTANCE_PLANE_S][3] = a * backEnd.viewDef->worldSpace.modelViewMatrix[14];
 
-	fogPlanes[1][0] = a * backEnd.viewDef->worldSpace.modelViewMatrix[0];
-	fogPlanes[1][1] = a * backEnd.viewDef->worldSpace.modelViewMatrix[4];
-	fogPlanes[1][2] = a * backEnd.viewDef->worldSpace.modelViewMatrix[8];
-	fogPlanes[1][3] = a * backEnd.viewDef->worldSpace.modelViewMatrix[12];
+	fogTexGenPlanes[FOG_DISTANCE_PLANE_T][0] = a * backEnd.viewDef->worldSpace.modelViewMatrix[0];
+	fogTexGenPlanes[FOG_DISTANCE_PLANE_T][1] = a * backEnd.viewDef->worldSpace.modelViewMatrix[4];
+	fogTexGenPlanes[FOG_DISTANCE_PLANE_T][2] = a * backEnd.viewDef->worldSpace.modelViewMatrix[8];
+	fogTexGenPlanes[FOG_DISTANCE_PLANE_T][3] = a * backEnd.viewDef->worldSpace.modelViewMatrix[12];
 
 
 	// texture 1 is the entering plane fade correction
 	GL_SelectTexture( 1 );
+	GL_TexEnv( GL_MODULATE );
 	globalImages->fogEnterImage->Bind();
 	glDisableClientState( GL_TEXTURE_COORD_ARRAY );
+	glDisable( GL_TEXTURE_GEN_R );
+	glDisable( GL_TEXTURE_GEN_Q );
 	glEnable( GL_TEXTURE_GEN_S );
 	glEnable( GL_TEXTURE_GEN_T );
 
 	// T will get a texgen for the fade plane, which is always the "top" plane on unrotated lights
-	fogPlanes[2][0] = 0.001f * backEnd.vLight->fogPlane[0];
-	fogPlanes[2][1] = 0.001f * backEnd.vLight->fogPlane[1];
-	fogPlanes[2][2] = 0.001f * backEnd.vLight->fogPlane[2];
-	fogPlanes[2][3] = 0.001f * backEnd.vLight->fogPlane[3];
+	fogTexGenPlanes[FOG_ENTER_PLANE_T][0] = 0.001f * backEnd.vLight->fogPlane[0];
+	fogTexGenPlanes[FOG_ENTER_PLANE_T][1] = 0.001f * backEnd.vLight->fogPlane[1];
+	fogTexGenPlanes[FOG_ENTER_PLANE_T][2] = 0.001f * backEnd.vLight->fogPlane[2];
+	fogTexGenPlanes[FOG_ENTER_PLANE_T][3] = 0.001f * backEnd.vLight->fogPlane[3];
 
 	// S is based on the view origin
-	float s = backEnd.viewDef->renderView.vieworg * fogPlanes[2].Normal() + fogPlanes[2][3];
+	const float s = backEnd.viewDef->renderView.vieworg * fogTexGenPlanes[FOG_ENTER_PLANE_T].Normal()
+		+ fogTexGenPlanes[FOG_ENTER_PLANE_T][3];
 
-	fogPlanes[3][0] = 0;
-	fogPlanes[3][1] = 0;
-	fogPlanes[3][2] = 0;
-	fogPlanes[3][3] = FOG_ENTER + s;
+	fogTexGenPlanes[FOG_ENTER_PLANE_S][0] = 0;
+	fogTexGenPlanes[FOG_ENTER_PLANE_S][1] = 0;
+	fogTexGenPlanes[FOG_ENTER_PLANE_S][2] = 0;
+	fogTexGenPlanes[FOG_ENTER_PLANE_S][3] = FOG_ENTER + s;
 
 	glTexCoord2f( FOG_ENTER + s, FOG_ENTER );
 

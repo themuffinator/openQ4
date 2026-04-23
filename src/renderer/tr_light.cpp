@@ -162,6 +162,16 @@ VERTEX CACHE GENERATORS
 ===========================================================================================
 */
 
+void R_TouchVertexCache( vertCache_t *cache ) {
+	if ( cache == NULL ) {
+		return;
+	}
+
+	if ( cache->tag != TAG_TEMP ) {
+		vertexCache.Touch( cache );
+	}
+}
+
 /*
 ==================
 R_CreateAmbientCache
@@ -514,6 +524,77 @@ void R_WobbleskyTexGen( drawSurf_t *surf, const idVec3 &viewOrg ) {
 		v[2] = verts[i].xyz[2] - localViewOrigin[2];
 
 		R_LocalPointToGlobal( transform, v, texCoords[i] );
+	}
+
+	surf->dynamicTexCoords = vertexCache.AllocFrameTemp( texCoords, size );
+}
+
+static idImage *R_GetFirstLegacyProgrammableStageImage( const newShaderStage_t *newStage ) {
+	if ( newStage == NULL ) {
+		return NULL;
+	}
+
+	for ( int imageIndex = 0; imageIndex < newStage->numShaderTextures; ++imageIndex ) {
+		idImage *image = newStage->shaderTextureImages[imageIndex];
+		if ( image != NULL ) {
+			return image;
+		}
+	}
+
+	for ( int imageIndex = 0; imageIndex < newStage->numFragmentProgramImages; ++imageIndex ) {
+		idImage *image = newStage->fragmentProgramImages[imageIndex];
+		if ( image != NULL ) {
+			return image;
+		}
+	}
+
+	return NULL;
+}
+
+static idImage *R_GetPOTCorrectionImage( const shaderStage_t *stage ) {
+	if ( stage == NULL ) {
+		return NULL;
+	}
+
+	if ( stage->texture.image != NULL ) {
+		return stage->texture.image;
+	}
+
+	return R_GetFirstLegacyProgrammableStageImage( stage->newStage );
+}
+
+static void R_POTCorrectionTexGen( drawSurf_t *surf ) {
+	const idMaterial *material = surf->material;
+	const shaderStage_t *stage = NULL;
+
+	for ( int stageNum = 0; stageNum < material->GetNumStages(); ++stageNum ) {
+		const shaderStage_t *candidate = material->GetStage( stageNum );
+		if ( candidate->texture.texgen == TG_POT_CORRECTION ) {
+			stage = candidate;
+			break;
+		}
+	}
+
+	if ( stage == NULL || R_GetPOTCorrectionImage( stage ) == NULL ) {
+		return;
+	}
+
+	const int width = tr.viewDef->viewport.x2 - tr.viewDef->viewport.x1 + 1;
+	const int height = tr.viewDef->viewport.y2 - tr.viewDef->viewport.y1 + 1;
+	const idVec2 correctionFactor( width / (float)MakePowerOfTwo( width ), height / (float)MakePowerOfTwo( height ) );
+
+	const int numVerts = surf->geo->numVerts;
+	if ( numVerts <= 0 || surf->geo->verts == NULL ) {
+		surf->dynamicTexCoords = NULL;
+		return;
+	}
+
+	const int size = numVerts * sizeof( idVec2 );
+	idVec2 *texCoords = (idVec2 *)_alloca16( size );
+	const idDrawVert *verts = surf->geo->verts;
+	for ( int vertNum = 0; vertNum < numVerts; ++vertNum ) {
+		texCoords[vertNum].x = correctionFactor.x * verts[vertNum].st.x;
+		texCoords[vertNum].y = correctionFactor.y * verts[vertNum].st.y;
 	}
 
 	surf->dynamicTexCoords = vertexCache.AllocFrameTemp( texCoords, size );
@@ -1291,7 +1372,7 @@ void R_AddLightSurfaces( void ) {
 				}
 			}
 			// touch the surface so it won't get purged
-			vertexCache.Touch( light->frustumTris->ambientCache );
+			R_TouchVertexCache( light->frustumTris->ambientCache );
 		}
 
 		// add the prelight shadows for the static world geometry
@@ -1330,13 +1411,13 @@ void R_AddLightSurfaces( void ) {
 					}
 				}
 
-				vertexCache.Touch( tri->shadowCache );
+				R_TouchVertexCache( tri->shadowCache );
 
 				if ( !tri->indexCache && r_useIndexBuffers.GetBool() && tri->numIndexes > 0 ) {
 					vertexCache.Alloc( tri->indexes, tri->numIndexes * sizeof( tri->indexes[0] ), &tri->indexCache, true );
 				}
 				if ( tri->indexCache ) {
-					vertexCache.Touch( tri->indexCache );
+					R_TouchVertexCache( tri->indexCache );
 				}
 #if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
 			}
@@ -1553,6 +1634,9 @@ void R_FinalizeDrawSurf( drawSurf_t *drawSurf ) {
 		case TG_WOBBLESKY_CUBE:
 			R_WobbleskyTexGen( drawSurf, tr.viewDef->renderView.vieworg );
 			break;
+		case TG_POT_CORRECTION:
+			R_POTCorrectionTexGen( drawSurf );
+			break;
 	}
 }
 
@@ -1756,9 +1840,9 @@ static void R_AddAmbientDrawsurfs( viewEntity_t *vEntity ) {
 				}
 			}
 
-			vertexCache.Touch( tri->ambientCache );
+			R_TouchVertexCache( tri->ambientCache );
 			if ( tri->indexCache ) {
-				vertexCache.Touch( tri->indexCache );
+				R_TouchVertexCache( tri->indexCache );
 			}
 
 			// add the surface for drawing
@@ -2032,7 +2116,7 @@ void R_AddEffectSurfaces(void) {
 				// BSE dynamic surfaces rebuild index data every frame; keep them on the CPU index path.
 				tri->indexCache = NULL;
 			}
-			vertexCache.Touch( tri->ambientCache );
+			R_TouchVertexCache( tri->ambientCache );
 
 			R_AddDrawSurf(tri, vEffect, &renderParms, shader, vEffect->scissorRect);
 			tri->ambientViewCount = tr.viewCount;

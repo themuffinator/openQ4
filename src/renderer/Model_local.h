@@ -273,9 +273,15 @@ class rvRenderModelMD5R;
 class rvSilTraceVertT;
 class idRenderModelDecal;
 struct decalProjectionInfo_s;
+struct rvMD5RMesh;
+struct rvMD5RVertexBufferDesc;
+struct rvMD5RIndexBufferDesc;
 
 #if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
 bool							R_MD5R_CreateDecalTriangles( idRenderModelDecal *decalModel, const srfTriangles_t &sourceTri, const decalProjectionInfo_s &localInfo );
+const rvMD5RMesh *				R_MD5R_GetMeshForTri( const srfTriangles_t *tri );
+const rvMD5RVertexBufferDesc *	R_MD5R_GetDrawVertexBufferForTri( const srfTriangles_t *tri );
+const rvMD5RIndexBufferDesc *	R_MD5R_GetDrawIndexBufferForTri( const srfTriangles_t *tri );
 #endif
 
 struct rvMD5RMesh {
@@ -516,6 +522,9 @@ private:
 #if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
 	friend bool					R_MD5R_CopyPrimBatchTriangles( idDrawVert *destDrawVerts, glIndex_t *destIndices, const rvMesh *primBatchMesh, const rvSilTraceVertT *silTraceVerts );
 	friend bool					R_MD5R_CreateDecalTriangles( idRenderModelDecal *decalModel, const srfTriangles_t &sourceTri, const decalProjectionInfo_s &localInfo );
+	friend const rvMD5RMesh *	R_MD5R_GetMeshForTri( const srfTriangles_t *tri );
+	friend const rvMD5RVertexBufferDesc *	R_MD5R_GetDrawVertexBufferForTri( const srfTriangles_t *tri );
+	friend const rvMD5RIndexBufferDesc *	R_MD5R_GetDrawIndexBufferForTri( const srfTriangles_t *tri );
 #endif
 	static void					RemoveFromList( rvRenderModelMD5R &model );
 

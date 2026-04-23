@@ -105,13 +105,33 @@ static void R_LinkShadowMapCasterSurf( const drawSurf_t **link, const srfTriangl
 }
 
 static void R_TouchShadowMapCache( vertCache_t *cache ) {
-	if ( cache == NULL ) {
-		return;
+	R_TouchVertexCache( cache );
+}
+
+static bool R_EnsureShadowMapCasterCaches( srfTriangles_t *casterTris ) {
+	if ( casterTris == NULL ) {
+		return false;
 	}
 
-	if ( cache->tag != TAG_TEMP ) {
-		vertexCache.Touch( cache );
+#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
+	if ( casterTris->primBatchMesh != NULL ) {
+		return R_CreatePackedSurfaceFrameCaches( casterTris, false, true );
 	}
+#endif
+
+	if ( !casterTris->ambientCache && !R_CreateAmbientCache( casterTris, false ) ) {
+		return false;
+	}
+
+	if ( !casterTris->indexCache && r_useIndexBuffers.GetBool() && casterTris->numIndexes > 0 ) {
+		vertexCache.Alloc(
+			casterTris->indexes,
+			casterTris->numIndexes * sizeof( casterTris->indexes[0] ),
+			&casterTris->indexCache,
+			true );
+	}
+
+	return casterTris->ambientCache != NULL;
 }
 
 static bool R_ShouldSkipPointLightEmitterCaster( const idMaterial *shadowShader, const srfTriangles_t *ambientTris, const idVec3 &localLightOrigin, const idVec3 &localLightRadius ) {
@@ -637,7 +657,7 @@ static bool R_EnsureInteractionShadowCache( surfaceInteraction_t *sint ) {
 		}
 	}
 
-	vertexCache.Touch( shadowTris->shadowCache );
+	R_TouchVertexCache( shadowTris->shadowCache );
 
 	if ( !shadowTris->indexCache && r_useIndexBuffers.GetBool() && shadowTris->numIndexes > 0 ) {
 		vertexCache.Alloc(
@@ -647,7 +667,7 @@ static bool R_EnsureInteractionShadowCache( surfaceInteraction_t *sint ) {
 			true );
 	}
 	if ( shadowTris->indexCache ) {
-		vertexCache.Touch( shadowTris->indexCache );
+		R_TouchVertexCache( shadowTris->indexCache );
 	}
 
 	return true;
@@ -1374,7 +1394,7 @@ void idInteraction::AddActiveInteraction( void ) {
 						if ( canAddLightSurf ) {
 							lightTris->ambientCache = ambientTris->ambientCache;
 							lightTris->tempAmbientCache = ambientTris->tempAmbientCache;
-							vertexCache.Touch( ambientTris->ambientCache );
+							R_TouchVertexCache( ambientTris->ambientCache );
 
 							// regenerate the lighting cache (for non-vertex program cards) if it has been purged
 							if ( !lightTris->lightingCache && !R_CreateLightingCache( entityDef, lightDef, lightTris ) ) {
@@ -1386,7 +1406,7 @@ void idInteraction::AddActiveInteraction( void ) {
 							// touch the light surface so it won't get purged
 							// (vertex program cards won't have a light cache at all)
 							if ( lightTris->lightingCache ) {
-								vertexCache.Touch( lightTris->lightingCache );
+								R_TouchVertexCache( lightTris->lightingCache );
 							}
 
 							if ( packedAmbientSurface ) {
@@ -1405,7 +1425,7 @@ void idInteraction::AddActiveInteraction( void ) {
 									true );
 							}
 							if ( lightTris->indexCache ) {
-								vertexCache.Touch( lightTris->indexCache );
+								R_TouchVertexCache( lightTris->indexCache );
 							}
 						}
 					}
@@ -1514,18 +1534,10 @@ void idInteraction::AddActiveInteraction( void ) {
 
 		if ( allowShadowMapCaster ) {
 			srfTriangles_t *casterTris = sint->ambientTris;
-			bool haveCasterGeometry = true;
-
-			if ( !casterTris->ambientCache ) {
-				haveCasterGeometry = R_CreateAmbientCache( casterTris, false );
-			}
+			const bool haveCasterGeometry = R_EnsureShadowMapCasterCaches( casterTris );
 
 			if ( haveCasterGeometry ) {
 				R_TouchShadowMapCache( casterTris->ambientCache );
-
-				if ( !casterTris->indexCache && r_useIndexBuffers.GetBool() && casterTris->numIndexes > 0 ) {
-					vertexCache.Alloc( casterTris->indexes, casterTris->numIndexes * sizeof( casterTris->indexes[0] ), &casterTris->indexCache, true );
-				}
 				R_TouchShadowMapCache( casterTris->indexCache );
 
 				if ( shadowMapNoSelfShadow ) {
@@ -1540,18 +1552,10 @@ void idInteraction::AddActiveInteraction( void ) {
 
 		if ( allowTranslucentShadowMapCaster ) {
 			srfTriangles_t *casterTris = sint->ambientTris;
-			bool haveCasterGeometry = true;
-
-			if ( !casterTris->ambientCache ) {
-				haveCasterGeometry = R_CreateAmbientCache( casterTris, false );
-			}
+			const bool haveCasterGeometry = R_EnsureShadowMapCasterCaches( casterTris );
 
 			if ( haveCasterGeometry ) {
 				R_TouchShadowMapCache( casterTris->ambientCache );
-
-				if ( !casterTris->indexCache && r_useIndexBuffers.GetBool() && casterTris->numIndexes > 0 ) {
-					vertexCache.Alloc( casterTris->indexes, casterTris->numIndexes * sizeof( casterTris->indexes[0] ), &casterTris->indexCache, true );
-				}
 				R_TouchShadowMapCache( casterTris->indexCache );
 
 				if ( shadowMapNoSelfShadow ) {

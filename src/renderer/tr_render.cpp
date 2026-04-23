@@ -119,7 +119,14 @@ RB_DrawShadowElementsWithCounters
 May not use all the indexes in the surface if caps are skipped
 ================
 */
-void RB_DrawShadowElementsWithCounters( const srfTriangles_t *tri, int numIndexes ) {
+void RB_DrawShadowElementsWithCounters( const drawSurf_t *surf, int numIndexes ) {
+	const srfTriangles_t *tri = surf->geo;
+
+	if ( tri->primBatchMesh != NULL ) {
+		RB_ARB2_MD5R_DrawShadowElements( surf, numIndexes );
+		return;
+	}
+
 	backEnd.pc.c_shadowElements++;
 	backEnd.pc.c_shadowIndexes += numIndexes;
 	backEnd.pc.c_shadowVertexes += tri->numVerts;
@@ -768,7 +775,7 @@ void RB_CreateSingleDrawInteractions( const drawSurf_t *surf, void (*DrawInterac
 	const float			*lightRegs = vLight->shaderRegisters;
 	drawInteraction_t	inter;
 
-	if ( r_skipInteractions.GetBool() || !surf->geo || !surf->geo->ambientCache ) {
+	if ( r_skipInteractions.GetBool() || !surf->geo || ( !surf->geo->ambientCache && surf->geo->primBatchMesh == NULL ) ) {
 		return;
 	}
 

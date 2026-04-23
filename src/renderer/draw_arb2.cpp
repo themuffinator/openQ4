@@ -30,6 +30,7 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #include "tr_local.h"
+#include "Model_local.h"
 
 #include "cg_explicit.h"
 #include <ctype.h>
@@ -41,6 +42,35 @@ static ID_INLINE GLint RB_ShadowMapSafeStencilClearValue() {
 
 CGcontext cg_context;
 
+static const int ARB2_MD5R_VARIANTS_PER_FAMILY = 3;
+
+typedef enum {
+	ARB2_MD5R_MVP_ROW_0 = 75,
+	ARB2_MD5R_MVP_ROW_1,
+	ARB2_MD5R_MVP_ROW_2,
+	ARB2_MD5R_MVP_ROW_3,
+	ARB2_MD5R_LOCAL_LIGHT_ORIGIN,
+	ARB2_MD5R_LOCAL_VIEW_ORIGIN,
+	ARB2_MD5R_PROJECTION_ROW_0,
+	ARB2_MD5R_PROJECTION_ROW_1,
+	ARB2_MD5R_PROJECTION_ROW_2,
+	ARB2_MD5R_PROJECTION_ROW_3,
+	ARB2_MD5R_TEXTURE_MATRIX_ROW_0,
+	ARB2_MD5R_TEXTURE_MATRIX_ROW_1,
+	ARB2_MD5R_MODEL_ROW_0,
+	ARB2_MD5R_MODEL_ROW_1,
+	ARB2_MD5R_MODEL_ROW_2,
+	ARB2_MD5R_STAGE_RESERVED,
+	ARB2_MD5R_STAGE_VERTEX_COLOR_MODULATE,
+	ARB2_MD5R_STAGE_VERTEX_COLOR_ADD,
+	ARB2_MD5R_FOG_DISTANCE_PLANE,
+	ARB2_MD5R_FOG_DISTANCE_BIAS,
+	ARB2_MD5R_FOG_ENTER_PLANE_T,
+	ARB2_MD5R_FOG_ENTER_PLANE_S
+} arb2ProgramParameter_t;
+
+static const int ARB2_MD5R_MAX_PALETTE_TRANSFORMS = ARB2_MD5R_MVP_ROW_0 / 3;
+
 typedef enum {
 	ICM_PACKED,
 	ICM_VECTOR
@@ -50,9 +80,831 @@ static interactionColorMode_t g_interactionVertexProgramAutoColorMode = ICM_PACK
 static interactionColorMode_t g_interactionVertexProgramColorMode = ICM_PACKED;
 static int g_interactionVertexProgramOverride = 0;
 static bool g_interactionShaderRescueWarned = false;
+static const drawSurf_t *g_packedInteractionSurf = NULL;
+static int g_packedInteractionVertexFormatIndex = -1;
 
 static GLuint RB_CurrentInteractionProgramIdent( GLenum target );
 static void RB_WarnInteractionShaderRescueMode( void );
+
+static const float RB_ARB2_MD5RIdentityTextureMatrixRows[2][4] = {
+	{ 1.0f, 0.0f, 0.0f, 0.0f },
+	{ 0.0f, 1.0f, 0.0f, 0.0f }
+};
+static const float RB_ARB2_MD5RVertexColorIgnore[4] = { 0.0f, 1.0f, 0.0f, 0.0f };
+static const float RB_ARB2_MD5RVertexColorModulate[4] = { 1.0f, 0.0f, 0.0f, 0.0f };
+static const float RB_ARB2_MD5RVertexColorInverseModulate[4] = { -1.0f, 1.0f, 0.0f, 0.0f };
+static const int ARB2_MD5R_INTERACTION_PARAM_BASE = ARB2_MD5R_MVP_ROW_0;
+
+static program_t RB_ARB2_GetMD5RVertexProgram( program_t familyBase, int vertexFormatIndex ) {
+	if ( vertexFormatIndex < 0 || vertexFormatIndex >= ARB2_MD5R_VARIANTS_PER_FAMILY ) {
+		return PROG_INVALID;
+	}
+
+	return static_cast<program_t>( familyBase + vertexFormatIndex );
+}
+
+static void RB_ARB2_LoadVertexProgramMatrixRows( int firstRegister, const float *matrix, int numRows ) {
+	float parm[4];
+
+	for ( int row = 0; row < numRows; ++row ) {
+		parm[0] = matrix[row];
+		parm[1] = matrix[row + 4];
+		parm[2] = matrix[row + 8];
+		parm[3] = matrix[row + 12];
+		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, firstRegister + row, parm );
+	}
+}
+
+static void RB_ARB2_LoadMD5RTextureMatrix( const float *shaderRegisters, const textureStage_t *texture ) {
+	float matrix[16];
+	RB_GetShaderTextureMatrix( shaderRegisters, texture, matrix );
+	RB_ARB2_LoadVertexProgramMatrixRows( ARB2_MD5R_TEXTURE_MATRIX_ROW_0, matrix, 2 );
+}
+
+static int RB_ARB2_GetMD5RVertexFormatIndex( const rvMD5RVertexBufferDesc &vertexBuffer ) {
+	const bool hasBlendIndices =
+		vertexBuffer.loadVertexFormat.hasBlendIndex
+		&& vertexBuffer.blendIndices.Num() == vertexBuffer.numVertices;
+	const bool hasBlendWeights =
+		vertexBuffer.loadVertexFormat.hasBlendWeight
+		&& vertexBuffer.blendWeights.Num() == vertexBuffer.numVertices;
+
+	if ( hasBlendWeights && !hasBlendIndices ) {
+		return -1;
+	}
+
+	if ( hasBlendWeights ) {
+		return 2;
+	}
+
+	if ( hasBlendIndices ) {
+		return 1;
+	}
+
+	return 0;
+}
+
+static void RB_ARB2_LoadMD5RPaletteTransformRows( int firstRegister, const float *transform ) {
+	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, firstRegister + 0, transform + 0 );
+	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, firstRegister + 1, transform + 4 );
+	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, firstRegister + 2, transform + 8 );
+}
+
+static int RB_ARB2_GetMD5RPositionSize( const rvMD5RVertexBufferDesc &vertexBuffer ) {
+	int positionSize = 3;
+
+	if ( vertexBuffer.loadVertexFormat.hasPosition ) {
+		positionSize = vertexBuffer.loadVertexFormat.positionSwizzled ? 3 : vertexBuffer.loadVertexFormat.positionDim;
+		if ( positionSize < 2 ) {
+			positionSize = 2;
+		} else if ( positionSize > 4 ) {
+			positionSize = 4;
+		}
+	}
+
+	return positionSize;
+}
+
+static program_t RB_ARB2_GetPackedMD5RInteractionVertexProgram( const drawSurf_t *surf, int *vertexFormatIndex ) {
+	if ( vertexFormatIndex != NULL ) {
+		*vertexFormatIndex = -1;
+	}
+
+	const rvMD5RVertexBufferDesc *drawVertexBuffer =
+		( surf != NULL && surf->geo != NULL ) ? R_MD5R_GetDrawVertexBufferForTri( surf->geo ) : NULL;
+	if ( drawVertexBuffer == NULL ) {
+		return PROG_INVALID;
+	}
+
+	const int formatIndex = RB_ARB2_GetMD5RVertexFormatIndex( *drawVertexBuffer );
+	if ( vertexFormatIndex != NULL ) {
+		*vertexFormatIndex = formatIndex;
+	}
+
+	return RB_ARB2_GetMD5RVertexProgram( ARB2_MD5R_INTERACTION_VPROG_BASE, formatIndex );
+}
+
+static bool RB_ARB2_BindPackedMD5RInteractionVertexData( const rvMD5RVertexBufferDesc &vertexBuffer, int vertexFormatIndex ) {
+	if ( vertexBuffer.numVertices <= 0
+		|| vertexBuffer.positions.Num() != vertexBuffer.numVertices
+		|| vertexBuffer.normals.Num() != vertexBuffer.numVertices
+		|| vertexBuffer.tangents.Num() != vertexBuffer.numVertices
+		|| vertexBuffer.texCoords[0].Num() != vertexBuffer.numVertices
+		|| vertexBuffer.diffuseColors.Num() != vertexBuffer.numVertices ) {
+		return false;
+	}
+
+	if ( vertexFormatIndex == 1 && vertexBuffer.binormals.Num() != vertexBuffer.numVertices ) {
+		return false;
+	}
+
+	if ( vertexFormatIndex >= 1 && vertexBuffer.blendIndices.Num() != vertexBuffer.numVertices ) {
+		return false;
+	}
+
+	if ( vertexFormatIndex >= 2 && vertexBuffer.blendWeights.Num() != vertexBuffer.numVertices ) {
+		return false;
+	}
+
+	glBindBufferARB( GL_ARRAY_BUFFER_ARB, 0 );
+	glVertexPointer(
+		RB_ARB2_GetMD5RPositionSize( vertexBuffer ),
+		GL_FLOAT,
+		sizeof( idVec4 ),
+		vertexBuffer.positions.Ptr()->ToFloatPtr() );
+	glColorPointer(
+		4,
+		GL_UNSIGNED_BYTE,
+		sizeof( dword ),
+		reinterpret_cast<const void *>( vertexBuffer.diffuseColors.Ptr() ) );
+	glVertexAttribPointerARB( 2, 3, GL_FLOAT, GL_FALSE, sizeof( idVec3 ), vertexBuffer.normals.Ptr()->ToFloatPtr() );
+	glVertexAttribPointerARB( 6, 3, GL_FLOAT, GL_FALSE, sizeof( idVec3 ), vertexBuffer.tangents.Ptr()->ToFloatPtr() );
+	glVertexAttribPointerARB( 8, 2, GL_FLOAT, GL_FALSE, sizeof( idVec4 ), vertexBuffer.texCoords[0].Ptr()->ToFloatPtr() );
+	glEnableVertexAttribArrayARB( 2 );
+	glEnableVertexAttribArrayARB( 6 );
+	glEnableVertexAttribArrayARB( 8 );
+	glDisableVertexAttribArrayARB( 9 );
+	glDisableVertexAttribArrayARB( 10 );
+	glDisableVertexAttribArrayARB( 11 );
+
+	if ( vertexFormatIndex <= 1 ) {
+		glVertexAttribPointerARB( 7, 3, GL_FLOAT, GL_FALSE, sizeof( idVec3 ), vertexBuffer.binormals.Ptr()->ToFloatPtr() );
+		glEnableVertexAttribArrayARB( 7 );
+	} else {
+		glDisableVertexAttribArrayARB( 7 );
+	}
+
+	if ( vertexFormatIndex >= 1 ) {
+		glVertexAttribPointerARB(
+			1,
+			4,
+			GL_UNSIGNED_BYTE,
+			GL_TRUE,
+			sizeof( dword ),
+			reinterpret_cast<const void *>( vertexBuffer.blendIndices.Ptr() ) );
+		glEnableVertexAttribArrayARB( 1 );
+	} else {
+		glDisableVertexAttribArrayARB( 1 );
+	}
+
+	if ( vertexFormatIndex >= 2 ) {
+		glVertexAttribPointerARB(
+			5,
+			4,
+			GL_FLOAT,
+			GL_FALSE,
+			sizeof( idVec4 ),
+			vertexBuffer.blendWeights.Ptr()->ToFloatPtr() );
+		glEnableVertexAttribArrayARB( 5 );
+	} else {
+		glDisableVertexAttribArrayARB( 5 );
+	}
+
+	return true;
+}
+
+static void RB_ARB2_UnbindPackedMD5RInteractionVertexData( void ) {
+	glDisableVertexAttribArrayARB( 1 );
+	glDisableVertexAttribArrayARB( 2 );
+	glDisableVertexAttribArrayARB( 5 );
+	glDisableVertexAttribArrayARB( 6 );
+	glDisableVertexAttribArrayARB( 7 );
+}
+
+static bool RB_ARB2_BindPackedMD5RDrawVertexData( const rvMD5RVertexBufferDesc &vertexBuffer, int vertexFormatIndex ) {
+	if ( vertexBuffer.numVertices <= 0 || vertexBuffer.positions.Num() != vertexBuffer.numVertices ) {
+		return false;
+	}
+
+	glBindBufferARB( GL_ARRAY_BUFFER_ARB, 0 );
+	glVertexPointer(
+		RB_ARB2_GetMD5RPositionSize( vertexBuffer ),
+		GL_FLOAT,
+		sizeof( idVec4 ),
+		vertexBuffer.positions.Ptr()->ToFloatPtr() );
+
+	if ( vertexFormatIndex >= 1 ) {
+		glEnableVertexAttribArrayARB( 1 );
+		glVertexAttribPointerARB(
+			1,
+			4,
+			GL_UNSIGNED_BYTE,
+			GL_TRUE,
+			sizeof( dword ),
+			reinterpret_cast<const void *>( vertexBuffer.blendIndices.Ptr() ) );
+	}
+
+	if ( vertexFormatIndex >= 2 ) {
+		glEnableVertexAttribArrayARB( 5 );
+		glVertexAttribPointerARB(
+			5,
+			4,
+			GL_FLOAT,
+			GL_FALSE,
+			sizeof( idVec4 ),
+			vertexBuffer.blendWeights.Ptr()->ToFloatPtr() );
+	}
+
+	return true;
+}
+
+static void RB_ARB2_UnbindPackedMD5RDrawVertexData( int vertexFormatIndex ) {
+	if ( vertexFormatIndex >= 2 ) {
+		glDisableVertexAttribArrayARB( 5 );
+	}
+	if ( vertexFormatIndex >= 1 ) {
+		glDisableVertexAttribArrayARB( 1 );
+	}
+}
+
+static bool RB_ARB2_DrawPackedMD5RInteractionBatches( const drawInteraction_t *din, int vertexFormatIndex ) {
+	const drawSurf_t *surf = ( din != NULL ) ? din->surf : NULL;
+	const srfTriangles_t *tri = ( surf != NULL ) ? surf->geo : NULL;
+	const rvMD5RMesh *mesh = ( tri != NULL ) ? R_MD5R_GetMeshForTri( tri ) : NULL;
+	const rvMD5RVertexBufferDesc *drawVertexBuffer = ( tri != NULL ) ? R_MD5R_GetDrawVertexBufferForTri( tri ) : NULL;
+	if ( tri == NULL
+		|| mesh == NULL
+		|| drawVertexBuffer == NULL
+		|| tri->indexes == NULL
+		|| tri->numIndexes <= 0
+		|| ( tri->numIndexes % 3 ) != 0
+		|| mesh->primBatches.Num() <= 0 ) {
+		return false;
+	}
+
+	glIndex_t *batchIndexes = (glIndex_t *)_alloca16( tri->numIndexes * sizeof( batchIndexes[0] ) );
+	const glIndex_t *lightIndexes = tri->indexes;
+	int destVertexBase = 0;
+	int transformBase = 0;
+
+	vertexCache.UnbindIndex();
+
+	for ( int primBatchIndex = 0; primBatchIndex < mesh->primBatches.Num(); ++primBatchIndex ) {
+		const rvMD5RPrimBatch &primBatch = mesh->primBatches[ primBatchIndex ];
+		const int primBatchTransformCount = Max( primBatch.numTransforms, 1 );
+		const int batchVertexStart = destVertexBase;
+		const int batchVertexEnd = destVertexBase + primBatch.drawGeoSpec.vertexCount;
+		int batchIndexCount = 0;
+
+		if ( !primBatch.hasDrawGeoSpec
+			|| primBatch.drawGeoSpec.vertexStart < 0
+			|| primBatch.drawGeoSpec.vertexCount < 0
+			|| primBatch.drawGeoSpec.vertexStart + primBatch.drawGeoSpec.vertexCount > drawVertexBuffer->numVertices ) {
+			return false;
+		}
+
+		if ( vertexFormatIndex > 0 ) {
+			if ( tri->skinToModelTransforms == NULL
+				|| tri->numSkinToModelTransforms <= 0
+				|| primBatchTransformCount > ARB2_MD5R_MAX_PALETTE_TRANSFORMS
+				|| transformBase + primBatchTransformCount > tri->numSkinToModelTransforms ) {
+				return false;
+			}
+		}
+
+		for ( int indexBase = 0; indexBase < tri->numIndexes; indexBase += 3 ) {
+			const int localIndex0 = lightIndexes[indexBase + 0];
+			const int localIndex1 = lightIndexes[indexBase + 1];
+			const int localIndex2 = lightIndexes[indexBase + 2];
+			const bool index0InBatch = ( localIndex0 >= batchVertexStart && localIndex0 < batchVertexEnd );
+			const bool index1InBatch = ( localIndex1 >= batchVertexStart && localIndex1 < batchVertexEnd );
+			const bool index2InBatch = ( localIndex2 >= batchVertexStart && localIndex2 < batchVertexEnd );
+
+			if ( !index0InBatch && !index1InBatch && !index2InBatch ) {
+				continue;
+			}
+
+			if ( !index0InBatch || !index1InBatch || !index2InBatch ) {
+				return false;
+			}
+
+			batchIndexes[batchIndexCount + 0] = localIndex0 - batchVertexStart + primBatch.drawGeoSpec.vertexStart;
+			batchIndexes[batchIndexCount + 1] = localIndex1 - batchVertexStart + primBatch.drawGeoSpec.vertexStart;
+			batchIndexes[batchIndexCount + 2] = localIndex2 - batchVertexStart + primBatch.drawGeoSpec.vertexStart;
+			batchIndexCount += 3;
+		}
+
+		if ( batchIndexCount > 0 ) {
+			if ( vertexFormatIndex > 0 ) {
+				for ( int transformIndex = 0; transformIndex < primBatchTransformCount; ++transformIndex ) {
+					RB_ARB2_LoadMD5RPaletteTransformRows(
+						transformIndex * 3,
+						tri->skinToModelTransforms + ( ( transformBase + transformIndex ) * 16 ) );
+				}
+			}
+
+			backEnd.pc.c_drawElements++;
+			backEnd.pc.c_drawIndexes += batchIndexCount;
+			backEnd.pc.c_drawVertexes += primBatch.drawGeoSpec.vertexCount;
+
+			glDrawElements(
+				GL_TRIANGLES,
+				r_singleTriangle.GetBool() ? 3 : batchIndexCount,
+				GL_INDEX_TYPE,
+				batchIndexes );
+		}
+
+		destVertexBase += primBatch.drawGeoSpec.vertexCount;
+		transformBase += primBatchTransformCount;
+	}
+
+	return true;
+}
+
+static bool RB_ARB2_DrawPackedMD5RDepthBatches( const drawSurf_t *surf ) {
+	const srfTriangles_t *tri = ( surf != NULL ) ? surf->geo : NULL;
+	const rvMD5RMesh *mesh = ( tri != NULL ) ? R_MD5R_GetMeshForTri( tri ) : NULL;
+	const rvMD5RVertexBufferDesc *drawVertexBuffer = ( tri != NULL ) ? R_MD5R_GetDrawVertexBufferForTri( tri ) : NULL;
+	const rvMD5RIndexBufferDesc *drawIndexBuffer = ( tri != NULL ) ? R_MD5R_GetDrawIndexBufferForTri( tri ) : NULL;
+	if ( tri == NULL || mesh == NULL || drawVertexBuffer == NULL || drawIndexBuffer == NULL ) {
+		return false;
+	}
+
+	const int vertexFormatIndex = RB_ARB2_GetMD5RVertexFormatIndex( *drawVertexBuffer );
+	if ( vertexFormatIndex < 0 ) {
+		return false;
+	}
+
+	const program_t depthProgram = RB_ARB2_GetMD5RVertexProgram( ARB2_MD5R_DEPTH_VPROG_BASE, vertexFormatIndex );
+	if ( depthProgram == PROG_INVALID ) {
+		return false;
+	}
+
+	if ( drawIndexBuffer->numIndices <= 0 || drawIndexBuffer->indices.Num() != drawIndexBuffer->numIndices || mesh->primBatches.Num() <= 0 ) {
+		return false;
+	}
+
+	int transformBase = 0;
+	for ( int primBatchIndex = 0; primBatchIndex < mesh->primBatches.Num(); ++primBatchIndex ) {
+		const rvMD5RPrimBatch &primBatch = mesh->primBatches[ primBatchIndex ];
+		const int primBatchTransformCount = Max( primBatch.numTransforms, 1 );
+		const int indexCount = primBatch.drawGeoSpec.primitiveCount * 3;
+
+		if ( !primBatch.hasDrawGeoSpec
+			|| primBatch.drawGeoSpec.vertexStart < 0
+			|| primBatch.drawGeoSpec.vertexCount < 0
+			|| primBatch.drawGeoSpec.vertexStart + primBatch.drawGeoSpec.vertexCount > drawVertexBuffer->numVertices
+			|| primBatch.drawGeoSpec.indexStart < 0
+			|| primBatch.drawGeoSpec.indexStart + indexCount > drawIndexBuffer->numIndices ) {
+			return false;
+		}
+
+		if ( vertexFormatIndex > 0 ) {
+			if ( tri->skinToModelTransforms == NULL
+				|| tri->numSkinToModelTransforms <= 0
+				|| primBatchTransformCount > ARB2_MD5R_MAX_PALETTE_TRANSFORMS
+				|| transformBase + primBatchTransformCount > tri->numSkinToModelTransforms ) {
+				return false;
+			}
+		}
+
+		transformBase += primBatchTransformCount;
+	}
+
+	if ( !R_BindARBProgram( GL_VERTEX_PROGRAM_ARB, depthProgram, "packed depth vertex program", false ) ) {
+		return false;
+	}
+
+	glEnable( GL_VERTEX_PROGRAM_ARB );
+	RB_ARB2_LoadMD5RMVPMatrix( surf );
+
+	if ( !RB_ARB2_BindPackedMD5RDrawVertexData( *drawVertexBuffer, vertexFormatIndex ) ) {
+		glBindProgramARB( GL_VERTEX_PROGRAM_ARB, 0 );
+		glDisable( GL_VERTEX_PROGRAM_ARB );
+		return false;
+	}
+
+	vertexCache.UnbindIndex();
+
+	transformBase = 0;
+	for ( int primBatchIndex = 0; primBatchIndex < mesh->primBatches.Num(); ++primBatchIndex ) {
+		const rvMD5RPrimBatch &primBatch = mesh->primBatches[ primBatchIndex ];
+		const int primBatchTransformCount = Max( primBatch.numTransforms, 1 );
+		const int indexCount = primBatch.drawGeoSpec.primitiveCount * 3;
+
+		if ( vertexFormatIndex > 0 ) {
+			for ( int transformIndex = 0; transformIndex < primBatchTransformCount; ++transformIndex ) {
+				RB_ARB2_LoadMD5RPaletteTransformRows(
+					transformIndex * 3,
+					tri->skinToModelTransforms + ( ( transformBase + transformIndex ) * 16 ) );
+			}
+		}
+
+		backEnd.pc.c_drawElements++;
+		backEnd.pc.c_drawIndexes += indexCount;
+		backEnd.pc.c_drawVertexes += primBatch.drawGeoSpec.vertexCount;
+
+		glDrawElements(
+			GL_TRIANGLES,
+			r_singleTriangle.GetBool() ? 3 : indexCount,
+			GL_INDEX_TYPE,
+			drawIndexBuffer->indices.Ptr() + primBatch.drawGeoSpec.indexStart );
+
+		transformBase += primBatchTransformCount;
+	}
+
+	RB_ARB2_UnbindPackedMD5RDrawVertexData( vertexFormatIndex );
+	glBindProgramARB( GL_VERTEX_PROGRAM_ARB, 0 );
+	glDisable( GL_VERTEX_PROGRAM_ARB );
+	return true;
+}
+
+static bool RB_ARB2_DrawPackedMD5RFogBatches( const drawSurf_t *surf ) {
+	const srfTriangles_t *tri = ( surf != NULL ) ? surf->geo : NULL;
+	const rvMD5RMesh *mesh = ( tri != NULL ) ? R_MD5R_GetMeshForTri( tri ) : NULL;
+	const rvMD5RVertexBufferDesc *drawVertexBuffer = ( tri != NULL ) ? R_MD5R_GetDrawVertexBufferForTri( tri ) : NULL;
+	const rvMD5RIndexBufferDesc *drawIndexBuffer = ( tri != NULL ) ? R_MD5R_GetDrawIndexBufferForTri( tri ) : NULL;
+	if ( tri == NULL || mesh == NULL || drawVertexBuffer == NULL || drawIndexBuffer == NULL ) {
+		return false;
+	}
+
+	const int vertexFormatIndex = RB_ARB2_GetMD5RVertexFormatIndex( *drawVertexBuffer );
+	if ( vertexFormatIndex < 0 ) {
+		return false;
+	}
+
+	const program_t fogProgram = RB_ARB2_GetMD5RVertexProgram( ARB2_MD5R_BASIC_FOG_VPROG_BASE, vertexFormatIndex );
+	if ( fogProgram == PROG_INVALID ) {
+		return false;
+	}
+
+	if ( drawIndexBuffer->numIndices <= 0 || drawIndexBuffer->indices.Num() != drawIndexBuffer->numIndices || mesh->primBatches.Num() <= 0 ) {
+		return false;
+	}
+
+	int transformBase = 0;
+	for ( int primBatchIndex = 0; primBatchIndex < mesh->primBatches.Num(); ++primBatchIndex ) {
+		const rvMD5RPrimBatch &primBatch = mesh->primBatches[ primBatchIndex ];
+		const int primBatchTransformCount = Max( primBatch.numTransforms, 1 );
+		const int indexCount = primBatch.drawGeoSpec.primitiveCount * 3;
+
+		if ( !primBatch.hasDrawGeoSpec
+			|| primBatch.drawGeoSpec.vertexStart < 0
+			|| primBatch.drawGeoSpec.vertexCount < 0
+			|| primBatch.drawGeoSpec.vertexStart + primBatch.drawGeoSpec.vertexCount > drawVertexBuffer->numVertices
+			|| primBatch.drawGeoSpec.indexStart < 0
+			|| primBatch.drawGeoSpec.indexStart + indexCount > drawIndexBuffer->numIndices ) {
+			return false;
+		}
+
+		if ( vertexFormatIndex > 0 ) {
+			if ( tri->skinToModelTransforms == NULL
+				|| tri->numSkinToModelTransforms <= 0
+				|| primBatchTransformCount > ARB2_MD5R_MAX_PALETTE_TRANSFORMS
+				|| transformBase + primBatchTransformCount > tri->numSkinToModelTransforms ) {
+				return false;
+			}
+		}
+
+		transformBase += primBatchTransformCount;
+	}
+
+	if ( !R_BindARBProgram( GL_VERTEX_PROGRAM_ARB, fogProgram, "packed fog vertex program", false ) ) {
+		return false;
+	}
+
+	idPlane local;
+	glEnable( GL_VERTEX_PROGRAM_ARB );
+	RB_ARB2_LoadMD5RMVPMatrix( surf );
+
+	R_GlobalPlaneToLocal( surf->space->modelMatrix, fogTexGenPlanes[FOG_DISTANCE_PLANE_S], local );
+	local[3] += 0.5f;
+	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_FOG_DISTANCE_PLANE, local.ToFloatPtr() );
+
+	local[0] = 0.0f;
+	local[1] = 0.0f;
+	local[2] = 0.0f;
+	local[3] = 0.5f;
+	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_FOG_DISTANCE_BIAS, local.ToFloatPtr() );
+
+	R_GlobalPlaneToLocal( surf->space->modelMatrix, fogTexGenPlanes[FOG_ENTER_PLANE_T], local );
+	local[3] += FOG_ENTER;
+	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_FOG_ENTER_PLANE_T, local.ToFloatPtr() );
+
+	R_GlobalPlaneToLocal( surf->space->modelMatrix, fogTexGenPlanes[FOG_ENTER_PLANE_S], local );
+	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_FOG_ENTER_PLANE_S, local.ToFloatPtr() );
+
+	if ( !RB_ARB2_BindPackedMD5RDrawVertexData( *drawVertexBuffer, vertexFormatIndex ) ) {
+		glBindProgramARB( GL_VERTEX_PROGRAM_ARB, 0 );
+		glDisable( GL_VERTEX_PROGRAM_ARB );
+		return false;
+	}
+
+	vertexCache.UnbindIndex();
+
+	transformBase = 0;
+	for ( int primBatchIndex = 0; primBatchIndex < mesh->primBatches.Num(); ++primBatchIndex ) {
+		const rvMD5RPrimBatch &primBatch = mesh->primBatches[ primBatchIndex ];
+		const int primBatchTransformCount = Max( primBatch.numTransforms, 1 );
+		const int indexCount = primBatch.drawGeoSpec.primitiveCount * 3;
+
+		if ( vertexFormatIndex > 0 ) {
+			for ( int transformIndex = 0; transformIndex < primBatchTransformCount; ++transformIndex ) {
+				RB_ARB2_LoadMD5RPaletteTransformRows(
+					transformIndex * 3,
+					tri->skinToModelTransforms + ( ( transformBase + transformIndex ) * 16 ) );
+			}
+		}
+
+		backEnd.pc.c_drawElements++;
+		backEnd.pc.c_drawIndexes += indexCount;
+		backEnd.pc.c_drawVertexes += primBatch.drawGeoSpec.vertexCount;
+
+		glDrawElements(
+			GL_TRIANGLES,
+			r_singleTriangle.GetBool() ? 3 : indexCount,
+			GL_INDEX_TYPE,
+			drawIndexBuffer->indices.Ptr() + primBatch.drawGeoSpec.indexStart );
+
+		transformBase += primBatchTransformCount;
+	}
+
+	RB_ARB2_UnbindPackedMD5RDrawVertexData( vertexFormatIndex );
+	glBindProgramARB( GL_VERTEX_PROGRAM_ARB, 0 );
+	glDisable( GL_VERTEX_PROGRAM_ARB );
+	return true;
+}
+
+static void RB_ARB2_LoadMD5RStageColor( const shaderStage_t *pStage, const drawSurf_t *surf, bool fillingDepth ) {
+	static const float zero[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+	static const float one[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+
+	if ( fillingDepth ) {
+		float alphaOnly[4] = { 0.0f, 0.0f, 0.0f, surf->shaderRegisters[pStage->color.registers[3]] };
+		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_STAGE_VERTEX_COLOR_MODULATE, zero );
+		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_STAGE_VERTEX_COLOR_ADD, alphaOnly );
+		return;
+	}
+
+	if ( pStage->vertexColor != SVC_IGNORE ) {
+		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_STAGE_VERTEX_COLOR_MODULATE, one );
+		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_STAGE_VERTEX_COLOR_ADD, zero );
+		return;
+	}
+
+	float stageColor[4] = {
+		surf->shaderRegisters[pStage->color.registers[0]],
+		surf->shaderRegisters[pStage->color.registers[1]],
+		surf->shaderRegisters[pStage->color.registers[2]],
+		surf->shaderRegisters[pStage->color.registers[3]]
+	};
+	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_STAGE_VERTEX_COLOR_MODULATE, zero );
+	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_STAGE_VERTEX_COLOR_ADD, stageColor );
+}
+
+void RB_ARB2_LoadMD5RLocalViewOrigin( const drawSurf_t *surf ) {
+	if ( surf == NULL || surf->space == NULL || backEnd.viewDef == NULL ) {
+		return;
+	}
+
+	idVec4 localViewOrigin;
+	R_GlobalPointToLocal( surf->space->modelMatrix, backEnd.viewDef->renderView.vieworg, localViewOrigin.ToVec3() );
+	localViewOrigin.w = 1.0f;
+	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_LOCAL_VIEW_ORIGIN, localViewOrigin.ToFloatPtr() );
+}
+
+void RB_ARB2_LoadMD5RMVPMatrix( const drawSurf_t *surf ) {
+	if ( surf == NULL || surf->space == NULL || backEnd.viewDef == NULL ) {
+		return;
+	}
+
+	float modelViewProjection[16];
+	myGlMultMatrix( surf->space->modelViewMatrix, backEnd.viewDef->projectionMatrix, modelViewProjection );
+	RB_ARB2_LoadVertexProgramMatrixRows( ARB2_MD5R_MVP_ROW_0, modelViewProjection, 4 );
+}
+
+void RB_ARB2_LoadMD5RProjectionMatrix( void ) {
+	if ( backEnd.viewDef == NULL ) {
+		return;
+	}
+
+	RB_ARB2_LoadVertexProgramMatrixRows( ARB2_MD5R_PROJECTION_ROW_0, backEnd.viewDef->projectionMatrix, 4 );
+}
+
+void RB_ARB2_LoadMD5RModelViewMatrix( const drawSurf_t *surf ) {
+	if ( surf == NULL || surf->space == NULL ) {
+		return;
+	}
+
+	RB_ARB2_LoadVertexProgramMatrixRows( ARB2_MD5R_MODEL_ROW_0, surf->space->modelViewMatrix, 3 );
+}
+
+static void RB_ARB2_LoadMD5RModelMatrix( const drawSurf_t *surf ) {
+	if ( surf == NULL || surf->space == NULL ) {
+		return;
+	}
+
+	RB_ARB2_LoadVertexProgramMatrixRows( ARB2_MD5R_MODEL_ROW_0, surf->space->modelMatrix, 3 );
+}
+
+void RB_ARB2_PrepareStageTexturing( const shaderStage_t *pStage, const drawSurf_t *surf, bool fillingDepth ) {
+	if ( pStage->privatePolygonOffset ) {
+		glEnable( GL_POLYGON_OFFSET_FILL );
+		glPolygonOffset( r_offsetFactor.GetFloat(), r_offsetUnits.GetFloat() * pStage->privatePolygonOffset );
+	}
+
+	switch ( pStage->texture.texgen ) {
+	case TG_DIFFUSE_CUBE:
+		if ( !R_BindARBProgram( GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_DIFFUSE_CUBE_VPROG_BASE, "packed diffuse-cube stage vertex program", false ) ) {
+			return;
+		}
+		glEnable( GL_VERTEX_PROGRAM_ARB );
+		break;
+
+	case TG_REFLECT_CUBE: {
+		const shaderStage_t *bumpStage = surf->material->GetBumpStage();
+		if ( bumpStage != NULL ) {
+			GL_SelectTexture( 1 );
+			bumpStage->texture.image->Bind();
+			GL_SelectTexture( 0 );
+
+			if ( R_BindARBProgram( GL_FRAGMENT_PROGRAM_ARB, FPROG_BUMPY_ENVIRONMENT, "packed reflect-cube stage fragment program", false ) ) {
+				glEnable( GL_FRAGMENT_PROGRAM_ARB );
+			}
+
+			if ( !R_BindARBProgram( GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_BUMPY_REFLECT_CUBE_VPROG_BASE, "packed bumpy reflect-cube stage vertex program", false ) ) {
+				return;
+			}
+			glEnable( GL_VERTEX_PROGRAM_ARB );
+			RB_ARB2_LoadMD5RLocalViewOrigin( surf );
+			RB_ARB2_LoadMD5RModelMatrix( surf );
+		} else {
+			if ( !R_BindARBProgram( GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_REFLECT_CUBE_VPROG_BASE, "packed reflect-cube stage vertex program", false ) ) {
+				return;
+			}
+			glEnable( GL_VERTEX_PROGRAM_ARB );
+			RB_ARB2_LoadMD5RLocalViewOrigin( surf );
+		}
+		break;
+	}
+
+	case TG_SKYBOX_CUBE:
+	case TG_WOBBLESKY_CUBE:
+		if ( surf->texGenTransformAndViewOrg == NULL ) {
+			return;
+		}
+		if ( !R_BindARBProgram( GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_SKYBOX_VPROG_BASE, "packed skybox stage vertex program", false ) ) {
+			return;
+		}
+		glEnable( GL_VERTEX_PROGRAM_ARB );
+		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_LOCAL_VIEW_ORIGIN, surf->texGenTransformAndViewOrg + 12 );
+		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_PROJECTION_ROW_0, surf->texGenTransformAndViewOrg + 0 );
+		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_PROJECTION_ROW_1, surf->texGenTransformAndViewOrg + 4 );
+		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_PROJECTION_ROW_2, surf->texGenTransformAndViewOrg + 8 );
+		break;
+
+	case TG_SCREEN:
+		// Retail keeps packed TG_SCREEN on a no-op path here; SCREEN2 and
+		// GLASSWARP continue through the generic MD5R stage program below.
+		return;
+
+	default:
+		if ( !R_BindARBProgram( GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_STAGE_VPROG_BASE, "packed stage texturing vertex program", false ) ) {
+			return;
+		}
+		glEnable( GL_VERTEX_PROGRAM_ARB );
+		break;
+	}
+
+	RB_ARB2_LoadMD5RStageColor( pStage, surf, fillingDepth );
+	RB_ARB2_LoadMD5RMVPMatrix( surf );
+
+	if ( pStage->texture.texgen == TG_DIFFUSE_CUBE || pStage->texture.texgen == TG_REFLECT_CUBE
+		|| pStage->texture.texgen == TG_SKYBOX_CUBE || pStage->texture.texgen == TG_WOBBLESKY_CUBE ) {
+		return;
+	}
+
+	if ( pStage->texture.hasMatrix ) {
+		RB_ARB2_LoadMD5RTextureMatrix( surf->shaderRegisters, &pStage->texture );
+	} else {
+		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_TEXTURE_MATRIX_ROW_0, RB_ARB2_MD5RIdentityTextureMatrixRows[0] );
+		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_TEXTURE_MATRIX_ROW_1, RB_ARB2_MD5RIdentityTextureMatrixRows[1] );
+	}
+}
+
+void RB_ARB2_MD5R_DrawDepthElements( const drawSurf_t *surf ) {
+	if ( surf == NULL || surf->geo == NULL || surf->geo->ambientCache == NULL ) {
+		return;
+	}
+
+	if ( RB_ARB2_DrawPackedMD5RDepthBatches( surf ) ) {
+		return;
+	}
+
+	if ( !R_BindARBProgram( GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_DEPTH_VPROG_BASE, "packed depth vertex program", false ) ) {
+		RB_DrawElementsWithCounters( surf->geo );
+		return;
+	}
+
+	glEnable( GL_VERTEX_PROGRAM_ARB );
+	RB_ARB2_LoadMD5RMVPMatrix( surf );
+	RB_DrawElementsWithCounters( surf->geo );
+	glBindProgramARB( GL_VERTEX_PROGRAM_ARB, 0 );
+	glDisable( GL_VERTEX_PROGRAM_ARB );
+}
+
+void RB_ARB2_MD5R_DrawShadowElements( const drawSurf_t *surf, int numIndexes ) {
+	const srfTriangles_t *tri = ( surf != NULL ) ? surf->geo : NULL;
+	if ( tri == NULL || tri->shadowCache == NULL ) {
+		return;
+	}
+
+	const bool vertexProgramWasEnabled = glIsEnabled( GL_VERTEX_PROGRAM_ARB ) == GL_TRUE;
+	if ( R_BindARBProgram( GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_SHADOW_VOLUME_VPROG_BASE, "packed shadow vertex program", false ) ) {
+		idVec4 localLight;
+		R_GlobalPointToLocal( surf->space->modelMatrix, backEnd.vLight->globalLightOrigin, localLight.ToVec3() );
+		localLight.w = 0.0f;
+
+		glEnable( GL_VERTEX_PROGRAM_ARB );
+		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_LOCAL_LIGHT_ORIGIN, localLight.ToFloatPtr() );
+		RB_ARB2_LoadMD5RMVPMatrix( surf );
+	}
+
+	backEnd.pc.c_shadowElements++;
+	backEnd.pc.c_shadowIndexes += numIndexes;
+	backEnd.pc.c_shadowVertexes += tri->numVerts;
+
+	if ( tri->indexCache && r_useIndexBuffers.GetBool() ) {
+		glDrawElements( GL_TRIANGLES,
+			r_singleTriangle.GetBool() ? 3 : numIndexes,
+			GL_INDEX_TYPE,
+			(int *)vertexCache.Position( tri->indexCache ) );
+		backEnd.pc.c_vboIndexes += numIndexes;
+	} else {
+		if ( r_useIndexBuffers.GetBool() ) {
+			vertexCache.UnbindIndex();
+		}
+		glDrawElements( GL_TRIANGLES,
+			r_singleTriangle.GetBool() ? 3 : numIndexes,
+			GL_INDEX_TYPE,
+			tri->indexes );
+	}
+
+	if ( vertexProgramWasEnabled ) {
+		glBindProgramARB( GL_VERTEX_PROGRAM_ARB, VPROG_STENCIL_SHADOW );
+	} else {
+		glBindProgramARB( GL_VERTEX_PROGRAM_ARB, 0 );
+		glDisable( GL_VERTEX_PROGRAM_ARB );
+	}
+}
+
+void RB_ARB2_MD5R_DrawBasicFog( const drawSurf_t *surf ) {
+	if ( surf == NULL || surf->geo == NULL || surf->geo->ambientCache == NULL ) {
+		return;
+	}
+
+	if ( RB_ARB2_DrawPackedMD5RFogBatches( surf ) ) {
+		return;
+	}
+
+	if ( !R_BindARBProgram( GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_BASIC_FOG_VPROG_BASE, "packed fog vertex program", false ) ) {
+		RB_DrawElementsWithCounters( surf->geo );
+		return;
+	}
+
+	idPlane local;
+	glEnable( GL_VERTEX_PROGRAM_ARB );
+	RB_ARB2_LoadMD5RMVPMatrix( surf );
+
+	R_GlobalPlaneToLocal( surf->space->modelMatrix, fogTexGenPlanes[FOG_DISTANCE_PLANE_S], local );
+	local[3] += 0.5f;
+	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_FOG_DISTANCE_PLANE, local.ToFloatPtr() );
+
+	local[0] = 0.0f;
+	local[1] = 0.0f;
+	local[2] = 0.0f;
+	local[3] = 0.5f;
+	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_FOG_DISTANCE_BIAS, local.ToFloatPtr() );
+
+	R_GlobalPlaneToLocal( surf->space->modelMatrix, fogTexGenPlanes[FOG_ENTER_PLANE_T], local );
+	local[3] += FOG_ENTER;
+	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_FOG_ENTER_PLANE_T, local.ToFloatPtr() );
+
+	R_GlobalPlaneToLocal( surf->space->modelMatrix, fogTexGenPlanes[FOG_ENTER_PLANE_S], local );
+	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_FOG_ENTER_PLANE_S, local.ToFloatPtr() );
+
+	RB_DrawElementsWithCounters( surf->geo );
+	glBindProgramARB( GL_VERTEX_PROGRAM_ARB, 0 );
+	glDisable( GL_VERTEX_PROGRAM_ARB );
+}
+
+void RB_ARB2_DisableStageTexturing( const shaderStage_t *pStage, const drawSurf_t *surf ) {
+	if ( pStage->privatePolygonOffset && !surf->material->TestMaterialFlag( MF_POLYGONOFFSET ) ) {
+		glDisable( GL_POLYGON_OFFSET_FILL );
+	}
+
+	glDisable( GL_FRAGMENT_PROGRAM_ARB );
+	glDisable( GL_VERTEX_PROGRAM_ARB );
+	glBindProgramARB( GL_VERTEX_PROGRAM_ARB, 0 );
+	glBindBufferARB( GL_ARRAY_BUFFER_ARB, 0 );
+	vertexCache.UnbindIndex();
+
+	if ( pStage->texture.texgen == TG_REFLECT_CUBE && surf->material->GetBumpStage() != NULL ) {
+		GL_SelectTexture( 1 );
+		globalImages->BindNull();
+		GL_SelectTexture( 0 );
+	}
+}
 
 static const char *RB_InteractionColorModeName( interactionColorMode_t mode ) {
 	switch ( mode ) {
@@ -5174,19 +6026,29 @@ RB_ARB2_DrawInteraction
 ==================
 */
 void	RB_ARB2_DrawInteraction( const drawInteraction_t *din ) {
+	const bool packedInteractionSurface =
+		( din != NULL
+			&& din->surf == g_packedInteractionSurf
+			&& g_packedInteractionVertexFormatIndex >= 0 );
+	const int interactionParamBase = packedInteractionSurface ? ARB2_MD5R_INTERACTION_PARAM_BASE : 0;
+
+	if ( packedInteractionSurface ) {
+		RB_ARB2_LoadMD5RMVPMatrix( din->surf );
+	}
+
 	// load all the vertex program parameters
-	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_LIGHT_ORIGIN, din->localLightOrigin.ToFloatPtr() );
-	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_VIEW_ORIGIN, din->localViewOrigin.ToFloatPtr() );
-	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_LIGHT_PROJECT_S, din->lightProjection[0].ToFloatPtr() );
-	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_LIGHT_PROJECT_T, din->lightProjection[1].ToFloatPtr() );
-	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_LIGHT_PROJECT_Q, din->lightProjection[2].ToFloatPtr() );
-	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_LIGHT_FALLOFF_S, din->lightProjection[3].ToFloatPtr() );
-	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_BUMP_MATRIX_S, din->bumpMatrix[0].ToFloatPtr() );
-	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_BUMP_MATRIX_T, din->bumpMatrix[1].ToFloatPtr() );
-	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_DIFFUSE_MATRIX_S, din->diffuseMatrix[0].ToFloatPtr() );
-	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_DIFFUSE_MATRIX_T, din->diffuseMatrix[1].ToFloatPtr() );
-	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_SPECULAR_MATRIX_S, din->specularMatrix[0].ToFloatPtr() );
-	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_SPECULAR_MATRIX_T, din->specularMatrix[1].ToFloatPtr() );
+	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, interactionParamBase + PP_LIGHT_ORIGIN, din->localLightOrigin.ToFloatPtr() );
+	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, interactionParamBase + PP_VIEW_ORIGIN, din->localViewOrigin.ToFloatPtr() );
+	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, interactionParamBase + PP_LIGHT_PROJECT_S, din->lightProjection[0].ToFloatPtr() );
+	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, interactionParamBase + PP_LIGHT_PROJECT_T, din->lightProjection[1].ToFloatPtr() );
+	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, interactionParamBase + PP_LIGHT_PROJECT_Q, din->lightProjection[2].ToFloatPtr() );
+	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, interactionParamBase + PP_LIGHT_FALLOFF_S, din->lightProjection[3].ToFloatPtr() );
+	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, interactionParamBase + PP_BUMP_MATRIX_S, din->bumpMatrix[0].ToFloatPtr() );
+	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, interactionParamBase + PP_BUMP_MATRIX_T, din->bumpMatrix[1].ToFloatPtr() );
+	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, interactionParamBase + PP_DIFFUSE_MATRIX_S, din->diffuseMatrix[0].ToFloatPtr() );
+	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, interactionParamBase + PP_DIFFUSE_MATRIX_T, din->diffuseMatrix[1].ToFloatPtr() );
+	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, interactionParamBase + PP_SPECULAR_MATRIX_S, din->specularMatrix[0].ToFloatPtr() );
+	glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, interactionParamBase + PP_SPECULAR_MATRIX_T, din->specularMatrix[1].ToFloatPtr() );
 
 	// testing fragment based normal mapping
 	if ( r_testARBProgram.GetBool() ) {
@@ -5213,7 +6075,20 @@ void	RB_ARB2_DrawInteraction( const drawInteraction_t *din ) {
 		break;
 	}
 
-	if ( g_interactionVertexProgramColorMode == ICM_PACKED ) {
+	if ( packedInteractionSurface ) {
+		const float *packedColorMode = RB_ARB2_MD5RVertexColorIgnore;
+		switch ( din->vertexColor ) {
+		case SVC_MODULATE:
+			packedColorMode = RB_ARB2_MD5RVertexColorModulate;
+			break;
+		case SVC_INVERSE_MODULATE:
+			packedColorMode = RB_ARB2_MD5RVertexColorInverseModulate;
+			break;
+		default:
+			break;
+		}
+		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, interactionParamBase + PP_COLOR_MODULATE, packedColorMode );
+	} else if ( g_interactionVertexProgramColorMode == ICM_PACKED ) {
 		// Stock Quake 4 interaction.vfp packs vertex-color mode as env[16].xy.
 		const float packed[4] = { modulate, add, 0.0f, 0.0f };
 		glProgramEnvParameter4fvARB( GL_VERTEX_PROGRAM_ARB, PP_COLOR_MODULATE, packed );
@@ -5265,7 +6140,9 @@ void	RB_ARB2_DrawInteraction( const drawInteraction_t *din ) {
 	}
 
 	// draw it
-	RB_DrawElementsWithCounters( din->surf->geo );
+	if ( !packedInteractionSurface || !RB_ARB2_DrawPackedMD5RInteractionBatches( din, g_packedInteractionVertexFormatIndex ) ) {
+		RB_DrawElementsWithCounters( din->surf->geo );
+	}
 
 	if ( surfaceMaterial && surfaceMaterial->TestMaterialFlag( MF_POLYGONOFFSET ) ) {
 		glDisable( GL_POLYGON_OFFSET_FILL );
@@ -5318,22 +6195,58 @@ void RB_ARB2_CreateDrawInteractions( const drawSurf_t *surf ) {
 
 
 	for ( ; surf ; surf=surf->nextOnLight ) {
-		// perform setup here that will not change over multiple interaction passes
+		g_packedInteractionSurf = NULL;
+		g_packedInteractionVertexFormatIndex = -1;
 
-		// set the vertex pointers
-		idDrawVert	*ac = (idDrawVert *)vertexCache.Position( surf->geo->ambientCache );
-		glColorPointer( 4, GL_UNSIGNED_BYTE, sizeof( idDrawVert ), ac->color );
-		glVertexAttribPointerARB( 11, 3, GL_FLOAT, false, sizeof( idDrawVert ), ac->normal.ToFloatPtr() );
-		glVertexAttribPointerARB( 10, 3, GL_FLOAT, false, sizeof( idDrawVert ), ac->tangents[1].ToFloatPtr() );
-		glVertexAttribPointerARB( 9, 3, GL_FLOAT, false, sizeof( idDrawVert ), ac->tangents[0].ToFloatPtr() );
-		glVertexAttribPointerARB( 8, 2, GL_FLOAT, false, sizeof( idDrawVert ), ac->st.ToFloatPtr() );
-		glVertexPointer( 3, GL_FLOAT, sizeof( idDrawVert ), ac->xyz.ToFloatPtr() );
+		// perform setup here that will not change over multiple interaction passes
+#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
+		bool useClassicInteraction = true;
+		const rvMD5RVertexBufferDesc *packedDrawVertexBuffer =
+			( surf->geo != NULL && surf->geo->primBatchMesh != NULL ) ? R_MD5R_GetDrawVertexBufferForTri( surf->geo ) : NULL;
+		if ( packedDrawVertexBuffer != NULL ) {
+			int packedVertexFormatIndex = -1;
+			const program_t packedVertexProgram = RB_ARB2_GetPackedMD5RInteractionVertexProgram( surf, &packedVertexFormatIndex );
+			if ( packedVertexProgram != PROG_INVALID
+				&& R_BindARBProgram( GL_VERTEX_PROGRAM_ARB, packedVertexProgram, "packed interaction vertex program", false )
+				&& RB_ARB2_BindPackedMD5RInteractionVertexData( *packedDrawVertexBuffer, packedVertexFormatIndex ) ) {
+				g_packedInteractionSurf = surf;
+				g_packedInteractionVertexFormatIndex = packedVertexFormatIndex;
+				useClassicInteraction = false;
+			}
+		}
+		if ( useClassicInteraction ) {
+#else
+		{
+#endif
+			glDisableVertexAttribArrayARB( 1 );
+			glDisableVertexAttribArrayARB( 2 );
+			glDisableVertexAttribArrayARB( 5 );
+			glDisableVertexAttribArrayARB( 6 );
+			glDisableVertexAttribArrayARB( 7 );
+			glEnableVertexAttribArrayARB( 8 );
+			glEnableVertexAttribArrayARB( 9 );
+			glEnableVertexAttribArrayARB( 10 );
+			glEnableVertexAttribArrayARB( 11 );
+
+			// set the vertex pointers
+			idDrawVert	*ac = (idDrawVert *)vertexCache.Position( surf->geo->ambientCache );
+			glColorPointer( 4, GL_UNSIGNED_BYTE, sizeof( idDrawVert ), ac->color );
+			glVertexAttribPointerARB( 11, 3, GL_FLOAT, false, sizeof( idDrawVert ), ac->normal.ToFloatPtr() );
+			glVertexAttribPointerARB( 10, 3, GL_FLOAT, false, sizeof( idDrawVert ), ac->tangents[1].ToFloatPtr() );
+			glVertexAttribPointerARB( 9, 3, GL_FLOAT, false, sizeof( idDrawVert ), ac->tangents[0].ToFloatPtr() );
+			glVertexAttribPointerARB( 8, 2, GL_FLOAT, false, sizeof( idDrawVert ), ac->st.ToFloatPtr() );
+			glVertexPointer( 3, GL_FLOAT, sizeof( idDrawVert ), ac->xyz.ToFloatPtr() );
+			R_BindARBProgram( GL_VERTEX_PROGRAM_ARB, vertexProgram, "interaction vertex program", true );
+		}
 
 		// this may cause RB_ARB2_DrawInteraction to be exacuted multiple
 		// times with different colors and images if the surface or light have multiple layers
 		RB_CreateSingleDrawInteractions( surf, RB_ARB2_DrawInteraction );
 	}
 
+	g_packedInteractionSurf = NULL;
+	g_packedInteractionVertexFormatIndex = -1;
+	RB_ARB2_UnbindPackedMD5RInteractionVertexData();
 	glDisableVertexAttribArrayARB( 8 );
 	glDisableVertexAttribArrayARB( 9 );
 	glDisableVertexAttribArrayARB( 10 );
@@ -5553,6 +6466,36 @@ static progDef_t	progs[MAX_GLPROGS] = {
 	{ GL_FRAGMENT_PROGRAM_ARB, FPROG_ENVIRONMENT, "environment.vfp" },
 	{ GL_VERTEX_PROGRAM_ARB, VPROG_GLASSWARP, "arbVP_glasswarp.txt" },
 	{ GL_FRAGMENT_PROGRAM_ARB, FPROG_GLASSWARP, "arbFP_glasswarp.txt" },
+	// Retail Quake 4 reserves fixed vertex-program ids for the packed MD5R
+	// families; register the stock glprogs here so dormant bind paths can
+	// resolve those ids without falling back to dynamic PROG_USER entries.
+	{ GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_INTERACTION_VPROG_BASE, "md5rinteraction.vp" },
+	{ GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_INTERACTION_VPROG_BASE + 1, "md5rinteraction1.vp" },
+	{ GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_INTERACTION_VPROG_BASE + 2, "md5rinteraction4.vp" },
+	{ GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_DEPTH_VPROG_BASE, "md5rsimple.vp" },
+	{ GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_DEPTH_VPROG_BASE + 1, "md5rsimple1.vp" },
+	{ GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_DEPTH_VPROG_BASE + 2, "md5rsimple4.vp" },
+	{ GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_STAGE_VPROG_BASE, "md5rstdtex.vp" },
+	{ GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_STAGE_VPROG_BASE + 1, "md5rstdtex1.vp" },
+	{ GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_STAGE_VPROG_BASE + 2, "md5rstdtex4.vp" },
+	{ GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_SKYBOX_VPROG_BASE, "md5rskybox.vp" },
+	{ GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_SKYBOX_VPROG_BASE + 1, "md5rskybox1.vp" },
+	{ GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_SKYBOX_VPROG_BASE + 2, "md5rskybox4.vp" },
+	{ GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_DIFFUSE_CUBE_VPROG_BASE, "md5renvnormal.vp" },
+	{ GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_DIFFUSE_CUBE_VPROG_BASE + 1, "md5renvnormal1.vp" },
+	{ GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_DIFFUSE_CUBE_VPROG_BASE + 2, "md5renvnormal4.vp" },
+	{ GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_REFLECT_CUBE_VPROG_BASE, "md5renvreflect.vp" },
+	{ GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_REFLECT_CUBE_VPROG_BASE + 1, "md5renvreflect1.vp" },
+	{ GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_REFLECT_CUBE_VPROG_BASE + 2, "md5renvreflect4.vp" },
+	{ GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_BUMPY_REFLECT_CUBE_VPROG_BASE, "md5renvbump.vp" },
+	{ GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_BUMPY_REFLECT_CUBE_VPROG_BASE + 1, "md5renvbump1.vp" },
+	{ GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_BUMPY_REFLECT_CUBE_VPROG_BASE + 2, "md5renvbump4.vp" },
+	{ GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_SHADOW_VOLUME_VPROG_BASE, "md5rshadow.vp" },
+	{ GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_SHADOW_VOLUME_VPROG_BASE + 1, "md5rshadow1.vp" },
+	{ GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_SHADOW_VOLUME_VPROG_BASE + 2, "md5rshadow4.vp" },
+	{ GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_BASIC_FOG_VPROG_BASE, "md5rbasicfog.vp" },
+	{ GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_BASIC_FOG_VPROG_BASE + 1, "md5rbasicfog1.vp" },
+	{ GL_VERTEX_PROGRAM_ARB, ARB2_MD5R_BASIC_FOG_VPROG_BASE + 2, "md5rbasicfog4.vp" },
 
 	// additional programs can be dynamically specified in materials
 };

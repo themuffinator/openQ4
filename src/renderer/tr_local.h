@@ -64,6 +64,15 @@ const int FOG_ENTER_SIZE = 64;
 const float FOG_ENTER = (FOG_ENTER_SIZE+1.0f)/(FOG_ENTER_SIZE*2);
 // picky to get the bilerp correct at terminator
 
+enum fogPlaneIndex_t {
+	FOG_DISTANCE_PLANE_S = 0,
+	FOG_DISTANCE_PLANE_T,
+	FOG_ENTER_PLANE_T,
+	FOG_ENTER_PLANE_S
+};
+
+extern idPlane fogTexGenPlanes[4];
+
 
 // idScreenRect gets carried around with each drawSurf, so it makes sense
 // to keep it compact, instead of just using the idBounds class
@@ -1465,6 +1474,7 @@ void R_LinkLightSurf( const drawSurf_t **link, const srfTriangles_t *tri, const 
 bool R_CreateAmbientCache( srfTriangles_t *tri, bool needsLighting );
 bool R_CreatePackedSurfaceFrameCaches( srfTriangles_t *tri, bool needsLighting, bool createIndexCache );
 bool R_CreateLightingCache( const idRenderEntityLocal *ent, const idRenderLightLocal *light, srfTriangles_t *tri );
+void R_TouchVertexCache( struct vertCache_s *cache );
 void R_CreatePrivateShadowCache( srfTriangles_t *tri );
 void R_CreateVertexProgramShadowCache( srfTriangles_t *tri );
 
@@ -1565,7 +1575,7 @@ DRAW_STANDARD
 */
 
 void RB_DrawElementsWithCounters( const srfTriangles_t *tri );
-void RB_DrawShadowElementsWithCounters( const srfTriangles_t *tri, int numIndexes );
+void RB_DrawShadowElementsWithCounters( const drawSurf_t *surf, int numIndexes );
 void RB_STD_FillDepthBuffer( drawSurf_t **drawSurfs, int numDrawSurfs );
 bool RB_PrepareStageTexturing( const shaderStage_t *pStage, const drawSurf_t *surf, idDrawVert *ac );
 void RB_FinishStageTexturing( const shaderStage_t *pStage, const drawSurf_t *surf, idDrawVert *ac );
@@ -1587,6 +1597,15 @@ DRAW_*
 
 void	R_ARB2_Init( void );
 void	RB_ARB2_DrawInteractions( void );
+void	RB_ARB2_MD5R_DrawDepthElements( const drawSurf_t *surf );
+void	RB_ARB2_MD5R_DrawShadowElements( const drawSurf_t *surf, int numIndexes );
+void	RB_ARB2_MD5R_DrawBasicFog( const drawSurf_t *surf );
+void	RB_ARB2_LoadMD5RLocalViewOrigin( const drawSurf_t *surf );
+void	RB_ARB2_LoadMD5RMVPMatrix( const drawSurf_t *surf );
+void	RB_ARB2_LoadMD5RProjectionMatrix( void );
+void	RB_ARB2_LoadMD5RModelViewMatrix( const drawSurf_t *surf );
+void	RB_ARB2_PrepareStageTexturing( const shaderStage_t *pStage, const drawSurf_t *surf, bool fillingDepth );
+void	RB_ARB2_DisableStageTexturing( const shaderStage_t *pStage, const drawSurf_t *surf );
 void	R_ReloadARBPrograms_f( const idCmdArgs &args );
 void	R_ReportShaderPrograms_f( const idCmdArgs &args );
 int		R_FindARBProgram( GLenum target, const char *program );
@@ -1613,7 +1632,18 @@ typedef enum {
 	FPROG_AMBIENT,
 	VPROG_GLASSWARP,
 	FPROG_GLASSWARP,
-	PROG_USER
+	VPROG_SIMPLE_INTERACTION,
+	FPROG_SIMPLE_INTERACTION,
+	ARB2_MD5R_INTERACTION_VPROG_BASE = 21,
+	ARB2_MD5R_DEPTH_VPROG_BASE = 24,
+	ARB2_MD5R_STAGE_VPROG_BASE = 27,
+	ARB2_MD5R_SKYBOX_VPROG_BASE = 30,
+	ARB2_MD5R_DIFFUSE_CUBE_VPROG_BASE = 33,
+	ARB2_MD5R_REFLECT_CUBE_VPROG_BASE = 36,
+	ARB2_MD5R_BUMPY_REFLECT_CUBE_VPROG_BASE = 39,
+	ARB2_MD5R_SHADOW_VOLUME_VPROG_BASE = 42,
+	ARB2_MD5R_BASIC_FOG_VPROG_BASE = 45,
+	PROG_USER = 51
 } program_t;
 
 /*

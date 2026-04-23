@@ -261,7 +261,9 @@ void R_FogImage( idImage *image ) {
 		}
 	}
 
-	image->GenerateImage( (byte *)data, FOG_SIZE, FOG_SIZE, TF_LINEAR, TR_CLAMP, TD_LOOKUP_TABLE_ALPHA );
+	// Retail Quake 4 keeps the fog lookup as a full RGBA texture. Treating it
+	// as alpha-only can zero the fog RGB contribution in the fixed-function pass.
+	image->GenerateImage( (byte *)data, FOG_SIZE, FOG_SIZE, TF_LINEAR, TR_CLAMP, TD_LOOKUP_TABLE_RGBA );
 }
 
 
@@ -368,7 +370,9 @@ void R_FogEnterImage( idImage *image ) {
 	}
 
 	// if mipmapped, acutely viewed surfaces fade wrong
-	image->GenerateImage( (byte *)data, FOG_ENTER_SIZE, FOG_ENTER_SIZE, TF_LINEAR, TR_CLAMP, TD_LOOKUP_TABLE_ALPHA );
+	// Match retail: this lookup needs RGB=white with alpha carrying the fade
+	// term, not an alpha-only texture classification.
+	image->GenerateImage( (byte *)data, FOG_ENTER_SIZE, FOG_ENTER_SIZE, TF_LINEAR, TR_CLAMP, TD_LOOKUP_TABLE_RGBA );
 }
 
 

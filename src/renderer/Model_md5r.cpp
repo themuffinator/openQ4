@@ -1206,6 +1206,64 @@ bool rvRenderModelMD5R::CopyPrimBatchTriangles( const rvMD5RMesh &mesh, idDrawVe
 #if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
 /*
 ===========================
+R_MD5R_GetMeshForTri
+===========================
+*/
+const rvMD5RMesh *R_MD5R_GetMeshForTri( const srfTriangles_t *tri ) {
+	if ( tri == NULL || tri->primBatchMesh == NULL ) {
+		return NULL;
+	}
+
+	const rvMD5RMesh *mesh = reinterpret_cast<const rvMD5RMesh *>( tri->primBatchMesh );
+	if ( mesh->renderModel == NULL ) {
+		return NULL;
+	}
+
+	return mesh;
+}
+
+/*
+===========================
+R_MD5R_GetDrawVertexBufferForTri
+===========================
+*/
+const rvMD5RVertexBufferDesc *R_MD5R_GetDrawVertexBufferForTri( const srfTriangles_t *tri ) {
+	const rvMD5RMesh *mesh = R_MD5R_GetMeshForTri( tri );
+	if ( mesh == NULL || mesh->drawVertexBuffer < 0 ) {
+		return NULL;
+	}
+
+	const rvRenderModelMD5R *renderModel = mesh->renderModel;
+	const idList<rvMD5RVertexBufferDesc> &vertexBuffers = renderModel->GetVertexBuffers();
+	if ( mesh->drawVertexBuffer >= vertexBuffers.Num() ) {
+		return NULL;
+	}
+
+	return &vertexBuffers[ mesh->drawVertexBuffer ];
+}
+
+/*
+===========================
+R_MD5R_GetDrawIndexBufferForTri
+===========================
+*/
+const rvMD5RIndexBufferDesc *R_MD5R_GetDrawIndexBufferForTri( const srfTriangles_t *tri ) {
+	const rvMD5RMesh *mesh = R_MD5R_GetMeshForTri( tri );
+	if ( mesh == NULL || mesh->drawIndexBuffer < 0 ) {
+		return NULL;
+	}
+
+	const rvRenderModelMD5R *renderModel = mesh->renderModel;
+	const idList<rvMD5RIndexBufferDesc> &indexBuffers = renderModel->GetIndexBuffers();
+	if ( mesh->drawIndexBuffer >= indexBuffers.Num() ) {
+		return NULL;
+	}
+
+	return &indexBuffers[ mesh->drawIndexBuffer ];
+}
+
+/*
+===========================
 R_MD5R_CopyPrimBatchTriangles
 ===========================
 */

@@ -153,6 +153,7 @@ typedef enum {
 	TG_REFLECT_CUBE,
 	TG_SKYBOX_CUBE,
 	TG_WOBBLESKY_CUBE,
+	TG_POT_CORRECTION,
 	TG_SCREEN,			// screen aligned, for mirrorRenders and screen space temporaries
 	TG_SCREEN2,
 	TG_GLASSWARP
@@ -208,6 +209,7 @@ typedef enum {
 
 typedef struct {
 	int					vertexProgram;
+	int					md5rVertexProgram;
 	int					numVertexParms;
 	int					vertexParms[MAX_VERTEX_PARMS][4];	// evaluated register indexes
 
