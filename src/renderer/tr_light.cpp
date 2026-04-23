@@ -40,6 +40,56 @@ static ID_INLINE idSoundEmitter *R_GetShaderSoundEmitter( int soundEmitterHandle
 	return soundSystem->EmitterForIndex( SOUNDWORLD_GAME, soundEmitterHandle );
 }
 
+static int R_QsortViewEntitiesByModel( const void *lhs, const void *rhs ) {
+	const viewEntity_t *const left = *reinterpret_cast<const viewEntity_t *const *>( lhs );
+	const viewEntity_t *const right = *reinterpret_cast<const viewEntity_t *const *>( rhs );
+
+	const idRenderModel *const leftModel =
+		( left != NULL && left->entityDef != NULL ) ? left->entityDef->parms.hModel : NULL;
+	const idRenderModel *const rightModel =
+		( right != NULL && right->entityDef != NULL ) ? right->entityDef->parms.hModel : NULL;
+
+	const size_t leftModelKey = reinterpret_cast<size_t>( leftModel );
+	const size_t rightModelKey = reinterpret_cast<size_t>( rightModel );
+	if ( leftModelKey < rightModelKey ) {
+		return -1;
+	}
+	if ( leftModelKey > rightModelKey ) {
+		return 1;
+	}
+
+	const size_t leftEntityKey = reinterpret_cast<size_t>( left );
+	const size_t rightEntityKey = reinterpret_cast<size_t>( right );
+	if ( leftEntityKey < rightEntityKey ) {
+		return -1;
+	}
+	if ( leftEntityKey > rightEntityKey ) {
+		return 1;
+	}
+
+	return 0;
+}
+
+static unsigned int R_SortViewEntities( viewEntity_t ***array ) {
+	unsigned int count = 0;
+	for ( viewEntity_t *vEntity = tr.viewDef->viewEntitys; vEntity != NULL; vEntity = vEntity->next ) {
+		++count;
+	}
+
+	viewEntity_t **sortedEntities = (viewEntity_t **)R_FrameAlloc( count * sizeof( *sortedEntities ) );
+	*array = sortedEntities;
+
+	viewEntity_t **nextSortedEntity = sortedEntities;
+	for ( viewEntity_t *vEntity = tr.viewDef->viewEntitys; vEntity != NULL; vEntity = vEntity->next ) {
+		*nextSortedEntity++ = vEntity;
+	}
+
+	// Retail Quake 4 clusters view entities by source model before ambient/light
+	// submission so repeated dynamic-model work stays hot in cache.
+	qsort( sortedEntities, count, sizeof( sortedEntities[0] ), R_QsortViewEntitiesByModel );
+	return count;
+}
+
 static const float CHECK_BOUNDS_EPSILON = 1.0f;
 idCVar bse_frameCounters(
 	"bse_frameCounters",
@@ -135,6 +185,61 @@ bool R_CreateAmbientCache( srfTriangles_t *tri, bool needsLighting ) {
 	if ( !tri->ambientCache ) {
 		return false;
 	}
+	return true;
+}
+
+/*
+==================
+R_CreatePackedSurfaceFrameCaches
+
+Packed MD5R surfaces keep their canonical geometry outside the classic static
+ambient/index cache ownership model. In the current Q4SDK_MD5R hybrid build we
+still draw through the classic backend, so visible packed surfaces upload a
+frame-temp ambient/index view instead of claiming long-lived cache residency.
+==================
+*/
+bool R_CreatePackedSurfaceFrameCaches( srfTriangles_t *tri, bool needsLighting, bool createIndexCache ) {
+	if ( tri == NULL || tri->numVerts <= 0 ) {
+		return false;
+	}
+
+	idDrawVert *sourceVerts = tri->verts;
+	glIndex_t *sourceIndexes = tri->indexes;
+
+#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
+	if ( tri->primBatchMesh != NULL && ( sourceVerts == NULL || ( createIndexCache && tri->numIndexes > 0 && sourceIndexes == NULL ) ) ) {
+		sourceVerts = (idDrawVert *)R_FrameAlloc( tri->numVerts * sizeof( sourceVerts[0] ) );
+		if ( createIndexCache && tri->numIndexes > 0 ) {
+			sourceIndexes = (glIndex_t *)R_FrameAlloc( tri->numIndexes * sizeof( sourceIndexes[0] ) );
+		} else {
+			sourceIndexes = NULL;
+		}
+
+		renderSystem->CopyPrimBatchTriangles( sourceVerts, sourceIndexes, tri->primBatchMesh, tri->silTraceVerts );
+	}
+#endif
+
+	if ( sourceVerts == NULL ) {
+		return false;
+	}
+
+	if ( needsLighting && !tri->tangentsCalculated && sourceVerts == tri->verts ) {
+		R_DeriveTangents( tri );
+		sourceVerts = tri->verts;
+	}
+
+	tri->ambientCache = vertexCache.AllocFrameTemp( sourceVerts, tri->numVerts * sizeof( sourceVerts[0] ) );
+	if ( !tri->ambientCache ) {
+		return false;
+	}
+
+	if ( r_useIndexBuffers.GetBool() && createIndexCache && tri->numIndexes > 0 && sourceIndexes != NULL ) {
+		tri->indexCache = vertexCache.AllocFrameTemp( sourceIndexes, tri->numIndexes * sizeof( sourceIndexes[0] ) );
+	} else {
+		tri->indexCache = NULL;
+	}
+
+	tri->tempAmbientCache = true;
 	return true;
 }
 
@@ -788,6 +893,11 @@ R_LinkLightSurf
 void R_LinkLightSurf( const drawSurf_t **link, const srfTriangles_t *tri, const viewEntity_t *space, 
 				   const idRenderLightLocal *light, const idMaterial *shader, const idScreenRect &scissor, bool viewInsideShadow ) {
 	drawSurf_t		*drawSurf;
+	const int		limitBatchSize = r_limitBatchSize.GetInteger();
+
+	if ( limitBatchSize > 0 && tri->numIndexes <= limitBatchSize ) {
+		return;
+	}
 
 	if ( !space ) {
 		space = &tr.viewDef->worldSpace;
@@ -804,6 +914,7 @@ void R_LinkLightSurf( const drawSurf_t **link, const srfTriangles_t *tri, const 
 	drawSurf->dynamicTexCoords = NULL;
 	drawSurf->texGenTransformAndViewOrg = NULL;
 	drawSurf->decalColorCache = NULL;
+	drawSurf->decalColorOffset = 0;
 	drawSurf->decalColorStride = 0;
 	drawSurf->decalColorStageCount = 0;
 	if ( viewInsideShadow ) {
@@ -1465,6 +1576,7 @@ void R_AddDrawSurf( const srfTriangles_t *tri, const viewEntity_t *space, const 
 	drawSurf->dynamicTexCoords = NULL;
 	drawSurf->texGenTransformAndViewOrg = NULL;
 	drawSurf->decalColorCache = NULL;
+	drawSurf->decalColorOffset = 0;
 	drawSurf->decalColorStride = 0;
 	drawSurf->decalColorStageCount = 0;
 
@@ -1624,21 +1736,27 @@ static void R_AddAmbientDrawsurfs( viewEntity_t *vEntity ) {
 
 			def->visibleCount = tr.viewCount;
 
-			// OpenQ4 still submits static MD5R surfaces through the classic
-			// ambient/index cache path even when the surface also keeps validated
-			// prim-batch metadata for later renderer work.
-			if ( tri->verts == NULL ) {
+			const bool packedSurface = ( tri->primBatchMesh != NULL );
+			if ( !packedSurface && tri->verts == NULL ) {
 				continue;
 			}
-			if ( !R_CreateAmbientCache( tri, shader->ReceivesLighting() ) ) {
-				// don't add anything if the vertex cache was too full to give us an ambient cache
-				return;
-			}
-			vertexCache.Touch( tri->ambientCache );
+			if ( packedSurface ) {
+				if ( !R_CreatePackedSurfaceFrameCaches( tri, shader->ReceivesLighting(), true ) ) {
+					// packed MD5R surfaces still need a transient draw view in the hybrid backend
+					return;
+				}
+			} else {
+				if ( !R_CreateAmbientCache( tri, shader->ReceivesLighting() ) ) {
+					// don't add anything if the vertex cache was too full to give us an ambient cache
+					return;
+				}
 
-			if ( r_useIndexBuffers.GetBool() && !tri->indexCache && tri->indexes != NULL && tri->numIndexes > 0 ) {
-				vertexCache.Alloc( tri->indexes, tri->numIndexes * sizeof( tri->indexes[0] ), &tri->indexCache, true );
+				if ( r_useIndexBuffers.GetBool() && !tri->indexCache && tri->indexes != NULL && tri->numIndexes > 0 ) {
+					vertexCache.Alloc( tri->indexes, tri->numIndexes * sizeof( tri->indexes[0] ), &tri->indexCache, true );
+				}
 			}
+
+			vertexCache.Touch( tri->ambientCache );
 			if ( tri->indexCache ) {
 				vertexCache.Touch( tri->indexCache );
 			}
@@ -1896,18 +2014,25 @@ void R_AddEffectSurfaces(void) {
 				continue;
 			}
 
-			if ( tri->verts == NULL ) {
+			if ( tri->verts == NULL && tri->primBatchMesh == NULL ) {
 				++surfaceCacheFail;
 				continue;
 			}
-			if (!R_CreateAmbientCache(tri, shader->ReceivesLighting())) {
-				++surfaceCacheFail;
-				continue;
-			}
-			vertexCache.Touch(tri->ambientCache);
+			if ( tri->primBatchMesh != NULL ) {
+				if ( !R_CreatePackedSurfaceFrameCaches( tri, shader->ReceivesLighting(), false ) ) {
+					++surfaceCacheFail;
+					continue;
+				}
+			} else {
+				if ( !R_CreateAmbientCache( tri, shader->ReceivesLighting() ) ) {
+					++surfaceCacheFail;
+					continue;
+				}
 
-			// BSE dynamic surfaces rebuild index data every frame; keep them on the CPU index path.
-			tri->indexCache = NULL;
+				// BSE dynamic surfaces rebuild index data every frame; keep them on the CPU index path.
+				tri->indexCache = NULL;
+			}
+			vertexCache.Touch( tri->ambientCache );
 
 			R_AddDrawSurf(tri, vEffect, &renderParms, shader, vEffect->scissorRect);
 			tri->ambientViewCount = tr.viewCount;
@@ -1985,9 +2110,12 @@ two or more lights.
 ===================
 */
 void R_AddModelSurfaces( void ) {
-	viewEntity_t		*vEntity;
+	viewEntity_t		**sortedEntities;
 	idInteraction		*inter, *next;
 	idRenderModel		*model;
+	const unsigned int	numViewEntities = R_SortViewEntities( &sortedEntities );
+	const bool			useEntityScissors = r_useEntityScissors.GetBool() && !R_ShouldDisableEntityCullingForLevelshot();
+	const bool			showEntityScissors = r_showEntityScissors.GetBool();
 	const bool			lodEntities = r_lod_entities.GetBool();
 	const float			lodEntitiesPercent = r_lod_entities_percent.GetFloat();
 
@@ -1995,17 +2123,16 @@ void R_AddModelSurfaces( void ) {
 	tr.viewDef->numDrawSurfs = 0;
 	tr.viewDef->maxDrawSurfs = 0;	// will be set to INITIAL_DRAWSURFS on R_AddDrawSurf
 
-	// go through each entity that is either visible to the view, or to
-	// any light that intersects the view (for shadows)
-	for ( vEntity = tr.viewDef->viewEntitys; vEntity; vEntity = vEntity->next ) {
+	for ( int i = static_cast<int>( numViewEntities ) - 1; i >= 0; --i ) {
+		viewEntity_t *vEntity = sortedEntities[i];
 
-		if ( r_useEntityScissors.GetBool() && !R_ShouldDisableEntityCullingForLevelshot() ) {
+		if ( useEntityScissors ) {
 			// calculate the screen area covered by the entity
 			idScreenRect scissorRect = R_CalcEntityScissorRectangle( vEntity );
 			// intersect with the portal crossing scissor rectangle
 			vEntity->scissorRect.Intersect( scissorRect );
 
-			if ( r_showEntityScissors.GetBool() ) {
+			if ( showEntityScissors ) {
 				R_ShowColoredScreenRect( vEntity->scissorRect, vEntity->entityDef->index );
 			}
 		}
@@ -2022,43 +2149,10 @@ void R_AddModelSurfaces( void ) {
 			vEntity->scissorRect.Clear();
 		}
 
-		float oldFloatTime;
-		int oldTime;
-// jmarshall
-		//game->SelectTimeGroup( vEntity->entityDef->parms.timeGroup );
-		//
-		//if ( vEntity->entityDef->parms.timeGroup ) {
-		//	oldFloatTime = tr.viewDef->floatTime;
-		//	oldTime = tr.viewDef->renderView.time;
-		//
-		//	tr.viewDef->floatTime = game->GetTimeGroupTime( vEntity->entityDef->parms.timeGroup ) * 0.001;
-		//	tr.viewDef->renderView.time = game->GetTimeGroupTime( vEntity->entityDef->parms.timeGroup );
-		//}
-
-		//if ( tr.viewDef->isXraySubview && vEntity->entityDef->parms.xrayIndex == 1 ) {
-		//	if ( vEntity->entityDef->parms.timeGroup ) {
-		//		tr.viewDef->floatTime = oldFloatTime;
-		//		tr.viewDef->renderView.time = oldTime;
-		//	}
-		//	continue;
-		//} else if ( !tr.viewDef->isXraySubview && vEntity->entityDef->parms.xrayIndex == 2 ) {
-		//	if ( vEntity->entityDef->parms.timeGroup ) {
-		//		tr.viewDef->floatTime = oldFloatTime;
-		//		tr.viewDef->renderView.time = oldTime;
-		//	}
-		//	continue;
-		//}
-// jmarshall end
 		// add the ambient surface if it has a visible rectangle
 		if ( !vEntity->scissorRect.IsEmpty() ) {
 			model = R_EntityDefDynamicModel( vEntity->entityDef );
 			if ( model == NULL || model->NumSurfaces() <= 0 ) {
-// jmarshall
-				//if ( vEntity->entityDef->parms.timeGroup ) {
-				//	tr.viewDef->floatTime = oldFloatTime;
-				//	tr.viewDef->renderView.time = oldTime;
-				//}
-// jmarshall
 				continue;
 			}
 
@@ -2071,40 +2165,19 @@ void R_AddModelSurfaces( void ) {
 		//
 		// for all the entity / light interactions on this entity, add them to the view
 		//
-// jmarshall
-		//if ( tr.viewDef->isXraySubview ) {
-		//	if ( vEntity->entityDef->parms.xrayIndex == 2 ) {
-		//		for ( inter = vEntity->entityDef->firstInteraction; inter != NULL && !inter->IsEmpty(); inter = next ) {
-		//			next = inter->entityNext;
-		//			if ( inter->lightDef->viewCount != tr.viewCount ) {
-		//				continue;
-		//			}
-		//			inter->AddActiveInteraction();
-		//		}
-		//	}
-		//} else {
-// jmarshall end
-		{
-			// all empty interactions are at the end of the list so once the
-			// first is encountered all the remaining interactions are empty
-			for ( inter = vEntity->entityDef->firstInteraction; inter != NULL && !inter->IsEmpty(); inter = next ) {
-				next = inter->entityNext;
+		// all empty interactions are at the end of the list so once the
+		// first is encountered all the remaining interactions are empty
+		for ( inter = vEntity->entityDef->firstInteraction; inter != NULL && inter->numSurfaces != 0; inter = next ) {
+			next = inter->entityNext;
 
-				// skip any lights that aren't currently visible
-				// this is run after any lights that are turned off have already
-				// been removed from the viewLights list, and had their viewCount cleared
-				if ( inter->lightDef->viewCount != tr.viewCount ) {
-					continue;
-				}
-				inter->AddActiveInteraction();
+			// skip any lights that aren't currently visible
+			// this is run after any lights that are turned off have already
+			// been removed from the viewLights list, and had their viewCount cleared
+			if ( inter->lightDef->viewCount != tr.viewCount ) {
+				continue;
 			}
+			inter->AddActiveInteraction();
 		}
-// jmarshall
-		//if ( vEntity->entityDef->parms.timeGroup ) {
-		//	tr.viewDef->floatTime = oldFloatTime;
-		//	tr.viewDef->renderView.time = oldTime;
-		//}
-// jmarshall
 	}
 }
 

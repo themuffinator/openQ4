@@ -1,0 +1,7 @@
+************************************* Invoked: Thu Apr 23 09:58:10 2026
+[0] Arguments: C:\Users\djdac\AppData\Local\Temp\WinGet\MSYS2.MSYS2.20251213\msys2-x86_64-20251213.exe, install, --confirm-command, --root, C:\msys64
+[5] Operations sanity check succeeded.
+[10] Using metadata cache from "C:/Users/djdac/AppData/Local/cache\\qt-installer-framework\\d75f1c19-3379-3717-ae8d-1404b51494a9"
+[10] Found 0 cached items.
+[13] Loaded control script ":/metadata/installer-config/control_js"
+[13] TargetDirectoryInUse : Error : The directory you selected already exists and contains an installation. Choose a different target for installation.

@@ -93,6 +93,7 @@ static void R_LinkShadowMapCasterSurf( const drawSurf_t **link, const srfTriangl
 	drawSurf->dynamicTexCoords = NULL;
 	drawSurf->texGenTransformAndViewOrg = NULL;
 	drawSurf->decalColorCache = NULL;
+	drawSurf->decalColorOffset = 0;
 	drawSurf->decalColorStride = 0;
 	drawSurf->decalColorStageCount = 0;
 
@@ -1350,10 +1351,21 @@ void idInteraction::AddActiveInteraction( void ) {
 					srfTriangles_t *ambientTris = sint->ambientTris;
 					bool canAddLightSurf = true;
 
-					if ( ambientTris->verts == NULL ) {
+					const bool packedAmbientSurface =
+#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
+						( ambientTris->primBatchMesh != NULL );
+#else
+						false;
+#endif
+
+					if ( ambientTris->verts == NULL && !packedAmbientSurface ) {
 						canAddLightSurf = false;
 					} else {
-						if ( !ambientTris->ambientCache ) {
+						if ( packedAmbientSurface ) {
+							if ( !R_CreatePackedSurfaceFrameCaches( ambientTris, sint->shader->ReceivesLighting(), true ) ) {
+								canAddLightSurf = false;
+							}
+						} else if ( !ambientTris->ambientCache ) {
 							if ( !R_CreateAmbientCache( ambientTris, sint->shader->ReceivesLighting() ) ) {
 								canAddLightSurf = false;
 							}
@@ -1361,6 +1373,7 @@ void idInteraction::AddActiveInteraction( void ) {
 
 						if ( canAddLightSurf ) {
 							lightTris->ambientCache = ambientTris->ambientCache;
+							lightTris->tempAmbientCache = ambientTris->tempAmbientCache;
 							vertexCache.Touch( ambientTris->ambientCache );
 
 							// regenerate the lighting cache (for non-vertex program cards) if it has been purged
@@ -1376,7 +1389,15 @@ void idInteraction::AddActiveInteraction( void ) {
 								vertexCache.Touch( lightTris->lightingCache );
 							}
 
-							if ( !lightTris->indexCache && r_useIndexBuffers.GetBool() && lightTris->indexes != NULL && lightTris->numIndexes > 0 ) {
+							if ( packedAmbientSurface ) {
+								if ( r_useIndexBuffers.GetBool() && lightTris->indexes != NULL && lightTris->numIndexes > 0 ) {
+									lightTris->indexCache = vertexCache.AllocFrameTemp(
+										lightTris->indexes,
+										lightTris->numIndexes * sizeof( lightTris->indexes[0] ) );
+								} else {
+									lightTris->indexCache = NULL;
+								}
+							} else if ( !lightTris->indexCache && r_useIndexBuffers.GetBool() && lightTris->indexes != NULL && lightTris->numIndexes > 0 ) {
 								vertexCache.Alloc(
 									lightTris->indexes,
 									lightTris->numIndexes * sizeof( lightTris->indexes[0] ),

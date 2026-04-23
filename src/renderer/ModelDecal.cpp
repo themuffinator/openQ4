@@ -478,10 +478,14 @@ idRenderModelDecal *idRenderModelDecal::RemoveFadedDecals( idRenderModelDecal *d
 	int inUse[MAX_DECAL_VERTS];
 	decalInfo_t	decalInfo;
 	idRenderModelDecal *nextDecal;
+	bool geometryChanged;
 
 	if ( decals == NULL ) {
 		return NULL;
 	}
+
+	const int oldNumIndexes = decals->tri.numIndexes;
+	const int oldNumVerts = decals->tri.numVerts;
 
 	// recursively free any next decals
 	decals->nextDecal = RemoveFadedDecals( decals->nextDecal, time );
@@ -495,6 +499,7 @@ idRenderModelDecal *idRenderModelDecal::RemoveFadedDecals( idRenderModelDecal *d
 	
 	decalInfo = decals->material->GetDecalInfo();
 	minTime = time - decalInfo.stayTime;
+	geometryChanged = false;
 
 	newNumIndexes = 0;
 	for ( i = 0; i < decals->tri.numIndexes; i += 3 ) {
@@ -518,6 +523,9 @@ idRenderModelDecal *idRenderModelDecal::RemoveFadedDecals( idRenderModelDecal *d
 	}
 
 	decals->tri.numIndexes = newNumIndexes;
+	if ( newNumIndexes != oldNumIndexes ) {
+		geometryChanged = true;
+	}
 
 	memset( inUse, 0, sizeof( inUse ) );
 	for ( i = 0; i < decals->tri.numIndexes; i++ ) {
@@ -527,7 +535,11 @@ idRenderModelDecal *idRenderModelDecal::RemoveFadedDecals( idRenderModelDecal *d
 	newNumVerts = 0;
 	for ( i = 0; i < decals->tri.numVerts; i++ ) {
 		if ( !inUse[i] ) {
+			geometryChanged = true;
 			continue;
+		}
+		if ( newNumVerts != i ) {
+			geometryChanged = true;
 		}
 		decals->tri.verts[newNumVerts] = decals->tri.verts[i];
 		decals->vertDepthFade[newNumVerts] = decals->vertDepthFade[i];
@@ -535,14 +547,24 @@ idRenderModelDecal *idRenderModelDecal::RemoveFadedDecals( idRenderModelDecal *d
 		inUse[i] = newNumVerts;
 		newNumVerts++;
 	}
+	if ( newNumVerts != oldNumVerts ) {
+		geometryChanged = true;
+	}
 	decals->tri.numVerts = newNumVerts;
 
 	for ( i = 0; i < decals->tri.numIndexes; i++ ) {
-		decals->tri.indexes[i] = inUse[decals->tri.indexes[i]];
+		const glIndex_t oldIndex = decals->tri.indexes[i];
+		const glIndex_t newIndex = inUse[oldIndex];
+		if ( newIndex != oldIndex ) {
+			geometryChanged = true;
+		}
+		decals->tri.indexes[i] = newIndex;
 	}
 
-	decals->tri.tangentsCalculated = false;
-	decals->tri.facePlanesCalculated = false;
+	if ( geometryChanged ) {
+		decals->tri.tangentsCalculated = false;
+		decals->tri.facePlanesCalculated = false;
+	}
 
 	return decals;
 }
@@ -562,8 +584,13 @@ void idRenderModelDecal::AddDecalDrawSurf( viewEntity_t *space ) {
 	const float stayTimeFloat = (float)stayTime;
 	const float renderTime = (float)tr.viewDef->renderView.time;
 	const int numStages = material->GetNumStages();
-	vertCache_s *decalColorCache = NULL;
-	int decalColorStride = 0;
+	const int vertexBytes = tri.numVerts * sizeof( idDrawVert );
+	const int decalColorStride = tri.numVerts * 4;
+	const int totalColorBytes = decalColorStride * numStages;
+	const int totalAmbientBytes = vertexBytes + totalColorBytes;
+	byte *vertexAndColorData = (byte *)R_FrameAlloc( totalAmbientBytes );
+	idDrawVert *uploadedVerts = reinterpret_cast<idDrawVert *>( vertexAndColorData );
+	byte *stageColors = vertexAndColorData + vertexBytes;
 
 	// Projected decals are built from clipped positions/UVs only. Rebuild the
 	// tangent basis from that projected mesh so direct-light and shadow-map
@@ -571,6 +598,8 @@ void idRenderModelDecal::AddDecalDrawSurf( viewEntity_t *space ) {
 	if ( tri.numVerts > 0 && tri.numIndexes > 0 && !tri.tangentsCalculated ) {
 		R_DeriveTangents( &tri, false );
 	}
+
+	memcpy( vertexAndColorData, tri.verts, vertexBytes );
 
 	memset( vertLifeSpan, 0, tri.numVerts * sizeof( vertLifeSpan[0] ) );
 	for ( int indexBase = 0; indexBase < tri.numIndexes; indexBase += 3 ) {
@@ -591,9 +620,6 @@ void idRenderModelDecal::AddDecalDrawSurf( viewEntity_t *space ) {
 
 	if ( numStages > 0 && tri.numVerts > 0 ) {
 		const int numRegisters = ( material->GetNumRegisters() > EXP_REG_NUM_PREDEFINED ) ? material->GetNumRegisters() : EXP_REG_NUM_PREDEFINED;
-		const int colorStride = tri.numVerts * 4;
-		const int totalColorBytes = colorStride * numStages;
-		byte *stageColors = (byte *)_alloca16( totalColorBytes );
 		float *regs = (float *)_alloca16( numRegisters * sizeof( regs[0] ) );
 		float shaderParms[MAX_ENTITY_SHADER_PARMS];
 
@@ -602,7 +628,7 @@ void idRenderModelDecal::AddDecalDrawSurf( viewEntity_t *space ) {
 
 		for ( int stage = 0; stage < numStages; stage++ ) {
 			const shaderStage_t *pStage = material->GetStage( stage );
-			byte *stageColor = stageColors + stage * colorStride;
+			byte *stageColor = stageColors + stage * decalColorStride;
 
 			for ( int indexBase = 0; indexBase < tri.numIndexes; indexBase += 3 ) {
 				const glIndex_t triVertIndex0 = tri.indexes[indexBase + 0];
@@ -626,16 +652,14 @@ void idRenderModelDecal::AddDecalDrawSurf( viewEntity_t *space ) {
 			}
 		}
 
-		// Keep the first stage color in the vertices as a fallback path.
+		// Keep the first stage color in the uploaded vertices as a fallback path
+		// without mutating the persistent decal mesh.
 		for ( int v = 0; v < tri.numVerts; v++ ) {
 			const byte *vertexColor = stageColors + v * 4;
 			for ( int k = 0; k < 4; k++ ) {
-				tri.verts[v].color[k] = vertexColor[k];
+				uploadedVerts[v].color[k] = vertexColor[k];
 			}
 		}
-
-		decalColorCache = vertexCache.AllocFrameTemp( stageColors, totalColorBytes );
-		decalColorStride = colorStride;
 	}
 
 	// copy the tri and indexes to temp heap memory,
@@ -644,14 +668,16 @@ void idRenderModelDecal::AddDecalDrawSurf( viewEntity_t *space ) {
 	srfTriangles_t *newTri = (srfTriangles_t *)R_FrameAlloc( sizeof( *newTri ) );
 	*newTri = tri;
 
-	// copy the current vertexes to temp vertex cache
-	newTri->ambientCache = vertexCache.AllocFrameTemp( tri.verts, tri.numVerts * sizeof( idDrawVert ) );
+	// Snapshot the vertices plus any per-stage color blocks into one transient
+	// upload so the draw surf matches Quake 4's frame-temp decal submission.
+	newTri->ambientCache = vertexCache.AllocFrameTemp( vertexAndColorData, totalAmbientBytes );
 
 	// create the drawsurf
 	R_AddDrawSurf( newTri, space, &space->entityDef->parms, material, space->scissorRect );
 
 	drawSurf_t *drawSurf = tr.viewDef->drawSurfs[tr.viewDef->numDrawSurfs - 1];
-	drawSurf->decalColorCache = decalColorCache;
+	drawSurf->decalColorCache = ( totalColorBytes > 0 ) ? newTri->ambientCache : NULL;
+	drawSurf->decalColorOffset = ( totalColorBytes > 0 ) ? vertexBytes : 0;
 	drawSurf->decalColorStride = decalColorStride;
 	drawSurf->decalColorStageCount = numStages;
 }

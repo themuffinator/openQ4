@@ -141,6 +141,7 @@ typedef struct drawSurf_s {
 	struct vertCache_s		*dynamicTexCoords;	// float * in vertex cache memory
 	float					*texGenTransformAndViewOrg;	// packed MD5R texgen rows + local view origin
 	struct vertCache_s		*decalColorCache;	// optional per-stage color blocks for decals
+	int						decalColorOffset;	// bytes from decalColorCache to the first stage color block
 	int						decalColorStride;	// bytes between stage color blocks (numVerts * 4)
 	int						decalColorStageCount;
 	// specular directions for non vertex program cards, skybox texcoords, etc
@@ -1061,6 +1062,7 @@ extern idCVar r_useEntityCulling;		// 0 = none, 1 = box
 extern idCVar r_useEntityScissors;		// 1 = use custom scissor rectangle for each entity
 extern idCVar r_useInteractionCulling;	// 1 = cull interactions
 extern idCVar r_useInteractionScissors;	// 1 = use a custom scissor rectangle for each interaction
+extern idCVar r_limitBatchSize;		// interaction/shadow batches at or below this many indexes are skipped
 extern idCVar r_useFrustumFarDistance;	// if != 0 force the view frustum far distance to this distance
 extern idCVar r_useShadowCulling;		// try to cull shadows from partially visible lights
 extern idCVar r_usePreciseTriangleInteractions;	// 1 = do winding clipping to determine if each ambiguous tri should be lit
@@ -1461,6 +1463,7 @@ void R_LinkLightSurf( const drawSurf_t **link, const srfTriangles_t *tri, const 
 				   const idRenderLightLocal *light, const idMaterial *shader, const idScreenRect &scissor, bool viewInsideShadow );
 
 bool R_CreateAmbientCache( srfTriangles_t *tri, bool needsLighting );
+bool R_CreatePackedSurfaceFrameCaches( srfTriangles_t *tri, bool needsLighting, bool createIndexCache );
 bool R_CreateLightingCache( const idRenderEntityLocal *ent, const idRenderLightLocal *light, srfTriangles_t *tri );
 void R_CreatePrivateShadowCache( srfTriangles_t *tri );
 void R_CreateVertexProgramShadowCache( srfTriangles_t *tri );

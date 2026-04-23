@@ -46,9 +46,15 @@ Canonical parser keys (game-side):
 
 - `noDynamicShadows` participates in shadow eligibility checks for interactions.
 - `noDynamicShadows` participates in light "shape change" checks that trigger derived-data rebuilds.
+- Fog/blend lights use the `noFog` contract instead of ordinary lighting-stage emission tests.
+- Light/material shader register evaluation uses `referenceSoundHandle` amplitude inputs.
 - `detailLevel` is compared against `r_lightDetailLevel` during area light-ref collection.
 - `globalLight` bypasses portal-based light culling in area light-ref collection.
 - `globalLight` bypasses per-surface light-tri frustum culling in interaction submission.
+- Tiny interaction/shadow batches can be dropped by `r_limitBatchSize` before drawsurf allocation.
+- View entities are processed in sort-by-model order during ambient/light submission.
+- Entity scissor tightening is enabled by default through `r_useEntityScissors`, and retail entity LOD clears those scissors for very small on-screen coverage.
+- Shadow submission keeps `noSelfShadow` ownership tied to the original interaction material instead of any later shader override.
 
 ## OpenQ4 Parity Updates Implemented
 
@@ -69,13 +75,36 @@ Canonical parser keys (game-side):
   - `src/renderer/RenderSystem.cpp`
 - Added retail-style default detail level in render light local ctor:
   - `src/renderer/RenderEntity.cpp`
+- Restored fog/blend-light `noFog` interaction routing:
+  - `src/renderer/Interaction.cpp`
+- Restored sound-driven shader register evaluation for light and entity material expressions:
+  - `src/renderer/tr_light.cpp`
+  - `src/renderer/RenderWorld_portals.cpp`
+- Added retail tiny-batch dropping via `r_limitBatchSize` in light/shadow submission:
+  - `src/renderer/RenderSystem_init.cpp`
+  - `src/renderer/tr_local.h`
+  - `src/renderer/tr_light.cpp`
+- Restored retail sort-by-model view-entity submission order in the light front end:
+  - `src/renderer/tr_light.cpp`
+- Restored retail entity scissor LOD handling and retail `r_useEntityScissors` default:
+  - `src/renderer/RenderSystem_init.cpp`
+  - `src/renderer/tr_light.cpp`
+- Restored original-material `noSelfShadow` routing for interaction lights and shadows:
+  - `src/renderer/Interaction.cpp`
 
 ## Current Result
 
 OpenQ4 now honors retail Quake 4 light entity keys and runtime handling for:
 
 - `noDynamicShadows`
+- fog/blend-light `noFog`
+- light/material shader `referenceSoundHandle` evaluation
 - `detailLevel` + `r_lightDetailLevel`
 - `globalLight`
+- `r_limitBatchSize`
+- retail sort-by-model view-entity submission
+- retail default `r_useEntityScissors`
+- retail entity scissor LOD
+- original-material `noSelfShadow` routing
 
 across parser, renderer culling, and interaction shadow behavior.

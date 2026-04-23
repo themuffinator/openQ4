@@ -300,7 +300,7 @@ static bool RB_BindStockGLSLShaderParm( glslShaderParmBinding_t binding, int loc
 static inline void RB_SetStageVertexColorPointer( const drawSurf_t *surf, int stage, idDrawVert *ac ) {
 	if ( surf->decalColorCache != NULL && stage >= 0 && stage < surf->decalColorStageCount && surf->decalColorStride > 0 ) {
 		byte *colorData = (byte *)vertexCache.Position( surf->decalColorCache );
-		glColorPointer( 4, GL_UNSIGNED_BYTE, 0, colorData + stage * surf->decalColorStride );
+		glColorPointer( 4, GL_UNSIGNED_BYTE, 0, colorData + surf->decalColorOffset + stage * surf->decalColorStride );
 		return;
 	}
 
