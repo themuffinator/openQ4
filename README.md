@@ -101,6 +101,9 @@ OpenQ4 will try to locate your Quake 4 install automatically. If detection fails
 > [!TIP]
 > As of March 30, 2026, Linux packages default to the SDL3 backend. On Steam Deck and other Wayland sessions where both `WAYLAND_DISPLAY` and `DISPLAY` are present, `OpenQ4-steamdeck` prefers XWayland unless you already set `SDL_VIDEODRIVER` yourself.
 
+> [!TIP]
+> Current platform baselines are `Windows 7+` for binary compatibility with active validation centered on newer Windows releases, `macOS 11+` for the arm64 package line, and Linux release packages built on `Ubuntu 24.04`-class environments with OpenGL plus X11/GLX or XWayland available.
+
 ---
 
 ## Compatibility and Scope

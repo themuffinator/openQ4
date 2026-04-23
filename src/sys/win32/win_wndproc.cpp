@@ -40,13 +40,7 @@ static void WIN_DisableAltTab( void ) {
 	if ( s_alttab_disabled || win32.win_allowAltTab.GetBool() ) {
 		return;
 	}
-	if ( !idStr::Icmp( cvarSystem->GetCVarString( "sys_arch" ), "winnt" ) ) {
-		RegisterHotKey( 0, 0, MOD_ALT, VK_TAB );
-	} else {
-		BOOL old;
-
-		SystemParametersInfo( SPI_SCREENSAVERRUNNING, 1, &old, 0 );
-	}
+	RegisterHotKey( 0, 0, MOD_ALT, VK_TAB );
 	s_alttab_disabled = true;
 }
 
@@ -54,14 +48,7 @@ static void WIN_EnableAltTab( void ) {
 	if ( !s_alttab_disabled || win32.win_allowAltTab.GetBool() ) {
 		return;
 	}
-	if ( !idStr::Icmp( cvarSystem->GetCVarString( "sys_arch" ), "winnt" ) ) {
-		UnregisterHotKey( 0, 0 );
-	} else {
-		BOOL old;
-
-		SystemParametersInfo( SPI_SCREENSAVERRUNNING, 0, &old, 0 );
-	}
-
+	UnregisterHotKey( 0, 0 );
 	s_alttab_disabled = false;
 }
 

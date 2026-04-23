@@ -88,7 +88,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: windows-latest
+          - os: windows-2025
             platform: windows
             label: Windows x64
             binary_arch: x64
@@ -102,7 +102,7 @@ jobs:
             platform_backend: sdl3
             archive_format: zip
             archive_ext: .zip
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             platform: linux
             label: Linux x64
             binary_arch: x64
@@ -116,7 +116,7 @@ jobs:
             platform_backend: sdl3
             archive_format: tar.xz
             archive_ext: .tar.xz
-          - os: macos-latest
+          - os: macos-15
             platform: macos
             label: macOS ARM64
             binary_arch: arm64

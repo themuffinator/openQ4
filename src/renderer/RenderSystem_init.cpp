@@ -33,7 +33,8 @@ If you have questions concerning this license or the applicable additional terms
 #include "DXT/DXTCodec.h"
 #include "../framework/RenderDoc.h"
 
-// Vista OpenGL wrapper check
+// Detect the Microsoft software OpenGL wrapper and guide the user toward
+// installing proper vendor drivers.
 #ifdef _WIN32
 #include "../sys/win32/win_local.h"
 #endif
@@ -933,7 +934,7 @@ void R_InitOpenGL( void ) {
 
 #ifdef _WIN32
 	static bool glCheck = false;
-	if ( !glCheck && win32.osversion.dwMajorVersion == 6 ) {
+	if ( !glCheck ) {
 		glCheck = true;
 		if ( !idStr::Icmp( glConfig.vendor_string, "Microsoft" ) && idStr::FindText( glConfig.renderer_string, "OpenGL-D3D" ) != -1 ) {
 			if ( cvarSystem->GetCVarBool( "r_fullscreen" ) ) {

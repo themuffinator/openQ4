@@ -149,6 +149,11 @@ static const char *Sys_GetFallbackProcessorName( const cpuid_t cpuid ) {
 	return "generic CPU";
 }
 
+static const DWORD OPENQ4_MIN_WINDOWS_MAJOR_VERSION = 6;
+static const DWORD OPENQ4_MIN_WINDOWS_MINOR_VERSION = 1;
+static const DWORD OPENQ4_VALIDATED_WINDOWS_MAJOR_VERSION = 10;
+static const DWORD OPENQ4_VALIDATED_WINDOWS_MINOR_VERSION = 0;
+
 static void Sys_GetProcessorTopology( int &logicalCores, int &physicalCores, int &packages ) {
 	SYSTEM_INFO systemInfo;
 
@@ -170,6 +175,59 @@ static void Sys_GetProcessorTopology( int &logicalCores, int &physicalCores, int
 	if ( packages <= 0 && logicalCores > 0 ) {
 		packages = 1;
 	}
+}
+
+static bool Sys_QueryWindowsVersion( OSVERSIONINFOEXW &version ) {
+	typedef LONG ( WINAPI *RtlGetVersionFn )( OSVERSIONINFOW * );
+
+	HMODULE ntdllModule;
+	RtlGetVersionFn rtlGetVersion;
+
+	memset( &version, 0, sizeof( version ) );
+	version.dwOSVersionInfoSize = sizeof( version );
+
+	ntdllModule = GetModuleHandleA( "ntdll.dll" );
+	if ( ntdllModule == NULL ) {
+		return false;
+	}
+
+	rtlGetVersion = reinterpret_cast<RtlGetVersionFn>( GetProcAddress( ntdllModule, "RtlGetVersion" ) );
+	if ( rtlGetVersion == NULL ) {
+		return false;
+	}
+
+	return rtlGetVersion( reinterpret_cast<OSVERSIONINFOW *>( &version ) ) == 0;
+}
+
+static bool Sys_IsWindowsVersionOrGreater( const OSVERSIONINFOEXW &version, const DWORD major, const DWORD minor ) {
+	if ( version.dwMajorVersion != major ) {
+		return version.dwMajorVersion > major;
+	}
+
+	return version.dwMinorVersion >= minor;
+}
+
+static idStr Sys_FormatWindowsVersion( const OSVERSIONINFOEXW &version ) {
+	idStr versionName;
+
+	if ( version.dwMajorVersion > 10 || ( version.dwMajorVersion == 10 && version.dwBuildNumber >= 22000 ) ) {
+		versionName = "Windows 11";
+	} else if ( version.dwMajorVersion == 10 ) {
+		versionName = "Windows 10";
+	} else if ( version.dwMajorVersion == 6 && version.dwMinorVersion == 3 ) {
+		versionName = "Windows 8.1";
+	} else if ( version.dwMajorVersion == 6 && version.dwMinorVersion == 2 ) {
+		versionName = "Windows 8";
+	} else if ( version.dwMajorVersion == 6 && version.dwMinorVersion == 1 ) {
+		versionName = "Windows 7";
+	} else if ( version.dwMajorVersion == 6 && version.dwMinorVersion == 0 ) {
+		versionName = "Windows Vista";
+	} else {
+		versionName = va( "Windows %lu.%lu", version.dwMajorVersion, version.dwMinorVersion );
+	}
+
+	versionName += va( " (build %lu)", version.dwBuildNumber );
+	return versionName;
 }
 
 bool Sys_HandlePrintScreenHotkey( bool pressed ) {
@@ -1324,9 +1382,6 @@ Sys_Init
 The cvar system must already be setup
 ================
 */
-#define OSR2_BUILD_NUMBER 1111
-#define WIN98_BUILD_NUMBER 1998
-
 void Sys_Init(void) {
 
 	CoInitialize(NULL);
@@ -1354,64 +1409,19 @@ void Sys_Init(void) {
 	//
 	// Windows version
 	//
-	win32.osversion.dwOSVersionInfoSize = sizeof(win32.osversion);
-
-	if (!GetVersionEx((LPOSVERSIONINFO)&win32.osversion))
-		Sys_Error("Couldn't get OS info");
-
-	if (win32.osversion.dwMajorVersion < 4) {
-		Sys_Error(GAME_NAME " requires Windows version 4 (NT) or greater");
-	}
-	if (win32.osversion.dwPlatformId == VER_PLATFORM_WIN32s) {
-		Sys_Error(GAME_NAME " doesn't run on Win32s");
+	if ( !Sys_QueryWindowsVersion( win32.osversion ) ) {
+		Sys_Error( "Couldn't query Windows version" );
 	}
 
-	if (win32.osversion.dwPlatformId == VER_PLATFORM_WIN32_NT) {
-		if (win32.osversion.dwMajorVersion <= 4) {
-			win32.sys_arch.SetString("WinNT (NT)");
-		}
-		else if (win32.osversion.dwMajorVersion == 5 && win32.osversion.dwMinorVersion == 0) {
-			win32.sys_arch.SetString("Win2K (NT)");
-		}
-		else if (win32.osversion.dwMajorVersion == 5 && win32.osversion.dwMinorVersion == 1) {
-			win32.sys_arch.SetString("WinXP (NT)");
-		}
-		else if (win32.osversion.dwMajorVersion == 6) {
-			win32.sys_arch.SetString("Vista");
-		}
-		else {
-			win32.sys_arch.SetString("Unknown NT variant");
-		}
+	if ( !Sys_IsWindowsVersionOrGreater( win32.osversion, OPENQ4_MIN_WINDOWS_MAJOR_VERSION, OPENQ4_MIN_WINDOWS_MINOR_VERSION ) ) {
+		Sys_Error( GAME_NAME " requires Windows 7 or newer" );
 	}
-	else if (win32.osversion.dwPlatformId == VER_PLATFORM_WIN32_WINDOWS) {
-		if (win32.osversion.dwMajorVersion == 4 && win32.osversion.dwMinorVersion == 0) {
-			// Win95
-			if (win32.osversion.szCSDVersion[1] == 'C') {
-				win32.sys_arch.SetString("Win95 OSR2 (95)");
-			}
-			else {
-				win32.sys_arch.SetString("Win95 (95)");
-			}
-		}
-		else if (win32.osversion.dwMajorVersion == 4 && win32.osversion.dwMinorVersion == 10) {
-			// Win98
-			if (win32.osversion.szCSDVersion[1] == 'A') {
-				win32.sys_arch.SetString("Win98SE (95)");
-			}
-			else {
-				win32.sys_arch.SetString("Win98 (95)");
-			}
-		}
-		else if (win32.osversion.dwMajorVersion == 4 && win32.osversion.dwMinorVersion == 90) {
-			// WinMe
-			win32.sys_arch.SetString("WinMe (95)");
-		}
-		else {
-			win32.sys_arch.SetString("Unknown 95 variant");
-		}
-	}
-	else {
-		win32.sys_arch.SetString("unknown Windows variant");
+
+	win32.sys_arch.SetString( Sys_FormatWindowsVersion( win32.osversion ) );
+	if ( !Sys_IsWindowsVersionOrGreater( win32.osversion, OPENQ4_VALIDATED_WINDOWS_MAJOR_VERSION, OPENQ4_VALIDATED_WINDOWS_MINOR_VERSION ) ) {
+		common->Printf(
+			"WARNING: %s is outside OpenQ4's actively validated Windows support matrix.\n",
+			win32.sys_arch.GetString() );
 	}
 
 	//

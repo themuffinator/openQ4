@@ -70,6 +70,15 @@ py = python_mod.find_installation('python3', required: true)
 fs_mod = import('fs')
 if host_system == 'darwin'
   add_languages('objc', 'objcpp', required: true)
+  macos_deployment_target = '11.0'
+  add_project_arguments(
+    '-mmacosx-version-min=' + macos_deployment_target,
+    language: ['c', 'cpp', 'objc', 'objcpp'],
+  )
+  add_project_link_arguments(
+    '-mmacosx-version-min=' + macos_deployment_target,
+    language: ['c', 'cpp', 'objc', 'objcpp'],
+  )
 endif
 
 version_track = get_option('version_track').strip()

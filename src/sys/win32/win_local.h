@@ -107,7 +107,7 @@ struct Win32Vars_t {
 	bool			movingWindow;		// inhibit mouse grab when dragging the window
 	bool			mouseGrabbed;		// current state of grab and hide
 
-	OSVERSIONINFOEX	osversion;
+	OSVERSIONINFOEXW	osversion;
 
 	cpuid_t			cpuid;
 

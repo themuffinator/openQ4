@@ -27,6 +27,15 @@ This document defines the long-term platform direction for OpenQ4 and how SDL3 +
 - When both `WAYLAND_DISPLAY` and `DISPLAY` are available, the Steam Deck launcher prefers XWayland by exporting `SDL_VIDEODRIVER=x11` unless the user already set an SDL video driver.
 - Windows arm64 currently uses a custom OpenAL Soft package path during bring-up because the in-repo bundled Windows runtime payload is still x64-only.
 
+## Runtime Baselines
+
+- Windows packaged compatibility floor: `Windows 7` or later.
+- Windows validation focus: current `Windows 11` releases first, with `Windows 10` retained as a practical compatibility target even though Microsoft's general Windows 10 servicing ended on `October 14, 2025`.
+- Windows 7/8/8.1 are no longer hard-blocked by the current x64 binaries, but they are legacy and outside the actively validated support matrix.
+- macOS packaged compatibility floor for the arm64 release line: `macOS 11` or later. Meson now pins the deployment target to `11.0` so the binary floor matches the documented floor.
+- Linux packaged compatibility floor: release archives are built on pinned `Ubuntu 24.04` runners and should be treated as targeting a comparable modern 64-bit desktop userspace with OpenGL plus X11/GLX or XWayland available.
+- Steam Deck support assumes a SteamOS 3.x style environment and the explicit `OpenQ4-steamdeck` launcher.
+
 ## SDL3 Direction
 
 - SDL3 is the default backend path and the portability layer for:
