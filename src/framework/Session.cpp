@@ -424,11 +424,7 @@ static void Session_NormalizeMapDeclPath( const char *mapPath, idStr &normalized
 	}
 }
 
-static bool Session_GetMapDeclDict( const char *mapPath, idDict &outMapDecl ) {
-	outMapDecl.Clear();
-
-	idStr normalizedPath;
-	Session_NormalizeMapDeclPath( mapPath, normalizedPath );
+static bool Session_GetMapDeclDictForNormalizedPath( const idStr &normalizedPath, idDict &outMapDecl ) {
 	if ( normalizedPath.IsEmpty() ) {
 		return false;
 	}
@@ -456,6 +452,57 @@ static bool Session_GetMapDeclDict( const char *mapPath, idDict &outMapDecl ) {
 
 		if ( !fileSystem->FilenameCompare( normalizedPath.c_str(), candidatePath.c_str() ) ) {
 			outMapDecl = *candidate;
+			return true;
+		}
+	}
+
+	return false;
+}
+
+static void Session_ApplyEntityFilterToServerInfo( idDict &serverInfo, const char *entityFilter ) {
+	if ( entityFilter != NULL && entityFilter[0] != '\0' ) {
+		serverInfo.Set( "si_entityFilter", entityFilter );
+	} else {
+		serverInfo.Delete( "si_entityFilter" );
+	}
+}
+
+static const char *Session_GetEntityFilterArg( const idCmdArgs &args ) {
+	return ( args.Argc() > 2 ) ? args.Argv( 2 ) : "";
+}
+
+static bool Session_GetMapDeclDict( const char *mapPath, const char *entityFilter, idDict &outMapDecl ) {
+	outMapDecl.Clear();
+
+	idStr normalizedPath;
+	Session_NormalizeMapDeclPath( mapPath, normalizedPath );
+	if ( normalizedPath.IsEmpty() ) {
+		return false;
+	}
+
+	if ( entityFilter != NULL && entityFilter[0] != '\0' ) {
+		idStr filteredPath = normalizedPath;
+		filteredPath += "_";
+		filteredPath += entityFilter;
+		filteredPath.Strip( ' ' );
+		filteredPath.Strip( '\t' );
+		filteredPath.StripTrailingWhitespace();
+		filteredPath.StripQuotes();
+		filteredPath.BackSlashesToSlashes();
+		filteredPath.Replace( " ", "_" );
+		if ( Session_GetMapDeclDictForNormalizedPath( filteredPath, outMapDecl ) ) {
+			return true;
+		}
+	}
+
+	if ( Session_GetMapDeclDictForNormalizedPath( normalizedPath, outMapDecl ) ) {
+		return true;
+	}
+
+	if ( entityFilter == NULL || entityFilter[0] == '\0' ) {
+		idStr firstSegmentPath = normalizedPath;
+		firstSegmentPath += "_first";
+		if ( Session_GetMapDeclDictForNormalizedPath( firstSegmentPath, outMapDecl ) ) {
 			return true;
 		}
 	}
@@ -1904,6 +1951,9 @@ static void Session_Map_f( const idCmdArgs &args ) {
 		common->Printf( "map %s is in an addon pak - reloading\n", string.c_str() );
 		rl_args.AppendArg( "map" );
 		rl_args.AppendArg( map );
+		if ( args.Argc() > 2 ) {
+			rl_args.AppendArg( args.Argv( 2 ) );
+		}
 		cmdSystem->SetupReloadEngine( rl_args );
 		return;
 	default:
@@ -1911,7 +1961,7 @@ static void Session_Map_f( const idCmdArgs &args ) {
 	}
 
 	const bool developerMapStart = cvarSystem->GetCVarBool( "developer" );
-	sessLocal.StartNewGame( map, developerMapStart );
+	sessLocal.StartNewGame( map, developerMapStart, Session_GetEntityFilterArg( args ) );
 }
 
 /*
@@ -1945,6 +1995,9 @@ static void Session_DevMap_f( const idCmdArgs &args ) {
 		common->Printf( "map %s is in an addon pak - reloading\n", string.c_str() );
 		rl_args.AppendArg( "devmap" );
 		rl_args.AppendArg( map );
+		if ( args.Argc() > 2 ) {
+			rl_args.AppendArg( args.Argv( 2 ) );
+		}
 		cmdSystem->SetupReloadEngine( rl_args );
 		return;
 	default:
@@ -1959,7 +2012,7 @@ static void Session_DevMap_f( const idCmdArgs &args ) {
 	}
 
 	cvarSystem->SetCVarBool( "developer", true );
-	sessLocal.StartNewGame( map, true );
+	sessLocal.StartNewGame( map, true, Session_GetEntityFilterArg( args ) );
 }
 
 /*
@@ -1992,12 +2045,13 @@ Session_OpenQ4StartSingleplayer_f
 */
 static void Session_OpenQ4StartSingleplayer_f( const idCmdArgs &args ) {
 	if ( args.Argc() < 2 ) {
-		common->Printf( "USAGE: openq4_startSingleplayer <map> [devmap]\n" );
+		common->Printf( "USAGE: openq4_startSingleplayer <map> [devmap] [entityFilter]\n" );
 		return;
 	}
 
 	const bool devmap = args.Argc() > 2 && atoi( args.Argv( 2 ) ) != 0;
-	sessLocal.StartNewGame( args.Argv( 1 ), devmap );
+	const char *entityFilter = ( args.Argc() > 3 ) ? args.Argv( 3 ) : "";
+	sessLocal.StartNewGame( args.Argv( 1 ), devmap, entityFilter );
 }
 
 /*
@@ -3016,7 +3070,7 @@ void idSessionLocal::CompressDemoFile( const char *scheme, const char *demoName 
 idSessionLocal::StartNewGame
 ===============
 */
-void idSessionLocal::StartNewGame( const char *mapName, bool devmap ) {
+void idSessionLocal::StartNewGame( const char *mapName, bool devmap, const char *entityFilter ) {
 #ifdef	ID_DEDICATED
 	common->Printf( "Dedicated servers cannot start singleplayer games.\n" );
 	return;
@@ -3038,6 +3092,9 @@ void idSessionLocal::StartNewGame( const char *mapName, bool devmap ) {
 		reloadArgs.AppendArg( "openq4_startSingleplayer" );
 		reloadArgs.AppendArg( mapName );
 		reloadArgs.AppendArg( devmap ? "1" : "0" );
+		if ( entityFilter != NULL && entityFilter[0] != '\0' ) {
+			reloadArgs.AppendArg( entityFilter );
+		}
 		cmdSystem->SetupReloadEngine( reloadArgs );
 		return;
 	}
@@ -3050,6 +3107,7 @@ void idSessionLocal::StartNewGame( const char *mapName, bool devmap ) {
 	mapSpawnData.serverInfo.Clear();
 	mapSpawnData.serverInfo = *cvarSystem->MoveCVarsToDict( CVAR_SERVERINFO );
 	mapSpawnData.serverInfo.Set( "si_gameType", "singleplayer" );
+	Session_ApplyEntityFilterToServerInfo( mapSpawnData.serverInfo, entityFilter );
 
 	// set the devmap key so any play testing items will be given at
 	// spawn time to set approximately the right weapons and ammo
@@ -3070,10 +3128,11 @@ idSessionLocal::GetAutoSaveName
 ===============
 */
 idStr idSessionLocal::GetAutoSaveName( const char *mapName ) const {
-	const idDecl *mapDecl = declManager->FindType( DECL_MAPDEF, mapName, false );
-	const idDeclEntityDef *mapDef = static_cast<const idDeclEntityDef *>( mapDecl );
+	idDict mapDeclDict;
+	const char *entityFilter = mapSpawnData.serverInfo.GetString( "si_entityFilter", "" );
+	const idDict *mapDef = Session_GetMapDeclDict( mapName, entityFilter, mapDeclDict ) ? &mapDeclDict : NULL;
 	if ( mapDef ) {
-		mapName = common->GetLanguageDict()->GetString( mapDef->dict.GetString( "name", mapName ) );
+		mapName = common->GetLanguageDict()->GetString( mapDef->GetString( "name", mapName ) );
 	}
 	// Fixme: Localization
 	return va( "^3AutoSave:^0 %s", mapName );
@@ -3320,11 +3379,12 @@ void idSessionLocal::LoadLoadingGui( const char *mapName ) {
 	const char *loadGuiOverride = "";
 	const char *spawnGameType = mapSpawnData.serverInfo.GetString( "si_gameType", cvarSystem->GetCVarString( "si_gameType" ) );
 	const char *spawnMapPath = mapSpawnData.serverInfo.GetString( "si_map", mapName );
+	const char *spawnEntityFilter = mapSpawnData.serverInfo.GetString( "si_entityFilter", "" );
 	const bool mapLooksMultiplayer = !idStr::Icmpn( spawnMapPath, "mp/", 3 );
 	const bool isMultiplayerLoad = mapLooksMultiplayer || ( spawnGameType[ 0 ] != '\0' && idStr::Icmp( spawnGameType, "singleplayer" ) != 0 );
 
 	idDict mapDeclDict;
-	const idDict *mapDef = Session_GetMapDeclDict( spawnMapPath, mapDeclDict ) ? &mapDeclDict : NULL;
+	const idDict *mapDef = Session_GetMapDeclDict( spawnMapPath, spawnEntityFilter, mapDeclDict ) ? &mapDeclDict : NULL;
 	if ( mapDef ) {
 		loadingLevelName = common->GetLanguageDict()->GetString( mapDef->GetString( "name", spawnMapPath ) );
 		loadingObjectives = common->GetLanguageDict()->GetString( mapDef->GetString( "objectives", "" ) );
@@ -3462,8 +3522,9 @@ idSessionLocal::GetBytesNeededForMapLoad
 ===============
 */
 int idSessionLocal::GetBytesNeededForMapLoad( const char *mapName ) {
-	const idDecl *mapDecl = declManager->FindType( DECL_MAPDEF, mapName, false );
-	const idDeclEntityDef *mapDef = static_cast<const idDeclEntityDef *>( mapDecl );
+	idDict mapDeclDict;
+	const char *entityFilter = mapSpawnData.serverInfo.GetString( "si_entityFilter", "" );
+	const idDict *mapDef = Session_GetMapDeclDict( mapName, entityFilter, mapDeclDict ) ? &mapDeclDict : NULL;
 	const int machineSpec = idMath::ClampInt( 0, 3, com_machineSpec.GetInteger() );
 	const int fallbackBytes = ( machineSpec < 2 ) ? ( 200 * 1024 * 1024 ) : ( 400 * 1024 * 1024 );
 
@@ -3471,7 +3532,7 @@ int idSessionLocal::GetBytesNeededForMapLoad( const char *mapName ) {
 		// Stock map defs commonly provide size0..size2 only, so for ultra-spec
 		// systems (or missing entries) walk down to the closest available key.
 		for ( int spec = machineSpec; spec >= 0; --spec ) {
-			const int bytesNeeded = mapDef->dict.GetInt( va( "size%d", spec ), "0" );
+			const int bytesNeeded = mapDef->GetInt( va( "size%d", spec ), "0" );
 			if ( bytesNeeded > 0 ) {
 				return bytesNeeded;
 			}
@@ -5170,11 +5231,13 @@ void idSessionLocal::RunGameTic() {
 			// clear the devmap key on serverinfo, so player spawns
 			// won't get the map testing items
 			mapSpawnData.serverInfo.Delete( "devmap" );
+			Session_ApplyEntityFilterToServerInfo( mapSpawnData.serverInfo, Session_GetEntityFilterArg( args ) );
 
 			// go to the next map
 			MoveToNewMap( args.Argv(1) );
 		} else if ( !idStr::Icmp( args.Argv(0), "devmap" ) ) {
 			mapSpawnData.serverInfo.Set( "devmap", "1" );
+			Session_ApplyEntityFilterToServerInfo( mapSpawnData.serverInfo, Session_GetEntityFilterArg( args ) );
 			MoveToNewMap( args.Argv(1) );
 		} else if ( !idStr::Icmp( args.Argv(0), "nextMap" ) ) {
 			cmdSystem->BufferCommandText( CMD_EXEC_INSERT, "nextMap" );

@@ -178,7 +178,7 @@ public:
 	void				MoveToNewMap( const char *mapName );
 
 	// loads a map and starts a new game on it
-	void				StartNewGame( const char *mapName, bool devmap = false );
+	void				StartNewGame( const char *mapName, bool devmap = false, const char *entityFilter = NULL );
 	void				PlayIntroGui();
 
 	void				LoadSession( const char *name );
