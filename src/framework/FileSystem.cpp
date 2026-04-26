@@ -263,12 +263,6 @@ typedef struct {
 } officialPk4Info_t;
 
 static officialPk4Info_t officialPk4s[] = {
-	// game binaries
-	{ "game000.pk4",			0xb3abe28c,	true,	false },
-	{ "game100.pk4",			0x74b379d9,	true,	false },
-	{ "game200.pk4",			0xa3c810d9,	true,	false },
-	{ "game300.pk4",			0x68fb90b1,	true,	false },
-
 	// core media baseline for Quake 4
 	{ "pak001.pk4",				0xf2cbc998,	true,	true },
 	{ "pak002.pk4",				0x7f8d80d1,	true,	true },
@@ -307,6 +301,26 @@ static officialPk4Info_t officialPk4s[] = {
 
 	{ NULL,						0,			false,	false }
 };
+
+static bool FS_IsIgnoredOfficialGameBinaryPk4( const char *pakName ) {
+	idStr name;
+
+	if ( !pakName || !pakName[ 0 ] ) {
+		return false;
+	}
+
+	name = pakName;
+	name.StripPath();
+
+	if ( !name.Icmp( "game000.pk4" ) ||
+		 !name.Icmp( "game100.pk4" ) ||
+		 !name.Icmp( "game200.pk4" ) ||
+		 !name.Icmp( "game300.pk4" ) ) {
+		return true;
+	}
+
+	return idStr::Filter( "gamex*.pk4", name.c_str(), false );
+}
 
 static const officialPk4Info_t *FindOfficialPk4Info( const char *pakName ) {
 	for ( int i = 0; officialPk4s[ i ].name != NULL; i++ ) {
@@ -358,7 +372,6 @@ static void FS_AddUniquePath( idStrList &paths, const char *path ) {
 
 static bool FS_HasGameFilesAtGameDirPath( const char *gameDirPath ) {
 	idStr pakPath;
-	idStr gamePath;
 
 	if ( !gameDirPath || !gameDirPath[ 0 ] ) {
 		return false;
@@ -366,9 +379,7 @@ static bool FS_HasGameFilesAtGameDirPath( const char *gameDirPath ) {
 
 	pakPath = gameDirPath;
 	pakPath.AppendPath( "pak001.pk4" );
-	gamePath = gameDirPath;
-	gamePath.AppendPath( "game000.pk4" );
-	return ( FS_FileExists( pakPath.c_str() ) && FS_FileExists( gamePath.c_str() ) );
+	return FS_FileExists( pakPath.c_str() );
 }
 
 static bool FS_TryResolveBasePathCandidate( const char *candidatePath, idStr &resolvedBasePath ) {
@@ -1106,7 +1117,7 @@ idCVar	idFileSystemLocal::fs_caseSensitiveOS( "fs_caseSensitiveOS", "0", CVAR_SY
 idCVar	idFileSystemLocal::fs_caseSensitiveOS( "fs_caseSensitiveOS", "1", CVAR_SYSTEM | CVAR_BOOL, "" );
 #endif
 idCVar	idFileSystemLocal::fs_searchAddons( "fs_searchAddons", "0", CVAR_SYSTEM | CVAR_BOOL, "search all addon pk4s ( disables addon functionality )" );
-idCVar	idFileSystemLocal::fs_validateOfficialPaks( "fs_validateOfficialPaks", "1", CVAR_SYSTEM | CVAR_INIT | CVAR_BOOL, "verify required official q4base pk4 checksums on startup" );
+idCVar	idFileSystemLocal::fs_validateOfficialPaks( "fs_validateOfficialPaks", "1", CVAR_SYSTEM | CVAR_INIT | CVAR_BOOL, "verify required official q4base media pk4 checksums on startup" );
 
 idFileSystemLocal	fileSystemLocal;
 idFileSystem *		fileSystem = &fileSystemLocal;
@@ -3155,6 +3166,11 @@ void idFileSystemLocal::AddGameDirectory( const char *path, const char *dir ) {
 	pakfiles.Sort();
 
 	for ( i = 0; i < pakfiles.Num(); i++ ) {
+		if ( !idStr::Icmp( dir, BASE_GAMEDIR ) && FS_IsIgnoredOfficialGameBinaryPk4( pakfiles[ i ] ) ) {
+			common->Printf( "Ignoring unneeded game binary pk4 %s\n", BuildOSPath( path, dir, pakfiles[ i ] ) );
+			continue;
+		}
+
 		pakfile = BuildOSPath( path, dir, pakfiles[i] );
 		pak = LoadZipFile( pakfile );
 		if ( !pak ) {
@@ -3521,7 +3537,7 @@ void idFileSystemLocal::Startup( void ) {
 		idStr validationErrors;
 		if ( !ValidateRequiredOfficialPaks( validationErrors ) ) {
 			common->FatalError(
-				"Required official Quake 4 pk4 files are missing or modified.\n\n%s\n"
+				"Required official Quake 4 media pk4 files are missing or modified.\n\n%s\n"
 				"Install/verify the original q4base assets and remove overrides from fs_savepath/fs_cdpath.",
 				validationErrors.c_str() );
 		}

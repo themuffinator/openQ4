@@ -45,7 +45,7 @@ Single-player and multiplayer live under one `baseoq4/` directory with `game-sp`
 - Complete engine and game-code replacement for Quake 4
 - Unified `baseoq4/` game directory for both single-player and multiplayer
 - Startup auto-discovery for Steam and GOG installs
-- Official `q4base` PK4 validation enabled by default
+- Official `q4base` media PK4 validation enabled by default, with retail game-binary PK4s ignored
 - In-tree BSE runtime integrated into `OpenQ4-client_<arch>`
 - Canonical SDK-derived game-library source kept in [OpenQ4-GameLibs](https://github.com/themuffinator/OpenQ4-GameLibs)
 
