@@ -410,7 +410,9 @@ void idGuiModel::DrawStretchPic( const idDrawVert *dverts, const glIndex_t *dind
 		if ( surf->numVerts ) {
 			AdvanceSurf();
 		}
-		const_cast<idMaterial *>(hShader)->EnsureNotPurged();	// in case it was a gui item started before a level change
+		if ( !com_SingleDeclFile.GetBool() ) {
+			const_cast<idMaterial *>(hShader)->EnsureNotPurged();	// in case it was a gui item started before a level change
+		}
 		surf->material = hShader;
 	}
 
@@ -671,7 +673,9 @@ void idGuiModel::DrawStretchTri( idVec2 p1, idVec2 p2, idVec2 p3, idVec2 t1, idV
 		if ( surf->numVerts ) {
 			AdvanceSurf();
 		}
-		const_cast<idMaterial *>(material)->EnsureNotPurged();	// in case it was a gui item started before a level change
+		if ( !com_SingleDeclFile.GetBool() ) {
+			const_cast<idMaterial *>(material)->EnsureNotPurged();	// in case it was a gui item started before a level change
+		}
 		surf->material = material;
 	}
 

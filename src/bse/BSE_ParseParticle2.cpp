@@ -115,6 +115,34 @@ ID_INLINE void BSE_UpdateExtents(const idVec3& sample, idVec3& mins, idVec3& max
 	maxs.y = Max(maxs.y, sample.y);
 	maxs.z = Max(maxs.z, sample.z);
 }
+
+ID_INLINE const char* BSE_EffectName(const rvDeclEffect* effect) {
+	return effect != NULL ? effect->GetName() : "<unknown>";
+}
+
+static void BSE_ParticleWarning(const idParser* src, const rvDeclEffect* effect, const char* fmt, ...) {
+	char detail[4096];
+	va_list argptr;
+
+	va_start(argptr, fmt);
+	idStr::vsnPrintf(detail, sizeof(detail), fmt, argptr);
+	va_end(argptr);
+	detail[sizeof(detail) - 1] = '\0';
+
+	if (effect != NULL) {
+		common->Warning("^4BSE:^1 %s in '%s' (file: %s, line: %d)",
+			detail,
+			BSE_EffectName(effect),
+			src != NULL ? src->GetFileName() : "",
+			src != NULL ? src->GetLineNum() : 0);
+	}
+	else {
+		common->Warning("^4BSE:^1 %s (file: %s, line: %d)",
+			detail,
+			src != NULL ? src->GetFileName() : "",
+			src != NULL ? src->GetLineNum() : 0);
+	}
+}
 }
 
 float rvParticleTemplate::GetSpawnVolume(rvBSE* effect) {
@@ -307,8 +335,7 @@ bool rvParticleTemplate::ParseBlendParms(rvDeclEffect* effect, idParser* src)
 	{
 		if (idStr::Icmp(token, "add"))
 		{
-			src->Error("Invalid blend type");
-			return false;
+			BSE_ParticleWarning(src, effect, "Invalid blend type '%s'", token.c_str());
 		}
 		else
 		{
@@ -390,8 +417,8 @@ bool rvParticleTemplate::ParseImpact(rvDeclEffect* effect, idParser* src)
 					//	v13,
 					//	v12,
 					//	v3);
-					src->Error("Invalid impact parameter");
-					return false;
+					BSE_ParticleWarning(src, effect, "Invalid impact parameter '%s'", token.c_str());
+					goto LABEL_29;
 				}
 				v4->mPhysicsDistance = src->ParseFloat();
 			}
@@ -408,7 +435,7 @@ bool rvParticleTemplate::ParseImpact(rvDeclEffect* effect, idParser* src)
 			}
 			if (v4->mNumImpactEffects >= 4)
 			{
-				src->Error("too many impact effects");
+				BSE_ParticleWarning(src, effect, "too many impact effects '%s'", token.c_str());
 				goto LABEL_29;
 			}
 			//v7 = sdSingleton<sdDeclTypeHolder>::GetInstance();
@@ -475,7 +502,7 @@ bool rvParticleTemplate::ParseTimeout(rvDeclEffect* effect, idParser* src)
 					//	v15,
 					//	v14,
 					//	v13);
-					src->Error("Invalid timeout parameter");
+					BSE_ParticleWarning(src, effect, "Invalid timeout parameter '%s'", token.c_str());
 				}
 				else
 				{
@@ -501,7 +528,7 @@ bool rvParticleTemplate::ParseTimeout(rvDeclEffect* effect, idParser* src)
 						//	v11,
 						//	v10,
 						//	v9);
-						src->Error("Too many timeout effects");
+						BSE_ParticleWarning(src, effect, "Too many timeout effects '%s'", token.c_str());
 					}
 					else
 					{
@@ -602,7 +629,7 @@ rvEnvParms* rvParticleTemplate::ParseMotionParms(idParser* src, int count, rvEnv
 								//	v11,
 								//	v10);
 
-								src->Error("Invalid motion parameter");
+								BSE_ParticleWarning(src, NULL, "Invalid motion parameter '%s'", token.c_str());
 								src->SkipBracedSection(1);
 							}
 							else
@@ -736,7 +763,7 @@ bool rvParticleTemplate::ParseMotionDomains(rvDeclEffect* effect, idParser* src)
 											//	v7,
 											//	srca);
 
-											src->Error("Invalid motion domain");
+											BSE_ParticleWarning(src, effect, "Invalid motion domain '%s'", token.c_str());
 											src->SkipBracedSection(1);
 										}
 										else
@@ -967,7 +994,7 @@ rvParticleParms* rvParticleTemplate::ParseSpawnParms(rvDeclEffect* effect, idPar
 	v8 = new rvParticleParms();
 	v8->Init();
 
-	if (token == "box") {
+	if (!token.Icmp("box")) {
 		v8->mSpawnType = count + 16;
 		src->Parse1DMatrix(count, v8->mMins.ToFloatPtr(), true);
 		src->ExpectTokenString(",");
@@ -975,7 +1002,7 @@ rvParticleParms* rvParticleTemplate::ParseSpawnParms(rvDeclEffect* effect, idPar
 
 		if (!rvParticleTemplate::CheckCommonParms(src, *v8))
 		{
-			src->Error("Invalid box parameter!");
+			BSE_ParticleWarning(src, effect, "Invalid box parameter '%s'", token.c_str());
 		}
 
 		if (v8->mFlags & 1)
@@ -983,7 +1010,7 @@ rvParticleParms* rvParticleTemplate::ParseSpawnParms(rvDeclEffect* effect, idPar
 		FixupParms(v8);
 		return v8;
 	}
-	else if (token == "sphere") {
+	else if (!token.Icmp("sphere")) {
 		v8->mSpawnType = count + 24;
 
 		src->Parse1DMatrix(count, v8->mMins.ToFloatPtr(), true);
@@ -992,7 +1019,7 @@ rvParticleParms* rvParticleTemplate::ParseSpawnParms(rvDeclEffect* effect, idPar
 
 		if (!rvParticleTemplate::CheckCommonParms(src, *v8))
 		{
-			src->Error("Invalid sphere parameter!");
+			BSE_ParticleWarning(src, effect, "Invalid sphere parameter '%s'", token.c_str());
 		}
 
 		if (v8->mFlags & 1)
@@ -1001,7 +1028,7 @@ rvParticleParms* rvParticleTemplate::ParseSpawnParms(rvDeclEffect* effect, idPar
 
 		return v8;
 	}
-	else if (token == "cylinder") {
+	else if (!token.Icmp("cylinder")) {
 		v8->mSpawnType = count + 32;
 
 		src->Parse1DMatrix(count, v8->mMins.ToFloatPtr(), true);
@@ -1010,7 +1037,7 @@ rvParticleParms* rvParticleTemplate::ParseSpawnParms(rvDeclEffect* effect, idPar
 
 		if (!rvParticleTemplate::CheckCommonParms(src, *v8))
 		{
-			src->Error("Invalid cylinder parameter!");
+			BSE_ParticleWarning(src, effect, "Invalid cylinder parameter '%s'", token.c_str());
 		}
 
 		if (v8->mFlags & 1)
@@ -1019,7 +1046,7 @@ rvParticleParms* rvParticleTemplate::ParseSpawnParms(rvDeclEffect* effect, idPar
 
 		return v8;
 	}
-	else if (token == "model") {
+	else if (!token.Icmp("model")) {
 		v8->mSpawnType = count + 44;
 		if (!src->ReadToken(&token)) {
 			delete v8;
@@ -1027,8 +1054,9 @@ rvParticleParms* rvParticleTemplate::ParseSpawnParms(rvDeclEffect* effect, idPar
 		}
 
 		idRenderModel* model = renderModelManager->FindModel(token);
-		if (model == NULL) {
-			src->Error("Failed to load model %s\n", token.c_str());
+		if (model == NULL || model->NumSurfaces() <= 0) {
+			BSE_ParticleWarning(src, effect, "No surfaces defined in model '%s'", token.c_str());
+			model = renderModelManager->FindModel("_default");
 		}
 
 		v8->mModelInfo = new sdModelInfo();
@@ -1041,12 +1069,12 @@ rvParticleParms* rvParticleTemplate::ParseSpawnParms(rvDeclEffect* effect, idPar
 
 		if (!rvParticleTemplate::CheckCommonParms(src, *v8))
 		{
-			src->Error("Invalid model parameter!");
+			BSE_ParticleWarning(src, effect, "Invalid model parameter '%s'", token.c_str());
 		}
 		FixupParms(v8);
 		return v8;
 	}
-	else if (token == "spiral") {
+	else if (!token.Icmp("spiral")) {
 		v8->mSpawnType = count + 40;
 
 		src->Parse1DMatrix(count, v8->mMins.ToFloatPtr(), true);
@@ -1058,12 +1086,12 @@ rvParticleParms* rvParticleTemplate::ParseSpawnParms(rvDeclEffect* effect, idPar
 
 		if (!rvParticleTemplate::CheckCommonParms(src, *v8))
 		{
-			src->Error("Invalid spiral parameter!");
+			BSE_ParticleWarning(src, effect, "Invalid spiral parameter '%s'", token.c_str());
 		}
 		FixupParms(v8);
 		return v8;
 	}
-	else if (token == "line") {
+	else if (!token.Icmp("line")) {
 		v8->mSpawnType = count + 12;
 
 		src->Parse1DMatrix(count, v8->mMins.ToFloatPtr(), true);
@@ -1072,25 +1100,25 @@ rvParticleParms* rvParticleTemplate::ParseSpawnParms(rvDeclEffect* effect, idPar
 
 		if (!rvParticleTemplate::CheckCommonParms(src, *v8))
 		{
-			src->Error("Invalid line parameter!");
+			BSE_ParticleWarning(src, effect, "Invalid line parameter '%s'", token.c_str());
 		}
 		FixupParms(v8);
 		return v8;
 	}
-	else if (token == "point") {
+	else if (!token.Icmp("point")) {
 		v8->mSpawnType = count + 8;
 
 		src->Parse1DMatrix(count, v8->mMins.ToFloatPtr(), true);
 
 		if (!rvParticleTemplate::CheckCommonParms(src, *v8))
 		{
-			src->Error("Invalid point parameter!");
+			BSE_ParticleWarning(src, effect, "Invalid point parameter '%s'", token.c_str());
 		}
 		FixupParms(v8);
 		return v8;
 	}
 
-	src->Error("Invalid spawn type %s\n", token.c_str());
+	BSE_ParticleWarning(src, effect, "Invalid spawn type '%s'", token.c_str());
 	while (token != "}") {
 		if (!src->ReadToken(&token)) {
 			break;
@@ -1113,48 +1141,48 @@ bool rvParticleTemplate::ParseSpawnDomains(rvDeclEffect* effect, idParser* src) 
 			return true;
 		}
 
-		if (token == "windStrength") {
+		if (!token.Icmp("windStrength")) {
 			BSE_AssignParmPtr(mpSpawnWindStrength, ParseSpawnParms(effect, src, 1, &rvParticleTemplate::sSPF_NONE_1));
 		}
-		else if (token == "length") {
+		else if (!token.Icmp("length")) {
 			BSE_AssignParmPtr(mpSpawnLength, ParseSpawnParms(effect, src, 3, &rvParticleTemplate::sSPF_NONE_3));
 		}
-		else if (token == "offset") {
+		else if (!token.Icmp("offset")) {
 			BSE_AssignParmPtr(mpSpawnOffset, ParseSpawnParms(effect, src, 3, &rvParticleTemplate::sSPF_NONE_3));
 		}
-		else if (token == "angle") {
+		else if (!token.Icmp("angle")) {
 			BSE_AssignParmPtr(mpSpawnAngle, ParseSpawnParms(effect, src, 3, &rvParticleTemplate::sSPF_NONE_3));
 		}
-		else if (token == "rotate") {
+		else if (!token.Icmp("rotate")) {
 			BSE_AssignParmPtr(mpSpawnRotate, ParseSpawnParms(effect, src, mNumRotateParms, &rvParticleTemplate::sSPF_NONE_3));
 		}
-		else if (token == "size") {
+		else if (!token.Icmp("size")) {
 			BSE_AssignParmPtr(mpSpawnSize, ParseSpawnParms(effect, src, mNumSizeParms, &rvParticleTemplate::sSPF_ONE_3));
 		}
-		else if (token == "fade") {
+		else if (!token.Icmp("fade")) {
 			BSE_AssignParmPtr(mpSpawnFade, ParseSpawnParms(effect, src, 1, &rvParticleTemplate::sSPF_ONE_1));
 		}
-		else if (token == "tint") {
+		else if (!token.Icmp("tint")) {
 			BSE_AssignParmPtr(mpSpawnTint, ParseSpawnParms(effect, src, 3, &rvParticleTemplate::sSPF_ONE_3));
 		}
-		else if (token == "friction") {
+		else if (!token.Icmp("friction")) {
 			BSE_AssignParmPtr(mpSpawnFriction, ParseSpawnParms(effect, src, 3, &rvParticleTemplate::sSPF_NONE_3));
 		}
-		else if (token == "acceleration") {
+		else if (!token.Icmp("acceleration")) {
 			BSE_AssignParmPtr(mpSpawnAcceleration, ParseSpawnParms(effect, src, 3, &rvParticleTemplate::sSPF_NONE_3));
 		}
-		else if (token == "velocity") {
+		else if (!token.Icmp("velocity")) {
 			BSE_AssignParmPtr(mpSpawnVelocity, ParseSpawnParms(effect, src, 3, &rvParticleTemplate::sSPF_NONE_3));
 		}
-		else if (token == "direction") {
+		else if (!token.Icmp("direction")) {
 			BSE_AssignParmPtr(mpSpawnDirection, ParseSpawnParms(effect, src, 3, &rvParticleTemplate::sSPF_NONE_3));
 			mFlags |= 0x4000u;
 		}
-		else if (token == "position") {
+		else if (!token.Icmp("position")) {
 			BSE_AssignParmPtr(mpSpawnPosition, ParseSpawnParms(effect, src, 3, &rvParticleTemplate::sSPF_NONE_3));
 		}
 		else {
-			src->Error("Invalid spawn type %s\n", token.c_str());
+			BSE_ParticleWarning(src, effect, "Invalid spawn type '%s'", token.c_str());
 		}
 	}
 
@@ -1173,7 +1201,7 @@ bool rvParticleTemplate::ParseDeathDomains(rvDeclEffect* effect, idParser* src) 
 			return true;
 		}
 
-		if (token == "length") {
+		if (!token.Icmp("length")) {
 			rvParticleParms* v13 = ParseSpawnParms(effect, src, 3, &rvParticleTemplate::sSPF_NONE_3);
 			bool v7 = mpLengthEnvelope == &rvParticleTemplate::sEmptyEnvelope;
 			BSE_AssignParmPtr(mpDeathLength, v13);
@@ -1181,7 +1209,7 @@ bool rvParticleTemplate::ParseDeathDomains(rvDeclEffect* effect, idParser* src) 
 				BSE_AssignEnvPtr(mpLengthEnvelope, &rvParticleTemplate::sDefaultEnvelope);
 			}
 		}
-		else if (token == "offset") {
+		else if (!token.Icmp("offset")) {
 			rvParticleParms* v13 = ParseSpawnParms(effect, src, 3, &rvParticleTemplate::sSPF_NONE_3);
 			bool v7 = mpOffsetEnvelope == &rvParticleTemplate::sEmptyEnvelope;
 			BSE_AssignParmPtr(mpDeathOffset, v13);
@@ -1189,7 +1217,7 @@ bool rvParticleTemplate::ParseDeathDomains(rvDeclEffect* effect, idParser* src) 
 				BSE_AssignEnvPtr(mpOffsetEnvelope, &rvParticleTemplate::sDefaultEnvelope);
 			}
 		}
-		else if (token == "angle") {
+		else if (!token.Icmp("angle")) {
 			rvParticleParms* v13 = ParseSpawnParms(effect, src, 3, &rvParticleTemplate::sSPF_NONE_3);
 			bool v7 = mpAngleEnvelope == &rvParticleTemplate::sEmptyEnvelope;
 			BSE_AssignParmPtr(mpDeathAngle, v13);
@@ -1197,28 +1225,28 @@ bool rvParticleTemplate::ParseDeathDomains(rvDeclEffect* effect, idParser* src) 
 				BSE_AssignEnvPtr(mpAngleEnvelope, &rvParticleTemplate::sDefaultEnvelope);
 			}
 		}
-		else if (token == "rotate") {
+		else if (!token.Icmp("rotate")) {
 			rvParticleParms* v10 = ParseSpawnParms(effect, src, mNumRotateParms, &rvParticleTemplate::sSPF_NONE_3);
 			BSE_AssignParmPtr(mpDeathRotate, v10);
 			if (mpRotateEnvelope == &rvParticleTemplate::sEmptyEnvelope) {
 				BSE_AssignEnvPtr(mpRotateEnvelope, &rvParticleTemplate::sDefaultEnvelope);
 			}
 		}
-		else if (token == "size") {
+		else if (!token.Icmp("size")) {
 			rvParticleParms* v9 = ParseSpawnParms(effect, src, mNumSizeParms, &rvParticleTemplate::sSPF_ONE_3);
 			BSE_AssignParmPtr(mpDeathSize, v9);
 			if (mpSizeEnvelope == &rvParticleTemplate::sEmptyEnvelope) {
 				BSE_AssignEnvPtr(mpSizeEnvelope, &rvParticleTemplate::sDefaultEnvelope);
 			}
 		}
-		else if (token == "fade") {
+		else if (!token.Icmp("fade")) {
 			rvParticleParms* v8 = ParseSpawnParms(effect, src, 1, &rvParticleTemplate::sSPF_NONE_1);
 			BSE_AssignParmPtr(mpDeathFade, v8);
 			if (mpFadeEnvelope == &rvParticleTemplate::sEmptyEnvelope) {
 				BSE_AssignEnvPtr(mpFadeEnvelope, &rvParticleTemplate::sDefaultEnvelope);
 			}
 		}
-		else if (token == "tint") {
+		else if (!token.Icmp("tint")) {
 			rvParticleParms* v6 = ParseSpawnParms(effect, src, 3, &rvParticleTemplate::sSPF_NONE_3);
 			BSE_AssignParmPtr(mpDeathTint, v6);
 			if (mpTintEnvelope == &rvParticleTemplate::sEmptyEnvelope) {
@@ -1226,7 +1254,7 @@ bool rvParticleTemplate::ParseDeathDomains(rvDeclEffect* effect, idParser* src) 
 			}
 		}
 		else {
-			src->Error("Invalid end type %s\n", token.c_str());
+			BSE_ParticleWarning(src, effect, "Invalid end type '%s'", token.c_str());
 		}
 	}
 
@@ -1245,101 +1273,101 @@ bool rvParticleTemplate::Parse(rvDeclEffect* effect, idParser* src) {
 			return true;
 		}
 
-		if (token == "windDeviationAngle") {
+		if (!token.Icmp("windDeviationAngle")) {
 			mWindDeviationAngle = src->ParseFloat();
 		}
-		else if (token == "timeout") {
+		else if (!token.Icmp("timeout")) {
 			if (!ParseTimeout(effect, src)) {
 				return false;
 			}
 		}
-		else if (token == "impact") {
+		else if (!token.Icmp("impact")) {
 			if (!ParseImpact(effect, src)) {
 				return false;
 			}
 		}
-		else if (token == "model") {
+		else if (!token.Icmp("model")) {
 			if (!src->ReadToken(&token)) {
 				return false;
 			}
 			mModel = renderModelManager->FindModel(token);
 
-			if (mModel == NULL) {
+			if (mModel == NULL || mModel->NumSurfaces() <= 0) {
 				mModel = renderModelManager->FindModel("_default");
 
-				src->Warning("No surfaces defined in model %s", token.c_str());
+				BSE_ParticleWarning(src, effect, "No surfaces defined in model '%s'", token.c_str());
 			}
 		}
-		else if (token == "numFrames") {
+		else if (!token.Icmp("numFrames")) {
 			mNumFrames = src->ParseInt();
 		}
-		else if (token == "fadeIn") {
+		else if (!token.Icmp("fadeIn")) {
 			mFlags |= PTFLAG_FADE_IN;
 		}
-		else if (token == "useLightningAxis") {
+		else if (!token.Icmp("useLightningAxis")) {
 			mFlags |= 0x400000u;
 		}
-		else if (token == "specular") {
+		else if (!token.Icmp("specular")) {
 			mFlags |= 0x40000u;
 		}
-		else if (token == "shadows") {
+		else if (!token.Icmp("shadows")) {
 			mFlags |= 0x20000u;
 		}
-		else if (token == "blend") {
+		else if (!token.Icmp("blend")) {
 			if (!ParseBlendParms(effect, src)) {
 				return false;
 			}
 		}
-		else if (token == "entityDef") {
+		else if (!token.Icmp("entityDef")) {
 			if (!src->ReadToken(&token)) {
 				return false;
 			}
 			mEntityDefName = token;
 		}
-		else if (token == "material") {
+		else if (!token.Icmp("material")) {
 			if (!src->ReadToken(&token)) {
 				return false;
 			}
 			mMaterial = declManager->FindMaterial(token);
 		}
-		else if (token == "trailScale") {
+		else if (!token.Icmp("trailScale")) {
 			AllocTrail();
 			mTrailInfo->mTrailScale = src->ParseFloat();
 		}
-		else if (token == "trailCount") {
+		else if (!token.Icmp("trailCount")) {
 			AllocTrail();
 			mTrailInfo->mTrailCount.x = src->ParseFloat();
 			src->ExpectTokenString(",");
 			mTrailInfo->mTrailCount.y = src->ParseFloat();
 		}
-		else if (token == "trailRepeat") {
+		else if (!token.Icmp("trailRepeat")) {
 			AllocTrail();
 			mTrailRepeat = src->ParseInt();
 		}
-		else if (token == "trailTime") {
+		else if (!token.Icmp("trailTime")) {
 			AllocTrail();
 			mTrailInfo->mTrailTime.x = src->ParseFloat();
 			src->ExpectTokenString(",");
 			mTrailInfo->mTrailTime.y = src->ParseFloat();
 		}
-		else if (token == "trailMaterial") {
+		else if (!token.Icmp("trailMaterial")) {
 			AllocTrail();
 			if (!src->ReadToken(&token)) {
 				return false;
 			}
 			mTrailInfo->mTrailMaterial = declManager->FindMaterial(token);
 		}
-		else if (token == "trailType") {
+		else if (!token.Icmp("trailType")) {
 			AllocTrail();
 			if (!src->ReadToken(&token)) {
 				return false;
 			}
 
-			if (token == "burn") {
+			if (!token.Icmp("burn")) {
 				mTrailInfo->mTrailType = 1;
 				mTrailInfo->mTrailTypeName = "";
 			}
-			else if (token == "motion") {
+			else if (!token.Icmp("motion")) {
 				mTrailInfo->mTrailType = 2;
 				mTrailInfo->mTrailTypeName = "";
 			}
@@ -1348,7 +1376,7 @@ bool rvParticleTemplate::Parse(rvDeclEffect* effect, idParser* src) {
 				mTrailInfo->mTrailTypeName = token;
 			}
 		}
-		else if (token == "fork") {
+		else if (!token.Icmp("fork")) {
 			AllocElectricityInfo();
 			int forks = src->ParseInt();
 			if (forks < 0) {
@@ -1358,23 +1386,23 @@ bool rvParticleTemplate::Parse(rvDeclEffect* effect, idParser* src) {
 			}
 			mElecInfo->mNumForks = forks;
 		}
-		else if (token == "forkMins") {
+		else if (!token.Icmp("forkMins")) {
 			AllocElectricityInfo();
 			src->Parse1DMatrix(3, mElecInfo->mForkSizeMins.ToFloatPtr(), true);
 		}
-		else if (token == "forkMaxs") {
+		else if (!token.Icmp("forkMaxs")) {
 			AllocElectricityInfo();
 			src->Parse1DMatrix(3, mElecInfo->mForkSizeMaxs.ToFloatPtr(), true);
 		}
-		else if (token == "jitterSize") {
+		else if (!token.Icmp("jitterSize")) {
 			AllocElectricityInfo();
 			src->Parse1DMatrix(3, mElecInfo->mJitterSize.ToFloatPtr(), true);
 		}
-		else if (token == "jitterRate") {
+		else if (!token.Icmp("jitterRate")) {
 			AllocElectricityInfo();
 			mElecInfo->mJitterRate = src->ParseFloat();
 		}
-		else if (token == "jitterTable") {
+		else if (!token.Icmp("jitterTable")) {
 			AllocElectricityInfo();
 			if (!src->ReadToken(&token)) {
 				return false;
@@ -1388,12 +1416,12 @@ bool rvParticleTemplate::Parse(rvDeclEffect* effect, idParser* src) {
 				mElecInfo->mJitterTableName = "";
 			}
 		}
-		else if (token == "gravity") {
+		else if (!token.Icmp("gravity")) {
 			mGravity.x = src->ParseFloat();
 			src->ExpectTokenString(",");
 			mGravity.y = src->ParseFloat();
 		}
-		else if (token == "duration") {
+		else if (!token.Icmp("duration")) {
 			float srcb = src->ParseFloat();
 			float v8 = 0.0020000001;
 			if (srcb >= 0.0020000001)
@@ -1418,10 +1446,10 @@ bool rvParticleTemplate::Parse(rvDeclEffect* effect, idParser* src) {
 				mDuration.y = 300.0;
 			}
 		}
-		else if (token == "parentvelocity") {
+		else if (!token.Icmp("parentvelocity")) {
 			mFlags |= 0x2000000u;
 		}
-		else if (token == "tiling") {
+		else if (!token.Icmp("tiling")) {
 			mFlags |= 0x100000u;
 			float srca = src->ParseFloat();
 			float v7 = 0.0020000001;
@@ -1435,41 +1463,41 @@ bool rvParticleTemplate::Parse(rvDeclEffect* effect, idParser* src) {
 				mTiling = 1024.0;
 			}
 		}
-		else if (token == "persist") {
+		else if (!token.Icmp("persist")) {
 			mFlags |= 0x200000u;
 		}
-		else if (token == "generatedLine") {
+		else if (!token.Icmp("generatedLine")) {
 			mFlags |= 0x10000u;
 		}
-		else if (token == "flipNormal") {
+		else if (!token.Icmp("flipNormal")) {
 			mFlags |= 0x2000u;
 		}
-		else if (token == "lineHit") {
+		else if (!token.Icmp("lineHit")) {
 			mFlags |= 0x4000000u;
 		}
-		else if (token == "generatedOriginNormal") {
+		else if (!token.Icmp("generatedOriginNormal")) {
 			mFlags |= 0x1000u;
 		}
-		else if (token == "generatedNormal") {
+		else if (!token.Icmp("generatedNormal")) {
 			mFlags |= 0x800u;
 		}
-		else if (token == "motion") {
+		else if (!token.Icmp("motion")) {
 			if (!ParseMotionDomains(effect, src)) {
 				return false;
 			}
 		}
-		else if (token == "end") {
+		else if (!token.Icmp("end")) {
 			if (!ParseDeathDomains(effect, src)) {
 				return false;
 			}
 		}
-		else if (token == "start") {
+		else if (!token.Icmp("start")) {
 			if (!ParseSpawnDomains(effect, src)) {
 				return false;
 			}
 		}
 		else {
-			src->Error("Invalid particle keyword %s\n", token.c_str());
+			BSE_ParticleWarning(src, effect, "Invalid particle keyword '%s'", token.c_str());
 		}
 	}
 	return false;

@@ -266,12 +266,96 @@ static void RB_UpdateStockGLSLShaderConstantCache() {
 	}
 }
 
-static bool RB_BindStockGLSLShaderParm( glslShaderParmBinding_t binding, int location ) {
+bool RB_BindGLSLShaderParm( glslShaderParmBinding_t binding, int location, const shaderStage_t *stage, const drawInteraction_t *din ) {
 	if ( location < 0 || backEnd.viewDef == NULL ) {
 		return false;
 	}
 
 	switch ( binding ) {
+	case GLSL_SHADERPARM_LOCAL_LIGHT_ORIGIN:
+		if ( din == NULL ) {
+			return false;
+		}
+		glUniform4fvARB( location, 1, din->localLightOrigin.ToFloatPtr() );
+		return true;
+	case GLSL_SHADERPARM_LOCAL_VIEW_ORIGIN:
+		if ( din == NULL ) {
+			return false;
+		}
+		glUniform4fvARB( location, 1, din->localViewOrigin.ToFloatPtr() );
+		return true;
+	case GLSL_SHADERPARM_LIGHT_PROJECT_S:
+		if ( din == NULL ) {
+			return false;
+		}
+		glUniform4fvARB( location, 1, din->lightProjection[0].ToFloatPtr() );
+		return true;
+	case GLSL_SHADERPARM_LIGHT_PROJECT_T:
+		if ( din == NULL ) {
+			return false;
+		}
+		glUniform4fvARB( location, 1, din->lightProjection[1].ToFloatPtr() );
+		return true;
+	case GLSL_SHADERPARM_LIGHT_PROJECT_Q:
+		if ( din == NULL ) {
+			return false;
+		}
+		glUniform4fvARB( location, 1, din->lightProjection[2].ToFloatPtr() );
+		return true;
+	case GLSL_SHADERPARM_LIGHT_FALLOFF_S:
+		if ( din == NULL ) {
+			return false;
+		}
+		glUniform4fvARB( location, 1, din->lightProjection[3].ToFloatPtr() );
+		return true;
+	case GLSL_SHADERPARM_BUMP_MATRIX_S:
+		if ( din == NULL ) {
+			return false;
+		}
+		glUniform4fvARB( location, 1, din->bumpMatrix[0].ToFloatPtr() );
+		return true;
+	case GLSL_SHADERPARM_BUMP_MATRIX_T:
+		if ( din == NULL ) {
+			return false;
+		}
+		glUniform4fvARB( location, 1, din->bumpMatrix[1].ToFloatPtr() );
+		return true;
+	case GLSL_SHADERPARM_DIFFUSE_MATRIX_S:
+		if ( din == NULL ) {
+			return false;
+		}
+		glUniform4fvARB( location, 1, din->diffuseMatrix[0].ToFloatPtr() );
+		return true;
+	case GLSL_SHADERPARM_DIFFUSE_MATRIX_T:
+		if ( din == NULL ) {
+			return false;
+		}
+		glUniform4fvARB( location, 1, din->diffuseMatrix[1].ToFloatPtr() );
+		return true;
+	case GLSL_SHADERPARM_SPECULAR_MATRIX_S:
+		if ( din == NULL ) {
+			return false;
+		}
+		glUniform4fvARB( location, 1, din->specularMatrix[0].ToFloatPtr() );
+		return true;
+	case GLSL_SHADERPARM_SPECULAR_MATRIX_T:
+		if ( din == NULL ) {
+			return false;
+		}
+		glUniform4fvARB( location, 1, din->specularMatrix[1].ToFloatPtr() );
+		return true;
+	case GLSL_SHADERPARM_DIFFUSE_COLOR:
+		if ( din == NULL ) {
+			return false;
+		}
+		glUniform4fvARB( location, 1, din->diffuseColor.ToFloatPtr() );
+		return true;
+	case GLSL_SHADERPARM_SPECULAR_COLOR:
+		if ( din == NULL ) {
+			return false;
+		}
+		glUniform4fvARB( location, 1, din->specularColor.ToFloatPtr() );
+		return true;
 	case GLSL_SHADERPARM_VIEW_ORIGIN: {
 		idVec4 viewOrigin;
 		viewOrigin.ToVec3() = backEnd.viewDef->renderView.vieworg;
@@ -288,6 +372,67 @@ static bool RB_BindStockGLSLShaderParm( glslShaderParmBinding_t binding, int loc
 	case GLSL_SHADERPARM_COLOR_MATRIX2:
 		glUniform4fvARB( location, 1, RB_STOCK_COLOR_MATRIX_ROWS[2].ToFloatPtr() );
 		return true;
+	case GLSL_SHADERPARM_COLOR_MODULATE:
+		if ( din == NULL && stage == NULL ) {
+			return false;
+		}
+		switch ( din != NULL ? din->vertexColor : stage->vertexColor ) {
+		case SVC_IGNORE:
+			glUniform4fvARB( location, 1, vec4_zero.ToFloatPtr() );
+			break;
+		case SVC_MODULATE:
+			glUniform4fvARB( location, 1, colorWhite.ToFloatPtr() );
+			break;
+		case SVC_INVERSE_MODULATE: {
+			const idVec4 negOne( -1.0f, -1.0f, -1.0f, -1.0f );
+			glUniform4fvARB( location, 1, negOne.ToFloatPtr() );
+			break;
+		}
+		}
+		return true;
+	case GLSL_SHADERPARM_COLOR_ADD:
+		if ( din == NULL && stage == NULL ) {
+			return false;
+		}
+		switch ( din != NULL ? din->vertexColor : stage->vertexColor ) {
+		case SVC_MODULATE:
+			glUniform4fvARB( location, 1, vec4_zero.ToFloatPtr() );
+			break;
+		case SVC_IGNORE:
+		case SVC_INVERSE_MODULATE:
+			glUniform4fvARB( location, 1, colorWhite.ToFloatPtr() );
+			break;
+		}
+		return true;
+	case GLSL_SHADERPARM_PROJECTION_ROW_0:
+	case GLSL_SHADERPARM_PROJECTION_ROW_1:
+	case GLSL_SHADERPARM_PROJECTION_ROW_2:
+	case GLSL_SHADERPARM_PROJECTION_ROW_3: {
+		const int row = binding - GLSL_SHADERPARM_PROJECTION_ROW_0;
+		idVec4 projectionRow(
+			backEnd.viewDef->projectionMatrix[row + 0],
+			backEnd.viewDef->projectionMatrix[row + 4],
+			backEnd.viewDef->projectionMatrix[row + 8],
+			backEnd.viewDef->projectionMatrix[row + 12] );
+		glUniform4fvARB( location, 1, projectionRow.ToFloatPtr() );
+		return true;
+	}
+	case GLSL_SHADERPARM_MODEL_ROW_0:
+	case GLSL_SHADERPARM_MODEL_ROW_1:
+	case GLSL_SHADERPARM_MODEL_ROW_2: {
+		const viewEntity_t *space = din != NULL && din->surf != NULL ? din->surf->space : backEnd.currentSpace;
+		if ( space == NULL ) {
+			return false;
+		}
+		const int row = binding - GLSL_SHADERPARM_MODEL_ROW_0;
+		idVec4 modelRow(
+			space->modelMatrix[row + 0],
+			space->modelMatrix[row + 4],
+			space->modelMatrix[row + 8],
+			space->modelMatrix[row + 12] );
+		glUniform4fvARB( location, 1, modelRow.ToFloatPtr() );
+		return true;
+	}
 	case GLSL_SHADERPARM_GAUSSIAN_SAMPLE_OFFSETS:
 		RB_UpdateStockGLSLShaderConstantCache();
 		glUniform4fvARB( location, RB_STOCK_GAUSSIAN_SAMPLE_COUNT, rbStockGaussianSampleOffsets[0].ToFloatPtr() );
@@ -311,6 +456,34 @@ static bool RB_BindStockGLSLShaderParm( glslShaderParmBinding_t binding, int loc
 	case GLSL_SHADERPARM_REGISTERS:
 	default:
 		return false;
+	}
+}
+
+idImage *RB_ResolveGLSLShaderTextureImage( const newShaderStage_t *stage, int slot, const drawInteraction_t *din ) {
+	if ( stage == NULL || slot < 0 || slot >= stage->numShaderTextures ) {
+		return NULL;
+	}
+
+	switch ( stage->shaderTextureBindings[slot] ) {
+	case GLSL_SHADERTEXTURE_LIGHT_FALLOFF:
+		if ( din != NULL && din->lightFalloffImage != NULL ) {
+			return din->lightFalloffImage;
+		}
+		return globalImages->whiteImage;
+	case GLSL_SHADERTEXTURE_LIGHT_IMAGE:
+		if ( din != NULL && din->lightImage != NULL ) {
+			return din->lightImage;
+		}
+		return globalImages->whiteImage;
+	case GLSL_SHADERTEXTURE_AMBIENT_NORMAL_MAP:
+		return globalImages->ambientNormalMap ? globalImages->ambientNormalMap : globalImages->defaultImage;
+	case GLSL_SHADERTEXTURE_NORMAL_CUBE_MAP:
+		return globalImages->normalCubeMapImage ? globalImages->normalCubeMapImage : globalImages->defaultImage;
+	case GLSL_SHADERTEXTURE_SPECULAR_TABLE:
+		return globalImages->specularTableImage ? globalImages->specularTableImage : globalImages->defaultImage;
+	case GLSL_SHADERTEXTURE_IMAGE:
+	default:
+		return stage->shaderTextureImages[slot];
 	}
 }
 
@@ -556,6 +729,10 @@ bool R_ValidateGLSLProgram( newShaderStage_t *stage ) {
 	GLhandleARB programObject = glCreateProgramObjectARB();
 	glAttachObjectARB( programObject, vertexShader );
 	glAttachObjectARB( programObject, fragmentShader );
+	glBindAttribLocationARB( programObject, 8, "attr_TexCoord0" );
+	glBindAttribLocationARB( programObject, 9, "attr_Tangent" );
+	glBindAttribLocationARB( programObject, 10, "attr_Bitangent" );
+	glBindAttribLocationARB( programObject, 11, "attr_Normal" );
 	glLinkProgramARB( programObject );
 
 	glGetObjectParameterivARB( programObject, GL_OBJECT_LINK_STATUS_ARB, &status );
@@ -941,6 +1118,12 @@ enum rbLightGridUniformIndex_t {
 	RB_LIGHTGRID_UNIFORM_LIGHTGRID_SIZE,
 	RB_LIGHTGRID_UNIFORM_LIGHTGRID_BOUNDS,
 	RB_LIGHTGRID_UNIFORM_ATLAS_INFO,
+	RB_LIGHTGRID_UNIFORM_VISIBILITY_INFO,
+	RB_LIGHTGRID_UNIFORM_PROBE_INFO,
+	RB_LIGHTGRID_UNIFORM_BLEND_INFO,
+	RB_LIGHTGRID_UNIFORM_PORTAL_PLANE,
+	RB_LIGHTGRID_UNIFORM_PORTAL_BOUNDS_MIN,
+	RB_LIGHTGRID_UNIFORM_PORTAL_BOUNDS_MAX,
 	RB_LIGHTGRID_UNIFORM_DIFFUSE_COLOR,
 	RB_LIGHTGRID_UNIFORM_VERTEX_COLOR_PARAMS,
 	RB_LIGHTGRID_UNIFORM_COUNT
@@ -970,6 +1153,12 @@ static void RB_InitLightGridIndirectStage( void ) {
 		{ "uLightGridSize", 4 },
 		{ "uLightGridBounds", 4 },
 		{ "uAtlasInfo", 4 },
+		{ "uVisibilityInfo", 4 },
+		{ "uProbeInfo", 4 },
+		{ "uBlendInfo", 4 },
+		{ "uPortalPlane", 4 },
+		{ "uPortalBoundsMin", 4 },
+		{ "uPortalBoundsMax", 4 },
 		{ "uDiffuseColor", 4 },
 		{ "uVertexColorParams", 2 }
 	};
@@ -980,10 +1169,12 @@ static void RB_InitLightGridIndirectStage( void ) {
 		rbLightGridIndirectStage.shaderParmNumRegisters[i] = uniforms[i].components;
 	}
 
-	rbLightGridIndirectStage.numShaderTextures = 3;
+	rbLightGridIndirectStage.numShaderTextures = 5;
 	idStr::Copynz( rbLightGridIndirectStage.shaderTextureNames[0], "uBumpMap", sizeof( rbLightGridIndirectStage.shaderTextureNames[0] ) );
 	idStr::Copynz( rbLightGridIndirectStage.shaderTextureNames[1], "uDiffuseMap", sizeof( rbLightGridIndirectStage.shaderTextureNames[1] ) );
 	idStr::Copynz( rbLightGridIndirectStage.shaderTextureNames[2], "uLightGridAtlas", sizeof( rbLightGridIndirectStage.shaderTextureNames[2] ) );
+	idStr::Copynz( rbLightGridIndirectStage.shaderTextureNames[3], "uLightGridVisibilityAtlas", sizeof( rbLightGridIndirectStage.shaderTextureNames[3] ) );
+	idStr::Copynz( rbLightGridIndirectStage.shaderTextureNames[4], "uLightGridProbeAtlas", sizeof( rbLightGridIndirectStage.shaderTextureNames[4] ) );
 
 	rbLightGridIndirectStageInitialized = true;
 }
@@ -4061,7 +4252,7 @@ static void RB_T_CaptureRVSpecialDepth( const drawSurf_t *surf ) {
 			}
 
 			glColor4fv( color );
-			glAlphaFunc( GL_GREATER, regs[ pStage->alphaTestRegister ] );
+			glAlphaFunc( pStage->alphaTestMode, regs[ pStage->alphaTestRegister ] );
 			pStage->texture.image->Bind();
 			if ( !RB_PrepareStageTexturing( pStage, surf, ac, true ) ) {
 				RB_FinishStageTexturing( pStage, surf, ac );
@@ -4621,7 +4812,7 @@ void RB_T_FillDepthBuffer( const drawSurf_t *surf ) {
 			}
 			glColor4fv( color );
 
-			glAlphaFunc( GL_GREATER, regs[ pStage->alphaTestRegister ] );
+			glAlphaFunc( pStage->alphaTestMode, regs[ pStage->alphaTestRegister ] );
 
 			// bind the texture
 			pStage->texture.image->Bind();
@@ -4978,6 +5169,9 @@ void RB_STD_T_RenderShaderPasses( const drawSurf_t *surf ) {
 		// see if we are a new-style stage
 		newShaderStage_t *newStage = pStage->newStage;
 		if ( newStage ) {
+			if ( newStage->customLighting ) {
+				continue;
+			}
 			if ( r_skipNewAmbient.GetBool() ) {
 				continue;
 			}
@@ -5018,7 +5212,7 @@ void RB_STD_T_RenderShaderPasses( const drawSurf_t *surf ) {
 						continue;
 					}
 
-					if ( RB_BindStockGLSLShaderParm( newStage->shaderParmBindings[i], location ) ) {
+					if ( RB_BindGLSLShaderParm( newStage->shaderParmBindings[i], location, pStage, NULL ) ) {
 						continue;
 					}
 
@@ -5049,7 +5243,7 @@ void RB_STD_T_RenderShaderPasses( const drawSurf_t *surf ) {
 				}
 
 				for ( int i = 0; i < newStage->numShaderTextures; i++ ) {
-					idImage *image = newStage->shaderTextureImages[i];
+					idImage *image = RB_ResolveGLSLShaderTextureImage( newStage, i, NULL );
 					if ( image == NULL ) {
 						continue;
 					}
@@ -5072,7 +5266,7 @@ void RB_STD_T_RenderShaderPasses( const drawSurf_t *surf ) {
 				RB_FinishStageTexturing( pStage, surf, ac );
 
 				for ( int i = 1; i < newStage->numShaderTextures; i++ ) {
-					if ( newStage->shaderTextureImages[i] ) {
+					if ( RB_ResolveGLSLShaderTextureImage( newStage, i, NULL ) != NULL ) {
 						GL_SelectTexture( i );
 						globalImages->BindNull();
 					}
@@ -5188,7 +5382,18 @@ void RB_STD_T_RenderShaderPasses( const drawSurf_t *surf ) {
 				if ( vertexProgramEnabled ) {
 					glProgramLocalParameter4fvARB( GL_VERTEX_PROGRAM_ARB, i, parm );
 				}
-				if ( fragmentProgramEnabled ) {
+				if ( fragmentProgramEnabled && newStage->numFragmentParms == 0 ) {
+					glProgramLocalParameter4fvARB( GL_FRAGMENT_PROGRAM_ARB, i, parm );
+				}
+			}
+
+			if ( fragmentProgramEnabled && newStage->numFragmentParms > 0 ) {
+				for ( int i = 0 ; i < newStage->numFragmentParms ; i++ ) {
+					float	parm[4];
+					parm[0] = regs[ newStage->fragmentParms[i][0] ];
+					parm[1] = regs[ newStage->fragmentParms[i][1] ];
+					parm[2] = regs[ newStage->fragmentParms[i][2] ];
+					parm[3] = regs[ newStage->fragmentParms[i][3] ];
 					glProgramLocalParameter4fvARB( GL_FRAGMENT_PROGRAM_ARB, i, parm );
 				}
 			}
@@ -5431,6 +5636,18 @@ int RB_STD_DrawShaderPasses( drawSurf_t **drawSurfs, int numDrawSurfs ) {
 			//if ( drawSurfs[i]->space->entityDef->parms.xrayIndex != 2 ) {
 			//	continue;
 			//}
+		}
+
+		if ( drawSurfs[i]->material->TestMaterialFlag( MF_NEED_CURRENT_RENDER )
+			&& drawSurfs[i]->material->GetSort() < SS_POST_PROCESS
+			&& !backEnd.currentRenderCopied ) {
+			if ( RB_AutomaticCurrentRenderCaptureAllowed() ) {
+				RB_CaptureCurrentRenderImage(
+					backEnd.viewDef->viewport.x2 - backEnd.viewDef->viewport.x1 + 1,
+					backEnd.viewDef->viewport.y2 - backEnd.viewDef->viewport.y1 + 1 );
+			} else {
+				backEnd.currentRenderCopied = true;
+			}
 		}
 
 		// we need to draw the post process shaders after we have drawn the fog lights
@@ -6182,10 +6399,26 @@ static void RB_LightGridVertexColorParams( const stageVertexColor_t vertexColor,
 	}
 }
 
-static bool RB_SurfaceHasLightGrid( const drawSurf_t *surf, const LightGrid *&lightGrid ) {
-	lightGrid = NULL;
+struct rbLightGridPortalBlend_t {
+	const LightGrid *	neighborLightGrid;
+	idPlane				portalPlane;
+	idBounds			portalBounds;
+	float				blendDistance;
+};
 
-	if ( surf == NULL || surf->area == NULL ) {
+static bool RB_LightGridIsUsable( const LightGrid &candidate ) {
+	if ( candidate.GridPointCount() <= 0 || !candidate.HasImage() ) {
+		return false;
+	}
+	if ( candidate.lightGridBounds[0] <= 0 || candidate.lightGridBounds[1] <= 0 || candidate.lightGridBounds[2] <= 0 ) {
+		return false;
+	}
+
+	return true;
+}
+
+static bool RB_SurfaceCanReceiveLightGrid( const drawSurf_t *surf ) {
+	if ( surf == NULL ) {
 		return false;
 	}
 	if ( surf->material == NULL || surf->space == NULL || surf->geo == NULL ) {
@@ -6197,13 +6430,26 @@ static bool RB_SurfaceHasLightGrid( const drawSurf_t *surf, const LightGrid *&li
 	if ( surf->material->Coverage() == MC_TRANSLUCENT ) {
 		return false;
 	}
-	// Keep the indirect light-grid pass on stable world/entity receivers only.
-	// Shot-created decals and depth-hacked weapon/effect surfaces use different
-	// color/depth paths and can leave this pass binding invalid state after fire.
 	if ( surf->decalColorCache != NULL ) {
 		return false;
 	}
 	if ( surf->material->TestMaterialFlag( MF_POLYGONOFFSET ) ) {
+		return false;
+	}
+
+	return true;
+}
+
+static bool RB_SurfaceHasLightGrid( const drawSurf_t *surf, const LightGrid *&lightGrid ) {
+	lightGrid = NULL;
+
+	if ( surf == NULL || surf->area == NULL ) {
+		return false;
+	}
+	// Keep the indirect light-grid pass on stable world/entity receivers only.
+	// Shot-created decals and depth-hacked weapon/effect surfaces use different
+	// color/depth paths and can leave this pass binding invalid state after fire.
+	if ( !RB_SurfaceCanReceiveLightGrid( surf ) ) {
 		return false;
 	}
 	if ( surf->space->weaponDepthHack || surf->space->modelDepthHack != 0.0f ) {
@@ -6211,10 +6457,7 @@ static bool RB_SurfaceHasLightGrid( const drawSurf_t *surf, const LightGrid *&li
 	}
 
 	const LightGrid &candidate = surf->area->lightGrid;
-	if ( candidate.GridPointCount() <= 0 || !candidate.HasImage() ) {
-		return false;
-	}
-	if ( candidate.lightGridBounds[0] <= 0 || candidate.lightGridBounds[1] <= 0 || candidate.lightGridBounds[2] <= 0 ) {
+	if ( !RB_LightGridIsUsable( candidate ) ) {
 		return false;
 	}
 
@@ -6222,28 +6465,259 @@ static bool RB_SurfaceHasLightGrid( const drawSurf_t *surf, const LightGrid *&li
 	return true;
 }
 
+static int RB_CurrentViewLightGridArea( idRenderWorldLocal *world ) {
+	if ( world == NULL || backEnd.viewDef == NULL ) {
+		return -1;
+	}
+
+	int areaNum = backEnd.viewDef->areaNum;
+	if ( areaNum < 0 || areaNum >= world->numPortalAreas ) {
+		areaNum = world->PointInArea( backEnd.viewDef->initialViewAreaOrigin );
+	}
+	if ( areaNum < 0 || areaNum >= world->numPortalAreas ) {
+		areaNum = world->PointInArea( backEnd.viewDef->renderView.vieworg );
+	}
+	if ( areaNum < 0 || areaNum >= world->numPortalAreas ) {
+		return -1;
+	}
+
+	return areaNum;
+}
+
+static const LightGrid *RB_CurrentViewLightGrid( void ) {
+	if ( backEnd.viewDef == NULL || backEnd.viewDef->renderWorld == NULL ) {
+		return NULL;
+	}
+
+	idRenderWorldLocal *world = backEnd.viewDef->renderWorld;
+	const int areaNum = RB_CurrentViewLightGridArea( world );
+	if ( areaNum < 0 ) {
+		return NULL;
+	}
+
+	const LightGrid &candidate = world->portalAreas[ areaNum ].lightGrid;
+	if ( !RB_LightGridIsUsable( candidate ) ) {
+		return NULL;
+	}
+
+	return &candidate;
+}
+
+static bool RB_LightGridSurfaceWorldBounds( const drawSurf_t *surf, idBounds &worldBounds ) {
+	if ( surf == NULL || surf->space == NULL || surf->geo == NULL || surf->geo->bounds.IsCleared() ) {
+		return false;
+	}
+
+	idVec3 localPoints[8];
+	surf->geo->bounds.ToPoints( localPoints );
+	worldBounds.Clear();
+	for ( int i = 0; i < 8; i++ ) {
+		idVec3 worldPoint;
+		R_LocalPointToGlobal( surf->space->modelMatrix, localPoints[i], worldPoint );
+		worldBounds.AddPoint( worldPoint );
+	}
+
+	return !worldBounds.IsCleared();
+}
+
+static bool RB_SurfaceHasLightGridPortalBlend( const drawSurf_t *surf, rbLightGridPortalBlend_t &blend ) {
+	blend.neighborLightGrid = NULL;
+	blend.blendDistance = 0.0f;
+	blend.portalPlane.Zero();
+	blend.portalBounds.Clear();
+
+	if ( surf == NULL || surf->area == NULL || backEnd.viewDef == NULL || backEnd.viewDef->renderWorld == NULL ) {
+		return false;
+	}
+
+	const float blendDistance = r_lightGridPortalBlend.GetFloat();
+	if ( blendDistance <= 0.0f ) {
+		return false;
+	}
+
+	idBounds surfaceBounds;
+	if ( !RB_LightGridSurfaceWorldBounds( surf, surfaceBounds ) ) {
+		return false;
+	}
+
+	idRenderWorldLocal *world = backEnd.viewDef->renderWorld;
+	float bestWeight = 0.0f;
+	for ( const portal_t *portal = surf->area->portals; portal != NULL; portal = portal->next ) {
+		if ( portal->w == NULL || portal->w->GetNumPoints() < 3 ) {
+			continue;
+		}
+		if ( portal->doublePortal != NULL && ( portal->doublePortal->blockingBits & PS_BLOCK_VIEW ) ) {
+			continue;
+		}
+		if ( portal->intoArea < 0 || portal->intoArea >= world->numPortalAreas ) {
+			continue;
+		}
+		portalArea_t &neighborArea = world->portalAreas[ portal->intoArea ];
+		if ( neighborArea.viewCount != tr.viewCount ) {
+			continue;
+		}
+		if ( backEnd.viewDef->connectedAreas != NULL && !backEnd.viewDef->connectedAreas[ portal->intoArea ] ) {
+			continue;
+		}
+		if ( !RB_LightGridIsUsable( neighborArea.lightGrid ) ) {
+			continue;
+		}
+
+		idBounds portalBounds;
+		portal->w->GetBounds( portalBounds );
+		portalBounds.ExpandSelf( blendDistance );
+		if ( !surfaceBounds.IntersectsBounds( portalBounds ) ) {
+			continue;
+		}
+
+		const float planeDistance = idMath::Fabs( surfaceBounds.PlaneDistance( portal->plane ) );
+		if ( planeDistance > blendDistance ) {
+			continue;
+		}
+
+		const float weight = 1.0f - idMath::ClampFloat( 0.0f, 1.0f, planeDistance / blendDistance );
+		if ( weight <= bestWeight ) {
+			continue;
+		}
+
+		bestWeight = weight;
+		blend.neighborLightGrid = &neighborArea.lightGrid;
+		blend.portalPlane = portal->plane;
+		blend.portalBounds = portalBounds;
+		blend.blendDistance = blendDistance;
+	}
+
+	return blend.neighborLightGrid != NULL;
+}
+
+static bool RB_SurfaceHasViewWeaponLightGrid( const drawSurf_t *surf, const LightGrid *&lightGrid ) {
+	lightGrid = NULL;
+
+	if ( !RB_SurfaceCanReceiveLightGrid( surf ) ) {
+		return false;
+	}
+	if ( !surf->space->weaponDepthHack ) {
+		return false;
+	}
+
+	const LightGrid *candidate = RB_CurrentViewLightGrid();
+	if ( candidate == NULL ) {
+		return false;
+	}
+
+	lightGrid = candidate;
+	return true;
+}
+
+static const int LIGHTGRID_RESIDENCY_UNTOUCHED = -0x40000000;
+
+static idRenderWorldLocal *rbLightGridResidencyWorld = NULL;
+static idList<int> rbLightGridResidencyLastTouched;
+static int rbLightGridResidencyFrame = 0;
+
+static void RB_EnsureLightGridResidencyState( idRenderWorldLocal *world ) {
+	if ( rbLightGridResidencyWorld == world && rbLightGridResidencyLastTouched.Num() == world->numPortalAreas ) {
+		return;
+	}
+
+	rbLightGridResidencyWorld = world;
+	rbLightGridResidencyLastTouched.SetNum( world->numPortalAreas );
+	for ( int areaIndex = 0; areaIndex < rbLightGridResidencyLastTouched.Num(); areaIndex++ ) {
+		rbLightGridResidencyLastTouched[areaIndex] = LIGHTGRID_RESIDENCY_UNTOUCHED;
+	}
+}
+
+static void RB_LoadLightGridResidencyImage( idImage *image ) {
+	if ( image != NULL && !image->IsLoaded() ) {
+		image->ActuallyLoadImage( true );
+	}
+}
+
+static void RB_LoadLightGridResidencyImages( LightGrid &lightGrid ) {
+	RB_LoadLightGridResidencyImage( lightGrid.irradianceImage );
+	RB_LoadLightGridResidencyImage( lightGrid.visibilityImage );
+	RB_LoadLightGridResidencyImage( lightGrid.probeImage );
+}
+
+static void RB_PurgeLightGridResidencyImage( idImage *image ) {
+	if ( image != NULL && image->IsLoaded() ) {
+		image->PurgeImage();
+	}
+}
+
+static void RB_PurgeLightGridResidencyImages( LightGrid &lightGrid ) {
+	RB_PurgeLightGridResidencyImage( lightGrid.irradianceImage );
+	RB_PurgeLightGridResidencyImage( lightGrid.visibilityImage );
+	RB_PurgeLightGridResidencyImage( lightGrid.probeImage );
+}
+
+static void RB_TouchLightGridResidencyArea( idRenderWorldLocal *world, int areaIndex, int frameIndex ) {
+	if ( areaIndex < 0 || areaIndex >= world->numPortalAreas ) {
+		return;
+	}
+
+	LightGrid &lightGrid = world->portalAreas[areaIndex].lightGrid;
+	if ( !RB_LightGridIsUsable( lightGrid ) ) {
+		return;
+	}
+
+	rbLightGridResidencyLastTouched[areaIndex] = frameIndex;
+	RB_LoadLightGridResidencyImages( lightGrid );
+}
+
+static void RB_TouchLightGridResidencyAreaAndNeighbors( idRenderWorldLocal *world, int areaIndex, int frameIndex ) {
+	if ( areaIndex < 0 || areaIndex >= world->numPortalAreas ) {
+		return;
+	}
+
+	RB_TouchLightGridResidencyArea( world, areaIndex, frameIndex );
+
+	for ( const portal_t *portal = world->portalAreas[areaIndex].portals; portal != NULL; portal = portal->next ) {
+		if ( portal->doublePortal != NULL && ( portal->doublePortal->blockingBits & PS_BLOCK_VIEW ) ) {
+			continue;
+		}
+		if ( portal->intoArea < 0 || portal->intoArea >= world->numPortalAreas ) {
+			continue;
+		}
+		if ( backEnd.viewDef != NULL && backEnd.viewDef->connectedAreas != NULL && !backEnd.viewDef->connectedAreas[ portal->intoArea ] ) {
+			continue;
+		}
+
+		RB_TouchLightGridResidencyArea( world, portal->intoArea, frameIndex );
+	}
+}
+
 static void RB_UpdateLightGridImageResidency( idRenderWorldLocal *world ) {
 	if ( world == NULL || world->portalAreas == NULL ) {
 		return;
 	}
 
+	RB_EnsureLightGridResidencyState( world );
+
+	const int frameIndex = ++rbLightGridResidencyFrame;
+	for ( int areaIndex = 0; areaIndex < world->numPortalAreas; areaIndex++ ) {
+		if ( world->portalAreas[areaIndex].viewCount != tr.viewCount ) {
+			continue;
+		}
+		RB_TouchLightGridResidencyAreaAndNeighbors( world, areaIndex, frameIndex );
+	}
+
+	const int viewArea = RB_CurrentViewLightGridArea( world );
+	RB_TouchLightGridResidencyAreaAndNeighbors( world, viewArea, frameIndex );
+
+	const int residencyFrames = Max( r_lightGridResidencyFrames.GetInteger(), 0 );
 	for ( int areaIndex = 0; areaIndex < world->numPortalAreas; areaIndex++ ) {
 		portalArea_t &area = world->portalAreas[ areaIndex ];
-		LightGrid &lightGrid = area.lightGrid;
-		idImage *irradianceImage = lightGrid.irradianceImage;
-		if ( irradianceImage == NULL || !irradianceImage->IsLoaded() ) {
+		const int lastTouchedFrame = rbLightGridResidencyLastTouched[areaIndex];
+		if ( lastTouchedFrame != LIGHTGRID_RESIDENCY_UNTOUCHED && frameIndex - lastTouchedFrame <= residencyFrames ) {
 			continue;
 		}
 
-		if ( area.viewCount == tr.viewCount ) {
-			continue;
-		}
-
-		irradianceImage->PurgeImage();
+		RB_PurgeLightGridResidencyImages( area.lightGrid );
 	}
 }
 
-static void RB_STD_DrawLightGridSurface( const drawSurf_t *surf, const LightGrid &lightGrid ) {
+static void RB_STD_DrawLightGridSurface( const drawSurf_t *surf, const LightGrid &lightGrid, const rbLightGridPortalBlend_t *portalBlend = NULL, bool invertPortalBlend = false ) {
 	const srfTriangles_t *tri = surf->geo;
 	const idMaterial *shader = surf->material;
 	const float *regs = surf->shaderRegisters;
@@ -6257,6 +6731,12 @@ static void RB_STD_DrawLightGridSurface( const drawSurf_t *surf, const LightGrid
 	if ( tri->numIndexes <= 0 || tri->ambientCache == NULL ) {
 		return;
 	}
+
+	const int diffuseStageIndex = shader->GetLightGridDiffuseStageIndex( regs );
+	if ( diffuseStageIndex < 0 ) {
+		return;
+	}
+	const shaderStage_t *diffuseStage = shader->GetStage( diffuseStageIndex );
 
 	idImage *irradianceImage = lightGrid.irradianceImage;
 	if ( irradianceImage == NULL ) {
@@ -6274,6 +6754,34 @@ static void RB_STD_DrawLightGridSurface( const drawSurf_t *surf, const LightGrid
 	const int atlasHeight = irradianceImage->GetOpts().height;
 	if ( atlasWidth <= 0 || atlasHeight <= 0 ) {
 		return;
+	}
+
+	idImage *visibilityImage = lightGrid.visibilityImage;
+	if ( visibilityImage != NULL ) {
+		if ( !visibilityImage->IsLoaded() ) {
+			visibilityImage->ActuallyLoadImage( true );
+		}
+		if ( visibilityImage->IsDefaulted() ) {
+			visibilityImage = NULL;
+		}
+		if ( visibilityImage != NULL && ( visibilityImage->GetOpts().width != atlasWidth || visibilityImage->GetOpts().height != atlasHeight ) ) {
+			visibilityImage = NULL;
+		}
+	}
+
+	idImage *probeImage = lightGrid.probeImage;
+	const int probeImageWidth = Max( lightGrid.lightGridBounds[0] * lightGrid.lightGridBounds[2], 1 );
+	const int probeImageHeight = Max( lightGrid.lightGridBounds[1], 1 );
+	if ( probeImage != NULL ) {
+		if ( !probeImage->IsLoaded() ) {
+			probeImage->ActuallyLoadImage( true );
+		}
+		if ( probeImage->IsDefaulted() ) {
+			probeImage = NULL;
+		}
+		if ( probeImage != NULL && ( probeImage->GetOpts().width != probeImageWidth || probeImage->GetOpts().height != probeImageHeight ) ) {
+			probeImage = NULL;
+		}
 	}
 
 	const shaderStage_t *bumpStage = shader->GetBumpStage();
@@ -6310,6 +6818,43 @@ static void RB_STD_DrawLightGridSurface( const drawSurf_t *surf, const LightGrid
 		1.0f / static_cast<float>( atlasHeight ),
 		static_cast<float>( lightGrid.imageBorderSize ),
 		static_cast<float>( Max( lightGrid.imageSingleProbeSize - lightGrid.imageBorderSize, 1 ) ) / static_cast<float>( Max( lightGrid.imageSingleProbeSize, 1 ) )
+	};
+	const float visibilityInfo[4] = {
+		lightGrid.visibilityMaxDistance > 0.0f ? lightGrid.visibilityMaxDistance : 4096.0f,
+		3.0f,
+		0.04f,
+		2.0f
+	};
+	const float probeInfo[4] = {
+		lightGrid.relocationMaxDistance > 0.0f ? lightGrid.relocationMaxDistance : 48.0f,
+		probeImage != NULL ? 1.0f : 0.0f,
+		0.0f,
+		0.0f
+	};
+	const bool usePortalBlend = portalBlend != NULL && portalBlend->blendDistance > 0.0f && !portalBlend->portalBounds.IsCleared();
+	const float blendInfo[4] = {
+		1.0f,
+		usePortalBlend ? ( invertPortalBlend ? -1.0f : 1.0f ) : 0.0f,
+		usePortalBlend ? portalBlend->blendDistance : 0.0f,
+		0.0f
+	};
+	const float portalPlane[4] = {
+		usePortalBlend ? portalBlend->portalPlane[0] : 0.0f,
+		usePortalBlend ? portalBlend->portalPlane[1] : 0.0f,
+		usePortalBlend ? portalBlend->portalPlane[2] : 0.0f,
+		usePortalBlend ? portalBlend->portalPlane[3] : 0.0f
+	};
+	const float portalBoundsMin[4] = {
+		usePortalBlend ? portalBlend->portalBounds[0][0] : 0.0f,
+		usePortalBlend ? portalBlend->portalBounds[0][1] : 0.0f,
+		usePortalBlend ? portalBlend->portalBounds[0][2] : 0.0f,
+		0.0f
+	};
+	const float portalBoundsMax[4] = {
+		usePortalBlend ? portalBlend->portalBounds[1][0] : 0.0f,
+		usePortalBlend ? portalBlend->portalBounds[1][1] : 0.0f,
+		usePortalBlend ? portalBlend->portalBounds[1][2] : 0.0f,
+		0.0f
 	};
 
 	const bool useAlphaToCoverage = RB_UseAlphaToCoverage( shader );
@@ -6356,43 +6901,60 @@ static void RB_STD_DrawLightGridSurface( const drawSurf_t *surf, const LightGrid
 	glUniform4fvARB( rbLightGridIndirectStage.shaderParmLocations[RB_LIGHTGRID_UNIFORM_LIGHTGRID_SIZE], 1, lightGridSize );
 	glUniform4fvARB( rbLightGridIndirectStage.shaderParmLocations[RB_LIGHTGRID_UNIFORM_LIGHTGRID_BOUNDS], 1, lightGridBounds );
 	glUniform4fvARB( rbLightGridIndirectStage.shaderParmLocations[RB_LIGHTGRID_UNIFORM_ATLAS_INFO], 1, atlasInfo );
+	glUniform4fvARB( rbLightGridIndirectStage.shaderParmLocations[RB_LIGHTGRID_UNIFORM_VISIBILITY_INFO], 1, visibilityInfo );
+	glUniform4fvARB( rbLightGridIndirectStage.shaderParmLocations[RB_LIGHTGRID_UNIFORM_PROBE_INFO], 1, probeInfo );
+	glUniform4fvARB( rbLightGridIndirectStage.shaderParmLocations[RB_LIGHTGRID_UNIFORM_BLEND_INFO], 1, blendInfo );
+	glUniform4fvARB( rbLightGridIndirectStage.shaderParmLocations[RB_LIGHTGRID_UNIFORM_PORTAL_PLANE], 1, portalPlane );
+	glUniform4fvARB( rbLightGridIndirectStage.shaderParmLocations[RB_LIGHTGRID_UNIFORM_PORTAL_BOUNDS_MIN], 1, portalBoundsMin );
+	glUniform4fvARB( rbLightGridIndirectStage.shaderParmLocations[RB_LIGHTGRID_UNIFORM_PORTAL_BOUNDS_MAX], 1, portalBoundsMax );
 
 	GL_SelectTextureNoClient( 0 );
 	bumpImage->Bind();
 	GL_SelectTextureNoClient( 2 );
 	irradianceImage->SetSamplerState( TF_LINEAR, TR_CLAMP );
 	irradianceImage->Bind();
-
-	for ( int stageIndex = 0; stageIndex < shader->GetNumStages(); stageIndex++ ) {
-		const shaderStage_t *diffuseStage = shader->GetStage( stageIndex );
-		if ( diffuseStage->lighting != SL_DIFFUSE || regs[ diffuseStage->conditionRegister ] == 0 ) {
-			continue;
-		}
-
-		idImage *diffuseImage = globalImages->whiteImage;
-		idVec4 diffuseMatrix[2];
-		float diffuseColor[4];
-		R_SetDrawInteraction( diffuseStage, regs, &diffuseImage, diffuseMatrix, diffuseColor );
-		if ( diffuseImage == NULL ) {
-			diffuseImage = globalImages->whiteImage;
-		}
-
-		float vertexColorParams[2];
-		RB_LightGridVertexColorParams( diffuseStage->vertexColor, vertexColorParams );
-
-		RB_SetStageVertexColorPointer( surf, stageIndex, ac );
-		glUniform4fvARB( rbLightGridIndirectStage.shaderParmLocations[RB_LIGHTGRID_UNIFORM_DIFFUSE_MATRIX_S], 1, diffuseMatrix[0].ToFloatPtr() );
-		glUniform4fvARB( rbLightGridIndirectStage.shaderParmLocations[RB_LIGHTGRID_UNIFORM_DIFFUSE_MATRIX_T], 1, diffuseMatrix[1].ToFloatPtr() );
-		glUniform4fvARB( rbLightGridIndirectStage.shaderParmLocations[RB_LIGHTGRID_UNIFORM_DIFFUSE_COLOR], 1, diffuseColor );
-		glUniform2fvARB( rbLightGridIndirectStage.shaderParmLocations[RB_LIGHTGRID_UNIFORM_VERTEX_COLOR_PARAMS], 1, vertexColorParams );
-
-		GL_SelectTextureNoClient( 1 );
-		diffuseImage->Bind();
-
-		RB_DrawElementsWithCounters( tri );
+	GL_SelectTextureNoClient( 3 );
+	if ( visibilityImage != NULL ) {
+		visibilityImage->SetSamplerState( TF_LINEAR, TR_CLAMP );
+		visibilityImage->Bind();
+	} else {
+		globalImages->whiteImage->Bind();
+	}
+	GL_SelectTextureNoClient( 4 );
+	if ( probeImage != NULL ) {
+		probeImage->SetSamplerState( TF_LINEAR, TR_CLAMP );
+		probeImage->Bind();
+	} else {
+		globalImages->blackImage->Bind();
 	}
 
+	idImage *diffuseImage = globalImages->whiteImage;
+	idVec4 diffuseMatrix[2];
+	float diffuseColor[4];
+	R_SetDrawInteraction( diffuseStage, regs, &diffuseImage, diffuseMatrix, diffuseColor );
+	if ( diffuseImage == NULL ) {
+		diffuseImage = globalImages->whiteImage;
+	}
+
+	float vertexColorParams[2];
+	RB_LightGridVertexColorParams( diffuseStage->vertexColor, vertexColorParams );
+
+	RB_SetStageVertexColorPointer( surf, diffuseStageIndex, ac );
+	glUniform4fvARB( rbLightGridIndirectStage.shaderParmLocations[RB_LIGHTGRID_UNIFORM_DIFFUSE_MATRIX_S], 1, diffuseMatrix[0].ToFloatPtr() );
+	glUniform4fvARB( rbLightGridIndirectStage.shaderParmLocations[RB_LIGHTGRID_UNIFORM_DIFFUSE_MATRIX_T], 1, diffuseMatrix[1].ToFloatPtr() );
+	glUniform4fvARB( rbLightGridIndirectStage.shaderParmLocations[RB_LIGHTGRID_UNIFORM_DIFFUSE_COLOR], 1, diffuseColor );
+	glUniform2fvARB( rbLightGridIndirectStage.shaderParmLocations[RB_LIGHTGRID_UNIFORM_VERTEX_COLOR_PARAMS], 1, vertexColorParams );
+
+	GL_SelectTextureNoClient( 1 );
+	diffuseImage->Bind();
+
+	RB_DrawElementsWithCounters( tri );
+
 	GL_SelectTextureNoClient( 2 );
+	globalImages->BindNull();
+	GL_SelectTextureNoClient( 3 );
+	globalImages->BindNull();
+	GL_SelectTextureNoClient( 4 );
 	globalImages->BindNull();
 	GL_SelectTextureNoClient( 1 );
 	globalImages->BindNull();
@@ -6463,6 +7025,33 @@ static void RB_STD_LightGridIndirect( void ) {
 
 		RB_SimpleSurfaceSetup( surf );
 		RB_STD_DrawLightGridSurface( surf, *lightGrid );
+	}
+
+	RB_LogComment( "---------- RB_STD_ViewWeaponLightGridIndirect ----------\n" );
+
+	backEnd.currentSpace = NULL;
+	for ( int i = 0; i < backEnd.viewDef->numDrawSurfs; i++ ) {
+		drawSurf_t *surf = backEnd.viewDef->drawSurfs[i];
+		if ( surf == NULL || surf->material == NULL ) {
+			continue;
+		}
+		if ( surf->material->GetSort() >= SS_POST_PROCESS || surf->material->SuppressInSubview() ) {
+			continue;
+		}
+
+		const LightGrid *lightGrid = NULL;
+		if ( !RB_SurfaceHasViewWeaponLightGrid( surf, lightGrid ) ) {
+			continue;
+		}
+
+		RB_SimpleSurfaceSetup( surf );
+		rbLightGridPortalBlend_t portalBlend;
+		if ( RB_SurfaceHasLightGridPortalBlend( surf, portalBlend ) ) {
+			RB_STD_DrawLightGridSurface( surf, *lightGrid, &portalBlend, true );
+			RB_STD_DrawLightGridSurface( surf, *portalBlend.neighborLightGrid, &portalBlend, false );
+		} else {
+			RB_STD_DrawLightGridSurface( surf, *lightGrid );
+		}
 	}
 
 	glUseProgramObjectARB( 0 );

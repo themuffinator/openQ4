@@ -445,201 +445,200 @@ bool rvSegmentTemplate::Parse(rvDeclEffect* effect, int segmentType, idParser* l
 
 	mSegType = segmentType;
 
-	if (!(lexer->ExpectTokenString("{") && lexer->ReadToken(&token))) {
+	if (!lexer->ExpectTokenString("{")) {
 		return false;
 	}
 
-	while (token != "}")
+	while (lexer->ReadToken(&token))
 	{
-			if (token == "decalAxis")
-			{
-				mDecalAxis = lexer->ParseInt();
-			}
-			else if (token == "orientateIdentity")
-			{
-				mFlags |= STFLAG_ORIENTATE_IDENTITY;
-			}
-			else if (token == "useMaterialColor")
-			{
-				mFlags |= STFLAG_USEMATCOLOR;
-			}
-			else if (token == "depthsort")
-			{
-				mFlags |= STFLAG_DEPTH_SORT;
-			}
-			else if (!idStr::Icmp(token.c_str(), "inverseDrawOrder"))
-			{
-				mFlags |= STFLAG_INVERSE_DRAWORDER;
-			}
-			else if (token == "calcDuration")
-			{
-				mFlags |= STFLAG_CALCULATE_DURATION;
-			}
-			else if (token == "constant")
-			{
-				mFlags |= STFLAG_INFINITE_DURATION;
-			}
-			else if (token == "looping")
-			{
-				// Keep legacy token behavior aligned with constant duration segments.
-				mFlags |= STFLAG_INFINITE_DURATION;
-			}
-			else if (token == "locked")
-			{
-				mFlags |= STFLAG_LOCKED;
-			}
-			else if (!idStr::Icmp(token.c_str(), "temporary"))
-			{
-				mFlags |= STFLAG_TEMPORARY;
-			}
-			else if (token == "inverseAttenuateEmitter")
-			{
-				// Stock parser behavior enables attenuation when inverse attenuation is requested.
-				mFlags |= STFLAG_ATTENUATE_EMITTER | STFLAG_INVERSE_ATTENUATE;
-			}
-			else if (token == "attenuateEmitter")
-			{
-				mFlags |= STFLAG_ATTENUATE_EMITTER;
-			}
-			else if (token == "scale")
-			{
-				mScale = lexer->ParseFloat();
-			}
-			else if (token == "channel")
-			{
-				if (!lexer->ReadToken(&token)) {
-					return false;
-				}
-			}
-			else if (token == "effect")
-			{
-				if (!lexer->ReadToken(&token)) {
-					return false;
-				}
-				if (mNumEffects >= 4)
-				{
-					common->FatalError("Unable to add effect '%s' - too many effects\n", token.c_str());
-				}
-				else
-				{
-					mEffects[this->mNumEffects++] = declManager->FindEffect(token);
-				}
-			}
-			else if (idStr::Icmp(token.c_str(), "freqShift") == 0)
-			{
-				mFreqShift.x = lexer->ParseFloat();
-				lexer->ExpectTokenString(",");
-				mFreqShift.y = lexer->ParseFloat();
-			}
-			else if (token == "attenuation")
-			{
-				mAttenuation.x = lexer->ParseFloat();
-				lexer->ExpectTokenString(",");
-				mAttenuation.y = lexer->ParseFloat();
-			}
-			else if (token == "volume")
-			{
-				mSoundVolume.x = lexer->ParseFloat();
-				lexer->ExpectTokenString(",");
-				mSoundVolume.y = lexer->ParseFloat();
-			}
-			else if (token == "soundShader")
-			{
-				if (!lexer->ReadToken(&token)) {
-					return false;
-				}
-				mSoundShader = (idSoundShader*)declManager->FindSound(token);
-				float effecta = 0.0f;
-				if (mSoundShader) {
-					effecta = mSoundShader->GetTimeLength();
-				}
-				// Preserve a sane non-zero fallback for missing/streamed metadata.
-				if (effecta <= BSE_TIME_EPSILON) {
-					effecta = 1.0f;
-				}
-				mLocalDuration.x = effecta;
-				mLocalDuration.y = effecta;
-			}
-			else if (token == "detail")
-			{
-				mDetail = lexer->ParseFloat();
-			}
-			else if (token == "duration")
-			{
-				mLocalDuration.x = lexer->ParseFloat();
-				lexer->ExpectTokenString(",");
-				mLocalDuration.y = lexer->ParseFloat();
-			}
-			else if (token == "start")
-			{
-				mLocalStartTime.x = lexer->ParseFloat();
-				lexer->ExpectTokenString(",");
-				mLocalStartTime.y = lexer->ParseFloat();
-			}
-			else if (token == "density")
-			{
-				mDensity.x = lexer->ParseFloat();
-				lexer->ExpectTokenString(",");
-				mDensity.y = lexer->ParseFloat();
-			}
-			else if (token == "count" || token == "rate")
-			{
-				mCount.x = lexer->ParseFloat();
-				lexer->ExpectTokenString(",");
-				mCount.y = lexer->ParseFloat();
-			}
-			else if (token == "particleCap")
-			{
-				mParticleCap = lexer->ParseFloat();
-			}
-			else if (token == "debris")
-			{
-				CreateParticleTemplate(effect, lexer, PTYPE_DEBRIS);
-			}
-			else if (token == "orientedlinked")
-			{
-				CreateParticleTemplate(effect, lexer, PTYPE_ORIENTEDLINKED);
-			}
-			else if (token == "linked")
-			{
-				CreateParticleTemplate(effect, lexer, PTYPE_LINKED);
-			}
-			else if (token == "electricity")
-			{
-				CreateParticleTemplate(effect, lexer, PTYPE_ELECTRICITY);
-			}
-			else if (token == "light")
-			{
-				CreateParticleTemplate(effect, lexer, PTYPE_LIGHT);
-			}
-			else if (token == "model")
-			{
-				CreateParticleTemplate(effect, lexer, PTYPE_MODEL);
-			}
-			else if (token == "decal")
-			{
-				CreateParticleTemplate(effect, lexer, PTYPE_DECAL);
-			}
-			else if (token == "oriented")
-			{
-				CreateParticleTemplate(effect, lexer, PTYPE_ORIENTED);
-			}
-			else if (token == "line")
-			{
-				CreateParticleTemplate(effect, lexer, PTYPE_LINE);
-			}
-			else if (token == "sprite")
-			{
-				CreateParticleTemplate(effect, lexer, PTYPE_SPRITE);
-			}
-			else
-			{
-				common->Warning("^4BSE:^1 Invalid segment parameter '%s' (file: %s, line: %d)", token.c_str(), lexer->GetFileName(), lexer->GetLineNum());
-			}
-
+		if (token == "}") {
+			return true;
+		}
+		if (!token.Icmp("decalAxis"))
+		{
+			mDecalAxis = lexer->ParseInt();
+		}
+		else if (!token.Icmp("orientateIdentity"))
+		{
+			mFlags |= STFLAG_ORIENTATE_IDENTITY;
+		}
+		else if (!token.Icmp("useMaterialColor"))
+		{
+			mFlags |= STFLAG_USEMATCOLOR;
+		}
+		else if (!token.Icmp("depthsort"))
+		{
+			mFlags |= STFLAG_DEPTH_SORT;
+		}
+		else if (!token.Icmp("inverseDrawOrder"))
+		{
+			mFlags |= STFLAG_INVERSE_DRAWORDER;
+		}
+		else if (!token.Icmp("calcDuration"))
+		{
+			mFlags |= STFLAG_CALCULATE_DURATION;
+		}
+		else if (!token.Icmp("constant"))
+		{
+			mFlags |= STFLAG_INFINITE_DURATION;
+		}
+		else if (!token.Icmp("looping"))
+		{
+			// Keep legacy token behavior aligned with constant duration segments.
+			mFlags |= STFLAG_INFINITE_DURATION;
+		}
+		else if (!token.Icmp("locked"))
+		{
+			mFlags |= STFLAG_LOCKED;
+		}
+		else if (!token.Icmp("temporary"))
+		{
+			mFlags |= STFLAG_TEMPORARY;
+		}
+		else if (!token.Icmp("inverseAttenuateEmitter"))
+		{
+			// Stock parser behavior enables attenuation when inverse attenuation is requested.
+			mFlags |= STFLAG_ATTENUATE_EMITTER | STFLAG_INVERSE_ATTENUATE;
+		}
+		else if (!token.Icmp("attenuateEmitter"))
+		{
+			mFlags |= STFLAG_ATTENUATE_EMITTER;
+		}
+		else if (!token.Icmp("scale"))
+		{
+			mScale = lexer->ParseFloat();
+		}
+		else if (!token.Icmp("channel"))
+		{
 			if (!lexer->ReadToken(&token)) {
 				return false;
 			}
+		}
+		else if (!token.Icmp("effect"))
+		{
+			if (!lexer->ReadToken(&token)) {
+				return false;
+			}
+			if (mNumEffects >= 4)
+			{
+				common->Warning("Unable to add effect '%s' - too many effects", token.c_str());
+			}
+			else
+			{
+				mEffects[this->mNumEffects++] = declManager->FindEffect(token);
+			}
+		}
+		else if (!token.Icmp("freqShift"))
+		{
+			mFreqShift.x = lexer->ParseFloat();
+			lexer->ExpectTokenString(",");
+			mFreqShift.y = lexer->ParseFloat();
+		}
+		else if (!token.Icmp("attenuation"))
+		{
+			mAttenuation.x = lexer->ParseFloat();
+			lexer->ExpectTokenString(",");
+			mAttenuation.y = lexer->ParseFloat();
+		}
+		else if (!token.Icmp("volume"))
+		{
+			mSoundVolume.x = lexer->ParseFloat();
+			lexer->ExpectTokenString(",");
+			mSoundVolume.y = lexer->ParseFloat();
+		}
+		else if (!token.Icmp("soundShader"))
+		{
+			if (!lexer->ReadToken(&token)) {
+				return false;
+			}
+			mSoundShader = (idSoundShader*)declManager->FindSound(token);
+			float effecta = 0.0f;
+			if (mSoundShader) {
+				effecta = mSoundShader->GetTimeLength();
+			}
+			// Preserve a sane non-zero fallback for missing/streamed metadata.
+			if (effecta <= BSE_TIME_EPSILON) {
+				effecta = 1.0f;
+			}
+			mLocalDuration.x = effecta;
+			mLocalDuration.y = effecta;
+		}
+		else if (!token.Icmp("detail"))
+		{
+			mDetail = lexer->ParseFloat();
+		}
+		else if (!token.Icmp("duration"))
+		{
+			mLocalDuration.x = lexer->ParseFloat();
+			lexer->ExpectTokenString(",");
+			mLocalDuration.y = lexer->ParseFloat();
+		}
+		else if (!token.Icmp("start"))
+		{
+			mLocalStartTime.x = lexer->ParseFloat();
+			lexer->ExpectTokenString(",");
+			mLocalStartTime.y = lexer->ParseFloat();
+		}
+		else if (!token.Icmp("density"))
+		{
+			mDensity.x = lexer->ParseFloat();
+			lexer->ExpectTokenString(",");
+			mDensity.y = lexer->ParseFloat();
+		}
+		else if (!token.Icmp("count") || !token.Icmp("rate"))
+		{
+			mCount.x = lexer->ParseFloat();
+			lexer->ExpectTokenString(",");
+			mCount.y = lexer->ParseFloat();
+		}
+		else if (!token.Icmp("particleCap"))
+		{
+			mParticleCap = lexer->ParseFloat();
+		}
+		else if (!token.Icmp("debris"))
+		{
+			CreateParticleTemplate(effect, lexer, PTYPE_DEBRIS);
+		}
+		else if (!token.Icmp("orientedlinked"))
+		{
+			CreateParticleTemplate(effect, lexer, PTYPE_ORIENTEDLINKED);
+		}
+		else if (!token.Icmp("linked"))
+		{
+			CreateParticleTemplate(effect, lexer, PTYPE_LINKED);
+		}
+		else if (!token.Icmp("electricity"))
+		{
+			CreateParticleTemplate(effect, lexer, PTYPE_ELECTRICITY);
+		}
+		else if (!token.Icmp("light"))
+		{
+			CreateParticleTemplate(effect, lexer, PTYPE_LIGHT);
+		}
+		else if (!token.Icmp("model"))
+		{
+			CreateParticleTemplate(effect, lexer, PTYPE_MODEL);
+		}
+		else if (!token.Icmp("decal"))
+		{
+			CreateParticleTemplate(effect, lexer, PTYPE_DECAL);
+		}
+		else if (!token.Icmp("oriented"))
+		{
+			CreateParticleTemplate(effect, lexer, PTYPE_ORIENTED);
+		}
+		else if (!token.Icmp("line"))
+		{
+			CreateParticleTemplate(effect, lexer, PTYPE_LINE);
+		}
+		else if (!token.Icmp("sprite"))
+		{
+			CreateParticleTemplate(effect, lexer, PTYPE_SPRITE);
+		}
+		else
+		{
+			common->Warning("^4BSE:^1 Invalid segment parameter '%s' (file: %s, line: %d)", token.c_str(), lexer->GetFileName(), lexer->GetLineNum());
+		}
 	}
-	return true;
+	return false;
 }

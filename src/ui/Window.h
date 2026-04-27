@@ -360,6 +360,7 @@ public:
 	idWindow *GetCaptureChild();
 	const char *GetComment() { return comment;  }
 	void SetComment( const char * p) { comment = p; }
+	bool AlwaysThink() const { return alwaysThink; }
 
 	idStr cmd;
 
@@ -388,6 +389,7 @@ protected:
 
 	friend class idSimpleWindow;
 	friend class idUserInterfaceLocal;
+	friend class idUserInterfaceManagerLocal;
 	bool IsSimple();
 	bool HasDirectChildReference( const idWindow *window ) const;
 	bool HasDescendantReference( const idWindow *window ) const;
@@ -450,6 +452,7 @@ protected:
 	idWinBool	noTime;					// 
 	idWinBool	visible;				// 
 	idWinBool	noEvents;
+	bool		alwaysThink;
 	idWinRectangle rect;				// overall rect
 	idWinVec4	backColor;
 	idWinFloatPtr	backColor_r;

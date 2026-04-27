@@ -58,8 +58,18 @@ typedef struct doublePortal_s {
 
 typedef struct lightGridPoint_s {
 	idVec3					origin;
+	float					visibilityMeanDistance;
+	float					visibilityMeanDistanceSq;
 	byte					valid;
 } lightGridPoint_t;
+
+enum lightGridPointState_t {
+	LIGHTGRID_POINT_INVALID = 0,
+	LIGHTGRID_POINT_VALID = 1,
+	LIGHTGRID_POINT_RELOCATED = 2,
+	LIGHTGRID_POINT_NEAR_SOLID = 3,
+	LIGHTGRID_POINT_RELOCATED_NEAR_SOLID = 4
+};
 
 class LightGrid {
 public:
@@ -69,15 +79,23 @@ public:
 	idList<lightGridPoint_t> lightGridPoints;
 	int						totalGridPointCount;
 	int						validGridPointCount;
+	int						relocatedGridPointCount;
+	int						nearSolidGridPointCount;
 	int						area;
 	idImage *				irradianceImage;
+	idImage *				visibilityImage;
+	idImage *				probeImage;
 	int						imageSingleProbeSize;
 	int						imageBorderSize;
+	float					visibilityMaxDistance;
+	float					relocationMaxDistance;
 
 	void					Clear();
 	bool					HasImage() const;
 	int						GridPointCount() const;
 	int						CountValidGridPoints() const;
+	int						CountRelocatedGridPoints() const;
+	int						CountNearSolidGridPoints() const;
 	bool					HasPointData() const;
 	void					DiscardPointData();
 	void					SetupGrid( const idBounds &bounds, const idRenderWorld *world, const idVec3 &preferredSize, int areaIndex, int totalAreas, int maxProbes, bool printToConsole );
@@ -259,6 +277,7 @@ public:
 	void					LoadLightGridImages( bool forceReloadLoaded = false );
 	bool					LoadLightGridFile( const char *name );
 	void					ParseLightGridPoints( idLexer *src );
+	void					ParseLightGridVisibility( idLexer *src );
 	void					WriteLightGridsToFile( const char *name ) const;
 
 	//--------------------------

@@ -3,11 +3,19 @@
 uniform sampler2D uBumpMap;
 uniform sampler2D uDiffuseMap;
 uniform sampler2D uLightGridAtlas;
+uniform sampler2D uLightGridVisibilityAtlas;
+uniform sampler2D uLightGridProbeAtlas;
 
 uniform vec4 uLightGridOrigin;
 uniform vec4 uLightGridSize;
 uniform vec4 uLightGridBounds;
 uniform vec4 uAtlasInfo;
+uniform vec4 uVisibilityInfo;
+uniform vec4 uProbeInfo;
+uniform vec4 uBlendInfo;
+uniform vec4 uPortalPlane;
+uniform vec4 uPortalBoundsMin;
+uniform vec4 uPortalBoundsMax;
 uniform vec4 uDiffuseColor;
 
 varying vec2 vBumpTexCoord;
@@ -52,6 +60,76 @@ void ComputeGridAxis( float lightOrigin, float cellSize, float bound, out float 
 	}
 }
 
+vec2 ProbeAtlasCoord( vec3 sampleCoord, vec2 octCoord ) {
+	float invCellsX = 1.0 / max( uLightGridBounds.x * uLightGridBounds.z, 1.0 );
+	float invCellsY = 1.0 / max( uLightGridBounds.y, 1.0 );
+	float probeScale = uAtlasInfo.w;
+	vec2 octCoordInCell = octCoord * vec2( invCellsX, invCellsY );
+	float cellIndex = sampleCoord.x + sampleCoord.z * uLightGridBounds.x;
+	vec2 atlasOffset = vec2( cellIndex * invCellsX, sampleCoord.y * invCellsY );
+
+	vec2 octCoordWithinAtlas = ( octCoordInCell + atlasOffset ) * probeScale;
+	vec2 probeTopLeftPixels = vec2(
+		cellIndex * uAtlasInfo.z + uAtlasInfo.z * 0.5,
+		sampleCoord.y * uAtlasInfo.z + uAtlasInfo.z * 0.5 );
+	return probeTopLeftPixels * uAtlasInfo.xy + octCoordWithinAtlas;
+}
+
+vec2 ProbeGridCoord( vec3 sampleCoord ) {
+	float invCellsX = 1.0 / max( uLightGridBounds.x * uLightGridBounds.z, 1.0 );
+	float invCellsY = 1.0 / max( uLightGridBounds.y, 1.0 );
+	float cellIndex = sampleCoord.x + sampleCoord.z * uLightGridBounds.x;
+	return vec2( ( cellIndex + 0.5 ) * invCellsX, ( sampleCoord.y + 0.5 ) * invCellsY );
+}
+
+vec3 ProbeWorldPosition( vec3 sampleCoord ) {
+	vec3 idealPosition = uLightGridOrigin.xyz + sampleCoord * uLightGridSize.xyz;
+	if ( uProbeInfo.y <= 0.0 ) {
+		return idealPosition;
+	}
+
+	vec3 encodedRelocation = texture2D( uLightGridProbeAtlas, ProbeGridCoord( sampleCoord ) ).rgb * 255.0;
+	vec3 relocation = ( encodedRelocation - vec3( 128.0 ) ) * ( uProbeInfo.x / 127.0 );
+	return idealPosition + relocation;
+}
+
+float VisibilityWeight( vec4 moments, float receiverDistance, vec3 worldNormal, vec3 probeToReceiverDir ) {
+	if ( moments.b <= 0.001 ) {
+		return 1.0;
+	}
+
+	float maxDistance = max( uVisibilityInfo.x, 1.0 );
+	float meanDistance = moments.r * maxDistance;
+	float meanDistanceSq = moments.g * maxDistance * maxDistance;
+	float normalBias = uVisibilityInfo.y * ( 0.25 + 0.75 * max( dot( worldNormal, -probeToReceiverDir ), 0.0 ) );
+	float biasedDistance = max( receiverDistance - normalBias, 0.0 );
+	if ( biasedDistance <= meanDistance ) {
+		return 1.0;
+	}
+
+	float variance = max( meanDistanceSq - meanDistance * meanDistance, maxDistance * maxDistance * 0.000025 );
+	float delta = biasedDistance - meanDistance;
+	float chebyshev = variance / ( variance + delta * delta );
+	chebyshev = clamp( chebyshev, uVisibilityInfo.z, 1.0 );
+	return pow( chebyshev, max( uVisibilityInfo.w, 1.0 ) );
+}
+
+float LightGridContributionScale() {
+	if ( abs( uBlendInfo.y ) <= 0.001 || uBlendInfo.z <= 0.0 ) {
+		return uBlendInfo.x;
+	}
+
+	float portalDistance = abs( dot( vWorldPosition, uPortalPlane.xyz ) + uPortalPlane.w );
+	vec3 nearestPortalBoundsPoint = clamp( vWorldPosition, uPortalBoundsMin.xyz, uPortalBoundsMax.xyz );
+	float apertureDistance = length( vWorldPosition - nearestPortalBoundsPoint );
+	float portalFade =
+		( 1.0 - smoothstep( 0.0, uBlendInfo.z, portalDistance ) ) *
+		( 1.0 - smoothstep( 0.0, uBlendInfo.z, apertureDistance ) );
+	float neighborWeight = 0.5 * portalFade;
+	float blendWeight = uBlendInfo.y > 0.0 ? neighborWeight : 1.0 - neighborWeight;
+	return uBlendInfo.x * blendWeight;
+}
+
 void main() {
 	vec4 bumpSample = texture2D( uBumpMap, vBumpTexCoord );
 	vec3 localNormal = normalize( vec3( bumpSample.a, bumpSample.g, bumpSample.b ) * 2.0 - 1.0 );
@@ -73,13 +151,8 @@ void main() {
 	ComputeGridAxis( lightOrigin.y, uLightGridSize.y, uLightGridBounds.y, gridCoordY, fracY );
 	ComputeGridAxis( lightOrigin.z, uLightGridSize.z, uLightGridBounds.z, gridCoordZ, fracZ );
 
-	float invCellsX = 1.0 / max( uLightGridBounds.x * uLightGridBounds.z, 1.0 );
-	float invCellsY = 1.0 / max( uLightGridBounds.y, 1.0 );
-	float probeScale = uAtlasInfo.w;
-	vec2 octCoordInCell = octCoord * vec2( invCellsX, invCellsY );
-
 	vec3 irradiance = vec3( 0.0 );
-	float totalFactor = 0.0;
+	float validFactor = 0.0;
 
 	for ( int i = 0; i < 8; i++ ) {
 		float fi = float( i );
@@ -96,29 +169,30 @@ void main() {
 		}
 
 		vec3 sampleCoord = vec3( gridCoordX, gridCoordY, gridCoordZ ) + corner;
-		float cellIndex = sampleCoord.x + sampleCoord.z * uLightGridBounds.x;
-		vec2 atlasOffset = vec2( cellIndex * invCellsX, sampleCoord.y * invCellsY );
-
-		vec2 octCoordWithinAtlas = ( octCoordInCell + atlasOffset ) * probeScale;
-		vec2 probeTopLeftPixels = vec2(
-			cellIndex * uAtlasInfo.z + uAtlasInfo.z * 0.5,
-			sampleCoord.y * uAtlasInfo.z + uAtlasInfo.z * 0.5 );
-		vec2 atlasCoord = probeTopLeftPixels * uAtlasInfo.xy + octCoordWithinAtlas;
+		vec2 atlasCoord = ProbeAtlasCoord( sampleCoord, octCoord );
 
 		vec3 sampleColor = texture2D( uLightGridAtlas, atlasCoord ).rgb;
 		if ( dot( sampleColor, vec3( 1.0 ) ) < 0.0001 ) {
 			continue;
 		}
 
-		irradiance += sampleColor * factor;
-		totalFactor += factor;
+		vec3 probePosition = ProbeWorldPosition( sampleCoord );
+		vec3 probeToReceiver = vWorldPosition - probePosition;
+		float receiverDistance = length( probeToReceiver );
+		vec3 probeToReceiverDir = receiverDistance > 0.001 ? probeToReceiver / receiverDistance : worldNormal;
+		vec2 visibilityOctCoord = ( OctEncode( probeToReceiverDir ) + vec2( 1.0 ) ) * 0.5;
+		vec4 visibilityMoments = texture2D( uLightGridVisibilityAtlas, ProbeAtlasCoord( sampleCoord, visibilityOctCoord ) );
+		float visibility = VisibilityWeight( visibilityMoments, receiverDistance, worldNormal, probeToReceiverDir );
+
+		irradiance += sampleColor * factor * visibility;
+		validFactor += factor;
 	}
 
-	if ( totalFactor > 0.0 && totalFactor < 0.9999 ) {
-		irradiance *= 1.0 / totalFactor;
+	if ( validFactor > 0.0 && validFactor < 0.9999 ) {
+		irradiance *= 1.0 / validFactor;
 	}
 
 	vec3 diffuseSample = texture2D( uDiffuseMap, vDiffuseTexCoord ).rgb;
-	vec3 diffuseLighting = irradiance * diffuseSample * uDiffuseColor.rgb * vVertexColor;
+	vec3 diffuseLighting = irradiance * diffuseSample * uDiffuseColor.rgb * vVertexColor * LightGridContributionScale();
 	gl_FragColor = vec4( diffuseLighting, 1.0 );
 }

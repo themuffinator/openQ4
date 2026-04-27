@@ -967,7 +967,16 @@ public:
 	virtual int				ReadFile( const char *relativePath, void **buffer, ID_TIME_T *timestamp );
 	virtual void			FreeFile( void *buffer );
 	virtual int				WriteFile( const char *relativePath, const void *buffer, int size, const char *basePath = "fs_savepath" );
-	virtual void			RemoveFile( const char *relativePath );	
+	virtual void			RemoveFile( const char *relativePath, const char *basePath = "fs_savepath" );
+	virtual int				RemoveExplicitFile( const char *OSPath );
+	virtual void			SetIsFileLoadingAllowed( bool mode );
+	virtual bool			GetIsFileLoadingAllowed() const;
+	virtual void			SetAssetLogName( const char *logName );
+	virtual void			WriteAssetLog();
+	virtual void			ClearAssetLog();
+	virtual const char *	GetAssetLogName();
+	virtual idFile *		GetNewFileMemory( void );
+	virtual idFile *		GetNewFilePermanent( void );
 	virtual idFile *		OpenFileReadFlags( const char *relativePath, int searchFlags, pack_t **foundInPak = NULL, bool allowCopyFiles = true, const char* gamedir = NULL );
 	virtual idFile *		OpenFileRead( const char *relativePath, bool allowCopyFiles = true, const char* gamedir = NULL );
 	virtual idFile *		OpenFileReadFromPak( const char *relativePath, bool allowCopyFiles = true, const char* gamedir = NULL );
@@ -1048,6 +1057,10 @@ private:
 	int						restartGamePakChecksum;
 	int						gameDLLChecksum;		// the checksum of the last loaded game DLL
 	int						gamePakChecksum;		// the checksum of the pak holding the loaded game DLL
+	bool					isFileLoadingAllowed;
+	idStr					currentAssetLog;
+	idStr					currentAssetLogUnfiltered;
+	idStrList				assetLog;
 
 	int						gamePakForOS[ MAX_GAME_OS ];
 
@@ -1065,6 +1078,7 @@ private:
 	FILE *					OpenOSFileCorrectName( idStr &path, const char *mode );
 	int						DirectFileLength( FILE *o );
 	void					CopyFile( idFile *src, const char *toOSPath );
+	void					AddAssetLogEntry( const char *relativePath );
 	int						AddUnique( const char *name, idStrList &list, idHashIndex &hashIndex ) const;
 	void					GetExtensionList( const char *extension, idStrList &extensionList ) const;
 	int						GetFileList( const char *relativePath, const idStrList &extensions, idStrList &list, idHashIndex &hashIndex, bool fullRelativePath, const char* gamedir = NULL );
@@ -1137,6 +1151,10 @@ idFileSystemLocal::idFileSystemLocal( void ) {
 	d3xp = 0;
 	loadedFileFromDir = false;
 	restartGamePakChecksum = 0;
+	isFileLoadingAllowed = false;
+	currentAssetLog.Clear();
+	currentAssetLogUnfiltered.Clear();
+	assetLog.Clear();
 	memset( &backgroundThread, 0, sizeof( backgroundThread ) );
 	addonPaks = NULL;
 }
@@ -1589,8 +1607,18 @@ const char *idFileSystemLocal::RelativePathToOSPath( const char *relativePath, c
 idFileSystemLocal::RemoveFile
 =================
 */
-void idFileSystemLocal::RemoveFile( const char *relativePath ) {
+void idFileSystemLocal::RemoveFile( const char *relativePath, const char *basePath ) {
 	idStr OSPath;
+
+	if ( idStr::Icmp( basePath, "fs_savepath" ) != 0 ) {
+		const char *path = cvarSystem->GetCVarString( basePath );
+		if ( path[0] ) {
+			OSPath = BuildOSPath( path, gameFolder, relativePath );
+			remove( OSPath );
+		}
+		ClearDirCache();
+		return;
+	}
 
 	if ( fs_cdpath.GetString()[0] ) {
 		OSPath = BuildOSPath( fs_cdpath.GetString(), gameFolder, relativePath );
@@ -1603,6 +1631,17 @@ void idFileSystemLocal::RemoveFile( const char *relativePath ) {
 	}
 
 	ClearDirCache();
+}
+
+/*
+=================
+idFileSystemLocal::RemoveExplicitFile
+=================
+*/
+int idFileSystemLocal::RemoveExplicitFile( const char *OSPath ) {
+	const int result = remove( OSPath );
+	ClearDirCache();
+	return result;
 }
 
 /*
@@ -1828,6 +1867,121 @@ int idFileSystemLocal::WriteFile( const char *relativePath, const void *buffer, 
 	CloseFile( f );
 
 	return size;
+}
+
+/*
+============
+idFileSystemLocal::SetIsFileLoadingAllowed
+============
+*/
+void idFileSystemLocal::SetIsFileLoadingAllowed( bool mode ) {
+	isFileLoadingAllowed = mode;
+}
+
+/*
+============
+idFileSystemLocal::GetIsFileLoadingAllowed
+============
+*/
+bool idFileSystemLocal::GetIsFileLoadingAllowed() const {
+	return isFileLoadingAllowed;
+}
+
+/*
+============
+idFileSystemLocal::SetAssetLogName
+============
+*/
+void idFileSystemLocal::SetAssetLogName( const char *logName ) {
+	currentAssetLog = "assetlogs/";
+	if ( logName != NULL ) {
+		currentAssetLog += logName;
+	}
+	currentAssetLog.BackSlashesToSlashes();
+	currentAssetLog.StripFileExtension();
+	currentAssetLogUnfiltered = currentAssetLog;
+
+	const char *entityFilter = cvarSystem->GetCVarString( "si_entityFilter" );
+	if ( entityFilter != NULL && entityFilter[0] != '\0' ) {
+		currentAssetLog += "-";
+		currentAssetLog += entityFilter;
+	}
+
+	common->Printf( "Asset log: %s\n", currentAssetLog.c_str() );
+}
+
+/*
+============
+idFileSystemLocal::GetAssetLogName
+============
+*/
+const char *idFileSystemLocal::GetAssetLogName() {
+	return currentAssetLog.c_str();
+}
+
+/*
+============
+idFileSystemLocal::ClearAssetLog
+============
+*/
+void idFileSystemLocal::ClearAssetLog() {
+	assetLog.Clear();
+}
+
+/*
+============
+idFileSystemLocal::AddAssetLogEntry
+============
+*/
+void idFileSystemLocal::AddAssetLogEntry( const char *relativePath ) {
+	if ( !isFileLoadingAllowed || relativePath == NULL || relativePath[0] == '\0' ) {
+		return;
+	}
+	assetLog.AddUnique( relativePath );
+}
+
+/*
+============
+idFileSystemLocal::WriteAssetLog
+============
+*/
+void idFileSystemLocal::WriteAssetLog() {
+	if ( currentAssetLog.Length() == 0 ) {
+		return;
+	}
+
+	idStr assetLogName = currentAssetLog;
+	assetLogName.SetFileExtension( ".assets" );
+
+	idFile *file = OpenFileWrite( assetLogName.c_str(), "fs_savepath" );
+	if ( file == NULL ) {
+		common->Warning( "Could not open asset log '%s' for writing", assetLogName.c_str() );
+		return;
+	}
+
+	for ( int i = 0; i < assetLog.Num(); i++ ) {
+		file->Printf( "%s\n", assetLog[i].c_str() );
+	}
+
+	CloseFile( file );
+}
+
+/*
+============
+idFileSystemLocal::GetNewFileMemory
+============
+*/
+idFile *idFileSystemLocal::GetNewFileMemory( void ) {
+	return new idFile_Memory();
+}
+
+/*
+============
+idFileSystemLocal::GetNewFilePermanent
+============
+*/
+idFile *idFileSystemLocal::GetNewFilePermanent( void ) {
+	return new idFile_Permanent();
 }
 
 /*
@@ -4189,6 +4343,9 @@ void idFileSystemLocal::Init( void ) {
 	// spawn a thread to handle background file reads
 	StartBackgroundDownloadThread();
 
+	currentAssetLog = "assetlogs/default";
+	currentAssetLogUnfiltered = "assetlogs/default";
+
 	// if we can't find default.cfg, assume that the paths are
 	// busted and error out now, rather than getting an unreadable
 	// graphics screen when the font fails to load
@@ -4597,6 +4754,7 @@ idFile *idFileSystemLocal::OpenFileReadFlags( const char *relativePath, int sear
 				}
 			}
 
+			AddAssetLogEntry( relativePath );
 			return file;
 		} else if ( search->pack && ( searchFlags & FSFLAG_SEARCH_PAKS ) ) {
 
@@ -4654,6 +4812,7 @@ idFile *idFileSystemLocal::OpenFileReadFlags( const char *relativePath, int sear
 					if ( fs_debug.GetInteger( ) ) {
 						common->Printf( "idFileSystem::OpenFileRead: %s (found in '%s')\n", relativePath, pak->pakFilename.c_str() );
 					}
+					AddAssetLogEntry( relativePath );
 					return file;
 				}
 			}
@@ -4675,6 +4834,7 @@ idFile *idFileSystemLocal::OpenFileReadFlags( const char *relativePath, int sear
 					if ( fs_debug.GetInteger( ) ) {
 						common->Printf( "idFileSystem::OpenFileRead: %s (found in addon pk4 '%s')\n", relativePath, search->pack->pakFilename.c_str() );
 					}
+					AddAssetLogEntry( relativePath );
 					return file;
 				}
 			}

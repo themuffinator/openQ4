@@ -189,17 +189,59 @@ typedef enum {
 } stageVertexColor_t;
 
 static const int	MAX_FRAGMENT_IMAGES = 8;
-static const int	MAX_VERTEX_PARMS = 4;
+static const int	MAX_VERTEX_PARMS = 8;
+static const int	MAX_FRAGMENT_PARMS = 8;
 static const int	MAX_GLSL_SHADER_PARMS = 32;
 static const int	MAX_GLSL_SHADER_NAME = 256;
 static const int	MAX_GLSL_SHADER_PARM_NAME = 32;
 
 typedef enum {
+	LEGACY_FRAGMENT_BINDING_NONE,
+	LEGACY_FRAGMENT_BINDING_LIGHT_FALLOFF,
+	LEGACY_FRAGMENT_BINDING_LIGHT_IMAGE,
+	LEGACY_FRAGMENT_BINDING_AMBIENT_NORMAL_MAP,
+	LEGACY_FRAGMENT_BINDING_NORMAL_CUBE_MAP,
+	LEGACY_FRAGMENT_BINDING_SPECULAR_TABLE
+} legacyFragmentProgramBinding_t;
+
+typedef enum {
+	GLSL_SHADERTEXTURE_IMAGE,
+	GLSL_SHADERTEXTURE_LIGHT_FALLOFF,
+	GLSL_SHADERTEXTURE_LIGHT_IMAGE,
+	GLSL_SHADERTEXTURE_AMBIENT_NORMAL_MAP,
+	GLSL_SHADERTEXTURE_NORMAL_CUBE_MAP,
+	GLSL_SHADERTEXTURE_SPECULAR_TABLE
+} glslShaderTextureBinding_t;
+
+typedef enum {
 	GLSL_SHADERPARM_REGISTERS,
+	GLSL_SHADERPARM_LOCAL_LIGHT_ORIGIN,
+	GLSL_SHADERPARM_LOCAL_VIEW_ORIGIN,
+	GLSL_SHADERPARM_LIGHT_PROJECT_S,
+	GLSL_SHADERPARM_LIGHT_PROJECT_T,
+	GLSL_SHADERPARM_LIGHT_PROJECT_Q,
+	GLSL_SHADERPARM_LIGHT_FALLOFF_S,
+	GLSL_SHADERPARM_BUMP_MATRIX_S,
+	GLSL_SHADERPARM_BUMP_MATRIX_T,
+	GLSL_SHADERPARM_DIFFUSE_MATRIX_S,
+	GLSL_SHADERPARM_DIFFUSE_MATRIX_T,
+	GLSL_SHADERPARM_SPECULAR_MATRIX_S,
+	GLSL_SHADERPARM_SPECULAR_MATRIX_T,
+	GLSL_SHADERPARM_COLOR_MODULATE,
+	GLSL_SHADERPARM_COLOR_ADD,
+	GLSL_SHADERPARM_DIFFUSE_COLOR,
+	GLSL_SHADERPARM_SPECULAR_COLOR,
 	GLSL_SHADERPARM_VIEW_ORIGIN,
 	GLSL_SHADERPARM_COLOR_MATRIX0,
 	GLSL_SHADERPARM_COLOR_MATRIX1,
 	GLSL_SHADERPARM_COLOR_MATRIX2,
+	GLSL_SHADERPARM_PROJECTION_ROW_0,
+	GLSL_SHADERPARM_PROJECTION_ROW_1,
+	GLSL_SHADERPARM_PROJECTION_ROW_2,
+	GLSL_SHADERPARM_PROJECTION_ROW_3,
+	GLSL_SHADERPARM_MODEL_ROW_0,
+	GLSL_SHADERPARM_MODEL_ROW_1,
+	GLSL_SHADERPARM_MODEL_ROW_2,
 	GLSL_SHADERPARM_GAUSSIAN_SAMPLE_OFFSETS,
 	GLSL_SHADERPARM_GAUSSIAN_SAMPLE_OFFSETS_HORIZONTAL,
 	GLSL_SHADERPARM_GAUSSIAN_SAMPLE_OFFSETS_VERTICAL,
@@ -214,7 +256,10 @@ typedef struct {
 	int					vertexParms[MAX_VERTEX_PARMS][4];	// evaluated register indexes
 
 	int					fragmentProgram;
+	int					numFragmentParms;
+	int					fragmentParms[MAX_FRAGMENT_PARMS][4];
 	int					numFragmentProgramImages;
+	legacyFragmentProgramBinding_t fragmentProgramBindings[MAX_FRAGMENT_IMAGES];
 	idImage* fragmentProgramImages[MAX_FRAGMENT_IMAGES];
 
 	bool				glslProgram;
@@ -225,6 +270,7 @@ typedef struct {
 	bool				glslProgramLoaded;
 	bool				glslProgramValid;
 	int					glslProgramGeneration;
+	bool				customLighting;
 
 	int					numShaderParms;
 	char				shaderParmNames[MAX_GLSL_SHADER_PARMS][MAX_GLSL_SHADER_PARM_NAME];
@@ -236,6 +282,7 @@ typedef struct {
 	int					numShaderTextures;
 	char				shaderTextureNames[MAX_FRAGMENT_IMAGES][MAX_GLSL_SHADER_PARM_NAME];
 	int					shaderTextureLocations[MAX_FRAGMENT_IMAGES];
+	glslShaderTextureBinding_t shaderTextureBindings[MAX_FRAGMENT_IMAGES];
 	idImage* shaderTextureImages[MAX_FRAGMENT_IMAGES];
 	textureFilter_t		shaderTextureFilters[MAX_FRAGMENT_IMAGES];
 	textureRepeat_t		shaderTextureRepeats[MAX_FRAGMENT_IMAGES];
@@ -251,6 +298,8 @@ typedef struct {
 	int					mNumStageOps;			// number of material ops emitted while parsing this stage
 	colorStage_t		color;
 	bool				hasAlphaTest;
+	bool				hasAlphaFunc;
+	int					alphaTestMode;
 	int					alphaTestRegister;
 	textureStage_t		texture;
 	stageVertexColor_t	vertexColor;
@@ -269,7 +318,9 @@ typedef enum {
 } materialCoverage_t;
 
 typedef enum {
-	SS_SUBVIEW = -3,	// mirrors, viewscreens, etc
+	SS_MIN = -10000,
+	SS_SUBVIEW = -4,	// mirrors, viewscreens, etc
+	SS_PREGUI = -3,		// guis
 	SS_GUI = -2,		// guis
 	SS_BAD = -1,
 	SS_OPAQUE,			// opaque
@@ -286,7 +337,8 @@ typedef enum {
 
 	SS_NEAREST,			// screen blood blobs
 
-	SS_POST_PROCESS = 100	// after a screen copy to texture
+	SS_POST_PROCESS = 100,	// after a screen copy to texture
+	SS_MAX = 10000
 } materialSort_t;
 
 typedef enum {
@@ -310,7 +362,9 @@ typedef enum {
 	MF_FORCESHADOWS = BIT(3),
 	MF_NOSELFSHADOW = BIT(4),
 	MF_NOPORTALFOG = BIT(5),	// this fog volume won't ever consider a portal fogged out
-	MF_EDITOR_VISIBLE = BIT(6)	// in use (visible) per editor
+	MF_EDITOR_VISIBLE = BIT(6),	// in use (visible) per editor
+	MF_SKY = BIT(7),
+	MF_NEED_CURRENT_RENDER = BIT(8)
 } materialFlags_t;
 
 // contents flags, NOTE: make sure to keep the defines in doom_defs.script up to date with these!
@@ -421,8 +475,11 @@ public:
 	virtual bool		SetDefaultText(void);
 	virtual const char* DefaultDefinition(void) const;
 	virtual bool		Parse(const char* text, const int textLength) override;
+	virtual bool		Parse(const char* text, const int textLength, bool noCaching) override;
 	virtual void		FreeData(void);
 	virtual void		Print(void) const;
+	virtual bool		RebuildTextSource(void) override { return false; }
+	virtual bool		Validate(const char* psText, int iTextLength, idStr& strReportTo) const override;
 
 	//BSM Nerve: Added for material editor
 	bool				Save(const char* fileName = NULL);
@@ -443,6 +500,9 @@ public:
 	// get the first bump map stage, or NULL if not present.
 	// used for bumpy-specular
 	const shaderStage_t* GetBumpStage(void) const;
+
+	// get the material-compiled diffuse stage used by the light-grid indirect pass
+	int					GetLightGridDiffuseStageIndex(const float* registers) const;
 
 	// returns true if the material will draw anything at all.  Triggers, portals,
 	// etc, will not have anything to draw.  A not drawn surface can still castShadow,
@@ -678,6 +738,12 @@ public:
 	bool				SuppressInSubview() const { return suppressInSubview; };
 	bool				IsPortalSky() const { return portalSky; };
 	void				AddReference();
+	void				ClearUseCount() { useCount = 0; }
+	void				IncreaseUseCount() { useCount++; globalUseCount++; }
+	void				AddLevelLoadReference() { IncreaseUseCount(); }
+	int					GetUseCount() const { return useCount; }
+	int					GetGlobalUseCount() const { return globalUseCount; }
+	void				ResolveUse();
 
 private:
 	// parse the entire material
@@ -687,6 +753,7 @@ private:
 	void				ParseSort(idLexer& src);
 	void				ParseBlend(idLexer& src, shaderStage_t* stage);
 	void				ParseVertexParm(idLexer& src, newShaderStage_t* newStage);
+	void				ParseFragmentParm(idLexer& src, newShaderStage_t* newStage);
 	void				ParseFragmentMap(idLexer& src, newShaderStage_t* newStage);
 	void				ParseShaderParm(idLexer& src, newShaderStage_t* newStage);
 	void				ParseShaderTexture(idLexer& src, newShaderStage_t* newStage);
@@ -708,6 +775,7 @@ private:
 	void				MultiplyTextureMatrix(textureStage_t* ts, int registers[2][3]);	// FIXME: for some reason the const is bad for gcc and Mac
 	void				SortInteractionStages();
 	void				AddImplicitStages(const textureRepeat_t trpDefault = TR_REPEAT);
+	void				SelectLightGridDiffuseStage();
 	void				CheckForConstantRegisters();
 
 private:
@@ -780,6 +848,7 @@ private:
 
 	int					numStages;
 	int					numAmbientStages;
+	int					lightGridDiffuseStage;
 
 	shaderStage_t* stages;
 

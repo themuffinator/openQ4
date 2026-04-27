@@ -67,6 +67,10 @@ float idDeclTable::TableLookup( float index ) const {
 		iIndex = idMath::FtoiFast( idMath::Floor( index ) );
 		iFrac = index - iIndex;
 		iIndex = iIndex % domain;
+		if ( iIndex < 0 || iFrac < 0.0f ) {
+			iIndex = 0;
+			iFrac = 0.0f;
+		}
 	}
 
 	if ( !snap ) {
@@ -115,6 +119,15 @@ idDeclTable::Parse
 =================
 */
 bool idDeclTable::Parse( const char *text, const int textLength ) {
+	return Parse( text, textLength, false );
+}
+
+/*
+=================
+idDeclTable::Parse
+=================
+*/
+bool idDeclTable::Parse( const char *text, const int textLength, bool noCaching ) {
 	idLexer src;
 	idToken token;
 	float v;
@@ -192,5 +205,23 @@ bool idDeclTable::Parse( const char *text, const int textLength ) {
 	float val = values[0];		// template bug requires this to not be in the Append()?
 	values.Append( val );
 
+	(void)noCaching;
 	return true;
+}
+
+/*
+================
+idDeclTable::Validate
+================
+*/
+bool idDeclTable::Validate( const char *psText, int iTextLength, idStr &strReportTo ) const {
+	(void)strReportTo;
+
+	idDecl *decl = declManager->AllocateDecl( DECL_TABLE );
+	const bool valid = DeclManager_ValidateParsedDecl( decl, DECL_TABLE, decl != NULL && decl->Parse( psText, iTextLength, false ) );
+	if ( decl != NULL ) {
+		decl->FreeData();
+	}
+	DeclManager_FreeAllocatedDecl( decl );
+	return valid;
 }

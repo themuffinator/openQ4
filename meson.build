@@ -530,6 +530,7 @@ endif
 
 if build_engine
   client_link_with = [bse_library]
+  dedicated_link_with = [bse_library]
 
   if host_system == 'windows'
     executable(
@@ -571,6 +572,7 @@ if build_engine
       openq4_engine_sources,
       include_directories: engine_include_dirs,
       dependencies: deps,
+      link_with: dedicated_link_with,
       cpp_args: dedicated_cpp_args,
       c_args: dedicated_c_args,
       cpp_pch: pch_headers,
@@ -585,6 +587,7 @@ if build_engine
       openq4_engine_sources,
       include_directories: engine_include_dirs,
       dependencies: deps,
+      link_with: dedicated_link_with,
       cpp_args: dedicated_cpp_args,
       c_args: dedicated_c_args,
       cpp_pch: pch_headers,

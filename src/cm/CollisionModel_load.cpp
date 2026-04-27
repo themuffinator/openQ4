@@ -3582,7 +3582,7 @@ idCollisionModelLocal *idCollisionModelManagerLocal::CollisionModelForMapEntity(
 	if ( !name[0] ) {
 		mapEnt->epairs.GetString( "name", "", &name );
 		if ( !name[0] ) {
-			if ( !numModels ) {
+			if ( ( mapFile != NULL && mapFile->GetNumEntities() > 0 && mapFile->GetEntity( 0 ) == mapEnt ) || !numModels ) {
 				// first model is always the world
 				name = "worldMap";
 			}

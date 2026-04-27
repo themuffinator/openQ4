@@ -49,6 +49,8 @@ typedef enum {
 	TD_FONT,				// Font image
 	TD_LIGHT,				// Light image
 	TD_LIGHTGRID,			// Light-grid irradiance atlas
+	TD_LIGHTGRID_VISIBILITY,// Light-grid visibility/distance moments
+	TD_LIGHTGRID_PROBE,		// Light-grid probe relocation/origin metadata
 	TD_LOOKUP_TABLE_MONO,	// Mono lookup table (including alpha)
 	TD_LOOKUP_TABLE_ALPHA,	// Alpha lookup table with a white color channel
 	TD_LOOKUP_TABLE_RGB1,	// RGB lookup table with a solid white alpha
@@ -118,6 +120,9 @@ public:
 
 	void		SetReferencedOutsideLevelLoad() { referencedOutsideLevelLoad = true; }
 	void		SetReferencedInsideLevelLoad() { levelLoadReferenced = true; }
+	void		ClearUseCount() { useCount = 0; }
+	void		AddUseCount( int count ) { useCount += count; }
+	int			GetUseCount() const { return useCount; }
 	void		ActuallyLoadImage(bool fromBackEnd);
 	//---------------------------------------------
 	// Platform specific implementations
@@ -184,6 +189,7 @@ private:
 	ID_TIME_T			binaryFileTime;			// the time stamp of the binary file
 
 	int					refCount;				// overall ref count
+	int					useCount;				// per-level material reference count
 
 	static const GLuint TEXTURE_NOT_LOADED = 0xFFFFFFFF;
 
@@ -216,6 +222,7 @@ ID_INLINE idImage::idImage(const char* name) : imgName(name) {
 	sourceFileTime = FILE_NOT_FOUND_TIMESTAMP;
 	binaryFileTime = FILE_NOT_FOUND_TIMESTAMP;
 	refCount = 0;
+	useCount = 0;
 }
 
 

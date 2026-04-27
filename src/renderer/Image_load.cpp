@@ -102,6 +102,16 @@ ID_INLINE void idImage::DeriveOpts() {
 			opts.colorFormat = CFM_DEFAULT;
 			opts.format = glConfig.textureCompressionAvailable ? FMT_DXT1 : FMT_RGB565;
 			break;
+		case TD_LIGHTGRID_VISIBILITY:
+			opts.gammaMips = false;
+			opts.colorFormat = CFM_DEFAULT;
+			opts.format = FMT_RGBA8;
+			break;
+		case TD_LIGHTGRID_PROBE:
+			opts.gammaMips = false;
+			opts.colorFormat = CFM_DEFAULT;
+			opts.format = FMT_RGBA8;
+			break;
 		case TD_LOOKUP_TABLE_MONO:
 			opts.format = FMT_INT8;
 			break;
@@ -988,7 +998,7 @@ void idImage::Print() const {
 			break;
 	}
 
-	common->Printf( "%4ik ", StorageSize() / 1024 );
+	common->Printf( "%5i %4ik ", GetUseCount(), StorageSize() / 1024 );
 
 	common->Printf( " %s\n", GetName() );
 }

@@ -57,6 +57,7 @@ void idUserInterfaceManagerLocal::Init() {
 
 void idUserInterfaceManagerLocal::Shutdown() {
 	guis.DeleteContents( true );
+	alwaysThinkGUIs.Clear();
 	demoGuis.DeleteContents( true );
 	dc.Shutdown();
 }
@@ -119,6 +120,7 @@ void idUserInterfaceManagerLocal::EndLevelLoad() {
 				}
 			}
 			if ( remove ) {
+				RemoveAlwaysThinkGui( guis[i] );
 				delete guis[ i ];
 				guis.RemoveIndex( i );
 				i--; c--;
@@ -183,6 +185,7 @@ void idUserInterfaceManagerLocal::DeAlloc( idUserInterface *gui ) {
 		int c = guis.Num();
 		for ( int i = 0; i < c; i++ ) {
 			if ( guis[i] == gui ) {
+				RemoveAlwaysThinkGui( guis[i] );
 				delete guis[i];
 				guis.RemoveIndex( i );
 				return;
@@ -233,6 +236,37 @@ idListGUI *	idUserInterfaceManagerLocal::AllocListGUI( void ) const {
 
 void idUserInterfaceManagerLocal::FreeListGUI( idListGUI *listgui ) {
 	delete listgui;
+}
+
+void idUserInterfaceManagerLocal::UpdateAlwaysThinkGui( idUserInterfaceLocal *gui ) {
+	if ( gui == NULL || gui->desktop == NULL || !gui->desktop->AlwaysThink() ) {
+		RemoveAlwaysThinkGui( gui );
+		return;
+	}
+
+	alwaysThinkGUIs.AddUnique( gui );
+}
+
+void idUserInterfaceManagerLocal::RemoveAlwaysThinkGui( idUserInterfaceLocal *gui ) {
+	if ( gui == NULL ) {
+		return;
+	}
+
+	alwaysThinkGUIs.Remove( gui );
+}
+
+void idUserInterfaceManagerLocal::RunAlwaysThinkGUIs( int time ) {
+	for ( int i = 0; i < alwaysThinkGUIs.Num(); i++ ) {
+		idUserInterfaceLocal *gui = alwaysThinkGUIs[i];
+		if ( gui == NULL || guis.Find( gui ) == NULL || gui->desktop == NULL || !gui->desktop->AlwaysThink() ) {
+			alwaysThinkGUIs.RemoveIndex( i );
+			i--;
+			continue;
+		}
+
+		gui->time = time;
+		gui->desktop->RunTimeEvents( time );
+	}
 }
 
 /*
@@ -345,6 +379,7 @@ bool idUserInterfaceLocal::InitFromFile( const char *qpath, bool rebuild, bool c
 	if ( uiManagerLocal.guis.Find( this ) == NULL ) {
 		uiManagerLocal.guis.Append( this );
 	}
+	uiManagerLocal.UpdateAlwaysThinkGui( this );
 
 	loading = false;
 	lightColorVar = NULL;

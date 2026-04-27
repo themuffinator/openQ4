@@ -140,8 +140,18 @@ rvDeclMatType::Parse
 =======================
 */
 bool rvDeclMatType::Parse(const char* text, const int textLength) {
+	return Parse(text, textLength, false);
+}
+
+/*
+=======================
+rvDeclMatType::Parse
+=======================
+*/
+bool rvDeclMatType::Parse(const char* text, const int textLength, bool noCaching) {
 	idLexer src;
 	idToken	token, token2;
+	bool success = false;
 
 	mDescription.Clear();
 	memset( mTint, 0, sizeof( mTint ) );
@@ -157,6 +167,7 @@ bool rvDeclMatType::Parse(const char* text, const int textLength) {
 		}
 
 		if (!token.Icmp("}")) {
+			success = true;
 			break;
 		}
 		else if (token == "rgb")
@@ -174,12 +185,10 @@ bool rvDeclMatType::Parse(const char* text, const int textLength) {
 			mDescription = token;
 			continue;
 		}
-		else
-		{
-			src.Warning("rvDeclMatType::Parse: ignoring unexpected token %s\n", token.c_str());
-		}
 	}
-	return true;
+	(void)token2;
+	(void)noCaching;
+	return success;
 }
 
 /*
@@ -198,4 +207,21 @@ rvDeclMatType::Size
 */
 size_t rvDeclMatType::Size(void) const {
 	return sizeof(rvDeclMatType) + mDescription.Allocated();
+}
+
+/*
+===================
+rvDeclMatType::Validate
+===================
+*/
+bool rvDeclMatType::Validate( const char *psText, int iTextLength, idStr &strReportTo ) const {
+	(void)strReportTo;
+
+	idDecl *decl = declManager->AllocateDecl( DECL_MATERIALTYPE );
+	const bool valid = DeclManager_ValidateParsedDecl( decl, DECL_MATERIALTYPE, decl != NULL && decl->Parse( psText, iTextLength, false ) );
+	if ( decl != NULL ) {
+		decl->FreeData();
+	}
+	DeclManager_FreeAllocatedDecl( decl );
+	return valid;
 }

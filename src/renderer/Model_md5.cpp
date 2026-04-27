@@ -863,6 +863,24 @@ idBounds idRenderModelMD5::Bounds( const renderEntity_t *ent ) const {
 
 /*
 ====================
+idRenderModelMD5::BoundsFromJoints
+====================
+*/
+bool idRenderModelMD5::BoundsFromJoints( const idJointMat *entJoints, idBounds &outBounds ) const {
+	if ( entJoints == NULL ) {
+		return false;
+	}
+
+	outBounds.Clear();
+	for ( int i = 0; i < meshes.Num(); ++i ) {
+		outBounds.AddBounds( const_cast<idMD5Mesh &>( meshes[i] ).CalcBounds( entJoints ) );
+	}
+
+	return !outBounds.IsCleared();
+}
+
+/*
+====================
 idRenderModelMD5::DrawJoints
 ====================
 */

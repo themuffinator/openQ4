@@ -47,8 +47,14 @@ Notes:
 OpenQ4's current light-grid path:
 - adds indirect diffuse lighting from precomputed probes
 - loads one `.lightgrid` metadata file per map
-- loads one baked atlas image per portal area
+- loads baked irradiance and visibility atlas images per portal area
 - samples that data at runtime when `r_useLightGrid 1`
+- uses visibility moments during interpolation to reduce wall and corner light leaks
+- relocates probes away from solid or near-solid map space where possible, then uses those relocated positions at runtime
+- blends indirect light between adjacent visible portal areas near doorway/window boundaries
+- keeps the current portal area and visible portal neighbors resident for a short age window to reduce atlas reload hitches while moving between areas
+- draws one material-selected representative diffuse stage for the indirect pass, avoiding repeated light-grid redraws on multi-diffuse materials
+- lights eligible first-person weapon/viewmodel surfaces from the active view area's light grid through a dedicated weapon pass
 
 Current scope and limits:
 - diffuse-only
@@ -56,6 +62,7 @@ Current scope and limits:
 - LDR bake output
 - writes `.tga` atlas images, not BFG `.exr`
 - intended for OpenQ4's native bake/load path, not drop-in BFG asset parity
+- translucent effects, decals, and other non-lighting surfaces remain outside the runtime light-grid pass
 
 If no baked assets are found, OpenQ4 can still generate a runtime probe layout for debugging and baking, but there will be no indirect-light contribution until actual baked files exist.
 
@@ -66,6 +73,8 @@ If no baked assets are found, OpenQ4 can still generate a runtime probe layout f
 | Setting | Default | Range | What it does |
 |---|---:|---:|---|
 | `r_useLightGrid` | `1` | `0..1` | Master toggle for runtime indirect diffuse from baked light grids. |
+| `r_lightGridPortalBlend` | `64` | `0..256` | World-unit radius for cross-area light-grid blending near visible portal boundaries. `0` disables portal blending. |
+| `r_lightGridResidencyFrames` | `180` | `0..3600` | Frames to keep light-grid atlas images resident after visible or portal-neighbor use. `0` keeps only the current visible/neighbor set. |
 | `r_showLightGrid` | `0` | `0..3` | Draws probe positions for debugging. |
 | `r_lightGridBakeWorkers` | `0` | `-1..8` | CPU worker threads for probe integration during baking. `-1` disables threading, `0` auto-picks from logical CPU cores. |
 | `r_lightGridBakeAsyncReadback` | `1` | `0..1` | Uses async pixel-pack-buffer readback during baking when the driver supports it. Falls back to synchronous readback when unsupported. |
@@ -85,6 +94,7 @@ Practical use:
 - `r_useLightGrid 0` lets you compare baked indirect lighting against the baseline renderer.
 - `r_showLightGrid 1` is the best first validation mode after baking a map.
 - `r_showLightGrid 3` is useful if a bake created probe slots that ended up invalid or sparse.
+- Relocated probes draw in orange, and probes that remain near solid space draw in yellow.
 
 These cvars are runtime controls. They do not require `vid_restart`.
 
@@ -136,8 +146,8 @@ Behavior:
 - OpenQ4 discovers or accepts target map names.
 - It loads each map automatically.
 - It switches between `game_sp` and `game_mp` automatically when needed.
-- Without `force`, it skips maps whose required `.lightgrid` metadata and area atlas files already exist.
-- It prints live progress to the console and log as it bakes probes and areas.
+- Without `force`, it skips maps whose required `.lightgrid` metadata and area atlas files already exist and whose stored bake-settings/layout hash matches the current bake.
+- It prints live progress plus a final phase timing/counter summary to the console and log as it bakes probes and areas.
 - It exits at the end if `-quit` is supplied.
 
 Important:
@@ -219,15 +229,23 @@ For a map such as `game/tram1`, the main outputs are:
 ```text
 maps/game/tram1.lightgrid
 env/maps/game/tram1/area0_lightgrid_amb.tga
+env/maps/game/tram1/area0_lightgrid_vis.tga
+env/maps/game/tram1/area0_lightgrid_pos.tga
 env/maps/game/tram1/area1_lightgrid_amb.tga
+env/maps/game/tram1/area1_lightgrid_vis.tga
+env/maps/game/tram1/area1_lightgrid_pos.tga
 ...
 ```
 
 What each file is for:
 - `maps/.../*.lightgrid`
-  Stores probe layout metadata, area assignment, bounds, spacing, and probe origins.
+  Stores probe layout metadata, area assignment, bounds, spacing, probe origins, and deterministic bake stats used to detect stale outputs.
 - `env/maps/.../area*_lightgrid_amb.tga`
   Stores the baked per-area indirect diffuse atlas data used at runtime.
+- `env/maps/.../area*_lightgrid_vis.tga`
+  Stores baked per-area visibility and distance moments used to reduce indirect-light leakage during runtime interpolation.
+- `env/maps/.../area*_lightgrid_pos.tga`
+  Stores compact per-probe relocation offsets so runtime visibility checks use the actual baked probe positions instead of ideal grid centers.
 
 OpenQ4 loads these files automatically when the corresponding map is loaded.
 
@@ -366,6 +384,7 @@ Try:
 - increasing `samples`
 - increasing `size`
 - checking that the map is using the expected saved files, not stale older bake output
+- confirming `area*_lightgrid_amb.tga`, `area*_lightgrid_vis.tga`, and `area*_lightgrid_pos.tga` exist for each baked area
 
 ### I want to turn the feature off completely
 
@@ -387,6 +406,8 @@ OpenQ4's current light-grid system is intentionally scoped. End users should exp
 - no HDR/EXR bake output
 - no BFG PBR pipeline
 - one atlas per portal area
+- one companion visibility atlas per portal area
+- one compact probe-position atlas per portal area
 - console/log progress rather than a fully interactive bake UI
 
 That is by design for the current OpenQ4 implementation.
@@ -399,7 +420,9 @@ During batch bakes, OpenQ4 reports:
 - bounce count
 - area count
 - probe count
+- relocated and near-solid probe counts
 - atlas writes
+- visibility trace count
 - total completion time
 
 If you want a separate bake log:

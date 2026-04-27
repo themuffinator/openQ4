@@ -143,13 +143,14 @@ public:
 
 	virtual const char		*DefaultDefinition( void ) const;
 	virtual bool			Parse( const char *text, const int textLength ) override;
+	virtual bool			Parse( const char *text, const int textLength, bool noCaching ) override;
 	virtual void			FreeData( void );
 	virtual	bool			RebuildTextSource( void );
 	virtual size_t			Size( void ) const;
 
 // RAVEN BEGIN
 // scork: for detailed error-reporting
-//	virtual bool			Validate( const char *psText, int iTextLength, idStr &strReportTo ) const;
+	virtual bool			Validate( const char *psText, int iTextLength, idStr &strReportTo ) const;
 // RAVEN END
 
 
@@ -178,6 +179,7 @@ public:
 	virtual void			SetOrigin( rvDeclPlayback *edit ) = 0;
 	virtual void			SetOrigin( rvDeclPlayback *edit, idVec3 &origin ) = 0;
 	virtual void			Copy( rvDeclPlayback *edit, rvDeclPlayback *copy ) = 0;
+	virtual void			PlaybackFinished( void ) = 0;
 };
 
 extern rvDeclPlaybackEdit		*declPlaybackEdit;

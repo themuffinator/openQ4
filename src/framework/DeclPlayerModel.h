@@ -31,13 +31,12 @@ public:
 	virtual size_t			Size( void ) const;
 	virtual const char *	DefaultDefinition() const;
 	virtual bool			Parse( const char *text, const int textLength ) override;
+	virtual bool			Parse( const char *text, const int textLength, bool noCaching ) override;
 	virtual void			FreeData( void );
 	virtual void			Print( void );
 
 	virtual	bool			RebuildTextSource( void ) { return( false ); }
-// jmarshall - not used in quake 4 sdk.
-	virtual bool			Validate(const char* psText, int iTextLength, idStr& strReportTo) const { return true; }
-// jmarshall end
+	virtual bool			Validate( const char *psText, int iTextLength, idStr &strReportTo ) const;
 };
 
 #endif 

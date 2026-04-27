@@ -500,6 +500,7 @@ public:
 	// dynamic models should return a fast, conservative approximation
 	// static models should usually return the exact value
 	virtual idBounds			Bounds( const struct renderEntity_s *ent = NULL ) const = 0;
+	virtual bool				BoundsFromJoints( const idJointMat *joints, idBounds &bounds ) const;
 
 	// returns value != 0.0f if the model requires the depth hack
 	virtual float				DepthHack( void ) const = 0;

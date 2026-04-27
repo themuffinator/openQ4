@@ -179,6 +179,7 @@ public:
 	virtual void				InitFromFile( const char *fileName );
 	virtual dynamicModel_t		IsDynamicModel() const;
 	virtual idBounds			Bounds( const struct renderEntity_s *ent ) const;
+	virtual bool				BoundsFromJoints( const idJointMat *joints, idBounds &bounds ) const;
 	virtual void				Print() const;
 	virtual void				List() const;
 	virtual void				TouchData();

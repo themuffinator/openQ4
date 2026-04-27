@@ -248,6 +248,8 @@ idCVar r_skipAmbient( "r_skipAmbient", "0", CVAR_RENDERER | CVAR_BOOL, "bypasses
 idCVar r_skipNewAmbient( "r_skipNewAmbient", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_ARCHIVE, "bypasses all vertex/fragment program ambient drawing" );
 idCVar r_forceAmbient( "r_forceAmbient", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "force ambient lighting level", 0.0f, 1.0f );
 idCVar r_useLightGrid( "r_useLightGrid", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "use precomputed irradiance-volume atlases when present" );
+idCVar r_lightGridPortalBlend( "r_lightGridPortalBlend", "64", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "world-unit radius for blending indirect light grids across visible portal boundaries; 0 disables", 0.0f, 256.0f );
+idCVar r_lightGridResidencyFrames( "r_lightGridResidencyFrames", "180", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "frames to keep light-grid atlases resident after visible/neighbor use", 0, 3600, idCmdSystem::ArgCompletion_Integer<0,3600> );
 idCVar r_lightGridBakeWorkers( "r_lightGridBakeWorkers", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "worker threads for light-grid probe integration (-1 = disabled, 0 = auto, 1..8 = explicit)", -1, 8, idCmdSystem::ArgCompletion_Integer<-1,8> );
 idCVar r_lightGridBakeAsyncReadback( "r_lightGridBakeAsyncReadback", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "use async pixel-pack-buffer readback for light-grid baking when supported" );
 idCVar r_lightGridBakeMemoryMB( "r_lightGridBakeMemoryMB", "12", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "transient memory budget in MB for in-flight light-grid bake jobs (lower reduces RAM/pagefile use)", 4, 256, idCmdSystem::ArgCompletion_Integer<4,256> );
@@ -285,8 +287,8 @@ idCVar r_offsetUnits( "r_offsetunits", "-600", CVAR_RENDERER | CVAR_FLOAT, "poly
 idCVar r_shadowPolygonOffset( "r_shadowPolygonOffset", "-1", CVAR_RENDERER | CVAR_FLOAT, "bias value added to depth test for stencil shadow drawing" );
 idCVar r_shadowPolygonFactor( "r_shadowPolygonFactor", "0", CVAR_RENDERER | CVAR_FLOAT, "scale value for stencil shadow drawing" );
 idCVar r_shadowMapSize( "r_shadowMapSize", "1024", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "square resolution for the simple projected-light shadow map", 128, 4096 );
-idCVar r_shadowMapBias( "r_shadowMapBias", "0.00035", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "constant receiver depth bias for projected shadow maps", 0.0f, 0.05f );
-idCVar r_shadowMapNormalBias( "r_shadowMapNormalBias", "0.0015", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "geometric normal bias added on sloped projected-light receivers", 0.0f, 0.05f );
+idCVar r_shadowMapBias( "r_shadowMapBias", "0.010", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "constant receiver depth bias for projected shadow maps", 0.0f, 0.05f );
+idCVar r_shadowMapNormalBias( "r_shadowMapNormalBias", "0.020", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "geometric normal bias added on sloped projected-light receivers", 0.0f, 0.05f );
 idCVar r_shadowMapPointBias( "r_shadowMapPointBias", "0.00020", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "constant receiver depth bias for point-light shadow maps", 0.0f, 0.05f );
 idCVar r_shadowMapPointNormalBias( "r_shadowMapPointNormalBias", "0.0020", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "geometric normal bias added on sloped point-light receivers", 0.0f, 0.05f );
 idCVar r_shadowMapFilterRadius( "r_shadowMapFilterRadius", "2.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "projected-light PCF radius in texels for the simple shadow-map path", 0.0f, 8.0f );

@@ -242,12 +242,20 @@ public:
 							// Returns the length of the file, or -1 on failure.
 	virtual int				WriteFile( const char *relativePath, const void *buffer, int size, const char *basePath = "fs_savepath" ) = 0;
 
-	// mekberg: is file loading allowed?
-// jmarshall - doesn't need implementation
-	virtual void			SetIsFileLoadingAllowed(bool mode) { }
-// jmarshall end
 							// Removes the given file.
-	virtual void			RemoveFile( const char *relativePath ) = 0;
+	virtual void			RemoveFile( const char *relativePath, const char *basePath = "fs_savepath" ) = 0;
+							// Removes the given explicit OS file and returns the OS remove result.
+	virtual int				RemoveExplicitFile( const char *OSPath ) = 0;
+
+							// mekberg: is file loading allowed?
+	virtual void			SetIsFileLoadingAllowed(bool mode) = 0;
+	virtual bool			GetIsFileLoadingAllowed() const { return false; }
+	virtual void			SetAssetLogName( const char *logName ) {}
+	virtual void			WriteAssetLog() {}
+	virtual void			ClearAssetLog() {}
+	virtual const char *	GetAssetLogName() { return ""; }
+	virtual idFile *		GetNewFileMemory( void ) = 0;
+	virtual idFile *		GetNewFilePermanent( void ) = 0;
 							// Opens a file for reading.
 	virtual idFile *		OpenFileRead( const char *relativePath, bool allowCopyFiles = true, const char* gamedir = NULL ) = 0;
 							// Opens a file for reading from pak files only.

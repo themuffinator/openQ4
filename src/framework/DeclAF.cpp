@@ -589,7 +589,9 @@ bool idDeclAF::WriteSettings( idFile *f ) const {
 	f->WriteFloatString( "\tcontents %s\n", ContentsToString( contents, str ) );
 	f->WriteFloatString( "\tclipMask %s\n", ContentsToString( clipMask, str ) );
 	f->WriteFloatString( "\tselfCollision %d\n", selfCollision );
-	f->WriteFloatString( "\tfastEval %d\n", fastEval );
+	if ( fastEval ) {
+		f->WriteFloatString( "\tfastEval\n" );
+	}
 	f->WriteFloatString( "}\n" );
 	return true;
 }
@@ -676,6 +678,15 @@ int idDeclAF::ContentsFromString( const char *str ) {
 		else if ( token.Icmp( "monsterclip" ) == 0 ) {
 			c |= CONTENTS_MONSTERCLIP;
 		}
+		else if ( token.Icmp( "vehicleclip" ) == 0 ) {
+			c |= CONTENTS_VEHICLECLIP;
+		}
+		else if ( token.Icmp( "flyclip" ) == 0 ) {
+			c |= CONTENTS_FLYCLIP;
+		}
+		else if ( token.Icmp( "itemclip" ) == 0 ) {
+			c |= CONTENTS_ITEMCLIP;
+		}
 		else if ( token == "," ) {
 			continue;
 		}
@@ -712,6 +723,18 @@ const char *idDeclAF::ContentsToString( const int contents, idStr &str ) {
 	if ( contents & CONTENTS_MONSTERCLIP ) {
 		if ( str.Length() ) str += ", ";
 		str += "monsterclip";
+	}
+	if ( contents & CONTENTS_VEHICLECLIP ) {
+		if ( str.Length() ) str += ", ";
+		str += "vehicleclip";
+	}
+	if ( contents & CONTENTS_FLYCLIP ) {
+		if ( str.Length() ) str += ", ";
+		str += "flyclip";
+	}
+	if ( contents & CONTENTS_ITEMCLIP ) {
+		if ( str.Length() ) str += ", ";
+		str += "itemclip";
 	}
 	if ( str[0] == '\0' ) {
 		str = "none";
@@ -1418,17 +1441,15 @@ bool idDeclAF::ParseSettings( idLexer &src ) {
 				return false;
 			}
 
-			// Compatibility: some stock AFs use a bare "fastEval" token (no explicit value).
-			if ( valueToken == "}" ) {
-				fastEval = true;
-				src.UnreadToken( &valueToken );
-			} else if ( !valueToken.Icmp( "1" ) || !valueToken.Icmp( "true" ) ) {
+			// Retail treats bare "fastEval" as true. Keep that behavior, while
+			// also accepting explicit boolean values for OpenQ4 tooling.
+			if ( !valueToken.Icmp( "1" ) || !valueToken.Icmp( "true" ) ) {
 				fastEval = true;
 			} else if ( !valueToken.Icmp( "0" ) || !valueToken.Icmp( "false" ) ) {
 				fastEval = false;
 			} else {
-				src.Error( "expected boolean value for fastEval" );
-				return false;
+				fastEval = true;
+				src.UnreadToken( &valueToken );
 			}
 		} else if ( token == "}" ) {
 			break;
@@ -1447,6 +1468,15 @@ idDeclAF::Parse
 ================
 */
 bool idDeclAF::Parse( const char *text, const int textLength ) {
+	return Parse( text, textLength, false );
+}
+
+/*
+================
+idDeclAF::Parse
+================
+*/
+bool idDeclAF::Parse( const char *text, const int textLength, bool noCaching ) {
 	int i, j;
 	idLexer src;
 	idToken token;
@@ -1534,6 +1564,7 @@ bool idDeclAF::Parse( const char *text, const int textLength ) {
 		}
 	}
 
+	(void)noCaching;
 	return true;
 }
 
@@ -1559,7 +1590,6 @@ const char *idDeclAF::DefaultDefinition( void ) const {
 	"\t\t"		"contents corpse\n"
 	"\t\t"		"clipMask solid, corpse\n"
 	"\t\t"		"selfCollision 1\n"
-	"\t\t"		"fastEval 0\n"
 	"\t"	"}\n"
 	"\t"	"body \"body\" {\n"
 	"\t\t"		"joint \"origin\"\n"
@@ -1764,3 +1794,66 @@ idDeclAF::~idDeclAF( void ) {
 	bodies.DeleteContents( true );
 	constraints.DeleteContents( true );
 }
+
+/*
+================
+idDeclAF::Validate
+================
+*/
+bool idDeclAF::Validate( const char *psText, int iTextLength, idStr &strReportTo ) const {
+	(void)strReportTo;
+
+	idDecl *decl = declManager->AllocateDecl( DECL_AF );
+	const bool valid = DeclManager_ValidateParsedDecl( decl, DECL_AF, decl != NULL && decl->Parse( psText, iTextLength, false ) );
+	if ( decl != NULL ) {
+		decl->FreeData();
+	}
+	DeclManager_FreeAllocatedDecl( decl );
+	return valid;
+}
+
+class rvDeclAFEditLocal : public rvDeclAFEdit {
+public:
+	bool Save(idDeclAF* edit) override {
+		return edit != NULL && edit->Save();
+	}
+
+	void NewBody(idDeclAF* edit, const char* name) override {
+		if (edit != NULL) {
+			edit->NewBody(name);
+		}
+	}
+
+	void RenameBody(idDeclAF* edit, const char* oldName, const char* newName) override {
+		if (edit != NULL) {
+			edit->RenameBody(oldName, newName);
+		}
+	}
+
+	void DeleteBody(idDeclAF* edit, const char* name) override {
+		if (edit != NULL) {
+			edit->DeleteBody(name);
+		}
+	}
+
+	void NewConstraint(idDeclAF* edit, const char* name) override {
+		if (edit != NULL) {
+			edit->NewConstraint(name);
+		}
+	}
+
+	void RenameConstraint(idDeclAF* edit, const char* oldName, const char* newName) override {
+		if (edit != NULL) {
+			edit->RenameConstraint(oldName, newName);
+		}
+	}
+
+	void DeleteConstraint(idDeclAF* edit, const char* name) override {
+		if (edit != NULL) {
+			edit->DeleteConstraint(name);
+		}
+	}
+};
+
+static rvDeclAFEditLocal localDeclAFEdit;
+rvDeclAFEdit* declAFEdit = &localDeclAFEdit;

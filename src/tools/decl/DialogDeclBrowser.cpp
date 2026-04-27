@@ -514,12 +514,46 @@ void DeclBrowserReloadDeclarations( void ) {
 
 /*
 ================
+DeclBrowserPrint
+================
+*/
+bool DeclBrowserPrint( const char *text ) {
+	if ( g_DeclDialog == NULL ) {
+		return false;
+	}
+
+	return g_DeclDialog->SetStatusText( text );
+}
+
+/*
+================
 DialogDeclBrowser::ReloadDeclarations
 ================
 */
 void DialogDeclBrowser::ReloadDeclarations( void ) {
 	InitBaseDeclTree();
 	OnBnClickedFind();
+}
+
+/*
+================
+DialogDeclBrowser::SetStatusText
+================
+*/
+bool DialogDeclBrowser::SetStatusText( const char *text ) {
+	if ( !statusBar.GetSafeHwnd() ) {
+		return false;
+	}
+
+	idStr statusText = text != NULL ? text : "";
+	statusText.Replace( "\r", "" );
+	statusText.Replace( "\n", "" );
+	statusText.StripTrailingWhitespace();
+
+	statusBar.SetWindowText( statusText.c_str() );
+	statusBar.RedrawWindow( NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW );
+
+	return true;
 }
 
 BEGIN_MESSAGE_MAP(DialogDeclBrowser, CDialog)

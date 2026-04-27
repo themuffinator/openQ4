@@ -82,6 +82,10 @@ public:
 	{
 		return totalBufferSize;
 	}
+	const byte*		GetNonCacheData() const
+	{
+		return buffers.Num() > 0 ? reinterpret_cast<const byte*>( buffers[0].buffer ) : NULL;
+	}
 
 	bool			IsCompressed() const
 	{

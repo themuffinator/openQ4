@@ -39,7 +39,13 @@ idDeclSkin::Size
 =================
 */
 size_t idDeclSkin::Size( void ) const {
-	return sizeof( idDeclSkin );
+	size_t size = sizeof( idDeclSkin ) + mappings.Allocated() + associatedModels.Allocated();
+
+	for ( int i = 0; i < associatedModels.Num(); i++ ) {
+		size += associatedModels[i].Allocated();
+	}
+
+	return size;
 }
 
 /*
@@ -49,6 +55,7 @@ idDeclSkin::FreeData
 */
 void idDeclSkin::FreeData( void ) {
 	mappings.Clear();
+	associatedModels.Clear();
 }
 
 /*
@@ -57,6 +64,15 @@ idDeclSkin::Parse
 ================
 */
 bool idDeclSkin::Parse( const char *text, const int textLength ) {
+	return Parse( text, textLength, false );
+}
+
+/*
+================
+idDeclSkin::Parse
+================
+*/
+bool idDeclSkin::Parse( const char *text, const int textLength, bool noCaching ) {
 	idLexer src;
 	idToken	token, token2;
 
@@ -99,6 +115,7 @@ bool idDeclSkin::Parse( const char *text, const int textLength ) {
 		mappings.Append( map );
 	}
 
+	(void)noCaching;
 	return false;
 }
 
@@ -164,4 +181,21 @@ const idMaterial *idDeclSkin::RemapShaderBySkin( const idMaterial *shader ) cons
 
 	// didn't find a match or wildcard, so stay the same
 	return shader;
+}
+
+/*
+================
+idDeclSkin::Validate
+================
+*/
+bool idDeclSkin::Validate( const char *psText, int iTextLength, idStr &strReportTo ) const {
+	(void)strReportTo;
+
+	idDecl *decl = declManager->AllocateDecl( DECL_SKIN );
+	const bool valid = DeclManager_ValidateParsedDecl( decl, DECL_SKIN, decl != NULL && decl->Parse( psText, iTextLength, false ) );
+	if ( decl != NULL ) {
+		decl->FreeData();
+	}
+	DeclManager_FreeAllocatedDecl( decl );
+	return valid;
 }

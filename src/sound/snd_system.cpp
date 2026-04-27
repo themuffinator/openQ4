@@ -43,11 +43,11 @@ idCVar s_warnOnMissingSamples( "s_warnOnMissingSamples", "0", CVAR_ARCHIVE | CVA
 #ifdef ID_RETAIL
 	idCVar s_useCompression( "s_useCompression", "1", CVAR_BOOL, "Use compressed sound files (mp3/xma)" );
 	idCVar s_playDefaultSound( "s_playDefaultSound", "0", CVAR_BOOL, "play a beep for missing sounds" );
-	idCVar s_maxSamples( "s_maxSamples", "5", CVAR_INTEGER, "max samples to load per shader" );
+	idCVar s_maxSoundsPerShader( "s_maxSoundsPerShader", "0", CVAR_ARCHIVE | CVAR_INTEGER, "max samples to load per shader, 0 loads all" );
 #else
 	idCVar s_useCompression( "s_useCompression", "1", CVAR_BOOL, "Use compressed sound files (mp3/xma)" );
 	idCVar s_playDefaultSound( "s_playDefaultSound", "1", CVAR_BOOL, "play a beep for missing sounds" );
-	idCVar s_maxSamples( "s_maxSamples", "5", CVAR_INTEGER, "max samples to load per shader" );
+	idCVar s_maxSoundsPerShader( "s_maxSoundsPerShader", "0", CVAR_ARCHIVE | CVAR_INTEGER, "max samples to load per shader, 0 loads all" );
 #endif
 
 idCVar preLoad_Samples( "preLoad_Samples", "1", CVAR_SYSTEM | CVAR_BOOL, "preload samples during beginlevelload" );

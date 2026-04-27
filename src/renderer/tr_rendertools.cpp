@@ -2220,6 +2220,12 @@ static void RB_ShowLightGrid( void ) {
 				gridCoord[1] = ( probeIndex / gridStepY ) % Max( lightGrid.lightGridBounds[1], 1 );
 				gridCoord[2] = probeIndex / gridStepZ;
 				color = lightGrid.GetGridCoordDebugColor( gridCoord );
+				if ( gridPoint.valid == LIGHTGRID_POINT_RELOCATED || gridPoint.valid == LIGHTGRID_POINT_RELOCATED_NEAR_SOLID ) {
+					color = idVec3( 1.0f, 0.45f, 0.0f );
+				}
+				if ( gridPoint.valid == LIGHTGRID_POINT_NEAR_SOLID || gridPoint.valid == LIGHTGRID_POINT_RELOCATED_NEAR_SOLID ) {
+					color = idVec3( 1.0f, 1.0f, 0.0f );
+				}
 			}
 
 			glColor3fv( color.ToFloatPtr() );

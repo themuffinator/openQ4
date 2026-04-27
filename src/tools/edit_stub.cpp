@@ -58,6 +58,7 @@ void	ScriptEditorRun( void ) {}
 void	DeclBrowserInit( const idDict *spawnArgs ) { common->Printf( "The Declaration Browser only runs on Win32\n" ); }
 void	DeclBrowserShutdown( void ) {}
 void	DeclBrowserRun( void ) {}
+bool	DeclBrowserPrint( const char *text ) { return false; }
 void	DeclBrowserReloadDeclarations( void ) {}
 
 void	GUIEditorInit( void ) { common->Printf( "The GUI Editor only runs on Win32\n" ); }

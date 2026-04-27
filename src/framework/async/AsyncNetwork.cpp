@@ -365,6 +365,10 @@ void idAsyncNetwork::SpawnServer_f( const idCmdArgs &args ) {
 	} else {
 		server.Spawn();
 	}
+
+	if ( com_WriteSingleDeclFile.GetBool() ) {
+		declManager->WriteDeclFile();
+	}
 }
 
 /*

@@ -147,7 +147,9 @@ public:
 	virtual size_t			Size( void ) const;
 	virtual const char *	DefaultDefinition( void ) const;
 	virtual bool			Parse( const char *text, const int textLength ) override;
+	virtual bool			Parse( const char *text, const int textLength, bool noCaching ) override;
 	virtual void			FreeData( void );
+	virtual bool			Validate( const char *psText, int iTextLength, idStr &strReportTo ) const;
 
 	virtual void			Finish( const getJointTransform_t GetJointTransform, const idJointMat *frame, void *model ) const;
 
@@ -213,5 +215,19 @@ private:
 
 	bool					RebuildTextSource( void );
 };
+
+class rvDeclAFEdit {
+public:
+	virtual					~rvDeclAFEdit() {}
+	virtual bool			Save( idDeclAF *edit ) = 0;
+	virtual void			NewBody( idDeclAF *edit, const char *name ) = 0;
+	virtual void			RenameBody( idDeclAF *edit, const char *oldName, const char *newName ) = 0;
+	virtual void			DeleteBody( idDeclAF *edit, const char *name ) = 0;
+	virtual void			NewConstraint( idDeclAF *edit, const char *name ) = 0;
+	virtual void			RenameConstraint( idDeclAF *edit, const char *oldName, const char *newName ) = 0;
+	virtual void			DeleteConstraint( idDeclAF *edit, const char *name ) = 0;
+};
+
+extern rvDeclAFEdit			*declAFEdit;
 
 #endif /* !__DECLAF_H__ */

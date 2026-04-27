@@ -187,8 +187,8 @@ Projected-light tuning:
 
 | Setting | Default | Range | What it does |
 |---|---:|---:|---|
-| `r_shadowMapBias` | `0.00035` | `0..0.05` | Constant receiver depth bias for projected lights. |
-| `r_shadowMapNormalBias` | `0.0015` | `0..0.05` | Extra projected-light bias on sloped receivers. |
+| `r_shadowMapBias` | `0.010` | `0..0.05` | Constant receiver depth bias for projected lights. |
+| `r_shadowMapNormalBias` | `0.020` | `0..0.05` | Extra projected-light bias on sloped receivers. |
 | `r_shadowMapPolygonFactor` | `2.0` | `0..16` | Slope-scale caster polygon offset used while rendering projected shadow maps. |
 | `r_shadowMapPolygonOffset` | `4.0` | `0..64` | Constant caster polygon offset used while rendering projected shadow maps. |
 

@@ -42,6 +42,15 @@ idCVar idRenderModelStatic::r_slopNormal( "r_slopNormal", "0.02", CVAR_RENDERER,
 
 /*
 ================
+idRenderModel::BoundsFromJoints
+================
+*/
+bool idRenderModel::BoundsFromJoints( const idJointMat *joints, idBounds &bounds ) const {
+	return false;
+}
+
+/*
+================
 idRenderModel::HasCollisionSurface
 ================
 */

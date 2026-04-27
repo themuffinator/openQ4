@@ -424,6 +424,66 @@ static bool Sys_TryTranslateOpenQ4ProtocolCommandLine( const char *rawCmdLine, i
 	return true;
 }
 
+static bool Sys_ConvertWideToUtf8( const wchar_t *wideText, idStr &utf8Text ) {
+	int requiredBytes;
+	char *utf8Buffer;
+
+	utf8Text.Clear();
+
+	if ( wideText == NULL ) {
+		return false;
+	}
+
+	requiredBytes = WideCharToMultiByte( CP_UTF8, 0, wideText, -1, NULL, 0, NULL, NULL );
+	if ( requiredBytes <= 0 ) {
+		return false;
+	}
+
+	utf8Buffer = new char[ requiredBytes ];
+	if ( WideCharToMultiByte( CP_UTF8, 0, wideText, -1, utf8Buffer, requiredBytes, NULL, NULL ) <= 0 ) {
+		delete[] utf8Buffer;
+		return false;
+	}
+
+	utf8Text = utf8Buffer;
+	delete[] utf8Buffer;
+	return true;
+}
+
+static bool Sys_BuildWindowsUtf8Argv( idList<idStr> &utf8Args, idList<const char *> &argvArgs ) {
+	int wideArgc = 0;
+	LPWSTR *wideArgv;
+
+	utf8Args.Clear();
+	argvArgs.Clear();
+
+	wideArgv = CommandLineToArgvW( GetCommandLineW(), &wideArgc );
+	if ( wideArgv == NULL ) {
+		return false;
+	}
+
+	for ( int i = 1; i < wideArgc; ++i ) {
+		idStr utf8Arg;
+
+		if ( !Sys_ConvertWideToUtf8( wideArgv[ i ], utf8Arg ) ) {
+			LocalFree( wideArgv );
+			utf8Args.Clear();
+			argvArgs.Clear();
+			return false;
+		}
+
+		utf8Args.Append( utf8Arg );
+	}
+
+	LocalFree( wideArgv );
+
+	for ( int i = 0; i < utf8Args.Num(); ++i ) {
+		argvArgs.Append( utf8Args[ i ].c_str() );
+	}
+
+	return true;
+}
+
 int g_thread_count = 0;
 
 static sysMemoryStats_t exeLaunchMemoryStats;
@@ -1671,6 +1731,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	const HCURSOR hcurSave = ::SetCursor(LoadCursor(0, IDC_WAIT));
 	idStr translatedCmdLine;
 	const char *effectiveCmdLine = lpCmdLine;
+	idList<idStr> utf8Args;
+	idList<const char *> argvArgs;
 
 	Sys_SetPhysicalWorkMemory(192 << 20, 1024 << 20);
 
@@ -1706,7 +1768,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	//	Sys_FPU_EnableExceptions( TEST_FPU_EXCEPTIONS );
 	Sys_FPU_SetPrecision(FPU_PRECISION_DOUBLE_EXTENDED);
 
-	common->Init(0, NULL, effectiveCmdLine);
+	if ( effectiveCmdLine != lpCmdLine ) {
+		common->Init( 0, NULL, effectiveCmdLine );
+	} else if ( Sys_BuildWindowsUtf8Argv( utf8Args, argvArgs ) ) {
+		if ( argvArgs.Num() <= 0 ) {
+			common->Init( 0, NULL, NULL );
+		} else {
+			common->Init( argvArgs.Num(), &argvArgs[ 0 ], NULL );
+		}
+	} else {
+		common->Init( 0, NULL, effectiveCmdLine );
+	}
 
 #if TEST_FPU_EXCEPTIONS != 0
 	common->Printf(Sys_FPU_GetState());

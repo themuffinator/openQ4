@@ -4016,7 +4016,7 @@ static void RB_ShadowMapDrawPerforatedCasterClassic( const drawSurf_t *surf, con
 		}
 
 		glColor4fv( color );
-		glAlphaFunc( GL_GREATER, regs[ pStage->alphaTestRegister ] );
+		glAlphaFunc( pStage->alphaTestMode, regs[ pStage->alphaTestRegister ] );
 
 		if ( !RB_ShadowMapTextureStageHasBindableImage( &pStage->texture ) ) {
 			continue;
@@ -5748,6 +5748,299 @@ static idDrawVert *RB_GLSLPrepareInteractionVertexCache( const drawSurf_t *surf 
 	return (idDrawVert *)vertexCache.Position( surf->geo->ambientCache );
 }
 
+static bool RB_SurfaceHasActiveCustomGLSLLighting( const drawSurf_t *surf ) {
+	if ( surf == NULL || surf->material == NULL || surf->shaderRegisters == NULL ) {
+		return false;
+	}
+
+	for ( int stageIndex = 0; stageIndex < surf->material->GetNumStages(); stageIndex++ ) {
+		const shaderStage_t *stage = surf->material->GetStage( stageIndex );
+		if ( stage == NULL || stage->newStage == NULL ) {
+			continue;
+		}
+		if ( !stage->newStage->customLighting || !stage->newStage->glslProgram ) {
+			continue;
+		}
+		if ( surf->shaderRegisters[ stage->conditionRegister ] == 0.0f ) {
+			continue;
+		}
+		return true;
+	}
+
+	return false;
+}
+
+static bool RB_DrawSurfChainHasCustomGLSLLighting( const drawSurf_t *surf ) {
+	for ( ; surf != NULL; surf = surf->nextOnLight ) {
+		if ( RB_SurfaceHasActiveCustomGLSLLighting( surf ) ) {
+			return true;
+		}
+	}
+	return false;
+}
+
+static void RB_ARB2_UploadCustomGLSLShaderParms( const shaderStage_t *stage, const float *regs, const drawInteraction_t *din ) {
+	newShaderStage_t *newStage = stage->newStage;
+
+	for ( int parmIndex = 0; parmIndex < newStage->numShaderParms; parmIndex++ ) {
+		const int location = newStage->shaderParmLocations[parmIndex];
+		if ( location < 0 ) {
+			continue;
+		}
+
+		if ( RB_BindGLSLShaderParm( newStage->shaderParmBindings[parmIndex], location, stage, din ) ) {
+			continue;
+		}
+
+		const int numRegisters = newStage->shaderParmNumRegisters[parmIndex];
+		if ( numRegisters <= 0 || regs == NULL ) {
+			continue;
+		}
+
+		float parm[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+		for ( int component = 0; component < numRegisters && component < 4; component++ ) {
+			parm[component] = regs[ newStage->shaderParmRegisters[parmIndex][component] ];
+		}
+
+		switch ( numRegisters ) {
+		case 1:
+			glUniform1fvARB( location, 1, parm );
+			break;
+		case 2:
+			glUniform2fvARB( location, 1, parm );
+			break;
+		case 3:
+			glUniform3fvARB( location, 1, parm );
+			break;
+		default:
+			glUniform4fvARB( location, 1, parm );
+			break;
+		}
+	}
+}
+
+static void RB_ARB2_BindCustomGLSLShaderTextures( const newShaderStage_t *newStage, const drawInteraction_t *din ) {
+	for ( int textureIndex = 0; textureIndex < newStage->numShaderTextures; textureIndex++ ) {
+		idImage *image = RB_ResolveGLSLShaderTextureImage( newStage, textureIndex, din );
+		if ( image == NULL ) {
+			continue;
+		}
+
+		GL_SelectTextureNoClient( textureIndex );
+		image->SetSamplerState( newStage->shaderTextureFilters[textureIndex], newStage->shaderTextureRepeats[textureIndex] );
+		image->Bind();
+		if ( newStage->shaderTextureLocations[textureIndex] >= 0 ) {
+			glUniform1iARB( newStage->shaderTextureLocations[textureIndex], textureIndex );
+		}
+	}
+}
+
+static void RB_ARB2_UnbindCustomGLSLShaderTextures( const newShaderStage_t *newStage ) {
+	for ( int textureIndex = newStage->numShaderTextures - 1; textureIndex >= 0; textureIndex-- ) {
+		if ( textureIndex == 0 || RB_ResolveGLSLShaderTextureImage( newStage, textureIndex, NULL ) != NULL ) {
+			GL_SelectTextureNoClient( textureIndex );
+			globalImages->BindNull();
+		}
+	}
+	GL_SelectTexture( 0 );
+}
+
+static void RB_ARB2_DrawCustomGLSLInteractionStage( const shaderStage_t *stage, const float *regs, const drawInteraction_t *din ) {
+	if ( stage == NULL || stage->newStage == NULL || din == NULL ) {
+		return;
+	}
+
+	newShaderStage_t *newStage = stage->newStage;
+	if ( !newStage->customLighting || !newStage->glslProgram || !R_ValidateGLSLProgram( newStage ) ) {
+		return;
+	}
+
+	glDisable( GL_VERTEX_PROGRAM_ARB );
+	glDisable( GL_FRAGMENT_PROGRAM_ARB );
+	glUseProgramObjectARB( (GLhandleARB)newStage->glslProgramObject );
+
+	RB_ARB2_UploadCustomGLSLShaderParms( stage, regs, din );
+	RB_ARB2_BindCustomGLSLShaderTextures( newStage, din );
+
+	const idMaterial *surfaceMaterial = din->surf->material;
+	if ( surfaceMaterial != NULL && surfaceMaterial->TestMaterialFlag( MF_POLYGONOFFSET ) ) {
+		glEnable( GL_POLYGON_OFFSET_FILL );
+		glPolygonOffset( r_offsetFactor.GetFloat(), r_offsetUnits.GetFloat() * surfaceMaterial->GetPolygonOffset() );
+	}
+
+	RB_DrawElementsWithCounters( din->surf->geo );
+
+	if ( surfaceMaterial != NULL && surfaceMaterial->TestMaterialFlag( MF_POLYGONOFFSET ) ) {
+		glDisable( GL_POLYGON_OFFSET_FILL );
+	}
+
+	RB_ARB2_UnbindCustomGLSLShaderTextures( newStage );
+	glUseProgramObjectARB( 0 );
+}
+
+static void RB_ARB2_CreateCustomGLSLDrawInteractionsForSurface( const drawSurf_t *surf ) {
+	if ( surf == NULL || surf->geo == NULL || surf->space == NULL || surf->material == NULL || surf->shaderRegisters == NULL ) {
+		return;
+	}
+	if ( surf->geo->ambientCache == NULL ) {
+		return;
+	}
+
+	const idMaterial *surfaceShader = surf->material;
+	const float *surfaceRegs = surf->shaderRegisters;
+	const viewLight_t *vLight = backEnd.vLight;
+	const idMaterial *lightShader = vLight->lightShader;
+	const float *lightRegs = vLight->shaderRegisters;
+
+	if ( surf->space != backEnd.currentSpace ) {
+		backEnd.currentSpace = surf->space;
+		glLoadMatrixf( surf->space->modelViewMatrix );
+	}
+
+	if ( r_useScissor.GetBool() && !backEnd.currentScissor.Equals( surf->scissorRect ) ) {
+		backEnd.currentScissor = surf->scissorRect;
+		glScissor( backEnd.viewDef->viewport.x1 + backEnd.currentScissor.x1,
+			backEnd.viewDef->viewport.y1 + backEnd.currentScissor.y1,
+			backEnd.currentScissor.x2 + 1 - backEnd.currentScissor.x1,
+			backEnd.currentScissor.y2 + 1 - backEnd.currentScissor.y1 );
+	}
+
+	bool depthHack = false;
+	if ( surf->space->weaponDepthHack ) {
+		RB_EnterWeaponDepthHack();
+		depthHack = true;
+	}
+	if ( surf->space->modelDepthHack != 0.0f ) {
+		RB_EnterModelDepthHack( surf->space->modelDepthHack );
+		depthHack = true;
+	}
+
+	drawInteraction_t inter;
+	memset( &inter, 0, sizeof( inter ) );
+	inter.surf = surf;
+	inter.lightFalloffImage = vLight->falloffImage;
+	inter.ambientLight = lightShader->IsAmbientLight();
+	R_GlobalPointToLocal( surf->space->modelMatrix, vLight->globalLightOrigin, inter.localLightOrigin.ToVec3() );
+	R_GlobalPointToLocal( surf->space->modelMatrix, backEnd.viewDef->renderView.vieworg, inter.localViewOrigin.ToVec3() );
+	inter.localLightOrigin[3] = 0.0f;
+	inter.localViewOrigin[3] = 1.0f;
+
+	idPlane lightProject[4];
+	for ( int i = 0; i < 4; i++ ) {
+		R_GlobalPlaneToLocal( surf->space->modelMatrix, backEnd.vLight->lightProject[i], lightProject[i] );
+	}
+
+	for ( int lightStageNum = 0; lightStageNum < lightShader->GetNumStages(); lightStageNum++ ) {
+		const shaderStage_t *lightStage = lightShader->GetStage( lightStageNum );
+		if ( lightRegs != NULL && lightRegs[ lightStage->conditionRegister ] == 0.0f ) {
+			continue;
+		}
+
+		inter.lightImage = lightStage->texture.image;
+		memcpy( inter.lightProjection, lightProject, sizeof( inter.lightProjection ) );
+		if ( lightStage->texture.hasMatrix ) {
+			RB_GetShaderTextureMatrix( lightRegs, &lightStage->texture, backEnd.lightTextureMatrix );
+			RB_BakeTextureMatrixIntoTexgen( reinterpret_cast<idPlane *>( inter.lightProjection ), backEnd.lightTextureMatrix );
+		}
+
+		const float lightColor[4] = {
+			backEnd.lightScale * lightRegs[ lightStage->color.registers[0] ],
+			backEnd.lightScale * lightRegs[ lightStage->color.registers[1] ],
+			backEnd.lightScale * lightRegs[ lightStage->color.registers[2] ],
+			lightRegs[ lightStage->color.registers[3] ]
+		};
+
+		for ( int surfaceStageNum = 0; surfaceStageNum < surfaceShader->GetNumStages(); surfaceStageNum++ ) {
+			const shaderStage_t *surfaceStage = surfaceShader->GetStage( surfaceStageNum );
+			if ( surfaceStage == NULL || surfaceStage->newStage == NULL ) {
+				continue;
+			}
+			if ( !surfaceStage->newStage->customLighting || !surfaceStage->newStage->glslProgram ) {
+				continue;
+			}
+			if ( surfaceRegs[ surfaceStage->conditionRegister ] == 0.0f ) {
+				continue;
+			}
+
+			idImage *unusedImage = NULL;
+			float surfaceColor[4];
+			R_SetDrawInteraction( surfaceStage, surfaceRegs, &unusedImage, inter.diffuseMatrix, surfaceColor );
+			inter.bumpMatrix[0] = inter.diffuseMatrix[0];
+			inter.bumpMatrix[1] = inter.diffuseMatrix[1];
+			inter.specularMatrix[0] = inter.diffuseMatrix[0];
+			inter.specularMatrix[1] = inter.diffuseMatrix[1];
+			for ( int component = 0; component < 4; component++ ) {
+				inter.diffuseColor[component] = surfaceColor[component] * lightColor[component];
+				inter.specularColor[component] = surfaceColor[component] * lightColor[component];
+			}
+			inter.vertexColor = surfaceStage->vertexColor;
+
+			RB_ARB2_DrawCustomGLSLInteractionStage( surfaceStage, surfaceRegs, &inter );
+		}
+	}
+
+	if ( depthHack ) {
+		RB_LeaveDepthHack();
+	}
+}
+
+static void RB_ARB2_CreateCustomGLSLDrawInteractions( const drawSurf_t *surf ) {
+	if ( !RB_DrawSurfChainHasCustomGLSLLighting( surf ) ) {
+		return;
+	}
+
+	GL_State( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE | GLS_DEPTHMASK | backEnd.depthFunc );
+
+	glDisable( GL_VERTEX_PROGRAM_ARB );
+	glDisable( GL_FRAGMENT_PROGRAM_ARB );
+	glDisableVertexAttribArrayARB( 1 );
+	glDisableVertexAttribArrayARB( 2 );
+	glDisableVertexAttribArrayARB( 5 );
+	glDisableVertexAttribArrayARB( 6 );
+	glDisableVertexAttribArrayARB( 7 );
+	glEnableVertexAttribArrayARB( 8 );
+	glEnableVertexAttribArrayARB( 9 );
+	glEnableVertexAttribArrayARB( 10 );
+	glEnableVertexAttribArrayARB( 11 );
+	glEnableClientState( GL_COLOR_ARRAY );
+	glEnableClientState( GL_NORMAL_ARRAY );
+	GL_SelectTexture( 0 );
+	glEnableClientState( GL_TEXTURE_COORD_ARRAY );
+
+	for ( ; surf != NULL; surf = surf->nextOnLight ) {
+		if ( !RB_SurfaceHasActiveCustomGLSLLighting( surf ) || surf->geo == NULL ) {
+			continue;
+		}
+
+		idDrawVert *ac = RB_GLSLPrepareInteractionVertexCache( surf );
+		if ( ac == NULL ) {
+			continue;
+		}
+
+		glColorPointer( 4, GL_UNSIGNED_BYTE, sizeof( idDrawVert ), ac->color );
+		glTexCoordPointer( 2, GL_FLOAT, sizeof( idDrawVert ), ac->st.ToFloatPtr() );
+		glNormalPointer( GL_FLOAT, sizeof( idDrawVert ), ac->normal.ToFloatPtr() );
+		glVertexAttribPointerARB( 8, 2, GL_FLOAT, false, sizeof( idDrawVert ), ac->st.ToFloatPtr() );
+		glVertexAttribPointerARB( 9, 3, GL_FLOAT, false, sizeof( idDrawVert ), ac->tangents[0].ToFloatPtr() );
+		glVertexAttribPointerARB( 10, 3, GL_FLOAT, false, sizeof( idDrawVert ), ac->tangents[1].ToFloatPtr() );
+		glVertexAttribPointerARB( 11, 3, GL_FLOAT, false, sizeof( idDrawVert ), ac->normal.ToFloatPtr() );
+		glVertexPointer( 3, GL_FLOAT, sizeof( idDrawVert ), ac->xyz.ToFloatPtr() );
+
+		RB_ARB2_CreateCustomGLSLDrawInteractionsForSurface( surf );
+	}
+
+	glDisableClientState( GL_TEXTURE_COORD_ARRAY );
+	glDisableClientState( GL_NORMAL_ARRAY );
+	glDisableClientState( GL_COLOR_ARRAY );
+	glDisableVertexAttribArrayARB( 8 );
+	glDisableVertexAttribArrayARB( 9 );
+	glDisableVertexAttribArrayARB( 10 );
+	glDisableVertexAttribArrayARB( 11 );
+	glUseProgramObjectARB( 0 );
+	backEnd.glState.currenttmu = -1;
+	GL_SelectTexture( 0 );
+}
+
 static bool RB_GLSLMaterial_CreateDrawInteractions( const drawSurf_t *surf ) {
 	if ( surf == NULL || !RB_MaterialInteractionLoadProgram() ) {
 		return false;
@@ -5829,7 +6122,7 @@ static void RB_DrawMaterialInteractions( const drawSurf_t *surf ) {
 		return;
 	}
 
-	if ( RB_EnhancedMaterialShadingActive() && RB_GLSLMaterial_CreateDrawInteractions( surf ) ) {
+	if ( !RB_DrawSurfChainHasCustomGLSLLighting( surf ) && RB_EnhancedMaterialShadingActive() && RB_GLSLMaterial_CreateDrawInteractions( surf ) ) {
 		return;
 	}
 
@@ -6473,7 +6766,8 @@ static void RB_ShadowMapRunPass( const viewLight_t *vLight, shadowMapPassKind_t 
 			RB_RenderTranslucentShadowMap( translucentPrimaryCasters, translucentSecondaryCasters );
 		}
 	}
-	const bool maskOk = renderOk && ( pointLight ? RB_GLSLPointShadowMap_CreateDrawInteractions( interactions ) : RB_GLSLShadowMap_CreateDrawInteractions( interactions ) );
+	const bool customGLSLLighting = RB_DrawSurfChainHasCustomGLSLLighting( interactions );
+	const bool maskOk = renderOk && !customGLSLLighting && ( pointLight ? RB_GLSLPointShadowMap_CreateDrawInteractions( interactions ) : RB_GLSLShadowMap_CreateDrawInteractions( interactions ) );
 	shadowMapPassResult_t passResult = SHADOWMAP_PASS_RESULT_MAPPED;
 	if ( !renderOk ) {
 		passResult = SHADOWMAP_PASS_RESULT_RENDER_FAIL;
@@ -6654,6 +6948,7 @@ void RB_ARB2_CreateDrawInteractions( const drawSurf_t *surf ) {
 	if ( !surf ) {
 		return;
 	}
+	const drawSurf_t *firstSurf = surf;
 
 	// perform setup here that will be constant for all interactions
 	GL_State( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE | GLS_DEPTHMASK | backEnd.depthFunc );
@@ -6738,6 +7033,8 @@ void RB_ARB2_CreateDrawInteractions( const drawSurf_t *surf ) {
 		// times with different colors and images if the surface or light have multiple layers
 		RB_CreateSingleDrawInteractions( surf, RB_ARB2_DrawInteraction );
 	}
+
+	RB_ARB2_CreateCustomGLSLDrawInteractions( firstSurf );
 
 	g_packedInteractionSurf = NULL;
 	g_packedInteractionVertexFormatIndex = -1;

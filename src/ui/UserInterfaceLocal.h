@@ -143,12 +143,17 @@ public:
 	virtual idUserInterface *	FindDemoGui( const char *qpath );
 	virtual	idListGUI *			AllocListGUI( void ) const;
 	virtual void				FreeListGUI( idListGUI *listgui );
+	virtual void				RunAlwaysThinkGUIs( int time );
 
 private:
+	void						UpdateAlwaysThinkGui( idUserInterfaceLocal *gui );
+	void						RemoveAlwaysThinkGui( idUserInterfaceLocal *gui );
+
 	idRectangle					screenRect;
 	idDeviceContext				dc;
 
 	idList<idUserInterfaceLocal*> guis;
+	idList<idUserInterfaceLocal*> alwaysThinkGUIs;
 	idList<idUserInterfaceLocal*> demoGuis;
 
 };

@@ -50,6 +50,7 @@ typedef struct lightGridBakeOptions_s {
 
 void					R_SetDefaultLightGridBakeOptions( lightGridBakeOptions_t &options );
 bool					R_BakeCurrentLightGrids( const lightGridBakeOptions_t &options, const char *jobName = NULL );
+bool					R_LightGridFileMatchesBakeOptions( const char *name, const lightGridBakeOptions_t &options, const idRenderWorldLocal *world );
 
 // everything that is needed by the backend needs
 // to be double buffered to allow it to run in
@@ -636,6 +637,8 @@ void *R_GetCommandBuffer( int bytes );
 // this allows a global override of all materials
 bool R_GlobalShaderOverride( const idMaterial **shader );
 bool R_ValidateGLSLProgram( newShaderStage_t *stage );
+bool RB_BindGLSLShaderParm( glslShaderParmBinding_t binding, int location, const shaderStage_t *stage, const drawInteraction_t *din );
+idImage *RB_ResolveGLSLShaderTextureImage( const newShaderStage_t *stage, int slot, const drawInteraction_t *din );
 
 // this does various checks before calling the idDeclSkin
 const idMaterial *R_RemapShaderBySkin( const idMaterial *shader, const idDeclSkin *customSkin, const idMaterial *customShader );
@@ -1145,6 +1148,8 @@ extern idCVar r_skipAmbient;			// bypasses all non-interaction drawing
 extern idCVar r_skipNewAmbient;			// bypasses all vertex/fragment program ambients
 extern idCVar r_forceAmbient;			// lifts the final scene toward a minimum brightness
 extern idCVar r_useLightGrid;			// enable indirect diffuse from precomputed irradiance volumes
+extern idCVar r_lightGridPortalBlend;	// world-unit blend radius for light-grid sampling across visible portal boundaries
+extern idCVar r_lightGridResidencyFrames;	// keep light-grid atlases resident after visible/neighbor use
 extern idCVar r_lightGridBakeWorkers;	// worker thread count for CPU probe integration (-1 = disabled, 0 = auto)
 extern idCVar r_lightGridBakeAsyncReadback;	// use async pixel-pack-buffer readback during light-grid baking when supported
 extern idCVar r_lightGridBakeMemoryMB;	// transient memory budget for in-flight light-grid bake jobs

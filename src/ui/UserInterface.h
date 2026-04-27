@@ -168,7 +168,7 @@ public:
 	
 // RAVEN BEGIN
 // rjohnson: added option for guis to always think
-//	virtual void				RunAlwaysThinkGUIs ( int time ) = 0;
+	virtual void				RunAlwaysThinkGUIs ( int time ) = 0;
 //// bdube: embedded icons
 	virtual void				RegisterIcon ( const char* code, const char* shader, int x = -1, int y = -1, int w = -1, int h = -1 ) { }
 // RAVEN END

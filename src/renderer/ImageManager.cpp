@@ -52,6 +52,12 @@ static void R_NormalizeInternalImageName( idStr& name ) {
 	}
 }
 
+static bool R_IsQ4LightImageNamespace( const char *name ) {
+	return name != NULL
+		&& ( idStr::Icmpn( name, "lights/", 7 ) == 0
+			|| idStr::Icmpn( name, "gfx/lights/", 11 ) == 0 );
+}
+
 /*
 ===============
 R_ReloadImages_f
@@ -167,7 +173,7 @@ void R_ListImages_f( const idCmdArgs &args ) {
 		return;
 	}
 
-	const char *header = "       -w-- -h-- filt -fmt-- wrap  size --name-------\n";
+	const char *header = "       -w-- -h-- filt -fmt-- wrap  use  size --name-------\n";
 	common->Printf( "\n%s", header );
 
 	totalSize = 0;
@@ -329,7 +335,7 @@ idImage	*idImageManager::GetImageWithParameters( const char *_name, textureFilte
 	if ( idStr::Icmpn( _name, "fonts", 5 ) == 0 || idStr::Icmpn( _name, "newfonts", 8 ) == 0 ) {
 		usage = TD_FONT;
 	}
-	if ( idStr::Icmpn( _name, "lights", 6 ) == 0 ) {
+	if ( R_IsQ4LightImageNamespace( _name ) ) {
 		usage = TD_LIGHT;
 	}
 	// strip any .tga file extensions from anywhere in the _name, including image program parameters
@@ -380,7 +386,7 @@ idImage	*idImageManager::ImageFromFile( const char *_name, textureFilter_t filte
 	if ( idStr::Icmpn( _name, "fonts", 5 ) == 0 || idStr::Icmpn( _name, "newfonts", 8 ) == 0 ) {
 		usage = TD_FONT;
 	}
-	if ( idStr::Icmpn( _name, "lights", 6 ) == 0 ) {
+	if ( R_IsQ4LightImageNamespace( _name ) ) {
 		usage = TD_LIGHT;
 	}
 
@@ -469,7 +475,7 @@ idImage *idImageManager::ImageHandleDeferred( const char *_name, textureFilter_t
 	if ( idStr::Icmpn( _name, "fonts", 5 ) == 0 || idStr::Icmpn( _name, "newfonts", 8 ) == 0 ) {
 		usage = TD_FONT;
 	}
-	if ( idStr::Icmpn( _name, "lights", 6 ) == 0 ) {
+	if ( R_IsQ4LightImageNamespace( _name ) ) {
 		usage = TD_LIGHT;
 	}
 
@@ -783,6 +789,7 @@ void idImageManager::BeginLevelLoad() {
 
 	for ( int i = 0 ; i < images.Num() ; i++ ) {
 		idImage	*image = images[ i ];
+		image->ClearUseCount();
 
 		// generator function images are always kept around
 		if ( image->generatorFunction || image->GetOpts().isPersistant ) {

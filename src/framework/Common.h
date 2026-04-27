@@ -40,19 +40,37 @@ If you have questions concerning this license or the applicable additional terms
 */
 
 typedef enum {
-	EDITOR_NONE = 0,
-	EDITOR_RADIANT = BIT(1),
-	EDITOR_GUI = BIT(2),
-	EDITOR_DEBUGGER = BIT(3),
-	EDITOR_SCRIPT = BIT(4),
-	EDITOR_LIGHT = BIT(5),
-	EDITOR_SOUND = BIT(6),
-	EDITOR_DECL = BIT(7),
-	EDITOR_AF = BIT(8),
-	EDITOR_FX = BIT(9),
-	EDITOR_PDA = BIT(10),
-	EDITOR_AAS = BIT(11),
-	EDITOR_MATERIAL = BIT(12)
+	EDITOR_NONE					= 0,
+	EDITOR_RADIANT				= BIT(1),
+	EDITOR_GUI					= BIT(2),
+	EDITOR_DEBUGGER				= BIT(3),
+	EDITOR_SCRIPT				= BIT(4),
+	EDITOR_LIGHT				= BIT(5),
+	EDITOR_SOUND				= BIT(6),
+	EDITOR_DECL					= BIT(7),
+	EDITOR_AF					= BIT(8),
+	EDITOR_PDA					= BIT(9),
+	EDITOR_FX					= BIT(10),
+	EDITOR_REVERB				= BIT(11),
+	EDITOR_PLAYBACKS			= BIT(12),
+	EDITOR_MODVIEW				= BIT(13),
+	EDITOR_LOGVIEW				= BIT(14),
+	EDITOR_ENTVIEW				= BIT(15),
+	EDITOR_MATERIAL				= BIT(16),
+
+	// Flags used to suppress expensive/unsafe media caching during tools passes.
+	EDITOR_AAS					= BIT(17),
+	EDITOR_RENDERBUMP			= BIT(18),
+	EDITOR_SPAWN_GUI			= BIT(19),
+
+	// Set while decl editor validation is parsing potentially broken content.
+	EDITOR_DECL_VALIDATING		= BIT(20),
+
+	EDITOR_ALL					= -1,
+
+	// Legacy OpenQ4 tool aliases retained for old in-tree editor code.
+	EDITOR_PARTICLE				= EDITOR_FX,
+	EDITOR_ENTITYDEF			= EDITOR_DECL
 } toolFlag_t;
 
 #define STRTABLE_ID				"#str_"
@@ -104,6 +122,8 @@ extern idCVar		com_asyncInput;
 extern idCVar		com_asyncSound;
 extern idCVar		com_machineSpec;
 extern idCVar		com_purgeAll;
+extern idCVar		com_SingleDeclFile;
+extern idCVar		com_WriteSingleDeclFile;
 extern idCVar		com_developer;
 extern idCVar		con_allowConsole;
 extern idCVar		com_speeds;
@@ -154,6 +174,8 @@ struct MemInfo_t {
 	int				soundAssetsTotal;
 };
 
+class idInterpreter;
+class idProgram;
 class rvISourceControl;
 
 struct openq4AsyncTimingStats_t {
@@ -170,6 +192,10 @@ struct openq4AsyncTimingStats_t {
 
 void				OpenQ4_GetAsyncTimingStats( openq4AsyncTimingStats_t &stats, int maxSamples = 60 );
 void				OpenQ4_BeginPresentationFrame( void );
+int					OpenQ4_GetActiveToolFlags( int flags );
+bool				OpenQ4_IsAnyToolActive( void );
+void				OpenQ4_ToolPrint( const char *text );
+bool				OpenQ4_ShouldCacheEntityDefMedia( bool noCaching );
 class idCommon {
 public:
 	virtual						~idCommon(void) {}
@@ -227,7 +253,7 @@ public:
 	virtual const char*			GetErrorMessage(void) const = 0;
 
 	// Initializes a tool with the given dictionary.
-	virtual void				InitTool(const toolFlag_t tool, const idDict* dict) = 0;
+	virtual void				InitTool(const int tool, const idDict* dict) = 0;
 
 	// Returns true if an editor currently has focus.
 	virtual bool				IsToolActive(void) const = 0;
@@ -243,6 +269,23 @@ public:
 
 	// Writes cvars with the given flags to a file.
 	virtual void				WriteFlaggedCVarsToFile(const char* filename, int flags, const char* setCmd) = 0;
+
+	// Modview thinks in the middle of a game frame.
+	virtual void				ModViewThink(void) = 0;
+
+	// Allows selected GUIs to process time events outside normal redraw.
+	virtual void				RunAlwaysThinkGUIs(int time) = 0;
+
+	// Script debugger hook to check if a breakpoint has been hit.
+	virtual void				DebuggerCheckBreakpoint(idInterpreter* interpreter, idProgram* program, int instructionPointer) = 0;
+
+	// Returns true while the decl editor is validating decl text.
+	virtual bool				DoingDeclValidation(void) = 0;
+
+	virtual void				SetCrashReportAutoSendString(const char* psString) = 0;
+
+	virtual void				LoadToolsDLL(void) = 0;
+	virtual void				UnloadToolsDLL(void) = 0;
 
 	// Begins redirection of console output to the given buffer.
 	virtual void				BeginRedirect(char* buffer, int buffersize, void (*flush)(const char*)) = 0;

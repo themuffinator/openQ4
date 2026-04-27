@@ -10,38 +10,38 @@
 
 namespace {
 int BSE_ParseSegmentType(const idToken& token) {
-	if (token == "effect") {
+	if (!token.Icmp("effect")) {
 		return SEG_EFFECT;
 	}
-	if (token == "emitter") {
+	if (!token.Icmp("emitter")) {
 		return SEG_EMITTER;
 	}
-	if (token == "spawner") {
+	if (!token.Icmp("spawner")) {
 		return SEG_SPAWNER;
 	}
-	if (token == "trail") {
+	if (!token.Icmp("trail")) {
 		return SEG_TRAIL;
 	}
-	if (token == "sound") {
+	if (!token.Icmp("sound")) {
 		return SEG_SOUND;
 	}
-	if (token == "decal") {
+	if (!token.Icmp("decal")) {
 		return SEG_DECAL;
 	}
-	if (token == "light") {
+	if (!token.Icmp("light")) {
 		return SEG_LIGHT;
 	}
-	if (token == "delay") {
+	if (!token.Icmp("delay")) {
 		return SEG_DELAY;
 	}
-	if (token == "shake") {
+	if (!token.Icmp("doubleVision")) {
+		return SEG_DOUBLEVISION;
+	}
+	if (!token.Icmp("shake")) {
 		return SEG_SHAKE;
 	}
-	if (token == "tunnel") {
+	if (!token.Icmp("tunnel")) {
 		return SEG_TUNNEL;
-	}
-	if (token == "doubleVision" || token == "doublevision") {
-		return SEG_DOUBLEVISION;
 	}
 	return SEG_NONE;
 }
@@ -49,6 +49,7 @@ int BSE_ParseSegmentType(const idToken& token) {
 
 void rvDeclEffect::Init()
 {
+	mEditorOriginal = NULL;
 	mMinDuration = 0.0;
 	mMaxDuration = 0.0;
 	mSize = 512.0;
@@ -69,7 +70,92 @@ bool rvDeclEffect::SetDefaultText()
 }
 
 size_t rvDeclEffect::Size(void) const {
-	return sizeof(rvDeclEffect);
+	return sizeof(rvDeclEffect) + mSegmentTemplates.Allocated();
+}
+
+rvDeclEffect& rvDeclEffect::operator=(const rvDeclEffect& copy) {
+	CopyData(copy);
+	return *this;
+}
+
+void rvDeclEffect::CopyData(const rvDeclEffect& copy) {
+	if (&copy == this) {
+		return;
+	}
+
+	const int playCount = mPlayCount;
+	const int loopCount = mLoopCount;
+	FreeData();
+
+	mFlags = copy.mFlags;
+	mMinDuration = copy.mMinDuration;
+	mMaxDuration = copy.mMaxDuration;
+	mCutOffDistance = copy.mCutOffDistance;
+	mSize = copy.mSize;
+	mPlayCount = playCount;
+	mLoopCount = loopCount;
+
+	for (int i = 0; i < copy.mSegmentTemplates.Num(); ++i) {
+		rvSegmentTemplate& segment = mSegmentTemplates.Alloc();
+		segment.Duplicate(copy.mSegmentTemplates[i]);
+		segment.mDeclEffect = this;
+	}
+}
+
+int rvDeclEffect::AddSegment(const rvSegmentTemplate& add) {
+	rvSegmentTemplate& segment = mSegmentTemplates.Alloc();
+	segment.Duplicate(add);
+	segment.mDeclEffect = this;
+	return mSegmentTemplates.Num() - 1;
+}
+
+void rvDeclEffect::DeleteSegment(int index) {
+	if (index < 0 || index >= mSegmentTemplates.Num()) {
+		return;
+	}
+
+	mSegmentTemplates.RemoveIndex(index);
+}
+
+void rvDeclEffect::CreateEditorOriginal(void) {
+	DeleteEditorOriginal();
+	mEditorOriginal = new rvDeclEffect(*this);
+}
+
+void rvDeclEffect::DeleteEditorOriginal(void) {
+	delete mEditorOriginal;
+	mEditorOriginal = NULL;
+}
+
+bool rvDeclEffect::CompareToEditorOriginal(void) const {
+	return (mEditorOriginal != NULL) && Compare(*mEditorOriginal);
+}
+
+void rvDeclEffect::RevertToEditorOriginal(void) {
+	if (mEditorOriginal == NULL) {
+		return;
+	}
+
+	CopyData(*mEditorOriginal);
+	CreateEditorOriginal();
+}
+
+const rvSegmentTemplate* rvDeclEffect::GetSegmentTemplate(const char* name) const {
+	if (name == NULL) {
+		return NULL;
+	}
+
+	for (int i = mSegmentTemplates.Num() - 1; i >= 0; --i) {
+		if (mSegmentTemplates[i].GetSegmentName().Icmp(name) == 0) {
+			return &mSegmentTemplates[i];
+		}
+	}
+
+	return NULL;
+}
+
+rvSegmentTemplate* rvDeclEffect::GetSegmentTemplate(const char* name) {
+	return const_cast<rvSegmentTemplate*>(static_cast<const rvDeclEffect*>(this)->GetSegmentTemplate(name));
 }
 
 int rvDeclEffect::GetTrailSegmentIndex(const idStr& name)
@@ -96,7 +182,7 @@ int rvDeclEffect::GetTrailSegmentIndex(const idStr& name)
 			v5 = &this->mSegmentTemplates[v4];
 			if (v5)
 			{
-				if (name == v5->GetSegmentName())
+				if (name.Icmp(v5->GetSegmentName()) == 0)
 					break;
 			}
 			++v3;
@@ -143,8 +229,12 @@ float rvDeclEffect::EvaluateCost(int activeParticles, int segment) const
 	double v7; // st7
 	float cost; // [esp+Ch] [ebp+8h]
 
-	if (segment != -1)
+	if (segment != -1) {
+		if (segment < 0 || segment >= mSegmentTemplates.Num()) {
+			return 0.0f;
+		}
 		return mSegmentTemplates[segment].EvaluateCost(activeParticles);
+	}
 	v5 = 0;
 	cost = 0.0;
 	if (this->mSegmentTemplates.Num() > 0)
@@ -204,6 +294,9 @@ void rvDeclEffect::Finish() {
 	rvSegmentTemplate* segment;
 	const int preservedFlags = mFlags & ETFLAG_EDITOR_MODIFIED;
 	mFlags = preservedFlags;
+	mMinDuration = 0.0f;
+	mMaxDuration = 0.0f;
+	mSegmentTemplates.SetNum(mSegmentTemplates.Num(), false);
 
 	for (int j = 0; j < mSegmentTemplates.Num(); j++)
 	{
@@ -237,8 +330,15 @@ void rvDeclEffect::Finish() {
 }
 
 bool rvDeclEffect::Parse(const char* text, const int textLength) {
+	return Parse(text, textLength, false);
+}
+
+bool rvDeclEffect::Parse(const char* text, const int textLength, bool noCaching) {
 	idParser src;
 	idToken	token;
+	bool parsed = false;
+
+	(void)noCaching;
 
 	FreeData();
 	mFlags = 0;
@@ -254,39 +354,39 @@ bool rvDeclEffect::Parse(const char* text, const int textLength) {
 		return false;
 	}
 
-	if (src.ReadToken(&token))
+	while (src.ReadToken(&token))
 	{
-		while (token != "}")
-		{
-			const int segmentType = BSE_ParseSegmentType(token);
-			if (segmentType != SEG_NONE) {
-				rvSegmentTemplate segment;
-				segment.Init(this);
-				segment.Parse(this, segmentType, &src);
-				if (segment.Finish(this)) {
-					mSegmentTemplates.Append(segment);
-				}
-			}
-			else if (token == "cutOffDistance") {
-				mCutOffDistance = src.ParseFloat();
-			}
-			else if (token == "size")
-			{
-				mSize = src.ParseFloat();
-			}
-			else
-			{
-				src.Warning("^4BSE:^1 Invalid segment type '%s' (file: %s, line: %d)\n", token.c_str(), GetFileName(), src.GetLineNum());
-				if (src.CheckTokenString("{")) {
-					src.SkipBracedSection(false);
-				}
-			}
+		if (token == "}") {
+			parsed = true;
+			break;
+		}
 
-			if (!src.ReadToken(&token)) {
-				src.Warning("^4BSE:^1 Unexpected end of effect '%s'", GetName());
-				break;
+		const int segmentType = BSE_ParseSegmentType(token);
+		if (segmentType != SEG_NONE) {
+			rvSegmentTemplate segment;
+			segment.Init(this);
+			segment.Parse(this, segmentType, &src);
+			if (segment.Finish(this)) {
+				mSegmentTemplates.Append(segment);
 			}
 		}
+		else if (!token.Icmp("cutOffDistance")) {
+			mCutOffDistance = src.ParseFloat();
+		}
+		else if (!token.Icmp("size"))
+		{
+			mSize = src.ParseFloat();
+		}
+		else
+		{
+			src.Warning("^4BSE:^1 Invalid segment type '%s' (file: %s, line: %d)\n", token.c_str(), GetFileName(), src.GetLineNum());
+			src.SkipBracedSection(true);
+		}
+	}
+
+	if (!parsed) {
+		src.Warning("^4BSE:^1 Unexpected end of effect '%s'", GetName());
+		return false;
 	}
 
 	Finish();

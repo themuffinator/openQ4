@@ -105,6 +105,22 @@ static idImage *R_LoadMaterialImage( const char *name, textureFilter_t filter, t
 	return globalImages->ImageFromFile( R_ResolveQ4SpecialImageName( name ), filter, repeat, usage, cubeMap );
 }
 
+static bool R_IsQ4LightImageNamespace( const char *name ) {
+	return name != NULL
+		&& ( idStr::Icmpn( name, "lights/", 7 ) == 0
+			|| idStr::Icmpn( name, "gfx/lights/", 11 ) == 0 );
+}
+
+static textureUsage_t R_DefaultStageUsageForMaterial( const char *materialName ) {
+	// Retail Quake 4 routes projected-light materials from both stock light
+	// namespaces through its light-oriented image bucket. OpenQ4 maps that
+	// behavior onto TD_LIGHT so projection cookies avoid the generic texture path.
+	if ( R_IsQ4LightImageNamespace( materialName ) ) {
+		return TD_LIGHT;
+	}
+	return TD_DEFAULT;
+}
+
 static bool R_IsSceneCaptureImage( const idImage *image ) {
 	if ( image == NULL ) {
 		return false;
@@ -150,6 +166,7 @@ void idMaterial::CommonInit() {
 	constantRegisters = NULL;
 	numStages = 0;
 	numAmbientStages = 0;
+	lightGridDiffuseStage = -1;
 	stages = NULL;
 	editorImage = NULL;
 	lightFalloffImage = NULL;
@@ -270,6 +287,7 @@ void idMaterial::FreeData() {
 		R_StaticFree( stages );
 		stages = NULL;
 	}
+	lightGridDiffuseStage = -1;
 	if ( expressionRegisters != NULL ) {
 		R_StaticFree( expressionRegisters );
 		expressionRegisters = NULL;
@@ -459,6 +477,8 @@ void idMaterial::ParseSort( idLexer &src ) {
 
 	if ( !token.Icmp( "subview" ) ) {
 		sort = SS_SUBVIEW;
+	} else if ( !token.Icmp( "gui" ) ) {
+		sort = SS_GUI;
 	} else if ( !token.Icmp( "opaque" ) ) {
 		sort = SS_OPAQUE;
 	}else if ( !token.Icmp( "decal" ) ) {
@@ -909,6 +929,8 @@ void idMaterial::ClearStage( shaderStage_t *ss ) {
 	ss->mStageOpsStart = numOps;
 	ss->mNumStageOps = 0;
 	ss->conditionRegister = GetExpressionConstant( 1 );
+	ss->alphaTestMode = GL_GREATER;
+	ss->alphaTestRegister = GetExpressionConstant( 0.5f );
 	ss->color.registers[0] =
 	ss->color.registers[1] =
 	ss->color.registers[2] =
@@ -1089,6 +1111,59 @@ void idMaterial::ParseVertexParm( idLexer &src, newShaderStage_t *newStage ) {
 	newStage->vertexParms[parm][3] = ParseExpression( src );
 }
 
+/*
+================
+idMaterial::ParseFragmentParm
+
+If there is a single value, it will be repeated across all elements
+If there are two values, 3 = 0.0, 4 = 1.0
+if there are three values, 4 = 1.0
+================
+*/
+void idMaterial::ParseFragmentParm( idLexer &src, newShaderStage_t *newStage ) {
+	idToken				token;
+
+	src.ReadTokenOnLine( &token );
+	int	parm = token.GetIntValue();
+	if ( !token.IsNumeric() || parm < 0 || parm >= MAX_FRAGMENT_PARMS ) {
+		common->Warning( "bad fragmentParm number\n" );
+		SetMaterialFlag( MF_DEFAULTED );
+		return;
+	}
+	if ( parm >= newStage->numFragmentParms ) {
+		newStage->numFragmentParms = parm+1;
+	}
+
+	newStage->fragmentParms[parm][0] = ParseExpression( src );
+
+	src.ReadTokenOnLine( &token );
+	if ( !token[0] || token.Icmp( "," ) ) {
+		newStage->fragmentParms[parm][1] =
+		newStage->fragmentParms[parm][2] =
+		newStage->fragmentParms[parm][3] = newStage->fragmentParms[parm][0];
+		return;
+	}
+
+	newStage->fragmentParms[parm][1] = ParseExpression( src );
+
+	src.ReadTokenOnLine( &token );
+	if ( !token[0] || token.Icmp( "," ) ) {
+		newStage->fragmentParms[parm][2] = GetExpressionConstant( 0 );
+		newStage->fragmentParms[parm][3] = GetExpressionConstant( 1 );
+		return;
+	}
+
+	newStage->fragmentParms[parm][2] = ParseExpression( src );
+
+	src.ReadTokenOnLine( &token );
+	if ( !token[0] || token.Icmp( "," ) ) {
+		newStage->fragmentParms[parm][3] = GetExpressionConstant( 1 );
+		return;
+	}
+
+	newStage->fragmentParms[parm][3] = ParseExpression( src );
+}
+
 
 /*
 ================
@@ -1182,12 +1257,39 @@ void idMaterial::ParseFragmentMap( idLexer &src, newShaderStage_t *newStage ) {
 			continue;
 		}
 
+		if ( !token.Icmp( "lightfalloffImage" ) ) {
+			newStage->fragmentProgramBindings[unit] = LEGACY_FRAGMENT_BINDING_LIGHT_FALLOFF;
+			newStage->fragmentProgramImages[unit] = NULL;
+			return;
+		}
+		if ( !token.Icmp( "lightImage" ) ) {
+			newStage->fragmentProgramBindings[unit] = LEGACY_FRAGMENT_BINDING_LIGHT_IMAGE;
+			newStage->fragmentProgramImages[unit] = NULL;
+			return;
+		}
+		if ( !token.Icmp( "ambientNormalMap" ) ) {
+			newStage->fragmentProgramBindings[unit] = LEGACY_FRAGMENT_BINDING_AMBIENT_NORMAL_MAP;
+			newStage->fragmentProgramImages[unit] = globalImages->ambientNormalMap;
+			return;
+		}
+		if ( !token.Icmp( "normalCubeMap" ) ) {
+			newStage->fragmentProgramBindings[unit] = LEGACY_FRAGMENT_BINDING_NORMAL_CUBE_MAP;
+			newStage->fragmentProgramImages[unit] = globalImages->normalCubeMapImage;
+			return;
+		}
+		if ( !token.Icmp( "specularTableImage" ) ) {
+			newStage->fragmentProgramBindings[unit] = LEGACY_FRAGMENT_BINDING_SPECULAR_TABLE;
+			newStage->fragmentProgramImages[unit] = globalImages->specularTableImage;
+			return;
+		}
+
 		// assume anything else is the image name
 		src.UnreadToken( &token );
 		break;
 	}
 	str = R_ParsePastImageProgram( src );
 
+	newStage->fragmentProgramBindings[unit] = LEGACY_FRAGMENT_BINDING_NONE;
 	newStage->fragmentProgramImages[unit] = 
 		R_LoadMaterialImage( str, tf, trp, td, cubeMap );
 	if ( !newStage->fragmentProgramImages[unit] ) {
@@ -1203,6 +1305,54 @@ GLSL shader parameter parser used by Quake 4 style "shaderParm" tokens.
 ================
 */
 static glslShaderParmBinding_t R_ParseGLSLShaderParmBinding( const idToken &token ) {
+	if ( !token.Icmp( "localLightOrigin" ) || !token.Icmp( "lightOrigin" ) ) {
+		return GLSL_SHADERPARM_LOCAL_LIGHT_ORIGIN;
+	}
+	if ( !token.Icmp( "localViewOrigin" ) ) {
+		return GLSL_SHADERPARM_LOCAL_VIEW_ORIGIN;
+	}
+	if ( !token.Icmp( "lightProjectS" ) || !token.Icmp( "lightProjectionS" ) || !token.Icmp( "lightProject_s" ) ) {
+		return GLSL_SHADERPARM_LIGHT_PROJECT_S;
+	}
+	if ( !token.Icmp( "lightProjectT" ) || !token.Icmp( "lightProjectionT" ) || !token.Icmp( "lightProject_t" ) ) {
+		return GLSL_SHADERPARM_LIGHT_PROJECT_T;
+	}
+	if ( !token.Icmp( "lightProjectQ" ) || !token.Icmp( "lightProjectionQ" ) || !token.Icmp( "lightProject_q" ) ) {
+		return GLSL_SHADERPARM_LIGHT_PROJECT_Q;
+	}
+	if ( !token.Icmp( "lightFalloffS" ) || !token.Icmp( "lightFalloff_s" ) ) {
+		return GLSL_SHADERPARM_LIGHT_FALLOFF_S;
+	}
+	if ( !token.Icmp( "bumpMatrixS" ) || !token.Icmp( "bumpMatrix_s" ) ) {
+		return GLSL_SHADERPARM_BUMP_MATRIX_S;
+	}
+	if ( !token.Icmp( "bumpMatrixT" ) || !token.Icmp( "bumpMatrix_t" ) ) {
+		return GLSL_SHADERPARM_BUMP_MATRIX_T;
+	}
+	if ( !token.Icmp( "diffuseMatrixS" ) || !token.Icmp( "diffuseMatrix_s" ) ) {
+		return GLSL_SHADERPARM_DIFFUSE_MATRIX_S;
+	}
+	if ( !token.Icmp( "diffuseMatrixT" ) || !token.Icmp( "diffuseMatrix_t" ) ) {
+		return GLSL_SHADERPARM_DIFFUSE_MATRIX_T;
+	}
+	if ( !token.Icmp( "specularMatrixS" ) || !token.Icmp( "specularMatrix_s" ) ) {
+		return GLSL_SHADERPARM_SPECULAR_MATRIX_S;
+	}
+	if ( !token.Icmp( "specularMatrixT" ) || !token.Icmp( "specularMatrix_t" ) ) {
+		return GLSL_SHADERPARM_SPECULAR_MATRIX_T;
+	}
+	if ( !token.Icmp( "colorModulate" ) ) {
+		return GLSL_SHADERPARM_COLOR_MODULATE;
+	}
+	if ( !token.Icmp( "colorAdd" ) ) {
+		return GLSL_SHADERPARM_COLOR_ADD;
+	}
+	if ( !token.Icmp( "diffuseColor" ) || !token.Icmp( "diffuse" ) ) {
+		return GLSL_SHADERPARM_DIFFUSE_COLOR;
+	}
+	if ( !token.Icmp( "specularColor" ) || !token.Icmp( "specular" ) ) {
+		return GLSL_SHADERPARM_SPECULAR_COLOR;
+	}
 	if ( !token.Icmp( "viewOrigin" ) ) {
 		return GLSL_SHADERPARM_VIEW_ORIGIN;
 	}
@@ -1214,6 +1364,27 @@ static glslShaderParmBinding_t R_ParseGLSLShaderParmBinding( const idToken &toke
 	}
 	if ( !token.Icmp( "colorMatrix2" ) ) {
 		return GLSL_SHADERPARM_COLOR_MATRIX2;
+	}
+	if ( !token.Icmp( "projectionRow0" ) || !token.Icmp( "projectionMatrix0" ) ) {
+		return GLSL_SHADERPARM_PROJECTION_ROW_0;
+	}
+	if ( !token.Icmp( "projectionRow1" ) || !token.Icmp( "projectionMatrix1" ) ) {
+		return GLSL_SHADERPARM_PROJECTION_ROW_1;
+	}
+	if ( !token.Icmp( "projectionRow2" ) || !token.Icmp( "projectionMatrix2" ) ) {
+		return GLSL_SHADERPARM_PROJECTION_ROW_2;
+	}
+	if ( !token.Icmp( "projectionRow3" ) || !token.Icmp( "projectionMatrix3" ) ) {
+		return GLSL_SHADERPARM_PROJECTION_ROW_3;
+	}
+	if ( !token.Icmp( "modelRow0" ) || !token.Icmp( "modelMatrix0" ) ) {
+		return GLSL_SHADERPARM_MODEL_ROW_0;
+	}
+	if ( !token.Icmp( "modelRow1" ) || !token.Icmp( "modelMatrix1" ) ) {
+		return GLSL_SHADERPARM_MODEL_ROW_1;
+	}
+	if ( !token.Icmp( "modelRow2" ) || !token.Icmp( "modelMatrix2" ) ) {
+		return GLSL_SHADERPARM_MODEL_ROW_2;
 	}
 	if ( !token.Icmp( "gaussianSampleOffsets" ) ) {
 		return GLSL_SHADERPARM_GAUSSIAN_SAMPLE_OFFSETS;
@@ -1336,6 +1507,7 @@ void idMaterial::ParseShaderTexture( idLexer &src, newShaderStage_t *newStage ) 
 
 	const int slot = newStage->numShaderTextures++;
 	idStr::Copynz( newStage->shaderTextureNames[slot], token.c_str(), MAX_GLSL_SHADER_PARM_NAME );
+	newStage->shaderTextureBindings[slot] = GLSL_SHADERTEXTURE_IMAGE;
 
 	tf = TF_DEFAULT;
 	trp = TR_REPEAT;
@@ -1408,6 +1580,42 @@ void idMaterial::ParseShaderTexture( idLexer &src, newShaderStage_t *newStage ) 
 		}
 		if ( !token.Icmp( "nomips" ) ) {
 			continue;
+		}
+
+		if ( !token.Icmp( "lightfalloffImage" ) ) {
+			newStage->shaderTextureBindings[slot] = GLSL_SHADERTEXTURE_LIGHT_FALLOFF;
+			newStage->shaderTextureImages[slot] = NULL;
+			newStage->shaderTextureFilters[slot] = tf;
+			newStage->shaderTextureRepeats[slot] = trp;
+			return;
+		}
+		if ( !token.Icmp( "lightImage" ) ) {
+			newStage->shaderTextureBindings[slot] = GLSL_SHADERTEXTURE_LIGHT_IMAGE;
+			newStage->shaderTextureImages[slot] = NULL;
+			newStage->shaderTextureFilters[slot] = tf;
+			newStage->shaderTextureRepeats[slot] = trp;
+			return;
+		}
+		if ( !token.Icmp( "ambientNormalMap" ) ) {
+			newStage->shaderTextureBindings[slot] = GLSL_SHADERTEXTURE_AMBIENT_NORMAL_MAP;
+			newStage->shaderTextureImages[slot] = globalImages->ambientNormalMap ? globalImages->ambientNormalMap : globalImages->defaultImage;
+			newStage->shaderTextureFilters[slot] = explicitFilter ? tf : newStage->shaderTextureImages[slot]->GetFilter();
+			newStage->shaderTextureRepeats[slot] = explicitRepeat ? trp : newStage->shaderTextureImages[slot]->GetRepeat();
+			return;
+		}
+		if ( !token.Icmp( "normalCubeMap" ) ) {
+			newStage->shaderTextureBindings[slot] = GLSL_SHADERTEXTURE_NORMAL_CUBE_MAP;
+			newStage->shaderTextureImages[slot] = globalImages->normalCubeMapImage ? globalImages->normalCubeMapImage : globalImages->defaultImage;
+			newStage->shaderTextureFilters[slot] = explicitFilter ? tf : newStage->shaderTextureImages[slot]->GetFilter();
+			newStage->shaderTextureRepeats[slot] = explicitRepeat ? trp : newStage->shaderTextureImages[slot]->GetRepeat();
+			return;
+		}
+		if ( !token.Icmp( "specularTableImage" ) ) {
+			newStage->shaderTextureBindings[slot] = GLSL_SHADERTEXTURE_SPECULAR_TABLE;
+			newStage->shaderTextureImages[slot] = globalImages->specularTableImage ? globalImages->specularTableImage : globalImages->defaultImage;
+			newStage->shaderTextureFilters[slot] = explicitFilter ? tf : newStage->shaderTextureImages[slot]->GetFilter();
+			newStage->shaderTextureRepeats[slot] = explicitRepeat ? trp : newStage->shaderTextureImages[slot]->GetRepeat();
+			return;
 		}
 
 		// assume anything else is the image name
@@ -1509,7 +1717,7 @@ void idMaterial::ParseStage( idLexer &src, const textureRepeat_t trpDefault ) {
 
 	tf = TF_DEFAULT;
 	trp = trpDefault;
-	td = TD_DEFAULT;
+	td = R_DefaultStageUsageForMaterial( GetName() );
 	allowPicmip = true;
 	cubeMap = CF_2D;
 
@@ -1885,9 +2093,30 @@ void idMaterial::ParseStage( idLexer &src, const textureRepeat_t trpDefault ) {
 		if ( !token.Icmp( "alphaTest" ) ) {
 			ss->hasAlphaTest = true;
 			ss->alphaTestRegister = ParseExpression( src );
+			if ( !ss->hasAlphaFunc ) {
+				ss->alphaTestMode = GL_GREATER;
+			}
 			coverage = MC_PERFORATED;
 			continue;
 		}		
+		if ( !token.Icmp( "alphaFunc" ) ) {
+			ss->hasAlphaFunc = true;
+			ss->hasAlphaTest = true;
+			ss->alphaTestMode = GL_GREATER;
+			if ( src.ReadTokenOnLine( &token ) ) {
+				if ( !token.Icmp( "less" ) ) {
+					ss->alphaTestMode = GL_LESS;
+				} else if ( !token.Icmp( "equal" ) ) {
+					ss->alphaTestMode = GL_EQUAL;
+				} else if ( !token.Icmp( "greater" ) ) {
+					ss->alphaTestMode = GL_GREATER;
+				} else {
+					src.Warning( "unknown alphaFunc '%s' in material '%s'", token.c_str(), GetName() );
+				}
+			}
+			coverage = MC_PERFORATED;
+			continue;
+		}
 
 		// shorthand for 2D modulated
 		if ( !token.Icmp( "colored" ) ) {
@@ -1982,6 +2211,10 @@ void idMaterial::ParseStage( idLexer &src, const textureRepeat_t trpDefault ) {
 			ParseVertexParm( src, &newStage );
 			continue;
 		}
+		if ( !token.Icmp( "fragmentParm" ) ) {
+			ParseFragmentParm( src, &newStage );
+			continue;
+		}
 
 		if (  !token.Icmp( "fragmentMap" ) ) {	
 			ParseFragmentMap( src, &newStage );
@@ -2015,6 +2248,11 @@ void idMaterial::ParseStage( idLexer &src, const textureRepeat_t trpDefault ) {
 		if ( !token.Icmp( "shaderTexture" ) ) {
 			stageHasShaderTokens = true;
 			ParseShaderTexture( src, &newStage );
+			continue;
+		}
+		if ( !token.Icmp( "customLighting" ) ) {
+			stageHasShaderTokens = true;
+			newStage.customLighting = true;
 			continue;
 		}
 
@@ -2346,11 +2584,11 @@ void idMaterial::ParseMaterial( idLexer &src ) {
 			continue;
 		}
 		else if (!token.Icmp("sky")) {
-			// Unknown what this is used for.
+			SetMaterialFlag( MF_SKY );
 			continue;
 		}
 		else if (!token.Icmp("needCurrentRender")) {
-			// Unknown what this is used for.
+			SetMaterialFlag( MF_NEED_CURRENT_RENDER );
 			continue;
 		}
 // jmarshall end
@@ -2362,6 +2600,9 @@ void idMaterial::ParseMaterial( idLexer &src ) {
 		else if (!token.Icmp("materialType")) {
 			src.ReadToken(&token);
 			materialType = declManager->FindMaterialType(token);
+			if ( materialType != NULL && materialType->IsImplicit() ) {
+				common->Warning( "UNKNOWN: materialType '%s' in '%s'", token.c_str(), GetName() );
+			}
 			continue;
 		}
 // jmarshall end
@@ -2496,7 +2737,7 @@ void idMaterial::ParseMaterial( idLexer &src ) {
 			idStr	copy;
 
 			copy = str;	// so other things don't step on it
-			lightFalloffImage = R_LoadMaterialImage( copy, TF_DEFAULT, TR_CLAMP /* TR_CLAMP_TO_ZERO */, TD_DEFAULT );
+			lightFalloffImage = R_LoadMaterialImage( copy, TF_DEFAULT, TR_CLAMP, TD_LIGHT );
 			continue;
 		}
 		// guisurf <guifile> | guisurf entity
@@ -2562,36 +2803,12 @@ void idMaterial::ParseMaterial( idLexer &src ) {
 		}
 		// diffusemap for stage shortcut
 		else if ( !token.Icmp( "diffusemap" ) ) {
-			idStr str;
-			src.ReadRestOfLine(str);
-			int parenDepth = 0;
-			for ( int i = 0; i < str.Length(); i++ ) {
-				if ( str[i] == '(' ) {
-					parenDepth++;
-				} else if ( str[i] == ')' && parenDepth > 0 ) {
-					parenDepth--;
-				}
-			}
-			if ( str.Length() > 0 && parenDepth > 0 ) {
-				idToken continuation;
-				while ( parenDepth > 0 && src.ReadToken( &continuation ) ) {
-					str += " ";
-					str += continuation;
-					if ( continuation == "(" ) {
-						parenDepth++;
-					} else if ( continuation == ")" ) {
-						parenDepth--;
-					}
-				}
-			}
-			if ( str.Length() == 0 ) {
-				str = R_ParsePastImageProgram( src );
-			}
-			if ( str.Length() == 0 ) {
+			str = R_ParsePastImageProgram( src );
+			if ( str[0] == '\0' ) {
 				src.Warning( "diffusemap expects an image program in '%s'", GetName() );
 				continue;
 			}
-			idStr::snPrintf( buffer, sizeof( buffer ), "blend diffusemap\nmap %s\n}\n", str.c_str());
+			idStr::snPrintf( buffer, sizeof( buffer ), "blend diffusemap\nmap %s\n}\n", str);
 			newSrc.LoadMemory( buffer, strlen(buffer), "diffusemap" );
 			newSrc.SetFlags( LEXFL_NOFATALERRORS | LEXFL_NOSTRINGCONCAT | LEXFL_NOSTRINGESCAPECHARS | LEXFL_ALLOWPATHNAMES );
 			ParseStage( newSrc, trpDefault );
@@ -2600,36 +2817,12 @@ void idMaterial::ParseMaterial( idLexer &src ) {
 		}
 		// specularmap for stage shortcut
 		else if ( !token.Icmp( "specularmap" ) ) {
-			idStr str;
-			src.ReadRestOfLine(str);
-			int parenDepth = 0;
-			for ( int i = 0; i < str.Length(); i++ ) {
-				if ( str[i] == '(' ) {
-					parenDepth++;
-				} else if ( str[i] == ')' && parenDepth > 0 ) {
-					parenDepth--;
-				}
-			}
-			if ( str.Length() > 0 && parenDepth > 0 ) {
-				idToken continuation;
-				while ( parenDepth > 0 && src.ReadToken( &continuation ) ) {
-					str += " ";
-					str += continuation;
-					if ( continuation == "(" ) {
-						parenDepth++;
-					} else if ( continuation == ")" ) {
-						parenDepth--;
-					}
-				}
-			}
-			if ( str.Length() == 0 ) {
-				str = R_ParsePastImageProgram( src );
-			}
-			if ( str.Length() == 0 ) {
+			str = R_ParsePastImageProgram( src );
+			if ( str[0] == '\0' ) {
 				src.Warning( "specularmap expects an image program in '%s'", GetName() );
 				continue;
 			}
-			idStr::snPrintf( buffer, sizeof( buffer ), "blend specularmap\nmap %s\n}\n", str.c_str());
+			idStr::snPrintf( buffer, sizeof( buffer ), "blend specularmap\nmap %s\n}\n", str);
 			newSrc.LoadMemory( buffer, strlen(buffer), "specularmap" );
 			newSrc.SetFlags( LEXFL_NOFATALERRORS | LEXFL_NOSTRINGCONCAT | LEXFL_NOSTRINGESCAPECHARS | LEXFL_ALLOWPATHNAMES );
 			ParseStage( newSrc, trpDefault );
@@ -2638,36 +2831,12 @@ void idMaterial::ParseMaterial( idLexer &src ) {
 		}
 		// normalmap for stage shortcut
 		else if ( !token.Icmp( "bumpmap" ) ) {
-			idStr str;
-			src.ReadRestOfLine(str);
-			int parenDepth = 0;
-			for ( int i = 0; i < str.Length(); i++ ) {
-				if ( str[i] == '(' ) {
-					parenDepth++;
-				} else if ( str[i] == ')' && parenDepth > 0 ) {
-					parenDepth--;
-				}
-			}
-			if ( str.Length() > 0 && parenDepth > 0 ) {
-				idToken continuation;
-				while ( parenDepth > 0 && src.ReadToken( &continuation ) ) {
-					str += " ";
-					str += continuation;
-					if ( continuation == "(" ) {
-						parenDepth++;
-					} else if ( continuation == ")" ) {
-						parenDepth--;
-					}
-				}
-			}
-			if ( str.Length() == 0 ) {
-				str = R_ParsePastImageProgram( src );
-			}
-			if ( str.Length() == 0 ) {
+			str = R_ParsePastImageProgram( src );
+			if ( str[0] == '\0' ) {
 				src.Warning( "bumpmap expects an image program in '%s'", GetName() );
 				continue;
 			}
-			idStr::snPrintf( buffer, sizeof( buffer ), "blend bumpmap\nmap %s\n}\n", str.c_str() );
+			idStr::snPrintf( buffer, sizeof( buffer ), "blend bumpmap\nmap %s\n}\n", str );
 			newSrc.LoadMemory( buffer, strlen(buffer), "bumpmap" );
 			newSrc.SetFlags( LEXFL_NOFATALERRORS | LEXFL_NOSTRINGCONCAT | LEXFL_NOSTRINGESCAPECHARS | LEXFL_ALLOWPATHNAMES );
 			ParseStage( newSrc, trpDefault );
@@ -2857,36 +3026,40 @@ bool idMaterial::Parse( const char *text, const int textLength ) {
 	}
 
 	// anything that references a captured scene buffer such as _currentRender or
-	// _currentDepth will automatically get sort = SS_POST_PROCESS and coverage = MC_TRANSLUCENT
+	// _currentDepth will automatically get sort = SS_POST_PROCESS and coverage = MC_TRANSLUCENT.
+	// Retail Quake 4's needCurrentRender flag preserves authored sort and asks the
+	// backend to copy the scene just before this material draws.
 
-	for ( i = 0 ; i < numStages ; i++ ) {
-		shaderStage_t	*pStage = &pd->parseStages[i];
-		if ( R_IsSceneCaptureImage( pStage->texture.image ) ) {
-			if ( sort != SS_PORTAL_SKY ) {
-				sort = SS_POST_PROCESS;
-				coverage = MC_TRANSLUCENT;
-			}
-			break;
-		}
-		if ( pStage->newStage ) {
-			for ( int j = 0 ; j < pStage->newStage->numFragmentProgramImages ; j++ ) {
-				if ( R_IsSceneCaptureImage( pStage->newStage->fragmentProgramImages[j] ) ) {
-					if ( sort != SS_PORTAL_SKY ) {
-						sort = SS_POST_PROCESS;
-						coverage = MC_TRANSLUCENT;
-					}
-					i = numStages;
-					break;
+	if ( !TestMaterialFlag( MF_NEED_CURRENT_RENDER ) ) {
+		for ( i = 0 ; i < numStages ; i++ ) {
+			shaderStage_t	*pStage = &pd->parseStages[i];
+			if ( R_IsSceneCaptureImage( pStage->texture.image ) ) {
+				if ( sort != SS_PORTAL_SKY ) {
+					sort = SS_POST_PROCESS;
+					coverage = MC_TRANSLUCENT;
 				}
+				break;
 			}
-			for ( int j = 0 ; j < pStage->newStage->numShaderTextures ; j++ ) {
-				if ( R_IsSceneCaptureImage( pStage->newStage->shaderTextureImages[j] ) ) {
-					if ( sort != SS_PORTAL_SKY ) {
-						sort = SS_POST_PROCESS;
-						coverage = MC_TRANSLUCENT;
+			if ( pStage->newStage ) {
+				for ( int j = 0 ; j < pStage->newStage->numFragmentProgramImages ; j++ ) {
+					if ( R_IsSceneCaptureImage( pStage->newStage->fragmentProgramImages[j] ) ) {
+						if ( sort != SS_PORTAL_SKY ) {
+							sort = SS_POST_PROCESS;
+							coverage = MC_TRANSLUCENT;
+						}
+						i = numStages;
+						break;
 					}
-					i = numStages;
-					break;
+				}
+				for ( int j = 0 ; j < pStage->newStage->numShaderTextures ; j++ ) {
+					if ( R_IsSceneCaptureImage( pStage->newStage->shaderTextureImages[j] ) ) {
+						if ( sort != SS_PORTAL_SKY ) {
+							sort = SS_POST_PROCESS;
+							coverage = MC_TRANSLUCENT;
+						}
+						i = numStages;
+						break;
+					}
 				}
 			}
 		}
@@ -2950,6 +3123,7 @@ bool idMaterial::Parse( const char *text, const int textLength ) {
 	if (numStages) {
 		stages = (shaderStage_t *)R_StaticAlloc( numStages * sizeof( stages[0] ) );
 		memcpy( stages, pd->parseStages, numStages * sizeof( stages[0] ) );
+		SelectLightGridDiffuseStage();
 	}
 
 	if ( numOps ) {
@@ -2974,6 +3148,30 @@ bool idMaterial::Parse( const char *text, const int textLength ) {
 		return false;
 	}
 	return true;
+}
+
+/*
+===============
+idMaterial::Parse
+===============
+*/
+bool idMaterial::Parse( const char *text, const int textLength, bool noCaching ) {
+	(void)noCaching;
+	return Parse( text, textLength );
+}
+
+/*
+===============
+idMaterial::Validate
+===============
+*/
+bool idMaterial::Validate( const char *psText, int iTextLength, idStr &strReportTo ) const {
+	(void)strReportTo;
+
+	idDecl *decl = declManager->AllocateDecl( DECL_MATERIAL );
+	const bool valid = DeclManager_ValidateParsedDecl( decl, DECL_MATERIAL, decl != NULL && decl->Parse( psText, iTextLength, false ) );
+	DeclManager_FreeAllocatedDecl( decl );
+	return valid;
 }
 
 /*
@@ -3042,6 +3240,41 @@ void idMaterial::AddReference() {
 
 	if ( portalImage ) {
 		portalImage->AddReference();
+	}
+}
+
+/*
+===============
+idMaterial::ResolveUse
+===============
+*/
+void idMaterial::ResolveUse() {
+	for ( int i = 0; i < numStages; i++ ) {
+		shaderStage_t *stage = &stages[i];
+		if ( stage->newStage != NULL ) {
+			for ( int j = 0; j < stage->newStage->numFragmentProgramImages; j++ ) {
+				if ( stage->newStage->fragmentProgramImages[j] != NULL ) {
+					stage->newStage->fragmentProgramImages[j]->AddUseCount( useCount );
+				}
+			}
+			for ( int j = 0; j < MAX_FRAGMENT_IMAGES; j++ ) {
+				if ( stage->newStage->shaderTextureImages[j] != NULL ) {
+					stage->newStage->shaderTextureImages[j]->AddUseCount( useCount );
+				}
+			}
+			continue;
+		}
+
+		if ( stage->texture.image != NULL ) {
+			stage->texture.image->AddUseCount( useCount );
+		}
+	}
+
+	if ( lightFalloffImage != NULL ) {
+		lightFalloffImage->AddUseCount( useCount );
+	}
+	if ( portalImage != NULL ) {
+		portalImage->AddUseCount( useCount );
 	}
 }
 
@@ -3283,8 +3516,12 @@ idMaterial::GetImageWidth
 =============
 */
 int idMaterial::GetImageWidth( void ) const {
-	assert( GetStage(0) && GetStage(0)->texture.image );
-	return GetStage(0)->texture.image->GetOpts().width;
+	if ( numStages > 0 && stages != NULL && stages[0].texture.image != NULL ) {
+		return stages[0].texture.image->GetOpts().width;
+	}
+
+	const idImage *image = GetEditorImage();
+	return image != NULL ? image->GetOpts().width : 0;
 }
 
 /*
@@ -3293,8 +3530,12 @@ idMaterial::GetImageHeight
 =============
 */
 int idMaterial::GetImageHeight( void ) const {
-	assert( GetStage(0) && GetStage(0)->texture.image );
-	return GetStage(0)->texture.image->GetOpts().height;
+	if ( numStages > 0 && stages != NULL && stages[0].texture.image != NULL ) {
+		return stages[0].texture.image->GetOpts().height;
+	}
+
+	const idImage *image = GetEditorImage();
+	return image != NULL ? image->GetOpts().height : 0;
 }
 
 /*
@@ -3496,6 +3737,63 @@ const shaderStage_t *idMaterial::GetBumpStage( void ) const {
 		}
 	}
 	return NULL;
+}
+
+/*
+===================
+idMaterial::SelectLightGridDiffuseStage
+===================
+*/
+void idMaterial::SelectLightGridDiffuseStage() {
+	lightGridDiffuseStage = -1;
+	if ( stages == NULL || numStages <= 0 ) {
+		return;
+	}
+
+	for ( int i = 0 ; i < numStages ; i++ ) {
+		const shaderStage_t &stage = stages[i];
+		if ( stage.lighting != SL_DIFFUSE ) {
+			continue;
+		}
+
+		if ( lightGridDiffuseStage < 0 ) {
+			lightGridDiffuseStage = i;
+		}
+		if ( stage.vertexColor == SVC_IGNORE ) {
+			lightGridDiffuseStage = i;
+			return;
+		}
+	}
+}
+
+/*
+===================
+idMaterial::GetLightGridDiffuseStageIndex
+===================
+*/
+int idMaterial::GetLightGridDiffuseStageIndex( const float *registers ) const {
+	if ( stages == NULL || numStages <= 0 ) {
+		return -1;
+	}
+
+	if ( lightGridDiffuseStage >= 0 && lightGridDiffuseStage < numStages ) {
+		const shaderStage_t &stage = stages[lightGridDiffuseStage];
+		if ( registers == NULL || registers[stage.conditionRegister] != 0.0f ) {
+			return lightGridDiffuseStage;
+		}
+	}
+
+	for ( int i = 0 ; i < numStages ; i++ ) {
+		if ( stages[i].lighting != SL_DIFFUSE ) {
+			continue;
+		}
+		if ( registers != NULL && registers[stages[i].conditionRegister] == 0.0f ) {
+			continue;
+		}
+		return i;
+	}
+
+	return -1;
 }
 
 /*

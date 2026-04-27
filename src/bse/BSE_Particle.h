@@ -630,6 +630,7 @@ public:
 	friend		class				sdOrientedLinkedParticle;
 	friend      class rvSegmentTemplate;
 	friend		class				rvSegment;
+	friend		class				rvDeclEffectEditLocal;
 
 									rvParticleTemplate( void ) : mFlags(0) { }
 									~rvParticleTemplate( void ) {}

@@ -90,6 +90,7 @@ void	ScriptEditorRun( void );
 void	DeclBrowserInit( const idDict *spawnArgs );
 void	DeclBrowserShutdown( void );
 void	DeclBrowserRun( void );
+bool	DeclBrowserPrint( const char *text );
 void	DeclBrowserReloadDeclarations( void );
 
 

@@ -40,6 +40,13 @@ If you have questions concerning this license or the applicable additional terms
 void OpenQ4_PrintFramePacingSnapshot( const char *reason );
 void OpenQ4_RecordMultiplayerFramePacing( int frameStartMsec );
 
+static const int OPENQ4_ENTITYDEF_MEDIA_CACHE_TOOL_MASK =
+	EDITOR_RADIANT |
+	EDITOR_MODVIEW |
+	EDITOR_AAS |
+	EDITOR_SPAWN_GUI |
+	EDITOR_DECL_VALIDATING;
+
 typedef enum {
 	ERP_NONE,
 	ERP_FATAL,						// exit the entire game with a popup window
@@ -66,6 +73,7 @@ idCVar com_buildInfo( "com_buildInfo", buildInfo.string, CVAR_SYSTEM|CVAR_ROM, "
 idCVar com_skipRenderer( "com_skipRenderer", "0", CVAR_BOOL|CVAR_SYSTEM, "skip the renderer completely" );
 idCVar com_machineSpec( "com_machineSpec", "-1", CVAR_INTEGER | CVAR_ARCHIVE | CVAR_SYSTEM, "hardware classification, -1 = not detected, 0 = low quality, 1 = medium quality, 2 = high quality, 3 = ultra quality" );
 idCVar com_purgeAll( "com_purgeAll", "0", CVAR_BOOL | CVAR_ARCHIVE | CVAR_SYSTEM, "purge everything between level loads" );
+idCVar com_WriteSingleDeclFile( "com_WriteSingleDeclFile", "0", CVAR_SYSTEM | CVAR_BOOL, "write a packed decl file after startup or map loads; use com_singleDeclFileWriteMode for OpenQ4 or exact-retail game-type coverage" );
 idCVar com_memoryMarker( "com_memoryMarker", "-1", CVAR_INTEGER | CVAR_SYSTEM | CVAR_INIT, "used as a marker for memory stats" );
 idCVar com_preciseTic( "com_preciseTic", "1", CVAR_BOOL|CVAR_SYSTEM, "run one game tick every async thread update" );
 idCVar com_asyncInput( "com_asyncInput", "0", CVAR_BOOL|CVAR_SYSTEM, "sample input from the async thread" );
@@ -228,6 +236,75 @@ volatile int	com_ticNumber;			// 60 hz tics
 int				com_editors;			// currently opened editor(s)
 bool			com_editorActive;		//  true if an editor has focus
 
+/*
+==================
+OpenQ4_GetActiveToolFlags
+==================
+*/
+int OpenQ4_GetActiveToolFlags( int flags ) {
+	if ( flags == EDITOR_ALL ) {
+		return com_editors;
+	}
+
+	return com_editors & flags;
+}
+
+/*
+==================
+OpenQ4_IsAnyToolActive
+==================
+*/
+bool OpenQ4_IsAnyToolActive( void ) {
+	return com_editorActive || OpenQ4_GetActiveToolFlags( EDITOR_ALL ) != 0;
+}
+
+/*
+==================
+OpenQ4_ToolPrint
+==================
+*/
+void OpenQ4_ToolPrint( const char *text ) {
+	bool toolPrinted = false;
+
+	if ( text == NULL || text[0] == '\0' ) {
+		return;
+	}
+
+#ifdef ID_ALLOW_TOOLS
+	if ( OpenQ4_GetActiveToolFlags( EDITOR_DECL ) != 0 ) {
+		toolPrinted = DeclBrowserPrint( text ) || toolPrinted;
+	}
+
+	if ( OpenQ4_GetActiveToolFlags( EDITOR_DEBUGGER ) != 0 ) {
+		DebuggerServerPrint( text );
+		toolPrinted = true;
+	}
+
+	if ( OpenQ4_GetActiveToolFlags( EDITOR_RADIANT ) != 0 ) {
+		RadiantPrint( text );
+		toolPrinted = true;
+	}
+
+	if ( OpenQ4_GetActiveToolFlags( EDITOR_MATERIAL ) != 0 ) {
+		MaterialEditorPrintConsole( text );
+		toolPrinted = true;
+	}
+#endif
+
+	if ( !toolPrinted ) {
+		common->Printf( "%s", text );
+	}
+}
+
+/*
+==================
+OpenQ4_ShouldCacheEntityDefMedia
+==================
+*/
+bool OpenQ4_ShouldCacheEntityDefMedia( bool noCaching ) {
+	return !noCaching && OpenQ4_GetActiveToolFlags( OPENQ4_ENTITYDEF_MEDIA_CACHE_TOOL_MASK ) == 0;
+}
+
 extern glconfig_t	glConfig;
 
 #ifdef _WIN32
@@ -325,12 +402,19 @@ public:
 	virtual bool				IsRenderableGameFrame( void ) const;
 	virtual void				SetRenderableGameFrame( bool in );
 	virtual const char *		GetErrorMessage( void ) const;
-	virtual void				InitTool( const toolFlag_t tool, const idDict *dict );
+	virtual void				InitTool( const int tool, const idDict *dict );
 	virtual bool				IsToolActive( void ) const;
 	virtual rvISourceControl *	GetSourceControl( void );
 	virtual void				ActivateTool( bool active );
 	virtual void				WriteConfigToFile( const char *filename );
 	virtual void				WriteFlaggedCVarsToFile( const char *filename, int flags, const char *setCmd );
+	virtual void				ModViewThink( void );
+	virtual void				RunAlwaysThinkGUIs( int time );
+	virtual void				DebuggerCheckBreakpoint( idInterpreter *interpreter, idProgram *program, int instructionPointer );
+	virtual bool				DoingDeclValidation( void );
+	virtual void				SetCrashReportAutoSendString( const char *psString );
+	virtual void				LoadToolsDLL( void );
+	virtual void				UnloadToolsDLL( void );
 	virtual void				BeginRedirect( char *buffer, int buffersize, void (*flush)( const char * ) );
 	virtual void				EndRedirect( void );
 	virtual void				SetRefreshOnPrint( bool set );
@@ -1229,7 +1313,10 @@ void idCommonLocal::StartupVariable( const char *match, bool once ) {
 		}
 
 		if ( !match || !idStr::Icmp( s, match ) ) {
-			const char *value = ( lineArgc >= 3 ) ? com_consoleLines[ i ].Argv( 2 ) : "";
+			// Match the regular "set" console command by preserving the full tail
+			// of the startup line as the cvar value. This keeps multi-word launch
+			// arguments intact even when a launcher/debugger doesn't quote them.
+			const char *value = ( lineArgc >= 3 ) ? com_consoleLines[ i ].Args( 2, lineArgc - 1 ) : "";
 			cvarSystem->SetCVarString( s, value );
 			if ( once ) {
 				// kill the line
@@ -1284,7 +1371,15 @@ bool idCommonLocal::AddStartupCommands( void ) {
 idCommonLocal::InitTool
 =================
 */
-void idCommonLocal::InitTool( const toolFlag_t tool, const idDict *dict ) {
+void idCommonLocal::InitTool( const int tool, const idDict *dict ) {
+	if ( cvarSystem->GetCVarBool( "r_fullscreen" ) ) {
+		cvarSystem->SetCVarBool( "r_fullscreen", false );
+		cmdSystem->BufferCommandText( CMD_EXEC_NOW, "vid_restart\n" );
+	}
+
+	LoadToolsDLL();
+	idKeyInput::ClearStates();
+
 #ifdef ID_ALLOW_TOOLS
 	if ( tool & EDITOR_SOUND ) {
 		SoundEditorInit( dict );
@@ -1294,7 +1389,22 @@ void idCommonLocal::InitTool( const toolFlag_t tool, const idDict *dict ) {
 		ParticleEditorInit( dict );
 	} else if ( tool & EDITOR_AF ) {
 		AFEditorInit( dict );
+	} else if ( tool & EDITOR_DECL ) {
+		DeclBrowserInit( dict );
+	} else if ( tool & EDITOR_PDA ) {
+		PDAEditorInit( dict );
+	} else if ( tool & EDITOR_SCRIPT ) {
+		ScriptEditorInit( dict );
+	} else if ( tool & EDITOR_GUI ) {
+		GUIEditorInit();
+	} else if ( tool & EDITOR_RADIANT ) {
+		RadiantInit();
+	} else if ( tool & EDITOR_MATERIAL ) {
+		MaterialEditorInit();
 	}
+#else
+	(void)tool;
+	(void)dict;
 #endif
 }
 
@@ -1393,11 +1503,78 @@ bool idCommonLocal::IsToolActive( void ) const {
 
 /*
 ==================
+idCommonLocal::DoingDeclValidation
+==================
+*/
+bool idCommonLocal::DoingDeclValidation( void ) {
+	const int validationMask = EDITOR_DECL | EDITOR_DECL_VALIDATING;
+	return OpenQ4_GetActiveToolFlags( validationMask ) == validationMask;
+}
+
+/*
+==================
 idCommonLocal::GetSourceControl
 ==================
 */
 rvISourceControl *idCommonLocal::GetSourceControl( void ) {
 	return NULL;
+}
+
+/*
+==================
+idCommonLocal::ModViewThink
+==================
+*/
+void idCommonLocal::ModViewThink( void ) {
+}
+
+/*
+==================
+idCommonLocal::RunAlwaysThinkGUIs
+==================
+*/
+void idCommonLocal::RunAlwaysThinkGUIs( int time ) {
+	uiManager->RunAlwaysThinkGUIs( time );
+}
+
+/*
+==================
+idCommonLocal::DebuggerCheckBreakpoint
+==================
+*/
+void idCommonLocal::DebuggerCheckBreakpoint( idInterpreter *interpreter, idProgram *program, int instructionPointer ) {
+#ifdef ID_ALLOW_TOOLS
+	DebuggerServerCheckBreakpoint( interpreter, program, instructionPointer );
+#else
+	(void)interpreter;
+	(void)program;
+	(void)instructionPointer;
+#endif
+}
+
+/*
+==================
+idCommonLocal::SetCrashReportAutoSendString
+==================
+*/
+void idCommonLocal::SetCrashReportAutoSendString( const char *psString ) {
+	(void)psString;
+}
+
+/*
+==================
+idCommonLocal::LoadToolsDLL
+==================
+*/
+void idCommonLocal::LoadToolsDLL( void ) {
+}
+
+/*
+==================
+idCommonLocal::UnloadToolsDLL
+==================
+*/
+void idCommonLocal::UnloadToolsDLL( void ) {
 }
 
 /*
@@ -1631,7 +1808,13 @@ Com_EditDecls_f
 ==================
 */
 static void Com_EditDecls_f( const idCmdArgs &args ) {
-	DeclBrowserInit( NULL );
+	idDict dict;
+
+	if ( args.Argc() > 1 ) {
+		dict.Set( args.Argv( 1 ), "1" );
+	}
+
+	commonLocal.InitTool( EDITOR_DECL, &dict );
 }
 
 /*
@@ -1965,6 +2148,7 @@ void Com_ReloadEngine_f( const idCmdArgs &args ) {
 	}
 
 	common->Printf( "============= ReloadEngine start =============\n" );
+	fileSystem->SetIsFileLoadingAllowed( true );
 	if ( !menu ) {
 		Sys_ShowConsole( 1, false );
 	}
@@ -1980,6 +2164,7 @@ void Com_ReloadEngine_f( const idCmdArgs &args ) {
 			session->StartMenu( );
 		}
 	}
+	fileSystem->SetIsFileLoadingAllowed( false );
 }
 
 /*
@@ -2220,7 +2405,30 @@ ReloadLanguage_f
 =================
 */
 void Com_ReloadLanguage_f( const idCmdArgs &args ) {
+	(void)args;
+	fileSystem->SetIsFileLoadingAllowed( true );
 	commonLocal.InitLanguageDict();
+	fileSystem->SetIsFileLoadingAllowed( false );
+}
+
+/*
+=================
+Com_WriteAssetLog_f
+=================
+*/
+void Com_WriteAssetLog_f( const idCmdArgs &args ) {
+	(void)args;
+	fileSystem->WriteAssetLog();
+}
+
+/*
+=================
+Com_ClearAssetLog_f
+=================
+*/
+void Com_ClearAssetLog_f( const idCmdArgs &args ) {
+	(void)args;
+	fileSystem->ClearAssetLog();
 }
 
 typedef idHashTable<idStrList> ListHash;
@@ -2778,6 +2986,8 @@ void idCommonLocal::InitCommands( void ) {
 	cmdSystem->AddCommand( "localizeGuis", Com_LocalizeGuis_f, CMD_FL_SYSTEM|CMD_FL_CHEAT, "localize guis" );
 	cmdSystem->AddCommand( "localizeMaps", Com_LocalizeMaps_f, CMD_FL_SYSTEM|CMD_FL_CHEAT, "localize maps" );
 	cmdSystem->AddCommand( "reloadLanguage", Com_ReloadLanguage_f, CMD_FL_SYSTEM, "reload language dict" );
+	cmdSystem->AddCommand( "writeAssetLog", Com_WriteAssetLog_f, CMD_FL_SYSTEM, "generates log file of all the assets loaded" );
+	cmdSystem->AddCommand( "clearAssetLog", Com_ClearAssetLog_f, CMD_FL_SYSTEM, "clears log of all the assets loaded" );
 
 	//D3XP Localization
 	cmdSystem->AddCommand( "localizeGuiParmsTest", Com_LocalizeGuiParmsTest_f, CMD_FL_SYSTEM, "Create test files that show gui parms localized and ignored." );
@@ -3286,7 +3496,7 @@ static void OpenQ4_DisableBSEWithWarning( const char *reason, bool showDialog = 
 #endif
 
 	::declEffectEdit = NULL;
-	::bseAllocDeclEffect = NULL;
+	::bseAllocDeclEffect = OpenQ4_AllocIntegratedBSEDeclEffect;
 	::bse = &bseDisabledLocal;
 }
 
@@ -3299,12 +3509,14 @@ void idCommonLocal::AttachBSE( void ) {
 #ifdef __DOOM_DLL__
 	::bse = &bseDisabledLocal;
 	::declEffectEdit = NULL;
-	::bseAllocDeclEffect = NULL;
+	::bseAllocDeclEffect = OpenQ4_AllocIntegratedBSEDeclEffect;
 
 #if !defined( ID_DEDICATED )
 	common->DPrintf( "Attaching integrated BSE.\n" );
 	::bse = OpenQ4_GetIntegratedBSEManager();
-	::bseAllocDeclEffect = OpenQ4_AllocIntegratedBSEDeclEffect;
+	::declEffectEdit = OpenQ4_GetIntegratedBSEDeclEffectEdit();
+#else
+	common->DPrintf( "Attaching integrated BSE decl allocator with disabled runtime manager.\n" );
 #endif
 #endif
 }
@@ -3577,6 +3789,10 @@ void idCommonLocal::Init( int argc, const char **argv, const char *cmdline ) {
 		if ( !AddStartupCommands() ) {
 			// if the user didn't give any commands, run default action
 			session->StartMenu( true );
+		}
+
+		if ( com_WriteSingleDeclFile.GetBool() ) {
+			declManager->WriteDeclFile();
 		}
 
 		Printf( "--- Common Initialization Complete ---\n" );

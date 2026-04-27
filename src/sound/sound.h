@@ -115,8 +115,12 @@ public:
 	virtual bool			SetDefaultText();
 	virtual const char* 	DefaultDefinition() const;
 	virtual bool			Parse( const char* text, const int textLength ) override;
+	virtual bool			Parse( const char* text, const int textLength, bool noCaching ) override;
 	virtual void			FreeData();
 	virtual void			List() const;
+	virtual void			SetReferencedThisLevel() override;
+	virtual bool			Validate( const char* psText, int iTextLength, idStr& strReportTo ) const override;
+	virtual bool			RebuildTextSource() override;
 
 // jmarshall: eval
 	virtual bool			IsVO_ForPlayer(void) const;
@@ -138,6 +142,24 @@ public:
 	virtual const char* 	GetSound( int index ) const;
 	virtual float			GetTimeLength() const;
 
+	float					GetLeadinVolume() const { return leadinVolume; }
+	int						GetNumEntries() const { return entries.Num(); }
+	idSoundSample*			GetLeadin( int index ) const { return ( index >= 0 && index < leadins.Num() ) ? leadins[index] : NULL; }
+	idSoundSample*			GetEntry( int index ) const { return ( index >= 0 && index < entries.Num() ) ? entries[index] : NULL; }
+	const char*				GetShakeData( int index ) const;
+	void					SetShakeData( int index, const char* ampData );
+	void					Purge( bool freeBaseBlocks );
+	void					LoadSampleData( int langIndex = -1 );
+
+	const char*				GetSampleName( int index ) const;
+	int						GetSamplesPerSec( int index ) const;
+	int						GetNumChannels( int index ) const;
+	int						GetNumSamples( int index ) const;
+	int						GetMemorySize( int index ) const;
+	const byte*				GetNonCacheData( int index ) const;
+
+	void					ExpandSmallOggs( bool force );
+
 private:
 	friend class idSoundWorldLocal;
 	friend class idSoundEmitterLocal;
@@ -155,10 +177,35 @@ private:
 	idList<idSoundSample*>	entries;
 	idStrList				shakes;
 
+	idStr					desc;
+	float					minFrequencyShift;
+	float					maxFrequencyShift;
+	bool					noShakes;
+	bool					frequentlyUsed;
+
 private:
 	void					Init();
 	bool					ParseShader( idLexer& src );
+	idSoundSample*			GetSampleByIndex( int index ) const;
 };
+
+class rvSoundShaderEdit {
+public:
+	virtual					~rvSoundShaderEdit() {}
+	virtual const char*		GetSampleName( const idSoundShader* sound, int index ) const = 0;
+	virtual int				GetSamplesPerSec( const idSoundShader* sound, int index ) const = 0;
+	virtual int				GetNumChannels( const idSoundShader* sound, int index ) const = 0;
+	virtual int				GetNumSamples( const idSoundShader* sound, int index ) const = 0;
+	virtual int				GetMemorySize( const idSoundShader* sound, int index ) const = 0;
+	virtual const byte*		GetNonCacheData( const idSoundShader* sound, int index ) const = 0;
+	virtual void			LoadSampleData( idSoundShader* sound, int langIndex = -1 ) = 0;
+	virtual void			ExpandSmallOggs( idSoundShader* sound, bool force ) = 0;
+	virtual const char*		GetShakeData( idSoundShader* sound, int index ) = 0;
+	virtual void			SetShakeData( idSoundShader* sound, int index, const char* ampData ) = 0;
+	virtual void			Purge( idSoundShader* sound, bool freeBaseBlocks ) = 0;
+};
+
+extern rvSoundShaderEdit* soundShaderEdit;
 
 /*
 ===============================================================================

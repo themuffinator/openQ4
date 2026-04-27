@@ -97,7 +97,7 @@ public:
 	virtual void					RevertToEditorOriginal( class rvDeclEffect *edit ) = 0;
 
 	virtual void 					Init( class rvSegmentTemplate *edit, class rvDeclEffect *effect ) = 0;
-	virtual bool 					Parse( class rvSegmentTemplate *edit, class rvDeclEffect *effect, int type, class idLexer *lexer ) = 0;
+	virtual bool 					Parse( class rvSegmentTemplate *edit, class rvDeclEffect *effect, int type, class idParser *lexer ) = 0;
 	virtual void 					Finish( class rvSegmentTemplate *edit, class rvDeclEffect *effect ) = 0;
 	virtual bool					Compare( class rvSegmentTemplate *edit, const class rvSegmentTemplate *other ) const = 0;
 	virtual void					SetName( class rvSegmentTemplate *edit, const char *name ) = 0;

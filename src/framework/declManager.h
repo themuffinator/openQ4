@@ -101,7 +101,7 @@ public:
 	virtual void			GetText( char *text ) const = 0;
 	virtual int				GetTextLength( void ) const = 0;
 // RAVEN BEGIN
-	//virtual int				GetCompressedLength( void ) const = 0;
+	virtual int				GetCompressedLength( void ) const = 0;
 // RAVEN END
 	virtual void			SetText( const char *text ) = 0;
 	virtual bool			ReplaceSourceFileText( void ) = 0;
@@ -122,7 +122,7 @@ public:
 // jscott: to prevent a recursive crash
 	virtual	bool			RebuildTextSource( void ) { return( false ); }
 // scork: Validation call for detailed error-reporting
-	//virtual bool			Validate( const char *psText, int iLength, idStr &strReportTo ) const = 0;
+	virtual bool			Validate( const char *psText, int iLength, idStr &strReportTo ) const = 0;
 // RAVEN END
 };
 
@@ -202,6 +202,9 @@ public:
 	// Returns the length of the decl text.
 	int						GetTextLength(void) const { return base->GetTextLength(); }
 
+	// Returns the compressed length of the decl text.
+	int						GetCompressedLength(void) const { return base->GetCompressedLength(); }
+
 	// Sets new decl text.
 	void					SetText(const char* text) { base->SetText(text); }
 
@@ -217,8 +220,6 @@ public:
 
 	// Returns true if the decl was ever referenced.
 	bool					EverReferenced(void) const { return base->EverReferenced(); }
-
-	void					SetReferencedThisLevel( void ) { base->SetReferencedThisLevel(); }
 
 public:
 	// Sets textSource to a default text if necessary.
@@ -240,7 +241,7 @@ public:
 	// The subclass can call MakeDefault() internally at any point if
 	// there are parse errors.
 	virtual bool			Parse(const char* text, const int textLength) { return base->Parse(text, textLength, false); }
-	virtual bool			Parse(const char* text, const int textLength, bool noCaching) { return Parse(text, textLength); }
+	virtual bool			Parse(const char* text, const int textLength, bool noCaching) { return base->Parse(text, textLength, noCaching); }
 
 	// Frees any pointers held by the subclass. This may be called before
 	// any Parse(), so the constructor must have set sane values. The decl will be
@@ -261,9 +262,41 @@ public:
 	// explicit data.
 	virtual void			Print(void) const { base->Print(); }
 
+// RAVEN BEGIN
+							// Rebuilds the text source of the decl for saving
+	virtual	bool			RebuildTextSource( void ) { return( base->RebuildTextSource() ); }
+
+							// Marks this decl as referenced this level
+	virtual void			SetReferencedThisLevel( void ) { base->SetReferencedThisLevel(); }
+
+// scork: for detailed error reporting
+	virtual bool			Validate( const char *psText, int iLength, idStr &strReportTo ) const { return base->Validate( psText, iLength, strReportTo ); }
+// RAVEN END
+
 public:
 	idDeclBase* base;
 };
+
+ID_INLINE bool DeclManager_ValidateParsedDecl( const idDecl *decl, declType_t type, bool parsed ) {
+	// Doom 3 / Quake 4 skin parsing reports success through the defaulted state
+	// rather than a true return value.
+	if ( type == DECL_SKIN ) {
+		return decl == NULL || decl->GetState() != DS_DEFAULTED;
+	}
+
+	return parsed && ( decl == NULL || decl->GetState() != DS_DEFAULTED );
+}
+
+ID_INLINE void DeclManager_FreeAllocatedDecl( idDecl *decl ) {
+	if ( decl == NULL ) {
+		return;
+	}
+
+	idDeclBase *base = decl->base;
+	decl->base = NULL;
+	delete decl;
+	delete base;
+}
 
 
 
@@ -302,6 +335,8 @@ class idDeclManager {
 public:
 	virtual					~idDeclManager( void ) {}
 
+	virtual void			SetInsideLoad( bool var ) = 0;
+	virtual bool			GetInsideLoad( void ) = 0;
 	virtual void			Init( void ) = 0;
 	virtual void			Shutdown( void ) = 0;
 	virtual void			Reload( bool force ) = 0;
@@ -412,20 +447,20 @@ public:
 	virtual	const rvDeclPlayback *	PlaybackByIndex( int index, bool forceParse = true ) = 0;
 	virtual const rvDeclEffect *	EffectByIndex( int index, bool forceParse = true ) = 0;
 
-	virtual void					StartPlaybackRecord(rvDeclPlayback* playback) { }
-	virtual bool					SetPlaybackData(rvDeclPlayback* playback, int now, int control, class rvDeclPlaybackData* pbd) { return false; }
-	virtual bool					GetPlaybackData( const rvDeclPlayback *playback, int control, int now, int last, class rvDeclPlaybackData *pbd ) { return false; }
-	virtual bool					FinishPlayback( rvDeclPlayback *playback ) { return false; }
+	virtual void					StartPlaybackRecord(rvDeclPlayback* playback) = 0;
+	virtual bool					SetPlaybackData(rvDeclPlayback* playback, int now, int control, class rvDeclPlaybackData* pbd) = 0;
+	virtual bool					GetPlaybackData( const rvDeclPlayback *playback, int control, int now, int last, class rvDeclPlaybackData *pbd ) = 0;
+	virtual bool					FinishPlayback( rvDeclPlayback *playback ) = 0;
 // jmarshall - used by the quake 4 tools.
-	//virtual	idStr					GetNewName( declType_t type, const char *base ) = 0;
-	//virtual	const char *			GetDeclTypeName( declType_t type ) = 0;
-	//virtual size_t					ListDeclSummary( const idCmdArgs &args ) = 0; 
-	//virtual void					RemoveDeclFile( const char *file ) = 0;
+	virtual	idStr					GetNewName( declType_t type, const char *base ) = 0;
+	virtual	const char *			GetDeclTypeName( declType_t type ) = 0;
+	virtual size_t					ListDeclSummary( const idCmdArgs &args ) = 0;
+	virtual void					RemoveDeclFile( const char *file ) = 0;
 // jmarshall end
 
 // scork: Validation call for detailed error-reporting
-	//virtual bool					Validate( declType_t type, int iIndex, idStr &strReportTo ) = 0;
-	//virtual idDecl *				AllocateDecl( declType_t type ) = 0;
+	virtual bool					Validate( declType_t type, int iIndex, idStr &strReportTo ) = 0;
+	virtual idDecl *				AllocateDecl( declType_t type ) = 0;
 
 #if defined(_XENON)
 // mwhitlock: Xenon texture streaming

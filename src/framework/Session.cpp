@@ -1409,7 +1409,9 @@ static bool Session_IsLightGridAtlasArtifact( const idStr &relativePath ) {
 	if ( fileName.Icmpn( "area", 4 ) != 0 ) {
 		return false;
 	}
-	return idStr::FindText( fileName.c_str(), "_lightgrid_amb" ) >= 0;
+	return idStr::FindText( fileName.c_str(), "_lightgrid_amb" ) >= 0 ||
+		idStr::FindText( fileName.c_str(), "_lightgrid_vis" ) >= 0 ||
+		idStr::FindText( fileName.c_str(), "_lightgrid_pos" ) >= 0;
 }
 
 static void Session_RemoveLightGridAtlasArtifacts( const idStr &atlasDir, const char *extension ) {
@@ -1476,6 +1478,9 @@ static bool Session_CurrentLightGridOutputsComplete( const lightGridBakeOptions_
 	if ( fileSystem->FindFile( lightGridPath.c_str(), true ) == FIND_NO ) {
 		return false;
 	}
+	if ( !R_LightGridFileMatchesBakeOptions( lightGridPath.c_str(), options, world ) ) {
+		return false;
+	}
 
 	for ( int areaIndex = 0; areaIndex < world->numPortalAreas; areaIndex++ ) {
 		const LightGrid &lightGrid = world->portalAreas[ areaIndex ].lightGrid;
@@ -1485,6 +1490,14 @@ static bool Session_CurrentLightGridOutputsComplete( const lightGridBakeOptions_
 
 		idStr atlasPath = va( "%s/area%i_lightgrid_amb.tga", atlasDir.c_str(), areaIndex );
 		if ( fileSystem->FindFile( atlasPath.c_str(), true ) == FIND_NO ) {
+			return false;
+		}
+		idStr visibilityPath = va( "%s/area%i_lightgrid_vis.tga", atlasDir.c_str(), areaIndex );
+		if ( fileSystem->FindFile( visibilityPath.c_str(), true ) == FIND_NO ) {
+			return false;
+		}
+		idStr probePath = va( "%s/area%i_lightgrid_pos.tga", atlasDir.c_str(), areaIndex );
+		if ( fileSystem->FindFile( probePath.c_str(), true ) == FIND_NO ) {
 			return false;
 		}
 	}
@@ -3119,6 +3132,11 @@ void idSessionLocal::StartNewGame( const char *mapName, bool devmap, const char 
 	mapSpawnData.syncedCVars = *cvarSystem->MoveCVarsToDict( CVAR_NETWORKSYNC );
 
 	MoveToNewMap( mapName );
+	if ( com_WriteSingleDeclFile.GetBool() ) {
+		Frame();
+		UpdateScreen( true );
+		declManager->WriteDeclFile();
+	}
 #endif
 }
 
@@ -3639,6 +3657,15 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 	} else {
 		reloadingSameMap = false;
 		currentMapName = fullMapName;
+	}
+	fileSystem->SetAssetLogName( fullMapName.c_str() );
+
+	if ( !reloadingSameMap && com_SingleDeclFile.GetBool() ) {
+		declManager->FlushDecls();
+		declManager->StartLoadingDecls();
+		declManager->LoadDeclsFromFile();
+		declManager->LoadDeclsFromFile();
+		declManager->FinishLoadingDecls();
 	}
 
 	// note which media we are going to need to load

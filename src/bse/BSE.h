@@ -60,9 +60,9 @@ typedef enum eBSESegment
 	SEG_DECAL,						// Leaves an idDecal
 	SEG_LIGHT,						// Displays a 3D light
 	SEG_DELAY,						// A control segment for looping
+	SEG_DOUBLEVISION,				// Triggers the id double-vision effect
 	SEG_SHAKE,						// Triggers a screen shake
 	SEG_TUNNEL,						// Triggers the id tunnel vision effect
-	SEG_DOUBLEVISION,				// Triggers the id double-vision effect
 	SEG_COUNT
 };
 
@@ -201,6 +201,8 @@ public:
 	friend	class			rvSegment;
 	friend	class			rvBSE;
 	friend	class			rvSegmentTemplateWrapper;
+	friend	class			rvDeclEffect;
+	friend	class			rvDeclEffectEditLocal;
 
 	rvSegmentTemplate(void) { Init(NULL); SetEnabled(true); }
 	~rvSegmentTemplate(void) {}
@@ -333,10 +335,11 @@ public:
 	friend	class			rvBSE;
 	friend	class			rvEffectTemplateWrapper;
 	friend  class			rvBSEManagerLocal;
+	friend	class			rvDeclEffectEditLocal;
 
 	rvDeclEffect(void) { Init(); }
 	rvDeclEffect(const rvDeclEffect& copy) { Init(); *this = copy; }
-	virtual 						~rvDeclEffect(void) { }
+	virtual 						~rvDeclEffect(void) { DeleteEditorOriginal(); FreeData(); }
 
 	bool					operator== (const rvDeclEffect& comp) const { return Compare(comp); }
 	bool					operator!= (const rvDeclEffect& comp) const { return !Compare(comp); }
@@ -346,10 +349,19 @@ public:
 	virtual bool					SetDefaultText(void);
 	virtual const char* DefaultDefinition(void) const;
 	virtual bool					Parse(const char* text, const int textLength) override;
+	virtual bool					Parse(const char* text, const int textLength, bool noCaching) override;
 	virtual void					FreeData(void);
 	virtual size_t					Size(void) const;
 
 	static	void					CacheFromDict(const idDict& dict);
+
+	void					CopyData(const rvDeclEffect& copy);
+	int						AddSegment(const rvSegmentTemplate& add);
+	void					DeleteSegment(int index);
+	void					CreateEditorOriginal(void);
+	void					DeleteEditorOriginal(void);
+	bool					CompareToEditorOriginal(void) const;
+	void					RevertToEditorOriginal(void);
 
 	void					SetFlag(bool on, int flag) { on ? mFlags |= flag : mFlags &= ~flag; }
 
@@ -369,8 +381,8 @@ public:
 	void					SetOrientateIdentity(bool orientateIdentity) { SetFlag(orientateIdentity, ETFLAG_ORIENTATE_IDENTITY); }
 	void					SetUsesAmbientCubeMap(bool usesAmbientCubeMap) { SetFlag(usesAmbientCubeMap, ETFLAG_USES_AMBIENT_CUBEMAP); }
 
-	rvSegmentTemplate* GetSegmentTemplate(int i) { return(&mSegmentTemplates[i]); }
-	const rvSegmentTemplate* GetSegmentTemplate(int i) const { return(&mSegmentTemplates[i]); }
+	rvSegmentTemplate* GetSegmentTemplate(int i) { return (i >= 0 && i < mSegmentTemplates.Num()) ? &mSegmentTemplates[i] : NULL; }
+	const rvSegmentTemplate* GetSegmentTemplate(int i) const { return (i >= 0 && i < mSegmentTemplates.Num()) ? &mSegmentTemplates[i] : NULL; }
 	rvSegmentTemplate* GetSegmentTemplate(const char* name);
 
 	int						GetTrailSegmentIndex(const idStr& name);
@@ -384,7 +396,7 @@ public:
 	void					SetSize(float size) { mSize = size; }
 
 	int						GetNumSegmentTemplates(void) const { return(mSegmentTemplates.Num()); }
-	rvSegmentTemplate* GetSegmentTemplate(const char* name) const;
+	const rvSegmentTemplate* GetSegmentTemplate(const char* name) const;
 
 	void					Init(void);
 	void					Finish(void);
@@ -403,6 +415,7 @@ public:
 private:
 	bool					Compare(const rvDeclEffect& comp) const;
 
+	rvDeclEffect*			mEditorOriginal;
 	int						mFlags;
 	float					mMinDuration;				// Minimum possible duration of the effect
 	float					mMaxDuration;				// Maximum possible duration of the effect

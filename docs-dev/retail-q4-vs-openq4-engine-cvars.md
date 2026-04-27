@@ -353,7 +353,6 @@ Generated on 2026-04-19.
 | `s_dsp` | src/sys/linux/sound.cpp:147 |
 | `s_lockListener` | src/sound/snd_world.cpp:32 |
 | `s_maxEmitterChannels` | src/sound/snd_world.cpp:34 |
-| `s_maxSamples` | src/sound/snd_system.cpp:46<br>src/sound/snd_system.cpp:50 |
 | `s_meterPosition` | src/sound/OpenAL/AL_SoundHardware.cpp:38 |
 | `s_muteUnfocused` | src/framework/Session.cpp:61 |
 | `s_openALEfxDebugMode` | src/sound/snd_system.cpp:39 |

@@ -120,8 +120,21 @@ void idDeviceContext::SizeIcon( embeddedIcon_t &icon ) {
 		return;
 	}
 
-	const float imageWidth = static_cast<float>( icon.material->GetImageWidth() );
-	const float imageHeight = static_cast<float>( icon.material->GetImageHeight() );
+	if ( icon.material->GetNumStages() <= 0 ) {
+		icon.width = 0.0f;
+		icon.height = 0.0f;
+		return;
+	}
+
+	const shaderStage_t *stage = icon.material->GetStage( 0 );
+	if ( stage == NULL || stage->texture.image == NULL ) {
+		icon.width = 0.0f;
+		icon.height = 0.0f;
+		return;
+	}
+
+	const float imageWidth = static_cast<float>( stage->texture.image->GetOpts().width );
+	const float imageHeight = static_cast<float>( stage->texture.image->GetOpts().height );
 	if ( imageWidth <= 0.0f || imageHeight <= 0.0f ) {
 		icon.width = 0.0f;
 		icon.height = 0.0f;

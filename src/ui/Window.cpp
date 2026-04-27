@@ -511,6 +511,7 @@ void idWindow::CommonInit() {
 	borderSize = 0;
 	noTime = false;
 	visible = true;
+	alwaysThink = false;
 	textAlign = 0;
 	textAlignx = 0;
 	textAligny = 0;
@@ -3034,7 +3035,7 @@ bool idWindow::ParseInternalVar(const char *_name, idParser *src) {
 	}
 // jmarshall - quake 4
 	if (idStr::Icmp(_name, "alwaysThink") == 0) {
-		src->ParseInt();
+		alwaysThink = src->ParseBool();
 		return true;
 	}
 	if (idStr::Icmp(_name, "chatWindow") == 0) {
@@ -3175,6 +3176,7 @@ void idWindow::SetInitialState(const char *_name) {
 	forceAspectHeight = 480.0;
 	noTime = false;
 	visible = true;
+	alwaysThink = false;
 	flags = 0;
 }
 

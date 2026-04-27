@@ -42,6 +42,7 @@ public:
 	virtual				~DialogDeclBrowser();
 
 	void				ReloadDeclarations( void );
+	bool				SetStatusText( const char *text );
 	bool				CompareDecl( HTREEITEM item, const char *name ) const;
 
 	//{{AFX_VIRTUAL(DialogDeclBrowser)

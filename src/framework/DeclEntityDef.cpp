@@ -129,9 +129,9 @@ bool idDeclEntityDef::Parse( const char *text, const int textLength, bool noCach
 		dict.SetDefaults( &defList[ i ]->dict );
 	}
 
-	// precache all referenced media
-	// do this as long as we arent in modview
-	if ( !noCaching && !( com_editors & (EDITOR_RADIANT|EDITOR_AAS) ) ) {
+	// Keep the retail-style tool-state decision centralized so validation/tool
+	// modes do not drift away from entityDef media-cache behavior.
+	if ( OpenQ4_ShouldCacheEntityDefMedia( noCaching ) ) {
 		game->CacheDictionaryMedia( &dict );
 	}
 
@@ -159,4 +159,21 @@ Dumps all key/value pairs, including inherited ones
 */
 void idDeclEntityDef::Print( void ) {
 	dict.Print();
+}
+
+/*
+================
+idDeclEntityDef::Validate
+================
+*/
+bool idDeclEntityDef::Validate( const char *psText, int iTextLength, idStr &strReportTo ) const {
+	(void)strReportTo;
+
+	idDecl *decl = declManager->AllocateDecl( DECL_ENTITYDEF );
+	const bool valid = DeclManager_ValidateParsedDecl( decl, DECL_ENTITYDEF, decl != NULL && decl->Parse( psText, iTextLength, false ) );
+	if ( decl != NULL ) {
+		decl->FreeData();
+	}
+	DeclManager_FreeAllocatedDecl( decl );
+	return valid;
 }
