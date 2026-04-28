@@ -10,6 +10,7 @@ Process:
 
 ## Ready For Changelog
 
+- [x] Ragdoll startup now follows Quake 4's retail articulated-figure path again: stock corpses no longer pick up OpenQ4-only AF handoff velocity/depenetration heuristics or extra per-body angular-velocity injection during pose transfer, and the AF contact solver is back on retail's tighter contact budget and per-pair planar-contact cap for SP/MP ragdolls.
 - [x] Animated MD5 reference bounds now use exact posed mesh extents when available, eliminating the fixed-screen-square scissor clipping that could chop up player heads/bodies and attached weapons in stock scenes such as the normal `game/airdefense2` launch path.
 - [x] VS Code launch-task runtime parity is fixed on Windows: the client and dedicated entry path now preserves native Windows argv quoting, startup `+set` handling now preserves the full multi-word value tail for debugger/task launches that fail to quote space-containing arguments cleanly, and projected shadow-map defaults now carry enough receiver bias to stop stock flashlight scenes such as `game/airdefense2` from collapsing into near-black self-shadowing.
 - [x] Decl reload progress now uses a shared retail-style tool print path: `Common.*` centralizes tool-routed print behavior, `reloadDecls` progress lines now use that helper instead of printing straight to the runtime console, and the decl browser can surface reload progress in its status bar while normal runtime sessions still fall back to the usual console/log output.
