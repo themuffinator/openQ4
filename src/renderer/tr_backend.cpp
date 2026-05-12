@@ -29,6 +29,8 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #include "tr_local.h"
+#include "RenderGraph.h"
+#include "RendererMetrics.h"
 
 
 frameData_t		*frameData;
@@ -671,11 +673,15 @@ smp extensions, or asyncronously by another thread.
 int		backEndStartTime, backEndFinishTime;
 void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 	// r_debugRenderToTexture
-	int	c_draw3d = 0, c_draw2d = 0, c_setBuffers = 0, c_swapBuffers = 0, c_copyRenders = 0;
+	int	c_draw3d = 0, c_draw2d = 0, c_setBuffers = 0, c_swapBuffers = 0, c_copyRenders = 0, c_specialEffects = 0, c_renderTargetOps = 0;
 
 	if ( cmds->commandId == RC_NOP && !cmds->next ) {
 		return;
 	}
+
+	idRenderGraph legacyGraph;
+	R_RenderGraph_BuildLegacyFrameGraph( cmds, legacyGraph );
+	R_RenderGraph_LogIfVerbose( legacyGraph );
 
 	backEndStartTime = Sys_Milliseconds();
 
@@ -702,16 +708,20 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 			break;
 		case RC_DRAW_SPECIAL_EFFECTS:
 			RB_DrawSpecialEffects( cmds );
+			c_specialEffects++;
 			break;
 // jmarshall
 		case RC_SET_RENDERTEXTURE:
 			RB_SetRenderTexture(cmds);
+			c_renderTargetOps++;
 			break;
 		case RC_RESOLVE_MSAA:
 			RB_ResolveMSAA(cmds);
+			c_renderTargetOps++;
 			break;
 		case RC_CLEAR_RENDERTARGET:
 			RB_ClearRenderTarget(cmds);
+			c_renderTargetOps++;
 			break;
 // jmarshall end
 		case RC_SET_BUFFER:
@@ -739,6 +749,7 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 	// stop rendering on this thread
 	backEndFinishTime = Sys_Milliseconds();
 	backEnd.pc.msec = backEndFinishTime - backEndStartTime;
+	R_RendererMetrics_RecordBackendCommands( c_draw3d, c_draw2d, c_setBuffers, c_swapBuffers, c_copyRenders, c_specialEffects, c_renderTargetOps );
 
 	if ( r_debugRenderToTexture.GetInteger() == 1 ) {
 		common->Printf( "3d: %i, 2d: %i, SetBuf: %i, SwpBuf: %i, CpyRenders: %i, CpyFrameBuf: %i\n", c_draw3d, c_draw2d, c_setBuffers, c_swapBuffers, c_copyRenders, backEnd.c_copyFrameBuffer );

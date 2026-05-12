@@ -31,6 +31,8 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "tr_local.h"
 #include "DXT/DXTCodec.h"
+#include "RendererBootstrap.h"
+#include "RendererUpload.h"
 #include "../framework/RenderDoc.h"
 
 // Detect the Microsoft software OpenGL wrapper and guide the user toward
@@ -119,6 +121,7 @@ glconfig_t	glConfig;
 static void GfxInfo_f( void );
 
 const char *r_rendererArgs[] = { "best", "arb", "arb2", "Cg", "exp", "nv10", "nv20", "r200", NULL };
+const char *r_glTierArgs[] = { "auto", "legacy", "gl33", "gl41", "gl43", "gl45", "gl46", NULL };
 
 idCVar r_inhibitFragmentProgram( "r_inhibitFragmentProgram", "0", CVAR_RENDERER | CVAR_BOOL, "ignore the fragment program extension" );
 idCVar r_glDriver( "r_glDriver", "", CVAR_RENDERER, "\"opengl32\", etc." );
@@ -253,6 +256,9 @@ idCVar r_brightness( "r_brightness", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FL
 
 idCVar r_renderer( "r_renderer", "best", CVAR_RENDERER | CVAR_ARCHIVE, "hardware specific renderer path to use", r_rendererArgs, idCmdSystem::ArgCompletion_String<r_rendererArgs> );
 idCVar r_actualRenderer( "r_actualRenderer", "UNINITIALIZED", CVAR_RENDERER | CVAR_ROM, "actual active renderer backend after request/fallback selection" );
+idCVar r_glTier( "r_glTier", "auto", CVAR_RENDERER | CVAR_ARCHIVE, "OpenGL renderer tier: auto, legacy, gl33, gl41, gl43, gl45, gl46", r_glTierArgs, idCmdSystem::ArgCompletion_String<r_glTierArgs> );
+idCVar r_glDebugContext( "r_glDebugContext", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "request a debug OpenGL context when the platform backend supports it" );
+idCVar r_rendererMetrics( "r_rendererMetrics", "0", CVAR_RENDERER | CVAR_INTEGER, "renderer metrics: 0 = off, 1 = periodic summary, 2 = per-frame/pass detail", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
 idCVar r_useSimpleInteraction( "r_useSimpleInteraction", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "use Quake 4's simpler ARB interaction shader pair as an explicit compatibility fallback; may reduce material lighting quality" );
 idCVar r_interactionColorMode( "r_interactionColorMode", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "interaction vertex-color mode: 0 = auto, 1 = packed env16.xy, 2 = vector env16/env17", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
 idCVar r_shaderReport( "r_shaderReport", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "shader diagnostics: 0 = off, 1 = startup/vid_restart summary, 2 = also warn on invalid program use", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
@@ -438,13 +444,24 @@ R_CheckExtension
 =================
 */
 bool R_CheckExtension( char *name ) {
-	if ( !strstr( glConfig.extensions_string, name ) ) {
+	if ( name == NULL || name[0] == '\0' ) {
+		return false;
+	}
+
+	if ( !GLCapabilityProbe_HasExtension( name ) ) {
 		common->Printf( "X..%s not found\n", name );
 		return false;
 	}
 
 	common->Printf( "...using %s\n", name );
 	return true;
+}
+
+static void R_RendererTierSelfTest_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !RendererTierSelect_RunSelfTest() ) {
+		common->Warning( "Renderer tier selector self-test failed" );
+	}
 }
 
 /*
@@ -459,8 +476,26 @@ static void R_CheckPortableExtensions( void ) {
 
 	common->Printf("Init Glew...\n");
 
+	glewExperimental = GL_TRUE;
 	if (glewInit() != GLEW_OK)
 		common->FatalError("Failed to init glew!\n");
+	while ( glGetError() != GL_NO_ERROR ) {
+	}
+
+	GLCapabilityProbe_Build( glConfig.backendCaps, glConfig.version_string, glConfig.extensions_string );
+	glConfig.extensions_string = GLCapabilityProbe_ExtensionString();
+	RendererBootstrap_BeginOpenGL( glConfig.backendCaps, r_glTier.GetString() );
+	glConfig.rendererTier = RendererBootstrap_GetState().selectedTier;
+	glConfig.renderFeatures = RendererBootstrap_GetState().features;
+
+	const rendererTierPreference_t requestedTier = RendererTierPreference_FromString( r_glTier.GetString() );
+	const rendererTier_t forcedTier = RendererTierPreference_ToForcedTier( requestedTier );
+	if ( forcedTier != RENDERER_TIER_NULL && forcedTier != glConfig.rendererTier ) {
+		common->Warning(
+			"r_glTier \"%s\" is not fully supported by this context; selected %s instead",
+			r_glTier.GetString(),
+			RendererTier_Name( glConfig.rendererTier ) );
+	}
 
 	// GL_ARB_multitexture
 	glConfig.multitextureAvailable = R_CheckRequiredExtension( "GL_ARB_multitexture" );
@@ -639,6 +674,20 @@ static void R_CheckPortableExtensions( void ) {
  	// GL_EXT_depth_bounds_test
  	glConfig.depthBoundsTestAvailable = R_CheckExtension( "EXT_depth_bounds_test" );
 
+	glConfig.backendCaps.maxTextureSize = glConfig.maxTextureSize;
+	glConfig.backendCaps.maxTextureUnits = glConfig.maxTextureUnits;
+	glConfig.backendCaps.maxTextureCoords = glConfig.maxTextureCoords;
+	glConfig.backendCaps.maxTextureImageUnits = glConfig.maxTextureImageUnits;
+	glConfig.backendCaps.maxDrawBuffers = glConfig.maxDrawBuffers;
+	glConfig.backendCaps.maxColorAttachments = glConfig.maxColorAttachments;
+	glConfig.backendCaps.hasARBVertexProgram = glConfig.ARBVertexProgramAvailable;
+	glConfig.backendCaps.hasARBFragmentProgram = glConfig.ARBFragmentProgramAvailable;
+	glConfig.backendCaps.hasVBO = glConfig.ARBVertexBufferObjectAvailable;
+	glConfig.backendCaps.hasPBO = glConfig.pixelBufferObjectAvailable;
+	glConfig.backendCaps.hasGLSL = glConfig.GLSLProgramAvailable;
+	glConfig.backendCaps.hasSRGBTextures = glConfig.textureSRGBAvailable;
+	glConfig.backendCaps.hasFramebufferSRGB = glConfig.framebufferSRGBAvailable;
+	glConfig.backendCaps.hasMRT = glConfig.maxDrawBuffers >= 4 && glConfig.maxColorAttachments >= 4;
 
 }
 
@@ -887,6 +936,18 @@ void R_InitOpenGL( void ) {
 	glConfig.renderer_string = (const char *)glGetString(GL_RENDERER);
 	glConfig.version_string = (const char *)glGetString(GL_VERSION);
 	glConfig.extensions_string = (const char *)glGetString(GL_EXTENSIONS);
+	if ( glConfig.vendor_string == NULL ) {
+		glConfig.vendor_string = "unknown";
+	}
+	if ( glConfig.renderer_string == NULL ) {
+		glConfig.renderer_string = "unknown";
+	}
+	if ( glConfig.version_string == NULL ) {
+		glConfig.version_string = "0.0";
+	}
+	if ( glConfig.extensions_string == NULL ) {
+		glConfig.extensions_string = "";
+	}
 
 	// Query the actual framebuffer bit depths from the active context.
 	// Some platform backends don't populate these fields directly.
@@ -946,12 +1007,17 @@ void R_InitOpenGL( void ) {
 	// parse our vertex and fragment programs, possibly disably support for
 	// one of the paths if there was an error
 	R_ARB2_Init();
+	RendererBootstrap_FinalizeLegacyBridge( glConfig.allowARB2Path );
+	glConfig.rendererTier = RendererBootstrap_GetState().selectedTier;
+	glConfig.renderFeatures = RendererBootstrap_GetState().features;
 	if ( !glConfig.allowARB2Path ) {
 		R_ErrorForMissingRequiredOpenGLFeatures();
 	}
 
 	cmdSystem->AddCommand( "reloadARBprograms", R_ReloadARBPrograms_f, CMD_FL_RENDERER, "reloads ARB programs" );
 	R_ReloadARBPrograms_f( idCmdArgs() );
+
+	R_RendererUpload_Init( glConfig.backendCaps );
 
 	// allocate the vertex array range or vertex objects
 	vertexCache.Init();
@@ -2304,6 +2370,30 @@ void GfxInfo_f( const idCmdArgs &args ) {
 
 	common->Printf( "Requested renderer path: %s\n", r_renderer.GetString() );
 	common->Printf( "Active renderer path: %s\n", r_actualRenderer.GetString() );
+	common->Printf( "Requested GL tier: %s\n", r_glTier.GetString() );
+	common->Printf( "Selected renderer tier: %s\n", RendererTier_Name( glConfig.rendererTier ) );
+	common->Printf( "GL context profile: %s", RendererContextProfile_Name( glConfig.backendCaps.profile ) );
+	if ( glConfig.contextRequest.label[0] != '\0' ) {
+		common->Printf( " (%s)", glConfig.contextRequest.label );
+	}
+	common->Printf( "\n" );
+	common->Printf(
+		"Renderer features: modern=%d gl41=%d gpuDriven=%d lowOverhead=%d persistentUploads=%d DSA=%d multiBind=%d renderGraph=%d scenePackets=%d legacyBridge=%d\n",
+		glConfig.renderFeatures.modernBaseline ? 1 : 0,
+		glConfig.renderFeatures.modernGL41 ? 1 : 0,
+		glConfig.renderFeatures.gpuDriven ? 1 : 0,
+		glConfig.renderFeatures.lowOverhead ? 1 : 0,
+		glConfig.renderFeatures.persistentMappedUploads ? 1 : 0,
+		glConfig.renderFeatures.directStateAccess ? 1 : 0,
+		glConfig.renderFeatures.multiBind ? 1 : 0,
+		glConfig.renderFeatures.renderGraph ? 1 : 0,
+		glConfig.renderFeatures.scenePackets ? 1 : 0,
+		glConfig.renderFeatures.legacyARB2Bridge ? 1 : 0 );
+	{
+		char capsSummary[512];
+		RendererCaps_FormatSummary( glConfig.backendCaps, capsSummary, sizeof( capsSummary ) );
+		common->Printf( "Renderer caps: %s\n", capsSummary );
+	}
 
 	if ( glConfig.allowARB2Path ) {
 		common->Printf( "ARB2 path ENABLED%s\n", active[tr.backEndRenderer == BE_ARB2] );
@@ -2587,6 +2677,7 @@ void R_InitCommands( void ) {
 	cmdSystem->AddCommand( "makeAmbientMap", R_MakeAmbientMap_f, CMD_FL_RENDERER|CMD_FL_CHEAT, "makes an ambient map" );
 	cmdSystem->AddCommand( "benchmark", R_Benchmark_f, CMD_FL_RENDERER, "benchmark" );
 	cmdSystem->AddCommand( "gfxInfo", GfxInfo_f, CMD_FL_RENDERER, "show graphics info" );
+	cmdSystem->AddCommand( "rendererTierSelfTest", R_RendererTierSelfTest_f, CMD_FL_RENDERER, "run renderer tier-selection self tests" );
 	cmdSystem->AddCommand( "modulateLights", R_ModulateLights_f, CMD_FL_RENDERER | CMD_FL_CHEAT, "modifies shader parms on all lights" );
 	cmdSystem->AddCommand( "testImage", R_TestImage_f, CMD_FL_RENDERER | CMD_FL_CHEAT, "displays the given image centered on screen", idCmdSystem::ArgCompletion_ImageName );
 	cmdSystem->AddCommand( "testVideo", R_TestVideo_f, CMD_FL_RENDERER | CMD_FL_CHEAT, "displays the given cinematic", idCmdSystem::ArgCompletion_VideoName );
@@ -2837,6 +2928,8 @@ void idRenderSystemLocal::ShutdownOpenGL( void ) {
 
 	// free the context and close the window
 	R_ShutdownFrameData();
+	R_RendererUpload_Shutdown();
+	RendererBootstrap_Shutdown();
 	GLimp_Shutdown();
 	glConfig.isInitialized = false;
 	backEnd.renderTexture = NULL;

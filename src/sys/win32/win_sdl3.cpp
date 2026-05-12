@@ -138,6 +138,14 @@ static idCVar in_joystickTriggerThreshold("in_joystickTriggerThreshold", "0.35",
 static idCVar r_screen("r_screen", "-1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "SDL3 display index to target (-1 = auto/current display)");
 static idCVar r_multiScreen("r_multiScreen", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "multi-screen mode (0 = single display, 1 = span all displays)", 0, 1);
 
+typedef struct sdl3GLContextCandidate_s {
+	int							major;
+	int							minor;
+	rendererContextProfile_t	profile;
+	bool						explicitVersion;
+	const char					*label;
+} sdl3GLContextCandidate_t;
+
 static const unsigned char s_scantokey[128] = {
 	0,          27,    '1',       '2',        '3',    '4',         '5',      '6',
 	'7',        '8',    '9',       '0',        '-',    '=',          K_BACKSPACE, 9,
@@ -2988,6 +2996,86 @@ void GLimp_SetGamma(unsigned short red[256], unsigned short green[256], unsigned
 	(void)blue;
 }
 
+static bool SDL3_UseCoreContextLadder(void) {
+	const rendererTierPreference_t preference = RendererTierPreference_FromString(r_glTier.GetString());
+	const rendererTier_t forcedTier = RendererTierPreference_ToForcedTier(preference);
+	return RendererTier_IsModern(forcedTier);
+}
+
+static int SDL3_BuildGLContextCandidates(sdl3GLContextCandidate_t *candidates, int maxCandidates) {
+	static const sdl3GLContextCandidate_t coreCandidates[] = {
+		{ 4, 6, RENDERER_CONTEXT_PROFILE_CORE, true, "4.6 core" },
+		{ 4, 5, RENDERER_CONTEXT_PROFILE_CORE, true, "4.5 core" },
+		{ 4, 3, RENDERER_CONTEXT_PROFILE_CORE, true, "4.3 core" },
+		{ 4, 1, RENDERER_CONTEXT_PROFILE_CORE, true, "4.1 core" },
+		{ 3, 3, RENDERER_CONTEXT_PROFILE_CORE, true, "3.3 core" },
+		{ 0, 0, RENDERER_CONTEXT_PROFILE_COMPATIBILITY, false, "compatibility fallback" }
+	};
+	static const sdl3GLContextCandidate_t compatibilityCandidates[] = {
+		{ 4, 6, RENDERER_CONTEXT_PROFILE_COMPATIBILITY, true, "4.6 compatibility" },
+		{ 4, 5, RENDERER_CONTEXT_PROFILE_COMPATIBILITY, true, "4.5 compatibility" },
+		{ 4, 3, RENDERER_CONTEXT_PROFILE_COMPATIBILITY, true, "4.3 compatibility" },
+		{ 4, 1, RENDERER_CONTEXT_PROFILE_COMPATIBILITY, true, "4.1 compatibility" },
+		{ 3, 3, RENDERER_CONTEXT_PROFILE_COMPATIBILITY, true, "3.3 compatibility" },
+		{ 0, 0, RENDERER_CONTEXT_PROFILE_COMPATIBILITY, false, "compatibility fallback" }
+	};
+
+	const sdl3GLContextCandidate_t *source = SDL3_UseCoreContextLadder() ? coreCandidates : compatibilityCandidates;
+	const int sourceCount = SDL3_UseCoreContextLadder()
+		? static_cast<int>(sizeof(coreCandidates) / sizeof(coreCandidates[0]))
+		: static_cast<int>(sizeof(compatibilityCandidates) / sizeof(compatibilityCandidates[0]));
+	const int count = (sourceCount < maxCandidates) ? sourceCount : maxCandidates;
+	for (int i = 0; i < count; ++i) {
+		candidates[i] = source[i];
+	}
+	return count;
+}
+
+static void SDL3_SetGLAttributesForCandidate(glimpParms_t parms, const sdl3GLContextCandidate_t &candidate) {
+	SDL_GL_ResetAttributes();
+	(void)SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
+	(void)SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
+	(void)SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
+	(void)SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
+	(void)SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+	(void)SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
+	(void)SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+	if (parms.stereo) {
+		(void)SDL_GL_SetAttribute(SDL_GL_STEREO, 1);
+	}
+	if (parms.multiSamples > 1) {
+		(void)SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
+		(void)SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, parms.multiSamples);
+	}
+	if (candidate.explicitVersion) {
+		(void)SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, candidate.major);
+		(void)SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, candidate.minor);
+		(void)SDL_GL_SetAttribute(
+			SDL_GL_CONTEXT_PROFILE_MASK,
+			candidate.profile == RENDERER_CONTEXT_PROFILE_CORE
+				? SDL_GL_CONTEXT_PROFILE_CORE
+				: SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
+	}
+	if (r_glDebugContext.GetBool()) {
+		(void)SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
+	}
+}
+
+static void SDL3_RecordGLContextCandidate(const sdl3GLContextCandidate_t &candidate) {
+	memset(&glConfig.contextRequest, 0, sizeof(glConfig.contextRequest));
+	glConfig.contextRequest.major = candidate.major;
+	glConfig.contextRequest.minor = candidate.minor;
+	glConfig.contextRequest.profile = candidate.profile;
+	glConfig.contextRequest.debugContext = r_glDebugContext.GetBool();
+	glConfig.contextRequest.explicitVersion = candidate.explicitVersion;
+	idStr::snPrintf(
+		glConfig.contextRequest.label,
+		sizeof(glConfig.contextRequest.label),
+		"%s%s",
+		candidate.label ? candidate.label : "unknown",
+		r_glDebugContext.GetBool() ? " debug" : "");
+}
+
 bool GLimp_Init(glimpParms_t parms) {
 	const char *driverName;
 
@@ -3015,21 +3103,9 @@ bool GLimp_Init(glimpParms_t parms) {
 
 	SDL3_InitDesktopMode();
 
-	SDL_GL_ResetAttributes();
-	(void)SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
-	(void)SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
-	(void)SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
-	(void)SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
-	(void)SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-	(void)SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-	(void)SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-	if (parms.stereo) {
-		(void)SDL_GL_SetAttribute(SDL_GL_STEREO, 1);
-	}
-	if (parms.multiSamples > 1) {
-		(void)SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
-		(void)SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, parms.multiSamples);
-	}
+	sdl3GLContextCandidate_t contextCandidates[8];
+	const int contextCandidateCount = SDL3_BuildGLContextCandidates(contextCandidates, static_cast<int>(sizeof(contextCandidates) / sizeof(contextCandidates[0])));
+	SDL3_SetGLAttributesForCandidate(parms, contextCandidates[0]);
 
 	SDL_WindowFlags flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
 	if (!parms.fullScreen && parms.borderless) {
@@ -3061,7 +3137,19 @@ bool GLimp_Init(glimpParms_t parms) {
 		(void)SDL_SetWindowPosition(s_sdlWindow, targetX, targetY);
 	}
 
-	s_sdlContext = SDL_GL_CreateContext(s_sdlWindow);
+	s_sdlContext = NULL;
+	for (int candidateIndex = 0; candidateIndex < contextCandidateCount; ++candidateIndex) {
+		const sdl3GLContextCandidate_t &candidate = contextCandidates[candidateIndex];
+		SDL3_SetGLAttributesForCandidate(parms, candidate);
+		common->Printf("SDL3: trying OpenGL context %s\n", candidate.label);
+		s_sdlContext = SDL_GL_CreateContext(s_sdlWindow);
+		if (s_sdlContext) {
+			SDL3_RecordGLContextCandidate(candidate);
+			common->Printf("SDL3: created OpenGL context %s\n", glConfig.contextRequest.label);
+			break;
+		}
+		common->Printf("SDL3: OpenGL context %s failed: %s\n", candidate.label, SDL_GetError());
+	}
 	if (!s_sdlContext) {
 		common->Printf("SDL3: could not create OpenGL context: %s\n", SDL_GetError());
 		SDL_DestroyWindow(s_sdlWindow);

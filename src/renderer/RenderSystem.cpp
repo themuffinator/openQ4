@@ -30,6 +30,8 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "tr_local.h"
 #include "Model_local.h"
+#include "RendererMetrics.h"
+#include "RendererUpload.h"
 #include "smaa/AreaTex.h"
 #include "smaa/SearchTex.h"
 
@@ -284,7 +286,9 @@ static void R_IssueRenderCommands( void ) {
 	// r_skipRender is usually more usefull, because it will still
 	// draw 2D graphics
 	if ( !r_skipBackEnd.GetBool() ) {
+		const int submitStart = Sys_Milliseconds();
 		RB_ExecuteBackEndCommands( frameData->cmdHead );
+		R_RendererMetrics_RecordSubmitMsec( Sys_Milliseconds() - submitStart );
 	}
 
 	R_ClearCommandChain();
@@ -1066,6 +1070,8 @@ void idRenderSystemLocal::BeginFrame( int windowWidth, int windowHeight ) {
 
 	// this is the ONLY place this is modified
 	frameCount++;
+	R_RendererMetrics_BeginFrame( frameCount );
+	R_RendererUpload_BeginFrame();
 
 	// just in case we did a common->Error while this
 	// was set
@@ -1134,6 +1140,17 @@ void idRenderSystemLocal::EndFrame( int *frontEndMsec, int *backEndMsec ) {
 		*backEndMsec = backEnd.pc.msec;
 	}
 
+	R_RendererMetrics_EndFrame(
+		pc.frontEndMsec,
+		backEnd.pc.msec,
+		pc.c_numViews,
+		pc.c_visibleViewEntities,
+		pc.c_viewLights,
+		backEnd.pc.c_drawElements,
+		backEnd.pc.c_surfaces,
+		backEnd.pc.c_vertexes,
+		backEnd.pc.c_indexes );
+
 	// print any other statistics and clear all of them
 	R_PerformanceCounters();
 
@@ -1157,6 +1174,7 @@ void idRenderSystemLocal::EndFrame( int *frontEndMsec, int *backEndMsec ) {
 
 	// we can now release the vertexes used this frame
 	vertexCache.EndFrame();
+	R_RendererUpload_EndFrame();
 
 	if ( session->writeDemo ) {
 		session->writeDemo->WriteInt( DS_RENDER );

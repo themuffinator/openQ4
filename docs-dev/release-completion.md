@@ -10,6 +10,7 @@ Process:
 
 ## Ready For Changelog
 
+- [x] GL renderer modernization groundwork is in place without replacing the shipping ARB2 path: SDL3 now negotiates explicit OpenGL tiers, `gfxInfo` reports selected tier/caps, `r_glTier`, `r_glDebugContext`, and `r_rendererMetrics` expose bring-up controls, extension parsing is token-safe, and the first render-graph, scene-packet, upload-manager, and metrics scaffolds wrap the legacy renderer for future GL 3.3/4.x work.
 - [x] Filter-style decal mips now fold coverage alpha into the neutral multiply color per generated level, so stock terrain stains such as `game/airdefense1` no longer reveal their decal bounds when the flashlight crosses them.
 - [x] Retail BSE trail-material parity is restored for shared bullet-impact effects: particle templates now retain the authored/default trail-material name, motion trails resolve that material at finish time instead of relying on an early static pointer, and the stock machinegun/shotgun impact spark trails once again use Quake 4's `gfx/effects/particles_shapes/motionblur` trail instead of falling back to the engine default texture.
 - [x] Ragdoll startup now follows Quake 4's retail articulated-figure path again: stock corpses no longer pick up OpenQ4-only AF handoff velocity/depenetration heuristics or extra per-body angular-velocity injection during pose transfer, and the AF contact solver is back on retail's tighter contact budget and per-pair planar-contact cap for SP/MP ragdolls.

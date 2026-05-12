@@ -9,6 +9,7 @@ class idImage;
 class idRenderTexture;
 
 #include "ImageOpts.h"
+#include "RendererCaps.h"
 // jmarshall end
 
 /*
@@ -31,6 +32,10 @@ typedef struct glconfig_s {
 	const char			*wgl_extensions_string;
 
 	float				glVersion;				// atof( version_string )
+	rendererContextRequest_t contextRequest;		// requested/created context from the platform layer
+	renderBackendCaps_t	backendCaps;			// exact feature-driven capability probe
+	rendererTier_t		rendererTier;			// highest selected renderer tier
+	renderFeatureSet_t	renderFeatures;			// feature flags derived from the selected tier
 
 
 	int					maxTextureSize;			// queried from GL

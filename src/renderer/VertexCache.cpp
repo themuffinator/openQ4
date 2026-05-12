@@ -30,6 +30,7 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #include "tr_local.h"
+#include "RendererUpload.h"
 
 
 static const int	FRAME_MEMORY_BYTES = 0x200000;
@@ -300,6 +301,7 @@ void idVertexCache::Alloc( void *data, int size, vertCache_t **buffer, bool inde
 		block->virtMem = Mem_Alloc( size );
 		SIMDProcessor->Memcpy( block->virtMem, data, size );
 	}
+	R_RendererUpload_RecordLegacyUpload( size );
 }
 
 /*
@@ -384,6 +386,7 @@ vertCache_t	*idVertexCache::AllocFrameTemp( void *data, int size ) {
 		// if we don't have enough room in the temp block, allocate a static block,
 		// but immediately free it so it will get freed at the next frame
 		tempOverflow = true;
+		R_RendererUpload_RecordLegacyStall();
 		Alloc( data, size, &block );
 		Free( block);
 		return block;
@@ -431,6 +434,7 @@ vertCache_t	*idVertexCache::AllocFrameTemp( void *data, int size ) {
 	} else {
 		SIMDProcessor->Memcpy( (byte *)block->virtMem + block->offset, data, size );
 	}
+	R_RendererUpload_RecordLegacyUpload( size );
 
 	return block;
 }
