@@ -684,6 +684,7 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 	R_RenderGraph_LogIfVerbose( legacyGraph );
 
 	backEndStartTime = Sys_Milliseconds();
+	R_RendererMetrics_BeginGpuBackendFrame();
 
 	// needed for editor rendering
 	RB_SetDefaultGLState();
@@ -698,7 +699,9 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 		case RC_NOP:
 			break;
 		case RC_DRAW_VIEW:
+			R_RendererMetrics_BeginGpuTimer( ((const drawSurfsCommand_t *)cmds)->viewDef->viewEntitys ? RENDERER_GPU_TIMER_DRAW3D : RENDERER_GPU_TIMER_DRAW2D );
 			RB_DrawView( cmds );
+			R_RendererMetrics_EndGpuTimer();
 			if ( ((const drawSurfsCommand_t *)cmds)->viewDef->viewEntitys ) {
 				c_draw3d++;
 			}
@@ -707,25 +710,35 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 			}
 			break;
 		case RC_DRAW_SPECIAL_EFFECTS:
+			R_RendererMetrics_BeginGpuTimer( RENDERER_GPU_TIMER_SPECIAL_EFFECTS );
 			RB_DrawSpecialEffects( cmds );
+			R_RendererMetrics_EndGpuTimer();
 			c_specialEffects++;
 			break;
 // jmarshall
 		case RC_SET_RENDERTEXTURE:
+			R_RendererMetrics_BeginGpuTimer( RENDERER_GPU_TIMER_RENDER_TARGET );
 			RB_SetRenderTexture(cmds);
+			R_RendererMetrics_EndGpuTimer();
 			c_renderTargetOps++;
 			break;
 		case RC_RESOLVE_MSAA:
+			R_RendererMetrics_BeginGpuTimer( RENDERER_GPU_TIMER_RENDER_TARGET );
 			RB_ResolveMSAA(cmds);
+			R_RendererMetrics_EndGpuTimer();
 			c_renderTargetOps++;
 			break;
 		case RC_CLEAR_RENDERTARGET:
+			R_RendererMetrics_BeginGpuTimer( RENDERER_GPU_TIMER_RENDER_TARGET );
 			RB_ClearRenderTarget(cmds);
+			R_RendererMetrics_EndGpuTimer();
 			c_renderTargetOps++;
 			break;
 // jmarshall end
 		case RC_SET_BUFFER:
+			R_RendererMetrics_BeginGpuTimer( RENDERER_GPU_TIMER_SET_BUFFER );
 			RB_SetBuffer( cmds );
+			R_RendererMetrics_EndGpuTimer();
 			c_setBuffers++;
 			break;
 		case RC_SWAP_BUFFERS:
@@ -733,7 +746,9 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 			c_swapBuffers++;
 			break;
 		case RC_COPY_RENDER:
+			R_RendererMetrics_BeginGpuTimer( RENDERER_GPU_TIMER_COPY_RENDER );
 			RB_CopyRender( cmds );
+			R_RendererMetrics_EndGpuTimer();
 			c_copyRenders++;
 			break;
 		default:
@@ -747,6 +762,7 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 	backEnd.glState.tmu[0].current2DMap = -1;
 
 	// stop rendering on this thread
+	R_RendererMetrics_EndGpuBackendFrame();
 	backEndFinishTime = Sys_Milliseconds();
 	backEnd.pc.msec = backEndFinishTime - backEndStartTime;
 	R_RendererMetrics_RecordBackendCommands( c_draw3d, c_draw2d, c_setBuffers, c_swapBuffers, c_copyRenders, c_specialEffects, c_renderTargetOps );

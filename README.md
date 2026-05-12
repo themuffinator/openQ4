@@ -51,7 +51,7 @@ Single-player and multiplayer live under one `baseoq4/` directory with `game-sp`
 
 ### Rendering and presentation
 
-- GL renderer modernization groundwork: explicit tier/capability probing, SDL3 context negotiation, `gfxInfo` tier/upload reporting, opt-in renderer metrics, and a feature-gated dynamic upload stream while the ARB2 compatibility bridge remains the active shipping path
+- GL renderer modernization groundwork: explicit tier/capability probing, SDL3 context negotiation, `gfxInfo` tier/upload/GPU-timer reporting, opt-in renderer metrics, and a feature-gated dynamic upload stream while the ARB2 compatibility bridge remains the active shipping path
 - Multi-scale **bloom** with luminance-based extraction
 - **FP16 HDR** scene targets, filmic tone mapping, color controls, and log-average auto exposure
 - Depth-aware **lens flares** with lightweight corona and high-quality ghost/streak modes

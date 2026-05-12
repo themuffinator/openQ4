@@ -1060,6 +1060,7 @@ extern idCVar r_actualRenderer;			// actual active renderer backend after fallba
 extern idCVar r_glTier;					// auto, legacy, gl33, gl41, gl43, gl45, gl46
 extern idCVar r_glDebugContext;			// request a debug GL context when the platform backend supports it
 extern idCVar r_rendererMetrics;			// 0 off, 1 summary, 2 verbose per-frame/pass metrics
+extern idCVar r_rendererGpuTimers;		// sample GL timer queries when renderer metrics are enabled
 extern idCVar r_rendererUploadMegs;		// dynamic upload stream size in megabytes per frame buffer
 extern idCVar r_rendererUploadPersistent;	// allow persistent-mapped dynamic upload stream
 extern idCVar r_useSimpleInteraction;	// use the simpler Quake 4 interaction program pair as a compatibility fallback

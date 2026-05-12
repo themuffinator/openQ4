@@ -72,7 +72,18 @@ Use `rendererUploadSelfTest` to run the pure ring/allocation tests in a live bui
 - `1`: periodic frame summary
 - `2`: per-frame command and legacy graph detail
 
-The first metrics layer records front-end time, submit time, back-end time, view/entity/light counts, draw/surface/vertex/index counts, upload bytes, buffer stalls, upload-stream high-water/overflow data, and selected renderer tier. GPU pass timings are reserved for the next timer-query milestone and currently report as `not-sampled`.
+The metrics layer records front-end time, submit time, back-end time, view/entity/light counts, draw/surface/vertex/index counts, upload bytes, buffer stalls, upload-stream high-water/overflow data, and selected renderer tier.
+
+`r_rendererGpuTimers 1` samples GL timer queries when `r_rendererMetrics` is enabled and the driver exposes timer-query support. Samples are resolved on a delayed, nonblocking path; unavailable results are reported as `not-sampled` or dropped instead of stalling the CPU. Detail mode reports resolved GPU timing for the current compatibility backend command categories:
+
+- 3D views
+- 2D/GUI views
+- render-target operations
+- copy-render operations
+- special effects
+- buffer switches
+
+Use `rendererGpuTimerSelfTest` to verify live timer-query support. `gfxInfo` reports whether renderer GPU timers are available and whether the cvar is enabled.
 
 ## Compatibility Bridge
 
@@ -83,4 +94,4 @@ The active renderer remains ARB2 unless future work adds a modern executor. The 
 - `ScenePacket`, `DrawPacket`, `PassPacket`, and `MaterialResourceRecord` define the backend-neutral packet contract for future extraction.
 - `RendererUpload` owns the feature-gated dynamic frame-temp stream and keeps the old vertex-cache path as a fallback.
 
-Use `gfxInfo` to inspect the selected tier, context profile, feature flags, capability summary, and upload stream. Use `rendererTierSelfTest` and `rendererUploadSelfTest` to run the table-driven selector/allocation tests in a live build.
+Use `gfxInfo` to inspect the selected tier, context profile, feature flags, capability summary, GPU-timer availability, and upload stream. Use `rendererTierSelfTest`, `rendererUploadSelfTest`, and `rendererGpuTimerSelfTest` to run the live renderer foundation tests.
