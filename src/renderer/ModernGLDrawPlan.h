@@ -12,7 +12,10 @@ const int MODERN_GL_DRAW_PLAN_MAX_ENTRIES = SCENE_PACKET_MAX_DRAWS;
 enum modernGLDrawPlanPipeline_t {
 	MODERN_GL_DRAW_PLAN_PIPELINE_NONE = 0,
 	MODERN_GL_DRAW_PLAN_PIPELINE_DEPTH,
-	MODERN_GL_DRAW_PLAN_PIPELINE_FLAT_MATERIAL
+	MODERN_GL_DRAW_PLAN_PIPELINE_SHADOW_DEPTH,
+	MODERN_GL_DRAW_PLAN_PIPELINE_FLAT_MATERIAL,
+	MODERN_GL_DRAW_PLAN_PIPELINE_LIGHT_GRID,
+	MODERN_GL_DRAW_PLAN_PIPELINE_FOG_BLEND
 };
 
 typedef struct modernGLDrawPlanEntry_s {
@@ -21,6 +24,11 @@ typedef struct modernGLDrawPlanEntry_s {
 	modernGLDrawPlanPipeline_t	pipeline;
 	modernGLShaderProgramKind_t	shaderKind;
 	unsigned int				program;
+	rendererPermutationKey_t		permutation;
+	int							modelViewProjectionLocation;
+	int							debugColorLocation;
+	int							localParamsLocation;
+	int							mainTextureLocation;
 	int							drawPacketIndex;
 	int							materialRecordIndex;
 	int							glslVersion;

@@ -52,6 +52,16 @@ static bool				CreateGameWindow( glimpParms_t parms );
 static unsigned long	Sys_QueryVideoMemory();
 CGDisplayErr		Sys_CaptureActiveDisplays(void);
 
+#ifndef NSOpenGLPFAOpenGLProfile
+#define NSOpenGLPFAOpenGLProfile 99
+#endif
+#ifndef NSOpenGLProfileVersion3_2Core
+#define NSOpenGLProfileVersion3_2Core 0x3200
+#endif
+#ifndef NSOpenGLProfileVersion4_1Core
+#define NSOpenGLProfileVersion4_1Core 0x4100
+#endif
+
 glwstate_t glw_state;
 static bool isHidden = false;
 
@@ -138,6 +148,7 @@ void QGLCheckError( const char *message ) {
 bool GLimp_SetMode(  glimpParms_t parms ) {
 	if ( !CreateGameWindow( parms ) ) {
 		common->Printf( "GLimp_SetMode: window could not be created!\n" );
+		return false;
 	}
 
 	glConfig.vidWidth = parms.width;
@@ -157,6 +168,7 @@ bool GLimp_SetMode(  glimpParms_t parms ) {
     
 	CheckErrors();
 
+	return true;
 }
 
 /*
@@ -178,7 +190,7 @@ GetPixelAttributes
 		}																\
 	} while(0)
 
-static NSOpenGLPixelFormatAttribute *GetPixelAttributes( unsigned int multisamples ) {
+static NSOpenGLPixelFormatAttribute *GetPixelAttributes( unsigned int multisamples, const rendererContextCandidate_t &candidate ) {
 	NSOpenGLPixelFormatAttribute *pixelAttributes;
 	unsigned int attributeIndex = 0;
 	unsigned int attributeSize = 128;
@@ -209,6 +221,11 @@ static NSOpenGLPixelFormatAttribute *GetPixelAttributes( unsigned int multisampl
 
 	// Require double-buffer
 	ADD_ATTR(NSOpenGLPFADoubleBuffer);
+
+	if ( candidate.explicitVersion && candidate.profile == RENDERER_CONTEXT_PROFILE_CORE ) {
+		ADD_ATTR( NSOpenGLPFAOpenGLProfile );
+		ADD_ATTR( NSOpenGLProfileVersion4_1Core );
+	}
 
 	// color bits
 	ADD_ATTR(NSOpenGLPFAColorSize);
@@ -244,7 +261,8 @@ static NSOpenGLPixelFormatAttribute *GetPixelAttributes( unsigned int multisampl
 
 	// Terminate the list
 	ADD_ATTR(0);
-    
+
+	return pixelAttributes;
 }
 
 void Sys_UpdateWindowMouseInputRect(void) {		
@@ -278,6 +296,84 @@ static void ReleaseAllDisplays() {
 	}
 }
 
+static bool OSX_ContextCandidateSupported( const rendererContextCandidate_t &candidate ) {
+	if ( candidate.debugContext ) {
+		common->Printf( "macOS: skipping OpenGL context %s because NSOpenGL does not expose debug-context creation\n", candidate.label );
+		return false;
+	}
+	if ( candidate.explicitVersion && candidate.profile == RENDERER_CONTEXT_PROFILE_COMPATIBILITY ) {
+		common->Printf( "macOS: skipping OpenGL context %s because versioned compatibility profiles are unavailable\n", candidate.label );
+		return false;
+	}
+	if ( candidate.explicitVersion && candidate.profile == RENDERER_CONTEXT_PROFILE_CORE ) {
+		if ( candidate.major > 4 || ( candidate.major == 4 && candidate.minor > 1 ) ) {
+			common->Printf( "macOS: skipping OpenGL context %s because macOS OpenGL tops out at 4.1 core\n", candidate.label );
+			return false;
+		}
+	}
+	return true;
+}
+
+static NSOpenGLPixelFormat *OSX_CreatePixelFormatForCandidate( unsigned int &multisamples, const rendererContextCandidate_t &candidate ) {
+	NSOpenGLPixelFormat *pixelFormat = nil;
+	while ( !pixelFormat ) {
+		NSOpenGLPixelFormatAttribute *pixelAttributes = GetPixelAttributes( multisamples, candidate );
+		pixelFormat = [[[NSOpenGLPixelFormat alloc] initWithAttributes: pixelAttributes] autorelease];
+		NSZoneFree(NULL, pixelAttributes);
+		if ( pixelFormat || multisamples == 0 ) {
+			break;
+		}
+		multisamples >>= 1;
+	}
+	return pixelFormat;
+}
+
+static bool OSX_CreateContextWithLadder( unsigned int &selectedMultisamples, NSOpenGLPixelFormat **selectedPixelFormat ) {
+	rendererContextCandidate_t candidates[RENDERER_CONTEXT_LADDER_MAX_CANDIDATES];
+	const rendererTierPreference_t preference = RendererTierPreference_FromString( r_glTier.GetString() );
+	const bool keepAutoCompatibility = preference == RENDERER_TIER_PREF_AUTO;
+	const int candidateCount = RendererContextLadder_Build(
+		candidates,
+		static_cast<int>( sizeof( candidates ) / sizeof( candidates[0] ) ),
+		preference,
+		r_glDebugContext.GetBool(),
+		keepAutoCompatibility );
+	if ( candidateCount <= 0 ) {
+		common->Printf( "macOS: no OpenGL context candidates were generated for r_glTier %s\n", r_glTier.GetString() );
+		return false;
+	}
+
+	for ( int i = 0; i < candidateCount; ++i ) {
+		const rendererContextCandidate_t &candidate = candidates[i];
+		if ( !OSX_ContextCandidateSupported( candidate ) ) {
+			continue;
+		}
+
+		unsigned int candidateMultisamples = cvarSystem->GetCVarInteger( "r_multiSamples" );
+		NSOpenGLPixelFormat *pixelFormat = OSX_CreatePixelFormatForCandidate( candidateMultisamples, candidate );
+		if ( pixelFormat == nil ) {
+			common->Printf( "macOS: OpenGL pixel format %s failed\n", candidate.label );
+			continue;
+		}
+
+		common->Printf( "macOS: trying OpenGL context %s\n", candidate.label );
+		NSOpenGLContext *context = [[NSOpenGLContext alloc] initWithFormat: pixelFormat shareContext: nil];
+		if ( context != nil ) {
+			OSX_SetGLContext( context );
+			memset( &glConfig.contextRequest, 0, sizeof( glConfig.contextRequest ) );
+			glConfig.contextRequest = candidate;
+			selectedMultisamples = candidateMultisamples;
+			*selectedPixelFormat = pixelFormat;
+			common->Printf( "macOS: created OpenGL context %s\n", glConfig.contextRequest.label );
+			return true;
+		}
+
+		common->Printf( "macOS: OpenGL context %s failed\n", candidate.label );
+	}
+
+	return false;
+}
+
 /*
 =================
 CreateGameWindow
@@ -285,7 +381,6 @@ CreateGameWindow
 */
 static bool CreateGameWindow(  glimpParms_t parms ) {
 	const char						*windowed[] = { "Windowed", "Fullscreen" };
-	NSOpenGLPixelFormatAttribute	*pixelAttributes;
 	NSOpenGLPixelFormat				*pixelFormat;
 	CGDisplayErr					err;
 	unsigned int					multisamples;
@@ -331,14 +426,9 @@ static bool CreateGameWindow(  glimpParms_t parms ) {
     
 	// Get the GL pixel format
 	pixelFormat = nil;
-	multisamples = cvarSystem->GetCVarInteger( "r_multiSamples" );
-	while ( !pixelFormat ) {
-		pixelAttributes = GetPixelAttributes( multisamples );
-		pixelFormat = [[[NSOpenGLPixelFormat alloc] initWithAttributes: pixelAttributes] autorelease];
-		NSZoneFree(NULL, pixelAttributes);
-		if ( pixelFormat || multisamples == 0 )
-			break;
-		multisamples >>= 1;
+	multisamples = 0;
+	if ( !OSX_CreateContextWithLadder( multisamples, &pixelFormat ) ) {
+		pixelFormat = nil;
 	}
 	cvarSystem->SetCVarInteger( "r_multiSamples", multisamples );			
     
@@ -347,15 +437,7 @@ static bool CreateGameWindow(  glimpParms_t parms ) {
 		CGDisplaySwitchToMode(glw_state.display, (CFDictionaryRef)glw_state.desktopMode);
 		ReleaseAllDisplays();
 		common->Printf(  " No pixel format found\n");
-	}
-
-	// Create a context with the desired pixel attributes
-	OSX_SetGLContext([[NSOpenGLContext alloc] initWithFormat: pixelFormat shareContext: nil]);
-	if ( !OSX_GetNSGLContext() ) {
-		CGDisplayRestoreColorSyncSettings();
-		CGDisplaySwitchToMode(glw_state.display, (CFDictionaryRef)glw_state.desktopMode);
-		ReleaseAllDisplays();
-		common->Printf(  "... +[NSOpenGLContext createWithFormat:share:] failed.\n" );
+		return false;
 	}
 #ifdef __ppc__
 	long system_version = 0;
@@ -434,6 +516,7 @@ static bool CreateGameWindow(  glimpParms_t parms ) {
     
 	common->Printf(  "ok\n" );
 
+	return true;
 }
 
 // This can be used to temporarily disassociate the GL context from the screen so that CoreGraphics can be used to draw to the screen.

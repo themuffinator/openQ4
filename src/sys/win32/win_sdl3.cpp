@@ -138,14 +138,6 @@ static idCVar in_joystickTriggerThreshold("in_joystickTriggerThreshold", "0.35",
 static idCVar r_screen("r_screen", "-1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "SDL3 display index to target (-1 = auto/current display)");
 static idCVar r_multiScreen("r_multiScreen", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "multi-screen mode (0 = single display, 1 = span all displays)", 0, 1);
 
-typedef struct sdl3GLContextCandidate_s {
-	int							major;
-	int							minor;
-	rendererContextProfile_t	profile;
-	bool						explicitVersion;
-	const char					*label;
-} sdl3GLContextCandidate_t;
-
 static const unsigned char s_scantokey[128] = {
 	0,          27,    '1',       '2',        '3',    '4',         '5',      '6',
 	'7',        '8',    '9',       '0',        '-',    '=',          K_BACKSPACE, 9,
@@ -2996,42 +2988,18 @@ void GLimp_SetGamma(unsigned short red[256], unsigned short green[256], unsigned
 	(void)blue;
 }
 
-static bool SDL3_UseCoreContextLadder(void) {
+static int SDL3_BuildGLContextCandidates(rendererContextCandidate_t *candidates, int maxCandidates) {
 	const rendererTierPreference_t preference = RendererTierPreference_FromString(r_glTier.GetString());
-	const rendererTier_t forcedTier = RendererTierPreference_ToForcedTier(preference);
-	return RendererTier_IsModern(forcedTier);
+	const bool keepAutoCompatibility = preference == RENDERER_TIER_PREF_AUTO;
+	return RendererContextLadder_Build(
+		candidates,
+		maxCandidates,
+		preference,
+		r_glDebugContext.GetBool(),
+		keepAutoCompatibility);
 }
 
-static int SDL3_BuildGLContextCandidates(sdl3GLContextCandidate_t *candidates, int maxCandidates) {
-	static const sdl3GLContextCandidate_t coreCandidates[] = {
-		{ 4, 6, RENDERER_CONTEXT_PROFILE_CORE, true, "4.6 core" },
-		{ 4, 5, RENDERER_CONTEXT_PROFILE_CORE, true, "4.5 core" },
-		{ 4, 3, RENDERER_CONTEXT_PROFILE_CORE, true, "4.3 core" },
-		{ 4, 1, RENDERER_CONTEXT_PROFILE_CORE, true, "4.1 core" },
-		{ 3, 3, RENDERER_CONTEXT_PROFILE_CORE, true, "3.3 core" },
-		{ 0, 0, RENDERER_CONTEXT_PROFILE_COMPATIBILITY, false, "compatibility fallback" }
-	};
-	static const sdl3GLContextCandidate_t compatibilityCandidates[] = {
-		{ 4, 6, RENDERER_CONTEXT_PROFILE_COMPATIBILITY, true, "4.6 compatibility" },
-		{ 4, 5, RENDERER_CONTEXT_PROFILE_COMPATIBILITY, true, "4.5 compatibility" },
-		{ 4, 3, RENDERER_CONTEXT_PROFILE_COMPATIBILITY, true, "4.3 compatibility" },
-		{ 4, 1, RENDERER_CONTEXT_PROFILE_COMPATIBILITY, true, "4.1 compatibility" },
-		{ 3, 3, RENDERER_CONTEXT_PROFILE_COMPATIBILITY, true, "3.3 compatibility" },
-		{ 0, 0, RENDERER_CONTEXT_PROFILE_COMPATIBILITY, false, "compatibility fallback" }
-	};
-
-	const sdl3GLContextCandidate_t *source = SDL3_UseCoreContextLadder() ? coreCandidates : compatibilityCandidates;
-	const int sourceCount = SDL3_UseCoreContextLadder()
-		? static_cast<int>(sizeof(coreCandidates) / sizeof(coreCandidates[0]))
-		: static_cast<int>(sizeof(compatibilityCandidates) / sizeof(compatibilityCandidates[0]));
-	const int count = (sourceCount < maxCandidates) ? sourceCount : maxCandidates;
-	for (int i = 0; i < count; ++i) {
-		candidates[i] = source[i];
-	}
-	return count;
-}
-
-static void SDL3_SetGLAttributesForCandidate(glimpParms_t parms, const sdl3GLContextCandidate_t &candidate) {
+static void SDL3_SetGLAttributesForCandidate(glimpParms_t parms, const rendererContextCandidate_t &candidate) {
 	SDL_GL_ResetAttributes();
 	(void)SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
 	(void)SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
@@ -3056,24 +3024,14 @@ static void SDL3_SetGLAttributesForCandidate(glimpParms_t parms, const sdl3GLCon
 				? SDL_GL_CONTEXT_PROFILE_CORE
 				: SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
 	}
-	if (r_glDebugContext.GetBool()) {
-		(void)SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
-	}
+	(void)SDL_GL_SetAttribute(
+		SDL_GL_CONTEXT_FLAGS,
+		candidate.debugContext ? SDL_GL_CONTEXT_DEBUG_FLAG : 0);
 }
 
-static void SDL3_RecordGLContextCandidate(const sdl3GLContextCandidate_t &candidate) {
+static void SDL3_RecordGLContextCandidate(const rendererContextCandidate_t &candidate) {
 	memset(&glConfig.contextRequest, 0, sizeof(glConfig.contextRequest));
-	glConfig.contextRequest.major = candidate.major;
-	glConfig.contextRequest.minor = candidate.minor;
-	glConfig.contextRequest.profile = candidate.profile;
-	glConfig.contextRequest.debugContext = r_glDebugContext.GetBool();
-	glConfig.contextRequest.explicitVersion = candidate.explicitVersion;
-	idStr::snPrintf(
-		glConfig.contextRequest.label,
-		sizeof(glConfig.contextRequest.label),
-		"%s%s",
-		candidate.label ? candidate.label : "unknown",
-		r_glDebugContext.GetBool() ? " debug" : "");
+	glConfig.contextRequest = candidate;
 }
 
 bool GLimp_Init(glimpParms_t parms) {
@@ -3103,8 +3061,12 @@ bool GLimp_Init(glimpParms_t parms) {
 
 	SDL3_InitDesktopMode();
 
-	sdl3GLContextCandidate_t contextCandidates[8];
+	rendererContextCandidate_t contextCandidates[RENDERER_CONTEXT_LADDER_MAX_CANDIDATES];
 	const int contextCandidateCount = SDL3_BuildGLContextCandidates(contextCandidates, static_cast<int>(sizeof(contextCandidates) / sizeof(contextCandidates[0])));
+	if (contextCandidateCount <= 0) {
+		common->Printf("SDL3: no OpenGL context candidates were generated for r_glTier %s\n", r_glTier.GetString());
+		return false;
+	}
 	SDL3_SetGLAttributesForCandidate(parms, contextCandidates[0]);
 
 	SDL_WindowFlags flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
@@ -3139,7 +3101,7 @@ bool GLimp_Init(glimpParms_t parms) {
 
 	s_sdlContext = NULL;
 	for (int candidateIndex = 0; candidateIndex < contextCandidateCount; ++candidateIndex) {
-		const sdl3GLContextCandidate_t &candidate = contextCandidates[candidateIndex];
+		const rendererContextCandidate_t &candidate = contextCandidates[candidateIndex];
 		SDL3_SetGLAttributesForCandidate(parms, candidate);
 		common->Printf("SDL3: trying OpenGL context %s\n", candidate.label);
 		s_sdlContext = SDL_GL_CreateContext(s_sdlWindow);

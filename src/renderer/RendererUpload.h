@@ -6,20 +6,25 @@
 
 typedef struct rendererUploadStats_s {
 	int		frameUploadBytes;
+	int		frameStaticUploadBytes;
 	int		frameStalls;
 	int		frameAllocations;
+	int		frameStaticAllocations;
 	int		frameRingUsedBytes;
 	int		frameRingHighWaterBytes;
 	int		frameOverflowBytes;
 	int		framePersistentWrites;
 	int		frameMapRangeWrites;
 	int		frameSubDataWrites;
+	int		staticBuffersLive;
+	int		staticBytesLive;
 	int		ringSizeBytes;
 	int		ringBufferCount;
 	bool	persistentMapped;
 	bool	mapRangeFallback;
 	bool	legacyBridge;
 	bool	dynamicFrameBridge;
+	bool	staticBufferAllocator;
 } rendererUploadStats_t;
 
 typedef struct rendererUploadAllocation_s {
@@ -35,11 +40,22 @@ public:
 	idBufferAllocator();
 	void Init( int bytes, bool persistent );
 	void Shutdown( void );
+	void BeginFrame( void );
+	bool AllocStaticBuffer( void *data, int bytes, bool indexBuffer, bool streamDraw, unsigned int &vbo );
+	void FreeStaticBuffer( unsigned int &vbo, int bytes );
 	int Capacity( void ) const;
 	bool IsPersistentMapped( void ) const;
+	int FrameStaticUploadBytes( void ) const;
+	int FrameStaticAllocations( void ) const;
+	int StaticBuffersLive( void ) const;
+	int StaticBytesLive( void ) const;
 
 private:
 	int		capacityBytes;
+	int		frameStaticUploadBytes;
+	int		frameStaticAllocations;
+	int		staticBuffersLive;
+	int		staticBytesLive;
 	bool	persistentMapped;
 };
 
@@ -85,10 +101,13 @@ public:
 	void BeginFrame( int frameCount );
 	void EndFrame( void );
 	bool AllocFrameTemp( void *data, int bytes, int alignment, rendererUploadAllocation_t &allocation );
+	bool AllocStaticBuffer( void *data, int bytes, bool indexBuffer, bool streamDraw, unsigned int &vbo );
+	void FreeStaticBuffer( unsigned int &vbo, int bytes );
 	void RecordLegacyUpload( int bytes );
 	void RecordLegacyStall( void );
 	const rendererUploadStats_t &Stats( void ) const;
 	bool DynamicFrameBridgeAvailable( void ) const;
+	bool StaticBufferAllocatorAvailable( void ) const;
 	int FrameCapacity( void ) const;
 
 private:
@@ -109,6 +128,7 @@ private:
 	void ShutdownFrameBuffers( void );
 	void RetireFrameFence( frameBuffer_t &frame );
 	void FenceCurrentFrame( void );
+	void UpdateAllocatorStats( void );
 	const char *PathName( void ) const;
 
 	idBufferAllocator	allocator;
@@ -127,10 +147,13 @@ void R_RendererUpload_Shutdown( void );
 void R_RendererUpload_BeginFrame( int frameCount );
 void R_RendererUpload_EndFrame( void );
 bool R_RendererUpload_AllocFrameTemp( void *data, int bytes, int alignment, rendererUploadAllocation_t &allocation );
+bool R_RendererUpload_AllocStaticBuffer( void *data, int bytes, bool indexBuffer, bool streamDraw, unsigned int &vbo );
+void R_RendererUpload_FreeStaticBuffer( unsigned int &vbo, int bytes );
 void R_RendererUpload_RecordLegacyUpload( int bytes );
 void R_RendererUpload_RecordLegacyStall( void );
 const rendererUploadStats_t &R_RendererUpload_Stats( void );
 bool R_RendererUpload_DynamicFrameBridgeAvailable( void );
+bool R_RendererUpload_StaticBufferAllocatorAvailable( void );
 int R_RendererUpload_FrameCapacity( void );
 bool RendererUpload_RunSelfTest( void );
 

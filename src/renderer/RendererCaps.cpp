@@ -66,6 +66,140 @@ const char *RendererContextProfile_Name( rendererContextProfile_t profile ) {
 	}
 }
 
+typedef struct rendererContextLadderStep_s {
+	int							major;
+	int							minor;
+	rendererTierPreference_t		preference;
+	const char					*coreLabel;
+	const char					*compatibilityLabel;
+} rendererContextLadderStep_t;
+
+static const rendererContextLadderStep_t rg_contextLadderSteps[] = {
+	{ 4, 6, RENDERER_TIER_PREF_GL46, "4.6 core", "4.6 compatibility" },
+	{ 4, 5, RENDERER_TIER_PREF_GL45, "4.5 core", "4.5 compatibility" },
+	{ 4, 3, RENDERER_TIER_PREF_GL43, "4.3 core", "4.3 compatibility" },
+	{ 4, 1, RENDERER_TIER_PREF_GL41, "4.1 core", "4.1 compatibility" },
+	{ 3, 3, RENDERER_TIER_PREF_GL33, "3.3 core", "3.3 compatibility" }
+};
+
+static int RendererContextLadder_FirstStepForPreference( rendererTierPreference_t preference ) {
+	for ( int i = 0; i < static_cast<int>( sizeof( rg_contextLadderSteps ) / sizeof( rg_contextLadderSteps[0] ) ); ++i ) {
+		if ( rg_contextLadderSteps[i].preference == preference ) {
+			return i;
+		}
+	}
+	return 0;
+}
+
+static bool RendererContextLadder_AddCandidate(
+	rendererContextCandidate_t *candidates,
+	int maxCandidates,
+	int &count,
+	int major,
+	int minor,
+	rendererContextProfile_t profile,
+	bool explicitVersion,
+	bool debugContext,
+	const char *label ) {
+	if ( candidates == NULL || count >= maxCandidates ) {
+		return false;
+	}
+
+	rendererContextCandidate_t &candidate = candidates[count++];
+	memset( &candidate, 0, sizeof( candidate ) );
+	candidate.major = major;
+	candidate.minor = minor;
+	candidate.profile = profile;
+	candidate.explicitVersion = explicitVersion;
+	candidate.debugContext = debugContext;
+	idStr::snPrintf(
+		candidate.label,
+		sizeof( candidate.label ),
+		"%s%s",
+		label ? label : "unknown",
+		debugContext ? " debug" : "" );
+	return true;
+}
+
+static void RendererContextLadder_AddCompatibilityFallback(
+	rendererContextCandidate_t *candidates,
+	int maxCandidates,
+	int &count,
+	bool debugContext ) {
+	(void)RendererContextLadder_AddCandidate(
+		candidates,
+		maxCandidates,
+		count,
+		0,
+		0,
+		RENDERER_CONTEXT_PROFILE_COMPATIBILITY,
+		false,
+		debugContext,
+		"compatibility fallback" );
+}
+
+static void RendererContextLadder_AddVersionRange(
+	rendererContextCandidate_t *candidates,
+	int maxCandidates,
+	int &count,
+	int firstStep,
+	rendererContextProfile_t profile,
+	bool debugContext ) {
+	const int stepCount = static_cast<int>( sizeof( rg_contextLadderSteps ) / sizeof( rg_contextLadderSteps[0] ) );
+	for ( int i = firstStep; i < stepCount; ++i ) {
+		const rendererContextLadderStep_t &step = rg_contextLadderSteps[i];
+		const char *label = profile == RENDERER_CONTEXT_PROFILE_CORE ? step.coreLabel : step.compatibilityLabel;
+		(void)RendererContextLadder_AddCandidate(
+			candidates,
+			maxCandidates,
+			count,
+			step.major,
+			step.minor,
+			profile,
+			true,
+			debugContext,
+			label );
+	}
+}
+
+int RendererContextLadder_Build(
+	rendererContextCandidate_t *candidates,
+	int maxCandidates,
+	rendererTierPreference_t preference,
+	bool debugContext,
+	bool keepAutoCompatibility ) {
+	if ( candidates == NULL || maxCandidates <= 0 ) {
+		return 0;
+	}
+
+	int count = 0;
+	const int passCount = debugContext ? 2 : 1;
+	const rendererTier_t forcedTier = RendererTierPreference_ToForcedTier( preference );
+	const bool forceModernCore = RendererTier_IsModern( forcedTier );
+	const bool compatibilityOnly = preference == RENDERER_TIER_PREF_LEGACY || ( preference == RENDERER_TIER_PREF_AUTO && keepAutoCompatibility );
+	const int firstStep = forceModernCore ? RendererContextLadder_FirstStepForPreference( preference ) : 0;
+
+	for ( int pass = 0; pass < passCount; ++pass ) {
+		const bool debugCandidate = debugContext && pass == 0;
+
+		if ( compatibilityOnly ) {
+			if ( preference == RENDERER_TIER_PREF_LEGACY ) {
+				RendererContextLadder_AddCompatibilityFallback( candidates, maxCandidates, count, debugCandidate );
+			} else {
+				RendererContextLadder_AddVersionRange( candidates, maxCandidates, count, 0, RENDERER_CONTEXT_PROFILE_COMPATIBILITY, debugCandidate );
+				RendererContextLadder_AddCompatibilityFallback( candidates, maxCandidates, count, debugCandidate );
+			}
+			continue;
+		}
+
+		RendererContextLadder_AddVersionRange( candidates, maxCandidates, count, firstStep, RENDERER_CONTEXT_PROFILE_CORE, debugCandidate );
+		RendererContextLadder_AddVersionRange( candidates, maxCandidates, count, firstStep, RENDERER_CONTEXT_PROFILE_COMPATIBILITY, debugCandidate );
+		RendererContextLadder_AddCompatibilityFallback( candidates, maxCandidates, count, debugCandidate );
+	}
+
+	return count;
+}
+
 rendererTierPreference_t RendererTierPreference_FromString( const char *value ) {
 	if ( value == NULL || value[0] == '\0' || RendererStringEquals( value, "auto" ) || RendererStringEquals( value, "best" ) ) {
 		return RENDERER_TIER_PREF_AUTO;
@@ -529,5 +663,130 @@ bool RendererTierSelect_RunSelfTest( void ) {
 	}
 
 	common->Printf( "RendererTierSelect self-test passed (%d cases)\n", static_cast<int>( sizeof( tests ) / sizeof( tests[0] ) ) );
+	return true;
+}
+
+bool RendererContextLadder_RunSelfTest( void ) {
+	struct rendererContextLadderTestCase_t {
+		const char *name;
+		rendererTierPreference_t preference;
+		bool debugContext;
+		bool keepAutoCompatibility;
+		int expectedCount;
+		int expectedFirstMajor;
+		int expectedFirstMinor;
+		rendererContextProfile_t expectedFirstProfile;
+		bool expectedFirstDebug;
+		bool expectedLastExplicitVersion;
+	};
+
+	const rendererContextLadderTestCase_t tests[] = {
+		{
+			"auto compatibility bridge",
+			RENDERER_TIER_PREF_AUTO,
+			false,
+			true,
+			6,
+			4,
+			6,
+			RENDERER_CONTEXT_PROFILE_COMPATIBILITY,
+			false,
+			false
+		},
+		{
+			"auto modern core",
+			RENDERER_TIER_PREF_AUTO,
+			false,
+			false,
+			11,
+			4,
+			6,
+			RENDERER_CONTEXT_PROFILE_CORE,
+			false,
+			false
+		},
+		{
+			"legacy fallback with debug fallback",
+			RENDERER_TIER_PREF_LEGACY,
+			true,
+			true,
+			2,
+			0,
+			0,
+			RENDERER_CONTEXT_PROFILE_COMPATIBILITY,
+			true,
+			false
+		},
+		{
+			"forced gl43 starts at gl43",
+			RENDERER_TIER_PREF_GL43,
+			false,
+			true,
+			7,
+			4,
+			3,
+			RENDERER_CONTEXT_PROFILE_CORE,
+			false,
+			false
+		},
+		{
+			"forced gl33 starts at gl33",
+			RENDERER_TIER_PREF_GL33,
+			false,
+			true,
+			3,
+			3,
+			3,
+			RENDERER_CONTEXT_PROFILE_CORE,
+			false,
+			false
+		}
+	};
+
+	for ( int i = 0; i < static_cast<int>( sizeof( tests ) / sizeof( tests[0] ) ); ++i ) {
+		rendererContextCandidate_t candidates[RENDERER_CONTEXT_LADDER_MAX_CANDIDATES];
+		memset( candidates, 0, sizeof( candidates ) );
+		const int count = RendererContextLadder_Build(
+			candidates,
+			static_cast<int>( sizeof( candidates ) / sizeof( candidates[0] ) ),
+			tests[i].preference,
+			tests[i].debugContext,
+			tests[i].keepAutoCompatibility );
+		if ( count != tests[i].expectedCount ) {
+			common->Printf(
+				"RendererContextLadder test failed: %s expected %d candidates got %d\n",
+				tests[i].name,
+				tests[i].expectedCount,
+				count );
+			return false;
+		}
+		if ( count <= 0 ) {
+			common->Printf( "RendererContextLadder test failed: %s produced no candidates\n", tests[i].name );
+			return false;
+		}
+		if ( candidates[0].major != tests[i].expectedFirstMajor ||
+			candidates[0].minor != tests[i].expectedFirstMinor ||
+			candidates[0].profile != tests[i].expectedFirstProfile ||
+			candidates[0].debugContext != tests[i].expectedFirstDebug ) {
+			common->Printf(
+				"RendererContextLadder test failed: %s first candidate was %s %d.%d debug=%d\n",
+				tests[i].name,
+				RendererContextProfile_Name( candidates[0].profile ),
+				candidates[0].major,
+				candidates[0].minor,
+				candidates[0].debugContext ? 1 : 0 );
+			return false;
+		}
+		if ( candidates[count - 1].explicitVersion != tests[i].expectedLastExplicitVersion ) {
+			common->Printf(
+				"RendererContextLadder test failed: %s last explicitVersion expected %d got %d\n",
+				tests[i].name,
+				tests[i].expectedLastExplicitVersion ? 1 : 0,
+				candidates[count - 1].explicitVersion ? 1 : 0 );
+			return false;
+		}
+	}
+
+	common->Printf( "RendererContextLadder self-test passed (%d cases)\n", static_cast<int>( sizeof( tests ) / sizeof( tests[0] ) ) );
 	return true;
 }

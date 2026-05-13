@@ -51,6 +51,10 @@ typedef struct rendererContextRequest_s {
 	char						label[32];
 } rendererContextRequest_t;
 
+typedef rendererContextRequest_t rendererContextCandidate_t;
+
+#define RENDERER_CONTEXT_LADDER_MAX_CANDIDATES 24
+
 typedef struct renderBackendCaps_s {
 	bool						contextCreated;
 	int							glMajor;
@@ -125,8 +129,10 @@ bool RendererCaps_SupportsTier( const renderBackendCaps_t &caps, rendererTier_t 
 rendererTier_t RendererTier_Select( const renderBackendCaps_t &caps, rendererTierPreference_t preference );
 renderFeatureSet_t RendererFeatureSet_Build( const renderBackendCaps_t &caps, rendererTier_t tier );
 void RendererCaps_FormatSummary( const renderBackendCaps_t &caps, char *buffer, int bufferSize );
+int RendererContextLadder_Build( rendererContextCandidate_t *candidates, int maxCandidates, rendererTierPreference_t preference, bool debugContext, bool keepAutoCompatibility );
 
 bool RendererTierSelect_RunSelfTest( void );
+bool RendererContextLadder_RunSelfTest( void );
 
 void GLCapabilityProbe_Build( renderBackendCaps_t &caps, const char *versionString, const char *legacyExtensionsString );
 bool GLCapabilityProbe_HasExtension( const char *name );

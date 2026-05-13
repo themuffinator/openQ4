@@ -1506,7 +1506,8 @@ void idInteraction::AddActiveInteraction( void ) {
 								if ( r_useIndexBuffers.GetBool() && lightTris->indexes != NULL && lightTris->numIndexes > 0 ) {
 									lightTris->indexCache = vertexCache.AllocFrameTemp(
 										lightTris->indexes,
-										lightTris->numIndexes * sizeof( lightTris->indexes[0] ) );
+										lightTris->numIndexes * sizeof( lightTris->indexes[0] ),
+										true );
 								} else {
 									lightTris->indexCache = NULL;
 								}

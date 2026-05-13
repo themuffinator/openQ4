@@ -14,6 +14,14 @@ typedef struct modernGLExecutorStats_s {
 	bool	vaoReady;
 	bool	frameUBOReady;
 	bool	shaderLibraryReady;
+	bool	gpuDrivenReady;
+	bool	lowOverheadReady;
+	bool	sceneSSBOReady;
+	bool	indirectBufferReady;
+	bool	validationSSBOReady;
+	bool	computeValidationReady;
+	bool	tierUsesDSA;
+	bool	tierUsesMultiBind;
 	bool	legacyFallback;
 	bool	drawPlanReady;
 	bool	drawPlanOverflow;
@@ -32,6 +40,14 @@ typedef struct modernGLExecutorStats_s {
 	int		shaderProgramCount;
 	int		shaderFailureCount;
 	int		highestGLSLVersion;
+	int		gpuDrivenSceneRecords;
+	int		gpuDrivenIndirectRecords;
+	int		gpuDrivenSceneBytes;
+	int		gpuDrivenIndirectBytes;
+	int		gpuDrivenValidationBytes;
+	int		gpuDrivenComputeDispatches;
+	int		lowOverheadDSAUpdates;
+	int		lowOverheadMultiBindBatches;
 	int		drawPlanDraws;
 	int		drawPlanDepthDraws;
 	int		drawPlanMaterialDraws;
@@ -47,6 +63,7 @@ typedef struct modernGLExecutorStats_s {
 	int		submitPlanMaterialDraws;
 	int		submitPlanMissingAmbientDraws;
 	int		submitPlanMissingIndexDraws;
+	int		submitPlanIndexUploadDraws;
 	int		submitPlanProgramBatches;
 	int		submitPlanVertexBufferBatches;
 	int		submitPlanIndexBufferBatches;
@@ -54,6 +71,12 @@ typedef struct modernGLExecutorStats_s {
 	int		submitPlanMaterialBatches;
 	int		submitPlanUniformUpdates;
 	int		submitPlanFrameUBOBinds;
+	bool	submitExecuted;
+	int		submittedDraws;
+	int		submittedDepthDraws;
+	int		submittedMaterialDraws;
+	int		submittedIndexUploadDraws;
+	int		submittedFallbackDraws;
 	char	status[96];
 } modernGLExecutorStats_t;
 

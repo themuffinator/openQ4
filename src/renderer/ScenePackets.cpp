@@ -4,6 +4,9 @@
 #include "tr_local.h"
 #include "ScenePackets.h"
 
+static idScenePacketFrame rg_frontEndScenePacketFrame;
+static bool rg_frontEndScenePacketFrameOpen = false;
+
 idScenePacketFrame::idScenePacketFrame() {
 	Clear();
 }
@@ -164,7 +167,7 @@ bool idScenePacketFrame::AddScene( const viewDef_t *viewDef, bool legacyBridge )
 	return true;
 }
 
-bool idScenePacketFrame::AddPass( renderPassCategory_t category, bool enabled ) {
+bool idScenePacketFrame::AddPass( renderPassCategory_t category, bool enabled, bool commandOnly ) {
 	if ( activeScene < 0 ) {
 		if ( !AddScene( NULL, true ) ) {
 			return false;
@@ -181,6 +184,7 @@ bool idScenePacketFrame::AddPass( renderPassCategory_t category, bool enabled ) 
 	pass.passCategory = category;
 	pass.firstDrawPacket = stats.drawPackets;
 	pass.enabled = enabled;
+	pass.commandOnly = commandOnly;
 	activePass = stats.passPackets - 1;
 	scenes[activeScene].passPacketCount++;
 	return true;
@@ -202,6 +206,7 @@ bool idScenePacketFrame::AddDrawPacket( const drawSurf_t *drawSurf, renderPassCa
 	memset( &packet, 0, sizeof( packet ) );
 	const int materialRecordIndex = FindOrAddMaterialRecord( drawSurf );
 	packet.legacyDrawSurf = drawSurf;
+	packet.viewDef = activeScene >= 0 ? scenes[activeScene].viewDef : NULL;
 	packet.space = drawSurf ? drawSurf->space : NULL;
 	packet.materialRecord = materialRecordIndex >= 0 ? &materialRecords[materialRecordIndex] : NULL;
 	packet.sortKey.value = R_ScenePackets_BuildSortKey( drawSurf, category, drawIndex );
@@ -266,6 +271,14 @@ void idScenePacketFrame::AddClippedDrawPackets( int count ) {
 		stats.clippedDrawPackets += count;
 		stats.overflow = true;
 	}
+}
+
+void idScenePacketFrame::MarkFrontEndDerived( void ) {
+	stats.frontEndDerived = true;
+}
+
+void idScenePacketFrame::MarkBackendDerived( void ) {
+	stats.backendDerived = true;
 }
 
 int idScenePacketFrame::NumScenes( void ) const {
@@ -364,6 +377,25 @@ const char *RendererMaterialClass_Name( rendererMaterialClass_t materialClass ) 
 	}
 }
 
+static void R_ScenePackets_EnsureFrontEndFrame( void ) {
+	if ( !rg_frontEndScenePacketFrameOpen ) {
+		rg_frontEndScenePacketFrame.Clear();
+		rg_frontEndScenePacketFrameOpen = true;
+	}
+	rg_frontEndScenePacketFrame.MarkFrontEndDerived();
+}
+
+void R_ScenePackets_BeginFrame( void ) {
+	rg_frontEndScenePacketFrame.Clear();
+	rg_frontEndScenePacketFrame.MarkFrontEndDerived();
+	rg_frontEndScenePacketFrameOpen = true;
+}
+
+void R_ScenePackets_EndFrame( void ) {
+	rg_frontEndScenePacketFrame.Clear();
+	rg_frontEndScenePacketFrameOpen = false;
+}
+
 static void R_ScenePackets_AddDrawSurfPass( idScenePacketFrame &packetFrame, const viewDef_t *viewDef, renderPassCategory_t category ) {
 	if ( !packetFrame.AddPass( category, true ) ) {
 		return;
@@ -380,9 +412,9 @@ static void R_ScenePackets_AddDrawSurfPass( idScenePacketFrame &packetFrame, con
 	}
 }
 
-static void R_ScenePackets_AddDrawView( idScenePacketFrame &packetFrame, const viewDef_t *viewDef ) {
+static void R_ScenePackets_AddDrawView( idScenePacketFrame &packetFrame, const viewDef_t *viewDef, bool legacyBridge ) {
 	packetFrame.AddLegacyDrawView();
-	if ( !packetFrame.AddScene( viewDef, true ) ) {
+	if ( !packetFrame.AddScene( viewDef, legacyBridge ) ) {
 		return;
 	}
 
@@ -401,39 +433,81 @@ static void R_ScenePackets_AddDrawView( idScenePacketFrame &packetFrame, const v
 	packetFrame.FinishScene();
 }
 
-static void R_ScenePackets_AddCommandPass( idScenePacketFrame &packetFrame, renderPassCategory_t category, const viewDef_t *viewDef ) {
+static void R_ScenePackets_AddCommandPass( idScenePacketFrame &packetFrame, renderPassCategory_t category, const viewDef_t *viewDef, bool legacyBridge ) {
 	packetFrame.AddCommandPacket();
-	if ( !packetFrame.AddScene( viewDef, true ) ) {
+	if ( !packetFrame.AddScene( viewDef, legacyBridge ) ) {
 		return;
 	}
-	packetFrame.AddPass( category, true );
+	packetFrame.AddPass( category, true, true );
 	packetFrame.FinishScene();
+}
+
+void R_ScenePackets_AddRenderView( const viewDef_t *viewDef ) {
+	R_ScenePackets_EnsureFrontEndFrame();
+	R_ScenePackets_AddDrawView( rg_frontEndScenePacketFrame, viewDef, false );
+}
+
+void R_ScenePackets_AddSpecialEffects( const viewDef_t *viewDef ) {
+	R_ScenePackets_EnsureFrontEndFrame();
+	R_ScenePackets_AddCommandPass( rg_frontEndScenePacketFrame, RENDER_PASS_SPECIAL_EFFECTS, viewDef, false );
+}
+
+void R_ScenePackets_AddRenderTargetOp( void ) {
+	R_ScenePackets_EnsureFrontEndFrame();
+	R_ScenePackets_AddCommandPass( rg_frontEndScenePacketFrame, RENDER_PASS_AUTHORED_POST, NULL, false );
+}
+
+void R_ScenePackets_AddCopyRender( void ) {
+	R_ScenePackets_EnsureFrontEndFrame();
+	R_ScenePackets_AddCommandPass( rg_frontEndScenePacketFrame, RENDER_PASS_AUTHORED_POST, NULL, false );
+}
+
+void R_ScenePackets_AddPresent( void ) {
+	R_ScenePackets_EnsureFrontEndFrame();
+	R_ScenePackets_AddCommandPass( rg_frontEndScenePacketFrame, RENDER_PASS_PRESENT, NULL, false );
+}
+
+void R_ScenePackets_AddCommandOnly( void ) {
+	R_ScenePackets_EnsureFrontEndFrame();
+	rg_frontEndScenePacketFrame.AddCommandPacket();
+}
+
+const idScenePacketFrame &R_ScenePackets_FrontEndFrame( void ) {
+	return rg_frontEndScenePacketFrame;
+}
+
+bool R_ScenePackets_FrontEndFrameAvailable( void ) {
+	const scenePacketFrameStats_t &stats = rg_frontEndScenePacketFrame.Stats();
+	return rg_frontEndScenePacketFrameOpen
+		&& stats.frontEndDerived
+		&& ( stats.scenePackets > 0 || stats.passPackets > 0 || stats.drawPackets > 0 || stats.commandPackets > 0 );
 }
 
 void R_ScenePackets_BuildLegacyCommandStream( const emptyCommand_t *cmds, idScenePacketFrame &packetFrame ) {
 	packetFrame.Clear();
+	packetFrame.MarkBackendDerived();
 
 	for ( const emptyCommand_t *cmd = cmds; cmd != NULL; cmd = reinterpret_cast<const emptyCommand_t *>( cmd->next ) ) {
 		switch ( cmd->commandId ) {
 		case RC_DRAW_VIEW:
-			R_ScenePackets_AddDrawView( packetFrame, reinterpret_cast<const drawSurfsCommand_t *>( cmd )->viewDef );
+			R_ScenePackets_AddDrawView( packetFrame, reinterpret_cast<const drawSurfsCommand_t *>( cmd )->viewDef, true );
 			break;
 		case RC_DRAW_SPECIAL_EFFECTS:
-			R_ScenePackets_AddCommandPass( packetFrame, RENDER_PASS_SPECIAL_EFFECTS, reinterpret_cast<const drawSurfsCommand_t *>( cmd )->viewDef );
+			R_ScenePackets_AddCommandPass( packetFrame, RENDER_PASS_SPECIAL_EFFECTS, reinterpret_cast<const drawSurfsCommand_t *>( cmd )->viewDef, true );
 			break;
 		case RC_SET_RENDERTEXTURE:
 		case RC_RESOLVE_MSAA:
 		case RC_CLEAR_RENDERTARGET:
-			R_ScenePackets_AddCommandPass( packetFrame, RENDER_PASS_AUTHORED_POST, NULL );
+			R_ScenePackets_AddCommandPass( packetFrame, RENDER_PASS_AUTHORED_POST, NULL, true );
 			break;
 		case RC_COPY_RENDER:
-			R_ScenePackets_AddCommandPass( packetFrame, RENDER_PASS_AUTHORED_POST, NULL );
+			R_ScenePackets_AddCommandPass( packetFrame, RENDER_PASS_AUTHORED_POST, NULL, true );
 			break;
 		case RC_SET_BUFFER:
 			packetFrame.AddCommandPacket();
 			break;
 		case RC_SWAP_BUFFERS:
-			R_ScenePackets_AddCommandPass( packetFrame, RENDER_PASS_PRESENT, NULL );
+			R_ScenePackets_AddCommandPass( packetFrame, RENDER_PASS_PRESENT, NULL, true );
 			break;
 		default:
 			break;
@@ -448,7 +522,8 @@ void R_ScenePackets_LogIfVerbose( const idScenePacketFrame &packetFrame ) {
 
 	const scenePacketFrameStats_t &stats = packetFrame.Stats();
 	common->Printf(
-		"scenePackets legacy scenes=%d passes=%d draws=%d clipped=%d cmds=%d drawViews=%d materials=%d withMaterial=%d resources=%d geometry=%d regs=%d indexCache=%d ambientCache=%d overflow=%d\n",
+		"scenePackets source=%s scenes=%d passes=%d draws=%d clipped=%d cmds=%d drawViews=%d materials=%d withMaterial=%d resources=%d geometry=%d regs=%d indexCache=%d ambientCache=%d overflow=%d\n",
+		stats.frontEndDerived ? "frontend" : ( stats.backendDerived ? "backend" : "unknown" ),
 		stats.scenePackets,
 		stats.passPackets,
 		stats.drawPackets,
@@ -530,7 +605,7 @@ bool RendererScenePacket_RunSelfTest( void ) {
 	const scenePacketFrameStats_t &stats = packetFrame.Stats();
 	const int expectedMaterialRecords = tr.defaultMaterial != NULL ? 1 : 0;
 	const int expectedDrawsWithMaterial = tr.defaultMaterial != NULL ? 12 : 0;
-	if ( stats.scenePackets != 3 || stats.passPackets != 8 || stats.drawPackets != 12 || stats.legacyDrawViews != 1 || stats.commandPackets != 2 || stats.materialRecords != expectedMaterialRecords || stats.drawPacketsWithResourceRecord != expectedDrawsWithMaterial || stats.drawPacketsWithGeometry != 12 || stats.overflow ) {
+	if ( stats.scenePackets != 3 || stats.passPackets != 8 || stats.drawPackets != 12 || stats.legacyDrawViews != 1 || stats.commandPackets != 2 || stats.materialRecords != expectedMaterialRecords || stats.drawPacketsWithResourceRecord != expectedDrawsWithMaterial || stats.drawPacketsWithGeometry != 12 || !stats.backendDerived || stats.frontEndDerived || stats.overflow ) {
 		common->Printf(
 			"RendererScenePacket self-test failed: scenes=%d passes=%d draws=%d views=%d cmds=%d materials=%d resources=%d geometry=%d overflow=%d\n",
 			stats.scenePackets,
@@ -556,6 +631,36 @@ bool RendererScenePacket_RunSelfTest( void ) {
 		}
 	}
 
-	common->Printf( "RendererScenePacket self-test passed\n" );
+	R_ScenePackets_BeginFrame();
+	R_ScenePackets_AddRenderView( &worldView );
+	R_ScenePackets_AddSpecialEffects( &worldView );
+	R_ScenePackets_AddPresent();
+	const idScenePacketFrame &frontEndPacketFrame = R_ScenePackets_FrontEndFrame();
+	const scenePacketFrameStats_t &frontEndStats = frontEndPacketFrame.Stats();
+	if ( frontEndStats.scenePackets != 3 || frontEndStats.passPackets != 8 || frontEndStats.drawPackets != 12 || frontEndStats.legacyDrawViews != 1 || frontEndStats.commandPackets != 2 || frontEndStats.materialRecords != expectedMaterialRecords || frontEndStats.drawPacketsWithResourceRecord != expectedDrawsWithMaterial || frontEndStats.drawPacketsWithGeometry != 12 || !frontEndStats.frontEndDerived || frontEndStats.backendDerived || frontEndStats.overflow ) {
+		common->Printf(
+			"RendererScenePacket self-test failed: frontend scenes=%d passes=%d draws=%d views=%d cmds=%d materials=%d resources=%d geometry=%d source(frontend=%d backend=%d) overflow=%d\n",
+			frontEndStats.scenePackets,
+			frontEndStats.passPackets,
+			frontEndStats.drawPackets,
+			frontEndStats.legacyDrawViews,
+			frontEndStats.commandPackets,
+			frontEndStats.materialRecords,
+			frontEndStats.drawPacketsWithResourceRecord,
+			frontEndStats.drawPacketsWithGeometry,
+			frontEndStats.frontEndDerived ? 1 : 0,
+			frontEndStats.backendDerived ? 1 : 0,
+			frontEndStats.overflow ? 1 : 0 );
+		R_ScenePackets_EndFrame();
+		return false;
+	}
+	if ( frontEndPacketFrame.NumScenes() > 0 && frontEndPacketFrame.Scene( 0 ).legacyBridge ) {
+		common->Printf( "RendererScenePacket self-test failed: frontend scene marked as legacy bridge\n" );
+		R_ScenePackets_EndFrame();
+		return false;
+	}
+	R_ScenePackets_EndFrame();
+
+	common->Printf( "RendererScenePacket self-test passed (backend and frontend)\n" );
 	return true;
 }

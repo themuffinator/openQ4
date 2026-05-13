@@ -1064,6 +1064,7 @@ extern idCVar r_rendererGpuTimers;		// sample GL timer queries when renderer met
 extern idCVar r_rendererUploadMegs;		// dynamic upload stream size in megabytes per frame buffer
 extern idCVar r_rendererUploadPersistent;	// allow persistent-mapped dynamic upload stream
 extern idCVar r_rendererModernExecutor;	// opt-in modern GL executor prepare path
+extern idCVar r_rendererModernSubmit;	// opt-in modern GL draw submission before ARB2 fallback
 extern idCVar r_useSimpleInteraction;	// use the simpler Quake 4 interaction program pair as a compatibility fallback
 extern idCVar r_interactionColorMode;	// interaction color mode: 0 auto, 1 packed env16.xy, 2 vector env16/env17
 extern idCVar r_shaderReport;			// shader diagnostics: 0 off, 1 summaries, 2 invalid-use warnings

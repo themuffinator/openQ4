@@ -13,17 +13,76 @@ static idUploadManager rg_uploadManager;
 
 idBufferAllocator::idBufferAllocator()
 	: capacityBytes( 0 )
+	, frameStaticUploadBytes( 0 )
+	, frameStaticAllocations( 0 )
+	, staticBuffersLive( 0 )
+	, staticBytesLive( 0 )
 	, persistentMapped( false ) {
 }
 
 void idBufferAllocator::Init( int bytes, bool persistent ) {
 	capacityBytes = bytes;
+	frameStaticUploadBytes = 0;
+	frameStaticAllocations = 0;
+	staticBuffersLive = 0;
+	staticBytesLive = 0;
 	persistentMapped = persistent;
 }
 
 void idBufferAllocator::Shutdown( void ) {
 	capacityBytes = 0;
+	frameStaticUploadBytes = 0;
+	frameStaticAllocations = 0;
+	staticBuffersLive = 0;
+	staticBytesLive = 0;
 	persistentMapped = false;
+}
+
+void idBufferAllocator::BeginFrame( void ) {
+	frameStaticUploadBytes = 0;
+	frameStaticAllocations = 0;
+}
+
+bool idBufferAllocator::AllocStaticBuffer( void *data, int bytes, bool indexBuffer, bool streamDraw, unsigned int &vbo ) {
+	if ( bytes <= 0 ) {
+		return false;
+	}
+
+	if ( vbo == 0 ) {
+		glGenBuffersARB( 1, &vbo );
+		if ( vbo == 0 ) {
+			return false;
+		}
+		staticBuffersLive++;
+	}
+
+	const GLenum target = indexBuffer ? GL_ELEMENT_ARRAY_BUFFER_ARB : GL_ARRAY_BUFFER_ARB;
+	const GLenum usage = streamDraw ? GL_STREAM_DRAW_ARB : GL_STATIC_DRAW_ARB;
+	glBindBufferARB( target, vbo );
+	glBufferDataARB( target, (GLsizeiptrARB)bytes, data, usage );
+
+	frameStaticUploadBytes += bytes;
+	frameStaticAllocations++;
+	staticBytesLive += bytes;
+	return true;
+}
+
+void idBufferAllocator::FreeStaticBuffer( unsigned int &vbo, int bytes ) {
+	if ( vbo == 0 ) {
+		return;
+	}
+
+	glDeleteBuffersARB( 1, &vbo );
+	vbo = 0;
+	if ( staticBuffersLive > 0 ) {
+		staticBuffersLive--;
+	}
+	if ( bytes > 0 ) {
+		staticBytesLive -= bytes;
+		if ( staticBytesLive < 0 ) {
+			staticBytesLive = 0;
+		}
+	}
 }
 
 int idBufferAllocator::Capacity( void ) const {
@@ -32,6 +91,22 @@ int idBufferAllocator::Capacity( void ) const {
 
 bool idBufferAllocator::IsPersistentMapped( void ) const {
 	return persistentMapped;
+}
+
+int idBufferAllocator::FrameStaticUploadBytes( void ) const {
+	return frameStaticUploadBytes;
+}
+
+int idBufferAllocator::FrameStaticAllocations( void ) const {
+	return frameStaticAllocations;
+}
+
+int idBufferAllocator::StaticBuffersLive( void ) const {
+	return staticBuffersLive;
+}
+
+int idBufferAllocator::StaticBytesLive( void ) const {
+	return staticBytesLive;
 }
 
 idRingBuffer::idRingBuffer()
@@ -183,6 +258,7 @@ void idUploadManager::Init( const renderBackendCaps_t &caps ) {
 	stats.mapRangeFallback = requestedPath == UPLOAD_PATH_MAP_RANGE;
 	stats.legacyBridge = true;
 	stats.dynamicFrameBridge = false;
+	stats.staticBufferAllocator = requestedPath != UPLOAD_PATH_DISABLED;
 	hasSync = caps.hasSync && glFenceSync != NULL && glClientWaitSync != NULL && glDeleteSync != NULL;
 
 	if ( requestedPath != UPLOAD_PATH_DISABLED ) {
@@ -198,11 +274,14 @@ void idUploadManager::Init( const renderBackendCaps_t &caps ) {
 
 	initialized = true;
 	stats.dynamicFrameBridge = path != UPLOAD_PATH_DISABLED;
+	stats.staticBufferAllocator = path != UPLOAD_PATH_DISABLED;
+	UpdateAllocatorStats();
 
 	common->Printf(
-		"Renderer upload manager: %s legacy bridge, frameStream=%s, buffers=%d, ring=%dKB, sync=%s\n",
+		"Renderer upload manager: %s legacy bridge, frameStream=%s, staticAllocator=%s, buffers=%d, ring=%dKB, sync=%s\n",
 		path == UPLOAD_PATH_PERSISTENT ? "persistent-mapped capable" : "streaming",
 		PathName(),
+		stats.staticBufferAllocator ? "yes" : "no",
 		RENDERER_UPLOAD_FRAME_BUFFERS,
 		ringBytes / 1024,
 		hasSync ? "yes" : "no" );
@@ -221,14 +300,18 @@ void idUploadManager::Shutdown( void ) {
 
 void idUploadManager::BeginFrame( int frameCount ) {
 	stats.frameUploadBytes = 0;
+	stats.frameStaticUploadBytes = 0;
 	stats.frameStalls = 0;
 	stats.frameAllocations = 0;
+	stats.frameStaticAllocations = 0;
 	stats.frameRingUsedBytes = 0;
 	stats.frameRingHighWaterBytes = 0;
 	stats.frameOverflowBytes = 0;
 	stats.framePersistentWrites = 0;
 	stats.frameMapRangeWrites = 0;
 	stats.frameSubDataWrites = 0;
+	allocator.BeginFrame();
+	UpdateAllocatorStats();
 	ring.BeginFrame();
 
 	if ( path == UPLOAD_PATH_DISABLED ) {
@@ -250,6 +333,7 @@ void idUploadManager::EndFrame( void ) {
 	stats.frameRingUsedBytes = ring.Used();
 	stats.frameRingHighWaterBytes = ring.HighWater();
 	stats.frameOverflowBytes += ring.OverflowBytes();
+	UpdateAllocatorStats();
 	legacy.EndFrame();
 	ring.EndFrame();
 }
@@ -312,6 +396,36 @@ bool idUploadManager::AllocFrameTemp( void *data, int bytes, int alignment, rend
 	return true;
 }
 
+bool idUploadManager::AllocStaticBuffer( void *data, int bytes, bool indexBuffer, bool streamDraw, unsigned int &vbo ) {
+	if ( !initialized || !stats.staticBufferAllocator || bytes <= 0 ) {
+		return false;
+	}
+
+	if ( !allocator.AllocStaticBuffer( data, bytes, indexBuffer, streamDraw, vbo ) ) {
+		return false;
+	}
+
+	stats.frameUploadBytes += bytes;
+	UpdateAllocatorStats();
+	R_RendererMetrics_AddUploadBytes( bytes );
+	return true;
+}
+
+void idUploadManager::FreeStaticBuffer( unsigned int &vbo, int bytes ) {
+	if ( vbo == 0 ) {
+		return;
+	}
+
+	if ( !initialized || !stats.staticBufferAllocator ) {
+		glDeleteBuffersARB( 1, &vbo );
+		vbo = 0;
+		return;
+	}
+
+	allocator.FreeStaticBuffer( vbo, bytes );
+	UpdateAllocatorStats();
+}
+
 void idUploadManager::RecordLegacyUpload( int bytes ) {
 	legacy.RecordUpload( bytes );
 	if ( bytes > 0 ) {
@@ -330,6 +444,10 @@ const rendererUploadStats_t &idUploadManager::Stats( void ) const {
 
 bool idUploadManager::DynamicFrameBridgeAvailable( void ) const {
 	return initialized && path != UPLOAD_PATH_DISABLED;
+}
+
+bool idUploadManager::StaticBufferAllocatorAvailable( void ) const {
+	return initialized && stats.staticBufferAllocator;
 }
 
 int idUploadManager::FrameCapacity( void ) const {
@@ -409,6 +527,13 @@ void idUploadManager::FenceCurrentFrame( void ) {
 	frame.fence = glFenceSync( GL_SYNC_GPU_COMMANDS_COMPLETE, 0 );
 }
 
+void idUploadManager::UpdateAllocatorStats( void ) {
+	stats.frameStaticUploadBytes = allocator.FrameStaticUploadBytes();
+	stats.frameStaticAllocations = allocator.FrameStaticAllocations();
+	stats.staticBuffersLive = allocator.StaticBuffersLive();
+	stats.staticBytesLive = allocator.StaticBytesLive();
+}
+
 const char *idUploadManager::PathName( void ) const {
 	switch ( path ) {
 	case UPLOAD_PATH_PERSISTENT:
@@ -443,6 +568,14 @@ bool R_RendererUpload_AllocFrameTemp( void *data, int bytes, int alignment, rend
 	return rg_uploadManager.AllocFrameTemp( data, bytes, alignment, allocation );
 }
 
+bool R_RendererUpload_AllocStaticBuffer( void *data, int bytes, bool indexBuffer, bool streamDraw, unsigned int &vbo ) {
+	return rg_uploadManager.AllocStaticBuffer( data, bytes, indexBuffer, streamDraw, vbo );
+}
+
+void R_RendererUpload_FreeStaticBuffer( unsigned int &vbo, int bytes ) {
+	rg_uploadManager.FreeStaticBuffer( vbo, bytes );
+}
+
 void R_RendererUpload_RecordLegacyUpload( int bytes ) {
 	rg_uploadManager.RecordLegacyUpload( bytes );
 }
@@ -457,6 +590,10 @@ const rendererUploadStats_t &R_RendererUpload_Stats( void ) {
 
 bool R_RendererUpload_DynamicFrameBridgeAvailable( void ) {
 	return rg_uploadManager.DynamicFrameBridgeAvailable();
+}
+
+bool R_RendererUpload_StaticBufferAllocatorAvailable( void ) {
+	return rg_uploadManager.StaticBufferAllocatorAvailable();
 }
 
 int R_RendererUpload_FrameCapacity( void ) {
@@ -500,6 +637,36 @@ bool RendererUpload_RunSelfTest( void ) {
 	}
 	ring.Shutdown();
 
-	common->Printf( "RendererUpload self-test passed\n" );
+	idBufferAllocator allocator;
+	allocator.Init( 2048, false );
+	allocator.BeginFrame();
+	if ( allocator.Capacity() != 2048 || allocator.FrameStaticUploadBytes() != 0 || allocator.FrameStaticAllocations() != 0 ) {
+		common->Printf( "RendererUpload self-test failed: allocator begin-frame state\n" );
+		return false;
+	}
+	allocator.Shutdown();
+
+	if ( R_RendererUpload_StaticBufferAllocatorAvailable() ) {
+		byte data[16];
+		memset( data, 0x5a, sizeof( data ) );
+		unsigned int vbo = 0;
+		if ( !R_RendererUpload_AllocStaticBuffer( data, sizeof( data ), false, false, vbo ) || vbo == 0 ) {
+			common->Printf( "RendererUpload self-test failed: static buffer allocation\n" );
+			return false;
+		}
+		const rendererUploadStats_t &stats = R_RendererUpload_Stats();
+		if ( stats.frameStaticUploadBytes < static_cast<int>( sizeof( data ) ) || stats.frameStaticAllocations <= 0 || stats.staticBuffersLive <= 0 ) {
+			common->Printf( "RendererUpload self-test failed: static buffer stats\n" );
+			R_RendererUpload_FreeStaticBuffer( vbo, sizeof( data ) );
+			return false;
+		}
+		R_RendererUpload_FreeStaticBuffer( vbo, sizeof( data ) );
+		if ( vbo != 0 ) {
+			common->Printf( "RendererUpload self-test failed: static buffer free\n" );
+			return false;
+		}
+	}
+
+	common->Printf( "RendererUpload self-test passed (ring, allocator, static buffers)\n" );
 	return true;
 }

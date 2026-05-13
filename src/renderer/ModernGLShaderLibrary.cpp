@@ -8,15 +8,54 @@ static modernGLShaderLibraryStats_t rg_modernGLShaderLibraryStats;
 static modernGLShaderProgramInfo_t rg_modernGLShaderPrograms[MODERN_GL_SHADER_MAX_PROGRAMS];
 static int rg_modernGLShaderProgramCount = 0;
 
-static const char *R_ModernGLShaderLibrary_ProgramKindName( modernGLShaderProgramKind_t kind ) {
+typedef struct modernGLShaderProgramDescriptor_s {
+	modernGLShaderProgramKind_t	kind;
+	renderPassCategory_t		passCategory;
+	rendererMaterialClass_t		materialClass;
+	unsigned int				lightingMode;
+	unsigned int				shadowMode;
+	unsigned int				alphaMode;
+	const char					*name;
+} modernGLShaderProgramDescriptor_t;
+
+static const modernGLShaderProgramDescriptor_t rg_modernGLShaderProgramDescriptors[MODERN_GL_SHADER_PROGRAM_KIND_COUNT] = {
+	{ MODERN_GL_SHADER_DEPTH, RENDER_PASS_DEPTH, RENDER_MATERIAL_OPAQUE, 0, 0, 0, "depth" },
+	{ MODERN_GL_SHADER_SHADOW_DEPTH, RENDER_PASS_SHADOW_MAP, RENDER_MATERIAL_SHADOW_ONLY, 0, 1, 0, "shadowDepth" },
+	{ MODERN_GL_SHADER_FLAT_MATERIAL, RENDER_PASS_ARB2_INTERACTION, RENDER_MATERIAL_OPAQUE, 1, 0, 0, "flatMaterial" },
+	{ MODERN_GL_SHADER_LIGHT_GRID, RENDER_PASS_LIGHT_GRID, RENDER_MATERIAL_OPAQUE, 2, 0, 0, "lightGrid" },
+	{ MODERN_GL_SHADER_FOG_BLEND, RENDER_PASS_FOG_BLEND, RENDER_MATERIAL_TRANSLUCENT, 3, 0, 1, "fogBlend" },
+	{ MODERN_GL_SHADER_GUI, RENDER_PASS_GUI, RENDER_MATERIAL_GUI, 0, 0, 1, "gui" },
+	{ MODERN_GL_SHADER_POST_COPY, RENDER_PASS_AUTHORED_POST, RENDER_MATERIAL_POST_PROCESS, 0, 0, 1, "postCopy" }
+};
+
+const char *ModernGLShaderProgramKind_Name( modernGLShaderProgramKind_t kind ) {
 	switch ( kind ) {
 	case MODERN_GL_SHADER_DEPTH:
 		return "depth";
+	case MODERN_GL_SHADER_SHADOW_DEPTH:
+		return "shadowDepth";
 	case MODERN_GL_SHADER_FLAT_MATERIAL:
 		return "flatMaterial";
+	case MODERN_GL_SHADER_LIGHT_GRID:
+		return "lightGrid";
+	case MODERN_GL_SHADER_FOG_BLEND:
+		return "fogBlend";
+	case MODERN_GL_SHADER_GUI:
+		return "gui";
+	case MODERN_GL_SHADER_POST_COPY:
+		return "postCopy";
 	default:
 		return "unknown";
 	}
+}
+
+static const modernGLShaderProgramDescriptor_t *R_ModernGLShaderLibrary_DescriptorForKind( modernGLShaderProgramKind_t kind ) {
+	for ( int i = 0; i < MODERN_GL_SHADER_PROGRAM_KIND_COUNT; ++i ) {
+		if ( rg_modernGLShaderProgramDescriptors[i].kind == kind ) {
+			return &rg_modernGLShaderProgramDescriptors[i];
+		}
+	}
+	return NULL;
 }
 
 static void R_ModernGLShaderLibrary_SetStatus( const char *status ) {
@@ -29,6 +68,7 @@ static void R_ModernGLShaderLibrary_SetStatus( const char *status ) {
 
 static void R_ModernGLShaderLibrary_ResetStats( void ) {
 	memset( &rg_modernGLShaderLibraryStats, 0, sizeof( rg_modernGLShaderLibraryStats ) );
+	rg_modernGLShaderLibraryStats.programKindCount = MODERN_GL_SHADER_PROGRAM_KIND_COUNT;
 	R_ModernGLShaderLibrary_SetStatus( "unavailable" );
 }
 
@@ -49,7 +89,9 @@ static bool R_ModernGLShaderLibrary_HasCoreEntrypoints( void ) {
 		&& glGetProgramInfoLog != NULL
 		&& glGetUniformLocation != NULL
 		&& glGetUniformBlockIndex != NULL
-		&& glUniformBlockBinding != NULL;
+		&& glUniformBlockBinding != NULL
+		&& glUseProgram != NULL
+		&& glUniform1i != NULL;
 }
 
 static bool R_ModernGLShaderLibrary_CanCompile( const renderBackendCaps_t &caps, const renderFeatureSet_t &features ) {
@@ -88,6 +130,7 @@ static void R_ModernGLShaderLibrary_BuildVertexSource( int glslVersion, char *bu
 		bufferSize,
 		"#version %d\n"
 		"layout(location = 0) in vec3 attr_Position;\n"
+		"layout(location = 8) in vec2 attr_TexCoord0;\n"
 		"layout(std140) uniform ModernFrameConstants {\n"
 		"    vec4 viewport;\n"
 		"    vec4 frame;\n"
@@ -95,20 +138,90 @@ static void R_ModernGLShaderLibrary_BuildVertexSource( int glslVersion, char *bu
 		"    vec4 reserved;\n"
 		"} uFrame;\n"
 		"uniform mat4 uModelViewProjection;\n"
+		"out vec2 vTexCoord;\n"
 		"void main() {\n"
 		"    vec4 frameJitter = vec4(uFrame.reserved.xy, 0.0, 0.0);\n"
+		"    vTexCoord = attr_TexCoord0;\n"
 		"    gl_Position = uModelViewProjection * vec4(attr_Position, 1.0) + frameJitter;\n"
 		"}\n",
 		glslVersion );
 }
 
 static void R_ModernGLShaderLibrary_BuildFragmentSource( int glslVersion, modernGLShaderProgramKind_t kind, char *buffer, int bufferSize ) {
-	if ( kind == MODERN_GL_SHADER_DEPTH ) {
+	if ( kind == MODERN_GL_SHADER_DEPTH || kind == MODERN_GL_SHADER_SHADOW_DEPTH ) {
 		idStr::snPrintf(
 			buffer,
 			bufferSize,
 			"#version %d\n"
 			"void main() {\n"
+			"}\n",
+			glslVersion );
+		return;
+	}
+
+	if ( kind == MODERN_GL_SHADER_LIGHT_GRID ) {
+		idStr::snPrintf(
+			buffer,
+			bufferSize,
+			"#version %d\n"
+			"layout(location = 0) out vec4 out_Color;\n"
+			"uniform vec4 uDebugColor;\n"
+			"uniform vec4 uLocalParams;\n"
+			"void main() {\n"
+			"    float lightScale = clamp(uLocalParams.x + 1.0, 0.25, 2.0);\n"
+			"    out_Color = vec4(uDebugColor.rgb * lightScale, uDebugColor.a);\n"
+			"}\n",
+			glslVersion );
+		return;
+	}
+
+	if ( kind == MODERN_GL_SHADER_FOG_BLEND ) {
+		idStr::snPrintf(
+			buffer,
+			bufferSize,
+			"#version %d\n"
+			"layout(location = 0) out vec4 out_Color;\n"
+			"uniform vec4 uDebugColor;\n"
+			"uniform vec4 uLocalParams;\n"
+			"void main() {\n"
+			"    float fogAmount = clamp(uLocalParams.x, 0.0, 1.0);\n"
+			"    vec3 fogColor = vec3(uLocalParams.y, uLocalParams.z, uLocalParams.w);\n"
+			"    out_Color = vec4(mix(uDebugColor.rgb, fogColor, fogAmount), uDebugColor.a);\n"
+			"}\n",
+			glslVersion );
+		return;
+	}
+
+	if ( kind == MODERN_GL_SHADER_GUI ) {
+		idStr::snPrintf(
+			buffer,
+			bufferSize,
+			"#version %d\n"
+			"in vec2 vTexCoord;\n"
+			"layout(location = 0) out vec4 out_Color;\n"
+			"uniform vec4 uDebugColor;\n"
+			"uniform sampler2D uMainTexture;\n"
+			"void main() {\n"
+			"    out_Color = texture(uMainTexture, vTexCoord) * uDebugColor;\n"
+			"}\n",
+			glslVersion );
+		return;
+	}
+
+	if ( kind == MODERN_GL_SHADER_POST_COPY ) {
+		idStr::snPrintf(
+			buffer,
+			bufferSize,
+			"#version %d\n"
+			"in vec2 vTexCoord;\n"
+			"layout(location = 0) out vec4 out_Color;\n"
+			"uniform vec4 uDebugColor;\n"
+			"uniform vec4 uLocalParams;\n"
+			"uniform sampler2D uMainTexture;\n"
+			"void main() {\n"
+			"    vec2 uv = clamp(vTexCoord + uLocalParams.xy, vec2(0.0), vec2(1.0));\n"
+			"    vec4 texel = texture(uMainTexture, uv);\n"
+			"    out_Color = vec4(texel.rgb * max(uDebugColor.rgb, vec3(0.0)), texel.a * uDebugColor.a);\n"
 			"}\n",
 			glslVersion );
 		return;
@@ -166,22 +279,99 @@ static GLuint R_ModernGLShaderLibrary_CompileShader( GLenum shaderType, const ch
 	return shader;
 }
 
+static bool R_ModernGLShaderLibrary_KindUsesDebugColor( modernGLShaderProgramKind_t kind ) {
+	return kind != MODERN_GL_SHADER_DEPTH && kind != MODERN_GL_SHADER_SHADOW_DEPTH;
+}
+
+static bool R_ModernGLShaderLibrary_KindUsesLocalParams( modernGLShaderProgramKind_t kind ) {
+	return kind == MODERN_GL_SHADER_LIGHT_GRID || kind == MODERN_GL_SHADER_FOG_BLEND || kind == MODERN_GL_SHADER_POST_COPY;
+}
+
+static bool R_ModernGLShaderLibrary_KindUsesMainTexture( modernGLShaderProgramKind_t kind ) {
+	return kind == MODERN_GL_SHADER_GUI || kind == MODERN_GL_SHADER_POST_COPY;
+}
+
 static bool R_ModernGLShaderLibrary_ReflectProgram( modernGLShaderProgramInfo_t &info ) {
-	info.frameBlockIndex = static_cast<int>( glGetUniformBlockIndex( info.program, "ModernFrameConstants" ) );
-	info.modelViewProjectionLocation = glGetUniformLocation( info.program, "uModelViewProjection" );
-	info.debugColorLocation = glGetUniformLocation( info.program, "uDebugColor" );
+	memset( &info.reflection, 0, sizeof( info.reflection ) );
+	info.reflection.positionAttribute = 0;
+	info.reflection.texCoordAttribute = 8;
+	info.reflection.usesFrameConstants = true;
+	info.reflection.usesModelViewProjection = true;
+	info.reflection.usesDebugColor = R_ModernGLShaderLibrary_KindUsesDebugColor( info.kind );
+	info.reflection.usesLocalParams = R_ModernGLShaderLibrary_KindUsesLocalParams( info.kind );
+	info.reflection.usesMainTexture = R_ModernGLShaderLibrary_KindUsesMainTexture( info.kind );
+	info.reflection.usesTexCoord = info.reflection.usesMainTexture;
+
+	const GLuint frameBlockIndex = glGetUniformBlockIndex( info.program, "ModernFrameConstants" );
+	info.reflection.frameBlockIndex = frameBlockIndex == GL_INVALID_INDEX ? -1 : static_cast<int>( frameBlockIndex );
+	info.reflection.modelViewProjectionLocation = glGetUniformLocation( info.program, "uModelViewProjection" );
+	info.reflection.debugColorLocation = glGetUniformLocation( info.program, "uDebugColor" );
+	info.reflection.localParamsLocation = glGetUniformLocation( info.program, "uLocalParams" );
+	info.reflection.mainTextureLocation = glGetUniformLocation( info.program, "uMainTexture" );
+
+	info.frameBlockIndex = info.reflection.frameBlockIndex;
+	info.modelViewProjectionLocation = info.reflection.modelViewProjectionLocation;
+	info.debugColorLocation = info.reflection.debugColorLocation;
+	info.localParamsLocation = info.reflection.localParamsLocation;
+	info.mainTextureLocation = info.reflection.mainTextureLocation;
 
 	if ( info.frameBlockIndex < 0 || info.modelViewProjectionLocation < 0 ) {
 		common->Warning( "Modern GL program '%s' is missing required reflected bindings", info.name );
 		return false;
 	}
-	if ( info.kind == MODERN_GL_SHADER_FLAT_MATERIAL && info.debugColorLocation < 0 ) {
+	if ( info.reflection.usesDebugColor && info.debugColorLocation < 0 ) {
 		common->Warning( "Modern GL program '%s' is missing uDebugColor", info.name );
+		return false;
+	}
+	if ( info.reflection.usesLocalParams && info.localParamsLocation < 0 ) {
+		common->Warning( "Modern GL program '%s' is missing uLocalParams", info.name );
+		return false;
+	}
+	if ( info.reflection.usesMainTexture && info.mainTextureLocation < 0 ) {
+		common->Warning( "Modern GL program '%s' is missing uMainTexture", info.name );
 		return false;
 	}
 
 	glUniformBlockBinding( info.program, static_cast<GLuint>( info.frameBlockIndex ), 0 );
+	if ( info.reflection.usesMainTexture ) {
+		glUseProgram( info.program );
+		glUniform1i( info.mainTextureLocation, 0 );
+		glUseProgram( 0 );
+	}
 	return true;
+}
+
+static void R_ModernGLShaderLibrary_MarkKindReady( modernGLShaderProgramKind_t kind ) {
+	bool *readyFlag = NULL;
+	switch ( kind ) {
+	case MODERN_GL_SHADER_DEPTH:
+		readyFlag = &rg_modernGLShaderLibraryStats.depthProgramReady;
+		break;
+	case MODERN_GL_SHADER_SHADOW_DEPTH:
+		readyFlag = &rg_modernGLShaderLibraryStats.shadowDepthProgramReady;
+		break;
+	case MODERN_GL_SHADER_FLAT_MATERIAL:
+		readyFlag = &rg_modernGLShaderLibraryStats.flatMaterialProgramReady;
+		break;
+	case MODERN_GL_SHADER_LIGHT_GRID:
+		readyFlag = &rg_modernGLShaderLibraryStats.lightGridProgramReady;
+		break;
+	case MODERN_GL_SHADER_FOG_BLEND:
+		readyFlag = &rg_modernGLShaderLibraryStats.fogBlendProgramReady;
+		break;
+	case MODERN_GL_SHADER_GUI:
+		readyFlag = &rg_modernGLShaderLibraryStats.guiProgramReady;
+		break;
+	case MODERN_GL_SHADER_POST_COPY:
+		readyFlag = &rg_modernGLShaderLibraryStats.postCopyProgramReady;
+		break;
+	default:
+		break;
+	}
+	if ( readyFlag != NULL && !*readyFlag ) {
+		*readyFlag = true;
+		rg_modernGLShaderLibraryStats.readyProgramKindCount++;
+	}
 }
 
 static bool R_ModernGLShaderLibrary_CreateProgram( int glslVersion, modernGLShaderProgramKind_t kind ) {
@@ -189,19 +379,34 @@ static bool R_ModernGLShaderLibrary_CreateProgram( int glslVersion, modernGLShad
 		rg_modernGLShaderLibraryStats.failedProgramCount++;
 		return false;
 	}
+	const modernGLShaderProgramDescriptor_t *descriptor = R_ModernGLShaderLibrary_DescriptorForKind( kind );
+	if ( descriptor == NULL ) {
+		rg_modernGLShaderLibraryStats.failedProgramCount++;
+		return false;
+	}
 
 	modernGLShaderProgramInfo_t &info = rg_modernGLShaderPrograms[rg_modernGLShaderProgramCount];
 	memset( &info, 0, sizeof( info ) );
 	info.kind = kind;
+	info.passCategory = descriptor->passCategory;
+	info.materialClass = descriptor->materialClass;
+	info.permutation.materialClass = descriptor->materialClass;
+	info.permutation.lightingMode = descriptor->lightingMode;
+	info.permutation.shadowMode = descriptor->shadowMode;
+	info.permutation.alphaMode = descriptor->alphaMode;
+	info.permutation.skinningMode = 0;
+	info.permutation.tier = static_cast<unsigned int>( glslVersion );
 	info.glslVersion = glslVersion;
 	info.frameBlockIndex = -1;
 	info.modelViewProjectionLocation = -1;
 	info.debugColorLocation = -1;
+	info.localParamsLocation = -1;
+	info.mainTextureLocation = -1;
 	idStr::snPrintf(
 		info.name,
 		sizeof( info.name ),
 		"modern_%s_%d",
-		R_ModernGLShaderLibrary_ProgramKindName( kind ),
+		ModernGLShaderProgramKind_Name( kind ),
 		glslVersion );
 
 	char vertexSource[4096];
@@ -233,6 +438,7 @@ static bool R_ModernGLShaderLibrary_CreateProgram( int glslVersion, modernGLShad
 	glAttachShader( info.program, vertexShader );
 	glAttachShader( info.program, fragmentShader );
 	glBindAttribLocation( info.program, 0, "attr_Position" );
+	glBindAttribLocation( info.program, 8, "attr_TexCoord0" );
 	glLinkProgram( info.program );
 
 	GLint linked = GL_FALSE;
@@ -261,14 +467,24 @@ static bool R_ModernGLShaderLibrary_CreateProgram( int glslVersion, modernGLShad
 
 	rg_modernGLShaderProgramCount++;
 	rg_modernGLShaderLibraryStats.programCount = rg_modernGLShaderProgramCount;
+	rg_modernGLShaderLibraryStats.permutationCount++;
+	rg_modernGLShaderLibraryStats.reflectedUniformCount++;
+	if ( info.debugColorLocation >= 0 ) {
+		rg_modernGLShaderLibraryStats.reflectedUniformCount++;
+	}
+	if ( info.localParamsLocation >= 0 ) {
+		rg_modernGLShaderLibraryStats.reflectedUniformCount++;
+	}
+	if ( info.mainTextureLocation >= 0 ) {
+		rg_modernGLShaderLibraryStats.reflectedSamplerCount++;
+	}
+	if ( info.reflection.usesMainTexture ) {
+		rg_modernGLShaderLibraryStats.textureProgramCount++;
+	}
 	if ( glslVersion > rg_modernGLShaderLibraryStats.highestGLSLVersion ) {
 		rg_modernGLShaderLibraryStats.highestGLSLVersion = glslVersion;
 	}
-	if ( kind == MODERN_GL_SHADER_DEPTH ) {
-		rg_modernGLShaderLibraryStats.depthProgramReady = true;
-	} else if ( kind == MODERN_GL_SHADER_FLAT_MATERIAL ) {
-		rg_modernGLShaderLibraryStats.flatMaterialProgramReady = true;
-	}
+	R_ModernGLShaderLibrary_MarkKindReady( kind );
 	rg_modernGLShaderLibraryStats.frameConstantsReady = true;
 	return true;
 }
@@ -291,14 +507,14 @@ void R_ModernGLShaderLibrary_Init( const renderBackendCaps_t &caps, const render
 
 	rg_modernGLShaderLibraryStats.initialized = true;
 	for ( int i = 0; i < versionCount; ++i ) {
-		R_ModernGLShaderLibrary_CreateProgram( versions[i], MODERN_GL_SHADER_DEPTH );
-		R_ModernGLShaderLibrary_CreateProgram( versions[i], MODERN_GL_SHADER_FLAT_MATERIAL );
+		for ( int kind = 0; kind < MODERN_GL_SHADER_PROGRAM_KIND_COUNT; ++kind ) {
+			R_ModernGLShaderLibrary_CreateProgram( versions[i], static_cast<modernGLShaderProgramKind_t>( kind ) );
+		}
 	}
 
 	if ( rg_modernGLShaderLibraryStats.programCount > 0
 		&& rg_modernGLShaderLibraryStats.failedProgramCount == 0
-		&& rg_modernGLShaderLibraryStats.depthProgramReady
-		&& rg_modernGLShaderLibraryStats.flatMaterialProgramReady
+		&& rg_modernGLShaderLibraryStats.readyProgramKindCount == MODERN_GL_SHADER_PROGRAM_KIND_COUNT
 		&& rg_modernGLShaderLibraryStats.frameConstantsReady ) {
 		rg_modernGLShaderLibraryStats.available = true;
 		R_ModernGLShaderLibrary_SetStatus( "available" );
@@ -346,14 +562,25 @@ const modernGLShaderProgramInfo_t *R_ModernGLShaderLibrary_FindProgram( modernGL
 
 void R_ModernGLShaderLibrary_PrintGfxInfo( void ) {
 	common->Printf(
-		"Modern GL shader library: %s, programs=%d, failed=%d, highestGLSL=%d, frameUBOBlock=%d, depth=%d, flatMaterial=%d\n",
+		"Modern GL shader library: %s, programs=%d, kinds=%d/%d, permutations=%d, failed=%d, highestGLSL=%d, frameUBOBlock=%d, uniforms=%d, samplers=%d, texturePrograms=%d, depth=%d, shadowDepth=%d, flatMaterial=%d, lightGrid=%d, fogBlend=%d, gui=%d, postCopy=%d\n",
 		rg_modernGLShaderLibraryStats.available ? "available" : rg_modernGLShaderLibraryStats.status,
 		rg_modernGLShaderLibraryStats.programCount,
+		rg_modernGLShaderLibraryStats.readyProgramKindCount,
+		rg_modernGLShaderLibraryStats.programKindCount,
+		rg_modernGLShaderLibraryStats.permutationCount,
 		rg_modernGLShaderLibraryStats.failedProgramCount,
 		rg_modernGLShaderLibraryStats.highestGLSLVersion,
 		rg_modernGLShaderLibraryStats.frameConstantsReady ? 1 : 0,
+		rg_modernGLShaderLibraryStats.reflectedUniformCount,
+		rg_modernGLShaderLibraryStats.reflectedSamplerCount,
+		rg_modernGLShaderLibraryStats.textureProgramCount,
 		rg_modernGLShaderLibraryStats.depthProgramReady ? 1 : 0,
-		rg_modernGLShaderLibraryStats.flatMaterialProgramReady ? 1 : 0 );
+		rg_modernGLShaderLibraryStats.shadowDepthProgramReady ? 1 : 0,
+		rg_modernGLShaderLibraryStats.flatMaterialProgramReady ? 1 : 0,
+		rg_modernGLShaderLibraryStats.lightGridProgramReady ? 1 : 0,
+		rg_modernGLShaderLibraryStats.fogBlendProgramReady ? 1 : 0,
+		rg_modernGLShaderLibraryStats.guiProgramReady ? 1 : 0,
+		rg_modernGLShaderLibraryStats.postCopyProgramReady ? 1 : 0 );
 }
 
 bool RendererModernGLShaderLibrary_RunSelfTest( void ) {
@@ -367,33 +594,57 @@ bool RendererModernGLShaderLibrary_RunSelfTest( void ) {
 		common->Printf( "RendererModernGLShaderLibrary self-test failed: library stats mismatch\n" );
 		return false;
 	}
-	if ( !stats.frameConstantsReady || !stats.depthProgramReady || !stats.flatMaterialProgramReady ) {
+	if ( !stats.frameConstantsReady
+		|| stats.programKindCount != MODERN_GL_SHADER_PROGRAM_KIND_COUNT
+		|| stats.readyProgramKindCount != MODERN_GL_SHADER_PROGRAM_KIND_COUNT
+		|| !stats.depthProgramReady
+		|| !stats.shadowDepthProgramReady
+		|| !stats.flatMaterialProgramReady
+		|| !stats.lightGridProgramReady
+		|| !stats.fogBlendProgramReady
+		|| !stats.guiProgramReady
+		|| !stats.postCopyProgramReady ) {
 		common->Printf( "RendererModernGLShaderLibrary self-test failed: required variant missing\n" );
 		return false;
 	}
+	if ( stats.permutationCount != stats.programCount || stats.reflectedUniformCount <= 0 || stats.reflectedSamplerCount <= 0 || stats.textureProgramCount <= 0 ) {
+		common->Printf( "RendererModernGLShaderLibrary self-test failed: reflection/permutation stats mismatch\n" );
+		return false;
+	}
 
-	const modernGLShaderProgramInfo_t *depthProgram = R_ModernGLShaderLibrary_FindProgram( MODERN_GL_SHADER_DEPTH, stats.highestGLSLVersion );
-	const modernGLShaderProgramInfo_t *flatProgram = R_ModernGLShaderLibrary_FindProgram( MODERN_GL_SHADER_FLAT_MATERIAL, stats.highestGLSLVersion );
-	if ( depthProgram == NULL || flatProgram == NULL ) {
-		common->Printf( "RendererModernGLShaderLibrary self-test failed: lookup mismatch\n" );
-		return false;
-	}
-	if ( depthProgram->program == 0 || flatProgram->program == 0 || !depthProgram->linked || !flatProgram->linked ) {
-		common->Printf( "RendererModernGLShaderLibrary self-test failed: program object mismatch\n" );
-		return false;
-	}
-	if ( depthProgram->frameBlockIndex < 0 || flatProgram->frameBlockIndex < 0 ) {
-		common->Printf( "RendererModernGLShaderLibrary self-test failed: frame block reflection mismatch\n" );
-		return false;
-	}
-	if ( depthProgram->modelViewProjectionLocation < 0 || flatProgram->modelViewProjectionLocation < 0 || flatProgram->debugColorLocation < 0 ) {
-		common->Printf( "RendererModernGLShaderLibrary self-test failed: uniform reflection mismatch\n" );
-		return false;
+	for ( int kind = 0; kind < MODERN_GL_SHADER_PROGRAM_KIND_COUNT; ++kind ) {
+		const modernGLShaderProgramInfo_t *program = R_ModernGLShaderLibrary_FindProgram( static_cast<modernGLShaderProgramKind_t>( kind ), stats.highestGLSLVersion );
+		if ( program == NULL || program->program == 0 || !program->linked ) {
+			common->Printf( "RendererModernGLShaderLibrary self-test failed: lookup/object mismatch for %s\n", ModernGLShaderProgramKind_Name( static_cast<modernGLShaderProgramKind_t>( kind ) ) );
+			return false;
+		}
+		if ( program->frameBlockIndex < 0 || program->modelViewProjectionLocation < 0 ) {
+			common->Printf( "RendererModernGLShaderLibrary self-test failed: frame/MVP reflection mismatch for %s\n", program->name );
+			return false;
+		}
+		if ( program->reflection.usesDebugColor && program->debugColorLocation < 0 ) {
+			common->Printf( "RendererModernGLShaderLibrary self-test failed: debug-color reflection mismatch for %s\n", program->name );
+			return false;
+		}
+		if ( program->reflection.usesLocalParams && program->localParamsLocation < 0 ) {
+			common->Printf( "RendererModernGLShaderLibrary self-test failed: local-param reflection mismatch for %s\n", program->name );
+			return false;
+		}
+		if ( program->reflection.usesMainTexture && program->mainTextureLocation < 0 ) {
+			common->Printf( "RendererModernGLShaderLibrary self-test failed: sampler reflection mismatch for %s\n", program->name );
+			return false;
+		}
+		if ( program->permutation.materialClass != static_cast<unsigned int>( program->materialClass ) || program->permutation.tier != static_cast<unsigned int>( program->glslVersion ) ) {
+			common->Printf( "RendererModernGLShaderLibrary self-test failed: permutation metadata mismatch for %s\n", program->name );
+			return false;
+		}
 	}
 
 	common->Printf(
-		"RendererModernGLShaderLibrary self-test passed (%d programs, GLSL %d)\n",
+		"RendererModernGLShaderLibrary self-test passed (%d programs, %d kinds, %d permutations, GLSL %d)\n",
 		stats.programCount,
+		stats.readyProgramKindCount,
+		stats.permutationCount,
 		stats.highestGLSLVersion );
 	return true;
 }

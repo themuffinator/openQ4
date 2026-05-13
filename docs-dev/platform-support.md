@@ -44,6 +44,7 @@ This document defines the long-term platform direction for OpenQ4 and how SDL3 +
   - context/window interop glue
 - New platform-facing work should prefer SDL3 abstractions first.
 - Platform-specific code should be isolated under `src/sys/<platform>/` when SDL3 cannot cover a requirement directly.
+- OpenGL context selection now uses the shared renderer ladder across SDL3, native GLX, and native NSOpenGL paths. macOS remains capped at OpenGL 4.1 core by the platform OpenGL stack, while Linux and Windows can continue down through core and compatibility-profile fallbacks according to `r_glTier`.
 
 ## Meson Direction
 

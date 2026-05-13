@@ -680,14 +680,20 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 		return;
 	}
 
-	idScenePacketFrame legacyScenePackets;
-	R_ScenePackets_BuildLegacyCommandStream( cmds, legacyScenePackets );
-	R_ScenePackets_LogIfVerbose( legacyScenePackets );
+	idScenePacketFrame backendScenePackets;
+	const idScenePacketFrame *scenePackets = NULL;
+	if ( R_ScenePackets_FrontEndFrameAvailable() ) {
+		scenePackets = &R_ScenePackets_FrontEndFrame();
+	} else {
+		R_ScenePackets_BuildLegacyCommandStream( cmds, backendScenePackets );
+		scenePackets = &backendScenePackets;
+	}
+	R_ScenePackets_LogIfVerbose( *scenePackets );
 	idRenderGraph legacyGraph;
-	R_RenderGraph_BuildFromScenePackets( legacyScenePackets, legacyGraph );
+	R_RenderGraph_BuildFromScenePackets( *scenePackets, legacyGraph );
 	R_RenderGraph_LogIfVerbose( legacyGraph );
 	{
-		const scenePacketFrameStats_t &packetStats = legacyScenePackets.Stats();
+		const scenePacketFrameStats_t &packetStats = scenePackets->Stats();
 		R_RendererMetrics_RecordScenePackets(
 			packetStats.scenePackets,
 			packetStats.passPackets,
@@ -702,6 +708,8 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 			packetStats.drawPacketsWithShaderRegisters,
 			packetStats.drawPacketsWithIndexCache,
 			packetStats.drawPacketsWithAmbientCache,
+			packetStats.frontEndDerived,
+			packetStats.backendDerived,
 			packetStats.overflow );
 		const renderGraphStats_t &graphStats = legacyGraph.Stats();
 		R_RendererMetrics_RecordRenderGraph(
@@ -710,9 +718,19 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 			graphStats.scenePackets,
 			graphStats.drawPackets,
 			graphStats.commandPackets,
+			graphStats.resources,
+			graphStats.importedResources,
+			graphStats.transientResources,
+			graphStats.aliasableTransientResources,
+			graphStats.resourceAccesses,
+			graphStats.readAccesses,
+			graphStats.writeAccesses,
+			graphStats.clearOps,
+			graphStats.resolveOps,
+			graphStats.presentOps,
 			graphStats.overflow );
 	}
-	R_ModernGLExecutor_PrepareFrame( legacyScenePackets, legacyGraph );
+	R_ModernGLExecutor_PrepareFrame( *scenePackets, legacyGraph );
 
 	backEndStartTime = Sys_Milliseconds();
 	R_RendererMetrics_BeginGpuBackendFrame();

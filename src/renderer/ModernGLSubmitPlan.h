@@ -12,11 +12,18 @@ typedef struct modernGLSubmitCommand_s {
 	const modernGLDrawPlanEntry_t *drawPlanEntry;
 	renderPassCategory_t		passCategory;
 	modernGLDrawPlanPipeline_t	pipeline;
+	modernGLShaderProgramKind_t	shaderKind;
 	unsigned int				program;
 	unsigned int				vertexBuffer;
 	unsigned int				indexBuffer;
+	const void					*clientIndexData;
 	int							ambientCacheOffset;
 	int							indexCacheOffset;
+	int							clientIndexBytes;
+	int							modelViewProjectionLocation;
+	int							debugColorLocation;
+	int							localParamsLocation;
+	int							mainTextureLocation;
 	int							vertexStride;
 	int							indexType;
 	int							indexCount;
@@ -27,6 +34,7 @@ typedef struct modernGLSubmitCommand_s {
 	int							scissorX2;
 	int							scissorY2;
 	bool						indexed;
+	bool						uploadIndexBuffer;
 } modernGLSubmitCommand_t;
 
 typedef struct modernGLSubmitPlanStats_s {
@@ -45,6 +53,8 @@ typedef struct modernGLSubmitPlanStats_s {
 	int		missingAmbientCacheDraws;
 	int		missingIndexCacheDraws;
 	int		clientVertexFallbackDraws;
+	int		indexCacheReadyDraws;
+	int		indexUploadDraws;
 	int		programBatches;
 	int		vertexBufferBatches;
 	int		indexBufferBatches;

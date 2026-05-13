@@ -35,6 +35,8 @@ typedef struct rendererMetricsFrame_s {
 	int		clippedDrawPackets;
 	int		commandPackets;
 	int		legacyDrawViews;
+	bool	scenePacketsFrontEndDerived;
+	bool	scenePacketsBackendDerived;
 	bool	scenePacketOverflow;
 	int		materialRecords;
 	int		drawPacketsWithMaterial;
@@ -48,6 +50,16 @@ typedef struct rendererMetricsFrame_s {
 	int		renderGraphScenePackets;
 	int		renderGraphDrawPackets;
 	int		renderGraphCommandPackets;
+	int		renderGraphResources;
+	int		renderGraphImportedResources;
+	int		renderGraphTransientResources;
+	int		renderGraphAliasableTransientResources;
+	int		renderGraphResourceAccesses;
+	int		renderGraphReadAccesses;
+	int		renderGraphWriteAccesses;
+	int		renderGraphClearOps;
+	int		renderGraphResolveOps;
+	int		renderGraphPresentOps;
 	bool	renderGraphOverflow;
 	rendererModernExecutorMetricsMode_t modernExecutorMode;
 	int		modernExecutorGraphPasses;
@@ -79,6 +91,11 @@ typedef struct rendererMetricsFrame_s {
 	int		modernExecutorSubmitPlanMaterialDraws;
 	int		modernExecutorSubmitPlanMissingAmbientDraws;
 	int		modernExecutorSubmitPlanMissingIndexDraws;
+	int		modernExecutorSubmitPlanIndexUploadDraws;
+	bool	modernExecutorSubmitExecuted;
+	int		modernExecutorSubmittedDraws;
+	int		modernExecutorSubmittedFallbackDraws;
+	int		modernExecutorSubmittedIndexUploadDraws;
 	int		modernExecutorSubmitPlanProgramBatches;
 	int		modernExecutorSubmitPlanVertexBufferBatches;
 	int		modernExecutorSubmitPlanIndexBufferBatches;
@@ -125,6 +142,8 @@ typedef struct rendererScenePacketLatest_s {
 	int		drawPacketsWithShaderRegisters;
 	int		drawPacketsWithIndexCache;
 	int		drawPacketsWithAmbientCache;
+	bool	frontEndDerived;
+	bool	backendDerived;
 	bool	overflow;
 } rendererScenePacketLatest_t;
 
@@ -134,6 +153,16 @@ typedef struct rendererRenderGraphLatest_s {
 	int		scenePackets;
 	int		drawPackets;
 	int		commandPackets;
+	int		resources;
+	int		importedResources;
+	int		transientResources;
+	int		aliasableTransientResources;
+	int		resourceAccesses;
+	int		readAccesses;
+	int		writeAccesses;
+	int		clearOps;
+	int		resolveOps;
+	int		presentOps;
 	bool	overflow;
 } rendererRenderGraphLatest_t;
 
@@ -168,6 +197,11 @@ typedef struct rendererModernExecutorLatest_s {
 	int		submitPlanMaterialDraws;
 	int		submitPlanMissingAmbientDraws;
 	int		submitPlanMissingIndexDraws;
+	int		submitPlanIndexUploadDraws;
+	bool	submitExecuted;
+	int		submittedDraws;
+	int		submittedFallbackDraws;
+	int		submittedIndexUploadDraws;
 	int		submitPlanProgramBatches;
 	int		submitPlanVertexBufferBatches;
 	int		submitPlanIndexBufferBatches;
@@ -224,6 +258,16 @@ static const char *R_RendererMetrics_ModernExecutorModeName( rendererModernExecu
 	default:
 		return "unknown";
 	}
+}
+
+static const char *R_RendererMetrics_ScenePacketSourceName( const rendererMetricsFrame_t &metrics ) {
+	if ( metrics.scenePacketsFrontEndDerived ) {
+		return "frontend";
+	}
+	if ( metrics.scenePacketsBackendDerived ) {
+		return "backend";
+	}
+	return "none";
 }
 
 static bool R_RendererMetrics_GpuTimersEnabled( void ) {
@@ -321,6 +365,8 @@ void R_RendererMetrics_BeginFrame( int frameCount ) {
 	rg_rendererMetrics.clippedDrawPackets = rg_scenePacketLatest.clippedDrawPackets;
 	rg_rendererMetrics.commandPackets = rg_scenePacketLatest.commandPackets;
 	rg_rendererMetrics.legacyDrawViews = rg_scenePacketLatest.legacyDrawViews;
+	rg_rendererMetrics.scenePacketsFrontEndDerived = rg_scenePacketLatest.frontEndDerived;
+	rg_rendererMetrics.scenePacketsBackendDerived = rg_scenePacketLatest.backendDerived;
 	rg_rendererMetrics.scenePacketOverflow = rg_scenePacketLatest.overflow;
 	rg_rendererMetrics.materialRecords = rg_scenePacketLatest.materialRecords;
 	rg_rendererMetrics.drawPacketsWithMaterial = rg_scenePacketLatest.drawPacketsWithMaterial;
@@ -334,6 +380,16 @@ void R_RendererMetrics_BeginFrame( int frameCount ) {
 	rg_rendererMetrics.renderGraphScenePackets = rg_renderGraphLatest.scenePackets;
 	rg_rendererMetrics.renderGraphDrawPackets = rg_renderGraphLatest.drawPackets;
 	rg_rendererMetrics.renderGraphCommandPackets = rg_renderGraphLatest.commandPackets;
+	rg_rendererMetrics.renderGraphResources = rg_renderGraphLatest.resources;
+	rg_rendererMetrics.renderGraphImportedResources = rg_renderGraphLatest.importedResources;
+	rg_rendererMetrics.renderGraphTransientResources = rg_renderGraphLatest.transientResources;
+	rg_rendererMetrics.renderGraphAliasableTransientResources = rg_renderGraphLatest.aliasableTransientResources;
+	rg_rendererMetrics.renderGraphResourceAccesses = rg_renderGraphLatest.resourceAccesses;
+	rg_rendererMetrics.renderGraphReadAccesses = rg_renderGraphLatest.readAccesses;
+	rg_rendererMetrics.renderGraphWriteAccesses = rg_renderGraphLatest.writeAccesses;
+	rg_rendererMetrics.renderGraphClearOps = rg_renderGraphLatest.clearOps;
+	rg_rendererMetrics.renderGraphResolveOps = rg_renderGraphLatest.resolveOps;
+	rg_rendererMetrics.renderGraphPresentOps = rg_renderGraphLatest.presentOps;
 	rg_rendererMetrics.renderGraphOverflow = rg_renderGraphLatest.overflow;
 	rg_rendererMetrics.modernExecutorMode = rg_modernExecutorLatest.mode;
 	rg_rendererMetrics.modernExecutorGraphPasses = rg_modernExecutorLatest.graphPasses;
@@ -365,6 +421,11 @@ void R_RendererMetrics_BeginFrame( int frameCount ) {
 	rg_rendererMetrics.modernExecutorSubmitPlanMaterialDraws = rg_modernExecutorLatest.submitPlanMaterialDraws;
 	rg_rendererMetrics.modernExecutorSubmitPlanMissingAmbientDraws = rg_modernExecutorLatest.submitPlanMissingAmbientDraws;
 	rg_rendererMetrics.modernExecutorSubmitPlanMissingIndexDraws = rg_modernExecutorLatest.submitPlanMissingIndexDraws;
+	rg_rendererMetrics.modernExecutorSubmitPlanIndexUploadDraws = rg_modernExecutorLatest.submitPlanIndexUploadDraws;
+	rg_rendererMetrics.modernExecutorSubmitExecuted = rg_modernExecutorLatest.submitExecuted;
+	rg_rendererMetrics.modernExecutorSubmittedDraws = rg_modernExecutorLatest.submittedDraws;
+	rg_rendererMetrics.modernExecutorSubmittedFallbackDraws = rg_modernExecutorLatest.submittedFallbackDraws;
+	rg_rendererMetrics.modernExecutorSubmittedIndexUploadDraws = rg_modernExecutorLatest.submittedIndexUploadDraws;
 	rg_rendererMetrics.modernExecutorSubmitPlanProgramBatches = rg_modernExecutorLatest.submitPlanProgramBatches;
 	rg_rendererMetrics.modernExecutorSubmitPlanVertexBufferBatches = rg_modernExecutorLatest.submitPlanVertexBufferBatches;
 	rg_rendererMetrics.modernExecutorSubmitPlanIndexBufferBatches = rg_modernExecutorLatest.submitPlanIndexBufferBatches;
@@ -388,7 +449,7 @@ void R_RendererMetrics_RecordBackendCommands( int draw3d, int draw2d, int setBuf
 	rg_rendererMetrics.renderTargetOps += renderTargetOps;
 }
 
-void R_RendererMetrics_RecordScenePackets( int scenePackets, int passPackets, int drawPackets, int clippedDrawPackets, int commandPackets, int legacyDrawViews, int materialRecords, int drawPacketsWithMaterial, int drawPacketsWithResourceRecord, int drawPacketsWithGeometry, int drawPacketsWithShaderRegisters, int drawPacketsWithIndexCache, int drawPacketsWithAmbientCache, bool overflow ) {
+void R_RendererMetrics_RecordScenePackets( int scenePackets, int passPackets, int drawPackets, int clippedDrawPackets, int commandPackets, int legacyDrawViews, int materialRecords, int drawPacketsWithMaterial, int drawPacketsWithResourceRecord, int drawPacketsWithGeometry, int drawPacketsWithShaderRegisters, int drawPacketsWithIndexCache, int drawPacketsWithAmbientCache, bool frontEndDerived, bool backendDerived, bool overflow ) {
 	rg_scenePacketLatest.scenePackets = scenePackets;
 	rg_scenePacketLatest.passPackets = passPackets;
 	rg_scenePacketLatest.drawPackets = drawPackets;
@@ -402,19 +463,31 @@ void R_RendererMetrics_RecordScenePackets( int scenePackets, int passPackets, in
 	rg_scenePacketLatest.drawPacketsWithShaderRegisters = drawPacketsWithShaderRegisters;
 	rg_scenePacketLatest.drawPacketsWithIndexCache = drawPacketsWithIndexCache;
 	rg_scenePacketLatest.drawPacketsWithAmbientCache = drawPacketsWithAmbientCache;
+	rg_scenePacketLatest.frontEndDerived = frontEndDerived;
+	rg_scenePacketLatest.backendDerived = backendDerived;
 	rg_scenePacketLatest.overflow = overflow;
 }
 
-void R_RendererMetrics_RecordRenderGraph( int graphPasses, int passPackets, int scenePackets, int drawPackets, int commandPackets, bool overflow ) {
+void R_RendererMetrics_RecordRenderGraph( int graphPasses, int passPackets, int scenePackets, int drawPackets, int commandPackets, int resources, int importedResources, int transientResources, int aliasableTransientResources, int resourceAccesses, int readAccesses, int writeAccesses, int clearOps, int resolveOps, int presentOps, bool overflow ) {
 	rg_renderGraphLatest.graphPasses = graphPasses;
 	rg_renderGraphLatest.passPackets = passPackets;
 	rg_renderGraphLatest.scenePackets = scenePackets;
 	rg_renderGraphLatest.drawPackets = drawPackets;
 	rg_renderGraphLatest.commandPackets = commandPackets;
+	rg_renderGraphLatest.resources = resources;
+	rg_renderGraphLatest.importedResources = importedResources;
+	rg_renderGraphLatest.transientResources = transientResources;
+	rg_renderGraphLatest.aliasableTransientResources = aliasableTransientResources;
+	rg_renderGraphLatest.resourceAccesses = resourceAccesses;
+	rg_renderGraphLatest.readAccesses = readAccesses;
+	rg_renderGraphLatest.writeAccesses = writeAccesses;
+	rg_renderGraphLatest.clearOps = clearOps;
+	rg_renderGraphLatest.resolveOps = resolveOps;
+	rg_renderGraphLatest.presentOps = presentOps;
 	rg_renderGraphLatest.overflow = overflow;
 }
 
-void R_RendererMetrics_RecordModernExecutor( rendererModernExecutorMetricsMode_t mode, int graphPasses, int preparedPasses, int fallbackPasses, int preparedDrawPackets, int materialDrawPackets, int resourceDrawPackets, int geometryDrawPackets, bool vaoReady, bool frameUBOReady, bool shaderLibraryReady, int shaderProgramCount, int shaderFailureCount, bool drawPlanReady, bool drawPlanOverflow, int drawPlanDraws, int drawPlanDepthDraws, int drawPlanMaterialDraws, int drawPlanFallbackDraws, int drawPlanStateBatches, int drawPlanProgramSwitches, int drawPlanMaterialSwitches, bool submitPlanReady, bool submitPlanOverflow, int submitPlanDraws, int submitPlanFallbackDraws, int submitPlanDepthDraws, int submitPlanMaterialDraws, int submitPlanMissingAmbientDraws, int submitPlanMissingIndexDraws, int submitPlanProgramBatches, int submitPlanVertexBufferBatches, int submitPlanIndexBufferBatches, int submitPlanScissorBatches, int submitPlanMaterialBatches, int submitPlanUniformUpdates, int submitPlanFrameUBOBinds ) {
+void R_RendererMetrics_RecordModernExecutor( rendererModernExecutorMetricsMode_t mode, int graphPasses, int preparedPasses, int fallbackPasses, int preparedDrawPackets, int materialDrawPackets, int resourceDrawPackets, int geometryDrawPackets, bool vaoReady, bool frameUBOReady, bool shaderLibraryReady, int shaderProgramCount, int shaderFailureCount, bool drawPlanReady, bool drawPlanOverflow, int drawPlanDraws, int drawPlanDepthDraws, int drawPlanMaterialDraws, int drawPlanFallbackDraws, int drawPlanStateBatches, int drawPlanProgramSwitches, int drawPlanMaterialSwitches, bool submitPlanReady, bool submitPlanOverflow, int submitPlanDraws, int submitPlanFallbackDraws, int submitPlanDepthDraws, int submitPlanMaterialDraws, int submitPlanMissingAmbientDraws, int submitPlanMissingIndexDraws, int submitPlanIndexUploadDraws, bool submitExecuted, int submittedDraws, int submittedFallbackDraws, int submittedIndexUploadDraws, int submitPlanProgramBatches, int submitPlanVertexBufferBatches, int submitPlanIndexBufferBatches, int submitPlanScissorBatches, int submitPlanMaterialBatches, int submitPlanUniformUpdates, int submitPlanFrameUBOBinds ) {
 	rg_modernExecutorLatest.mode = mode;
 	rg_modernExecutorLatest.graphPasses = graphPasses;
 	rg_modernExecutorLatest.preparedPasses = preparedPasses;
@@ -445,6 +518,11 @@ void R_RendererMetrics_RecordModernExecutor( rendererModernExecutorMetricsMode_t
 	rg_modernExecutorLatest.submitPlanMaterialDraws = submitPlanMaterialDraws;
 	rg_modernExecutorLatest.submitPlanMissingAmbientDraws = submitPlanMissingAmbientDraws;
 	rg_modernExecutorLatest.submitPlanMissingIndexDraws = submitPlanMissingIndexDraws;
+	rg_modernExecutorLatest.submitPlanIndexUploadDraws = submitPlanIndexUploadDraws;
+	rg_modernExecutorLatest.submitExecuted = submitExecuted;
+	rg_modernExecutorLatest.submittedDraws = submittedDraws;
+	rg_modernExecutorLatest.submittedFallbackDraws = submittedFallbackDraws;
+	rg_modernExecutorLatest.submittedIndexUploadDraws = submittedIndexUploadDraws;
 	rg_modernExecutorLatest.submitPlanProgramBatches = submitPlanProgramBatches;
 	rg_modernExecutorLatest.submitPlanVertexBufferBatches = submitPlanVertexBufferBatches;
 	rg_modernExecutorLatest.submitPlanIndexBufferBatches = submitPlanIndexBufferBatches;
@@ -485,7 +563,7 @@ void R_RendererMetrics_EndFrame( int frontEndMsec, int backEndMsec, int viewCoun
 	R_RendererMetrics_FormatGpuMsec( rg_rendererMetrics, gpuText, sizeof( gpuText ) );
 	if ( detail >= 2 ) {
 		common->Printf(
-			"rendererMetrics frame=%d tier=%s fe=%dms submit=%dms be=%dms gpu=%s views=%d ents=%d lights=%d draws=%d surf=%d verts=%d idx=%d uploads=%d stalls=%d ring=%d/%dKB allocs=%d overflow=%d writes(p=%d map=%d sub=%d) packets(scene=%d pass=%d draw=%d clipped=%d cmd=%d views=%d overflow=%d) resources(materials=%d withMaterial=%d records=%d geometry=%d regs=%d ibo=%d vbo=%d) graph(pass=%d packets=%d scenes=%d draw=%d cmd=%d overflow=%d) modernExec(mode=%s vao=%d ubo=%d shaderLib=%d shaders=%d shaderFails=%d passes=%d/%d fallback=%d draws=%d material=%d resources=%d geometry=%d plan=%d planDraws=%d depth=%d flat=%d planFallback=%d batches=%d switches=%d materialSwitches=%d planOverflow=%d submit=%d submitDraws=%d submitDepth=%d submitFlat=%d submitFallback=%d missing(vbo=%d ibo=%d) submitBatches(program=%d vbo=%d ibo=%d scissor=%d material=%d) uniforms=%d frameUBO=%d submitOverflow=%d) gpuPass(3d=%d/%d 2d=%d/%d rt=%d/%d copy=%d/%d special=%d/%d setbuf=%d/%d dropped=%d) cmds(3d=%d 2d=%d rt=%d copy=%d swap=%d)\n",
+			"rendererMetrics frame=%d tier=%s fe=%dms submit=%dms be=%dms gpu=%s views=%d ents=%d lights=%d draws=%d surf=%d verts=%d idx=%d uploads=%d stalls=%d ring=%d/%dKB allocs=%d overflow=%d static=%dKB/%d live=%d/%dKB writes(p=%d map=%d sub=%d) packets(source=%s scene=%d pass=%d draw=%d clipped=%d cmd=%d views=%d overflow=%d) resources(materials=%d withMaterial=%d records=%d geometry=%d regs=%d ibo=%d vbo=%d) graph(pass=%d packets=%d scenes=%d draw=%d cmd=%d res=%d imported=%d transient=%d aliasable=%d access=%d read=%d write=%d clear=%d resolve=%d present=%d overflow=%d) modernExec(mode=%s vao=%d ubo=%d shaderLib=%d shaders=%d shaderFails=%d passes=%d/%d fallback=%d draws=%d material=%d resources=%d geometry=%d plan=%d planDraws=%d depth=%d materialFamily=%d planFallback=%d batches=%d switches=%d materialSwitches=%d planOverflow=%d submit=%d submitDraws=%d submitDepth=%d submitMaterial=%d submitFallback=%d missing(vbo=%d ibo=%d) indexUpload=%d submitted=%d/%d submittedFallback=%d submittedUpload=%d submitBatches(program=%d vbo=%d ibo=%d scissor=%d material=%d) uniforms=%d frameUBO=%d submitOverflow=%d) gpuPass(3d=%d/%d 2d=%d/%d rt=%d/%d copy=%d/%d special=%d/%d setbuf=%d/%d dropped=%d) cmds(3d=%d 2d=%d rt=%d copy=%d swap=%d)\n",
 			rg_rendererMetrics.frameCount,
 			RendererTier_Name( glConfig.rendererTier ),
 			rg_rendererMetrics.frontEndMsec,
@@ -505,9 +583,14 @@ void R_RendererMetrics_EndFrame( int frontEndMsec, int backEndMsec, int viewCoun
 			uploadStats.ringSizeBytes / 1024,
 			uploadStats.frameAllocations,
 			uploadStats.frameOverflowBytes / 1024,
+			uploadStats.frameStaticUploadBytes / 1024,
+			uploadStats.frameStaticAllocations,
+			uploadStats.staticBuffersLive,
+			uploadStats.staticBytesLive / 1024,
 			uploadStats.framePersistentWrites,
 			uploadStats.frameMapRangeWrites,
 			uploadStats.frameSubDataWrites,
+			R_RendererMetrics_ScenePacketSourceName( rg_rendererMetrics ),
 			rg_rendererMetrics.scenePackets,
 			rg_rendererMetrics.passPackets,
 			rg_rendererMetrics.drawPackets,
@@ -527,6 +610,16 @@ void R_RendererMetrics_EndFrame( int frontEndMsec, int backEndMsec, int viewCoun
 			rg_rendererMetrics.renderGraphScenePackets,
 			rg_rendererMetrics.renderGraphDrawPackets,
 			rg_rendererMetrics.renderGraphCommandPackets,
+			rg_rendererMetrics.renderGraphResources,
+			rg_rendererMetrics.renderGraphImportedResources,
+			rg_rendererMetrics.renderGraphTransientResources,
+			rg_rendererMetrics.renderGraphAliasableTransientResources,
+			rg_rendererMetrics.renderGraphResourceAccesses,
+			rg_rendererMetrics.renderGraphReadAccesses,
+			rg_rendererMetrics.renderGraphWriteAccesses,
+			rg_rendererMetrics.renderGraphClearOps,
+			rg_rendererMetrics.renderGraphResolveOps,
+			rg_rendererMetrics.renderGraphPresentOps,
 			rg_rendererMetrics.renderGraphOverflow ? 1 : 0,
 			R_RendererMetrics_ModernExecutorModeName( rg_rendererMetrics.modernExecutorMode ),
 			rg_rendererMetrics.modernExecutorVAOReady ? 1 : 0,
@@ -557,6 +650,11 @@ void R_RendererMetrics_EndFrame( int frontEndMsec, int backEndMsec, int viewCoun
 			rg_rendererMetrics.modernExecutorSubmitPlanFallbackDraws,
 			rg_rendererMetrics.modernExecutorSubmitPlanMissingAmbientDraws,
 			rg_rendererMetrics.modernExecutorSubmitPlanMissingIndexDraws,
+			rg_rendererMetrics.modernExecutorSubmitPlanIndexUploadDraws,
+			rg_rendererMetrics.modernExecutorSubmitExecuted ? 1 : 0,
+			rg_rendererMetrics.modernExecutorSubmittedDraws,
+			rg_rendererMetrics.modernExecutorSubmittedFallbackDraws,
+			rg_rendererMetrics.modernExecutorSubmittedIndexUploadDraws,
 			rg_rendererMetrics.modernExecutorSubmitPlanProgramBatches,
 			rg_rendererMetrics.modernExecutorSubmitPlanVertexBufferBatches,
 			rg_rendererMetrics.modernExecutorSubmitPlanIndexBufferBatches,
@@ -589,7 +687,7 @@ void R_RendererMetrics_EndFrame( int frontEndMsec, int backEndMsec, int viewCoun
 	if ( rg_rendererMetricsLastSummaryFrame < 0 || rg_rendererMetrics.frameCount - rg_rendererMetricsLastSummaryFrame >= 60 ) {
 		rg_rendererMetricsLastSummaryFrame = rg_rendererMetrics.frameCount;
 		common->Printf(
-			"rendererMetrics summary tier=%s fe=%dms submit=%dms be=%dms gpu=%s views=%d ents=%d lights=%d draws=%d uploads=%dKB stalls=%d ring=%d/%dKB overflow=%dKB packets=%d/%d/%d clipped=%d packetOverflow=%d materials=%d resources=%d geometry=%d graph=%d/%d/%d graphOverflow=%d modernExec=%s shaders=%d shaderFails=%d prep=%d/%d fallback=%d draws=%d resources=%d geometry=%d plan=%d/%d depth=%d flat=%d batches=%d switches=%d submit=%d/%d submitFallback=%d missingVBO=%d missingIBO=%d submitBatches=%d/%d/%d\n",
+			"rendererMetrics summary tier=%s fe=%dms submit=%dms be=%dms gpu=%s views=%d ents=%d lights=%d draws=%d uploads=%dKB stalls=%d ring=%d/%dKB overflow=%dKB static=%dKB/%d live=%d/%dKB packets=%s:%d/%d/%d clipped=%d packetOverflow=%d materials=%d resources=%d geometry=%d graph=%d/%d/%d res=%d/%d/%d aliasable=%d access=%d read=%d write=%d clear=%d resolve=%d present=%d graphOverflow=%d modernExec=%s shaders=%d shaderFails=%d prep=%d/%d fallback=%d draws=%d resources=%d geometry=%d plan=%d/%d depth=%d materialFamily=%d batches=%d switches=%d submit=%d/%d submitFallback=%d missingVBO=%d missingIBO=%d indexUpload=%d submitted=%d/%d submittedFallback=%d submittedUpload=%d submitBatches=%d/%d/%d\n",
 			RendererTier_Name( glConfig.rendererTier ),
 			rg_rendererMetrics.frontEndMsec,
 			rg_rendererMetrics.submitMsec,
@@ -604,6 +702,11 @@ void R_RendererMetrics_EndFrame( int frontEndMsec, int backEndMsec, int viewCoun
 			uploadStats.frameRingHighWaterBytes / 1024,
 			uploadStats.ringSizeBytes / 1024,
 			uploadStats.frameOverflowBytes / 1024,
+			uploadStats.frameStaticUploadBytes / 1024,
+			uploadStats.frameStaticAllocations,
+			uploadStats.staticBuffersLive,
+			uploadStats.staticBytesLive / 1024,
+			R_RendererMetrics_ScenePacketSourceName( rg_rendererMetrics ),
 			rg_rendererMetrics.scenePackets,
 			rg_rendererMetrics.passPackets,
 			rg_rendererMetrics.drawPackets,
@@ -615,6 +718,16 @@ void R_RendererMetrics_EndFrame( int frontEndMsec, int backEndMsec, int viewCoun
 			rg_rendererMetrics.renderGraphPasses,
 			rg_rendererMetrics.renderGraphPassPackets,
 			rg_rendererMetrics.renderGraphDrawPackets,
+			rg_rendererMetrics.renderGraphResources,
+			rg_rendererMetrics.renderGraphImportedResources,
+			rg_rendererMetrics.renderGraphTransientResources,
+			rg_rendererMetrics.renderGraphAliasableTransientResources,
+			rg_rendererMetrics.renderGraphResourceAccesses,
+			rg_rendererMetrics.renderGraphReadAccesses,
+			rg_rendererMetrics.renderGraphWriteAccesses,
+			rg_rendererMetrics.renderGraphClearOps,
+			rg_rendererMetrics.renderGraphResolveOps,
+			rg_rendererMetrics.renderGraphPresentOps,
 			rg_rendererMetrics.renderGraphOverflow ? 1 : 0,
 			R_RendererMetrics_ModernExecutorModeName( rg_rendererMetrics.modernExecutorMode ),
 			rg_rendererMetrics.modernExecutorShaderProgramCount,
@@ -636,6 +749,11 @@ void R_RendererMetrics_EndFrame( int frontEndMsec, int backEndMsec, int viewCoun
 			rg_rendererMetrics.modernExecutorSubmitPlanFallbackDraws,
 			rg_rendererMetrics.modernExecutorSubmitPlanMissingAmbientDraws,
 			rg_rendererMetrics.modernExecutorSubmitPlanMissingIndexDraws,
+			rg_rendererMetrics.modernExecutorSubmitPlanIndexUploadDraws,
+			rg_rendererMetrics.modernExecutorSubmitExecuted ? 1 : 0,
+			rg_rendererMetrics.modernExecutorSubmittedDraws,
+			rg_rendererMetrics.modernExecutorSubmittedFallbackDraws,
+			rg_rendererMetrics.modernExecutorSubmittedIndexUploadDraws,
 			rg_rendererMetrics.modernExecutorSubmitPlanProgramBatches,
 			rg_rendererMetrics.modernExecutorSubmitPlanVertexBufferBatches,
 			rg_rendererMetrics.modernExecutorSubmitPlanIndexBufferBatches );

@@ -59,7 +59,7 @@ static void R_FinishDeform( drawSurf_t *drawSurf, srfTriangles_t *newTri, idDraw
 
 	newTri->ambientCache = vertexCache.AllocFrameTemp( ac, newTri->numVerts * sizeof( idDrawVert ) );
 	if ( r_useIndexBuffers.GetBool() && newTri->numIndexes > 0 ) {
-		newTri->indexCache = vertexCache.AllocFrameTemp( newTri->indexes, newTri->numIndexes * sizeof( newTri->indexes[0] ) );
+		newTri->indexCache = vertexCache.AllocFrameTemp( newTri->indexes, newTri->numIndexes * sizeof( newTri->indexes[0] ), true );
 	}
 	// if we are out of vertex cache, leave it the way it is
 	if ( newTri->ambientCache ) {

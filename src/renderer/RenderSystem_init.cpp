@@ -270,6 +270,7 @@ idCVar r_rendererGpuTimers( "r_rendererGpuTimers", "1", CVAR_RENDERER | CVAR_ARC
 idCVar r_rendererUploadMegs( "r_rendererUploadMegs", "16", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "dynamic renderer upload stream size in megabytes per frame buffer", 1, 128, idCmdSystem::ArgCompletion_Integer<1,128> );
 idCVar r_rendererUploadPersistent( "r_rendererUploadPersistent", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "allow persistent-mapped dynamic renderer uploads when supported" );
 idCVar r_rendererModernExecutor( "r_rendererModernExecutor", "0", CVAR_RENDERER | CVAR_BOOL, "prepare the opt-in modern GL executor frame contract while legacy ARB2 still executes" );
+idCVar r_rendererModernSubmit( "r_rendererModernSubmit", "0", CVAR_RENDERER | CVAR_BOOL, "execute opt-in modern GL draw submission before legacy ARB2 fallback; diagnostic until visible pass replacement lands" );
 idCVar r_useSimpleInteraction( "r_useSimpleInteraction", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "use Quake 4's simpler ARB interaction shader pair as an explicit compatibility fallback; may reduce material lighting quality" );
 idCVar r_interactionColorMode( "r_interactionColorMode", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "interaction vertex-color mode: 0 = auto, 1 = packed env16.xy, 2 = vector env16/env17", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
 idCVar r_shaderReport( "r_shaderReport", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "shader diagnostics: 0 = off, 1 = startup/vid_restart summary, 2 = also warn on invalid program use", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
@@ -472,6 +473,13 @@ static void R_RendererTierSelfTest_f( const idCmdArgs &args ) {
 	(void)args;
 	if ( !RendererTierSelect_RunSelfTest() ) {
 		common->Warning( "Renderer tier selector self-test failed" );
+	}
+}
+
+static void R_RendererContextLadderSelfTest_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !RendererContextLadder_RunSelfTest() ) {
+		common->Warning( "Renderer context ladder self-test failed" );
 	}
 }
 
@@ -2447,6 +2455,15 @@ void GfxInfo_f( const idCmdArgs &args ) {
 	}
 	common->Printf( "\n" );
 	common->Printf(
+		"GL context request: %s %d.%d explicit=%d requestedDebug=%d actualDebug=%d forwardCompatible=%d\n",
+		RendererContextProfile_Name( glConfig.contextRequest.profile ),
+		glConfig.contextRequest.major,
+		glConfig.contextRequest.minor,
+		glConfig.contextRequest.explicitVersion ? 1 : 0,
+		glConfig.contextRequest.debugContext ? 1 : 0,
+		glConfig.backendCaps.debugContext ? 1 : 0,
+		glConfig.backendCaps.forwardCompatibleContext ? 1 : 0 );
+	common->Printf(
 		"Renderer features: modern=%d gl41=%d gpuDriven=%d lowOverhead=%d persistentUploads=%d DSA=%d multiBind=%d renderGraph=%d scenePackets=%d legacyBridge=%d\n",
 		glConfig.renderFeatures.modernBaseline ? 1 : 0,
 		glConfig.renderFeatures.modernGL41 ? 1 : 0,
@@ -2475,18 +2492,23 @@ void GfxInfo_f( const idCmdArgs &args ) {
 		SCENE_PACKET_MAX_DRAWS,
 		SCENE_PACKET_MAX_MATERIAL_RECORDS );
 	common->Printf(
-		"Renderer graph: packet-driven legacy bridge, maxPasses=%d\n",
-		RENDER_GRAPH_MAX_PASSES );
+		"Renderer graph: resource-backed packet graph, maxPasses=%d, maxResources=%d, maxResourceAccesses=%d\n",
+		RENDER_GRAPH_MAX_PASSES,
+		RENDER_GRAPH_MAX_RESOURCES,
+		RENDER_GRAPH_MAX_RESOURCE_ACCESSES );
 	R_ModernGLExecutor_PrintGfxInfo();
 	{
 		const rendererUploadStats_t &uploadStats = R_RendererUpload_Stats();
 		common->Printf(
-			"Renderer upload stream: %s, buffers=%d, ring=%dKB, persistent=%d, mapRangeFallback=%d, legacyBridge=%d\n",
+			"Renderer upload manager: frameStream=%s, staticAllocator=%d, buffers=%d, ring=%dKB, persistent=%d, mapRangeFallback=%d, staticLive=%d/%dKB, legacyBridge=%d\n",
 			uploadStats.dynamicFrameBridge ? "enabled" : "disabled",
+			uploadStats.staticBufferAllocator ? 1 : 0,
 			uploadStats.ringBufferCount,
 			uploadStats.ringSizeBytes / 1024,
 			uploadStats.persistentMapped ? 1 : 0,
 			uploadStats.mapRangeFallback ? 1 : 0,
+			uploadStats.staticBuffersLive,
+			uploadStats.staticBytesLive / 1024,
 			uploadStats.legacyBridge ? 1 : 0 );
 	}
 
@@ -2774,10 +2796,11 @@ void R_InitCommands( void ) {
 	cmdSystem->AddCommand( "benchmark", R_Benchmark_f, CMD_FL_RENDERER, "benchmark" );
 	cmdSystem->AddCommand( "gfxInfo", GfxInfo_f, CMD_FL_RENDERER, "show graphics info" );
 	cmdSystem->AddCommand( "rendererTierSelfTest", R_RendererTierSelfTest_f, CMD_FL_RENDERER, "run renderer tier-selection self tests" );
+	cmdSystem->AddCommand( "rendererContextLadderSelfTest", R_RendererContextLadderSelfTest_f, CMD_FL_RENDERER, "run renderer context ladder self tests" );
 	cmdSystem->AddCommand( "rendererUploadSelfTest", R_RendererUploadSelfTest_f, CMD_FL_RENDERER, "run renderer upload stream self tests" );
 	cmdSystem->AddCommand( "rendererGpuTimerSelfTest", R_RendererGpuTimerSelfTest_f, CMD_FL_RENDERER, "run renderer GPU timer query self tests" );
-	cmdSystem->AddCommand( "rendererScenePacketSelfTest", R_RendererScenePacketSelfTest_f, CMD_FL_RENDERER, "run renderer scene-packet bridge self tests" );
-	cmdSystem->AddCommand( "rendererRenderGraphSelfTest", R_RendererRenderGraphSelfTest_f, CMD_FL_RENDERER, "run renderer packet-driven render-graph self tests" );
+	cmdSystem->AddCommand( "rendererScenePacketSelfTest", R_RendererScenePacketSelfTest_f, CMD_FL_RENDERER, "run renderer front-end scene-packet self tests" );
+	cmdSystem->AddCommand( "rendererRenderGraphSelfTest", R_RendererRenderGraphSelfTest_f, CMD_FL_RENDERER, "run renderer resource-graph self tests" );
 	cmdSystem->AddCommand( "rendererModernGLExecutorSelfTest", R_RendererModernGLExecutorSelfTest_f, CMD_FL_RENDERER, "run renderer modern GL executor self tests" );
 	cmdSystem->AddCommand( "rendererModernGLShaderLibrarySelfTest", R_RendererModernGLShaderLibrarySelfTest_f, CMD_FL_RENDERER, "run renderer modern GL shader-library self tests" );
 	cmdSystem->AddCommand( "rendererModernGLDrawPlanSelfTest", R_RendererModernGLDrawPlanSelfTest_f, CMD_FL_RENDERER, "run renderer modern GL draw-plan self tests" );

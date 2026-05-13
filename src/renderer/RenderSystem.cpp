@@ -32,6 +32,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "Model_local.h"
 #include "RendererMetrics.h"
 #include "RendererUpload.h"
+#include "ScenePackets.h"
 #include "smaa/AreaTex.h"
 #include "smaa/SearchTex.h"
 
@@ -324,6 +325,8 @@ and by R_ToggleSmpFrame
 ====================
 */
 void R_ClearCommandChain( void ) {
+	R_ScenePackets_EndFrame();
+
 	// clear the command chain
 	frameData->cmdHead = frameData->cmdTail = (emptyCommand_t *)R_FrameAlloc( sizeof( *frameData->cmdHead ) );
 	frameData->cmdHead->commandId = RC_NOP;
@@ -400,6 +403,7 @@ void R_AddSpecialEffects( viewDef_t *parms ) {
 	cmd = (drawSurfsCommand_t *)R_GetCommandBuffer( sizeof( *cmd ) );
 	cmd->commandId = RC_DRAW_SPECIAL_EFFECTS;
 	cmd->viewDef = parms;
+	R_ScenePackets_AddSpecialEffects( parms );
 }
 
 
@@ -604,6 +608,7 @@ void idRenderSystemLocal::CaptureDepthRenderToImage( const char *imageName ) {
 	cmd->image = image;
 	cmd->cubeFace = 0;
 	cmd->copyDepth = true;
+	R_ScenePackets_AddCopyRender();
 
 	guiModel->Clear();
 }
@@ -1072,6 +1077,7 @@ void idRenderSystemLocal::BeginFrame( int windowWidth, int windowHeight ) {
 	frameCount++;
 	R_RendererMetrics_BeginFrame( frameCount );
 	R_RendererUpload_BeginFrame( frameCount );
+	R_ScenePackets_BeginFrame();
 
 	// just in case we did a common->Error while this
 	// was set
@@ -1097,6 +1103,7 @@ void idRenderSystemLocal::BeginFrame( int windowWidth, int windowHeight ) {
 	} else {
 		cmd->buffer = (int)GL_BACK;
 	}
+	R_ScenePackets_AddCommandOnly();
 }
 
 void idRenderSystemLocal::WriteDemoPics() {
@@ -1163,6 +1170,7 @@ void idRenderSystemLocal::EndFrame( int *frontEndMsec, int *backEndMsec ) {
 	// add the swapbuffers command
 	cmd = (emptyCommand_t *)R_GetCommandBuffer( sizeof( *cmd ) );
 	cmd->commandId = RC_SWAP_BUFFERS;
+	R_ScenePackets_AddPresent();
 
 	// start the back end up again with the new command list
 	R_IssueRenderCommands();
@@ -1387,6 +1395,7 @@ void idRenderSystemLocal::CaptureRenderToImage( const char *imageName ) {
 	cmd->image = image;
 	cmd->cubeFace = 0;
 	cmd->copyDepth = false;
+	R_ScenePackets_AddCopyRender();
 
 	guiModel->Clear();
 }
@@ -1508,6 +1517,7 @@ void idRenderSystemLocal::BindRenderTexture(idRenderTexture* renderTexture, idRe
 	cmd->renderTexture = renderTexture;
 	cmd->feedbackRenderTexture = feedbackRenderTexture;
 	activeRenderTexture = renderTexture;
+	R_ScenePackets_AddRenderTargetOp();
 }
 
 /*
@@ -1526,6 +1536,7 @@ void idRenderSystemLocal::ClearRenderTarget(bool clearColor, bool clearDepth, fl
 
 	cmd->clearDepthValue = depthValue;
 	cmd->clearColorValue = idVec4(red, green, blue, 1.0);
+	R_ScenePackets_AddRenderTargetOp();
 }
 
 /*
@@ -1542,6 +1553,7 @@ void idRenderSystemLocal::ResolveMSAA(idRenderTexture* msaaRenderTexture, idRend
 	cmd->msaaRenderTexture = msaaRenderTexture;
 	cmd->destRenderTexture = destRenderTexture;
 	cmd->resolveDepth = resolveDepth;
+	R_ScenePackets_AddRenderTargetOp();
 }
 
 /*

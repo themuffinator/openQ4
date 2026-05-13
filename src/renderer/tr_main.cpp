@@ -30,6 +30,7 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #include "tr_local.h"
+#include "ScenePackets.h"
 #ifdef __ppc__
 #include <vecLib/vecLib.h>
 #endif
@@ -1220,7 +1221,9 @@ void R_RenderView( viewDef_t *parms ) {
 		static_cast<idRenderWorldLocal *>(parms->renderWorld)->WriteVisibleDefs( tr.viewDef );
 	}
 
-	// add the rendering commands for this viewDef
+	// Emit backend-neutral packets from the completed RenderWorld view before
+	// the legacy command is queued for ARB2 compatibility.
+	R_ScenePackets_AddRenderView( parms );
 	R_AddDrawViewCmd( parms );
 
 	// restore view in case we are a subview

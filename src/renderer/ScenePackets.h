@@ -76,6 +76,7 @@ typedef struct drawPacketSortKey_s {
 
 typedef struct drawPacket_s {
 	const drawSurf_t			*legacyDrawSurf;
+	const viewDef_t			*viewDef;
 	const viewEntity_t		*space;
 	const materialResourceRecord_t *materialRecord;
 	drawPacketSortKey_t		sortKey;
@@ -103,6 +104,7 @@ typedef struct passPacket_s {
 	int						firstDrawPacket;
 	int						drawPacketCount;
 	bool					enabled;
+	bool					commandOnly;
 } passPacket_t;
 
 typedef struct scenePacket_s {
@@ -128,6 +130,8 @@ typedef struct scenePacketFrameStats_s {
 	int						drawPacketsWithShaderRegisters;
 	int						drawPacketsWithIndexCache;
 	int						drawPacketsWithAmbientCache;
+	bool					frontEndDerived;
+	bool					backendDerived;
 	bool					overflow;
 } scenePacketFrameStats_t;
 
@@ -137,12 +141,14 @@ public:
 	void Clear( void );
 
 	bool AddScene( const viewDef_t *viewDef, bool legacyBridge );
-	bool AddPass( renderPassCategory_t category, bool enabled );
+	bool AddPass( renderPassCategory_t category, bool enabled, bool commandOnly = false );
 	bool AddDrawPacket( const drawSurf_t *drawSurf, renderPassCategory_t category, int drawIndex );
 	void FinishScene( void );
 	void AddCommandPacket( void );
 	void AddLegacyDrawView( void );
 	void AddClippedDrawPackets( int count );
+	void MarkFrontEndDerived( void );
+	void MarkBackendDerived( void );
 
 	int NumScenes( void ) const;
 	int NumPasses( void ) const;
@@ -168,6 +174,16 @@ private:
 
 const char *RenderPassCategory_Name( renderPassCategory_t category );
 const char *RendererMaterialClass_Name( rendererMaterialClass_t materialClass );
+void R_ScenePackets_BeginFrame( void );
+void R_ScenePackets_EndFrame( void );
+void R_ScenePackets_AddRenderView( const viewDef_t *viewDef );
+void R_ScenePackets_AddSpecialEffects( const viewDef_t *viewDef );
+void R_ScenePackets_AddRenderTargetOp( void );
+void R_ScenePackets_AddCopyRender( void );
+void R_ScenePackets_AddPresent( void );
+void R_ScenePackets_AddCommandOnly( void );
+const idScenePacketFrame &R_ScenePackets_FrontEndFrame( void );
+bool R_ScenePackets_FrontEndFrameAvailable( void );
 void R_ScenePackets_BuildLegacyCommandStream( const emptyCommand_t *cmds, idScenePacketFrame &packetFrame );
 void R_ScenePackets_LogIfVerbose( const idScenePacketFrame &packetFrame );
 bool RendererScenePacket_RunSelfTest( void );

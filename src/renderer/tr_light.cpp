@@ -244,7 +244,7 @@ bool R_CreatePackedSurfaceFrameCaches( srfTriangles_t *tri, bool needsLighting, 
 	}
 
 	if ( r_useIndexBuffers.GetBool() && createIndexCache && tri->numIndexes > 0 && sourceIndexes != NULL ) {
-		tri->indexCache = vertexCache.AllocFrameTemp( sourceIndexes, tri->numIndexes * sizeof( sourceIndexes[0] ) );
+		tri->indexCache = vertexCache.AllocFrameTemp( sourceIndexes, tri->numIndexes * sizeof( sourceIndexes[0] ), true );
 	} else {
 		tri->indexCache = NULL;
 	}

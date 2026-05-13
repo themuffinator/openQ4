@@ -5938,7 +5938,8 @@ static idDrawVert *RB_GLSLPrepareInteractionVertexCache( const drawSurf_t *surf 
 			&& mutableTri->numIndexes > 0 ) {
 			mutableTri->indexCache = vertexCache.AllocFrameTemp(
 				mutableTri->indexes,
-				mutableTri->numIndexes * sizeof( mutableTri->indexes[0] ) );
+				mutableTri->numIndexes * sizeof( mutableTri->indexes[0] ),
+				true );
 		}
 
 		R_TouchVertexCache( mutableTri->ambientCache );

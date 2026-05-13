@@ -20,8 +20,14 @@ const char *ModernGLDrawPlanPipeline_Name( modernGLDrawPlanPipeline_t pipeline )
 	switch ( pipeline ) {
 	case MODERN_GL_DRAW_PLAN_PIPELINE_DEPTH:
 		return "depth";
+	case MODERN_GL_DRAW_PLAN_PIPELINE_SHADOW_DEPTH:
+		return "shadowDepth";
 	case MODERN_GL_DRAW_PLAN_PIPELINE_FLAT_MATERIAL:
 		return "flatMaterial";
+	case MODERN_GL_DRAW_PLAN_PIPELINE_LIGHT_GRID:
+		return "lightGrid";
+	case MODERN_GL_DRAW_PLAN_PIPELINE_FOG_BLEND:
+		return "fogBlend";
 	case MODERN_GL_DRAW_PLAN_PIPELINE_NONE:
 	default:
 		return "none";
@@ -35,17 +41,26 @@ static void R_ModernGLDrawPlan_SetStatus( modernGLDrawPlanStats_t &stats, const 
 static bool R_ModernGLDrawPlan_CategoryPipeline( renderPassCategory_t category, modernGLDrawPlanPipeline_t &pipeline, modernGLShaderProgramKind_t &shaderKind ) {
 	switch ( category ) {
 	case RENDER_PASS_DEPTH:
-	case RENDER_PASS_STENCIL_SHADOW:
-	case RENDER_PASS_SHADOW_MAP:
 		pipeline = MODERN_GL_DRAW_PLAN_PIPELINE_DEPTH;
 		shaderKind = MODERN_GL_SHADER_DEPTH;
 		return true;
+	case RENDER_PASS_STENCIL_SHADOW:
+	case RENDER_PASS_SHADOW_MAP:
+		pipeline = MODERN_GL_DRAW_PLAN_PIPELINE_SHADOW_DEPTH;
+		shaderKind = MODERN_GL_SHADER_SHADOW_DEPTH;
+		return true;
 	case RENDER_PASS_ARB2_INTERACTION:
-	case RENDER_PASS_LIGHT_GRID:
 	case RENDER_PASS_AMBIENT:
-	case RENDER_PASS_FOG_BLEND:
 		pipeline = MODERN_GL_DRAW_PLAN_PIPELINE_FLAT_MATERIAL;
 		shaderKind = MODERN_GL_SHADER_FLAT_MATERIAL;
+		return true;
+	case RENDER_PASS_LIGHT_GRID:
+		pipeline = MODERN_GL_DRAW_PLAN_PIPELINE_LIGHT_GRID;
+		shaderKind = MODERN_GL_SHADER_LIGHT_GRID;
+		return true;
+	case RENDER_PASS_FOG_BLEND:
+		pipeline = MODERN_GL_DRAW_PLAN_PIPELINE_FOG_BLEND;
+		shaderKind = MODERN_GL_SHADER_FOG_BLEND;
 		return true;
 	default:
 		pipeline = MODERN_GL_DRAW_PLAN_PIPELINE_NONE;
@@ -64,6 +79,16 @@ static bool R_ModernGLDrawPlan_HasGraphPass( const idRenderGraph &graph, renderP
 	return false;
 }
 
+static bool R_ModernGLDrawPlan_IsDepthPipeline( modernGLDrawPlanPipeline_t pipeline ) {
+	return pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_DEPTH || pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_SHADOW_DEPTH;
+}
+
+static bool R_ModernGLDrawPlan_IsMaterialPipeline( modernGLDrawPlanPipeline_t pipeline ) {
+	return pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_FLAT_MATERIAL
+		|| pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_LIGHT_GRID
+		|| pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_FOG_BLEND;
+}
+
 bool idModernGLDrawPlan::AddEntry( const drawPacket_t &draw, int drawPacketIndex, modernGLDrawPlanPipeline_t pipeline, const modernGLShaderProgramInfo_t &program ) {
 	if ( numEntries >= MODERN_GL_DRAW_PLAN_MAX_ENTRIES ) {
 		stats.overflow = true;
@@ -78,6 +103,11 @@ bool idModernGLDrawPlan::AddEntry( const drawPacket_t &draw, int drawPacketIndex
 	entry.pipeline = pipeline;
 	entry.shaderKind = program.kind;
 	entry.program = program.program;
+	entry.permutation = program.permutation;
+	entry.modelViewProjectionLocation = program.modelViewProjectionLocation;
+	entry.debugColorLocation = program.debugColorLocation;
+	entry.localParamsLocation = program.localParamsLocation;
+	entry.mainTextureLocation = program.mainTextureLocation;
 	entry.drawPacketIndex = drawPacketIndex;
 	entry.materialRecordIndex = draw.materialRecordIndex;
 	entry.glslVersion = program.glslVersion;
@@ -86,9 +116,9 @@ bool idModernGLDrawPlan::AddEntry( const drawPacket_t &draw, int drawPacketIndex
 	entry.indexed = draw.hasIndexCache || draw.indexCount > 0;
 
 	stats.plannedDraws++;
-	if ( pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_DEPTH ) {
+	if ( R_ModernGLDrawPlan_IsDepthPipeline( pipeline ) ) {
 		stats.depthDraws++;
-	} else if ( pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_FLAT_MATERIAL ) {
+	} else if ( R_ModernGLDrawPlan_IsMaterialPipeline( pipeline ) ) {
 		stats.materialDraws++;
 	}
 	if ( entry.indexed ) {
@@ -243,12 +273,31 @@ bool RendererModernGLDrawPlan_RunSelfTest( void ) {
 		return false;
 	}
 	if ( tr.defaultMaterial != NULL ) {
-		if ( stats.depthDraws != 2 || stats.materialDraws != 8 || stats.stateBatches != 5 || stats.programSwitches != 1 || stats.overflow ) {
+		if ( stats.depthDraws != 2 || stats.materialDraws != 8 || stats.stateBatches != 5 || stats.programSwitches != 4 || stats.overflow ) {
 			common->Printf( "RendererModernGLDrawPlan self-test failed: plan classification mismatch\n" );
 			return false;
 		}
 		if ( plan.NumEntries() != stats.plannedDraws ) {
 			common->Printf( "RendererModernGLDrawPlan self-test failed: entry count mismatch\n" );
+			return false;
+		}
+		bool sawDepth = false;
+		bool sawMaterial = false;
+		bool sawLightGrid = false;
+		bool sawFog = false;
+		for ( int i = 0; i < plan.NumEntries(); ++i ) {
+			const modernGLDrawPlanEntry_t &entry = plan.Entry( i );
+			sawDepth = sawDepth || entry.shaderKind == MODERN_GL_SHADER_DEPTH;
+			sawMaterial = sawMaterial || entry.shaderKind == MODERN_GL_SHADER_FLAT_MATERIAL;
+			sawLightGrid = sawLightGrid || entry.shaderKind == MODERN_GL_SHADER_LIGHT_GRID;
+			sawFog = sawFog || entry.shaderKind == MODERN_GL_SHADER_FOG_BLEND;
+			if ( entry.modelViewProjectionLocation < 0 || entry.permutation.materialClass == RENDER_MATERIAL_NONE ) {
+				common->Printf( "RendererModernGLDrawPlan self-test failed: shader metadata mismatch\n" );
+				return false;
+			}
+		}
+		if ( !sawDepth || !sawMaterial || !sawLightGrid || !sawFog ) {
+			common->Printf( "RendererModernGLDrawPlan self-test failed: shader-kind coverage mismatch\n" );
 			return false;
 		}
 	}

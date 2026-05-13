@@ -72,11 +72,7 @@ void idVertexCache::ActuallyFree( vertCache_t *block ) {
 		staticCountTotal--;
 
 		if ( block->vbo ) {
-#if 0		// this isn't really necessary, it will be reused soon enough
-			// filling with zero length data is the equivalent of freeing
-			glBindBufferARB(GL_ARRAY_BUFFER_ARB, block->vbo);
-			glBufferDataARB(GL_ARRAY_BUFFER_ARB, 0, 0, GL_DYNAMIC_DRAW_ARB);
-#endif
+			R_RendererUpload_FreeStaticBuffer( block->vbo, block->size );
 		} else if ( block->virtMem ) {
 			Mem_Free( block->virtMem );
 			block->virtMem = NULL;
@@ -221,7 +217,26 @@ idVertexCache::Shutdown
 ===========
 */
 void idVertexCache::Shutdown() {
-//	PurgeAll();	// !@#: also purge the temp buffers
+	PurgeAll();
+
+	while( deferredFreeList.next != &deferredFreeList ) {
+		ActuallyFree( deferredFreeList.next );
+	}
+
+	for ( int i = 0; i < NUM_VERTEX_FRAMES; i++ ) {
+		vertCache_t *block = tempBuffers[i];
+		if ( block == NULL ) {
+			continue;
+		}
+		if ( block->vbo ) {
+			R_RendererUpload_FreeStaticBuffer( block->vbo, block->size );
+		} else if ( block->virtMem ) {
+			Mem_Free( block->virtMem );
+			block->virtMem = NULL;
+		}
+		block->tag = TAG_FREE;
+		tempBuffers[i] = NULL;
+	}
 
 	headerAllocator.Shutdown();
 }
@@ -249,14 +264,11 @@ void idVertexCache::Alloc( void *data, int size, vertCache_t **buffer, bool inde
 
 		for ( int i = 0; i < EXPAND_HEADERS; i++ ) {
 			block = headerAllocator.Alloc();
+			memset( block, 0, sizeof( *block ) );
 			block->next = freeStaticHeaders.next;
 			block->prev = &freeStaticHeaders;
 			block->next->prev = block;
 			block->prev->next = block;
-
-			if( !virtualMemory ) {
-				glGenBuffersARB( 1, & block->vbo );
-			}
 		}
 	}
 
@@ -291,23 +303,30 @@ void idVertexCache::Alloc( void *data, int size, vertCache_t **buffer, bool inde
 	block->indexBuffer = indexBuffer;
 
 	// copy the data
-	if ( block->vbo ) {
-		if ( indexBuffer ) {
-			glBindBufferARB( GL_ELEMENT_ARRAY_BUFFER_ARB, block->vbo );
-			glBufferDataARB( GL_ELEMENT_ARRAY_BUFFER_ARB, (GLsizeiptrARB)size, data, GL_STATIC_DRAW_ARB );
-		} else {
-			glBindBufferARB( GL_ARRAY_BUFFER_ARB, block->vbo );
-			if ( allocatingTempBuffer ) {
-				glBufferDataARB( GL_ARRAY_BUFFER_ARB, (GLsizeiptrARB)size, data, GL_STREAM_DRAW_ARB );
-			} else {
-				glBufferDataARB( GL_ARRAY_BUFFER_ARB, (GLsizeiptrARB)size, data, GL_STATIC_DRAW_ARB );
+	if ( !virtualMemory ) {
+		if ( !R_RendererUpload_AllocStaticBuffer( data, size, indexBuffer, allocatingTempBuffer, block->vbo ) ) {
+			if ( block->vbo == 0 ) {
+				glGenBuffersARB( 1, &block->vbo );
 			}
+			if ( indexBuffer ) {
+				glBindBufferARB( GL_ELEMENT_ARRAY_BUFFER_ARB, block->vbo );
+				glBufferDataARB( GL_ELEMENT_ARRAY_BUFFER_ARB, (GLsizeiptrARB)size, data, GL_STATIC_DRAW_ARB );
+			} else {
+				glBindBufferARB( GL_ARRAY_BUFFER_ARB, block->vbo );
+				if ( allocatingTempBuffer ) {
+					glBufferDataARB( GL_ARRAY_BUFFER_ARB, (GLsizeiptrARB)size, data, GL_STREAM_DRAW_ARB );
+				} else {
+					glBufferDataARB( GL_ARRAY_BUFFER_ARB, (GLsizeiptrARB)size, data, GL_STATIC_DRAW_ARB );
+				}
+			}
+			R_RendererUpload_RecordLegacyUpload( size );
 		}
+		block->virtMem = NULL;
 	} else {
 		block->virtMem = Mem_Alloc( size );
 		SIMDProcessor->Memcpy( block->virtMem, data, size );
+		R_RendererUpload_RecordLegacyUpload( size );
 	}
-	R_RendererUpload_RecordLegacyUpload( size );
 }
 
 /*
@@ -378,7 +397,7 @@ We can't simply sync with the GPU and overwrite what we have, because
 there may still be future references to dynamically created surfaces.
 ===========
 */
-vertCache_t	*idVertexCache::AllocFrameTemp( void *data, int size ) {
+vertCache_t	*idVertexCache::AllocFrameTemp( void *data, int size, bool indexBuffer ) {
 	vertCache_t	*block;
 
 	if ( size < 0 ) {
@@ -389,10 +408,12 @@ vertCache_t	*idVertexCache::AllocFrameTemp( void *data, int size ) {
 	}
 
 	rendererUploadAllocation_t uploadAllocation;
-	if ( R_RendererUpload_AllocFrameTemp( data, size, 16, uploadAllocation ) ) {
+	const int alignment = indexBuffer ? 4 : 16;
+	if ( R_RendererUpload_AllocFrameTemp( data, size, alignment, uploadAllocation ) ) {
 		if ( freeDynamicHeaders.next == &freeDynamicHeaders ) {
 			for ( int i = 0; i < EXPAND_HEADERS; i++ ) {
 				block = headerAllocator.Alloc();
+				memset( block, 0, sizeof( *block ) );
 				block->next = freeDynamicHeaders.next;
 				block->prev = &freeDynamicHeaders;
 				block->next->prev = block;
@@ -410,7 +431,7 @@ vertCache_t	*idVertexCache::AllocFrameTemp( void *data, int size ) {
 
 		block->size = size;
 		block->tag = TAG_TEMP;
-		block->indexBuffer = false;
+		block->indexBuffer = indexBuffer;
 		block->offset = uploadAllocation.offset;
 		block->virtMem = NULL;
 		block->vbo = uploadAllocation.vbo;
@@ -426,7 +447,7 @@ vertCache_t	*idVertexCache::AllocFrameTemp( void *data, int size ) {
 		// but immediately free it so it will get freed at the next frame
 		tempOverflow = true;
 		R_RendererUpload_RecordLegacyStall();
-		Alloc( data, size, &block );
+		Alloc( data, size, &block, indexBuffer );
 		Free( block);
 		return block;
 	}
@@ -438,6 +459,7 @@ vertCache_t	*idVertexCache::AllocFrameTemp( void *data, int size ) {
 
 		for ( int i = 0; i < EXPAND_HEADERS; i++ ) {
 			block = headerAllocator.Alloc();
+			memset( block, 0, sizeof( *block ) );
 			block->next = freeDynamicHeaders.next;
 			block->prev = &freeDynamicHeaders;
 			block->next->prev = block;
@@ -456,7 +478,7 @@ vertCache_t	*idVertexCache::AllocFrameTemp( void *data, int size ) {
 
 	block->size = size;
 	block->tag = TAG_TEMP;
-	block->indexBuffer = false;
+	block->indexBuffer = indexBuffer;
 	block->offset = dynamicAllocThisFrame;
 	dynamicAllocThisFrame += block->size;
 	dynamicCountThisFrame++;
@@ -468,8 +490,9 @@ vertCache_t	*idVertexCache::AllocFrameTemp( void *data, int size ) {
 	block->vbo = tempBuffers[listNum]->vbo;
 
 	if ( block->vbo ) {
-		glBindBufferARB( GL_ARRAY_BUFFER_ARB, block->vbo );
-		glBufferSubDataARB( GL_ARRAY_BUFFER_ARB, block->offset, (GLsizeiptrARB)size, data );
+		const GLenum target = indexBuffer ? GL_ELEMENT_ARRAY_BUFFER_ARB : GL_ARRAY_BUFFER_ARB;
+		glBindBufferARB( target, block->vbo );
+		glBufferSubDataARB( target, block->offset, (GLsizeiptrARB)size, data );
 	} else {
 		SIMDProcessor->Memcpy( (byte *)block->virtMem + block->offset, data, size );
 	}
