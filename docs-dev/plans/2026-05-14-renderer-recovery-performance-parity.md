@@ -222,10 +222,10 @@ Phase 6 implementation notes:
 
 Goal: make shadow mapping correct, budgeted, and integral to the modern renderer instead of leaving it as a separate ARB2-era island.
 
-- [ ] Create a shared per-frame shadow plan from the clustered light records. Each shadowed light must carry type, priority, update policy, caster lists, receiver policy, fallback reason, and estimated GPU cost.
-- [ ] Move shadow-map resources into the render graph: projected atlases, point-light face atlases or cubemap-compatible layouts, cascade tiles, depth formats, translucent moment MRTs, resolve targets, and debug overlays must have named lifetime/resource ownership.
-- [ ] Preserve the existing user-facing contract from `docs-user/shadow-mapping.md`: `r_shadows` remains the master switch, `r_useShadowMap` enables supported mapped lights, unavailable or failed shadow maps fall back to legacy shadows, and unsupported translucent moments fail closed.
-- [ ] Keep stencil shadows as a real fallback path for lights/materials that cannot be safely mapped. Fallback must be per light and counted; it must not leave the light unshadowed and must not double-shadow a modern receiver.
+- [x] Create a shared per-frame shadow plan from the clustered light records. Each shadowed light must carry type, priority, update policy, caster lists, receiver policy, fallback reason, and estimated GPU cost.
+- [x] Move shadow-map resources into the render graph: projected atlases, point-light face atlases or cubemap-compatible layouts, cascade tiles, depth formats, translucent moment MRTs, resolve targets, and debug overlays must have named lifetime/resource ownership.
+- [x] Preserve the existing user-facing contract from `docs-user/shadow-mapping.md`: `r_shadows` remains the master switch, `r_useShadowMap` enables supported mapped lights, unavailable or failed shadow maps fall back to legacy shadows, and unsupported translucent moments fail closed.
+- [x] Keep stencil shadows as a real fallback path for lights/materials that cannot be safely mapped. Fallback must be per light and counted; it must not leave the light unshadowed and must not double-shadow a modern receiver.
 - [ ] Promote projected-light and point-light shadow maps first, then CSM, then optional translucent moments. Do not block base shadow-map correctness on the experimental translucent path.
 - [ ] Make shadow-map correctness diagnostics authoritative: atlas/depth view, cascade index, projected UV, projected depth, projected W, invalid-coordinate mask, face/tile labels, and selected light metadata must be usable during gameplay and RenderDoc capture.
 - [ ] Add a hard shadow-validation mode that can disable caster polygon offset, receiver bias, PCF, and cascade blending independently. If shadows still detach or scatter in that mode, the bug is structural and must be investigated as projection/resource/state corruption.
@@ -249,6 +249,14 @@ Acceptance:
 - [ ] Translucent moments are either correct enough for documented supported materials or are clearly gated and off by default.
 - [ ] Shadow budgets keep P95 frame time within the selected renderer preset instead of allowing shadow maps to dominate frame time.
 - [ ] RenderDoc captures show named shadow resources and passes with valid contents, expected state, and no duplicate legacy/modern shadow contribution for the same light.
+
+Phase 7 implementation notes:
+
+- Added `ModernShadowPlanner` as the shared per-frame shadow decision layer. It walks packet-frame `viewLight_t` lists, classifies projected/point/CSM candidates, records caster/receiver/translucent counts, assigns mapped/stencil-fallback/skipped policy, preserves `r_shadows`/`r_useShadowMap` fail-closed behavior, and applies the first budget layer for benchmark preset shadow resolution, update rate, max mapped light count, and total pixel cost.
+- Render graph shadow resources are now explicit: `shadowMap` remains as the compatibility depth target while `projectedShadowAtlas`, `pointShadowAtlas`, `cascadeShadowAtlas`, `shadowDescriptors`, and optional `translucentShadowMoments` are named producer/consumer resources. Shadow atlas handles size from the active renderer budget and GL texture limits instead of the main viewport.
+- Clustered lighting now consumes the shadow plan and uploads shadow descriptor index/policy state in each modern light record. Cluster diagnostics and `gfxInfo` report mapped, fallback, skipped, and descriptor counts, giving deferred and forward+ a single shadow-policy source for later receiver sampling.
+- Added `rendererShadowPlannerSelfTest` and shadow-planner `gfxInfo` diagnostics. Full budget downgrades, receiver shader sampling, shadow-map cache reuse, hard bias/filter validation controls, shadow GPU timing, and gameplay screenshot/RenderDoc proof remain follow-up work before Phase 7 is visually complete.
+- Validation passed for `tools/build/meson_setup.ps1 compile -C builddir`, `tools/build/meson_setup.ps1 install -C builddir --no-rebuild --skip-subprojects`, `python -m py_compile tools/tests/renderer_validation_matrix.py`, staged GL 4.5 runs of `rendererShadowPlannerSelfTest`, `rendererRenderGraphSelfTest`, `rendererRenderGraphResourceSelfTest`, `rendererVisiblePathSelfTest`, `rendererShaderLibrarySelfTest`, `rendererClusterGridSelfTest`, `rendererForwardPlusSelfTest`, and `rendererDeferredResolveSelfTest`, plus a forced `r_glTier gl33` run of `rendererShaderLibrarySelfTest`, `rendererShadowPlannerSelfTest`, and `rendererClusterGridSelfTest`. Phase 7 validation logs contained no renderer `idStr::snPrintf` overflow, `WARNING: idStr`, shader compile, or program link failures.
 
 ## Phase 8: Hybrid Deferred/Forward+ Pipeline
 

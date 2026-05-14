@@ -46,6 +46,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "ModernGLDrawPlan.h"
 #include "ModernGLShaderLibrary.h"
 #include "ModernGLSubmitPlan.h"
+#include "ModernShadowPlanner.h"
 #include "../framework/RenderDoc.h"
 
 // Detect the Microsoft software OpenGL wrapper and guide the user toward
@@ -632,6 +633,13 @@ static void R_RendererClusterGridSelfTest_f( const idCmdArgs &args ) {
 	(void)args;
 	if ( !RendererClusterGrid_RunSelfTest() ) {
 		common->Warning( "Renderer clustered light-grid self-test failed" );
+	}
+}
+
+static void R_RendererShadowPlannerSelfTest_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !RendererShadowPlanner_RunSelfTest() ) {
+		common->Warning( "Renderer shadow-planner self-test failed" );
 	}
 }
 
@@ -2754,6 +2762,7 @@ void GfxInfo_f( const idCmdArgs &args ) {
 	R_MaterialResourceTable_PrintGfxInfo();
 	R_ModernGLExecutor_PrintGfxInfo();
 	R_ModernClusteredLighting_PrintGfxInfo();
+	R_ModernShadowPlanner_PrintGfxInfo();
 	{
 		const rendererUploadStats_t &uploadStats = R_RendererUpload_Stats();
 		common->Printf(
@@ -3075,6 +3084,7 @@ void R_InitCommands( void ) {
 	cmdSystem->AddCommand( "rendererVisiblePathSelfTest", R_RendererVisiblePathSelfTest_f, CMD_FL_RENDERER, "run renderer visible modern depth-path self tests" );
 	cmdSystem->AddCommand( "rendererGBufferSelfTest", R_RendererGBufferSelfTest_f, CMD_FL_RENDERER, "run renderer modern opaque G-buffer self tests" );
 	cmdSystem->AddCommand( "rendererClusterGridSelfTest", R_RendererClusterGridSelfTest_f, CMD_FL_RENDERER, "run renderer clustered light-grid self tests" );
+	cmdSystem->AddCommand( "rendererShadowPlannerSelfTest", R_RendererShadowPlannerSelfTest_f, CMD_FL_RENDERER, "run renderer modern shadow-planner self tests" );
 	cmdSystem->AddCommand( "rendererDeferredResolveSelfTest", R_RendererDeferredResolveSelfTest_f, CMD_FL_RENDERER, "run renderer deferred light resolve self tests" );
 	cmdSystem->AddCommand( "rendererForwardPlusSelfTest", R_RendererForwardPlusSelfTest_f, CMD_FL_RENDERER, "run renderer clustered forward+ self tests" );
 	cmdSystem->AddCommand( "rendererModernVisibleSelfTest", R_RendererModernVisibleSelfTest_f, CMD_FL_RENDERER, "run renderer modern visible-frame composition self tests" );

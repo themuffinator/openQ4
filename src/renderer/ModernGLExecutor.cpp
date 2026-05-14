@@ -10,6 +10,7 @@
 #include "ModernClusteredLighting.h"
 #include "ModernGLShaderLibrary.h"
 #include "ModernGLSubmitPlan.h"
+#include "ModernShadowPlanner.h"
 #include "RenderGraphResources.h"
 #include "RendererBootstrap.h"
 #include "RendererMetrics.h"
@@ -3496,6 +3497,7 @@ void R_ModernGLExecutor_Init( const renderBackendCaps_t &caps, const renderFeatu
 	rg_modernGLExecutorCaps = caps;
 	rg_modernGLExecutorFeatures = features;
 	R_GLStateCache_Init( caps );
+	R_ModernShadowPlanner_Init( caps, features );
 	R_ModernClusteredLighting_Init( caps, features );
 	rg_modernGLExecutorLowOverheadReady = R_ModernGLExecutor_CanUseLowOverhead( caps, features );
 	R_ModernGLExecutor_ResetStats( rg_modernGLExecutorStats, r_rendererModernExecutor.GetBool() );
@@ -3619,6 +3621,7 @@ void R_ModernGLExecutor_Shutdown( void ) {
 	memset( &rg_modernGLExecutorCaps, 0, sizeof( rg_modernGLExecutorCaps ) );
 	memset( &rg_modernGLExecutorFeatures, 0, sizeof( rg_modernGLExecutorFeatures ) );
 	R_ModernClusteredLighting_Shutdown();
+	R_ModernShadowPlanner_Shutdown();
 	R_GLStateCache_Shutdown();
 	R_ModernGLExecutor_ResetStats( rg_modernGLExecutorStats, false );
 	R_ModernGLExecutor_ResetPassOwnershipTable( "shutdown" );
@@ -3719,8 +3722,12 @@ void R_ModernGLExecutor_PrepareFrame( const idScenePacketFrame &packetFrame, con
 		forwardPlusRequested ||
 		gpuDrivenValidationRequested ||
 		r_rendererClusterDebug.GetInteger() > 0;
+	const bool shadowPlanningRequested =
+		r_shadows.GetBool() &&
+		( clusteredLightingRequested || visibleDepthRequested || R_ModernGLExecutor_ShadowMapSidecarRequested() );
 	const bool gpuDrivenWorkRequested = gpuDrivenValidationRequested || r_rendererModernSubmit.GetBool();
 
+	R_ModernShadowPlanner_PrepareFrame( packetFrame, shadowPlanningRequested );
 	R_ModernClusteredLighting_PrepareFrame( packetFrame, clusteredLightingRequested );
 	if ( gpuDrivenWorkRequested ) {
 		R_ModernGLExecutor_UpdateGpuDrivenBuffers( rg_modernGLExecutorStats );
@@ -4875,6 +4882,7 @@ bool RendererGpuDriven_RunSelfTest( void ) {
 	idRenderGraph graph;
 	R_RenderGraph_BuildFromScenePackets( packetFrame, graph );
 	R_MaterialResourceTable_PrepareFrame( packetFrame );
+	R_ModernShadowPlanner_PrepareFrame( packetFrame, true );
 	R_ModernClusteredLighting_PrepareFrame( packetFrame, true );
 
 	R_ModernGLExecutor_AnalyzeFrame(
@@ -5363,6 +5371,7 @@ bool RendererDeferredResolve_RunSelfTest( void ) {
 	}
 	R_MaterialResourceTable_PrepareFrame( packetFrame );
 	R_RenderGraphResources_PrepareFrame( graph );
+	R_ModernShadowPlanner_PrepareFrame( packetFrame, true );
 	R_ModernClusteredLighting_PrepareFrame( packetFrame, true );
 
 	modernGLExecutorStats_t stats;
@@ -5539,6 +5548,7 @@ bool RendererForwardPlus_RunSelfTest( void ) {
 	}
 	R_MaterialResourceTable_PrepareFrame( packetFrame );
 	R_RenderGraphResources_PrepareFrame( graph );
+	R_ModernShadowPlanner_PrepareFrame( packetFrame, true );
 	R_ModernClusteredLighting_PrepareFrame( packetFrame, true );
 
 	modernGLExecutorStats_t stats;
@@ -5759,6 +5769,7 @@ bool RendererModernVisible_RunSelfTest( void ) {
 
 	R_MaterialResourceTable_PrepareFrame( packetFrame );
 	R_RenderGraphResources_PrepareFrame( graph );
+	R_ModernShadowPlanner_PrepareFrame( packetFrame, true );
 	R_ModernClusteredLighting_PrepareFrame( packetFrame, true );
 	R_ModernGLExecutor_AnalyzeFrame(
 		packetFrame,
@@ -6319,6 +6330,7 @@ bool RendererLowOverhead_RunSelfTest( void ) {
 			graphStats.lastFailure );
 		return false;
 	}
+	R_ModernShadowPlanner_PrepareFrame( packetFrame, true );
 	R_ModernClusteredLighting_PrepareFrame( packetFrame, true );
 
 	modernGLExecutorStats_t stats;

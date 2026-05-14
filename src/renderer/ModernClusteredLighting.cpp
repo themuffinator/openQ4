@@ -5,6 +5,7 @@
 #include "ModernClusteredLighting.h"
 #include "GLDebugScope.h"
 #include "GLStateCache.h"
+#include "ModernShadowPlanner.h"
 #include "RendererBenchmarks.h"
 #include "RendererMetrics.h"
 
@@ -24,6 +25,14 @@ const int MODERN_CLUSTER_UBO_BINDING_LIGHTS = 4;
 const int MODERN_CLUSTER_UBO_BINDING_INDICES = 5;
 const int MODERN_CLUSTER_SSBO_BINDING_LIGHTS = 6;
 const int MODERN_CLUSTER_SSBO_BINDING_INDICES = 7;
+const int MODERN_CLUSTER_LIGHT_FLAG_VIEW_INSIDE = 1 << 0;
+const int MODERN_CLUSTER_LIGHT_FLAG_GLOBAL_ORIGIN_VISIBLE = 1 << 1;
+const int MODERN_CLUSTER_LIGHT_FLAG_PARALLEL = 1 << 2;
+const int MODERN_CLUSTER_LIGHT_FLAG_FULL_DEPTH = 1 << 3;
+const int MODERN_CLUSTER_LIGHT_FLAG_SHADOW_MAPPED = 1 << 4;
+const int MODERN_CLUSTER_LIGHT_FLAG_SHADOW_FALLBACK = 1 << 5;
+const int MODERN_CLUSTER_LIGHT_FLAG_SHADOW_CASCADE = 1 << 6;
+const int MODERN_CLUSTER_LIGHT_FLAG_SHADOW_POINT = 1 << 7;
 
 enum modernClusterLightType_t {
 	MODERN_CLUSTER_LIGHT_POINT = 0,
@@ -59,6 +68,9 @@ typedef struct modernClusterLightRecord_s {
 	int					lightDefIndex;
 	int					areaNum;
 	int					flags;
+	int					shadowDescriptorIndex;
+	int					shadowPolicy;
+	int					shadowFallbackReason;
 	idVec3				worldOrigin;
 	idVec3				cameraOrigin;
 	idVec3				color;
@@ -337,6 +349,38 @@ static void R_ModernClusteredLighting_CountLightType( modernClusterLightType_t t
 	}
 }
 
+static void R_ModernClusteredLighting_ApplyShadowDescriptor( modernClusterLightRecord_t &record, const viewLight_t *vLight, rendererClusteredLightingStats_t &stats ) {
+	record.shadowDescriptorIndex = -1;
+	record.shadowPolicy = MODERN_SHADOW_POLICY_NONE;
+	record.shadowFallbackReason = MODERN_SHADOW_FALLBACK_NONE;
+
+	const modernShadowLightDescriptor_t *shadow = R_ModernShadowPlanner_DescriptorForLight( vLight );
+	if ( shadow == NULL ) {
+		return;
+	}
+
+	record.shadowDescriptorIndex = shadow->descriptorIndex;
+	record.shadowPolicy = shadow->policy;
+	record.shadowFallbackReason = shadow->fallbackReason;
+	stats.shadowDescriptorCount = Max( stats.shadowDescriptorCount, shadow->descriptorIndex + 1 );
+
+	if ( shadow->policy == MODERN_SHADOW_POLICY_MAPPED ) {
+		record.flags |= MODERN_CLUSTER_LIGHT_FLAG_SHADOW_MAPPED;
+		stats.shadowMappedLights++;
+	} else if ( shadow->policy == MODERN_SHADOW_POLICY_STENCIL_FALLBACK ) {
+		record.flags |= MODERN_CLUSTER_LIGHT_FLAG_SHADOW_FALLBACK;
+		stats.shadowFallbackLights++;
+	} else if ( shadow->policy == MODERN_SHADOW_POLICY_SKIPPED ) {
+		stats.shadowSkippedLights++;
+	}
+
+	if ( shadow->mapType == MODERN_SHADOW_MAP_CASCADE ) {
+		record.flags |= MODERN_CLUSTER_LIGHT_FLAG_SHADOW_CASCADE;
+	} else if ( shadow->mapType == MODERN_SHADOW_MAP_POINT ) {
+		record.flags |= MODERN_CLUSTER_LIGHT_FLAG_SHADOW_POINT;
+	}
+}
+
 static int R_ModernClusteredLighting_CountViewLights( const viewDef_t *viewDef ) {
 	int count = 0;
 	if ( viewDef == NULL ) {
@@ -513,10 +557,11 @@ static bool R_ModernClusteredLighting_AddLight( modernClusterGridRecord_t &grid,
 		return false;
 	}
 	record.flags =
-		( vLight->viewInsideLight ? 1 : 0 ) |
-		( vLight->viewSeesGlobalLightOrigin ? 2 : 0 ) |
-		( vLight->parallel ? 4 : 0 ) |
-		( record.fullDepthRange ? 8 : 0 );
+		( vLight->viewInsideLight ? MODERN_CLUSTER_LIGHT_FLAG_VIEW_INSIDE : 0 ) |
+		( vLight->viewSeesGlobalLightOrigin ? MODERN_CLUSTER_LIGHT_FLAG_GLOBAL_ORIGIN_VISIBLE : 0 ) |
+		( vLight->parallel ? MODERN_CLUSTER_LIGHT_FLAG_PARALLEL : 0 ) |
+		( record.fullDepthRange ? MODERN_CLUSTER_LIGHT_FLAG_FULL_DEPTH : 0 );
+	R_ModernClusteredLighting_ApplyShadowDescriptor( record, vLight, stats );
 	if ( r_rendererMetrics.GetInteger() >= 2 || r_rendererClusterDebug.GetInteger() > 0 ) {
 		const char *shaderName = vLight->lightShader != NULL ? vLight->lightShader->GetName() : ( vLight->lightDef != NULL && vLight->lightDef->lightShader != NULL ? vLight->lightDef->lightShader->GetName() : "<light>" );
 		if ( !R_ModernClusteredLighting_FormatDebugString( record.debugName, sizeof( record.debugName ), "%s:%d:%s", R_ModernClusteredLighting_TypeName( record.type ), record.lightDefIndex, shaderName != NULL ? shaderName : "<null>" ) ) {
@@ -831,8 +876,8 @@ static bool R_ModernClusteredLighting_UploadBuffers( rendererClusteredLightingSt
 		dst.scissorDepth[3] = static_cast<float>( src.scissor.y2 );
 		dst.flags[0] = static_cast<float>( src.flags );
 		dst.flags[1] = static_cast<float>( src.lightDefIndex );
-		dst.flags[2] = static_cast<float>( src.areaNum );
-		dst.flags[3] = static_cast<float>( src.sceneIndex );
+		dst.flags[2] = static_cast<float>( src.shadowDescriptorIndex );
+		dst.flags[3] = static_cast<float>( src.shadowPolicy );
 	}
 
 	idList<modernClusterIndexGpuRecord_t> indexRecords;
@@ -1052,7 +1097,7 @@ void R_ModernClusteredLighting_PrepareFrame( const idScenePacketFrame &packetFra
 	R_RendererMetrics_RecordClusteredLighting( rg_clusteredLightingStats );
 	if ( r_rendererMetrics.GetInteger() >= 2 && rg_clusteredLightingStats.requested ) {
 		common->Printf(
-			"clusteredLighting status=%s requested=%d valid=%d grids=%d scenes=%d lights=%d point=%d projected=%d fog=%d ambient=%d special=%d clusters=%d active=%d refs=%d uploaded(l=%d c=%d r=%d) spill=%d/%d overflow=%d/%d overflowRefs=%d maxCluster=%d/%d groups=%d grid=%dx%dx%d z=%d..%d ubo=%d ssbo=%d buffers=%d caps(l=%d idx=%d) bytes(params=%d lights=%d indices=%d) debug=%d/%d debugTrunc=%d source='%s' build=%dms uploads=%d\n",
+			"clusteredLighting status=%s requested=%d valid=%d grids=%d scenes=%d lights=%d point=%d projected=%d fog=%d ambient=%d special=%d shadow(mapped=%d fallback=%d skipped=%d descriptors=%d) clusters=%d active=%d refs=%d uploaded(l=%d c=%d r=%d) spill=%d/%d overflow=%d/%d overflowRefs=%d maxCluster=%d/%d groups=%d grid=%dx%dx%d z=%d..%d ubo=%d ssbo=%d buffers=%d caps(l=%d idx=%d) bytes(params=%d lights=%d indices=%d) debug=%d/%d debugTrunc=%d source='%s' build=%dms uploads=%d\n",
 			rg_clusteredLightingStats.status,
 			rg_clusteredLightingStats.requested ? 1 : 0,
 			rg_clusteredLightingStats.frameValid ? 1 : 0,
@@ -1064,6 +1109,10 @@ void R_ModernClusteredLighting_PrepareFrame( const idScenePacketFrame &packetFra
 			rg_clusteredLightingStats.fogLights,
 			rg_clusteredLightingStats.ambientLights,
 			rg_clusteredLightingStats.specialLights,
+			rg_clusteredLightingStats.shadowMappedLights,
+			rg_clusteredLightingStats.shadowFallbackLights,
+			rg_clusteredLightingStats.shadowSkippedLights,
+			rg_clusteredLightingStats.shadowDescriptorCount,
 			rg_clusteredLightingStats.clusterCount,
 			rg_clusteredLightingStats.activeClusters,
 			rg_clusteredLightingStats.lightReferences,
@@ -1139,7 +1188,7 @@ void R_ModernClusteredLighting_DrawDebugOverlay( void ) {
 
 void R_ModernClusteredLighting_PrintGfxInfo( void ) {
 	common->Printf(
-		"Modern clustered lighting: %s, requested=%d, cvarDebug=%d, grids=%d scenes=%d lights=%d(point=%d projected=%d fog=%d ambient=%d special=%d) clusters=%d active=%d refs=%d uploaded(l=%d c=%d r=%d) spill=%d/%d overflow=%d/%d overflowRefs=%d maxCluster=%d/%d groups=%d grid=%dx%dx%d z=%d..%d ubo=%d ssbo=%d buffers=%d caps(l=%d idx=%d) bytes(params=%d lights=%d indices=%d) overlay=%d/%d texture=%d debugTrunc=%d source='%s' build=%dms uploads=%d\n",
+		"Modern clustered lighting: %s, requested=%d, cvarDebug=%d, grids=%d scenes=%d lights=%d(point=%d projected=%d fog=%d ambient=%d special=%d shadowMapped=%d shadowFallback=%d shadowSkipped=%d shadowDescriptors=%d) clusters=%d active=%d refs=%d uploaded(l=%d c=%d r=%d) spill=%d/%d overflow=%d/%d overflowRefs=%d maxCluster=%d/%d groups=%d grid=%dx%dx%d z=%d..%d ubo=%d ssbo=%d buffers=%d caps(l=%d idx=%d) bytes(params=%d lights=%d indices=%d) overlay=%d/%d texture=%d debugTrunc=%d source='%s' build=%dms uploads=%d\n",
 		rg_clusteredLightingStats.available ? "available" : "unavailable",
 		rg_clusteredLightingStats.requested ? 1 : 0,
 		r_rendererClusterDebug.GetInteger(),
@@ -1151,6 +1200,10 @@ void R_ModernClusteredLighting_PrintGfxInfo( void ) {
 		rg_clusteredLightingStats.fogLights,
 		rg_clusteredLightingStats.ambientLights,
 		rg_clusteredLightingStats.specialLights,
+		rg_clusteredLightingStats.shadowMappedLights,
+		rg_clusteredLightingStats.shadowFallbackLights,
+		rg_clusteredLightingStats.shadowSkippedLights,
+		rg_clusteredLightingStats.shadowDescriptorCount,
 		rg_clusteredLightingStats.clusterCount,
 		rg_clusteredLightingStats.activeClusters,
 		rg_clusteredLightingStats.lightReferences,

@@ -344,6 +344,26 @@ static bool R_RenderGraph_ShouldModelModernVisible( void ) {
 
 static void R_RenderGraph_AddSceneColorReadWrite( idRenderGraph &graph, int passIndex, const char *usage );
 
+static void R_RenderGraph_AddShadowReceiverReads(
+	idRenderGraph &graph,
+	int passIndex,
+	const char *descriptorUsage,
+	const char *projectedUsage,
+	const char *pointUsage,
+	const char *cascadeUsage,
+	const char *translucentUsage ) {
+	const int shadowDescriptors = graph.FindResource( "shadowDescriptors" );
+	const int projectedShadowAtlas = graph.FindResource( "projectedShadowAtlas" );
+	const int pointShadowAtlas = graph.FindResource( "pointShadowAtlas" );
+	const int cascadeShadowAtlas = graph.FindResource( "cascadeShadowAtlas" );
+	const int translucentShadowMoments = graph.FindResource( "translucentShadowMoments" );
+	R_RenderGraph_AddAccess( graph, passIndex, shadowDescriptors, RENDER_GRAPH_ACCESS_READ, descriptorUsage );
+	R_RenderGraph_AddAccess( graph, passIndex, projectedShadowAtlas, RENDER_GRAPH_ACCESS_READ, projectedUsage );
+	R_RenderGraph_AddAccess( graph, passIndex, pointShadowAtlas, RENDER_GRAPH_ACCESS_READ, pointUsage );
+	R_RenderGraph_AddAccess( graph, passIndex, cascadeShadowAtlas, RENDER_GRAPH_ACCESS_READ, cascadeUsage );
+	R_RenderGraph_AddAccess( graph, passIndex, translucentShadowMoments, RENDER_GRAPH_ACCESS_READ, translucentUsage );
+}
+
 static void R_RenderGraph_AddGBufferWrites( idRenderGraph &graph, int passIndex ) {
 	const int gbufferAlbedo = R_RenderGraph_EnsureResource( graph, "gbufferAlbedo", RENDER_GRAPH_RESOURCE_COLOR, false, true, false, 3 );
 	const int gbufferNormal = R_RenderGraph_EnsureResource( graph, "gbufferNormal", RENDER_GRAPH_RESOURCE_COLOR, false, true, false, 3 );
@@ -379,6 +399,14 @@ static void R_RenderGraph_AddDeferredResolvePass( idRenderGraph &graph ) {
 	R_RenderGraph_AddAccess( graph, passIndex, gbufferEmissive, RENDER_GRAPH_ACCESS_READ, "deferred-lightgrid-read" );
 	R_RenderGraph_AddAccess( graph, passIndex, clusterGrid, RENDER_GRAPH_ACCESS_READ, "deferred-cluster-read" );
 	R_RenderGraph_AddAccess( graph, passIndex, lightGrid, RENDER_GRAPH_ACCESS_READ, "deferred-baked-light-grid-read" );
+	R_RenderGraph_AddShadowReceiverReads(
+		graph,
+		passIndex,
+		"deferred-shadow-descriptor-read",
+		"deferred-projected-shadow-read",
+		"deferred-point-shadow-read",
+		"deferred-cascade-shadow-read",
+		"deferred-translucent-shadow-read" );
 	R_RenderGraph_AddAccess( graph, passIndex, deferredLight, RENDER_GRAPH_ACCESS_WRITE | RENDER_GRAPH_ACCESS_CLEAR | RENDER_GRAPH_ACCESS_RESOLVE | RENDER_GRAPH_ACCESS_INVALIDATE, "deferred-light-write" );
 }
 
@@ -401,6 +429,14 @@ static void R_RenderGraph_AddForwardPlusPass( idRenderGraph &graph ) {
 	}
 	R_RenderGraph_AddAccess( graph, passIndex, clusterGrid, RENDER_GRAPH_ACCESS_READ, "forward-plus-cluster-read" );
 	R_RenderGraph_AddAccess( graph, passIndex, lightGrid, RENDER_GRAPH_ACCESS_READ, "forward-plus-light-grid-read" );
+	R_RenderGraph_AddShadowReceiverReads(
+		graph,
+		passIndex,
+		"forward-plus-shadow-descriptor-read",
+		"forward-plus-projected-shadow-read",
+		"forward-plus-point-shadow-read",
+		"forward-plus-cascade-shadow-read",
+		"forward-plus-translucent-shadow-read" );
 	R_RenderGraph_AddSceneColorReadWrite( graph, passIndex, "forward-plus-scene-color" );
 }
 
@@ -438,7 +474,19 @@ static void R_RenderGraph_AddPassResources( idRenderGraph &graph, int passIndex,
 	}
 	case RENDER_PASS_SHADOW_MAP: {
 		const int shadowMap = R_RenderGraph_EnsureResource( graph, "shadowMap", RENDER_GRAPH_RESOURCE_DEPTH, false, true, false, 2 );
+		const int projectedShadowAtlas = R_RenderGraph_EnsureResource( graph, "projectedShadowAtlas", RENDER_GRAPH_RESOURCE_DEPTH, false, true, false, 2 );
+		const int pointShadowAtlas = R_RenderGraph_EnsureResource( graph, "pointShadowAtlas", RENDER_GRAPH_RESOURCE_DEPTH, false, true, false, 2 );
+		const int cascadeShadowAtlas = R_RenderGraph_EnsureResource( graph, "cascadeShadowAtlas", RENDER_GRAPH_RESOURCE_DEPTH, false, true, false, 2 );
+		const int shadowDescriptors = R_RenderGraph_EnsureResource( graph, "shadowDescriptors", RENDER_GRAPH_RESOURCE_BUFFER, false, true, false, 0 );
 		R_RenderGraph_AddAccess( graph, passIndex, shadowMap, RENDER_GRAPH_ACCESS_WRITE | RENDER_GRAPH_ACCESS_CLEAR, "shadow-map-write" );
+		R_RenderGraph_AddAccess( graph, passIndex, projectedShadowAtlas, RENDER_GRAPH_ACCESS_WRITE | RENDER_GRAPH_ACCESS_CLEAR, "shadow-projected-atlas-write" );
+		R_RenderGraph_AddAccess( graph, passIndex, pointShadowAtlas, RENDER_GRAPH_ACCESS_WRITE | RENDER_GRAPH_ACCESS_CLEAR, "shadow-point-atlas-write" );
+		R_RenderGraph_AddAccess( graph, passIndex, cascadeShadowAtlas, RENDER_GRAPH_ACCESS_WRITE | RENDER_GRAPH_ACCESS_CLEAR, "shadow-cascade-atlas-write" );
+		R_RenderGraph_AddAccess( graph, passIndex, shadowDescriptors, RENDER_GRAPH_ACCESS_WRITE, "shadow-descriptor-write" );
+		if ( r_shadowMapTranslucentMoments.GetBool() ) {
+			const int translucentShadowMoments = R_RenderGraph_EnsureResource( graph, "translucentShadowMoments", RENDER_GRAPH_RESOURCE_COLOR, false, true, false, 5 );
+			R_RenderGraph_AddAccess( graph, passIndex, translucentShadowMoments, RENDER_GRAPH_ACCESS_WRITE | RENDER_GRAPH_ACCESS_CLEAR, "shadow-translucent-moment-write" );
+		}
 		break;
 	}
 	case RENDER_PASS_ARB2_INTERACTION: {

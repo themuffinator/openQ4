@@ -38,6 +38,7 @@ SELFTEST_CHECKS = [
     ["RendererModernGLDrawPlan self-test passed"],
     ["RendererModernGLSubmitPlan self-test passed"],
     ["RendererModernGLExecutor self-test passed"],
+    ["RendererShadowPlanner self-test passed"],
 ]
 
 STARTUP_CHECKS = [
@@ -319,6 +320,7 @@ def build_safe_cases(tiers: tuple[str, ...]) -> list[dict[str, Any]]:
         "+rendererModernGLDrawPlanSelfTest",
         "+rendererModernGLSubmitPlanSelfTest",
         "+rendererModernGLExecutorSelfTest",
+        "+rendererShadowPlannerSelfTest",
         "+gfxInfo",
     ]
 
@@ -409,6 +411,42 @@ def build_safe_cases(tiers: tuple[str, ...]) -> list[dict[str, Any]]:
                 ["ubo=1"],
                 ["overlay=1"],
                 ["Modern clustered lighting:"],
+                ["Selected renderer tier:"],
+                ["GL context request:"],
+            ],
+        },
+        {
+            "id": "renderer-shadow-planner-selftest",
+            "category": "selftest",
+            "description": "Modern shadow planner policy, budget, fallback, and clustered descriptor integration self-test.",
+            "args": [
+                "+set",
+                "r_rendererMetrics",
+                "2",
+                "+set",
+                "r_rendererModernExecutor",
+                "1",
+                "+set",
+                "r_rendererModernVisibleDepth",
+                "1",
+                "+set",
+                "r_useShadowMap",
+                "1",
+                "+set",
+                "r_shadowMapCSM",
+                "1",
+                "+rendererVisiblePathSelfTest",
+                "+rendererShadowPlannerSelfTest",
+                "+gfxInfo",
+            ],
+            "checks": [
+                ["RendererVisiblePath self-test passed"],
+                ["RendererShadowPlanner self-test passed"],
+                ["shadowMap=1"],
+                ["mapped="],
+                ["fallback="],
+                ["skipped="],
+                ["Modern shadow plan:"],
                 ["Selected renderer tier:"],
                 ["GL context request:"],
             ],

@@ -5,6 +5,7 @@
 #include "RenderGraphResources.h"
 #include "GLDebugScope.h"
 #include "GLStateCache.h"
+#include "RendererBenchmarks.h"
 
 typedef struct renderGraphPhysicalAllocation_s {
 	bool					valid;
@@ -123,10 +124,36 @@ static bool R_RenderGraphResources_IsTextureResource( renderGraphResourceType_t 
 		|| type == RENDER_GRAPH_RESOURCE_DEPTH_STENCIL;
 }
 
+static bool R_RenderGraphResources_IsShadowAtlasResource( const char *name ) {
+	return name != NULL
+		&& ( !idStr::Icmp( name, "shadowMap" )
+			|| !idStr::Icmp( name, "projectedShadowAtlas" )
+			|| !idStr::Icmp( name, "pointShadowAtlas" )
+			|| !idStr::Icmp( name, "cascadeShadowAtlas" )
+			|| !idStr::Icmp( name, "translucentShadowMoments" ) );
+}
+
+static int R_RenderGraphResources_ShadowResourceSize( void ) {
+	const rendererBenchmarkBudget_t &budget = RendererBenchmarks_CurrentBudget();
+	int size = idMath::ClampInt( 128, 4096, r_shadowMapSize.GetInteger() );
+	size = Min( size, idMath::ClampInt( 128, 4096, budget.shadowMapSize ) );
+	if ( rg_renderGraphResourceCaps.maxTextureSize > 0 ) {
+		size = Min( size, rg_renderGraphResourceCaps.maxTextureSize );
+	}
+	return Max( 1, size );
+}
+
 static bool R_RenderGraphResources_FormatForType( const char *name, renderGraphResourceType_t type, GLenum &internalFormat, GLenum &format, GLenum &dataType, GLenum &attachment ) {
 	switch ( type ) {
 	case RENDER_GRAPH_RESOURCE_COLOR:
 		if ( name != NULL && ( !idStr::Icmp( name, "gbufferEmissive" ) || !idStr::Icmp( name, "deferredLight" ) ) && ( rg_renderGraphResourceFeatures.modernGL41 || rg_renderGraphResourceFeatures.gpuDriven || rg_renderGraphResourceFeatures.lowOverhead ) ) {
+			internalFormat = GL_RGBA16F;
+			format = GL_RGBA;
+			dataType = GL_HALF_FLOAT;
+			attachment = GL_COLOR_ATTACHMENT0;
+			return true;
+		}
+		if ( name != NULL && !idStr::Icmp( name, "translucentShadowMoments" ) && ( rg_renderGraphResourceFeatures.modernGL41 || rg_renderGraphResourceFeatures.gpuDriven || rg_renderGraphResourceFeatures.lowOverhead ) ) {
 			internalFormat = GL_RGBA16F;
 			format = GL_RGBA;
 			dataType = GL_HALF_FLOAT;
@@ -195,11 +222,17 @@ static bool R_RenderGraphResources_CanUseLowOverheadObjects( void ) {
 }
 
 static int R_RenderGraphResources_FrameWidth( const renderGraphResource_t &resource ) {
+	if ( R_RenderGraphResources_IsShadowAtlasResource( resource.name ) ) {
+		return R_RenderGraphResources_ShadowResourceSize();
+	}
 	const int scale = Max( 1, resource.widthScale );
 	return Max( 1, glConfig.vidWidth / scale );
 }
 
 static int R_RenderGraphResources_FrameHeight( const renderGraphResource_t &resource ) {
+	if ( R_RenderGraphResources_IsShadowAtlasResource( resource.name ) ) {
+		return R_RenderGraphResources_ShadowResourceSize();
+	}
 	const int scale = Max( 1, resource.heightScale );
 	return Max( 1, glConfig.vidHeight / scale );
 }
