@@ -276,6 +276,7 @@ idCVar r_rendererUploadMegs( "r_rendererUploadMegs", "16", CVAR_RENDERER | CVAR_
 idCVar r_rendererUploadPersistent( "r_rendererUploadPersistent", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "allow persistent-mapped dynamic renderer uploads when supported" );
 idCVar r_rendererModernExecutor( "r_rendererModernExecutor", "0", CVAR_RENDERER | CVAR_BOOL, "prepare the opt-in modern GL executor frame contract while legacy ARB2 still executes" );
 idCVar r_rendererModernSubmit( "r_rendererModernSubmit", "0", CVAR_RENDERER | CVAR_BOOL, "execute opt-in modern GL draw submission before legacy ARB2 fallback; diagnostic until visible pass replacement lands" );
+idCVar r_rendererModernVisible( "r_rendererModernVisible", "0", CVAR_RENDERER | CVAR_BOOL, "execute the opt-in modern hybrid visible-frame composition when all required pass owners are modern-safe" );
 idCVar r_rendererShaderReload( "r_rendererShaderReload", "0", CVAR_RENDERER | CVAR_BOOL, "allow runtime reload of the internal modern GL shader library" );
 idCVar r_rendererModernVisibleDepth( "r_rendererModernVisibleDepth", "0", CVAR_RENDERER | CVAR_BOOL, "execute graph-backed modern depth and compatible shadow-depth passes while ARB2 remains the visible color path" );
 idCVar r_rendererModernDepthDebug( "r_rendererModernDepthDebug", "0", CVAR_RENDERER | CVAR_INTEGER, "modern depth debug overlay: 0 = off, 1 = scene depth, 2 = shadow-map depth", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
@@ -602,6 +603,13 @@ static void R_RendererForwardPlusSelfTest_f( const idCmdArgs &args ) {
 	(void)args;
 	if ( !RendererForwardPlus_RunSelfTest() ) {
 		common->Warning( "Renderer clustered forward+ self-test failed" );
+	}
+}
+
+static void R_RendererModernVisibleSelfTest_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !RendererModernVisible_RunSelfTest() ) {
+		common->Warning( "Renderer modern visible-frame self-test failed" );
 	}
 }
 
@@ -2917,6 +2925,7 @@ void R_InitCommands( void ) {
 	cmdSystem->AddCommand( "rendererClusterGridSelfTest", R_RendererClusterGridSelfTest_f, CMD_FL_RENDERER, "run renderer clustered light-grid self tests" );
 	cmdSystem->AddCommand( "rendererDeferredResolveSelfTest", R_RendererDeferredResolveSelfTest_f, CMD_FL_RENDERER, "run renderer deferred light resolve self tests" );
 	cmdSystem->AddCommand( "rendererForwardPlusSelfTest", R_RendererForwardPlusSelfTest_f, CMD_FL_RENDERER, "run renderer clustered forward+ self tests" );
+	cmdSystem->AddCommand( "rendererModernVisibleSelfTest", R_RendererModernVisibleSelfTest_f, CMD_FL_RENDERER, "run renderer modern visible-frame composition self tests" );
 	cmdSystem->AddCommand( "rendererShaderLibrarySelfTest", R_RendererModernGLShaderLibrarySelfTest_f, CMD_FL_RENDERER, "run renderer modern GL shader-library self tests" );
 	cmdSystem->AddCommand( "rendererModernGLShaderLibrarySelfTest", R_RendererModernGLShaderLibrarySelfTest_f, CMD_FL_RENDERER, "run renderer modern GL shader-library self tests" );
 	cmdSystem->AddCommand( "rendererShaderLibraryReload", R_RendererShaderLibraryReload_f, CMD_FL_RENDERER, "reload the internal modern GL shader library when r_rendererShaderReload is enabled" );

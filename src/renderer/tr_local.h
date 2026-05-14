@@ -1065,6 +1065,7 @@ extern idCVar r_rendererUploadMegs;		// dynamic upload stream size in megabytes 
 extern idCVar r_rendererUploadPersistent;	// allow persistent-mapped dynamic upload stream
 extern idCVar r_rendererModernExecutor;	// opt-in modern GL executor prepare path
 extern idCVar r_rendererModernSubmit;	// opt-in modern GL draw submission before ARB2 fallback
+extern idCVar r_rendererModernVisible;	// opt-in modern hybrid visible-frame composition
 extern idCVar r_rendererShaderReload;	// allow runtime reload of the internal modern GL shader library
 extern idCVar r_rendererModernVisibleDepth;	// opt-in graph-backed modern depth/shadow-depth execution
 extern idCVar r_rendererModernDepthDebug;	// show graph-backed modern depth resources as a debug overlay

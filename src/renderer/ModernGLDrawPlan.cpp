@@ -102,7 +102,8 @@ static bool R_ModernGLDrawPlan_IsMaterialPipeline( modernGLDrawPlanPipeline_t pi
 }
 
 static bool R_ModernGLDrawPlan_ShouldUseGBuffer( const materialResourceTableRecord_t &materialRecord ) {
-	if ( !r_rendererModernOpaque.GetBool()
+	if ( !r_rendererModernVisible.GetBool()
+		&& !r_rendererModernOpaque.GetBool()
 		&& r_rendererModernGBufferDebug.GetInteger() <= 0
 		&& !r_rendererModernDeferred.GetBool()
 		&& r_rendererModernDeferredDebug.GetInteger() <= 0 ) {
@@ -114,7 +115,7 @@ static bool R_ModernGLDrawPlan_ShouldUseGBuffer( const materialResourceTableReco
 }
 
 static bool R_ModernGLDrawPlan_ShouldUseForwardPlus( renderPassCategory_t passCategory, const materialResourceTableRecord_t &materialRecord, modernGLDrawPlanPipeline_t &pipeline, modernGLShaderProgramKind_t &shaderKind ) {
-	if ( !r_rendererForwardPlus.GetBool() ) {
+	if ( !r_rendererModernVisible.GetBool() && !r_rendererForwardPlus.GetBool() ) {
 		return false;
 	}
 	if ( materialRecord.materialClass == RENDER_MATERIAL_GUI

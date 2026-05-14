@@ -195,6 +195,27 @@ typedef struct rendererMetricsFrame_s {
 	int		modernForwardProjectedLights;
 	int		modernForwardLightGridContributions;
 	int		modernForwardClearOps;
+	bool	modernVisibleRequested;
+	bool	modernVisibleExecuted;
+	bool	modernVisibleResourcesReady;
+	bool	modernVisibleProgramReady;
+	bool	modernVisibleSourceReady;
+	bool	modernVisibleBackBufferReady;
+	bool	modernVisibleBlockedByLegacy;
+	int		modernVisibleCompositions;
+	int		modernVisiblePixels;
+	int		modernVisibleModernPasses;
+	int		modernVisibleLegacyPasses;
+	int		modernVisibleDisabledPasses;
+	int		modernVisibleFallbackPasses;
+	int		modernVisibleOwnerFallbacks;
+	int		modernVisibleResourceFallbacks;
+	int		modernVisibleGuiLegacyPasses;
+	int		modernVisiblePostLegacyPasses;
+	int		modernVisibleSpecialLegacyPasses;
+	int		modernVisibleSubviewLegacyPasses;
+	int		modernVisiblePresentPasses;
+	int		modernVisibleClearOps;
 	rendererClusteredLightingStats_t clusteredLighting;
 	glStateCacheStats_t glStateCache;
 	bool	gpuTimersValid;
@@ -401,6 +422,30 @@ typedef struct rendererForwardPlusLatest_s {
 	int		clearOps;
 } rendererForwardPlusLatest_t;
 
+typedef struct rendererModernVisibleLatest_s {
+	bool	requested;
+	bool	executed;
+	bool	resourcesReady;
+	bool	programReady;
+	bool	sourceReady;
+	bool	backBufferReady;
+	bool	blockedByLegacy;
+	int		compositions;
+	int		pixels;
+	int		modernPasses;
+	int		legacyPasses;
+	int		disabledPasses;
+	int		fallbackPasses;
+	int		ownerFallbacks;
+	int		resourceFallbacks;
+	int		guiLegacyPasses;
+	int		postLegacyPasses;
+	int		specialLegacyPasses;
+	int		subviewLegacyPasses;
+	int		presentPasses;
+	int		clearOps;
+} rendererModernVisibleLatest_t;
+
 typedef struct rendererGLStateCacheLatest_s {
 	glStateCacheStats_t stats;
 } rendererGLStateCacheLatest_t;
@@ -416,6 +461,7 @@ static materialResourceTableStats_t rg_materialResourceTableLatest;
 static rendererModernExecutorLatest_t rg_modernExecutorLatest;
 static rendererDeferredResolveLatest_t rg_deferredResolveLatest;
 static rendererForwardPlusLatest_t rg_forwardPlusLatest;
+static rendererModernVisibleLatest_t rg_modernVisibleLatest;
 static rendererClusteredLightingStats_t rg_clusteredLightingLatest;
 static rendererGLStateCacheLatest_t rg_glStateCacheLatest;
 static int rg_gpuTimerFrameCursor = 0;
@@ -444,6 +490,8 @@ static const char *R_RendererMetrics_GpuTimerSlotName( rendererGpuTimerSlot_t sl
 		return "modernDeferred";
 	case RENDERER_GPU_TIMER_MODERN_FORWARD:
 		return "modernForward";
+	case RENDERER_GPU_TIMER_MODERN_COMPOSITE:
+		return "modernComposite";
 	default:
 		return "unknown";
 	}
@@ -729,6 +777,27 @@ void R_RendererMetrics_BeginFrame( int frameCount ) {
 	rg_rendererMetrics.modernForwardProjectedLights = rg_forwardPlusLatest.projectedLights;
 	rg_rendererMetrics.modernForwardLightGridContributions = rg_forwardPlusLatest.lightGridContributions;
 	rg_rendererMetrics.modernForwardClearOps = rg_forwardPlusLatest.clearOps;
+	rg_rendererMetrics.modernVisibleRequested = rg_modernVisibleLatest.requested;
+	rg_rendererMetrics.modernVisibleExecuted = rg_modernVisibleLatest.executed;
+	rg_rendererMetrics.modernVisibleResourcesReady = rg_modernVisibleLatest.resourcesReady;
+	rg_rendererMetrics.modernVisibleProgramReady = rg_modernVisibleLatest.programReady;
+	rg_rendererMetrics.modernVisibleSourceReady = rg_modernVisibleLatest.sourceReady;
+	rg_rendererMetrics.modernVisibleBackBufferReady = rg_modernVisibleLatest.backBufferReady;
+	rg_rendererMetrics.modernVisibleBlockedByLegacy = rg_modernVisibleLatest.blockedByLegacy;
+	rg_rendererMetrics.modernVisibleCompositions = rg_modernVisibleLatest.compositions;
+	rg_rendererMetrics.modernVisiblePixels = rg_modernVisibleLatest.pixels;
+	rg_rendererMetrics.modernVisibleModernPasses = rg_modernVisibleLatest.modernPasses;
+	rg_rendererMetrics.modernVisibleLegacyPasses = rg_modernVisibleLatest.legacyPasses;
+	rg_rendererMetrics.modernVisibleDisabledPasses = rg_modernVisibleLatest.disabledPasses;
+	rg_rendererMetrics.modernVisibleFallbackPasses = rg_modernVisibleLatest.fallbackPasses;
+	rg_rendererMetrics.modernVisibleOwnerFallbacks = rg_modernVisibleLatest.ownerFallbacks;
+	rg_rendererMetrics.modernVisibleResourceFallbacks = rg_modernVisibleLatest.resourceFallbacks;
+	rg_rendererMetrics.modernVisibleGuiLegacyPasses = rg_modernVisibleLatest.guiLegacyPasses;
+	rg_rendererMetrics.modernVisiblePostLegacyPasses = rg_modernVisibleLatest.postLegacyPasses;
+	rg_rendererMetrics.modernVisibleSpecialLegacyPasses = rg_modernVisibleLatest.specialLegacyPasses;
+	rg_rendererMetrics.modernVisibleSubviewLegacyPasses = rg_modernVisibleLatest.subviewLegacyPasses;
+	rg_rendererMetrics.modernVisiblePresentPasses = rg_modernVisibleLatest.presentPasses;
+	rg_rendererMetrics.modernVisibleClearOps = rg_modernVisibleLatest.clearOps;
 	rg_rendererMetrics.clusteredLighting = rg_clusteredLightingLatest;
 	rg_rendererMetrics.glStateCache = rg_glStateCacheLatest.stats;
 }
@@ -984,6 +1053,51 @@ void R_RendererMetrics_RecordForwardPlus( bool requested, bool executed, bool re
 	rg_rendererMetrics.modernForwardProjectedLights = projectedLights;
 	rg_rendererMetrics.modernForwardLightGridContributions = lightGridContributions;
 	rg_rendererMetrics.modernForwardClearOps = clearOps;
+}
+
+void R_RendererMetrics_RecordModernVisible( bool requested, bool executed, bool resourcesReady, bool programReady, bool sourceReady, bool backBufferReady, bool blockedByLegacy, int compositions, int pixels, int modernPasses, int legacyPasses, int disabledPasses, int fallbackPasses, int ownerFallbacks, int resourceFallbacks, int guiLegacyPasses, int postLegacyPasses, int specialLegacyPasses, int subviewLegacyPasses, int presentPasses, int clearOps ) {
+	rg_modernVisibleLatest.requested = requested;
+	rg_modernVisibleLatest.executed = executed;
+	rg_modernVisibleLatest.resourcesReady = resourcesReady;
+	rg_modernVisibleLatest.programReady = programReady;
+	rg_modernVisibleLatest.sourceReady = sourceReady;
+	rg_modernVisibleLatest.backBufferReady = backBufferReady;
+	rg_modernVisibleLatest.blockedByLegacy = blockedByLegacy;
+	rg_modernVisibleLatest.compositions = compositions;
+	rg_modernVisibleLatest.pixels = pixels;
+	rg_modernVisibleLatest.modernPasses = modernPasses;
+	rg_modernVisibleLatest.legacyPasses = legacyPasses;
+	rg_modernVisibleLatest.disabledPasses = disabledPasses;
+	rg_modernVisibleLatest.fallbackPasses = fallbackPasses;
+	rg_modernVisibleLatest.ownerFallbacks = ownerFallbacks;
+	rg_modernVisibleLatest.resourceFallbacks = resourceFallbacks;
+	rg_modernVisibleLatest.guiLegacyPasses = guiLegacyPasses;
+	rg_modernVisibleLatest.postLegacyPasses = postLegacyPasses;
+	rg_modernVisibleLatest.specialLegacyPasses = specialLegacyPasses;
+	rg_modernVisibleLatest.subviewLegacyPasses = subviewLegacyPasses;
+	rg_modernVisibleLatest.presentPasses = presentPasses;
+	rg_modernVisibleLatest.clearOps = clearOps;
+	rg_rendererMetrics.modernVisibleRequested = requested;
+	rg_rendererMetrics.modernVisibleExecuted = executed;
+	rg_rendererMetrics.modernVisibleResourcesReady = resourcesReady;
+	rg_rendererMetrics.modernVisibleProgramReady = programReady;
+	rg_rendererMetrics.modernVisibleSourceReady = sourceReady;
+	rg_rendererMetrics.modernVisibleBackBufferReady = backBufferReady;
+	rg_rendererMetrics.modernVisibleBlockedByLegacy = blockedByLegacy;
+	rg_rendererMetrics.modernVisibleCompositions = compositions;
+	rg_rendererMetrics.modernVisiblePixels = pixels;
+	rg_rendererMetrics.modernVisibleModernPasses = modernPasses;
+	rg_rendererMetrics.modernVisibleLegacyPasses = legacyPasses;
+	rg_rendererMetrics.modernVisibleDisabledPasses = disabledPasses;
+	rg_rendererMetrics.modernVisibleFallbackPasses = fallbackPasses;
+	rg_rendererMetrics.modernVisibleOwnerFallbacks = ownerFallbacks;
+	rg_rendererMetrics.modernVisibleResourceFallbacks = resourceFallbacks;
+	rg_rendererMetrics.modernVisibleGuiLegacyPasses = guiLegacyPasses;
+	rg_rendererMetrics.modernVisiblePostLegacyPasses = postLegacyPasses;
+	rg_rendererMetrics.modernVisibleSpecialLegacyPasses = specialLegacyPasses;
+	rg_rendererMetrics.modernVisibleSubviewLegacyPasses = subviewLegacyPasses;
+	rg_rendererMetrics.modernVisiblePresentPasses = presentPasses;
+	rg_rendererMetrics.modernVisibleClearOps = clearOps;
 }
 
 void R_RendererMetrics_RecordGLStateCache( const glStateCacheStats_t &stats ) {
@@ -1331,6 +1445,31 @@ void R_RendererMetrics_EndFrame( int frontEndMsec, int backEndMsec, int viewCoun
 			rg_rendererMetrics.modernForwardClearOps,
 			rg_rendererMetrics.gpuTimerMsec[RENDERER_GPU_TIMER_MODERN_FORWARD],
 			rg_rendererMetrics.gpuTimerSamples[RENDERER_GPU_TIMER_MODERN_FORWARD] );
+		common->Printf(
+			"rendererMetrics modernVisible(req=%d exec=%d res=%d program=%d source=%d backBuffer=%d blocked=%d composed=%d pixels=%d modern=%d legacy=%d disabled=%d fallback=%d ownerFallback=%d resourceFallback=%d gui=%d post=%d special=%d subview=%d present=%d clear=%d gpu=%d/%d)\n",
+			rg_rendererMetrics.modernVisibleRequested ? 1 : 0,
+			rg_rendererMetrics.modernVisibleExecuted ? 1 : 0,
+			rg_rendererMetrics.modernVisibleResourcesReady ? 1 : 0,
+			rg_rendererMetrics.modernVisibleProgramReady ? 1 : 0,
+			rg_rendererMetrics.modernVisibleSourceReady ? 1 : 0,
+			rg_rendererMetrics.modernVisibleBackBufferReady ? 1 : 0,
+			rg_rendererMetrics.modernVisibleBlockedByLegacy ? 1 : 0,
+			rg_rendererMetrics.modernVisibleCompositions,
+			rg_rendererMetrics.modernVisiblePixels,
+			rg_rendererMetrics.modernVisibleModernPasses,
+			rg_rendererMetrics.modernVisibleLegacyPasses,
+			rg_rendererMetrics.modernVisibleDisabledPasses,
+			rg_rendererMetrics.modernVisibleFallbackPasses,
+			rg_rendererMetrics.modernVisibleOwnerFallbacks,
+			rg_rendererMetrics.modernVisibleResourceFallbacks,
+			rg_rendererMetrics.modernVisibleGuiLegacyPasses,
+			rg_rendererMetrics.modernVisiblePostLegacyPasses,
+			rg_rendererMetrics.modernVisibleSpecialLegacyPasses,
+			rg_rendererMetrics.modernVisibleSubviewLegacyPasses,
+			rg_rendererMetrics.modernVisiblePresentPasses,
+			rg_rendererMetrics.modernVisibleClearOps,
+			rg_rendererMetrics.gpuTimerMsec[RENDERER_GPU_TIMER_MODERN_COMPOSITE],
+			rg_rendererMetrics.gpuTimerSamples[RENDERER_GPU_TIMER_MODERN_COMPOSITE] );
 		return;
 	}
 

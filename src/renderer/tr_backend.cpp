@@ -786,6 +786,7 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 			c_setBuffers++;
 			break;
 		case RC_SWAP_BUFFERS:
+			R_ModernGLExecutor_ComposeVisibleFrame();
 			R_ModernGLExecutor_DrawDepthDebugOverlay();
 			R_ModernGLExecutor_DrawGBufferDebugOverlay();
 			R_ModernGLExecutor_DrawDeferredDebugOverlay();

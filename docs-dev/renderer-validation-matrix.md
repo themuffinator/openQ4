@@ -39,6 +39,7 @@ Automated coverage:
 | `renderer-cluster-grid-selftest` | opt-in modern clustered-light preparation coverage for point/projected/fog/ambient/special light classification, 8x6x16 grid slicing, cluster reference packing, overflow accounting, GL 3.3 UBO fallback readiness, cluster debug-overlay texture generation, and `gfxInfo` reporting |
 | `renderer-deferred-resolve-selftest` | opt-in `r_rendererModernDeferred` coverage for graph-backed deferred resolve output, G-buffer/depth/cluster UBO inputs, point/projected light accumulation, light-grid contribution, fallback accounting, deferred debug-overlay readiness, GPU timer coverage, and `gfxInfo` reporting |
 | `renderer-forward-plus-selftest` | opt-in `r_rendererForwardPlus` coverage for graph-backed scene-color/depth resources, clustered opaque/alpha-test/transparent programs, clustered-light UBO reads, transparent sort preservation, fallback accounting, overdraw estimates, GPU timer coverage, and `gfxInfo` reporting |
+| `renderer-modern-visible-selftest` | opt-in `r_rendererModernVisible` coverage for the guarded hybrid visible-frame bridge: graph-backed depth, G-buffer, deferred resolve, forward+ source output, pass-owner/fallback accounting, back-buffer composition, GPU timer coverage, and `gfxInfo` reporting |
 | `tier-auto` | default compatibility-preserving startup and `gfxInfo` |
 | `tier-legacy` | forced legacy compatibility startup and `gfxInfo` |
 | `tier-gl33` | forced GL 3.3 startup and `gfxInfo` |
@@ -53,7 +54,7 @@ Automated coverage:
 
 The forced tier cases pass when startup succeeds and the selected tier is reported. If a machine cannot support the forced tier, the log must show the selected fallback tier.
 
-The visible-depth, G-buffer, clustered-light, deferred-resolve, and forward+ self-tests intentionally run as their own safe cases instead of being appended to the foundation self-test startup command, because the engine command parser has a fixed startup command list budget.
+The visible-depth, G-buffer, clustered-light, deferred-resolve, forward+, and modern-visible self-tests intentionally run as their own safe cases instead of being appended to the foundation self-test startup command, because the engine command parser has a fixed startup command list budget.
 
 ## Manual Gameplay Matrix
 

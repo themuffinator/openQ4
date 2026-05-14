@@ -41,6 +41,7 @@ const int MODERN_GL_DEFERRED_TEXTURE_COUNT = 5;
 const int MODERN_GL_CLUSTER_UBO_BINDING_PARAMS = 3;
 const int MODERN_GL_CLUSTER_UBO_BINDING_LIGHTS = 4;
 const int MODERN_GL_CLUSTER_UBO_BINDING_INDICES = 5;
+const int MODERN_GL_VISIBLE_COMPOSITE_TEXTURE_COUNT = 2;
 
 static const char *rg_modernGLGBufferAttachmentNames[MODERN_GL_GBUFFER_ATTACHMENT_COUNT] = {
 	"gbufferAlbedo",
@@ -79,6 +80,7 @@ static GLuint rg_modernGLExecutorDepthOverlayProgram = 0;
 static GLuint rg_modernGLExecutorGBufferFBO = 0;
 static GLuint rg_modernGLExecutorGBufferOverlayProgram = 0;
 static GLuint rg_modernGLExecutorDeferredOverlayProgram = 0;
+static GLuint rg_modernGLExecutorVisibleCompositeProgram = 0;
 static GLint rg_modernGLExecutorComputeRecordCountLocation = -1;
 static GLint rg_modernGLExecutorDepthOverlayTextureLocation = -1;
 static GLint rg_modernGLExecutorDepthOverlayParamsLocation = -1;
@@ -86,6 +88,9 @@ static GLint rg_modernGLExecutorGBufferOverlayTextureLocation = -1;
 static GLint rg_modernGLExecutorGBufferOverlayParamsLocation = -1;
 static GLint rg_modernGLExecutorDeferredOverlayTextureLocation = -1;
 static GLint rg_modernGLExecutorDeferredOverlayParamsLocation = -1;
+static GLint rg_modernGLExecutorVisibleCompositeDeferredLocation = -1;
+static GLint rg_modernGLExecutorVisibleCompositeForwardLocation = -1;
+static GLint rg_modernGLExecutorVisibleCompositeParamsLocation = -1;
 static bool rg_modernGLExecutorInitialized = false;
 static bool rg_modernGLExecutorAvailable = false;
 static bool rg_modernGLExecutorGpuDrivenReady = false;
@@ -517,6 +522,77 @@ static GLuint R_ModernGLExecutor_CompileDeferredOverlayProgram( void ) {
 	return program;
 }
 
+static GLuint R_ModernGLExecutor_CompileVisibleCompositeProgram( void ) {
+	static const char *vertexSource =
+		"#version 330\n"
+		"out vec2 vTexCoord;\n"
+		"void main() {\n"
+		"	vec2 positions[4] = vec2[]( vec2(-1.0, 1.0), vec2(1.0, 1.0), vec2(-1.0, -1.0), vec2(1.0, -1.0) );\n"
+		"	vec2 texcoords[4] = vec2[]( vec2(0.0, 1.0), vec2(1.0, 1.0), vec2(0.0, 0.0), vec2(1.0, 0.0) );\n"
+		"	vTexCoord = texcoords[gl_VertexID];\n"
+		"	gl_Position = vec4( positions[gl_VertexID], 0.0, 1.0 );\n"
+		"}\n";
+	static const char *fragmentSource =
+		"#version 330\n"
+		"in vec2 vTexCoord;\n"
+		"layout(location = 0) out vec4 out_Color;\n"
+		"uniform sampler2D uDeferredTexture;\n"
+		"uniform sampler2D uForwardTexture;\n"
+		"uniform vec4 uParams;\n"
+		"void main() {\n"
+		"	vec4 deferredValue = texture( uDeferredTexture, vTexCoord ) * uParams.x;\n"
+		"	vec4 forwardValue = texture( uForwardTexture, vTexCoord ) * uParams.y;\n"
+		"	vec3 color = clamp( deferredValue.rgb + forwardValue.rgb, vec3(0.0), vec3(1.0) );\n"
+		"	out_Color = vec4( color, 1.0 );\n"
+		"}\n";
+
+	if ( glCreateShader == NULL || glShaderSource == NULL || glCompileShader == NULL || glCreateProgram == NULL || glAttachShader == NULL || glLinkProgram == NULL || glGetProgramiv == NULL ) {
+		return 0;
+	}
+
+	GLuint vertexShader = R_ModernGLExecutor_CompileShaderStage( GL_VERTEX_SHADER, vertexSource, "modern visible composite vertex" );
+	if ( vertexShader == 0 ) {
+		return 0;
+	}
+	GLuint fragmentShader = R_ModernGLExecutor_CompileShaderStage( GL_FRAGMENT_SHADER, fragmentSource, "modern visible composite fragment" );
+	if ( fragmentShader == 0 ) {
+		glDeleteShader( vertexShader );
+		return 0;
+	}
+
+	GLuint program = glCreateProgram();
+	if ( program == 0 ) {
+		glDeleteShader( vertexShader );
+		glDeleteShader( fragmentShader );
+		return 0;
+	}
+	glAttachShader( program, vertexShader );
+	glAttachShader( program, fragmentShader );
+	glLinkProgram( program );
+	glDetachShader( program, vertexShader );
+	glDetachShader( program, fragmentShader );
+	glDeleteShader( vertexShader );
+	glDeleteShader( fragmentShader );
+
+	GLint linked = GL_FALSE;
+	glGetProgramiv( program, GL_LINK_STATUS, &linked );
+	if ( linked != GL_TRUE ) {
+		char log[2048];
+		memset( log, 0, sizeof( log ) );
+		if ( glGetProgramInfoLog != NULL ) {
+			glGetProgramInfoLog( program, sizeof( log ) - 1, NULL, log );
+		}
+		common->Printf( "Modern GL executor: visible composite program link failed: %s\n", log );
+		glDeleteProgram( program );
+		return 0;
+	}
+
+	rg_modernGLExecutorVisibleCompositeDeferredLocation = glGetUniformLocation != NULL ? glGetUniformLocation( program, "uDeferredTexture" ) : -1;
+	rg_modernGLExecutorVisibleCompositeForwardLocation = glGetUniformLocation != NULL ? glGetUniformLocation( program, "uForwardTexture" ) : -1;
+	rg_modernGLExecutorVisibleCompositeParamsLocation = glGetUniformLocation != NULL ? glGetUniformLocation( program, "uParams" ) : -1;
+	return program;
+}
+
 static void R_ModernGLExecutor_DestroyGpuDrivenObjects( void ) {
 	if ( rg_modernGLExecutorComputeProgram != 0 && glDeleteProgram != NULL ) {
 		glDeleteProgram( rg_modernGLExecutorComputeProgram );
@@ -529,6 +605,9 @@ static void R_ModernGLExecutor_DestroyGpuDrivenObjects( void ) {
 	}
 	if ( rg_modernGLExecutorDeferredOverlayProgram != 0 && glDeleteProgram != NULL ) {
 		glDeleteProgram( rg_modernGLExecutorDeferredOverlayProgram );
+	}
+	if ( rg_modernGLExecutorVisibleCompositeProgram != 0 && glDeleteProgram != NULL ) {
+		glDeleteProgram( rg_modernGLExecutorVisibleCompositeProgram );
 	}
 	GLuint buffers[3];
 	int numBuffers = 0;
@@ -551,6 +630,7 @@ static void R_ModernGLExecutor_DestroyGpuDrivenObjects( void ) {
 	rg_modernGLExecutorDepthOverlayProgram = 0;
 	rg_modernGLExecutorGBufferOverlayProgram = 0;
 	rg_modernGLExecutorDeferredOverlayProgram = 0;
+	rg_modernGLExecutorVisibleCompositeProgram = 0;
 	rg_modernGLExecutorComputeRecordCountLocation = -1;
 	rg_modernGLExecutorDepthOverlayTextureLocation = -1;
 	rg_modernGLExecutorDepthOverlayParamsLocation = -1;
@@ -558,6 +638,9 @@ static void R_ModernGLExecutor_DestroyGpuDrivenObjects( void ) {
 	rg_modernGLExecutorGBufferOverlayParamsLocation = -1;
 	rg_modernGLExecutorDeferredOverlayTextureLocation = -1;
 	rg_modernGLExecutorDeferredOverlayParamsLocation = -1;
+	rg_modernGLExecutorVisibleCompositeDeferredLocation = -1;
+	rg_modernGLExecutorVisibleCompositeForwardLocation = -1;
+	rg_modernGLExecutorVisibleCompositeParamsLocation = -1;
 	rg_modernGLExecutorGpuDrivenReady = false;
 }
 
@@ -611,21 +694,84 @@ static void R_ModernGLExecutor_ResetStats( modernGLExecutorStats_t &stats, bool 
 	stats.indirectBufferReady = rg_modernGLExecutorIndirectBuffer != 0;
 	stats.validationSSBOReady = rg_modernGLExecutorValidationSSBO != 0;
 	stats.computeValidationReady = rg_modernGLExecutorComputeProgram != 0;
-	stats.visibleDepthRequested = r_rendererModernVisibleDepth.GetBool() || r_rendererModernDepthDebug.GetInteger() > 0;
+	stats.modernVisibleRequested = r_rendererModernVisible.GetBool();
+	stats.modernVisibleProgramReady = rg_modernGLExecutorVisibleCompositeProgram != 0;
+	stats.visibleDepthRequested = stats.modernVisibleRequested || r_rendererModernVisibleDepth.GetBool() || r_rendererModernDepthDebug.GetInteger() > 0;
 	stats.visibleDepthDebugOverlayReady = rg_modernGLExecutorDepthOverlayProgram != 0;
-	stats.opaqueGBufferRequested = r_rendererModernOpaque.GetBool() || r_rendererModernGBufferDebug.GetInteger() > 0 || r_rendererModernDeferred.GetBool() || r_rendererModernDeferredDebug.GetInteger() > 0;
+	stats.opaqueGBufferRequested = stats.modernVisibleRequested || r_rendererModernOpaque.GetBool() || r_rendererModernGBufferDebug.GetInteger() > 0 || r_rendererModernDeferred.GetBool() || r_rendererModernDeferredDebug.GetInteger() > 0;
 	stats.opaqueGBufferDebugOverlayReady = rg_modernGLExecutorGBufferOverlayProgram != 0;
 	stats.opaqueGBufferMRTReady = rg_modernGLExecutorGBufferFBO != 0 && rg_modernGLExecutorCaps.hasMRT && rg_modernGLExecutorCaps.maxDrawBuffers >= MODERN_GL_GBUFFER_ATTACHMENT_COUNT && glDrawBuffers != NULL;
-	stats.deferredResolveRequested = r_rendererModernDeferred.GetBool() || r_rendererModernDeferredDebug.GetInteger() > 0;
+	stats.deferredResolveRequested = stats.modernVisibleRequested || r_rendererModernDeferred.GetBool() || r_rendererModernDeferredDebug.GetInteger() > 0;
 	stats.deferredResolveDebugOverlayReady = rg_modernGLExecutorDeferredOverlayProgram != 0;
 	stats.deferredResolveDebugMode = r_rendererModernDeferredDebug.GetInteger();
-	stats.forwardPlusRequested = r_rendererForwardPlus.GetBool();
+	stats.forwardPlusRequested = stats.modernVisibleRequested || r_rendererForwardPlus.GetBool();
 	stats.tierUsesDSA = rg_modernGLExecutorLowOverheadReady && rg_modernGLExecutorFeatures.directStateAccess;
 	stats.tierUsesMultiBind = rg_modernGLExecutorLowOverheadReady && rg_modernGLExecutorFeatures.multiBind;
 	stats.shaderProgramCount = shaderStats.programCount;
 	stats.shaderFailureCount = shaderStats.failedProgramCount;
 	stats.highestGLSLVersion = shaderStats.highestGLSLVersion;
 	R_ModernGLExecutor_SetStatus( stats, enabled ? "unavailable" : "off" );
+}
+
+static void R_ModernGLExecutor_CountModernVisibleOwner( const renderGraphPass_t &pass, modernGLExecutorStats_t &stats ) {
+	if ( !stats.modernVisibleRequested ) {
+		return;
+	}
+	if ( !pass.enabled ) {
+		stats.modernVisibleDisabledPasses++;
+		return;
+	}
+
+	bool modernOwned = false;
+	switch ( pass.category ) {
+	case RENDER_PASS_DEPTH:
+	case RENDER_PASS_SHADOW_MAP:
+		modernOwned = stats.visibleDepthRequested;
+		break;
+	case RENDER_PASS_AMBIENT:
+		modernOwned = stats.opaqueGBufferRequested || stats.deferredResolveRequested;
+		break;
+	case RENDER_PASS_DEFERRED_RESOLVE:
+		modernOwned = stats.deferredResolveRequested;
+		break;
+	case RENDER_PASS_ARB2_INTERACTION:
+	case RENDER_PASS_FOG_BLEND:
+	case RENDER_PASS_FORWARD_PLUS:
+		modernOwned = stats.forwardPlusRequested;
+		break;
+	case RENDER_PASS_PRESENT:
+		modernOwned = true;
+		stats.modernVisiblePresentPasses++;
+		break;
+	default:
+		modernOwned = false;
+		break;
+	}
+
+	if ( modernOwned ) {
+		stats.modernVisibleModernPasses++;
+	} else {
+		stats.modernVisibleLegacyPasses++;
+	}
+}
+
+static void R_ModernGLExecutor_AnalyzeModernVisibleFallbacks( const idScenePacketFrame &packetFrame, modernGLExecutorStats_t &stats ) {
+	if ( !stats.modernVisibleRequested ) {
+		return;
+	}
+	const scenePacketFrameStats_t &packetStats = packetFrame.Stats();
+	stats.modernVisibleGuiLegacyPasses = packetStats.guiPackets;
+	stats.modernVisiblePostLegacyPasses = packetStats.postProcessPackets;
+	stats.modernVisibleSpecialLegacyPasses = packetStats.specialEffectPackets;
+	stats.modernVisibleSubviewLegacyPasses = packetStats.subviewPackets + packetStats.remoteCameraPackets + packetStats.renderDemoPackets;
+	stats.modernVisibleOwnerFallbacks =
+		stats.modernVisibleLegacyPasses
+		+ stats.modernVisibleGuiLegacyPasses
+		+ stats.modernVisiblePostLegacyPasses
+		+ stats.modernVisibleSpecialLegacyPasses
+		+ stats.modernVisibleSubviewLegacyPasses;
+	stats.modernVisibleBlockedByLegacy = stats.modernVisibleOwnerFallbacks > 0;
+	stats.modernVisibleFallbackPasses = stats.modernVisibleOwnerFallbacks + stats.modernVisibleDisabledPasses;
 }
 
 static void R_ModernGLExecutor_AnalyzeFrame(
@@ -651,15 +797,17 @@ static void R_ModernGLExecutor_AnalyzeFrame(
 	stats.indirectBufferReady = rg_modernGLExecutorIndirectBuffer != 0;
 	stats.validationSSBOReady = rg_modernGLExecutorValidationSSBO != 0;
 	stats.computeValidationReady = rg_modernGLExecutorComputeProgram != 0;
-	stats.visibleDepthRequested = r_rendererModernVisibleDepth.GetBool() || r_rendererModernDepthDebug.GetInteger() > 0;
+	stats.modernVisibleRequested = r_rendererModernVisible.GetBool();
+	stats.modernVisibleProgramReady = rg_modernGLExecutorVisibleCompositeProgram != 0;
+	stats.visibleDepthRequested = stats.modernVisibleRequested || r_rendererModernVisibleDepth.GetBool() || r_rendererModernDepthDebug.GetInteger() > 0;
 	stats.visibleDepthDebugOverlayReady = rg_modernGLExecutorDepthOverlayProgram != 0;
-	stats.opaqueGBufferRequested = r_rendererModernOpaque.GetBool() || r_rendererModernGBufferDebug.GetInteger() > 0 || r_rendererModernDeferred.GetBool() || r_rendererModernDeferredDebug.GetInteger() > 0;
+	stats.opaqueGBufferRequested = stats.modernVisibleRequested || r_rendererModernOpaque.GetBool() || r_rendererModernGBufferDebug.GetInteger() > 0 || r_rendererModernDeferred.GetBool() || r_rendererModernDeferredDebug.GetInteger() > 0;
 	stats.opaqueGBufferDebugOverlayReady = rg_modernGLExecutorGBufferOverlayProgram != 0;
 	stats.opaqueGBufferMRTReady = rg_modernGLExecutorGBufferFBO != 0 && rg_modernGLExecutorCaps.hasMRT && rg_modernGLExecutorCaps.maxDrawBuffers >= MODERN_GL_GBUFFER_ATTACHMENT_COUNT && glDrawBuffers != NULL;
-	stats.deferredResolveRequested = r_rendererModernDeferred.GetBool() || r_rendererModernDeferredDebug.GetInteger() > 0;
+	stats.deferredResolveRequested = stats.modernVisibleRequested || r_rendererModernDeferred.GetBool() || r_rendererModernDeferredDebug.GetInteger() > 0;
 	stats.deferredResolveDebugOverlayReady = rg_modernGLExecutorDeferredOverlayProgram != 0;
 	stats.deferredResolveDebugMode = r_rendererModernDeferredDebug.GetInteger();
-	stats.forwardPlusRequested = r_rendererForwardPlus.GetBool();
+	stats.forwardPlusRequested = stats.modernVisibleRequested || r_rendererForwardPlus.GetBool();
 	if ( stats.forwardPlusRequested ) {
 		stats.forwardPlusSpecialEffectFallbacks = packetFrame.Stats().specialEffectPackets;
 	}
@@ -690,6 +838,7 @@ static void R_ModernGLExecutor_AnalyzeFrame(
 
 	for ( int i = 0; i < graph.NumPasses(); ++i ) {
 		const renderGraphPass_t &pass = graph.Pass( i );
+		R_ModernGLExecutor_CountModernVisibleOwner( pass, stats );
 		if ( pass.enabled && pass.packetBacked ) {
 			stats.preparedPasses++;
 		} else {
@@ -718,6 +867,7 @@ static void R_ModernGLExecutor_AnalyzeFrame(
 			stats.preparedDrawPackets++;
 		}
 	}
+	R_ModernGLExecutor_AnalyzeModernVisibleFallbacks( packetFrame, stats );
 
 	stats.legacyFallback = true;
 	R_ModernGLExecutor_SetStatus( stats, "prepared-legacy-fallback" );
@@ -2046,6 +2196,28 @@ static void R_ModernGLExecutor_RecordMetrics( const modernGLExecutorStats_t &sta
 		stats.forwardPlusProjectedLights,
 		stats.forwardPlusLightGridContributions,
 		stats.forwardPlusClearOps );
+	R_RendererMetrics_RecordModernVisible(
+		stats.modernVisibleRequested,
+		stats.modernVisibleExecuted,
+		stats.modernVisibleResourcesReady,
+		stats.modernVisibleProgramReady,
+		stats.modernVisibleSourceReady,
+		stats.modernVisibleBackBufferReady,
+		stats.modernVisibleBlockedByLegacy,
+		stats.modernVisibleCompositions,
+		stats.modernVisiblePixels,
+		stats.modernVisibleModernPasses,
+		stats.modernVisibleLegacyPasses,
+		stats.modernVisibleDisabledPasses,
+		stats.modernVisibleFallbackPasses,
+		stats.modernVisibleOwnerFallbacks,
+		stats.modernVisibleResourceFallbacks,
+		stats.modernVisibleGuiLegacyPasses,
+		stats.modernVisiblePostLegacyPasses,
+		stats.modernVisibleSpecialLegacyPasses,
+		stats.modernVisibleSubviewLegacyPasses,
+		stats.modernVisiblePresentPasses,
+		stats.modernVisibleClearOps );
 }
 
 void R_ModernGLExecutor_Init( const renderBackendCaps_t &caps, const renderFeatureSet_t &features ) {
@@ -2110,6 +2282,12 @@ void R_ModernGLExecutor_Init( const renderBackendCaps_t &caps, const renderFeatu
 	if ( rg_modernGLExecutorDeferredOverlayProgram != 0 ) {
 		R_GLDebug_LabelProgram( rg_modernGLExecutorDeferredOverlayProgram, "ModernGLExecutor deferred resolve debug overlay" );
 	}
+	rg_modernGLExecutorVisibleCompositeProgram = R_ModernGLExecutor_CompileVisibleCompositeProgram();
+	if ( rg_modernGLExecutorVisibleCompositeProgram != 0 ) {
+		R_GLDebug_LabelProgram( rg_modernGLExecutorVisibleCompositeProgram, "ModernGLExecutor visible composite" );
+	} else {
+		common->Printf( "Modern GL executor: visible composite program unavailable, modern visible cvar will fail closed\n" );
+	}
 	if ( glGenFramebuffers != NULL ) {
 		glGenFramebuffers( 1, &rg_modernGLExecutorGBufferFBO );
 		if ( rg_modernGLExecutorGBufferFBO != 0 ) {
@@ -2160,12 +2338,13 @@ void R_ModernGLExecutor_Shutdown( void ) {
 }
 
 void R_ModernGLExecutor_PrepareFrame( const idScenePacketFrame &packetFrame, const idRenderGraph &graph ) {
-	const bool visibleDepthRequested = r_rendererModernVisibleDepth.GetBool() || r_rendererModernDepthDebug.GetInteger() > 0;
-	const bool deferredResolveRequested = r_rendererModernDeferred.GetBool() || r_rendererModernDeferredDebug.GetInteger() > 0;
-	const bool forwardPlusRequested = r_rendererForwardPlus.GetBool();
-	const bool opaqueGBufferRequested = r_rendererModernOpaque.GetBool() || r_rendererModernGBufferDebug.GetInteger() > 0 || deferredResolveRequested;
+	const bool modernVisibleRequested = r_rendererModernVisible.GetBool();
+	const bool visibleDepthRequested = modernVisibleRequested || r_rendererModernVisibleDepth.GetBool() || r_rendererModernDepthDebug.GetInteger() > 0;
+	const bool deferredResolveRequested = modernVisibleRequested || r_rendererModernDeferred.GetBool() || r_rendererModernDeferredDebug.GetInteger() > 0;
+	const bool forwardPlusRequested = modernVisibleRequested || r_rendererForwardPlus.GetBool();
+	const bool opaqueGBufferRequested = modernVisibleRequested || r_rendererModernOpaque.GetBool() || r_rendererModernGBufferDebug.GetInteger() > 0 || deferredResolveRequested;
 	const bool clusteredLightingRequested = r_rendererModernExecutor.GetBool() || opaqueGBufferRequested || deferredResolveRequested || forwardPlusRequested || r_rendererClusterDebug.GetInteger() > 0;
-	const bool enabled = r_rendererModernExecutor.GetBool() || r_rendererModernSubmit.GetBool() || visibleDepthRequested || opaqueGBufferRequested || deferredResolveRequested || forwardPlusRequested || clusteredLightingRequested;
+	const bool enabled = r_rendererModernExecutor.GetBool() || r_rendererModernSubmit.GetBool() || modernVisibleRequested || visibleDepthRequested || opaqueGBufferRequested || deferredResolveRequested || forwardPlusRequested || clusteredLightingRequested;
 	R_ModernGLExecutor_AnalyzeFrame(
 		packetFrame,
 		graph,
@@ -2347,7 +2526,119 @@ void R_ModernGLExecutor_PrepareFrame( const idScenePacketFrame &packetFrame, con
 			rg_modernGLExecutorStats.forwardPlusProjectedLights,
 			rg_modernGLExecutorStats.forwardPlusLightGridContributions,
 			rg_modernGLExecutorStats.forwardPlusClearOps );
+		common->Printf(
+			"modernVisible req=%d exec=%d res=%d program=%d source=%d backBuffer=%d blocked=%d composed=%d pixels=%d modern=%d legacy=%d disabled=%d fallback=%d ownerFallback=%d resourceFallback=%d gui=%d post=%d special=%d subview=%d present=%d clear=%d\n",
+			rg_modernGLExecutorStats.modernVisibleRequested ? 1 : 0,
+			rg_modernGLExecutorStats.modernVisibleExecuted ? 1 : 0,
+			rg_modernGLExecutorStats.modernVisibleResourcesReady ? 1 : 0,
+			rg_modernGLExecutorStats.modernVisibleProgramReady ? 1 : 0,
+			rg_modernGLExecutorStats.modernVisibleSourceReady ? 1 : 0,
+			rg_modernGLExecutorStats.modernVisibleBackBufferReady ? 1 : 0,
+			rg_modernGLExecutorStats.modernVisibleBlockedByLegacy ? 1 : 0,
+			rg_modernGLExecutorStats.modernVisibleCompositions,
+			rg_modernGLExecutorStats.modernVisiblePixels,
+			rg_modernGLExecutorStats.modernVisibleModernPasses,
+			rg_modernGLExecutorStats.modernVisibleLegacyPasses,
+			rg_modernGLExecutorStats.modernVisibleDisabledPasses,
+			rg_modernGLExecutorStats.modernVisibleFallbackPasses,
+			rg_modernGLExecutorStats.modernVisibleOwnerFallbacks,
+			rg_modernGLExecutorStats.modernVisibleResourceFallbacks,
+			rg_modernGLExecutorStats.modernVisibleGuiLegacyPasses,
+			rg_modernGLExecutorStats.modernVisiblePostLegacyPasses,
+			rg_modernGLExecutorStats.modernVisibleSpecialLegacyPasses,
+			rg_modernGLExecutorStats.modernVisibleSubviewLegacyPasses,
+			rg_modernGLExecutorStats.modernVisiblePresentPasses,
+			rg_modernGLExecutorStats.modernVisibleClearOps );
 	}
+}
+
+void R_ModernGLExecutor_ComposeVisibleFrame( void ) {
+	modernGLExecutorStats_t &stats = rg_modernGLExecutorStats;
+	if ( !stats.modernVisibleRequested ) {
+		return;
+	}
+
+	stats.modernVisibleProgramReady = rg_modernGLExecutorVisibleCompositeProgram != 0;
+	const renderGraphResourceHandle_t *deferredLight = NULL;
+	const renderGraphResourceHandle_t *sceneColor = NULL;
+	const renderGraphResourceHandle_t *backBuffer = R_RenderGraphResources_FindHandle( "backBuffer" );
+	const bool deferredReady = stats.deferredResolveExecuted && R_ModernGLExecutor_GBufferResourceReady( "deferredLight", deferredLight );
+	const bool forwardReady = stats.forwardPlusExecuted && R_ModernGLExecutor_GBufferResourceReady( "sceneColor", sceneColor );
+	stats.modernVisibleSourceReady = deferredReady && forwardReady;
+	stats.modernVisibleBackBufferReady = backBuffer != NULL && backBuffer->presentable;
+	stats.modernVisibleResourcesReady = stats.modernVisibleSourceReady && stats.modernVisibleBackBufferReady;
+
+	if ( !stats.enabled || !stats.available || !stats.initialized || rg_modernGLExecutorVAO == 0 || !stats.modernVisibleProgramReady ) {
+		stats.modernVisibleResourceFallbacks++;
+		stats.modernVisibleFallbackPasses++;
+		R_ModernGLExecutor_SetStatus( stats, "modern-visible-unavailable" );
+		R_ModernGLExecutor_RecordMetrics( stats );
+		return;
+	}
+	if ( stats.modernVisibleBlockedByLegacy ) {
+		stats.modernVisibleFallbackPasses++;
+		R_ModernGLExecutor_SetStatus( stats, "modern-visible-legacy-blocked" );
+		R_ModernGLExecutor_RecordMetrics( stats );
+		return;
+	}
+	if ( !stats.modernVisibleResourcesReady || deferredLight == NULL || sceneColor == NULL || deferredLight->texture == 0 || sceneColor->texture == 0 ) {
+		stats.modernVisibleResourceFallbacks++;
+		stats.modernVisibleFallbackPasses++;
+		R_ModernGLExecutor_SetStatus( stats, "modern-visible-resource-fallback" );
+		R_ModernGLExecutor_RecordMetrics( stats );
+		return;
+	}
+
+	R_RendererMetrics_BeginGpuTimer( RENDERER_GPU_TIMER_MODERN_COMPOSITE );
+	{
+		idGLDebugScope composeScope( "ModernGLExecutor visible hybrid composite" );
+		R_GLStateCache_InvalidateAll( "modern visible composition" );
+		R_GLStateCache().BindFramebuffer( GL_FRAMEBUFFER, 0 );
+		R_GLStateCache().BindVertexArray( rg_modernGLExecutorVAO );
+		R_GLStateCache().SetViewport( 0, 0, Max( 1, glConfig.vidWidth ), Max( 1, glConfig.vidHeight ) );
+		R_GLStateCache().SetScissor( 0, 0, Max( 1, glConfig.vidWidth ), Max( 1, glConfig.vidHeight ) );
+		R_GLStateCache().SetScissorTestEnabled( false );
+		R_GLStateCache().SetDepthTestEnabled( false );
+		R_GLStateCache().SetDepthMask( GL_FALSE );
+		R_GLStateCache().SetStencilTestEnabled( false );
+		R_GLStateCache().SetBlendEnabled( false );
+		R_GLStateCache().SetCullFaceEnabled( false );
+		R_GLStateCache().SetColorMask( GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE );
+		glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );
+		glClear( GL_COLOR_BUFFER_BIT );
+		stats.modernVisibleClearOps++;
+
+		R_GLStateCache().UseProgram( rg_modernGLExecutorVisibleCompositeProgram );
+		R_GLStateCache().ActiveTextureUnit( 0 );
+		R_GLStateCache().BindTexture( 0, GL_TEXTURE_2D, deferredLight->texture );
+		R_GLStateCache().ActiveTextureUnit( 1 );
+		R_GLStateCache().BindTexture( 1, GL_TEXTURE_2D, sceneColor->texture );
+		if ( rg_modernGLExecutorVisibleCompositeDeferredLocation >= 0 ) {
+			glUniform1i( rg_modernGLExecutorVisibleCompositeDeferredLocation, 0 );
+		}
+		if ( rg_modernGLExecutorVisibleCompositeForwardLocation >= 0 ) {
+			glUniform1i( rg_modernGLExecutorVisibleCompositeForwardLocation, 1 );
+		}
+		if ( rg_modernGLExecutorVisibleCompositeParamsLocation >= 0 ) {
+			glUniform4f( rg_modernGLExecutorVisibleCompositeParamsLocation, 1.0f, 1.0f, 0.0f, 0.0f );
+		}
+		glDrawArrays( GL_TRIANGLE_STRIP, 0, 4 );
+	}
+	R_RendererMetrics_EndGpuTimer();
+
+	stats.modernVisibleExecuted = true;
+	stats.modernVisibleCompositions++;
+	stats.modernVisiblePixels = Max( 1, glConfig.vidWidth ) * Max( 1, glConfig.vidHeight );
+	R_ModernGLExecutor_SetStatus( stats, "modern-visible-composited" );
+	R_ModernGLExecutor_RecordMetrics( stats );
+
+	R_GLStateCache().BindTexture( 1, GL_TEXTURE_2D, 0 );
+	R_GLStateCache().BindTexture( 0, GL_TEXTURE_2D, 0 );
+	R_GLStateCache().ActiveTextureUnit( 0 );
+	R_GLStateCache().UseProgram( 0 );
+	R_GLStateCache().BindVertexArray( 0 );
+	R_GLStateCache().SetDepthMask( GL_TRUE );
+	GL_ClearStateDelta();
 }
 
 void R_ModernGLExecutor_DrawDepthDebugOverlay( void ) {
@@ -2623,6 +2914,30 @@ void R_ModernGLExecutor_PrintGfxInfo( void ) {
 		rg_modernGLExecutorStats.forwardPlusProjectedLights,
 		rg_modernGLExecutorStats.forwardPlusLightGridContributions,
 		rg_modernGLExecutorStats.forwardPlusClearOps );
+	common->Printf(
+		"Modern visible frame: cvar=%d, req=%d exec=%d resources=%d program=%d source=%d backBuffer=%d blocked=%d composed=%d pixels=%d modern=%d legacy=%d disabled=%d fallback=%d ownerFallback=%d resourceFallback=%d gui=%d post=%d special=%d subview=%d present=%d clears=%d\n",
+		r_rendererModernVisible.GetBool() ? 1 : 0,
+		rg_modernGLExecutorStats.modernVisibleRequested ? 1 : 0,
+		rg_modernGLExecutorStats.modernVisibleExecuted ? 1 : 0,
+		rg_modernGLExecutorStats.modernVisibleResourcesReady ? 1 : 0,
+		rg_modernGLExecutorStats.modernVisibleProgramReady ? 1 : 0,
+		rg_modernGLExecutorStats.modernVisibleSourceReady ? 1 : 0,
+		rg_modernGLExecutorStats.modernVisibleBackBufferReady ? 1 : 0,
+		rg_modernGLExecutorStats.modernVisibleBlockedByLegacy ? 1 : 0,
+		rg_modernGLExecutorStats.modernVisibleCompositions,
+		rg_modernGLExecutorStats.modernVisiblePixels,
+		rg_modernGLExecutorStats.modernVisibleModernPasses,
+		rg_modernGLExecutorStats.modernVisibleLegacyPasses,
+		rg_modernGLExecutorStats.modernVisibleDisabledPasses,
+		rg_modernGLExecutorStats.modernVisibleFallbackPasses,
+		rg_modernGLExecutorStats.modernVisibleOwnerFallbacks,
+		rg_modernGLExecutorStats.modernVisibleResourceFallbacks,
+		rg_modernGLExecutorStats.modernVisibleGuiLegacyPasses,
+		rg_modernGLExecutorStats.modernVisiblePostLegacyPasses,
+		rg_modernGLExecutorStats.modernVisibleSpecialLegacyPasses,
+		rg_modernGLExecutorStats.modernVisibleSubviewLegacyPasses,
+		rg_modernGLExecutorStats.modernVisiblePresentPasses,
+		rg_modernGLExecutorStats.modernVisibleClearOps );
 	R_GLStateCache_PrintGfxInfo();
 	R_ModernGLShaderLibrary_PrintGfxInfo();
 }
@@ -3011,7 +3326,7 @@ static bool R_ModernGLExecutor_ValidateGBufferPacking( void ) {
 }
 
 bool RendererGBuffer_RunSelfTest( void ) {
-	if ( !r_rendererModernOpaque.GetBool() && r_rendererModernGBufferDebug.GetInteger() <= 0 ) {
+	if ( !r_rendererModernVisible.GetBool() && !r_rendererModernOpaque.GetBool() && r_rendererModernGBufferDebug.GetInteger() <= 0 ) {
 		common->Printf( "RendererGBuffer self-test passed (disabled)\n" );
 		return true;
 	}
@@ -3103,7 +3418,7 @@ bool RendererGBuffer_RunSelfTest( void ) {
 }
 
 bool RendererDeferredResolve_RunSelfTest( void ) {
-	if ( !r_rendererModernDeferred.GetBool() && r_rendererModernDeferredDebug.GetInteger() <= 0 ) {
+	if ( !r_rendererModernVisible.GetBool() && !r_rendererModernDeferred.GetBool() && r_rendererModernDeferredDebug.GetInteger() <= 0 ) {
 		common->Printf( "RendererDeferredResolve self-test passed (disabled)\n" );
 		return true;
 	}
@@ -3273,7 +3588,7 @@ bool RendererDeferredResolve_RunSelfTest( void ) {
 }
 
 bool RendererForwardPlus_RunSelfTest( void ) {
-	if ( !r_rendererForwardPlus.GetBool() ) {
+	if ( !r_rendererModernVisible.GetBool() && !r_rendererForwardPlus.GetBool() ) {
 		common->Printf( "RendererForwardPlus self-test passed (disabled)\n" );
 		return true;
 	}
@@ -3463,5 +3778,236 @@ bool RendererForwardPlus_RunSelfTest( void ) {
 		stats.forwardPlusPointLights,
 		stats.forwardPlusProjectedLights,
 		stats.forwardPlusLightGridContributions );
+	return true;
+}
+
+bool RendererModernVisible_RunSelfTest( void ) {
+	if ( !r_rendererModernVisible.GetBool() ) {
+		common->Printf( "RendererModernVisible self-test passed (disabled)\n" );
+		return true;
+	}
+
+	const modernGLShaderLibraryStats_t &shaderStats = R_ModernGLShaderLibrary_Stats();
+	if ( !shaderStats.available ) {
+		common->Printf( "RendererModernVisible self-test passed (shader library unavailable)\n" );
+		return true;
+	}
+	if ( rg_modernGLExecutorAvailable && rg_modernGLExecutorVisibleCompositeProgram == 0 ) {
+		common->Printf( "RendererModernVisible self-test failed: visible composite program unavailable\n" );
+		return false;
+	}
+
+	const modernGLShaderProgramInfo_t *deferredProgram = R_ModernGLShaderLibrary_FindProgram( MODERN_GL_SHADER_DEFERRED_LIGHT_RESOLVE, shaderStats.highestGLSLVersion );
+	const modernGLShaderProgramInfo_t *forwardOpaqueProgram = R_ModernGLShaderLibrary_FindProgram( MODERN_GL_SHADER_CLUSTERED_FORWARD_OPAQUE, shaderStats.highestGLSLVersion );
+	const modernGLShaderProgramInfo_t *forwardAlphaProgram = R_ModernGLShaderLibrary_FindProgram( MODERN_GL_SHADER_CLUSTERED_FORWARD_ALPHA_TEST, shaderStats.highestGLSLVersion );
+	const modernGLShaderProgramInfo_t *forwardTransparentProgram = R_ModernGLShaderLibrary_FindProgram( MODERN_GL_SHADER_TRANSPARENT_FORWARD, shaderStats.highestGLSLVersion );
+	const bool programsReady =
+		deferredProgram != NULL && deferredProgram->program != 0 && deferredProgram->linked
+		&& forwardOpaqueProgram != NULL && forwardOpaqueProgram->program != 0 && forwardOpaqueProgram->linked
+		&& forwardAlphaProgram != NULL && forwardAlphaProgram->program != 0 && forwardAlphaProgram->linked
+		&& forwardTransparentProgram != NULL && forwardTransparentProgram->program != 0 && forwardTransparentProgram->linked;
+	if ( !programsReady ) {
+		common->Printf( "RendererModernVisible self-test failed: deferred or forward+ programs unavailable\n" );
+		return false;
+	}
+
+	drawSurf_t drawSurfs[3];
+	memset( drawSurfs, 0, sizeof( drawSurfs ) );
+	srfTriangles_t geometry;
+	memset( &geometry, 0, sizeof( geometry ) );
+	geometry.numVerts = 3;
+	geometry.numIndexes = 6;
+	vertCache_t ambientCache;
+	memset( &ambientCache, 0, sizeof( ambientCache ) );
+	ambientCache.vbo = 101;
+	ambientCache.offset = 64;
+	ambientCache.size = geometry.numVerts * static_cast<int>( sizeof( idDrawVert ) );
+	ambientCache.indexBuffer = false;
+	ambientCache.tag = TAG_USED;
+	vertCache_t indexCache;
+	memset( &indexCache, 0, sizeof( indexCache ) );
+	indexCache.vbo = 202;
+	indexCache.offset = 128;
+	indexCache.size = geometry.numIndexes * static_cast<int>( sizeof( glIndex_t ) );
+	indexCache.indexBuffer = true;
+	indexCache.tag = TAG_USED;
+	geometry.ambientCache = &ambientCache;
+	geometry.indexCache = &indexCache;
+	for ( int i = 0; i < 3; ++i ) {
+		drawSurfs[i].geo = &geometry;
+		if ( tr.defaultMaterial != NULL ) {
+			drawSurfs[i].material = tr.defaultMaterial;
+			drawSurfs[i].sort = tr.defaultMaterial->GetSort() + static_cast<float>( i ) * 0.01f;
+		}
+	}
+
+	drawSurf_t *drawSurfPtrs[3] = { &drawSurfs[0], &drawSurfs[1], &drawSurfs[2] };
+	viewEntity_t viewEntity;
+	memset( &viewEntity, 0, sizeof( viewEntity ) );
+	drawSurfs[0].space = &viewEntity;
+	drawSurfs[1].space = &viewEntity;
+	drawSurfs[2].space = &viewEntity;
+	viewLight_t lights[2];
+	memset( lights, 0, sizeof( lights ) );
+	idRenderLightLocal lightDefs[2];
+	for ( int i = 0; i < 2; ++i ) {
+		lightDefs[i].index = i;
+		lightDefs[i].areaNum = -1;
+		lightDefs[i].parms.origin.Set( 128.0f + 48.0f * i, 24.0f, 32.0f );
+		lightDefs[i].parms.lightRadius.Set( 256.0f, 256.0f, 256.0f );
+		lightDefs[i].parms.shaderParms[SHADERPARM_RED] = i == 0 ? 1.0f : 0.35f;
+		lightDefs[i].parms.shaderParms[SHADERPARM_GREEN] = i == 0 ? 0.65f : 0.85f;
+		lightDefs[i].parms.shaderParms[SHADERPARM_BLUE] = i == 0 ? 0.45f : 1.0f;
+		lights[i].lightDef = &lightDefs[i];
+		lights[i].next = i == 0 ? &lights[1] : NULL;
+		lights[i].scissorRect.x1 = 0;
+		lights[i].scissorRect.y1 = 0;
+		lights[i].scissorRect.x2 = 639;
+		lights[i].scissorRect.y2 = 479;
+		lights[i].globalLightOrigin = lightDefs[i].parms.origin;
+		lights[i].lightRadius = lightDefs[i].parms.lightRadius;
+		lights[i].pointLight = i == 0;
+		lights[i].parallel = false;
+		lights[i].viewInsideLight = i == 0;
+		lights[i].viewSeesGlobalLightOrigin = true;
+	}
+
+	viewDef_t worldView;
+	memset( &worldView, 0, sizeof( worldView ) );
+	worldView.viewEntitys = &viewEntity;
+	worldView.drawSurfs = drawSurfPtrs;
+	worldView.numDrawSurfs = 3;
+	worldView.viewLights = &lights[0];
+	worldView.renderView.width = 640;
+	worldView.renderView.height = 480;
+	worldView.renderView.fov_x = 90.0f;
+	worldView.renderView.fov_y = 70.0f;
+	worldView.renderView.viewaxis = mat3_identity;
+	worldView.viewport.x1 = 0;
+	worldView.viewport.y1 = 0;
+	worldView.viewport.x2 = 639;
+	worldView.viewport.y2 = 479;
+	worldView.scissor.x1 = 0;
+	worldView.scissor.y1 = 0;
+	worldView.scissor.x2 = 639;
+	worldView.scissor.y2 = 479;
+
+	idScenePacketFrame packetFrame;
+	if ( !packetFrame.AddScene( &worldView, true ) || !packetFrame.AddPass( RENDER_PASS_DEPTH, true ) ) {
+		common->Printf( "RendererModernVisible self-test failed: could not build depth packet scene\n" );
+		return false;
+	}
+	for ( int i = 0; i < 2; ++i ) {
+		if ( !packetFrame.AddDrawPacket( &drawSurfs[i], RENDER_PASS_DEPTH, i ) ) {
+			common->Printf( "RendererModernVisible self-test failed: could not add depth draw packet\n" );
+			return false;
+		}
+	}
+	if ( !packetFrame.AddPass( RENDER_PASS_AMBIENT, true ) ) {
+		common->Printf( "RendererModernVisible self-test failed: could not add ambient pass\n" );
+		return false;
+	}
+	for ( int i = 0; i < 2; ++i ) {
+		if ( !packetFrame.AddDrawPacket( &drawSurfs[i], RENDER_PASS_AMBIENT, i ) ) {
+			common->Printf( "RendererModernVisible self-test failed: could not add ambient draw packet\n" );
+			return false;
+		}
+	}
+	if ( !packetFrame.AddPass( RENDER_PASS_ARB2_INTERACTION, true ) ) {
+		common->Printf( "RendererModernVisible self-test failed: could not add interaction pass\n" );
+		return false;
+	}
+	for ( int i = 0; i < 2; ++i ) {
+		if ( !packetFrame.AddDrawPacket( &drawSurfs[i], RENDER_PASS_ARB2_INTERACTION, i ) ) {
+			common->Printf( "RendererModernVisible self-test failed: could not add interaction draw packet\n" );
+			return false;
+		}
+	}
+	if ( !packetFrame.AddPass( RENDER_PASS_FOG_BLEND, true ) || !packetFrame.AddDrawPacket( &drawSurfs[2], RENDER_PASS_FOG_BLEND, 2 ) ) {
+		common->Printf( "RendererModernVisible self-test failed: could not add transparent draw packet\n" );
+		return false;
+	}
+	packetFrame.FinishScene();
+	packetFrame.AddCommandPacket( SCENE_PACKET_CATEGORY_UNKNOWN );
+	if ( !packetFrame.AddScene( NULL, true ) || !packetFrame.AddPass( RENDER_PASS_PRESENT, true, true ) ) {
+		common->Printf( "RendererModernVisible self-test failed: could not add present command packet\n" );
+		return false;
+	}
+	packetFrame.FinishScene();
+
+	idRenderGraph graph;
+	R_RenderGraph_BuildFromScenePackets( packetFrame, graph );
+	if ( graph.FindPass( RENDER_PASS_DEFERRED_RESOLVE ) < 0 || graph.FindPass( RENDER_PASS_FORWARD_PLUS ) < 0 || graph.FindPass( RENDER_PASS_PRESENT ) < 0
+		|| graph.FindResource( "deferredLight" ) < 0 || graph.FindResource( "sceneColor" ) < 0 || graph.FindResource( "backBuffer" ) < 0 ) {
+		common->Printf( "RendererModernVisible self-test failed: graph composition resources missing\n" );
+		return false;
+	}
+
+	R_MaterialResourceTable_PrepareFrame( packetFrame );
+	R_RenderGraphResources_PrepareFrame( graph );
+	R_ModernClusteredLighting_PrepareFrame( packetFrame, true );
+	R_ModernGLExecutor_AnalyzeFrame(
+		packetFrame,
+		graph,
+		true,
+		rg_modernGLExecutorAvailable,
+		rg_modernGLExecutorInitialized,
+		rg_modernGLExecutorVAO != 0,
+		rg_modernGLExecutorFrameUBO != 0,
+		rg_modernGLExecutorStats );
+	rg_modernGLDrawPlan.Build( packetFrame, graph );
+	R_ModernGLExecutor_CopyDrawPlanStats( rg_modernGLExecutorStats, rg_modernGLDrawPlan.Stats() );
+	rg_modernGLSubmitPlan.Build( rg_modernGLDrawPlan );
+	R_ModernGLExecutor_CopySubmitPlanStats( rg_modernGLExecutorStats, rg_modernGLSubmitPlan.Stats() );
+	R_ModernGLExecutor_UpdateFrameUBO( rg_modernGLExecutorStats );
+	R_ModernGLExecutor_SubmitVisibleDepth( rg_modernGLExecutorStats );
+	R_ModernGLExecutor_SubmitGBuffer( rg_modernGLExecutorStats );
+	R_ModernGLExecutor_SubmitDeferredResolve( rg_modernGLExecutorStats );
+	R_ModernGLExecutor_SubmitForwardPlus( rg_modernGLExecutorStats );
+	R_ModernGLExecutor_ComposeVisibleFrame();
+
+	const modernGLExecutorStats_t &stats = rg_modernGLExecutorStats;
+	if ( stats.modernVisibleBlockedByLegacy || stats.modernVisibleOwnerFallbacks != 0 || stats.modernVisibleLegacyPasses != 0 || stats.modernVisiblePresentPasses <= 0 ) {
+		common->Printf(
+			"RendererModernVisible self-test failed: owner selection mismatch (blocked=%d legacy=%d ownerFallback=%d present=%d)\n",
+			stats.modernVisibleBlockedByLegacy ? 1 : 0,
+			stats.modernVisibleLegacyPasses,
+			stats.modernVisibleOwnerFallbacks,
+			stats.modernVisiblePresentPasses );
+		return false;
+	}
+
+	const bool resourcesAvailable = R_RenderGraphResources_Stats().initialized && R_RenderGraphResources_Stats().available && rg_modernGLExecutorAvailable;
+	if ( resourcesAvailable && ( !stats.deferredResolveExecuted || !stats.forwardPlusExecuted || !stats.modernVisibleExecuted || !stats.modernVisibleResourcesReady || !stats.modernVisibleSourceReady || !stats.modernVisibleBackBufferReady || stats.modernVisibleCompositions <= 0 || stats.modernVisiblePixels <= 0 ) ) {
+		common->Printf(
+			"RendererModernVisible self-test failed: composition execution mismatch (deferred=%d forward=%d exec=%d res=%d source=%d backBuffer=%d composed=%d pixels=%d fallback=%d)\n",
+			stats.deferredResolveExecuted ? 1 : 0,
+			stats.forwardPlusExecuted ? 1 : 0,
+			stats.modernVisibleExecuted ? 1 : 0,
+			stats.modernVisibleResourcesReady ? 1 : 0,
+			stats.modernVisibleSourceReady ? 1 : 0,
+			stats.modernVisibleBackBufferReady ? 1 : 0,
+			stats.modernVisibleCompositions,
+			stats.modernVisiblePixels,
+			stats.modernVisibleFallbackPasses );
+		return false;
+	}
+
+	common->Printf(
+		"RendererModernVisible self-test passed (program=%d resources=%d source=%d backBuffer=%d blocked=%d composed=%d pixels=%d modern=%d legacy=%d fallback=%d deferred=%d forward=%d present=%d clears=%d)\n",
+		stats.modernVisibleProgramReady ? 1 : 0,
+		stats.modernVisibleResourcesReady ? 1 : 0,
+		stats.modernVisibleSourceReady ? 1 : 0,
+		stats.modernVisibleBackBufferReady ? 1 : 0,
+		stats.modernVisibleBlockedByLegacy ? 1 : 0,
+		stats.modernVisibleCompositions,
+		stats.modernVisiblePixels,
+		stats.modernVisibleModernPasses,
+		stats.modernVisibleLegacyPasses,
+		stats.modernVisibleFallbackPasses,
+		stats.deferredResolveExecuted ? 1 : 0,
+		stats.forwardPlusExecuted ? 1 : 0,
+		stats.modernVisiblePresentPasses,
+		stats.modernVisibleClearOps );
 	return true;
 }

@@ -51,6 +51,13 @@ typedef struct modernGLExecutorStats_s {
 	bool	forwardPlusSceneDepthReady;
 	bool	forwardPlusProgramReady;
 	bool	forwardPlusClusterReady;
+	bool	modernVisibleRequested;
+	bool	modernVisibleExecuted;
+	bool	modernVisibleResourcesReady;
+	bool	modernVisibleProgramReady;
+	bool	modernVisibleSourceReady;
+	bool	modernVisibleBackBufferReady;
+	bool	modernVisibleBlockedByLegacy;
 	int		graphPasses;
 	int		preparedPasses;
 	int		fallbackPasses;
@@ -169,6 +176,20 @@ typedef struct modernGLExecutorStats_s {
 	int		forwardPlusProjectedLights;
 	int		forwardPlusLightGridContributions;
 	int		forwardPlusClearOps;
+	int		modernVisibleCompositions;
+	int		modernVisiblePixels;
+	int		modernVisibleModernPasses;
+	int		modernVisibleLegacyPasses;
+	int		modernVisibleDisabledPasses;
+	int		modernVisibleFallbackPasses;
+	int		modernVisibleOwnerFallbacks;
+	int		modernVisibleResourceFallbacks;
+	int		modernVisibleGuiLegacyPasses;
+	int		modernVisiblePostLegacyPasses;
+	int		modernVisibleSpecialLegacyPasses;
+	int		modernVisibleSubviewLegacyPasses;
+	int		modernVisiblePresentPasses;
+	int		modernVisibleClearOps;
 	char	status[96];
 } modernGLExecutorStats_t;
 
@@ -178,6 +199,7 @@ void R_ModernGLExecutor_PrepareFrame( const idScenePacketFrame &packetFrame, con
 void R_ModernGLExecutor_DrawDepthDebugOverlay( void );
 void R_ModernGLExecutor_DrawGBufferDebugOverlay( void );
 void R_ModernGLExecutor_DrawDeferredDebugOverlay( void );
+void R_ModernGLExecutor_ComposeVisibleFrame( void );
 const modernGLExecutorStats_t &R_ModernGLExecutor_Stats( void );
 void R_ModernGLExecutor_PrintGfxInfo( void );
 bool RendererModernGLExecutor_RunSelfTest( void );
@@ -185,5 +207,6 @@ bool RendererVisiblePath_RunSelfTest( void );
 bool RendererGBuffer_RunSelfTest( void );
 bool RendererDeferredResolve_RunSelfTest( void );
 bool RendererForwardPlus_RunSelfTest( void );
+bool RendererModernVisible_RunSelfTest( void );
 
 #endif /* !__MODERN_GL_EXECUTOR_H__ */

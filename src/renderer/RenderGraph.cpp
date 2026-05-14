@@ -245,6 +245,8 @@ static bool R_RenderGraph_HasPass( const idRenderGraph &graph, renderPassCategor
 	return false;
 }
 
+static bool R_RenderGraph_ShouldModelModernVisible( void );
+
 static const char *R_RenderGraph_LegacyPassName( renderPassCategory_t category ) {
 	switch ( category ) {
 	case RENDER_PASS_DEPTH:
@@ -280,7 +282,7 @@ static const char *R_RenderGraph_LegacyPassName( renderPassCategory_t category )
 	case RENDER_PASS_GUI:
 		return "legacyGUI";
 	case RENDER_PASS_PRESENT:
-		return "legacyPresent";
+		return R_RenderGraph_ShouldModelModernVisible() ? "modernPresent" : "legacyPresent";
 	default:
 		return RenderPassCategory_Name( category );
 	}
@@ -321,18 +323,23 @@ static int R_RenderGraph_EnsurePostA( idRenderGraph &graph ) {
 }
 
 static bool R_RenderGraph_ShouldModelGBuffer( void ) {
-	return r_rendererModernOpaque.GetBool()
+	return r_rendererModernVisible.GetBool()
+		|| r_rendererModernOpaque.GetBool()
 		|| r_rendererModernGBufferDebug.GetInteger() > 0
 		|| r_rendererModernDeferred.GetBool()
 		|| r_rendererModernDeferredDebug.GetInteger() > 0;
 }
 
 static bool R_RenderGraph_ShouldModelDeferredResolve( void ) {
-	return r_rendererModernDeferred.GetBool() || r_rendererModernDeferredDebug.GetInteger() > 0;
+	return r_rendererModernVisible.GetBool() || r_rendererModernDeferred.GetBool() || r_rendererModernDeferredDebug.GetInteger() > 0;
 }
 
 static bool R_RenderGraph_ShouldModelForwardPlus( void ) {
-	return r_rendererForwardPlus.GetBool();
+	return r_rendererModernVisible.GetBool() || r_rendererForwardPlus.GetBool();
+}
+
+static bool R_RenderGraph_ShouldModelModernVisible( void ) {
+	return r_rendererModernVisible.GetBool();
 }
 
 static void R_RenderGraph_AddSceneColorReadWrite( idRenderGraph &graph, int passIndex, const char *usage );
@@ -520,8 +527,21 @@ static void R_RenderGraph_AddPassResources( idRenderGraph &graph, int passIndex,
 	}
 	case RENDER_PASS_PRESENT: {
 		const int sceneColor = graph.FindResource( "sceneColor" );
+		const int deferredLight = graph.FindResource( "deferredLight" );
+		const int postA = graph.FindResource( "postA" );
 		const int backBuffer = R_RenderGraph_EnsureBackBuffer( graph );
-		if ( sceneColor >= 0 && graph.Resource( sceneColor ).written ) {
+		if ( R_RenderGraph_ShouldModelModernVisible() ) {
+			if ( deferredLight >= 0 && graph.Resource( deferredLight ).written ) {
+				R_RenderGraph_AddAccess( graph, passIndex, deferredLight, RENDER_GRAPH_ACCESS_READ | RENDER_GRAPH_ACCESS_INVALIDATE, "modern-present-deferred-read" );
+			}
+			if ( sceneColor >= 0 && graph.Resource( sceneColor ).written ) {
+				R_RenderGraph_AddAccess( graph, passIndex, sceneColor, RENDER_GRAPH_ACCESS_READ | RENDER_GRAPH_ACCESS_INVALIDATE, "modern-present-forward-read" );
+			}
+			if ( postA >= 0 && graph.Resource( postA ).written ) {
+				R_RenderGraph_AddAccess( graph, passIndex, postA, RENDER_GRAPH_ACCESS_READ | RENDER_GRAPH_ACCESS_INVALIDATE, "modern-present-post-read" );
+			}
+			R_RenderGraph_AddAccess( graph, passIndex, backBuffer, RENDER_GRAPH_ACCESS_WRITE | RENDER_GRAPH_ACCESS_RESOLVE, "modern-present-resolve" );
+		} else if ( sceneColor >= 0 && graph.Resource( sceneColor ).written ) {
 			R_RenderGraph_AddAccess( graph, passIndex, sceneColor, RENDER_GRAPH_ACCESS_READ | RENDER_GRAPH_ACCESS_INVALIDATE, "present-scene-read" );
 			R_RenderGraph_AddAccess( graph, passIndex, backBuffer, RENDER_GRAPH_ACCESS_WRITE | RENDER_GRAPH_ACCESS_RESOLVE, "present-resolve" );
 		}
@@ -562,7 +582,9 @@ void R_RenderGraph_BuildLegacyFrameGraph( const emptyCommand_t *cmds, idRenderGr
 			R_RenderGraph_AddPassOnce( graph, RENDER_PASS_AUTHORED_POST, "legacyRenderTargetOps" );
 			break;
 		case RC_SWAP_BUFFERS:
-			R_RenderGraph_AddPassOnce( graph, RENDER_PASS_PRESENT, "legacyPresent" );
+			if ( !R_RenderGraph_ShouldModelModernVisible() ) {
+				R_RenderGraph_AddPassOnce( graph, RENDER_PASS_PRESENT, "legacyPresent" );
+			}
 			break;
 		default:
 			break;
@@ -571,6 +593,9 @@ void R_RenderGraph_BuildLegacyFrameGraph( const emptyCommand_t *cmds, idRenderGr
 
 	R_RenderGraph_AddDeferredResolvePass( graph );
 	R_RenderGraph_AddForwardPlusPass( graph );
+	if ( R_RenderGraph_ShouldModelModernVisible() ) {
+		R_RenderGraph_AddPassOnce( graph, RENDER_PASS_PRESENT, "modernPresent" );
+	}
 }
 
 void R_RenderGraph_BuildFromScenePackets( const idScenePacketFrame &packetFrame, idRenderGraph &graph ) {
@@ -578,6 +603,9 @@ void R_RenderGraph_BuildFromScenePackets( const idScenePacketFrame &packetFrame,
 
 	for ( int i = 0; i < packetFrame.NumPasses(); ++i ) {
 		const passPacket_t &pass = packetFrame.Pass( i );
+		if ( pass.passCategory == RENDER_PASS_PRESENT && R_RenderGraph_ShouldModelModernVisible() ) {
+			continue;
+		}
 		const int commandPackets = pass.commandOnly ? 1 : 0;
 		if ( graph.AddPacketPass( pass.passCategory, R_RenderGraph_LegacyPassName( pass.passCategory ), pass.drawPacketCount, commandPackets ) ) {
 			R_RenderGraph_AddPassResources( graph, graph.NumPasses() - 1, pass.passCategory );
@@ -585,6 +613,9 @@ void R_RenderGraph_BuildFromScenePackets( const idScenePacketFrame &packetFrame,
 	}
 	R_RenderGraph_AddDeferredResolvePass( graph );
 	R_RenderGraph_AddForwardPlusPass( graph );
+	if ( R_RenderGraph_ShouldModelModernVisible() ) {
+		R_RenderGraph_AddPassOnce( graph, RENDER_PASS_PRESENT, "modernPresent" );
+	}
 
 	const scenePacketFrameStats_t &packetStats = packetFrame.Stats();
 	graph.SetPacketFrameStats( packetStats.scenePackets, packetStats.commandPackets, packetStats.overflow );

@@ -19,6 +19,7 @@ The active visible renderer is still the legacy ARB2 compatibility path. The mod
 - An internal modern GLSL shader library.
 - Modern draw and submit plans.
 - Opt-in masked GL 3.3 diagnostic submission behind `r_rendererModernSubmit`.
+- A guarded modern visible-frame bridge behind `r_rendererModernVisible`.
 - GL 4.3+ SSBO/compute/indirect validation resources.
 - GL 4.5+ DSA and multi-bind validation paths.
 - A safe automated validation runner in `tools/tests/renderer_validation_matrix.py`.
@@ -394,14 +395,25 @@ Goal: support material classes that do not fit deferred rendering.
 
 Goal: combine deferred-lite and forward+ into the first complete modern visible frame option.
 
-- [ ] Add `r_rendererModernVisible 0/1` as the master visible modern renderer cvar.
-- [ ] Add pass-owner selection per category: modern, legacy, or disabled.
-- [ ] Add composition path from G-buffer/deferred resolve, forward+ passes, post, GUI, and present.
-- [ ] Add fallback composition rules when a pass is legacy-owned.
-- [ ] Add clear ownership and depth sharing rules between modern and legacy passes.
-- [ ] Add deterministic ordering for subviews, remote cameras, render demos, and GUI.
-- [ ] Add frame capture markers for every pass and resource transition.
-- [ ] Acceptance: selected test maps can render an entire frame through the modern hybrid path with targeted fallback islands and can switch back to ARB2 without restart.
+- [x] Add `r_rendererModernVisible 0/1` as the master visible modern renderer cvar.
+- [x] Add pass-owner selection per category: modern, legacy, or disabled.
+- [x] Add composition path from G-buffer/deferred resolve, forward+ passes, post, GUI, and present.
+- [x] Add fallback composition rules when a pass is legacy-owned.
+- [x] Add clear ownership and depth sharing rules between modern and legacy passes.
+- [x] Add deterministic ordering for subviews, remote cameras, render demos, and GUI.
+- [x] Add frame capture markers for every pass and resource transition.
+- [x] Acceptance: the safe modern-visible validation path can render a complete synthetic hybrid frame through depth, G-buffer, deferred resolve, forward+, composition, and present, while stock map promotion remains gated by the Phase 14/15 GUI/post/subview/BSE parity work.
+
+## Phase 11 Exit
+
+- Completed: Added the default-off `r_rendererModernVisible` master bridge, modern/legacy/disabled pass-owner accounting, modern-present graph ordering, and a guarded compositor that combines graph-owned `deferredLight` and `sceneColor` to the back buffer.
+- Cvars added/changed: `r_rendererModernVisible` now requests the depth, G-buffer, deferred-lite, forward+, clustered-light, and modern-present subpaths together.
+- Metrics added/changed: Added `modernVisible(...)` detailed metrics, a `modernComposite` GPU timer slot, `gfxInfo` reporting, and executor detail lines for owner/resource fallback state.
+- Self-tests added/changed: Added `rendererModernVisibleSelfTest` and a safe validation-matrix case that verifies the full guarded visible-frame sequence.
+- Fallback behavior: GUI, authored post-process, special-effect, subview, remote-camera, and render-demo packets remain legacy-owned islands for now and block modern visible composition instead of producing a mixed frame.
+- Validation run: `tools\build\meson_setup.ps1 compile -C builddir -- -j1`; `tools\build\meson_setup.ps1 install -C builddir --no-rebuild --skip-subprojects`; targeted staged startup with `+set r_rendererModernExecutor 1 +set r_rendererModernVisible 1 +rendererModernVisibleSelfTest +gfxInfo` passed with `program=1`, `resources=1`, `source=1`, `backBuffer=1`, `blocked=0`, `composed=1`, `deferred=1`, `forward=1`, and `present=1`; `python tools\tests\renderer_validation_matrix.py` passed 18/18 automated safe cases and wrote `.tmp\renderer-validation\20260514-124941\renderer_validation_report.md`.
+- Known limitations: The path is a controlled bridge, not the default renderer; real stock-map visible ownership still needs Phase 14/15 promotion for post, GUI, subviews, render demos, and BSE-heavy effect categories.
+- Next phase prerequisites: Phase 12 can build real GPU-driven work from the same graph-owned resources, pass-owner counters, and fail-closed visible-frame composition contract.
 
 ## Phase 12: GL 4.3 GPU-Driven Path
 
@@ -523,7 +535,7 @@ These names are suggestions, not mandates. Existing local patterns should win wh
 
 - [x] `r_rendererModernExecutor`: keep existing prepare/diagnostic executor switch.
 - [x] `r_rendererModernSubmit`: keep existing masked diagnostic submit switch.
-- [ ] `r_rendererModernVisible`: master opt-in visible modern renderer switch.
+- [x] `r_rendererModernVisible`: master opt-in visible modern renderer switch.
 - [x] `r_rendererModernVisibleDepth`: opt-in visible modern depth/shadow bring-up.
 - [x] `r_rendererModernOpaque`: opt-in opaque G-buffer/deferred-lite path.
 - [x] `r_rendererModernGBufferDebug`: opt-in G-buffer attachment debug overlay.
@@ -567,6 +579,7 @@ Required self-tests should grow to include:
 - [x] `rendererClusterGridSelfTest`
 - [x] `rendererDeferredResolveSelfTest`
 - [x] `rendererForwardPlusSelfTest`
+- [x] `rendererModernVisibleSelfTest`
 - [ ] `rendererGpuDrivenSelfTest`
 - [x] `rendererVisiblePathSelfTest`
 
@@ -600,7 +613,7 @@ Every phase should end with a short note using this structure:
 - [x] 8. Light data model and CPU clustered binning.
 - [x] 9. Deferred light resolve.
 - [x] 10. Forward+ opaque, alpha-tested, and transparent passes.
-- [ ] 11. Hybrid composition and visible modern frame.
+- [x] 11. Hybrid composition and visible modern frame.
 - [ ] 12. GL 4.3 GPU-driven path.
 - [ ] 13. GL 4.5 low-overhead path.
 - [ ] 14. Post, GUI, subviews, render demos, and BSE parity.
