@@ -207,9 +207,16 @@ typedef struct rendererMetricsFrame_s {
 	bool	modernVisibleProgramReady;
 	bool	modernVisibleSourceReady;
 	bool	modernVisibleBackBufferReady;
+	bool	modernVisibleHybridTargetReady;
+	bool	modernVisibleShadowReady;
+	bool	modernVisibleHDRTargetReady;
+	bool	modernVisiblePostProcessHandoff;
 	bool	modernVisibleBlockedByLegacy;
 	int		modernVisibleCompositions;
 	int		modernVisiblePixels;
+	int		modernVisibleCompositeCopies;
+	int		modernVisiblePostProcessCompositions;
+	int		modernVisibleDepthCopies;
 	int		modernVisibleModernPasses;
 	int		modernVisibleLegacyPasses;
 	int		modernVisibleDisabledPasses;
@@ -479,9 +486,16 @@ typedef struct rendererModernVisibleLatest_s {
 	bool	programReady;
 	bool	sourceReady;
 	bool	backBufferReady;
+	bool	hybridTargetReady;
+	bool	shadowReady;
+	bool	hdrTargetReady;
+	bool	postProcessHandoff;
 	bool	blockedByLegacy;
 	int		compositions;
 	int		pixels;
+	int		compositeCopies;
+	int		postProcessCompositions;
+	int		depthCopies;
 	int		modernPasses;
 	int		legacyPasses;
 	int		disabledPasses;
@@ -887,9 +901,16 @@ void R_RendererMetrics_BeginFrame( int frameCount ) {
 	rg_rendererMetrics.modernVisibleProgramReady = rg_modernVisibleLatest.programReady;
 	rg_rendererMetrics.modernVisibleSourceReady = rg_modernVisibleLatest.sourceReady;
 	rg_rendererMetrics.modernVisibleBackBufferReady = rg_modernVisibleLatest.backBufferReady;
+	rg_rendererMetrics.modernVisibleHybridTargetReady = rg_modernVisibleLatest.hybridTargetReady;
+	rg_rendererMetrics.modernVisibleShadowReady = rg_modernVisibleLatest.shadowReady;
+	rg_rendererMetrics.modernVisibleHDRTargetReady = rg_modernVisibleLatest.hdrTargetReady;
+	rg_rendererMetrics.modernVisiblePostProcessHandoff = rg_modernVisibleLatest.postProcessHandoff;
 	rg_rendererMetrics.modernVisibleBlockedByLegacy = rg_modernVisibleLatest.blockedByLegacy;
 	rg_rendererMetrics.modernVisibleCompositions = rg_modernVisibleLatest.compositions;
 	rg_rendererMetrics.modernVisiblePixels = rg_modernVisibleLatest.pixels;
+	rg_rendererMetrics.modernVisibleCompositeCopies = rg_modernVisibleLatest.compositeCopies;
+	rg_rendererMetrics.modernVisiblePostProcessCompositions = rg_modernVisibleLatest.postProcessCompositions;
+	rg_rendererMetrics.modernVisibleDepthCopies = rg_modernVisibleLatest.depthCopies;
 	rg_rendererMetrics.modernVisibleModernPasses = rg_modernVisibleLatest.modernPasses;
 	rg_rendererMetrics.modernVisibleLegacyPasses = rg_modernVisibleLatest.legacyPasses;
 	rg_rendererMetrics.modernVisibleDisabledPasses = rg_modernVisibleLatest.disabledPasses;
@@ -1227,16 +1248,23 @@ void R_RendererMetrics_RecordForwardPlus( bool requested, bool executed, bool re
 	rg_rendererMetrics.modernForwardClearOps = clearOps;
 }
 
-void R_RendererMetrics_RecordModernVisible( bool requested, bool executed, bool resourcesReady, bool programReady, bool sourceReady, bool backBufferReady, bool blockedByLegacy, int compositions, int pixels, int modernPasses, int legacyPasses, int disabledPasses, int fallbackPasses, int ownerFallbacks, int resourceFallbacks, int guiLegacyPasses, int postLegacyPasses, int specialLegacyPasses, int subviewLegacyPasses, int presentPasses, int clearOps ) {
+void R_RendererMetrics_RecordModernVisible( bool requested, bool executed, bool resourcesReady, bool programReady, bool sourceReady, bool backBufferReady, bool hybridTargetReady, bool shadowReady, bool hdrTargetReady, bool postProcessHandoff, bool blockedByLegacy, int compositions, int pixels, int compositeCopies, int postProcessCompositions, int depthCopies, int modernPasses, int legacyPasses, int disabledPasses, int fallbackPasses, int ownerFallbacks, int resourceFallbacks, int guiLegacyPasses, int postLegacyPasses, int specialLegacyPasses, int subviewLegacyPasses, int presentPasses, int clearOps ) {
 	rg_modernVisibleLatest.requested = requested;
 	rg_modernVisibleLatest.executed = executed;
 	rg_modernVisibleLatest.resourcesReady = resourcesReady;
 	rg_modernVisibleLatest.programReady = programReady;
 	rg_modernVisibleLatest.sourceReady = sourceReady;
 	rg_modernVisibleLatest.backBufferReady = backBufferReady;
+	rg_modernVisibleLatest.hybridTargetReady = hybridTargetReady;
+	rg_modernVisibleLatest.shadowReady = shadowReady;
+	rg_modernVisibleLatest.hdrTargetReady = hdrTargetReady;
+	rg_modernVisibleLatest.postProcessHandoff = postProcessHandoff;
 	rg_modernVisibleLatest.blockedByLegacy = blockedByLegacy;
 	rg_modernVisibleLatest.compositions = compositions;
 	rg_modernVisibleLatest.pixels = pixels;
+	rg_modernVisibleLatest.compositeCopies = compositeCopies;
+	rg_modernVisibleLatest.postProcessCompositions = postProcessCompositions;
+	rg_modernVisibleLatest.depthCopies = depthCopies;
 	rg_modernVisibleLatest.modernPasses = modernPasses;
 	rg_modernVisibleLatest.legacyPasses = legacyPasses;
 	rg_modernVisibleLatest.disabledPasses = disabledPasses;
@@ -1255,9 +1283,16 @@ void R_RendererMetrics_RecordModernVisible( bool requested, bool executed, bool 
 	rg_rendererMetrics.modernVisibleProgramReady = programReady;
 	rg_rendererMetrics.modernVisibleSourceReady = sourceReady;
 	rg_rendererMetrics.modernVisibleBackBufferReady = backBufferReady;
+	rg_rendererMetrics.modernVisibleHybridTargetReady = hybridTargetReady;
+	rg_rendererMetrics.modernVisibleShadowReady = shadowReady;
+	rg_rendererMetrics.modernVisibleHDRTargetReady = hdrTargetReady;
+	rg_rendererMetrics.modernVisiblePostProcessHandoff = postProcessHandoff;
 	rg_rendererMetrics.modernVisibleBlockedByLegacy = blockedByLegacy;
 	rg_rendererMetrics.modernVisibleCompositions = compositions;
 	rg_rendererMetrics.modernVisiblePixels = pixels;
+	rg_rendererMetrics.modernVisibleCompositeCopies = compositeCopies;
+	rg_rendererMetrics.modernVisiblePostProcessCompositions = postProcessCompositions;
+	rg_rendererMetrics.modernVisibleDepthCopies = depthCopies;
 	rg_rendererMetrics.modernVisibleModernPasses = modernPasses;
 	rg_rendererMetrics.modernVisibleLegacyPasses = legacyPasses;
 	rg_rendererMetrics.modernVisibleDisabledPasses = disabledPasses;
@@ -1766,15 +1801,22 @@ void R_RendererMetrics_EndFrame( int frontEndMsec, int backEndMsec, int viewCoun
 			rg_rendererMetrics.gpuTimerMsec[RENDERER_GPU_TIMER_MODERN_FORWARD],
 			rg_rendererMetrics.gpuTimerSamples[RENDERER_GPU_TIMER_MODERN_FORWARD] );
 		common->Printf(
-			"rendererMetrics modernVisible(req=%d exec=%d res=%d program=%d source=%d backBuffer=%d blocked=%d composed=%d pixels=%d modern=%d legacy=%d disabled=%d fallback=%d ownerFallback=%d resourceFallback=%d gui=%d post=%d special=%d subview=%d present=%d clear=%d gpu=%d/%d)\n",
+			"rendererMetrics modernVisible(req=%d exec=%d res=%d program=%d source=%d hybrid=%d backBuffer=%d shadow=%d hdr=%d postHandoff=%d blocked=%d composed=%d copies=%d postComposed=%d depthCopies=%d pixels=%d modern=%d legacy=%d disabled=%d fallback=%d ownerFallback=%d resourceFallback=%d gui=%d post=%d special=%d subview=%d present=%d clear=%d gpu=%d/%d)\n",
 			rg_rendererMetrics.modernVisibleRequested ? 1 : 0,
 			rg_rendererMetrics.modernVisibleExecuted ? 1 : 0,
 			rg_rendererMetrics.modernVisibleResourcesReady ? 1 : 0,
 			rg_rendererMetrics.modernVisibleProgramReady ? 1 : 0,
 			rg_rendererMetrics.modernVisibleSourceReady ? 1 : 0,
+			rg_rendererMetrics.modernVisibleHybridTargetReady ? 1 : 0,
 			rg_rendererMetrics.modernVisibleBackBufferReady ? 1 : 0,
+			rg_rendererMetrics.modernVisibleShadowReady ? 1 : 0,
+			rg_rendererMetrics.modernVisibleHDRTargetReady ? 1 : 0,
+			rg_rendererMetrics.modernVisiblePostProcessHandoff ? 1 : 0,
 			rg_rendererMetrics.modernVisibleBlockedByLegacy ? 1 : 0,
 			rg_rendererMetrics.modernVisibleCompositions,
+			rg_rendererMetrics.modernVisibleCompositeCopies,
+			rg_rendererMetrics.modernVisiblePostProcessCompositions,
+			rg_rendererMetrics.modernVisibleDepthCopies,
 			rg_rendererMetrics.modernVisiblePixels,
 			rg_rendererMetrics.modernVisibleModernPasses,
 			rg_rendererMetrics.modernVisibleLegacyPasses,

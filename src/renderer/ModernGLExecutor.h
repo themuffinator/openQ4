@@ -70,6 +70,9 @@ typedef struct modernGLExecutorStats_s {
 	bool	modernVisibleBackBufferReady;
 	bool	modernVisibleHybridTargetReady;
 	bool	modernVisibleShadowReady;
+	bool	modernVisibleHDRTargetReady;
+	bool	modernVisibleSceneComposited;
+	bool	modernVisiblePostProcessHandoff;
 	bool	modernVisibleBlockedByLegacy;
 	bool	modernVisibleCompatibilityReady;
 	bool	modernVisibleGuiProgramReady;
@@ -264,6 +267,8 @@ typedef struct modernGLExecutorStats_s {
 	int		modernVisibleCompositions;
 	int		modernVisiblePixels;
 	int		modernVisibleCompositeCopies;
+	int		modernVisiblePostProcessCompositions;
+	int		modernVisibleDepthCopies;
 	int		modernVisibleModernPasses;
 	int		modernVisibleLegacyPasses;
 	int		modernVisibleDisabledPasses;
@@ -311,8 +316,11 @@ void R_ModernGLExecutor_PrepareFrame( const idScenePacketFrame &packetFrame, con
 void R_ModernGLExecutor_DrawDepthDebugOverlay( void );
 void R_ModernGLExecutor_DrawGBufferDebugOverlay( void );
 void R_ModernGLExecutor_DrawDeferredDebugOverlay( void );
+void R_ModernGLExecutor_ComposeVisibleSceneForPost( void );
 void R_ModernGLExecutor_ComposeVisibleFrame( void );
 const modernGLExecutorStats_t &R_ModernGLExecutor_Stats( void );
+bool R_ModernGLExecutor_ModernVisibleRequestedForPost( void );
+bool R_ModernGLExecutor_ModernVisiblePostProcessHandoffActive( void );
 bool R_ModernGLExecutor_LegacyPassCanSkip( renderPassCategory_t category );
 void R_ModernGLExecutor_RecordLegacyPassSkipped( renderPassCategory_t category );
 void R_ModernGLExecutor_PrintGfxInfo( void );

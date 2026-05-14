@@ -857,11 +857,16 @@ static int RB_HDRDebugViewValue( void ) {
 	return idMath::ClampInt( 0, 2, r_hdrDebugView.GetInteger() );
 }
 
+static bool RB_ModernVisibleSceneTargetRequested( void ) {
+	return R_ModernGLExecutor_ModernVisibleRequestedForPost() && r_hdrSceneTarget.GetBool();
+}
+
+static bool RB_HDRAutoExposureRequested( void ) {
+	return r_hdrAutoExposure.GetBool() && R_ModernGLExecutor_ModernVisibleRequestedForPost();
+}
+
 static bool RB_HDRAutoExposureEnabled( void ) {
-	// Auto exposure only makes sense once the full renderer feeds a reliable
-	// scene-linear buffer into post. In the legacy SDR path it over-corrects
-	// stock Quake 4 content and washes out LDR presentation.
-	return false;
+	return r_hdrAutoExposure.GetBool() && R_ModernGLExecutor_ModernVisiblePostProcessHandoffActive();
 }
 
 static bool RB_IsSceneRenderTexture( const idRenderTexture *renderTexture ) {
@@ -941,7 +946,7 @@ static bool RB_EnsureSceneRenderTexture( void ) {
 	const int targetWidth = Max( glConfig.vidWidth, backEnd.viewDef->viewport.x2 + 1 );
 	const int targetHeight = Max( glConfig.vidHeight, backEnd.viewDef->viewport.y2 + 1 );
 	const int requestedSamples = Max( 0, r_multiSamples.GetInteger() );
-	const int sceneSamples = ( requestedSamples > 1 ) ? requestedSamples : 0;
+	const int sceneSamples = ( requestedSamples > 1 && !R_ModernGLExecutor_ModernVisibleRequestedForPost() ) ? requestedSamples : 0;
 
 	if ( targetWidth <= 0 || targetHeight <= 0 ) {
 		return false;
@@ -1001,7 +1006,18 @@ static bool RB_SceneRenderTargetRequested( void ) {
 	}
 	const bool bloomRequested = RB_PostProcessBloomRequested();
 	const bool motionBlurRequested = RB_PostProcessMotionBlurRequested();
-	if ( !bloomRequested && !motionBlurRequested && !r_hdrSceneTarget.GetBool() ) {
+	const bool ssaoRequested = r_ssao.GetBool();
+	const bool toneMapRequested = r_hdrToneMap.GetBool();
+	const bool autoExposureRequested = RB_HDRAutoExposureRequested();
+	const bool hdrDebugRequested = RB_HDRDebugViewValue() > 0;
+	const bool modernVisibleSceneTargetRequested = RB_ModernVisibleSceneTargetRequested();
+	if ( !bloomRequested
+		&& !motionBlurRequested
+		&& !ssaoRequested
+		&& !toneMapRequested
+		&& !autoExposureRequested
+		&& !hdrDebugRequested
+		&& !modernVisibleSceneTargetRequested ) {
 		return false;
 	}
 	if ( backEnd.renderTexture != NULL ) {
@@ -1013,10 +1029,11 @@ static bool RB_SceneRenderTargetRequested( void ) {
 	// map handoffs, and it also clipped highlight energy before the bright-pass.
 	return bloomRequested
 		|| motionBlurRequested
-		|| r_ssao.GetBool()
-		|| r_hdrToneMap.GetBool()
-		|| RB_HDRAutoExposureEnabled()
-		|| ( RB_HDRDebugViewValue() > 0 );
+		|| ssaoRequested
+		|| toneMapRequested
+		|| autoExposureRequested
+		|| hdrDebugRequested
+		|| modernVisibleSceneTargetRequested;
 }
 
 static void RB_BeginFullscreenPostProcessPass( int scissorX, int scissorY, int scissorWidth, int scissorHeight ) {
@@ -7165,6 +7182,9 @@ void	RB_STD_DrawView( void ) {
 	} else {
 		RB_STD_FogAllLights();
 	}
+
+	// Modern visible color and depth enter the existing HDR/SSAO/bloom stack here; GUI remains a swap-time overlay.
+	R_ModernGLExecutor_ComposeVisibleSceneForPost();
 
 	// Apply SSAO before bloom and tonemapping so indirect shadowing modulates the lit scene.
 	RB_STD_SSAO();

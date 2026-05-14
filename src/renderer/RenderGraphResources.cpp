@@ -143,17 +143,26 @@ static int R_RenderGraphResources_ShadowResourceSize( void ) {
 	return Max( 1, size );
 }
 
+static bool R_RenderGraphResources_HDRColorFormatSupported( void ) {
+	return rg_renderGraphResourceFeatures.modernGL41
+		|| rg_renderGraphResourceFeatures.gpuDriven
+		|| rg_renderGraphResourceFeatures.lowOverhead;
+}
+
+static bool R_RenderGraphResources_IsHDRColorResource( const char *name ) {
+	return name != NULL
+		&& ( !idStr::Icmp( name, "sceneColor" )
+			|| !idStr::Icmp( name, "deferredLight" )
+			|| !idStr::Icmp( name, "hybridSceneColor" )
+			|| !idStr::Icmp( name, "postA" )
+			|| !idStr::Icmp( name, "gbufferEmissive" )
+			|| !idStr::Icmp( name, "translucentShadowMoments" ) );
+}
+
 static bool R_RenderGraphResources_FormatForType( const char *name, renderGraphResourceType_t type, GLenum &internalFormat, GLenum &format, GLenum &dataType, GLenum &attachment ) {
 	switch ( type ) {
 	case RENDER_GRAPH_RESOURCE_COLOR:
-		if ( name != NULL && ( !idStr::Icmp( name, "gbufferEmissive" ) || !idStr::Icmp( name, "deferredLight" ) ) && ( rg_renderGraphResourceFeatures.modernGL41 || rg_renderGraphResourceFeatures.gpuDriven || rg_renderGraphResourceFeatures.lowOverhead ) ) {
-			internalFormat = GL_RGBA16F;
-			format = GL_RGBA;
-			dataType = GL_HALF_FLOAT;
-			attachment = GL_COLOR_ATTACHMENT0;
-			return true;
-		}
-		if ( name != NULL && !idStr::Icmp( name, "translucentShadowMoments" ) && ( rg_renderGraphResourceFeatures.modernGL41 || rg_renderGraphResourceFeatures.gpuDriven || rg_renderGraphResourceFeatures.lowOverhead ) ) {
+		if ( R_RenderGraphResources_HDRColorFormatSupported() && R_RenderGraphResources_IsHDRColorResource( name ) ) {
 			internalFormat = GL_RGBA16F;
 			format = GL_RGBA;
 			dataType = GL_HALF_FLOAT;

@@ -523,7 +523,7 @@ def build_safe_cases(tiers: tuple[str, ...]) -> list[dict[str, Any]]:
         {
             "id": "renderer-modern-visible-selftest",
             "category": "selftest",
-            "description": "Opt-in hybrid visible-frame composition over modern depth, deferred-lite, forward+, and present passes.",
+            "description": "Opt-in hybrid visible-frame composition over modern depth, deferred-lite, forward+, HDR/post handoff, and present passes.",
             "args": [
                 "+set",
                 "r_rendererMetrics",
@@ -551,9 +551,13 @@ def build_safe_cases(tiers: tuple[str, ...]) -> list[dict[str, Any]]:
                 ["hybrid=1"],
                 ["backBuffer=1"],
                 ["shadow=1"],
+                ["hdr="],
+                ["postHandoff=1"],
                 ["blocked=0"],
                 ["composed=1"],
                 ["copies=1"],
+                ["postComposed=1"],
+                ["depthCopies=1"],
                 ["deferred=1"],
                 ["forward=1"],
                 ["present=1"],

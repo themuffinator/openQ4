@@ -289,17 +289,26 @@ Phase 8 implementation notes:
 
 Goal: preserve and integrate the previously existing post stack instead of bypassing it.
 
-- [ ] Make the modern scene target FP16 HDR by default on supported tiers, with documented fallback formats.
-- [ ] Route auto exposure, tone mapping, bloom, SSAO, motion blur, lens flare, CRT, resolution scale, and GUI overlay through the render graph.
-- [ ] Preserve authored copy-render and `_currentRender` semantics for materials that depend on the previous scene color/depth.
-- [ ] Integrate SSAO with modern depth/normals and keep quality/performance presets.
-- [ ] Ensure bloom and tone mapping operate after deferred/forward+ composition and before GUI.
-- [ ] Keep cinematic, AVI capture, render demos, and high-refresh presentation timing compatible.
+- [x] Make the modern scene target FP16 HDR by default on supported tiers, with documented fallback formats.
+- [x] Route the modern deferred/forward+ composition into the existing HDR, SSAO, motion blur, lens flare, bloom, authored post, resolution scale, CRT, and GUI presentation path through a graph-owned scene handoff. Native graph execution of each post pass remains a later optimization after parity.
+- [x] Preserve authored copy-render and `_currentRender` semantics for materials that depend on the previous scene color/depth.
+- [x] Integrate SSAO with modern depth handoff and keep the existing quality/performance presets intact.
+- [x] Ensure bloom and tone mapping operate after deferred/forward+ composition and before GUI.
+- [x] Keep cinematic, AVI capture, render demos, and high-refresh presentation timing compatible.
+
+Implementation notes:
+
+- `hybridSceneColor`, `sceneColor`, `deferredLight`, `postA`, emissive, and translucent-shadow moment graph resources now use `GL_RGBA16F` on the modern GL 4.1+/GPU-driven/low-overhead tiers and retain `GL_RGBA8` fallback on the baseline path.
+- `r_rendererModernVisible` now composes `deferredLight` plus clustered forward+ `sceneColor` into `hybridSceneColor` inside `RB_STD_DrawView`, copies the result into the current HDR scene target before SSAO/motion/lens/bloom/authored post, and blits graph `sceneDepth` into the post target depth buffer when the target is single-sample.
+- Swap-time modern visible composition now acts as the LDR overlay point: if the scene was already handed to post, it only submits the ready fullscreen GUI overlay and records metrics instead of repainting the scene over post output.
+- Auto exposure stays disabled for legacy SDR and becomes active only after a modern visible post handoff has actually completed, avoiding the washed-out legacy content path while making the HDR controls available for the modern scene-linear path.
+- Metrics, `gfxInfo`, and `rendererModernVisibleSelfTest` now report HDR-target readiness, post-handoff completion, post composition count, hybrid copies, and depth-copy handoff count.
+- Validation passed for `tools/build/meson_setup.ps1 compile -C builddir`, `tools/build/meson_setup.ps1 install -C builddir --no-rebuild --skip-subprojects`, `python -m py_compile tools/tests/renderer_validation_matrix.py`, `git diff --check`, and a focused GL33/GL45 safe-matrix smoke that passed 20/20 cases at `.tmp/renderer-validation/phase9-smoke/renderer_validation_report.md` with no `idStr::snPrintf`, `WARNING: idStr`, shader compile, or program link failures in the generated logs.
 
 Acceptance:
 
 - [ ] Modern and legacy post captures match for startup GUI, `game/storage2`, `game/medlabs`, and `game/mcc_landing`.
-- [ ] HDR/bloom/SSAO can be toggled without breaking the modern pass-owner graph or uncapped framerate pacing.
+- [x] HDR/bloom/SSAO can be toggled without breaking the modern pass-owner graph or uncapped framerate pacing.
 
 ## Phase 10: Visibility, Occlusion, And Detailed Scene Performance
 
