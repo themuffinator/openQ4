@@ -703,6 +703,8 @@ const char *RenderPassCategory_Name( renderPassCategory_t category ) {
 		return "ambient";
 	case RENDER_PASS_DEFERRED_RESOLVE:
 		return "deferredResolve";
+	case RENDER_PASS_FORWARD_PLUS:
+		return "forwardPlus";
 	case RENDER_PASS_FOG_BLEND:
 		return "fogBlend";
 	case RENDER_PASS_SSAO:

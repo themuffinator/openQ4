@@ -30,6 +30,12 @@ const char *ModernGLDrawPlanPipeline_Name( modernGLDrawPlanPipeline_t pipeline )
 		return "lightGrid";
 	case MODERN_GL_DRAW_PLAN_PIPELINE_FOG_BLEND:
 		return "fogBlend";
+	case MODERN_GL_DRAW_PLAN_PIPELINE_FORWARD_PLUS_OPAQUE:
+		return "forwardPlusOpaque";
+	case MODERN_GL_DRAW_PLAN_PIPELINE_FORWARD_PLUS_ALPHA_TEST:
+		return "forwardPlusAlphaTest";
+	case MODERN_GL_DRAW_PLAN_PIPELINE_FORWARD_PLUS_TRANSPARENT:
+		return "forwardPlusTransparent";
 	case MODERN_GL_DRAW_PLAN_PIPELINE_NONE:
 	default:
 		return "none";
@@ -89,7 +95,10 @@ static bool R_ModernGLDrawPlan_IsMaterialPipeline( modernGLDrawPlanPipeline_t pi
 	return pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_FLAT_MATERIAL
 		|| pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_GBUFFER
 		|| pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_LIGHT_GRID
-		|| pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_FOG_BLEND;
+		|| pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_FOG_BLEND
+		|| pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_FORWARD_PLUS_OPAQUE
+		|| pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_FORWARD_PLUS_ALPHA_TEST
+		|| pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_FORWARD_PLUS_TRANSPARENT;
 }
 
 static bool R_ModernGLDrawPlan_ShouldUseGBuffer( const materialResourceTableRecord_t &materialRecord ) {
@@ -102,6 +111,36 @@ static bool R_ModernGLDrawPlan_ShouldUseGBuffer( const materialResourceTableReco
 	return materialRecord.materialClass == RENDER_MATERIAL_OPAQUE
 		|| materialRecord.materialClass == RENDER_MATERIAL_PERFORATED
 		|| materialRecord.alphaTest;
+}
+
+static bool R_ModernGLDrawPlan_ShouldUseForwardPlus( renderPassCategory_t passCategory, const materialResourceTableRecord_t &materialRecord, modernGLDrawPlanPipeline_t &pipeline, modernGLShaderProgramKind_t &shaderKind ) {
+	if ( !r_rendererForwardPlus.GetBool() ) {
+		return false;
+	}
+	if ( materialRecord.materialClass == RENDER_MATERIAL_GUI
+		|| materialRecord.materialClass == RENDER_MATERIAL_POST_PROCESS
+		|| materialRecord.materialClass == RENDER_MATERIAL_SUBVIEW
+		|| materialRecord.materialClass == RENDER_MATERIAL_SHADOW_ONLY ) {
+		return false;
+	}
+	if ( passCategory == RENDER_PASS_ARB2_INTERACTION || passCategory == RENDER_PASS_AMBIENT ) {
+		if ( materialRecord.alphaTest || materialRecord.materialClass == RENDER_MATERIAL_PERFORATED ) {
+			pipeline = MODERN_GL_DRAW_PLAN_PIPELINE_FORWARD_PLUS_ALPHA_TEST;
+			shaderKind = MODERN_GL_SHADER_CLUSTERED_FORWARD_ALPHA_TEST;
+			return true;
+		}
+		if ( materialRecord.materialClass == RENDER_MATERIAL_OPAQUE ) {
+			pipeline = MODERN_GL_DRAW_PLAN_PIPELINE_FORWARD_PLUS_OPAQUE;
+			shaderKind = MODERN_GL_SHADER_CLUSTERED_FORWARD_OPAQUE;
+			return true;
+		}
+	}
+	if ( passCategory == RENDER_PASS_FOG_BLEND ) {
+		pipeline = MODERN_GL_DRAW_PLAN_PIPELINE_FORWARD_PLUS_TRANSPARENT;
+		shaderKind = MODERN_GL_SHADER_TRANSPARENT_FORWARD;
+		return true;
+	}
+	return false;
 }
 
 bool idModernGLDrawPlan::AddEntry( const drawPacket_t &draw, int drawPacketIndex, const materialResourceTableRecord_t &materialRecord, modernGLDrawPlanPipeline_t pipeline, const modernGLShaderProgramInfo_t &program ) {
@@ -220,6 +259,14 @@ bool idModernGLDrawPlan::Build( const idScenePacketFrame &packetFrame, const idR
 			shaderKind = ( materialRecord->alphaTest || materialRecord->materialClass == RENDER_MATERIAL_PERFORATED )
 				? MODERN_GL_SHADER_GBUFFER_ALPHA_TEST
 				: MODERN_GL_SHADER_GBUFFER_OPAQUE;
+		}
+		if ( R_ModernGLDrawPlan_ShouldUseForwardPlus( draw.passCategory, *materialRecord, pipeline, shaderKind ) ) {
+			if ( draw.passCategory == RENDER_PASS_AMBIENT && R_ModernGLDrawPlan_ShouldUseGBuffer( *materialRecord ) ) {
+				pipeline = MODERN_GL_DRAW_PLAN_PIPELINE_GBUFFER;
+				shaderKind = ( materialRecord->alphaTest || materialRecord->materialClass == RENDER_MATERIAL_PERFORATED )
+					? MODERN_GL_SHADER_GBUFFER_ALPHA_TEST
+					: MODERN_GL_SHADER_GBUFFER_OPAQUE;
+			}
 		}
 
 		const modernGLShaderProgramInfo_t *program = R_ModernGLShaderLibrary_FindProgram( shaderKind, shaderStats.highestGLSLVersion );

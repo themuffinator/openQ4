@@ -39,7 +39,10 @@ static bool R_ModernGLSubmitPlan_IsMaterialPipeline( modernGLDrawPlanPipeline_t 
 	return pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_FLAT_MATERIAL
 		|| pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_GBUFFER
 		|| pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_LIGHT_GRID
-		|| pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_FOG_BLEND;
+		|| pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_FOG_BLEND
+		|| pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_FORWARD_PLUS_OPAQUE
+		|| pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_FORWARD_PLUS_ALPHA_TEST
+		|| pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_FORWARD_PLUS_TRANSPARENT;
 }
 
 static bool R_ModernGLSubmitPlan_RunFrameTempIndexCacheSelfTest( void ) {

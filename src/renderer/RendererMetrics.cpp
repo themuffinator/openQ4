@@ -166,6 +166,35 @@ typedef struct rendererMetricsFrame_s {
 	int		modernDeferredClearOps;
 	int		modernDeferredDebugMode;
 	int		modernDeferredDebugOverlayDraws;
+	bool	modernForwardRequested;
+	bool	modernForwardExecuted;
+	bool	modernForwardResourcesReady;
+	bool	modernForwardSceneColorReady;
+	bool	modernForwardSceneDepthReady;
+	bool	modernForwardProgramReady;
+	bool	modernForwardClusterReady;
+	int		modernForwardDraws;
+	int		modernForwardOpaqueDraws;
+	int		modernForwardAlphaTestDraws;
+	int		modernForwardTransparentDraws;
+	int		modernForwardViewModelDraws;
+	int		modernForwardFogBlendDraws;
+	int		modernForwardSortedBatches;
+	int		modernForwardFallbackDraws;
+	int		modernForwardResourceFallbackDraws;
+	int		modernForwardMaterialFallbackDraws;
+	int		modernForwardGeometryFallbackDraws;
+	int		modernForwardTextureFallbackDraws;
+	int		modernForwardUnsupportedBlendFallbackDraws;
+	int		modernForwardSpecialEffectFallbacks;
+	int		modernForwardSortFallbackDraws;
+	int		modernForwardOverdrawEstimate;
+	int		modernForwardClusterReads;
+	int		modernForwardActiveLights;
+	int		modernForwardPointLights;
+	int		modernForwardProjectedLights;
+	int		modernForwardLightGridContributions;
+	int		modernForwardClearOps;
 	rendererClusteredLightingStats_t clusteredLighting;
 	glStateCacheStats_t glStateCache;
 	bool	gpuTimersValid;
@@ -340,6 +369,38 @@ typedef struct rendererDeferredResolveLatest_s {
 	int		debugOverlayDraws;
 } rendererDeferredResolveLatest_t;
 
+typedef struct rendererForwardPlusLatest_s {
+	bool	requested;
+	bool	executed;
+	bool	resourcesReady;
+	bool	sceneColorReady;
+	bool	sceneDepthReady;
+	bool	programReady;
+	bool	clusterReady;
+	int		draws;
+	int		opaqueDraws;
+	int		alphaTestDraws;
+	int		transparentDraws;
+	int		viewModelDraws;
+	int		fogBlendDraws;
+	int		sortedBatches;
+	int		fallbackDraws;
+	int		resourceFallbackDraws;
+	int		materialFallbackDraws;
+	int		geometryFallbackDraws;
+	int		textureFallbackDraws;
+	int		unsupportedBlendFallbackDraws;
+	int		specialEffectFallbacks;
+	int		sortFallbackDraws;
+	int		overdrawEstimate;
+	int		clusterReads;
+	int		activeLights;
+	int		pointLights;
+	int		projectedLights;
+	int		lightGridContributions;
+	int		clearOps;
+} rendererForwardPlusLatest_t;
+
 typedef struct rendererGLStateCacheLatest_s {
 	glStateCacheStats_t stats;
 } rendererGLStateCacheLatest_t;
@@ -354,6 +415,7 @@ static renderGraphResourceManagerStats_t rg_renderGraphResourceLatest;
 static materialResourceTableStats_t rg_materialResourceTableLatest;
 static rendererModernExecutorLatest_t rg_modernExecutorLatest;
 static rendererDeferredResolveLatest_t rg_deferredResolveLatest;
+static rendererForwardPlusLatest_t rg_forwardPlusLatest;
 static rendererClusteredLightingStats_t rg_clusteredLightingLatest;
 static rendererGLStateCacheLatest_t rg_glStateCacheLatest;
 static int rg_gpuTimerFrameCursor = 0;
@@ -380,6 +442,8 @@ static const char *R_RendererMetrics_GpuTimerSlotName( rendererGpuTimerSlot_t sl
 		return "swap";
 	case RENDERER_GPU_TIMER_MODERN_DEFERRED:
 		return "modernDeferred";
+	case RENDERER_GPU_TIMER_MODERN_FORWARD:
+		return "modernForward";
 	default:
 		return "unknown";
 	}
@@ -636,6 +700,35 @@ void R_RendererMetrics_BeginFrame( int frameCount ) {
 	rg_rendererMetrics.modernDeferredClearOps = rg_deferredResolveLatest.clearOps;
 	rg_rendererMetrics.modernDeferredDebugMode = rg_deferredResolveLatest.debugMode;
 	rg_rendererMetrics.modernDeferredDebugOverlayDraws = rg_deferredResolveLatest.debugOverlayDraws;
+	rg_rendererMetrics.modernForwardRequested = rg_forwardPlusLatest.requested;
+	rg_rendererMetrics.modernForwardExecuted = rg_forwardPlusLatest.executed;
+	rg_rendererMetrics.modernForwardResourcesReady = rg_forwardPlusLatest.resourcesReady;
+	rg_rendererMetrics.modernForwardSceneColorReady = rg_forwardPlusLatest.sceneColorReady;
+	rg_rendererMetrics.modernForwardSceneDepthReady = rg_forwardPlusLatest.sceneDepthReady;
+	rg_rendererMetrics.modernForwardProgramReady = rg_forwardPlusLatest.programReady;
+	rg_rendererMetrics.modernForwardClusterReady = rg_forwardPlusLatest.clusterReady;
+	rg_rendererMetrics.modernForwardDraws = rg_forwardPlusLatest.draws;
+	rg_rendererMetrics.modernForwardOpaqueDraws = rg_forwardPlusLatest.opaqueDraws;
+	rg_rendererMetrics.modernForwardAlphaTestDraws = rg_forwardPlusLatest.alphaTestDraws;
+	rg_rendererMetrics.modernForwardTransparentDraws = rg_forwardPlusLatest.transparentDraws;
+	rg_rendererMetrics.modernForwardViewModelDraws = rg_forwardPlusLatest.viewModelDraws;
+	rg_rendererMetrics.modernForwardFogBlendDraws = rg_forwardPlusLatest.fogBlendDraws;
+	rg_rendererMetrics.modernForwardSortedBatches = rg_forwardPlusLatest.sortedBatches;
+	rg_rendererMetrics.modernForwardFallbackDraws = rg_forwardPlusLatest.fallbackDraws;
+	rg_rendererMetrics.modernForwardResourceFallbackDraws = rg_forwardPlusLatest.resourceFallbackDraws;
+	rg_rendererMetrics.modernForwardMaterialFallbackDraws = rg_forwardPlusLatest.materialFallbackDraws;
+	rg_rendererMetrics.modernForwardGeometryFallbackDraws = rg_forwardPlusLatest.geometryFallbackDraws;
+	rg_rendererMetrics.modernForwardTextureFallbackDraws = rg_forwardPlusLatest.textureFallbackDraws;
+	rg_rendererMetrics.modernForwardUnsupportedBlendFallbackDraws = rg_forwardPlusLatest.unsupportedBlendFallbackDraws;
+	rg_rendererMetrics.modernForwardSpecialEffectFallbacks = rg_forwardPlusLatest.specialEffectFallbacks;
+	rg_rendererMetrics.modernForwardSortFallbackDraws = rg_forwardPlusLatest.sortFallbackDraws;
+	rg_rendererMetrics.modernForwardOverdrawEstimate = rg_forwardPlusLatest.overdrawEstimate;
+	rg_rendererMetrics.modernForwardClusterReads = rg_forwardPlusLatest.clusterReads;
+	rg_rendererMetrics.modernForwardActiveLights = rg_forwardPlusLatest.activeLights;
+	rg_rendererMetrics.modernForwardPointLights = rg_forwardPlusLatest.pointLights;
+	rg_rendererMetrics.modernForwardProjectedLights = rg_forwardPlusLatest.projectedLights;
+	rg_rendererMetrics.modernForwardLightGridContributions = rg_forwardPlusLatest.lightGridContributions;
+	rg_rendererMetrics.modernForwardClearOps = rg_forwardPlusLatest.clearOps;
 	rg_rendererMetrics.clusteredLighting = rg_clusteredLightingLatest;
 	rg_rendererMetrics.glStateCache = rg_glStateCacheLatest.stats;
 }
@@ -830,6 +923,67 @@ void R_RendererMetrics_RecordDeferredResolve( bool requested, bool executed, boo
 	rg_rendererMetrics.modernDeferredClearOps = clearOps;
 	rg_rendererMetrics.modernDeferredDebugMode = debugMode;
 	rg_rendererMetrics.modernDeferredDebugOverlayDraws = debugOverlayDraws;
+}
+
+void R_RendererMetrics_RecordForwardPlus( bool requested, bool executed, bool resourcesReady, bool sceneColorReady, bool sceneDepthReady, bool programReady, bool clusterReady, int draws, int opaqueDraws, int alphaTestDraws, int transparentDraws, int viewModelDraws, int fogBlendDraws, int sortedBatches, int fallbackDraws, int resourceFallbackDraws, int materialFallbackDraws, int geometryFallbackDraws, int textureFallbackDraws, int unsupportedBlendFallbackDraws, int specialEffectFallbacks, int sortFallbackDraws, int overdrawEstimate, int clusterReads, int activeLights, int pointLights, int projectedLights, int lightGridContributions, int clearOps ) {
+	rg_forwardPlusLatest.requested = requested;
+	rg_forwardPlusLatest.executed = executed;
+	rg_forwardPlusLatest.resourcesReady = resourcesReady;
+	rg_forwardPlusLatest.sceneColorReady = sceneColorReady;
+	rg_forwardPlusLatest.sceneDepthReady = sceneDepthReady;
+	rg_forwardPlusLatest.programReady = programReady;
+	rg_forwardPlusLatest.clusterReady = clusterReady;
+	rg_forwardPlusLatest.draws = draws;
+	rg_forwardPlusLatest.opaqueDraws = opaqueDraws;
+	rg_forwardPlusLatest.alphaTestDraws = alphaTestDraws;
+	rg_forwardPlusLatest.transparentDraws = transparentDraws;
+	rg_forwardPlusLatest.viewModelDraws = viewModelDraws;
+	rg_forwardPlusLatest.fogBlendDraws = fogBlendDraws;
+	rg_forwardPlusLatest.sortedBatches = sortedBatches;
+	rg_forwardPlusLatest.fallbackDraws = fallbackDraws;
+	rg_forwardPlusLatest.resourceFallbackDraws = resourceFallbackDraws;
+	rg_forwardPlusLatest.materialFallbackDraws = materialFallbackDraws;
+	rg_forwardPlusLatest.geometryFallbackDraws = geometryFallbackDraws;
+	rg_forwardPlusLatest.textureFallbackDraws = textureFallbackDraws;
+	rg_forwardPlusLatest.unsupportedBlendFallbackDraws = unsupportedBlendFallbackDraws;
+	rg_forwardPlusLatest.specialEffectFallbacks = specialEffectFallbacks;
+	rg_forwardPlusLatest.sortFallbackDraws = sortFallbackDraws;
+	rg_forwardPlusLatest.overdrawEstimate = overdrawEstimate;
+	rg_forwardPlusLatest.clusterReads = clusterReads;
+	rg_forwardPlusLatest.activeLights = activeLights;
+	rg_forwardPlusLatest.pointLights = pointLights;
+	rg_forwardPlusLatest.projectedLights = projectedLights;
+	rg_forwardPlusLatest.lightGridContributions = lightGridContributions;
+	rg_forwardPlusLatest.clearOps = clearOps;
+	rg_rendererMetrics.modernForwardRequested = requested;
+	rg_rendererMetrics.modernForwardExecuted = executed;
+	rg_rendererMetrics.modernForwardResourcesReady = resourcesReady;
+	rg_rendererMetrics.modernForwardSceneColorReady = sceneColorReady;
+	rg_rendererMetrics.modernForwardSceneDepthReady = sceneDepthReady;
+	rg_rendererMetrics.modernForwardProgramReady = programReady;
+	rg_rendererMetrics.modernForwardClusterReady = clusterReady;
+	rg_rendererMetrics.modernForwardDraws = draws;
+	rg_rendererMetrics.modernForwardOpaqueDraws = opaqueDraws;
+	rg_rendererMetrics.modernForwardAlphaTestDraws = alphaTestDraws;
+	rg_rendererMetrics.modernForwardTransparentDraws = transparentDraws;
+	rg_rendererMetrics.modernForwardViewModelDraws = viewModelDraws;
+	rg_rendererMetrics.modernForwardFogBlendDraws = fogBlendDraws;
+	rg_rendererMetrics.modernForwardSortedBatches = sortedBatches;
+	rg_rendererMetrics.modernForwardFallbackDraws = fallbackDraws;
+	rg_rendererMetrics.modernForwardResourceFallbackDraws = resourceFallbackDraws;
+	rg_rendererMetrics.modernForwardMaterialFallbackDraws = materialFallbackDraws;
+	rg_rendererMetrics.modernForwardGeometryFallbackDraws = geometryFallbackDraws;
+	rg_rendererMetrics.modernForwardTextureFallbackDraws = textureFallbackDraws;
+	rg_rendererMetrics.modernForwardUnsupportedBlendFallbackDraws = unsupportedBlendFallbackDraws;
+	rg_rendererMetrics.modernForwardSpecialEffectFallbacks = specialEffectFallbacks;
+	rg_rendererMetrics.modernForwardSortFallbackDraws = sortFallbackDraws;
+	rg_rendererMetrics.modernForwardOverdrawEstimate = overdrawEstimate;
+	rg_rendererMetrics.modernForwardClusterReads = clusterReads;
+	rg_rendererMetrics.modernForwardActiveLights = activeLights;
+	rg_rendererMetrics.modernForwardPointLights = pointLights;
+	rg_rendererMetrics.modernForwardProjectedLights = projectedLights;
+	rg_rendererMetrics.modernForwardLightGridContributions = lightGridContributions;
+	rg_rendererMetrics.modernForwardClearOps = clearOps;
 }
 
 void R_RendererMetrics_RecordGLStateCache( const glStateCacheStats_t &stats ) {
@@ -1144,6 +1298,39 @@ void R_RendererMetrics_EndFrame( int frontEndMsec, int backEndMsec, int viewCoun
 			rg_rendererMetrics.renderTargetOps,
 			rg_rendererMetrics.copyRenders,
 			rg_rendererMetrics.swapBuffers );
+		common->Printf(
+			"rendererMetrics forwardPlus(req=%d exec=%d res=%d scene=%d depth=%d program=%d cluster=%d draws=%d opaque=%d alpha=%d transparent=%d viewmodel=%d fog=%d batches=%d fallback=%d resource=%d material=%d geometry=%d texture=%d blend=%d effects=%d sort=%d overdraw=%d reads=%d lights=%d point=%d projected=%d lightGrid=%d clear=%d gpu=%d/%d)\n",
+			rg_rendererMetrics.modernForwardRequested ? 1 : 0,
+			rg_rendererMetrics.modernForwardExecuted ? 1 : 0,
+			rg_rendererMetrics.modernForwardResourcesReady ? 1 : 0,
+			rg_rendererMetrics.modernForwardSceneColorReady ? 1 : 0,
+			rg_rendererMetrics.modernForwardSceneDepthReady ? 1 : 0,
+			rg_rendererMetrics.modernForwardProgramReady ? 1 : 0,
+			rg_rendererMetrics.modernForwardClusterReady ? 1 : 0,
+			rg_rendererMetrics.modernForwardDraws,
+			rg_rendererMetrics.modernForwardOpaqueDraws,
+			rg_rendererMetrics.modernForwardAlphaTestDraws,
+			rg_rendererMetrics.modernForwardTransparentDraws,
+			rg_rendererMetrics.modernForwardViewModelDraws,
+			rg_rendererMetrics.modernForwardFogBlendDraws,
+			rg_rendererMetrics.modernForwardSortedBatches,
+			rg_rendererMetrics.modernForwardFallbackDraws,
+			rg_rendererMetrics.modernForwardResourceFallbackDraws,
+			rg_rendererMetrics.modernForwardMaterialFallbackDraws,
+			rg_rendererMetrics.modernForwardGeometryFallbackDraws,
+			rg_rendererMetrics.modernForwardTextureFallbackDraws,
+			rg_rendererMetrics.modernForwardUnsupportedBlendFallbackDraws,
+			rg_rendererMetrics.modernForwardSpecialEffectFallbacks,
+			rg_rendererMetrics.modernForwardSortFallbackDraws,
+			rg_rendererMetrics.modernForwardOverdrawEstimate,
+			rg_rendererMetrics.modernForwardClusterReads,
+			rg_rendererMetrics.modernForwardActiveLights,
+			rg_rendererMetrics.modernForwardPointLights,
+			rg_rendererMetrics.modernForwardProjectedLights,
+			rg_rendererMetrics.modernForwardLightGridContributions,
+			rg_rendererMetrics.modernForwardClearOps,
+			rg_rendererMetrics.gpuTimerMsec[RENDERER_GPU_TIMER_MODERN_FORWARD],
+			rg_rendererMetrics.gpuTimerSamples[RENDERER_GPU_TIMER_MODERN_FORWARD] );
 		return;
 	}
 

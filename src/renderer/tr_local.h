@@ -1072,6 +1072,7 @@ extern idCVar r_rendererModernOpaque;	// opt-in graph-backed modern opaque G-buf
 extern idCVar r_rendererModernGBufferDebug;	// show graph-backed modern G-buffer attachments as a debug overlay
 extern idCVar r_rendererModernDeferred;	// opt-in graph-backed modern deferred light resolve execution
 extern idCVar r_rendererModernDeferredDebug;	// show graph-backed modern deferred resolve debug output
+extern idCVar r_rendererForwardPlus;	// opt-in graph-backed modern clustered forward+ execution
 extern idCVar r_rendererClusterDebug;	// show modern clustered light bins as a debug overlay
 extern idCVar r_useSimpleInteraction;	// use the simpler Quake 4 interaction program pair as a compatibility fallback
 extern idCVar r_interactionColorMode;	// interaction color mode: 0 auto, 1 packed env16.xy, 2 vector env16/env17

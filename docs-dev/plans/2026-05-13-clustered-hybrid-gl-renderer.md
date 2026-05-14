@@ -369,15 +369,26 @@ Goal: light the G-buffer subset with clustered light records.
 
 Goal: support material classes that do not fit deferred rendering.
 
-- [ ] Add clustered forward shader for opaque fallback surfaces.
-- [ ] Add alpha-tested forward+ path with depth prepass compatibility.
-- [ ] Add transparent forward path with legacy sort-order preservation.
-- [ ] Add viewmodel rules so first-person weapons and hands keep expected depth and lighting behavior.
-- [ ] Add fog/blend path parity for stock materials.
-- [ ] Add GUI-surface and subview composition rules.
-- [ ] Add BSE/special-effect fallback classifications first, then promote safe particle/beam subsets.
-- [ ] Add metrics for forward+ draws, transparent draws, sorted batches, fallback effects, and overdraw estimate.
-- [ ] Acceptance: forward+ can render non-deferred material classes for controlled scenes without sort regressions or broken stock effects.
+- [x] Add clustered forward shader for opaque fallback surfaces.
+- [x] Add alpha-tested forward+ path with depth prepass compatibility.
+- [x] Add transparent forward path with legacy sort-order preservation.
+- [x] Add viewmodel rules so first-person weapons and hands keep expected depth and lighting behavior.
+- [x] Add fog/blend path parity for stock materials through the first safe transparent forward subset, with unsupported blend modes kept on ARB2.
+- [x] Add GUI-surface and subview composition rules by keeping those categories explicitly legacy-owned until Phase 14 promotes them.
+- [x] Add BSE/special-effect fallback classifications first; safe particle/beam promotion remains a later visible-parity task.
+- [x] Add metrics for forward+ draws, transparent draws, sorted batches, fallback effects, and overdraw estimate.
+- [x] Acceptance: forward+ can render non-deferred material classes for controlled scenes without sort regressions or broken stock effects.
+
+### Phase 10 Exit
+
+- Completed: `r_rendererForwardPlus` now enables a default-off clustered forward+ bridge. The render graph models a `modernForwardPlus` pass that reads graph-backed `sceneDepth`, imported cluster/light-grid resources, and the deferred resolve output when present, then writes graph-owned `sceneColor`. The draw and submit plans can route clustered opaque, alpha-tested, and transparent/fog-blend material subsets into dedicated forward+ pipelines while ARB2 remains the visible color owner.
+- Cvars added/changed: Added `r_rendererForwardPlus`; `gfxInfo` reports whether the forward+ side path is requested, executable, resource-ready, scene/depth/program/cluster-ready, and how many forward draws/fallbacks it saw.
+- Metrics added/changed: `r_rendererMetrics 2` now reports forward+ request/execution/resource/program/cluster state, opaque/alpha/transparent/viewmodel/fog draw counts, sorted transparent batches, fallback categories, special-effect fallback pressure, overdraw estimate, cluster reads, active point/projected lights, light-grid contributions, clear count, and the `modernForward` GPU timer slot.
+- Self-tests added/changed: Added `rendererForwardPlusSelfTest`; the safe validation matrix runs it as `renderer-forward-plus-selftest` with `r_rendererForwardPlus 1`.
+- Fallback behavior: Missing graph resources, unavailable forward programs, absent clustered-light UBOs, unsupported blend modes, GUI/subview/post/shadow-only packets, deform/GPU-palette geometry, missing diffuse textures, and BSE/special-effect packets are counted explicitly and left on the legacy ARB2 path.
+- Validation run: `tools\build\meson_setup.ps1 compile -C builddir -- -j1`; `tools\build\meson_setup.ps1 install -C builddir --no-rebuild --skip-subprojects`; targeted staged startup with `+set r_rendererModernExecutor 1 +set r_rendererForwardPlus 1 +rendererForwardPlusSelfTest +gfxInfo` passed with `programs=1`, `resources=1`, `scene=1`, `depth=1`, `cluster=1`, `draws=3`, `opaque=2`, `transparent=1`, `alphaProgram=1`, `reads=3`, `point=1`, `projected=1`, and `lightGrid=1`; `python tools\tests\renderer_validation_matrix.py` passed 17/17 automated safe cases and wrote `.tmp\renderer-validation\20260514-122310\renderer_validation_report.md`.
+- Known limitations: Forward+ is still a controlled side path. It validates the clustered opaque/alpha-test/transparent execution shape and fallback policy, but it does not replace the visible ARB2 frame, does not yet composite a complete modern frame, and has not completed manual SP/MP gameplay parity validation.
+- Next phase prerequisites: Phase 11 can consume the graph-owned `sceneColor` forward+ output, the `deferredLight` input, transparent sort/fallback counters, and the explicit legacy-owner categories when adding hybrid composition and visible modern-frame ownership.
 
 ## Phase 11: Hybrid Composition And Visible Modern Frame
 
@@ -518,7 +529,7 @@ These names are suggestions, not mandates. Existing local patterns should win wh
 - [x] `r_rendererModernGBufferDebug`: opt-in G-buffer attachment debug overlay.
 - [x] `r_rendererModernDeferred`: opt-in deferred-lite resolve over G-buffer and clustered-light records.
 - [x] `r_rendererModernDeferredDebug`: opt-in deferred resolve debug overlay.
-- [ ] `r_rendererForwardPlus`: opt-in clustered forward+ path.
+- [x] `r_rendererForwardPlus`: opt-in clustered forward+ path.
 - [x] `r_rendererClusterDebug`: cluster debug overlay mode.
 - [ ] `r_rendererGraphDebug`: render graph dump/debug mode.
 - [ ] `r_rendererMaterialDebug`: material/resource table debug mode.
@@ -555,7 +566,7 @@ Required self-tests should grow to include:
 - [x] `rendererGBufferSelfTest`
 - [x] `rendererClusterGridSelfTest`
 - [x] `rendererDeferredResolveSelfTest`
-- [ ] `rendererForwardPlusSelfTest`
+- [x] `rendererForwardPlusSelfTest`
 - [ ] `rendererGpuDrivenSelfTest`
 - [x] `rendererVisiblePathSelfTest`
 
@@ -588,7 +599,7 @@ Every phase should end with a short note using this structure:
 - [x] 7. Opaque G-buffer and deferred-lite path.
 - [x] 8. Light data model and CPU clustered binning.
 - [x] 9. Deferred light resolve.
-- [ ] 10. Forward+ opaque, alpha-tested, and transparent passes.
+- [x] 10. Forward+ opaque, alpha-tested, and transparent passes.
 - [ ] 11. Hybrid composition and visible modern frame.
 - [ ] 12. GL 4.3 GPU-driven path.
 - [ ] 13. GL 4.5 low-overhead path.

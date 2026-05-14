@@ -44,6 +44,13 @@ typedef struct modernGLExecutorStats_s {
 	bool	deferredResolveProgramReady;
 	bool	deferredResolveClusterReady;
 	bool	deferredResolveDebugOverlayReady;
+	bool	forwardPlusRequested;
+	bool	forwardPlusExecuted;
+	bool	forwardPlusResourcesReady;
+	bool	forwardPlusSceneColorReady;
+	bool	forwardPlusSceneDepthReady;
+	bool	forwardPlusProgramReady;
+	bool	forwardPlusClusterReady;
 	int		graphPasses;
 	int		preparedPasses;
 	int		fallbackPasses;
@@ -140,6 +147,28 @@ typedef struct modernGLExecutorStats_s {
 	int		deferredResolveClearOps;
 	int		deferredResolveDebugMode;
 	int		deferredResolveDebugOverlayDraws;
+	int		forwardPlusDraws;
+	int		forwardPlusOpaqueDraws;
+	int		forwardPlusAlphaTestDraws;
+	int		forwardPlusTransparentDraws;
+	int		forwardPlusViewModelDraws;
+	int		forwardPlusFogBlendDraws;
+	int		forwardPlusSortedBatches;
+	int		forwardPlusFallbackDraws;
+	int		forwardPlusResourceFallbackDraws;
+	int		forwardPlusMaterialFallbackDraws;
+	int		forwardPlusGeometryFallbackDraws;
+	int		forwardPlusTextureFallbackDraws;
+	int		forwardPlusUnsupportedBlendFallbackDraws;
+	int		forwardPlusSpecialEffectFallbacks;
+	int		forwardPlusSortFallbackDraws;
+	int		forwardPlusOverdrawEstimate;
+	int		forwardPlusClusterReads;
+	int		forwardPlusActiveLights;
+	int		forwardPlusPointLights;
+	int		forwardPlusProjectedLights;
+	int		forwardPlusLightGridContributions;
+	int		forwardPlusClearOps;
 	char	status[96];
 } modernGLExecutorStats_t;
 
@@ -155,5 +184,6 @@ bool RendererModernGLExecutor_RunSelfTest( void );
 bool RendererVisiblePath_RunSelfTest( void );
 bool RendererGBuffer_RunSelfTest( void );
 bool RendererDeferredResolve_RunSelfTest( void );
+bool RendererForwardPlus_RunSelfTest( void );
 
 #endif /* !__MODERN_GL_EXECUTOR_H__ */

@@ -261,6 +261,8 @@ static const char *R_RenderGraph_LegacyPassName( renderPassCategory_t category )
 		return "legacyAmbient";
 	case RENDER_PASS_DEFERRED_RESOLVE:
 		return "modernDeferredResolve";
+	case RENDER_PASS_FORWARD_PLUS:
+		return "modernForwardPlus";
 	case RENDER_PASS_FOG_BLEND:
 		return "legacyFogBlend";
 	case RENDER_PASS_SSAO:
@@ -329,6 +331,12 @@ static bool R_RenderGraph_ShouldModelDeferredResolve( void ) {
 	return r_rendererModernDeferred.GetBool() || r_rendererModernDeferredDebug.GetInteger() > 0;
 }
 
+static bool R_RenderGraph_ShouldModelForwardPlus( void ) {
+	return r_rendererForwardPlus.GetBool();
+}
+
+static void R_RenderGraph_AddSceneColorReadWrite( idRenderGraph &graph, int passIndex, const char *usage );
+
 static void R_RenderGraph_AddGBufferWrites( idRenderGraph &graph, int passIndex ) {
 	const int gbufferAlbedo = R_RenderGraph_EnsureResource( graph, "gbufferAlbedo", RENDER_GRAPH_RESOURCE_COLOR, false, true, false, 3 );
 	const int gbufferNormal = R_RenderGraph_EnsureResource( graph, "gbufferNormal", RENDER_GRAPH_RESOURCE_COLOR, false, true, false, 3 );
@@ -365,6 +373,28 @@ static void R_RenderGraph_AddDeferredResolvePass( idRenderGraph &graph ) {
 	R_RenderGraph_AddAccess( graph, passIndex, clusterGrid, RENDER_GRAPH_ACCESS_READ, "deferred-cluster-read" );
 	R_RenderGraph_AddAccess( graph, passIndex, lightGrid, RENDER_GRAPH_ACCESS_READ, "deferred-baked-light-grid-read" );
 	R_RenderGraph_AddAccess( graph, passIndex, deferredLight, RENDER_GRAPH_ACCESS_WRITE | RENDER_GRAPH_ACCESS_CLEAR | RENDER_GRAPH_ACCESS_RESOLVE | RENDER_GRAPH_ACCESS_INVALIDATE, "deferred-light-write" );
+}
+
+static void R_RenderGraph_AddForwardPlusPass( idRenderGraph &graph ) {
+	if ( !R_RenderGraph_ShouldModelForwardPlus() || R_RenderGraph_HasPass( graph, RENDER_PASS_FORWARD_PLUS ) ) {
+		return;
+	}
+	if ( !graph.AddPass( RENDER_PASS_FORWARD_PLUS, "modernForwardPlus", true, false ) ) {
+		return;
+	}
+	const int passIndex = graph.NumPasses() - 1;
+	const int sceneDepth = R_RenderGraph_EnsureSceneDepth( graph );
+	const int clusterGrid = R_RenderGraph_EnsureResource( graph, "clusterGrid", RENDER_GRAPH_RESOURCE_BUFFER, true, false, false, 0 );
+	const int lightGrid = R_RenderGraph_EnsureResource( graph, "lightGrid", RENDER_GRAPH_RESOURCE_BUFFER, true, false, false, 0 );
+	const int deferredLight = graph.FindResource( "deferredLight" );
+
+	R_RenderGraph_AddAccess( graph, passIndex, sceneDepth, RENDER_GRAPH_ACCESS_READ, "forward-plus-depth-read" );
+	if ( deferredLight >= 0 ) {
+		R_RenderGraph_AddAccess( graph, passIndex, deferredLight, RENDER_GRAPH_ACCESS_READ, "forward-plus-deferred-read" );
+	}
+	R_RenderGraph_AddAccess( graph, passIndex, clusterGrid, RENDER_GRAPH_ACCESS_READ, "forward-plus-cluster-read" );
+	R_RenderGraph_AddAccess( graph, passIndex, lightGrid, RENDER_GRAPH_ACCESS_READ, "forward-plus-light-grid-read" );
+	R_RenderGraph_AddSceneColorReadWrite( graph, passIndex, "forward-plus-scene-color" );
 }
 
 static void R_RenderGraph_AddSceneColorWrite( idRenderGraph &graph, int passIndex, const char *usage ) {
@@ -540,6 +570,7 @@ void R_RenderGraph_BuildLegacyFrameGraph( const emptyCommand_t *cmds, idRenderGr
 	}
 
 	R_RenderGraph_AddDeferredResolvePass( graph );
+	R_RenderGraph_AddForwardPlusPass( graph );
 }
 
 void R_RenderGraph_BuildFromScenePackets( const idScenePacketFrame &packetFrame, idRenderGraph &graph ) {
@@ -553,6 +584,7 @@ void R_RenderGraph_BuildFromScenePackets( const idScenePacketFrame &packetFrame,
 		}
 	}
 	R_RenderGraph_AddDeferredResolvePass( graph );
+	R_RenderGraph_AddForwardPlusPass( graph );
 
 	const scenePacketFrameStats_t &packetStats = packetFrame.Stats();
 	graph.SetPacketFrameStats( packetStats.scenePackets, packetStats.commandPackets, packetStats.overflow );

@@ -283,6 +283,7 @@ idCVar r_rendererModernOpaque( "r_rendererModernOpaque", "0", CVAR_RENDERER | CV
 idCVar r_rendererModernGBufferDebug( "r_rendererModernGBufferDebug", "0", CVAR_RENDERER | CVAR_INTEGER, "modern G-buffer debug overlay: 0 = off, 1 = albedo, 2 = normal, 3 = material, 4 = emissive/light-grid", 0, 4, idCmdSystem::ArgCompletion_Integer<0,4> );
 idCVar r_rendererModernDeferred( "r_rendererModernDeferred", "0", CVAR_RENDERER | CVAR_BOOL, "execute graph-backed modern deferred light resolve while ARB2 remains the visible color path" );
 idCVar r_rendererModernDeferredDebug( "r_rendererModernDeferredDebug", "0", CVAR_RENDERER | CVAR_INTEGER, "modern deferred resolve debug overlay: 0 = off, 1 = light contribution, 2 = cluster id, 3 = light count, 4 = fallback pressure", 0, 4, idCmdSystem::ArgCompletion_Integer<0,4> );
+idCVar r_rendererForwardPlus( "r_rendererForwardPlus", "0", CVAR_RENDERER | CVAR_BOOL, "execute graph-backed modern clustered forward+ passes while ARB2 remains the visible color path" );
 idCVar r_rendererClusterDebug( "r_rendererClusterDebug", "0", CVAR_RENDERER | CVAR_INTEGER, "modern clustered light debug overlay: 0 = off, 1 = occupancy, 2 = light count, 3 = overflow", 0, 3, idCmdSystem::ArgCompletion_Integer<0,3> );
 idCVar r_useSimpleInteraction( "r_useSimpleInteraction", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "use Quake 4's simpler ARB interaction shader pair as an explicit compatibility fallback; may reduce material lighting quality" );
 idCVar r_interactionColorMode( "r_interactionColorMode", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "interaction vertex-color mode: 0 = auto, 1 = packed env16.xy, 2 = vector env16/env17", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
@@ -594,6 +595,13 @@ static void R_RendererDeferredResolveSelfTest_f( const idCmdArgs &args ) {
 	(void)args;
 	if ( !RendererDeferredResolve_RunSelfTest() ) {
 		common->Warning( "Renderer deferred light resolve self-test failed" );
+	}
+}
+
+static void R_RendererForwardPlusSelfTest_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !RendererForwardPlus_RunSelfTest() ) {
+		common->Warning( "Renderer clustered forward+ self-test failed" );
 	}
 }
 
@@ -2908,6 +2916,7 @@ void R_InitCommands( void ) {
 	cmdSystem->AddCommand( "rendererGBufferSelfTest", R_RendererGBufferSelfTest_f, CMD_FL_RENDERER, "run renderer modern opaque G-buffer self tests" );
 	cmdSystem->AddCommand( "rendererClusterGridSelfTest", R_RendererClusterGridSelfTest_f, CMD_FL_RENDERER, "run renderer clustered light-grid self tests" );
 	cmdSystem->AddCommand( "rendererDeferredResolveSelfTest", R_RendererDeferredResolveSelfTest_f, CMD_FL_RENDERER, "run renderer deferred light resolve self tests" );
+	cmdSystem->AddCommand( "rendererForwardPlusSelfTest", R_RendererForwardPlusSelfTest_f, CMD_FL_RENDERER, "run renderer clustered forward+ self tests" );
 	cmdSystem->AddCommand( "rendererShaderLibrarySelfTest", R_RendererModernGLShaderLibrarySelfTest_f, CMD_FL_RENDERER, "run renderer modern GL shader-library self tests" );
 	cmdSystem->AddCommand( "rendererModernGLShaderLibrarySelfTest", R_RendererModernGLShaderLibrarySelfTest_f, CMD_FL_RENDERER, "run renderer modern GL shader-library self tests" );
 	cmdSystem->AddCommand( "rendererShaderLibraryReload", R_RendererShaderLibraryReload_f, CMD_FL_RENDERER, "reload the internal modern GL shader library when r_rendererShaderReload is enabled" );

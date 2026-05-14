@@ -619,6 +619,7 @@ static void R_ModernGLExecutor_ResetStats( modernGLExecutorStats_t &stats, bool 
 	stats.deferredResolveRequested = r_rendererModernDeferred.GetBool() || r_rendererModernDeferredDebug.GetInteger() > 0;
 	stats.deferredResolveDebugOverlayReady = rg_modernGLExecutorDeferredOverlayProgram != 0;
 	stats.deferredResolveDebugMode = r_rendererModernDeferredDebug.GetInteger();
+	stats.forwardPlusRequested = r_rendererForwardPlus.GetBool();
 	stats.tierUsesDSA = rg_modernGLExecutorLowOverheadReady && rg_modernGLExecutorFeatures.directStateAccess;
 	stats.tierUsesMultiBind = rg_modernGLExecutorLowOverheadReady && rg_modernGLExecutorFeatures.multiBind;
 	stats.shaderProgramCount = shaderStats.programCount;
@@ -658,6 +659,10 @@ static void R_ModernGLExecutor_AnalyzeFrame(
 	stats.deferredResolveRequested = r_rendererModernDeferred.GetBool() || r_rendererModernDeferredDebug.GetInteger() > 0;
 	stats.deferredResolveDebugOverlayReady = rg_modernGLExecutorDeferredOverlayProgram != 0;
 	stats.deferredResolveDebugMode = r_rendererModernDeferredDebug.GetInteger();
+	stats.forwardPlusRequested = r_rendererForwardPlus.GetBool();
+	if ( stats.forwardPlusRequested ) {
+		stats.forwardPlusSpecialEffectFallbacks = packetFrame.Stats().specialEffectPackets;
+	}
 	stats.tierUsesDSA = rg_modernGLExecutorLowOverheadReady && rg_modernGLExecutorFeatures.directStateAccess;
 	stats.tierUsesMultiBind = rg_modernGLExecutorLowOverheadReady && rg_modernGLExecutorFeatures.multiBind;
 	stats.shaderProgramCount = shaderStats.programCount;
@@ -890,7 +895,10 @@ static bool R_ModernGLExecutor_IsMaterialPipeline( modernGLDrawPlanPipeline_t pi
 	return pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_FLAT_MATERIAL
 		|| pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_GBUFFER
 		|| pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_LIGHT_GRID
-		|| pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_FOG_BLEND;
+		|| pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_FOG_BLEND
+		|| pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_FORWARD_PLUS_OPAQUE
+		|| pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_FORWARD_PLUS_ALPHA_TEST
+		|| pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_FORWARD_PLUS_TRANSPARENT;
 }
 
 static void R_ModernGLExecutor_BindGpuDrivenBuffers( modernGLExecutorStats_t &stats ) {
@@ -1031,6 +1039,21 @@ static GLuint R_ModernGLExecutor_TextureForCommand( const modernGLSubmitCommand_
 	return 0;
 }
 
+static void R_ModernGLExecutor_SetUniformBlockBinding( GLuint program, const char *blockName, GLuint binding );
+
+static bool R_ModernGLExecutor_CommandUsesClusteredLighting( const modernGLSubmitCommand_t &command ) {
+	return command.shaderKind == MODERN_GL_SHADER_DEFERRED_LIGHT_RESOLVE
+		|| command.shaderKind == MODERN_GL_SHADER_CLUSTERED_FORWARD_OPAQUE
+		|| command.shaderKind == MODERN_GL_SHADER_CLUSTERED_FORWARD_ALPHA_TEST
+		|| command.shaderKind == MODERN_GL_SHADER_TRANSPARENT_FORWARD;
+}
+
+static void R_ModernGLExecutor_BindClusterUniformBlocks( GLuint program ) {
+	R_ModernGLExecutor_SetUniformBlockBinding( program, "ModernClusterGridParams", MODERN_GL_CLUSTER_UBO_BINDING_PARAMS );
+	R_ModernGLExecutor_SetUniformBlockBinding( program, "ModernClusterLightRecords", MODERN_GL_CLUSTER_UBO_BINDING_LIGHTS );
+	R_ModernGLExecutor_SetUniformBlockBinding( program, "ModernClusterIndexRecords", MODERN_GL_CLUSTER_UBO_BINDING_INDICES );
+}
+
 static bool R_ModernGLExecutor_SubmitCommand( const modernGLSubmitCommand_t &command, modernGLExecutorStats_t &stats, bool recordSubmitStats ) {
 	if ( command.drawPlanEntry == NULL || command.viewDef == NULL ) {
 		R_ModernGLExecutor_CountSubmittedFallback( stats, recordSubmitStats );
@@ -1068,6 +1091,9 @@ static bool R_ModernGLExecutor_SubmitCommand( const modernGLSubmitCommand_t &com
 
 	R_GLStateCache().UseProgram( command.program );
 	R_ModernGLExecutor_BindFrameUniformBufferBase( stats );
+	if ( R_ModernGLExecutor_CommandUsesClusteredLighting( command ) ) {
+		R_ModernGLExecutor_BindClusterUniformBlocks( command.program );
+	}
 	glUniformMatrix4fv( command.modelViewProjectionLocation, 1, GL_FALSE, modelViewProjection );
 	R_ModernGLExecutor_SetDebugColor( command );
 	R_ModernGLExecutor_SetLocalParams( command );
@@ -1644,6 +1670,224 @@ static void R_ModernGLExecutor_SubmitDeferredResolve( modernGLExecutorStats_t &s
 	}
 }
 
+static bool R_ModernGLExecutor_IsForwardPlusPipeline( modernGLDrawPlanPipeline_t pipeline ) {
+	return pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_FORWARD_PLUS_OPAQUE
+		|| pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_FORWARD_PLUS_ALPHA_TEST
+		|| pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_FORWARD_PLUS_TRANSPARENT;
+}
+
+static int R_ModernGLExecutor_ForwardPlusCommandArea( const modernGLSubmitCommand_t &command ) {
+	int x1 = command.scissorX1;
+	int y1 = command.scissorY1;
+	int x2 = command.scissorX2;
+	int y2 = command.scissorY2;
+	if ( x2 < x1 || y2 < y1 ) {
+		if ( command.viewDef != NULL ) {
+			x1 = command.viewDef->scissor.x1;
+			y1 = command.viewDef->scissor.y1;
+			x2 = command.viewDef->scissor.x2;
+			y2 = command.viewDef->scissor.y2;
+		} else {
+			x1 = 0;
+			y1 = 0;
+			x2 = Max( 0, glConfig.vidWidth - 1 );
+			y2 = Max( 0, glConfig.vidHeight - 1 );
+		}
+	}
+	return Max( 1, x2 - x1 + 1 ) * Max( 1, y2 - y1 + 1 );
+}
+
+static void R_ModernGLExecutor_CountForwardPlusFallback( const modernGLSubmitCommand_t &command, modernGLExecutorStats_t &stats ) {
+	if ( R_ModernGLExecutor_IsForwardPlusPipeline( command.pipeline ) ) {
+		stats.forwardPlusFallbackDraws++;
+	}
+}
+
+static bool R_ModernGLExecutor_ForwardPlusMaterialSupported( const modernGLSubmitCommand_t &command, modernGLExecutorStats_t &stats ) {
+	const materialResourceTableRecord_t *materialRecord = R_MaterialResourceTable_RecordForIndex( command.materialTableIndex );
+	if ( materialRecord == NULL || materialRecord->fallbackReason != MATERIAL_RESOURCE_FALLBACK_NONE ) {
+		stats.forwardPlusMaterialFallbackDraws++;
+		return false;
+	}
+	if ( materialRecord->materialClass == RENDER_MATERIAL_GUI
+		|| materialRecord->materialClass == RENDER_MATERIAL_POST_PROCESS
+		|| materialRecord->materialClass == RENDER_MATERIAL_SUBVIEW
+		|| materialRecord->materialClass == RENDER_MATERIAL_SHADOW_ONLY ) {
+		stats.forwardPlusMaterialFallbackDraws++;
+		return false;
+	}
+	if ( command.pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_FORWARD_PLUS_TRANSPARENT
+		&& ( materialRecord->blendMode == MATERIAL_RESOURCE_BLEND_ADD || materialRecord->blendMode == MATERIAL_RESOURCE_BLEND_FILTER ) ) {
+		stats.forwardPlusUnsupportedBlendFallbackDraws++;
+		return false;
+	}
+	if ( command.pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_FORWARD_PLUS_ALPHA_TEST
+		|| command.pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_FORWARD_PLUS_TRANSPARENT ) {
+		const materialResourceTextureBinding_t *binding = R_ModernGLExecutor_FindTextureBinding( *materialRecord, MATERIAL_RESOURCE_TEXTURE_DIFFUSE );
+		if ( binding == NULL || binding->textureHandle == 0 ) {
+			stats.forwardPlusTextureFallbackDraws++;
+			return false;
+		}
+	}
+
+	const drawPacket_t *draw = command.drawPlanEntry != NULL ? command.drawPlanEntry->drawPacket : NULL;
+	const geometryResourceRecord_t *geometry = draw != NULL ? draw->geometryRecord : NULL;
+	if ( geometry == NULL ) {
+		stats.forwardPlusGeometryFallbackDraws++;
+		return false;
+	}
+	if ( geometry->deformMode != GEOMETRY_DEFORM_NONE || geometry->skinningMode == GEOMETRY_SKINNING_GPU_PALETTE ) {
+		stats.forwardPlusGeometryFallbackDraws++;
+		return false;
+	}
+	return true;
+}
+
+static bool R_ModernGLExecutor_PrepareForwardPlusFBO( const renderGraphResourceHandle_t &sceneColor, const renderGraphResourceHandle_t &sceneDepth, modernGLExecutorStats_t &stats ) {
+	if ( sceneColor.framebuffer == 0 || sceneColor.texture == 0 || sceneDepth.texture == 0 || glFramebufferTexture2D == NULL || glCheckFramebufferStatus == NULL ) {
+		return false;
+	}
+	R_GLStateCache().BindFramebuffer( GL_FRAMEBUFFER, sceneColor.framebuffer );
+	const GLenum depthAttachment = sceneDepth.type == RENDER_GRAPH_RESOURCE_DEPTH_STENCIL ? GL_DEPTH_STENCIL_ATTACHMENT : GL_DEPTH_ATTACHMENT;
+	glFramebufferTexture2D( GL_FRAMEBUFFER, depthAttachment, sceneDepth.target, sceneDepth.texture, 0 );
+	glDrawBuffer( GL_COLOR_ATTACHMENT0 );
+	glReadBuffer( GL_COLOR_ATTACHMENT0 );
+	const GLenum status = glCheckFramebufferStatus( GL_FRAMEBUFFER );
+	stats.forwardPlusResourcesReady = status == GL_FRAMEBUFFER_COMPLETE;
+	return stats.forwardPlusResourcesReady;
+}
+
+static void R_ModernGLExecutor_SubmitForwardPlus( modernGLExecutorStats_t &stats ) {
+	if ( !stats.forwardPlusRequested || !stats.enabled || !stats.available || !stats.submitPlanReady || !rg_modernGLExecutorInitialized || rg_modernGLExecutorVAO == 0 ) {
+		return;
+	}
+
+	const modernGLShaderLibraryStats_t &shaderStats = R_ModernGLShaderLibrary_Stats();
+	const modernGLShaderProgramInfo_t *opaqueProgram = R_ModernGLShaderLibrary_FindProgram( MODERN_GL_SHADER_CLUSTERED_FORWARD_OPAQUE, shaderStats.highestGLSLVersion );
+	const modernGLShaderProgramInfo_t *alphaProgram = R_ModernGLShaderLibrary_FindProgram( MODERN_GL_SHADER_CLUSTERED_FORWARD_ALPHA_TEST, shaderStats.highestGLSLVersion );
+	const modernGLShaderProgramInfo_t *transparentProgram = R_ModernGLShaderLibrary_FindProgram( MODERN_GL_SHADER_TRANSPARENT_FORWARD, shaderStats.highestGLSLVersion );
+	stats.forwardPlusProgramReady = opaqueProgram != NULL && opaqueProgram->program != 0 && opaqueProgram->linked
+		&& alphaProgram != NULL && alphaProgram->program != 0 && alphaProgram->linked
+		&& transparentProgram != NULL && transparentProgram->program != 0 && transparentProgram->linked;
+	if ( !stats.forwardPlusProgramReady ) {
+		stats.forwardPlusResourceFallbackDraws++;
+		return;
+	}
+
+	const rendererClusteredLightingStats_t &clusterStats = R_ModernClusteredLighting_Stats();
+	stats.forwardPlusClusterReady = clusterStats.requested && clusterStats.frameValid && clusterStats.uboFallbackReady;
+	stats.forwardPlusActiveLights = clusterStats.lightCount;
+	stats.forwardPlusPointLights = clusterStats.pointLights;
+	stats.forwardPlusProjectedLights = clusterStats.projectedLights;
+	if ( !stats.forwardPlusClusterReady ) {
+		stats.forwardPlusResourceFallbackDraws++;
+		return;
+	}
+
+	const renderGraphResourceHandle_t *sceneColor = NULL;
+	const renderGraphResourceHandle_t *sceneDepth = NULL;
+	stats.forwardPlusSceneColorReady = R_ModernGLExecutor_GBufferResourceReady( "sceneColor", sceneColor );
+	stats.forwardPlusSceneDepthReady = R_ModernGLExecutor_DepthResourceReady( "sceneDepth", sceneDepth ) && sceneDepth != NULL && sceneDepth->target == GL_TEXTURE_2D && sceneDepth->texture != 0;
+	if ( !stats.forwardPlusSceneColorReady || !stats.forwardPlusSceneDepthReady || sceneColor == NULL || sceneDepth == NULL || !R_ModernGLExecutor_PrepareForwardPlusFBO( *sceneColor, *sceneDepth, stats ) ) {
+		for ( int i = 0; i < rg_modernGLSubmitPlan.NumCommands(); ++i ) {
+			const modernGLSubmitCommand_t &command = rg_modernGLSubmitPlan.Command( i );
+			if ( R_ModernGLExecutor_IsForwardPlusPipeline( command.pipeline ) ) {
+				stats.forwardPlusResourceFallbackDraws++;
+				R_ModernGLExecutor_CountForwardPlusFallback( command, stats );
+			}
+		}
+		R_ModernGLExecutor_RestoreAfterSubmit();
+		return;
+	}
+
+	stats.forwardPlusLightGridContributions = R_RenderGraphResources_FindHandle( "lightGrid" ) != NULL ? 1 : 0;
+	R_RendererMetrics_BeginGpuTimer( RENDERER_GPU_TIMER_MODERN_FORWARD );
+	{
+		idGLDebugScope passScope( "ModernGLExecutor clustered forward+ pass" );
+		R_GLStateCache().BindVertexArray( rg_modernGLExecutorVAO );
+		R_GLStateCache().SetViewport( 0, 0, Max( 1, sceneColor->width ), Max( 1, sceneColor->height ) );
+		R_GLStateCache().SetScissor( 0, 0, Max( 1, sceneColor->width ), Max( 1, sceneColor->height ) );
+		R_GLStateCache().SetScissorTestEnabled( true );
+		R_GLStateCache().SetDepthTestEnabled( true );
+		R_GLStateCache().SetDepthFunc( GL_LEQUAL );
+		R_GLStateCache().SetDepthMask( GL_FALSE );
+		R_GLStateCache().SetStencilTestEnabled( false );
+		R_GLStateCache().SetCullFaceEnabled( false );
+		R_GLStateCache().SetColorMask( GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE );
+		glClearColor( 0.0f, 0.0f, 0.0f, 0.0f );
+		glClear( GL_COLOR_BUFFER_BIT );
+		stats.forwardPlusClearOps++;
+
+		bool haveTransparentSort = false;
+		unsigned long long previousTransparentSort = 0;
+		int previousTransparentMaterial = -2;
+		for ( int i = 0; i < rg_modernGLSubmitPlan.NumCommands(); ++i ) {
+			const modernGLSubmitCommand_t &command = rg_modernGLSubmitPlan.Command( i );
+			if ( !R_ModernGLExecutor_IsForwardPlusPipeline( command.pipeline ) ) {
+				continue;
+			}
+			if ( !R_ModernGLExecutor_ForwardPlusMaterialSupported( command, stats ) ) {
+				R_ModernGLExecutor_CountForwardPlusFallback( command, stats );
+				continue;
+			}
+
+			const bool transparent = command.pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_FORWARD_PLUS_TRANSPARENT;
+			const drawPacket_t *draw = command.drawPlanEntry != NULL ? command.drawPlanEntry->drawPacket : NULL;
+			if ( transparent && draw != NULL ) {
+				if ( haveTransparentSort && draw->sortKey.value < previousTransparentSort ) {
+					stats.forwardPlusSortFallbackDraws++;
+					R_ModernGLExecutor_CountForwardPlusFallback( command, stats );
+					continue;
+				}
+				if ( !haveTransparentSort || command.materialTableIndex != previousTransparentMaterial ) {
+					stats.forwardPlusSortedBatches++;
+				}
+				previousTransparentSort = draw->sortKey.value;
+				previousTransparentMaterial = command.materialTableIndex;
+				haveTransparentSort = true;
+			}
+
+			if ( transparent ) {
+				R_GLStateCache().SetBlendEnabled( true );
+				R_GLStateCache().SetBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
+				R_GLStateCache().SetDepthMask( GL_FALSE );
+			} else {
+				R_GLStateCache().SetBlendEnabled( false );
+				R_GLStateCache().SetDepthMask( GL_FALSE );
+			}
+			if ( !R_ModernGLExecutor_SubmitCommand( command, stats, false ) ) {
+				R_ModernGLExecutor_CountForwardPlusFallback( command, stats );
+				continue;
+			}
+
+			const int area = R_ModernGLExecutor_ForwardPlusCommandArea( command );
+			stats.forwardPlusDraws++;
+			stats.forwardPlusOverdrawEstimate += area;
+			stats.forwardPlusClusterReads += area;
+			if ( command.pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_FORWARD_PLUS_ALPHA_TEST ) {
+				stats.forwardPlusAlphaTestDraws++;
+			} else if ( transparent ) {
+				stats.forwardPlusTransparentDraws++;
+				if ( command.passCategory == RENDER_PASS_FOG_BLEND ) {
+					stats.forwardPlusFogBlendDraws++;
+				}
+			} else {
+				stats.forwardPlusOpaqueDraws++;
+			}
+			if ( draw != NULL && draw->packetCategory == SCENE_PACKET_CATEGORY_VIEWMODEL ) {
+				stats.forwardPlusViewModelDraws++;
+			}
+		}
+	}
+	R_RendererMetrics_EndGpuTimer();
+
+	R_ModernGLExecutor_RestoreAfterSubmit();
+	stats.forwardPlusExecuted = stats.forwardPlusDraws > 0 || stats.forwardPlusClearOps > 0;
+	if ( stats.forwardPlusExecuted ) {
+		R_ModernGLExecutor_SetStatus( stats, "forward-plus-legacy-fallback" );
+	}
+}
+
 static void R_ModernGLExecutor_SubmitPlan( modernGLExecutorStats_t &stats ) {
 	if ( !r_rendererModernSubmit.GetBool() || !stats.enabled || !stats.available || !stats.submitPlanReady || !rg_modernGLExecutorInitialized || rg_modernGLExecutorVAO == 0 ) {
 		return;
@@ -1661,7 +1905,7 @@ static void R_ModernGLExecutor_SubmitPlan( modernGLExecutorStats_t &stats ) {
 
 	for ( int i = 0; i < rg_modernGLSubmitPlan.NumCommands(); ++i ) {
 		const modernGLSubmitCommand_t &command = rg_modernGLSubmitPlan.Command( i );
-		if ( command.pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_GBUFFER ) {
+		if ( command.pipeline == MODERN_GL_DRAW_PLAN_PIPELINE_GBUFFER || R_ModernGLExecutor_IsForwardPlusPipeline( command.pipeline ) ) {
 			continue;
 		}
 		R_ModernGLExecutor_SubmitCommand( command, stats, true );
@@ -1772,6 +2016,36 @@ static void R_ModernGLExecutor_RecordMetrics( const modernGLExecutorStats_t &sta
 		stats.deferredResolveClearOps,
 		stats.deferredResolveDebugMode,
 		stats.deferredResolveDebugOverlayDraws );
+	R_RendererMetrics_RecordForwardPlus(
+		stats.forwardPlusRequested,
+		stats.forwardPlusExecuted,
+		stats.forwardPlusResourcesReady,
+		stats.forwardPlusSceneColorReady,
+		stats.forwardPlusSceneDepthReady,
+		stats.forwardPlusProgramReady,
+		stats.forwardPlusClusterReady,
+		stats.forwardPlusDraws,
+		stats.forwardPlusOpaqueDraws,
+		stats.forwardPlusAlphaTestDraws,
+		stats.forwardPlusTransparentDraws,
+		stats.forwardPlusViewModelDraws,
+		stats.forwardPlusFogBlendDraws,
+		stats.forwardPlusSortedBatches,
+		stats.forwardPlusFallbackDraws,
+		stats.forwardPlusResourceFallbackDraws,
+		stats.forwardPlusMaterialFallbackDraws,
+		stats.forwardPlusGeometryFallbackDraws,
+		stats.forwardPlusTextureFallbackDraws,
+		stats.forwardPlusUnsupportedBlendFallbackDraws,
+		stats.forwardPlusSpecialEffectFallbacks,
+		stats.forwardPlusSortFallbackDraws,
+		stats.forwardPlusOverdrawEstimate,
+		stats.forwardPlusClusterReads,
+		stats.forwardPlusActiveLights,
+		stats.forwardPlusPointLights,
+		stats.forwardPlusProjectedLights,
+		stats.forwardPlusLightGridContributions,
+		stats.forwardPlusClearOps );
 }
 
 void R_ModernGLExecutor_Init( const renderBackendCaps_t &caps, const renderFeatureSet_t &features ) {
@@ -1888,9 +2162,10 @@ void R_ModernGLExecutor_Shutdown( void ) {
 void R_ModernGLExecutor_PrepareFrame( const idScenePacketFrame &packetFrame, const idRenderGraph &graph ) {
 	const bool visibleDepthRequested = r_rendererModernVisibleDepth.GetBool() || r_rendererModernDepthDebug.GetInteger() > 0;
 	const bool deferredResolveRequested = r_rendererModernDeferred.GetBool() || r_rendererModernDeferredDebug.GetInteger() > 0;
+	const bool forwardPlusRequested = r_rendererForwardPlus.GetBool();
 	const bool opaqueGBufferRequested = r_rendererModernOpaque.GetBool() || r_rendererModernGBufferDebug.GetInteger() > 0 || deferredResolveRequested;
-	const bool clusteredLightingRequested = r_rendererModernExecutor.GetBool() || opaqueGBufferRequested || deferredResolveRequested || r_rendererClusterDebug.GetInteger() > 0;
-	const bool enabled = r_rendererModernExecutor.GetBool() || r_rendererModernSubmit.GetBool() || visibleDepthRequested || opaqueGBufferRequested || deferredResolveRequested || clusteredLightingRequested;
+	const bool clusteredLightingRequested = r_rendererModernExecutor.GetBool() || opaqueGBufferRequested || deferredResolveRequested || forwardPlusRequested || r_rendererClusterDebug.GetInteger() > 0;
+	const bool enabled = r_rendererModernExecutor.GetBool() || r_rendererModernSubmit.GetBool() || visibleDepthRequested || opaqueGBufferRequested || deferredResolveRequested || forwardPlusRequested || clusteredLightingRequested;
 	R_ModernGLExecutor_AnalyzeFrame(
 		packetFrame,
 		graph,
@@ -1926,6 +2201,7 @@ void R_ModernGLExecutor_PrepareFrame( const idScenePacketFrame &packetFrame, con
 	R_ModernGLExecutor_SubmitVisibleDepth( rg_modernGLExecutorStats );
 	R_ModernGLExecutor_SubmitGBuffer( rg_modernGLExecutorStats );
 	R_ModernGLExecutor_SubmitDeferredResolve( rg_modernGLExecutorStats );
+	R_ModernGLExecutor_SubmitForwardPlus( rg_modernGLExecutorStats );
 	R_ModernGLExecutor_SubmitPlan( rg_modernGLExecutorStats );
 	R_ModernGLExecutor_RecordMetrics( rg_modernGLExecutorStats );
 
@@ -2040,6 +2316,37 @@ void R_ModernGLExecutor_PrepareFrame( const idScenePacketFrame &packetFrame, con
 			rg_modernGLExecutorStats.tierUsesMultiBind ? 1 : 0,
 			rg_modernGLExecutorStats.lowOverheadDSAUpdates,
 			rg_modernGLExecutorStats.lowOverheadMultiBindBatches );
+		common->Printf(
+			"modernForwardPlus req=%d exec=%d res=%d scene=%d depth=%d program=%d cluster=%d draws=%d opaque=%d alpha=%d transparent=%d viewmodel=%d fog=%d batches=%d fallback=%d resource=%d material=%d geometry=%d texture=%d blend=%d effects=%d sort=%d overdraw=%d reads=%d lights=%d point=%d projected=%d lightGrid=%d clear=%d\n",
+			rg_modernGLExecutorStats.forwardPlusRequested ? 1 : 0,
+			rg_modernGLExecutorStats.forwardPlusExecuted ? 1 : 0,
+			rg_modernGLExecutorStats.forwardPlusResourcesReady ? 1 : 0,
+			rg_modernGLExecutorStats.forwardPlusSceneColorReady ? 1 : 0,
+			rg_modernGLExecutorStats.forwardPlusSceneDepthReady ? 1 : 0,
+			rg_modernGLExecutorStats.forwardPlusProgramReady ? 1 : 0,
+			rg_modernGLExecutorStats.forwardPlusClusterReady ? 1 : 0,
+			rg_modernGLExecutorStats.forwardPlusDraws,
+			rg_modernGLExecutorStats.forwardPlusOpaqueDraws,
+			rg_modernGLExecutorStats.forwardPlusAlphaTestDraws,
+			rg_modernGLExecutorStats.forwardPlusTransparentDraws,
+			rg_modernGLExecutorStats.forwardPlusViewModelDraws,
+			rg_modernGLExecutorStats.forwardPlusFogBlendDraws,
+			rg_modernGLExecutorStats.forwardPlusSortedBatches,
+			rg_modernGLExecutorStats.forwardPlusFallbackDraws,
+			rg_modernGLExecutorStats.forwardPlusResourceFallbackDraws,
+			rg_modernGLExecutorStats.forwardPlusMaterialFallbackDraws,
+			rg_modernGLExecutorStats.forwardPlusGeometryFallbackDraws,
+			rg_modernGLExecutorStats.forwardPlusTextureFallbackDraws,
+			rg_modernGLExecutorStats.forwardPlusUnsupportedBlendFallbackDraws,
+			rg_modernGLExecutorStats.forwardPlusSpecialEffectFallbacks,
+			rg_modernGLExecutorStats.forwardPlusSortFallbackDraws,
+			rg_modernGLExecutorStats.forwardPlusOverdrawEstimate,
+			rg_modernGLExecutorStats.forwardPlusClusterReads,
+			rg_modernGLExecutorStats.forwardPlusActiveLights,
+			rg_modernGLExecutorStats.forwardPlusPointLights,
+			rg_modernGLExecutorStats.forwardPlusProjectedLights,
+			rg_modernGLExecutorStats.forwardPlusLightGridContributions,
+			rg_modernGLExecutorStats.forwardPlusClearOps );
 	}
 }
 
@@ -2284,6 +2591,38 @@ void R_ModernGLExecutor_PrintGfxInfo( void ) {
 		rg_modernGLExecutorStats.lowOverheadDSAUpdates,
 		rg_modernGLExecutorStats.lowOverheadMultiBindBatches,
 		rg_modernGLExecutorStats.legacyFallback ? 1 : 0 );
+	common->Printf(
+		"Modern forward+: cvar=%d, req=%d exec=%d resources=%d sceneColor=%d sceneDepth=%d program=%d cluster=%d draws=%d opaque=%d alpha=%d transparent=%d viewmodel=%d fog=%d batches=%d fallback=%d resource=%d material=%d geometry=%d texture=%d blend=%d effects=%d sort=%d overdraw=%d reads=%d lights=%d point=%d projected=%d lightGrid=%d clears=%d\n",
+		r_rendererForwardPlus.GetBool() ? 1 : 0,
+		rg_modernGLExecutorStats.forwardPlusRequested ? 1 : 0,
+		rg_modernGLExecutorStats.forwardPlusExecuted ? 1 : 0,
+		rg_modernGLExecutorStats.forwardPlusResourcesReady ? 1 : 0,
+		rg_modernGLExecutorStats.forwardPlusSceneColorReady ? 1 : 0,
+		rg_modernGLExecutorStats.forwardPlusSceneDepthReady ? 1 : 0,
+		rg_modernGLExecutorStats.forwardPlusProgramReady ? 1 : 0,
+		rg_modernGLExecutorStats.forwardPlusClusterReady ? 1 : 0,
+		rg_modernGLExecutorStats.forwardPlusDraws,
+		rg_modernGLExecutorStats.forwardPlusOpaqueDraws,
+		rg_modernGLExecutorStats.forwardPlusAlphaTestDraws,
+		rg_modernGLExecutorStats.forwardPlusTransparentDraws,
+		rg_modernGLExecutorStats.forwardPlusViewModelDraws,
+		rg_modernGLExecutorStats.forwardPlusFogBlendDraws,
+		rg_modernGLExecutorStats.forwardPlusSortedBatches,
+		rg_modernGLExecutorStats.forwardPlusFallbackDraws,
+		rg_modernGLExecutorStats.forwardPlusResourceFallbackDraws,
+		rg_modernGLExecutorStats.forwardPlusMaterialFallbackDraws,
+		rg_modernGLExecutorStats.forwardPlusGeometryFallbackDraws,
+		rg_modernGLExecutorStats.forwardPlusTextureFallbackDraws,
+		rg_modernGLExecutorStats.forwardPlusUnsupportedBlendFallbackDraws,
+		rg_modernGLExecutorStats.forwardPlusSpecialEffectFallbacks,
+		rg_modernGLExecutorStats.forwardPlusSortFallbackDraws,
+		rg_modernGLExecutorStats.forwardPlusOverdrawEstimate,
+		rg_modernGLExecutorStats.forwardPlusClusterReads,
+		rg_modernGLExecutorStats.forwardPlusActiveLights,
+		rg_modernGLExecutorStats.forwardPlusPointLights,
+		rg_modernGLExecutorStats.forwardPlusProjectedLights,
+		rg_modernGLExecutorStats.forwardPlusLightGridContributions,
+		rg_modernGLExecutorStats.forwardPlusClearOps );
 	R_GLStateCache_PrintGfxInfo();
 	R_ModernGLShaderLibrary_PrintGfxInfo();
 }
@@ -2930,5 +3269,199 @@ bool RendererDeferredResolve_RunSelfTest( void ) {
 		stats.deferredResolveResourceFallbacks + stats.deferredResolveUnsupportedLightFallbacks,
 		stats.deferredResolveDebugMode,
 		rg_modernGLExecutorDeferredOverlayProgram != 0 ? 1 : 0 );
+	return true;
+}
+
+bool RendererForwardPlus_RunSelfTest( void ) {
+	if ( !r_rendererForwardPlus.GetBool() ) {
+		common->Printf( "RendererForwardPlus self-test passed (disabled)\n" );
+		return true;
+	}
+
+	const modernGLShaderLibraryStats_t &shaderStats = R_ModernGLShaderLibrary_Stats();
+	if ( !shaderStats.available ) {
+		common->Printf( "RendererForwardPlus self-test passed (shader library unavailable)\n" );
+		return true;
+	}
+	const modernGLShaderProgramInfo_t *opaqueProgram = R_ModernGLShaderLibrary_FindProgram( MODERN_GL_SHADER_CLUSTERED_FORWARD_OPAQUE, shaderStats.highestGLSLVersion );
+	const modernGLShaderProgramInfo_t *alphaProgram = R_ModernGLShaderLibrary_FindProgram( MODERN_GL_SHADER_CLUSTERED_FORWARD_ALPHA_TEST, shaderStats.highestGLSLVersion );
+	const modernGLShaderProgramInfo_t *transparentProgram = R_ModernGLShaderLibrary_FindProgram( MODERN_GL_SHADER_TRANSPARENT_FORWARD, shaderStats.highestGLSLVersion );
+	const bool programsReady = opaqueProgram != NULL && opaqueProgram->program != 0 && opaqueProgram->linked
+		&& alphaProgram != NULL && alphaProgram->program != 0 && alphaProgram->linked
+		&& transparentProgram != NULL && transparentProgram->program != 0 && transparentProgram->linked;
+	if ( !programsReady ) {
+		common->Printf( "RendererForwardPlus self-test failed: clustered forward programs unavailable\n" );
+		return false;
+	}
+
+	drawSurf_t drawSurfs[3];
+	memset( drawSurfs, 0, sizeof( drawSurfs ) );
+	srfTriangles_t geometry;
+	memset( &geometry, 0, sizeof( geometry ) );
+	geometry.numVerts = 3;
+	geometry.numIndexes = 6;
+	vertCache_t ambientCache;
+	memset( &ambientCache, 0, sizeof( ambientCache ) );
+	ambientCache.vbo = 101;
+	ambientCache.offset = 64;
+	ambientCache.size = geometry.numVerts * static_cast<int>( sizeof( idDrawVert ) );
+	ambientCache.indexBuffer = false;
+	ambientCache.tag = TAG_USED;
+	vertCache_t indexCache;
+	memset( &indexCache, 0, sizeof( indexCache ) );
+	indexCache.vbo = 202;
+	indexCache.offset = 128;
+	indexCache.size = geometry.numIndexes * static_cast<int>( sizeof( glIndex_t ) );
+	indexCache.indexBuffer = true;
+	indexCache.tag = TAG_USED;
+	geometry.ambientCache = &ambientCache;
+	geometry.indexCache = &indexCache;
+	for ( int i = 0; i < 3; ++i ) {
+		drawSurfs[i].geo = &geometry;
+		if ( tr.defaultMaterial != NULL ) {
+			drawSurfs[i].material = tr.defaultMaterial;
+			drawSurfs[i].sort = tr.defaultMaterial->GetSort() + static_cast<float>( i ) * 0.01f;
+		}
+	}
+
+	drawSurf_t *drawSurfPtrs[3] = { &drawSurfs[0], &drawSurfs[1], &drawSurfs[2] };
+	viewEntity_t viewEntity;
+	memset( &viewEntity, 0, sizeof( viewEntity ) );
+	drawSurfs[0].space = &viewEntity;
+	drawSurfs[1].space = &viewEntity;
+	drawSurfs[2].space = &viewEntity;
+	viewLight_t lights[2];
+	memset( lights, 0, sizeof( lights ) );
+	idRenderLightLocal lightDefs[2];
+	for ( int i = 0; i < 2; ++i ) {
+		lightDefs[i].index = i;
+		lightDefs[i].areaNum = -1;
+		lightDefs[i].parms.origin.Set( 128.0f + 32.0f * i, 24.0f, 32.0f );
+		lightDefs[i].parms.lightRadius.Set( 256.0f, 256.0f, 256.0f );
+		lightDefs[i].parms.shaderParms[SHADERPARM_RED] = i == 0 ? 1.0f : 0.35f;
+		lightDefs[i].parms.shaderParms[SHADERPARM_GREEN] = i == 0 ? 0.65f : 0.85f;
+		lightDefs[i].parms.shaderParms[SHADERPARM_BLUE] = i == 0 ? 0.45f : 1.0f;
+		lights[i].lightDef = &lightDefs[i];
+		lights[i].next = i == 0 ? &lights[1] : NULL;
+		lights[i].scissorRect.x1 = 0;
+		lights[i].scissorRect.y1 = 0;
+		lights[i].scissorRect.x2 = 639;
+		lights[i].scissorRect.y2 = 479;
+		lights[i].globalLightOrigin = lightDefs[i].parms.origin;
+		lights[i].lightRadius = lightDefs[i].parms.lightRadius;
+		lights[i].pointLight = i == 0;
+		lights[i].parallel = false;
+		lights[i].viewInsideLight = i == 0;
+		lights[i].viewSeesGlobalLightOrigin = true;
+	}
+
+	viewDef_t worldView;
+	memset( &worldView, 0, sizeof( worldView ) );
+	worldView.viewEntitys = &viewEntity;
+	worldView.drawSurfs = drawSurfPtrs;
+	worldView.numDrawSurfs = 3;
+	worldView.viewLights = &lights[0];
+	worldView.renderView.width = 640;
+	worldView.renderView.height = 480;
+	worldView.renderView.fov_x = 90.0f;
+	worldView.renderView.fov_y = 70.0f;
+	worldView.renderView.viewaxis = mat3_identity;
+	worldView.viewport.x1 = 0;
+	worldView.viewport.y1 = 0;
+	worldView.viewport.x2 = 639;
+	worldView.viewport.y2 = 479;
+	worldView.scissor.x1 = 0;
+	worldView.scissor.y1 = 0;
+	worldView.scissor.x2 = 639;
+	worldView.scissor.y2 = 479;
+
+	idScenePacketFrame packetFrame;
+	if ( !packetFrame.AddScene( &worldView, true ) || !packetFrame.AddPass( RENDER_PASS_DEPTH, true ) ) {
+		common->Printf( "RendererForwardPlus self-test failed: could not build depth packet scene\n" );
+		return false;
+	}
+	for ( int i = 0; i < 2; ++i ) {
+		if ( !packetFrame.AddDrawPacket( &drawSurfs[i], RENDER_PASS_DEPTH, i ) ) {
+			common->Printf( "RendererForwardPlus self-test failed: could not add depth draw packet\n" );
+			return false;
+		}
+	}
+	if ( !packetFrame.AddPass( RENDER_PASS_ARB2_INTERACTION, true ) ) {
+		common->Printf( "RendererForwardPlus self-test failed: could not add interaction pass\n" );
+		return false;
+	}
+	for ( int i = 0; i < 2; ++i ) {
+		if ( !packetFrame.AddDrawPacket( &drawSurfs[i], RENDER_PASS_ARB2_INTERACTION, i ) ) {
+			common->Printf( "RendererForwardPlus self-test failed: could not add interaction draw packet\n" );
+			return false;
+		}
+	}
+	if ( !packetFrame.AddPass( RENDER_PASS_FOG_BLEND, true ) || !packetFrame.AddDrawPacket( &drawSurfs[2], RENDER_PASS_FOG_BLEND, 2 ) ) {
+		common->Printf( "RendererForwardPlus self-test failed: could not add transparent draw packet\n" );
+		return false;
+	}
+	packetFrame.FinishScene();
+
+	idRenderGraph graph;
+	R_RenderGraph_BuildFromScenePackets( packetFrame, graph );
+	if ( graph.FindPass( RENDER_PASS_FORWARD_PLUS ) < 0 || graph.FindResource( "sceneColor" ) < 0 || graph.FindResource( "sceneDepth" ) < 0 || graph.FindResource( "clusterGrid" ) < 0 ) {
+		common->Printf( "RendererForwardPlus self-test failed: graph forward+ resources missing\n" );
+		return false;
+	}
+	R_MaterialResourceTable_PrepareFrame( packetFrame );
+	R_RenderGraphResources_PrepareFrame( graph );
+	R_ModernClusteredLighting_PrepareFrame( packetFrame, true );
+
+	modernGLExecutorStats_t stats;
+	R_ModernGLExecutor_AnalyzeFrame(
+		packetFrame,
+		graph,
+		true,
+		rg_modernGLExecutorAvailable,
+		rg_modernGLExecutorInitialized,
+		rg_modernGLExecutorVAO != 0,
+		rg_modernGLExecutorFrameUBO != 0,
+		stats );
+	rg_modernGLDrawPlan.Build( packetFrame, graph );
+	R_ModernGLExecutor_CopyDrawPlanStats( stats, rg_modernGLDrawPlan.Stats() );
+	rg_modernGLSubmitPlan.Build( rg_modernGLDrawPlan );
+	R_ModernGLExecutor_CopySubmitPlanStats( stats, rg_modernGLSubmitPlan.Stats() );
+	R_ModernGLExecutor_SubmitForwardPlus( stats );
+
+	const bool resourcesAvailable = R_RenderGraphResources_Stats().initialized && R_RenderGraphResources_Stats().available && rg_modernGLExecutorAvailable;
+	if ( resourcesAvailable && ( !stats.forwardPlusExecuted || !stats.forwardPlusResourcesReady || !stats.forwardPlusClusterReady || stats.forwardPlusDraws <= 0 || stats.forwardPlusTransparentDraws <= 0 || stats.forwardPlusClusterReads <= 0 ) ) {
+		common->Printf(
+			"RendererForwardPlus self-test failed: execution mismatch (exec=%d res=%d cluster=%d draws=%d transparent=%d reads=%d fallback=%d)\n",
+			stats.forwardPlusExecuted ? 1 : 0,
+			stats.forwardPlusResourcesReady ? 1 : 0,
+			stats.forwardPlusClusterReady ? 1 : 0,
+			stats.forwardPlusDraws,
+			stats.forwardPlusTransparentDraws,
+			stats.forwardPlusClusterReads,
+			stats.forwardPlusFallbackDraws );
+		return false;
+	}
+
+	common->Printf(
+		"RendererForwardPlus self-test passed (programs=%d resources=%d scene=%d depth=%d cluster=%d draws=%d opaque=%d alpha=%d alphaProgram=%d transparent=%d batches=%d fallback=%d effects=%d overdraw=%d reads=%d lights=%d point=%d projected=%d lightGrid=%d)\n",
+		stats.forwardPlusProgramReady ? 1 : 0,
+		stats.forwardPlusResourcesReady ? 1 : 0,
+		stats.forwardPlusSceneColorReady ? 1 : 0,
+		stats.forwardPlusSceneDepthReady ? 1 : 0,
+		stats.forwardPlusClusterReady ? 1 : 0,
+		stats.forwardPlusDraws,
+		stats.forwardPlusOpaqueDraws,
+		stats.forwardPlusAlphaTestDraws,
+		alphaProgram != NULL && alphaProgram->program != 0 && alphaProgram->linked ? 1 : 0,
+		stats.forwardPlusTransparentDraws,
+		stats.forwardPlusSortedBatches,
+		stats.forwardPlusFallbackDraws,
+		stats.forwardPlusSpecialEffectFallbacks,
+		stats.forwardPlusOverdrawEstimate,
+		stats.forwardPlusClusterReads,
+		stats.forwardPlusActiveLights,
+		stats.forwardPlusPointLights,
+		stats.forwardPlusProjectedLights,
+		stats.forwardPlusLightGridContributions );
 	return true;
 }
