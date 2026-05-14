@@ -68,6 +68,8 @@ typedef struct modernGLExecutorStats_s {
 	bool	modernVisibleProgramReady;
 	bool	modernVisibleSourceReady;
 	bool	modernVisibleBackBufferReady;
+	bool	modernVisibleHybridTargetReady;
+	bool	modernVisibleShadowReady;
 	bool	modernVisibleBlockedByLegacy;
 	bool	modernVisibleCompatibilityReady;
 	bool	modernVisibleGuiProgramReady;
@@ -183,6 +185,8 @@ typedef struct modernGLExecutorStats_s {
 	int		submittedFallbackDraws;
 	int		visibleDepthDraws;
 	int		visibleDepthFallbackDraws;
+	int		visibleDepthAlphaTestDraws;
+	int		visibleDepthSkinnedDraws;
 	int		visibleShadowDepthDraws;
 	int		visibleShadowFallbackDraws;
 	int		visibleStencilShadowFallbackDraws;
@@ -217,6 +221,10 @@ typedef struct modernGLExecutorStats_s {
 	int		deferredResolveActiveLights;
 	int		deferredResolvePointLights;
 	int		deferredResolveProjectedLights;
+	int		deferredResolveShadowMappedLights;
+	int		deferredResolveShadowFallbackLights;
+	int		deferredResolveShadowSkippedLights;
+	int		deferredResolveShadowDescriptors;
 	int		deferredResolveLightGridContributions;
 	int		deferredResolveClusterReads;
 	int		deferredResolveResourceFallbacks;
@@ -247,10 +255,15 @@ typedef struct modernGLExecutorStats_s {
 	int		forwardPlusActiveLights;
 	int		forwardPlusPointLights;
 	int		forwardPlusProjectedLights;
+	int		forwardPlusShadowMappedLights;
+	int		forwardPlusShadowFallbackLights;
+	int		forwardPlusShadowSkippedLights;
+	int		forwardPlusShadowDescriptors;
 	int		forwardPlusLightGridContributions;
 	int		forwardPlusClearOps;
 	int		modernVisibleCompositions;
 	int		modernVisiblePixels;
+	int		modernVisibleCompositeCopies;
 	int		modernVisibleModernPasses;
 	int		modernVisibleLegacyPasses;
 	int		modernVisibleDisabledPasses;
@@ -267,6 +280,10 @@ typedef struct modernGLExecutorStats_s {
 	int		modernVisibleCompatibilityModernPasses;
 	int		modernVisibleCompatibilityLegacyPasses;
 	int		modernVisibleLightGridModernPasses;
+	int		modernVisibleShadowMappedLights;
+	int		modernVisibleShadowFallbackLights;
+	int		modernVisibleShadowSkippedLights;
+	int		modernVisibleShadowDescriptors;
 	int		modernVisibleGuiModernPasses;
 	int		modernVisibleGuiDraws;
 	int		modernVisibleGuiReadyDraws;

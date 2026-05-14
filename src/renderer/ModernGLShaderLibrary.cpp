@@ -33,8 +33,8 @@ typedef struct modernGLShaderProgramDescriptor_s {
 } modernGLShaderProgramDescriptor_t;
 
 static const modernGLShaderProgramDescriptor_t rg_modernGLShaderProgramDescriptors[MODERN_GL_SHADER_PROGRAM_KIND_COUNT] = {
-	{ MODERN_GL_SHADER_DEPTH, RENDER_PASS_DEPTH, RENDER_MATERIAL_OPAQUE, 0, 0, 0, 0, 0, 0, 0, 0, false, false, false, false, "depth" },
-	{ MODERN_GL_SHADER_SHADOW_DEPTH, RENDER_PASS_SHADOW_MAP, RENDER_MATERIAL_SHADOW_ONLY, 0, 1, 0, 0, 0, 0, 0, 0, false, false, false, false, "shadowDepth" },
+	{ MODERN_GL_SHADER_DEPTH, RENDER_PASS_DEPTH, RENDER_MATERIAL_OPAQUE, 0, 0, 1, 0, 0, 0, 0, 0, true, true, false, false, "depth" },
+	{ MODERN_GL_SHADER_SHADOW_DEPTH, RENDER_PASS_SHADOW_MAP, RENDER_MATERIAL_SHADOW_ONLY, 0, 1, 1, 0, 0, 0, 0, 0, true, true, false, false, "shadowDepth" },
 	{ MODERN_GL_SHADER_FLAT_MATERIAL, RENDER_PASS_ARB2_INTERACTION, RENDER_MATERIAL_OPAQUE, 1, 0, 0, 0, 0, 0, 0, 0, false, false, false, false, "flatMaterial" },
 	{ MODERN_GL_SHADER_LIGHT_GRID, RENDER_PASS_LIGHT_GRID, RENDER_MATERIAL_OPAQUE, 2, 0, 0, 0, 0, 1, 0, 0, false, true, false, false, "lightGrid" },
 	{ MODERN_GL_SHADER_FOG_BLEND, RENDER_PASS_FOG_BLEND, RENDER_MATERIAL_TRANSLUCENT, 3, 0, 1, 0, 0, 0, 1, 0, true, true, true, false, "fogBlend" },
@@ -237,7 +237,11 @@ static void R_ModernGLShaderLibrary_BuildFragmentSource( int glslVersion, modern
 			buffer,
 			bufferSize,
 			"#version %d\n"
+			"in vec2 vTexCoord;\n"
+			"uniform vec4 uLocalParams;\n"
+			"uniform sampler2D uMainTexture;\n"
 			"void main() {\n"
+			"    if (uLocalParams.y > 0.5 && texture(uMainTexture, vTexCoord).a < max(uLocalParams.x, 0.001)) { discard; }\n"
 			"}\n",
 			glslVersion );
 		return;
@@ -336,6 +340,16 @@ static void R_ModernGLShaderLibrary_BuildFragmentSource( int glslVersion, modern
 		"    if (indexRecord < 0 || indexRecord >= MODERN_CLUSTER_UBO_MAX_INDEX_RECORDS) { return uvec4(0xffffffffu); }\n"
 		"    return uClusterIndices.indices[indexRecord];\n"
 		"#endif\n"
+		"}\n";
+	const char *shadowPolicyHeader =
+		"#define MODERN_SHADOW_POLICY_MAPPED 1.0\n"
+		"#define MODERN_SHADOW_POLICY_STENCIL_FALLBACK 2.0\n"
+		"#define MODERN_SHADOW_POLICY_SKIPPED 3.0\n"
+		"float ModernClusterShadowVisibility(ModernClusterLightRecord light) {\n"
+		"    float policy = floor(light.flags.w + 0.5);\n"
+		"    float descriptorValid = step(0.0, light.flags.z);\n"
+		"    if (policy == MODERN_SHADOW_POLICY_MAPPED) { return descriptorValid; }\n"
+		"    return 1.0;\n"
 		"}\n";
 
 	if ( kind == MODERN_GL_SHADER_GBUFFER_OPAQUE ) {
@@ -452,6 +466,7 @@ static void R_ModernGLShaderLibrary_BuildFragmentSource( int glslVersion, modern
 			"uniform sampler2D uGBufferEmissive;\n"
 			"uniform sampler2D uSceneDepth;\n"
 			"%s"
+			"%s"
 			"void main() {\n"
 			"    vec4 albedo = texture(uMainTexture, vTexCoord);\n"
 			"    vec3 normal = normalize(texture(uGBufferNormal, vTexCoord).xyz * 2.0 - 1.0);\n"
@@ -482,7 +497,8 @@ static void R_ModernGLShaderLibrary_BuildFragmentSource( int glslVersion, modern
 			"        vec3 lightDir = normalize(vec3(0.25, 0.35, 1.0));\n"
 			"        float ndotl = clamp(dot(normal, lightDir) * 0.5 + 0.5, 0.18, 1.0);\n"
 			"        float projectedScale = type == 1 ? 0.85 : 1.0;\n"
-			"        float attenuation = supported ? inX * inY * ndotl * projectedScale : 0.0;\n"
+			"        float shadowVisibility = ModernClusterShadowVisibility(light);\n"
+			"        float attenuation = supported ? inX * inY * ndotl * projectedScale * shadowVisibility : 0.0;\n"
 			"        lightAccum += light.colorType.rgb * attenuation;\n"
 			"        contributingLights += attenuation > 0.001 ? 1 : 0;\n"
 			"        scannedLights++;\n"
@@ -506,7 +522,8 @@ static void R_ModernGLShaderLibrary_BuildFragmentSource( int glslVersion, modern
 			"}\n",
 			glslVersion,
 			hasShaderStorage,
-			clusterHeader );
+			clusterHeader,
+			shadowPolicyHeader );
 		return;
 	}
 
@@ -516,6 +533,7 @@ static void R_ModernGLShaderLibrary_BuildFragmentSource( int glslVersion, modern
 			bufferSize,
 			"#version %d\n"
 			"#define MODERN_HAS_SHADER_STORAGE %d\n"
+			"%s"
 			"%s"
 			"%s"
 			"void main() {\n"
@@ -546,7 +564,8 @@ static void R_ModernGLShaderLibrary_BuildFragmentSource( int glslVersion, modern
 			"        float inX = step(light.scissorDepth.x, gl_FragCoord.x) * step(gl_FragCoord.x, light.scissorDepth.z);\n"
 			"        float inY = step(light.scissorDepth.y, gl_FragCoord.y) * step(gl_FragCoord.y, light.scissorDepth.w);\n"
 			"        float projectedScale = type == 1 ? 0.85 : 1.0;\n"
-			"        lightAccum += supported ? light.colorType.rgb * inX * inY * projectedScale * normalScale : vec3(0.0);\n"
+			"        float shadowVisibility = ModernClusterShadowVisibility(light);\n"
+			"        lightAccum += supported ? light.colorType.rgb * inX * inY * projectedScale * normalScale * shadowVisibility : vec3(0.0);\n"
 			"        scannedLights++;\n"
 			"    }\n"
 			"    float lightScale = clamp((0.18 + uLocalParams.y + float(scannedLights) * 0.05) * normalScale, 0.18, 2.5);\n"
@@ -557,6 +576,7 @@ static void R_ModernGLShaderLibrary_BuildFragmentSource( int glslVersion, modern
 			hasShaderStorage,
 			sharedHeader,
 			clusterHeader,
+			shadowPolicyHeader,
 			kind == MODERN_GL_SHADER_CLUSTERED_FORWARD_ALPHA_TEST ? 1 : 0 );
 		return;
 	}
@@ -567,6 +587,7 @@ static void R_ModernGLShaderLibrary_BuildFragmentSource( int glslVersion, modern
 			bufferSize,
 			"#version %d\n"
 			"#define MODERN_HAS_SHADER_STORAGE %d\n"
+			"%s"
 			"%s"
 			"%s"
 			"void main() {\n"
@@ -594,14 +615,16 @@ static void R_ModernGLShaderLibrary_BuildFragmentSource( int glslVersion, modern
 			"        if (lightIndex == 0xffffffffu || lightIndex >= uint(max(uClusterGrid.counts.x, 0.0))) { continue; }\n"
 			"        ModernClusterLightRecord light = ModernClusterFetchLight(lightIndex);\n"
 			"        int type = int(floor(light.colorType.w + 0.5));\n"
-			"        if (type == 0 || type == 1) { lightAccum += light.colorType.rgb * (0.16 + specular * 0.08) * normalScale; }\n"
+			"        float shadowVisibility = ModernClusterShadowVisibility(light);\n"
+			"        if (type == 0 || type == 1) { lightAccum += light.colorType.rgb * (0.16 + specular * 0.08) * normalScale * shadowVisibility; }\n"
 			"    }\n"
 			"    out_Color = vec4(clamp(mix(baseColor, blendColor, blendAmount) + lightAccum + emissive, vec3(0.0), vec3(1.0)), texel.a * uDebugColor.a);\n"
 			"}\n",
 			glslVersion,
 			hasShaderStorage,
 			sharedHeader,
-			clusterHeader );
+			clusterHeader,
+			shadowPolicyHeader );
 		return;
 	}
 

@@ -318,6 +318,10 @@ static int R_RenderGraph_EnsureBackBuffer( idRenderGraph &graph ) {
 	return R_RenderGraph_EnsureResource( graph, "backBuffer", RENDER_GRAPH_RESOURCE_COLOR, true, false, true, 0 );
 }
 
+static int R_RenderGraph_EnsureHybridSceneColor( idRenderGraph &graph ) {
+	return R_RenderGraph_EnsureResource( graph, "hybridSceneColor", RENDER_GRAPH_RESOURCE_COLOR, false, true, false, 6 );
+}
+
 static int R_RenderGraph_EnsurePostA( idRenderGraph &graph ) {
 	return R_RenderGraph_EnsureResource( graph, "postA", RENDER_GRAPH_RESOURCE_COLOR, false, true, false, 1 );
 }
@@ -579,6 +583,7 @@ static void R_RenderGraph_AddPassResources( idRenderGraph &graph, int passIndex,
 		const int postA = graph.FindResource( "postA" );
 		const int backBuffer = R_RenderGraph_EnsureBackBuffer( graph );
 		if ( R_RenderGraph_ShouldModelModernVisible() ) {
+			const int hybridSceneColor = R_RenderGraph_EnsureHybridSceneColor( graph );
 			if ( deferredLight >= 0 && graph.Resource( deferredLight ).written ) {
 				R_RenderGraph_AddAccess( graph, passIndex, deferredLight, RENDER_GRAPH_ACCESS_READ | RENDER_GRAPH_ACCESS_INVALIDATE, "modern-present-deferred-read" );
 			}
@@ -588,6 +593,8 @@ static void R_RenderGraph_AddPassResources( idRenderGraph &graph, int passIndex,
 			if ( postA >= 0 && graph.Resource( postA ).written ) {
 				R_RenderGraph_AddAccess( graph, passIndex, postA, RENDER_GRAPH_ACCESS_READ | RENDER_GRAPH_ACCESS_INVALIDATE, "modern-present-post-read" );
 			}
+			R_RenderGraph_AddAccess( graph, passIndex, hybridSceneColor, RENDER_GRAPH_ACCESS_WRITE | RENDER_GRAPH_ACCESS_CLEAR | RENDER_GRAPH_ACCESS_RESOLVE, "modern-hybrid-scene-write" );
+			R_RenderGraph_AddAccess( graph, passIndex, hybridSceneColor, RENDER_GRAPH_ACCESS_READ | RENDER_GRAPH_ACCESS_INVALIDATE, "modern-present-hybrid-read" );
 			R_RenderGraph_AddAccess( graph, passIndex, backBuffer, RENDER_GRAPH_ACCESS_WRITE | RENDER_GRAPH_ACCESS_RESOLVE, "modern-present-resolve" );
 		} else if ( sceneColor >= 0 && graph.Resource( sceneColor ).written ) {
 			R_RenderGraph_AddAccess( graph, passIndex, sceneColor, RENDER_GRAPH_ACCESS_READ | RENDER_GRAPH_ACCESS_INVALIDATE, "present-scene-read" );

@@ -1516,12 +1516,20 @@ static void R_ModernGLExecutor_SetDebugColor( const modernGLSubmitCommand_t &com
 }
 
 static float R_ModernGLExecutor_AlphaReferenceForCommand( const modernGLSubmitCommand_t &command );
+static bool R_ModernGLExecutor_MaterialContractPromotable( const materialResourceTableRecord_t &materialRecord, bool allowAlphaBlend );
 
 static void R_ModernGLExecutor_SetLocalParams( const modernGLSubmitCommand_t &command ) {
 	if ( command.localParamsLocation < 0 ) {
 		return;
 	}
 	switch ( command.shaderKind ) {
+	case MODERN_GL_SHADER_DEPTH:
+	case MODERN_GL_SHADER_SHADOW_DEPTH: {
+		const materialResourceTableRecord_t *materialRecord = R_MaterialResourceTable_RecordForIndex( command.materialTableIndex );
+		const bool alphaTest = materialRecord != NULL && ( materialRecord->alphaTest || materialRecord->materialClass == RENDER_MATERIAL_PERFORATED );
+		glUniform4f( command.localParamsLocation, R_ModernGLExecutor_AlphaReferenceForCommand( command ), alphaTest ? 1.0f : 0.0f, 0.0f, 0.0f );
+		break;
+	}
 	case MODERN_GL_SHADER_GBUFFER_ALPHA_TEST:
 	case MODERN_GL_SHADER_CLUSTERED_FORWARD_ALPHA_TEST:
 		glUniform4f( command.localParamsLocation, R_ModernGLExecutor_AlphaReferenceForCommand( command ), 0.0f, 0.25f, 0.0f );
@@ -2161,13 +2169,27 @@ static bool R_ModernGLExecutor_VisibleDepthMaterialSupported( const modernGLSubm
 		stats.visibleDepthMaterialFallbackDraws++;
 		return false;
 	}
-	if ( materialRecord->alphaTest || materialRecord->materialClass == RENDER_MATERIAL_PERFORATED ) {
-		stats.visibleDepthAlphaTestFallbackDraws++;
-		return false;
-	}
-	if ( materialRecord->materialClass != RENDER_MATERIAL_OPAQUE && materialRecord->materialClass != RENDER_MATERIAL_SHADOW_ONLY ) {
+	const bool alphaTest = materialRecord->alphaTest || materialRecord->materialClass == RENDER_MATERIAL_PERFORATED;
+	if ( materialRecord->materialClass != RENDER_MATERIAL_OPAQUE && materialRecord->materialClass != RENDER_MATERIAL_SHADOW_ONLY && !alphaTest ) {
 		stats.visibleDepthMaterialFallbackDraws++;
 		return false;
+	}
+	if ( alphaTest ) {
+		const bool shadowCaster = command.passCategory == RENDER_PASS_SHADOW_MAP;
+		if ( shadowCaster ) {
+			if ( !materialRecord->shadowCasterSupported || !materialRecord->shadowAlphaTest ) {
+				stats.visibleDepthAlphaTestFallbackDraws++;
+				return false;
+			}
+		} else if ( !R_ModernGLExecutor_MaterialContractPromotable( *materialRecord, false ) ) {
+			stats.visibleDepthAlphaTestFallbackDraws++;
+			return false;
+		}
+		const materialResourceTextureBinding_t *binding = R_ModernGLExecutor_FindTextureBinding( *materialRecord, MATERIAL_RESOURCE_TEXTURE_DIFFUSE );
+		if ( binding == NULL || binding->textureHandle == 0 ) {
+			stats.visibleDepthAlphaTestFallbackDraws++;
+			return false;
+		}
 	}
 
 	const drawPacket_t *draw = command.drawPlanEntry != NULL ? command.drawPlanEntry->drawPacket : NULL;
@@ -2180,11 +2202,23 @@ static bool R_ModernGLExecutor_VisibleDepthMaterialSupported( const modernGLSubm
 		stats.visibleDepthDeformFallbackDraws++;
 		return false;
 	}
-	if ( geometry->skinningMode != GEOMETRY_SKINNING_NONE ) {
+	if ( geometry->skinningMode == GEOMETRY_SKINNING_GPU_PALETTE ) {
 		stats.visibleDepthSkinnedFallbackDraws++;
 		return false;
 	}
 	return true;
+}
+
+static void R_ModernGLExecutor_CountVisibleDepthOwnedFeatures( const modernGLSubmitCommand_t &command, modernGLExecutorStats_t &stats ) {
+	const materialResourceTableRecord_t *materialRecord = R_MaterialResourceTable_RecordForIndex( command.materialTableIndex );
+	if ( materialRecord != NULL && ( materialRecord->alphaTest || materialRecord->materialClass == RENDER_MATERIAL_PERFORATED ) ) {
+		stats.visibleDepthAlphaTestDraws++;
+	}
+	const drawPacket_t *draw = command.drawPlanEntry != NULL ? command.drawPlanEntry->drawPacket : NULL;
+	const geometryResourceRecord_t *geometry = draw != NULL ? draw->geometryRecord : NULL;
+	if ( geometry != NULL && geometry->skinningMode == GEOMETRY_SKINNING_CPU ) {
+		stats.visibleDepthSkinnedDraws++;
+	}
 }
 
 static void R_ModernGLExecutor_BeginDepthResourcePass( const renderGraphResourceHandle_t &handle, bool clearStencil, const char *clearLabel ) {
@@ -2245,6 +2279,7 @@ static void R_ModernGLExecutor_ExecuteVisibleDepthPass(
 		} else {
 			stats.visibleDepthDraws++;
 		}
+		R_ModernGLExecutor_CountVisibleDepthOwnedFeatures( command, stats );
 	}
 }
 
@@ -2636,9 +2671,13 @@ static void R_ModernGLExecutor_SubmitDeferredResolve( modernGLExecutorStats_t &s
 	stats.deferredResolveActiveLights = clusterStats.lightCount;
 	stats.deferredResolvePointLights = clusterStats.pointLights;
 	stats.deferredResolveProjectedLights = clusterStats.projectedLights;
+	stats.deferredResolveShadowMappedLights = clusterStats.shadowMappedLights;
+	stats.deferredResolveShadowFallbackLights = clusterStats.shadowFallbackLights;
+	stats.deferredResolveShadowSkippedLights = clusterStats.shadowSkippedLights;
+	stats.deferredResolveShadowDescriptors = clusterStats.shadowDescriptorCount;
 	stats.deferredResolveFogFallbackLights = clusterStats.fogLights;
 	stats.deferredResolveSpecialFallbackLights = clusterStats.specialLights;
-	stats.deferredResolveUnsupportedLightFallbacks = clusterStats.fogLights + clusterStats.specialLights;
+	stats.deferredResolveUnsupportedLightFallbacks = clusterStats.fogLights + clusterStats.specialLights + clusterStats.shadowFallbackLights;
 	stats.deferredResolveOverflowClusters = clusterStats.overflowClusters;
 	if ( !stats.deferredResolveClusterReady ) {
 		stats.deferredResolveResourceFallbacks++;
@@ -2864,6 +2903,10 @@ static void R_ModernGLExecutor_SubmitForwardPlus( modernGLExecutorStats_t &stats
 	stats.forwardPlusActiveLights = clusterStats.lightCount;
 	stats.forwardPlusPointLights = clusterStats.pointLights;
 	stats.forwardPlusProjectedLights = clusterStats.projectedLights;
+	stats.forwardPlusShadowMappedLights = clusterStats.shadowMappedLights;
+	stats.forwardPlusShadowFallbackLights = clusterStats.shadowFallbackLights;
+	stats.forwardPlusShadowSkippedLights = clusterStats.shadowSkippedLights;
+	stats.forwardPlusShadowDescriptors = clusterStats.shadowDescriptorCount;
 	if ( !stats.forwardPlusClusterReady ) {
 		stats.forwardPlusResourceFallbackDraws++;
 		return;
@@ -3126,13 +3169,30 @@ static void R_ModernGLExecutor_SetPassOwnership(
 static bool R_ModernGLExecutor_ModernVisiblePrecomposeReady( modernGLExecutorStats_t &stats ) {
 	const renderGraphResourceHandle_t *deferredLight = NULL;
 	const renderGraphResourceHandle_t *sceneColor = NULL;
+	const renderGraphResourceHandle_t *hybridSceneColor = NULL;
 	const renderGraphResourceHandle_t *backBuffer = R_RenderGraphResources_FindHandle( "backBuffer" );
 	const bool deferredReady = stats.deferredResolveExecuted && R_ModernGLExecutor_GBufferResourceReady( "deferredLight", deferredLight );
 	const bool forwardReady = stats.forwardPlusExecuted && R_ModernGLExecutor_GBufferResourceReady( "sceneColor", sceneColor );
+	const bool hybridReady = R_ModernGLExecutor_GBufferResourceReady( "hybridSceneColor", hybridSceneColor );
 	const bool guiReady = stats.modernVisibleGuiFallbackDraws == 0;
+	const modernShadowPlannerStats_t &shadowStats = R_ModernShadowPlanner_Stats();
+	stats.modernVisibleShadowMappedLights = shadowStats.mappedLights;
+	stats.modernVisibleShadowFallbackLights = shadowStats.fallbackLights;
+	stats.modernVisibleShadowSkippedLights = shadowStats.skippedLights;
+	stats.modernVisibleShadowDescriptors = shadowStats.descriptorCount;
+	stats.modernVisibleShadowReady =
+		!r_shadows.GetBool()
+		|| !shadowStats.requested
+		|| ( shadowStats.frameValid
+			&& shadowStats.fallbackLights == 0
+			&& stats.deferredResolveShadowFallbackLights == 0
+			&& stats.forwardPlusShadowFallbackLights == 0
+			&& stats.visibleShadowFallbackDraws == 0
+			&& stats.visibleStencilShadowFallbackDraws == 0 );
 	stats.modernVisibleSourceReady = deferredReady && forwardReady;
 	stats.modernVisibleBackBufferReady = backBuffer != NULL && backBuffer->presentable;
-	stats.modernVisibleResourcesReady = stats.modernVisibleSourceReady && stats.modernVisibleBackBufferReady;
+	stats.modernVisibleHybridTargetReady = hybridReady;
+	stats.modernVisibleResourcesReady = stats.modernVisibleSourceReady && stats.modernVisibleBackBufferReady && stats.modernVisibleHybridTargetReady;
 	stats.modernVisibleHandoffReady =
 		stats.modernVisibleRequested &&
 		stats.modernVisibleCanReplaceFrame &&
@@ -3141,12 +3201,15 @@ static bool R_ModernGLExecutor_ModernVisiblePrecomposeReady( modernGLExecutorSta
 		stats.initialized &&
 		stats.modernVisibleProgramReady &&
 		!stats.modernVisibleBlockedByLegacy &&
+		stats.modernVisibleShadowReady &&
 		guiReady &&
 		stats.modernVisibleResourcesReady &&
 		deferredLight != NULL &&
 		sceneColor != NULL &&
+		hybridSceneColor != NULL &&
 		deferredLight->texture != 0 &&
-		sceneColor->texture != 0;
+		sceneColor->texture != 0 &&
+		hybridSceneColor->texture != 0;
 	return stats.modernVisibleHandoffReady;
 }
 
@@ -3216,12 +3279,14 @@ static void R_ModernGLExecutor_FinalizePassOwnership( const idRenderGraph &graph
 			stats.deferredResolveResourceFallbacks == 0 &&
 			stats.deferredResolveUnsupportedLightFallbacks == 0 &&
 			stats.deferredResolveFogFallbackLights == 0 &&
-			stats.deferredResolveSpecialFallbackLights == 0;
+			stats.deferredResolveSpecialFallbackLights == 0 &&
+			stats.deferredResolveShadowFallbackLights == 0;
 		const bool forwardModern =
 			stats.forwardPlusExecuted &&
 			stats.forwardPlusResourcesReady &&
 			stats.forwardPlusFallbackDraws == 0 &&
-			stats.forwardPlusSpecialEffectFallbacks == 0;
+			stats.forwardPlusSpecialEffectFallbacks == 0 &&
+			stats.forwardPlusShadowFallbackLights == 0;
 
 		if ( depthModern && R_ModernGLExecutor_PassExistsInGraph( graph, RENDER_PASS_DEPTH ) ) {
 			R_ModernGLExecutor_SetPassOwnership( RENDER_PASS_DEPTH, MODERN_GL_PASS_OWNER_MODERN, true, true, "modern-depth-complete" );
@@ -3355,6 +3420,8 @@ static void R_ModernGLExecutor_RecordMetrics( const modernGLExecutorStats_t &sta
 		stats.visibleShadowResourceReady,
 		stats.visibleDepthDebugOverlayReady,
 		stats.visibleDepthDraws,
+		stats.visibleDepthAlphaTestDraws,
+		stats.visibleDepthSkinnedDraws,
 		stats.visibleDepthFallbackDraws,
 		stats.visibleShadowDepthDraws,
 		stats.visibleShadowFallbackDraws,
@@ -3753,7 +3820,7 @@ void R_ModernGLExecutor_PrepareFrame( const idScenePacketFrame &packetFrame, con
 
 	if ( r_rendererMetrics.GetInteger() >= 2 && enabled ) {
 		common->Printf(
-			"modernGLExecutor status=%s passes=%d/%d fallback=%d draws=%d prepared=%d material=%d resources=%d geometry=%d gui=%d world=%d plan=%d planDraws=%d depth=%d materialFamily=%d planFallback=%d batches=%d programSwitches=%d materialSwitches=%d planOverflow=%d submit=%d submitDraws=%d submitFallback=%d submitMissing(vbo=%d ibo=%d) submitIndexUpload=%d submitted=%d submittedDraws=%d submittedFallback=%d submittedUpload=%d submitBatches(program=%d vbo=%d ibo=%d scissor=%d material=%d) uniforms=%d frameUBO=%d submitOverflow=%d visibleDepth(req=%d exec=%d res=%d/%d draws=%d shadow=%d fallback=%d/%d stencil=%d mismatch=%d clear=%d resolve=%d overlay=%d/%d) gbuffer(req=%d exec=%d res=%d mrt=%d draws=%d fallback=%d alpha=%d skinned=%d clear=%d att=%d bpp=%d bw=%dKB overlay=%d/%d) deferred(req=%d exec=%d res=%d out=%d program=%d cluster=%d pixels=%d lights=%d point=%d projected=%d lightGrid=%d reads=%d fallback=%d unsupported=%d fog=%d special=%d overflow=%d clear=%d debug=%d overlay=%d/%d) vao=%d ubo=%d shaders=%d shaderFails=%d glsl=%d gpuDriven=%d ssbo=%d indirect=%d validation=%d compute=%d sceneRecords=%d indirectRecords=%d gpuBytes(scene=%d indirect=%d validation=%d) dispatches=%d source=%d eligible=%d generated=%d culled=%d visible=%d mismatches=%d readbacks=%d indirectExec=%d multiDraw=%d indirectCalls=%d lowOverhead=%d dsa=%d multiBind=%d dsaUpdates=%d multiBindBatches=%d\n",
+			"modernGLExecutor status=%s passes=%d/%d fallback=%d draws=%d prepared=%d material=%d resources=%d geometry=%d gui=%d world=%d plan=%d planDraws=%d depth=%d materialFamily=%d planFallback=%d batches=%d programSwitches=%d materialSwitches=%d planOverflow=%d submit=%d submitDraws=%d submitFallback=%d submitMissing(vbo=%d ibo=%d) submitIndexUpload=%d submitted=%d submittedDraws=%d submittedFallback=%d submittedUpload=%d submitBatches(program=%d vbo=%d ibo=%d scissor=%d material=%d) uniforms=%d frameUBO=%d submitOverflow=%d visibleDepth(req=%d exec=%d res=%d/%d draws=%d alpha=%d skinned=%d shadow=%d fallback=%d/%d stencil=%d mismatch=%d clear=%d resolve=%d overlay=%d/%d) gbuffer(req=%d exec=%d res=%d mrt=%d draws=%d fallback=%d alpha=%d skinned=%d clear=%d att=%d bpp=%d bw=%dKB overlay=%d/%d) deferred(req=%d exec=%d res=%d out=%d program=%d cluster=%d pixels=%d lights=%d point=%d projected=%d lightGrid=%d reads=%d fallback=%d unsupported=%d fog=%d special=%d overflow=%d clear=%d debug=%d overlay=%d/%d) vao=%d ubo=%d shaders=%d shaderFails=%d glsl=%d gpuDriven=%d ssbo=%d indirect=%d validation=%d compute=%d sceneRecords=%d indirectRecords=%d gpuBytes(scene=%d indirect=%d validation=%d) dispatches=%d source=%d eligible=%d generated=%d culled=%d visible=%d mismatches=%d readbacks=%d indirectExec=%d multiDraw=%d indirectCalls=%d lowOverhead=%d dsa=%d multiBind=%d dsaUpdates=%d multiBindBatches=%d\n",
 			rg_modernGLExecutorStats.status,
 			rg_modernGLExecutorStats.preparedPasses,
 			rg_modernGLExecutorStats.graphPasses,
@@ -3797,6 +3864,8 @@ void R_ModernGLExecutor_PrepareFrame( const idScenePacketFrame &packetFrame, con
 			rg_modernGLExecutorStats.visibleDepthResourceReady ? 1 : 0,
 			rg_modernGLExecutorStats.visibleShadowResourceReady ? 1 : 0,
 			rg_modernGLExecutorStats.visibleDepthDraws,
+			rg_modernGLExecutorStats.visibleDepthAlphaTestDraws,
+			rg_modernGLExecutorStats.visibleDepthSkinnedDraws,
 			rg_modernGLExecutorStats.visibleShadowDepthDraws,
 			rg_modernGLExecutorStats.visibleDepthFallbackDraws,
 			rg_modernGLExecutorStats.visibleShadowFallbackDraws,
@@ -4052,12 +4121,15 @@ void R_ModernGLExecutor_ComposeVisibleFrame( void ) {
 	stats.modernVisibleProgramReady = rg_modernGLExecutorVisibleCompositeProgram != 0;
 	const renderGraphResourceHandle_t *deferredLight = NULL;
 	const renderGraphResourceHandle_t *sceneColor = NULL;
+	const renderGraphResourceHandle_t *hybridSceneColor = NULL;
 	const renderGraphResourceHandle_t *backBuffer = R_RenderGraphResources_FindHandle( "backBuffer" );
 	const bool deferredReady = stats.deferredResolveExecuted && R_ModernGLExecutor_GBufferResourceReady( "deferredLight", deferredLight );
 	const bool forwardReady = stats.forwardPlusExecuted && R_ModernGLExecutor_GBufferResourceReady( "sceneColor", sceneColor );
+	const bool hybridReady = R_ModernGLExecutor_GBufferResourceReady( "hybridSceneColor", hybridSceneColor );
 	stats.modernVisibleSourceReady = deferredReady && forwardReady;
 	stats.modernVisibleBackBufferReady = backBuffer != NULL && backBuffer->presentable;
-	stats.modernVisibleResourcesReady = stats.modernVisibleSourceReady && stats.modernVisibleBackBufferReady;
+	stats.modernVisibleHybridTargetReady = hybridReady;
+	stats.modernVisibleResourcesReady = stats.modernVisibleSourceReady && stats.modernVisibleBackBufferReady && stats.modernVisibleHybridTargetReady;
 
 	if ( !stats.enabled || !stats.available || !stats.initialized || rg_modernGLExecutorVAO == 0 || !stats.modernVisibleProgramReady ) {
 		R_ModernGLExecutor_FailClosedPassOwnership( stats, "modern-visible-unavailable" );
@@ -4074,7 +4146,14 @@ void R_ModernGLExecutor_ComposeVisibleFrame( void ) {
 		R_ModernGLExecutor_RecordMetrics( stats );
 		return;
 	}
-	if ( !stats.modernVisibleResourcesReady || deferredLight == NULL || sceneColor == NULL || deferredLight->texture == 0 || sceneColor->texture == 0 ) {
+	if ( !stats.modernVisibleShadowReady ) {
+		R_ModernGLExecutor_FailClosedPassOwnership( stats, "modern-visible-shadow-fallback" );
+		stats.modernVisibleFallbackPasses++;
+		R_ModernGLExecutor_SetStatus( stats, "modern-visible-shadow-fallback" );
+		R_ModernGLExecutor_RecordMetrics( stats );
+		return;
+	}
+	if ( !stats.modernVisibleResourcesReady || deferredLight == NULL || sceneColor == NULL || hybridSceneColor == NULL || deferredLight->texture == 0 || sceneColor->texture == 0 || hybridSceneColor->texture == 0 || hybridSceneColor->framebuffer == 0 ) {
 		R_ModernGLExecutor_FailClosedPassOwnership( stats, "modern-visible-resource-fallback" );
 		stats.modernVisibleResourceFallbacks++;
 		stats.modernVisibleFallbackPasses++;
@@ -4087,10 +4166,12 @@ void R_ModernGLExecutor_ComposeVisibleFrame( void ) {
 	{
 		idGLDebugScope composeScope( "ModernGLExecutor visible hybrid composite" );
 		R_GLStateCache_InvalidateAll( "modern visible composition" );
-		R_GLStateCache().BindFramebuffer( GL_FRAMEBUFFER, 0 );
+		R_GLStateCache().BindFramebuffer( GL_FRAMEBUFFER, hybridSceneColor->framebuffer );
+		glDrawBuffer( GL_COLOR_ATTACHMENT0 );
+		glReadBuffer( GL_COLOR_ATTACHMENT0 );
 		R_GLStateCache().BindVertexArray( rg_modernGLExecutorVAO );
-		R_GLStateCache().SetViewport( 0, 0, Max( 1, glConfig.vidWidth ), Max( 1, glConfig.vidHeight ) );
-		R_GLStateCache().SetScissor( 0, 0, Max( 1, glConfig.vidWidth ), Max( 1, glConfig.vidHeight ) );
+		R_GLStateCache().SetViewport( 0, 0, Max( 1, hybridSceneColor->width ), Max( 1, hybridSceneColor->height ) );
+		R_GLStateCache().SetScissor( 0, 0, Max( 1, hybridSceneColor->width ), Max( 1, hybridSceneColor->height ) );
 		R_GLStateCache().SetScissorTestEnabled( false );
 		R_GLStateCache().SetDepthTestEnabled( false );
 		R_GLStateCache().SetDepthMask( GL_FALSE );
@@ -4115,6 +4196,17 @@ void R_ModernGLExecutor_ComposeVisibleFrame( void ) {
 			glUniform4f( rg_modernGLExecutorVisibleCompositeParamsLocation, 1.0f, 1.0f, 0.0f, 0.0f );
 		}
 		glDrawArrays( GL_TRIANGLE_STRIP, 0, 4 );
+
+		R_GLStateCache().BindFramebuffer( GL_FRAMEBUFFER, 0 );
+		R_GLStateCache().SetViewport( 0, 0, Max( 1, glConfig.vidWidth ), Max( 1, glConfig.vidHeight ) );
+		R_GLStateCache().SetScissor( 0, 0, Max( 1, glConfig.vidWidth ), Max( 1, glConfig.vidHeight ) );
+		GLuint presentTextures[2] = { hybridSceneColor->texture, hybridSceneColor->texture };
+		R_ModernGLExecutor_BindTextureGroup( 0, 2, presentTextures, stats );
+		if ( rg_modernGLExecutorVisibleCompositeParamsLocation >= 0 ) {
+			glUniform4f( rg_modernGLExecutorVisibleCompositeParamsLocation, 1.0f, 0.0f, 0.0f, 0.0f );
+		}
+		glDrawArrays( GL_TRIANGLE_STRIP, 0, 4 );
+		stats.modernVisibleCompositeCopies++;
 	}
 	R_RendererMetrics_EndGpuTimer();
 	R_ModernGLExecutor_SubmitModernGui( stats );
@@ -4275,7 +4367,7 @@ const modernGLExecutorStats_t &R_ModernGLExecutor_Stats( void ) {
 
 void R_ModernGLExecutor_PrintGfxInfo( void ) {
 	common->Printf(
-		"Modern GL executor: %s, cvar=%d, submitCvar=%d, gpuValidation=%d, visibleDepthCvar=%d, depthDebug=%d, opaqueCvar=%d, gbufferDebug=%d, deferredCvar=%d, deferredDebug=%d, VAO=%d, frameUBO=%d, shaderLibrary=%d, shaderPrograms=%d, highestGLSL=%d, drawPlan=%d, planDraws=%d, depth=%d, materialFamily=%d, planFallback=%d, batches=%d, submitPlan=%d, submitDraws=%d, submitFallback=%d, missingVBO=%d, missingIBO=%d, indexUpload=%d, submitted=%d/%d upload=%d fallback=%d, visibleDepth(req=%d exec=%d res=%d/%d draws=%d shadow=%d fallback=%d/%d stencil=%d mismatch=%d clears=%d resolves=%d overlay=%d/%d), gbuffer(req=%d exec=%d res=%d mrt=%d draws=%d fallback=%d alpha=%d skinned=%d clear=%d att=%d bpp=%d bw=%dKB overlay=%d/%d), deferred(req=%d exec=%d res=%d out=%d program=%d cluster=%d pixels=%d lights=%d point=%d projected=%d lightGrid=%d reads=%d fallback=%d unsupported=%d fog=%d special=%d overflow=%d clears=%d overlay=%d/%d), submitBatches(program=%d vbo=%d ibo=%d), gpuDriven=%d ssbo=%d indirect=%d validation=%d compute=%d sceneRecords=%d indirectRecords=%d gpuBytes(scene=%d indirect=%d validation=%d) dispatches=%d source=%d eligible=%d generated=%d culled=%d visible=%d cpu=%d/%d/%d gpu=%d/%d/%d clusters=%d/%d mismatches=%d readbacks=%d indirectExec=%d multiDraw=%d indirectCalls=%d, lowOverhead=%d dsa=%d multiBind=%d dsaUpdates=%d multiBindBatches=%d, legacyFallback=%d\n",
+		"Modern GL executor: %s, cvar=%d, submitCvar=%d, gpuValidation=%d, visibleDepthCvar=%d, depthDebug=%d, opaqueCvar=%d, gbufferDebug=%d, deferredCvar=%d, deferredDebug=%d, VAO=%d, frameUBO=%d, shaderLibrary=%d, shaderPrograms=%d, highestGLSL=%d, drawPlan=%d, planDraws=%d, depth=%d, materialFamily=%d, planFallback=%d, batches=%d, submitPlan=%d, submitDraws=%d, submitFallback=%d, missingVBO=%d, missingIBO=%d, indexUpload=%d, submitted=%d/%d upload=%d fallback=%d, visibleDepth(req=%d exec=%d res=%d/%d draws=%d alpha=%d skinned=%d shadow=%d fallback=%d/%d stencil=%d mismatch=%d clears=%d resolves=%d overlay=%d/%d), gbuffer(req=%d exec=%d res=%d mrt=%d draws=%d fallback=%d alpha=%d skinned=%d clear=%d att=%d bpp=%d bw=%dKB overlay=%d/%d), deferred(req=%d exec=%d res=%d out=%d program=%d cluster=%d pixels=%d lights=%d point=%d projected=%d lightGrid=%d reads=%d fallback=%d unsupported=%d fog=%d special=%d overflow=%d clears=%d overlay=%d/%d), submitBatches(program=%d vbo=%d ibo=%d), gpuDriven=%d ssbo=%d indirect=%d validation=%d compute=%d sceneRecords=%d indirectRecords=%d gpuBytes(scene=%d indirect=%d validation=%d) dispatches=%d source=%d eligible=%d generated=%d culled=%d visible=%d cpu=%d/%d/%d gpu=%d/%d/%d clusters=%d/%d mismatches=%d readbacks=%d indirectExec=%d multiDraw=%d indirectCalls=%d, lowOverhead=%d dsa=%d multiBind=%d dsaUpdates=%d multiBindBatches=%d, legacyFallback=%d\n",
 		rg_modernGLExecutorStats.available ? "available" : "unavailable",
 		r_rendererModernExecutor.GetBool() ? 1 : 0,
 		r_rendererModernSubmit.GetBool() ? 1 : 0,
@@ -4312,6 +4404,8 @@ void R_ModernGLExecutor_PrintGfxInfo( void ) {
 		rg_modernGLExecutorStats.visibleDepthResourceReady ? 1 : 0,
 		rg_modernGLExecutorStats.visibleShadowResourceReady ? 1 : 0,
 		rg_modernGLExecutorStats.visibleDepthDraws,
+		rg_modernGLExecutorStats.visibleDepthAlphaTestDraws,
+		rg_modernGLExecutorStats.visibleDepthSkinnedDraws,
 		rg_modernGLExecutorStats.visibleShadowDepthDraws,
 		rg_modernGLExecutorStats.visibleDepthFallbackDraws,
 		rg_modernGLExecutorStats.visibleShadowFallbackDraws,
@@ -4412,7 +4506,7 @@ void R_ModernGLExecutor_PrintGfxInfo( void ) {
 		rg_modernGLExecutorStats.lowOverheadClassicTextureBinds,
 		rg_modernGLExecutorStats.lowOverheadCompactedBatches );
 	common->Printf(
-		"Modern forward+: cvar=%d, req=%d exec=%d resources=%d sceneColor=%d sceneDepth=%d program=%d cluster=%d draws=%d opaque=%d alpha=%d transparent=%d viewmodel=%d fog=%d batches=%d fallback=%d resource=%d material=%d geometry=%d texture=%d blend=%d effects=%d sort=%d overdraw=%d reads=%d lights=%d point=%d projected=%d lightGrid=%d clears=%d\n",
+		"Modern forward+: cvar=%d, req=%d exec=%d resources=%d sceneColor=%d sceneDepth=%d program=%d cluster=%d draws=%d opaque=%d alpha=%d transparent=%d viewmodel=%d fog=%d batches=%d fallback=%d resource=%d material=%d geometry=%d texture=%d blend=%d effects=%d sort=%d overdraw=%d reads=%d lights=%d point=%d projected=%d shadow(mapped=%d fallback=%d skipped=%d descriptors=%d) lightGrid=%d clears=%d\n",
 		r_rendererForwardPlus.GetBool() ? 1 : 0,
 		rg_modernGLExecutorStats.forwardPlusRequested ? 1 : 0,
 		rg_modernGLExecutorStats.forwardPlusExecuted ? 1 : 0,
@@ -4441,19 +4535,30 @@ void R_ModernGLExecutor_PrintGfxInfo( void ) {
 		rg_modernGLExecutorStats.forwardPlusActiveLights,
 		rg_modernGLExecutorStats.forwardPlusPointLights,
 		rg_modernGLExecutorStats.forwardPlusProjectedLights,
+		rg_modernGLExecutorStats.forwardPlusShadowMappedLights,
+		rg_modernGLExecutorStats.forwardPlusShadowFallbackLights,
+		rg_modernGLExecutorStats.forwardPlusShadowSkippedLights,
+		rg_modernGLExecutorStats.forwardPlusShadowDescriptors,
 		rg_modernGLExecutorStats.forwardPlusLightGridContributions,
 		rg_modernGLExecutorStats.forwardPlusClearOps );
 	common->Printf(
-		"Modern visible frame: cvar=%d, req=%d exec=%d resources=%d program=%d source=%d backBuffer=%d blocked=%d composed=%d pixels=%d modern=%d legacy=%d disabled=%d fallback=%d ownerFallback=%d resourceFallback=%d gui=%d post=%d special=%d subview=%d present=%d clears=%d\n",
+		"Modern visible frame: cvar=%d, req=%d exec=%d resources=%d program=%d source=%d hybrid=%d backBuffer=%d shadowReady=%d shadow(mapped=%d fallback=%d skipped=%d descriptors=%d) blocked=%d composed=%d copies=%d pixels=%d modern=%d legacy=%d disabled=%d fallback=%d ownerFallback=%d resourceFallback=%d gui=%d post=%d special=%d subview=%d present=%d clears=%d\n",
 		r_rendererModernVisible.GetBool() ? 1 : 0,
 		rg_modernGLExecutorStats.modernVisibleRequested ? 1 : 0,
 		rg_modernGLExecutorStats.modernVisibleExecuted ? 1 : 0,
 		rg_modernGLExecutorStats.modernVisibleResourcesReady ? 1 : 0,
 		rg_modernGLExecutorStats.modernVisibleProgramReady ? 1 : 0,
 		rg_modernGLExecutorStats.modernVisibleSourceReady ? 1 : 0,
+		rg_modernGLExecutorStats.modernVisibleHybridTargetReady ? 1 : 0,
 		rg_modernGLExecutorStats.modernVisibleBackBufferReady ? 1 : 0,
+		rg_modernGLExecutorStats.modernVisibleShadowReady ? 1 : 0,
+		rg_modernGLExecutorStats.modernVisibleShadowMappedLights,
+		rg_modernGLExecutorStats.modernVisibleShadowFallbackLights,
+		rg_modernGLExecutorStats.modernVisibleShadowSkippedLights,
+		rg_modernGLExecutorStats.modernVisibleShadowDescriptors,
 		rg_modernGLExecutorStats.modernVisibleBlockedByLegacy ? 1 : 0,
 		rg_modernGLExecutorStats.modernVisibleCompositions,
+		rg_modernGLExecutorStats.modernVisibleCompositeCopies,
 		rg_modernGLExecutorStats.modernVisiblePixels,
 		rg_modernGLExecutorStats.modernVisibleModernPasses,
 		rg_modernGLExecutorStats.modernVisibleLegacyPasses,
@@ -5024,6 +5129,10 @@ bool RendererVisiblePath_RunSelfTest( void ) {
 		common->Printf( "RendererVisiblePath self-test failed: depth/shadow programs unavailable\n" );
 		return false;
 	}
+	if ( depthProgram->mainTextureLocation < 0 || depthProgram->localParamsLocation < 0 || shadowProgram->mainTextureLocation < 0 || shadowProgram->localParamsLocation < 0 ) {
+		common->Printf( "RendererVisiblePath self-test failed: alpha-aware depth bindings unavailable\n" );
+		return false;
+	}
 
 	idModernGLDrawPlan drawPlan;
 	drawPlan.Build( packetFrame, graph );
@@ -5400,7 +5509,7 @@ bool RendererDeferredResolve_RunSelfTest( void ) {
 	}
 
 	common->Printf(
-		"RendererDeferredResolve self-test passed (program=%d output=%d resources=%d cluster=%d pixels=%d lights=%d point=%d projected=%d lightGrid=%d reads=%d fallback=%d debug=%d overlay=%d)\n",
+		"RendererDeferredResolve self-test passed (program=%d output=%d resources=%d cluster=%d pixels=%d lights=%d point=%d projected=%d shadow=%d/%d/%d/%d lightGrid=%d reads=%d fallback=%d debug=%d overlay=%d)\n",
 		stats.deferredResolveProgramReady ? 1 : 0,
 		stats.deferredResolveOutputReady ? 1 : 0,
 		stats.deferredResolveResourcesReady ? 1 : 0,
@@ -5409,6 +5518,10 @@ bool RendererDeferredResolve_RunSelfTest( void ) {
 		stats.deferredResolveActiveLights,
 		stats.deferredResolvePointLights,
 		stats.deferredResolveProjectedLights,
+		stats.deferredResolveShadowMappedLights,
+		stats.deferredResolveShadowFallbackLights,
+		stats.deferredResolveShadowSkippedLights,
+		stats.deferredResolveShadowDescriptors,
 		stats.deferredResolveLightGridContributions,
 		stats.deferredResolveClusterReads,
 		stats.deferredResolveResourceFallbacks + stats.deferredResolveUnsupportedLightFallbacks,
@@ -5582,7 +5695,7 @@ bool RendererForwardPlus_RunSelfTest( void ) {
 	}
 
 	common->Printf(
-		"RendererForwardPlus self-test passed (programs=%d resources=%d scene=%d depth=%d cluster=%d draws=%d opaque=%d alpha=%d alphaProgram=%d transparent=%d batches=%d fallback=%d effects=%d overdraw=%d reads=%d lights=%d point=%d projected=%d lightGrid=%d)\n",
+		"RendererForwardPlus self-test passed (programs=%d resources=%d scene=%d depth=%d cluster=%d draws=%d opaque=%d alpha=%d alphaProgram=%d transparent=%d batches=%d fallback=%d effects=%d overdraw=%d reads=%d lights=%d point=%d projected=%d shadow=%d/%d/%d/%d lightGrid=%d)\n",
 		stats.forwardPlusProgramReady ? 1 : 0,
 		stats.forwardPlusResourcesReady ? 1 : 0,
 		stats.forwardPlusSceneColorReady ? 1 : 0,
@@ -5601,6 +5714,10 @@ bool RendererForwardPlus_RunSelfTest( void ) {
 		stats.forwardPlusActiveLights,
 		stats.forwardPlusPointLights,
 		stats.forwardPlusProjectedLights,
+		stats.forwardPlusShadowMappedLights,
+		stats.forwardPlusShadowFallbackLights,
+		stats.forwardPlusShadowSkippedLights,
+		stats.forwardPlusShadowDescriptors,
 		stats.forwardPlusLightGridContributions );
 	return true;
 }
@@ -5638,25 +5755,11 @@ bool RendererModernVisible_RunSelfTest( void ) {
 	drawSurf_t drawSurfs[3];
 	memset( drawSurfs, 0, sizeof( drawSurfs ) );
 	srfTriangles_t geometry;
-	memset( &geometry, 0, sizeof( geometry ) );
-	geometry.numVerts = 3;
-	geometry.numIndexes = 6;
 	vertCache_t ambientCache;
-	memset( &ambientCache, 0, sizeof( ambientCache ) );
-	ambientCache.vbo = 101;
-	ambientCache.offset = 64;
-	ambientCache.size = geometry.numVerts * static_cast<int>( sizeof( idDrawVert ) );
-	ambientCache.indexBuffer = false;
-	ambientCache.tag = TAG_USED;
 	vertCache_t indexCache;
-	memset( &indexCache, 0, sizeof( indexCache ) );
-	indexCache.vbo = 202;
-	indexCache.offset = 128;
-	indexCache.size = geometry.numIndexes * static_cast<int>( sizeof( glIndex_t ) );
-	indexCache.indexBuffer = true;
-	indexCache.tag = TAG_USED;
-	geometry.ambientCache = &ambientCache;
-	geometry.indexCache = &indexCache;
+	if ( !R_ModernGLExecutor_InitSelfTestTriangleGeometry( geometry, ambientCache, indexCache, "RendererModernVisible" ) ) {
+		return false;
+	}
 	for ( int i = 0; i < 3; ++i ) {
 		drawSurfs[i].geo = &geometry;
 		if ( tr.defaultMaterial != NULL ) {
@@ -5762,7 +5865,7 @@ bool RendererModernVisible_RunSelfTest( void ) {
 	idRenderGraph graph;
 	R_RenderGraph_BuildFromScenePackets( packetFrame, graph );
 	if ( graph.FindPass( RENDER_PASS_DEFERRED_RESOLVE ) < 0 || graph.FindPass( RENDER_PASS_FORWARD_PLUS ) < 0 || graph.FindPass( RENDER_PASS_PRESENT ) < 0
-		|| graph.FindResource( "deferredLight" ) < 0 || graph.FindResource( "sceneColor" ) < 0 || graph.FindResource( "backBuffer" ) < 0 ) {
+		|| graph.FindResource( "deferredLight" ) < 0 || graph.FindResource( "sceneColor" ) < 0 || graph.FindResource( "hybridSceneColor" ) < 0 || graph.FindResource( "backBuffer" ) < 0 ) {
 		common->Printf( "RendererModernVisible self-test failed: graph composition resources missing\n" );
 		return false;
 	}
@@ -5811,29 +5914,35 @@ bool RendererModernVisible_RunSelfTest( void ) {
 	}
 
 	const bool resourcesAvailable = R_RenderGraphResources_Stats().initialized && R_RenderGraphResources_Stats().available && rg_modernGLExecutorAvailable;
-	if ( resourcesAvailable && ( !stats.deferredResolveExecuted || !stats.forwardPlusExecuted || !stats.modernVisibleExecuted || !stats.modernVisibleResourcesReady || !stats.modernVisibleSourceReady || !stats.modernVisibleBackBufferReady || stats.modernVisibleCompositions <= 0 || stats.modernVisiblePixels <= 0 ) ) {
+	if ( resourcesAvailable && ( !stats.deferredResolveExecuted || !stats.forwardPlusExecuted || !stats.modernVisibleExecuted || !stats.modernVisibleResourcesReady || !stats.modernVisibleSourceReady || !stats.modernVisibleHybridTargetReady || !stats.modernVisibleBackBufferReady || !stats.modernVisibleShadowReady || stats.modernVisibleCompositions <= 0 || stats.modernVisibleCompositeCopies <= 0 || stats.modernVisiblePixels <= 0 ) ) {
 		common->Printf(
-			"RendererModernVisible self-test failed: composition execution mismatch (deferred=%d forward=%d exec=%d res=%d source=%d backBuffer=%d composed=%d pixels=%d fallback=%d)\n",
+			"RendererModernVisible self-test failed: composition execution mismatch (deferred=%d forward=%d exec=%d res=%d source=%d hybrid=%d backBuffer=%d shadow=%d composed=%d copies=%d pixels=%d fallback=%d)\n",
 			stats.deferredResolveExecuted ? 1 : 0,
 			stats.forwardPlusExecuted ? 1 : 0,
 			stats.modernVisibleExecuted ? 1 : 0,
 			stats.modernVisibleResourcesReady ? 1 : 0,
 			stats.modernVisibleSourceReady ? 1 : 0,
+			stats.modernVisibleHybridTargetReady ? 1 : 0,
 			stats.modernVisibleBackBufferReady ? 1 : 0,
+			stats.modernVisibleShadowReady ? 1 : 0,
 			stats.modernVisibleCompositions,
+			stats.modernVisibleCompositeCopies,
 			stats.modernVisiblePixels,
 			stats.modernVisibleFallbackPasses );
 		return false;
 	}
 
 	common->Printf(
-		"RendererModernVisible self-test passed (program=%d resources=%d source=%d backBuffer=%d blocked=%d composed=%d pixels=%d modern=%d legacy=%d fallback=%d deferred=%d forward=%d present=%d clears=%d)\n",
+		"RendererModernVisible self-test passed (program=%d resources=%d source=%d hybrid=%d backBuffer=%d shadow=%d blocked=%d composed=%d copies=%d pixels=%d modern=%d legacy=%d fallback=%d deferred=%d forward=%d present=%d clears=%d)\n",
 		stats.modernVisibleProgramReady ? 1 : 0,
 		stats.modernVisibleResourcesReady ? 1 : 0,
 		stats.modernVisibleSourceReady ? 1 : 0,
+		stats.modernVisibleHybridTargetReady ? 1 : 0,
 		stats.modernVisibleBackBufferReady ? 1 : 0,
+		stats.modernVisibleShadowReady ? 1 : 0,
 		stats.modernVisibleBlockedByLegacy ? 1 : 0,
 		stats.modernVisibleCompositions,
+		stats.modernVisibleCompositeCopies,
 		stats.modernVisiblePixels,
 		stats.modernVisibleModernPasses,
 		stats.modernVisibleLegacyPasses,

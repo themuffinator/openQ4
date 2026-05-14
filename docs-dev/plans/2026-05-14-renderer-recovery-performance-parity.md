@@ -262,18 +262,28 @@ Phase 7 implementation notes:
 
 Goal: build the actual target renderer around pass ownership and material parity.
 
-- [ ] Depth prepass: own static, CPU-skinned, and safe alpha-tested depth; keep stencil shadows and unsupported deforms legacy until parity.
+- [x] Depth prepass: own static, CPU-skinned, and safe alpha-tested depth; keep stencil shadows, GPU-palette skinning, unsupported material contracts, and unsupported deforms legacy until parity.
 - [ ] G-buffer: albedo, normal, material/specular, emissive/light-grid, motion vectors where needed, depth, and optional velocity.
 - [ ] Deferred resolve: point/projected lights, shadow-map/stencil-fallback contribution, light-grid/baked contribution, fog exclusions, HDR output.
 - [ ] Forward+: alpha-tested surfaces that cannot be deferred, transparent surfaces, viewmodels, decals, particles, BSE geometry once ready, and special material cases.
-- [ ] Shadows: consume the Phase 7 shadow descriptors and fallback states; do not reimplement shadow policy in the lighting shaders.
-- [ ] Composition: resolve deferred and forward+ into one HDR scene target exactly once, then feed post-processing.
-- [ ] Mixed fallback: support per-pass legacy composition without double-clearing or double-lighting.
+- [x] Shadows: consume the Phase 7 shadow descriptors and fallback states; do not reimplement shadow policy in the lighting shaders.
+- [x] Composition: resolve deferred and forward+ into one graph-owned hybrid scene target exactly once before final presentation. HDR/post handoff remains Phase 9.
+- [x] Mixed fallback: support fail-closed per-pass legacy composition without double-clearing, double-lighting, or accepting unresolved shadow/stencil fallbacks into modern visible handoff.
 
 Acceptance:
 
 - [ ] Modern visible frames render a complete gameplay scene without requiring ARB2 color fallback for the common opaque/deferred and forward+ surface set.
 - [ ] Fallbacks are limited, visible in metrics, and do not duplicate owned work.
+
+Phase 8 implementation notes:
+
+- Depth and shadow-depth programs now bind the diffuse texture and local alpha-test parameters, so safe perforated/alpha-tested materials can participate in modern visible depth and shadow-depth passes instead of becoming immediate fallback draws. CPU-skinned geometry is accepted for depth ownership; GPU palette skinning and deforms remain explicit legacy fallback contracts.
+- Deferred resolve, clustered forward opaque/alpha, and transparent forward shaders now consume the clustered shadow descriptor policy uploaded by `ModernShadowPlanner`. Mapped lights require a valid descriptor index, skipped lights remain lit, and stencil-fallback lights block modern visible handoff instead of being silently treated as unshadowed.
+- `RenderGraph` now models `hybridSceneColor` as a distinct graph-owned transient target for modern visible composition. The executor composites `deferredLight` and `sceneColor` into that target first, then performs the final back-buffer copy, so present ownership has a single modern scene handoff point for Phase 9 HDR/post integration.
+- Modern visible readiness now requires the hybrid target and shadow policy to be valid. Fallback shadow descriptors, deferred/forward shadow fallback counts, or legacy stencil-shadow fallbacks fail closed before the renderer clears or presents the modern visible frame.
+- `rendererModernVisibleSelfTest` now uses real upload-manager-backed self-test geometry instead of placeholder VBO/IBO names, which removes driver-thread present crashes while keeping the synthetic full hybrid sequence live.
+- Metrics and `gfxInfo` now expose visible hybrid readiness, shadow readiness, mapped/fallback/skipped shadow descriptor counts, alpha-tested/skinned depth ownership, and the final hybrid-copy count.
+- Validation passed for `tools/build/meson_setup.ps1 compile -C builddir`, `tools/build/meson_setup.ps1 install -C builddir --no-rebuild --skip-subprojects`, `python -m py_compile tools/tests/renderer_validation_matrix.py`, staged GL 4.5 runs of `rendererShaderLibrarySelfTest`, `rendererVisiblePathSelfTest`, `rendererGBufferSelfTest`, `rendererShadowPlannerSelfTest`, `rendererClusterGridSelfTest`, `rendererDeferredResolveSelfTest`, `rendererForwardPlusSelfTest`, and `rendererModernVisibleSelfTest`, plus the same forced `r_glTier gl33` hybrid-visible chain. A focused safe-matrix smoke with GL33 and GL45 tier probes passed 20/20 cases and wrote `.tmp/renderer-validation/phase8-smoke-final/renderer_validation_report.md`. The Phase 8 validation logs contained no renderer `idStr::snPrintf` overflow, `WARNING: idStr`, shader compile, or program link failures.
 
 ## Phase 9: HDR, Bloom, SSAO, And Post Integration
 
