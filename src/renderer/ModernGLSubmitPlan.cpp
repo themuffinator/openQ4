@@ -130,6 +130,7 @@ bool idModernGLSubmitPlan::AddCommand( const modernGLDrawPlanEntry_t &entry ) {
 	command.indexCacheOffset = hasIndexBuffer ? geo->indexCacheOffset : 0;
 	command.clientIndexBytes = canUploadIndexes ? entry.indexCount * static_cast<int>( sizeof( glIndex_t ) ) : 0;
 	command.modelViewProjectionLocation = entry.modelViewProjectionLocation;
+	command.modelViewMatrixLocation = entry.modelViewMatrixLocation;
 	command.debugColorLocation = entry.debugColorLocation;
 	command.localParamsLocation = entry.localParamsLocation;
 	command.mainTextureLocation = entry.mainTextureLocation;

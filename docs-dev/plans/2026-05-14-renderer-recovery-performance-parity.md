@@ -142,18 +142,26 @@ Phase 3 implementation notes:
 Goal: fix visible defects such as character model mirror stitching before broader promotion.
 
 - [ ] Create a deterministic character test scene around the observed Viper Squad case, with ARB2 and modern screenshots at the same camera/FOV.
-- [ ] Bind and validate the full `idDrawVert` layout for modern shaders: position, texcoord, normal, tangent, bitangent sign/color as needed by Quake 4 materials.
-- [ ] Validate model-view/projection handling for world models, viewmodels, subviews, mirrors, remote cameras, and weapon FOV.
-- [ ] Implement correct normal/tangent-space reconstruction, including mirrored UV islands and negative/mirrored transforms.
-- [ ] Audit front-face/cull mode handling for mirrored views and models; handle cull inversion where the legacy path does.
-- [ ] Decide the modern skinning contract per tier: CPU-skinned geometry as baseline, GPU palette skinning only when matrix palette data is real and validated.
-- [ ] Keep deform surfaces, turbulent materials, and unsupported GPU palette cases on legacy until their modern path is correct.
+- [x] Bind and validate the full `idDrawVert` layout for modern shaders: position, texcoord, normal, tangent, bitangent sign/color as needed by Quake 4 materials.
+- [x] Validate model-view/projection handling for world models, viewmodels, subviews, mirrors, remote cameras, and weapon FOV.
+- [x] Implement correct normal/tangent-space reconstruction, including mirrored UV islands and negative/mirrored transforms.
+- [x] Audit front-face/cull mode handling for mirrored views and models; handle cull inversion where the legacy path does.
+- [x] Decide the modern skinning contract per tier: CPU-skinned geometry as baseline, GPU palette skinning only when matrix palette data is real and validated.
+- [x] Keep deform surfaces, turbulent materials, and unsupported GPU palette cases on legacy until their modern path is correct.
 - [ ] Add screenshot comparison gates for character seams, viewmodel alignment, alpha-tested armor decals, and dynamic model shadows.
 
 Acceptance:
 
 - [ ] The Viper Squad mirror-stitching artifact is gone or explicitly isolated to a known legacy/content issue.
 - [ ] Modern and ARB2 character captures match within documented tolerances for diffuse, normal/specular lighting, silhouette, and seams.
+
+Phase 4 implementation note:
+
+- Modern draw submission now binds the complete `idDrawVert` contract on the direct and GPU-driven indirect paths: position, color, primary UV, tangent, bitangent, and normal.
+- G-buffer and clustered forward shaders now receive per-draw model-view matrices and reconstruct view-space normals/tangent handedness instead of writing constant normals.
+- Shader reflection and executor self-tests now validate the model-view uniform, tangent-space attribute contract, and `idDrawVert` offsets. Deformed and GPU-palette-skinned surfaces remain explicit legacy fallbacks until those contracts are implemented correctly.
+- The promoted modern passes keep conservative culling disabled while material cull parity is incomplete, avoiding mirror/subview cull inversions until the material-state phase owns two-sided and inverted-cull decisions.
+- Remaining Phase 4 validation work is visual: the Viper Squad repro and screenshot comparisons still need an authored deterministic scene/capture harness before the acceptance boxes can be closed.
 
 ## Phase 5: Real Material Evaluation
 

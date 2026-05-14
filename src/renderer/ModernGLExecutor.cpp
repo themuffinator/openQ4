@@ -79,6 +79,15 @@ const int MODERN_GL_GPU_DRIVEN_VALIDATION_COUNTERS = MODERN_GL_GPU_COUNTER_COUNT
 const int MODERN_GL_GPU_DRIVEN_WORKGROUP_SIZE = 64;
 const int MODERN_GL_GBUFFER_ATTACHMENT_COUNT = 4;
 
+enum modernGLDrawVertAttribute_t {
+	MODERN_GL_DRAWVERT_ATTR_POSITION = 0,
+	MODERN_GL_DRAWVERT_ATTR_COLOR = 3,
+	MODERN_GL_DRAWVERT_ATTR_TEXCOORD0 = 8,
+	MODERN_GL_DRAWVERT_ATTR_TANGENT0 = 9,
+	MODERN_GL_DRAWVERT_ATTR_TANGENT1 = 10,
+	MODERN_GL_DRAWVERT_ATTR_NORMAL = 11
+};
+
 enum modernGLExecutorFrameMode_t {
 	MODERN_GL_EXECUTOR_FRAME_ANALYZE = 0,
 	MODERN_GL_EXECUTOR_FRAME_SIDECAR_DIAGNOSTIC,
@@ -1376,6 +1385,54 @@ static const GLvoid *R_ModernGLExecutor_BufferOffset( int offset ) {
 	return reinterpret_cast<const GLvoid *>( static_cast<uintptr_t>( offset ) );
 }
 
+static bool R_ModernGLExecutor_DrawVertLayoutSupported( int vertexStride, int ambientCacheOffset ) {
+	return vertexStride >= static_cast<int>( sizeof( idDrawVert ) )
+		&& vertexStride >= DRAWVERT_SIZE
+		&& ambientCacheOffset >= 0;
+}
+
+static void R_ModernGLExecutor_SetDrawVertFloatAttrib( modernGLDrawVertAttribute_t attribute, int components, int vertexStride, int offset ) {
+	glEnableVertexAttribArray( static_cast<GLuint>( attribute ) );
+	glVertexAttribPointer(
+		static_cast<GLuint>( attribute ),
+		components,
+		GL_FLOAT,
+		GL_FALSE,
+		vertexStride,
+		R_ModernGLExecutor_BufferOffset( offset ) );
+}
+
+static bool R_ModernGLExecutor_BindDrawVertLayout( const modernGLSubmitCommand_t &command ) {
+	if ( !R_ModernGLExecutor_DrawVertLayoutSupported( command.vertexStride, command.ambientCacheOffset ) ) {
+		return false;
+	}
+
+	const int baseOffset = command.ambientCacheOffset;
+	R_ModernGLExecutor_SetDrawVertFloatAttrib( MODERN_GL_DRAWVERT_ATTR_POSITION, 3, command.vertexStride, baseOffset + DRAWVERT_XYZ_OFFSET );
+	glEnableVertexAttribArray( MODERN_GL_DRAWVERT_ATTR_COLOR );
+	glVertexAttribPointer(
+		MODERN_GL_DRAWVERT_ATTR_COLOR,
+		4,
+		GL_UNSIGNED_BYTE,
+		GL_TRUE,
+		command.vertexStride,
+		R_ModernGLExecutor_BufferOffset( baseOffset + DRAWVERT_COLOR_OFFSET ) );
+	R_ModernGLExecutor_SetDrawVertFloatAttrib( MODERN_GL_DRAWVERT_ATTR_TEXCOORD0, 2, command.vertexStride, baseOffset + DRAWVERT_ST_OFFSET );
+	R_ModernGLExecutor_SetDrawVertFloatAttrib( MODERN_GL_DRAWVERT_ATTR_TANGENT0, 3, command.vertexStride, baseOffset + DRAWVERT_TANGENT0_OFFSET );
+	R_ModernGLExecutor_SetDrawVertFloatAttrib( MODERN_GL_DRAWVERT_ATTR_TANGENT1, 3, command.vertexStride, baseOffset + DRAWVERT_TANGENT1_OFFSET );
+	R_ModernGLExecutor_SetDrawVertFloatAttrib( MODERN_GL_DRAWVERT_ATTR_NORMAL, 3, command.vertexStride, baseOffset + DRAWVERT_NORMAL_OFFSET );
+	return true;
+}
+
+static void R_ModernGLExecutor_DisableDrawVertLayout( void ) {
+	glDisableVertexAttribArray( MODERN_GL_DRAWVERT_ATTR_POSITION );
+	glDisableVertexAttribArray( MODERN_GL_DRAWVERT_ATTR_COLOR );
+	glDisableVertexAttribArray( MODERN_GL_DRAWVERT_ATTR_TEXCOORD0 );
+	glDisableVertexAttribArray( MODERN_GL_DRAWVERT_ATTR_TANGENT0 );
+	glDisableVertexAttribArray( MODERN_GL_DRAWVERT_ATTR_TANGENT1 );
+	glDisableVertexAttribArray( MODERN_GL_DRAWVERT_ATTR_NORMAL );
+}
+
 static void R_ModernGLExecutor_SetSubmitScissor( const modernGLSubmitCommand_t &command, const viewDef_t *viewDef ) {
 	if ( viewDef == NULL ) {
 		R_GLStateCache().SetViewport( 0, 0, glConfig.vidWidth, glConfig.vidHeight );
@@ -1829,6 +1886,9 @@ static bool R_ModernGLExecutor_SubmitCommand( const modernGLSubmitCommand_t &com
 		R_ModernGLExecutor_BindClusterUniformBlocks( command.program );
 	}
 	glUniformMatrix4fv( command.modelViewProjectionLocation, 1, GL_FALSE, modelViewProjection );
+	if ( command.modelViewMatrixLocation >= 0 ) {
+		glUniformMatrix4fv( command.modelViewMatrixLocation, 1, GL_FALSE, command.modelViewMatrix );
+	}
 	R_ModernGLExecutor_SetDebugColor( command );
 	R_ModernGLExecutor_SetLocalParams( command );
 	if ( command.mainTextureLocation >= 0 && glUniform1i != NULL ) {
@@ -1842,23 +1902,9 @@ static bool R_ModernGLExecutor_SubmitCommand( const modernGLSubmitCommand_t &com
 
 	R_ModernGLExecutor_SetSubmitScissor( command, command.viewDef );
 	R_GLStateCache().BindBuffer( GL_ARRAY_BUFFER, command.vertexBuffer );
-	glEnableVertexAttribArray( 0 );
-	glVertexAttribPointer(
-		0,
-		3,
-		GL_FLOAT,
-		GL_FALSE,
-		command.vertexStride,
-		R_ModernGLExecutor_BufferOffset( command.ambientCacheOffset + DRAWVERT_XYZ_OFFSET ) );
-	if ( command.mainTextureLocation >= 0 ) {
-		glEnableVertexAttribArray( 8 );
-		glVertexAttribPointer(
-			8,
-			2,
-			GL_FLOAT,
-			GL_FALSE,
-			command.vertexStride,
-			R_ModernGLExecutor_BufferOffset( command.ambientCacheOffset + DRAWVERT_ST_OFFSET ) );
+	if ( !R_ModernGLExecutor_BindDrawVertLayout( command ) ) {
+		R_ModernGLExecutor_CountSubmittedFallback( stats, recordSubmitStats );
+		return false;
 	}
 
 	if ( command.indexed ) {
@@ -1887,8 +1933,7 @@ static bool R_ModernGLExecutor_SubmitCommand( const modernGLSubmitCommand_t &com
 }
 
 static void R_ModernGLExecutor_RestoreAfterSubmit( void ) {
-	glDisableVertexAttribArray( 0 );
-	glDisableVertexAttribArray( 8 );
+	R_ModernGLExecutor_DisableDrawVertLayout();
 	R_GLStateCache().BindBuffer( GL_ARRAY_BUFFER, 0 );
 	R_GLStateCache().BindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
 	R_GLStateCache().BindTexture( 0, GL_TEXTURE_2D, 0 );
@@ -1940,6 +1985,9 @@ static void R_ModernGLExecutor_SubmitGpuDrivenIndirect( modernGLExecutorStats_t 
 		R_ModernGLExecutor_BindClusterUniformBlocks( command.program );
 	}
 	glUniformMatrix4fv( command.modelViewProjectionLocation, 1, GL_FALSE, modelViewProjection );
+	if ( command.modelViewMatrixLocation >= 0 ) {
+		glUniformMatrix4fv( command.modelViewMatrixLocation, 1, GL_FALSE, command.modelViewMatrix );
+	}
 	R_ModernGLExecutor_SetDebugColor( command );
 	R_ModernGLExecutor_SetLocalParams( command );
 	if ( command.mainTextureLocation >= 0 && glUniform1i != NULL ) {
@@ -1953,23 +2001,11 @@ static void R_ModernGLExecutor_SubmitGpuDrivenIndirect( modernGLExecutorStats_t 
 
 	R_ModernGLExecutor_SetSubmitScissor( command, command.viewDef );
 	R_GLStateCache().BindBuffer( GL_ARRAY_BUFFER, command.vertexBuffer );
-	glEnableVertexAttribArray( 0 );
-	glVertexAttribPointer(
-		0,
-		3,
-		GL_FLOAT,
-		GL_FALSE,
-		command.vertexStride,
-		R_ModernGLExecutor_BufferOffset( command.ambientCacheOffset + DRAWVERT_XYZ_OFFSET ) );
-	if ( command.mainTextureLocation >= 0 ) {
-		glEnableVertexAttribArray( 8 );
-		glVertexAttribPointer(
-			8,
-			2,
-			GL_FLOAT,
-			GL_FALSE,
-			command.vertexStride,
-			R_ModernGLExecutor_BufferOffset( command.ambientCacheOffset + DRAWVERT_ST_OFFSET ) );
+	if ( !R_ModernGLExecutor_BindDrawVertLayout( command ) ) {
+		stats.gpuDrivenIndirectFallbacks += stats.gpuDrivenGeneratedCommands;
+		R_RendererMetrics_EndGpuTimer();
+		R_ModernGLExecutor_RestoreAfterSubmit();
+		return;
 	}
 
 	R_GLStateCache().BindBuffer( GL_ELEMENT_ARRAY_BUFFER, command.indexBuffer );
@@ -4317,7 +4353,48 @@ void R_ModernGLExecutor_PrintGfxInfo( void ) {
 	R_ModernGLShaderLibrary_PrintGfxInfo();
 }
 
+static bool R_ModernGLExecutor_DrawVertLayoutSelfTest( void ) {
+	idDrawVert vertex;
+	vertex.Clear();
+	const byte *base = reinterpret_cast<const byte *>( &vertex );
+	const int xyzOffset = static_cast<int>( reinterpret_cast<const byte *>( &vertex.xyz ) - base );
+	const int colorOffset = static_cast<int>( reinterpret_cast<const byte *>( &vertex.color[0] ) - base );
+	const int normalOffset = static_cast<int>( reinterpret_cast<const byte *>( &vertex.normal ) - base );
+	const int tangent0Offset = static_cast<int>( reinterpret_cast<const byte *>( &vertex.tangents[0] ) - base );
+	const int tangent1Offset = static_cast<int>( reinterpret_cast<const byte *>( &vertex.tangents[1] ) - base );
+	const int stOffset = static_cast<int>( reinterpret_cast<const byte *>( &vertex.st ) - base );
+	if ( sizeof( idDrawVert ) != DRAWVERT_SIZE
+		|| xyzOffset != DRAWVERT_XYZ_OFFSET
+		|| colorOffset != DRAWVERT_COLOR_OFFSET
+		|| normalOffset != DRAWVERT_NORMAL_OFFSET
+		|| tangent0Offset != DRAWVERT_TANGENT0_OFFSET
+		|| tangent1Offset != DRAWVERT_TANGENT1_OFFSET
+		|| stOffset != DRAWVERT_ST_OFFSET ) {
+		common->Printf(
+			"RendererModernGLExecutor self-test failed: idDrawVert layout mismatch (size=%d xyz=%d color=%d normal=%d tan0=%d tan1=%d st=%d)\n",
+			static_cast<int>( sizeof( idDrawVert ) ),
+			xyzOffset,
+			colorOffset,
+			normalOffset,
+			tangent0Offset,
+			tangent1Offset,
+			stOffset );
+		return false;
+	}
+	if ( !R_ModernGLExecutor_DrawVertLayoutSupported( static_cast<int>( sizeof( idDrawVert ) ), 0 )
+		|| R_ModernGLExecutor_DrawVertLayoutSupported( DRAWVERT_ST_OFFSET, 0 )
+		|| R_ModernGLExecutor_DrawVertLayoutSupported( static_cast<int>( sizeof( idDrawVert ) ), -1 ) ) {
+		common->Printf( "RendererModernGLExecutor self-test failed: draw-vertex layout support gate mismatch\n" );
+		return false;
+	}
+	return true;
+}
+
 bool RendererModernGLExecutor_RunSelfTest( void ) {
+	if ( !R_ModernGLExecutor_DrawVertLayoutSelfTest() ) {
+		return false;
+	}
+
 	drawSurf_t drawSurfs[2];
 	memset( drawSurfs, 0, sizeof( drawSurfs ) );
 	srfTriangles_t geometry;

@@ -22,6 +22,7 @@ typedef struct modernGLSubmitCommand_s {
 	int							indexCacheOffset;
 	int							clientIndexBytes;
 	int							modelViewProjectionLocation;
+	int							modelViewMatrixLocation;
 	int							debugColorLocation;
 	int							localParamsLocation;
 	int							mainTextureLocation;

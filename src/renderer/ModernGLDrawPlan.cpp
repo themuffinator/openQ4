@@ -167,6 +167,7 @@ bool idModernGLDrawPlan::AddEntry( const drawPacket_t &draw, int drawPacketIndex
 	entry.program = program.program;
 	entry.permutation = program.permutation;
 	entry.modelViewProjectionLocation = program.modelViewProjectionLocation;
+	entry.modelViewMatrixLocation = program.modelViewMatrixLocation;
 	entry.debugColorLocation = program.debugColorLocation;
 	entry.localParamsLocation = program.localParamsLocation;
 	entry.mainTextureLocation = program.mainTextureLocation;

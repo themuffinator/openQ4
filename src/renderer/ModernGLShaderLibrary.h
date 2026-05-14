@@ -51,11 +51,16 @@ typedef struct modernGLShaderResourceReflection_s {
 typedef struct modernGLShaderReflection_s {
 	int		frameBlockIndex;
 	int		modelViewProjectionLocation;
+	int		modelViewMatrixLocation;
 	int		debugColorLocation;
 	int		localParamsLocation;
 	int		mainTextureLocation;
 	int		positionAttribute;
+	int		colorAttribute;
 	int		texCoordAttribute;
+	int		normalAttribute;
+	int		tangentAttribute;
+	int		bitangentAttribute;
 	int		uniformCount;
 	int		uniformBlockCount;
 	int		shaderStorageBlockCount;
@@ -70,10 +75,13 @@ typedef struct modernGLShaderReflection_s {
 	modernGLShaderResourceReflection_t attributes[MODERN_GL_SHADER_MAX_REFLECTION_RECORDS];
 	bool	usesFrameConstants;
 	bool	usesModelViewProjection;
+	bool	usesModelViewMatrix;
 	bool	usesDebugColor;
 	bool	usesLocalParams;
 	bool	usesMainTexture;
 	bool	usesTexCoord;
+	bool	usesDrawVertColor;
+	bool	usesDrawVertTangentSpace;
 	bool	usesShaderStorage;
 	bool	usesImage;
 } modernGLShaderReflection_t;
@@ -88,6 +96,7 @@ typedef struct modernGLShaderProgramInfo_s {
 	unsigned int				program;
 	int							frameBlockIndex;
 	int							modelViewProjectionLocation;
+	int							modelViewMatrixLocation;
 	int							debugColorLocation;
 	int							localParamsLocation;
 	int							mainTextureLocation;

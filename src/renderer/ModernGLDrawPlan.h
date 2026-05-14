@@ -32,6 +32,7 @@ typedef struct modernGLDrawPlanEntry_s {
 	unsigned int				program;
 	rendererPermutationKey_t		permutation;
 	int							modelViewProjectionLocation;
+	int							modelViewMatrixLocation;
 	int							debugColorLocation;
 	int							localParamsLocation;
 	int							mainTextureLocation;
