@@ -384,14 +384,26 @@ bool RendererModernGLDrawPlan_RunSelfTest( void ) {
 	plan.Build( packetFrame, graph );
 	const modernGLDrawPlanStats_t &stats = plan.Stats();
 
-	const int expectedPlanned = tr.defaultMaterial != NULL ? 10 : 0;
-	const int expectedFallback = tr.defaultMaterial != NULL ? 2 : packetFrame.NumDrawPackets();
+	const bool expectedDepthEligible = tr.defaultMaterial != NULL
+		&& tr.defaultMaterial->IsDrawn()
+		&& tr.defaultMaterial->Coverage() != MC_TRANSLUCENT;
+	const bool expectedAmbientEligible = tr.defaultMaterial != NULL
+		&& tr.defaultMaterial->HasAmbient()
+		&& !tr.defaultMaterial->IsPortalSky()
+		&& !tr.defaultMaterial->SuppressInSubview()
+		&& tr.defaultMaterial->GetSort() < SS_POST_PROCESS;
+	const int expectedDepthDraws = expectedDepthEligible ? 2 : 0;
+	const int expectedMaterialDraws = expectedAmbientEligible ? 2 : 0;
+	const int expectedPlanned = expectedDepthDraws + expectedMaterialDraws;
+	const int expectedFallback = packetFrame.NumDrawPackets() - expectedPlanned;
 	if ( stats.sourceDrawPackets != packetFrame.NumDrawPackets() || stats.plannedDraws != expectedPlanned || stats.fallbackDraws != expectedFallback ) {
 		common->Printf( "RendererModernGLDrawPlan self-test failed: draw count mismatch\n" );
 		return false;
 	}
-	if ( tr.defaultMaterial != NULL ) {
-		if ( stats.depthDraws != 2 || stats.materialDraws != 8 || stats.stateBatches != 5 || stats.programSwitches != 4 || stats.overflow ) {
+	if ( expectedPlanned > 0 ) {
+		const int expectedStateBatches = ( expectedDepthDraws > 0 ? 1 : 0 ) + ( expectedMaterialDraws > 0 ? 1 : 0 );
+		const int expectedProgramSwitches = expectedDepthDraws > 0 && expectedMaterialDraws > 0 ? 1 : 0;
+		if ( stats.depthDraws != expectedDepthDraws || stats.materialDraws != expectedMaterialDraws || stats.stateBatches != expectedStateBatches || stats.programSwitches != expectedProgramSwitches || stats.overflow ) {
 			common->Printf( "RendererModernGLDrawPlan self-test failed: plan classification mismatch\n" );
 			return false;
 		}
@@ -401,14 +413,10 @@ bool RendererModernGLDrawPlan_RunSelfTest( void ) {
 		}
 		bool sawDepth = false;
 		bool sawMaterial = false;
-		bool sawLightGrid = false;
-		bool sawFog = false;
 		for ( int i = 0; i < plan.NumEntries(); ++i ) {
 			const modernGLDrawPlanEntry_t &entry = plan.Entry( i );
 			sawDepth = sawDepth || entry.shaderKind == MODERN_GL_SHADER_DEPTH;
 			sawMaterial = sawMaterial || entry.shaderKind == MODERN_GL_SHADER_FLAT_MATERIAL;
-			sawLightGrid = sawLightGrid || entry.shaderKind == MODERN_GL_SHADER_LIGHT_GRID;
-			sawFog = sawFog || entry.shaderKind == MODERN_GL_SHADER_FOG_BLEND;
 			if ( entry.modelViewProjectionLocation < 0 || entry.permutation.materialClass == RENDER_MATERIAL_NONE ) {
 				common->Printf( "RendererModernGLDrawPlan self-test failed: shader metadata mismatch\n" );
 				return false;
@@ -418,7 +426,7 @@ bool RendererModernGLDrawPlan_RunSelfTest( void ) {
 				return false;
 			}
 		}
-		if ( !sawDepth || !sawMaterial || !sawLightGrid || !sawFog ) {
+		if ( ( expectedDepthDraws > 0 && !sawDepth ) || ( expectedMaterialDraws > 0 && !sawMaterial ) ) {
 			common->Printf( "RendererModernGLDrawPlan self-test failed: shader-kind coverage mismatch\n" );
 			return false;
 		}

@@ -823,11 +823,25 @@ static bool R_RenderGraph_CheckAccess( const idRenderGraph &graph, int passIndex
 }
 
 static bool R_RenderGraph_RunWorldPacketSelfTest( void ) {
+	srfTriangles_t geo;
+	memset( &geo, 0, sizeof( geo ) );
+	geo.numVerts = 3;
+	geo.numIndexes = 6;
 	drawSurf_t drawSurfs[2];
 	memset( drawSurfs, 0, sizeof( drawSurfs ) );
+	drawSurfs[0].geo = &geo;
+	drawSurfs[1].geo = &geo;
+	if ( tr.defaultMaterial != NULL ) {
+		drawSurfs[0].material = tr.defaultMaterial;
+		drawSurfs[0].sort = tr.defaultMaterial->GetSort();
+		drawSurfs[1].material = tr.defaultMaterial;
+		drawSurfs[1].sort = tr.defaultMaterial->GetSort() + 0.000001f;
+	}
 	drawSurf_t *drawSurfPtrs[2] = { &drawSurfs[0], &drawSurfs[1] };
 	viewEntity_t viewEntity;
 	memset( &viewEntity, 0, sizeof( viewEntity ) );
+	drawSurfs[0].space = &viewEntity;
+	drawSurfs[1].space = &viewEntity;
 	viewDef_t worldView;
 	memset( &worldView, 0, sizeof( worldView ) );
 	worldView.viewEntitys = &viewEntity;
@@ -854,7 +868,18 @@ static bool R_RenderGraph_RunWorldPacketSelfTest( void ) {
 	idRenderGraph graph;
 	R_RenderGraph_BuildFromScenePackets( packetFrame, graph );
 	const renderGraphStats_t &stats = graph.Stats();
-	if ( graph.NumPasses() != 8 || stats.passPackets != 8 || stats.scenePackets != 3 || stats.drawPackets != 12 || stats.commandPackets != 2 || stats.overflow ) {
+	const bool expectedDepthEligible = tr.defaultMaterial != NULL
+		&& tr.defaultMaterial->IsDrawn()
+		&& tr.defaultMaterial->Coverage() != MC_TRANSLUCENT;
+	const bool expectedAmbientEligible = tr.defaultMaterial != NULL
+		&& tr.defaultMaterial->HasAmbient()
+		&& !tr.defaultMaterial->IsPortalSky()
+		&& !tr.defaultMaterial->SuppressInSubview()
+		&& tr.defaultMaterial->GetSort() < SS_POST_PROCESS;
+	const int expectedDepthDraws = expectedDepthEligible ? 2 : 0;
+	const int expectedAmbientDraws = expectedAmbientEligible ? 2 : 0;
+	const int expectedWorldDraws = expectedDepthDraws + expectedAmbientDraws;
+	if ( graph.NumPasses() != 8 || stats.passPackets != 8 || stats.scenePackets != 3 || stats.drawPackets != expectedWorldDraws || stats.commandPackets != 2 || stats.overflow ) {
 		common->Printf(
 			"RendererRenderGraph self-test detail: world pass stats passes=%d passPackets=%d scenes=%d draws=%d cmds=%d overflow=%d\n",
 			graph.NumPasses(),
@@ -918,19 +943,31 @@ static bool R_RenderGraph_RunWorldPacketSelfTest( void ) {
 	}
 
 	return
-		R_RenderGraph_CheckPass( graph, 0, RENDER_PASS_DEPTH, 1, 2 ) &&
-		R_RenderGraph_CheckPass( graph, 1, RENDER_PASS_ARB2_INTERACTION, 1, 2 ) &&
-		R_RenderGraph_CheckPass( graph, 2, RENDER_PASS_LIGHT_GRID, 1, 2 ) &&
-		R_RenderGraph_CheckPass( graph, 3, RENDER_PASS_AMBIENT, 1, 2 ) &&
-		R_RenderGraph_CheckPass( graph, 4, RENDER_PASS_FOG_BLEND, 1, 2 ) &&
-		R_RenderGraph_CheckPass( graph, 5, RENDER_PASS_AUTHORED_POST, 1, 2 ) &&
+		R_RenderGraph_CheckPass( graph, 0, RENDER_PASS_DEPTH, 1, expectedDepthDraws ) &&
+		R_RenderGraph_CheckPass( graph, 1, RENDER_PASS_ARB2_INTERACTION, 1, 0 ) &&
+		R_RenderGraph_CheckPass( graph, 2, RENDER_PASS_LIGHT_GRID, 1, 0 ) &&
+		R_RenderGraph_CheckPass( graph, 3, RENDER_PASS_AMBIENT, 1, expectedAmbientDraws ) &&
+		R_RenderGraph_CheckPass( graph, 4, RENDER_PASS_FOG_BLEND, 1, 0 ) &&
+		R_RenderGraph_CheckPass( graph, 5, RENDER_PASS_AUTHORED_POST, 1, 0 ) &&
 		R_RenderGraph_CheckPass( graph, 6, RENDER_PASS_SPECIAL_EFFECTS, 1, 0 ) &&
 		R_RenderGraph_CheckPass( graph, 7, RENDER_PASS_PRESENT, 1, 0 );
 }
 
 static bool R_RenderGraph_RunGuiPacketSelfTest( void ) {
+	srfTriangles_t geo;
+	memset( &geo, 0, sizeof( geo ) );
+	geo.numVerts = 3;
+	geo.numIndexes = 6;
 	drawSurf_t drawSurf;
 	memset( &drawSurf, 0, sizeof( drawSurf ) );
+	drawSurf.geo = &geo;
+	if ( tr.defaultMaterial != NULL ) {
+		drawSurf.material = tr.defaultMaterial;
+		drawSurf.sort = tr.defaultMaterial->GetSort();
+	}
+	viewEntity_t guiSpace;
+	memset( &guiSpace, 0, sizeof( guiSpace ) );
+	drawSurf.space = &guiSpace;
 	drawSurf_t *drawSurfPtrs[1] = { &drawSurf };
 	viewDef_t guiView;
 	memset( &guiView, 0, sizeof( guiView ) );
@@ -953,7 +990,10 @@ static bool R_RenderGraph_RunGuiPacketSelfTest( void ) {
 	idRenderGraph graph;
 	R_RenderGraph_BuildFromScenePackets( packetFrame, graph );
 	const renderGraphStats_t &stats = graph.Stats();
-	if ( graph.NumPasses() != 2 || stats.passPackets != 2 || stats.scenePackets != 2 || stats.drawPackets != 1 || stats.commandPackets != 1 || stats.overflow ) {
+	const int expectedGuiDraws = tr.defaultMaterial != NULL
+		&& tr.defaultMaterial->HasAmbient()
+		&& !tr.defaultMaterial->IsPortalSky() ? 1 : 0;
+	if ( graph.NumPasses() != 2 || stats.passPackets != 2 || stats.scenePackets != 2 || stats.drawPackets != expectedGuiDraws || stats.commandPackets != 1 || stats.overflow ) {
 		return false;
 	}
 	if ( !R_RenderGraph_CheckResourceStats( graph, 1, 1, 0, 0, 2, 1, 1, 1, 0, 0, 1 ) ) {
@@ -980,7 +1020,7 @@ static bool R_RenderGraph_RunGuiPacketSelfTest( void ) {
 	}
 
 	return
-		R_RenderGraph_CheckPass( graph, 0, RENDER_PASS_GUI, 1, 1 ) &&
+		R_RenderGraph_CheckPass( graph, 0, RENDER_PASS_GUI, 1, expectedGuiDraws ) &&
 		R_RenderGraph_CheckPass( graph, 1, RENDER_PASS_PRESENT, 1, 0 );
 }
 

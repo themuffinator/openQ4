@@ -324,15 +324,26 @@ bool RendererModernGLSubmitPlan_RunSelfTest( void ) {
 	idModernGLSubmitPlan submitPlan;
 	submitPlan.Build( drawPlan );
 	const modernGLSubmitPlanStats_t &readyStats = submitPlan.Stats();
-	const int expectedReadyDraws = tr.defaultMaterial != NULL ? 10 : 0;
+	const bool expectedDepthEligible = tr.defaultMaterial != NULL
+		&& tr.defaultMaterial->IsDrawn()
+		&& tr.defaultMaterial->Coverage() != MC_TRANSLUCENT;
+	const bool expectedAmbientEligible = tr.defaultMaterial != NULL
+		&& tr.defaultMaterial->HasAmbient()
+		&& !tr.defaultMaterial->IsPortalSky()
+		&& !tr.defaultMaterial->SuppressInSubview()
+		&& tr.defaultMaterial->GetSort() < SS_POST_PROCESS;
+	const int expectedDepthDraws = expectedDepthEligible ? 2 : 0;
+	const int expectedMaterialDraws = expectedAmbientEligible ? 2 : 0;
+	const int expectedReadyDraws = expectedDepthDraws + expectedMaterialDraws;
 	if ( readyStats.sourcePlanDraws != expectedReadyDraws || readyStats.readyDraws != expectedReadyDraws || readyStats.fallbackDraws != 0 || readyStats.overflow ) {
 		common->Printf( "RendererModernGLSubmitPlan self-test failed: ready draw count mismatch\n" );
 		return false;
 	}
 	if ( expectedReadyDraws > 0 ) {
-		if ( readyStats.depthReadyDraws != 2
-			|| readyStats.materialReadyDraws != 8
-			|| readyStats.programBatches != 5
+		const int expectedProgramBatches = ( expectedDepthDraws > 0 ? 1 : 0 ) + ( expectedMaterialDraws > 0 ? 1 : 0 );
+		if ( readyStats.depthReadyDraws != expectedDepthDraws
+			|| readyStats.materialReadyDraws != expectedMaterialDraws
+			|| readyStats.programBatches != expectedProgramBatches
 			|| readyStats.vertexBufferBatches != 1
 			|| readyStats.indexBufferBatches != 1
 			|| readyStats.scissorBatches != 1

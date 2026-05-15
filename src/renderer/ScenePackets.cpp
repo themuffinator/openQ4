@@ -271,10 +271,25 @@ static unsigned int R_ScenePackets_LegacySortOrdinal( const drawSurf_t *drawSurf
 	return bits;
 }
 
+static bool R_ScenePackets_PassUsesLegacySort( renderPassCategory_t category ) {
+	switch ( category ) {
+	case RENDER_PASS_DEPTH:
+	case RENDER_PASS_LIGHT_GRID:
+	case RENDER_PASS_AMBIENT:
+	case RENDER_PASS_AUTHORED_POST:
+		return true;
+	default:
+		return false;
+	}
+}
+
 static unsigned long long R_ScenePackets_BuildSortKey( const drawSurf_t *drawSurf, renderPassCategory_t category, int drawIndex ) {
 	const unsigned long long categoryBits = static_cast<unsigned long long>( category & 0xff ) << 56;
-	const unsigned long long sortBits = static_cast<unsigned long long>( R_ScenePackets_LegacySortOrdinal( drawSurf ) ) << 24;
 	const unsigned long long stableIndexBits = static_cast<unsigned int>( drawIndex ) & 0x00ffffffu;
+	if ( !R_ScenePackets_PassUsesLegacySort( category ) ) {
+		return categoryBits | stableIndexBits;
+	}
+	const unsigned long long sortBits = static_cast<unsigned long long>( R_ScenePackets_LegacySortOrdinal( drawSurf ) ) << 24;
 	return categoryBits | sortBits | stableIndexBits;
 }
 
@@ -819,18 +834,392 @@ void R_ScenePackets_EndFrame( void ) {
 	rg_frontEndScenePacketFrameOpen = false;
 }
 
-static void R_ScenePackets_AddDrawSurfPass( idScenePacketFrame &packetFrame, const viewDef_t *viewDef, renderPassCategory_t category ) {
+typedef bool (*scenePacketDrawSurfFilter_t)( const viewDef_t *viewDef, const drawSurf_t *drawSurf );
+
+static bool R_ScenePackets_DrawSurfHasGeometry( const drawSurf_t *drawSurf ) {
+	return drawSurf != NULL && drawSurf->geo != NULL && drawSurf->geo->numIndexes > 0;
+}
+
+static bool R_ScenePackets_DrawSurfHasMaterialGeometry( const drawSurf_t *drawSurf ) {
+	return R_ScenePackets_DrawSurfHasGeometry( drawSurf )
+		&& drawSurf->space != NULL
+		&& drawSurf->material != NULL;
+}
+
+static bool R_ScenePackets_LightGridIsUsable( const LightGrid &candidate ) {
+	if ( candidate.GridPointCount() <= 0 || !candidate.HasImage() ) {
+		return false;
+	}
+	if ( candidate.lightGridBounds[0] <= 0 || candidate.lightGridBounds[1] <= 0 || candidate.lightGridBounds[2] <= 0 ) {
+		return false;
+	}
+	return true;
+}
+
+static int R_ScenePackets_CurrentViewLightGridArea( const viewDef_t *viewDef ) {
+	if ( viewDef == NULL || viewDef->renderWorld == NULL ) {
+		return -1;
+	}
+
+	idRenderWorldLocal *world = viewDef->renderWorld;
+	int areaNum = viewDef->areaNum;
+	if ( areaNum < 0 || areaNum >= world->numPortalAreas ) {
+		areaNum = world->PointInArea( viewDef->initialViewAreaOrigin );
+	}
+	if ( areaNum < 0 || areaNum >= world->numPortalAreas ) {
+		areaNum = world->PointInArea( viewDef->renderView.vieworg );
+	}
+	return ( areaNum >= 0 && areaNum < world->numPortalAreas ) ? areaNum : -1;
+}
+
+static const LightGrid *R_ScenePackets_CurrentViewLightGrid( const viewDef_t *viewDef ) {
+	if ( viewDef == NULL || viewDef->renderWorld == NULL ) {
+		return NULL;
+	}
+	const int areaNum = R_ScenePackets_CurrentViewLightGridArea( viewDef );
+	if ( areaNum < 0 ) {
+		return NULL;
+	}
+
+	const LightGrid &candidate = viewDef->renderWorld->portalAreas[areaNum].lightGrid;
+	return R_ScenePackets_LightGridIsUsable( candidate ) ? &candidate : NULL;
+}
+
+static bool R_ScenePackets_SurfaceCanReceiveLightGrid( const drawSurf_t *drawSurf ) {
+	if ( !R_ScenePackets_DrawSurfHasMaterialGeometry( drawSurf ) ) {
+		return false;
+	}
+	const idMaterial *material = drawSurf->material;
+	if ( !material->ReceivesLighting() || material->IsPortalSky() ) {
+		return false;
+	}
+	if ( material->Coverage() == MC_TRANSLUCENT ) {
+		return false;
+	}
+	if ( drawSurf->decalColorCache != NULL ) {
+		return false;
+	}
+	if ( material->TestMaterialFlag( MF_POLYGONOFFSET ) ) {
+		return false;
+	}
+	return true;
+}
+
+static bool R_ScenePackets_DrawSurfDepthEligible( const viewDef_t *viewDef, const drawSurf_t *drawSurf ) {
+	if ( !R_ScenePackets_DrawSurfHasMaterialGeometry( drawSurf ) ) {
+		return false;
+	}
+	const idMaterial *material = drawSurf->material;
+	if ( !material->IsDrawn() ) {
+		return false;
+	}
+	if ( material->Coverage() == MC_TRANSLUCENT ) {
+		return false;
+	}
+	return true;
+}
+
+static bool R_ScenePackets_DrawSurfAmbientEligible( const viewDef_t *viewDef, const drawSurf_t *drawSurf ) {
+	if ( !R_ScenePackets_DrawSurfHasMaterialGeometry( drawSurf ) ) {
+		return false;
+	}
+	const idMaterial *material = drawSurf->material;
+	if ( !material->HasAmbient() || material->IsPortalSky() || material->SuppressInSubview() ) {
+		return false;
+	}
+	return material->GetSort() < SS_POST_PROCESS;
+}
+
+static bool R_ScenePackets_DrawSurfAuthoredPostEligible( const viewDef_t *viewDef, const drawSurf_t *drawSurf ) {
+	if ( !R_ScenePackets_DrawSurfHasMaterialGeometry( drawSurf ) ) {
+		return false;
+	}
+	const idMaterial *material = drawSurf->material;
+	if ( !material->HasAmbient() || material->IsPortalSky() || material->SuppressInSubview() ) {
+		return false;
+	}
+	return material->GetSort() >= SS_POST_PROCESS;
+}
+
+static bool R_ScenePackets_DrawSurfLightGridEligible( const viewDef_t *viewDef, const drawSurf_t *drawSurf ) {
+	if ( !r_useLightGrid.GetBool() || r_skipDiffuse.GetBool() || !glConfig.GLSLProgramAvailable ) {
+		return false;
+	}
+	if ( !R_ScenePackets_SurfaceCanReceiveLightGrid( drawSurf ) ) {
+		return false;
+	}
+	if ( drawSurf->material->GetSort() >= SS_POST_PROCESS || drawSurf->material->SuppressInSubview() ) {
+		return false;
+	}
+	if ( drawSurf->space->weaponDepthHack ) {
+		return R_ScenePackets_CurrentViewLightGrid( viewDef ) != NULL;
+	}
+	if ( drawSurf->space->modelDepthHack != 0.0f || drawSurf->area == NULL ) {
+		return false;
+	}
+	return R_ScenePackets_LightGridIsUsable( drawSurf->area->lightGrid );
+}
+
+static bool R_ScenePackets_DrawSurfGUIEligible( const viewDef_t *viewDef, const drawSurf_t *drawSurf ) {
+	if ( !R_ScenePackets_DrawSurfHasMaterialGeometry( drawSurf ) ) {
+		return false;
+	}
+	const idMaterial *material = drawSurf->material;
+	return material->HasAmbient() && !material->IsPortalSky();
+}
+
+static bool R_ScenePackets_DrawSurfInteractionEligible( const drawSurf_t *drawSurf ) {
+	if ( !R_ScenePackets_DrawSurfHasMaterialGeometry( drawSurf ) ) {
+		return false;
+	}
+	const idMaterial *material = drawSurf->material;
+	return material->ReceivesLighting() && !material->IsPortalSky();
+}
+
+static bool R_ScenePackets_DrawSurfFogBlendEligible( const drawSurf_t *drawSurf ) {
+	if ( !R_ScenePackets_DrawSurfHasMaterialGeometry( drawSurf ) ) {
+		return false;
+	}
+	return drawSurf->material->ReceivesFog() && !drawSurf->material->SuppressInSubview();
+}
+
+static bool R_ScenePackets_DrawSurfShadowEligible( const drawSurf_t *drawSurf ) {
+	return R_ScenePackets_DrawSurfHasGeometry( drawSurf );
+}
+
+static int R_ScenePackets_CountFilteredDrawSurfs( const viewDef_t *viewDef, int firstDrawSurf, scenePacketDrawSurfFilter_t filter ) {
+	if ( viewDef == NULL || viewDef->drawSurfs == NULL || viewDef->numDrawSurfs <= 0 || filter == NULL ) {
+		return 0;
+	}
+
+	int count = 0;
+	for ( int i = Max( 0, firstDrawSurf ); i < viewDef->numDrawSurfs; ++i ) {
+		if ( filter( viewDef, viewDef->drawSurfs[i] ) ) {
+			count++;
+		}
+	}
+	return count;
+}
+
+static int R_ScenePackets_CountDrawSurfChain( const drawSurf_t *drawSurf, bool ( *filter )( const drawSurf_t *drawSurf ) ) {
+	int count = 0;
+	for ( const drawSurf_t *cursor = drawSurf; cursor != NULL; cursor = cursor->nextOnLight ) {
+		if ( filter == NULL || filter( cursor ) ) {
+			count++;
+		}
+	}
+	return count;
+}
+
+static bool R_ScenePackets_AppendDrawSurfChain( idScenePacketFrame &packetFrame, const drawSurf_t *drawSurf, renderPassCategory_t category, bool ( *filter )( const drawSurf_t *drawSurf ), int &drawIndex ) {
+	for ( const drawSurf_t *cursor = drawSurf; cursor != NULL; cursor = cursor->nextOnLight ) {
+		if ( filter != NULL && !filter( cursor ) ) {
+			continue;
+		}
+		if ( !packetFrame.AddDrawPacket( cursor, category, drawIndex++ ) ) {
+			packetFrame.AddClippedDrawPackets( R_ScenePackets_CountDrawSurfChain( cursor->nextOnLight, filter ) );
+			return false;
+		}
+	}
+	return true;
+}
+
+static void R_ScenePackets_AddFilteredDrawSurfPass( idScenePacketFrame &packetFrame, const viewDef_t *viewDef, renderPassCategory_t category, scenePacketDrawSurfFilter_t filter ) {
 	if ( !packetFrame.AddPass( category, true ) ) {
 		return;
 	}
-	if ( viewDef == NULL || viewDef->drawSurfs == NULL || viewDef->numDrawSurfs <= 0 ) {
+	if ( viewDef == NULL || viewDef->drawSurfs == NULL || viewDef->numDrawSurfs <= 0 || filter == NULL ) {
 		return;
 	}
 
+	int drawIndex = 0;
 	for ( int i = 0; i < viewDef->numDrawSurfs; ++i ) {
-		if ( !packetFrame.AddDrawPacket( viewDef->drawSurfs[i], category, i ) ) {
-			packetFrame.AddClippedDrawPackets( viewDef->numDrawSurfs - i - 1 );
+		const drawSurf_t *drawSurf = viewDef->drawSurfs[i];
+		if ( !filter( viewDef, drawSurf ) ) {
+			continue;
+		}
+		if ( !packetFrame.AddDrawPacket( drawSurf, category, drawIndex++ ) ) {
+			packetFrame.AddClippedDrawPackets( R_ScenePackets_CountFilteredDrawSurfs( viewDef, i + 1, filter ) );
 			break;
+		}
+	}
+}
+
+static bool R_ScenePackets_ViewLightHasMaterialInteractions( const viewLight_t *vLight ) {
+	if ( vLight == NULL || vLight->lightShader == NULL ) {
+		return false;
+	}
+	if ( vLight->lightShader->IsFogLight() || vLight->lightShader->IsBlendLight() ) {
+		return false;
+	}
+	return vLight->localInteractions != NULL || vLight->globalInteractions != NULL || vLight->translucentInteractions != NULL;
+}
+
+static bool R_ScenePackets_ViewLightCanCastShadows( const viewLight_t *vLight ) {
+	if ( vLight == NULL || vLight->lightShader == NULL ) {
+		return false;
+	}
+	if ( vLight->lightShader->IsFogLight() || vLight->lightShader->IsBlendLight() || vLight->lightShader->IsAmbientLight() ) {
+		return false;
+	}
+	if ( !r_shadows.GetBool() || !vLight->lightShader->LightCastsShadows() ) {
+		return false;
+	}
+	if ( vLight->lightDef != NULL && ( vLight->lightDef->parms.noShadows || vLight->lightDef->parms.noDynamicShadows ) ) {
+		return false;
+	}
+	return true;
+}
+
+static bool R_ScenePackets_ViewLightIsFogOrBlend( const viewLight_t *vLight ) {
+	if ( vLight == NULL || vLight->lightShader == NULL ) {
+		return false;
+	}
+	if ( !vLight->lightShader->IsFogLight() && !vLight->lightShader->IsBlendLight() ) {
+		return false;
+	}
+	if ( r_skipFogLights.GetBool() ) {
+		return false;
+	}
+	if ( vLight->lightShader->IsBlendLight() && r_skipBlendLights.GetBool() ) {
+		return false;
+	}
+	return true;
+}
+
+static int R_ScenePackets_CountShadowMapCandidates( const viewDef_t *viewDef ) {
+	if ( !r_useShadowMap.GetBool() || viewDef == NULL ) {
+		return 0;
+	}
+
+	int count = 0;
+	for ( const viewLight_t *vLight = viewDef->viewLights; vLight != NULL; vLight = vLight->next ) {
+		if ( !R_ScenePackets_ViewLightCanCastShadows( vLight ) ) {
+			continue;
+		}
+		count += R_ScenePackets_CountDrawSurfChain( vLight->globalShadowMapCasters, R_ScenePackets_DrawSurfShadowEligible );
+		count += R_ScenePackets_CountDrawSurfChain( vLight->localShadowMapCasters, R_ScenePackets_DrawSurfShadowEligible );
+		count += R_ScenePackets_CountDrawSurfChain( vLight->globalTranslucentShadowMapCasters, R_ScenePackets_DrawSurfShadowEligible );
+		count += R_ScenePackets_CountDrawSurfChain( vLight->localTranslucentShadowMapCasters, R_ScenePackets_DrawSurfShadowEligible );
+		if ( vLight->globalShadowMapCasters == NULL && vLight->localShadowMapCasters == NULL ) {
+			count += R_ScenePackets_CountDrawSurfChain( vLight->globalShadows, R_ScenePackets_DrawSurfShadowEligible );
+			count += R_ScenePackets_CountDrawSurfChain( vLight->localShadows, R_ScenePackets_DrawSurfShadowEligible );
+		}
+	}
+	return count;
+}
+
+static int R_ScenePackets_CountStencilShadowCandidates( const viewDef_t *viewDef ) {
+	if ( viewDef == NULL ) {
+		return 0;
+	}
+
+	int count = 0;
+	for ( const viewLight_t *vLight = viewDef->viewLights; vLight != NULL; vLight = vLight->next ) {
+		if ( !R_ScenePackets_ViewLightCanCastShadows( vLight ) ) {
+			continue;
+		}
+		count += R_ScenePackets_CountDrawSurfChain( vLight->globalShadows, R_ScenePackets_DrawSurfShadowEligible );
+		count += R_ScenePackets_CountDrawSurfChain( vLight->localShadows, R_ScenePackets_DrawSurfShadowEligible );
+	}
+	return count;
+}
+
+static void R_ScenePackets_AddInteractionPass( idScenePacketFrame &packetFrame, const viewDef_t *viewDef ) {
+	if ( !packetFrame.AddPass( RENDER_PASS_ARB2_INTERACTION, true ) || viewDef == NULL ) {
+		return;
+	}
+
+	int drawIndex = 0;
+	for ( const viewLight_t *vLight = viewDef->viewLights; vLight != NULL; vLight = vLight->next ) {
+		if ( !R_ScenePackets_ViewLightHasMaterialInteractions( vLight ) ) {
+			continue;
+		}
+		if ( !R_ScenePackets_AppendDrawSurfChain( packetFrame, vLight->localInteractions, RENDER_PASS_ARB2_INTERACTION, R_ScenePackets_DrawSurfInteractionEligible, drawIndex ) ) {
+			return;
+		}
+		if ( !R_ScenePackets_AppendDrawSurfChain( packetFrame, vLight->globalInteractions, RENDER_PASS_ARB2_INTERACTION, R_ScenePackets_DrawSurfInteractionEligible, drawIndex ) ) {
+			return;
+		}
+		if ( !r_skipTranslucent.GetBool() && !R_ScenePackets_AppendDrawSurfChain( packetFrame, vLight->translucentInteractions, RENDER_PASS_ARB2_INTERACTION, R_ScenePackets_DrawSurfInteractionEligible, drawIndex ) ) {
+			return;
+		}
+	}
+}
+
+static void R_ScenePackets_AddShadowMapPass( idScenePacketFrame &packetFrame, const viewDef_t *viewDef ) {
+	if ( R_ScenePackets_CountShadowMapCandidates( viewDef ) <= 0 ) {
+		return;
+	}
+	if ( !packetFrame.AddPass( RENDER_PASS_SHADOW_MAP, true ) ) {
+		return;
+	}
+
+	int drawIndex = 0;
+	for ( const viewLight_t *vLight = viewDef->viewLights; vLight != NULL; vLight = vLight->next ) {
+		if ( !R_ScenePackets_ViewLightCanCastShadows( vLight ) ) {
+			continue;
+		}
+		if ( !R_ScenePackets_AppendDrawSurfChain( packetFrame, vLight->globalShadowMapCasters, RENDER_PASS_SHADOW_MAP, R_ScenePackets_DrawSurfShadowEligible, drawIndex ) ) {
+			return;
+		}
+		if ( !R_ScenePackets_AppendDrawSurfChain( packetFrame, vLight->localShadowMapCasters, RENDER_PASS_SHADOW_MAP, R_ScenePackets_DrawSurfShadowEligible, drawIndex ) ) {
+			return;
+		}
+		if ( !R_ScenePackets_AppendDrawSurfChain( packetFrame, vLight->globalTranslucentShadowMapCasters, RENDER_PASS_SHADOW_MAP, R_ScenePackets_DrawSurfShadowEligible, drawIndex ) ) {
+			return;
+		}
+		if ( !R_ScenePackets_AppendDrawSurfChain( packetFrame, vLight->localTranslucentShadowMapCasters, RENDER_PASS_SHADOW_MAP, R_ScenePackets_DrawSurfShadowEligible, drawIndex ) ) {
+			return;
+		}
+		if ( vLight->globalShadowMapCasters == NULL && vLight->localShadowMapCasters == NULL ) {
+			if ( !R_ScenePackets_AppendDrawSurfChain( packetFrame, vLight->globalShadows, RENDER_PASS_SHADOW_MAP, R_ScenePackets_DrawSurfShadowEligible, drawIndex ) ) {
+				return;
+			}
+			if ( !R_ScenePackets_AppendDrawSurfChain( packetFrame, vLight->localShadows, RENDER_PASS_SHADOW_MAP, R_ScenePackets_DrawSurfShadowEligible, drawIndex ) ) {
+				return;
+			}
+		}
+	}
+}
+
+static void R_ScenePackets_AddStencilShadowPass( idScenePacketFrame &packetFrame, const viewDef_t *viewDef ) {
+	if ( R_ScenePackets_CountStencilShadowCandidates( viewDef ) <= 0 ) {
+		return;
+	}
+	if ( !packetFrame.AddPass( RENDER_PASS_STENCIL_SHADOW, true ) ) {
+		return;
+	}
+
+	int drawIndex = 0;
+	for ( const viewLight_t *vLight = viewDef->viewLights; vLight != NULL; vLight = vLight->next ) {
+		if ( !R_ScenePackets_ViewLightCanCastShadows( vLight ) ) {
+			continue;
+		}
+		if ( !R_ScenePackets_AppendDrawSurfChain( packetFrame, vLight->globalShadows, RENDER_PASS_STENCIL_SHADOW, R_ScenePackets_DrawSurfShadowEligible, drawIndex ) ) {
+			return;
+		}
+		if ( !R_ScenePackets_AppendDrawSurfChain( packetFrame, vLight->localShadows, RENDER_PASS_STENCIL_SHADOW, R_ScenePackets_DrawSurfShadowEligible, drawIndex ) ) {
+			return;
+		}
+	}
+}
+
+static void R_ScenePackets_AddFogBlendPass( idScenePacketFrame &packetFrame, const viewDef_t *viewDef ) {
+	if ( !packetFrame.AddPass( RENDER_PASS_FOG_BLEND, true ) || viewDef == NULL ) {
+		return;
+	}
+
+	int drawIndex = 0;
+	for ( const viewLight_t *vLight = viewDef->viewLights; vLight != NULL; vLight = vLight->next ) {
+		if ( !R_ScenePackets_ViewLightIsFogOrBlend( vLight ) ) {
+			continue;
+		}
+		if ( !R_ScenePackets_AppendDrawSurfChain( packetFrame, vLight->globalInteractions, RENDER_PASS_FOG_BLEND, R_ScenePackets_DrawSurfFogBlendEligible, drawIndex ) ) {
+			return;
+		}
+		if ( !R_ScenePackets_AppendDrawSurfChain( packetFrame, vLight->localInteractions, RENDER_PASS_FOG_BLEND, R_ScenePackets_DrawSurfFogBlendEligible, drawIndex ) ) {
+			return;
 		}
 	}
 }
@@ -843,14 +1232,16 @@ static void R_ScenePackets_AddDrawView( idScenePacketFrame &packetFrame, const v
 
 	const bool worldView = viewDef != NULL && viewDef->viewEntitys != NULL;
 	if ( worldView ) {
-		R_ScenePackets_AddDrawSurfPass( packetFrame, viewDef, RENDER_PASS_DEPTH );
-		R_ScenePackets_AddDrawSurfPass( packetFrame, viewDef, RENDER_PASS_ARB2_INTERACTION );
-		R_ScenePackets_AddDrawSurfPass( packetFrame, viewDef, RENDER_PASS_LIGHT_GRID );
-		R_ScenePackets_AddDrawSurfPass( packetFrame, viewDef, RENDER_PASS_AMBIENT );
-		R_ScenePackets_AddDrawSurfPass( packetFrame, viewDef, RENDER_PASS_FOG_BLEND );
-		R_ScenePackets_AddDrawSurfPass( packetFrame, viewDef, RENDER_PASS_AUTHORED_POST );
+		R_ScenePackets_AddFilteredDrawSurfPass( packetFrame, viewDef, RENDER_PASS_DEPTH, R_ScenePackets_DrawSurfDepthEligible );
+		R_ScenePackets_AddShadowMapPass( packetFrame, viewDef );
+		R_ScenePackets_AddStencilShadowPass( packetFrame, viewDef );
+		R_ScenePackets_AddInteractionPass( packetFrame, viewDef );
+		R_ScenePackets_AddFilteredDrawSurfPass( packetFrame, viewDef, RENDER_PASS_LIGHT_GRID, R_ScenePackets_DrawSurfLightGridEligible );
+		R_ScenePackets_AddFilteredDrawSurfPass( packetFrame, viewDef, RENDER_PASS_AMBIENT, R_ScenePackets_DrawSurfAmbientEligible );
+		R_ScenePackets_AddFogBlendPass( packetFrame, viewDef );
+		R_ScenePackets_AddFilteredDrawSurfPass( packetFrame, viewDef, RENDER_PASS_AUTHORED_POST, R_ScenePackets_DrawSurfAuthoredPostEligible );
 	} else {
-		R_ScenePackets_AddDrawSurfPass( packetFrame, viewDef, RENDER_PASS_GUI );
+		R_ScenePackets_AddFilteredDrawSurfPass( packetFrame, viewDef, RENDER_PASS_GUI, R_ScenePackets_DrawSurfGUIEligible );
 	}
 
 	packetFrame.FinishScene();
@@ -1087,9 +1478,22 @@ bool RendererScenePacket_RunSelfTest( void ) {
 	idScenePacketFrame packetFrame;
 	R_ScenePackets_BuildLegacyCommandStream( reinterpret_cast<const emptyCommand_t *>( &drawCmd ), packetFrame );
 	const scenePacketFrameStats_t &stats = packetFrame.Stats();
-	const int expectedMaterialRecords = tr.defaultMaterial != NULL ? 1 : 0;
-	const int expectedDrawsWithMaterial = tr.defaultMaterial != NULL ? 12 : 0;
-	if ( stats.scenePackets != 3 || stats.passPackets != 8 || stats.drawPackets != 12 || stats.legacyDrawViews != 1 || stats.commandPackets != 2 || stats.materialRecords != expectedMaterialRecords || stats.geometryRecords != 1 || stats.instanceRecords != 1 || stats.drawPacketsWithResourceRecord != expectedDrawsWithMaterial || stats.drawPacketsWithGeometryRecord != 12 || stats.drawPacketsWithInstanceRecord != 12 || stats.drawPacketsWithGeometry != 12 || stats.worldPackets != 10 || stats.postProcessPackets != 2 || stats.specialEffectPackets != 1 || stats.presentPackets != 1 || stats.sortKeyValidationFailures != 0 || !stats.backendDerived || stats.frontEndDerived || stats.overflow || !packetFrame.ValidateSortKeys() ) {
+	const bool expectedDepthEligible = tr.defaultMaterial != NULL
+		&& tr.defaultMaterial->IsDrawn()
+		&& tr.defaultMaterial->Coverage() != MC_TRANSLUCENT;
+	const bool expectedAmbientEligible = tr.defaultMaterial != NULL
+		&& tr.defaultMaterial->HasAmbient()
+		&& !tr.defaultMaterial->IsPortalSky()
+		&& !tr.defaultMaterial->SuppressInSubview()
+		&& tr.defaultMaterial->GetSort() < SS_POST_PROCESS;
+	const int expectedDepthDraws = expectedDepthEligible ? 2 : 0;
+	const int expectedAmbientDraws = expectedAmbientEligible ? 2 : 0;
+	const int expectedWorldDraws = expectedDepthDraws + expectedAmbientDraws;
+	const int expectedMaterialRecords = expectedWorldDraws > 0 && tr.defaultMaterial != NULL ? 1 : 0;
+	const int expectedGeometryRecords = expectedWorldDraws > 0 ? 1 : 0;
+	const int expectedInstanceRecords = expectedWorldDraws > 0 ? 1 : 0;
+	const int expectedDrawsWithMaterial = tr.defaultMaterial != NULL ? expectedWorldDraws : 0;
+	if ( stats.scenePackets != 3 || stats.passPackets != 8 || stats.drawPackets != expectedWorldDraws || stats.legacyDrawViews != 1 || stats.commandPackets != 2 || stats.materialRecords != expectedMaterialRecords || stats.geometryRecords != expectedGeometryRecords || stats.instanceRecords != expectedInstanceRecords || stats.drawPacketsWithResourceRecord != expectedDrawsWithMaterial || stats.drawPacketsWithGeometryRecord != expectedWorldDraws || stats.drawPacketsWithInstanceRecord != expectedWorldDraws || stats.drawPacketsWithGeometry != expectedWorldDraws || stats.worldPackets != expectedWorldDraws || stats.postProcessPackets != 0 || stats.specialEffectPackets != 1 || stats.presentPackets != 1 || stats.sortKeyValidationFailures != 0 || !stats.backendDerived || stats.frontEndDerived || stats.overflow || !packetFrame.ValidateSortKeys() ) {
 		common->Printf(
 			"RendererScenePacket self-test failed: scenes=%d passes=%d draws=%d views=%d cmds=%d materials=%d geometryRecords=%d instances=%d resources=%d geometryRefs=%d instanceRefs=%d geometry=%d world=%d post=%d special=%d present=%d sortFailures=%d overflow=%d cause=%s\n",
 			stats.scenePackets,
@@ -1113,7 +1517,7 @@ bool RendererScenePacket_RunSelfTest( void ) {
 			ScenePacketOverflowCause_Name( stats.overflowCause ) );
 		return false;
 	}
-	if ( expectedMaterialRecords > 0 ) {
+	if ( expectedWorldDraws > 0 ) {
 		const drawPacket_t &packet = packetFrame.DrawPacket( 0 );
 		if ( packet.materialRecord == NULL || packet.materialRecord->material != tr.defaultMaterial || packet.materialRecordIndex != 0 || packet.geometryRecord == NULL || packet.geometryRecordIndex != 0 || packet.instanceRecord == NULL || packet.instanceRecordIndex != 0 || packet.indexCount != 6 || packet.vertexCount != 3 ) {
 			common->Printf(
@@ -1138,7 +1542,7 @@ bool RendererScenePacket_RunSelfTest( void ) {
 	R_ScenePackets_AddPresent();
 	const idScenePacketFrame &frontEndPacketFrame = R_ScenePackets_FrontEndFrame();
 	const scenePacketFrameStats_t &frontEndStats = frontEndPacketFrame.Stats();
-	if ( frontEndStats.scenePackets != 3 || frontEndStats.passPackets != 8 || frontEndStats.drawPackets != 12 || frontEndStats.legacyDrawViews != 1 || frontEndStats.commandPackets != 2 || frontEndStats.materialRecords != expectedMaterialRecords || frontEndStats.geometryRecords != 1 || frontEndStats.instanceRecords != 1 || frontEndStats.drawPacketsWithResourceRecord != expectedDrawsWithMaterial || frontEndStats.drawPacketsWithGeometryRecord != 12 || frontEndStats.drawPacketsWithInstanceRecord != 12 || frontEndStats.drawPacketsWithGeometry != 12 || frontEndStats.worldPackets != 10 || frontEndStats.postProcessPackets != 2 || frontEndStats.specialEffectPackets != 1 || frontEndStats.presentPackets != 1 || frontEndStats.sortKeyValidationFailures != 0 || !frontEndStats.frontEndDerived || frontEndStats.backendDerived || frontEndStats.overflow || !frontEndPacketFrame.ValidateSortKeys() ) {
+	if ( frontEndStats.scenePackets != 3 || frontEndStats.passPackets != 8 || frontEndStats.drawPackets != expectedWorldDraws || frontEndStats.legacyDrawViews != 1 || frontEndStats.commandPackets != 2 || frontEndStats.materialRecords != expectedMaterialRecords || frontEndStats.geometryRecords != expectedGeometryRecords || frontEndStats.instanceRecords != expectedInstanceRecords || frontEndStats.drawPacketsWithResourceRecord != expectedDrawsWithMaterial || frontEndStats.drawPacketsWithGeometryRecord != expectedWorldDraws || frontEndStats.drawPacketsWithInstanceRecord != expectedWorldDraws || frontEndStats.drawPacketsWithGeometry != expectedWorldDraws || frontEndStats.worldPackets != expectedWorldDraws || frontEndStats.postProcessPackets != 0 || frontEndStats.specialEffectPackets != 1 || frontEndStats.presentPackets != 1 || frontEndStats.sortKeyValidationFailures != 0 || !frontEndStats.frontEndDerived || frontEndStats.backendDerived || frontEndStats.overflow || !frontEndPacketFrame.ValidateSortKeys() ) {
 		common->Printf(
 			"RendererScenePacket self-test failed: frontend scenes=%d passes=%d draws=%d views=%d cmds=%d materials=%d geometryRecords=%d instances=%d resources=%d geometryRefs=%d instanceRefs=%d geometry=%d source(frontend=%d backend=%d) world=%d post=%d special=%d present=%d sortFailures=%d overflow=%d cause=%s\n",
 			frontEndStats.scenePackets,
