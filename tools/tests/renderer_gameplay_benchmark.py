@@ -312,6 +312,18 @@ def parse_extra_cvars(values: list[str]) -> tuple[tuple[str, str], ...]:
     return tuple(parsed)
 
 
+def parse_exec_commands(values: list[str]) -> tuple[str, ...]:
+    commands: list[str] = []
+    for raw in values:
+        command = raw.strip()
+        if not command:
+            raise ValueError("empty --exec-command value")
+        if any(ord(ch) < 32 for ch in command):
+            raise ValueError(f"--exec-command contains a control character: {raw!r}")
+        commands.append(command)
+    return tuple(commands)
+
+
 def append_set(args: list[str], name: str, value: Any) -> None:
     args += ["+set", name, str(value)]
 
@@ -380,6 +392,7 @@ def build_scripted_capture_lines(
     sample_frames: int,
     sample_msec: int,
     extra_cvars: tuple[tuple[str, str], ...] = (),
+    exec_commands: tuple[str, ...] = (),
     gpu_timers: bool = False,
     renderer_metrics: bool = True,
     capture_index: int = 0,
@@ -403,8 +416,9 @@ def build_scripted_capture_lines(
         "god",
         "notarget",
         "getviewpos",
-        "framePacingReset",
     ]
+    lines.extend(exec_commands)
+    lines.append("framePacingReset")
     sample_wait = f"waitMsec {max(1, sample_msec)}" if sample_msec > 0 else f"wait {max(1, sample_frames)}"
     if renderer_metrics:
         lines += [
@@ -439,6 +453,7 @@ def write_autoexec_cfg(
     sample_frames: int,
     sample_msec: int,
     extra_cvars: tuple[tuple[str, str], ...] = (),
+    exec_commands: tuple[str, ...] = (),
     gpu_timers: bool = False,
     renderer_metrics: bool = True,
     capture_index: int = 0,
@@ -451,6 +466,7 @@ def write_autoexec_cfg(
         sample_frames,
         sample_msec,
         extra_cvars,
+        exec_commands,
         gpu_timers,
         renderer_metrics,
         capture_index,
@@ -816,6 +832,7 @@ def run_sp_spec(
         args.sample_frames,
         args.sample_msec,
         args.extra_cvars,
+        args.exec_commands,
         args.gpu_timers,
         not args.pacing_only,
     )
@@ -928,6 +945,7 @@ def run_mp_spec(
         args.sample_frames,
         args.sample_msec,
         args.extra_cvars,
+        args.exec_commands,
         args.gpu_timers,
         not args.pacing_only,
     )
@@ -961,6 +979,7 @@ def run_mp_spec(
         args.sample_frames,
         args.sample_msec,
         args.extra_cvars,
+        args.exec_commands,
         args.gpu_timers,
         not args.pacing_only,
     )
@@ -1246,6 +1265,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--max-p99-ms", type=float, default=0.0, help="Fail when the parsed frame-pacing P99 exceeds this millisecond budget. Use 0 to disable.")
     parser.add_argument("--set-cvar", action="append", default=[], metavar="NAME=VALUE", help="Extra post-map cvar written into the generated benchmark cfg. Repeat for A/B diagnostics without extending the launch command line.")
     parser.add_argument("--set-launch-cvar", action="append", default=[], metavar="NAME=VALUE", help="Extra cvar applied on the OpenQ4 launch command line before the map loads. Use for load-time renderer knobs such as vertex/index buffer caching.")
+    parser.add_argument("--exec-command", action="append", default=[], metavar="COMMAND", help="Extra post-map console command written into the generated benchmark cfg. Repeat for targeted diagnostics such as flashlight impulses.")
     parser.add_argument("--autoexec-delay-ms", type=int, default=1000, help="Delay after active map draw before executing the generated benchmark cfg.")
     parser.add_argument("--settle-frames", type=int, default=360, help="Frames to wait after map/connect before sampling.")
     parser.add_argument("--sample-frames", type=int, default=600, help="Frames to sample before dumping metrics and screenshots.")
@@ -1267,6 +1287,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     try:
         parsed.extra_cvars = parse_extra_cvars(parsed.set_cvar)
         parsed.launch_cvars = parse_extra_cvars(parsed.set_launch_cvar)
+        parsed.exec_commands = parse_exec_commands(parsed.exec_command)
     except ValueError as exc:
         parser.error(str(exc))
     parsed.reference_dir_path = Path(parsed.reference_dir).resolve() if parsed.reference_dir else None
@@ -1343,6 +1364,7 @@ def main(argv: list[str]) -> int:
         "maxP95Ms": args.max_p95_ms,
         "maxP99Ms": args.max_p99_ms,
         "launchCvars": dict(args.launch_cvars),
+        "execCommands": list(args.exec_commands),
     }
     report_json, report_md = write_reports(output_dir, results, metadata)
     print(f"wrote {report_md}")

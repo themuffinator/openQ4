@@ -451,6 +451,44 @@ void idBinaryImage::MakeGeneratedFileName( idStr & gfn ) {
 idBinaryImage::GetGeneratedFileName
 ==========================
 */
+static bool R_BinaryImageNameNeedsHashedPath( const char *name, const idStr &legacyPath ) {
+	if ( name == NULL ) {
+		return true;
+	}
+	if ( legacyPath.Length() > 180 ) {
+		return true;
+	}
+	for ( const char *s = name; *s != '\0'; s++ ) {
+		if ( *s == '(' || *s == ')' || *s == ',' || *s == ' ' ) {
+			return true;
+		}
+	}
+	return false;
+}
+
+static void R_BinaryImageSanitizedPrefix( idStr &prefix, const idStr &name ) {
+	prefix.Clear();
+
+	bool lastWasSeparator = false;
+	for ( int i = 0; i < name.Length() && prefix.Length() < 48; i++ ) {
+		const char c = name[ i ];
+		if ( idStr::CharIsAlpha( (byte)c ) || idStr::CharIsNumeric( (byte)c ) ) {
+			prefix.Append( c );
+			lastWasSeparator = false;
+		} else if ( !lastWasSeparator && prefix.Length() > 0 ) {
+			prefix.Append( '_' );
+			lastWasSeparator = true;
+		}
+	}
+
+	while ( prefix.Length() > 0 && prefix[ prefix.Length() - 1 ] == '_' ) {
+		prefix.CapLength( prefix.Length() - 1 );
+	}
+	if ( prefix.IsEmpty() ) {
+		prefix = "image_program";
+	}
+}
+
 void idBinaryImage::GetGeneratedFileName( idStr & gfn, const char *name ) {
 	gfn = va( "generated/images/%s.bimage", name );
 	gfn.Replace( "(", "/" );
@@ -458,6 +496,19 @@ void idBinaryImage::GetGeneratedFileName( idStr & gfn, const char *name ) {
 	gfn.Replace( ")", "" );
 	gfn.Replace( " ", "" );
 	gfn.ToLower();
+
+	if ( !R_BinaryImageNameNeedsHashedPath( name, gfn ) ) {
+		return;
+	}
+
+	idStr normalizedName = name != NULL ? name : "";
+	normalizedName.ToLower();
+
+	idStr prefix;
+	R_BinaryImageSanitizedPrefix( prefix, normalizedName );
+
+	const unsigned long crc = CRC32_BlockChecksum( normalizedName.c_str(), normalizedName.Length() );
+	gfn = va( "generated/images/_programs/%s_%08lx.bimage", prefix.c_str(), crc );
 }
 
 

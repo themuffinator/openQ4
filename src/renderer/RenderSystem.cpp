@@ -271,7 +271,37 @@ R_IssueRenderCommands
 Called by R_EndFrame each frame
 ====================
 */
+static emptyCommand_t *r_deferredCommandHead = NULL;
+static emptyCommand_t *r_deferredCommandTail = NULL;
+
+static void *R_GetCommandBufferDeferred( int bytes ) {
+	emptyCommand_t *cmd = (emptyCommand_t *)R_FrameAlloc( bytes );
+	cmd->next = NULL;
+
+	if ( r_deferredCommandTail != NULL ) {
+		r_deferredCommandTail->next = &cmd->commandId;
+	} else {
+		r_deferredCommandHead = cmd;
+	}
+	r_deferredCommandTail = cmd;
+
+	return (void *)cmd;
+}
+
+static void R_SubmitDeferredCommands( void ) {
+	if ( r_deferredCommandHead == NULL ) {
+		return;
+	}
+
+	frameData->cmdTail->next = &r_deferredCommandHead->commandId;
+	frameData->cmdTail = r_deferredCommandTail;
+	r_deferredCommandHead = NULL;
+	r_deferredCommandTail = NULL;
+}
+
 static void R_IssueRenderCommands( void ) {
+	R_SubmitDeferredCommands();
+
 	if ( frameData->cmdHead->commandId == RC_NOP
 		&& !frameData->cmdHead->next ) {
 		// nothing to issue
@@ -326,6 +356,8 @@ and by R_ToggleSmpFrame
 */
 void R_ClearCommandChain( void ) {
 	R_ScenePackets_EndFrame();
+	r_deferredCommandHead = NULL;
+	r_deferredCommandTail = NULL;
 
 	// clear the command chain
 	frameData->cmdHead = frameData->cmdTail = (emptyCommand_t *)R_FrameAlloc( sizeof( *frameData->cmdHead ) );
@@ -344,6 +376,7 @@ static void R_ViewStatistics( viewDef_t *parms ) {
 		return;
 	}
 	int portalSkySurfs = 0;
+	int skyboxSurfs = 0;
 	int postProcessSurfs = 0;
 	for ( int i = 0; i < parms->numDrawSurfs; i++ ) {
 		const drawSurf_t *surf = parms->drawSurfs[i];
@@ -353,15 +386,21 @@ static void R_ViewStatistics( viewDef_t *parms ) {
 		if ( surf->material->IsPortalSky() ) {
 			portalSkySurfs++;
 		}
+		const texgen_t texgen = surf->material->Texgen();
+		if ( texgen == TG_SKYBOX_CUBE || texgen == TG_WOBBLESKY_CUBE ) {
+			skyboxSurfs++;
+		}
 		if ( surf->material->GetSort() >= SS_POST_PROCESS ) {
 			postProcessSurfs++;
 		}
 	}
 	common->Printf(
-		"view:%p surfs:%i portalSky:%i post:%i subview=%d mirror=%d xray=%d super=%p surface=%p viewID=%d area=%d org=%s fov=%.1f/%.1f viewport=%d,%d %dx%d scissor=%d,%d %dx%d entities=%d lights=%d\n",
+		"view:%p flags=0x%x surfs:%i portalSky:%i skybox:%i post:%i subview=%d mirror=%d xray=%d super=%p surface=%p viewID=%d area=%d org=%s fov=%.1f/%.1f viewport=%d,%d %dx%d scissor=%d,%d %dx%d entities=%d lights=%d\n",
 		parms,
+		parms->renderFlags,
 		parms->numDrawSurfs,
 		portalSkySurfs,
+		skyboxSurfs,
 		postProcessSurfs,
 		parms->isSubview ? 1 : 0,
 		parms->isMirror ? 1 : 0,
@@ -396,7 +435,12 @@ have multiple views if a mirror, portal, or dynamic texture is present.
 void	R_AddDrawViewCmd( viewDef_t *parms ) {
 	drawSurfsCommand_t	*cmd;
 
-	cmd = (drawSurfsCommand_t *)R_GetCommandBuffer( sizeof( *cmd ) );
+	if ( ( parms->renderFlags & RF_DEFER_COMMAND_SUBMIT ) != 0 ) {
+		cmd = (drawSurfsCommand_t *)R_GetCommandBufferDeferred( sizeof( *cmd ) );
+	} else {
+		R_SubmitDeferredCommands();
+		cmd = (drawSurfsCommand_t *)R_GetCommandBuffer( sizeof( *cmd ) );
+	}
 	cmd->commandId = RC_DRAW_VIEW;
 
 	cmd->viewDef = parms;
@@ -484,7 +528,12 @@ void R_LockSurfaceScene( viewDef_t *parms ) {
 	}
 
 	// add the stored off surface commands again
-	cmd = (drawSurfsCommand_t *)R_GetCommandBuffer( sizeof( *cmd ) );
+	if ( ( parms->renderFlags & RF_DEFER_COMMAND_SUBMIT ) != 0 ) {
+		cmd = (drawSurfsCommand_t *)R_GetCommandBufferDeferred( sizeof( *cmd ) );
+	} else {
+		R_SubmitDeferredCommands();
+		cmd = (drawSurfsCommand_t *)R_GetCommandBuffer( sizeof( *cmd ) );
+	}
 	*cmd = tr.lockSurfacesCmd;
 }
 

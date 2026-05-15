@@ -181,9 +181,20 @@ R_MD5R_ModelHasSky
 ========================
 */
 static bool R_MD5R_ModelHasSky( const idRenderModelStatic &model ) {
+	if ( model.HasProcSky() ) {
+		return true;
+	}
+
 	for ( int surfaceIndex = 0; surfaceIndex < model.surfaces.Num(); ++surfaceIndex ) {
 		const modelSurface_t &surface = model.surfaces[ surfaceIndex ];
-		if ( surface.shader != NULL && idStr::Icmp( surface.shader->GetName(), "textures/smf/portal_sky" ) == 0 ) {
+		if ( surface.shader == NULL ) {
+			continue;
+		}
+		const texgen_t texgen = surface.shader->Texgen();
+		if ( surface.shader->IsPortalSky()
+			|| texgen == TG_SKYBOX_CUBE
+			|| texgen == TG_WOBBLESKY_CUBE
+			|| idStr::Icmp( surface.shader->GetName(), "textures/smf/portal_sky" ) == 0 ) {
 			return true;
 		}
 	}
@@ -1858,6 +1869,7 @@ bool rvRenderModelMD5R::InitFromStaticModelInternal(
 	md5rVersion = MD5R_VERSION;
 	bounds = sourceModel.bounds;
 	hasSky = ( sourceType == MD5R_SOURCE_PROC ) && R_MD5R_ModelHasSky( sourceModel );
+	SetProcSky( hasSky );
 
 	idList<rvMD5RVertexBufferDesc> *targetVertexBuffers = &vertexBuffers;
 	idList<rvMD5RIndexBufferDesc> *targetIndexBuffers = &indexBuffers;
@@ -1977,6 +1989,7 @@ void rvRenderModelMD5R::InitFromProcWorldModel(
 	if ( parser.PeekTokenString( "HasSky" ) ) {
 		parser.ExpectTokenString( "HasSky" );
 		hasSky = true;
+		SetProcSky( true );
 	}
 
 	if ( joints.Num() == 0 && GetVertexBuffers().Num() > 0 && meshes.Num() > 0 ) {
@@ -3718,6 +3731,7 @@ void rvRenderModelMD5R::LoadModel() {
 	if ( parser->PeekTokenString( "HasSky" ) ) {
 		parser->ExpectTokenString( "HasSky" );
 		hasSky = true;
+		SetProcSky( true );
 	}
 
 	idToken token;

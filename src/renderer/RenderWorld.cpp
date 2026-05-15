@@ -817,7 +817,7 @@ Rendering a scene may require multiple views to be rendered
 to handle mirrors,
 ====================
 */
-void idRenderWorldLocal::RenderScene( const renderView_t *renderView ) {
+void idRenderWorldLocal::RenderScene( const renderView_t *renderView, int renderFlags ) {
 #ifndef	ID_DEDICATED
 	renderView_t	copy;
 
@@ -854,6 +854,7 @@ void idRenderWorldLocal::RenderScene( const renderView_t *renderView ) {
 	//
 	viewDef_t		*parms = (viewDef_t *)R_ClearedFrameAlloc( sizeof( *parms ) );
 	parms->renderView = *renderView;
+	parms->renderFlags = renderFlags;
 
 	if ( tr.takingScreenshot ) {
 		parms->renderView.forceUpdate = true;

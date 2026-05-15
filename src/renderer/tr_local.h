@@ -423,6 +423,7 @@ typedef struct viewDef_s {
 	viewEntity_t		worldSpace;
 
 	idRenderWorldLocal *renderWorld;
+	int					renderFlags;
 
 	float				floatTime;
 

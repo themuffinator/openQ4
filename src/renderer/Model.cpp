@@ -113,6 +113,7 @@ idRenderModelStatic::idRenderModelStatic() {
 	purged = false;
 	fastLoad = false;
 	reloadable = true;
+	procSky = false;
 	levelLoadReferenced = false;
 	timeStamp = 0;
 }
@@ -400,6 +401,7 @@ void idRenderModelStatic::InitEmpty( const char *fileName ) {
 	reloadable = false;	// if it didn't come from a file, we can't reload it
 	PurgeModel();
 	purged = false;
+	procSky = false;
 	bounds.Zero();
 }
 
@@ -422,6 +424,24 @@ idRenderModelStatic::Name
 */
 const char *idRenderModelStatic::Name() const {
 	return name;
+}
+
+/*
+================
+idRenderModelStatic::SetProcSky
+================
+*/
+void idRenderModelStatic::SetProcSky( bool value ) {
+	procSky = value;
+}
+
+/*
+================
+idRenderModelStatic::HasProcSky
+================
+*/
+bool idRenderModelStatic::HasProcSky() const {
+	return procSky;
 }
 
 /*
@@ -2174,6 +2194,7 @@ void idRenderModelStatic::PurgeModel() {
 	surfaces.Clear();
 
 	purged = true;
+	procSky = false;
 }
 
 /*

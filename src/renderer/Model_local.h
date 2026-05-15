@@ -87,6 +87,8 @@ public:
 	virtual int					GetSurfaceMask( const char *surface ) const;
 
 	void						MakeDefaultModel();
+	void						SetProcSky( bool value );
+	bool						HasProcSky() const;
 	
 	bool						LoadASE( const char *fileName );
 	bool						LoadLWO( const char *fileName );
@@ -119,6 +121,7 @@ protected:
 	bool						purged;					// eventually we will have dynamic reloading
 	bool						fastLoad;				// don't generate tangents and shadow data
 	bool						reloadable;				// if not, reloadModels won't check timestamp
+	bool						procSky;				// Quake 4 .proc / MD5RProc area needs portal-sky PVS
 	bool						levelLoadReferenced;	// for determining if it needs to be freed
 	ID_TIME_T						timeStamp;
 

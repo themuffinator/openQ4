@@ -435,6 +435,8 @@ skybox surfaces.
 ===================
 */
 void idRenderWorldLocal::FindVisibleAreas_r( const idVec3 origin, int areaNum, bool *visibleAreas ) {
+	(void)origin;
+
 	if ( areaNum < 0 || areaNum >= numPortalAreas || visibleAreas == NULL ) {
 		return;
 	}
@@ -452,9 +454,6 @@ void idRenderWorldLocal::FindVisibleAreas_r( const idVec3 origin, int areaNum, b
 			continue;
 		}
 		if ( visibleAreas[ portal->intoArea ] ) {
-			continue;
-		}
-		if ( portal->plane.Distance( origin ) < -0.1f ) {
 			continue;
 		}
 

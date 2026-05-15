@@ -60,11 +60,11 @@ typedef enum {
 	ARB2_MD5R_MODEL_ROW_0,
 	ARB2_MD5R_MODEL_ROW_1,
 	ARB2_MD5R_MODEL_ROW_2,
+	ARB2_MD5R_STAGE_RESERVED,
 	// Retail md5r*.vp programs read programmable stage vertex-color controls
-	// from c[90]/c[91] and leave c[92] as the preserved reserved slot.
+	// from c[91]/c[92] and leave c[90] as the preserved reserved slot.
 	ARB2_MD5R_STAGE_VERTEX_COLOR_MODULATE,
 	ARB2_MD5R_STAGE_VERTEX_COLOR_ADD,
-	ARB2_MD5R_STAGE_RESERVED,
 	ARB2_MD5R_FOG_DISTANCE_PLANE,
 	ARB2_MD5R_FOG_DISTANCE_BIAS,
 	ARB2_MD5R_FOG_ENTER_PLANE_T,
@@ -72,9 +72,9 @@ typedef enum {
 } arb2ProgramParameter_t;
 
 static_assert(
-	ARB2_MD5R_STAGE_VERTEX_COLOR_MODULATE == 90 &&
-	ARB2_MD5R_STAGE_VERTEX_COLOR_ADD == 91 &&
-	ARB2_MD5R_STAGE_RESERVED == 92 &&
+	ARB2_MD5R_STAGE_RESERVED == 90 &&
+	ARB2_MD5R_STAGE_VERTEX_COLOR_MODULATE == 91 &&
+	ARB2_MD5R_STAGE_VERTEX_COLOR_ADD == 92 &&
 	ARB2_MD5R_FOG_DISTANCE_PLANE == 93,
 	"Packed MD5R stage/fog registers must stay aligned with retail Quake 4 ARB programs" );
 
