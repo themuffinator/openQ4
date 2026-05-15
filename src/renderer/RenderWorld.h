@@ -559,7 +559,7 @@ public:
 	virtual void			RenderScene( const renderView_t *renderView ) = 0;
 // jscott: for portal skies
 	virtual bool			HasSkybox( int areaNum ) = 0;
-	//virtual void			FindVisibleAreas( idVec3 origin, int areaNum, bool *visibleAreas ) = 0;
+	virtual void			FindVisibleAreas( idVec3 origin, int areaNum, bool *visibleAreas ) = 0;
 // AReis: This is where we draw the portal fadeout polygon
 	virtual void			RenderPortalFades( void ) = 0;
 // ddynerman: Helper function

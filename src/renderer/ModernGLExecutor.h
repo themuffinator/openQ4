@@ -391,6 +391,7 @@ typedef struct modernGLExecutorStats_s {
 
 void R_ModernGLExecutor_Init( const renderBackendCaps_t &caps, const renderFeatureSet_t &features );
 void R_ModernGLExecutor_Shutdown( void );
+void R_ModernGLExecutor_SkipFrame( void );
 void R_ModernGLExecutor_PrepareFrame( const idScenePacketFrame &packetFrame, const idRenderGraph &graph );
 void R_ModernGLExecutor_DrawDepthDebugOverlay( void );
 void R_ModernGLExecutor_DrawGBufferDebugOverlay( void );

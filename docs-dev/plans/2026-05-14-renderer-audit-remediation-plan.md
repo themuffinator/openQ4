@@ -310,6 +310,26 @@ Round 3 Phase 8 implementation notes:
 - `rendererDefaultSafetySelfTest` now treats a non-empty promotion-evidence token as non-conservative on clean startup, keeping default ARB2 startup free of both the auto-promotion switch and stale release evidence.
 - Validation passed for `tools/build/meson_setup.ps1 compile -C builddir`, `python -m py_compile tools/tests/renderer_validation_matrix.py tools/tests/renderer_gameplay_benchmark.py`, `python tools/tests/renderer_validation_matrix.py --list`, `tools/build/meson_setup.ps1 install -C builddir --no-rebuild --skip-subprojects`, a single staged-client run of `rendererDefaultPromotionSelfTest`, `rendererDefaultSafetySelfTest`, and `gfxInfo`, and a no-launch validation-report schema smoke under `.tmp/renderer-validation/phase8-report-schema-smoke`. The focused self-test log reports `RendererDefaultPromotion self-test passed (cases=8)`, `RendererDefaultSafety self-test passed`, default safety with `promotionEvidence=0`, and no renderer fatal/error/idStr/shader-link signatures.
 
+Audit follow-up 2026-05-15:
+
+- Found that the gameplay benchmark harness failed on renderer warning signatures, but the safe validation matrix only checked expected lines plus a few fatal markers. This could allow a startup/self-test case to report `pass` while still containing `idStr::snPrintf`, `WARNING: idStr`, shader compile/link, or OpenGL error signatures, weakening the Phase 8 `warnings=0` evidence contract.
+- Tightened `tools/tests/renderer_validation_matrix.py` so safe cases count those warning signatures, fail when any count is nonzero, include the counts in JSON, and show them in the generated Markdown table. Mirrored the OpenGL-error marker in `tools/tests/renderer_gameplay_benchmark.py` so startup and gameplay evidence gates share the same warning vocabulary.
+- Added a `--cases` filter to the safe validation matrix so focused audit checks can run one or a small set of case ids instead of relaunching the full startup matrix every time a single gate changes.
+- Validation passed for `python -m py_compile tools/tests/renderer_validation_matrix.py tools/tests/renderer_gameplay_benchmark.py`, `python tools/tests/renderer_validation_matrix.py --cases renderer-default-promotion-selftest --list`, a focused one-launch safe-matrix run with `python tools/tests/renderer_validation_matrix.py --cases renderer-default-promotion-selftest --tiers auto --timeout 90 --output-dir .tmp/renderer-validation/audit-warning-gate-promotion`, `python tools/tests/renderer_gameplay_benchmark.py --profile smoke --dry-run --output-dir .tmp/renderer-gameplay/audit-warning-pattern-dry-run`, and `git diff --check`. The focused safe-matrix report recorded warning signatures as `0` in Markdown and JSON.
+
+Performance/lighting follow-up 2026-05-15:
+
+- Removed the lingering low-FPS acceptance assumption by making default `com_maxfps` `240`, replacing renderer-plan `30 FPS` presentation coverage with `120/240/uncapped`, and keeping `game/storage1` as the smoke acceptance scene.
+- Restored authored light visibility by returning `r_lightDetailLevel` to the stock-compatible default of `0`; the previous high default filtered many Quake 4 `detailLevel 5` lights and left storage maps visually dark.
+- Found a default-path CPU regression in interaction setup: shadow-map caster draw-surfs were built even when `r_useShadowMap 0`. Those lists are now gated behind active shadow maps, preserving the default stencil-shadow path while removing unused per-frame work.
+- Made shadow-surface scissor tightening opt-in because it walks shadow/interactions for each light and the in-code note plus `game/storage1` A/B results show it does not help the default path on this scene.
+- Added a pacing-only gameplay benchmark mode and parsed `framePacingSnapshot` thresholds so high-FPS acceptance can run without renderer metrics, GL timer queries, or overlay text perturbing the measured window.
+- Added a real-time `waitMsec` command and `--sample-msec` gameplay benchmark option so the `game/storage1` acceptance window measures real elapsed time instead of a frame count that shrinks as FPS improves.
+- Restored the retail-style portal-sky PVS/skybox query path so `game/storage1` no longer renders an unnecessary portal-sky view every frame when the current area cannot see a skybox surface.
+- Added conservative BSE area/frustum culling and loop-service deferral for offscreen looping effects. In the `game/storage1` spawn view this drops effect surface emission from hundreds of surfaces to the visible handful without touching one-shot effect lifetime.
+- Validation now includes a clean staged wall-clock `game/storage1` run two seconds after active gameplay draw: `present=2.01 ms (498.0 Hz), p50=2 ms, p95=4 ms, p99=8 ms, max=14 ms` over a `3000 ms` pacing window, with ARB2 still the active visible renderer and modern visible disabled.
+- RenderDoc was attempted for the failing `game/storage1` path, but the current OpenGL compatibility renderer cannot start under RenderDoc injection because required ARB compatibility features disappear. RenderDoc evidence remains blocked until the visible renderer no longer depends on those compatibility features.
+
 ## Recommended Fix Order
 
 1. Capture the failing scene and isolate the first FPS cliff.

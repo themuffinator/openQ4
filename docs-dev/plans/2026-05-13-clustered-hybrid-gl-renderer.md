@@ -512,7 +512,7 @@ Goal: make the renderer trustworthy across real content and drivers.
 - [x] Validate:
   - [x] `r_swapInterval 0`
   - [x] `r_swapInterval 1`
-  - [x] `com_maxfps 30`
+  - [x] `com_maxfps 120`
   - [x] `com_maxfps 240`
   - [x] `com_maxfps 0`
   - [x] fullscreen

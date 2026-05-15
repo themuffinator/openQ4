@@ -3,9 +3,41 @@
 
 #include "tr_local.h"
 #include "ScenePackets.h"
+#include "RendererBootstrap.h"
 
 static idScenePacketFrame rg_frontEndScenePacketFrame;
 static bool rg_frontEndScenePacketFrameOpen = false;
+
+static bool R_ScenePackets_ModernPipelineRequested( void ) {
+	const bool modernVisibleRequested = r_rendererModernVisible.GetBool() || RendererBootstrap_ShouldAutoPromoteModernVisible();
+	const bool shadowMapSidecarRequested =
+		r_useShadowMap.GetBool()
+		&& r_shadows.GetBool()
+		&& ( r_shadowMapDebugOverlay.GetInteger() > 0 || r_shadowMapReport.GetInteger() > 0 );
+
+	return r_rendererModernExecutor.GetBool()
+		|| r_rendererModernSubmit.GetBool()
+		|| r_rendererGpuValidation.GetBool()
+		|| r_rendererBindless.GetBool()
+		|| modernVisibleRequested
+		|| r_rendererModernVisibleDepth.GetBool()
+		|| r_rendererModernDepthDebug.GetInteger() > 0
+		|| r_rendererModernOpaque.GetBool()
+		|| r_rendererModernGBufferDebug.GetInteger() > 0
+		|| r_rendererModernDeferred.GetBool()
+		|| r_rendererModernDeferredDebug.GetInteger() > 0
+		|| r_rendererForwardPlus.GetBool()
+		|| r_rendererClusterDebug.GetInteger() > 0
+		|| shadowMapSidecarRequested;
+}
+
+bool R_ScenePackets_FrontEndCaptureRequired( void ) {
+	return r_rendererMetrics.GetInteger() >= 2;
+}
+
+bool R_ScenePackets_SidePipelineRequired( void ) {
+	return R_ScenePackets_ModernPipelineRequested() || r_rendererMetrics.GetInteger() >= 2;
+}
 
 idScenePacketFrame::idScenePacketFrame() {
 	Clear();

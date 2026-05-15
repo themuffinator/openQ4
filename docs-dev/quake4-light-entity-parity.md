@@ -48,7 +48,7 @@ Canonical parser keys (game-side):
 - `noDynamicShadows` participates in light "shape change" checks that trigger derived-data rebuilds.
 - Fog/blend lights use the `noFog` contract instead of ordinary lighting-stage emission tests.
 - Light/material shader register evaluation uses `referenceSoundHandle` amplitude inputs.
-- `detailLevel` is compared against `r_lightDetailLevel` during area light-ref collection.
+- `detailLevel` is compared against `r_lightDetailLevel` during area light-ref collection; OpenQ4 defaults this cvar to `0` so all stock-authored lights remain visible unless a user explicitly requests detail culling.
 - `globalLight` bypasses portal-based light culling in area light-ref collection.
 - `globalLight` bypasses per-surface light-tri frustum culling in interaction submission.
 - Tiny interaction/shadow batches can be dropped by `r_limitBatchSize` before drawsurf allocation.
@@ -68,7 +68,7 @@ Canonical parser keys (game-side):
   - `src/renderer/RenderWorld.cpp`
 - Added `detailLevel` filter + `globalLight` portal bypass in area light refs:
   - `src/renderer/RenderWorld_portals.cpp`
-- Added renderer cvar `r_lightDetailLevel`:
+- Added renderer cvar `r_lightDetailLevel` with the stock-compatible default of `0`:
   - `src/renderer/RenderSystem_init.cpp`
   - `src/renderer/tr_local.h`
 - Added retail ARB2 renderer hook to force `r_lightDetailLevel` to `0` when simple lighting is not preferred:

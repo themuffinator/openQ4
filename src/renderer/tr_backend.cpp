@@ -686,53 +686,70 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 
 	R_GLStateCache_BeginFrame();
 
-	const int packetBuildStart = Sys_Milliseconds();
-	idScenePacketFrame backendScenePackets;
-	const idScenePacketFrame *scenePackets = NULL;
-	if ( R_ScenePackets_FrontEndFrameAvailable() ) {
-		scenePackets = &R_ScenePackets_FrontEndFrame();
-	} else {
-		R_ScenePackets_BuildLegacyCommandStream( cmds, backendScenePackets );
-		scenePackets = &backendScenePackets;
-	}
-	R_RendererMetrics_AddPacketBuildMsec( Sys_Milliseconds() - packetBuildStart );
-	R_ScenePackets_LogIfVerbose( *scenePackets );
+	if ( R_ScenePackets_SidePipelineRequired() ) {
+		const int packetBuildStart = Sys_Milliseconds();
+		idScenePacketFrame backendScenePackets;
+		const idScenePacketFrame *scenePackets = NULL;
+		if ( R_ScenePackets_FrontEndFrameAvailable() ) {
+			scenePackets = &R_ScenePackets_FrontEndFrame();
+		} else {
+			R_ScenePackets_BuildLegacyCommandStream( cmds, backendScenePackets );
+			scenePackets = &backendScenePackets;
+		}
+		R_RendererMetrics_AddPacketBuildMsec( Sys_Milliseconds() - packetBuildStart );
+		R_ScenePackets_LogIfVerbose( *scenePackets );
 
-	const int graphBuildStart = Sys_Milliseconds();
-	idRenderGraph legacyGraph;
-	R_RenderGraph_BuildFromScenePackets( *scenePackets, legacyGraph );
-	R_RendererMetrics_AddGraphBuildMsec( Sys_Milliseconds() - graphBuildStart );
-	R_RenderGraph_LogIfVerbose( legacyGraph );
-	{
-		const scenePacketFrameStats_t &packetStats = scenePackets->Stats();
+		const int graphBuildStart = Sys_Milliseconds();
+		idRenderGraph legacyGraph;
+		R_RenderGraph_BuildFromScenePackets( *scenePackets, legacyGraph );
+		R_RendererMetrics_AddGraphBuildMsec( Sys_Milliseconds() - graphBuildStart );
+		R_RenderGraph_LogIfVerbose( legacyGraph );
+		{
+			const scenePacketFrameStats_t &packetStats = scenePackets->Stats();
+			R_RendererMetrics_RecordScenePackets( packetStats );
+			const renderGraphStats_t &graphStats = legacyGraph.Stats();
+			R_RendererMetrics_RecordRenderGraph(
+				graphStats.graphPasses,
+				graphStats.passPackets,
+				graphStats.scenePackets,
+				graphStats.drawPackets,
+				graphStats.commandPackets,
+				graphStats.resources,
+				graphStats.importedResources,
+				graphStats.transientResources,
+				graphStats.aliasableTransientResources,
+				graphStats.resourceAccesses,
+				graphStats.readAccesses,
+				graphStats.writeAccesses,
+				graphStats.clearOps,
+				graphStats.resolveOps,
+				graphStats.invalidateOps,
+				graphStats.presentOps,
+				graphStats.overflow );
+		}
+		R_RenderGraphResources_PrepareFrame( legacyGraph );
+		R_RendererMetrics_RecordRenderGraphResources( R_RenderGraphResources_Stats() );
+		R_MaterialResourceTable_PrepareFrame( *scenePackets );
+		R_RendererMetrics_RecordMaterialResourceTable( R_MaterialResourceTable_Stats() );
+		R_ModernGLExecutor_PrepareFrame( *scenePackets, legacyGraph );
+	} else {
+		scenePacketFrameStats_t packetStats;
+		memset( &packetStats, 0, sizeof( packetStats ) );
 		R_RendererMetrics_RecordScenePackets( packetStats );
-		const renderGraphStats_t &graphStats = legacyGraph.Stats();
-		R_RendererMetrics_RecordRenderGraph(
-			graphStats.graphPasses,
-			graphStats.passPackets,
-			graphStats.scenePackets,
-			graphStats.drawPackets,
-			graphStats.commandPackets,
-			graphStats.resources,
-			graphStats.importedResources,
-			graphStats.transientResources,
-			graphStats.aliasableTransientResources,
-			graphStats.resourceAccesses,
-			graphStats.readAccesses,
-			graphStats.writeAccesses,
-			graphStats.clearOps,
-			graphStats.resolveOps,
-			graphStats.invalidateOps,
-			graphStats.presentOps,
-			graphStats.overflow );
+		R_RendererMetrics_RecordRenderGraph( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false );
+		renderGraphResourceManagerStats_t graphResourceStats;
+		memset( &graphResourceStats, 0, sizeof( graphResourceStats ) );
+		R_RendererMetrics_RecordRenderGraphResources( graphResourceStats );
+		materialResourceTableStats_t materialStats;
+		memset( &materialStats, 0, sizeof( materialStats ) );
+		R_RendererMetrics_RecordMaterialResourceTable( materialStats );
+		rendererClusteredLightingStats_t clusterStats;
+		memset( &clusterStats, 0, sizeof( clusterStats ) );
+		R_RendererMetrics_RecordClusteredLighting( clusterStats );
+		R_ModernGLExecutor_SkipFrame();
 	}
-	R_RenderGraphResources_PrepareFrame( legacyGraph );
-	R_RendererMetrics_RecordRenderGraphResources( R_RenderGraphResources_Stats() );
-	R_MaterialResourceTable_PrepareFrame( *scenePackets );
-	R_RendererMetrics_RecordMaterialResourceTable( R_MaterialResourceTable_Stats() );
 	backEndStartTime = Sys_Milliseconds();
 	R_RendererMetrics_BeginGpuBackendFrame();
-	R_ModernGLExecutor_PrepareFrame( *scenePackets, legacyGraph );
 	R_GLStateCache_LegacyHandoffReset( "legacy ARB2 backend" );
 
 	// needed for editor rendering

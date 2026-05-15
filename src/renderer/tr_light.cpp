@@ -101,11 +101,31 @@ idCVar bse_respectConnectedArea(
 	"0",
 	CVAR_RENDERER | CVAR_BOOL,
 	"if 1, cull effect defs when parms.inConnectedArea is false (legacy portal gating)");
+idCVar bse_useAreaCull(
+	"bse_useAreaCull",
+	"1",
+	CVAR_RENDERER | CVAR_BOOL,
+	"if 1, cull BSE render surfaces when the effect is outside the current portal-visible area set");
+idCVar bse_skipCulledLoopService(
+	"bse_skipCulledLoopService",
+	"1",
+	CVAR_RENDERER | CVAR_BOOL,
+	"if 1, defer service for looping BSE effects while portal/frustum culling proves they are invisible");
 idCVar bse_useFrustumCull(
 	"bse_useFrustumCull",
+	"1",
+	CVAR_RENDERER | CVAR_BOOL,
+	"if 1, cull BSE render surfaces by expanded effect bounds before emitting draw surfaces");
+idCVar bse_useSurfaceFrustumCull(
+	"bse_useSurfaceFrustumCull",
 	"0",
 	CVAR_RENDERER | CVAR_BOOL,
-	"if 1, apply renderer frustum culling to BSE effect defs/surfaces");
+	"if 1, additionally cull individual BSE effect surfaces by local bounds");
+idCVar bse_frustumCullExpand(
+	"bse_frustumCullExpand",
+	"32",
+	CVAR_RENDERER | CVAR_FLOAT,
+	"world units added to BSE effect bounds before frustum culling");
 
 #if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
 static void R_CreateVertexProgramShadowCacheFromSilTraceVerts( shadowCache_t *temp, const rvSilTraceVertT *silTraceVerts, int numVerts ) {
@@ -1910,6 +1930,83 @@ idScreenRect R_CalcEntityScissorRectangle( viewEntity_t *vEntity ) {
 	return R_ScreenRectFromViewFrustumBounds( bounds );
 }
 
+static bool R_EffectUsesViewModelDepth( const rvRenderEffectLocal *def ) {
+	if ( def == NULL ) {
+		return false;
+	}
+	return def->parms.weaponDepthHackInViewID != 0 || def->parms.allowSurfaceInViewID != 0;
+}
+
+static bool R_EffectPointAreaVisible( const idRenderWorldLocal *world, const idVec3 &point ) {
+	if ( world == NULL || tr.viewDef == NULL || !r_usePortals.GetBool() ) {
+		return true;
+	}
+
+	const int areaNum = world->PointInArea( point );
+	if ( areaNum < 0 || areaNum >= world->NumAreas() ) {
+		return true;
+	}
+
+	return world->portalAreas[ areaNum ].viewCount == tr.viewCount;
+}
+
+static bool R_EffectBoundsAreaVisible( const idRenderWorldLocal *world, const rvRenderEffectLocal *def ) {
+	if ( world == NULL || def == NULL || def->referenceBounds.IsCleared() || !r_usePortals.GetBool() ) {
+		return true;
+	}
+
+	idBounds worldBounds;
+	worldBounds.FromTransformedBounds( def->referenceBounds, def->parms.origin, def->parms.axis );
+	worldBounds.ExpandSelf( Max( 0.0f, bse_frustumCullExpand.GetFloat() ) );
+
+	int areas[32];
+	const int numAreas = world->BoundsInAreas( worldBounds, areas, sizeof( areas ) / sizeof( areas[0] ) );
+	if ( numAreas <= 0 ) {
+		return true;
+	}
+
+	for ( int areaIndex = 0; areaIndex < numAreas; ++areaIndex ) {
+		const int areaNum = areas[areaIndex];
+		if ( areaNum >= 0 && areaNum < world->NumAreas() && world->portalAreas[areaNum].viewCount == tr.viewCount ) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+static bool R_CullEffectByArea( const idRenderWorldLocal *world, const rvRenderEffectLocal *def ) {
+	if ( !bse_useAreaCull.GetBool() || R_EffectUsesViewModelDepth( def ) ) {
+		return false;
+	}
+
+	if ( R_EffectPointAreaVisible( world, def->parms.origin ) ) {
+		return false;
+	}
+
+	if ( def->parms.hasEndOrigin && R_EffectPointAreaVisible( world, def->parms.endOrigin ) ) {
+		return false;
+	}
+
+	return !R_EffectBoundsAreaVisible( world, def );
+}
+
+static bool R_CullEffectByFrustum( const rvRenderEffectLocal *def ) {
+	if ( !bse_useFrustumCull.GetBool() || R_EffectUsesViewModelDepth( def ) || R_ShouldDisableEntityCullingForLevelshot() ) {
+		return false;
+	}
+	if ( def == NULL || def->referenceBounds.IsCleared() ) {
+		return false;
+	}
+
+	idBounds expandedBounds = def->referenceBounds;
+	expandedBounds.ExpandSelf( Max( 0.0f, bse_frustumCullExpand.GetFloat() ) );
+
+	float modelMatrix[16];
+	R_AxisToModelMatrix( def->parms.axis, def->parms.origin, modelMatrix );
+	return R_CullLocalBox( expandedBounds, modelMatrix, 5, tr.viewDef->frustum );
+}
+
 /*
 ===============
 R_AddEffectSurfaces
@@ -1939,8 +2036,11 @@ void R_AddEffectSurfaces(void) {
 	int serviceSpawnGateFalse = 0;
 	int serviceGateLagMin = 0x7fffffff;
 	int serviceGateLagMax = (-0x7fffffff - 1);
+	int deferredService = 0;
 	int dropNotConnected = 0;
 	int dropViewSuppress = 0;
+	int dropAreaCull = 0;
+	int dropDefFrustumCull = 0;
 	int dropNoModel = 0;
 	int dropNoModelSurfaces = 0;
 	int dropClearedBounds = 0;
@@ -1968,6 +2068,24 @@ void R_AddEffectSurfaces(void) {
 		}
 		else {
 			++serviceSpawnGateFalse;
+		}
+
+		const bool canDeferLoopService =
+			bse_skipCulledLoopService.GetBool() &&
+			def->parms.loop &&
+			def->effect != NULL &&
+			!def->expired;
+		if ( canDeferLoopService ) {
+			if ( R_CullEffectByArea( world, def ) ) {
+				++deferredService;
+				++dropAreaCull;
+				continue;
+			}
+			if ( R_CullEffectByFrustum( def ) ) {
+				++deferredService;
+				++dropDefFrustumCull;
+				continue;
+			}
 		}
 
 		if ( def->updateFramenum != tr.frameCount ) {
@@ -2023,6 +2141,18 @@ void R_AddEffectSurfaces(void) {
 			}
 		}
 
+		if ( !canDeferLoopService ) {
+			if ( R_CullEffectByArea( world, def ) ) {
+				++dropAreaCull;
+				continue;
+			}
+
+			if ( R_CullEffectByFrustum( def ) ) {
+				++dropDefFrustumCull;
+				continue;
+			}
+		}
+
 		def->dynamicModel = bse->RenderEffect(def, tr.viewDef);
 		if (!def->dynamicModel) {
 			++dropNoModel;
@@ -2052,7 +2182,9 @@ void R_AddEffectSurfaces(void) {
 		myGlMultMatrix(vEffect->modelMatrix, tr.viewDef->worldSpace.modelViewMatrix, vEffect->modelViewMatrix);
 
 		if (bse_useFrustumCull.GetBool() && !R_ShouldDisableEntityCullingForLevelshot()) {
-			if (R_CullLocalBox(localBounds, vEffect->modelMatrix, 5, tr.viewDef->frustum)) {
+			idBounds expandedBounds = localBounds;
+			expandedBounds.ExpandSelf( Max( 0.0f, bse_frustumCullExpand.GetFloat() ) );
+			if (R_CullLocalBox(expandedBounds, vEffect->modelMatrix, 5, tr.viewDef->frustum)) {
 				++dropFrustumCull;
 				continue;
 			}
@@ -2106,7 +2238,7 @@ void R_AddEffectSurfaces(void) {
 			}
 
 			srfTriangles_t* tri = surf->geometry;
-			if (bse_useFrustumCull.GetBool() && !R_ShouldDisableEntityCullingForLevelshot()) {
+			if (bse_useSurfaceFrustumCull.GetBool() && !R_ShouldDisableEntityCullingForLevelshot()) {
 				if (R_CullLocalBox(tri->bounds, vEffect->modelMatrix, 5, tr.viewDef->frustum)) {
 					++surfaceFrustumCull;
 					continue;
@@ -2163,21 +2295,24 @@ void R_AddEffectSurfaces(void) {
 
 	if (counterMode > 0) {
 		common->Printf(
-			"BSE frame %d view %d mode=%d: spawned=%d serviced=%d rendered=%d defs=%d alive=%d expired=%d surfaces=%d\n",
+			"BSE frame %d view %d mode=%d: spawned=%d serviced=%d deferred=%d rendered=%d defs=%d alive=%d expired=%d surfaces=%d\n",
 			tr.frameCount,
 			tr.viewDef->renderView.viewID,
 			counterMode,
 			spawned,
 			serviced,
+			deferredService,
 			renderedEffects,
 			totalDefs,
 			alive,
 			expired,
 			renderedSurfaces);
 		common->Printf(
-			"BSE drops: notConnected=%d viewSuppress=%d noModel=%d noSurfaces=%d clearedBounds=%d frustum=%d scissor=%d\n",
+			"BSE drops: notConnected=%d viewSuppress=%d area=%d defFrustum=%d noModel=%d noSurfaces=%d clearedBounds=%d frustum=%d scissor=%d\n",
 			dropNotConnected,
 			dropViewSuppress,
+			dropAreaCull,
+			dropDefFrustumCull,
 			dropNoModel,
 			dropNoModelSurfaces,
 			dropClearedBounds,

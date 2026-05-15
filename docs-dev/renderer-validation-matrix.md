@@ -27,6 +27,12 @@ The safe matrix starts the staged client, runs renderer self-tests or startup pr
 python tools\tests\renderer_validation_matrix.py
 ```
 
+For focused validation without relaunching the full matrix, use `--cases` with one or more case ids:
+
+```powershell
+python tools\tests\renderer_validation_matrix.py --cases renderer-default-promotion-selftest
+```
+
 The runner writes a timestamped report under `.tmp/renderer-validation/` with per-case logs and a JSON copy for CI or release triage.
 
 Automated coverage:
@@ -58,11 +64,19 @@ Automated coverage:
 | `tier-gl33-debug-context` | debug-context request with non-debug fallback available |
 | `present-vsync0-fps0` | unlocked presentation startup probe |
 | `present-vsync1-fps240` | high-refresh capped presentation startup probe |
-| `present-vsync1-fps30` | low-fps capped presentation startup probe |
+| `present-vsync1-fps120` | 120 FPS capped presentation startup probe |
 
 The forced tier cases pass when startup succeeds and the selected tier is reported. If a machine cannot support the forced tier, the log must show the selected fallback tier and `Renderer tier contract:` must report `degraded=1`, `failClosed=1`, and a concise `missing=` reason.
 
+Automated safe cases also fail if their logs contain renderer warning signatures such as `idStr::snPrintf` overflow, `WARNING: idStr`, shader compile/program link failures, or OpenGL error markers. The generated Markdown/JSON report records per-case warning-signature counts so the Phase 8 `warnings=0` promotion token cannot be inferred from expected-line checks alone.
+
 The visible-depth, G-buffer, clustered-light, deferred-resolve, forward+, modern-visible, modern-compatibility, compatibility-gates, default-promotion, default-safety, benchmark, GPU-driven, and low-overhead self-tests intentionally run as their own safe cases instead of being appended to the foundation self-test startup command, because the engine command parser has a fixed startup command list budget.
+
+Gameplay benchmark acceptance should use wall-clock sampling for FPS claims. The `--sample-msec` option emits `waitMsec` into the generated cfg so the measurement window is a real duration rather than a frame count:
+
+```powershell
+python tools\tests\renderer_gameplay_benchmark.py --profile smoke --maxfps 0 --swap-intervals 0 --display-modes fullscreen --autoexec-delay-ms 2000 --settle-frames 1 --sample-msec 3000 --pacing-only --min-pacing-hz 120 --max-p95-ms 12 --max-p99-ms 20
+```
 
 ## Compatibility Gates
 
@@ -149,6 +163,7 @@ Gameplay validation remains mandatory before renderer release sign-off, but it i
 
 | Case | Mode | Map | Purpose |
 |---|---|---|---|
+| `sp-storage1` | SP | `game/storage1` | primary high-FPS renderer acceptance scene, dense indoor lighting, and early-game storage visual parity |
 | `sp-airdefense1` | SP | `game/airdefense1` | stock SP baseline, outdoor lighting, BSE smoke |
 | `sp-airdefense2` | SP | `game/airdefense2` | flashlight, projected shadows, animated characters |
 | `sp-storage2` | SP | `game/storage2` | indoor materials and post-process coverage |
@@ -163,7 +178,7 @@ For each gameplay case, validate the matrix variants that the hardware supports:
 | `r_glTier` | `auto`, `legacy`, `gl33`, `gl41`, `gl43`, `gl45`, `gl46` |
 | renderer escape | `r_renderer best`, `r_renderer arb2`, `r_glTier legacy` |
 | `r_swapInterval` | `0`, `1` |
-| `com_maxfps` | `30`, `240`, `0` |
+| `com_maxfps` | `120`, `240`, `0` |
 | display mode | windowed, fullscreen |
 | renderer diagnostics | `r_rendererMetrics 1`, `r_rendererMetrics 2`, `r_rendererModernAutoPromote 0`, and one signed `r_rendererModernAutoPromote 1` candidate run with the complete `r_rendererPromotionEvidence` token after the other rows are clean |
 
@@ -175,11 +190,14 @@ After each gameplay smoke, inspect the configured log file under `fs_savepath\<g
 
 The runner uses the SP/MP `g_autoExecAfterMapLoad` hook to execute its generated cfg after the map is active, not during loading UI. Renderer metrics are enabled only inside the gameplay capture window, which keeps load-screen logs quiet while still producing benchmark samples, GPU timing where available, frame-pacing output, and a screenshot artifact.
 
+Use `--pacing-only` for high-FPS acceptance after a diagnostic metrics pass is already clean. This keeps `r_rendererMetrics`, GL timer queries, and the FPS overlay out of the timed window, still emits `framePacingSnapshot`, and can fail the run with parsed thresholds such as `--min-pacing-hz 120 --max-p95-ms 12`. The `game/storage1` acceptance run should start sampling two seconds after the active map draw with `r_swapInterval 0` and `com_maxfps 0` so the result measures renderer throughput rather than the old low-FPS plan cap.
+
 Common runs:
 
 ```powershell
 python tools\tests\renderer_gameplay_benchmark.py --list
 python tools\tests\renderer_gameplay_benchmark.py --profile smoke
+python tools\tests\renderer_gameplay_benchmark.py --profile smoke --pacing-only --autoexec-delay-ms 2000 --min-pacing-hz 120 --max-p95-ms 12
 python tools\tests\renderer_gameplay_benchmark.py --profile required
 python tools\tests\renderer_gameplay_benchmark.py --profile tiers
 python tools\tests\renderer_gameplay_benchmark.py --profile presentation
@@ -190,10 +208,10 @@ The runner fails a case when the process times out, no gameplay screenshot is pr
 
 | Profile | Coverage |
 |---|---|
-| `smoke` | bounded `game/airdefense1` SP gameplay smoke with screenshot, metrics, frame-pacing snapshot, and zero-warning log gates |
-| `required` | `game/airdefense1`, `game/airdefense2`, `game/storage2`, `game/medlabs`, `game/mcc_landing`, and `mp/q4dm1` listen server plus local client |
+| `smoke` | bounded `game/storage1` SP gameplay smoke with screenshot, metrics, frame-pacing snapshot, and zero-warning log gates |
+| `required` | `game/storage1`, `game/airdefense1`, `game/airdefense2`, `game/storage2`, `game/medlabs`, `game/mcc_landing`, and `mp/q4dm1` listen server plus local client |
 | `tiers` | forced `r_glTier auto`, `legacy`, `gl33`, `gl41`, `gl43`, `gl45`, and `gl46` gameplay probes |
-| `presentation` | `r_swapInterval 0/1`, `com_maxfps 0/30/240`, windowed, and fullscreen coverage for uncapped/high-refresh validation |
+| `presentation` | `r_swapInterval 0/1`, `com_maxfps 0/120/240`, windowed, and fullscreen coverage for uncapped/high-refresh validation |
 | `shadows` | stencil fallback, mapped shadows, CSM, translucent moments, and debug-overlay modes `1..6` over the shadow correctness scenes |
 
 Optional deterministic image comparison uses TGA references:

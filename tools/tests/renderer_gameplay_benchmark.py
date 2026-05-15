@@ -27,11 +27,17 @@ from typing import Any
 
 
 SAFE_TIERS = ("auto", "legacy", "gl33", "gl41", "gl43", "gl45", "gl46")
-PRESENTATION_MAXFPS = ("0", "30", "240")
+PRESENTATION_MAXFPS = ("0", "120", "240")
 PRESENTATION_SWAP_INTERVALS = ("0", "1")
 DISPLAY_MODES = ("windowed", "fullscreen")
 
 REQUIRED_SCENES: dict[str, dict[str, Any]] = {
+    "sp-storage1": {
+        "mode": "SP",
+        "map": "game/storage1",
+        "purpose": "primary renderer performance acceptance scene, dense indoor lighting, and early-game storage visual parity",
+        "path": "spawn-static",
+    },
     "sp-airdefense1": {
         "mode": "SP",
         "map": "game/airdefense1",
@@ -153,7 +159,7 @@ for debug_mode in range(1, 7):
 
 PROFILE_DEFAULTS = {
     "smoke": {
-        "cases": ("sp-airdefense1",),
+        "cases": ("sp-storage1",),
         "tiers": ("auto",),
         "maxfps": ("240",),
         "swap": ("0",),
@@ -206,6 +212,7 @@ WARNING_PATTERNS = {
     "snPrintfOverflow": re.compile(r"idStr::snPrintf:\s*overflow", re.IGNORECASE),
     "idStrWarning": re.compile(r"WARNING:\s+idStr", re.IGNORECASE),
     "shaderCompile": re.compile(r"(shader compile|program link).*(failed|error)|failed to compile", re.IGNORECASE),
+    "glError": re.compile(r"\bGL_INVALID_[A-Z_]+|OpenGL error", re.IGNORECASE),
     "fatal": re.compile(r"Fatal Error|could not initialize OpenGL|Unable to initialize OpenGL", re.IGNORECASE),
 }
 
@@ -282,6 +289,29 @@ def split_csv(value: str, defaults: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(item.strip() for item in value.split(",") if item.strip())
 
 
+def parse_extra_cvars(values: list[str]) -> tuple[tuple[str, str], ...]:
+    parsed: list[tuple[str, str]] = []
+    for raw in values:
+        item = raw.strip()
+        if not item:
+            continue
+        if "=" in item:
+            name, value = item.split("=", 1)
+        else:
+            parts = item.split(None, 1)
+            if len(parts) != 2:
+                raise ValueError(f"extra cvar '{raw}' must use name=value or 'name value'")
+            name, value = parts
+        name = name.strip()
+        value = value.strip()
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name):
+            raise ValueError(f"extra cvar name '{name}' is not a valid cvar identifier")
+        if not value:
+            raise ValueError(f"extra cvar '{name}' needs a value")
+        parsed.append((name, value))
+    return tuple(parsed)
+
+
 def append_set(args: list[str], name: str, value: Any) -> None:
     args += ["+set", name, str(value)]
 
@@ -298,6 +328,9 @@ def common_args(
     basepath: str,
     spec: RunSpec,
     benchmark_preset: str,
+    modern_executor: bool,
+    show_fps_overlay: bool,
+    launch_cvars: tuple[tuple[str, str], ...] = (),
     autoexec_cfg: str | None = None,
     autoexec_delay_ms: int = 1000,
 ) -> list[str]:
@@ -309,7 +342,7 @@ def common_args(
     append_set(args, "r_fullscreen", "1" if spec.fullscreen else "0")
     append_set(args, "r_swapInterval", spec.swap_interval)
     append_set(args, "com_maxfps", spec.maxfps)
-    append_set(args, "com_showFPS", "1")
+    append_set(args, "com_showFPS", "1" if show_fps_overlay else "0")
     append_set(args, "com_skipLoadingContinue", "1")
     append_set(args, "com_loadingContinueAutoAdvance", "1")
     append_set(args, "g_autoSkipCinematics", "1")
@@ -321,7 +354,7 @@ def common_args(
     append_set(args, "r_renderer", spec.renderer)
     append_set(args, "r_rendererMetrics", "0")
     append_set(args, "r_rendererGpuTimers", "0")
-    append_set(args, "r_rendererModernExecutor", "0" if spec.tier == "legacy" else "1")
+    append_set(args, "r_rendererModernExecutor", "1" if modern_executor and spec.tier != "legacy" else "0")
     append_set(args, "r_rendererModernAutoPromote", "0")
     append_set(args, "r_rendererBenchmarkPreset", benchmark_preset)
     append_set(args, "fs_savepath", str(savepath))
@@ -329,6 +362,9 @@ def common_args(
     append_set(args, "fs_game", "baseoq4")
     if basepath:
         append_set(args, "fs_basepath", basepath)
+
+    for name, value in launch_cvars:
+        append_set(args, name, value)
 
     for name, value in SHADOW_PRESETS[spec.shadow_preset].items():
         append_set(args, name, value)
@@ -342,19 +378,49 @@ def build_scripted_capture_lines(
     run_id: str,
     settle_frames: int,
     sample_frames: int,
+    sample_msec: int,
+    extra_cvars: tuple[tuple[str, str], ...] = (),
+    gpu_timers: bool = False,
+    renderer_metrics: bool = True,
     capture_index: int = 0,
 ) -> tuple[list[str], str]:
     shot_name = f"screenshots/renderer-bench/{role}_{capture_index}.tga"
-    lines = [
+    lines: list[str] = [
+        "r_rendererModernVisible 0",
+        "r_rendererModernVisibleDepth 0",
+        "r_rendererModernOpaque 0",
+        "r_rendererModernDeferred 0",
+        "r_rendererForwardPlus 0",
+        "r_rendererModernSubmit 0",
+        "r_rendererGpuValidation 0",
+        "r_rendererBindless 0",
+        "r_rendererShaderReload 0",
+    ]
+    for name, value in extra_cvars:
+        lines.append(f"{name} {value}")
+    lines += [
         f"wait {max(1, settle_frames)}",
         "god",
         "notarget",
         "getviewpos",
-        "r_rendererMetrics 1",
-        "r_rendererGpuTimers 1",
-        f"wait {max(1, sample_frames)}",
-        "rendererBenchmarkCapture",
-        "r_rendererMetrics 0",
+        "framePacingReset",
+    ]
+    sample_wait = f"waitMsec {max(1, sample_msec)}" if sample_msec > 0 else f"wait {max(1, sample_frames)}"
+    if renderer_metrics:
+        lines += [
+            "r_rendererMetrics 1",
+            f"r_rendererGpuTimers {1 if gpu_timers else 0}",
+            sample_wait,
+            "rendererBenchmarkCapture",
+            "r_rendererMetrics 0",
+        ]
+    else:
+        lines += [
+            "r_rendererMetrics 0",
+            "r_rendererGpuTimers 0",
+            sample_wait,
+        ]
+    lines += [
         "framePacingSnapshot",
         "gfxInfo",
         f'screenshot "{shot_name}"',
@@ -371,6 +437,10 @@ def write_autoexec_cfg(
     run_id: str,
     settle_frames: int,
     sample_frames: int,
+    sample_msec: int,
+    extra_cvars: tuple[tuple[str, str], ...] = (),
+    gpu_timers: bool = False,
+    renderer_metrics: bool = True,
     capture_index: int = 0,
 ) -> tuple[str, str]:
     lines, shot_name = build_scripted_capture_lines(
@@ -379,6 +449,10 @@ def write_autoexec_cfg(
         run_id,
         settle_frames,
         sample_frames,
+        sample_msec,
+        extra_cvars,
+        gpu_timers,
+        renderer_metrics,
         capture_index,
     )
     cfg_rel = f"renderer-bench/{role}_{capture_index}.cfg"
@@ -432,6 +506,34 @@ def extract_last_line(text: str, token: str) -> str:
     return lines[-1] if lines else ""
 
 
+def parse_frame_pacing(line: str) -> dict[str, str]:
+    if not line:
+        return {}
+    match = re.search(
+        r"samples=(\d+).*?present=([0-9.]+) ms \(([0-9.]+) Hz\)"
+        r"(?:, p50=([0-9.]+) ms, p95=([0-9.]+) ms, p99=([0-9.]+) ms, max=([0-9.]+) ms)?",
+        line,
+    )
+    if not match:
+        return {}
+    samples, present_ms, present_hz, p50_ms, p95_ms, p99_ms, max_ms = match.groups()
+    result = {
+        "pacingSamples": samples,
+        "pacingPresentMs": present_ms,
+        "pacingHz": present_hz,
+    }
+    if p50_ms is not None:
+        result.update(
+            {
+                "pacingP50Ms": p50_ms,
+                "pacingP95Ms": p95_ms,
+                "pacingP99Ms": p99_ms,
+                "pacingMaxMs": max_ms,
+            }
+        )
+    return result
+
+
 def extract_summary(text: str) -> dict[str, str]:
     summary: dict[str, str] = {
         "benchmarkCapture": extract_last_line(text, "rendererBenchmark capture("),
@@ -452,7 +554,18 @@ def extract_summary(text: str) -> dict[str, str]:
                 "thresholdPass": threshold_pass,
             }
         )
+    summary.update(parse_frame_pacing(summary["framePacing"]))
     return summary
+
+
+def summary_float(summary: dict[str, str], key: str) -> float | None:
+    value = summary.get(key)
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except ValueError:
+        return None
 
 
 def load_tga_rgb(path: Path) -> tuple[int, int, bytes]:
@@ -574,6 +687,10 @@ def evaluate_role_result(
     rms_threshold: float,
     max_threshold: int,
     require_reference: bool,
+    require_benchmark: bool = True,
+    min_pacing_hz: float = 0.0,
+    max_p95_ms: float = 0.0,
+    max_p99_ms: float = 0.0,
 ) -> dict[str, Any]:
     log_path = find_log(savepath, log_name)
     text = read_text(log_path)
@@ -595,10 +712,28 @@ def evaluate_role_result(
         missing.append("timeout")
     if log_path is None:
         missing.append("log file")
-    if "rendererBenchmark capture(" not in text:
+    if require_benchmark and "rendererBenchmark capture(" not in text:
         missing.append("renderer benchmark capture line")
-    if "Renderer benchmark:" not in text:
+    if require_benchmark and "Renderer benchmark:" not in text:
         missing.append("gfxInfo benchmark line")
+    if min_pacing_hz > 0.0:
+        pacing_hz = summary_float(summary, "pacingHz")
+        if pacing_hz is None:
+            missing.append("frame pacing Hz")
+        elif pacing_hz < min_pacing_hz:
+            missing.append(f"pacingHz={pacing_hz:.1f}<{min_pacing_hz:.1f}")
+    if max_p95_ms > 0.0:
+        p95_ms = summary_float(summary, "pacingP95Ms")
+        if p95_ms is None:
+            missing.append("frame pacing p95")
+        elif p95_ms > max_p95_ms:
+            missing.append(f"pacingP95={p95_ms:.1f}>{max_p95_ms:.1f}")
+    if max_p99_ms > 0.0:
+        p99_ms = summary_float(summary, "pacingP99Ms")
+        if p99_ms is None:
+            missing.append("frame pacing p99")
+        elif p99_ms > max_p99_ms:
+            missing.append(f"pacingP99={p99_ms:.1f}>{max_p99_ms:.1f}")
     if "Selected renderer tier:" not in text:
         missing.append("selected tier line")
     if screenshot is None:
@@ -679,6 +814,10 @@ def run_sp_spec(
         run_id,
         args.settle_frames,
         args.sample_frames,
+        args.sample_msec,
+        args.extra_cvars,
+        args.gpu_timers,
+        not args.pacing_only,
     )
     game_args = common_args(
         root,
@@ -687,6 +826,9 @@ def run_sp_spec(
         basepath,
         spec,
         args.benchmark_preset,
+        args.modern_executor,
+        args.show_fps_overlay,
+        args.launch_cvars,
         autoexec_cfg,
         args.autoexec_delay_ms,
     )
@@ -728,6 +870,10 @@ def run_sp_spec(
         args.image_rms_threshold,
         args.image_max_threshold,
         args.require_references,
+        not args.pacing_only,
+        args.min_pacing_hz,
+        args.max_p95_ms,
+        args.max_p99_ms,
     )
     return {
         "id": spec.id,
@@ -780,6 +926,10 @@ def run_mp_spec(
         run_id,
         args.settle_frames + args.mp_client_delay_frames,
         args.sample_frames,
+        args.sample_msec,
+        args.extra_cvars,
+        args.gpu_timers,
+        not args.pacing_only,
     )
     server_args = common_args(
         root,
@@ -788,6 +938,9 @@ def run_mp_spec(
         basepath,
         spec,
         args.benchmark_preset,
+        args.modern_executor,
+        args.show_fps_overlay,
+        args.launch_cvars,
         server_autoexec_cfg,
         args.autoexec_delay_ms,
     )
@@ -806,6 +959,10 @@ def run_mp_spec(
         run_id,
         args.settle_frames,
         args.sample_frames,
+        args.sample_msec,
+        args.extra_cvars,
+        args.gpu_timers,
+        not args.pacing_only,
     )
     client_args = common_args(
         root,
@@ -814,6 +971,9 @@ def run_mp_spec(
         basepath,
         spec,
         args.benchmark_preset,
+        args.modern_executor,
+        args.show_fps_overlay,
+        args.launch_cvars,
         client_autoexec_cfg,
         args.autoexec_delay_ms,
     )
@@ -885,6 +1045,10 @@ def run_mp_spec(
         args.image_rms_threshold,
         args.image_max_threshold,
         args.require_references,
+        not args.pacing_only,
+        args.min_pacing_hz,
+        args.max_p95_ms,
+        args.max_p99_ms,
     )
     client_result = evaluate_role_result(
         spec,
@@ -901,6 +1065,10 @@ def run_mp_spec(
         args.image_rms_threshold,
         args.image_max_threshold,
         args.require_references,
+        not args.pacing_only,
+        args.min_pacing_hz,
+        args.max_p95_ms,
+        args.max_p99_ms,
     )
     ok = server_result["status"] == "pass" and client_result["status"] == "pass"
     return {
@@ -988,17 +1156,18 @@ def write_reports(output_dir: Path, results: list[dict[str, Any]], metadata: dic
         f"- Executable: `{metadata['executable']}`",
         f"- Base path: `{metadata['basepath'] or 'not set'}`",
         f"- Profile: `{metadata['profile']}`",
+        f"- Sample: `{metadata['sampleMsec']} ms`" if metadata.get("sampleMsec", 0) > 0 else f"- Sample: `{metadata['sampleFrames']} frames`",
         f"- Cases: {passed} passed, {failed} failed, {planned} planned",
         "",
         "## Results",
         "",
-        "| Status | Case | Mode | Map | Tier | FPS | VSync | Display | Shadow | Benchmark | Screenshot | Log |",
-        "|---|---|---|---|---|---:|---:|---|---|---|---|---|",
+        "| Status | Case | Mode | Map | Tier | FPS | VSync | Display | Shadow | Pacing | Benchmark | Screenshot | Log |",
+        "|---|---|---|---|---|---:|---:|---|---|---|---|---|---|",
     ]
     for result in results:
         if result["status"] == "planned":
             lines.append(
-                f"| planned | `{result['id']}` | {result['mode']} | `{result['map']}` |  |  |  |  |  | dry run |  |  |"
+                f"| planned | `{result['id']}` | {result['mode']} | `{result['map']}` |  |  |  |  |  |  | dry run |  |  |"
             )
             continue
         role = next((item for item in result.get("roles", []) if item["role"] in ("client", "sp")), result.get("roles", [{}])[0])
@@ -1006,15 +1175,20 @@ def write_reports(output_dir: Path, results: list[dict[str, Any]], metadata: dic
         benchmark = summary.get("benchmarkCapture", "")
         if len(benchmark) > 80:
             benchmark = benchmark[:77] + "..."
+        pacing = ""
+        if summary.get("pacingHz"):
+            pacing = f"{summary['pacingHz']} Hz"
+            if summary.get("pacingP95Ms"):
+                pacing += f" / p95 {summary['pacingP95Ms']} ms"
         screenshot = role.get("screenshot", "")
         log = role.get("log", "")
         lines.append(
-            f"| {result['status']} | `{result['id']}` | {result['mode']} | `{result['map']}` | `{result['tier']}` | {result['maxfps']} | {result['swapInterval']} | {result['display']} | `{result['shadowPreset']}` | {benchmark or 'missing'} | `{screenshot}` | `{log}` |"
+            f"| {result['status']} | `{result['id']}` | {result['mode']} | `{result['map']}` | `{result['tier']}` | {result['maxfps']} | {result['swapInterval']} | {result['display']} | `{result['shadowPreset']}` | {pacing or 'missing'} | {benchmark or 'missing'} | `{screenshot}` | `{log}` |"
         )
         for role_result in result.get("roles", []):
             if role_result.get("missing"):
                 lines.append(
-                    f"|  | `{role_result['role']}` missing |  |  |  |  |  |  |  | {'; '.join(role_result['missing'])} |  |  |"
+                    f"|  | `{role_result['role']}` missing |  |  |  |  |  |  |  |  | {'; '.join(role_result['missing'])} |  |  |"
                 )
 
     lines += [
@@ -1063,9 +1237,19 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--shadow-presets", default="", help="Comma-separated shadow presets. Use --list to inspect values.")
     parser.add_argument("--renderer", default="best", help="Value for r_renderer, usually best or arb2.")
     parser.add_argument("--benchmark-preset", default="baseline", help="Value for r_rendererBenchmarkPreset.")
+    parser.add_argument("--modern-executor", action="store_true", help="Opt into r_rendererModernExecutor for gameplay benchmarking. Defaults off so ARB2/high-FPS baselines are not polluted by side-path work.")
+    parser.add_argument("--gpu-timers", action="store_true", help="Enable GL timer queries during the sampled benchmark window. Defaults off for acceptance FPS runs because timer queries can perturb frame pacing.")
+    parser.add_argument("--show-fps-overlay", action="store_true", help="Draw the in-game FPS overlay during the run. Defaults off so acceptance timings measure renderer/gameplay cost, not diagnostic text drawing.")
+    parser.add_argument("--pacing-only", action="store_true", help="Measure frame pacing without enabling r_rendererMetrics or rendererBenchmarkCapture. Use this for high-FPS acceptance runs after diagnostic captures are clean.")
+    parser.add_argument("--min-pacing-hz", type=float, default=0.0, help="Fail when the parsed frame-pacing snapshot falls below this average presentation rate.")
+    parser.add_argument("--max-p95-ms", type=float, default=0.0, help="Fail when the parsed frame-pacing P95 exceeds this millisecond budget. Use 0 to disable.")
+    parser.add_argument("--max-p99-ms", type=float, default=0.0, help="Fail when the parsed frame-pacing P99 exceeds this millisecond budget. Use 0 to disable.")
+    parser.add_argument("--set-cvar", action="append", default=[], metavar="NAME=VALUE", help="Extra post-map cvar written into the generated benchmark cfg. Repeat for A/B diagnostics without extending the launch command line.")
+    parser.add_argument("--set-launch-cvar", action="append", default=[], metavar="NAME=VALUE", help="Extra cvar applied on the OpenQ4 launch command line before the map loads. Use for load-time renderer knobs such as vertex/index buffer caching.")
     parser.add_argument("--autoexec-delay-ms", type=int, default=1000, help="Delay after active map draw before executing the generated benchmark cfg.")
     parser.add_argument("--settle-frames", type=int, default=360, help="Frames to wait after map/connect before sampling.")
     parser.add_argument("--sample-frames", type=int, default=600, help="Frames to sample before dumping metrics and screenshots.")
+    parser.add_argument("--sample-msec", type=int, default=0, help="Real milliseconds to sample before dumping metrics and screenshots. Overrides --sample-frames when positive.")
     parser.add_argument("--timeout", type=int, default=180, help="Per-case process timeout in seconds.")
     parser.add_argument("--basepath", default=default_basepath(), help="Quake 4 install/base path. Omit or set empty to skip fs_basepath.")
     parser.add_argument("--output-dir", default="", help="Report/output directory. Defaults to <repo>/.tmp/renderer-gameplay/<timestamp>.")
@@ -1080,6 +1264,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--dry-run", action="store_true", help="Write the planned command lines without launching OpenQ4.")
     parser.add_argument("--list", action="store_true", help="List profiles, cases, and shadow presets without running.")
     parsed = parser.parse_args(argv)
+    try:
+        parsed.extra_cvars = parse_extra_cvars(parsed.set_cvar)
+        parsed.launch_cvars = parse_extra_cvars(parsed.set_launch_cvar)
+    except ValueError as exc:
+        parser.error(str(exc))
     parsed.reference_dir_path = Path(parsed.reference_dir).resolve() if parsed.reference_dir else None
     return parsed
 
@@ -1149,6 +1338,11 @@ def main(argv: list[str]) -> int:
         "autoexecDelayMs": args.autoexec_delay_ms,
         "settleFrames": args.settle_frames,
         "sampleFrames": args.sample_frames,
+        "sampleMsec": args.sample_msec,
+        "minPacingHz": args.min_pacing_hz,
+        "maxP95Ms": args.max_p95_ms,
+        "maxP99Ms": args.max_p99_ms,
+        "launchCvars": dict(args.launch_cvars),
     }
     report_json, report_md = write_reports(output_dir, results, metadata)
     print(f"wrote {report_md}")

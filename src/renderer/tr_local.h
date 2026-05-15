@@ -1248,6 +1248,8 @@ extern idCVar r_showMemory;				// print frame memory utilization
 extern idCVar r_showCull;				// report sphere and box culling stats
 extern idCVar r_showInteractions;		// report interaction generation activity
 extern idCVar r_showSurfaces;			// report surface/light/shadow counts
+extern idCVar r_showViewBuildTimes;		// print CPU timings for render-view construction
+extern idCVar r_showViewBuildTimesInterval; // frames between render-view timing reports
 extern idCVar r_showPrimitives;			// report vertex/index/draw counts
 extern idCVar r_showPortals;			// draw portal outlines in color based on passed / not passed
 extern idCVar r_showAlloc;				// report alloc/free counts

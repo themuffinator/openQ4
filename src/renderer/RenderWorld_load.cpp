@@ -1473,7 +1473,7 @@ void idRenderWorldLocal::AddWorldModelEntities() {
 		for ( int j = 0; j < hModel->NumSurfaces(); j++ ) {
 			const modelSurface_t *surf = hModel->Surface( j );
 
-			if ( surf->shader->GetName() == idStr( "textures/smf/portal_sky" ) ) {
+			if ( surf->shader != NULL && surf->shader->IsPortalSky() ) {
 				def->needsPortalSky = true;
 			}
 		}
@@ -1516,4 +1516,16 @@ bool idRenderWorldLocal::CheckAreaForPortalSky( int areaNum ) {
 	}
 
 	return false;
+}
+
+/*
+=====================
+idRenderWorldLocal::HasSkybox
+=====================
+*/
+bool idRenderWorldLocal::HasSkybox( int areaNum ) {
+	if ( areaNum < 0 || areaNum >= numPortalAreas ) {
+		return false;
+	}
+	return CheckAreaForPortalSky( areaNum );
 }

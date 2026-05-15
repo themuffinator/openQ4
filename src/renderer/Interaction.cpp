@@ -1592,7 +1592,9 @@ void idInteraction::AddActiveInteraction( void ) {
 		// whether a surface casts or locally routes its shadows.
 		const bool materialNoSelfShadow = shadowShader->TestMaterialFlag( MF_NOSELFSHADOW );
 		const bool shadowMapNoSelfShadow = entityDef->parms.noSelfShadow || materialNoSelfShadow;
+		const bool shadowMapsEnabled = r_shadows.GetBool() && r_useShadowMap.GetBool();
 		const bool translucentShadowMapSupported =
+			shadowMapsEnabled &&
 			r_shadowMapTranslucentMoments.GetBool() &&
 			glConfig.GLSLProgramAvailable &&
 			glConfig.maxTextureUnits >= 9 &&
@@ -1604,6 +1606,7 @@ void idInteraction::AddActiveInteraction( void ) {
 			vLight->pointLight &&
 			R_ShouldSkipPointLightEmitterCaster( shadowShader, sint->ambientTris, localLightOrigin, lightDef->parms.lightRadius );
 		const bool allowShadowMapCaster =
+			shadowMapsEnabled &&
 			!entityDef->parms.noShadow &&
 			!isViewOnlyEntity &&
 			vEntity->modelDepthHack == 0.0f &&

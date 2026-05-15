@@ -343,7 +343,46 @@ static void R_ViewStatistics( viewDef_t *parms ) {
 	if ( !r_showSurfaces.GetBool() ) {
 		return;
 	}
-	common->Printf( "view:%p surfs:%i\n", parms, parms->numDrawSurfs );
+	int portalSkySurfs = 0;
+	int postProcessSurfs = 0;
+	for ( int i = 0; i < parms->numDrawSurfs; i++ ) {
+		const drawSurf_t *surf = parms->drawSurfs[i];
+		if ( surf == NULL || surf->material == NULL ) {
+			continue;
+		}
+		if ( surf->material->IsPortalSky() ) {
+			portalSkySurfs++;
+		}
+		if ( surf->material->GetSort() >= SS_POST_PROCESS ) {
+			postProcessSurfs++;
+		}
+	}
+	common->Printf(
+		"view:%p surfs:%i portalSky:%i post:%i subview=%d mirror=%d xray=%d super=%p surface=%p viewID=%d area=%d org=%s fov=%.1f/%.1f viewport=%d,%d %dx%d scissor=%d,%d %dx%d entities=%d lights=%d\n",
+		parms,
+		parms->numDrawSurfs,
+		portalSkySurfs,
+		postProcessSurfs,
+		parms->isSubview ? 1 : 0,
+		parms->isMirror ? 1 : 0,
+		parms->isXraySubview ? 1 : 0,
+		parms->superView,
+		parms->subviewSurface,
+		parms->renderView.viewID,
+		parms->areaNum,
+		parms->renderView.vieworg.ToString( 0 ),
+		parms->renderView.fov_x,
+		parms->renderView.fov_y,
+		parms->viewport.x1,
+		parms->viewport.y1,
+		parms->viewport.x2 - parms->viewport.x1 + 1,
+		parms->viewport.y2 - parms->viewport.y1 + 1,
+		parms->scissor.x1,
+		parms->scissor.y1,
+		parms->scissor.x2 - parms->scissor.x1 + 1,
+		parms->scissor.y2 - parms->scissor.y1 + 1,
+		parms->viewEntitys != NULL ? 1 : 0,
+		parms->viewLights != NULL ? 1 : 0 );
 }
 
 /*
@@ -403,7 +442,9 @@ void R_AddSpecialEffects( viewDef_t *parms ) {
 	cmd = (drawSurfsCommand_t *)R_GetCommandBuffer( sizeof( *cmd ) );
 	cmd->commandId = RC_DRAW_SPECIAL_EFFECTS;
 	cmd->viewDef = parms;
-	R_ScenePackets_AddSpecialEffects( parms );
+	if ( R_ScenePackets_FrontEndCaptureRequired() ) {
+		R_ScenePackets_AddSpecialEffects( parms );
+	}
 }
 
 
@@ -608,7 +649,9 @@ void idRenderSystemLocal::CaptureDepthRenderToImage( const char *imageName ) {
 	cmd->image = image;
 	cmd->cubeFace = 0;
 	cmd->copyDepth = true;
-	R_ScenePackets_AddCopyRender();
+	if ( R_ScenePackets_FrontEndCaptureRequired() ) {
+		R_ScenePackets_AddCopyRender();
+	}
 
 	guiModel->Clear();
 }
@@ -1077,7 +1120,9 @@ void idRenderSystemLocal::BeginFrame( int windowWidth, int windowHeight ) {
 	frameCount++;
 	R_RendererMetrics_BeginFrame( frameCount );
 	R_RendererUpload_BeginFrame( frameCount );
-	R_ScenePackets_BeginFrame();
+	if ( R_ScenePackets_FrontEndCaptureRequired() ) {
+		R_ScenePackets_BeginFrame();
+	}
 
 	// just in case we did a common->Error while this
 	// was set
@@ -1103,7 +1148,9 @@ void idRenderSystemLocal::BeginFrame( int windowWidth, int windowHeight ) {
 	} else {
 		cmd->buffer = (int)GL_BACK;
 	}
-	R_ScenePackets_AddCommandOnly();
+	if ( R_ScenePackets_FrontEndCaptureRequired() ) {
+		R_ScenePackets_AddCommandOnly();
+	}
 }
 
 void idRenderSystemLocal::WriteDemoPics() {
@@ -1148,7 +1195,9 @@ void idRenderSystemLocal::EndFrame( int *frontEndMsec, int *backEndMsec ) {
 	// add the swapbuffers command
 	cmd = (emptyCommand_t *)R_GetCommandBuffer( sizeof( *cmd ) );
 	cmd->commandId = RC_SWAP_BUFFERS;
-	R_ScenePackets_AddPresent();
+	if ( R_ScenePackets_FrontEndCaptureRequired() ) {
+		R_ScenePackets_AddPresent();
+	}
 
 	// start the back end up again with the new command list
 	R_IssueRenderCommands();
@@ -1395,7 +1444,9 @@ void idRenderSystemLocal::CaptureRenderToImage( const char *imageName ) {
 	cmd->image = image;
 	cmd->cubeFace = 0;
 	cmd->copyDepth = false;
-	R_ScenePackets_AddCopyRender();
+	if ( R_ScenePackets_FrontEndCaptureRequired() ) {
+		R_ScenePackets_AddCopyRender();
+	}
 
 	guiModel->Clear();
 }
@@ -1517,7 +1568,9 @@ void idRenderSystemLocal::BindRenderTexture(idRenderTexture* renderTexture, idRe
 	cmd->renderTexture = renderTexture;
 	cmd->feedbackRenderTexture = feedbackRenderTexture;
 	activeRenderTexture = renderTexture;
-	R_ScenePackets_AddRenderTargetOp();
+	if ( R_ScenePackets_FrontEndCaptureRequired() ) {
+		R_ScenePackets_AddRenderTargetOp();
+	}
 }
 
 /*
@@ -1536,7 +1589,9 @@ void idRenderSystemLocal::ClearRenderTarget(bool clearColor, bool clearDepth, fl
 
 	cmd->clearDepthValue = depthValue;
 	cmd->clearColorValue = idVec4(red, green, blue, 1.0);
-	R_ScenePackets_AddRenderTargetOp();
+	if ( R_ScenePackets_FrontEndCaptureRequired() ) {
+		R_ScenePackets_AddRenderTargetOp();
+	}
 }
 
 /*
@@ -1553,7 +1608,9 @@ void idRenderSystemLocal::ResolveMSAA(idRenderTexture* msaaRenderTexture, idRend
 	cmd->msaaRenderTexture = msaaRenderTexture;
 	cmd->destRenderTexture = destRenderTexture;
 	cmd->resolveDepth = resolveDepth;
-	R_ScenePackets_AddRenderTargetOp();
+	if ( R_ScenePackets_FrontEndCaptureRequired() ) {
+		R_ScenePackets_AddRenderTargetOp();
+	}
 }
 
 /*

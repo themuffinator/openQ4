@@ -4792,6 +4792,12 @@ void R_ModernGLExecutor_Shutdown( void ) {
 	R_ModernGLExecutor_ResetPassOwnershipTable( "shutdown" );
 }
 
+void R_ModernGLExecutor_SkipFrame( void ) {
+	R_ModernGLExecutor_ResetPassOwnershipTable( "side-pipeline-skipped" );
+	R_ModernGLExecutor_ResetStats( rg_modernGLExecutorStats, false );
+	R_ModernGLExecutor_RecordMetrics( rg_modernGLExecutorStats );
+}
+
 void R_ModernGLExecutor_PrepareFrame( const idScenePacketFrame &packetFrame, const idRenderGraph &graph ) {
 	R_ModernGLExecutor_ResetPassOwnershipTable( "frame-start" );
 	const bool modernVisibleRequested = R_ModernGLExecutor_ModernVisibleRequested();

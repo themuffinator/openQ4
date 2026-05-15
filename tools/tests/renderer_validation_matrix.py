@@ -178,7 +178,7 @@ GAMEPLAY_BENCHMARK_HARNESS = [
     {
         "profile": "presentation",
         "command": "python tools\\tests\\renderer_gameplay_benchmark.py --profile presentation",
-        "coverage": "windowed/fullscreen coverage for r_swapInterval 0/1 and com_maxfps 0/30/240 while preserving uncapped presentation behavior",
+        "coverage": "windowed/fullscreen coverage for r_swapInterval 0/1 and com_maxfps 0/120/240 while preserving uncapped high-refresh presentation behavior",
     },
     {
         "profile": "shadows",
@@ -315,6 +315,13 @@ DEFAULT_PROMOTION_CRITERIA = [
         "required": "`r_rendererModernAutoPromote 1` is set only together with a complete `r_rendererPromotionEvidence` token",
     },
 ]
+
+WARNING_PATTERNS = {
+    "snPrintfOverflow": re.compile(r"idStr::snPrintf:\s*overflow", re.IGNORECASE),
+    "idStrWarning": re.compile(r"WARNING:\s+idStr", re.IGNORECASE),
+    "shaderCompileOrLink": re.compile(r"(shader compile|program link).*(failed|error)|failed to compile", re.IGNORECASE),
+    "glError": re.compile(r"\bGL_INVALID_[A-Z_]+|OpenGL error", re.IGNORECASE),
+}
 
 
 def repo_root() -> Path:
@@ -934,16 +941,16 @@ def build_safe_cases(tiers: tuple[str, ...]) -> list[dict[str, Any]]:
             "checks": STARTUP_CHECKS,
         },
         {
-            "id": "present-vsync1-fps30",
+            "id": "present-vsync1-fps120",
             "category": "presentation-startup",
-            "description": "Low-fps capped presentation startup probe.",
+            "description": "120 FPS capped presentation startup probe.",
             "args": [
                 "+set",
                 "r_swapInterval",
                 "1",
                 "+set",
                 "com_maxfps",
-                "30",
+                "120",
                 "+gfxInfo",
             ],
             "checks": STARTUP_CHECKS,
@@ -965,7 +972,16 @@ def find_log(savepath: Path, log_name: str) -> Path | None:
     return None
 
 
-def evaluate_checks(text: str, checks: list[list[str]]) -> tuple[bool, list[str]]:
+def count_warning_signatures(text: str) -> dict[str, int]:
+    return {name: len(pattern.findall(text)) for name, pattern in WARNING_PATTERNS.items()}
+
+
+def format_warning_signatures(warnings: dict[str, int]) -> str:
+    active = [f"{name}={count}" for name, count in sorted(warnings.items()) if count > 0]
+    return ", ".join(active) if active else "0"
+
+
+def evaluate_checks(text: str, checks: list[list[str]], warnings: dict[str, int]) -> tuple[bool, list[str]]:
     missing: list[str] = []
     for alternatives in checks:
         if not any(pattern in text for pattern in alternatives):
@@ -979,6 +995,7 @@ def evaluate_checks(text: str, checks: list[list[str]]) -> tuple[bool, list[str]
     for marker in failed_markers:
         if marker in text:
             missing.append(f"unexpected marker: {marker}")
+    missing += [f"warning signature: {name}={count}" for name, count in sorted(warnings.items()) if count > 0]
     return len(missing) == 0, missing
 
 
@@ -1041,7 +1058,8 @@ def run_case(
         if stderr_path.exists():
             log_text += "\n" + stderr_path.read_text(encoding="utf-8", errors="replace")
 
-    checks_ok, missing = evaluate_checks(log_text, case["checks"])
+    warning_signatures = count_warning_signatures(log_text)
+    checks_ok, missing = evaluate_checks(log_text, case["checks"], warning_signatures)
     ok = exit_code == 0 and not timed_out and log_path is not None and checks_ok
     return {
         "id": case_id,
@@ -1055,6 +1073,7 @@ def run_case(
         "stdout": str(stdout_path),
         "stderr": str(stderr_path),
         "missing": missing,
+        "warningSignatures": warning_signatures,
         "summary": extract_summary(log_text),
     }
 
@@ -1099,19 +1118,20 @@ def write_reports(output_dir: Path, results: list[dict[str, Any]], metadata: dic
         "",
         "## Automated Safe Cases",
         "",
-        "| Status | Case | Category | Context | Selected Tier | Log |",
-        "|---|---|---|---|---|---|",
+        "| Status | Case | Category | Context | Selected Tier | Warning Signatures | Log |",
+        "|---|---|---|---|---|---|---|",
     ]
     for result in results:
         summary = result["summary"]
         context = summary.get("context", summary.get("contextProfile", ""))
         selected = summary.get("selectedTier", "")
+        warnings = format_warning_signatures(result.get("warningSignatures", {}))
         log = result["log"] or result["stdout"]
         lines.append(
-            f"| {result['status']} | `{result['id']}` | {result['category']} | {context} | {selected} | `{log}` |"
+            f"| {result['status']} | `{result['id']}` | {result['category']} | {context} | {selected} | {warnings} | `{log}` |"
         )
         if result["missing"]:
-            lines.append(f"|  | missing |  | {'; '.join(result['missing'])} |  |  |")
+            lines.append(f"|  | missing |  | {'; '.join(result['missing'])} |  |  |  |")
 
     lines += [
         "",
@@ -1237,6 +1257,7 @@ def write_reports(output_dir: Path, results: list[dict[str, Any]], metadata: dic
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tiers", default=",".join(SAFE_TIERS), help="Comma-separated r_glTier startup probes.")
+    parser.add_argument("--cases", default="", help="Comma-separated automated safe case ids to run. Defaults to all cases.")
     parser.add_argument("--timeout", type=int, default=60, help="Per-case timeout in seconds.")
     parser.add_argument("--basepath", default=default_basepath(), help="Quake 4 install/base path. Omit or set empty to skip fs_basepath.")
     parser.add_argument("--savepath", default="", help="Save path root. Defaults to <repo>/.home.")
@@ -1250,6 +1271,16 @@ def main(argv: list[str]) -> int:
     root = repo_root()
     tiers = tuple(tier.strip() for tier in args.tiers.split(",") if tier.strip())
     safe_cases = build_safe_cases(tiers)
+    requested_cases = tuple(case_id.strip() for case_id in args.cases.split(",") if case_id.strip())
+    if requested_cases:
+        available = {case["id"] for case in safe_cases}
+        missing_cases = sorted(case_id for case_id in requested_cases if case_id not in available)
+        if missing_cases:
+            print(f"Unknown automated safe case id(s): {', '.join(missing_cases)}", file=sys.stderr)
+            print("Use --list to see available case ids.", file=sys.stderr)
+            return 2
+        requested = set(requested_cases)
+        safe_cases = [case for case in safe_cases if case["id"] in requested]
 
     if args.list:
         print("Automated safe cases:")

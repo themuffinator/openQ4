@@ -333,7 +333,9 @@ void idGuiModel::EmitFullScreen( void ) {
 
 	tr.viewDef = oldViewDef;
 
-	R_ScenePackets_AddRenderView( viewDef );
+	if ( R_ScenePackets_FrontEndCaptureRequired() ) {
+		R_ScenePackets_AddRenderView( viewDef );
+	}
 	R_AddDrawViewCmd( viewDef );
 }
 
