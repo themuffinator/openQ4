@@ -287,7 +287,8 @@ idCVar r_rendererModernSubmit( "r_rendererModernSubmit", "0", CVAR_RENDERER | CV
 idCVar r_rendererGpuValidation( "r_rendererGpuValidation", "0", CVAR_RENDERER | CVAR_BOOL, "compare GL 4.3 GPU-driven compute results against CPU reference data on sampled frames" );
 idCVar r_rendererBindless( "r_rendererBindless", "0", CVAR_RENDERER | CVAR_BOOL, "enable experimental GL 4.5 bindless texture diagnostics without changing visible output" );
 idCVar r_rendererModernVisible( "r_rendererModernVisible", "0", CVAR_RENDERER | CVAR_BOOL, "execute the opt-in modern hybrid visible-frame composition when all required pass owners are modern-safe" );
-idCVar r_rendererModernAutoPromote( "r_rendererModernAutoPromote", "0", CVAR_RENDERER | CVAR_BOOL, "allow r_glTier auto and r_renderer best to request the guarded modern visible path after promotion sign-off; off keeps ARB2 default" );
+idCVar r_rendererModernAutoPromote( "r_rendererModernAutoPromote", "0", CVAR_RENDERER | CVAR_BOOL, "allow r_glTier auto and r_renderer best to request the guarded modern visible path after promotion evidence and sign-off; off keeps ARB2 default" );
+idCVar r_rendererPromotionEvidence( "r_rendererPromotionEvidence", "", CVAR_RENDERER, "Phase 8 validation evidence token required with r_rendererModernAutoPromote before automatic modern visible promotion" );
 idCVar r_rendererShaderReload( "r_rendererShaderReload", "0", CVAR_RENDERER | CVAR_BOOL, "allow runtime reload of the internal modern GL shader library" );
 idCVar r_rendererModernVisibleDepth( "r_rendererModernVisibleDepth", "0", CVAR_RENDERER | CVAR_BOOL, "execute graph-backed modern depth and compatible shadow-depth passes while ARB2 remains the visible color path" );
 idCVar r_rendererModernDepthDebug( "r_rendererModernDepthDebug", "0", CVAR_RENDERER | CVAR_INTEGER, "modern depth debug overlay: 0 = off, 1 = scene depth, 2 = shadow-map depth", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );

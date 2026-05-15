@@ -35,7 +35,7 @@ Use `rendererTierContractSelfTest` alongside `rendererTierSelfTest` when changin
 
 ## Default Promotion
 
-The visible default remains conservative. `r_glTier auto` can select a modern-capable tier after capability probing, but the automatic visible path stays on the ARB2 compatibility bridge unless every default-promotion gate passes and `r_rendererModernAutoPromote 1` is explicitly set after release sign-off.
+The visible default remains conservative. `r_glTier auto` can select a modern-capable tier after capability probing, but the automatic visible path stays on the ARB2 compatibility bridge unless every default-promotion gate passes, `r_rendererPromotionEvidence` contains the Phase 8 validation token, and `r_rendererModernAutoPromote 1` is explicitly set after release sign-off.
 
 Default promotion requires:
 
@@ -43,9 +43,10 @@ Default promotion requires:
 - `r_renderer best`, so explicit `r_renderer arb2` remains a rollback escape.
 - a selected modern GL 3.3+ tier with baseline gates passing after driver quirks are applied.
 - a live modern executor and the ARB2 bridge still available as an escape hatch.
-- completed SP/MP gameplay smoke, RenderDoc tier captures, and benchmark captures on target hardware.
+- `r_rendererPromotionEvidence` carrying the complete Phase 8 token: `phase8=complete;warnings=0;visual=pass;gameplay=pass;renderdoc=pass;perf=arb2-or-better;presentation=pass;rollback=pass;debug=off`.
+- completed deterministic visual checks, required SP/MP gameplay, RenderDoc tier captures, ARB2-or-better benchmark captures, high-refresh presentation checks, rollback checks, and debug-off validation on target hardware.
 
-`gfxInfo` prints `Renderer default promotion:` with active/eligible state and the current blocking reason. `rendererDefaultPromotionSelfTest` covers the signed path, unsigned-but-eligible path, explicit ARB2 escape, forced legacy tier, compatibility-gate block, and missing-legacy-escape block. `r_rendererModernVisible 1` remains the manual opt-in for targeted bring-up; `r_rendererModernAutoPromote 1` is the release sign-off switch that lets `r_glTier auto` request that guarded visible path automatically.
+`gfxInfo` prints `Renderer default promotion:` with active/eligible state, evidence coverage, missing evidence fields, and the current blocking reason. `rendererDefaultPromotionSelfTest` covers missing evidence, incomplete evidence, evidence-ready unsigned promotion, signed promotion, explicit ARB2 escape, forced legacy tier, compatibility-gate block, and missing-legacy-escape block. `r_rendererModernVisible 1` remains the manual opt-in for targeted bring-up; `r_rendererModernAutoPromote 1` is the release sign-off switch that lets `r_glTier auto` request that guarded visible path automatically only when the evidence token is complete.
 
 `gfxInfo` also prints `Renderer default safety:`. That line is the clean-startup audit for Phase 13: `r_renderer best` or explicit `r_renderer arb2`, `r_glTier auto`, auto-promotion disabled, ARB2 rollback available, and all modern executor, submit, visible, debug, validation, bindless, and shader-reload side paths off unless explicitly requested. `rendererDefaultSafetySelfTest` validates that contract before release candidates or benchmark claims are made.
 
@@ -55,6 +56,7 @@ Rollback and quarantine commands:
 r_renderer arb2
 r_glTier legacy
 r_rendererModernAutoPromote 0
+r_rendererPromotionEvidence ""
 r_rendererModernExecutor 0
 r_rendererModernSubmit 0
 r_rendererModernVisible 0
@@ -158,7 +160,7 @@ Scene Packet V2 adds copied geometry and instance records to the packet stream. 
 
 ## Modern GL Executor Bring-Up
 
-`r_rendererModernExecutor 1` enables the first modern-executor entry point. `r_rendererModernSubmit 1` additionally enables the first real GL 3.3 submission path, and `r_rendererModernVisible 1` opts into the guarded hybrid visible-frame bridge. After Phase 17, `r_rendererModernAutoPromote 1` can request the same guarded visible path automatically only when `r_glTier auto`, `r_renderer best`, compatibility gates, executor readiness, and ARB2 rollback availability all pass:
+`r_rendererModernExecutor 1` enables the first modern-executor entry point. `r_rendererModernSubmit 1` additionally enables the first real GL 3.3 submission path, and `r_rendererModernVisible 1` opts into the guarded hybrid visible-frame bridge. After Phase 8 validation, `r_rendererModernAutoPromote 1` can request the same guarded visible path automatically only when `r_glTier auto`, `r_renderer best`, compatibility gates, executor readiness, ARB2 rollback availability, and the complete `r_rendererPromotionEvidence` token all pass:
 
 - Requires the selected renderer tier to expose the GL 3.3 baseline feature set, including VAOs, UBOs, and buffer objects.
 - Allocates a starter VAO and frame-constants UBO during OpenGL initialization.

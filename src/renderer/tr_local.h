@@ -1074,6 +1074,7 @@ extern idCVar r_rendererGpuValidation;	// compare GL43 GPU-driven compute result
 extern idCVar r_rendererBindless;	// opt-in experimental bindless texture diagnostics, disabled by default
 extern idCVar r_rendererModernVisible;	// opt-in modern hybrid visible-frame composition
 extern idCVar r_rendererModernAutoPromote;	// allow gated default modern-visible promotion
+extern idCVar r_rendererPromotionEvidence;	// Phase 8 evidence token required before auto-promotion
 extern idCVar r_rendererShaderReload;	// allow runtime reload of the internal modern GL shader library
 extern idCVar r_rendererModernVisibleDepth;	// opt-in graph-backed modern depth/shadow-depth execution
 extern idCVar r_rendererModernDepthDebug;	// show graph-backed modern depth resources as a debug overlay

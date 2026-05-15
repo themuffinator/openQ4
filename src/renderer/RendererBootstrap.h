@@ -11,10 +11,21 @@ typedef struct rendererDefaultPromotionState_s {
 	bool						compatibilityGatesPassed;
 	bool						modernExecutorAvailable;
 	bool						legacyEscapeAvailable;
+	bool						validationEvidencePresent;
+	bool						validationEvidenceReady;
+	bool						validationWarningFree;
+	bool						validationVisualCoverage;
+	bool						validationGameplayCoverage;
+	bool						validationRenderDocCoverage;
+	bool						validationPerformanceCoverage;
+	bool						validationPresentationCoverage;
+	bool						validationRollbackCoverage;
+	bool						validationDebugClean;
 	bool						manualSignoffEnabled;
 	bool						eligible;
 	bool						active;
 	char						reason[128];
+	char						validationEvidenceMissing[256];
 } rendererDefaultPromotionState_t;
 
 typedef struct rendererBootstrapState_s {

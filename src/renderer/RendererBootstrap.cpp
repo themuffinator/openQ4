@@ -16,6 +16,14 @@ static void RendererBootstrap_SetPromotionReason( rendererDefaultPromotionState_
 	idStr::snPrintf( state.reason, sizeof( state.reason ), "%s", reason != NULL ? reason : "unknown" );
 }
 
+static void RendererBootstrap_SetPromotionEvidenceMissing( rendererDefaultPromotionState_t &state, const idStr &missing ) {
+	idStr::snPrintf(
+		state.validationEvidenceMissing,
+		sizeof( state.validationEvidenceMissing ),
+		"%s",
+		missing.Length() > 0 ? missing.c_str() : "none" );
+}
+
 static void RendererBootstrap_AppendIssue( idStr &issues, const char *issue ) {
 	if ( issues.Length() > 0 ) {
 		issues.Append( "," );
@@ -64,6 +72,10 @@ static bool RendererBootstrap_BuildDefaultSafetyReport( idStr &report, idStr &is
 		RendererBootstrap_AppendIssue( issues, "rollback" );
 		conservative = false;
 	}
+	if ( r_rendererPromotionEvidence.GetString()[0] != '\0' ) {
+		RendererBootstrap_AppendIssue( issues, "r_rendererPromotionEvidence" );
+		conservative = false;
+	}
 
 	for ( int i = 0; i < static_cast<int>( sizeof( guardedCVars ) / sizeof( guardedCVars[0] ) ); ++i ) {
 		if ( guardedCVars[i].cvar->GetInteger() != guardedCVars[i].expectedInteger ) {
@@ -73,12 +85,13 @@ static bool RendererBootstrap_BuildDefaultSafetyReport( idStr &report, idStr &is
 	}
 
 	report = va(
-		"renderer=%s glTier=%s executor=%d submit=%d autoPromote=%d visible=%d visibleDepth=%d depthDebug=%d opaque=%d gbufferDebug=%d deferred=%d deferredDebug=%d forwardPlus=%d clusterDebug=%d gpuValidation=%d bindless=%d shaderReload=%d rollback=%s issues=%s",
+		"renderer=%s glTier=%s executor=%d submit=%d autoPromote=%d promotionEvidence=%d visible=%d visibleDepth=%d depthDebug=%d opaque=%d gbufferDebug=%d deferred=%d deferredDebug=%d forwardPlus=%d clusterDebug=%d gpuValidation=%d bindless=%d shaderReload=%d rollback=%s issues=%s",
 		r_renderer.GetString(),
 		r_glTier.GetString(),
 		r_rendererModernExecutor.GetInteger(),
 		r_rendererModernSubmit.GetInteger(),
 		r_rendererModernAutoPromote.GetInteger(),
+		r_rendererPromotionEvidence.GetString()[0] != '\0' ? 1 : 0,
 		r_rendererModernVisible.GetInteger(),
 		r_rendererModernVisibleDepth.GetInteger(),
 		r_rendererModernDepthDebug.GetInteger(),
@@ -121,6 +134,70 @@ static bool RendererBootstrap_RendererRequestAllowsPromotion( const char *render
 	return rendererRequest == NULL || rendererRequest[0] == '\0' || idStr::Icmp( rendererRequest, "best" ) == 0;
 }
 
+static bool RendererBootstrap_EvidenceHasToken( const char *evidence, const char *token ) {
+	if ( evidence == NULL || evidence[0] == '\0' || token == NULL || token[0] == '\0' ) {
+		return false;
+	}
+
+	const int tokenLength = static_cast<int>( strlen( token ) );
+	const char *cursor = evidence;
+	while ( ( cursor = strstr( cursor, token ) ) != NULL ) {
+		const char before = cursor == evidence ? ';' : cursor[-1];
+		const char after = cursor[tokenLength];
+		const bool leftBoundary = before == ';' || before == ',' || before == ' ' || before == '\t';
+		const bool rightBoundary = after == '\0' || after == ';' || after == ',' || after == ' ' || after == '\t';
+		if ( leftBoundary && rightBoundary ) {
+			return true;
+		}
+		cursor += tokenLength;
+	}
+	return false;
+}
+
+static void RendererBootstrap_EvaluatePromotionEvidence( const char *evidence, rendererDefaultPromotionState_t &state ) {
+	idStr missing;
+	state.validationEvidencePresent = evidence != NULL && evidence[0] != '\0';
+	state.validationWarningFree = RendererBootstrap_EvidenceHasToken( evidence, "warnings=0" );
+	state.validationVisualCoverage = RendererBootstrap_EvidenceHasToken( evidence, "visual=pass" );
+	state.validationGameplayCoverage = RendererBootstrap_EvidenceHasToken( evidence, "gameplay=pass" );
+	state.validationRenderDocCoverage = RendererBootstrap_EvidenceHasToken( evidence, "renderdoc=pass" );
+	state.validationPerformanceCoverage = RendererBootstrap_EvidenceHasToken( evidence, "perf=arb2-or-better" );
+	state.validationPresentationCoverage = RendererBootstrap_EvidenceHasToken( evidence, "presentation=pass" );
+	state.validationRollbackCoverage = RendererBootstrap_EvidenceHasToken( evidence, "rollback=pass" );
+	state.validationDebugClean = RendererBootstrap_EvidenceHasToken( evidence, "debug=off" );
+
+	if ( !RendererBootstrap_EvidenceHasToken( evidence, "phase8=complete" ) ) {
+		RendererBootstrap_AppendIssue( missing, "phase8" );
+	}
+	if ( !state.validationWarningFree ) {
+		RendererBootstrap_AppendIssue( missing, "warnings" );
+	}
+	if ( !state.validationVisualCoverage ) {
+		RendererBootstrap_AppendIssue( missing, "visual" );
+	}
+	if ( !state.validationGameplayCoverage ) {
+		RendererBootstrap_AppendIssue( missing, "gameplay" );
+	}
+	if ( !state.validationRenderDocCoverage ) {
+		RendererBootstrap_AppendIssue( missing, "renderdoc" );
+	}
+	if ( !state.validationPerformanceCoverage ) {
+		RendererBootstrap_AppendIssue( missing, "perf" );
+	}
+	if ( !state.validationPresentationCoverage ) {
+		RendererBootstrap_AppendIssue( missing, "presentation" );
+	}
+	if ( !state.validationRollbackCoverage ) {
+		RendererBootstrap_AppendIssue( missing, "rollback" );
+	}
+	if ( !state.validationDebugClean ) {
+		RendererBootstrap_AppendIssue( missing, "debug" );
+	}
+
+	state.validationEvidenceReady = state.validationEvidencePresent && missing.Length() == 0;
+	RendererBootstrap_SetPromotionEvidenceMissing( state, missing );
+}
+
 static rendererDefaultPromotionState_t RendererBootstrap_EvaluateDefaultPromotion(
 	rendererTierPreference_t requestedPreference,
 	rendererTier_t selectedTier,
@@ -128,10 +205,12 @@ static rendererDefaultPromotionState_t RendererBootstrap_EvaluateDefaultPromotio
 	bool legacyBridgeActive,
 	bool modernExecutorAvailable,
 	bool manualSignoffEnabled,
+	const char *promotionEvidence,
 	const char *rendererRequest,
 	const rendererDriverQuirkReport_t &quirkReport ) {
 	rendererDefaultPromotionState_t state;
 	memset( &state, 0, sizeof( state ) );
+	RendererBootstrap_EvaluatePromotionEvidence( promotionEvidence, state );
 
 	const unsigned int blockingQuirks =
 		RENDERER_DRIVER_QUIRK_FORCE_LEGACY |
@@ -158,7 +237,8 @@ static rendererDefaultPromotionState_t RendererBootstrap_EvaluateDefaultPromotio
 		state.selectedModernTier &&
 		state.compatibilityGatesPassed &&
 		state.modernExecutorAvailable &&
-		state.legacyEscapeAvailable;
+		state.legacyEscapeAvailable &&
+		state.validationEvidenceReady;
 	state.active = state.eligible && state.manualSignoffEnabled;
 
 	if ( !state.requestedAutoTier ) {
@@ -173,6 +253,8 @@ static rendererDefaultPromotionState_t RendererBootstrap_EvaluateDefaultPromotio
 		RendererBootstrap_SetPromotionReason( state, "modern-executor-unavailable" );
 	} else if ( !state.legacyEscapeAvailable ) {
 		RendererBootstrap_SetPromotionReason( state, "legacy-escape-unavailable" );
+	} else if ( !state.validationEvidenceReady ) {
+		RendererBootstrap_SetPromotionReason( state, "validation-evidence-required" );
 	} else if ( !state.manualSignoffEnabled ) {
 		RendererBootstrap_SetPromotionReason( state, "manual-signoff-required" );
 	} else {
@@ -190,6 +272,7 @@ static void RendererBootstrap_UpdateDefaultPromotionState( void ) {
 		rg_bootstrapState.legacyBridgeActive,
 		rg_bootstrapState.modernExecutorAvailable,
 		r_rendererModernAutoPromote.GetBool(),
+		r_rendererPromotionEvidence.GetString(),
 		r_renderer.GetString(),
 		RendererDriverQuirks_LastReport() );
 }
@@ -245,7 +328,7 @@ void RendererBootstrap_PrintGfxInfo( void ) {
 	RendererBootstrap_UpdateDefaultPromotionState();
 	const rendererDefaultPromotionState_t &promotion = rg_bootstrapState.defaultPromotion;
 	common->Printf(
-		"Renderer default promotion: cvar=%d manualVisible=%d active=%d eligible=%d autoTier=%d rendererAllows=%d modernTier=%d gates=%d executor=%d legacyEscape=%d reason=%s\n",
+		"Renderer default promotion: cvar=%d manualVisible=%d active=%d eligible=%d autoTier=%d rendererAllows=%d modernTier=%d gates=%d executor=%d legacyEscape=%d evidence=%d evidenceReady=%d evidenceMissing=%s visual=%d gameplay=%d renderdoc=%d perf=%d presentation=%d rollback=%d warnings=%d debugClean=%d reason=%s\n",
 		r_rendererModernAutoPromote.GetBool() ? 1 : 0,
 		r_rendererModernVisible.GetBool() ? 1 : 0,
 		promotion.active ? 1 : 0,
@@ -256,6 +339,17 @@ void RendererBootstrap_PrintGfxInfo( void ) {
 		promotion.compatibilityGatesPassed ? 1 : 0,
 		promotion.modernExecutorAvailable ? 1 : 0,
 		promotion.legacyEscapeAvailable ? 1 : 0,
+		promotion.validationEvidencePresent ? 1 : 0,
+		promotion.validationEvidenceReady ? 1 : 0,
+		promotion.validationEvidenceMissing,
+		promotion.validationVisualCoverage ? 1 : 0,
+		promotion.validationGameplayCoverage ? 1 : 0,
+		promotion.validationRenderDocCoverage ? 1 : 0,
+		promotion.validationPerformanceCoverage ? 1 : 0,
+		promotion.validationPresentationCoverage ? 1 : 0,
+		promotion.validationRollbackCoverage ? 1 : 0,
+		promotion.validationWarningFree ? 1 : 0,
+		promotion.validationDebugClean ? 1 : 0,
 		promotion.reason );
 
 	idStr safetyReport;
@@ -307,6 +401,9 @@ bool RendererDefaultPromotion_RunSelfTest( void ) {
 	modernFeatures.scenePackets = true;
 	modernFeatures.renderGraph = true;
 
+	const char *validEvidence = "phase8=complete;warnings=0;visual=pass;gameplay=pass;renderdoc=pass;perf=arb2-or-better;presentation=pass;rollback=pass;debug=off";
+	const char *partialEvidence = "phase8=complete;warnings=0;visual=pass;gameplay=pass";
+
 	bool ok = true;
 	int cases = 0;
 
@@ -317,13 +414,37 @@ bool RendererDefaultPromotion_RunSelfTest( void ) {
 		true,
 		true,
 		false,
+		"",
 		"best",
 		cleanReport );
-	if ( !state.eligible || state.active || idStr::Icmp( state.reason, "manual-signoff-required" ) != 0 ) {
+	if ( state.eligible || state.active || idStr::Icmp( state.reason, "validation-evidence-required" ) != 0 || state.validationEvidenceReady ) {
 		common->Printf(
-			"RendererDefaultPromotion self-test failed: unsigned eligible path mismatch (eligible=%d active=%d reason=%s)\n",
+			"RendererDefaultPromotion self-test failed: missing evidence path mismatch (eligible=%d active=%d evidence=%d reason=%s missing=%s)\n",
 			state.eligible ? 1 : 0,
 			state.active ? 1 : 0,
+			state.validationEvidenceReady ? 1 : 0,
+			state.reason,
+			state.validationEvidenceMissing );
+		ok = false;
+	}
+	cases++;
+
+	state = RendererBootstrap_EvaluateDefaultPromotion(
+		RENDERER_TIER_PREF_AUTO,
+		RENDERER_TIER_TOP_GL46,
+		modernFeatures,
+		true,
+		true,
+		false,
+		validEvidence,
+		"best",
+		cleanReport );
+	if ( !state.eligible || state.active || idStr::Icmp( state.reason, "manual-signoff-required" ) != 0 || !state.validationEvidenceReady ) {
+		common->Printf(
+			"RendererDefaultPromotion self-test failed: evidence-ready unsigned path mismatch (eligible=%d active=%d evidence=%d reason=%s)\n",
+			state.eligible ? 1 : 0,
+			state.active ? 1 : 0,
+			state.validationEvidenceReady ? 1 : 0,
 			state.reason );
 		ok = false;
 	}
@@ -336,6 +457,7 @@ bool RendererDefaultPromotion_RunSelfTest( void ) {
 		true,
 		true,
 		true,
+		validEvidence,
 		"best",
 		cleanReport );
 	if ( !state.eligible || !state.active || idStr::Icmp( state.reason, "auto-promoted" ) != 0 ) {
@@ -349,12 +471,35 @@ bool RendererDefaultPromotion_RunSelfTest( void ) {
 	cases++;
 
 	state = RendererBootstrap_EvaluateDefaultPromotion(
+		RENDERER_TIER_PREF_AUTO,
+		RENDERER_TIER_TOP_GL46,
+		modernFeatures,
+		true,
+		true,
+		true,
+		partialEvidence,
+		"best",
+		cleanReport );
+	if ( state.eligible || state.active || idStr::Icmp( state.reason, "validation-evidence-required" ) != 0 || state.validationEvidenceReady ) {
+		common->Printf(
+			"RendererDefaultPromotion self-test failed: incomplete evidence path mismatch (eligible=%d active=%d evidence=%d reason=%s missing=%s)\n",
+			state.eligible ? 1 : 0,
+			state.active ? 1 : 0,
+			state.validationEvidenceReady ? 1 : 0,
+			state.reason,
+			state.validationEvidenceMissing );
+		ok = false;
+	}
+	cases++;
+
+	state = RendererBootstrap_EvaluateDefaultPromotion(
 		RENDERER_TIER_PREF_LEGACY,
 		RENDERER_TIER_LEGACY_GL2_COMPAT,
 		modernFeatures,
 		true,
 		true,
 		true,
+		validEvidence,
 		"best",
 		cleanReport );
 	if ( state.eligible || state.active || idStr::Icmp( state.reason, "r-gl-tier-not-auto" ) != 0 ) {
@@ -374,6 +519,7 @@ bool RendererDefaultPromotion_RunSelfTest( void ) {
 		true,
 		true,
 		true,
+		validEvidence,
 		"arb2",
 		cleanReport );
 	if ( state.eligible || state.active || idStr::Icmp( state.reason, "explicit-renderer-escape" ) != 0 ) {
@@ -395,6 +541,7 @@ bool RendererDefaultPromotion_RunSelfTest( void ) {
 		true,
 		true,
 		true,
+		validEvidence,
 		"best",
 		blockedReport );
 	if ( state.eligible || state.active || idStr::Icmp( state.reason, "compatibility-gates-blocked" ) != 0 ) {
@@ -414,6 +561,7 @@ bool RendererDefaultPromotion_RunSelfTest( void ) {
 		false,
 		true,
 		true,
+		validEvidence,
 		"best",
 		cleanReport );
 	if ( state.eligible || state.active || idStr::Icmp( state.reason, "legacy-escape-unavailable" ) != 0 ) {

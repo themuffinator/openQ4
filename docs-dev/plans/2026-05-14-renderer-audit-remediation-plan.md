@@ -301,6 +301,15 @@ Acceptance:
 - `r_rendererModernAutoPromote 1` is allowed only after the above evidence exists.
 - Default remains ARB2-safe until target-hardware gameplay proves modern parity and performance.
 
+Round 3 Phase 8 implementation notes:
+
+- Added `r_rendererPromotionEvidence` as a separate Phase 8 evidence token required before `r_rendererModernAutoPromote 1` can activate automatic modern-visible promotion. The required token is `phase8=complete;warnings=0;visual=pass;gameplay=pass;renderdoc=pass;perf=arb2-or-better;presentation=pass;rollback=pass;debug=off`.
+- Extended the default-promotion state with explicit evidence booleans for warning-free logs, deterministic visual coverage, required SP/MP gameplay, RenderDoc tier captures, ARB2-or-better performance, high-refresh presentation, rollback, and debug-off validation. `gfxInfo` now reports the evidence coverage and missing fields, and promotion fails closed with `validation-evidence-required` until every token is present.
+- Updated `rendererDefaultPromotionSelfTest` to cover missing evidence, incomplete evidence, evidence-ready unsigned promotion, signed promotion, explicit ARB2 escape, forced legacy tier, compatibility-gate block, and missing ARB2 rollback.
+- Updated the validation matrix report schema and Markdown output with a promotion-evidence gate section so safe automated results, manual gameplay/capture evidence, and the engine cvar contract all point at the same token.
+- `rendererDefaultSafetySelfTest` now treats a non-empty promotion-evidence token as non-conservative on clean startup, keeping default ARB2 startup free of both the auto-promotion switch and stale release evidence.
+- Validation passed for `tools/build/meson_setup.ps1 compile -C builddir`, `python -m py_compile tools/tests/renderer_validation_matrix.py tools/tests/renderer_gameplay_benchmark.py`, `python tools/tests/renderer_validation_matrix.py --list`, `tools/build/meson_setup.ps1 install -C builddir --no-rebuild --skip-subprojects`, a single staged-client run of `rendererDefaultPromotionSelfTest`, `rendererDefaultSafetySelfTest`, and `gfxInfo`, and a no-launch validation-report schema smoke under `.tmp/renderer-validation/phase8-report-schema-smoke`. The focused self-test log reports `RendererDefaultPromotion self-test passed (cases=8)`, `RendererDefaultSafety self-test passed`, default safety with `promotionEvidence=0`, and no renderer fatal/error/idStr/shader-link signatures.
+
 ## Recommended Fix Order
 
 1. Capture the failing scene and isolate the first FPS cliff.

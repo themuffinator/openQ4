@@ -271,6 +271,20 @@ PERF_REGRESSION_THRESHOLDS = [
     },
 ]
 
+PROMOTION_EVIDENCE_REQUIRED_TOKENS = [
+    "phase8=complete",
+    "warnings=0",
+    "visual=pass",
+    "gameplay=pass",
+    "renderdoc=pass",
+    "perf=arb2-or-better",
+    "presentation=pass",
+    "rollback=pass",
+    "debug=off",
+]
+
+PROMOTION_EVIDENCE_TOKEN = ";".join(PROMOTION_EVIDENCE_REQUIRED_TOKENS)
+
 DEFAULT_PROMOTION_CRITERIA = [
     {
         "criterion": "tier",
@@ -293,8 +307,12 @@ DEFAULT_PROMOTION_CRITERIA = [
         "required": "`r_renderer best` or explicit `r_renderer arb2` keeps ARB2 visible; modern executor, submit, visible, side-path, debug, GPU-validation, bindless, shader-reload, and auto-promotion cvars remain off in a clean startup",
     },
     {
+        "criterion": "validation evidence",
+        "required": "`r_rendererPromotionEvidence` contains the Phase 8 evidence token after zero-warning deterministic visual checks, required SP/MP gameplay, RenderDoc tier captures, ARB2-or-better performance, presentation, rollback, and debug-off checks pass",
+    },
+    {
         "criterion": "manual sign-off",
-        "required": "`r_rendererModernAutoPromote 1` is set only after SP/MP gameplay, RenderDoc captures, and benchmark captures pass on target hardware",
+        "required": "`r_rendererModernAutoPromote 1` is set only together with a complete `r_rendererPromotionEvidence` token",
     },
 ]
 
@@ -720,7 +738,7 @@ def build_safe_cases(tiers: tuple[str, ...]) -> list[dict[str, Any]]:
         {
             "id": "renderer-default-promotion-selftest",
             "category": "selftest",
-            "description": "Phase 17 default-promotion gates for r_glTier auto, explicit ARB2 escapes, compatibility gates, legacy fallback availability, and sign-off control.",
+            "description": "Phase 8 evidence-gated default-promotion coverage for r_glTier auto, explicit ARB2 escapes, compatibility gates, legacy fallback availability, missing/incomplete/complete r_rendererPromotionEvidence, and auto-promote sign-off control.",
             "args": [
                 "+set",
                 "r_rendererMetrics",
@@ -1056,6 +1074,13 @@ def write_reports(output_dir: Path, results: list[dict[str, Any]], metadata: dic
         "renderDocTierMatrix": RENDERDOC_TIER_MATRIX,
         "longRunValidationMatrix": LONG_RUN_VALIDATION_MATRIX,
         "perfRegressionThresholds": PERF_REGRESSION_THRESHOLDS,
+        "promotionEvidenceGate": {
+            "cvar": "r_rendererPromotionEvidence",
+            "requiredTokens": PROMOTION_EVIDENCE_REQUIRED_TOKENS,
+            "completeToken": PROMOTION_EVIDENCE_TOKEN,
+            "autoPromoteCvar": "r_rendererModernAutoPromote",
+            "status": "blocked-until-manual-evidence",
+        },
         "defaultPromotionCriteria": DEFAULT_PROMOTION_CRITERIA,
     }
     report_json.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -1171,6 +1196,29 @@ def write_reports(output_dir: Path, results: list[dict[str, Any]], metadata: dic
     ]
     for item in PERF_REGRESSION_THRESHOLDS:
         lines.append(f"| `{item['preset']}` | {item['p95Ms']} ms | {item['p99Ms']} ms | {item['budget']} |")
+
+    lines += [
+        "",
+        "## Promotion Evidence Gate",
+        "",
+        "`r_rendererModernAutoPromote 1` is ignored by the engine unless `r_rendererPromotionEvidence` carries a complete Phase 8 evidence token.",
+        "",
+        "Required token:",
+        "",
+        f"`{PROMOTION_EVIDENCE_TOKEN}`",
+        "",
+        "| Token | Meaning |",
+        "|---|---|",
+        "| `phase8=complete` | The Phase 8 evidence bundle has been reviewed as a single promotion candidate. |",
+        "| `warnings=0` | Renderer validation, gameplay, and benchmark logs are free of renderer warning/fatal/signature failures. |",
+        "| `visual=pass` | Deterministic captures and human visual checks pass for materials, characters, GUI, post, fog/blend, BSE, and shadow cases. |",
+        "| `gameplay=pass` | Required SP maps and the MP q4dm1 listen/local-client case reach gameplay and pass log/screenshot gates. |",
+        "| `renderdoc=pass` | Required GL-tier RenderDoc captures show named resources and expected pass contents. |",
+        "| `perf=arb2-or-better` | Modern candidate P95/P99 frame time is ARB2-or-better for target scenes and presets. |",
+        "| `presentation=pass` | High-refresh and vsync presentation cases preserve uncapped rendering with 60 Hz simulation. |",
+        "| `rollback=pass` | `r_renderer arb2`, `r_glTier legacy`, and modern-disable rollback commands work after modern-visible frames. |",
+        "| `debug=off` | Promotion does not depend on debug-only overlays, validation readbacks, bindless experiments, or shader reload. |",
+    ]
 
     lines += [
         "",
