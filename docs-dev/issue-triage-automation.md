@@ -5,7 +5,7 @@ OpenQ4 now ships a GitHub Actions workflow that triages **newly opened issues** 
 ## Files
 
 - `.github/workflows/issue-triage.yml` — triggers once on `issues.opened`
-- `.github/issue-triage.config.json` — label definitions, duplicate thresholds, and response-style knobs
+- `.github/issue-triage.config.json` — label definitions, duplicate thresholds, and response-style settings
 - `.github/scripts/issue-triage.mjs` — reads the new issue, repository context, labels, and open issues; calls the configured AI provider; validates the result; applies labels; posts the comment; and closes only high-confidence duplicates
 - `.github/scripts/issue-triage.test.mjs` — local test harness for duplicate-scoring and response rendering
 

@@ -914,16 +914,6 @@ class GitHubClient {
   }
 }
 
-async function ensureManagedLabels(client, owner, repo, labels, config, dryRun) {
-  const byName = new Map(labels.map((label) => [label.name, label]));
-  for (const labelName of labels.map((label) => label.name)) {
-    if (!config.managedLabels[labelName] || byName.has(labelName)) {
-      continue;
-    }
-  }
-  return byName;
-}
-
 async function createManagedLabel(client, owner, repo, labelName, config, dryRun) {
   const managed = config.managedLabels[labelName];
   if (!managed) {
