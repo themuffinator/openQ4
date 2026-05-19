@@ -358,6 +358,7 @@ static bool R_RenderGraph_ShouldModelHiZ( void ) {
 			|| R_RenderGraph_ShouldModelDeferredResolve()
 			|| R_RenderGraph_ShouldModelForwardPlus()
 			|| r_rendererModernVisibleDepth.GetBool()
+			|| r_rendererModernSubmit.GetBool()
 			|| r_rendererGpuValidation.GetBool() );
 }
 

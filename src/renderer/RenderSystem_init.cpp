@@ -222,6 +222,8 @@ idCVar r_shadowMapTranslucentDensity( "r_shadowMapTranslucentDensity", "1.0", CV
 idCVar r_shadowMapTranslucentMinAlpha( "r_shadowMapTranslucentMinAlpha", "0.02", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "minimum per-stage alpha considered by translucent shadow moments", 0.0f, 1.0f );
 idCVar r_shadowMapReport( "r_shadowMapReport", "0", CVAR_RENDERER | CVAR_INTEGER, "shadow-map diagnostics: 0 = off, 1 = per-view summary, 2 = per-light decisions", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
 idCVar r_shadowMapReportInterval( "r_shadowMapReportInterval", "30", CVAR_RENDERER | CVAR_INTEGER, "frames between shadow-map diagnostic reports when r_shadowMapReport is enabled", 1, 3600 );
+idCVar r_softParticles( "r_softParticles", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "depth-fade eligible BSE particles against opaque scene depth when GLSL is available" );
+idCVar r_softParticleFadeDistance( "r_softParticleFadeDistance", "64", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "world-unit distance over which r_softParticles fades particle intersections", 1.0f, 512.0f );
 idCVar r_enhancedMaterials( "r_enhancedMaterials", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "use enhanced GLSL interaction shading for existing materials when supported" );
 idCVar r_enhancedMaterialNormalScale( "r_enhancedMaterialNormalScale", "1.25", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "tangent-space normal XY scale when enhanced material shading is enabled", 0.5f, 2.0f );
 idCVar r_enhancedMaterialSpecularBoost( "r_enhancedMaterialSpecularBoost", "1.15", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "specular intensity scale when enhanced material shading is enabled", 0.0f, 4.0f );
@@ -281,10 +283,12 @@ idCVar r_rendererPerfThresholdP99( "r_rendererPerfThresholdP99", "0", CVAR_RENDE
 idCVar r_rendererAdaptiveClusterGrid( "r_rendererAdaptiveClusterGrid", "0", CVAR_RENDERER | CVAR_BOOL, "use benchmark preset cluster-grid dimensions for the modern clustered-light experiment" );
 idCVar r_rendererDynamicResolution( "r_rendererDynamicResolution", "0", CVAR_RENDERER | CVAR_BOOL, "allow benchmark presets to recommend dynamic screen-percentage experiments; disabled by default" );
 idCVar r_rendererUploadMegs( "r_rendererUploadMegs", "16", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "dynamic renderer upload stream size in megabytes per frame buffer", 1, 128, idCmdSystem::ArgCompletion_Integer<1,128> );
+idCVar r_rendererUploadFrameBuffers( "r_rendererUploadFrameBuffers", "4", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "dynamic renderer upload stream frame-buffer rotation depth", 3, 8, idCmdSystem::ArgCompletion_Integer<3,8> );
 idCVar r_rendererUploadPersistent( "r_rendererUploadPersistent", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "allow persistent-mapped dynamic renderer uploads when supported" );
 idCVar r_rendererModernExecutor( "r_rendererModernExecutor", "0", CVAR_RENDERER | CVAR_BOOL, "prepare the opt-in modern GL executor frame contract while legacy ARB2 still executes" );
 idCVar r_rendererModernSubmit( "r_rendererModernSubmit", "0", CVAR_RENDERER | CVAR_BOOL, "execute opt-in modern GL draw submission before legacy ARB2 fallback; diagnostic until visible pass replacement lands" );
 idCVar r_rendererGpuValidation( "r_rendererGpuValidation", "0", CVAR_RENDERER | CVAR_BOOL, "compare GL 4.3 GPU-driven compute results against CPU reference data on sampled frames" );
+idCVar r_rendererGpuValidationReadbackDelay( "r_rendererGpuValidationReadbackDelay", "2", CVAR_RENDERER | CVAR_INTEGER, "frames to defer opt-in GL 4.3 GPU validation readbacks before polling without a sync wait", 1, 8, idCmdSystem::ArgCompletion_Integer<1,8> );
 idCVar r_rendererBindless( "r_rendererBindless", "0", CVAR_RENDERER | CVAR_BOOL, "enable experimental GL 4.5 bindless texture diagnostics without changing visible output" );
 idCVar r_rendererModernVisible( "r_rendererModernVisible", "0", CVAR_RENDERER | CVAR_BOOL, "execute the opt-in modern hybrid visible-frame composition when all required pass owners are modern-safe" );
 idCVar r_rendererModernAutoPromote( "r_rendererModernAutoPromote", "0", CVAR_RENDERER | CVAR_BOOL, "allow r_glTier auto and r_renderer best to request the guarded modern visible path after promotion evidence and sign-off; off keeps ARB2 default" );
@@ -2793,15 +2797,19 @@ void GfxInfo_f( const idCmdArgs &args ) {
 	{
 		const rendererUploadStats_t &uploadStats = R_RendererUpload_Stats();
 		common->Printf(
-			"Renderer upload manager: frameStream=%s, staticAllocator=%d, buffers=%d, ring=%dKB, persistent=%d, mapRangeFallback=%d, staticLive=%d/%dKB, legacyBridge=%d\n",
+			"Renderer upload manager: frameStream=%s, staticAllocator=%d, buffers=%d index=%d, ring=%dKB, persistent=%d, mapRangeFallback=%d, staticLive=%d/%dKB, fences=%d/%d waits=%d, legacyBridge=%d\n",
 			uploadStats.dynamicFrameBridge ? "enabled" : "disabled",
 			uploadStats.staticBufferAllocator ? 1 : 0,
 			uploadStats.ringBufferCount,
+			uploadStats.frameBufferIndex,
 			uploadStats.ringSizeBytes / 1024,
 			uploadStats.persistentMapped ? 1 : 0,
 			uploadStats.mapRangeFallback ? 1 : 0,
 			uploadStats.staticBuffersLive,
 			uploadStats.staticBytesLive / 1024,
+			uploadStats.frameFencesSubmitted,
+			uploadStats.frameFencesRetired,
+			uploadStats.frameFenceWaits,
 			uploadStats.legacyBridge ? 1 : 0 );
 	}
 

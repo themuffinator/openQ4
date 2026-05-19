@@ -1666,7 +1666,7 @@ R_AddDrawSurf
 =================
 */
 void R_AddDrawSurf( const srfTriangles_t *tri, const viewEntity_t *space, const renderEntity_t *renderEntity,
-					const idMaterial *shader, const idScreenRect &scissor ) {
+					const idMaterial *shader, const idScreenRect &scissor, int extraDrawSurfFlags ) {
 	drawSurf_t		*drawSurf;
 
 	drawSurf = (drawSurf_t *)R_FrameAlloc( sizeof( *drawSurf ) );
@@ -1676,7 +1676,7 @@ void R_AddDrawSurf( const srfTriangles_t *tri, const viewEntity_t *space, const 
 	drawSurf->scissorRect = scissor;
 	drawSurf->sort = shader->GetSort() + tr.sortOffset;
 	drawSurf->area = NULL;
-	drawSurf->dsFlags = 0;
+	drawSurf->dsFlags = extraDrawSurfFlags;
 	drawSurf->dynamicTexCoords = NULL;
 	drawSurf->texGenTransformAndViewOrg = NULL;
 	drawSurf->decalColorCache = NULL;
@@ -2286,7 +2286,7 @@ void R_AddEffectSurfaces(void) {
 			}
 			R_TouchVertexCache( tri->ambientCache );
 
-			R_AddDrawSurf(tri, vEffect, &renderParms, shader, vEffect->scissorRect);
+			R_AddDrawSurf(tri, vEffect, &renderParms, shader, vEffect->scissorRect, DSF_BSE_EFFECT);
 			tri->ambientViewCount = tr.viewCount;
 			def->visibleCount = tr.viewCount;
 			++effectSurfaceCount;

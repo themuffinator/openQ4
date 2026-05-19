@@ -137,6 +137,7 @@ SURFACES
 
 // drawSurf_t are always allocated and freed every frame, they are never cached
 static const int	DSF_VIEW_INSIDE_SHADOW	= 1;
+static const int	DSF_BSE_EFFECT			= 2;
 
 typedef struct drawSurf_s {
 	const srfTriangles_t	*geo;
@@ -1068,10 +1069,12 @@ extern idCVar r_rendererPerfThresholdP99;	// custom P99 benchmark threshold in m
 extern idCVar r_rendererAdaptiveClusterGrid;	// use preset-driven cluster-grid dimensions
 extern idCVar r_rendererDynamicResolution;	// allow benchmark screen-percentage experiments
 extern idCVar r_rendererUploadMegs;		// dynamic upload stream size in megabytes per frame buffer
+extern idCVar r_rendererUploadFrameBuffers;	// dynamic upload stream frame-buffer rotation depth
 extern idCVar r_rendererUploadPersistent;	// allow persistent-mapped dynamic upload stream
 extern idCVar r_rendererModernExecutor;	// opt-in modern GL executor prepare path
 extern idCVar r_rendererModernSubmit;	// opt-in modern GL draw submission before ARB2 fallback
 extern idCVar r_rendererGpuValidation;	// compare GL43 GPU-driven compute results against CPU reference data
+extern idCVar r_rendererGpuValidationReadbackDelay;	// defer opt-in GL43 validation readback polling
 extern idCVar r_rendererBindless;	// opt-in experimental bindless texture diagnostics, disabled by default
 extern idCVar r_rendererModernVisible;	// opt-in modern hybrid visible-frame composition
 extern idCVar r_rendererModernAutoPromote;	// allow gated default modern-visible promotion
@@ -1129,6 +1132,8 @@ extern idCVar r_shadowMapTranslucentDensity;	// density scale applied when resol
 extern idCVar r_shadowMapTranslucentMinAlpha;	// minimum per-stage alpha considered by translucent shadow moments
 extern idCVar r_shadowMapReport;		// 0 = off, 1 = per-view summary, 2 = per-light decisions
 extern idCVar r_shadowMapReportInterval;	// frames between shadow-map diagnostic reports
+extern idCVar r_softParticles;			// 1 = depth-fade eligible BSE particle surfaces against the opaque scene depth
+extern idCVar r_softParticleFadeDistance;	// world-unit fade distance for r_softParticles
 extern idCVar r_enhancedMaterials;		// 1 = use enhanced GLSL interaction shading for stock materials when supported
 extern idCVar r_enhancedMaterialNormalScale;	// tangent-space normal XY scale when enhanced material shading is enabled
 extern idCVar r_enhancedMaterialSpecularBoost;	// specular intensity scale when enhanced material shading is enabled
@@ -1516,7 +1521,7 @@ const float *R_SetupDrawSurfShaderRegisters( const viewEntity_t *space, const re
 					 const idMaterial *shader );
 void R_FinalizeDrawSurf( drawSurf_t *drawSurf );
 void R_AddDrawSurf( const srfTriangles_t *tri, const viewEntity_t *space, const renderEntity_t *renderEntity,
-					const idMaterial *shader, const idScreenRect &scissor );
+					const idMaterial *shader, const idScreenRect &scissor, int extraDrawSurfFlags = 0 );
 
 void R_LinkLightSurf( const drawSurf_t **link, const srfTriangles_t *tri, const viewEntity_t *space, 
 				   const idRenderLightLocal *light, const idMaterial *shader, const idScreenRect &scissor, bool viewInsideShadow );

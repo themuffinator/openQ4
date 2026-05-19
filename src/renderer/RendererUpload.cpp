@@ -4,8 +4,9 @@
 #include "tr_local.h"
 #include "RendererUpload.h"
 #include "RendererMetrics.h"
+#include "GLStateCache.h"
 
-static const int RENDERER_UPLOAD_FRAME_BUFFERS = 3;
+static const int RENDERER_UPLOAD_MIN_FRAME_BUFFERS = 3;
 static const int RENDERER_UPLOAD_MIN_MEGS = 1;
 static const int RENDERER_UPLOAD_MAX_MEGS = 128;
 
@@ -60,6 +61,7 @@ bool idBufferAllocator::AllocStaticBuffer( void *data, int bytes, bool indexBuff
 	const GLenum usage = streamDraw ? GL_STREAM_DRAW_ARB : GL_STATIC_DRAW_ARB;
 	glBindBufferARB( target, vbo );
 	glBufferDataARB( target, (GLsizeiptrARB)bytes, data, usage );
+	R_GLStateCache_InvalidateBufferBinding( target, "renderer upload static buffer" );
 
 	frameStaticUploadBytes += bytes;
 	frameStaticAllocations++;
@@ -224,6 +226,7 @@ idUploadManager::idUploadManager() {
 	memset( frameBuffers, 0, sizeof( frameBuffers ) );
 	path = UPLOAD_PATH_DISABLED;
 	currentFrameBuffer = 0;
+	frameBufferCount = 0;
 	initialized = false;
 	hasSync = false;
 }
@@ -236,6 +239,7 @@ void idUploadManager::Init( const renderBackendCaps_t &caps ) {
 	const bool useMapRange = caps.hasMapBufferRange && glMapBufferRange != NULL;
 	const int ringMegs = idMath::ClampInt( RENDERER_UPLOAD_MIN_MEGS, RENDERER_UPLOAD_MAX_MEGS, r_rendererUploadMegs.GetInteger() );
 	const int ringBytes = ringMegs * 1024 * 1024;
+	frameBufferCount = idMath::ClampInt( RENDERER_UPLOAD_MIN_FRAME_BUFFERS, RENDERER_UPLOAD_MAX_FRAME_BUFFERS, r_rendererUploadFrameBuffers.GetInteger() );
 	uploadPath_t requestedPath = UPLOAD_PATH_DISABLED;
 
 	if ( caps.hasVBO ) {
@@ -254,7 +258,7 @@ void idUploadManager::Init( const renderBackendCaps_t &caps ) {
 
 	memset( &stats, 0, sizeof( stats ) );
 	stats.ringSizeBytes = ringBytes;
-	stats.ringBufferCount = RENDERER_UPLOAD_FRAME_BUFFERS;
+	stats.ringBufferCount = frameBufferCount;
 	stats.persistentMapped = requestedPath == UPLOAD_PATH_PERSISTENT;
 	stats.lowOverheadPersistentDefault = lowOverheadPersistentDefault;
 	stats.mapRangeFallback = requestedPath == UPLOAD_PATH_MAP_RANGE;
@@ -285,7 +289,7 @@ void idUploadManager::Init( const renderBackendCaps_t &caps ) {
 		path == UPLOAD_PATH_PERSISTENT ? "GL45 persistent-mapped capable" : "streaming",
 		PathName(),
 		stats.staticBufferAllocator ? "yes" : "no",
-		RENDERER_UPLOAD_FRAME_BUFFERS,
+		frameBufferCount,
 		ringBytes / 1024,
 		hasSync ? "yes" : "no" );
 }
@@ -297,6 +301,7 @@ void idUploadManager::Shutdown( void ) {
 	memset( &stats, 0, sizeof( stats ) );
 	path = UPLOAD_PATH_DISABLED;
 	currentFrameBuffer = 0;
+	frameBufferCount = 0;
 	initialized = false;
 	hasSync = false;
 }
@@ -316,21 +321,24 @@ void idUploadManager::BeginFrame( int frameCount ) {
 	stats.frameFencesSubmitted = 0;
 	stats.frameFencesRetired = 0;
 	stats.frameFenceWaits = 0;
+	stats.frameBufferIndex = 0;
 	allocator.BeginFrame();
 	UpdateAllocatorStats();
 	ring.BeginFrame();
 
-	if ( path == UPLOAD_PATH_DISABLED ) {
+	if ( path == UPLOAD_PATH_DISABLED || frameBufferCount <= 0 ) {
 		return;
 	}
 
-	currentFrameBuffer = frameCount % RENDERER_UPLOAD_FRAME_BUFFERS;
+	currentFrameBuffer = frameCount % frameBufferCount;
+	stats.frameBufferIndex = currentFrameBuffer;
 	frameBuffer_t &frame = frameBuffers[currentFrameBuffer];
 	RetireFrameFence( frame );
 
 	if ( path != UPLOAD_PATH_PERSISTENT ) {
 		glBindBufferARB( GL_ARRAY_BUFFER_ARB, frame.vbo );
 		glBufferDataARB( GL_ARRAY_BUFFER_ARB, (GLsizeiptrARB)stats.ringSizeBytes, NULL, GL_STREAM_DRAW_ARB );
+		R_GLStateCache_InvalidateBufferBinding( GL_ARRAY_BUFFER, "renderer upload frame orphan" );
 	}
 }
 
@@ -399,6 +407,7 @@ bool idUploadManager::AllocFrameTemp( void *data, int bytes, int alignment, rend
 	stats.frameRingUsedBytes = ring.Used();
 	stats.frameRingHighWaterBytes = ring.HighWater();
 	R_RendererMetrics_AddUploadBytes( bytes );
+	R_GLStateCache_InvalidateBufferBinding( GL_ARRAY_BUFFER, "renderer upload frame stream" );
 	return true;
 }
 
@@ -469,7 +478,7 @@ bool idUploadManager::CreateFrameBuffers( uploadPath_t requestedPath ) {
 	const GLbitfield persistentFlags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_DYNAMIC_STORAGE_BIT;
 	const GLbitfield mapFlags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
 
-	for ( int i = 0; i < RENDERER_UPLOAD_FRAME_BUFFERS; ++i ) {
+	for ( int i = 0; i < frameBufferCount; ++i ) {
 		glGenBuffersARB( 1, &frameBuffers[i].vbo );
 		glBindBufferARB( GL_ARRAY_BUFFER_ARB, frameBuffers[i].vbo );
 
@@ -485,11 +494,12 @@ bool idUploadManager::CreateFrameBuffers( uploadPath_t requestedPath ) {
 	}
 
 	glBindBufferARB( GL_ARRAY_BUFFER_ARB, 0 );
+	R_GLStateCache_InvalidateBufferBinding( GL_ARRAY_BUFFER, "renderer upload init" );
 	return true;
 }
 
 void idUploadManager::ShutdownFrameBuffers( void ) {
-	for ( int i = 0; i < RENDERER_UPLOAD_FRAME_BUFFERS; ++i ) {
+	for ( int i = 0; i < RENDERER_UPLOAD_MAX_FRAME_BUFFERS; ++i ) {
 		if ( frameBuffers[i].fence != NULL && glDeleteSync != NULL ) {
 			glDeleteSync( frameBuffers[i].fence );
 			frameBuffers[i].fence = NULL;
@@ -505,6 +515,7 @@ void idUploadManager::ShutdownFrameBuffers( void ) {
 		}
 	}
 	glBindBufferARB( GL_ARRAY_BUFFER_ARB, 0 );
+	R_GLStateCache_InvalidateBufferBinding( GL_ARRAY_BUFFER, "renderer upload shutdown" );
 }
 
 void idUploadManager::RetireFrameFence( frameBuffer_t &frame ) {
@@ -679,7 +690,8 @@ bool RendererUpload_RunSelfTest( void ) {
 	}
 
 	common->Printf(
-		"RendererUpload self-test passed (ring, allocator, static buffers, persistent=%d lowOverheadDefault=%d fences=%d/%d waits=%d sync=%d)\n",
+		"RendererUpload self-test passed (ring, allocator, static buffers, buffers=%d persistent=%d lowOverheadDefault=%d fences=%d/%d waits=%d sync=%d)\n",
+		R_RendererUpload_Stats().ringBufferCount,
 		R_RendererUpload_Stats().persistentMapped ? 1 : 0,
 		R_RendererUpload_Stats().lowOverheadPersistentDefault ? 1 : 0,
 		R_RendererUpload_Stats().frameFencesSubmitted,

@@ -113,6 +113,17 @@ void idGLStateCache::InvalidateAll( const char *reason ) {
 	SetInvalidationReason( reason );
 }
 
+void idGLStateCache::InvalidateBufferBinding( GLenum target, const char *reason ) {
+	cachedGLuint_t *cached = BufferBindingForTarget( target );
+	if ( cached == NULL ) {
+		InvalidateAll( reason );
+		return;
+	}
+	memset( cached, 0, sizeof( *cached ) );
+	stats.forcedInvalidations++;
+	SetInvalidationReason( reason );
+}
+
 void idGLStateCache::LegacyHandoffReset( const char *reason ) {
 	InvalidateAll( reason != NULL ? reason : "legacy-handoff" );
 	stats.legacyHandoffResets++;
@@ -169,7 +180,7 @@ idGLStateCache::cachedGLuint_t *idGLStateCache::BufferBindingForTarget( GLenum t
 	}
 }
 
-idGLStateCache::cachedGLuint_t *idGLStateCache::BufferBaseBindingForTarget( GLenum target, GLuint index ) {
+idGLStateCache::cachedBufferBaseBinding_t *idGLStateCache::BufferBaseBindingForTarget( GLenum target, GLuint index ) {
 	switch ( target ) {
 	case GL_UNIFORM_BUFFER:
 		if ( index < static_cast<GLuint>( UniformBindingCount() ) ) {
@@ -252,15 +263,44 @@ bool idGLStateCache::BindBufferBase( GLenum target, GLuint index, GLuint buffer 
 	if ( glBindBufferBase == NULL ) {
 		return false;
 	}
-	cachedGLuint_t *cached = BufferBaseBindingForTarget( target, index );
-	if ( cached != NULL && cached->valid && cached->value == buffer ) {
+	cachedBufferBaseBinding_t *cached = BufferBaseBindingForTarget( target, index );
+	if ( cached != NULL && cached->valid && !cached->range && cached->buffer == buffer ) {
 		RecordHit();
 		return false;
 	}
 	glBindBufferBase( target, index, buffer );
 	if ( cached != NULL ) {
 		cached->valid = true;
-		cached->value = buffer;
+		cached->buffer = buffer;
+		cached->offset = 0;
+		cached->size = 0;
+		cached->range = false;
+	}
+	cachedGLuint_t *generic = BufferBindingForTarget( target );
+	if ( generic != NULL ) {
+		generic->valid = true;
+		generic->value = buffer;
+	}
+	RecordMiss( *BufferMissBucketForTarget( target ) );
+	return true;
+}
+
+bool idGLStateCache::BindBufferRange( GLenum target, GLuint index, GLuint buffer, GLintptr offset, GLsizeiptr size ) {
+	if ( glBindBufferRange == NULL || size <= 0 ) {
+		return false;
+	}
+	cachedBufferBaseBinding_t *cached = BufferBaseBindingForTarget( target, index );
+	if ( cached != NULL && cached->valid && cached->range && cached->buffer == buffer && cached->offset == offset && cached->size == size ) {
+		RecordHit();
+		return false;
+	}
+	glBindBufferRange( target, index, buffer, offset, size );
+	if ( cached != NULL ) {
+		cached->valid = true;
+		cached->buffer = buffer;
+		cached->offset = offset;
+		cached->size = size;
+		cached->range = true;
 	}
 	cachedGLuint_t *generic = BufferBindingForTarget( target );
 	if ( generic != NULL ) {
@@ -285,8 +325,8 @@ bool idGLStateCache::BindBuffersBase( GLenum target, GLuint first, GLsizei count
 
 	bool allCached = true;
 	for ( GLsizei i = 0; i < count; ++i ) {
-		cachedGLuint_t *cached = BufferBaseBindingForTarget( target, first + i );
-		if ( cached == NULL || !cached->valid || cached->value != buffers[i] ) {
+		cachedBufferBaseBinding_t *cached = BufferBaseBindingForTarget( target, first + i );
+		if ( cached == NULL || !cached->valid || cached->range || cached->buffer != buffers[i] ) {
 			allCached = false;
 			break;
 		}
@@ -298,15 +338,18 @@ bool idGLStateCache::BindBuffersBase( GLenum target, GLuint first, GLsizei count
 
 	glBindBuffersBase( target, first, count, buffers );
 	for ( GLsizei i = 0; i < count; ++i ) {
-		cachedGLuint_t *cached = BufferBaseBindingForTarget( target, first + i );
+		cachedBufferBaseBinding_t *cached = BufferBaseBindingForTarget( target, first + i );
 		if ( cached != NULL ) {
-			if ( cached->valid && cached->value == buffers[i] ) {
+			if ( cached->valid && !cached->range && cached->buffer == buffers[i] ) {
 				stats.hits++;
 			} else {
 				RecordMiss( *BufferMissBucketForTarget( target ) );
 			}
 			cached->valid = true;
-			cached->value = buffers[i];
+			cached->buffer = buffers[i];
+			cached->offset = 0;
+			cached->size = 0;
+			cached->range = false;
 		} else {
 			RecordMiss( *BufferMissBucketForTarget( target ) );
 		}
@@ -715,6 +758,10 @@ void R_GLStateCache_InvalidateAll( const char *reason ) {
 	rg_glStateCache.InvalidateAll( reason );
 }
 
+void R_GLStateCache_InvalidateBufferBinding( GLenum target, const char *reason ) {
+	rg_glStateCache.InvalidateBufferBinding( target, reason );
+}
+
 void R_GLStateCache_LegacyHandoffReset( const char *reason ) {
 	rg_glStateCache.LegacyHandoffReset( reason );
 }
@@ -759,9 +806,31 @@ bool RendererGLStateCache_RunSelfTest( void ) {
 	}
 	cache.BindBuffer( GL_ARRAY_BUFFER, 0 );
 	cache.BindBuffer( GL_ARRAY_BUFFER, 0 );
+	{
+		const glStateCacheStats_t beforeTargetInvalidate = cache.Stats();
+		cache.InvalidateBufferBinding( GL_ARRAY_BUFFER, "self-test buffer target" );
+		cache.BindBuffer( GL_ARRAY_BUFFER, 0 );
+		if ( cache.Stats().misses <= beforeTargetInvalidate.misses ) {
+			common->Printf( "RendererGLStateCache self-test failed: buffer-target invalidation did not force a cache miss\n" );
+			return false;
+		}
+	}
 	if ( glBindBufferBase != NULL ) {
 		cache.BindBufferBase( GL_UNIFORM_BUFFER, 0, 0 );
 		cache.BindBufferBase( GL_UNIFORM_BUFFER, 0, 0 );
+	}
+	if ( glBindBufferRange != NULL && glGenBuffers != NULL && glBufferData != NULL && glDeleteBuffers != NULL ) {
+		GLuint rangeBuffer = 0;
+		glGenBuffers( 1, &rangeBuffer );
+		if ( rangeBuffer != 0 ) {
+			cache.BindBuffer( GL_UNIFORM_BUFFER, rangeBuffer );
+			glBufferData( GL_UNIFORM_BUFFER, 64, NULL, GL_STREAM_DRAW );
+			cache.BindBufferRange( GL_UNIFORM_BUFFER, 0, rangeBuffer, 0, 16 );
+			cache.BindBufferRange( GL_UNIFORM_BUFFER, 0, rangeBuffer, 0, 16 );
+			cache.BindBufferBase( GL_UNIFORM_BUFFER, 0, 0 );
+			cache.BindBuffer( GL_UNIFORM_BUFFER, 0 );
+			glDeleteBuffers( 1, &rangeBuffer );
+		}
 	}
 	cache.SetBlendEnabled( false );
 	cache.SetBlendEnabled( false );

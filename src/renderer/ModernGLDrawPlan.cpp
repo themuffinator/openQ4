@@ -223,7 +223,10 @@ bool idModernGLDrawPlan::AddEntry( const drawPacket_t &draw, int drawPacketIndex
 	entry.normalTextureLocation = program.normalTextureLocation;
 	entry.specularTextureLocation = program.specularTextureLocation;
 	entry.emissiveTextureLocation = program.emissiveTextureLocation;
+	entry.textureIndicesLocation = program.textureIndicesLocation;
+	entry.textureTableModeLocation = program.textureTableModeLocation;
 	entry.materialFlagsLocation = program.materialFlagsLocation;
+	entry.drawRecordModeLocation = program.drawRecordModeLocation;
 	entry.drawPacketIndex = drawPacketIndex;
 	entry.materialRecordIndex = draw.materialRecordIndex;
 	entry.materialTableIndex = materialRecord.tableIndex;

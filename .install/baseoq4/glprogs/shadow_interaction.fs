@@ -12,6 +12,7 @@ uniform sampler2D uTranslucentShadowMapB;
 
 uniform vec4 uDiffuseColor;
 uniform vec4 uSpecularColor;
+uniform float uMaterialEnhanced;
 uniform float uMaterialNormalScale;
 uniform float uMaterialSpecularBoost;
 uniform float uMaterialFresnel;
@@ -87,6 +88,10 @@ vec3 SafeNormalize( vec3 value ) {
 }
 
 vec3 DecodeLocalNormal( vec4 bumpSample ) {
+	if ( uMaterialEnhanced < 0.5 ) {
+		return SafeNormalize( vec3( bumpSample.a, bumpSample.g, bumpSample.b ) * 2.0 - 1.0 );
+	}
+
 	vec2 localNormalXY = vec2( bumpSample.a, bumpSample.g ) * 2.0 - 1.0;
 	localNormalXY *= max( uMaterialNormalScale, 0.0 );
 
@@ -108,6 +113,18 @@ float EnhancedSpecularTerm( vec3 halfAngle, vec3 viewDir, vec3 localNormal, vec3
 	float specularPower = mix( 10.0, 40.0, gloss );
 	float fresnel = 1.0 + ( pow( 1.0 - ndotv, 5.0 ) * 2.0 * clamp( uMaterialFresnel, 0.0, 1.0 ) );
 	return pow( ndoth, specularPower ) * max( uMaterialSpecularBoost, 0.0 ) * fresnel;
+}
+
+float LegacySpecularTerm( vec3 halfAngle, vec3 localNormal ) {
+	float specular = clamp( dot( halfAngle, localNormal ) * 4.0 - 3.0, 0.0, 1.0 );
+	return specular * specular;
+}
+
+vec3 InteractionSpecular( vec3 halfAngle, vec3 viewDir, vec3 localNormal, vec3 specularSample ) {
+	if ( uMaterialEnhanced >= 0.5 ) {
+		return specularSample * uSpecularColor.rgb * EnhancedSpecularTerm( halfAngle, viewDir, localNormal, specularSample );
+	}
+	return specularSample * ( uSpecularColor.rgb * 2.0 ) * LegacySpecularTerm( halfAngle, localNormal );
 }
 
 float ApproxErf( float x ) {
@@ -527,8 +544,7 @@ void main() {
 	vec3 specularSample = texture2D( uSpecularMap, vSpecularTexCoord ).rgb;
 	vec3 halfAngle = SafeNormalize( vHalfAngleVector );
 	vec3 viewDir = SafeNormalize( vViewVector );
-	float specularTerm = EnhancedSpecularTerm( halfAngle, viewDir, localNormal, specularSample );
-	vec3 specular = specularSample * uSpecularColor.rgb * specularTerm;
+	vec3 specular = InteractionSpecular( halfAngle, viewDir, localNormal, specularSample );
 
 	vec3 color = ( diffuse + specular ) * light * vVertexColor;
 	if ( ShadowVisualDebugMode() ) {

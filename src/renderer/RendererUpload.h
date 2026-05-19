@@ -19,6 +19,7 @@ typedef struct rendererUploadStats_s {
 	int		frameFencesSubmitted;
 	int		frameFencesRetired;
 	int		frameFenceWaits;
+	int		frameBufferIndex;
 	int		staticBuffersLive;
 	int		staticBytesLive;
 	int		ringSizeBytes;
@@ -123,6 +124,10 @@ private:
 		UPLOAD_PATH_PERSISTENT
 	};
 
+	enum {
+		RENDERER_UPLOAD_MAX_FRAME_BUFFERS = 8
+	};
+
 	struct frameBuffer_t {
 		unsigned int	vbo;
 		byte			*mapped;
@@ -140,9 +145,10 @@ private:
 	idRingBuffer			ring;
 	idLegacyStreamBuffer	legacy;
 	rendererUploadStats_t	stats;
-	frameBuffer_t			frameBuffers[3];
+	frameBuffer_t			frameBuffers[RENDERER_UPLOAD_MAX_FRAME_BUFFERS];
 	uploadPath_t			path;
 	int						currentFrameBuffer;
+	int						frameBufferCount;
 	bool					initialized;
 	bool					hasSync;
 };

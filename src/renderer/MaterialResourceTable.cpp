@@ -11,6 +11,8 @@ typedef struct materialResourceTableState_s {
 	renderBackendCaps_t				caps;
 	renderFeatureSet_t				features;
 	int								maxClassicTextureUnits;
+	unsigned int					textureArrayTable[MATERIAL_RESOURCE_TABLE_TEXTURE_ARRAY_CAPACITY];
+	int								textureArrayTableCount;
 } materialResourceTableState_t;
 
 static materialResourceTableState_t rg_materialResourceTable;
@@ -372,6 +374,67 @@ static void R_MaterialResourceTable_UpdateRecordSemanticFlags( materialResourceT
 	}
 }
 
+static unsigned int R_MaterialResourceTable_ImageHandleOrZero( const idImage *image ) {
+	if ( image != NULL && image->IsLoaded() ) {
+		return const_cast<idImage *>( image )->GetDeviceHandle();
+	}
+	return 0;
+}
+
+static int R_MaterialResourceTable_TextureArrayCapacity( void ) {
+	if ( !rg_materialResourceTable.stats.textureArraysSupported ) {
+		return 0;
+	}
+	if ( rg_materialResourceTable.caps.maxTextureImageUnits > 0 ) {
+		return Min( rg_materialResourceTable.caps.maxTextureImageUnits, MATERIAL_RESOURCE_TABLE_TEXTURE_ARRAY_CAPACITY );
+	}
+	return MATERIAL_RESOURCE_TABLE_TEXTURE_ARRAY_CAPACITY;
+}
+
+static int R_MaterialResourceTable_FindTextureArrayTableIndexInternal( unsigned int textureHandle ) {
+	if ( textureHandle == 0 ) {
+		return -1;
+	}
+	for ( int i = 0; i < rg_materialResourceTable.textureArrayTableCount; ++i ) {
+		if ( rg_materialResourceTable.textureArrayTable[i] == textureHandle ) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+static int R_MaterialResourceTable_AddTextureArrayTableHandle( unsigned int textureHandle ) {
+	if ( textureHandle == 0 ) {
+		return -1;
+	}
+	const int existing = R_MaterialResourceTable_FindTextureArrayTableIndexInternal( textureHandle );
+	if ( existing >= 0 ) {
+		return existing;
+	}
+	const int capacity = R_MaterialResourceTable_TextureArrayCapacity();
+	if ( rg_materialResourceTable.textureArrayTableCount >= capacity ) {
+		rg_materialResourceTable.stats.textureArrayTableOverflows++;
+		return -1;
+	}
+	const int index = rg_materialResourceTable.textureArrayTableCount++;
+	rg_materialResourceTable.textureArrayTable[index] = textureHandle;
+	return index;
+}
+
+static void R_MaterialResourceTable_AddTextureArrayFallbackImage( const idImage *image ) {
+	R_MaterialResourceTable_AddTextureArrayTableHandle( R_MaterialResourceTable_ImageHandleOrZero( image ) );
+}
+
+static void R_MaterialResourceTable_SeedTextureArrayFallbacks( void ) {
+	if ( globalImages == NULL ) {
+		return;
+	}
+	R_MaterialResourceTable_AddTextureArrayFallbackImage( globalImages->defaultImage );
+	R_MaterialResourceTable_AddTextureArrayFallbackImage( globalImages->whiteImage );
+	R_MaterialResourceTable_AddTextureArrayFallbackImage( globalImages->blackImage );
+	R_MaterialResourceTable_AddTextureArrayFallbackImage( globalImages->flatNormalMap );
+}
+
 static int R_MaterialResourceTable_FindTextureBindingIndex( const materialResourceTableRecord_t &record, materialResourceTextureSemantic_t semantic ) {
 	for ( int i = 0; i < record.textureBindingCount; ++i ) {
 		if ( record.textures[i].semantic == semantic ) {
@@ -446,7 +509,7 @@ static void R_MaterialResourceTable_AddTextureBinding(
 	}
 	binding.loaded = image->IsLoaded();
 	binding.defaulted = image->IsDefaulted();
-	binding.textureArrayCandidate = rg_materialResourceTable.stats.textureArraysSupported;
+	binding.textureArrayCandidate = rg_materialResourceTable.stats.textureArraysSupported && binding.loaded && binding.textureHandle != 0;
 	binding.textureArrayLayer = -1;
 	binding.textureViewCandidate = rg_materialResourceTable.stats.textureViewsSupported;
 	binding.textureViewHandle = 0;
@@ -476,12 +539,40 @@ static void R_MaterialResourceTable_AddTextureBinding(
 	if ( binding.classicUnit >= 0 ) {
 		rg_materialResourceTable.stats.classicTextureBindings++;
 	}
-	if ( binding.textureArrayCandidate ) {
-		rg_materialResourceTable.stats.textureArrayDescriptors++;
-	}
 	if ( binding.textureViewCandidate ) {
 		rg_materialResourceTable.stats.textureViewDescriptors++;
 	}
+}
+
+static void R_MaterialResourceTable_BuildTextureArrayTable( void ) {
+	memset( rg_materialResourceTable.textureArrayTable, 0, sizeof( rg_materialResourceTable.textureArrayTable ) );
+	rg_materialResourceTable.textureArrayTableCount = 0;
+	rg_materialResourceTable.stats.textureArrayTableCapacity = R_MaterialResourceTable_TextureArrayCapacity();
+	if ( !rg_materialResourceTable.stats.textureArraysSupported || rg_materialResourceTable.stats.textureArrayTableCapacity <= 0 ) {
+		return;
+	}
+
+	R_MaterialResourceTable_SeedTextureArrayFallbacks();
+	for ( int recordIndex = 0; recordIndex < rg_materialResourceTable.stats.records; ++recordIndex ) {
+		materialResourceTableRecord_t &record = rg_materialResourceTable.records[recordIndex];
+		for ( int bindingIndex = 0; bindingIndex < record.textureBindingCount; ++bindingIndex ) {
+			materialResourceTextureBinding_t &binding = record.textures[bindingIndex];
+			if ( !binding.loaded || binding.textureHandle == 0 ) {
+				binding.textureArrayCandidate = false;
+				binding.textureArrayLayer = -1;
+				continue;
+			}
+			const int layer = R_MaterialResourceTable_AddTextureArrayTableHandle( binding.textureHandle );
+			binding.textureArrayCandidate = layer >= 0;
+			binding.textureArrayLayer = layer;
+			if ( layer >= 0 ) {
+				rg_materialResourceTable.stats.textureArrayDescriptors++;
+				rg_materialResourceTable.stats.textureArrayTableDescriptors++;
+			}
+		}
+	}
+	rg_materialResourceTable.stats.textureArrayTableTextures = rg_materialResourceTable.textureArrayTableCount;
+	rg_materialResourceTable.stats.textureArrayTableReady = rg_materialResourceTable.textureArrayTableCount > 0;
 }
 
 static void R_MaterialResourceTable_CountClass( const materialResourceTableRecord_t &record ) {
@@ -834,6 +925,8 @@ static void R_MaterialResourceTable_ResetFrameStats( void ) {
 	const bool textureArraysSupported = rg_materialResourceTable.stats.textureArraysSupported;
 	const bool textureViewsSupported = rg_materialResourceTable.stats.textureViewsSupported;
 	memset( rg_materialResourceTable.records, 0, sizeof( rg_materialResourceTable.records ) );
+	memset( rg_materialResourceTable.textureArrayTable, 0, sizeof( rg_materialResourceTable.textureArrayTable ) );
+	rg_materialResourceTable.textureArrayTableCount = 0;
 	memset( &rg_materialResourceTable.stats, 0, sizeof( rg_materialResourceTable.stats ) );
 	rg_materialResourceTable.stats.initialized = initialized;
 	rg_materialResourceTable.stats.available = available;
@@ -853,8 +946,9 @@ void R_MaterialResourceTable_Init( const renderBackendCaps_t &caps, const render
 	rg_materialResourceTable.stats.available = features.scenePackets;
 	rg_materialResourceTable.stats.bindlessSupported = features.bindlessTextures && caps.hasBindlessTexture;
 	rg_materialResourceTable.stats.bindlessEnabled = false;
-	rg_materialResourceTable.stats.textureArraysSupported = caps.hasTextureArrays;
+	rg_materialResourceTable.stats.textureArraysSupported = features.gpuDriven && caps.hasTextureArrays && caps.maxTextureImageUnits >= MATERIAL_RESOURCE_TABLE_TEXTURE_ARRAY_CAPACITY;
 	rg_materialResourceTable.stats.textureViewsSupported = features.gpuDriven && caps.hasTextureViews;
+	rg_materialResourceTable.stats.textureArrayTableCapacity = R_MaterialResourceTable_TextureArrayCapacity();
 	R_MaterialResourceTable_SetStatus( rg_materialResourceTable.stats.available ? "ready" : "scene packets unavailable" );
 }
 
@@ -879,6 +973,7 @@ void R_MaterialResourceTable_PrepareFrame( const idScenePacketFrame &packetFrame
 	for ( int i = 0; i < packetFrame.NumMaterialRecords(); ++i ) {
 		R_MaterialResourceTable_AddRecordFromSource( packetFrame.MaterialRecord( i ), i, true );
 	}
+	R_MaterialResourceTable_BuildTextureArrayTable();
 	if ( rg_materialResourceTable.stats.overflow ) {
 		R_MaterialResourceTable_SetStatus( "overflow" );
 	} else {
@@ -909,10 +1004,19 @@ const materialResourceTableRecord_t *R_MaterialResourceTable_FindRecordForMateri
 	return NULL;
 }
 
+const unsigned int *R_MaterialResourceTable_TextureArrayTable( int &count ) {
+	count = rg_materialResourceTable.textureArrayTableCount;
+	return rg_materialResourceTable.textureArrayTable;
+}
+
+int R_MaterialResourceTable_TextureArrayTableIndexForHandle( unsigned int textureHandle ) {
+	return R_MaterialResourceTable_FindTextureArrayTableIndexInternal( textureHandle );
+}
+
 void R_MaterialResourceTable_PrintGfxInfo( void ) {
 	const materialResourceTableStats_t &stats = R_MaterialResourceTable_Stats();
 	common->Printf(
-		"Material resource table: initialized=%d available=%d prepared=%d records=%d source=%d draws=%d textures=%d classic=%d arrays=%d views=%d bindless=%d/%d fallback=%d missing=%d unsupported=%d custom=%d/%d dynamic=%d current=%d texgen=%d(screen=%d sky=%d) condition=%d matrix=%d vertexColor=%d offset=%d debugTrunc=%d source='%s' status='%s'\n",
+		"Material resource table: initialized=%d available=%d prepared=%d records=%d source=%d draws=%d textures=%d classic=%d arrays=%d table=%d/%d desc=%d overflow=%d views=%d bindless=%d/%d fallback=%d missing=%d unsupported=%d custom=%d/%d dynamic=%d current=%d texgen=%d(screen=%d sky=%d) condition=%d matrix=%d vertexColor=%d offset=%d debugTrunc=%d source='%s' status='%s'\n",
 		stats.initialized ? 1 : 0,
 		stats.available ? 1 : 0,
 		stats.prepared ? 1 : 0,
@@ -922,6 +1026,10 @@ void R_MaterialResourceTable_PrintGfxInfo( void ) {
 		stats.textureBindings,
 		stats.classicTextureBindings,
 		stats.textureArrayDescriptors,
+		stats.textureArrayTableTextures,
+		stats.textureArrayTableCapacity,
+		stats.textureArrayTableDescriptors,
+		stats.textureArrayTableOverflows,
 		stats.textureViewDescriptors,
 		stats.bindlessEnabled ? 1 : 0,
 		stats.bindlessSupported ? 1 : 0,
@@ -947,13 +1055,17 @@ void R_MaterialResourceTable_PrintGfxInfo( void ) {
 void R_MaterialResourceTable_DumpLatest( void ) {
 	const materialResourceTableStats_t &stats = R_MaterialResourceTable_Stats();
 	common->Printf(
-		"MaterialResourceTable dump: prepared=%d available=%d records=%d source=%d draws=%d textures=%d fallback=%d missing=%d defaulted=%d unsupported=%d debugTrunc=%d source='%s' status='%s'\n",
+		"MaterialResourceTable dump: prepared=%d available=%d records=%d source=%d draws=%d textures=%d table=%d/%d desc=%d overflow=%d fallback=%d missing=%d defaulted=%d unsupported=%d debugTrunc=%d source='%s' status='%s'\n",
 		stats.prepared ? 1 : 0,
 		stats.available ? 1 : 0,
 		stats.records,
 		stats.sourceMaterialRecords,
 		stats.drawPacketReferences,
 		stats.textureBindings,
+		stats.textureArrayTableTextures,
+		stats.textureArrayTableCapacity,
+		stats.textureArrayTableDescriptors,
+		stats.textureArrayTableOverflows,
 		stats.fallbackRecords,
 		stats.missingImages,
 		stats.defaultedImages,
@@ -1005,7 +1117,7 @@ void R_MaterialResourceTable_DumpLatest( void ) {
 		for ( int bindingIndex = 0; bindingIndex < record.textureBindingCount; ++bindingIndex ) {
 			const materialResourceTextureBinding_t &binding = record.textures[bindingIndex];
 			common->Printf(
-				"    tex[%d] semantic=%s unit=%d image='%s' handle=%u loaded=%d defaulted=%d filter=%d repeat=%d stage=%d regs=%d+%d cond=%d alpha=%d texgen=%d matrix=%d vcolor=%d blend=%d depthWrite=%d offset=%.2f array=%d view=%d bindless=%d\n",
+				"    tex[%d] semantic=%s unit=%d image='%s' handle=%u loaded=%d defaulted=%d filter=%d repeat=%d stage=%d regs=%d+%d cond=%d alpha=%d texgen=%d matrix=%d vcolor=%d blend=%d depthWrite=%d offset=%.2f array=%d layer=%d view=%d bindless=%d\n",
 				bindingIndex,
 				MaterialResourceTextureSemantic_Name( binding.semantic ),
 				binding.classicUnit,
@@ -1027,6 +1139,7 @@ void R_MaterialResourceTable_DumpLatest( void ) {
 				binding.depthWrite ? 1 : 0,
 				binding.privatePolygonOffset,
 				binding.textureArrayCandidate ? 1 : 0,
+				binding.textureArrayLayer,
 				binding.textureViewCandidate ? 1 : 0,
 				binding.bindlessEnabled ? 1 : 0 );
 		}
@@ -1070,6 +1183,7 @@ static bool R_MaterialResourceTable_RunSyntheticRecordSelfTest( void ) {
 		common->Printf( "RendererMaterialResourceTable self-test failed: missing-texture record add failed\n" );
 		return false;
 	}
+	R_MaterialResourceTable_BuildTextureArrayTable();
 
 	const materialResourceTableStats_t &stats = R_MaterialResourceTable_Stats();
 	if ( stats.records != 6
@@ -1105,6 +1219,15 @@ static bool R_MaterialResourceTable_RunSyntheticRecordSelfTest( void ) {
 	}
 	if ( missing == NULL || missing->fallbackReason != MATERIAL_RESOURCE_FALLBACK_MISSING_IMAGE ) {
 		common->Printf( "RendererMaterialResourceTable self-test failed: missing-texture fallback mismatch\n" );
+		return false;
+	}
+	if ( stats.textureArraysSupported && ( !stats.textureArrayTableReady || stats.textureArrayTableTextures <= 0 || stats.textureArrayTableDescriptors <= 0 ) ) {
+		common->Printf(
+			"RendererMaterialResourceTable self-test failed: texture-array table mismatch ready=%d textures=%d desc=%d overflow=%d\n",
+			stats.textureArrayTableReady ? 1 : 0,
+			stats.textureArrayTableTextures,
+			stats.textureArrayTableDescriptors,
+			stats.textureArrayTableOverflows );
 		return false;
 	}
 	return true;
@@ -1182,12 +1305,14 @@ bool RendererMaterialResourceTable_RunSelfTest( void ) {
 	}
 
 	common->Printf(
-		"RendererMaterialResourceTable self-test passed (records=%d textures=%d fallback=%d missing=%d arrays=%d views=%d bindless=%d/%d)\n",
+		"RendererMaterialResourceTable self-test passed (records=%d textures=%d fallback=%d missing=%d arrays=%d table=%d/%d views=%d bindless=%d/%d)\n",
 		stats.records,
 		stats.textureBindings,
 		stats.fallbackRecords,
 		stats.missingImages,
 		stats.textureArrayDescriptors,
+		stats.textureArrayTableTextures,
+		stats.textureArrayTableCapacity,
 		stats.textureViewDescriptors,
 		stats.bindlessEnabled ? 1 : 0,
 		stats.bindlessSupported ? 1 : 0 );

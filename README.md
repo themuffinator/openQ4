@@ -56,6 +56,7 @@ Single-player and multiplayer live under one `baseoq4/` directory with `game-sp`
 - Multi-scale **bloom** with luminance-based extraction
 - **FP16 HDR** scene targets, filmic tone mapping, color controls, and log-average auto exposure
 - Depth-aware **lens flares** with lightweight corona and high-quality ghost/streak modes
+- Opt-in **soft particles** for BSE effects, letting smoke, dust, and additive bursts depth-fade against solid scene geometry without changing stock assets
 - **SSAO** and optional **CRT** post-processing
 - Classic **stencil shadows** remain the default and now include translucent material caster/receiver support by default, with experimental **shadow mapping** for projected and point lights, projected-light CSM, alpha-tested transparency shadows, and optional translucent shadow accumulation
 - Optional **enhanced material shading** upgrades stock normal/specular response through a renderer-only GLSL path, with no asset or material script changes required

@@ -27,6 +27,239 @@ static bool R_ModernGLSubmitPlan_ScissorEquals( const modernGLSubmitCommand_t &a
 		&& a.scissorY2 == b.scissorY2;
 }
 
+static modernGLSubmitCommand_t rg_modernGLSubmitPlanSortScratch[MODERN_GL_SUBMIT_PLAN_MAX_COMMANDS];
+
+static int R_ModernGLSubmitPlan_CompareInt( int a, int b ) {
+	return ( a > b ) - ( a < b );
+}
+
+static int R_ModernGLSubmitPlan_CompareUInt( unsigned int a, unsigned int b ) {
+	return ( a > b ) - ( a < b );
+}
+
+static bool R_ModernGLSubmitPlan_CommandCanSort( const modernGLSubmitCommand_t &command ) {
+	const modernGLDrawPlanEntry_t *entry = command.drawPlanEntry;
+	const drawPacket_t *draw = entry != NULL ? entry->drawPacket : NULL;
+	if ( draw == NULL || draw->packetCategory != SCENE_PACKET_CATEGORY_WORLD || command.viewDef == NULL ) {
+		return false;
+	}
+	if ( command.weaponDepthHack || command.visibilityDynamic || command.blendMode != MATERIAL_RESOURCE_BLEND_OPAQUE ) {
+		return false;
+	}
+	switch ( command.pipeline ) {
+	case MODERN_GL_DRAW_PLAN_PIPELINE_DEPTH:
+	case MODERN_GL_DRAW_PLAN_PIPELINE_GBUFFER:
+	case MODERN_GL_DRAW_PLAN_PIPELINE_FORWARD_PLUS_OPAQUE:
+		return true;
+	default:
+		return false;
+	}
+}
+
+static int R_ModernGLSubmitPlan_CullSortKey( const modernGLSubmitCommand_t &command ) {
+	int key = command.cullType & 0xff;
+	if ( command.twoSided ) {
+		key |= 1 << 8;
+	}
+	if ( command.shouldCreateBackSides ) {
+		key |= 1 << 9;
+	}
+	if ( command.negativeScale ) {
+		key |= 1 << 10;
+	}
+	return key;
+}
+
+static int R_ModernGLSubmitPlan_CompareSortKey( const modernGLSubmitCommand_t &a, const modernGLSubmitCommand_t &b ) {
+	int cmp = R_ModernGLSubmitPlan_CompareInt( static_cast<int>( a.pipeline ), static_cast<int>( b.pipeline ) );
+	if ( cmp != 0 ) {
+		return cmp;
+	}
+	cmp = R_ModernGLSubmitPlan_CompareUInt( a.program, b.program );
+	if ( cmp != 0 ) {
+		return cmp;
+	}
+	cmp = R_ModernGLSubmitPlan_CompareInt( a.materialTableIndex, b.materialTableIndex );
+	if ( cmp != 0 ) {
+		return cmp;
+	}
+	cmp = R_ModernGLSubmitPlan_CompareUInt( a.vertexBuffer, b.vertexBuffer );
+	if ( cmp != 0 ) {
+		return cmp;
+	}
+	cmp = R_ModernGLSubmitPlan_CompareInt( a.ambientCacheOffset, b.ambientCacheOffset );
+	if ( cmp != 0 ) {
+		return cmp;
+	}
+	cmp = R_ModernGLSubmitPlan_CompareUInt( a.indexBuffer, b.indexBuffer );
+	if ( cmp != 0 ) {
+		return cmp;
+	}
+	cmp = R_ModernGLSubmitPlan_CompareInt( a.indexType, b.indexType );
+	if ( cmp != 0 ) {
+		return cmp;
+	}
+	cmp = R_ModernGLSubmitPlan_CompareInt( a.vertexStride, b.vertexStride );
+	if ( cmp != 0 ) {
+		return cmp;
+	}
+	cmp = R_ModernGLSubmitPlan_CompareInt( R_ModernGLSubmitPlan_CullSortKey( a ), R_ModernGLSubmitPlan_CullSortKey( b ) );
+	if ( cmp != 0 ) {
+		return cmp;
+	}
+	cmp = R_ModernGLSubmitPlan_CompareInt( a.scissorX1, b.scissorX1 );
+	if ( cmp != 0 ) {
+		return cmp;
+	}
+	cmp = R_ModernGLSubmitPlan_CompareInt( a.scissorY1, b.scissorY1 );
+	if ( cmp != 0 ) {
+		return cmp;
+	}
+	cmp = R_ModernGLSubmitPlan_CompareInt( a.scissorX2, b.scissorX2 );
+	if ( cmp != 0 ) {
+		return cmp;
+	}
+	cmp = R_ModernGLSubmitPlan_CompareInt( a.scissorY2, b.scissorY2 );
+	if ( cmp != 0 ) {
+		return cmp;
+	}
+	return R_ModernGLSubmitPlan_CompareInt( a.originalSubmitOrder, b.originalSubmitOrder );
+}
+
+static bool R_ModernGLSubmitPlan_StateBucketEquals( const modernGLSubmitCommand_t &a, const modernGLSubmitCommand_t &b ) {
+	return a.pipeline == b.pipeline
+		&& a.program == b.program
+		&& a.materialTableIndex == b.materialTableIndex
+		&& a.vertexBuffer == b.vertexBuffer
+		&& a.ambientCacheOffset == b.ambientCacheOffset
+		&& a.indexBuffer == b.indexBuffer
+		&& a.indexType == b.indexType
+		&& a.vertexStride == b.vertexStride
+		&& R_ModernGLSubmitPlan_CullSortKey( a ) == R_ModernGLSubmitPlan_CullSortKey( b )
+		&& R_ModernGLSubmitPlan_ScissorEquals( a, b );
+}
+
+static void R_ModernGLSubmitPlan_StableSortRange( modernGLSubmitCommand_t *commands, int left, int right ) {
+	if ( right - left <= 1 ) {
+		return;
+	}
+	const int mid = left + ( right - left ) / 2;
+	R_ModernGLSubmitPlan_StableSortRange( commands, left, mid );
+	R_ModernGLSubmitPlan_StableSortRange( commands, mid, right );
+
+	for ( int i = left; i < right; ++i ) {
+		rg_modernGLSubmitPlanSortScratch[i] = commands[i];
+	}
+	int a = left;
+	int b = mid;
+	for ( int out = left; out < right; ++out ) {
+		if ( a >= mid ) {
+			commands[out] = rg_modernGLSubmitPlanSortScratch[b++];
+		} else if ( b >= right ) {
+			commands[out] = rg_modernGLSubmitPlanSortScratch[a++];
+		} else if ( R_ModernGLSubmitPlan_CompareSortKey( rg_modernGLSubmitPlanSortScratch[a], rg_modernGLSubmitPlanSortScratch[b] ) <= 0 ) {
+			commands[out] = rg_modernGLSubmitPlanSortScratch[a++];
+		} else {
+			commands[out] = rg_modernGLSubmitPlanSortScratch[b++];
+		}
+	}
+}
+
+static void R_ModernGLSubmitPlan_RebuildBatchStats( const modernGLSubmitCommand_t *commands, int numCommands, modernGLSubmitPlanStats_t &stats ) {
+	stats.programBatches = 0;
+	stats.vertexBufferBatches = 0;
+	stats.indexBufferBatches = 0;
+	stats.scissorBatches = 0;
+	stats.materialBatches = 0;
+	stats.sortedStateBuckets = 0;
+	for ( int i = 0; i < numCommands; ++i ) {
+		const bool havePrevious = i > 0;
+		const modernGLSubmitCommand_t &command = commands[i];
+		if ( !havePrevious || commands[i - 1].program != command.program ) {
+			stats.programBatches++;
+		}
+		if ( !havePrevious || commands[i - 1].vertexBuffer != command.vertexBuffer ) {
+			stats.vertexBufferBatches++;
+		}
+		if ( command.indexed && !command.uploadIndexBuffer && ( !havePrevious || commands[i - 1].indexBuffer != command.indexBuffer ) ) {
+			stats.indexBufferBatches++;
+		}
+		if ( !havePrevious || !R_ModernGLSubmitPlan_ScissorEquals( commands[i - 1], command ) ) {
+			stats.scissorBatches++;
+		}
+		if ( !havePrevious || commands[i - 1].materialTableIndex != command.materialTableIndex ) {
+			stats.materialBatches++;
+		}
+		if ( !havePrevious || !R_ModernGLSubmitPlan_StateBucketEquals( commands[i - 1], command ) ) {
+			stats.sortedStateBuckets++;
+		}
+	}
+}
+
+static void R_ModernGLSubmitPlan_SortCommands( modernGLSubmitCommand_t *commands, int numCommands, modernGLSubmitPlanStats_t &stats ) {
+	if ( numCommands <= 0 ) {
+		return;
+	}
+
+	stats.unsortedStateBuckets = 0;
+	for ( int i = 0; i < numCommands; ++i ) {
+		commands[i].sortEligible = R_ModernGLSubmitPlan_CommandCanSort( commands[i] );
+		commands[i].sortBucket = -1;
+		if ( commands[i].sortEligible ) {
+			stats.sortEligibleDraws++;
+		} else {
+			stats.sortLockedDraws++;
+		}
+		if ( i == 0 || !R_ModernGLSubmitPlan_StateBucketEquals( commands[i - 1], commands[i] ) ) {
+			stats.unsortedStateBuckets++;
+		}
+	}
+
+	int index = 0;
+	while ( index < numCommands ) {
+		if ( !commands[index].sortEligible ) {
+			index++;
+			continue;
+		}
+		const int start = index;
+		const renderPassCategory_t passCategory = commands[index].passCategory;
+		const viewDef_t *viewDef = commands[index].viewDef;
+		while ( index < numCommands
+			&& commands[index].sortEligible
+			&& commands[index].passCategory == passCategory
+			&& commands[index].viewDef == viewDef ) {
+			index++;
+		}
+		if ( index - start > 1 ) {
+			stats.sortSpans++;
+			R_ModernGLSubmitPlan_StableSortRange( commands, start, index );
+		}
+	}
+
+	int bucket = -1;
+	for ( int i = 0; i < numCommands; ++i ) {
+		if ( commands[i].sortEligible ) {
+			if ( i == 0 || !commands[i - 1].sortEligible || !R_ModernGLSubmitPlan_StateBucketEquals( commands[i - 1], commands[i] ) ) {
+				bucket++;
+				stats.sortBuckets++;
+			}
+			commands[i].sortBucket = bucket;
+			if ( commands[i].originalSubmitOrder != i ) {
+				stats.sortReorderedDraws++;
+			}
+		}
+	}
+
+	const int unsortedProgramBatches = stats.programBatches;
+	const int unsortedVertexBufferBatches = stats.vertexBufferBatches;
+	const int unsortedMaterialBatches = stats.materialBatches;
+	R_ModernGLSubmitPlan_RebuildBatchStats( commands, numCommands, stats );
+	stats.sortStateBucketSavings = Max( 0, stats.unsortedStateBuckets - stats.sortedStateBuckets );
+	stats.sortProgramBatchSavings = Max( 0, unsortedProgramBatches - stats.programBatches );
+	stats.sortMaterialBatchSavings = Max( 0, unsortedMaterialBatches - stats.materialBatches );
+	stats.sortVertexBufferBatchSavings = Max( 0, unsortedVertexBufferBatches - stats.vertexBufferBatches );
+}
+
 static bool R_ModernGLSubmitPlan_EntryNeedsIndexBuffer( const modernGLDrawPlanEntry_t &entry ) {
 	return entry.indexed && entry.indexCount > 0;
 }
@@ -295,7 +528,10 @@ bool idModernGLSubmitPlan::AddCommand( const modernGLDrawPlanEntry_t &entry ) {
 	command.normalTextureLocation = entry.normalTextureLocation;
 	command.specularTextureLocation = entry.specularTextureLocation;
 	command.emissiveTextureLocation = entry.emissiveTextureLocation;
+	command.textureIndicesLocation = entry.textureIndicesLocation;
+	command.textureTableModeLocation = entry.textureTableModeLocation;
 	command.materialFlagsLocation = entry.materialFlagsLocation;
+	command.drawRecordModeLocation = entry.drawRecordModeLocation;
 	command.vertexStride = geo->vertexStride;
 	command.indexType = geo->indexType;
 	command.indexCount = entry.indexCount;
@@ -304,6 +540,8 @@ bool idModernGLSubmitPlan::AddCommand( const modernGLDrawPlanEntry_t &entry ) {
 	command.materialTableIndex = entry.materialTableIndex;
 	command.geometryRecordIndex = entry.geometryRecordIndex;
 	command.instanceRecordIndex = entry.instanceRecordIndex;
+	command.originalSubmitOrder = numCommands;
+	command.sortBucket = -1;
 	const materialResourceTableRecord_t *materialRecord = R_MaterialResourceTable_RecordForIndex( entry.materialTableIndex );
 	command.blendMode = materialRecord != NULL ? materialRecord->blendMode : MATERIAL_RESOURCE_BLEND_OPAQUE;
 	command.cullType = materialRecord != NULL ? materialRecord->cullType : CT_FRONT_SIDED;
@@ -320,6 +558,7 @@ bool idModernGLSubmitPlan::AddCommand( const modernGLDrawPlanEntry_t &entry ) {
 	command.shouldCreateBackSides = materialRecord != NULL && materialRecord->shouldCreateBackSides;
 	command.weaponDepthHack = instance->weaponDepthHack;
 	command.negativeScale = instance->negativeScale;
+	command.sortEligible = false;
 	R_ModernGLSubmitPlan_FillVisibilityPacket( command, *geo, instance, materialRecord );
 
 	const bool havePrevious = numCommands > 0;
@@ -379,6 +618,7 @@ bool idModernGLSubmitPlan::Build( const idModernGLDrawPlan &drawPlan ) {
 	for ( int i = 0; i < drawPlan.NumEntries(); ++i ) {
 		AddCommand( drawPlan.Entry( i ) );
 	}
+	R_ModernGLSubmitPlan_SortCommands( commands, numCommands, stats );
 
 	stats.valid = stats.available && !stats.overflow;
 	if ( stats.overflow ) {
@@ -472,7 +712,124 @@ static bool R_ModernGLSubmitPlan_BuildSelfTestDrawPlan( bool ambientCacheReady, 
 	return drawPlan.Build( packetFrame, graph );
 }
 
+static void R_ModernGLSubmitPlan_InitSortSelfTestCommand(
+	modernGLSubmitCommand_t &command,
+	modernGLDrawPlanEntry_t &entry,
+	drawPacket_t &draw,
+	const viewDef_t *viewDef,
+	int originalOrder,
+	unsigned int program,
+	int materialTableIndex,
+	unsigned int vertexBuffer,
+	bool sortable ) {
+	memset( &draw, 0, sizeof( draw ) );
+	draw.packetCategory = sortable ? SCENE_PACKET_CATEGORY_WORLD : SCENE_PACKET_CATEGORY_GUI;
+	draw.passCategory = sortable ? RENDER_PASS_DEPTH : RENDER_PASS_GUI;
+	memset( &entry, 0, sizeof( entry ) );
+	entry.drawPacket = &draw;
+	entry.pipeline = sortable ? MODERN_GL_DRAW_PLAN_PIPELINE_DEPTH : MODERN_GL_DRAW_PLAN_PIPELINE_GUI;
+	entry.program = program;
+	entry.materialTableIndex = materialTableIndex;
+	entry.materialRecordIndex = materialTableIndex;
+
+	memset( &command, 0, sizeof( command ) );
+	command.drawPlanEntry = &entry;
+	command.viewDef = viewDef;
+	command.passCategory = draw.passCategory;
+	command.pipeline = entry.pipeline;
+	command.program = program;
+	command.vertexBuffer = vertexBuffer;
+	command.indexBuffer = 301;
+	command.ambientCacheOffset = 64;
+	command.indexCacheOffset = 128;
+	command.vertexStride = static_cast<int>( sizeof( idDrawVert ) );
+	command.indexType = GL_UNSIGNED_INT;
+	command.indexCount = 6;
+	command.vertexCount = 3;
+	command.materialTableIndex = materialTableIndex;
+	command.materialRecordIndex = materialTableIndex;
+	command.geometryRecordIndex = originalOrder;
+	command.instanceRecordIndex = originalOrder;
+	command.blendMode = sortable ? MATERIAL_RESOURCE_BLEND_OPAQUE : MATERIAL_RESOURCE_BLEND_GUI;
+	command.cullType = CT_FRONT_SIDED;
+	command.originalSubmitOrder = originalOrder;
+	command.sortBucket = -1;
+	command.scissorX1 = 0;
+	command.scissorY1 = 0;
+	command.scissorX2 = 639;
+	command.scissorY2 = 479;
+	command.indexed = true;
+	command.uploadIndexBuffer = false;
+	command.visibilityDynamic = false;
+	command.sortEligible = false;
+}
+
+static bool R_ModernGLSubmitPlan_RunSortSelfTest( void ) {
+	viewDef_t viewDef;
+	memset( &viewDef, 0, sizeof( viewDef ) );
+	modernGLSubmitCommand_t commands[5];
+	modernGLDrawPlanEntry_t entries[5];
+	drawPacket_t draws[5];
+	R_ModernGLSubmitPlan_InitSortSelfTestCommand( commands[0], entries[0], draws[0], &viewDef, 0, 200, 20, 20, true );
+	R_ModernGLSubmitPlan_InitSortSelfTestCommand( commands[1], entries[1], draws[1], &viewDef, 1, 100, 10, 10, true );
+	R_ModernGLSubmitPlan_InitSortSelfTestCommand( commands[2], entries[2], draws[2], &viewDef, 2, 200, 20, 20, true );
+	R_ModernGLSubmitPlan_InitSortSelfTestCommand( commands[3], entries[3], draws[3], &viewDef, 3, 100, 10, 10, true );
+	R_ModernGLSubmitPlan_InitSortSelfTestCommand( commands[4], entries[4], draws[4], &viewDef, 4, 300, 30, 30, false );
+
+	modernGLSubmitPlanStats_t stats;
+	memset( &stats, 0, sizeof( stats ) );
+	R_ModernGLSubmitPlan_RebuildBatchStats( commands, 5, stats );
+	R_ModernGLSubmitPlan_SortCommands( commands, 5, stats );
+	if ( !commands[0].sortEligible
+		|| !commands[1].sortEligible
+		|| !commands[2].sortEligible
+		|| !commands[3].sortEligible
+		|| commands[4].sortEligible
+		|| commands[0].program != 100
+		|| commands[1].program != 100
+		|| commands[2].program != 200
+		|| commands[3].program != 200
+		|| commands[4].originalSubmitOrder != 4
+		|| commands[0].originalSubmitOrder != 1
+		|| commands[1].originalSubmitOrder != 3
+		|| commands[2].originalSubmitOrder != 0
+		|| commands[3].originalSubmitOrder != 2 ) {
+		common->Printf( "RendererModernGLSubmitPlan self-test failed: sort order or lock mismatch\n" );
+		return false;
+	}
+	if ( stats.sortEligibleDraws != 4
+		|| stats.sortLockedDraws != 1
+		|| stats.sortSpans != 1
+		|| stats.sortBuckets != 2
+		|| stats.sortReorderedDraws != 4
+		|| stats.unsortedStateBuckets != 5
+		|| stats.sortedStateBuckets != 3
+		|| stats.sortStateBucketSavings != 2
+		|| stats.sortProgramBatchSavings != 2
+		|| stats.sortMaterialBatchSavings != 2
+		|| stats.sortVertexBufferBatchSavings != 2 ) {
+		common->Printf(
+			"RendererModernGLSubmitPlan self-test failed: sort stats mismatch (eligible=%d locked=%d spans=%d buckets=%d moved=%d state=%d/%d saved=%d program=%d material=%d vbo=%d)\n",
+			stats.sortEligibleDraws,
+			stats.sortLockedDraws,
+			stats.sortSpans,
+			stats.sortBuckets,
+			stats.sortReorderedDraws,
+			stats.unsortedStateBuckets,
+			stats.sortedStateBuckets,
+			stats.sortStateBucketSavings,
+			stats.sortProgramBatchSavings,
+			stats.sortMaterialBatchSavings,
+			stats.sortVertexBufferBatchSavings );
+		return false;
+	}
+	return true;
+}
+
 bool RendererModernGLSubmitPlan_RunSelfTest( void ) {
+	if ( !R_ModernGLSubmitPlan_RunSortSelfTest() ) {
+		return false;
+	}
 	if ( !R_ModernGLSubmitPlan_RunFrameTempIndexCacheSelfTest() ) {
 		return false;
 	}
@@ -588,13 +945,15 @@ bool RendererModernGLSubmitPlan_RunSelfTest( void ) {
 	}
 
 	common->Printf(
-		"RendererModernGLSubmitPlan self-test passed (ready=%d fallback=%d tempIndex=%d uploadIndex=%d programBatches=%d vertexBatches=%d indexBatches=%d)\n",
+		"RendererModernGLSubmitPlan self-test passed (ready=%d fallback=%d tempIndex=%d uploadIndex=%d programBatches=%d vertexBatches=%d indexBatches=%d sortEligible=%d sortSaved=%d)\n",
 		readyStats.readyDraws,
 		fallbackStats.fallbackDraws,
 		tempIndexStats.indexCacheReadyDraws,
 		uploadStats.indexUploadDraws,
 		readyStats.programBatches,
 		readyStats.vertexBufferBatches,
-		readyStats.indexBufferBatches );
+		readyStats.indexBufferBatches,
+		readyStats.sortEligibleDraws,
+		readyStats.sortStateBucketSavings );
 	return true;
 }

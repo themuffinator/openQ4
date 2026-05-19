@@ -77,15 +77,15 @@ r_rendererShaderReload 0
 
 OpenQ4 now builds context candidates from one shared renderer-side ladder instead of keeping per-platform arrays. Windows SDL3, Linux SDL3, native Linux/GLX, and native macOS/NSOpenGL all record the selected request in `glConfig.contextRequest`, and `gfxInfo` prints both requested and actual debug-context state.
 
-Forced modern tiers try the requested core-profile tier first, then lower modern tiers, then compatibility-profile fallbacks:
+Forced modern tiers prefer the requested compatibility-profile tier first, then lower compatibility-profile tiers, then the unversioned compatibility fallback, with core-profile candidates retained only as a final diagnostic fallback:
 
-1. `gl46`: `4.6 core`, `4.5 core`, `4.3 core`, `4.1 core`, `3.3 core`, compatibility fallbacks
-2. `gl45`: `4.5 core`, `4.3 core`, `4.1 core`, `3.3 core`, compatibility fallbacks
-3. `gl43`: `4.3 core`, `4.1 core`, `3.3 core`, compatibility fallbacks
-4. `gl41`: `4.1 core`, `3.3 core`, compatibility fallbacks
-5. `gl33`: `3.3 core`, compatibility fallback
+1. `gl46`: `4.6 compatibility`, `4.5 compatibility`, `4.3 compatibility`, `4.1 compatibility`, `3.3 compatibility`, compatibility fallback, then matching core fallbacks
+2. `gl45`: `4.5 compatibility`, `4.3 compatibility`, `4.1 compatibility`, `3.3 compatibility`, compatibility fallback, then matching core fallbacks
+3. `gl43`: `4.3 compatibility`, `4.1 compatibility`, `3.3 compatibility`, compatibility fallback, then matching core fallbacks
+4. `gl41`: `4.1 compatibility`, `3.3 compatibility`, compatibility fallback, then matching core fallbacks
+5. `gl33`: `3.3 compatibility`, compatibility fallback, then `3.3 core`
 
-The default `auto` path still uses a versioned compatibility-profile ladder, because the current visible shipping executor is still the ARB2 compatibility bridge. This avoids regressing stock rendering while the modern executor is being promoted pass by pass. The shared ladder also has a modern-auto mode covered by self-test for the point where the visible renderer no longer needs the compatibility bridge.
+The default `auto` path and forced modern tiers both prefer versioned compatibility profiles because the current visible shipping executor is still the ARB2 compatibility bridge. This avoids regressing stock rendering while the modern executor is being promoted pass by pass. The shared ladder also has a modern-auto mode covered by self-test for the point where the visible renderer no longer needs the compatibility bridge.
 
 `r_glDebugContext 1` now expands the ladder rather than making startup all-or-nothing: each requested debug candidate is followed by the same non-debug candidate if the platform or driver rejects debug contexts. macOS skips debug candidates explicitly because NSOpenGL does not expose debug-context creation. macOS also skips 4.3+ core requests and continues at the highest supported OpenGL profile, 4.1 core.
 

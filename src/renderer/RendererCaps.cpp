@@ -338,9 +338,9 @@ int RendererContextLadder_Build(
 	int count = 0;
 	const int passCount = debugContext ? 2 : 1;
 	const rendererTier_t forcedTier = RendererTierPreference_ToForcedTier( preference );
-	const bool forceModernCore = RendererTier_IsModern( forcedTier );
+	const bool forcedModernTier = RendererTier_IsModern( forcedTier );
 	const bool compatibilityOnly = preference == RENDERER_TIER_PREF_LEGACY || ( preference == RENDERER_TIER_PREF_AUTO && keepAutoCompatibility );
-	const int firstStep = forceModernCore ? RendererContextLadder_FirstStepForPreference( preference ) : 0;
+	const int firstStep = forcedModernTier ? RendererContextLadder_FirstStepForPreference( preference ) : 0;
 
 	for ( int pass = 0; pass < passCount; ++pass ) {
 		const bool debugCandidate = debugContext && pass == 0;
@@ -352,6 +352,16 @@ int RendererContextLadder_Build(
 				RendererContextLadder_AddVersionRange( candidates, maxCandidates, count, 0, RENDERER_CONTEXT_PROFILE_COMPATIBILITY, debugCandidate );
 				RendererContextLadder_AddCompatibilityFallback( candidates, maxCandidates, count, debugCandidate );
 			}
+			continue;
+		}
+
+		if ( forcedModernTier ) {
+			// The visible renderer still rolls back through the ARB2 compatibility bridge.
+			// Prefer versioned compatibility contexts for forced tiers so gameplay does not
+			// land on a core profile before the modern visible path is complete.
+			RendererContextLadder_AddVersionRange( candidates, maxCandidates, count, firstStep, RENDERER_CONTEXT_PROFILE_COMPATIBILITY, debugCandidate );
+			RendererContextLadder_AddCompatibilityFallback( candidates, maxCandidates, count, debugCandidate );
+			RendererContextLadder_AddVersionRange( candidates, maxCandidates, count, firstStep, RENDERER_CONTEXT_PROFILE_CORE, debugCandidate );
 			continue;
 		}
 
@@ -1384,28 +1394,28 @@ bool RendererContextLadder_RunSelfTest( void ) {
 			false
 		},
 		{
-			"forced gl43 starts at gl43",
+			"forced gl43 starts at gl43 compatibility bridge",
 			RENDERER_TIER_PREF_GL43,
 			false,
 			true,
 			7,
 			4,
 			3,
-			RENDERER_CONTEXT_PROFILE_CORE,
+			RENDERER_CONTEXT_PROFILE_COMPATIBILITY,
 			false,
-			false
+			true
 		},
 		{
-			"forced gl33 starts at gl33",
+			"forced gl33 starts at gl33 compatibility bridge",
 			RENDERER_TIER_PREF_GL33,
 			false,
 			true,
 			3,
 			3,
 			3,
-			RENDERER_CONTEXT_PROFILE_CORE,
+			RENDERER_CONTEXT_PROFILE_COMPATIBILITY,
 			false,
-			false
+			true
 		}
 	};
 

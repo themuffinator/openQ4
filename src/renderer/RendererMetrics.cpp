@@ -302,6 +302,16 @@ typedef struct rendererMetricsFrame_s {
 	int		lowOverheadSamplerMultiBindBatches;
 	int		lowOverheadClassicTextureBinds;
 	int		lowOverheadCompactedBatches;
+	int		lowOverheadSoftRestores;
+	int		lowOverheadFullRestores;
+	bool	lowOverheadTextureTableReady;
+	bool	lowOverheadTextureTableUsed;
+	int		lowOverheadTextureTableCapacity;
+	int		lowOverheadTextureTableTextures;
+	int		lowOverheadTextureTableDescriptors;
+	int		lowOverheadTextureTableDraws;
+	int		lowOverheadTextureTableUniforms;
+	int		lowOverheadTextureTableFallbacks;
 	rendererClusteredLightingStats_t clusteredLighting;
 	glStateCacheStats_t glStateCache;
 	bool	gpuTimersValid;
@@ -621,6 +631,16 @@ typedef struct rendererLowOverheadLatest_s {
 	int		samplerMultiBindBatches;
 	int		classicTextureBinds;
 	int		compactedBatches;
+	int		softRestores;
+	int		fullRestores;
+	bool	textureTableReady;
+	bool	textureTableUsed;
+	int		textureTableCapacity;
+	int		textureTableTextures;
+	int		textureTableDescriptors;
+	int		textureTableDraws;
+	int		textureTableUniforms;
+	int		textureTableFallbacks;
 } rendererLowOverheadLatest_t;
 
 typedef struct rendererGLStateCacheLatest_s {
@@ -1062,6 +1082,16 @@ void R_RendererMetrics_BeginFrame( int frameCount ) {
 	rg_rendererMetrics.lowOverheadSamplerMultiBindBatches = rg_lowOverheadLatest.samplerMultiBindBatches;
 	rg_rendererMetrics.lowOverheadClassicTextureBinds = rg_lowOverheadLatest.classicTextureBinds;
 	rg_rendererMetrics.lowOverheadCompactedBatches = rg_lowOverheadLatest.compactedBatches;
+	rg_rendererMetrics.lowOverheadSoftRestores = rg_lowOverheadLatest.softRestores;
+	rg_rendererMetrics.lowOverheadFullRestores = rg_lowOverheadLatest.fullRestores;
+	rg_rendererMetrics.lowOverheadTextureTableReady = rg_lowOverheadLatest.textureTableReady;
+	rg_rendererMetrics.lowOverheadTextureTableUsed = rg_lowOverheadLatest.textureTableUsed;
+	rg_rendererMetrics.lowOverheadTextureTableCapacity = rg_lowOverheadLatest.textureTableCapacity;
+	rg_rendererMetrics.lowOverheadTextureTableTextures = rg_lowOverheadLatest.textureTableTextures;
+	rg_rendererMetrics.lowOverheadTextureTableDescriptors = rg_lowOverheadLatest.textureTableDescriptors;
+	rg_rendererMetrics.lowOverheadTextureTableDraws = rg_lowOverheadLatest.textureTableDraws;
+	rg_rendererMetrics.lowOverheadTextureTableUniforms = rg_lowOverheadLatest.textureTableUniforms;
+	rg_rendererMetrics.lowOverheadTextureTableFallbacks = rg_lowOverheadLatest.textureTableFallbacks;
 	rg_rendererMetrics.clusteredLighting = rg_clusteredLightingLatest;
 	rg_rendererMetrics.glStateCache = rg_glStateCacheLatest.stats;
 }
@@ -1524,7 +1554,7 @@ void R_RendererMetrics_RecordModernVisibility( bool requested, bool enabled, boo
 	rg_rendererMetrics.modernVisibilityShadowCasterSavedTriangles = shadowCasterSavedTriangles;
 }
 
-void R_RendererMetrics_RecordLowOverhead( bool requested, bool ready, bool usesDSA, bool usesMultiBind, bool bindlessRequested, bool bindlessAvailable, bool samplerReady, int dsaUpdates, int framebufferDSAUpdates, int samplerDSACreations, int samplerDSAUpdates, int bufferMultiBindBatches, int textureMultiBindBatches, int samplerMultiBindBatches, int classicTextureBinds, int compactedBatches ) {
+void R_RendererMetrics_RecordLowOverhead( bool requested, bool ready, bool usesDSA, bool usesMultiBind, bool bindlessRequested, bool bindlessAvailable, bool samplerReady, int dsaUpdates, int framebufferDSAUpdates, int samplerDSACreations, int samplerDSAUpdates, int bufferMultiBindBatches, int textureMultiBindBatches, int samplerMultiBindBatches, int classicTextureBinds, int compactedBatches, int softRestores, int fullRestores, bool textureTableReady, bool textureTableUsed, int textureTableCapacity, int textureTableTextures, int textureTableDescriptors, int textureTableDraws, int textureTableUniforms, int textureTableFallbacks ) {
 	rg_lowOverheadLatest.requested = requested;
 	rg_lowOverheadLatest.ready = ready;
 	rg_lowOverheadLatest.usesDSA = usesDSA;
@@ -1541,6 +1571,16 @@ void R_RendererMetrics_RecordLowOverhead( bool requested, bool ready, bool usesD
 	rg_lowOverheadLatest.samplerMultiBindBatches = samplerMultiBindBatches;
 	rg_lowOverheadLatest.classicTextureBinds = classicTextureBinds;
 	rg_lowOverheadLatest.compactedBatches = compactedBatches;
+	rg_lowOverheadLatest.softRestores = softRestores;
+	rg_lowOverheadLatest.fullRestores = fullRestores;
+	rg_lowOverheadLatest.textureTableReady = textureTableReady;
+	rg_lowOverheadLatest.textureTableUsed = textureTableUsed;
+	rg_lowOverheadLatest.textureTableCapacity = textureTableCapacity;
+	rg_lowOverheadLatest.textureTableTextures = textureTableTextures;
+	rg_lowOverheadLatest.textureTableDescriptors = textureTableDescriptors;
+	rg_lowOverheadLatest.textureTableDraws = textureTableDraws;
+	rg_lowOverheadLatest.textureTableUniforms = textureTableUniforms;
+	rg_lowOverheadLatest.textureTableFallbacks = textureTableFallbacks;
 	rg_rendererMetrics.lowOverheadRequested = requested;
 	rg_rendererMetrics.lowOverheadReady = ready;
 	rg_rendererMetrics.lowOverheadUsesDSA = usesDSA;
@@ -1557,6 +1597,16 @@ void R_RendererMetrics_RecordLowOverhead( bool requested, bool ready, bool usesD
 	rg_rendererMetrics.lowOverheadSamplerMultiBindBatches = samplerMultiBindBatches;
 	rg_rendererMetrics.lowOverheadClassicTextureBinds = classicTextureBinds;
 	rg_rendererMetrics.lowOverheadCompactedBatches = compactedBatches;
+	rg_rendererMetrics.lowOverheadSoftRestores = softRestores;
+	rg_rendererMetrics.lowOverheadFullRestores = fullRestores;
+	rg_rendererMetrics.lowOverheadTextureTableReady = textureTableReady;
+	rg_rendererMetrics.lowOverheadTextureTableUsed = textureTableUsed;
+	rg_rendererMetrics.lowOverheadTextureTableCapacity = textureTableCapacity;
+	rg_rendererMetrics.lowOverheadTextureTableTextures = textureTableTextures;
+	rg_rendererMetrics.lowOverheadTextureTableDescriptors = textureTableDescriptors;
+	rg_rendererMetrics.lowOverheadTextureTableDraws = textureTableDraws;
+	rg_rendererMetrics.lowOverheadTextureTableUniforms = textureTableUniforms;
+	rg_rendererMetrics.lowOverheadTextureTableFallbacks = textureTableFallbacks;
 }
 
 void R_RendererMetrics_RecordGLStateCache( const glStateCacheStats_t &stats ) {
@@ -1650,7 +1700,7 @@ void R_RendererMetrics_EndFrame( int frontEndMsec, int backEndMsec, int viewCoun
 	R_RendererMetrics_FormatGpuMsec( rg_rendererMetrics, gpuText, sizeof( gpuText ) );
 	if ( detail >= 2 ) {
 		common->Printf(
-			"rendererMetrics frame=%d tier=%s fe=%dms visibility=%dms packet=%dms graph=%dms submit=%dms be=%dms present=%dms gpu=%s views=%d ents=%d lights=%d draws=%d surf=%d verts=%d idx=%d uploads=%d stalls=%d ring=%d/%dKB allocs=%d overflow=%d static=%dKB/%d live=%d/%dKB writes(p=%d map=%d sub=%d) packets(source=%s scene=%d pass=%d draw=%d clipped=%d cmd=%d views=%d overflow=%d cause=%s sortFailures=%d categories(world=%d subview=%d remote=%d fx=%d viewmodel=%d demo=%d gui=%d post=%d present=%d command=%d)) resources(materials=%d geometryRecords=%d instances=%d withMaterial=%d materialRefs=%d geometryRefs=%d instanceRefs=%d geometry=%d regs=%d ibo=%d vbo=%d) graph(pass=%d packets=%d scenes=%d draw=%d cmd=%d res=%d imported=%d transient=%d aliasable=%d access=%d read=%d write=%d clear=%d resolve=%d invalidate=%d present=%d overflow=%d) graphGL(prepared=%d available=%d handles=%d imported=%d transient=%d textures=%d buffers=%d physical=%d new=%d reuse=%d aliasReuse=%d fbo=%d/%d skipped(imported=%d buffer=%d) lifetimeFailures=%d overflow=%d status='%s') materialTable(prepared=%d available=%d records=%d source=%d draws=%d textures=%d classic=%d arrays=%d views=%d bindless=%d/%d classes(o=%d p=%d t=%d gui=%d post=%d) fallback=%d missing=%d unsupported=%d reasons(matl=%d nodraw=%d image=%d custom=%d dynamic=%d texgen=%d current=%d slots=%d) status='%s') modernExec(mode=%s vao=%d ubo=%d shaderLib=%d shaders=%d shaderFails=%d passes=%d/%d fallback=%d draws=%d material=%d resources=%d geometry=%d plan=%d planDraws=%d depth=%d materialFamily=%d planFallback=%d batches=%d switches=%d materialSwitches=%d planOverflow=%d submit=%d submitDraws=%d submitDepth=%d submitMaterial=%d submitFallback=%d missing(vbo=%d ibo=%d) indexUpload=%d submitted=%d/%d submittedFallback=%d submittedUpload=%d submitBatches(program=%d vbo=%d ibo=%d scissor=%d material=%d) uniforms=%d frameUBO=%d submitOverflow=%d visibleDepth(req=%d exec=%d res=%d/%d draws=%d alpha=%d skinned=%d shadow=%d fallback=%d/%d stencil=%d mismatch=%d overlay=%d/%d) gbuffer(req=%d exec=%d res=%d mrt=%d draws=%d fallback=%d att=%d bpp=%d bw=%dKB overlay=%d/%d) deferred(req=%d exec=%d res=%d out=%d program=%d cluster=%d pixels=%d lights=%d p=%d proj=%d lightGrid=%d reads=%d fallback=%d unsupported=%d fog=%d special=%d overflow=%d clear=%d debug=%d overlay=%d/%d) cluster(req=%d valid=%d grids=%d lights=%d p=%d proj=%d fog=%d ambient=%d special=%d clusters=%d active=%d refs=%d overflow=%d/%d overflowRefs=%d max=%d grid=%dx%dx%d build=%dms ubo=%d bytes=%dKB overlay=%d/%d)) stateCache(hits=%d misses=%d invalidations=%d legacyResets=%d labels=%d groups=%d prog=%d vao=%d buf=%d tex=%d sampler=%d fbo=%d blend=%d depth=%d stencil=%d raster=%d viewport=%d scissor=%d color=%d last='%s') gpuPass(3d=%d/%d 2d=%d/%d rt=%d/%d copy=%d/%d special=%d/%d setbuf=%d/%d swap=%d/%d deferred=%d/%d dropped=%d) cmds(3d=%d 2d=%d rt=%d copy=%d swap=%d)\n",
+			"rendererMetrics frame=%d tier=%s fe=%dms visibility=%dms packet=%dms graph=%dms submit=%dms be=%dms present=%dms gpu=%s views=%d ents=%d lights=%d draws=%d surf=%d verts=%d idx=%d uploads=%d stalls=%d ring=%d/%dKB allocs=%d overflow=%d static=%dKB/%d live=%d/%dKB writes(p=%d map=%d sub=%d) packets(source=%s scene=%d pass=%d draw=%d clipped=%d cmd=%d views=%d overflow=%d cause=%s sortFailures=%d categories(world=%d subview=%d remote=%d fx=%d viewmodel=%d demo=%d gui=%d post=%d present=%d command=%d)) resources(materials=%d geometryRecords=%d instances=%d withMaterial=%d materialRefs=%d geometryRefs=%d instanceRefs=%d geometry=%d regs=%d ibo=%d vbo=%d) graph(pass=%d packets=%d scenes=%d draw=%d cmd=%d res=%d imported=%d transient=%d aliasable=%d access=%d read=%d write=%d clear=%d resolve=%d invalidate=%d present=%d overflow=%d) graphGL(prepared=%d available=%d handles=%d imported=%d transient=%d textures=%d buffers=%d physical=%d new=%d reuse=%d aliasReuse=%d fbo=%d/%d skipped(imported=%d buffer=%d) lifetimeFailures=%d overflow=%d status='%s') materialTable(prepared=%d available=%d records=%d source=%d draws=%d textures=%d classic=%d arrays=%d views=%d bindless=%d/%d classes(o=%d p=%d t=%d gui=%d post=%d) fallback=%d missing=%d unsupported=%d reasons(matl=%d nodraw=%d image=%d custom=%d dynamic=%d texgen=%d current=%d slots=%d) status='%s') modernExec(mode=%s vao=%d ubo=%d shaderLib=%d shaders=%d shaderFails=%d passes=%d/%d fallback=%d draws=%d material=%d resources=%d geometry=%d plan=%d planDraws=%d depth=%d materialFamily=%d planFallback=%d batches=%d switches=%d materialSwitches=%d planOverflow=%d submit=%d submitDraws=%d submitDepth=%d submitMaterial=%d submitFallback=%d missing(vbo=%d ibo=%d) indexUpload=%d submitted=%d/%d submittedFallback=%d submittedUpload=%d submitBatches(program=%d vbo=%d ibo=%d scissor=%d material=%d) uniforms=%d frameUBO=%d submitOverflow=%d visibleDepth(req=%d exec=%d res=%d/%d draws=%d alpha=%d skinned=%d shadow=%d fallback=%d/%d stencil=%d mismatch=%d overlay=%d/%d) gbuffer(req=%d exec=%d res=%d mrt=%d draws=%d fallback=%d att=%d bpp=%d bw=%dKB overlay=%d/%d) deferred(req=%d exec=%d res=%d out=%d program=%d cluster=%d pixels=%d lights=%d p=%d proj=%d lightGrid=%d reads=%d fallback=%d unsupported=%d fog=%d special=%d overflow=%d clear=%d debug=%d overlay=%d/%d) cluster(req=%d valid=%d grids=%d lights=%d p=%d proj=%d fog=%d ambient=%d special=%d clusters=%d active=%d refs=%d csr=%d records=%d+%d compute=%d/%d/%d overflow=%d/%d overflowRefs=%d max=%d grid=%dx%dx%d build=%dms ubo=%d bytes=%dKB overlay=%d/%d)) stateCache(hits=%d misses=%d invalidations=%d legacyResets=%d labels=%d groups=%d prog=%d vao=%d buf=%d tex=%d sampler=%d fbo=%d blend=%d depth=%d stencil=%d raster=%d viewport=%d scissor=%d color=%d last='%s') gpuPass(3d=%d/%d 2d=%d/%d rt=%d/%d copy=%d/%d special=%d/%d setbuf=%d/%d swap=%d/%d deferred=%d/%d dropped=%d) cmds(3d=%d 2d=%d rt=%d copy=%d swap=%d)\n",
 			rg_rendererMetrics.frameCount,
 			RendererTier_Name( glConfig.rendererTier ),
 			rg_rendererMetrics.frontEndMsec,
@@ -1875,6 +1925,12 @@ void R_RendererMetrics_EndFrame( int frontEndMsec, int backEndMsec, int viewCoun
 			rg_rendererMetrics.clusteredLighting.clusterCount,
 			rg_rendererMetrics.clusteredLighting.activeClusters,
 			rg_rendererMetrics.clusteredLighting.lightReferences,
+			rg_rendererMetrics.clusteredLighting.csrReady ? 1 : 0,
+			rg_rendererMetrics.clusteredLighting.clusterRecordCount,
+			rg_rendererMetrics.clusteredLighting.flatIndexRecordCount,
+			rg_rendererMetrics.clusteredLighting.computeBinningReady ? 1 : 0,
+			rg_rendererMetrics.clusteredLighting.computeBinningExecuted ? 1 : 0,
+			rg_rendererMetrics.clusteredLighting.computeBinningDispatches,
 			rg_rendererMetrics.clusteredLighting.overflow ? 1 : 0,
 			rg_rendererMetrics.clusteredLighting.overflowClusters,
 			rg_rendererMetrics.clusteredLighting.overflowReferences,
@@ -2054,7 +2110,7 @@ void R_RendererMetrics_EndFrame( int frontEndMsec, int backEndMsec, int viewCoun
 			rg_rendererMetrics.modernVisibilityShadowCasterSavedDraws,
 			rg_rendererMetrics.modernVisibilityShadowCasterSavedTriangles );
 		common->Printf(
-			"rendererMetrics lowOverhead(req=%d ready=%d dsa=%d multiBind=%d bindless=%d/%d sampler=%d dsaUpdates=%d framebufferDSA=%d samplerDSA=%d/%d bufferMultiBind=%d textureMultiBind=%d samplerMultiBind=%d classicTextureBinds=%d compactedBatches=%d graphDSA(tex=%d params=%d fbo=%d) graphClassic(tex=%d fbo=%d) upload(persistent=%d default=%d fences=%d/%d waits=%d sync=%d))\n",
+			"rendererMetrics lowOverhead(req=%d ready=%d dsa=%d multiBind=%d bindless=%d/%d sampler=%d dsaUpdates=%d framebufferDSA=%d samplerDSA=%d/%d bufferMultiBind=%d textureMultiBind=%d samplerMultiBind=%d classicTextureBinds=%d compactedBatches=%d restores=%d/%d textureTable=%d/%d tableSize=%d/%d desc=%d draws=%d uniforms=%d fallback=%d graphDSA(tex=%d params=%d fbo=%d) graphClassic(tex=%d fbo=%d) upload(persistent=%d default=%d buffers=%d index=%d fences=%d/%d waits=%d sync=%d))\n",
 			rg_rendererMetrics.lowOverheadRequested ? 1 : 0,
 			rg_rendererMetrics.lowOverheadReady ? 1 : 0,
 			rg_rendererMetrics.lowOverheadUsesDSA ? 1 : 0,
@@ -2071,6 +2127,16 @@ void R_RendererMetrics_EndFrame( int frontEndMsec, int backEndMsec, int viewCoun
 			rg_rendererMetrics.lowOverheadSamplerMultiBindBatches,
 			rg_rendererMetrics.lowOverheadClassicTextureBinds,
 			rg_rendererMetrics.lowOverheadCompactedBatches,
+			rg_rendererMetrics.lowOverheadSoftRestores,
+			rg_rendererMetrics.lowOverheadFullRestores,
+			rg_rendererMetrics.lowOverheadTextureTableUsed ? 1 : 0,
+			rg_rendererMetrics.lowOverheadTextureTableReady ? 1 : 0,
+			rg_rendererMetrics.lowOverheadTextureTableTextures,
+			rg_rendererMetrics.lowOverheadTextureTableCapacity,
+			rg_rendererMetrics.lowOverheadTextureTableDescriptors,
+			rg_rendererMetrics.lowOverheadTextureTableDraws,
+			rg_rendererMetrics.lowOverheadTextureTableUniforms,
+			rg_rendererMetrics.lowOverheadTextureTableFallbacks,
 			rg_rendererMetrics.renderGraphResourceManager.dsaTextureAllocations,
 			rg_rendererMetrics.renderGraphResourceManager.dsaTextureParameterUpdates,
 			rg_rendererMetrics.renderGraphResourceManager.dsaFramebufferAllocations,
@@ -2078,6 +2144,8 @@ void R_RendererMetrics_EndFrame( int frontEndMsec, int backEndMsec, int viewCoun
 			rg_rendererMetrics.renderGraphResourceManager.classicFramebufferAllocations,
 			uploadStats.persistentMapped ? 1 : 0,
 			uploadStats.lowOverheadPersistentDefault ? 1 : 0,
+			uploadStats.ringBufferCount,
+			uploadStats.frameBufferIndex,
 			uploadStats.frameFencesSubmitted,
 			uploadStats.frameFencesRetired,
 			uploadStats.frameFenceWaits,
@@ -2089,7 +2157,7 @@ void R_RendererMetrics_EndFrame( int frontEndMsec, int backEndMsec, int viewCoun
 	if ( rg_rendererMetricsLastSummaryFrame < 0 || rg_rendererMetrics.frameCount - rg_rendererMetricsLastSummaryFrame >= 60 ) {
 		rg_rendererMetricsLastSummaryFrame = rg_rendererMetrics.frameCount;
 		common->Printf(
-			"rendererMetrics summary tier=%s fe=%dms visibility=%dms packet=%dms graph=%dms submit=%dms be=%dms present=%dms gpu=%s views=%d ents=%d lights=%d draws=%d uploads=%dKB stalls=%d ring=%d/%dKB overflow=%dKB static=%dKB/%d live=%d/%dKB packets=%s:%d/%d/%d clipped=%d packetOverflow=%d cause=%s materials=%d geometryRecords=%d instances=%d resources=%d geometryRefs=%d instanceRefs=%d geometry=%d sort=%d graph=%d/%d/%d res=%d/%d/%d aliasable=%d access=%d read=%d write=%d clear=%d resolve=%d invalidate=%d present=%d graphOverflow=%d graphGL=%d/%d handles=%d fbo=%d/%d materialTable=%d/%d records=%d tex=%d fallback=%d missing=%d modernExec=%s shaders=%d shaderFails=%d prep=%d/%d fallback=%d draws=%d resources=%d geometry=%d plan=%d/%d depth=%d materialFamily=%d batches=%d switches=%d submit=%d/%d submitFallback=%d missingVBO=%d missingIBO=%d indexUpload=%d submitted=%d/%d submittedFallback=%d submittedUpload=%d submitBatches=%d/%d/%d visibleDepth=%d/%d alpha=%d skinned=%d fallback=%d mismatch=%d overlay=%d gbuffer=%d/%d fallback=%d mrt=%d bw=%dKB overlay=%d deferred=%d/%d pixels=%d lights=%d reads=%d fallback=%d overlay=%d cluster=%d/%d lights=%d refs=%d overflow=%d/%d build=%dms ubo=%d stateCache=%d/%d invalid=%d legacyReset=%d\n",
+			"rendererMetrics summary tier=%s fe=%dms visibility=%dms packet=%dms graph=%dms submit=%dms be=%dms present=%dms gpu=%s views=%d ents=%d lights=%d draws=%d uploads=%dKB stalls=%d ring=%d/%dKB overflow=%dKB static=%dKB/%d live=%d/%dKB packets=%s:%d/%d/%d clipped=%d packetOverflow=%d cause=%s materials=%d geometryRecords=%d instances=%d resources=%d geometryRefs=%d instanceRefs=%d geometry=%d sort=%d graph=%d/%d/%d res=%d/%d/%d aliasable=%d access=%d read=%d write=%d clear=%d resolve=%d invalidate=%d present=%d graphOverflow=%d graphGL=%d/%d handles=%d fbo=%d/%d materialTable=%d/%d records=%d tex=%d fallback=%d missing=%d modernExec=%s shaders=%d shaderFails=%d prep=%d/%d fallback=%d draws=%d resources=%d geometry=%d plan=%d/%d depth=%d materialFamily=%d batches=%d switches=%d submit=%d/%d submitFallback=%d missingVBO=%d missingIBO=%d indexUpload=%d submitted=%d/%d submittedFallback=%d submittedUpload=%d submitBatches=%d/%d/%d visibleDepth=%d/%d alpha=%d skinned=%d fallback=%d mismatch=%d overlay=%d gbuffer=%d/%d fallback=%d mrt=%d bw=%dKB overlay=%d deferred=%d/%d pixels=%d lights=%d reads=%d fallback=%d overlay=%d cluster=%d/%d lights=%d refs=%d csr=%d flat=%d compute=%d/%d overflow=%d/%d build=%dms ubo=%d stateCache=%d/%d invalid=%d legacyReset=%d\n",
 			RendererTier_Name( glConfig.rendererTier ),
 			rg_rendererMetrics.frontEndMsec,
 			rg_rendererMetrics.visibilityMsec,
@@ -2205,6 +2273,10 @@ void R_RendererMetrics_EndFrame( int frontEndMsec, int backEndMsec, int viewCoun
 			rg_rendererMetrics.clusteredLighting.gridCount,
 			rg_rendererMetrics.clusteredLighting.lightCount,
 			rg_rendererMetrics.clusteredLighting.lightReferences,
+			rg_rendererMetrics.clusteredLighting.csrReady ? 1 : 0,
+			rg_rendererMetrics.clusteredLighting.flatIndexRecordCount,
+			rg_rendererMetrics.clusteredLighting.computeBinningReady ? 1 : 0,
+			rg_rendererMetrics.clusteredLighting.computeBinningExecuted ? 1 : 0,
 			rg_rendererMetrics.clusteredLighting.overflow ? 1 : 0,
 			rg_rendererMetrics.clusteredLighting.overflowClusters,
 			rg_rendererMetrics.clusteredLighting.buildMsec,

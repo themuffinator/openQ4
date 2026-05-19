@@ -29,7 +29,10 @@ typedef struct modernGLSubmitCommand_s {
 	int							normalTextureLocation;
 	int							specularTextureLocation;
 	int							emissiveTextureLocation;
+	int							textureIndicesLocation;
+	int							textureTableModeLocation;
 	int							materialFlagsLocation;
+	int							drawRecordModeLocation;
 	int							vertexStride;
 	int							indexType;
 	int							indexCount;
@@ -40,6 +43,8 @@ typedef struct modernGLSubmitCommand_s {
 	int							instanceRecordIndex;
 	materialResourceBlendMode_t	blendMode;
 	int							cullType;
+	int							originalSubmitOrder;
+	int							sortBucket;
 	unsigned int				materialStableId;
 	float						modelViewMatrix[16];
 	float						modelDepthHack;
@@ -67,6 +72,7 @@ typedef struct modernGLSubmitCommand_s {
 	bool						visibilityHiZCandidate;
 	bool						visibilityDynamic;
 	bool						visibilityShadowCaster;
+	bool						sortEligible;
 } modernGLSubmitCommand_t;
 
 typedef struct modernGLSubmitPlanStats_s {
@@ -92,6 +98,17 @@ typedef struct modernGLSubmitPlanStats_s {
 	int		indexBufferBatches;
 	int		scissorBatches;
 	int		materialBatches;
+	int		sortEligibleDraws;
+	int		sortLockedDraws;
+	int		sortSpans;
+	int		sortBuckets;
+	int		sortReorderedDraws;
+	int		unsortedStateBuckets;
+	int		sortedStateBuckets;
+	int		sortStateBucketSavings;
+	int		sortProgramBatchSavings;
+	int		sortMaterialBatchSavings;
+	int		sortVertexBufferBatchSavings;
 	int		uniformUpdates;
 	int		frameUBOBinds;
 	int		highestGLSLVersion;

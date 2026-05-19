@@ -66,6 +66,9 @@ typedef struct rendererClusteredLightingStats_s {
 	bool	debugOverlayReady;
 	bool	debugTextureReady;
 	bool	shaderStorageReady;
+	bool	csrReady;
+	bool	computeBinningReady;
+	bool	computeBinningExecuted;
 	bool	lossless;
 	bool	overflow;
 	int		gridCount;
@@ -104,7 +107,11 @@ typedef struct rendererClusteredLightingStats_s {
 	int		indexGroupsPerCluster;
 	int		lightCapacity;
 	int		indexRecordCapacity;
+	int		clusterRecordCount;
+	int		flatIndexRecordCount;
+	int		flatIndexReferenceCapacity;
 	int		uploadedGridIndexRecords;
+	int		computeBinningDispatches;
 	int		gridSwitches;
 	int		gridBindFailures;
 	int		tileCountX;

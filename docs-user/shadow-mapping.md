@@ -26,6 +26,7 @@ vid_restart
 Notes:
 - `r_shadows` must stay enabled for any shadow path to render.
 - If the shadow-map path is unavailable or fails for a light, OpenQ4 falls back to the legacy shadow path instead of leaving the light unshadowed.
+- Lights touching animated, deformed, or packed character receivers can also fall back to the legacy stencil path so stock character lighting, mirrored seams, and eye materials retain retail-style interaction behavior.
 - Most shadow cvars can be changed live, but `vid_restart` is the safest way to apply large changes such as map resolution, cascade layout, or switching the shadow pipeline on/off.
 
 ## What the System Does

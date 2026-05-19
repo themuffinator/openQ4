@@ -3417,6 +3417,235 @@ void RB_FinishStageTexturing( const shaderStage_t *pStage, const drawSurf_t *sur
 	}
 }
 
+enum rbSoftParticleUniformIndex_t {
+	RB_SOFT_PARTICLE_UNIFORM_STAGE_COLOR = 0,
+	RB_SOFT_PARTICLE_UNIFORM_VERTEX_COLOR_MODE,
+	RB_SOFT_PARTICLE_UNIFORM_DEPTH_PROJECTION,
+	RB_SOFT_PARTICLE_UNIFORM_VIEWPORT_ORIGIN,
+	RB_SOFT_PARTICLE_UNIFORM_INV_DEPTH_TEX_SIZE,
+	RB_SOFT_PARTICLE_UNIFORM_FADE_DISTANCE,
+	RB_SOFT_PARTICLE_UNIFORM_ADDITIVE_BLEND,
+	RB_SOFT_PARTICLE_UNIFORM_COUNT
+};
+
+static newShaderStage_t rbSoftParticleStage;
+static bool rbSoftParticleStageInitialized = false;
+
+static void RB_InitSoftParticleStage( void ) {
+	if ( rbSoftParticleStageInitialized ) {
+		return;
+	}
+
+	memset( &rbSoftParticleStage, 0, sizeof( rbSoftParticleStage ) );
+	rbSoftParticleStage.glslProgram = true;
+	idStr::Copynz( rbSoftParticleStage.glslProgramName, "soft_particle.fs", sizeof( rbSoftParticleStage.glslProgramName ) );
+
+	static const rbBuiltinUniformDef_t uniforms[RB_SOFT_PARTICLE_UNIFORM_COUNT] = {
+		{ "stageColor", 4 },
+		{ "vertexColorMode", 1 },
+		{ "depthProjection", 2 },
+		{ "viewportOrigin", 2 },
+		{ "invDepthTexSize", 2 },
+		{ "fadeDistance", 1 },
+		{ "additiveBlend", 1 }
+	};
+
+	rbSoftParticleStage.numShaderParms = RB_SOFT_PARTICLE_UNIFORM_COUNT;
+	for ( int i = 0; i < RB_SOFT_PARTICLE_UNIFORM_COUNT; i++ ) {
+		idStr::Copynz( rbSoftParticleStage.shaderParmNames[i], uniforms[i].name, sizeof( rbSoftParticleStage.shaderParmNames[i] ) );
+		rbSoftParticleStage.shaderParmNumRegisters[i] = uniforms[i].components;
+	}
+
+	rbSoftParticleStage.numShaderTextures = 2;
+	idStr::Copynz( rbSoftParticleStage.shaderTextureNames[0], "ParticleTexture", sizeof( rbSoftParticleStage.shaderTextureNames[0] ) );
+	idStr::Copynz( rbSoftParticleStage.shaderTextureNames[1], "SceneDepth", sizeof( rbSoftParticleStage.shaderTextureNames[1] ) );
+
+	rbSoftParticleStageInitialized = true;
+}
+
+static bool RB_SoftParticleBlendSupported( int drawStateBits ) {
+	const int blendBits = drawStateBits & ( GLS_SRCBLEND_BITS | GLS_DSTBLEND_BITS );
+	return blendBits == ( GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA )
+		|| blendBits == ( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE );
+}
+
+static bool RB_SoftParticleStageEligible( const drawSurf_t *surf, const shaderStage_t *pStage ) {
+	if ( !r_softParticles.GetBool() || !glConfig.GLSLProgramAvailable ) {
+		return false;
+	}
+	if ( globalImages == NULL || globalImages->currentDepthImage == NULL || backEnd.viewDef == NULL ) {
+		return false;
+	}
+	if ( surf == NULL || pStage == NULL || surf->geo == NULL ) {
+		return false;
+	}
+	if ( ( surf->dsFlags & DSF_BSE_EFFECT ) == 0 ) {
+		return false;
+	}
+	if ( surf->geo->primBatchMesh != NULL || pStage->newStage != NULL ) {
+		return false;
+	}
+	if ( pStage->lighting != SL_AMBIENT || pStage->hasAlphaTest ) {
+		return false;
+	}
+	if ( pStage->texture.image == NULL && pStage->texture.cinematic == NULL ) {
+		return false;
+	}
+	if ( pStage->texture.texgen != TG_EXPLICIT && pStage->texture.texgen != TG_POT_CORRECTION ) {
+		return false;
+	}
+	if ( !RB_SoftParticleBlendSupported( pStage->drawStateBits ) ) {
+		return false;
+	}
+
+	const idMaterial *shader = surf->material;
+	if ( shader == NULL || shader->GetSort() < SS_MEDIUM || shader->GetSort() >= SS_POST_PROCESS ) {
+		return false;
+	}
+
+	return true;
+}
+
+static float RB_SoftParticleVertexColorModeValue( stageVertexColor_t vertexColor ) {
+	switch ( vertexColor ) {
+	case SVC_MODULATE:
+		return 1.0f;
+	case SVC_INVERSE_MODULATE:
+		return 2.0f;
+	case SVC_IGNORE:
+	default:
+		return 0.0f;
+	}
+}
+
+static bool RB_TryDrawSoftParticleStage( const drawSurf_t *surf, const shaderStage_t *pStage, const float *regs, const srfTriangles_t *tri, idDrawVert *ac, int stage, const float color[4] ) {
+	if ( !RB_SoftParticleStageEligible( surf, pStage ) ) {
+		return false;
+	}
+
+	RB_InitSoftParticleStage();
+	if ( !R_ValidateGLSLProgram( &rbSoftParticleStage ) ) {
+		return false;
+	}
+
+	const int viewportWidth = backEnd.viewDef->viewport.x2 - backEnd.viewDef->viewport.x1 + 1;
+	const int viewportHeight = backEnd.viewDef->viewport.y2 - backEnd.viewDef->viewport.y1 + 1;
+	if ( viewportWidth <= 0 || viewportHeight <= 0 ) {
+		return false;
+	}
+
+	if ( !backEnd.currentDepthCopied ) {
+		RB_CaptureCurrentDepthImage( viewportWidth, viewportHeight );
+	}
+
+	idImage *depthImage = globalImages->currentDepthImage;
+	if ( depthImage == NULL || !backEnd.currentDepthCopied ) {
+		return false;
+	}
+
+	const int depthTextureWidth = depthImage->GetOpts().width;
+	const int depthTextureHeight = depthImage->GetOpts().height;
+	if ( depthTextureWidth <= 0 || depthTextureHeight <= 0 ) {
+		return false;
+	}
+
+	const bool useColorArray = pStage->vertexColor != SVC_IGNORE;
+	if ( useColorArray ) {
+		RB_SetStageVertexColorPointer( surf, stage, ac );
+		glEnableClientState( GL_COLOR_ARRAY );
+	} else {
+		glColor4f( 1.0f, 1.0f, 1.0f, 1.0f );
+	}
+
+	GL_SelectTexture( 0 );
+	RB_BindVariableStageImage( &pStage->texture, regs );
+	GL_State( pStage->drawStateBits );
+
+	if ( !RB_PrepareStageTexturing( pStage, surf, ac ) ) {
+		RB_FinishStageTexturing( pStage, surf, ac );
+		if ( useColorArray ) {
+			glDisableClientState( GL_COLOR_ARRAY );
+		}
+		return false;
+	}
+
+	GL_SelectTexture( 1 );
+	depthImage->Bind();
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE );
+	glTexParameteri( GL_TEXTURE_2D, GL_DEPTH_TEXTURE_MODE, GL_LUMINANCE );
+	GL_SelectTexture( 0 );
+
+	if ( glConfig.ARBVertexProgramAvailable ) {
+		glDisable( GL_VERTEX_PROGRAM_ARB );
+	}
+	if ( glConfig.ARBFragmentProgramAvailable ) {
+		glDisable( GL_FRAGMENT_PROGRAM_ARB );
+	}
+	glUseProgramObjectARB( (GLhandleARB)rbSoftParticleStage.glslProgramObject );
+
+	if ( rbSoftParticleStage.shaderTextureLocations[0] >= 0 ) {
+		glUniform1iARB( rbSoftParticleStage.shaderTextureLocations[0], 0 );
+	}
+	if ( rbSoftParticleStage.shaderTextureLocations[1] >= 0 ) {
+		glUniform1iARB( rbSoftParticleStage.shaderTextureLocations[1], 1 );
+	}
+
+	const GLfloat depthProjection[2] = {
+		backEnd.viewDef->projectionMatrix[10],
+		backEnd.viewDef->projectionMatrix[14]
+	};
+	const GLfloat viewportOrigin[2] = {
+		static_cast<GLfloat>( backEnd.viewDef->viewport.x1 ),
+		static_cast<GLfloat>( backEnd.viewDef->viewport.y1 )
+	};
+	const GLfloat invDepthTexSize[2] = {
+		1.0f / static_cast<GLfloat>( depthTextureWidth ),
+		1.0f / static_cast<GLfloat>( depthTextureHeight )
+	};
+	const GLfloat fadeDistance = idMath::ClampFloat( 1.0f, 512.0f, r_softParticleFadeDistance.GetFloat() );
+	const GLfloat vertexColorMode = RB_SoftParticleVertexColorModeValue( pStage->vertexColor );
+	const GLfloat additiveBlend =
+		( ( pStage->drawStateBits & ( GLS_SRCBLEND_BITS | GLS_DSTBLEND_BITS ) ) == ( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE ) )
+		? 1.0f
+		: 0.0f;
+
+	if ( rbSoftParticleStage.shaderParmLocations[RB_SOFT_PARTICLE_UNIFORM_STAGE_COLOR] >= 0 ) {
+		glUniform4fvARB( rbSoftParticleStage.shaderParmLocations[RB_SOFT_PARTICLE_UNIFORM_STAGE_COLOR], 1, color );
+	}
+	if ( rbSoftParticleStage.shaderParmLocations[RB_SOFT_PARTICLE_UNIFORM_VERTEX_COLOR_MODE] >= 0 ) {
+		glUniform1fARB( rbSoftParticleStage.shaderParmLocations[RB_SOFT_PARTICLE_UNIFORM_VERTEX_COLOR_MODE], vertexColorMode );
+	}
+	if ( rbSoftParticleStage.shaderParmLocations[RB_SOFT_PARTICLE_UNIFORM_DEPTH_PROJECTION] >= 0 ) {
+		glUniform2fvARB( rbSoftParticleStage.shaderParmLocations[RB_SOFT_PARTICLE_UNIFORM_DEPTH_PROJECTION], 1, depthProjection );
+	}
+	if ( rbSoftParticleStage.shaderParmLocations[RB_SOFT_PARTICLE_UNIFORM_VIEWPORT_ORIGIN] >= 0 ) {
+		glUniform2fvARB( rbSoftParticleStage.shaderParmLocations[RB_SOFT_PARTICLE_UNIFORM_VIEWPORT_ORIGIN], 1, viewportOrigin );
+	}
+	if ( rbSoftParticleStage.shaderParmLocations[RB_SOFT_PARTICLE_UNIFORM_INV_DEPTH_TEX_SIZE] >= 0 ) {
+		glUniform2fvARB( rbSoftParticleStage.shaderParmLocations[RB_SOFT_PARTICLE_UNIFORM_INV_DEPTH_TEX_SIZE], 1, invDepthTexSize );
+	}
+	if ( rbSoftParticleStage.shaderParmLocations[RB_SOFT_PARTICLE_UNIFORM_FADE_DISTANCE] >= 0 ) {
+		glUniform1fARB( rbSoftParticleStage.shaderParmLocations[RB_SOFT_PARTICLE_UNIFORM_FADE_DISTANCE], fadeDistance );
+	}
+	if ( rbSoftParticleStage.shaderParmLocations[RB_SOFT_PARTICLE_UNIFORM_ADDITIVE_BLEND] >= 0 ) {
+		glUniform1fARB( rbSoftParticleStage.shaderParmLocations[RB_SOFT_PARTICLE_UNIFORM_ADDITIVE_BLEND], additiveBlend );
+	}
+
+	RB_DrawElementsWithCounters( tri );
+
+	glUseProgramObjectARB( 0 );
+	GL_SelectTexture( 1 );
+	globalImages->BindNull();
+	GL_SelectTexture( 0 );
+	RB_FinishStageTexturing( pStage, surf, ac );
+
+	if ( useColorArray ) {
+		glDisableClientState( GL_COLOR_ARRAY );
+	}
+
+	return true;
+}
+
 enum rbRVSpecialDepthUniformIndex_t {
 	RB_RVSPECIAL_DEPTH_UNIFORM_DISTANCE_SCALE = 0,
 	RB_RVSPECIAL_DEPTH_UNIFORM_COUNT
@@ -5490,6 +5719,10 @@ void RB_STD_T_RenderShaderPasses( const drawSurf_t *surf ) {
 		// skip the entire stage if a blend would be completely transparent
 		if ( ( pStage->drawStateBits & (GLS_SRCBLEND_BITS|GLS_DSTBLEND_BITS) ) == ( GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA )
 			&& color[3] <= 0 ) {
+			continue;
+		}
+
+		if ( RB_TryDrawSoftParticleStage( surf, pStage, regs, tri, ac, stage, color ) ) {
 			continue;
 		}
 

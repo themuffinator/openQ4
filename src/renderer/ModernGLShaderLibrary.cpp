@@ -3,6 +3,7 @@
 
 #include "tr_local.h"
 #include "GLDebugScope.h"
+#include "MaterialResourceTable.h"
 #include "ModernGLShaderLibrary.h"
 
 static modernGLShaderLibraryStats_t rg_modernGLShaderLibraryStats;
@@ -157,6 +158,8 @@ static int R_ModernGLShaderLibrary_BuildVersionList( const renderBackendCaps_t &
 }
 
 static void R_ModernGLShaderLibrary_BuildVertexSource( int glslVersion, modernGLShaderProgramKind_t kind, char *buffer, int bufferSize ) {
+	const int hasDrawRecords = ( glslVersion >= 430 && kind != MODERN_GL_SHADER_DEFERRED_LIGHT_RESOLVE ) ? 1 : 0;
+
 	if ( kind == MODERN_GL_SHADER_DEFERRED_LIGHT_RESOLVE ) {
 		idStr::snPrintf(
 			buffer,
@@ -199,6 +202,47 @@ static void R_ModernGLShaderLibrary_BuildVertexSource( int glslVersion, modernGL
 		"} uFrame;\n"
 		"uniform mat4 uModelViewProjection;\n"
 		"uniform mat4 uModelViewMatrix;\n"
+		"uniform vec4 uDebugColor;\n"
+		"uniform vec4 uLocalParams;\n"
+		"uniform vec4 uMaterialFlags;\n"
+		"#define MODERN_HAS_DRAW_RECORDS %d\n"
+		"struct ModernDrawRecord {\n"
+		"    mat4 modelViewProjection;\n"
+		"    mat4 modelViewMatrix;\n"
+		"    vec4 debugColor;\n"
+		"    vec4 localParams;\n"
+		"    vec4 materialFlags;\n"
+		"    uvec4 ids;\n"
+		"};\n"
+		"#if MODERN_HAS_DRAW_RECORDS\n"
+		"layout(location = 12) in float attr_DrawRecordIndex;\n"
+		"layout(std430, binding = 4) readonly buffer ModernDrawRecords {\n"
+		"    ModernDrawRecord records[];\n"
+		"} uDrawRecords;\n"
+		"uniform uint uDrawRecordMode;\n"
+		"flat out vec4 vDrawDebugColor;\n"
+		"flat out vec4 vDrawLocalParams;\n"
+		"flat out vec4 vDrawMaterialFlags;\n"
+		"#endif\n"
+		"ModernDrawRecord ModernUniformDrawRecord(void) {\n"
+		"    ModernDrawRecord record;\n"
+		"    record.modelViewProjection = uModelViewProjection;\n"
+		"    record.modelViewMatrix = uModelViewMatrix;\n"
+		"    record.debugColor = uDebugColor;\n"
+		"    record.localParams = uLocalParams;\n"
+		"    record.materialFlags = uMaterialFlags;\n"
+		"    record.ids = uvec4(0u);\n"
+		"    return record;\n"
+		"}\n"
+		"ModernDrawRecord ModernFetchDrawRecord(void) {\n"
+		"#if MODERN_HAS_DRAW_RECORDS\n"
+		"    if (uDrawRecordMode != 0u) {\n"
+		"        uint drawRecordIndex = uint(attr_DrawRecordIndex + 0.5);\n"
+		"        return uDrawRecords.records[int(drawRecordIndex)];\n"
+		"    }\n"
+		"#endif\n"
+		"    return ModernUniformDrawRecord();\n"
+		"}\n"
 		"out vec2 vTexCoord;\n"
 		"out vec4 vVertexColor;\n"
 		"out vec3 vViewNormal;\n"
@@ -211,8 +255,14 @@ static void R_ModernGLShaderLibrary_BuildVertexSource( int glslVersion, modernGL
 		"    return len2 > 0.00000001 ? value * inversesqrt(len2) : fallback;\n"
 		"}\n"
 		"void main() {\n"
+		"    ModernDrawRecord drawRecord = ModernFetchDrawRecord();\n"
+		"#if MODERN_HAS_DRAW_RECORDS\n"
+		"    vDrawDebugColor = drawRecord.debugColor;\n"
+		"    vDrawLocalParams = drawRecord.localParams;\n"
+		"    vDrawMaterialFlags = drawRecord.materialFlags;\n"
+		"#endif\n"
 		"    vec4 frameJitter = vec4(uFrame.reserved.xy, 0.0, 0.0);\n"
-		"    mat3 localToView = mat3(uModelViewMatrix);\n"
+		"    mat3 localToView = mat3(drawRecord.modelViewMatrix);\n"
 		"    vec3 normal = ModernSafeNormalize(localToView * attr_Normal, vec3(0.0, 0.0, 1.0));\n"
 		"    vec3 tangent = ModernSafeNormalize(localToView * attr_Tangent0, vec3(1.0, 0.0, 0.0));\n"
 		"    vec3 rawBitangent = ModernSafeNormalize(localToView * attr_Tangent1, vec3(0.0, 1.0, 0.0));\n"
@@ -223,16 +273,65 @@ static void R_ModernGLShaderLibrary_BuildVertexSource( int glslVersion, modernGL
 		"    vViewNormal = normal;\n"
 		"    vViewTangent = tangent;\n"
 		"    vViewBitangent = ModernSafeNormalize(cross(normal, tangent) * signValue, rawBitangent);\n"
-		"    vViewPosition = (uModelViewMatrix * vec4(attr_Position, 1.0)).xyz;\n"
+		"    vViewPosition = (drawRecord.modelViewMatrix * vec4(attr_Position, 1.0)).xyz;\n"
 		"    vTangentSign = signValue;\n"
-		"    gl_Position = uModelViewProjection * vec4(attr_Position, 1.0) + frameJitter;\n"
+		"    gl_Position = drawRecord.modelViewProjection * vec4(attr_Position, 1.0) + frameJitter;\n"
 		"}\n",
-		glslVersion );
+		glslVersion,
+		hasDrawRecords );
 }
 
 static void R_ModernGLShaderLibrary_BuildFragmentSource( int glslVersion, modernGLShaderProgramKind_t kind, char *buffer, int bufferSize ) {
 	const int hasShaderStorage = glslVersion >= 430 ? 1 : 0;
 	const int hasImageLoadStore = glslVersion >= 430 ? 1 : 0;
+	const int hasDrawRecords = glslVersion >= 430 && kind != MODERN_GL_SHADER_DEFERRED_LIGHT_RESOLVE ? 1 : 0;
+	const int hasTextureTable = glslVersion >= 430 && kind != MODERN_GL_SHADER_DEFERRED_LIGHT_RESOLVE ? 1 : 0;
+
+	char materialTextureHeader[4096];
+	idStr::snPrintf(
+		materialTextureHeader,
+		sizeof( materialTextureHeader ),
+		"uniform sampler2D uMainTexture;\n"
+		"uniform sampler2D uNormalTexture;\n"
+		"uniform sampler2D uSpecularTexture;\n"
+		"uniform sampler2D uEmissiveTexture;\n"
+		"#define MODERN_HAS_TEXTURE_TABLE %d\n"
+		"#define MODERN_MATERIAL_TEXTURE_TABLE_SIZE %d\n"
+		"#if MODERN_HAS_TEXTURE_TABLE\n"
+		"uniform sampler2D uMaterialTextures[%d];\n"
+		"uniform uvec4 uTextureIndices;\n"
+		"uniform uint uTextureTableMode;\n"
+		"uint ModernTextureTableIndex(uint index) {\n"
+		"    return min(index, uint(MODERN_MATERIAL_TEXTURE_TABLE_SIZE - 1));\n"
+		"}\n"
+		"#endif\n"
+		"vec4 ModernSampleMainTexture(vec2 uv) {\n"
+		"#if MODERN_HAS_TEXTURE_TABLE\n"
+		"    if (uTextureTableMode != 0u) { return texture(uMaterialTextures[int(ModernTextureTableIndex(uTextureIndices.x))], uv); }\n"
+		"#endif\n"
+		"    return texture(uMainTexture, uv);\n"
+		"}\n"
+		"vec4 ModernSampleNormalTexture(vec2 uv) {\n"
+		"#if MODERN_HAS_TEXTURE_TABLE\n"
+		"    if (uTextureTableMode != 0u) { return texture(uMaterialTextures[int(ModernTextureTableIndex(uTextureIndices.y))], uv); }\n"
+		"#endif\n"
+		"    return texture(uNormalTexture, uv);\n"
+		"}\n"
+		"vec4 ModernSampleSpecularTexture(vec2 uv) {\n"
+		"#if MODERN_HAS_TEXTURE_TABLE\n"
+		"    if (uTextureTableMode != 0u) { return texture(uMaterialTextures[int(ModernTextureTableIndex(uTextureIndices.z))], uv); }\n"
+		"#endif\n"
+		"    return texture(uSpecularTexture, uv);\n"
+		"}\n"
+		"vec4 ModernSampleEmissiveTexture(vec2 uv) {\n"
+		"#if MODERN_HAS_TEXTURE_TABLE\n"
+		"    if (uTextureTableMode != 0u) { return texture(uMaterialTextures[int(ModernTextureTableIndex(uTextureIndices.w))], uv); }\n"
+		"#endif\n"
+		"    return texture(uEmissiveTexture, uv);\n"
+		"}\n",
+		hasTextureTable,
+		MATERIAL_RESOURCE_TABLE_TEXTURE_ARRAY_CAPACITY,
+		MATERIAL_RESOURCE_TABLE_TEXTURE_ARRAY_CAPACITY );
 
 	if ( kind == MODERN_GL_SHADER_DEPTH || kind == MODERN_GL_SHADER_SHADOW_DEPTH ) {
 		idStr::snPrintf(
@@ -240,16 +339,27 @@ static void R_ModernGLShaderLibrary_BuildFragmentSource( int glslVersion, modern
 			bufferSize,
 			"#version %d\n"
 			"in vec2 vTexCoord;\n"
+			"#define MODERN_HAS_DRAW_RECORDS %d\n"
+			"#if MODERN_HAS_DRAW_RECORDS\n"
+			"flat in vec4 vDrawLocalParams;\n"
+			"#define uLocalParams vDrawLocalParams\n"
+			"#else\n"
 			"uniform vec4 uLocalParams;\n"
-			"uniform sampler2D uMainTexture;\n"
+			"#endif\n"
+			"%s"
 			"void main() {\n"
-			"    if (uLocalParams.y > 0.5 && texture(uMainTexture, vTexCoord).a < max(uLocalParams.x, 0.001)) { discard; }\n"
+			"    if (uLocalParams.y > 0.5 && ModernSampleMainTexture(vTexCoord).a < max(uLocalParams.x, 0.001)) { discard; }\n"
 			"}\n",
-			glslVersion );
+			glslVersion,
+			hasDrawRecords,
+			materialTextureHeader );
 		return;
 	}
 
-	const char *sharedHeader =
+	char sharedHeader[8192];
+	idStr::snPrintf(
+		sharedHeader,
+		sizeof( sharedHeader ),
 		"in vec2 vTexCoord;\n"
 		"in vec4 vVertexColor;\n"
 		"in vec3 vViewNormal;\n"
@@ -258,35 +368,44 @@ static void R_ModernGLShaderLibrary_BuildFragmentSource( int glslVersion, modern
 		"in vec3 vViewPosition;\n"
 		"flat in float vTangentSign;\n"
 		"layout(location = 0) out vec4 out_Color;\n"
+		"#define MODERN_HAS_DRAW_RECORDS %d\n"
+		"#if MODERN_HAS_DRAW_RECORDS\n"
+		"flat in vec4 vDrawDebugColor;\n"
+		"flat in vec4 vDrawLocalParams;\n"
+		"flat in vec4 vDrawMaterialFlags;\n"
+		"#define uDebugColor vDrawDebugColor\n"
+		"#define uLocalParams vDrawLocalParams\n"
+		"#define uMaterialFlags vDrawMaterialFlags\n"
+		"#else\n"
 		"uniform vec4 uDebugColor;\n"
 		"uniform vec4 uLocalParams;\n"
 		"uniform vec4 uMaterialFlags;\n"
-		"uniform sampler2D uMainTexture;\n"
-		"uniform sampler2D uNormalTexture;\n"
-		"uniform sampler2D uSpecularTexture;\n"
-		"uniform sampler2D uEmissiveTexture;\n"
+		"#endif\n"
+		"%s"
 		"vec3 ModernSafeNormal(vec3 normal) {\n"
 		"    float len2 = dot(normal, normal);\n"
 		"    return len2 > 0.00000001 ? normal * inversesqrt(len2) : vec3(0.0, 0.0, 1.0);\n"
 		"}\n"
 		"vec3 ModernMaterialNormal(void) {\n"
-		"    vec3 tangentNormal = uMaterialFlags.x > 0.5 ? texture(uNormalTexture, vTexCoord).xyz * 2.0 - 1.0 : vec3(0.0, 0.0, 1.0);\n"
+		"    vec3 tangentNormal = uMaterialFlags.x > 0.5 ? ModernSampleNormalTexture(vTexCoord).xyz * 2.0 - 1.0 : vec3(0.0, 0.0, 1.0);\n"
 		"    vec3 tangent = ModernSafeNormal(vViewTangent);\n"
 		"    vec3 bitangent = ModernSafeNormal(vViewBitangent);\n"
 		"    vec3 normal = ModernSafeNormal(vViewNormal);\n"
 		"    return ModernSafeNormal(mat3(tangent, bitangent, normal) * tangentNormal);\n"
 		"}\n"
 		"float ModernSpecularStrength(void) {\n"
-		"    vec3 specular = uMaterialFlags.y > 0.5 ? texture(uSpecularTexture, vTexCoord).rgb : vec3(0.04);\n"
+		"    vec3 specular = uMaterialFlags.y > 0.5 ? ModernSampleSpecularTexture(vTexCoord).rgb : vec3(0.04);\n"
 		"    return clamp(dot(specular, vec3(0.333333)), 0.0, 2.0);\n"
 		"}\n"
 		"vec3 ModernEmissiveColor(void) {\n"
-		"    return uMaterialFlags.z > 0.5 ? texture(uEmissiveTexture, vTexCoord).rgb : vec3(0.0);\n"
+		"    return uMaterialFlags.z > 0.5 ? ModernSampleEmissiveTexture(vTexCoord).rgb : vec3(0.0);\n"
 		"}\n"
 		"float ModernNormalLightScale(void) {\n"
 		"    vec3 lightDir = normalize(vec3(0.25, 0.35, 1.0));\n"
 		"    return clamp(dot(ModernMaterialNormal(), lightDir) * 0.5 + 0.5, 0.18, 1.0);\n"
-		"}\n";
+		"}\n",
+		hasDrawRecords,
+		materialTextureHeader );
 
 	const char *clusterHeader =
 		"#define MODERN_CLUSTER_UBO_MAX_LIGHTS 256\n"
@@ -353,6 +472,19 @@ static void R_ModernGLShaderLibrary_BuildFragmentSource( int glslVersion, modern
 		"    if (indexRecord < 0 || indexRecord >= MODERN_CLUSTER_UBO_MAX_INDEX_RECORDS) { return uvec4(0xffffffffu); }\n"
 		"    return uClusterIndices.indices[indexRecord];\n"
 		"#endif\n"
+		"}\n"
+		"uvec4 ModernClusterFetchRange(int clusterIndex) {\n"
+		"    int headerBase = int(max(uClusterGrid.viewport.w, 0.0));\n"
+		"    return ModernClusterFetchIndex(headerBase + clusterIndex);\n"
+		"}\n"
+		"uint ModernClusterFetchLightIndex(uint scalarOffset) {\n"
+		"    uint flatBase = uint(max(uClusterGrid.viewport.z, 0.0));\n"
+		"    uvec4 word = ModernClusterFetchIndex(int(flatBase + (scalarOffset >> 2u)));\n"
+		"    uint lane = scalarOffset & 3u;\n"
+		"    if (lane == 0u) { return word.x; }\n"
+		"    if (lane == 1u) { return word.y; }\n"
+		"    if (lane == 2u) { return word.z; }\n"
+		"    return word.w;\n"
 		"}\n"
 		"float ModernClusterLinearDepth(float rawDepth) {\n"
 		"    float n = max(uClusterGrid.depth.x, 0.01);\n"
@@ -426,37 +558,46 @@ static void R_ModernGLShaderLibrary_BuildFragmentSource( int glslVersion, modern
 			"layout(location = 1) out vec4 out_Normal;\n"
 			"layout(location = 2) out vec4 out_Material;\n"
 			"layout(location = 3) out vec4 out_Emissive;\n"
+			"#define MODERN_HAS_DRAW_RECORDS %d\n"
+			"#if MODERN_HAS_DRAW_RECORDS\n"
+			"flat in vec4 vDrawDebugColor;\n"
+			"flat in vec4 vDrawLocalParams;\n"
+			"flat in vec4 vDrawMaterialFlags;\n"
+			"#define uDebugColor vDrawDebugColor\n"
+			"#define uLocalParams vDrawLocalParams\n"
+			"#define uMaterialFlags vDrawMaterialFlags\n"
+			"#else\n"
 			"uniform vec4 uDebugColor;\n"
 			"uniform vec4 uLocalParams;\n"
 			"uniform vec4 uMaterialFlags;\n"
-			"uniform sampler2D uMainTexture;\n"
-			"uniform sampler2D uNormalTexture;\n"
-			"uniform sampler2D uSpecularTexture;\n"
-			"uniform sampler2D uEmissiveTexture;\n"
+			"#endif\n"
+			"%s"
 			"vec3 ModernSafeNormal(vec3 normal) {\n"
 			"    float len2 = dot(normal, normal);\n"
 			"    return len2 > 0.00000001 ? normal * inversesqrt(len2) : vec3(0.0, 0.0, 1.0);\n"
 			"}\n"
 			"vec3 ModernMaterialNormal(void) {\n"
-			"    vec3 tangentNormal = uMaterialFlags.x > 0.5 ? texture(uNormalTexture, vTexCoord).xyz * 2.0 - 1.0 : vec3(0.0, 0.0, 1.0);\n"
+			"    vec3 tangentNormal = uMaterialFlags.x > 0.5 ? ModernSampleNormalTexture(vTexCoord).xyz * 2.0 - 1.0 : vec3(0.0, 0.0, 1.0);\n"
 			"    return ModernSafeNormal(mat3(ModernSafeNormal(vViewTangent), ModernSafeNormal(vViewBitangent), ModernSafeNormal(vViewNormal)) * tangentNormal);\n"
 			"}\n"
 			"float ModernSpecularStrength(void) {\n"
-			"    vec3 specular = uMaterialFlags.y > 0.5 ? texture(uSpecularTexture, vTexCoord).rgb : vec3(0.04);\n"
+			"    vec3 specular = uMaterialFlags.y > 0.5 ? ModernSampleSpecularTexture(vTexCoord).rgb : vec3(0.04);\n"
 			"    return clamp(dot(specular, vec3(0.333333)), 0.0, 2.0);\n"
 			"}\n"
 			"void main() {\n"
-			"    vec4 texel = texture(uMainTexture, vTexCoord);\n"
+			"    vec4 texel = ModernSampleMainTexture(vTexCoord);\n"
 			"    vec3 baseColor = texel.rgb * max(uDebugColor.rgb, vec3(0.0));\n"
 			"    vec3 normal = ModernMaterialNormal();\n"
 			"    float specular = ModernSpecularStrength();\n"
-			"    vec3 emissive = uMaterialFlags.z > 0.5 ? texture(uEmissiveTexture, vTexCoord).rgb : vec3(uLocalParams.w);\n"
+			"    vec3 emissive = uMaterialFlags.z > 0.5 ? ModernSampleEmissiveTexture(vTexCoord).rgb : vec3(uLocalParams.w);\n"
 			"    out_Albedo = vec4(baseColor, 1.0);\n"
 			"    out_Normal = vec4(normal * 0.5 + 0.5, vTangentSign * 0.5 + 0.5);\n"
 			"    out_Material = vec4(0.04, specular, uLocalParams.z, 1.0);\n"
 			"    out_Emissive = vec4(emissive, 1.0);\n"
 			"}\n",
-			glslVersion );
+			glslVersion,
+			hasDrawRecords,
+			materialTextureHeader );
 		return;
 	}
 
@@ -475,37 +616,46 @@ static void R_ModernGLShaderLibrary_BuildFragmentSource( int glslVersion, modern
 			"layout(location = 1) out vec4 out_Normal;\n"
 			"layout(location = 2) out vec4 out_Material;\n"
 			"layout(location = 3) out vec4 out_Emissive;\n"
+			"#define MODERN_HAS_DRAW_RECORDS %d\n"
+			"#if MODERN_HAS_DRAW_RECORDS\n"
+			"flat in vec4 vDrawDebugColor;\n"
+			"flat in vec4 vDrawLocalParams;\n"
+			"flat in vec4 vDrawMaterialFlags;\n"
+			"#define uDebugColor vDrawDebugColor\n"
+			"#define uLocalParams vDrawLocalParams\n"
+			"#define uMaterialFlags vDrawMaterialFlags\n"
+			"#else\n"
 			"uniform vec4 uDebugColor;\n"
 			"uniform vec4 uLocalParams;\n"
 			"uniform vec4 uMaterialFlags;\n"
-			"uniform sampler2D uMainTexture;\n"
-			"uniform sampler2D uNormalTexture;\n"
-			"uniform sampler2D uSpecularTexture;\n"
-			"uniform sampler2D uEmissiveTexture;\n"
+			"#endif\n"
+			"%s"
 			"vec3 ModernSafeNormal(vec3 normal) {\n"
 			"    float len2 = dot(normal, normal);\n"
 			"    return len2 > 0.00000001 ? normal * inversesqrt(len2) : vec3(0.0, 0.0, 1.0);\n"
 			"}\n"
 			"vec3 ModernMaterialNormal(void) {\n"
-			"    vec3 tangentNormal = uMaterialFlags.x > 0.5 ? texture(uNormalTexture, vTexCoord).xyz * 2.0 - 1.0 : vec3(0.0, 0.0, 1.0);\n"
+			"    vec3 tangentNormal = uMaterialFlags.x > 0.5 ? ModernSampleNormalTexture(vTexCoord).xyz * 2.0 - 1.0 : vec3(0.0, 0.0, 1.0);\n"
 			"    return ModernSafeNormal(mat3(ModernSafeNormal(vViewTangent), ModernSafeNormal(vViewBitangent), ModernSafeNormal(vViewNormal)) * tangentNormal);\n"
 			"}\n"
 			"float ModernSpecularStrength(void) {\n"
-			"    vec3 specular = uMaterialFlags.y > 0.5 ? texture(uSpecularTexture, vTexCoord).rgb : vec3(0.04);\n"
+			"    vec3 specular = uMaterialFlags.y > 0.5 ? ModernSampleSpecularTexture(vTexCoord).rgb : vec3(0.04);\n"
 			"    return clamp(dot(specular, vec3(0.333333)), 0.0, 2.0);\n"
 			"}\n"
 			"void main() {\n"
-			"    vec4 texel = texture(uMainTexture, vTexCoord);\n"
+			"    vec4 texel = ModernSampleMainTexture(vTexCoord);\n"
 			"    if (texel.a < max(uLocalParams.x, 0.001)) { discard; }\n"
 			"    vec3 normal = ModernMaterialNormal();\n"
 			"    float specular = ModernSpecularStrength();\n"
-			"    vec3 emissive = uMaterialFlags.z > 0.5 ? texture(uEmissiveTexture, vTexCoord).rgb : vec3(0.0);\n"
+			"    vec3 emissive = uMaterialFlags.z > 0.5 ? ModernSampleEmissiveTexture(vTexCoord).rgb : vec3(0.0);\n"
 			"    out_Albedo = vec4(texel.rgb * max(uDebugColor.rgb, vec3(0.0)), 1.0);\n"
 			"    out_Normal = vec4(normal * 0.5 + 0.5, vTangentSign * 0.5 + 0.5);\n"
 			"    out_Material = vec4(0.04, specular, uLocalParams.z, 1.0);\n"
 			"    out_Emissive = vec4(emissive, 1.0);\n"
 			"}\n",
-			glslVersion );
+			glslVersion,
+			hasDrawRecords,
+			materialTextureHeader );
 		return;
 	}
 
@@ -534,20 +684,18 @@ static void R_ModernGLShaderLibrary_BuildFragmentSource( int glslVersion, modern
 			"    float rawDepth = texture(uSceneDepth, vTexCoord).r;\n"
 			"    vec3 viewPosition = ModernClusterViewPositionFromDepth(vTexCoord, rawDepth);\n"
 			"    ivec3 grid = ivec3(max(uClusterGrid.grid.xyz, vec3(1.0)));\n"
-			"    int maxLights = int(max(uClusterGrid.grid.w, 1.0));\n"
 			"    int tileX = clamp(int(floor(vTexCoord.x * float(grid.x))), 0, grid.x - 1);\n"
 			"    int tileY = clamp(int(floor((1.0 - vTexCoord.y) * float(grid.y))), 0, grid.y - 1);\n"
 			"    int sliceZ = ModernClusterSliceForDepth(viewPosition.z);\n"
 			"    int clusterIndex = (sliceZ * grid.y + tileY) * grid.x + tileX;\n"
-			"    int indexBase = int(max(uClusterGrid.viewport.z, 0.0));\n"
-			"    int indexGroups = max((maxLights + 3) / 4, 1);\n"
+			"    uvec4 clusterRange = ModernClusterFetchRange(clusterIndex);\n"
+			"    int maxLights = int(max(uClusterGrid.grid.w, 1.0));\n"
+			"    int clusterLightCount = int(min(clusterRange.y, uint(maxLights)));\n"
 			"    vec3 lightAccum = vec3(0.0);\n"
 			"    int contributingLights = 0;\n"
 			"    int scannedLights = 0;\n"
-			"    for (int i = 0; i < maxLights; ++i) {\n"
-			"        if (i >= maxLights) { break; }\n"
-			"        uvec4 lightIndices = ModernClusterFetchIndex(indexBase + clusterIndex * indexGroups + (i >> 2));\n"
-			"        uint lightIndex = lightIndices[i & 3];\n"
+			"    for (int i = 0; i < clusterLightCount; ++i) {\n"
+			"        uint lightIndex = ModernClusterFetchLightIndex(clusterRange.x + uint(i));\n"
 			"        if (lightIndex == 0xffffffffu || lightIndex >= uint(max(uClusterGrid.counts.x, 0.0))) { continue; }\n"
 			"        ModernClusterLightRecord light = ModernClusterFetchLight(lightIndex);\n"
 			"        int type = int(floor(light.colorType.w + 0.5));\n"
@@ -597,27 +745,25 @@ static void R_ModernGLShaderLibrary_BuildFragmentSource( int glslVersion, modern
 			"%s"
 			"%s"
 			"void main() {\n"
-			"    vec4 texel = texture(uMainTexture, vTexCoord);\n"
+			"    vec4 texel = ModernSampleMainTexture(vTexCoord);\n"
 			"    if (%d != 0 && texel.a < max(uLocalParams.x, 0.001)) { discard; }\n"
 			"    vec3 materialNormal = ModernMaterialNormal();\n"
 			"    float specular = ModernSpecularStrength();\n"
 			"    vec3 emissive = ModernEmissiveColor();\n"
 			"    ivec3 grid = ivec3(max(uClusterGrid.grid.xyz, vec3(1.0)));\n"
-			"    int maxLights = int(max(uClusterGrid.grid.w, 1.0));\n"
 			"    vec2 viewport = max(uClusterGrid.viewport.xy, vec2(1.0));\n"
 			"    vec2 normalizedPixel = clamp(gl_FragCoord.xy / viewport, vec2(0.0), vec2(0.999));\n"
 			"    int tileX = clamp(int(floor(normalizedPixel.x * float(grid.x))), 0, grid.x - 1);\n"
 			"    int tileY = clamp(int(floor((1.0 - normalizedPixel.y) * float(grid.y))), 0, grid.y - 1);\n"
 			"    int sliceZ = ModernClusterSliceForDepth(max(vViewPosition.z, ModernClusterLinearDepth(gl_FragCoord.z)));\n"
 			"    int clusterIndex = (sliceZ * grid.y + tileY) * grid.x + tileX;\n"
-			"    int indexBase = int(max(uClusterGrid.viewport.z, 0.0));\n"
-			"    int indexGroups = max((maxLights + 3) / 4, 1);\n"
+			"    uvec4 clusterRange = ModernClusterFetchRange(clusterIndex);\n"
+			"    int maxLights = int(max(uClusterGrid.grid.w, 1.0));\n"
+			"    int clusterLightCount = int(min(clusterRange.y, uint(maxLights)));\n"
 			"    vec3 lightAccum = vec3(0.0);\n"
 			"    int scannedLights = 0;\n"
-			"    for (int i = 0; i < maxLights; ++i) {\n"
-			"        if (i >= maxLights) { break; }\n"
-			"        uvec4 lightIndices = ModernClusterFetchIndex(indexBase + clusterIndex * indexGroups + (i >> 2));\n"
-			"        uint lightIndex = lightIndices[i & 3];\n"
+			"    for (int i = 0; i < clusterLightCount; ++i) {\n"
+			"        uint lightIndex = ModernClusterFetchLightIndex(clusterRange.x + uint(i));\n"
 			"        if (lightIndex == 0xffffffffu || lightIndex >= uint(max(uClusterGrid.counts.x, 0.0))) { continue; }\n"
 			"        ModernClusterLightRecord light = ModernClusterFetchLight(lightIndex);\n"
 			"        int type = int(floor(light.colorType.w + 0.5));\n"
@@ -653,7 +799,7 @@ static void R_ModernGLShaderLibrary_BuildFragmentSource( int glslVersion, modern
 			"%s"
 			"%s"
 			"void main() {\n"
-			"    vec4 texel = texture(uMainTexture, vTexCoord);\n"
+			"    vec4 texel = ModernSampleMainTexture(vTexCoord);\n"
 			"    float blendAmount = clamp(uLocalParams.x, 0.0, 1.0);\n"
 			"    vec3 blendColor = vec3(uLocalParams.y, uLocalParams.z, uLocalParams.w);\n"
 			"    vec3 baseColor = texel.rgb * max(uDebugColor.rgb, vec3(0.0));\n"
@@ -668,13 +814,11 @@ static void R_ModernGLShaderLibrary_BuildFragmentSource( int glslVersion, modern
 			"    int tileY = clamp(int(floor((1.0 - normalizedPixel.y) * float(grid.y))), 0, grid.y - 1);\n"
 			"    int sliceZ = ModernClusterSliceForDepth(max(vViewPosition.z, ModernClusterLinearDepth(gl_FragCoord.z)));\n"
 			"    int clusterIndex = (sliceZ * grid.y + tileY) * grid.x + tileX;\n"
-			"    int indexBase = int(max(uClusterGrid.viewport.z, 0.0));\n"
-			"    int indexGroups = max((maxLights + 3) / 4, 1);\n"
+			"    uvec4 clusterRange = ModernClusterFetchRange(clusterIndex);\n"
+			"    int clusterLightCount = int(min(clusterRange.y, uint(maxLights)));\n"
 			"    vec3 lightAccum = vec3(0.0);\n"
-			"    for (int i = 0; i < maxLights; ++i) {\n"
-			"        if (i >= maxLights) { break; }\n"
-			"        uvec4 lightIndices = ModernClusterFetchIndex(indexBase + clusterIndex * indexGroups + (i >> 2));\n"
-			"        uint lightIndex = lightIndices[i & 3];\n"
+			"    for (int i = 0; i < clusterLightCount; ++i) {\n"
+			"        uint lightIndex = ModernClusterFetchLightIndex(clusterRange.x + uint(i));\n"
 			"        if (lightIndex == 0xffffffffu || lightIndex >= uint(max(uClusterGrid.counts.x, 0.0))) { continue; }\n"
 			"        ModernClusterLightRecord light = ModernClusterFetchLight(lightIndex);\n"
 			"        int type = int(floor(light.colorType.w + 0.5));\n"
@@ -717,11 +861,12 @@ static void R_ModernGLShaderLibrary_BuildFragmentSource( int glslVersion, modern
 			"in vec2 vTexCoord;\n"
 			"layout(location = 0) out vec4 out_Color;\n"
 			"uniform vec4 uDebugColor;\n"
-			"uniform sampler2D uMainTexture;\n"
+			"%s"
 			"void main() {\n"
-			"    out_Color = texture(uMainTexture, vTexCoord) * uDebugColor;\n"
+			"    out_Color = ModernSampleMainTexture(vTexCoord) * uDebugColor;\n"
 			"}\n",
-			glslVersion );
+			glslVersion,
+			materialTextureHeader );
 		return;
 	}
 
@@ -734,13 +879,14 @@ static void R_ModernGLShaderLibrary_BuildFragmentSource( int glslVersion, modern
 			"layout(location = 0) out vec4 out_Color;\n"
 			"uniform vec4 uDebugColor;\n"
 			"uniform vec4 uLocalParams;\n"
-			"uniform sampler2D uMainTexture;\n"
+			"%s"
 			"void main() {\n"
 			"    vec2 uv = clamp(vTexCoord + uLocalParams.xy, vec2(0.0), vec2(1.0));\n"
-			"    vec4 texel = texture(uMainTexture, uv);\n"
+			"    vec4 texel = ModernSampleMainTexture(uv);\n"
 			"    out_Color = vec4(texel.rgb * max(uDebugColor.rgb, vec3(0.0)), texel.a * uDebugColor.a);\n"
 			"}\n",
-			glslVersion );
+			glslVersion,
+			materialTextureHeader );
 		return;
 	}
 
@@ -915,6 +1061,7 @@ static bool R_ModernGLShaderLibrary_ReflectProgram( modernGLShaderProgramInfo_t 
 	info.reflection.tangentAttribute = 9;
 	info.reflection.bitangentAttribute = 10;
 	info.reflection.normalAttribute = 11;
+	info.reflection.drawRecordAttribute = 12;
 	info.reflection.usesFrameConstants = true;
 	info.reflection.usesModelViewProjection = true;
 	info.reflection.usesModelViewMatrix = R_ModernGLShaderLibrary_KindUsesDrawVertTangentSpace( info.kind );
@@ -922,7 +1069,9 @@ static bool R_ModernGLShaderLibrary_ReflectProgram( modernGLShaderProgramInfo_t 
 	info.reflection.usesLocalParams = R_ModernGLShaderLibrary_KindUsesLocalParams( info.kind );
 	info.reflection.usesMainTexture = R_ModernGLShaderLibrary_KindUsesMainTexture( info.kind );
 	info.reflection.usesMaterialTextures = R_ModernGLShaderLibrary_KindUsesMaterialTextures( info.kind );
+	info.reflection.usesMaterialTextureTable = info.glslVersion >= 430 && info.reflection.usesMainTexture && info.kind != MODERN_GL_SHADER_DEFERRED_LIGHT_RESOLVE;
 	info.reflection.usesMaterialFlags = info.reflection.usesMaterialTextures;
+	info.reflection.usesDrawRecords = info.glslVersion >= 430 && info.kind != MODERN_GL_SHADER_DEFERRED_LIGHT_RESOLVE;
 	info.reflection.usesTexCoord = info.reflection.usesMainTexture;
 	info.reflection.usesDrawVertColor = R_ModernGLShaderLibrary_KindUsesDrawVertColor( info.kind );
 	info.reflection.usesDrawVertTangentSpace = R_ModernGLShaderLibrary_KindUsesDrawVertTangentSpace( info.kind );
@@ -939,7 +1088,11 @@ static bool R_ModernGLShaderLibrary_ReflectProgram( modernGLShaderProgramInfo_t 
 	info.reflection.normalTextureLocation = glGetUniformLocation( info.program, "uNormalTexture" );
 	info.reflection.specularTextureLocation = glGetUniformLocation( info.program, "uSpecularTexture" );
 	info.reflection.emissiveTextureLocation = glGetUniformLocation( info.program, "uEmissiveTexture" );
+	info.reflection.textureIndicesLocation = glGetUniformLocation( info.program, "uTextureIndices" );
+	info.reflection.textureTableModeLocation = glGetUniformLocation( info.program, "uTextureTableMode" );
+	info.reflection.materialTextureTableLocation = glGetUniformLocation( info.program, "uMaterialTextures[0]" );
 	info.reflection.materialFlagsLocation = glGetUniformLocation( info.program, "uMaterialFlags" );
+	info.reflection.drawRecordModeLocation = glGetUniformLocation( info.program, "uDrawRecordMode" );
 
 	R_ModernGLShaderLibrary_AddReflectionRecord(
 		info.reflection.uniformBlocks,
@@ -1059,6 +1212,44 @@ static bool R_ModernGLShaderLibrary_ReflectProgram( modernGLShaderProgramInfo_t 
 			true,
 			info.reflection.emissiveTextureLocation >= 0 );
 	}
+	if ( info.reflection.usesMaterialTextureTable ) {
+		R_ModernGLShaderLibrary_AddReflectionRecord(
+			info.reflection.uniforms,
+			info.reflection.uniformCount,
+			"uTextureIndices",
+			MODERN_GL_SHADER_RESOURCE_UNIFORM,
+			-1,
+			info.reflection.textureIndicesLocation,
+			-1,
+			1,
+			GL_UNSIGNED_INT_VEC4,
+			true,
+			info.reflection.textureIndicesLocation >= 0 );
+		R_ModernGLShaderLibrary_AddReflectionRecord(
+			info.reflection.uniforms,
+			info.reflection.uniformCount,
+			"uTextureTableMode",
+			MODERN_GL_SHADER_RESOURCE_UNIFORM,
+			-1,
+			info.reflection.textureTableModeLocation,
+			-1,
+			1,
+			GL_UNSIGNED_INT,
+			true,
+			info.reflection.textureTableModeLocation >= 0 );
+		R_ModernGLShaderLibrary_AddReflectionRecord(
+			info.reflection.samplers,
+			info.reflection.samplerCount,
+			"uMaterialTextures",
+			MODERN_GL_SHADER_RESOURCE_SAMPLER,
+			-1,
+			info.reflection.materialTextureTableLocation,
+			0,
+			MATERIAL_RESOURCE_TABLE_TEXTURE_ARRAY_CAPACITY,
+			GL_SAMPLER_2D,
+			true,
+			info.reflection.materialTextureTableLocation >= 0 );
+	}
 	if ( info.reflection.usesMaterialFlags ) {
 		R_ModernGLShaderLibrary_AddReflectionRecord(
 			info.reflection.uniforms,
@@ -1072,6 +1263,33 @@ static bool R_ModernGLShaderLibrary_ReflectProgram( modernGLShaderProgramInfo_t 
 			GL_FLOAT_VEC4,
 			true,
 			info.reflection.materialFlagsLocation >= 0 );
+	}
+	if ( info.reflection.usesDrawRecords ) {
+		R_ModernGLShaderLibrary_AddReflectionRecord(
+			info.reflection.uniforms,
+			info.reflection.uniformCount,
+			"uDrawRecordMode",
+			MODERN_GL_SHADER_RESOURCE_UNIFORM,
+			-1,
+			info.reflection.drawRecordModeLocation,
+			-1,
+			1,
+			GL_UNSIGNED_INT,
+			true,
+			info.reflection.drawRecordModeLocation >= 0 );
+		const int drawRecordSSBOIndex = R_ModernGLShaderLibrary_ProgramResourceIndex( info.program, GL_SHADER_STORAGE_BLOCK, "ModernDrawRecords" );
+		R_ModernGLShaderLibrary_AddReflectionRecord(
+			info.reflection.shaderStorageBlocks,
+			info.reflection.shaderStorageBlockCount,
+			"ModernDrawRecords",
+			MODERN_GL_SHADER_RESOURCE_SHADER_STORAGE_BLOCK,
+			drawRecordSSBOIndex,
+			-1,
+			4,
+			1,
+			GL_SHADER_STORAGE_BLOCK,
+			true,
+			drawRecordSSBOIndex >= 0 );
 	}
 	if ( info.reflection.usesShaderStorage ) {
 		const int ssboIndex = R_ModernGLShaderLibrary_ProgramResourceIndex( info.program, GL_SHADER_STORAGE_BLOCK, "ModernLightRecords" );
@@ -1151,6 +1369,20 @@ static bool R_ModernGLShaderLibrary_ReflectProgram( modernGLShaderProgramInfo_t 
 		GL_FLOAT_VEC3,
 		info.reflection.usesDrawVertTangentSpace,
 		info.reflection.usesDrawVertTangentSpace );
+	if ( info.reflection.usesDrawRecords ) {
+		R_ModernGLShaderLibrary_AddReflectionRecord(
+			info.reflection.attributes,
+			info.reflection.attributeCount,
+			"attr_DrawRecordIndex",
+			MODERN_GL_SHADER_RESOURCE_ATTRIBUTE,
+			-1,
+			info.reflection.drawRecordAttribute,
+			-1,
+			1,
+			GL_FLOAT,
+			true,
+			true );
+	}
 	R_ModernGLShaderLibrary_AddReflectionRecord(
 		info.reflection.attributes,
 		info.reflection.attributeCount,
@@ -1185,7 +1417,11 @@ static bool R_ModernGLShaderLibrary_ReflectProgram( modernGLShaderProgramInfo_t 
 	info.normalTextureLocation = info.reflection.normalTextureLocation;
 	info.specularTextureLocation = info.reflection.specularTextureLocation;
 	info.emissiveTextureLocation = info.reflection.emissiveTextureLocation;
+	info.textureIndicesLocation = info.reflection.textureIndicesLocation;
+	info.textureTableModeLocation = info.reflection.textureTableModeLocation;
+	info.materialTextureTableLocation = info.reflection.materialTextureTableLocation;
 	info.materialFlagsLocation = info.reflection.materialFlagsLocation;
+	info.drawRecordModeLocation = info.reflection.drawRecordModeLocation;
 
 	if ( info.frameBlockIndex < 0 || info.modelViewProjectionLocation < 0 ) {
 		common->Warning( "Modern GL program '%s' is missing required reflected bindings", info.name );
@@ -1212,8 +1448,17 @@ static bool R_ModernGLShaderLibrary_ReflectProgram( modernGLShaderProgramInfo_t 
 		common->Warning( "Modern GL program '%s' is missing material texture samplers", info.name );
 		return false;
 	}
+	if ( info.reflection.usesMaterialTextureTable
+		&& ( info.textureIndicesLocation < 0 || info.textureTableModeLocation < 0 || info.materialTextureTableLocation < 0 ) ) {
+		common->Warning( "Modern GL program '%s' is missing material texture table bindings", info.name );
+		return false;
+	}
 	if ( info.reflection.usesMaterialFlags && info.materialFlagsLocation < 0 ) {
 		common->Warning( "Modern GL program '%s' is missing uMaterialFlags", info.name );
+		return false;
+	}
+	if ( info.reflection.usesDrawRecords && info.drawRecordModeLocation < 0 ) {
+		common->Warning( "Modern GL program '%s' is missing uDrawRecordMode", info.name );
 		return false;
 	}
 
@@ -1228,6 +1473,26 @@ static bool R_ModernGLShaderLibrary_ReflectProgram( modernGLShaderProgramInfo_t 
 			glUniform1i( info.specularTextureLocation, 2 );
 			glUniform1i( info.emissiveTextureLocation, 3 );
 		}
+		if ( info.reflection.usesMaterialTextureTable && glUniform1iv != NULL ) {
+			GLint tableUnits[MATERIAL_RESOURCE_TABLE_TEXTURE_ARRAY_CAPACITY];
+			for ( int i = 0; i < MATERIAL_RESOURCE_TABLE_TEXTURE_ARRAY_CAPACITY; ++i ) {
+				tableUnits[i] = i;
+			}
+			glUniform1iv( info.materialTextureTableLocation, MATERIAL_RESOURCE_TABLE_TEXTURE_ARRAY_CAPACITY, tableUnits );
+		}
+		glUseProgram( 0 );
+	}
+	if ( info.reflection.usesMaterialTextureTable && glUniform1ui != NULL ) {
+		glUseProgram( info.program );
+		glUniform1ui( info.textureTableModeLocation, 0 );
+		if ( glUniform4ui != NULL ) {
+			glUniform4ui( info.textureIndicesLocation, 0, 0, 0, 0 );
+		}
+		glUseProgram( 0 );
+	}
+	if ( info.reflection.usesDrawRecords && glUniform1ui != NULL ) {
+		glUseProgram( info.program );
+		glUniform1ui( info.drawRecordModeLocation, 0 );
 		glUseProgram( 0 );
 	}
 	return true;
@@ -1323,7 +1588,11 @@ static bool R_ModernGLShaderLibrary_CreateProgram( int glslVersion, modernGLShad
 	info.normalTextureLocation = -1;
 	info.specularTextureLocation = -1;
 	info.emissiveTextureLocation = -1;
+	info.textureIndicesLocation = -1;
+	info.textureTableModeLocation = -1;
+	info.materialTextureTableLocation = -1;
 	info.materialFlagsLocation = -1;
+	info.drawRecordModeLocation = -1;
 	idStr::snPrintf(
 		info.name,
 		sizeof( info.name ),
@@ -1351,8 +1620,8 @@ static bool R_ModernGLShaderLibrary_CreateProgram( int glslVersion, modernGLShad
 		info.permutation.debugMode,
 		info.permutation.tier );
 
-	char vertexSource[4096];
-	char fragmentSource[16384];
+	char vertexSource[8192];
+	char fragmentSource[32768];
 	R_ModernGLShaderLibrary_BuildVertexSource( glslVersion, kind, vertexSource, sizeof( vertexSource ) );
 	R_ModernGLShaderLibrary_BuildFragmentSource( glslVersion, kind, fragmentSource, sizeof( fragmentSource ) );
 
@@ -1381,6 +1650,7 @@ static bool R_ModernGLShaderLibrary_CreateProgram( int glslVersion, modernGLShad
 	glAttachShader( info.program, fragmentShader );
 	glBindAttribLocation( info.program, 0, "attr_Position" );
 	glBindAttribLocation( info.program, 8, "attr_TexCoord0" );
+	glBindAttribLocation( info.program, 12, "attr_DrawRecordIndex" );
 	glLinkProgram( info.program );
 
 	GLint linked = GL_FALSE;
@@ -1654,6 +1924,11 @@ bool RendererModernGLShaderLibrary_RunSelfTest( void ) {
 			common->Printf( "RendererModernGLShaderLibrary self-test failed: material texture reflection mismatch for %s\n", program->name );
 			return false;
 		}
+		if ( program->reflection.usesMaterialTextureTable
+			&& ( program->textureIndicesLocation < 0 || program->textureTableModeLocation < 0 || program->materialTextureTableLocation < 0 ) ) {
+			common->Printf( "RendererModernGLShaderLibrary self-test failed: texture-table reflection mismatch for %s\n", program->name );
+			return false;
+		}
 		if ( program->reflection.uniformBlockCount <= 0 || program->reflection.uniformCount <= 0 || program->reflection.attributeCount <= 0 ) {
 			common->Printf( "RendererModernGLShaderLibrary self-test failed: reflection record coverage mismatch for %s\n", program->name );
 			return false;
@@ -1664,6 +1939,10 @@ bool RendererModernGLShaderLibrary_RunSelfTest( void ) {
 		}
 		if ( program->reflection.usesShaderStorage && program->reflection.shaderStorageBlockCount <= 0 ) {
 			common->Printf( "RendererModernGLShaderLibrary self-test failed: SSBO reflection mismatch for %s\n", program->name );
+			return false;
+		}
+		if ( program->reflection.usesDrawRecords && ( program->drawRecordModeLocation < 0 || program->reflection.shaderStorageBlockCount <= 0 || program->reflection.attributeCount < 7 ) ) {
+			common->Printf( "RendererModernGLShaderLibrary self-test failed: draw-record reflection mismatch for %s\n", program->name );
 			return false;
 		}
 		if ( program->reflection.usesImage && program->reflection.imageCount <= 0 ) {

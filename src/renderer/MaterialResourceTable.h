@@ -22,6 +22,7 @@
 
 const int MATERIAL_RESOURCE_TABLE_MAX_RECORDS = SCENE_PACKET_MAX_MATERIAL_RECORDS;
 const int MATERIAL_RESOURCE_TABLE_MAX_TEXTURE_BINDINGS = 8;
+const int MATERIAL_RESOURCE_TABLE_TEXTURE_ARRAY_CAPACITY = 12;
 
 enum materialResourceBlendMode_t {
 	MATERIAL_RESOURCE_BLEND_OPAQUE = 0,
@@ -203,6 +204,7 @@ typedef struct materialResourceTableStats_s {
 	bool	bindlessEnabled;
 	bool	textureArraysSupported;
 	bool	textureViewsSupported;
+	bool	textureArrayTableReady;
 	int		sourceMaterialRecords;
 	int		drawPacketReferences;
 	int		records;
@@ -218,6 +220,10 @@ typedef struct materialResourceTableStats_s {
 	int		textureBindings;
 	int		classicTextureBindings;
 	int		textureArrayDescriptors;
+	int		textureArrayTableCapacity;
+	int		textureArrayTableTextures;
+	int		textureArrayTableDescriptors;
+	int		textureArrayTableOverflows;
 	int		textureViewDescriptors;
 	int		bindlessDescriptors;
 	int		missingImages;
@@ -251,6 +257,8 @@ void R_MaterialResourceTable_PrepareFrame( const idScenePacketFrame &packetFrame
 const materialResourceTableStats_t &R_MaterialResourceTable_Stats( void );
 const materialResourceTableRecord_t *R_MaterialResourceTable_RecordForIndex( int tableIndex );
 const materialResourceTableRecord_t *R_MaterialResourceTable_FindRecordForMaterial( const idMaterial *material );
+const unsigned int *R_MaterialResourceTable_TextureArrayTable( int &count );
+int R_MaterialResourceTable_TextureArrayTableIndexForHandle( unsigned int textureHandle );
 const char *MaterialResourceBlendMode_Name( materialResourceBlendMode_t blendMode );
 const char *MaterialResourceTextureSemantic_Name( materialResourceTextureSemantic_t semantic );
 const char *MaterialResourceFallbackReason_Name( materialResourceFallbackReason_t reason );

@@ -47,12 +47,14 @@ public:
 	void Shutdown( void );
 	void BeginFrame( void );
 	void InvalidateAll( const char *reason );
+	void InvalidateBufferBinding( GLenum target, const char *reason );
 	void LegacyHandoffReset( const char *reason );
 
 	bool UseProgram( GLuint program );
 	bool BindVertexArray( GLuint vertexArray );
 	bool BindBuffer( GLenum target, GLuint buffer );
 	bool BindBufferBase( GLenum target, GLuint index, GLuint buffer );
+	bool BindBufferRange( GLenum target, GLuint index, GLuint buffer, GLintptr offset, GLsizeiptr size );
 	bool BindBuffersBase( GLenum target, GLuint first, GLsizei count, const GLuint *buffers );
 	bool ActiveTextureUnit( int unit );
 	bool BindTexture( int unit, GLenum target, GLuint texture );
@@ -98,6 +100,13 @@ private:
 		bool valid;
 		GLuint value;
 	};
+	struct cachedBufferBaseBinding_t {
+		bool valid;
+		GLuint buffer;
+		GLintptr offset;
+		GLsizeiptr size;
+		bool range;
+	};
 
 	void ResetCachedState( void );
 	void RecordHit( void );
@@ -108,7 +117,7 @@ private:
 	int ShaderStorageBindingCount( void ) const;
 	int TextureTargetSlot( GLenum target ) const;
 	cachedGLuint_t *BufferBindingForTarget( GLenum target );
-	cachedGLuint_t *BufferBaseBindingForTarget( GLenum target, GLuint index );
+	cachedBufferBaseBinding_t *BufferBaseBindingForTarget( GLenum target, GLuint index );
 	int *BufferMissBucketForTarget( GLenum target );
 	bool SetCapability( GLenum capability, bool enabled, cachedBool_t &cached, int &bucket );
 
@@ -125,8 +134,8 @@ private:
 	cachedGLuint_t uniformBuffer;
 	cachedGLuint_t shaderStorageBuffer;
 	cachedGLuint_t drawIndirectBuffer;
-	cachedGLuint_t uniformBufferBase[GL_STATE_CACHE_MAX_BUFFER_BINDINGS];
-	cachedGLuint_t shaderStorageBufferBase[GL_STATE_CACHE_MAX_BUFFER_BINDINGS];
+	cachedBufferBaseBinding_t uniformBufferBase[GL_STATE_CACHE_MAX_BUFFER_BINDINGS];
+	cachedBufferBaseBinding_t shaderStorageBufferBase[GL_STATE_CACHE_MAX_BUFFER_BINDINGS];
 	cachedTextureBinding_t textures[GL_STATE_CACHE_MAX_TEXTURE_UNITS][3];
 	cachedGLuint_t samplers[GL_STATE_CACHE_MAX_TEXTURE_UNITS];
 	cachedGLuint_t framebuffer;
@@ -169,6 +178,7 @@ void R_GLStateCache_Init( const renderBackendCaps_t &caps );
 void R_GLStateCache_Shutdown( void );
 void R_GLStateCache_BeginFrame( void );
 void R_GLStateCache_InvalidateAll( const char *reason );
+void R_GLStateCache_InvalidateBufferBinding( GLenum target, const char *reason );
 void R_GLStateCache_LegacyHandoffReset( const char *reason );
 const glStateCacheStats_t &R_GLStateCache_Stats( void );
 void R_GLStateCache_PrintGfxInfo( void );

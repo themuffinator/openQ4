@@ -1695,6 +1695,7 @@ typedef struct {
 	GLint			vertexColorParams;
 	GLint			diffuseColor;
 	GLint			specularColor;
+	GLint			materialEnhanced;
 	GLint			materialNormalScale;
 	GLint			materialSpecularBoost;
 	GLint			materialFresnel;
@@ -1791,6 +1792,7 @@ typedef struct {
 	GLint			vertexColorParams;
 	GLint			diffuseColor;
 	GLint			specularColor;
+	GLint			materialEnhanced;
 	GLint			materialNormalScale;
 	GLint			materialSpecularBoost;
 	GLint			materialFresnel;
@@ -2996,6 +2998,7 @@ static const char *programBaseName = "glprogs/shadow_interaction";
 	g_shadowMapProgram.vertexColorParams = glGetUniformLocationARB( programObject, "uVertexColorParams" );
 	g_shadowMapProgram.diffuseColor = glGetUniformLocationARB( programObject, "uDiffuseColor" );
 	g_shadowMapProgram.specularColor = glGetUniformLocationARB( programObject, "uSpecularColor" );
+	g_shadowMapProgram.materialEnhanced = glGetUniformLocationARB( programObject, "uMaterialEnhanced" );
 	g_shadowMapProgram.materialNormalScale = glGetUniformLocationARB( programObject, "uMaterialNormalScale" );
 	g_shadowMapProgram.materialSpecularBoost = glGetUniformLocationARB( programObject, "uMaterialSpecularBoost" );
 	g_shadowMapProgram.materialFresnel = glGetUniformLocationARB( programObject, "uMaterialFresnel" );
@@ -3355,6 +3358,7 @@ static const char *programBaseName = "glprogs/shadow_point_interaction";
 	g_pointShadowMapProgram.vertexColorParams = glGetUniformLocationARB( programObject, "uVertexColorParams" );
 	g_pointShadowMapProgram.diffuseColor = glGetUniformLocationARB( programObject, "uDiffuseColor" );
 	g_pointShadowMapProgram.specularColor = glGetUniformLocationARB( programObject, "uSpecularColor" );
+	g_pointShadowMapProgram.materialEnhanced = glGetUniformLocationARB( programObject, "uMaterialEnhanced" );
 	g_pointShadowMapProgram.materialNormalScale = glGetUniformLocationARB( programObject, "uMaterialNormalScale" );
 	g_pointShadowMapProgram.materialSpecularBoost = glGetUniformLocationARB( programObject, "uMaterialSpecularBoost" );
 	g_pointShadowMapProgram.materialFresnel = glGetUniformLocationARB( programObject, "uMaterialFresnel" );
@@ -5978,6 +5982,69 @@ static idDrawVert *RB_GLSLPrepareInteractionVertexCache( const drawSurf_t *surf 
 	return (idDrawVert *)vertexCache.Position( surf->geo->ambientCache );
 }
 
+static bool RB_SurfaceUsesGeneratedCharacterGeometry( const drawSurf_t *surf ) {
+	if ( surf == NULL || surf->geo == NULL ) {
+		return true;
+	}
+
+	const srfTriangles_t *tri = surf->geo;
+	const srfTriangles_t *ambientTri = ( tri->ambientSurface != NULL ) ? tri->ambientSurface : tri;
+
+	if ( tri->deformedSurface || ( ambientTri != NULL && ambientTri->deformedSurface ) ) {
+		return true;
+	}
+
+#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
+	if ( tri->primBatchMesh != NULL || ( ambientTri != NULL && ambientTri->primBatchMesh != NULL ) ) {
+		return true;
+	}
+	if ( tri->skinToModelTransforms != NULL || tri->numSkinToModelTransforms > 0
+		|| ( ambientTri != NULL && ( ambientTri->skinToModelTransforms != NULL || ambientTri->numSkinToModelTransforms > 0 ) ) ) {
+		return true;
+	}
+#endif
+
+	if ( surf->space != NULL && surf->space->entityDef != NULL ) {
+		const renderEntity_t &renderEntity = surf->space->entityDef->parms;
+		if ( renderEntity.joints != NULL || renderEntity.numJoints > 0 ) {
+			return true;
+		}
+		if ( renderEntity.hModel != NULL && renderEntity.hModel->IsDynamicModel() != DM_STATIC ) {
+			return true;
+		}
+		if ( surf->space->entityDef->dynamicModel != NULL || surf->space->entityDef->cachedDynamicModel != NULL ) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+static bool RB_SurfaceEligibleForStockGLSLInteraction( const drawSurf_t *surf ) {
+	if ( surf == NULL || surf->geo == NULL || surf->space == NULL || surf->material == NULL || surf->shaderRegisters == NULL ) {
+		return false;
+	}
+	if ( surf->geo->numIndexes <= 0 || surf->geo->ambientCache == NULL ) {
+		return false;
+	}
+	if ( RB_SurfaceUsesGeneratedCharacterGeometry( surf ) ) {
+		return false;
+	}
+
+	return true;
+}
+
+static bool RB_DrawSurfChainEligibleForStockGLSLInteractions( const drawSurf_t *surf ) {
+	bool sawSurface = false;
+	for ( ; surf != NULL; surf = surf->nextOnLight ) {
+		sawSurface = true;
+		if ( !RB_SurfaceEligibleForStockGLSLInteraction( surf ) ) {
+			return false;
+		}
+	}
+	return sawSurface;
+}
+
 static bool RB_SurfaceHasActiveCustomGLSLLighting( const drawSurf_t *surf ) {
 	if ( surf == NULL || surf->material == NULL || surf->shaderRegisters == NULL ) {
 		return false;
@@ -6352,7 +6419,10 @@ static void RB_DrawMaterialInteractions( const drawSurf_t *surf ) {
 		return;
 	}
 
-	if ( !RB_DrawSurfChainHasCustomGLSLLighting( surf ) && RB_EnhancedMaterialShadingActive() && RB_GLSLMaterial_CreateDrawInteractions( surf ) ) {
+	if ( !RB_DrawSurfChainHasCustomGLSLLighting( surf )
+		&& RB_EnhancedMaterialShadingActive()
+		&& RB_DrawSurfChainEligibleForStockGLSLInteractions( surf )
+		&& RB_GLSLMaterial_CreateDrawInteractions( surf ) ) {
 		return;
 	}
 
@@ -6432,6 +6502,9 @@ static bool RB_GLSLShadowMap_CreateDrawInteractions( const drawSurf_t *surf ) {
 	}
 	if ( g_shadowMapProgram.translucentShadowDensity >= 0 ) {
 		glUniform1fARB( g_shadowMapProgram.translucentShadowDensity, r_shadowMapTranslucentDensity.GetFloat() );
+	}
+	if ( g_shadowMapProgram.materialEnhanced >= 0 ) {
+		glUniform1fARB( g_shadowMapProgram.materialEnhanced, RB_EnhancedMaterialShadingActive() ? 1.0f : 0.0f );
 	}
 	RB_MaterialInteractionSetEnhancementUniforms(
 		g_shadowMapProgram.materialNormalScale,
@@ -6562,6 +6635,9 @@ static bool RB_GLSLPointShadowMap_CreateDrawInteractions( const drawSurf_t *surf
 	}
 	if ( g_pointShadowMapProgram.translucentShadowDensity >= 0 ) {
 		glUniform1fARB( g_pointShadowMapProgram.translucentShadowDensity, r_shadowMapTranslucentDensity.GetFloat() );
+	}
+	if ( g_pointShadowMapProgram.materialEnhanced >= 0 ) {
+		glUniform1fARB( g_pointShadowMapProgram.materialEnhanced, RB_EnhancedMaterialShadingActive() ? 1.0f : 0.0f );
 	}
 	RB_MaterialInteractionSetEnhancementUniforms(
 		g_pointShadowMapProgram.materialNormalScale,
@@ -7007,7 +7083,8 @@ static void RB_ShadowMapRunPass( const viewLight_t *vLight, shadowMapPassKind_t 
 		}
 	}
 	const bool customGLSLLighting = RB_DrawSurfChainHasCustomGLSLLighting( interactions );
-	const bool maskOk = renderOk && !customGLSLLighting && ( pointLight ? RB_GLSLPointShadowMap_CreateDrawInteractions( interactions ) : RB_GLSLShadowMap_CreateDrawInteractions( interactions ) );
+	const bool stockGLSLInteractionsSafe = RB_DrawSurfChainEligibleForStockGLSLInteractions( interactions );
+	const bool maskOk = renderOk && !customGLSLLighting && stockGLSLInteractionsSafe && ( pointLight ? RB_GLSLPointShadowMap_CreateDrawInteractions( interactions ) : RB_GLSLShadowMap_CreateDrawInteractions( interactions ) );
 	shadowMapPassResult_t passResult = SHADOWMAP_PASS_RESULT_MAPPED;
 	if ( !renderOk ) {
 		passResult = SHADOWMAP_PASS_RESULT_RENDER_FAIL;
@@ -7934,6 +8011,11 @@ void R_ARB2_Init( void ) {
 	glConfig.preferSimpleLighting = false;
 
 	common->Printf( "---------- R_ARB2_Init ----------\n" );
+
+	if ( !glConfig.backendCaps.hasFixedFunctionCompatibility ) {
+		common->Printf( "Not available: OpenGL core profile does not expose the compatibility state required by the ARB2 bridge.\n" );
+		return;
+	}
 
 	if ( !glConfig.ARBVertexProgramAvailable || !glConfig.ARBFragmentProgramAvailable ) {
 		common->Printf( "Not available.\n" );
