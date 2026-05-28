@@ -65,6 +65,7 @@ const int WIN_MATCOVER		= 0x02000000;
 const int WIN_MATFIT		= 0x04000000;
 const int WIN_MATCANVASFILL	= 0x08000000;
 const int WIN_NATIVESCREENOVERLAY = 0x20000000;
+const int WIN_CHATWINDOW	= 0x40000000;	// retail Q4 used 0x20000000; OpenQ4 keeps that bit for native overlays
 
 const int WIN_DESKTOP		= 0x10000000;
 

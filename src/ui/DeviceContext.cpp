@@ -30,6 +30,7 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #include "DeviceContext.h"
+#include "UserInterface.h"
 #include "../renderer/tr_local.h"
 
 idVec4 idDeviceContext::colorPurple;
@@ -51,9 +52,50 @@ idList<fontInfoEx_t> idDeviceContext::fonts;
 
 namespace {
 
+static const float Q4_GUI_FONT_BASE_POINT_SIZE = 48.0f;
+static const float Q4_TEXT_BRIGHTNESS_STEP = 0.1f;
+static const float Q4_TEXT_RGB_ESCAPE_SCALE = 1.0f / 9.0f;
+static const float Q4_TEXT_OUTLINE_DARK_THRESHOLD = 0.2f;
+static const float Q4_TEXT_STYLE_OFFSET = 1.0f;
+static const float Q4_TEXT_LINE_SPACING_SCALE = 1.25f;
+static const int Q4_TEXT_STYLE_SHADOW = 1;
+static const int Q4_TEXT_STYLE_OUTLINE = 2;
+static const int Q4_TEXT_ALIGN_VERTICAL_CENTER = 3;
+static const int Q4_TEXT_CURSOR_NONE = -1;
+static const int Q4_TEXT_LINE_BUFFER_SIZE = 1024;
+static const int Q4_TEXT_REPEAT_ESCAPE_MAX = 9;
+static const unsigned char Q4_INSERT_CURSOR_GLYPH = '|';
+static const unsigned char Q4_OVERSTRIKE_CURSOR_GLYPH = '_';
+static const unsigned char Q4_EMBEDDED_ICON_REFERENCE_GLYPH = 'W';
+
+static int OpenQ4_TextEscapeLength( const char *text, int *type = NULL ) {
+	return idStr::IsEscape( text, type );
+}
+
+static bool OpenQ4_IsRepeatTextEscape( const char *escape, int escapeLength ) {
+	return escapeLength > 2 && escape != NULL && ( escape[1] == 'N' || escape[1] == 'n' );
+}
+
+static int OpenQ4_TextEscapeRepeatCount( const char *escape ) {
+	int repeats = static_cast<unsigned char>( escape[2] ) - '0';
+	if ( repeats < 0 ) {
+		repeats = 0;
+	} else if ( repeats >= Q4_TEXT_REPEAT_ESCAPE_MAX ) {
+		repeats = Q4_TEXT_REPEAT_ESCAPE_MAX;
+	}
+	return repeats;
+}
+
+struct q4ScaledFont_t {
+	const fontInfo_t *font;
+	float renderScale;
+	float maxWidth;
+	float maxHeight;
+};
+
 static bool OpenQ4_ExtractIconCode( const char *escape, char code[4] ) {
 	int escapeType = 0;
-	if ( idStr::IsEscape( escape, &escapeType ) != 5 || escapeType != S_ESCAPE_ICON ) {
+	if ( OpenQ4_TextEscapeLength( escape, &escapeType ) != 5 || escapeType != S_ESCAPE_ICON ) {
 		return false;
 	}
 
@@ -64,6 +106,101 @@ static bool OpenQ4_ExtractIconCode( const char *escape, char code[4] ) {
 	return true;
 }
 
+static float OpenQ4_FontRenderScale( const fontInfo_t *font, float scale ) {
+	if ( font == NULL || font->pointSize == 0.0f ) {
+		return 0.0f;
+	}
+	return scale / font->pointSize * Q4_GUI_FONT_BASE_POINT_SIZE;
+}
+
+static int OpenQ4_ScaledFontUnits( float fontScale, float units ) {
+	return static_cast<int>( fontScale * units );
+}
+
+static int OpenQ4_RoundedGlyphAdvance( const glyphInfo_t *glyph ) {
+	return static_cast<int>( idMath::Ceil( glyph->horiAdvance ) );
+}
+
+static int OpenQ4_GlyphAdvanceUnits( const glyphInfo_t *glyph, int adjust ) {
+	return adjust + OpenQ4_RoundedGlyphAdvance( glyph );
+}
+
+static int OpenQ4_GlyphHeightUnits( const glyphInfo_t *glyph ) {
+	return static_cast<int>( glyph->height );
+}
+
+static int OpenQ4_EmbeddedIconWidthUnits( float iconWidth, float iconHeight, float referenceHeight ) {
+	if ( referenceHeight <= 0.0f || iconWidth <= 0.0f || iconHeight <= 0.0f ) {
+		return 0;
+	}
+	return static_cast<int>( iconWidth * ( referenceHeight / iconHeight ) );
+}
+
+static float OpenQ4_ScaledGlyphAdvance( float fontScale, const glyphInfo_t *glyph, float adjust ) {
+	return idMath::Ceil( ( glyph->horiAdvance + adjust ) * fontScale );
+}
+
+static float OpenQ4_GlyphDrawX( float x, float fontScale, const glyphInfo_t *glyph ) {
+	return x + fontScale * glyph->horiBearingX;
+}
+
+static float OpenQ4_GlyphDrawY( float y, float fontScale, const glyphInfo_t *glyph ) {
+	return y - ( fontScale * glyph->horiBearingY - 1.0f );
+}
+
+static bool OpenQ4_HasRenderableFont( const q4ScaledFont_t &scaledFont ) {
+	return scaledFont.font != NULL && scaledFont.renderScale != 0.0f && scaledFont.font->material != NULL;
+}
+
+static bool OpenQ4_TextCursorReached( int cursor, int count ) {
+	return cursor != Q4_TEXT_CURSOR_NONE && cursor <= count;
+}
+
+static bool OpenQ4_IsLineBreakChar( char c ) {
+	return c == '\n' || c == '\r' || c == '\0';
+}
+
+static const char *OpenQ4_SkipPairedLineBreak( const char *text ) {
+	if ( ( *text == '\n' && text[1] == '\r' ) || ( *text == '\r' && text[1] == '\n' ) ) {
+		return text + 1;
+	}
+	return text;
+}
+
+static bool OpenQ4_ShouldCaptureBreak( bool lineBreak, bool wrap, char c ) {
+	return lineBreak || ( wrap && ( c == ' ' || c == '\t' ) );
+}
+
+static float OpenQ4_InitialTextBaseline( idRectangle &rect, int &textAlign, float lineHeight ) {
+	if ( textAlign == Q4_TEXT_ALIGN_VERTICAL_CENTER ) {
+		textAlign = idDeviceContext::ALIGN_LEFT;
+		return rect.y + rect.h * 0.5f + lineHeight * 0.5f;
+	}
+	return rect.y + lineHeight;
+}
+
+static float OpenQ4_AlignedTextX( const idRectangle &rect, int textAlign, int textWidth ) {
+	if ( textAlign == idDeviceContext::ALIGN_RIGHT ) {
+		return rect.x + rect.w - textWidth;
+	}
+	if ( textAlign == idDeviceContext::ALIGN_CENTER ) {
+		return rect.x + ( rect.w - textWidth ) * 0.5f;
+	}
+	return rect.x;
+}
+
+static void OpenQ4_SetGuiSortForFont( fontInfoEx_t &font ) {
+	if ( font.fontInfoSmall.material != NULL ) {
+		font.fontInfoSmall.material->SetSort( SS_GUI );
+	}
+	if ( font.fontInfoMedium.material != NULL ) {
+		font.fontInfoMedium.material->SetSort( SS_GUI );
+	}
+	if ( font.fontInfoLarge.material != NULL ) {
+		font.fontInfoLarge.material->SetSort( SS_GUI );
+	}
+}
+
 }
 
 int idDeviceContext::FindFont( const char *name ) {
@@ -71,6 +208,7 @@ int idDeviceContext::FindFont( const char *name ) {
 
 	for (int i = 0; i < c; i++) {
 		if (idStr::Icmp(name, fonts[i].name) == 0) {
+			OpenQ4_SetGuiSortForFont( fonts[i] );
 			return i;
 		}
 	}
@@ -83,14 +221,14 @@ int idDeviceContext::FindFont( const char *name ) {
 	fileName.Replace("fonts", va("fonts/%s", fontLang.c_str()) );
 
 	fontInfoEx_t fontInfo;
-		int index = fonts.Append( fontInfo );
-		if ( renderSystem->RegisterFont( fileName, fonts[index] ) ){
+	int index = fonts.Append( fontInfo );
+	if ( renderSystem->RegisterFont( fileName, fonts[index] ) ) {
 		idStr::Copynz( fonts[index].name, name, sizeof( fonts[index].name ) );
 		return index;
-		} else {
+	} else {
 		common->Printf( "Could not register font %s [%s]\n", name, fileName.c_str() );
 		return -1;
-}
+	}
 }
 
 void idDeviceContext::SetupFonts() {
@@ -103,11 +241,15 @@ void idDeviceContext::SetupFonts() {
 		fontLang = "english";
 	}
 
-	// Default font has to be added first
-	FindFont( "fonts" );
+	// Default font has to be added first.
+	FindFont( "fonts/chain" );
 }
 
 void idDeviceContext::SetFont( int num ) {
+	if ( fonts.Num() == 0 ) {
+		activeFont = NULL;
+		return;
+	}
 	if ( num >= 0 && num < fonts.Num() ) {
 		activeFont = &fonts[num];
 	} else {
@@ -120,21 +262,8 @@ void idDeviceContext::SizeIcon( embeddedIcon_t &icon ) {
 		return;
 	}
 
-	if ( icon.material->GetNumStages() <= 0 ) {
-		icon.width = 0.0f;
-		icon.height = 0.0f;
-		return;
-	}
-
-	const shaderStage_t *stage = icon.material->GetStage( 0 );
-	if ( stage == NULL || stage->texture.image == NULL ) {
-		icon.width = 0.0f;
-		icon.height = 0.0f;
-		return;
-	}
-
-	const float imageWidth = static_cast<float>( stage->texture.image->GetOpts().width );
-	const float imageHeight = static_cast<float>( stage->texture.image->GetOpts().height );
+	const float imageWidth = static_cast<float>( icon.material->GetImageWidth() );
+	const float imageHeight = static_cast<float>( icon.material->GetImageHeight() );
 	if ( imageWidth <= 0.0f || imageHeight <= 0.0f ) {
 		icon.width = 0.0f;
 		icon.height = 0.0f;
@@ -174,7 +303,6 @@ float idDeviceContext::GetIconDisplayWidth( const embeddedIcon_t &icon, float re
 	if ( referenceHeight <= 0.0f || icon.width <= 0.0f || icon.height <= 0.0f ) {
 		return 0.0f;
 	}
-
 	return icon.width * ( referenceHeight / icon.height );
 }
 
@@ -234,7 +362,7 @@ void idDeviceContext::Init() {
 	whiteImage->SetSort( SS_GUI );
 	mbcs = false;
 	SetupFonts();
-	activeFont = &fonts[0];
+	activeFont = fonts.Num() > 0 ? &fonts[0] : NULL;
 	icons.Clear();
 	idStr::ClearIconEscapeCodes();
 	RegisterBuiltinIcons();
@@ -268,6 +396,8 @@ void idDeviceContext::Init() {
 	cursor = CURSOR_ARROW;
 	enableClipping = true;
 	overStrikeMode = true;
+	drawTextColor = colorWhite;
+	drawTextColorAdjust = 0.0f;
 	mat.Identity();
 	origin.Zero();
 	initialized = true;
@@ -286,6 +416,8 @@ void idDeviceContext::Clear() {
 	activeFont = NULL;
 	mbcs = false;
 	aspectCorrect = true;
+	drawTextColor.Zero();
+	drawTextColorAdjust = 0.0f;
 	icons.Clear();
 }
 
@@ -804,6 +936,10 @@ void idDeviceContext::PaintChar(float x,float y,float width,float height,float s
 
 
 void idDeviceContext::SetFontByScale(float scale) {
+	if ( activeFont == NULL ) {
+		useFont = NULL;
+		return;
+	}
 	if (scale <= gui_smallFontLimit.GetFloat()) {
 		useFont = &activeFont->fontInfoSmall;
 		activeFont->maxHeight = activeFont->maxHeightSmall;
@@ -819,104 +955,157 @@ void idDeviceContext::SetFontByScale(float scale) {
 	}
 }
 
-int idDeviceContext::DrawText(float x, float y, float scale, idVec4 color, const char *text, float adjust, int limit, int style, int cursor) {
-	int			len, count;
-	idVec4		newColor;
-	const glyphInfo_t *glyph;
-	float		useScale;
-	SetFontByScale(scale);
-	useScale = scale * useFont->glyphScale;
-	count = 0;
-	if ( text && color.w != 0.0f ) {
-		const unsigned char	*s = (const unsigned char*)text;
-		renderSystem->SetColor(color);
-		memcpy(&newColor[0], &color[0], sizeof(idVec4));
-		len = strlen(text);
-		if (limit > 0 && len > limit) {
-			len = limit;
-		}
+int idDeviceContext::DrawText(float x, float y, float scale, idVec4 color, const char *text, float adjust, int limit, int style, int cursor, bool resetEscapes) {
+	SetFontByScale( scale );
+	q4ScaledFont_t scaledFont;
+	scaledFont.font = useFont;
+	scaledFont.renderScale = OpenQ4_FontRenderScale( useFont, scale );
+	scaledFont.maxWidth = activeFont != NULL ? activeFont->maxWidth : 0.0f;
+	scaledFont.maxHeight = activeFont != NULL ? activeFont->maxHeight : 0.0f;
 
-		while (s && *s && count < len) {
-			idVec4 parsedColor;
-			bool resetToDefault = false;
-			const int colorEscapeLength = idStr::ColorEscapeLength( reinterpret_cast<const char *>( s ), &parsedColor, &resetToDefault );
-			if ( colorEscapeLength > 0 ) {
-				if ( resetToDefault ) {
-					newColor = color;
-				} else {
-					newColor = parsedColor;
-					newColor[3] = color[3];
+	if ( !OpenQ4_HasRenderableFont( scaledFont ) || text == NULL || color.w == 0.0f ) {
+		return 0;
+	}
+
+	if ( resetEscapes ) {
+		drawTextColor = color;
+		drawTextColorAdjust = 0.0f;
+	}
+
+	idVec4 currentColor = drawTextColor;
+	currentColor[3] = color[3];
+	renderSystem->SetColor( currentColor );
+
+	const unsigned char *s = reinterpret_cast<const unsigned char *>( text );
+	int len = strlen( text );
+	if ( limit > 0 && len > limit ) {
+		len = limit;
+	}
+
+	int count = 0;
+	while ( *s != '\0' && count < len ) {
+		int escapeType = 0;
+		const int escapeLength = OpenQ4_TextEscapeLength( reinterpret_cast<const char *>( s ), &escapeType );
+		if ( escapeLength > 0 ) {
+			const unsigned char *payload = s;
+			int payloadType = escapeType;
+			int payloadLength = escapeLength;
+			int sourceAdvance = escapeLength;
+			int countAdvance = escapeLength;
+			int repeats = 1;
+
+			if ( OpenQ4_IsRepeatTextEscape( reinterpret_cast<const char *>( s ), escapeLength ) ) {
+				payload = s + escapeLength;
+				payloadLength = OpenQ4_TextEscapeLength( reinterpret_cast<const char *>( payload ), &payloadType );
+				if ( payloadLength <= 0 ) {
+					s += escapeLength;
+					continue;
 				}
-				if (cursor == count || cursor == count+1) {
-					glyph = &useFont->glyphs[*s];
-					const float advance = idMath::Ceil( ( glyph->xSkip + adjust ) * useScale );
-					float partialSkip = advance / 5.0f;
-					if ( cursor == count ) {
-						partialSkip *= 2.0f;
-					} else {
-						renderSystem->SetColor(newColor);
-					}
-					DrawEditCursor(x - partialSkip, y, scale);
-				}
-				renderSystem->SetColor(newColor);
-				s += colorEscapeLength;
-				count += colorEscapeLength;
-				continue;
+				sourceAdvance = escapeLength + payloadLength;
+				countAdvance = payloadLength;
+				repeats = OpenQ4_TextEscapeRepeatCount( reinterpret_cast<const char *>( s ) );
 			}
 
-			int escapeType = 0;
-			const int escapeLength = idStr::IsEscape( reinterpret_cast<const char *>( s ), &escapeType );
-			if ( escapeLength > 0 ) {
-				if ( escapeType == S_ESCAPE_ICON ) {
+			for ( int repeatIndex = 0; repeatIndex < repeats; ++repeatIndex ) {
+				if ( payloadType == S_ESCAPE_ICON ) {
 					char iconCode[4];
-					if ( OpenQ4_ExtractIconCode( reinterpret_cast<const char *>( s ), iconCode ) ) {
+					if ( OpenQ4_ExtractIconCode( reinterpret_cast<const char *>( payload ), iconCode ) ) {
 						const embeddedIcon_t *icon = NULL;
-						if ( FindIcon( iconCode, &icon ) ) {
-							const glyphInfo_t *referenceGlyph = &useFont->glyphs[(const unsigned char)'W'];
-							const float referenceHeight = ( referenceGlyph->height > 0.0f ) ? referenceGlyph->height : activeFont->maxHeight;
+						if ( FindIcon( iconCode, &icon ) && icon->height > 0.0f ) {
+							const glyphInfo_t *referenceGlyph = &scaledFont.font->glyphs[Q4_EMBEDDED_ICON_REFERENCE_GLYPH];
+							const float referenceHeight = referenceGlyph->height;
 							const float iconWidth = GetIconDisplayWidth( *icon, referenceHeight );
 							if ( iconWidth > 0.0f ) {
-								const float yadj = useScale * referenceGlyph->top;
-								PaintChar( x, y - yadj, iconWidth, referenceHeight, useScale, icon->s1, icon->t1, icon->s2, icon->t2, icon->material );
-								if (cursor == count) {
-									DrawEditCursor(x, y, scale);
-								}
-								x += idMath::Ceil( iconWidth * useScale );
+								const float iconY = OpenQ4_GlyphDrawY( y, scaledFont.renderScale, referenceGlyph );
+								PaintChar( x, iconY, iconWidth, referenceHeight, scaledFont.renderScale, icon->s1, icon->t1, icon->s2, icon->t2, icon->material );
+								x += iconWidth;
 							}
 						}
 					}
+				} else {
+					switch ( payload[1] ) {
+						case '+':
+							drawTextColorAdjust += Q4_TEXT_BRIGHTNESS_STEP;
+							currentColor = idVec4( drawTextColor.x + drawTextColorAdjust, drawTextColor.y + drawTextColorAdjust, drawTextColor.z + drawTextColorAdjust, color.w );
+							renderSystem->SetColor( currentColor );
+							break;
+						case '-':
+							drawTextColorAdjust -= Q4_TEXT_BRIGHTNESS_STEP;
+							currentColor = idVec4( drawTextColor.x + drawTextColorAdjust, drawTextColor.y + drawTextColorAdjust, drawTextColor.z + drawTextColorAdjust, color.w );
+							renderSystem->SetColor( currentColor );
+							break;
+						case '0':
+						case 'R':
+						case 'r':
+							drawTextColor = color;
+							drawTextColorAdjust = 0.0f;
+							currentColor = color;
+							renderSystem->SetColor( currentColor );
+							break;
+						case '1': case '2': case '3': case '4': case '5':
+						case '6': case '7': case '8': case '9': case ':':
+							drawTextColor = idStr::ColorForIndex( payload[1] );
+							drawTextColor[3] = color[3];
+							drawTextColorAdjust = 0.0f;
+							currentColor = drawTextColor;
+							renderSystem->SetColor( currentColor );
+							break;
+						case 'C':
+						case 'c':
+							if ( payloadLength >= 5 ) {
+								drawTextColor = idVec4( ( payload[2] - '0' ) * Q4_TEXT_RGB_ESCAPE_SCALE, ( payload[3] - '0' ) * Q4_TEXT_RGB_ESCAPE_SCALE, ( payload[4] - '0' ) * Q4_TEXT_RGB_ESCAPE_SCALE, color[3] );
+								drawTextColorAdjust = 0.0f;
+								currentColor = drawTextColor;
+								renderSystem->SetColor( currentColor );
+							}
+							break;
+						default:
+							break;
+					}
 				}
-				s += escapeLength;
-				count += escapeLength;
-				continue;
 			}
-
-			if ( *s < GLYPH_START || *s > GLYPH_END ) {
-				s++;
-				continue;
-			}
-
-			glyph = &useFont->glyphs[*s];
-
-			//
-			// int yadj = Assets.textFont.glyphs[text[i]].bottom +
-			// Assets.textFont.glyphs[text[i]].top; float yadj = scale *
-			// (Assets.textFont.glyphs[text[i]].imageHeight -
-			// Assets.textFont.glyphs[text[i]].height);
-			//
-			float yadj = useScale * glyph->top;
-			PaintChar(x,y - yadj,glyph->imageWidth,glyph->imageHeight,useScale,glyph->s,glyph->t,glyph->s2,glyph->t2,glyph->glyph);
-
-			if (cursor == count) {
-				DrawEditCursor(x, y, scale);
-			}
-			x += idMath::Ceil( ( glyph->xSkip + adjust ) * useScale );
-			s++;
-			count++;
+			s += sourceAdvance;
+			count += countAdvance;
+			continue;
 		}
-		if (cursor == len) {
-			DrawEditCursor(x, y, scale);
+
+		const glyphInfo_t *glyph = &scaledFont.font->glyphs[*s];
+		const float drawX = OpenQ4_GlyphDrawX( x, scaledFont.renderScale, glyph );
+		const float drawY = OpenQ4_GlyphDrawY( y, scaledFont.renderScale, glyph );
+
+		if ( style == Q4_TEXT_STYLE_SHADOW ) {
+			idVec4 shadowColor( 0.0f, 0.0f, 0.0f, currentColor[3] );
+			renderSystem->SetColor( shadowColor );
+			PaintChar( drawX + Q4_TEXT_STYLE_OFFSET, drawY + Q4_TEXT_STYLE_OFFSET, glyph->width, glyph->height, scaledFont.renderScale, glyph->s, glyph->t, glyph->s2, glyph->t2, scaledFont.font->material );
+			renderSystem->SetColor( currentColor );
+		} else if ( style == Q4_TEXT_STYLE_OUTLINE ) {
+			const bool darkOutline = currentColor[0] >= Q4_TEXT_OUTLINE_DARK_THRESHOLD || currentColor[1] >= Q4_TEXT_OUTLINE_DARK_THRESHOLD || currentColor[2] >= Q4_TEXT_OUTLINE_DARK_THRESHOLD;
+			idVec4 outlineColor = darkOutline ? idVec4( 0.0f, 0.0f, 0.0f, currentColor[3] ) : idVec4( 1.0f, 1.0f, 1.0f, currentColor[3] );
+			static const float offsets[4][2] = {
+				{ Q4_TEXT_STYLE_OFFSET, Q4_TEXT_STYLE_OFFSET },
+				{ -Q4_TEXT_STYLE_OFFSET, Q4_TEXT_STYLE_OFFSET },
+				{ -Q4_TEXT_STYLE_OFFSET, -Q4_TEXT_STYLE_OFFSET },
+				{ Q4_TEXT_STYLE_OFFSET, -Q4_TEXT_STYLE_OFFSET }
+			};
+			renderSystem->SetColor( outlineColor );
+			for ( int i = 0; i < 4; ++i ) {
+				PaintChar( drawX + offsets[i][0], drawY + offsets[i][1], glyph->width, glyph->height, scaledFont.renderScale, glyph->s, glyph->t, glyph->s2, glyph->t2, scaledFont.font->material );
+			}
+			renderSystem->SetColor( currentColor );
 		}
+
+		PaintChar( drawX, drawY, glyph->width, glyph->height, scaledFont.renderScale, glyph->s, glyph->t, glyph->s2, glyph->t2, scaledFont.font->material );
+
+		if ( OpenQ4_TextCursorReached( cursor, count ) ) {
+			DrawEditCursor( x, y, scale );
+			cursor = Q4_TEXT_CURSOR_NONE;
+		}
+		x += OpenQ4_ScaledGlyphAdvance( scaledFont.renderScale, glyph, adjust );
+		s++;
+		count++;
+	}
+	if ( OpenQ4_TextCursorReached( cursor, count ) ) {
+		DrawEditCursor( x, y, scale );
 	}
 	return count;
 }
@@ -1045,120 +1234,152 @@ void idDeviceContext::GetCursorBounds( float &minX, float &maxX, float &minY, fl
 }
 
 int idDeviceContext::CharWidth( const char c, float scale, int adjust ) {
-	glyphInfo_t *glyph;
-	float		useScale;
-	SetFontByScale(scale);
-	fontInfo_t	*font = useFont;
-	useScale = scale * font->glyphScale;
-	glyph = &font->glyphs[(const unsigned char)c];
-	return idMath::FtoiFast( ( glyph->xSkip + adjust ) * useScale );
+	SetFontByScale( scale );
+	const float useScale = OpenQ4_FontRenderScale( useFont, scale );
+	if ( useFont == NULL || useScale == 0.0f ) {
+		return 0;
+	}
+	const glyphInfo_t *glyph = &useFont->glyphs[(const unsigned char)c];
+	return OpenQ4_ScaledFontUnits( useScale, OpenQ4_GlyphAdvanceUnits( glyph, adjust ) );
 }
 
 int idDeviceContext::TextWidth( const char *text, float scale, int limit, int adjust ) {
 	SetFontByScale( scale );
-	const float useScale = scale * useFont->glyphScale;
-	const glyphInfo_t *glyphs = useFont->glyphs;
-	const glyphInfo_t *referenceGlyph = &glyphs[(const unsigned char)'W'];
-	const float referenceHeight = ( referenceGlyph->height > 0.0f ) ? referenceGlyph->height : activeFont->maxHeight;
-
-	if ( text == NULL ) {
+	const float useScale = OpenQ4_FontRenderScale( useFont, scale );
+	if ( text == NULL || useFont == NULL || useScale == 0.0f ) {
 		return 0;
 	}
 
 	int width = 0;
-	int count = 0;
+	int index = 0;
 	const unsigned char *s = reinterpret_cast<const unsigned char *>( text );
-	while ( *s != '\0' && ( limit <= 0 || count < limit ) ) {
-		const int colorEscapeLength = idStr::ColorEscapeLength( reinterpret_cast<const char *>( s ) );
-		if ( colorEscapeLength > 0 ) {
-			// Width calculations must ignore inline color formatting just like DrawText().
-			s += colorEscapeLength;
-			count += colorEscapeLength;
-			continue;
-		}
-
+	while ( *s != '\0' && ( limit <= 0 || index < limit ) ) {
 		int escapeType = 0;
-		const int escapeLength = idStr::IsEscape( reinterpret_cast<const char *>( s ), &escapeType );
+		const int escapeLength = OpenQ4_TextEscapeLength( reinterpret_cast<const char *>( s ), &escapeType );
 		if ( escapeLength > 0 ) {
 			if ( escapeType == S_ESCAPE_ICON ) {
 				char iconCode[4];
 				if ( OpenQ4_ExtractIconCode( reinterpret_cast<const char *>( s ), iconCode ) ) {
 					const embeddedIcon_t *icon = NULL;
-					if ( FindIcon( iconCode, &icon ) ) {
-						width += idMath::Ceil( GetIconDisplayWidth( *icon, referenceHeight ) * useScale );
+					if ( FindIcon( iconCode, &icon ) && icon->height > 0.0f ) {
+						const glyphInfo_t *referenceGlyph = &useFont->glyphs[Q4_EMBEDDED_ICON_REFERENCE_GLYPH];
+						width += OpenQ4_EmbeddedIconWidthUnits( icon->width, icon->height, referenceGlyph->height );
 					}
 				}
 			}
 			s += escapeLength;
-			count += escapeLength;
+			index += escapeLength;
 			continue;
 		}
 
-		width += idMath::Ceil( ( glyphs[*s].xSkip + adjust ) * useScale );
+		width += OpenQ4_GlyphAdvanceUnits( &useFont->glyphs[*s], adjust );
 		s++;
-		count++;
+		index++;
 	}
-	return width;
+	return OpenQ4_ScaledFontUnits( useScale, width );
 }
 
-int idDeviceContext::TextHeight(const char *text, float scale, int limit) {
-	int			len, count;
-	float		max;
-	glyphInfo_t *glyph;
-	float		useScale;
-	const char	*s = text;
-	SetFontByScale(scale);
-	fontInfo_t	*font = useFont;
+int idDeviceContext::TextHeight(const char *text, float scale, int limit, int adjust) {
+	(void)adjust;
 
-	useScale = scale * font->glyphScale;
-	max = 0;
-	if (text) {
-		len = strlen(text);
-		if (limit > 0 && len > limit) {
-			len = limit;
-		}
-
-	count = 0;
-	while (s && *s && count < len) {
-			int escapeType = 0;
-			const int escapeLength = idStr::IsEscape( s, &escapeType );
-			if ( escapeLength > 0 ) {
-				if ( escapeType == S_ESCAPE_ICON ) {
-					const glyphInfo_t *referenceGlyph = &font->glyphs[(const unsigned char)'W'];
-					const float referenceHeight = ( referenceGlyph->height > 0.0f ) ? referenceGlyph->height : activeFont->maxHeight;
-					if ( max < referenceHeight ) {
-						max = referenceHeight;
-					}
-				}
-				s += escapeLength;
-				count += escapeLength;
-				continue;
-			}
-			else {
-				glyph = &font->glyphs[*(const unsigned char*)s];
-				if (max < glyph->height) {
-					max = glyph->height;
-				}
-
-				s++;
-				count++;
-			}
-		}
+	SetFontByScale( scale );
+	const float useScale = OpenQ4_FontRenderScale( useFont, scale );
+	if ( text == NULL || useFont == NULL || useScale == 0.0f ) {
+		return 0;
 	}
 
-	return idMath::FtoiFast( max * useScale );
+	int maxHeight = 0;
+	int index = 0;
+	const char *s = text;
+	while ( *s != '\0' && ( limit <= 0 || index < limit ) ) {
+		int escapeType = 0;
+		const int escapeLength = OpenQ4_TextEscapeLength( s, &escapeType );
+		if ( escapeLength > 0 ) {
+			if ( escapeType == S_ESCAPE_ICON ) {
+				const glyphInfo_t *referenceGlyph = &useFont->glyphs[Q4_EMBEDDED_ICON_REFERENCE_GLYPH];
+				const int referenceHeight = OpenQ4_GlyphHeightUnits( referenceGlyph );
+				if ( maxHeight < referenceHeight ) {
+					maxHeight = referenceHeight;
+				}
+			}
+			s += escapeLength;
+			index += escapeLength;
+			continue;
+		}
+
+		const glyphInfo_t *glyph = &useFont->glyphs[*(const unsigned char *)s];
+		const int glyphHeight = OpenQ4_GlyphHeightUnits( glyph );
+		if ( maxHeight < glyphHeight ) {
+			maxHeight = glyphHeight;
+		}
+		s++;
+		index++;
+	}
+
+	return OpenQ4_ScaledFontUnits( useScale, maxHeight );
+}
+
+bool idDeviceContext::GetMaxTextIndex( const char *text, int limit, float textScale, wrapInfo_t &wrapInfo ) {
+	SetFontByScale( textScale );
+	const float useScale = OpenQ4_FontRenderScale( useFont, textScale );
+	if ( text == NULL || text[0] == '\0' || useFont == NULL || useScale == 0.0f ) {
+		return false;
+	}
+
+	int width = 0;
+	int index = 0;
+	while ( text[index] != '\0' ) {
+		int escapeType = 0;
+		const int escapeLength = OpenQ4_TextEscapeLength( &text[index], &escapeType );
+		const int tokenLength = escapeLength > 0 ? escapeLength : 1;
+		int tokenWidth = 0;
+
+		if ( escapeType == S_ESCAPE_ICON ) {
+			char iconCode[4];
+			if ( OpenQ4_ExtractIconCode( &text[index], iconCode ) ) {
+				const embeddedIcon_t *icon = NULL;
+				if ( FindIcon( iconCode, &icon ) ) {
+					tokenWidth = icon->width;
+				}
+			}
+		} else if ( escapeLength == 0 ) {
+			tokenWidth = OpenQ4_GlyphAdvanceUnits( &useFont->glyphs[static_cast<unsigned char>( text[index] )], 0 );
+		}
+
+		width += tokenWidth;
+		if ( OpenQ4_ScaledFontUnits( useScale, width ) > limit ) {
+			const int lastTokenIndex = index + ( escapeLength > 0 ? escapeLength - 1 : 0 );
+			wrapInfo.maxIndex = lastTokenIndex - 1;
+			return true;
+		}
+
+		const int lastTokenIndex = index + tokenLength - 1;
+		if ( text[lastTokenIndex] == ' ' ) {
+			wrapInfo.lastWhitespace = lastTokenIndex;
+		}
+
+		index += tokenLength;
+	}
+
+	return false;
 }
 
 int idDeviceContext::MaxCharWidth(float scale) {
 	SetFontByScale(scale);
-	float useScale = scale * useFont->glyphScale;
-	return idMath::FtoiFast( activeFont->maxWidth * useScale );
+	const float useScale = OpenQ4_FontRenderScale( useFont, scale );
+	if ( useFont == NULL || useScale == 0.0f || activeFont == NULL ) {
+		return 0;
+	}
+	return OpenQ4_ScaledFontUnits( useScale, activeFont->maxWidth );
 }
 
 int idDeviceContext::MaxCharHeight(float scale) {
 	SetFontByScale(scale);
-	float useScale = scale * useFont->glyphScale;
-	return idMath::FtoiFast( activeFont->maxHeight * useScale );
+	const float useScale = OpenQ4_FontRenderScale( useFont, scale );
+	if ( useFont == NULL || useScale == 0.0f || activeFont == NULL ) {
+		return 0;
+	}
+	return OpenQ4_ScaledFontUnits( useScale, activeFont->maxHeight );
 }
 
 const idMaterial *idDeviceContext::GetScrollBarImage(int index) {
@@ -1244,124 +1465,121 @@ void idDeviceContext::DrawEditCursor( float x, float y, float scale ) {
 		return;
 	}
 	SetFontByScale(scale);
-	float useScale = scale * useFont->glyphScale;
-	const glyphInfo_t *glyph2 = &useFont->glyphs[(overStrikeMode) ? '_' : '|'];
-	float	yadj = useScale * glyph2->top;
- 	PaintChar(x, y - yadj,glyph2->imageWidth,glyph2->imageHeight,useScale,glyph2->s,glyph2->t,glyph2->s2,glyph2->t2,glyph2->glyph);
+	const float useScale = OpenQ4_FontRenderScale( useFont, scale );
+	if ( useFont == NULL || useScale == 0.0f || useFont->material == NULL ) {
+		return;
+	}
+	const glyphInfo_t *glyph = &useFont->glyphs[overStrikeMode ? Q4_OVERSTRIKE_CURSOR_GLYPH : Q4_INSERT_CURSOR_GLYPH];
+	PaintChar( x, OpenQ4_GlyphDrawY( y, useScale, glyph ), glyph->width, glyph->height, useScale, glyph->s, glyph->t, glyph->s2, glyph->t2, useFont->material );
 }
 
-int idDeviceContext::DrawText( const char *text, float textScale, int textAlign, idVec4 color, idRectangle rectDraw, bool wrap, int cursor, bool calcOnly, idList<int> *breaks, int limit, int adjust, int style ) {
-	const char	*p, *textPtr, *newLinePtr;
-	char		buff[1024];
-	int			len, newLine, newLineWidth, count;
-	float		y;
-	float		textWidth;
-
-	float		charSkip = MaxCharWidth( textScale ) + 1;
-	float		lineSkip = MaxCharHeight( textScale );
-
-	float		cursorSkip = ( cursor >= 0 ? charSkip : 0 );
-
-	bool		lineBreak, wordBreak;
+int idDeviceContext::DrawText( const char *text, float textScale, int textAlign, idVec4 color, idRectangle rectDraw, bool wrap, int cursor, bool calcOnly, idList<int> *breaks, int limit, int adjust, int style, bool chatWindow ) {
+	const float charSkip = MaxCharWidth( textScale ) + 1;
+	const float lineSkip = MaxCharHeight( textScale );
+	const float cursorSkip = ( cursor >= 0 ? charSkip : 0 );
+	const int visibleCellCount = charSkip > 0.0f ? idMath::FtoiFast( rectDraw.w / charSkip ) : 0;
 
 	SetFontByScale( textScale );
-	(void)style;
-
-	textWidth = 0;
-	newLinePtr = NULL;
-
-	if (!calcOnly && !(text && *text)) {
-		if (cursor == 0) {
-			renderSystem->SetColor(color);
-			DrawEditCursor(rectDraw.x, lineSkip + rectDraw.y, textScale);
-		}
-		return idMath::FtoiFast( rectDraw.w / charSkip );
+	const float useScale = OpenQ4_FontRenderScale( useFont, textScale );
+	if ( useFont == NULL || useScale == 0.0f ) {
+		return visibleCellCount;
 	}
 
-	textPtr = text;
-
-	y = lineSkip + rectDraw.y; 
-	len = 0;
-	buff[0] = '\0';
-	newLine = 0;
-	newLineWidth = 0;
-	p = textPtr;
+	drawTextColor = color;
+	drawTextColorAdjust = 0.0f;
 
 	if ( breaks ) {
-		breaks->Append(0);
+		breaks->Append( 0 );
 	}
-	count = 0;
-	textWidth = 0;
-	lineBreak = false;
-	wordBreak = false;
-	while (p) {
 
-		if ( *p == '\n' || *p == '\r' || *p == '\0' ) {
+	if ( !( text && *text ) ) {
+		if ( !calcOnly && cursor == 0 ) {
+			renderSystem->SetColor( color );
+			DrawEditCursor( rectDraw.x, rectDraw.y + lineSkip, textScale );
+		}
+		return visibleCellCount;
+	}
+
+	char buff[Q4_TEXT_LINE_BUFFER_SIZE];
+	buff[0] = '\0';
+	int len = 0;
+	int newLine = 0;
+	int newLineWidth = 0;
+	float textWidth = 0.0f;
+	bool lineBreak = false;
+	bool wordBreak = false;
+	const char *p = text;
+	const char *newLinePtr = NULL;
+	float y = OpenQ4_InitialTextBaseline( rectDraw, textAlign, lineSkip );
+	int count = 0;
+
+	while ( p != NULL ) {
+		if ( OpenQ4_IsLineBreakChar( *p ) ) {
 			lineBreak = true;
-			if ((*p == '\n' && *(p + 1) == '\r') || (*p == '\r' && *(p + 1) == '\n')) {
-				p++;
-			}
+			p = OpenQ4_SkipPairedLineBreak( p );
 		}
 
-		const int escapeLength = idStr::IsEscape( p );
+		int escapeType = 0;
+		const int escapeLength = OpenQ4_TextEscapeLength( p, &escapeType );
+		const bool isIconEscape = escapeLength > 0 && escapeType == S_ESCAPE_ICON;
 		if ( escapeLength > 0 ) {
 			if ( len + escapeLength < static_cast<int>( sizeof( buff ) ) ) {
 				idStr::Copynz( &buff[len], p, escapeLength + 1 );
+			}
+			if ( !isIconEscape ) {
 				len += escapeLength;
 				p += escapeLength;
-				textWidth = TextWidth( buff, textScale, -1, adjust );
+				continue;
 			}
-			continue;
 		}
 
-		int nextCharWidth = ( idStr::CharIsPrintable(*p) ? CharWidth( *p, textScale, adjust ) : cursorSkip );
-		// FIXME: this is a temp hack until the guis can be fixed not not overflow the bounding rectangles
-		//		  the side-effect is that list boxes and edit boxes will draw over their scroll bars
-		//	The following line and the !linebreak in the if statement below should be removed
-		nextCharWidth = 0;
+		int nextCharWidth = 0;
+		if ( chatWindow && !lineBreak ) {
+			if ( isIconEscape ) {
+				char iconCode[4];
+				if ( OpenQ4_ExtractIconCode( p, iconCode ) ) {
+					const embeddedIcon_t *icon = NULL;
+					if ( FindIcon( iconCode, &icon ) && icon->height > 0.0f ) {
+						const glyphInfo_t *referenceGlyph = &useFont->glyphs[Q4_EMBEDDED_ICON_REFERENCE_GLYPH];
+						nextCharWidth = OpenQ4_ScaledFontUnits( useScale, OpenQ4_EmbeddedIconWidthUnits( icon->width, icon->height, referenceGlyph->height ) );
+					}
+				}
+			} else if ( idStr::CharIsPrintable( *p ) ) {
+				nextCharWidth = CharWidth( *p, textScale, adjust );
+			} else {
+				nextCharWidth = static_cast<int>( cursorSkip );
+			}
+		}
 
 		if ( !lineBreak && ( textWidth + nextCharWidth ) > rectDraw.w ) {
-			// The next character will cause us to overflow, if we haven't yet found a suitable
-			// break spot, set it to be this character
 			if ( len > 0 && newLine == 0 ) {
 				newLine = len;
 				newLinePtr = p;
-				newLineWidth = textWidth;
+				newLineWidth = static_cast<int>( textWidth );
 			}
 			wordBreak = true;
-		} else if ( lineBreak || ( wrap && (*p == ' ' || *p == '\t') ) ) {
-			// The next character is in view, so if we are a break character, store our position
+		} else if ( OpenQ4_ShouldCaptureBreak( lineBreak, wrap, *p ) ) {
 			newLine = len;
 			newLinePtr = p + 1;
-			newLineWidth = textWidth;
+			newLineWidth = static_cast<int>( textWidth );
 		}
 
 		if ( lineBreak || wordBreak ) {
-			float x = rectDraw.x;
-
-			if (textAlign == ALIGN_RIGHT) {
-				x = rectDraw.x + rectDraw.w - newLineWidth;
-			} else if (textAlign == ALIGN_CENTER) {
-				x = rectDraw.x + (rectDraw.w - newLineWidth) / 2;
-			}
+			const float x = OpenQ4_AlignedTextX( rectDraw, textAlign, newLineWidth );
 
 			if ( wrap || newLine > 0 ) {
 				buff[newLine] = '\0';
-
-				// This is a special case to handle breaking in the middle of a word.
-				// if we didn't do this, the cursor would appear on the end of this line
-				// and the beginning of the next.
 				if ( wordBreak && cursor >= newLine && newLine == len ) {
 					cursor++;
 				}
 			}
 
-			if (!calcOnly) {
-				count += DrawText(x, y, textScale, color, buff, static_cast<float>( adjust ), 0, style, cursor);
+			if ( !calcOnly ) {
+				count += DrawText( x, y, textScale, color, buff, static_cast<float>( adjust ), 0, style, cursor );
 			}
 
 			if ( cursor < newLine ) {
-				cursor = -1;
+				cursor = Q4_TEXT_CURSOR_NONE;
 			} else if ( cursor >= 0 ) {
 				cursor -= ( newLine + 1 );
 			}
@@ -1371,36 +1589,49 @@ int idDeviceContext::DrawText( const char *text, float textScale, int textAlign,
 			}
 
 			if ( ( limit && count > limit ) || *p == '\0' ) {
-				break;
+				return visibleCellCount;
 			}
 
-			y += lineSkip + 5;
-
+			y += lineSkip * Q4_TEXT_LINE_SPACING_SCALE;
 			if ( !calcOnly && y > rectDraw.Bottom() ) {
-				break;
+				return visibleCellCount;
 			}
 
 			p = newLinePtr;
-
-			if (breaks) {
-				breaks->Append(p - text);
+			if ( breaks ) {
+				breaks->Append( p - text );
 			}
 
+			buff[0] = '\0';
 			len = 0;
 			newLine = 0;
 			newLineWidth = 0;
-			textWidth = 0;
+			textWidth = 0.0f;
 			lineBreak = false;
 			wordBreak = false;
 			continue;
 		}
 
-		buff[len++] = *p++;
-		buff[len] = '\0';
-		textWidth = TextWidth( buff, textScale, -1, adjust );
+		if ( escapeLength > 0 ) {
+			len += escapeLength;
+			p += escapeLength;
+		} else {
+			if ( len + 1 < static_cast<int>( sizeof( buff ) ) ) {
+				buff[len++] = *p;
+				buff[len] = '\0';
+			}
+			p++;
+		}
+
+		textWidth = static_cast<float>( TextWidth( buff, textScale, -1, adjust ) );
 	}
 
-	return idMath::FtoiFast( rectDraw.w / charSkip );
+	if ( cursor == 0 && !calcOnly ) {
+		renderSystem->SetColor( color );
+		DrawEditCursor( rectDraw.x, rectDraw.y + lineSkip, textScale );
+	}
+
+	return visibleCellCount;
 }
 
 /*

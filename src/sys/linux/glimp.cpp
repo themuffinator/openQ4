@@ -49,6 +49,32 @@ bool dga_found = false;
 
 static GLXContext ctx = NULL;
 
+#ifndef GLX_CONTEXT_MAJOR_VERSION_ARB
+#define GLX_CONTEXT_MAJOR_VERSION_ARB		0x2091
+#endif
+#ifndef GLX_CONTEXT_MINOR_VERSION_ARB
+#define GLX_CONTEXT_MINOR_VERSION_ARB		0x2092
+#endif
+#ifndef GLX_CONTEXT_FLAGS_ARB
+#define GLX_CONTEXT_FLAGS_ARB				0x2094
+#endif
+#ifndef GLX_CONTEXT_DEBUG_BIT_ARB
+#define GLX_CONTEXT_DEBUG_BIT_ARB			0x0001
+#endif
+#ifndef GLX_CONTEXT_PROFILE_MASK_ARB
+#define GLX_CONTEXT_PROFILE_MASK_ARB		0x9126
+#endif
+#ifndef GLX_CONTEXT_CORE_PROFILE_BIT_ARB
+#define GLX_CONTEXT_CORE_PROFILE_BIT_ARB	0x00000001
+#endif
+#ifndef GLX_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB
+#define GLX_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB 0x00000002
+#endif
+
+typedef GLXContext ( *glXCreateContextAttribsARBProc_t )( Display *, GLXFBConfig, GLXContext, Bool, const int * );
+
+static bool glx_context_create_error = false;
+
 static bool vidmode_ext = false;
 static int vidmode_MajorVersion = 0, vidmode_MinorVersion = 0;	// major and minor of XF86VidExtensions
 
@@ -98,6 +124,133 @@ void GLimp_ActivateContext() {
 void GLimp_DeactivateContext() {
 	assert( dpy );
 	glXMakeCurrent( dpy, None, NULL );
+}
+
+static int GLX_ContextCreateErrorHandler( Display *display, XErrorEvent *event ) {
+	(void)display;
+	(void)event;
+	glx_context_create_error = true;
+	return 0;
+}
+
+static GLXFBConfig GLX_FindFBConfigForVisual( XVisualInfo *visinfo ) {
+	if ( visinfo == NULL ) {
+		return NULL;
+	}
+
+	int fbConfigCount = 0;
+	GLXFBConfig *fbConfigs = glXGetFBConfigs( dpy, scrnum, &fbConfigCount );
+	if ( fbConfigs == NULL ) {
+		return NULL;
+	}
+
+	GLXFBConfig match = NULL;
+	for ( int i = 0; i < fbConfigCount; ++i ) {
+		XVisualInfo *configVisual = glXGetVisualFromFBConfig( dpy, fbConfigs[i] );
+		if ( configVisual != NULL ) {
+			if ( configVisual->visualid == visinfo->visualid ) {
+				match = fbConfigs[i];
+				XFree( configVisual );
+				break;
+			}
+			XFree( configVisual );
+		}
+	}
+
+	XFree( fbConfigs );
+	return match;
+}
+
+static glXCreateContextAttribsARBProc_t GLX_GetCreateContextAttribsProc( void ) {
+	glXCreateContextAttribsARBProc_t proc = NULL;
+#if defined( GLX_VERSION_1_4 )
+	proc = reinterpret_cast<glXCreateContextAttribsARBProc_t>( glXGetProcAddress( reinterpret_cast<const GLubyte *>( "glXCreateContextAttribsARB" ) ) );
+#endif
+	if ( proc == NULL ) {
+		proc = reinterpret_cast<glXCreateContextAttribsARBProc_t>( glXGetProcAddressARB( reinterpret_cast<const GLubyte *>( "glXCreateContextAttribsARB" ) ) );
+	}
+	return proc;
+}
+
+static bool GLX_CreateContextForCandidate(
+	const rendererContextCandidate_t &candidate,
+	XVisualInfo *visinfo,
+	GLXFBConfig fbConfig,
+	glXCreateContextAttribsARBProc_t createContextAttribsProc ) {
+	if ( candidate.explicitVersion ) {
+		if ( fbConfig == NULL || createContextAttribsProc == NULL ) {
+			return false;
+		}
+
+		int attribs[11];
+		int attribCount = 0;
+		attribs[attribCount++] = GLX_CONTEXT_MAJOR_VERSION_ARB;
+		attribs[attribCount++] = candidate.major;
+		attribs[attribCount++] = GLX_CONTEXT_MINOR_VERSION_ARB;
+		attribs[attribCount++] = candidate.minor;
+		attribs[attribCount++] = GLX_CONTEXT_PROFILE_MASK_ARB;
+		attribs[attribCount++] = ( candidate.profile == RENDERER_CONTEXT_PROFILE_CORE )
+			? GLX_CONTEXT_CORE_PROFILE_BIT_ARB
+			: GLX_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB;
+		if ( candidate.debugContext ) {
+			attribs[attribCount++] = GLX_CONTEXT_FLAGS_ARB;
+			attribs[attribCount++] = GLX_CONTEXT_DEBUG_BIT_ARB;
+		}
+		attribs[attribCount++] = None;
+
+		glx_context_create_error = false;
+		XErrorHandler oldHandler = XSetErrorHandler( GLX_ContextCreateErrorHandler );
+		ctx = createContextAttribsProc( dpy, fbConfig, NULL, True, attribs );
+		XSync( dpy, False );
+		XSetErrorHandler( oldHandler );
+		if ( glx_context_create_error ) {
+			if ( ctx != NULL ) {
+				glXDestroyContext( dpy, ctx );
+				ctx = NULL;
+			}
+			return false;
+		}
+	} else {
+		ctx = glXCreateContext( dpy, visinfo, NULL, True );
+	}
+
+	if ( ctx == NULL ) {
+		return false;
+	}
+
+	memset( &glConfig.contextRequest, 0, sizeof( glConfig.contextRequest ) );
+	glConfig.contextRequest = candidate;
+	return true;
+}
+
+static bool GLX_CreateContextWithLadder( XVisualInfo *visinfo ) {
+	rendererContextCandidate_t candidates[RENDERER_CONTEXT_LADDER_MAX_CANDIDATES];
+	const rendererTierPreference_t preference = RendererTierPreference_FromString( r_glTier.GetString() );
+	const bool keepAutoCompatibility = preference == RENDERER_TIER_PREF_AUTO;
+	const int candidateCount = RendererContextLadder_Build(
+		candidates,
+		static_cast<int>( sizeof( candidates ) / sizeof( candidates[0] ) ),
+		preference,
+		r_glDebugContext.GetBool(),
+		keepAutoCompatibility );
+	if ( candidateCount <= 0 ) {
+		common->Printf( "GLX: no OpenGL context candidates were generated for r_glTier %s\n", r_glTier.GetString() );
+		return false;
+	}
+
+	GLXFBConfig fbConfig = GLX_FindFBConfigForVisual( visinfo );
+	glXCreateContextAttribsARBProc_t createContextAttribsProc = GLX_GetCreateContextAttribsProc();
+	for ( int i = 0; i < candidateCount; ++i ) {
+		const rendererContextCandidate_t &candidate = candidates[i];
+		common->Printf( "GLX: trying OpenGL context %s\n", candidate.label );
+		if ( GLX_CreateContextForCandidate( candidate, visinfo, fbConfig, createContextAttribsProc ) ) {
+			common->Printf( "GLX: created OpenGL context %s\n", glConfig.contextRequest.label );
+			return true;
+		}
+		common->Printf( "GLX: OpenGL context %s failed\n", candidate.label );
+	}
+
+	return false;
 }
 
 /*
@@ -542,7 +695,11 @@ int GLX_Init(glimpParms_t a) {
 
 	XFlush(dpy);
 	XSync(dpy, False);
-	ctx = glXCreateContext(dpy, visinfo, NULL, True);
+	if ( !GLX_CreateContextWithLadder( visinfo ) ) {
+		common->Printf( "Couldn't create a GLX context\n" );
+		XFree(visinfo);
+		return false;
+	}
 	XSync(dpy, False);
 
 	// Free the visinfo after we're done with it

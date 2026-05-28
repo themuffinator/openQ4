@@ -34,6 +34,8 @@ If you have questions concerning this license or the applicable additional terms
 #include "UserInterfaceLocal.h"
 #include "ChoiceWindow.h"
 
+static const int Q4_CHOICE_WINDOW_TEXT_SPACING = 0;
+
 /*
 ============
 idChoiceWindow::InitVars
@@ -369,7 +371,6 @@ void idChoiceWindow::PostParse() {
 
 void idChoiceWindow::Draw(int time, float x, float y) {
 	idVec4 color = foreColor;
-	const int textAdjust = static_cast<int>( textspacing );
 	const int style = static_cast<int>( textstyle );
 
 	UpdateChoicesAndVals();
@@ -386,7 +387,7 @@ void idChoiceWindow::Draw(int time, float x, float y) {
 		shadowRect.x += textShadow;
 		shadowRect.y += textShadow;
 
-		dc->DrawText( shadowText, textScale, textAlign, colorBlack, shadowRect, false, -1, false, NULL, 0, textAdjust, style );
+		dc->DrawText( shadowText, textScale, textAlign, colorBlack, shadowRect, false, -1, false, NULL, 0, Q4_CHOICE_WINDOW_TEXT_SPACING, style );
 	}
 
 	if ( hover && !noEvents && Contains(gui->CursorX(), gui->CursorY()) ) {
@@ -399,7 +400,7 @@ void idChoiceWindow::Draw(int time, float x, float y) {
 	}
 
 	if (choices.Num() > 0 && currentChoice < choices.Num()) {
-		dc->DrawText( choices[currentChoice], textScale, textAlign, color, textRect, false, -1, false, NULL, 0, textAdjust, style );
+		dc->DrawText( choices[currentChoice], textScale, textAlign, color, textRect, false, -1, false, NULL, 0, Q4_CHOICE_WINDOW_TEXT_SPACING, style );
 	}
 }
 

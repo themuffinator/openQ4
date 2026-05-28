@@ -752,6 +752,7 @@ void idWindow::Draw( int time, float x, float y ) {
 	}
 	const int textAdjust = static_cast<int>( textspacing );
 	const int style = static_cast<int>( textstyle );
+	const bool isChatWindow = ( flags & WIN_CHATWINDOW ) != 0;
 	if ( textShadow ) {
 		idStr shadowText = text;
 		idRectangle shadowRect = textRect;
@@ -760,9 +761,9 @@ void idWindow::Draw( int time, float x, float y ) {
 		shadowRect.x += textShadow;
 		shadowRect.y += textShadow;
 
-		dc->DrawText( shadowText, textScale, textAlign, colorBlack, shadowRect, !( flags & WIN_NOWRAP ), -1, false, NULL, 0, textAdjust, style );
+		dc->DrawText( shadowText, textScale, textAlign, colorBlack, shadowRect, !( flags & WIN_NOWRAP ), -1, false, NULL, 0, textAdjust, style, isChatWindow );
 	}
-	dc->DrawText( text, textScale, textAlign, foreColor, textRect, !( flags & WIN_NOWRAP ), -1, false, NULL, 0, textAdjust, style );
+	dc->DrawText( text, textScale, textAlign, foreColor, textRect, !( flags & WIN_NOWRAP ), -1, false, NULL, 0, textAdjust, style, isChatWindow );
 
 	if ( gui_edit.GetBool() ) {
 		dc->EnableClipping( false );
@@ -3039,7 +3040,9 @@ bool idWindow::ParseInternalVar(const char *_name, idParser *src) {
 		return true;
 	}
 	if (idStr::Icmp(_name, "chatWindow") == 0) {
-		src->ParseInt();
+		if ( src->ParseBool() ) {
+			flags |= WIN_CHATWINDOW;
+		}
 		return true;
 	}
 // jmarshall end
@@ -4625,6 +4628,10 @@ void idWindow::WriteToSaveGame( idFile *savefile ) {
 	savefile->Write( &textAlign, sizeof( textAlign ) );
 	savefile->Write( &textAlignx, sizeof( textAlignx ) );
 	savefile->Write( &textAligny, sizeof( textAligny ) );
+	const signed char savedTextStyle = static_cast<signed char>( static_cast<int>( textstyle ) );
+	const float savedTextSpacing = textspacing;
+	savefile->Write( &savedTextStyle, sizeof( savedTextStyle ) );
+	savefile->Write( &savedTextSpacing, sizeof( savedTextSpacing ) );
 	savefile->Write( &textShadow, sizeof( textShadow ) );
 	savefile->Write( &shear, sizeof( shear ) );
 
@@ -4775,6 +4782,12 @@ void idWindow::ReadFromSaveGame( idFile *savefile ) {
 	savefile->Read( &textAlign, sizeof( textAlign ) );
 	savefile->Read( &textAlignx, sizeof( textAlignx ) );
 	savefile->Read( &textAligny, sizeof( textAligny ) );
+	signed char savedTextStyle = 0;
+	float savedTextSpacing = 0.0f;
+	savefile->Read( &savedTextStyle, sizeof( savedTextStyle ) );
+	savefile->Read( &savedTextSpacing, sizeof( savedTextSpacing ) );
+	textstyle = static_cast<float>( savedTextStyle );
+	textspacing = savedTextSpacing;
 	savefile->Read( &textShadow, sizeof( textShadow ) );
 	savefile->Read( &shear, sizeof( shear ) );
 

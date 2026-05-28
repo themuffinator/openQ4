@@ -212,7 +212,16 @@ int idStr::ColorEscapeLength( const char *s, idVec4 *outColor, bool *resetToDefa
 	}
 	int type = 0;
 	const int escapeLength = idStr::IsEscape( s, &type );
-	if ( escapeLength == 0 || ( type & ( S_ESCAPE_COLOR | S_ESCAPE_COLORINDEX ) ) == 0 ) {
+	if ( escapeLength == 0 ) {
+		return 0;
+	}
+	if ( type == S_ESCAPE_COMMAND && ( s[1] == 'r' || s[1] == 'R' ) ) {
+		if ( resetToDefault ) {
+			*resetToDefault = true;
+		}
+		return escapeLength;
+	}
+	if ( ( type & ( S_ESCAPE_COLOR | S_ESCAPE_COLORINDEX ) ) == 0 ) {
 		return 0;
 	}
 	switch ( s[1] ) {
@@ -222,10 +231,7 @@ int idStr::ColorEscapeLength( const char *s, idVec4 *outColor, bool *resetToDefa
 			}
 			return escapeLength;
 		case 'c': case 'C':
-			if ( escapeLength != 5 ||
-				!idStr::CharIsNumeric( s[2] ) ||
-				!idStr::CharIsNumeric( s[3] ) ||
-				!idStr::CharIsNumeric( s[4] ) ) {
+			if ( escapeLength != 5 ) {
 				return 0;
 			}
 			if ( outColor ) {
@@ -1919,38 +1925,36 @@ int idStr::IsEscape( const char *s, int* type )  {
 				*type = S_ESCAPE_COLOR;
 			}
 			return 2;
+		case 'r': case 'R':
+			if ( type ) {
+				*type = S_ESCAPE_COMMAND;
+			}
+			return 2;
 		case 'c': case 'C':
-			if ( *(s+2) && *(s+3) && *(s+4) &&
-				idStr::CharIsNumeric( s[2] ) &&
-				idStr::CharIsNumeric( s[3] ) &&
-				idStr::CharIsNumeric( s[4] ) ) {
+			if ( *(s+2) && *(s+3) && *(s+4) ) {
 				if ( type ) {
 					*type = S_ESCAPE_COLOR;
 				}
 				return 5;
 			}
+			return 0;
+		case 'n': case 'N':
 			if ( type ) {
-				*type = S_ESCAPE_COLORINDEX;
+				*type = S_ESCAPE_COMMAND;
 			}
-			return 2;
+			if ( *(s+2) ) {
+				return 3;
+			}
+			return 0;
 		case 'i': case 'I':
-			if ( *(s+2) && *(s+3) && *(s+4) && OpenQ4_IsRegisteredIconEscapeCode( s + 2 ) ) {
+			if ( *(s+2) && *(s+3) && *(s+4) ) {
 				if ( type ) {
 					*type = S_ESCAPE_ICON;
 				}
 				return 5;
 			}
-			if ( type ) {
-				*type = S_ESCAPE_COLORINDEX;
-			}
-			return 2;
+			return 0;
 	}			
-	if ( ( s[1] >= 'a' && s[1] <= 'z' ) || ( s[1] >= 'A' && s[1] <= 'Z' ) ) {
-		if ( type ) {
-			*type = S_ESCAPE_COLORINDEX;
-		}
-		return 2;
-	}
 	return 0;
 }
 // RAVEN END

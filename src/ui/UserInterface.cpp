@@ -763,3 +763,35 @@ void idUserInterfaceLocal::SetCursor( float x, float y ) {
 	cursorY = idMath::ClampFloat( minY, maxY, y );
 }
 
+bool idUserInterfaceLocal::GetMaxTextIndex( const char *windowName, const char *text, wrapInfo_t& wrapInfo ) const {
+	if ( desktop == NULL ) {
+		return false;
+	}
+
+	drawWin_t *drawWindow = desktop->FindChildByName( windowName );
+	if ( drawWindow == NULL ) {
+		return false;
+	}
+
+	idDeviceContext *measureDc = NULL;
+	int pixelLimit = 0;
+	float textScale = 0.0f;
+
+	if ( drawWindow->win != NULL ) {
+		drawWindow->win->SetFont();
+		measureDc = drawWindow->win->dc;
+		pixelLimit = static_cast<int>( drawWindow->win->textRect.w );
+		textScale = drawWindow->win->textScale;
+	} else if ( drawWindow->simp != NULL ) {
+		drawWindow->simp->dc->SetFont( drawWindow->simp->fontNum );
+		measureDc = drawWindow->simp->dc;
+		pixelLimit = static_cast<int>( drawWindow->simp->textRect.w );
+		textScale = drawWindow->simp->textScale;
+	}
+
+	if ( measureDc == NULL ) {
+		return false;
+	}
+
+	return measureDc->GetMaxTextIndex( text, pixelLimit, textScale, wrapInfo );
+}

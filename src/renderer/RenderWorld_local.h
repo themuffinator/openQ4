@@ -159,7 +159,7 @@ public:
 	virtual void			RemoveDecals( qhandle_t entityHandle );
 
 	virtual void			SetRenderView( const renderView_t *renderView );
-	virtual	void			RenderScene( const renderView_t *renderView );
+	virtual	void			RenderScene( const renderView_t *renderView, int renderFlags = RF_NORMAL );
 
 	virtual	int				NumAreas( void ) const;
 	virtual int				PointInArea( const idVec3 &point ) const;
@@ -209,7 +209,7 @@ public:
 	// jscott: fix for FreeWorld crash
 	virtual void			RemoveAllModelReferences(idRenderModel* model) { }
 
-	virtual bool			HasSkybox(int areaNum) { return true; }
+	virtual bool			HasSkybox( int areaNum );
 
 	//-----------------------
 
@@ -288,6 +288,8 @@ public:
 	virtual void			RenderPortalFades( void );
 	void					FloodViewThroughArea_r( const idVec3 origin, int areaNum, const struct portalStack_s *ps );
 	void					FlowViewThroughPortals( const idVec3 origin, int numPlanes, const idPlane *planes );
+	void					FindVisibleAreas_r( const idVec3 origin, int areaNum, bool *visibleAreas );
+	virtual void			FindVisibleAreas( idVec3 origin, int areaNum, bool *visibleAreas );
 	void					FloodLightThroughArea_r( idRenderLightLocal *light, int areaNum, const struct portalStack_s *ps );
 	void					FlowLightThroughPortals( idRenderLightLocal *light );
 	areaNumRef_t *			FloodFrustumAreas_r( const idFrustum &frustum, const int areaNum, const idBounds &bounds, areaNumRef_t *areas );

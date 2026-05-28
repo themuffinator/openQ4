@@ -659,7 +659,13 @@ void PutPrimitivesInAreas( uEntity_t *e ) {
 
 			for ( i = 0 ; i < model->NumSurfaces() ; i++ ) {
 				const modelSurface_t *surface = model->Surface( i );
+				if ( surface == NULL || surface->shader == NULL || surface->shader->IsDedicatedCollisionSurface() ) {
+					continue;
+				}
 				const srfTriangles_t *tri = surface->geometry;
+				if ( tri == NULL ) {
+					continue;
+				}
 
 				mapTri_t	mapTri;
 				memset( &mapTri, 0, sizeof( mapTri ) );

@@ -424,6 +424,62 @@ void idRenderWorldLocal::FlowViewThroughPortals( const idVec3 origin, int numPla
 
 //==================================================================================================
 
+/*
+===================
+FindVisibleAreas_r
+
+Coarse topological portal flood used by game-side portal-sky PVS setup. This
+intentionally avoids render-time scissor, fog, and distance culling because the
+caller only needs to know whether any currently reachable visible area contains
+skybox surfaces.
+===================
+*/
+void idRenderWorldLocal::FindVisibleAreas_r( const idVec3 origin, int areaNum, bool *visibleAreas ) {
+	(void)origin;
+
+	if ( areaNum < 0 || areaNum >= numPortalAreas || visibleAreas == NULL ) {
+		return;
+	}
+	if ( visibleAreas[ areaNum ] ) {
+		return;
+	}
+
+	visibleAreas[ areaNum ] = true;
+	portalArea_t *area = &portalAreas[ areaNum ];
+	for ( portal_t *portal = area->portals; portal != NULL; portal = portal->next ) {
+		if ( portal->doublePortal != NULL && ( portal->doublePortal->blockingBits & PS_BLOCK_VIEW ) ) {
+			continue;
+		}
+		if ( portal->intoArea < 0 || portal->intoArea >= numPortalAreas ) {
+			continue;
+		}
+		if ( visibleAreas[ portal->intoArea ] ) {
+			continue;
+		}
+
+		FindVisibleAreas_r( origin, portal->intoArea, visibleAreas );
+	}
+}
+
+/*
+===================
+FindVisibleAreas
+===================
+*/
+void idRenderWorldLocal::FindVisibleAreas( idVec3 origin, int areaNum, bool *visibleAreas ) {
+	if ( visibleAreas == NULL ) {
+		return;
+	}
+	if ( areaNum < 0 || areaNum >= numPortalAreas ) {
+		for ( int i = 0; i < numPortalAreas; i++ ) {
+			visibleAreas[ i ] = true;
+		}
+		return;
+	}
+
+	FindVisibleAreas_r( origin, areaNum, visibleAreas );
+}
+
 
 /*
 ===================

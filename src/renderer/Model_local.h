@@ -80,6 +80,7 @@ public:
 	virtual const char *		GetJointName( jointHandle_t handle ) const;
 	virtual const idJointQuat *	GetDefaultPose( void ) const;
 	virtual int					NearestJoint( int surfaceNum, int a, int b, int c ) const;
+	virtual bool				HasCollisionSurface( const struct renderEntity_s *ent ) const;
 	virtual idBounds			Bounds( const struct renderEntity_s *ent ) const;
 	virtual void				ReadFromDemoFile( class idDemoFile *f );
 	virtual void				WriteToDemoFile( class idDemoFile *f );
@@ -87,6 +88,8 @@ public:
 	virtual int					GetSurfaceMask( const char *surface ) const;
 
 	void						MakeDefaultModel();
+	void						SetProcSky( bool value );
+	bool						HasProcSky() const;
 	
 	bool						LoadASE( const char *fileName );
 	bool						LoadLWO( const char *fileName );
@@ -119,6 +122,7 @@ protected:
 	bool						purged;					// eventually we will have dynamic reloading
 	bool						fastLoad;				// don't generate tangents and shadow data
 	bool						reloadable;				// if not, reloadModels won't check timestamp
+	bool						procSky;				// Quake 4 .proc / MD5RProc area needs portal-sky PVS
 	bool						levelLoadReferenced;	// for determining if it needs to be freed
 	ID_TIME_T						timeStamp;
 

@@ -672,8 +672,8 @@ idRenderModel *idRenderWorldLocal::ParseModel( Lexer *src ) {
 	}
 
 // jmarshall - quake 4 proc format
-	if (!src->PeekTokenString("{") && !src->PeekTokenString("}")) {
-		int sky = src->ParseInt();
+	if ( !src->PeekTokenString( "{" ) && !src->PeekTokenString( "}" ) ) {
+		static_cast<idRenderModelStatic *>( model )->SetProcSky( src->ParseInt() != 0 );
 	}
 // jmarshall end
 
@@ -1469,11 +1469,16 @@ void idRenderWorldLocal::AddWorldModelEntities() {
 
 		idRenderModel *hModel = def->parms.hModel;
 		portalAreas[i].globalBounds = hModel->Bounds();
+		if ( idRenderModelStatic *staticModel = dynamic_cast<idRenderModelStatic *>( hModel ) ) {
+			def->needsPortalSky = staticModel->HasProcSky();
+		}
 
 		for ( int j = 0; j < hModel->NumSurfaces(); j++ ) {
 			const modelSurface_t *surf = hModel->Surface( j );
 
-			if ( surf->shader->GetName() == idStr( "textures/smf/portal_sky" ) ) {
+			if ( surf->shader != NULL && ( surf->shader->IsPortalSky()
+				|| surf->shader->Texgen() == TG_SKYBOX_CUBE
+				|| surf->shader->Texgen() == TG_WOBBLESKY_CUBE ) ) {
 				def->needsPortalSky = true;
 			}
 		}
@@ -1516,4 +1521,16 @@ bool idRenderWorldLocal::CheckAreaForPortalSky( int areaNum ) {
 	}
 
 	return false;
+}
+
+/*
+=====================
+idRenderWorldLocal::HasSkybox
+=====================
+*/
+bool idRenderWorldLocal::HasSkybox( int areaNum ) {
+	if ( areaNum < 0 || areaNum >= numPortalAreas ) {
+		return false;
+	}
+	return CheckAreaForPortalSky( areaNum );
 }

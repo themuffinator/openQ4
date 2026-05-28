@@ -84,6 +84,11 @@ typedef enum {
 	OPENQ4_FRAME_BOUND_UNCAPPED
 } openq4FramePacingBound_t;
 
+enum {
+	OPENQ4_FRAME_PACING_HISTOGRAM_BINS = 66,
+	OPENQ4_FRAME_PACING_HISTOGRAM_OVERFLOW = OPENQ4_FRAME_PACING_HISTOGRAM_BINS - 1
+};
+
 typedef struct {
 	bool						valid;
 	bool						multiplayer;
@@ -91,6 +96,9 @@ typedef struct {
 	int							lastFrameMsec;
 	float						avgFrameMsec;
 	float						avgFrameHz;
+	int							minFrameMsec;
+	int							maxFrameMsec;
+	int							frameMsecHistogram[OPENQ4_FRAME_PACING_HISTOGRAM_BINS];
 	int							lastTicDelta;
 	float						avgTicsPerFrame;
 	int							lastGameTics;
@@ -166,6 +174,7 @@ public:
 
 	virtual const char *GetCurrentMapName();
 	const openq4FramePacingStats_t &GetFramePacingStats( void ) const { return framePacingStats; }
+	void				ResetFramePacingStats( void );
 	void				PrintFramePacingSnapshot( const char *reason = NULL ) const;
 	void				SampleMultiplayerFramePacing( int frameStartMsec );
 	void				RunTimedWaitBoxPacingTest( int durationMsec, bool network, const char *reason = NULL );
@@ -399,7 +408,6 @@ private:
 	void				EmitGameAuth( void );
 	bool				IsIAmTheDukeActive( void ) const;
 	void				DrawIAmTheDukeOverlay( void ) const;
-	void				ResetFramePacingStats( void );
 	void				UpdateFramePacingStats( int frameStartMsec, int requestedWaitMsec, int actualWaitMsec, int gameTicsToRun );
 	
 	typedef enum {

@@ -72,6 +72,7 @@ public:
 	virtual float				CursorX() { return cursorX; }
 	virtual float				CursorY() { return cursorY; }
 	virtual idVec4				GetLightColor(void) override;
+	virtual bool				GetMaxTextIndex( const char *windowName, const char *text, wrapInfo_t& wrapInfo ) const override;
 
 	size_t						Size();
 

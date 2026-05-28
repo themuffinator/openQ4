@@ -40,6 +40,7 @@ typedef struct {
 
 class idSimpleWindow {
 	friend class idWindow;
+	friend class idUserInterfaceLocal;
 public:
 					idSimpleWindow(idWindow* win);
 	virtual			~idSimpleWindow();
@@ -82,6 +83,8 @@ protected:
 	float 			textAligny;
 	float			forceAspectWidth;
 	float			forceAspectHeight;
+	int				textSpacing;
+	signed char		textStyle;
 	unsigned char	screenAlignX;
 	unsigned char	screenAlignY;
 	int				textShadow;

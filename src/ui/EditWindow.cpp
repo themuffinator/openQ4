@@ -35,6 +35,17 @@ If you have questions concerning this license or the applicable additional terms
 #include "SliderWindow.h"
 #include "EditWindow.h"
 
+static const int Q4_EDIT_WINDOW_TEXT_SPACING = 0;
+static const float Q4_EDIT_WINDOW_LINE_HEIGHT_SCALE = 1.25f;
+
+static float OpenQ4_EditWindowWrappedLineHeight( idEditWindow *window ) {
+	float lineHeight = window->GetMaxCharHeight() * Q4_EDIT_WINDOW_LINE_HEIGHT_SCALE;
+	return lineHeight > 0.0f ? lineHeight : 1.0f;
+}
+
+static int OpenQ4_EditWindowEscapeLength( const char *text ) {
+	return idStr::IsEscape( text );
+}
 
 bool idEditWindow::ParseInternalVar( const char *_name, idParser *src ) {
 	if ( idStr::Icmp( _name, "maxchars" ) == 0) {
@@ -166,10 +177,10 @@ void idEditWindow::Draw( int time, float x, float y ) {
 	rect.w += paintOffset;
 
 	if ( wrap && scroller->GetHigh() > 0.0f ) {
-		float lineHeight = GetMaxCharHeight( ) + 5;
+		const float lineHeight = OpenQ4_EditWindowWrappedLineHeight( this );
 		rect.y -= scroller->GetValue() * lineHeight;
 		rect.w -= sizeBias;
-		rect.h = ( breaks.Num() + 1 ) * lineHeight;
+		rect.h = breaks.Num() * lineHeight;
 	}
 
 	if ( hover && !noEvents && Contains(gui->CursorX(), gui->CursorY()) ) {
@@ -181,7 +192,7 @@ void idEditWindow::Draw( int time, float x, float y ) {
 		color = hoverColor;
 	}
 
-	dc->DrawText( buffer, scale, 0, color, rect, wrap, ( flags & WIN_FOCUS ) ? cursorPos : -1, false, NULL, 0, static_cast<int>( textspacing ), static_cast<int>( textstyle ) );
+	dc->DrawText( buffer, scale, 0, color, rect, wrap, ( flags & WIN_FOCUS ) ? cursorPos : -1, false, NULL, 0, Q4_EDIT_WINDOW_TEXT_SPACING, static_cast<int>( textstyle ), ( flags & WIN_CHATWINDOW ) != 0 );
 }
 
 /*
@@ -533,19 +544,18 @@ void idEditWindow::EnsureCursorVisible()
 	}
 
 	SetFont();
-	const int textAdjust = static_cast<int>( textspacing );
 	if ( !wrap ) {
 		int cursorX = 0;
 		if ( password ) {
-			cursorX = cursorPos * dc->CharWidth( '*', textScale, textAdjust );
+			cursorX = cursorPos * dc->CharWidth( '*', textScale, Q4_EDIT_WINDOW_TEXT_SPACING );
 		} else {
 			int i = 0;
 			while ( i < text.Length() && i < cursorPos ) {
-				const int colorEscapeLength = idStr::ColorEscapeLength( &text[i] );
-				if ( colorEscapeLength > 0 ) {
-					i += colorEscapeLength;
+				const int escapeLength = OpenQ4_EditWindowEscapeLength( &text[i] );
+				if ( escapeLength > 0 ) {
+					i += escapeLength;
 				} else {
-					cursorX += dc->CharWidth( text[i], textScale, textAdjust );
+					cursorX += dc->CharWidth( text[i], textScale, Q4_EDIT_WINDOW_TEXT_SPACING );
 					i++;
 				}
 			}
@@ -571,15 +581,23 @@ void idEditWindow::EnsureCursorVisible()
 
 		breaks.Clear();
 		idRectangle rect = textRect;
-		rect.w -= sizeBias;
-		dc->DrawText( text, textScale, textAlign, colorWhite, rect, true, ( flags & WIN_FOCUS ) ? cursorPos : -1, true, &breaks, 0, textAdjust, static_cast<int>( textstyle ) );
+		if ( scroller->GetHigh() > 0.0f ) {
+			rect.w -= sizeBias;
+		}
+		dc->DrawText( text, textScale, textAlign, colorWhite, rect, true, ( flags & WIN_FOCUS ) ? cursorPos : -1, true, &breaks, 0, Q4_EDIT_WINDOW_TEXT_SPACING, static_cast<int>( textstyle ), ( flags & WIN_CHATWINDOW ) != 0 );
 
-		int fit = textRect.h / (GetMaxCharHeight() + 5);
-		if ( fit < breaks.Num() + 1 ) {
-			scroller->SetRange(0, breaks.Num() + 1 - fit, 1);
-		} else {
+		const int fit = static_cast<int>( textRect.h / OpenQ4_EditWindowWrappedLineHeight( this ) );
+		if ( breaks.Num() <= fit ) {
 			// The text fits completely in the box
 			scroller->SetRange(0.0f, 0.0f, 1.0f);
+		} else {
+			if ( scroller->GetHigh() == 0.0f ) {
+				breaks.Clear();
+				rect = textRect;
+				rect.w -= sizeBias;
+				dc->DrawText( text, textScale, textAlign, colorWhite, rect, true, ( flags & WIN_FOCUS ) ? cursorPos : -1, true, &breaks, 0, Q4_EDIT_WINDOW_TEXT_SPACING, static_cast<int>( textstyle ), ( flags & WIN_CHATWINDOW ) != 0 );
+			}
+			scroller->SetRange(0, breaks.Num() - fit, 1);
 		}
 
 		if ( forceScroll ) {

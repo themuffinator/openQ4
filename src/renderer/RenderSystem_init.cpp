@@ -31,6 +31,22 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "tr_local.h"
 #include "DXT/DXTCodec.h"
+#include "RendererBootstrap.h"
+#include "GLStateCache.h"
+#include "RendererBenchmarks.h"
+#include "RendererMetrics.h"
+#include "RendererUpload.h"
+#include "RenderGraph.h"
+#include "RenderGraphResources.h"
+#include "MaterialResourceTable.h"
+#include "GeometryResources.h"
+#include "ScenePackets.h"
+#include "ModernClusteredLighting.h"
+#include "ModernGLExecutor.h"
+#include "ModernGLDrawPlan.h"
+#include "ModernGLShaderLibrary.h"
+#include "ModernGLSubmitPlan.h"
+#include "ModernShadowPlanner.h"
 #include "../framework/RenderDoc.h"
 
 // Detect the Microsoft software OpenGL wrapper and guide the user toward
@@ -119,6 +135,8 @@ glconfig_t	glConfig;
 static void GfxInfo_f( void );
 
 const char *r_rendererArgs[] = { "best", "arb", "arb2", "Cg", "exp", "nv10", "nv20", "r200", NULL };
+const char *r_glTierArgs[] = { "auto", "legacy", "gl33", "gl41", "gl43", "gl45", "gl46", NULL };
+const char *r_rendererBenchmarkPresetArgs[] = { "low", "baseline", "modern", "high-end", NULL };
 
 idCVar r_inhibitFragmentProgram( "r_inhibitFragmentProgram", "0", CVAR_RENDERER | CVAR_BOOL, "ignore the fragment program extension" );
 idCVar r_glDriver( "r_glDriver", "", CVAR_RENDERER, "\"opengl32\", etc." );
@@ -231,11 +249,13 @@ idCVar r_shadowMapTranslucentMinVariance( "r_shadowMapTranslucentMinVariance", "
 idCVar r_shadowMapTranslucentBleedReduction( "r_shadowMapTranslucentBleedReduction", "0.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "light-bleed reduction applied to translucent shadow moment resolve", 0.0f, 0.95f );
 idCVar r_shadowMapGpuSyncTimings( "r_shadowMapGpuSyncTimings", "0", CVAR_RENDERER | CVAR_BOOL, "diagnostic-only: glFinish around shadow-map passes to report GPU-synchronized milliseconds" );
 idCVar r_shadowMapGpuTimerQueries( "r_shadowMapGpuTimerQueries", "1", CVAR_RENDERER | CVAR_BOOL, "use non-blocking GL timer queries for shadow-map GPU diagnostics when available" );
+idCVar r_softParticles( "r_softParticles", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "depth-fade eligible BSE particles against opaque scene depth when GLSL is available" );
+idCVar r_softParticleFadeDistance( "r_softParticleFadeDistance", "64", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "world-unit distance over which r_softParticles fades particle intersections", 1.0f, 512.0f );
 idCVar r_enhancedMaterials( "r_enhancedMaterials", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "use enhanced GLSL interaction shading for existing materials when supported" );
 idCVar r_enhancedMaterialNormalScale( "r_enhancedMaterialNormalScale", "1.25", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "tangent-space normal XY scale when enhanced material shading is enabled", 0.5f, 2.0f );
 idCVar r_enhancedMaterialSpecularBoost( "r_enhancedMaterialSpecularBoost", "1.15", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "specular intensity scale when enhanced material shading is enabled", 0.0f, 4.0f );
 idCVar r_enhancedMaterialFresnel( "r_enhancedMaterialFresnel", "0.65", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "grazing-angle fresnel contribution when enhanced material shading is enabled", 0.0f, 1.0f );
-idCVar r_useShadowSurfaceScissor( "r_useShadowSurfaceScissor", "1", CVAR_RENDERER | CVAR_BOOL, "scissor shadows by the scissor rect of the interaction surfaces" );
+idCVar r_useShadowSurfaceScissor( "r_useShadowSurfaceScissor", "0", CVAR_RENDERER | CVAR_BOOL, "scissor shadows by the scissor rect of the interaction surfaces" );
 idCVar r_useInteractionTable( "r_useInteractionTable", "1", CVAR_RENDERER | CVAR_BOOL, "create a full entityDefs * lightDefs table to make finding interactions faster" );
 idCVar r_useTurboShadow( "r_useTurboShadow", "1", CVAR_RENDERER | CVAR_BOOL, "use the infinite projection with W technique for dynamic shadows" );
 idCVar r_useTwoSidedStencil( "r_useTwoSidedStencil", "1", CVAR_RENDERER | CVAR_BOOL, "do stencil shadows in one pass with different ops on each side" );
@@ -280,6 +300,37 @@ idCVar r_brightness( "r_brightness", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FL
 
 idCVar r_renderer( "r_renderer", "best", CVAR_RENDERER | CVAR_ARCHIVE, "hardware specific renderer path to use", r_rendererArgs, idCmdSystem::ArgCompletion_String<r_rendererArgs> );
 idCVar r_actualRenderer( "r_actualRenderer", "UNINITIALIZED", CVAR_RENDERER | CVAR_ROM, "actual active renderer backend after request/fallback selection" );
+idCVar r_glTier( "r_glTier", "auto", CVAR_RENDERER | CVAR_ARCHIVE, "OpenGL renderer tier: auto, legacy, gl33, gl41, gl43, gl45, gl46", r_glTierArgs, idCmdSystem::ArgCompletion_String<r_glTierArgs> );
+idCVar r_glDebugContext( "r_glDebugContext", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "request a debug OpenGL context when the platform backend supports it" );
+idCVar r_rendererMetrics( "r_rendererMetrics", "0", CVAR_RENDERER | CVAR_INTEGER, "renderer metrics: 0 = off, 1 = periodic summary, 2 = per-frame/pass detail", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
+idCVar r_rendererGpuTimers( "r_rendererGpuTimers", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "sample GL timer queries when r_rendererMetrics is enabled and supported" );
+idCVar r_rendererBenchmarkPreset( "r_rendererBenchmarkPreset", "baseline", CVAR_RENDERER | CVAR_ARCHIVE, "renderer benchmark budget preset: low, baseline, modern, high-end", r_rendererBenchmarkPresetArgs, idCmdSystem::ArgCompletion_String<r_rendererBenchmarkPresetArgs> );
+idCVar r_rendererPerfThresholdP95( "r_rendererPerfThresholdP95", "0", CVAR_RENDERER | CVAR_INTEGER, "custom renderer benchmark P95 frame-time budget in milliseconds (0 = preset default)", 0, 1000, idCmdSystem::ArgCompletion_Integer<0,1000> );
+idCVar r_rendererPerfThresholdP99( "r_rendererPerfThresholdP99", "0", CVAR_RENDERER | CVAR_INTEGER, "custom renderer benchmark P99 frame-time budget in milliseconds (0 = preset default)", 0, 1000, idCmdSystem::ArgCompletion_Integer<0,1000> );
+idCVar r_rendererAdaptiveClusterGrid( "r_rendererAdaptiveClusterGrid", "0", CVAR_RENDERER | CVAR_BOOL, "use benchmark preset cluster-grid dimensions for the modern clustered-light experiment" );
+idCVar r_rendererDynamicResolution( "r_rendererDynamicResolution", "0", CVAR_RENDERER | CVAR_BOOL, "allow benchmark presets to recommend dynamic screen-percentage experiments; disabled by default" );
+idCVar r_rendererUploadMegs( "r_rendererUploadMegs", "16", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "dynamic renderer upload stream size in megabytes per frame buffer", 1, 128, idCmdSystem::ArgCompletion_Integer<1,128> );
+idCVar r_rendererUploadFrameBuffers( "r_rendererUploadFrameBuffers", "4", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "dynamic renderer upload stream frame-buffer rotation depth", 3, 8, idCmdSystem::ArgCompletion_Integer<3,8> );
+idCVar r_rendererUploadPersistent( "r_rendererUploadPersistent", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "allow persistent-mapped dynamic renderer uploads when supported" );
+idCVar r_rendererModernExecutor( "r_rendererModernExecutor", "0", CVAR_RENDERER | CVAR_BOOL, "prepare the opt-in modern GL executor frame contract while legacy ARB2 still executes" );
+idCVar r_rendererModernSubmit( "r_rendererModernSubmit", "0", CVAR_RENDERER | CVAR_BOOL, "execute opt-in modern GL draw submission before legacy ARB2 fallback; diagnostic until visible pass replacement lands" );
+idCVar r_rendererGpuValidation( "r_rendererGpuValidation", "0", CVAR_RENDERER | CVAR_BOOL, "compare GL 4.3 GPU-driven compute results against CPU reference data on sampled frames" );
+idCVar r_rendererGpuValidationReadbackDelay( "r_rendererGpuValidationReadbackDelay", "2", CVAR_RENDERER | CVAR_INTEGER, "frames to defer opt-in GL 4.3 GPU validation readbacks before polling without a sync wait", 1, 8, idCmdSystem::ArgCompletion_Integer<1,8> );
+idCVar r_rendererBindless( "r_rendererBindless", "0", CVAR_RENDERER | CVAR_BOOL, "enable experimental GL 4.5 bindless texture diagnostics without changing visible output" );
+idCVar r_rendererModernVisible( "r_rendererModernVisible", "0", CVAR_RENDERER | CVAR_BOOL, "execute the opt-in modern hybrid visible-frame composition when all required pass owners are modern-safe" );
+idCVar r_rendererModernAutoPromote( "r_rendererModernAutoPromote", "0", CVAR_RENDERER | CVAR_BOOL, "allow r_glTier auto and r_renderer best to request the guarded modern visible path after promotion evidence and sign-off; off keeps ARB2 default" );
+idCVar r_rendererPromotionEvidence( "r_rendererPromotionEvidence", "", CVAR_RENDERER, "Phase 8 validation evidence token required with r_rendererModernAutoPromote before automatic modern visible promotion" );
+idCVar r_rendererShaderReload( "r_rendererShaderReload", "0", CVAR_RENDERER | CVAR_BOOL, "allow runtime reload of the internal modern GL shader library" );
+idCVar r_rendererModernVisibleDepth( "r_rendererModernVisibleDepth", "0", CVAR_RENDERER | CVAR_BOOL, "execute graph-backed modern depth and compatible shadow-depth passes while ARB2 remains the visible color path" );
+idCVar r_rendererModernDepthDebug( "r_rendererModernDepthDebug", "0", CVAR_RENDERER | CVAR_INTEGER, "modern depth debug overlay: 0 = off, 1 = scene depth, 2 = shadow-map depth", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
+idCVar r_rendererModernOpaque( "r_rendererModernOpaque", "0", CVAR_RENDERER | CVAR_BOOL, "execute graph-backed modern opaque G-buffer passes while ARB2 remains the visible color path" );
+idCVar r_rendererModernGBufferDebug( "r_rendererModernGBufferDebug", "0", CVAR_RENDERER | CVAR_INTEGER, "modern G-buffer debug overlay: 0 = off, 1 = albedo, 2 = normal, 3 = material, 4 = emissive/light-grid", 0, 4, idCmdSystem::ArgCompletion_Integer<0,4> );
+idCVar r_rendererModernDeferred( "r_rendererModernDeferred", "0", CVAR_RENDERER | CVAR_BOOL, "execute graph-backed modern deferred light resolve while ARB2 remains the visible color path" );
+idCVar r_rendererModernDeferredDebug( "r_rendererModernDeferredDebug", "0", CVAR_RENDERER | CVAR_INTEGER, "modern deferred resolve debug overlay: 0 = off, 1 = light contribution, 2 = cluster id, 3 = light count, 4 = fallback pressure", 0, 4, idCmdSystem::ArgCompletion_Integer<0,4> );
+idCVar r_rendererForwardPlus( "r_rendererForwardPlus", "0", CVAR_RENDERER | CVAR_BOOL, "execute graph-backed modern clustered forward+ passes while ARB2 remains the visible color path" );
+idCVar r_rendererClusterDebug( "r_rendererClusterDebug", "0", CVAR_RENDERER | CVAR_INTEGER, "modern clustered light debug overlay: 0 = off, 1 = occupancy, 2 = light count, 3 = overflow", 0, 3, idCmdSystem::ArgCompletion_Integer<0,3> );
+idCVar r_rendererOcclusion( "r_rendererOcclusion", "1", CVAR_RENDERER | CVAR_BOOL, "enable conservative modern visibility and occlusion culling for modern renderer passes; 0 disables the culling path instantly for debugging" );
+idCVar r_rendererHiZ( "r_rendererHiZ", "1", CVAR_RENDERER | CVAR_BOOL, "allocate and build the modern scene Hi-Z depth pyramid when visibility culling has a depth producer" );
 idCVar r_useSimpleInteraction( "r_useSimpleInteraction", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "use Quake 4's simpler ARB interaction shader pair as an explicit compatibility fallback; may reduce material lighting quality" );
 idCVar r_interactionColorMode( "r_interactionColorMode", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "interaction vertex-color mode: 0 = auto, 1 = packed env16.xy, 2 = vector env16/env17", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
 idCVar r_shaderReport( "r_shaderReport", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "shader diagnostics: 0 = off, 1 = startup/vid_restart summary, 2 = also warn on invalid program use", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
@@ -355,7 +406,7 @@ idCVar r_shadowMapDebugOverlay( "r_shadowMapDebugOverlay", "0", CVAR_RENDERER | 
 	"shadow-map overlay: 0 = off, 1 = show the selected shadow map as a top-left mini-map with stats",
 	0, 1, idCmdSystem::ArgCompletion_Integer<0, 1> );
 idCVar r_shadowMapDebugMode( "r_shadowMapDebugMode", "0", CVAR_RENDERER | CVAR_INTEGER,
-	"projected shadow-map debug mode: 0 = off, 1 = atlas/depth, 2 = cascade index, 3 = projected UV, 4 = projected depth, 5 = projected w, 6 = invalid mask, 7 = bias heatmap",
+	"projected shadow-map debug mode: 0 = off, 1 = atlas/depth, 2 = cascade index, 3 = projected UV, 4 = projected depth, 5 = projected w, 6 = invalid mask, 7 = bias heatmap, 8 = bias off, 9 = PCF off, 10 = caster offset off, 11 = receiver-plane bias off",
 	0, SHADOWMAP_DEBUGMODE_COUNT - 1, idCmdSystem::ArgCompletion_Integer<0, SHADOWMAP_DEBUGMODE_COUNT - 1> );
 idCVar r_shadowMapCascadeStabilize( "r_shadowMapCascadeStabilize", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "snap projected-light cascade bounds to texels to reduce shimmering" );
 idCVar r_shadowMapPointFarScale( "r_shadowMapPointFarScale", "1.25", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "padding multiplier applied to point-light shadow-map range", 1.0f, 4.0f );
@@ -372,7 +423,7 @@ idCVar r_testGamma( "r_testGamma", "0", CVAR_RENDERER | CVAR_FLOAT, "if > 0 draw
 idCVar r_testGammaBias( "r_testGammaBias", "0", CVAR_RENDERER | CVAR_FLOAT, "if > 0 draw a grid pattern to test gamma levels" );
 idCVar r_testStepGamma( "r_testStepGamma", "0", CVAR_RENDERER | CVAR_FLOAT, "if > 0 draw a grid pattern to test gamma levels" );
 idCVar r_lightScale( "r_lightScale", "2", CVAR_RENDERER | CVAR_FLOAT, "all light intensities are multiplied by this" );
-idCVar r_lightDetailLevel( "r_lightDetailLevel", "9", CVAR_RENDERER | CVAR_FLOAT, "minimum light detail level to render" );
+idCVar r_lightDetailLevel( "r_lightDetailLevel", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "minimum light detail level to render; 0 keeps all authored lights active", 0.0f, 10.0f );
 idCVar r_lightSourceRadius( "r_lightSourceRadius", "0", CVAR_RENDERER | CVAR_FLOAT, "for soft-shadow sampling" );
 idCVar r_flareSize( "r_flareSize", "1", CVAR_RENDERER | CVAR_FLOAT, "scale the flare deforms from the material def" ); 
 
@@ -431,6 +482,8 @@ idCVar r_showCull( "r_showCull", "0", CVAR_RENDERER | CVAR_BOOL, "report sphere 
 idCVar r_showInteractions( "r_showInteractions", "0", CVAR_RENDERER | CVAR_BOOL, "report interaction generation activity" );
 idCVar r_showDepth( "r_showDepth", "0", CVAR_RENDERER | CVAR_BOOL, "display the contents of the depth buffer and the depth range" );
 idCVar r_showSurfaces( "r_showSurfaces", "0", CVAR_RENDERER | CVAR_BOOL, "report surface/light/shadow counts" );
+idCVar r_showViewBuildTimes( "r_showViewBuildTimes", "0", CVAR_RENDERER | CVAR_INTEGER, "print CPU timings for render-view construction: 1 = primary views, 2 = all views", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
+idCVar r_showViewBuildTimesInterval( "r_showViewBuildTimesInterval", "60", CVAR_RENDERER | CVAR_INTEGER, "frames between r_showViewBuildTimes reports", 1, 3600 );
 idCVar r_showPrimitives( "r_showPrimitives", "0", CVAR_RENDERER | CVAR_INTEGER, "report drawsurf/index/vertex counts" );
 idCVar r_showEdges( "r_showEdges", "0", CVAR_RENDERER | CVAR_BOOL, "draw the sil edges" );
 idCVar r_showTexturePolarity( "r_showTexturePolarity", "0", CVAR_RENDERER | CVAR_BOOL, "shade triangles by texture area polarity" );
@@ -465,13 +518,256 @@ R_CheckExtension
 =================
 */
 bool R_CheckExtension( char *name ) {
-	if ( !strstr( glConfig.extensions_string, name ) ) {
+	if ( name == NULL || name[0] == '\0' ) {
+		return false;
+	}
+
+	if ( !GLCapabilityProbe_HasExtension( name ) ) {
 		common->Printf( "X..%s not found\n", name );
 		return false;
 	}
 
 	common->Printf( "...using %s\n", name );
 	return true;
+}
+
+static void R_RendererTierSelfTest_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !RendererTierSelect_RunSelfTest() ) {
+		common->Warning( "Renderer tier selector self-test failed" );
+	}
+}
+
+static void R_RendererTierContractSelfTest_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !RendererTierContract_RunSelfTest() ) {
+		common->Warning( "Renderer tier contract self-test failed" );
+	}
+}
+
+static void R_RendererContextLadderSelfTest_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !RendererContextLadder_RunSelfTest() ) {
+		common->Warning( "Renderer context ladder self-test failed" );
+	}
+}
+
+static void R_RendererCompatibilityGatesSelfTest_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !RendererCompatibilityGates_RunSelfTest() ) {
+		common->Warning( "Renderer compatibility gates self-test failed" );
+	}
+}
+
+static void R_RendererBenchmarkSelfTest_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !RendererBenchmark_RunSelfTest() ) {
+		common->Warning( "Renderer benchmark self-test failed" );
+	}
+}
+
+static void R_RendererDefaultPromotionSelfTest_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !RendererDefaultPromotion_RunSelfTest() ) {
+		common->Warning( "Renderer default promotion self-test failed" );
+	}
+}
+
+static void R_RendererDefaultSafetySelfTest_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !RendererDefaultSafety_RunSelfTest() ) {
+		common->Warning( "Renderer default safety self-test failed" );
+	}
+}
+
+static void R_RendererBenchmarkCapture_f( const idCmdArgs &args ) {
+	(void)args;
+	RendererBenchmarks_PrintLatestCapture();
+}
+
+static void R_RendererUploadSelfTest_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !RendererUpload_RunSelfTest() ) {
+		common->Warning( "Renderer upload self-test failed" );
+	}
+}
+
+static void R_RendererGpuTimerSelfTest_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !RendererGpuTimer_RunSelfTest() ) {
+		common->Warning( "Renderer GPU timer self-test failed" );
+	}
+}
+
+static void R_RendererScenePacketSelfTest_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !RendererScenePacket_RunSelfTest() ) {
+		common->Warning( "Renderer scene-packet self-test failed" );
+	}
+}
+
+static void R_RendererRenderGraphSelfTest_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !RendererRenderGraph_RunSelfTest() ) {
+		common->Warning( "Renderer render-graph self-test failed" );
+	}
+}
+
+static void R_RendererRenderGraphResourceSelfTest_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !RendererRenderGraphResource_RunSelfTest() ) {
+		common->Warning( "Renderer render-graph resource self-test failed" );
+	}
+}
+
+static void R_RendererRenderGraphResourceDump_f( const idCmdArgs &args ) {
+	(void)args;
+	R_RenderGraphResources_DumpLatest();
+}
+
+static void R_RendererMaterialResourceTableSelfTest_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !RendererMaterialResourceTable_RunSelfTest() ) {
+		common->Warning( "Renderer material resource-table self-test failed" );
+	}
+}
+
+static void R_RendererMaterialResourceTableDump_f( const idCmdArgs &args ) {
+	(void)args;
+	R_MaterialResourceTable_DumpLatest();
+}
+
+static void R_RendererGeometryResourceSelfTest_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !RendererGeometryResource_RunSelfTest() ) {
+		common->Warning( "Renderer geometry resource self-test failed" );
+	}
+}
+
+static void R_RendererGLStateCacheSelfTest_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !RendererGLStateCache_RunSelfTest() ) {
+		common->Warning( "Renderer GL state-cache self-test failed" );
+	}
+}
+
+static void R_RendererModernGLExecutorSelfTest_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !RendererModernGLExecutor_RunSelfTest() ) {
+		common->Warning( "Renderer modern GL executor self-test failed" );
+	}
+}
+
+static void R_RendererGpuDrivenSelfTest_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !RendererGpuDriven_RunSelfTest() ) {
+		common->Warning( "Renderer GPU-driven self-test failed" );
+	}
+}
+
+static void R_RendererVisiblePathSelfTest_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !RendererVisiblePath_RunSelfTest() ) {
+		common->Warning( "Renderer visible modern depth-path self-test failed" );
+	}
+}
+
+static void R_RendererGBufferSelfTest_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !RendererGBuffer_RunSelfTest() ) {
+		common->Warning( "Renderer modern G-buffer self-test failed" );
+	}
+}
+
+static void R_RendererClusterGridSelfTest_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !RendererClusterGrid_RunSelfTest() ) {
+		common->Warning( "Renderer clustered light-grid self-test failed" );
+	}
+}
+
+static void R_RendererShadowPlannerSelfTest_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !RendererShadowPlanner_RunSelfTest() ) {
+		common->Warning( "Renderer shadow-planner self-test failed" );
+	}
+}
+
+static void R_RendererDeferredResolveSelfTest_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !RendererDeferredResolve_RunSelfTest() ) {
+		common->Warning( "Renderer deferred light resolve self-test failed" );
+	}
+}
+
+static void R_RendererForwardPlusSelfTest_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !RendererForwardPlus_RunSelfTest() ) {
+		common->Warning( "Renderer clustered forward+ self-test failed" );
+	}
+}
+
+static void R_RendererModernVisibleSelfTest_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !RendererModernVisible_RunSelfTest() ) {
+		common->Warning( "Renderer modern visible-frame self-test failed" );
+	}
+}
+
+static void R_RendererModernCompatibilitySelfTest_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !RendererModernCompatibility_RunSelfTest() ) {
+		common->Warning( "Renderer modern compatibility self-test failed" );
+	}
+}
+
+static void R_RendererPassOwnershipSelfTest_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !RendererPassOwnership_RunSelfTest() ) {
+		common->Warning( "Renderer pass ownership self-test failed" );
+	}
+}
+
+static void R_RendererModernVisibilitySelfTest_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !RendererModernVisibility_RunSelfTest() ) {
+		common->Warning( "Renderer modern visibility self-test failed" );
+	}
+}
+
+static void R_RendererLowOverheadSelfTest_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !RendererLowOverhead_RunSelfTest() ) {
+		common->Warning( "Renderer GL45 low-overhead self-test failed" );
+	}
+}
+
+static void R_RendererModernGLShaderLibrarySelfTest_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !RendererModernGLShaderLibrary_RunSelfTest() ) {
+		common->Warning( "Renderer modern GL shader-library self-test failed" );
+	}
+}
+
+static void R_RendererShaderLibraryReload_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !R_ModernGLShaderLibrary_Reload() ) {
+		common->Warning( "Renderer shader-library reload did not complete" );
+	}
+}
+
+static void R_RendererModernGLDrawPlanSelfTest_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !RendererModernGLDrawPlan_RunSelfTest() ) {
+		common->Warning( "Renderer modern GL draw-plan self-test failed" );
+	}
+}
+
+static void R_RendererModernGLSubmitPlanSelfTest_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( !RendererModernGLSubmitPlan_RunSelfTest() ) {
+		common->Warning( "Renderer modern GL submit-plan self-test failed" );
+	}
 }
 
 /*
@@ -486,8 +782,14 @@ static void R_CheckPortableExtensions( void ) {
 
 	common->Printf("Init Glew...\n");
 
+	glewExperimental = GL_TRUE;
 	if (glewInit() != GLEW_OK)
 		common->FatalError("Failed to init glew!\n");
+	while ( glGetError() != GL_NO_ERROR ) {
+	}
+
+	GLCapabilityProbe_Build( glConfig.backendCaps, glConfig.version_string, glConfig.extensions_string );
+	glConfig.extensions_string = GLCapabilityProbe_ExtensionString();
 
 	// GL_ARB_multitexture
 	glConfig.multitextureAvailable = R_CheckRequiredExtension( "GL_ARB_multitexture" );
@@ -666,6 +968,39 @@ static void R_CheckPortableExtensions( void ) {
  	// GL_EXT_depth_bounds_test
  	glConfig.depthBoundsTestAvailable = R_CheckExtension( "EXT_depth_bounds_test" );
 
+	glConfig.backendCaps.maxTextureSize = glConfig.maxTextureSize;
+	glConfig.backendCaps.maxTextureUnits = glConfig.maxTextureUnits;
+	glConfig.backendCaps.maxTextureCoords = glConfig.maxTextureCoords;
+	glConfig.backendCaps.maxTextureImageUnits = glConfig.maxTextureImageUnits;
+	glConfig.backendCaps.maxDrawBuffers = glConfig.maxDrawBuffers;
+	glConfig.backendCaps.maxColorAttachments = glConfig.maxColorAttachments;
+	glConfig.backendCaps.hasARBVertexProgram = glConfig.ARBVertexProgramAvailable;
+	glConfig.backendCaps.hasARBFragmentProgram = glConfig.ARBFragmentProgramAvailable;
+	glConfig.backendCaps.hasVBO = glConfig.ARBVertexBufferObjectAvailable;
+	glConfig.backendCaps.hasPBO = glConfig.pixelBufferObjectAvailable;
+	glConfig.backendCaps.hasGLSL = glConfig.GLSLProgramAvailable;
+	glConfig.backendCaps.hasSRGBTextures = glConfig.textureSRGBAvailable;
+	glConfig.backendCaps.hasFramebufferSRGB = glConfig.framebufferSRGBAvailable;
+	glConfig.backendCaps.hasMRT = glConfig.maxDrawBuffers >= 4 && glConfig.maxColorAttachments >= 4;
+
+	const rendererDriverInfo_t driverInfo = {
+		glConfig.vendor_string,
+		glConfig.renderer_string,
+		glConfig.version_string
+	};
+	RendererDriverQuirks_Apply( glConfig.backendCaps, driverInfo );
+	RendererBootstrap_BeginOpenGL( glConfig.backendCaps, r_glTier.GetString() );
+	glConfig.rendererTier = RendererBootstrap_GetState().selectedTier;
+	glConfig.renderFeatures = RendererBootstrap_GetState().features;
+
+	const rendererTierPreference_t requestedTier = RendererTierPreference_FromString( r_glTier.GetString() );
+	const rendererTier_t forcedTier = RendererTierPreference_ToForcedTier( requestedTier );
+	if ( forcedTier != RENDERER_TIER_NULL && forcedTier != glConfig.rendererTier ) {
+		common->Warning(
+			"r_glTier \"%s\" is not fully supported by this context; selected %s instead",
+			r_glTier.GetString(),
+			RendererTier_Name( glConfig.rendererTier ) );
+	}
 
 }
 
@@ -914,6 +1249,18 @@ void R_InitOpenGL( void ) {
 	glConfig.renderer_string = (const char *)glGetString(GL_RENDERER);
 	glConfig.version_string = (const char *)glGetString(GL_VERSION);
 	glConfig.extensions_string = (const char *)glGetString(GL_EXTENSIONS);
+	if ( glConfig.vendor_string == NULL ) {
+		glConfig.vendor_string = "unknown";
+	}
+	if ( glConfig.renderer_string == NULL ) {
+		glConfig.renderer_string = "unknown";
+	}
+	if ( glConfig.version_string == NULL ) {
+		glConfig.version_string = "0.0";
+	}
+	if ( glConfig.extensions_string == NULL ) {
+		glConfig.extensions_string = "";
+	}
 
 	// Query the actual framebuffer bit depths from the active context.
 	// Some platform backends don't populate these fields directly.
@@ -973,12 +1320,21 @@ void R_InitOpenGL( void ) {
 	// parse our vertex and fragment programs, possibly disably support for
 	// one of the paths if there was an error
 	R_ARB2_Init();
+	R_ModernGLExecutor_Init( glConfig.backendCaps, glConfig.renderFeatures );
+	RendererBootstrap_SetModernExecutorAvailable( R_ModernGLExecutor_Stats().available );
+	RendererBootstrap_FinalizeLegacyBridge( glConfig.allowARB2Path );
+	glConfig.rendererTier = RendererBootstrap_GetState().selectedTier;
+	glConfig.renderFeatures = RendererBootstrap_GetState().features;
 	if ( !glConfig.allowARB2Path ) {
 		R_ErrorForMissingRequiredOpenGLFeatures();
 	}
+	R_RenderGraphResources_Init( glConfig.backendCaps, glConfig.renderFeatures );
+	R_MaterialResourceTable_Init( glConfig.backendCaps, glConfig.renderFeatures );
 
 	cmdSystem->AddCommand( "reloadARBprograms", R_ReloadARBPrograms_f, CMD_FL_RENDERER, "reloads ARB programs" );
 	R_ReloadARBPrograms_f( idCmdArgs() );
+
+	R_RendererUpload_Init( glConfig.backendCaps );
 
 	// allocate the vertex array range or vertex objects
 	vertexCache.Init();
@@ -1278,30 +1634,79 @@ void R_ReportImageDuplication_f( const idCmdArgs &args ) {
 R_RenderingFPS
 ================
 */
-static float R_RenderingFPS( const renderView_t *renderView ) {
+typedef struct renderingFPSResult_s {
+	float	fps;
+	float	averageMsec;
+	int		frameCount;
+	int		p50Msec;
+	int		p95Msec;
+	int		p99Msec;
+	int		maxMsec;
+} renderingFPSResult_t;
+
+static void R_SortBenchmarkFrameTimes( int *values, int count ) {
+	for ( int i = 1; i < count; ++i ) {
+		const int key = values[i];
+		int j = i - 1;
+		while ( j >= 0 && values[j] > key ) {
+			values[j + 1] = values[j];
+			j--;
+		}
+		values[j + 1] = key;
+	}
+}
+
+static int R_BenchmarkPercentileIndex( int count, int percentile ) {
+	if ( count <= 0 ) {
+		return 0;
+	}
+	const int rank = ( count * percentile + 99 ) / 100;
+	return idMath::ClampInt( 0, count - 1, rank - 1 );
+}
+
+static renderingFPSResult_t R_RenderingFPS( const renderView_t *renderView ) {
+	renderingFPSResult_t result;
+	memset( &result, 0, sizeof( result ) );
 	glFinish();
 
 	int		start = Sys_Milliseconds();
 	static const int SAMPLE_MSEC = 1000;
+	static const int MAX_FRAME_SAMPLES = 512;
+	int		frameTimes[MAX_FRAME_SAMPLES];
+	int		frameSampleCount = 0;
 	int		end;
 	int		count = 0;
 
 	while( 1 ) {
 		// render
+		const int frameStart = Sys_Milliseconds();
 		renderSystem->BeginFrame( glConfig.vidWidth, glConfig.vidHeight );
 		tr.primaryWorld->RenderScene( renderView );
 		renderSystem->EndFrame( NULL, NULL );
 		glFinish();
+		const int frameEnd = Sys_Milliseconds();
+		if ( frameSampleCount < MAX_FRAME_SAMPLES ) {
+			frameTimes[frameSampleCount++] = Max( 0, frameEnd - frameStart );
+		}
 		count++;
-		end = Sys_Milliseconds();
+		end = frameEnd;
 		if ( end - start > SAMPLE_MSEC ) {
 			break;
 		}
 	}
 
-	float fps = count * 1000.0 / ( end - start );
+	result.frameCount = count;
+	result.fps = count * 1000.0f / Max( 1, end - start );
+	result.averageMsec = 1000.0f / Max( 0.001f, result.fps );
+	if ( frameSampleCount > 0 ) {
+		R_SortBenchmarkFrameTimes( frameTimes, frameSampleCount );
+		result.p50Msec = frameTimes[R_BenchmarkPercentileIndex( frameSampleCount, 50 )];
+		result.p95Msec = frameTimes[R_BenchmarkPercentileIndex( frameSampleCount, 95 )];
+		result.p99Msec = frameTimes[R_BenchmarkPercentileIndex( frameSampleCount, 99 )];
+		result.maxMsec = frameTimes[frameSampleCount - 1];
+	}
 
-	return fps;
+	return result;
 }
 
 /*
@@ -1310,7 +1715,7 @@ R_Benchmark_f
 ================
 */
 void R_Benchmark_f( const idCmdArgs &args ) {
-	float	fps, msec;
+	renderingFPSResult_t result;
 	renderView_t	view;
 
 	if ( !tr.primaryView ) {
@@ -1321,25 +1726,47 @@ void R_Benchmark_f( const idCmdArgs &args ) {
 
 	for ( int size = 100 ; size >= 10 ; size -= 10 ) {
 		r_screenFraction.SetInteger( size );
-		fps = R_RenderingFPS( &view );
+		result = R_RenderingFPS( &view );
 		int	kpix = glConfig.vidWidth * glConfig.vidHeight * ( size * 0.01 ) * ( size * 0.01 ) * 0.001;
-		msec = 1000.0 / fps;
-		common->Printf( "kpix: %4i  msec:%5.1f fps:%5.1f\n", kpix, msec, fps );
+		common->Printf(
+			"kpix: %4i  avg:%5.1fms p50:%3ims p95:%3ims p99:%3ims max:%3ims fps:%5.1f frames:%i\n",
+			kpix,
+			result.averageMsec,
+			result.p50Msec,
+			result.p95Msec,
+			result.p99Msec,
+			result.maxMsec,
+			result.fps,
+			result.frameCount );
 	}
 
 	// enable r_singleTriangle 1 while r_screenFraction is still at 10
 	r_singleTriangle.SetBool( 1 );
-	fps = R_RenderingFPS( &view );
-	msec = 1000.0 / fps;
-	common->Printf( "single tri  msec:%5.1f fps:%5.1f\n", msec, fps );
+	result = R_RenderingFPS( &view );
+	common->Printf(
+		"single tri  avg:%5.1fms p50:%3ims p95:%3ims p99:%3ims max:%3ims fps:%5.1f frames:%i\n",
+		result.averageMsec,
+		result.p50Msec,
+		result.p95Msec,
+		result.p99Msec,
+		result.maxMsec,
+		result.fps,
+		result.frameCount );
 	r_singleTriangle.SetBool( 0 );
 	r_screenFraction.SetInteger( 100 );
 
 	// enable r_skipRenderContext 1
 	r_skipRenderContext.SetBool( true );
-	fps = R_RenderingFPS( &view );
-	msec = 1000.0 / fps;
-	common->Printf( "no context  msec:%5.1f fps:%5.1f\n", msec, fps );
+	result = R_RenderingFPS( &view );
+	common->Printf(
+		"no context  avg:%5.1fms p50:%3ims p95:%3ims p99:%3ims max:%3ims fps:%5.1f frames:%i\n",
+		result.averageMsec,
+		result.p50Msec,
+		result.p95Msec,
+		result.p99Msec,
+		result.maxMsec,
+		result.fps,
+		result.frameCount );
 	r_skipRenderContext.SetBool( false );
 }
 
@@ -2331,6 +2758,87 @@ void GfxInfo_f( const idCmdArgs &args ) {
 
 	common->Printf( "Requested renderer path: %s\n", r_renderer.GetString() );
 	common->Printf( "Active renderer path: %s\n", r_actualRenderer.GetString() );
+	common->Printf( "Requested GL tier: %s\n", r_glTier.GetString() );
+	common->Printf( "Selected renderer tier: %s\n", RendererTier_Name( glConfig.rendererTier ) );
+	common->Printf( "GL context profile: %s", RendererContextProfile_Name( glConfig.backendCaps.profile ) );
+	if ( glConfig.contextRequest.label[0] != '\0' ) {
+		common->Printf( " (%s)", glConfig.contextRequest.label );
+	}
+	common->Printf( "\n" );
+	common->Printf(
+		"GL context request: %s %d.%d explicit=%d requestedDebug=%d actualDebug=%d forwardCompatible=%d\n",
+		RendererContextProfile_Name( glConfig.contextRequest.profile ),
+		glConfig.contextRequest.major,
+		glConfig.contextRequest.minor,
+		glConfig.contextRequest.explicitVersion ? 1 : 0,
+		glConfig.contextRequest.debugContext ? 1 : 0,
+		glConfig.backendCaps.debugContext ? 1 : 0,
+		glConfig.backendCaps.forwardCompatibleContext ? 1 : 0 );
+	common->Printf(
+		"Renderer features: modern=%d gl41=%d gpuDriven=%d lowOverhead=%d persistentUploads=%d DSA=%d multiBind=%d bindless=%d bindlessExperiment=%d renderGraph=%d scenePackets=%d legacyBridge=%d\n",
+		glConfig.renderFeatures.modernBaseline ? 1 : 0,
+		glConfig.renderFeatures.modernGL41 ? 1 : 0,
+		glConfig.renderFeatures.gpuDriven ? 1 : 0,
+		glConfig.renderFeatures.lowOverhead ? 1 : 0,
+		glConfig.renderFeatures.persistentMappedUploads ? 1 : 0,
+		glConfig.renderFeatures.directStateAccess ? 1 : 0,
+		glConfig.renderFeatures.multiBind ? 1 : 0,
+		glConfig.renderFeatures.bindlessTextures ? 1 : 0,
+		r_rendererBindless.GetBool() ? 1 : 0,
+		glConfig.renderFeatures.renderGraph ? 1 : 0,
+		glConfig.renderFeatures.scenePackets ? 1 : 0,
+		glConfig.renderFeatures.legacyARB2Bridge ? 1 : 0 );
+	{
+		char capsSummary[512];
+		RendererCaps_FormatSummary( glConfig.backendCaps, capsSummary, sizeof( capsSummary ) );
+		common->Printf( "Renderer caps: %s\n", capsSummary );
+	}
+	RendererCompatibilityGates_PrintGfxInfo();
+	RendererTierContract_PrintGfxInfo();
+	RendererBootstrap_PrintGfxInfo();
+	RendererBenchmarks_PrintGfxInfo();
+	common->Printf(
+		"Renderer GPU timers: %s, cvar=%d, timerQuery=%d\n",
+		R_RendererMetrics_GpuTimersAvailable() ? "available" : "unavailable",
+		r_rendererGpuTimers.GetBool() ? 1 : 0,
+		glConfig.backendCaps.hasTimerQuery ? 1 : 0 );
+	common->Printf(
+		"Renderer scene packets: legacy bridge V2, maxScenes=%d, maxPasses=%d, maxDrawPackets=%d, maxMaterialRecords=%d, maxGeometryRecords=%d, maxInstanceRecords=%d\n",
+		SCENE_PACKET_MAX_SCENES,
+		SCENE_PACKET_MAX_PASSES,
+		SCENE_PACKET_MAX_DRAWS,
+		SCENE_PACKET_MAX_MATERIAL_RECORDS,
+		SCENE_PACKET_MAX_GEOMETRY_RECORDS,
+		SCENE_PACKET_MAX_INSTANCE_RECORDS );
+	R_GeometryResources_PrintGfxInfo();
+	common->Printf(
+		"Renderer graph: resource-backed packet graph, maxPasses=%d, maxResources=%d, maxResourceAccesses=%d\n",
+		RENDER_GRAPH_MAX_PASSES,
+		RENDER_GRAPH_MAX_RESOURCES,
+		RENDER_GRAPH_MAX_RESOURCE_ACCESSES );
+	R_RenderGraphResources_PrintGfxInfo();
+	R_MaterialResourceTable_PrintGfxInfo();
+	R_ModernGLExecutor_PrintGfxInfo();
+	R_ModernClusteredLighting_PrintGfxInfo();
+	R_ModernShadowPlanner_PrintGfxInfo();
+	{
+		const rendererUploadStats_t &uploadStats = R_RendererUpload_Stats();
+		common->Printf(
+			"Renderer upload manager: frameStream=%s, staticAllocator=%d, buffers=%d index=%d, ring=%dKB, persistent=%d, mapRangeFallback=%d, staticLive=%d/%dKB, fences=%d/%d waits=%d, legacyBridge=%d\n",
+			uploadStats.dynamicFrameBridge ? "enabled" : "disabled",
+			uploadStats.staticBufferAllocator ? 1 : 0,
+			uploadStats.ringBufferCount,
+			uploadStats.frameBufferIndex,
+			uploadStats.ringSizeBytes / 1024,
+			uploadStats.persistentMapped ? 1 : 0,
+			uploadStats.mapRangeFallback ? 1 : 0,
+			uploadStats.staticBuffersLive,
+			uploadStats.staticBytesLive / 1024,
+			uploadStats.frameFencesSubmitted,
+			uploadStats.frameFencesRetired,
+			uploadStats.frameFenceWaits,
+			uploadStats.legacyBridge ? 1 : 0 );
+	}
 
 	if ( glConfig.allowARB2Path ) {
 		common->Printf( "ARB2 path ENABLED%s\n", active[tr.backEndRenderer == BE_ARB2] );
@@ -2400,6 +2908,9 @@ static void R_PerformFullVidRestart( bool forceWindow ) {
 
 	// Force image/object handles to rebuild against the new context.
 	globalImages->PurgeAllImages();
+	R_MaterialResourceTable_Shutdown();
+	R_RenderGraphResources_Shutdown();
+	R_ModernGLExecutor_Shutdown();
 	GLimp_Shutdown();
 	glConfig.isInitialized = false;
 
@@ -2614,6 +3125,42 @@ void R_InitCommands( void ) {
 	cmdSystem->AddCommand( "makeAmbientMap", R_MakeAmbientMap_f, CMD_FL_RENDERER|CMD_FL_CHEAT, "makes an ambient map" );
 	cmdSystem->AddCommand( "benchmark", R_Benchmark_f, CMD_FL_RENDERER, "benchmark" );
 	cmdSystem->AddCommand( "gfxInfo", GfxInfo_f, CMD_FL_RENDERER, "show graphics info" );
+	cmdSystem->AddCommand( "rendererTierSelfTest", R_RendererTierSelfTest_f, CMD_FL_RENDERER, "run renderer tier-selection self tests" );
+	cmdSystem->AddCommand( "rendererTierContractSelfTest", R_RendererTierContractSelfTest_f, CMD_FL_RENDERER, "run renderer tier workload-contract self tests" );
+	cmdSystem->AddCommand( "rendererContextLadderSelfTest", R_RendererContextLadderSelfTest_f, CMD_FL_RENDERER, "run renderer context ladder self tests" );
+	cmdSystem->AddCommand( "rendererCompatibilityGatesSelfTest", R_RendererCompatibilityGatesSelfTest_f, CMD_FL_RENDERER, "run renderer driver-quirk and fallback-gate self tests" );
+	cmdSystem->AddCommand( "rendererBenchmarkSelfTest", R_RendererBenchmarkSelfTest_f, CMD_FL_RENDERER, "run renderer benchmark capture and percentile self tests" );
+	cmdSystem->AddCommand( "rendererDefaultPromotionSelfTest", R_RendererDefaultPromotionSelfTest_f, CMD_FL_RENDERER, "run renderer default-promotion gate self tests" );
+	cmdSystem->AddCommand( "rendererDefaultSafetySelfTest", R_RendererDefaultSafetySelfTest_f, CMD_FL_RENDERER, "run renderer conservative-default safety self tests" );
+	cmdSystem->AddCommand( "rendererBenchmarkCapture", R_RendererBenchmarkCapture_f, CMD_FL_RENDERER, "print the latest renderer benchmark capture summary" );
+	cmdSystem->AddCommand( "rendererUploadSelfTest", R_RendererUploadSelfTest_f, CMD_FL_RENDERER, "run renderer upload stream self tests" );
+	cmdSystem->AddCommand( "rendererGpuTimerSelfTest", R_RendererGpuTimerSelfTest_f, CMD_FL_RENDERER, "run renderer GPU timer query self tests" );
+	cmdSystem->AddCommand( "rendererScenePacketSelfTest", R_RendererScenePacketSelfTest_f, CMD_FL_RENDERER, "run renderer front-end scene-packet self tests" );
+	cmdSystem->AddCommand( "rendererRenderGraphSelfTest", R_RendererRenderGraphSelfTest_f, CMD_FL_RENDERER, "run renderer resource-graph self tests" );
+	cmdSystem->AddCommand( "rendererRenderGraphResourceSelfTest", R_RendererRenderGraphResourceSelfTest_f, CMD_FL_RENDERER, "run renderer graph resource owner self tests" );
+	cmdSystem->AddCommand( "rendererRenderGraphResourceDump", R_RendererRenderGraphResourceDump_f, CMD_FL_RENDERER, "dump the latest renderer graph resource handles" );
+	cmdSystem->AddCommand( "rendererMaterialResourceTableSelfTest", R_RendererMaterialResourceTableSelfTest_f, CMD_FL_RENDERER, "run renderer material resource-table self tests" );
+	cmdSystem->AddCommand( "rendererMaterialResourceTableDump", R_RendererMaterialResourceTableDump_f, CMD_FL_RENDERER, "dump the latest renderer material resource table" );
+	cmdSystem->AddCommand( "rendererGeometryResourceSelfTest", R_RendererGeometryResourceSelfTest_f, CMD_FL_RENDERER, "run renderer geometry and instance packet self tests" );
+	cmdSystem->AddCommand( "rendererGLStateCacheSelfTest", R_RendererGLStateCacheSelfTest_f, CMD_FL_RENDERER, "run renderer GL state-cache self tests" );
+	cmdSystem->AddCommand( "rendererModernGLExecutorSelfTest", R_RendererModernGLExecutorSelfTest_f, CMD_FL_RENDERER, "run renderer modern GL executor self tests" );
+	cmdSystem->AddCommand( "rendererGpuDrivenSelfTest", R_RendererGpuDrivenSelfTest_f, CMD_FL_RENDERER, "run renderer GL43 GPU-driven compute and indirect self tests" );
+	cmdSystem->AddCommand( "rendererVisiblePathSelfTest", R_RendererVisiblePathSelfTest_f, CMD_FL_RENDERER, "run renderer visible modern depth-path self tests" );
+	cmdSystem->AddCommand( "rendererGBufferSelfTest", R_RendererGBufferSelfTest_f, CMD_FL_RENDERER, "run renderer modern opaque G-buffer self tests" );
+	cmdSystem->AddCommand( "rendererClusterGridSelfTest", R_RendererClusterGridSelfTest_f, CMD_FL_RENDERER, "run renderer clustered light-grid self tests" );
+	cmdSystem->AddCommand( "rendererShadowPlannerSelfTest", R_RendererShadowPlannerSelfTest_f, CMD_FL_RENDERER, "run renderer modern shadow-planner self tests" );
+	cmdSystem->AddCommand( "rendererDeferredResolveSelfTest", R_RendererDeferredResolveSelfTest_f, CMD_FL_RENDERER, "run renderer deferred light resolve self tests" );
+	cmdSystem->AddCommand( "rendererForwardPlusSelfTest", R_RendererForwardPlusSelfTest_f, CMD_FL_RENDERER, "run renderer clustered forward+ self tests" );
+	cmdSystem->AddCommand( "rendererModernVisibleSelfTest", R_RendererModernVisibleSelfTest_f, CMD_FL_RENDERER, "run renderer modern visible-frame composition self tests" );
+	cmdSystem->AddCommand( "rendererModernCompatibilitySelfTest", R_RendererModernCompatibilitySelfTest_f, CMD_FL_RENDERER, "run renderer modern compatibility owner self tests" );
+	cmdSystem->AddCommand( "rendererPassOwnershipSelfTest", R_RendererPassOwnershipSelfTest_f, CMD_FL_RENDERER, "run renderer modern/legacy pass ownership self tests" );
+	cmdSystem->AddCommand( "rendererModernVisibilitySelfTest", R_RendererModernVisibilitySelfTest_f, CMD_FL_RENDERER, "run renderer modern visibility and occlusion self tests" );
+	cmdSystem->AddCommand( "rendererLowOverheadSelfTest", R_RendererLowOverheadSelfTest_f, CMD_FL_RENDERER, "run renderer GL45 low-overhead self tests" );
+	cmdSystem->AddCommand( "rendererShaderLibrarySelfTest", R_RendererModernGLShaderLibrarySelfTest_f, CMD_FL_RENDERER, "run renderer modern GL shader-library self tests" );
+	cmdSystem->AddCommand( "rendererModernGLShaderLibrarySelfTest", R_RendererModernGLShaderLibrarySelfTest_f, CMD_FL_RENDERER, "run renderer modern GL shader-library self tests" );
+	cmdSystem->AddCommand( "rendererShaderLibraryReload", R_RendererShaderLibraryReload_f, CMD_FL_RENDERER, "reload the internal modern GL shader library when r_rendererShaderReload is enabled" );
+	cmdSystem->AddCommand( "rendererModernGLDrawPlanSelfTest", R_RendererModernGLDrawPlanSelfTest_f, CMD_FL_RENDERER, "run renderer modern GL draw-plan self tests" );
+	cmdSystem->AddCommand( "rendererModernGLSubmitPlanSelfTest", R_RendererModernGLSubmitPlanSelfTest_f, CMD_FL_RENDERER, "run renderer modern GL submit-plan self tests" );
 	cmdSystem->AddCommand( "modulateLights", R_ModulateLights_f, CMD_FL_RENDERER | CMD_FL_CHEAT, "modifies shader parms on all lights" );
 	cmdSystem->AddCommand( "testImage", R_TestImage_f, CMD_FL_RENDERER | CMD_FL_CHEAT, "displays the given image centered on screen", idCmdSystem::ArgCompletion_ImageName );
 	cmdSystem->AddCommand( "testVideo", R_TestVideo_f, CMD_FL_RENDERER | CMD_FL_CHEAT, "displays the given cinematic", idCmdSystem::ArgCompletion_VideoName );
@@ -2864,6 +3411,12 @@ void idRenderSystemLocal::ShutdownOpenGL( void ) {
 
 	// free the context and close the window
 	R_ShutdownFrameData();
+	R_RendererMetrics_ShutdownGpuTimers();
+	R_MaterialResourceTable_Shutdown();
+	R_RenderGraphResources_Shutdown();
+	R_ModernGLExecutor_Shutdown();
+	R_RendererUpload_Shutdown();
+	RendererBootstrap_Shutdown();
 	GLimp_Shutdown();
 	glConfig.isInitialized = false;
 	backEnd.renderTexture = NULL;

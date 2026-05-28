@@ -103,6 +103,7 @@ void idFieldWindow::Draw(int time, float x, float y) {
 	if (cursorPos > len) {
 		cursorPos = len;
 	}
-	dc->DrawText( &text[paintOffset], scale, 0, foreColor, rect, false, (( flags & WIN_FOCUS ) || showCursor ) ? cursorPos - paintOffset : -1, false, NULL, 0, textAdjust, style );
+	// Retail Q4 uses authored textSpacing to choose the visible prefix, then draws the field text without extra spacing.
+	dc->DrawText( &text[paintOffset], scale, 0, foreColor, rect, false, (( flags & WIN_FOCUS ) || showCursor ) ? cursorPos - paintOffset : -1, false, NULL, 0, 0, style );
 }
 

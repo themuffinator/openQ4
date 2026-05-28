@@ -117,15 +117,36 @@ static const char *Session_GetFramePacingBoundName( openq4FramePacingBound_t bou
 	}
 }
 
+static int Session_GetFramePacingPercentileMsec( const openq4FramePacingStats_t &stats, int percentile ) {
+	if ( stats.frameSampleCount <= 0 ) {
+		return 0;
+	}
+
+	const int target = Max( 1, ( stats.frameSampleCount * percentile + 99 ) / 100 );
+	int accumulated = 0;
+	for ( int i = 0; i < OPENQ4_FRAME_PACING_HISTOGRAM_BINS; ++i ) {
+		accumulated += stats.frameMsecHistogram[i];
+		if ( accumulated >= target ) {
+			return i == OPENQ4_FRAME_PACING_HISTOGRAM_OVERFLOW ? stats.maxFrameMsec : i;
+		}
+	}
+
+	return stats.maxFrameMsec;
+}
+
 static void Session_PrintFramePacingSummary( const openq4FramePacingStats_t &stats, const char *reason ) {
 	common->Printf(
-		"Frame pacing%s (%s): bound=%s, samples=%d, present=%.2f ms (%.1f Hz), async=%.2f ms (%.1f Hz), ticDelta/frame=%.2f, gameTics/frame=%.2f, wait overshoot=%.2f ms, wake jitter=%.2f ms\n",
+		"Frame pacing%s (%s): bound=%s, samples=%d, present=%.2f ms (%.1f Hz), p50=%d ms, p95=%d ms, p99=%d ms, max=%d ms, async=%.2f ms (%.1f Hz), ticDelta/frame=%.2f, gameTics/frame=%.2f, wait overshoot=%.2f ms, wake jitter=%.2f ms\n",
 		reason != NULL ? reason : "",
 		stats.multiplayer ? "MP" : "SP",
 		Session_GetFramePacingBoundName( stats.boundMode ),
 		stats.frameSampleCount,
 		stats.avgFrameMsec,
 		stats.avgFrameHz,
+		Session_GetFramePacingPercentileMsec( stats, 50 ),
+		Session_GetFramePacingPercentileMsec( stats, 95 ),
+		Session_GetFramePacingPercentileMsec( stats, 99 ),
+		stats.maxFrameMsec,
 		stats.asyncStats.avgDeltaMsec,
 		stats.asyncStats.avgHz,
 		stats.avgTicsPerFrame,
@@ -143,6 +164,11 @@ static void Session_FramePacingSnapshot_f( const idCmdArgs &args ) {
 	}
 
 	sessLocal.PrintFramePacingSnapshot( reason );
+}
+
+static void Session_FramePacingReset_f( const idCmdArgs &args ) {
+	sessLocal.ResetFramePacingStats();
+	common->Printf( "Frame pacing stats reset\n" );
 }
 
 static void Session_TestWaitBox_f( const idCmdArgs &args ) {
@@ -280,6 +306,11 @@ void idSessionLocal::UpdateFramePacingStats( int frameStartMsec, int requestedWa
 		++framePacingStats.frameSampleCount;
 		framePacingStats.avgFrameMsec = Session_UpdateMetricAverage( framePacingStats.avgFrameMsec, static_cast<float>( frameDeltaMsec ), framePacingStats.frameSampleCount );
 		framePacingStats.avgFrameHz = framePacingStats.avgFrameMsec > 0.0f ? 1000.0f / framePacingStats.avgFrameMsec : 0.0f;
+		if ( framePacingStats.frameSampleCount == 1 || frameDeltaMsec < framePacingStats.minFrameMsec ) {
+			framePacingStats.minFrameMsec = frameDeltaMsec;
+		}
+		framePacingStats.maxFrameMsec = Max( framePacingStats.maxFrameMsec, frameDeltaMsec );
+		++framePacingStats.frameMsecHistogram[Min( frameDeltaMsec, static_cast<int>( OPENQ4_FRAME_PACING_HISTOGRAM_OVERFLOW ) )];
 	}
 	framePacingLastFrameMsec = frameStartMsec;
 
@@ -5303,6 +5334,7 @@ void idSessionLocal::Init() {
 	cmdSystem->AddCommand( "devmap", Session_DevMap_f, CMD_FL_SYSTEM, "loads a map in developer mode", idCmdSystem::ArgCompletion_MapName );
 	cmdSystem->AddCommand( "testmap", Session_TestMap_f, CMD_FL_SYSTEM, "tests a map", idCmdSystem::ArgCompletion_MapName );
 	cmdSystem->AddCommand( "framePacingSnapshot", Session_FramePacingSnapshot_f, CMD_FL_SYSTEM, "prints the current frame-pacing diagnostics summary" );
+	cmdSystem->AddCommand( "framePacingReset", Session_FramePacingReset_f, CMD_FL_SYSTEM, "resets frame-pacing diagnostics before a measured window" );
 	cmdSystem->AddCommand( "testWaitBox", Session_TestWaitBox_f, CMD_FL_SYSTEM | CMD_FL_CHEAT, "opens a timed wait box and prints frame-pacing stats: testWaitBox <msec> [network 0/1] [reason]" );
 	cmdSystem->AddCommand( "testMessageBox", Session_TestMessageBox_f, CMD_FL_SYSTEM | CMD_FL_CHEAT, "opens a timed message box and prints frame-pacing stats: testMessageBox <msec> [network 0/1] [reason]" );
 

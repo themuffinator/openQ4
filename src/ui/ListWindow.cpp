@@ -46,6 +46,8 @@ static const int tabBorder = 4;
 // Time in milliseconds between clicks to register as a double-click
 static const int doubleClickSpeed = 300;
 
+static const int Q4_LIST_WINDOW_TEXT_SPACING = 0;
+
 static const idMaterial *OpenQ4_ListMaterial( const char *name ) {
 	if ( name == NULL || name[ 0 ] == '\0' ) {
 		return NULL;
@@ -683,7 +685,7 @@ void idListWindow::Draw(int time, float x, float y) {
 					} else if ( tabInfo[tab].valign == 2 ) {
 						textRect.y += lineHeight - textHeight;
 					}
-					dc->DrawText( work, tabScale, tabInfo[tab].align, color, textRect, false, -1, false, NULL, 0, static_cast<int>( textspacing ), static_cast<int>( textstyle ) );
+					dc->DrawText( work, tabScale, tabInfo[tab].align, color, textRect, false, -1, false, NULL, 0, Q4_LIST_WINDOW_TEXT_SPACING, static_cast<int>( textstyle ) );
 				} else if (tabInfo[tab].type == TAB_TYPE_ICON) {
 					
 					const idMaterial	**hashMat;
@@ -740,7 +742,7 @@ void idListWindow::Draw(int time, float x, float y) {
 			idRectangle textRect = rect;
 			const float textHeight = dc->MaxCharHeight( scale );
 			textRect.y += ( lineHeight - textHeight ) * 0.5f + 1.0f;
-			dc->DrawText( listItems[i], scale, 0, color, textRect, false, -1, false, NULL, 0, static_cast<int>( textspacing ), static_cast<int>( textstyle ) );
+			dc->DrawText( listItems[i], scale, 0, color, textRect, false, -1, false, NULL, 0, Q4_LIST_WINDOW_TEXT_SPACING, static_cast<int>( textstyle ) );
 		}
 		rect.y += lineHeight;
 		if ( rect.y > bottom ) {

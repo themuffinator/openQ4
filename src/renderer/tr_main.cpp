@@ -30,6 +30,8 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #include "tr_local.h"
+#include "RendererMetrics.h"
+#include "ScenePackets.h"
 #ifdef __ppc__
 #include <vecLib/vecLib.h>
 #endif
@@ -1135,6 +1137,22 @@ static void R_SortDrawSurfs( void ) {
 		R_QsortSurfaces );
 }
 
+static int R_CountViewEntityList( const viewEntity_t *viewEntity ) {
+	int count = 0;
+	for ( const viewEntity_t *current = viewEntity; current != NULL; current = current->next ) {
+		count++;
+	}
+	return count;
+}
+
+static int R_CountViewLightList( const viewLight_t *viewLight ) {
+	int count = 0;
+	for ( const viewLight_t *current = viewLight; current != NULL; current = current->next ) {
+		count++;
+	}
+	return count;
+}
+
 
 
 //========================================================================
@@ -1170,49 +1188,136 @@ void R_RenderView( viewDef_t *parms ) {
 
 	tr.sortOffset = 0;
 
+	const int viewBuildReportMode = r_showViewBuildTimes.GetInteger();
+	const int viewBuildInterval = Max( 1, r_showViewBuildTimesInterval.GetInteger() );
+	const bool reportViewBuildTimes =
+		viewBuildReportMode > 0 &&
+		( viewBuildReportMode >= 2 || parms->renderView.viewID >= 0 ) &&
+		( tr.frameCount % viewBuildInterval ) == 0;
+	int viewBuildTotalStart = 0;
+	int viewBuildLastMark = 0;
+	int viewBuildMatrixMsec = 0;
+	int viewBuildFrustumMsec = 0;
+	int viewBuildProjectionMsec = 0;
+	int viewBuildVisibilityMsec = 0;
+	int viewBuildConstrainMsec = 0;
+	int viewBuildLightMsec = 0;
+	int viewBuildModelMsec = 0;
+	int viewBuildEffectMsec = 0;
+	int viewBuildPruneMsec = 0;
+	int viewBuildSortMsec = 0;
+	int viewBuildSubviewMsec = 0;
+	int viewBuildPacketMsec = 0;
+	int viewBuildCommandMsec = 0;
+
+	if ( reportViewBuildTimes ) {
+		viewBuildTotalStart = Sys_Milliseconds();
+		viewBuildLastMark = viewBuildTotalStart;
+	}
+
 	// set the matrix for world space to eye space
 	R_SetViewMatrix( tr.viewDef );
+	if ( reportViewBuildTimes ) {
+		const int now = Sys_Milliseconds();
+		viewBuildMatrixMsec = now - viewBuildLastMark;
+		viewBuildLastMark = now;
+	}
 
 	// the four sides of the view frustum are needed
 	// for culling and portal visibility
 	R_SetupViewFrustum();
+	if ( reportViewBuildTimes ) {
+		const int now = Sys_Milliseconds();
+		viewBuildFrustumMsec = now - viewBuildLastMark;
+		viewBuildLastMark = now;
+	}
 
 	// we need to set the projection matrix before doing
 	// portal-to-screen scissor box calculations
 	R_SetupProjection();
+	if ( reportViewBuildTimes ) {
+		const int now = Sys_Milliseconds();
+		viewBuildProjectionMsec = now - viewBuildLastMark;
+		viewBuildLastMark = now;
+	}
 
 	// identify all the visible portalAreas, and the entityDefs and
 	// lightDefs that are in them and pass culling.
+	const int visibilityStart = Sys_Milliseconds();
 	static_cast<idRenderWorldLocal *>(parms->renderWorld)->FindViewLightsAndEntities();
+	viewBuildVisibilityMsec = Sys_Milliseconds() - visibilityStart;
+	R_RendererMetrics_AddVisibilityMsec( viewBuildVisibilityMsec );
+	if ( reportViewBuildTimes ) {
+		viewBuildLastMark = Sys_Milliseconds();
+	}
 
 	// constrain the view frustum to the view lights and entities
 	R_ConstrainViewFrustum();
+	if ( reportViewBuildTimes ) {
+		const int now = Sys_Milliseconds();
+		viewBuildConstrainMsec = now - viewBuildLastMark;
+		viewBuildLastMark = now;
+	}
 
 	// make sure that interactions exist for all light / entity combinations
 	// that are visible
 	// add any pre-generated light shadows, and calculate the light shader values
 	R_AddLightSurfaces();
+	if ( reportViewBuildTimes ) {
+		const int now = Sys_Milliseconds();
+		viewBuildLightMsec = now - viewBuildLastMark;
+		viewBuildLastMark = now;
+	}
 
 	// adds ambient surfaces and create any necessary interaction surfaces to add to the light
 	// lists
 	R_AddModelSurfaces();
+	if ( reportViewBuildTimes ) {
+		const int now = Sys_Milliseconds();
+		viewBuildModelMsec = now - viewBuildLastMark;
+		viewBuildLastMark = now;
+	}
 
 	// submit dynamic effect surfaces after the model pass has initialized drawSurf lists
 	R_AddEffectSurfaces();
+	if ( reportViewBuildTimes ) {
+		const int now = Sys_Milliseconds();
+		viewBuildEffectMsec = now - viewBuildLastMark;
+		viewBuildLastMark = now;
+	}
 
 	// any viewLight that didn't have visible surfaces can have it's shadows removed
 	R_RemoveUnecessaryViewLights();
+	if ( reportViewBuildTimes ) {
+		const int now = Sys_Milliseconds();
+		viewBuildPruneMsec = now - viewBuildLastMark;
+		viewBuildLastMark = now;
+	}
 
 	// sort all the ambient surfaces for translucency ordering
 	R_SortDrawSurfs();
+	if ( reportViewBuildTimes ) {
+		const int now = Sys_Milliseconds();
+		viewBuildSortMsec = now - viewBuildLastMark;
+		viewBuildLastMark = now;
+	}
 
 	// generate any subviews (mirrors, cameras, etc) before adding this view
 	if ( R_GenerateSubViews() ) {
+		if ( reportViewBuildTimes ) {
+			const int now = Sys_Milliseconds();
+			viewBuildSubviewMsec = now - viewBuildLastMark;
+			viewBuildLastMark = now;
+		}
 		// if we are debugging subviews, allow the skipping of the
 		// main view draw
 		if ( r_subviewOnly.GetBool() ) {
 			return;
 		}
+	} else if ( reportViewBuildTimes ) {
+		const int now = Sys_Milliseconds();
+		viewBuildSubviewMsec = now - viewBuildLastMark;
+		viewBuildLastMark = now;
 	}
 
 	// write everything needed to the demo file
@@ -1220,8 +1325,42 @@ void R_RenderView( viewDef_t *parms ) {
 		static_cast<idRenderWorldLocal *>(parms->renderWorld)->WriteVisibleDefs( tr.viewDef );
 	}
 
-	// add the rendering commands for this viewDef
+	if ( R_ScenePackets_FrontEndCaptureRequired() ) {
+		const int packetBuildStart = Sys_Milliseconds();
+		R_ScenePackets_AddRenderView( parms );
+		viewBuildPacketMsec = Sys_Milliseconds() - packetBuildStart;
+		R_RendererMetrics_AddPacketBuildMsec( viewBuildPacketMsec );
+		if ( reportViewBuildTimes ) {
+			viewBuildLastMark = Sys_Milliseconds();
+		}
+	}
 	R_AddDrawViewCmd( parms );
+	if ( reportViewBuildTimes ) {
+		const int now = Sys_Milliseconds();
+		viewBuildCommandMsec = now - viewBuildLastMark;
+		common->Printf(
+			"viewBuild frame=%d viewID=%d subview=%d surfs=%d entities=%d lights=%d matrix=%d frustum=%d projection=%d visibility=%d constrain=%d light=%d model=%d effects=%d prune=%d sort=%d subviews=%d packet=%d command=%d total=%d\n",
+			tr.frameCount,
+			parms->renderView.viewID,
+			parms->isSubview ? 1 : 0,
+			parms->numDrawSurfs,
+			R_CountViewEntityList( parms->viewEntitys ),
+			R_CountViewLightList( parms->viewLights ),
+			viewBuildMatrixMsec,
+			viewBuildFrustumMsec,
+			viewBuildProjectionMsec,
+			viewBuildVisibilityMsec,
+			viewBuildConstrainMsec,
+			viewBuildLightMsec,
+			viewBuildModelMsec,
+			viewBuildEffectMsec,
+			viewBuildPruneMsec,
+			viewBuildSortMsec,
+			viewBuildSubviewMsec,
+			viewBuildPacketMsec,
+			viewBuildCommandMsec,
+			now - viewBuildTotalStart );
+	}
 
 	// restore view in case we are a subview
 	tr.viewDef = oldView;

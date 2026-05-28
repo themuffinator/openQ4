@@ -30,6 +30,7 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #include "tr_local.h"
+#include "ScenePackets.h"
 
 
 /*
@@ -332,7 +333,9 @@ void idGuiModel::EmitFullScreen( void ) {
 
 	tr.viewDef = oldViewDef;
 
-	// add the command to draw this view
+	if ( R_ScenePackets_FrontEndCaptureRequired() ) {
+		R_ScenePackets_AddRenderView( viewDef );
+	}
 	R_AddDrawViewCmd( viewDef );
 }
 

@@ -479,7 +479,7 @@ void R_CreateLightRefs( idRenderLightLocal *light ) {
 	// we can limit the area references to those visible through the portals from the light center.
 	// We can't do this in the normal case, because shadows are cast from back facing triangles, which
 	// may be in areas not directly visible to the light projection center.
-	if ( light->parms.prelightModel && r_useLightPortalFlow.GetBool() && light->lightShader->LightCastsShadows() ) {
+	if ( R_LightHasRealPrelightModel( light->parms ) && r_useLightPortalFlow.GetBool() && light->lightShader->LightCastsShadows() ) {
 		light->world->FlowLightThroughPortals( light );
 	} else {
 		// push these points down the BSP tree into areas

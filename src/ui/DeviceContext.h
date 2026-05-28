@@ -38,6 +38,8 @@ const int VIRTUAL_WIDTH = 640;
 const int VIRTUAL_HEIGHT = 480;
 const int BLINK_DIVISOR = 200;
 
+struct wrapInfo_t;
+
 class idDeviceContext {
 public:
 	idDeviceContext();
@@ -55,7 +57,7 @@ public:
 	void				DrawMaterial(float x, float y, float w, float h, const idMaterial *mat, const idVec4 &color, float scalex = 1.0, float scaley = 1.0);
 	void				DrawRect(float x, float y, float width, float height, float size, const idVec4 &color);
 	void				DrawFilledRect(float x, float y, float width, float height, const idVec4 &color);
-	int					DrawText(const char *text, float textScale, int textAlign, idVec4 color, idRectangle rectDraw, bool wrap, int cursor = -1, bool calcOnly = false, idList<int> *breaks = NULL, int limit = 0, int adjust = 0, int style = 0 );
+	int					DrawText(const char *text, float textScale, int textAlign, idVec4 color, idRectangle rectDraw, bool wrap, int cursor = -1, bool calcOnly = false, idList<int> *breaks = NULL, int limit = 0, int adjust = 0, int style = 0, bool chatWindow = false );
 	void				DrawMaterialRect( float x, float y, float w, float h, float size, const idMaterial *mat, const idVec4 &color);
 	void				DrawStretchPic(float x, float y, float w, float h, float s0, float t0, float s1, float t1, const idMaterial *mat);
 
@@ -64,9 +66,10 @@ public:
 
 	int					CharWidth( const char c, float scale, int adjust = 0 );
 	int					TextWidth(const char *text, float scale, int limit, int adjust = 0);
-	int					TextHeight(const char *text, float scale, int limit);
+	int					TextHeight(const char *text, float scale, int limit, int adjust = 0);
 	int					MaxCharHeight(float scale);
 	int					MaxCharWidth(float scale);
+	bool				GetMaxTextIndex(const char *text, int limit, float textScale, wrapInfo_t &wrapInfo);
 
 	int					FindFont( const char *name );
 	void				SetupFonts();
@@ -162,7 +165,7 @@ private:
 	void				SizeIcon( embeddedIcon_t &icon );
 	bool				FindIcon( const char *code, const embeddedIcon_t **icon ) const;
 	float				GetIconDisplayWidth( const embeddedIcon_t &icon, float referenceHeight ) const;
-	int					DrawText(float x, float y, float scale, idVec4 color, const char *text, float adjust, int limit, int style, int cursor = -1);
+	int					DrawText(float x, float y, float scale, idVec4 color, const char *text, float adjust, int limit, int style, int cursor = -1, bool resetEscapes = false);
 	void				PaintChar(float x,float y,float width,float height,float scale,float	s,float	t,float	s2,float t2,const idMaterial *hShader);
 	void				SetFontByScale( float scale );
 	void				Clear( void );
@@ -192,6 +195,8 @@ private:
 	bool				enableClipping;
 
 	bool				overStrikeMode;
+	idVec4				drawTextColor;
+	float				drawTextColorAdjust;
 
 	idMat3				mat;
 	idVec3				origin;

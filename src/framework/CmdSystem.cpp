@@ -71,6 +71,7 @@ public:
 	virtual bool			PostReloadEngine( void );
 
 	void					SetWait( int numFrames ) { wait = numFrames; }
+	void					SetWaitMsec( int numMsec ) { waitMsecEnd = Sys_Milliseconds() + Max( 0, numMsec ); }
 	commandDef_t *			GetCommands( void ) const { return commands; }
 
 private:
@@ -79,6 +80,7 @@ private:
 	commandDef_t *			commands;
 
 	int						wait;
+	int						waitMsecEnd;
 	int						textLength;
 	byte					textBuf[MAX_CMD_BUFFER];
 
@@ -109,6 +111,7 @@ private:
 	static void				Echo_f( const idCmdArgs &args );
 	static void				Parse_f( const idCmdArgs &args );
 	static void				Wait_f( const idCmdArgs &args );
+	static void				WaitMsec_f( const idCmdArgs &args );
 	static void				PrintMemInfo_f( const idCmdArgs &args );
 };
 
@@ -321,6 +324,23 @@ void idCmdSystemLocal::Wait_f( const idCmdArgs &args ) {
 
 /*
 ============
+idCmdSystemLocal::WaitMsec_f
+
+Causes execution of the remainder of the command buffer to be delayed until a
+real-time interval has elapsed. This keeps benchmark scripts independent of the
+current presentation rate.
+============
+*/
+void idCmdSystemLocal::WaitMsec_f( const idCmdArgs &args ) {
+	if ( args.Argc() == 2 ) {
+		cmdSystemLocal.SetWaitMsec( atoi( args.Argv( 1 ) ) );
+	} else {
+		cmdSystemLocal.SetWaitMsec( 1 );
+	}
+}
+
+/*
+============
 idCmdSystemLocal::Parse_f
 
 This just prints out how the rest of the line was parsed, as a debugging tool.
@@ -365,10 +385,13 @@ void idCmdSystemLocal::Init( void ) {
 	AddCommand( "echo", Echo_f, CMD_FL_SYSTEM, "prints text" );
 	AddCommand( "parse", Parse_f, CMD_FL_SYSTEM, "prints tokenized string" );
 	AddCommand( "wait", Wait_f, CMD_FL_SYSTEM, "delays remaining buffered commands one or more frames" );
+	AddCommand( "waitMsec", WaitMsec_f, CMD_FL_SYSTEM, "delays remaining buffered commands by real milliseconds" );
 	AddCommand( "flashlight", Flashlight_f, CMD_FL_SYSTEM, "toggles the flashlight" );
 
 	completionString = "*";
 
+	wait = 0;
+	waitMsecEnd = 0;
 	textLength = 0;
 }
 
@@ -687,6 +710,14 @@ void idCmdSystemLocal::ExecuteCommandBuffer( void ) {
 	idCmdArgs	args;
 
 	while( textLength ) {
+
+		if ( waitMsecEnd > 0 ) {
+			if ( Sys_Milliseconds() < waitMsecEnd ) {
+				// skip out while text still remains in buffer, leaving it for a later frame
+				break;
+			}
+			waitMsecEnd = 0;
+		}
 
 		if ( wait )	{
 			// skip out while text still remains in buffer, leaving it for next frame

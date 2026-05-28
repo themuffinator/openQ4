@@ -29,6 +29,13 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #include "tr_local.h"
+#include "GLStateCache.h"
+#include "RenderGraph.h"
+#include "RenderGraphResources.h"
+#include "MaterialResourceTable.h"
+#include "ModernGLExecutor.h"
+#include "ModernClusteredLighting.h"
+#include "RendererMetrics.h"
 
 
 frameData_t		*frameData;
@@ -671,13 +678,79 @@ smp extensions, or asyncronously by another thread.
 int		backEndStartTime, backEndFinishTime;
 void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 	// r_debugRenderToTexture
-	int	c_draw3d = 0, c_draw2d = 0, c_setBuffers = 0, c_swapBuffers = 0, c_copyRenders = 0;
+	int	c_draw3d = 0, c_draw2d = 0, c_setBuffers = 0, c_swapBuffers = 0, c_copyRenders = 0, c_specialEffects = 0, c_renderTargetOps = 0;
 
 	if ( cmds->commandId == RC_NOP && !cmds->next ) {
 		return;
 	}
 
+	R_GLStateCache_BeginFrame();
+
+	if ( R_ScenePackets_SidePipelineRequired() ) {
+		const int packetBuildStart = Sys_Milliseconds();
+		idScenePacketFrame backendScenePackets;
+		const idScenePacketFrame *scenePackets = NULL;
+		if ( R_ScenePackets_FrontEndFrameAvailable() ) {
+			scenePackets = &R_ScenePackets_FrontEndFrame();
+		} else {
+			R_ScenePackets_BuildLegacyCommandStream( cmds, backendScenePackets );
+			scenePackets = &backendScenePackets;
+		}
+		R_RendererMetrics_AddPacketBuildMsec( Sys_Milliseconds() - packetBuildStart );
+		R_ScenePackets_LogIfVerbose( *scenePackets );
+
+		const int graphBuildStart = Sys_Milliseconds();
+		idRenderGraph legacyGraph;
+		R_RenderGraph_BuildFromScenePackets( *scenePackets, legacyGraph );
+		R_RendererMetrics_AddGraphBuildMsec( Sys_Milliseconds() - graphBuildStart );
+		R_RenderGraph_LogIfVerbose( legacyGraph );
+		{
+			const scenePacketFrameStats_t &packetStats = scenePackets->Stats();
+			R_RendererMetrics_RecordScenePackets( packetStats );
+			const renderGraphStats_t &graphStats = legacyGraph.Stats();
+			R_RendererMetrics_RecordRenderGraph(
+				graphStats.graphPasses,
+				graphStats.passPackets,
+				graphStats.scenePackets,
+				graphStats.drawPackets,
+				graphStats.commandPackets,
+				graphStats.resources,
+				graphStats.importedResources,
+				graphStats.transientResources,
+				graphStats.aliasableTransientResources,
+				graphStats.resourceAccesses,
+				graphStats.readAccesses,
+				graphStats.writeAccesses,
+				graphStats.clearOps,
+				graphStats.resolveOps,
+				graphStats.invalidateOps,
+				graphStats.presentOps,
+				graphStats.overflow );
+		}
+		R_RenderGraphResources_PrepareFrame( legacyGraph );
+		R_RendererMetrics_RecordRenderGraphResources( R_RenderGraphResources_Stats() );
+		R_MaterialResourceTable_PrepareFrame( *scenePackets );
+		R_RendererMetrics_RecordMaterialResourceTable( R_MaterialResourceTable_Stats() );
+		R_ModernGLExecutor_PrepareFrame( *scenePackets, legacyGraph );
+	} else {
+		scenePacketFrameStats_t packetStats;
+		memset( &packetStats, 0, sizeof( packetStats ) );
+		R_RendererMetrics_RecordScenePackets( packetStats );
+		R_RendererMetrics_RecordRenderGraph( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false );
+		renderGraphResourceManagerStats_t graphResourceStats;
+		memset( &graphResourceStats, 0, sizeof( graphResourceStats ) );
+		R_RendererMetrics_RecordRenderGraphResources( graphResourceStats );
+		materialResourceTableStats_t materialStats;
+		memset( &materialStats, 0, sizeof( materialStats ) );
+		R_RendererMetrics_RecordMaterialResourceTable( materialStats );
+		rendererClusteredLightingStats_t clusterStats;
+		memset( &clusterStats, 0, sizeof( clusterStats ) );
+		R_RendererMetrics_RecordClusteredLighting( clusterStats );
+		R_ModernGLExecutor_SkipFrame();
+	}
 	backEndStartTime = Sys_Milliseconds();
+	R_RendererMetrics_BeginGpuBackendFrame();
+	R_GLStateCache_LegacyHandoffReset( "legacy ARB2 backend" );
 
 	// needed for editor rendering
 	RB_SetDefaultGLState();
@@ -692,7 +765,13 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 		case RC_NOP:
 			break;
 		case RC_DRAW_VIEW:
-			RB_DrawView( cmds );
+			R_RendererMetrics_BeginGpuTimer( ((const drawSurfsCommand_t *)cmds)->viewDef->viewEntitys ? RENDERER_GPU_TIMER_DRAW3D : RENDERER_GPU_TIMER_DRAW2D );
+			if ( !((const drawSurfsCommand_t *)cmds)->viewDef->viewEntitys && R_ModernGLExecutor_LegacyPassCanSkip( RENDER_PASS_GUI ) ) {
+				R_ModernGLExecutor_RecordLegacyPassSkipped( RENDER_PASS_GUI );
+			} else {
+				RB_DrawView( cmds );
+			}
+			R_RendererMetrics_EndGpuTimer();
 			if ( ((const drawSurfsCommand_t *)cmds)->viewDef->viewEntitys ) {
 				c_draw3d++;
 			}
@@ -701,29 +780,59 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 			}
 			break;
 		case RC_DRAW_SPECIAL_EFFECTS:
-			RB_DrawSpecialEffects( cmds );
+			R_RendererMetrics_BeginGpuTimer( RENDERER_GPU_TIMER_SPECIAL_EFFECTS );
+			if ( R_ModernGLExecutor_LegacyPassCanSkip( RENDER_PASS_SPECIAL_EFFECTS ) ) {
+				R_ModernGLExecutor_RecordLegacyPassSkipped( RENDER_PASS_SPECIAL_EFFECTS );
+			} else {
+				RB_DrawSpecialEffects( cmds );
+			}
+			R_RendererMetrics_EndGpuTimer();
+			c_specialEffects++;
 			break;
 // jmarshall
 		case RC_SET_RENDERTEXTURE:
+			R_RendererMetrics_BeginGpuTimer( RENDERER_GPU_TIMER_RENDER_TARGET );
 			RB_SetRenderTexture(cmds);
+			R_RendererMetrics_EndGpuTimer();
+			c_renderTargetOps++;
 			break;
 		case RC_RESOLVE_MSAA:
+			R_RendererMetrics_BeginGpuTimer( RENDERER_GPU_TIMER_RENDER_TARGET );
 			RB_ResolveMSAA(cmds);
+			R_RendererMetrics_EndGpuTimer();
+			c_renderTargetOps++;
 			break;
 		case RC_CLEAR_RENDERTARGET:
+			R_RendererMetrics_BeginGpuTimer( RENDERER_GPU_TIMER_RENDER_TARGET );
 			RB_ClearRenderTarget(cmds);
+			R_RendererMetrics_EndGpuTimer();
+			c_renderTargetOps++;
 			break;
 // jmarshall end
 		case RC_SET_BUFFER:
+			R_RendererMetrics_BeginGpuTimer( RENDERER_GPU_TIMER_SET_BUFFER );
 			RB_SetBuffer( cmds );
+			R_RendererMetrics_EndGpuTimer();
 			c_setBuffers++;
 			break;
-		case RC_SWAP_BUFFERS:
+		case RC_SWAP_BUFFERS: {
+			R_ModernGLExecutor_ComposeVisibleFrame();
+			R_ModernGLExecutor_DrawDepthDebugOverlay();
+			R_ModernGLExecutor_DrawGBufferDebugOverlay();
+			R_ModernGLExecutor_DrawDeferredDebugOverlay();
+			R_ModernClusteredLighting_DrawDebugOverlay();
+			R_RendererMetrics_BeginGpuTimer( RENDERER_GPU_TIMER_SWAP_BUFFERS );
+			const int presentStart = Sys_Milliseconds();
 			RB_SwapBuffers( cmds );
+			R_RendererMetrics_AddPresentMsec( Sys_Milliseconds() - presentStart );
+			R_RendererMetrics_EndGpuTimer();
 			c_swapBuffers++;
 			break;
+		}
 		case RC_COPY_RENDER:
+			R_RendererMetrics_BeginGpuTimer( RENDERER_GPU_TIMER_COPY_RENDER );
 			RB_CopyRender( cmds );
+			R_RendererMetrics_EndGpuTimer();
 			c_copyRenders++;
 			break;
 		default:
@@ -737,8 +846,11 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 	backEnd.glState.tmu[0].current2DMap = -1;
 
 	// stop rendering on this thread
+	R_RendererMetrics_EndGpuBackendFrame();
 	backEndFinishTime = Sys_Milliseconds();
 	backEnd.pc.msec = backEndFinishTime - backEndStartTime;
+	R_RendererMetrics_RecordGLStateCache( R_GLStateCache_Stats() );
+	R_RendererMetrics_RecordBackendCommands( c_draw3d, c_draw2d, c_setBuffers, c_swapBuffers, c_copyRenders, c_specialEffects, c_renderTargetOps );
 
 	if ( r_debugRenderToTexture.GetInteger() == 1 ) {
 		common->Printf( "3d: %i, 2d: %i, SetBuf: %i, SwpBuf: %i, CpyRenders: %i, CpyFrameBuf: %i\n", c_draw3d, c_draw2d, c_setBuffers, c_swapBuffers, c_copyRenders, backEnd.c_copyFrameBuffer );

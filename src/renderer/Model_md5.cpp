@@ -1088,9 +1088,7 @@ bool idRenderModelMD5::HasCollisionSurface( const renderEntity_t *ent ) const {
 			continue;
 		}
 
-		if ( ( shader->GetSurfaceFlags() & SURF_COLLISION ) != 0
-			&& !shader->IsDrawn()
-			&& !shader->SurfaceCastsShadow() ) {
+		if ( shader->IsDedicatedCollisionSurface() ) {
 			return true;
 		}
 	}

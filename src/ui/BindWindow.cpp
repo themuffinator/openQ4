@@ -34,6 +34,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "UserInterfaceLocal.h"
 #include "BindWindow.h"
 
+static const int Q4_BIND_WINDOW_TEXT_SPACING = 0;
 
 void idBindWindow::CommonInit() {
 	bindName = "";
@@ -103,7 +104,6 @@ void idBindWindow::PostParse() {
 
 void idBindWindow::Draw(int time, float x, float y) {
 	idVec4 color = foreColor;
-	const int textAdjust = static_cast<int>( textspacing );
 	const int style = static_cast<int>( textstyle );
 
 	idStr str;
@@ -121,7 +121,7 @@ void idBindWindow::Draw(int time, float x, float y) {
 		hover = false;
 	}
 
-	dc->DrawText( str, textScale, textAlign, color, textRect, false, -1, false, NULL, 0, textAdjust, style );
+	dc->DrawText( str, textScale, textAlign, color, textRect, false, -1, false, NULL, 0, Q4_BIND_WINDOW_TEXT_SPACING, style );
 }
 
 void idBindWindow::Activate( bool activate, idStr &act ) {

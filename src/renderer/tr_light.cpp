@@ -101,11 +101,46 @@ idCVar bse_respectConnectedArea(
 	"0",
 	CVAR_RENDERER | CVAR_BOOL,
 	"if 1, cull effect defs when parms.inConnectedArea is false (legacy portal gating)");
+idCVar bse_useAreaCull(
+	"bse_useAreaCull",
+	"1",
+	CVAR_RENDERER | CVAR_BOOL,
+	"if 1, cull BSE render surfaces when the effect is outside the current portal-visible area set");
+idCVar bse_skipCulledLoopService(
+	"bse_skipCulledLoopService",
+	"0",
+	CVAR_RENDERER | CVAR_BOOL,
+	"if 1, experimental: defer service for looping BSE effects while portal/PVS culling proves they are invisible");
+idCVar bse_culledLoopServiceMaxMsec(
+	"bse_culledLoopServiceMaxMsec",
+	"1000",
+	CVAR_RENDERER | CVAR_INTEGER,
+	"maximum owner-time lag before a portal-culled looping BSE effect is serviced once to refresh state and bounds; 0 disables stale refresh");
+idCVar bse_culledLoopServiceRefreshBudget(
+	"bse_culledLoopServiceRefreshBudget",
+	"2",
+	CVAR_RENDERER | CVAR_INTEGER,
+	"maximum portal-culled looping BSE effects to refresh per rendered view; 0 disables stale refresh");
 idCVar bse_useFrustumCull(
 	"bse_useFrustumCull",
 	"0",
 	CVAR_RENDERER | CVAR_BOOL,
-	"if 1, apply renderer frustum culling to BSE effect defs/surfaces");
+	"if 1, experimental: cull BSE render surfaces by expanded effect bounds before emitting draw surfaces");
+idCVar bse_useCachedFrustumCull(
+	"bse_useCachedFrustumCull",
+	"0",
+	CVAR_RENDERER | CVAR_BOOL,
+	"if 1, use cached BSE effect bounds for pre-render frustum culling; faster but less conservative for growing effects");
+idCVar bse_useSurfaceFrustumCull(
+	"bse_useSurfaceFrustumCull",
+	"0",
+	CVAR_RENDERER | CVAR_BOOL,
+	"if 1, additionally cull individual BSE effect surfaces by local bounds");
+idCVar bse_frustumCullExpand(
+	"bse_frustumCullExpand",
+	"32",
+	CVAR_RENDERER | CVAR_FLOAT,
+	"world units added to BSE effect bounds before frustum culling");
 
 #if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
 static void R_CreateVertexProgramShadowCacheFromSilTraceVerts( shadowCache_t *temp, const rvSilTraceVertT *silTraceVerts, int numVerts ) {
@@ -244,13 +279,75 @@ bool R_CreatePackedSurfaceFrameCaches( srfTriangles_t *tri, bool needsLighting, 
 	}
 
 	if ( r_useIndexBuffers.GetBool() && createIndexCache && tri->numIndexes > 0 && sourceIndexes != NULL ) {
-		tri->indexCache = vertexCache.AllocFrameTemp( sourceIndexes, tri->numIndexes * sizeof( sourceIndexes[0] ) );
+		tri->indexCache = vertexCache.AllocFrameTemp( sourceIndexes, tri->numIndexes * sizeof( sourceIndexes[0] ), true );
 	} else {
 		tri->indexCache = NULL;
 	}
 
 	tri->tempAmbientCache = true;
 	return true;
+}
+
+/*
+==================
+R_CreateFrameSubmitTri
+
+Runtime BSE models are rebuilt for each rendered view. Submit a frame-local
+triangle snapshot so a later subview/main-view rebuild cannot clear the cache
+fields used by a draw surface that is already queued for the backend.
+==================
+*/
+static srfTriangles_t *R_CreateFrameSubmitTri( srfTriangles_t *tri, bool needsLighting ) {
+	if ( tri == NULL || tri->numVerts <= 0 || tri->numIndexes <= 0 ) {
+		return NULL;
+	}
+
+	idDrawVert *sourceVerts = tri->verts;
+	glIndex_t *sourceIndexes = tri->indexes;
+
+#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
+	if ( tri->primBatchMesh != NULL && ( sourceVerts == NULL || sourceIndexes == NULL ) ) {
+		sourceVerts = (idDrawVert *)R_FrameAlloc( tri->numVerts * sizeof( sourceVerts[0] ) );
+		sourceIndexes = (glIndex_t *)R_FrameAlloc( tri->numIndexes * sizeof( sourceIndexes[0] ) );
+		renderSystem->CopyPrimBatchTriangles( sourceVerts, sourceIndexes, tri->primBatchMesh, tri->silTraceVerts );
+	}
+#endif
+
+	if ( sourceVerts == NULL || sourceIndexes == NULL ) {
+		return NULL;
+	}
+
+	if ( needsLighting && !tri->tangentsCalculated && sourceVerts == tri->verts ) {
+		R_DeriveTangents( tri );
+		sourceVerts = tri->verts;
+	}
+
+	srfTriangles_t *submitTri = (srfTriangles_t *)R_FrameAlloc( sizeof( *submitTri ) );
+	*submitTri = *tri;
+	submitTri->verts = sourceVerts;
+	submitTri->indexes = sourceIndexes;
+#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
+	submitTri->primBatchMesh = NULL;
+#endif
+	submitTri->ambientCache = vertexCache.AllocFrameTemp( sourceVerts, tri->numVerts * sizeof( sourceVerts[0] ) );
+	if ( submitTri->ambientCache == NULL ) {
+		return NULL;
+	}
+	submitTri->tempAmbientCache = true;
+
+	if ( r_useIndexBuffers.GetBool() ) {
+		submitTri->indexCache = vertexCache.AllocFrameTemp( sourceIndexes, tri->numIndexes * sizeof( sourceIndexes[0] ), true );
+		if ( submitTri->indexCache == NULL ) {
+			return NULL;
+		}
+	} else {
+		glIndex_t *submitIndexes = (glIndex_t *)R_FrameAlloc( tri->numIndexes * sizeof( sourceIndexes[0] ) );
+		memcpy( submitIndexes, sourceIndexes, tri->numIndexes * sizeof( sourceIndexes[0] ) );
+		submitTri->indexes = submitIndexes;
+		submitTri->indexCache = NULL;
+	}
+
+	return submitTri;
 }
 
 /*
@@ -1216,6 +1313,116 @@ idScreenRect	R_CalcLightScissorRectangle( viewLight_t *vLight ) {
 
 /*
 =================
+R_ViewLightHasStaticWorldLocalInteractions
+=================
+*/
+static bool R_ViewLightHasStaticWorldLocalInteractions( const viewLight_t *vLight ) {
+	for ( const drawSurf_t *surf = vLight->localInteractions; surf != NULL; surf = surf->nextOnLight ) {
+		const viewEntity_t *space = surf->space;
+		if ( space == NULL || space->entityDef == NULL || space->entityDef->parms.hModel == NULL ) {
+			continue;
+		}
+		if ( space->entityDef->parms.hModel->IsStaticWorldModel() ) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+static idRenderModel *R_ViewLightPrelightModel( viewLight_t *vLight ) {
+	if ( vLight == NULL || vLight->lightDef == NULL || !r_useOptimizedShadows.GetBool() ) {
+		return NULL;
+	}
+
+	idRenderModel *prelightModel = vLight->lightDef->parms.prelightModel;
+	idRenderModel *sanitizedPrelightModel = R_SanitizePrelightModelPointer( prelightModel );
+	if ( sanitizedPrelightModel != prelightModel ) {
+		vLight->lightDef->parms.prelightModel = NULL;
+		prelightModel = NULL;
+	}
+	if ( prelightModel == NULL ) {
+		return NULL;
+	}
+
+	return prelightModel;
+}
+
+/*
+=================
+R_AddOptimizedPrelightShadows
+=================
+*/
+static void R_AddOptimizedPrelightShadows( viewLight_t *vLight ) {
+	idRenderModel *prelightModel = R_ViewLightPrelightModel( vLight );
+	if ( prelightModel == NULL ) {
+		return;
+	}
+
+	idRenderLightLocal *light = vLight->lightDef;
+	if ( !R_LightHasRealPrelightModel( light->parms ) ) {
+		light->parms.prelightModel = NULL;
+		return;
+	}
+	prelightModel = light->parms.prelightModel;
+
+	if ( !prelightModel->NumSurfaces() ) {
+		common->Error( "no surfs in prelight model '%s'", prelightModel->Name() );
+	}
+
+	const modelSurface_t *surface = prelightModel->Surface( 0 );
+	if ( surface == NULL || surface->geometry == NULL ) {
+		common->Error( "R_AddLightSurfaces: prelight model '%s' without geometry", prelightModel->Name() );
+	}
+
+	srfTriangles_t	*tri = surface->geometry;
+#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
+	if ( !tri->shadowVertexes && tri->primBatchMesh == NULL ) {
+#else
+	if ( !tri->shadowVertexes ) {
+#endif
+		common->Error( "R_AddLightSurfaces: prelight model '%s' without shadowVertexes", prelightModel->Name() );
+	}
+
+	// These shadows will all have valid bounds, and can be culled normally.
+	if ( r_useShadowCulling.GetBool() ) {
+		if ( R_CullLocalBox( tri->bounds, tr.viewDef->worldSpace.modelMatrix, 5, tr.viewDef->frustum ) ) {
+			return;
+		}
+	}
+
+	// Classic prelight shadows upload explicit shadow verts/indexes here.
+	// Packed MD5R prelight meshes keep those resources inside the prim-batch
+	// representation and bypass the legacy cache path.
+#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
+	if ( tri->primBatchMesh == NULL ) {
+#endif
+		if ( !tri->shadowCache ) {
+			R_CreatePrivateShadowCache( tri );
+			if ( !tri->shadowCache ) {
+				return;
+			}
+		}
+
+		R_TouchVertexCache( tri->shadowCache );
+
+		if ( !tri->indexCache && r_useIndexBuffers.GetBool() && tri->numIndexes > 0 ) {
+			vertexCache.Alloc( tri->indexes, tri->numIndexes * sizeof( tri->indexes[0] ), &tri->indexCache, true );
+		}
+		if ( tri->indexCache ) {
+			R_TouchVertexCache( tri->indexCache );
+		}
+#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
+	}
+#endif
+
+	const bool protectStaticWorldNoSelfReceivers = R_ViewLightHasStaticWorldLocalInteractions( vLight );
+	R_LinkLightSurf( protectStaticWorldNoSelfReceivers ? &vLight->localShadows : &vLight->globalShadows,
+		tri, NULL, light, NULL, vLight->scissorRect, true /* FIXME? */ );
+}
+
+/*
+=================
 R_AddLightSurfaces
 
 Calc the light shader values, removing any light from the viewLight list
@@ -1375,56 +1582,8 @@ void R_AddLightSurfaces( void ) {
 			R_TouchVertexCache( light->frustumTris->ambientCache );
 		}
 
-		// add the prelight shadows for the static world geometry
-		if ( light->parms.prelightModel && r_useOptimizedShadows.GetBool() ) {
-
-			if ( !light->parms.prelightModel->NumSurfaces() ) {
-				common->Error( "no surfs in prelight model '%s'", light->parms.prelightModel->Name() );
-			}
-
-			srfTriangles_t	*tri = light->parms.prelightModel->Surface( 0 )->geometry;
-#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
-			if ( !tri->shadowVertexes && tri->primBatchMesh == NULL ) {
-#else
-			if ( !tri->shadowVertexes ) {
-#endif
-				common->Error( "R_AddLightSurfaces: prelight model '%s' without shadowVertexes", light->parms.prelightModel->Name() );
-			}
-
-			// these shadows will all have valid bounds, and can be culled normally
-			if ( r_useShadowCulling.GetBool() ) {
-				if ( R_CullLocalBox( tri->bounds, tr.viewDef->worldSpace.modelMatrix, 5, tr.viewDef->frustum ) ) {
-					continue;
-				}
-			}
-
-			// Classic prelight shadows upload explicit shadow verts/indexes here.
-			// Packed MD5R prelight meshes keep those resources inside the prim-batch
-			// representation and bypass the legacy cache path.
-#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
-			if ( tri->primBatchMesh == NULL ) {
-#endif
-				if ( !tri->shadowCache ) {
-					R_CreatePrivateShadowCache( tri );
-					if ( !tri->shadowCache ) {
-						continue;
-					}
-				}
-
-				R_TouchVertexCache( tri->shadowCache );
-
-				if ( !tri->indexCache && r_useIndexBuffers.GetBool() && tri->numIndexes > 0 ) {
-					vertexCache.Alloc( tri->indexes, tri->numIndexes * sizeof( tri->indexes[0] ), &tri->indexCache, true );
-				}
-				if ( tri->indexCache ) {
-					R_TouchVertexCache( tri->indexCache );
-				}
-#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
-			}
-#endif
-
-			R_LinkLightSurf( &vLight->globalShadows, tri, NULL, light, NULL, vLight->scissorRect, true /* FIXME? */ );
-		}
+		// Optimized prelight shadows are added after model interactions have
+		// established whether any static-world no-self receivers need local routing.
 	}
 }
 
@@ -1646,7 +1805,7 @@ R_AddDrawSurf
 =================
 */
 void R_AddDrawSurf( const srfTriangles_t *tri, const viewEntity_t *space, const renderEntity_t *renderEntity,
-					const idMaterial *shader, const idScreenRect &scissor ) {
+					const idMaterial *shader, const idScreenRect &scissor, int extraDrawSurfFlags ) {
 	drawSurf_t		*drawSurf;
 
 	drawSurf = (drawSurf_t *)R_FrameAlloc( sizeof( *drawSurf ) );
@@ -1656,7 +1815,7 @@ void R_AddDrawSurf( const srfTriangles_t *tri, const viewEntity_t *space, const 
 	drawSurf->scissorRect = scissor;
 	drawSurf->sort = shader->GetSort() + tr.sortOffset;
 	drawSurf->area = NULL;
-	drawSurf->dsFlags = 0;
+	drawSurf->dsFlags = extraDrawSurfFlags;
 	drawSurf->dynamicTexCoords = NULL;
 	drawSurf->texGenTransformAndViewOrg = NULL;
 	drawSurf->decalColorCache = NULL;
@@ -1910,6 +2069,192 @@ idScreenRect R_CalcEntityScissorRectangle( viewEntity_t *vEntity ) {
 	return R_ScreenRectFromViewFrustumBounds( bounds );
 }
 
+static bool R_EffectUsesViewModelDepth( const rvRenderEffectLocal *def ) {
+	if ( def == NULL ) {
+		return false;
+	}
+	return def->parms.weaponDepthHackInViewID != 0 || def->parms.allowSurfaceInViewID != 0;
+}
+
+static bool R_EffectPointAreaVisible( const idRenderWorldLocal *world, const idVec3 &point ) {
+	if ( world == NULL || tr.viewDef == NULL || !r_usePortals.GetBool() ) {
+		return true;
+	}
+
+	const int areaNum = world->PointInArea( point );
+	if ( areaNum < 0 || areaNum >= world->NumAreas() ) {
+		return true;
+	}
+
+	return world->portalAreas[ areaNum ].viewCount == tr.viewCount;
+}
+
+static bool R_EffectLocalBoundsUsable( const idBounds &bounds ) {
+	if ( bounds.IsCleared() ) {
+		return false;
+	}
+
+	for ( int axis = 0; axis < 3; ++axis ) {
+		const float minValue = bounds[0][axis];
+		const float maxValue = bounds[1][axis];
+		if ( FLOAT_IS_NAN( minValue ) || FLOAT_IS_NAN( maxValue ) || minValue > maxValue ) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+static bool R_EffectCachedRenderBounds( const rvRenderEffectLocal *def, idBounds &bounds ) {
+	if ( def == NULL || def->dynamicModel == NULL || def->dynamicModelFrameCount <= 0 ) {
+		return false;
+	}
+
+	bool hasBounds = false;
+	bounds.Clear();
+	const int numSurfaces = def->dynamicModel->NumSurfaces();
+	for ( int surfaceIndex = 0; surfaceIndex < numSurfaces; ++surfaceIndex ) {
+		const modelSurface_t *surface = def->dynamicModel->Surface( surfaceIndex );
+		if ( surface == NULL || surface->geometry == NULL ) {
+			continue;
+		}
+
+		const srfTriangles_t *tri = surface->geometry;
+		if ( tri->numVerts <= 0 || tri->numIndexes <= 0 || !R_EffectLocalBoundsUsable( tri->bounds ) ) {
+			continue;
+		}
+
+		if ( !hasBounds ) {
+			bounds = tri->bounds;
+			hasBounds = true;
+		} else {
+			bounds.AddBounds( tri->bounds );
+		}
+	}
+
+	return hasBounds;
+}
+
+static bool R_EffectBuildCullBounds( const rvRenderEffectLocal *def, idBounds &bounds, bool &hasCachedRenderBounds ) {
+	hasCachedRenderBounds = false;
+	bounds.Clear();
+
+	if ( def == NULL ) {
+		return false;
+	}
+
+	if ( R_EffectLocalBoundsUsable( def->referenceBounds ) ) {
+		bounds = def->referenceBounds;
+	}
+
+	idBounds cachedRenderBounds;
+	if ( R_EffectCachedRenderBounds( def, cachedRenderBounds ) ) {
+		hasCachedRenderBounds = true;
+		if ( bounds.IsCleared() ) {
+			bounds = cachedRenderBounds;
+		} else {
+			bounds.AddBounds( cachedRenderBounds );
+		}
+	}
+
+	return !bounds.IsCleared();
+}
+
+static bool R_EffectBoundsAreaVisible( const idRenderWorldLocal *world, const rvRenderEffectLocal *def, bool requireCachedRenderBounds ) {
+	if ( world == NULL || def == NULL || !r_usePortals.GetBool() ) {
+		return true;
+	}
+
+	idBounds cullBounds;
+	bool hasCachedRenderBounds = false;
+	if ( !R_EffectBuildCullBounds( def, cullBounds, hasCachedRenderBounds ) ) {
+		return true;
+	}
+	if ( requireCachedRenderBounds && !hasCachedRenderBounds ) {
+		return true;
+	}
+
+	idBounds worldBounds;
+	worldBounds.FromTransformedBounds( cullBounds, def->parms.origin, def->parms.axis );
+	worldBounds.ExpandSelf( Max( 0.0f, bse_frustumCullExpand.GetFloat() ) );
+	for ( int axis = 0; axis < 3; ++axis ) {
+		const float minValue = worldBounds[0][axis];
+		const float maxValue = worldBounds[1][axis];
+		const float span = maxValue - minValue;
+		if ( FLOAT_IS_NAN( minValue ) || FLOAT_IS_NAN( maxValue ) || minValue > maxValue || span >= 1e4f ) {
+			// BoundsInAreas is intentionally limited to normal portal-sized queries.
+			// Area culling is only an optimization, so keep large sky/smoke effects visible.
+			return true;
+		}
+	}
+
+	int areas[32];
+	const int numAreas = world->BoundsInAreas( worldBounds, areas, sizeof( areas ) / sizeof( areas[0] ) );
+	if ( numAreas <= 0 ) {
+		return true;
+	}
+
+	for ( int areaIndex = 0; areaIndex < numAreas; ++areaIndex ) {
+		const int areaNum = areas[areaIndex];
+		if ( areaNum >= 0 && areaNum < world->NumAreas() && world->portalAreas[areaNum].viewCount == tr.viewCount ) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+static bool R_CullEffectByArea( const idRenderWorldLocal *world, const rvRenderEffectLocal *def, bool requireCachedRenderBounds = false ) {
+	if ( !bse_useAreaCull.GetBool() || R_EffectUsesViewModelDepth( def ) ) {
+		return false;
+	}
+
+	if ( R_EffectPointAreaVisible( world, def->parms.origin ) ) {
+		return false;
+	}
+
+	if ( def->parms.hasEndOrigin && R_EffectPointAreaVisible( world, def->parms.endOrigin ) ) {
+		return false;
+	}
+
+	return !R_EffectBoundsAreaVisible( world, def, requireCachedRenderBounds );
+}
+
+static bool R_CullEffectByFrustum( const rvRenderEffectLocal *def, bool requireCachedRenderBounds = false ) {
+	if ( !bse_useFrustumCull.GetBool() || !bse_useCachedFrustumCull.GetBool() || R_EffectUsesViewModelDepth( def ) || R_ShouldDisableEntityCullingForLevelshot() ) {
+		return false;
+	}
+
+	idBounds expandedBounds;
+	bool hasCachedRenderBounds = false;
+	if ( !R_EffectBuildCullBounds( def, expandedBounds, hasCachedRenderBounds ) ) {
+		return false;
+	}
+	if ( requireCachedRenderBounds && !hasCachedRenderBounds ) {
+		return false;
+	}
+	expandedBounds.ExpandSelf( Max( 0.0f, bse_frustumCullExpand.GetFloat() ) );
+
+	float modelMatrix[16];
+	R_AxisToModelMatrix( def->parms.axis, def->parms.origin, modelMatrix );
+	return R_CullLocalBox( expandedBounds, modelMatrix, 5, tr.viewDef->frustum );
+}
+
+static bool R_ShouldRefreshCulledLoopService( const rvRenderEffectLocal *def ) {
+	const int maxLagMsec = Max( 0, bse_culledLoopServiceMaxMsec.GetInteger() );
+	const int refreshBudget = Max( 0, bse_culledLoopServiceRefreshBudget.GetInteger() );
+	if ( def == NULL || maxLagMsec <= 0 || refreshBudget <= 0 || def->serviceTime < 0 ) {
+		return false;
+	}
+	if ( def->gameTime - def->serviceTime < maxLagMsec ) {
+		return false;
+	}
+
+	// Spread refresh work over several frames so stale culled loops cannot all
+	// service on the same frame when a portal view changes.
+	return ( ( tr.frameCount + def->index ) & 7 ) == 0;
+}
+
 /*
 ===============
 R_AddEffectSurfaces
@@ -1939,8 +2284,13 @@ void R_AddEffectSurfaces(void) {
 	int serviceSpawnGateFalse = 0;
 	int serviceGateLagMin = 0x7fffffff;
 	int serviceGateLagMax = (-0x7fffffff - 1);
+	int deferredService = 0;
+	int refreshedCulledService = 0;
+	const int refreshCulledLoopServiceBudget = Max( 0, bse_culledLoopServiceRefreshBudget.GetInteger() );
 	int dropNotConnected = 0;
 	int dropViewSuppress = 0;
+	int dropAreaCull = 0;
+	int dropDefFrustumCull = 0;
 	int dropNoModel = 0;
 	int dropNoModelSurfaces = 0;
 	int dropClearedBounds = 0;
@@ -1970,6 +2320,25 @@ void R_AddEffectSurfaces(void) {
 			++serviceSpawnGateFalse;
 		}
 
+		const bool canDeferLoopService =
+			bse_skipCulledLoopService.GetBool() &&
+			def->parms.loop &&
+			def->effect != NULL &&
+			!def->expired;
+		bool refreshCulledLoopService = false;
+		if ( canDeferLoopService ) {
+			// Deferring service is only safe when a previous rendered model gives
+			// the portal test real particle bounds instead of owner-origin guesses.
+			if ( R_CullEffectByArea( world, def, true ) ) {
+				if ( refreshedCulledService >= refreshCulledLoopServiceBudget || !R_ShouldRefreshCulledLoopService( def ) ) {
+					++deferredService;
+					++dropAreaCull;
+					continue;
+				}
+				refreshCulledLoopService = true;
+			}
+		}
+
 		if ( def->updateFramenum != tr.frameCount ) {
 			// Effect servicing is view-independent. Run it once per rendered frame,
 			// then let each view reuse the resulting particle state/model rebuild.
@@ -1986,8 +2355,16 @@ void R_AddEffectSurfaces(void) {
 				}
 				continue;
 			}
+			if ( refreshCulledLoopService ) {
+				++refreshedCulledService;
+			}
 		} else if ( def->expired ) {
 			++expired;
+			continue;
+		}
+
+		if ( refreshCulledLoopService && R_CullEffectByArea( world, def, true ) ) {
+			++dropAreaCull;
 			continue;
 		}
 		++alive;
@@ -2023,6 +2400,21 @@ void R_AddEffectSurfaces(void) {
 			}
 		}
 
+		if ( !canDeferLoopService ) {
+			// Pre-render culling is a broad-phase optimization. Require cached
+			// rendered bounds so new or previously hidden effects get one chance
+			// to build current geometry before any portal/PVS rejection.
+			if ( R_CullEffectByArea( world, def, true ) ) {
+				++dropAreaCull;
+				continue;
+			}
+
+			if ( R_CullEffectByFrustum( def, true ) ) {
+				++dropDefFrustumCull;
+				continue;
+			}
+		}
+
 		def->dynamicModel = bse->RenderEffect(def, tr.viewDef);
 		if (!def->dynamicModel) {
 			++dropNoModel;
@@ -2044,6 +2436,13 @@ void R_AddEffectSurfaces(void) {
 		}
 		def->referenceBounds = localBounds;
 
+		// Now that BSE has rebuilt the model for this view, run the authoritative
+		// area test with actual particle/trail bounds.
+		if ( R_CullEffectByArea( world, def ) ) {
+			++dropAreaCull;
+			continue;
+		}
+
 		viewEntity_t* vEffect = (viewEntity_t*)R_ClearedFrameAlloc(sizeof(*vEffect));
 		vEffect->entityDef = NULL;
 		vEffect->weaponDepthHack = (def->parms.weaponDepthHackInViewID != 0 && def->parms.weaponDepthHackInViewID == tr.viewDef->renderView.viewID);
@@ -2052,7 +2451,9 @@ void R_AddEffectSurfaces(void) {
 		myGlMultMatrix(vEffect->modelMatrix, tr.viewDef->worldSpace.modelViewMatrix, vEffect->modelViewMatrix);
 
 		if (bse_useFrustumCull.GetBool() && !R_ShouldDisableEntityCullingForLevelshot()) {
-			if (R_CullLocalBox(localBounds, vEffect->modelMatrix, 5, tr.viewDef->frustum)) {
+			idBounds expandedBounds = localBounds;
+			expandedBounds.ExpandSelf( Max( 0.0f, bse_frustumCullExpand.GetFloat() ) );
+			if (R_CullLocalBox(expandedBounds, vEffect->modelMatrix, 5, tr.viewDef->frustum)) {
 				++dropFrustumCull;
 				continue;
 			}
@@ -2106,7 +2507,7 @@ void R_AddEffectSurfaces(void) {
 			}
 
 			srfTriangles_t* tri = surf->geometry;
-			if (bse_useFrustumCull.GetBool() && !R_ShouldDisableEntityCullingForLevelshot()) {
+			if (bse_useSurfaceFrustumCull.GetBool() && !R_ShouldDisableEntityCullingForLevelshot()) {
 				if (R_CullLocalBox(tri->bounds, vEffect->modelMatrix, 5, tr.viewDef->frustum)) {
 					++surfaceFrustumCull;
 					continue;
@@ -2124,27 +2525,17 @@ void R_AddEffectSurfaces(void) {
 				continue;
 			}
 
-			if ( tri->verts == NULL && tri->primBatchMesh == NULL ) {
+			srfTriangles_t *submitTri = R_CreateFrameSubmitTri( tri, shader->ReceivesLighting() );
+			if ( submitTri == NULL ) {
 				++surfaceCacheFail;
 				continue;
 			}
-			if ( tri->primBatchMesh != NULL ) {
-				if ( !R_CreatePackedSurfaceFrameCaches( tri, shader->ReceivesLighting(), false ) ) {
-					++surfaceCacheFail;
-					continue;
-				}
-			} else {
-				if ( !R_CreateAmbientCache( tri, shader->ReceivesLighting() ) ) {
-					++surfaceCacheFail;
-					continue;
-				}
-
-				// BSE dynamic surfaces rebuild index data every frame; keep them on the CPU index path.
-				tri->indexCache = NULL;
+			R_TouchVertexCache( submitTri->ambientCache );
+			if ( submitTri->indexCache != NULL ) {
+				R_TouchVertexCache( submitTri->indexCache );
 			}
-			R_TouchVertexCache( tri->ambientCache );
 
-			R_AddDrawSurf(tri, vEffect, &renderParms, shader, vEffect->scissorRect);
+			R_AddDrawSurf(submitTri, vEffect, &renderParms, shader, vEffect->scissorRect, DSF_BSE_EFFECT);
 			tri->ambientViewCount = tr.viewCount;
 			def->visibleCount = tr.viewCount;
 			++effectSurfaceCount;
@@ -2163,21 +2554,25 @@ void R_AddEffectSurfaces(void) {
 
 	if (counterMode > 0) {
 		common->Printf(
-			"BSE frame %d view %d mode=%d: spawned=%d serviced=%d rendered=%d defs=%d alive=%d expired=%d surfaces=%d\n",
+			"BSE frame %d view %d mode=%d: spawned=%d serviced=%d refreshed=%d deferred=%d rendered=%d defs=%d alive=%d expired=%d surfaces=%d\n",
 			tr.frameCount,
 			tr.viewDef->renderView.viewID,
 			counterMode,
 			spawned,
 			serviced,
+			refreshedCulledService,
+			deferredService,
 			renderedEffects,
 			totalDefs,
 			alive,
 			expired,
 			renderedSurfaces);
 		common->Printf(
-			"BSE drops: notConnected=%d viewSuppress=%d noModel=%d noSurfaces=%d clearedBounds=%d frustum=%d scissor=%d\n",
+			"BSE drops: notConnected=%d viewSuppress=%d area=%d defFrustum=%d noModel=%d noSurfaces=%d clearedBounds=%d frustum=%d scissor=%d\n",
 			dropNotConnected,
 			dropViewSuppress,
+			dropAreaCull,
+			dropDefFrustumCull,
 			dropNoModel,
 			dropNoModelSurfaces,
 			dropClearedBounds,
@@ -2301,12 +2696,18 @@ void R_RemoveUnecessaryViewLights( void ) {
 
 	// go through each visible light
 	for ( vLight = tr.viewDef->viewLights ; vLight ; vLight = vLight->next ) {
+		R_AddOptimizedPrelightShadows( vLight );
+
 		// if the light didn't have any lit surfaces visible, there is no need to
 		// draw any of the shadows.  We still keep the vLight for debugging
 		// draws
 		if ( !vLight->localInteractions && !vLight->globalInteractions && !vLight->translucentInteractions ) {
 			vLight->localShadows = NULL;
 			vLight->globalShadows = NULL;
+			vLight->localShadowMapCasters = NULL;
+			vLight->globalShadowMapCasters = NULL;
+			vLight->localTranslucentShadowMapCasters = NULL;
+			vLight->globalTranslucentShadowMapCasters = NULL;
 		}
 	}
 

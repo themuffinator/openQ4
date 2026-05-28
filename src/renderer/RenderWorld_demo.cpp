@@ -635,7 +635,8 @@ void	idRenderWorldLocal::WriteRenderLight( qhandle_t handle, const renderLight_t
 	session->writeDemo->WriteVec3( light->up );
 	session->writeDemo->WriteVec3( light->start );
 	session->writeDemo->WriteVec3( light->end );
-	session->writeDemo->WriteBool( light->prelightModel != NULL );
+	idRenderModel *prelightModel = R_SanitizePrelightModelPointer( light->prelightModel );
+	session->writeDemo->WriteBool( prelightModel != NULL );
 	session->writeDemo->WriteInt( light->lightId );
 	session->writeDemo->WriteBool( light->shader != NULL );
 	for ( int i = 0; i < MAX_ENTITY_SHADER_PARMS; i++)
@@ -643,8 +644,8 @@ void	idRenderWorldLocal::WriteRenderLight( qhandle_t handle, const renderLight_t
 	session->writeDemo->WriteInt( light->referenceSoundHandle );
 	session->writeDemo->WriteInt( light->referenceSound );
 
-	if ( light->prelightModel ) {
-		session->writeDemo->WriteHashString( light->prelightModel->Name() );
+	if ( prelightModel ) {
+		session->writeDemo->WriteHashString( prelightModel->Name() );
 	}
 	if ( light->shader ) {
 		session->writeDemo->WriteHashString( light->shader->GetName() );

@@ -27,6 +27,7 @@ uniform float uPointShadowTexelDepthBias;
 uniform float uShadowFilterRadius;
 uniform float uShadowFilterTaps;
 uniform float uShadowFilterMode;
+uniform float uShadowDebugMode;
 uniform float uPointShadowTexelScale;
 uniform float uPointShadowDepthMode;
 uniform float uTranslucentShadowEnabled;
@@ -34,6 +35,10 @@ uniform float uTranslucentShadowDensity;
 uniform float uTranslucentShadowFilterRadius;
 uniform float uTranslucentShadowMinVariance;
 uniform float uTranslucentShadowBleedReduction;
+
+const float kShadowDebugBiasOff = 8.0;
+const float kShadowDebugPCFOff = 9.0;
+const float kShadowDebugReceiverPlaneBiasOff = 11.0;
 
 varying vec2 vBumpTexCoord;
 varying vec2 vDiffuseTexCoord;
@@ -49,6 +54,14 @@ varying float vShadowLightCos;
 
 vec3 SafeNormalize( vec3 value ) {
 	return value * inversesqrt( max( dot( value, value ), 1.0e-8 ) );
+}
+
+bool ShadowDebugModeIs( float mode ) {
+	return abs( uShadowDebugMode - mode ) < 0.5;
+}
+
+float EffectiveShadowFilterRadius() {
+	return ShadowDebugModeIs( kShadowDebugPCFOff ) ? 0.0 : uShadowFilterRadius;
 }
 
 vec3 DecodeLocalNormal( vec4 bumpSample ) {
@@ -142,7 +155,7 @@ float ResolveTranslucentShadowMoments( vec4 moments, float depth ) {
 }
 
 vec4 SampleFilteredPointMoments( samplerCube momentMap, vec3 direction ) {
-	float filterRadius = TranslucentFilterRadius();
+	float filterRadius = ShadowDebugModeIs( kShadowDebugPCFOff ) ? 0.0 : TranslucentFilterRadius();
 	if ( filterRadius <= 0.0 || uPointShadowTexelScale <= 0.0 ) {
 		return textureCube( momentMap, direction );
 	}
@@ -160,10 +173,14 @@ vec4 SampleFilteredPointMoments( samplerCube momentMap, vec3 direction ) {
 }
 
 float ShadowReceiverBias() {
+	if ( ShadowDebugModeIs( kShadowDebugBiasOff ) ) {
+		return 0.0;
+	}
 	float lightCos = clamp( vShadowLightCos, 1.0e-3, 1.0 );
 	float sinTheta = sqrt( max( 1.0 - lightCos * lightCos, 0.0 ) );
 	float slopeBias = sinTheta / lightCos;
-	float scalarBias = uShadowBias + uShadowNormalBias * sinTheta;
+	float normalBias = ShadowDebugModeIs( kShadowDebugReceiverPlaneBiasOff ) ? 0.0 : uShadowNormalBias;
+	float scalarBias = uShadowBias + normalBias * sinTheta;
 	float texelBias = uPointShadowTexelDepthBias * ( 1.0 + slopeBias );
 	return max( max( scalarBias, 0.0 ), max( texelBias, 0.0 ) );
 }
@@ -200,14 +217,15 @@ float SamplePointShadow() {
 	}
 
 	vec3 direction = SafeNormalize( vPointShadowVector );
-	if ( uShadowFilterRadius <= 0.0 || uPointShadowTexelScale <= 0.0 ) {
+	float filterRadius = EffectiveShadowFilterRadius();
+	if ( filterRadius <= 0.0 || uPointShadowTexelScale <= 0.0 ) {
 		return SamplePointShadowCompare( direction, depth );
 	}
 
 	vec3 up = ( abs( direction.z ) < 0.99 ) ? vec3( 0.0, 0.0, 1.0 ) : vec3( 0.0, 1.0, 0.0 );
 	vec3 tangent = SafeNormalize( cross( up, direction ) );
 	vec3 bitangent = cross( direction, tangent );
-	float tap = uPointShadowTexelScale * uShadowFilterRadius;
+	float tap = uPointShadowTexelScale * filterRadius;
 
 	float shadow = 0.0;
 	shadow += SamplePointShadowCompare( direction, depth );

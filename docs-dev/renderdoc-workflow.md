@@ -15,6 +15,7 @@ This document covers the OpenQ4 RenderDoc status and the March 2026 black-viewpo
 
 - Upstream RenderDoc currently supports `OpenGL 3.2 - 4.6 Core` but not `OpenGL 1.0 - 2.0 Compat`; see the RenderDoc project README: <https://github.com/baldurk/renderdoc>.
 - OpenQ4's current renderer still depends on the ARB2 compatibility path (`GL_ARB_fragment_program`, `GL_ARB_shader_objects`, and related fixed-function era state).
+- OpenQ4 now has an explicit GL tier/context ladder (`r_glTier`) and can request core-profile contexts for forced modern tiers, but the shipping executor is still routed through the ARB2 bridge. Treat forced core contexts as renderer-modernization bring-up only until the GL 3.3/4.x executor lands.
 - On this machine, launching OpenQ4 through RenderDoc injection caused required compatibility features to disappear during startup, which aborted renderer initialization before any frame could be captured.
 - OpenQ4 now reports the missing required OpenGL features explicitly during that failure instead of only showing the generic "video card / driver" error.
 - The commands and wrapper below are retained as plumbing for future renderer modernization, but today they should be treated as unsupported on the shipping OpenGL renderer.

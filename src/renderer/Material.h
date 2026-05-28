@@ -521,9 +521,18 @@ public:
 	// a mirror or dynamic rendered image
 	bool				HasSubview(void) const { return hasSubview; }
 
+	// Retail collision helpers are hidden, explicitly non-shadowing collision
+	// hulls. Keep this separate from SurfaceCastsShadow() so callers can decide
+	// whether they need retail shadow semantics or render-only admission.
+	bool				IsDedicatedCollisionSurface(void) const {
+		return (surfaceFlags & SURF_COLLISION) != 0 && !IsDrawn() && TestMaterialFlag(MF_NOSHADOWS) && !TestMaterialFlag(MF_FORCESHADOWS);
+	}
+
 	// returns true if the material will generate shadows, not making a
 	// distinction between global and no-self shadows
-	bool				SurfaceCastsShadow(void) const { return TestMaterialFlag(MF_FORCESHADOWS) || !TestMaterialFlag(MF_NOSHADOWS); }
+	bool				SurfaceCastsShadow(void) const {
+		return TestMaterialFlag(MF_FORCESHADOWS) || !TestMaterialFlag(MF_NOSHADOWS);
+	}
 
 	// returns true if the material will generate interactions with fog/blend lights
 	// All non-translucent surfaces receive fog unless they are explicitly noFog

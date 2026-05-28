@@ -137,6 +137,7 @@ SURFACES
 
 // drawSurf_t are always allocated and freed every frame, they are never cached
 static const int	DSF_VIEW_INSIDE_SHADOW	= 1;
+static const int	DSF_BSE_EFFECT			= 2;
 
 typedef struct drawSurf_s {
 	const srfTriangles_t	*geo;
@@ -196,6 +197,17 @@ public:
 	virtual int				GetIndex() = 0;
 };
 
+ID_INLINE bool R_IsInvalidPrelightModelPointer( const idRenderModel *model ) {
+	return ( (uintptr_t)model ) == ~(uintptr_t)0;
+}
+
+ID_INLINE idRenderModel *R_SanitizePrelightModelPointer( idRenderModel *model ) {
+	return R_IsInvalidPrelightModelPointer( model ) ? NULL : model;
+}
+
+ID_INLINE bool R_LightHasRealPrelightModel( const renderLight_t &parms ) {
+	return R_SanitizePrelightModelPointer( parms.prelightModel ) != NULL;
+}
 
 // idRenderEntity should become the new public interface replacing the qhandle_t to entity defs in the idRenderWorld interface
 class idRenderEntity {
@@ -449,6 +461,7 @@ typedef struct viewDef_s {
 	viewEntity_t		worldSpace;
 
 	idRenderWorldLocal *renderWorld;
+	int					renderFlags;
 
 	float				floatTime;
 
@@ -1083,6 +1096,37 @@ extern idCVar r_brightness;				// changes gamma tables
 
 extern idCVar r_renderer;				// arb, nv10, nv20, r200, gl2, etc
 extern idCVar r_actualRenderer;			// actual active renderer backend after fallback
+extern idCVar r_glTier;					// auto, legacy, gl33, gl41, gl43, gl45, gl46
+extern idCVar r_glDebugContext;			// request a debug GL context when the platform backend supports it
+extern idCVar r_rendererMetrics;			// 0 off, 1 summary, 2 verbose per-frame/pass metrics
+extern idCVar r_rendererGpuTimers;		// sample GL timer queries when renderer metrics are enabled
+extern idCVar r_rendererBenchmarkPreset;	// benchmark budget preset
+extern idCVar r_rendererPerfThresholdP95;	// custom P95 benchmark threshold in milliseconds
+extern idCVar r_rendererPerfThresholdP99;	// custom P99 benchmark threshold in milliseconds
+extern idCVar r_rendererAdaptiveClusterGrid;	// use preset-driven cluster-grid dimensions
+extern idCVar r_rendererDynamicResolution;	// allow benchmark screen-percentage experiments
+extern idCVar r_rendererUploadMegs;		// dynamic upload stream size in megabytes per frame buffer
+extern idCVar r_rendererUploadFrameBuffers;	// dynamic upload stream frame-buffer rotation depth
+extern idCVar r_rendererUploadPersistent;	// allow persistent-mapped dynamic upload stream
+extern idCVar r_rendererModernExecutor;	// opt-in modern GL executor prepare path
+extern idCVar r_rendererModernSubmit;	// opt-in modern GL draw submission before ARB2 fallback
+extern idCVar r_rendererGpuValidation;	// compare GL43 GPU-driven compute results against CPU reference data
+extern idCVar r_rendererGpuValidationReadbackDelay;	// defer opt-in GL43 validation readback polling
+extern idCVar r_rendererBindless;	// opt-in experimental bindless texture diagnostics, disabled by default
+extern idCVar r_rendererModernVisible;	// opt-in modern hybrid visible-frame composition
+extern idCVar r_rendererModernAutoPromote;	// allow gated default modern-visible promotion
+extern idCVar r_rendererPromotionEvidence;	// Phase 8 evidence token required before auto-promotion
+extern idCVar r_rendererShaderReload;	// allow runtime reload of the internal modern GL shader library
+extern idCVar r_rendererModernVisibleDepth;	// opt-in graph-backed modern depth/shadow-depth execution
+extern idCVar r_rendererModernDepthDebug;	// show graph-backed modern depth resources as a debug overlay
+extern idCVar r_rendererModernOpaque;	// opt-in graph-backed modern opaque G-buffer execution
+extern idCVar r_rendererModernGBufferDebug;	// show graph-backed modern G-buffer attachments as a debug overlay
+extern idCVar r_rendererModernDeferred;	// opt-in graph-backed modern deferred light resolve execution
+extern idCVar r_rendererModernDeferredDebug;	// show graph-backed modern deferred resolve debug output
+extern idCVar r_rendererForwardPlus;	// opt-in graph-backed modern clustered forward+ execution
+extern idCVar r_rendererClusterDebug;	// show modern clustered light bins as a debug overlay
+extern idCVar r_rendererOcclusion;	// enable conservative modern visibility and occlusion culling
+extern idCVar r_rendererHiZ;	// allocate and build the modern scene Hi-Z depth pyramid
 extern idCVar r_useSimpleInteraction;	// use the simpler Quake 4 interaction program pair as a compatibility fallback
 extern idCVar r_interactionColorMode;	// interaction color mode: 0 auto, 1 packed env16.xy, 2 vector env16/env17
 extern idCVar r_shaderReport;			// shader diagnostics: 0 off, 1 summaries, 2 invalid-use warnings
@@ -1152,6 +1196,8 @@ extern idCVar r_shadowMapTranslucentMinVariance;	// minimum variance for translu
 extern idCVar r_shadowMapTranslucentBleedReduction;	// moment light-bleed reduction
 extern idCVar r_shadowMapGpuSyncTimings;	// 1 = glFinish-bracket shadow-map passes for GPU-synchronized diagnostics
 extern idCVar r_shadowMapGpuTimerQueries;	// 1 = use GL timer queries for shadow-map GPU diagnostics when available
+extern idCVar r_softParticles;			// 1 = depth-fade eligible BSE particle surfaces against the opaque scene depth
+extern idCVar r_softParticleFadeDistance;	// world-unit fade distance for r_softParticles
 extern idCVar r_enhancedMaterials;		// 1 = use enhanced GLSL interaction shading for stock materials when supported
 extern idCVar r_enhancedMaterialNormalScale;	// tangent-space normal XY scale when enhanced material shading is enabled
 extern idCVar r_enhancedMaterialSpecularBoost;	// specular intensity scale when enhanced material shading is enabled
@@ -1272,6 +1318,8 @@ extern idCVar r_showMemory;				// print frame memory utilization
 extern idCVar r_showCull;				// report sphere and box culling stats
 extern idCVar r_showInteractions;		// report interaction generation activity
 extern idCVar r_showSurfaces;			// report surface/light/shadow counts
+extern idCVar r_showViewBuildTimes;		// print CPU timings for render-view construction
+extern idCVar r_showViewBuildTimesInterval; // frames between render-view timing reports
 extern idCVar r_showPrimitives;			// report vertex/index/draw counts
 extern idCVar r_showPortals;			// draw portal outlines in color based on passed / not passed
 extern idCVar r_showAlloc;				// report alloc/free counts
@@ -1314,6 +1362,10 @@ typedef enum {
 	SHADOWMAP_DEBUGMODE_PROJECTED_W,
 	SHADOWMAP_DEBUGMODE_INVALID_MASK,
 	SHADOWMAP_DEBUGMODE_BIAS_HEATMAP,
+	SHADOWMAP_DEBUGMODE_BIAS_OFF,
+	SHADOWMAP_DEBUGMODE_PCF_OFF,
+	SHADOWMAP_DEBUGMODE_CASTER_OFFSET_OFF,
+	SHADOWMAP_DEBUGMODE_RECEIVER_PLANE_BIAS_OFF,
 	SHADOWMAP_DEBUGMODE_COUNT
 } shadowMapDebugMode_t;
 extern idCVar r_shadowMapDebugMode;		// projected shadow-map visualization mode
@@ -1534,7 +1586,7 @@ const float *R_SetupDrawSurfShaderRegisters( const viewEntity_t *space, const re
 					 const idMaterial *shader );
 void R_FinalizeDrawSurf( drawSurf_t *drawSurf );
 void R_AddDrawSurf( const srfTriangles_t *tri, const viewEntity_t *space, const renderEntity_t *renderEntity,
-					const idMaterial *shader, const idScreenRect &scissor );
+					const idMaterial *shader, const idScreenRect &scissor, int extraDrawSurfFlags = 0 );
 
 void R_LinkLightSurf( const drawSurf_t **link, const srfTriangles_t *tri, const viewEntity_t *space, 
 				   const idRenderLightLocal *light, const idMaterial *shader, const idScreenRect &scissor, bool viewInsideShadow );

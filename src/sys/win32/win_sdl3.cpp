@@ -2988,6 +2988,52 @@ void GLimp_SetGamma(unsigned short red[256], unsigned short green[256], unsigned
 	(void)blue;
 }
 
+static int SDL3_BuildGLContextCandidates(rendererContextCandidate_t *candidates, int maxCandidates) {
+	const rendererTierPreference_t preference = RendererTierPreference_FromString(r_glTier.GetString());
+	const bool keepAutoCompatibility = preference == RENDERER_TIER_PREF_AUTO;
+	return RendererContextLadder_Build(
+		candidates,
+		maxCandidates,
+		preference,
+		r_glDebugContext.GetBool(),
+		keepAutoCompatibility);
+}
+
+static void SDL3_SetGLAttributesForCandidate(glimpParms_t parms, const rendererContextCandidate_t &candidate) {
+	SDL_GL_ResetAttributes();
+	(void)SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
+	(void)SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
+	(void)SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
+	(void)SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
+	(void)SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+	(void)SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
+	(void)SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+	if (parms.stereo) {
+		(void)SDL_GL_SetAttribute(SDL_GL_STEREO, 1);
+	}
+	if (parms.multiSamples > 1) {
+		(void)SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
+		(void)SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, parms.multiSamples);
+	}
+	if (candidate.explicitVersion) {
+		(void)SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, candidate.major);
+		(void)SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, candidate.minor);
+		(void)SDL_GL_SetAttribute(
+			SDL_GL_CONTEXT_PROFILE_MASK,
+			candidate.profile == RENDERER_CONTEXT_PROFILE_CORE
+				? SDL_GL_CONTEXT_PROFILE_CORE
+				: SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
+	}
+	(void)SDL_GL_SetAttribute(
+		SDL_GL_CONTEXT_FLAGS,
+		candidate.debugContext ? SDL_GL_CONTEXT_DEBUG_FLAG : 0);
+}
+
+static void SDL3_RecordGLContextCandidate(const rendererContextCandidate_t &candidate) {
+	memset(&glConfig.contextRequest, 0, sizeof(glConfig.contextRequest));
+	glConfig.contextRequest = candidate;
+}
+
 bool GLimp_Init(glimpParms_t parms) {
 	const char *driverName;
 
@@ -3015,21 +3061,13 @@ bool GLimp_Init(glimpParms_t parms) {
 
 	SDL3_InitDesktopMode();
 
-	SDL_GL_ResetAttributes();
-	(void)SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
-	(void)SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
-	(void)SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
-	(void)SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
-	(void)SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-	(void)SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-	(void)SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-	if (parms.stereo) {
-		(void)SDL_GL_SetAttribute(SDL_GL_STEREO, 1);
+	rendererContextCandidate_t contextCandidates[RENDERER_CONTEXT_LADDER_MAX_CANDIDATES];
+	const int contextCandidateCount = SDL3_BuildGLContextCandidates(contextCandidates, static_cast<int>(sizeof(contextCandidates) / sizeof(contextCandidates[0])));
+	if (contextCandidateCount <= 0) {
+		common->Printf("SDL3: no OpenGL context candidates were generated for r_glTier %s\n", r_glTier.GetString());
+		return false;
 	}
-	if (parms.multiSamples > 1) {
-		(void)SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
-		(void)SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, parms.multiSamples);
-	}
+	SDL3_SetGLAttributesForCandidate(parms, contextCandidates[0]);
 
 	SDL_WindowFlags flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
 	if (!parms.fullScreen && parms.borderless) {
@@ -3061,7 +3099,19 @@ bool GLimp_Init(glimpParms_t parms) {
 		(void)SDL_SetWindowPosition(s_sdlWindow, targetX, targetY);
 	}
 
-	s_sdlContext = SDL_GL_CreateContext(s_sdlWindow);
+	s_sdlContext = NULL;
+	for (int candidateIndex = 0; candidateIndex < contextCandidateCount; ++candidateIndex) {
+		const rendererContextCandidate_t &candidate = contextCandidates[candidateIndex];
+		SDL3_SetGLAttributesForCandidate(parms, candidate);
+		common->Printf("SDL3: trying OpenGL context %s\n", candidate.label);
+		s_sdlContext = SDL_GL_CreateContext(s_sdlWindow);
+		if (s_sdlContext) {
+			SDL3_RecordGLContextCandidate(candidate);
+			common->Printf("SDL3: created OpenGL context %s\n", glConfig.contextRequest.label);
+			break;
+		}
+		common->Printf("SDL3: OpenGL context %s failed: %s\n", candidate.label, SDL_GetError());
+	}
 	if (!s_sdlContext) {
 		common->Printf("SDL3: could not create OpenGL context: %s\n", SDL_GetError());
 		SDL_DestroyWindow(s_sdlWindow);

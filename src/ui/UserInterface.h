@@ -113,6 +113,7 @@ public:
 	virtual void				SetCursor( float x, float y ) = 0;
 	virtual float				CursorX( void ) = 0;
 	virtual float				CursorY( void ) = 0;
+	virtual bool				GetMaxTextIndex( const char *windowName, const char *text, wrapInfo_t& wrapInfo ) const = 0;
 
 };
 

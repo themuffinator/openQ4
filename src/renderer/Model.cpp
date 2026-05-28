@@ -60,6 +60,29 @@ bool idRenderModel::HasCollisionSurface( const struct renderEntity_s *ent ) cons
 
 /*
 ================
+idRenderModelStatic::HasCollisionSurface
+================
+*/
+bool idRenderModelStatic::HasCollisionSurface( const struct renderEntity_s *ent ) const {
+	for ( int i = 0; i < surfaces.Num(); ++i ) {
+		const modelSurface_t *surf = &surfaces[i];
+		if ( surf->id == -1 || surf->shader == NULL ) {
+			continue;
+		}
+
+		const idMaterial *shader = ent != NULL
+			? R_RemapShaderBySkin( surf->shader, ent->customSkin, ent->customShader )
+			: surf->shader;
+		if ( shader != NULL && shader->IsDedicatedCollisionSurface() ) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+/*
+================
 idRenderModel::InstantiateDynamicModel
 ================
 */
@@ -113,6 +136,7 @@ idRenderModelStatic::idRenderModelStatic() {
 	purged = false;
 	fastLoad = false;
 	reloadable = true;
+	procSky = false;
 	levelLoadReferenced = false;
 	timeStamp = 0;
 }
@@ -400,6 +424,7 @@ void idRenderModelStatic::InitEmpty( const char *fileName ) {
 	reloadable = false;	// if it didn't come from a file, we can't reload it
 	PurgeModel();
 	purged = false;
+	procSky = false;
 	bounds.Zero();
 }
 
@@ -422,6 +447,24 @@ idRenderModelStatic::Name
 */
 const char *idRenderModelStatic::Name() const {
 	return name;
+}
+
+/*
+================
+idRenderModelStatic::SetProcSky
+================
+*/
+void idRenderModelStatic::SetProcSky( bool value ) {
+	procSky = value;
+}
+
+/*
+================
+idRenderModelStatic::HasProcSky
+================
+*/
+bool idRenderModelStatic::HasProcSky() const {
+	return procSky;
 }
 
 /*
@@ -2174,6 +2217,7 @@ void idRenderModelStatic::PurgeModel() {
 	surfaces.Clear();
 
 	purged = true;
+	procSky = false;
 }
 
 /*

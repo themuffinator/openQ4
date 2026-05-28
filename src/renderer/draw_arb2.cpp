@@ -60,11 +60,11 @@ typedef enum {
 	ARB2_MD5R_MODEL_ROW_0,
 	ARB2_MD5R_MODEL_ROW_1,
 	ARB2_MD5R_MODEL_ROW_2,
+	ARB2_MD5R_STAGE_RESERVED,
 	// Retail md5r*.vp programs read programmable stage vertex-color controls
-	// from c[90]/c[91] and leave c[92] as the preserved reserved slot.
+	// from c[91]/c[92] and leave c[90] as the preserved reserved slot.
 	ARB2_MD5R_STAGE_VERTEX_COLOR_MODULATE,
 	ARB2_MD5R_STAGE_VERTEX_COLOR_ADD,
-	ARB2_MD5R_STAGE_RESERVED,
 	ARB2_MD5R_FOG_DISTANCE_PLANE,
 	ARB2_MD5R_FOG_DISTANCE_BIAS,
 	ARB2_MD5R_FOG_ENTER_PLANE_T,
@@ -72,9 +72,9 @@ typedef enum {
 } arb2ProgramParameter_t;
 
 static_assert(
-	ARB2_MD5R_STAGE_VERTEX_COLOR_MODULATE == 90 &&
-	ARB2_MD5R_STAGE_VERTEX_COLOR_ADD == 91 &&
-	ARB2_MD5R_STAGE_RESERVED == 92 &&
+	ARB2_MD5R_STAGE_RESERVED == 90 &&
+	ARB2_MD5R_STAGE_VERTEX_COLOR_MODULATE == 91 &&
+	ARB2_MD5R_STAGE_VERTEX_COLOR_ADD == 92 &&
 	ARB2_MD5R_FOG_DISTANCE_PLANE == 93,
 	"Packed MD5R stage/fog registers must stay aligned with retail Quake 4 ARB programs" );
 
@@ -1816,6 +1816,7 @@ typedef struct {
 	GLint			shadowFilterRadius;
 	GLint			shadowFilterTaps;
 	GLint			shadowFilterMode;
+	GLint			shadowDebugMode;
 	GLint			pointShadowTexelScale;
 	GLint			pointShadowDepthMode;
 	GLint			translucentShadowEnabled;
@@ -2108,6 +2109,7 @@ typedef enum {
 	SHADOWMAP_PASS_RESULT_MAPPED = 0,
 	SHADOWMAP_PASS_RESULT_CACHE_REUSE,
 	SHADOWMAP_PASS_RESULT_NO_SHADOW_SURFS,
+	SHADOWMAP_PASS_RESULT_STENCIL_ONLY,
 	SHADOWMAP_PASS_RESULT_RENDER_FAIL,
 	SHADOWMAP_PASS_RESULT_MASK_FAIL,
 	SHADOWMAP_PASS_RESULT_SCHEDULED_SKIP
@@ -2243,6 +2245,8 @@ static const char *RB_ShadowMapPassResultName( shadowMapPassResult_t result ) {
 		return "cache-reuse";
 	case SHADOWMAP_PASS_RESULT_NO_SHADOW_SURFS:
 		return "no-shadow-surfs";
+	case SHADOWMAP_PASS_RESULT_STENCIL_ONLY:
+		return "stencil-only";
 	case SHADOWMAP_PASS_RESULT_RENDER_FAIL:
 		return "render-fail";
 	case SHADOWMAP_PASS_RESULT_MASK_FAIL:
@@ -2430,9 +2434,29 @@ static const char *RB_ShadowMapDebugModeName( shadowMapDebugMode_t mode ) {
 		return "invalid-mask";
 	case SHADOWMAP_DEBUGMODE_BIAS_HEATMAP:
 		return "bias-heatmap";
+	case SHADOWMAP_DEBUGMODE_BIAS_OFF:
+		return "bias-off";
+	case SHADOWMAP_DEBUGMODE_PCF_OFF:
+		return "pcf-off";
+	case SHADOWMAP_DEBUGMODE_CASTER_OFFSET_OFF:
+		return "caster-offset-off";
+	case SHADOWMAP_DEBUGMODE_RECEIVER_PLANE_BIAS_OFF:
+		return "receiver-plane-bias-off";
 	default:
 		return "unknown";
 	}
+}
+
+static bool RB_ShadowMapDebugModeIs( shadowMapDebugMode_t mode ) {
+	return RB_ShadowMapDebugMode() == mode;
+}
+
+static float RB_ShadowMapPolygonFactor( void ) {
+	return RB_ShadowMapDebugModeIs( SHADOWMAP_DEBUGMODE_CASTER_OFFSET_OFF ) ? 0.0f : r_shadowMapPolygonFactor.GetFloat();
+}
+
+static float RB_ShadowMapPolygonOffset( void ) {
+	return RB_ShadowMapDebugModeIs( SHADOWMAP_DEBUGMODE_CASTER_OFFSET_OFF ) ? 0.0f : r_shadowMapPolygonOffset.GetFloat();
 }
 
 static int RB_CountDrawSurfChain( const drawSurf_t *surf ) {
@@ -4275,6 +4299,7 @@ static const char *programBaseName = "glprogs/shadow_point_interaction";
 	g_pointShadowMapProgram.shadowFilterRadius = glGetUniformLocationARB( programObject, "uShadowFilterRadius" );
 	g_pointShadowMapProgram.shadowFilterTaps = glGetUniformLocationARB( programObject, "uShadowFilterTaps" );
 	g_pointShadowMapProgram.shadowFilterMode = glGetUniformLocationARB( programObject, "uShadowFilterMode" );
+	g_pointShadowMapProgram.shadowDebugMode = glGetUniformLocationARB( programObject, "uShadowDebugMode" );
 	g_pointShadowMapProgram.pointShadowTexelScale = glGetUniformLocationARB( programObject, "uPointShadowTexelScale" );
 	g_pointShadowMapProgram.pointShadowDepthMode = glGetUniformLocationARB( programObject, "uPointShadowDepthMode" );
 	g_pointShadowMapProgram.translucentShadowEnabled = glGetUniformLocationARB( programObject, "uTranslucentShadowEnabled" );
@@ -5203,7 +5228,7 @@ static bool RB_ShadowMapResolveCasterDrawData( const drawSurf_t *surf, srfTriang
 
 static void RB_ShadowMapRestorePolygonOffset( void ) {
 	glEnable( GL_POLYGON_OFFSET_FILL );
-	glPolygonOffset( r_shadowMapPolygonFactor.GetFloat(), r_shadowMapPolygonOffset.GetFloat() );
+	glPolygonOffset( RB_ShadowMapPolygonFactor(), RB_ShadowMapPolygonOffset() );
 }
 
 static void RB_ShadowMapModelMatrixRows( const float modelMatrix[16], float row0[4], float row1[4], float row2[4] );
@@ -5624,7 +5649,9 @@ static void RB_ShadowMapDrawPerforatedCasterHashed( const drawSurf_t *surf, cons
 	}
 }
 
-static void RB_ShadowMapDrawCasterChain( const drawSurf_t *surf, const bool useHashedAlpha ) {
+static int RB_ShadowMapDrawCasterChain( const drawSurf_t *surf, const bool useHashedAlpha ) {
+	int drawnCasters = 0;
+
 	for ( ; surf != NULL; surf = surf->nextOnLight ) {
 		srfTriangles_t *casterGeo = NULL;
 		vertCache_s *ambientCache = NULL;
@@ -5654,11 +5681,15 @@ static void RB_ShadowMapDrawCasterChain( const drawSurf_t *surf, const bool useH
 			} else {
 				RB_ShadowMapDrawPerforatedCasterClassic( surf, casterGeo, ac );
 			}
+			drawnCasters++;
 			continue;
 		}
 
 		RB_DrawElementsWithCounters( casterGeo );
+		drawnCasters++;
 	}
+
+	return drawnCasters;
 }
 
 static void RB_ShadowMapDrawTranslucentCasterChain( const drawSurf_t *surf ) {
@@ -6037,7 +6068,9 @@ static void RB_PointShadowMapDrawPerforatedCaster( const drawSurf_t *surf, const
 	}
 }
 
-static void RB_PointShadowMapDrawCasterChain( const drawSurf_t *surf, const float lightModelViewMatrix[16] ) {
+static int RB_PointShadowMapDrawCasterChain( const drawSurf_t *surf, const float lightModelViewMatrix[16] ) {
+	int drawnCasters = 0;
+
 	for ( ; surf != NULL; surf = surf->nextOnLight ) {
 		srfTriangles_t *casterGeo = NULL;
 		vertCache_s *ambientCache = NULL;
@@ -6078,11 +6111,15 @@ static void RB_PointShadowMapDrawCasterChain( const drawSurf_t *surf, const floa
 			} else {
 				RB_DrawElementsWithCounters( casterGeo );
 			}
+			drawnCasters++;
 			continue;
 		}
 
 		RB_DrawElementsWithCounters( casterGeo );
+		drawnCasters++;
 	}
+
+	return drawnCasters;
 }
 
 static void RB_PointShadowMapDrawTranslucentCasterChain( const drawSurf_t *surf, const float lightModelViewMatrix[16] ) {
@@ -6232,6 +6269,12 @@ static bool RB_RenderShadowMap( const drawSurf_t *primaryCasters, const drawSurf
 		return false;
 	}
 
+	const bool haveOpaqueCasterChain =
+		primaryCasters != NULL ||
+		secondaryCasters != NULL ||
+		tertiaryCasters != NULL ||
+		quaternaryCasters != NULL;
+	int drawnCasterCount = 0;
 	const GLboolean blendWasEnabled = glIsEnabled( GL_BLEND );
 	const GLboolean scissorWasEnabled = glIsEnabled( GL_SCISSOR_TEST );
 	const int savedFaceCulling = backEnd.glState.faceCulling;
@@ -6266,7 +6309,7 @@ static bool RB_RenderShadowMap( const drawSurf_t *primaryCasters, const drawSurf
 	glEnable( GL_CULL_FACE );
 	glCullFace( GL_BACK );
 	glEnable( GL_POLYGON_OFFSET_FILL );
-	glPolygonOffset( r_shadowMapPolygonFactor.GetFloat(), r_shadowMapPolygonOffset.GetFloat() );
+	glPolygonOffset( RB_ShadowMapPolygonFactor(), RB_ShadowMapPolygonOffset() );
 	const bool useHashedAlpha = RB_ShadowMapHashedAlphaEnabled() && RB_ShadowMapLoadCasterProgram();
 
 	for ( int cascadeIndex = 0; cascadeIndex < g_projectedShadowMapState.cascadeCount; cascadeIndex++ ) {
@@ -6284,10 +6327,10 @@ static bool RB_RenderShadowMap( const drawSurf_t *primaryCasters, const drawSurf
 		glMatrixMode( GL_MODELVIEW );
 
 		backEnd.currentSpace = NULL;
-		RB_ShadowMapDrawCasterChain( primaryCasters, useHashedAlpha );
-		RB_ShadowMapDrawCasterChain( secondaryCasters, useHashedAlpha );
-		RB_ShadowMapDrawCasterChain( tertiaryCasters, useHashedAlpha );
-		RB_ShadowMapDrawCasterChain( quaternaryCasters, useHashedAlpha );
+		drawnCasterCount += RB_ShadowMapDrawCasterChain( primaryCasters, useHashedAlpha );
+		drawnCasterCount += RB_ShadowMapDrawCasterChain( secondaryCasters, useHashedAlpha );
+		drawnCasterCount += RB_ShadowMapDrawCasterChain( tertiaryCasters, useHashedAlpha );
+		drawnCasterCount += RB_ShadowMapDrawCasterChain( quaternaryCasters, useHashedAlpha );
 	}
 
 	glDisable( GL_POLYGON_OFFSET_FILL );
@@ -6333,7 +6376,11 @@ static bool RB_RenderShadowMap( const drawSurf_t *primaryCasters, const drawSurf
 	GL_ClearStateDelta();
 	GL_SelectTexture( 0 );
 
-	return true;
+	// Legacy stencil/prelight shadow chains are valid fallback inputs, but they
+	// may not resolve to ambient geometry that the shadow-map caster path can
+	// draw. Treat an all-skipped opaque caster set as a render miss so the pass
+	// falls back to the retail stencil path instead of sampling an empty map.
+	return !haveOpaqueCasterChain || drawnCasterCount > 0;
 }
 
 static bool RB_RenderPointShadowMap( const drawSurf_t *primaryCasters, const drawSurf_t *secondaryCasters, const drawSurf_t *tertiaryCasters, const drawSurf_t *quaternaryCasters ) {
@@ -6341,6 +6388,12 @@ static bool RB_RenderPointShadowMap( const drawSurf_t *primaryCasters, const dra
 		return false;
 	}
 
+	const bool haveOpaqueCasterChain =
+		primaryCasters != NULL ||
+		secondaryCasters != NULL ||
+		tertiaryCasters != NULL ||
+		quaternaryCasters != NULL;
+	int drawnCasterCount = 0;
 	const GLboolean blendWasEnabled = glIsEnabled( GL_BLEND );
 	const int savedFaceCulling = backEnd.glState.faceCulling;
 
@@ -6407,7 +6460,7 @@ static bool RB_RenderPointShadowMap( const drawSurf_t *primaryCasters, const dra
 	glEnable( GL_CULL_FACE );
 	glCullFace( GL_BACK );
 	glEnable( GL_POLYGON_OFFSET_FILL );
-	glPolygonOffset( r_shadowMapPolygonFactor.GetFloat(), r_shadowMapPolygonOffset.GetFloat() );
+	glPolygonOffset( RB_ShadowMapPolygonFactor(), RB_ShadowMapPolygonOffset() );
 	glClearColor( 1.0f, 1.0f, 1.0f, 1.0f );
 
 	glMatrixMode( GL_PROJECTION );
@@ -6424,10 +6477,10 @@ static bool RB_RenderPointShadowMap( const drawSurf_t *primaryCasters, const dra
 		glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 
 		backEnd.currentSpace = NULL;
-		RB_PointShadowMapDrawCasterChain( primaryCasters, lightModelViewMatrix );
-		RB_PointShadowMapDrawCasterChain( secondaryCasters, lightModelViewMatrix );
-		RB_PointShadowMapDrawCasterChain( tertiaryCasters, lightModelViewMatrix );
-		RB_PointShadowMapDrawCasterChain( quaternaryCasters, lightModelViewMatrix );
+		drawnCasterCount += RB_PointShadowMapDrawCasterChain( primaryCasters, lightModelViewMatrix );
+		drawnCasterCount += RB_PointShadowMapDrawCasterChain( secondaryCasters, lightModelViewMatrix );
+		drawnCasterCount += RB_PointShadowMapDrawCasterChain( tertiaryCasters, lightModelViewMatrix );
+		drawnCasterCount += RB_PointShadowMapDrawCasterChain( quaternaryCasters, lightModelViewMatrix );
 	}
 
 	glDisable( GL_POLYGON_OFFSET_FILL );
@@ -6469,7 +6522,9 @@ static bool RB_RenderPointShadowMap( const drawSurf_t *primaryCasters, const dra
 	GL_ClearStateDelta();
 	GL_SelectTexture( 0 );
 
-	return true;
+	// See the projected-light path above: mapped point lights must not treat an
+	// all-skipped legacy caster chain as a successful, empty shadow map.
+	return !haveOpaqueCasterChain || drawnCasterCount > 0;
 }
 
 static bool RB_RenderTranslucentShadowMap( const drawSurf_t *primaryCasters, const drawSurf_t *secondaryCasters ) {
@@ -6515,7 +6570,7 @@ static bool RB_RenderTranslucentShadowMap( const drawSurf_t *primaryCasters, con
 	glEnable( GL_CULL_FACE );
 	glCullFace( GL_BACK );
 	glEnable( GL_POLYGON_OFFSET_FILL );
-	glPolygonOffset( r_shadowMapPolygonFactor.GetFloat(), r_shadowMapPolygonOffset.GetFloat() );
+	glPolygonOffset( RB_ShadowMapPolygonFactor(), RB_ShadowMapPolygonOffset() );
 	glClearColor( 0.0f, 0.0f, 0.0f, 0.0f );
 
 	for ( int cascadeIndex = 0; cascadeIndex < g_projectedShadowMapState.cascadeCount; cascadeIndex++ ) {
@@ -6647,7 +6702,7 @@ static bool RB_RenderPointTranslucentShadowMap( const drawSurf_t *primaryCasters
 	glEnable( GL_CULL_FACE );
 	glCullFace( GL_BACK );
 	glEnable( GL_POLYGON_OFFSET_FILL );
-	glPolygonOffset( r_shadowMapPolygonFactor.GetFloat(), r_shadowMapPolygonOffset.GetFloat() );
+	glPolygonOffset( RB_ShadowMapPolygonFactor(), RB_ShadowMapPolygonOffset() );
 	glClearColor( 0.0f, 0.0f, 0.0f, 0.0f );
 
 	glMatrixMode( GL_PROJECTION );
@@ -7042,17 +7097,15 @@ static bool RB_GLSLPrepareInteractionVertexCache( const drawSurf_t *surf, idDraw
 		return false;
 	}
 
-#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
-	if ( mutableTri->primBatchMesh != NULL
-		&& mutableTri->indexCache == NULL
+	if ( mutableTri->indexCache == NULL
 		&& r_useIndexBuffers.GetBool()
 		&& mutableTri->indexes != NULL
 		&& mutableTri->numIndexes > 0 ) {
 		mutableTri->indexCache = vertexCache.AllocFrameTemp(
 			mutableTri->indexes,
-			mutableTri->numIndexes * sizeof( mutableTri->indexes[0] ) );
+			mutableTri->numIndexes * sizeof( mutableTri->indexes[0] ),
+			true );
 	}
-#endif
 
 	R_TouchVertexCache( mutableTri->ambientCache );
 	if ( mutableTri->indexCache != NULL ) {
@@ -7061,6 +7114,69 @@ static bool RB_GLSLPrepareInteractionVertexCache( const drawSurf_t *surf, idDraw
 
 	ambientVertexPointer = (idDrawVert *)vertexCache.Position( mutableTri->ambientCache );
 	return true;
+}
+
+static bool RB_SurfaceUsesGeneratedCharacterGeometry( const drawSurf_t *surf ) {
+	if ( surf == NULL || surf->geo == NULL ) {
+		return true;
+	}
+
+	const srfTriangles_t *tri = surf->geo;
+	const srfTriangles_t *ambientTri = ( tri->ambientSurface != NULL ) ? tri->ambientSurface : tri;
+
+	if ( tri->deformedSurface || ( ambientTri != NULL && ambientTri->deformedSurface ) ) {
+		return true;
+	}
+
+#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
+	if ( tri->primBatchMesh != NULL || ( ambientTri != NULL && ambientTri->primBatchMesh != NULL ) ) {
+		return true;
+	}
+	if ( tri->skinToModelTransforms != NULL || tri->numSkinToModelTransforms > 0
+		|| ( ambientTri != NULL && ( ambientTri->skinToModelTransforms != NULL || ambientTri->numSkinToModelTransforms > 0 ) ) ) {
+		return true;
+	}
+#endif
+
+	if ( surf->space != NULL && surf->space->entityDef != NULL ) {
+		const renderEntity_t &renderEntity = surf->space->entityDef->parms;
+		if ( renderEntity.joints != NULL || renderEntity.numJoints > 0 ) {
+			return true;
+		}
+		if ( renderEntity.hModel != NULL && renderEntity.hModel->IsDynamicModel() != DM_STATIC ) {
+			return true;
+		}
+		if ( surf->space->entityDef->dynamicModel != NULL || surf->space->entityDef->cachedDynamicModel != NULL ) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+static bool RB_SurfaceEligibleForStockGLSLInteraction( const drawSurf_t *surf ) {
+	if ( surf == NULL || surf->geo == NULL || surf->space == NULL || surf->material == NULL || surf->shaderRegisters == NULL ) {
+		return false;
+	}
+	if ( surf->geo->numIndexes <= 0 || surf->geo->ambientCache == NULL ) {
+		return false;
+	}
+	if ( RB_SurfaceUsesGeneratedCharacterGeometry( surf ) ) {
+		return false;
+	}
+
+	return true;
+}
+
+static bool RB_DrawSurfChainEligibleForStockGLSLInteractions( const drawSurf_t *surf ) {
+	bool sawSurface = false;
+	for ( ; surf != NULL; surf = surf->nextOnLight ) {
+		sawSurface = true;
+		if ( !RB_SurfaceEligibleForStockGLSLInteraction( surf ) ) {
+			return false;
+		}
+	}
+	return sawSurface;
 }
 
 static bool RB_SurfaceHasActiveCustomGLSLLighting( const drawSurf_t *surf ) {
@@ -7437,7 +7553,10 @@ static void RB_DrawMaterialInteractions( const drawSurf_t *surf ) {
 		return;
 	}
 
-	if ( !RB_DrawSurfChainHasCustomGLSLLighting( surf ) && RB_EnhancedMaterialShadingActive() && RB_GLSLMaterial_CreateDrawInteractions( surf ) ) {
+	if ( !RB_DrawSurfChainHasCustomGLSLLighting( surf )
+		&& RB_EnhancedMaterialShadingActive()
+		&& RB_DrawSurfChainEligibleForStockGLSLInteractions( surf )
+		&& RB_GLSLMaterial_CreateDrawInteractions( surf ) ) {
 		return;
 	}
 
@@ -7554,6 +7673,9 @@ static bool RB_GLSLShadowMap_CreateDrawInteractions( const drawSurf_t *surf ) {
 				globalImages->BindNull();
 			}
 		}
+	}
+	if ( g_shadowMapProgram.materialEnhanced >= 0 ) {
+		glUniform1fARB( g_shadowMapProgram.materialEnhanced, RB_EnhancedMaterialShadingActive() ? 1.0f : 0.0f );
 	}
 	RB_MaterialInteractionSetEnhancementUniforms(
 		g_shadowMapProgram.materialNormalScale,
@@ -7694,6 +7816,9 @@ static bool RB_GLSLPointShadowMap_CreateDrawInteractions( const drawSurf_t *surf
 	if ( g_pointShadowMapProgram.shadowFilterMode >= 0 ) {
 		glUniform1fARB( g_pointShadowMapProgram.shadowFilterMode, static_cast<float>( idMath::ClampInt( 0, 1, r_shadowMapPointFilterMode.GetInteger() ) ) );
 	}
+	if ( g_pointShadowMapProgram.shadowDebugMode >= 0 ) {
+		glUniform1fARB( g_pointShadowMapProgram.shadowDebugMode, (float)RB_ShadowMapDebugMode() );
+	}
 	if ( g_pointShadowMapProgram.globalLightOrigin >= 0 ) {
 		const float globalLightOrigin[4] = {
 			backEnd.vLight->globalLightOrigin[0],
@@ -7727,6 +7852,9 @@ static bool RB_GLSLPointShadowMap_CreateDrawInteractions( const drawSurf_t *surf
 	}
 	if ( g_pointShadowMapProgram.translucentShadowBleedReduction >= 0 ) {
 		glUniform1fARB( g_pointShadowMapProgram.translucentShadowBleedReduction, r_shadowMapTranslucentBleedReduction.GetFloat() );
+	}
+	if ( g_pointShadowMapProgram.materialEnhanced >= 0 ) {
+		glUniform1fARB( g_pointShadowMapProgram.materialEnhanced, RB_EnhancedMaterialShadingActive() ? 1.0f : 0.0f );
 	}
 	RB_MaterialInteractionSetEnhancementUniforms(
 		g_pointShadowMapProgram.materialNormalScale,
@@ -8034,6 +8162,13 @@ static void RB_ShadowMapDebugOverlayDrawLabels( const float panelX, const float 
 	}
 }
 
+static void RB_ShadowMapDebugOverlayFormatLine( char *dest, int destSize, const char *fmt, ... ) {
+	va_list argptr;
+	va_start( argptr, fmt );
+	idStr::vsnPrintf( dest, destSize, fmt, argptr );
+	va_end( argptr );
+}
+
 static void RB_ShadowMapDebugOverlayDraw( void ) {
 	if ( !RB_ShadowMapDebugOverlayEnabled() || !RB_ShadowMapDebugOverlayLoadProgram() ) {
 		return;
@@ -8136,21 +8271,21 @@ static void RB_ShadowMapDebugOverlayDraw( void ) {
 		RB_ShadowMapDebugOverlayDrawLabels( panelX, panelY, panelW, panelH );
 	}
 
-	char line1[96];
-	char line2[96];
-	char line3[96];
-	char line4[96];
+	char line1[128];
+	char line2[128];
+	char line3[128];
+	char line4[128];
 	if ( g_shadowMapDebugOverlayState.valid ) {
 		const char *lightLabel = ( g_shadowMapDebugOverlayState.lightDefIndex >= 0 ) ?
 			va( "L%d", g_shadowMapDebugOverlayState.lightDefIndex ) : "L?";
-		idStr::snPrintf( line1, sizeof( line1 ), "%s %c %s %c%d %s",
+		RB_ShadowMapDebugOverlayFormatLine( line1, sizeof( line1 ), "%s %c %s %c%d %s",
 			g_shadowMapDebugOverlayState.pointLight ? "POINT" : "PROJ",
 			g_shadowMapDebugOverlayState.globalPass ? 'G' : 'L',
 			lightLabel,
 			g_shadowMapDebugOverlayState.pointLight ? 'F' : 'C',
 			g_shadowMapDebugOverlayState.pointLight ? 6 : g_shadowMapDebugOverlayState.cascadeCount,
 			g_shadowMapDebugOverlayState.mapped ? "MAP" : "FB" );
-		idStr::snPrintf( line2, sizeof( line2 ), "CAST %s SURF %s INTR %s",
+		RB_ShadowMapDebugOverlayFormatLine( line2, sizeof( line2 ), "CAST %s SURF %s INTR %s",
 			( g_shadowMapDebugOverlayState.casterCount >= 0 ) ? va( "%d", g_shadowMapDebugOverlayState.casterCount ) : "?",
 			( g_shadowMapDebugOverlayState.shadowSurfCount >= 0 ) ? va( "%d", g_shadowMapDebugOverlayState.shadowSurfCount ) : "?",
 			( g_shadowMapDebugOverlayState.interactionCount >= 0 ) ? va( "%d", g_shadowMapDebugOverlayState.interactionCount ) : "?" );
@@ -8160,13 +8295,13 @@ static void RB_ShadowMapDebugOverlayDraw( void ) {
 			( g_shadowMapDebugOverlayState.rejectedCasterCount >= 0 ) ? va( "%d", g_shadowMapDebugOverlayState.rejectedCasterCount ) : "?",
 			( g_shadowMapDebugOverlayState.expandedCasterCount >= 0 ) ? va( "%d", g_shadowMapDebugOverlayState.expandedCasterCount ) : "?" );
 	} else {
-		idStr::snPrintf( line1, sizeof( line1 ), "NO MAP" );
-		idStr::snPrintf( line2, sizeof( line2 ), "SUP %d/%d",
+		idStr::Copynz( line1, "NO MAP", sizeof( line1 ) );
+		RB_ShadowMapDebugOverlayFormatLine( line2, sizeof( line2 ), "SUP %d/%d",
 			g_shadowMapStats.supportedLights,
 			g_shadowMapStats.totalLights );
 		idStr::snPrintf( line4, sizeof( line4 ), "NO CAST" );
 	}
-	idStr::snPrintf( line3, sizeof( line3 ), "SUP %d/%d MAP %d/%d FB %d/%d",
+	RB_ShadowMapDebugOverlayFormatLine( line3, sizeof( line3 ), "SUP %d/%d MAP %d/%d FB %d/%d",
 		g_shadowMapStats.supportedLights,
 		g_shadowMapStats.totalLights,
 		g_shadowMapStats.mappedLocalPasses,
@@ -8229,9 +8364,11 @@ static void RB_ShadowMapRunPass( const viewLight_t *vLight, shadowMapPassKind_t 
 
 	const drawSurf_t *translucentPrimaryCasters = vLight->globalTranslucentShadowMapCasters;
 	const drawSurf_t *translucentSecondaryCasters = ( passKind == SHADOWMAP_PASS_GLOBAL ) ? vLight->localTranslucentShadowMapCasters : NULL;
+	const bool haveOpaqueCasters = primaryCasters != NULL || secondaryCasters != NULL || tertiaryCasters != NULL || quaternaryCasters != NULL;
 	const bool haveTranslucentCasters = translucentPrimaryCasters != NULL || translucentSecondaryCasters != NULL;
+	const bool haveStencilShadowSurfs = primaryShadowSurfs != NULL || secondaryShadowSurfs != NULL;
 
-	if ( primaryShadowSurfs == NULL && secondaryShadowSurfs == NULL && primaryCasters == NULL && secondaryCasters == NULL && tertiaryCasters == NULL && quaternaryCasters == NULL && !haveTranslucentCasters ) {
+	if ( !haveOpaqueCasters && !haveStencilShadowSurfs && !haveTranslucentCasters ) {
 		if ( passKind == SHADOWMAP_PASS_LOCAL ) {
 			g_shadowMapStats.unshadowedLocalPasses++;
 		} else {
@@ -8243,11 +8380,30 @@ static void RB_ShadowMapRunPass( const viewLight_t *vLight, shadowMapPassKind_t 
 		return;
 	}
 
+	const bool customGLSLLighting = RB_DrawSurfChainHasCustomGLSLLighting( interactions );
+	const bool stockGLSLInteractionsSafe = RB_DrawSurfChainEligibleForStockGLSLInteractions( interactions );
+	const bool receiverMaskSafe = !customGLSLLighting && stockGLSLInteractionsSafe;
+
+	if ( !haveOpaqueCasters && !haveTranslucentCasters ) {
+		const shadowMapPassResult_t passResult = SHADOWMAP_PASS_RESULT_STENCIL_ONLY;
+		if ( passKind == SHADOWMAP_PASS_LOCAL ) {
+			g_shadowMapStats.fallbackLocalPasses++;
+		} else {
+			g_shadowMapStats.fallbackGlobalPasses++;
+		}
+		RB_ShadowMapDebugOverlayCapture( vLight, passKind, pointLight, false, false,
+			primaryCasters, secondaryCasters, tertiaryCasters, quaternaryCasters,
+			primaryShadowSurfs, secondaryShadowSurfs, interactions );
+		RB_ShadowMapPassReport( vLight, passKind, pointLight, passResult, primaryCasters, secondaryCasters, tertiaryCasters, quaternaryCasters, primaryShadowSurfs, secondaryShadowSurfs, interactions );
+		RB_ShadowMapStencilFallback( primaryShadowSurfs, secondaryShadowSurfs, interactions );
+		return;
+	}
+
 	shadowMapSchedule_t schedule = RB_ShadowMapSchedulePass( vLight, passKind, pointLight, haveTranslucentCasters );
 	if ( schedule.action == SHADOWMAP_SCHEDULE_REUSE ) {
 		idTimer maskTimer;
 		maskTimer.Start();
-		const bool maskOk = pointLight ? RB_GLSLPointShadowMap_CreateDrawInteractions( interactions ) : RB_GLSLShadowMap_CreateDrawInteractions( interactions );
+		const bool maskOk = receiverMaskSafe && ( pointLight ? RB_GLSLPointShadowMap_CreateDrawInteractions( interactions ) : RB_GLSLShadowMap_CreateDrawInteractions( interactions ) );
 		maskTimer.Stop();
 		g_shadowMapStats.cpuMaskMilliseconds += maskTimer.Milliseconds();
 		if ( pointLight && schedule.pointEntry != NULL ) {
@@ -8264,8 +8420,8 @@ static void RB_ShadowMapRunPass( const viewLight_t *vLight, shadowMapPassKind_t 
 			RB_ShadowMapDebugOverlayCapture( vLight, passKind, pointLight, true, true,
 				primaryCasters, secondaryCasters, tertiaryCasters, quaternaryCasters,
 				primaryShadowSurfs, secondaryShadowSurfs, interactions );
-			// Preserve custom GLSL material lighting without letting one custom
-			// receiver veto the shadow-mapped standard interactions for the light.
+			// Keep the custom-stage hook after standard lighting; receiverMaskSafe
+			// currently makes this a no-op unless the safety gate widens later.
 			RB_ARB2_CreateCustomGLSLDrawInteractions( interactions );
 			RB_ShadowMapPassReport( vLight, passKind, pointLight, SHADOWMAP_PASS_RESULT_CACHE_REUSE, primaryCasters, secondaryCasters, tertiaryCasters, quaternaryCasters, primaryShadowSurfs, secondaryShadowSurfs, interactions );
 			return;
@@ -8321,7 +8477,7 @@ static void RB_ShadowMapRunPass( const viewLight_t *vLight, shadowMapPassKind_t 
 	}
 	idTimer maskTimer;
 	maskTimer.Start();
-	const bool maskOk = renderOk && ( pointLight ? RB_GLSLPointShadowMap_CreateDrawInteractions( interactions ) : RB_GLSLShadowMap_CreateDrawInteractions( interactions ) );
+	const bool maskOk = renderOk && receiverMaskSafe && ( pointLight ? RB_GLSLPointShadowMap_CreateDrawInteractions( interactions ) : RB_GLSLShadowMap_CreateDrawInteractions( interactions ) );
 	maskTimer.Stop();
 	g_shadowMapStats.cpuMaskMilliseconds += maskTimer.Milliseconds();
 	shadowMapPassResult_t passResult = SHADOWMAP_PASS_RESULT_MAPPED;
@@ -8342,8 +8498,8 @@ static void RB_ShadowMapRunPass( const viewLight_t *vLight, shadowMapPassKind_t 
 		} else {
 			g_shadowMapStats.mappedGlobalPasses++;
 		}
-		// Custom GLSL material stages are additive and do not currently sample the
-		// shadow map, so draw them after the standard shadow-mapped interactions.
+		// Keep the custom-stage hook after standard lighting; receiverMaskSafe
+		// currently makes this a no-op unless the safety gate widens later.
 		RB_ARB2_CreateCustomGLSLDrawInteractions( interactions );
 		RB_ShadowMapPassReport( vLight, passKind, pointLight, passResult, primaryCasters, secondaryCasters, tertiaryCasters, quaternaryCasters, primaryShadowSurfs, secondaryShadowSurfs, interactions );
 		return;
@@ -8693,20 +8849,17 @@ void RB_ARB2_DrawInteractions( void ) {
 			glStencilFunc( GL_ALWAYS, 128, 255 );
 
 			if ( vLight->pointLight ) {
-				const drawSurf_t *pointLocalPrimaryCasters = vLight->globalShadowMapCasters;
-				const drawSurf_t *pointLocalSecondaryCasters = NULL;
-				const drawSurf_t *pointGlobalPrimaryCasters = vLight->globalShadowMapCasters;
-				const drawSurf_t *pointGlobalSecondaryCasters = vLight->localShadowMapCasters;
-				const drawSurf_t *pointGlobalTertiaryCasters = NULL;
-				const drawSurf_t *pointGlobalQuaternaryCasters = NULL;
-
-				// Point depth cubemaps use dedicated ambient-geometry caster lists. Feeding
-				// legacy shadow-volume geometry into these passes creates false occluders.
-				RB_ShadowMapRunPass( vLight, SHADOWMAP_PASS_LOCAL, true, pointLocalPrimaryCasters, pointLocalSecondaryCasters, NULL, NULL, vLight->globalShadows, NULL, vLight->localInteractions );
-				RB_ShadowMapRunPass( vLight, SHADOWMAP_PASS_GLOBAL, true, pointGlobalPrimaryCasters, pointGlobalSecondaryCasters, pointGlobalTertiaryCasters, pointGlobalQuaternaryCasters, vLight->globalShadows, vLight->localShadows, vLight->globalInteractions );
+				// Point-light shadow maps use the same ownership split as the retail
+				// stencil path: local receivers see global casters, while global
+				// receivers see both global and noSelfShadow/local casters. The
+				// shadow-map pass must only draw dedicated ambient-geometry casters:
+				// legacy stencil shadow chains resolve back to the same ambient
+				// surfaces and can double-submit overlapping collision/helper meshes.
+				RB_ShadowMapRunPass( vLight, SHADOWMAP_PASS_LOCAL, true, vLight->globalShadowMapCasters, NULL, NULL, NULL, vLight->globalShadows, NULL, vLight->localInteractions );
+				RB_ShadowMapRunPass( vLight, SHADOWMAP_PASS_GLOBAL, true, vLight->globalShadowMapCasters, vLight->localShadowMapCasters, NULL, NULL, vLight->globalShadows, vLight->localShadows, vLight->globalInteractions );
 			} else {
-				RB_ShadowMapRunPass( vLight, SHADOWMAP_PASS_LOCAL, false, vLight->globalShadowMapCasters, vLight->globalShadows, NULL, NULL, vLight->globalShadows, NULL, vLight->localInteractions );
-				RB_ShadowMapRunPass( vLight, SHADOWMAP_PASS_GLOBAL, false, vLight->globalShadowMapCasters, vLight->localShadowMapCasters, vLight->globalShadows, vLight->localShadows, vLight->globalShadows, vLight->localShadows, vLight->globalInteractions );
+				RB_ShadowMapRunPass( vLight, SHADOWMAP_PASS_LOCAL, false, vLight->globalShadowMapCasters, NULL, NULL, NULL, vLight->globalShadows, NULL, vLight->localInteractions );
+				RB_ShadowMapRunPass( vLight, SHADOWMAP_PASS_GLOBAL, false, vLight->globalShadowMapCasters, vLight->localShadowMapCasters, NULL, NULL, vLight->globalShadows, vLight->localShadows, vLight->globalInteractions );
 			}
 
 			if ( !r_skipTranslucent.GetBool() ) {
@@ -9259,6 +9412,11 @@ void R_ARB2_Init( void ) {
 	glConfig.preferSimpleLighting = false;
 
 	common->Printf( "---------- R_ARB2_Init ----------\n" );
+
+	if ( !glConfig.backendCaps.hasFixedFunctionCompatibility ) {
+		common->Printf( "Not available: OpenGL core profile does not expose the compatibility state required by the ARB2 bridge.\n" );
+		return;
+	}
 
 	if ( !glConfig.ARBVertexProgramAvailable || !glConfig.ARBFragmentProgramAvailable ) {
 		common->Printf( "Not available.\n" );

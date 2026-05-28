@@ -67,10 +67,22 @@ const float kShadowDebugProjectedDepth = 4.0;
 const float kShadowDebugProjectedW = 5.0;
 const float kShadowDebugInvalidMask = 6.0;
 const float kShadowDebugBiasHeatmap = 7.0;
+const float kShadowDebugBiasOff = 8.0;
+const float kShadowDebugPCFOff = 9.0;
+const float kShadowDebugCasterOffsetOff = 10.0;
+const float kShadowDebugReceiverPlaneBiasOff = 11.0;
 
 float gShadowDebugState = 0.0;
 
 bool ProjectShadowCoord( vec4 shadowCoord, out vec2 localUv, out float depth );
+
+bool ShadowDebugModeIs( float mode ) {
+	return abs( uShadowDebugMode - mode ) < 0.5;
+}
+
+bool ShadowVisualDebugMode() {
+	return uShadowDebugMode > 0.5 && uShadowDebugMode < kShadowDebugBiasOff - 0.5;
+}
 
 bool ShadowCoordComponentInvalid( float value ) {
 	return value != value || abs( value ) > kShadowCoordMaxMagnitude;
@@ -155,6 +167,9 @@ float TranslucentFilterRadius() {
 }
 
 float EffectiveShadowFilterRadius() {
+	if ( ShadowDebugModeIs( kShadowDebugPCFOff ) ) {
+		return 0.0;
+	}
 	float radius = uShadowFilterRadius;
 #ifndef OPENQ4_SHADOW_COMPARE
 	if ( uShadowFilterMode > 1.5 ) {
@@ -190,7 +205,7 @@ vec2 ShadowAtlasGuardBand() {
 }
 
 vec4 SampleFilteredMoments( sampler2D momentMap, vec2 uv, vec2 clampMin, vec2 clampMax ) {
-	float filterRadius = TranslucentFilterRadius();
+	float filterRadius = ShadowDebugModeIs( kShadowDebugPCFOff ) ? 0.0 : TranslucentFilterRadius();
 	if ( filterRadius <= 0.0 ) {
 		return texture2D( momentMap, uv );
 	}
@@ -231,15 +246,19 @@ float CascadeTexelDepthBias( int cascadeIndex ) {
 }
 
 float ShadowReceiverBias( int cascadeIndex, float depth ) {
+	if ( ShadowDebugModeIs( kShadowDebugBiasOff ) ) {
+		return 0.0;
+	}
 	float lightCos = clamp( vShadowLightCos, 1.0e-3, 1.0 );
 	float sinTheta = sqrt( max( 1.0 - lightCos * lightCos, 0.0 ) );
 	float slopeBias = sinTheta / lightCos;
 	float cascadeScale = CascadeBiasScale( cascadeIndex );
-	float scalarBias = ( uShadowBias + uShadowNormalBias * sinTheta ) * cascadeScale;
+	float normalBias = ShadowDebugModeIs( kShadowDebugReceiverPlaneBiasOff ) ? 0.0 : uShadowNormalBias;
+	float scalarBias = ( uShadowBias + normalBias * sinTheta ) * cascadeScale;
 	float texelBias = CascadeTexelDepthBias( cascadeIndex ) * ( 1.0 + slopeBias );
 	float receiverPlaneBias = 0.0;
-	if ( uShadowReceiverPlaneBias > 0.5 ) {
-		receiverPlaneBias = ( abs( dFdx( depth ) ) + abs( dFdy( depth ) ) ) * max( uShadowFilterRadius, 1.0 );
+	if ( uShadowReceiverPlaneBias > 0.5 && !ShadowDebugModeIs( kShadowDebugReceiverPlaneBiasOff ) ) {
+		receiverPlaneBias = ( abs( dFdx( depth ) ) + abs( dFdy( depth ) ) ) * max( EffectiveShadowFilterRadius(), 1.0 );
 	}
 	float texelAwareBias = max( texelBias, receiverPlaneBias );
 	return max( max( scalarBias, 0.0 ), max( texelAwareBias, 0.0 ) );
@@ -328,9 +347,11 @@ vec4 SampleShadowCascade( vec4 shadowCoord, vec4 atlasRect, int cascadeIndex ) {
 	clampMin = min( clampMin, clampMax );
 	uv = clamp( uv, clampMin, clampMax );
 
-	float filterRadius = uShadowFilterRadius;
+	float filterRadius = EffectiveShadowFilterRadius();
 #ifndef OPENQ4_SHADOW_COMPARE
-	filterRadius = ProjectedPCSSRadius( uv, depth, cascadeIndex, clampMin, clampMax );
+	if ( !ShadowDebugModeIs( kShadowDebugPCFOff ) ) {
+		filterRadius = ProjectedPCSSRadius( uv, depth, cascadeIndex, clampMin, clampMax );
+	}
 #endif
 	if ( filterRadius <= 0.0 ) {
 		return vec4( SampleShadowCompare( uv, depth, cascadeIndex ), localUv.x, localUv.y, depth );
@@ -676,7 +697,7 @@ void main() {
 	vec3 specular = InteractionSpecular( halfAngle, viewDir, localNormal, specularSample );
 
 	vec3 color = ( diffuse + specular ) * light * vVertexColor;
-	if ( uShadowDebugMode > 0.5 ) {
+	if ( ShadowVisualDebugMode() ) {
 		gl_FragColor = ShadowDebugOutput( shadowInfo );
 		return;
 	}

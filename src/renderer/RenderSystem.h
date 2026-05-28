@@ -9,6 +9,7 @@ class idImage;
 class idRenderTexture;
 
 #include "ImageOpts.h"
+#include "RendererCaps.h"
 // jmarshall end
 
 /*
@@ -31,6 +32,10 @@ typedef struct glconfig_s {
 	const char			*wgl_extensions_string;
 
 	float				glVersion;				// atof( version_string )
+	rendererContextRequest_t contextRequest;		// requested/created context from the platform layer
+	renderBackendCaps_t	backendCaps;			// exact feature-driven capability probe
+	rendererTier_t		rendererTier;			// highest selected renderer tier
+	renderFeatureSet_t	renderFeatures;			// feature flags derived from the selected tier
 
 
 	int					maxTextureSize;			// queried from GL
@@ -137,24 +142,24 @@ const int GLYPH_CHAREND = 127;
 const int GLYPHS_PER_FONT = GLYPH_END - GLYPH_START + 1;
 
 typedef struct {
-	int					height;			// number of scan lines
-	int					top;			// top of glyph in buffer
-	int					bottom;			// bottom of glyph in buffer
-	int					pitch;			// width for copying
-	int					xSkip;			// x adjustment
-	int					imageWidth;		// width of actual image
-	int					imageHeight;	// height of actual image
+	float				width;
+	float				height;
+	float				horiAdvance;
+	float				horiBearingX;
+	float				horiBearingY;
 	float				s;				// x offset in image where glyph starts
 	float				t;				// y offset in image where glyph starts
 	float				s2;
 	float				t2;
-	const idMaterial* glyph;			// shader with the glyph
-	char				shaderName[32];
 } glyphInfo_t;
 
 typedef struct {
 	glyphInfo_t			glyphs[GLYPHS_PER_FONT];
-	float				glyphScale;
+	float				pointSize;
+	float				fontHeight;
+	float				ascender;
+	float				descender;
+	const idMaterial *	material;
 	char				name[64];
 } fontInfo_t;
 
@@ -162,14 +167,14 @@ typedef struct {
 	fontInfo_t			fontInfoSmall;
 	fontInfo_t			fontInfoMedium;
 	fontInfo_t			fontInfoLarge;
-	int					maxHeight;
-	int					maxWidth;
-	int					maxHeightSmall;
-	int					maxWidthSmall;
-	int					maxHeightMedium;
-	int					maxWidthMedium;
-	int					maxHeightLarge;
-	int					maxWidthLarge;
+	float				maxHeight;
+	float				maxWidth;
+	float				maxHeightSmall;
+	float				maxWidthSmall;
+	float				maxHeightMedium;
+	float				maxWidthMedium;
+	float				maxHeightLarge;
+	float				maxWidthLarge;
 	char				name[64];
 } fontInfoEx_t;
 

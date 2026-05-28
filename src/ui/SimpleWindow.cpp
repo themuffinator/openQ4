@@ -169,6 +169,8 @@ idSimpleWindow::idSimpleWindow(idWindow *win) {
 	textAligny = win->textAligny;
 	forceAspectWidth = win->forceAspectWidth;
 	forceAspectHeight = win->forceAspectHeight;
+	textSpacing = static_cast<int>( win->textspacing );
+	textStyle = static_cast<signed char>( static_cast<int>( win->textstyle ) );
 	screenAlignX = win->screenAlignX;
 	screenAlignY = win->screenAlignY;
 	background = win->background;
@@ -529,9 +531,9 @@ void idSimpleWindow::Redraw(float x, float y) {
 		shadowRect.x += textShadow;
 		shadowRect.y += textShadow;
 
-		dc->DrawText( shadowText, textScale, textAlign, colorBlack, shadowRect, !( flags & WIN_NOWRAP ), -1 );
+		dc->DrawText( shadowText, textScale, textAlign, colorBlack, shadowRect, !( flags & WIN_NOWRAP ), -1, false, NULL, 0, textSpacing, textStyle, ( flags & WIN_CHATWINDOW ) != 0 );
 	}
-	dc->DrawText(text, textScale, textAlign, foreColor, textRect, !( flags & WIN_NOWRAP ), -1);
+	dc->DrawText( text, textScale, textAlign, foreColor, textRect, !( flags & WIN_NOWRAP ), -1, false, NULL, 0, textSpacing, textStyle, ( flags & WIN_CHATWINDOW ) != 0 );
 	dc->SetTransformInfo(vec3_origin, mat3_identity);
 	if ( flags & WIN_NOCLIP ) {
 		dc->EnableClipping( true );
@@ -635,6 +637,8 @@ void idSimpleWindow::WriteToSaveGame( idFile *savefile ) {
 	savefile->Write( &textAlign, sizeof( textAlign ) );
 	savefile->Write( &textAlignx, sizeof( textAlignx ) );
 	savefile->Write( &textAligny, sizeof( textAligny ) );
+	savefile->Write( &textSpacing, sizeof( textSpacing ) );
+	savefile->Write( &textStyle, sizeof( textStyle ) );
 	savefile->Write( &textShadow, sizeof( textShadow ) );
 
 	text.WriteToSaveGame( savefile );
@@ -681,6 +685,8 @@ void idSimpleWindow::ReadFromSaveGame( idFile *savefile ) {
 	savefile->Read( &textAlign, sizeof( textAlign ) );
 	savefile->Read( &textAlignx, sizeof( textAlignx ) );
 	savefile->Read( &textAligny, sizeof( textAligny ) );
+	savefile->Read( &textSpacing, sizeof( textSpacing ) );
+	savefile->Read( &textStyle, sizeof( textStyle ) );
 	savefile->Read( &textShadow, sizeof( textShadow ) );
 
 	text.ReadFromSaveGame( savefile );

@@ -114,7 +114,9 @@ OpenQ4 automatically validates your Quake 4 installation to ensure you have legi
 - `r_shadowMapHashedAlpha 0|1` — Hashed alpha testing for cutout/perforated shadow casters
 - `r_shadowMapTranslucentMoments 0|1` — Experimental blended/translucent shadow overlay
 - `r_stencilTranslucentShadows 0|1` — Let translucent materials cast and receive stencil shadows in the classic shadow-volume path (`regenerateWorld` or a map reload is required after toggling)
-- `r_enhancedMaterials 0|1` — Route stock material interactions through the enhanced GLSL shading path
+- `r_softParticles 0|1` — Enable optional depth-faded BSE particles so smoke/dust and additive bursts fade against solid scene depth
+- `r_softParticleFadeDistance` — World-unit fade distance used when `r_softParticles` is enabled (default `64`)
+- `r_enhancedMaterials 0|1` — Route eligible stock material interactions through the enhanced GLSL shading path; animated, deformed, and packed character geometry remains on the classic ARB2 interaction path for visual parity
 - `r_enhancedMaterialNormalScale` — Boost tangent-space normal detail when enhanced materials are active
 - `r_enhancedMaterialSpecularBoost` — Increase specular intensity when enhanced materials are active
 - `r_enhancedMaterialFresnel` — Add grazing-angle fresnel to existing materials when enhanced materials are active
