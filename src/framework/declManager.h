@@ -353,13 +353,11 @@ public:
 	virtual void			RegisterDeclType( const char *typeName, declType_t type, idDecl *(*allocator)( void ) ) = 0;
 #endif
 // jsinger: Added to support loading all decls from a single file
-#ifdef RV_SINGLE_DECL_FILE
 	virtual void			StartLoadingDecls() = 0;
 	virtual void			FinishLoadingDecls() = 0;
 	virtual void			LoadDeclsFromFile() = 0;
 	virtual void			WriteDeclFile() = 0;
 	virtual void			FlushDecls() = 0;
-#endif
 // RAVEN END
 
 // RAVEN BEGIN

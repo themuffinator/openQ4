@@ -32,7 +32,6 @@ If you have questions concerning this license or the applicable additional terms
 //#include "../renderer/Image.h"
 #include "../bse/BSE_API.h"
 #include "RenderDoc.h"
-#include <SDL3/SDL.h>
 
 #define	MAX_PRINT_MSG_SIZE	4096
 #define MAX_WARNING_LIST	256
@@ -140,11 +139,11 @@ static void Common_ResetPresentationThrottle( void ) {
 }
 
 static double Common_GetPresentationClockNow( void ) {
-	return static_cast<double>( SDL_GetPerformanceCounter() );
+	return Sys_GetClockTicks();
 }
 
 static double Common_GetPresentationClockUnitsPerSecond( void ) {
-	return static_cast<double>( SDL_GetPerformanceFrequency() );
+	return Sys_ClockTicksPerSecond();
 }
 
 static int Common_GetRequestedPresentationCap( void ) {
