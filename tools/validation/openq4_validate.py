@@ -217,8 +217,8 @@ def validate_staged_payload(root: Path, *, dry_run: bool) -> None:
     if not game_dir.is_dir():
         raise ValidationError(f"Staged game directory is missing: {game_dir}")
 
-    client_candidates = sorted(install_root.glob("OpenQ4-client_*"))
-    dedicated_candidates = sorted(install_root.glob("OpenQ4-ded_*"))
+    client_candidates = sorted(install_root.glob("openQ4-client_*"))
+    dedicated_candidates = sorted(install_root.glob("openQ4-ded_*"))
     if not client_candidates:
         raise ValidationError("Staged client executable was not found under .install/.")
     if not dedicated_candidates:

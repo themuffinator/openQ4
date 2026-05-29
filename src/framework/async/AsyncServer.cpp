@@ -319,7 +319,7 @@ void idAsyncServer::ExecuteMapChange( void ) {
 	if ( sessLocal.mapSpawnData.serverInfo.GetInt( "si_pure" ) ) {
 		sessLocal.mapSpawnData.serverInfo.SetInt( "si_pure", 0 );
 		cvarSystem->SetCVarBool( "si_pure", false );
-		common->Printf( "OpenQ4: forcing si_pure 0 for local server startup\n" );
+		common->Printf( "openQ4: forcing si_pure 0 for local server startup\n" );
 	}
 
 	// initialize game id and time

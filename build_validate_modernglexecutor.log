@@ -1,0 +1,1297 @@
+icon sync complete: generated_png=0, png_source=assets/icons/quake4_1024.png
+ninja: Entering directory `E:/Repositories/OpenQ4/builddir'
+[0/1] Regenerating build files
+The Meson build system
+Version: 1.9.1
+Source dir: E:\Repositories\OpenQ4
+Build dir: E:\Repositories\OpenQ4\builddir
+Build type: native build
+Project name: openQ4
+Project version: 0.1.010
+C compiler for the host machine: cl (msvc 19.50.35724 "Microsoft (R) C/C++ Optimizing Compiler Version 19.50.35724 for x64")
+C linker for the host machine: link link 14.50.35724.0
+C++ compiler for the host machine: cl (msvc 19.50.35724 "Microsoft (R) C/C++ Optimizing Compiler Version 19.50.35724 for x64")
+C++ linker for the host machine: link link 14.50.35724.0
+Host machine cpu family: x86_64
+Host machine cpu: x86_64
+Program C:\Python311\python found: YES (C:\Python311\python.exe)
+Program windres found: YES
+Windows resource compiler: LLVM Resource Converter
+Looking for a fallback subproject for the dependency glew because:
+Use of fallback dependencies is forced.
+
+Executing subproject glew 
+
+glew| Project name: glew
+glew| Project version: undefined
+glew| C compiler for the host machine: cl (msvc 19.50.35724 "Microsoft (R) C/C++ Optimizing Compiler Version 19.50.35724 for x64")
+glew| C linker for the host machine: link link 14.50.35724.0
+glew| Build targets in project: 2
+glew| Subproject glew finished.
+
+Dependency glew from subproject subprojects/glew found: YES undefined
+Looking for a fallback subproject for the dependency stb_vorbis because:
+Use of fallback dependencies is forced.
+
+Executing subproject stb_vorbis 
+
+stb_vorbis| Project name: stb_vorbis
+stb_vorbis| Project version: undefined
+stb_vorbis| C compiler for the host machine: cl (msvc 19.50.35724 "Microsoft (R) C/C++ Optimizing Compiler Version 19.50.35724 for x64")
+stb_vorbis| C linker for the host machine: link link 14.50.35724.0
+stb_vorbis| Build targets in project: 3
+stb_vorbis| Subproject stb_vorbis finished.
+
+Dependency stb_vorbis from subproject subprojects/stb_vorbis found: YES undefined
+Looking for a fallback subproject for the dependency openal because:
+Use of fallback dependencies is forced.
+
+Executing subproject openal-soft-prebuilt 
+
+openal-soft-prebuilt| Project name: openal-soft-prebuilt
+openal-soft-prebuilt| Project version: undefined
+openal-soft-prebuilt| C compiler for the host machine: cl (msvc 19.50.35724 "Microsoft (R) C/C++ Optimizing Compiler Version 19.50.35724 for x64")
+openal-soft-prebuilt| C linker for the host machine: link link 14.50.35724.0
+openal-soft-prebuilt| Library OpenAL32 found: YES
+openal-soft-prebuilt| Build targets in project: 3
+openal-soft-prebuilt| Subproject openal-soft-prebuilt finished.
+
+Dependency openal from subproject subprojects/openal-soft-prebuilt found: YES undefined
+Looking for a fallback subproject for the dependency sdl3 because:
+Use of fallback dependencies is forced.
+
+Executing subproject sdl3 
+
+sdl3| Project name: sdl3
+sdl3| Project version: 3.4.4
+sdl3| C compiler for the host machine: cl (msvc 19.50.35724 "Microsoft (R) C/C++ Optimizing Compiler Version 19.50.35724 for x64")
+sdl3| C linker for the host machine: link link 14.50.35724.0
+sdl3| Dependency threads found: YES unknown (cached)
+sdl3| Run-time dependency dl found: NO (tried builtin and system)
+sdl3| Library m found: NO
+sdl3| Has header "float.h" : YES (cached)
+sdl3| Has header "stdarg.h" : YES (cached)
+sdl3| Has header "stddef.h" : YES (cached)
+sdl3| Has header "stdint.h" : YES (cached)
+sdl3| Has header "iconv.h" : NO (cached)
+sdl3| Has header "inttypes.h" : YES (cached)
+sdl3| Has header "limits.h" : YES (cached)
+sdl3| Has header "malloc.h" : YES (cached)
+sdl3| Has header "math.h" : YES (cached)
+sdl3| Has header "memory.h" : YES (cached)
+sdl3| Has header "signal.h" : YES (cached)
+sdl3| Has header "stdio.h" : YES (cached)
+sdl3| Has header "stdlib.h" : YES (cached)
+sdl3| Has header "strings.h" : NO (cached)
+sdl3| Has header "string.h" : YES (cached)
+sdl3| Has header "sys/types.h" : YES (cached)
+sdl3| Has header "wchar.h" : YES (cached)
+sdl3| Has header "pthread_np.h" : NO (cached)
+sdl3| Has header "linux/input.h" : NO (cached)
+sdl3| Has header "ddraw.h" : YES (cached)
+sdl3| Has header "dsound.h" : YES (cached)
+sdl3| Has header "dinput.h" : YES (cached)
+sdl3| Has header "signal.h" : YES (cached)
+sdl3| Checking for function "dlopen" with dependencies threads, dl, -lm: NO
+sdl3| Checking for function "malloc" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "fdatasync" with dependencies threads, dl, -lm: NO
+sdl3| Checking for function "getenv" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "setenv" with dependencies threads, dl, -lm: NO
+sdl3| Checking for function "putenv" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "unsetenv" with dependencies threads, dl, -lm: NO
+sdl3| Checking for function "abs" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "bcopy" with dependencies threads, dl, -lm: NO
+sdl3| Checking for function "memset" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "memcpy" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "memmove" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "memcmp" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "strlen" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "strnlen" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "strlcpy" with dependencies threads, dl, -lm: NO
+sdl3| Checking for function "strlcat" with dependencies threads, dl, -lm: NO
+sdl3| Checking for function "_strrev" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "index" with dependencies threads, dl, -lm: NO
+sdl3| Checking for function "rindex" with dependencies threads, dl, -lm: NO
+sdl3| Checking for function "strchr" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "strrchr" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "strstr" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "strtok_r" with dependencies threads, dl, -lm: NO
+sdl3| Checking for function "strtol" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "strtoul" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "strtoll" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "strtoull" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "strtod" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "atoi" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "atof" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "strcmp" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "strncmp" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "vsscanf" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "vsnprintf" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "acos" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "acosf" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "asin" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "asinf" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "atan" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "atanf" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "atan2" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "atan2f" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "ceil" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "ceilf" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "copysign" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "copysignf" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "cos" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "cosf" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "exp" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "expf" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "fabs" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "fabsf" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "floor" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "floorf" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "fmod" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "fmodf" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "isinf" with dependencies threads, dl, -lm: NO
+sdl3| Checking for function "isinff" with dependencies threads, dl, -lm: NO
+sdl3| Checking for function "isnan" with dependencies threads, dl, -lm: NO
+sdl3| Checking for function "isnanf" with dependencies threads, dl, -lm: NO
+sdl3| Checking for function "log" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "logf" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "log10" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "log10f" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "pow" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "round" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "scalbn" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "sin" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "sinf" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "sqrt" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "sqrtf" with dependencies threads, dl, -lm: YES (cached)
+sdl3| Checking for function "fseeko" with dependencies threads, dl, -lm: NO
+sdl3| Checking for function "fseeko64" with dependencies threads, dl, -lm: NO
+sdl3| Checking for function "sigaction" with dependencies threads, dl, -lm: NO
+sdl3| Checking for function "setjmp" with dependencies threads, dl, -lm: NO
+sdl3| Checking for function "nanosleep" with dependencies threads, dl, -lm: NO
+sdl3| Checking for function "gmtime_r" with dependencies threads, dl, -lm: NO
+sdl3| Checking for function "sysconf" with dependencies threads, dl, -lm: NO
+sdl3| Checking for function "sysctlbyname" with dependencies threads, dl, -lm: NO
+sdl3| Checking for function "clock_gettime" with dependencies threads, dl, -lm: NO
+sdl3| Checking for function "getpagesize" with dependencies threads, dl, -lm: NO
+sdl3| Checking for function "pthread_setname_np" with dependencies threads, dl, -lm: NO
+sdl3| Checking for function "pthread_set_name_np" with dependencies threads, dl, -lm: NO
+sdl3| Checking for function "sem_timedwait" with dependencies threads, dl, -lm: NO
+sdl3| Checking for function "poll" with dependencies threads, dl, -lm: NO
+sdl3| Checking for function "inotify_init1" with dependencies threads, dl, -lm: NO
+sdl3| Checking if "have XInput support" compiles: YES (cached)
+sdl3| Checking if "have Windows Gaming Input support" compiles: YES (cached)
+sdl3| Checking if "have GameInput support" compiles: YES (cached)
+sdl3| C++ compiler for the host machine: cl (msvc 19.50.35724 "Microsoft (R) C/C++ Optimizing Compiler Version 19.50.35724 for x64")
+sdl3| C++ linker for the host machine: link link 14.50.35724.0
+sdl3| Library version found: YES
+sdl3| Library imm32 found: YES
+sdl3| Library setupapi found: YES
+sdl3| Library winmm found: YES
+sdl3| Library opengl32 found: YES
+sdl3| Configuring SDL_build_config.h using configuration
+sdl3| Build targets in project: 4
+sdl3| Subproject sdl3 finished.
+
+Dependency sdl3 found: YES 3.4.4 (overridden)
+Library opengl32 found: YES
+Library Dbghelp found: YES
+Library Iphlpapi found: YES
+Library Winmm found: YES
+Library ws2_32 found: YES
+Build targets in project: 10
+
+openQ4 0.1.010
+
+  Build Features
+    Host system                : windows
+    Host cpu family            : x86_64
+    Version track              : nightly
+    Version iteration          : 20260319.1
+    Version short              : 0.1.010-nightly.20260319.1
+    Version full               : 0.1.010-nightly.20260319.1+g082005fd.dirty
+    Version tag                : 0.1.010-nightly.20260319.1-g082005fd.dirty
+    Version resource           : 0.1.10.375
+    Git short SHA              : 082005fd
+    Git dirty                  : 1
+    Git commit count           : 375
+    MSVC toolchain             : YES
+    MSVC version               : 19.50.35724
+    MSVC 2026 baseline enforced: NO
+    C++ standard               : c++20
+    Platform backend requested : sdl3
+    Platform backend           : sdl3
+    OpenAL override root       : bundled/default
+    Build engine               : YES
+    engine client binary       : openQ4-client_x64
+    engine dedicated binary    : openQ4-ded_x64
+    Integrated BSE in client   : YES
+    Integrated BSE source dir  : E:/Repositories/OpenQ4/src/bse
+    Build games                : YES
+    GameLibs source repo       : E:/Repositories/openQ4-GameLibs
+    Build game_sp              : YES
+    Build game_mp              : YES
+    game_sp binary             : game-sp_x64
+    game_mp binary             : game-mp_x64
+    Resource compiler          : YES
+    SDL3                       : YES
+    GLEW                       : YES
+    OpenAL                     : YES
+    stb_vorbis                 : YES
+    Precompiled headers        : YES
+    Dedicated server target    : YES
+    Install root               : E:/Repositories/OpenQ4/.install
+
+  Subprojects
+    glew                       : YES
+    openal-soft-prebuilt       : YES
+    sdl3                       : YES
+
+    stb_vorbis                 : YES
+
+  User defined options
+    b_vscrt                    : static_from_buildtype
+    backend                    : ninja
+    buildtype                  : debug
+    platform_backend           : sdl3
+    version_iteration          : 20260319.1
+    version_track              : nightly
+    wrap_mode                  : forcefallback
+
+Found ninja-1.13.0.git.kitware.jobserver-pipe-1 at C:\Users\djdac\AppData\Roaming\Python\Python311\Scripts\ninja.EXE
+Generating targets:   0%|          | 0/10 eta ?
+Generating targets:  40%|####      | 4/10 eta 00:00
+Generating targets:  80%|########  | 8/10 eta 00:00
+                                                   
+
+Writing build.ninja:   0%|          | 0/1270 eta ?
+Writing build.ninja:  31%|###1      | 394/1270 eta 00:00
+Writing build.ninja:  62%|######2   | 788/1270 eta 00:00
+Writing build.ninja:  88%|########8 | 1121/1270 eta 00:00
+                                                         
+Cleaning... 396 files.
+[1/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jcapimin.c.obj
+[2/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jcmainct.c.obj
+[3/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jcomapi.c.obj
+[4/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jccoefct.c.obj
+[5/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jccolor.c.obj
+[6/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jcmarker.c.obj
+[7/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jcsample.c.obj
+[8/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jcinit.c.obj
+[9/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jcphuff.c.obj
+[10/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jchuff.c.obj
+[11/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jcmaster.c.obj
+[12/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jcapistd.c.obj
+[13/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jcdctmgr.c.obj
+[14/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jctrans.c.obj
+[15/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jcparam.c.obj
+[16/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jcprepct.c.obj
+[17/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jdatadst.c.obj
+[18/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jdcoefct.c.obj
+[19/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jddctmgr.c.obj
+[20/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jdcolor.c.obj
+[21/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jdapistd.c.obj
+[22/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jdapimin.c.obj
+[23/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jdatasrc.c.obj
+[24/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jdhuff.c.obj
+[25/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jdphuff.c.obj
+[26/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jdinput.c.obj
+[27/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jdpostct.c.obj
+[28/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jdmainct.c.obj
+[29/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jdmerge.c.obj
+[30/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jdmarker.c.obj
+[31/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jdmaster.c.obj
+[32/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jfdctfst.c.obj
+[33/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jidctflt.c.obj
+[34/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jfdctflt.c.obj
+[35/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jidctfst.c.obj
+[36/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jfdctint.c.obj
+[37/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jdsample.c.obj
+[38/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jidctred.c.obj
+[39/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jidctint.c.obj
+[40/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jmemansi.c.obj
+[41/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jload.c.obj
+[42/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jdtrans.c.obj
+[43/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jerror.c.obj
+[44/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jmemdos.c.obj
+[45/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jpegtran.c.obj
+[46/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jmemname.c.obj
+[47/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jmemmgr.c.obj
+[48/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jquant2.c.obj
+[49/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jmemnobs.c.obj
+[50/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jutils.c.obj
+[51/1007] Compiling C object openQ4-client_x64.exe.p/src_renderer_jpeg-6_jquant1.c.obj
+[52/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jcapimin.c.obj
+[53/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jccolor.c.obj
+[54/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jcmarker.c.obj
+[55/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jcdctmgr.c.obj
+[56/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jcmaster.c.obj
+[57/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jcinit.c.obj
+[58/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jcmainct.c.obj
+[59/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jcomapi.c.obj
+[60/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jccoefct.c.obj
+[61/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jchuff.c.obj
+[62/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jcapistd.c.obj
+[63/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jcprepct.c.obj
+[64/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jdapistd.c.obj
+[65/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jcsample.c.obj
+[66/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jctrans.c.obj
+[67/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jdapimin.c.obj
+[68/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jdatadst.c.obj
+[69/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jcphuff.c.obj
+[70/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jcparam.c.obj
+[71/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jdmarker.c.obj
+[72/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jdmainct.c.obj
+[73/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jdinput.c.obj
+[74/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jddctmgr.c.obj
+[75/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jdatasrc.c.obj
+[76/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jdcoefct.c.obj
+[77/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jdcolor.c.obj
+[78/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jdhuff.c.obj
+[79/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jdphuff.c.obj
+[80/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jfdctfst.c.obj
+[81/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jdmerge.c.obj
+[82/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jdpostct.c.obj
+[83/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jdtrans.c.obj
+[84/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jerror.c.obj
+[85/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jdmaster.c.obj
+[86/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jfdctflt.c.obj
+[87/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jdsample.c.obj
+[88/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jmemansi.c.obj
+[89/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jload.c.obj
+[90/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jidctint.c.obj
+[91/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jfdctint.c.obj
+[92/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jmemdos.c.obj
+[93/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jidctred.c.obj
+[94/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jmemname.c.obj
+[95/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jidctflt.c.obj
+[96/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jidctfst.c.obj
+[97/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jpegtran.c.obj
+[98/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jmemmgr.c.obj
+[99/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jquant1.c.obj
+[100/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jquant2.c.obj
+[101/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jmemnobs.c.obj
+[102/1007] Compiling C object openQ4-ded_x64.exe.p/src_renderer_jpeg-6_jutils.c.obj
+[103/1007] Precompiling header openQ4-ded_x64.exe.p/meson_pch-cpp.cpp
+[104/1007] Precompiling header openQ4-client_x64.exe.p/meson_pch-cpp.cpp
+[105/1007] Precompiling header libopenq4_bse.a.p/meson_pch-cpp.cpp
+[106/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_aas_AASFileManager.cpp.obj
+[107/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_cm_CollisionModel_contacts.cpp.obj
+[108/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_cm_CollisionModel.cpp.obj
+[109/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_aas_AASFile_sample.cpp.obj
+[110/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_cm_CollisionModel_trace.cpp.obj
+[111/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_cm_CollisionModel_contents.cpp.obj
+[112/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_cm_CollisionModel_translate.cpp.obj
+[113/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_cm_CollisionModel_files.cpp.obj
+[114/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_framework_CmdSystem.cpp.obj
+[115/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_cm_CollisionModel_debug.cpp.obj
+[116/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_aas_AASFile.cpp.obj
+[117/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_cm_CollisionModel_rotate.cpp.obj
+[118/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_aas_AASFile_optimize.cpp.obj
+[119/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_framework_Compressor.cpp.obj
+[120/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_framework_Console.cpp.obj
+[121/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_cm_CollisionModel_load.cpp.obj
+[122/1007] Compiling C++ object openQ4-client_x64.exe.p/src_aas_AASFile.cpp.obj
+[123/1007] Compiling C++ object libopenq4_bse.a.p/src_bse_BSE_Envelopes.cpp.obj
+[124/1007] Compiling C++ object libopenq4_bse.a.p/src_bse_BSE_EffectTemplate.cpp.obj
+[125/1007] Compiling C++ object libopenq4_bse.a.p/src_bse_BSE_Manager.cpp.obj
+[126/1007] Compiling C++ object libopenq4_bse.a.p/src_bse_BSE_Module.cpp.obj
+[127/1007] Compiling C++ object openQ4-client_x64.exe.p/src_aas_AASFile_sample.cpp.obj
+[128/1007] Compiling C++ object libopenq4_bse.a.p/src_bse_BSE_ParseParticle2.cpp.obj
+[129/1007] Compiling C++ object openQ4-client_x64.exe.p/src_aas_AASFile_optimize.cpp.obj
+[130/1007] Compiling C++ object openQ4-client_x64.exe.p/src_aas_AASFileManager.cpp.obj
+[131/1007] Compiling C++ object libopenq4_bse.a.p/src_bse_BSE_Effect.cpp.obj
+[132/1007] Compiling C++ object openQ4-client_x64.exe.p/src_cm_CollisionModel.cpp.obj
+[133/1007] Compiling C++ object libopenq4_bse.a.p/src_bse_BSE_SpawnDomains.cpp.obj
+[134/1007] Compiling C++ object openQ4-client_x64.exe.p/src_cm_CollisionModel_contacts.cpp.obj
+[135/1007] Compiling C++ object openQ4-client_x64.exe.p/src_cm_CollisionModel_contents.cpp.obj
+[136/1007] Compiling C++ object libopenq4_bse.a.p/src_bse_BSE_SegmentTemplate.cpp.obj
+[137/1007] Compiling C++ object openQ4-client_x64.exe.p/src_cm_CollisionModel_debug.cpp.obj
+[138/1007] Compiling C++ object libopenq4_bse.a.p/src_bse_BSE_Particle.cpp.obj
+[139/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_framework_Common.cpp.obj
+[140/1007] Compiling C++ object openQ4-client_x64.exe.p/src_cm_CollisionModel_files.cpp.obj
+[141/1007] Compiling C++ object openQ4-client_x64.exe.p/src_cm_CollisionModel_trace.cpp.obj
+[142/1007] Compiling C++ object openQ4-client_x64.exe.p/src_cm_CollisionModel_rotate.cpp.obj
+[143/1007] Compiling C++ object libopenq4_bse.a.p/src_bse_BSE_Segment.cpp.obj
+[144/1007] Compiling C++ object openQ4-client_x64.exe.p/src_cm_CollisionModel_translate.cpp.obj
+[145/1007] Compiling C++ object openQ4-client_x64.exe.p/src_framework_CmdSystem.cpp.obj
+[146/1007] Compiling C++ object libopenq4_bse.a.p/src_bse_BSE_SegmentRuntime.cpp.obj
+[147/1007] Compiling C++ object openQ4-client_x64.exe.p/src_cm_CollisionModel_load.cpp.obj
+[148/1007] Compiling C++ object openQ4-client_x64.exe.p/src_framework_DeclPlayerModel.cpp.obj
+[149/1007] Compiling C++ object openQ4-client_x64.exe.p/src_framework_DeclMatType.cpp.obj
+[150/1007] Compiling C++ object openQ4-client_x64.exe.p/src_framework_DeclLipSync.cpp.obj
+[151/1007] Compiling C++ object openQ4-client_x64.exe.p/src_framework_DeclEntityDef.cpp.obj
+[152/1007] Compiling C++ object openQ4-client_x64.exe.p/src_framework_Compressor.cpp.obj
+[153/1007] Compiling C++ object openQ4-client_x64.exe.p/src_framework_DeclSkin.cpp.obj
+[154/1007] Compiling C++ object openQ4-client_x64.exe.p/src_framework_DeclPDA.cpp.obj
+[155/1007] Compiling C++ object openQ4-client_x64.exe.p/src_framework_DeclTable.cpp.obj
+[156/1007] Compiling C++ object openQ4-client_x64.exe.p/src_framework_DemoFile.cpp.obj
+[157/1007] Linking static target libopenq4_bse.a
+[158/1007] Compiling C++ object openQ4-client_x64.exe.p/src_framework_Console.cpp.obj
+[159/1007] Compiling C++ object openQ4-client_x64.exe.p/src_framework_DeclAF.cpp.obj
+[160/1007] Compiling C++ object openQ4-client_x64.exe.p/src_framework_CVarSystem.cpp.obj
+[161/1007] Compiling C++ object openQ4-client_x64.exe.p/src_framework_DeclPlayback.cpp.obj
+[162/1007] Compiling C++ object openQ4-client_x64.exe.p/src_framework_EditField.cpp.obj
+[163/1007] Compiling C++ object openQ4-client_x64.exe.p/src_framework_EventLoop.cpp.obj
+[164/1007] Compiling C++ object openQ4-client_x64.exe.p/src_framework_File.cpp.obj
+[165/1007] Compiling C++ object openQ4-client_x64.exe.p/src_framework_RenderDoc.cpp.obj
+[166/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_Base64.cpp.obj
+[167/1007] Compiling C++ object openQ4-client_x64.exe.p/src_framework_async_MsgChannel.cpp.obj
+[168/1007] Compiling C++ object openQ4-client_x64.exe.p/src_framework_KeyInput.cpp.obj
+[169/1007] Compiling C++ object openQ4-client_x64.exe.p/src_framework_async_AsyncNetwork.cpp.obj
+[170/1007] Compiling C++ object openQ4-client_x64.exe.p/src_framework_async_ServerScan.cpp.obj
+[171/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_BitMsg.cpp.obj
+[172/1007] Compiling C++ object openQ4-client_x64.exe.p/src_framework_async_NetworkSystem.cpp.obj
+[173/1007] Compiling C++ object openQ4-client_x64.exe.p/src_framework_UsercmdGen.cpp.obj
+[174/1007] Compiling C++ object openQ4-client_x64.exe.p/src_framework_async_AsyncClient.cpp.obj
+[175/1007] Compiling C++ object openQ4-client_x64.exe.p/src_framework_Unzip.cpp.obj
+[176/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_CmdArgs.cpp.obj
+[177/1007] Compiling C++ object openQ4-client_x64.exe.p/src_framework_DeclManager.cpp.obj
+[178/1007] Compiling C++ object openQ4-client_x64.exe.p/src_framework_async_AsyncServer.cpp.obj
+[179/1007] Compiling C++ object openQ4-client_x64.exe.p/src_framework_FileSystem.cpp.obj
+[180/1007] Compiling C++ object openQ4-client_x64.exe.p/src_framework_Common.cpp.obj
+[181/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_rvHeap.cpp.obj
+[182/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_precompiled.cpp.obj
+[183/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_LexerFactory.cpp.obj
+[184/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_Lib.cpp.obj
+[185/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_Token.cpp.obj
+[186/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_Heap.cpp.obj
+[187/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_Dict.cpp.obj
+[188/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_mapfile.cpp.obj
+[189/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_LangDict.cpp.obj
+[190/1007] Precompiling header content/baseoq4/game-mp_x64.dll.p/meson_pch-cpp.cpp
+[191/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_Lexer.cpp.obj
+[192/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_bv_Bounds.cpp.obj
+[193/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_bv_Box.cpp.obj
+[194/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_Parser.cpp.obj
+[195/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_rvMemSys.cpp.obj
+[196/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_rvHeapArena.cpp.obj
+[197/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_TextCompiler.cpp.obj
+[198/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_bv_Frustum.cpp.obj
+[199/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_Timer.cpp.obj
+[200/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_Str.cpp.obj
+[201/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_bv_Sphere.cpp.obj
+[202/1007] Precompiling header libopenq4_game_idlib.a.p/meson_pch-cpp.cpp
+[203/1007] Precompiling header content/baseoq4/game-sp_x64.dll.p/meson_pch-cpp.cpp
+[204/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_containers_HashIndex.cpp.obj
+[205/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_geometry_JointTransform.cpp.obj
+[206/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_TimingCollection.cpp.obj
+[207/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_geometry_Surface_Patch.cpp.obj
+[208/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_geometry_Surface.cpp.obj
+[209/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_hashing_Honeyman.cpp.obj
+[210/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_hashing_CRC32.cpp.obj
+[211/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_hashing_MD5.cpp.obj
+[212/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_geometry_TraceModel.cpp.obj
+[213/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_hashing_CRC16.cpp.obj
+[214/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_hashing_CRC8.cpp.obj
+[215/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_Dict.cpp.obj
+[216/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_geometry_Surface_SweptSpline.cpp.obj
+[217/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_math_Angles.cpp.obj
+[218/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_hashing_MD4.cpp.obj
+[219/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_geometry_Surface_Polytope.cpp.obj
+[220/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_geometry_Winding2D.cpp.obj
+[221/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_geometry_Winding.cpp.obj
+[222/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_Heap.cpp.obj
+[223/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_LangDict.cpp.obj
+[224/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_Lexer.cpp.obj
+[225/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_math_Complex.cpp.obj
+[226/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_Base64.cpp.obj
+[227/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_CmdArgs.cpp.obj
+[228/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_BitMsg.cpp.obj
+[229/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_LexerFactory.cpp.obj
+[230/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_Lib.cpp.obj
+[231/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_Parser.cpp.obj
+[232/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_Str.cpp.obj
+[233/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_TextCompiler.cpp.obj
+[234/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_Timer.cpp.obj
+[235/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_Token.cpp.obj
+[236/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_bv_Bounds.cpp.obj
+[237/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_bv_Box.cpp.obj
+[238/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_bv_Sphere.cpp.obj
+[239/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_bv_Frustum.cpp.obj
+[240/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_containers_HashIndex.cpp.obj
+[241/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_geometry_JointTransform.cpp.obj
+[242/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_hashing_CRC16.cpp.obj
+[243/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_geometry_Surface.cpp.obj
+[244/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_geometry_Surface_Polytope.cpp.obj
+[245/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_geometry_Surface_Patch.cpp.obj
+[246/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_geometry_Winding2D.cpp.obj
+[247/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_TimingCollection.cpp.obj
+[248/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_geometry_Winding.cpp.obj
+[249/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_geometry_Surface_SweptSpline.cpp.obj
+[250/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_geometry_TraceModel.cpp.obj
+[251/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_hashing_Honeyman.cpp.obj
+[252/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_hashing_CRC32.cpp.obj
+[253/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_hashing_MD4.cpp.obj
+[254/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_hashing_CRC8.cpp.obj
+[255/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_hashing_MD5.cpp.obj
+[256/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_math_Pluecker.cpp.obj
+[257/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_math_Plane.cpp.obj
+[258/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_math_Quat.cpp.obj
+[259/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_math_Polynomial.cpp.obj
+[260/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_math_Math.cpp.obj
+[261/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_math_Ode.cpp.obj
+[262/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_math_Lcp.cpp.obj
+[263/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_math_Complex.cpp.obj
+[264/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_precompiled.cpp.obj
+[265/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_math_Angles.cpp.obj
+[266/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_math_FFT.cpp.obj
+[267/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_mapfile.cpp.obj
+[268/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_rvHeapArena.cpp.obj
+[269/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_math_Rotation.cpp.obj
+[270/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_rvHeap.cpp.obj
+[271/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_math_Vector.cpp.obj
+[272/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_rvMemSys.cpp.obj
+[273/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_math_FFT.cpp.obj
+[274/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_math_Radians.cpp.obj
+[275/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_math_Matrix.cpp.obj
+[276/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_math_Lcp.cpp.obj
+[277/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_math_Math.cpp.obj
+[278/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_math_Ode.cpp.obj
+[279/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_math_Plane.cpp.obj
+[280/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_math_Pluecker.cpp.obj
+[281/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_math_Simd.cpp.obj
+[282/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_math_Polynomial.cpp.obj
+[283/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_math_Quat.cpp.obj
+[284/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_math_Radians.cpp.obj
+[285/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_math_Rotation.cpp.obj
+[286/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_math_Vector.cpp.obj
+[287/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_cg_explicit.cpp.obj
+[288/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_math_Simd_generic.cpp.obj
+[289/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_math_Matrix.cpp.obj
+[290/1007] Compiling C++ object openQ4-client_x64.exe.p/src_idlib_math_Simd.cpp.obj
+[291/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_Cinematic.cpp.obj
+[292/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_BinaryImage.cpp.obj
+[293/1007] Compiling C++ object libopenq4_game_idlib.a.p/src_idlib_math_Simd_generic.cpp.obj
+[294/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_draw_exp_stub.cpp.obj
+[295/1007] Compiling C++ object openQ4-client_x64.exe.p/src_framework_Session_menu.cpp.obj
+[296/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_draw_common.cpp.obj
+[297/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_draw_arb2.cpp.obj
+[298/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_GuiModel.cpp.obj
+[299/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_Image_process.cpp.obj
+[300/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_Image_files.cpp.obj
+[301/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_GLStateCache.cpp.obj
+[302/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_Image_program.cpp.obj
+[303/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_GeometryResources.cpp.obj
+[304/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_Model_ase.cpp.obj
+[305/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_GLDebugScope.cpp.obj
+[306/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_MaterialResourceTable.cpp.obj
+[307/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_Image_load.cpp.obj
+[308/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_ImageManager.cpp.obj
+[309/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_Interaction.cpp.obj
+[310/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_Model.cpp.obj
+[311/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_Material.cpp.obj
+[312/1007] Compiling C++ object openQ4-client_x64.exe.p/src_framework_Session.cpp.obj
+[313/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_Model_ma.cpp.obj
+[314/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_Model_lwo.cpp.obj
+[315/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_Image_intrinsic.cpp.obj
+[316/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_Model_beam.cpp.obj
+[317/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_Model_md3.cpp.obj
+[318/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_Model_liquid.cpp.obj
+[319/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_Model_sprite.cpp.obj
+[320/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_ModernGLDrawPlan.cpp.obj
+[321/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_Model_prt.cpp.obj
+[322/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_RenderEntity.cpp.obj
+[323/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_ModelOverlay.cpp.obj
+[324/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_ModernGLShaderLibrary.cpp.obj
+[325/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_Model_md5.cpp.obj
+[326/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_ModelDecal.cpp.obj
+[327/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_ModernGLSubmitPlan.cpp.obj
+[328/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_ModelManager.cpp.obj
+[329/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_ModernClusteredLighting.cpp.obj
+[330/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_RendererBenchmarks.cpp.obj
+[331/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_Model_md5r.cpp.obj
+[332/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_ModernGLExecutor.cpp.obj
+[333/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_RenderGraph.cpp.obj
+[334/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_RendererBootstrap.cpp.obj
+[335/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_RenderGraphResources.cpp.obj
+[336/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_RendererUpload.cpp.obj
+[337/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_RendererCaps.cpp.obj
+[338/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_RenderWorld_demo.cpp.obj
+[339/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_RenderWorld_portals.cpp.obj
+[340/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_ModernShadowPlanner.cpp.obj
+[341/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_ScenePackets.cpp.obj
+[342/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_RendererMetrics.cpp.obj
+[343/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_RenderWorld.cpp.obj
+[344/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_RenderWorld_load.cpp.obj
+[345/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_RenderSystem_init.cpp.obj
+[346/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_tr_font.cpp.obj
+[347/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_tr_polytope.cpp.obj
+[348/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_tr_guisurf.cpp.obj
+[349/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_tr_orderIndexes.cpp.obj
+[350/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_RenderSystem.cpp.obj
+[351/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_tr_backend.cpp.obj
+[352/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_tr_main.cpp.obj
+[353/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_tr_deform.cpp.obj
+[354/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_tr_lightrun.cpp.obj
+[355/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_tr_light.cpp.obj
+[356/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_tr_trace.cpp.obj
+[357/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_RenderWorld_lightgrid.cpp.obj
+[358/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_Color_ColorSpace.cpp.obj
+[359/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_tr_render.cpp.obj
+[360/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_tr_subview.cpp.obj
+[361/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_DXT_DXTDecoder.cpp.obj
+[362/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_OpenGL_gl_RenderTexture.cpp.obj
+[363/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_VertexCache.cpp.obj
+[364/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_tr_shadowbounds.cpp.obj
+[365/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_OpenGL_gl_Image.cpp.obj
+[366/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_DXT_DXTEncoder.cpp.obj
+[367/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_tr_stencilshadow.cpp.obj
+[368/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_tr_turboshadow.cpp.obj
+[369/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_tr_rendertools.cpp.obj
+[370/1007] Compiling C++ object openQ4-client_x64.exe.p/src_renderer_tr_trisurf.cpp.obj
+[371/1007] Compiling C++ object openQ4-client_x64.exe.p/src_tools_compilers_dmap_gldraw.cpp.obj
+[372/1007] Compiling C++ object openQ4-client_x64.exe.p/src_tools_compilers_dmap_dmap.cpp.obj
+[373/1007] Compiling C++ object openQ4-client_x64.exe.p/src_tools_compilers_dmap_optimize.cpp.obj
+[374/1007] Compiling C++ object openQ4-client_x64.exe.p/src_tools_compilers_dmap_portals.cpp.obj
+[375/1007] Compiling C++ object openQ4-client_x64.exe.p/src_tools_compilers_dmap_output.cpp.obj
+[376/1007] Compiling C++ object openQ4-client_x64.exe.p/src_tools_compilers_dmap_optimize_gcc.cpp.obj
+[377/1007] Compiling C++ object openQ4-client_x64.exe.p/src_tools_compilers_dmap_glfile.cpp.obj
+[378/1007] Compiling C++ object openQ4-client_x64.exe.p/src_tools_compilers_dmap_map.cpp.obj
+[379/1007] Compiling C++ object openQ4-client_x64.exe.p/src_tools_compilers_dmap_facebsp.cpp.obj
+[380/1007] Compiling C++ object openQ4-client_x64.exe.p/src_tools_compilers_dmap_leakfile.cpp.obj
+[381/1007] Compiling C++ object openQ4-client_x64.exe.p/src_tools_compilers_dmap_shadowopt3.cpp.obj
+[382/1007] Compiling C++ object openQ4-client_x64.exe.p/src_sound_OpenAL_AL_SoundHardware.cpp.obj
+[383/1007] Compiling C++ object openQ4-client_x64.exe.p/src_sound_SoundVoice.cpp.obj
+[384/1007] Compiling C++ object openQ4-client_x64.exe.p/src_sound_WaveFile.cpp.obj
+[385/1007] Compiling C++ object openQ4-client_x64.exe.p/src_tools_compilers_dmap_ubrush.cpp.obj
+[386/1007] Compiling C++ object openQ4-client_x64.exe.p/src_sound_snd_world.cpp.obj
+[387/1007] Compiling C++ object openQ4-client_x64.exe.p/src_tools_compilers_dmap_usurface.cpp.obj
+[388/1007] Compiling C++ object openQ4-client_x64.exe.p/src_tools_compilers_dmap_tritools.cpp.obj
+[389/1007] Compiling C++ object openQ4-client_x64.exe.p/src_sound_snd_emitter.cpp.obj
+[390/1007] Compiling C++ object openQ4-client_x64.exe.p/src_tools_compilers_dmap_tritjunction.cpp.obj
+[391/1007] Compiling C++ object openQ4-client_x64.exe.p/src_sound_snd_system.cpp.obj
+[392/1007] Compiling C++ object openQ4-client_x64.exe.p/src_sound_OpenAL_AL_SoundSample.cpp.obj
+[393/1007] Compiling C++ object openQ4-client_x64.exe.p/src_sound_snd_shader.cpp.obj
+[394/1007] Compiling C++ object openQ4-client_x64.exe.p/src_sys_sys_local.cpp.obj
+[395/1007] Compiling C++ object openQ4-client_x64.exe.p/src_sound_OpenAL_AL_SoundVoice.cpp.obj
+[396/1007] Compiling C++ object openQ4-client_x64.exe.p/src_ui_FieldWindow.cpp.obj
+[397/1007] Compiling C++ object openQ4-client_x64.exe.p/src_ui_GameWindow.cpp.obj
+[398/1007] Compiling C++ object openQ4-client_x64.exe.p/src_ui_ChoiceWindow.cpp.obj
+[399/1007] Compiling C++ object openQ4-client_x64.exe.p/src_ui_GameBearShootWindow.cpp.obj
+[400/1007] Compiling C++ object openQ4-client_x64.exe.p/src_ui_GameBustOutWindow.cpp.obj
+[401/1007] Compiling C++ object openQ4-client_x64.exe.p/src_ui_BindWindow.cpp.obj
+[402/1007] Compiling C++ object openQ4-client_x64.exe.p/src_ui_GuiScript.cpp.obj
+[403/1007] Compiling C++ object openQ4-client_x64.exe.p/src_ui_EditWindow.cpp.obj
+[404/1007] Compiling C++ object openQ4-client_x64.exe.p/src_ui_DeviceContext.cpp.obj
+[405/1007] Compiling C++ object openQ4-client_x64.exe.p/src_ui_GameSSDWindow.cpp.obj
+[406/1007] Compiling C++ object openQ4-client_x64.exe.p/src_sys_win32_win_cpu.cpp.obj
+[407/1007] Compiling C++ object openQ4-client_x64.exe.p/src_sys_win32_win_crash.cpp.obj
+[408/1007] Compiling C++ object openQ4-client_x64.exe.p/src_ui_SliderWindow.cpp.obj
+[409/1007] Compiling C++ object openQ4-client_x64.exe.p/src_ui_RegExp.cpp.obj
+[410/1007] Compiling C++ object openQ4-client_x64.exe.p/src_sys_win32_win_taskkeyhook.cpp.obj
+[411/1007] Compiling C++ object openQ4-client_x64.exe.p/src_ui_ListGUI.cpp.obj
+[412/1007] Compiling C++ object openQ4-client_x64.exe.p/src_ui_Winvar.cpp.obj
+[413/1007] Compiling C++ object openQ4-client_x64.exe.p/src_ui_UserInterface.cpp.obj
+[414/1007] Compiling C++ object openQ4-client_x64.exe.p/src_ui_MarkerWindow.cpp.obj
+[415/1007] Compiling C++ object openQ4-client_x64.exe.p/src_ui_SimpleWindow.cpp.obj
+[416/1007] Compiling C++ object openQ4-client_x64.exe.p/src_ui_ListWindow.cpp.obj
+[417/1007] Compiling C++ object openQ4-client_x64.exe.p/src_sys_win32_win_snd.cpp.obj
+[418/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_framework_CVarSystem.cpp.obj
+[419/1007] Compiling C++ object openQ4-client_x64.exe.p/src_ui_RenderWindow.cpp.obj
+[420/1007] Compiling C++ object openQ4-client_x64.exe.p/src_ui_Window.cpp.obj
+[421/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_framework_DeclAF.cpp.obj
+[422/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_framework_DeclEntityDef.cpp.obj
+[423/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_framework_DeclLipSync.cpp.obj
+[424/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_framework_DeclPDA.cpp.obj
+[425/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_framework_DeclPlayback.cpp.obj
+[426/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_framework_DeclPlayerModel.cpp.obj
+[427/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_framework_DeclSkin.cpp.obj
+[428/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_framework_DeclTable.cpp.obj
+[429/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_framework_DemoFile.cpp.obj
+[430/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_framework_EditField.cpp.obj
+[431/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_framework_EventLoop.cpp.obj
+[432/1007] Compiling C++ object openQ4-client_x64.exe.p/src_sys_win32_win_net.cpp.obj
+[433/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_framework_KeyInput.cpp.obj
+[434/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_framework_File.cpp.obj
+[435/1007] Compiling C++ object openQ4-client_x64.exe.p/src_sys_win32_win_syscon.cpp.obj
+[436/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_framework_DeclMatType.cpp.obj
+[437/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_framework_RenderDoc.cpp.obj
+[438/1007] Compiling C++ object openQ4-client_x64.exe.p/src_sys_win32_win_qgl.cpp.obj
+[439/1007] Compiling C++ object openQ4-client_x64.exe.p/src_sys_win32_win_gamma.cpp.obj
+[440/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_framework_async_NetworkSystem.cpp.obj
+[441/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_framework_async_MsgChannel.cpp.obj
+[442/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_framework_DeclManager.cpp.obj
+[443/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_framework_async_AsyncNetwork.cpp.obj
+[444/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_framework_UsercmdGen.cpp.obj
+[445/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_framework_async_ServerScan.cpp.obj
+[446/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_Base64.cpp.obj
+[447/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_framework_Unzip.cpp.obj
+[448/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_BitMsg.cpp.obj
+[449/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_framework_FileSystem.cpp.obj
+[450/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_framework_async_AsyncClient.cpp.obj
+[451/1007] Compiling C++ object openQ4-client_x64.exe.p/src_sys_win32_win_main.cpp.obj
+[452/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_CmdArgs.cpp.obj
+[453/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_framework_async_AsyncServer.cpp.obj
+[454/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_LangDict.cpp.obj
+[455/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_LexerFactory.cpp.obj
+[456/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_Dict.cpp.obj
+[457/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_Heap.cpp.obj
+[458/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_Lib.cpp.obj
+[459/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_rvHeapArena.cpp.obj
+[460/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_precompiled.cpp.obj
+[461/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_rvHeap.cpp.obj
+[462/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_rvMemSys.cpp.obj
+[463/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_Parser.cpp.obj
+[464/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_TextCompiler.cpp.obj
+[465/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_mapfile.cpp.obj
+[466/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_Lexer.cpp.obj
+[467/1007] Compiling C++ object openQ4-client_x64.exe.p/src_sys_win32_win_shared.cpp.obj
+[468/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_Str.cpp.obj
+[469/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_Timer.cpp.obj
+[470/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_TimingCollection.cpp.obj
+[471/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_bv_Bounds.cpp.obj
+[472/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_Token.cpp.obj
+[473/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_containers_HashIndex.cpp.obj
+[474/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_bv_Sphere.cpp.obj
+[475/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_geometry_JointTransform.cpp.obj
+[476/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_geometry_Surface_Patch.cpp.obj
+[477/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_geometry_Surface_Polytope.cpp.obj
+[478/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_bv_Box.cpp.obj
+[479/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_hashing_Honeyman.cpp.obj
+[480/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_geometry_Surface_SweptSpline.cpp.obj
+[481/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_hashing_CRC32.cpp.obj
+[482/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_hashing_CRC8.cpp.obj
+[483/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_bv_Frustum.cpp.obj
+[484/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_geometry_Winding2D.cpp.obj
+[485/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_geometry_Winding.cpp.obj
+[486/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_geometry_TraceModel.cpp.obj
+[487/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_geometry_Surface.cpp.obj
+[488/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_hashing_CRC16.cpp.obj
+[489/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_math_Math.cpp.obj
+[490/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_math_Lcp.cpp.obj
+[491/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_hashing_MD5.cpp.obj
+[492/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_hashing_MD4.cpp.obj
+[493/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_math_Angles.cpp.obj
+[494/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_math_Ode.cpp.obj
+[495/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_math_Plane.cpp.obj
+[496/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_math_Complex.cpp.obj
+[497/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_math_FFT.cpp.obj
+[498/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_math_Pluecker.cpp.obj
+[499/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_math_Polynomial.cpp.obj
+[500/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_math_Quat.cpp.obj
+[501/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_math_Radians.cpp.obj
+[502/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_math_Rotation.cpp.obj
+[503/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_math_Vector.cpp.obj
+[504/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_math_Matrix.cpp.obj
+[505/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_math_Simd_generic.cpp.obj
+[506/1007] Compiling C++ object openQ4-client_x64.exe.p/src_sys_win32_win_sdl3.cpp.obj
+[507/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_cg_explicit.cpp.obj
+[508/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_idlib_math_Simd.cpp.obj
+[509/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_GuiModel.cpp.obj
+[510/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_draw_exp_stub.cpp.obj
+[511/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_GLDebugScope.cpp.obj
+[512/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_Image_load.cpp.obj
+[513/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_Cinematic.cpp.obj
+[514/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_GeometryResources.cpp.obj
+[515/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_BinaryImage.cpp.obj
+[516/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_Image_files.cpp.obj
+[517/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_framework_Session_menu.cpp.obj
+[518/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_GLStateCache.cpp.obj
+[519/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_draw_common.cpp.obj
+[520/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_draw_arb2.cpp.obj
+[521/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_framework_Session.cpp.obj
+[522/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_Image_program.cpp.obj
+[523/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_Image_process.cpp.obj
+[524/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_Image_intrinsic.cpp.obj
+[525/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_ImageManager.cpp.obj
+[526/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_Model_ma.cpp.obj
+[527/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_MaterialResourceTable.cpp.obj
+[528/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_Model_prt.cpp.obj
+[529/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_Model_ase.cpp.obj
+[530/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_Model_sprite.cpp.obj
+[531/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_Model_md3.cpp.obj
+[532/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_Material.cpp.obj
+[533/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_Model_beam.cpp.obj
+[534/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_Model_liquid.cpp.obj
+[535/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_Interaction.cpp.obj
+[536/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_Model_lwo.cpp.obj
+[537/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_ModelDecal.cpp.obj
+[538/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_Model.cpp.obj
+[539/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_Model_md5.cpp.obj
+[540/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_Model_md5r.cpp.obj
+[541/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_ModernGLDrawPlan.cpp.obj
+[542/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_RendererBenchmarks.cpp.obj
+[543/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_RenderEntity.cpp.obj
+[544/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_RendererBootstrap.cpp.obj
+[545/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_ModelOverlay.cpp.obj
+[546/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_ModernGLShaderLibrary.cpp.obj
+[547/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_ModernGLSubmitPlan.cpp.obj
+[548/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_ModernShadowPlanner.cpp.obj
+[549/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_ModelManager.cpp.obj
+[550/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_RendererCaps.cpp.obj
+[551/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_ModernClusteredLighting.cpp.obj
+[552/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_RendererMetrics.cpp.obj
+[553/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_ModernGLExecutor.cpp.obj
+[554/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_tr_guisurf.cpp.obj
+[555/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_RenderWorld_portals.cpp.obj
+[556/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_RendererUpload.cpp.obj
+[557/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_tr_backend.cpp.obj
+[558/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_tr_deform.cpp.obj
+[559/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_RenderGraph.cpp.obj
+[560/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_ScenePackets.cpp.obj
+[561/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_RenderGraphResources.cpp.obj
+[562/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_RenderWorld_demo.cpp.obj
+[563/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_RenderWorld.cpp.obj
+[564/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_tr_lightrun.cpp.obj
+[565/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_tr_font.cpp.obj
+[566/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_RenderWorld_load.cpp.obj
+[567/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_tr_orderIndexes.cpp.obj
+[568/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_tr_polytope.cpp.obj
+[569/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_tr_main.cpp.obj
+[570/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_RenderSystem_init.cpp.obj
+[571/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_tr_render.cpp.obj
+[572/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_RenderSystem.cpp.obj
+[573/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_tr_light.cpp.obj
+[574/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_tr_rendertools.cpp.obj
+[575/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_Color_ColorSpace.cpp.obj
+[576/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_VertexCache.cpp.obj
+[577/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_tr_trace.cpp.obj
+[578/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_tr_subview.cpp.obj
+[579/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_DXT_DXTDecoder.cpp.obj
+[580/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_tr_stencilshadow.cpp.obj
+[581/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_tr_turboshadow.cpp.obj
+[582/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_tools_compilers_dmap_gldraw.cpp.obj
+[583/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_tools_compilers_dmap_dmap.cpp.obj
+[584/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_tools_compilers_dmap_facebsp.cpp.obj
+[585/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_tools_compilers_dmap_glfile.cpp.obj
+[586/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_tools_compilers_dmap_leakfile.cpp.obj
+[587/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_OpenGL_gl_RenderTexture.cpp.obj
+[588/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_tr_shadowbounds.cpp.obj
+[589/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_RenderWorld_lightgrid.cpp.obj
+[590/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_tools_compilers_dmap_map.cpp.obj
+[591/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_DXT_DXTEncoder.cpp.obj
+[592/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_tr_trisurf.cpp.obj
+[593/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_tools_compilers_dmap_optimize.cpp.obj
+[594/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_renderer_OpenGL_gl_Image.cpp.obj
+[595/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_tools_compilers_dmap_tritools.cpp.obj
+[596/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_tools_compilers_dmap_optimize_gcc.cpp.obj
+[597/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_tools_compilers_dmap_portals.cpp.obj
+[598/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_tools_compilers_dmap_ubrush.cpp.obj
+[599/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_tools_compilers_dmap_output.cpp.obj
+[600/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_tools_compilers_dmap_usurface.cpp.obj
+[601/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_tools_compilers_dmap_tritjunction.cpp.obj
+[602/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_tools_compilers_dmap_shadowopt3.cpp.obj
+[603/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_sound_snd_shader.cpp.obj
+[604/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_sound_snd_emitter.cpp.obj
+[605/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_sys_sys_local.cpp.obj
+[606/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_sound_OpenAL_AL_SoundHardware.cpp.obj
+[607/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_sound_WaveFile.cpp.obj
+[608/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_sound_OpenAL_AL_SoundSample.cpp.obj
+[609/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_sound_snd_system.cpp.obj
+[610/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_sound_SoundVoice.cpp.obj
+[611/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_ui_BindWindow.cpp.obj
+[612/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_ui_ListGUI.cpp.obj
+[613/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_sound_OpenAL_AL_SoundVoice.cpp.obj
+[614/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_ui_EditWindow.cpp.obj
+[615/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_sound_snd_world.cpp.obj
+[616/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_ui_FieldWindow.cpp.obj
+[617/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_ui_GameBearShootWindow.cpp.obj
+[618/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_ui_ChoiceWindow.cpp.obj
+[619/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_ui_GameBustOutWindow.cpp.obj
+[620/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_ui_DeviceContext.cpp.obj
+[621/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_ui_GuiScript.cpp.obj
+[622/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_ui_GameWindow.cpp.obj
+[623/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_sys_win32_win_cpu.cpp.obj
+[624/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_ui_Winvar.cpp.obj
+[625/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_ui_GameSSDWindow.cpp.obj
+[626/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_ui_RegExp.cpp.obj
+[627/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_ui_SimpleWindow.cpp.obj
+[628/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_ui_MarkerWindow.cpp.obj
+[629/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_ui_SliderWindow.cpp.obj
+[630/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_ui_ListWindow.cpp.obj
+[631/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_ui_UserInterface.cpp.obj
+[632/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_sys_win32_win_snd.cpp.obj
+[633/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_ui_RenderWindow.cpp.obj
+[634/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_sys_win32_win_taskkeyhook.cpp.obj
+[635/1007] Linking static target libopenq4_game_idlib.a
+[636/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_sys_win32_win_qgl.cpp.obj
+[637/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_ui_Window.cpp.obj
+[638/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_sys_win32_win_syscon.cpp.obj
+[639/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_sys_win32_win_gamma.cpp.obj
+[640/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_sys_win32_win_crash.cpp.obj
+[641/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_sys_win32_win_net.cpp.obj
+[642/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_AF.cpp.obj
+[643/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_sys_win32_win_shared.cpp.obj
+[644/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_FreeView.cpp.obj
+[645/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Game_Debug.cpp.obj
+[646/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Actor.cpp.obj
+[647/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Effect.cpp.obj
+[648/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_AFEntity.cpp.obj
+[649/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_BrittleFracture.cpp.obj
+[650/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Icon.cpp.obj
+[651/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Game_Log.cpp.obj
+[652/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Camera.cpp.obj
+[653/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_sys_win32_win_main.cpp.obj
+[654/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_IK.cpp.obj
+[655/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_GameEdit.cpp.obj
+[656/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Game_network.cpp.obj
+[657/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_IconManager.cpp.obj
+[658/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Instance.cpp.obj
+[659/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Healing_Station.cpp.obj
+[660/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Game_render.cpp.obj
+[661/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Playback.cpp.obj
+[662/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_LipSync.cpp.obj
+[663/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Player_Cheats.cpp.obj
+[664/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Light.cpp.obj
+[665/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Player_States.cpp.obj
+[666/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Item.cpp.obj
+[667/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Entity.cpp.obj
+[668/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_PlayerView.cpp.obj
+[669/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Pvs.cpp.obj
+[670/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_SecurityCamera.cpp.obj
+[671/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Moveable.cpp.obj
+[672/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Sound.cpp.obj
+[673/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Mover.cpp.obj
+[674/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Misc.cpp.obj
+[675/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AAS.cpp.obj
+[676/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_MultiplayerGame.cpp.obj
+[677/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_TramGate.cpp.obj
+[678/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Projectile.cpp.obj
+[679/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Game_local.cpp.obj
+[680/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Target.cpp.obj
+[681/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_WorldSpawn.cpp.obj
+[682/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_SplineMover.cpp.obj
+[683/1007] Compiling C++ object openQ4-ded_x64.exe.p/src_sys_win32_win_sdl3.cpp.obj
+[684/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Player.cpp.obj
+[685/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AAS_routing.cpp.obj
+[686/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AI_Actions.cpp.obj
+[687/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AAS_pathing.cpp.obj
+[688/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Trigger.cpp.obj
+[689/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Weapon.cpp.obj
+[690/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AASCallback_AvoidLocation.cpp.obj
+[691/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AAS_debug.cpp.obj
+[692/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AI_Announcements.cpp.obj
+[693/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AAS_Find.cpp.obj
+[694/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AASCallback_FindCoverArea.cpp.obj
+[695/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AI_Manager.cpp.obj
+[696/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AAS_tactical.cpp.obj
+[697/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AI_Medic.cpp.obj
+[698/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_Berserker.cpp.obj
+[699/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AI_States.cpp.obj
+[700/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AI_Tactical.cpp.obj
+[701/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AI_Debug.cpp.obj
+[702/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AI_pathing.cpp.obj
+[703/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AI_Util.cpp.obj
+[704/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_FailedTransfer.cpp.obj
+[705/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_ConvoyGround.cpp.obj
+[706/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AI.cpp.obj
+[707/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_Grunt.cpp.obj
+[708/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_BossMakron.cpp.obj
+[709/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_Fatty.cpp.obj
+[710/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AI_Move.cpp.obj
+[711/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_BossBuddy.cpp.obj
+[712/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_Gladiator.cpp.obj
+[713/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_Gunner.cpp.obj
+[714/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_IronMaiden.cpp.obj
+[715/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AI_events.cpp.obj
+[716/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_ConvoyHover.cpp.obj
+[717/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_HarvesterDispersal.cpp.obj
+[718/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_Scientist.cpp.obj
+[719/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_HeavyHoverTank.cpp.obj
+[720/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_RepairBot.cpp.obj
+[721/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_LightTank.cpp.obj
+[722/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_Harvester.cpp.obj
+[723/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_NetworkGuardian.cpp.obj
+[724/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_SlimyTransfer.cpp.obj
+[725/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_StreamProtector.cpp.obj
+[726/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_Sentry.cpp.obj
+[727/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_StroggFlyer.cpp.obj
+[728/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_TurretFlying.cpp.obj
+[729/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_Turret.cpp.obj
+[730/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_StroggMarine.cpp.obj
+[731/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_StroggHover.cpp.obj
+[732/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_VehicleAI.cpp.obj
+[733/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_anim_Anim_Import.cpp.obj
+[734/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_anim_Anim_Testmodel.cpp.obj
+[735/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_bots_BotAI.cpp.obj
+[736/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_bots_Bot.cpp.obj
+[737/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_TeleportDropper.cpp.obj
+[738/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_ObstacleAvoidance.cpp.obj
+[739/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_anim_Anim.cpp.obj
+[740/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_bots_BotAI_Seek_NBG.cpp.obj
+[741/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_bots_BotAI_Battle_Attacked.cpp.obj
+[742/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_bots_BotAI_SeekLTG.cpp.obj
+[743/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_bots_BotAI_respawn.cpp.obj
+[744/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_bots_BotAI_Battle_Fight.cpp.obj
+[745/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_bots_BotAI_Battle_Chase.cpp.obj
+[746/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_bots_Bot_Input.cpp.obj
+[747/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_bots_BotAI_Battle_NBG.cpp.obj
+[748/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_bots_Bot_chat.cpp.obj
+[749/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_bots_BotAI_Battle_Retreat.cpp.obj
+[750/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_bots_Bot_char.cpp.obj
+[751/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_bots_Bot_goal.cpp.obj
+[752/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_anim_Anim_Blend.cpp.obj
+[753/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_bots_Bot_weapons.cpp.obj
+[754/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_bots_Bot_weights.cpp.obj
+[755/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_client_ClientEffect.cpp.obj
+[756/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_client_ClientModel.cpp.obj
+[757/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_client_ClientEntity.cpp.obj
+[758/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_client_ClientAFEntity.cpp.obj
+[759/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_gamesys_State.cpp.obj
+[760/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_mp_Buying.cpp.obj
+[761/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_client_ClientMoveable.cpp.obj
+[762/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_mp_VoiceComms.cpp.obj
+[763/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_mp_Tourney.cpp.obj
+[764/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_gamesys_DebugGraph.cpp.obj
+[765/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/02ba7e9df74619ad360f86de5b46e63d8f6a95ad_src_game_mp_stats_StatWindow.cpp.obj
+[766/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/84a11b67f5491cb518d6e5a1dc7dcf0307f24d70_src_game_mp_stats_StatEvent.cpp.obj
+[767/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_mp_CTF.cpp.obj
+[768/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_gamesys_SaveGame.cpp.obj
+[769/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/ebcbd9a867216e5ab9842fa0468a2d3077ce1dd8_src_game_mp_stats_StatManager.cpp.obj
+[770/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_gamesys_Event.cpp.obj
+[771/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_mp_GameState.cpp.obj
+[772/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Clip.cpp.obj
+[773/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Force.cpp.obj
+[774/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_gamesys_SysCvar.cpp.obj
+[775/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Force_Constant.cpp.obj
+[776/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Force_Drag.cpp.obj
+[777/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Force_Spring.cpp.obj
+[778/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Physics_Actor.cpp.obj
+[779/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Force_Field.cpp.obj
+[780/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Physics.cpp.obj
+[781/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_gamesys_SysCmds.cpp.obj
+[782/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_gamesys_Class.cpp.obj
+[783/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Physics_Base.cpp.obj
+[784/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Physics_Particle.cpp.obj
+[785/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_script_ScriptFuncUtility.cpp.obj
+[786/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Physics_Static.cpp.obj
+[787/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Physics_VehicleMonster.cpp.obj
+[788/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Physics_Monster.cpp.obj
+[789/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Physics_RigidBody.cpp.obj
+[790/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Physics_Player.cpp.obj
+[791/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Physics_StaticMulti.cpp.obj
+[792/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_script_Script_Compiler.cpp.obj
+[793/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_vehicle_VehicleAnimated.cpp.obj
+[794/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Push.cpp.obj
+[795/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_script_Script_Interpreter.cpp.obj
+[796/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_vehicle_VehicleDriver.cpp.obj
+[797/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_spawner.cpp.obj
+[798/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Physics_Parametric.cpp.obj
+[799/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_vehicle_Vehicle.cpp.obj
+[800/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_script_Script_Thread.cpp.obj
+[801/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_vehicle_VehicleController.cpp.obj
+[802/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Physics_AF.cpp.obj
+[803/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_script_Script_Program.cpp.obj
+[804/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_vehicle_VehiclePosition.cpp.obj
+[805/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_vehicle_VehicleMonster.cpp.obj
+[806/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_vehicle_VehicleSpline.cpp.obj
+[807/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_weapon_WeaponGrenadeLauncher.cpp.obj
+[808/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_weapon_WeaponBlaster.cpp.obj
+[809/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_weapon_WeaponHyperblaster.cpp.obj
+[810/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_weapon_WeaponMachinegun.cpp.obj
+[811/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_vehicle_VehicleStatic.cpp.obj
+[812/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_vehicle_Vehicle_Walker.cpp.obj
+[813/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_vehicle_Vehicle_DropPod.cpp.obj
+[814/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_vehicle_VehicleParts.cpp.obj
+[815/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_vehicle_VehicleRigid.cpp.obj
+[816/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_weapon_WeaponGauntlet.cpp.obj
+[817/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_weapon_WeaponDarkMatterGun.cpp.obj
+[818/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_weapon_WeaponNailgun.cpp.obj
+[819/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_weapon_WeaponRailgun.cpp.obj
+[820/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_weapon_WeaponShotgun.cpp.obj
+[821/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_weapon_WeaponRocketLauncher.cpp.obj
+[822/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_weapon_WeaponNapalmGun.cpp.obj
+[823/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_FreeView.cpp.obj
+[824/1007] Compiling C++ object content/baseoq4/game-sp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_weapon_WeaponLightningGun.cpp.obj
+[825/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_AF.cpp.obj
+[826/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_BrittleFracture.cpp.obj
+[827/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Game_Debug.cpp.obj
+[828/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Camera.cpp.obj
+[829/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Effect.cpp.obj
+[830/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Icon.cpp.obj
+[831/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_IconManager.cpp.obj
+[832/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Healing_Station.cpp.obj
+[833/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Game_Log.cpp.obj
+[834/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Game_render.cpp.obj
+[835/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_IK.cpp.obj
+[836/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_AFEntity.cpp.obj
+[837/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Instance.cpp.obj
+[838/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Light.cpp.obj
+[839/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_LipSync.cpp.obj
+[840/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Game_network.cpp.obj
+[841/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_GameEdit.cpp.obj
+[842/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Item.cpp.obj
+[843/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Actor.cpp.obj
+[844/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Playback.cpp.obj
+[845/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Entity.cpp.obj
+[846/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Player_Cheats.cpp.obj
+[847/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_PlayerView.cpp.obj
+[848/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Player_States.cpp.obj
+[849/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Pvs.cpp.obj
+[850/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_SecurityCamera.cpp.obj
+[851/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Sound.cpp.obj
+[852/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Moveable.cpp.obj
+[853/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Game_local.cpp.obj
+[854/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Trigger.cpp.obj
+[855/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Projectile.cpp.obj
+[856/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_TramGate.cpp.obj
+[857/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Misc.cpp.obj
+[858/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Weapon.cpp.obj
+[859/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_MultiplayerGame.cpp.obj
+[860/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Mover.cpp.obj
+[861/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_SplineMover.cpp.obj
+[862/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_WorldSpawn.cpp.obj
+[863/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AASCallback_AvoidLocation.cpp.obj
+[864/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Target.cpp.obj
+[865/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AASCallback_FindCoverArea.cpp.obj
+[866/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AAS_pathing.cpp.obj
+[867/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AAS.cpp.obj
+[868/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AAS_Find.cpp.obj
+[869/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AAS_debug.cpp.obj
+[870/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_Player.cpp.obj
+[871/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AAS_tactical.cpp.obj
+[872/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AI_Actions.cpp.obj
+[873/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_Berserker.cpp.obj
+[874/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AI.cpp.obj
+[875/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AI_pathing.cpp.obj
+[876/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_BossBuddy.cpp.obj
+[877/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AI_Debug.cpp.obj
+[878/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AI_Medic.cpp.obj
+[879/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AAS_routing.cpp.obj
+[880/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_BossMakron.cpp.obj
+[881/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AI_Announcements.cpp.obj
+[882/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AI_Tactical.cpp.obj
+[883/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AI_States.cpp.obj
+[884/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_ConvoyGround.cpp.obj
+[885/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AI_Manager.cpp.obj
+[886/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AI_Util.cpp.obj
+[887/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AI_events.cpp.obj
+[888/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_Fatty.cpp.obj
+[889/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_Grunt.cpp.obj
+[890/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_FailedTransfer.cpp.obj
+[891/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_ConvoyHover.cpp.obj
+[892/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_Gladiator.cpp.obj
+[893/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_HarvesterDispersal.cpp.obj
+[894/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_AI_Move.cpp.obj
+[895/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_Scientist.cpp.obj
+[896/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_HeavyHoverTank.cpp.obj
+[897/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_Gunner.cpp.obj
+[898/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_NetworkGuardian.cpp.obj
+[899/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_RepairBot.cpp.obj
+[900/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_IronMaiden.cpp.obj
+[901/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_LightTank.cpp.obj
+[902/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_SlimyTransfer.cpp.obj
+[903/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_Sentry.cpp.obj
+[904/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_StreamProtector.cpp.obj
+[905/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_StroggFlyer.cpp.obj
+[906/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_TurretFlying.cpp.obj
+[907/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_StroggMarine.cpp.obj
+[908/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_Harvester.cpp.obj
+[909/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_Turret.cpp.obj
+[910/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_StroggHover.cpp.obj
+[911/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_bots_Bot.cpp.obj
+[912/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_bots_BotAI_Battle_Attacked.cpp.obj
+[913/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_anim_Anim_Import.cpp.obj
+[914/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_VehicleAI.cpp.obj
+[915/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_anim_Anim.cpp.obj
+[916/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_ObstacleAvoidance.cpp.obj
+[917/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_bots_BotAI_Battle_Fight.cpp.obj
+[918/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_anim_Anim_Testmodel.cpp.obj
+[919/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_ai_Monster_TeleportDropper.cpp.obj
+[920/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_bots_BotAI.cpp.obj
+[921/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_bots_BotAI_Battle_NBG.cpp.obj
+[922/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_bots_BotAI_respawn.cpp.obj
+[923/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_bots_Bot_Input.cpp.obj
+[924/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_bots_BotAI_Seek_NBG.cpp.obj
+[925/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_bots_BotAI_Battle_Chase.cpp.obj
+[926/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_bots_BotAI_Battle_Retreat.cpp.obj
+[927/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_bots_BotAI_SeekLTG.cpp.obj
+[928/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_bots_Bot_char.cpp.obj
+[929/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_bots_Bot_chat.cpp.obj
+[930/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_bots_Bot_weapons.cpp.obj
+[931/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_bots_Bot_goal.cpp.obj
+[932/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_bots_Bot_weights.cpp.obj
+[933/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_client_ClientAFEntity.cpp.obj
+[934/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_anim_Anim_Blend.cpp.obj
+[935/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_gamesys_DebugGraph.cpp.obj
+[936/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_gamesys_Event.cpp.obj
+[937/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_gamesys_State.cpp.obj
+[938/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_mp_Buying.cpp.obj
+[939/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_client_ClientEffect.cpp.obj
+[940/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_client_ClientModel.cpp.obj
+[941/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_client_ClientEntity.cpp.obj
+[942/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_client_ClientMoveable.cpp.obj
+[943/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_mp_CTF.cpp.obj
+[944/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_mp_VoiceComms.cpp.obj
+[945/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_gamesys_SysCvar.cpp.obj
+[946/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_mp_Tourney.cpp.obj
+[947/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/02ba7e9df74619ad360f86de5b46e63d8f6a95ad_src_game_mp_stats_StatWindow.cpp.obj
+[948/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/84a11b67f5491cb518d6e5a1dc7dcf0307f24d70_src_game_mp_stats_StatEvent.cpp.obj
+[949/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_mp_GameState.cpp.obj
+[950/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_gamesys_SaveGame.cpp.obj
+[951/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Clip.cpp.obj
+[952/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Force.cpp.obj
+[953/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Physics.cpp.obj
+[954/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Force_Spring.cpp.obj
+[955/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Force_Constant.cpp.obj
+[956/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/ebcbd9a867216e5ab9842fa0468a2d3077ce1dd8_src_game_mp_stats_StatManager.cpp.obj
+[957/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Force_Field.cpp.obj
+[958/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Physics_Actor.cpp.obj
+[959/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Force_Drag.cpp.obj
+[960/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Physics_VehicleMonster.cpp.obj
+[961/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Physics_Particle.cpp.obj
+[962/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Physics_Base.cpp.obj
+[963/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Physics_Monster.cpp.obj
+[964/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_script_ScriptFuncUtility.cpp.obj
+[965/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Physics_Parametric.cpp.obj
+[966/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Physics_Player.cpp.obj
+[967/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Physics_Static.cpp.obj
+[968/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Physics_StaticMulti.cpp.obj
+[969/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Physics_RigidBody.cpp.obj
+[970/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_gamesys_Class.cpp.obj
+[971/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Physics_AF.cpp.obj
+[972/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_script_Script_Compiler.cpp.obj
+[973/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_script_Script_Interpreter.cpp.obj
+[974/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_gamesys_SysCmds.cpp.obj
+[975/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_script_Script_Thread.cpp.obj
+[976/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_physics_Push.cpp.obj
+[977/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_vehicle_VehicleController.cpp.obj
+[978/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_script_Script_Program.cpp.obj
+[979/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_vehicle_VehiclePosition.cpp.obj
+[980/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_vehicle_VehicleAnimated.cpp.obj
+[981/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_vehicle_VehicleStatic.cpp.obj
+[982/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_weapon_WeaponGauntlet.cpp.obj
+[983/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_vehicle_VehicleRigid.cpp.obj
+[984/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_vehicle_VehicleSpline.cpp.obj
+[985/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_weapon_WeaponBlaster.cpp.obj
+[986/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_weapon_WeaponDarkMatterGun.cpp.obj
+[987/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_weapon_WeaponGrenadeLauncher.cpp.obj
+[988/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_vehicle_Vehicle_DropPod.cpp.obj
+[989/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_vehicle_Vehicle_Walker.cpp.obj
+[990/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_vehicle_VehicleMonster.cpp.obj
+[991/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_spawner.cpp.obj
+[992/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_vehicle_VehicleDriver.cpp.obj
+[993/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_weapon_WeaponHyperblaster.cpp.obj
+[994/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_vehicle_Vehicle.cpp.obj
+[995/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_weapon_WeaponMachinegun.cpp.obj
+[996/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_weapon_WeaponNapalmGun.cpp.obj
+[997/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_weapon_WeaponRocketLauncher.cpp.obj
+[998/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_vehicle_VehicleParts.cpp.obj
+[999/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_weapon_WeaponRailgun.cpp.obj
+[1000/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_weapon_WeaponShotgun.cpp.obj
+[1001/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_weapon_WeaponLightningGun.cpp.obj
+[1002/1007] Compiling C++ object content/baseoq4/game-mp_x64.dll.p/E__Repositories_OpenQ4_.tmp_gamelibs_stage_src_game_weapon_WeaponNailgun.cpp.obj
+[1003/1007] Linking target content/baseoq4/game-mp_x64.dll
+   Creating library content/baseoq4\game-mp_x64.lib and object content/baseoq4\game-mp_x64.exp
+[1004/1007] Linking target content/baseoq4/game-sp_x64.dll
+   Creating library content/baseoq4\game-sp_x64.lib and object content/baseoq4\game-sp_x64.exp
+[1005/1007] Linking target openQ4-ded_x64.exe
+[1006/1007] Linking target openQ4-client_x64.exe
+   Creating library openQ4-client_x64.lib and object openQ4-client_x64.exp
+INFO: autodetecting backend as ninja
+INFO: calculating backend command to run: C:\Users\djdac\AppData\Roaming\Python\Python311\Scripts\ninja.EXE -C E:/Repositories/OpenQ4/builddir
+{
+  "arch": "x64",
+  "copied_files": [
+    "E:\\Repositories\\OpenQ4\\builddir\\OpenAL32.dll"
+  ],
+  "runtime_flavor": "none",
+  "targets": [
+    "E:\\Repositories\\OpenQ4\\builddir"
+  ],
+  "validated_binaries": [
+    "E:\\Repositories\\OpenQ4\\builddir\\openQ4-client_x64.exe",
+    "E:\\Repositories\\OpenQ4\\builddir\\openQ4-ded_x64.exe"
+  ]
+}

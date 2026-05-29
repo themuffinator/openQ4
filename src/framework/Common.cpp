@@ -3491,7 +3491,7 @@ static void OpenQ4_DisableBSEWithWarning( const char *reason, bool showDialog = 
 			"BSE initialization failed.\n\nReason: %s\n\nEffects will be disabled.",
 			reason ? reason : "unknown reason"
 		);
-		::MessageBoxA( NULL, message, "OpenQ4 Warning", MB_OK | MB_ICONWARNING | MB_SYSTEMMODAL );
+		::MessageBoxA( NULL, message, "openQ4 Warning", MB_OK | MB_ICONWARNING | MB_SYSTEMMODAL );
 	}
 #endif
 

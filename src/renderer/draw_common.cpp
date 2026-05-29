@@ -1302,9 +1302,23 @@ static void RB_STD_SSAO( void ) {
 		return;
 	}
 
-	idImage *sceneImage = globalImages->currentRenderImage;
-	idImage *depthImage = globalImages->currentDepthImage;
-	if ( sceneImage == NULL || depthImage == NULL ) {
+	GLuint deferredSceneTexture = 0;
+	GLuint deferredDepthTexture = 0;
+	int deferredSceneWidth = 0;
+	int deferredSceneHeight = 0;
+	int deferredDepthWidth = 0;
+	int deferredDepthHeight = 0;
+	const bool useDeferredInputs = R_ModernGLExecutor_GetDeferredSSAOInputs(
+		deferredSceneTexture,
+		deferredDepthTexture,
+		deferredSceneWidth,
+		deferredSceneHeight,
+		deferredDepthWidth,
+		deferredDepthHeight );
+
+	idImage *sceneImage = useDeferredInputs ? NULL : globalImages->currentRenderImage;
+	idImage *depthImage = useDeferredInputs ? NULL : globalImages->currentDepthImage;
+	if ( !useDeferredInputs && ( sceneImage == NULL || depthImage == NULL ) ) {
 		return;
 	}
 
@@ -1316,21 +1330,23 @@ static void RB_STD_SSAO( void ) {
 
 	RB_LogComment( "---------- RB_STD_SSAO ----------\n" );
 
-	sceneImage->CopyFramebuffer(
-		backEnd.viewDef->viewport.x1,
-		backEnd.viewDef->viewport.y1,
-		viewportWidth,
-		viewportHeight );
-	depthImage->CopyDepthbuffer(
-		backEnd.viewDef->viewport.x1,
-		backEnd.viewDef->viewport.y1,
-		viewportWidth,
-		viewportHeight );
+	if ( !useDeferredInputs ) {
+		sceneImage->CopyFramebuffer(
+			backEnd.viewDef->viewport.x1,
+			backEnd.viewDef->viewport.y1,
+			viewportWidth,
+			viewportHeight );
+		depthImage->CopyDepthbuffer(
+			backEnd.viewDef->viewport.x1,
+			backEnd.viewDef->viewport.y1,
+			viewportWidth,
+			viewportHeight );
+	}
 
-	const int textureWidth = sceneImage->GetOpts().width;
-	const int textureHeight = sceneImage->GetOpts().height;
-	const int depthTextureWidth = depthImage->GetOpts().width;
-	const int depthTextureHeight = depthImage->GetOpts().height;
+	const int textureWidth = useDeferredInputs ? deferredSceneWidth : sceneImage->GetOpts().width;
+	const int textureHeight = useDeferredInputs ? deferredSceneHeight : sceneImage->GetOpts().height;
+	const int depthTextureWidth = useDeferredInputs ? deferredDepthWidth : depthImage->GetOpts().width;
+	const int depthTextureHeight = useDeferredInputs ? deferredDepthHeight : depthImage->GetOpts().height;
 	if ( textureWidth <= 0 || textureHeight <= 0 || depthTextureWidth <= 0 || depthTextureHeight <= 0 ) {
 		return;
 	}
@@ -1344,9 +1360,17 @@ static void RB_STD_SSAO( void ) {
 		backEnd.viewDef->scissor.y2 - backEnd.viewDef->scissor.y1 + 1 );
 
 	GL_SelectTexture( 0 );
-	sceneImage->Bind();
+	if ( useDeferredInputs ) {
+		glBindTexture( GL_TEXTURE_2D, deferredSceneTexture );
+	} else {
+		sceneImage->Bind();
+	}
 	GL_SelectTexture( 1 );
-	depthImage->Bind();
+	if ( useDeferredInputs ) {
+		glBindTexture( GL_TEXTURE_2D, deferredDepthTexture );
+	} else {
+		depthImage->Bind();
+	}
 	GL_SelectTexture( 0 );
 
 	glUseProgramObjectARB( (GLhandleARB)rbSSAOStage.glslProgramObject );

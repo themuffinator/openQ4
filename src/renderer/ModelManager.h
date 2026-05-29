@@ -58,6 +58,9 @@ public:
 	// returns NULL if not loadable
 	virtual	idRenderModel *	CheckModel( const char *modelName ) = 0;
 
+	// returns true when the model pointer is currently owned by the model manager
+	virtual bool			ContainsModel( const idRenderModel *model ) const = 0;
+
 // RAVEN BEGIN
 // jscott: for tools
 //	virtual srfTriangles_t		*AllocStaticTriSurf( int verts, int indices ) = 0;

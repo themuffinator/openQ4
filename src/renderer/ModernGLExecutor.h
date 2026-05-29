@@ -452,6 +452,7 @@ void R_ModernGLExecutor_ComposeVisibleFrame( void );
 const modernGLExecutorStats_t &R_ModernGLExecutor_Stats( void );
 bool R_ModernGLExecutor_ModernVisibleRequestedForPost( void );
 bool R_ModernGLExecutor_ModernVisiblePostProcessHandoffActive( void );
+bool R_ModernGLExecutor_GetDeferredSSAOInputs( GLuint &sceneTexture, GLuint &depthTexture, int &sceneWidth, int &sceneHeight, int &depthWidth, int &depthHeight );
 bool R_ModernGLExecutor_LegacyPassCanSkip( renderPassCategory_t category );
 bool R_ModernGLExecutor_LegacyPassCanSkipForView( renderPassCategory_t category, const viewDef_t *viewDef );
 void R_ModernGLExecutor_RecordLegacyPassSkipped( renderPassCategory_t category );

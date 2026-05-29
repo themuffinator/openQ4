@@ -1,6 +1,6 @@
 # Multiplayer Networking Guide
 
-This guide covers OpenQ4 multiplayer networking behavior and the cvars used to tune or revert prediction/lag-comp behavior.
+This guide covers openQ4 multiplayer networking behavior and the cvars used to tune or revert prediction/lag-comp behavior.
 
 ## Quick Summary
 

@@ -2,7 +2,7 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Configure OpenQ4 (Meson Debug)",
+      "label": "Configure openQ4 (Meson Debug)",
       "type": "shell",
       "command": "powershell",
       "args": [
@@ -16,7 +16,7 @@
       "problemMatcher": []
     },
     {
-      "label": "Compile OpenQ4 (Meson Debug)",
+      "label": "Compile openQ4 (Meson Debug)",
       "type": "shell",
       "command": "powershell",
       "args": [
@@ -32,7 +32,7 @@
       ]
     },
     {
-      "label": "Stage OpenQ4 Install Tree (Meson Debug)",
+      "label": "Stage openQ4 Install Tree (Meson Debug)",
       "type": "shell",
       "command": "powershell",
       "args": [
@@ -46,12 +46,12 @@
       "problemMatcher": []
     },
     {
-      "label": "Build OpenQ4 (Meson Debug)",
+      "label": "Build openQ4 (Meson Debug)",
       "dependsOrder": "sequence",
       "dependsOn": [
-        "Configure OpenQ4 (Meson Debug)",
-        "Compile OpenQ4 (Meson Debug)",
-        "Stage OpenQ4 Install Tree (Meson Debug)"
+        "Configure openQ4 (Meson Debug)",
+        "Compile openQ4 (Meson Debug)",
+        "Stage openQ4 Install Tree (Meson Debug)"
       ],
       "group": {
         "kind": "build",
@@ -62,7 +62,7 @@
     {
       "label": "Bake Light Grids (All MP)",
       "type": "shell",
-      "command": "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+      "command": "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
       "args": [
         "+set",
         "logFile",
@@ -94,7 +94,7 @@
       ],
       "dependsOrder": "sequence",
       "dependsOn": [
-        "Build OpenQ4 (Meson Debug)"
+        "Build openQ4 (Meson Debug)"
       ],
       "options": {
         "cwd": "${workspaceFolder}\\.install"

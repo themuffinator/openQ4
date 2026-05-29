@@ -26,13 +26,13 @@ $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $workspaceRoot = [System.IO.Path]::GetFullPath((Join-Path $scriptDir "..\.."))
 $installDir = Join-Path $workspaceRoot ".install"
 $savePath = Join-Path $workspaceRoot ".home"
-$exePath = Join-Path $installDir "OpenQ4-client_x64.exe"
+$exePath = Join-Path $installDir "openQ4-client_x64.exe"
 $captureTemplate = Join-Path $workspaceRoot ".home\baseoq4\renderdoc\openq4"
 $captureDir = Split-Path -Parent $captureTemplate
 $renderDocDoc = Join-Path $workspaceRoot "docs-dev\renderdoc-workflow.md"
 
 if (-not (Test-Path -LiteralPath $exePath)) {
-    throw "OpenQ4 client executable not found: $exePath"
+    throw "openQ4 client executable not found: $exePath"
 }
 
 if (-not (Test-Path -LiteralPath $BasePath)) {
@@ -68,7 +68,7 @@ if ([string]::IsNullOrWhiteSpace($Map)) {
 }
 
 if (-not $AllowUnsupported) {
-    throw "RenderDoc capture is not currently supported with the shipping OpenQ4 OpenGL renderer. The renderer is still hard-wired to ARB2 / compatibility-profile features that RenderDoc drops during startup. See $renderDocDoc. Use -AllowUnsupported only if you intentionally want to reproduce this limitation while testing renderer modernization."
+    throw "RenderDoc capture is not currently supported with the shipping openQ4 OpenGL renderer. The renderer is still hard-wired to ARB2 / compatibility-profile features that RenderDoc drops during startup. See $renderDocDoc. Use -AllowUnsupported only if you intentionally want to reproduce this limitation while testing renderer modernization."
 }
 
 New-Item -ItemType Directory -Force -Path $captureDir | Out-Null
@@ -154,7 +154,7 @@ foreach ($logPath in $logCandidates) {
 }
 
 if ($rendererCompatibilityFailure) {
-    throw "RenderDoc did not launch successfully because the injected run dropped required OpenQ4 compatibility / ARB2 OpenGL features. RenderDoc capture is not yet supported with the current OpenQ4 renderer."
+    throw "RenderDoc did not launch successfully because the injected run dropped required openQ4 compatibility / ARB2 OpenGL features. RenderDoc capture is not yet supported with the current openQ4 renderer."
 }
 
 if ($LaunchOnly) {

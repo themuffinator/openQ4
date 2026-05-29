@@ -188,6 +188,11 @@ void R_ToggleSmpFrame( void ) {
 		return;
 	}
 	R_FreeDeferredTriSurfs( frameData );
+	for ( int i = 0; i < tr.worlds.Num(); i++ ) {
+		if ( tr.worlds[i] != NULL ) {
+			tr.worlds[i]->FreeDeferredLightDefs();
+		}
+	}
 
 	// clear frame-temporary data
 	frameData_t		*frame;

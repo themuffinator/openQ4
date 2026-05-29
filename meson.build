@@ -1,5 +1,5 @@
 project(
-  'OpenQ4',
+  'openQ4',
   ['c', 'cpp'],
   version: '0.1.010',
   meson_version: '>=1.2.0',
@@ -9,7 +9,7 @@ project(
 host_system = host_machine.system()
 host_cpu_family = host_machine.cpu_family()
 if not ['windows', 'linux', 'darwin'].contains(host_system)
-  error('Unsupported host system for OpenQ4 Meson build: ' + host_system)
+  error('Unsupported host system for openQ4 Meson build: ' + host_system)
 endif
 
 binary_arch = host_cpu_family
@@ -27,7 +27,7 @@ engine_ded_binary_name = meson.project_name() + '-ded_' + binary_arch
 
 if host_cpu_family != 'x86_64'
   warning(
-    'OpenQ4 currently targets x64 as the active compatibility baseline. '
+    'openQ4 currently targets x64 as the active compatibility baseline. '
     + 'Non-x64 builds are considered experimental during platform bring-up.'
   )
 endif
@@ -649,13 +649,13 @@ endif
 install_data(
   'assets/icons/quake4.ico',
   install_dir: install_root_dir,
-  rename: 'OpenQ4.ico',
+  rename: 'openQ4.ico',
 )
 
 install_data(
   'assets/icons/quake4.icns',
   install_dir: install_root_dir,
-  rename: 'OpenQ4.icns',
+  rename: 'openQ4.icns',
 )
 
 if host_system == 'linux'
@@ -665,7 +665,7 @@ if host_system == 'linux'
   linux_desktop_conf.set('OPENQ4_PROJECT_VERSION_FULL', openq4_version_full)
   linux_steamdeck_launcher = configure_file(
     input: 'assets/linux/OpenQ4-steamdeck.in',
-    output: 'OpenQ4-steamdeck',
+    output: 'openQ4-steamdeck',
     configuration: linux_desktop_conf,
   )
   linux_desktop_entry = configure_file(

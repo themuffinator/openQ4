@@ -628,6 +628,10 @@ void idRenderSystemLocal::SetSpecialEffectParm( ESpecialEffectType Which, int Pa
 	specialEffectParms[ Which ][ Parm ] = Value;
 }
 
+void idRenderSystemLocal::SetPortalSkyCaptureViewCallback( renderPortalSkyCaptureViewCallback_t callback ) {
+	portalSkyCaptureViewCallback = callback;
+}
+
 /*
 =============
 idRenderSystemLocal::ShutdownSpecialEffects
@@ -1056,7 +1060,7 @@ void idRenderSystemLocal::SetBackEndRenderer() {
 	if ( requestedRendererName != NULL && requestedRendererName[0] != '\0' ) {
 		if ( R_IsLegacyBackEndRequest( requestedRendererName ) ) {
 			common->Warning(
-				"r_renderer \"%s\" requested, but OpenQ4 only ships the ARB2 backend; using %s instead",
+				"r_renderer \"%s\" requested, but openQ4 only ships the ARB2 backend; using %s instead",
 				requestedRendererName,
 				r_actualRenderer.GetString() );
 		} else if ( idStr::Icmp( requestedRendererName, "best" ) != 0 && idStr::Icmp( requestedRendererName, r_actualRenderer.GetString() ) != 0 ) {

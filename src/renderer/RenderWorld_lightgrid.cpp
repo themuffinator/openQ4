@@ -2305,7 +2305,7 @@ bool R_BakeCurrentLightGrids( const lightGridBakeOptions_t &options, const char 
 		options.bounces,
 		fileStats.settingsHash );
 	if ( options.bounces > 1 ) {
-		common->Printf( "bakeLightGrids: bounce 2+ reuse the previous OpenQ4 bake through the runtime light-grid pass.\n" );
+		common->Printf( "bakeLightGrids: bounce 2+ reuse the previous openQ4 bake through the runtime light-grid pass.\n" );
 	}
 
 	const bool oldUseLightGrid = r_useLightGrid.GetBool();

@@ -1,6 +1,6 @@
 <div align="center">
 
-# OpenQ4 Technical Reference
+# openQ4 Technical Reference
 
 </div>
 
@@ -28,12 +28,12 @@ This status reflects compatibility with official Quake 4 assets (`q4base` PK4s),
 
 ### Compatible
 
-- ✅ **Basic Set of Effects (BSE) Reconstruction**: Core BSE runtime behavior rebuilt and integrated so stock effects execute through the OpenQ4 engine/game pipeline
+- ✅ **Basic Set of Effects (BSE) Reconstruction**: Core BSE runtime behavior rebuilt and integrated so stock effects execute through the openQ4 engine/game pipeline
 - ✅ **Sound Shaders**: Effect-driven sound shader paths restored, including effect sound capability checks and runtime playback behavior
 - ✅ **Screen Effects**: BSE-driven screen/camera effect paths used by stock content are operational
 - ✅ **Material Shaders**: Material handling compatibility restored to remove startup reliance on custom `q4base` material overrides
 - ✅ **Modern Display Handling**: Automatic aspect-ratio/FOV behavior, multi-monitor targeting, and desktop-native fullscreen paths integrated
-- ✅ **Steam Deck Runtime Path**: Linux SDL3 backend, controller/menu integration, and a dedicated `OpenQ4-steamdeck` launcher/profile are in place as of March 30, 2026
+- ✅ **Steam Deck Runtime Path**: Linux SDL3 backend, controller/menu integration, and a dedicated `openQ4-steamdeck` launcher/profile are in place as of March 30, 2026
 - ✅ **Stock-Asset Validation Path**: Repeated validation loops with stock assets keep parser/runtime compatibility regressions visible and actionable
 - ✅ **Door/Trigger Script Progression Stability (OpenD3 Parity)**: Right-associative script compiler pointer-temp handling guards x64 storage width mismatches, preventing interpreter write corruption in affected trigger/door event chains
 
@@ -48,10 +48,10 @@ Current known regressions and follow-up work are tracked in [TODO.md](TODO.md) a
 ## Game Directory Structure
 
 ```
-OpenQ4/
-├── OpenQ4-client_x64      # Main executable (.exe on Windows)
-├── OpenQ4-ded_x64         # Dedicated server (.exe on Windows)
-├── OpenQ4-steamdeck       # Linux Steam Deck launcher
+openQ4/
+├── openQ4-client_x64      # Main executable (.exe on Windows)
+├── openQ4-ded_x64         # Dedicated server (.exe on Windows)
+├── openQ4-steamdeck       # Linux Steam Deck launcher
 └── baseoq4/               # Unified game directory
     ├── game-sp_x64        # Single-player module (.dll / .so / .dylib)
     └── game-mp_x64        # Multiplayer module (.dll / .so / .dylib)
@@ -59,7 +59,7 @@ OpenQ4/
 
 - **Single-player**: loads `game-sp_<arch>`
 - **Multiplayer**: loads `game-mp_<arch>`
-- **BSE runtime**: linked directly into `OpenQ4-client_<arch>`; dedicated server builds keep a disabled/stub path
+- **BSE runtime**: linked directly into `openQ4-client_<arch>`; dedicated server builds keep a disabled/stub path
 - **Source-owned runtime content**: author repo-managed overrides in `content/baseoq4/`
 - **Generated staging output**: treat `.install/baseoq4/` as build output, not an editing target
 - **Runtime identity**: the in-game directory remains `baseoq4/` even though the repo source path now lives under `content/baseoq4/`
@@ -69,12 +69,12 @@ OpenQ4/
 
 ## Asset Validation
 
-OpenQ4 automatically validates your Quake 4 installation to ensure you have legitimate, unmodified media files.
+openQ4 automatically validates your Quake 4 installation to ensure you have legitimate, unmodified media files.
 
 **How it works:**
 1. Engine validates required official `q4base` media PK4 checksums at startup
 2. Refuses to run if required assets are missing or modified
-3. Ignores retail game-binary PK4 archives such as `game000.pk4` through `game300.pk4` and `gamex*.pk4` because OpenQ4 ships its own game modules
+3. Ignores retail game-binary PK4 archives such as `game000.pk4` through `game300.pk4` and `gamex*.pk4` because openQ4 ships its own game modules
 4. Auto-discovers your installation (checks Steam, GOG, or current directory)
 
 **Configuration:**
@@ -176,7 +176,7 @@ On Linux, Steam auto-discovery checks `~/.steam/steam`, `~/.local/share/Steam`, 
 If your Quake 4 installation is not auto-detected, launch with:
 
 ```
-OpenQ4-client_x64 +set fs_basepath "C:\path\to\Quake 4"
+openQ4-client_x64 +set fs_basepath "C:\path\to\Quake 4"
 ```
 
 </details>
@@ -204,7 +204,7 @@ All dependencies are automatically fetched and built during the Meson configure 
 
 ## Versioning
 
-OpenQ4 uses numeric release versions from `meson.build` and appends an explicit build track when the build is not stable:
+openQ4 uses numeric release versions from `meson.build` and appends an explicit build track when the build is not stable:
 
 - `stable` — release builds, e.g. `X.Y.Z`
 - `dev` — default local builds, e.g. `X.Y.Z-dev+gabcdef12`

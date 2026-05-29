@@ -99,7 +99,7 @@ static void R_ErrorForMissingRequiredOpenGLFeatures( void ) {
 	if ( RenderDoc_IsInjected() ) {
 		common->Printf(
 			"RenderDoc detected during OpenGL initialization.\n"
-			"OpenQ4 currently requires OpenGL compatibility / ARB2-era features "
+			"openQ4 currently requires OpenGL compatibility / ARB2-era features "
 			"that are unavailable in the injected context.\n" );
 		R_ErrorForUnsupportedCompatibilityOpenGL();
 	}
@@ -1809,6 +1809,12 @@ void R_ReadTiledPixels( int width, int height, byte *buffer, renderView_t *ref =
 
 			if ( ref ) {
 				tr.BeginFrame( oldWidth, oldHeight );
+				if ( tr.portalSkyCaptureViewCallback != NULL && tr.primaryWorld != NULL ) {
+					renderView_t portalSkyView = *ref;
+					if ( tr.portalSkyCaptureViewCallback( ref, &portalSkyView ) ) {
+						tr.primaryWorld->RenderScene( &portalSkyView, RF_DEFER_COMMAND_SUBMIT | RF_PORTAL_SKY );
+					}
+				}
 				tr.primaryWorld->RenderScene( ref );
 
 				// Match CaptureRenderToFile's direct back-buffer readback path instead of
@@ -2138,13 +2144,28 @@ static void R_LevelShotNormalizeFovToAspect( const renderView_t &sourceView, flo
 	}
 }
 
+static bool R_GetDefaultLevelShotBaseName( idStr &baseName ) {
+	idStr mapName;
+
+	if ( tr.primaryWorld != NULL && tr.primaryWorld->mapName.Length() > 0 && tr.primaryWorld->mapName != "<FREED>" ) {
+		mapName = tr.primaryWorld->mapName;
+	} else {
+		mapName = cvarSystem->GetCVarString( "si_map" );
+	}
+
+	mapName.StripPath();
+	mapName.StripFileExtension();
+	if ( mapName.Length() <= 0 ) {
+		return false;
+	}
+
+	baseName = va( "gfx/guis/loadscreens/%s", mapName.c_str() );
+	return true;
+}
+
 static void R_NormalizeLevelShotBaseName( idStr &baseName ) {
 	if ( baseName.Length() <= 0 ) {
-		idStr mapName = cvarSystem->GetCVarString( "si_map" );
-		mapName.StripPath();
-		mapName.StripFileExtension();
-		if ( mapName.Length() > 0 ) {
-			baseName = va( "gfx/guis/loadscreens/%s", mapName.c_str() );
+		if ( R_GetDefaultLevelShotBaseName( baseName ) ) {
 			return;
 		}
 
@@ -3233,6 +3254,7 @@ void idRenderSystemLocal::Clear( void ) {
 	pendingRenderTextureDeletes.Clear();
 	useUIViewportFor2D = true;
 	activeRenderTexture = NULL;
+	portalSkyCaptureViewCallback = NULL;
 	suppressLevelshotViewModels = false;
 	disableLevelshotEntityCulling = false;
 	memset( gammaTable, 0, sizeof( gammaTable ) );

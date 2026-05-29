@@ -107,7 +107,7 @@ def sanitize_release_notes_override(body: str, version_tag: str, release_tag: st
 
     if lines:
         title_pattern = re.compile(
-            rf"^#{1,6}\s+OpenQ4\s+(?:{re.escape(version_tag)}|{re.escape(release_tag)})"
+            rf"^#{1,6}\s+openQ4\s+(?:{re.escape(version_tag)}|{re.escape(release_tag)})"
             rf"(?:\s+Release(?:\s+Notes)?)?\s*$",
             re.IGNORECASE,
         )
@@ -141,7 +141,7 @@ def build_release_header(
         compare_link = f"[compare]({repo_url}/compare/{previous_tag}...{head_sha})"
 
     lines: list[str] = []
-    lines.append(f"## OpenQ4 {version_tag}")
+    lines.append(f"## openQ4 {version_tag}")
     lines.append("")
     lines.append("| Field | Value |")
     lines.append("| --- | --- |")
@@ -163,7 +163,7 @@ def build_release_header(
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Generate OpenQ4 release notes.")
+    parser = argparse.ArgumentParser(description="Generate openQ4 release notes.")
     parser.add_argument("--version", required=True, help="Human-readable release version.")
     parser.add_argument("--version-tag", required=True, help="File-safe release version tag.")
     parser.add_argument("--release-tag", required=True, help="Release tag (for example v0.1.010).")

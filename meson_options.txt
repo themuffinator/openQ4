@@ -9,7 +9,7 @@ option(
   'build_engine',
   type: 'boolean',
   value: true,
-  description: 'Build engine executables (OpenQ4-client_<arch>/OpenQ4-ded_<arch>).',
+  description: 'Build engine executables (openQ4-client_<arch>/openQ4-ded_<arch>).',
 )
 
 option(

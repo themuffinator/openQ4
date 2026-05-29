@@ -200,7 +200,8 @@ remove_stale_bse_artifacts() {
     [[ -n "${directory_path}" && -d "${directory_path}" ]] || return
 
     find "${directory_path}" -maxdepth 1 -type f \
-        \( -name 'OpenQ4-BSE_*.dll' -o -name 'OpenQ4-BSE_*.dylib' -o -name 'OpenQ4-BSE_*.so' -o -name 'OpenQ4-BSE_*.lib' -o -name 'OpenQ4-BSE_*.pdb' \) \
+        \( -name 'openQ4-BSE_*.dll' -o -name 'openQ4-BSE_*.dylib' -o -name 'openQ4-BSE_*.so' -o -name 'openQ4-BSE_*.lib' -o -name 'openQ4-BSE_*.pdb' -o \
+           -name 'OpenQ4-BSE_*.dll' -o -name 'OpenQ4-BSE_*.dylib' -o -name 'OpenQ4-BSE_*.so' -o -name 'OpenQ4-BSE_*.lib' -o -name 'OpenQ4-BSE_*.pdb' \) \
         -print | while IFS= read -r match; do
             [[ -n "${match}" ]] || continue
             echo "Removing stale BSE artifact '${match}'"

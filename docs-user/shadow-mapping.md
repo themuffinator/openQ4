@@ -1,6 +1,6 @@
 # Shadow Mapping and Transparency Shadowing Guide
 
-This guide covers OpenQ4's user-facing shadow-map settings, including projected-light shadow maps, experimental point-light shadow maps, cascaded shadow maps (CSM), alpha-tested transparency shadows, and the current experimental translucent-shadow path.
+This guide covers openQ4's user-facing shadow-map settings, including projected-light shadow maps, experimental point-light shadow maps, cascaded shadow maps (CSM), alpha-tested transparency shadows, and the current experimental translucent-shadow path.
 
 ## Quick Start
 
@@ -25,7 +25,7 @@ vid_restart
 
 Notes:
 - `r_shadows` must stay enabled for any shadow path to render.
-- If the shadow-map path is unavailable or fails for a light, OpenQ4 falls back to the legacy shadow path instead of leaving the light unshadowed.
+- If the shadow-map path is unavailable or fails for a light, openQ4 falls back to the legacy shadow path instead of leaving the light unshadowed.
 - Point lights use the legacy stencil shadow path by default; enable `r_shadowMapPointLights 1` only when testing the experimental point-light cubemap path.
 - Lights touching animated, deformed, or packed character receivers can also fall back to the legacy stencil path so stock character lighting, mirrored seams, and eye materials retain retail-style interaction behavior.
 - Modern renderer diagnostics keep lighting visible when shadow-map receiver sampling is not ready, but full modern visible-frame replacement stays fail-closed so the legacy path continues to provide the actual shadowed frame.
@@ -33,7 +33,7 @@ Notes:
 
 ## What the System Does
 
-OpenQ4 currently supports:
+openQ4 currently supports:
 - Projected-light shadow maps for regular projected lights.
 - Experimental point-light shadow maps for omni/point lights when `r_shadowMapPointLights 1` is enabled.
 - Optional projected-light cascaded shadow maps (CSM).
@@ -154,7 +154,7 @@ vid_restart
 
 ## Residency and Update Budgeting
 
-OpenQ4 can keep static-only shadow maps resident and reuse them across backend views. This is enabled by default for regular projected and point lights. Dynamic casters, translucent caster passes, and view-fitted CSM/global passes are conservative by default and continue to update normally unless explicitly opted in.
+openQ4 can keep static-only shadow maps resident and reuse them across backend views. This is enabled by default for regular projected and point lights. Dynamic casters, translucent caster passes, and view-fitted CSM/global passes are conservative by default and continue to update normally unless explicitly opted in.
 
 | Setting | Default | Range | What it does |
 |---|---:|---:|---|
@@ -180,7 +180,7 @@ These are materials with holes cut by alpha test, such as:
 Behavior:
 - They cast cutout shadows in both projected and point shadow-map paths.
 - `r_shadowMapHashedAlpha 1` is the recommended mode and is enabled by default.
-- If a perforated stage cannot use the hashed path, OpenQ4 falls back to its classic alpha-test caster behavior instead of dropping the shadow.
+- If a perforated stage cannot use the hashed path, openQ4 falls back to its classic alpha-test caster behavior instead of dropping the shadow.
 
 Hashed alpha notes:
 - Usually gives more stable distant foliage/fence shadows than hard binary alpha test.
@@ -201,7 +201,7 @@ Behavior:
 
 Current limits:
 - Supported stages currently include old-style alpha and premultiplied-alpha stages with explicit ST texture coordinates, plus common additive `blend add` / `GL_ONE, GL_ONE` stages.
-- When a translucent shell/tint stage is layered on top of a separate explicit-ST coverage stage, OpenQ4 now reuses that coverage stage, including its alpha-test threshold when present, so layered pickup-orb and similar materials can cast shaped transmitted shadows instead of only uniform blobs.
+- When a translucent shell/tint stage is layered on top of a separate explicit-ST coverage stage, openQ4 now reuses that coverage stage, including its alpha-test threshold when present, so layered pickup-orb and similar materials can cast shaped transmitted shadows instead of only uniform blobs.
 - Supported translucent casters now derive colored transmission from the material inputs available to that stage: texture alpha, sampled texture RGB, stage color, and applicable vertex color.
 - View-dependent reflection cubemaps are treated as tinted transmissive shells instead of using the reflected sample directly, so pickup orbs can tint transmitted light without camera-dependent shadow color shifts.
 - The current high-quality path stores separate translucent shadow moments for red, green, and blue, so each channel resolves blocker depth independently instead of sharing one grayscale depth distribution.
@@ -209,7 +209,7 @@ Current limits:
 - BSE/FX particles, unusual custom stage setups, and many effect-style materials are intentionally not forced into the translucent shadow pass.
 - Colored transmission is still approximate rather than a full deep-shadow solution, but it is materially closer to real tinted transmission than the earlier scalar/grayscale model.
 - This path adds extra GPU work because eligible lights render an additional translucent caster pass.
-- The feature now expects enough hardware for 3 translucent MRT attachments and 3 extra texture samplers in the receiver path; if that is unavailable, OpenQ4 disables this experimental translucent-shadow feature.
+- The feature now expects enough hardware for 3 translucent MRT attachments and 3 extra texture samplers in the receiver path; if that is unavailable, openQ4 disables this experimental translucent-shadow feature.
 
 Controls:
 

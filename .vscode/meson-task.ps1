@@ -12,10 +12,10 @@ $mesonWrapper = Join-Path $workspaceRoot 'tools\build\meson_setup.ps1'
 $buildDir = Join-Path $workspaceRoot 'builddir'
 
 if (-not (Test-Path $mesonWrapper)) {
-    throw "OpenQ4 Meson wrapper not found at '$mesonWrapper'."
+    throw "openQ4 Meson wrapper not found at '$mesonWrapper'."
 }
 
-function Invoke-OpenQ4Meson([string[]]$MesonArgs) {
+function Invoke-openQ4Meson([string[]]$MesonArgs) {
     & powershell -NoProfile -ExecutionPolicy Bypass -File $mesonWrapper @MesonArgs
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
@@ -31,7 +31,7 @@ function Test-MesonBuildDirectory([string]$Path) {
 switch ($Action) {
     'setup' {
         if (Test-MesonBuildDirectory $buildDir) {
-            Invoke-OpenQ4Meson @(
+            Invoke-openQ4Meson @(
                 'setup',
                 $buildDir,
                 $workspaceRoot,
@@ -43,7 +43,7 @@ switch ($Action) {
                 '--wrap-mode=forcefallback'
             )
         } else {
-            Invoke-OpenQ4Meson @(
+            Invoke-openQ4Meson @(
                 'setup',
                 '--wipe',
                 $buildDir,
@@ -57,14 +57,14 @@ switch ($Action) {
         }
     }
     'compile' {
-        Invoke-OpenQ4Meson @(
+        Invoke-openQ4Meson @(
             'compile',
             '-C',
             $buildDir
         )
     }
     'install' {
-        Invoke-OpenQ4Meson @(
+        Invoke-openQ4Meson @(
             'install',
             '-C',
             $buildDir,

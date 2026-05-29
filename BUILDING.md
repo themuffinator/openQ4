@@ -1,10 +1,10 @@
 <div align="center">
 
-# Building OpenQ4 from Source
+# Building openQ4 from Source
 
 </div>
 
-This guide covers everything required to compile OpenQ4 from source on Windows, Linux, and macOS.
+This guide covers everything required to compile openQ4 from source on Windows, Linux, and macOS.
 
 > [!NOTE]
 > **Regular players do not need to build from source.** Download the latest release from the [Releases page](https://github.com/themuffinator/OpenQ4/releases) and follow the [Quick Start instructions](README.md#quick-start) instead.
@@ -45,7 +45,7 @@ This guide covers everything required to compile OpenQ4 from source on Windows, 
 
 On Windows, always invoke Meson through `tools/build/meson_setup.ps1` rather than calling `meson` directly from an arbitrary shell. The wrapper ensures MSVC tools (`cl.exe`, `link.exe`, etc.) are on `PATH` and performs automatic icon-set synchronisation before setup, compile, and install steps.
 
-For Windows `arm64` builds, OpenQ4 also needs an ARM64 OpenAL Soft package. The release workflow prepares that automatically. For local builds, use `tools/build/prepare_windows_openal.ps1` to create one under `.tmp/`, then pass `-Dopenal_root_override=<path>` during `meson setup`.
+For Windows `arm64` builds, openQ4 also needs an ARM64 OpenAL Soft package. The release workflow prepares that automatically. For local builds, use `tools/build/prepare_windows_openal.ps1` to create one under `.tmp/`, then pass `-Dopenal_root_override=<path>` during `meson setup`.
 
 ```powershell
 # Open a regular PowerShell window and use the wrapper:
@@ -58,10 +58,10 @@ Alternatively, open `tools/build/openq4_devcmd.cmd` first to initialise the Visu
 
 ## GameLibs Companion Repository
 
-OpenQ4's game code (single-player and multiplayer modules) lives in a **separate companion repository** — [OpenQ4-GameLibs](https://github.com/themuffinator/OpenQ4-GameLibs). This separation clearly identifies the SDK-licensed components derived from the [Quake 4 SDK](https://www.moddb.com/games/quake-4/downloads/quake-4-sdk-v15).
+openQ4's game code (single-player and multiplayer modules) lives in a **separate companion repository** — [OpenQ4-GameLibs](https://github.com/themuffinator/OpenQ4-GameLibs). This separation clearly identifies the SDK-licensed components derived from the [Quake 4 SDK](https://www.moddb.com/games/quake-4/downloads/quake-4-sdk-v15).
 
 > [!IMPORTANT]
-> **The OpenQ4 build expects OpenQ4-GameLibs to be checked out alongside OpenQ4**, at `../OpenQ4-GameLibs` relative to this repository. If the companion repository is missing or at a different path, game-module builds will fail.
+> **The openQ4 build expects OpenQ4-GameLibs to be checked out alongside openQ4**, at `../OpenQ4-GameLibs` relative to this repository. If the companion repository is missing or at a different path, game-module builds will fail.
 
 ### Setting Up
 
@@ -82,7 +82,7 @@ export OPENQ4_GAMELIBS_REPO=/path/to/OpenQ4-GameLibs   # Linux / macOS
 $env:OPENQ4_GAMELIBS_REPO = "C:\path\to\OpenQ4-GameLibs"  # PowerShell
 ```
 
-To rebuild the game libraries as part of the OpenQ4 build, set `OPENQ4_BUILD_GAMELIBS=1` before running compile.
+To rebuild the game libraries as part of the openQ4 build, set `OPENQ4_BUILD_GAMELIBS=1` before running compile.
 
 ---
 
@@ -98,7 +98,7 @@ Pass any of these with `-D<option>=<value>` on the `meson setup` command line:
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `build_engine` | `true` | Build `OpenQ4-client_<arch>` and `OpenQ4-ded_<arch>` |
+| `build_engine` | `true` | Build `openQ4-client_<arch>` and `openQ4-ded_<arch>` |
 | `build_games` | `true` | Build game modules |
 | `build_game_sp` | `true` | Build single-player game module |
 | `build_game_mp` | `true` | Build multiplayer game module |
@@ -112,7 +112,7 @@ Pass any of these with `-D<option>=<value>` on the `meson setup` command line:
 
 ## Validation Scripts
 
-OpenQ4 includes two local validation profiles under `tools/validation/`. They share one Python runner and use the platform build wrappers so Windows validation still goes through `tools/build/meson_setup.ps1`.
+openQ4 includes two local validation profiles under `tools/validation/`. They share one Python runner and use the platform build wrappers so Windows validation still goes through `tools/build/meson_setup.ps1`.
 
 GitHub Actions runs the same validation entrypoints on every pushed commit, pull request, and manual dispatch through `.github/workflows/commit-validation.yml`. Branch pushes run the faster push profile; pull requests, manual dispatches, and direct pushes to `main` run the full PR profile.
 
@@ -164,7 +164,7 @@ powershell -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 setup --wip
 powershell -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 compile -C builddir
 
 # 3. Run directly from builddir
-builddir\OpenQ4-client_<arch>.exe
+builddir\openQ4-client_<arch>.exe
 ```
 
 ### Release Build
@@ -194,7 +194,7 @@ meson compile -C builddir
 ## Building on Linux / macOS
 
 > [!NOTE]
-> As of March 30, 2026, Linux defaults to the SDL3 backend. `-Dplatform_backend=native` remains available as the fallback Linux path. On Steam Deck or other mixed Wayland/X11 sessions, `OpenQ4-steamdeck` prefers XWayland when both `WAYLAND_DISPLAY` and `DISPLAY` are present.
+> As of March 30, 2026, Linux defaults to the SDL3 backend. `-Dplatform_backend=native` remains available as the fallback Linux path. On Steam Deck or other mixed Wayland/X11 sessions, `openQ4-steamdeck` prefers XWayland when both `WAYLAND_DISPLAY` and `DISPLAY` are present.
 
 ### Debug Build
 
@@ -206,7 +206,7 @@ bash tools/build/meson_setup.sh setup --wipe builddir . --backend ninja --buildt
 bash tools/build/meson_setup.sh compile -C builddir
 
 # 3. Run directly from builddir
-./builddir/OpenQ4-client_<arch>
+./builddir/openQ4-client_<arch>
 ```
 
 Use `-Dplatform_backend=native` during setup if you need to compare against the legacy Linux X11/GLX backend.
@@ -232,12 +232,12 @@ bash tools/build/meson_setup.sh install -C builddir --no-rebuild --skip-subproje
 
 | File | Description |
 |------|-------------|
-| `OpenQ4-client_<arch>[.exe]` | Main engine executable |
-| `OpenQ4-ded_<arch>[.exe]` | Dedicated server |
+| `openQ4-client_<arch>[.exe]` | Main engine executable |
+| `openQ4-ded_<arch>[.exe]` | Dedicated server |
 | `baseoq4/game-sp_<arch>[.dll/.so/.dylib]` | Single-player game module |
 | `baseoq4/game-mp_<arch>[.dll/.so/.dylib]` | Multiplayer game module |
 
-- BSE (Basic Set of Effects) is linked directly into `OpenQ4-client_<arch>`; the dedicated server keeps a disabled/stub path.
+- BSE (Basic Set of Effects) is linked directly into `openQ4-client_<arch>`; the dedicated server keeps a disabled/stub path.
 - On Windows, the wrapper stages `OpenAL32.dll` next to the executables and rejects builds that still depend on external MSVC/UCRT runtime DLLs.
 
 ### Install directory (`.install/`)
@@ -246,15 +246,15 @@ After running the install step, `.install/` is a self-contained distributable pa
 
 ```
 .install/
-├── OpenQ4-client_<arch>[.exe]  # Main executable
-├── OpenQ4-ded_<arch>[.exe]     # Dedicated server
-├── OpenQ4-steamdeck            # (Linux) Steam Deck launcher
+├── openQ4-client_<arch>[.exe]  # Main executable
+├── openQ4-ded_<arch>[.exe]     # Dedicated server
+├── openQ4-steamdeck            # (Linux) Steam Deck launcher
 ├── OpenAL32.dll                # (Windows) runtime dependency
 ├── share/applications/         # (Linux) desktop entries
 └── baseoq4/
     ├── game-sp_<arch>[.dll/.so/.dylib]   # Single-player module
     ├── game-mp_<arch>[.dll/.so/.dylib]   # Multiplayer module
-    ├── openq4_defaults.cfg            # OpenQ4-owned default binds
+    ├── openq4_defaults.cfg            # openQ4-owned default binds
     └── openq4_profile_steamdeck.cfg   # Steam Deck profile overrides
 ```
 

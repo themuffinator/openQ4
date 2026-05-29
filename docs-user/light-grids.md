@@ -1,12 +1,12 @@
 # Light Grid and Irradiance Volume Guide
 
-This guide covers OpenQ4's user-facing light-grid system: what it does, how to enable or disable it, how to bake data for one map or many maps, where the baked files go, and how to troubleshoot common problems.
+This guide covers openQ4's user-facing light-grid system: what it does, how to enable or disable it, how to bake data for one map or many maps, where the baked files go, and how to troubleshoot common problems.
 
-OpenQ4 keeps the existing feature naming in the engine and README, so you will see both of these terms:
+openQ4 keeps the existing feature naming in the engine and README, so you will see both of these terms:
 - `light grid`
 - `irradiance volume`
 
-In practice they refer to the same OpenQ4 feature: precomputed indirect diffuse lighting sampled from a 3D probe layout.
+In practice they refer to the same openQ4 feature: precomputed indirect diffuse lighting sampled from a 3D probe layout.
 
 ## Quick Start
 
@@ -28,7 +28,7 @@ bakeLightGrids
 Bake every discovered multiplayer map from the command line, then quit when finished:
 
 ```text
-OpenQ4-client_x64.exe +bakeLightGrids all-mp -quit
+openQ4-client_x64.exe +bakeLightGrids all-mp -quit
 ```
 
 Show probe positions while testing a baked map:
@@ -44,7 +44,7 @@ Notes:
 
 ## What the System Does
 
-OpenQ4's current light-grid path:
+openQ4's current light-grid path:
 - adds indirect diffuse lighting from precomputed probes
 - loads one `.lightgrid` metadata file per map
 - loads baked irradiance and visibility atlas images per portal area
@@ -61,10 +61,10 @@ Current scope and limits:
 - non-PBR
 - LDR bake output
 - writes `.tga` atlas images, not BFG `.exr`
-- intended for OpenQ4's native bake/load path, not drop-in BFG asset parity
+- intended for openQ4's native bake/load path, not drop-in BFG asset parity
 - translucent effects, decals, and other non-lighting surfaces remain outside the runtime light-grid pass
 
-If no baked assets are found, OpenQ4 can still generate a runtime probe layout for debugging and baking, but there will be no indirect-light contribution until actual baked files exist.
+If no baked assets are found, openQ4 can still generate a runtime probe layout for debugging and baking, but there will be no indirect-light contribution until actual baked files exist.
 
 ## Runtime Controls
 
@@ -116,8 +116,8 @@ bakeLightGrids
 ```
 
 After the bake completes:
-- OpenQ4 writes the `.lightgrid` metadata file.
-- OpenQ4 writes one atlas per area.
+- openQ4 writes the `.lightgrid` metadata file.
+- openQ4 writes one atlas per area.
 - The newly written data is reloaded automatically.
 
 ## Batch Baking from the Command Line
@@ -127,23 +127,23 @@ This is the preferred workflow when you want progress information without manual
 Bake all maps:
 
 ```text
-OpenQ4-client_x64.exe +bakeLightGrids all -quit
+openQ4-client_x64.exe +bakeLightGrids all -quit
 ```
 
 Bake all multiplayer maps only:
 
 ```text
-OpenQ4-client_x64.exe +bakeLightGrids all-mp -quit
+openQ4-client_x64.exe +bakeLightGrids all-mp -quit
 ```
 
 Bake a selected list of maps:
 
 ```text
-OpenQ4-client_x64.exe +bakeLightGrids game/tram1 game/process1 mp/q4dm1 -quit
+openQ4-client_x64.exe +bakeLightGrids game/tram1 game/process1 mp/q4dm1 -quit
 ```
 
 Behavior:
-- OpenQ4 discovers or accepts target map names.
+- openQ4 discovers or accepts target map names.
 - It loads each map automatically.
 - It switches between `game_sp` and `game_mp` automatically when needed.
 - Without `force`, it skips maps whose required `.lightgrid` metadata and area atlas files already exist and whose stored bake-settings/layout hash matches the current bake.
@@ -151,8 +151,8 @@ Behavior:
 - It exits at the end if `-quit` is supplied.
 
 Important:
-- Use `OpenQ4-client_x64.exe`, not `OpenQ4-ded_x64.exe`.
-- Multiplayer-map baking requires a render-capable client path, so OpenQ4 forces `net_serverDedicated 0` during that workflow when necessary.
+- Use `openQ4-client_x64.exe`, not `openQ4-ded_x64.exe`.
+- Multiplayer-map baking requires a render-capable client path, so openQ4 forces `net_serverDedicated 0` during that workflow when necessary.
 
 ## Bake Command Syntax
 
@@ -163,10 +163,10 @@ bakeLightGrids [all | all-mp | <map> ...] [force] [-quit] [limit<num>] [bounce<n
 ```
 
 If no map names are given:
-- OpenQ4 bakes the currently loaded map.
+- openQ4 bakes the currently loaded map.
 
 If map names, `all`, or `all-mp` are given:
-- OpenQ4 runs in batch mode and loads maps automatically.
+- openQ4 runs in batch mode and loads maps automatically.
 - Multiplayer targets are cheat-protected. Enable cheats first with `sv_cheats 1` or `net_allowCheats 1`.
 
 ### Bake Options
@@ -179,7 +179,7 @@ If map names, `all`, or `all-mp` are given:
 | `force` | `bakeLightGrids force` | Remove existing outputs for the target map(s) and rebuild them even if all required files already exist. |
 | `-quit` | `+bakeLightGrids all -quit` | Quit after the batch completes. |
 | `limit<num>` | `limit2048` | Maximum probe count per area before the grid spacing grows. |
-| `bounce<num>` | `bounce2` | Number of bake passes. Bounce 2+ reuses the previous OpenQ4 bake through the runtime light-grid path. |
+| `bounce<num>` | `bounce2` | Number of bake passes. Bounce 2+ reuses the previous openQ4 bake through the runtime light-grid path. |
 | `size<num>` | `size256` | Cubemap capture resolution used during baking. |
 | `blends<num>` | `blends4` | Number of capture blends/jittered accumulations per face. |
 | `samples<num>` | `samples256` | Irradiance integration samples per output texel. |
@@ -191,21 +191,21 @@ If map names, `all`, or `all-mp` are given:
 Fast test bake:
 
 ```text
-OpenQ4-client_x64.exe +bakeLightGrids game/tram1 size64 samples32 limit1024 -quit
+openQ4-client_x64.exe +bakeLightGrids game/tram1 size64 samples32 limit1024 -quit
 ```
 
-For multiplayer maps or `all-mp`, enable cheats before starting the bake, for example `OpenQ4-client_x64.exe +set sv_cheats 1 +bakeLightGrids all-mp -quit`.
+For multiplayer maps or `all-mp`, enable cheats before starting the bake, for example `openQ4-client_x64.exe +set sv_cheats 1 +bakeLightGrids all-mp -quit`.
 
 Balanced quality:
 
 ```text
-OpenQ4-client_x64.exe +bakeLightGrids game/tram1 size128 samples128 blends1 bounce1 grid 64 64 128 -quit
+openQ4-client_x64.exe +bakeLightGrids game/tram1 size128 samples128 blends1 bounce1 grid 64 64 128 -quit
 ```
 
 Higher-quality bake:
 
 ```text
-OpenQ4-client_x64.exe +bakeLightGrids game/tram1 size256 samples256 blends2 bounce2 grid 48 48 96 -quit
+openQ4-client_x64.exe +bakeLightGrids game/tram1 size256 samples256 blends2 bounce2 grid 48 48 96 -quit
 ```
 
 Practical tuning advice:
@@ -247,7 +247,7 @@ What each file is for:
 - `env/maps/.../area*_lightgrid_pos.tga`
   Stores compact per-probe relocation offsets so runtime visibility checks use the actual baked probe positions instead of ideal grid centers.
 
-OpenQ4 loads these files automatically when the corresponding map is loaded.
+openQ4 loads these files automatically when the corresponding map is loaded.
 
 ## Typical Workflows
 
@@ -267,7 +267,7 @@ Then:
 ### 2. Batch Bake a Whole Asset Set Overnight
 
 ```text
-OpenQ4-client_x64.exe +set logFileName logs/openq4_lightgrids.log +bakeLightGrids all -quit
+openQ4-client_x64.exe +set logFileName logs/openq4_lightgrids.log +bakeLightGrids all -quit
 ```
 
 This gives you:
@@ -278,7 +278,7 @@ This gives you:
 ### 3. Re-Bake Only Multiplayer Maps
 
 ```text
-OpenQ4-client_x64.exe +bakeLightGrids all-mp -quit
+openQ4-client_x64.exe +bakeLightGrids all-mp -quit
 ```
 
 ### 4. Force a Clean Re-Bake of the Current Map
@@ -316,13 +316,13 @@ Fix:
 - Or use explicit map targets:
 
 ```text
-OpenQ4-client_x64.exe +bakeLightGrids game/tram1 -quit
+openQ4-client_x64.exe +bakeLightGrids game/tram1 -quit
 ```
 
 ### `bakeLightGrids: no valid map targets were found.`
 
 Cause:
-- The supplied map names were wrong or not found by OpenQ4.
+- The supplied map names were wrong or not found by openQ4.
 
 Fix:
 - Use map paths without the `.map` extension.
@@ -400,7 +400,7 @@ r_showLightGrid 0
 
 ## Limitations and Expectations
 
-OpenQ4's current light-grid system is intentionally scoped. End users should expect:
+openQ4's current light-grid system is intentionally scoped. End users should expect:
 - indirect diffuse only
 - no specular/reflection-probe lighting from this system
 - no HDR/EXR bake output
@@ -410,11 +410,11 @@ OpenQ4's current light-grid system is intentionally scoped. End users should exp
 - one compact probe-position atlas per portal area
 - console/log progress rather than a fully interactive bake UI
 
-That is by design for the current OpenQ4 implementation.
+That is by design for the current openQ4 implementation.
 
 ## Log and Console Output
 
-During batch bakes, OpenQ4 reports:
+During batch bakes, openQ4 reports:
 - map load progress
 - module switches between SP and MP
 - bounce count
@@ -428,7 +428,7 @@ During batch bakes, OpenQ4 reports:
 If you want a separate bake log:
 
 ```text
-OpenQ4-client_x64.exe +set logFileName logs/openq4_lightgrids.log +bakeLightGrids all -quit
+openQ4-client_x64.exe +set logFileName logs/openq4_lightgrids.log +bakeLightGrids all -quit
 ```
 
 On a standard local setup, logs are written under `fs_savepath/baseoq4/logs/`.

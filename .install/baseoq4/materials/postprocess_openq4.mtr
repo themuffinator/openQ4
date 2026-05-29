@@ -177,3 +177,15 @@ gfx/guis/mainmenu/btmbar_tile_right
 		colored
 	}
 }
+
+gfx/guis/loading/bg_grid_tiled
+{
+	noshadows
+	translucent
+	{
+		nopicmip
+		blend blend
+		map gfx/guis/mainmenu/bg_grid.tga
+		colored
+	}
+}

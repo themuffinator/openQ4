@@ -93,19 +93,13 @@ windowDef Desktop
 		screenalignx	right
 		screenaligny	bottom
 	}
-	windowDef grid1
+	windowDef grid
 	{
-		rect	0,0,480,480
+		rect	( 0 - "gui::virtual_screen_x_expand" ),( 0 - "gui::virtual_screen_y_expand" ),( 640 + ( "gui::virtual_screen_x_expand" * 2 ) ),( 480 + ( "gui::virtual_screen_y_expand" * 2 ) )
 		visible	1
-		background	"gfx/guis/mainmenu/bg_grid"
+		background	"gfx/guis/loading/bg_grid_tiled"
 		matcolor	1,1,1,0.04
-	}
-	windowDef grid2
-	{
-		rect	480,0,480,480
-		visible	1
-		background	"gfx/guis/mainmenu/bg_grid"
-		matcolor	1,1,1,0.04
+		naturalmatscale	1
 	}
 	windowDef bar
 	{

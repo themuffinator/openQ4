@@ -11,7 +11,7 @@
 
 // RAVEN BEGIN
 // rjohnson: this is the name of the game we are making
-#define PROJECT_NAME					"OpenQ4"
+#define PROJECT_NAME					"openQ4"
 #define PROJECT_AUTHOR					"themuffinator"
 #define PROJECT_COMPANY				"DarkMatter Productions"
 #define PROJECT_VERSION				OPENQ4_VERSION_SHORT
@@ -123,7 +123,7 @@
 // - New OpenQ4 saves use Quake 4's retail engine header name/version.
 // - Older OpenQ4 builds wrote OpenQ4-branded headers with versions 0 and 1.
 #define SAVEGAME_GAME_NAME_RETAIL				"Quake4"
-#define SAVEGAME_GAME_NAME_LEGACY_OPENQ4		PROJECT_NAME
+#define SAVEGAME_GAME_NAME_LEGACY_OPENQ4		"OpenQ4"
 #define SAVEGAME_VERSION						1834
 #define LEGACY_OPENQ4_SAVEGAME_VERSION			0
 #define LEGACY_OPENQ4_SAVEGAME_VERSION_ALT		1
@@ -140,7 +140,7 @@
 #ifdef __linux__
 	#define DEFAULT_BASE_PATH				"/usr/local/games/openq4"
 #elif defined( MACOS_X )
-	#define DEFAULT_BASE_PATH				"/Applications/OpenQ4"
+	#define DEFAULT_BASE_PATH				"/Applications/openQ4"
 #endif
 
 // CD Key file info

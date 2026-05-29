@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create curated release distributable archives for OpenQ4."""
+"""Create curated release distributable archives for openQ4."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ from windows_runtime import (
 from generate_release_docs import GeneratedDocSite, generate_release_docs_site
 
 
-PRODUCT_NAME = "OpenQ4"
+PRODUCT_NAME = "openQ4"
 GAME_DIR_NAME = "baseoq4"
 RELEASE_README_PATH = Path("assets") / "release" / "README.html"
 LICENSE_PATH = Path("LICENSE")
@@ -84,7 +84,7 @@ OPENQ4_PK4_EXCLUDED_FILES = {
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Package OpenQ4 release artifacts into a release archive."
+        description="Package openQ4 release artifacts into a release archive."
     )
     parser.add_argument(
         "--platform",
@@ -111,7 +111,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--source-root",
         default=".",
-        help="OpenQ4 repository root.",
+        help="openQ4 repository root.",
     )
     parser.add_argument(
         "--install-dir",
@@ -188,9 +188,9 @@ def write_macos_localized_info_strings(app_contents: Path, version: str) -> None
     localized_info_lines = [
         "/* Localized versions of Info.plist keys */",
         "",
-        'CFBundleName = "OpenQ4";',
+        'CFBundleName = "openQ4";',
         f'CFBundleShortVersionString = "{version}";',
-        f'CFBundleGetInfoString = "OpenQ4 version {version}, Copyright 2026 DarkMatter Productions";',
+        f'CFBundleGetInfoString = "openQ4 version {version}, Copyright 2026 DarkMatter Productions";',
         'NSHumanReadableCopyright = "Copyright 2026 DarkMatter Productions";',
     ]
 
@@ -274,7 +274,7 @@ def copy_required_windows_runtime(
     if runtime_flavor != RuntimeFlavor.NONE:
         raise RuntimeError(
             "Windows package staging detected MSVC/UCRT runtime imports. "
-            "Public OpenQ4 packages must be built with the static CRT policy."
+            "Public openQ4 packages must be built with the static CRT policy."
         )
 
     for source in runtime_files:
@@ -419,7 +419,7 @@ def copy_optional_share_tree(platform: str, install_dir: Path, package_root: Pat
 def copy_optional_linux_launchers(install_dir: Path, package_root: Path) -> list[str]:
     copied: list[str] = []
 
-    for filename in ("OpenQ4-steamdeck",):
+    for filename in ("openQ4-steamdeck",):
         source = install_dir / filename
         if not source.is_file():
             continue
@@ -439,7 +439,7 @@ def create_macos_app_bundle(
     version: str,
     version_tag: str,
 ) -> Path:
-    app_root = package_root / "OpenQ4.app"
+    app_root = package_root / "openQ4.app"
     app_contents = app_root / "Contents"
     app_macos = app_contents / "MacOS"
     app_resources = app_contents / "Resources"
@@ -447,7 +447,7 @@ def create_macos_app_bundle(
     app_macos.mkdir(parents=True, exist_ok=True)
     app_resources.mkdir(parents=True, exist_ok=True)
 
-    launcher = app_macos / "OpenQ4"
+    launcher = app_macos / "openQ4"
     write_text_file(
         launcher,
         [
@@ -460,12 +460,12 @@ def create_macos_app_bundle(
     os.chmod(launcher, 0o755)
 
     icns_candidates = [
-        install_dir / "OpenQ4.icns",
+        install_dir / "openQ4.icns",
         install_dir / "quake4.icns",
     ]
     for icns_source in icns_candidates:
         if icns_source.is_file():
-            shutil.copy2(icns_source, app_resources / "OpenQ4.icns")
+            shutil.copy2(icns_source, app_resources / "openQ4.icns")
             break
 
     info_plist = app_contents / "Info.plist"
@@ -479,15 +479,15 @@ def create_macos_app_bundle(
             "<key>CFBundleDevelopmentRegion</key>",
             "<string>English</string>",
             "<key>CFBundleExecutable</key>",
-            "<string>OpenQ4</string>",
+            "<string>openQ4</string>",
             "<key>CFBundleIconFile</key>",
-            "<string>OpenQ4.icns</string>",
+            "<string>openQ4.icns</string>",
             "<key>CFBundleIdentifier</key>",
             "<string>com.darkmatter.openq4</string>",
             "<key>CFBundleInfoDictionaryVersion</key>",
             "<string>6.0</string>",
             "<key>CFBundleName</key>",
-            "<string>OpenQ4</string>",
+            "<string>openQ4</string>",
             "<key>CFBundlePackageType</key>",
             "<string>APPL</string>",
             "<key>CFBundleShortVersionString</key>",
@@ -631,13 +631,13 @@ def main(argv: list[str]) -> int:
     archive_path = output_dir / f"{package_stem}{archive_suffix}"
     create_release_archive(package_root, archive_path, archive_format)
 
-    print(f"Packaged OpenQ4 release {args.version} for {args.platform}")
+    print(f"Packaged openQ4 release {args.version} for {args.platform}")
     print(f"Package directory: {package_root}")
     print(f"Release archive: {archive_path}")
     print(f"Archive format: {archive_format}")
     print(f"Version manifest: {package_root / 'VERSION.txt'}")
     print(f"Documentation portal: {generated_docs.index_path} ({generated_docs.page_count} pages)")
-    print(f"OpenQ4 pk4: {game_pk4_path} ({added_files} files)")
+    print(f"openQ4 pk4: {game_pk4_path} ({added_files} files)")
     if copied_share:
         print(f"Share payload: {package_root / 'share'}")
     if copied_linux_launchers:

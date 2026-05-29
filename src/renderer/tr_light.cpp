@@ -867,6 +867,7 @@ a viewLight and add it to the list with an empty scissor rect.
 */
 viewLight_t *R_SetLightDefViewLight( idRenderLightLocal *light ) {
 	viewLight_t *vLight;
+	light->referencedFrameNum = tr.frameCount;
 
 	if ( light->viewCount == tr.viewCount ) {
 		return light->viewLight;
@@ -1330,18 +1331,38 @@ static bool R_ViewLightHasStaticWorldLocalInteractions( const viewLight_t *vLigh
 	return false;
 }
 
+static bool R_IsUsablePrelightModel( idRenderModel *model ) {
+	if ( model == NULL ) {
+		return false;
+	}
+	if ( renderModelManager == NULL || !renderModelManager->ContainsModel( model ) ) {
+		return false;
+	}
+	if ( !model->IsLoaded() || model->IsDefaultModel() ) {
+		return false;
+	}
+
+	return true;
+}
+
 static idRenderModel *R_ViewLightPrelightModel( viewLight_t *vLight ) {
 	if ( vLight == NULL || vLight->lightDef == NULL || !r_useOptimizedShadows.GetBool() ) {
 		return NULL;
 	}
 
+	idRenderLightLocal *light = vLight->lightDef;
 	idRenderModel *prelightModel = vLight->lightDef->parms.prelightModel;
 	idRenderModel *sanitizedPrelightModel = R_SanitizePrelightModelPointer( prelightModel );
 	if ( sanitizedPrelightModel != prelightModel ) {
-		vLight->lightDef->parms.prelightModel = NULL;
-		prelightModel = NULL;
+		light->parms.prelightModel = sanitizedPrelightModel;
+		prelightModel = sanitizedPrelightModel;
 	}
 	if ( prelightModel == NULL ) {
+		return NULL;
+	}
+	if ( !R_IsUsablePrelightModel( prelightModel ) ) {
+		common->DWarning( "R_ViewLightPrelightModel: discarding stale prelight model pointer for lightDef %d", light->index );
+		light->parms.prelightModel = NULL;
 		return NULL;
 	}
 
@@ -1360,11 +1381,12 @@ static void R_AddOptimizedPrelightShadows( viewLight_t *vLight ) {
 	}
 
 	idRenderLightLocal *light = vLight->lightDef;
-	if ( !R_LightHasRealPrelightModel( light->parms ) ) {
+	if ( !R_IsUsablePrelightModel( prelightModel ) ) {
+		common->DWarning( "R_AddOptimizedPrelightShadows: discarding stale prelight model pointer for lightDef %d", light->index );
 		light->parms.prelightModel = NULL;
 		return;
 	}
-	prelightModel = light->parms.prelightModel;
+	light->parms.prelightModel = prelightModel;
 
 	if ( !prelightModel->NumSurfaces() ) {
 		common->Error( "no surfs in prelight model '%s'", prelightModel->Name() );
@@ -2205,7 +2227,7 @@ static bool R_EffectBoundsAreaVisible( const idRenderWorldLocal *world, const rv
 }
 
 static bool R_CullEffectByArea( const idRenderWorldLocal *world, const rvRenderEffectLocal *def, bool requireCachedRenderBounds = false ) {
-	if ( !bse_useAreaCull.GetBool() || R_EffectUsesViewModelDepth( def ) ) {
+	if ( !bse_useAreaCull.GetBool() || R_EffectUsesViewModelDepth( def ) || R_IsPortalSkyView() ) {
 		return false;
 	}
 
@@ -2221,7 +2243,7 @@ static bool R_CullEffectByArea( const idRenderWorldLocal *world, const rvRenderE
 }
 
 static bool R_CullEffectByFrustum( const rvRenderEffectLocal *def, bool requireCachedRenderBounds = false ) {
-	if ( !bse_useFrustumCull.GetBool() || !bse_useCachedFrustumCull.GetBool() || R_EffectUsesViewModelDepth( def ) || R_ShouldDisableEntityCullingForLevelshot() ) {
+	if ( !bse_useFrustumCull.GetBool() || !bse_useCachedFrustumCull.GetBool() || R_EffectUsesViewModelDepth( def ) || R_ShouldDisableEntityCullingForLevelshot() || R_IsPortalSkyView() ) {
 		return false;
 	}
 

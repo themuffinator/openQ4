@@ -1,6 +1,6 @@
 # Display Settings and Multi-Screen Guide
 
-This guide covers OpenQ4 display/window settings for end users, including multi-monitor behavior and modern fullscreen/window handling.
+This guide covers openQ4 display/window settings for end users, including multi-monitor behavior and modern fullscreen/window handling.
 
 ## Quick Start
 
@@ -53,7 +53,7 @@ Notes:
 - Default behavior is **desktop-native fullscreen** (`r_fullscreenDesktop 1`): fullscreen matches your current desktop resolution and does not change Windows display mode.
 - For **exclusive fullscreen** (explicit mode switch), set `r_fullscreenDesktop 0`. In this mode, `r_mode`/`r_customWidth`/`r_customHeight` control the requested fullscreen resolution.
 - On Windows, fullscreen windows minimize on focus loss so system UI such as Alt+Tab and the Snipping Tool overlay can take foreground cleanly.
-- On Windows, `PrintScreen` yields to the system snipping UI by default (`win_printScreenToSystemTool 1`). Use `F12` for the built-in OpenQ4 screenshot command, or set that cvar to `0` if you explicitly want `PrintScreen` available for in-engine binds again.
+- On Windows, `PrintScreen` yields to the system snipping UI by default (`win_printScreenToSystemTool 1`). Use `F12` for the built-in openQ4 screenshot command, or set that cvar to `0` if you explicitly want `PrintScreen` available for in-engine binds again.
 
 Notes:
 - When `r_fullscreenDesktop 1`, `r_mode` and `r_custom*` are ignored for fullscreen sizing (they still exist for legacy configs and exclusive mode).
@@ -63,8 +63,8 @@ Notes:
 
 - When windowed (`r_fullscreen 0`, `r_borderless 0`), resizing updates `r_windowWidth`/`r_windowHeight` automatically.
 - Moving the window updates `win_xpos`/`win_ypos` automatically.
-- When switching fullscreen -> windowed, OpenQ4 restores the last remembered windowed size/position (it should not come back as a fullscreen-sized window).
-- If you unplug/rearrange monitors and the saved window position becomes off-screen, OpenQ4 will recover by clamping/recentering the window back onto a valid display.
+- When switching fullscreen -> windowed, openQ4 restores the last remembered windowed size/position (it should not come back as a fullscreen-sized window).
+- If you unplug/rearrange monitors and the saved window position becomes off-screen, openQ4 will recover by clamping/recentering the window back onto a valid display.
 - If you set `r_screen` to an explicit display index (`0..N`), window placement is constrained to that display's usable area. With `r_screen -1`, placement is respected unless it becomes invalid/off-screen.
 - SDL3 tip: hold `Shift` while resizing to snap the window aspect ratio to common targets (4:3, 16:9, 16:10, 21:9, etc.).
 
@@ -91,7 +91,7 @@ Notes:
 - `cl_gunfov` values above `0` are clamped to a safe range internally for weapon projection.
 - Weapon projection is handled in renderer weapon-depth path, so narrow/wide aspect changes are handled consistently.
 - `cl_gun_x/y/z` are additive with legacy `g_gunX/Y/Z` offsets. Prefer `cl_gun_*` for user config.
-- OpenQ4's legacy baseline keeps `g_gunX` at `1` and `g_gunZ` at `-1` so the default widescreen viewmodel framing stays out of the viewport edge.
+- openQ4's legacy baseline keeps `g_gunX` at `1` and `g_gunZ` at `-1` so the default widescreen viewmodel framing stays out of the viewport edge.
 
 ## UI Aspect Correction (New)
 
@@ -192,6 +192,6 @@ vid_restart
 - If a display change does not apply, run `vid_restart`.
 - If monitor targeting looks wrong, run `listDisplays`, then set `r_screen` to the correct index and restart video.
 - If UI appears too centered/boxed on wide displays, set `ui_aspectCorrection 0`.
-- If the window opens off-screen after a monitor change, set `r_screen` explicitly to the target monitor and restart video; OpenQ4 will also attempt to recover automatically.
+- If the window opens off-screen after a monitor change, set `r_screen` explicitly to the target monitor and restart video; openQ4 will also attempt to recover automatically.
 - If AA settings seem unchanged, check values with `r_multiSamples`, `r_postAA`, and `r_msaaAlphaToCoverage`, then run `vid_restart`.
-- If enabling `r_postAA 1` turns the 3D viewport black on an older build, set `r_postAA 0`, run `vid_restart`, and attach `openq4.log` plus the output of `gfxInfo`. Current builds use a three-pass GLSL SMAA path and should no longer hit the old feedback-loop failure. RenderDoc capture is not yet supported on the current OpenQ4 renderer.
+- If enabling `r_postAA 1` turns the 3D viewport black on an older build, set `r_postAA 0`, run `vid_restart`, and attach `openq4.log` plus the output of `gfxInfo`. Current builds use a three-pass GLSL SMAA path and should no longer hit the old feedback-loop failure. RenderDoc capture is not yet supported on the current openQ4 renderer.

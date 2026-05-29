@@ -44,6 +44,7 @@ public:
 	virtual void			FreeModel( idRenderModel *model );
 	virtual idRenderModel *	FindModel( const char *modelName );
 	virtual idRenderModel *	CheckModel( const char *modelName );
+	virtual bool			ContainsModel( const idRenderModel *model ) const;
 	virtual idRenderModel *	DefaultModel();
 	virtual void			AddModel( idRenderModel *model );
 	virtual void			RemoveModel( idRenderModel *model );
@@ -563,6 +564,19 @@ idRenderModelManagerLocal::CheckModel
 */
 idRenderModel *idRenderModelManagerLocal::CheckModel( const char *modelName ) {
 	return GetModel( modelName, false );
+}
+
+/*
+=================
+idRenderModelManagerLocal::ContainsModel
+=================
+*/
+bool idRenderModelManagerLocal::ContainsModel( const idRenderModel *model ) const {
+	if ( model == NULL ) {
+		return false;
+	}
+
+	return models.FindIndex( const_cast<idRenderModel *>( model ) ) >= 0;
 }
 
 /*

@@ -1142,6 +1142,8 @@ void idRenderWorldLocal::FreeDefs() {
 		}
 	}
 
+	FreeDeferredLightDefs();
+
 	// free all effectDefs
 	for ( i = 0 ; i < effectsDef.Num() ; i++ ) {
 		rvRenderEffectLocal* effect;

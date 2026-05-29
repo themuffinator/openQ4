@@ -5,7 +5,7 @@
                                "name":  "(MP) q4dm1 'THE FRAGGING YARD'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -68,7 +68,7 @@
                                "name":  "(MP) q4dm2 'SANDSTORM'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -131,7 +131,7 @@
                                "name":  "(MP) q4dm3 'THE LOST FLEET'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -194,7 +194,7 @@
                                "name":  "(MP) q4dm4 'BLOODWORK'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -257,7 +257,7 @@
                                "name":  "(MP) q4dm5 'THE ROSE'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -320,7 +320,7 @@
                                "name":  "(MP) q4dm6 'NO DOCTORS'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -383,7 +383,7 @@
                                "name":  "(MP) q4dm7 'OVER THE EDGE'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -446,7 +446,7 @@
                                "name":  "(MP) q4dm8 'THE LONGEST DAY'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -509,7 +509,7 @@
                                "name":  "(MP) q4dm9 'CAMPGROUNDS REDUX'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -572,7 +572,7 @@
                                "name":  "(MP) q4dm10 'OUTPATIENT'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -635,7 +635,7 @@
                                "name":  "(MP) q4dm11 'SKELETON CREW'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -698,7 +698,7 @@
                                "name":  "(MP) q4cmp1 'SPIRAL'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -761,7 +761,7 @@
                                "name":  "(MP) q4cmp2 'GRINDER'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -824,7 +824,7 @@
                                "name":  "(MP) q4cmp3 'PHRANTIC'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -887,7 +887,7 @@
                                "name":  "(MP) q4cmp4 'CITY HEAT'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -950,7 +950,7 @@
                                "name":  "(MP) q4cmp5 'RAVAGE'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -1013,7 +1013,7 @@
                                "name":  "(MP) q4cmp6 'PENETRATION'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -1076,7 +1076,7 @@
                                "name":  "(MP) q4cmp7 'CAUSTIC BURN'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -1139,7 +1139,7 @@
                                "name":  "(MP) q4cmp8 'BETTER THAN NOTHING'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -1202,7 +1202,7 @@
                                "name":  "(MP) q4cmp9 'WALLS OF HATE'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -1265,7 +1265,7 @@
                                "name":  "(MP) q4cmp10 'ARID WASTES'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -1328,7 +1328,7 @@
                                "name":  "(MP) q4cmp11 'SYSTEMATIC LOCKDOWN'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -1391,7 +1391,7 @@
                                "name":  "(MP) q4cmp12 'KAT FIGHT!'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -1454,7 +1454,7 @@
                                "name":  "(MP) q4cmp13 'LEARNING CURVE'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -1517,7 +1517,7 @@
                                "name":  "(MP) q4cmp14 'ATOMS FOR PEACE'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -1580,7 +1580,7 @@
                                "name":  "(MP) q4cmp15 'CLINT EASTWOOD'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -1643,7 +1643,7 @@
                                "name":  "(MP) q4xdm10 'CENTRAL INDUSTRIAL'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -1706,7 +1706,7 @@
                                "name":  "(MP) q4xdm11 'WARFORGED'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -1769,7 +1769,7 @@
                                "name":  "(MP) q4xdm13 'STROYENT RED'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -1832,7 +1832,7 @@
                                "name":  "(MP) q4xdm14 'RETROPHOBOPOLIS'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -1895,7 +1895,7 @@
                                "name":  "(MP) q4xdm15 'FIREWALL'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -1958,7 +1958,7 @@
                                "name":  "(MP) q4dm11v1 'THE FRAGGING YARD 1v1'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -2021,7 +2021,7 @@
                                "name":  "(MP) q4tourney1 'RAILED'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -2084,7 +2084,7 @@
                                "name":  "(MP) q4xtourney1 'STROGGENOMENON'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -2147,7 +2147,7 @@
                                "name":  "(MP) q4xtourney2 'VERTICON'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -2210,7 +2210,7 @@
                                "name":  "(MP) q4ctf1 'HEARTLESS'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -2273,7 +2273,7 @@
                                "name":  "(MP) q4ctf2 'DEATH BEFORE DISHONOR'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -2336,7 +2336,7 @@
                                "name":  "(MP) q4ctf3 'SPEED TRAP'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -2399,7 +2399,7 @@
                                "name":  "(MP) q4ctf4 'RELATIVITY'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -2462,7 +2462,7 @@
                                "name":  "(MP) q4ctf5 'XAERO GRAVITY'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -2525,7 +2525,7 @@
                                "name":  "(MP) q4ctf6 'MIND THE GAP'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -2588,7 +2588,7 @@
                                "name":  "(MP) q4ctf7 'TREMORS'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -2651,7 +2651,7 @@
                                "name":  "(MP) q4ctf8 'DOUBLE EDGED'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -2714,7 +2714,7 @@
                                "name":  "(MP) q4xctf6 'CAVERNOUS CRYONICS'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -2777,7 +2777,7 @@
                                "name":  "(MP) q4dz1 'HEARTLESS'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -2840,7 +2840,7 @@
                                "name":  "(MP) q4dz2 'DEATH BEFORE DISHONOR'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -2903,7 +2903,7 @@
                                "name":  "(MP) q4dz3 'SPEED TRAP'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -2966,7 +2966,7 @@
                                "name":  "(MP) q4dz4 'THE ROSE'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -3029,7 +3029,7 @@
                                "name":  "(SP) airdefense1 'AIR DEFENSE BUNKER'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -3083,7 +3083,7 @@
                                "name":  "(SP) airdefense1_noblue 'AIR DEFENSE BUNKER' - No Blue Global FX",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -3137,7 +3137,7 @@
                                "name":  "(SP) airdefense1 'AIR DEFENSE BUNKER' - Loading Continue Gate",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -3206,7 +3206,7 @@
                                "name":  "(SP) airdefense2 'AIR DEFENSE TRENCHES'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -3257,7 +3257,7 @@
                                "name":  "(SP) hangar1 'HANGAR PERIMETER'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -3308,7 +3308,7 @@
                                "name":  "(SP) hangar2 'INTERIOR HANGAR'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -3359,7 +3359,7 @@
                                "name":  "(SP) mcc_landing 'MCC LANDING SITE'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -3410,7 +3410,7 @@
                                "name":  "(SP) mcc_1 'OPERATION: ADVANTAGE'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -3461,7 +3461,7 @@
                                "name":  "(SP) convoy1 'CANYON'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -3512,7 +3512,7 @@
                                "name":  "(SP) building_b 'PERIMETER DEFENSE STATION'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -3563,7 +3563,7 @@
                                "name":  "(SP) convoy2 'AQUEDUCTS'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -3614,7 +3614,7 @@
                                "name":  "(SP) convoy2b 'AQUEDUCTS ANNEX'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -3665,7 +3665,7 @@
                                "name":  "(SP) hub1 'NEXUS HUB TUNNELS'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -3716,7 +3716,7 @@
                                "name":  "(SP) hub2 'NEXUS HUB'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -3767,7 +3767,7 @@
                                "name":  "(SP) medlabs 'STROGG MEDICAL FACILITIES'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -3818,7 +3818,7 @@
                                "name":  "(SP) walker 'CONSTRUCTION ZONE'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -3869,7 +3869,7 @@
                                "name":  "(SP) dispersal 'DISPERSAL FACILITY'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -3920,7 +3920,7 @@
                                "name":  "(SP) recomp 'RECOMPOSITION CENTER'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -3971,7 +3971,7 @@
                                "name":  "(SP) putra 'PUTRIFICATION CENTER'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -4022,7 +4022,7 @@
                                "name":  "(SP) waste 'WASTE PROCESSING FACILITY'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -4073,7 +4073,7 @@
                                "name":  "(SP) mcc_2 'OPERATION: LAST HOPE'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -4124,7 +4124,7 @@
                                "name":  "(SP) storage1 'DATA STORAGE TERMINAL'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -4175,7 +4175,7 @@
                                "name":  "(SP) storage2 'DATA STORAGE SECURITY'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -4226,7 +4226,7 @@
                                "name":  "(SP) tram1 'TRAM HUB STATION'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -4277,7 +4277,7 @@
                                "name":  "(SP) tram1b 'TRAM RAIL'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -4328,7 +4328,7 @@
                                "name":  "(SP) process1 'DATA PROCESSING TERMINAL'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -4379,7 +4379,7 @@
                                "name":  "(SP) process2 'DATA PROCESSING SECURITY'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -4430,7 +4430,7 @@
                                "name":  "(SP) network1 'DATA NETWORKING TERMINAL'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -4481,7 +4481,7 @@
                                "name":  "(SP) network2 'DATA NETWORKING SECURITY'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -4532,7 +4532,7 @@
                                "name":  "(SP) core1 'NEXUS CORE'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -4583,7 +4583,7 @@
                                "name":  "(SP) core2 'THE NEXUS'",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -4634,7 +4634,7 @@
                                "name":  "(SP) airdefense2 'AIR DEFENSE TRENCHES' - Door Test",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -4692,7 +4692,7 @@
                                "name":  "(MP)",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",
@@ -4753,7 +4753,7 @@
                                "name":  "(SP)",
                                "type":  "cppvsdbg",
                                "request":  "launch",
-                               "program":  "${workspaceFolder}\\.install\\OpenQ4-client_x64.exe",
+                               "program":  "${workspaceFolder}\\.install\\openQ4-client_x64.exe",
                                "args":  [
                                             "+set",
                                             "logFile",

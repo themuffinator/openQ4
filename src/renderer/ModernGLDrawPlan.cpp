@@ -162,6 +162,7 @@ static bool R_ModernGLDrawPlan_ShouldUseGBuffer( const materialResourceTableReco
 		&& !r_rendererModernOpaque.GetBool()
 		&& r_rendererModernGBufferDebug.GetInteger() <= 0
 		&& !r_rendererModernDeferred.GetBool()
+		&& !r_ssao.GetBool()
 		&& r_rendererModernDeferredDebug.GetInteger() <= 0 ) {
 		return false;
 	}

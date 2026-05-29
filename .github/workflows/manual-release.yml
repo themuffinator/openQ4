@@ -356,10 +356,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          app_root="${{ steps.package.outputs.package_dir }}/OpenQ4.app"
+          app_root="${{ steps.package.outputs.package_dir }}/openQ4.app"
           app_plist="${app_root}/Contents/Info.plist"
-          app_exec="${app_root}/Contents/MacOS/OpenQ4"
-          app_icon="${app_root}/Contents/Resources/OpenQ4.icns"
+          app_exec="${app_root}/Contents/MacOS/openQ4"
+          app_icon="${app_root}/Contents/Resources/openQ4.icns"
 
           if [ ! -f "${app_plist}" ]; then
             echo "Missing macOS app Info.plist: ${app_plist}"

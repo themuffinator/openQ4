@@ -164,6 +164,23 @@ idRenderWorldLocal::~idRenderWorldLocal() {
 
 /*
 ===================
+idRenderWorldLocal::FreeDeferredLightDefs
+===================
+*/
+void idRenderWorldLocal::FreeDeferredLightDefs() {
+	for ( int i = 0; i < deferredFreeLightDefs.Num(); i++ ) {
+		idRenderLightLocal *light = deferredFreeLightDefs[i];
+		if ( light == NULL ) {
+			continue;
+		}
+		R_FreeLightDefDerivedData( light );
+		delete light;
+	}
+	deferredFreeLightDefs.Clear();
+}
+
+/*
+===================
 ResizeInteractionTable
 ===================
 */
@@ -611,12 +628,18 @@ void idRenderWorldLocal::FreeLightDef( qhandle_t lightHandle ) {
 		return;
 	}
 
-	R_FreeLightDefDerivedData( light );
-
 	if ( session->writeDemo && light->archived ) {
 		WriteFreeLight( lightHandle );
+		light->archived = false;
 	}
 
+	if ( light->referencedFrameNum == tr.frameCount ) {
+		deferredFreeLightDefs.Append( light );
+		lightDefs[lightHandle] = NULL;
+		return;
+	}
+
+	R_FreeLightDefDerivedData( light );
 	delete light;
 	lightDefs[lightHandle] = NULL;
 }

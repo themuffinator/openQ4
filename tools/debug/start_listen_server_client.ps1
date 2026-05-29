@@ -88,7 +88,7 @@ function New-OpenQ4CommonArgs {
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $workspaceRoot = [System.IO.Path]::GetFullPath((Join-Path $scriptDir "..\.."))
 $installDir = Join-Path $workspaceRoot ".install"
-$exePath = Join-Path $installDir "OpenQ4-client_x64.exe"
+$exePath = Join-Path $installDir "openQ4-client_x64.exe"
 
 if ([string]::IsNullOrWhiteSpace($SaveRoot)) {
     $SaveRoot = Join-Path $workspaceRoot ".tmp"
@@ -97,11 +97,11 @@ if ([string]::IsNullOrWhiteSpace($SaveRoot)) {
 }
 
 if (-not (Test-Path -LiteralPath $exePath)) {
-    throw "OpenQ4 client executable not found: $exePath"
+    throw "openQ4 client executable not found: $exePath"
 }
 
 if (-not (Test-Path -LiteralPath $installDir)) {
-    throw "OpenQ4 install directory not found: $installDir"
+    throw "openQ4 install directory not found: $installDir"
 }
 
 if (-not (Test-Path -LiteralPath $BasePath)) {

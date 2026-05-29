@@ -19,6 +19,7 @@ static bool R_ScenePackets_ModernPipelineRequested( void ) {
 		|| r_rendererModernSubmit.GetBool()
 		|| r_rendererGpuValidation.GetBool()
 		|| r_rendererBindless.GetBool()
+		|| r_ssao.GetBool()
 		|| modernVisibleRequested
 		|| r_rendererModernVisibleDepth.GetBool()
 		|| r_rendererModernDepthDebug.GetInteger() > 0

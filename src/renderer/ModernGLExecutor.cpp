@@ -6087,10 +6087,11 @@ void R_ModernGLExecutor_SkipFrame( void ) {
 void R_ModernGLExecutor_PrepareFrame( const idScenePacketFrame &packetFrame, const idRenderGraph &graph ) {
 	R_ModernGLExecutor_ResetPassOwnershipTable( "frame-start" );
 	const bool modernVisibleRequested = R_ModernGLExecutor_ModernVisibleRequested();
-	const bool visibleDepthSidecarRequested = r_rendererModernVisibleDepth.GetBool() || r_rendererModernDepthDebug.GetInteger() > 0 || R_ModernGLExecutor_ShadowMapSidecarRequested();
-	const bool deferredResolveSidecarRequested = r_rendererModernDeferred.GetBool() || r_rendererModernDeferredDebug.GetInteger() > 0;
+	const bool ssaoDeferredSidecarRequested = r_ssao.GetBool();
+	const bool visibleDepthSidecarRequested = r_rendererModernVisibleDepth.GetBool() || r_rendererModernDepthDebug.GetInteger() > 0 || R_ModernGLExecutor_ShadowMapSidecarRequested() || ssaoDeferredSidecarRequested;
+	const bool deferredResolveSidecarRequested = r_rendererModernDeferred.GetBool() || r_rendererModernDeferredDebug.GetInteger() > 0 || ssaoDeferredSidecarRequested;
 	const bool forwardPlusSidecarRequested = r_rendererForwardPlus.GetBool();
-	const bool opaqueGBufferSidecarRequested = r_rendererModernOpaque.GetBool() || r_rendererModernGBufferDebug.GetInteger() > 0;
+	const bool opaqueGBufferSidecarRequested = r_rendererModernOpaque.GetBool() || r_rendererModernGBufferDebug.GetInteger() > 0 || ssaoDeferredSidecarRequested;
 	const bool gpuDrivenValidationRequested = r_rendererGpuValidation.GetBool() && R_ModernGLExecutor_FrameSupportsGpuDrivenValidation( packetFrame );
 	const bool explicitSidecarRequested =
 		visibleDepthSidecarRequested ||
@@ -6832,7 +6833,13 @@ static void R_ModernGLExecutor_BlitVisibleDepthToTarget(
 	if ( backEnd.renderTexture != NULL && backEnd.renderTexture->GetDepthImage() != NULL ) {
 		targetSamples = backEnd.renderTexture->GetDepthImage()->GetOpts().numMSAASamples;
 	}
-	if ( sceneDepth->samples > 1 || targetSamples > 1 ) {
+
+	// SSAO and other legacy post-process depth consumers still rely on the same
+	// depth blit path that CopyDepthbuffer() uses for MSAA scene targets. Only
+	// skip here when a multisample blit would need to rescale, which OpenGL does
+	// not allow.
+	if ( ( sceneDepth->samples > 1 || targetSamples > 1 )
+		&& ( Max( 1, sceneDepth->width ) != targetWidth || Max( 1, sceneDepth->height ) != targetHeight ) ) {
 		return;
 	}
 
@@ -7131,6 +7138,51 @@ bool R_ModernGLExecutor_ModernVisiblePostProcessHandoffActive( void ) {
 		&& rg_modernGLExecutorStats.modernVisibleExecuted
 		&& rg_modernGLExecutorStats.modernVisibleSceneComposited
 		&& rg_modernGLExecutorStats.modernVisiblePostProcessHandoff;
+}
+
+bool R_ModernGLExecutor_GetDeferredSSAOInputs( GLuint &sceneTexture, GLuint &depthTexture, int &sceneWidth, int &sceneHeight, int &depthWidth, int &depthHeight ) {
+	sceneTexture = 0;
+	depthTexture = 0;
+	sceneWidth = 0;
+	sceneHeight = 0;
+	depthWidth = 0;
+	depthHeight = 0;
+
+	const modernGLExecutorStats_t &stats = rg_modernGLExecutorStats;
+	if ( stats.modernVisibleRequested || stats.forwardPlusRequested ) {
+		return false;
+	}
+	if ( !stats.deferredResolveExecuted || !stats.deferredResolveResourcesReady || !stats.visibleDepthExecuted || !stats.visibleDepthResourceReady ) {
+		return false;
+	}
+	if ( stats.deferredResolveResourceFallbacks > 0
+		|| stats.deferredResolveUnsupportedLightFallbacks > 0
+		|| stats.deferredResolveFogFallbackLights > 0
+		|| stats.deferredResolveSpecialFallbackLights > 0
+		|| stats.deferredResolveShadowFallbackLights > 0
+		|| stats.visibleDepthFallbackDraws > 0
+		|| stats.visibleDepthMismatchDraws > 0 ) {
+		return false;
+	}
+
+	const renderGraphResourceHandle_t *deferredLight = NULL;
+	const renderGraphResourceHandle_t *sceneDepth = NULL;
+	if ( !R_ModernGLExecutor_GBufferResourceReady( "deferredLight", deferredLight )
+		|| !R_ModernGLExecutor_DepthResourceReady( "sceneDepth", sceneDepth )
+		|| deferredLight == NULL
+		|| sceneDepth == NULL
+		|| sceneDepth->target != GL_TEXTURE_2D
+		|| sceneDepth->texture == 0 ) {
+		return false;
+	}
+
+	sceneTexture = deferredLight->texture;
+	depthTexture = sceneDepth->texture;
+	sceneWidth = Max( 1, deferredLight->width );
+	sceneHeight = Max( 1, deferredLight->height );
+	depthWidth = Max( 1, sceneDepth->width );
+	depthHeight = Max( 1, sceneDepth->height );
+	return true;
 }
 
 void R_ModernGLExecutor_PrintGfxInfo( void ) {

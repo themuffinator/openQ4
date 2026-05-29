@@ -944,7 +944,7 @@ def render_doc_page(
     summary_html = (
         f'<p class="lead">{html.escape(spec.summary)}</p>'
         if spec.summary
-        else '<p class="lead">Included in the packaged OpenQ4 offline documentation set.</p>'
+        else '<p class="lead">Included in the packaged openQ4 offline documentation set.</p>'
     )
 
     return "\n".join(
@@ -955,7 +955,7 @@ def render_doc_page(
             '  <meta charset="UTF-8">',
             '  <meta name="viewport" content="width=device-width, initial-scale=1.0">',
             '  <meta name="color-scheme" content="dark">',
-            f"  <title>{html.escape(spec.title)} | OpenQ4 Documentation</title>",
+            f"  <title>{html.escape(spec.title)} | openQ4 Documentation</title>",
             f'  <link rel="stylesheet" href="{html.escape(css_href)}">',
             "</head>",
             "<body>",
@@ -963,7 +963,7 @@ def render_doc_page(
             '    <header class="topbar">',
             '      <div class="brand">',
             '        <span class="eyebrow">Packaged HTML documentation</span>',
-            f'        <a class="brand-title" href="{html.escape(docs_home_href)}">OpenQ4 Documentation</a>',
+            f'        <a class="brand-title" href="{html.escape(docs_home_href)}">openQ4 Documentation</a>',
             f'        <div class="brand-subtitle">Release {html.escape(version)} · {html.escape(platform)} · {html.escape(arch)}</div>',
             "      </div>",
             '      <div class="action-row">',
@@ -996,7 +996,7 @@ def render_doc_page(
             "      </aside>",
             "    </div>",
             '    <footer class="footer">',
-            f'      <p>Offline release documentation generated from the OpenQ4 repository sources for version <strong>{html.escape(version)}</strong>.</p>',
+            f'      <p>Offline release documentation generated from the openQ4 repository sources for version <strong>{html.escape(version)}</strong>.</p>',
             f'      <p><a href="{html.escape(docs_home_href)}">Documentation home</a> | <a href="{html.escape(package_home_href)}">Package home</a> | <a href="https://www.darkmatter-quake.com">Website</a></p>',
             "    </footer>",
             "  </div>",
@@ -1054,7 +1054,7 @@ def render_index_page(
             '  <meta charset="UTF-8">',
             '  <meta name="viewport" content="width=device-width, initial-scale=1.0">',
             '  <meta name="color-scheme" content="dark">',
-            "  <title>OpenQ4 Documentation Portal</title>",
+            "  <title>openQ4 Documentation Portal</title>",
             '  <link rel="stylesheet" href="_static/site.css">',
             "</head>",
             "<body>",
@@ -1062,7 +1062,7 @@ def render_index_page(
             '    <header class="topbar">',
             '      <div class="brand">',
             '        <span class="eyebrow">Offline HTML documentation</span>',
-            '        <a class="brand-title" href="index.html">OpenQ4 Documentation Portal</a>',
+            '        <a class="brand-title" href="index.html">openQ4 Documentation Portal</a>',
             f'        <div class="brand-subtitle">Release {html.escape(version)} · {html.escape(platform)} · {html.escape(arch)} · {len(specs)} documents</div>',
             "      </div>",
             '      <div class="action-row">',
@@ -1073,8 +1073,8 @@ def render_index_page(
             "      </div>",
             "    </header>",
             '    <section class="hero">',
-            '      <img class="hero-banner" src="assets/docs/img/banner.png" alt="OpenQ4 banner">',
-            '      <span class="eyebrow">OpenQ4 Release Documentation</span>',
+            '      <img class="hero-banner" src="assets/docs/img/banner.png" alt="openQ4 banner">',
+            '      <span class="eyebrow">openQ4 Release Documentation</span>',
             '      <h1>Full offline HTML docs, shipped with the release package.</h1>',
             '      <p class="lead">This package includes the project overview, build and technical references, user guides, developer notes, and proposal research converted into a browsable HTML site with internal links preserved.</p>',
             '      <div class="hero-actions">',
@@ -1186,7 +1186,7 @@ def main(argv: list[str]) -> int:
         platform=args.platform,
         arch=args.arch,
     )
-    print(f"Generated OpenQ4 HTML docs: {result.index_path} ({result.page_count} pages)")
+    print(f"Generated openQ4 HTML docs: {result.index_path} ({result.page_count} pages)")
     return 0
 
 

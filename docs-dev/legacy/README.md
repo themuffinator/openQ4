@@ -1,4 +1,4 @@
-# OpenQ4 (Legacy Notes)
+# openQ4 (Legacy Notes)
 Quake 4 SDK integrated with the open-source engine base
 
 ![alt text](https://i.ibb.co/V3Mw0Rv/unknown-1.png)

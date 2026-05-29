@@ -335,11 +335,12 @@ static bool R_RenderGraph_ShouldModelGBuffer( void ) {
 		|| r_rendererModernOpaque.GetBool()
 		|| r_rendererModernGBufferDebug.GetInteger() > 0
 		|| r_rendererModernDeferred.GetBool()
+		|| r_ssao.GetBool()
 		|| r_rendererModernDeferredDebug.GetInteger() > 0;
 }
 
 static bool R_RenderGraph_ShouldModelDeferredResolve( void ) {
-	return r_rendererModernVisible.GetBool() || r_rendererModernDeferred.GetBool() || r_rendererModernDeferredDebug.GetInteger() > 0;
+	return r_rendererModernVisible.GetBool() || r_rendererModernDeferred.GetBool() || r_ssao.GetBool() || r_rendererModernDeferredDebug.GetInteger() > 0;
 }
 
 static bool R_RenderGraph_ShouldModelForwardPlus( void ) {

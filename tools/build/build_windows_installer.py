@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build an OpenQ4 Windows installer from a packaged release directory."""
+"""Build an openQ4 Windows installer from a packaged release directory."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 
-PRODUCT_NAME = "OpenQ4"
+PRODUCT_NAME = "openQ4"
 PRODUCT_PUBLISHER = "DarkMatter Productions"
 SETUP_ICON_RELATIVE = Path("assets") / "icons" / "quake4.ico"
 TEMPLATE_RELATIVE = Path("tools") / "build" / "OpenQ4Installer.iss.in"
@@ -34,14 +34,14 @@ ARCHITECTURE_DIRECTIVES = {
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Compile an Inno Setup installer using an already-packaged OpenQ4 "
+            "Compile an Inno Setup installer using an already-packaged openQ4 "
             "Windows release directory."
         )
     )
     parser.add_argument(
         "--package-dir",
         required=True,
-        help="Prepared OpenQ4 Windows package directory to embed in the installer.",
+        help="Prepared openQ4 Windows package directory to embed in the installer.",
     )
     parser.add_argument(
         "--version",
@@ -62,7 +62,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--source-root",
         default=".",
-        help="OpenQ4 repository root (used for installer assets).",
+        help="openQ4 repository root (used for installer assets).",
     )
     parser.add_argument(
         "--output-dir",

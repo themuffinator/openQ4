@@ -2860,7 +2860,7 @@ bool idFileSystemLocal::ReadModManifestFile( const char *manifestPath, idModInfo
 	if ( modInfo.requiredOpenQ4Version.Icmp( OPENQ4_VERSION_BASE ) != 0 ) {
 		if ( reason != NULL ) {
 			*reason = va(
-				"%s requires OpenQ4 %s but this build is %s",
+				"%s requires openQ4 %s but this build is %s",
 				modInfo.displayName.c_str(),
 				modInfo.requiredOpenQ4Version.c_str(),
 				OPENQ4_VERSION_BASE );
@@ -3665,7 +3665,7 @@ void idFileSystemLocal::Startup( void ) {
 		 idStr::Icmp( fs_game.GetString(), BASE_GAMEDIR ) &&
 		 !ValidateConfiguredGameDir( fs_game.GetString(), &invalidReason ) ) {
 		if ( !idStr::Icmp( fs_game.GetString(), OPENQ4_GAMEDIR ) ) {
-			common->FatalError( "Required OpenQ4 mod manifest for '%s' is missing or incompatible: %s", fs_game.GetString(), invalidReason.c_str() );
+			common->FatalError( "Required openQ4 mod manifest for '%s' is missing or incompatible: %s", fs_game.GetString(), invalidReason.c_str() );
 		}
 
 		common->Warning( "Ignoring fs_game '%s': %s", fs_game.GetString(), invalidReason.c_str() );

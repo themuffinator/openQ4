@@ -1,16 +1,16 @@
 # Steam Deck
 
-OpenQ4 supports Steam Deck through the dedicated `OpenQ4-steamdeck` launcher shipped in Linux packages as of March 30, 2026.
+openQ4 supports Steam Deck through the dedicated `openQ4-steamdeck` launcher shipped in Linux packages as of March 30, 2026.
 
 ## Launching
 
-- Use `OpenQ4-steamdeck` instead of `OpenQ4-client_x64`.
+- Use `openQ4-steamdeck` instead of `openQ4-client_x64`.
 - The launcher adds `+set com_platformProfile steamdeck` and preserves any extra command-line arguments you pass.
 - If `SDL_VIDEODRIVER` is unset and both `WAYLAND_DISPLAY` and `DISPLAY` exist, the launcher exports `SDL_VIDEODRIVER=x11` so Steam Deck sessions prefer XWayland for now.
 
 ## Controls
 
-Default gameplay bindings shipped by the stock OpenQ4 config:
+Default gameplay bindings shipped by the stock openQ4 config:
 
 - `JOY15` = attack
 - `JOY16` = zoom
@@ -36,7 +36,7 @@ Linux Steam auto-discovery checks these roots and then expands any additional li
 - `~/.local/share/Steam`
 - `~/.var/app/com.valvesoftware.Steam/.local/share/Steam`
 
-OpenQ4 then looks for `steamapps/common/Quake 4` under each Steam library root.
+openQ4 then looks for `steamapps/common/Quake 4` under each Steam library root.
 
 ## Notes
 

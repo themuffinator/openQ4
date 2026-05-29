@@ -1,4 +1,4 @@
-name = "OpenQ4"
+name = "openQ4"
 
 [setup]
 script = 'echo "No Codex setup script is configured for this platform."'
@@ -7,25 +7,25 @@ script = 'echo "No Codex setup script is configured for this platform."'
 script = 'powershell -NoProfile -ExecutionPolicy Bypass -File .codex\scripts\run-vscode-entry.ps1 task 0'
 
 [[actions]]
-name = "Configure OpenQ4 (Meson Debug)"
+name = "Configure openQ4 (Meson Debug)"
 command = 'powershell -NoProfile -ExecutionPolicy Bypass -File .codex\scripts\run-vscode-entry.ps1 task 0'
 icon = "tool"
 platforms = ["windows"]
 
 [[actions]]
-name = "Compile OpenQ4 (Meson Debug)"
+name = "Compile openQ4 (Meson Debug)"
 command = 'powershell -NoProfile -ExecutionPolicy Bypass -File .codex\scripts\run-vscode-entry.ps1 task 1'
 icon = "tool"
 platforms = ["windows"]
 
 [[actions]]
-name = "Stage OpenQ4 Install Tree (Meson Debug)"
+name = "Stage openQ4 Install Tree (Meson Debug)"
 command = 'powershell -NoProfile -ExecutionPolicy Bypass -File .codex\scripts\run-vscode-entry.ps1 task 2'
 icon = "tool"
 platforms = ["windows"]
 
 [[actions]]
-name = "Build OpenQ4 (Meson Debug)"
+name = "Build openQ4 (Meson Debug)"
 command = 'powershell -NoProfile -ExecutionPolicy Bypass -File .codex\scripts\run-vscode-entry.ps1 task 3'
 icon = "tool"
 platforms = ["windows"]

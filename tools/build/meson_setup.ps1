@@ -450,6 +450,11 @@ function Remove-BSEArtifacts {
     }
 
     $patterns = @(
+        "openQ4-BSE_*.dll",
+        "openQ4-BSE_*.dylib",
+        "openQ4-BSE_*.so",
+        "openQ4-BSE_*.lib",
+        "openQ4-BSE_*.pdb",
         "OpenQ4-BSE_*.dll",
         "OpenQ4-BSE_*.dylib",
         "OpenQ4-BSE_*.so",
@@ -531,6 +536,12 @@ function Stop-OpenQ4RuntimeProcesses {
     param()
 
     $processNames = @(
+        "openQ4-client_x64",
+        "openQ4-client_x86",
+        "openQ4-client_arm64",
+        "openQ4-ded_x64",
+        "openQ4-ded_x86",
+        "openQ4-ded_arm64",
         "OpenQ4-client_x64",
         "OpenQ4-client_x86",
         "OpenQ4-client_arm64",
@@ -544,7 +555,7 @@ function Stop-OpenQ4RuntimeProcesses {
         return $false
     }
 
-    Write-Host "Stopping running OpenQ4 processes before install: $($running.ProcessName -join ', ')"
+    Write-Host "Stopping running openQ4 processes before install: $($running.ProcessName -join ', ')"
 
     foreach ($proc in $running) {
         try {
@@ -563,7 +574,7 @@ function Stop-OpenQ4RuntimeProcesses {
         try {
             $stillRunning | Stop-Process -Force -ErrorAction Stop
         } catch {
-            throw "Failed to stop running OpenQ4 processes. Close them manually and retry install. Details: $($_.Exception.Message)"
+            throw "Failed to stop running openQ4 processes. Close them manually and retry install. Details: $($_.Exception.Message)"
         }
     }
 
@@ -744,7 +755,7 @@ Invoke-Meson -MesonArgs $effectiveArgs -VsDevCmdPath $vsDevCmd -MesonCommand $me
 $exitCode = [int]$LASTEXITCODE
 
 if ($commandName -eq "install" -and $exitCode -ne 0 -and $env:OPENQ4_INSTALL_RETRY_ON_FAILURE -ne "0") {
-    Write-Host "Meson install failed; retrying once after ensuring OpenQ4 processes are stopped..."
+    Write-Host "Meson install failed; retrying once after ensuring openQ4 processes are stopped..."
     Stop-OpenQ4RuntimeProcesses | Out-Null
     Start-Sleep -Milliseconds 500
     Invoke-Meson -MesonArgs $effectiveArgs -VsDevCmdPath $vsDevCmd -MesonCommand $mesonCommand -VsTargetArch $vsTargetArch -VsHostArch $vsHostArch

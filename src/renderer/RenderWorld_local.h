@@ -210,6 +210,7 @@ public:
 	virtual void			RemoveAllModelReferences(idRenderModel* model) { }
 
 	virtual bool			HasSkybox( int areaNum );
+	void					FreeDeferredLightDefs();
 
 	//-----------------------
 
@@ -234,6 +235,7 @@ public:
 
 	idList<idRenderEntityLocal*>	entityDefs;
 	idList<idRenderLightLocal*>		lightDefs;
+	idList<idRenderLightLocal*>		deferredFreeLightDefs;
 // jmarshall: BSE
 	idList<rvRenderEffectLocal*>	effectsDef;
 // jmarshll end

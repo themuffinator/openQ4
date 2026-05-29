@@ -34,7 +34,7 @@ seta g_autoSkipCinematics 1
 
 ## Corpse Cleanup
 
-OpenQ4 now exposes separate corpse-removal timing controls for single-player and multiplayer.
+openQ4 now exposes separate corpse-removal timing controls for single-player and multiplayer.
 
 ### Single-player
 

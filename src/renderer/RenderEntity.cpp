@@ -96,6 +96,7 @@ idRenderLightLocal::idRenderLightLocal() {
 	index					= 0;
 	areaNum					= 0;
 	lastModifiedFrameNum	= 0;
+	referencedFrameNum	= -1;
 	archived				= false;
 	lightShader				= NULL;
 	falloffImage			= NULL;

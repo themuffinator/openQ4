@@ -1,9 +1,9 @@
-#define MyAppName "OpenQ4"
+#define MyAppName "openQ4"
 #define MyAppVersion "@@APP_VERSION@@"
 #define MyAppPublisher "DarkMatter Productions"
 #define MyAppURL "https://www.darkmatter-quake.com"
-#define MyAppExeName "OpenQ4-client_@@APP_ARCH@@.exe"
-#define MyAppServerExeName "OpenQ4-ded_@@APP_ARCH@@.exe"
+#define MyAppExeName "openQ4-client_@@APP_ARCH@@.exe"
+#define MyAppServerExeName "openQ4-ded_@@APP_ARCH@@.exe"
 #define MyAppDocsFile "docs\\index.html"
 #define MyAppInstallRegKey "Software\\DarkMatter Productions\\OpenQ4"
 #define MyAppProtocolName "openq4"
@@ -24,7 +24,7 @@ AppMutex=OpenQ4
 AppReadmeFile={app}\README.html
 ChangesAssociations=yes
 DefaultDirName={code:GetDefaultInstallDir}
-DefaultGroupName=OpenQ4
+DefaultGroupName=openQ4
 DisableProgramGroupPage=yes
 UsePreviousAppDir=yes
 LicenseFile=@@LICENSE_FILE@@
@@ -41,7 +41,7 @@ PrivilegesRequired=lowest
 @@ARCH_INSTALL_MODE_DIRECTIVE@@
 VersionInfoVersion=@@APP_VERSION@@
 VersionInfoCompany={#MyAppPublisher}
-VersionInfoDescription=OpenQ4 Windows Installer
+VersionInfoDescription=openQ4 Windows Installer
 VersionInfoProductName={#MyAppName}
 VersionInfoCopyright=Copyright 2026 DarkMatter Productions
 
@@ -65,31 +65,31 @@ Root: HKA; Subkey: "{#MyAppInstallRegKey}"; ValueType: dword; ValueName: "Protoc
 Root: HKA; Subkey: "{#MyAppInstallRegKey}"; ValueType: dword; ValueName: "ProtocolEnabled"; ValueData: "1"; Tasks: protocol; Flags: uninsdeletekeyifempty
 Root: HKA; Subkey: "{#MyAppClientAppPathsKey}"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName}"; Flags: uninsdeletekey
 Root: HKA; Subkey: "{#MyAppClientAppPathsKey}"; ValueType: string; ValueName: "Path"; ValueData: "{app}"; Flags: uninsdeletekey
-Root: HKA; Subkey: "{#MyAppProtocolRegKey}"; ValueType: string; ValueName: ""; ValueData: "URL:OpenQ4 Protocol"; Tasks: protocol; Flags: uninsdeletekeyifempty
+Root: HKA; Subkey: "{#MyAppProtocolRegKey}"; ValueType: string; ValueName: ""; ValueData: "URL:openQ4 Protocol"; Tasks: protocol; Flags: uninsdeletekeyifempty
 Root: HKA; Subkey: "{#MyAppProtocolRegKey}"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""; Tasks: protocol; Flags: uninsdeletekeyifempty
-Root: HKA; Subkey: "{#MyAppProtocolRegKey}"; ValueType: string; ValueName: "FriendlyTypeName"; ValueData: "OpenQ4 Link"; Tasks: protocol; Flags: uninsdeletekeyifempty
+Root: HKA; Subkey: "{#MyAppProtocolRegKey}"; ValueType: string; ValueName: "FriendlyTypeName"; ValueData: "openQ4 Link"; Tasks: protocol; Flags: uninsdeletekeyifempty
 Root: HKA; Subkey: "{#MyAppProtocolRegKey}\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: protocol; Flags: uninsdeletekey
 Root: HKA; Subkey: "{#MyAppProtocolRegKey}\shell"; ValueType: string; ValueName: ""; ValueData: "open"; Tasks: protocol; Flags: uninsdeletekeyifempty
-Root: HKA; Subkey: "{#MyAppProtocolRegKey}\shell\open"; ValueType: string; ValueName: ""; ValueData: "Open in OpenQ4"; Tasks: protocol; Flags: uninsdeletekeyifempty
+Root: HKA; Subkey: "{#MyAppProtocolRegKey}\shell\open"; ValueType: string; ValueName: ""; ValueData: "Open in openQ4"; Tasks: protocol; Flags: uninsdeletekeyifempty
 Root: HKA; Subkey: "{#MyAppProtocolRegKey}\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: protocol; Flags: uninsdeletekey
 
 [Icons]
-Name: "{group}\OpenQ4"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"
+Name: "{group}\openQ4"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"
 Name: "{group}\Dedicated Server"; Filename: "{app}\{#MyAppServerExeName}"; WorkingDir: "{app}"
 Name: "{group}\Documentation Portal"; Filename: "{app}\{#MyAppDocsFile}"
 Name: "{group}\Package Overview"; Filename: "{app}\README.html"
-Name: "{group}\Uninstall OpenQ4"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\OpenQ4"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{group}\Uninstall openQ4"; Filename: "{uninstallexe}"
+Name: "{autodesktop}\openQ4"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\docs\index.html"; Description: "Open the release documentation"; Flags: postinstall shellexec skipifsilent
-Filename: "{app}\{#MyAppExeName}"; Description: "Launch OpenQ4"; WorkingDir: "{app}"; Flags: postinstall nowait skipifsilent unchecked
+Filename: "{app}\{#MyAppExeName}"; Description: "Launch openQ4"; WorkingDir: "{app}"; Flags: postinstall nowait skipifsilent unchecked
 
 [Code]
 const
   OpenQ4InstallRegKey = '{#MyAppInstallRegKey}';
   OpenQ4ProtocolRegKey = '{#MyAppProtocolRegKey}';
-  OpenQ4DefaultInstallDir = '{localappdata}\Programs\OpenQ4';
+  OpenQ4DefaultInstallDir = '{localappdata}\Programs\openQ4';
 
 function GetDefaultInstallDir(Param: String): String;
 var
@@ -116,7 +116,7 @@ begin
   RegQueryStringValue(HKEY_AUTO, OpenQ4InstallRegKey, 'InstallVersion', InstallVersion);
   RegQueryStringValue(HKEY_AUTO, OpenQ4InstallRegKey, 'InstallArch', InstallArch);
 
-  Result := 'Existing OpenQ4 installation detected';
+  Result := 'Existing openQ4 installation detected';
   if InstallVersion <> '' then
     Result := Result + ': version ' + InstallVersion;
   if InstallArch <> '' then

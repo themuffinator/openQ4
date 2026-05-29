@@ -244,7 +244,7 @@ static bool RenderDoc_UpdateCaptureTemplate( idStr &captureTemplate ) {
 
 static void RenderDoc_PrintUnavailable( void ) {
 	common->Printf(
-		"RenderDoc API unavailable. Launch OpenQ4 through RenderDoc first "
+		"RenderDoc API unavailable. Launch openQ4 through RenderDoc first "
 		"(for example tools/debug/renderdoc_capture.ps1 or renderdoccmd capture).\n" );
 }
 

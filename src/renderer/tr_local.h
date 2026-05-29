@@ -252,6 +252,7 @@ public:
 	int						lastModifiedFrameNum;	// to determine if it is constantly changing,
 													// and should go in the dynamic frame memory, or kept
 													// in the cached memory
+	int					referencedFrameNum;	// last frame where a viewLight captured this light
 	bool					archived;				// for demo writing
 
 
@@ -862,6 +863,7 @@ public:
 	virtual void			CropRenderSize( int width, int height, bool makePowerOfTwo = false, bool forceDimensions = false );
 	virtual void			CaptureRenderToImage( const char *imageName );
 	virtual void			CaptureRenderToFile( const char *fileName, bool fixAlpha );
+	virtual void			SetPortalSkyCaptureViewCallback( renderPortalSkyCaptureViewCallback_t callback );
 	virtual void			UnCrop();
 	virtual void			GetCardCaps( bool &oldCard, bool &nv10or20 );
 	virtual bool			UploadImage( const char *imageName, const byte *data, int width, int height );
@@ -972,6 +974,7 @@ public:
 	idList<idRenderTexture*> pendingRenderTextureDeletes;
 	bool					useUIViewportFor2D;
 	idRenderTexture *		activeRenderTexture;
+	renderPortalSkyCaptureViewCallback_t portalSkyCaptureViewCallback;
 	bool					suppressLevelshotViewModels;
 	bool					disableLevelshotEntityCulling;
 
@@ -984,6 +987,10 @@ extern glconfig_t			glConfig;		// outside of TR since it shouldn't be cleared du
 extern bool					tr_levelshotProjectionShiftActive;
 extern float				tr_levelshotProjectionShiftX;
 extern float				tr_levelshotProjectionShiftY;
+
+static ID_INLINE bool R_IsPortalSkyView( void ) {
+	return tr.viewDef != NULL && ( tr.viewDef->renderFlags & RF_PORTAL_SKY ) != 0;
+}
 
 static ID_INLINE bool R_ShouldSuppressViewModelForLevelshot( int viewID, int allowSurfaceInViewID, int weaponDepthHackInViewID ) {
 	return tr.suppressLevelshotViewModels

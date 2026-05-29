@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate shared OpenQ4 version metadata for builds and packaging."""
+"""Generate shared openQ4 version metadata for builds and packaging."""
 
 from __future__ import annotations
 
@@ -19,12 +19,12 @@ DATE_STAMP_RE = re.compile(r"^\d{8}$")
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Compute OpenQ4 version metadata for builds and CI."
+        description="Compute openQ4 version metadata for builds and CI."
     )
     parser.add_argument(
         "--source-root",
         default=".",
-        help="OpenQ4 repository root (default: current directory).",
+        help="openQ4 repository root (default: current directory).",
     )
     parser.add_argument(
         "--base-version",
@@ -316,8 +316,8 @@ def main(argv: list[str]) -> int:
     version_short, version, version_tag = compose_version_strings(
         base_version, prerelease, build_metadata
     )
-    product_version = f"OpenQ4 {version_short}"
-    product_version_full = f"OpenQ4 {version}"
+    product_version = f"openQ4 {version_short}"
+    product_version_full = f"openQ4 {version}"
     resource_build = compute_resource_build(commit_count)
     resource_commas = f"{major}, {minor}, {patch}, {resource_build}"
     resource_dotted = f"{major}.{minor}.{patch}.{resource_build}"
