@@ -16,7 +16,7 @@ jobs:
     name: Validation Script Smoke
     runs-on: ubuntu-24.04
     env:
-      OPENQ4_GAMELIBS_REPO: ${{ runner.temp }}/OpenQ4-GameLibs
+      OPENQ4_GAMELIBS_REPO: ${{ github.workspace }}/OpenQ4-GameLibs
 
     steps:
       - name: Checkout
@@ -56,7 +56,7 @@ jobs:
     needs: script-smoke
     timeout-minutes: 60
     env:
-      OPENQ4_GAMELIBS_REPO: ${{ runner.temp }}/OpenQ4-GameLibs
+      OPENQ4_GAMELIBS_REPO: ${{ github.workspace }}/OpenQ4-GameLibs
 
     steps:
       - name: Checkout
