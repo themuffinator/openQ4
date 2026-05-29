@@ -49,7 +49,7 @@ postprocess/smaa_edge
 		blend gl_one, gl_zero
 		glslProgram smaa_edge.fs
 		shaderParm invTexSize 1.0 / VideoWidth, 1.0 / VideoHeight
-		shaderTexture ColorTex nearest clamp _forwardRenderResolvedAlbedo
+		shaderTexture ColorTex nearest clamp _currentRender
 	}
 }
 
@@ -75,7 +75,7 @@ postprocess/smaa_blend
 		blend gl_one, gl_zero
 		glslProgram smaa_blend.fs
 		shaderParm invTexSize 1.0 / VideoWidth, 1.0 / VideoHeight
-		shaderTexture ColorTex linear clamp _forwardRenderResolvedAlbedo
+		shaderTexture ColorTex linear clamp _currentRender
 		shaderTexture BlendTex linear clamp _postProcessAlbedo0
 	}
 }
