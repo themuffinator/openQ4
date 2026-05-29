@@ -87,6 +87,53 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install meson ninja
 
+      - name: Install Linux native dependencies
+        if: matrix.os == 'ubuntu-24.04'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if sudo apt-get update && sudo apt-get install -y \
+              libasound2-dev \
+              libdbus-1-dev \
+              libdecor-0-dev \
+              libdrm-dev \
+              libegl1-mesa-dev \
+              libfribidi-dev \
+              libgbm-dev \
+              libgl1-mesa-dev \
+              libibus-1.0-dev \
+              libjack-dev \
+              libopenal-dev \
+              libpipewire-0.3-dev \
+              libpulse-dev \
+              libsndio-dev \
+              libthai-dev \
+              libudev-dev \
+              libwayland-dev \
+              libx11-dev \
+              libxcursor-dev \
+              libxext-dev \
+              libxfixes-dev \
+              libxi-dev \
+              libxkbcommon-dev \
+              libxrandr-dev \
+              libxss-dev \
+              libxtst-dev \
+              libxxf86dga-dev \
+              libxxf86vm-dev; then
+              exit 0
+            fi
+
+            if [ "${attempt}" -eq 3 ]; then
+              echo "Failed to install Linux native dependencies after ${attempt} attempts."
+              exit 1
+            fi
+
+            echo "Linux dependency installation attempt ${attempt} failed; retrying in 10 seconds..."
+            sleep 10
+          done
+
       - name: Run push verification
         shell: bash
         run: |
@@ -105,7 +152,7 @@ jobs:
   windows-build:
     name: Windows Push Verification
     needs: script-smoke
-    runs-on: windows-2025
+    runs-on: windows-2025-vs2026
     timeout-minutes: 90
     env:
       OPENQ4_GAMELIBS_REPO: ${{ github.workspace }}/../OpenQ4-GameLibs
@@ -130,6 +177,15 @@ jobs:
           $ErrorActionPreference = "Stop"
           python -m pip install --upgrade pip
           python -m pip install meson ninja
+
+      - name: Prepare OpenAL Soft (Windows)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $outputRoot = Join-Path $env:GITHUB_WORKSPACE ".tmp/openal-soft-x64"
+          $env:OPENQ4_VS_TARGET_ARCH = "x64"
+          powershell -ExecutionPolicy Bypass -File tools/build/prepare_windows_openal.ps1 -Architecture "x64" -OutputRoot $outputRoot
+          "OPENQ4_OPENAL_ROOT=$outputRoot" >> $env:GITHUB_ENV
 
       - name: Run push verification
         shell: pwsh

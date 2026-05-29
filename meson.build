@@ -423,6 +423,9 @@ if build_engine
         required: true,
       ),
     ]
+    if use_sdl3_backend
+      deps += [sdl3_dep]
+    endif
   endif
 endif
 
