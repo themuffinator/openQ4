@@ -662,6 +662,12 @@ void GLimp_SwapBuffers(void) {
 	if (SDL3_EnsureGLContextCurrent("swap buffers") && !s_glWindowServices->SwapGLWindow()) {
 		common->Printf("SDL3: failed to swap window buffers: %s\n", R_GLVideoError());
 	}
+
+#if defined(__ANDROID__) && defined(OPENQ4_RENDERER_GLES_MODULE)
+	// The host app's touch overlay draws inside that swap; undo what it left
+	// behind before the next frame delta-codes against it.
+	RB_GLES_RestoreStateAfterOverlay();
+#endif
 }
 
 void GLimp_ActivateContext(void) {

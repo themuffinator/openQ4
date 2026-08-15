@@ -293,7 +293,12 @@ bool Sys_GetSecureRandomBytes( void *buffer, int bytes ) {
 		return true;
 	}
 
-#if defined( __linux__ )
+#if defined( __ANDROID__ )
+	// bionic only grew getrandom() at API 28; arc4random_buf has been there
+	// since API 21 and is the same kernel entropy source.
+	arc4random_buf( buffer, static_cast<size_t>( bytes ) );
+	return true;
+#elif defined( __linux__ )
 	unsigned char *cursor = static_cast<unsigned char *>( buffer );
 	int remaining = bytes;
 	while ( remaining > 0 ) {
@@ -990,7 +995,7 @@ void Posix_EarlyInit( void ) {
 	posix_mainThreadRecorded = true;
 	memset( &asyncThread, 0, sizeof( asyncThread ) );
 	exit_spawn[0] = '\0';
-	Posix_InitSigs();
+	//Posix_InitSigs();
 	// set the base time
 	Sys_Milliseconds();
 	Posix_InitPThreads();

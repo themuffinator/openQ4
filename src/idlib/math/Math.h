@@ -4,6 +4,12 @@
 
 #include <stdint.h>
 
+// idMath::INFINITY needs the macro gone, but libc++ uses it inside <cmath>'s
+// own function bodies (__clamp_to_integral), so any translation unit that
+// reaches <cmath> after this header would fail to compile. Pulling it in first
+// means the macro is still defined while that header is processed.
+#include <cmath>
+
 /*
 ===============================================================================
 

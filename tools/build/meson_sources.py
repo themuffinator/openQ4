@@ -239,6 +239,18 @@ LINUX_PLATFORM_SOURCES = (
     "sys/linux/libXNVCtrl/NVCtrl.c",
 )
 
+# Android is SDL3-only and has no console/terminal or process-spawning story,
+# so it takes the posix core plus its own two translation units.
+SDL3_ANDROID_SOURCES = (
+    "sys/posix/posix_main.cpp",
+    "sys/posix/posix_net.cpp",
+    "sys/posix/posix_signal.cpp",
+    "sys/posix/posix_syscon.cpp",
+    "sys/posix/posix_threads.cpp",
+    "sys/android/android_main.cpp",
+    "sys/android/android_sdl3.cpp",
+)
+
 DARWIN_PLATFORM_SOURCES = (
     "sys/posix/posix_input.cpp",
     "sys/posix/posix_main.cpp",
@@ -315,9 +327,9 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--host-system",
-        choices=("windows", "linux", "darwin"),
+        choices=("windows", "linux", "darwin", "android"),
         default="windows",
-        help="Meson host system for source selection.",
+        help="Host system for source selection ('android' is CMake-only; Meson never asks for it).",
     )
     parser.add_argument(
         "--platform-backend",
@@ -471,6 +483,9 @@ def main(argv: list[str]) -> int:
                 SDL3_DARWIN_SOURCES if args.platform_backend == "sdl3" else DARWIN_PLATFORM_SOURCES
             )
             for rel_path in platform_sources:
+                add_required_source(source_set, ordered_sources, source_root, rel_path)
+        elif args.host_system == "android":
+            for rel_path in SDL3_ANDROID_SOURCES:
                 add_required_source(source_set, ordered_sources, source_root, rel_path)
         else:
             print(f"Unsupported host system: {args.host_system}", file=sys.stderr)

@@ -568,6 +568,19 @@ extern GLboolean glewExperimental;
 GLenum glewInit( void );
 const GLubyte *glewGetErrorString( GLenum error );
 
+#ifdef __ANDROID__
+/*
+===============================================================================
+	Android touch-overlay state handoff.
+
+	The host app draws its touch controls from inside SDL_GL_SwapWindow, i.e.
+	between engine frames and behind the renderer's back. Defined in
+	gles_Backend.cpp, called from GLimp_SwapBuffers once the swap returns.
+===============================================================================
+*/
+void RB_GLES_RestoreStateAfterOverlay( void );
+#endif
+
 #ifdef __cplusplus
 }
 #endif

@@ -36,7 +36,9 @@
 
 #include "../tr_local.h"
 #include "../ShadowMapArb2Parity.h"
+#include "../GLStateCache.h"
 #include "../GLES_D3/gles_d3_local.h"
+#include "../GLES_D3/gles_program.h"
 
 /*
 ====================
@@ -533,5 +535,98 @@ bool RB_ShadowMapProjectedAtlasSlotForLight( int lightDefIndex, shadowMapArb2Atl
 }
 
 void RB_ShadowMapProjectedAtlasSlotMarkUsed( int lightDefIndex ) { ( void )lightDefIndex; }
+
+/*
+===============================================================================
+
+	Four more references out of the kept front end into the dropped
+	fixed-function translation units (draw_arb2.cpp, tr_render.cpp,
+	tr_rendertools.cpp). macOS never needed them because -dead_strip removes
+	the callers before the linker resolves them; a platform that links without
+	dead-stripping does. Same treatment as renderer/Vulkan/vk_Backend.cpp.
+
+===============================================================================
+*/
+
+void GL_SelectTextureNoClient( int unit ) {
+	( void )unit;
+}
+
+void RB_DrawBounds( const idBounds &bounds ) {
+	( void )bounds;
+}
+
+float RB_DrawTextLength( const char *text, float scale, int len ) {
+	( void )text; ( void )scale; ( void )len;
+	return 0.0f;
+}
+
+void RB_DrawElementsImmediate( const srfTriangles_t *tri ) {
+	( void )tri;
+}
+
+#ifdef __ANDROID__
+/*
+===============================================================================
+
+	RB_GLES_RestoreStateAfterOverlay
+
+	The host app's touch controls are drawn from inside SDL_GL_SwapWindow --
+	between engine frames, behind this renderer's back. They bind their own
+	program, VAO, framebuffer, sampler and texture, drop the array/element/
+	uniform buffer bindings, switch to texture unit 0, disable depth test and
+	cull, force their own blend func, and reset the viewport.
+
+	Nothing puts any of that back, and worse, the renderer's several "I know
+	what is already bound" caches still describe the pre-overlay driver, so
+	the next frame skips re-issuing exactly the state that changed. The
+	symptom is a black screen the moment the overlay is switched on.
+
+	Called from GLimp_SwapBuffers once the swap returns. Cheap: a couple of
+	dozen state calls once per frame.
+
+===============================================================================
+*/
+void RB_GLES_RestoreStateAfterOverlay( void ) {
+	// Put the driver back where R_SetDefaultGLState leaves it. The renderer
+	// treats these enables as permanent and only ever toggles depth/stencil
+	// per view, so they have to be true again before the next frame starts.
+	glBindFramebuffer( GL_FRAMEBUFFER, 0 );
+	glBindVertexArray( 0 );
+	glBindBuffer( GL_ARRAY_BUFFER, 0 );
+	glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
+	glBindBuffer( GL_UNIFORM_BUFFER, 0 );
+	glActiveTexture( GL_TEXTURE0 );
+	glBindSampler( 0, 0 );
+	glUseProgram( 0 );
+
+	glEnable( GL_DEPTH_TEST );
+	glEnable( GL_BLEND );
+	glEnable( GL_SCISSOR_TEST );
+	glDisable( GL_STENCIL_TEST );
+	glDepthMask( GL_TRUE );
+	glColorMask( GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE );
+	glViewport( 0, 0, glConfig.vidWidth, glConfig.vidHeight );
+	glScissor( 0, 0, glConfig.vidWidth, glConfig.vidHeight );
+
+	// Culling is left off to match the overlay, and the cache is told so:
+	// GL_Cull only re-issues glEnable( GL_CULL_FACE ) when it believes the
+	// previous state was CT_TWO_SIDED, so claiming anything else here would
+	// leave culling disabled for the rest of the frame.
+	glDisable( GL_CULL_FACE );
+	backEnd.glState.faceCulling = CT_TWO_SIDED;
+
+	// Now drop every cached record of what is bound, so the next draw re-issues
+	// its real state instead of delta-ing against the overlay's.
+	memset( backEnd.glState.tmu, 0, sizeof( backEnd.glState.tmu ) );
+	backEnd.glState.currenttmu = 0;
+	backEnd.glState.forceGlState = true;
+
+	R_GLESD3_InvalidateProgramState();
+	R_GLESD3_InvalidateAttributeState();
+	R_GLStateCache_InvalidateAll( "android touch overlay" );
+	idVertexCache::InvalidateBufferBindings();
+}
+#endif /* __ANDROID__ */
 
 #endif /* OPENQ4_RENDERER_GLES_MODULE */

@@ -22,7 +22,7 @@ along with Doom 3 Source Code.  If not, see <http://www.gnu.org/licenses/>.
 ===========================================================================
 */
 
-#if defined(OPENQ4_SDL3_LINUX_HOST) || defined(OPENQ4_SDL3_DARWIN_HOST)
+#if defined(OPENQ4_SDL3_LINUX_HOST) || defined(OPENQ4_SDL3_DARWIN_HOST) || defined(OPENQ4_SDL3_ANDROID_HOST)
 #define OPENQ4_SDL3_POSIX_HOST 1
 #endif
 
@@ -4649,6 +4649,15 @@ static bool SDL3_EventTargetsGameWindow(const SDL_Event &event) {
 }
 
 bool Sys_SDL_PumpEvents(void) {
+#if defined(OPENQ4_SDL3_ANDROID_HOST)
+	// The shared OpenTouch glue reaches SDL_StartTextInput/StopTextInput
+	// through a global the host app expects every SDL3 engine to export.
+	window = s_sdlWindow;
+	// The touch overlay runs on Android's UI thread and only ever fills a ring
+	// buffer; this is the one place, on the engine thread, where that buffer
+	// turns into real input events.
+	Quake4_DrainTouchInput();
+#endif
 #if defined(OPENQ4_SDL3_POSIX_HOST)
 	if (!Posix_IsMainThread()) {
 		// The async timer thread reaches this through Sys_PollMouseInputEvents

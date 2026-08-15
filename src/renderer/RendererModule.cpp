@@ -21,7 +21,13 @@
 // every build shape, including module-only clients that shed the static
 // renderer sources
 static const char *r_renderApiArgs[] = { "best", "gl", "vulkan", "gl-module", "gles", NULL };
-idCVar r_renderApi( "r_renderApi", "gl", CVAR_RENDERER | CVAR_ARCHIVE, "rendering API: best = platform default (currently gl), gl = OpenGL renderer (loaded as the renderer-gl module on module-only builds, statically linked elsewhere), vulkan = native Vulkan renderer module (bring-up; falls back to gl), gl-module = alias that always selects the OpenGL module. Module selections take effect on engine restart.", r_renderApiArgs, idCmdSystem::ArgCompletion_String<r_renderApiArgs> );
+#ifdef __ANDROID__
+// Android has no desktop GL at all; the ES module is the only renderer built.
+#define OPENQ4_DEFAULT_RENDER_API	"gles"
+#else
+#define OPENQ4_DEFAULT_RENDER_API	"gl"
+#endif
+idCVar r_renderApi( "r_renderApi", OPENQ4_DEFAULT_RENDER_API, CVAR_RENDERER | CVAR_ARCHIVE, "rendering API: best = platform default (currently gl), gl = OpenGL renderer (loaded as the renderer-gl module on module-only builds, statically linked elsewhere), vulkan = native Vulkan renderer module (bring-up; falls back to gl), gl-module = alias that always selects the OpenGL module. Module selections take effect on engine restart.", r_renderApiArgs, idCmdSystem::ArgCompletion_String<r_renderApiArgs> );
 idCVar r_actualRenderApi( "r_actualRenderApi", "UNINITIALIZED", CVAR_RENDERER | CVAR_ROM, "rendering API actually active after request/fallback selection" );
 
 // engine-side homes for window/gui cvars referenced by both the platform
@@ -304,6 +310,12 @@ int R_RendererModule_BuildFallbackLadder( rendererModuleApi_t requested, rendere
 	if ( maxEntries <= 0 ) {
 		return 0;
 	}
+#ifdef __ANDROID__
+	// No desktop GL module is built, so falling back onto it would only trade a
+	// clear "gles module failed" for a misleading "renderer-gl not found".
+	outLadder[ numEntries++ ] = RENDER_MODULE_API_GLES;
+	return numEntries;
+#else
 	if ( requested != RENDER_MODULE_API_GL ) {
 		outLadder[ numEntries++ ] = requested;
 	}
@@ -311,6 +323,7 @@ int R_RendererModule_BuildFallbackLadder( rendererModuleApi_t requested, rendere
 		outLadder[ numEntries++ ] = RENDER_MODULE_API_GL;
 	}
 	return numEntries;
+#endif
 }
 
 /*
