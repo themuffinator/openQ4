@@ -111,28 +111,80 @@ if(NOT DEFINED OPENQ4_PAK_DIR)
 endif()
 file(MAKE_DIRECTORY "${OPENQ4_PAK_DIR}")
 
+# Most of pak1 cannot be reached from this build, so Android packs a reduced
+# one. Two thirds of it is the baked light grid, and draw_common.cpp -- the only
+# file that renders it -- is in RENDERER_GLES_EXCLUDED_SOURCES, so the GLES
+# module has no code path that could read it. The rest is the upscaled
+# loadscreens, which retail q4base already covers for 45 of the 46 maps; mcc_1
+# is the exception and stays, and generic.* is required by the packer and
+# named directly by the engine.
+#
+# 561MB becomes 1.7MB. Set OPENQ4_MINIMAL_PAK1 to OFF for a desktop-identical
+# pair. The engine's checksum test follows either way: the generated header
+# takes its MD5 from whatever was packed here.
+option(OPENQ4_MINIMAL_PAK1 "Pack only the pak1 content the GLES build can use" ON)
+
+set(OPENQ4_PAK1_EXCLUDES "")
+if(OPENQ4_MINIMAL_PAK1)
+    set(OPENQ4_PAK1_EXCLUDES
+        --exclude "gfx/guis/loadscreens/*"
+        --exclude "!gfx/guis/loadscreens/generic.*"
+        --exclude "!gfx/guis/loadscreens/mcc_1*"
+        --exclude "env/*"
+        --exclude "maps/*")
+endif()
+
 function(oq4_ensure_pak PAK_NAME SOURCE_SUBDIR)
     set(_pak "${OPENQ4_PAK_DIR}/${PAK_NAME}")
-    if(EXISTS "${_pak}")
+    # The filter set is part of the pack's identity, so a stamp beside it forces
+    # a repack when it changes. Without this, flipping OPENQ4_MINIMAL_PAK1 would
+    # silently keep whichever pack happened to be there and then bake its MD5
+    # into the header, which is a fatal error at runtime rather than a warning.
+    set(_stamp "${_pak}.filters")
+    string(REPLACE ";" " " _filter_text "${ARGN}")
+    set(_existing "")
+    if(EXISTS "${_stamp}")
+        file(READ "${_stamp}" _existing)
+    endif()
+    if(EXISTS "${_pak}" AND _existing STREQUAL _filter_text)
         return()
     endif()
-    message(STATUS "openQ4: packing ${PAK_NAME} (first build only)")
+    message(STATUS "openQ4: packing ${PAK_NAME}")
     oq4_run_script(_manifest_out "${OQ4_ROOT}/tools/build/write_pak_manifest.py"
         "${OQ4_ROOT}" "${PAK_NAME}" "${SOURCE_SUBDIR}" "${OQ4_GEN}/${PAK_NAME}.sources")
     oq4_run_script(_pack_out "${OQ4_ROOT}/tools/build/build_openq4_pack.py"
         --pak-name "${PAK_NAME}"
         --source-dir "${OQ4_ROOT}/${SOURCE_SUBDIR}"
         --manifest "${OQ4_GEN}/${PAK_NAME}.sources"
-        --out "${_pak}")
+        --out "${_pak}"
+        ${ARGN})
+    file(WRITE "${_stamp}" "${_filter_text}")
 endfunction()
 
 oq4_ensure_pak(pak0.pk4 content/baseoq4/pak0)
-oq4_ensure_pak(pak1.pk4 content/baseoq4/pak1)
+oq4_ensure_pak(pak1.pk4 content/baseoq4/pak1 ${OPENQ4_PAK1_EXCLUDES})
 
 oq4_run_script(_paks_out "${OQ4_ROOT}/tools/build/generate_pak_header.py"
     --pak0 "${OPENQ4_PAK_DIR}/pak0.pk4"
     --pak1 "${OPENQ4_PAK_DIR}/pak1.pk4"
     --header-out "${OQ4_GEN}/openq4_paks_generated.h")
+
+# The host app ships the pair inside the APK and unpacks it on the device, so
+# copy them wherever it wants them. Set from the host build, because only it
+# knows its own asset layout; unset, this does nothing and the packs stay in the
+# build directory. Copying here rather than in a build target keeps them in step
+# with the header generated just above -- they have to be the same pair, or the
+# engine fatal-errors on the checksum.
+if(OPENQ4_PAK_ASSET_DIR)
+    file(MAKE_DIRECTORY "${OPENQ4_PAK_ASSET_DIR}")
+    foreach(_pak_name pak0.pk4 pak1.pk4)
+        file(COPY_FILE
+            "${OPENQ4_PAK_DIR}/${_pak_name}"
+            "${OPENQ4_PAK_ASSET_DIR}/${_pak_name}"
+            ONLY_IF_DIFFERENT)
+    endforeach()
+    message(STATUS "openQ4: staged pak0.pk4 and pak1.pk4 into ${OPENQ4_PAK_ASSET_DIR}")
+endif()
 
 # baseoq4/mod.json is as required as the pk4s: idFileSystemLocal::Startup
 # fatal-errors when fs_game is the openQ4 game dir and its manifest is missing
