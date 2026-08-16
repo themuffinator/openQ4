@@ -151,6 +151,11 @@ Posix_Exit
 ================
 */
 void Posix_Exit(int ret) {
+#if defined( __ANDROID__ )
+	// nothing below is guaranteed to print again, so do not let an
+	// unterminated line leave with the process
+	Sys_AndroidLogFlush();
+#endif
 	if ( !Posix_IsMainThread() ) {
 		// A worker-thread fatal error exits through here. Joining the async
 		// thread from itself would recurse through common->Error until the
@@ -1507,29 +1512,45 @@ low level output
 ===============
 */
 
+#define MAX_POSIX_PRINT_MSG 4096
+
 void Sys_DebugPrintf( const char *fmt, ... ) {
 	va_list argptr;
 
 	if ( fmt == NULL ) {
 		return;
 	}
+#if defined( __ANDROID__ )
+	char text[MAX_POSIX_PRINT_MSG];
+	va_start( argptr, fmt );
+	idStr::vsnPrintf( text, sizeof( text ) - 1, fmt, argptr );
+	va_end( argptr );
+	text[sizeof( text ) - 1] = '\0';
+	Sys_AndroidLogPrint( SYS_ANDROID_LOG_DEBUG, text );
+#else
 	tty_Hide();
 	va_start( argptr, fmt );
 	vprintf( fmt, argptr );
 	va_end( argptr );
 	tty_Show();
+#endif
 }
 
 void Sys_DebugVPrintf( const char *fmt, va_list arg ) {
 	if ( fmt == NULL ) {
 		return;
 	}
+#if defined( __ANDROID__ )
+	char text[MAX_POSIX_PRINT_MSG];
+	idStr::vsnPrintf( text, sizeof( text ) - 1, fmt, arg );
+	text[sizeof( text ) - 1] = '\0';
+	Sys_AndroidLogPrint( SYS_ANDROID_LOG_DEBUG, text );
+#else
 	tty_Hide();
 	vprintf( fmt, arg );
 	tty_Show();
+#endif
 }
-
-#define MAX_POSIX_PRINT_MSG 4096
 
 void Sys_Printf(const char *msg, ...) {
 	char text[MAX_POSIX_PRINT_MSG];
@@ -1545,9 +1566,16 @@ void Sys_Printf(const char *msg, ...) {
 
 	Posix_ConsoleAppendText( text );
 
+#if defined( __ANDROID__ )
+	// There is no terminal here, and stdout only reaches logcat through the
+	// host app's pipe pump, which cannot preserve line boundaries. Go straight
+	// to liblog instead - see sys/android/android_log.cpp.
+	Sys_AndroidLogPrint( SYS_ANDROID_LOG_INFO, text );
+#else
 	tty_Hide();
 	fputs( text, stdout );
 	tty_Show();
+#endif
 }
 
 void Sys_VPrintf(const char *msg, va_list arg) {
@@ -1561,9 +1589,13 @@ void Sys_VPrintf(const char *msg, va_list arg) {
 
 	Posix_ConsoleAppendText( text );
 
+#if defined( __ANDROID__ )
+	Sys_AndroidLogPrint( SYS_ANDROID_LOG_INFO, text );
+#else
 	tty_Hide();
 	fputs( text, stdout );
 	tty_Show();
+#endif
 }
 
 static char posix_fatalBreadcrumbPath[ MAX_OSPATH ];
@@ -1678,6 +1710,11 @@ void Sys_Error(const char *error, ...) {
 
 	Sys_SetFatalError( text );
 	Posix_AppendFatalBreadcrumb( text );
+#if defined( __ANDROID__ )
+	// whatever was mid-line when this happened is the context for the error,
+	// so get it out before the error itself rather than after
+	Sys_AndroidLogFlush();
+#endif
 	Sys_Printf( "Sys_Error: %s\n", text );
 	Posix_ConsoleFatalErrorWait();
 

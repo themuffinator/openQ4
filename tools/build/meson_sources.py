@@ -240,13 +240,14 @@ LINUX_PLATFORM_SOURCES = (
 )
 
 # Android is SDL3-only and has no console/terminal or process-spawning story,
-# so it takes the posix core plus its own two translation units.
+# so it takes the posix core plus its own translation units.
 SDL3_ANDROID_SOURCES = (
     "sys/posix/posix_main.cpp",
     "sys/posix/posix_net.cpp",
     "sys/posix/posix_signal.cpp",
     "sys/posix/posix_syscon.cpp",
     "sys/posix/posix_threads.cpp",
+    "sys/android/android_log.cpp",
     "sys/android/android_main.cpp",
     "sys/android/android_sdl3.cpp",
 )

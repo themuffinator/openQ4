@@ -96,6 +96,12 @@ static void Posix_WriteSignalText( const char *text ) {
 		return;
 	}
 
+#if defined( __ANDROID__ )
+	// stderr reaches logcat only through the host app's pump thread, which the
+	// _exit() at the end of this handler will usually beat. A crash breadcrumb
+	// that loses that race is worthless, so write to liblog directly.
+	Sys_AndroidLogPrintRaw( SYS_ANDROID_LOG_ERROR, text );
+#else
 	size_t length = 0;
 	while ( text[ length ] != '\0' ) {
 		length++;
@@ -103,12 +109,17 @@ static void Posix_WriteSignalText( const char *text ) {
 	if ( length > 0 ) {
 		write( STDERR_FILENO, text, length );
 	}
+#endif
 }
 
 static void Posix_WriteSignalNumber( int value ) {
 	char buffer[ 16 ];
-	int pos = sizeof( buffer );
+	// filled back to front, so reserve the last byte for the terminator
+	// Posix_WriteSignalText needs
+	int pos = sizeof( buffer ) - 1;
 	unsigned int number;
+
+	buffer[ pos ] = '\0';
 
 	if ( value < 0 ) {
 		Posix_WriteSignalText( "-" );
@@ -122,7 +133,7 @@ static void Posix_WriteSignalNumber( int value ) {
 		number /= 10;
 	} while ( number > 0 && pos > 0 );
 
-	write( STDERR_FILENO, buffer + pos, sizeof( buffer ) - pos );
+	Posix_WriteSignalText( buffer + pos );
 }
 
 /*

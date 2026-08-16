@@ -28,22 +28,45 @@ extern const char *nativeLibsPath;
 // Startup
 // -------------------------------------------------------------------------
 
-// The engine prints through common->Printf, which already reaches logcat, but
-// third-party code (SDL, OpenAL, the C runtime) still writes to stdout/stderr,
-// where it would otherwise vanish.
+// Third-party code (SDL, OpenAL, the C runtime) writes to stdout/stderr, where
+// it would otherwise vanish. The engine itself no longer comes through here:
+// Sys_Printf writes to liblog directly, because a pipe can only carry bytes and
+// this pump would have to guess where the engine's lines began and ended. See
+// sys/android/android_log.cpp.
+//
+// A read() returns whatever bytes happen to be in flight, so it can deliver
+// several lines at once or stop halfway through one. Reassembling here is what
+// keeps one printed line equal to one logcat record.
+#define STDIO_PUMP_LINE_MAX 1008
+
 static void *stdio_pump(void *arg)
 {
     int fd = (int) (long) arg;
+    char line[STDIO_PUMP_LINE_MAX + 1];
+    int len = 0;
     char buf[512];
     ssize_t n;
 
-    while ((n = read(fd, buf, sizeof(buf) - 1)) > 0)
+    while ((n = read(fd, buf, sizeof(buf))) > 0)
     {
-        if (buf[n - 1] == '\n')
-            n--;
+        for (ssize_t i = 0; i < n; i++)
+        {
+            if (buf[i] == '\n' || len == STDIO_PUMP_LINE_MAX)
+            {
+                if (len > 0)
+                {
+                    line[len] = 0;
+                    Q4_LOGI("%s", line);
+                    len = 0;
+                }
 
-        buf[n] = 0;
-        Q4_LOGI("%s", buf);
+                if (buf[i] == '\n')
+                    continue;
+            }
+
+            if (buf[i] != '\r')
+                line[len++] = buf[i];
+        }
     }
 
     return NULL;
@@ -54,14 +77,18 @@ static void redirect_stdio_to_logcat()
     int pipes[2];
     pthread_t thread;
 
-    setvbuf(stdout, NULL, _IOLBF, 0);
-    setvbuf(stderr, NULL, _IONBF, 0);
-
     if (pipe(pipes) != 0)
         return;
 
     dup2(pipes[1], STDOUT_FILENO);
     dup2(pipes[1], STDERR_FILENO);
+    close(pipes[1]); // fd 1 and 2 are the write end now
+
+    // Must follow the dup2: setvbuf only has to be honoured before a stream's
+    // first I/O, and a fully buffered stdout would hold up to 4 KB of output
+    // until a flush that a crash never performs.
+    setvbuf(stdout, NULL, _IOLBF, 0);
+    setvbuf(stderr, NULL, _IONBF, 0);
 
     if (pthread_create(&thread, NULL, stdio_pump, (void *) (long) pipes[0]) == 0)
         pthread_detach(thread);
