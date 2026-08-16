@@ -609,6 +609,21 @@ void RB_GLES_RestoreStateAfterOverlay( void ) {
 	glViewport( 0, 0, glConfig.vidWidth, glConfig.vidHeight );
 	glScissor( 0, 0, glConfig.vidWidth, glConfig.vidHeight );
 
+	// backEnd.currentScissor is the tracker every GLES_D3 draw path delta-codes
+	// against, and it is a sibling of backEnd.glState rather than a member of
+	// it, so neither the memset below nor forceGlState reaches it. Without this
+	// the box set above and the tracked rect disagree until the next
+	// RB_GLESD3_BeginDrawingView re-issues both.
+	//
+	// Nothing draws in that window today, so this is a latent inconsistency
+	// rather than a live defect -- but it is exactly the class of cache this
+	// function exists to clear, and a draw that ever landed there would
+	// silently under-clip.
+	backEnd.currentScissor.x1 = 0;
+	backEnd.currentScissor.y1 = 0;
+	backEnd.currentScissor.x2 = glConfig.vidWidth - 1;
+	backEnd.currentScissor.y2 = glConfig.vidHeight - 1;
+
 	// Culling is left off to match the overlay, and the cache is told so:
 	// GL_Cull only re-issues glEnable( GL_CULL_FACE ) when it believes the
 	// previous state was CT_TWO_SIDED, so claiming anything else here would
