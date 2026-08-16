@@ -169,23 +169,6 @@ oq4_run_script(_paks_out "${OQ4_ROOT}/tools/build/generate_pak_header.py"
     --pak1 "${OPENQ4_PAK_DIR}/pak1.pk4"
     --header-out "${OQ4_GEN}/openq4_paks_generated.h")
 
-# The host app ships the pair inside the APK and unpacks it on the device, so
-# copy them wherever it wants them. Set from the host build, because only it
-# knows its own asset layout; unset, this does nothing and the packs stay in the
-# build directory. Copying here rather than in a build target keeps them in step
-# with the header generated just above -- they have to be the same pair, or the
-# engine fatal-errors on the checksum.
-if(OPENQ4_PAK_ASSET_DIR)
-    file(MAKE_DIRECTORY "${OPENQ4_PAK_ASSET_DIR}")
-    foreach(_pak_name pak0.pk4 pak1.pk4)
-        file(COPY_FILE
-            "${OPENQ4_PAK_DIR}/${_pak_name}"
-            "${OPENQ4_PAK_ASSET_DIR}/${_pak_name}"
-            ONLY_IF_DIFFERENT)
-    endforeach()
-    message(STATUS "openQ4: staged pak0.pk4 and pak1.pk4 into ${OPENQ4_PAK_ASSET_DIR}")
-endif()
-
 # baseoq4/mod.json is as required as the pk4s: idFileSystemLocal::Startup
 # fatal-errors when fs_game is the openQ4 game dir and its manifest is missing
 # or its requiredopenQ4Version does not match the engine. Meson generates it in
@@ -197,6 +180,27 @@ if(NOT OPENQ4_VERSION_BASE)
     message(FATAL_ERROR "openq4_version.py did not report base_version:\n${_version_out}")
 endif()
 configure_file("${OQ4_ROOT}/content/baseoq4/mod.json.in" "${OPENQ4_PAK_DIR}/mod.json" @ONLY)
+
+# The host app ships baseoq4 inside the APK and unpacks it on the device, so
+# copy it wherever the app wants it. Set from the host build, because only it
+# knows its own asset layout; unset, this does nothing and the files stay in the
+# build directory.
+#
+# All three travel together and this runs after all three exist. Two of them are
+# separately fatal if they go missing or stale: the engine compares each pak
+# against the MD5 compiled into it, and refuses to start without a mod.json
+# whose requiredopenQ4Version matches. Staging here, rather than in a build
+# target, keeps them in step with the header generated above.
+if(OPENQ4_PAK_ASSET_DIR)
+    file(MAKE_DIRECTORY "${OPENQ4_PAK_ASSET_DIR}")
+    foreach(_staged_name pak0.pk4 pak1.pk4 mod.json)
+        file(COPY_FILE
+            "${OPENQ4_PAK_DIR}/${_staged_name}"
+            "${OPENQ4_PAK_ASSET_DIR}/${_staged_name}"
+            ONLY_IF_DIFFERENT)
+    endforeach()
+    message(STATUS "openQ4: staged pak0.pk4, pak1.pk4 and mod.json into ${OPENQ4_PAK_ASSET_DIR}")
+endif()
 
 # ---------------------------------------------------------------------------
 # Shared compile settings (the CMake peer of meson.build's shared_*_args)
