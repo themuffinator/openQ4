@@ -75,14 +75,14 @@ openQ4/
 openQ4 automatically validates your Quake 4 installation to ensure you have legitimate, unmodified media files.
 
 **How it works:**
-1. Engine validates required official `q4base` media PK4 checksums at startup
+1. Engine validates required official `q4base` media PK4 checksums and the openQ4 runtime `baseoq4/pak0.pk4` / `pak1.pk4` md5s at startup
 2. Refuses to run if required assets are missing or modified
 3. Ignores retail game-binary PK4 archives such as `game000.pk4` through `game300.pk4` and `gamex*.pk4` because openQ4 ships its own game modules
 4. Allows optional official patch/menu and language PK4s when present without making them startup requirements
 5. Auto-discovers your installation (checks Steam, GOG, or current directory)
 
 **Configuration:**
-- `fs_validateOfficialPaks 1` (default) — Enable asset validation
+- `fs_validateOfficialPaks 1` (default) — Enable asset validation. Set to `0` on the command line (`+set fs_validateOfficialPaks 0`) to skip both the retail `q4base` checks and the openQ4 runtime pak md5 checks; useful for ports that repack `pak0.pk4`/`pak1.pk4`
 - See [official-pk4-checksums.md](docs/dev/official-pk4-checksums.md) for the checksum reference
 
 ---

@@ -1603,7 +1603,7 @@ idCVar	idFileSystemLocal::fs_caseSensitiveOS( "fs_caseSensitiveOS", "0", CVAR_SY
 idCVar	idFileSystemLocal::fs_caseSensitiveOS( "fs_caseSensitiveOS", "1", CVAR_SYSTEM | CVAR_BOOL, "" );
 #endif
 idCVar	idFileSystemLocal::fs_searchAddons( "fs_searchAddons", "0", CVAR_SYSTEM | CVAR_BOOL, "search all addon pk4s ( disables addon functionality )" );
-idCVar	idFileSystemLocal::fs_validateOfficialPaks( "fs_validateOfficialPaks", "1", CVAR_SYSTEM | CVAR_INIT | CVAR_BOOL, "verify required official q4base media pk4 checksums on startup" );
+idCVar	idFileSystemLocal::fs_validateOfficialPaks( "fs_validateOfficialPaks", "1", CVAR_SYSTEM | CVAR_INIT | CVAR_BOOL, "verify required official q4base media pk4 checksums and the openQ4 runtime pak md5s on startup" );
 
 idFileSystemLocal	fileSystemLocal;
 idFileSystem *		fileSystem = &fileSystemLocal;
@@ -5437,16 +5437,16 @@ void idFileSystemLocal::Startup( void ) {
 		SetupGameDirectories( fs_game.GetString() );
 	}
 
-	idStr openQ4PakErrors;
-	if ( !ValidateOpenQ4Paks( openQ4PakErrors ) ) {
-		PrintContentSearchDiagnostics();
-		common->FatalError(
-			"openQ4 runtime content packs in '%s' are missing or modified.\n\n%s\n"
-			"Rebuild or reinstall openQ4 so '<openQ4 package root>/%s/pak0.pk4' and '<openQ4 package root>/%s/pak1.pk4' match this engine. Retail Quake 4 PK4s belong in '%s', not '%s'.",
-			OPENQ4_GAMEDIR, openQ4PakErrors.c_str(), OPENQ4_GAMEDIR, OPENQ4_GAMEDIR, BASE_GAMEDIR, OPENQ4_GAMEDIR );
-	}
-
 	if ( fs_validateOfficialPaks.GetBool() ) {
+		idStr openQ4PakErrors;
+		if ( !ValidateOpenQ4Paks( openQ4PakErrors ) ) {
+			PrintContentSearchDiagnostics();
+			common->FatalError(
+				"openQ4 runtime content packs in '%s' are missing or modified.\n\n%s\n"
+				"Rebuild or reinstall openQ4 so '<openQ4 package root>/%s/pak0.pk4' and '<openQ4 package root>/%s/pak1.pk4' match this engine. Retail Quake 4 PK4s belong in '%s', not '%s'.",
+				OPENQ4_GAMEDIR, openQ4PakErrors.c_str(), OPENQ4_GAMEDIR, OPENQ4_GAMEDIR, BASE_GAMEDIR, OPENQ4_GAMEDIR );
+		}
+
 		idStr misplacedErrors;
 		if ( FindMisplacedOfficialPaks( misplacedErrors ) ) {
 			PrintContentSearchDiagnostics();

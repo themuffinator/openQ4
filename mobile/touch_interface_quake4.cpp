@@ -60,10 +60,10 @@ void TouchInterface::addGameControls(touchcontrols::TouchControls *tc)
     tc->addControl(new touchcontrols::Button("attack", touchcontrols::RectF(20, 7, 23, 10), "shoot", KEY_SHOOT, false, false, "Attack!"));
     tc->addControl(new touchcontrols::Button("attack2", touchcontrols::RectF(3, 5, 6, 8), "shoot", KEY_SHOOT, false, true, "Attack! (duplicate)"));
 
-    tc->addControl(new touchcontrols::Button("zoom", touchcontrols::RectF(23, 6, 26, 9), "binocular", PORT_ACT_ZOOM_IN, false, false, "Zoom"));
-    tc->addControl(new touchcontrols::Button("reload", touchcontrols::RectF(21, 5, 23, 7), "reload", PORT_ACT_RELOAD, false, false, "Reload"));
-    tc->addControl(new touchcontrols::Button("flashlight", touchcontrols::RectF(16, 3, 18, 5), "flashlight", PORT_ACT_FLASH_LIGHT, false, false, "Flashlight"));
-    tc->addControl(new touchcontrols::Button("objectives", touchcontrols::RectF(18, 3, 20, 5), "map", PORT_ACT_HELPCOMP, false, false, "Objectives"));
+    tc->addControl(new touchcontrols::Button("zoom", touchcontrols::RectF(21, 3, 23, 5), "binocular", PORT_ACT_ZOOM_IN, false, false, "Zoom"));
+    tc->addControl(new touchcontrols::Button("reload", touchcontrols::RectF(0, 5, 3, 7), "reload", PORT_ACT_RELOAD, false, false, "Reload"));
+    tc->addControl(new touchcontrols::Button("flashlight", touchcontrols::RectF(19, 3, 21, 5), "flashlight", PORT_ACT_FLASH_LIGHT, false, false, "Flashlight"));
+    tc->addControl(new touchcontrols::Button("objectives", touchcontrols::RectF(16, 0, 23, 2), "notebook", PORT_ACT_HELPCOMP, false, false, "Objectives"));
 
     tc->addControl(new touchcontrols::Button("quick_save", touchcontrols::RectF(24, 0, 26, 2), "save", PORT_ACT_QUICKSAVE, false, false, "Quick save"));
     tc->addControl(new touchcontrols::Button("quick_load", touchcontrols::RectF(20, 0, 22, 2), "load", PORT_ACT_QUICKLOAD, false, false, "Quick load"));
@@ -78,7 +78,7 @@ void TouchInterface::addGameControls(touchcontrols::TouchControls *tc)
     tc->addControl(new touchcontrols::Button("show_custom", touchcontrols::RectF(0, 7, 2, 9), "custom_show", KEY_SHOW_CUSTOM, false, true, "Show custom"));
     tc->addControl(new touchcontrols::Button("show_weapons", touchcontrols::RectF(12, 14, 14, 16), "show_weapons", KEY_SHOW_WEAPONS, false, false, "Show numbers"));
     tc->addControl(new touchcontrols::Button("next_weapon", touchcontrols::RectF(0, 3, 3, 5), "next_weap", PORT_ACT_NEXT_WEP, false, false, "Next weapon"));
-    tc->addControl(new touchcontrols::Button("prev_weapon", touchcontrols::RectF(0, 5, 3, 7), "prev_weap", PORT_ACT_PREV_WEP, false, false, "Prev weapon"));
+    tc->addControl(new touchcontrols::Button("prev_weapon", touchcontrols::RectF(0, 7, 3, 9), "prev_weap", PORT_ACT_PREV_WEP, false, false, "Prev weapon"));
 
     touchcontrols::ButtonGrid *dpad = new touchcontrols::ButtonGrid("dpad_move", touchcontrols::RectF(6, 3, 12, 7), "", 3, 2, true, "Movement btns (WASD)");
 
