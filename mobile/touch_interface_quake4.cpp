@@ -63,7 +63,7 @@ void TouchInterface::addGameControls(touchcontrols::TouchControls *tc)
     tc->addControl(new touchcontrols::Button("zoom", touchcontrols::RectF(21, 3, 23, 5), "binocular", PORT_ACT_ZOOM_IN, false, false, "Zoom"));
     tc->addControl(new touchcontrols::Button("reload", touchcontrols::RectF(0, 5, 3, 7), "reload", PORT_ACT_RELOAD, false, false, "Reload"));
     tc->addControl(new touchcontrols::Button("flashlight", touchcontrols::RectF(19, 3, 21, 5), "flashlight", PORT_ACT_FLASH_LIGHT, false, false, "Flashlight"));
-    tc->addControl(new touchcontrols::Button("objectives", touchcontrols::RectF(16, 0, 23, 2), "notebook", PORT_ACT_HELPCOMP, false, false, "Objectives"));
+    tc->addControl(new touchcontrols::Button("objectives", touchcontrols::RectF(16, 0, 18, 2), "notebook", PORT_ACT_HELPCOMP, false, false, "Objectives"));
 
     tc->addControl(new touchcontrols::Button("quick_save", touchcontrols::RectF(24, 0, 26, 2), "save", PORT_ACT_QUICKSAVE, false, false, "Quick save"));
     tc->addControl(new touchcontrols::Button("quick_load", touchcontrols::RectF(20, 0, 22, 2), "load", PORT_ACT_QUICKLOAD, false, false, "Quick load"));
