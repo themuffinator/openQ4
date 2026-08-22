@@ -60,6 +60,20 @@ void Quake4_PostCommand( const char *cmd );
 // is 13, next/prev weapon 14/15, objectives 19, flashlight 50, last weapon 51.
 void Quake4_TriggerImpulse( int impulse );
 
+// Presses or releases a held gameplay action on the usercmd itself, so it works
+// no matter which key - if any - the player has that action bound to. Button is
+// one of QUAKE4_BTN_*.
+void Quake4_PostButton( int button, int down );
+
+#define QUAKE4_BTN_ATTACK		0
+#define QUAKE4_BTN_ZOOM			1
+#define QUAKE4_BTN_MOVE_UP		2	// jump
+#define QUAKE4_BTN_MOVE_DOWN	3	// crouch
+#define QUAKE4_BTN_SPEED		4	// run / walk
+#define QUAKE4_BTN_STRAFE		5
+#define QUAKE4_BTN_WEAPON_WHEEL	6
+#define QUAKE4_BTN_COUNT		7
+
 // Menu/console vs in-game, so the overlay can pick its control screen. Values
 // match touchscreemode_t in Clibs_OpenTouch/game_interface.h.
 int Quake4_GetScreenMode( void );

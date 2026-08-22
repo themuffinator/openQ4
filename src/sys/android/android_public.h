@@ -18,4 +18,9 @@ openQ4 Android platform layer.
 // is engine-type-free on purpose so mobile/ can include it too.
 #include "../../../mobile/quake4_bridge.h"
 
+// framework/UsercmdGen.cpp. Presses or releases one usercmd action, bypassing
+// the key bindings, for the touch controls - which have no key to be rebound.
+// Takes a usercmdGen->CommandStringUsercmdData() result.
+void Sys_SetUsercmdButton( int action, bool down );
+
 #endif

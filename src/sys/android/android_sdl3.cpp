@@ -163,11 +163,38 @@ extern "C" void Quake4_TriggerImpulse( int impulse ) {
 
 /*
 ====================
+Quake4_PostButton
+
+The rebinding-proof path for held gameplay buttons. These action names are what
+a bound key resolves to on its way into the usercmd, so naming the action does
+the same press without needing a key that still has it bound.
+====================
+*/
+extern "C" void Quake4_PostButton( int button, int down ) {
+	static const char *actionNames[QUAKE4_BTN_COUNT] = {
+		"_attack",			// QUAKE4_BTN_ATTACK
+		"_zoom",			// QUAKE4_BTN_ZOOM
+		"_moveUp",			// QUAKE4_BTN_MOVE_UP
+		"_moveDown",		// QUAKE4_BTN_MOVE_DOWN
+		"_speed",			// QUAKE4_BTN_SPEED
+		"_strafe",			// QUAKE4_BTN_STRAFE
+		"_weaponWheel"		// QUAKE4_BTN_WEAPON_WHEEL
+	};
+
+	if ( usercmdGen == NULL || button < 0 || button >= QUAKE4_BTN_COUNT ) {
+		return;
+	}
+
+	Sys_SetUsercmdButton( usercmdGen->CommandStringUsercmdData( actionNames[ button ] ), down != 0 );
+}
+
+/*
+====================
 Quake4_PostCommand
 
-The rebinding-proof path for gameplay actions: idTech4's impulse commands
-("_forward", "_attack", ...) are what a bound key ultimately runs, so calling
-them directly does the right thing no matter what the player rebound.
+Runs a real console command ("savegame quick", ...). Note this is not a route to
+the _attack / _moveUp family: those are usercmd actions resolved from a key's
+binding, not registered commands - Quake4_PostButton is their path.
 ====================
 */
 extern "C" void Quake4_PostCommand( const char *cmd ) {

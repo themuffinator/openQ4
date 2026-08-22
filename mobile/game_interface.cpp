@@ -122,6 +122,7 @@ enum
     EV_MOUSE_DELTA,  // a = dx, b = dy
     EV_MOUSE_BUTTON, // a = button, b = down
     EV_IMPULSE,      // a = impulse number
+    EV_BUTTON,       // a = QUAKE4_BTN_*, b = down
     EV_COMMAND       // a = index into the command ring
 };
 
@@ -223,6 +224,7 @@ extern "C" void Quake4_DrainTouchInput(void)
             case EV_MOUSE_DELTA:  Quake4_PostMouseDelta(ev.a, ev.b); break;
             case EV_MOUSE_BUTTON: Quake4_PostMouseButton(ev.a, ev.b); break;
             case EV_IMPULSE:      Quake4_TriggerImpulse(ev.a); break;
+            case EV_BUTTON:       Quake4_PostButton(ev.a, ev.b); break;
             case EV_COMMAND:      Quake4_PostCommand(commandRing[ev.a]); break;
         }
 
@@ -345,25 +347,26 @@ void PortableAction(int state, int action)
             break;
     }
 
-    // Everything left is a held button, driven as its default bound key or
-    // mouse button. That breaks the moment the player rebinds in-game; Phase 2
-    // replaces it with a direct usercmd-button path. See docs/engines/quake4.md.
+    // Everything left is a held button, set on the usercmd by name instead of
+    // as the key default.cfg happens to bind it to, so rebinding in-game cannot
+    // break it. See docs/engines/quake4.md.
     switch (action)
     {
-        // _attack and _zoom live on the mouse in default.cfg.
-        case PORT_ACT_ATTACK:     queueEvent(EV_MOUSE_BUTTON, 1, state); break;
+        case PORT_ACT_ATTACK:     queueEvent(EV_BUTTON, QUAKE4_BTN_ATTACK, state); break;
         case PORT_ACT_ALT_ATTACK:
-        case PORT_ACT_ZOOM_IN:    queueEvent(EV_MOUSE_BUTTON, 2, state); break;
+        case PORT_ACT_ZOOM_IN:    queueEvent(EV_BUTTON, QUAKE4_BTN_ZOOM, state); break;
 
         case PORT_ACT_JUMP:
-        case PORT_ACT_UP:         queueEvent(EV_KEY, SDL_SCANCODE_SPACE, state); break;
+        case PORT_ACT_UP:         queueEvent(EV_BUTTON, QUAKE4_BTN_MOVE_UP, state); break;
         case PORT_ACT_CROUCH:
-        case PORT_ACT_DOWN:       queueEvent(EV_KEY, SDL_SCANCODE_C, state); break;
+        case PORT_ACT_DOWN:       queueEvent(EV_BUTTON, QUAKE4_BTN_MOVE_DOWN, state); break;
         case PORT_ACT_SPEED:
-        case PORT_ACT_SPRINT:     queueEvent(EV_KEY, SDL_SCANCODE_LSHIFT, state); break;
-        case PORT_ACT_STRAFE:     queueEvent(EV_KEY, SDL_SCANCODE_LALT, state); break;
+        case PORT_ACT_SPRINT:     queueEvent(EV_BUTTON, QUAKE4_BTN_SPEED, state); break;
+        case PORT_ACT_STRAFE:     queueEvent(EV_BUTTON, QUAKE4_BTN_STRAFE, state); break;
+        case PORT_ACT_USE_WEAPON_WHEEL: queueEvent(EV_BUTTON, QUAKE4_BTN_WEAPON_WHEEL, state); break;
+
+        // Stays a raw key: the console reads the key itself, ahead of any bind.
         case PORT_ACT_CONSOLE:    queueEvent(EV_KEY, SDL_SCANCODE_GRAVE, state); break;
-        case PORT_ACT_USE_WEAPON_WHEEL: queueEvent(EV_KEY, SDL_SCANCODE_E, state); break;
 
         default: break;
     }

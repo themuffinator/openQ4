@@ -31,6 +31,9 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "Session_local.h"
 #include "../idlib/NumericString.h"
+#ifdef __ANDROID__
+#include "../sys/android/android_public.h"
+#endif
 
 static const float MOUSE_CPI_INCHES_PER_CM = 2.5399999618530273f;
 static const float MOUSE_CPI_VIEW_SCALE = 45.45454545454546f;
@@ -372,6 +375,7 @@ public:
 
 	usercmd_t		GetDirectUsercmd( void );
 	void			TriggerImpulse( int impulseNum );
+	void			SetUsercmdButton( int action, bool down );	// not part of idUsercmdGen, see Sys_SetUsercmdButton
 	bool			GetPresentationViewDelta( float &yawDelta, float &pitchDelta );
 
 private:
@@ -403,6 +407,7 @@ private:
 	void			Joystick( void );
 
 	void			Key( int keyNum, bool down );
+	void			SetButtonAction( int action, bool down );
 
 	idVec3			viewangles;
 	int				flags;
@@ -414,6 +419,7 @@ private:
 
 	int				buttonState[UB_MAX_BUTTONS];
 	bool			keyState[K_LAST_KEY];
+	bool			directButtonState[UB_MAX_BUTTONS];	// SetUsercmdButton's own held-state, see Key()'s keyState
 
 	int				inhibitCommands;	// true when in console or menu locally
 	int				lastCommandTime;
@@ -1322,6 +1328,7 @@ void idUsercmdGenLocal::Clear( void ) {
 	// clears all key states 
 	memset( buttonState, 0, sizeof( buttonState ) );
 	memset( keyState, false, sizeof( keyState ) );
+	memset( directButtonState, false, sizeof( directButtonState ) );
 	toggled_zoom.Clear();
 
 	inhibitCommands = false;
@@ -1392,6 +1399,19 @@ void idUsercmdGenLocal::Key( int keyNum, bool down ) {
 		return;
 	}
 
+	SetButtonAction( action, down );
+}
+
+/*
+===================
+idUsercmdGenLocal::SetButtonAction
+
+Applies a press or release to one usercmd action. Callers are responsible for
+never sending two presses or two releases in a row, since buttonState counts
+the inputs currently holding the action down.
+===================
+*/
+void idUsercmdGenLocal::SetButtonAction( int action, bool down ) {
 	if ( down ) {
 		if ( action == UB_WEAPONWHEEL || IsWeaponSelectionImpulse( action ) ) {
 			toggled_zoom.Clear();
@@ -1412,6 +1432,29 @@ void idUsercmdGenLocal::Key( int keyNum, bool down ) {
 			buttonState[ action ] = 0;
 		}
 	}
+}
+
+/*
+===================
+idUsercmdGenLocal::SetUsercmdButton
+
+Presses or releases an action directly, for input sources that name the action
+rather than a key - the touch controls, which have no key to be rebound.
+===================
+*/
+void idUsercmdGenLocal::SetUsercmdButton( int action, bool down ) {
+	if ( action <= UB_NONE || action >= UB_MAX_BUTTONS ) {
+		return;
+	}
+
+	// Own held-state, the way Key() has keyState: a repeated press would
+	// otherwise leave the action permanently held.
+	if ( directButtonState[ action ] == down ) {
+		return;
+	}
+	directButtonState[ action ] = down;
+
+	SetButtonAction( action, down );
 }
 
 /*
@@ -1658,3 +1701,18 @@ void idUsercmdGenLocal::TriggerImpulse( int impulseNum ) {
 	cmd.impulse = impulse;
 	cmd.flags = flags;
 }
+
+#ifdef __ANDROID__
+/*
+================
+Sys_SetUsercmdButton
+
+The touch controls have no key that could be rebound, so they name the action
+itself; this is what mobile/quake4_bridge.h's Quake4_PostButton reaches. Here
+rather than in sys/android because idUsercmdGenLocal never leaves this file.
+================
+*/
+void Sys_SetUsercmdButton( int action, bool down ) {
+	localUsercmdGen.SetUsercmdButton( action, down );
+}
+#endif
