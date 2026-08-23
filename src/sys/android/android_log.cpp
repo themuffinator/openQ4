@@ -26,6 +26,8 @@ openQ4 Android platform layer: engine console output -> logcat.
 
 #include <android/log.h>
 
+#include "LogWritter.h"
+
 static const char *ANDROID_LOG_TAG = "openQ4";
 
 // liblog truncates a record at roughly 4076 bytes including the tag and
@@ -87,6 +89,8 @@ static void Sys_AndroidLogEmitLine( int priority ) {
 
 	line.text[ line.length ] = '\0';
 	__android_log_write( Sys_AndroidLogLinePriority( priority, line.text ), ANDROID_LOG_TAG, line.text );
+	// same line into the log file the app hands the user
+	LogWritter_Write( line.text );
 	line.length = 0;
 }
 
