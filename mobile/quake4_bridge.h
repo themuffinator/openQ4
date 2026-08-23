@@ -57,7 +57,8 @@ void Quake4_PostCommand( const char *cmd );
 
 // Fires an _impulseNN action directly, so it works no matter what the player
 // has that impulse bound to. Quake 4's weapon slots are impulses 0-10, reload
-// is 13, next/prev weapon 14/15, objectives 19, flashlight 50, last weapon 51.
+// is 13, next/prev weapon 14/15, flashlight 50, last weapon 51. Objectives is
+// not an impulse at all despite the bind name - see QUAKE4_BTN_SCORES.
 void Quake4_TriggerImpulse( int impulse );
 
 // Presses or releases a held gameplay action on the usercmd itself, so it works
@@ -72,7 +73,8 @@ void Quake4_PostButton( int button, int down );
 #define QUAKE4_BTN_SPEED		4	// run / walk
 #define QUAKE4_BTN_STRAFE		5
 #define QUAKE4_BTN_WEAPON_WHEEL	6
-#define QUAKE4_BTN_COUNT		7
+#define QUAKE4_BTN_SCORES		7	// objectives (SP) / scoreboard (MP)
+#define QUAKE4_BTN_COUNT		8
 
 // Menu/console vs in-game, so the overlay can pick its control screen. Values
 // match touchscreemode_t in Clibs_OpenTouch/game_interface.h.

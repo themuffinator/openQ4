@@ -328,7 +328,6 @@ void PortableAction(int state, int action)
         case PORT_ACT_RELOAD:      if (state) queueEvent(EV_IMPULSE, 13, 0); return;
         case PORT_ACT_NEXT_WEP:    if (state) queueEvent(EV_IMPULSE, 14, 0); return;
         case PORT_ACT_PREV_WEP:    if (state) queueEvent(EV_IMPULSE, 15, 0); return;
-        case PORT_ACT_HELPCOMP:    if (state) queueEvent(EV_IMPULSE, 19, 0); return;
         case PORT_ACT_FLASH_LIGHT: if (state) queueEvent(EV_IMPULSE, 50, 0); return;
         case PORT_ACT_HOLSTER_WEAPON: if (state) queueEvent(EV_IMPULSE, 51, 0); return;
 
@@ -364,6 +363,10 @@ void PortableAction(int state, int action)
         case PORT_ACT_SPRINT:     queueEvent(EV_BUTTON, QUAKE4_BTN_SPEED, state); break;
         case PORT_ACT_STRAFE:     queueEvent(EV_BUTTON, QUAKE4_BTN_STRAFE, state); break;
         case PORT_ACT_USE_WEAPON_WHEEL: queueEvent(EV_BUTTON, QUAKE4_BTN_WEAPON_WHEEL, state); break;
+
+        // Objectives is hold-to-show, not an impulse: PerformImpulse's IMPULSE_19
+        // case is empty, HandleObjectiveInput watches BUTTON_SCORES instead.
+        case PORT_ACT_HELPCOMP:   queueEvent(EV_BUTTON, QUAKE4_BTN_SCORES, state); break;
 
         // Stays a raw key: the console reads the key itself, ahead of any bind.
         case PORT_ACT_CONSOLE:    queueEvent(EV_KEY, SDL_SCANCODE_GRAVE, state); break;

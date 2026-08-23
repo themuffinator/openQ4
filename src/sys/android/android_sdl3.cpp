@@ -178,7 +178,8 @@ extern "C" void Quake4_PostButton( int button, int down ) {
 		"_moveDown",		// QUAKE4_BTN_MOVE_DOWN
 		"_speed",			// QUAKE4_BTN_SPEED
 		"_strafe",			// QUAKE4_BTN_STRAFE
-		"_weaponWheel"		// QUAKE4_BTN_WEAPON_WHEEL
+		"_weaponWheel",		// QUAKE4_BTN_WEAPON_WHEEL
+		"_showScores"		// QUAKE4_BTN_SCORES
 	};
 
 	if ( usercmdGen == NULL || button < 0 || button >= QUAKE4_BTN_COUNT ) {
