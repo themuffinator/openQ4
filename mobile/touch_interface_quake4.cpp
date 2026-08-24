@@ -51,7 +51,7 @@ void TouchInterface::mouseMove(int action, float x, float y, float mouse_x, floa
         // Hold for a few frames: the GUI samples button state per frame, so a
         // press and release inside one frame reads as never-clicked.
         MouseButton(1, BUTTON_PRIMARY);
-        waitFrames(3);
+        //waitFrames(3);
         MouseButton(0, BUTTON_PRIMARY);
     }
 }
