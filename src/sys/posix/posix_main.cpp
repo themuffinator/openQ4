@@ -887,6 +887,13 @@ return in MegaBytes
 ===========
 */
 int Sys_GetDriveFreeSpace( const char *path ) {
+#ifdef __ANDROID__
+	// Always report plenty. Save paths may be SAF-backed and synthetic
+	// ('/[internal]/...'), so statvfs resolves no component of them and the walk
+	// up below would end on the read-only system mount and report it as (near
+	// zero) free, blocking savegames with "not enough drive space".
+	return 1024;
+#else
 	char probePath[PATH_MAX];
 	struct statvfs fsStats;
 
@@ -924,6 +931,7 @@ int Sys_GetDriveFreeSpace( const char *path ) {
 
 	common->DPrintf( "Sys_GetDriveFreeSpace: statvfs failed for '%s': %s\n", path, strerror( errno ) );
 	return 26;
+#endif
 }
 
 /*
