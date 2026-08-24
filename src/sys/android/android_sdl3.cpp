@@ -223,6 +223,8 @@ extern "C" void Quake4_PostCommand( const char *cmd ) {
 		return;
 	}
 	cmdSystem->BufferCommandText( CMD_EXEC_APPEND, cmd );
+	// Terminate the command: APPEND inserts raw text, so without this two queued
+	// commands run together into one garbled line.
 	cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "\n" );
 }
 
