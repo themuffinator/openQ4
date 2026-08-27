@@ -23,6 +23,23 @@ any cached payload can be accepted.
 #include "LevelLoadPipeline.h"
 #include "File.h"
 
+// Android NDK libc++'s <sstream>/<locale> internals call vsnprintf/snprintf
+// and use the INT_MAX macro. idlib breaks both inside standard headers:
+// Str.h redirects the printf names by macro, and math/Math.h #undefs
+// INT_MAX/INT_MIN to reuse the names as idMath members. Undo the redirect and
+// restore the macro before the standard includes. Safe in this one TU: the
+// idlib headers are fully included above, and this file uses neither the
+// printf names nor idMath::INT_MAX (which the macro would mangle) itself.
+#if defined( snprintf )
+	#undef snprintf
+#endif
+#if defined( vsnprintf )
+	#undef vsnprintf
+#endif
+#ifndef INT_MAX
+	#define INT_MAX 2147483647
+#endif
+
 #include <algorithm>
 #include <array>
 #include <atomic>
