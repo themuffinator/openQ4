@@ -213,6 +213,13 @@ void TouchInterface::createControls(std::string filesPath)
     tcYesNo->signal_button.connect(sigc::mem_fun(this, &TouchInterface::menuButton));
     tcYesNo->setAlpha(0.8);
 
+    //Custom buttons -------------------------------------------
+    //------------------------------------------------------
+    // Shared set (6 buttons, 4 hidden extras, 4 quad slides) sending
+    // PORT_ACT_CUSTOM_*; game_interface.cpp turns those into the keys their
+    // labels name, to be bound in Quake 4's own controls menu.
+    createCustomControls(tcCustomButtons);
+
     //Gamepad utility -------------------------------------------
     //------------------------------------------------------
     touchcontrols::ButtonGrid *gamepadUtils = new touchcontrols::ButtonGrid("gamepad_grid", touchcontrols::RectF(8, 5, 18, 11), "gamepad_utils_bg", 3, 2);

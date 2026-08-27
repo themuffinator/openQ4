@@ -367,28 +367,78 @@ int PortableKeyEvent(int state, int code, int unitcode)
 
 void PortableAction(int state, int action)
 {
+    // Custom buttons are keys the player binds in Quake 4's own controls menu,
+    // so they have to reach the engine in either mode - pressing one while the
+    // bind screen is up is the whole point. The scheme is the shared one the
+    // touch layer's own labels name: KP1-KP0 for the ten buttons, A-P for the
+    // four quad slides. SDL's KP_1..KP_9 are followed by KP_0, hence the single
+    // run. Nothing is unbound-safe here: A-P land on Quake 4's default WASD
+    // binds until the player rebinds them.
+    if (action >= PORT_ACT_CUSTOM_0 && action <= PORT_ACT_CUSTOM_25)
+    {
+        if (action <= PORT_ACT_CUSTOM_9)
+            queueEvent(EV_KEY, SDL_SCANCODE_KP_1 + action - PORT_ACT_CUSTOM_0, state);
+        else
+            queueEvent(EV_KEY, SDL_SCANCODE_A + action - PORT_ACT_CUSTOM_10, state);
+
+        return;
+    }
+
+    // Menu actions only do anything while a menu is up - the same split
+    // gzdoom_game_interface.cpp uses. In game those scancodes are live binds
+    // (default.cfg has UPARROW as _forward), so a gamepad dpad or the yes/no
+    // screen would otherwise drive the player around. The console counts as
+    // menu here: it borrows the menu overlay and reads the arrows and escape
+    // itself.
+    const bool menuUp = PortableGetScreenMode() != TS_GAME;
+
+    // Overlay buttons that exist in both modes, so neither branch may swallow
+    // them: the console toggle sits on the menu overlay, quick save/load on the
+    // gamepad utility one.
     switch (action)
     {
-        // Menu and console navigation reads raw keys rather than going through
-        // the rebindable path, so synthetic key presses are both correct and
-        // simplest. The menus themselves are worked with the pointer (see
-        // TouchInterface::mouseMove); these are what the gamepad and the yes/no
-        // screen send.
-        case PORT_ACT_MENU_UP:      queueEvent(EV_KEY, SDL_SCANCODE_UP, state); return;
-        case PORT_ACT_MENU_DOWN:    queueEvent(EV_KEY, SDL_SCANCODE_DOWN, state); return;
-        case PORT_ACT_MENU_LEFT:    queueEvent(EV_KEY, SDL_SCANCODE_LEFT, state); return;
-        case PORT_ACT_MENU_RIGHT:   queueEvent(EV_KEY, SDL_SCANCODE_RIGHT, state); return;
-        case PORT_ACT_MENU_SELECT:
-        case PORT_ACT_MENU_CONFIRM: queueEvent(EV_KEY, SDL_SCANCODE_RETURN, state); return;
-        case PORT_ACT_MENU_BACK:
-        case PORT_ACT_MENU_ABORT:   queueEvent(EV_KEY, SDL_SCANCODE_ESCAPE, state); return;
+        // Stays a raw key: the console reads the key itself, ahead of any bind.
+        case PORT_ACT_CONSOLE:   queueEvent(EV_KEY, SDL_SCANCODE_GRAVE, state); return;
 
-        // The menu screen's explicit click button. Injected as a real SDL mouse
-        // event, same path as the pointer itself.
-        case PORT_ACT_MOUSE_LEFT:   MouseButton(state, BUTTON_PRIMARY); return;
+        case PORT_ACT_QUICKSAVE: if (state) queueCommand("savegame quick"); return;
+        case PORT_ACT_QUICKLOAD: if (state) queueCommand("loadgame quick"); return;
 
         default: break;
     }
+
+    // Releases are handled whatever the mode is: a menu that closes on the press
+    // must not leave its key stuck down in the game that follows.
+    if (menuUp || !state)
+    {
+        switch (action)
+        {
+            // Menu and console navigation reads raw keys rather than going
+            // through the rebindable path, so synthetic key presses are both
+            // correct and simplest. The menus themselves are worked with the
+            // pointer (see TouchInterface::mouseMove); these are what the
+            // gamepad and the yes/no screen send.
+            case PORT_ACT_MENU_UP:      queueEvent(EV_KEY, SDL_SCANCODE_UP, state); return;
+            case PORT_ACT_MENU_DOWN:    queueEvent(EV_KEY, SDL_SCANCODE_DOWN, state); return;
+            case PORT_ACT_MENU_LEFT:    queueEvent(EV_KEY, SDL_SCANCODE_LEFT, state); return;
+            case PORT_ACT_MENU_RIGHT:   queueEvent(EV_KEY, SDL_SCANCODE_RIGHT, state); return;
+            case PORT_ACT_MENU_SELECT:
+            case PORT_ACT_MENU_CONFIRM: queueEvent(EV_KEY, SDL_SCANCODE_RETURN, state); return;
+            case PORT_ACT_MENU_BACK:
+            case PORT_ACT_MENU_ABORT:   queueEvent(EV_KEY, SDL_SCANCODE_ESCAPE, state); return;
+
+            // The menu screen's explicit click button. Injected as a real SDL
+            // mouse event, same path as the pointer itself.
+            case PORT_ACT_MOUSE_LEFT:   MouseButton(state, BUTTON_PRIMARY); return;
+
+            default: break;
+        }
+    }
+
+    // Nothing below starts behind a menu. Releases still fall through, because
+    // the touch layer emits its button-ups as the game controls fade out - by
+    // which point the screen mode has already changed.
+    if (menuUp && state)
+        return;
 
     switch (action)
     {
@@ -418,9 +468,6 @@ void PortableAction(int state, int action)
         case PORT_ACT_PREV_WEP:    if (state) queueEvent(EV_IMPULSE, 15, 0); return;
         case PORT_ACT_FLASH_LIGHT: if (state) queueEvent(EV_IMPULSE, 50, 0); return;
         case PORT_ACT_HOLSTER_WEAPON: if (state) queueEvent(EV_IMPULSE, 51, 0); return;
-
-        case PORT_ACT_QUICKSAVE: if (state) queueCommand("savegame quick"); return;
-        case PORT_ACT_QUICKLOAD: if (state) queueCommand("loadgame quick"); return;
 
         default:
             // Weapon number grid. PORT_ACT_WEAP0 is impulse 0 (blaster), so the
@@ -455,9 +502,6 @@ void PortableAction(int state, int action)
         // Objectives is hold-to-show, not an impulse: PerformImpulse's IMPULSE_19
         // case is empty, HandleObjectiveInput watches BUTTON_SCORES instead.
         case PORT_ACT_HELPCOMP:   queueButton(QUAKE4_BTN_SCORES, 1, state); break;
-
-        // Stays a raw key: the console reads the key itself, ahead of any bind.
-        case PORT_ACT_CONSOLE:    queueEvent(EV_KEY, SDL_SCANCODE_GRAVE, state); break;
 
         default: break;
     }
