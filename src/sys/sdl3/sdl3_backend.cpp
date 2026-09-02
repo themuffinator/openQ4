@@ -4142,6 +4142,14 @@ void Sys_SDL_EmergencyReleaseGameWindow(void) {
 	if (!s_sdlWindow) {
 		return;
 	}
+#if defined(__ANDROID__)
+	// Drop text input before the window goes away. SDL routes this to the
+	// host's OpenTouch layer, which enables the on-screen touch keyboard on
+	// start and disables it on stop; leaving it enabled here paints that
+	// overlay over the error window with GL state belonging to the window
+	// being hidden.
+	(void)SDL_StopTextInput(s_sdlWindow);
+#endif
 	(void)SDL3_LeaveFullscreenAndRestoreDesktopMode();
 	SDL_HideWindow(s_sdlWindow);
 }

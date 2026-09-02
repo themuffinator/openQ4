@@ -606,12 +606,51 @@ static void Posix_ConsoleApplyLogicalPresentation( int width, int height ) {
 	s_consoleWindow.logicalHeight = height;
 }
 
+#if defined( __ANDROID__ )
+/*
+===============
+Posix_ConsoleScale
+
+SDL_RenderDebugText draws a fixed 8x8 cell, so the only way to enlarge console
+text is to shrink the coordinate space it is drawn into and let the logical
+presentation stretch it back out. A phone panel is physically small but has
+more pixels than the desktop window this layout was designed for -- 2340x1080
+on the S24 Ultra against a 760x520 desktop console -- so at 1:1 the glyphs land
+at eight actual pixels and the fatal error is unreadable at arm's length.
+
+Aim for roughly the desktop console's width in logical units and derive an
+integer factor from that. Integer, because a fractional stretch of an 8x8
+bitmap font resamples the glyph grid unevenly and the text ends up fuzzy rather
+than simply larger.
+===============
+*/
+static int Posix_ConsoleScale( int windowWidth ) {
+	const int targetLogicalWidth = POSIX_CONSOLE_WIDTH;
+	if ( windowWidth <= targetLogicalWidth ) {
+		return 1;
+	}
+	const int scale = ( windowWidth + targetLogicalWidth / 2 ) / targetLogicalWidth;
+	return idMath::ClampInt( 1, 6, scale );
+}
+#endif
+
 static void Posix_ConsoleUpdateLayout( void ) {
 	int width = POSIX_CONSOLE_WIDTH;
 	int height = POSIX_CONSOLE_HEIGHT;
 	if ( s_consoleWindow.window != NULL ) {
 		(void)SDL_GetWindowSize( s_consoleWindow.window, &width, &height );
 	}
+
+#if defined( __ANDROID__ )
+	// Shrink the coordinate space, not the window: the logical presentation
+	// below stretches it back to the panel, magnifying the fixed-size debug
+	// font along with everything else. Pointer input needs no adjustment --
+	// Posix_ConsoleWindowToRenderCoordinates already maps window coordinates
+	// through the renderer's logical presentation, which is this same space.
+	const int contentScale = Posix_ConsoleScale( width );
+	width /= contentScale;
+	height /= contentScale;
+#endif
 
 	// The window itself is clamped to the same minimum, but a compositor can
 	// still hand us a smaller size during a resize; clamp so the fixed rows
@@ -776,6 +815,25 @@ static void Posix_ConsoleStartTextInput( void ) {
 	if ( s_consoleWindow.window == NULL || !s_consoleWindow.visible ) {
 		return;
 	}
+
+#if defined( __ANDROID__ )
+	// The fatal-error window takes no input. Its loop only waits for the user
+	// to close it -- there is no command line to type into -- so asking for
+	// text input gains nothing here and costs a great deal.
+	//
+	// SDL_StartTextInput reaches the host's OpenTouch layer through the
+	// SDL_SetShowKeyboardCallBack hook, whose showKeyboardCallback() enables
+	// the on-screen touch keyboard (tcKeyboard->setEnabled) when the app is not
+	// configured for the system IME. That overlay then draws over the error
+	// text using GL state set up for the game window this path has just
+	// hidden, with a touch framebuffer whose config was never set because the
+	// error arrived before video init -- so it samples an unallocated texture
+	// and paints a tiled atlas and a band of uninitialised memory across the
+	// one screen whose whole job is to be readable.
+	if ( s_consoleWindow.forceFatalWindow ) {
+		return;
+	}
+#endif
 
 	const SDL_Rect inputRect = {
 		static_cast<int>( s_consoleWindow.layout.inputRect.x ),
@@ -1578,6 +1636,42 @@ void Posix_ConsoleFrame( void ) {
 #endif
 }
 
+#if defined( __ANDROID__ )
+/*
+===============
+Posix_ConsoleFatalErrorActive
+
+True once the fatal-error console has taken the screen. Read from the touch
+overlay through Quake4_GetScreenMode, which runs on the host's UI thread, so
+this is written once and never cleared -- the process is on its way out.
+===============
+*/
+static volatile bool s_androidFatalConsoleActive = false;
+static volatile bool s_androidFatalDismissRequested = false;
+
+bool Posix_ConsoleFatalErrorActive( void ) {
+	return s_androidFatalConsoleActive;
+}
+
+/*
+===============
+Posix_ConsoleRequestFatalDismiss
+
+The fatal window's own close button is a desktop affordance: on a phone the
+only things the player has are the screen and the back key, and neither reaches
+this loop through SDL. The touch overlay feeds a ring buffer that only
+Sys_SDL_PumpEvents drains, and the fatal loop polls SDL directly instead, so
+without this the error window can only be left by killing the app.
+
+Called from the host input thread, so the loop below re-reads the flag rather
+than being signalled.
+===============
+*/
+void Posix_ConsoleRequestFatalDismiss( void ) {
+	s_androidFatalDismissRequested = true;
+}
+#endif
+
 void Posix_ConsoleFatalErrorWait( void ) {
 #ifdef ID_DEDICATED
 	// Headless servers already preserve fatal diagnostics on stderr, in the
@@ -1613,6 +1707,9 @@ void Posix_ConsoleFatalErrorWait( void ) {
 		return;
 	}
 
+#if defined( __ANDROID__ )
+	s_androidFatalConsoleActive = true;
+#endif
 	s_consoleWindow.forceFatalWindow = true;
 	// An earlier transient console-window failure must not permanently
 	// suppress the forced fatal-error window; give it one fresh attempt.
@@ -1627,7 +1724,13 @@ void Posix_ConsoleFatalErrorWait( void ) {
 		return;
 	}
 
-	while ( !s_consoleWindow.exitRequested ) {
+	while ( !s_consoleWindow.exitRequested
+#if defined( __ANDROID__ )
+			// A tap or the back key ends the wait; Posix_Exit below then takes
+			// the process down and the host activity comes back to the front.
+			&& !s_androidFatalDismissRequested
+#endif
+			) {
 		SDL_Event event;
 		while ( SDL_PollEvent( &event ) ) {
 			if ( event.type == SDL_EVENT_QUIT ) {

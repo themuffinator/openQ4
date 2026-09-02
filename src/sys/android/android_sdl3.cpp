@@ -103,10 +103,13 @@ int Sys_GetVideoRam( void ) {
 */
 
 #if defined( OPENQ4_SIGMATOUCH )
+// Mirrors touchscreemode_t in Clibs_OpenTouch/game_interface.h.
+enum { TS_BLANK = 0, TS_MENU = 1, TS_GAME = 2, TS_MAP = 3, TS_CONSOLE = 4 };
+
 static bool touchKeysDown[K_LAST_KEY] = { false };
 static bool touchMouseDown[3] = { false };
 static bool touchButtonsDown[QUAKE4_BTN_COUNT] = { false };
-static std::atomic<int> touchScreenMode(1);
+static std::atomic<int> touchScreenMode(TS_MENU);
 
 extern "C" void Quake4_PostKey( int sdlScancode, int down ) {
 	const int key = SDL3_MapScancode( (SDL_Scancode)sdlScancode );
@@ -230,14 +233,22 @@ extern "C" void Quake4_PostCommand( const char *cmd ) {
 
 /*
 ====================
-Quake4_GetScreenMode
+Quake4_FatalConsoleActive / Quake4_FatalConsoleDismiss
 
-Mirrors touchscreemode_t in Clibs_OpenTouch/game_interface.h.
+The host input thread has no other way to reach the fatal-error wait: the touch
+overlay queues into a ring buffer that only Sys_SDL_PumpEvents drains, and that
+is not running once Sys_Error has taken over.
 ====================
 */
-extern "C" void Quake4_UpdateTouchScreenMode( void ) {
-	enum { TS_BLANK = 0, TS_MENU = 1, TS_GAME = 2, TS_MAP = 3, TS_CONSOLE = 4 };
+extern "C" int Quake4_FatalConsoleActive( void ) {
+	return Posix_ConsoleFatalErrorActive() ? 1 : 0;
+}
 
+extern "C" void Quake4_FatalConsoleDismiss( void ) {
+	Posix_ConsoleRequestFatalDismiss();
+}
+
+extern "C" void Quake4_UpdateTouchScreenMode( void ) {
 	if ( console != NULL && console->Active() ) {
 		touchScreenMode.store(TS_CONSOLE);
 		return;
@@ -252,6 +263,21 @@ extern "C" void Quake4_UpdateTouchScreenMode( void ) {
 }
 
 extern "C" int Quake4_GetScreenMode( void ) {
+	// Read here rather than in the update above: the fatal path has taken over
+	// from the event pump, so the published mode would never change again.
+	//
+	// The fatal-error console owns the screen and the process is on its way
+	// out, so no game or menu pad means anything from here. TS_BLANK is the
+	// overlay's own empty set -- one full-screen invisible button that sends
+	// enter -- so the error text stays readable and a tap still dismisses it.
+	//
+	// Any other mode draws real controls, and they are drawn with GL state set
+	// up for the game window the fatal path has just hidden: the pads come out
+	// opaque because nothing clears behind them, and they fight the console's
+	// own render loop for the surface, which is the flicker.
+	if ( Posix_ConsoleFatalErrorActive() ) {
+		return TS_BLANK;
+	}
 	return touchScreenMode.load();
 }
 

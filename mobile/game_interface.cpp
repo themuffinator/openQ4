@@ -186,6 +186,18 @@ static void clearPendingInput()
     memset(heldButtonSources, 0, sizeof(heldButtonSources));
 }
 
+// While the fatal-error console is up nothing drains the queue, so an event put
+// there is lost. Any input at all -- a screen tap through the blank control set,
+// or the back key -- means the player is done reading, so end the wait instead
+// of queueing. Sys_Error then exits the process and the host activity returns.
+static bool dismissedFatalConsole()
+{
+    if (!Quake4_FatalConsoleActive())
+        return false;
+    Quake4_FatalConsoleDismiss();
+    return true;
+}
+
 extern "C" void Quake4_ClearTouchInput(void)
 {
     std::lock_guard<std::mutex> lock(inputMutex);
@@ -220,12 +232,16 @@ static void queueEventLocked(int type, int a, int b, const char *command = NULL)
 
 static void queueEvent(int type, int a, int b, const char *command = NULL)
 {
+    if (dismissedFatalConsole())
+        return;
     std::lock_guard<std::mutex> lock(inputMutex);
     queueEventLocked(type, a, b, command);
 }
 
 static void queueButton(int button, unsigned int source, int down)
 {
+    if (dismissedFatalConsole())
+        return;
     std::lock_guard<std::mutex> lock(inputMutex);
     const unsigned int before = heldButtonSources[button];
     const unsigned int after = down ? before | source : before & ~source;
