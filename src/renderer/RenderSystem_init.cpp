@@ -62,6 +62,9 @@ If you have questions concerning this license or the applicable additional terms
 #include "ModernShadowPlanner.h"
 #include "../framework/RenderDoc.h"
 #include "../framework/declEntityDef.h"
+#if defined(__APPLE__)
+#include <execinfo.h>
+#endif
 
 // Detect the Microsoft software OpenGL wrapper and guide the user toward
 // installing proper vendor drivers.
@@ -2049,6 +2052,17 @@ void GL_CheckErrors( void ) {
 
 		if ( !r_ignoreGLErrors.GetBool() ) {
 			common->Printf( "GL_CheckErrors: %s\n", s );
+#if defined(__APPLE__)
+			void *frames[8];
+			const int frameCount = backtrace( frames, 8 );
+			char **symbols = backtrace_symbols( frames, frameCount );
+			if ( symbols != NULL ) {
+				for ( int frame = 0; frame < frameCount; ++frame ) {
+					common->Printf( "  %s\n", symbols[frame] );
+				}
+				free( symbols );
+			}
+#endif
 		}
 	}
 }

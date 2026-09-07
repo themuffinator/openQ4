@@ -925,7 +925,8 @@ static bool R_BindTextureToUnit( int texUnit, GLenum target, GLuint texture ) {
 		return true;
 	}
 
-	if ( GLEW_EXT_direct_state_access && glBindMultiTextureEXT != NULL ) {
+	// Experimental loaders can expose entry points absent from this context.
+	if ( GLCapabilityProbe_HasExtension( "GL_EXT_direct_state_access" ) && glBindMultiTextureEXT != NULL ) {
 		glBindMultiTextureEXT( GL_TEXTURE0_ARB + texUnit, target, texture );
 		return true;
 	}
