@@ -16,6 +16,7 @@ SUPPORT = r'''
 #include <cctype>
 #include <cstdarg>
 #include <cstdio>
+#include <cstdint>
 #include <map>
 #include <string>
 #include <vector>
