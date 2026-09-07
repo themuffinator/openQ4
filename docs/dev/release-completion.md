@@ -1,6 +1,6 @@
 # openQ4 Release Completion List
 
-- [ ] Release CI exposed existing Apple GL 2.1 startup errors from unsupported texture swizzles, multisample textures and eager SMAA shader validation. Resource creation now checks the context's advertised capabilities and SMAA checks its backend before material compilation. Awaiting the hosted macOS runtime rerun.
+- [ ] Release CI exposed existing Apple GL 2.1 startup errors from unsupported texture swizzles, multisample textures, eager SMAA shader validation and GPU timestamp queries. Resource creation and direct texture binding now check the context's advertised capabilities, SMAA checks its backend before material compilation, and GPU timing distinguishes EXT elapsed queries from ARB/core timestamp support. The production timestamp capability regression passes on Windows and Linux. Awaiting the hosted macOS runtime rerun.
 
 - [x] The 0.13.0 integration pass wires the new source contracts into local and CI validation, includes syntax checks for gameplay drivers, synchronizes the shared memory-file header, and pins both repositories' CI inputs. Windows build/staging, 12 native tests, all 54 competitive contracts and OpenGL/Vulkan chat gameplay checks pass. Stock `q4dm1` still logs missing AAS sizes, the optional `mp_buying_givecash` sound and non-precached declarations during these no-bot chat checks; those content diagnostics remain outside this release-tooling change.
 

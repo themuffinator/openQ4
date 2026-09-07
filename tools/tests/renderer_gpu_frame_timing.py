@@ -5,8 +5,10 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
+import tempfile
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -52,6 +54,50 @@ def current_branch(repository: Path) -> str | None:
     )
     branch = result.stdout.strip()
     return branch if result.returncode == 0 and branch else None
+
+
+def validate_gl_timestamp_support(metrics: str) -> None:
+    support = function_body(metrics, "static bool R_RendererMetrics_GlTimestampQueriesSupported(")
+    available = function_body(metrics, "static bool R_RendererMetrics_GlFullFrameTimingAvailable(")
+    harness = r'''
+#include <cassert>
+#include <cstddef>
+#include <cstring>
+struct { struct { bool hasTimerQuery = true; float glVersion = 2.1f; } backendCaps; } glConfig;
+bool arbTimer = false;
+bool GLCapabilityProbe_HasExtension(const char *name) {
+    return !std::strcmp(name, "GL_EXT_timer_query") ||
+        (!std::strcmp(name, "GL_ARB_timer_query") && arbTimer);
+}
+void stub() {}
+auto glGenQueries = &stub, glDeleteQueries = &stub, glQueryCounter = &stub;
+auto glGetQueryObjectiv = &stub, glGetQueryObjectui64v = &stub;
+'''
+    harness += "bool R_RendererMetrics_GlTimestampQueriesSupported() {" + support + "}\n"
+    harness += "bool R_RendererMetrics_GlFullFrameTimingAvailable() {" + available + "}\n"
+    harness += r'''
+int main() {
+    // Apple GL 2.1: EXT elapsed queries and exported symbols do not imply timestamps.
+    assert(!R_RendererMetrics_GlFullFrameTimingAvailable());
+    arbTimer = true;
+    assert(R_RendererMetrics_GlFullFrameTimingAvailable());
+    arbTimer = false; glConfig.backendCaps.glVersion = 3.3f;
+    assert(R_RendererMetrics_GlFullFrameTimingAvailable());
+    glConfig.backendCaps.hasTimerQuery = false;
+    assert(!R_RendererMetrics_GlFullFrameTimingAvailable());
+    glConfig.backendCaps.hasTimerQuery = true; glQueryCounter = nullptr;
+    assert(!R_RendererMetrics_GlFullFrameTimingAvailable());
+}
+'''
+    compiler = next((p for name in ("clang++", "g++", "c++") if (p := shutil.which(name))), None)
+    if compiler is None:
+        raise RuntimeError("a C++ compiler is required for the GPU timestamp contract")
+    (ROOT / ".tmp").mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="gpu-timestamp-", dir=ROOT / ".tmp") as directory:
+        source, binary = Path(directory) / "timestamp.cpp", Path(directory) / "timestamp.exe"
+        source.write_text(harness, encoding="utf-8")
+        subprocess.run([compiler, "-std=c++17", str(source), "-o", str(binary)], check=True)
+        subprocess.run([str(binary)], check=True)
 
 
 def main() -> int:
@@ -164,6 +210,7 @@ def main() -> int:
         raise AssertionError("CPU frame timing must have exactly one BeginFrame anchor")
 
     metrics = read(RENDERER / "RendererMetrics.cpp")
+    validate_gl_timestamp_support(metrics)
     gl_poll = function_body(metrics, "static bool R_RendererMetrics_PollGlFullFrameTiming(")
     availability = gl_poll.find("GL_QUERY_RESULT_AVAILABLE")
     result_read = gl_poll.find("glGetQueryObjectui64v")

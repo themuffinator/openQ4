@@ -864,6 +864,14 @@ static const char *R_RendererMetrics_FormatGpuMsec( const rendererMetricsFrame_t
 }
 
 #ifndef OPENQ4_RENDERER_VK_MODULE
+static bool R_RendererMetrics_GlTimestampQueriesSupported( void ) {
+	// EXT_timer_query only provides elapsed queries. Timestamp pairs require
+	// OpenGL 3.3 or ARB_timer_query, regardless of exported loader functions.
+	return glConfig.backendCaps.hasTimerQuery &&
+		( glConfig.backendCaps.glVersion >= 3.3f ||
+			GLCapabilityProbe_HasExtension( "GL_ARB_timer_query" ) );
+}
+
 static void R_RendererMetrics_PollGpuTimerFrame( rendererGpuTimerFrame_t &frame ) {
 	if ( frame.numQueries <= 0 ) {
 		return;
@@ -897,8 +905,10 @@ static void R_RendererMetrics_PollGpuTimerFrame( rendererGpuTimerFrame_t &frame 
 		}
 
 		GLuint64 elapsedNsec = 0;
-		if ( glGetQueryObjectui64v != NULL ) {
+		if ( R_RendererMetrics_GlTimestampQueriesSupported() && glGetQueryObjectui64v != NULL ) {
 			glGetQueryObjectui64v( query.id, GL_QUERY_RESULT, &elapsedNsec );
+		} else if ( GLCapabilityProbe_HasExtension( "GL_EXT_timer_query" ) && glGetQueryObjectui64vEXT != NULL ) {
+			glGetQueryObjectui64vEXT( query.id, GL_QUERY_RESULT, &elapsedNsec );
 		} else {
 			GLuint elapsedNsec32 = 0;
 			glGetQueryObjectuiv( query.id, GL_QUERY_RESULT, &elapsedNsec32 );
@@ -915,7 +925,7 @@ static void R_RendererMetrics_PollGpuTimerFrame( rendererGpuTimerFrame_t &frame 
 }
 
 static bool R_RendererMetrics_GlFullFrameTimingAvailable( void ) {
-	return glConfig.backendCaps.hasTimerQuery &&
+	return R_RendererMetrics_GlTimestampQueriesSupported() &&
 		glGenQueries != NULL &&
 		glDeleteQueries != NULL &&
 		glQueryCounter != NULL &&
