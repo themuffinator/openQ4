@@ -1,5 +1,7 @@
 # openQ4 Release Completion List
 
+- [ ] Release CI exposed existing Apple GL 2.1 startup errors from unsupported texture swizzles, multisample textures and eager SMAA shader validation. Resource creation now checks the context's advertised capabilities and SMAA checks its backend before material compilation. Awaiting the hosted macOS runtime rerun.
+
 - [x] The 0.13.0 integration pass wires the new source contracts into local and CI validation, includes syntax checks for gameplay drivers, synchronizes the shared memory-file header, and pins both repositories' CI inputs. Windows build/staging, 12 native tests, all 54 competitive contracts and OpenGL/Vulkan chat gameplay checks pass. Stock `q4dm1` still logs missing AAS sizes, the optional `mp_buying_givecash` sound and non-precached declarations during these no-bot chat checks; those content diagnostics remain outside this release-tooling change.
 
 - [x] Manual release publication resolves both drafts and published releases through the draft-aware GitHub CLI lookup and sends typed boolean publication flags. Draft promotion no longer depends on a published tag existing before publication; the Discord job still waits for successful publication.

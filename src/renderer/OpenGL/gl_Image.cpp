@@ -194,6 +194,11 @@ void idImage::SetTexParameters() {
 
 	// ALPHA, LUMINANCE, LUMINANCE_ALPHA, and INTENSITY have been removed
 	// in OpenGL 3.2. In order to mimic those modes, we use the swizzle operators
+	// Exported GL entry points do not imply that a legacy context supports
+	// texture swizzles. Unsupported contexts retain their native channel maps.
+	if ( glConfig.backendCaps.glVersion >= 3.3f ||
+		GLCapabilityProbe_HasExtension( "GL_ARB_texture_swizzle" ) ||
+		GLCapabilityProbe_HasExtension( "GL_EXT_texture_swizzle" ) ) {
 #if defined( USE_CORE_PROFILE )
 	if ( opts.colorFormat == CFM_GREEN_ALPHA ) {
 		glTexParameteri( target, GL_TEXTURE_SWIZZLE_R, GL_ONE );
@@ -249,6 +254,7 @@ void idImage::SetTexParameters() {
 		glTexParameteri( target, GL_TEXTURE_SWIZZLE_A, GL_RED );
 	}
 #endif
+	}
 
 	const bool hasMipChain = opts.numLevels > 1;
 
@@ -487,7 +493,8 @@ void idImage::AllocImage() {
 	int uploadTarget;
 	bool wantsMSAA = ( opts.textureType == TT_2D && opts.numMSAASamples > 0 );
 	if ( wantsMSAA ) {
-		if ( !( GLEW_ARB_texture_multisample || GLEW_VERSION_3_2 ) ) {
+		if ( glTexImage2DMultisample == NULL || !( glConfig.backendCaps.glVersion >= 3.2f ||
+			GLCapabilityProbe_HasExtension( "GL_ARB_texture_multisample" ) ) ) {
 			common->Warning( "MSAA textures not supported, disabling for %s", GetName() );
 			opts.numMSAASamples = 0;
 			wantsMSAA = false;

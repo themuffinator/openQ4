@@ -2195,6 +2195,11 @@ static bool R_ValidateSMAALookupImage( const idImage *image, const char *imageNa
 }
 
 bool idRenderSystemLocal::ValidateSMAALookupTextures( void ) {
+#ifndef OPENQ4_RENDERER_VK_MODULE
+	if ( !glConfig.GLSLProgramAvailable || !glConfig.GLSL130Available ) {
+		return false;
+	}
+#endif
 	const idImage *areaImage = globalImages->GetImage( "_smaaArea" );
 	const idImage *searchImage = globalImages->GetImage( "_smaaSearch" );
 
