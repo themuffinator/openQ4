@@ -644,9 +644,29 @@ def validate_validation_wiring() -> None:
     if 'os.environ.get("OPENQ4_GAMELIBS_REPO"' not in settings_coverage:
         raise AssertionError("settings menu coverage ignores the configured GameLibs repository")
 
-    # Runtime drivers that need a built target package or retail assets; their
-    # static contracts are wired into lightweight local validation instead.
+    # Runtime drivers need a built target package or retail assets. Helpers are
+    # exercised by their native harnesses or runtime callers. Keep both out of
+    # the argument-free lightweight suite; CI still checks their syntax.
     smoke_wiring_allowlist = {
+        "chat_gameplay_smoke.py",
+        "mp_browser_smoke.py",
+        "mp_control_smoke.py",
+        "mp_duel_queue_smoke.py",
+        "mp_match_flow_smoke.py",
+        "mp_mvd_smoke.py",
+        "mp_pause_lifecycle_smoke.py",
+        "mp_pause_world_smoke.py",
+        "mp_recording_ownership_smoke.py",
+        "mp_roster_smoke.py",
+        "mp_round_remote_smoke.py",
+        "mp_series_smoke.py",
+        "mp_tourney_smoke.py",
+        "renderer_shadow_mapping_maps.py",
+        "renderer_shadow_mapping_movers.py",
+        "renderer_shadow_mapping_scenes.py",
+        "renderer_shadow_mapping_transitions.py",
+        "generate_file_memory_test.py",
+        "mp_view_decoder.py",
         "linux_dedicated_server_smoke.py",
         "linux_dedicated_stock_map_smoke.py",
         "linux_wayland_stock_sp_smoke.py",

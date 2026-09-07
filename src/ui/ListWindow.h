@@ -93,6 +93,7 @@ private:
 	idStr				listName;
 
 	int					clickTime;
+	int					clickRow;
 
 	int					typedTime;
 	idStr				typed;

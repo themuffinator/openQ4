@@ -2997,7 +2997,75 @@ bool RendererShadowPlanner_RunSelfTest( void ) {
 	return true;
 }
 
+static bool R_ShadowMapPointFaceBoundsSelfTest( void ) {
+	viewLight_t light;
+	memset( &light, 0, sizeof( light ) );
+	const idVec3 minimum( -6.0f, -3.0f, -1.0f );
+	const idVec3 maximum( 6.0f, 3.0f, 1.0f );
+	int rejected = 0;
+	for ( int sample = 0; sample < 160; ++sample ) {
+		float matrix[16] = { 0 };
+		matrix[15] = 1.0f;
+		// Rotated, mirrored, scaled, and sheared bounds, including singular
+		// transforms and casters that straddle cube seams or enclose the light.
+		const float angle = sample * 0.37f;
+		matrix[0] = idMath::Cos( angle ) * ( ( sample % 7 ) - 3 );
+		matrix[1] = idMath::Sin( angle ) * ( ( sample % 7 ) - 3 );
+		matrix[4] = -idMath::Sin( angle ) * 2.0f + 0.4f;
+		matrix[5] = idMath::Cos( angle ) * 2.0f;
+		matrix[8] = 0.75f;
+		matrix[10] = ( sample % 5 ) - 2.0f;
+		matrix[12] = ( ( sample * 17 ) % 101 ) - 50.0f;
+		matrix[13] = ( ( sample * 29 ) % 103 ) - 51.0f;
+		matrix[14] = ( ( sample * 37 ) % 107 ) - 53.0f;
+		for ( int face = 0; face < 6; ++face ) {
+			if ( !R_ShadowMapCasterOutsidePointFace( &light, matrix,
+					minimum.ToFloatPtr(), maximum.ToFloatPtr(), face ) ) {
+				continue;
+			}
+			++rejected;
+			const int axis = face >> 1;
+			const float sign = ( face & 1 ) ? -1.0f : 1.0f;
+			bool separatingPlane = false;
+			// Independent reference: transform all eight corners, then require
+			// a single face plane to exclude every corner of the convex box.
+			for ( int plane = 0; plane < 4; ++plane ) {
+				const int other = ( axis + 1 + ( plane >> 1 ) ) % 3;
+				const float side = ( plane & 1 ) ? -1.0f : 1.0f;
+				bool allOutside = true;
+				for ( int corner = 0; corner < 8; ++corner ) {
+					idVec3 local, world;
+					for ( int component = 0; component < 3; ++component ) {
+						local[component] = ( corner & ( 1 << component ) ) ? maximum[component] : minimum[component];
+					}
+					R_LocalPointToGlobal( matrix, local, world );
+					allOutside &= sign * world[axis] + side * world[other] < 0.0f;
+				}
+				separatingPlane |= allOutside;
+			}
+			if ( !separatingPlane ) {
+				common->Printf( "Point-face bounds self-test FAILED sample=%d face=%d\n", sample, face );
+				return false;
+			}
+		}
+	}
+	float identity[16] = { 0 };
+	identity[0] = identity[5] = identity[10] = identity[15] = 1.0f;
+	for ( int face = 0; face < 6; ++face ) {
+		if ( R_ShadowMapCasterOutsidePointFace( &light, identity, minimum.ToFloatPtr(), maximum.ToFloatPtr(), face ) ||
+				R_ShadowMapCasterOutsidePointFace( &light, identity, maximum.ToFloatPtr(), minimum.ToFloatPtr(), face ) ) {
+			return false;
+		}
+	}
+	common->Printf( "Point-face bounds self-test %s: 960 affine cases, %d conservative rejections\n",
+		rejected > 0 ? "passed" : "FAILED", rejected );
+	return rejected > 0;
+}
+
 bool RendererShadowProjectedDiagnostic_RunSelfTest( void ) {
+	if ( !R_ShadowMapPointFaceBoundsSelfTest() ) {
+		return false;
+	}
 	// pure-math stabilization pins run regardless of planner availability
 	if ( !R_ShadowMapCascadeStabilitySelfTest() ) {
 		common->Printf( "RendererShadowProjectedDiagnostic self-test failed (cascade stability)\n" );

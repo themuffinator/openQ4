@@ -33,6 +33,8 @@ If you have questions concerning this license or the applicable additional terms
 #include "DeviceContext.h"
 #include "Window.h"
 #include "UserInterfaceLocal.h"
+#include "ChatWindow.h"
+#include "SimpleWindow.h"
 #include "../framework/Session.h"
 
 extern idCVar r_skipGuiShaders;		// 1 = don't render any gui elements on surfaces
@@ -67,11 +69,14 @@ static void SetStateRectangleComponents( idUserInterfaceLocal *gui, const char *
 */
 
 void idUserInterfaceManagerLocal::Init() {
+	cmdSystem->AddCommand("chatHistory", idChatWindow::History_f, CMD_FL_SYSTEM, "browse open chat: up, down, top, bottom, status");
 	screenRect = idRectangle(0, 0, 640, 480);
 	dc.Init();
 }
 
 void idUserInterfaceManagerLocal::Shutdown() {
+	cmdSystem->RemoveCommand("chatHistory");
+	idChatWindow::Reset();
 	guis.DeleteContents( true );
 	alwaysThinkGUIs.Clear();
 	demoGuis.DeleteContents( true );
@@ -313,6 +318,7 @@ void idUserInterfaceManagerLocal::RunAlwaysThinkGUIs( int time ) {
 */
 
 idUserInterfaceLocal::idUserInterfaceLocal() {
+	chatWindow = NULL;
 	cursorX = cursorY = 0.0;
 	desktop = NULL;
 	loading = false;
@@ -362,6 +368,7 @@ bool idUserInterfaceLocal::InitFromFile( const char *qpath, bool rebuild, bool c
 
 	if ( rebuild ) {
 		delete desktop;
+		chatWindow = NULL;
 		desktop = new idWindow( this );
 	} else if ( desktop == NULL ) {
 		desktop = new idWindow( this );
@@ -407,6 +414,27 @@ bool idUserInterfaceLocal::InitFromFile( const char *qpath, bool rebuild, bool c
 		common->Warning( "Couldn't load gui: '%s'", qpath );
 	}
 
+	// Replace only the two stock chat surfaces. Installing the native control
+	// here also supports retail PK4 GUIs without shipping replacement GUI art
+	// or depending on openQ4's optional HUD scripts.
+	const bool chatInput = !idStr::Icmp(qpath, "guis/mpmsgmode.gui");
+	const bool chatHud = !idStr::Icmp(qpath, "guis/mphud.gui");
+	if ((chatInput || chatHud) && chatWindow == NULL) {
+		drawWin_t *legacy = desktop->FindChildByName(chatInput ? "MainWindow" : "p_history");
+		if (legacy != NULL) {
+			idWinVar *visibility = legacy->win != NULL ? legacy->win->GetWinVarByName("visible") : legacy->simp->GetWinVarByName("visible");
+			if (visibility != NULL) { visibility->Set("0"); visibility->SetEval(false); }
+		}
+		chatWindow = new idChatWindow(&uiManagerLocal.dc, this, chatInput);
+		desktop->InsertChild(chatWindow, NULL);
+		chatWindow->SetParent(desktop);
+		chatWindow->FixupParms();
+		if (chatInput && active) {
+			idStr ignored;
+			chatWindow->Activate(true, ignored);
+			desktop->SetFocus(chatWindow, false);
+		}
+	}
 	interactive = desktop->Interactive();
 
 	if ( uiManagerLocal.guis.Find( this ) == NULL ) {
@@ -424,6 +452,11 @@ bool idUserInterfaceLocal::InitFromFile( const char *qpath, bool rebuild, bool c
 const char *idUserInterfaceLocal::HandleEvent( const sysEvent_t *event, int _time, bool *updateVisuals ) {
 
 	time = _time;
+
+	const bool controllerKey = event->evType == SE_KEY && event->evValue >= K_JOY1 && event->evValue <= K_JOY32;
+	if (chatWindow != NULL && chatWindow->IsInput() && active && !controllerKey) {
+		return chatWindow->HandleEvent(event, updateVisuals);
+	}
 
 	if ( bindHandler && event->evType == SE_KEY && event->evValue2 == 1 ) {
 		const char *ret = bindHandler->HandleEvent( event, updateVisuals );
@@ -614,6 +647,9 @@ const char *idUserInterfaceLocal::Activate(bool activate, int _time) {
 	if ( desktop ) {
 		activateStr = "";
 		desktop->Activate( activate, activateStr );
+		if (activate && chatWindow != NULL && chatWindow->IsInput()) {
+			desktop->SetFocus(chatWindow, false);
+		}
 		return activateStr;
 	}
 	return "";

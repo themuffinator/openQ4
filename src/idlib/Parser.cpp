@@ -1012,8 +1012,7 @@ static bool Parser_StripPackArchivePrefix( idStr& path ) {
 		return true;
 	}
 
-	// The caller strips the current filename first. A file at the archive root
-	// therefore leaves a base ending in just "pak-name.pk4", without a slash.
+	// An archive-root base can end in just "pak-name.pk4", without a slash.
 	const int pakSuffixPos = path.Length() - 4;
 	if ( pakSuffixPos >= 0 && idStr::Icmp( path.c_str() + pakSuffixPos, ".pk4" ) == 0 ) {
 		path.Clear();
@@ -1082,8 +1081,10 @@ int idParser::Directive_include( void ) {
 		// the lexer reports an OS or pk4-backed filename.
 		idStr relBase = scriptstack->GetFileName();
 		relBase.BackSlashesToSlashes();
-		relBase.StripFilename();
+		// Convert the complete filename first: an empty relative directory is
+		// the valid VFS root, but an empty OS-path conversion also means failure.
 		Parser_NormalizeIncludeBase( relBase );
+		relBase.StripFilename();
 		relBase.StripTrailing( '/' );
 
 		idStr tokenStr = token.c_str();

@@ -169,6 +169,7 @@ COMMANDS = (
     | (set(COMMAND_TO_CANONICAL) - set(CONFIRMED_COMMANDS))
     | ARMED_COMMANDS
     | {"confirm", "cancel_confirm"}
+    | {"follow_prev", "follow_next", "follow_free"}
 )
 DESCRIPTOR_RE = re.compile(
     r'\{\s*(?P<opcode>MP_MATCH_OP_[A-Z0-9_]+),\s*'
@@ -472,6 +473,16 @@ def main() -> None:
         )
 
     require(match_gui, "windowDef p_matchcontrol", "Match Control fragment")
+    require(match_gui, 'visible\t( "gui::match_follow_visible" == 1 )', "spectator camera row")
+    for direction, x in (("prev", 202), ("next", 322), ("free", 442)):
+        require(match_gui, f"windowDef match_follow_{direction}_button", "camera button")
+        require(match_gui, f'rect\t{x},344,116,24', "camera button layout")
+        require(match_gui, f'"matchControl follow_{direction}"', "fixed camera command")
+    for language in (*LANGUAGES, "polish_openq4.lang", "russian_openq4.lang"):
+        table = parse_language(STRINGS_ROOT / language)
+        for identifier in range(42885, 42889):
+            if not table.get(f"#str_{identifier}", "").strip():
+                raise AssertionError(f"{language} lacks spectator camera localization {identifier}")
     require(match_gui, 'password\t1', "credential input")
     require(match_gui, 'maxchars\t64', "bounded credential input")
     require(match_gui, 'values\t"1;2;3;4"', "bounded roster roles")

@@ -1780,6 +1780,10 @@ void idAsyncClient::ProcessInfoResponseMessage( const netadr_t from, const idBit
 		serverInfo.clients++;
 	}
 	serverInfo.OSMask = msg.ReadLong();
+	if ( msg.IsReadOverflowed() ) {
+		common->DPrintf( "server %s ignored - truncated info response\n", Sys_NetAdrToString( from ) );
+		return;
+	}
 	index = serverList.InfoResponse( serverInfo );
 
 	common->Printf( "%d: server %s - protocol %d.%d - %s\n", index, Sys_NetAdrToString( serverInfo.adr ), protocol >> 16, protocol & 0xffff, serverInfo.serverInfo.GetString( "si_name" ) );
@@ -2482,6 +2486,10 @@ void idAsyncClient::RunFrame( bool allowBlocking ) {
 		cvarSystem->ClearModifiedFlags( CVAR_USERINFO );
 	}
 
+	// Quake 4 services client work once per presentation frame, including
+	// reliable referee challenges and UI updates, even without a prediction tic.
+	game->ClientRun();
+
 	if ( gameTimeResidual + clientPredictTime >= AsyncClient_NextGameFrameMsec( gameFrame ) ) {
 		lastFrameDelta = 0;
 	}
@@ -2521,6 +2529,7 @@ void idAsyncClient::RunFrame( bool allowBlocking ) {
 			snapshotGameTime = snapshotGameFrame * common->GetUserCmdMSec();
 		}
 	}
+	game->ClientEndFrame();
 }
 
 /*

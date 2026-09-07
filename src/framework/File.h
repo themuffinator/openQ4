@@ -181,9 +181,9 @@ public:
 
 							// changes memory file to read only
 	virtual void			MakeReadOnly( void );
-							// clear the file
+							// clear the file; freeMemory releases owned storage and detaches borrowed storage
 	virtual void			Clear( bool freeMemory = true );
-							// set data for reading
+							// set data for reading; releases old owned storage unless data is a slice of it
 	void					SetData( const char *data, int length );
 							// returns const pointer to the memory buffer
 	virtual const char *	GetDataPtr( void ) const { return filePtr; }

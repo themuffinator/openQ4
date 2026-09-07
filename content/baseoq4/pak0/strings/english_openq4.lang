@@ -3,6 +3,22 @@
 //
 
 {
+	"#str_42873"	"Last result: %s"
+	"#str_42870"	"Match aborted"
+	"#str_42871"	"Draw"
+	"#str_42872"	"Result pending"
+	"#str_42880"	"Usage: follow <next|prev|free|client slot>"
+	"#str_42881"	"Spectate a live match before using follow controls."
+	"#str_42882"	"That player is no longer available to follow."
+	"#str_42883"	"No players are available to follow under the current spectator rules."
+	"#str_42884"	"Free camera enabled."
+	"#str_42885"	"Previous"
+	"#str_42886"	"Next"
+	"#str_42887"	"Free camera"
+	"#str_42888"	"Cycle permitted players or use a free camera. Console: follow <slot> selects a player."
+	"#str_42860"	"DeadZone"
+	"#str_42861"	"Showing %d out of %d servers"
+	"#str_42682"	"Not enough active players."
 	"#str_41081"	"ADVANCED RENDERING"
 	"#str_41082"	"Bloom"
 	"#str_41083"	"Bloom Intensity"
@@ -465,7 +481,9 @@
 	"#str_41609"	"Percentage of eligible participants who must be ready before the countdown can begin."
 	"#str_41610"	"Bots Can Ready"
 	"#str_41611"	"Allows bots to count toward the readiness requirement."
-	"#str_41612"	"Minimum Active Players"
+	"#str_41612"	"Minimum Active Humans"
+	"#str_42680"	"Minimum Active Players"
+	"#str_42681"	"Minimum number of active players, including bots, required before the countdown can begin."
 	"#str_41613"	"Minimum number of human players required before the countdown can begin."
 	"#str_41614"	"Minimum Team Size"
 	"#str_41615"	"Minimum number of active players required on each team."
@@ -926,4 +944,10 @@
 
 	"#str_42820"	"Preload Light Grids"
 	"#str_42821"	"Smoother area changes; longer loads, more video memory.\nApplies next map load."
+
+	"#str_42830"	"All:"
+	"#str_42831"	"Team:"
+	"#str_42832"	"Tab: channel | PgUp/PgDn: history"
+	"#str_42833"	"History | Ctrl+End: latest"
+	"#str_42834"	"PgUp/PgDn: history | Up/Down: recall"
 }

@@ -1791,8 +1791,9 @@ VkPipeline VK_Exec_CasterPipeline( void ) {
 }
 
 // depth-only point cube-face caster (Phase F2b): same shape as the atlas
-// caster, radial-depth shaders; depth clamp is restricted to this pipeline
-// and remains off when the optional device feature was unavailable
+// caster, radial-depth shaders. Retain near clipping to avoid false radial
+// depths from triangles crossing a cube face's origin. The point projection
+// uses a tiny positive near plane independent of the radial depth precision.
 VkPipeline VK_Exec_PointCasterPipeline( void ) {
 	if ( vkExec.pointCasterPipeline != VK_NULL_HANDLE ) {
 		return vkExec.pointCasterPipeline;
@@ -1812,7 +1813,7 @@ VkPipeline VK_Exec_PointCasterPipeline( void ) {
 	target.stencilFormat = vkCtx.shadowDepthHasStencil ? vkCtx.shadowDepthFormat : VK_FORMAT_UNDEFINED;
 	target.samples = VK_SAMPLE_COUNT_1_BIT;
 	vkExec.pointCasterPipeline = VK_Exec_CreatePipeline( vkExec.pointCasterVertModule, vkExec.pointCasterFragModule,
-			&vertexInput, 0, vkExec.pipelineLayout, true, false, target, vkCtx.depthClampSupported );
+			&vertexInput, 0, vkExec.pipelineLayout, true, false, target );
 	return vkExec.pointCasterPipeline;
 }
 

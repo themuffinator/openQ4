@@ -972,8 +972,10 @@ Invoke-Meson -MesonArgs $effectiveArgs -VsDevCmdPath $vsDevCmd -MesonCommand $me
 $exitCode = [int]$LASTEXITCODE
 
 if ($commandName -eq "install" -and $exitCode -ne 0 -and $env:OPENQ4_INSTALL_RETRY_ON_FAILURE -ne "0") {
-    Write-Host "Meson install failed; retrying once after ensuring openQ4 processes are stopped..."
-    Stop-openQ4RuntimeProcesses | Out-Null
+    Write-Host "Meson install failed; retrying once..."
+    if ($env:OPENQ4_INSTALL_CLOSE_RUNNING -ne "0") {
+        Stop-openQ4RuntimeProcesses | Out-Null
+    }
     Start-Sleep -Milliseconds 500
     Invoke-Meson -MesonArgs $effectiveArgs -VsDevCmdPath $vsDevCmd -MesonCommand $mesonCommand -VsTargetArch $vsTargetArch -VsHostArch $vsHostArch
     $exitCode = [int]$LASTEXITCODE

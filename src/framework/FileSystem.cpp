@@ -7798,6 +7798,7 @@ idFileSystemLocal::FindFile
 	}
 	if ( !pak ) {
 		// found in FS, not even in paks
+		delete f;
 		return FIND_YES;
 	}
 	// marking addons for inclusion on reload - may need to do that even when already in the search path

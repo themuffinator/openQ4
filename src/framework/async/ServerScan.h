@@ -66,7 +66,13 @@ typedef enum {
 	SORT_PLAYERS,
 	SORT_GAMETYPE,
 	SORT_MAP,
-	SORT_GAME
+	SORT_GAME,
+	SORT_FAVORITE,
+	SORT_PASSWORD,
+	SORT_DEDICATED,
+	SORT_PUNKBUSTER,
+	SORT_REPEATER,
+	SORT_NONE
 } serverSort_t;
 
 class idServerScan : public idList<networkServer_t> {
@@ -111,6 +117,12 @@ public:
 	void				GUIConfig( idUserInterface *pGUI, const char *name );
 						// update the GUI fields with information about the currently selected server
 	void				GUIUpdateSelected( void );
+	void				GUIInit();
+	bool				GetSelectedAddress( idStr &address );
+	void				ToggleFavorite();
+	void				AddFavoriteServers();
+	void				UpdateFilterByMod( int direction );
+	void				ResetSorting();
 
 	void				Shutdown( );
 
@@ -153,6 +165,8 @@ private:
 	idList<int>			m_sortedServers;	// use ascending for the walking order
 
 	idStr				screenshot;
+	idStrList			favorites;
+	bool				favoritesLoaded;
 	int					challenge;			// challenge for current scan
 	
 	int					endWaitTime;		// when to stop waiting on a port init
@@ -163,6 +177,9 @@ private:
 	void				EmitGetInfo( netadr_t &serv );
 	void				GUIAdd( int id, const networkServer_t server );
 	bool				IsFiltered( const networkServer_t server );
+	void				UpdateBrowserStatus();
+	void				LoadFavorites();
+	bool				IsFavorite( const netadr_t &address ) const;
 
 	static int			Cmp( const int *a, const int *b );
 };

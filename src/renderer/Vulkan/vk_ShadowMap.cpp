@@ -26,11 +26,10 @@
 	  samplerCubeShadow LINEAR/LEQUAL compare and raw-depth sampling. Native
 	  depth replaces the obsolete packed-color fallback.
 	- Projected tiles use negative-height viewports for GL winding parity.
-	  Point faces use positive-height viewports/CLOCKWISE front. When device
-	  depth clamp is available, the caster pipeline and point near-plane
-	  policy use it; otherwise point near distance retains the 4-unit cap.
-	  The conservative point-face caster cull remains intentionally skipped,
-	  so every point caster draws to all six faces.
+	  Point faces use positive-height viewports/CLOCKWISE front and a small
+	  positive near plane. Depth clipping keeps light-plane-crossing triangles
+	  away from the radial-depth interpolation singularity at the face origin.
+	  The shared conservative bounds test skips faces a caster cannot touch.
 	- RETAIL OWNERSHIP: each light prepares a LOCAL receiver map containing
 	  global static + dynamic casters and a GLOBAL receiver map containing
 	  global + local static + dynamic casters. noSelfShadow
@@ -229,15 +228,26 @@ typedef struct vkShadowMapState_s {
 	int					atlasTilesRendered;	// cascade tiles whose depth was written
 	int					atlasTilesAllocated;	// atlasDiv^2 blocks claimed
 	int					pointFacesRendered;
+	int					pointCasterFaceTests;
+	int					pointCasterFaceCulled;
 	int					numLights;
 	// The view whose PrepareViewLights produced the table below. Shared
 	// ownership can reach a view that prepared nothing (shadowMapPassCount 0),
 	// which would otherwise leave the previous view's lights readable.
 	const viewDef_t *	preparedView;
+	int					preparedFrame;
 	vkShadowLightState_t lights[ VK_SHADOW_MAX_LIGHTS ];
 } vkShadowMapState_t;
 
 static vkShadowMapState_t vkShadow;
+
+// View definitions and their lights live in the frame arena. An empty view
+// can skip preparation and later reuse the old view's address. Pointer identity
+// alone must not admit diagnostics or sampling of those recycled light records.
+static bool VK_ShadowMap_ViewPrepared( const viewDef_t *viewDef ) {
+	return viewDef != NULL && vkShadow.preparedView == viewDef
+		&& vkShadow.preparedFrame == tr.frameCount;
+}
 
 // One sealed caster record may feed both LOCAL and GLOBAL ownership maps, so
 // geometry/descriptors are retained once and referenced from both resource
@@ -443,6 +453,7 @@ static void VK_ShadowMap_ReleasePreparedLights( const bool markSticky ) {
 	}
 	vkShadow.numLights = 0;
 	vkShadow.preparedView = NULL;
+	vkShadow.preparedFrame = -1;
 	vkShadow.nextTileX = 0;
 	vkShadow.nextTileY = 0;
 	vkShadow.nextTileRowHeight = 0;
@@ -457,6 +468,8 @@ static void VK_ShadowMap_ReleasePreparedLights( const bool markSticky ) {
 	vkShadow.atlasTilesRendered = 0;
 	vkShadow.atlasTilesAllocated = 0;
 	vkShadow.pointFacesRendered = 0;
+	vkShadow.pointCasterFaceTests = 0;
+	vkShadow.pointCasterFaceCulled = 0;
 }
 
 void VK_ShadowMap_AbandonPreparedLights( void ) {
@@ -925,8 +938,7 @@ static int VK_ShadowMap_HashInt( int hash, const int value ) {
 }
 
 static int VK_ShadowMap_HashFloat( int hash, const float value ) {
-	return VK_ShadowMap_HashInt( hash,
-			idMath::Ftoi( value * 1024.0f ) );
+	return R_ShadowMapHashFloat( hash, value );
 }
 
 static int VK_ShadowMap_HashPointer( int hash, const void *pointer ) {
@@ -1000,16 +1012,11 @@ static int VK_ShadowMap_BuildPassSignatureForView(
 	hash = VK_ShadowMap_HashInt( hash,
 			static_cast<int>( classification.lightClass ) );
 	hash = VK_ShadowMap_HashInt( hash, pointLight ? 1 : 0 );
-	hash = VK_ShadowMap_HashInt( hash,
-			vLight != NULL ? vLight->shadowMapCasterCount : 0 );
-	hash = VK_ShadowMap_HashInt( hash,
-			vLight != NULL ? vLight->shadowMapAlphaCasterCount : 0 );
+	// Live caster counts do not describe the resident opaque static depth.
 	hash = VK_ShadowMap_HashInt( hash,
 			vLight != NULL ? vLight->shadowMapTranslucentCasterCount : 0 );
 	hash = VK_ShadowMap_HashInt( hash,
 			vLight != NULL ? vLight->shadowMapStaticCasterCount : 0 );
-	hash = VK_ShadowMap_HashInt( hash,
-			vLight != NULL ? vLight->shadowMapDynamicCasterCount : 0 );
 	hash = VK_ShadowMap_HashInt( hash,
 			vLight != NULL ? vLight->shadowMapCasterSignature : 0 );
 	hash = VK_ShadowMap_HashInt( hash, cascadeCount );
@@ -1049,6 +1056,10 @@ static int VK_ShadowMap_BuildPassSignatureForView(
 				r_shadowMapProjectionPad.GetFloat() );
 		hash = VK_ShadowMap_HashFloat( hash,
 				r_shadowMapTexelBiasScale.GetFloat() );
+		shadowMapProjectedLightState_t projectedState;
+		R_BuildShadowMapProjectedLightState( vLight, viewDef,
+				resourceSize, projectedState );
+		hash = R_ShadowMapProjectedStateHash( hash, projectedState );
 	}
 
 	if ( vLight != NULL ) {
@@ -1193,7 +1204,6 @@ static bool VK_ShadowMap_StaticCacheable(
 			|| dynamicsDefeatCache
 			|| vLight->shadowMapCasterCount <= 0
 			|| vLight->shadowMapStaticCasterCount <= 0
-			|| vLight->shadowMapAlphaCasterCount > 0
 			|| vLight->shadowMapTranslucentCasterCount > 0
 			|| vLight->globalTranslucentShadowMapCasters != NULL
 			|| vLight->localTranslucentShadowMapCasters != NULL ) {
@@ -1208,12 +1218,11 @@ static bool VK_ShadowMap_StaticCacheable(
 		return false;
 	}
 
-	// Vulkan does not cache composed alpha/translucent maps. View-fitted CSM
+	// Perforated surfaces are in the live dynamic chains, never resident depth.
+	// Translucent moment maps still bypass this opaque cache. View-fitted CSM
 	// reuse follows the GL gate (RB_ShadowMapStaticCacheable): a resident
-	// cascade block was fitted to the camera it was rendered from, and
-	// AllocateProjectedPass restores that exact fit along with the tiles, so
-	// the reuse is self-consistent but deliberately stale. That is why
-	// r_shadowMapCacheCSM defaults off on both backends.
+	// cascade block must match the current fitted projection. The signature
+	// includes that fit, and AllocateProjectedPass restores it with the tiles.
 	if ( !pointLight && cascadeCount > 1
 			&& !r_shadowMapCacheCSM.GetBool() ) {
 		return false;
@@ -1506,7 +1515,7 @@ runs afterwards and would then see state it did not create.
 ====================
 */
 
-static const int VK_SHADOW_MAX_ADMITTED_LIGHTS = 128;
+static const int VK_SHADOW_MAX_ADMITTED_LIGHTS = VK_SHADOW_MAX_LIGHTS;
 static int vkShadowAdmittedLightIndexes[ VK_SHADOW_MAX_ADMITTED_LIGHTS ];
 static int vkShadowAdmittedLightCount = 0;
 static bool vkShadowAdmissionsActive = false;
@@ -1532,7 +1541,6 @@ static bool VK_ShadowMap_StaticCacheableReadOnly(
 			|| renderWorld == NULL || lightIndex < 0
 			|| vLight->shadowMapCasterCount <= 0
 			|| vLight->shadowMapStaticCasterCount <= 0
-			|| vLight->shadowMapAlphaCasterCount > 0
 			|| vLight->shadowMapTranslucentCasterCount > 0
 			|| vLight->globalTranslucentShadowMapCasters != NULL
 			|| vLight->localTranslucentShadowMapCasters != NULL ) {
@@ -2087,7 +2095,15 @@ static void VK_ShadowMap_ReportViewLights( void ) {
 				passIndex < VK_SHADOW_RECEIVER_PASS_COUNT ; passIndex++ ) {
 			const vkShadowPassState_t &pass = light.passes[ passIndex ];
 			if ( !pass.valid ) {
-				outcome[ passIndex ] = "stencil";
+				const bool receivers = passIndex == VK_SHADOW_RECEIVER_LOCAL
+					? vLight->localInteractions != NULL
+					: ( vLight->globalInteractions != NULL
+						|| ( r_shadowMapTranslucentReceivers.GetBool()
+							&& vLight->translucentInteractions != NULL ) );
+				// This is map preparation, before the receiver decides whether
+				// stencil is usable. Do not report a stencil draw for an unused
+				// ownership or for an unresolved resource failure.
+				outcome[ passIndex ] = receivers ? "unmapped" : "unused";
 			} else if ( pass.resourcePass
 					!= (vkShadowReceiverPass_t)passIndex ) {
 				outcome[ passIndex ] = "alias";
@@ -2148,7 +2164,7 @@ static void VK_ShadowMap_ReportViewCache( const viewDef_t *viewDef ) {
 				|| vkShadow.pointCache[ i ].reserved ) ? 1 : 0;
 	}
 	common->Printf(
-			"Vulkan shadow cache: view=%s exact=%d/%d projected/point fresh=%d/%d composed=%d fallback=%d budget (%d admission)/%d subview tiles=%d/%d pointFaces=%d resident=%.1fMB slots=%d/%d projected %d/%d point\n",
+			"Vulkan shadow cache: view=%s exact=%d/%d projected/point fresh=%d/%d composed=%d fallback=%d budget (%d admission)/%d subview tiles=%d/%d pointFaces=%d resident=%.1fMB slots=%d/%d projected %d/%d point casterFaces=%d/%d culled/tested\n",
 			( viewDef != NULL && viewDef->isSubview )
 				? "subview" : "main",
 			vkShadow.projectedCacheHits,
@@ -2164,7 +2180,8 @@ static void VK_ShadowMap_ReportViewCache( const viewDef_t *viewDef ) {
 			vkShadow.pointFacesRendered,
 			VK_ShadowMap_ResidentBytes() / ( 1024.0 * 1024.0 ),
 			projectedSlots, projectedLimit,
-			pointSlots, pointLimit );
+			pointSlots, pointLimit,
+			vkShadow.pointCasterFaceCulled, vkShadow.pointCasterFaceTests );
 	// GPU shadow-pass timings. The numbers are what resolved during this
 	// view, so they lag the work by a frame or more -- the same lagged
 	// attribution the OpenGL shadow stats carry.
@@ -2437,12 +2454,15 @@ static void VK_ShadowMap_BuildUpdateAdmissions( const viewDef_t *viewDef ) {
 
 	int remaining = updateBudget;
 	for ( int i = 0 ; i < candidateCount && remaining > 0 ; i++ ) {
-		if ( candidates[ i ].cost > remaining ) {
+		// A two-pass light must be able to fill its cache with a budget of one.
+		// Admit the first candidate for partial progress; SchedulePass enforces
+		// the per-pass limit and can finish the other ownership on a later view.
+		if ( candidates[ i ].cost > remaining && vkShadowAdmittedLightCount > 0 ) {
 			continue;
 		}
 		vkShadowAdmittedLightIndexes[ vkShadowAdmittedLightCount++ ] =
 				candidates[ i ].lightIndex;
-		remaining -= candidates[ i ].cost;
+		remaining = Max( 0, remaining - candidates[ i ].cost );
 	}
 	vkShadowAdmissionsActive = true;
 }
@@ -2463,6 +2483,7 @@ int VK_ShadowMap_PrepareViewLights( const viewDef_t *viewDef,
 		const bool stencilFallbackAvailable ) {
 	vkShadow.numLights = 0;
 	vkShadow.preparedView = viewDef;
+	vkShadow.preparedFrame = tr.frameCount;
 	vkShadow.nextTileX = 0;
 	vkShadow.nextTileY = 0;
 	vkShadow.nextTileRowHeight = 0;
@@ -2477,6 +2498,8 @@ int VK_ShadowMap_PrepareViewLights( const viewDef_t *viewDef,
 	vkShadow.atlasTilesRendered = 0;
 	vkShadow.atlasTilesAllocated = 0;
 	vkShadow.pointFacesRendered = 0;
+	vkShadow.pointCasterFaceTests = 0;
+	vkShadow.pointCasterFaceCulled = 0;
 	vkShadow.budgetFallbacks = 0;
 	vkShadow.subviewFallbacks = 0;
 
@@ -2566,8 +2589,8 @@ int VK_ShadowMap_PrepareViewLights( const viewDef_t *viewDef,
 		}
 		if ( vkShadow.numLights >= VK_SHADOW_MAX_LIGHTS ) {
 			// This otherwise mappable light cannot enter the bounded backend
-			// table. Same-frame stencil remains present; sticky only guarantees
-			// later frames keep that volume too.
+			// table. Complete stencil coverage can recover this view; map-only
+			// geometry must report a resource failure until its volumes rebuild.
 			VK_ShadowMap_MarkStencilFallbackSticky( vLight );
 			continue;
 		}
@@ -2778,11 +2801,13 @@ int VK_ShadowMap_PrepareViewLights( const viewDef_t *viewDef,
 	}
 	}
 
-	VK_ShadowMap_ReportViewCache( viewDef );
 	return prepared;
 }
 
 const vkShadowLightState_t *VK_ShadowMap_LightState( const viewLight_t *vLight ) {
+	if ( vkShadow.preparedFrame != tr.frameCount ) {
+		return NULL;
+	}
 	for ( int i = 0 ; i < vkShadow.numLights ; i++ ) {
 		if ( vkShadow.lights[ i ].vLight == vLight ) {
 			return vkShadow.lights[ i ].valid ? &vkShadow.lights[ i ] : NULL;
@@ -3272,13 +3297,12 @@ static int VK_ShadowMap_DrawPassCasters( vkCasterPassCtx_t &ctx,
 	return drawnCasters;
 }
 
-// one caster chain into the bound cube face (RB_PointShadowMapDrawCasterChain
-// minus the per-face frustum cull — see the header divergence note). The push
+// One caster chain into the bound cube face. The push
 // mvp is the model -> face-view matrix; the shader projects analytically
 // through projRow and stores the radial view-space distance / far.
 static int VK_ShadowMap_DrawPointCasterChain( vkCasterPassCtx_t &ctx,
 		const viewLight_t *vLight, const float faceViewMatrix[ 16 ],
-		const float projRow[ 2 ], const float farClip,
+		const float projRow[ 2 ], const float farClip, const int cubeFace,
 		const drawSurf_t *surf ) {
 	int drawnCasters = 0;
 
@@ -3287,6 +3311,12 @@ static int VK_ShadowMap_DrawPointCasterChain( vkCasterPassCtx_t &ctx,
 		if ( casterGeo == NULL ) {
 			VK_ShadowMap_ReportUnsupportedCaster( ctx, surf,
 					"caster-geometry" );
+			continue;
+		}
+		vkShadow.pointCasterFaceTests++;
+		if ( R_ShadowMapCasterOutsidePointFace( vLight, surf->space->modelMatrix,
+				casterGeo->bounds[0].ToFloatPtr(), casterGeo->bounds[1].ToFloatPtr(), cubeFace ) ) {
+			vkShadow.pointCasterFaceCulled++;
 			continue;
 		}
 		if ( !VK_Exec_BindTriGeometry( ctx.cmd, ctx.slot, casterGeo ) ) {
@@ -5113,16 +5143,18 @@ bool VK_ShadowMap_RenderAtlas( const viewDef_t *viewDef ) {
 			}
 			// near/far + the analytic face projection in the shared
 			// VK_FixupClipSpaceZ convention: z_clip = zA*z_eye + zB*w_eye,
-			// w_clip = -z_eye (RB_PointShadowMapBuildProjectionMatrix). The
-			// Match the GL depth-clamp branch when the optional feature was
-			// enabled; unsupported devices retain the existing 4-unit cap.
-			// Shared commits derive projection from the sealed semantic point
-			// state. Depth-clamp support is the sole backend capability input.
+			// w_clip = -z_eye (RB_PointShadowMapBuildProjectionMatrix).
+			// Shared commits derive far distance from the sealed point state.
 			const float farClip = classicCommit
 				? classicPointState->pass->point.farDistance
 				: light.pointFar;
-			const float nearClip = idMath::ClampFloat(
-					0.5f, vkCtx.depthClampSupported ? 16.0f : 4.0f, farClip * 0.01f );
+			// Radial depth is written by the fragment shader, so a tiny near
+			// plane does not sacrifice stored-depth precision. Keep clipping
+			// enabled: depth-clamped world triangles crossing the light plane
+			// produced false near occluders in Air Defense 2 on native Vulkan.
+			// A conventional 4/16-unit near plane would instead lose nearby
+			// casters; this plane only excludes the immediate face apex.
+			const float nearClip = 0.01f;
 			const float projA = -( farClip + nearClip ) / ( farClip - nearClip );
 			const float projB = -( 2.0f * farClip * nearClip ) / ( farClip - nearClip );
 			float projRow[ 2 ];
@@ -5220,14 +5252,14 @@ bool VK_ShadowMap_RenderAtlas( const viewDef_t *viewDef ) {
 					} else {
 					const viewLight_t *vLight = light.vLight;
 					drawnCasters += VK_ShadowMap_DrawPointCasterChain( ctx, vLight, faceViewMatrix,
-							projRow, farClip, vLight->globalShadowMapCasters );
+							projRow, farClip, cubeFace, vLight->globalShadowMapCasters );
 					drawnCasters += VK_ShadowMap_DrawPointCasterChain( ctx, vLight, faceViewMatrix,
-							projRow, farClip, vLight->globalShadowMapDynamicCasters );
+							projRow, farClip, cubeFace, vLight->globalShadowMapDynamicCasters );
 					if ( receiverPass == VK_SHADOW_RECEIVER_GLOBAL ) {
 						drawnCasters += VK_ShadowMap_DrawPointCasterChain( ctx, vLight, faceViewMatrix,
-								projRow, farClip, vLight->localShadowMapCasters );
+								projRow, farClip, cubeFace, vLight->localShadowMapCasters );
 						drawnCasters += VK_ShadowMap_DrawPointCasterChain( ctx, vLight, faceViewMatrix,
-								projRow, farClip, vLight->localShadowMapDynamicCasters );
+								projRow, farClip, cubeFace, vLight->localShadowMapDynamicCasters );
 					}
 					}
 
@@ -5346,7 +5378,7 @@ void VK_ShadowMap_CommitClassicInteractionView(
 	Unlike the OpenGL driver, nothing is captured while the shadow pass runs:
 	the per-view light table survives until the next PrepareViewLights, so the
 	overlay selects from it afterwards and reads the same state the receivers
-	sampled. vkShadow.preparedView is what makes that safe — a view that
+	sampled. The prepared view and frame identity make that safe — a view that
 	prepared no lights (or handed the pass back) must not display the previous
 	view's table.
 
@@ -5548,7 +5580,7 @@ static bool VK_ShadowMap_OverlaySelect( const viewDef_t *viewDef,
 	selection.uvRect[ 2 ] = 1.0f;
 	selection.uvRect[ 3 ] = 1.0f;
 
-	if ( viewDef == NULL || vkShadow.preparedView != viewDef ) {
+	if ( !VK_ShadowMap_ViewPrepared( viewDef ) ) {
 		return false;
 	}
 
@@ -5643,6 +5675,12 @@ because Vulkan cannot query the rect the shared walker last latched.
 ====================
 */
 void VK_ShadowMap_DebugOverlayDraw( const viewDef_t *viewDef ) {
+	// This hook runs after either interaction walker. Reporting at preparation
+	// time always printed zero rendered faces/tiles and hid late map failures.
+	const bool viewPrepared = VK_ShadowMap_ViewPrepared( viewDef );
+	if ( viewPrepared ) {
+		VK_ShadowMap_ReportViewCache( viewDef );
+	}
 	if ( !r_shadowMapDebugOverlay.GetBool() || viewDef == NULL ) {
 		return;
 	}
@@ -5682,7 +5720,6 @@ void VK_ShadowMap_DebugOverlayDraw( const viewDef_t *viewDef ) {
 
 	// The view counters describe the view that prepared the table; a view that
 	// prepared nothing reports nothing rather than the previous view's work.
-	const bool viewPrepared = ( vkShadow.preparedView == viewDef );
 
 	VkViewport viewport;
 	viewport.x = 0.0f;

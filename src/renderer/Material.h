@@ -447,7 +447,8 @@ typedef enum {
 	MF_NOPORTALFOG = BIT(5),	// this fog volume won't ever consider a portal fogged out
 	MF_EDITOR_VISIBLE = BIT(6),	// in use (visible) per editor
 	MF_SKY = BIT(7),
-	MF_NEED_CURRENT_RENDER = BIT(8)
+	MF_NEED_CURRENT_RENDER = BIT(8),
+	MF_NOSHADOWS_EXPLICIT = BIT(9) // authored noShadows/DECAL_MACRO, not inferred from translucent coverage
 } materialFlags_t;
 
 // contents flags, NOTE: make sure to keep the defines in doom_defs.script up to date with these!
@@ -642,6 +643,12 @@ public:
 	// distinction between global and no-self shadows
 	bool				SurfaceCastsShadow(void) const {
 		return TestMaterialFlag(MF_FORCESHADOWS) || !TestMaterialFlag(MF_NOSHADOWS);
+	}
+
+	// Translucent shadow options may override the coverage-implied default,
+	// but must retain authored opt-outs. forceShadows keeps its usual priority.
+	bool				ExplicitlyDisablesShadows(void) const {
+		return TestMaterialFlag(MF_NOSHADOWS_EXPLICIT) && !TestMaterialFlag(MF_FORCESHADOWS);
 	}
 
 	// returns true if the material will generate interactions with fog/blend lights

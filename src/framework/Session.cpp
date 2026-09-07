@@ -50,6 +50,7 @@ If you have questions concerning this license or the applicable additional terms
 #undef protected
 #undef private
 #include "../imagetools/ImageTools.h"
+#include "../ui/Window.h"
 
 idCVar	idSessionLocal::com_showAngles( "com_showAngles", "0", CVAR_SYSTEM | CVAR_BOOL, "" );
 idCVar	idSessionLocal::com_minTics( "com_minTics", "1", CVAR_SYSTEM, "" );
@@ -3592,13 +3593,31 @@ Session_openQ4AssertMenuActivation_f
 */
 static void Session_openQ4AssertMenuActivation_f( const idCmdArgs &args ) {
 	const int maxMsec = args.Argc() > 1 ? atoi( args.Argv( 1 ) ) : 50;
+	const bool gameMenuRequested = args.Argc() > 2 && idStr::Icmp( args.Argv( 2 ), "game" ) == 0;
+	if ( gameMenuRequested && args.Argc() == 4 && idStr::Icmp( args.Argv( 3 ), "reopen" ) == 0 &&
+		maxMsec > 0 && sessLocal.IsMapSpawned() && game != NULL && sessLocal.GetActiveGUI() != NULL ) {
+		// A review screen can remain open into the next warmup. Exercise the
+		// game's ordinary close handler before measuring a fresh menu opening;
+		// this is a semantic GUI action, with no injected keyboard/mouse event.
+		game->HandleGuiCommands( "close" );
+		sessLocal.SetGUI( NULL, NULL );
+	}
 	if ( maxMsec < 1 || !sessLocal.IsMapSpawned() || sessLocal.GetActiveGUI() != NULL ) {
 		common->Error( "openq4_assertMenuActivation requires active gameplay with no GUI and a positive millisecond limit" );
 		return;
 	}
 
 	const int startMsec = Sys_Milliseconds();
-	sessLocal.StartMenu( false );
+	if ( gameMenuRequested ) {
+		idUserInterface *gameMenu = NULL;
+		if ( game == NULL || game->HandleESC( &gameMenu ) != ESC_GUI || gameMenu == NULL ) {
+			common->Error( "openq4_assertMenuActivation: game did not provide its in-game menu" );
+			return;
+		}
+		sessLocal.SetGUI( gameMenu, NULL );
+	} else {
+		sessLocal.StartMenu( false );
+	}
 	const int elapsedMsec = Max( 0, Sys_Milliseconds() - startMsec );
 	if ( sessLocal.GetActiveMenu() == NULL || elapsedMsec > maxMsec ) {
 		common->Error( "openq4_assertMenuActivation failed: active=%d elapsed=%dms limit=%dms",
@@ -3655,6 +3674,7 @@ idSessionLocal::Clear
 void idSessionLocal::Clear() {
 	
 	insideUpdateScreen = false;
+	insidePacifierUpdate = false;
 	insideExecuteMapChange = false;
 	stopDepth = 0;
 	preserveWipeDuringStop = false;
@@ -4115,6 +4135,158 @@ static void Session_TestGUI_f( const idCmdArgs &args ) {
 }
 
 #ifndef ID_DEDICATED
+// This diagnostic exercises the same semantic browser actions as the menu.
+// It neither synthesizes input events nor accepts arbitrary console commands.
+static idStr Session_BrowserDiagnosticText( const char *source ) {
+	idStr text = source != NULL ? source : "";
+	for ( int i = 0; i < text.Length(); ++i ) {
+		const unsigned char value = static_cast<unsigned char>( text[ i ] );
+		if ( ( value < 32 && value != '\t' ) || value == 127 ) {
+			text[ i ] = ' ';
+		}
+	}
+	return text;
+}
+
+static void Session_OpenQ4Browser_f( const idCmdArgs &args ) {
+	idUserInterface *gui = session->GetActiveGUI();
+	if ( gui == NULL || gui != sessLocal.guiMainMenu || gui != sessLocal.guiActive ) {
+		common->Printf( "openq4_browser requires the active main menu\n" );
+		return;
+	}
+	const char *verb = args.Argv( 1 );
+	if ( args.Argc() == 2 && !idStr::Icmp( verb, "open" ) ) {
+		gui->HandleNamedEvent( "main_to_browser" );
+		return;
+	}
+	if ( args.Argc() == 2 && !idStr::Icmp( verb, "report" ) ) {
+		int visible = 0;
+		const int maximumRows = Min( idAsyncNetwork::client.serverList.Num(), 4096 );
+		while ( visible < maximumRows && gui->State().GetString(
+			va( "serverList_item_%d", visible ) )[ 0 ] != '\0' ) {
+			++visible;
+		}
+		idStr selectedAddress;
+		const bool selected = idAsyncNetwork::client.serverList.GetSelectedAddress( selectedAddress );
+		const int reportRows = Min( visible, 256 );
+		common->Printf( "BROWSER_STATE discovered=%d visible=%d selected=%d selected_row=%d lan=%d scan=%d truncated=%d\n",
+			idAsyncNetwork::client.serverList.Num(), visible, selected,
+			gui->State().GetInt( "serverList_sel_0", "-1" ),
+			gui->State().GetBool( "lanSet" ),
+			static_cast<int>( idAsyncNetwork::client.serverList.GetState() ), visible > reportRows );
+		for ( int i = 0; i < reportRows; ++i ) {
+			const idStr row = Session_BrowserDiagnosticText(
+				gui->State().GetString( va( "serverList_item_%d", i ) ) );
+			common->Printf( "BROWSER_ROW index=%d text=%s\n", i, row.c_str() );
+		}
+		static const char *const details[] = {
+			"browser_selected", "server_IP", "server_name", "server_map",
+			"server_gameType", "server_passworded", "browser_levelshot",
+			"loadNotice", "sortNotice", "filterMod", "browser_count"
+		};
+		for ( int i = 0; i < static_cast<int>( sizeof( details ) / sizeof( details[ 0 ] ) ); ++i ) {
+			const idStr value = Session_BrowserDiagnosticText( gui->State().GetString( details[ i ] ) );
+			common->Printf( "BROWSER_DETAIL key=%s value=%s\n", details[ i ], value.c_str() );
+		}
+		static const char *const windows[] = {
+			"desktop::curr", "desktop::dest", "desktop::active", "desktop::blockBrowser",
+			"p_main::visible", "p_mp_browse::visible", "p_mp_browse::rect",
+			"anim_mainOut::notime", "anim_mpBrowseIn::notime"
+		};
+		for ( int i = 0; i < static_cast<int>( sizeof( windows ) / sizeof( windows[ 0 ] ) ); ++i ) {
+			const idWinVar *variable = gui->GetDesktop() != NULL ?
+				gui->GetDesktop()->GetWinVarByName( windows[ i ], true ) : NULL;
+			const idStr value = Session_BrowserDiagnosticText( variable != NULL ? variable->c_str() : "" );
+			common->Printf( "BROWSER_WINDOW key=%s found=%d value=%s\n",
+				windows[ i ], variable != NULL, value.c_str() );
+		}
+		return;
+	}
+	if ( args.Argc() == 3 && !idStr::Icmp( verb, "source" ) ) {
+		if ( idStr::Icmp( args.Argv( 2 ), "lan" ) && idStr::Icmp( args.Argv( 2 ), "internet" ) ) {
+			common->Printf( "openq4_browser source requires lan or internet\n" );
+			return;
+		}
+		gui->SetStateBool( "lanSet", !idStr::Icmp( args.Argv( 2 ), "lan" ) );
+		gui->HandleNamedEvent( "showMpBrowse" );
+		gui->StateChanged( common->GetPresentationTime() );
+		return;
+	}
+	if ( args.Argc() == 3 && !idStr::Icmp( verb, "select" ) ) {
+		const char *number = args.Argv( 2 );
+		int row = -1;
+		bool valid = !idStr::Cmp( number, "-1" );
+		if ( !valid && number[ 0 ] != '\0' ) {
+			row = 0;
+			valid = true;
+			for ( int i = 0; number[ i ] != '\0'; ++i ) {
+				if ( number[ i ] < '0' || number[ i ] > '9' || row > 409 ) {
+					valid = false;
+					break;
+				}
+				row = row * 10 + number[ i ] - '0';
+			}
+		}
+		if ( !valid || row >= 4096 || ( row >= 0 &&
+			( row >= idAsyncNetwork::client.serverList.Num() ||
+			  gui->State().GetString( va( "serverList_item_%d", row ) )[ 0 ] == '\0' ) ) ) {
+			common->Printf( "openq4_browser select requires an existing visible row or -1\n" );
+			return;
+		}
+		gui->SetStateInt( "serverList_sel_0", row );
+		idAsyncNetwork::client.serverList.GUIUpdateSelected();
+		gui->StateChanged( common->GetPresentationTime() );
+		return;
+	}
+	if ( args.Argc() == 3 && !idStr::Icmp( verb, "action" ) ) {
+		static const char *const actions[] = {
+			"InitServerBrowser", "updateServers", "refreshServers", "FilterServers",
+			"click_serverList", "connect", "toggleFavorite", "sortFavorite",
+			"sortServerName", "sortPlayers", "sortPing", "sortGameType", "sortMap",
+			"sortGame", "sortLocked", "sortDed", "sortPB", "sortRepeater",
+			"server_clearSort", "filterByNextMod", "filterByPrevMod", "updateFilterByMod"
+		};
+		for ( int i = 0; i < static_cast<int>( sizeof( actions ) / sizeof( actions[ 0 ] ) ); ++i ) {
+			if ( !idStr::Icmp( args.Argv( 2 ), actions[ i ] ) ) {
+				sessLocal.HandleMainMenuCommands( actions[ i ] );
+				return;
+			}
+		}
+		common->Printf( "openq4_browser action is not a supported browser operation\n" );
+		return;
+	}
+	common->Printf( "usage: openq4_browser open | report | source <lan|internet> | select <visible-row|-1> | action <browser-operation>\n" );
+}
+
+static void Session_OpenQ4GuiGet_f( const idCmdArgs &args ) {
+	idUserInterface *gui = session->GetActiveGUI();
+	if ( args.Argc() != 2 || gui == NULL || gui->GetDesktop() == NULL ) {
+		common->Printf( "usage: openq4_guiGet <window::variable> with an active GUI\n" );
+		return;
+	}
+	idWinVar *variable = gui->GetDesktop()->GetWinVarByName( args.Argv( 1 ), true );
+	if ( variable == NULL ) {
+		common->Printf( "openq4_guiGet: unknown GUI variable\n" );
+		return;
+	}
+	common->Printf( "GUI_VALUE %s=%s\n", args.Argv( 1 ), variable->c_str() );
+}
+
+static void Session_OpenQ4GuiSet_f( const idCmdArgs &args ) {
+	idUserInterface *gui = session->GetActiveGUI();
+	if ( args.Argc() != 3 || gui == NULL || gui->GetDesktop() == NULL ) {
+		common->Printf( "usage: openq4_guiSet <window::variable> <value> with an active GUI\n" );
+		return;
+	}
+	idWinVar *variable = gui->GetDesktop()->GetWinVarByName( args.Argv( 1 ), true );
+	if ( variable == NULL ) {
+		common->Printf( "openq4_guiSet: unknown GUI variable\n" );
+		return;
+	}
+	variable->Set( args.Argv( 2 ) );
+	gui->StateChanged( common->GetPresentationTime() );
+}
+
 static void Session_GuiEvent_f( const idCmdArgs &args ) {
 	if ( args.Argc() < 2 ) {
 		return;
@@ -7083,9 +7255,17 @@ idSessionLocal::PacifierUpdate
 ===============
 */
 void idSessionLocal::PacifierUpdate() {
-	if ( !insideExecuteMapChange ) {
+	if ( !insideExecuteMapChange || insidePacifierUpdate ) {
 		return;
 	}
+	// Printing from a loading redraw or network send offers another pacifier
+	// update. The time gate alone cannot prevent recursion when that work takes
+	// longer than the interval: a nested send can mutate an unfinished fragment.
+	struct PacifierScope {
+		bool &active;
+		explicit PacifierScope( bool &flag ) : active( flag ) { active = true; }
+		~PacifierScope() { active = false; }
+	} scope( insidePacifierUpdate );
 
 #ifdef ID_DEDICATED
 	// Dedicated map loads have no client presentation path, but the server
@@ -7930,6 +8110,9 @@ void idSessionLocal::Init() {
 
 #ifndef	ID_DEDICATED
 	cmdSystem->AddCommand( "GuiEvent", Session_GuiEvent_f, CMD_FL_SYSTEM, "sends a named event to the active gui" );
+	cmdSystem->AddCommand( "openq4_guiSet", Session_OpenQ4GuiSet_f, CMD_FL_SYSTEM | CMD_FL_CHEAT, "sets an existing active GUI variable for engine-scripted layout validation" );
+	cmdSystem->AddCommand( "openq4_guiGet", Session_OpenQ4GuiGet_f, CMD_FL_SYSTEM | CMD_FL_CHEAT, "reports an existing active GUI variable for engine-scripted layout validation" );
+	cmdSystem->AddCommand( "openq4_browser", Session_OpenQ4Browser_f, CMD_FL_SYSTEM | CMD_FL_CHEAT, "reports and exercises main-menu server-browser operations for engine-scripted validation" );
 	cmdSystem->AddCommand( "saveGame", SaveGame_f, CMD_FL_SYSTEM|CMD_FL_CHEAT, "saves a game" );
 	cmdSystem->AddCommand( "loadGame", LoadGame_f, CMD_FL_SYSTEM|CMD_FL_CHEAT, "loads a game", idCmdSystem::ArgCompletion_SaveGame );
 #endif

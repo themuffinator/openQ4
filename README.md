@@ -61,6 +61,8 @@ It is designed for players who want the original Quake 4 experience with a clean
 - **Reliable OpenAL audio** with compatibility-first voice handling; experimental macOS packages bundle OpenAL Soft so large stock levels are not constrained by Apple's legacy buffer pool.
 - **Improved input and quality-of-life features** including controller support, better console UX, and modern settings behavior.
 - **Single-player and multiplayer in one install** with active compatibility work aimed at the stock game.
+- **Readable multiplayer chat** with adjustable layout, retained conversation history, channel switching and sent-message recall.
+- **A usable multiplayer server browser** with sorting, filters and saved favorites, plus managed Duel queues and contextual Match Control feedback. Match Control retains the last result into warmup and offers Previous, Next and Free Camera controls for spectators, alongside follow commands governed by server permissions. Automated gameplay checks cover these controls and results on OpenGL and Vulkan; multiplayer remains experimental.
 - **Smarter repeat level loads** with exact-match learned source preparation and validated local model, world, collision, and animation caches that fall back safely to the installed assets.
 - **A stock-map Arena Campaign** (experimental) with five escalating bot tiers, varied combat game types, boss matches, and persistent ladder progress beside the original story.
 - **A unified demo library and player** with pause, speed, stepping, rewind/fast-forward controls, honest legacy-format status, and full-world free-fly/player-follow playback for server-side multi-view recordings.
@@ -137,11 +139,12 @@ Packaged support currently focuses on Windows, Linux x64, Steam Deck/SteamOS, pr
 - [Arena Campaign](docs/user/arena-campaign.md) (experimental) - single-player arena tiers, unlock rules, maps, game types, and bot rosters
 - [Steam Deck](docs/user/steam-deck.md) - launcher, controls, and Linux handheld notes
 - [Multiplayer Networking](docs/user/multiplayer-networking.md) (experimental) - multiplayer tuning and lag-comp behavior
-- [Competitive Matches](docs/user/competitive-matches.md) (experimental) - match framework, rules, and warmup behaviour
+- [Multiplayer Chat](docs/user/multiplayer-chat.md) - chat controls, scrollback, message recall and saved layout settings
+- [Competitive Matches](docs/user/competitive-matches.md) (experimental) - match rules, human voting, optional readiness, round flow, stock-map One Flag support, and match endings
 - [Demo Library and Multi-View Demos](docs/user/multiview-demos.md) - browse formats, use playback controls, and record or replay complete multiplayer matches
 - [Liquids](docs/user/liquids.md) - water, slime, and lava behaviour, and how to author them
 - [Classic Dynamic Lights](docs/user/classic-dynamic-lights.md) - Quake II/III style dynamic lights on muzzle flashes, bright projectiles, and explosions
-- [Shadow Mapping](docs/user/shadow-mapping.md) - optional shadow-map settings and troubleshooting
+- [Shadow Mapping](docs/user/shadow-mapping.md) - optional shadow-map settings, flashlight, door and cutout shadows, stabilized cascades, cache budgets, and fallback diagnostics
 - [Light Grids](docs/user/light-grids.md) - advanced lighting guide for players and testers
 - [Advanced Screen-Space Lighting](docs/user/advanced-screen-space-lighting.md) (experimental) - bounded froxel volumetrics, SSR, SSGI, performance controls, and one-setting rollback
 - [Temporal AA and Dynamic Resolution](docs/user/temporal-presentation.md) (experimental) - temporal anti-aliasing/upscaling and GPU-time resolution scaling
@@ -166,6 +169,10 @@ Packaged support currently focuses on Windows, Linux x64, Steam Deck/SteamOS, pr
 
 Developers and testers should use the [engine capability matrix](docs/dev/engine-capability-matrix.md) for authoritative implemented/experimental/missing status, the [idTech 5-level modernization roadmap](docs/dev/idtech5-modernization-roadmap.md) for the compatibility-safe implementation order, the [shared interaction-lighting contract](docs/dev/classic-interaction-domain-modernization.md), [shared fog/blend contract](docs/dev/classic-fog-blend-domain-modernization.md), and [shared material-deform contract](docs/dev/classic-deform-domain-modernization.md) for the default-off ownership and rollback boundaries, the [loading/cache contract](docs/dev/loading-cache-modernization.md) for the source-authoritative preload and generated-cache boundary plus pending evidence, and the [stock-asset baseline](docs/dev/stock-asset-baseline.md) for reproducible PK4, SP/MP, save/load, demo, log, and engine-screenshot evidence.
 
+The [shadow-mapping audit](docs/dev/shadowmapping-final-audit-2026-09-05.md) records shadow correctness and cache repairs, repeatable stock-map comparisons, and the remaining compatibility and validation limits.
+
+The [memory-file robustness notes](docs/dev/memory-file-robustness.md) document buffer-growth measurements and native regression coverage for in-memory file generation.
+
 If you run into problems, please use the [issue tracker](https://github.com/themuffinator/openQ4/issues) and include crash logs or setup details when possible. For experimental macOS crashes, use the [macOS support-data guide](docs/user/macos-support-data.md) before filing or updating an issue.
 
 ---
@@ -180,6 +187,8 @@ Bug reports, compatibility reports, testing feedback, and code contributions are
 
 - **themuffinator** - openQ4 development and maintenance
 - **DarkMatter Productions** - project stewardship and website
+- **[Q2REX Project Team](https://github.com/themuffinator/Q2REX)** - design reference for the native [multiplayer chat panel, scaling and history](docs/user/multiplayer-chat.md)
+- **[MuffMode](https://github.com/themuffinator/MuffMode)** and **[Q4MAX](https://www.moddb.com/mods/q4max)** - multiplayer workflow and usability references; see the [competitive reference audit](docs/dev/competitive-match-reference-audit.md)
 - **Justin Marshall** - Quake4Doom and early BSE reverse engineering reference work
 - **Robert Beckebans** - renderer modernization reference work, including RBDOOM-3-BFG inspiration
 - **id Software's official Doom 3 and Doom 3 BFG source releases** - retained idTech 4 source lineage; see the [audited provenance inventory](docs/dev/source-provenance.md)

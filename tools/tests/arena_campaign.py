@@ -1956,9 +1956,8 @@ def validate_game_hooks() -> None:
         modes, "void rvRedRoverGameState::PrepareNextRound( void )"
     )
     for token in (
-        "player->team = targetTeam;",
-        "player->latchedTeam = targetTeam;",
-        'BufferCommandText( CMD_EXEC_NOW, va( "updateUI %d',
+        "gameLocal.mpGame.ApplyRoundTeamAssignment( player, targetTeam, false )",
+        "targetTeam = seat->side;",
         '"red rover: prepared round %d with %d Marine and %d Strogg players',
     ):
         require(rover_prepare, token, "Red Rover between-round rebalance")
@@ -2781,9 +2780,11 @@ def validate_ceremony_flow() -> None:
     require(managed, "if ( IsArenaCampaignMatch() ) {", "the campaign is never a managed match")
     require(
         game,
-        '!IsArenaCampaignMatch() && rules.GetBool( MP_RULE_MANAGED_MATCH ) );',
+        'const bool managedMatch = !IsArenaCampaignMatch() && rules.GetBool( MP_RULE_MANAGED_MATCH );',
         "si_managedMatch must agree with IsManagedMatch for the campaign",
     )
+    require(game, 'gameLocal.serverInfo.SetBool( "si_managedMatch", managedMatch );',
+            "the campaign-aware managed flag must reach server info")
     # A declared-seat roster has nobody to declare it in single player, so the
     # arena arm must clear it after the profile has been applied - not merely
     # rely on the default it was initialised with.

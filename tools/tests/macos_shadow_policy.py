@@ -51,7 +51,8 @@ def validate_docs() -> None:
         "Platform Support Matrix",
         "Apple legacy GL2.1 tier",
         "Stencil only",
-        "fails closed per light",
+        "Lights fall back to the retail stencil path automatically",
+        "rejects incomplete maps and uses complete stencil coverage when available",
     ):
         require(shadow_doc, token, "shadow-mapping user doc platform matrix")
 

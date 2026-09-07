@@ -1127,6 +1127,10 @@ BindNull
 */
 void idImageManager::BindNull() {
 	tmu_t* tmu;
+	if ( backEnd.glState.currenttmu < 0 || backEnd.glState.currenttmu >= MAX_MULTITEXTURE_UNITS ) {
+		common->Warning( "idImageManager::BindNull: invalid tracked texture unit %d", backEnd.glState.currenttmu );
+		return;
+	}
 
 	tmu = &backEnd.glState.tmu[backEnd.glState.currenttmu];
 

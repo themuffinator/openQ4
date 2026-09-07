@@ -76,6 +76,27 @@ windowDef Desktop
 		set "summ_strogg::rect" "93,168,448,118" ;
 	}
 
+	onNamedEvent managed_summary {
+		set "summ_marine_teamname::text" "#str_200197" ;
+		set "summ_strogg_teamname::text" "#str_200199" ;
+		set "summ_marine::rect" "93,109,448,118" ;
+		set "summ_strogg::rect" "93,224,448,118" ;
+	}
+
+	onNamedEvent managed_marine_wins {
+		set "summ_marine_teamname::text" "#str_201012" ;
+		set "summ_strogg_teamname::text" "#str_201015" ;
+		set "summ_marine::rect" "93,109,448,118" ;
+		set "summ_strogg::rect" "93,224,448,118" ;
+	}
+
+	onNamedEvent managed_strogg_wins {
+		set "summ_marine_teamname::text" "#str_201014" ;
+		set "summ_strogg_teamname::text" "#str_201013" ;
+		set "summ_marine::rect" "93,224,448,118" ;
+		set "summ_strogg::rect" "93,109,448,118" ;
+	}
+
 	onNamedEvent strogg_wins {
 		set "summ_marine_teamname::text" "#str_201014" ;
 		set "summ_strogg_teamname::text" "#str_201013" ;
@@ -512,9 +533,29 @@ windowDef Desktop
 	{
 		rect	0,0,640,480
 		visible	1
+		windowDef summary_result_frame
+		{
+			rect	93,52,446,52
+			visible	"gui::summary_result_visible"
+			background	"gfx/guis/mainmenu/b3_light"
+			matcolor	0.545,0.588,0.294,0.35
+			noevents	1
+		}
+		editDef summary_result
+		{
+			rect	102,53,428,50
+			visible	"gui::summary_result_visible"
+			text	"gui::summary_result_text"
+			font	"fonts/lowpixel"
+			textscale	.22
+			textspacing	-1
+			forecolor	0.96,0.97,0.83,1
+			wrap	1
+			readonly	1
+		}
 		windowDef summ_list_nonteam
 		{
-			rect	0,0,640,480
+			rect	0,(56 * "gui::summary_result_visible"),640,480
 			visible	( "gui::gametype" <= 2 )
 			windowDef summary_horizline
 			{
@@ -570,7 +611,7 @@ windowDef Desktop
 			}
 			listDef summary_list
 			{
-				rect	94,64,446,228
+				rect	94,64,446,226
 				forecolor	1,1,1,1
 				listname	summary_names
 				font	"fonts/lowpixel"
@@ -788,7 +829,7 @@ windowDef Desktop
 		}
 		windowDef t_chat_history
 		{
-			rect	92,291,385,19
+			rect	92,(291 + 56 * "gui::summary_result_visible"),385,19
 			visible	1
 			forecolor	1,1,1,0.4
 			text	"#str_200196"
@@ -798,14 +839,14 @@ windowDef Desktop
 		}
 		windowDef chatbox_top
 		{
-			rect	93,307,446,14
+			rect	93,(307 + 56 * "gui::summary_result_visible"),446,14
 			visible	1
 			matcolor	1,1,1,0.4
 			background	"gfx/guis/mainmenu/chatbox_edge"
 		}
 		windowDef chatbox_mid
 		{
-			rect	93,321,446,74
+			rect	93,(321 + 56 * "gui::summary_result_visible"),446,(74 - 56 * "gui::summary_result_visible")
 			visible	1
 			matcolor	1,1,1,0.4
 			background	"gfx/guis/mainmenu/chatbox_mid"
@@ -820,7 +861,7 @@ windowDef Desktop
 		}
 		editDef chat_history
 		{
-			rect	97,312,440,94
+			rect	97,(312 + 56 * "gui::summary_result_visible"),440,(94 - 56 * "gui::summary_result_visible")
 			visible	1
 			wrap	1
 			readonly	1

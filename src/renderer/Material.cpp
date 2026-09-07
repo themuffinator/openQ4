@@ -3483,7 +3483,7 @@ void idMaterial::ParseMaterial( idLexer &src ) {
 		}
 		// noshadow
 		else if ( !token.Icmp( "noShadows" ) ) {
-			SetMaterialFlag( MF_NOSHADOWS );
+			SetMaterialFlag( MF_NOSHADOWS | MF_NOSHADOWS_EXPLICIT );
 			continue;
 		}
 // jmarshall - possible legacy optimisations that aren't needed for current hardware.
@@ -3781,7 +3781,7 @@ void idMaterial::ParseMaterial( idLexer &src ) {
 			sort = SS_DECAL;
 
 			// noShadows
-			SetMaterialFlag( MF_NOSHADOWS );
+			SetMaterialFlag( MF_NOSHADOWS | MF_NOSHADOWS_EXPLICIT );
 			continue;
 		}
 		else if ( token == "{" ) {

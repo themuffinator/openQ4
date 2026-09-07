@@ -1176,15 +1176,15 @@ def main() -> None:
             "entry->lightOrigin[1] == vLight->globalLightOrigin[1]",
             "entry->lightOrigin[2] == vLight->globalLightOrigin[2]",
         ),
-        "stale point cubes cannot cross light-origin or far-plane changes",
+        "point allocation history cannot cross light-origin or far-plane changes",
     )
-    point_stale_reuse = function_body(
+    point_history = function_body(
         gl,
-        "static pointShadowMapCacheEntry_t *RB_ShadowMapFindPointCacheEntryAnySignature(",
-        "newest compatible point stale reuse",
+        "static pointShadowMapCacheEntry_t *RB_ShadowMapNewestCompatiblePointEntry(",
+        "newest compatible point allocation history",
     )
     require_order(
-        point_stale_reuse,
+        point_history,
         (
             "RB_ShadowMapPointCacheEntryStorageValid( entry )",
             "entry->size == requiredSize",
@@ -1195,23 +1195,26 @@ def main() -> None:
             "newest = entry;",
             "return newest;",
         ),
-        "point stale reuse selects the newest projection-compatible allocation",
+        "point update priority uses the newest projection-compatible allocation",
     )
-    projected_stale_reuse = function_body(
+    direct_schedule = function_body(
         gl,
-        "static projectedShadowMapCacheEntry_t *RB_ShadowMapFindProjectedCacheEntryAnySignature(",
-        "newest projected stale reuse",
+        "static shadowMapSchedule_t RB_ShadowMapSchedulePass(",
+        "direct map cache scheduling",
     )
-    require_order(
-        projected_stale_reuse,
-        (
-            "RB_ShadowMapProjectedCacheEntryStorageValid( entry )",
-            "entry->lastUpdatedFrame > newest->lastUpdatedFrame",
-            "newest = entry;",
-            "return newest;",
-        ),
-        "projected stale reuse selects the most recently rendered sibling",
-    )
+    # A changed caster set must never sample the old map, even if the light's
+    # projection is unchanged and a fresh update is denied. In particular,
+    # composing moving doors over stale static depth retains their old pose.
+    for scheduler in (direct_schedule, gl_map_schedule):
+        reject(scheduler, "RB_ShadowMapNewestCompatiblePointEntry(",
+               "allocation age must not select sampled shadow content")
+    reject(gl, "CacheEntryAnySignature(", "signature-agnostic shadow reuse")
+    for cache_type in ("Point", "Projected"):
+        lookup = function_body(
+            gl, f"static {cache_type.lower()}ShadowMapCacheEntry_t *RB_ShadowMapFind{cache_type}CacheEntry(",
+            f"exact {cache_type.lower()} shadow cache lookup")
+        require_order(lookup, ("entry->signature == signature", "return entry;"),
+                      f"{cache_type.lower()} maps require current caster signatures")
     direct_cache_completion = function_body(
         gl,
         "static void RB_ShadowMapCompleteCacheUpdate(",

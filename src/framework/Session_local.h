@@ -329,6 +329,7 @@ public:
 	// each game tic, numClients usercmds will be added, until full
 
 	bool				insideUpdateScreen;	// true while inside ::UpdateScreen()
+	bool				insidePacifierUpdate;	// prevents recursive loading/network updates
 
 	bool				loadingSaveGame;	// currently loading map from a SaveGame
 	idFile *			savegameFile;		// this is the savegame file to load from

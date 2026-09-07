@@ -22,15 +22,16 @@ LANGUAGE_FILES = (
 )
 # 41693-41698 are the three built-in match-series profiles (label, description)
 # consumed by seriesProfileDescriptors in mp/match/MatchSeries.cpp.
-EXPECTED_IDS = tuple(f"#str_{value}" for value in range(41600, 41699))
+EXPECTED_IDS = tuple(f"#str_{value}" for value in range(41600, 41699)) + ("#str_42680", "#str_42681")
 EXPECTED_SET = set(EXPECTED_IDS)
 DESCRIPTION_IDS = (
     {f"#str_{value}" for value in range(41601, 41666, 2)}
     | {f"#str_{value}" for value in range(41678, 41693, 2)}
     | {f"#str_{value}" for value in range(41694, 41699, 2)}
+    | {"#str_42681"}
 )
 ENTRY_RE = re.compile(r'^\s*"(?P<id>#str_\d+)"\s+"(?P<value>.*)"\s*$')
-RULE_ID_RE = re.compile(r'"(?P<id>#str_416\d{2})"')
+RULE_ID_RE = re.compile(r'"(?P<id>#str_(?:416\d{2}|4268[01]))"')
 PLACEHOLDER_RE = re.compile(
     r"(?:#str_|\b(?:todo|tbd|fixme|placeholder|missing translation)\b|\?\?\?)",
     re.IGNORECASE,
@@ -61,7 +62,7 @@ def parse_language_table(path: Path) -> dict[str, str]:
     table = dict(entries)
     actual_target_ids = set(table) & {
         f"#str_{value}" for value in range(41600, 41700)
-    }
+    } | (set(table) & {"#str_42680", "#str_42681"})
     if actual_target_ids != EXPECTED_SET:
         missing = sorted(EXPECTED_SET - actual_target_ids)
         unexpected = sorted(actual_target_ids - EXPECTED_SET)

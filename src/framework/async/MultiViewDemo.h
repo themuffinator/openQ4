@@ -80,6 +80,7 @@ public:
 	static void				Stop_f( const idCmdArgs &args );
 	static void				Play_f( const idCmdArgs &args );
 	static void				Info_f( const idCmdArgs &args );
+	static void				Status_f( const idCmdArgs &args );
 	static void				Pause_f( const idCmdArgs &args );
 	static void				Seek_f( const idCmdArgs &args );
 	static void				Skip_f( const idCmdArgs &args );
@@ -161,13 +162,12 @@ private:
 	bool					seekInProgress;
 	bool					forcePresentationFrame;
 	int						seekTargetGameTime;
+	int						preferredFollowClient;
 	int						playbackStreamOffset;
 	int						playbackInitializationRecordCount;
 	int						playbackEndGameTime;
 	int						playbackLastRecordGameFrame;
 	int						playbackLastRecordGameTime;
-	int						pendingButtons;
-	int						pendingUpMove;
 	record_t				pendingRecord;
 	record_t				playbackMapState;
 	record_t				playbackNetworkState;

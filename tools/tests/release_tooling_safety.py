@@ -809,11 +809,19 @@ def validate_draft_releases_never_announce() -> None:
             raise AssertionError(f"draft release publication is missing token: {token}")
 
     draft_branch_offset = release_create_step.index('if [ "${RELEASE_DRAFT}" = "true" ]; then\n            # A draft is not a release')
-    publish_offset = release_create_step.index('-f draft=false')
+    publish_offset = release_create_step.index('-F draft=false')
     if draft_branch_offset > publish_offset:
         raise AssertionError("the draft branch must short-circuit before the release is published")
     if "exit 0" not in release_create_step[draft_branch_offset:publish_offset]:
         raise AssertionError("the draft branch must exit before clearing the draft flag")
+
+    promotion = release_create_step[draft_branch_offset:publish_offset]
+    if '--json databaseId --jq .databaseId' not in promotion:
+        raise AssertionError("draft promotion must resolve the release ID through the draft-aware gh view")
+    if 'releases/tags/${tag}' in promotion:
+        raise AssertionError("draft promotion must not require a published release-by-tag lookup")
+    if '-F prerelease=false' not in promotion:
+        raise AssertionError("release publication must send typed boolean state to GitHub")
 
     if "if (release.draft) {" not in announcer:
         raise AssertionError("Discord release announcer must refuse to announce a draft")

@@ -12,17 +12,43 @@ windowDef p_matchcontrol
 
 	windowDef match_panel
 	{
-		rect	188,44,386,383
+		rect	188,44,386,396
 		visible	1
 		background	"gfx/guis/mainmenu/screen"
 		matcolor	0.05,0.07,0.06,0.92
 	}
 	windowDef match_panel_grad
 	{
-		rect	188,44,386,383
+		rect	188,44,386,396
 		visible	1
 		background	"gfx/guis/mainmenu/bg_darkgrad"
 		matcolor	0.545,0.588,0.294,0.24
+	}
+	windowDef match_frame_top
+	{
+		rect	188,44,386,16
+		visible	1
+		noevents	1
+		background	"gfx/guis/mainmenu/tooltip_edge"
+		matcolor	0.545,0.588,0.294,0.95
+	}
+	windowDef match_frame_mid
+	{
+		rect	188,60,386,364
+		visible	1
+		noevents	1
+		background	"gfx/guis/mainmenu/tooltip_mid"
+		matcolor	0.545,0.588,0.294,0.95
+	}
+	windowDef match_frame_bottom
+	{
+		rect	188,424,386,16
+		visible	1
+		noevents	1
+		background	"gfx/guis/mainmenu/tooltip_edge"
+		matscalex	-1
+		matscaley	-1
+		matcolor	0.545,0.588,0.294,0.95
 	}
 	windowDef match_title
 	{
@@ -38,9 +64,10 @@ windowDef p_matchcontrol
 	{
 		rect	420,54,138,18
 		visible	1
-		text	"gui::match_phase"
+		text	"gui::match_phase_short"
 		textscale	0.23
 		font	"fonts/lowpixel"
+		textspacing	-1
 		textalign	2
 		forecolor	1,0.745,0.137,0.9
 	}
@@ -61,11 +88,12 @@ windowDef p_matchcontrol
 		text	"#str_41701"
 		textscale	0.21
 		font	"fonts/lowpixel"
+		textspacing	-1
 		textalign	1
 		forecolor	1,1,1,( 0.55 + ( ( "desktop::match_tab" == 0 ) * 0.35 ) )
-		backcolor	0.08,0.10,0.08,0.75
-		bordercolor	0.545,0.588,0.294,0.45
-		bordersize	1
+		background	"gfx/guis/mainmenu/b6_light"
+		matcolor	0.545,0.588,0.294,0.45
+
 		onAction {
 			set "desktop::match_tab" "0" ;
 			set "cmd" "play main_menu_selection" ;
@@ -78,11 +106,12 @@ windowDef p_matchcontrol
 		text	"#str_41702"
 		textscale	0.21
 		font	"fonts/lowpixel"
+		textspacing	-1
 		textalign	1
 		forecolor	1,1,1,( 0.55 + ( ( "desktop::match_tab" == 1 ) * 0.35 ) )
-		backcolor	0.08,0.10,0.08,0.75
-		bordercolor	0.545,0.588,0.294,0.45
-		bordersize	1
+		background	"gfx/guis/mainmenu/b6_light"
+		matcolor	0.545,0.588,0.294,0.45
+
 		onAction {
 			set "desktop::match_tab" "1" ;
 			set "cmd" "play main_menu_selection" ;
@@ -95,11 +124,12 @@ windowDef p_matchcontrol
 		text	"#str_41703"
 		textscale	0.18
 		font	"fonts/lowpixel"
+		textspacing	-1
 		textalign	1
 		forecolor	1,1,1,( 0.55 + ( ( "desktop::match_tab" == 2 ) * 0.35 ) )
-		backcolor	0.08,0.10,0.08,0.75
-		bordercolor	0.545,0.588,0.294,0.45
-		bordersize	1
+		background	"gfx/guis/mainmenu/b6_light"
+		matcolor	0.545,0.588,0.294,0.45
+
 		onAction {
 			set "desktop::match_tab" "2" ;
 			set "cmd" "play main_menu_selection" ;
@@ -112,11 +142,12 @@ windowDef p_matchcontrol
 		text	"#str_41704"
 		textscale	0.21
 		font	"fonts/lowpixel"
+		textspacing	-1
 		textalign	1
 		forecolor	1,1,1,( 0.55 + ( ( "desktop::match_tab" == 3 ) * 0.35 ) )
-		backcolor	0.08,0.10,0.08,0.75
-		bordercolor	0.545,0.588,0.294,0.45
-		bordersize	1
+		background	"gfx/guis/mainmenu/b6_light"
+		matcolor	0.545,0.588,0.294,0.45
+
 		onAction {
 			set "desktop::match_tab" "3" ;
 			set "cmd" "play main_menu_selection" ;
@@ -129,11 +160,12 @@ windowDef p_matchcontrol
 		text	"#str_41705"
 		textscale	0.21
 		font	"fonts/lowpixel"
+		textspacing	-1
 		textalign	1
 		forecolor	1,1,1,( 0.55 + ( ( "desktop::match_tab" == 4 ) * 0.35 ) )
-		backcolor	0.08,0.10,0.08,0.75
-		bordercolor	0.545,0.588,0.294,0.45
-		bordersize	1
+		background	"gfx/guis/mainmenu/b6_light"
+		matcolor	0.545,0.588,0.294,0.45
+
 		onAction {
 			set "desktop::match_tab" "4" ;
 			set "cmd" "play main_menu_selection" ;
@@ -146,11 +178,12 @@ windowDef p_matchcontrol
 		text	"#str_41706"
 		textscale	0.19
 		font	"fonts/lowpixel"
+		textspacing	-1
 		textalign	1
 		forecolor	1,1,1,( 0.55 + ( ( "desktop::match_tab" == 5 ) * 0.35 ) )
-		backcolor	0.08,0.10,0.08,0.75
-		bordercolor	0.545,0.588,0.294,0.45
-		bordersize	1
+		background	"gfx/guis/mainmenu/b6_light"
+		matcolor	0.545,0.588,0.294,0.45
+
 		onAction {
 			set "desktop::match_tab" "5" ;
 			set "cmd" "play main_menu_selection" ;
@@ -164,6 +197,7 @@ windowDef p_matchcontrol
 		text	"#str_41774"
 		textscale	0.25
 		font	"fonts/lowpixel"
+		textspacing	-1
 		textalign	1
 		forecolor	1,1,1,0.72
 	}
@@ -176,19 +210,19 @@ windowDef p_matchcontrol
 		rect	0,0,640,480
 		visible	( "gui::match_surface_available" == 1 && "desktop::match_tab" == 0 )
 
-		windowDef match_status_label { rect 204,116,120,18 visible 1 text "#str_41707" textscale 0.22 font "fonts/lowpixel" forecolor 1,1,1,0.65 }
-		windowDef match_readiness_label { rect 204,134,120,18 visible 1 text "#str_41708" textscale 0.22 font "fonts/lowpixel" forecolor 1,1,1,0.65 }
-		windowDef match_pause_label { rect 204,152,120,18 visible 1 text "#str_41709" textscale 0.22 font "fonts/lowpixel" forecolor 1,1,1,0.65 }
-		windowDef match_recipient_label { rect 204,170,120,18 visible 1 text "#str_41710" textscale 0.22 font "fonts/lowpixel" forecolor 1,1,1,0.65 }
-		windowDef match_timeout_budget_label { rect 204,188,120,18 visible 1 text "#str_41778" textscale 0.22 font "fonts/lowpixel" forecolor 1,1,1,0.65 }
-		windowDef match_status_values
+		// The localized summary already includes its labels. Let long blocker
+		// lists wrap and scroll together without displacing unrelated row labels.
+		editDef match_status_values
 		{
-			rect	318,116,240,93
+			rect	204,116,354,93
 			visible	1
 			text	"gui::match_status_lines"
-			textscale	0.22
+			textscale	0.20
 			font	"fonts/lowpixel"
-			forecolor	1,0.745,0.137,0.88
+			textspacing	-1
+			readonly	1
+			wrap	1
+			forecolor	1,1,1,0.8
 		}
 
 		// One explicit selector drives every side-scoped action.  The accepted
@@ -201,6 +235,7 @@ windowDef p_matchcontrol
 			text	"gui::match_action_side_label"
 			textscale	0.20
 			font	"fonts/lowpixel"
+			textspacing	-1
 			forecolor	1,1,1,0.65
 		}
 		windowDef match_action_side_0_button
@@ -210,11 +245,12 @@ windowDef p_matchcontrol
 			text	"gui::match_action_side_0_label"
 			textscale	0.19
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.38 + ( "gui::match_action_side_0_enabled" * 0.22 ) + ( "gui::match_action_side_0_selected" * 0.30 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,( 0.35 + ( "gui::match_action_side_0_selected" * 0.45 ) )
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,( 0.35 + ( "gui::match_action_side_0_selected" * 0.45 ) )
+
 			onAction {
 				if ( "gui::match_action_side_0_enabled" == 1 ) {
 					set "cmd" "play main_menu_selection" ;
@@ -229,11 +265,12 @@ windowDef p_matchcontrol
 			text	"gui::match_action_side_1_label"
 			textscale	0.19
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.38 + ( "gui::match_action_side_1_enabled" * 0.22 ) + ( "gui::match_action_side_1_selected" * 0.30 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,( 0.35 + ( "gui::match_action_side_1_selected" * 0.45 ) )
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,( 0.35 + ( "gui::match_action_side_1_selected" * 0.45 ) )
+
 			onAction {
 				if ( "gui::match_action_side_1_enabled" == 1 ) {
 					set "cmd" "play main_menu_selection" ;
@@ -249,12 +286,15 @@ windowDef p_matchcontrol
 			text	"gui::match_ready_action"
 			textscale	0.20
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_ready_set_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_ready_set_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_ready_set_reason" ; }
 			onAction {
 				if ( "gui::match_op_ready_set_available" == 1 ) {
 					set "cmd" "play main_menu_selection" ;
@@ -269,12 +309,15 @@ windowDef p_matchcontrol
 			text	"#str_41715"
 			textscale	0.20
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_team_ready_set_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_team_ready_set_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_team_ready_set_reason" ; }
 			onAction {
 				if ( "gui::match_op_team_ready_set_available" == 1 ) {
 					set "cmd" "play main_menu_selection" ;
@@ -289,12 +332,15 @@ windowDef p_matchcontrol
 			text	"#str_41719"
 			textscale	0.20
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_force_ready_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_force_ready_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_force_ready_reason" ; }
 			onAction {
 				if ( "gui::match_op_force_ready_available" == 1 ) {
 					set "cmd" "play main_menu_selection" ;
@@ -311,12 +357,15 @@ windowDef p_matchcontrol
 			text	"#str_41716"
 			textscale	0.19
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_timeout_request_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_timeout_request_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_timeout_request_reason" ; }
 			onAction {
 				if ( "gui::match_op_timeout_request_available" == 1 ) {
 					set "cmd" "play main_menu_selection" ;
@@ -331,12 +380,15 @@ windowDef p_matchcontrol
 			text	"#str_41717"
 			textscale	0.19
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_tech_pause_request_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_tech_pause_request_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_tech_pause_request_reason" ; }
 			onAction {
 				if ( "gui::match_op_tech_pause_request_available" == 1 ) {
 					set "cmd" "play main_menu_selection" ;
@@ -351,12 +403,15 @@ windowDef p_matchcontrol
 			text	"#str_41718"
 			textscale	0.20
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_resume_request_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_resume_request_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_resume_request_reason" ; }
 			onAction {
 				if ( "gui::match_op_resume_request_available" == 1 ) {
 					set "cmd" "play main_menu_selection" ;
@@ -371,12 +426,15 @@ windowDef p_matchcontrol
 			text	"#str_41783"
 			textscale	0.20
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_forfeit_available" * 0.4 ) )
-			backcolor	0.10,0.06,0.04,0.85
-			bordercolor	0.890,0.537,0,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.890,0.537,0,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_forfeit_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_forfeit_reason" ; }
 			onAction {
 				if ( "gui::match_op_forfeit_available" == 1 ) {
 					set "cmd" "play main_menu_selection" ;
@@ -393,12 +451,15 @@ windowDef p_matchcontrol
 			text	"#str_41784"
 			textscale	0.20
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_abort_available" * 0.4 ) )
-			backcolor	0.10,0.06,0.04,0.85
-			bordercolor	0.890,0.537,0,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.890,0.537,0,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_abort_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_abort_reason" ; }
 			onAction {
 				if ( "gui::match_op_abort_available" == 1 ) {
 					set "cmd" "play main_menu_selection" ;
@@ -416,6 +477,7 @@ windowDef p_matchcontrol
 			text	"#str_41779"
 			textscale	0.22
 			font	"fonts/lowpixel"
+			textspacing	-1
 			forecolor	1,1,1,0.65
 		}
 		editDef match_referee_credential
@@ -427,6 +489,7 @@ windowDef p_matchcontrol
 			maxchars	64
 			textscale	0.22
 			font	"fonts/lowpixel"
+			textspacing	-1
 			forecolor	1,0.745,0.137,0.9
 			backcolor	0,0,0,0.6
 			bordercolor	0.545,0.588,0.294,0.45
@@ -439,12 +502,15 @@ windowDef p_matchcontrol
 			text	"#str_41781"
 			textscale	0.20
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_ref_authenticate_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_ref_authenticate_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_ref_authenticate_reason" ; }
 			onAction {
 				if ( "gui::match_op_ref_authenticate_available" == 1 ) {
 					set "cmd" "play main_menu_selection" ;
@@ -459,17 +525,182 @@ windowDef p_matchcontrol
 			text	"#str_41782"
 			textscale	0.20
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_ref_logout_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_ref_logout_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_ref_logout_reason" ; }
 			onAction {
 				if ( "gui::match_op_ref_logout_available" == 1 ) {
 					set "cmd" "play main_menu_selection" ;
 					set "cmd" "matchControl referee_logout" ;
 				}
+			}
+		}
+		// Camera requests use fixed verbs; live server permissions choose targets.
+		windowDef match_follow_controls
+		{
+			rect	0,0,640,480
+			visible	( "gui::match_follow_visible" == 1 )
+			windowDef match_follow_prev_button
+			{
+				rect	202,344,116,24
+				visible	1
+				background	"gfx/guis/mainmenu/b6_light"
+				matcolor	0.545,0.588,0.294,0.45
+				onMouseEnter {
+					if ( "desktop::active" == 0 && "desktop::match_confirm" == 0 ) {
+						stoptransitions "match_follow_prev_button" ;
+						set "matcolor_w" "1" ;
+						set "match_follow_prev_label::forecolor" "$desktop::orange" ;
+						set "match_follow_prev_label::textscale" "0.21" ;
+						set "match_follow_prev_corner::matcolor" "$desktop::orange" ;
+						set "match_action_reason::text" "#str_42888" ;
+						set "cmd" "play main_menu_mouseover" ;
+					}
+				}
+				onMouseExit {
+					if ( "desktop::active" == 0 && "desktop::match_confirm" == 0 ) {
+						transition "matcolor_w" "1" "0.45" "300" ;
+						transition "match_follow_prev_label::forecolor" "$desktop::orange" "$desktop::white_8" "300" ;
+						transition "match_follow_prev_label::textscale" "0.21" "0.20" "300" ;
+						transition "match_follow_prev_corner::matcolor" "$desktop::orange" "$desktop::corner" "300" ;
+					}
+				}
+				onGainFocus { set "match_action_reason::text" "#str_42888" ; }
+				onAction {
+					if ( "desktop::active" == 0 && "desktop::match_confirm" == 0 && "gui::match_follow_visible" == 1 ) {
+						set "cmd" "play main_menu_selection" ;
+						set "cmd" "matchControl follow_prev" ;
+					}
+				}
+			}
+			windowDef match_follow_prev_label
+			{
+				rect	218,347,98,18
+				visible	1
+				noevents	1
+				text	"#str_42885"
+				textscale	0.20
+				font	"fonts/lowpixel"
+				textspacing	-1
+				forecolor	1,1,1,0.8
+			}
+			windowDef match_follow_prev_corner
+			{
+				rect	209,353,6,6
+				visible	1
+				noevents	1
+				background	"gfx/guis/mainmenu/corner"
+				matcolor	0.564,0.603,0.286,0.4
+			}
+			windowDef match_follow_next_button
+			{
+				rect	322,344,116,24
+				visible	1
+				background	"gfx/guis/mainmenu/b6_light"
+				matcolor	0.545,0.588,0.294,0.45
+				onMouseEnter {
+					if ( "desktop::active" == 0 && "desktop::match_confirm" == 0 ) {
+						stoptransitions "match_follow_next_button" ;
+						set "matcolor_w" "1" ;
+						set "match_follow_next_label::forecolor" "$desktop::orange" ;
+						set "match_follow_next_label::textscale" "0.21" ;
+						set "match_follow_next_corner::matcolor" "$desktop::orange" ;
+						set "match_action_reason::text" "#str_42888" ;
+						set "cmd" "play main_menu_mouseover" ;
+					}
+				}
+				onMouseExit {
+					if ( "desktop::active" == 0 && "desktop::match_confirm" == 0 ) {
+						transition "matcolor_w" "1" "0.45" "300" ;
+						transition "match_follow_next_label::forecolor" "$desktop::orange" "$desktop::white_8" "300" ;
+						transition "match_follow_next_label::textscale" "0.21" "0.20" "300" ;
+						transition "match_follow_next_corner::matcolor" "$desktop::orange" "$desktop::corner" "300" ;
+					}
+				}
+				onGainFocus { set "match_action_reason::text" "#str_42888" ; }
+				onAction {
+					if ( "desktop::active" == 0 && "desktop::match_confirm" == 0 && "gui::match_follow_visible" == 1 ) {
+						set "cmd" "play main_menu_selection" ;
+						set "cmd" "matchControl follow_next" ;
+					}
+				}
+			}
+			windowDef match_follow_next_label
+			{
+				rect	338,347,98,18
+				visible	1
+				noevents	1
+				text	"#str_42886"
+				textscale	0.20
+				font	"fonts/lowpixel"
+				textspacing	-1
+				forecolor	1,1,1,0.8
+			}
+			windowDef match_follow_next_corner
+			{
+				rect	329,353,6,6
+				visible	1
+				noevents	1
+				background	"gfx/guis/mainmenu/corner"
+				matcolor	0.564,0.603,0.286,0.4
+			}
+			windowDef match_follow_free_button
+			{
+				rect	442,344,116,24
+				visible	1
+				background	"gfx/guis/mainmenu/b6_light"
+				matcolor	0.545,0.588,0.294,0.45
+				onMouseEnter {
+					if ( "desktop::active" == 0 && "desktop::match_confirm" == 0 ) {
+						stoptransitions "match_follow_free_button" ;
+						set "matcolor_w" "1" ;
+						set "match_follow_free_label::forecolor" "$desktop::orange" ;
+						set "match_follow_free_label::textscale" "0.21" ;
+						set "match_follow_free_corner::matcolor" "$desktop::orange" ;
+						set "match_action_reason::text" "#str_42888" ;
+						set "cmd" "play main_menu_mouseover" ;
+					}
+				}
+				onMouseExit {
+					if ( "desktop::active" == 0 && "desktop::match_confirm" == 0 ) {
+						transition "matcolor_w" "1" "0.45" "300" ;
+						transition "match_follow_free_label::forecolor" "$desktop::orange" "$desktop::white_8" "300" ;
+						transition "match_follow_free_label::textscale" "0.21" "0.20" "300" ;
+						transition "match_follow_free_corner::matcolor" "$desktop::orange" "$desktop::corner" "300" ;
+					}
+				}
+				onGainFocus { set "match_action_reason::text" "#str_42888" ; }
+				onAction {
+					if ( "desktop::active" == 0 && "desktop::match_confirm" == 0 && "gui::match_follow_visible" == 1 ) {
+						set "cmd" "play main_menu_selection" ;
+						set "cmd" "matchControl follow_free" ;
+					}
+				}
+			}
+			windowDef match_follow_free_label
+			{
+				rect	458,347,98,18
+				visible	1
+				noevents	1
+				text	"#str_42887"
+				textscale	0.20
+				font	"fonts/lowpixel"
+				textspacing	-1
+				forecolor	1,1,1,0.8
+			}
+			windowDef match_follow_free_corner
+			{
+				rect	449,353,6,6
+				visible	1
+				noevents	1
+				background	"gfx/guis/mainmenu/corner"
+				matcolor	0.564,0.603,0.286,0.4
 			}
 		}
 	}
@@ -488,6 +719,7 @@ windowDef p_matchcontrol
 			text	"#str_41736"
 			textscale	0.23
 			font	"fonts/lowpixel"
+			textspacing	-1
 			forecolor	1,1,1,0.75
 		}
 		windowDef match_replacements_title
@@ -497,29 +729,31 @@ windowDef p_matchcontrol
 			text	"#str_41785"
 			textscale	0.20
 			font	"fonts/lowpixel"
+			textspacing	-1
 			forecolor	1,1,1,0.75
 		}
 		listDef match_team_rows
 		{
-			rect	202,132,218,148
+			rect	202,132,234,148
 			visible	1
 			listname	match_team_rows
-			textscale	0.19
+			textscale	0.17
 			itemheight	18
 			scrollbar	1
 			backcolor	0,0,0,0.6
 			forecolor	1,1,1,0.8
 			font	"fonts/lowpixel"
+			textspacing	-1
 			backgroundHover	"gfx/guis/mainmenu/bg_hover2"
 			backgroundFocus	"gfx/guis/mainmenu/bg_focus2"
 			backgroundLine	"gfx/guis/mainmenu/bg_line2"
-			tabstops	"0,112,176,218"
-			tabaligns	"0,0,2"
+			tabstops	"0,100,154,234"
+			tabaligns	"0,0,0"
 			onAction { set "cmd" "matchControl select_team_row" ; }
 		}
 		listDef match_replacement_rows
 		{
-			rect	430,132,128,116
+			rect	444,132,114,116
 			visible	1
 			listname	match_replacement_rows
 			textscale	0.19
@@ -528,6 +762,7 @@ windowDef p_matchcontrol
 			backcolor	0,0,0,0.6
 			forecolor	1,1,1,0.8
 			font	"fonts/lowpixel"
+			textspacing	-1
 			backgroundHover	"gfx/guis/mainmenu/bg_hover2"
 			backgroundFocus	"gfx/guis/mainmenu/bg_focus2"
 			backgroundLine	"gfx/guis/mainmenu/bg_line2"
@@ -545,6 +780,7 @@ windowDef p_matchcontrol
 			gui	match_role_choice
 			textscale	0.20
 			font	"fonts/lowpixel"
+			textspacing	-1
 			forecolor	1,0.745,0.137,0.88
 		}
 		// Duel contestant binding reuses the typed action-side state.  These
@@ -557,11 +793,12 @@ windowDef p_matchcontrol
 			text	"gui::match_action_side_0_label"
 			textscale	0.14
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.38 + ( "gui::match_action_side_0_enabled" * 0.22 ) + ( "gui::match_action_side_0_selected" * 0.30 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,( 0.35 + ( "gui::match_action_side_0_selected" * 0.45 ) )
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,( 0.35 + ( "gui::match_action_side_0_selected" * 0.45 ) )
+
 			onAction {
 				if ( "gui::match_action_side_0_enabled" == 1 ) {
 					set "cmd" "matchControl action_side_a" ;
@@ -575,11 +812,12 @@ windowDef p_matchcontrol
 			text	"gui::match_action_side_1_label"
 			textscale	0.14
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.38 + ( "gui::match_action_side_1_enabled" * 0.22 ) + ( "gui::match_action_side_1_selected" * 0.30 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,( 0.35 + ( "gui::match_action_side_1_selected" * 0.45 ) )
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,( 0.35 + ( "gui::match_action_side_1_selected" * 0.45 ) )
+
 			onAction {
 				if ( "gui::match_action_side_1_enabled" == 1 ) {
 					set "cmd" "matchControl action_side_b" ;
@@ -594,12 +832,15 @@ windowDef p_matchcontrol
 			text	"#str_41723"
 			textscale	0.17
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_team_join_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_team_join_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_team_join_reason" ; }
 			onAction { if ( "gui::match_op_team_join_available" == 1 ) { set "cmd" "matchControl team_join_marine" ; } }
 		}
 		windowDef match_join_strogg_button
@@ -609,12 +850,15 @@ windowDef p_matchcontrol
 			text	"#str_41724"
 			textscale	0.17
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_team_join_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_team_join_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_team_join_reason" ; }
 			onAction { if ( "gui::match_op_team_join_available" == 1 ) { set "cmd" "matchControl team_join_strogg" ; } }
 		}
 		windowDef match_spectate_button
@@ -624,12 +868,15 @@ windowDef p_matchcontrol
 			text	"#str_41725"
 			textscale	0.18
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_team_join_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_team_join_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_team_join_reason" ; }
 			onAction { if ( "gui::match_op_team_join_available" == 1 ) { set "cmd" "matchControl team_spectate" ; } }
 		}
 		windowDef match_queue_leave_button
@@ -639,12 +886,15 @@ windowDef p_matchcontrol
 			text	"#str_41727"
 			textscale	0.17
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_queue_leave_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_queue_leave_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_queue_leave_reason" ; }
 			onAction { if ( "gui::match_op_queue_leave_available" == 1 ) { set "cmd" "matchControl queue_leave" ; } }
 		}
 
@@ -657,12 +907,15 @@ windowDef p_matchcontrol
 			text	"#str_41726"
 			textscale	0.17
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_queue_join_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_queue_join_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_queue_join_reason" ; }
 			onAction { if ( "gui::match_op_queue_join_available" == 1 ) { set "cmd" "matchControl queue_join" ; } }
 		}
 		windowDef match_queue_defer_button
@@ -672,12 +925,15 @@ windowDef p_matchcontrol
 			text	"#str_41728"
 			textscale	0.18
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_queue_defer_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_queue_defer_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_queue_defer_reason" ; }
 			onAction { if ( "gui::match_op_queue_defer_available" == 1 ) { set "cmd" "matchControl queue_defer" ; } }
 		}
 		windowDef match_accept_invite_button
@@ -687,12 +943,15 @@ windowDef p_matchcontrol
 			text	"#str_41729"
 			textscale	0.16
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_roster_accept_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_roster_accept_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_roster_accept_reason" ; }
 			onAction { if ( "gui::match_op_roster_accept_available" == 1 ) { set "cmd" "matchControl roster_accept" ; } }
 		}
 		windowDef match_contestant_bind_button
@@ -702,12 +961,15 @@ windowDef p_matchcontrol
 			text	"#str_41909"
 			textscale	0.14
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_series_contestant_bind_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_series_contestant_bind_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_series_contestant_bind_reason" ; }
 			onAction { if ( "gui::match_op_series_contestant_bind_available" == 1 ) { set "cmd" "matchControl series_contestant_bind" ; } }
 		}
 
@@ -718,12 +980,15 @@ windowDef p_matchcontrol
 			text	"#str_41730"
 			textscale	0.18
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_roster_invite_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_roster_invite_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_roster_invite_reason" ; }
 			onAction { if ( "gui::match_op_roster_invite_available" == 1 ) { set "cmd" "matchControl roster_invite" ; } }
 		}
 		windowDef match_remove_button
@@ -733,12 +998,15 @@ windowDef p_matchcontrol
 			text	"#str_41731"
 			textscale	0.18
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_roster_remove_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_roster_remove_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_roster_remove_reason" ; }
 			onAction {
 				if ( "gui::match_op_roster_remove_available" == 1 ) {
 					set "cmd" "matchControl arm_roster_remove" ;
@@ -754,12 +1022,15 @@ windowDef p_matchcontrol
 			text	"#str_41732"
 			textscale	0.17
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_roster_substitute_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_roster_substitute_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_roster_substitute_reason" ; }
 			onAction {
 				if ( "gui::match_op_roster_substitute_available" == 1 ) {
 					set "cmd" "matchControl arm_roster_substitute" ;
@@ -775,12 +1046,15 @@ windowDef p_matchcontrol
 			text	"#str_41733"
 			textscale	0.16
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_role_assign_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_role_assign_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_role_assign_reason" ; }
 			onAction { if ( "gui::match_op_role_assign_available" == 1 ) { set "cmd" "matchControl role_assign" ; } }
 		}
 		windowDef match_team_lock_button
@@ -790,12 +1064,15 @@ windowDef p_matchcontrol
 			text	"gui::match_team_lock_action"
 			textscale	0.16
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_team_lock_set_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_team_lock_set_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_team_lock_set_reason" ; }
 				onAction { if ( "gui::match_op_team_lock_set_available" == 1 ) { set "cmd" "matchControl team_lock_toggle" ; } }
 		}
 		windowDef match_roster_leave_button
@@ -805,12 +1082,15 @@ windowDef p_matchcontrol
 			text	"#str_42343"
 			textscale	0.16
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_roster_leave_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_roster_leave_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_roster_leave_reason" ; }
 			onAction { if ( "gui::match_op_roster_leave_available" == 1 ) { set "cmd" "matchControl roster_leave" ; } }
 		}
 		windowDef match_broadcaster_button
@@ -820,12 +1100,15 @@ windowDef p_matchcontrol
 			text	"gui::match_broadcaster_action"
 			textscale	0.17
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_broadcaster_set_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_broadcaster_set_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_broadcaster_set_reason" ; }
 			onAction { if ( "gui::match_op_broadcaster_set_available" == 1 ) { set "cmd" "matchControl broadcaster_set" ; } }
 		}
 		windowDef match_participant_remove_button
@@ -835,12 +1118,15 @@ windowDef p_matchcontrol
 			text	"#str_41908"
 			textscale	0.14
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_participant_remove_available" * 0.4 ) )
-			backcolor	0.10,0.06,0.04,0.85
-			bordercolor	0.890,0.537,0,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.890,0.537,0,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_participant_remove_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_participant_remove_reason" ; }
 			onAction {
 				if ( "gui::match_op_participant_remove_available" == 1 ) {
 					set "cmd" "matchControl arm_participant_remove" ;
@@ -865,6 +1151,7 @@ windowDef p_matchcontrol
 			text	"#str_41738"
 			textscale	0.22
 			font	"fonts/lowpixel"
+			textspacing	-1
 			forecolor	1,1,1,0.65
 		}
 		windowDef match_global_proposal_value
@@ -874,6 +1161,7 @@ windowDef p_matchcontrol
 			text	"gui::match_global_proposal"
 			textscale	0.20
 			font	"fonts/lowpixel"
+			textspacing	-1
 			forecolor	1,0.745,0.137,0.88
 		}
 		windowDef match_side_proposal_label
@@ -883,6 +1171,7 @@ windowDef p_matchcontrol
 			text	"#str_41739"
 			textscale	0.22
 			font	"fonts/lowpixel"
+			textspacing	-1
 			forecolor	1,1,1,0.65
 		}
 		windowDef match_side_proposal_value
@@ -892,6 +1181,7 @@ windowDef p_matchcontrol
 			text	"gui::match_side_proposal"
 			textscale	0.20
 			font	"fonts/lowpixel"
+			textspacing	-1
 			forecolor	1,0.745,0.137,0.88
 		}
 		windowDef match_proposal_scope_label
@@ -901,6 +1191,7 @@ windowDef p_matchcontrol
 			text	"#str_41793"
 			textscale	0.21
 			font	"fonts/lowpixel"
+			textspacing	-1
 			forecolor	1,1,1,0.65
 		}
 		choiceDef match_proposal_scope_choice
@@ -913,6 +1204,7 @@ windowDef p_matchcontrol
 			gui	match_proposal_scope_choice
 			textscale	0.20
 			font	"fonts/lowpixel"
+			textspacing	-1
 			forecolor	1,0.745,0.137,0.88
 		}
 		listDef match_proposal_rows
@@ -926,6 +1218,7 @@ windowDef p_matchcontrol
 			backcolor	0,0,0,0.6
 			forecolor	1,1,1,0.8
 			font	"fonts/lowpixel"
+			textspacing	-1
 			backgroundHover	"gfx/guis/mainmenu/bg_hover2"
 			backgroundFocus	"gfx/guis/mainmenu/bg_focus2"
 			backgroundLine	"gfx/guis/mainmenu/bg_line2"
@@ -938,12 +1231,15 @@ windowDef p_matchcontrol
 			text	"#str_41740"
 			textscale	0.18
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_proposal_create_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_proposal_create_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_proposal_create_reason" ; }
 			onAction { if ( "gui::match_op_proposal_create_available" == 1 ) { set "cmd" "matchControl proposal_create" ; } }
 		}
 		windowDef match_proposal_yes_button
@@ -953,12 +1249,15 @@ windowDef p_matchcontrol
 			text	"#str_41741"
 			textscale	0.18
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_proposal_cast_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_proposal_cast_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_proposal_cast_reason" ; }
 			onAction { if ( "gui::match_op_proposal_cast_available" == 1 ) { set "cmd" "matchControl proposal_yes" ; } }
 		}
 		windowDef match_proposal_no_button
@@ -968,12 +1267,15 @@ windowDef p_matchcontrol
 			text	"#str_41742"
 			textscale	0.18
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_proposal_cast_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_proposal_cast_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_proposal_cast_reason" ; }
 			onAction { if ( "gui::match_op_proposal_cast_available" == 1 ) { set "cmd" "matchControl proposal_no" ; } }
 		}
 		windowDef match_proposal_abstain_button
@@ -983,12 +1285,15 @@ windowDef p_matchcontrol
 			text	"#str_41743"
 			textscale	0.17
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_proposal_cast_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_proposal_cast_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_proposal_cast_reason" ; }
 			onAction { if ( "gui::match_op_proposal_cast_available" == 1 ) { set "cmd" "matchControl proposal_abstain" ; } }
 		}
 		windowDef match_proposal_cancel_button
@@ -998,12 +1303,15 @@ windowDef p_matchcontrol
 			text	"#str_41744"
 			textscale	0.19
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_proposal_cancel_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_proposal_cancel_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_proposal_cancel_reason" ; }
 			onAction { if ( "gui::match_op_proposal_cancel_available" == 1 ) { set "cmd" "matchControl proposal_cancel" ; } }
 		}
 	}
@@ -1022,29 +1330,32 @@ windowDef p_matchcontrol
 			text	"gui::match_rules_summary"
 			textscale	0.20
 			font	"fonts/lowpixel"
+			textspacing	-1
 			forecolor	1,0.745,0.137,0.88
 		}
 		windowDef match_profile_title
 		{
-			rect	202,145,168,18
+			rect	202,145,76,18
 			visible	1
 			text	"#str_41788"
 			textscale	0.21
 			font	"fonts/lowpixel"
+			textspacing	-1
 			forecolor	1,1,1,0.7
 		}
 		windowDef match_rule_title
 		{
-			rect	378,145,180,18
+			rect	202,184,356,18
 			visible	1
 			text	"#str_41745"
 			textscale	0.21
 			font	"fonts/lowpixel"
+			textspacing	-1
 			forecolor	1,1,1,0.7
 		}
 		listDef match_profile_rows
 		{
-			rect	202,164,168,112
+			rect	282,141,276,40
 			visible	1
 			listname	match_profile_rows
 			textscale	0.19
@@ -1053,6 +1364,7 @@ windowDef p_matchcontrol
 			backcolor	0,0,0,0.6
 			forecolor	1,1,1,0.8
 			font	"fonts/lowpixel"
+			textspacing	-1
 			backgroundHover	"gfx/guis/mainmenu/bg_hover2"
 			backgroundFocus	"gfx/guis/mainmenu/bg_focus2"
 			backgroundLine	"gfx/guis/mainmenu/bg_line2"
@@ -1060,7 +1372,7 @@ windowDef p_matchcontrol
 		}
 		listDef match_rule_rows
 		{
-			rect	378,164,180,112
+			rect	202,202,356,76
 			visible	1
 			listname	match_rule_rows
 			textscale	0.18
@@ -1069,11 +1381,12 @@ windowDef p_matchcontrol
 			backcolor	0,0,0,0.6
 			forecolor	1,1,1,0.8
 			font	"fonts/lowpixel"
+			textspacing	-1
 			backgroundHover	"gfx/guis/mainmenu/bg_hover2"
 			backgroundFocus	"gfx/guis/mainmenu/bg_focus2"
 			backgroundLine	"gfx/guis/mainmenu/bg_line2"
-			tabstops	"0,132,180"
-			tabaligns	"0,2"
+			tabstops	"0,184,276,340"
+			tabaligns	"0,0,2"
 			onAction { set "cmd" "matchControl select_rule_row" ; }
 		}
 		windowDef match_rule_value_label
@@ -1083,6 +1396,7 @@ windowDef p_matchcontrol
 			text	"#str_41789"
 			textscale	0.21
 			font	"fonts/lowpixel"
+			textspacing	-1
 			forecolor	1,1,1,0.7
 		}
 		editDef match_rule_value
@@ -1093,6 +1407,7 @@ windowDef p_matchcontrol
 			maxchars	11
 			textscale	0.21
 			font	"fonts/lowpixel"
+			textspacing	-1
 			forecolor	1,0.745,0.137,0.9
 			backcolor	0,0,0,0.6
 			bordercolor	0.545,0.588,0.294,0.45
@@ -1105,6 +1420,7 @@ windowDef p_matchcontrol
 			text	"gui::match_staged_summary"
 			textscale	0.18
 			font	"fonts/lowpixel"
+			textspacing	-1
 			forecolor	1,0.745,0.137,0.8
 		}
 		windowDef match_profile_select_button
@@ -1114,12 +1430,15 @@ windowDef p_matchcontrol
 			text	"#str_41747"
 			textscale	0.18
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_rules_select_profile_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_rules_select_profile_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_rules_select_profile_reason" ; }
 			onAction { if ( "gui::match_op_rules_select_profile_available" == 1 ) { set "cmd" "matchControl rules_select_profile" ; } }
 		}
 		windowDef match_rule_stage_button
@@ -1129,12 +1448,15 @@ windowDef p_matchcontrol
 			text	"#str_41748"
 			textscale	0.18
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_rules_stage_field_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_rules_stage_field_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_rules_stage_field_reason" ; }
 			onAction { if ( "gui::match_op_rules_stage_field_available" == 1 ) { set "cmd" "matchControl rules_stage_field" ; } }
 		}
 		windowDef match_rules_commit_button
@@ -1144,12 +1466,15 @@ windowDef p_matchcontrol
 			text	"#str_41749"
 			textscale	0.18
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_rules_commit_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_rules_commit_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_rules_commit_reason" ; }
 			onAction {
 				if ( "gui::match_op_rules_commit_available" == 1 ) {
 					set "cmd" "matchControl arm_rules_commit" ;
@@ -1165,12 +1490,15 @@ windowDef p_matchcontrol
 			text	"#str_41750"
 			textscale	0.18
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_rules_discard_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_rules_discard_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_rules_discard_reason" ; }
 			onAction { if ( "gui::match_op_rules_discard_available" == 1 ) { set "cmd" "matchControl rules_discard" ; } }
 		}
 	}
@@ -1189,6 +1517,7 @@ windowDef p_matchcontrol
 			text	"gui::match_series_summary"
 			textscale	0.19
 			font	"fonts/lowpixel"
+			textspacing	-1
 			forecolor	1,0.745,0.137,0.88
 		}
 		choiceDef match_series_profile_choice
@@ -1201,47 +1530,55 @@ windowDef p_matchcontrol
 			gui	match_series_profile_choice
 			textscale	0.19
 			font	"fonts/lowpixel"
+			textspacing	-1
 			forecolor	1,0.745,0.137,0.88
 		}
 		windowDef match_series_history_title
 		{
-			rect	378,142,180,18
+			rect	202,218,356,18
 			visible	1
 			text	"#str_41753"
 			textscale	0.19
 			font	"fonts/lowpixel"
+			textspacing	-1
 			forecolor	1,1,1,0.7
 		}
 		listDef match_series_map_rows
 		{
-			rect	202,164,168,126
+			rect	202,164,356,50
 			visible	1
 			listname	match_series_map_rows
 			textscale	0.18
-			itemheight	18
+			itemheight	16
 			scrollbar	1
 			backcolor	0,0,0,0.6
 			forecolor	1,1,1,0.8
 			font	"fonts/lowpixel"
+			textspacing	-1
 			backgroundHover	"gfx/guis/mainmenu/bg_hover2"
 			backgroundFocus	"gfx/guis/mainmenu/bg_focus2"
 			backgroundLine	"gfx/guis/mainmenu/bg_line2"
+			tabstops	"0,164,228,284,340"
+			tabaligns	"0,0,0,0"
 			onAction { set "cmd" "matchControl select_series_map" ; }
 		}
 		listDef match_series_history_rows
 		{
-			rect	378,164,180,126
+			rect	202,238,356,50
 			visible	1
 			listname	match_series_history_rows
 			textscale	0.17
-			itemheight	18
+			itemheight	16
 			scrollbar	1
 			backcolor	0,0,0,0.6
 			forecolor	1,1,1,0.8
 			font	"fonts/lowpixel"
+			textspacing	-1
 			backgroundHover	"gfx/guis/mainmenu/bg_hover2"
 			backgroundFocus	"gfx/guis/mainmenu/bg_focus2"
 			backgroundLine	"gfx/guis/mainmenu/bg_line2"
+			tabstops	"0,164,228,284,340"
+			tabaligns	"0,0,0,0"
 		}
 		windowDef match_series_stage_button
 		{
@@ -1250,12 +1587,15 @@ windowDef p_matchcontrol
 			text	"#str_41754"
 			textscale	0.17
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_series_stage_profile_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_series_stage_profile_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_series_stage_profile_reason" ; }
 			onAction { if ( "gui::match_op_series_stage_profile_available" == 1 ) { set "cmd" "matchControl series_stage" ; } }
 		}
 		windowDef match_series_start_button
@@ -1265,12 +1605,15 @@ windowDef p_matchcontrol
 			text	"#str_41755"
 			textscale	0.17
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_series_start_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_series_start_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_series_start_reason" ; }
 			onAction {
 				if ( "gui::match_op_series_start_available" == 1 ) {
 					set "cmd" "matchControl arm_series_start" ;
@@ -1286,12 +1629,15 @@ windowDef p_matchcontrol
 			text	"#str_41756"
 			textscale	0.17
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_series_cancel_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_series_cancel_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_series_cancel_reason" ; }
 			onAction {
 				if ( "gui::match_op_series_cancel_available" == 1 ) {
 					set "cmd" "matchControl arm_series_cancel" ;
@@ -1307,12 +1653,15 @@ windowDef p_matchcontrol
 			text	"#str_41757"
 			textscale	0.17
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_series_advance_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_series_advance_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_series_advance_reason" ; }
 			onAction {
 				if ( "gui::match_op_series_advance_available" == 1 ) {
 					set "cmd" "matchControl arm_series_advance" ;
@@ -1328,12 +1677,15 @@ windowDef p_matchcontrol
 			text	"#str_41758"
 			textscale	0.17
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_veto_select_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_veto_select_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_veto_select_reason" ; }
 			onAction { if ( "gui::match_op_veto_select_available" == 1 ) { set "cmd" "matchControl arm_veto_ban" ; set "match_confirm_body::text" "#str_41907" ; set "desktop::match_confirm" "10" ; } }
 		}
 		windowDef match_veto_pick_button
@@ -1343,12 +1695,15 @@ windowDef p_matchcontrol
 			text	"#str_41759"
 			textscale	0.17
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_veto_select_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_veto_select_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_veto_select_reason" ; }
 			onAction { if ( "gui::match_op_veto_select_available" == 1 ) { set "cmd" "matchControl arm_veto_pick" ; set "match_confirm_body::text" "#str_41907" ; set "desktop::match_confirm" "10" ; } }
 		}
 		windowDef match_veto_decider_button
@@ -1358,12 +1713,15 @@ windowDef p_matchcontrol
 			text	"#str_41760"
 			textscale	0.17
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_veto_select_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_veto_select_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_veto_select_reason" ; }
 			onAction { if ( "gui::match_op_veto_select_available" == 1 ) { set "cmd" "matchControl arm_veto_decider" ; set "match_confirm_body::text" "#str_41907" ; set "desktop::match_confirm" "10" ; } }
 		}
 		windowDef match_veto_side_marine_button
@@ -1373,12 +1731,15 @@ windowDef p_matchcontrol
 			text	"#str_41761"
 			textscale	0.15
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_veto_select_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_veto_select_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_veto_select_reason" ; }
 			onAction { if ( "gui::match_op_veto_select_available" == 1 ) { set "cmd" "matchControl arm_veto_side_marine" ; set "match_confirm_body::text" "#str_41907" ; set "desktop::match_confirm" "10" ; } }
 		}
 		windowDef match_veto_side_strogg_button
@@ -1388,12 +1749,15 @@ windowDef p_matchcontrol
 			text	"#str_41762"
 			textscale	0.17
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,( 0.4 + ( "gui::match_op_veto_select_available" * 0.4 ) )
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onMouseEnter { set "match_action_reason::text" "gui::match_op_veto_select_reason" ; }
+
+			onGainFocus { set "match_action_reason::text" "gui::match_op_veto_select_reason" ; }
 			onAction { if ( "gui::match_op_veto_select_available" == 1 ) { set "cmd" "matchControl arm_veto_side_strogg" ; set "match_confirm_body::text" "#str_41907" ; set "desktop::match_confirm" "10" ; } }
 		}
 	}
@@ -1406,15 +1770,16 @@ windowDef p_matchcontrol
 		rect	0,0,640,480
 		visible	( "gui::match_surface_available" == 1 && "desktop::match_tab" == 5 )
 		windowDef match_evidence_status_label { rect 202,116,112,18 visible 1 text "#str_41763" textscale 0.22 font "fonts/lowpixel" forecolor 1,1,1,0.65 }
-		windowDef match_evidence_report_label { rect 202,140,112,18 visible 1 text "#str_41764" textscale 0.22 font "fonts/lowpixel" forecolor 1,1,1,0.65 }
-		windowDef match_evidence_demo_label { rect 202,164,112,18 visible 1 text "#str_41765" textscale 0.22 font "fonts/lowpixel" forecolor 1,1,1,0.65 }
-		windowDef match_evidence_values
+		editDef match_evidence_values
 		{
-			rect	314,116,244,72
+			rect	202,136,356,52
 			visible	1
 			text	"gui::match_evidence_summary"
+			readonly	1
+			wrap	1
 			textscale	0.20
 			font	"fonts/lowpixel"
+			textspacing	-1
 			forecolor	1,0.745,0.137,0.88
 		}
 		windowDef match_evidence_recent_title
@@ -1424,6 +1789,7 @@ windowDef p_matchcontrol
 			text	"#str_41766"
 			textscale	0.22
 			font	"fonts/lowpixel"
+			textspacing	-1
 			forecolor	1,1,1,0.7
 		}
 		listDef match_evidence_rows
@@ -1437,6 +1803,7 @@ windowDef p_matchcontrol
 			backcolor	0,0,0,0.6
 			forecolor	1,1,1,0.8
 			font	"fonts/lowpixel"
+			textspacing	-1
 			backgroundHover	"gfx/guis/mainmenu/bg_hover2"
 			backgroundFocus	"gfx/guis/mainmenu/bg_focus2"
 			backgroundLine	"gfx/guis/mainmenu/bg_line2"
@@ -1450,11 +1817,12 @@ windowDef p_matchcontrol
 			text	"#str_41771"
 			textscale	0.20
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,0.8
-			backcolor	0.06,0.08,0.06,0.85
-			bordercolor	0.545,0.588,0.294,0.45
-			bordersize	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.45
+
 			onAction {
 				set "cmd" "play main_menu_selection" ;
 				set "cmd" "matchControl refresh" ;
@@ -1462,9 +1830,9 @@ windowDef p_matchcontrol
 		}
 	}
 
-	// Persistent, localized feedback.  Hovering any operation replaces the
-	// upper line with its exact server-projected availability reason; operation
-	// results replace the lower line after the authoritative response arrives.
+	// Persistent, localized feedback. Hovering or focusing an operation shows
+	// its server-projected availability reason. Both fields wrap and can scroll
+	// so translated explanations and authoritative results remain accessible.
 	windowDef match_feedback_line
 	{
 		rect	200,375,362,4
@@ -1479,24 +1847,31 @@ windowDef p_matchcontrol
 		text	"#str_41767"
 		textscale	0.18
 		font	"fonts/lowpixel"
+		textspacing	-1
 		forecolor	1,1,1,0.55
 	}
-	windowDef match_action_reason
+	editDef match_action_reason
 	{
-		rect	276,381,282,16
+		rect	276,381,282,26
 		visible	1
 		text	"#str_41770"
 		textscale	0.18
 		font	"fonts/lowpixel"
+		textspacing	-1
+		readonly	1
+		wrap	1
 		forecolor	1,1,1,0.72
 	}
-	windowDef match_result
+	editDef match_result
 	{
-		rect	202,399,356,24
+		rect	202,409,356,26
 		visible	1
 		text	"gui::match_result_message"
 		textscale	0.19
 		font	"fonts/lowpixel"
+		textspacing	-1
+		readonly	1
+		wrap	1
 		forecolor	1,0.745,0.137,0.88
 	}
 
@@ -1526,6 +1901,7 @@ windowDef p_matchcontrol
 			text	"#str_41797"
 			textscale	0.27
 			font	"fonts/marine"
+			textspacing	-1
 			textalign	1
 			forecolor	1,0.745,0.137,0.95
 		}
@@ -1536,6 +1912,7 @@ windowDef p_matchcontrol
 			text	"#str_41798"
 			textscale	0.21
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,0.82
 		}
@@ -1546,6 +1923,7 @@ windowDef p_matchcontrol
 			text	"#str_107703"
 			textscale	0.21
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,0.85
 			backcolor	0.10,0.06,0.04,0.9
@@ -1563,6 +1941,7 @@ windowDef p_matchcontrol
 			text	"#str_104340"
 			textscale	0.21
 			font	"fonts/lowpixel"
+			textspacing	-1
 			textalign	1
 			forecolor	1,1,1,0.85
 			backcolor	0.06,0.08,0.06,0.9

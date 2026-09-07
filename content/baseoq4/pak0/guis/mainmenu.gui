@@ -2431,8 +2431,15 @@ windowDef Desktop
 				textscale	0.22
 				font	"fonts/lowpixel"
 				tabstops	"5,26,47,68,89,331,378,399,451,522,590"
-				tabaligns	"1,1,1,1,0,0,1"
-				tabTextScales	".3,.3,.3,.3,.22,.22,.3"
+				tabaligns	"1,1,1,1,0,0,1,0,0,0,0"
+				tabTypes	"1,1,1,1,0,0,1,0,0,0,0"
+				tabIconSizes	"14,14,14,14,14,14,14,14,0,0,0,0,14,14,0,0,0,0,0,0,0,0"
+				mtr_favorite	"gfx/guis/mainmenu/icon_favorite"
+				mtr_locked	"gfx/guis/mainmenu/icon_locked"
+				mtr_dedicated	"gfx/guis/mainmenu/icon_dedserver"
+				mtr_pb	"gfx/guis/mainmenu/icon_pb"
+				mtr_repeater	"gfx/guis/mainmenu/icon_repeater"
+				tabTextScales	".3,.3,.3,.3,.22,.22,.3,.22,.17,.17,.17"
 				tabValigns	"1,1,1,1,0,0,1"
 				itemheight	18
 				matcolor	1,1,1,0.4
@@ -2446,7 +2453,9 @@ windowDef Desktop
 				}
 
 				onEnter {
-					set "cmd" "connect ; play main_menu_selection" ;
+					if ( "gui::browser_selected" == 1 ) {
+						set "cmd" "connect ; play main_menu_selection" ;
+					}
 				}
 
 			}
@@ -20916,6 +20925,7 @@ windowDef Desktop
 		{
 			rect	388,337,244,26
 			visible	0
+			noevents	( "gui::browser_selected" == 0 )
 
 			onMouseEnter {
 				if ("desktop::active" == 0) {
@@ -20950,6 +20960,7 @@ windowDef Desktop
 		{
 			rect	388,400,244,26
 			visible	0
+			noevents	( "gui::browser_selected" == 0 )
 
 			onMouseEnter {
 				if ("desktop::active" == 0) {

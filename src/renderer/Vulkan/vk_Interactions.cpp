@@ -3808,6 +3808,8 @@ void VK_Interactions_DrawLights( const viewDef_t *viewDef ) {
 				|| vLight->localShadowMapDynamicCasters != NULL;
 		const bool shadowingEnabled = r_shadows.GetBool()
 				&& vLight->lightShader->LightCastsShadows()
+				&& ( vLight->lightDef == NULL
+					|| !vLight->lightDef->parms.noShadows )
 				&& ( hasGlobalCasters || hasLocalCasters
 					|| incompleteMapMask != 0 );
 		const bool localReceiverNeedsShadow = shadowingEnabled
@@ -3923,7 +3925,12 @@ void VK_Interactions_DrawLights( const viewDef_t *viewDef ) {
 			static bool warnedUnshadowedFallback = false;
 			if ( !warnedUnshadowedFallback ) {
 				warnedUnshadowedFallback = true;
-				common->Warning( "Vulkan: required shadow resource unavailable; affected light receivers fall back unshadowed" );
+				common->Warning( "Vulkan: required shadow resource unavailable; affected light receivers fall back unshadowed "
+					"(light=%d shader=%s stencilTarget=%d mapMask=0x%x stencilMask=0x%x hybridMask=0x%x localMap=%d globalMap=%d)",
+					vLight->lightDef != NULL ? vLight->lightDef->index : -1,
+					vLight->lightShader->GetName(), activeTargetHasStencil ? 1 : 0,
+					incompleteMapMask, incompleteStencilMask, hybridIncompleteMask,
+					localShadowState != NULL ? 1 : 0, globalShadowState != NULL ? 1 : 0 );
 			}
 		}
 

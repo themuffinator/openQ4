@@ -14,7 +14,8 @@ Core scalar states are:
 | --- | --- |
 | `match_surface_available` | Accepted recipient view is usable |
 | `match_phase` | Localized lifecycle phase and round |
-| `match_status_lines` | Five newline-separated localized values: lifecycle, readiness, pause, recipient role/side/readiness, timeout budgets |
+| `match_status_lines` | Newline-separated localized values: lifecycle, retained last result when present, readiness during warmup/countdown, pause, recipient role/side, timeout budgets. Personal readiness appears only for active recipients before play. Omitted readiness does not leave a blank line. |
+| `match_follow_visible` | Current local entity is an in-game human spectator; excludes fake clients, bots, demo/repeater playback and invalid local slots. Updated independently of the accepted-view revision. |
 | `match_ready_action` | `#str_41713` or `#str_41714` from `recipient.ready` |
 | `match_action_side_*` | One explicit, model-authorized side selector shared by team ready, timeout, lock and forfeit; Marine/Strogg in team modes and Contestant A/B in Duel |
 | `match_team_lock_action` | `#str_41734` or `#str_41735` for the currently selected side |
@@ -28,13 +29,53 @@ Core scalar states are:
 | `match_staged_summary` | Recipient-authorized staged revision/digest and changed-field count |
 | `match_series_summary` | State, best-of, score, current/next map, and veto turn |
 | `match_evidence_summary` | Evidence policy/status, final report qpath status, and MVD status; never claim a file exists until persistence reports success |
-| `match_result_message` | Localized latest authoritative result, including rejection/no-change/pending/committed status |
+| `match_result_message` | Localized latest authoritative result, including rejection/no-change/pending/committed status; empty until a result belongs to the accepted session |
+
+## Terminal match outcomes
+
+The schema-4 `publicState.terminalResult` is a frozen public match outcome,
+independent of optional evidence recording. Its outcome, reason, result revision,
+winner identity and bounded UTF-8 display name survive review, nextgame and the
+following warmup. The next countdown or session reset clears it. Team winners
+carry the gameplay team; individual winners carry their historical participant
+identity and name. Current scores, ranks, names and roster membership cannot
+reconstruct that historical result.
+
+The summary publishes `summary_result_visible`, `summary_result_outcome` and
+localized `summary_result_text`. Accepted views arriving after the summary opens
+refresh the banner and team headings. Aborted, drawn and pending results keep
+neutral headings; a forfeit identifies the actual winner without changing the
+raw score rows. Session or recipient-binding replacement clears the presentation.
+Personal victory audio requires the frozen winner identity to match the current
+accepted recipient during review, and runs once per session/result revision.
+Late joiners and mutable team membership do not establish a personal loss or win.
+
+The complete encoded view is capped at 7,936 bytes, with the maximum legal native
+fixture using 7,728 bytes. The outer reliable-message buffer is 8,192 bytes.
+Clients and servers must use matching schema-4 builds.
+
+The managed summary reserves a three-line, wrapped result banner so a bounded
+wide winner name cannot hide the separate forfeit notice. Its vertical offset
+retains ten 22-pixel ranking rows and the existing chat-entry and footer controls.
+Chat remains scrollable beneath the scores.
+
+The Status page's Previous, Next and Free camera buttons emit fixed
+`follow_prev`, `follow_next` and `follow_free` tokens. A live-player check gates
+the local presentation and request entry, while the ordinary owner-checked
+spectator event enforces camera permissions on the server. GUI text and role
+labels never select or authorize a target. The console's direct-slot request
+also includes the target spawn identity so replacement occupants cannot inherit
+an in-flight follow request.
 
 `match_referee_credential` is local input only. Never populate it from a view or result. Copy it into the authentication request through the secure challenge/proof path, then clear the GUI state and wipe every temporary buffer on success or failure. The GUI also clears it when the panel closes.
 
 ## Operation availability
 
 Every button consumes the matching `mpMatchViewOperationAvailability` decision. For each prefix below, set `match_op_<prefix>_available` to `1` only for `MP_MATCH_PROTOCOL_REASON_OK`, and set `match_op_<prefix>_reason` to the decision's localized reason. Do not infer availability from role masks in the UI adapter.
+
+Both hover and focus publish that reason into the persistent feedback field.
+Reason and result fields wrap and scroll without overlapping the global Back
+control; do not reduce them to a clipped single-line label.
 
 | Prefix | Opcode |
 | --- | --- |

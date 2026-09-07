@@ -740,10 +740,10 @@ def validate_ready_binding_contract() -> None:
         "void idMultiplayerGame::ToggleReady(",
         str(multiplayer_path),
     )
-    require(toggle_ready, "MPSendReady( !ready );", "reliable impulse-17 ready toggle")
+    require(toggle_ready, "SendReady( !ready );", "reliable impulse-17 ready toggle")
     reject(toggle_ready, "SetCVarString", "userinfo-only impulse-17 ready toggle")
 
-    send_ready = body_of(multiplayer, "static void MPSendReady(", str(multiplayer_path))
+    send_ready = body_of(multiplayer, "void idMultiplayerGame::SendReady(", str(multiplayer_path))
     require(
         send_ready,
         "GAME_RELIABLE_MESSAGE_READY",
@@ -759,7 +759,7 @@ def validate_ready_binding_contract() -> None:
         "void idMultiplayerGame::Ready_f(",
         str(multiplayer_path),
     )
-    require(ready_command, "MPSendReady( true );", "idempotent ready command")
+    require(ready_command, "SendReady( true );", "idempotent ready command")
 
     reset = body_of(multiplayer, "void idMultiplayerGame::Reset(", str(multiplayer_path))
     require(

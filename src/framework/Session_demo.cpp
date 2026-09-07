@@ -426,6 +426,41 @@ static void Session_DemoFreeRoam_f( const idCmdArgs &args ) {
 static void Session_DemoStop_f( const idCmdArgs &args ) {
 	sessLocal.StopDemoPlayback();
 }
+
+static void Session_OpenQ4DemoLibrary_f( const idCmdArgs &args ) {
+	idUserInterface *gui = session->GetActiveGUI();
+	if ( gui == NULL || gui != sessLocal.guiDemoMenu || !sessLocal.demoBrowserMode ||
+		sessLocal.guiDemoList == NULL ) {
+		common->Printf( "openq4_demoLibrary requires the active demo library\n" );
+		return;
+	}
+	const int selected = sessLocal.guiDemoList->GetSelection( NULL, 0 );
+	if ( args.Argc() == 2 && !idStr::Icmp( args.Argv( 1 ), "report" ) ) {
+		const int rows = Min( sessLocal.demoLibrary.Num(), 256 );
+		common->Printf( "DEMO_LIBRARY count=%d visible=%d selected=%d canPlay=%d truncated=%d\n",
+			sessLocal.demoLibrary.Num(), gui->State().GetInt( "demo_count" ), selected,
+			gui->State().GetBool( "demo_canPlay" ), rows < sessLocal.demoLibrary.Num() );
+		for ( int i = 0; i < rows; ++i ) {
+			const demoLibraryEntry_t &entry = sessLocal.demoLibrary[i];
+			const idStr path = DemoSanitizeText( entry.path, MAX_OSPATH );
+			common->Printf( "DEMO_LIBRARY_ENTRY index=%d type=%d playable=%d capabilities=%d path=%s\n",
+				i, static_cast<int>( entry.type ), entry.playable, entry.capabilities, path.c_str() );
+		}
+		return;
+	}
+	if ( args.Argc() == 2 && !idStr::Icmp( args.Argv( 1 ), "play" ) ) {
+		if ( selected < 0 || selected >= sessLocal.demoLibrary.Num() ||
+			( sessLocal.demoLibrary[selected].capabilities & DEMO_CAP_PLAY ) == 0 ) {
+			common->Printf( "openq4_demoLibrary play requires a playable selected recording\n" );
+			return;
+		}
+		// Invoke the same engine action as the library's Play button, without
+		// generating keyboard or mouse events for an automated runtime check.
+		sessLocal.HandleDemoMenuCommand( "demoPlay" );
+		return;
+	}
+	common->Printf( "usage: openq4_demoLibrary report | play\n" );
+}
 #endif
 
 }
@@ -446,6 +481,7 @@ void idSessionLocal::InitDemoSystem() {
 	}
 
 	cmdSystem->AddCommand( "demoMenu", Session_DemoMenu_f, CMD_FL_SYSTEM, "opens the demo library or playback controls" );
+	cmdSystem->AddCommand( "openq4_demoLibrary", Session_OpenQ4DemoLibrary_f, CMD_FL_SYSTEM | CMD_FL_CHEAT, "reports the active demo library or invokes its selected Play action for runtime validation" );
 	cmdSystem->AddCommand( "demoPause", Session_DemoPause_f, CMD_FL_SYSTEM, "toggles unified demo playback pause" );
 	cmdSystem->AddCommand( "demoSpeed", Session_DemoSpeed_f, CMD_FL_SYSTEM, "sets unified demo playback speed" );
 	cmdSystem->AddCommand( "demoSeek", Session_DemoSeek_f, CMD_FL_SYSTEM, "seeks to a unified demo time in seconds" );

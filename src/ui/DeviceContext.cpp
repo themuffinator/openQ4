@@ -1854,7 +1854,7 @@ bool idDeviceContext::ClippedCoords(float *x, float *y, float *w, float *h, floa
 		float oh = *h;
 
 		if ( ow <= 0.0f || oh <= 0.0f ) {
-			break;
+			return true;
 		}
 
 		if (*x < clipRect->x) {
@@ -1878,6 +1878,13 @@ bool idDeviceContext::ClippedCoords(float *x, float *y, float *w, float *h, floa
 			*h = clipRect->h - *y + clipRect->y;
 		} else if (*y + *h > clipRect->y + clipRect->h) {
 			*h = clipRect->Bottom() - *y;
+		}
+
+		// A quad wholly above or left of the viewport can now have a negative
+		// extent. Cull it before extrapolating its atlas coordinates or passing
+		// an inverted quad to the renderer (for example, scrolled chat glyphs).
+		if ( *w < 0.0f || *h < 0.0f ) {
+			return true;
 		}
 
 		if ( s1 && s2 && t1 && t2 && ow > 0.0f ) {
@@ -1906,7 +1913,7 @@ bool idDeviceContext::ClippedCoords(float *x, float *y, float *w, float *h, floa
 		}
 	}
 
-	return (*w == 0 || *h == 0) ? true : false;
+	return ( *w <= 0.0f || *h <= 0.0f );
 }
 
 

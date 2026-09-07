@@ -60,6 +60,9 @@ typedef struct shadowMapPointReceiverSettings_s {
 } shadowMapPointReceiverSettings_t;
 
 shadowMapLightClassification_t R_ClassifyShadowMapLight( const viewLight_t *vLight );
+// Preserve projection coefficients exactly: quantizing to world-coordinate
+// precision can erase entire rows of a large light's projection.
+int R_ShadowMapHashFloat( int hash, float value );
 shadowMapProjectedFilterSettings_t R_ShadowMapProjectedFilterSettings( const viewLight_t *vLight );
 float R_ShadowMapPointFarDistance( const viewLight_t *vLight );
 shadowMapPointReceiverSettings_t R_ClampShadowMapPointReceiverSettings(
@@ -80,6 +83,11 @@ bool R_ShadowMapCasterTransformNeedsTwoSided( const float modelMatrix[ 16 ] );
 bool R_ShadowMapLightOriginInsideCasterBounds( const viewLight_t *vLight,
 	const float modelMatrix[ 16 ], const float boundsMin[ 3 ],
 	const float boundsMax[ 3 ] );
+// Conservative cube-face rejection, shared by GL and Vulkan. Invalid bounds
+// or transforms remain visible. Face order is +X,-X,+Y,-Y,+Z,-Z.
+bool R_ShadowMapCasterOutsidePointFace( const viewLight_t *vLight,
+	const float modelMatrix[ 16 ], const float boundsMin[ 3 ],
+	const float boundsMax[ 3 ], int cubeFace );
 const char *R_ShadowMapLightClassName( shadowMapLightClass_t lightClass );
 
 #endif /* !__SHADOWMAP_CLASSIFICATION_H__ */

@@ -377,7 +377,7 @@ rejected atomically.
 
 Only a committed map result advances the score. Abort does not; forfeit does.
 A selected-map load failure returns the series to `READY`, preserves the last
-committed result and records the failure. The schema-3 cross-map recovery record
+committed result and records the failure. The schema-4 cross-map recovery record
 stores the series core and mutable report draft together. It is bounded,
 checksummed, written beneath `fs_savepath` through a fixed server-owned path
 using temp-write plus atomic replace, and contains no secret, address or

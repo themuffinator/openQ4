@@ -2534,11 +2534,44 @@ void idSessionLocal::HandleMainMenuCommands( const char *menuCommand ) {
 			continue;
 		}
 
+		if ( !idStr::Icmp( cmd, "InitServerBrowser" ) ) {
+			idAsyncNetwork::client.serverList.GUIInit();
+			continue;
+		}
+
+		if ( !idStr::Icmp( cmd, "updateFilterByMod" ) ||
+			!idStr::Icmp( cmd, "filterByPrevMod" ) || !idStr::Icmp( cmd, "filterByNextMod" ) ) {
+			const int direction = !idStr::Icmp( cmd, "filterByPrevMod" ) ? -1 : !idStr::Icmp( cmd, "filterByNextMod" ) ? 1 : 0;
+			idAsyncNetwork::client.serverList.UpdateFilterByMod( direction );
+			continue;
+		}
+
+		if ( !idStr::Icmp( cmd, "toggleFavorite" ) ) {
+			idAsyncNetwork::client.serverList.ToggleFavorite();
+			continue;
+		}
+
+		if ( !idStr::Icmp( cmd, "server_clearSort" ) ) {
+			idAsyncNetwork::client.serverList.ResetSorting();
+			continue;
+		}
+
+		if ( !idStr::Icmp( cmd, "sortFavorite" ) || !idStr::Icmp( cmd, "sortLocked" ) ||
+			!idStr::Icmp( cmd, "sortDed" ) || !idStr::Icmp( cmd, "sortPB" ) || !idStr::Icmp( cmd, "sortRepeater" ) ) {
+			const serverSort_t sort = !idStr::Icmp( cmd, "sortFavorite" ) ? SORT_FAVORITE :
+				!idStr::Icmp( cmd, "sortLocked" ) ? SORT_PASSWORD : !idStr::Icmp( cmd, "sortDed" ) ? SORT_DEDICATED :
+				!idStr::Icmp( cmd, "sortPB" ) ? SORT_PUNKBUSTER : SORT_REPEATER;
+			idAsyncNetwork::client.serverList.SetSorting( sort );
+			continue;
+		}
+
 		if ( !idStr::Icmp( cmd, "UpdateServers" ) ) {
+			idAsyncNetwork::client.serverList.GUIInit();
 			if ( guiActive->State().GetBool( "lanSet" ) ) {
 				cmdSystem->BufferCommandText( CMD_EXEC_NOW, "LANScan" );
 			} else {
 				idAsyncNetwork::GetNETServers();
+				idAsyncNetwork::client.serverList.AddFavoriteServers();
 			}
 			continue;
 		}
@@ -2587,14 +2620,20 @@ void idSessionLocal::HandleMainMenuCommands( const char *menuCommand ) {
 			continue;
 		}
 
-		if ( !idStr::Icmp( cmd, "serverList" ) ) {
+		if ( !idStr::Icmp( cmd, "serverList" ) || !idStr::Icmp( cmd, "click_serverList" ) ) {
 			idAsyncNetwork::client.serverList.GUIUpdateSelected();
 			continue;
 		}
 
-		if ( !idStr::Icmp( cmd, "LANConnect" ) ) {
-			int sel = guiActive->State().GetInt( "serverList_selid_0" ); 
-			cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "Connect %d\n", sel ) );
+		if ( !idStr::Icmp( cmd, "LANConnect" ) || !idStr::Icmp( cmd, "connect" ) ) {
+			idStr endpoint;
+			if ( !idAsyncNetwork::client.serverList.GetSelectedAddress( endpoint ) ) {
+				continue;
+			}
+			idCmdArgs connectArgs;
+			connectArgs.AppendArg( "connect" );
+			connectArgs.AppendArg( endpoint.c_str() );
+			cmdSystem->BufferCommandArgs( CMD_EXEC_NOW, connectArgs );
 			return;
 		}
 
@@ -2693,9 +2732,26 @@ void idSessionLocal::HandleMainMenuCommands( const char *menuCommand ) {
 				continue;
 			}
 
-			// Quote it: an unquoted IPv6 endpoint is split by the command
-			// tokenizer, which treats '[', ']' and '%' as punctuation.
-			cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "connect \"%s\"", s ) );
+			// Validate before handing a typed argument to the command system.
+			// A hostname or IPv6 literal must never become console command text.
+			netadr_t address;
+			bool valid = strlen( s ) < 256;
+			for ( const unsigned char *p = reinterpret_cast<const unsigned char *>( s ); valid && *p; ++p ) {
+				valid = *p > 32 && *p != 127 && *p != '"' && *p != ';' && *p != '\\';
+			}
+			if ( !valid || !Sys_StringToNetAdr( s, &address, true ) ||
+				( address.type != NA_IP && address.type != NA_IP6 && address.type != NA_LOOPBACK ) ) {
+				MessageBox( MSG_OK, va( common->GetLanguageDict()->GetString( "#str_06734" ), s ),
+					common->GetLanguageDict()->GetString( "#str_06735" ), true );
+				continue;
+			}
+			if ( !address.port ) {
+				address.port = PORT_SERVER;
+			}
+			idCmdArgs connectArgs;
+			connectArgs.AppendArg( "connect" );
+			connectArgs.AppendArg( Sys_NetAdrToString( address ) );
+			cmdSystem->BufferCommandArgs( CMD_EXEC_NOW, connectArgs );
 			return;
 		}
 

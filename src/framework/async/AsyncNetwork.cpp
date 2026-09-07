@@ -728,6 +728,12 @@ idAsyncNetwork::ExecuteSessionCommand
 */
 void idAsyncNetwork::ExecuteSessionCommand( const char *sessCmd ) {
 	if ( sessCmd[ 0 ] ) {
+		if ( server.IsActive() && !idStr::Icmp( sessCmd, "nextMap" ) ) {
+			// The game has already selected si_map. Defer the engine map load
+			// until this simulation frame has returned and released its world.
+			cmdSystem->BufferCommandText( CMD_EXEC_INSERT, "nextMap\n" );
+			return;
+		}
 		if ( !idStr::Icmp( sessCmd, "game_startmenu" ) ) {
 			session->SetGUI( game->StartMenu(), NULL );
 			return;

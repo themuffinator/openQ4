@@ -75,6 +75,7 @@ idVec4 R_ShadowMapBuildAtlasRect( int cascadeIndex, int atlasDiv );
 float R_ShadowMapTexelDepthBias( float worldTexelSize, float depthRange );
 float R_ShadowMapQuantizeCascadeExtent( float rawExtent, int tileSize );
 float R_ShadowMapSnapCascadeCenter( float rawCenter, float quantizedExtent, int tileSize );
+int R_ShadowMapProjectedStateHash( int hash, const shadowMapProjectedLightState_t &state );
 // pins the stabilization guarantees (shadow plan invariant I5)
 bool R_ShadowMapCascadeStabilitySelfTest( void );
 void R_BuildShadowMapProjectedLightState( const viewLight_t *vLight, const viewDef_t *viewDef, int tileSize, shadowMapProjectedLightState_t &state );

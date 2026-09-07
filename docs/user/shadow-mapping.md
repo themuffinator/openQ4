@@ -25,10 +25,13 @@ vid_restart
 
 Notes:
 - `r_shadows` must stay enabled for any shadow path to render.
-- If the shadow-map path is unavailable or fails for a light, openQ4 falls back to the legacy shadow path instead of leaving the light unshadowed.
+- If a light cannot use a complete shadow map, openQ4 uses its stencil representation when available. Vulkan logs a missing-resource warning and preserves direct illumination if neither representation can be submitted.
 - If only part of a receiver ownership can be represented in a shadow map, the classic renderer combines that exact map with the missing casters' stencil supplements. If those supplements are incomplete, the complete ownership falls back to stencil instead of publishing a partial shadow.
 - Point lights shadow-map by default (`r_shadowMapPointLights 1`); they are the dominant light class in Quake 4 content. Set `r_shadowMapPointLights 0` to fall back to stencil shadows for point lights only.
 - Lights touching animated, deformed, or packed character receivers can also fall back to the legacy stencil path so stock character lighting, mirrored seams, and eye materials retain retail-style interaction behavior.
+- The player flashlight uses its authored single projected shadow map; disabling flashlight cascades does not select stencil shadows. `testFlashlight 1` enables the current SP weapon's flashlight for rendering tests without simulated player input (`testFlashlight 0` turns it off).
+- Light-emitting panels that cast no stencil volume no longer force an entire point light into fallback. Panels with a real surface volume are admitted to the depth map, including the moving lift panel in Storage 2. A real missing caster still requires a complete map or stencil supplement.
+- Update budgets and subview policy may select stencil only when it covers all admitted casters. Required map updates can exceed `r_shadowMapMaxUpdatesPerView`; use `0` for unrestricted updates. Cache slot exhaustion alone can use scratch maps and does not require stencil.
 - Modern renderer diagnostics keep lighting visible when shadow-map receiver sampling is not ready, but full modern visible-frame replacement stays fail-closed so the legacy path continues to provide the actual shadowed frame.
 - Most shadow cvars can be changed live, but `vid_restart` is the safest way to apply large changes such as map resolution, cascade layout, or switching the shadow pipeline on/off.
 
@@ -164,24 +167,42 @@ vid_restart
 
 ## Residency and Update Budgeting
 
-openQ4 can keep static-only shadow maps resident and reuse them across backend views. This is enabled by default for regular projected and point lights. Dynamic casters, translucent caster passes, and view-fitted CSM/global passes are conservative by default and continue to update normally unless explicitly opted in.
+openQ4 can keep opaque static depth resident and reuse it across backend views. Regular projected lights can compose moving and cutout casters over that depth each frame. Point lights still require an entirely static, opaque caster set for reuse. Translucent caster passes continue to update normally, and view-fitted CSM/global cache reuse requires an explicit opt-in.
+
+OpenGL preserves the world's cache while drawing 2D HUD, console, and post-processing views. Changing the actual render world or map still invalidates its resident maps.
 
 | Setting | Default | Range | What it does |
 |---|---:|---:|---|
-| `r_shadowMapStaticCache` | `1` | `0..1` | Reuses resident shadow maps for static-only projected and point lights. |
+| `r_shadowMapStaticCache` | `1` | `0..1` | Reuses opaque static depth for projected lights, and complete static-only maps for point lights. |
 | `r_shadowMapStaticHysteresisFrames` | `2` | `0..120` | Frames to wait after dynamic casters disappear before a point light becomes cacheable again. Projected lights stay cached while dynamic casters move: their static tiles persist in the atlas and the moving casters are composed on top each frame. |
 | `r_shadowMapResidentFrames` | `120` | `1..3600` | Frames an unused static shadow map can stay resident before its slot may be expired. |
 | `r_shadowMapProjectedCacheSize` | `8` | `0..16` | Static projected-light cache slots inside the shared atlas. |
 | `r_shadowMapPointCacheSize` | `12` | `0..16` | Static point-light cubemap cache slots. |
-| `r_shadowMapCacheCSM` | `0` | `0..1` | Allows static-cache reuse for CSM/global shadow-map passes. Leave off unless you are testing a fixed-view or otherwise stable scene. |
+| `r_shadowMapCacheCSM` | `0` | `0..1` | Allows static-cache reuse for CSM/global shadow-map passes when their fitted projection is unchanged. Both backends refresh the map when camera movement or coverage settings change the fit. Most useful for fixed-view or otherwise stable scenes. |
 | `r_shadowMapSubviewPolicy` | `1` | `0..2` | Shadow maps in mirror/remote-camera subviews: `0` renders them like main views, `1` reuses cached maps or falls back to stencil, `2` prefers stencil in subviews. When the target has no usable stencil attachment or an ownership contains map-only casters, Vulkan still renders the required fresh map rather than dropping its shadow. |
 | `r_shadowMapTranslucentReceivers` | `1` | `0..1` | Lets translucent surfaces sample the shadow map like opaque receivers, matching the stencil path's `r_stencilTranslucentShadows` behavior. |
 
-`r_shadowMapMaxUpdatesPerView` still limits discretionary dynamic shadow-map work. Resident cache hits do not consume that update budget, so static light reuse can reduce update pressure without starving moving lights. When the budget constrains a frame, updates go to the most important stale lights first (screen coverage, staleness, and view proximity ordered), and starved lights age up the priority list so every light is eventually refreshed. A denied light may reuse its newest projection-compatible resident map. Point-light reuse additionally requires the same light origin, padded far range, cube resolution, depth-storage mode, and live physical storage generations; a moved or rescaled light therefore renders a fresh map or returns to stencil instead of decoding an old cube with a new projection. On Vulkan, a receiver ownership containing a map-only caster can exceed the nominal budget because no equivalent complete stencil result exists, and those correctness-required maps are admitted before optional maps can consume bounded resources. Cache signatures include caster materials, alpha/hash settings, caster offset settings, point-light range/depth mode, and view-fitted CSM state, so changing those inputs forces a fresh shadow map instead of reusing stale resident data.
+`r_shadowMapMaxUpdatesPerView` limits discretionary fresh shadow-map work. Resident cache hits do not consume that budget. When it constrains a frame, admission considers screen coverage, staleness, and view proximity. Both renderers require exact cache hits, including current caster membership and projection. A cache miss uses complete current stencil coverage or renders a required map. A light needing separate LOCAL and GLOBAL maps can begin filling its cache with a budget of one; it is no longer denied indefinitely because both passes cannot fit at once.
+
+On both renderers, an ownership containing map-only casters can exceed the nominal budget because no equivalent complete stencil result exists. Vulkan also admits those required maps before optional maps consume bounded resources. Cache signatures include caster materials, alpha/hash settings, caster offsets, point-light range/depth mode, and fitted CSM state. Changing those inputs invalidates ordinary exact reuse.
 
 Resident entries are scoped to the loaded render world and are invalidated on map changes. Recreated atlas or cube storage invalidates its old metadata before cache occupancy and eviction are counted. Modern OpenGL also verifies the exact world, light, GLOBAL-pass signature, resolution, storage generation, and selected atlas slot or cube immediately before use; a resource belonging to another light, pass, storage generation, or previous map is treated as unavailable. Because that path exposes one shadow resource per light and cannot compose stencil supplements, it accepts only a complete GLOBAL ownership with no distinct local/no-self caster ownership and otherwise leaves the complete shadowed frame to the classic path. GLOBAL ownership is the union of opaque and enabled translucent receivers, so a translucent-only receiver can still request a complete map; if that map cannot be prepared, the affected translucent subset returns to filtered stencil shadowing at its normal depth phase instead of being drawn unshadowed.
 
-Projected lights with moving casters no longer pay full re-renders: the light's static geometry stays cached in the shared atlas, and each frame the cached tiles are copied and only the moving casters are drawn on top. A walking character in a cached light costs one small copy plus its own triangles.
+In the classic interaction path, projected lights can retain their opaque static geometry in the shared atlas, copy it to a working map, and draw only moving and cutout casters on top. Perforated materials always remain in these live chains, even on stationary entities: stage conditions, image animation, and texture matrices can change their coverage without moving the model. Adding or removing live casters does not by itself invalidate the opaque static depth.
+
+The copy still costs GPU time, especially with several large cascades; cache reuse is not free. `r_shadowMapCacheCSM` remains off by default. The experimental shared interaction path keeps conservative cache admission where live composition is unavailable.
+
+Normal cache hits preserve the exact floating-point projection and caster transforms. Cascaded-map keys include the fitted clip planes and receiver parameters, so changes to cascade blend overlap, PCSS guards, or distant-light filter scaling cannot silently retain an obsolete fit. Stabilization reserves space for center snapping and moves edge crops back inside the projection without trimming their resolution. Budgets and subviews cannot bypass these cache checks.
+
+### Doors and other movers
+
+A resting door may enter static depth. When it moves, its old static membership must invalidate that depth before its current pose is composed into a projected map. Adding the moving leaf over an old closed-door map would leave a ghost blocker. Point maps with moving casters regenerate. Changed portal connectivity also changes the participating caster and receiver sets; returning after a door moved elsewhere must validate them again.
+
+Freezing single-player simulation with `g_stopTime 1` also holds the door's rendered pose and material clock. This allows consistent comparisons of cached and freshly rendered shadows at the same point in its travel.
+
+The Vulkan shadow-light table supports 256 lights, with space for both receiver ownerships and matching descriptor capacity. Cubemap images remain allocated on demand. This removes the earlier 64-light failure seen in a stock Air Defense 2 door view; it does not remove hardware, atlas, or memory limits. Dense scenes containing more lights than the resident cache can still require substantial fresh shadow work.
+
+The [door regression report](../dev/shadowmapping-movers-2026-09-05.md) covers real paired doors, portal state, opening and reversal, point lights, the weapon flashlight, and return after off-screen movement. `testDoor <entity name> [open|close]` is a single-player cheat diagnostic: omit the action to report every leaf's physics state and portal blocking flags. It uses the normal door movement logic.
 
 ## Transparency Shadowing
 
@@ -196,7 +217,7 @@ These are materials with holes cut by alpha test, such as:
 Behavior:
 - They cast cutout shadows in both projected and point shadow-map paths.
 - `r_shadowMapHashedAlpha 1` is the recommended mode and is enabled by default.
-- If a perforated stage uses explicit texture coordinates, openQ4 can render it with either hashed alpha or hard alpha-test shadowing; unsupported animated texgen cutouts cast conservative solid depth instead of dropping the shadow.
+- Supported perforated stages with explicit texture coordinates can use hashed alpha or hard alpha-test shadowing. OpenGL can use conservative solid depth for unsupported coverage stages; Vulkan retains stencil fallback for unsupported cinematic, dynamic-image, or generated-coordinate coverage. These cases still prevent removing the stencil implementation entirely.
 - Translucent shadow coverage stages preserve the same material alpha-test mode, so blended foliage/glass masks stay consistent with opaque cutouts.
 
 Hashed alpha notes:
@@ -217,6 +238,7 @@ Behavior:
 - Implemented as an additional experimental translucent shadow overlay on top of the main shadow map.
 
 Current limits:
+- Translucent moments are an OpenGL experiment; enabling the CVar on Vulkan does not establish equivalent translucent shadowing.
 - Supported stages currently include old-style alpha and premultiplied-alpha stages with explicit ST texture coordinates, plus common additive `blend add` / `GL_ONE, GL_ONE` stages.
 - When a translucent shell/tint stage is layered on top of a separate explicit-ST coverage stage, openQ4 now reuses that coverage stage, including its alpha-test threshold when present, so layered pickup-orb and similar materials can cast shaped transmitted shadows instead of only uniform blobs.
 - Supported translucent casters now derive colored transmission from the material inputs available to that stage: texture alpha, sampled texture RGB, stage color, and applicable vertex color.
@@ -292,7 +314,7 @@ Practical advice:
 | `r_shadowMapDebugOverlay` | `0` | Draws a top-left mini-map of the selected shadow map plus frame counters. |
 | `r_shadowMapReport` | `0` | Shadow-map diagnostics: `0` off, `1` summary, `2` per-light decisions, `3` verbose receiver-submit decisions. |
 | `r_shadowMapReportInterval` | `30` | Frames between report prints when `r_shadowMapReport` is enabled. |
-| `r_shadowMapMaxUpdatesPerView` | `0` | Optional per-view shadow-map update budget. `0` means unlimited. Lights over budget reuse their last cached map when one exists (shadows lag briefly instead of flickering to stencil); lights with no cached map fall back to stencil when that receiver ownership has a complete stencil result. Vulkan may exceed the nominal budget for an ownership containing map-only casters so it does not become falsely unshadowed. |
+| `r_shadowMapMaxUpdatesPerView` | `0` | Optional per-view update budget; `0` means unlimited. Both renderers require exact cache hits. Budget misses use stencil only when it is complete, and may exceed the limit for map-only casters. Two-pass lights can fill their cache over successive views. |
 | `r_shadowMapGpuTimerQueries` | `1` | Uses non-blocking GL timer queries for shadow-map GPU timing when the driver supports them. |
 | `r_shadowMapGpuSyncTimings` | `0` | Diagnostic-only GPU-synchronized pass timing using `glFinish`; leave off during normal play. |
 | `reportShaderPrograms` | n/a | Prints current ARB/GLSL shader validity, including shadow programs. |
@@ -331,6 +353,7 @@ Useful workflow:
 7. Use `reportShaderPrograms` if the scene looks unlit or obviously wrong.
 8. Use `r_shadowMapReport 1`, `2`, or `3` for live diagnostic logging. Summary lines include point depth-compare usage as `pointCmp`, timer-query totals as `gpuQuery`, and the `SM cache:` line reports cache hits, misses, resident reuse, budget reuse, evictions, active projected/point cache slots, and resident shadow VRAM. The `SM metrics:` line reports per-frame updates, composed static/dynamic layer passes (`composed`), subview reuse/fallback activity, translucent receiver chains drawn with shadow sampling, and importance-budget denials. The `SM modern:` line summarizes the modern path's consumption of the persistent atlas (live atlas slots, mapped/cache-reuse lights, and per-light blocking counts). Verbose projected CSM bias lines include per-cascade near/far range, fitted depth range, world texel size, and clip-space depth extent. Level `3` adds receiver-submit diagnostics for mapped-light cases that had visible receivers but no GLSL interaction submissions.
    Per-light lines separate semantic light class from backing shadow-map resource shape. For example, a stock authored parallel light may report `class=parallel type=point` when it uses the point-resource path.
+   Vulkan reports cache work after rendering the view, so `tiles`, `pointFaces`, and `composed` describe completed work. `casterFaces=C/T culled/tested` counts candidate point-caster submissions rejected before geometry binding by conservative cube-face bounds tests. It is not an FPS or whole-frame performance measurement.
 9. When rejected casters are present, the `SM caster-reject:` line breaks them down by reason, such as view-only entities, depth-hack models, disconnected portal areas, GUI/subview surfaces, non-shadowing materials, or disabled/unsupported translucent casters.
 
 ## Troubleshooting
@@ -338,7 +361,7 @@ Useful workflow:
 - If shadows do not appear at all, check `r_shadows 1` and `r_useShadowMap 1`, then run `vid_restart`.
 - If projected-light shadows shimmer while moving, keep `r_shadowMapCSM 1` and `r_shadowMapCascadeStabilize 1`.
 - Parallel/global sky shadows automatically use the tighter `r_shadowMapDistantFilterScale 0.35` policy. If a particular outdoor scene still looks too soft, lower it toward `0`; if you want the old shared projected-light softness, set it to `1`.
-- If cutout materials cast solid-looking shadows, make sure `r_shadowMapHashedAlpha 1` is enabled and the material is actually alpha-tested with explicit texture coordinates. Unusual animated texgen cutouts may cast conservative solid depth until that stage type is supported.
+- If cutout materials cast solid-looking shadows, check the material's alpha-test and explicit texture coordinates. Unsupported coverage can use conservative solid depth on OpenGL or stencil fallback on Vulkan. Changing `r_shadowMapHashedAlpha` cannot add support for an unsupported stage type.
 - If translucent shadows are too strong or too noisy, lower `r_shadowMapTranslucentDensity` or disable `r_shadowMapTranslucentMoments`.
 - If blended materials still do not cast translucent shadows, that material may be outside the currently supported stage set. Common additive pickup orbs are supported, but many particle/effect materials still are not.
 - If point-light shadows look too detached, first confirm `r_shadowMapCasterCulling 2` and `r_shadowMapPointMaxWorldBias 4`; then reduce `r_shadowMapPointFilterRadius`, `r_shadowMapPointBias`, or `r_shadowMapPointNormalBias` in small steps.
@@ -359,7 +382,7 @@ Useful workflow:
 | macOS (Apple legacy GL2.1 tier) | Stencil only | The Apple compatibility corridor lacks the GLSL/FBO feature set the shadow-map receiver and caster programs require. Lights fall back to the retail stencil path automatically; this is expected and documented behavior, not an error. |
 | macOS (opt-in Vulkan through MoltenVK) | Implemented, untested on Apple hardware | Requires `r_renderApi vulkan` and a full engine restart. MoltenVK is a Vulkan-on-Metal translation layer bundled in both macOS packages, not a Metal renderer. This path uses the same Vulkan shadow implementation as Windows and Linux — projected, point, parallel, and global lights, cascades, PCF/PCSS-lite, and static caching — but no real-Mac evidence exists yet, so treat it as experimental and expect problems. The default macOS renderer is still OpenGL, which uses the row above. |
 
-The shadow-map pipeline fails closed per light: any light that cannot complete the map path (missing capability, failed framebuffer, unsupported receiver) renders with the retail stencil path for that light instead of losing its shadows.
+The shadow-map pipeline rejects incomplete maps and uses complete stencil coverage when available. If Vulkan temporarily has neither usable representation, it preserves direct illumination and logs the missing resource while requesting stencil ownership for later frames. This recovery case and unsupported material/platform paths still prevent treating shadow mapping as a universal replacement.
 
 ## Summary
 
@@ -372,3 +395,25 @@ Recommended default user setup:
 - `r_shadowMapStaticCache 1`
 
 Only enable `r_shadowMapTranslucentMoments 1` if you specifically want experimental blended transparency shadows and accept the extra cost and current material-support limits.
+
+Authored `noShadows` and `DECAL_MACRO` materials remain non-casting under both
+the translucent stencil option and translucent moment maps. `forceShadows`
+retains precedence when a material explicitly requests it. This prevents lit
+slime and other decals from becoming solid shadow blockers.
+
+For repeatable stock-map comparisons, see the [individual map test report](../dev/shadowmapping-map-tests-2026-09-05.md) and `tools/tests/renderer_shadow_mapping_maps.py`. It captures mapped, stencil, and disabled shadows in isolated windowed SP/MP runs; images still require visual inspection.
+
+The runner also accepts `--scenario flashlight-cycle`, `caster-cycle`,
+`caster-cycle-point`, `caster-cycle-cutout`, `emitter-lift`, `resource-cycle`, or `cascade-motion` to exercise changes
+during gameplay. See the [transition test report](../dev/shadowmapping-transition-tests-2026-09-05.md)
+for commands, coverage, and interpretation of animated-scene comparisons.
+
+The [replacement progress report](../dev/shadowmapping-replacement-progress-2026-09-05.md)
+records the next round's cutout-cache, emitter, and point-face improvements,
+retained map tests, measured shadow-pass costs, and remaining stencil dependencies.
+
+Use `--random-maps 4 --seed 20260905` to sample the stock SP launch catalog
+reproducibly. The runner saves the candidate pool and chosen maps, verifies the
+requested renderer module, and checks the Air Defense 1 reference camera after
+its presentation pose has updated. See the [final audit and random-map report](../dev/shadowmapping-final-audit-2026-09-05.md)
+for the decal repair, comparison evidence, and remaining limitations.

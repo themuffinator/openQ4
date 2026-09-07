@@ -268,18 +268,18 @@ so the buy menu no longer appears in the four modes added since.
 - The second pass above is compile-verified only. Every change is server-side
   game logic or gui state, and none of it has been played.
 
-## Known remaining
+## Follow-up status
 
-- **Round reset rebuilds the client game state.** `ResetRound` broadcasts
-  `GAME_RELIABLE_MESSAGE_RESTART`, which makes every remote client tear down and
-  reallocate `gameState` and replay the base `GAMEON` transition once per round.
-  The obvious fix — a flag bit on that message — collides with the existing
-  meaning of the one spare bit (`idGameLocal::MapRestart` uses it for "a
-  serverInfo delta follows"), so it needs its own encoding.
-- **Red Rover under a managed match.** `mpMatchTeams` hardcodes
-  `allowLiveJoin = false`, so the authoritative team core denies every
-  conversion and writes the old side back over `ui_team`. Red Rover is unplayable
-  on a managed profile; it needs the team core to understand a mode whose rule
-  *is* a live side change.
-- `#str_41693`–`#str_41698`, referenced by the match-series profile table, exist
-  in no language file and render as raw tokens.
+- The former client round-reset issue now has an append-only
+  `GAME_RELIABLE_MESSAGE_ROUNDRESTART` message that calls `LocalMapRestart`
+  without recreating the game state. Runtime qualification is tracked in the
+  [competitive reference audit](../competitive-match-reference-audit.md).
+- Managed Red Rover uses a dedicated authoritative conversion path. Ordinary
+  live joins and voluntary side changes still use the normal admission policy.
+  A conversion may fill one side, while locked roster seats and captain roles
+  retain their declared identity; round preparation restores those home sides.
+  The production core covers full-server and locked-roster conversions, and
+  two real clients completed the eight-round profile with seven remote resets.
+- The six best-of profile strings `#str_41693`–`#str_41698` are now present
+  in the language tables. The role, controller and display qualification
+  matrix remains tracked in the competitive reference audit.

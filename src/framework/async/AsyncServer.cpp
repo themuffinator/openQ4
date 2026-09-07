@@ -1589,9 +1589,15 @@ void idAsyncServer::ProcessUnreliableClientMessage( int clientNum, const idBitMs
 			clientGameFrame = msg.ReadLong();
 			numUsercmds = msg.ReadByte();
 			if ( numUsercmds < 1 || numUsercmds > MAX_USERCMD_PACKET_COMMANDS ||
-				 clientGameFrame < numUsercmds - 1 ||
-				 static_cast<int64>( clientGameFrame ) > static_cast<int64>( gameFrame ) + MAX_USERCMD_BACKUP ) {
+				 clientGameFrame < numUsercmds - 1 ) {
 				DropClient( clientNum, "#str_07138" );
+				return;
+			}
+			if ( static_cast<int64>( clientGameFrame ) > static_cast<int64>( gameFrame ) + MAX_USERCMD_BACKUP ) {
+				// A synchronous world reset can stall the server while a remote
+				// client keeps predicting. Ignore commands outside our ring window;
+				// the next snapshot resynchronizes the client without a disconnect.
+				// Never decode them into the authoritative command history.
 				return;
 			}
 

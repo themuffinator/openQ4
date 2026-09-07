@@ -28,6 +28,7 @@ If you have questions concerning this license or the applicable additional terms
 
 class idWindow;
 class idWinVec4;
+class idChatWindow;
 
 class idUserInterfaceLocal : public idUserInterface {
 	friend class idUserInterfaceManagerLocal;
@@ -108,6 +109,7 @@ private:
 
 	idDict						state;
 	idWindow *					desktop;
+	idChatWindow *				chatWindow; // owned by desktop; transient MP presentation
 	idWindow *					bindHandler;
 
 	idStr						source;

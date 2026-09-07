@@ -19,8 +19,9 @@ typedef struct classicInteractionDomainView_s classicInteractionDomainView_t;
 	ownerships of every admitted point light. Exact-signature opaque
 	static-only passes may reuse resident depth: projected entries copy
 	between transfer-only cache images and the current atlas tile, while point
-	entries retain identity-owned cubes. Dynamic, alpha, translucent, and CSM
-	passes always stay on the fresh/stencil path. Each prepared light carries
+	entries retain identity-owned cubes. Projected maps compose live moving and
+	cutout casters over static depth; point maps with live casters regenerate.
+	Each prepared light carries
 	the retail LOCAL/GLOBAL receiver ownership split: LOCAL maps contain global
 	casters, while GLOBAL maps contain global + local casters. Include after
 	tr_local.h (idPlane/viewLight_t) and volk.h (VkDescriptorSet).
@@ -37,8 +38,12 @@ typedef enum vkShadowReceiverPass_e {
 // One admitted light can need two distinct LOCAL/GLOBAL resources. Keep the
 // point pool large enough for every ownership in the bounded light table;
 // cube images and descriptor sets are still created lazily as a view needs
-// them, so ordinary maps do not pay the maximum allocation.
-static const int VK_SHADOW_MAX_LIGHTS = 64;
+// them, so ordinary maps do not pay the maximum image allocation. A stock
+// Air Defense 2 door/portal view exceeds 64 shadowing lights; table overflow
+// can lose a map-only caster before sticky stencil recovery on the next view.
+// Keep descriptor capacity (vk_GuiExecutor) and admission capacity tied to this
+// same bound so increasing one does not simply move the failure elsewhere.
+static const int VK_SHADOW_MAX_LIGHTS = 256;
 static const int VK_SHADOW_MAX_POINT_CUBES =
 	VK_SHADOW_MAX_LIGHTS * VK_SHADOW_RECEIVER_PASS_COUNT;
 static const int VK_SHADOW_MAX_CACHE_SLOTS = 16;

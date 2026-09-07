@@ -68,7 +68,6 @@ private:
 	void				UpdateCvar( bool read, bool force = false );
 	
 	void				CommonInit();
-	void				EnsureCursorVisible();
 	void				InitScroller( bool horizontal );
 	
 	int					maxChars;
@@ -93,6 +92,10 @@ private:
 
 	idWinBool			liveUpdate;
 	idWinStr			cvarGroup;
+
+protected:
+	// Derived editors can resize their text area without moving the caret.
+	void				EnsureCursorVisible();
 };
 
 #endif /* !__EDITWINDOW_H__ */

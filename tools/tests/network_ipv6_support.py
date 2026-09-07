@@ -624,10 +624,12 @@ def validate_console_address_arguments() -> None:
     require(server_info, "Net_AddressArgument( args )", "serverInfo address rejoin")
     reject(server_info, "args.Argv( 1 )", "serverInfo single-argument address")
 
-    # The Join-by-IP box hands its text straight to the command buffer, so it
-    # has to quote it or the same split happens one layer earlier.
+    # The Join-by-IP box validates and canonicalizes the endpoint, then
+    # supplies a typed argument so IPv6 punctuation never becomes command text.
     menu = read("src/framework/Session_menu.cpp")
-    require(menu, 'va( "connect \\"%s\\"", s )', "GUI join-by-IP quoting")
+    require(menu, 'connectArgs.AppendArg( Sys_NetAdrToString( address ) );', "GUI join-by-IP address")
+    require(menu, 'BufferCommandArgs( CMD_EXEC_NOW, connectArgs )', "GUI typed connect command")
+    reject(menu, 'va( "connect \\"%s\\"", s )', "GUI untrusted command interpolation")
 
 
 def validate_family_scoped_resolution() -> None:

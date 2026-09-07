@@ -11,7 +11,7 @@ env:
   # Keep the engine's shared File/FileSystem ABI locked to the companion
   # revision that implements GAME_API 46, generated-animation cache v3, and
   # the game-owned transient time-scale interface.
-  OPENQ4_GAMELIBS_SHA: 680490234f018432d04ef5ce9a9d3e11a06b1f7d
+  OPENQ4_GAMELIBS_SHA: c17b17c4ed32fd912a5af518a675c1c2afec1ff4
 
 concurrency:
   group: openq4-push-verification-${{ github.ref }}
@@ -82,13 +82,40 @@ jobs:
             tools/validation/stock_asset_baseline.py \
             tools/tests/renderer_validation_matrix.py \
             tools/tests/aas_settings_contract.py \
+            tools/tests/chat_gameplay_smoke.py \
+            tools/tests/chat_history.py \
+            tools/tests/filesystem_find_file_contract.py \
+            tools/tests/generate_file_memory_test.py \
+            tools/tests/gui_clipping_contract.py \
+            tools/tests/list_window_selection_contract.py \
+            tools/tests/mp_browser_smoke.py \
+            tools/tests/mp_duel_queue_smoke.py \
+            tools/tests/mp_match_flow_smoke.py \
+            tools/tests/mp_roster_smoke.py \
+            tools/tests/mp_round_remote_smoke.py \
+            tools/tests/mp_tourney_smoke.py \
+            tools/tests/parser_include_paths_contract.py \
+            tools/tests/renderer_shadow_mapping_maps.py \
+            tools/tests/renderer_shadow_mapping_movers.py \
+            tools/tests/renderer_shadow_mapping_scenes.py \
+            tools/tests/renderer_shadow_mapping_transitions.py \
+            tools/tests/server_browser_contract.py \
             tools/tests/arena_campaign.py \
             tools/tests/async_drop_client_contract.py \
+            tools/tests/async_client_frame_contract.py \
+            tools/tests/async_session_command_contract.py \
+            tools/tests/async_usercmd_window_contract.py \
             tools/tests/base64_input_safety.py \
             tools/tests/campaign_split_state_transition.py \
             tools/tests/clang_tidy_input_safety.py \
             tools/tests/cmdargs_append_contract.py \
             tools/tests/competitive_match_layer.py \
+            tools/tests/mp_control_smoke.py \
+            tools/tests/mp_series_smoke.py \
+            tools/tests/mp_recording_ownership_smoke.py \
+            tools/tests/mp_pause_world_smoke.py \
+            tools/tests/mp_pause_lifecycle_smoke.py \
+            tools/tests/mp_view_decoder.py \
             tools/tests/competitive_match_localization.py \
             tools/tests/decl_checksum_stability_contract.py \
             tools/tests/match_control_localization_bridge.py \
@@ -136,6 +163,9 @@ jobs:
             tools/tests/linux_wayland_build_contract.py \
             tools/tests/loading_continue_input.py \
             tools/tests/loading_pacifier_pacing.py \
+            tools/tests/loading_pacifier_reentry_contract.py \
+            tools/tests/choice_gui_value_contract.py \
+            tools/tests/mp_mvd_smoke.py \
             tools/tests/map_entity_strings.py \
             tools/tests/weapon_wheel_time_scale.py \
             tools/tests/weapon_zoom_view_alignment.py \
@@ -178,6 +208,7 @@ jobs:
             tools/tests/mp_weapon_switch_contract.py \
             tools/tests/multiview_demo.py \
             tools/tests/mvd_server_api_contract.py \
+            tools/tests/mvd_recording_failure_contract.py \
             tools/tests/native_glx_shutdown.py \
             tools/tests/network_ipv4_support.py \
             tools/tests/network_ipv6_support.py \
@@ -252,8 +283,17 @@ jobs:
           bash -n tools/validation/validate_pr.sh
           python tools/validation/audit_source_provenance.py --check
           python tools/tests/aas_settings_contract.py
+          python tools/tests/chat_history.py
+          python tools/tests/filesystem_find_file_contract.py
+          python tools/tests/gui_clipping_contract.py
+          python tools/tests/list_window_selection_contract.py
+          python tools/tests/parser_include_paths_contract.py
+          python tools/tests/server_browser_contract.py
           python tools/tests/arena_campaign.py
           python tools/tests/async_drop_client_contract.py
+          python tools/tests/async_client_frame_contract.py
+          python tools/tests/async_session_command_contract.py
+          python tools/tests/async_usercmd_window_contract.py
           python tools/tests/base64_input_safety.py
           python tools/tests/campaign_split_state_transition.py
           python tools/tests/clang_tidy_input_safety.py
@@ -303,6 +343,8 @@ jobs:
           python tools/tests/linux_wayland_build_contract.py
           python tools/tests/loading_continue_input.py
           python tools/tests/loading_pacifier_pacing.py
+          python tools/tests/loading_pacifier_reentry_contract.py
+          python tools/tests/choice_gui_value_contract.py
           python tools/tests/map_entity_strings.py
           python tools/tests/weapon_wheel_time_scale.py
           python tools/tests/weapon_zoom_view_alignment.py
@@ -344,6 +386,7 @@ jobs:
           python tools/tests/mp_weapon_switch_contract.py
           python tools/tests/multiview_demo.py
           python tools/tests/mvd_server_api_contract.py
+          python tools/tests/mvd_recording_failure_contract.py
           python tools/tests/native_glx_shutdown.py
           python tools/tests/network_ipv4_support.py
           python tools/tests/network_ipv6_support.py

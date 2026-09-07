@@ -6,6 +6,17 @@
 
 #include <cmath>
 
+int R_ShadowMapHashFloat( const int hash, const float value ) {
+	unsigned int bits = 0;
+	static_assert( sizeof( bits ) == sizeof( value ), "shadow cache requires 32-bit floats" );
+	// Signed zero has identical projection behavior. memcpy avoids aliasing
+	// violations and float-to-int overflow for large or non-finite inputs.
+	if ( value != 0.0f ) {
+		memcpy( &bits, &value, sizeof( bits ) );
+	}
+	return static_cast<int>( ( static_cast<unsigned int>( hash ) ^ bits ) * 16777619u );
+}
+
 static shadowMapLightClass_t R_ShadowMapLightClassForViewLight( const viewLight_t *vLight ) {
 	if ( vLight == NULL ) {
 		return SHADOWMAP_LIGHT_PROJECTED;
@@ -274,6 +285,58 @@ bool R_ShadowMapLightOriginInsideCasterBounds( const viewLight_t *vLight,
 		}
 	}
 	return true;
+}
+
+bool R_ShadowMapCasterOutsidePointFace( const viewLight_t *vLight,
+		const float modelMatrix[ 16 ], const float boundsMin[ 3 ],
+		const float boundsMax[ 3 ], int cubeFace ) {
+	if ( vLight == NULL || modelMatrix == NULL || boundsMin == NULL ||
+			boundsMax == NULL || cubeFace < 0 || cubeFace >= 6 ) {
+		return false;
+	}
+	for ( int index = 0; index < 16; ++index ) {
+		if ( !std::isfinite( modelMatrix[index] ) ) {
+			return false;
+		}
+	}
+	if ( modelMatrix[3] != 0.0f || modelMatrix[7] != 0.0f ||
+			modelMatrix[11] != 0.0f || modelMatrix[15] != 1.0f ) {
+		return false;
+	}
+	double center[3], extent[3];
+	for ( int axis = 0; axis < 3; ++axis ) {
+		if ( !std::isfinite( boundsMin[axis] ) || !std::isfinite( boundsMax[axis] ) ||
+				boundsMin[axis] > boundsMax[axis] ) {
+			return false;
+		}
+		center[axis] = ( static_cast<double>( boundsMin[axis] ) + boundsMax[axis] ) * 0.5;
+		extent[axis] = ( static_cast<double>( boundsMax[axis] ) - boundsMin[axis] ) * 0.5;
+	}
+	double delta[3], worldExtent[3];
+	for ( int row = 0; row < 3; ++row ) {
+		delta[row] = static_cast<double>( modelMatrix[12 + row] ) - vLight->globalLightOrigin[row];
+		worldExtent[row] = 0.0;
+		for ( int column = 0; column < 3; ++column ) {
+			const double coefficient = modelMatrix[column * 4 + row];
+			delta[row] += coefficient * center[column];
+			worldExtent[row] += std::fabs( coefficient ) * extent[column];
+		}
+		if ( !std::isfinite( delta[row] ) || !std::isfinite( worldExtent[row] ) ) {
+			return false;
+		}
+	}
+	// The world AABB encloses scale, shear, rotation, and reflections. Its
+	// support radius for each 45-degree plane is the sum of the two relevant
+	// extents: tighter and cheaper than an enclosing sphere (no square root).
+	const int axis = cubeFace >> 1;
+	const double forward = ( cubeFace & 1 ) ? -delta[axis] : delta[axis];
+	for ( int side = 1; side <= 2; ++side ) {
+		const int other = ( axis + side ) % 3;
+		if ( forward - std::fabs( delta[other] ) + worldExtent[axis] + worldExtent[other] < -1.0 ) {
+			return true;
+		}
+	}
+	return false;
 }
 
 const char *R_ShadowMapLightClassName( shadowMapLightClass_t lightClass ) {

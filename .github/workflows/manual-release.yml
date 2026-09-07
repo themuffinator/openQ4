@@ -2456,12 +2456,14 @@ jobs:
             exit 0
           fi
 
-          release_id="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag}" --jq .id)"
+          # Resolve through gh so an existing unpublished draft can be promoted.
+          # The release-by-tag REST endpoint only returns published releases.
+          release_id="$(gh release view "${tag}" --repo "${GITHUB_REPOSITORY}" --json databaseId --jq .databaseId)"
           gh api \
             --method PATCH \
             "repos/${GITHUB_REPOSITORY}/releases/${release_id}" \
-            -f prerelease=false \
-            -f draft=false >/dev/null
+            -F prerelease=false \
+            -F draft=false >/dev/null
 
           git fetch --force origin "refs/tags/${tag}:refs/tags/${tag}"
           published_tag_sha="$(git rev-parse --verify "refs/tags/${tag}^{commit}")"

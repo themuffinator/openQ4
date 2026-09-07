@@ -52,6 +52,8 @@ float AlphaCoverage(float alpha) {
 }
 
 void main() {
+    // Derivatives need the complete fragment quad, before cutout/depth discard.
+    float depthSlope = max(abs(dFdx(vShadowDepth)), abs(dFdy(vShadowDepth)));
     if (pc.params.x != 0.0) {
         float alpha = texture(alphaMap, vAlphaTexCoord).a * pc.params.z;
         if (pc.params.w > 0.5 && pc.params.x > 0.5
@@ -82,6 +84,5 @@ void main() {
         discard;
     }
 
-    float depthSlope = max(abs(dFdx(vShadowDepth)), abs(dFdy(vShadowDepth)));
     gl_FragDepth = clamp(vShadowDepth + pc.alphaS.z * depthSlope + pc.alphaT.z, 0.0, 1.0);
 }

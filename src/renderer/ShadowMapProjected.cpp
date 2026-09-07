@@ -444,6 +444,31 @@ float R_ShadowMapSnapCascadeCenter( const float rawCenter, const float quantized
 	return floor( rawCenter / snapStep + 0.5f ) * snapStep;
 }
 
+static void R_ShadowMapFitCascadeAxis( float &minimum, float &maximum,
+		const float filterGuard, const int tileSize, const bool stabilize ) {
+	// Only the intersection with the light projection needs coverage. Clipping
+	// after quantization could shrink the crop and change its texel scale.
+	minimum = idMath::ClampFloat( -1.0f, 1.0f, minimum );
+	maximum = idMath::ClampFloat( -1.0f, 1.0f, maximum );
+	float center = ( minimum + maximum ) * 0.5f;
+	float extent = Max( ( maximum - minimum ) * 0.5f + filterGuard,
+		2.0f / Max( 1, tileSize ) );
+	if ( stabilize ) {
+		// Reserve half a final texel for center snapping in addition to the
+		// filter guard: e >= rawExtent + guard + e / tileSize.
+		extent = R_ShadowMapQuantizeCascadeExtent(
+			extent / ( 1.0f - 1.0f / Max( 2, tileSize ) ), tileSize );
+		center = R_ShadowMapSnapCascadeCenter( center, extent, tileSize );
+		// Translate a boundary crop back into the projection; never trim it.
+		center = idMath::ClampFloat( -1.0f + extent, 1.0f - extent, center );
+		minimum = center - extent;
+		maximum = center + extent;
+	} else {
+		minimum = Max( -1.0f, center - extent );
+		maximum = Min( 1.0f, center + extent );
+	}
+}
+
 static float R_ShadowMapProjectedKernelGuardNDC( const viewLight_t *vLight, const int tileSize ) {
 	const float texelStep = 2.0f / Max( 1, tileSize );
 	const shadowMapProjectedFilterSettings_t filterSettings = R_ShadowMapProjectedFilterSettings( vLight );
@@ -522,33 +547,14 @@ static bool R_ShadowMapBuildCascadeBounds( const viewLight_t *vLight, const idPl
 	// it to fitted extents compounded to ~30% wasted crop resolution at the
 	// default pad. Cascades only add the filter kernel guard.
 	const float filterGuard = R_ShadowMapProjectedKernelGuardNDC( vLight, tileSize );
-	idVec3 center = ( ndcMins + ndcMaxs ) * 0.5f;
-	idVec3 extent = ( ndcMaxs - ndcMins ) * 0.5f;
-
-	extent.x = Max( extent.x + filterGuard, 2.0f / Max( 1, tileSize ) );
-	extent.y = Max( extent.y + filterGuard, 2.0f / Max( 1, tileSize ) );
-	extent.z = Max( extent.z, 0.001f );
-
-	if ( r_shadowMapCascadeStabilize.GetBool() ) {
-		extent.x = R_ShadowMapQuantizeCascadeExtent( extent.x, tileSize );
-		extent.y = R_ShadowMapQuantizeCascadeExtent( extent.y, tileSize );
-		// keep the crop inside the projection while preserving its quantized
-		// size, then snap in the cascade's own texel units
-		center.x = idMath::ClampFloat( -1.0f + extent.x, 1.0f - extent.x, center.x );
-		center.y = idMath::ClampFloat( -1.0f + extent.y, 1.0f - extent.y, center.y );
-		center.x = R_ShadowMapSnapCascadeCenter( center.x, extent.x, tileSize );
-		center.y = R_ShadowMapSnapCascadeCenter( center.y, extent.y, tileSize );
-	}
-
-	ndcMins = center - extent;
-	ndcMaxs = center + extent;
-
-	ndcMins.x = idMath::ClampFloat( -1.0f, 1.0f, ndcMins.x );
-	ndcMins.y = idMath::ClampFloat( -1.0f, 1.0f, ndcMins.y );
-	ndcMins.z = idMath::ClampFloat( 0.0f, 1.0f, ndcMins.z );
-	ndcMaxs.x = idMath::ClampFloat( -1.0f, 1.0f, ndcMaxs.x );
-	ndcMaxs.y = idMath::ClampFloat( -1.0f, 1.0f, ndcMaxs.y );
-	ndcMaxs.z = idMath::ClampFloat( 0.0f, 1.0f, ndcMaxs.z );
+	R_ShadowMapFitCascadeAxis( ndcMins.x, ndcMaxs.x, filterGuard,
+		tileSize, r_shadowMapCascadeStabilize.GetBool() );
+	R_ShadowMapFitCascadeAxis( ndcMins.y, ndcMaxs.y, filterGuard,
+		tileSize, r_shadowMapCascadeStabilize.GetBool() );
+	const float centerZ = ( ndcMins.z + ndcMaxs.z ) * 0.5f;
+	const float extentZ = Max( ( ndcMaxs.z - ndcMins.z ) * 0.5f, 0.001f );
+	ndcMins.z = idMath::ClampFloat( 0.0f, 1.0f, centerZ - extentZ );
+	ndcMaxs.z = idMath::ClampFloat( 0.0f, 1.0f, centerZ + extentZ );
 
 	if ( ndcMaxs.x - ndcMins.x <= 1.0e-4f || ndcMaxs.y - ndcMins.y <= 1.0e-4f ) {
 		fit.collapsedBounds = true;
@@ -656,8 +662,90 @@ bool R_ShadowMapCascadeStabilitySelfTest( void ) {
 		return false;
 	}
 
+	// Exercise complete fits, including both projection boundaries. Testing
+	// the snap helper alone missed the subsequent clipping that changed scale.
+	const int sizes[] = { 128, 512, 1024, 4096 };
+	for ( int sizeIndex = 0; sizeIndex < 4; ++sizeIndex ) {
+		const int size = sizes[sizeIndex];
+		const float guard = 3.0f / size;
+		for ( int position = -120; position <= 100; ++position ) {
+			const float rawMin = position * 0.01f;
+			const float rawMax = rawMin + 0.371f;
+			const float clippedMin = idMath::ClampFloat( -1.0f, 1.0f, rawMin );
+			const float clippedMax = idMath::ClampFloat( -1.0f, 1.0f, rawMax );
+			float minimum = rawMin, maximum = rawMax;
+			R_ShadowMapFitCascadeAxis( minimum, maximum, guard, size, true );
+			const float expectedExtent = R_ShadowMapQuantizeCascadeExtent(
+				Max( ( clippedMax - clippedMin ) * 0.5f + guard, 2.0f / size )
+					/ ( 1.0f - 1.0f / size ), size );
+			if ( minimum > clippedMin + 1.0e-6f || maximum < clippedMax - 1.0e-6f
+					|| minimum < -1.000001f || maximum > 1.000001f
+					|| idMath::Fabs( maximum - minimum - 2.0f * expectedExtent ) > 1.0e-6f ) {
+				common->Printf( "ShadowMap cascade stability self-test failed: boundary fit %d/%d\n", size, position );
+				return false;
+			}
+		}
+	}
+
+	const int seed = static_cast<int>( 2166136261u );
+	if ( R_ShadowMapHashFloat( seed, 0.0001f ) == R_ShadowMapHashFloat( seed, 0.0002f )
+			|| R_ShadowMapHashFloat( seed, 1.0e30f ) == R_ShadowMapHashFloat( seed, 2.0e30f )
+			|| R_ShadowMapHashFloat( seed, 0.0f ) != R_ShadowMapHashFloat( seed, -0.0f ) ) {
+		common->Printf( "ShadowMap cache self-test failed: float identity\n" );
+		return false;
+	}
+	shadowMapProjectedLightState_t original;
+	R_ShadowMapResetProjectedLightState( original );
+	original.valid = true;
+	original.tileSize = 1024;
+	original.clipPlanes[0][0][0] = 0.0001f;
+	const int originalHash = R_ShadowMapProjectedStateHash( seed, original );
+	shadowMapProjectedLightState_t changed = original;
+	changed.clipPlanes[0][0][0] = 0.0002f;
+	if ( R_ShadowMapProjectedStateHash( seed, changed ) == originalHash ) {
+		common->Printf( "ShadowMap cache self-test failed: fitted projection identity\n" );
+		return false;
+	}
+	changed = original;
+	changed.cascadeFit[0].validPoints++;
+	if ( R_ShadowMapProjectedStateHash( seed, changed ) != originalHash ) {
+		common->Printf( "ShadowMap cache self-test failed: diagnostics invalidated unchanged depth\n" );
+		return false;
+	}
+
 	common->Printf( "ShadowMap cascade stability self-test passed\n" );
 	return true;
+}
+
+int R_ShadowMapProjectedStateHash( int hash, const shadowMapProjectedLightState_t &state ) {
+	// Hash the rendered/sampled contract, not camera coordinates or the fit's
+	// diagnostic samples. Stable fits may reuse depth across camera movement;
+	// changed blend bands, filter guards, and light bounds must invalidate it.
+	hash = R_ShadowMapHashFloat( hash, state.valid ? 1.0f : 0.0f );
+	hash = R_ShadowMapHashFloat( hash, static_cast<float>( state.tileSize ) );
+	hash = R_ShadowMapHashFloat( hash, static_cast<float>( state.cascadeCount ) );
+	hash = R_ShadowMapHashFloat( hash, static_cast<float>( state.atlasDiv ) );
+	for ( int plane = 0; plane < 4; ++plane ) {
+		for ( int component = 0; component < 4; ++component ) {
+			hash = R_ShadowMapHashFloat( hash, state.baseClipPlanes[plane][component] );
+		}
+	}
+	for ( int cascade = 0; cascade < state.cascadeCount; ++cascade ) {
+		for ( int plane = 0; plane < 4; ++plane ) {
+			for ( int component = 0; component < 4; ++component ) {
+				hash = R_ShadowMapHashFloat( hash, state.clipPlanes[cascade][plane][component] );
+			}
+		}
+		hash = R_ShadowMapHashFloat( hash, state.splitDepths[cascade] );
+		hash = R_ShadowMapHashFloat( hash, state.biasScale[cascade] );
+		hash = R_ShadowMapHashFloat( hash, state.texelDepthBias[cascade] );
+		hash = R_ShadowMapHashFloat( hash, state.worldTexelSize[cascade] );
+		hash = R_ShadowMapHashFloat( hash, state.sliceNear[cascade] );
+		hash = R_ShadowMapHashFloat( hash, state.sliceFar[cascade] );
+		hash = R_ShadowMapHashFloat( hash, state.depthRange[cascade] );
+		hash = R_ShadowMapHashFloat( hash, state.clipZExtent[cascade] );
+	}
+	return hash;
 }
 
 void R_BuildShadowMapProjectedLightState( const viewLight_t *vLight, const viewDef_t *viewDef, const int tileSize, shadowMapProjectedLightState_t &state ) {

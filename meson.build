@@ -221,6 +221,20 @@ if not build_engine and not build_games
 endif
 
 if get_option('build_native_tests')
+  openq4_file_memory_under_test = custom_target(
+    'openq4-file-memory-under-test',
+    input: files('src/framework/File.h', 'src/framework/File.cpp'),
+    output: 'FileMemoryUnderTest.inc',
+    command: [py, files('tools/tests/generate_file_memory_test.py'), '@INPUT0@', '@INPUT1@', '@OUTPUT@'],
+  )
+  openq4_file_memory_test = executable(
+    'openq4-file-memory-test',
+    [files('tools/tests/native/FileMemoryTest.cpp'), openq4_file_memory_under_test],
+    include_directories: root_include_dir,
+    install: false,
+  )
+  test('openq4-file-memory', openq4_file_memory_test, timeout: 30)
+
   openq4_core_safety_test = executable(
     'openq4-core-safety-test',
     files(

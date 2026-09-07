@@ -140,7 +140,14 @@ void idChoiceWindow::UpdateVars( bool read, bool force ) {
 			}	
 		}
 		if ( !read && guiStr.NeedsUpdate() ) {
-			guiStr.Set( va( "%i", currentChoice ) );
+			// A GUI-only string choice carries its declared value just like a
+			// CVar-backed choice. Stock dual bindings still expose the numeric
+			// selection index to their GUI scripts.
+			if ( choiceType != 0 && cvar == NULL ) {
+				guiStr.Set( values.Num() ? values[ currentChoice ] : choices[ currentChoice ] );
+			} else {
+				guiStr.Set( va( "%i", currentChoice ) );
+			}
 		}
 	}
 }
@@ -255,11 +262,12 @@ void idChoiceWindow::UpdateChoice() {
 		}
 		ValidateChoice();
 	} else {
-		// ChoiceType 1 stores current as a cvar string
+		// ChoiceType 1 stores the declared value in its CVar or GUI binding.
+		const char *currentValue = cvar != NULL ? cvarStr.c_str() : guiStr.c_str();
 		int c = ( values.Num() ) ? values.Num() : choices.Num();
 		int i;
 		for ( i = 0; i < c; i++ ) {
-			if ( idStr::Icmp( cvarStr.c_str(), ( values.Num() ) ? values[i] : choices[i] ) == 0 ) {
+			if ( idStr::Icmp( currentValue, ( values.Num() ) ? values[i] : choices[i] ) == 0 ) {
 				break;
 			}
 		}

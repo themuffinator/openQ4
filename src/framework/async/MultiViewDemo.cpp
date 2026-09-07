@@ -494,13 +494,12 @@ void idMultiViewDemo::Clear() {
 	seekInProgress = false;
 	forcePresentationFrame = false;
 	seekTargetGameTime = 0;
+	preferredFollowClient = DEMO_FOLLOW_FREE;
 	playbackStreamOffset = 0;
 	playbackInitializationRecordCount = 0;
 	playbackEndGameTime = 0;
 	playbackLastRecordGameFrame = 0;
 	playbackLastRecordGameTime = 0;
-	pendingButtons = 0;
-	pendingUpMove = 0;
 	pendingRecord.payload.Clear();
 	playbackMapState.payload.Clear();
 	playbackNetworkState.payload.Clear();
@@ -517,6 +516,7 @@ void idMultiViewDemo::Init() {
 	cmdSystem->AddCommand( "stopMVD", Stop_f, CMD_FL_SYSTEM, "stops MVD recording or playback" );
 	cmdSystem->AddCommand( "playMVD", Play_f, CMD_FL_SYSTEM, "plays a multi-view demo" );
 	cmdSystem->AddCommand( "mvdInfo", Info_f, CMD_FL_SYSTEM, "validates and describes a multi-view demo" );
+	cmdSystem->AddCommand( "mvdStatus", Status_f, CMD_FL_SYSTEM, "reports multi-view playback time and camera state" );
 	cmdSystem->AddCommand( "mvdPause", Pause_f, CMD_FL_SYSTEM, "toggles MVD playback pause" );
 	cmdSystem->AddCommand( "mvdSeek", Seek_f, CMD_FL_SYSTEM, "seeks to an MVD time in seconds" );
 	cmdSystem->AddCommand( "mvdSkip", Skip_f, CMD_FL_SYSTEM, "moves relative to the current MVD time in seconds" );
@@ -707,20 +707,19 @@ void idMultiViewDemo::SetPlaybackScale( float scale ) {
 }
 
 void idMultiViewDemo::FollowNext() {
-	if ( state == MVD_PLAYING ) {
-		pendingButtons |= BUTTON_ATTACK;
-		if ( IsPaused() ) {
-			StepFrames( 1 );
-		}
+	// Replay controls must work while paused and across Tourney arenas.
+	// Select an eligible recorded POV directly; live spectator input has a
+	// game-time debounce and mode-specific bindings that do not apply here.
+	if ( state == MVD_PLAYING && game != NULL && game->SetDemoFollowClient( DEMO_FOLLOW_NEXT ) ) {
+		preferredFollowClient = game->GetDemoFollowClient();
+		forcePresentationFrame = true;
 	}
 }
 
 void idMultiViewDemo::FreeRoam() {
-	if ( state == MVD_PLAYING ) {
-		pendingUpMove = 127;
-		if ( IsPaused() ) {
-			StepFrames( 1 );
-		}
+	if ( state == MVD_PLAYING && game != NULL && game->SetDemoFollowClient( DEMO_FOLLOW_FREE ) ) {
+		preferredFollowClient = DEMO_FOLLOW_FREE;
+		forcePresentationFrame = true;
 	}
 }
 
@@ -2066,7 +2065,8 @@ bool idMultiViewDemo::ResetPlaybackStream() {
 	const bool restoreDemoMenu =
 		sessLocal.guiDemoMenu != NULL && sessLocal.guiActive == sessLocal.guiDemoMenu;
 #endif
-	const int restoreFollowClient = game->GetDemoFollowClient();
+	const int restoreFollowClient = preferredFollowClient >= 0 ?
+		preferredFollowClient : game->GetDemoFollowClient();
 	resettingPlayback = true;
 	game->SetDemoState( DEMO_NONE, false, false );
 	session->Stop();
@@ -2146,6 +2146,10 @@ bool idMultiViewDemo::SeekToMS( int relativeTimeMS ) {
 	}
 
 	const int duration = playbackEndGameTime - header.startGameTime;
+	const int currentFollowClient = game->GetDemoFollowClient();
+	if ( currentFollowClient >= 0 || preferredFollowClient < 0 ) {
+		preferredFollowClient = currentFollowClient;
+	}
 	const int clampedRelative = idMath::ClampInt( 0, Max( 0, duration - 1 ), relativeTimeMS );
 	const int target = header.startGameTime + clampedRelative;
 	seekTargetGameTime = target;
@@ -2157,6 +2161,9 @@ bool idMultiViewDemo::SeekToMS( int relativeTimeMS ) {
 			return false;
 		}
 	}
+	// A paused seek still needs one presentation pass after replay has reached
+	// its target.  Snapshots and round resets can replace the camera meanwhile.
+	forcePresentationFrame = true;
 
 	if ( sessLocal.sw != NULL ) {
 		sessLocal.sw->Pause();
@@ -2474,6 +2481,13 @@ void idMultiViewDemo::RunPlaybackFrame() {
 		return;
 	}
 
+	// Remember the chosen POV before snapshots or a round reset temporarily
+	// make its player inactive, during both normal playback and seeking.
+	const int currentFollowClient = game->GetDemoFollowClient();
+	if ( currentFollowClient >= 0 || preferredFollowClient < 0 ) {
+		preferredFollowClient = currentFollowClient;
+	}
+
 	if ( seekInProgress ) {
 		ProcessSeekBudget();
 		if ( state != MVD_PLAYING || seekInProgress ) {
@@ -2522,8 +2536,7 @@ void idMultiViewDemo::RunPlaybackFrame() {
 	if ( state != MVD_PLAYING ) {
 		return;
 	}
-	if ( mvd_paused.GetBool() && !forcePresentationFrame &&
-		 pendingButtons == 0 && pendingUpMove == 0 ) {
+	if ( mvd_paused.GetBool() && !forcePresentationFrame ) {
 		usercmdGen->GetDirectUsercmd();
 		return;
 	}
@@ -2533,7 +2546,7 @@ void idMultiViewDemo::RunPlaybackFrame() {
 		const int ticMsec = Max( 1, common->GetUserCmdMSec() );
 		int targetFrame = latestSnapshotGameFrame +
 			Max( 0, static_cast<int>( playbackGameTime ) - latestSnapshotGameTime ) / ticMsec;
-		if ( pendingButtons != 0 || pendingUpMove != 0 ) {
+		if ( forcePresentationFrame ) {
 			targetFrame = Max( targetFrame, predictionGameFrame + 1 );
 		}
 		const int maxPredictionFrames = 64;
@@ -2542,18 +2555,23 @@ void idMultiViewDemo::RunPlaybackFrame() {
 			usercmd_t commands[MAX_ASYNC_CLIENTS + 1];
 			memset( commands, 0, sizeof( commands ) );
 			commands[MAX_ASYNC_CLIENTS] = usercmdGen->GetDirectUsercmd();
-			commands[MAX_ASYNC_CLIENTS].buttons |= pendingButtons;
-			if ( pendingUpMove != 0 ) {
-				commands[MAX_ASYNC_CLIENTS].upmove = static_cast<signed char>( pendingUpMove );
-			}
 			commands[MAX_ASYNC_CLIENTS].gameFrame = predictionGameFrame;
 			commands[MAX_ASYNC_CLIENTS].gameTime = predictionGameFrame * ticMsec;
+			// A restart can precede the next active player snapshot. Restore the
+			// chosen slot when prediction can present it again. Explicit camera
+			// input or a missing target cancels restoration. A continuous valid
+			// view needs no reset, preserving its normal crouch-height smoothing.
+			if ( preferredFollowClient >= 0 &&
+				( commands[MAX_ASYNC_CLIENTS].upmove > 0 ||
+					( commands[MAX_ASYNC_CLIENTS].buttons & BUTTON_ATTACK ) != 0 ||
+					( ( forcePresentationFrame || game->GetDemoFollowClient() != preferredFollowClient ) &&
+						!game->SetDemoFollowClient( preferredFollowClient ) ) ) ) {
+				preferredFollowClient = DEMO_FOLLOW_FREE;
+			}
 
 			const bool last = predictionGameFrame + 1 >= targetFrame;
 			const gameReturn_t result = game->ClientPrediction( MAX_ASYNC_CLIENTS, commands, last );
 			idAsyncNetwork::ExecuteSessionCommand( result.sessionCommand );
-			pendingButtons = 0;
-			pendingUpMove = 0;
 			predictionGameFrame++;
 			predicted++;
 		}
@@ -3076,6 +3094,13 @@ void idMultiViewDemo::Play_f( const idCmdArgs &args ) {
 
 void idMultiViewDemo::Info_f( const idCmdArgs &args ) {
 	idAsyncNetwork::multiViewDemo.Inspect( args );
+}
+
+void idMultiViewDemo::Status_f( const idCmdArgs &args ) {
+	const idMultiViewDemo &demo = idAsyncNetwork::multiViewDemo;
+	common->Printf( "MVD_STATUS playing=%d paused=%d seeking=%d time=%d duration=%d follow=%d\n",
+		demo.IsPlaying(), demo.IsPaused(), demo.IsSeeking(), demo.GetPlaybackTimeMS(),
+		demo.GetPlaybackDurationMS(), demo.GetFollowClient() );
 }
 
 void idMultiViewDemo::Pause_f( const idCmdArgs &args ) {

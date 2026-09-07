@@ -9,6 +9,7 @@ This guide covers openQ4 multiplayer networking behavior and the cvars used to t
 
 ## Quick Summary
 
+- The server browser lists discovered servers, keeps your selection through sorting, and remembers favorite server addresses.
 - Direct connections accept numeric IPv4 addresses, IPv6 addresses, and hostnames with either kind of DNS record.
 - IPv4 ports use the complete unsigned 16-bit range, including high ports above `32767`.
 - IPv6 is enabled by default. A server binds both families on the same port, so one address works for every client.
@@ -16,6 +17,28 @@ This guide covers openQ4 multiplayer networking behavior and the cvars used to t
 - Server-side hitscan lag compensation is enabled by default.
 - Remote-client prediction runs in enhanced mode by default.
 - Both systems can be switched back to legacy behavior with cvars.
+
+## Find and join a server
+
+Open **Multiplayer > Browse**, then choose **Internet** or **LAN**. The list
+shows the server name, ping, player count, game type and map, with the stock
+icons for favorites, passwords and dedicated servers. Select a row to see its
+address and map preview, then choose **Join**. Passworded servers use the
+existing password prompt.
+
+Click a column heading to sort. Filters can hide full or empty servers,
+passworded servers, game types or mods. When a filter hides the selected
+server, Join is disabled until you select a visible server. Refresh updates
+the currently known addresses; Get New List runs discovery again.
+
+The favorite control saves the selected server's address locally. Favorites
+are queried alongside Internet discovery, so a saved address can still appear
+when it is absent from the master list. Removing a favorite leaves the server
+available in ordinary discovery results.
+
+LAN discovery probes ports `28004` through `28011`. Use a direct connection
+for a server on another port. Internet results depend on the configured master
+service and reachable servers; direct connections remain available below.
 
 ## IPv4 Connections
 
