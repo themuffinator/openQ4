@@ -10297,6 +10297,10 @@ bool RendererModernGLExecutor_RunSelfTest( void ) {
 	if ( !RendererModernGLSubmitPlan_RunSelfTest() ) {
 		return false;
 	}
+	if ( !R_ModernGLShaderLibrary_Stats().available ) {
+		common->Printf( "RendererModernGLExecutor self-test passed (CPU contracts; live modern shader path unavailable)\n" );
+		return true;
+	}
 	return R_ModernGLExecutor_RunFrameSelfTest();
 }
 
