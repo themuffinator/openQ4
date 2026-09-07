@@ -15,7 +15,7 @@ env:
   # Keep the engine's shared File/FileSystem ABI locked to the companion
   # revision that implements GAME_API 46, generated-animation cache v3, and
   # the game-owned transient time-scale interface.
-  OPENQ4_GAMELIBS_SHA: c17b17c4ed32fd912a5af518a675c1c2afec1ff4
+  OPENQ4_GAMELIBS_SHA: f8aaf1755db2d036e002ef64b0e3e399ac55d699
 
 jobs:
   script-smoke:
