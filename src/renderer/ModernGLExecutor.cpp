@@ -11124,7 +11124,7 @@ bool RendererGBuffer_RunSelfTest( void ) {
 bool RendererPBRVisible_RunSelfTest( void ) {
 	const modernGLShaderLibraryStats_t &shaderStats = R_ModernGLShaderLibrary_Stats();
 	if ( !shaderStats.available ) {
-		common->Printf( "RendererPBRVisible self-test passed (shader library unavailable)\n" );
+		common->Printf( "RendererPBRVisible self-test skipped: modern shader library unavailable\n" );
 		return true;
 	}
 	const modernGLShaderProgramInfo_t *opaqueProgram = R_ModernGLShaderLibrary_FindProgram( MODERN_GL_SHADER_GBUFFER_OPAQUE, shaderStats.highestGLSLVersion );
@@ -11152,7 +11152,10 @@ bool RendererPBRVisible_RunSelfTest( void ) {
 	r_rendererModernOpaque.SetBool( true );
 	r_rendererForwardPlus.SetBool( false );
 
-	idScenePacketFrame packetFrame;
+	// Packet, draw and submit arenas exceed the macOS main-thread stack when
+	// the two PBR fixtures are alive together. Keep their storage on the heap.
+	idAutoPtr<idScenePacketFrame> packetFrameStorage( new idScenePacketFrame );
+	idScenePacketFrame &packetFrame = *packetFrameStorage;
 	idRenderGraph graph;
 	rendererModernGLSelfTestSurfaceScene_t scene;
 	const idMaterial *pbrMaterial = scene.InitPBROpaqueMaterial( "RendererPBRVisible" );
@@ -11174,9 +11177,11 @@ bool RendererPBRVisible_RunSelfTest( void ) {
 	}
 	r_rendererModernQuality.SetBool( true );
 
-	idModernGLDrawPlan drawPlan;
+	idAutoPtr<idModernGLDrawPlan> drawPlanStorage( new idModernGLDrawPlan );
+	idModernGLDrawPlan &drawPlan = *drawPlanStorage;
 	drawPlan.Build( packetFrame, graph );
-	idModernGLSubmitPlan submitPlan;
+	idAutoPtr<idModernGLSubmitPlan> submitPlanStorage( new idModernGLSubmitPlan );
+	idModernGLSubmitPlan &submitPlan = *submitPlanStorage;
 	submitPlan.Build( drawPlan );
 	const int expectedDraws = packetFrame.NumDrawPackets();
 	if ( drawPlan.Stats().materialDraws != expectedDraws || submitPlan.Stats().materialReadyDraws != expectedDraws || submitPlan.NumCommands() != expectedDraws ) {
@@ -11208,7 +11213,8 @@ bool RendererPBRVisible_RunSelfTest( void ) {
 	// two per-light interaction packets for each surface and prove that the
 	// stable ambient packet is the sole ordered surface owner.
 	r_rendererForwardPlus.SetBool( true );
-	idScenePacketFrame clusteredFrame;
+	idAutoPtr<idScenePacketFrame> clusteredFrameStorage( new idScenePacketFrame );
+	idScenePacketFrame &clusteredFrame = *clusteredFrameStorage;
 	if ( !clusteredFrame.AddScene( &scene.worldView, true )
 			|| !clusteredFrame.AddPass( RENDER_PASS_ARB2_INTERACTION, true ) ) {
 		common->Printf( "RendererPBRVisible self-test failed: clustered interaction frame setup\n" );
@@ -11252,9 +11258,11 @@ bool RendererPBRVisible_RunSelfTest( void ) {
 	idRenderGraph clusteredGraph;
 	R_RenderGraph_BuildFromScenePackets( clusteredFrame, clusteredGraph );
 	R_MaterialResourceTable_PrepareFrame( clusteredFrame );
-	idModernGLDrawPlan clusteredDrawPlan;
+	idAutoPtr<idModernGLDrawPlan> clusteredDrawPlanStorage( new idModernGLDrawPlan );
+	idModernGLDrawPlan &clusteredDrawPlan = *clusteredDrawPlanStorage;
 	clusteredDrawPlan.Build( clusteredFrame, clusteredGraph );
-	idModernGLSubmitPlan clusteredSubmitPlan;
+	idAutoPtr<idModernGLSubmitPlan> clusteredSubmitPlanStorage( new idModernGLSubmitPlan );
+	idModernGLSubmitPlan &clusteredSubmitPlan = *clusteredSubmitPlanStorage;
 	clusteredSubmitPlan.Build( clusteredDrawPlan );
 	const modernGLDrawPlanStats_t &clusteredStats = clusteredDrawPlan.Stats();
 	if ( clusteredStats.sourceDrawPackets != 6

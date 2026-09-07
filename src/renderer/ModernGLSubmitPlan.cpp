@@ -1139,17 +1139,18 @@ bool RendererModernGLSubmitPlan_RunSelfTest( void ) {
 		return true;
 	}
 
-	// This fixture keeps four fixed-capacity packet arenas alive at once. Keep
-	// them off the finite render-thread stack; sealed geometry contracts make
-	// the arenas deliberately substantial even though each fixture uses only a
-	// handful of records.
+	// Four packet, draw and submit arenas remain alive together. All three
+	// arena types must stay off the finite render-thread stack, even though
+	// each fixture uses only a handful of records.
 	idAutoPtr<idScenePacketFrame> packetFrame( new idScenePacketFrame );
 	idRenderGraph graph;
-	idModernGLDrawPlan drawPlan;
+	idAutoPtr<idModernGLDrawPlan> drawPlanStorage( new idModernGLDrawPlan );
+	idModernGLDrawPlan &drawPlan = *drawPlanStorage;
 	R_ModernGLSubmitPlan_BuildSelfTestDrawPlan( true, true, TAG_USED, false,
 		drawPlan, *packetFrame, graph );
 
-	idModernGLSubmitPlan submitPlan;
+	idAutoPtr<idModernGLSubmitPlan> submitPlanStorage( new idModernGLSubmitPlan );
+	idModernGLSubmitPlan &submitPlan = *submitPlanStorage;
 	submitPlan.Build( drawPlan );
 	const modernGLSubmitPlanStats_t &readyStats = submitPlan.Stats();
 	const bool expectedDepthEligible = tr.defaultMaterial != NULL
@@ -1207,13 +1208,15 @@ bool RendererModernGLSubmitPlan_RunSelfTest( void ) {
 		}
 	}
 
-	idModernGLDrawPlan missingCacheDrawPlan;
+	idAutoPtr<idModernGLDrawPlan> missingCacheDrawPlanStorage( new idModernGLDrawPlan );
+	idModernGLDrawPlan &missingCacheDrawPlan = *missingCacheDrawPlanStorage;
 	idAutoPtr<idScenePacketFrame> missingCachePacketFrame(
 		new idScenePacketFrame );
 	idRenderGraph missingCacheGraph;
 	R_ModernGLSubmitPlan_BuildSelfTestDrawPlan( false, false, TAG_FREE, false,
 		missingCacheDrawPlan, *missingCachePacketFrame, missingCacheGraph );
-	idModernGLSubmitPlan missingCacheSubmitPlan;
+	idAutoPtr<idModernGLSubmitPlan> missingCacheSubmitPlanStorage( new idModernGLSubmitPlan );
+	idModernGLSubmitPlan &missingCacheSubmitPlan = *missingCacheSubmitPlanStorage;
 	missingCacheSubmitPlan.Build( missingCacheDrawPlan );
 	const modernGLDrawPlanStats_t &missingDrawStats = missingCacheDrawPlan.Stats();
 	const modernGLSubmitPlanStats_t &fallbackStats = missingCacheSubmitPlan.Stats();
@@ -1229,13 +1232,15 @@ bool RendererModernGLSubmitPlan_RunSelfTest( void ) {
 		return false;
 	}
 
-	idModernGLDrawPlan tempIndexDrawPlan;
+	idAutoPtr<idModernGLDrawPlan> tempIndexDrawPlanStorage( new idModernGLDrawPlan );
+	idModernGLDrawPlan &tempIndexDrawPlan = *tempIndexDrawPlanStorage;
 	idAutoPtr<idScenePacketFrame> tempIndexPacketFrame(
 		new idScenePacketFrame );
 	idRenderGraph tempIndexGraph;
 	R_ModernGLSubmitPlan_BuildSelfTestDrawPlan( true, true, TAG_TEMP, false,
 		tempIndexDrawPlan, *tempIndexPacketFrame, tempIndexGraph );
-	idModernGLSubmitPlan tempIndexSubmitPlan;
+	idAutoPtr<idModernGLSubmitPlan> tempIndexSubmitPlanStorage( new idModernGLSubmitPlan );
+	idModernGLSubmitPlan &tempIndexSubmitPlan = *tempIndexSubmitPlanStorage;
 	tempIndexSubmitPlan.Build( tempIndexDrawPlan );
 	const modernGLSubmitPlanStats_t &tempIndexStats = tempIndexSubmitPlan.Stats();
 	if ( tempIndexStats.sourcePlanDraws != expectedReadyDraws || tempIndexStats.readyDraws != expectedReadyDraws || tempIndexStats.fallbackDraws != 0 || tempIndexStats.indexCacheReadyDraws != expectedReadyDraws || tempIndexStats.indexUploadDraws != 0 ) {
@@ -1247,13 +1252,15 @@ bool RendererModernGLSubmitPlan_RunSelfTest( void ) {
 		return false;
 	}
 
-	idModernGLDrawPlan uploadIndexDrawPlan;
+	idAutoPtr<idModernGLDrawPlan> uploadIndexDrawPlanStorage( new idModernGLDrawPlan );
+	idModernGLDrawPlan &uploadIndexDrawPlan = *uploadIndexDrawPlanStorage;
 	idAutoPtr<idScenePacketFrame> uploadIndexPacketFrame(
 		new idScenePacketFrame );
 	idRenderGraph uploadIndexGraph;
 	R_ModernGLSubmitPlan_BuildSelfTestDrawPlan( true, false, TAG_FREE, true,
 		uploadIndexDrawPlan, *uploadIndexPacketFrame, uploadIndexGraph );
-	idModernGLSubmitPlan uploadIndexSubmitPlan;
+	idAutoPtr<idModernGLSubmitPlan> uploadIndexSubmitPlanStorage( new idModernGLSubmitPlan );
+	idModernGLSubmitPlan &uploadIndexSubmitPlan = *uploadIndexSubmitPlanStorage;
 	uploadIndexSubmitPlan.Build( uploadIndexDrawPlan );
 	const modernGLSubmitPlanStats_t &uploadStats = uploadIndexSubmitPlan.Stats();
 	if ( uploadStats.sourcePlanDraws != expectedReadyDraws || uploadStats.readyDraws != expectedReadyDraws || uploadStats.fallbackDraws != 0 || uploadStats.indexUploadDraws != expectedReadyDraws || uploadStats.indexCacheReadyDraws != 0 ) {

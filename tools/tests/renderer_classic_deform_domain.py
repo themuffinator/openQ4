@@ -404,6 +404,16 @@ def validate_frontend_packet_provenance() -> None:
         "idScenePacketFrame packetFrame;",
         "render-thread stack packet fixture",
     )
+    for arena in ("idModernGLDrawPlan", "idModernGLSubmitPlan"):
+        require_count(submit_plan, f"idAutoPtr<{arena}>", 4, "heap-backed draw/submit fixtures")
+
+    pbr_test = braced_body(
+        read("src/renderer/ModernGLExecutor.cpp"),
+        "bool RendererPBRVisible_RunSelfTest(",
+        "PBR fixture stack budget",
+    )
+    for arena in ("idScenePacketFrame", "idModernGLDrawPlan", "idModernGLSubmitPlan"):
+        require_count(pbr_test, f"idAutoPtr<{arena}>", 2, "heap-backed simultaneous PBR fixtures")
 
 
 def validate_shared_domain_admission() -> None:

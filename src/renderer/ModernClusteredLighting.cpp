@@ -4172,6 +4172,10 @@ bool RendererClusterGrid_RunSelfTest( void ) {
 	if ( !R_ModernClusteredLighting_RunProbeRecordSelfTest() ) {
 		return false;
 	}
+	if ( !rg_clusteredLightingAvailable ) {
+		common->Printf( "RendererClusterGrid self-test skipped: modern clustered lighting unavailable\n" );
+		return true;
+	}
 	if ( !r_rendererModernExecutor.GetBool() && r_rendererClusterDebug.GetInteger() <= 0 ) {
 		common->Printf( "RendererClusterGrid self-test passed (disabled)\n" );
 		return true;

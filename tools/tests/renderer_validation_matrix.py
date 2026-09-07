@@ -34,6 +34,8 @@ PER_MAP_BUDGET_CONTRACT, PER_MAP_BUDGET_BINDING = load_contract(DEFAULT_CONTRACT
 # silently ignores any "+command" beyond this limit, which would drop "+quit"
 # and leave the case running until the timeout.
 ENGINE_MAX_STARTUP_COMMANDS = 64
+PBR_UNAVAILABLE_MARKER = "RendererPBRVisible self-test skipped: modern shader library unavailable"
+CLUSTER_UNAVAILABLE_MARKER = "RendererClusterGrid self-test skipped: modern clustered lighting unavailable"
 
 SELFTEST_CHECKS = [
     ["RendererModule self-test passed"],
@@ -739,10 +741,10 @@ def build_safe_cases(tiers: tuple[str, ...]) -> list[dict[str, Any]]:
                 "+gfxInfo",
             ],
             "checks": [
-                ["RendererPBRVisible self-test passed"],
-                ["gbuffer=1"],
-                ["deferred=1"],
-                ["forward=1"],
+                ["RendererPBRVisible self-test passed", PBR_UNAVAILABLE_MARKER],
+                ["gbuffer=1", PBR_UNAVAILABLE_MARKER],
+                ["deferred=1", PBR_UNAVAILABLE_MARKER],
+                ["forward=1", PBR_UNAVAILABLE_MARKER],
                 ["Selected renderer tier:"],
                 ["GL context request:"],
             ],
@@ -781,14 +783,14 @@ def build_safe_cases(tiers: tuple[str, ...]) -> list[dict[str, Any]]:
                 "+gfxInfo",
             ],
             "checks": [
-                ["RendererClusterGrid self-test passed"],
-                ["lights=6"],
-                ["shadowDesc="],
-                ["shadowBuffer=1"],
-                ["uploadedShadow="],
-                ["overflow="],
-                ["ubo=1"],
-                ["overlay=1"],
+                ["RendererClusterGrid self-test passed", CLUSTER_UNAVAILABLE_MARKER],
+                ["lights=6", CLUSTER_UNAVAILABLE_MARKER],
+                ["shadowDesc=", CLUSTER_UNAVAILABLE_MARKER],
+                ["shadowBuffer=1", CLUSTER_UNAVAILABLE_MARKER],
+                ["uploadedShadow=", CLUSTER_UNAVAILABLE_MARKER],
+                ["overflow=", CLUSTER_UNAVAILABLE_MARKER],
+                ["ubo=1", CLUSTER_UNAVAILABLE_MARKER],
+                ["overlay=1", CLUSTER_UNAVAILABLE_MARKER],
                 ["Modern clustered lighting:"],
                 ["Selected renderer tier:"],
                 ["GL context request:"],
