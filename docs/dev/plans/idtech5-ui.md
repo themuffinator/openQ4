@@ -1,6 +1,6 @@
 # idtech5-ui: complete interface replacement
 
-Started 8 September 2026. Status: active; specification stage only. This is a
+Started 8 September 2026. Status: active; inventory implementation underway. This is a
 development branch, not a released UI feature.
 
 ## Objective and immutable completion scope
@@ -21,8 +21,8 @@ not the final architecture.
 
 - Engine branch: `idtech5-ui`, initially based on `23847b22` from the current
   `android-gles` checkout so its Android/GLES integration is retained.
-- Companion branch: `idtech5-ui`, initially based on its current `android-gles`
-  checkout. Record paired exact revisions in integration reports.
+- Companion branch: `idtech5-ui`, initially based on `f9bf8a692de539b9d149cc7b2c47759dbb1ddd62`
+  from its current `android-gles` checkout. Record paired revisions in reports.
 - New game/UI bridge edits are canonical in `openQ4-game`; no `src/game` mirror.
 - Runtime-authored sources live under `content/baseoq4/`; engine defaults that
   need no user editing can be compiled resources. Build outputs belong in
@@ -138,14 +138,16 @@ when useful, but mark the stage complete only when its exit evidence exists.
   vector, family, editor and qualification requirements before visual authoring.
 - [x] Retain old GUI conventions as a clearly historical translation reference.
 - [x] Record complete scope, dependency decision, stages and completion audit.
-- [ ] Review links/status, commit both repositories and verify pushed heads.
+- [x] Review links/status, commit both repositories and verify pushed heads:
+  engine `7a0b8153897d37feeaab0cd883697e245f727500`, companion
+  `9a2d8715fc40d4f5b1ca1cfd7f90230baf3192f2`.
 
 Exit: published specification/plan and companion integration note. No runtime
 or visual-completion claim is associated with this stage.
 
 ### Stage 1 — asset and behavior inventory
 
-- [ ] Enumerate effective sources from installed PK4s and repo overrides with
+- [x] Enumerate effective sources from installed PK4s and repo overrides with
   explicit precedence, duplicates, case collisions, hashes and include graph.
 - [ ] Parse/tokenize resources without interpreting comments/strings as syntax;
   enumerate windows, properties, expressions, named events, scripts and assets.
@@ -261,4 +263,7 @@ successful commit/push, verify remote heads before saying the stage is published
 
 | Date | Stage | Authoritative progress | Remaining |
 | --- | --- | --- | --- |
-| 2026-09-08 | 0 | Both branches created; extensive specification, historical reference and implementation plan written | Commit/push verification; all runtime/editor/migration stages |
+| 2026-09-08 | 0 | Specification/integration contracts committed and pushed in both repositories; remote heads verified | Complete |
+| 2026-09-08 | 1 | Effective VFS inventory implemented; 271 GUI resources, 14,517 lexical window declarations and 8,037 event declarations; migration seed created | Full semantic classification, material/bitmap decisions and family gameplay baselines |
+
+Inventory methodology and limitations: [inventory report](../ui/inventory-report.md).

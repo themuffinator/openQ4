@@ -2,6 +2,12 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- [x] Disabled mouse input and hidden rendering windows no longer route menu
+  cursor synchronization; unfocused windows cannot warp the pointer on menu
+  changes. Production-function tests cover Windows and POSIX paths; the staged
+  Windows client completed hidden-window SP/OpenGL and MP/Vulkan gameplay
+  captures. Broader platform and interactive qualification remains pending.
+
 - [ ] Replace every current GUI with a high-definition vector interface that
   preserves Quake 4's identity, expands across aspect ratios and responds to
   display density and player scale settings.

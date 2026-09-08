@@ -859,6 +859,11 @@ static void SDL3_QueueMouseInput(int action, int value, int time) {
 }
 
 static bool SDL3_ShouldRouteMenuMouse(void) {
+	// Disabled input and hidden batch-render windows must never synchronize or
+	// warp the host cursor when a GUI becomes active.
+	if (!s_sdlWindow || !win32.in_mouse.GetBool() || (SDL_GetWindowFlags(s_sdlWindow) & SDL_WINDOW_HIDDEN)) {
+		return false;
+	}
 	return ( session != NULL && session->IsGUIActive() ) || ( console != NULL && console->Active() );
 }
 
@@ -1294,7 +1299,7 @@ static bool SDL3_SetRoutedCursorFromWindowPosition(float windowMouseX, float win
 }
 
 static void SDL3_SyncSystemMouseToActiveCursor(void) {
-	if (!SDL3_ShouldRouteMenuMouse() || !s_sdlWindow) {
+	if (!SDL3_ShouldRouteMenuMouse() || !win32.activeApp) {
 		return;
 	}
 
