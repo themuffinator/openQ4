@@ -1,5 +1,17 @@
 # openQ4 Release Completion List
 
+## 0.13.1 candidate
+
+- [x] #159: release compilation uses complete engine history; stable version generation refuses shallow or missing history before producing a savegame build number. Regression coverage uses real full/shallow Git repositories.
+- [x] #160: full archive decompression/CRC validation runs before upload; GitHub asset sizes and SHA-256 digests must match local files before a new draft is published. The reported 0.13.0 Metal download was truncated (563,930,525 bytes); its intact original Actions artifact is 671,512,342 bytes and passes full gzip/tar validation.
+- [x] #158 render geometry: `.proc` now records the source geometry CRC instead of a fixed placeholder. AAS rebuilding is explicitly reported as unavailable; the compiler implementation is absent, so navigation remains open.
+- [x] Staged Windows qualification: `airdefense1` manual save, quicksave, load and save-after-load pass. A freshly compiled `mp/liquid_lab` produces `.proc`/`.cm`, reports the AAS limitation, enters multiplayer gameplay with explicit auto-join and exits cleanly; its new `.proc` is not reported out of date. Release/version, savegame, dmap, macOS packaging and documentation contracts pass.
+- [x] #157 investigation: fresh `game/hub1` passes saves during and after the terminal animation, restoration, and another save. A temporary named-event fixture executes the unchanged stock button script and its three target relays without injecting mouse/keyboard input; its console source is retained for restore. The supplied 0.12.0 save carries build 1 and is outside the current restore policy, so the exact historical campaign state and later EMP autosave still need reporter confirmation.
+- [ ] Complete the release CI matrix, exact packaged Windows save/load qualification and published-byte checks before publication.
+- [ ] #89 remains awaiting native CachyOS/RTX 3070 frame-pacing evidence; Windows or software-rendered Linux results cannot close that hardware-specific report.
+
+Curated player notes: [0.13.1](releases/v0.13.1.md). Work occurs on `main` in isolated engine/companion worktrees while the primary checkouts continue on `android-gles`.
+
 - [x] Release CI exposed existing Apple GL 2.1 startup errors from unsupported texture swizzles, multisample textures, eager SMAA shader validation and GPU timestamp queries. Resource creation and direct texture binding now check the context's advertised capabilities, SMAA checks its backend before material compilation, and GPU timing distinguishes EXT elapsed queries from ARB/core timestamp support. The production timestamp capability regression passes on Windows and Linux; hosted macOS now has zero GL/shader/framebuffer errors and passes the default-renderer safety test.
 - [x] Modern-renderer diagnostics exposed oversized simultaneous draw/submit/PBR fixtures on the macOS stack and unsupported-feature assumptions. The large fixtures now use heap storage, while unavailable PBR and clustered-light GPU paths produce explicit skip markers and executor CPU contracts run without requiring modern GPU uploads. Hosted macOS ARM64 OpenGL and Metal matrices pass with zero tracked error diagnostics. Local modern-renderer checks pass with both the normal and an 8 MiB stack, and forced-legacy foundation/PBR/clustered checks pass.
 

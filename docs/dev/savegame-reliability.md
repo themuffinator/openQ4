@@ -57,22 +57,21 @@ it provides no confidentiality. The description and preview sidecars are not
 covered by the `.save` CRC; they are validated and committed separately as part
 of the same slot transaction.
 
-The build and source snapshot remain useful diagnostics in v3. They are not a v3
-compatibility gate: same-version payloads may load across build/source changes
-when the exact wire-ABI stamp still matches. This makes schema-version discipline
-mandatory.
+The current v3 reader requires a matching wire ABI and a build number of at least
+661. Build/source differences above that floor are diagnostic, but two player
+fields still depend on historical build thresholds: `swimSpeed` at 661 and
+`nextLiquidSurfaceSoundTime` at 721. Payload-version discipline remains necessary;
+the build count is not a substitute for an explicit future schema revision.
 
-### Released v0.10 Compatibility Repair
+Release compilation must use complete engine Git history. A shallow checkout
+incorrectly produces build 1, causing the engine to reject its own staged saves
+and causing field-presence checks to describe the wrong layout. Starting with
+0.13.1, stable version generation rejects incomplete history. Lowering the restore
+floor alone would not repair these incorrectly stamped payloads. Older released
+build-1 saves are not supported by the current reader; previous snapshot-specific
+compatibility claims were withdrawn when actual restores failed.
 
-The released Windows x64 v0.10 snapshot identified by build `1`, source SHA-256
-`19351be39d2d4077a74294c0442707ef9565fc7a2fa9af9b81e05fc9aca8b220`, 404
-source files, and `windows-msvcabi-x64-le-raw1` predates two fields that were
-later added without a version bump. Its reader initializes `swimSpeed` and
-`nextLiquidSurfaceSoundTime` to safe defaults instead of consuming bytes that
-belong to the following fields. The complete tuple is required; other v3 source
-snapshots are not guessed to have the older player layout.
-
-That release could also serialize a different class-frame sequence depending on
+Older releases could also serialize a different class-frame sequence depending on
 link optimization. The old dispatcher compared member-function addresses, and
 MSVC identical-code folding made the empty `idPhysics` and `idClass` methods
 appear identical in optimized builds. Current restore code recognizes the
@@ -244,7 +243,7 @@ Consequences:
 
 ## Schema-Bump Rules
 
-The v3 reader intentionally accepts a different build/source snapshot when the
+The v3 reader accepts different supported build/source snapshots when the
 payload version and wire ABI match. Therefore a source edit that changes bytes or
 their meaning must not rely on the source hash to reject old saves.
 
@@ -257,8 +256,9 @@ Use these rules for future changes:
 2. Update engine preflight plus both SP and MP GameLib readers/writers atomically.
    Preserve an explicit older-version decoder only when it is bounded, tested,
    and intentional; never probe or guess between layouts after restore starts.
-3. Keep the v2 allowlist immutable except for a reviewed, exact tuple backed by
-   runtime evidence. Do not broaden it to “same build” or “same source count.”
+3. Keep unsupported v2 payloads rejected before map teardown. Any future older
+   format support needs an explicit decoder and successful real-save evidence;
+   matching a build number or source tuple is insufficient.
 4. Treat any raw-write inventory drift as a review failure. A byte-for-byte typed
    replacement may retain `raw1`; an ABI/layout change requires a new raw-layout
    suffix and normally a new payload version.
@@ -336,14 +336,18 @@ source parity; static contracts are not runtime proof. Windows x64 client UI
 translation units and both SP/MP GameLibs compile/link, while companion checks
 cover the ARM64 ABI source contract and typed restored-object references.
 
-Current Windows x64 candidate runs on `game/airdefense1` record a fresh v3 save
+Historical Windows x64 candidate runs on `game/airdefense1` recorded a fresh v3 save
 and `Game Map Init SaveGame`, rejection of a CRC-modified copy before map
 teardown, rollback/finalization recovery including preview-marker cleanup, restore
-of the approved build-614 v2 fixture, wrong-ABI rejection, and successful v3
+of a then-allowlisted build-614 v2 fixture, wrong-ABI rejection, and successful v3
 restore when only build/source diagnostics differ. A netplay save is rejected,
 and dedicated builds expose neither save nor load commands. These runs used
 windowed launches and engine-render-target screenshots where visual evidence was
 captured.
+
+The old v2 compatibility claim above has since been withdrawn. The 0.13.1 Windows
+candidate passes fresh manual save, quicksave, restore, and save-after-restore in
+stock `game/airdefense1`; incorrectly stamped build-1 saves remain rejected.
 
 Historical Linux x64/Wayland save/load evidence predates v3 and does not prove
 the current candidate on physical Linux hardware. ARM64 contract/build results
