@@ -4,6 +4,7 @@
 #include <array>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 #include "Vector.h"
@@ -26,6 +27,9 @@ struct Node {
 	std::map<std::string, Value> properties;
 	std::vector<Node> children;
 	std::vector<VectorPath> paths;
+	// Alpha mask of this completed subtree, in the node's border-box space.
+	// An explicitly empty mask hides the subtree; absence leaves it unmasked.
+	std::optional<std::vector<VectorPath>> mask;
 };
 struct Easing {
 	double x1 = 0, y1 = 0, x2 = 1, y2 = 1;

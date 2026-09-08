@@ -2,7 +2,8 @@
 
 8 September 2026. The replacement runtime now fades complete subtrees through
 transparent render targets. This advances Stage 3 of the
-[full replacement plan](../plans/idtech5-ui.md); masks, other composition effects,
+[full replacement plan](../plans/idtech5-ui.md). [Vector alpha masks](masks.md)
+have subsequently been added; other composition effects,
 full font/artwork qualification, the editor and all GUI migration remain open.
 
 ## Rendering contract
@@ -36,8 +37,9 @@ through the legacy and shared material paths and Vulkan pipeline keys. Vector
 paint and completed layers use premultiplied source-over for both RGB and alpha.
 This prevents translucent glyph edges from writing squared alpha into a layer.
 
-The host reuses target slots by nesting depth. The current pool uses full UI
-viewport dimensions, at most 48 layers and a 256 MiB limit for the active depth
+The runtime leases reusable target slots for stack layers, mask snapshots and
+filter scratch. The current pool uses full UI viewport dimensions, at most 48
+targets and a 256 MiB limit for the highest allocated slot
 at that viewport size. Resizing invalidates the pool; video/language recreation
 clears targets and document
 geometry. The image manager owns named image storage and the renderer defers
@@ -48,9 +50,10 @@ Allocation failure is diagnosed, suppresses the affected frame's remaining
 retained draws and restores the base
 target. It cannot redirect the failed group onto gameplay by accident.
 
-This checkpoint implements normal source-over group opacity. General blend
-modes, same-layer/backdrop operations, reusable layer textures, shaped clip masks,
-mask images, blur and the other filters remain unimplemented. Bounded regions,
+This checkpoint implements normal source-over group opacity; the subsequent
+mask checkpoint adds canonical alpha masks through RmlUi mask images. General
+blend modes, same-layer/backdrop operations, reusable layer textures, RmlUi's
+separate stencil-style clip-mask API, blur and other filters remain unimplemented. Bounded regions,
 deeper/extreme-resolution stress and GPU frame pacing remain qualification work.
 The current engine preview's base target is the normal 2D output; world/editor
 target ownership is part of the pending integration work.

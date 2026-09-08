@@ -157,6 +157,15 @@ appearance throughout a fade. Nested opacity composes inside-out; paint alpha
 remains intrinsic to each primitive. Crossing opacity 1 cannot reorder siblings.
 Editor previews use the same composition and clipping rules as gameplay.
 
+Shaped content clipping and reveals use editable vector alpha masks in the
+owning node's border-box coordinates. Masks move and scale with that node;
+fixed dp chamfers retain their proportions as the frame expands. Mask coverage
+applies once to the completed subtree, including text and nested panels. Curved
+holes and partially transparent reveals must preserve clean edges without color
+fringes. Mask RGB never changes the content color or coverage. Nested masks
+compose inside-out, and an explicitly empty mask exposes no content. The editor
+must display and edit the same mask geometry used by runtime rendering.
+
 Body text must remain readable over the brightest permitted scene. Target
 4.5:1 composited contrast for essential normal text and 3:1 for large text and
 essential control boundaries. If stock opacity fails, strengthen the local

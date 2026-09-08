@@ -50,13 +50,26 @@ struct Geometry {
 	std::vector<Rml::Vertex> vertices;
 	std::vector<int> indices;
 };
+struct Filter {
+	float opacity = 1;
+	std::uint32_t mask = 0;
+	int width = 0, height = 0;
+	std::uint64_t generation = 0;
+};
 
 class Renderer final : public Rml::RenderInterface {
 public:
 	Renderer(Host& h, RuntimeStatistics& statistics) : host(h), statistics(statistics) {}
-	void BeginFrame(int width, int height) { viewportWidth = width; viewportHeight = height; failed = false; }
+	void BeginFrame(int width, int height) {
+		if (width != viewportWidth || height != viewportHeight) ++viewportGeneration;
+		viewportWidth = width; viewportHeight = height; failed = false;
+	}
 	void EndFrame() {
-		if (depth) { host.Log(true,"Unbalanced retained composition layers"); host.EndLayer(0); depth = 0; }
+		if (!layers.empty()) {
+			host.Log(true,"Unbalanced retained composition layers"); host.EndLayer(0);
+			for (const auto slot : layers) ReleaseSlot(slot);
+			layers.clear();
+		}
 	}
 	Rml::CompiledGeometryHandle CompileGeometry(Rml::Span<const Rml::Vertex> vertices, Rml::Span<const int> indices) override {
 		if (vertices.empty() || vertices.size() > 262144 || indices.empty() || indices.size() % 3 != 0) return 0;
@@ -120,47 +133,102 @@ public:
 		if (value) transform = *value;
 	}
 	Rml::LayerHandle PushLayer() override {
-		++depth;
-		++statistics.layerPushes; statistics.peakLayerDepth = std::max<std::uint64_t>(statistics.peakLayerDepth,depth);
-		if (!failed && (depth > 48 || !host.BeginLayer(depth,viewportWidth,viewportHeight))) {
-			host.Log(true,"Cannot allocate retained composition layer"); failed = true;
-		}
-		return depth;
+		const auto slot = AllocateSlot();
+		// Keep a nonzero logical handle even when allocation failed, so RmlUi
+		// can unwind its stack while this renderer suppresses the failed frame.
+		layers.push_back(slot ? slot : static_cast<std::uint32_t>(49+layers.size()));
+		++statistics.layerPushes; statistics.peakLayerDepth = std::max<std::uint64_t>(statistics.peakLayerDepth,layers.size());
+		return layers.back();
 	}
 	void PopLayer() override {
-		if (!depth) { host.Log(true,"Retained composition layer underflow"); failed = true; return; }
-		--depth;
+		if (layers.empty()) { host.Log(true,"Retained composition layer underflow"); failed = true; return; }
+		ReleaseSlot(layers.back()); layers.pop_back();
 		// Restore the base even after an allocation failure. No further draws
 		// are accepted in a failed frame, preventing paint on the wrong target.
-		if (!failed || !depth) host.EndLayer(depth);
+		if (!failed || layers.empty()) host.EndLayer(TopLayer());
 	}
 	Rml::CompiledFilterHandle CompileFilter(const Rml::String& name, const Rml::Dictionary& parameters) override {
 		const auto value = parameters.find("value");
 		if (name == "opacity" && value != parameters.end()) {
 			const float opacity = value->second.Get<float>();
-			if (std::isfinite(opacity)) return reinterpret_cast<Rml::CompiledFilterHandle>(new float(std::clamp(opacity,0.f,1.f)));
+			if (std::isfinite(opacity)) return reinterpret_cast<Rml::CompiledFilterHandle>(new Filter{std::clamp(opacity,0.f,1.f)});
 		}
 		host.Log(true,"Unsupported retained filter: "+name); return 0;
 	}
-	void ReleaseFilter(Rml::CompiledFilterHandle filter) override { delete reinterpret_cast<float*>(filter); }
+	Rml::CompiledFilterHandle SaveLayerAsMaskImage() override {
+		if (failed || layers.empty()) return 0;
+		const auto snapshot = AllocateSlot();
+		if (!snapshot) return 0;
+		// A copy owns its slot until ReleaseFilter: popping/reusing the source
+		// layer, or drawing to it again, cannot change an already saved mask.
+		host.CompositeLayer(TopLayer(),snapshot,1,ClipBounds());
+		host.EndLayer(TopLayer());
+		++statistics.maskSnapshots;
+		return reinterpret_cast<Rml::CompiledFilterHandle>(new Filter{1,snapshot,viewportWidth,viewportHeight,viewportGeneration});
+	}
+	void ReleaseFilter(Rml::CompiledFilterHandle handle) override {
+		const auto* filter = reinterpret_cast<const Filter*>(handle);
+		if (!filter) return;
+		ReleaseSlot(filter->mask); delete filter;
+	}
 	void CompositeLayers(Rml::LayerHandle source, Rml::LayerHandle destination, Rml::BlendMode mode,
 		Rml::Span<const Rml::CompiledFilterHandle> filters) override {
 		if (failed) return;
-		if (!source || source > depth || destination >= source || mode != Rml::BlendMode::Blend) {
+		if (!source || source == destination || !ActiveLayer(source) || !ActiveLayer(destination) || mode != Rml::BlendMode::Blend) {
 			host.Log(true,"Unsupported retained layer composition"); failed = true; return;
 		}
 		float opacity = 1;
-		for (auto filter : filters) opacity *= *reinterpret_cast<const float*>(filter);
-		const float left = scissorEnabled ? std::clamp(float(scissor.Left()),0.f,float(viewportWidth)) : 0;
-		const float top = scissorEnabled ? std::clamp(float(scissor.Top()),0.f,float(viewportHeight)) : 0;
-		const float right = scissorEnabled ? std::clamp(float(scissor.Right()),left,float(viewportWidth)) : float(viewportWidth);
-		const float bottom = scissorEnabled ? std::clamp(float(scissor.Bottom()),top,float(viewportHeight)) : float(viewportHeight);
-		if (right > left && bottom > top) {
-			host.CompositeLayer(static_cast<std::uint32_t>(source),static_cast<std::uint32_t>(destination),opacity,{left,top,right-left,bottom-top});
+		std::vector<std::uint32_t> masks;
+		for (auto handle : filters) {
+			const auto& filter = *reinterpret_cast<const Filter*>(handle);
+			opacity *= filter.opacity;
+			if (filter.mask) {
+				if (filter.generation != viewportGeneration) {
+					host.Log(true,"Retained mask snapshot belongs to a different viewport"); failed = true; return;
+				}
+				masks.push_back(filter.mask);
+			}
+		}
+		const Bounds clip = ClipBounds();
+		if (clip.width > 0 && clip.height > 0) {
+			std::uint32_t scratch = 0;
+			if (!masks.empty()) {
+				scratch = AllocateSlot();
+				if (!scratch) return;
+				// Filters cannot mutate the source: it may be composited again.
+				host.CompositeLayer(static_cast<std::uint32_t>(source),scratch,1,clip);
+				for (const auto mask : masks) { host.MaskLayer(mask,scratch,clip); ++statistics.maskApplications; }
+			}
+			host.CompositeLayer(scratch ? scratch : static_cast<std::uint32_t>(source),static_cast<std::uint32_t>(destination),opacity,clip);
+			ReleaseSlot(scratch);
 			++statistics.layerComposites;
 		}
 	}
 private:
+	std::uint32_t TopLayer() const { return layers.empty() ? 0 : layers.back(); }
+	bool ActiveLayer(Rml::LayerHandle handle) const {
+		return !handle || std::find(layers.begin(),layers.end(),handle) != layers.end();
+	}
+	std::uint32_t AllocateSlot() {
+		if (failed) return 0;
+		for (std::uint32_t id = 1; id < slots.size(); ++id) if (!slots[id]) {
+			if (host.BeginLayer(id,viewportWidth,viewportHeight)) {
+				slots[id] = true;
+				statistics.peakLayerTargets = std::max<std::uint64_t>(statistics.peakLayerTargets,std::count(slots.begin(),slots.end(),true));
+				return id;
+			}
+			break;
+		}
+		host.Log(true,"Cannot allocate retained composition layer"); failed = true; return 0;
+	}
+	void ReleaseSlot(std::uint32_t id) { if (id && id < slots.size()) slots[id] = false; }
+	Bounds ClipBounds() const {
+		const float left = scissorEnabled ? std::clamp(float(scissor.Left()),0.f,float(viewportWidth)) : 0;
+		const float top = scissorEnabled ? std::clamp(float(scissor.Top()),0.f,float(viewportHeight)) : 0;
+		const float right = scissorEnabled ? std::clamp(float(scissor.Right()),left,float(viewportWidth)) : float(viewportWidth);
+		const float bottom = scissorEnabled ? std::clamp(float(scissor.Bottom()),top,float(viewportHeight)) : float(viewportHeight);
+		return {left,top,right-left,bottom-top};
+	}
 	static size_t Bytes(const Geometry& geometry) {
 		return sizeof(Geometry)+geometry.vertices.capacity()*sizeof(Rml::Vertex)+geometry.indices.capacity()*sizeof(int);
 	}
@@ -174,7 +242,9 @@ private:
 	Rml::Rectanglei scissor;
 	Rml::Matrix4f transform;
 	int viewportWidth = 0, viewportHeight = 0;
-	std::uint32_t depth = 0;
+	std::uint64_t viewportGeneration = 0;
+	std::vector<std::uint32_t> layers;
+	std::array<bool,49> slots{};
 	bool failed = false;
 };
 
@@ -310,6 +380,7 @@ struct Runtime::Impl {
 	System system;
 	Fonts fonts;
 	Rml::ElementInstancerGeneric<VectorElement> vectorInstancer;
+	std::unique_ptr<VectorMaskInstancer> maskInstancer;
 	Rml::Context* context = nullptr;
 	Rml::ElementDocument* document = nullptr;
 	std::unique_ptr<Document> canonical;
@@ -343,7 +414,10 @@ bool Runtime::Initialize() {
 	Rml::SetSystemInterface(&impl->system);
 	Rml::SetFontEngineInterface(&impl->fonts);
 	if (!Rml::Initialise()) return false;
+	impl->maskInstancer = std::make_unique<VectorMaskInstancer>();
 	Rml::Factory::RegisterElementInstancer("q4-vector",&impl->vectorInstancer);
+	Rml::Factory::RegisterElementInstancer("q4-node",&impl->vectorInstancer);
+	Rml::Factory::RegisterDecoratorInstancer("q4-mask",impl->maskInstancer.get());
 	impl->initialized = true;
 	activeRuntime = this;
 	impl->context = Rml::CreateContext("openq4-retained", {1280,720});
@@ -353,6 +427,7 @@ bool Runtime::Initialize() {
 void Runtime::Shutdown() {
 	if (!impl->initialized) return;
 	Rml::Shutdown();
+	impl->maskInstancer.reset();
 	impl->context = nullptr;
 	impl->document = nullptr;
 	impl->canonical.reset(); impl->applied.clear(); impl->motion.Reset({});
@@ -393,10 +468,8 @@ bool Runtime::LoadDocument(const std::string& source, const std::string& sourceP
 		// Canonical subtrees preserve paint order when opacity crosses 1 and
 		// their temporary filter layer appears or disappears.
 		if (auto* element = impl->document->GetElementById(node->id)) element->SetProperty("z-index","0");
-		if (node->type == "vector") {
-			auto* element = impl->document->GetElementById(node->id);
-			if (element) static_cast<VectorElement*>(element)->Configure(node->paths,impl->host,impl->statistics);
-		}
+		if (auto* element = impl->document->GetElementById(node->id))
+			static_cast<VectorElement*>(element)->Configure(*node,impl->host,impl->statistics);
 		for (const auto& child : node->children) nodes.push_back(&child);
 	}
 	impl->ApplyMotion();

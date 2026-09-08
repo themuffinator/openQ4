@@ -371,7 +371,7 @@ private:
 	}
 	Node ReadNode(const Json::Value& value, const std::string& path, unsigned depth) {
 		Require(depth <= 48 && ++nodeCount <= 65536,value,path,"Document hierarchy exceeds the node/depth limit");
-		Fields(value,path,{"id","type","properties","children","paths","extensions"});
+		Fields(value,path,{"id","type","properties","children","paths","mask","extensions"});
 		Node result;
 		result.id = Id(value["id"],path+"/id");
 		Require(nodeIds.insert(result.id).second,value["id"],path+"/id","Duplicate node ID '"+result.id+"'");
@@ -387,6 +387,19 @@ private:
 				result.paths.push_back(std::move(shape));
 			}
 		} else Require(!value.isMember("paths"),value["paths"],path+"/paths","Paths require a vector node");
+		if (value.isMember("mask")) {
+			const auto& mask = value["mask"]; const auto p = path+"/mask";
+			Fields(mask,p,{"paths","extensions"});
+			Require(mask["paths"].isArray(),mask["paths"],p+"/paths","Mask requires a path array");
+			result.mask.emplace();
+			std::set<std::string> ids;
+			for (Json::ArrayIndex i = 0; i < mask["paths"].size(); ++i) {
+				const auto at = p+"/paths/"+std::to_string(i);
+				auto shape = ReadPath(mask["paths"][i],at);
+				Require(ids.insert(shape.id).second,mask["paths"][i]["id"],at+"/id","Duplicate path ID within mask");
+				result.mask->push_back(std::move(shape));
+			}
+		}
 		if (value.isMember("properties")) {
 			Require(value["properties"].isObject(),value["properties"],path+"/properties","Expected a property object");
 			for (const auto& name : value["properties"].getMemberNames()) {
@@ -512,12 +525,13 @@ const Json::Value* Resolve(const Json::Value& root, const std::string& pointer) 
 	return value;
 }
 void MarkupNode(const Node& node, std::string& output) {
-	const std::string tag = node.type == "vector" ? "q4-vector" : "div";
+	const std::string tag = node.type == "vector" ? "q4-vector" : "q4-node";
 	output += "<"+tag+" id=\""+node.id+"\" style=\"";
 	// Canonical opacity isolates the complete node subtree. RmlUi's ordinary
 	// opacity is an inherited primitive tint; its filter supplies the needed
 	// stacking/render boundary without changing the editable source format.
 	output += "opacity:1;";
+	if (node.mask) output += "mask-image:q4-mask(alpha);";
 	for (const auto& [name,value] : node.properties) if (name != "text") {
 		if (name == "opacity") { if (value.data[0] < 1) output += "filter:opacity("+value.Css()+");"; }
 		else output += name+":"+value.Css()+";";
@@ -604,7 +618,7 @@ bool Document::ReplaceValue(const std::string& pointer, const std::string& repla
 const std::string& Document::Source() const { return impl->source; }
 const DocumentModel& Document::Model() const { return impl->model; }
 std::string Document::BuildMarkup() const {
-	std::string result = "<rml><head><style>body{margin:0;width:100%;height:100%;font-family:marine;font-size:16dp;color:#fff;}div,q4-vector{display:block;}</style></head><body>";
+	std::string result = "<rml><head><style>body{margin:0;width:100%;height:100%;font-family:marine;font-size:16dp;color:#fff;}div,q4-node,q4-vector{display:block;}</style></head><body>";
 	MarkupNode(impl->model.root,result);
 	return result+"</body></rml>";
 }

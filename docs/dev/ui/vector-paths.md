@@ -4,8 +4,8 @@
 rendered as native geometry through the engine. The runtime and future editor
 share the path model/compiler. This does **not** complete the production vector
 renderer or artwork migration. [Coverage antialiasing](coverage-antialiasing.md)
-has subsequently been added, followed by [isolated opacity layers](composition.md).
-Masks, broader layer effects, additional
+has subsequently been added, followed by [isolated opacity layers](composition.md)
+and [vector alpha masks](masks.md). Broader layer effects, additional
 paint/stroke features and full visual qualification remain Stage 3 requirements
 in the [plan](../plans/idtech5-ui.md).
 

@@ -4721,6 +4721,15 @@ idMaterial::SetDefaultText
 ===================
 */
 bool idMaterial::SetDefaultText( void ) {
+	if (idStr::Icmpn(GetName(),"_retainedMask/",14) == 0) {
+		const char* slot = GetName()+14;
+		if (!*slot) return false;
+		for (const char* p = slot; *p; ++p) if (*p < '0' || *p > '9') return false;
+		// Multiply premultiplied destination RGBA by sampled mask alpha.
+		// A full clipped quad also clears the area outside the mask paths.
+		SetText(va("material %s { sort gui twoSided { blend gl_zero, gl_src_alpha vertexColor nopicmip nearest clamp map _retainedLayerImage%s } }",GetName(),slot));
+		return true;
+	}
 	if (idStr::Icmpn(GetName(),"_retainedLayer/",15) == 0) {
 		const char* slot = GetName()+15;
 		if (!*slot) return false;

@@ -17,6 +17,7 @@ struct BenchmarkHost final : Host {
 	void Draw(const std::vector<Vertex>&, const std::vector<int>&, std::uintptr_t) override {}
 	bool BeginLayer(std::uint32_t, int, int) override { return true; }
 	void CompositeLayer(std::uint32_t, std::uint32_t, float, const Bounds&) override {}
+	void MaskLayer(std::uint32_t, std::uint32_t, const Bounds&) override {}
 	void EndLayer(std::uint32_t) override {}
 	FontMetrics GetFontMetrics(const std::string&, int size) override { return {size*.8f,size*.2f,size*1.2f,size*.5f}; }
 	Glyph GetGlyph(const std::string&, int size, std::uint32_t) override { return {size*.6f,0,-size*.8f,size*.6f,static_cast<float>(size),0,0,1,1,"benchmark-font"}; }

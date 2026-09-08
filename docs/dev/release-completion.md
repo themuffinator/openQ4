@@ -2,12 +2,18 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- Mask development: editable paths now clip complete panels and their contents,
+  with smooth chamfers, curved holes and soft gradient reveals. Nested masks
+  and fades share the runtime's vector renderer. The [mask checkpoint](ui/masks.md)
+  records coverage checks and current limits; full GUI migration and the visual
+  editor remain in development.
+
 - Composition development: panels and their overlapping contents now fade as
   one group, including nested controls and text edges. The
   [composition checkpoint](ui/composition.md) records native overlap tests and
   engine pixel comparisons. Development packages must replace engine, renderer
   modules and both game modules together (renderer API 13, game API 47).
-  Shaped masks, broader effects and complete UI/editor qualification remain open.
+  Broader effects and complete UI/editor qualification remain open.
 
 - Transition development: fades and whole-pixel movement now reuse compiled
   vector paths, with measured reductions in CPU work. A precision fix keeps thin

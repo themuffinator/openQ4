@@ -3907,7 +3907,7 @@ void idDeclLocal::ParseLocal( bool noCaching ) {
 	// geometry and font pages. Ordinary image/material assets still require
 	// precaching; an explicit declaration using this name is not exempt.
 	const bool generatedRetainedResource = type == DECL_MATERIAL && generatedDefaultText && IsImplicit() &&
-		( name.Icmp("_retainedsolid") == 0 || name.Icmpn("_retained/_ttfatlas_",20) == 0 || name.Icmpn("_retainedLayer/",15) == 0 );
+		( name.Icmp("_retainedsolid") == 0 || name.Icmpn("_retained/_ttfatlas_",20) == 0 || name.Icmpn("_retainedLayer/",15) == 0 || name.Icmpn("_retainedMask/",14) == 0 );
 	if ( common->IsInitialized() && !declManagerLocal.GetInsideLoad() && !openQ4_IsAnyToolActive() && !generatedRetainedResource ) {
 		common->Warning( "Loading non pre-cached %s decl %s", declManagerLocal.GetDeclNameFromType( type ), name.c_str() );
 	}

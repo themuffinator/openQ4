@@ -18,6 +18,7 @@ struct TestHost final : Host {
 	std::uint32_t activeLayer = 0;
 	std::vector<Bounds> samplePoints;
 	bool failLayer = false;
+	int allocationsUntilFailure = -1;
 	static void Over(Vertex& destination, const Vertex& source, float opacity = 1) {
 		const float remain = 1-source.a*opacity;
 		destination.r = source.r*opacity+destination.r*remain;
@@ -55,16 +56,30 @@ struct TestHost final : Host {
 		}
 	}
 	bool BeginLayer(std::uint32_t id, int, int) override {
-		if (failLayer) return false;
+		if (failLayer || allocationsUntilFailure == 0) return false;
+		if (allocationsUntilFailure > 0) --allocationsUntilFailure;
 		if (layers.size() <= id) layers.resize(id+1);
 		layers[id] = {}; layers[id].pixels.assign(samplePoints.size(),Vertex{0,0,0,0,0,0,0,0}); activeLayer = id; return true;
 	}
 	void CompositeLayer(std::uint32_t source, std::uint32_t destination, float opacity, const Bounds& clip) override {
+		Check(source != destination,"composition never samples its destination");
+		activeLayer = destination;
 		auto& output = destination ? layers[destination].vertices : drawn;
 		for (auto v : layers[source].vertices) { v.r *= opacity; v.g *= opacity; v.b *= opacity; v.a *= opacity; output.push_back(v); }
 		for (size_t i = 0; i < samplePoints.size(); ++i) {
 			const auto& p = samplePoints[i];
 			if (p.x >= clip.x && p.x < clip.x+clip.width && p.y >= clip.y && p.y < clip.y+clip.height) Over(layers[destination].pixels[i],layers[source].pixels[i],opacity);
+		}
+	}
+	void MaskLayer(std::uint32_t mask, std::uint32_t destination, const Bounds& clip) override {
+		Check(mask && destination && mask != destination,"mask never samples its destination or base");
+		activeLayer = destination;
+		for (size_t i = 0; i < samplePoints.size(); ++i) {
+			const auto& p = samplePoints[i];
+			if (p.x >= clip.x && p.x < clip.x+clip.width && p.y >= clip.y && p.y < clip.y+clip.height) {
+				auto& pixel = layers[destination].pixels[i]; const float alpha = layers[mask].pixels[i].a;
+				pixel.r *= alpha; pixel.g *= alpha; pixel.b *= alpha; pixel.a *= alpha;
+			}
 		}
 	}
 	void EndLayer(std::uint32_t restore) override { activeLayer = restore; }
@@ -281,6 +296,75 @@ int main() {
 	sampleFrame(15.5); // Monotonic clock keeps the already advanced .6 sample.
 	pixel(0,.2f,.8f,0); pixel(1,.1f,.8f,.1f);
 	sampleFrame(16); pixel(0,0,1,0); pixel(1,0,1,0);
+	// The same overlapping groups, now masked at both levels. Red and black
+	// masks with equal alpha must behave alike: this is alpha, not luminance.
+	std::string maskedDocument = compositionDocument;
+	maskedDocument.insert(maskedDocument.find("\"id\":\"fade-group\""),R"json("mask":{"paths":[
+	 {"id":"chamfer-hole","fillRule":"evenodd","fill":{"type":"solid","color":{"type":"color","value":[1,0,0,0.5]}},"commands":[
+	  {"id":"a","op":"move","points":[[0,20]]},{"id":"b","op":"line","points":[[20,0]]},
+	  {"id":"c","op":"line","points":[[120,0]]},{"id":"d","op":"line","points":[[120,80]]},
+	  {"id":"e","op":"line","points":[[0,80]]},{"id":"f","op":"close"},
+	  {"id":"g","op":"move","points":[[50,30]]},{"id":"h","op":"line","points":[[70,30]]},
+	  {"id":"i","op":"line","points":[[70,50]]},{"id":"j","op":"line","points":[[50,50]]},{"id":"k","op":"close"}]
+	 }]},)json");
+	maskedDocument.insert(maskedDocument.find("\"id\":\"nested\""),R"json("mask":{"paths":[
+	 {"id":"half","fill":{"type":"solid","color":{"type":"color","value":[0,0,0,0.5]}},"commands":[
+	  {"id":"a","op":"move","points":[[0,0]]},{"id":"b","op":"line","points":[[80,0]]},
+	  {"id":"c","op":"line","points":[[80,80]]},{"id":"d","op":"line","points":[[0,80]]},{"id":"e","op":"close"}]
+	 }]},)json");
+	Check(runtime.LoadDocument(maskedDocument,"masked.q4ui",diagnostics),"load nested alpha masks with a chamfer and hole");
+	viewport = {}; // These mask coordinates are dp; paint coordinates are px.
+	host.samplePoints = {{20.37f,20.63f},{50.37f,20.63f},{70.37f,50.63f},{12.37f,12.63f},{19.37f,20.63f}};
+	sampleFrame(17);
+	const float maskAlpha = 128.f/255;
+	pixel(0,.5f*maskAlpha,1-.5f*maskAlpha,0);
+	pixel(1,(1-.5f*maskAlpha)*.5f*maskAlpha,1-.5f*maskAlpha,.25f*maskAlpha*maskAlpha);
+	pixel(2,0,1,0); pixel(3,0,1,0); pixel(4,32.f/255,1-32.f/255,0);
+	Check(runtime.Statistics().maskSnapshots == 2 && runtime.Statistics().maskApplications == 2,"both masks reach isolated subtree composition");
+	Check(runtime.Statistics().peakLayerTargets <= 4,"snapshots and scratch reuse a bounded slot pool");
+	sampleFrame(17.1);
+	Check(runtime.Statistics().vectorPathsCompiled == 0 && runtime.Statistics().vectorUploads == 0,"unchanged mask coverage stays cached");
+	Check(runtime.PlayTimeline("fade",17.1),"animate opacity independently of alpha mask");
+	sampleFrame(17.6); pixel(0,.25f*maskAlpha,1-.25f*maskAlpha,0); pixel(2,0,1,0);
+	Check(runtime.Statistics().vectorPathsCompiled == 0,"fades do not rebuild mask coverage");
+	Check(runtime.LoadDocument(maskedDocument,"mask-failure.q4ui",diagnostics),"restore authored mask opacity");
+	for (int allocation = 0; allocation < 8; ++allocation) {
+		host.allocationsUntilFailure = allocation;
+		sampleFrame(17.7+allocation*.02);
+		Check(host.errors == 1 && host.activeLayer == 0,"every mask allocation failure is diagnosed and restores base");
+		pixel(0,0,1,0); pixel(1,0,1,0);
+		--host.errors; host.allocationsUntilFailure = -1;
+		sampleFrame(17.71+allocation*.02);
+		pixel(0,.5f*maskAlpha,1-.5f*maskAlpha,0);
+		Check(runtime.Statistics().peakLayerTargets <= 4,"failed mask allocations do not leak leases across frames");
+	}
+	Document maskEdit;
+	Check(maskEdit.Load(maskedDocument,diagnostics),"load editable masked source");
+	Check(maskEdit.Source() == maskedDocument,"mask source round trip preserves every byte");
+	const std::string gradient = R"json({"type":"linear","from":[0,0],"to":[120,0],"stops":[
+	 {"at":0,"color":{"type":"color","value":[1,0,0,0]}},
+	 {"at":1,"color":{"type":"color","value":[0,0,0,1]}}]})json";
+	Check(maskEdit.ReplaceValue("/root/children/0/mask/paths/0/fill",gradient,diagnostics),"edit mask paint to a soft reveal gradient");
+	Check(runtime.LoadDocument(maskEdit.Source(),"gradient-mask.q4ui",diagnostics),"load gradient alpha mask");
+	sampleFrame(17.9);
+	const float gradientAlpha = (20.37f-10)/120;
+	pixel(0,.5f*gradientAlpha,1-.5f*gradientAlpha,0); pixel(2,0,1,0);
+	Check(maskEdit.ReplaceValue("/root/children/0/mask/paths","[]",diagnostics),"author an empty mask");
+	Check(runtime.LoadDocument(maskEdit.Source(),"empty-mask.q4ui",diagnostics),"load explicitly empty mask");
+	sampleFrame(18); pixel(0,0,1,0); pixel(1,0,1,0);
+	Check(maskEdit.ReplaceValue("/root/children/0/mask",R"json({"paths":[{"id":"invalid","commands":[]}]})json",diagnostics) == false,"invalid mask edit is transactional");
+	Check(diagnostics[0].pointer == "/root/children/0/mask/paths/0/commands","mask diagnostic identifies the source command array");
+	std::string dpMasked = maskedDocument;
+	for (size_t pos = 0; (pos = dpMasked.find("\"px\"",pos)) != std::string::npos; pos += 4) dpMasked.replace(pos,4,"\"dp\"");
+	Check(runtime.LoadDocument(dpMasked,"mask-density.q4ui",diagnostics),"mask and contents share dp coordinates");
+	for (float density : {1.25f,1.5f,2.f,1.f}) {
+		viewport.displayScale = density;
+		host.samplePoints = {{20.37f*density,20.63f*density},{50.37f*density,20.63f*density},{70.37f*density,50.63f*density},{12.37f*density,12.63f*density}};
+		sampleFrame(19);
+		pixel(0,.5f*maskAlpha,1-.5f*maskAlpha,0);
+		pixel(1,(1-.5f*maskAlpha)*.5f*maskAlpha,1-.5f*maskAlpha,.25f*maskAlpha*maskAlpha);
+		pixel(2,0,1,0); pixel(3,0,1,0);
+	}
 	host.samplePoints.clear();
 	runtime.CloseDocument();
 	Check(!runtime.IsLoaded(),"close document");

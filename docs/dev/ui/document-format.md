@@ -57,7 +57,7 @@ resolves every reference in the candidate model.
 | `transform` | `[x,y,sx,sy,degrees]` plus `unit` | Translation uses `dp` or `px`; scales are dimensionless |
 
 The current node types are `group`, `text` and `vector`. Each has an `id`, `type`, optional
-`properties`, `children` and `extensions`. Text content belongs only to text
+`properties`, `children`, `mask` and `extensions`. Text content belongs only to text
 nodes; text nodes cannot own children. The root is a normal node inside a
 viewport-filling retained document.
 
@@ -85,6 +85,18 @@ anchors, dimensions and margins. Additional layout constraints, components,
 bindings and material/image nodes remain to be implemented. Native vector nodes
 now have a `paths` array; their [source/compiler contract](vector-paths.md)
 records supported curves, strokes, paints and remaining quality gates.
+
+Every node type can have an alpha `mask` object with `paths` and optional
+`extensions`. These paths use the same schema as vector artwork and their own
+path-ID namespace. Coordinates resolve against the node's border box, including
+padding. Masks follow its transform and dp scale. Mask paths paint in source
+order; their resulting alpha multiplies the completed subtree once. Colors do
+not affect mask strength. Fills, strokes, gradients, holes and pixel coverage
+all contribute alpha. An absent mask leaves paint unchanged; `{"paths":[]}`
+hides the entire subtree. Nested masks and group opacity compose inside-out.
+See [vector masks](masks.md) for rendering, tests and limits. Mask values support
+the same transactional JSON-pointer edits and source diagnostics as artwork;
+mask points/paints are not yet timeline or game-binding targets.
 
 The render adapter owns the conversion into RmlUi syntax. In particular, RmlUi
 RGBA functions use integer 0–255 alpha, whereas this document stores 0–1 alpha.

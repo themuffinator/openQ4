@@ -80,7 +80,7 @@ public:
 	}
 	bool BeginLayer(std::uint32_t id, int width, int height) override {
 		// Bound the full-size transient pool to 256 MiB of RGBA8 storage.
-		// Slots follow nesting depth and are reused in command order.
+		// Runtime leases cover stack layers, mask snapshots and filter scratch.
 		if (!id || id > 48 || width <= 0 || height <= 0 ||
 			static_cast<std::uint64_t>(width)*height*4*id > 256*1024*1024) return false;
 		if (!layers.empty() && (layers.front().width != width || layers.front().height != height)) ClearLayers();
@@ -99,7 +99,8 @@ public:
 			if (!layer.target) return false;
 			layer.width = width; layer.height = height;
 			layer.material = declManager->FindMaterial(va("_retainedLayer/%u",id));
-			if (!layer.material || layer.material->GetState() == DS_DEFAULTED) {
+			layer.maskMaterial = declManager->FindMaterial(va("_retainedMask/%u",id));
+			if (!layer.material || layer.material->GetState() == DS_DEFAULTED || !layer.maskMaterial || layer.maskMaterial->GetState() == DS_DEFAULTED) {
 				renderSystem->DestroyRenderTexture(layer.target); layer.target = nullptr; return false;
 			}
 		}
@@ -108,6 +109,12 @@ public:
 		return true;
 	}
 	void CompositeLayer(std::uint32_t source, std::uint32_t destination, float opacity, const openq4::ui::Bounds& clip) override {
+		DrawLayer(layers[source-1].material,destination,opacity,clip);
+	}
+	void MaskLayer(std::uint32_t mask, std::uint32_t destination, const openq4::ui::Bounds& clip) override {
+		DrawLayer(layers[mask-1].maskMaterial,destination,1,clip);
+	}
+	void DrawLayer(const idMaterial* material, std::uint32_t destination, float opacity, const openq4::ui::Bounds& clip) {
 		renderSystem->BindRenderTexture(destination ? layers[destination-1].target : nullptr,nullptr);
 		const float x0 = clip.x, y0 = clip.y, x1 = x0+clip.width, y1 = y0+clip.height;
 		// Vulkan attachments store the top row at v=0. GL/GLES render targets
@@ -117,7 +124,7 @@ public:
 			return {x,y,x/viewportWidth,topOrigin ? y/viewportHeight : 1-y/viewportHeight,opacity,opacity,opacity,opacity};
 		};
 		Draw({vertex(x0,y0),vertex(x1,y0),vertex(x1,y1),vertex(x0,y1)}, {0,1,2,0,2,3},
-			reinterpret_cast<std::uintptr_t>(layers[source-1].material));
+			reinterpret_cast<std::uintptr_t>(material));
 	}
 	void EndLayer(std::uint32_t restore) override {
 		renderSystem->BindRenderTexture(restore ? layers[restore-1].target : nullptr,nullptr);
@@ -151,7 +158,7 @@ public:
 	}
 	int viewportWidth = 1280, viewportHeight = 720;
 private:
-	struct Layer { idRenderTexture* target = nullptr; const idMaterial* material = nullptr; int width = 0, height = 0; };
+	struct Layer { idRenderTexture* target = nullptr; const idMaterial* material = nullptr; const idMaterial* maskMaterial = nullptr; int width = 0, height = 0; };
 	std::vector<Layer> layers;
 	const fontInfo_t* Font(const std::string& family) {
 		const std::string key = family == "marine" ? "marine" : family == "lowpixel" ? "lowpixel" : "chain";
@@ -188,6 +195,7 @@ void RecordProfile(double engineMilliseconds) {
 	double compileMilliseconds = 0;
 	unsigned long long paths = 0, uploads = 0, hits = 0, peakBytes = 0;
 	unsigned long long layerPushes = 0, layerComposites = 0, peakLayerDepth = 0;
+	unsigned long long maskSnapshots = 0, maskApplications = 0, peakLayerTargets = 0;
 	for (const auto& sample : profile) {
 		times.push_back(sample.engineMilliseconds);
 		compileMilliseconds += sample.statistics.vectorCompileMilliseconds;
@@ -195,11 +203,13 @@ void RecordProfile(double engineMilliseconds) {
 		peakBytes = Max(peakBytes,static_cast<unsigned long long>(sample.statistics.residentGeometryBytes+sample.statistics.visibleVectorCacheBytes));
 		layerPushes += sample.statistics.layerPushes; layerComposites += sample.statistics.layerComposites;
 		peakLayerDepth = Max(peakLayerDepth,static_cast<unsigned long long>(sample.statistics.peakLayerDepth));
+		maskSnapshots += sample.statistics.maskSnapshots; maskApplications += sample.statistics.maskApplications;
+		peakLayerTargets = Max(peakLayerTargets,static_cast<unsigned long long>(sample.statistics.peakLayerTargets));
 	}
 	std::sort(times.begin(),times.end());
 	auto percentile = [&](double fraction) { return times[static_cast<size_t>(std::ceil(fraction*times.size()))-1]; };
-	common->Printf("Retained UI profile: {\"frames\":%d,\"engine_cpu_p50_ms\":%.6f,\"engine_cpu_p95_ms\":%.6f,\"engine_cpu_max_ms\":%.6f,\"vector_compile_ms\":%.6f,\"paths_compiled\":%llu,\"vector_uploads\":%llu,\"cache_hits\":%llu,\"tracked_peak_bytes\":%llu,\"layer_pushes\":%llu,\"layer_composites\":%llu,\"peak_layer_depth\":%llu}\n",
-		profileFrames,percentile(.5),percentile(.95),percentile(1),compileMilliseconds,paths,uploads,hits,peakBytes,layerPushes,layerComposites,peakLayerDepth);
+	common->Printf("Retained UI profile: {\"frames\":%d,\"engine_cpu_p50_ms\":%.6f,\"engine_cpu_p95_ms\":%.6f,\"engine_cpu_max_ms\":%.6f,\"vector_compile_ms\":%.6f,\"paths_compiled\":%llu,\"vector_uploads\":%llu,\"cache_hits\":%llu,\"tracked_peak_bytes\":%llu,\"layer_pushes\":%llu,\"layer_composites\":%llu,\"peak_layer_depth\":%llu,\"mask_snapshots\":%llu,\"mask_applications\":%llu,\"peak_layer_targets\":%llu}\n",
+		profileFrames,percentile(.5),percentile(.95),percentile(1),compileMilliseconds,paths,uploads,hits,peakBytes,layerPushes,layerComposites,peakLayerDepth,maskSnapshots,maskApplications,peakLayerTargets);
 	profileFrames = 0; profile.clear();
 }
 
