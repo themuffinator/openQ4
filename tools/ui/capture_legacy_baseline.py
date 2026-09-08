@@ -18,6 +18,7 @@ import re
 import struct
 import subprocess
 import time
+import legacy_import
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -59,6 +60,7 @@ def capture(args: argparse.Namespace) -> int:
     game = savepath / 'baseoq4'
     game.mkdir(parents=True)
     cfg_path = game / 'ui-baseline.cfg'
+    import_requests = legacy_import.requests(args.legacy_export_list) if args.legacy_export_list else []
     preview = ''
     if args.retained_document:
         fixture = args.retained_document.resolve()
@@ -75,7 +77,7 @@ def capture(args: argparse.Namespace) -> int:
         if args.video_restart:
             preview += 'vid_restart windowed\nwait 2\n' + begin + profile_command + play + script + f'wait {settle}\n' + end
     close = 'ui_retainedClose\nwait 3\nui_retainedOwnership\n' if args.retained_open else ''
-    cfg_path.write_text(preview + 'gfxInfo\nscreenshot "screenshots/ui-baseline.tga"\necho UI_BASELINE_CAPTURE_COMPLETE\n' + close + 'quit\n', encoding='utf-8')
+    cfg_path.write_text(preview + legacy_import.commands(import_requests) + 'gfxInfo\nscreenshot "screenshots/ui-baseline.tga"\necho UI_BASELINE_CAPTURE_COMPLETE\n' + close + 'quit\n', encoding='utf-8')
     overrides = {
         'fs_basepath': str(args.assets.resolve()), 'fs_savepath': str(savepath), 'fs_devpath': str(savepath),
         'fs_game': 'baseoq4', 'logFile': '2', 'logFileName': 'logs/openq4.log',
@@ -162,6 +164,8 @@ def capture(args: argparse.Namespace) -> int:
     log_path = game / 'logs/openq4.log'
     log = log_path.read_text(encoding='utf-8', errors='replace') if log_path.exists() else ''
     plain_log = re.sub(r'\^[0-9]', '', log)
+    if import_requests:
+        metadata['legacy_import'] = legacy_import.collect(game,plain_log,import_requests)
     diagnostics = [line for line in plain_log.splitlines() if 'WARNING:' in line or 'ERROR:' in line]
     metadata['diagnostics'] = {'warnings': sum('WARNING:' in line for line in diagnostics),
                                'errors': sum('ERROR:' in line for line in diagnostics)}
@@ -169,6 +173,8 @@ def capture(args: argparse.Namespace) -> int:
     active_apis = re.findall(r'Renderer API: requested=\S+ active=(\S+) disposition=(\S+)', plain_log)
     metadata['active_renderer'] = active_apis[-1][0] if active_apis else None
     valid = valid and metadata['active_renderer'] == args.renderer
+    if import_requests:
+        valid = valid and metadata['legacy_import']['passed']
     if args.retained_document:
         retained_diagnostics = [line for line in diagnostics if 'retained UI:' in line or '_retained' in line]
         retained_diagnostics += [line for line in plain_log.splitlines() if line.startswith('usage: ui_retained')]
@@ -216,6 +222,7 @@ def main() -> int:
     parser.add_argument('--retained-document', type=Path, help='Optional Q4UI or RML integration fixture, copied into the isolated savepath.')
     parser.add_argument('--retained-script', type=Path, help='Optional semantic control script; does not send device input.')
     parser.add_argument('--retained-open', action='store_true', help='Acquire application ownership with host input still disabled; inspect pause/resume and close.')
+    parser.add_argument('--legacy-export-list', type=Path, help='JSON source/hash records to preprocess through the engine without executing GUI scripts.')
     parser.add_argument('--timeline', help='Canonical timeline to play before capture, and again after an optional video restart.')
     parser.add_argument('--reduced-motion', action='store_true')
     parser.add_argument('--density', type=float, default=0, help='Test density override; zero uses SDL display scale.')

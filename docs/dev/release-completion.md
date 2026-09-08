@@ -2,6 +2,13 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- Translation development: the current GUI set can now be imported through the
+  engine preprocessor into ordered windows, events, expressions and dependency
+  records. All 271 source hashes match in SP/OpenGL and MP/Vulkan; two unusual
+  monitor expressions remain flagged for review. The
+  [import checkpoint](ui/legacy-import.md) records the evidence. GUI replacements,
+  vector reconstruction, game bindings and the visual editor remain in progress.
+
 - Input development: the retained menu host now routes keyboard, mouse and
   controller navigation, preserves console access and requires held controls
   to be released before returning them to gameplay. Disconnecting a controller

@@ -486,7 +486,7 @@ def migration_seed(report: dict) -> dict:
     }
 
 
-def write_json(path: Path, value: dict) -> None:
+def write_json(path: Path, value: dict | list) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, indent=2, ensure_ascii=True) + '\n', encoding='utf-8')
 
@@ -497,11 +497,13 @@ def main(argv: list[str] | None = None) -> int:
                         help='Game directory, repeat in low-to-high priority order; no automatic savepath mounts.')
     parser.add_argument('--output', type=Path, required=True, help='Full generated lexical inventory JSON.')
     parser.add_argument('--seed-manifest', type=Path, help='Create a new migration seed; refuses to overwrite existing work.')
+    parser.add_argument('--export-requests', type=Path, help='Write source/hash requests for native preprocessing.')
     args = parser.parse_args(argv)
     if args.seed_manifest and args.seed_manifest.exists():
         parser.error('migration manifest already exists; refusing to overwrite evidence')
-    if args.seed_manifest and args.seed_manifest.resolve() == args.output.resolve():
-        parser.error('inventory and migration manifest must be different files')
+    destinations = [path.resolve() for path in (args.output,args.seed_manifest,args.export_requests) if path]
+    if len(set(destinations)) != len(destinations):
+        parser.error('inventory, migration manifest and export requests must be different files')
     catalog = Catalog()
     try:
         for mount in args.mount:
@@ -513,6 +515,8 @@ def main(argv: list[str] | None = None) -> int:
         write_json(args.output, report)
         if args.seed_manifest:
             write_json(args.seed_manifest, migration_seed(report))
+        if args.export_requests:
+            write_json(args.export_requests, [{'path':r['path'],'sha256':r['sha256']} for r in report['resources']])
     except (OSError, ValueError, BadZipFile, RecursionError) as error:
         print(f'GUI inventory failed: {error}', file=sys.stderr)
         return 1

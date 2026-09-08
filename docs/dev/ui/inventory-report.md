@@ -26,6 +26,8 @@ The tracked [migration manifest](migration-manifest.json) is initialized using
 the optional `--seed-manifest` argument. That operation refuses to overwrite an
 existing manifest so later translation/acceptance evidence cannot be erased.
 Each source hash binds evidence to the corresponding effective GUI content.
+The optional `--export-requests` output feeds the subsequent
+[native preprocessing and structured import](legacy-import.md) pipeline.
 
 ## Observed corpus
 
@@ -94,8 +96,9 @@ being called missing assets. No artwork has yet been classified as an approved
 bitmap exception; simple furniture remains mandatory vector reconstruction.
 
 `guis/maps/tram1/bridge1.gui` has an extra lexical closing brace. Its behavior
-under the actual engine parser must be recorded before translation. This is a
-source observation, not evidence of a runtime failure or permission to drop it.
+must be recorded before translation. Subsequent native preprocessing and
+structured import consume its full token stream successfully. This lexical
+observation is not evidence of a runtime failure or permission to drop it.
 
 ## Validation
 

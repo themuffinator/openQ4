@@ -2,6 +2,7 @@
 #include "RetainedUI.h"
 
 #ifndef ID_DEDICATED
+#include "LegacyGuiImport.h"
 #include "retained/Runtime.h"
 #include "retained/Input.h"
 #include "../renderer/RendererModule.h"
@@ -391,6 +392,7 @@ void Events_f(const idCmdArgs&) {
 }
 
 void RetainedUI_Init() {
+	cmdSystem->AddCommand("ui_exportLegacy",RetainedUI_ExportLegacy,CMD_FL_SYSTEM,"export native-preprocessed GUI tokens for translation without executing scripts");
 	cmdSystem->AddCommand("ui_retainedPreview",Preview_f,CMD_FL_SYSTEM,"preview a retained UI integration document");
 	cmdSystem->AddCommand("ui_retainedOpen",Open_f,CMD_FL_SYSTEM,"open a canonical retained document with application input ownership");
 	cmdSystem->AddCommand("ui_retainedOwnership",Ownership_f,CMD_FL_SYSTEM,"inspect retained application input ownership");
@@ -406,6 +408,7 @@ void RetainedUI_Init() {
 }
 void RetainedUI_Shutdown() {
 	Close();
+	cmdSystem->RemoveCommand("ui_exportLegacy");
 	cmdSystem->RemoveCommand("ui_retainedPreview");
 	cmdSystem->RemoveCommand("ui_retainedOpen");
 	cmdSystem->RemoveCommand("ui_retainedOwnership");

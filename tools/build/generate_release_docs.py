@@ -1302,6 +1302,7 @@ def generate_release_docs_site(
         "docs/dev/ui/migration-manifest.json",
         "subprojects/rmlui.wrap", "subprojects/packagefiles/libtess2/double-precision.patch",
         "tools/ui/capture_legacy_baseline.py",
+        "tools/ui/legacy_import.py", "tools/ui/legacy_inventory.py", "tools/ui/legacy_syntax.py",
         "tools/ui/verify_composition_capture.py", "tools/ui/verify_interaction_capture.py",
         "tools/ui/verify_mask_capture.py",
         "tools/ui/fixtures/composition-smoke.q4ui", "tools/ui/fixtures/document-smoke.q4ui",

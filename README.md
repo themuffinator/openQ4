@@ -61,7 +61,9 @@ feature; see the [visual specification](docs/dev/ui-visual-design.md) and
 includes [isolated group fades](docs/dev/ui/composition.md),
 [editable vector masks](docs/dev/ui/masks.md) and
 [button navigation and state feedback](docs/dev/ui/interaction.md), plus
-[menu input ownership](docs/dev/ui/input-routing.md). Complete GUI migration,
+[menu input ownership](docs/dev/ui/input-routing.md). A
+[native GUI importer](docs/dev/ui/legacy-import.md) now preserves the current
+GUI set's structure, expressions and dependency references. Complete GUI migration,
 game action integration and the visual editor remain in development.
 
 The [0.13.1 patch notes](docs/dev/releases/v0.13.1.md) cover the release save fix, download verification, and map-compilation corrections. Replace the complete package when upgrading.

@@ -4,6 +4,9 @@
 from __future__ import annotations
 
 from functools import cmp_to_key
+from contextlib import redirect_stdout
+import io
+import json
 from pathlib import Path
 import sys
 import tempfile
@@ -11,7 +14,8 @@ import unittest
 from zipfile import ZipFile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'ui'))
-from legacy_inventory import Catalog, LexError, compare_paks, inventory, lex, migration_seed, qpath
+from legacy_inventory import Catalog, LexError, compare_paks, inventory, lex, migration_seed, qpath, main
+import legacy_import
 
 
 class InventoryTests(unittest.TestCase):
@@ -171,6 +175,17 @@ class InventoryTests(unittest.TestCase):
         item = inventory(catalog)['asset_dependencies'][0]
         self.assertEqual(item['resolution'], 'multiple_declaration_candidates')
         self.assertEqual(len(item['declaration_candidates']), 2)
+
+    def test_native_export_requests_use_effective_source_hashes(self):
+        self.pack('pak001.pk4', {'guis/a.gui':'windowDef A {}'})
+        self.write('guis/a.gui','windowDef Override {}')
+        report = self.root/'report.json'
+        requests = self.root/'requests.json'
+        with redirect_stdout(io.StringIO()):
+            code = main(['--mount',f'base={self.root}','--output',str(report),'--export-requests',str(requests)])
+        self.assertEqual(code,0)
+        resource = json.loads(report.read_text())['resources'][0]
+        self.assertEqual(legacy_import.requests(requests),[{'path':resource['path'],'sha256':resource['sha256']}])
 
 
 if __name__ == '__main__':
