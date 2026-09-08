@@ -117,6 +117,38 @@ int main() {
 	Check(Near(animatedLeft,60),"half-second transform at 144 Hz");
 	Check(Near(leftAt(5.4),60),"backward clock does not reverse presentation");
 	Check(Near(leftAt(5.5+1.0/144.0),60+100.f/144.f),"144 Hz sample advances between simulation ticks");
+	const char* canonical = R"json({
+	 "format":"openq4-ui","version":1,"id":"canonical-test",
+	 "root":{"id":"root","type":"group","children":[
+	  {"id":"canonical-panel","type":"group","properties":{
+	   "position":{"type":"keyword","value":"absolute"},
+	   "left":{"type":"length","value":10,"unit":"dp"},
+	   "top":{"type":"length","value":20,"unit":"dp"},
+	   "width":{"type":"length","value":100,"unit":"dp"},
+	   "height":{"type":"length","value":40,"unit":"dp"},
+	   "background-color":{"type":"color","value":[0.5,0.6,0.3,1]},
+	   "transform":{"type":"transform","unit":"dp","value":[0,0,1,1,0]}
+	  }}
+	 ]},
+	 "timelines":[{"id":"slide","durationMs":1000,"tracks":[
+	  {"node":"canonical-panel","property":"transform","keys":[
+	   {"atMs":0,"value":{"type":"transform","unit":"dp","value":[0,0,1,1,0]}},
+	   {"atMs":1000,"value":{"type":"transform","unit":"dp","value":[100,0,1,1,0]}}
+	  ]}
+	 ]}]
+	})json";
+	std::vector<Diagnostic> diagnostics;
+	Check(runtime.LoadDocument(canonical,"test.q4ui",diagnostics),"load canonical document through real layout adapter");
+	Check(!runtime.SetProperty("canonical-panel","left","30dp"),"canonical source retains property ownership");
+	Check(runtime.PlayTimeline("slide",6),"play canonical absolute timeline");
+	Check(Near(leftAt(6),10),"canonical initial transform reaches renderer");
+	Check(!host.drawn.empty() && host.drawn[0].a > .99f && Near(host.drawn[0].r,.5f),"normalized canonical colour converts to RmlUi alpha units");
+	Check(Near(leftAt(6.25),35),"canonical renderer advances full 250 ms after a stall");
+	viewport.displayScale=2;
+	Check(Near(leftAt(6.5),120),"canonical transform and layout share dp scale during animation");
+	Check(Near(leftAt(7),220),"canonical transform reaches exact final endpoint");
+	Check(!runtime.LoadDocument("{\"version\":2}","bad.q4ui",diagnostics),"reject invalid replacement document");
+	Check(Near(leftAt(7.25),220),"invalid replacement keeps previous rendered document");
 	runtime.CloseDocument();
 	Check(!runtime.IsLoaded(),"close document");
 	runtime.Shutdown();

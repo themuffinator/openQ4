@@ -2,6 +2,14 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- Document/editor foundation: typed canonical sources retain comments and
+  extension data through validated value edits. Presentation tracks now support
+  continuous timing, interruption, pause, cancellation and reduced motion. The
+  [document checkpoint](ui/document-format.md) records the implemented subset;
+  native checks and SP gameplay captures pass in OpenGL and Vulkan, including
+  video restart and 100%/200% density. The visual editor and complete GUI
+  translation remain in progress; existing non-UI Vulkan warnings remain open.
+
 - Retained runtime development: RmlUi is pinned and integrated with the engine's
   renderer, density model and current scalable fonts. Native layout, clipping
   and motion-sampling checks are in place. The [integration checkpoint](ui/runtime-spike.md)

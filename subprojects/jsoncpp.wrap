@@ -1,0 +1,9 @@
+[wrap-file]
+directory = jsoncpp-1.9.6
+source_url = https://codeload.github.com/open-source-parsers/jsoncpp/tar.gz/refs/tags/1.9.6
+source_filename = jsoncpp-1.9.6.tar.gz
+source_hash = f93b6dd7ce796b13d02c108bc9f79812245a82e577581c4c9aabe57075c90ea2
+patch_directory = jsoncpp
+
+[provide]
+dependency_names = jsoncpp

@@ -12,6 +12,8 @@ idCVar ui_retainedScale("ui_retainedScale", "1", CVAR_GUI | CVAR_FLOAT | CVAR_AR
 	"retained UI density multiplier", .75f, 2.f);
 idCVar ui_retainedDensity("ui_retainedDensity", "0", CVAR_GUI | CVAR_FLOAT,
 	"retained UI test density override; zero uses the window display scale", 0.f, 8.f);
+idCVar ui_retainedReducedMotion("ui_retainedReducedMotion", "0", CVAR_GUI | CVAR_BOOL | CVAR_ARCHIVE,
+	"reduce decorative motion in the retained UI preview");
 
 class EngineHost final : public openq4::ui::Host {
 public:
@@ -119,36 +121,54 @@ std::string currentPath, currentMarkup;
 int restartGeneration = -1, languageGeneration = -1;
 std::chrono::steady_clock::time_point epoch;
 
+double PresentationTime() { return std::chrono::duration<double>(std::chrono::steady_clock::now()-epoch).count(); }
+bool LoadPreview(const std::string& source, const std::string& path) {
+	if (!idStr::CheckExtension(path.c_str(),"q4ui")) return runtime->LoadMarkup(source,path);
+	std::vector<openq4::ui::Diagnostic> diagnostics;
+	if (runtime->LoadDocument(source,path,diagnostics)) return true;
+	for (const auto& d : diagnostics) common->Warning("retained UI: %s:%u:%u %s: %s",path.c_str(),
+		static_cast<unsigned>(d.line),static_cast<unsigned>(d.column),d.pointer.c_str(),d.message.c_str());
+	return false;
+}
+
 void Close() {
 	runtime.reset();
 	host.Reset();
 	currentPath.clear(); currentMarkup.clear();
 }
 void Preview_f(const idCmdArgs& args) {
-	if (args.Argc() != 2) { common->Printf("usage: ui_retainedPreview <VFS path.rml>\n"); return; }
+	if (args.Argc() != 2) { common->Printf("usage: ui_retainedPreview <VFS path.q4ui or path.rml>\n"); return; }
 	std::string markup;
 	if (!host.ReadFile(args.Argv(1),markup)) { common->Warning("retained UI: cannot read %s",args.Argv(1)); return; }
 	if (!runtime) {
 		runtime = std::make_unique<openq4::ui::Runtime>(host);
 		epoch = std::chrono::steady_clock::now();
 	}
-	if (!runtime->LoadMarkup(markup,args.Argv(1))) { common->Warning("retained UI: cannot load %s",args.Argv(1)); return; }
+	if (!LoadPreview(markup,args.Argv(1))) { common->Warning("retained UI: cannot load %s",args.Argv(1)); return; }
 	currentPath = args.Argv(1); currentMarkup = std::move(markup);
 	restartGeneration = renderSystem->GetVideoRestartCount();
 	languageGeneration = LangDict_GetCodePageGeneration();
 	common->Printf("Retained UI preview loaded: %s (integration spike)\n",currentPath.c_str());
 }
 void Close_f(const idCmdArgs&) { Close(); }
+void Play_f(const idCmdArgs& args) {
+	if (args.Argc() != 2) { common->Printf("usage: ui_retainedPlay <timeline ID>\n"); return; }
+	if (runtime) runtime->SetReducedMotion(ui_retainedReducedMotion.GetBool(),PresentationTime());
+	if (!runtime || !runtime->PlayTimeline(args.Argv(1),PresentationTime())) common->Warning("retained UI: unknown timeline %s",args.Argv(1));
+	else common->Printf("Retained UI timeline played: %s\n",args.Argv(1));
+}
 }
 
 void RetainedUI_Init() {
 	cmdSystem->AddCommand("ui_retainedPreview",Preview_f,CMD_FL_SYSTEM,"preview a retained UI integration document");
 	cmdSystem->AddCommand("ui_retainedClose",Close_f,CMD_FL_SYSTEM,"close the retained UI integration preview");
+	cmdSystem->AddCommand("ui_retainedPlay",Play_f,CMD_FL_SYSTEM,"play a canonical retained UI timeline");
 }
 void RetainedUI_Shutdown() {
 	Close();
 	cmdSystem->RemoveCommand("ui_retainedPreview");
 	cmdSystem->RemoveCommand("ui_retainedClose");
+	cmdSystem->RemoveCommand("ui_retainedPlay");
 }
 void RetainedUI_Draw() {
 	if (!runtime || !runtime->IsLoaded() || !renderSystem || !renderSystem->IsOpenGLRunning()) return;
@@ -158,7 +178,7 @@ void RetainedUI_Draw() {
 		runtime->Shutdown(); host.Reset();
 		restartGeneration = renderSystem->GetVideoRestartCount();
 		languageGeneration = LangDict_GetCodePageGeneration();
-		if (!runtime->LoadMarkup(currentMarkup,currentPath)) return;
+		if (!LoadPreview(currentMarkup,currentPath)) return;
 		epoch = std::chrono::steady_clock::now();
 	}
 	openq4::ui::Viewport viewport;
@@ -173,7 +193,9 @@ void RetainedUI_Draw() {
 	const bool oldViewport = renderSystem->GetUseUIViewportFor2D();
 	renderSystem->FlushGui();
 	renderSystem->SetUseUIViewportFor2D(true);
-	runtime->Frame(viewport,std::chrono::duration<double>(std::chrono::steady_clock::now()-epoch).count());
+	const double now = PresentationTime();
+	runtime->SetReducedMotion(ui_retainedReducedMotion.GetBool(),now);
+	runtime->Frame(viewport,now);
 	renderSystem->FlushGui();
 	renderSystem->SetUseUIViewportFor2D(oldViewport);
 	renderSystem->SetColor4(1,1,1,1);

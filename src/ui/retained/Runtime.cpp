@@ -236,14 +236,31 @@ void Viewport::WindowToDocument(float x, float y, float& outX, float& outY) cons
 }
 
 struct Runtime::Impl {
-	explicit Impl(Host& host) : renderer(host), files(host), system(host), fonts(host) {}
+	explicit Impl(Host& host) : host(host), renderer(host), files(host), system(host), fonts(host) {}
+	Host& host;
 	Renderer renderer;
 	Files files;
 	System system;
 	Fonts fonts;
 	Rml::Context* context = nullptr;
 	Rml::ElementDocument* document = nullptr;
+	std::unique_ptr<Document> canonical;
+	Motion motion;
+	std::map<PropertyKey,std::string> applied;
 	bool initialized = false;
+	void ApplyMotion() {
+		if (!document || !canonical) return;
+		for (const auto& [key,value] : motion.Values()) {
+			const auto string = value.type == ValueType::Text ? host.Translate(value.text) : value.Css();
+			auto previous = applied.find(key);
+			if (previous != applied.end() && previous->second == string) continue;
+			auto* element = document->GetElementById(key.first);
+			if (!element) continue;
+			if (value.type == ValueType::Text) element->SetInnerRML(Rml::StringUtilities::EncodeRml(string));
+			else if (!element->SetProperty(key.second,string)) host.Log(true,"Canonical property rejected: "+key.first+"."+key.second);
+			applied[key] = string;
+		}
+	}
 };
 
 Runtime::Runtime(Host& host) : impl(std::make_unique<Impl>(host)) {}
@@ -267,6 +284,7 @@ void Runtime::Shutdown() {
 	Rml::Shutdown();
 	impl->context = nullptr;
 	impl->document = nullptr;
+	impl->canonical.reset(); impl->applied.clear(); impl->motion.Reset({});
 	impl->initialized = false;
 	impl->system.time = 0;
 	activeRuntime = nullptr;
@@ -276,6 +294,7 @@ void Runtime::Shutdown() {
 	Rml::SetFontEngineInterface(nullptr);
 }
 void Runtime::CloseDocument() {
+	impl->canonical.reset(); impl->applied.clear(); impl->motion.Reset({});
 	if (!impl->document) return;
 	impl->document->Close();
 	impl->document = nullptr;
@@ -291,9 +310,25 @@ bool Runtime::LoadMarkup(const std::string& markup, const std::string& sourcePat
 	document->Show(Rml::ModalFlag::None, Rml::FocusFlag::None);
 	return true;
 }
+bool Runtime::LoadDocument(const std::string& source, const std::string& sourcePath, std::vector<Diagnostic>& diagnostics) {
+	auto candidate = std::make_unique<Document>();
+	if (!candidate->Load(source,diagnostics)) return false;
+	if (!LoadMarkup(candidate->BuildMarkup(),sourcePath)) return false;
+	impl->motion.Reset(candidate->Model());
+	impl->canonical = std::move(candidate);
+	impl->ApplyMotion();
+	return true;
+}
+bool Runtime::PlayTimeline(const std::string& id, double seconds) { return impl->canonical && impl->motion.Play(id,seconds); }
+void Runtime::PauseTimeline(const std::string& id, double seconds) { impl->motion.Pause(id,seconds); }
+void Runtime::ResumeTimeline(const std::string& id, double seconds) { impl->motion.Resume(id,seconds); }
+void Runtime::CancelTimeline(const std::string& id, CancelPolicy policy, double seconds) { impl->motion.Cancel(id,policy,seconds); }
+void Runtime::SetReducedMotion(bool enabled, double seconds) { impl->motion.SetReducedMotion(enabled,seconds); }
 void Runtime::Frame(const Viewport& viewport, double seconds) {
 	if (!impl->context || !impl->document || viewport.width <= 0 || viewport.height <= 0) return;
 	if (std::isfinite(seconds)) impl->system.time = std::max(impl->system.time, seconds);
+	impl->motion.Advance(impl->system.time);
+	impl->ApplyMotion();
 	impl->context->SetDimensions({viewport.width, viewport.height});
 	impl->context->SetDensityIndependentPixelRatio(viewport.DpRatio());
 	impl->context->Update();
@@ -308,10 +343,12 @@ bool Runtime::GetBounds(const std::string& id, Bounds& bounds) const {
 	return true;
 }
 bool Runtime::SetProperty(const std::string& id, const std::string& property, const std::string& value) {
+	if (impl->canonical) return false; // Edit the canonical source transactionally.
 	auto* element = impl->document ? impl->document->GetElementById(id) : nullptr;
 	return element && element->SetProperty(property,value);
 }
 bool Runtime::SetText(const std::string& id, const std::string& text) {
+	if (impl->canonical) return false;
 	auto* element = impl->document ? impl->document->GetElementById(id) : nullptr;
 	if (!element) return false;
 	element->SetInnerRML(Rml::StringUtilities::EncodeRml(text));

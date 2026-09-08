@@ -2,7 +2,9 @@
 
 8 September 2026. Stage 2 is in progress. This checkpoint establishes an engine
 rendering path and tests for the layout-library candidate. It does not replace a
-GUI, establish the canonical document format, or constitute a finished menu.
+GUI or constitute a finished menu. The subsequent
+[document/timeline checkpoint](document-format.md) now establishes the first
+implemented canonical source subset; its limits remain explicit.
 The [complete plan](../plans/idtech5-ui.md) and [visual specification](../ui-visual-design.md)
 continue to define completion.
 
@@ -130,6 +132,8 @@ warning; ordinary or explicitly authored materials keep that diagnostic.
   **100 ms**. Its default CSS clock therefore loses elapsed motion time after a
   stall. The canonical timeline must own timing, interruption, easing, pause,
   cancellation and reduced-motion behavior instead of adopting that policy.
+  The first-party evaluator now implements those presentation operations for
+  canonical documents; raw RML CSS animations retain the upstream behavior.
 - Shader-based linear/radial/conic gradients, clip masks, layers, filters and
   generated RGBA textures are not implemented by this adapter. Horizontal/
   vertical geometry gradients are supported. Unsupported features remain
@@ -145,7 +149,8 @@ warning; ordinary or explicitly authored materials keep that diagnostic.
   behavior-preserving operations. Live DPI font-density invalidation needs the
   new font backend, beyond the restart/language invalidation already present.
 - Input/focus/navigation, game semantic events and commands, save restoration,
-  schemas, the editor and translation of all 271 inventory entries remain open.
+  remaining path/component/state schemas, the editor and translation of all 271
+  inventory entries remain open.
   The preview does not capture or route user input and its rows are not controls.
 - Actual mixed-DPI monitor transitions, high-refresh playback, all renderer
   modes and Linux/macOS/Android runtime checks remain unqualified.

@@ -5,6 +5,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "Document.h"
+#include "Motion.h"
 
 namespace openq4::ui {
 
@@ -57,6 +59,12 @@ public:
 	void Shutdown();
 	// Integration-spike entry point, not the canonical editor serialization.
 	bool LoadMarkup(const std::string& markup, const std::string& sourcePath);
+	bool LoadDocument(const std::string& source, const std::string& sourcePath, std::vector<Diagnostic>& diagnostics);
+	bool PlayTimeline(const std::string& id, double monotonicSeconds);
+	void PauseTimeline(const std::string& id, double monotonicSeconds);
+	void ResumeTimeline(const std::string& id, double monotonicSeconds);
+	void CancelTimeline(const std::string& id, CancelPolicy policy, double monotonicSeconds);
+	void SetReducedMotion(bool enabled, double monotonicSeconds);
 	void CloseDocument();
 	void Frame(const Viewport& viewport, double monotonicSeconds);
 	bool GetBounds(const std::string& id, Bounds& bounds) const;

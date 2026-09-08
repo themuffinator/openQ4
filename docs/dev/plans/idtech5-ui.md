@@ -266,5 +266,7 @@ successful commit/push, verify remote heads before saying the stage is published
 | --- | --- | --- | --- |
 | 2026-09-08 | 0 | Specification/integration contracts committed and pushed in both repositories; remote heads verified | Complete |
 | 2026-09-08 | 1 | Effective VFS inventory implemented; 271 GUI resources, 14,517 lexical window declarations and 8,037 event declarations; migration seed created | Full semantic classification, material/bitmap decisions and family gameplay baselines |
+| 2026-09-08 | 2 | Retained engine rendering, density and clipping integrated; initial typed canonical documents, comment-preserving value edits and absolute presentation tracks implemented | Path/component/state/binding schemas, input/game bridge, text backend and representative screen/editor qualification |
 
 Inventory methodology and limitations: [inventory report](../ui/inventory-report.md).
+Canonical source and motion contract: [document checkpoint](../ui/document-format.md).

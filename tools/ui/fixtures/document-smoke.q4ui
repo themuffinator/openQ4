@@ -1,0 +1,105 @@
+// Canonical document integration fixture. Rectangular diagnostic furniture is
+// temporary; this is not a completed vector design or a functional menu.
+{
+  "format": "openq4-ui",
+  "version": 1,
+  "id": "document-smoke",
+  "tokens": {
+    "marine.olive": {"type":"color", "value":[0.5451,0.5882,0.2941,1]},
+    "marine.orange": {"type":"color", "value":[0.8902,0.5373,0,1]},
+    "marine.panel": {"type":"color", "value":[0.0902,0.1098,0.0706,0.9333]},
+    "space.frame": {"type":"length", "value":24, "unit":"dp"}
+  },
+  "root": {
+    "id":"screen", "type":"group",
+    "properties": {
+      "width":{"type":"length", "value":100, "unit":"%"},
+      "height":{"type":"length", "value":100, "unit":"%"},
+      "font-family":{"type":"font", "value":"marine"},
+      "font-size":{"type":"length", "value":18, "unit":"dp"},
+      "color":{"type":"color", "value":[1,1,1,0.8]}
+    },
+    "children":[
+      {
+        "id":"panel", "type":"group",
+        "properties": {
+          "position":{"type":"keyword", "value":"absolute"},
+          "left":{"type":"token", "value":"space.frame"},
+          "top":{"type":"length", "value":32, "unit":"dp"},
+          "width":{"type":"length", "value":360, "unit":"dp"},
+          "padding":{"type":"token", "value":"space.frame"},
+          "background-color":{"type":"token", "value":"marine.panel"},
+          "border-width":{"type":"length", "value":1, "unit":"dp"},
+          "border-color":{"type":"token", "value":"marine.olive"},
+          "opacity":{"type":"number", "value":0},
+          "transform":{"type":"transform", "unit":"dp", "value":[0,12,1,1,0]}
+        },
+        "children":[
+          {"id":"title", "type":"text", "properties":{
+            "text":{"type":"text", "value":"#str_200009"},
+            "font-size":{"type":"length", "value":28, "unit":"dp"},
+            "line-height":{"type":"length", "value":34, "unit":"dp"},
+            "margin-bottom":{"type":"length", "value":20, "unit":"dp"}
+          }},
+          {"id":"controls", "type":"text", "properties":{
+            "text":{"type":"text", "value":"#str_200083"},
+            "height":{"type":"length", "value":40, "unit":"dp"},
+            "line-height":{"type":"length", "value":40, "unit":"dp"},
+            "padding-left":{"type":"length", "value":12, "unit":"dp"},
+            "margin-bottom":{"type":"length", "value":8, "unit":"dp"},
+            "border-left-width":{"type":"length", "value":2, "unit":"dp"},
+            "border-left-color":{"type":"token", "value":"marine.orange"},
+            "background-color":{"type":"color", "value":[0.8902,0.5373,0,0.62]}
+          }},
+          {"id":"game-options", "type":"text", "properties":{
+            "text":{"type":"text", "value":"#str_200084"},
+            "height":{"type":"length", "value":40, "unit":"dp"},
+            "line-height":{"type":"length", "value":40, "unit":"dp"},
+            "padding-left":{"type":"length", "value":12, "unit":"dp"},
+            "margin-bottom":{"type":"length", "value":8, "unit":"dp"},
+            "border-left-width":{"type":"length", "value":2, "unit":"dp"},
+            "border-left-color":{"type":"token", "value":"marine.olive"},
+            "background-color":{"type":"color", "value":[0.5451,0.5882,0.2941,0.28]}
+          }},
+          {"id":"system", "type":"text", "properties":{
+            "text":{"type":"text", "value":"#str_200085"},
+            "height":{"type":"length", "value":40, "unit":"dp"},
+            "line-height":{"type":"length", "value":40, "unit":"dp"},
+            "padding-left":{"type":"length", "value":12, "unit":"dp"},
+            "margin-bottom":{"type":"length", "value":8, "unit":"dp"},
+            "border-left-width":{"type":"length", "value":2, "unit":"dp"},
+            "border-left-color":{"type":"token", "value":"marine.olive"},
+            "background-color":{"type":"color", "value":[0.5451,0.5882,0.2941,0.28]}
+          }}
+        ]
+      },
+      {"id":"anchor", "type":"text", "properties":{
+        "text":{"type":"text", "value":"#str_200018"},
+        "position":{"type":"keyword", "value":"absolute"},
+        "right":{"type":"token", "value":"space.frame"},
+        "bottom":{"type":"token", "value":"space.frame"},
+        "width":{"type":"length", "value":140, "unit":"dp"},
+        "height":{"type":"length", "value":40, "unit":"dp"},
+        "line-height":{"type":"length", "value":40, "unit":"dp"},
+        "text-align":{"type":"keyword", "value":"center"},
+        "border-width":{"type":"length", "value":1, "unit":"dp"},
+        "border-color":{"type":"token", "value":"marine.olive"},
+        "background-color":{"type":"token", "value":"marine.panel"}
+      }}
+    ]
+  },
+  "timelines":[
+    {"id":"enter", "durationMs":220, "tracks":[
+      {"node":"panel", "property":"opacity", "keys":[
+        {"atMs":0, "value":{"type":"number", "value":0}, "easing":[0.16,1,0.3,1]},
+        {"atMs":220, "value":{"type":"number", "value":1}}
+      ]},
+      {"node":"panel", "property":"transform", "keys":[
+        {"atMs":0, "value":{"type":"transform", "unit":"dp", "value":[0,12,1,1,0]}, "easing":[0.16,1,0.3,1]},
+        {"atMs":220, "value":{"type":"transform", "unit":"dp", "value":[0,0,1,1,0]}}
+      ]}
+    ]}
+  ],
+  "editor":{"zoom":1, "selection":["panel"]},
+  "extensions":{"openq4.fixture":{"productionDesign":false, "interactive":false}}
+}

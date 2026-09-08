@@ -44,6 +44,7 @@
 /subprojects/packagecache/
 /subprojects/SDL3-*/
 /subprojects/RmlUi-*/
+/subprojects/jsoncpp-*/
 /.install/
 __pycache__/
 *.pyc
