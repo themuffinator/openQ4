@@ -832,6 +832,11 @@ def validate_draft_releases_never_announce() -> None:
 
     release_create_offset = workflow.index("- name: Create or update release")
     release_create_step = workflow[release_create_offset:discord_offset]
+    assets_query = 'gh api "repos/${GITHUB_REPOSITORY}/releases/${release_id}/assets?per_page=100"'
+    if assets_query not in release_create_step or RELEASE_ASSET_SET.MAX_RELEASE_ASSETS > 100:
+        raise AssertionError("published asset verification must fetch the complete bounded whitelist")
+    if "--slurp" in release_create_step:
+        raise AssertionError("release asset JSON must not combine incompatible gh --slurp/--jq flags")
     for token in (
         "RELEASE_DRAFT: ${{ inputs.draft }}",
         'if [ "${RELEASE_DRAFT}" != "true" ] && [ "${RELEASE_DRAFT}" != "false" ]; then',
