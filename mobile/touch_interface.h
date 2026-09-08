@@ -4,6 +4,10 @@
 #ifndef touch_interface_h
 #define touch_interface_h
 
+// The shared Clibs sources include this header, and NO_SEC is what keeps them
+// off Delta Touch's secure/license tree, which is not part of this app.
+#define NO_SEC
+
 #include "touch_interface_base.h"
 
 class TouchInterface : public TouchInterfaceBase
