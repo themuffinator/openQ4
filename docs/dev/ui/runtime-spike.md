@@ -138,8 +138,9 @@ warning; ordinary or explicitly authored materials keep that diagnostic.
   generated RGBA textures are not implemented by this adapter. Horizontal/
   vertical geometry gradients are supported. Unsupported features remain
   qualification failures, not silent claims of approximate equivalence.
-- Arbitrary curved vector paths, holes, stroke joins/caps, full coverage
-  antialiasing, editor path sources and density-dependent tessellation remain.
+- Native curved paths, holes, stroke joins/caps, editable path sources and
+  density-dependent subdivision now have a [separate checkpoint](vector-paths.md).
+  Coverage antialiasing, masks/layers and complete paint/artwork qualification remain.
 - The text adapter uses the existing 48-point engine metrics/pages. It does not
   yet provide arbitrary-size rasterization, shaping, kerning, font effects,
   inline game colour/icon escapes, IME or a separate player text scale. Textured

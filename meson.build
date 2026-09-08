@@ -429,10 +429,11 @@ endif
 if build_engine or get_option('build_native_tests')
   rmlui_project = subproject('rmlui')
   jsoncpp_project = subproject('jsoncpp')
+  libtess2_project = subproject('libtess2')
   openq4_retained_library = static_library(
     'openq4-retained-ui',
-    files('src/ui/retained/Runtime.cpp', 'src/ui/retained/Document.cpp', 'src/ui/retained/Motion.cpp'),
-    dependencies: [rmlui_project.get_variable('rmlui_dep'), jsoncpp_project.get_variable('jsoncpp_dep')],
+    files('src/ui/retained/Runtime.cpp', 'src/ui/retained/Document.cpp', 'src/ui/retained/Motion.cpp', 'src/ui/retained/Vector.cpp', 'src/ui/retained/VectorElement.cpp'),
+    dependencies: [rmlui_project.get_variable('rmlui_dep'), jsoncpp_project.get_variable('jsoncpp_dep'), libtess2_project.get_variable('libtess2_dep')],
     pic: true,
     install: false,
   )
@@ -454,6 +455,14 @@ if build_engine or get_option('build_native_tests')
       install: false,
     )
     test('openq4-ui-document', openq4_ui_document_test, timeout: 30)
+    openq4_ui_vector_test = executable(
+      'openq4-ui-vector-test',
+      files('tools/tests/native/UiVectorTest.cpp'),
+      include_directories: root_include_dir,
+      dependencies: openq4_retained_dep,
+      install: false,
+    )
+    test('openq4-ui-vector', openq4_ui_vector_test, timeout: 30)
   endif
 endif
 
@@ -2235,6 +2244,7 @@ install_data('LICENSE', 'CONTRIBUTORS.md', install_dir: install_root_dir)
 install_data('LICENSES/KHRONOS-GLES-MIT.txt', install_dir: install_root_dir / 'licenses')
 install_data('docs/licenses/RmlUi.txt', install_dir: install_root_dir / 'licenses')
 install_data('docs/licenses/JsonCpp.txt', install_dir: install_root_dir / 'licenses')
+install_data('docs/licenses/libtess2.txt', install_dir: install_root_dir / 'licenses')
 
 install_data(
   'assets/icons/quake4.icns',

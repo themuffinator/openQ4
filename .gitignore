@@ -45,6 +45,7 @@
 /subprojects/SDL3-*/
 /subprojects/RmlUi-*/
 /subprojects/jsoncpp-*/
+/subprojects/libtess2-*/
 /.install/
 __pycache__/
 *.pyc

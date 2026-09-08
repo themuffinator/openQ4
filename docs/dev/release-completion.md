@@ -2,6 +2,13 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- Vector development: editable native paths now support responsive chamfers,
+  curves, holes, strokes and fading rails through the retained engine renderer.
+  [Geometry checks](ui/vector-paths.md) and SP/OpenGL and MP/Vulkan gameplay
+  captures pass, including fractional scaling and video restart. Coverage
+  antialiasing, the full component/artwork corpus and editor interactions remain
+  incomplete; existing MP content warnings remain open.
+
 - Document/editor foundation: typed canonical sources retain comments and
   extension data through validated value edits. Presentation tracks now support
   continuous timing, interruption, pause, cancellation and reduced motion. The

@@ -253,6 +253,94 @@ private:
 		}
 		return result;
 	}
+	VectorCoordinate Coordinate(const Json::Value& value, const std::string& path) {
+		if (value.isNumeric()) return {0,Numeric(value,path,-1000000,1000000)};
+		Fields(value,path,{"fraction","dp","extensions"});
+		Require(value.isMember("fraction") || value.isMember("dp"),value,path,"Coordinate requires fraction or dp");
+		return {value.isMember("fraction") ? Numeric(value["fraction"],path+"/fraction",-64,64) : 0,
+			value.isMember("dp") ? Numeric(value["dp"],path+"/dp",-1000000,1000000) : 0};
+	}
+	PathPoint Point(const Json::Value& value, const std::string& path) {
+		Require(value.isArray() && value.size() == 2,value,path,"Point requires x and y coordinates");
+		return {Coordinate(value[0],path+"/0"),Coordinate(value[1],path+"/1")};
+	}
+	VectorColour Colour(const Json::Value& value, const std::string& path) {
+		const auto colour = Typed(value,path);
+		Require(colour.type == ValueType::Colour,value,path,"Paint requires a typed color or color token");
+		return {colour.data[0],colour.data[1],colour.data[2],colour.data[3]};
+	}
+	VectorPaint Paint(const Json::Value& value, const std::string& path) {
+		Require(value.isObject() && value["type"].isString(),value,path,"Expected a typed paint object");
+		VectorPaint result;
+		const auto type = value["type"].asString();
+		if (type == "none") Fields(value,path,{"type","extensions"});
+		else if (type == "solid") {
+			Fields(value,path,{"type","color","extensions"});
+			result.type = PaintType::Solid; result.colour = Colour(value["color"],path+"/color");
+		} else if (type == "linear") {
+			Fields(value,path,{"type","from","to","stops","extensions"});
+			result.type = PaintType::Linear;
+			result.from = Point(value["from"],path+"/from"); result.to = Point(value["to"],path+"/to");
+			Require(value["stops"].isArray() && value["stops"].size() >= 2 && value["stops"].size() <= 256,value["stops"],path+"/stops","Gradient requires 2..256 stops");
+			double previous = -1;
+			for (Json::ArrayIndex i = 0; i < value["stops"].size(); ++i) {
+				const auto& stop = value["stops"][i]; const auto p = path+"/stops/"+std::to_string(i);
+				Fields(stop,p,{"at","color","extensions"});
+				const double at = Numeric(stop["at"],p+"/at",0,1);
+				Require(at > previous,stop["at"],p+"/at","Gradient stop positions must increase strictly");
+				previous = at; result.stops.push_back({at,Colour(stop["color"],p+"/color")});
+			}
+			Require(result.stops.front().at == 0 && result.stops.back().at == 1,value["stops"],path+"/stops","Gradient requires stops at both zero and one");
+		} else Require(false,value["type"],path+"/type","Unsupported paint type; expected none, solid or linear");
+		return result;
+	}
+	VectorPath ReadPath(const Json::Value& value, const std::string& path) {
+		Fields(value,path,{"id","commands","fillRule","fill","stroke","extensions"});
+		VectorPath result;
+		result.id = Id(value["id"],path+"/id");
+		if (value.isMember("fillRule")) {
+			Require(value["fillRule"] == "nonzero" || value["fillRule"] == "evenodd",value["fillRule"],path+"/fillRule","Expected nonzero or evenodd fill rule");
+			if (value["fillRule"] == "evenodd") result.fillRule = FillRule::EvenOdd;
+		}
+		if (value.isMember("fill")) result.fill = Paint(value["fill"],path+"/fill");
+		if (value.isMember("stroke")) {
+			const auto& stroke = value["stroke"]; const auto p = path+"/stroke";
+			Fields(stroke,p,{"paint","widthDp","minimumPixels","miterLimit","cap","join","extensions"});
+			result.stroke.paint = Paint(stroke["paint"],p+"/paint");
+			if (stroke.isMember("widthDp")) result.stroke.widthDp = Numeric(stroke["widthDp"],p+"/widthDp",0,4096);
+			if (stroke.isMember("minimumPixels")) result.stroke.minimumPixels = Numeric(stroke["minimumPixels"],p+"/minimumPixels",0,4);
+			if (stroke.isMember("miterLimit")) result.stroke.miterLimit = Numeric(stroke["miterLimit"],p+"/miterLimit",1,64);
+			if (stroke.isMember("cap")) {
+				Require(stroke["cap"] == "butt" || stroke["cap"] == "square" || stroke["cap"] == "round",stroke["cap"],p+"/cap","Expected butt, square or round cap");
+				result.stroke.cap = stroke["cap"] == "round" ? StrokeCap::Round : stroke["cap"] == "square" ? StrokeCap::Square : StrokeCap::Butt;
+			}
+			if (stroke.isMember("join")) {
+				Require(stroke["join"] == "miter" || stroke["join"] == "bevel" || stroke["join"] == "round",stroke["join"],p+"/join","Expected miter, bevel or round join");
+				result.stroke.join = stroke["join"] == "round" ? StrokeJoin::Round : stroke["join"] == "bevel" ? StrokeJoin::Bevel : StrokeJoin::Miter;
+			}
+		}
+		Require(value["commands"].isArray() && !value["commands"].empty() && value["commands"].size() <= 65536,value["commands"],path+"/commands","Path requires 1..65536 commands");
+		std::set<std::string> ids;
+		for (Json::ArrayIndex i = 0; i < value["commands"].size(); ++i) {
+			const auto& command = value["commands"][i]; const auto p = path+"/commands/"+std::to_string(i);
+			Fields(command,p,{"id","op","points","extensions"});
+			PathCommand parsed; parsed.id = Id(command["id"],p+"/id");
+			Require(ids.insert(parsed.id).second,command["id"],p+"/id","Duplicate path command ID");
+			const std::map<std::string,std::pair<PathOperation,unsigned>> operations = {
+				{"move",{PathOperation::Move,1}},{"line",{PathOperation::Line,1}},{"quadratic",{PathOperation::Quadratic,2}},
+				{"cubic",{PathOperation::Cubic,3}},{"close",{PathOperation::Close,0}}};
+			Require(command["op"].isString(),command["op"],p+"/op","Expected path operation");
+			auto operation = operations.find(command["op"].asString());
+			Require(operation != operations.end(),command["op"],p+"/op","Unsupported path operation");
+			parsed.op = operation->second.first;
+			Require(i != 0 || parsed.op == PathOperation::Move,command,p,"Path must begin with move");
+			const unsigned points = operation->second.second;
+			Require((points == 0 && !command.isMember("points")) || (command["points"].isArray() && command["points"].size() == points),command["points"],p+"/points","Incorrect point count for path operation");
+			for (unsigned j = 0; j < points; ++j) parsed.points[j] = Point(command["points"][j],p+"/points/"+std::to_string(j));
+			result.commands.push_back(std::move(parsed));
+		}
+		return result;
+	}
 	void Property(const std::string& name, const Value& value, const Json::Value& at, const std::string& path) {
 		static const std::set<std::string> lengths = {"left","right","top","bottom","width","height","min-width","max-width","min-height","max-height","padding","padding-left","padding-right","padding-top","padding-bottom","margin","margin-left","margin-right","margin-top","margin-bottom","font-size","line-height","letter-spacing","border-width","border-left-width","border-right-width","border-top-width","border-bottom-width","row-gap","column-gap"};
 		static const std::set<std::string> colours = {"color","background-color","border-color","border-left-color","border-right-color","border-top-color","border-bottom-color"};
@@ -283,12 +371,22 @@ private:
 	}
 	Node ReadNode(const Json::Value& value, const std::string& path, unsigned depth) {
 		Require(depth <= 48 && ++nodeCount <= 65536,value,path,"Document hierarchy exceeds the node/depth limit");
-		Fields(value,path,{"id","type","properties","children","extensions"});
+		Fields(value,path,{"id","type","properties","children","paths","extensions"});
 		Node result;
 		result.id = Id(value["id"],path+"/id");
 		Require(nodeIds.insert(result.id).second,value["id"],path+"/id","Duplicate node ID '"+result.id+"'");
-		Require(value["type"] == "group" || value["type"] == "text",value["type"],path+"/type","Supported node types are group and text; unsupported nodes cannot be silently rendered");
+		Require(value["type"] == "group" || value["type"] == "text" || value["type"] == "vector",value["type"],path+"/type","Supported node types are group, text and vector; unsupported nodes cannot be silently rendered");
 		result.type = value["type"].asString();
+		if (result.type == "vector") {
+			Require(value["paths"].isArray(),value["paths"],path+"/paths","Vector node requires a path array");
+			std::set<std::string> pathIds;
+			for (Json::ArrayIndex i = 0; i < value["paths"].size(); ++i) {
+				const auto p = path+"/paths/"+std::to_string(i);
+				auto shape = ReadPath(value["paths"][i],p);
+				Require(pathIds.insert(shape.id).second,value["paths"][i]["id"],p+"/id","Duplicate path ID within vector node");
+				result.paths.push_back(std::move(shape));
+			}
+		} else Require(!value.isMember("paths"),value["paths"],path+"/paths","Paths require a vector node");
 		if (value.isMember("properties")) {
 			Require(value["properties"].isObject(),value["properties"],path+"/properties","Expected a property object");
 			for (const auto& name : value["properties"].getMemberNames()) {
@@ -414,11 +512,12 @@ const Json::Value* Resolve(const Json::Value& root, const std::string& pointer) 
 	return value;
 }
 void MarkupNode(const Node& node, std::string& output) {
-	output += "<div id=\""+node.id+"\" style=\"";
+	const std::string tag = node.type == "vector" ? "q4-vector" : "div";
+	output += "<"+tag+" id=\""+node.id+"\" style=\"";
 	for (const auto& [name,value] : node.properties) if (name != "text") output += name+":"+value.Css()+";";
 	output += "\">";
 	for (const auto& child : node.children) MarkupNode(child,output);
-	output += "</div>";
+	output += "</"+tag+">";
 }
 } // namespace
 
@@ -498,7 +597,7 @@ bool Document::ReplaceValue(const std::string& pointer, const std::string& repla
 const std::string& Document::Source() const { return impl->source; }
 const DocumentModel& Document::Model() const { return impl->model; }
 std::string Document::BuildMarkup() const {
-	std::string result = "<rml><head><style>body{margin:0;width:100%;height:100%;font-family:marine;font-size:16dp;color:#fff;}div{display:block;}</style></head><body>";
+	std::string result = "<rml><head><style>body{margin:0;width:100%;height:100%;font-family:marine;font-size:16dp;color:#fff;}div,q4-vector{display:block;}</style></head><body>";
 	MarkupNode(impl->model.root,result);
 	return result+"</body></rml>";
 }

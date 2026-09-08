@@ -3,7 +3,7 @@
 8 September 2026. This is the first implemented canonical-source checkpoint on
 `idtech5-ui`. It establishes typed layout/text/tokens and presentation tracks,
 with a source-preserving editing API shared by the future editor and runtime.
-It is **not** the complete path/component/state/binding schema, editor, input
+It is **not** the complete paint/component/state/binding schema, editor, input
 bridge or translated GUI corpus. Those remain required by the
 [delivery plan](../plans/idtech5-ui.md) and
 [visual specification](../ui-visual-design.md).
@@ -56,7 +56,7 @@ resolves every reference in the candidate model.
 | `text` | `#str_*` localization key | Runtime translates then escapes markup |
 | `transform` | `[x,y,sx,sy,degrees]` plus `unit` | Translation uses `dp` or `px`; scales are dimensionless |
 
-The current node types are `group` and `text`. Each has an `id`, `type`, optional
+The current node types are `group`, `text` and `vector`. Each has an `id`, `type`, optional
 `properties`, `children` and `extensions`. Text content belongs only to text
 nodes; text nodes cannot own children. The root is a normal node inside a
 viewport-filling retained document.
@@ -75,7 +75,9 @@ Negative anchors, margins and letter spacing are supported; sizes, padding,
 gaps and border widths cannot be negative. Percentages are not accepted for
 font metrics, borders or transform translations. `auto` is supported for
 anchors, dimensions and margins. Additional layout constraints, components,
-bindings, material/image nodes and native paths remain to be implemented.
+bindings and material/image nodes remain to be implemented. Native vector nodes
+now have a `paths` array; their [source/compiler contract](vector-paths.md)
+records supported curves, strokes, paints and remaining quality gates.
 
 The render adapter owns the conversion into RmlUi syntax. In particular, RmlUi
 RGBA functions use integer 0–255 alpha, whereas this document stores 0–1 alpha.

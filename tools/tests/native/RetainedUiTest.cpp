@@ -149,6 +149,29 @@ int main() {
 	Check(Near(leftAt(7),220),"canonical transform reaches exact final endpoint");
 	Check(!runtime.LoadDocument("{\"version\":2}","bad.q4ui",diagnostics),"reject invalid replacement document");
 	Check(Near(leftAt(7.25),220),"invalid replacement keeps previous rendered document");
+	const char* vectorDocument = R"json({"format":"openq4-ui","version":1,"id":"vector-render-test",
+	 "root":{"id":"clip","type":"group","properties":{
+	  "position":{"type":"keyword","value":"absolute"},"overflow":{"type":"keyword","value":"hidden"},
+	  "left":{"type":"length","value":100,"unit":"dp"},"top":{"type":"length","value":100,"unit":"dp"},
+	  "width":{"type":"length","value":100,"unit":"dp"},"height":{"type":"length","value":100,"unit":"dp"},
+	  "opacity":{"type":"number","value":0.5}
+	 },"children":[{"id":"shape","type":"vector","properties":{
+	  "width":{"type":"length","value":200,"unit":"dp"},"height":{"type":"length","value":100,"unit":"dp"},
+	  "opacity":{"type":"number","value":0.5}
+	 },"paths":[{"id":"rectangle","fill":{"type":"solid","color":{"type":"color","value":[0.8,0.4,0.2,0.8]}},
+	  "commands":[{"id":"p0","op":"move","points":[[0,0]]},{"id":"p1","op":"line","points":[[{"fraction":1},0]]},
+	   {"id":"p2","op":"line","points":[[{"fraction":1},{"fraction":1}]]},{"id":"p3","op":"line","points":[[0,{"fraction":1}]]},
+	   {"id":"close","op":"close"}]}]}]}})json";
+	Check(runtime.LoadDocument(vectorDocument,"vector.q4ui",diagnostics),"load native vector element into retained tree");
+	for (int density : {1,2}) {
+		viewport.displayScale = static_cast<float>(density);
+		host.drawn.clear(); runtime.Frame(viewport,8+density);
+		Check(!host.drawn.empty(),"native path geometry reaches host through retained renderer");
+		for (const auto& v : host.drawn) {
+			Check(v.x >= 100*density-.1f && v.x <= 200*density+.1f && v.y >= 100*density-.1f && v.y <= 200*density+.1f,"native vectors inherit clipping with one DPI transform");
+			Check(std::abs(v.a-.2f)<.01f && std::abs(v.r-.16f)<.01f,"vector paint alpha and inherited opacity are each applied once");
+		}
+	}
 	runtime.CloseDocument();
 	Check(!runtime.IsLoaded(),"close document");
 	runtime.Shutdown();

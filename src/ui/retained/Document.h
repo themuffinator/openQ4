@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "Vector.h"
 
 namespace openq4::ui {
 
@@ -24,6 +25,7 @@ struct Node {
 	std::string id, type;
 	std::map<std::string, Value> properties;
 	std::vector<Node> children;
+	std::vector<VectorPath> paths;
 };
 struct Easing {
 	double x1 = 0, y1 = 0, x2 = 1, y2 = 1;

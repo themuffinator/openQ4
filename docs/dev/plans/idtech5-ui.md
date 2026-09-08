@@ -270,3 +270,6 @@ successful commit/push, verify remote heads before saying the stage is published
 
 Inventory methodology and limitations: [inventory report](../ui/inventory-report.md).
 Canonical source and motion contract: [document checkpoint](../ui/document-format.md).
+Native path source/compiler: [vector checkpoint](../ui/vector-paths.md). Curves,
+holes, strokes, gradients and responsive cuts are integrated; coverage AA,
+compositing, full art reconstruction and the complete Stage 3 gate remain open.

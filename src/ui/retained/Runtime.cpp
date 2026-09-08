@@ -1,9 +1,11 @@
 // Copyright (C) 2026 DarkMatter Productions. GPL-3.0-or-later.
 #include "Runtime.h"
+#include "VectorElement.h"
 
 #include <RmlUi/Core.h>
 #include <RmlUi/Core/FontEngineInterface.h>
 #include <RmlUi/Core/RenderManager.h>
+#include <RmlUi/Core/ElementInstancer.h>
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -242,6 +244,7 @@ struct Runtime::Impl {
 	Files files;
 	System system;
 	Fonts fonts;
+	Rml::ElementInstancerGeneric<VectorElement> vectorInstancer;
 	Rml::Context* context = nullptr;
 	Rml::ElementDocument* document = nullptr;
 	std::unique_ptr<Document> canonical;
@@ -251,6 +254,7 @@ struct Runtime::Impl {
 	void ApplyMotion() {
 		if (!document || !canonical) return;
 		for (const auto& [key,value] : motion.Values()) {
+			if (key.second == "opacity") continue; // Resolve ancestry below.
 			const auto string = value.type == ValueType::Text ? host.Translate(value.text) : value.Css();
 			auto previous = applied.find(key);
 			if (previous != applied.end() && previous->second == string) continue;
@@ -259,6 +263,24 @@ struct Runtime::Impl {
 			if (value.type == ValueType::Text) element->SetInnerRML(Rml::StringUtilities::EncodeRml(string));
 			else if (!element->SetProperty(key.second,string)) host.Log(true,"Canonical property rejected: "+key.first+"."+key.second);
 			applied[key] = string;
+		}
+		// RmlUi's opacity is inherited as a value, rather than multiplied with
+		// an explicitly authored child's opacity. Canonical opacity multiplies
+		// ancestry for all paint/text primitives, including custom vector nodes.
+		std::vector<std::pair<const Node*,double>> stack{{&canonical->Model().root,1}};
+		while (!stack.empty()) {
+			const auto [node,parentOpacity] = stack.back(); stack.pop_back();
+			const PropertyKey key{node->id,"opacity"};
+			const auto authored = motion.Values().find(key);
+			const double opacity = parentOpacity*(authored == motion.Values().end() ? 1 : authored->second.data[0]);
+			Value effective; effective.data[0] = opacity;
+			const auto string = effective.Css();
+			const auto previous = applied.find(key);
+			if (previous == applied.end() || previous->second != string) {
+				if (auto* element = document->GetElementById(node->id)) element->SetProperty("opacity",string);
+				applied[key] = string;
+			}
+			for (const auto& child : node->children) stack.push_back({&child,opacity});
 		}
 	}
 };
@@ -273,6 +295,7 @@ bool Runtime::Initialize() {
 	Rml::SetSystemInterface(&impl->system);
 	Rml::SetFontEngineInterface(&impl->fonts);
 	if (!Rml::Initialise()) return false;
+	Rml::Factory::RegisterElementInstancer("q4-vector",&impl->vectorInstancer);
 	impl->initialized = true;
 	activeRuntime = this;
 	impl->context = Rml::CreateContext("openq4-retained", {1280,720});
@@ -316,6 +339,15 @@ bool Runtime::LoadDocument(const std::string& source, const std::string& sourceP
 	if (!LoadMarkup(candidate->BuildMarkup(),sourcePath)) return false;
 	impl->motion.Reset(candidate->Model());
 	impl->canonical = std::move(candidate);
+	std::vector<const Node*> nodes{&impl->canonical->Model().root};
+	while (!nodes.empty()) {
+		const auto* node = nodes.back(); nodes.pop_back();
+		if (node->type == "vector") {
+			auto* element = impl->document->GetElementById(node->id);
+			if (element) static_cast<VectorElement*>(element)->Configure(node->paths,impl->host);
+		}
+		for (const auto& child : node->children) nodes.push_back(&child);
+	}
 	impl->ApplyMotion();
 	return true;
 }
