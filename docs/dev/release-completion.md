@@ -1,5 +1,19 @@
 # openQ4 Release Completion List
 
+## Unreleased — `idtech5-ui` development
+
+- [ ] Replace every current GUI with a high-definition vector interface that
+  preserves Quake 4's identity, expands across aspect ratios and responds to
+  display density and player scale settings.
+- [ ] Deliver continuous transitions and the complete visual editor, including
+  editable vector paths, layout, states, bindings, timelines and reliable saving.
+- [ ] Qualify the complete SP/MP corpus, saves, world terminals, scopes, vehicles,
+  languages, supported platforms and release-style packages before promotion.
+- Specification and staged evidence: [UI replacement plan](plans/idtech5-ui.md).
+  This is development work; no completed player feature or upgrade requirement
+  is claimed yet. Curated release notes will use the actual selected release
+  version once the replacement is qualified.
+
 ## 0.13.1 — published 8 September 2026
 
 - [x] #159: release compilation uses complete engine history; stable version generation refuses shallow or missing history before producing a savegame build number. Regression coverage uses real full/shallow Git repositories.
