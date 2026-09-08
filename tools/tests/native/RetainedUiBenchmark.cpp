@@ -16,6 +16,7 @@ struct BenchmarkHost final : Host {
 	void Log(bool error, const std::string& text) override { if (error) throw std::runtime_error(text); }
 	std::uintptr_t LoadMaterial(const std::string&, int& width, int& height) override { width = height = 256; return 1; }
 	void Draw(const std::vector<Vertex>&, const std::vector<int>&, std::uintptr_t) override {}
+	std::uint64_t RenderFrame() const override { return 0; } // Immediate CPU sink; fixed dimensions.
 	bool BeginLayer(std::uint32_t, int, int) override { return true; }
 	void CompositeLayer(std::uint32_t, std::uint32_t, float, const Bounds&) override {}
 	void MaskLayer(std::uint32_t, std::uint32_t, const Bounds&) override {}

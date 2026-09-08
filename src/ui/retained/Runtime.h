@@ -46,11 +46,16 @@ struct RuntimeStatistics {
 	std::uint64_t visibleVectorCacheBytes = 0;
 	std::uint64_t layerPushes = 0, layerComposites = 0, peakLayerDepth = 0;
 	std::uint64_t maskSnapshots = 0, maskApplications = 0, peakLayerTargets = 0;
+	// Shared service residency, sampled by Statistics(); idle backends are reused.
+	std::uint64_t activeContexts = 0, residentBackends = 0;
 };
 
 class Host {
 public:
-	virtual ~Host() = default;
+	Host();
+	virtual ~Host();
+	Host(const Host&) = delete;
+	Host& operator=(const Host&) = delete;
 	virtual bool ReadFile(const std::string& path, std::string& contents) = 0;
 	virtual std::string Translate(const std::string& text) = 0;
 	// Read-only external state. Return false for unavailable/invalid sources;
@@ -59,6 +64,10 @@ public:
 	virtual void Log(bool error, const std::string& message) = 0;
 	virtual std::uintptr_t LoadMaterial(const std::string& name, int& width, int& height) = 0;
 	virtual void Draw(const std::vector<Vertex>& vertices, const std::vector<int>& indices, std::uintptr_t material) = 0;
+	// Identifies the host's current submission frame, shared by ALL contexts.
+	// A target used in this frame cannot be resized until the token changes.
+	// Constant tokens are safe but prevent recycling differently sized targets.
+	virtual std::uint64_t RenderFrame() const = 0;
 	// Physical-pixel, transparent, premultiplied targets. The runtime owns slot
 	// leases (including immutable mask snapshots); zero is the caller's output.
 	// BeginLayer clears a reused slot. EndLayer only changes the active target.
@@ -70,10 +79,19 @@ public:
 	virtual void EndLayer(std::uint32_t restore) = 0;
 	virtual FontMetrics GetFontMetrics(const std::string& family, int pixelSize) = 0;
 	virtual Glyph GetGlyph(const std::string& family, int pixelSize, std::uint32_t codepoint) = 0;
+private:
+	// Target identities must survive a last-context close/reopen within one
+	// host submission frame, even though RmlUi services can be shut down then.
+	struct Shared;
+	std::unique_ptr<Shared> shared;
+	friend class Runtime;
 };
 
-// One owner of RmlUi's process-wide services; many documents/contexts will
-// share this owner. Runtime contains no platform window, GL or input capture.
+// One independent document/context. Live runtimes share process-wide services
+// and must use the same Host, which outlives all of them. Call on one engine
+// thread, without reentering from Host callbacks. State, input, clocks, geometry
+// and composition leases are per context; closing one leaves the others alive.
+// Runtime contains no platform window, GL or input capture.
 class Runtime {
 public:
 	explicit Runtime(Host& host);

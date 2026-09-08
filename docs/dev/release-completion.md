@@ -2,6 +2,13 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- Instance development: retained documents can now keep separate data, focus,
+  display scale and transitions while sharing engine services. Closing one view
+  preserves its peers, and render targets cannot be resized underneath another
+  view's queued drawing. The [instance checkpoint](ui/instances.md) records
+  validation scope. GUI-manager/world integration, full translation and the
+  visual editor remain in development.
+
 - Integration development: menu and game callers now query GUI values without
   stopping their expressions. Explicit overrides and focused
   text-field queries prepare the replacement interface boundary. Development

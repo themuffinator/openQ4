@@ -286,6 +286,11 @@ The [presentation boundary](../ui/presentation-bridge.md) now separates session,
 game and SDL consumers from legacy windows, with read-only value queries and
 explicit expression overrides. Game API 48 requires coordinated engine/SP/MP
 modules; retained document alias mapping and action dispatch remain open.
+The [instance checkpoint](../ui/instances.md) removes the single-document
+runtime restriction, isolates state/input/layout/clocks, reuses per-view render
+backends and protects composition target identities within a host submission
+frame. Normal GUI-manager routing, coordinated engine multi-view resource
+reset, world surfaces and save restoration remain open.
 Semantic buttons now use authored state timelines, projected hit testing,
 source-order/spatial navigation and modal focus ownership. The
 [interaction checkpoint](../ui/interaction.md) records native behavior checks,

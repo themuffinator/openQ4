@@ -66,7 +66,8 @@ includes [isolated group fades](docs/dev/ui/composition.md),
 [native GUI importer](docs/dev/ui/legacy-import.md) now preserves the current
 GUI set's structure, expressions and dependency references. A
 [presentation boundary](docs/dev/ui/presentation-bridge.md) separates game and
-menu consumers from legacy window objects. Complete GUI migration,
+menu consumers from legacy window objects, and the runtime now supports
+[independent document instances](docs/dev/ui/instances.md). Complete GUI migration,
 game action integration and the visual editor remain in development.
 
 The [0.13.1 patch notes](docs/dev/releases/v0.13.1.md) cover the release save fix, download verification, and map-compilation corrections. Replace the complete package when upgrading.

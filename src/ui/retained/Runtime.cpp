@@ -59,9 +59,24 @@ struct Filter {
 	std::uint64_t generation = 0;
 };
 
+// The host's composition target IDs are process-wide. A mask may retain its
+// lease after the stack layer that produced it has been popped.
+struct LayerPool {
+	struct Slot { const void* owner = nullptr; int width = 0, height = 0; std::uint64_t frame = 0; };
+	std::array<Slot,49> slots{};
+};
+
 class Renderer final : public Rml::RenderInterface {
 public:
 	Renderer(Host& h, RuntimeStatistics& statistics) : host(h), statistics(statistics) {}
+	void Attach(LayerPool& value) { pool = &value; }
+	void Detach() {
+		EndFrame();
+		if (pool) for (auto& slot : pool->slots) if (slot.owner == this) {
+			host.Log(true,"Retained context leaked a composition lease"); slot.owner = nullptr;
+		}
+		pool = nullptr;
+	}
 	void BeginFrame(int width, int height) {
 		if (width != viewportWidth || height != viewportHeight) ++viewportGeneration;
 		viewportWidth = width; viewportHeight = height; failed = false;
@@ -213,17 +228,32 @@ private:
 	}
 	std::uint32_t AllocateSlot() {
 		if (failed) return 0;
-		for (std::uint32_t id = 1; id < slots.size(); ++id) if (!slots[id]) {
-			if (host.BeginLayer(id,viewportWidth,viewportHeight)) {
-				slots[id] = true;
-				statistics.peakLayerTargets = std::max<std::uint64_t>(statistics.peakLayerTargets,std::count(slots.begin(),slots.end(),true));
-				return id;
+		if (!pool) return 0;
+		const auto frame = host.RenderFrame();
+		// Reuse the same dimensions first, then unused slots, then older-frame
+		// targets. Resizing a target already referenced by this submission frame
+		// would also resize the image seen by earlier deferred draw commands.
+		for (int pass = 0; pass < 3; ++pass) {
+			for (std::uint32_t id = 1; id < pool->slots.size(); ++id) {
+				auto& slot = pool->slots[id];
+				if (slot.owner) continue;
+				const bool matches = slot.width == viewportWidth && slot.height == viewportHeight;
+				const bool unused = slot.width == 0;
+				if ((pass == 0 && !matches) || (pass == 1 && !unused) ||
+					(pass == 2 && (matches || unused || slot.frame == frame))) continue;
+				if (host.BeginLayer(id,viewportWidth,viewportHeight)) {
+					slot = {this,viewportWidth,viewportHeight,frame};
+					statistics.peakLayerTargets = std::max<std::uint64_t>(statistics.peakLayerTargets,
+						std::count_if(pool->slots.begin(),pool->slots.end(),[this](const auto& value) { return value.owner == this; }));
+					return id;
+				}
 			}
-			break;
 		}
 		host.Log(true,"Cannot allocate retained composition layer"); failed = true; return 0;
 	}
-	void ReleaseSlot(std::uint32_t id) { if (id && id < slots.size()) slots[id] = false; }
+	void ReleaseSlot(std::uint32_t id) {
+		if (pool && id && id < pool->slots.size() && pool->slots[id].owner == this) pool->slots[id].owner = nullptr;
+	}
 	Bounds ClipBounds() const {
 		const float left = scissorEnabled ? std::clamp(float(scissor.Left()),0.f,float(viewportWidth)) : 0;
 		const float top = scissorEnabled ? std::clamp(float(scissor.Top()),0.f,float(viewportHeight)) : 0;
@@ -246,7 +276,7 @@ private:
 	int viewportWidth = 0, viewportHeight = 0;
 	std::uint64_t viewportGeneration = 0;
 	std::vector<std::uint32_t> layers;
-	std::array<bool,49> slots{};
+	LayerPool* pool = nullptr;
 	bool failed = false;
 };
 
@@ -364,8 +394,84 @@ private:
 	std::map<std::string, std::unique_ptr<Face>> faces;
 };
 
-Runtime* activeRuntime = nullptr;
+struct Backend {
+	explicit Backend(Host& host) : renderer(host,statistics) {}
+	RuntimeStatistics statistics;
+	Renderer renderer;
+	bool leased = false;
+};
+
+// File, font and element factories belong to RmlUi's process lifetime. Contexts
+// have separate renderers, state and clocks, but share the same engine host.
+struct Services {
+	Services(Host& host, LayerPool& layers) : host(host), files(host), system(host), fonts(host), layers(layers) {}
+	Host& host;
+	Files files;
+	System system;
+	Fonts fonts;
+	LayerPool& layers;
+	std::vector<std::unique_ptr<Backend>> backends;
+	Rml::ElementInstancerGeneric<VectorElement> vectorInstancer;
+	std::unique_ptr<VectorMaskInstancer> maskInstancer;
+	bool initialized = false;
+	Backend* AcquireBackend() {
+		for (auto& backend : backends) if (!backend->leased) {
+			backend->leased = true; backend->statistics = {}; backend->renderer.Attach(layers);
+			return backend.get();
+		}
+		backends.push_back(std::make_unique<Backend>(host));
+		auto* backend = backends.back().get();
+		backend->leased = true; backend->renderer.Attach(layers);
+		return backend;
+	}
+	void ReleaseBackend(Backend& backend) {
+		// Keep the render interface alive for RmlUi's cached render manager,
+		// reusing idle backends instead of retaining one per departed document.
+		// ReleaseRenderManagers would update EVERY live context on this view's
+		// clock, so use the renderer-scoped resource release APIs instead.
+		Rml::ReleaseTextures(&backend.renderer);
+		Rml::ReleaseCompiledGeometry(&backend.renderer);
+		backend.renderer.Detach();
+		backend.leased = false;
+	}
+	bool Initialize() {
+		Rml::SetRenderInterface(nullptr); // Every context supplies its own renderer.
+		Rml::SetFileInterface(&files);
+		Rml::SetSystemInterface(&system);
+		Rml::SetFontEngineInterface(&fonts);
+		if (!Rml::Initialise()) return false;
+		initialized = true;
+		maskInstancer = std::make_unique<VectorMaskInstancer>();
+		Rml::Factory::RegisterElementInstancer("q4-vector",&vectorInstancer);
+		Rml::Factory::RegisterElementInstancer("q4-node",&vectorInstancer);
+		Rml::Factory::RegisterDecoratorInstancer("q4-mask",maskInstancer.get());
+		return true;
+	}
+	~Services() {
+		if (initialized) Rml::Shutdown();
+		maskInstancer.reset();
+		Rml::SetRenderInterface(nullptr);
+		Rml::SetFileInterface(nullptr);
+		Rml::SetSystemInterface(nullptr);
+		Rml::SetFontEngineInterface(nullptr);
+	}
+};
+std::weak_ptr<Services> activeServices;
+std::uint64_t nextContext = 0;
+
+// RmlUi callbacks must observe the clock of the view being evaluated. Restoring
+// it also avoids a document load changing the clock of an outer operation.
+struct ContextClock {
+	System& system;
+	double previous;
+	ContextClock(Services& services, double time) : system(services.system), previous(system.time) { system.time = time; }
+	~ContextClock() { system.time = previous; }
+};
 } // namespace
+
+struct Host::Shared { LayerPool layers; };
+Host::Host() = default;
+Host::~Host() = default;
 
 float Viewport::DpRatio() const { return Positive(displayScale) * std::clamp(Positive(userScale), .75f, 2.f); }
 void Viewport::WindowToDocument(float x, float y, float& outX, float& outY) const {
@@ -374,15 +480,14 @@ void Viewport::WindowToDocument(float x, float y, float& outX, float& outY) cons
 }
 
 struct Runtime::Impl {
-	explicit Impl(Host& host) : host(host), renderer(host,statistics), files(host), system(host), fonts(host) {}
+	explicit Impl(Host& host) : host(host) {}
 	Host& host;
+	std::shared_ptr<Services> services;
 	RuntimeStatistics statistics;
-	Renderer renderer;
-	Files files;
-	System system;
-	Fonts fonts;
-	Rml::ElementInstancerGeneric<VectorElement> vectorInstancer;
-	std::unique_ptr<VectorMaskInstancer> maskInstancer;
+	Backend* backend = nullptr;
+	RuntimeStatistics& Stats() { return backend ? backend->statistics : statistics; }
+	double time = 0;
+	std::string contextName;
 	Rml::Context* context = nullptr;
 	Rml::ElementDocument* document = nullptr;
 	std::unique_ptr<Document> canonical;
@@ -401,7 +506,7 @@ struct Runtime::Impl {
 	void ApplyControlBindings() {
 		if (appliedStateRevision == state.Revision()) return;
 		for (const auto& [id,enabled] : state.Enabled()) interaction.SetEnabled(id,enabled);
-		appliedStateRevision = state.Revision(); Feedback(system.time);
+		appliedStateRevision = state.Revision(); Feedback(time);
 	}
 	void ReadStateSources() {
 		StateValues changes; std::string error;
@@ -418,8 +523,8 @@ struct Runtime::Impl {
 		stateError = std::move(error); ApplyControlBindings();
 	}
 	void Feedback(double seconds) {
-		if (std::isfinite(seconds)) system.time = std::max(system.time,seconds);
-		for (const auto& change : interaction.TakeFeedback()) motion.Play(change.timeline,system.time);
+		if (std::isfinite(seconds)) time = std::max(time,seconds);
+		for (const auto& change : interaction.TakeFeedback()) motion.Play(change.timeline,time);
 	}
 	std::string HitControl() const {
 		if (!pointerPresent || !canonical || !document || pointerX < 0 || pointerY < 0 || pointerX >= viewport.width || pointerY >= viewport.height) return {};
@@ -442,7 +547,7 @@ struct Runtime::Impl {
 			if (element && element->IsVisible(true) && Rml::ElementUtilities::GetBoundingBox(rect,element,Rml::BoxArea::Border))
 				bounds[id] = {rect.Left(),rect.Top(),rect.Width(),rect.Height(),true};
 		}
-		interaction.SetBounds(bounds); interaction.Hover(HitControl()); Feedback(system.time);
+		interaction.SetBounds(bounds); interaction.Hover(HitControl()); Feedback(time);
 	}
 	void ApplyMotion() {
 		if (!document || !canonical) return;
@@ -467,50 +572,60 @@ Runtime::Runtime(Host& host) : impl(std::make_unique<Impl>(host)) {}
 Runtime::~Runtime() { Shutdown(); }
 bool Runtime::Initialize() {
 	if (impl->initialized) return true;
-	if (activeRuntime) return false;
-	Rml::SetRenderInterface(&impl->renderer);
-	Rml::SetFileInterface(&impl->files);
-	Rml::SetSystemInterface(&impl->system);
-	Rml::SetFontEngineInterface(&impl->fonts);
-	if (!Rml::Initialise()) return false;
-	impl->maskInstancer = std::make_unique<VectorMaskInstancer>();
-	Rml::Factory::RegisterElementInstancer("q4-vector",&impl->vectorInstancer);
-	Rml::Factory::RegisterElementInstancer("q4-node",&impl->vectorInstancer);
-	Rml::Factory::RegisterDecoratorInstancer("q4-mask",impl->maskInstancer.get());
+	auto services = activeServices.lock();
+	if (services && &services->host != &impl->host) {
+		impl->host.Log(true,"Live retained contexts must share the same host"); return false;
+	}
+	if (!services) {
+		if (!impl->host.shared) impl->host.shared = std::make_unique<Host::Shared>();
+		services = std::make_shared<Services>(impl->host,impl->host.shared->layers);
+		if (!services->Initialize()) return false;
+		activeServices = services;
+	}
+	impl->services = services;
+	ContextClock clock(*impl->services,impl->time);
+	impl->backend = impl->services->AcquireBackend();
+	impl->contextName = "openq4-retained-"+std::to_string(++nextContext);
+	impl->context = Rml::CreateContext(impl->contextName, {1280,720}, &impl->backend->renderer);
+	if (!impl->context) {
+		impl->services->ReleaseBackend(*impl->backend); impl->backend = nullptr;
+		impl->services.reset(); return false;
+	}
 	impl->initialized = true;
-	activeRuntime = this;
-	impl->context = Rml::CreateContext("openq4-retained", {1280,720});
-	if (!impl->context) { Shutdown(); return false; }
 	return true;
 }
 void Runtime::Shutdown() {
 	if (!impl->initialized) return;
-	Rml::Shutdown();
-	impl->maskInstancer.reset();
+	{
+		ContextClock clock(*impl->services,impl->time);
+		Rml::RemoveContext(impl->contextName);
+		impl->services->ReleaseBackend(*impl->backend);
+		impl->statistics = impl->backend->statistics;
+		impl->backend = nullptr;
+	}
 	impl->context = nullptr;
 	impl->document = nullptr;
 	impl->canonical.reset(); impl->applied.clear(); impl->motion.Reset({});
 	impl->state = {}; impl->appliedStateRevision = 0; impl->stateError.clear();
 	impl->interaction.Reset({}); impl->controls.clear(); impl->pointerPresent = false;
 	impl->initialized = false;
-	impl->system.time = 0;
-	activeRuntime = nullptr;
-	Rml::SetRenderInterface(nullptr);
-	Rml::SetFileInterface(nullptr);
-	Rml::SetSystemInterface(nullptr);
-	Rml::SetFontEngineInterface(nullptr);
+	impl->time = 0;
+	impl->contextName.clear();
+	impl->services.reset();
 }
 void Runtime::CloseDocument() {
 	impl->canonical.reset(); impl->applied.clear(); impl->motion.Reset({});
 	impl->state = {}; impl->appliedStateRevision = 0; impl->stateError.clear();
 	impl->interaction.Reset({}); impl->controls.clear(); impl->pointerPresent = false;
 	if (!impl->document) return;
+	ContextClock clock(*impl->services,impl->time);
 	impl->document->Close();
 	impl->document = nullptr;
 	impl->context->Update();
 }
 bool Runtime::LoadMarkup(const std::string& markup, const std::string& sourcePath) {
 	if (!Initialize()) return false;
+	ContextClock clock(*impl->services,impl->time);
 	// Keep the currently loaded document if parsing a replacement fails.
 	auto* document = impl->context->LoadDocumentFromMemory(markup, sourcePath);
 	if (!document) return false;
@@ -523,6 +638,7 @@ bool Runtime::LoadDocument(const std::string& source, const std::string& sourceP
 	auto candidate = std::make_unique<Document>();
 	if (!candidate->Load(source,diagnostics)) return false;
 	if (!LoadMarkup(candidate->BuildMarkup(),sourcePath)) return false;
+	ContextClock clock(*impl->services,impl->time);
 	impl->motion.Reset(candidate->Model());
 	impl->interaction.Reset(candidate->Model());
 	std::string stateError;
@@ -536,10 +652,10 @@ bool Runtime::LoadDocument(const std::string& source, const std::string& sourceP
 		// their temporary filter layer appears or disappears.
 		if (auto* element = impl->document->GetElementById(node->id)) element->SetProperty("z-index","0");
 		if (auto* element = impl->document->GetElementById(node->id))
-			static_cast<VectorElement*>(element)->Configure(*node,impl->host,impl->statistics);
+			static_cast<VectorElement*>(element)->Configure(*node,impl->host,impl->Stats());
 		for (const auto& child : node->children) nodes.push_back(&child);
 	}
-	impl->ReadStateSources(); impl->Feedback(impl->system.time);
+	impl->ReadStateSources(); impl->Feedback(impl->time);
 	impl->ApplyMotion();
 	return true;
 }
@@ -547,7 +663,7 @@ bool Runtime::PlayTimeline(const std::string& id, double seconds) { return impl-
 bool Runtime::SetState(const StateValues& changes, std::string& error, double seconds) {
 	if (!impl->canonical) { error = "State updates require a canonical document"; return false; }
 	if (!impl->state.Set(changes,error)) return false;
-	if (std::isfinite(seconds)) impl->system.time = std::max(impl->system.time,seconds);
+	if (std::isfinite(seconds)) impl->time = std::max(impl->time,seconds);
 	impl->ApplyControlBindings(); return true;
 }
 StateValues Runtime::GetState(bool includeHostSources) const {
@@ -569,9 +685,10 @@ void Runtime::ResumeTimeline(const std::string& id, double seconds) { impl->moti
 void Runtime::CancelTimeline(const std::string& id, CancelPolicy policy, double seconds) { impl->motion.Cancel(id,policy,seconds); }
 void Runtime::SetReducedMotion(bool enabled, double seconds) { impl->motion.SetReducedMotion(enabled,seconds); }
 void Runtime::Frame(const Viewport& viewport, double seconds) {
-	const auto residentCount = impl->statistics.residentGeometryCount, residentBytes = impl->statistics.residentGeometryBytes;
-	impl->statistics = {};
-	impl->statistics.residentGeometryCount = residentCount; impl->statistics.residentGeometryBytes = residentBytes;
+	auto& statistics = impl->Stats();
+	const auto residentCount = statistics.residentGeometryCount, residentBytes = statistics.residentGeometryBytes;
+	statistics = {};
+	statistics.residentGeometryCount = residentCount; statistics.residentGeometryBytes = residentBytes;
 	if (!impl->context || !impl->document) return;
 	if (viewport.width <= 0 || viewport.height <= 0) {
 		impl->interaction.SetBounds({}); impl->interaction.Cancel(); impl->Feedback(seconds); return;
@@ -579,24 +696,25 @@ void Runtime::Frame(const Viewport& viewport, double seconds) {
 	impl->viewport = viewport;
 	if (impl->pointerPresent) viewport.WindowToDocument(impl->windowPointerX,impl->windowPointerY,impl->pointerX,impl->pointerY);
 	const auto start = std::chrono::steady_clock::now();
-	if (std::isfinite(seconds)) impl->system.time = std::max(impl->system.time, seconds);
+	if (std::isfinite(seconds)) impl->time = std::max(impl->time, seconds);
+	ContextClock clock(*impl->services,impl->time);
 	impl->ReadStateSources();
-	impl->motion.Advance(impl->system.time);
+	impl->motion.Advance(impl->time);
 	impl->ApplyMotion();
 	impl->context->SetDimensions({viewport.width, viewport.height});
 	impl->context->SetDensityIndependentPixelRatio(viewport.DpRatio());
 	impl->context->Update();
 	const auto updated = std::chrono::steady_clock::now();
-	impl->renderer.BeginFrame(viewport.width,viewport.height);
+	impl->backend->renderer.BeginFrame(viewport.width,viewport.height);
 	impl->context->Render();
-	impl->renderer.EndFrame();
+	impl->backend->renderer.EndFrame();
 	// RmlUi resolves transform state while rendering. Hit/navigation bounds
 	// therefore follow the just-presented frame, not stale transform matrices.
 	impl->UpdateInteraction();
 	const auto end = std::chrono::steady_clock::now();
-	impl->statistics.updateMilliseconds = std::chrono::duration<double,std::milli>(updated-start).count();
-	impl->statistics.renderMilliseconds = std::chrono::duration<double,std::milli>(end-updated).count();
-	impl->statistics.frameMilliseconds = std::chrono::duration<double,std::milli>(end-start).count();
+	statistics.updateMilliseconds = std::chrono::duration<double,std::milli>(updated-start).count();
+	statistics.renderMilliseconds = std::chrono::duration<double,std::milli>(end-updated).count();
+	statistics.frameMilliseconds = std::chrono::duration<double,std::milli>(end-start).count();
 }
 bool Runtime::GetBounds(const std::string& id, Bounds& bounds) const {
 	auto* element = impl->document ? impl->document->GetElementById(id) : nullptr;
@@ -609,17 +727,28 @@ bool Runtime::GetBounds(const std::string& id, Bounds& bounds) const {
 bool Runtime::SetProperty(const std::string& id, const std::string& property, const std::string& value) {
 	if (impl->canonical) return false; // Edit the canonical source transactionally.
 	auto* element = impl->document ? impl->document->GetElementById(id) : nullptr;
-	return element && element->SetProperty(property,value);
+	if (!element) return false;
+	ContextClock clock(*impl->services,impl->time);
+	return element->SetProperty(property,value);
 }
 bool Runtime::SetText(const std::string& id, const std::string& text) {
 	if (impl->canonical) return false;
 	auto* element = impl->document ? impl->document->GetElementById(id) : nullptr;
 	if (!element) return false;
+	ContextClock clock(*impl->services,impl->time);
 	element->SetInnerRML(Rml::StringUtilities::EncodeRml(text));
 	return true;
 }
 bool Runtime::IsLoaded() const { return impl->document != nullptr; }
-RuntimeStatistics Runtime::Statistics() const { return impl->statistics; }
+RuntimeStatistics Runtime::Statistics() const {
+	auto statistics = impl->Stats();
+	if (impl->services) {
+		statistics.residentBackends = impl->services->backends.size();
+		statistics.activeContexts = std::count_if(impl->services->backends.begin(),impl->services->backends.end(),
+			[](const auto& backend) { return backend->leased; });
+	}
+	return statistics;
+}
 void Runtime::PointerMove(float x, float y, double seconds) {
 	impl->pointerPresent = std::isfinite(x) && std::isfinite(y);
 	impl->windowPointerX = x; impl->windowPointerY = y;

@@ -282,6 +282,7 @@ jobs:
             tools/tests/ui_retained_input.py \
             tools/tests/ui_retained_state_sources.py \
             tools/tests/ui_presentation_bridge.py \
+            tools/tests/ui_retained_layer_pool.py \
             tools/tests/ui_legacy_inventory.py \
             tools/tests/ui_legacy_import.py \
             tools/ui/legacy_inventory.py \
@@ -477,6 +478,7 @@ jobs:
           python tools/tests/ui_retained_input.py
           python tools/tests/ui_retained_state_sources.py
           python tools/tests/ui_presentation_bridge.py
+          python tools/tests/ui_retained_layer_pool.py
           python tools/tests/ui_legacy_inventory.py
           python tools/tests/ui_legacy_import.py
           python tools/tests/ui_background_cursor.py

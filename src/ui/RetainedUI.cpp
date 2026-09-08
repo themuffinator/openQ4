@@ -100,12 +100,24 @@ public:
 			renderSystem->DrawStretchPic(converted.Ptr(), localIndices.Ptr(), count, count, material, false);
 		}
 	}
+	std::uint64_t RenderFrame() const override {
+		renderPresentationState_t state;
+		renderSystem->GetPresentationState(state);
+		return (static_cast<std::uint64_t>(static_cast<unsigned>(renderSystem->GetVideoRestartCount())) << 32) |
+			static_cast<unsigned>(state.frameNumber);
+	}
 	bool BeginLayer(std::uint32_t id, int width, int height) override {
 		// Bound the full-size transient pool to 256 MiB of RGBA8 storage.
 		// Runtime leases cover stack layers, mask snapshots and filter scratch.
-		if (!id || id > 48 || width <= 0 || height <= 0 ||
-			static_cast<std::uint64_t>(width)*height*4*id > 256*1024*1024) return false;
-		if (!layers.empty() && (layers.front().width != width || layers.front().height != height)) ClearLayers();
+		if (!id || id > 48 || width <= 0 || height <= 0) return false;
+		std::uint64_t bytes = static_cast<std::uint64_t>(width)*height*4;
+		if (bytes > 256*1024*1024) return false;
+		for (size_t i = 0; i < layers.size(); ++i) if (i != id-1 && layers[i].target) {
+			bytes += static_cast<std::uint64_t>(layers[i].width)*layers[i].height*4;
+		}
+		if (bytes > 256*1024*1024) return false;
+		// Other contexts may own mask snapshots at different dimensions.
+		// Resize only this unleased slot; never discard their render targets.
 		if (layers.size() < id) layers.resize(id);
 		auto& layer = layers[id-1];
 		if (layer.target && (layer.width != width || layer.height != height)) {

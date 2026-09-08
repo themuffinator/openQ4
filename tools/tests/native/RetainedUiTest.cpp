@@ -16,7 +16,9 @@ static bool Near(float a, float b) { return std::abs(a-b) < .1f; }
 struct TestHost final : Host {
 	int drawCalls = 0, errors = 0;
 	std::vector<Vertex> drawn;
-	struct Layer { std::vector<Vertex> vertices; std::vector<Vertex> pixels; };
+	struct Layer { std::vector<Vertex> vertices; std::vector<Vertex> pixels; int width=0,height=0; std::uint64_t frame=0; };
+	std::uint64_t renderFrame = 1;
+	std::uint64_t RenderFrame() const override { return renderFrame; }
 	std::vector<Layer> layers{1};
 	std::uint32_t activeLayer = 0;
 	std::vector<Bounds> samplePoints;
@@ -29,7 +31,10 @@ struct TestHost final : Host {
 		destination.b = source.b*opacity+destination.b*remain;
 		destination.a = source.a*opacity+destination.a*remain;
 	}
-	void ClearSamples() { layers[0].pixels.assign(samplePoints.size(),Vertex{0,0,0,0,0,0,0,0}); drawn.clear(); }
+	void ClearSamples(bool newFrame = true) {
+		if (newFrame) ++renderFrame;
+		layers[0].pixels.assign(samplePoints.size(),Vertex{0,0,0,0,0,0,0,0}); drawn.clear();
+	}
 	bool ReadFile(const std::string&, std::string&) override { return false; }
 	StateValues cvars;
 	bool ReadCVar(const std::string& name, size_t, StateValue& value) override {
@@ -63,11 +68,15 @@ struct TestHost final : Host {
 			}
 		}
 	}
-	bool BeginLayer(std::uint32_t id, int, int) override {
+	bool BeginLayer(std::uint32_t id, int width, int height) override {
 		if (failLayer || allocationsUntilFailure == 0) return false;
 		if (allocationsUntilFailure > 0) --allocationsUntilFailure;
 		if (layers.size() <= id) layers.resize(id+1);
-		layers[id] = {}; layers[id].pixels.assign(samplePoints.size(),Vertex{0,0,0,0,0,0,0,0}); activeLayer = id; return true;
+		const auto& previous = layers[id];
+		Check(previous.width == 0 || (previous.width == width && previous.height == height) || previous.frame != renderFrame,
+			"target dimensions remain stable for every deferred draw in the same host frame");
+		layers[id] = {}; layers[id].width=width; layers[id].height=height; layers[id].frame=renderFrame;
+		layers[id].pixels.assign(samplePoints.size(),Vertex{0,0,0,0,0,0,0,0}); activeLayer = id; return true;
 	}
 	void CompositeLayer(std::uint32_t source, std::uint32_t destination, float opacity, const Bounds& clip) override {
 		Check(source != destination,"composition never samples its destination");
@@ -116,7 +125,11 @@ int main(int argc, char** argv) {
 	Check(runtime.Initialize(),"initialize real RmlUi core");
 	{
 		Runtime other(host);
-		Check(!other.Initialize(),"reject a competing global owner");
+		Check(other.Initialize(),"share process services with a second independent context");
+		TestHost otherHost;
+		Runtime competing(otherHost);
+		Check(!competing.Initialize(),"reject competing host services while contexts are live");
+		Check(otherHost.errors == 1,"competing host gets an explicit diagnostic");
 	}
 	const char* markup = R"(<rml><head><style>
 		body { margin:0; width:100%; height:100%; font-family: test; font-size:20dp; }
@@ -576,6 +589,85 @@ int main(int argc, char** argv) {
 	Check(runtime.Statistics().residentGeometryCount == 0 && runtime.Statistics().residentGeometryBytes == 0,"geometry accounting returns to zero after shutdown");
 	Check(runtime.Initialize(),"restart lifetime without stale services");
 	runtime.Shutdown();
+	{
+		// Duplicate document/node IDs are local to their view. Different density,
+		// data and input must survive interleaved frames and arbitrary close order.
+		auto first = std::make_unique<Runtime>(host);
+		Runtime second(host);
+		Check(first->LoadDocument(bindingSource,"first.q4ui",diagnostics),"first independent live document");
+		Check(second.LoadDocument(bindingSource,"second.q4ui",diagnostics),"second independent live document");
+		Check(first->SetState({{"progress",20.0}},stateError,1),"first instance state");
+		Check(second.SetState({{"progress",80.0}},stateError,100),"second instance state");
+		const Viewport firstViewport{900,650,1,1}, secondViewport{1200,900,2,1};
+		first->Frame(firstViewport,1); second.Frame(secondViewport,100);
+		Bounds firstTrack,firstFill,secondTrack,secondFill;
+		first->GetBounds("progress-track",firstTrack); first->GetBounds("progress-fill",firstFill);
+		second.GetBounds("progress-track",secondTrack); second.GetBounds("progress-fill",secondFill);
+		Check(Near(firstFill.width,firstTrack.width*.2f) && Near(secondFill.width,secondTrack.width*.8f),"same IDs retain separate live values and layouts");
+		Check(Near(secondTrack.width,firstTrack.width*2),"contexts retain independent density");
+		Check(first->FocusControl("reference-controls",1),"focus first view");
+		Check(second.FocusedControl().empty(),"focus does not cross view boundaries");
+		first->MenuAction(MenuInput::Accept,true,1);
+		Check(second.SetState({{"available",false}},stateError,100),"disable only second view");
+		first->MenuAction(MenuInput::Accept,false,1);
+		Check(first->TakeActions().size()==1 && second.TakeActions().empty(),"activation and availability are independent");
+		const auto secondRevision = second.StateRevision();
+		Check(!first->LoadDocument("{}","bad.q4ui",diagnostics),"failed replacement is local");
+		Check(second.StateRevision()==secondRevision && first->PresentedValue("reading","text")->text=="20","failed load preserves both documents");
+		const auto secondGeometry = second.Statistics().residentGeometryCount;
+		first.reset(); // The initial RmlUi service creator may leave first.
+		Check(second.IsLoaded() && second.Statistics().activeContexts==1,"survivor retains shared services");
+		Check(second.Statistics().residentGeometryCount==secondGeometry,"closing a neighbor does not flush the survivor's text geometry");
+		for (int iteration=0; iteration<24; ++iteration) {
+			Runtime temporary(host);
+			Check(temporary.LoadDocument(bindingSource,"temporary.q4ui",diagnostics),"reacquire an idle render backend");
+			temporary.Frame(firstViewport,iteration);
+			Check(temporary.Statistics().residentBackends==2 && second.Statistics().activeContexts==2,"backend residency is bounded by peak concurrent views");
+		}
+		second.Frame(secondViewport,101);
+		Check(second.PresentedValue("reading","text")->text=="80" && second.GetControlState("reference-controls")==ControlState::Disabled,"survivor keeps data/input after context churn");
+		second.Shutdown();
+		Check(second.Statistics().residentGeometryCount==0,"last context releases its geometry");
+	}
+	{
+		Runtime first(host),second(host);
+		Check(first.LoadDocument(maskedDocument,"mask-first.q4ui",diagnostics),"first masked view");
+		Check(second.LoadDocument(maskedDocument,"mask-second.q4ui",diagnostics),"second masked view");
+		Check(first.PlayTimeline("fade",1) && second.PlayTimeline("fade",100),"separate playback epochs");
+		host.samplePoints={{20.37f,20.63f},{70.37f,50.63f}};
+		const Viewport small{240,160,1,1},large{800,600,1,1};
+		host.ClearSamples(); first.Frame(small,1.25);
+		pixel(0,.375f*maskAlpha,1-.375f*maskAlpha,0); pixel(1,0,1,0);
+		host.ClearSamples(false); second.Frame(large,100.75);
+		pixel(0,.125f*maskAlpha,1-.125f*maskAlpha,0); pixel(1,0,1,0);
+		host.ClearSamples(false); first.Frame(small,1.5);
+		pixel(0,.25f*maskAlpha,1-.25f*maskAlpha,0); pixel(1,0,1,0);
+		Check(first.Statistics().maskSnapshots==2 && second.Statistics().maskSnapshots==2,"each view composites its own masks");
+		second.Shutdown();
+		host.ClearSamples(); first.Frame(small,1.75);
+		pixel(0,.125f*maskAlpha,1-.125f*maskAlpha,0); pixel(1,0,1,0);
+		Check(first.Statistics().activeContexts==1,"closing the newer view also preserves the older view");
+	}
+	{
+		Runtime limited(host);
+		Check(limited.LoadDocument(maskedDocument,"bounded-frames.q4ui",diagnostics),"load frame-fence exhaustion fixture");
+		host.samplePoints={{20.37f,20.63f}}; ++host.renderFrame;
+		int exhausted = 0;
+		for (int i=0; i<60; ++i) {
+			host.ClearSamples(false);
+			const int errors = host.errors;
+			limited.Frame({300+i,200,1,1},200+i*.001);
+			if (host.errors != errors) {
+				Check(host.errors==errors+1 && host.activeLayer==0,"exhausted frame reports once and restores base output");
+				host.errors=errors; ++exhausted;
+			}
+		}
+		Check(exhausted>0,"many different targets in one frame obey the shared slot cap");
+		host.ClearSamples(); limited.Frame({450,200,1,1},201);
+		pixel(0,.5f*maskAlpha,1-.5f*maskAlpha,0);
+		Check(host.errors==0 && host.activeLayer==0,"next host frame recycles targets and recovers drawing");
+	}
+	host.samplePoints.clear();
 	Check(host.errors==0,"no library warnings or errors");
-	std::puts("Retained UI: density, aspect layout, ownership, mutation, clipping, motion and restart passed");
+	std::puts("Retained UI: density, layout, input, clipping, motion, bindings, independent contexts, bounded backend reuse and restart passed");
 }

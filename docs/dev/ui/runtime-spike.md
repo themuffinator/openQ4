@@ -39,8 +39,9 @@ empty engine entry points and does not link RmlUi.
 
 ## Current capabilities
 
-- A single owner of RmlUi's global services, with explicit initialization,
-  document close/reload and shutdown. Competing global owners are rejected.
+- Shared RmlUi services with [independent document instances](instances.md).
+  Each context owns state, input, layout and playback; idle render backends are
+  reused. Concurrent contexts must share the same host.
 - Retained layout, source-element IDs, runtime style/text changes and bounds
   queries. Text mutation escapes markup. These APIs are integration tools, not
   a promise that raw RML is the editor's canonical serialization.
