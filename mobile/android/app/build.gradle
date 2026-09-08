@@ -1,4 +1,5 @@
 import java.security.MessageDigest
+import groovy.json.JsonSlurper
 
 plugins { id 'com.android.application' }
 
@@ -15,8 +16,63 @@ if (abi != 'arm64-v8a') {
     throw new GradleException('openQ4 currently supports the arm64-v8a Android ABI.')
 }
 def nativeStage = file(providers.gradleProperty('openq4Stage').getOrElse("../../../.install/android/${abi}"))
+def nativeMetadataFile = new File(nativeStage, 'android-build.json')
+def modMetadataFile = new File(nativeStage, 'baseoq4/mod.json')
+if (!nativeMetadataFile.isFile() || !modMetadataFile.isFile()) {
+    throw new GradleException('Missing native build metadata; run the Android Meson install step first.')
+}
+def nativeMetadata = new JsonSlurper().parse(nativeMetadataFile)
+if (nativeMetadata.format != 1 || nativeMetadata.abi != abi ||
+        !(nativeMetadata.androidApi instanceof Number) || nativeMetadata.androidApi < 24 ||
+        nativeMetadata.androidApi > 35) {
+    throw new GradleException('Unsupported staged Android ABI/API metadata (this host supports API 24 through 35).')
+}
+def sdlVersionHeader = new File(sdlRoot, 'include/SDL3/SDL_version.h')
+def sdlVersionText = sdlVersionHeader.isFile() ? sdlVersionHeader.getText('UTF-8') : ''
+def javaSdlVersion = ['MAJOR', 'MINOR', 'MICRO'].collect { part ->
+    def match = sdlVersionText =~ /(?m)^\s*#define\s+SDL_${part}_VERSION\s+(\d+)\s*$/
+    match.find() ? match.group(1) : '?'
+}.join('.')
+if (javaSdlVersion != nativeMetadata.sdlVersion) {
+    throw new GradleException("SDL Java source ${javaSdlVersion} does not match staged native SDL ${nativeMetadata.sdlVersion}.")
+}
+def modMetadata = new JsonSlurper().parse(modMetadataFile)
+def stagedVersion = modMetadata.version
+if (!(stagedVersion instanceof String) || stagedVersion != modMetadata.requiredopenQ4Version) {
+    throw new GradleException('Staged mod version must match requiredopenQ4Version.')
+}
+def versionMatch = stagedVersion =~ /^(\d+)\.(\d+)\.(\d+)(?:[-+][0-9A-Za-z.+-]+)?$/
+if (!versionMatch.matches()) {
+    throw new GradleException("Invalid staged openQ4 version: ${stagedVersion}")
+}
+def versionParts = (1..3).collect { versionMatch.group(it).toBigInteger() }
+if (versionParts.any { it > 999 }) {
+    throw new GradleException('Android version components must be between 0 and 999.')
+}
+// Preserve the initial APK's 0.13.0 -> 13000 numbering and increase on each
+// patch release. Distributors can number successive prerelease builds explicitly.
+def defaultVersionCode = versionParts[0] * 1000000 + versionParts[1] * 1000 + versionParts[2]
+def versionCodeText = providers.gradleProperty('openq4VersionCode').getOrElse(defaultVersionCode.toString())
+if (!(versionCodeText ==~ /[1-9][0-9]*/) || versionCodeText.toBigInteger() > 2100000000) {
+    throw new GradleException('openq4VersionCode must be an integer between 1 and 2100000000.')
+}
 def generatedJni = layout.buildDirectory.dir('generated/openq4/jniLibs')
 def generatedAssets = layout.buildDirectory.dir('generated/openq4/assets')
+def generatedResources = layout.buildDirectory.dir('generated/openq4/res')
+def launcherIcon = file('../../../assets/icons/quake4_512.png')
+
+tasks.register('stageOpenQ4Icon', Sync) {
+    // Reuse the official desktop application artwork without duplicating or
+    // modifying the source image. Android scales this density-independent icon.
+    from(launcherIcon)
+    into(generatedResources.map { it.dir('mipmap-nodpi') })
+    rename { 'ic_launcher.png' }
+    doFirst {
+        if (!launcherIcon.isFile()) {
+            throw new GradleException('Missing the official openQ4 application icon.')
+        }
+    }
+}
 
 tasks.register('stageOpenQ4Native', Sync) {
     from(new File(nativeStage, 'lib')) { include '*.so' }
@@ -35,7 +91,7 @@ tasks.register('stageOpenQ4Native', Sync) {
 tasks.register('stageOpenQ4Assets', Sync) {
     from(new File(nativeStage, 'baseoq4')) { into 'baseoq4' }
     from(new File(nativeStage, 'licenses')) { into 'licenses' }
-    from(nativeStage) { include 'LICENSE', 'CONTRIBUTORS.md' }
+    from(nativeStage) { include 'LICENSE', 'CONTRIBUTORS.md', 'android-build.json' }
     into(generatedAssets)
     doFirst {
         ['baseoq4/pak0.pk4', 'baseoq4/pak1.pk4', 'baseoq4/mod.json',
@@ -70,16 +126,17 @@ android {
     buildToolsVersion "35.0.0"
     defaultConfig {
         applicationId 'com.darkmatter.openq4'
-        minSdk 24
+        minSdk nativeMetadata.androidApi.intValue()
         targetSdk 35
-        versionCode 13000
-        versionName '0.13.0'
+        versionCode versionCodeText.toInteger()
+        versionName stagedVersion
         ndk { abiFilters abi }
     }
     sourceSets.main {
         java.srcDir sdlJava
         jniLibs.srcDir generatedJni
         assets.srcDir generatedAssets
+        res.srcDir generatedResources
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
@@ -94,5 +151,5 @@ android {
     }
 }
 tasks.named('preBuild').configure {
-    dependsOn 'stageOpenQ4Native', 'stageOpenQ4Assets'
+    dependsOn 'stageOpenQ4Native', 'stageOpenQ4Assets', 'stageOpenQ4Icon'
 }

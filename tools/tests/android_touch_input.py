@@ -27,6 +27,12 @@ def main() -> None:
     root = Path(__file__).resolve().parents[2]
     source = (root / "mobile/game_interface.cpp").read_text(encoding="utf-8")
     body = source[source.index("enum\n{\n    EV_KEY") :]
+    bridge_source = (root / "src/sys/android/android_sdl3.cpp").read_text(encoding="utf-8")
+    localization_start = bridge_source.index('extern "C" const char *Quake4_LocalizeString(')
+    localization = bridge_source[localization_start : bridge_source.index("\n}", localization_start) + 2]
+    layout_source = (root / "mobile/touch_interface_quake4.cpp").read_text(encoding="utf-8")
+    labels_start = layout_source.index("void TouchInterface::updateControlLabels()")
+    labels = layout_source[labels_start : layout_source.index("\nvoid TouchInterface::newGLContext()", labels_start)]
     actions = sorted(set(re.findall(r"\bPORT_ACT_[A-Z0-9_]+\b", body)) - {"PORT_ACT_WEAP0", "PORT_ACT_WEAP10"})
     declarations = "enum { " + ", ".join(actions) + ", PORT_ACT_WEAP0=200, PORT_ACT_WEAP10=210 };\n"
     scancodes = sorted(set(re.findall(r"\bSDL_SCANCODE_[A-Z_]+\b", body)))
@@ -59,9 +65,52 @@ extern "C" void Quake4_ResetTouchState() { ++resets; memset(buttons, 0, sizeof(b
 void PortableMoveFwd(float);
 void PortableMoveSide(float);
 void MouseButton(int, int) {}
+struct TestDictionary {
+    int lookups = 0;
+    std::string result;
+    const char *GetString(const char *id) { ++lookups; result = std::string("localized:") + id; return result.c_str(); }
+};
+struct TestCommon {
+    bool initialized = false;
+    TestDictionary dictionary;
+    bool IsInitialized() { return initialized; }
+    TestDictionary *GetLanguageDict() { return &dictionary; }
+};
+static TestCommon *common = nullptr;
+namespace touchcontrols {
+    struct ControlSuper { std::string description; };
+    struct TouchControls {
+        std::vector<ControlSuper *> controls;
+        std::vector<ControlSuper *> *getControls() { return &controls; }
+    };
+}
+class TouchInterface {
+public:
+    touchcontrols::TouchControls *tcGameMain, *tcMouse;
+    bool labelsLocalized = false;
+    void updateControlLabels();
+};
 '''
     checks = r'''
 int main() {
+    // The external host creates controls before any engine initialization.
+    touchcontrols::ControlSuper attack{"#str_200114"}, mouse{"#str_42911"}, custom{"custom"};
+    touchcontrols::TouchControls gameControls{{&attack, &custom}}, mouseControls{{&mouse}};
+    TouchInterface layout{&gameControls, &mouseControls};
+    layout.updateControlLabels();
+    assert(!layout.labelsLocalized && attack.description == "#str_200114");
+    TestCommon engine;
+    common = &engine;
+    layout.updateControlLabels();
+    assert(engine.dictionary.lookups == 0 && !layout.labelsLocalized);
+    engine.initialized = true;
+    layout.updateControlLabels();
+    assert(layout.labelsLocalized && attack.description == "localized:#str_200114");
+    assert(mouse.description == "localized:#str_42911" && custom.description == "custom");
+    const int resolvedLookups = engine.dictionary.lookups;
+    layout.updateControlLabels();
+    assert(engine.dictionary.lookups == resolvedLookups);
+
     // More than the old eight-slot command ring must retain each command.
     for (int i=0; i<20; ++i) PortableCommand(("echo " + std::to_string(i)).c_str());
     assert(commands.empty());
@@ -123,6 +172,29 @@ int main() {
     PortableAction(0, PORT_ACT_RELOAD);
     Quake4_DrainTouchInput();
     assert(impulses.size() == 1 && impulses[0] == 13);
+    // Aliased controls must retain the action until its last source releases.
+    PortableAction(1, PORT_ACT_ALT_ATTACK);
+    PortableAction(1, PORT_ACT_ZOOM_IN);
+    PortableAction(0, PORT_ACT_ALT_ATTACK);
+    Quake4_DrainTouchInput();
+    assert(buttons[QUAKE4_BTN_ZOOM]);
+    PortableAction(0, PORT_ACT_ZOOM_IN);
+    Quake4_DrainTouchInput();
+    assert(!buttons[QUAKE4_BTN_ZOOM]);
+    PortableAction(1, PORT_ACT_SPRINT);
+    PortableAction(1, PORT_ACT_SPEED);
+    PortableAction(1, PORT_ACT_SPEED); // repeat is not another held source
+    PortableAction(0, PORT_ACT_SPRINT);
+    Quake4_DrainTouchInput();
+    assert(buttons[QUAKE4_BTN_SPEED]);
+    PortableAction(0, PORT_ACT_SPEED);
+    Quake4_DrainTouchInput();
+    assert(!buttons[QUAKE4_BTN_SPEED]);
+    PortableAction(1, PORT_ACT_JUMP);
+    Quake4_ClearTouchInput();
+    PortableAction(1, PORT_ACT_JUMP);
+    Quake4_DrainTouchInput();
+    assert(buttons[QUAKE4_BTN_MOVE_UP]);
     assert(PortableShowKeyboard());
     PortableSetAlwaysRun(true);
     Quake4_DrainTouchInput();
@@ -132,7 +204,7 @@ int main() {
     scratch = root / ".tmp/android-touch-input"
     scratch.mkdir(parents=True, exist_ok=True)
     unit = scratch / "touch_input_test.cpp"
-    unit.write_text(harness + declarations + body + checks, encoding="utf-8")
+    unit.write_text(harness + declarations + body + localization + labels + checks, encoding="utf-8")
     binary = scratch / ("touch_input_test.exe" if os.name == "nt" else "touch_input_test")
     if Path(args.cxx).name.lower() in ("cl", "cl.exe"):
         command = [args.cxx, "/nologo", "/std:c++17", "/EHsc", "/D_CRT_SECURE_NO_WARNINGS",
@@ -143,7 +215,7 @@ int main() {
             command.append("-pthread")
     subprocess.run(command, cwd=scratch, check=True)
     subprocess.run([str(binary)], cwd=scratch, check=True)
-    print("PASS: Android touch queue, overflow releases, concurrent look, actions and analog bounds")
+    print("PASS: Android touch queue, overflow releases, concurrent look, aliased actions, analog bounds and deferred localization")
 
 
 if __name__ == "__main__":

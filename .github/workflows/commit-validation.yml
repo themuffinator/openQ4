@@ -43,6 +43,12 @@ jobs:
         with:
           python-version: "3.x"
 
+      - name: Setup Java for Android host storage validation
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
       - name: Install release documentation dependency
         run: python -m pip install markdown
 
@@ -51,6 +57,9 @@ jobs:
         run: |
           set -euo pipefail
           python -m py_compile \
+            tools/build/android_cross.py \
+            tools/build/android_elf.py \
+            tools/build/prepare_android_deps.py \
             tools/build/build_openq4_pack.py \
             tools/build/build_pak0.py \
             tools/build/build_windows_installer.py \
@@ -129,6 +138,10 @@ jobs:
             tools/tests/android_touch_input.py \
             tools/tests/audio_payload_restore.py \
             tools/tests/renderer_gles_dispatch.py \
+            tools/tests/renderer_gles_alpha.py \
+            tools/tests/renderer_gles_upload.py \
+            tools/tests/android_host_storage.py \
+            tools/tests/image_block_mips.py \
             tools/tests/filesystem_case_segments.py \
             tools/tests/filesystem_mod_manifest.py \
             tools/tests/filesystem_write_qpath_safety.py \
@@ -316,6 +329,10 @@ jobs:
           python tools/tests/android_touch_input.py
           python tools/tests/audio_payload_restore.py
           python tools/tests/renderer_gles_dispatch.py
+          python tools/tests/renderer_gles_alpha.py
+          python tools/tests/renderer_gles_upload.py
+          python tools/tests/android_host_storage.py
+          python tools/tests/image_block_mips.py
           python tools/tests/filesystem_case_segments.py
           python tools/tests/filesystem_mod_manifest.py
           python tools/tests/filesystem_write_qpath_safety.py
@@ -500,6 +517,12 @@ jobs:
         with:
           python-version: "3.x"
 
+      - name: Setup Java for Android host storage validation
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
       - name: Install Meson and Ninja
         shell: pwsh
         run: |
@@ -560,6 +583,12 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: "3.x"
+
+      - name: Setup Java for Android host storage validation
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
 
       - name: Install Meson and Ninja
         shell: bash
@@ -693,6 +722,12 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: "3.x"
+
+      - name: Setup Java for Android host storage validation
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
 
       - name: Install Meson and Ninja
         shell: bash
@@ -948,6 +983,12 @@ jobs:
         with:
           python-version: "3.x"
 
+      - name: Setup Java for Android host storage validation
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
       - name: Install Meson and Ninja
         shell: bash
         run: |
@@ -1187,6 +1228,12 @@ jobs:
         with:
           python-version: "3.x"
 
+      - name: Setup Java for Android host storage validation
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
       - name: Install Meson and Ninja
         shell: bash
         run: |
@@ -1332,6 +1379,12 @@ jobs:
         with:
           python-version: "3.x"
 
+      - name: Setup Java for Android host storage validation
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
       - name: Install Meson and Ninja
         shell: bash
         run: |
@@ -1454,6 +1507,12 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: "3.x"
+
+      - name: Setup Java for Android host storage validation
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
 
       - name: Install release documentation dependency
         run: python -m pip install markdown

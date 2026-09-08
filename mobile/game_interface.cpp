@@ -165,6 +165,7 @@ static TouchEvent eventQueue[EVENT_QUEUE_SIZE];
 static int eventHead, eventTail;
 static std::mutex inputMutex;
 static bool resetPending;
+static unsigned int heldButtonSources[QUAKE4_BTN_COUNT];
 
 // Protected by inputMutex, including read/modify/write of fractional look.
 static float s_moveStick, s_strafeStick;
@@ -182,6 +183,7 @@ static void clearPendingInput()
     s_forwardDown = s_backDown = s_leftDown = s_rightDown = false;
     s_turnLeftDown = s_turnRightDown = false;
     s_yawJoy = s_pitchJoy = s_yawMouse = s_pitchMouse = 0.0f;
+    memset(heldButtonSources, 0, sizeof(heldButtonSources));
 }
 
 extern "C" void Quake4_ClearTouchInput(void)
@@ -191,9 +193,9 @@ extern "C" void Quake4_ClearTouchInput(void)
     resetPending = true;
 }
 
-static void queueEvent(int type, int a, int b, const char *command = NULL)
+// inputMutex is held by the caller, including source-state updates below.
+static void queueEventLocked(int type, int a, int b, const char *command = NULL)
 {
-    std::lock_guard<std::mutex> lock(inputMutex);
     const int next = (eventHead + 1) % EVENT_QUEUE_SIZE;
     if (next == eventTail)
     {
@@ -214,6 +216,22 @@ static void queueEvent(int type, int a, int b, const char *command = NULL)
         event.command[COMMAND_MAX_LEN - 1] = 0;
     }
     eventHead = next;
+}
+
+static void queueEvent(int type, int a, int b, const char *command = NULL)
+{
+    std::lock_guard<std::mutex> lock(inputMutex);
+    queueEventLocked(type, a, b, command);
+}
+
+static void queueButton(int button, unsigned int source, int down)
+{
+    std::lock_guard<std::mutex> lock(inputMutex);
+    const unsigned int before = heldButtonSources[button];
+    const unsigned int after = down ? before | source : before & ~source;
+    heldButtonSources[button] = after;
+    if ((before != 0) != (after != 0))
+        queueEventLocked(EV_BUTTON, button, after != 0);
 }
 
 static void queueCommand(const char *cmd)
@@ -421,22 +439,22 @@ void PortableAction(int state, int action)
     // break it. See docs/engines/quake4.md.
     switch (action)
     {
-        case PORT_ACT_ATTACK:     queueEvent(EV_BUTTON, QUAKE4_BTN_ATTACK, state); break;
-        case PORT_ACT_ALT_ATTACK:
-        case PORT_ACT_ZOOM_IN:    queueEvent(EV_BUTTON, QUAKE4_BTN_ZOOM, state); break;
+        case PORT_ACT_ATTACK:     queueButton(QUAKE4_BTN_ATTACK, 1, state); break;
+        case PORT_ACT_ALT_ATTACK: queueButton(QUAKE4_BTN_ZOOM, 1, state); break;
+        case PORT_ACT_ZOOM_IN:    queueButton(QUAKE4_BTN_ZOOM, 2, state); break;
 
-        case PORT_ACT_JUMP:
-        case PORT_ACT_UP:         queueEvent(EV_BUTTON, QUAKE4_BTN_MOVE_UP, state); break;
-        case PORT_ACT_CROUCH:
-        case PORT_ACT_DOWN:       queueEvent(EV_BUTTON, QUAKE4_BTN_MOVE_DOWN, state); break;
-        case PORT_ACT_SPEED:
-        case PORT_ACT_SPRINT:     queueEvent(EV_BUTTON, QUAKE4_BTN_SPEED, state); break;
-        case PORT_ACT_STRAFE:     queueEvent(EV_BUTTON, QUAKE4_BTN_STRAFE, state); break;
-        case PORT_ACT_USE_WEAPON_WHEEL: queueEvent(EV_BUTTON, QUAKE4_BTN_WEAPON_WHEEL, state); break;
+        case PORT_ACT_JUMP:       queueButton(QUAKE4_BTN_MOVE_UP, 1, state); break;
+        case PORT_ACT_UP:         queueButton(QUAKE4_BTN_MOVE_UP, 2, state); break;
+        case PORT_ACT_CROUCH:     queueButton(QUAKE4_BTN_MOVE_DOWN, 1, state); break;
+        case PORT_ACT_DOWN:       queueButton(QUAKE4_BTN_MOVE_DOWN, 2, state); break;
+        case PORT_ACT_SPEED:      queueButton(QUAKE4_BTN_SPEED, 1, state); break;
+        case PORT_ACT_SPRINT:     queueButton(QUAKE4_BTN_SPEED, 2, state); break;
+        case PORT_ACT_STRAFE:     queueButton(QUAKE4_BTN_STRAFE, 1, state); break;
+        case PORT_ACT_USE_WEAPON_WHEEL: queueButton(QUAKE4_BTN_WEAPON_WHEEL, 1, state); break;
 
         // Objectives is hold-to-show, not an impulse: PerformImpulse's IMPULSE_19
         // case is empty, HandleObjectiveInput watches BUTTON_SCORES instead.
-        case PORT_ACT_HELPCOMP:   queueEvent(EV_BUTTON, QUAKE4_BTN_SCORES, state); break;
+        case PORT_ACT_HELPCOMP:   queueButton(QUAKE4_BTN_SCORES, 1, state); break;
 
         // Stays a raw key: the console reads the key itself, ahead of any bind.
         case PORT_ACT_CONSOLE:    queueEvent(EV_KEY, SDL_SCANCODE_GRAVE, state); break;

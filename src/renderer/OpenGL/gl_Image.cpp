@@ -104,6 +104,8 @@ idImage::SubImageUpload
 */
 void idImage::SubImageUpload( int mipLevel, int x, int y, int z, int width, int height, const void * pic, int pixelPitch ) const {
 	assert( x >= 0 && y >= 0 && mipLevel >= 0 && width >= 0 && height >= 0 && mipLevel < opts.numLevels );
+	const int mipWidth = Max( 1, opts.width >> mipLevel );
+	const int mipHeight = Max( 1, opts.height >> mipLevel );
 
 	int compressedSize = 0;
 
@@ -113,21 +115,21 @@ void idImage::SubImageUpload( int mipLevel, int x, int y, int z, int width, int 
 		// compressed size may be larger than the dimensions due to padding to quads
 		compressedSize = R_CompressedTextureSizeInBytes( opts.format, width, height );
 
-		int padW = ( opts.width + 3 ) & ~3;
-		int padH = ( opts.height + 3 ) & ~3;
+		int padW = ( mipWidth + 3 ) & ~3;
+		int padH = ( mipHeight + 3 ) & ~3;
 		(void)padH;
 		(void)padW;
 		assert( x + width <= padW && y + height <= padH );
 		// upload the non-aligned value, OpenGL understands that there
 		// will be padding
-		if ( x + width > opts.width ) {
-			width = opts.width - x;
+		if ( x + width > mipWidth ) {
+			width = mipWidth - x;
 		}
-		if ( y + height > opts.height ) {
-			height = opts.height - y;
+		if ( y + height > mipHeight ) {
+			height = mipHeight - y;
 		}
 	} else {
-		assert( x + width <= opts.width && y + height <= opts.height );
+		assert( x + width <= mipWidth && y + height <= mipHeight );
 	}
 
 	int target;
@@ -190,7 +192,9 @@ void idImage::SubImageUpload( int mipLevel, int x, int y, int z, int width, int 
 		// make sure the pixel store alignment is correct so that lower mips get created
 		// properly for odd shaped textures - this fixes the mip mapping issues with
 		// fonts
-		int unpackAlignment = width * BitsForFormat( (textureFormat_t)opts.format ) / 8;
+		// GL aligns the complete source row, not the subrectangle width. This
+		// must agree with the software RGB565 byte swap when pixelPitch is set.
+		int unpackAlignment = ( pixelPitch != 0 ? pixelPitch : width ) * BitsForFormat( (textureFormat_t)opts.format ) / 8;
 		if ( ( unpackAlignment & 3 ) == 0 ) {
 			glPixelStorei( GL_UNPACK_ALIGNMENT, 4 );
 		} else {

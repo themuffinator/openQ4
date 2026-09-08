@@ -75,7 +75,11 @@ public final class OpenQ4Activity extends SDLActivity {
         if (!version.matches("[0-9a-f]{64}")) {
             throw new IOException("Invalid packaged content revision");
         }
-        File root = new File(new File(getFilesDir(), "packages"), version);
+        // Android may expose /data/user/0 through an alias of /data/data.
+        // Normalize that trusted parent once so cleanup can reject symlinks
+        // inside packages without mistaking the app storage alias for one.
+        File packages = new File(getFilesDir(), "packages").getCanonicalFile();
+        File root = new File(packages, version);
         File ready = new File(root, ".ready");
         if (!ready.isFile()) {
             requireDirectory(root);
@@ -84,7 +88,37 @@ public final class OpenQ4Activity extends SDLActivity {
                 throw new IOException("Cannot mark content package complete");
             }
         }
+        // Retain the previous version until extraction succeeds. Once the new
+        // package is complete, old generated copies must not consume another
+        // ~640 MB on every upgrade. Saves live in a different directory.
+        File[] previousPackages = packages.listFiles();
+        if (previousPackages != null) {
+            for (File previous : previousPackages) {
+                if (!previous.getName().equals(version) &&
+                        previous.getName().matches("[0-9a-f]{64}")) {
+                    deleteGeneratedPackage(previous);
+                }
+            }
+        }
         return root;
+    }
+
+    private static void deleteGeneratedPackage(File file) {
+        // Never follow a symlink out of the app-owned package directory. An
+        // unexpected entry is left alone; cleanup must not prevent startup.
+        try {
+            if (!file.getCanonicalFile().equals(file.getAbsoluteFile())) return;
+        } catch (IOException error) {
+            return;
+        }
+        if (file.isDirectory()) {
+            File[] children = file.listFiles();
+            if (children == null) return;
+            for (File child : children) deleteGeneratedPackage(child);
+        }
+        // A failed delete can be retried on the next launch. It is safe to use
+        // the new package even if an old generated file remains.
+        file.delete();
     }
 
     private static void copyAssetTree(AssetManager assets, String source, File target)

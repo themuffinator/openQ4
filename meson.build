@@ -957,10 +957,44 @@ if build_engine
       endif
       install_data(android_deps_root / 'lib' / runtime, install_dir: install_engine_dir)
     endforeach
-    if fs_mod.is_dir(android_deps_root / 'licenses')
-      install_subdir(android_deps_root / 'licenses', install_dir: install_root_dir)
-    endif
+    # Khronos' notice also creates licenses/, so testing just that directory
+    # would allow an APK to silently omit its shared dependency notices.
+    foreach notice : ['sdl3/LICENSE.txt', 'openal-soft/COPYING', 'android-ndk/NOTICE.toolchain']
+      if not fs_mod.is_file(android_deps_root / 'licenses' / notice)
+        error('Missing Android dependency notice: ' + notice + '; prepare the target prefix with tools/build/prepare_android_deps.py.')
+      endif
+    endforeach
+    install_subdir(android_deps_root / 'licenses', install_dir: install_root_dir)
     android_include_args = ['-I' + android_deps_root / 'include']
+    # Record the compiler/header values actually used, rather than relying on
+    # the host application's independently configured SDK and SDL defaults.
+    android_native_api = cpp.get_define('__ANDROID_API__').to_int()
+    if android_native_api < 24
+      error('openQ4 requires Android API 24 or later.')
+    endif
+    run_command(
+      py, meson.project_source_root() / 'tools/build/android_elf.py',
+      '--api', android_native_api.to_string(),
+      android_deps_root / 'lib/libSDL3.so',
+      android_deps_root / 'lib/libopenal.so',
+      android_deps_root / 'lib/libc++_shared.so',
+      check: true,
+    )
+    android_sdl_version = []
+    foreach part : ['MAJOR', 'MINOR', 'MICRO']
+      android_sdl_version += cpp.get_define('SDL_' + part + '_VERSION',
+        prefix: '#include <SDL3/SDL_version.h>', args: android_include_args)
+    endforeach
+    android_build_config = configuration_data()
+    android_build_config.set('ANDROID_API', android_native_api)
+    android_build_config.set('SDL_VERSION', '.'.join(android_sdl_version))
+    configure_file(
+      input: 'tools/build/android-build.json.in',
+      output: 'android-build.json',
+      configuration: android_build_config,
+      install: true,
+      install_dir: install_root_dir,
+    )
     openal_dep = declare_dependency(
       compile_args: android_include_args,
       dependencies: cc.find_library('openal', dirs: [android_deps_root / 'lib'], required: true),
@@ -1487,6 +1521,16 @@ if build_engine
   dedicated_link_with = [bse_library, imagetools_library, render_geo_library]
 
   if build_sigmatouch
+    # The external host uses its patched SDL callback/input API. Stock SDL3
+    # cannot link this glue, even though it is enough for standalone Android.
+    if not fs_mod.is_file(sigmatouch_root / '..' / '..' / 'SDL_beloko_extra.h')
+      error('Sigma Touch requires its host SDL_beloko_extra.h two levels above sigmatouch_root, as included by Clibs_OpenTouch.')
+    endif
+    foreach callback : ['SDL_SetSwapBufferCallBack', 'SDL_ShowMouseCallBack', 'SDL_MouseMoveCallBack', 'SDL_SetShowKeyboardCallBack', 'SDL_NewEGLCreated', 'SDL_SendKeyboardText', 'SDL_SendKeyboardKey', 'Android_JNI_SendMessage']
+      if not cpp.has_function(callback, prefix: 'extern "C" void ' + callback + '();', dependencies: sdl3_dep)
+        error('Sigma Touch requires a compatible host SDL3 exporting ' + callback + '; the standard standalone SDL3 build cannot be used.')
+      endif
+    endforeach
     sigmatouch_sources = files(
       'mobile/game_interface.cpp',
       'mobile/touch_interface_quake4.cpp',
@@ -1510,8 +1554,8 @@ if build_engine
       sigmatouch_sources,
       include_directories: [include_directories('mobile'), include_directories(sigmatouch_root), include_directories(sigmatouch_controls_root)],
       dependencies: sigmatouch_deps,
-      cpp_args: ['-DOPENQ4_SIGMATOUCH=1', '-DENGINE_NAME="quake4"'],
-      c_args: ['-DOPENQ4_SIGMATOUCH=1', '-DENGINE_NAME="quake4"'],
+      cpp_args: ['-DOPENQ4_SIGMATOUCH=1', '-DUSE_SDL3=1', '-DENGINE_NAME="quake4"'],
+      c_args: ['-DOPENQ4_SIGMATOUCH=1', '-DUSE_SDL3=1', '-DENGINE_NAME="quake4"'],
       pic: true,
       install: false,
     )

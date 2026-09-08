@@ -25,6 +25,17 @@ Set `ANDROID_HOME` to an installed Android SDK, or set `sdk.dir` in the ignored
 `builddir/android-apk/app/outputs/apk/debug/`. Native compilation stays in Meson;
 Gradle only packages staged libraries and openQ4-owned overlays. Android currently targets `arm64-v8a` and API 24 or later.
 
+Meson installation writes `android-build.json` beside `lib/`; the host requires
+that metadata and uses its native API as the APK's minimum Android version.
+The supplied SDL Java source version must match the staged native SDL library.
+Do not mix Java classes and native libraries from different SDL releases.
+
+The APK version name comes from the staged `baseoq4/mod.json`, and its default
+version code is `major * 1000000 + minor * 1000 + patch` (for example, `0.13.1`
+becomes `13001`). Distributors publishing multiple APKs with the same engine
+version, including prereleases, can provide an increasing
+`-Popenq4VersionCode=<integer>`; preserve increasing codes across later releases.
+
 Use an absolute `--project-cache-dir` path: Gradle resolves a relative path
 against `mobile/android`, which can otherwise place generated cache files in
 the source tree. Compiler and APK intermediates remain under `builddir/`.
@@ -59,7 +70,9 @@ adb shell run-as com.darkmatter.openq4 cat files/saves/baseoq4/logs/openq4.log
 ```
 
 Each packaged overlay revision extracts to its own private directory before
-engine startup; incomplete extraction is retried. App data removal also removes
+engine startup; incomplete extraction is retried. Old generated revisions are
+removed only after the current package is complete, so updates do not retain
+another full copy indefinitely. Saves are kept separately. App data removal also removes
 these copies and local saves. The native libraries must be extracted by the
 package manager. Gradle's `useLegacyPackaging` setting writes the corresponding
 `extractNativeLibs` attribute into the packaged manifest.
@@ -79,3 +92,8 @@ signature, ZIP alignment and packaged manifest were verified. All seven native
 libraries, both overlay packs, mod metadata, contributor credits and dependency
 notices match the Meson staging files. Device installation and gameplay have
 not been tested as part of this integration.
+
+The host's extraction/retry and upgrade cleanup are exercised by
+`python tools/tests/android_host_storage.py` with a JDK. The test compiles the
+actual Activity with minimal Android API substitutes and runs against temporary
+filesystem fixtures; it does not require or control an Android device.

@@ -274,6 +274,13 @@ extern "C" void Quake4_ResetTouchState( void ) {
 }
 
 extern "C" const char *Quake4_LocalizeString( const char *stringId ) {
+	// The external host builds its controls before PortableInit/common->Init.
+	// In particular, a missing string lookup there would call idLib::common
+	// before that interface pointer exists. Resolve labels from newFrame only
+	// after engine startup, on the same thread that owns the language dictionary.
+	if ( common == NULL || !common->IsInitialized() ) {
+		return NULL;
+	}
 	return common->GetLanguageDict()->GetString(stringId);
 }
 #endif

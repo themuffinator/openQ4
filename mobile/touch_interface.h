@@ -27,6 +27,8 @@ public:
 
 private:
     void addGameControls(touchcontrols::TouchControls *tc);
+    void updateControlLabels();
+    bool labelsLocalized = false;
 };
 
 #endif /* touch_interface_h */

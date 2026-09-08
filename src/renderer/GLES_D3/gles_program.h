@@ -65,7 +65,8 @@ typedef struct glesProgram_s {
 	GLint		uMVP;				// mat4, model-to-clip
 	GLint		uColor;				// vec4, flat/stage colour
 	GLint		uTextureMatrix;		// mat4, stage texture matrix
-	GLint		uAlphaTest;			// float, discard below this; < 0 disables
+	GLint		uAlphaTest;			// float, alpha-test reference
+	GLint		uAlphaTestFunc;		// int, GL comparison enum
 	GLint		uTexture0;			// sampler2D
 	GLint		uTexture1;
 	GLint		uTexture2;

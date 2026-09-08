@@ -39,7 +39,9 @@ This is where the Binary image headers go that are also included by external too
 // These structures are used for memory mapping bimage files, but
 // not for the normal loading, so be careful making changes.
 // Values are big endien to reduce effort on consoles.
-#define BIMAGE_VERSION 10
+// Version 11 regenerates cached blocks made with zero-filled edge padding and
+// stores logical dimensions for the final compressed cube-map mips.
+#define BIMAGE_VERSION 11
 #define BIMAGE_MAGIC (unsigned int)( ('B'<<0)|('I'<<8)|('M'<<16)|(BIMAGE_VERSION<<24) )
 
 struct bimageImage_t {

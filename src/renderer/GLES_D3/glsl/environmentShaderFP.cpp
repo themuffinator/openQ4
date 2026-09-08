@@ -17,6 +17,7 @@ uniform samplerCube uCubeMap;
 uniform vec4 uColor;
 #ifdef GLESD3_ALPHATEST
 uniform float uAlphaTest;
+uniform int uAlphaTestFunc;
 #endif
 
 in vec3 vNormal;
@@ -33,7 +34,12 @@ void main() {
     vec4 color = texture(uCubeMap, r) * uColor * vColor;
 
 #ifdef GLESD3_ALPHATEST
-    if (uAlphaTest >= 0.0 && color.a <= uAlphaTest) {
+    // Match the fixed-function alpha comparison, including equality boundaries.
+    float alpha = clamp(color.a, 0.0, 1.0);
+    if ((uAlphaTestFunc == 514 && alpha != uAlphaTest) || // GL_EQUAL
+        (uAlphaTestFunc == 513 && alpha >= uAlphaTest) || // GL_LESS
+        (uAlphaTestFunc == 518 && alpha < uAlphaTest) ||  // GL_GEQUAL
+        (uAlphaTestFunc == 516 && alpha <= uAlphaTest)) { // GL_GREATER
         discard;
     }
 #endif

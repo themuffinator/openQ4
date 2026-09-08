@@ -88,6 +88,13 @@ jobs:
         with:
           python-version: "3.x"
 
+      - name: Setup Java for Android host storage validation
+        if: steps.select.outputs.selected == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
       - name: Install Meson and Ninja
         if: steps.select.outputs.selected == 'true'
         shell: bash
@@ -320,6 +327,12 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: "3.x"
+
+      - name: Setup Java for Android host storage validation
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
 
       - name: Install Meson and Ninja
         shell: bash

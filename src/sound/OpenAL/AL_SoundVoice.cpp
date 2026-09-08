@@ -745,15 +745,10 @@ int idSoundVoice_OpenAL::RestartAt( int offsetSamples )
 		return 0;
 	}
 
-	// Below, a sample plays either straight from its uploaded openalBuffer --
-	// which needs no CPU bytes at all -- or through the queued path, which
-	// re-uploads slices out of buffers[]. Only the second needs a payload that
-	// CreateOpenALBuffer may have released, and it has to be restored here,
-	// before anything takes a pointer or index into buffers[]: the reload
-	// rebuilds that list and would leave them dangling.
-	const bool willStream = ( sample->openalBuffer == 0 ) ||
-			( loopingSample != NULL && sample != loopingSample );
-	if( willStream && !sample->EnsureCpuPayload() )
+	// Both direct playback and intro/loop queues can use an uploaded OpenAL
+	// buffer without CPU bytes. Only the streaming fallback uploads PCM slices;
+	// restore those bytes before taking any pointers into the sample buffers.
+	if( sample->openalBuffer == 0 && !sample->EnsureCpuPayload() )
 	{
 		return 0;
 	}
@@ -932,14 +927,6 @@ int idSoundVoice_OpenAL::SubmitBuffer( idSoundSample_OpenAL* sample, int bufferN
 	const int byteOffset = offset * bytesPerSample;
 	if( byteOffset < 0 || byteOffset >= sampleBuffer.bufferSize )
 	{
-		return 0;
-	}
-
-	if( sampleBuffer.buffer == NULL )
-	{
-		// RestartAt restores a released payload before routing anything here, so
-		// this is a backstop rather than the expected path: submitting NULL+offset
-		// to alBufferData would read whatever happens to be at that address.
 		return 0;
 	}
 

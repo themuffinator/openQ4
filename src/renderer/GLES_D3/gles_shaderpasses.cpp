@@ -746,7 +746,8 @@ static void RB_GLESD3_T_FillDepthBuffer( const drawSurf_t *surf, glesProgram_t *
 			glUniform4fv( alphaTestProgram->uColor, 1, color );
 			// the stage's own reference, not the GLS_ATEST buckets: a
 			// perforated stage carries an arbitrary alphaTestRegister
-			glUniform1f( alphaTestProgram->uAlphaTest, regs[ pStage->alphaTestRegister ] );
+			glUniform1f( alphaTestProgram->uAlphaTest, idMath::ClampFloat( 0.0f, 1.0f, regs[ pStage->alphaTestRegister ] ) );
+			glUniform1i( alphaTestProgram->uAlphaTestFunc, GL_GREATER );
 
 			R_GLESD3_DrawElements( tri );
 		}
@@ -936,8 +937,7 @@ static bool GLESD3_DrawCubeTexgenStage( const drawSurf_t *surf, const shaderStag
 	// run until below, so reading backEnd.glState here would arm the previous
 	// stage's alpha test
 	if ( program->uAlphaTest >= 0 ) {
-		glUniform1f( program->uAlphaTest,
-				R_GLESD3_AlphaTestReference( pStage->drawStateBits ) );
+		R_GLESD3_SetAlphaTest( program, pStage->drawStateBits );
 	}
 
 	GL_SelectTexture( 0 );
@@ -1076,7 +1076,7 @@ static bool GLESD3_DrawBumpyEnvironmentStage( const drawSurf_t *surf, const shad
 	glUniform4fv( program->uModelRow1, 1, row1 );
 	glUniform4fv( program->uModelRow2, 1, row2 );
 
-	glUniform1f( program->uAlphaTest, R_GLESD3_AlphaTestReference( pStage->drawStateBits ) );
+	R_GLESD3_SetAlphaTest( program, pStage->drawStateBits );
 
 	GL_SelectTexture( 1 );
 	normalImage->Bind();
@@ -1123,7 +1123,7 @@ static bool GLESD3_DrawMonochromeStage( const drawSurf_t *surf, const shaderStag
 		}
 	}
 	glUniform4fv( program->uColor, 1, color );
-	glUniform1f( program->uAlphaTest, R_GLESD3_AlphaTestReference( pStage->drawStateBits ) );
+	R_GLESD3_SetAlphaTest( program, pStage->drawStateBits );
 
 	GL_SelectTexture( 0 );
 	newStage->fragmentProgramImages[ 0 ]->Bind();
@@ -1228,7 +1228,7 @@ static bool GLESD3_DrawHeatHazeStage( const drawSurf_t *surf, const shaderStage_
 	R_GLESD3_UseProgram( program );
 	glUniformMatrix4fv( program->uMVP, 1, GL_FALSE, mvp );
 	glUniform4fv( program->uParms, 8, &parms[ 0 ][ 0 ] );
-	glUniform1f( program->uAlphaTest, R_GLESD3_AlphaTestReference( pStage->drawStateBits ) );
+	R_GLESD3_SetAlphaTest( program, pStage->drawStateBits );
 
 	for ( int i = 0; i < numTextures; i++ ) {
 		GL_SelectTexture( i );
@@ -1568,7 +1568,7 @@ static void RB_GLESD3_T_RenderShaderPasses( const drawSurf_t *surf ) {
 		glUniform4fv( stageProgram->uTexMatrixS, 1, matrixS.ToFloatPtr() );
 		glUniform4fv( stageProgram->uTexMatrixT, 1, matrixT.ToFloatPtr() );
 		glUniform4fv( stageProgram->uVertexColor, 1, vertexColorPacking );
-		glUniform1f( stageProgram->uAlphaTest, alphaTestRef );
+		R_GLESD3_SetAlphaTest( stageProgram, pStage->drawStateBits );
 		if ( hasBakedDecalStageColor ) {
 			glUniform4f( stageProgram->uColor, 1.0f, 1.0f, 1.0f, 1.0f );
 		} else {

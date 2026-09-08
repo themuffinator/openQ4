@@ -148,6 +148,19 @@ void idBinaryImage::Clear() {
 	memset( &fileData, 0, sizeof( fileData ) );
 }
 
+static void R_PadRGBAImageTo4x4Blocks( const byte *src, int width, int height,
+		byte *dest, int paddedWidth, int paddedHeight ) {
+	assert( width > 0 && height > 0 && paddedWidth >= width && paddedHeight >= height );
+	for ( int y = 0; y < paddedHeight; ++y ) {
+		const byte *sourceRow = src + (size_t)Min( y, height - 1 ) * width * 4;
+		byte *destRow = dest + (size_t)y * paddedWidth * 4;
+		memcpy( destRow, sourceRow, (size_t)width * 4 );
+		for ( int x = width; x < paddedWidth; ++x ) {
+			memcpy( destRow + (size_t)x * 4, sourceRow + (size_t)( width - 1 ) * 4, 4 );
+		}
+	}
+}
+
 /*
 ========================
 idBinaryImage::Load2DFromMemory
@@ -225,10 +238,11 @@ void idBinaryImage::Load2DFromMemory( int width, int height, const byte * pic_co
 			if ( ( scaledWidth & 3 ) || ( scaledHeight & 3 ) ) {
 				dxtWidth = ( scaledWidth + 3 ) & ~3;
 				dxtHeight = ( scaledHeight + 3 ) & ~3;
-				byte * padded = (byte *)Mem_ClearedAlloc( dxtWidth*4*dxtHeight );
-				for ( int i = 0; i < scaledHeight; i++ ) {
-					memcpy( padded + i*dxtWidth*4, uploadPic + i*scaledWidth*4, scaledWidth*4 );
-				}
+				byte * padded = (byte *)Mem_Alloc( dxtWidth*4*dxtHeight );
+				// Out-of-image texels still influence the block fit. Replicate the
+				// edge instead of introducing black/transparent samples, especially
+				// for the 1x1 and 2x2 mip levels used by distant surfaces.
+				R_PadRGBAImageTo4x4Blocks( uploadPic, scaledWidth, scaledHeight, padded, dxtWidth, dxtHeight );
 				dxtPic = padded;
 			} else {
 				dxtPic = uploadPic;
@@ -461,8 +475,11 @@ void idBinaryImage::LoadCubeFromMemory( int width, const byte * pics[6], int num
 
 			img.level = level;
 			img.destZ = side;
-			img.width = padSize;
-			img.height = padSize;
+			// The header describes the logical mip; only the compressed payload
+			// is rounded up to complete blocks. Cache validation and uploads use
+			// these dimensions even for the final 2x2 and 1x1 cube levels.
+			img.width = scaledWidth;
+			img.height = scaledWidth;
 			if ( textureFormat == FMT_DXT1 ) {
 				img.Alloc( padSize * padSize / 2 );
 				idDxtEncoder dxt;

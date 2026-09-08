@@ -7,17 +7,107 @@ from pathlib import Path
 import json
 import os
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools/build"))
 import android_cross
+import prepare_android_deps
+import android_elf
+
+
+def android_library(api: int = 24, alignment: int = 16384, machine: int = 183) -> bytes:
+    """Small valid ELF fixture with one load segment and an NDK target note."""
+    data = bytearray(200)
+    data[:7] = b"\x7fELF\x02\x01\x01"
+    struct.pack_into("<HHI", data, 16, 3, machine, 1)
+    struct.pack_into("<Q", data, 32, 64)
+    struct.pack_into("<HHH", data, 52, 64, 56, 2)
+    struct.pack_into("<IIQQQQQQ", data, 64, 1, 5, 0, 0, 0, len(data), len(data), alignment)
+    struct.pack_into("<IIQQQQQQ", data, 120, 4, 4, 176, 176, 176, 24, 24, 4)
+    struct.pack_into("<III8sI", data, 176, 8, 4, 1, b"Android\0", api)
+    return bytes(data)
 
 
 class AndroidBuildTests(unittest.TestCase):
+    def test_library_validation_checks_loadability(self) -> None:
+        (ROOT / ".tmp").mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix="android-elf-test-", dir=ROOT / ".tmp") as temporary:
+            library = Path(temporary) / "libfixture.so"
+            library.write_bytes(android_library(api=21))
+            self.assertEqual(android_elf.validate_library(library, 24), 21)
+            for contents, error in (
+                (android_library(api=28), "above the configured API 24"),
+                (android_library(alignment=4096), "16 KiB"),
+                (android_library(machine=62), "AArch64"),
+                (android_library()[:130], "program headers"),
+            ):
+                library.write_bytes(contents)
+                with self.assertRaisesRegex(ValueError, error):
+                    android_elf.validate_library(library, 24)
+            library.write_bytes(android_library(api=28))
+            self.assertEqual(android_elf.validate_library(library, 28), 28)
+
+    def test_dependency_preparation_preserves_and_requires_notices(self) -> None:
+        (ROOT / ".tmp").mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix="android-deps-test-", dir=ROOT / ".tmp") as temporary:
+            fixture = Path(temporary)
+            ndk, sdl, openal = (fixture / name for name in ("ndk", "sdl", "openal"))
+            sources = {
+                ndk / "build/cmake/android.toolchain.cmake": "# toolchain\n",
+                ndk / "NOTICE.toolchain": "C++ runtime notice\n",
+                ndk / "NOTICE": "NDK notice\n",
+                sdl / "CMakeLists.txt": "# SDL\n",
+                sdl / "LICENSE.txt": "SDL notice\n",
+                openal / "CMakeLists.txt": "# OpenAL\n",
+                openal / "COPYING": "OpenAL notice\n",
+                openal / "LICENSE-pffft": "PFFFT notice\n",
+                openal / "fmt-11.1.3/LICENSE": "fmt notice\n",
+            }
+            for path, contents in sources.items():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(contents, encoding="utf-8")
+            prefix = fixture / "prefix"
+            runtime = android_library(api=21)
+            for path in (
+                ndk / "toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so",
+                prefix / "lib/libSDL3.so", prefix / "lib/libopenal.so",
+            ):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(runtime)
+            argv = ["prepare_android_deps.py", "--ndk", str(ndk), "--sdl-source", str(sdl),
+                    "--openal-source", str(openal), "--prefix", str(prefix),
+                    "--build-root", str(fixture / "build"), "--api", "28"]
+            with mock.patch.object(sys, "argv", argv), mock.patch.object(prepare_android_deps.platform, "system", return_value="Windows"):
+                with mock.patch.object(prepare_android_deps.subprocess, "run") as runner:
+                    prepare_android_deps.main()
+                # The dependency build must honor the same target API and
+                # page-size settings for both independent native libraries.
+                self.assertEqual(runner.call_count, 6)
+                for call in (runner.call_args_list[0], runner.call_args_list[3]):
+                    self.assertIn("-DANDROID_PLATFORM=android-28", call.args[0])
+                    self.assertIn("-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON", call.args[0])
+                for relative, expected in {
+                    "licenses/sdl3/LICENSE.txt": "SDL notice\n",
+                    "licenses/openal-soft/COPYING": "OpenAL notice\n",
+                    "licenses/openal-soft/LICENSE-fmt": "fmt notice\n",
+                    "licenses/openal-soft/LICENSE-pffft": "PFFFT notice\n",
+                    "licenses/android-ndk/NOTICE.toolchain": "C++ runtime notice\n",
+                }.items():
+                    self.assertEqual((prefix / relative).read_text(encoding="utf-8"), expected)
+                self.assertEqual((prefix / "lib/libc++_shared.so").read_bytes(), runtime)
+                (sdl / "LICENSE.txt").unlink()
+                with mock.patch.object(prepare_android_deps.subprocess, "run") as runner:
+                    with mock.patch("sys.stderr"), self.assertRaises(SystemExit) as error:
+                        prepare_android_deps.main()
+                    self.assertEqual(error.exception.code, 2)
+                    runner.assert_not_called()
+
     @unittest.skipUnless(os.name == "nt", "Windows Meson wrapper")
     def test_windows_wrapper_refreshes_android_game_sources(self) -> None:
         (ROOT / ".tmp").mkdir(exist_ok=True)

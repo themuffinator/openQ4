@@ -38,7 +38,7 @@ void Quake4_ClearTouchInput( void );
 void Quake4_ResetTouchState( void );
 // Publish the engine's current screen mode for host/UI-thread readers.
 void Quake4_UpdateTouchScreenMode( void );
-// Used when constructing the touch editor's localized labels.
+// Engine-thread lookup for touch editor labels; NULL until engine initialization.
 const char *Quake4_LocalizeString( const char *stringId );
 
 /*

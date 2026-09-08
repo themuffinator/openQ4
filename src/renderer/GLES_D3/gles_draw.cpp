@@ -251,12 +251,9 @@ void R_GLESD3_DisableCubeTexDirAttribute( void ) {
 ====================
 R_GLESD3_DrawElements
 
-Client-memory index pointers are legal in a compatibility context and REMOVED
-in ES: without an index buffer every indexed draw fails with
-GL_INVALID_VALUE and the target reads back as zero. That cost a full round in
-the ModernGL bring-up (G6c-G6e), where r_useIndexBuffers also defaults to 0.
-So there is no client-memory fallback here -- a surface with no index cache is
-not drawn, and says so once.
+GLES indexed draws require a buffer object. Upload CPU-only index streams to
+frame-temporary storage without writing that transient handle back into the
+potentially persistent surface.
 ====================
 */
 vertCache_t *R_GLESD3_EnsureIndexCache( const srfTriangles_t *tri ) {
@@ -312,11 +309,9 @@ glAlphaFunc, which is a no-op stub on ES (GLES/gles_GLStubs.cpp). The test has
 to move into the fragment shader, so the state bits are translated into a
 reference value the shaders compare against with `discard`.
 
-Returns < 0 when no test is armed. GLS_ATEST_EQ_255 is expressed as a
-reference just under 1.0 rather than an equality: the byte 255 arrives as
-exactly 1.0 after normalization, and every lesser value is below the
-reference, so `a <= ref -> discard` reproduces `EQUAL 1` for real data
-without needing a second comparison mode in every shader.
+Returns < 0 when no test is armed. The reference and comparison are kept
+separate: LESS, GEQUAL and EQUAL cannot be approximated by a GREATER test
+without changing which boundary fragments survive.
 
 stateBits is passed in rather than read from backEnd.glState because the two
 are only the same once GL_State has run for this draw. A caller that writes
@@ -329,18 +324,24 @@ current" pass backEnd.glState.glStateBits explicitly.
 float R_GLESD3_AlphaTestReference( int stateBits ) {
 	switch ( stateBits & GLS_ATEST_BITS ) {
 		case GLS_ATEST_EQ_255:
-			return 0.996f;
+			return 1.0f;
 		case GLS_ATEST_LT_128:
-			// LESS 0.5 keeps fragments BELOW the reference, the opposite sense
-			// of the other two. The shaders only implement "discard at or
-			// below", so this one is handled by its caller; treat as no test
-			// here rather than silently inverting it.
-			return -1.0f;
 		case GLS_ATEST_GE_128:
 			return 0.5f;
 		default:
 			return -1.0f;
 	}
+}
+
+void R_GLESD3_SetAlphaTest( const glesProgram_t *program, int stateBits ) {
+	GLenum comparison = GL_ALWAYS;
+	switch ( stateBits & GLS_ATEST_BITS ) {
+		case GLS_ATEST_EQ_255: comparison = GL_EQUAL; break;
+		case GLS_ATEST_LT_128: comparison = GL_LESS; break;
+		case GLS_ATEST_GE_128: comparison = GL_GEQUAL; break;
+	}
+	glUniform1i( program->uAlphaTestFunc, comparison );
+	glUniform1f( program->uAlphaTest, R_GLESD3_AlphaTestReference( stateBits ) );
 }
 
 /*
@@ -369,8 +370,7 @@ void R_GLESD3_SetupProgramForDraw( const glesProgram_t *program, const float mvp
 	if ( program->uAlphaTest >= 0 ) {
 		// no stage in hand here: this is the shared setup for draws whose
 		// GL_State has already run
-		glUniform1f( program->uAlphaTest,
-				R_GLESD3_AlphaTestReference( backEnd.glState.glStateBits ) );
+		R_GLESD3_SetAlphaTest( program, backEnd.glState.glStateBits );
 	}
 }
 

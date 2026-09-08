@@ -6,12 +6,16 @@
 - **Matching single-player and multiplayer modules** use the current official engine and game sources, retaining changes made since 0.12.0.
 - **Generated texture and audio caches can live separately from saves**, allowing a mobile host to reclaim cache space without removing player progress.
 - **Animated weapon and in-world displays stay visible** with GPU skinning enabled.
+- **GLES cutout edges and small texture mips render correctly**, including configurations carried over with vertex buffers disabled.
+- **Android upgrades reclaim obsolete extracted packages** after successful installation, while keeping saves separate. APK versions now follow the packaged engine version.
+- **Overlapping SigmaTouch controls retain held actions**, and touch-editor labels initialize after the engine's language data is ready.
 
 ## Upgrade notes
 
 - Android is currently a source-build target with a standalone SDLActivity APK host. Build matching engine, renderer, game modules and runtime packs together, then assemble the APK using the included Gradle project. Players must supply original Quake 4 assets. The standalone app supports ordinary SDL/gamepad input; the external SigmaTouch host library is not included.
 - The initial debug APK contains the complete current runtime packs and is approximately 660 MB, with additional private storage needed to extract those packs. Physical Android device and SigmaTouch host qualification remains open.
 - GLES remains experimental and does not yet provide every advanced effect from the desktop renderers. Desktop OpenGL remains the default; GLES must be selected explicitly on desktop.
+- Generated image caches rebuild once to apply corrected compression padding and cube-map mip headers. The first map load can take longer; saves are unaffected.
 - Read the [Android/GLES build guide](../android-build.md) for dependencies, host integration and validation limits. Do not mix modules or runtime packs from the fork's older 0.12.0-based build with this integration.
 
 ## Credit

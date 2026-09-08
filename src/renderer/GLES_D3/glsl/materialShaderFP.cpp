@@ -33,6 +33,7 @@ uniform vec4 uColor;
 uniform vec4 uVertexColor;
 #ifdef GLESD3_ALPHATEST
 uniform float uAlphaTest;
+uniform int uAlphaTestFunc;
 #endif
 
 in vec4 vColor;
@@ -51,7 +52,12 @@ void main() {
     // only for alpha-tested stages: a discard anywhere in a program disables
     // early-Z/LRZ on tile-based GPUs even for draws that never take it, so
     // the base variant must not contain one (gles_program.cpp, D8).
-    if (uAlphaTest >= 0.0 && result.a <= uAlphaTest) {
+    // Match the fixed-function alpha comparison, including equality boundaries.
+    float alpha = clamp(result.a, 0.0, 1.0);
+    if ((uAlphaTestFunc == 514 && alpha != uAlphaTest) || // GL_EQUAL
+        (uAlphaTestFunc == 513 && alpha >= uAlphaTest) || // GL_LESS
+        (uAlphaTestFunc == 518 && alpha < uAlphaTest) ||  // GL_GEQUAL
+        (uAlphaTestFunc == 516 && alpha <= uAlphaTest)) { // GL_GREATER
         discard;
     }
 #endif

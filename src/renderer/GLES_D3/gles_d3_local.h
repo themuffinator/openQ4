@@ -81,6 +81,7 @@ void	R_GLESD3_InvalidateAttributeState( void );
 vertCache_t *	R_GLESD3_EnsureIndexCache( const srfTriangles_t *tri );
 bool	R_GLESD3_DrawElements( const srfTriangles_t *tri );
 float	R_GLESD3_AlphaTestReference( int stateBits );
+void	R_GLESD3_SetAlphaTest( const struct glesProgram_s *program, int stateBits );
 void	R_GLESD3_SetupProgramForDraw( const struct glesProgram_s *program,
 				const float mvp[16], const idVec4 &color );
 

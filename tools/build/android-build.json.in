@@ -1,0 +1,6 @@
+{
+  "format": 1,
+  "abi": "arm64-v8a",
+  "androidApi": @ANDROID_API@,
+  "sdlVersion": "@SDL_VERSION@"
+}

@@ -13,6 +13,28 @@ import platform
 import shutil
 import subprocess
 
+from android_elf import validate_library
+
+
+def dependency_notices(ndk: Path, sdl_source: Path, openal_source: Path) -> list[tuple[Path, Path]]:
+    """Collect notices before building, so incomplete sources cannot ship quietly."""
+    notices: list[tuple[Path, Path]] = []
+    for label, source, required, optional in (
+        ("sdl3", sdl_source, ("LICENSE.txt",), ()),
+        ("openal-soft", openal_source, ("COPYING",), ("LICENSE-pffft", "LICENSE-fmt", "LICENSE-gsl")),
+        ("android-ndk", ndk, ("NOTICE.toolchain",), ("NOTICE",)),
+    ):
+        for name in required + optional:
+            path = source / name
+            if path.is_file():
+                notices.append((path, Path("licenses") / label / name))
+            elif name in required:
+                raise ValueError(f"Missing required dependency notice: {path}")
+    # OpenAL 1.24 keeps the bundled fmt notice in its source subdirectory.
+    for path in openal_source.glob("fmt-*/LICENSE"):
+        notices.append((path, Path("licenses/openal-soft/LICENSE-fmt")))
+    return notices
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -32,6 +54,20 @@ def main() -> None:
     toolchain = args.ndk.resolve() / "build/cmake/android.toolchain.cmake"
     if not toolchain.is_file():
         parser.error(f"Missing NDK CMake toolchain: {toolchain}")
+    try:
+        notices = dependency_notices(args.ndk, args.sdl_source, args.openal_source)
+    except ValueError as exc:
+        parser.error(str(exc))
+    host = {"Windows": "windows-x86_64", "Linux": "linux-x86_64", "Darwin": "darwin-x86_64"}.get(platform.system())
+    if host is None:
+        parser.error("Unsupported NDK build host")
+    runtime = args.ndk / "toolchains/llvm/prebuilt" / host / "sysroot/usr/lib/aarch64-linux-android/libc++_shared.so"
+    if not runtime.is_file():
+        parser.error(f"Missing shared NDK C++ runtime: {runtime}")
+    try:
+        validate_library(runtime, args.api)
+    except (OSError, ValueError) as exc:
+        parser.error(str(exc))
     common = [
         "-G", "Ninja", f"-DCMAKE_TOOLCHAIN_FILE={toolchain}",
         "-DANDROID_ABI=arm64-v8a", f"-DANDROID_PLATFORM=android-{args.api}",
@@ -47,25 +83,15 @@ def main() -> None:
         subprocess.run(["cmake", "-S", str(source.resolve()), "-B", str(build), *common, *options], check=True)
         subprocess.run(["cmake", "--build", str(build), "--parallel", str(args.jobs)], check=True)
         subprocess.run(["cmake", "--install", str(build)], check=True)
-    host = {"Windows": "windows-x86_64", "Linux": "linux-x86_64", "Darwin": "darwin-x86_64"}[platform.system()]
-    runtime = args.ndk / "toolchains/llvm/prebuilt" / host / "sysroot/usr/lib/aarch64-linux-android/libc++_shared.so"
     destination = args.prefix / "lib/libc++_shared.so"
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(runtime, destination)
-    for label, source, names in (
-        ("sdl3", args.sdl_source, ("LICENSE.txt",)),
-        ("openal-soft", args.openal_source, ("COPYING", "LICENSE-pffft", "LICENSE-fmt", "LICENSE-gsl")),
-        ("android-ndk", args.ndk, ("NOTICE", "NOTICE.toolchain")),
-    ):
-        notices = args.prefix / "licenses" / label
-        notices.mkdir(parents=True, exist_ok=True)
-        for name in names:
-            path = source / name
-            if path.is_file():
-                shutil.copy2(path, notices / name)
-    # OpenAL 1.24 keeps the bundled fmt notice in its source subdirectory.
-    for path in args.openal_source.glob("fmt-*/LICENSE"):
-        shutil.copy2(path, args.prefix / "licenses/openal-soft/LICENSE-fmt")
+    for name in ("libSDL3.so", "libopenal.so"):
+        validate_library(args.prefix / "lib" / name, args.api)
+    for source, relative_destination in notices:
+        destination = args.prefix / relative_destination
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
 
 
 if __name__ == "__main__":

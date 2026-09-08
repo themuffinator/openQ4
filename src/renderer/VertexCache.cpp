@@ -300,6 +300,18 @@ void idVertexCache::Init() {
 	virtualMemory = false;
 	InvalidateBufferBindings();
 
+	// Core and ES contexts have no client-memory vertex path. An archived
+	// setting from a compatibility renderer must not select virtual memory
+	// and turn every subsequent draw into an invalid buffer access.
+	const bool clientMemoryIllegal =
+		glConfig.backendCaps.profile == RENDERER_CONTEXT_PROFILE_CORE
+		|| glConfig.backendCaps.profile == RENDERER_CONTEXT_PROFILE_ES;
+	if ( clientMemoryIllegal && glConfig.ARBVertexBufferObjectAvailable
+			&& !r_useVertexBuffers.GetInteger() ) {
+		r_useVertexBuffers.SetInteger( 1 );
+		common->Printf( "forcing r_useVertexBuffers 1: this profile requires vertex buffers\n" );
+	}
+
 	// use ARB_vertex_buffer_object unless explicitly disabled
 	if( r_useVertexBuffers.GetInteger() && glConfig.ARBVertexBufferObjectAvailable ) {
 		common->Printf( "using ARB_vertex_buffer_object memory\n" );
@@ -312,10 +324,7 @@ void idVertexCache::Init() {
 		// indexed draw fail with GL_INVALID_VALUE and render nothing --
 		// measured on game/mcc_1, all 375 forward+ draws submitted with ibo=0
 		// and the scene target read back as entirely zero.
-		const bool clientMemoryIndicesIllegal =
-			glConfig.backendCaps.profile == RENDERER_CONTEXT_PROFILE_CORE
-			|| glConfig.backendCaps.profile == RENDERER_CONTEXT_PROFILE_ES;
-		if ( clientMemoryIndicesIllegal && r_useIndexBuffers.GetInteger() < 2 ) {
+		if ( clientMemoryIllegal && r_useIndexBuffers.GetInteger() < 2 ) {
 			r_useIndexBuffers.SetInteger( 2 );
 			common->Printf( "forcing r_useIndexBuffers 2: this profile cannot draw from client index memory\n" );
 		}

@@ -63,7 +63,9 @@ powershell -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 install -C 
 ```
 
 Adjust absolute paths for your checkout. On Linux/macOS, run the same Python
-helpers and invoke `meson setup`, `meson compile` and `meson install` directly.
+helpers and use `bash tools/build/meson_setup.sh setup`, `compile` and `install`
+with the corresponding arguments above. The wrapper refreshes the companion
+source stage when engine interfaces change; use it for subsequent rebuilds too.
 Use a separate build directory so desktop settings and staged binaries remain
 available. Android game-header staging has its own directory under `.tmp/`.
 
@@ -80,6 +82,12 @@ from the prefix alongside the native modules in the host's `jniLibs/arm64-v8a/`.
 Use a host that exposes an extracted native library directory for runtime module
 loading. Keep the application's SDL Java sources and native SDL library from the
 same SDL release.
+
+Meson also installs `android-build.json` with the ABI, actual native minimum API
+and SDL version. The standalone Gradle host requires this file, uses its API for
+the APK's minimum SDK and rejects a mismatched SDL source tree. APK version names
+follow the staged mod metadata; see the standalone guide for custom version-code
+numbering when publishing several builds of one engine version.
 
 Package **both** generated packs and the matching `mod.json`. The engine checks
 their checksums and required version. Do not reuse stale metadata or disable
@@ -101,6 +109,13 @@ legally compatible external host, set `-Dsigmatouch_root=<Clibs_OpenTouch>` and
 `touchcontrols` and `saffal` libraries under `android_deps_root/lib`. This enables
 `OPENQ4_SIGMATOUCH` and builds emileb's portable API and touch-layout adapters
 without injecting the engine PCH into the host sources.
+
+This external host also requires its compatible SDL3 callback extensions
+(`SDL_beloko_extra.h` and the corresponding linked exports). Ordinary SDL3
+dependency builds support the standalone Activity; they do not supply those
+host-specific callbacks. Keep host headers, native SDL and touch libraries from
+one compatible integration. The touch editor's labels are resolved after engine
+initialization, since the host constructs its controls before starting openQ4.
 
 External host dependencies are **not** included or licensed by this repository.
 The examined MobileTouchControls license grants GPLv2 without an "or later"
@@ -127,3 +142,7 @@ notices and deployment; desktop GLES remains opt-in.
 For runtime checks use windowed desktop launches and the engine's `screenshot`
 command. Enter a map before claiming gameplay validation. Android cross-link
 success does not verify the app lifecycle, device driver, touch host or gameplay.
+
+The local push/commit validation profiles require a C++ compiler and JDK 17 or
+21 (`javac`/`java` on `PATH`, or `JAVA_HOME`). Their Android host regression runs
+the actual Activity against temporary filesystem fixtures without a device.
