@@ -331,6 +331,8 @@ const char *RendererContextProfile_Name( rendererContextProfile_t profile ) {
 		return "compatibility";
 	case RENDERER_CONTEXT_PROFILE_CORE:
 		return "core";
+	case RENDERER_CONTEXT_PROFILE_ES:
+		return "es";
 	case RENDERER_CONTEXT_PROFILE_UNKNOWN:
 	default:
 		return "unknown";
@@ -555,15 +557,27 @@ bool RendererCaps_SupportsTier( const renderBackendCaps_t &caps, rendererTier_t 
 		caps.hasTextureArrays &&
 		caps.hasMapBufferRange;
 
+	// OpenGL ES numbers its versions independently of desktop GL. ES 3.0 is the
+	// feature equivalent of the GL 3.3 modern baseline (FBO, MRT, UBO, VAO,
+	// instancing, texture arrays, map-buffer-range are all core), and ES 3.1
+	// adds the compute/SSBO/indirect set that defines the GL 4.3 tier. Compare
+	// against those ES versions instead, and never offer the legacy
+	// fixed-function tier, which has no ES equivalent at any version.
+	const bool isES = caps.profile == RENDERER_CONTEXT_PROFILE_ES;
+
 	switch ( tier ) {
 	case RENDERER_TIER_NULL:
 		return false;
 	case RENDERER_TIER_LEGACY_GL2_COMPAT:
-		return caps.hasFixedFunctionCompatibility;
+		return !isES && caps.hasFixedFunctionCompatibility;
 	case RENDERER_TIER_MODERN_GL33:
-		return RendererCaps_HasVersion( caps, 3, 3 ) && baseline;
+		return isES
+			? ( RendererCaps_HasVersion( caps, 3, 0 ) && baseline )
+			: ( RendererCaps_HasVersion( caps, 3, 3 ) && baseline );
 	case RENDERER_TIER_MODERN_GL41:
-		return RendererCaps_HasVersion( caps, 4, 1 ) && baseline;
+		return isES
+			? ( RendererCaps_HasVersion( caps, 3, 1 ) && baseline )
+			: ( RendererCaps_HasVersion( caps, 4, 1 ) && baseline );
 	case RENDERER_TIER_GPU_DRIVEN_GL43:
 		return RendererCaps_HasVersion( caps, 4, 3 ) && baseline &&
 			caps.hasCompute && caps.hasSSBO && caps.hasDrawIndirect &&
@@ -1104,7 +1118,25 @@ void GLCapabilityProbe_Build( renderBackendCaps_t &caps, const char *versionStri
 
 	caps.contextCreated = true;
 	caps.profile = RENDERER_CONTEXT_PROFILE_UNKNOWN;
-	caps.glVersion = versionString ? static_cast<float>( atof( versionString ) ) : 0.0f;
+
+	// An ES context reports GL_VERSION as "OpenGL ES <major>.<minor> <vendor
+	// detail>". Parsing that with atof() straight off the front yields 0.0,
+	// which silently mis-detects every capability below, so skip the prefix
+	// and record the profile that no GL_CONTEXT_PROFILE_MASK query can report
+	// (that enum does not exist in ES).
+	const bool isESVersionString =
+		versionString != NULL && idStr::Cmpn( versionString, "OpenGL ES", 9 ) == 0;
+	if ( isESVersionString ) {
+		const char *esVersion = versionString + 9;
+		while ( *esVersion != '\0' && ( *esVersion < '0' || *esVersion > '9' ) ) {
+			esVersion++;
+		}
+		caps.profile = RENDERER_CONTEXT_PROFILE_ES;
+		caps.glVersion = static_cast<float>( atof( esVersion ) );
+	} else {
+		caps.glVersion = versionString ? static_cast<float>( atof( versionString ) ) : 0.0f;
+	}
+
 	caps.glMajor = static_cast<int>( caps.glVersion );
 	caps.glMinor = static_cast<int>( ( caps.glVersion - static_cast<float>( caps.glMajor ) ) * 10.0f + 0.5f );
 
@@ -1120,7 +1152,7 @@ void GLCapabilityProbe_Build( renderBackendCaps_t &caps, const char *versionStri
 		}
 	}
 
-	if ( caps.glVersion >= 3.2f ) {
+	if ( caps.glVersion >= 3.2f && !isESVersionString ) {
 		GLint profileMask = 0;
 		GLint contextFlags = 0;
 		glGetIntegerv( GL_CONTEXT_PROFILE_MASK, &profileMask );
@@ -1180,11 +1212,87 @@ void GLCapabilityProbe_Build( renderBackendCaps_t &caps, const char *versionStri
 	caps.hasBindlessTexture = GLCapabilityProbe_HasExtension( "GL_ARB_bindless_texture" ) || GLCapabilityProbe_HasExtension( "GL_NV_bindless_texture" );
 	caps.hasDebugOutput = caps.glVersion >= 4.3f || GLCapabilityProbe_HasExtension( "GL_KHR_debug" ) || GLCapabilityProbe_HasExtension( "GL_ARB_debug_output" );
 
+	if ( caps.profile == RENDERER_CONTEXT_PROFILE_CORE ) {
+		// A core profile does not advertise the ARB extension strings for
+		// features that were promoted into core -- GL_ARB_vertex_buffer_object,
+		// GL_ARB_shader_objects and friends are simply absent. Probing for them
+		// makes a 4.1 core context look like it has no VBOs and no GLSL, which
+		// drops tier selection to NullRenderer. Assert what the version
+		// guarantees instead. (Reached on macOS, where Apple offers 2.1
+		// compatibility or 4.1 core and nothing between.)
+		caps.hasFixedFunctionCompatibility = false;	// removed by definition
+		caps.hasARBVertexProgram = false;			// ARB assembly is compatibility-only
+		caps.hasARBFragmentProgram = false;
+		caps.hasARBShaderObjects = false;			// superseded by core GLSL
+
+		caps.hasGLSL = true;						// core since 2.0
+		caps.hasVBO = true;							// core since 1.5
+		caps.hasFBO = true;							// core since 3.0
+		caps.hasPBO = true;							// core since 2.1
+		caps.hasUBO = caps.glVersion >= 3.1f;
+		caps.hasVAO = true;							// core since 3.0
+		caps.hasInstancing = caps.glVersion >= 3.1f;
+		caps.hasTextureArrays = true;				// core since 3.0
+		caps.hasSync = caps.glVersion >= 3.2f;
+		caps.hasMapBufferRange = true;				// core since 3.0
+	}
+
+	if ( caps.profile == RENDERER_CONTEXT_PROFILE_ES ) {
+		// The thresholds above are desktop-GL version numbers. OpenGL ES
+		// promotes the same features at different (lower) versions, so an ES
+		// 3.0 context would otherwise be mis-detected as missing UBOs,
+		// instancing and sync while falsely claiming fixed-function support.
+		// Everything below is core in ES 3.0 unless noted.
+		const bool es30 = caps.glVersion >= 3.0f;
+
+		caps.hasFixedFunctionCompatibility = false;	// removed in ES 2.0
+		caps.hasARBVertexProgram = false;			// ARB assembly does not exist in ES
+		caps.hasARBFragmentProgram = false;
+		caps.hasARBShaderObjects = false;			// ES uses core GLSL ES, not the ARB extension
+		caps.hasGLSL = caps.glVersion >= 2.0f;
+
+		caps.hasVBO = true;							// core since ES 2.0
+		caps.hasFBO = true;							// core since ES 2.0
+		caps.hasPBO = es30;
+		caps.hasUBO = es30;
+		caps.hasVAO = es30;
+		caps.hasInstancing = es30;
+		caps.hasTextureArrays = es30;
+		caps.hasSync = es30;
+		caps.hasMapBufferRange = es30;
+		caps.hasSRGBTextures = es30;
+		caps.hasFramebufferSRGB = es30;
+
+		// ES 3.1 territory: compute, SSBO and indirect draws. Left to the
+		// generic extension probe so a 3.1+ context can still light them up.
+		caps.hasCompute = caps.glVersion >= 3.1f;
+		caps.hasSSBO = caps.glVersion >= 3.1f;
+		caps.hasDrawIndirect = caps.glVersion >= 3.1f;
+
+		// No ES equivalent at any version; these stay extension-gated.
+		caps.hasBufferStorage = GLCapabilityProbe_HasExtension( "GL_EXT_buffer_storage" );
+		caps.hasMultiDrawIndirect = GLCapabilityProbe_HasExtension( "GL_EXT_multi_draw_indirect" );
+		caps.hasTextureViews = GLCapabilityProbe_HasExtension( "GL_EXT_texture_view" ) || GLCapabilityProbe_HasExtension( "GL_OES_texture_view" );
+		caps.hasTimerQuery = GLCapabilityProbe_HasExtension( "GL_EXT_disjoint_timer_query" );
+		caps.hasDebugOutput = caps.glVersion >= 3.2f || GLCapabilityProbe_HasExtension( "GL_KHR_debug" );
+		caps.hasDSA = false;
+		caps.hasMultiBind = false;
+		caps.hasGLSpirv = false;
+		caps.hasBindlessTexture = false;
+	}
+
 	GLCapabilityProbe_QueryInt( GL_MAX_TEXTURE_SIZE, caps.maxTextureSize );
 	if ( caps.maxTextureSize <= 0 ) {
 		caps.maxTextureSize = 256;
 	}
-	if ( caps.glVersion >= 1.3f || GLCapabilityProbe_HasExtension( "GL_ARB_multitexture" ) ) {
+	if ( caps.profile == RENDERER_CONTEXT_PROFILE_CORE || caps.profile == RENDERER_CONTEXT_PROFILE_ES ) {
+		// GL_MAX_TEXTURE_UNITS and GL_MAX_TEXTURE_COORDS count fixed-function
+		// stages and are not valid enums without one, so querying them here
+		// yields 0 and an INVALID_ENUM. Only the image-unit count is meaningful.
+		GLCapabilityProbe_QueryInt( GL_MAX_TEXTURE_IMAGE_UNITS, caps.maxTextureImageUnits );
+		caps.maxTextureUnits = caps.maxTextureImageUnits;
+		caps.maxTextureCoords = caps.maxTextureImageUnits;
+	} else if ( caps.glVersion >= 1.3f || GLCapabilityProbe_HasExtension( "GL_ARB_multitexture" ) ) {
 		GLCapabilityProbe_QueryInt( GL_MAX_TEXTURE_UNITS_ARB, caps.maxTextureUnits );
 		GLCapabilityProbe_QueryInt( GL_MAX_TEXTURE_COORDS_ARB, caps.maxTextureCoords );
 		GLCapabilityProbe_QueryInt( GL_MAX_TEXTURE_IMAGE_UNITS_ARB, caps.maxTextureImageUnits );
@@ -1225,7 +1333,7 @@ static renderBackendCaps_t RendererTierSelect_TestCaps(
 	caps.glMinor = minor;
 	caps.glVersion = static_cast<float>( major ) + static_cast<float>( minor ) * 0.1f;
 	caps.profile = profile;
-	caps.hasFixedFunctionCompatibility = profile != RENDERER_CONTEXT_PROFILE_CORE;
+	caps.hasFixedFunctionCompatibility = profile == RENDERER_CONTEXT_PROFILE_COMPATIBILITY;
 	caps.hasVBO = baseline;
 	caps.hasFBO = baseline;
 	caps.hasMRT = baseline;
@@ -1267,6 +1375,30 @@ bool RendererTierSelect_RunSelfTest( void ) {
 			RendererTierSelect_TestCaps( 2, 1, RENDERER_CONTEXT_PROFILE_COMPATIBILITY, false, false, false, false ),
 			RENDERER_TIER_PREF_AUTO,
 			RENDERER_TIER_LEGACY_GL2_COMPAT
+		},
+		{
+			"ES 3.0 programmable baseline",
+			RendererTierSelect_TestCaps( 3, 0, RENDERER_CONTEXT_PROFILE_ES, true, false, false, false ),
+			RENDERER_TIER_PREF_AUTO,
+			RENDERER_TIER_MODERN_GL33
+		},
+		{
+			"ES 3.1 programmable baseline",
+			RendererTierSelect_TestCaps( 3, 1, RENDERER_CONTEXT_PROFILE_ES, true, false, false, false ),
+			RENDERER_TIER_PREF_AUTO,
+			RENDERER_TIER_MODERN_GL41
+		},
+		{
+			"ES missing baseline cannot fall back to fixed function",
+			RendererTierSelect_TestCaps( 3, 0, RENDERER_CONTEXT_PROFILE_ES, false, false, false, false ),
+			RENDERER_TIER_PREF_AUTO,
+			RENDERER_TIER_NULL
+		},
+		{
+			"ES 3.2 cannot select desktop gpu-driven tiers",
+			RendererTierSelect_TestCaps( 3, 2, RENDERER_CONTEXT_PROFILE_ES, true, true, true, true ),
+			RENDERER_TIER_PREF_GL46,
+			RENDERER_TIER_MODERN_GL41
 		},
 		{
 			"GL 3.3 baseline",

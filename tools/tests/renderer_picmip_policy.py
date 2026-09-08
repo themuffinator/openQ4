@@ -251,7 +251,14 @@ def test_reduction_changes_reload_images_without_a_restart():
         "image_downSizeBumpLimit",
     ):
         assert_true(f"&{cvar}" in image_manager, f"{cvar} changes should trigger an image reload")
-    assert_true("ReloadImages( true );" in image_manager, "a reduction change should force a full image reload")
+    assert_true(
+        "images[i]->Reload( true );" in image_manager,
+        "a reduction change should reload the file-backed images",
+    )
+    assert_true(
+        "if ( images[i]->GetOpts().isPersistant ) {" in image_manager,
+        "the reduction reload must skip render targets and glyph atlases, which Reload() would blank",
+    )
     assert_true(
         "if ( insideLevelLoad ) {" in image_manager,
         "a level load already touches every image, so the reload must not double up on it",

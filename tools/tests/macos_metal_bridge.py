@@ -936,6 +936,8 @@ def validate_macos_package_main_collateral_error_runtime() -> None:
     try:
         write_test_file(source_root / "assets" / "release" / "README.html", b"<html></html>\n")
         write_test_file(source_root / "LICENSE", b"license\n")
+        write_test_file(source_root / "LICENSES" / "KHRONOS-GLES-MIT.txt", b"khronos notice\n")
+        write_test_file(source_root / "CONTRIBUTORS.md", b"contributors\n")
         write_test_file(
             source_root / package.MACOS_SUPPORT_INFO_SCRIPT_PATH,
             b"#!/bin/sh\nexit 0\n",

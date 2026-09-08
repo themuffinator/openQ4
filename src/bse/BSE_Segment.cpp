@@ -569,10 +569,12 @@ bool rvSegment::Check(rvBSE* effect, float time, float offset) {
 	case SEG_SOUND:
 		if (effect->GetReferenceSound() && st->mSoundShader) {
 			if (!GetSoundPlaying()) {
+				// random diversity so multi-sample shaders (bullet impacts, ricochets)
+				// don't always play their first entry
 				effect->GetReferenceSound()->StartSound(
 					st->mSoundShader,
 					static_cast<s_channelType>(mSegmentTemplateHandle + SCHANNEL_ONE),
-					0.0f,
+					rvRandom::flrand(0.0f, 1.0f),
 					0,
 					false);
 				SetSoundPlaying(true);

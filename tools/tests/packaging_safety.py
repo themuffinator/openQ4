@@ -1371,9 +1371,30 @@ def validate_validation_wiring() -> None:
             raise AssertionError(f"packaging_safety.py is not wired into {context}")
 
 
+def validate_target_repository_metadata() -> None:
+    project_root = WORK / "target-repository-metadata"
+    targets = (
+        ("windows", "x64", "gamelibs_stage", "1" * 40),
+        ("linux", "x64", "gamelibs_stage-linux-x64", "2" * 40),
+        ("linux", "arm64", "gamelibs_stage-linux-arm64", "3" * 40),
+        ("macos", "arm64", "gamelibs_stage-darwin-arm64", "4" * 40),
+    )
+    for platform, arch, directory, revision in targets:
+        manifest = project_root / ".tmp" / directory / "openq4_gamelibs_stage_manifest.json"
+        manifest.parent.mkdir(parents=True, exist_ok=True)
+        manifest.write_text(json.dumps({"gameLibsGitCommit": revision, "gameLibsGitDirty": False}), encoding="utf-8")
+    for platform, arch, directory, revision in targets:
+        metadata = PACKAGE.read_staged_repository_metadata(project_root, platform, arch)
+        if metadata.get("openq4_game_commit") != revision:
+            raise AssertionError(f"{platform}/{arch} package read another target's source provenance: {metadata}")
+    if PACKAGE.read_staged_repository_metadata(project_root, "macos", "universal2"):
+        raise AssertionError("Universal2 must not read an unrelated thin-build stage")
+
+
 def main() -> None:
     shutil.rmtree(WORK, ignore_errors=True)
     try:
+        validate_target_repository_metadata()
         validate_pk4_source_containment()
         validate_pk4_archive_member_guards()
         validate_copy_helpers_do_not_follow_destination_symlinks()

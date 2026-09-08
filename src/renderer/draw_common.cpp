@@ -5793,7 +5793,10 @@ void RB_ApplyResolutionScaleToBackBuffer( void ) {
 		return;
 	}
 
-	int mode = idMath::ClampInt( 0, 2, r_resolutionScaleMode.GetInteger() );
+	// Clamped to 3, not 2: mode 3 is the ES point-filter upscale, and clamping it
+	// down here would silently turn this path's sharpening on instead. The
+	// reduced-grid sampling below is already point-like, so 3 behaves as 1 does.
+	int mode = idMath::ClampInt( 0, 3, r_resolutionScaleMode.GetInteger() );
 	if ( mode == 0 ) {
 		// Legacy path: BeginFrame crop mode without fullscreen upscale.
 		return;

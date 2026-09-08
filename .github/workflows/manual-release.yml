@@ -21,7 +21,8 @@ on:
       openq4_game_ref:
         description: openQ4-game branch, tag, or full commit SHA to package
         required: true
-        default: main
+        # The default must match the engine-interface revision pinned in CI.
+        default: f9bf8a692de539b9d149cc7b2c47759dbb1ddd62
         type: string
       linux_arm64_support_tier:
         description: Linux ARM64 release support tier
@@ -868,7 +869,7 @@ jobs:
           python tools/build/verify_release_source_provenance.py \
             --project-root "${GITHUB_WORKSPACE}" \
             --gamelibs-root "${OPENQ4_GAMELIBS_REPO}" \
-            --stage-manifest "${GITHUB_WORKSPACE}/.tmp/gamelibs_stage/openq4_gamelibs_stage_manifest.json" \
+            --stage-manifest "$(python tools/build/gamelibs_stage_path.py --build-dir builddir --manifest)" \
             --expected-project-commit "${{ needs.metadata.outputs.openq4_source_sha }}" \
             --expected-gamelibs-commit "${{ needs.metadata.outputs.openq4_game_sha }}"
 

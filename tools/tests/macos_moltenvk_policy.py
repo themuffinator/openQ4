@@ -163,12 +163,17 @@ def validate_module_link_contract() -> None:
     require(meson, "-Wl,-install_name,@loader_path/", "macOS renderer module install name")
     require(meson, "name_suffix: 'dylib',", "macOS renderer module dylib suffix")
 
-    # The darwin carve-out is gone; the remaining gate is the SDL3 seam only.
-    require(
-        meson,
-        "if build_renderer_vk and platform_backend != 'sdl3'",
-        "Vulkan module gate no longer excludes darwin",
-    )
+    # Test the supported-host matrix, rather than pinning how the condition is
+    # formatted. Android has its own GLES-only target; Darwin SDL3 must remain
+    # eligible for the MoltenVK renderer.
+    gate = re.search(r"if build_renderer_vk and ([^\n]+)\n\s*build_renderer_vk = false", meson)
+    if gate is None:
+        raise AssertionError("Missing Vulkan module platform/backend gate")
+    for host in ("windows", "linux", "darwin", "android"):
+        for backend in ("sdl3", "native", "legacy_win32"):
+            disabled = eval(gate.group(1), {"__builtins__": {}}, {"host_system": host, "platform_backend": backend})
+            if disabled != (host == "android" or backend != "sdl3"):
+                raise AssertionError(f"Unexpected Vulkan module gate for {host}/{backend}: disabled={disabled}")
     require(meson, "MoltenVK is not a native Metal renderer", "meson MoltenVK policy note")
 
 

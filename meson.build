@@ -8,7 +8,7 @@ project(
 
 host_system = host_machine.system()
 host_cpu_family = host_machine.cpu_family()
-if not ['windows', 'linux', 'darwin'].contains(host_system)
+if not ['windows', 'linux', 'darwin', 'android'].contains(host_system)
   error('Unsupported host system for openQ4 Meson build: ' + host_system)
 endif
 
@@ -30,6 +30,13 @@ elif host_system == 'darwin'
 endif
 engine_client_binary_name = meson.project_name() + '-client_' + binary_arch
 engine_ded_binary_name = meson.project_name() + '-ded_' + binary_arch
+module_filename_prefix = host_system == 'android' ? 'lib' : ''
+if host_system == 'android'
+  if host_cpu_family != 'aarch64'
+    error('Android currently supports the arm64-v8a ABI only.')
+  endif
+  engine_client_binary_name = 'quake4'
+endif
 
 if host_cpu_family != 'x86_64' and not (host_system == 'linux' and host_cpu_family == 'aarch64')
   warning(
@@ -53,7 +60,11 @@ if host_system != 'darwin' and macos_openal_provider != 'apple_framework'
   error('macos_openal_provider=' + macos_openal_provider + ' is only valid on macOS hosts.')
 endif
 
-if host_system == 'linux'
+if host_system == 'android'
+  if platform_backend_requested != 'sdl3'
+    error('Android requires platform_backend=sdl3.')
+  endif
+elif host_system == 'linux'
   if platform_backend_requested == 'legacy_win32'
     error('platform_backend=legacy_win32 is only valid on Windows hosts.')
   endif
@@ -204,6 +215,26 @@ build_game_mp = get_option('build_game_mp')
 needs_game_headers = build_engine or build_games
 install_root_dir = meson.project_source_root() / '.install'
 install_game_dir = install_root_dir / 'baseoq4'
+install_module_dir = install_game_dir
+install_engine_dir = install_root_dir
+if host_system == 'android'
+  # Keep mobile assets/native libraries together without replacing a staged
+  # desktop installation. The host app copies these into assets/ and jniLibs/.
+  install_root_dir = install_root_dir / 'android' / 'arm64-v8a'
+  install_game_dir = install_root_dir / 'baseoq4'
+  install_module_dir = install_root_dir / 'lib'
+  install_engine_dir = install_module_dir
+endif
+android_deps_root = get_option('android_deps_root').strip()
+sigmatouch_root = get_option('sigmatouch_root').strip()
+sigmatouch_controls_root = get_option('sigmatouch_controls_root').strip()
+build_sigmatouch = sigmatouch_root != ''
+if host_system != 'android' and (android_deps_root != '' or build_sigmatouch or sigmatouch_controls_root != '')
+  error('Android dependency and Sigma Touch options require an Android cross build.')
+endif
+if build_sigmatouch and sigmatouch_controls_root == ''
+  error('sigmatouch_root requires sigmatouch_controls_root.')
+endif
 game_libs_repo_root = ''
 game_libs_source_root = ''
 game_libs_repo_summary = 'not required'
@@ -212,6 +243,13 @@ game_stage_game_root = ''
 game_stage_mpgame_root = ''
 game_stage_game_include_rel = '.tmp/gamelibs_stage/src/game'
 game_stage_mpgame_include_rel = '.tmp/gamelibs_stage/src/mpgame'
+game_stage_output_rel = '.tmp/gamelibs_stage'
+if host_system != 'windows'
+  # A cross configure must not refresh files an active desktop build reads.
+  game_stage_output_rel = '.tmp/gamelibs_stage-' + host_system + '-' + binary_arch
+  game_stage_game_include_rel = game_stage_output_rel / 'src/game'
+  game_stage_mpgame_include_rel = game_stage_output_rel / 'src/mpgame'
+endif
 bse_source_root = meson.project_source_root() / 'src' / 'bse'
 game_sp_module_defs_file = ''
 game_mp_module_defs_file = ''
@@ -527,7 +565,7 @@ if needs_game_headers
     meson.project_source_root() / 'tools' / 'build' / 'stage_gamelibs.py',
     meson.project_source_root(),
     game_libs_repo_root,
-    meson.project_source_root() / '.tmp' / 'gamelibs_stage',
+    meson.project_source_root() / game_stage_output_rel,
     check: true,
   )
   game_stage_root = game_stage_result.stdout().strip()
@@ -604,7 +642,7 @@ endif
 # ('gl' resolves to the module there). macOS and the legacy backends keep
 # the static renderer; the dedicated targets keep it everywhere until the
 # server front-end story changes.
-renderer_module_only_client = build_engine and get_option('build_renderer_gl') and use_sdl3_backend and (host_system == 'windows' or host_system == 'linux')
+renderer_module_only_client = build_engine and use_sdl3_backend and (host_system == 'android' or (get_option('build_renderer_gl') and (host_system == 'windows' or host_system == 'linux')))
 # Phase B7: the Windows SDL3 ded keeps the renderer front-end but links no GL
 windows_gl_free_ded = build_engine and host_system == 'windows' and use_sdl3_backend
 
@@ -874,7 +912,11 @@ sdl3_dep = disabler()
 macos_graphics_bridge_dep = disabler()
 deps = []
 if build_engine
-  if host_system == 'linux' and use_sdl3_backend
+  if host_system == 'android'
+    # Shared engine headers still declare desktop GL types, but this client
+    # loads GLES as a module and must not build/link desktop GLEW or OpenGL.
+    glew_dep = declare_dependency()
+  elif host_system == 'linux' and use_sdl3_backend
     glew_sp = subproject('glew', default_options: glew_default_options)
     glew_dep = glew_sp.get_variable('glew_dep')
     glew_dedicated_dep = glew_sp.get_variable('glew_dedicated_dep')
@@ -900,7 +942,30 @@ if build_engine
     default_options: fallback_opt,
   )
 
-  if host_system == 'darwin'
+  if host_system == 'android'
+    if android_deps_root == ''
+      error('Android requires -Dandroid_deps_root=<target-prefix>; see docs/dev/android-build.md.')
+    endif
+    foreach header : ['AL/al.h', 'SDL3/SDL.h']
+      if not fs_mod.is_file(android_deps_root / 'include' / header)
+        error('Missing Android target dependency header: ' + android_deps_root / 'include' / header)
+      endif
+    endforeach
+    foreach runtime : ['libSDL3.so', 'libopenal.so', 'libc++_shared.so']
+      if not fs_mod.is_file(android_deps_root / 'lib' / runtime)
+        error('Missing Android target runtime: ' + android_deps_root / 'lib' / runtime)
+      endif
+      install_data(android_deps_root / 'lib' / runtime, install_dir: install_engine_dir)
+    endforeach
+    if fs_mod.is_dir(android_deps_root / 'licenses')
+      install_subdir(android_deps_root / 'licenses', install_dir: install_root_dir)
+    endif
+    android_include_args = ['-I' + android_deps_root / 'include']
+    openal_dep = declare_dependency(
+      compile_args: android_include_args,
+      dependencies: cc.find_library('openal', dirs: [android_deps_root / 'lib'], required: true),
+    )
+  elif host_system == 'darwin'
     if macos_openal_provider == 'apple_framework'
       openal_dep = dependency('appleframeworks', modules: ['OpenAL'], required: true)
     else
@@ -941,7 +1006,12 @@ if build_engine
   endif
 
   if use_sdl3_backend
-    if host_system == 'linux' and not linux_x11_option.auto()
+    if host_system == 'android'
+      sdl3_dep = declare_dependency(
+        compile_args: android_include_args,
+        dependencies: cc.find_library('SDL3', dirs: [android_deps_root / 'lib'], required: true),
+      )
+    elif host_system == 'linux' and not linux_x11_option.auto()
       # A system SDL's compiled video-driver set cannot be changed by a Meson
       # feature option. Explicit linux_x11 modes therefore select the bundled
       # SDL so enabled/disabled is a real build contract rather than a hint
@@ -983,6 +1053,14 @@ if build_engine
         cc.find_library('dxguid', required: true),
       ]
     endif
+  elif host_system == 'android'
+    deps += [
+      sdl3_dep,
+      cc.find_library('android', required: true),
+      cc.find_library('log', required: true),
+      cc.find_library('dl', required: true),
+      cc.find_library('m', required: true),
+    ]
   elif host_system == 'linux'
     deps += [
       dependency('threads', required: true),
@@ -1047,6 +1125,8 @@ if renderer_module_only_client
       windows_ole_dep,
       sdl3_dep,
     ]
+  elif host_system == 'android'
+    client_deps = deps
   else
     client_deps += [
       dependency('threads', required: true),
@@ -1150,7 +1230,7 @@ if host_system == 'darwin'
   endif
 endif
 
-if host_system == 'linux'
+if host_system == 'linux' or host_system == 'android'
   linux_compile_hardening_args = []
   foreach hardening_arg : ['-fstack-protector-strong', '-D_FORTIFY_SOURCE=2']
     if cpp.has_argument(hardening_arg) and cc.has_argument(hardening_arg)
@@ -1183,6 +1263,19 @@ endif
 if use_sdl3_backend
   shared_cpp_args += ['-DUSE_SDL3=1']
   shared_c_args += ['-DUSE_SDL3=1']
+endif
+
+if host_system == 'android'
+  shared_cpp_args += ['-DID_GL_HARDLINK']
+  shared_c_args += ['-DID_GL_HARDLINK']
+  if build_engine
+    shared_cpp_args += android_include_args
+    shared_c_args += android_include_args
+  endif
+  if build_sigmatouch
+    shared_cpp_args += ['-DOPENQ4_SIGMATOUCH=1']
+    shared_c_args += ['-DOPENQ4_SIGMATOUCH=1']
+  endif
 endif
 
 if host_system == 'linux' and use_sdl3_backend and linux_x11_helpers_enabled
@@ -1357,7 +1450,7 @@ if build_engine
     cpp_args: bse_cpp_args,
     c_args: bse_c_args,
     cpp_pch: pch_headers,
-    pic: host_system == 'linux',
+    pic: host_system == 'linux' or host_system == 'android',
     install: false,
   )
 
@@ -1371,7 +1464,7 @@ if build_engine
     cpp_args: engine_cpp_args,
     c_args: engine_c_args,
     cpp_pch: pch_headers,
-    pic: host_system == 'linux',
+    pic: host_system == 'linux' or host_system == 'android',
     install: false,
   )
 
@@ -1384,7 +1477,7 @@ if build_engine
     cpp_args: engine_cpp_args,
     c_args: engine_c_args,
     cpp_pch: pch_headers,
-    pic: host_system == 'linux',
+    pic: host_system == 'linux' or host_system == 'android',
     install: false,
   )
 endif
@@ -1393,7 +1486,61 @@ if build_engine
   client_link_with = [bse_library, imagetools_library, render_geo_library]
   dedicated_link_with = [bse_library, imagetools_library, render_geo_library]
 
-  if host_system == 'windows'
+  if build_sigmatouch
+    sigmatouch_sources = files(
+      'mobile/game_interface.cpp',
+      'mobile/touch_interface_quake4.cpp',
+      sigmatouch_root / 'sigma/android_jni.cpp',
+      sigmatouch_root / 'touch_interface_base.cpp',
+      sigmatouch_root / 'LogWritter.c',
+      sigmatouch_root / 'fts.c',
+      sigmatouch_root / 'rand.c',
+    )
+    sigmatouch_deps = [
+      sdl3_dep,
+      cc.find_library('touchcontrols', dirs: [android_deps_root / 'lib'], required: true),
+      cc.find_library('saffal', dirs: [android_deps_root / 'lib'], required: true),
+      cc.find_library('GLESv3', required: true),
+      cc.find_library('EGL', required: true),
+      cc.find_library('log', required: true),
+    ]
+    # The host's headers have their own types; do not inject the engine PCH.
+    sigmatouch_library = static_library(
+      'openq4_sigmatouch',
+      sigmatouch_sources,
+      include_directories: [include_directories('mobile'), include_directories(sigmatouch_root), include_directories(sigmatouch_controls_root)],
+      dependencies: sigmatouch_deps,
+      cpp_args: ['-DOPENQ4_SIGMATOUCH=1', '-DENGINE_NAME="quake4"'],
+      c_args: ['-DOPENQ4_SIGMATOUCH=1', '-DENGINE_NAME="quake4"'],
+      pic: true,
+      install: false,
+    )
+    # JNI entry points are discovered by the VM, not by linker references.
+    # link_whole keeps that glue in the application shared library.
+  endif
+
+  if host_system == 'android'
+    android_link_whole = []
+    if build_sigmatouch
+      android_link_whole += sigmatouch_library
+      client_deps += sigmatouch_deps
+    endif
+    shared_library(
+      engine_client_binary_name,
+      openq4_engine_sources,
+      include_directories: engine_include_dirs,
+      dependencies: client_deps,
+      link_with: client_link_with,
+      link_whole: android_link_whole,
+      cpp_args: client_engine_cpp_args,
+      c_args: engine_c_args,
+      cpp_pch: pch_headers,
+      link_args: engine_link_args + ['-Wl,-z,defs'],
+      name_prefix: 'lib',
+      install: true,
+      install_dir: install_engine_dir,
+    )
+  elif host_system == 'windows'
     executable(
       engine_client_binary_name,
       openq4_engine_sources,
@@ -1502,7 +1649,7 @@ if build_engine
       install: true,
       install_dir: install_root_dir,
     )
-  else
+  elif host_system != 'android'
     executable(
       engine_ded_binary_name,
       openq4_dedicated_sources,
@@ -1551,7 +1698,7 @@ elif host_system == 'darwin'
   darwin_game_module_export_list = files('tools/build/darwin_game_module.exp')
   game_module_link_args += '-Wl,-exported_symbols_list,' + darwin_game_module_export_list[0].full_path()
   game_module_link_depends += darwin_game_module_export_list
-elif host_system == 'linux'
+elif host_system == 'linux' or host_system == 'android'
   game_module_link_args += linux_module_link_hardening_args
   if cpp.has_link_argument('-Wl,-z,defs')
     game_module_link_args += '-Wl,-z,defs'
@@ -1578,7 +1725,7 @@ if build_engine or build_games
     c_args: game_common_c_args,
     cpp_pch: game_idlib_pch_headers,
     override_options: game_target_override_options,
-    pic: host_system == 'linux',
+    pic: host_system == 'linux' or host_system == 'android',
     gnu_symbol_visibility: host_system == 'windows' ? 'default' : 'hidden',
     install: false,
   )
@@ -1590,7 +1737,7 @@ if build_engine or build_games
     c_args: game_common_c_args,
     cpp_pch: game_idlib_pch_headers,
     override_options: game_target_override_options,
-    pic: host_system == 'linux',
+    pic: host_system == 'linux' or host_system == 'android',
     gnu_symbol_visibility: host_system == 'windows' ? 'default' : 'hidden',
     install: false,
   )
@@ -1603,7 +1750,7 @@ endif
 # OPENQ4_SDL3_CONTEXT_IMPL and drives the engine window through
 # renderWindowServices_t).
 build_renderer_gl = get_option('build_renderer_gl')
-if build_renderer_gl and (host_system == 'darwin' or platform_backend != 'sdl3')
+if build_renderer_gl and (host_system == 'darwin' or host_system == 'android' or platform_backend != 'sdl3')
   build_renderer_gl = false
 endif
 
@@ -1613,13 +1760,45 @@ endif
 # stays opt-in behind r_renderApi vulkan with OpenGL as the default renderer.
 # MoltenVK is not a native Metal renderer and must never be described as one.
 build_renderer_vk = get_option('build_renderer_vk')
-if build_renderer_vk and platform_backend != 'sdl3'
+if build_renderer_vk and (platform_backend != 'sdl3' or host_system == 'android')
   build_renderer_vk = false
 endif
 renderer_vk_binary_name = 'renderer-vk_' + binary_arch
 
 renderer_gl_binary_name = 'renderer-gl_' + binary_arch
-if build_engine and (build_renderer_gl or build_renderer_vk)
+
+# emileb's GLES renderer is required on Android and explicitly selectable on
+# desktop. Never silently ship an ANGLE copied from another installed product.
+renderer_gles_binary_name = 'renderer-gles_' + binary_arch
+gles_option = get_option('build_renderer_gles')
+build_renderer_gles = build_engine and (gles_option.enabled() or (host_system == 'android' and not gles_option.disabled()))
+if build_engine and host_system == 'android' and gles_option.disabled()
+  error('Android requires the GLES renderer module.')
+endif
+if build_renderer_gles and not use_sdl3_backend
+  error('build_renderer_gles requires platform_backend=sdl3.')
+endif
+gles_root = get_option('gles_root').strip()
+angle_staged_dir = meson.project_source_root() / '.tmp' / 'angle-macos'
+angle_gles_lib = disabler()
+gles_deps = []
+gles_development_angle = false
+if build_renderer_gles
+  if host_system == 'android'
+    gles_deps = [cc.find_library('GLESv3', required: true), cc.find_library('EGL', required: true), cc.find_library('log', required: true)]
+  else
+    gles_library_dirs = []
+    if gles_root != ''
+      gles_library_dirs += [gles_root / 'lib']
+    elif host_system == 'darwin'
+      gles_library_dirs += [angle_staged_dir]
+      gles_development_angle = true
+    endif
+    angle_gles_lib = cpp.find_library('GLESv2', dirs: gles_library_dirs, required: true)
+    gles_deps = [angle_gles_lib, cpp.find_library('EGL', dirs: gles_library_dirs, required: true)]
+  endif
+endif
+if build_engine and (build_renderer_gl or build_renderer_vk or build_renderer_gles)
   # the modules' own idlib copy, compiled with engine flavor so codegen and
   # interface layout match the renderer sources
   renderer_idlib_library = static_library(
@@ -1629,7 +1808,7 @@ if build_engine and (build_renderer_gl or build_renderer_vk)
     cpp_args: engine_cpp_args,
     c_args: engine_c_args,
     cpp_pch: pch_headers,
-    pic: host_system == 'linux',
+    pic: host_system == 'linux' or host_system == 'android',
     install: false,
   )
 endif
@@ -1678,6 +1857,113 @@ if build_renderer_gl and build_engine
     name_prefix: '',
     install: true,
     install_dir: install_root_dir,
+  )
+endif
+
+# Experimental macOS OpenGL ES clear probe (Android GLES backend bring-up).
+#
+# openQ4's GL 1.x entry points bind at link time, so on macOS they resolve from
+# OpenGL.framework and an EGL/ANGLE ES context is never actually driven. This
+# target is the minimal proof of the opposite arrangement: link ANGLE's
+# libGLESv2 and no desktop GL, then clear and present through it. It is the
+# link-shape a future renderer-gles module has to use.
+#
+# Local development only: it needs an ANGLE staged by
+# tools/build/prepare_macos_angle.sh and is never installed or packaged.
+build_gles_probe = host_system == 'darwin' and build_renderer_gles
+if build_gles_probe
+  if not angle_gles_lib.found()
+    warning('ANGLE not staged; skipping the GLES clear probe. Run tools/build/prepare_macos_angle.sh to enable it.')
+  else
+    executable(
+      'openq4-gles-probe',
+      files('src/renderer/GLES/gles_clear_probe.cpp'),
+      include_directories: engine_include_dirs,
+      dependencies: [sdl3_dep, angle_gles_lib],
+      cpp_args: engine_cpp_args,
+      # @loader_path so the staged ANGLE resolves next to the probe binary,
+      # matching how a shipped module would find its own runtime.
+      link_args: ['-Wl,-rpath,@loader_path'],
+      install: false,
+    )
+  endif
+endif
+
+# Experimental OpenGL ES renderer module.
+#
+# The shared renderer front-end again, but with GL resolved through
+# renderer/GLES/qgl_gles.h against a real ES driver instead of GLEW against
+# desktop GL. Unlike renderer-vk this KEEPS the ModernGL translation units --
+# GLES is still GL, so the executor, shader library, state cache, upload
+# manager and render-graph resources are reused rather than rewritten -- and
+# keeps tr_backend.cpp, whose five references into the dropped legacy TUs are
+# supplied by renderer/GLES/gles_Backend.cpp.
+#
+# Never installed: the ANGLE it links is a local development aid.
+if build_renderer_gles
+  renderer_gles_source_discovery = run_command(
+    py,
+    meson.project_source_root() / 'tools' / 'build' / 'meson_sources.py',
+    '--emit',
+    'renderer_gles',
+    check: true,
+  )
+  renderer_gles_source_paths = renderer_gles_source_discovery.stdout().strip().split('\n')
+  if renderer_gles_source_paths.length() == 0
+    error('tools/build/meson_sources.py returned no renderer_gles source files.')
+  endif
+  renderer_gles_sources = files(renderer_gles_source_paths)
+
+  renderer_gles_module_args = engine_cpp_args + [
+    '-DOPENQ4_RENDERER_MODULE',
+    '-DOPENQ4_RENDERER_GLES_MODULE',
+    '-DOPENQ4_SDL3_CONTEXT_IMPL',
+    '-DOPENQ4_RENDERER_BACKEND_NAME="gles"',
+    '-DOPENQ4_RENDERER_BACKEND_DESC="openQ4 OpenGL ES renderer module"',
+  ]
+
+  renderer_gles_export_list = []
+  renderer_gles_link_args = []
+  if host_system == 'darwin'
+    renderer_gles_export_list = files('tools/build/macos_renderer_module.exp')
+    renderer_gles_link_args = [
+      '-Wl,-exported_symbols_list,' + renderer_gles_export_list[0].full_path(),
+      '-Wl,-dead_strip',
+      '-Wl,-headerpad_max_install_names',
+      '-Wl,-install_name,@loader_path/' + renderer_gles_binary_name + '.dylib',
+      '-Wl,-rpath,@loader_path',
+    ]
+  elif host_system == 'linux' or host_system == 'android'
+    renderer_gles_export_list = files('tools/build/linux_renderer_module.map')
+    renderer_gles_link_args = linux_module_link_hardening_args + [
+      '-Wl,--version-script=' + renderer_gles_export_list[0].full_path(),
+      '-Wl,-z,defs',
+    ]
+    gles_deps += [cc.find_library('m', required: true), cc.find_library('dl', required: true)]
+  endif
+
+  # shared_library, not shared_module: meson links shared_module on darwin as an
+  # MH_BUNDLE with -undefined dynamic_lookup, which drops the undefined-symbol
+  # closure. That closure is the point here -- it is what proves the module has
+  # no desktop GL left in it.
+  renderer_gles_module_target = shared_library(
+    renderer_gles_binary_name,
+    renderer_gles_sources,
+    include_directories: [
+      engine_include_dirs,
+      include_directories('src/external/gles'),
+    ],
+    cpp_args: renderer_gles_module_args,
+    c_args: engine_c_args,
+    cpp_pch: pch_headers,
+    link_with: [renderer_idlib_library, imagetools_library, render_geo_library],
+    dependencies: gles_deps,
+    link_args: renderer_gles_link_args,
+    link_depends: renderer_gles_export_list,
+    gnu_symbol_visibility: 'hidden',
+    name_prefix: module_filename_prefix,
+    install: not gles_development_angle,
+    install_dir: install_engine_dir,
   )
 endif
 
@@ -1817,7 +2103,7 @@ if build_games and build_game_sp
       '--source',
       '@INPUT@',
       '--destination',
-      meson.current_build_dir() / 'baseoq4' / (game_sp_binary_name + game_module_filename_suffix),
+      meson.current_build_dir() / 'baseoq4' / (module_filename_prefix + game_sp_binary_name + game_module_filename_suffix),
       '--stamp',
       '@OUTPUT@',
     ],
@@ -1838,7 +2124,7 @@ if build_games and build_game_mp
       '--source',
       '@INPUT@',
       '--destination',
-      meson.current_build_dir() / 'baseoq4' / (game_mp_binary_name + game_module_filename_suffix),
+      meson.current_build_dir() / 'baseoq4' / (module_filename_prefix + game_mp_binary_name + game_module_filename_suffix),
       '--stamp',
       '@OUTPUT@',
     ],
@@ -1863,6 +2149,9 @@ install_data(
   install_dir: install_root_dir,
   rename: 'openQ4.ico',
 )
+
+install_data('LICENSE', 'CONTRIBUTORS.md', install_dir: install_root_dir)
+install_data('LICENSES/KHRONOS-GLES-MIT.txt', install_dir: install_root_dir / 'licenses')
 
 install_data(
   'assets/icons/quake4.icns',
@@ -1995,7 +2284,9 @@ summary(
     'OpenAL': openal_dep.found(),
     'stb_vorbis': stb_vorbis_dep.found(),
     'Precompiled headers': get_option('use_pch'),
-    'Dedicated server target': build_engine,
+    'Dedicated server target': build_engine and host_system != 'android',
+    'GLES renderer module': build_renderer_gles,
+    'Sigma Touch host adapter': build_sigmatouch,
     'Linux dedicated headless link split': build_engine and host_system == 'linux',
     'Install root': install_root_dir,
   },

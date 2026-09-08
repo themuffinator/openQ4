@@ -950,4 +950,18 @@
 	"#str_42832"	"Tab : canal | PgUp/PgDn : historique"
 	"#str_42833"	"Historique | Ctrl+End : derniers messages"
 	"#str_42834"	"PgUp/PgDn : historique | Haut/Bas : rappel"
+
+	// SigmaTouch editor labels (emileb Android support).
+	"#str_42900"	"Afficher le menu"
+	"#str_42901"	"Sauvegarde rapide"
+	"#str_42902"	"Chargement rapide"
+	"#str_42903"	"Afficher le clavier"
+	"#str_42904"	"Utiliser la souris"
+	"#str_42905"	"Console"
+	"#str_42906"	"Afficher les commandes personnalisées"
+	"#str_42907"	"Afficher les numéros des armes"
+	"#str_42908"	"Arme suivante"
+	"#str_42909"	"Arme précédente"
+	"#str_42910"	"Touches de déplacement (WASD)"
+	"#str_42911"	"Clic gauche"
 }

@@ -145,6 +145,22 @@ idCVar image_ignoreHighQuality(
 	"0",
 	CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL,
 	"ignore material highquality / uncompressed image usage hints" );
+// Only does anything where the renderer reports no S3TC, which in practice
+// means an OpenGL ES driver that never exposed it -- everywhere else the DXT
+// data Quake 4 ships is already being uploaded as-is and is both smaller and
+// better than anything re-encoded from it would be.
+//
+// Rising by usage rather than all at once because each step has a different
+// risk: specular is the least visually sensitive, diffuse needs the alpha split
+// decided against real materials, and bump wants EAC_RG11 plus a shader change
+// that does not exist yet.
+idCVar image_useETC2(
+	"image_useETC2",
+	"0",
+	CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER,
+	"compress textures to ETC2 when the driver exposes no S3TC:\n 0: off, keep uncompressed RGBA8\n 1: specular only\n 2: specular and diffuse\n 3: specular, diffuse and bump (bump as EAC_RG11)",
+	0,
+	3 );
 idCVar image_picmip(
 	"image_picmip",
 	"0",
@@ -346,7 +362,30 @@ void idImageManager::CheckCvars() {
 
 	if ( reductionChanged ) {
 		common->Printf( "Texture reduction changed, reloading images...\n" );
-		ReloadImages( true );
+
+		// Everything except the runtime pages. An isPersistant image is a render
+		// target or a TTF glyph atlas: not file backed, and sized by the code that
+		// made it rather than by the reduction cvars. idImage::Reload answers that
+		// case by reallocating the image empty and returning, so including them
+		// here cannot apply the new setting, and it silently destroys the glyph
+		// atlases -- every string in the menus and the HUD goes blank until the
+		// process restarts, because nothing rebuilds a scratch page.
+		//
+		// It surfaced as a first-run bug: the launcher passes a texture-detail
+		// setting the archived config does not have yet, this fires once, and by
+		// the second launch the value matches and it never fires again. Whether the
+		// blanking is even visible depends on whether the reload lands before or
+		// after the fonts are built, which is a race, which is why it looked
+		// intermittent and unrelated to the setting that caused it.
+		//
+		// vid_restart still goes through ReloadImages and reallocates every render
+		// target, which is where that genuinely belongs.
+		for ( int i = 0; i < images.Num(); i++ ) {
+			if ( images[i]->GetOpts().isPersistant ) {
+				continue;
+			}
+			images[i]->Reload( true );
+		}
 		return;
 	}
 

@@ -6,6 +6,8 @@
 
 This guide covers everything required to compile openQ4 from source on Windows, Linux, and experimental macOS.
 
+Experimental Android native builds, SigmaTouch host integration and the optional desktop GLES renderer are covered in the [Android/GLES build guide](docs/dev/android-build.md). These are source-build targets; existing desktop release packages remain unchanged.
+
 > [!NOTE]
 > **Regular players do not need to build from source.** Download the latest release from the [Releases page](https://github.com/themuffinator/openQ4/releases) and follow the [Getting Started instructions](README.md#getting-started) instead.
 
@@ -84,7 +86,7 @@ $env:OPENQ4_GAMELIBS_REPO = "C:\path\to\openQ4-game"  # PowerShell
 
 To rebuild the game libraries as part of the openQ4 build, set `OPENQ4_BUILD_GAMELIBS=1` before running compile.
 
-During configure, openQ4 stages the canonical `src/game` and `src/mpgame` source inputs from openQ4-game into `.tmp/gamelibs_stage/` and writes a source manifest with file hashes and git state. Meson requires that manifest before compiling a distinct SP module from `src/game` and MP module from `src/mpgame`, so Linux and experimental macOS builds consume the companion repository directly without maintaining local game-source mirrors. The standalone openQ4-game build supports Windows/MSVC, Linux x64/ARM64 with GCC or Clang, and experimental macOS/Clang developer outputs for compiler and ABI validation; openQ4's staged build remains the integrated runtime, packaging, and gameplay-validation path.
+During configure, openQ4 stages the canonical `src/game` and `src/mpgame` source inputs from openQ4-game into `.tmp/gamelibs_stage/` on Windows or `.tmp/gamelibs_stage-<system>-<arch>/` on other targets and writes a source manifest with file hashes and git state. Meson requires that manifest before compiling a distinct SP module from `src/game` and MP module from `src/mpgame`, so Linux and experimental macOS builds consume the companion repository directly without maintaining local game-source mirrors. The standalone openQ4-game build supports Windows/MSVC, Linux x64/ARM64 with GCC or Clang, and experimental macOS/Clang developer outputs for compiler and ABI validation; openQ4's staged build remains the integrated runtime, packaging, and gameplay-validation path.
 
 ---
 
@@ -537,7 +539,7 @@ Package the default SDL3 backend with OpenGL plus Wayland/EGL support, and keep 
 - Wayland decoration preference: `OPENQ4_WAYLAND_PREFER_LIBDECOR=1` when a compositor behaves better with libdecor.
 - Wayland window-operation diagnostics: `OPENQ4_WAYLAND_SYNC_WINDOW_OPS=1`; use only for troubleshooting because some compositors can block during window animations.
 
-Build from the companion `openQ4-game` checkout through `OPENQ4_GAMELIBS_REPO` or the default sibling path. The staged `.tmp/gamelibs_stage/openq4_gamelibs_stage_manifest.json` records the exact source-input hashes and git state used by the engine build; keep that manifest in CI artifacts when investigating packaging or reproducibility problems, but do not package `.tmp/gamelibs_stage/` as a runtime payload.
+Build from the companion `openQ4-game` checkout through `OPENQ4_GAMELIBS_REPO` or the default sibling path. The staged `openq4_gamelibs_stage_manifest.json` records the exact source-input hashes and git state used by the engine build. Locate the configured target's manifest with `python tools/build/gamelibs_stage_path.py --build-dir builddir --manifest`; keep it in CI artifacts when investigating packaging or reproducibility problems, but do not package the source stage as a runtime payload.
 
 Release packaging publishes detached Linux debug symbols as `openq4-<version>-linux-<arch>-debugsymbols.tar.xz`. Keep that archive paired with the matching runtime package so crash reports from optimized Linux builds can be symbolized.
 

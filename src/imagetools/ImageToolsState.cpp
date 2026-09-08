@@ -100,6 +100,9 @@ int BitsForFormat( textureFormat_t format ) {
 		case FMT_DXT1:		return 4;
 		case FMT_DXT5:		return 8;
 		case FMT_BC7:		return 8;
+		case FMT_ETC2_RGB8:	return 4;
+		case FMT_ETC2_RGBA8:	return 8;
+		case FMT_EAC_RG11:	return 8;
 		case FMT_DEPTH:		return 32;
 		case FMT_DEPTH_STENCIL:	return 32;
 		case FMT_X16:		return 16;
@@ -107,5 +110,30 @@ int BitsForFormat( textureFormat_t format ) {
 		default:
 			assert( 0 );
 			return 0;
+	}
+}
+
+/*
+================
+BytesPerBlockForFormat
+
+Every block-compressed format the engine handles uses 4x4 blocks; only the
+bytes per block differ. Shared so the cache-file validator and the GL and
+Vulkan upload paths cannot disagree about how big a compressed level is --
+they each used to carry their own copy of this table.
+
+Returns 0 for uncompressed formats, which is the caller's cue to use
+BitsForFormat instead.
+================
+*/
+int BytesPerBlockForFormat( textureFormat_t format ) {
+	switch ( format ) {
+		case FMT_DXT1:			return 8;
+		case FMT_ETC2_RGB8:		return 8;
+		case FMT_DXT5:			return 16;
+		case FMT_BC7:			return 16;
+		case FMT_ETC2_RGBA8:	return 16;
+		case FMT_EAC_RG11:		return 16;
+		default:				return 0;
 	}
 }

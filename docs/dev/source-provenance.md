@@ -33,6 +33,15 @@ audited Doom 3 BFG header-family inventory remains 37 files.
 
 ## Reproducible inventory
 
+The Android/GLES integration adds two Doom 3-headered platform adaptations,
+`src/sys/android/android_main.cpp` and `src/sys/android/android_sdl3.cpp`, from
+[Emile Belanger's Android branch at `9aacbf47`](https://github.com/emileb/openQ4/commit/9aacbf478383f3dea9053a9425cc2788b47af063).
+Their retained notices refer to the existing Doom 3 Additional Terms. The
+reviewed current Doom 3 family count is **583**; the BFG count remains **37**.
+The original August audit table above is historical. The [Android/GLES
+integration record](android-gles-integration.md) separately identifies the
+GPLv3 fork contribution and the MIT-licensed Khronos headers.
+
 Run the offline audit from the repository root:
 
 ```text

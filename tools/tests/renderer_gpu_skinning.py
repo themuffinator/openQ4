@@ -334,9 +334,9 @@ def validate_model_integration_and_ownership() -> None:
         (
             "r_useNewSkinning.GetBool() && !collisionOnly",
             "mesh->UpdateSurface( ent, entJoints, surf, !collisionOnly,",
-            "!collisionOnly && gpuJointPaletteReady );",
+            "!collisionOnly && gpuJointPaletteReady && !shader->HasGui() );",
         ),
-        "classic MD5 collision-only CPU skinning",
+        "classic MD5 collision and GUI surface CPU skinning",
     )
 
     md5r = read(RENDERER / "Model_md5r.cpp")
@@ -374,10 +374,13 @@ def validate_model_integration_and_ownership() -> None:
     )
     reject(md5r_sidecar, ".color2", "MD5R authored secondary-color mutation")
     reject(md5r_sidecar, "SetColor", "MD5R authored primary-color mutation")
-    require(
+    require_all(
         md5r,
-        "UpdateDynamicSurface( mesh, entJoints, *surface, !collisionOnly, skinScale, !collisionOnly )",
-        "MD5R collision-only CPU skinning",
+        (
+            "const bool allowGpuSkinning = !collisionOnly && !shader->HasGui();",
+            "UpdateDynamicSurface( mesh, entJoints, *surface, !collisionOnly, skinScale, allowGpuSkinning )",
+        ),
+        "MD5R collision and GUI surface CPU skinning",
     )
 
 

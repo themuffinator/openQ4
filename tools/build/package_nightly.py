@@ -33,6 +33,7 @@ from linux_metadata import (
     desktop_exec_command as parse_linux_desktop_exec_command,
 )
 from generate_release_docs import GeneratedDocSite, generate_release_docs_site
+from gamelibs_stage_path import MANIFEST_NAME as GAMELIBS_STAGE_MANIFEST_NAME, stage_root as gamelibs_stage_root
 from openq4_pak import (
     OPENQ4_PK4_FORBIDDEN_FILES,
     OPENQ4_PACK_NAMES,
@@ -53,7 +54,6 @@ MACOS_SUPPORT_INFO_SCRIPT_PATH = Path("tools") / "macos" / "collect_macos_suppor
 MACOS_SUPPORT_INFO_SCRIPT_NAME = "collect_macos_support_info.sh"
 MACOS_SYMBOL_MANIFEST_NAME = "SYMBOLS.txt"
 MACOS_SYMBOL_ARCHIVE_SUFFIX = ".tar.xz"
-GAMELIBS_STAGE_MANIFEST_PATH = Path(".tmp") / "gamelibs_stage" / "openq4_gamelibs_stage_manifest.json"
 SUPPORTED_ARCHES = ("x64", "x86", "arm64", "universal2")
 
 PLATFORM_EXECUTABLE_EXT = {
@@ -1538,8 +1538,12 @@ def clean_version_metadata_value(value: object) -> str:
     return text
 
 
-def read_staged_repository_metadata(source_root: Path) -> dict[str, str]:
-    manifest_path = source_root / GAMELIBS_STAGE_MANIFEST_PATH
+def read_staged_repository_metadata(source_root: Path, platform: str = "windows", arch: str = "x64") -> dict[str, str]:
+    # Universal2 provenance comes from the verified thin-package records; it
+    # has no corresponding Meson source stage of its own.
+    if arch == "universal2":
+        return {}
+    manifest_path = gamelibs_stage_root(source_root, platform, arch) / GAMELIBS_STAGE_MANIFEST_NAME
     if not manifest_path.is_file() or manifest_path.is_symlink():
         return {}
 
@@ -1558,9 +1562,9 @@ def read_staged_repository_metadata(source_root: Path) -> dict[str, str]:
     }
 
 
-def collect_package_repository_metadata(source_root: Path) -> dict[str, str]:
+def collect_package_repository_metadata(source_root: Path, platform: str = "windows", arch: str = "x64") -> dict[str, str]:
     metadata = {key: "unavailable" for key in VERSION_REPOSITORY_METADATA_KEYS}
-    staged_metadata = read_staged_repository_metadata(source_root)
+    staged_metadata = read_staged_repository_metadata(source_root, platform, arch)
     for key, value in staged_metadata.items():
         if value != "unavailable":
             metadata[key] = value
@@ -2201,6 +2205,8 @@ def copy_release_collateral(source_root: Path, package_root: Path, platform: str
     collateral = (
         (source_root / RELEASE_README_PATH, package_root / "README.html"),
         (source_root / LICENSE_PATH, package_root / "LICENSE"),
+        (source_root / "LICENSES" / "KHRONOS-GLES-MIT.txt", package_root / "licenses" / "KHRONOS-GLES-MIT.txt"),
+        (source_root / "CONTRIBUTORS.md", package_root / "CONTRIBUTORS.md"),
     )
 
     for source, destination in collateral:
@@ -3710,7 +3716,7 @@ def main(argv: list[str]) -> int:
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
-    repository_metadata = collect_package_repository_metadata(source_root)
+    repository_metadata = collect_package_repository_metadata(source_root, args.platform, args.arch)
 
     package_stem = f"openq4-{version_tag}-{args.platform}-{args.arch}{package_suffix}"
     archive_path = output_dir / f"{package_stem}{archive_suffix}"

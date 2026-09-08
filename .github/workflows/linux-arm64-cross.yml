@@ -14,6 +14,10 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  # Keep all builds on the companion engine-interface revision used by CI.
+  OPENQ4_GAMELIBS_SHA: f9bf8a692de539b9d149cc7b2c47759dbb1ddd62
+
 jobs:
   cross-build:
     name: Linux ARM64 Cross Build (x64 host)
@@ -33,7 +37,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git clone --depth 1 https://github.com/themuffinator/openQ4-game.git "${OPENQ4_GAMELIBS_REPO}"
+          git init "${OPENQ4_GAMELIBS_REPO}"
+          git -C "${OPENQ4_GAMELIBS_REPO}" remote add origin https://github.com/themuffinator/openQ4-game.git
+          git -C "${OPENQ4_GAMELIBS_REPO}" fetch --depth 1 origin "${OPENQ4_GAMELIBS_SHA}"
+          git -C "${OPENQ4_GAMELIBS_REPO}" checkout --detach "${OPENQ4_GAMELIBS_SHA}"
+          test "$(git -C "${OPENQ4_GAMELIBS_REPO}" rev-parse HEAD)" = "${OPENQ4_GAMELIBS_SHA}"
 
       - name: Setup Python
         uses: actions/setup-python@v6
@@ -132,14 +140,16 @@ jobs:
                 count++
                 if ($4 == "FUNC" && $5 == "GLOBAL" && $6 == "DEFAULT" && $8 == "GetGameAPI") {
                   api++
+                } else if ($4 == "FUNC" && $5 == "GLOBAL" && $6 == "DEFAULT" && $8 == "openQ4_Mem_GetModuleStats") {
+                  stats++
                 } else {
                   unexpected++
                   print "Unexpected public game-module symbol: " $0 > "/dev/stderr"
                 }
               }
               END {
-                if (count != 1 || api != 1 || unexpected != 0) {
-                  print "Expected exactly one GLOBAL DEFAULT FUNC GetGameAPI export" > "/dev/stderr"
+                if (count != 2 || api != 1 || stats != 1 || unexpected != 0) {
+                  print "Expected only GLOBAL DEFAULT FUNC GetGameAPI and openQ4_Mem_GetModuleStats exports" > "/dev/stderr"
                   exit 1
                 }
               }

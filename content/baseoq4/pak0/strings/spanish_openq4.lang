@@ -950,4 +950,18 @@
 	"#str_42832"	"Tab: canal | RePág/AvPág: historial"
 	"#str_42833"	"Historial | Ctrl+Fin: últimos mensajes"
 	"#str_42834"	"RePág/AvPág: historial | Arriba/Abajo: recuperar"
+
+	// SigmaTouch editor labels (emileb Android support).
+	"#str_42900"	"Mostrar menú"
+	"#str_42901"	"Guardado rápido"
+	"#str_42902"	"Carga rápida"
+	"#str_42903"	"Mostrar teclado"
+	"#str_42904"	"Usar ratón"
+	"#str_42905"	"Consola"
+	"#str_42906"	"Mostrar controles personalizados"
+	"#str_42907"	"Mostrar números de armas"
+	"#str_42908"	"Arma siguiente"
+	"#str_42909"	"Arma anterior"
+	"#str_42910"	"Botones de movimiento (WASD)"
+	"#str_42911"	"Clic izquierdo"
 }

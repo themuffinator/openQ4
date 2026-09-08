@@ -169,7 +169,11 @@ def validate_sdl3_context_teardown_guards() -> None:
     require(shutdown, "if (s_glWindow) {\n\t\t\t(void)windowServices->MakeGLContextCurrent(NULL);", "SDL3 shutdown context detach guard")
     reject(shutdown, "(void)windowServices->MakeGLContextCurrent(NULL);\n\t\twindowServices->DestroyGLContext", "SDL3 shutdown unguarded context detach")
 
-    require(swap, 'if (SDL3_EnsureGLContextCurrent("swap buffers") && !s_glWindowServices->SwapGLWindow())', "SDL3 swap current-context guard")
+    current_guard = 'if (!SDL3_EnsureGLContextCurrent("swap buffers")) {'
+    guard_body = function_body(swap, current_guard)
+    require(guard_body, "return;", "SDL3 failed current-context stops presentation")
+    require_before(swap, current_guard, "s_glWindowServices->SwapGLWindow()", "SDL3 swap current-context guard")
+    require_before(swap, current_guard, "RB_GLES_RestoreStateAfterOverlay();", "GLES overlay restore current-context guard")
     reject(swap, "if (s_glWindow && !s_glWindowServices->SwapGLWindow())", "SDL3 swap window-only guard")
 
     require(activate, 'SDL3_EnsureGLContextCurrent("activate context")', "SDL3 activate current-context guard")

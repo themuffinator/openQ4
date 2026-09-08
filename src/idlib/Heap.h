@@ -117,7 +117,10 @@ typedef struct {
 	int		num;
 	int		minSize;
 	int		maxSize;
-	int		totalSize;
+	// A single allocation is bounded by Mem_ValidateAllocSize, but the running
+	// total is not: a loaded Quake 4 map sits within a few hundred megabytes of
+	// INT_MAX, so the accumulator has to be wider than the sizes it sums.
+	int64_t	totalSize;
 } memoryStats_t;
 
 // RAVEN BEGIN
@@ -166,12 +169,53 @@ const char *GetMemAllocStats(int tag, int &num, int &size, int &peak);
 #endif
 // RAVEN END
 
+/*
+================================================
+Cross-module allocation totals.
+
+idlib is compiled once per binary: the engine, the renderer module and the game
+module each link their own archive, deliberately, so that the type layouts
+behind __DOOM_DLL__ and GAME_DLL cannot collide. Every copy therefore keeps its
+own allocation counters, and Mem_GetStats can only ever answer for the binary it
+was called from -- which on Android leaves the renderer's image allocations out
+of the engine's total entirely.
+
+Each copy exports MEM_MODULE_STATS_ENTRY_POINT, and whoever loads a module looks
+it up and registers it here. Mem_GetProcessStats then sums the local counters
+with every registered module's. The lookup is by name through the normal dynamic
+symbol path, so a module built before this existed simply does not resolve and
+is skipped rather than breaking the load.
+================================================
+*/
+#define MEM_MODULE_STATS_ENTRY_POINT	"openQ4_Mem_GetModuleStats"
+
+// 'used' is load-bearing, not decoration: nothing inside the binary calls this
+// -- it is only ever reached by name from the loader -- so without it both
+// -dead_strip and --gc-sections drop the symbol and every module silently
+// reports nothing.
+#if defined( _WIN32 )
+	#define MEM_MODULE_STATS_EXPORT		__declspec( dllexport )
+#else
+	#define MEM_MODULE_STATS_EXPORT		__attribute__( ( visibility( "default" ), used ) )
+#endif
+
+typedef void ( *memModuleStats_t )( memoryStats_t *stats );
+
+// Exported from every idlib copy. Reports that binary's counters only.
+extern "C" MEM_MODULE_STATS_EXPORT void openQ4_Mem_GetModuleStats( memoryStats_t *stats );
+
 void		Mem_Init( void );
 void		Mem_Shutdown( void );
 void		Mem_EnableLeakTest( const char *name );
 void		Mem_ClearFrameStats( void );
 void		Mem_GetFrameStats( memoryStats_t &allocs, memoryStats_t &frees );
 void		Mem_GetStats( memoryStats_t &stats );
+// Registers a just-loaded module's exported counters. Ignores NULL and
+// duplicates, so a vid_restart that reloads the same module cannot double-count.
+void		Mem_RegisterModuleStats( memModuleStats_t provider );
+void		Mem_UnregisterModuleStats( memModuleStats_t provider );
+// Local counters plus every registered module's.
+void		Mem_GetProcessStats( memoryStats_t &stats );
 void		Mem_Dump_f( const class idCmdArgs &args );
 void		Mem_DumpCompressed_f( const class idCmdArgs &args );
 void		Mem_AllocDefragBlock( void );
@@ -372,6 +416,78 @@ template < class T >
 ID_INLINE idTempArray<T>::~idTempArray() {
 	Mem_Free(buffer);
 }
+
+/*
+================================================
+idTempArray16 is idTempArray with the 16 byte alignment that _alloca16
+guaranteed.
+
+It exists so that a scratch buffer whose size comes from asset data -- a vertex
+count out of a model file, say -- can be moved off the stack without silently
+dropping the alignment the code around it was written against. _alloca16 cannot
+fail: it moves the stack pointer and returns, so a large enough count simply
+walks off the end of the thread's stack and the first write dies on the guard
+page. A model big enough to do that is a normal model on a thread with a small
+stack, which is every thread on Android.
+
+The template parameter MUST BE POD, as with idTempArray.
+================================================
+*/
+template < class T >
+class idTempArray16 {
+public:
+	idTempArray16( unsigned int num ) {
+		this->num = num;
+		buffer = ( T * )Mem_Alloc16( num * sizeof( T ) );
+	}
+	~idTempArray16() {
+		Mem_Free16( buffer );
+	}
+
+	T &			operator []( unsigned int i ) { assert( i < num ); return buffer[i]; }
+	const T &	operator []( unsigned int i ) const { assert( i < num ); return buffer[i]; }
+
+	T *			Ptr() { return buffer; }
+	const T *	Ptr() const { return buffer; }
+
+	size_t		Size() const { return num * sizeof( T ); }
+	unsigned int Num() const { return num; }
+
+	void		Zero() { memset( Ptr(), 0, Size() ); }
+
+private:
+	T *				buffer;
+	unsigned int	num;
+
+	idTempArray16( const idTempArray16 & );
+	idTempArray16 & operator=( const idTempArray16 & );
+};
+
+/*
+================================================
+A 16 byte aligned scratch buffer that stays on the stack while that is cheap and
+moves to the heap once it would not fit.
+
+Some of these sites run per frame, so allocating unconditionally on the heap
+would trade a crash for a malloc in the frame loop; and some are sized from
+asset data, so staying on the stack risks walking off the end of it. The size
+decides. 256KB is 4096 idDrawVerts, comfortably above any normal mesh and well
+below the ~1MB that overflows a thread stack on Android.
+
+Declares 'name' as a 'type *'. As with _alloca16, it is valid to the end of the
+enclosing scope; unlike _alloca16, an oversized count is not fatal.
+================================================
+*/
+#define OPENQ4_STACK_SCRATCH_LIMIT		( 256 * 1024 )
+
+#define OPENQ4_ALLOC16_SCRATCH( type, name, count )										\
+	const unsigned int name##_scratchCount = ( unsigned int )( count );					\
+	idTempArray16< type > name##_scratchHeap(											\
+		( ( size_t )name##_scratchCount * sizeof( type ) >= OPENQ4_STACK_SCRATCH_LIMIT )	\
+			? name##_scratchCount : 0 );												\
+	type *name = ( name##_scratchHeap.Num() > 0 )										\
+		? name##_scratchHeap.Ptr()														\
+		: ( type * )_alloca16( ( size_t )name##_scratchCount * sizeof( type ) )
 
 
 /*

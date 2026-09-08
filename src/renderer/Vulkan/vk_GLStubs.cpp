@@ -27,7 +27,7 @@
 
 #include "../tr_local.h"
 
-bool VK_GuiExecutor_ReadPixels( int x, int y, int width, int height, void *pixels );
+bool VK_GuiExecutor_ReadPixels( int x, int y, int width, int height, void *pixels, int components );
 
 void glAccum(GLenum op, GLfloat value){};
 void glAlphaFunc(GLenum func, GLclampf ref){};
@@ -278,8 +278,12 @@ void glRasterPos4s(GLshort x, GLshort y, GLshort z, GLshort w){};
 void glRasterPos4sv(const GLshort *v){};
 void glReadBuffer(GLenum mode){};
 void glReadPixels(GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, GLvoid *pixels){
-	if ( format == GL_RGB && type == GL_UNSIGNED_BYTE ) {
-		if ( !VK_GuiExecutor_ReadPixels( x, y, width, height, pixels ) ) {
+	// GL_RGBA is what R_ReadTiledPixels issues since the ES screenshot fix, and
+	// is the only format OpenGL ES guarantees for the default framebuffer.
+	// GL_RGB is kept for callers that still ask for it.
+	if ( ( format == GL_RGB || format == GL_RGBA ) && type == GL_UNSIGNED_BYTE ) {
+		if ( !VK_GuiExecutor_ReadPixels( x, y, width, height, pixels,
+				format == GL_RGBA ? 4 : 3 ) ) {
 			common->Warning( "Vulkan glReadPixels failed for %d x %d capture", width, height );
 		}
 		return;

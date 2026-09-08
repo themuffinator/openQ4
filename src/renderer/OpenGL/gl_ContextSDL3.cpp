@@ -205,7 +205,76 @@ static void SDL3_MoveCompatibilityFallbacksToFront(rendererContextCandidate_t *c
 // path differs.
 bool RendererBootstrap_ShouldAutoPromoteModernVisible( void );
 
+// The inverse of the above, for r_glCoreProfileFirst.
+//
+// RendererContextLadder_Build deliberately orders a forced modern tier as
+// versioned-compatibility, then the 2.1-ish compatibility fallback, then core,
+// so gameplay does not land on a core profile while the modern visible path is
+// incomplete. On a driver that caps compatibility below 3.3 that ordering makes
+// the modern tier unreachable: every versioned compatibility request fails, the
+// fallback succeeds, and the core candidates behind it are never tried. macOS is
+// exactly this case -- Apple offers 2.1 compatibility or 4.1 core and nothing
+// between -- so r_glTier gl41 still lands on the legacy ARB2 bridge.
+//
+// Hoisting the core candidates ahead of the fallback makes the modern path
+// reachable for diagnosis. Off by default: it changes which context shipping
+// configurations get.
+static void SDL3_MoveCoreCandidatesToFront(rendererContextCandidate_t *candidates, int candidateCount) {
+	int insertIndex = 0;
+
+	for (int i = 0; i < candidateCount; ++i) {
+		if (candidates[i].profile != RENDERER_CONTEXT_PROFILE_CORE) {
+			continue;
+		}
+
+		if (i != insertIndex) {
+			rendererContextCandidate_t core = candidates[i];
+			memmove(&candidates[insertIndex + 1], &candidates[insertIndex], (i - insertIndex) * sizeof(candidates[0]));
+			candidates[insertIndex] = core;
+		}
+		++insertIndex;
+	}
+}
+
+// Puts a single GLES 3.0 candidate at the front of the ladder. The desktop-GL
+// candidates are deliberately left in place behind it: if no EGL/GLES driver is
+// present the ES request simply fails and the normal ladder proceeds, so
+// enabling this cannot leave the engine without a context.
+static int SDL3_PrependGLESCandidate(rendererContextCandidate_t *candidates, int maxCandidates, int candidateCount) {
+	if (candidates == NULL || maxCandidates <= 0) {
+		return candidateCount;
+	}
+
+	if (candidateCount >= maxCandidates) {
+		candidateCount = maxCandidates - 1;
+	}
+	if (candidateCount > 0) {
+		memmove(&candidates[1], &candidates[0], candidateCount * sizeof(candidates[0]));
+	}
+
+	rendererContextCandidate_t &es = candidates[0];
+	memset(&es, 0, sizeof(es));
+	es.major = 3;
+	es.minor = 0;
+	es.profile = RENDERER_CONTEXT_PROFILE_ES;
+	es.explicitVersion = true;
+	es.debugContext = r_glDebugContext.GetBool();
+	idStr::Copynz(es.label, "gles 3.0", sizeof(es.label));
+
+	return candidateCount + 1;
+}
+
 static int SDL3_BuildGLContextCandidates(rendererContextCandidate_t *candidates, int maxCandidates) {
+#if defined(OPENQ4_RENDERER_GLES_MODULE)
+	// The GLES module links libGLESv2 and nothing else, so a desktop context is
+	// not a fallback -- it is a context none of this module's GL entry points
+	// can talk to. Without this the macOS ladder hands back a 2.1 compatibility
+	// context, ANGLE never becomes current, and the first glGetString returns
+	// NULL. Offer the ES candidate alone and let context creation fail loudly
+	// if the platform cannot provide one.
+	(void)r_glTier;
+	return SDL3_PrependGLESCandidate(candidates, maxCandidates, 0);
+#else
 	const rendererTierPreference_t preference = RendererTierPreference_FromString(r_glTier.GetString());
 	// r_glTier auto asks for a compatibility profile because the ARB2 bridge is
 	// what actually draws, and it needs fixed-function state. Once the modern
@@ -235,7 +304,17 @@ static int SDL3_BuildGLContextCandidates(rendererContextCandidate_t *candidates,
 		}
 	}
 
+	if (candidateCount > 0 && r_glCoreProfileFirst.GetBool()) {
+		SDL3_MoveCoreCandidatesToFront(candidates, candidateCount);
+		common->Printf("SDL3: r_glCoreProfileFirst -- core-profile contexts moved ahead of the compatibility fallback\n");
+	}
+
+	if (r_glesContext.GetBool()) {
+		return SDL3_PrependGLESCandidate(candidates, maxCandidates, candidateCount);
+	}
+
 	return candidateCount;
+#endif
 }
 
 static int SDL3_NormalizeMSAASampleFallback(const int samples) {
@@ -287,6 +366,7 @@ static void SDL3_BuildFramebufferDesc(const glimpParms_t &parms, const rendererC
 	desc.glMajor = candidate.major;
 	desc.glMinor = candidate.minor;
 	desc.glCoreProfile = candidate.profile == RENDERER_CONTEXT_PROFILE_CORE;
+	desc.glESProfile = candidate.profile == RENDERER_CONTEXT_PROFILE_ES;
 	desc.glDebugContext = candidate.debugContext;
 }
 
@@ -582,9 +662,18 @@ void GLimp_SwapBuffers(void) {
 		glConfig.uiViewportHeight = windowInfo.uiViewportHeight;
 	}
 
-	if (SDL3_EnsureGLContextCurrent("swap buffers") && !s_glWindowServices->SwapGLWindow()) {
+	if (!SDL3_EnsureGLContextCurrent("swap buffers")) {
+		return;
+	}
+	if (!s_glWindowServices->SwapGLWindow()) {
 		common->Printf("SDL3: failed to swap window buffers: %s\n", R_GLVideoError());
 	}
+
+#if defined(__ANDROID__) && defined(OPENQ4_RENDERER_GLES_MODULE)
+	// The host app's touch overlay draws inside that swap; undo what it left
+	// behind before the next frame delta-codes against it.
+	RB_GLES_RestoreStateAfterOverlay();
+#endif
 }
 
 void GLimp_ActivateContext(void) {

@@ -30,6 +30,7 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "tr_local.h"
 #include "Model_local.h"
+#include "ModernGLExecutor.h"
 #include "RendererMetrics.h"
 #include "RendererUpload.h"
 #include "ScenePackets.h"
@@ -49,6 +50,10 @@ static const char *R_GetBackEndRendererName( backEndName_t renderer ) {
 	switch ( renderer ) {
 		case BE_ARB2:
 			return "ARB2";
+		case BE_MODERN:
+			return "Modern";
+		case BE_GLES_D3:
+			return "GLESD3";
 		default:
 			return "BAD";
 	}
@@ -77,6 +82,10 @@ static bool R_IsLegacyBackEndRequest( const char *rendererName ) {
 R_RequestBackEndRenderer
 ==============================
 */
+static bool R_ModernBackEndAvailable( void ) {
+	return R_ModernGLExecutor_Stats().available;
+}
+
 static backEndName_t R_RequestBackEndRenderer( const char *rendererName ) {
 	if ( rendererName == NULL || rendererName[0] == '\0' || idStr::Icmp( rendererName, "best" ) == 0 ) {
 		return BE_BAD;
@@ -85,6 +94,18 @@ static backEndName_t R_RequestBackEndRenderer( const char *rendererName ) {
 	if ( idStr::Icmp( rendererName, "arb2" ) == 0 ) {
 		return glConfig.allowARB2Path ? BE_ARB2 : BE_BAD;
 	}
+
+	if ( idStr::Icmp( rendererName, "modern" ) == 0 ) {
+		return R_ModernBackEndAvailable() ? BE_MODERN : BE_BAD;
+	}
+
+#ifdef OPENQ4_RENDERER_GLES_MODULE
+	// Only the renderer-gles module compiles the GLES_D3 translation units, so
+	// the name resolves nowhere else.
+	if ( idStr::Icmp( rendererName, "glesd3" ) == 0 ) {
+		return BE_GLES_D3;
+	}
+#endif
 
 	return BE_BAD;
 }
@@ -95,8 +116,27 @@ R_PickBestBackEndRenderer
 ===============================
 */
 static backEndName_t R_PickBestBackEndRenderer() {
+	// ARB2 stays the automatic choice wherever it exists. The modern executor
+	// is layered over it there and gives up passes it cannot own, which is a
+	// strictly better frame than the standalone backend can produce today.
 	if ( glConfig.allowARB2Path ) {
 		return BE_ARB2;
+	}
+
+#ifdef OPENQ4_RENDERER_GLES_MODULE
+	// An ES profile: gles_d3 is the back end that renders here. The modern
+	// executor's shader library targets desktop GLSL and does not compile as
+	// GLSL ES, so BE_MODERN on ES draws nothing -- picking it would hand back a
+	// black frame rather than a renderer.
+	if ( glConfig.backendCaps.profile == RENDERER_CONTEXT_PROFILE_ES ) {
+		return BE_GLES_D3;
+	}
+#endif
+
+	// No ARB2 -- a desktop core profile. Standalone modern is the only backend
+	// left, and it is still better than failing to start.
+	if ( R_ModernBackEndAvailable() ) {
+		return BE_MODERN;
 	}
 
 	return BE_BAD;
@@ -1255,6 +1295,22 @@ void idRenderSystemLocal::SetBackEndRenderer() {
 			r_lightDetailLevel.SetFloat( 0.0f );
 		}
 		break;
+	case BE_MODERN:
+		common->Printf( "using standalone modern renderSystem (no ARB2 bridge)\n" );
+		// Vertex programs in the sense the legacy path means -- ARB assembly
+		// vertex programs -- do not exist here. The flag drives interaction
+		// data layout and vertex-cache invalidation, and the modern executor
+		// builds its own vertex input, so it stays false.
+		backEndRendererHasVertexPrograms = false;
+		backEndRendererMaxLight = 999;
+		break;
+	case BE_GLES_D3:
+		common->Printf( "using Doom 3-shaped GLES 3.0 renderSystem (gles_d3)\n" );
+		// Same reasoning as BE_MODERN: no ARB assembly vertex programs exist on
+		// an ES context, and this backend builds its own vertex input.
+		backEndRendererHasVertexPrograms = false;
+		backEndRendererMaxLight = 999;
+		break;
 	default:
 		common->FatalError( "SetbackEndRenderer: bad back end" );
 	}
@@ -1409,6 +1465,15 @@ void idRenderSystemLocal::BeginFrame( int windowWidth, int windowHeight ) {
 	// quick fill-rate testing below native resolution. Supersampling above native
 	// is handled by the main-scene render target path so the back buffer stays at
 	// the display size.
+	//
+	// Modes 1 and 2 on ES are NOT applied here. A crop pushed in BeginFrame is the
+	// whole frame's coordinate system -- menu, HUD and scene alike -- so scaling it
+	// costs the UI its native resolution, which is the one part of a phone frame
+	// that cannot afford to be soft. PushSceneResolutionScale wraps the world
+	// render instead; see idRenderWorldLocal::RenderScene.
+	resolutionScaleCropActive = false;
+	resolutionScaleWidth = 0;
+	resolutionScaleHeight = 0;
 	const int screenFraction = idMath::ClampInt( 10, 200, r_screenFraction.GetInteger() );
 	if ( !R_TemporalPresentation_DynamicResolutionRequested()
 			&& !R_TemporalPresentation_TemporalAARequested()
@@ -1595,6 +1660,118 @@ static int RoundDownToPowerOfTwo( int v ) {
 		}
 	}
 	return 1<<i;
+}
+
+/*
+================
+idRenderSystemLocal::PushSceneResolutionScale
+
+r_screenFraction below native, scoped to the world render.
+
+The saving comes from the crop: everything downstream of RenderViewToViewport --
+the view's viewport, its scissor, every drawSurf, light and entity scissor rect,
+and the viewports of any mirror or portal subviews derived from it -- is computed
+in the smaller space by front-end maths that already exists. Nothing in the back
+end has to rescale anything.
+
+Scoping it to RenderScene rather than the frame is what keeps the HUD and the
+menus at native resolution. A crop pushed in BeginFrame reaches
+idGuiModel::EmitFullScreen too, and every fullscreen 2D draw in the frame lands
+inside it.
+
+Returns whether a crop was pushed; the caller must pop exactly when it did.
+================
+*/
+bool idRenderSystemLocal::PushSceneResolutionScale( void ) {
+	resolutionScaleCropActive = false;
+	resolutionScaleWidth = 0;
+	resolutionScaleHeight = 0;
+
+	if ( !glConfig.isInitialized ) {
+		return false;
+	}
+
+	const int screenFraction = idMath::ClampInt( 10, 200, r_screenFraction.GetInteger() );
+	if ( screenFraction >= 100 ) {
+		return false;
+	}
+
+	// Mode 0 is the legacy whole-frame crop, still pushed in BeginFrame, and it
+	// deliberately has no upscale. Modes 1 and 2 are implemented in
+	// draw_common.cpp for the desktop path; this is the ES half of them.
+	if ( r_resolutionScaleMode.GetInteger() == 0 ) {
+		return false;
+	}
+	if ( glConfig.backendCaps.profile != RENDERER_CONTEXT_PROFILE_ES ) {
+		return false;
+	}
+
+	// the back end has told us it cannot resolve the crop on this context
+	if ( resolutionScaleSuppressed ) {
+		return false;
+	}
+
+	// Something else already owns the frame's coordinate system -- a levelshot,
+	// or the legacy mode 0 crop. Do not layer a second one under it.
+	if ( currentRenderCrop != 0 ) {
+		return false;
+	}
+
+	// A larger-than-window capture re-renders the scene once per tile with
+	// tr.viewportOffset moved, and resolving a crop inside one tile would stretch
+	// that tile over the whole window. Ordinary same-size screenshots are just a
+	// re-render of the live frame and keep the scaling, so a capture shows what
+	// the display shows.
+	if ( tiledViewport[0] > glConfig.vidWidth || tiledViewport[1] > glConfig.vidHeight ) {
+		return false;
+	}
+
+	// The scene may be rendering into an offscreen target rather than the back
+	// buffer -- that is the normal path once MSAA or post AA is on, and it is
+	// what an Android build with r_multiSamples set does. That is fine: the back
+	// end resolves the crop inside whatever target is bound, before the game's
+	// fullscreen material samples it at texcoords 0..1.
+	//
+	// The one case it cannot handle is a multisampled target, which ES 3.0
+	// refuses as a blit destination. Catch that here rather than letting the back
+	// end discover it, so no frame is ever presented with the scene left in the
+	// target's corner.
+	if ( activeRenderTexture != NULL ) {
+		idImage *sceneColor = ( activeRenderTexture->GetNumColorImages() > 0 )
+			? activeRenderTexture->GetColorImage( 0 )
+			: NULL;
+		if ( sceneColor == NULL || sceneColor->GetOpts().numMSAASamples > 1 ) {
+			static bool reported = false;
+			if ( !reported ) {
+				reported = true;
+				common->Printf( "r_screenFraction: inactive -- the scene target is multisampled, which cannot receive a blit on ES.\n" );
+			}
+			return false;
+		}
+	}
+
+	CropRenderSize( SCREEN_WIDTH * screenFraction / 100.0f, SCREEN_HEIGHT * screenFraction / 100.0f );
+
+	// CropRenderSize converts to physical pixels and can halve what it was asked
+	// for, so the rect it actually pushed is the one the back end has to resolve
+	// -- not the percentage it was derived from.
+	resolutionScaleCropActive = true;
+	resolutionScaleWidth = renderCrops[currentRenderCrop].width;
+	resolutionScaleHeight = renderCrops[currentRenderCrop].height;
+	return true;
+}
+
+/*
+================
+idRenderSystemLocal::PopSceneResolutionScale
+================
+*/
+void idRenderSystemLocal::PopSceneResolutionScale( void ) {
+	if ( !resolutionScaleCropActive ) {
+		return;
+	}
+	resolutionScaleCropActive = false;
+	UnCrop();
 }
 
 /*

@@ -147,16 +147,83 @@ bool idScreenRect::IsEmpty() const {
 
 /*
 ======================
+R_ClampedScreenCoord
+
+idScreenRect stores shorts, and nothing upstream bounds what reaches this
+conversion.
+
+idFrustum::ProjectionBounds divides by the distance along the frustum axis when
+it projects a box corner (Frustum.cpp, AddLocalLineToProjectionBoundsSetCull:
+"if ( cull1 == 0 && start.x > 0.0f )" then "start.y * dFar / ( start.x * dLeft
+)"). A corner sitting essentially on the eye point satisfies that test and
+divides by a near-zero, so the projection comes back as a huge finite y or z --
+with the function still returning true, so a caller checking the return value
+learns nothing.
+
+0.5 * ( 1 - y ) * width then overflows a short at y < -26 on a 2400-pixel-wide
+viewport, but only at y < -50 on a 1280-pixel one. That is why this reproduces
+on a phone and not in a desktop test window, and idMath::FtoiFast is lrintf on
+Android, which saturates the opposite way from x86-64 before the truncation.
+
+The overflowed value wraps back into range, so the rect looks plausible:
+IsEmpty() does not reject it, and the Intersect in R_AddModelSurfaces takes a
+min and so cannot undo it either. The entity ends up drawn clipped to a bogus
+small box. Nothing clears the colour buffer, so everything that box stops
+covering keeps the previous frame -- a frozen screen with one small live box
+moving around in it.
+
+Clamping in float, ahead of the narrowing conversion, is what makes that
+impossible. This is behaviour-preserving for every value that was not already
+wrapping: callers all intersect the result into a rect no larger than the
+viewport, and that Intersect takes the min either way. The one pixel of slack
+matches idScreenRect::Expand.
+======================
+*/
+static int r_screenRectClampReports = 0;
+
+static short R_ClampedScreenCoord( float coord, int dimension, bool &clamped ) {
+	const float low = -1.0f;
+	const float high = ( float )( dimension + 1 );
+
+	// ordered so a NaN fails the test and is clamped rather than converted
+	if ( coord >= low && coord <= high ) {
+		return ( short )idMath::FtoiFast( coord );
+	}
+
+	clamped = true;
+	return ( coord < low ) ? ( short )-1 : ( short )( dimension + 1 );
+}
+
+/*
+======================
 R_ScreenRectFromViewFrustumBounds
 ======================
 */
 idScreenRect R_ScreenRectFromViewFrustumBounds( const idBounds &bounds ) {
 	idScreenRect screenRect;
 
-	screenRect.x1 = idMath::FtoiFast( 0.5f * ( 1.0f - bounds[1].y ) * ( tr.viewDef->viewport.x2 - tr.viewDef->viewport.x1 ) );
-	screenRect.x2 = idMath::FtoiFast( 0.5f * ( 1.0f - bounds[0].y ) * ( tr.viewDef->viewport.x2 - tr.viewDef->viewport.x1 ) );
-	screenRect.y1 = idMath::FtoiFast( 0.5f * ( 1.0f + bounds[0].z ) * ( tr.viewDef->viewport.y2 - tr.viewDef->viewport.y1 ) );
-	screenRect.y2 = idMath::FtoiFast( 0.5f * ( 1.0f + bounds[1].z ) * ( tr.viewDef->viewport.y2 - tr.viewDef->viewport.y1 ) );
+	const int width = tr.viewDef->viewport.x2 - tr.viewDef->viewport.x1;
+	const int height = tr.viewDef->viewport.y2 - tr.viewDef->viewport.y1;
+	bool clamped = false;
+
+	screenRect.x1 = R_ClampedScreenCoord( 0.5f * ( 1.0f - bounds[1].y ) * width, width, clamped );
+	screenRect.x2 = R_ClampedScreenCoord( 0.5f * ( 1.0f - bounds[0].y ) * width, width, clamped );
+	screenRect.y1 = R_ClampedScreenCoord( 0.5f * ( 1.0f + bounds[0].z ) * height, height, clamped );
+	screenRect.y2 = R_ClampedScreenCoord( 0.5f * ( 1.0f + bounds[1].z ) * height, height, clamped );
+
+	// Loud and self-limiting. Bounds this far out are a real anomaly, and the
+	// whole reason this survived so long is that it was silent: the value
+	// wrapped into a plausible-looking rect instead of an obviously broken one.
+	// If the frozen-frame bug reproduces without these lines in the log, the
+	// cause is somewhere else and this fix is not it.
+	if ( clamped && r_screenRectClampReports < 8 ) {
+		r_screenRectClampReports++;
+		common->Printf( "R_ScreenRectFromViewFrustumBounds: bounds out of range, clamped -- "
+				"y %f..%f z %f..%f, viewport %ix%i, rect %i,%i..%i,%i\n",
+				bounds[0].y, bounds[1].y, bounds[0].z, bounds[1].z,
+				width, height,
+				screenRect.x1, screenRect.y1, screenRect.x2, screenRect.y2 );
+	}
 
 	if ( r_useDepthBoundsTest.GetInteger() ) {
 		R_TransformEyeZToWin( -bounds[0].x, tr.viewDef->projectionMatrix, screenRect.zmin );

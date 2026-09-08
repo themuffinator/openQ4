@@ -1545,6 +1545,7 @@ private:
 	static idCVar			fs_basepath;
 	static idCVar			fs_homepath;
 	static idCVar			fs_savepath;
+	static idCVar			fs_cachepath;
 	static idCVar			fs_cdpath;
 	static idCVar			fs_game;
 	static idCVar			fs_game_base;
@@ -1641,6 +1642,13 @@ idCVar	idFileSystemLocal::fs_copyfiles( "fs_copyfiles", "0", CVAR_SYSTEM | CVAR_
 idCVar	idFileSystemLocal::fs_basepath( "fs_basepath", "", CVAR_SYSTEM | CVAR_INIT, "" );
 idCVar	idFileSystemLocal::fs_homepath( "fs_homepath", "", CVAR_SYSTEM | CVAR_INIT, "" );
 idCVar	idFileSystemLocal::fs_savepath( "fs_savepath", "", CVAR_SYSTEM | CVAR_INIT, "" );
+// Regenerable data only: the generated/ tree (binary image and sound caches).
+// Empty means "write it to fs_savepath", which is where it went before this
+// existed, so leaving it unset changes nothing. Hosts that have a directory the
+// OS may reclaim -- Android's getCacheDir(), XDG_CACHE_HOME -- should point this
+// there, because a purged cache costs a slow reload and nothing else, while a
+// purged savepath costs the player their config and saves.
+idCVar	idFileSystemLocal::fs_cachepath( "fs_cachepath", "", CVAR_SYSTEM | CVAR_INIT, "regenerable cache directory for the generated/ tree; empty uses fs_savepath" );
 idCVar	idFileSystemLocal::fs_cdpath( "fs_cdpath", "", CVAR_SYSTEM | CVAR_INIT, "" );
 idCVar	idFileSystemLocal::fs_game( "fs_game", OPENQ4_GAMEDIR, CVAR_SYSTEM | CVAR_INIT | CVAR_SERVERINFO, "mod path" );
 idCVar  idFileSystemLocal::fs_game_base( "fs_game_base", "", CVAR_SYSTEM | CVAR_INIT | CVAR_SERVERINFO, "alternate mod path, searched after the main fs_game path, before the basedir" );
@@ -2071,6 +2079,7 @@ void idFileSystemLocal::CreateOSPath( const char *OSPath ) {
 			*ofs = PATHSEPERATOR_CHAR;
 		}
 	}
+
 }
 
 /*
@@ -4961,6 +4970,22 @@ void idFileSystemLocal::SetupGameDirectories( const char *gameName ) {
 		AddGameDirectory( fs_savepath.GetString(), gameName );
 	}
 
+	// Cache after savepath, which gives it the higher search priority of the
+	// two: entries are prepended, so whatever is added last is found first.
+	//
+	// It must outrank savepath specifically because the cache is the only thing
+	// that writes the generated/ tree. Ordering it below savepath means a
+	// generated file left there by an older build is found first, fails the
+	// derived-opts check against what the current build wants, and is re-derived
+	// and rewritten into the cache on every single load -- where it is never
+	// read, because the stale copy keeps winning. Measured on the Note 20 that
+	// was 1249 of 1944 images re-encoded every load against a 1.1 GB stale tree.
+	//
+	// It stays below basepath and cdpath, so real game content still wins.
+	if ( fs_cachepath.GetString()[0] ) {
+		AddGameDirectory( fs_cachepath.GetString(), gameName );
+	}
+
 	// setup basepath
 	if ( fs_basepath.GetString()[0] ) {
 		AddGameDirectory( fs_basepath.GetString(), gameName );
@@ -6171,14 +6196,23 @@ void idFileSystemLocal::Init( void ) {
 	if ( fs_savepath.GetString()[0] == '\0' ) {
 		fs_savepath.SetString( fs_homepath.GetString() );
 	}
+	// Resolving this to fs_savepath rather than leaving it empty keeps the log
+	// honest about where the generated/ tree actually lands. It also costs
+	// nothing when the two are equal: SetupGameDirectories adds the cache first
+	// and AddGameDirectory ignores a duplicate path, so the search order comes
+	// out exactly as it did before.
+	if ( fs_cachepath.GetString()[0] == '\0' ) {
+		fs_cachepath.SetString( fs_savepath.GetString() );
+	}
 	// fs_cdpath is locked to the platform content root (the app's Resources
 	// directory on macOS, otherwise the process current directory).
 	fs_cdpath.SetString( Sys_DefaultCDPath() );
 	common->Printf(
-		"Filesystem paths: fs_basepath='%s' fs_homepath='%s' fs_savepath='%s' fs_cdpath='%s' fs_game='%s' fs_game_base='%s'\n",
+		"Filesystem paths: fs_basepath='%s' fs_homepath='%s' fs_savepath='%s' fs_cachepath='%s' fs_cdpath='%s' fs_game='%s' fs_game_base='%s'\n",
 		fs_basepath.GetString(),
 		fs_homepath.GetString(),
 		fs_savepath.GetString(),
+		fs_cachepath.GetString(),
 		fs_cdpath.GetString(),
 		fs_game.GetString(),
 		fs_game_base.GetString() );

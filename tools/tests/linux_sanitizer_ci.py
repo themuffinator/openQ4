@@ -61,7 +61,7 @@ def validate_commit_workflow() -> None:
     require(source, '--output-dir "${output_dir}"', "commit validation sanitizer report output")
     require(source, "commit-linux-sanitizer-build-logs", "commit validation sanitizer artifact")
     require(source, ".tmp/validation/linux-sanitizer-builddir/meson-logs", "commit validation sanitizer logs")
-    require(source, ".tmp/gamelibs_stage/openq4_gamelibs_stage_manifest.json", "commit validation sanitizer staging manifest")
+    require(source, ".tmp/gamelibs_stage-linux-x64/openq4_gamelibs_stage_manifest.json", "commit validation sanitizer staging manifest")
     require(source, ".tmp/renderer-validation/sanitizer", "commit validation sanitizer runtime artifacts")
     require(workflow, "python tools/tests/linux_sanitizer_ci.py", "commit script-smoke sanitizer guard")
 

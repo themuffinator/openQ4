@@ -102,6 +102,7 @@ This file describes project goals, rules, and upstream credits for anyone workin
 - Quake 4 installation (Steam): `C:\Program Files (x86)\Steam\steamapps\common\Quake 4`
 
 **Upstream Credits**
+- [Emile Belanger (emileb)](https://github.com/emileb): original Android, SigmaTouch and GLES support; see `docs/dev/android-gles-integration.md`.
 - Justin Marshall.
 - Robert Backebans.
 - id Software.

@@ -22,6 +22,7 @@ typedef enum {
 	RENDER_MODULE_API_GL,		// OpenGL renderer, statically linked (default)
 	RENDER_MODULE_API_VULKAN,	// native Vulkan renderer module
 	RENDER_MODULE_API_GL_MODULE,// OpenGL renderer as a dynamic module (opt-in Phase B8 soak path)
+	RENDER_MODULE_API_GLES,		// OpenGL ES renderer module (Android backend bring-up; macOS needs ANGLE)
 	RENDER_MODULE_API_COUNT
 } rendererModuleApi_t;
 

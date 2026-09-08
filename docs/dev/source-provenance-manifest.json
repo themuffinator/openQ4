@@ -7,7 +7,7 @@
     "doom3": {
       "displayName": "Doom 3 GPL Source Code",
       "headerMarker": "Doom 3 GPL Source Code",
-      "expectedFileCount": 581,
+      "expectedFileCount": 583,
       "officialRepository": "https://github.com/id-Software/DOOM-3",
       "auditedCommit": "a9c49da5afb18201d31e3f0a429a037e56ce2b9a",
       "officialCopying": "https://github.com/id-Software/DOOM-3/blob/a9c49da5afb18201d31e3f0a429a037e56ce2b9a/COPYING.txt",

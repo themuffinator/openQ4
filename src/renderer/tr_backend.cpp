@@ -101,8 +101,10 @@ void RB_SetDefaultGLState( void ) {
 	glEnable( GL_SCISSOR_TEST );
 	glEnable( GL_CULL_FACE );
 	glDisable( GL_SAMPLE_ALPHA_TO_COVERAGE );
-	glDisable( GL_LIGHTING );
-	glDisable( GL_LINE_STIPPLE );
+	if ( glConfig.backendCaps.hasFixedFunctionCompatibility ) {
+		glDisable( GL_LIGHTING );
+		glDisable( GL_LINE_STIPPLE );
+	}
 	glDisable( GL_STENCIL_TEST );
 
 	glPolygonMode (GL_FRONT_AND_BACK, GL_FILL);
@@ -126,6 +128,9 @@ void RB_SetDefaultGLState( void ) {
 		glTexGenf( GL_Q, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR );
 
 		GL_TexEnv( GL_MODULATE );
+		if ( !glConfig.backendCaps.hasFixedFunctionCompatibility ) {
+			continue;
+		}
 		glDisable( GL_TEXTURE_2D );
 		if ( glConfig.texture3DAvailable ) {
 			glDisable( GL_TEXTURE_3D );
@@ -421,7 +426,17 @@ void GL_State( int stateBits ) {
 	//
 	// alpha test
 	//
-	if ( diff & GLS_ATEST_BITS ) {
+	// GL_ALPHA_TEST is fixed-function: it does not exist as an enable in any
+	// OpenGL ES profile, and glEnable/glDisable with it raises GL_INVALID_ENUM
+	// on every state change that touches these bits. glAlphaFunc is already a
+	// no-op stub on ES (GLES/gles_GLStubs.cpp), so the enable was the only half
+	// still reaching the driver -- and it was the source of a persistent
+	// GL_INVALID_ENUM that outlived every frame it was raised in, corrupting
+	// per-draw glGetError checks elsewhere.
+	//
+	// Backends without fixed-function alpha test evaluate the same state bits
+	// in the fragment shader instead (gles_d3: R_GLESD3_AlphaTestReference).
+	if ( ( diff & GLS_ATEST_BITS ) && glConfig.backendCaps.profile != RENDERER_CONTEXT_PROFILE_ES ) {
 		switch ( stateBits & GLS_ATEST_BITS ) {
 		case 0:
 			glDisable( GL_ALPHA_TEST );
@@ -543,6 +558,93 @@ RB_SwapBuffers
 
 =============
 */
+/*
+====================
+r_forceOpaquePresent
+
+idTech 4 writes MEANINGFUL alpha into the colour buffer. Every `maskcolor`
+stage does it deliberately -- the dropship hull's second stage is
+`maskcolor / map makealpha(...)`, and the HUD's ekg widget is the same -- so
+that a later stage can blend through GL_DST_ALPHA.
+
+That is harmless as long as nothing downstream believes the alpha. On the
+desktop GL path nothing does: the NSOpenGL surface is opaque and the channel
+is ignored. On the ES path ANGLE presents through a Metal-backed layer, the
+macOS compositor honours the surface alpha, and every pixel one of those
+stages touched becomes transparent -- which reads as black.
+
+The failure is invisible in a screenshot, because R_ReadTiledPixels reads
+RGBA and packs down to RGB, discarding exactly the channel that is wrong. A
+whole session of captures came back correct while the display was black.
+
+The alpha channel itself comes from SDL3_BuildFramebufferDesc
+(OpenGL/gl_ContextSDL3.cpp:342), which requests alphaBits = 8 for every
+profile including ES.
+
+Why this is fixed at PRESENT time rather than by asking for a config without
+alpha: the back buffer's alpha is load-bearing. gfx/guis/hud/ekg writes a mask
+with `maskcolor` and its second stage blends through GL_DST_ALPHA, and both
+are 2D draws to the default framebuffer, not to a render texture. Drop the
+channel and that widget blends at full strength everywhere instead of through
+its mask. The channel has to exist for the frame and be neutral only at the
+moment the compositor reads it.
+
+Cost is one alpha-only full-screen write per frame -- a masked clear, so not
+the driver's fast-clear path. At 1280x720 that is under a millisecond and it
+happens once, after all rendering. The cheaper alternatives are worse: making
+the game's final resolve emit alpha 1 would be free but depends on
+identifying that draw, and dropping the channel breaks the HUD as above.
+====================
+*/
+static idCVar r_forceOpaquePresent( "r_forceOpaquePresent", "1", CVAR_RENDERER | CVAR_BOOL,
+		"write alpha=1 over the back buffer before presenting on ES, where the compositor honours surface alpha" );
+
+static void RB_ForceOpaquePresentAlpha( void ) {
+	if ( !r_forceOpaquePresent.GetBool() ) {
+		return;
+	}
+	if ( glConfig.backendCaps.profile != RENDERER_CONTEXT_PROFILE_ES ) {
+		return;
+	}
+	// nothing to neutralise when the surface carries no alpha, and the write
+	// would be pure cost
+	if ( glConfig.alphaBits <= 0 ) {
+		return;
+	}
+
+	// The DEFAULT framebuffer specifically. Whatever the frame left bound is
+	// not necessarily it, and clearing a render texture's alpha here would
+	// both miss the fix and corrupt a buffer a later frame samples.
+	GLint previousFbo = 0;
+	glGetIntegerv( GL_FRAMEBUFFER_BINDING, &previousFbo );
+	if ( previousFbo != 0 ) {
+		glBindFramebuffer( GL_FRAMEBUFFER, 0 );
+	}
+
+	// alpha only: RGB must survive untouched, and the scissor must not clip
+	// this to whatever rect the last pass left behind
+	const bool scissorWasEnabled = glIsEnabled( GL_SCISSOR_TEST ) == GL_TRUE;
+	if ( scissorWasEnabled ) {
+		glDisable( GL_SCISSOR_TEST );
+	}
+	glColorMask( GL_FALSE, GL_FALSE, GL_FALSE, GL_TRUE );
+	glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );
+	glClear( GL_COLOR_BUFFER_BIT );
+	glColorMask( GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE );
+	if ( scissorWasEnabled ) {
+		glEnable( GL_SCISSOR_TEST );
+	}
+
+	if ( previousFbo != 0 ) {
+		glBindFramebuffer( GL_FRAMEBUFFER, (GLuint)previousFbo );
+	}
+
+	// glColorMask was issued behind GL_State's back, so its cached mask bits no
+	// longer describe the driver. Force the next GL_State to re-issue
+	// everything rather than delta against a stale record.
+	backEnd.glState.forceGlState = true;
+}
+
 const void	RB_SwapBuffers( const void *data ) {
 	// texture swapping test
 	if ( r_showImages.GetInteger() != 0 ) {
@@ -566,6 +668,8 @@ const void	RB_SwapBuffers( const void *data ) {
 	// Keep that buffer owned by OpenGL until R_ReadTiledPixels has copied it;
 	// presenting an EGL window surface may discard its contents immediately.
 	// All ordinary frames retain the existing presentation path.
+	RB_ForceOpaquePresentAlpha();
+
 	if ( !r_frontBuffer.GetBool() && !tr.takingScreenshot ) {
 	    GLimp_SwapBuffers();
 	}
@@ -670,6 +774,15 @@ static void RB_ResolveMSAA(const void* data) {
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, sourceHandle);
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, destinationHandle);
 
+	// A resolve is a whole-target operation, and glBlitFramebuffer is clipped
+	// by the scissor; it must not depend on whatever box the previous view
+	// left. Measured on Android: a leaked per-surface box clipped this blit to
+	// one door frame and froze everything outside it.
+	const GLboolean resolveScissorWasEnabled = glIsEnabled( GL_SCISSOR_TEST );
+	if ( resolveScissorWasEnabled ) {
+		glDisable( GL_SCISSOR_TEST );
+	}
+
 	// Resolve all of the render targets.
 	const int colorImageCount = cmd->msaaRenderTexture->GetNumColorImages();
 	for (int i = 0; i < colorImageCount; i++)
@@ -706,6 +819,10 @@ static void RB_ResolveMSAA(const void* data) {
 	glReadBuffer(GL_COLOR_ATTACHMENT0);
 	glDrawBuffer(GL_COLOR_ATTACHMENT0);
 
+	if ( resolveScissorWasEnabled ) {
+		glEnable( GL_SCISSOR_TEST );
+	}
+
 	// restore the tracked render target so backEnd.renderTexture stays in
 	// sync with the bound framebuffer
 	RB_RestoreTrackedRenderTexture();
@@ -720,6 +837,15 @@ static void RB_ClearRenderTarget(const void* data) {
 	const renderClearBufferCommand_t* cmd;
 
 	cmd = (renderClearBufferCommand_t*)data;
+
+	// this command means "clear the whole target": it must not be clipped by
+	// whatever scissor box the previous view left (same hazard as the alpha
+	// clear at the top of this file, and measured on Android clipping the
+	// postprocess target's clear to one surface's box)
+	const GLboolean clearScissorWasEnabled = glIsEnabled( GL_SCISSOR_TEST );
+	if ( clearScissorWasEnabled ) {
+		glDisable( GL_SCISSOR_TEST );
+	}
 
 	if ( cmd->clearColor ) {
 		glColorMask( GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE );
@@ -743,6 +869,11 @@ static void RB_ClearRenderTarget(const void* data) {
 	}
 
 	glClearDepth(1.0f);
+
+	if ( clearScissorWasEnabled ) {
+		glEnable( GL_SCISSOR_TEST );
+	}
+
 	GL_ClearStateDelta();
 
 }
@@ -997,6 +1128,8 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 	RB_SetDefaultGLState();
 	backEnd.renderTexture = NULL;
 	backEnd.postProcessTexelSize = tr.postProcessTexelSize;
+	backEnd.resolutionScaleWidth = tr.resolutionScaleWidth;
+	backEnd.resolutionScaleHeight = tr.resolutionScaleHeight;
 	backEnd.postProcessSourceColorSpace = tr.postProcessSourceColorSpace;
 	backEnd.postProcessSMAAQuality = tr.postProcessSMAAQuality;
 	idRenderTexture::BindNull();

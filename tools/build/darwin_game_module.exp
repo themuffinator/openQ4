@@ -15,3 +15,9 @@
 #
 # Leading underscore is the Mach-O C symbol decoration.
 _GetGameAPI
+# openQ4_Mem_GetModuleStats is the one deliberate addition. It is not an
+# interposition hazard: nothing inside either binary calls it, so there are no
+# references that could bind to the wrong copy. It exists only to be found by
+# name from the loader, which asks a specific module handle for it so that the
+# engine's memory total can include that module's own idlib counters.
+_openQ4_Mem_GetModuleStats

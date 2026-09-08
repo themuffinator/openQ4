@@ -41,7 +41,7 @@ struct gpuSkinningGLState_t {
 
 static gpuSkinningGLState_t gpuSkinningGL;
 
-static GLuint R_GpuSkinningGL_CompileShader( const char *source ) {
+static GLuint R_GpuSkinningGL_CompileShader( const char *source, bool esProfile ) {
 	if ( glCreateShader == NULL || glShaderSource == NULL || glCompileShader == NULL
 			|| glGetShaderiv == NULL || glDeleteShader == NULL ) {
 		return 0;
@@ -51,7 +51,13 @@ static GLuint R_GpuSkinningGL_CompileShader( const char *source ) {
 	if ( shader == 0 ) {
 		return 0;
 	}
-	glShaderSource( shader, 1, &source, NULL );
+	// The compute body uses the common GL 4.3 / ES 3.1 feature set. Select the
+	// language from the actual context, including explicit ES float precision.
+	const char *sources[] = {
+		esProfile ? "#version 310 es\nprecision highp float;\nprecision highp int;\n" : "#version 430\n",
+		source
+	};
+	glShaderSource( shader, 2, sources, NULL );
 	glCompileShader( shader );
 
 	GLint compiled = GL_FALSE;
@@ -69,9 +75,8 @@ static GLuint R_GpuSkinningGL_CompileShader( const char *source ) {
 	return shader;
 }
 
-static GLuint R_GpuSkinningGL_CreateProgram( void ) {
+static GLuint R_GpuSkinningGL_CreateProgram( bool esProfile ) {
 	static const char *computeSource =
-		"#version 430\n"
 		"layout(local_size_x = 64) in;\n"
 		"layout(std430, binding = 0) readonly buffer SourceWords { uint words[]; } sourceData;\n"
 		"layout(std430, binding = 1) readonly buffer SkinWords { uint words[]; } skinData;\n"
@@ -143,7 +148,7 @@ static GLuint R_GpuSkinningGL_CreateProgram( void ) {
 		return 0;
 	}
 
-	GLuint shader = R_GpuSkinningGL_CompileShader( computeSource );
+	GLuint shader = R_GpuSkinningGL_CompileShader( computeSource, esProfile );
 	if ( shader == 0 ) {
 		return 0;
 	}
@@ -189,7 +194,7 @@ void R_BackendGpuSkinning_Init( const renderBackendCaps_t &caps ) {
 		return;
 	}
 
-	gpuSkinningGL.program = R_GpuSkinningGL_CreateProgram();
+	gpuSkinningGL.program = R_GpuSkinningGL_CreateProgram( caps.profile == RENDERER_CONTEXT_PROFILE_ES );
 	if ( gpuSkinningGL.program == 0 ) {
 		return;
 	}

@@ -398,10 +398,10 @@ void RendererModule_PrintGfxInfo( void ) {
 	}
 }
 
-#ifdef OPENQ4_RENDERER_GL_MODULE
+#if defined( OPENQ4_RENDERER_GL_MODULE ) || defined( OPENQ4_RENDERER_GLES_MODULE )
 /*
 ====================
-QGL loader (module-local, GL backend only)
+QGL loader (module-local, GL and GLES backends)
 
 Under the SDL3 seam all GL procs resolve through the window services; QGL
 only tracks the driver library handle on Windows for parity with the legacy
@@ -438,7 +438,7 @@ void QGL_Shutdown( void ) {
 }
 #endif
 
-#endif /* OPENQ4_RENDERER_GL_MODULE */
+#endif /* OPENQ4_RENDERER_GL_MODULE || OPENQ4_RENDERER_GLES_MODULE */
 
 /*
 ====================

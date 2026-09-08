@@ -477,7 +477,8 @@ function Test-GamelibsStageRefreshNeeded {
     param(
         [string]$BuildDir,
         [string]$RepoRoot,
-        [string]$GameLibsRepo
+        [string]$GameLibsRepo,
+        [string]$StageRoot = ""
     )
 
     if (-not (Test-MesonBuildDirectory $BuildDir)) {
@@ -491,7 +492,9 @@ function Test-GamelibsStageRefreshNeeded {
     }
 
     $resolvedGameLibsRepo = Get-openQ4GameLibsRepoPath -RepoRoot $RepoRoot -ConfiguredRepo $GameLibsRepo
-    $stageRoot = Join-Path $RepoRoot ".tmp\gamelibs_stage"
+    if ([string]::IsNullOrWhiteSpace($StageRoot)) {
+        $StageRoot = Join-Path $RepoRoot ".tmp\gamelibs_stage"
+    }
     $sourceGameDirs = @(
         (Join-Path $resolvedGameLibsRepo "src\game"),
         (Join-Path $resolvedGameLibsRepo "src\mpgame")
@@ -787,6 +790,62 @@ function Stop-openQ4RuntimeProcesses {
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $scriptDir "..\.."))
 $defaultBuildDir = Join-Path $repoRoot "builddir"
+
+# Android uses the NDK compiler recorded in its cross file/build metadata.
+# Dispatch through this same Windows entry point, without desktop-only CRT,
+# companion Windows builds, process shutdown or runtime staging side effects.
+$androidMesonArgs = @($args)
+$isAndroidCross = $false
+$androidBuildInfo = Get-CompileBuildDirInfo -MesonArgs $androidMesonArgs -DefaultBuildDir $defaultBuildDir
+$androidMachineInfo = Join-Path $androidBuildInfo.BuildDir "meson-info/intro-machines.json"
+if ($androidMesonArgs.Count -gt 0 -and $androidMesonArgs[0] -in @("compile", "install", "test") -and
+        (Test-Path -LiteralPath $androidMachineInfo -PathType Leaf)) {
+    $androidMachines = Get-Content -LiteralPath $androidMachineInfo -Raw | ConvertFrom-Json
+    $isAndroidCross = $androidMachines.host.system -eq "android"
+}
+for ($index = 0; $index -lt $androidMesonArgs.Count; $index++) {
+    $argument = $androidMesonArgs[$index]
+    $crossFile = $null
+    if ($argument -eq "--cross-file" -and ($index + 1) -lt $androidMesonArgs.Count) {
+        $crossFile = $androidMesonArgs[$index + 1]
+    } elseif ($argument.StartsWith("--cross-file=")) {
+        $crossFile = $argument.Substring("--cross-file=".Length)
+    }
+    if ($crossFile -and (Test-Path -LiteralPath $crossFile -PathType Leaf)) {
+        if ((Get-Content -LiteralPath $crossFile -Raw) -match '(?m)^\s*system\s*=\s*''android''\s*$') {
+            $isAndroidCross = $true
+        }
+    }
+    if (-not $argument.StartsWith("-")) {
+        $machineInfo = Join-Path $argument "meson-info/intro-machines.json"
+        if (Test-Path -LiteralPath $machineInfo -PathType Leaf) {
+            $machines = Get-Content -LiteralPath $machineInfo -Raw | ConvertFrom-Json
+            if ($machines.host.system -eq "android") { $isAndroidCross = $true }
+        }
+    }
+}
+if ($isAndroidCross) {
+    if ($androidMesonArgs[0] -eq "install" -and -not ($androidMesonArgs -contains "--skip-subprojects")) {
+        $androidMesonArgs += "--skip-subprojects"
+    }
+    $androidMesonCommand = Get-MesonCommand
+    if ($androidMesonArgs[0] -eq "compile" -or $androidMesonArgs[0] -eq "install") {
+        $androidPython = Get-Command python -ErrorAction SilentlyContinue
+        if ($null -eq $androidPython) { $androidPython = Get-Command python3 -ErrorAction Stop }
+        $androidStageRoot = & $androidPython.Source (Join-Path $scriptDir "gamelibs_stage_path.py") `
+            --source-root $repoRoot --build-dir $androidBuildInfo.BuildDir
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        if (Test-GamelibsStageRefreshNeeded -BuildDir $androidBuildInfo.BuildDir -RepoRoot $repoRoot `
+                -GameLibsRepo $env:OPENQ4_GAMELIBS_REPO -StageRoot $androidStageRoot) {
+            Write-Host "GameLibs staging inputs changed. Reconfiguring '$($androidBuildInfo.BuildDir)'..."
+            Invoke-Meson -MesonArgs @("setup", "--reconfigure", $androidBuildInfo.BuildDir, $repoRoot) `
+                -VsDevCmdPath "" -MesonCommand $androidMesonCommand -VsTargetArch "" -VsHostArch ""
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        }
+    }
+    Invoke-Meson -MesonArgs $androidMesonArgs -VsDevCmdPath "" -MesonCommand $androidMesonCommand -VsTargetArch "" -VsHostArch ""
+    exit $LASTEXITCODE
+}
 
 $rcWrapper = Join-Path $scriptDir "rc.cmd"
 if (-not (Test-Path $rcWrapper)) {

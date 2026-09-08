@@ -20,8 +20,16 @@
 // loader-owned cvars: defined here (not in a renderer TU) so they exist in
 // every build shape, including module-only clients that shed the static
 // renderer sources
-static const char *r_renderApiArgs[] = { "best", "gl", "vulkan", "gl-module", NULL };
-idCVar r_renderApi( "r_renderApi", "gl", CVAR_RENDERER | CVAR_ARCHIVE, "rendering API: best = platform default (currently gl), gl = OpenGL renderer (loaded as the renderer-gl module on module-only builds, statically linked elsewhere), vulkan = native Vulkan renderer module (bring-up; falls back to gl), gl-module = alias that always selects the OpenGL module. Module selections take effect on engine restart.", r_renderApiArgs, idCmdSystem::ArgCompletion_String<r_renderApiArgs> );
+static const char *r_renderApiArgs[] = { "best", "gl", "vulkan", "gl-module", "gles", NULL };
+#ifdef __ANDROID__
+// Android has no desktop GL at all; the ES module is the only renderer built.
+#define OPENQ4_DEFAULT_RENDER_API	"gles"
+static const rendererModuleApi_t rm_platformDefaultApi = RENDER_MODULE_API_GLES;
+#else
+#define OPENQ4_DEFAULT_RENDER_API	"gl"
+static const rendererModuleApi_t rm_platformDefaultApi = RENDER_MODULE_API_GL;
+#endif
+idCVar r_renderApi( "r_renderApi", OPENQ4_DEFAULT_RENDER_API, CVAR_RENDERER | CVAR_ARCHIVE, "rendering API: best = platform default (Android: gles, desktop: gl), gles = OpenGL ES 3.0 renderer module, gl = OpenGL renderer (loaded as the renderer-gl module on module-only builds, statically linked elsewhere), vulkan = native Vulkan renderer module (bring-up; falls back to gl), gl-module = alias that always selects the OpenGL module. Module selections take effect on engine restart.", r_renderApiArgs, idCmdSystem::ArgCompletion_String<r_renderApiArgs> );
 idCVar r_actualRenderApi( "r_actualRenderApi", "UNINITIALIZED", CVAR_RENDERER | CVAR_ROM, "rendering API actually active after request/fallback selection" );
 
 // engine-side homes for window/gui cvars referenced by both the platform
@@ -71,8 +79,8 @@ typedef struct rendererModuleState_s {
 static rendererModuleState_t rm_state;
 
 // module binary short tags; indexed by rendererModuleApi_t
-static const char *rm_moduleBinaryTags[ RENDER_MODULE_API_COUNT ] = { "gl", "vk", "gl" };
-static const char *rm_apiNames[ RENDER_MODULE_API_COUNT ] = { "gl", "vulkan", "gl-module" };
+static const char *rm_moduleBinaryTags[ RENDER_MODULE_API_COUNT ] = { "gl", "vk", "gl", "gles" };
+static const char *rm_apiNames[ RENDER_MODULE_API_COUNT ] = { "gl", "vulkan", "gl-module", "gles" };
 
 /*
 ====================
@@ -237,7 +245,7 @@ R_RendererModule_ParseApi
 */
 bool R_RendererModule_ParseApi( const char *value, rendererModuleApi_t &api ) {
 	if ( value == NULL || value[ 0 ] == '\0' ) {
-		api = RENDER_MODULE_API_GL;
+		api = rm_platformDefaultApi;
 		return false;
 	}
 	if ( idStr::Icmp( value, "gl" ) == 0 || idStr::Icmp( value, "opengl" ) == 0 ) {
@@ -252,12 +260,15 @@ bool R_RendererModule_ParseApi( const char *value, rendererModuleApi_t &api ) {
 		api = RENDER_MODULE_API_GL_MODULE;
 		return true;
 	}
-	if ( idStr::Icmp( value, "best" ) == 0 ) {
-		// the platform default stays GL until Vulkan promotion evidence lands
-		api = RENDER_MODULE_API_GL;
+	if ( idStr::Icmp( value, "gles" ) == 0 || idStr::Icmp( value, "es" ) == 0 ) {
+		api = RENDER_MODULE_API_GLES;
 		return true;
 	}
-	api = RENDER_MODULE_API_GL;
+	if ( idStr::Icmp( value, "best" ) == 0 ) {
+		api = rm_platformDefaultApi;
+		return true;
+	}
+	api = rm_platformDefaultApi;
 	return false;
 }
 
@@ -300,6 +311,12 @@ int R_RendererModule_BuildFallbackLadder( rendererModuleApi_t requested, rendere
 	if ( maxEntries <= 0 ) {
 		return 0;
 	}
+#ifdef __ANDROID__
+	// No desktop GL module is built, so falling back onto it would only trade a
+	// clear "gles module failed" for a misleading "renderer-gl not found".
+	outLadder[ numEntries++ ] = RENDER_MODULE_API_GLES;
+	return numEntries;
+#else
 	if ( requested != RENDER_MODULE_API_GL ) {
 		outLadder[ numEntries++ ] = requested;
 	}
@@ -307,6 +324,7 @@ int R_RendererModule_BuildFallbackLadder( rendererModuleApi_t requested, rendere
 		outLadder[ numEntries++ ] = RENDER_MODULE_API_GL;
 	}
 	return numEntries;
+#endif
 }
 
 /*
@@ -472,6 +490,8 @@ static void RM_UnloadModule( void ) {
 	rm_state.moduleExportValid = false;
 	memset( &rm_state.moduleExport, 0, sizeof( rm_state.moduleExport ) );
 	if ( rm_state.moduleHandle != 0 ) {
+		// drop the counters before the code they live in goes away
+		Mem_UnregisterModuleStats( ( memModuleStats_t )Sys_DLL_GetProcAddress( rm_state.moduleHandle, MEM_MODULE_STATS_ENTRY_POINT ) );
 		Sys_DLL_Unload( rm_state.moduleHandle );
 		rm_state.moduleHandle = 0;
 	}
@@ -563,6 +583,11 @@ static bool RM_TryLoadModuleApi( rendererModuleApi_t api, rendererModuleStatus_t
 		RM_AppendFallbackReason( status, reason );
 		return false;
 	}
+
+	// The module links its own idlib archive, so its allocations live in a
+	// separate set of counters. Optional symbol, looked up by name: a module
+	// built before this existed just does not contribute to the total.
+	Mem_RegisterModuleStats( ( memModuleStats_t )Sys_DLL_GetProcAddress( handle, MEM_MODULE_STATS_ENTRY_POINT ) );
 
 	rm_state.moduleHandle = handle;
 	rm_state.moduleExport = *moduleExport;

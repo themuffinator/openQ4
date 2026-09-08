@@ -303,6 +303,23 @@ void idGuiModel::EmitSurface( guiModelSurface_t *surf, float modelMatrix[16], fl
 		return;
 	}
 
+	// GUI geometry drew from tri->indexes directly, which is a client-memory
+	// index pointer: legal in a compatibility context and REMOVED in a core
+	// profile and in OpenGL ES, where a bound element-array buffer is the only
+	// way to draw indexed geometry. Without this the entire GUI -- menu, HUD,
+	// every in-world screen -- silently draws nothing on those profiles.
+	//
+	// r_useIndexBuffers is already forced to 2 for them in idVertexCache::Init,
+	// but that only governs geometry that asks the cache for an index range;
+	// this path never asked.
+	if ( r_useIndexBuffers.GetInteger() >= 2 ) {
+		tri->indexCache = vertexCache.AllocFrameTemp( tri->indexes,
+				tri->numIndexes * sizeof( tri->indexes[0] ), true );
+		if ( !tri->indexCache ) {
+			return;
+		}
+	}
+
 	renderEntity_t renderEntity;
 	memset( &renderEntity, 0, sizeof( renderEntity ) );
 	memcpy( renderEntity.shaderParms, surf->color, sizeof( surf->color ) );

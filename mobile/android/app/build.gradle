@@ -1,0 +1,98 @@
+import java.security.MessageDigest
+
+plugins { id 'com.android.application' }
+
+def sdlRoot = providers.gradleProperty('sdl3SourceRoot').orNull
+if (sdlRoot == null) {
+    throw new GradleException('Set -Psdl3SourceRoot to the SDL3 source tree used for the native build.')
+}
+def sdlJava = new File(sdlRoot, 'android-project/app/src/main/java')
+if (!new File(sdlJava, 'org/libsdl/app/SDLActivity.java').isFile()) {
+    throw new GradleException('sdl3SourceRoot must contain SDL3 Android Java sources.')
+}
+def abi = providers.gradleProperty('openq4Abi').getOrElse('arm64-v8a')
+if (abi != 'arm64-v8a') {
+    throw new GradleException('openQ4 currently supports the arm64-v8a Android ABI.')
+}
+def nativeStage = file(providers.gradleProperty('openq4Stage').getOrElse("../../../.install/android/${abi}"))
+def generatedJni = layout.buildDirectory.dir('generated/openq4/jniLibs')
+def generatedAssets = layout.buildDirectory.dir('generated/openq4/assets')
+
+tasks.register('stageOpenQ4Native', Sync) {
+    from(new File(nativeStage, 'lib')) { include '*.so' }
+    into(generatedJni.map { it.dir(abi) })
+    doFirst {
+        ['libquake4.so', 'libSDL3.so', 'librenderer-gles_arm64.so',
+         'libgame-sp_arm64.so', 'libgame-mp_arm64.so', 'libopenal.so',
+         'libc++_shared.so'].each { name ->
+            if (!new File(nativeStage, "lib/${name}").isFile()) {
+                throw new GradleException("Missing ${name}; build and stage native Android targets with Meson first.")
+            }
+        }
+    }
+}
+
+tasks.register('stageOpenQ4Assets', Sync) {
+    from(new File(nativeStage, 'baseoq4')) { into 'baseoq4' }
+    from(new File(nativeStage, 'licenses')) { into 'licenses' }
+    from(nativeStage) { include 'LICENSE', 'CONTRIBUTORS.md' }
+    into(generatedAssets)
+    doFirst {
+        ['baseoq4/pak0.pk4', 'baseoq4/pak1.pk4', 'baseoq4/mod.json',
+         'LICENSE', 'CONTRIBUTORS.md'].each { name ->
+            if (!new File(nativeStage, name).isFile()) {
+                throw new GradleException("Missing staged ${name}; run the Meson install step first.")
+            }
+        }
+        if (!new File(nativeStage, 'licenses').isDirectory()) {
+            throw new GradleException('Missing staged dependency license notices.')
+        }
+    }
+    doLast {
+        // Each APK gets a content-addressed private package directory. A failed
+        // extraction can be retried; an upgrade never reads stale old PK4s.
+        def digest = MessageDigest.getInstance('SHA-256')
+        fileTree(new File(nativeStage, 'baseoq4')).files.sort { it.path }.each { asset ->
+            digest.update(new File(nativeStage, 'baseoq4').toPath().relativize(asset.toPath()).toString().replace('\\', '/').getBytes('UTF-8'))
+            asset.withInputStream { input ->
+                byte[] buffer = new byte[65536]
+                int count
+                while ((count = input.read(buffer)) != -1) digest.update(buffer, 0, count)
+            }
+        }
+        new File(generatedAssets.get().asFile, 'openq4-package-version.txt').text = digest.digest().encodeHex().toString()
+    }
+}
+
+android {
+    namespace 'com.darkmatter.openq4'
+    compileSdk 35
+    buildToolsVersion "35.0.0"
+    defaultConfig {
+        applicationId 'com.darkmatter.openq4'
+        minSdk 24
+        targetSdk 35
+        versionCode 13000
+        versionName '0.13.0'
+        ndk { abiFilters abi }
+    }
+    sourceSets.main {
+        java.srcDir sdlJava
+        jniLibs.srcDir generatedJni
+        assets.srcDir generatedAssets
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    packaging {
+        // Engine/game renderer modules are dlopen'ed from nativeLibraryDir.
+        jniLibs.useLegacyPackaging = true
+    }
+    buildTypes {
+        release { minifyEnabled false }
+    }
+}
+tasks.named('preBuild').configure {
+    dependsOn 'stageOpenQ4Native', 'stageOpenQ4Assets'
+}

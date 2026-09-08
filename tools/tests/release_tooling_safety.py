@@ -8,6 +8,7 @@ import argparse
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -1143,8 +1144,10 @@ def validate_manual_release_companion_checkout() -> None:
 
     game_ref_input_offset = workflow.index("      openq4_game_ref:")
     game_ref_input_end = workflow.index("      linux_arm64_support_tier:", game_ref_input_offset)
-    if "        default: main" not in workflow[game_ref_input_offset:game_ref_input_end]:
-        raise AssertionError("manual release openq4_game_ref input must default to main")
+    ci = (ROOT / ".github" / "workflows" / "commit-validation.yml").read_text(encoding="utf-8")
+    ci_pin = re.search(r"^\s*OPENQ4_GAMELIBS_SHA: ([0-9a-f]{40})\s*$", ci, re.MULTILINE)
+    if ci_pin is None or f"        default: {ci_pin[1]}" not in workflow[game_ref_input_offset:game_ref_input_end]:
+        raise AssertionError("manual release openq4_game_ref input must default to the immutable CI companion revision")
 
     source_resolution_offset = workflow.index("- name: Resolve immutable source revisions")
     build_job_offset = workflow.index("  builds:")

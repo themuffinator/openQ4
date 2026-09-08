@@ -1421,7 +1421,15 @@ idScreenRect	R_CalcLightScissorRectangle( viewLight_t *vLight ) {
 	if ( vLight->lightDef->parms.pointLight && !tr_levelshotProjectionShiftActive ) {
 		idBounds bounds;
 		idRenderLightLocal *lightDef = vLight->lightDef;
-		tr.viewDef->viewFrustum.ProjectionBounds( idBox( lightDef->parms.origin, lightDef->parms.lightRadius, lightDef->parms.axis ), bounds );
+		// same ProjectionBounds contract as R_CalcEntityScissorRectangle: it can
+		// return true having added no points, leaving the bounds Clear()ed, so
+		// IsCleared() is the test rather than the return value
+		bounds.Clear();
+		tr.viewDef->viewFrustum.ProjectionBounds(
+				idBox( lightDef->parms.origin, lightDef->parms.lightRadius, lightDef->parms.axis ), bounds );
+		if ( bounds.IsCleared() ) {
+			return vLight->scissorRect;
+		}
 		return R_ScreenRectFromViewFrustumBounds( bounds );
 	}
 
@@ -2429,7 +2437,36 @@ idScreenRect R_CalcEntityScissorRectangle( viewEntity_t *vEntity ) {
 	idBounds bounds;
 	idRenderEntityLocal *def = vEntity->entityDef;
 
-	tr.viewDef->viewFrustum.ProjectionBounds( idBox( def->referenceBounds, def->parms.origin, def->parms.axis ), bounds );
+	// ProjectionBounds can return TRUE having added nothing at all, leaving the
+	// bounds exactly as it Clear()ed them -- +/-idMath::INFINITY, i.e. 1e30.
+	// Its "if ( !outside ) return true" path (Frustum.cpp) means "no corner sat
+	// outside a side plane", but corners are only ADDED under
+	// "cull1 == 0 && start.x > 0.0f", so a box at or behind the eye plane
+	// contributes no points while leaving outside == 0.
+	//
+	// So the return value is not the test; IsCleared() is. This is the same
+	// guard idInteraction::CalcInteractionScissorRectangle already applies to
+	// its own ClippedProjectionBounds result (Interaction.cpp), which is why
+	// the light path never showed this and the entity path did.
+	//
+	// Measured on Android/Adreno 750, game/airdefense1: the cleared bounds
+	// reached R_ScreenRectFromViewFrustumBounds and became a garbage rect that
+	// IsEmpty() did not reject, so the entity drew clipped to a few pixels
+	// instead of keeping its portal rect. Nothing clears colour, so everything
+	// it stopped covering kept the previous frame -- the frozen screen with one
+	// small live box. r_useEntityScissors 0 was the bisect that found it.
+	//
+	// Clear() first so IsCleared() is still meaningful on the early-out path,
+	// which writes every component before this ever runs.
+	bounds.Clear();
+	tr.viewDef->viewFrustum.ProjectionBounds(
+			idBox( def->referenceBounds, def->parms.origin, def->parms.axis ), bounds );
+
+	if ( bounds.IsCleared() ) {
+		// the caller intersects this into vEntity->scissorRect, so handing back
+		// what it already holds leaves the entity on the portal flood's rect
+		return vEntity->scissorRect;
+	}
 
 	return R_ScreenRectFromViewFrustumBounds( bounds );
 }

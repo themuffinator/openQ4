@@ -731,6 +731,8 @@ typedef struct {
 	idRenderTexture		*renderTexture;
 	idRenderTexture		*feedbackRenderTexture;	// active scene target allowed to feed _currentRender
 	idVec4				postProcessTexelSize;	// x/y = inverse source size, z/w = source size
+	int					resolutionScaleWidth;	// crop this frame rendered into, 0 when unscaled
+	int					resolutionScaleHeight;
 	idVec4				postProcessSourceColorSpace;	// x = contract enum, y = display gamma, z/w reserved
 	idVec4				postProcessSMAAQuality;	// x = edge mode, y = threshold, z = search steps, w = local contrast
 
@@ -765,6 +767,19 @@ const int MAX_GUI_SURFACES	= 1024;		// default size of the drawSurfs list for gu
 
 typedef enum {
 	BE_ARB2,
+	// The programmable path standing on its own, with no ARB2 bridge beneath
+	// it. Selected only on a profile that cannot have ARB2 (desktop core,
+	// OpenGL ES); every compatibility context keeps BE_ARB2 with the modern
+	// executor layered over it as before. Passes the modern executor does not
+	// own simply do not render under this backend -- there is nothing to hand
+	// them back to.
+	BE_MODERN,
+	// Doom 3-shaped GLES 3.0 backend: its own depth / interaction / ambient /
+	// fog passes written directly against ES 3.0, rather than the modern
+	// executor's cluster-forward architecture. Opt-in with `r_renderer glesd3`
+	// on the renderer-gles module only; never selected automatically, so
+	// BE_MODERN remains the default ES path.
+	BE_GLES_D3,
 	BE_BAD
 } backEndName_t;
 
@@ -970,6 +985,20 @@ public:
 	renderCrop_t			renderCrops[MAX_RENDER_CROPS];
 	int						currentRenderCrop;
 
+	// r_screenFraction below native, on a back end that can upscale the finished
+	// frame. BeginFrame pushes a crop the whole frame renders into, and the back
+	// end blits that corner out to the full back buffer before the swap.
+	// Zero means no scaling crop is live this frame.
+	bool					resolutionScaleCropActive;
+	int						resolutionScaleWidth;
+	int						resolutionScaleHeight;
+	// latched once the game routes a frame through an offscreen scene target,
+	// where a whole-frame crop cannot be resolved back to full screen
+	bool					resolutionScaleSuppressed;
+
+	bool					PushSceneResolutionScale( void );
+	void					PopSceneResolutionScale( void );
+
 	// GUI drawing variables for surface creation
 	int						guiRecursionLevel;		// to prevent infinite overruns
 	int						inWorldGuiEmissionDepth;	// provenance scope for R_RenderGuiSurf output
@@ -1151,6 +1180,8 @@ extern idCVar r_brightness;				// changes gamma tables
 extern idCVar r_renderer;				// arb, nv10, nv20, r200, gl2, etc
 extern idCVar r_actualRenderer;			// actual active renderer backend after fallback
 extern idCVar r_glTier;					// auto, legacy, gl33, gl41, gl43, gl45, gl46
+extern idCVar r_glesContext;			// request an OpenGL ES 3.0 context (Android GLES backend bring-up)
+extern idCVar r_glCoreProfileFirst;		// try core-profile contexts before the compatibility fallback
 extern idCVar r_glDebugContext;			// request a debug GL context when the platform backend supports it
 extern idCVar r_glDebugOutput;			// report driver debug messages when a debug context is active
 extern idCVar r_glDebugSynchronous;		// synchronously deliver GL debug callbacks for diagnostics
@@ -1394,6 +1425,7 @@ extern idCVar r_skipROQ;
 
 extern idCVar r_ignoreGLErrors;
 extern idCVar image_ignoreHighQuality;
+extern idCVar image_useETC2;			// compress to ETC2 where the driver exposes no S3TC
 
 extern idCVar r_forceLoadImages;		// draw all images to screen after registration
 extern idCVar r_demonstrateBug;			// used during development to show IHV's their problems

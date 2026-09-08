@@ -39,4 +39,25 @@ public:
 	virtual bool			Validate( const char *psText, int iTextLength, idStr &strReportTo ) const;
 };
 
+/*
+===============================================================================
+
+Parsing a playerModel decl precaches its model, head, skin and sounds. That is
+the right default when the decl is about to be used, but the main menu parses
+every one of them purely to read their names and teams for a dropdown, which
+loaded every multiplayer character's media before the menu could draw.
+
+Suppress the precache around bulk reads of that kind, then cache the one model
+that is actually shown.
+
+===============================================================================
+*/
+class idSuppressPlayerModelMediaCaching {
+public:
+			idSuppressPlayerModelMediaCaching();
+			~idSuppressPlayerModelMediaCaching();
+};
+
+void DeclPlayerModel_CacheMediaForDecl( const rvDeclPlayerModel *decl );
+
 #endif 

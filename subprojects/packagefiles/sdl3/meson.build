@@ -482,6 +482,13 @@ elif host_machine.system() == 'darwin'
   cdata.set('SDL_VIDEO_DRIVER_COCOA', 1)
   cdata.set('SDL_VIDEO_OPENGL_CGL', 1)
   cdata.set('SDL_VIDEO_OPENGL', 1)
+  # macOS ships no OpenGL ES: these drive SDL_egl.c and SDL_cocoaopengles.m,
+  # which dlopen an ANGLE (GLES-on-Metal) libEGL/libGLESv2 at runtime. Both
+  # files are already in the source lists but compile to empty translation
+  # units without these defines. Nothing is linked at build time, so the CGL
+  # desktop-GL path and GL-free targets are unaffected.
+  cdata.set('SDL_VIDEO_OPENGL_EGL', 1)
+  cdata.set('SDL_VIDEO_OPENGL_ES2', 1)
   cdata.set('SDL_FSOPS_POSIX', 1)
   cdata.set('SDL_SENSOR_DUMMY', 1)
   cdata.set('SDL_POWER_MACOSX', 1)
@@ -538,10 +545,19 @@ else
   extra_args = []
 endif
 
+sdl_include_dirs = ['include', 'src']
+if host_machine.system() == 'darwin'
+  # macOS ships no system EGL/GLES headers, so the ES2/EGL paths enabled above
+  # compile against SDL's own bundled Khronos copies. Scoped to darwin so it
+  # cannot shadow the system EGL headers the Linux Wayland/X11 build uses.
+  # Vulkan is unaffected: SDL includes it as "./khronos/vulkan/vulkan.h".
+  sdl_include_dirs += 'src/video/khronos'
+endif
+
 sdl_lib = library(
   'SDL3',
   sources,
-  include_directories: ['include', 'src'],
+  include_directories: sdl_include_dirs,
   c_args: extra_args,
   dependencies: sdl_deps,
   install: true,

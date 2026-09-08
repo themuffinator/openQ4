@@ -25,6 +25,20 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         default="",
         help="Optional additional baseoq4/<pak>.pk4 path to copy for direct builddir launches.",
     )
+    parser.add_argument(
+        "--exclude",
+        action="append",
+        default=[],
+        metavar="GLOB",
+        help=(
+            "Drop archive paths matching this glob; repeatable, and the last "
+            "matching pattern wins so a later '!GLOB' puts a subtree back. '*' "
+            "spans '/', so 'env/*' covers a whole tree. Intended for platform "
+            "builds that cannot use some of the content -- the generated pak "
+            "header takes its MD5 from whatever is actually packed, so the "
+            "engine's integrity check follows automatically."
+        ),
+    )
     return parser.parse_args(argv[1:])
 
 
@@ -69,7 +83,7 @@ def main(argv: list[str]) -> int:
             return 1
 
     try:
-        result = create_game_pk4(source_dir, pak_out, pak_name=pak_name)
+        result = create_game_pk4(source_dir, pak_out, pak_name=pak_name, content_filters=args.exclude)
     except RuntimeError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

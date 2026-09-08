@@ -57,7 +57,9 @@
 // 11 - Append-only idRenderSystem slots publish frame-latched scene/native
 //      output state and enqueue the backend-neutral temporal presentation
 //      resolve requested by game modules
-#define RENDER_API_VERSION			11
+// 12 - renderFramebufferDesc_t::glESProfile lets a module ask for an OpenGL ES
+//      context; a stale module would leave that byte uninitialised
+#define RENDER_API_VERSION			12
 #define RENDER_API_ENTRY_POINT		"GetRenderAPI"
 
 class idSys;
@@ -153,6 +155,8 @@ typedef struct renderFramebufferDesc_s {
 	bool			glDebugContext;
 	// --- version 6 ---
 	int				surfaceKind;		// renderSurfaceKind_t; GL attributes above are ignored for Vulkan
+	// --- version 12 ---
+	bool			glESProfile;		// request an OpenGL ES context; overrides glCoreProfile
 } renderFramebufferDesc_t;
 
 // ABI-neutral mirror of the renderer's glimpParms_t

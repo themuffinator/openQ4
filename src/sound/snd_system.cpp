@@ -43,6 +43,11 @@ idCVar s_openALEfxDebugMode( "s_openALEfxDebugMode", "0", CVAR_ARCHIVE | CVAR_IN
 idCVar s_numberOfSpeakers( "s_numberOfSpeakers", "6", CVAR_ARCHIVE | CVAR_INTEGER, "number of speakers (2 or 6)" );
 idCVar s_warnOnMissingSamples( "s_warnOnMissingSamples", "0", CVAR_ARCHIVE | CVAR_BOOL, "warn when falling back to default sound samples" );
 idCVar s_controllerRumble( "s_controllerRumble", "1", CVAR_ARCHIVE | CVAR_BOOL, "sound-side controller rumble master switch; input menu uses in_joystickRumble" );
+// alBufferData copies a sample's PCM into OpenAL's own storage, so holding on to
+// our copy means every uploaded sample is resident twice. A loaded Quake 4 map
+// carries ~218MB of PCM, so the duplicate is one of the largest single items in
+// the process. Off restores the old behaviour for A/B testing an audio problem.
+idCVar s_releaseSamplePayload( "s_releaseSamplePayload", "1", CVAR_ARCHIVE | CVAR_BOOL, "free the CPU copy of a sound sample once OpenAL has it" );
 
 #ifdef ID_RETAIL
 	idCVar s_useCompression( "s_useCompression", "1", CVAR_BOOL, "Use compressed sound files (mp3/xma)" );
@@ -145,6 +150,7 @@ void ListSounds_f( const idCmdArgs& args )
 	int totalMemory = 0;
 	int totalCompressedMemory = 0;
 	int totalPCMMemory = 0;
+	int totalResidentMemory = 0;
 
 	idLib::Printf( "Sound samples\n-------------\n" );
 	for( int i = 0; i < soundSystemLocal.samples.Num(); i++ )
@@ -179,6 +185,7 @@ void ListSounds_f( const idCmdArgs& args )
 		{
 			totalLoaded++;
 			totalMemory += sampleBytes;
+			totalResidentMemory += sample->ResidentBufferSize();
 			if( compressed )
 			{
 				totalCompressedMemory += sampleBytes;
@@ -194,7 +201,12 @@ void ListSounds_f( const idCmdArgs& args )
 	idLib::Printf( "%8d total samples loaded\n", totalLoaded );
 	idLib::Printf( "%8d kB OGG samples loaded\n", totalCompressedMemory / 1024 );
 	idLib::Printf( "%8d kB PCM samples loaded\n", totalPCMMemory / 1024 );
-	idLib::Printf( "%8d kB total system memory used\n", totalMemory / 1024 );
+	idLib::Printf( "%8d kB total sample data\n", totalMemory / 1024 );
+	// Sample data is not the same as memory held. OpenAL keeps its own copy of
+	// everything uploaded to it, so ours is released; report what is actually
+	// still resident rather than letting the decoded size stand in for it.
+	idLib::Printf( "%8d kB held in CPU memory (%d kB released to OpenAL)\n",
+				   totalResidentMemory / 1024, ( totalMemory - totalResidentMemory ) / 1024 );
 }
 
 /*

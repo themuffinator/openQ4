@@ -5364,7 +5364,22 @@ bool VK_Exec_ResolveRenderTargets( idRenderTexture *sourceRenderTexture,
 	return depthResolved;
 }
 
-bool VK_GuiExecutor_ReadPixels( int x, int y, int width, int height, void *pixels ) {
+/*
+====================
+VK_GuiExecutor_ReadPixels
+
+components is 3 (GL_RGB) or 4 (GL_RGBA). Both are needed: R_ReadTiledPixels
+reads GL_RGBA everywhere since the ES screenshot fix, because OpenGL ES
+guarantees only that pair for the default framebuffer. This entry point
+accepted GL_RGB alone until 2026-08-10, so every Vulkan screenshot after that
+change came back black with a warning -- the same silent-black failure the ES
+fix was written to cure, moved to a different backend.
+====================
+*/
+bool VK_GuiExecutor_ReadPixels( int x, int y, int width, int height, void *pixels, int components ) {
+	if ( components != 3 && components != 4 ) {
+		return false;
+	}
 	if ( pixels == NULL || width <= 0 || height <= 0 || !VK_GuiExecutor_BeginFrame()
 			|| !vkCtx.swapchainTransferSrc ) {
 		return false;
@@ -5473,19 +5488,27 @@ bool VK_GuiExecutor_ReadPixels( int x, int y, int width, int height, void *pixel
 
 	const byte *source = (const byte *)allocationInfo.pMappedData;
 	byte *destination = (byte *)pixels;
-	const int destinationStride = ( width * 3 + 3 ) & ~3;
+	// GL pads rows to dword boundaries, and R_ReadTiledPixels indexes the
+	// result with exactly this stride
+	const int destinationStride = ( width * components + 3 ) & ~3;
 	for ( int row = 0; row < height; row++ ) {
 		const byte *sourceRow = source + (size_t)( height - 1 - row ) * (size_t)width * 4;
 		byte *destinationRow = destination + (size_t)row * (size_t)destinationStride;
 		for ( int column = 0; column < width; column++ ) {
 			const byte *sourcePixel = sourceRow + column * 4;
-			byte *destinationPixel = destinationRow + column * 3;
+			byte *destinationPixel = destinationRow + column * components;
 			destinationPixel[ 0 ] = sourcePixel[ bgra ? 2 : 0 ];
 			destinationPixel[ 1 ] = sourcePixel[ 1 ];
 			destinationPixel[ 2 ] = sourcePixel[ bgra ? 0 : 2 ];
+			if ( components == 4 ) {
+				// the swapchain is opaque; a captured alpha of 0 would make the
+				// whole shot transparent in any format that keeps the channel
+				destinationPixel[ 3 ] = 255;
+			}
 		}
-		if ( destinationStride > width * 3 ) {
-			memset( destinationRow + width * 3, 0, (size_t)( destinationStride - width * 3 ) );
+		if ( destinationStride > width * components ) {
+			memset( destinationRow + width * components, 0,
+					(size_t)( destinationStride - width * components ) );
 		}
 	}
 

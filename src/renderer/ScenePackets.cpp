@@ -208,6 +208,17 @@ bool R_ScenePackets_FrontEndCaptureRequired( void ) {
 }
 
 bool R_ScenePackets_SidePipelineRequired( void ) {
+	// gles_d3 renders the view itself and shares no state with the modern
+	// executor. Leaving the side pipeline armed under BE_GLES_D3 does not just
+	// waste work: R_ModernGLExecutor_ComposeVisibleFrame and SubmitModernGui
+	// run on RC_SWAP_BUFFERS and paint an empty composite over the finished
+	// frame -- the same failure mode the legacy post chain has on this
+	// context. This is the single gate that keeps the two backends from
+	// touching each other.
+	if ( tr.backEndRenderer == BE_GLES_D3 ) {
+		return false;
+	}
+
 	return R_ScenePackets_ModernPipelineRequested()
 		|| R_TemporalPresentation_TemporalAARequested()
 		|| r_rendererMetrics.GetInteger() >= 2;

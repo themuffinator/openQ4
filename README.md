@@ -155,6 +155,7 @@ Packaged support currently focuses on Windows, Linux x64, Steam Deck/SteamOS, pr
 ### Build and technical docs
 
 - [BUILDING.md](BUILDING.md) - compile openQ4 from source
+- [Android, GLES and SigmaTouch](docs/dev/android-build.md) - experimental native Android builds, optional touch-host integration, and desktop GLES testing
 - [TECHNICAL.md](TECHNICAL.md) - advanced configuration, file layout, compatibility notes, and mod details
 - [Map Entity Strings](docs/user/map-entity-strings.md) - replace or extend a map's runtime entities without editing the original map
 
@@ -186,6 +187,7 @@ Bug reports, compatibility reports, testing feedback, and code contributions are
 ## Credits
 
 - **themuffinator** - openQ4 development and maintenance
+- **[Emile Belanger (emileb)](https://github.com/emileb)** - contributor and original author of the Android port, SigmaTouch integration, OpenGL ES 3.0 renderer, GLES shader variants, ETC2/EAC compression, and associated mobile memory/loading work. This integration builds on his [Android branch](https://github.com/emileb/openQ4/tree/android) and [GLES shader-variants branch](https://github.com/emileb/openQ4/tree/gles-shader-variants); see the [contribution and adaptation record](docs/dev/android-gles-integration.md).
 - **DarkMatter Productions** - project stewardship and website
 - **[Q2REX Project Team](https://github.com/themuffinator/Q2REX)** - design reference for the native [multiplayer chat panel, scaling and history](docs/user/multiplayer-chat.md)
 - **[MuffMode](https://github.com/themuffinator/MuffMode)** and **[Q4MAX](https://www.moddb.com/mods/q4max)** - multiplayer workflow and usability references; see the [competitive reference audit](docs/dev/competitive-match-reference-audit.md)
@@ -194,6 +196,7 @@ Bug reports, compatibility reports, testing feedback, and code contributions are
 - **id Software's official Doom 3 and Doom 3 BFG source releases** - retained idTech 4 source lineage; see the [audited provenance inventory](docs/dev/source-provenance.md)
 - **id Software** and **Raven Software** - Quake 4 and the underlying technology
 - **Chris Robinson and the [OpenAL Soft](https://openal-soft.org/) contributors** - maintained cross-platform OpenAL runtime bundled by macOS packages
+- **[The Khronos Group](https://github.com/KhronosGroup/OpenGL-Registry)** - MIT-licensed OpenGL ES API headers, with their original notices retained
 - **akacross** (Discord user) - Thorough playtesting on Linux and Windows, a huge help moving the project forward!
 
 ---

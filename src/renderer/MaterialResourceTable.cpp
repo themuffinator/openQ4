@@ -3419,7 +3419,7 @@ static bool R_MaterialResourceTable_RunPBRContractSelfTest( void ) {
 		&& stats.textureArrayTableDescriptors == 0;
 	if ( !ok ) {
 		common->Printf(
-			"RendererMaterialResourceTable self-test failed: PBR contract added=%d/%d/%d/%d/%d/%d/%d/%d/%d/%d sourceAlpha=%d/%d/%d/%d/%d record=%d resource=%d modern=%d fallback=%s records=%d packed=%d separate=%d missingFallback=%d mapsMissing=%d/%d/%d\n",
+			"RendererMaterialResourceTable self-test failed: PBR contract added=%d/%d/%d/%d/%d/%d/%d/%d/%d/%d sourceAlpha=%d/%d/%d/%d/%d/%d record=%d resource=%d modern=%d fallback=%s records=%d packed=%d separate=%d missingFallback=%d mapsMissing=%d/%d/%d\n",
 			added ? 1 : 0,
 			separateAdded ? 1 : 0,
 			scalarAdded ? 1 : 0,

@@ -15,6 +15,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tools" / "build"))
+from gamelibs_stage_path import build_stage_root, stage_root as target_stage_root
 STAGE_SCRIPT = ROOT / "tools" / "build" / "stage_gamelibs.py"
 POWERSHELL_WRAPPER = ROOT / "tools" / "build" / "meson_setup.ps1"
 SHELL_WRAPPER = ROOT / "tools" / "build" / "meson_setup.sh"
@@ -270,9 +272,11 @@ def validate_posix_wrapper_refresh(work: Path) -> None:
         return
 
     project_root, gamelibs_root, stage_root = make_minimal_workspace(work)
+    stage_root = target_stage_root(project_root, "linux", "aarch64")
     wrapper = project_root / "tools" / "build" / "meson_setup.sh"
     wrapper.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(ROOT / "tools" / "build" / "meson_setup.sh", wrapper)
+    shutil.copy2(ROOT / "tools" / "build" / "gamelibs_stage_path.py", wrapper.parent)
 
     baseline_mtime_ns = 1_700_000_000_000_000_000
     for module_name in ("game", "mpgame"):
@@ -294,6 +298,10 @@ def validate_posix_wrapper_refresh(work: Path) -> None:
                 os.utime(staged_file, ns=(stale_stage_mtime_ns, stale_stage_mtime_ns))
 
     build_dir = project_root / "builddir"
+    write_file(
+        build_dir / "meson-info" / "intro-machines.json",
+        json.dumps({"host": {"system": "linux", "cpu_family": "aarch64"}}),
+    )
     write_file(build_dir / "meson-private" / "coredata.dat", "test\n")
     write_file(build_dir / "build.ninja", "# test\n")
     write_file(
@@ -718,10 +726,33 @@ def validate_source_contracts() -> None:
         raise AssertionError("BUILDING.md does not document the GameLibs source-input role")
 
 
+def validate_target_stage_paths(work: Path) -> None:
+    project_root = work / "project"
+    build_dir = project_root / "builddir"
+    for system, cpu, expected in (
+        ("windows", "x86_64", "gamelibs_stage"),
+        ("linux", "x86_64", "gamelibs_stage-linux-x64"),
+        ("linux", "aarch64", "gamelibs_stage-linux-arm64"),
+        ("darwin", "aarch64", "gamelibs_stage-darwin-arm64"),
+        ("darwin", "x86_64", "gamelibs_stage-darwin-x64"),
+        ("android", "aarch64", "gamelibs_stage-android-arm64"),
+    ):
+        write_file(
+            build_dir / "meson-info" / "intro-machines.json",
+            json.dumps({"host": {"system": system, "cpu_family": cpu}}),
+        )
+        actual = build_stage_root(project_root, build_dir)
+        if actual != project_root / ".tmp" / expected:
+            raise AssertionError(f"wrong target stage for {system}/{cpu}: {actual}")
+    if target_stage_root(project_root, "macos", "arm64") != target_stage_root(project_root, "darwin", "aarch64"):
+        raise AssertionError("package platform and Meson machine must identify the same source stage")
+
+
 def main() -> None:
     work = ROOT / ".tmp" / "gamelibs-staging-test"
     shutil.rmtree(work, ignore_errors=True)
     try:
+        validate_target_stage_paths(work / "target-paths")
         validate_successful_stage(work / "success")
         validate_symlink_rejection(work / "symlink")
         validate_stage_root_guard(work / "stage-root")

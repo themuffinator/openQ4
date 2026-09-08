@@ -1,0 +1,10 @@
+plugins {
+    // Same Android plugin as SDL 3.4.10's supported Android project.
+    id 'com.android.application' version '8.7.3' apply false
+}
+
+// Keep compiler/package intermediates under the repository's standard build root.
+layout.buildDirectory.set(file('../../builddir/android-apk'))
+subprojects {
+    layout.buildDirectory.set(new File(rootProject.layout.buildDirectory.get().asFile, name))
+}

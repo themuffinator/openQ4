@@ -303,6 +303,22 @@ void idVertexCache::Init() {
 	// use ARB_vertex_buffer_object unless explicitly disabled
 	if( r_useVertexBuffers.GetInteger() && glConfig.ARBVertexBufferObjectAvailable ) {
 		common->Printf( "using ARB_vertex_buffer_object memory\n" );
+
+		// r_useIndexBuffers defaults to 0, so index data normally stays in
+		// client memory and glDrawElements receives a real pointer. That is
+		// legal in a compatibility context and removed outright in a core
+		// profile and in OpenGL ES, where a bound element-array buffer is the
+		// only way to draw indexed geometry. Leaving it off there makes every
+		// indexed draw fail with GL_INVALID_VALUE and render nothing --
+		// measured on game/mcc_1, all 375 forward+ draws submitted with ibo=0
+		// and the scene target read back as entirely zero.
+		const bool clientMemoryIndicesIllegal =
+			glConfig.backendCaps.profile == RENDERER_CONTEXT_PROFILE_CORE
+			|| glConfig.backendCaps.profile == RENDERER_CONTEXT_PROFILE_ES;
+		if ( clientMemoryIndicesIllegal && r_useIndexBuffers.GetInteger() < 2 ) {
+			r_useIndexBuffers.SetInteger( 2 );
+			common->Printf( "forcing r_useIndexBuffers 2: this profile cannot draw from client index memory\n" );
+		}
 	} else {
 		virtualMemory = true;
 		r_useIndexBuffers.SetBool( false );

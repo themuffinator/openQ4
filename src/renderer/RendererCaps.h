@@ -39,7 +39,11 @@ enum rendererTierPreference_t {
 enum rendererContextProfile_t {
 	RENDERER_CONTEXT_PROFILE_UNKNOWN = 0,
 	RENDERER_CONTEXT_PROFILE_COMPATIBILITY,
-	RENDERER_CONTEXT_PROFILE_CORE
+	RENDERER_CONTEXT_PROFILE_CORE,
+	// OpenGL ES. The Android target's native profile; on desktop it is reached
+	// through a translation layer (ANGLE on macOS) so the GLES path can be
+	// developed and tested without a device.
+	RENDERER_CONTEXT_PROFILE_ES
 };
 
 typedef struct rendererContextRequest_s {

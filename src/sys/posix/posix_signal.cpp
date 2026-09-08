@@ -107,8 +107,12 @@ static void Posix_WriteSignalText( const char *text ) {
 
 static void Posix_WriteSignalNumber( int value ) {
 	char buffer[ 16 ];
-	int pos = sizeof( buffer );
+	// filled back to front, so reserve the last byte for the terminator
+	// Posix_WriteSignalText needs
+	int pos = sizeof( buffer ) - 1;
 	unsigned int number;
+
+	buffer[ pos ] = '\0';
 
 	if ( value < 0 ) {
 		Posix_WriteSignalText( "-" );
@@ -122,7 +126,7 @@ static void Posix_WriteSignalNumber( int value ) {
 		number /= 10;
 	} while ( number > 0 && pos > 0 );
 
-	write( STDERR_FILENO, buffer + pos, sizeof( buffer ) - pos );
+	Posix_WriteSignalText( buffer + pos );
 }
 
 /*
@@ -139,6 +143,13 @@ void Posix_ClearSigs( ) {
 	action.sa_flags = 0;
 
 	for ( int i = 0; signalRoutes[ i ].signum != -1; ++i ) {
+#if defined( __ANDROID__ )
+		// Android's runtime owns fatal signal handlers, including deliberate
+		// faults used by ART. Install/reset only our graceful quit routes.
+		if ( !signalRoutes[ i ].graceful ) {
+			continue;
+		}
+#endif
 		if ( sigaction( signalRoutes[ i ].signum, &action, NULL ) != 0 ) {
 			Sys_Printf( "Failed to reset %s handler: %s\n", signalRoutes[ i ].name, strerror( errno ) );
 		}
@@ -246,6 +257,13 @@ void Posix_InitSigs( ) {
 	action.sa_flags = SA_SIGINFO;
 
 	for ( int i = 0; signalRoutes[ i ].signum != -1; ++i ) {
+#if defined( __ANDROID__ )
+		// Android's runtime owns fatal signal handlers, including deliberate
+		// faults used by ART. Install/reset only our graceful quit routes.
+		if ( !signalRoutes[ i ].graceful ) {
+			continue;
+		}
+#endif
 		if ( sigaction( signalRoutes[ i ].signum, &action, NULL ) != 0 ) {
 			Sys_Printf( "Failed to set %s handler: %s\n", signalRoutes[ i ].name, strerror( errno ) );
 		}

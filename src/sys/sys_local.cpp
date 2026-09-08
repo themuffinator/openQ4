@@ -286,6 +286,14 @@ void idSysLocal::DLL_GetFileName( const char *baseName, char *dllName, int maxLe
 	} else {
 		idStr::snPrintf( dllName, maxLength, "%s" CPUSTRING ".dll", baseName );
 	}
+#elif defined( __ANDROID__ )
+	// Only lib*.so is packaged into the APK and extracted to the native library
+	// directory, so every module carries the prefix there.
+	if ( explicitGameModuleName ) {
+		idStr::snPrintf( dllName, maxLength, "lib%s.so", baseName );
+	} else {
+		idStr::snPrintf( dllName, maxLength, "lib%s" CPUSTRING ".so", baseName );
+	}
 #elif defined( __linux__ )
 	if ( explicitGameModuleName ) {
 		idStr::snPrintf( dllName, maxLength, "%s.so", baseName );

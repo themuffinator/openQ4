@@ -22,7 +22,7 @@ along with Doom 3 Source Code.  If not, see <http://www.gnu.org/licenses/>.
 ===========================================================================
 */
 
-#if defined(OPENQ4_SDL3_LINUX_HOST) || defined(OPENQ4_SDL3_DARWIN_HOST)
+#if defined(OPENQ4_SDL3_LINUX_HOST) || defined(OPENQ4_SDL3_DARWIN_HOST) || defined(OPENQ4_SDL3_ANDROID_HOST)
 #define OPENQ4_SDL3_POSIX_HOST 1
 #endif
 
@@ -39,6 +39,7 @@ along with Doom 3 Source Code.  If not, see <http://www.gnu.org/licenses/>.
 #include "../../framework/Session.h"
 #include "../../renderer/tr_local.h"
 #include "../../renderer/RenderModuleAPI.h"
+#include "../../renderer/RendererModule.h"
 #include "../../ui/EditWindow.h"
 
 #include <SDL3/SDL.h>
@@ -49,6 +50,11 @@ along with Doom 3 Source Code.  If not, see <http://www.gnu.org/licenses/>.
 
 #if defined(OPENQ4_SDL3_DARWIN_HOST)
 #include "../osx/macosx_common.h"
+// SDL3_SetANGLEHintDefaults runs before SDL_Init, so it cannot use
+// SDL_GetBasePath to find a staged ANGLE beside the executable.
+#include <limits.h>
+#include <mach-o/dyld.h>
+#include <string.h>
 #endif
 
 #if defined(OPENQ4_SDL3_POSIX_HOST)
@@ -270,6 +276,22 @@ static sdlJoystickAxisEvent_t s_polledJoystick[MAX_JOYSTICK_AXIS];
 static int s_polledJoystickCount = 0;
 
 static int s_joystickAxisState[MAX_JOYSTICK_AXIS] = { 0 };
+#if defined(OPENQ4_SIGMATOUCH)
+static int s_touchAxisState[MAX_JOYSTICK_AXIS] = { 0 };
+static int SDL3_ReadJoystickAxis(int axis) {
+	if (axis == AXIS_ROLL && (s_touchAxisState[AXIS_SIDE] != 0 ||
+		s_touchAxisState[AXIS_FORWARD] != 0 || s_touchAxisState[AXIS_YAW] != 0 ||
+		s_touchAxisState[AXIS_PITCH] != 0)) {
+		return 127;
+	}
+	if (axis != AXIS_ROLL && s_touchAxisState[axis] != 0) {
+		return s_touchAxisState[axis];
+	}
+	return s_joystickAxisState[axis];
+}
+#else
+static int SDL3_ReadJoystickAxis(int axis) { return s_joystickAxisState[axis]; }
+#endif
 static bool s_gamepadButtonsDown[SDL_GAMEPAD_BUTTON_COUNT] = { false };
 static bool s_gamepadLeftTriggerDown = false;
 static bool s_gamepadRightTriggerDown = false;
@@ -421,12 +443,16 @@ static const char *SDL3_HintString(const char *name) {
 	return (value != NULL && value[0] != '\0') ? value : "<unset>";
 }
 
-#if defined(OPENQ4_SDL3_LINUX_HOST)
+// Also needed on Darwin: SDL3_SetANGLEHintDefaults uses it to leave an ANGLE
+// path the user set in the environment alone.
+#if defined(OPENQ4_SDL3_LINUX_HOST) || defined(OPENQ4_SDL3_DARWIN_HOST)
 static bool SDL3_EnvHasValue(const char *name) {
 	const char *value = getenv(name);
 	return value != NULL && value[0] != '\0';
 }
+#endif
 
+#if defined(OPENQ4_SDL3_LINUX_HOST)
 static bool SDL3_EnvFlagEnabled(const char *name) {
 	const char *value = getenv(name);
 	return value != NULL && value[0] != '\0' && idStr::Icmp(value, "0") != 0 && idStr::Icmp(value, "false") != 0;
@@ -464,6 +490,168 @@ static const char *SDL3_GraphicsBridgeDescription(void) {
 		: "OpenGL";
 }
 
+#if defined(OPENQ4_SDL3_DARWIN_HOST)
+/*
+===============
+SDL3_SetANGLEHintDefaults
+
+macOS ships no OpenGL ES, so SDL's cocoa EGL path is only usable with a
+translation layer (ANGLE, GLES-on-Metal). SDL dlopens the bare leaf names
+"libEGL.dylib" and "libGLESv2.dylib", which dyld does not resolve from the
+executable's own directory, so a staged ANGLE would be invisible without an
+absolute path. Look bundle-relative first, then beside the executable -- the
+same order the Vulkan module uses to find MoltenVK.
+
+Applied only when the selected renderer is the GLES module. SDL_HINT_OPENGL_LIBRARY
+is consulted when creating *any* GL context, not just an ES one, so setting it
+process-wide on macOS points desktop context creation at ANGLE as well: every
+core-profile candidate then fails with "Failed getting OpenGL context version"
+and the ladder silently falls back to 2.1 compatibility. That fallback still
+reaches ARB2, so a desktop smoke test stays green while core 4.1 is quietly
+unreachable -- gate on the API rather than trusting the comment that nothing
+loads until an ES context is requested.
+
+An explicit environment override always wins.
+
+The executable directory comes from _NSGetExecutablePath, not SDL_GetBasePath:
+this runs from Sys_SDL_ApplyVideoHintDefaults *before* SDL_Init, and
+SDL_GetBasePath returns NULL until the video subsystem is up. Anchoring on the
+uninitialised SDL call made the whole search bail on its first line, which is
+why a staged ANGLE was invisible without SDL_EGL_LIBRARY set by hand.
+_NSGetExecutablePath has no such ordering dependency and is what the engine's
+own macOS Sys_EXEPath is built on.
+===============
+*/
+/*
+===============
+SDL3_LoadedAngleImagePath
+
+Returns the path of an already-loaded dylib with this leaf name, or NULL.
+
+The renderer module links libGLESv2 and is loaded before the window exists, so
+by the time the ES context is created ANGLE is already in the process -- and the
+module resolved it through its own rpath list, which meson populates from the
+staged ANGLE directory ahead of @loader_path. Handing SDL a path we merely
+*guessed* (the executable directory) pointed it at a second, byte-identical copy
+at a different path. dyld keys images by resolved path, so that is two ANGLE
+images: SDL creates the context in one while the module's linked entry points
+call into the other, which then reports no current context and returns NULL for
+GL_VERSION.
+
+Asking dyld what is actually loaded removes the guess.
+===============
+*/
+static const char *SDL3_LoadedAngleImagePath(const char *leafName) {
+	const uint32_t imageCount = _dyld_image_count();
+	for (uint32_t i = 0; i < imageCount; ++i) {
+		const char *imageName = _dyld_get_image_name(i);
+		if (imageName == NULL) {
+			continue;
+		}
+		const char *slash = strrchr(imageName, '/');
+		const char *leaf = (slash != NULL) ? slash + 1 : imageName;
+		if (idStr::Icmp(leaf, leafName) == 0) {
+			return imageName;
+		}
+	}
+	return NULL;
+}
+
+static const char *SDL3_DarwinExecutableDir(void) {
+	static char exeDir[PATH_MAX];
+
+	if (exeDir[0] != '\0') {
+		return exeDir;
+	}
+
+	uint32_t bufferSize = (uint32_t)sizeof(exeDir);
+	if (_NSGetExecutablePath(exeDir, &bufferSize) != 0) {
+		exeDir[0] = '\0';
+		return exeDir;
+	}
+
+	// Trim to the directory, keeping the trailing separator so callers can
+	// concatenate a leaf name directly.
+	char *lastSlash = strrchr(exeDir, '/');
+	if (lastSlash == NULL) {
+		exeDir[0] = '\0';
+		return exeDir;
+	}
+	lastSlash[1] = '\0';
+	return exeDir;
+}
+
+static void SDL3_SetANGLEHintDefaults(void) {
+	static const struct {
+		const char *hint;
+		const char *leafName;
+	} angleLibraries[] = {
+		{ SDL_HINT_EGL_LIBRARY, "libEGL.dylib" },
+		{ SDL_HINT_OPENGL_LIBRARY, "libGLESv2.dylib" },
+	};
+
+	// Sys_SDL_ApplyVideoHintDefaults is also called from the early splash/console
+	// path, before the renderer module is booted, where the API is not yet known.
+	// SDL3_WindowServices_PrepareWindowSystem calls it again before the game
+	// window is created, which is the call that matters for the GL context.
+	const rendererModuleStatus_t &moduleStatus = R_RendererModule_GetStatus();
+	if (moduleStatus.activeApi != RENDER_MODULE_API_GLES &&
+			moduleStatus.requestedApi != RENDER_MODULE_API_GLES) {
+		return;
+	}
+
+	const char *basePath = SDL3_DarwinExecutableDir();
+	if (basePath == NULL || basePath[0] == '\0') {
+		return;
+	}
+
+	// Whatever ANGLE the renderer module already loaded wins: matching its exact
+	// path is what keeps this to a single driver instance.
+	const char *loadedGLES = SDL3_LoadedAngleImagePath("libGLESv2.dylib");
+	char loadedAngleDir[1024] = { 0 };
+	if (loadedGLES != NULL) {
+		idStr::snPrintf(loadedAngleDir, sizeof(loadedAngleDir), "%s", loadedGLES);
+		char *lastSlash = strrchr(loadedAngleDir, '/');
+		if (lastSlash != NULL) {
+			lastSlash[1] = '\0';
+		} else {
+			loadedAngleDir[0] = '\0';
+		}
+	}
+
+	for (size_t i = 0; i < sizeof(angleLibraries) / sizeof(angleLibraries[0]); ++i) {
+		if (SDL3_EnvHasValue(angleLibraries[i].hint)) {
+			continue;
+		}
+
+		if (loadedAngleDir[0] != '\0') {
+			char loadedCandidate[1024];
+			SDL_PathInfo loadedInfo;
+			idStr::snPrintf(loadedCandidate, sizeof(loadedCandidate), "%s%s", loadedAngleDir, angleLibraries[i].leafName);
+			if (SDL_GetPathInfo(loadedCandidate, &loadedInfo)) {
+				SDL3_SetHintDefaultLogged(angleLibraries[i].hint, loadedCandidate, "loaded ANGLE (GLES on Metal)");
+				continue;
+			}
+		}
+
+		const char *searchDirs[] = { "../Frameworks/", "" };
+		for (size_t d = 0; d < sizeof(searchDirs) / sizeof(searchDirs[0]); ++d) {
+			char candidate[1024];
+			SDL_PathInfo info;
+
+			idStr::snPrintf(candidate, sizeof(candidate), "%s%s%s",
+				basePath, searchDirs[d], angleLibraries[i].leafName);
+			if (!SDL_GetPathInfo(candidate, &info)) {
+				continue;
+			}
+
+			SDL3_SetHintDefaultLogged(angleLibraries[i].hint, candidate, "staged ANGLE (GLES on Metal)");
+			break;
+		}
+	}
+}
+#endif
+
 static void SDL3_SetVideoHintDefaults(void) {
 	// openQ4 consumes committed UTF-8 text but does not render composition or
 	// candidate lists itself. Ask SDL to keep the platform-native IME UI so
@@ -496,6 +684,7 @@ static void SDL3_SetVideoHintDefaults(void) {
 		SDL3_SetHintDefaultLogged(SDL_HINT_GPU_DRIVER, "metal", "macOS Metal bridge");
 		SDL3_SetHintDefaultLogged(SDL_HINT_VIDEO_METAL_AUTO_RESIZE_DRAWABLE, "1", "macOS Metal bridge");
 	}
+	SDL3_SetANGLEHintDefaults();
 #endif
 }
 
@@ -2047,6 +2236,10 @@ static void SDL3_ReleaseFocusInputState(int eventTime) {
 	// background events used on handheld/mobile platforms. Release every
 	// latched input path here too so Alt+Tab cannot leave fullscreen relative
 	// mouse mode, controller buttons, triggers, hats, or axes stuck active.
+#if defined(OPENQ4_SIGMATOUCH)
+	Quake4_ClearTouchInput();
+	Quake4_ResetTouchState();
+#endif
 	SDL3_ClearInputQueues();
 	idKeyInput::ClearStates();
 	Sys_GrabMouseCursor(false);
@@ -4939,7 +5132,9 @@ bool Sys_SDL_PumpEvents(void) {
 			case SDL_EVENT_FINGER_MOTION:
 			case SDL_EVENT_FINGER_UP:
 			case SDL_EVENT_FINGER_CANCELED:
+#if !defined(OPENQ4_SIGMATOUCH)
 				SDL3_HandleFingerEvent(event.tfinger, eventTime);
+#endif
 				break;
 
 			default:
@@ -4951,6 +5146,17 @@ bool Sys_SDL_PumpEvents(void) {
 	SDL3_ProcessPendingLifecycleEvents(Sys_Milliseconds());
 	SDL3_RefreshWindowPlacement();
 	SDL3_UpdateWindowAspectSnap(sawResizeEvent);
+#if defined(OPENQ4_SIGMATOUCH)
+	// The POSIX guard above guarantees this runs on the engine thread. Process
+	// lifecycle transitions before accepting a batch from the UI thread.
+	window = s_sdlWindow;
+	Quake4_UpdateTouchScreenMode();
+	if (win32.activeApp && !s_sdlFocusInputReleased) {
+		Quake4_DrainTouchInput();
+	} else {
+		Quake4_ClearTouchInput();
+	}
+#endif
 
 	return true;
 }
@@ -5437,7 +5643,7 @@ int Sys_PollJoystickInputEvents(void) {
 	s_polledJoystickCount = 0;
 	for (int axis = 0; axis < MAX_JOYSTICK_AXIS; ++axis) {
 		s_polledJoystick[s_polledJoystickCount].axis = axis;
-		s_polledJoystick[s_polledJoystickCount].value = s_joystickAxisState[axis];
+		s_polledJoystick[s_polledJoystickCount].value = SDL3_ReadJoystickAxis(axis);
 		s_polledJoystickCount++;
 	}
 	Sys_LeaveCriticalSection(CRITICAL_SECTION_ONE);
@@ -5467,7 +5673,7 @@ bool Sys_GetJoystickAxisState(int axis, int &value) {
 	}
 
 	Sys_EnterCriticalSection(CRITICAL_SECTION_ONE);
-	value = s_joystickAxisState[axis];
+	value = SDL3_ReadJoystickAxis(axis);
 	Sys_LeaveCriticalSection(CRITICAL_SECTION_ONE);
 
 	return true;
@@ -5695,7 +5901,15 @@ static void SDL3_ApplyFramebufferDesc(const renderFramebufferDesc_t *desc) {
 		(void)SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
 		(void)SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, desc->multiSamples);
 	}
-	if (desc->explicitGLVersion) {
+	if (desc->glESProfile) {
+		// An ES context is always an explicit version request: there is no
+		// meaningful "unversioned ES" and SDL must know before it picks a
+		// driver, because on desktop this routes through EGL/ANGLE rather
+		// than the platform's desktop-GL path.
+		(void)SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, desc->glMajor);
+		(void)SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, desc->glMinor);
+		(void)SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+	} else if (desc->explicitGLVersion) {
 		(void)SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, desc->glMajor);
 		(void)SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, desc->glMinor);
 		(void)SDL_GL_SetAttribute(

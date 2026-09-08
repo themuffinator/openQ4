@@ -8,10 +8,10 @@ permissions:
   contents: read
 
 env:
-  # Keep the engine's shared File/FileSystem ABI locked to the companion
-  # revision that implements GAME_API 46, generated-animation cache v3, and
-  # the game-owned transient time-scale interface.
-  OPENQ4_GAMELIBS_SHA: 089a328096faa8da82fad5c23306ec8c4ccee290
+  # Pin the companion's engine-interface copies, including GAME_API 46,
+  # generated-animation cache v3, transient time scale, and Android/GLES
+  # renderer/image capabilities. Publish this companion commit before CI runs.
+  OPENQ4_GAMELIBS_SHA: f9bf8a692de539b9d149cc7b2c47759dbb1ddd62
 
 concurrency:
   group: openq4-push-verification-${{ github.ref }}
@@ -69,6 +69,7 @@ jobs:
             tools/build/verify_linux_arm64_release_evidence.py \
             tools/build/stage_fast_install.py \
             tools/build/stage_gamelibs.py \
+            tools/build/gamelibs_stage_path.py \
             tools/build/stage_windows_runtime.py \
             tools/build/sync_icons.py \
             tools/build/windows_runtime.py \
@@ -124,6 +125,10 @@ jobs:
             tools/tests/docs_link_integrity.py \
             tools/tests/dmap_render_geometry_lifecycle.py \
             tools/tests/fatal_error_startup_safety.py \
+            tools/tests/android_build.py \
+            tools/tests/android_touch_input.py \
+            tools/tests/audio_payload_restore.py \
+            tools/tests/renderer_gles_dispatch.py \
             tools/tests/filesystem_case_segments.py \
             tools/tests/filesystem_mod_manifest.py \
             tools/tests/filesystem_write_qpath_safety.py \
@@ -307,6 +312,10 @@ jobs:
           python tools/tests/docs_link_integrity.py
           python tools/tests/dmap_render_geometry_lifecycle.py
           python tools/tests/fatal_error_startup_safety.py
+          python tools/tests/android_build.py
+          python tools/tests/android_touch_input.py
+          python tools/tests/audio_payload_restore.py
+          python tools/tests/renderer_gles_dispatch.py
           python tools/tests/filesystem_case_segments.py
           python tools/tests/filesystem_mod_manifest.py
           python tools/tests/filesystem_write_qpath_safety.py

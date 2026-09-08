@@ -1092,12 +1092,18 @@ SCR_DrawMemoryUsage
 */
 float SCR_DrawMemoryUsage( float y ) {
 	memoryStats_t allocs, frees;
-	
-	Mem_GetStats( allocs );
-	SCR_DrawTextRightAlign( y, "total allocated memory: %4d, %4dkB", allocs.num, allocs.totalSize>>10 );
+
+	// Reports what is still held: allocations minus frees, summed over the
+	// engine and every loaded module (each links its own idlib, so each keeps
+	// its own counters). Printed in MB because a loaded map runs to well over a
+	// million kB, unreadable as one number and enough to overflow a 32-bit sum.
+	Mem_GetProcessStats( allocs );
+	SCR_DrawTextRightAlign( y, "live allocations: %d blocks, %.1f MB",
+		allocs.num, allocs.totalSize / ( 1024.0 * 1024.0 ) );
 
 	Mem_GetFrameStats( allocs, frees );
-	SCR_DrawTextRightAlign( y, "frame alloc: %4d, %4dkB  frame free: %4d, %4dkB", allocs.num, allocs.totalSize>>10, frees.num, frees.totalSize>>10 );
+	SCR_DrawTextRightAlign( y, "frame alloc: %d, %.0f kB  frame free: %d, %.0f kB",
+		allocs.num, allocs.totalSize / 1024.0, frees.num, frees.totalSize / 1024.0 );
 
 	Mem_ClearFrameStats();
 

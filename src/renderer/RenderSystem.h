@@ -67,6 +67,7 @@ typedef struct glconfig_s {
 	bool				sharedTexturePaletteAvailable;
 	bool				textureCompressionAvailable;
 	bool				bptcTextureCompressionAvailable;
+	bool				etc2TextureCompressionAvailable;
 // RAVEN BEGIN
 // dluetscher: added
 	bool				drawRangeElementsAvailable;

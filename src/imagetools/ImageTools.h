@@ -48,6 +48,7 @@ void	R_StaticFree( void *data );
 typedef struct imageToolsCompressionCaps_s {
 	bool	textureCompressionAvailable;		// S3TC/DXT sampling support
 	bool	bptcTextureCompressionAvailable;	// BC7 sampling support
+	bool	etc2TextureCompressionAvailable;	// ETC2/EAC sampling support
 } imageToolsCompressionCaps_t;
 
 void	ImageTools_SetCompressionCaps( const imageToolsCompressionCaps_t &caps );

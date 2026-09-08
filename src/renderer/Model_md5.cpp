@@ -980,7 +980,12 @@ void idMD5Mesh::ParseMesh( idLexer &parser, int numJoints, const idJointMat *joi
 		c_numWeightJoints += weightIndex[i * 2 + 1];
 	}
 
-	idDrawVert *verts = (idDrawVert *)_alloca16( texCoords.Num() * sizeof( idDrawVert ) );
+	// Heap, not _alloca16: this is sized by the mesh's vertex count, and a large
+	// enough mesh walked off the end of the thread stack. Android runs the engine
+	// on an SDL thread with a 1MB stack, where a ~17k vertex mesh is a megabyte
+	// of alloca and the first verts[i].Clear() dies on the guard page.
+	idTempArray16< idDrawVert > vertsBuffer( texCoords.Num() );
+	idDrawVert *verts = vertsBuffer.Ptr();
 	for ( i = 0; i < texCoords.Num(); i++ ) {
 		verts[i].Clear();
 		verts[i].st = texCoords[i];
@@ -1326,11 +1331,14 @@ idMD5Mesh::CalcBounds
 */
 idBounds idMD5Mesh::CalcBounds( const idJointMat *entJoints ) {
 	idBounds	bounds;
+	// Both scratch buffers are sized by the mesh's vertex count, the same count
+	// that overflowed the stack in ParseMesh. This runs per frame for animated
+	// models, so the small case stays on the stack.
 	if ( scaledBaseVectors != NULL && weights != NULL ) {
-		idDrawVert *verts = (idDrawVert *)_alloca16( deformInfo->numOutputVerts * sizeof( idDrawVert ) );
+		OPENQ4_ALLOC16_SCRATCH( idDrawVert, verts, deformInfo->numOutputVerts );
 		SIMDProcessor->TransformVertsNew( verts, deformInfo->numOutputVerts, bounds, entJoints, scaledBaseVectors, weights, numWeights );
 	} else {
-		idDrawVert *verts = (idDrawVert *)_alloca16( texCoords.Num() * sizeof( idDrawVert ) );
+		OPENQ4_ALLOC16_SCRATCH( idDrawVert, verts, texCoords.Num() );
 
 		TransformVerts( verts, entJoints );
 		SIMDProcessor->MinMax( bounds[0], bounds[1], verts, texCoords.Num() );
@@ -1861,8 +1869,11 @@ idRenderModel *idRenderModelMD5::InstantiateDynamicModel( const struct renderEnt
 		}
 
 		if ( collisionOnly || mesh->UpdateLod( ent, viewEnt, surf ) ) {
+			// GUI quads are positioned from CPU-skinned vertices. Keep their
+			// supporting surface on that same path so GPU rounding cannot place
+			// the mesh in front of its coplanar GUI (for example weapon displays).
 			mesh->UpdateSurface( ent, entJoints, surf, !collisionOnly,
-				!collisionOnly && gpuJointPaletteReady );
+				!collisionOnly && gpuJointPaletteReady && !shader->HasGui() );
 		}
 		srfTriangles_t *frontTri = surf->geometry;
 

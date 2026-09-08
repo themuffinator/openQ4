@@ -5,11 +5,13 @@ from __future__ import annotations
 
 import filecmp
 import hashlib
+import fnmatch
 import os
 import shutil
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Sequence
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 
@@ -184,7 +186,24 @@ def copy_file_if_changed(source: Path, destination: Path) -> bool:
     return True
 
 
-def _should_skip_pk4_entry(relative_path: Path) -> bool:
+def _matches_content_filter(rel_posix_lower: str, filters: Sequence[str]) -> bool:
+    """Last matching pattern wins; a leading '!' re-includes.
+
+    Ordering matters, so 'gfx/*' followed by '!gfx/keepme*' drops the directory
+    but keeps one subtree. Patterns are fnmatch globs against the lowercased
+    archive path, where '*' spans '/' -- 'env/*' therefore covers the whole
+    tree rather than only its top level.
+    """
+    excluded = False
+    for pattern in filters:
+        negated = pattern.startswith("!")
+        candidate = pattern[1:] if negated else pattern
+        if fnmatch.fnmatch(rel_posix_lower, candidate.lower()):
+            excluded = not negated
+    return excluded
+
+
+def _should_skip_pk4_entry(relative_path: Path, content_filters: Sequence[str] = ()) -> bool:
     rel_parts_lower = {part.lower() for part in relative_path.parts}
     rel_posix_lower = relative_path.as_posix().lower()
 
@@ -195,6 +214,9 @@ def _should_skip_pk4_entry(relative_path: Path) -> bool:
         return True
 
     if relative_path.suffix.lower() in OPENQ4_PK4_EXCLUDED_SUFFIXES:
+        return True
+
+    if content_filters and _matches_content_filter(rel_posix_lower, content_filters):
         return True
 
     return False
@@ -215,7 +237,9 @@ def format_openq4_paks_header(pak0_result: Pk4BuildResult, pak1_result: Pk4Build
     )
 
 
-def _iter_pk4_entries(source_dir: Path, pak_name: str) -> tuple[list[tuple[Path, str]], list[str]]:
+def _iter_pk4_entries(
+    source_dir: Path, pak_name: str, content_filters: Sequence[str] = ()
+) -> tuple[list[tuple[Path, str]], list[str]]:
     entries: list[tuple[Path, str]] = []
     skipped_samples: list[str] = []
 
@@ -240,7 +264,7 @@ def _iter_pk4_entries(source_dir: Path, pak_name: str) -> tuple[list[tuple[Path,
                 f"refusing marker file: {rel_posix}"
             )
 
-        if _should_skip_pk4_entry(rel):
+        if _should_skip_pk4_entry(rel, content_filters):
             if len(skipped_samples) < 5:
                 skipped_samples.append(rel_posix)
             continue
@@ -273,8 +297,9 @@ def _write_deterministic_zip(
     destination_pk4: Path,
     pak_name: str,
     required_files: set[str] | None = None,
+    content_filters: Sequence[str] = (),
 ) -> tuple[int, list[str], list[str]]:
-    entries, skipped_samples = _iter_pk4_entries(source_dir, pak_name)
+    entries, skipped_samples = _iter_pk4_entries(source_dir, pak_name, content_filters)
     added_paths: set[str] = set()
     required_files = required_files if required_files is not None else required_files_for_pack(pak_name)
 
@@ -317,6 +342,7 @@ def create_game_pk4(
     *,
     pak_name: str | None = None,
     required_files: set[str] | None = None,
+    content_filters: Sequence[str] = (),
 ) -> Pk4BuildResult:
     pak_name = pak_name or destination_pk4.name
     added_files, skipped_samples, missing_required = _write_deterministic_zip(
@@ -324,6 +350,7 @@ def create_game_pk4(
         destination_pk4,
         pak_name,
         required_files,
+        content_filters,
     )
     return Pk4BuildResult(
         added_files=added_files,

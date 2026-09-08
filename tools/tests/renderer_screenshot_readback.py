@@ -51,8 +51,11 @@ def test_screenshot_reads_the_unpresented_back_buffer() -> None:
         (
             "session->UpdateScreen();",
             "glReadBuffer( r_frontBuffer.GetBool() ? GL_FRONT : GL_BACK );",
-            "glReadPixels( 0, 0, w, h, GL_RGB, GL_UNSIGNED_BYTE, temp );",
+            "glReadPixels( 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, rgbaTemp );",
         ),
+        # GL_RGBA, not GL_RGB: ES guarantees only RGBA/UNSIGNED_BYTE for the
+        # default framebuffer, and ANGLE rejects the GL_RGB read outright. The
+        # read is RGBA everywhere and packed down to RGB on the CPU.
         "regular screenshot readback path",
     )
 

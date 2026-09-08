@@ -91,6 +91,51 @@ void local_free(void *ptr)
 }
 // RAVEN END
 
+// The usable-size query local_msize needs lives in a different header on every
+// platform, and precompiled.h only pulls <malloc.h> in for the Windows build.
+#if !defined( RV_UNIFIED_ALLOCATOR )
+	#if defined( __APPLE__ )
+		#include <malloc/malloc.h>
+	#elif defined( __ANDROID__ ) || defined( __linux__ ) || defined( _WIN32 )
+		#include <malloc.h>
+	#endif
+#endif
+
+/*
+==================
+local_msize
+
+USE_LIBC_MALLOC hands allocation off to the C library, which leaves Mem_Free
+with a bare pointer and no record of how large the block was. Every libc we
+target can answer that question about a live pointer, so ask it rather than
+threading a size header through every allocation: the stats are diagnostics and
+must not change the layout of what they measure.
+
+Returns the usable size, which is the requested size rounded up to the
+allocator's bucket. That is the honest number -- it is what the process
+actually holds -- and using it on both sides keeps alloc and free symmetric.
+==================
+*/
+inline size_t local_msize( void *ptr )
+{
+	if ( ptr == NULL ) {
+		return 0;
+	}
+#ifdef RV_UNIFIED_ALLOCATOR
+	return Memory::MSize( ptr );
+#elif defined( __APPLE__ )
+	return malloc_size( ptr );
+#elif defined( _WIN32 )
+	return _msize( ptr );
+#elif defined( __ANDROID__ ) || defined( __linux__ )
+	return malloc_usable_size( ptr );
+#else
+	// No portable way to recover the size: report zero so the running total
+	// stays consistent (nothing added, nothing subtracted) instead of drifting.
+	return 0;
+#endif
+}
+
 //===============================================================
 //
 //	idHeap
@@ -1415,9 +1460,46 @@ void idHeap::LargeFree( void *ptr) {
 #undef new
 
 static idHeap *			mem_heap = NULL;
-static memoryStats_t	mem_total_allocs = { 0, 0x0fffffff, -1, 0 };
-static memoryStats_t	mem_frame_allocs;
-static memoryStats_t	mem_frame_frees;
+
+/*
+================================================
+Allocation counters are written from every thread that allocates -- the game
+thread, the renderer, the sound mixer -- so they cannot be plain ints. The
+counts are pure diagnostics and never gate a decision, so each field is updated
+with relaxed ordering: no barriers on the allocation hot path, and a reader
+sees a consistent-enough snapshot for a debug overlay.
+
+minSize/maxSize are maintained with the usual relaxed compare-exchange climb.
+After warmup the comparison fails immediately and no exchange is attempted.
+================================================
+*/
+// The initialisers are constant expressions, so these statics are constant
+// initialised. That matters: idLib allocates during static construction, before
+// any explicit init would have had a chance to run.
+struct memoryStatsCounters_t {
+	std::atomic<int>		num{ 0 };
+	std::atomic<int>		minSize{ 0x0fffffff };
+	std::atomic<int>		maxSize{ -1 };
+	std::atomic<int64_t>	totalSize{ 0 };
+};
+
+static memoryStatsCounters_t	mem_total_allocs;
+static memoryStatsCounters_t	mem_frame_allocs;
+static memoryStatsCounters_t	mem_frame_frees;
+
+static void Mem_ResetCounters( memoryStatsCounters_t &counters ) {
+	counters.num.store( 0, std::memory_order_relaxed );
+	counters.minSize.store( 0x0fffffff, std::memory_order_relaxed );
+	counters.maxSize.store( -1, std::memory_order_relaxed );
+	counters.totalSize.store( 0, std::memory_order_relaxed );
+}
+
+static void Mem_ReadCounters( const memoryStatsCounters_t &counters, memoryStats_t &stats ) {
+	stats.num = counters.num.load( std::memory_order_relaxed );
+	stats.minSize = counters.minSize.load( std::memory_order_relaxed );
+	stats.maxSize = counters.maxSize.load( std::memory_order_relaxed );
+	stats.totalSize = counters.totalSize.load( std::memory_order_relaxed );
+}
 
 /*
 ==================
@@ -1425,10 +1507,8 @@ Mem_ClearFrameStats
 ==================
 */
 void Mem_ClearFrameStats( void ) {
-	mem_frame_allocs.num = mem_frame_frees.num = 0;
-	mem_frame_allocs.minSize = mem_frame_frees.minSize = 0x0fffffff;
-	mem_frame_allocs.maxSize = mem_frame_frees.maxSize = -1;
-	mem_frame_allocs.totalSize = mem_frame_frees.totalSize = 0;
+	Mem_ResetCounters( mem_frame_allocs );
+	Mem_ResetCounters( mem_frame_frees );
 }
 
 /*
@@ -1437,8 +1517,8 @@ Mem_GetFrameStats
 ==================
 */
 void Mem_GetFrameStats( memoryStats_t &allocs, memoryStats_t &frees ) {
-	allocs = mem_frame_allocs;
-	frees = mem_frame_frees;
+	Mem_ReadCounters( mem_frame_allocs, allocs );
+	Mem_ReadCounters( mem_frame_frees, frees );
 }
 
 /*
@@ -1447,12 +1527,129 @@ Mem_GetStats
 ==================
 */
 void Mem_GetStats( memoryStats_t &stats ) {
-	stats = mem_total_allocs;
+	Mem_ReadCounters( mem_total_allocs, stats );
+}
+
+/*
+==================
+openQ4_Mem_GetModuleStats
+
+The cross-binary half of Mem_GetProcessStats. Exported with default visibility
+so it survives the hidden-visibility preset the modules are built with, and
+resolved by name rather than through the versioned module ABI: a renderer or
+game module built before this existed simply fails the lookup and is left out
+of the total, instead of failing to load.
+==================
+*/
+extern "C" MEM_MODULE_STATS_EXPORT void openQ4_Mem_GetModuleStats( memoryStats_t *stats ) {
+	if ( stats == NULL ) {
+		return;
+	}
+	Mem_ReadCounters( mem_total_allocs, *stats );
+}
+
+/*
+================================================
+Registered module providers. Written once per module load, from the loader,
+before anything reads them; a fixed array keeps registration allocation-free,
+which matters because this is reachable from the allocator's own header.
+================================================
+*/
+static const int			MAX_MEM_MODULE_STATS = 8;
+static memModuleStats_t		mem_moduleStats[MAX_MEM_MODULE_STATS];
+static int					mem_numModuleStats = 0;
+
+/*
+==================
+Mem_RegisterModuleStats
+==================
+*/
+void Mem_RegisterModuleStats( memModuleStats_t provider ) {
+	if ( provider == NULL ) {
+		return;
+	}
+	// A vid_restart reloads the renderer module and would otherwise register
+	// the same provider a second time, counting that module twice.
+	for ( int i = 0; i < mem_numModuleStats; i++ ) {
+		if ( mem_moduleStats[i] == provider ) {
+			return;
+		}
+	}
+	if ( mem_numModuleStats >= MAX_MEM_MODULE_STATS ) {
+		return;
+	}
+	mem_moduleStats[mem_numModuleStats++] = provider;
+}
+
+/*
+==================
+Mem_UnregisterModuleStats
+
+Must be called before the module is unloaded: the function pointer dies with it.
+==================
+*/
+void Mem_UnregisterModuleStats( memModuleStats_t provider ) {
+	for ( int i = 0; i < mem_numModuleStats; i++ ) {
+		if ( mem_moduleStats[i] != provider ) {
+			continue;
+		}
+		mem_moduleStats[i] = mem_moduleStats[mem_numModuleStats - 1];
+		mem_moduleStats[--mem_numModuleStats] = NULL;
+		return;
+	}
+}
+
+/*
+==================
+Mem_GetProcessStats
+==================
+*/
+void Mem_GetProcessStats( memoryStats_t &stats ) {
+	Mem_GetStats( stats );
+
+	for ( int i = 0; i < mem_numModuleStats; i++ ) {
+		memoryStats_t moduleStats;
+		memset( &moduleStats, 0, sizeof( moduleStats ) );
+		mem_moduleStats[i]( &moduleStats );
+
+		stats.num += moduleStats.num;
+		stats.totalSize += moduleStats.totalSize;
+		if ( moduleStats.num > 0 ) {
+			if ( moduleStats.minSize < stats.minSize ) {
+				stats.minSize = moduleStats.minSize;
+			}
+			if ( moduleStats.maxSize > stats.maxSize ) {
+				stats.maxSize = moduleStats.maxSize;
+			}
+		}
+	}
 }
 
 /*
 ==================
 Mem_UpdateStats
+==================
+*/
+static void Mem_UpdateStats( memoryStatsCounters_t &counters, int size ) {
+	counters.num.fetch_add( 1, std::memory_order_relaxed );
+	counters.totalSize.fetch_add( size, std::memory_order_relaxed );
+
+	int observed = counters.minSize.load( std::memory_order_relaxed );
+	while ( size < observed && !counters.minSize.compare_exchange_weak(
+				observed, size, std::memory_order_relaxed, std::memory_order_relaxed ) ) {
+	}
+	observed = counters.maxSize.load( std::memory_order_relaxed );
+	while ( size > observed && !counters.maxSize.compare_exchange_weak(
+				observed, size, std::memory_order_relaxed, std::memory_order_relaxed ) ) {
+	}
+}
+
+/*
+==================
+Mem_UpdateStats
+
+Kept for the published idlib signature; the internal callers use the atomic
+counters directly.
 ==================
 */
 void Mem_UpdateStats( memoryStats_t &stats, int size ) {
@@ -1483,8 +1680,8 @@ Mem_UpdateFreeStats
 */
 void Mem_UpdateFreeStats( int size ) {
 	Mem_UpdateStats( mem_frame_frees, size );
-	mem_total_allocs.num--;
-	mem_total_allocs.totalSize -= size;
+	mem_total_allocs.num.fetch_sub( 1, std::memory_order_relaxed );
+	mem_total_allocs.totalSize.fetch_sub( size, std::memory_order_relaxed );
 }
 
 /*
@@ -1530,7 +1727,9 @@ void *Mem_Alloc( const size_t size, byte tag ) {
 		*((int*)0x0) = 1;
 #endif
 // jnewquist: send all allocations through one place on the Xenon
-		return local_malloc( size );
+		void *mem = local_malloc( size );
+		Mem_UpdateAllocStats( static_cast<int>( local_msize( mem ) ) );
+		return mem;
 	}
 // amccarthy: Added allocation tag
 	void *mem = mem_heap->Allocate( static_cast<dword>( heapSize ), tag );
@@ -1554,6 +1753,8 @@ void Mem_Free( void *ptr ) {
 #endif
 // RAVEN BEGIN
 // jnewquist: send all allocations through one place on the Xenon
+		// measure before the free: the pointer is not queryable afterwards
+		Mem_UpdateFreeStats( static_cast<int>( local_msize( ptr ) ) );
 		local_free( ptr );
 // RAVEN END
 		return;
@@ -1582,13 +1783,16 @@ void *Mem_Alloc16( const size_t size, byte tag ) {
 		*((int*)0x0) = 1;
 #endif
 // jnewquist: send all allocations through one place on the Xenon
-		return local_malloc( size );
+		void *mem = local_malloc( size );
+		Mem_UpdateAllocStats( static_cast<int>( local_msize( mem ) ) );
+		return mem;
 	}
 
 // amccarthy: Added allocation tag
 	void *mem = mem_heap->Allocate16( static_cast<dword>( heapSize ), tag );
 	// make sure the memory is 16 byte aligned
 	assert( ( ((uintptr_t)mem) & 15 ) == 0 );
+	Mem_UpdateAllocStats( mem_heap->Msize( mem ) );
 	return mem;
 }
 // RAVEN END
@@ -1608,12 +1812,15 @@ void Mem_Free16( void *ptr ) {
 #endif
 // RAVEN BEGIN
 // jnewquist: send all allocations through one place on the Xenon
+		// measure before the free: the pointer is not queryable afterwards
+		Mem_UpdateFreeStats( static_cast<int>( local_msize( ptr ) ) );
 		local_free( ptr );
 // RAVEN END
 		return;
 	}
 	// make sure the memory is 16 byte aligned
 	assert( ( ((uintptr_t)ptr) & 15 ) == 0 );
+	Mem_UpdateFreeStats( mem_heap->Msize( ptr ) );
  	mem_heap->Free16( ptr );
 }
 
@@ -1664,9 +1871,41 @@ char *Mem_CopyString( const char *in ) {
 /*
 ==================
 Mem_Dump_f
+
+The per-allocation dump needs ID_DEBUG_MEMORY, which a release build does not
+have. It can still report the totals, and those are the numbers worth having in
+a bug report: a console command can be scripted and captured in a condump,
+where the com_showMemoryUsage overlay cannot.
 ==================
 */
 void Mem_Dump_f( const idCmdArgs &args ) {
+	memoryStats_t local;
+	Mem_GetStats( local );
+
+	// Split the total by binary. Each of the engine, renderer and game links its
+	// own idlib archive, so this says which one is holding the memory -- and on
+	// Android the renderer's line covers the image data, which is usually the
+	// answer being looked for.
+	idLib::common->Printf( "this binary: %d live allocations, %.1f MB\n",
+		local.num, local.totalSize / ( 1024.0 * 1024.0 ) );
+	for ( int i = 0; i < mem_numModuleStats; i++ ) {
+		memoryStats_t moduleStats;
+		memset( &moduleStats, 0, sizeof( moduleStats ) );
+		mem_moduleStats[i]( &moduleStats );
+		idLib::common->Printf( "  module %d: %d live allocations, %.1f MB\n",
+			i, moduleStats.num, moduleStats.totalSize / ( 1024.0 * 1024.0 ) );
+	}
+
+	memoryStats_t stats;
+	Mem_GetProcessStats( stats );
+	idLib::common->Printf( "total: %d live allocations, %.1f MB (%lld bytes)\n",
+		stats.num, stats.totalSize / ( 1024.0 * 1024.0 ), (long long)stats.totalSize );
+	if ( stats.num > 0 ) {
+		idLib::common->Printf( "smallest %d bytes, largest %d bytes, mean %lld bytes\n",
+			stats.minSize, stats.maxSize, (long long)( stats.totalSize / stats.num ) );
+	}
+	idLib::common->Printf( "sizes are the allocator's usable block size, so they include its rounding\n" );
+	idLib::common->Printf( "build has no per-allocation tracking; rebuild with ID_DEBUG_MEMORY for a full dump\n" );
 }
 
 /*

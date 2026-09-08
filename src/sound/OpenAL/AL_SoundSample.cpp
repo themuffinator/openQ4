@@ -39,6 +39,8 @@ If you have questions concerning this license or the applicable additional terms
 
 extern idCVar s_useCompression;
 extern idCVar s_noSound;
+extern idCVar s_releaseSamplePayload;
+extern idCVar s_debugHardware;
 
 #define GPU_CONVERT_CPU_TO_CPU_CACHED_READONLY_ADDRESS( x ) x
 
@@ -272,6 +274,10 @@ idSoundSample_OpenAL::idSoundSample_OpenAL()
 
 	lastPlayedTime = 0;
 
+	payloadReleased = false;
+	// deliberately not cleared by FreeData: LoadResource frees before it
+	// reloads, and the whole point of the flag is to survive that
+	keepPayload = false;
 	openalBuffer = 0;
 	openalBufferUploadFailed = false;
 }
@@ -330,7 +336,11 @@ void idSoundSample_OpenAL::WriteAllSamples( const idStr& sampleName )
 
 		if( samplePC->LoadWav( inName ) || samplePC->LoadWav( inName2 ) )
 		{
-			idFile* fileOut = fileSystem->OpenFileWrite( outName, "fs_basepath" );
+			// the generated/ tree is regenerable cache, and fs_basepath is
+			// commonly the read-only game install (SAF-backed storage on
+			// Android, Program Files on Windows); fs_cachepath is always
+			// writable and falls back to fs_savepath when the host leaves it unset
+			idFile* fileOut = fileSystem->OpenFileWrite( outName, "fs_cachepath" );
 			samplePC->WriteGeneratedSample( fileOut );
 			delete fileOut;
 		}
@@ -697,7 +707,91 @@ void idSoundSample_OpenAL::CreateOpenALBuffer()
 				GetName(),
 				uploadError );
 		}
+
+		// OpenAL owns a copy of these bytes now; ours is redundant
+		ReleaseCpuPayload();
 	}
+}
+
+/*
+========================
+idSoundSample_OpenAL::ReleaseCpuPayload
+
+alBufferData copied every byte into OpenAL's own storage, so what is left in
+buffers[] is a second resident copy of the same PCM. Free the payload but keep
+the sampleBuffer_t entries: RestartAt and GetPlayableBufferRange navigate a
+sample through numSamples and bufferSize, and only the streaming submit path
+dereferences the bytes.
+
+Not done for a sample split across several buffers. CreateOpenALBuffer only
+uploads the single-buffer case -- it asserts as much -- so a multi-buffer sample
+has no complete OpenAL copy to fall back on.
+========================
+*/
+void idSoundSample_OpenAL::ReleaseCpuPayload()
+{
+	if( payloadReleased || keepPayload || !s_releaseSamplePayload.GetBool() )
+	{
+		return;
+	}
+	if( openalBuffer == 0 || buffers.Num() != 1 )
+	{
+		return;
+	}
+
+	FreeBuffer( buffers[0].buffer );
+	buffers[0].buffer = NULL;
+	payloadReleased = true;
+}
+
+/*
+========================
+idSoundSample_OpenAL::EnsureCpuPayload
+
+Restore through a temporary sample. Other voices may still be using our OpenAL
+buffer, so reloading this object would delete an attached buffer and invalidate
+their playback state. Only transfer matching CPU bytes; retain our metadata and
+OpenAL handle.
+========================
+*/
+bool idSoundSample_OpenAL::EnsureCpuPayload()
+{
+	if( !payloadReleased )
+	{
+		return buffers.Num() > 0 && buffers[0].buffer != NULL;
+	}
+
+	// Set before the reload, not after: LoadResource ends by uploading to
+	// OpenAL, which would otherwise release the payload we are restoring.
+	keepPayload = true;
+
+	// This costs a synchronous decode in the middle of starting a sound, so it
+	// is worth seeing when it happens. It should be rare and it should never
+	// repeat for the same sample -- keepPayload is sticky.
+	if( s_debugHardware.GetBool() )
+	{
+		idLib::Printf( "%dms: reloading released payload for %s\n", Sys_Milliseconds(), GetName() );
+	}
+	idSoundSample_OpenAL restored;
+	restored.SetName( GetName() );
+	restored.keepPayload = true;
+	restored.LoadResource();
+	if( !restored.loaded || buffers.Num() != 1 || restored.buffers.Num() != 1 ||
+		restored.buffers[0].buffer == NULL ||
+		memcmp( &format, &restored.format, sizeof( format ) ) != 0 ||
+		playBegin != restored.playBegin || playLength != restored.playLength ||
+		buffers[0].numSamples != restored.buffers[0].numSamples ||
+		buffers[0].bufferSize != restored.buffers[0].bufferSize )
+	{
+		// A missing or replaced source must not change already playing voices.
+		restored.FreeData();
+		return false;
+	}
+	buffers[0].buffer = restored.buffers[0].buffer;
+	restored.buffers[0].buffer = NULL;
+	payloadReleased = false;
+	restored.FreeData();
+	return true;
 }
 
 /*
@@ -1332,6 +1426,7 @@ void idSoundSample_OpenAL::FreeData()
 	memset( &format, 0, sizeof( format ) );
 	loaded = false;
 	totalBufferSize = 0;
+	payloadReleased = false;
 	playBegin = 0;
 	playLength = 0;
 	openalBufferUploadFailed = false;

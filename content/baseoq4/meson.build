@@ -11,9 +11,9 @@ if build_games and build_game_sp
       override_options: game_target_override_options,
       link_args: game_module_link_args,
       vs_module_defs: game_sp_module_defs_file,
-      name_prefix: '',
+      name_prefix: module_filename_prefix,
       install: true,
-      install_dir: install_game_dir,
+      install_dir: install_module_dir,
     )
   elif host_system == 'darwin'
     game_sp_module_target = shared_library(
@@ -28,10 +28,10 @@ if build_games and build_game_sp
       link_args: game_module_link_args + ['-Wl,-install_name,@loader_path/' + game_sp_binary_name + '.dylib'],
       link_depends: game_module_link_depends,
       gnu_symbol_visibility: 'hidden',
-      name_prefix: '',
+      name_prefix: module_filename_prefix,
       name_suffix: 'dylib',
       install: true,
-      install_dir: install_game_dir,
+      install_dir: install_module_dir,
     )
   else
     game_sp_module_target = shared_module(
@@ -46,9 +46,9 @@ if build_games and build_game_sp
       link_args: game_module_link_args,
       link_depends: game_module_link_depends,
       gnu_symbol_visibility: 'hidden',
-      name_prefix: '',
+      name_prefix: module_filename_prefix,
       install: true,
-      install_dir: install_game_dir,
+      install_dir: install_module_dir,
     )
   endif
 endif
@@ -66,9 +66,9 @@ if build_games and build_game_mp
       override_options: game_target_override_options,
       link_args: game_module_link_args,
       vs_module_defs: game_mp_module_defs_file,
-      name_prefix: '',
+      name_prefix: module_filename_prefix,
       install: true,
-      install_dir: install_game_dir,
+      install_dir: install_module_dir,
     )
   elif host_system == 'darwin'
     game_mp_module_target = shared_library(
@@ -83,10 +83,10 @@ if build_games and build_game_mp
       link_args: game_module_link_args + ['-Wl,-install_name,@loader_path/' + game_mp_binary_name + '.dylib'],
       link_depends: game_module_link_depends,
       gnu_symbol_visibility: 'hidden',
-      name_prefix: '',
+      name_prefix: module_filename_prefix,
       name_suffix: 'dylib',
       install: true,
-      install_dir: install_game_dir,
+      install_dir: install_module_dir,
     )
   else
     game_mp_module_target = shared_module(
@@ -101,9 +101,9 @@ if build_games and build_game_mp
       link_args: game_module_link_args,
       link_depends: game_module_link_depends,
       gnu_symbol_visibility: 'hidden',
-      name_prefix: '',
+      name_prefix: module_filename_prefix,
       install: true,
-      install_dir: install_game_dir,
+      install_dir: install_module_dir,
     )
   endif
 endif

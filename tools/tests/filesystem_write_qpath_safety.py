@@ -233,15 +233,15 @@ def validate_generated_binary_image_cache_fallback() -> None:
            "compact binary-image identity must preserve meaningful spaces")
 
     require_order(write_cache,
-                  'fileSystem->OpenFileWrite( writeFileName, "fs_savepath" )',
+                  'fileSystem->OpenFileWrite( writeFileName, "fs_cachepath" )',
                   "R_MakeCompactBinaryImageFileName( writeFileName, GetName() )",
                   "legacy binary-image write before compact fallback")
     require_order(write_cache,
                   "R_MakeCompactBinaryImageFileName( writeFileName, GetName() )",
-                  '\t\toutputFile = fileSystem->OpenFileWrite( writeFileName, "fs_savepath" );',
+                  '\t\toutputFile = fileSystem->OpenFileWrite( writeFileName, "fs_cachepath" );',
                   "compact binary-image fallback write")
     require_order(write_cache,
-                  '\t\toutputFile = fileSystem->OpenFileWrite( writeFileName, "fs_savepath" );',
+                  '\t\toutputFile = fileSystem->OpenFileWrite( writeFileName, "fs_cachepath" );',
                   "idLib::Warning(",
                   "binary-image warning only after compact fallback failure")
     require(write_cache, "return FILE_NOT_FOUND_TIMESTAMP;",

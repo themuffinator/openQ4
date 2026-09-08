@@ -34,6 +34,41 @@ option(
 )
 
 option(
+  'build_renderer_gles',
+  type: 'feature',
+  value: 'auto',
+  description: 'Build the OpenGL ES 3 renderer module. Auto enables it on Android; enable explicitly on desktop (native GLES on Linux or an ANGLE SDK).',
+)
+
+option(
+  'gles_root',
+  type: 'string',
+  value: '',
+  description: 'Optional desktop GLES/ANGLE SDK prefix containing lib/ (and bin/ on Windows). Runtime libraries must be supplied and licensed separately.',
+)
+
+option(
+  'android_deps_root',
+  type: 'string',
+  value: '',
+  description: 'Android target dependency prefix containing include/SDL3, include/AL, lib/libSDL3.so and lib/libopenal.so. See docs/dev/android-build.md.',
+)
+
+option(
+  'sigmatouch_root',
+  type: 'string',
+  value: '',
+  description: 'Optional external Clibs_OpenTouch source directory for the Sigma Touch host adapter (Android only).',
+)
+
+option(
+  'sigmatouch_controls_root',
+  type: 'string',
+  value: '',
+  description: 'External touchcontrols include root; required with sigmatouch_root. Target touchcontrols/saffal libraries come from android_deps_root/lib.',
+)
+
+option(
   'build_renderer_vk',
   type: 'boolean',
   value: true,

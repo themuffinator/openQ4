@@ -1292,6 +1292,8 @@ def generate_release_docs_site(
 
     for auxiliary in (Path("LICENSE"),):
         copy_docs_auxiliary_file(source_root, auxiliary, output_root / auxiliary.name)
+    khronos_notice = Path("LICENSES") / "KHRONOS-GLES-MIT.txt"
+    copy_docs_auxiliary_file(source_root, khronos_notice, output_root / khronos_notice)
 
     rendered_sources = {spec.source_relative.as_posix().lower() for spec in specs}
     for spec in specs:

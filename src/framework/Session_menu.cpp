@@ -1293,6 +1293,13 @@ static void MainMenuBuildModelList( const bool isTeamGame, const int menuModelTe
 	buildValues.Clear();
 	buildNames.Clear();
 
+	// Only declName and description are read out of these, but parsing a
+	// playerModel decl precaches its model, head, skin and sounds as a side
+	// effect. Walking the whole list therefore loaded every multiplayer
+	// character before the main menu could draw -- several seconds of startup
+	// spent on a dropdown the player may never open.
+	idSuppressPlayerModelMediaCaching suppressPrecache;
+
 	const int numModels = declManager->GetNumDecls( DECL_PLAYER_MODEL );
 	for ( int i = 0; i < numModels; ++i ) {
 		const rvDeclPlayerModel *playerModel = static_cast<const rvDeclPlayerModel *>( declManager->DeclByIndex( DECL_PLAYER_MODEL, i, true ) );
@@ -1323,9 +1330,15 @@ static void SetMainMenuMPModelVars( idUserInterface *gui ) {
 	const int menuModelTeam = MainMenuResolveModelTeam();
 	MainMenuSyncMPSettingsGuiState( gui, menuModelTeam );
 
-	const idDeclEntityDef *menuDef = static_cast<const idDeclEntityDef *>( declManager->FindType( DECL_ENTITYDEF, "player_marine_mp_ui", false ) );
-	const idDeclEntityDef *fallbackDef = static_cast<const idDeclEntityDef *>( declManager->FindType( DECL_ENTITYDEF, "player_marine_mp", false ) );
-	const idDeclEntityDef *def = menuDef ? menuDef : fallbackDef;
+	// Look the fallback up only when it is needed. FindType parses the decl, and
+	// parsing a player entityDef precaches everything it references -- models,
+	// animations, weapons and sounds. Resolving both unconditionally paid that
+	// cost for "player_marine_mp" on every main menu build and then threw the
+	// result away whenever the _ui variant existed, which it normally does.
+	const idDeclEntityDef *def = static_cast<const idDeclEntityDef *>( declManager->FindType( DECL_ENTITYDEF, "player_marine_mp_ui", false ) );
+	if ( def == NULL ) {
+		def = static_cast<const idDeclEntityDef *>( declManager->FindType( DECL_ENTITYDEF, "player_marine_mp", false ) );
+	}
 
 	idStr buildValues;
 	idStr buildNames;
@@ -1359,6 +1372,13 @@ static void SetMainMenuMPModelVars( idUserInterface *gui ) {
 		if ( MainMenuFirstModelFromList( buildValues, isTeamGame, menuModelTeam, selectedDecl, selectedModelName, selectedHeadName, selectedSkinName ) ) {
 			cvarSystem->SetCVarString( modelCVar.c_str(), selectedDecl.c_str() );
 		}
+	}
+
+	// The list above was built with precaching suppressed, so restore it for the
+	// one model the menu actually displays.
+	if ( selectedDecl.Length() ) {
+		DeclPlayerModel_CacheMediaForDecl(
+			static_cast<const rvDeclPlayerModel *>( declManager->FindType( DECL_PLAYER_MODEL, selectedDecl.c_str(), false ) ) );
 	}
 
 	if ( !selectedModelName.Length() && def ) {
@@ -1404,6 +1424,14 @@ idUserInterface *idSessionLocal::GetActiveMenu( void ) {
 idSessionLocal::StartMainMenu
 ==============
 */
+
+// Building the main menu was over half of startup at one point; keep the split
+// visible so a regression there is obvious rather than folded into "startup".
+extern idCVar com_showLevelLoadTimes;
+
+static int menuProfileSaveVarsMsec = 0;
+static int menuProfileMainVarsMsec = 0;
+
 void idSessionLocal::StartMenu( bool playIntro ) {
 	const bool shouldPlayIntro = playIntro && !com_skipLogoVideos.GetBool();
 
@@ -1424,8 +1452,17 @@ void idSessionLocal::StartMenu( bool playIntro ) {
 	// start playing the menu sounds
 	SetPlayingSoundWorld( menuSoundWorld );
 
+	const int menuProfileStart = Sys_Milliseconds();
+	menuProfileSaveVarsMsec = 0;
+	menuProfileMainVarsMsec = 0;
+
+	const int setGuiStart = Sys_Milliseconds();
 	SetGUI( guiMainMenu, NULL );
+	const int setGuiMsec = Sys_Milliseconds() - setGuiStart;
+
+	const int introStart = Sys_Milliseconds();
 	guiMainMenu->HandleNamedEvent( shouldPlayIntro ? "playIntro" : "noIntro" );
+	const int introMsec = Sys_Milliseconds() - introStart;
 	menuIntroBlackoutActive = true;
 	menuIntroBlackoutAwaitMenuMusic = shouldPlayIntro;
 	menuIntroBlackoutFadeStart = -1;
@@ -1444,6 +1481,18 @@ void idSessionLocal::StartMenu( bool playIntro ) {
 
 	console->Close();
 
+	if ( com_showLevelLoadTimes.GetBool() ) {
+		const int menuProfileTotal = Sys_Milliseconds() - menuProfileStart;
+		common->Printf(
+			"Main menu phases: setGUI=%d (saveVars=%d mainVars=%d other=%d) introEvent=%d rest=%d total=%d msec\n",
+			setGuiMsec,
+			menuProfileSaveVarsMsec,
+			menuProfileMainVarsMsec,
+			setGuiMsec - menuProfileSaveVarsMsec - menuProfileMainVarsMsec,
+			introMsec,
+			menuProfileTotal - setGuiMsec - introMsec,
+			menuProfileTotal );
+	}
 }
 
 bool idSessionLocal::IsMainMenuIntroPlaying() const {
@@ -1475,10 +1524,14 @@ void idSessionLocal::SetGUI( idUserInterface *gui, HandleGuiCommand_t handle ) {
 		// or declaration enumeration. Those catalogs are refreshed when their
 		// page is opened; the title-screen path still primes them for stock GUIs.
 		const bool refreshCatalogs = !mapSpawned;
+		const int saveVarsStart = Sys_Milliseconds();
 		if ( refreshCatalogs ) {
 			SetSaveGameGuiVars();
 		}
+		menuProfileSaveVarsMsec = Sys_Milliseconds() - saveVarsStart;
+		const int mainVarsStart = Sys_Milliseconds();
 		SetMainMenuGuiVars( refreshCatalogs );
+		menuProfileMainVarsMsec = Sys_Milliseconds() - mainVarsStart;
 	} else if ( guiActive == guiRestartMenu ) {
 		SetSaveGameGuiVars();
 	}

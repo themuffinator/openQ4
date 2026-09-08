@@ -988,6 +988,14 @@ void idRenderWorldLocal::RenderScene( const renderView_t *renderView, int render
 		parms->renderView.forceUpdate = true;
 	}
 
+	// r_screenFraction below native on ES: render the world into a smaller rect
+	// and let the back end blit it back out to the view's native extents before
+	// any 2D is drawn, so the HUD and menus keep their own resolution. Everything
+	// derived from the viewport below -- this view's scissor, and the viewports of
+	// any mirror or portal subviews R_RenderView spawns from it -- picks the
+	// smaller space up from the crop automatically.
+	const bool sceneResolutionScaled = tr.PushSceneResolutionScale();
+
 	// set up viewport, adjusted for resolution and OpenGL style 0 at the bottom
 	tr.RenderViewToViewport( &parms->renderView, &parms->viewport );
 
@@ -1021,6 +1029,9 @@ void idRenderWorldLocal::RenderScene( const renderView_t *renderView, int render
 
 	if ( r_lockSurfaces.GetBool() ) {
 		R_LockSurfaceScene( parms );
+		if ( sceneResolutionScaled ) {
+			tr.PopSceneResolutionScale();
+		}
 		return;
 	}
 
@@ -1034,6 +1045,12 @@ void idRenderWorldLocal::RenderScene( const renderView_t *renderView, int render
 	// this will also cause any necessary entities and lights to be
 	// updated to the demo file
 	R_RenderView( parms );
+
+	// popped before any 2D is emitted, so the HUD is laid out against the full
+	// display and not against the crop the scene rendered into
+	if ( sceneResolutionScaled ) {
+		tr.PopSceneResolutionScale();
+	}
 
 	// now write delete commands for any modified-but-not-visible entities, and
 	// add the renderView command to the demo

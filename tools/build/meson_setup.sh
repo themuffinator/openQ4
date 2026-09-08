@@ -210,7 +210,9 @@ test_gamelibs_stage_refresh_needed() {
 
     local gamelibs_repo=""
     gamelibs_repo="$(resolve_gamelibs_repo_path)"
-    local stage_root="${repo_root}/.tmp/gamelibs_stage"
+    local stage_root=""
+    stage_root="$("${PYTHON_CMD}" "${script_dir}/gamelibs_stage_path.py" \
+        --source-root "${repo_root}" --build-dir "${build_dir}")" || return 0
     local source_game_dirs=("${gamelibs_repo}/src/game" "${gamelibs_repo}/src/mpgame")
     local staged_game_dirs=("${stage_root}/src/game" "${stage_root}/src/mpgame")
 

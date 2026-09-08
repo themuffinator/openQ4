@@ -6,7 +6,8 @@ on:
       openq4_game_ref:
         description: openQ4-game branch, tag, or full commit SHA to build
         required: true
-        default: main
+        # The default must match the engine-interface revision pinned in CI.
+        default: f9bf8a692de539b9d149cc7b2c47759dbb1ddd62
         type: string
       graphics_bridge:
         description: Graphics bridge package(s) to assemble
@@ -261,7 +262,7 @@ jobs:
           python tools/build/verify_release_source_provenance.py \
             --project-root "${GITHUB_WORKSPACE}" \
             --gamelibs-root "${OPENQ4_GAMELIBS_REPO}" \
-            --stage-manifest "${GITHUB_WORKSPACE}/.tmp/gamelibs_stage/openq4_gamelibs_stage_manifest.json" \
+            --stage-manifest "$(python tools/build/gamelibs_stage_path.py --build-dir builddir --manifest)" \
             --expected-project-commit "${{ needs.metadata.outputs.source_sha }}" \
             --expected-gamelibs-commit "${{ needs.metadata.outputs.game_sha }}"
 
@@ -294,7 +295,7 @@ jobs:
           set -euo pipefail
           python tools/build/assemble_macos_universal2.py record \
             --install-root .install \
-            --source-manifest .tmp/gamelibs_stage/openq4_gamelibs_stage_manifest.json \
+            --source-manifest "$(python tools/build/gamelibs_stage_path.py --build-dir builddir --manifest)" \
             --arch "${{ matrix.binary_arch }}" \
             --graphics-bridge "${{ matrix.bridge }}" \
             --openal-provider system \

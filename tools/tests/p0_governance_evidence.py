@@ -45,7 +45,10 @@ def test_provenance_inventory() -> None:
     if failures:
         raise AssertionError("provenance validation failed:\n" + "\n".join(failures))
 
-    assert report["families"]["doom3"]["count"] == 581
+    # Emile's two Android platform adaptations retain the Doom 3 notices.
+    assert report["families"]["doom3"]["count"] == 583
+    doom3_paths = {entry["localPath"] for entry in report["families"]["doom3"]["files"]}
+    assert {"src/sys/android/android_main.cpp", "src/sys/android/android_sdl3.cpp"} <= doom3_paths
     bfg_files = report["families"]["doom3_bfg"]["files"]
     assert len(bfg_files) == 37
     classifications: dict[str, int] = {}

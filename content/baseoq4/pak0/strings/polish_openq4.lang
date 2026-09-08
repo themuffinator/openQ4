@@ -959,4 +959,18 @@
 	"#str_42832"	"Tab: kanał | PgUp/PgDn: historia"
 	"#str_42833"	"Historia | Ctrl+End: najnowsze"
 	"#str_42834"	"PgUp/PgDn: historia | Góra/Dół: przywołaj"
+
+	// SigmaTouch editor labels (emileb Android support).
+	"#str_42900"	"Pokaż menu"
+	"#str_42901"	"Szybki zapis"
+	"#str_42902"	"Szybkie wczytanie"
+	"#str_42903"	"Pokaż klawiaturę"
+	"#str_42904"	"Użyj myszy"
+	"#str_42905"	"Konsola"
+	"#str_42906"	"Pokaż własne sterowanie"
+	"#str_42907"	"Pokaż numery broni"
+	"#str_42908"	"Następna broń"
+	"#str_42909"	"Poprzednia broń"
+	"#str_42910"	"Przyciski ruchu (WASD)"
+	"#str_42911"	"Lewy przycisk myszy"
 }

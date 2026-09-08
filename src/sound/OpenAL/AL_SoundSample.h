@@ -82,8 +82,31 @@ public:
 	{
 		return totalBufferSize;
 	}
+	// What this sample still costs in CPU memory. Diverges from BufferSize once
+	// the payload has been handed to OpenAL and released, and the two must not
+	// be conflated: listSounds reports both so the saving is visible.
+	int				ResidentBufferSize() const
+	{
+		return payloadReleased ? 0 : totalBufferSize;
+	}
+	bool			PayloadReleased() const
+	{
+		return payloadReleased;
+	}
+	// Drops the CPU copy of an uploaded sample, keeping the buffer sizes.
+	void			ReleaseCpuPayload();
+	// Reloads a released payload. Needed before any path that reads the PCM
+	// bytes rather than just their sizes. Returns false if it cannot be had.
+	bool			EnsureCpuPayload();
+
 	const byte*		GetNonCacheData() const
 	{
+		// Callers want the bytes, so restoring a released payload is part of
+		// answering; returning NULL instead would be a silent wrong answer.
+		if( !const_cast< idSoundSample_OpenAL* >( this )->EnsureCpuPayload() )
+		{
+			return NULL;
+		}
 		return buffers.Num() > 0 ? reinterpret_cast<const byte*>( buffers[0].buffer ) : NULL;
 	}
 
@@ -202,6 +225,18 @@ protected:
 
 	int				totalBufferSize;	// total size of all the buffers
 	idList<sampleBuffer_t> buffers;
+
+	// alBufferData copies the PCM into OpenAL's own storage, so once a sample
+	// has been uploaded to openalBuffer the copy in buffers[] is a second,
+	// identical resident copy of every byte. Releasing it frees the payload
+	// while keeping the sampleBuffer_t sizes, which the playback paths still
+	// need to resolve offsets. See ReleaseCpuPayload.
+	bool			payloadReleased;
+
+	// Sticky: set once a sample has been found to need its PCM bytes after all,
+	// so the reload that restores them is not undone by the upload at the end of
+	// LoadResource, and so the same sample cannot cost a reload twice.
+	bool			keepPayload;
 
 	// OpenAL buffer that contains all buffers
 	ALuint			openalBuffer;

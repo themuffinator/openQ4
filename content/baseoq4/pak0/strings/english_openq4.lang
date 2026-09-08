@@ -950,4 +950,18 @@
 	"#str_42832"	"Tab: channel | PgUp/PgDn: history"
 	"#str_42833"	"History | Ctrl+End: latest"
 	"#str_42834"	"PgUp/PgDn: history | Up/Down: recall"
+
+	// SigmaTouch editor labels (emileb Android support).
+	"#str_42900"	"Show menu"
+	"#str_42901"	"Quick save"
+	"#str_42902"	"Quick load"
+	"#str_42903"	"Show keyboard"
+	"#str_42904"	"Use mouse"
+	"#str_42905"	"Console"
+	"#str_42906"	"Show custom controls"
+	"#str_42907"	"Show weapon numbers"
+	"#str_42908"	"Next weapon"
+	"#str_42909"	"Previous weapon"
+	"#str_42910"	"Movement buttons (WASD)"
+	"#str_42911"	"Left click"
 }

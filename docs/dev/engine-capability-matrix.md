@@ -75,9 +75,16 @@ Any change that moves a row between these states must update this file and its e
 
 ## Platform, audio, and networking
 
+The Android/GLES additions below were reviewed on 2026-09-08 and originate in
+[Emile Belanger's port](android-gles-integration.md). They remain experimental
+independently of desktop renderer qualification.
+
 | Capability | Status | Scope and qualification | Evidence |
 |---|---|---|---|
 | SDL3 platform foundation | **Implemented** | Shared SDL3 window/display/input infrastructure is integrated with platform-specific bridges where required. Platform qualification is tracked separately below. | [`sdl3_backend.cpp`](https://github.com/themuffinator/openQ4/blob/master/src/sys/sdl3/sdl3_backend.cpp), [SDL3 migration](sdl3-linux-macos-migration.md) |
+| Android ARM64 client and SP/MP modules | **Experimental** | Meson/NDK API 24+ native port and standalone SDLActivity host. Native cross-build/export/alignment checks pass; device lifecycle, gameplay and input qualification remain open. | [Android build guide](android-build.md), [integration evidence and credit](android-gles-integration.md) |
+| OpenGL ES 3.0 renderer | **Experimental** | Optional desktop module and Android default; specialized GLSL shaders, stencil shadows, ETC2/EAC images and mobile presentation. Temporal resolve, CRT, some desktop post effects and immediate debug drawing are outside the implemented scope. | [Android/GLES integration](android-gles-integration.md) |
+| SigmaTouch host bridge | **Experimental** | Optional adapter from emileb's GPLv3 fork, with synchronized command/analog input and overlay restoration. External host libraries are excluded and require compatible licensing; complete host/device qualification remains open. | [Host integration and licence boundary](android-build.md#optional-sigma-touch-host-adapter) |
 | Windows x64 client/server | **Implemented** | Primary build/package target with staged client, dedicated server, renderer modules, and game modules. | [`meson_setup.ps1`](https://github.com/themuffinator/openQ4/blob/master/tools/build/meson_setup.ps1), [`platform-support.md`](platform-support.md) |
 | Linux x64 client/server | **Implemented** | Native builds, Wayland/X11 paths, packaging, and physical-host stock SP/dedicated evidence exist. | [`platform-support.md`](platform-support.md), [`linux_wayland_stock_sp_smoke.py`](https://github.com/themuffinator/openQ4/blob/master/tools/tests/linux_wayland_stock_sp_smoke.py) |
 | macOS client/server | **Experimental** | Build/package/VM workflows and renderer corridors exist, but hardware qualification and backend/audio consistency remain narrower than Windows/Linux. | [macOS workflow](macos-vm-testing-workflow.md), [`macos_matrix_policy.py`](https://github.com/themuffinator/openQ4/blob/master/tools/tests/macos_matrix_policy.py) |

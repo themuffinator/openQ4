@@ -245,7 +245,12 @@ public:
 	// done under any normal circumstances, and probably not at all on consoles.
 	void		Resize(int width, int height);
 
-	bool		IsCompressed() const { return ( opts.format == FMT_DXT1 || opts.format == FMT_DXT5 || opts.format == FMT_BC7 ); }
+	// every block-compressed format: gates the compressed upload path, the
+	// 4-pixel alignment asserts and the block-size arithmetic
+	bool		IsCompressed() const {
+		return ( opts.format == FMT_DXT1 || opts.format == FMT_DXT5 || opts.format == FMT_BC7 ||
+				 opts.format == FMT_ETC2_RGB8 || opts.format == FMT_ETC2_RGBA8 || opts.format == FMT_EAC_RG11 );
+	}
 
 	void		SetTexParameters();	// update aniso and trilinear
 

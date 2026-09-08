@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
+import subprocess
 from pathlib import Path
 
 
@@ -101,6 +103,45 @@ def validate_engine_interface_header_parity() -> None:
         )
 
 
+def validate_companion_ci_revision() -> None:
+    """Every default CI source pair must contain the tested interface copies."""
+    workflow_names = (
+        "commit-validation.yml", "push-verification.yml", "linux-arm64-cross.yml",
+        "macos-debug.yml", "macos-sanitizer.yml",
+    )
+    pinned_revision = ""
+    for name in workflow_names:
+        source = read(f".github/workflows/{name}")
+        pins = re.findall(r"^\s*OPENQ4_GAMELIBS_SHA: ([0-9a-f]{40})\s*$", source, re.MULTILINE)
+        if len(pins) != 1:
+            raise AssertionError(f"{name} must pin exactly one immutable companion revision")
+        if pinned_revision and pins[0] != pinned_revision:
+            raise AssertionError(f"{name} has a different default companion revision")
+        pinned_revision = pins[0]
+        reject(source, "git clone --depth 1 https://github.com/themuffinator/openQ4-game.git", name)
+        require(source, 'origin "${OPENQ4_GAMELIBS_SHA}"', f"{name} immutable companion fetch")
+        require(source, 'checkout --detach "${OPENQ4_GAMELIBS_SHA}"', f"{name} detached companion checkout")
+        require(source, 'rev-parse HEAD)', f"{name} companion checkout verification")
+
+    for name in ("manual-release.yml", "macos-universal2-candidate.yml"):
+        source = read(f".github/workflows/{name}")
+        match = re.search(r"      openq4_game_ref:\n(.*?)        type: string", source, re.DOTALL)
+        if match is None or f"default: {pinned_revision}" not in match[1]:
+            raise AssertionError(f"{name} must default to the same tested companion revision as CI")
+
+    # A syntactically correct but stale pin would pass the working-tree parity
+    # check. Compare the immutable revision CI actually fetches as well.
+    for relative_path in ENGINE_INTERFACE_HEADERS:
+        completed = subprocess.run(
+            ["git", "-C", str(GAME_LIBS_ROOT), "show", f"{pinned_revision}:{relative_path}"],
+            check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+        if completed.returncode != 0:
+            raise AssertionError(f"cannot inspect CI companion header {relative_path}: {completed.stderr.decode(errors='replace')}")
+        if completed.stdout.replace(b"\r\n", b"\n") != (ROOT / relative_path).read_bytes().replace(b"\r\n", b"\n"):
+            raise AssertionError(f"CI companion pin {pinned_revision} carries a stale engine-interface header: {relative_path}")
+
+
 def validate_companion_boundary() -> None:
     if (ROOT / "src" / "game").exists():
         raise AssertionError("openQ4 must not grow a local src/game mirror; use openQ4-game as the source input")
@@ -175,11 +216,15 @@ def validate_game_module_symbol_discipline() -> None:
     module_meson = read("content/baseoq4/meson.build")
     engine_exports = read("tools/build/darwin_game_module.exp")
 
-    require(engine_exports, "_GetGameAPI", "darwin game module export list")
+    allowed_exports = {"_GetGameAPI", "_openQ4_Mem_GetModuleStats"}
+    actual_exports = set()
     for line in engine_exports.splitlines():
         stripped = line.strip()
-        if stripped and not stripped.startswith("#") and stripped != "_GetGameAPI":
-            raise AssertionError(f"darwin game module export list exports {stripped!r} beyond the entry point")
+        if stripped and not stripped.startswith("#"):
+            actual_exports.add(stripped)
+    if actual_exports != allowed_exports:
+        raise AssertionError(f"darwin game module must export only its API and per-module memory counters: {actual_exports}")
+    require(read("src/framework/Common.cpp"), "Sys_DLL_GetProcAddress( gameDLL, MEM_MODULE_STATS_ENTRY_POINT )", "game memory counter lookup is scoped to its module handle")
 
     for token in (
         "game_idlib_library_mp = static_library(",
@@ -259,7 +304,7 @@ def validate_metadata_contract() -> None:
 
     for token in (
         "VERSION_REPOSITORY_METADATA_KEYS",
-        "GAMELIBS_STAGE_MANIFEST_PATH",
+        "GAMELIBS_STAGE_MANIFEST_NAME",
         "collect_package_repository_metadata",
         "read_staged_repository_metadata",
         "openq4_commit",
@@ -371,6 +416,7 @@ def validate_wiring() -> None:
 
 def main() -> None:
     validate_engine_interface_header_parity()
+    validate_companion_ci_revision()
     validate_companion_boundary()
     validate_companion_macos_contract()
     validate_game_module_symbol_discipline()

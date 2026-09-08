@@ -96,10 +96,33 @@ enum textureFormat_t {
 
 	FMT_RGBA16F,		// 64 bpp
 
-	FMT_BC7				// 8 bpp
+	FMT_BC7,			// 8 bpp
+
+	//------------------------
+	// ETC2 / EAC, core in OpenGL ES 3.0.
+	//
+	// These exist because half the Android fleet exposes no S3TC at all, which
+	// left every texture on those devices at FMT_RGBA8 -- eight times the size
+	// of the DXT1 data Quake 4 actually ships. Unlike the DXT and BPTC formats
+	// above, no extension gates these: an ES 3.0 context always has them.
+	//
+	// Append only. The generated/ image cache stores this enum by value and
+	// BinaryImage.cpp range-checks it, so inserting in the middle silently
+	// reinterprets every cached file.
+	//------------------------
+
+	FMT_ETC2_RGB8,		// 4 bpp, opaque
+	FMT_ETC2_RGBA8,		// 8 bpp, ETC2 RGB + EAC alpha
+	FMT_EAC_RG11		// 8 bpp, two channels; normal maps reconstruct Z
 };
 
+// the last value the generated-image cache will accept; keep in step with the
+// enum above
+#define FMT_MAX_VALID		FMT_EAC_RG11
+
 int BitsForFormat( textureFormat_t format );
+// 4x4 block size in bytes for the block-compressed formats; 0 for the rest
+int BytesPerBlockForFormat( textureFormat_t format );
 
 /*
 ================================================

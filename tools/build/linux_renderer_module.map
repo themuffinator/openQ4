@@ -1,6 +1,7 @@
 {
   global:
     GetRenderAPI;
+    openQ4_Mem_GetModuleStats;
   local:
     *;
 };
