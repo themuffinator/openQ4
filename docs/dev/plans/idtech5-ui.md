@@ -4,6 +4,13 @@ Started 8 September 2026. Status: active; inventory qualification and runtime in
 development branch, not a released UI feature. The [retained runtime checkpoint](../ui/runtime-spike.md)
 records the stage 2 integration candidate and its remaining limitations.
 
+The [product completion review and plan](ui-product-completion.md) audits the
+implementation at `80bb3939` and defines the next delivery milestones, concrete
+runtime/editor/corpus requirements and final quality/performance gates. It refines
+delivery order without reducing the complete scope below. A representative screen
+is an intermediate milestone; full implementation must deliver the complete,
+high-quality UI product at an id Tech 5 standard.
+
 ## Objective and immutable completion scope
 
 Plan, implement and publish a complete idTech 5-esque replacement for openQ4's
