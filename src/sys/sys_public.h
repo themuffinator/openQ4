@@ -427,6 +427,9 @@ typedef struct engineWindowState_s {
 	int			uiViewportHeight;
 	int			displayFrequency;
 	bool		isFullscreen;
+	float		displayScale;     // physical pixels per density-independent UI unit
+	float		pixelDensityX;   // window-coordinate to framebuffer conversion
+	float		pixelDensityY;
 } engineWindowState_t;
 
 extern engineWindowState_t engineWindowState;

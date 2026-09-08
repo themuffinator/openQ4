@@ -36,6 +36,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "ChatWindow.h"
 #include "SimpleWindow.h"
 #include "../framework/Session.h"
+#include "RetainedUI.h"
 
 extern idCVar r_skipGuiShaders;		// 1 = don't render any gui elements on surfaces
 extern idCVar gui_debugScript;
@@ -69,12 +70,14 @@ static void SetStateRectangleComponents( idUserInterfaceLocal *gui, const char *
 */
 
 void idUserInterfaceManagerLocal::Init() {
+	RetainedUI_Init();
 	cmdSystem->AddCommand("chatHistory", idChatWindow::History_f, CMD_FL_SYSTEM, "browse open chat: up, down, top, bottom, status");
 	screenRect = idRectangle(0, 0, 640, 480);
 	dc.Init();
 }
 
 void idUserInterfaceManagerLocal::Shutdown() {
+	RetainedUI_Shutdown();
 	cmdSystem->RemoveCommand("chatHistory");
 	idChatWindow::Reset();
 	guis.DeleteContents( true );

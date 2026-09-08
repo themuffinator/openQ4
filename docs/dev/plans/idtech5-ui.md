@@ -1,7 +1,8 @@
 # idtech5-ui: complete interface replacement
 
-Started 8 September 2026. Status: active; inventory implementation underway. This is a
-development branch, not a released UI feature.
+Started 8 September 2026. Status: active; inventory qualification and runtime integration underway. This is a
+development branch, not a released UI feature. The [retained runtime checkpoint](../ui/runtime-spike.md)
+records the stage 2 integration candidate and its remaining limitations.
 
 ## Objective and immutable completion scope
 
@@ -163,7 +164,7 @@ all diagnostics and still-unclassified resources; no inferred translated status.
 
 ### Stage 2 — document, layout, time and engine integration
 
-- [ ] Pin/check dependencies, integrate through Meson and credit incorporated code.
+- [x] Pin/check dependencies, integrate through Meson and credit incorporated code.
 - [ ] Version canonical document/token/path/timeline schemas and editor metadata.
 - [ ] Load/validate documents with stable IDs and actionable source locations.
 - [ ] Implement DPI, viewport, anchoring/expansion, text-scale and clipping math.

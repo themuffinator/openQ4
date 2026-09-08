@@ -11,8 +11,10 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
+import re
 import struct
 import subprocess
 import time
@@ -39,7 +41,14 @@ def capture(args: argparse.Namespace) -> int:
     game = savepath / 'baseoq4'
     game.mkdir(parents=True)
     cfg_path = game / 'ui-baseline.cfg'
-    cfg_path.write_text('gfxInfo\nscreenshot "screenshots/ui-baseline.tga"\necho UI_BASELINE_CAPTURE_COMPLETE\nquit\n', encoding='utf-8')
+    preview = ''
+    if args.retained_document:
+        fixture = args.retained_document.resolve()
+        (game / 'retained-smoke.rml').write_bytes(fixture.read_bytes())
+        preview = 'ui_retainedPreview "retained-smoke.rml"\nwait 30\n'
+        if args.video_restart:
+            preview += 'vid_restart windowed\nwait 30\n'
+    cfg_path.write_text(preview + 'gfxInfo\nscreenshot "screenshots/ui-baseline.tga"\necho UI_BASELINE_CAPTURE_COMPLETE\nquit\n', encoding='utf-8')
     overrides = {
         'fs_basepath': str(args.assets.resolve()), 'fs_savepath': str(savepath), 'fs_devpath': str(savepath),
         'fs_game': 'baseoq4', 'logFile': '2', 'logFileName': 'logs/openq4.log',
@@ -53,6 +62,7 @@ def capture(args: argparse.Namespace) -> int:
         'g_autoExecAfterMapLoad': 'ui-baseline.cfg', 'g_autoExecAfterMapLoadDelayMs': '3000',
         'com_skipLoadingContinue': '1', 'com_loadingContinueAutoAdvance': '1',
         'com_maxfps': '60', 'ui_autoJoin': '1' if args.mode == 'mp' else '0',
+        'ui_retainedScale': str(args.ui_scale), 'ui_retainedDensity': str(args.density),
     }
     override_keys = {key.lower() for key in overrides}
     retained = []
@@ -80,6 +90,12 @@ def capture(args: argparse.Namespace) -> int:
         'binaries': {str(p.relative_to(runtime)): digest(p) for p in binaries if p.is_file()},
     }
     report_path = output / 'capture.json'
+    if args.retained_document:
+        metadata['retained_preview'] = {'source': str(args.retained_document),
+                                        'sha256': digest(args.retained_document),
+                                        'density_override': args.density, 'ui_scale': args.ui_scale,
+                                        'settle_frames': 30, 'video_restart': args.video_restart,
+                                        'replacement_acceptance': False}
 
     def save_report():
         report_path.write_text(json.dumps(metadata, indent=2) + '\n', encoding='utf-8')
@@ -112,7 +128,18 @@ def capture(args: argparse.Namespace) -> int:
     screenshot = game / 'screenshots/ui-baseline.tga'
     log_path = game / 'logs/openq4.log'
     log = log_path.read_text(encoding='utf-8', errors='replace') if log_path.exists() else ''
+    plain_log = re.sub(r'\^[0-9]', '', log)
+    diagnostics = [line for line in plain_log.splitlines() if 'WARNING:' in line or 'ERROR:' in line]
+    metadata['diagnostics'] = {'warnings': sum('WARNING:' in line for line in diagnostics),
+                               'errors': sum('ERROR:' in line for line in diagnostics)}
     valid = metadata['returncode'] == 0 and screenshot.is_file() and 'UI_BASELINE_CAPTURE_COMPLETE' in log
+    active_apis = re.findall(r'Renderer API: requested=\S+ active=(\S+) disposition=(\S+)', plain_log)
+    metadata['active_renderer'] = active_apis[-1][0] if active_apis else None
+    valid = valid and metadata['active_renderer'] == args.renderer
+    if args.retained_document:
+        retained_diagnostics = [line for line in diagnostics if 'retained UI:' in line or '_retained' in line]
+        metadata['retained_preview']['diagnostics'] = retained_diagnostics
+        valid = valid and 'Retained UI preview loaded:' in plain_log and not retained_diagnostics
     if screenshot.is_file():
         image = screenshot.read_bytes()
         if len(image) >= 18:
@@ -139,9 +166,19 @@ def main() -> int:
     parser.add_argument('--width', type=int, default=1280)
     parser.add_argument('--height', type=int, default=720)
     parser.add_argument('--timeout', type=int, default=180)
+    parser.add_argument('--retained-document', type=Path, help='Optional RML integration fixture, copied into the isolated savepath.')
+    parser.add_argument('--density', type=float, default=0, help='Test density override; zero uses SDL display scale.')
+    parser.add_argument('--ui-scale', type=float, default=1)
+    parser.add_argument('--video-restart', action='store_true', help='Restart the windowed renderer with the preview loaded before capturing.')
     args = parser.parse_args()
     if args.width < 1 or args.height < 1 or args.timeout < 1:
         parser.error('dimensions and timeout must be positive')
+    if not math.isfinite(args.density) or not 0 <= args.density <= 8:
+        parser.error('density must be zero (automatic) or a positive value up to 8')
+    if not math.isfinite(args.ui_scale) or not .75 <= args.ui_scale <= 2:
+        parser.error('UI scale must be between 0.75 and 2')
+    if args.video_restart and not args.retained_document:
+        parser.error('--video-restart requires --retained-document')
     try:
         return capture(args)
     except (OSError, ValueError, StopIteration) as error:

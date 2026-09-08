@@ -4717,6 +4717,27 @@ idMaterial::SetDefaultText
 ===================
 */
 bool idMaterial::SetDefaultText( void ) {
+	if ( idStr::Icmp(GetName(),"_retainedSolid") == 0 ) {
+		// RmlUi's native winding differs from legacy GUI quads; UI planes
+		// also remain visible under mirrored document transforms.
+		SetText("material _retainedSolid { sort gui twoSided { blend gl_one, gl_one_minus_src_alpha vertexColor map _white } }");
+		return true;
+	}
+	// Process-local retained UI image material. Do not mutate the original
+	// material's vertex colour/blending or add a networked content declaration.
+	// The runtime's first integration path accepts direct images and generated
+	// font atlas image identities here, not arbitrary multi-stage materials.
+	if ( idStr::Icmpn( GetName(), "_retained/", 10 ) == 0 ) {
+		const char* imageName = GetName() + 10;
+		if ( !imageName[0] ) return false;
+		for ( const char* p = imageName; *p; ++p ) {
+			if ( !( (*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9') ||
+				*p == '_' || *p == '-' || *p == '/' || *p == '.' ) ) return false;
+		}
+		idStr generated = va( "material %s { sort gui twoSided { blend blend vertexColor nopicmip linear clamp map \"%s\" } }", GetName(), imageName );
+		SetText( generated.c_str() );
+		return true;
+	}
 	// if there exists an image with the same name
 	if ( 1 ) { //fileSystem->ReadFile( GetName(), NULL ) != -1 ) {
 		char generated[2048];

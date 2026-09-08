@@ -3988,6 +3988,10 @@ static void SDL3_RefreshWindowPlacement(void) {
 	if (pixelWidth > 0 && pixelHeight > 0) {
 		SDL3_SetVidSize( pixelWidth, pixelHeight );
 	}
+	const float uiDisplayScale = SDL_GetWindowDisplayScale(s_sdlWindow);
+	engineWindowState.displayScale = std::isfinite(uiDisplayScale) && uiDisplayScale > 0 ? uiDisplayScale : 1.0f;
+	engineWindowState.pixelDensityX = width > 0 && pixelWidth > 0 ? static_cast<float>(pixelWidth) / width : 1.0f;
+	engineWindowState.pixelDensityY = height > 0 && pixelHeight > 0 ? static_cast<float>(pixelHeight) / height : 1.0f;
 
 	if (SDL3_UseAbsoluteWindowPlacement()) {
 		SDL3_UpdateDisplayViewport(SDL3_ResolveViewportDisplay(), x, y, width, height, pixelWidth, pixelHeight);

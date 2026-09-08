@@ -424,6 +424,30 @@ if get_option('build_native_tests')
   )
 endif
 
+# The retained runtime is isolated from engine PCH/platform/render headers.
+# It can be tested with the same layout/geometry code without creating a window.
+if build_engine or get_option('build_native_tests')
+  rmlui_project = subproject('rmlui')
+  openq4_retained_library = static_library(
+    'openq4-retained-ui',
+    files('src/ui/retained/Runtime.cpp'),
+    dependencies: rmlui_project.get_variable('rmlui_dep'),
+    pic: true,
+    install: false,
+  )
+  openq4_retained_dep = declare_dependency(link_with: openq4_retained_library)
+  if get_option('build_native_tests')
+    openq4_retained_test = executable(
+      'openq4-retained-ui-test',
+      files('tools/tests/native/RetainedUiTest.cpp'),
+      include_directories: root_include_dir,
+      dependencies: openq4_retained_dep,
+      install: false,
+    )
+    test('openq4-retained-ui', openq4_retained_test, timeout: 30)
+  endif
+endif
+
 openq4_pak_files = []
 openq4_paks_generated_header = []
 if build_engine or build_games
@@ -1171,6 +1195,10 @@ if renderer_module_only_client
       client_deps += [linux_x11_dep, linux_xext_dep]
     endif
   endif
+endif
+
+if build_engine
+  client_deps += openq4_retained_dep
 endif
 
 dedicated_deps = deps
@@ -2196,6 +2224,7 @@ install_data(
 
 install_data('LICENSE', 'CONTRIBUTORS.md', install_dir: install_root_dir)
 install_data('LICENSES/KHRONOS-GLES-MIT.txt', install_dir: install_root_dir / 'licenses')
+install_data('docs/licenses/RmlUi.txt', install_dir: install_root_dir / 'licenses')
 
 install_data(
   'assets/icons/quake4.icns',

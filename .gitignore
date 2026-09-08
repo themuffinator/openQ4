@@ -43,6 +43,7 @@
 /subprojects/.wraplock
 /subprojects/packagecache/
 /subprojects/SDL3-*/
+/subprojects/RmlUi-*/
 /.install/
 __pycache__/
 *.pyc

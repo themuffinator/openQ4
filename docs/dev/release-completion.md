@@ -2,6 +2,12 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- Retained runtime development: RmlUi is pinned and integrated with the engine's
+  renderer, density model and current scalable fonts. Native layout, clipping
+  and motion-sampling checks are in place. The [integration checkpoint](ui/runtime-spike.md)
+  records remaining renderer, text, timing, input, editor and migration work;
+  this preview is not a completed player-facing replacement.
+
 - [x] Disabled mouse input and hidden rendering windows no longer route menu
   cursor synchronization; unfocused windows cannot warp the pointer on menu
   changes. Production-function tests cover Windows and POSIX paths; the staged

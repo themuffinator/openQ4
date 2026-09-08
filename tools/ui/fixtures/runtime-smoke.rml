@@ -1,0 +1,28 @@
+<!-- Engine integration fixture, not a completed replacement screen/design. -->
+<rml>
+<head>
+<style>
+body { margin: 0; width: 100%; height: 100%; font-family: marine; font-size: 18dp; color: #ffffffcc; }
+div { display: block; }
+#panel { position: absolute; left: 24dp; top: 32dp; width: 360dp; padding: 24dp;
+ background-color: #171c12ee; border: 1dp #8b964bf2; }
+#title { font-size: 28dp; line-height: 34dp; margin-bottom: 20dp; }
+.row { height: 40dp; line-height: 40dp; padding-left: 12dp; margin-bottom: 8dp;
+ border-left: 2dp #909a49; background-color: #8b964b47; }
+.active { background-color: #e389009e; border-left-color: #e38900; }
+#wash { width: 100%; height: 8dp; decorator: horizontal-gradient(#8b964b #8b964b00); margin-top: 16dp; }
+#anchor { position: absolute; right: 24dp; bottom: 24dp; width: 140dp; height: 40dp;
+ line-height: 40dp; text-align: center; border: 1dp #8b964b; background-color: #171c12ee; }
+</style>
+</head>
+<body>
+<div id="panel">
+ <div id="title">#str_200009</div>
+ <div class="row active">#str_200083</div>
+ <div class="row">#str_200084</div>
+ <div class="row">#str_200085</div>
+ <div id="wash"/>
+</div>
+<div id="anchor">#str_200018</div>
+</body>
+</rml>

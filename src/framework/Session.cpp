@@ -51,6 +51,7 @@ If you have questions concerning this license or the applicable additional terms
 #undef private
 #include "../imagetools/ImageTools.h"
 #include "../ui/Window.h"
+#include "../ui/RetainedUI.h"
 
 idCVar	idSessionLocal::com_showAngles( "com_showAngles", "0", CVAR_SYSTEM | CVAR_BOOL, "" );
 idCVar	idSessionLocal::com_minTics( "com_minTics", "1", CVAR_SYSTEM, "" );
@@ -7557,6 +7558,7 @@ void idSessionLocal::Draw() {
 	}
 
 	// draw the wipe material on top of this if it hasn't completed yet
+	RetainedUI_Draw();
 	DrawWipeModel();
 	
 	// draw debug graphs

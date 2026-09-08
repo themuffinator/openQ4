@@ -196,6 +196,7 @@ Bug reports, compatibility reports, testing feedback, and code contributions are
 - **themuffinator** - openQ4 development and maintenance
 - **[Emile Belanger (emileb)](https://github.com/emileb)** - contributor and original author of the Android port, SigmaTouch integration, OpenGL ES 3.0 renderer, GLES shader variants, ETC2/EAC compression, and associated mobile memory/loading work. This integration builds on his [Android branch](https://github.com/emileb/openQ4/tree/android) and [GLES shader-variants branch](https://github.com/emileb/openQ4/tree/gles-shader-variants); see the [contribution and adaptation record](docs/dev/android-gles-integration.md).
 - **DarkMatter Productions** - project stewardship and website
+- **[The RmlUi Team, CodePoint, Shift Technology and contributors](https://github.com/mikke89/RmlUi/tree/6.3)** - MIT-licensed retained layout library used by the `idtech5-ui` runtime integration; [retained licence notice](docs/licenses/RmlUi.txt).
 - **[Q2REX Project Team](https://github.com/themuffinator/Q2REX)** - design reference for the native [multiplayer chat panel, scaling and history](docs/user/multiplayer-chat.md)
 - **[MuffMode](https://github.com/themuffinator/MuffMode)** and **[Q4MAX](https://www.moddb.com/mods/q4max)** - multiplayer workflow and usability references; see the [competitive reference audit](docs/dev/competitive-match-reference-audit.md)
 - **Justin Marshall** - Quake4Doom and early BSE reverse engineering reference work
