@@ -23,7 +23,9 @@ unsigned SDL_GetWindowFlags(SDL_Window* w) { return w->flags; }
 unsigned reads = 0, warps = 0;
 void SDL_GetMouseState(float* x, float* y) { ++reads; *x = 20; *y = 30; }
 void SDL_WarpMouseInWindow(SDL_Window*, float, float) { ++warps; }
-struct Session { bool active = true; bool IsGUIActive() { return active; } } sessionObject;
+bool retainedOpen = false;
+bool RetainedUI_IsOpen() { return retainedOpen; }
+struct Session { bool active = true; bool IsGUIActive() { return active || retainedOpen; } } sessionObject;
 Session* session = &sessionObject;
 struct Console {
     bool active = false;
@@ -57,20 +59,22 @@ int main() {
     for (int enabled=0; enabled<2; ++enabled)
     for (int hidden=0; hidden<2; ++hidden)
     for (int menu=0; menu<2; ++menu)
-    for (int consoleActive=0; consoleActive<2; ++consoleActive) {
+    for (int consoleActive=0; consoleActive<2; ++consoleActive)
+    for (int retained=0; retained<2; ++retained) {
         win32.activeApp = focused; win32.in_mouse.value = enabled;
         window.flags = hidden ? SDL_WINDOW_HIDDEN : 0;
         sessionObject.active = menu; consoleObject.active = consoleActive;
+        retainedOpen = retained;
         reads=warps=0;
         SDL3_SyncSystemMouseToActiveCursor();
-        const bool ownsInput = focused && enabled && !hidden && (menu || consoleActive);
+        const bool ownsInput = focused && enabled && !hidden && (consoleActive || (menu && !retained));
         assert((reads+warps) == (ownsInput ? 1u : 0u));
     }
     s_sdlWindow = nullptr;
     reads=warps=0;
     SDL3_SyncSystemMouseToActiveCursor();
     assert(reads == 0 && warps == 0);
-    std::puts("background cursor: production routing passed 32 state combinations + no window");
+    std::puts("background cursor: production routing passed 64 state combinations + no window; retained routing never warps or polls the cursor");
 }
 '''
 

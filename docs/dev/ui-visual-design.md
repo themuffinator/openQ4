@@ -285,6 +285,15 @@ disabled > error/busy constraints > pressed > focus > hover > selected >
 default. Selection remains visible under focus; errors remain visible while
 editing. Hidden controls receive no input.
 
+Accept activates on a matched release. Multiple physical inputs mapped to one
+action hold one logical press; releasing one source cannot activate while
+another remains held. Navigation moves immediately, repeats after 320 ms, then
+every 110 ms, independently of OS key repeat. Accept and Back do not repeat.
+Focus loss, device removal, replacement and modal changes cancel pending activation. Controls
+held across a menu/gameplay handoff must be released (or an axis returned to
+neutral) before the next owner acts on them. A stall must not replay a burst of
+navigation steps.
+
 | Component | Visual and behavior contract |
 | --- | --- |
 | Action | Cut plate, marker, clear verb; one activation per action; disabled reason where useful |

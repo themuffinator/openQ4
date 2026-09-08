@@ -31,6 +31,7 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "Session_local.h"
 #include "../idlib/NumericString.h"
+#include "../ui/RetainedUI.h"
 #ifdef __ANDROID__
 #include "../sys/android/android_public.h"
 #endif
@@ -358,6 +359,7 @@ public:
 	usercmd_t		TicCmd( int ticNumber );
 
 	void			InhibitUsercmd( inhibit_t subsystem, bool inhibit );
+	void			RetainedInputChanged();
 
 	void			UsercmdInterrupt( void );
 
@@ -420,6 +422,9 @@ private:
 	int				buttonState[UB_MAX_BUTTONS];
 	bool			keyState[K_LAST_KEY];
 	bool			directButtonState[UB_MAX_BUTTONS];	// SetUsercmdButton's own held-state, see Key()'s keyState
+	bool			retainedKeyBlocked[K_LAST_KEY];
+	bool			retainedDirectBlocked[UB_MAX_BUTTONS];
+	bool			retainedAxisBlocked[MAX_JOYSTICK_AXIS];
 
 	int				inhibitCommands;	// true when in console or menu locally
 	int				lastCommandTime;
@@ -603,7 +608,7 @@ is user cmd generation inhibited
 ================
 */
 bool idUsercmdGenLocal::Inhibited( void ) {
-	return ( inhibitCommands != 0);
+	return inhibitCommands != 0 || RetainedUI_IsOpen();
 }
 
 /*
@@ -1329,6 +1334,9 @@ void idUsercmdGenLocal::Clear( void ) {
 	memset( buttonState, 0, sizeof( buttonState ) );
 	memset( keyState, false, sizeof( keyState ) );
 	memset( directButtonState, false, sizeof( directButtonState ) );
+	memset( retainedKeyBlocked, false, sizeof( retainedKeyBlocked ) );
+	memset( retainedDirectBlocked, false, sizeof( retainedDirectBlocked ) );
+	memset( retainedAxisBlocked, false, sizeof( retainedAxisBlocked ) );
 	toggled_zoom.Clear();
 
 	inhibitCommands = false;
@@ -1385,6 +1393,10 @@ Handles async mouse/keyboard button actions
 */
 void idUsercmdGenLocal::Key( int keyNum, bool down ) {
 	if ( keyNum <= 0 || keyNum >= K_LAST_KEY ) {
+		return;
+	}
+	if ( RetainedUI_IsOpen() || retainedKeyBlocked[keyNum] ) {
+		retainedKeyBlocked[keyNum] = down;
 		return;
 	}
 
@@ -1444,6 +1456,10 @@ rather than a key - the touch controls, which have no key to be rebound.
 */
 void idUsercmdGenLocal::SetUsercmdButton( int action, bool down ) {
 	if ( action <= UB_NONE || action >= UB_MAX_BUTTONS ) {
+		return;
+	}
+	if ( RetainedUI_IsOpen() || retainedDirectBlocked[action] ) {
+		retainedDirectBlocked[action] = down;
 		return;
 	}
 
@@ -1548,6 +1564,10 @@ void idUsercmdGenLocal::Joystick( void ) {
 		int value;
 		if ( Sys_ReturnJoystickInputEvent( i, axis, value ) ) {
 			if ( axis >= 0 && axis < MAX_JOYSTICK_AXIS ) {
+				if ( axis != AXIS_ROLL && ( RetainedUI_IsOpen() || retainedAxisBlocked[axis] ) ) {
+					retainedAxisBlocked[axis] = idMath::Abs(value) >= 12;
+					continue;
+				}
 				joystickAxis[ axis ] = idMath::ClampChar( value );
 			}
 		}
@@ -1555,6 +1575,27 @@ void idUsercmdGenLocal::Joystick( void ) {
 
 	Sys_EndJoystickInputEvents();
 }
+
+void idUsercmdGenLocal::RetainedInputChanged() {
+	for ( int key = 0; key < K_LAST_KEY; ++key )
+		// The ordered event path may already have observed a release whose
+		// poll sample will be discarded at this handoff. Use that current state
+		// instead of keeping an obsolete blocked bit until another release.
+		retainedKeyBlocked[key] = keyState[key] || idKeyInput::IsDown(key);
+	for ( int action = 0; action < UB_MAX_BUTTONS; ++action )
+		retainedDirectBlocked[action] = retainedDirectBlocked[action] || directButtonState[action];
+	for ( int axis = 0; axis < MAX_JOYSTICK_AXIS; ++axis ) if ( axis != AXIS_ROLL ) {
+		int value = 0; Sys_GetJoystickAxisState(axis,value);
+		retainedAxisBlocked[axis] = idMath::Abs(value) >= 12;
+	}
+	memset(buttonState,0,sizeof(buttonState));
+	memset(keyState,0,sizeof(keyState));
+	memset(directButtonState,0,sizeof(directButtonState));
+	memset(joystickAxis,0,sizeof(joystickAxis));
+	mouseDx = mouseDy = 0;
+	ResetMouseFilter();
+}
+void Usercmd_RetainedInputChanged() { localUsercmdGen.RetainedInputChanged(); }
 
 /*
 ================

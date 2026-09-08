@@ -8,8 +8,9 @@ implemented canonical source subset; its limits remain explicit.
 Later [native vector](vector-paths.md), [coverage](coverage-antialiasing.md),
 [isolated composition](composition.md), [masks](masks.md) and
 [semantic controls](interaction.md) checkpoints supersede the corresponding
-initial limitations below. Platform input routing and the game action bridge
-remain open.
+initial limitations below. [SDL/session input ownership](input-routing.md) now
+connects these controls to the platform adapter; the game action bridge and
+broader device/platform qualification remain open.
 The [complete plan](../plans/idtech5-ui.md) and [visual specification](../ui-visual-design.md)
 continue to define completion.
 

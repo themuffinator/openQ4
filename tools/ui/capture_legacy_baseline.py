@@ -68,10 +68,14 @@ def capture(args: argparse.Namespace) -> int:
         profile_command = f'ui_retainedProfile {args.profile_frames}\n' if args.profile_frames else ''
         settle = max(30, args.profile_frames + 2)
         script = 'wait 2\n'+interaction_script(args.retained_script) if args.retained_script else ''
-        preview = f'ui_retainedPreview "{staged_name}"\n' + profile_command + play + script + f'wait {settle}\n'
+        begin = 'wait 2\nui_retainedOwnership\n' if args.retained_open else ''
+        end = 'ui_retainedOwnership\n' if args.retained_open else ''
+        load_command = 'ui_retainedOpen' if args.retained_open else 'ui_retainedPreview'
+        preview = f'{load_command} "{staged_name}"\n' + begin + profile_command + play + script + f'wait {settle}\n' + end
         if args.video_restart:
-            preview += 'vid_restart windowed\nwait 2\n' + profile_command + play + script + f'wait {settle}\n'
-    cfg_path.write_text(preview + 'gfxInfo\nscreenshot "screenshots/ui-baseline.tga"\necho UI_BASELINE_CAPTURE_COMPLETE\nquit\n', encoding='utf-8')
+            preview += 'vid_restart windowed\nwait 2\n' + begin + profile_command + play + script + f'wait {settle}\n' + end
+    close = 'ui_retainedClose\nwait 3\nui_retainedOwnership\n' if args.retained_open else ''
+    cfg_path.write_text(preview + 'gfxInfo\nscreenshot "screenshots/ui-baseline.tga"\necho UI_BASELINE_CAPTURE_COMPLETE\n' + close + 'quit\n', encoding='utf-8')
     overrides = {
         'fs_basepath': str(args.assets.resolve()), 'fs_savepath': str(savepath), 'fs_devpath': str(savepath),
         'fs_game': 'baseoq4', 'logFile': '2', 'logFileName': 'logs/openq4.log',
@@ -116,6 +120,7 @@ def capture(args: argparse.Namespace) -> int:
     report_path = output / 'capture.json'
     if args.retained_document:
         metadata['retained_preview'] = {'source': str(args.retained_document),
+                                        'application_open': args.retained_open,
                                         'sha256': digest(args.retained_document),
                                         'density_override': args.density, 'ui_scale': args.ui_scale,
                                         'settle_frames': settle, 'video_restart': args.video_restart,
@@ -172,6 +177,7 @@ def capture(args: argparse.Namespace) -> int:
         metadata['retained_preview']['profiles'] = profiles
         metadata['retained_preview']['interaction_trace'] = [line for line in plain_log.splitlines()
             if line.startswith(('Retained UI control:', 'Retained UI action:', 'Retained UI actions:'))]
+        metadata['retained_preview']['ownership_trace'] = [line for line in plain_log.splitlines() if line.startswith('Retained UI ownership:')]
         if args.profile_frames and (len(profiles) != (2 if args.video_restart else 1)
                                    or any(p.get('frames') != args.profile_frames for p in profiles)):
             retained_diagnostics.append('retained CPU profile did not complete for the requested frame count')
@@ -209,6 +215,7 @@ def main() -> int:
     parser.add_argument('--timeout', type=int, default=180)
     parser.add_argument('--retained-document', type=Path, help='Optional Q4UI or RML integration fixture, copied into the isolated savepath.')
     parser.add_argument('--retained-script', type=Path, help='Optional semantic control script; does not send device input.')
+    parser.add_argument('--retained-open', action='store_true', help='Acquire application ownership with host input still disabled; inspect pause/resume and close.')
     parser.add_argument('--timeline', help='Canonical timeline to play before capture, and again after an optional video restart.')
     parser.add_argument('--reduced-motion', action='store_true')
     parser.add_argument('--density', type=float, default=0, help='Test density override; zero uses SDL display scale.')
@@ -226,6 +233,8 @@ def main() -> int:
         parser.error('--video-restart requires --retained-document')
     if args.retained_script and (not args.retained_document or args.retained_document.suffix.lower() != '.q4ui'):
         parser.error('--retained-script requires a .q4ui document')
+    if args.retained_open and (not args.retained_document or args.retained_document.suffix.lower() != '.q4ui'):
+        parser.error('--retained-open requires a .q4ui document')
     if not 0 <= args.profile_frames <= 3600 or (args.profile_frames and not args.retained_document):
         parser.error('--profile-frames requires a retained document and a count from 1 to 3600')
     if args.retained_document and args.retained_document.suffix.lower() not in ('.rml', '.q4ui'):

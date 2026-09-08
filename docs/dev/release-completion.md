@@ -2,6 +2,17 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- Input development: the retained menu host now routes keyboard, mouse and
+  controller navigation, preserves console access and requires held controls
+  to be released before returning them to gameplay. Disconnecting a controller
+  cancels a pending button press. Navigation repeats without
+  depending on OS key repeat, and pointer positions retain their display-density
+  precision. [Input ownership](ui/input-routing.md) records implementation and
+  qualification: native checks pass and reviewed OpenGL/Vulkan gameplay captures
+  confirm SP pause/resume and continued MP simulation. The game action bridge,
+  full GUI migration and editor remain incomplete; existing MP warnings are
+  unchanged.
+
 - Button development: the retained runtime now owns focus, disabled navigation,
   paired activation and modal input scopes. Editable timelines supply hover,
   focus, pressed and disabled feedback. Native tests and reviewed SP/OpenGL

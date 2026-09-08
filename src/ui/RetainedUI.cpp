@@ -3,11 +3,17 @@
 
 #ifndef ID_DEDICATED
 #include "retained/Runtime.h"
+#include "retained/Input.h"
 #include "../renderer/RendererModule.h"
 #include <algorithm>
 #include <chrono>
 #include <cstring>
 #include <map>
+#include <atomic>
+#include <limits>
+#if defined(USE_SDL3)
+bool Sys_SDL_IsGameWindowFocused(void);
+#endif
 
 namespace {
 idCVar ui_retainedScale("ui_retainedScale", "1", CVAR_GUI | CVAR_FLOAT | CVAR_ARCHIVE,
@@ -180,6 +186,14 @@ private:
 
 EngineHost host;
 std::unique_ptr<openq4::ui::Runtime> runtime;
+openq4::ui::Input input;
+std::atomic<bool> applicationOpen{false};
+unsigned inputGeneration = 0;
+bool inputFocused = true, inputSuspended = false;
+int analogDirection = -1;
+bool analogNeedsNeutral = true;
+std::map<int,int> inputKeys;
+std::vector<openq4::ui::ControlAction> applicationRequests;
 std::string currentPath, currentMarkup;
 int restartGeneration = -1, languageGeneration = -1;
 std::chrono::steady_clock::time_point epoch;
@@ -214,6 +228,60 @@ void RecordProfile(double engineMilliseconds) {
 }
 
 double PresentationTime() { return std::chrono::duration<double>(std::chrono::steady_clock::now()-epoch).count(); }
+bool WindowFocused() {
+#if defined(USE_SDL3)
+	return Sys_SDL_IsGameWindowFocused();
+#else
+	return true;
+#endif
+}
+void SetApplicationOpen(bool value) {
+	if (RetainedUI_IsOpen() == value) return;
+	Sys_EnterCriticalSection();
+	applicationOpen.store(value,std::memory_order_release);
+	Usercmd_RetainedInputChanged();
+	// These queued poll samples belong to the previous owner. SDL's cached
+	// physical axes remain available for release gating and menu navigation.
+	Sys_ClearInputEvents();
+	Sys_LeaveCriticalSection();
+}
+void ApplyInput() {
+	for (const auto& event : input.Take()) if (runtime) {
+		if (event.kind == openq4::ui::RoutedInput::Kind::Cancel) runtime->CancelInput(PresentationTime());
+		else if (event.kind == openq4::ui::RoutedInput::Kind::PointerButton) runtime->PointerButton(event.down,PresentationTime());
+		else runtime->MenuAction(event.menu,event.down,PresentationTime());
+	}
+}
+void CancelInput(bool forgetSources = false) {
+	input.Cancel(forgetSources);
+	// The adapter owns this virtual source and will require physical neutral
+	// before pressing it again. Remove its quarantined hold before resetting
+	// the remembered direction, or it could never receive its paired release.
+	input.Menu(60000,openq4::ui::MenuInput::Next,false,false,PresentationTime());
+	ApplyInput(); analogDirection = -1; analogNeedsNeutral = true;
+}
+void SuspendInput(bool suspend) {
+	if (inputSuspended == suspend) return;
+	inputSuspended = suspend;
+	CancelInput(true); inputKeys.clear();
+}
+bool MapMenuKey(int key, openq4::ui::MenuInput& action) {
+	using openq4::ui::MenuInput;
+	switch (key) {
+		case K_TAB: {
+			bool shift = idKeyInput::IsDown(K_SHIFT);
+			for (const auto& held : inputKeys) if (held.second == K_SHIFT) shift = true;
+			action = shift ? MenuInput::Previous : MenuInput::Next; return true;
+		}
+		case K_UPARROW: case K_JOY9: action = MenuInput::Up; return true;
+		case K_DOWNARROW: case K_JOY10: action = MenuInput::Down; return true;
+		case K_LEFTARROW: case K_JOY12: action = MenuInput::Left; return true;
+		case K_RIGHTARROW: case K_JOY11: action = MenuInput::Right; return true;
+		case K_ENTER: case K_KP_ENTER: case K_SPACE: case K_JOY3: action = MenuInput::Accept; return true;
+		case K_ESCAPE: case K_JOY4: case K_JOY7: case K_JOY8: action = MenuInput::Back; return true;
+		default: return false;
+	}
+}
 bool LoadPreview(const std::string& source, const std::string& path) {
 	if (!idStr::CheckExtension(path.c_str(),"q4ui")) return runtime->LoadMarkup(source,path);
 	std::vector<openq4::ui::Diagnostic> diagnostics;
@@ -224,6 +292,10 @@ bool LoadPreview(const std::string& source, const std::string& path) {
 }
 
 void Close() {
+	SetApplicationOpen(false); ++inputGeneration;
+	CancelInput(true); inputKeys.clear(); applicationRequests.clear();
+	input = openq4::ui::Input{}; analogDirection = -1; analogNeedsNeutral = true;
+	inputSuspended = false;
 	profileFrames = 0; profile.clear();
 	runtime.reset();
 	host.Reset();
@@ -238,10 +310,28 @@ void Preview_f(const idCmdArgs& args) {
 		epoch = std::chrono::steady_clock::now();
 	}
 	if (!LoadPreview(markup,args.Argv(1))) { common->Warning("retained UI: cannot load %s",args.Argv(1)); return; }
+	SetApplicationOpen(idStr::Icmp(args.Argv(0),"ui_retainedOpen") == 0);
+	CancelInput(); applicationRequests.clear(); ++inputGeneration;
 	currentPath = args.Argv(1); currentMarkup = std::move(markup);
 	restartGeneration = renderSystem->GetVideoRestartCount();
 	languageGeneration = LangDict_GetCodePageGeneration();
 	common->Printf("Retained UI preview loaded: %s (integration spike)\n",currentPath.c_str());
+}
+void Open_f(const idCmdArgs& args) {
+	if (args.Argc() != 2 || !idStr::CheckExtension(args.Argv(1),"q4ui")) {
+		common->Printf("usage: ui_retainedOpen <VFS path.q4ui>\n"); return;
+	}
+	const unsigned previousGeneration = inputGeneration;
+	Preview_f(args);
+	if (inputGeneration == previousGeneration) return;
+	if (console) console->Close();
+	inputFocused = WindowFocused();
+	common->Printf("Retained UI application opened: %s\n",currentPath.c_str());
+}
+void Ownership_f(const idCmdArgs&) {
+	common->Printf("Retained UI ownership: open=%d suspended=%d session_gui=%d game_time=%d requests=%u\n",
+		RetainedUI_IsOpen(),inputSuspended,session && session->IsGUIActive(),gameEdit ? gameEdit->GetGameTime() : -1,
+		static_cast<unsigned>(applicationRequests.size()));
 }
 void Close_f(const idCmdArgs&) { Close(); }
 void Play_f(const idCmdArgs& args) {
@@ -292,7 +382,8 @@ void State_f(const idCmdArgs& args) {
 }
 void Events_f(const idCmdArgs&) {
 	if (!runtime) return;
-	const auto events = runtime->TakeActions();
+	auto events = runtime->TakeActions();
+	events.insert(events.begin(),applicationRequests.begin(),applicationRequests.end()); applicationRequests.clear();
 	common->Printf("Retained UI actions: %u\n",static_cast<unsigned>(events.size()));
 	for (const auto& event : events) common->Printf("Retained UI action: %s document=%s node=%s action=%s\n",
 		event.kind == openq4::ui::ControlAction::Kind::Activate ? "activate" : "back",event.document.c_str(),event.node.c_str(),event.action.c_str());
@@ -301,6 +392,8 @@ void Events_f(const idCmdArgs&) {
 
 void RetainedUI_Init() {
 	cmdSystem->AddCommand("ui_retainedPreview",Preview_f,CMD_FL_SYSTEM,"preview a retained UI integration document");
+	cmdSystem->AddCommand("ui_retainedOpen",Open_f,CMD_FL_SYSTEM,"open a canonical retained document with application input ownership");
+	cmdSystem->AddCommand("ui_retainedOwnership",Ownership_f,CMD_FL_SYSTEM,"inspect retained application input ownership");
 	cmdSystem->AddCommand("ui_retainedClose",Close_f,CMD_FL_SYSTEM,"close the retained UI integration preview");
 	cmdSystem->AddCommand("ui_retainedPlay",Play_f,CMD_FL_SYSTEM,"play a canonical retained UI timeline");
 	cmdSystem->AddCommand("ui_retainedProfile",Profile_f,CMD_FL_SYSTEM,"measure retained UI CPU submission over bounded rendered frames");
@@ -314,6 +407,8 @@ void RetainedUI_Init() {
 void RetainedUI_Shutdown() {
 	Close();
 	cmdSystem->RemoveCommand("ui_retainedPreview");
+	cmdSystem->RemoveCommand("ui_retainedOpen");
+	cmdSystem->RemoveCommand("ui_retainedOwnership");
 	cmdSystem->RemoveCommand("ui_retainedClose");
 	cmdSystem->RemoveCommand("ui_retainedPlay");
 	cmdSystem->RemoveCommand("ui_retainedProfile");
@@ -329,11 +424,12 @@ void RetainedUI_Draw() {
 	if (restartGeneration != renderSystem->GetVideoRestartCount() || languageGeneration != LangDict_GetCodePageGeneration()) {
 		// Geometry owns font UVs and material handles. Recreate the preview
 		// before using any of them after an image/font generation change.
+		CancelInput(); ++inputGeneration;
 		runtime->Shutdown(); host.Reset();
 		restartGeneration = renderSystem->GetVideoRestartCount();
 		languageGeneration = LangDict_GetCodePageGeneration();
-		if (!LoadPreview(currentMarkup,currentPath)) return;
-		epoch = std::chrono::steady_clock::now();
+		if (!LoadPreview(currentMarkup,currentPath)) { Close(); return; }
+		inputFocused = WindowFocused();
 	}
 	openq4::ui::Viewport viewport;
 	viewport.width = engineWindowState.uiViewportWidth;
@@ -356,8 +452,92 @@ void RetainedUI_Draw() {
 	renderSystem->SetColor4(1,1,1,1);
 	RecordProfile(std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-profileStart).count());
 }
+bool RetainedUI_IsOpen() { return applicationOpen.load(std::memory_order_acquire); }
+unsigned RetainedUI_InputGeneration() { return inputGeneration; }
+void RetainedUI_Close() { Close(); }
+#if !defined(USE_SDL3)
+void RetainedUI_QueueInput(const retainedUIInput_t&, int) {}
+#endif
+void RetainedUI_FrameInput() {
+	if (!RetainedUI_IsOpen() || !runtime) return;
+	SuspendInput(!inputFocused || (console && console->Active()) || engineWindowState.uiViewportWidth <= 0 || engineWindowState.uiViewportHeight <= 0);
+	if (inputSuspended) return;
+	int x = 0, y = 0;
+	Sys_GetJoystickAxisState(AXIS_YAW,x); Sys_GetJoystickAxisState(AXIS_PITCH,y);
+	const int extent = Max(idMath::Abs(x),idMath::Abs(y));
+	if (extent < 38) analogNeedsNeutral = false;
+	int direction = -1;
+	if (!analogNeedsNeutral && extent >= (analogDirection < 0 ? 50 : 38)) {
+		using openq4::ui::MenuInput;
+		direction = static_cast<int>(idMath::Abs(x) > idMath::Abs(y) ?
+			(x > 0 ? MenuInput::Right : MenuInput::Left) : (y > 0 ? MenuInput::Up : MenuInput::Down));
+	}
+	if (direction != analogDirection) {
+		if (analogDirection >= 0) input.Menu(60000,static_cast<openq4::ui::MenuInput>(analogDirection),false,false,PresentationTime());
+		if (direction >= 0) input.Menu(60000,static_cast<openq4::ui::MenuInput>(direction),true,false,PresentationTime());
+		analogDirection = direction;
+	}
+	input.Advance(PresentationTime()); ApplyInput();
+}
+bool RetainedUI_ProcessEvent(const sysEvent_s* event) {
+	const bool transport = event->evType == SE_RETAINED_UI;
+	retainedUIInput_t decoded;
+	if (transport) {
+		if (!event->evPtr || event->evPtrLength != sizeof(decoded)) return true;
+		std::memcpy(&decoded,event->evPtr,sizeof(decoded));
+		if (decoded.kind < retainedUIInput_t::KEY || decoded.kind > retainedUIInput_t::CANCEL ||
+			decoded.down < 0 || decoded.down > 1 || decoded.repeated < 0 || decoded.repeated > 1 ||
+			decoded.source < 0 || decoded.source > 65535) return true;
+		// Preserve physical key tracking even when a queued release belongs to
+		// a document which was closed or replaced earlier in this event batch.
+		if (decoded.kind == retainedUIInput_t::KEY && decoded.key > 0 && decoded.key < K_LAST_KEY)
+			idKeyInput::PreliminaryKeyEvent(decoded.key,decoded.down);
+		if (decoded.kind == retainedUIInput_t::FOCUS && !decoded.down) idKeyInput::ClearStates();
+		if (static_cast<unsigned>(event->evValue) != inputGeneration) return true;
+	} else if (event->evType == SE_KEY) {
+		// Non-SDL fallback and events already queued when a menu was opened.
+		decoded.kind = retainedUIInput_t::KEY; decoded.key = event->evValue;
+		decoded.source = event->evValue; decoded.down = event->evValue2 != 0;
+	} else return RetainedUI_IsOpen();
+	if (!RetainedUI_IsOpen() || !runtime) return transport;
+	// Device removal/disable queues cancellation before artificial key-ups.
+	// Do not advance navigation repeat or activate a pending release first.
+	if (decoded.kind == retainedUIInput_t::CANCEL) { CancelInput(); return true; }
+	if (decoded.kind == retainedUIInput_t::FOCUS) inputFocused = decoded.down;
+	RetainedUI_FrameInput();
+	if (inputSuspended) return true;
+	if (decoded.kind == retainedUIInput_t::KEY) {
+		if (decoded.key <= 0 || decoded.key >= K_LAST_KEY || decoded.source < 0 || decoded.source > 65535) return true;
+		if (decoded.down && !decoded.repeated && inputKeys.size() < 1024) inputKeys[decoded.source] = decoded.key;
+		else if (!decoded.down) inputKeys.erase(decoded.source);
+		openq4::ui::MenuInput action;
+		if (decoded.key == K_MOUSE1) input.Pointer(decoded.source,decoded.down,PresentationTime());
+		else if (MapMenuKey(decoded.key,action)) input.Menu(decoded.source,action,decoded.down,decoded.repeated,PresentationTime());
+	} else if (decoded.kind == retainedUIInput_t::POINTER) {
+		runtime->PointerMove(decoded.x,decoded.y,PresentationTime());
+	} else if (decoded.kind == retainedUIInput_t::POINTER_BUTTON) {
+		runtime->PointerMove(decoded.x,decoded.y,PresentationTime());
+		input.Pointer(65536,decoded.down,PresentationTime());
+	} else if (decoded.kind == retainedUIInput_t::POINTER_LEAVE) {
+		runtime->PointerMove(std::numeric_limits<float>::quiet_NaN(),0,PresentationTime());
+	}
+	ApplyInput();
+	for (const auto& action : runtime->TakeActions()) {
+		if (action.kind == openq4::ui::ControlAction::Kind::Back) {
+			if (!runtime->PopModal(PresentationTime())) { Close(); break; }
+		} else if (applicationRequests.size() < 256) applicationRequests.push_back(action);
+		else common->Warning("retained UI: application request queue overflow");
+	}
+	return true;
+}
 #else
 void RetainedUI_Init() {}
 void RetainedUI_Shutdown() {}
 void RetainedUI_Draw() {}
+void RetainedUI_Close() {}
+bool RetainedUI_IsOpen() { return false; }
+unsigned RetainedUI_InputGeneration() { return 0; }
+void RetainedUI_FrameInput() {}
+bool RetainedUI_ProcessEvent(const sysEvent_s*) { return false; }
+void RetainedUI_QueueInput(const retainedUIInput_t&, int) {}
 #endif

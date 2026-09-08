@@ -5409,6 +5409,7 @@ Exits with mapSpawned = false
 ===============
 */
 void idSessionLocal::UnloadMap() {
+	RetainedUI_Close();
 	// A level-load generation owns worker-visible file handles and immutable
 	// staging buffers. Join it before any game, render-world, renderer-module,
 	// or filesystem state used by the outgoing map can be destroyed.
@@ -6915,9 +6916,14 @@ bool idSessionLocal::DeleteGame( const char *saveName ) {
 idSessionLocal::ProcessEvent
 ===============
 */
+bool idSessionLocal::IsGUIActive() const {
+	return guiActive != NULL || guiTest != NULL || RetainedUI_IsOpen();
+}
+
 bool idSessionLocal::ProcessEvent( const sysEvent_t *event ) {
+	if ( event->evType == SE_RETAINED_UI ) return RetainedUI_ProcessEvent( event );
 	// hitting escape anywhere brings up the menu
-	if ( !guiActive && event->evType == SE_KEY && event->evValue2 == 1 &&
+	if ( !guiActive && !RetainedUI_IsOpen() && event->evType == SE_KEY && event->evValue2 == 1 &&
 		( event->evValue == K_ESCAPE || event->evValue == K_JOY7 || event->evValue == K_JOY8 ) ) {
 		console->Close();
 		if ( IsDemoPlaybackActive() ) {
@@ -6941,8 +6947,10 @@ bool idSessionLocal::ProcessEvent( const sysEvent_t *event ) {
 
 	// let the pull-down console take it if desired
 	if ( console->ProcessEvent( event, false ) ) {
+		RetainedUI_FrameInput();
 		return true;
 	}
+	if ( RetainedUI_IsOpen() ) return RetainedUI_ProcessEvent( event );
 
 	// if we are testing a GUI, send all events to it
 	if ( guiTest ) {
@@ -7759,7 +7767,7 @@ void idSessionLocal::Frame() {
 
 	//------------ single player game tics --------------
 
-	if ( !mapSpawned || guiActive ) {
+	if ( !mapSpawned || guiActive || RetainedUI_IsOpen() ) {
 		if ( !com_asyncInput.GetBool() ) {
 			// early exit, won't do RunGameTic .. but still need to update mouse position for GUIs
 			usercmdGen->GetDirectUsercmd();
@@ -7771,7 +7779,7 @@ void idSessionLocal::Frame() {
 		return;
 	}
 
-	if ( guiActive ) {
+	if ( guiActive || RetainedUI_IsOpen() ) {
 		lastGameTic = latchedTicNumber;
 		UpdateFramePacingStats( frameStartMsec, requestedWaitMsec, actualWaitMsec, 0 );
 		return;

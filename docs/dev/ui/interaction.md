@@ -3,8 +3,10 @@
 8 September 2026. The retained runtime now owns button focus, navigation,
 press/release pairing, modal input scopes and authored state feedback. This
 advances the [replacement runtime](../plans/idtech5-ui.md) and supplies a shared
-interaction model for the future native editor. It does not complete platform
-input routing, the game action bridge, the remaining widgets or GUI translation.
+interaction model for the future native editor. The subsequent
+[input integration](input-routing.md) connects this model to SDL and session
+ownership. The game action bridge, remaining widgets and GUI translation are
+still incomplete.
 
 ## Authored control contract
 
@@ -103,9 +105,9 @@ The preview exposes semantic development commands: `ui_retainedFocus`,
 `ui_retainedMenu`, `ui_retainedEnabled`, `ui_retainedModal`, `ui_retainedState`
 and `ui_retainedEvents`. They exercise the runtime API and print focus/actions;
 they never read, inject or move OS input. Quote stable IDs in engine command
-text, including IDs containing hyphens. Real SDL input routing and gameplay
-input inhibition are still pending, so these commands are not a claim that
-live mouse/keyboard/controller menu integration is complete.
+text, including IDs containing hyphens. These commands alone do not qualify
+platform input. The later [input integration](input-routing.md) adds a distinct
+`ui_retainedOpen` host and tracks its device-routing/ownership evidence.
 
 The [capture harness](../../../tools/ui/capture_legacy_baseline.py) accepts
 `--retained-script` for a bounded sequence of these commands and waits. It rejects
@@ -181,11 +183,12 @@ with zero errors. These existing MP issues remain open.
 
 ## Remaining integration
 
-SDL event routing, gameplay input inhibition, physical-key/source aggregation,
-touch/scroll/text editing and IME, game-state bindings/action dispatch, selection,
+Broader device/platform qualification, touch/scroll/text editing and IME,
+game-state bindings/action dispatch, selection,
 busy/error semantics, sounds, other widget roles, native editor tools, complete
 GUI translation and broad platform/visual qualification remain open. The current
-preview remains a developer renderer until that application integration is done.
+preview remains a developer renderer; the subsequent `ui_retainedOpen` host owns
+input but still needs application/game dispatch and complete widgets.
 
 Transformed overflow clipping still reaches RmlUi's separate clip-mask API,
 which the retained renderer has not implemented. The canonical alpha-mask

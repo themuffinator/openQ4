@@ -1295,6 +1295,22 @@ def generate_release_docs_site(
     khronos_notice = Path("LICENSES") / "KHRONOS-GLES-MIT.txt"
     copy_docs_auxiliary_file(source_root, khronos_notice, output_root / khronos_notice)
 
+    # Keep the retained UI's linked sources and licence notices available in
+    # offline documentation. These are authored fixtures, not extracted art.
+    for relative in (
+        "docs/licenses/RmlUi.txt", "docs/licenses/JsonCpp.txt", "docs/licenses/libtess2.txt",
+        "docs/dev/ui/migration-manifest.json",
+        "subprojects/rmlui.wrap", "subprojects/packagefiles/libtess2/double-precision.patch",
+        "tools/ui/capture_legacy_baseline.py",
+        "tools/ui/verify_composition_capture.py", "tools/ui/verify_interaction_capture.py",
+        "tools/ui/verify_mask_capture.py",
+        "tools/ui/fixtures/composition-smoke.q4ui", "tools/ui/fixtures/document-smoke.q4ui",
+        "tools/ui/fixtures/interaction-smoke.q4ui", "tools/ui/fixtures/interaction-smoke.cfg",
+        "tools/ui/fixtures/mask-smoke.q4ui", "tools/ui/fixtures/vector-smoke.q4ui",
+    ):
+        auxiliary = Path(relative)
+        copy_docs_auxiliary_file(source_root, auxiliary, output_root / auxiliary)
+
     rendered_sources = {spec.source_relative.as_posix().lower() for spec in specs}
     for spec in specs:
         raw_text = (source_root / spec.source_relative).read_text(encoding="utf-8")

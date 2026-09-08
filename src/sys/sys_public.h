@@ -240,7 +240,8 @@ typedef enum {
 	SE_CHAR,				// evValue is an ascii char
 	SE_MOUSE,				// evValue and evValue2 are reletive signed x / y moves
 	SE_JOYSTICK_AXIS,		// evValue is an axis number and evValue2 is the current state (-127 to 127)
-	SE_CONSOLE				// evPtr is a char*, from typing something at a non-game console
+	SE_CONSOLE,				// evPtr is a char*, from typing something at a non-game console
+	SE_RETAINED_UI			// engine-owned retained input payload; consumed before game/legacy GUI dispatch
 } sysEventType_t;
 
 typedef enum {

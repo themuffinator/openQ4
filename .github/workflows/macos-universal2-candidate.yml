@@ -7,7 +7,7 @@ on:
         description: openQ4-game branch, tag, or full commit SHA to build
         required: true
         # The default must match the engine-interface revision pinned in CI.
-        default: f9bf8a692de539b9d149cc7b2c47759dbb1ddd62
+        default: 300aedd9c56e20666ca7eacc0d71db70502660b9
         type: string
       graphics_bridge:
         description: Graphics bridge package(s) to assemble

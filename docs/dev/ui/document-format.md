@@ -104,7 +104,8 @@ semantic action IDs, enabled state, navigation links and five required state
 timelines. Feedback stays within the button subtree, covers the same properties
 in every state and preserves the button's own hit box. The runtime uses these
 declarations for focus, paired activation and modal input scopes; other widget
-roles, game bindings and platform input routing remain open.
+roles and game bindings remain open. [Input ownership](input-routing.md) connects
+these declarations to SDL and session routing and records its qualification limits.
 
 The render adapter owns the conversion into RmlUi syntax. In particular, RmlUi
 RGBA functions use integer 0–255 alpha, whereas this document stores 0–1 alpha.

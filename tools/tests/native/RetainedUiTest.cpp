@@ -6,6 +6,7 @@
 #include <limits>
 #include <fstream>
 #include <iterator>
+#include "src/ui/retained/Input.h"
 
 using namespace openq4::ui;
 static void Check(bool condition, const char* message) {
@@ -456,6 +457,72 @@ int main(int argc, char** argv) {
 	runtime.MenuAction(MenuInput::Accept,true,25);
 	viewport.width = 0; runtime.Frame(viewport,26); runtime.MenuAction(MenuInput::Accept,false,26);
 	Check(runtime.TakeActions().empty() && runtime.FocusedControl().empty(),"invalid/minimized output disables stale hit targets and disarms input");
+	Check(runtime.LoadDocument(interactionSource,"input-aggregation.q4ui",diagnostics),"load button document for platform-source aggregation");
+	viewport = {}; runtime.Frame(viewport,30); runtime.FocusControl("reference-controls",30);
+	Input routedInput;
+	double inputTime = 30;
+	auto route = [&]() {
+		for (const auto& event : routedInput.Take()) {
+			if (event.kind == RoutedInput::Kind::Cancel) runtime.CancelInput(inputTime);
+			else if (event.kind == RoutedInput::Kind::PointerButton) runtime.PointerButton(event.down,inputTime);
+			else runtime.MenuAction(event.menu,event.down,inputTime);
+		}
+	};
+	auto button = [&](unsigned source, MenuInput action, bool down, bool repeated = false) {
+		routedInput.Menu(source,action,down,repeated,inputTime); route();
+	};
+	button(10,MenuInput::Accept,true); button(11,MenuInput::Accept,true);
+	button(10,MenuInput::Accept,false);
+	Check(runtime.GetControlState("reference-controls") == ControlState::Pressed && runtime.TakeActions().empty(),"releasing one of two accept sources cannot release the aggregate press");
+	button(11,MenuInput::Accept,false);
+	Check(runtime.TakeActions().size() == 1,"the last matching accept source releases exactly one activation");
+	button(99,MenuInput::Accept,true,true); button(99,MenuInput::Accept,false);
+	Check(runtime.TakeActions().empty(),"an orphan OS repeat cannot arm a newly opened menu");
+	button(1,MenuInput::Next,true);
+	Check(runtime.FocusedControl() == "reference-system","a fresh navigation source moves immediately");
+	routedInput.Advance(30.319); route();
+	Check(runtime.FocusedControl() == "reference-system","navigation repeat waits for its initial delay");
+	inputTime = 30.321; routedInput.Advance(inputTime); route();
+	Check(runtime.FocusedControl() == "modal-controls","navigation repeats independently of OS key repeat");
+	inputTime = 100; routedInput.Advance(inputTime); route();
+	Check(runtime.FocusedControl() == "modal-game-options","a long presentation stall produces at most one navigation repeat");
+	button(1,MenuInput::Next,true,true);
+	Check(runtime.FocusedControl() == "modal-game-options","OS repeat cannot duplicate the presentation-clock repeat");
+	button(1,MenuInput::Previous,false);
+	inputTime = 101; routedInput.Advance(inputTime); route();
+	Check(runtime.FocusedControl() == "modal-game-options","a modifier change releases the original key-down action");
+	runtime.FocusControl("reference-controls",inputTime);
+	button(10,MenuInput::Accept,true);
+	routedInput.Cancel(); route();
+	Check(runtime.TakeActions().empty(),"source cancellation disarms before releasing logical inputs");
+	Check(runtime.LoadDocument(interactionSource,"input-replacement.q4ui",diagnostics),"replace a document with physical input held");
+	runtime.Frame(viewport,102); runtime.FocusControl("reference-controls",102); inputTime = 102;
+	button(10,MenuInput::Accept,true); button(10,MenuInput::Accept,false);
+	Check(runtime.TakeActions().empty(),"a held physical source cannot reactivate after document replacement");
+	button(10,MenuInput::Accept,true); button(10,MenuInput::Accept,false);
+	Check(runtime.TakeActions().size() == 1,"a released physical source can arm a fresh activation");
+	button(10,MenuInput::Accept,true); routedInput.Cancel(true); route();
+	button(10,MenuInput::Accept,true,true); button(10,MenuInput::Accept,false);
+	Check(runtime.TakeActions().empty(),"focus loss rejects orphan repeats even when release occurred outside the application");
+	button(10,MenuInput::Accept,true); button(10,MenuInput::Accept,false);
+	Check(runtime.TakeActions().size() == 1,"fresh non-repeat input works after focus recovery");
+	button(20,MenuInput::Back,true); button(21,MenuInput::Back,true);
+	actions = runtime.TakeActions();
+	Check(actions.size() == 1 && actions[0].kind == ControlAction::Kind::Back,"back sources aggregate into one request");
+	inputTime = 200; routedInput.Advance(inputTime); route();
+	Check(runtime.TakeActions().empty(),"back and accept do not repeat on the navigation clock");
+	button(20,MenuInput::Back,false); button(21,MenuInput::Back,false);
+	runtime.GetBounds("reference-controls",controlBounds);
+	runtime.PointerMove(controlBounds.x+controlBounds.width*.5f,controlBounds.y+controlBounds.height*.5f,inputTime);
+	routedInput.Pointer(30,true,inputTime); route(); routedInput.Pointer(31,true,inputTime); route();
+	routedInput.Pointer(30,false,inputTime); route();
+	Check(runtime.TakeActions().empty(),"multiple primary-pointer sources share one logical held button");
+	routedInput.Pointer(31,false,inputTime); route();
+	Check(runtime.TakeActions().size() == 1,"last pointer source completes exactly one activation");
+	runtime.MenuAction(MenuInput::Accept,true,inputTime);
+	routedInput.Cancel(true); route();
+	button(10,MenuInput::Accept,true); button(10,MenuInput::Accept,false);
+	Check(runtime.TakeActions().size() == 1,"cancellation also releases logical arms created by a previous input adapter");
 	runtime.CloseDocument();
 	Check(!runtime.IsLoaded(),"close document");
 	runtime.Shutdown();

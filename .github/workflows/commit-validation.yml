@@ -12,10 +12,10 @@ permissions:
   contents: read
 
 env:
-  # Pin the companion's engine-interface copies, including GAME_API 46,
-  # generated-animation cache v3, transient time scale, and Android/GLES
-  # renderer/image capabilities. Publish this companion commit before CI runs.
-  OPENQ4_GAMELIBS_SHA: f9bf8a692de539b9d149cc7b2c47759dbb1ddd62
+  # Pin the companion's engine-interface copies, including GAME_API 47,
+  # renderer API 13 transparent targets and the retained input event contract.
+  # Publish this companion commit before CI runs.
+  OPENQ4_GAMELIBS_SHA: 300aedd9c56e20666ca7eacc0d71db70502660b9
 
 jobs:
   script-smoke:
@@ -279,6 +279,8 @@ jobs:
             tools/tests/savegame_pointer_width_safety.py \
             tools/tests/savegame_v3_contract.py \
             tools/tests/sdl3_input_parity.py \
+            tools/tests/ui_retained_input.py \
+            tools/tests/ui_background_cursor.py \
             tools/tests/menu_controller_navigation.py \
             tools/tests/sdl3_multidisplay_windowing.py \
             tools/tests/settings_menu_coverage.py \
@@ -463,6 +465,8 @@ jobs:
           python tools/tests/savegame_pointer_width_safety.py
           python tools/tests/savegame_v3_contract.py
           python tools/tests/sdl3_input_parity.py
+          python tools/tests/ui_retained_input.py
+          python tools/tests/ui_background_cursor.py
           python tools/tests/menu_controller_navigation.py
           python tools/tests/sdl3_multidisplay_windowing.py
           python tools/tests/settings_menu_coverage.py

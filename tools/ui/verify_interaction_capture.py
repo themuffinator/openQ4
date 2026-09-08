@@ -53,6 +53,22 @@ def verify(folder: Path) -> dict:
               'state_observations':len(observed),'disabled_patch_pixels':len(errors),'disabled_patch_max_error':max(errors),
               'pressed_orange_rail_pixels':orange,'backdrop':backdrop}
     result['passed'] = max(errors) <= 3 and orange > 100*density
+    if capture['retained_preview'].get('application_open'):
+        ownership = []
+        for line in capture['retained_preview']['ownership_trace']:
+            match = re.fullmatch(r'Retained UI ownership: open=(\d) suspended=(\d) session_gui=(\d) game_time=(-?\d+) requests=(\d+)',line)
+            if match:
+                ownership.append([int(value) for value in match.groups()])
+        valid = len(ownership) == repetitions*2+1
+        if valid:
+            valid = all(row[0] == 1 and row[2] == 1 and row[3] >= 0 for row in ownership[:-1])
+            valid = valid and ownership[-1][0] == 0 and ownership[-1][2] == 0
+            for begin,end in zip(ownership[:-1:2],ownership[1:-1:2]):
+                valid = valid and (end[3] == begin[3] if capture['mode'] == 'sp' else end[3] > begin[3])
+            valid = valid and ownership[-1][3] > ownership[-2][3]
+        result['application_ownership'] = ownership
+        result['ownership_passed'] = valid
+        result['passed'] = result['passed'] and valid
     return result
 
 

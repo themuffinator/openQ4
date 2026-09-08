@@ -37,6 +37,7 @@ along with Doom 3 Source Code.  If not, see <http://www.gnu.org/licenses/>.
 #include "../../framework/FileSystem.h"
 #include "../../framework/licensee.h"
 #include "../../framework/Session.h"
+#include "../../ui/RetainedUI.h"
 #include "../../renderer/tr_local.h"
 #include "../../renderer/RenderModuleAPI.h"
 #include "../../renderer/RendererModule.h"
@@ -858,6 +859,42 @@ static void SDL3_QueueMouseInput(int action, int value, int time) {
 	Sys_LeaveCriticalSection(CRITICAL_SECTION_ONE);
 }
 
+#ifndef ID_DEDICATED
+void RetainedUI_QueueInput(const retainedUIInput_t& event, int time) {
+	if (!RetainedUI_IsOpen()) return;
+	void* payload = Mem_Alloc(sizeof(event)); memcpy(payload,&event,sizeof(event));
+	Sys_QueEvent(time,SE_RETAINED_UI,static_cast<int>(RetainedUI_InputGeneration()),0,sizeof(event),payload);
+}
+#endif
+static bool s_retainedKeyOwners[K_LAST_KEY] = {};
+static bool SDL3_QueueRetainedKey(int key, bool down, bool repeated, int source, int time) {
+	if (key <= 0 || key >= K_LAST_KEY) return false;
+	const bool previouslyOwned = s_retainedKeyOwners[key];
+	if (!down) s_retainedKeyOwners[key] = false;
+	const bool reserved = key == Sys_GetConsoleKey(false) || key == Sys_GetConsoleKey(true);
+	if (RetainedUI_IsOpen() && !(console && console->Active()) && !reserved) {
+		s_retainedKeyOwners[key] = down;
+		retainedUIInput_t event;
+		event.kind = retainedUIInput_t::KEY; event.key = key; event.source = source;
+		event.down = down; event.repeated = repeated;
+		RetainedUI_QueueInput(event,time);
+		return true;
+	}
+	// A repeat belonging to the old menu must not run a gameplay binding.
+	return previouslyOwned && down;
+}
+static void SDL3_QueueRetainedPointer(float x, float y, int time) {
+	retainedUIInput_t event; event.kind = retainedUIInput_t::POINTER; event.x = x; event.y = y;
+	RetainedUI_QueueInput(event,time);
+}
+static void SDL3_QueueRetainedFocus(bool focused, int time) {
+	retainedUIInput_t event; event.kind = retainedUIInput_t::FOCUS; event.down = focused;
+	RetainedUI_QueueInput(event,time);
+}
+static void SDL3_QueueRetainedCancel(int time) {
+	retainedUIInput_t event; event.kind = retainedUIInput_t::CANCEL;
+	RetainedUI_QueueInput(event,time);
+}
 static bool SDL3_ShouldRouteMenuMouse(void) {
 	// Disabled input and hidden batch-render windows must never synchronize or
 	// warp the host cursor when a GUI becomes active.
@@ -868,6 +905,7 @@ static bool SDL3_ShouldRouteMenuMouse(void) {
 }
 
 static idUserInterface *SDL3_GetActiveMenuGui(void) {
+	if (RetainedUI_IsOpen()) return NULL;
 	return ( session != NULL ) ? session->GetActiveGUI() : NULL;
 }
 
@@ -945,7 +983,8 @@ static void SDL3_UpdateCursorVisibility(void) {
 		return;
 	}
 
-	if (SDL3_ShouldRouteMenuMouse() && win32.activeApp && (win32.cdsFullscreen || s_menuMouseInsideWindow)) {
+	if (SDL3_ShouldRouteMenuMouse() && win32.activeApp && (win32.cdsFullscreen || s_menuMouseInsideWindow) &&
+		!(RetainedUI_IsOpen() && !(console && console->Active()))) {
 		(void)SDL_HideCursor();
 		return;
 	}
@@ -1271,13 +1310,20 @@ static void SDL3_QueueMouseButtonEvent(int key, bool down, int eventTime, bool p
 		return;
 	}
 
-	Sys_QueEvent(eventTime, SE_KEY, key, down ? 1 : 0, 0, NULL);
+	if (!SDL3_QueueRetainedKey(key,down,false,4096+key,eventTime))
+		Sys_QueEvent(eventTime, SE_KEY, key, down ? 1 : 0, 0, NULL);
 	if (pollState) {
 		SDL3_QueueMouseInput(M_ACTION1 + (key - K_MOUSE1), down ? 1 : 0, eventTime);
 	}
 }
 
 static bool SDL3_SetRoutedCursorFromWindowPosition(float windowMouseX, float windowMouseY, int &dx, int &dy) {
+	if (RetainedUI_IsOpen() && !(console && console->Active())) {
+		if (!std::isfinite(windowMouseX) || !std::isfinite(windowMouseY)) return false;
+		dx = dy = 0;
+		SDL3_QueueRetainedPointer(windowMouseX,windowMouseY,Sys_Milliseconds());
+		return true;
+	}
 	float cursorX = 0.0f;
 	float cursorY = 0.0f;
 	if (!SDL3_MapWindowMouseToRoutedCursor(windowMouseX, windowMouseY, cursorX, cursorY)) {
@@ -1302,6 +1348,9 @@ static void SDL3_SyncSystemMouseToActiveCursor(void) {
 	if (!SDL3_ShouldRouteMenuMouse() || !win32.activeApp) {
 		return;
 	}
+	// Retained controls consume the absolute coordinates in queued SDL motion
+	// and button events. They never move the OS cursor to a 640x480 GUI cursor.
+	if (RetainedUI_IsOpen() && !(console && console->Active())) return;
 
 	if (console != NULL && console->Active()) {
 		float windowMouseX = 0.0f;
@@ -1709,7 +1758,8 @@ static void SDL3_PostControllerKeyEvent(int key, bool down, int eventTime) {
 		return;
 	}
 
-	Sys_QueEvent(eventTime, SE_KEY, key, down ? 1 : 0, 0, NULL);
+	if (!SDL3_QueueRetainedKey(key,down,false,2048+key,eventTime))
+		Sys_QueEvent(eventTime, SE_KEY, key, down ? 1 : 0, 0, NULL);
 	SDL3_QueueKeyboardInput(key, down, eventTime);
 }
 
@@ -1904,6 +1954,7 @@ static void SDL3_SetJoystickHat(Uint8 newHat, int eventTime) {
 }
 
 static void SDL3_ReleaseGamepadState(int eventTime) {
+	SDL3_QueueRetainedCancel(eventTime);
 	for (int i = 0; i < SDL_GAMEPAD_BUTTON_COUNT; ++i) {
 		if (!s_gamepadButtonsDown[i]) {
 			continue;
@@ -1923,6 +1974,7 @@ static void SDL3_ReleaseGamepadState(int eventTime) {
 }
 
 static void SDL3_ReleaseJoystickState(int eventTime) {
+	SDL3_QueueRetainedCancel(eventTime);
 	for (int i = 0; i < SDL3_MAX_JOYSTICK_BUTTONS; ++i) {
 		if (!s_joystickButtonsDown[i]) {
 			continue;
@@ -2236,6 +2288,8 @@ static void SDL3_ReleaseFocusInputState(int eventTime) {
 		return;
 	}
 	s_sdlFocusInputReleased = true;
+	SDL3_QueueRetainedFocus(false,eventTime);
+	memset(s_retainedKeyOwners,0,sizeof(s_retainedKeyOwners));
 
 	// Desktop focus changes do not necessarily produce the app-level
 	// background events used on handheld/mobile platforms. Release every
@@ -2396,6 +2450,7 @@ static void SDL3_HandleAppForegroundTransition(int eventTime, const char *reason
 
 	s_sdlAppInBackground = false;
 	win32.activeApp = Sys_SDL_IsGameWindowFocused();
+	SDL3_QueueRetainedFocus(win32.activeApp,eventTime);
 	win32.movingWindow = false;
 	s_menuMouseInsideWindow = s_sdlWindow != NULL &&
 		(SDL_GetWindowFlags(s_sdlWindow) & SDL_WINDOW_MOUSE_FOCUS) != 0;
@@ -4509,6 +4564,7 @@ static void SDL3_HandleWindowEvent(const SDL_WindowEvent &event, int eventTime) 
 
 		case SDL_EVENT_WINDOW_FOCUS_GAINED:
 			win32.activeApp = true;
+			SDL3_QueueRetainedFocus(true,eventTime);
 			s_sdlFocusInputReleased = false;
 #if !defined(OPENQ4_SDL3_POSIX_HOST)
 			win32.printScreenFocusReleaseUntil = 0;
@@ -4582,6 +4638,7 @@ static void SDL3_HandleWindowEvent(const SDL_WindowEvent &event, int eventTime) 
 		case SDL_EVENT_WINDOW_SHOWN:
 		case SDL_EVENT_WINDOW_RESTORED:
 			win32.activeApp = Sys_SDL_IsGameWindowFocused();
+			SDL3_QueueRetainedFocus(win32.activeApp,eventTime);
 			s_menuMouseInsideWindow = s_sdlWindow != NULL &&
 				(SDL_GetWindowFlags(s_sdlWindow) & SDL_WINDOW_MOUSE_FOCUS) != 0;
 			SDL3_RefreshWindowPlacement();
@@ -4612,6 +4669,10 @@ static void SDL3_HandleWindowEvent(const SDL_WindowEvent &event, int eventTime) 
 			break;
 
 		case SDL_EVENT_WINDOW_MOUSE_LEAVE:
+			{
+				retainedUIInput_t leave; leave.kind = retainedUIInput_t::POINTER_LEAVE;
+				RetainedUI_QueueInput(leave,eventTime);
+			}
 			s_menuMouseInsideWindow = false;
 			SDL3_ResetMenuMouseTracking();
 			SDL3_UpdateCursorVisibility();
@@ -4875,13 +4936,14 @@ bool Sys_SDL_PumpEvents(void) {
 				}
 
 				if (key != 0) {
+					const bool retained = SDL3_QueueRetainedKey(key,down,event.key.repeat,1024+static_cast<int>(event.key.scancode),eventTime);
 					// Keep parity with the old Win32 path: these are queued from keyboard polling.
-					if (key != K_PRINT_SCR && key != K_CTRL && key != K_ALT && key != K_RIGHT_ALT) {
+					if (!retained && key != K_PRINT_SCR && key != K_CTRL && key != K_ALT && key != K_RIGHT_ALT) {
 						Sys_QueEvent(eventTime, SE_KEY, key, down, 0, NULL);
 					}
 
 					const int controlChar = SDL3_MapControlChar(key, down, event.key.mod);
-					if (controlChar != 0) {
+					if (!retained && controlChar != 0) {
 						Sys_QueEvent(eventTime, SE_CHAR, controlChar, 0, 0, NULL);
 					}
 
@@ -4929,6 +4991,11 @@ bool Sys_SDL_PumpEvents(void) {
 
 			case SDL_EVENT_MOUSE_MOTION:
 			{
+				if (RetainedUI_IsOpen() && !(console && console->Active())) {
+					if (SDL3_ShouldRouteMenuMouse() && !SDL3_IsMouseCaptured())
+						SDL3_QueueRetainedPointer(event.motion.x,event.motion.y,eventTime);
+					break;
+				}
 				if (!std::isfinite(event.motion.x) || !std::isfinite(event.motion.y) ||
 						!std::isfinite(event.motion.xrel) || !std::isfinite(event.motion.yrel)) {
 					s_sdlRelativeMouseRemainderX = 0.0f;
@@ -4998,6 +5065,8 @@ bool Sys_SDL_PumpEvents(void) {
 			case SDL_EVENT_MOUSE_BUTTON_DOWN:
 			case SDL_EVENT_MOUSE_BUTTON_UP: {
 				const bool routedMouseInput = SDL3_IsMouseCaptured() || SDL3_ShouldRouteMenuMouse();
+				if (RetainedUI_IsOpen() && !(console && console->Active()) && SDL3_ShouldRouteMenuMouse())
+					SDL3_QueueRetainedPointer(event.button.x,event.button.y,eventTime);
 				if (routedMouseInput || openQ4_AcceptingLoadingContinueInput()) {
 					const int key = SDL3_MapMouseButton(event.button.button);
 					if (key != 0) {
