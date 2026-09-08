@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <limits>
+#include <map>
 #include <memory>
 #include <new>
 
@@ -235,15 +236,15 @@ public:
 		}
 		return Premultiply(source.stops.back().colour);
 	}
-	void Triangle(VectorPoint a, VectorPoint b, VectorPoint c, VectorMesh& output, const VectorOptions& options) const {
-		if (source.type != PaintType::Linear) { Polygon({a,b,c},output,options); return; }
+	void Shape(const std::vector<VectorPoint>& shape, VectorMesh& output, const VectorOptions& options, double coverage = 1) const {
+		if (source.type != PaintType::Linear) { Polygon(shape,output,options,coverage); return; }
 		// Split at every stop plane. A triangle spanning several stops cannot
 		// reproduce them by interpolating only the triangle's corner colours.
 		for (size_t i = 0; i <= source.stops.size(); ++i) {
-			std::vector<VectorPoint> polygon{a,b,c};
+			auto polygon = shape;
 			if (i > 0) Clip(polygon,source.stops[i-1].at,true);
 			if (i < source.stops.size()) Clip(polygon,source.stops[i].at,false);
-			Polygon(polygon,output,options);
+			Polygon(polygon,output,options,coverage);
 		}
 	}
 private:
@@ -263,11 +264,11 @@ private:
 		}
 		polygon.swap(clipped);
 	}
-	void Polygon(const std::vector<VectorPoint>& polygon, VectorMesh& output, const VectorOptions& options) const {
+	void Polygon(const std::vector<VectorPoint>& polygon, VectorMesh& output, const VectorOptions& options, double coverage) const {
 		if (polygon.size() < 3 || std::abs(SignedArea(polygon)) < 1e-12) return;
 		Require(output.vertices.size()+polygon.size() <= options.maximumVertices,"paint subdivision exceeds output vertex budget");
 		const int base = static_cast<int>(output.vertices.size());
-		for (auto p : polygon) { const auto c = Colour(p); output.vertices.push_back({p.x,p.y,c.r,c.g,c.b,c.a}); }
+		for (auto p : polygon) { const auto c = Colour(p); output.vertices.push_back({p.x,p.y,c.r*coverage,c.g*coverage,c.b*coverage,c.a*coverage}); }
 		for (int i = 2; i < static_cast<int>(polygon.size()); ++i) output.indices.insert(output.indices.end(),{base,base+i-1,base+i});
 	}
 	const VectorPaint& source;
@@ -275,6 +276,104 @@ private:
 	VectorPoint from, direction;
 	double length2 = 1;
 };
+
+// Integrate normalized region boundaries over output pixel cells. For each
+// oriented edge, Green's theorem gives coverage as integral(clamp(x-X,0,1) dy).
+// Resolve all edges before painting, so holes and overlapping stroke segments
+// cannot darken themselves and there are no internal triangulation seams.
+class Coverage {
+public:
+	explicit Coverage(const VectorOptions& options) : options(options) {
+		bounds = options.pixelBounds.value_or(VectorPixelBounds{-1000000,-1000000,1000000,1000000});
+	}
+	void Edge(VectorPoint a, VectorPoint b) {
+		if (a.y == b.y || bounds.left == bounds.right || bounds.top == bounds.bottom) return;
+		const double sign = a.y < b.y ? 1 : -1;
+		if (a.y > b.y) std::swap(a,b);
+		const int top = std::max(bounds.top,static_cast<int>(std::floor(a.y)));
+		const int bottom = std::min(bounds.bottom,static_cast<int>(std::ceil(b.y)));
+		Require(bottom-top <= 65536,"coverage edge exceeds row budget; provide viewport bounds");
+		for (int row = top; row < bottom; ++row) {
+			Charge();
+			const double y0 = std::max(a.y,static_cast<double>(row));
+			const double y1 = std::min(b.y,static_cast<double>(row+1));
+			const double dy = sign*(y1-y0);
+			const double x0 = a.x+(b.x-a.x)*((y0-a.y)/(b.y-a.y));
+			const double x1 = a.x+(b.x-a.x)*((y1-a.y)/(b.y-a.y));
+			const double low = std::min(x0,x1), high = std::max(x0,x1);
+			const int first = static_cast<int>(std::floor(low));
+			Range(row,bounds.left,first,dy);
+			// Only columns crossed by this edge need a partial-cell integral.
+			// A vertical edge has one such column, including integer-aligned edges.
+			const int last = high == low ? first+1 : static_cast<int>(std::ceil(high));
+			for (int column = std::max(first,bounds.left); column < std::min(last,bounds.right); ++column) {
+				Charge();
+				const double average = high-low < 1e-12 ? std::clamp(low-column,0.0,1.0)
+					: (Integral(high-column)-Integral(low-column))/(high-low);
+				Range(row,column,column+1,dy*average);
+			}
+		}
+	}
+	void Emit(const Paint& paint, VectorMesh& output) {
+		std::sort(events.begin(),events.end(),[](const Event& a, const Event& b) {
+			return a.y != b.y ? a.y < b.y : a.x < b.x;
+		});
+		struct Rectangle { int left, top, right, bottom; double coverage; };
+		std::vector<Rectangle> rectangles;
+		std::map<std::pair<int,int>,size_t> previous;
+		size_t index = 0;
+		while (index < events.size()) {
+			const int row = events[index].y;
+			std::map<std::pair<int,int>,size_t> current;
+			auto emit = [&](int left, int right, double coverage) {
+				if (left >= right || coverage == 0) return;
+				const auto key = std::make_pair(left,right);
+				auto found = previous.find(key);
+				if (found != previous.end() && rectangles[found->second].bottom == row &&
+					std::abs(rectangles[found->second].coverage-coverage) < 1e-12) {
+					rectangles[found->second].bottom = row+1; current[key] = found->second;
+				} else {
+					Require(rectangles.size() < options.maximumVertices/4,"coverage exceeds output rectangle budget");
+					current[key] = rectangles.size(); rectangles.push_back({left,row,right,row+1,coverage});
+				}
+			};
+			double sum = 0, pendingCoverage = 0;
+			int pendingLeft = events[index].x, pendingRight = pendingLeft;
+			while (index < events.size() && events[index].y == row) {
+				const int x = events[index].x;
+				do { sum += events[index++].delta; } while (index < events.size() && events[index].y == row && events[index].x == x);
+				Require(sum >= -1e-7 && sum <= 1+1e-7,"normalized coverage escaped zero-to-one range");
+				const double coverage = std::abs(sum) < 1e-10 ? 0 : std::abs(sum-1) < 1e-10 ? 1 : std::clamp(sum,0.0,1.0);
+				const int right = index < events.size() && events[index].y == row ? events[index].x : x;
+				if (x == pendingRight && std::abs(coverage-pendingCoverage) < 1e-12) pendingRight = right;
+				else { emit(pendingLeft,pendingRight,pendingCoverage); pendingLeft = x; pendingRight = right; pendingCoverage = coverage; }
+			}
+			emit(pendingLeft,pendingRight,pendingCoverage);
+			Require(std::abs(sum) < 1e-7,"coverage row has an unclosed boundary");
+			previous.swap(current);
+		}
+		for (const auto& r : rectangles) paint.Shape({
+			{static_cast<double>(r.left),static_cast<double>(r.top)},
+			{static_cast<double>(r.right),static_cast<double>(r.top)},
+			{static_cast<double>(r.right),static_cast<double>(r.bottom)},
+			{static_cast<double>(r.left),static_cast<double>(r.bottom)}},output,options,r.coverage);
+	}
+private:
+	struct Event { int y, x; double delta; };
+	static double Integral(double x) { return x <= 0 ? 0 : x >= 1 ? x-.5 : .5*x*x; }
+	void Charge() { Require(++work <= 2097152,"coverage exceeds edge-work budget"); }
+	void Range(int y, int left, int right, double value) {
+		left = std::max(left,bounds.left); right = std::min(right,bounds.right);
+		if (left >= right || value == 0) return;
+		Require(events.size()+2 <= 1048576,"coverage exceeds event-memory budget");
+		events.push_back({y,left,value}); events.push_back({y,right,-value});
+	}
+	const VectorOptions& options;
+	VectorPixelBounds bounds;
+	std::vector<Event> events;
+	size_t work = 0;
+};
+
 void Fill(const Contours& contours, FillRule rule, const VectorPaint& paint, const VectorOptions& options, VectorMesh& output) {
 	AllocationBudget budget;
 	TESSalloc allocator{};
@@ -296,26 +395,42 @@ void Fill(const Contours& contours, FillRule rule, const VectorPaint& paint, con
 	}
 	if (!vertices) return;
 	const TESSreal normal[3] = {0,0,1};
-	Require(tessTesselate(tess.get(),rule == FillRule::EvenOdd ? TESS_WINDING_ODD : TESS_WINDING_NONZERO,TESS_POLYGONS,3,2,normal) != 0,"polygon tessellation failed or exceeds memory budget");
-	const int vertexCount = tessGetVertexCount(tess.get()), triangleCount = tessGetElementCount(tess.get());
+	Require(tessTesselate(tess.get(),rule == FillRule::EvenOdd ? TESS_WINDING_ODD : TESS_WINDING_NONZERO,options.antialias ? TESS_BOUNDARY_CONTOURS : TESS_POLYGONS,3,2,normal) != 0,"polygon tessellation failed or exceeds memory budget");
+	const int vertexCount = tessGetVertexCount(tess.get()), elementCount = tessGetElementCount(tess.get());
 	Require(vertexCount >= 0 && static_cast<size_t>(vertexCount) <= options.maximumVertices,"polygon intersections exceed vertex budget");
 	const TESSreal* points = tessGetVertices(tess.get());
 	const TESSindex* indices = tessGetElements(tess.get());
 	Paint evaluator(paint,options);
-	for (int i = 0; i < triangleCount; ++i) {
+	if (options.antialias) {
+		Coverage coverage(options);
+		for (int i = 0; i < elementCount; ++i) {
+			const int base = indices[i*2], count = indices[i*2+1];
+			Require(base >= 0 && count >= 0 && base <= vertexCount && count <= vertexCount-base,"invalid boundary contour output");
+			for (int j = 0; j < count; ++j) {
+				const int a = base+j, b = base+(j+1)%count;
+				coverage.Edge({points[a*2],points[a*2+1]},{points[b*2],points[b*2+1]});
+			}
+		}
+		coverage.Emit(evaluator,output); return;
+	}
+	for (int i = 0; i < elementCount; ++i) {
 		VectorPoint triangle[3];
 		for (int j = 0; j < 3; ++j) {
 			const int index = indices[i*3+j];
 			Require(index >= 0 && index < vertexCount,"invalid polygon output index");
 			triangle[j] = {points[index*2],points[index*2+1]};
 		}
-		evaluator.Triangle(triangle[0],triangle[1],triangle[2],output,options);
+		evaluator.Shape({triangle[0],triangle[1],triangle[2]},output,options);
 	}
 }
 void Validate(const VectorOptions& options) {
 	Require(std::isfinite(options.widthDp) && std::isfinite(options.heightDp) && options.widthDp >= 0 && options.heightDp >= 0,"invalid vector layout extent");
 	Require(std::isfinite(options.tolerancePixels) && options.tolerancePixels >= .01 && options.tolerancePixels <= 1,"curve tolerance must be 0.01..1 output pixels");
 	Require(options.maximumVertices >= 3 && options.maximumVertices <= 1048576,"invalid vector vertex budget");
+	if (options.pixelBounds) {
+		const auto& b = *options.pixelBounds;
+		Require(b.left >= -1000000 && b.top >= -1000000 && b.right <= 1000000 && b.bottom <= 1000000 && b.left <= b.right && b.top <= b.bottom,"invalid coverage pixel bounds");
+	}
 	for (double value : {options.transform.a,options.transform.b,options.transform.c,options.transform.d,options.transform.tx,options.transform.ty})
 		Require(std::isfinite(value),"non-finite vector transform");
 }
@@ -354,7 +469,9 @@ bool TessellatePath(const VectorPath& path, const VectorOptions& options, Vector
 bool HitTestPath(const VectorPath& path, const VectorOptions& options, VectorPoint point, bool& hit, std::string& diagnostic) {
 	VectorMesh mesh;
 	if (!Finite(point)) { diagnostic = path.id+": invalid hit-test coordinate"; return false; }
-	if (!TessellatePath(path,options,mesh,diagnostic)) return false;
+	auto geometricOptions = options;
+	geometricOptions.antialias = false; // Partial-coverage pixel quads are not hit targets.
+	if (!TessellatePath(path,geometricOptions,mesh,diagnostic)) return false;
 	hit = false;
 	for (size_t i = 0; i < mesh.indices.size(); i += 3) {
 		const auto& a = mesh.vertices[mesh.indices[i]]; const auto& b = mesh.vertices[mesh.indices[i+1]]; const auto& c = mesh.vertices[mesh.indices[i+2]];

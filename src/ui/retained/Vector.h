@@ -2,6 +2,7 @@
 #pragma once
 
 #include <array>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -61,11 +62,16 @@ struct VectorVertex {
 	double r = 1, g = 1, b = 1, a = 1;
 };
 struct VectorMesh { std::vector<VectorVertex> vertices; std::vector<int> indices; };
+// Bounds of output pixel cells, with exclusive right/bottom edges. These limit
+// coverage work; the renderer still owns its final clip and composition state.
+struct VectorPixelBounds { int left = 0, top = 0, right = 0, bottom = 0; };
 struct VectorOptions {
 	double widthDp = 0, heightDp = 0;
 	VectorTransform transform;
 	double tolerancePixels = .15;
 	size_t maximumVertices = 262144;
+	bool antialias = true;
+	std::optional<VectorPixelBounds> pixelBounds;
 };
 
 // Backend-independent path compiler. No GPU/window, engine, RmlUi or JSON API.

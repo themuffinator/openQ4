@@ -267,9 +267,12 @@ successful commit/push, verify remote heads before saying the stage is published
 | 2026-09-08 | 0 | Specification/integration contracts committed and pushed in both repositories; remote heads verified | Complete |
 | 2026-09-08 | 1 | Effective VFS inventory implemented; 271 GUI resources, 14,517 lexical window declarations and 8,037 event declarations; migration seed created | Full semantic classification, material/bitmap decisions and family gameplay baselines |
 | 2026-09-08 | 2 | Retained engine rendering, density and clipping integrated; initial typed canonical documents, comment-preserving value edits and absolute presentation tracks implemented | Path/component/state/binding schemas, input/game bridge, text backend and representative screen/editor qualification |
+| 2026-09-08 | 3 | Editable responsive paths, winding fills, stroke unions and linear paints published in `a9c9e75b`; analytic output-pixel coverage added with an independent area oracle | Composition/masks, complete paints/strokes/fonts, production components and all artwork, performance and broader platform/visual qualification |
 
 Inventory methodology and limitations: [inventory report](../ui/inventory-report.md).
 Canonical source and motion contract: [document checkpoint](../ui/document-format.md).
 Native path source/compiler: [vector checkpoint](../ui/vector-paths.md). Curves,
-holes, strokes, gradients and responsive cuts are integrated; coverage AA,
-compositing, full art reconstruction and the complete Stage 3 gate remain open.
+holes, strokes, gradients, responsive cuts and
+[analytic pixel coverage](../ui/coverage-antialiasing.md) are integrated.
+Compositing, broader quality/performance qualification, full art reconstruction
+and the complete Stage 3 gate remain open.

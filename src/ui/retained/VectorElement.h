@@ -16,7 +16,7 @@ private:
 	std::vector<VectorPath> paths;
 	std::vector<Rml::Geometry> geometry;
 	Host* host = nullptr;
-	std::array<double,9> previous{};
+	std::array<double,13> previous{};
 	bool valid = false;
 };
 } // namespace openq4::ui

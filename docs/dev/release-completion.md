@@ -6,8 +6,12 @@
   curves, holes, strokes and fading rails through the retained engine renderer.
   [Geometry checks](ui/vector-paths.md) and SP/OpenGL and MP/Vulkan gameplay
   captures pass, including fractional scaling and video restart. Coverage
-  antialiasing, the full component/artwork corpus and editor interactions remain
-  incomplete; existing MP content warnings remain open.
+  antialiasing now has an [analytic implementation](ui/coverage-antialiasing.md)
+  with independent pixel-area tests and reviewed SP/OpenGL 125% and MP/Vulkan
+  200% captures. Dense vector batches now split before exceeding the renderer's
+  surface capacity. Broader renderer qualification, the full
+  component/artwork corpus and editor interactions remain incomplete; existing
+  MP content warnings remain open.
 
 - Document/editor foundation: typed canonical sources retain comments and
   extension data through validated value edits. Presentation tracks now support

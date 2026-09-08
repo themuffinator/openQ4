@@ -3,7 +3,8 @@
 8 September 2026. Canonical `.q4ui` documents now contain editable vector paths
 rendered as native geometry through the engine. The runtime and future editor
 share the path model/compiler. This does **not** complete the production vector
-renderer or artwork migration. Coverage antialiasing, masks, layers, additional
+renderer or artwork migration. [Coverage antialiasing](coverage-antialiasing.md)
+has subsequently been added. Masks, layers, additional
 paint/stroke features and full visual qualification remain Stage 3 requirements
 in the [plan](../plans/idtech5-ui.md).
 
@@ -111,8 +112,10 @@ under nonuniform scale and shear. The physical minimum uses the smallest singula
 scale to protect every orientation; round subdivision uses the largest singular
 scale to bound error. Mirroring retains winding semantics.
 
-libtess2 triangulates fills/stroke unions, then the paint compiler splits gradient
-triangles. Native elements submit through RmlUi's render manager with the already
+libtess2 resolves fills/stroke unions. The current antialiased path compiles its
+normalized boundaries into coverage quads; geometric hit testing uses triangles.
+The paint compiler splits geometry at gradient stops. Native elements submit
+through RmlUi's render manager with the already
 applied transform disabled for that submission. Existing clipping, render order
 and resource lifetime remain in control. Meshes are reused while dimensions,
 transform and opacity remain unchanged. Translation and opacity currently rebuild
@@ -181,14 +184,15 @@ triangle markers, a cubic ring with a hole and a rounded stroke. It uses existin
 localized strings and the normative family colors. It is a geometry fixture,
 **not** a finished component kit, functional controls or accepted artwork corpus.
 
-Coverage antialiasing is **not implemented yet**. Adaptive geometry alone does
-not establish smooth pixel coverage at fractional density, thin diagonals or
-small curves. Hard edges in captures remain a quality failure for production.
+The original geometry checkpoint below preceded coverage antialiasing. Adaptive
+geometry alone did not establish smooth pixel coverage at fractional density,
+thin diagonals or small curves. Those hard edges prompted the subsequent
+[analytic coverage implementation](coverage-antialiasing.md).
 Masks, isolated composition, full paint/stroke operations, font quality,
 performance, editor interactions and all 271 GUI migrations also remain open.
 The goal and its complete visual acceptance requirements are unchanged.
 
-### Windowed gameplay evidence
+### Original geometry checkpoint: windowed gameplay evidence
 
 The final Windows client built and staged successfully, and the retained UI,
 document and vector native test targets passed (3/3). Client SHA-256:

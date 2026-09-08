@@ -31,9 +31,19 @@ void VectorElement::OnRender() {
 	options.widthDp = size.x/density; options.heightDp = size.y/density;
 	options.transform = {(x.x-origin.x)/origin.w,(x.y-origin.y)/origin.w,
 		(y.x-origin.x)/origin.w,(y.y-origin.y)/origin.w,origin.x/origin.w,origin.y/origin.w};
+	const auto viewport = manager->GetViewport();
+	VectorPixelBounds bounds{0,0,viewport.x,viewport.y};
+	if (state.scissor_region.Valid()) {
+		bounds.left = std::clamp(state.scissor_region.Left(),0,viewport.x);
+		bounds.top = std::clamp(state.scissor_region.Top(),0,viewport.y);
+		bounds.right = std::clamp(state.scissor_region.Right(),bounds.left,viewport.x);
+		bounds.bottom = std::clamp(state.scissor_region.Bottom(),bounds.top,viewport.y);
+	}
+	options.pixelBounds = bounds;
 	const double opacity = std::clamp(static_cast<double>(GetComputedValues().opacity()),0.0,1.0);
-	const std::array<double,9> signature{options.widthDp,options.heightDp,options.transform.a,options.transform.b,
-		options.transform.c,options.transform.d,options.transform.tx,options.transform.ty,opacity};
+	const std::array<double,13> signature{options.widthDp,options.heightDp,options.transform.a,options.transform.b,
+		options.transform.c,options.transform.d,options.transform.tx,options.transform.ty,opacity,
+		static_cast<double>(bounds.left),static_cast<double>(bounds.top),static_cast<double>(bounds.right),static_cast<double>(bounds.bottom)};
 	if (!valid || signature != previous) {
 		geometry.clear(); previous = signature; valid = true;
 		for (const auto& path : paths) {
