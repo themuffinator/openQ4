@@ -50,7 +50,6 @@ If you have questions concerning this license or the applicable additional terms
 #undef protected
 #undef private
 #include "../imagetools/ImageTools.h"
-#include "../ui/Window.h"
 #include "../ui/RetainedUI.h"
 
 idCVar	idSessionLocal::com_showAngles( "com_showAngles", "0", CVAR_SYSTEM | CVAR_BOOL, "" );
@@ -4195,11 +4194,11 @@ static void Session_OpenQ4Browser_f( const idCmdArgs &args ) {
 			"anim_mainOut::notime", "anim_mpBrowseIn::notime"
 		};
 		for ( int i = 0; i < static_cast<int>( sizeof( windows ) / sizeof( windows[ 0 ] ) ); ++i ) {
-			const idWinVar *variable = gui->GetDesktop() != NULL ?
-				gui->GetDesktop()->GetWinVarByName( windows[ i ], true ) : NULL;
-			const idStr value = Session_BrowserDiagnosticText( variable != NULL ? variable->c_str() : "" );
+			idStr presentation;
+			const bool found = gui->GetPresentationValue( windows[ i ], presentation );
+			const idStr value = Session_BrowserDiagnosticText( presentation.c_str() );
 			common->Printf( "BROWSER_WINDOW key=%s found=%d value=%s\n",
-				windows[ i ], variable != NULL, value.c_str() );
+				windows[ i ], found, value.c_str() );
 		}
 		return;
 	}
@@ -4261,30 +4260,28 @@ static void Session_OpenQ4Browser_f( const idCmdArgs &args ) {
 
 static void Session_OpenQ4GuiGet_f( const idCmdArgs &args ) {
 	idUserInterface *gui = session->GetActiveGUI();
-	if ( args.Argc() != 2 || gui == NULL || gui->GetDesktop() == NULL ) {
+	if ( args.Argc() != 2 || gui == NULL ) {
 		common->Printf( "usage: openq4_guiGet <window::variable> with an active GUI\n" );
 		return;
 	}
-	idWinVar *variable = gui->GetDesktop()->GetWinVarByName( args.Argv( 1 ), true );
-	if ( variable == NULL ) {
+	idStr value;
+	if ( !gui->GetPresentationValue( args.Argv( 1 ), value ) ) {
 		common->Printf( "openq4_guiGet: unknown GUI variable\n" );
 		return;
 	}
-	common->Printf( "GUI_VALUE %s=%s\n", args.Argv( 1 ), variable->c_str() );
+	common->Printf( "GUI_VALUE %s=%s\n", args.Argv( 1 ), value.c_str() );
 }
 
 static void Session_OpenQ4GuiSet_f( const idCmdArgs &args ) {
 	idUserInterface *gui = session->GetActiveGUI();
-	if ( args.Argc() != 3 || gui == NULL || gui->GetDesktop() == NULL ) {
+	if ( args.Argc() != 3 || gui == NULL ) {
 		common->Printf( "usage: openq4_guiSet <window::variable> <value> with an active GUI\n" );
 		return;
 	}
-	idWinVar *variable = gui->GetDesktop()->GetWinVarByName( args.Argv( 1 ), true );
-	if ( variable == NULL ) {
+	if ( !gui->SetPresentationValue( args.Argv( 1 ), args.Argv( 2 ) ) ) {
 		common->Printf( "openq4_guiSet: unknown GUI variable\n" );
 		return;
 	}
-	variable->Set( args.Argv( 2 ) );
 	gui->StateChanged( common->GetPresentationTime() );
 }
 

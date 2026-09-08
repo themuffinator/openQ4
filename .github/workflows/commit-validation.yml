@@ -15,7 +15,7 @@ env:
   # Pin the companion's engine-interface copies, including GAME_API 47,
   # renderer API 13 transparent targets and the retained input event contract.
   # Publish this companion commit before CI runs.
-  OPENQ4_GAMELIBS_SHA: 300aedd9c56e20666ca7eacc0d71db70502660b9
+  OPENQ4_GAMELIBS_SHA: 1cd33980f072ac3d78978a07b388b4b6fe6b5eb2
 
 jobs:
   script-smoke:
@@ -281,6 +281,7 @@ jobs:
             tools/tests/sdl3_input_parity.py \
             tools/tests/ui_retained_input.py \
             tools/tests/ui_retained_state_sources.py \
+            tools/tests/ui_presentation_bridge.py \
             tools/tests/ui_legacy_inventory.py \
             tools/tests/ui_legacy_import.py \
             tools/ui/legacy_inventory.py \
@@ -475,6 +476,7 @@ jobs:
           python tools/tests/sdl3_input_parity.py
           python tools/tests/ui_retained_input.py
           python tools/tests/ui_retained_state_sources.py
+          python tools/tests/ui_presentation_bridge.py
           python tools/tests/ui_legacy_inventory.py
           python tools/tests/ui_legacy_import.py
           python tools/tests/ui_background_cursor.py

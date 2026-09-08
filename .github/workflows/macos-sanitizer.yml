@@ -36,7 +36,7 @@ concurrency:
 
 env:
   # Keep all builds on the companion engine-interface revision used by CI.
-  OPENQ4_GAMELIBS_SHA: 300aedd9c56e20666ca7eacc0d71db70502660b9
+  OPENQ4_GAMELIBS_SHA: 1cd33980f072ac3d78978a07b388b4b6fe6b5eb2
 
 jobs:
   macos-sanitizer:

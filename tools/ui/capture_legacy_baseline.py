@@ -71,6 +71,16 @@ def capture(args: argparse.Namespace) -> int:
         (game/'retained-data'/path.name).write_bytes(contents)
         data_files.append({'name':path.name,'source':str(path),'sha256':hashlib.sha256(contents).hexdigest()})
     cfg_path = game / 'ui-baseline.cfg'
+    presentation = ''
+    presentation_sources = {}
+    if args.presentation_probe:
+        for extension in ('gui', 'cfg'):
+            fixture = ROOT / f'tools/ui/fixtures/presentation-smoke.{extension}'
+            presentation_sources[fixture.name] = digest(fixture)
+            if extension == 'gui':
+                (game / fixture.name).write_bytes(fixture.read_bytes())
+            else:
+                presentation = fixture.read_text(encoding='utf-8')
     import_requests = legacy_import.requests(args.legacy_export_list) if args.legacy_export_list else []
     preview = ''
     if args.retained_document:
@@ -88,7 +98,7 @@ def capture(args: argparse.Namespace) -> int:
         if args.video_restart:
             preview += 'vid_restart windowed\nwait 2\n' + begin + profile_command + play + script + f'wait {settle}\n' + end
     close = 'ui_retainedClose\nwait 3\nui_retainedOwnership\n' if args.retained_open else ''
-    cfg_path.write_text(preview + legacy_import.commands(import_requests) + 'gfxInfo\nscreenshot "screenshots/ui-baseline.tga"\necho UI_BASELINE_CAPTURE_COMPLETE\n' + close + 'quit\n', encoding='utf-8')
+    cfg_path.write_text(presentation + preview + legacy_import.commands(import_requests) + 'gfxInfo\nscreenshot "screenshots/ui-baseline.tga"\necho UI_BASELINE_CAPTURE_COMPLETE\n' + close + 'quit\n', encoding='utf-8')
     overrides = {
         'fs_basepath': str(args.assets.resolve()), 'fs_savepath': str(savepath), 'fs_devpath': str(savepath),
         'fs_game': 'baseoq4', 'logFile': '2', 'logFileName': 'logs/openq4.log',
@@ -185,6 +195,21 @@ def capture(args: argparse.Namespace) -> int:
     active_apis = re.findall(r'Renderer API: requested=\S+ active=(\S+) disposition=(\S+)', plain_log)
     metadata['active_renderer'] = active_apis[-1][0] if active_apis else None
     valid = valid and metadata['active_renderer'] == args.renderer
+    if args.presentation_probe:
+        values = re.findall(r'^GUI_VALUE ([^=]+)=(.*)$', plain_log, re.MULTILINE)
+        expected = [('probe', [1]), ('probe', [2]), ('desktop::probe', [2]), ('probe', [7]),
+                    ('panel::visible', [1]), ('panel::visible', [0]), ('panel::rect', [80,80,480,320]),
+                    ('panel::visible', [1])]
+        try:
+            measured = [(name, [float(v) for v in re.split(r'[,\s]+', value.strip())]) for name,value in values]
+        except ValueError:
+            measured = []
+        missing_reads = plain_log.count('openq4_guiGet: unknown GUI variable')
+        missing_writes = plain_log.count('openq4_guiSet: unknown GUI variable')
+        passed = measured == expected and missing_reads == 1 and missing_writes == 1
+        metadata['presentation_probe'] = {'sources':presentation_sources, 'values':values,
+            'unknown_reads':missing_reads, 'unknown_writes':missing_writes, 'passed':passed}
+        valid = valid and passed
     if import_requests:
         valid = valid and metadata['legacy_import']['passed']
     if args.retained_document:
@@ -237,6 +262,7 @@ def main() -> int:
     parser.add_argument('--retained-data', type=Path, action='append', default=[], help='State JSON copied to retained-data/<name>; repeat for scripted state batches.')
     parser.add_argument('--retained-open', action='store_true', help='Acquire application ownership with host input still disabled; inspect pause/resume and close.')
     parser.add_argument('--legacy-export-list', type=Path, help='JSON source/hash records to preprocess through the engine without executing GUI scripts.')
+    parser.add_argument('--presentation-probe', action='store_true', help='Exercise production presentation reads/writes with an authored legacy fixture after map gameplay; no host input.')
     parser.add_argument('--timeline', help='Canonical timeline to play before capture, and again after an optional video restart.')
     parser.add_argument('--reduced-motion', action='store_true')
     parser.add_argument('--density', type=float, default=0, help='Test density override; zero uses SDL display scale.')

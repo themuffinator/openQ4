@@ -1308,6 +1308,7 @@ def generate_release_docs_site(
         "tools/ui/verify_binding_capture.py",
         "tools/ui/fixtures/binding-smoke.q4ui", "tools/ui/fixtures/binding-smoke.cfg",
         "tools/ui/fixtures/binding-first.json", "tools/ui/fixtures/binding-final.json",
+        "tools/ui/fixtures/presentation-smoke.gui", "tools/ui/fixtures/presentation-smoke.cfg",
         "tools/ui/fixtures/composition-smoke.q4ui", "tools/ui/fixtures/document-smoke.q4ui",
         "tools/ui/fixtures/interaction-smoke.q4ui", "tools/ui/fixtures/interaction-smoke.cfg",
         "tools/ui/fixtures/mask-smoke.q4ui", "tools/ui/fixtures/vector-smoke.q4ui",

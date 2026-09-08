@@ -34,6 +34,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "Window.h"
 #include "UserInterfaceLocal.h"
 #include "ChatWindow.h"
+#include "EditWindow.h"
 #include "SimpleWindow.h"
 #include "../framework/Session.h"
 #include "RetainedUI.h"
@@ -48,6 +49,36 @@ idUserInterfaceManager *	uiManager = &uiManagerLocal;
 
 namespace {
 
+// Resolve presentation aliases without parser fixup. GetWinVarByName(..., true)
+// can disable a root expression or allocate a gui:: variable as a side effect.
+// External value queries must do neither, including when used by diagnostics.
+static idWinVar *FindPresentationVariable( idWindow *desktop, const char *name ) {
+	if ( desktop == NULL || name == NULL || name[ 0 ] == '\0' ) {
+		return NULL;
+	}
+	idStr key = name;
+	const int separator = key.Find( "::" );
+	if ( separator < 0 ) {
+		return desktop->GetWinVarByName( key.c_str(), false );
+	}
+	if ( separator == 0 || separator + 2 == key.Length() ) {
+		return NULL;
+	}
+	const idStr element = key.Left( separator );
+	key = key.Right( key.Length() - separator - 2 );
+	if ( key.Find( "::" ) >= 0 ) {
+		return NULL;
+	}
+	drawWin_t *target = desktop->FindChildByName( element.c_str() );
+	if ( target == NULL ) {
+		return NULL;
+	}
+	if ( target->win != NULL ) {
+		return target->win->GetWinVarByName( key.c_str(), false );
+	}
+	return target->simp != NULL ? target->simp->GetWinVarByName( key.c_str() ) : NULL;
+}
+
 static void SetStateRectangleComponents( idUserInterfaceLocal *gui, const char *prefix, const idRectangle &rect ) {
 	if ( gui == NULL || prefix == NULL ) {
 		return;
@@ -59,6 +90,45 @@ static void SetStateRectangleComponents( idUserInterfaceLocal *gui, const char *
 	gui->SetStateFloat( va( "%s_h", prefix ), rect.h );
 }
 
+}
+
+bool idUserInterfaceLocal::GetPresentationValue( const char *name, idStr &value ) const {
+	idWinVar *variable = FindPresentationVariable( desktop, name );
+	if ( variable == NULL ) {
+		return false;
+	}
+	value = variable->c_str();
+	return true;
+}
+
+bool idUserInterfaceLocal::SetPresentationValue( const char *name, const char *value, bool overrideExpression ) {
+	if ( value == NULL ) {
+		return false;
+	}
+	idWinVar *variable = FindPresentationVariable( desktop, name );
+	if ( variable == NULL ) {
+		return false;
+	}
+	variable->Set( value );
+	if ( overrideExpression ) {
+		variable->SetEval( false );
+	}
+	return true;
+}
+
+bool idUserInterfaceLocal::GetTextInputState( idRectangle &area, float &cursorOffset ) const {
+	if ( desktop == NULL ) {
+		return false;
+	}
+	idEditWindow *edit = dynamic_cast<idEditWindow *>( desktop->GetFocusedChild() );
+	idRectangle candidateArea;
+	float candidateOffset = 0.0f;
+	if ( edit == NULL || !edit->GetTextInputState( candidateArea, candidateOffset ) ) {
+		return false;
+	}
+	area = candidateArea;
+	cursorOffset = candidateOffset;
+	return true;
 }
 
 /*

@@ -92,10 +92,12 @@ named events, timelines, commands, script-driven visibility, material stages,
 text escapes, localization, sound routing and world-GUI instances. Preserve
 save/restore semantics and define a migration/version policy before cutover.
 
-Existing `idUserInterface` provides a useful transitional boundary but exposes
-`GetDesktop()`/`idWindow`. Session menus and both SP/MP player code access those
-objects directly. Replace those accesses with semantic queries/actions in a
-coordinated companion change. A wrapper returning a null desktop is not parity.
+The transitional `idUserInterface` now exposes presentation value and focused
+text-field operations in place of `GetDesktop()`/`idWindow`. The coordinated
+[presentation boundary](../ui/presentation-bridge.md) removes direct session,
+SDL and SP/MP player accesses. Retained alias mapping and complete semantic
+state/action dispatch remain to be implemented; removing pointers alone does
+not establish replacement parity.
 
 Inventory special window types and implement functional replacements, including
 render/model previews and any used custom game/instrument widgets. Unsupported
@@ -280,6 +282,10 @@ without rebuilding documents, validate state batches atomically and retain
 application values through renderer/language changes. Native checks and reviewed
 SP/OpenGL and MP/Vulkan captures pass. The game bridge, legacy lowering and full
 Stage 2 completion remain open.
+The [presentation boundary](../ui/presentation-bridge.md) now separates session,
+game and SDL consumers from legacy windows, with read-only value queries and
+explicit expression overrides. Game API 48 requires coordinated engine/SP/MP
+modules; retained document alias mapping and action dispatch remain open.
 Semantic buttons now use authored state timelines, projected hit testing,
 source-order/spatial navigation and modal focus ownership. The
 [interaction checkpoint](../ui/interaction.md) records native behavior checks,

@@ -2,6 +2,13 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- Integration development: menu and game callers now query GUI values without
+  stopping their expressions. Explicit overrides and focused
+  text-field queries prepare the replacement interface boundary. Development
+  packages must replace engine and both game modules together (game API 48;
+  renderer API 13). See the [presentation boundary](ui/presentation-bridge.md).
+  Complete GUI migration and the visual editor remain in development.
+
 - Live data development: retained interfaces now update text, gauges, layout
   and control availability from typed state and read-only CVars without
   rebuilding the screen. Invalid updates preserve the last valid snapshot;

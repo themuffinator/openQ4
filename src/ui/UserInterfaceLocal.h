@@ -57,6 +57,9 @@ public:
 	virtual bool				GetStateBool( const char *varName, const char* defaultString = "0" ) const;
 	virtual int					GetStateInt( const char *varName, const char* defaultString = "0" ) const;
 	virtual float				GetStateFloat( const char *varName, const char* defaultString = "0" ) const;
+	virtual bool                GetPresentationValue( const char *name, idStr &value ) const override;
+	virtual bool                SetPresentationValue( const char *name, const char *value, bool overrideExpression = true ) override;
+	virtual bool                GetTextInputState( idRectangle &area, float &cursorOffset ) const override;
 
 	virtual void				StateChanged( int time, bool redraw );
 	virtual const char *		Activate( bool activate, int time );
@@ -82,7 +85,8 @@ public:
 	const char *				GetSourceFile( void ) const { return source; }
 	ID_TIME_T						GetTimeStamp( void ) const { return timeStamp; }
 
-	virtual idWindow *			GetDesktop() const { return desktop; }
+	// Legacy implementation/editor access only; not part of the game interface.
+	idWindow *					GetDesktop() const { return desktop; }
 	void						SetBindHandler( idWindow *win ) { bindHandler = win; }
 	bool						Active() const { return active; }
 	bool						ControllerNavigation() const { return controllerNavigation; }

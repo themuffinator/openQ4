@@ -90,9 +90,17 @@ public:
 //	virtual idVec3				GetStateVector( const char *varName, const char* defaultString = "0 0 0" ) const = 0;
 //	virtual idVec4				GetStateVec4( const char *varName, const char* defaultString = "0 0 0 0" ) const = 0;
 
-// jscott: added
-	virtual class idWindow *	GetDesktop( void ) const = 0;
-// RAVEN END
+	// Presentation values are distinct from the application State() dictionary.
+	// Names are document-owned aliases (legacy: root variable or element::variable).
+	// Queries copy the value without changing expression ownership. Failure leaves
+	// the output untouched. Missing names never create variables or elements.
+	virtual bool                GetPresentationValue( const char *name, idStr &value ) const = 0;
+	// Explicit overrides stop the expression driving this value. A transient write
+	// keeps its existing expression; StateChanged/Redraw remain the caller's choice.
+	virtual bool                SetPresentationValue( const char *name, const char *value, bool overrideExpression = true ) = 0;
+	// Focused editable field/caret in the GUI's cursor coordinate space. False means
+	// there is no editable focus; outputs remain unchanged. No window pointer escapes.
+	virtual bool                GetTextInputState( class idRectangle &area, float &cursorOffset ) const = 0;
 
 								// The state has changed and the gui needs to update from the state idDict.
 	virtual void				StateChanged( int time, bool redraw = false ) = 0;

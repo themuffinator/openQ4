@@ -38,10 +38,10 @@ along with Doom 3 Source Code.  If not, see <http://www.gnu.org/licenses/>.
 #include "../../framework/licensee.h"
 #include "../../framework/Session.h"
 #include "../../ui/RetainedUI.h"
+#include "../../ui/Rectangle.h"
 #include "../../renderer/tr_local.h"
 #include "../../renderer/RenderModuleAPI.h"
 #include "../../renderer/RendererModule.h"
-#include "../../ui/EditWindow.h"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
@@ -1115,12 +1115,7 @@ static bool SDL3_BuildGuiMouseTransform(sdl3GuiMouseTransform_t &transform) {
 
 static bool SDL3_GetActiveGuiTextInputState(idRectangle &area, float &cursorOffset) {
 	idUserInterface *activeGui = SDL3_GetActiveMenuGui();
-	if (activeGui == NULL || activeGui->GetDesktop() == NULL) {
-		return false;
-	}
-
-	idEditWindow *editWindow = dynamic_cast<idEditWindow *>(activeGui->GetDesktop()->GetFocusedChild());
-	return editWindow != NULL && editWindow->GetTextInputState(area, cursorOffset);
+	return activeGui != NULL && activeGui->GetTextInputState(area, cursorOffset);
 }
 
 static void SDL3_UpdateTextInputArea(void) {

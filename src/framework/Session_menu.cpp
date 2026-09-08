@@ -30,9 +30,9 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #include "Session_local.h"
+#include "../ui/Rectangle.h"
 #include "ArenaCampaign.h"
 #include "../ui/ListGUILocal.h"
-#include "../ui/Window.h"
 #include "../ui/RetainedUI.h"
 #include "../sound/snd_local.h"
 
@@ -2425,15 +2425,10 @@ static int MainMenuGetNewGameOption( idUserInterface *gui, const char *desktopSt
 		return defaultValue;
 	}
 
-	idWindow *desktop = gui->GetDesktop();
-	if ( desktop != NULL ) {
-		idWinVar *winVar = desktopStateName != NULL ? desktop->GetWinVarByName( desktopStateName, true ) : NULL;
-		if ( winVar == NULL && stateName != NULL ) {
-			winVar = desktop->GetWinVarByName( stateName, false );
-		}
-		if ( winVar != NULL ) {
-			return atoi( winVar->c_str() );
-		}
+	idStr presentation;
+	if ( ( desktopStateName != NULL && gui->GetPresentationValue( desktopStateName, presentation ) ) ||
+		 ( stateName != NULL && gui->GetPresentationValue( stateName, presentation ) ) ) {
+		return atoi( presentation.c_str() );
 	}
 
 	int value = defaultValue;
@@ -3373,21 +3368,13 @@ Executes any commands returned by the gui
 ==============
 */
 static bool MainMenuWindowStateIsNonZero( idUserInterface *gui, const char *stateName ) {
-	if ( gui == NULL || gui->GetDesktop() == NULL ) {
-		return false;
-	}
-
-	idWinVar *state = gui->GetDesktop()->GetWinVarByName( stateName, true );
-	return state != NULL && atoi( state->c_str() ) != 0;
+	idStr value;
+	return gui != NULL && gui->GetPresentationValue( stateName, value ) && atoi( value.c_str() ) != 0;
 }
 
 static bool MainMenuWindowStateEqualsInt( idUserInterface *gui, const char *stateName, int expectedValue ) {
-	if ( gui == NULL || gui->GetDesktop() == NULL ) {
-		return false;
-	}
-
-	idWinVar *state = gui->GetDesktop()->GetWinVarByName( stateName, true );
-	return state != NULL && atoi( state->c_str() ) == expectedValue;
+	idStr value;
+	return gui != NULL && gui->GetPresentationValue( stateName, value ) && atoi( value.c_str() ) == expectedValue;
 }
 
 static bool MainMenuSettingsPopupIsVisible( idUserInterface *gui ) {
@@ -3496,18 +3483,7 @@ static const mainMenuSettingsScrollPage_t *FindMainMenuSettingsScrollPage( const
 }
 
 static bool MainMenuSetWindowVar( idUserInterface *gui, const char *stateName, const char *value ) {
-	if ( gui == NULL || gui->GetDesktop() == NULL || stateName == NULL || value == NULL ) {
-		return false;
-	}
-
-	idWinVar *state = gui->GetDesktop()->GetWinVarByName( stateName, true );
-	if ( state == NULL ) {
-		return false;
-	}
-
-	state->Set( value );
-	state->SetEval( false );
-	return true;
+	return gui != NULL && gui->SetPresentationValue( stateName, value );
 }
 
 static int MainMenuSettingsSectionChoiceForScroll( const mainMenuSettingsScrollPage_t &page, int scrollValue ) {
@@ -3553,7 +3529,7 @@ static int MainMenuSettingsSectionChoiceForScroll( const mainMenuSettingsScrollP
 }
 
 static bool ApplyMainMenuSettingsScrollPage( idUserInterface *gui, const mainMenuSettingsScrollPage_t &page, int requestedValue, bool requireVisiblePage ) {
-	if ( gui == NULL || gui->GetDesktop() == NULL ) {
+	if ( gui == NULL ) {
 		return false;
 	}
 
@@ -3617,7 +3593,7 @@ static bool ApplyMainMenuSettingsScrollPage( idUserInterface *gui, const char *p
 }
 
 static bool AdjustMainMenuPageScroll( idUserInterface *gui, const mainMenuSettingsScrollPage_t &page, int delta, bool toStart, bool toEnd ) {
-	if ( gui == NULL || gui->GetDesktop() == NULL ) {
+	if ( gui == NULL ) {
 		return false;
 	}
 
