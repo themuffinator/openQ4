@@ -26,6 +26,24 @@ def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def interaction_script(path: Path) -> str:
+    """Allow semantic runtime operations and bounded waits; no device commands."""
+    source = path.read_text(encoding='utf-8')
+    if len(source) > 32768:
+        raise ValueError('retained interaction script exceeds 32 KiB')
+    # The engine lexer splits punctuation in unquoted IDs (notably '-').
+    identifier = r'"[A-Za-z0-9_.-]{1,128}"'
+    patterns = [rf'ui_retained(?:Focus|State) {identifier}', rf'ui_retainedEnabled {identifier} [01]',
+                rf'ui_retainedModal push {identifier}', r'ui_retainedModal pop', r'ui_retainedEvents',
+                r'ui_retainedMenu (?:next|previous|up|down|left|right|accept|back) [01]', r'wait [1-9][0-9]{0,2}']
+    lines = [line.strip() for line in source.splitlines() if line.strip() and not line.strip().startswith('//')]
+    if len(lines) > 256 or any(not any(re.fullmatch(pattern, line) for pattern in patterns) for line in lines):
+        raise ValueError('retained script must contain only semantic control commands and bounded waits')
+    if sum(int(line.split()[1]) for line in lines if line.startswith('wait ')) > 3600:
+        raise ValueError('retained script waits exceed 3600 frames')
+    return '\n'.join(lines)+'\n'
+
+
 def capture(args: argparse.Namespace) -> int:
     output = args.output.resolve()
     if output.exists():
@@ -49,9 +67,10 @@ def capture(args: argparse.Namespace) -> int:
         play = f'ui_retainedPlay "{args.timeline}"\n' if args.timeline else ''
         profile_command = f'ui_retainedProfile {args.profile_frames}\n' if args.profile_frames else ''
         settle = max(30, args.profile_frames + 2)
-        preview = f'ui_retainedPreview "{staged_name}"\n' + profile_command + play + f'wait {settle}\n'
+        script = 'wait 2\n'+interaction_script(args.retained_script) if args.retained_script else ''
+        preview = f'ui_retainedPreview "{staged_name}"\n' + profile_command + play + script + f'wait {settle}\n'
         if args.video_restart:
-            preview += 'vid_restart windowed\nwait 2\n' + profile_command + play + f'wait {settle}\n'
+            preview += 'vid_restart windowed\nwait 2\n' + profile_command + play + script + f'wait {settle}\n'
     cfg_path.write_text(preview + 'gfxInfo\nscreenshot "screenshots/ui-baseline.tga"\necho UI_BASELINE_CAPTURE_COMPLETE\nquit\n', encoding='utf-8')
     overrides = {
         'fs_basepath': str(args.assets.resolve()), 'fs_savepath': str(savepath), 'fs_devpath': str(savepath),
@@ -103,6 +122,8 @@ def capture(args: argparse.Namespace) -> int:
                                         'profile_frames': args.profile_frames,
                                         'timeline': args.timeline, 'reduced_motion': args.reduced_motion,
                                         'replacement_acceptance': False}
+        if args.retained_script:
+            metadata['retained_preview']['interaction_script'] = {'source': str(args.retained_script), 'sha256': digest(args.retained_script)}
 
     def save_report():
         report_path.write_text(json.dumps(metadata, indent=2) + '\n', encoding='utf-8')
@@ -145,9 +166,12 @@ def capture(args: argparse.Namespace) -> int:
     valid = valid and metadata['active_renderer'] == args.renderer
     if args.retained_document:
         retained_diagnostics = [line for line in diagnostics if 'retained UI:' in line or '_retained' in line]
+        retained_diagnostics += [line for line in plain_log.splitlines() if line.startswith('usage: ui_retained')]
         metadata['retained_preview']['diagnostics'] = retained_diagnostics
         profiles = [json.loads(line.split('Retained UI profile: ', 1)[1]) for line in plain_log.splitlines() if 'Retained UI profile: ' in line]
         metadata['retained_preview']['profiles'] = profiles
+        metadata['retained_preview']['interaction_trace'] = [line for line in plain_log.splitlines()
+            if line.startswith(('Retained UI control:', 'Retained UI action:', 'Retained UI actions:'))]
         if args.profile_frames and (len(profiles) != (2 if args.video_restart else 1)
                                    or any(p.get('frames') != args.profile_frames for p in profiles)):
             retained_diagnostics.append('retained CPU profile did not complete for the requested frame count')
@@ -184,6 +208,7 @@ def main() -> int:
     parser.add_argument('--shared-gui', action='store_true', help='exercise the shared GUI renderer domain')
     parser.add_argument('--timeout', type=int, default=180)
     parser.add_argument('--retained-document', type=Path, help='Optional Q4UI or RML integration fixture, copied into the isolated savepath.')
+    parser.add_argument('--retained-script', type=Path, help='Optional semantic control script; does not send device input.')
     parser.add_argument('--timeline', help='Canonical timeline to play before capture, and again after an optional video restart.')
     parser.add_argument('--reduced-motion', action='store_true')
     parser.add_argument('--density', type=float, default=0, help='Test density override; zero uses SDL display scale.')
@@ -199,6 +224,8 @@ def main() -> int:
         parser.error('UI scale must be between 0.75 and 2')
     if args.video_restart and not args.retained_document:
         parser.error('--video-restart requires --retained-document')
+    if args.retained_script and (not args.retained_document or args.retained_document.suffix.lower() != '.q4ui'):
+        parser.error('--retained-script requires a .q4ui document')
     if not 0 <= args.profile_frames <= 3600 or (args.profile_frames and not args.retained_document):
         parser.error('--profile-frames requires a retained document and a count from 1 to 3600')
     if args.retained_document and args.retained_document.suffix.lower() not in ('.rml', '.q4ui'):

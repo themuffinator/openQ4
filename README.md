@@ -58,9 +58,10 @@ Development on the `idtech5-ui` branch is building a complete scalable vector
 interface and visual editor. This work is not yet available as a finished
 feature; see the [visual specification](docs/dev/ui-visual-design.md) and
 [implementation progress](docs/dev/plans/idtech5-ui.md). The current runtime
-includes [isolated group fades](docs/dev/ui/composition.md) and
-[editable vector masks](docs/dev/ui/masks.md); complete GUI
-migration and the visual editor remain in development.
+includes [isolated group fades](docs/dev/ui/composition.md),
+[editable vector masks](docs/dev/ui/masks.md) and
+[button navigation and state feedback](docs/dev/ui/interaction.md). Platform
+input routing, complete GUI migration and the visual editor remain in development.
 
 The [0.13.1 patch notes](docs/dev/releases/v0.13.1.md) cover the release save fix, download verification, and map-compilation corrections. Replace the complete package when upgrading.
 

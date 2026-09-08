@@ -432,7 +432,7 @@ if build_engine or get_option('build_native_tests')
   libtess2_project = subproject('libtess2')
   openq4_retained_library = static_library(
     'openq4-retained-ui',
-    files('src/ui/retained/Runtime.cpp', 'src/ui/retained/Document.cpp', 'src/ui/retained/Motion.cpp', 'src/ui/retained/Vector.cpp', 'src/ui/retained/VectorElement.cpp'),
+    files('src/ui/retained/Runtime.cpp', 'src/ui/retained/Document.cpp', 'src/ui/retained/Motion.cpp', 'src/ui/retained/Interaction.cpp', 'src/ui/retained/Vector.cpp', 'src/ui/retained/VectorElement.cpp'),
     dependencies: [rmlui_project.get_variable('rmlui_dep'), jsoncpp_project.get_variable('jsoncpp_dep'), libtess2_project.get_variable('libtess2_dep')],
     pic: true,
     install: false,
@@ -446,7 +446,8 @@ if build_engine or get_option('build_native_tests')
       dependencies: openq4_retained_dep,
       install: false,
     )
-    test('openq4-retained-ui', openq4_retained_test, timeout: 30)
+    test('openq4-retained-ui', openq4_retained_test,
+      args: [meson.project_source_root() / 'tools/ui/fixtures/interaction-smoke.q4ui'], timeout: 30)
     openq4_ui_document_test = executable(
       'openq4-ui-document-test',
       files('tools/tests/native/UiDocumentTest.cpp'),

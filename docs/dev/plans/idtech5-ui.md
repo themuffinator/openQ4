@@ -266,11 +266,17 @@ successful commit/push, verify remote heads before saying the stage is published
 | --- | --- | --- | --- |
 | 2026-09-08 | 0 | Specification/integration contracts committed and pushed in both repositories; remote heads verified | Complete |
 | 2026-09-08 | 1 | Effective VFS inventory implemented; 271 GUI resources, 14,517 lexical window declarations and 8,037 event declarations; migration seed created | Full semantic classification, material/bitmap decisions and family gameplay baselines |
-| 2026-09-08 | 2 | Retained engine rendering, density and clipping integrated; initial typed canonical documents, comment-preserving value edits and absolute presentation tracks implemented | Path/component/state/binding schemas, input/game bridge, text backend and representative screen/editor qualification |
+| 2026-09-08 | 2 | Retained engine rendering, density and rectangular clipping integrated; typed canonical documents, comment-preserving value edits, absolute presentation tracks and semantic button/navigation/modal feedback implemented | Complete component/state/binding schemas, platform input/game bridge, transformed overflow clipping, text backend and representative screen/editor qualification |
 | 2026-09-08 | 3 | Editable responsive paths, winding fills, stroke unions, linear paints, analytic coverage, isolated subtree opacity and editable alpha masks integrated | Broader composition effects, complete paints/strokes/fonts, production components and all artwork, performance and broader platform/visual qualification |
 
 Inventory methodology and limitations: [inventory report](../ui/inventory-report.md).
 Canonical source and motion contract: [document checkpoint](../ui/document-format.md).
+Semantic buttons now use authored state timelines, projected hit testing,
+source-order/spatial navigation and modal focus ownership. The
+[interaction checkpoint](../ui/interaction.md) records native behavior checks,
+SP/OpenGL and MP/Vulkan engine traces and reviewed rendered states. Live SDL
+input, game dispatch, other widgets and the full Stage 2 gate remain open;
+these fixtures accept no stock GUI as a finished replacement.
 Native path source/compiler: [vector checkpoint](../ui/vector-paths.md). Curves,
 holes, strokes, gradients, responsive cuts and
 [analytic pixel coverage](../ui/coverage-antialiasing.md) are integrated.

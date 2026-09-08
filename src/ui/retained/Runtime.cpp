@@ -6,6 +6,7 @@
 #include <RmlUi/Core/FontEngineInterface.h>
 #include <RmlUi/Core/RenderManager.h>
 #include <RmlUi/Core/ElementInstancer.h>
+#include <RmlUi/Core/ElementUtilities.h>
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -385,8 +386,41 @@ struct Runtime::Impl {
 	Rml::ElementDocument* document = nullptr;
 	std::unique_ptr<Document> canonical;
 	Motion motion;
+	Interaction interaction;
+	Viewport viewport;
+	std::vector<std::string> controls;
+	float pointerX = 0, pointerY = 0;
+	float windowPointerX = 0, windowPointerY = 0;
+	bool pointerPresent = false;
 	std::map<PropertyKey,std::string> applied;
 	bool initialized = false;
+	void Feedback(double seconds) {
+		if (std::isfinite(seconds)) system.time = std::max(system.time,seconds);
+		for (const auto& change : interaction.TakeFeedback()) motion.Play(change.timeline,system.time);
+	}
+	std::string HitControl() const {
+		if (!pointerPresent || !canonical || !document || pointerX < 0 || pointerY < 0 || pointerX >= viewport.width || pointerY >= viewport.height) return {};
+		auto* element = context->GetElementAtPoint({pointerX,pointerY},nullptr,document);
+		for (; element && element != document; element = element->GetParentNode()) {
+			const auto* node = canonical->Model().FindNode(element->GetId());
+			if (node && node->control) {
+				// Decorative/translated child ink never enlarges the button's
+				// stable hit box, including during pressed-state movement.
+				Rml::Vector2f local(pointerX,pointerY);
+				return element->Project(local) && element->IsPointWithinElement(local) ? node->id : std::string{};
+			}
+		}
+		return {};
+	}
+	void UpdateInteraction() {
+		std::map<std::string,ControlBounds> bounds;
+		for (const auto& id : controls) {
+			auto* element = document->GetElementById(id); Rml::Rectanglef rect;
+			if (element && element->IsVisible(true) && Rml::ElementUtilities::GetBoundingBox(rect,element,Rml::BoxArea::Border))
+				bounds[id] = {rect.Left(),rect.Top(),rect.Width(),rect.Height(),true};
+		}
+		interaction.SetBounds(bounds); interaction.Hover(HitControl()); Feedback(system.time);
+	}
 	void ApplyMotion() {
 		if (!document || !canonical) return;
 		for (const auto& [key,value] : motion.Values()) {
@@ -431,6 +465,7 @@ void Runtime::Shutdown() {
 	impl->context = nullptr;
 	impl->document = nullptr;
 	impl->canonical.reset(); impl->applied.clear(); impl->motion.Reset({});
+	impl->interaction.Reset({}); impl->controls.clear(); impl->pointerPresent = false;
 	impl->initialized = false;
 	impl->system.time = 0;
 	activeRuntime = nullptr;
@@ -441,6 +476,7 @@ void Runtime::Shutdown() {
 }
 void Runtime::CloseDocument() {
 	impl->canonical.reset(); impl->applied.clear(); impl->motion.Reset({});
+	impl->interaction.Reset({}); impl->controls.clear(); impl->pointerPresent = false;
 	if (!impl->document) return;
 	impl->document->Close();
 	impl->document = nullptr;
@@ -461,10 +497,12 @@ bool Runtime::LoadDocument(const std::string& source, const std::string& sourceP
 	if (!candidate->Load(source,diagnostics)) return false;
 	if (!LoadMarkup(candidate->BuildMarkup(),sourcePath)) return false;
 	impl->motion.Reset(candidate->Model());
+	impl->interaction.Reset(candidate->Model());
 	impl->canonical = std::move(candidate);
 	std::vector<const Node*> nodes{&impl->canonical->Model().root};
 	while (!nodes.empty()) {
 		const auto* node = nodes.back(); nodes.pop_back();
+		if (node->control) impl->controls.push_back(node->id);
 		// Canonical subtrees preserve paint order when opacity crosses 1 and
 		// their temporary filter layer appears or disappears.
 		if (auto* element = impl->document->GetElementById(node->id)) element->SetProperty("z-index","0");
@@ -472,6 +510,7 @@ bool Runtime::LoadDocument(const std::string& source, const std::string& sourceP
 			static_cast<VectorElement*>(element)->Configure(*node,impl->host,impl->statistics);
 		for (const auto& child : node->children) nodes.push_back(&child);
 	}
+	impl->Feedback(impl->system.time);
 	impl->ApplyMotion();
 	return true;
 }
@@ -484,7 +523,12 @@ void Runtime::Frame(const Viewport& viewport, double seconds) {
 	const auto residentCount = impl->statistics.residentGeometryCount, residentBytes = impl->statistics.residentGeometryBytes;
 	impl->statistics = {};
 	impl->statistics.residentGeometryCount = residentCount; impl->statistics.residentGeometryBytes = residentBytes;
-	if (!impl->context || !impl->document || viewport.width <= 0 || viewport.height <= 0) return;
+	if (!impl->context || !impl->document) return;
+	if (viewport.width <= 0 || viewport.height <= 0) {
+		impl->interaction.SetBounds({}); impl->interaction.Cancel(); impl->Feedback(seconds); return;
+	}
+	impl->viewport = viewport;
+	if (impl->pointerPresent) viewport.WindowToDocument(impl->windowPointerX,impl->windowPointerY,impl->pointerX,impl->pointerY);
 	const auto start = std::chrono::steady_clock::now();
 	if (std::isfinite(seconds)) impl->system.time = std::max(impl->system.time, seconds);
 	impl->motion.Advance(impl->system.time);
@@ -496,6 +540,9 @@ void Runtime::Frame(const Viewport& viewport, double seconds) {
 	impl->renderer.BeginFrame(viewport.width,viewport.height);
 	impl->context->Render();
 	impl->renderer.EndFrame();
+	// RmlUi resolves transform state while rendering. Hit/navigation bounds
+	// therefore follow the just-presented frame, not stale transform matrices.
+	impl->UpdateInteraction();
 	const auto end = std::chrono::steady_clock::now();
 	impl->statistics.updateMilliseconds = std::chrono::duration<double,std::milli>(updated-start).count();
 	impl->statistics.renderMilliseconds = std::chrono::duration<double,std::milli>(end-updated).count();
@@ -523,5 +570,24 @@ bool Runtime::SetText(const std::string& id, const std::string& text) {
 }
 bool Runtime::IsLoaded() const { return impl->document != nullptr; }
 RuntimeStatistics Runtime::Statistics() const { return impl->statistics; }
+void Runtime::PointerMove(float x, float y, double seconds) {
+	impl->pointerPresent = std::isfinite(x) && std::isfinite(y);
+	impl->windowPointerX = x; impl->windowPointerY = y;
+	impl->viewport.WindowToDocument(x,y,impl->pointerX,impl->pointerY);
+	impl->interaction.Hover(impl->HitControl()); impl->Feedback(seconds);
+}
+void Runtime::PointerButton(bool down, double seconds) { impl->interaction.Pointer(down); impl->Feedback(seconds); }
+void Runtime::MenuAction(MenuInput input, bool down, double seconds) { impl->interaction.Input(input,down); impl->Feedback(seconds); }
+void Runtime::CancelInput(double seconds) { impl->pointerPresent = false; impl->interaction.Cancel(); impl->Feedback(seconds); }
+bool Runtime::FocusControl(const std::string& id, double seconds) { const bool result = impl->interaction.Focus(id); impl->Feedback(seconds); return result; }
+bool Runtime::SetControlEnabled(const std::string& id, bool enabled, double seconds) { const bool result = impl->interaction.SetEnabled(id,enabled); impl->Feedback(seconds); return result; }
+bool Runtime::PushModal(const std::string& id, double seconds) { const bool result = impl->interaction.PushModal(id); impl->Feedback(seconds); return result; }
+bool Runtime::PopModal(double seconds) { const bool result = impl->interaction.PopModal(); impl->Feedback(seconds); return result; }
+std::string Runtime::FocusedControl() const { return impl->interaction.Focused(); }
+std::optional<ControlState> Runtime::GetControlState(const std::string& id) const { return impl->interaction.State(id); }
+std::vector<ControlAction> Runtime::TakeActions() {
+	if (impl->interaction.Overflowed()) impl->host.Log(true,"Retained control action queue overflow");
+	return impl->interaction.TakeActions();
+}
 
 } // namespace openq4::ui

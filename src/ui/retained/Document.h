@@ -22,6 +22,13 @@ struct Value {
 	Value Interpolate(const Value& other, double fraction) const;
 	std::string Css() const;
 };
+enum class ControlState { Default, Hover, Focus, Pressed, Disabled };
+struct Control {
+	std::string action, label;
+	bool enabled = true;
+	std::map<ControlState,std::string> states;
+	std::map<std::string,std::string> navigation;
+};
 struct Node {
 	std::string id, type;
 	std::map<std::string, Value> properties;
@@ -30,6 +37,7 @@ struct Node {
 	// Alpha mask of this completed subtree, in the node's border-box space.
 	// An explicitly empty mask hides the subtree; absence leaves it unmasked.
 	std::optional<std::vector<VectorPath>> mask;
+	std::optional<Control> control;
 };
 struct Easing {
 	double x1 = 0, y1 = 0, x2 = 1, y2 = 1;

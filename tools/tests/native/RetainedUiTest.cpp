@@ -4,6 +4,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <limits>
+#include <fstream>
+#include <iterator>
 
 using namespace openq4::ui;
 static void Check(bool condition, const char* message) {
@@ -89,7 +91,7 @@ struct TestHost final : Host {
 	}
 };
 
-int main() {
+int main(int argc, char** argv) {
 	Viewport viewport;
 	viewport.displayScale = 1.5f;
 	viewport.userScale = 1.25f;
@@ -366,6 +368,94 @@ int main() {
 		pixel(2,0,1,0); pixel(3,0,1,0);
 	}
 	host.samplePoints.clear();
+	std::ifstream interactionFile(argc > 1 ? argv[1] : "tools/ui/fixtures/interaction-smoke.q4ui",std::ios::binary);
+	Check(interactionFile.good(),"open canonical interaction qualification fixture");
+	const std::string interactionSource((std::istreambuf_iterator<char>(interactionFile)),std::istreambuf_iterator<char>());
+	Check(runtime.LoadDocument(interactionSource,"interaction.q4ui",diagnostics),"load semantic buttons and visual-state timelines");
+	viewport = {}; runtime.Frame(viewport,20);
+	auto menu = [&](MenuInput action, bool down = true) { runtime.MenuAction(action,down,20); };
+	menu(MenuInput::Next); Check(runtime.FocusedControl() == "reference-controls","source-order navigation chooses the first eligible button");
+	runtime.FocusControl("",20); menu(MenuInput::Previous); Check(runtime.FocusedControl() == "modal-system","reverse tab without focus starts at the last eligible control");
+	menu(MenuInput::Next); Check(runtime.FocusedControl() == "reference-controls","forward tab wraps through document order");
+	menu(MenuInput::Next); Check(runtime.FocusedControl() == "reference-system","tab skips the authored disabled button");
+	menu(MenuInput::Up); Check(runtime.FocusedControl() == "reference-controls","spatial navigation stays in the nearest column");
+	menu(MenuInput::Accept); menu(MenuInput::Accept);
+	Check(runtime.GetControlState("reference-controls") == ControlState::Pressed && runtime.TakeActions().empty(),"accept-down owns pressed feedback without activation or repeats");
+	menu(MenuInput::Accept,false); menu(MenuInput::Accept,false);
+	auto actions = runtime.TakeActions();
+	Check(actions.size() == 1 && actions[0].node == "reference-controls" && actions[0].action == "menu.controls" && actions[0].document == "interaction-qualification","one named activation after a matching release");
+	host.drawn.clear();
+	runtime.Frame(viewport,20.5);
+	bool focusRail = false;
+	for (const auto& vertex : host.drawn) if (vertex.r > .99f && vertex.g > .57f && vertex.g < .59f && vertex.b < .01f && vertex.a > .99f) focusRail = true;
+	Check(focusRail,"focus timeline produces an opaque orange vector rail in the actual renderer");
+	menu(MenuInput::Accept); menu(MenuInput::Down); menu(MenuInput::Accept,false);
+	Check(runtime.TakeActions().empty(),"navigation cancels an armed activation instead of releasing onto the next button");
+	Check(runtime.PushModal("modal-panel",21),"activate contained modal input scope");
+	Check(runtime.FocusedControl() == "modal-controls","modal chooses its first eligible control");
+	Check(!runtime.FocusControl("reference-controls",21),"modal rejects focus outside its subtree");
+	menu(MenuInput::Previous); Check(runtime.FocusedControl() == "modal-system","modal tab wraps within its own controls");
+	menu(MenuInput::Accept);
+	Check(runtime.PopModal(21),"close modal scope");
+	Check(runtime.FocusedControl() == "reference-system","modal close restores the previous eligible focus");
+	menu(MenuInput::Accept,false); Check(runtime.TakeActions().empty(),"modal teardown prevents release click-through");
+	menu(MenuInput::Back); menu(MenuInput::Back); menu(MenuInput::Back,false);
+	actions = runtime.TakeActions(); Check(actions.size() == 1 && actions[0].kind == ControlAction::Kind::Back,"back requests are semantic and repeated key-downs cannot duplicate them");
+	Check(runtime.SetControlEnabled("reference-system",false,21),"disable control through instance state");
+	Check(runtime.FocusedControl().empty() && runtime.GetControlState("reference-system") == ControlState::Disabled,"disabled controls drop focus immediately");
+	viewport.displayScale = 1.25f; viewport.pixelDensityX = viewport.pixelDensityY = 2; viewport.originX = 30; viewport.originY = 20;
+	runtime.Frame(viewport,22);
+	Bounds controlBounds; runtime.GetBounds("reference-controls",controlBounds);
+	const float hitX = controlBounds.x+controlBounds.width*.5f, hitY = controlBounds.y+controlBounds.height*.5f;
+	runtime.PointerMove((hitX+30)/2,(hitY+20)/2,22);
+	Check(runtime.GetControlState("reference-controls") == ControlState::Hover,"window input density and viewport origin map to the rendered control once");
+	runtime.PointerButton(true,22); runtime.PointerButton(true,22); runtime.PointerButton(false,22); runtime.PointerButton(false,22);
+	actions = runtime.TakeActions(); Check(actions.size() == 1 && actions[0].node == "reference-controls","pointer press/release activates the containing button through its label");
+	runtime.PointerButton(true,22); runtime.PointerMove(-100,-100,22); runtime.PointerButton(false,22);
+	Check(runtime.TakeActions().empty(),"dragging off a pressed button cancels activation");
+	runtime.MenuAction(MenuInput::Accept,true,22); runtime.MenuAction(MenuInput::Accept,false,22);
+	runtime.MenuAction(MenuInput::Accept,true,22);
+	Check(runtime.LoadDocument(interactionSource,"replacement.q4ui",diagnostics),"replace the document while accept is held");
+	runtime.Frame(viewport,23); runtime.FocusControl("reference-controls",23);
+	runtime.MenuAction(MenuInput::Accept,true,23); runtime.MenuAction(MenuInput::Accept,false,23);
+	Check(runtime.TakeActions().empty(),"held input and repeats cannot activate a replacement document");
+	runtime.MenuAction(MenuInput::Accept,true,23); runtime.CancelInput(23); runtime.MenuAction(MenuInput::Accept,false,23);
+	Check(runtime.TakeActions().empty(),"input cancellation disarms a pending release");
+	Check(!runtime.GetControlState("missing"),"unknown control queries remain explicit");
+	runtime.FocusControl("",23);
+	runtime.PointerMove((hitX+30)/2,(hitY+20)/2,23);
+	if (runtime.GetControlState("reference-controls") != ControlState::Hover) {
+		Bounds latest; runtime.GetBounds("reference-controls",latest);
+		std::fprintf(stderr,"Hover diagnostic: point %.3f %.3f, control %.3f %.3f %.3f %.3f, state %d focus %s\n",hitX,hitY,latest.x,latest.y,latest.width,latest.height,int(*runtime.GetControlState("reference-controls")),runtime.FocusedControl().c_str());
+	}
+	Check(runtime.GetControlState("reference-controls") == ControlState::Hover,"stationary pointer begins over the control");
+	viewport.originX = 10000; runtime.Frame(viewport,24);
+	Check(runtime.GetControlState("reference-controls") == ControlState::Default,"viewport change reprojects stationary window input");
+	viewport.originX = 30; runtime.Frame(viewport,24.1);
+	Check(runtime.GetControlState("reference-controls") == ControlState::Hover,"restored viewport recovers hover without moving a device");
+	Document interactionEdit;
+	Check(interactionEdit.Load(interactionSource,diagnostics),"load editable control schema");
+	Check(!interactionEdit.ReplaceValue("/root/children/0/children/1/control/action","\"quit; exec file\"",diagnostics),"actions are semantic IDs, not executable command text");
+	Check(!interactionEdit.ReplaceValue("/root/children/0/children/1/control/states/focus","\"missing\"",diagnostics),"reject missing state feedback timeline");
+	Check(!interactionEdit.ReplaceValue("/root/children/0/children/1/control/label","\"Hardcoded\"",diagnostics),"control labels remain localized");
+	Check(!interactionEdit.ReplaceValue("/root/children/0/children/1/control/states/focus","\"modal-controls.focus\"",diagnostics),"feedback cannot animate a different control's subtree");
+	Check(!interactionEdit.ReplaceValue("/timelines/1/tracks",R"json([{"node":"reference-controls-focus","property":"opacity","keys":[
+	 {"atMs":0,"value":{"type":"number","value":0}},{"atMs":60,"value":{"type":"number","value":1}}]}])json",diagnostics),"incomplete feedback cannot leave pressed properties stuck on another state");
+	Check(interactionEdit.Source() == interactionSource,"failed control edits preserve exact canonical source");
+	Check(interactionEdit.ReplaceValue("/root/children/0/properties/transform/value","[30,0,1,1,25]",diagnostics),"edit the control ancestor's transform");
+	Check(runtime.LoadDocument(interactionEdit.Source(),"rotated-controls.q4ui",diagnostics),"load rotated control hierarchy");
+	viewport = {}; runtime.Frame(viewport,25);
+	Bounds parentBounds; runtime.GetBounds("reference-panel",parentBounds); runtime.GetBounds("reference-controls",controlBounds);
+	const double radians = 25*3.141592653589793/180;
+	const double cx = parentBounds.x+parentBounds.width*.5, cy = parentBounds.y+parentBounds.height*.5;
+	const double dx = controlBounds.x+controlBounds.width*.5-cx, dy = controlBounds.y+controlBounds.height*.5-cy;
+	runtime.PointerMove(float(cx+30+dx*std::cos(radians)-dy*std::sin(radians)),float(cy+dx*std::sin(radians)+dy*std::cos(radians)),25);
+	runtime.PointerButton(true,25); runtime.PointerButton(false,25);
+	actions = runtime.TakeActions(); Check(actions.size() == 1 && actions[0].node == "reference-controls","pointer hit testing inverts the presented ancestor transform");
+	runtime.FocusControl("reference-controls",25);
+	runtime.MenuAction(MenuInput::Accept,true,25);
+	viewport.width = 0; runtime.Frame(viewport,26); runtime.MenuAction(MenuInput::Accept,false,26);
+	Check(runtime.TakeActions().empty() && runtime.FocusedControl().empty(),"invalid/minimized output disables stale hit targets and disarms input");
 	runtime.CloseDocument();
 	Check(!runtime.IsLoaded(),"close document");
 	runtime.Shutdown();

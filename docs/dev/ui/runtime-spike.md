@@ -5,9 +5,11 @@ rendering path and tests for the layout-library candidate. It does not replace a
 GUI or constitute a finished menu. The subsequent
 [document/timeline checkpoint](document-format.md) now establishes the first
 implemented canonical source subset; its limits remain explicit.
-Later [native vector](vector-paths.md), [coverage](coverage-antialiasing.md) and
-[isolated composition](composition.md) checkpoints supersede the corresponding
-initial renderer limitations below.
+Later [native vector](vector-paths.md), [coverage](coverage-antialiasing.md),
+[isolated composition](composition.md), [masks](masks.md) and
+[semantic controls](interaction.md) checkpoints supersede the corresponding
+initial limitations below. Platform input routing and the game action bridge
+remain open.
 The [complete plan](../plans/idtech5-ui.md) and [visual specification](../ui-visual-design.md)
 continue to define completion.
 

@@ -57,7 +57,7 @@ resolves every reference in the candidate model.
 | `transform` | `[x,y,sx,sy,degrees]` plus `unit` | Translation uses `dp` or `px`; scales are dimensionless |
 
 The current node types are `group`, `text` and `vector`. Each has an `id`, `type`, optional
-`properties`, `children`, `mask` and `extensions`. Text content belongs only to text
+`properties`, `children`, `mask`, `control` and `extensions`. Text content belongs only to text
 nodes; text nodes cannot own children. The root is a normal node inside a
 viewport-filling retained document.
 
@@ -97,6 +97,14 @@ hides the entire subtree. Nested masks and group opacity compose inside-out.
 See [vector masks](masks.md) for rendering, tests and limits. Mask values support
 the same transactional JSON-pointer edits and source diagnostics as artwork;
 mask points/paints are not yet timeline or game-binding targets.
+
+An optional `control` supplies button semantics independently of its vector/text
+parts. Its [interaction contract](interaction.md) defines localized labels,
+semantic action IDs, enabled state, navigation links and five required state
+timelines. Feedback stays within the button subtree, covers the same properties
+in every state and preserves the button's own hit box. The runtime uses these
+declarations for focus, paired activation and modal input scopes; other widget
+roles, game bindings and platform input routing remain open.
 
 The render adapter owns the conversion into RmlUi syntax. In particular, RmlUi
 RGBA functions use integer 0–255 alpha, whereas this document stores 0–1 alpha.

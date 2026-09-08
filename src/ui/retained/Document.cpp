@@ -183,6 +183,7 @@ public:
 				model.timelines.push_back(std::move(timeline));
 			}
 		}
+		ValidateControls(root["root"],model.root,"/root",false);
 		return std::move(model);
 	}
 private:
@@ -371,12 +372,35 @@ private:
 	}
 	Node ReadNode(const Json::Value& value, const std::string& path, unsigned depth) {
 		Require(depth <= 48 && ++nodeCount <= 65536,value,path,"Document hierarchy exceeds the node/depth limit");
-		Fields(value,path,{"id","type","properties","children","paths","mask","extensions"});
+		Fields(value,path,{"id","type","properties","children","paths","mask","control","extensions"});
 		Node result;
 		result.id = Id(value["id"],path+"/id");
 		Require(nodeIds.insert(result.id).second,value["id"],path+"/id","Duplicate node ID '"+result.id+"'");
 		Require(value["type"] == "group" || value["type"] == "text" || value["type"] == "vector",value["type"],path+"/type","Supported node types are group, text and vector; unsupported nodes cannot be silently rendered");
 		result.type = value["type"].asString();
+		if (value.isMember("control")) {
+			const auto& control = value["control"]; const auto p = path+"/control";
+			Fields(control,p,{"role","action","label","enabled","states","navigation","extensions"});
+			Require(control["role"] == "button",control["role"],p+"/role","Supported control role is button");
+			result.control.emplace(); auto& parsed = *result.control;
+			parsed.action = Id(control["action"],p+"/action");
+			Require(control["label"].isString(),control["label"],p+"/label","Button requires a #str_ accessible label");
+			parsed.label = control["label"].asString();
+			Require(parsed.label.starts_with("#str_") && Identifier(parsed.label.substr(1)),control["label"],p+"/label","Button label must reference a #str_ localization key");
+			if (control.isMember("enabled")) {
+				Require(control["enabled"].isBool(),control["enabled"],p+"/enabled","Expected a boolean");
+				parsed.enabled = control["enabled"].asBool();
+			}
+			Fields(control["states"],p+"/states",{"default","hover","focus","pressed","disabled","extensions"});
+			const std::map<std::string,ControlState> states = {{"default",ControlState::Default},{"hover",ControlState::Hover},
+				{"focus",ControlState::Focus},{"pressed",ControlState::Pressed},{"disabled",ControlState::Disabled}};
+			for (const auto& [name,state] : states) parsed.states[state] = Id(control["states"][name],p+"/states/"+name);
+			if (control.isMember("navigation")) {
+				Fields(control["navigation"],p+"/navigation",{"next","previous","up","down","left","right","extensions"});
+				for (const auto& name : control["navigation"].getMemberNames()) if (name != "extensions")
+					parsed.navigation[name] = Id(control["navigation"][name],p+"/navigation/"+name);
+			}
+		}
 		if (result.type == "vector") {
 			Require(value["paths"].isArray(),value["paths"],path+"/paths","Vector node requires a path array");
 			std::set<std::string> pathIds;
@@ -426,6 +450,39 @@ private:
 			for (Json::ArrayIndex i = 0; i < value["children"].size(); ++i) result.children.push_back(ReadNode(value["children"][i],path+"/children/"+std::to_string(i),depth+1));
 		}
 		return result;
+	}
+	void ValidateControls(const Json::Value& sourceNode, const Node& node, const std::string& path, bool ancestorControl) {
+		if (node.control) {
+			const auto& value = sourceNode["control"]; const auto p = path+"/control";
+			Require(!ancestorControl,value,p,"Button controls cannot be nested inside another button");
+			std::set<std::string> descendants;
+			std::vector<const Node*> nodes{&node};
+			while (!nodes.empty()) { const auto* child = nodes.back(); nodes.pop_back(); descendants.insert(child->id); for (const auto& next : child->children) nodes.push_back(&next); }
+			std::set<std::pair<std::string,std::string>> coverage;
+			for (const auto& name : {"default","hover","focus","pressed","disabled"}) {
+				const std::string id = value["states"][name].asString();
+				const auto timeline = std::find_if(model.timelines.begin(),model.timelines.end(),[&](const Timeline& item) { return item.id == id; });
+				const auto at = p+"/states/"+name;
+				Require(timeline != model.timelines.end(),value["states"][name],at,"Control state timeline does not exist");
+				Require(timeline->iterations == 1,value["states"][name],at,"Control state timelines must run once");
+				std::set<std::pair<std::string,std::string>> targets;
+				for (const auto& track : timeline->tracks) {
+					Require(descendants.contains(track.node),value["states"][name],at,"Control feedback can target only its own subtree");
+					const bool ownPaint = track.property == "opacity" || track.property == "color" || track.property == "background-color" ||
+						(track.property.starts_with("border-") && track.property.ends_with("color"));
+					Require(track.node != node.id || ownPaint,value["states"][name],at,"Feedback must keep the button hit box stable; animate geometry on child parts");
+					targets.insert({track.node,track.property});
+				}
+				if (coverage.empty()) coverage = targets;
+				else Require(coverage == targets,value["states"][name],at,"Every control state must cover the same properties so interrupted feedback can restore them");
+			}
+			for (const auto& [name,target] : node.control->navigation) {
+				const auto* next = model.FindNode(target);
+				Require(next && next->control,value["navigation"][name],p+"/navigation/"+name,"Navigation target must be a control in this document");
+			}
+		}
+		for (size_t i = 0; i < node.children.size(); ++i)
+			ValidateControls(sourceNode["children"][static_cast<Json::ArrayIndex>(i)],node.children[i],path+"/children/"+std::to_string(i),ancestorControl || node.control.has_value());
 	}
 	Timeline ReadTimeline(const Json::Value& value, const std::string& path) {
 		Fields(value,path,{"id","durationMs","iterations","essential","tracks","extensions"});
@@ -531,6 +588,9 @@ void MarkupNode(const Node& node, std::string& output) {
 	// opacity is an inherited primitive tint; its filter supplies the needed
 	// stacking/render boundary without changing the editable source format.
 	output += "opacity:1;";
+	// Button parts (focus rail, marker, label) use the button's local box even
+	// when the button itself participates in normal document flow.
+	if (node.control) output += "position:relative;";
 	if (node.mask) output += "mask-image:q4-mask(alpha);";
 	for (const auto& [name,value] : node.properties) if (name != "text") {
 		if (name == "opacity") { if (value.data[0] < 1) output += "filter:opacity("+value.Css()+");"; }

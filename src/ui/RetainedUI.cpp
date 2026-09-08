@@ -256,6 +256,47 @@ void Profile_f(const idCmdArgs& args) {
 	if (!runtime || !runtime->IsLoaded()) { common->Warning("retained UI: profiling requires a loaded document"); return; }
 	profile.clear(); profile.reserve(frames); profileFrames = frames;
 }
+void Focus_f(const idCmdArgs& args) {
+	if (args.Argc() != 2) { common->Printf("usage: ui_retainedFocus <control ID>\n"); return; }
+	if (!runtime || !runtime->FocusControl(args.Argv(1),PresentationTime())) common->Warning("retained UI: cannot focus %s",args.Argv(1));
+}
+void Menu_f(const idCmdArgs& args) {
+	const std::map<std::string,openq4::ui::MenuInput> inputs = {{"next",openq4::ui::MenuInput::Next},{"previous",openq4::ui::MenuInput::Previous},
+		{"up",openq4::ui::MenuInput::Up},{"down",openq4::ui::MenuInput::Down},{"left",openq4::ui::MenuInput::Left},{"right",openq4::ui::MenuInput::Right},
+		{"accept",openq4::ui::MenuInput::Accept},{"back",openq4::ui::MenuInput::Back}};
+	const auto found = args.Argc() == 3 ? inputs.find(args.Argv(1)) : inputs.end();
+	if (found == inputs.end() || (idStr::Cmp(args.Argv(2),"0") && idStr::Cmp(args.Argv(2),"1"))) {
+		common->Printf("usage: ui_retainedMenu <next|previous|up|down|left|right|accept|back> <0|1>\n"); return;
+	}
+	if (runtime) runtime->MenuAction(found->second,args.Argv(2)[0] == '1',PresentationTime());
+}
+void Enabled_f(const idCmdArgs& args) {
+	if (args.Argc() != 3 || (idStr::Cmp(args.Argv(2),"0") && idStr::Cmp(args.Argv(2),"1"))) {
+		common->Printf("usage: ui_retainedEnabled <control ID> <0|1>\n"); return;
+	}
+	if (!runtime || !runtime->SetControlEnabled(args.Argv(1),args.Argv(2)[0] == '1',PresentationTime())) common->Warning("retained UI: unknown control %s",args.Argv(1));
+}
+void Modal_f(const idCmdArgs& args) {
+	bool result = false;
+	if (runtime && args.Argc() == 3 && idStr::Cmp(args.Argv(1),"push") == 0) result = runtime->PushModal(args.Argv(2),PresentationTime());
+	else if (runtime && args.Argc() == 2 && idStr::Cmp(args.Argv(1),"pop") == 0) result = runtime->PopModal(PresentationTime());
+	if (!result) common->Warning("retained UI: expected a valid ui_retainedModal push <scope ID> or pop");
+}
+void State_f(const idCmdArgs& args) {
+	if (!runtime || args.Argc() != 2) { common->Printf("usage: ui_retainedState <control ID>\n"); return; }
+	const auto state = runtime->GetControlState(args.Argv(1));
+	if (!state) { common->Warning("retained UI: unknown control %s",args.Argv(1)); return; }
+	const char* names[] = {"default","hover","focus","pressed","disabled"};
+	openq4::ui::Bounds bounds; runtime->GetBounds(args.Argv(1),bounds);
+	common->Printf("Retained UI control: %s state=%s focus=%s bounds=%.3f,%.3f,%.3f,%.3f\n",args.Argv(1),names[static_cast<unsigned>(*state)],runtime->FocusedControl().c_str(),bounds.x,bounds.y,bounds.width,bounds.height);
+}
+void Events_f(const idCmdArgs&) {
+	if (!runtime) return;
+	const auto events = runtime->TakeActions();
+	common->Printf("Retained UI actions: %u\n",static_cast<unsigned>(events.size()));
+	for (const auto& event : events) common->Printf("Retained UI action: %s document=%s node=%s action=%s\n",
+		event.kind == openq4::ui::ControlAction::Kind::Activate ? "activate" : "back",event.document.c_str(),event.node.c_str(),event.action.c_str());
+}
 }
 
 void RetainedUI_Init() {
@@ -263,6 +304,12 @@ void RetainedUI_Init() {
 	cmdSystem->AddCommand("ui_retainedClose",Close_f,CMD_FL_SYSTEM,"close the retained UI integration preview");
 	cmdSystem->AddCommand("ui_retainedPlay",Play_f,CMD_FL_SYSTEM,"play a canonical retained UI timeline");
 	cmdSystem->AddCommand("ui_retainedProfile",Profile_f,CMD_FL_SYSTEM,"measure retained UI CPU submission over bounded rendered frames");
+	cmdSystem->AddCommand("ui_retainedFocus",Focus_f,CMD_FL_SYSTEM,"focus a semantic retained control without reading or moving a device");
+	cmdSystem->AddCommand("ui_retainedMenu",Menu_f,CMD_FL_SYSTEM,"submit a semantic menu action to the retained preview");
+	cmdSystem->AddCommand("ui_retainedEnabled",Enabled_f,CMD_FL_SYSTEM,"set a retained control's instance enabled state");
+	cmdSystem->AddCommand("ui_retainedModal",Modal_f,CMD_FL_SYSTEM,"push or pop a retained modal input scope");
+	cmdSystem->AddCommand("ui_retainedState",State_f,CMD_FL_SYSTEM,"inspect retained control feedback and focus");
+	cmdSystem->AddCommand("ui_retainedEvents",Events_f,CMD_FL_SYSTEM,"read and drain semantic retained action requests");
 }
 void RetainedUI_Shutdown() {
 	Close();
@@ -270,6 +317,12 @@ void RetainedUI_Shutdown() {
 	cmdSystem->RemoveCommand("ui_retainedClose");
 	cmdSystem->RemoveCommand("ui_retainedPlay");
 	cmdSystem->RemoveCommand("ui_retainedProfile");
+	cmdSystem->RemoveCommand("ui_retainedFocus");
+	cmdSystem->RemoveCommand("ui_retainedMenu");
+	cmdSystem->RemoveCommand("ui_retainedEnabled");
+	cmdSystem->RemoveCommand("ui_retainedModal");
+	cmdSystem->RemoveCommand("ui_retainedState");
+	cmdSystem->RemoveCommand("ui_retainedEvents");
 }
 void RetainedUI_Draw() {
 	if (!runtime || !runtime->IsLoaded() || !renderSystem || !renderSystem->IsOpenGLRunning()) return;

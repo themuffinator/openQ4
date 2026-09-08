@@ -2,6 +2,14 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- Button development: the retained runtime now owns focus, disabled navigation,
+  paired activation and modal input scopes. Editable timelines supply hover,
+  focus, pressed and disabled feedback. Native tests and reviewed SP/OpenGL
+  125% and MP/Vulkan 200% gameplay captures pass, including an OpenGL video
+  restart. The [interaction checkpoint](ui/interaction.md) records the evidence;
+  live platform input, game action dispatch, full GUI translation and the visual
+  editor remain open. The existing 93 MP content warnings are unchanged.
+
 - Mask development: editable paths now clip complete panels and their contents,
   with smooth chamfers, curved holes and soft gradient reveals. Nested masks
   and fades share the runtime's vector renderer. The [mask checkpoint](ui/masks.md)

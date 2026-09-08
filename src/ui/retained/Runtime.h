@@ -7,6 +7,7 @@
 #include <vector>
 #include "Document.h"
 #include "Motion.h"
+#include "Interaction.h"
 
 namespace openq4::ui {
 
@@ -88,6 +89,19 @@ public:
 	void SetReducedMotion(bool enabled, double monotonicSeconds);
 	void CloseDocument();
 	void Frame(const Viewport& viewport, double monotonicSeconds);
+	// Device adapters provide events; these calls never query/control a device.
+	// Pointer coordinates are window units, converted once using the last frame.
+	void PointerMove(float windowX, float windowY, double monotonicSeconds);
+	void PointerButton(bool down, double monotonicSeconds);
+	void MenuAction(MenuInput input, bool down, double monotonicSeconds);
+	void CancelInput(double monotonicSeconds);
+	bool FocusControl(const std::string& id, double monotonicSeconds);
+	bool SetControlEnabled(const std::string& id, bool enabled, double monotonicSeconds);
+	bool PushModal(const std::string& root, double monotonicSeconds);
+	bool PopModal(double monotonicSeconds);
+	std::string FocusedControl() const;
+	std::optional<ControlState> GetControlState(const std::string& id) const;
+	std::vector<ControlAction> TakeActions();
 	bool GetBounds(const std::string& id, Bounds& bounds) const;
 	bool SetProperty(const std::string& id, const std::string& property, const std::string& value);
 	bool SetText(const std::string& id, const std::string& text);
