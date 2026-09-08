@@ -274,9 +274,17 @@ Canonical source and motion contract: [document checkpoint](../ui/document-forma
 Native path source/compiler: [vector checkpoint](../ui/vector-paths.md). Curves,
 holes, strokes, gradients, responsive cuts and
 [analytic pixel coverage](../ui/coverage-antialiasing.md) are integrated.
-Compositing, broader quality/performance qualification, full art reconstruction
+Broader composition effects/masks, quality/performance qualification, full art reconstruction
 and the complete Stage 3 gate remain open.
 Runtime CPU counters, repeatable native/gameplay profiles, opacity/integer-motion
 cache reuse and stable tessellation are recorded in the
 [performance checkpoint](../ui/runtime-performance.md). Optimized-build, GPU and
 full-corpus costs are still unqualified.
+Isolated source-over opacity layers are now integrated with GL/Vulkan targets,
+transparent clears, image alpha coverage and stable subtree ordering. The
+[composition checkpoint](../ui/composition.md) tracks native overlap checks,
+matching-panel pixel comparisons and paired renderer/game API requirements.
+Mask geometry, other effects and the complete Stage 3 gate remain open.
+GL/Vulkan composition pixels pass in the current fallback draw paths; requesting
+the shared GUI owner still reports zero owned views in these captures. Shared
+ownership and total GPU image-pool trimming remain explicit follow-up work.

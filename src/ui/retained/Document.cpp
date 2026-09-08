@@ -514,7 +514,14 @@ const Json::Value* Resolve(const Json::Value& root, const std::string& pointer) 
 void MarkupNode(const Node& node, std::string& output) {
 	const std::string tag = node.type == "vector" ? "q4-vector" : "div";
 	output += "<"+tag+" id=\""+node.id+"\" style=\"";
-	for (const auto& [name,value] : node.properties) if (name != "text") output += name+":"+value.Css()+";";
+	// Canonical opacity isolates the complete node subtree. RmlUi's ordinary
+	// opacity is an inherited primitive tint; its filter supplies the needed
+	// stacking/render boundary without changing the editable source format.
+	output += "opacity:1;";
+	for (const auto& [name,value] : node.properties) if (name != "text") {
+		if (name == "opacity") { if (value.data[0] < 1) output += "filter:opacity("+value.Css()+");"; }
+		else output += name+":"+value.Css()+";";
+	}
 	output += "\">";
 	for (const auto& child : node.children) MarkupNode(child,output);
 	output += "</"+tag+">";

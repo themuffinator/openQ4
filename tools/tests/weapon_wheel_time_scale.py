@@ -88,7 +88,7 @@ def main() -> None:
     require(run_frame, "cvarSystem->GetCVarFloat( \"timescale\" ) * common->GetGameTimeScale()", "SP simulation scale")
 
     game_api = read(GAME_ROOT / "src/game/Game.h")
-    require(game_api, "const int GAME_API_VERSION\t\t= 46;", "updated engine/GameLib ABI")
+    require(game_api, "const int GAME_API_VERSION\t\t= 47;", "updated engine/GameLib ABI")
 
     print("single-player time-scale and walking CVar checks passed")
 

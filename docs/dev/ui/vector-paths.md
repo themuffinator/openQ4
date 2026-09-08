@@ -4,7 +4,8 @@
 rendered as native geometry through the engine. The runtime and future editor
 share the path model/compiler. This does **not** complete the production vector
 renderer or artwork migration. [Coverage antialiasing](coverage-antialiasing.md)
-has subsequently been added. Masks, layers, additional
+has subsequently been added, followed by [isolated opacity layers](composition.md).
+Masks, broader layer effects, additional
 paint/stroke features and full visual qualification remain Stage 3 requirements
 in the [plan](../plans/idtech5-ui.md).
 
@@ -93,11 +94,10 @@ transparent endpoints cannot tint visible interpolation. Float colors survive
 paint subdivision and engine clipping. RmlUi's geometry boundary currently
 quantizes to 8-bit channels; higher precision/dithering remains quality work.
 
-Canonical opacity now multiplies through the node hierarchy before assignment
-to retained primitives. RmlUi's default inherited value would let an explicit
-child opacity override the parent. The canonical resolver retains both factors
-and applies paint alpha once. This is **per-primitive opacity**; isolated group
-composition for overlapping children still requires the planned layer renderer.
+Canonical opacity now uses [isolated group composition](composition.md).
+Each node's paths and descendants paint into a transparent target before its
+opacity applies once. Nested groups compose inside-out. Primitive paint alpha
+remains independent, so fades reuse both path coverage and vertex colors.
 
 ## Compilation and rendering
 
@@ -189,7 +189,7 @@ The original geometry checkpoint below preceded coverage antialiasing. Adaptive
 geometry alone did not establish smooth pixel coverage at fractional density,
 thin diagonals or small curves. Those hard edges prompted the subsequent
 [analytic coverage implementation](coverage-antialiasing.md).
-Masks, isolated composition, full paint/stroke operations, font quality,
+Masks, broader composition effects, full paint/stroke operations, font quality,
 performance, editor interactions and all 271 GUI migrations also remain open.
 The goal and its complete visual acceptance requirements are unchanged.
 

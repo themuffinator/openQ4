@@ -3,6 +3,7 @@
 
 #ifndef ID_DEDICATED
 #include "retained/Runtime.h"
+#include "../renderer/RendererModule.h"
 #include <algorithm>
 #include <chrono>
 #include <cstring>
@@ -64,7 +65,8 @@ public:
 				// Untextured vectors use premultiplied blending all the way to
 				// the target. Current engine font images store straight coverage;
 				// their uniform text tint is unpremultiplied at this boundary.
-				const float inverseAlpha = handle ? (source.a > 0 ? 1.f/source.a : 0) : 1.f;
+				const bool straightImage = handle && idStr::Icmpn(material->GetName(),"_retainedLayer/",15) != 0;
+				const float inverseAlpha = straightImage ? (source.a > 0 ? 1.f/source.a : 0) : 1.f;
 				const float components[4] = {source.r*inverseAlpha, source.g*inverseAlpha, source.b*inverseAlpha, source.a};
 				for (int channel = 0; channel < 4; ++channel) {
 					v.color[channel] = static_cast<byte>(idMath::ClampFloat(0,1,components[channel]) * 255.f + .5f);
@@ -75,6 +77,50 @@ public:
 			renderSystem->SetColor4(1,1,1,1);
 			renderSystem->DrawStretchPic(converted.Ptr(), localIndices.Ptr(), count, count, material, false);
 		}
+	}
+	bool BeginLayer(std::uint32_t id, int width, int height) override {
+		// Bound the full-size transient pool to 256 MiB of RGBA8 storage.
+		// Slots follow nesting depth and are reused in command order.
+		if (!id || id > 48 || width <= 0 || height <= 0 ||
+			static_cast<std::uint64_t>(width)*height*4*id > 256*1024*1024) return false;
+		if (!layers.empty() && (layers.front().width != width || layers.front().height != height)) ClearLayers();
+		if (layers.size() < id) layers.resize(id);
+		auto& layer = layers[id-1];
+		if (layer.target && (layer.width != width || layer.height != height)) {
+			renderSystem->DestroyRenderTexture(layer.target); layer.target = nullptr;
+		}
+		if (!layer.target) {
+			idImageOpts options;
+			options.width = width; options.height = height; options.format = FMT_RGBA8;
+			options.numLevels = 1; options.isPersistant = true;
+			idImage* image = renderSystem->CreateImage(va("_retainedLayerImage%u",id),&options,TF_NEAREST);
+			if (!image) return false;
+			layer.target = renderSystem->CreateRenderTexture(image,nullptr);
+			if (!layer.target) return false;
+			layer.width = width; layer.height = height;
+			layer.material = declManager->FindMaterial(va("_retainedLayer/%u",id));
+			if (!layer.material || layer.material->GetState() == DS_DEFAULTED) {
+				renderSystem->DestroyRenderTexture(layer.target); layer.target = nullptr; return false;
+			}
+		}
+		renderSystem->BindRenderTexture(layer.target,nullptr);
+		renderSystem->ClearRenderTarget(true,false,1,0,0,0,0);
+		return true;
+	}
+	void CompositeLayer(std::uint32_t source, std::uint32_t destination, float opacity, const openq4::ui::Bounds& clip) override {
+		renderSystem->BindRenderTexture(destination ? layers[destination-1].target : nullptr,nullptr);
+		const float x0 = clip.x, y0 = clip.y, x1 = x0+clip.width, y1 = y0+clip.height;
+		// Vulkan attachments store the top row at v=0. GL/GLES render targets
+		// have the opposite origin; resolve this once at the host boundary.
+		const bool topOrigin = R_RendererModule_GetStatus().activeApi == RENDER_MODULE_API_VULKAN;
+		auto vertex = [&](float x, float y) -> openq4::ui::Vertex {
+			return {x,y,x/viewportWidth,topOrigin ? y/viewportHeight : 1-y/viewportHeight,opacity,opacity,opacity,opacity};
+		};
+		Draw({vertex(x0,y0),vertex(x1,y0),vertex(x1,y1),vertex(x0,y1)}, {0,1,2,0,2,3},
+			reinterpret_cast<std::uintptr_t>(layers[source-1].material));
+	}
+	void EndLayer(std::uint32_t restore) override {
+		renderSystem->BindRenderTexture(restore ? layers[restore-1].target : nullptr,nullptr);
 	}
 	openq4::ui::FontMetrics GetFontMetrics(const std::string& family, int size) override {
 		const fontInfo_t* font = Font(family);
@@ -95,9 +141,18 @@ public:
 			glyph->width*scale, glyph->height*scale, glyph->s,glyph->t,glyph->s2,glyph->t2,
 			material ? material->GetName() : ""};
 	}
-	void Reset() { fonts.clear(); }
+	void Reset() {
+		fonts.clear();
+		ClearLayers();
+	}
+	void ClearLayers() {
+		for (auto& layer : layers) renderSystem->DestroyRenderTexture(layer.target);
+		layers.clear();
+	}
 	int viewportWidth = 1280, viewportHeight = 720;
 private:
+	struct Layer { idRenderTexture* target = nullptr; const idMaterial* material = nullptr; int width = 0, height = 0; };
+	std::vector<Layer> layers;
 	const fontInfo_t* Font(const std::string& family) {
 		const std::string key = family == "marine" ? "marine" : family == "lowpixel" ? "lowpixel" : "chain";
 		auto found = fonts.find(key);
@@ -132,16 +187,19 @@ void RecordProfile(double engineMilliseconds) {
 	std::vector<double> times;
 	double compileMilliseconds = 0;
 	unsigned long long paths = 0, uploads = 0, hits = 0, peakBytes = 0;
+	unsigned long long layerPushes = 0, layerComposites = 0, peakLayerDepth = 0;
 	for (const auto& sample : profile) {
 		times.push_back(sample.engineMilliseconds);
 		compileMilliseconds += sample.statistics.vectorCompileMilliseconds;
 		paths += sample.statistics.vectorPathsCompiled; uploads += sample.statistics.vectorUploads; hits += sample.statistics.vectorCacheHits;
 		peakBytes = Max(peakBytes,static_cast<unsigned long long>(sample.statistics.residentGeometryBytes+sample.statistics.visibleVectorCacheBytes));
+		layerPushes += sample.statistics.layerPushes; layerComposites += sample.statistics.layerComposites;
+		peakLayerDepth = Max(peakLayerDepth,static_cast<unsigned long long>(sample.statistics.peakLayerDepth));
 	}
 	std::sort(times.begin(),times.end());
 	auto percentile = [&](double fraction) { return times[static_cast<size_t>(std::ceil(fraction*times.size()))-1]; };
-	common->Printf("Retained UI profile: {\"frames\":%d,\"engine_cpu_p50_ms\":%.6f,\"engine_cpu_p95_ms\":%.6f,\"engine_cpu_max_ms\":%.6f,\"vector_compile_ms\":%.6f,\"paths_compiled\":%llu,\"vector_uploads\":%llu,\"cache_hits\":%llu,\"tracked_peak_bytes\":%llu}\n",
-		profileFrames,percentile(.5),percentile(.95),percentile(1),compileMilliseconds,paths,uploads,hits,peakBytes);
+	common->Printf("Retained UI profile: {\"frames\":%d,\"engine_cpu_p50_ms\":%.6f,\"engine_cpu_p95_ms\":%.6f,\"engine_cpu_max_ms\":%.6f,\"vector_compile_ms\":%.6f,\"paths_compiled\":%llu,\"vector_uploads\":%llu,\"cache_hits\":%llu,\"tracked_peak_bytes\":%llu,\"layer_pushes\":%llu,\"layer_composites\":%llu,\"peak_layer_depth\":%llu}\n",
+		profileFrames,percentile(.5),percentile(.95),percentile(1),compileMilliseconds,paths,uploads,hits,peakBytes,layerPushes,layerComposites,peakLayerDepth);
 	profileFrames = 0; profile.clear();
 }
 

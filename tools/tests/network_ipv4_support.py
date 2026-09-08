@@ -311,7 +311,7 @@ def validate_idport_platform_data_mirror() -> None:
     if game_api.is_file():
         require(
             game_api.read_text(encoding="utf-8", errors="strict"),
-            "const int GAME_API_VERSION\t\t= 46;",
+            "const int GAME_API_VERSION\t\t= 47;",
             "idPort-layout game API revision",
         )
 

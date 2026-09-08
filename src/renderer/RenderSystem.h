@@ -646,7 +646,7 @@ public:
 	virtual void			ResolveMSAA(idRenderTexture* msaaRenderTexture, idRenderTexture* destRenderTexture, bool resolveDepth = false) = 0;
 
 	// Clears the current render target
-	virtual void			ClearRenderTarget(bool clearColor, bool clearDepth, float depthValue, float red, float green, float blue) = 0;
+	virtual void			ClearRenderTarget(bool clearColor, bool clearDepth, float depthValue, float red, float green, float blue, float alpha = 1.0f) = 0;
 
 	// Sets the source dimensions used by post-process shader parameter bindings.
 	virtual void			SetPostProcessSourceSize(int width, int height) = 0;

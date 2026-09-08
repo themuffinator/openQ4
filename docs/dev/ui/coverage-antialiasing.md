@@ -3,7 +3,9 @@
 8 September 2026. Native vector elements now compute analytic pixel coverage
 from their editable paths. This advances the renderer requirements in the
 [replacement plan](../plans/idtech5-ui.md); it does not qualify the entire
-component kit, composition system, font backend or migrated GUI corpus.
+component kit, composition system, font backend or migrated GUI corpus. The
+later [composition checkpoint](composition.md) adds isolated opacity layers;
+masks and broader effects remain open.
 
 ## Coverage and paint contract
 

@@ -13,6 +13,19 @@ static bool Near(float a, float b) { return std::abs(a-b) < .1f; }
 struct TestHost final : Host {
 	int drawCalls = 0, errors = 0;
 	std::vector<Vertex> drawn;
+	struct Layer { std::vector<Vertex> vertices; std::vector<Vertex> pixels; };
+	std::vector<Layer> layers{1};
+	std::uint32_t activeLayer = 0;
+	std::vector<Bounds> samplePoints;
+	bool failLayer = false;
+	static void Over(Vertex& destination, const Vertex& source, float opacity = 1) {
+		const float remain = 1-source.a*opacity;
+		destination.r = source.r*opacity+destination.r*remain;
+		destination.g = source.g*opacity+destination.g*remain;
+		destination.b = source.b*opacity+destination.b*remain;
+		destination.a = source.a*opacity+destination.a*remain;
+	}
+	void ClearSamples() { layers[0].pixels.assign(samplePoints.size(),Vertex{0,0,0,0,0,0,0,0}); drawn.clear(); }
 	bool ReadFile(const std::string&, std::string&) override { return false; }
 	std::string Translate(const std::string& s) override { return s == "#str_test" ? "Localised" : s; }
 	void Log(bool error, const std::string& s) override { if (error) { ++errors; std::fprintf(stderr,"RmlUi: %s\n",s.c_str()); } }
@@ -22,8 +35,39 @@ struct TestHost final : Host {
 		Check(indices.size()%3==0,"triangle topology");
 		for (int index : indices) Check(index>=0 && static_cast<size_t>(index)<vertices.size(),"valid indices");
 		for (const auto& v : vertices) Check(std::isfinite(v.x)&&std::isfinite(v.y),"finite output");
-		drawn.insert(drawn.end(),vertices.begin(),vertices.end());
+		auto& output = activeLayer ? layers[activeLayer].vertices : drawn;
+		output.insert(output.end(),vertices.begin(),vertices.end());
+		// Independently evaluate triangle interiors at selected off-edge points,
+		// then source-over into the current transparent layer. This checks actual
+		// overlap colors, separately from the flattened geometry trace above.
+		for (size_t p = 0; p < samplePoints.size(); ++p) for (size_t i = 0; i < indices.size(); i += 3) {
+			const auto& a = vertices[indices[i]]; const auto& b = vertices[indices[i+1]]; const auto& c = vertices[indices[i+2]];
+			const double px = samplePoints[p].x, py = samplePoints[p].y;
+			const double determinant = (b.y-c.y)*(a.x-c.x)+(c.x-b.x)*(a.y-c.y);
+			if (std::abs(determinant) < 1e-12) continue;
+			const double u = ((b.y-c.y)*(px-c.x)+(c.x-b.x)*(py-c.y))/determinant;
+			const double v = ((c.y-a.y)*(px-c.x)+(a.x-c.x)*(py-c.y))/determinant;
+			const double w = 1-u-v;
+			if (u > 0 && v > 0 && w > 0) {
+				Vertex source{0,0,0,0,float(u*a.r+v*b.r+w*c.r),float(u*a.g+v*b.g+w*c.g),float(u*a.b+v*b.b+w*c.b),float(u*a.a+v*b.a+w*c.a)};
+				Over(layers[activeLayer].pixels[p],source);
+			}
+		}
 	}
+	bool BeginLayer(std::uint32_t id, int, int) override {
+		if (failLayer) return false;
+		if (layers.size() <= id) layers.resize(id+1);
+		layers[id] = {}; layers[id].pixels.assign(samplePoints.size(),Vertex{0,0,0,0,0,0,0,0}); activeLayer = id; return true;
+	}
+	void CompositeLayer(std::uint32_t source, std::uint32_t destination, float opacity, const Bounds& clip) override {
+		auto& output = destination ? layers[destination].vertices : drawn;
+		for (auto v : layers[source].vertices) { v.r *= opacity; v.g *= opacity; v.b *= opacity; v.a *= opacity; output.push_back(v); }
+		for (size_t i = 0; i < samplePoints.size(); ++i) {
+			const auto& p = samplePoints[i];
+			if (p.x >= clip.x && p.x < clip.x+clip.width && p.y >= clip.y && p.y < clip.y+clip.height) Over(layers[destination].pixels[i],layers[source].pixels[i],opacity);
+		}
+	}
+	void EndLayer(std::uint32_t restore) override { activeLayer = restore; }
 	FontMetrics GetFontMetrics(const std::string&, int size) override { return {size*.8f,size*.2f,size*1.2f,size*.5f}; }
 	Glyph GetGlyph(const std::string&, int size, std::uint32_t) override {
 		return {size*.6f,0,-size*.8f,size*.6f,static_cast<float>(size),0,0,1,1,"test-font"};
@@ -181,7 +225,8 @@ int main() {
 	Check(runtime.Statistics().vectorPathsCompiled == 0 && runtime.Statistics().vectorUploads == 0,"stationary frame reuses vector geometry");
 	Check(runtime.PlayTimeline("fade",11),"start opacity cache regression");
 	host.drawn.clear(); runtime.Frame(viewport,11.5);
-	Check(runtime.Statistics().vectorPathsCompiled == 0 && runtime.Statistics().vectorUploads == 1,"opacity refreshes tint without compiling coverage");
+	Check(runtime.Statistics().vectorPathsCompiled == 0 && runtime.Statistics().vectorUploads == 0,"isolated opacity reuses both coverage and vertex tint");
+	Check(runtime.Statistics().layerComposites == 2 && runtime.Statistics().peakLayerDepth == 2,"parent and child opacity use nested composition");
 	for (const auto& v : host.drawn) Check(std::abs(v.a-.15f)<.01f,"cached paint receives current animated opacity");
 	runtime.Frame(viewport,12);
 	Check(runtime.PlayTimeline("move",12),"start integer movement cache regression");
@@ -205,6 +250,38 @@ int main() {
 		const auto& a = host.drawn[i]; const auto& b = cachedDraw[i];
 		Check(std::abs(a.x-b.x)<.0001f && std::abs(a.y-b.y)<.0001f && std::abs(a.r-b.r)<.0001f && std::abs(a.a-b.a)<.0001f,"fresh compilation matches animated cached pixels and premultiplied paint");
 	}
+	const char* compositionDocument = R"json({"format":"openq4-ui","version":1,"id":"composition",
+	 "root":{"id":"root","type":"group","properties":{
+	  "width":{"type":"length","value":100,"unit":"%"},"height":{"type":"length","value":100,"unit":"%"},
+	  "background-color":{"type":"color","value":[0,1,0,1]}},"children":[
+	  {"id":"fade-group","type":"group","properties":{
+	   "position":{"type":"keyword","value":"absolute"},"left":{"type":"length","value":10,"unit":"px"},"top":{"type":"length","value":10,"unit":"px"},
+	   "width":{"type":"length","value":120,"unit":"px"},"height":{"type":"length","value":80,"unit":"px"},
+	   "opacity":{"type":"number","value":0.5},"background-color":{"type":"color","value":[1,0,0,1]}},"children":[
+	   {"id":"nested","type":"group","properties":{
+	    "position":{"type":"keyword","value":"absolute"},"left":{"type":"length","value":30,"unit":"px"},"top":{"type":"length","value":0,"unit":"px"},
+	    "width":{"type":"length","value":80,"unit":"px"},"height":{"type":"length","value":80,"unit":"px"},
+	    "opacity":{"type":"number","value":0.5},"background-color":{"type":"color","value":[0,0,1,1]}}}
+	  ]}
+	 ]},"timelines":[{"id":"fade","durationMs":1000,"tracks":[{"node":"fade-group","property":"opacity","keys":[
+	 {"atMs":0,"value":{"type":"number","value":0.5}},{"atMs":1000,"value":{"type":"number","value":0}}]}]}]})json";
+	Check(runtime.LoadDocument(compositionDocument,"composition.q4ui",diagnostics),"load nested isolated opacity fixture");
+	host.samplePoints = {{20.37f,20.63f},{50.37f,20.63f},{200.37f,20.63f}};
+	auto sampleFrame = [&](double time) { host.ClearSamples(); runtime.Frame(viewport,time); };
+	auto pixel = [&](size_t index, float r, float g, float b) {
+		const auto& v = host.layers[0].pixels[index];
+		Check(std::abs(v.r-r)<.002f && std::abs(v.g-g)<.002f && std::abs(v.b-b)<.002f && std::abs(v.a-1)<.002f,"isolated source-over matches independent overlap color");
+	};
+	sampleFrame(15); pixel(0,.5f,.5f,0); pixel(1,.25f,.5f,.25f); pixel(2,0,1,0);
+	Check(runtime.PlayTimeline("fade",15),"animate isolated parent opacity");
+	sampleFrame(15.5); pixel(0,.25f,.75f,0); pixel(1,.125f,.75f,.125f); pixel(2,0,1,0);
+	host.failLayer = true; sampleFrame(15.6);
+	Check(host.errors == 1 && host.activeLayer == 0,"allocation failure diagnosed and output target restored");
+	--host.errors; host.failLayer = false;
+	sampleFrame(15.5); // Monotonic clock keeps the already advanced .6 sample.
+	pixel(0,.2f,.8f,0); pixel(1,.1f,.8f,.1f);
+	sampleFrame(16); pixel(0,0,1,0); pixel(1,0,1,0);
+	host.samplePoints.clear();
 	runtime.CloseDocument();
 	Check(!runtime.IsLoaded(),"close document");
 	runtime.Shutdown();

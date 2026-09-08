@@ -1525,7 +1525,7 @@ static bool R_MaterialResourceTable_CompileOrderedPasses(
 			}
 		}
 
-		const int supportedStateBits = GLS_SRCBLEND_BITS | GLS_DSTBLEND_BITS
+		const int supportedStateBits = GLS_SRCBLEND_BITS | GLS_DSTBLEND_BITS | GLS_ALPHA_COVERAGE
 			| GLS_DEPTHMASK | GLS_COLORMASK | GLS_ALPHAMASK
 			| GLS_DEPTHFUNC_ALWAYS | GLS_DEPTHFUNC_EQUAL | GLS_ATEST_BITS;
 		if ( ( stage->drawStateBits & ~supportedStateBits ) != 0
@@ -1547,8 +1547,8 @@ static bool R_MaterialResourceTable_CompileOrderedPasses(
 		}
 		pass.blend.enabled = R_MaterialResourceTable_BlendBits(
 			stage->drawStateBits ) != 0;
-		pass.blend.destinationAlpha = pass.blend.destinationColor;
-		pass.blend.sourceAlpha = pass.blend.sourceColor;
+		pass.blend.destinationAlpha = (stage->drawStateBits & GLS_ALPHA_COVERAGE) ? RENDERER_BLEND_ONE_MINUS_SRC_ALPHA : pass.blend.destinationColor;
+		pass.blend.sourceAlpha = (stage->drawStateBits & GLS_ALPHA_COVERAGE) ? RENDERER_BLEND_ONE : pass.blend.sourceColor;
 		pass.blend.colorOperation = RENDERER_BLEND_OP_ADD;
 		pass.blend.alphaOperation = RENDERER_BLEND_OP_ADD;
 		pass.colorWriteMask = R_MaterialResourceTable_ColorWriteMask(

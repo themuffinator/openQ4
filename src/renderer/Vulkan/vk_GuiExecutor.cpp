@@ -774,8 +774,8 @@ static VkPipeline VK_Exec_CreatePipeline( VkShaderModule vertModule, VkShaderMod
 		blendAttachment.srcColorBlendFactor = srcFactor;
 		blendAttachment.dstColorBlendFactor = dstFactor;
 		blendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
-		blendAttachment.srcAlphaBlendFactor = srcFactor;
-		blendAttachment.dstAlphaBlendFactor = dstFactor;
+		blendAttachment.srcAlphaBlendFactor = (blendBits & GLS_ALPHA_COVERAGE) ? VK_BLEND_FACTOR_ONE : srcFactor;
+		blendAttachment.dstAlphaBlendFactor = (blendBits & GLS_ALPHA_COVERAGE) ? VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA : dstFactor;
 		blendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
 	}
 
@@ -859,7 +859,7 @@ static VkPipeline VK_Exec_CreatePipeline( VkShaderModule vertModule, VkShaderMod
 }
 
 static VkPipeline VK_GuiExecutor_GetPipeline( int stateBits, bool separateColor = false ) {
-	const int pipelineBits = stateBits & ( GLS_SRCBLEND_BITS | GLS_DSTBLEND_BITS
+	const int pipelineBits = stateBits & ( GLS_ALPHA_COVERAGE | GLS_SRCBLEND_BITS | GLS_DSTBLEND_BITS
 			| GLS_COLORMASK | GLS_ALPHAMASK );
 	const vkPipelineTarget_t target = VK_Exec_CurrentPipelineTarget();
 
@@ -942,7 +942,7 @@ object is backed by that key before exposing it to the transactional path.
 ====================
 */
 static VkPipeline VK_GuiExecutor_GetPipelineStrict( int stateBits ) {
-	const int pipelineBits = stateBits & ( GLS_SRCBLEND_BITS | GLS_DSTBLEND_BITS
+	const int pipelineBits = stateBits & ( GLS_ALPHA_COVERAGE | GLS_SRCBLEND_BITS | GLS_DSTBLEND_BITS
 			| GLS_COLORMASK | GLS_ALPHAMASK );
 	const vkPipelineTarget_t target = VK_Exec_CurrentPipelineTarget();
 	for ( int i = 0; i < vkExec.numPipelines; ++i ) {
@@ -973,7 +973,7 @@ static VkPipeline VK_GuiExecutor_GetPipelineStrict( int stateBits ) {
 
 static VkPipeline VK_GuiExecutor_GetScreenPipeline( int stateBits,
 		bool separateColor = false ) {
-	const int pipelineBits = stateBits & ( GLS_SRCBLEND_BITS | GLS_DSTBLEND_BITS
+	const int pipelineBits = stateBits & ( GLS_ALPHA_COVERAGE | GLS_SRCBLEND_BITS | GLS_DSTBLEND_BITS
 			| GLS_COLORMASK | GLS_ALPHAMASK );
 	const vkPipelineTarget_t target = VK_Exec_CurrentPipelineTarget();
 
@@ -1075,7 +1075,7 @@ static VkPipeline VK_TemporalPresentation_GetResolvePipeline( void ) {
 // front-end texgen's tightly packed stream on binding 1 for the skies, or
 // the idDrawVert normal straight off binding 0 for diffuse cube maps
 static VkPipeline VK_GuiExecutor_GetCubePipeline( int stateBits, bool dirFromNormal ) {
-	const int pipelineBits = stateBits & ( GLS_SRCBLEND_BITS | GLS_DSTBLEND_BITS
+	const int pipelineBits = stateBits & ( GLS_ALPHA_COVERAGE | GLS_SRCBLEND_BITS | GLS_DSTBLEND_BITS
 			| GLS_COLORMASK | GLS_ALPHAMASK );
 	const vkPipelineTarget_t target = VK_Exec_CurrentPipelineTarget();
 
@@ -1145,7 +1145,7 @@ static void VK_Exec_InteractionVertexInput( VkVertexInputBindingDescription &bin
 // owns a bump stage, bumpyEnvironment.vfp with a second sampler and the
 // model-space transform block.
 static VkPipeline VK_GuiExecutor_GetEnvironmentPipeline( int stateBits, bool bumpy ) {
-	const int pipelineBits = stateBits & ( GLS_SRCBLEND_BITS | GLS_DSTBLEND_BITS
+	const int pipelineBits = stateBits & ( GLS_ALPHA_COVERAGE | GLS_SRCBLEND_BITS | GLS_DSTBLEND_BITS
 			| GLS_COLORMASK | GLS_ALPHAMASK );
 	const vkPipelineTarget_t target = VK_Exec_CurrentPipelineTarget();
 
@@ -1488,7 +1488,7 @@ static void VK_Exec_CasterVertexInput( VkVertexInputBindingDescription &binding,
 // the packed primary color from idDrawVert.
 static VkPipeline VK_Exec_GetProgramPipeline( vkMaterialProgramFamily_t family,
 		int stateBits, bool separateColor ) {
-	const int pipelineBits = stateBits & ( GLS_SRCBLEND_BITS | GLS_DSTBLEND_BITS
+	const int pipelineBits = stateBits & ( GLS_ALPHA_COVERAGE | GLS_SRCBLEND_BITS | GLS_DSTBLEND_BITS
 			| GLS_COLORMASK | GLS_ALPHAMASK );
 	const vkPipelineTarget_t target = VK_Exec_CurrentPipelineTarget();
 
@@ -1609,7 +1609,7 @@ static VkPipeline VK_Exec_GetGLSLMaterialPipeline( vkGLSLProgramFamily_t family,
 			VK_Exec_GLSLFamilyUsesVertexColor( family );
 	separateColor = separateColor && usesVertexColor;
 	const int programKey = 0x100 + (int)family;
-	const int pipelineBits = stateBits & ( GLS_SRCBLEND_BITS | GLS_DSTBLEND_BITS
+	const int pipelineBits = stateBits & ( GLS_ALPHA_COVERAGE | GLS_SRCBLEND_BITS | GLS_DSTBLEND_BITS
 			| GLS_COLORMASK | GLS_ALPHAMASK );
 	const vkPipelineTarget_t target = VK_Exec_CurrentPipelineTarget();
 
@@ -1710,7 +1710,7 @@ static VkPipeline VK_Exec_GetGLSLMaterialPipeline( vkGLSLProgramFamily_t family,
 
 static VkPipeline VK_Exec_GetGlassWarpPipeline( int stateBits ) {
 	static const int programKey = 0x80;
-	const int pipelineBits = stateBits & ( GLS_SRCBLEND_BITS | GLS_DSTBLEND_BITS
+	const int pipelineBits = stateBits & ( GLS_ALPHA_COVERAGE | GLS_SRCBLEND_BITS | GLS_DSTBLEND_BITS
 			| GLS_COLORMASK | GLS_ALPHAMASK );
 	const vkPipelineTarget_t target = VK_Exec_CurrentPipelineTarget();
 	for ( int i = 0; i < vkExec.numProgramPipelines; i++ ) {
@@ -1914,7 +1914,7 @@ VkPipeline VK_Exec_FogPipeline( void ) {
 // GL_State( GLS_DEPTHMASK | stage->drawStateBits | GLS_DEPTHFUNC_EQUAL ),
 // where only the blend factors are pipeline-level state
 VkPipeline VK_Exec_BlendLightPipeline( int stateBits ) {
-	const int pipelineBits = stateBits & ( GLS_SRCBLEND_BITS | GLS_DSTBLEND_BITS
+	const int pipelineBits = stateBits & ( GLS_ALPHA_COVERAGE | GLS_SRCBLEND_BITS | GLS_DSTBLEND_BITS
 			| GLS_COLORMASK | GLS_ALPHAMASK );
 	const vkPipelineTarget_t target = VK_Exec_CurrentPipelineTarget();
 
@@ -9376,6 +9376,9 @@ static bool VK_ClassicGui_MapCull( rendererCullMode_t cull,
 
 static bool VK_ClassicGui_MapState( const rendererEvaluatedMaterialPass_t &pass,
 		bool inWorld, vkClassicGuiPassPlan_t &plan ) {
+	const bool alphaCoverage = pass.blend.sourceAlpha == RENDERER_BLEND_ONE &&
+		pass.blend.destinationAlpha == RENDERER_BLEND_ONE_MINUS_SRC_ALPHA &&
+		pass.blend.sourceColor == RENDERER_BLEND_SRC_ALPHA && pass.blend.destinationColor == RENDERER_BLEND_ONE_MINUS_SRC_ALPHA;
 	if ( pass.kind != ( inWorld ? RENDERER_MATERIAL_PASS_SURFACE
 			: RENDERER_MATERIAL_PASS_GUI )
 			|| ( inWorld
@@ -9392,8 +9395,8 @@ static bool VK_ClassicGui_MapState( const rendererEvaluatedMaterialPass_t &pass,
 			|| pass.vertexColor > RENDERER_VERTEX_COLOR_INVERSE_MODULATE
 			|| pass.blend.colorOperation != RENDERER_BLEND_OP_ADD
 			|| pass.blend.alphaOperation != RENDERER_BLEND_OP_ADD
-			|| pass.blend.sourceAlpha != pass.blend.sourceColor
-			|| pass.blend.destinationAlpha != pass.blend.destinationColor
+			|| (!alphaCoverage && (pass.blend.sourceAlpha != pass.blend.sourceColor
+				|| pass.blend.destinationAlpha != pass.blend.destinationColor))
 			|| pass.depth.testEnabled != inWorld
 			|| ( pass.depth.compareOperation != RENDERER_COMPARE_LESS_OR_EQUAL
 				&& pass.depth.compareOperation != RENDERER_COMPARE_EQUAL
@@ -9418,7 +9421,7 @@ static bool VK_ClassicGui_MapState( const rendererEvaluatedMaterialPass_t &pass,
 		return false;
 	}
 
-	plan.stateBits = sourceBits | destinationBits;
+	plan.stateBits = sourceBits | destinationBits | (alphaCoverage ? GLS_ALPHA_COVERAGE : 0);
 	if ( ( pass.colorWriteMask & RENDERER_COLOR_WRITE_RED ) == 0 ) {
 		plan.stateBits |= GLS_REDMASK;
 	}

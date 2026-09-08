@@ -60,7 +60,7 @@ def capture(args: argparse.Namespace) -> int:
         'r_borderlessDefaultMigrated': '1', 'r_hiddenWindow': '1',
         'r_windowWidth': str(args.width), 'r_windowHeight': str(args.height),
         'r_mode': '-1', 'r_customWidth': str(args.width), 'r_customHeight': str(args.height),
-        'r_renderApi': args.renderer, 'r_rendererSharedGui': '0', 'r_rendererSharedInWorldGui': '0',
+        'r_renderApi': args.renderer, 'r_rendererSharedGui': '1' if args.shared_gui else '0', 'r_rendererSharedInWorldGui': '0',
         'in_mouse': '0', 'in_joystick': '0', 'in_joystickRumble': '0',
         'g_autoScreenshot': '0', 'g_autoSkipCinematics': '1',
         'g_autoExecAfterMapLoad': 'ui-baseline.cfg', 'g_autoExecAfterMapLoadDelayMs': '3000',
@@ -90,7 +90,7 @@ def capture(args: argparse.Namespace) -> int:
     metadata = {
         'status': 'running', 'profile': profile['name'], 'mode': args.mode, 'renderer': args.renderer,
         'capture_method': 'engine screenshot command after 3 seconds of active map drawing',
-        'windowed': True, 'hidden_window': True, 'host_input_injection': False,
+        'windowed': True, 'hidden_window': True, 'host_input_injection': False, 'shared_gui': args.shared_gui,
         'command': command, 'cwd': str(runtime), 'cfg_sha256': digest(cfg_path),
         'binaries': {str(p.relative_to(runtime)): digest(p) for p in binaries if p.is_file()},
     }
@@ -181,6 +181,7 @@ def main() -> int:
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--width', type=int, default=1280)
     parser.add_argument('--height', type=int, default=720)
+    parser.add_argument('--shared-gui', action='store_true', help='exercise the shared GUI renderer domain')
     parser.add_argument('--timeout', type=int, default=180)
     parser.add_argument('--retained-document', type=Path, help='Optional Q4UI or RML integration fixture, copied into the isolated savepath.')
     parser.add_argument('--timeline', help='Canonical timeline to play before capture, and again after an optional video restart.')

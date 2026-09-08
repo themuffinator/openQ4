@@ -59,7 +59,8 @@
 //      resolve requested by game modules
 // 12 - renderFramebufferDesc_t::glESProfile lets a module ask for an OpenGL ES
 //      context; a stale module would leave that byte uninitialised
-#define RENDER_API_VERSION			12
+// 13 - ClearRenderTarget carries alpha for transparent retained UI layers.
+#define RENDER_API_VERSION			13
 #define RENDER_API_ENTRY_POINT		"GetRenderAPI"
 
 class idSys;

@@ -2,6 +2,13 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- Composition development: panels and their overlapping contents now fade as
+  one group, including nested controls and text edges. The
+  [composition checkpoint](ui/composition.md) records native overlap tests and
+  engine pixel comparisons. Development packages must replace engine, renderer
+  modules and both game modules together (renderer API 13, game API 47).
+  Shaped masks, broader effects and complete UI/editor qualification remain open.
+
 - Transition development: fades and whole-pixel movement now reuse compiled
   vector paths, with measured reductions in CPU work. A precision fix keeps thin
   rails stable during fractional movement. The new

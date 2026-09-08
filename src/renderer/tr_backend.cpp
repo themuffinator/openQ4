@@ -312,7 +312,7 @@ void GL_State( int stateBits ) {
 	//
 	// check blend bits
 	//
-	if ( diff & ( GLS_SRCBLEND_BITS | GLS_DSTBLEND_BITS ) ) {
+	if ( diff & ( GLS_SRCBLEND_BITS | GLS_DSTBLEND_BITS | GLS_ALPHA_COVERAGE ) ) {
 		GLenum srcFactor, dstFactor;
 
 		switch ( stateBits & GLS_SRCBLEND_BITS ) {
@@ -386,7 +386,8 @@ void GL_State( int stateBits ) {
 			break;
 		}
 
-		glBlendFunc( srcFactor, dstFactor );
+		if (stateBits & GLS_ALPHA_COVERAGE) glBlendFuncSeparate(srcFactor,dstFactor,GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
+		else glBlendFunc(srcFactor,dstFactor);
 	}
 
 	//

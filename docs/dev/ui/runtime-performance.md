@@ -5,6 +5,10 @@ redundant path compilation during fades and whole-pixel movement. It advances
 the [replacement plan](../plans/idtech5-ui.md); full performance qualification,
 composition, production artwork, editor and GUI migration gates remain open.
 
+The later [composition checkpoint](composition.md) supersedes the per-primitive
+opacity path described below: canonical fades now use isolated layers and reuse
+both geometry and vertex tint. Measurements here remain the historical baseline.
+
 ## Cache behavior
 
 Vector elements retain compiled, premultiplied path geometry independently of

@@ -71,6 +71,13 @@ The property registry in `Document.cpp` currently supports:
   whitespace policy, plus localized text content.
 - Background and border colors, opacity and a composed transform.
 
+`opacity` applies to the node's complete subtree using
+[isolated composition](composition.md), including when it is animated. Paint
+alpha is separate. Nested group opacities compose inside-out, and subtree paint
+ordering stays stable when a temporary layer appears or disappears at opacity 1.
+The canonical format remains version 1 during this pre-release schema phase;
+this corrects the earlier per-primitive rendering behavior.
+
 Negative anchors, margins and letter spacing are supported; sizes, padding,
 gaps and border widths cannot be negative. Percentages are not accepted for
 font metrics, borders or transform translations. `auto` is supported for

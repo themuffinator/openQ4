@@ -2183,7 +2183,7 @@ void idRenderSystemLocal::BindRenderTexture(idRenderTexture* renderTexture, idRe
 idRenderSystemLocal::ClearRenderTarget
 ===============
 */
-void idRenderSystemLocal::ClearRenderTarget(bool clearColor, bool clearDepth, float depthValue, float red, float green, float blue) {
+void idRenderSystemLocal::ClearRenderTarget(bool clearColor, bool clearDepth, float depthValue, float red, float green, float blue, float alpha) {
 	renderClearBufferCommand_t* cmd;
 
 	cmd = (renderClearBufferCommand_t*)R_GetCommandBuffer(sizeof(*cmd));
@@ -2193,7 +2193,7 @@ void idRenderSystemLocal::ClearRenderTarget(bool clearColor, bool clearDepth, fl
 	cmd->clearDepth = clearDepth;
 
 	cmd->clearDepthValue = depthValue;
-	cmd->clearColorValue = idVec4(red, green, blue, 1.0);
+	cmd->clearColorValue = idVec4(red, green, blue, alpha);
 	if ( R_ScenePackets_FrontEndCaptureRequired() ) {
 		R_ScenePackets_AddRenderTargetOp();
 	}

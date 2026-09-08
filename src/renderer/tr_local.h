@@ -877,7 +877,7 @@ public:
 	virtual void			SetRenderTextureDebugName(idRenderTexture* renderTexture, const char* label);
 	virtual void			BindRenderTexture(idRenderTexture* renderTexture, idRenderTexture* feedbackRenderTexture);
 	virtual void			ResolveMSAA(idRenderTexture* msaaRenderTexture, idRenderTexture* destRenderTexture, bool resolveDepth = false);
-	virtual void			ClearRenderTarget(bool clearColor, bool clearDepth, float depthValue, float red, float green, float blue);
+	virtual void			ClearRenderTarget(bool clearColor, bool clearDepth, float depthValue, float red, float green, float blue, float alpha = 1.0f);
 	virtual void			SetPostProcessSourceSize(int width, int height);
 	virtual void			SetPostProcessSourceColorSpace(const idVec4& colorSpace);
 	virtual void			SetPostProcessSMAAQuality(const idVec4& quality);
@@ -1583,6 +1583,10 @@ const int GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA		= 0x00000060;
 const int GLS_DSTBLEND_DST_ALPHA				= 0x00000070;
 const int GLS_DSTBLEND_ONE_MINUS_DST_ALPHA		= 0x00000080;
 const int GLS_DSTBLEND_BITS						= 0x000000f0;
+
+// Straight-alpha retained images write source-over coverage to an isolated
+// target's alpha channel, while RGB keeps the ordinary SRC_ALPHA factor.
+const int GLS_ALPHA_COVERAGE = 0x00040000;
 
 
 // these masks are the inverse, meaning when set the glColorMask value will be 0,

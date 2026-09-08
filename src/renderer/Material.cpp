@@ -2486,6 +2486,10 @@ void idMaterial::ParseStage( idLexer &src, const textureRepeat_t trpDefault ) {
 	ss->mNumStageOps = numOps - ss->mStageOpsStart;
 
 	// successfully parsed a stage
+	if (idStr::Icmpn(GetName(),"_retained/",10) == 0 &&
+		(ss->drawStateBits & (GLS_SRCBLEND_BITS | GLS_DSTBLEND_BITS)) == (GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA)) {
+		ss->drawStateBits |= GLS_ALPHA_COVERAGE;
+	}
 	numStages++;
 
 	// select a compressed depth based on what the stage is
@@ -4717,6 +4721,13 @@ idMaterial::SetDefaultText
 ===================
 */
 bool idMaterial::SetDefaultText( void ) {
+	if (idStr::Icmpn(GetName(),"_retainedLayer/",15) == 0) {
+		const char* slot = GetName()+15;
+		if (!*slot) return false;
+		for (const char* p = slot; *p; ++p) if (*p < '0' || *p > '9') return false;
+		SetText(va("material %s { sort gui twoSided { blend gl_one, gl_one_minus_src_alpha vertexColor nopicmip nearest clamp map _retainedLayerImage%s } }",GetName(),slot));
+		return true;
+	}
 	if ( idStr::Icmp(GetName(),"_retainedSolid") == 0 ) {
 		// RmlUi's native winding differs from legacy GUI quads; UI planes
 		// also remain visible under mirrored document transforms.

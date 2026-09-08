@@ -8990,6 +8990,9 @@ static bool RB_SharedGuiGLBuildState( const rendererEvaluatedMaterialPass_t &pas
 	stateBits = 0;
 	alphaFunction = GL_ALWAYS;
 	cullType = CT_FRONT_SIDED;
+	const bool alphaCoverage = pass.blend.sourceAlpha == RENDERER_BLEND_ONE &&
+		pass.blend.destinationAlpha == RENDERER_BLEND_ONE_MINUS_SRC_ALPHA &&
+		pass.blend.sourceColor == RENDERER_BLEND_SRC_ALPHA && pass.blend.destinationColor == RENDERER_BLEND_ONE_MINUS_SRC_ALPHA;
 
 	if ( pass.kind != ( inWorld ? RENDERER_MATERIAL_PASS_SURFACE
 			: RENDERER_MATERIAL_PASS_GUI )
@@ -9001,8 +9004,8 @@ static bool RB_SharedGuiGLBuildState( const rendererEvaluatedMaterialPass_t &pas
 			|| pass.textureSemantic != RENDERER_TEXTURE_DIFFUSE
 			|| pass.blend.colorOperation != RENDERER_BLEND_OP_ADD
 			|| pass.blend.alphaOperation != RENDERER_BLEND_OP_ADD
-			|| pass.blend.sourceAlpha != pass.blend.sourceColor
-			|| pass.blend.destinationAlpha != pass.blend.destinationColor ) {
+			|| (!alphaCoverage && (pass.blend.sourceAlpha != pass.blend.sourceColor
+				|| pass.blend.destinationAlpha != pass.blend.destinationColor)) ) {
 		return false;
 	}
 	const bool replacementBlend = pass.blend.sourceColor == RENDERER_BLEND_ONE
@@ -9017,6 +9020,7 @@ static bool RB_SharedGuiGLBuildState( const rendererEvaluatedMaterialPass_t &pas
 			|| !RB_SharedGuiGLMapCull( pass.cull, cullType ) ) {
 		return false;
 	}
+	if (alphaCoverage) stateBits |= GLS_ALPHA_COVERAGE;
 
 	if ( ( pass.colorWriteMask
 			& ~static_cast<std::uint32_t>( RENDERER_COLOR_WRITE_RGBA ) ) != 0 ) {

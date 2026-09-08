@@ -54,6 +54,10 @@ struct Geometry {
 class Renderer final : public Rml::RenderInterface {
 public:
 	Renderer(Host& h, RuntimeStatistics& statistics) : host(h), statistics(statistics) {}
+	void BeginFrame(int width, int height) { viewportWidth = width; viewportHeight = height; failed = false; }
+	void EndFrame() {
+		if (depth) { host.Log(true,"Unbalanced retained composition layers"); host.EndLayer(0); depth = 0; }
+	}
 	Rml::CompiledGeometryHandle CompileGeometry(Rml::Span<const Rml::Vertex> vertices, Rml::Span<const int> indices) override {
 		if (vertices.empty() || vertices.size() > 262144 || indices.empty() || indices.size() % 3 != 0) return 0;
 		for (const int i : indices) if (i < 0 || static_cast<size_t>(i) >= vertices.size()) return 0;
@@ -71,7 +75,7 @@ public:
 		delete geometry;
 	}
 	void RenderGeometry(Rml::CompiledGeometryHandle handle, Rml::Vector2f translation, Rml::TextureHandle texture) override {
-		if (!handle || (scissorEnabled && (scissor.Width() <= 0 || scissor.Height() <= 0))) return;
+		if (failed || !handle || (scissorEnabled && (scissor.Width() <= 0 || scissor.Height() <= 0))) return;
 		const Geometry& geometry = *reinterpret_cast<const Geometry*>(handle);
 		std::vector<Vertex> vertices;
 		vertices.reserve(geometry.vertices.size());
@@ -115,6 +119,47 @@ public:
 		hasTransform = value != nullptr;
 		if (value) transform = *value;
 	}
+	Rml::LayerHandle PushLayer() override {
+		++depth;
+		++statistics.layerPushes; statistics.peakLayerDepth = std::max<std::uint64_t>(statistics.peakLayerDepth,depth);
+		if (!failed && (depth > 48 || !host.BeginLayer(depth,viewportWidth,viewportHeight))) {
+			host.Log(true,"Cannot allocate retained composition layer"); failed = true;
+		}
+		return depth;
+	}
+	void PopLayer() override {
+		if (!depth) { host.Log(true,"Retained composition layer underflow"); failed = true; return; }
+		--depth;
+		// Restore the base even after an allocation failure. No further draws
+		// are accepted in a failed frame, preventing paint on the wrong target.
+		if (!failed || !depth) host.EndLayer(depth);
+	}
+	Rml::CompiledFilterHandle CompileFilter(const Rml::String& name, const Rml::Dictionary& parameters) override {
+		const auto value = parameters.find("value");
+		if (name == "opacity" && value != parameters.end()) {
+			const float opacity = value->second.Get<float>();
+			if (std::isfinite(opacity)) return reinterpret_cast<Rml::CompiledFilterHandle>(new float(std::clamp(opacity,0.f,1.f)));
+		}
+		host.Log(true,"Unsupported retained filter: "+name); return 0;
+	}
+	void ReleaseFilter(Rml::CompiledFilterHandle filter) override { delete reinterpret_cast<float*>(filter); }
+	void CompositeLayers(Rml::LayerHandle source, Rml::LayerHandle destination, Rml::BlendMode mode,
+		Rml::Span<const Rml::CompiledFilterHandle> filters) override {
+		if (failed) return;
+		if (!source || source > depth || destination >= source || mode != Rml::BlendMode::Blend) {
+			host.Log(true,"Unsupported retained layer composition"); failed = true; return;
+		}
+		float opacity = 1;
+		for (auto filter : filters) opacity *= *reinterpret_cast<const float*>(filter);
+		const float left = scissorEnabled ? std::clamp(float(scissor.Left()),0.f,float(viewportWidth)) : 0;
+		const float top = scissorEnabled ? std::clamp(float(scissor.Top()),0.f,float(viewportHeight)) : 0;
+		const float right = scissorEnabled ? std::clamp(float(scissor.Right()),left,float(viewportWidth)) : float(viewportWidth);
+		const float bottom = scissorEnabled ? std::clamp(float(scissor.Bottom()),top,float(viewportHeight)) : float(viewportHeight);
+		if (right > left && bottom > top) {
+			host.CompositeLayer(static_cast<std::uint32_t>(source),static_cast<std::uint32_t>(destination),opacity,{left,top,right-left,bottom-top});
+			++statistics.layerComposites;
+		}
+	}
 private:
 	static size_t Bytes(const Geometry& geometry) {
 		return sizeof(Geometry)+geometry.vertices.capacity()*sizeof(Rml::Vertex)+geometry.indices.capacity()*sizeof(int);
@@ -128,6 +173,9 @@ private:
 	bool scissorEnabled = false, hasTransform = false;
 	Rml::Rectanglei scissor;
 	Rml::Matrix4f transform;
+	int viewportWidth = 0, viewportHeight = 0;
+	std::uint32_t depth = 0;
+	bool failed = false;
 };
 
 class Files final : public Rml::FileInterface {
@@ -271,33 +319,16 @@ struct Runtime::Impl {
 	void ApplyMotion() {
 		if (!document || !canonical) return;
 		for (const auto& [key,value] : motion.Values()) {
-			if (key.second == "opacity") continue; // Resolve ancestry below.
-			const auto string = value.type == ValueType::Text ? host.Translate(value.text) : value.Css();
+			const bool opacity = key.second == "opacity";
+			const auto string = opacity ? (value.data[0] < 1 ? "opacity("+value.Css()+")" : "none") :
+				value.type == ValueType::Text ? host.Translate(value.text) : value.Css();
 			auto previous = applied.find(key);
 			if (previous != applied.end() && previous->second == string) continue;
 			auto* element = document->GetElementById(key.first);
 			if (!element) continue;
 			if (value.type == ValueType::Text) element->SetInnerRML(Rml::StringUtilities::EncodeRml(string));
-			else if (!element->SetProperty(key.second,string)) host.Log(true,"Canonical property rejected: "+key.first+"."+key.second);
+			else if (!element->SetProperty(opacity ? "filter" : key.second,string)) host.Log(true,"Canonical property rejected: "+key.first+"."+key.second);
 			applied[key] = string;
-		}
-		// RmlUi's opacity is inherited as a value, rather than multiplied with
-		// an explicitly authored child's opacity. Canonical opacity multiplies
-		// ancestry for all paint/text primitives, including custom vector nodes.
-		std::vector<std::pair<const Node*,double>> stack{{&canonical->Model().root,1}};
-		while (!stack.empty()) {
-			const auto [node,parentOpacity] = stack.back(); stack.pop_back();
-			const PropertyKey key{node->id,"opacity"};
-			const auto authored = motion.Values().find(key);
-			const double opacity = parentOpacity*(authored == motion.Values().end() ? 1 : authored->second.data[0]);
-			Value effective; effective.data[0] = opacity;
-			const auto string = effective.Css();
-			const auto previous = applied.find(key);
-			if (previous == applied.end() || previous->second != string) {
-				if (auto* element = document->GetElementById(node->id)) element->SetProperty("opacity",string);
-				applied[key] = string;
-			}
-			for (const auto& child : node->children) stack.push_back({&child,opacity});
 		}
 	}
 };
@@ -359,6 +390,9 @@ bool Runtime::LoadDocument(const std::string& source, const std::string& sourceP
 	std::vector<const Node*> nodes{&impl->canonical->Model().root};
 	while (!nodes.empty()) {
 		const auto* node = nodes.back(); nodes.pop_back();
+		// Canonical subtrees preserve paint order when opacity crosses 1 and
+		// their temporary filter layer appears or disappears.
+		if (auto* element = impl->document->GetElementById(node->id)) element->SetProperty("z-index","0");
 		if (node->type == "vector") {
 			auto* element = impl->document->GetElementById(node->id);
 			if (element) static_cast<VectorElement*>(element)->Configure(node->paths,impl->host,impl->statistics);
@@ -386,7 +420,9 @@ void Runtime::Frame(const Viewport& viewport, double seconds) {
 	impl->context->SetDensityIndependentPixelRatio(viewport.DpRatio());
 	impl->context->Update();
 	const auto updated = std::chrono::steady_clock::now();
+	impl->renderer.BeginFrame(viewport.width,viewport.height);
 	impl->context->Render();
+	impl->renderer.EndFrame();
 	const auto end = std::chrono::steady_clock::now();
 	impl->statistics.updateMilliseconds = std::chrono::duration<double,std::milli>(updated-start).count();
 	impl->statistics.renderMilliseconds = std::chrono::duration<double,std::milli>(end-updated).count();

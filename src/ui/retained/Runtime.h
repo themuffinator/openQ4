@@ -43,6 +43,7 @@ struct RuntimeStatistics {
 	std::uint64_t geometryCompiles = 0, drawCalls = 0, submittedVertices = 0, submittedIndices = 0;
 	std::uint64_t residentGeometryCount = 0, residentGeometryBytes = 0;
 	std::uint64_t visibleVectorCacheBytes = 0;
+	std::uint64_t layerPushes = 0, layerComposites = 0, peakLayerDepth = 0;
 };
 
 class Host {
@@ -53,6 +54,11 @@ public:
 	virtual void Log(bool error, const std::string& message) = 0;
 	virtual std::uintptr_t LoadMaterial(const std::string& name, int& width, int& height) = 0;
 	virtual void Draw(const std::vector<Vertex>& vertices, const std::vector<int>& indices, std::uintptr_t material) = 0;
+	// Physical-pixel, transparent, premultiplied targets. Identifiers are stack
+	// slots, reusable after EndLayer; zero denotes the caller's output surface.
+	virtual bool BeginLayer(std::uint32_t id, int width, int height) = 0;
+	virtual void CompositeLayer(std::uint32_t source, std::uint32_t destination, float opacity, const Bounds& clip) = 0;
+	virtual void EndLayer(std::uint32_t restore) = 0;
 	virtual FontMetrics GetFontMetrics(const std::string& family, int pixelSize) = 0;
 	virtual Glyph GetGlyph(const std::string& family, int pixelSize, std::uint32_t codepoint) = 0;
 };

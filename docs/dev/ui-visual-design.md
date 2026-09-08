@@ -151,6 +151,12 @@ only distinction between teams, enabled states or errors.
 | Separators | 0.20–0.30 | Never compete with labels |
 | Rest marker | 0.40 | 1.00 hover/focus |
 
+Node opacity applies to the completed node and its descendants as one isolated
+group. Overlapping controls, text, washes and rails must retain their internal
+appearance throughout a fade. Nested opacity composes inside-out; paint alpha
+remains intrinsic to each primitive. Crossing opacity 1 cannot reorder siblings.
+Editor previews use the same composition and clipping rules as gameplay.
+
 Body text must remain readable over the brightest permitted scene. Target
 4.5:1 composited contrast for essential normal text and 3:1 for large text and
 essential control boundaries. If stock opacity fails, strengthen the local
