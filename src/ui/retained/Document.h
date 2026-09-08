@@ -7,6 +7,7 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include <variant>
 #include "Vector.h"
 
 namespace openq4::ui {
@@ -22,6 +23,26 @@ struct Value {
 	Value Interpolate(const Value& other, double fraction) const;
 	std::string Css() const;
 };
+using StateValue = std::variant<double, bool, std::string>;
+using StateValues = std::map<std::string, StateValue>;
+struct StateDeclaration {
+	StateValue initial;
+	std::string cvar; // Optional read-only host source; empty means application-owned.
+};
+struct Expression {
+	std::string op, state;
+	StateValue literal;
+	size_t type = 0; // StateValue variant index, resolved by the document compiler.
+	unsigned decimals = 0;
+	std::vector<Expression> args;
+};
+struct Binding {
+	std::string id, node, property;
+	Value prototype;
+	std::vector<Expression> values;
+};
+bool ValidProperty(const std::string& name, const Value& value);
+bool ValidStateValue(const StateValue& value);
 enum class ControlState { Default, Hover, Focus, Pressed, Disabled };
 struct Control {
 	std::string action, label;
@@ -64,12 +85,15 @@ struct DocumentModel {
 	Node root;
 	std::map<std::string, Value> tokens;
 	std::vector<Timeline> timelines;
+	std::map<std::string, StateDeclaration> state;
+	std::vector<Binding> bindings;
 	const Node* FindNode(const std::string& id) const;
 };
 struct Diagnostic {
 	std::string pointer, message;
 	size_t byte = 0, line = 1, column = 1;
 };
+bool ParseStateValues(const std::string& source, StateValues& values, std::vector<Diagnostic>& diagnostics);
 
 // Canonical JSONC source is retained verbatim. DOM source offsets make edits
 // transactional and preserve comments/extension fields outside the edited span.

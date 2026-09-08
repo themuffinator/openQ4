@@ -1,0 +1,2182 @@
+// Live state qualification using existing Marine vector fixtures.
+{
+  "format": "openq4-ui",
+  "version": 1,
+  "id": "binding-qualification",
+  "tokens": {
+    "marine.olive": {
+      "type": "color",
+      "value": [
+        0.5451,
+        0.5882,
+        0.2941,
+        1
+      ]
+    },
+    "marine.orange": {
+      "type": "color",
+      "value": [
+        0.8902,
+        0.5373,
+        0,
+        1
+      ]
+    },
+    "marine.panel": {
+      "type": "color",
+      "value": [
+        0.0902,
+        0.1098,
+        0.0706,
+        0.9333
+      ]
+    },
+    "space.frame": {
+      "type": "length",
+      "value": 24,
+      "unit": "dp"
+    }
+  },
+  "root": {
+    "id": "screen",
+    "type": "group",
+    "properties": {
+      "width": {
+        "type": "length",
+        "value": 100,
+        "unit": "%"
+      },
+      "height": {
+        "type": "length",
+        "value": 100,
+        "unit": "%"
+      },
+      "font-family": {
+        "type": "font",
+        "value": "marine"
+      },
+      "font-size": {
+        "type": "length",
+        "value": 18,
+        "unit": "dp"
+      },
+      "color": {
+        "type": "color",
+        "value": [
+          1,
+          1,
+          1,
+          0.8
+        ]
+      },
+      "background-color": {
+        "type": "color",
+        "value": [
+          0.25,
+          0.3,
+          0.35,
+          1
+        ]
+      }
+    },
+    "children": [
+      {
+        "id": "reference-panel",
+        "type": "vector",
+        "properties": {
+          "position": {
+            "type": "keyword",
+            "value": "absolute"
+          },
+          "left": {
+            "type": "length",
+            "value": 24,
+            "unit": "dp"
+          },
+          "top": {
+            "type": "length",
+            "value": 32,
+            "unit": "dp"
+          },
+          "width": {
+            "type": "length",
+            "value": 360,
+            "unit": "dp"
+          },
+          "padding": {
+            "type": "token",
+            "value": "space.frame"
+          },
+          "opacity": {
+            "type": "number",
+            "value": 1
+          },
+          "transform": {
+            "type": "transform",
+            "unit": "dp",
+            "value": [
+              0,
+              0,
+              1,
+              1,
+              0
+            ]
+          },
+          "display": {
+            "type": "keyword",
+            "value": "block"
+          }
+        },
+        "children": [
+          {
+            "id": "reference-title",
+            "type": "text",
+            "properties": {
+              "text": {
+                "type": "text",
+                "value": "#str_200009"
+              },
+              "font-size": {
+                "type": "length",
+                "value": 28,
+                "unit": "dp"
+              },
+              "line-height": {
+                "type": "length",
+                "value": 34,
+                "unit": "dp"
+              },
+              "margin-bottom": {
+                "type": "length",
+                "value": 20,
+                "unit": "dp"
+              }
+            }
+          },
+          {
+            "id": "reading",
+            "type": "text",
+            "properties": {
+              "text": {
+                "type": "text",
+                "value": "#str_200009"
+              },
+              "font-size": {
+                "type": "length",
+                "value": 32,
+                "unit": "dp"
+              },
+              "line-height": {
+                "type": "length",
+                "value": 40,
+                "unit": "dp"
+              },
+              "margin-bottom": {
+                "type": "length",
+                "value": 12,
+                "unit": "dp"
+              }
+            }
+          },
+          {
+            "id": "progress-track",
+            "type": "vector",
+            "properties": {
+              "height": {
+                "type": "length",
+                "value": 20,
+                "unit": "dp"
+              },
+              "margin-bottom": {
+                "type": "length",
+                "value": 16,
+                "unit": "dp"
+              }
+            },
+            "paths": [
+              {
+                "id": "track",
+                "commands": [
+                  {
+                    "id": "p0",
+                    "op": "move",
+                    "points": [
+                      [
+                        0,
+                        0
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "p1",
+                    "op": "line",
+                    "points": [
+                      [
+                        {
+                          "fraction": 1,
+                          "dp": 0
+                        },
+                        0
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "p2",
+                    "op": "line",
+                    "points": [
+                      [
+                        {
+                          "fraction": 1,
+                          "dp": 0
+                        },
+                        {
+                          "fraction": 1,
+                          "dp": 0
+                        }
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "p3",
+                    "op": "line",
+                    "points": [
+                      [
+                        8,
+                        {
+                          "fraction": 1,
+                          "dp": 0
+                        }
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "p4",
+                    "op": "line",
+                    "points": [
+                      [
+                        0,
+                        {
+                          "fraction": 1,
+                          "dp": -8
+                        }
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "close",
+                    "op": "close"
+                  }
+                ],
+                "fill": {
+                  "type": "solid",
+                  "color": {
+                    "type": "color",
+                    "value": [
+                      0.25,
+                      0.28,
+                      0.15,
+                      1
+                    ]
+                  }
+                }
+              }
+            ],
+            "children": [
+              {
+                "id": "progress-fill",
+                "type": "vector",
+                "properties": {
+                  "width": {
+                    "type": "length",
+                    "value": 0,
+                    "unit": "%"
+                  },
+                  "height": {
+                    "type": "length",
+                    "value": 20,
+                    "unit": "dp"
+                  }
+                },
+                "paths": [
+                  {
+                    "id": "fill",
+                    "commands": [
+                      {
+                        "id": "p0",
+                        "op": "move",
+                        "points": [
+                          [
+                            0,
+                            0
+                          ]
+                        ]
+                      },
+                      {
+                        "id": "p1",
+                        "op": "line",
+                        "points": [
+                          [
+                            {
+                              "fraction": 1,
+                              "dp": 0
+                            },
+                            0
+                          ]
+                        ]
+                      },
+                      {
+                        "id": "p2",
+                        "op": "line",
+                        "points": [
+                          [
+                            {
+                              "fraction": 1,
+                              "dp": 0
+                            },
+                            {
+                              "fraction": 1,
+                              "dp": 0
+                            }
+                          ]
+                        ]
+                      },
+                      {
+                        "id": "p3",
+                        "op": "line",
+                        "points": [
+                          [
+                            8,
+                            {
+                              "fraction": 1,
+                              "dp": 0
+                            }
+                          ]
+                        ]
+                      },
+                      {
+                        "id": "p4",
+                        "op": "line",
+                        "points": [
+                          [
+                            0,
+                            {
+                              "fraction": 1,
+                              "dp": -8
+                            }
+                          ]
+                        ]
+                      },
+                      {
+                        "id": "close",
+                        "op": "close"
+                      }
+                    ],
+                    "fill": {
+                      "type": "solid",
+                      "color": {
+                        "type": "color",
+                        "value": [
+                          0.89,
+                          0.537,
+                          0,
+                          1
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "reference-controls",
+            "type": "vector",
+            "properties": {
+              "height": {
+                "type": "length",
+                "value": 40,
+                "unit": "dp"
+              },
+              "line-height": {
+                "type": "length",
+                "value": 40,
+                "unit": "dp"
+              },
+              "margin-bottom": {
+                "type": "length",
+                "value": 8,
+                "unit": "dp"
+              },
+              "opacity": {
+                "type": "number",
+                "value": 1
+              }
+            },
+            "paths": [
+              {
+                "id": "action-plate",
+                "commands": [
+                  {
+                    "id": "p0",
+                    "op": "move",
+                    "points": [
+                      [
+                        0,
+                        0
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "p1",
+                    "op": "line",
+                    "points": [
+                      [
+                        {
+                          "fraction": 1,
+                          "dp": 0
+                        },
+                        0
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "p2",
+                    "op": "line",
+                    "points": [
+                      [
+                        {
+                          "fraction": 1,
+                          "dp": 0
+                        },
+                        {
+                          "fraction": 1,
+                          "dp": 0
+                        }
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "p3",
+                    "op": "line",
+                    "points": [
+                      [
+                        12,
+                        {
+                          "fraction": 1,
+                          "dp": 0
+                        }
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "p4",
+                    "op": "line",
+                    "points": [
+                      [
+                        0,
+                        {
+                          "fraction": 1,
+                          "dp": -12
+                        }
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "close",
+                    "op": "close"
+                  }
+                ],
+                "fill": {
+                  "type": "solid",
+                  "color": {
+                    "type": "color",
+                    "value": [
+                      0.8902,
+                      0.5373,
+                      0,
+                      0.62
+                    ]
+                  }
+                }
+              },
+              {
+                "id": "leading-bottom-rail",
+                "commands": [
+                  {
+                    "id": "start",
+                    "op": "move",
+                    "points": [
+                      [
+                        0.5,
+                        0.5
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "lower-left",
+                    "op": "line",
+                    "points": [
+                      [
+                        0.5,
+                        {
+                          "fraction": 1,
+                          "dp": -12.5
+                        }
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "cut",
+                    "op": "line",
+                    "points": [
+                      [
+                        12.5,
+                        {
+                          "fraction": 1,
+                          "dp": -0.5
+                        }
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "end",
+                    "op": "line",
+                    "points": [
+                      [
+                        {
+                          "fraction": 1,
+                          "dp": -0.5
+                        },
+                        {
+                          "fraction": 1,
+                          "dp": -0.5
+                        }
+                      ]
+                    ]
+                  }
+                ],
+                "stroke": {
+                  "paint": {
+                    "type": "linear",
+                    "from": [
+                      0,
+                      0
+                    ],
+                    "to": [
+                      {
+                        "fraction": 1,
+                        "dp": 0
+                      },
+                      0
+                    ],
+                    "stops": [
+                      {
+                        "at": 0,
+                        "color": {
+                          "type": "color",
+                          "value": [
+                            0.8902,
+                            0.5373,
+                            0,
+                            1
+                          ]
+                        }
+                      },
+                      {
+                        "at": 1,
+                        "color": {
+                          "type": "color",
+                          "value": [
+                            0.8902,
+                            0.5373,
+                            0,
+                            0
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  "widthDp": 1,
+                  "minimumPixels": 1,
+                  "join": "miter"
+                }
+              },
+              {
+                "id": "triangle-marker",
+                "commands": [
+                  {
+                    "id": "p0",
+                    "op": "move",
+                    "points": [
+                      [
+                        12,
+                        16
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "p1",
+                    "op": "line",
+                    "points": [
+                      [
+                        20,
+                        20
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "p2",
+                    "op": "line",
+                    "points": [
+                      [
+                        12,
+                        24
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "close",
+                    "op": "close"
+                  }
+                ],
+                "fill": {
+                  "type": "solid",
+                  "color": {
+                    "type": "color",
+                    "value": [
+                      0.8902,
+                      0.5373,
+                      0,
+                      1
+                    ]
+                  }
+                }
+              }
+            ],
+            "children": [
+              {
+                "id": "reference-controls-label",
+                "type": "text",
+                "properties": {
+                  "text": {
+                    "type": "text",
+                    "value": "#str_200083"
+                  },
+                  "line-height": {
+                    "type": "length",
+                    "value": 40,
+                    "unit": "dp"
+                  },
+                  "padding-left": {
+                    "type": "length",
+                    "value": 28,
+                    "unit": "dp"
+                  },
+                  "color": {
+                    "type": "color",
+                    "value": [
+                      0.92,
+                      0.94,
+                      0.85,
+                      1
+                    ]
+                  },
+                  "transform": {
+                    "type": "transform",
+                    "value": [
+                      0,
+                      0,
+                      1,
+                      1,
+                      0
+                    ],
+                    "unit": "dp"
+                  }
+                }
+              },
+              {
+                "id": "reference-controls-focus",
+                "type": "vector",
+                "properties": {
+                  "position": {
+                    "type": "keyword",
+                    "value": "absolute"
+                  },
+                  "left": {
+                    "type": "length",
+                    "value": 3,
+                    "unit": "dp"
+                  },
+                  "top": {
+                    "type": "length",
+                    "value": 3,
+                    "unit": "dp"
+                  },
+                  "right": {
+                    "type": "length",
+                    "value": 3,
+                    "unit": "dp"
+                  },
+                  "bottom": {
+                    "type": "length",
+                    "value": 3,
+                    "unit": "dp"
+                  },
+                  "width": {
+                    "type": "keyword",
+                    "value": "auto"
+                  },
+                  "height": {
+                    "type": "keyword",
+                    "value": "auto"
+                  },
+                  "opacity": {
+                    "type": "number",
+                    "value": 0
+                  }
+                },
+                "paths": [
+                  {
+                    "id": "shape",
+                    "commands": [
+                      {
+                        "id": "p0",
+                        "op": "move",
+                        "points": [
+                          [
+                            0.5,
+                            0.5
+                          ]
+                        ]
+                      },
+                      {
+                        "id": "p1",
+                        "op": "line",
+                        "points": [
+                          [
+                            {
+                              "fraction": 1,
+                              "dp": -0.5
+                            },
+                            0.5
+                          ]
+                        ]
+                      },
+                      {
+                        "id": "p2",
+                        "op": "line",
+                        "points": [
+                          [
+                            {
+                              "fraction": 1,
+                              "dp": -0.5
+                            },
+                            {
+                              "fraction": 1,
+                              "dp": -0.5
+                            }
+                          ]
+                        ]
+                      },
+                      {
+                        "id": "p3",
+                        "op": "line",
+                        "points": [
+                          [
+                            9.5,
+                            {
+                              "fraction": 1,
+                              "dp": -0.5
+                            }
+                          ]
+                        ]
+                      },
+                      {
+                        "id": "p4",
+                        "op": "line",
+                        "points": [
+                          [
+                            0.5,
+                            {
+                              "fraction": 1,
+                              "dp": -9.5
+                            }
+                          ]
+                        ]
+                      },
+                      {
+                        "id": "close",
+                        "op": "close"
+                      }
+                    ],
+                    "stroke": {
+                      "widthDp": 1,
+                      "minimumPixels": 1,
+                      "paint": {
+                        "type": "solid",
+                        "color": {
+                          "type": "color",
+                          "value": [
+                            1,
+                            0.58,
+                            0,
+                            1
+                          ]
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            ],
+            "control": {
+              "role": "button",
+              "action": "menu.controls",
+              "label": "#str_200083",
+              "enabled": true,
+              "states": {
+                "default": "reference-controls.default",
+                "hover": "reference-controls.hover",
+                "focus": "reference-controls.focus",
+                "pressed": "reference-controls.pressed",
+                "disabled": "reference-controls.disabled"
+              }
+            }
+          },
+          {
+            "id": "scale-reading",
+            "type": "text",
+            "properties": {
+              "text": {
+                "type": "text",
+                "value": "#str_200009"
+              },
+              "font-size": {
+                "type": "length",
+                "value": 18,
+                "unit": "dp"
+              },
+              "line-height": {
+                "type": "length",
+                "value": 28,
+                "unit": "dp"
+              },
+              "margin-top": {
+                "type": "length",
+                "value": 12,
+                "unit": "dp"
+              }
+            }
+          }
+        ],
+        "paths": [
+          {
+            "id": "inset-plate",
+            "commands": [
+              {
+                "id": "p0",
+                "op": "move",
+                "points": [
+                  [
+                    12,
+                    0
+                  ]
+                ]
+              },
+              {
+                "id": "p1",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1,
+                      "dp": -12
+                    },
+                    0
+                  ]
+                ]
+              },
+              {
+                "id": "p2",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1,
+                      "dp": 0
+                    },
+                    12
+                  ]
+                ]
+              },
+              {
+                "id": "p3",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1,
+                      "dp": 0
+                    },
+                    {
+                      "fraction": 1,
+                      "dp": -8
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p4",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1,
+                      "dp": -8
+                    },
+                    {
+                      "fraction": 1,
+                      "dp": 0
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p5",
+                "op": "line",
+                "points": [
+                  [
+                    8,
+                    {
+                      "fraction": 1,
+                      "dp": 0
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p6",
+                "op": "line",
+                "points": [
+                  [
+                    0,
+                    {
+                      "fraction": 1,
+                      "dp": -8
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p7",
+                "op": "line",
+                "points": [
+                  [
+                    0,
+                    12
+                  ]
+                ]
+              },
+              {
+                "id": "close",
+                "op": "close"
+              }
+            ],
+            "fill": {
+              "type": "solid",
+              "color": {
+                "type": "color",
+                "value": [
+                  0.09,
+                  0.11,
+                  0.07,
+                  0.88
+                ]
+              }
+            }
+          },
+          {
+            "id": "outer-rail",
+            "commands": [
+              {
+                "id": "p0",
+                "op": "move",
+                "points": [
+                  [
+                    12.5,
+                    0.5
+                  ]
+                ]
+              },
+              {
+                "id": "p1",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1,
+                      "dp": -12.5
+                    },
+                    0.5
+                  ]
+                ]
+              },
+              {
+                "id": "p2",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1,
+                      "dp": -0.5
+                    },
+                    12.5
+                  ]
+                ]
+              },
+              {
+                "id": "p3",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1,
+                      "dp": -0.5
+                    },
+                    {
+                      "fraction": 1,
+                      "dp": -8.5
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p4",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1,
+                      "dp": -8.5
+                    },
+                    {
+                      "fraction": 1,
+                      "dp": -0.5
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p5",
+                "op": "line",
+                "points": [
+                  [
+                    8.5,
+                    {
+                      "fraction": 1,
+                      "dp": -0.5
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p6",
+                "op": "line",
+                "points": [
+                  [
+                    0.5,
+                    {
+                      "fraction": 1,
+                      "dp": -8.5
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p7",
+                "op": "line",
+                "points": [
+                  [
+                    0.5,
+                    12.5
+                  ]
+                ]
+              },
+              {
+                "id": "close",
+                "op": "close"
+              }
+            ],
+            "stroke": {
+              "paint": {
+                "type": "solid",
+                "color": {
+                  "type": "color",
+                  "value": [
+                    0.545,
+                    0.588,
+                    0.294,
+                    0.95
+                  ]
+                }
+              },
+              "widthDp": 1,
+              "minimumPixels": 1,
+              "join": "miter"
+            }
+          },
+          {
+            "id": "inner-rail",
+            "commands": [
+              {
+                "id": "p0",
+                "op": "move",
+                "points": [
+                  [
+                    13.5,
+                    3.5
+                  ]
+                ]
+              },
+              {
+                "id": "p1",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1,
+                      "dp": -13.5
+                    },
+                    3.5
+                  ]
+                ]
+              },
+              {
+                "id": "p2",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1,
+                      "dp": -3.5
+                    },
+                    13.5
+                  ]
+                ]
+              },
+              {
+                "id": "p3",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1,
+                      "dp": -3.5
+                    },
+                    {
+                      "fraction": 1,
+                      "dp": -9.5
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p4",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1,
+                      "dp": -9.5
+                    },
+                    {
+                      "fraction": 1,
+                      "dp": -3.5
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p5",
+                "op": "line",
+                "points": [
+                  [
+                    9.5,
+                    {
+                      "fraction": 1,
+                      "dp": -3.5
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p6",
+                "op": "line",
+                "points": [
+                  [
+                    3.5,
+                    {
+                      "fraction": 1,
+                      "dp": -9.5
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p7",
+                "op": "line",
+                "points": [
+                  [
+                    3.5,
+                    13.5
+                  ]
+                ]
+              },
+              {
+                "id": "close",
+                "op": "close"
+              }
+            ],
+            "stroke": {
+              "paint": {
+                "type": "solid",
+                "color": {
+                  "type": "color",
+                  "value": [
+                    0.545,
+                    0.588,
+                    0.294,
+                    0.28
+                  ]
+                }
+              },
+              "widthDp": 1,
+              "minimumPixels": 1,
+              "join": "miter"
+            }
+          },
+          {
+            "id": "header-wash",
+            "commands": [
+              {
+                "id": "p0",
+                "op": "move",
+                "points": [
+                  [
+                    15,
+                    4
+                  ]
+                ]
+              },
+              {
+                "id": "p1",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1,
+                      "dp": -15
+                    },
+                    4
+                  ]
+                ]
+              },
+              {
+                "id": "p2",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1,
+                      "dp": -4
+                    },
+                    15
+                  ]
+                ]
+              },
+              {
+                "id": "p3",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1,
+                      "dp": -4
+                    },
+                    62
+                  ]
+                ]
+              },
+              {
+                "id": "p4",
+                "op": "line",
+                "points": [
+                  [
+                    4,
+                    62
+                  ]
+                ]
+              },
+              {
+                "id": "p5",
+                "op": "line",
+                "points": [
+                  [
+                    4,
+                    15
+                  ]
+                ]
+              },
+              {
+                "id": "close",
+                "op": "close"
+              }
+            ],
+            "fill": {
+              "type": "linear",
+              "from": [
+                0,
+                0
+              ],
+              "to": [
+                {
+                  "fraction": 1,
+                  "dp": 0
+                },
+                0
+              ],
+              "stops": [
+                {
+                  "at": 0,
+                  "color": {
+                    "type": "color",
+                    "value": [
+                      0.545,
+                      0.588,
+                      0.294,
+                      0.16
+                    ]
+                  }
+                },
+                {
+                  "at": 1,
+                  "color": {
+                    "type": "color",
+                    "value": [
+                      0.545,
+                      0.588,
+                      0.294,
+                      0
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "timelines": [
+    {
+      "id": "reference-controls.default",
+      "durationMs": 300,
+      "tracks": [
+        {
+          "node": "reference-controls-focus",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 0
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 300,
+              "value": {
+                "type": "number",
+                "value": 0
+              }
+            }
+          ]
+        },
+        {
+          "node": "reference-controls-label",
+          "property": "color",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "color",
+                "value": [
+                  0.92,
+                  0.94,
+                  0.85,
+                  1
+                ]
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 300,
+              "value": {
+                "type": "color",
+                "value": [
+                  0.92,
+                  0.94,
+                  0.85,
+                  1
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "node": "reference-controls-label",
+          "property": "transform",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "transform",
+                "value": [
+                  0,
+                  0,
+                  1,
+                  1,
+                  0
+                ],
+                "unit": "dp"
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 300,
+              "value": {
+                "type": "transform",
+                "value": [
+                  0,
+                  0,
+                  1,
+                  1,
+                  0
+                ],
+                "unit": "dp"
+              }
+            }
+          ]
+        },
+        {
+          "node": "reference-controls",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 1
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 300,
+              "value": {
+                "type": "number",
+                "value": 1
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reference-controls.hover",
+      "durationMs": 60,
+      "tracks": [
+        {
+          "node": "reference-controls-focus",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 0
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 60,
+              "value": {
+                "type": "number",
+                "value": 0.35
+              }
+            }
+          ]
+        },
+        {
+          "node": "reference-controls-label",
+          "property": "color",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "color",
+                "value": [
+                  0.92,
+                  0.94,
+                  0.85,
+                  1
+                ]
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 60,
+              "value": {
+                "type": "color",
+                "value": [
+                  1,
+                  0.75,
+                  0.4,
+                  1
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "node": "reference-controls-label",
+          "property": "transform",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "transform",
+                "value": [
+                  0,
+                  0,
+                  1,
+                  1,
+                  0
+                ],
+                "unit": "dp"
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 60,
+              "value": {
+                "type": "transform",
+                "value": [
+                  0,
+                  0,
+                  1,
+                  1,
+                  0
+                ],
+                "unit": "dp"
+              }
+            }
+          ]
+        },
+        {
+          "node": "reference-controls",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 1
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 60,
+              "value": {
+                "type": "number",
+                "value": 1
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reference-controls.focus",
+      "durationMs": 80,
+      "tracks": [
+        {
+          "node": "reference-controls-focus",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 0
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 80,
+              "value": {
+                "type": "number",
+                "value": 1
+              }
+            }
+          ]
+        },
+        {
+          "node": "reference-controls-label",
+          "property": "color",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "color",
+                "value": [
+                  0.92,
+                  0.94,
+                  0.85,
+                  1
+                ]
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 80,
+              "value": {
+                "type": "color",
+                "value": [
+                  1,
+                  0.85,
+                  0.6,
+                  1
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "node": "reference-controls-label",
+          "property": "transform",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "transform",
+                "value": [
+                  0,
+                  0,
+                  1,
+                  1,
+                  0
+                ],
+                "unit": "dp"
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 80,
+              "value": {
+                "type": "transform",
+                "value": [
+                  0,
+                  0,
+                  1,
+                  1,
+                  0
+                ],
+                "unit": "dp"
+              }
+            }
+          ]
+        },
+        {
+          "node": "reference-controls",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 1
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 80,
+              "value": {
+                "type": "number",
+                "value": 1
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reference-controls.pressed",
+      "durationMs": 60,
+      "tracks": [
+        {
+          "node": "reference-controls-focus",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 0
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 60,
+              "value": {
+                "type": "number",
+                "value": 1
+              }
+            }
+          ]
+        },
+        {
+          "node": "reference-controls-label",
+          "property": "color",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "color",
+                "value": [
+                  0.92,
+                  0.94,
+                  0.85,
+                  1
+                ]
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 60,
+              "value": {
+                "type": "color",
+                "value": [
+                  1,
+                  1,
+                  0.9,
+                  1
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "node": "reference-controls-label",
+          "property": "transform",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "transform",
+                "value": [
+                  0,
+                  0,
+                  1,
+                  1,
+                  0
+                ],
+                "unit": "dp"
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 60,
+              "value": {
+                "type": "transform",
+                "value": [
+                  1,
+                  1,
+                  1,
+                  1,
+                  0
+                ],
+                "unit": "dp"
+              }
+            }
+          ]
+        },
+        {
+          "node": "reference-controls",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 1
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 60,
+              "value": {
+                "type": "number",
+                "value": 1
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reference-controls.disabled",
+      "durationMs": 80,
+      "tracks": [
+        {
+          "node": "reference-controls-focus",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 0
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 80,
+              "value": {
+                "type": "number",
+                "value": 0
+              }
+            }
+          ]
+        },
+        {
+          "node": "reference-controls-label",
+          "property": "color",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "color",
+                "value": [
+                  0.92,
+                  0.94,
+                  0.85,
+                  1
+                ]
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 80,
+              "value": {
+                "type": "color",
+                "value": [
+                  0.6,
+                  0.62,
+                  0.54,
+                  1
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "node": "reference-controls-label",
+          "property": "transform",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "transform",
+                "value": [
+                  0,
+                  0,
+                  1,
+                  1,
+                  0
+                ],
+                "unit": "dp"
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 80,
+              "value": {
+                "type": "transform",
+                "value": [
+                  0,
+                  0,
+                  1,
+                  1,
+                  0
+                ],
+                "unit": "dp"
+              }
+            }
+          ]
+        },
+        {
+          "node": "reference-controls",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 1
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 80,
+              "value": {
+                "type": "number",
+                "value": 0.35
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "editor": {
+    "zoom": 1,
+    "selection": [
+      "reference-panel"
+    ]
+  },
+  "extensions": {
+    "openq4.fixture": {
+      "productionDesign": false,
+      "interactive": false,
+      "nativeVectors": true,
+      "coverageAntialiasingQualified": false
+    }
+  },
+  "state": {
+    "progress": {
+      "type": "number",
+      "initial": 25
+    },
+    "limit": {
+      "type": "number",
+      "initial": 100
+    },
+    "available": {
+      "type": "boolean",
+      "initial": true
+    },
+    "shown": {
+      "type": "boolean",
+      "initial": true
+    },
+    "heading": {
+      "type": "string",
+      "initial": "#str_200009"
+    },
+    "scale": {
+      "type": "number",
+      "initial": 1,
+      "cvar": "ui_retainedScale"
+    }
+  },
+  "bindings": [
+    {
+      "id": "progress-width",
+      "node": "progress-fill",
+      "property": "width",
+      "value": {
+        "op": "clamp",
+        "args": [
+          {
+            "op": "*",
+            "args": [
+              100,
+              {
+                "op": "/",
+                "args": [
+                  {
+                    "state": "progress"
+                  },
+                  {
+                    "state": "limit"
+                  }
+                ]
+              }
+            ]
+          },
+          0,
+          100
+        ]
+      }
+    },
+    {
+      "id": "progress-number",
+      "node": "reading",
+      "property": "text",
+      "value": {
+        "op": "numberText",
+        "args": [
+          {
+            "state": "progress"
+          }
+        ]
+      }
+    },
+    {
+      "id": "heading-text",
+      "node": "reference-title",
+      "property": "text",
+      "value": {
+        "state": "heading"
+      }
+    },
+    {
+      "id": "action-availability",
+      "node": "reference-controls",
+      "property": "enabled",
+      "value": {
+        "state": "available"
+      }
+    },
+    {
+      "id": "panel-visibility",
+      "node": "reference-panel",
+      "property": "display",
+      "value": {
+        "op": "select",
+        "args": [
+          {
+            "state": "shown"
+          },
+          "block",
+          "none"
+        ]
+      }
+    },
+    {
+      "id": "scale-number",
+      "node": "scale-reading",
+      "property": "text",
+      "value": {
+        "op": "numberText",
+        "args": [
+          {
+            "state": "scale"
+          }
+        ],
+        "decimals": 2
+      }
+    }
+  ]
+}

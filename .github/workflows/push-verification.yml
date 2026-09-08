@@ -280,12 +280,14 @@ jobs:
             tools/tests/savegame_v3_contract.py \
             tools/tests/sdl3_input_parity.py \
             tools/tests/ui_retained_input.py \
+            tools/tests/ui_retained_state_sources.py \
             tools/tests/ui_legacy_inventory.py \
             tools/tests/ui_legacy_import.py \
             tools/ui/legacy_inventory.py \
             tools/ui/legacy_import.py \
             tools/ui/legacy_syntax.py \
             tools/ui/capture_legacy_baseline.py \
+            tools/ui/verify_binding_capture.py \
             tools/tests/ui_background_cursor.py \
             tools/tests/menu_controller_navigation.py \
             tools/tests/sdl3_multidisplay_windowing.py \
@@ -472,6 +474,7 @@ jobs:
           python tools/tests/savegame_v3_contract.py
           python tools/tests/sdl3_input_parity.py
           python tools/tests/ui_retained_input.py
+          python tools/tests/ui_retained_state_sources.py
           python tools/tests/ui_legacy_inventory.py
           python tools/tests/ui_legacy_import.py
           python tools/tests/ui_background_cursor.py

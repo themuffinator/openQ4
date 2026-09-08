@@ -31,6 +31,11 @@ struct TestHost final : Host {
 	}
 	void ClearSamples() { layers[0].pixels.assign(samplePoints.size(),Vertex{0,0,0,0,0,0,0,0}); drawn.clear(); }
 	bool ReadFile(const std::string&, std::string&) override { return false; }
+	StateValues cvars;
+	bool ReadCVar(const std::string& name, size_t, StateValue& value) override {
+		const auto found = cvars.find(name); if (found == cvars.end()) return false;
+		value = found->second; return true;
+	}
 	std::string Translate(const std::string& s) override { return s == "#str_test" ? "Localised" : s; }
 	void Log(bool error, const std::string& s) override { if (error) { ++errors; std::fprintf(stderr,"RmlUi: %s\n",s.c_str()); } }
 	std::uintptr_t LoadMaterial(const std::string&, int& w, int& h) override { w=h=256; return 1; }
@@ -523,8 +528,50 @@ int main(int argc, char** argv) {
 	routedInput.Cancel(true); route();
 	button(10,MenuInput::Accept,true); button(10,MenuInput::Accept,false);
 	Check(runtime.TakeActions().size() == 1,"cancellation also releases logical arms created by a previous input adapter");
+	std::ifstream bindingFile(argc > 2 ? argv[2] : "tools/ui/fixtures/binding-smoke.q4ui",std::ios::binary);
+	Check(bindingFile.good(),"live binding fixture exists");
+	const std::string bindingSource((std::istreambuf_iterator<char>(bindingFile)),std::istreambuf_iterator<char>());
+	host.cvars["ui_retainedScale"] = 1.25;
+	Check(runtime.LoadDocument(bindingSource,"bindings.q4ui",diagnostics),"load live state bindings");
+	viewport = {1280,720,1,1}; runtime.Frame(viewport,110);
+	Bounds track, fill; runtime.GetBounds("progress-track",track); runtime.GetBounds("progress-fill",fill);
+	Check(Near(fill.width,track.width*.25f),"binding sets actual layout width");
+	Check(runtime.PresentedValue("scale-reading","text")->text == "1.25","host CVar feeds runtime text");
+	std::string stateError;
+	Check(runtime.SetState({{"progress",75.0},{"heading",std::string("<img id='injected'> & Player")}},stateError,111),"application batch updates data");
+	runtime.Frame(viewport,111); runtime.GetBounds("progress-fill",fill);
+	Check(Near(fill.width,track.width*.75f),"live width changes without rebuilding document");
+	Bounds injected;
+	Check(!runtime.GetBounds("injected",injected),"dynamic text cannot inject retained elements");
+	Check(runtime.PresentedValue("reading","text")->text == "75","numeric text follows live state");
+	Check(runtime.FocusControl("reference-controls",111),"focus live bound control");
+	runtime.MenuAction(MenuInput::Accept,true,111);
+	Check(runtime.SetState({{"available",false}},stateError,111),"binding disables a pending activation");
+	runtime.MenuAction(MenuInput::Accept,false,111);
+	Check(runtime.TakeActions().empty() && runtime.GetControlState("reference-controls") == ControlState::Disabled,"state invalidation cancels the armed control");
+	Check(!runtime.SetControlEnabled("reference-controls",true,111),"manual mutation cannot bypass bound availability");
+	const auto boundRevision = runtime.StateRevision();
+	Check(!runtime.SetState({{"progress",5.0},{"limit",0.0}},stateError,112),"invalid derived state is rejected");
+	Check(runtime.StateRevision()==boundRevision && runtime.PresentedValue("reading","text")->text == "75","invalid batch keeps previous rendered values");
+	host.cvars["ui_retainedScale"] = 2.0; runtime.Frame(viewport,112);
+	Check(runtime.PresentedValue("scale-reading","text")->text == "2.00","external source refreshes existing document");
+	const auto stableRevision=runtime.StateRevision(); runtime.Frame(viewport,113);
+	Check(runtime.StateRevision()==stableRevision,"unchanged frame does not reevaluate bindings");
+	host.cvars["ui_retainedScale"] = std::numeric_limits<double>::quiet_NaN(); runtime.Frame(viewport,113);
+	Check(host.errors == 1 && runtime.StateRevision()==stableRevision && runtime.PresentedValue("scale-reading","text")->text == "2.00","invalid host state reports an error and retains the last snapshot");
+	runtime.Frame(viewport,113); Check(host.errors == 1,"a persistent host error is not logged every frame");
+	--host.errors; host.cvars["ui_retainedScale"] = 2.0; runtime.Frame(viewport,113);
+	Check(runtime.SetState({{"shown",false}},stateError,113),"hide state"); runtime.Frame(viewport,113);
+	Check(!runtime.FocusControl("reference-controls",113),"hidden bound panel has no eligible controls");
+	Check(runtime.SetState({{"shown",true},{"available",true}},stateError,114),"restore bound panel"); runtime.Frame(viewport,114);
+	const auto savedState=runtime.GetState(false);
+	Check(!savedState.contains("scale"),"application snapshot excludes host sources");
+	runtime.Shutdown(); Check(runtime.LoadDocument(bindingSource,"bindings-restart.q4ui",diagnostics),"restart live document");
+	Check(runtime.SetState(savedState,stateError,115),"restore application state through validated batch");
+	runtime.Frame(viewport,115);
+	Check(runtime.PresentedValue("reading","text")->text == "75" && runtime.PresentedValue("scale-reading","text")->text == "2.00","restart preserves application state and rereads current host state");
 	runtime.CloseDocument();
-	Check(!runtime.IsLoaded(),"close document");
+	Check(!runtime.IsLoaded() && runtime.GetState().empty(),"close releases document state");
 	runtime.Shutdown();
 	Check(runtime.Statistics().residentGeometryCount == 0 && runtime.Statistics().residentGeometryBytes == 0,"geometry accounting returns to zero after shutdown");
 	Check(runtime.Initialize(),"restart lifetime without stale services");

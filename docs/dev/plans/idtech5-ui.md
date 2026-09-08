@@ -266,7 +266,7 @@ successful commit/push, verify remote heads before saying the stage is published
 | --- | --- | --- | --- |
 | 2026-09-08 | 0 | Specification/integration contracts committed and pushed in both repositories; remote heads verified | Complete |
 | 2026-09-08 | 1 | Effective VFS inventory and native structured import implemented for 271 resources; 15,414 preprocessed windows and 8,654 events, with two explicit expression diagnostics; migration seed remains pending | Full semantic/binding classification, material/bitmap decisions and family gameplay baselines |
-| 2026-09-08 | 2 | Retained engine rendering, density and rectangular clipping integrated; canonical documents, value edits, presentation tracks, semantic controls and SDL/session input ownership implemented | Complete component/state/binding schemas, game bridge, text/IME and broader input qualification, transformed overflow clipping, text backend and representative screen/editor qualification |
+| 2026-09-08 | 2 | Retained engine rendering, density and rectangular clipping integrated; canonical documents, value edits, presentation tracks, controls, SDL/session ownership and typed application/CVar expression bindings implemented | Complete component/event/binding semantics, game bridge and legacy lowering, text/IME and broader input qualification, transformed overflow clipping, text backend and representative screen/editor qualification |
 | 2026-09-08 | 3 | Editable responsive paths, winding fills, stroke unions, linear paints, analytic coverage, isolated subtree opacity and editable alpha masks integrated | Broader composition effects, complete paints/strokes/fonts, production components and all artwork, performance and broader platform/visual qualification |
 
 Inventory methodology and limitations: [inventory report](../ui/inventory-report.md).
@@ -275,6 +275,11 @@ preprocessing, ordered declarations, expression/script trees and dependency
 records. SP/OpenGL and MP/Vulkan produce identical exports; none of the 271
 resources is accepted as a replacement.
 Canonical source and motion contract: [document checkpoint](../ui/document-format.md).
+[Live state bindings](../ui/bindings.md) now update geometry, text and availability
+without rebuilding documents, validate state batches atomically and retain
+application values through renderer/language changes. Native checks and reviewed
+SP/OpenGL and MP/Vulkan captures pass. The game bridge, legacy lowering and full
+Stage 2 completion remain open.
 Semantic buttons now use authored state timelines, projected hit testing,
 source-order/spatial navigation and modal focus ownership. The
 [interaction checkpoint](../ui/interaction.md) records native behavior checks,

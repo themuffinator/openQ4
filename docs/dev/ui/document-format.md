@@ -8,6 +8,9 @@ bridge or translated GUI corpus. Those remain required by the
 [delivery plan](../plans/idtech5-ui.md) and
 [visual specification](../ui-visual-design.md).
 
+The later [live binding checkpoint](bindings.md) adds typed application/CVar
+state, expression trees and transactional updates to this canonical format.
+
 ## Source and compatibility
 
 Author `.q4ui` files as UTF-8 JSON with `//` and `/* ... */` comments. A file
@@ -82,7 +85,7 @@ Negative anchors, margins and letter spacing are supported; sizes, padding,
 gaps and border widths cannot be negative. Percentages are not accepted for
 font metrics, borders or transform translations. `auto` is supported for
 anchors, dimensions and margins. Additional layout constraints, components,
-bindings and material/image nodes remain to be implemented. Native vector nodes
+and material/image nodes remain to be implemented. Native vector nodes
 now have a `paths` array; their [source/compiler contract](vector-paths.md)
 records supported curves, strokes, paints and remaining quality gates.
 
@@ -104,7 +107,9 @@ semantic action IDs, enabled state, navigation links and five required state
 timelines. Feedback stays within the button subtree, covers the same properties
 in every state and preserves the button's own hit box. The runtime uses these
 declarations for focus, paired activation and modal input scopes; other widget
-roles and game bindings remain open. [Input ownership](input-routing.md) connects
+roles and the game bridge remain open. [Live bindings](bindings.md) can now own
+control availability and cancel an ineligible pending activation.
+[Input ownership](input-routing.md) connects
 these declarations to SDL and session routing and records its qualification limits.
 
 The render adapter owns the conversion into RmlUi syntax. In particular, RmlUi
@@ -197,8 +202,9 @@ timeline are rejected.
   current opacity before retargeting. Disabling it never resurrects cancelled
   motion. Essential gameplay-information tracks retain their authored timing.
 
-This checkpoint covers property presentation. Action/event markers, game-state
-bindings, named legacy script events, state graphs, sound scheduling, layout
+This checkpoint covers property presentation. Subsequent [state bindings](bindings.md)
+drive data properties independently of timeline-owned properties. Action/event
+markers, full game-state integration, named legacy script events, state graphs, sound scheduling, layout
 invalidation policies, map/unload cancellation and save restoration still need
 their semantic bridge. No functional menu behavior is claimed from animation.
 

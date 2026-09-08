@@ -53,6 +53,9 @@ public:
 	virtual ~Host() = default;
 	virtual bool ReadFile(const std::string& path, std::string& contents) = 0;
 	virtual std::string Translate(const std::string& text) = 0;
+	// Read-only external state. Return false for unavailable/invalid sources;
+	// the runtime retains the last valid snapshot and reports the source.
+	virtual bool ReadCVar(const std::string& name, size_t type, StateValue& value) = 0;
 	virtual void Log(bool error, const std::string& message) = 0;
 	virtual std::uintptr_t LoadMaterial(const std::string& name, int& width, int& height) = 0;
 	virtual void Draw(const std::vector<Vertex>& vertices, const std::vector<int>& indices, std::uintptr_t material) = 0;
@@ -82,6 +85,10 @@ public:
 	// Integration-spike entry point, not the canonical editor serialization.
 	bool LoadMarkup(const std::string& markup, const std::string& sourcePath);
 	bool LoadDocument(const std::string& source, const std::string& sourcePath, std::vector<Diagnostic>& diagnostics);
+	bool SetState(const StateValues& changes, std::string& error, double monotonicSeconds);
+	StateValues GetState(bool includeHostSources = true) const;
+	std::optional<Value> PresentedValue(const std::string& node, const std::string& property) const;
+	std::uint64_t StateRevision() const;
 	bool PlayTimeline(const std::string& id, double monotonicSeconds);
 	void PauseTimeline(const std::string& id, double monotonicSeconds);
 	void ResumeTimeline(const std::string& id, double monotonicSeconds);

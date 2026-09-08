@@ -1,5 +1,6 @@
 // Copyright (C) 2026 DarkMatter Productions. GPL-3.0-or-later.
 #include "Runtime.h"
+#include "State.h"
 #include "VectorElement.h"
 
 #include <RmlUi/Core.h>
@@ -386,6 +387,9 @@ struct Runtime::Impl {
 	Rml::ElementDocument* document = nullptr;
 	std::unique_ptr<Document> canonical;
 	Motion motion;
+	State state;
+	std::string stateError;
+	std::uint64_t appliedStateRevision = 0;
 	Interaction interaction;
 	Viewport viewport;
 	std::vector<std::string> controls;
@@ -394,6 +398,25 @@ struct Runtime::Impl {
 	bool pointerPresent = false;
 	std::map<PropertyKey,std::string> applied;
 	bool initialized = false;
+	void ApplyControlBindings() {
+		if (appliedStateRevision == state.Revision()) return;
+		for (const auto& [id,enabled] : state.Enabled()) interaction.SetEnabled(id,enabled);
+		appliedStateRevision = state.Revision(); Feedback(system.time);
+	}
+	void ReadStateSources() {
+		StateValues changes; std::string error;
+		for (const auto& [id,declaration] : state.Declarations()) {
+			if (declaration.cvar.empty()) continue;
+			StateValue value;
+			if (!host.ReadCVar(declaration.cvar,declaration.initial.index(),value)) {
+				error = "Unavailable or invalid CVar source '"+declaration.cvar+"' for state '"+id+"'"; break;
+			}
+			changes[id] = std::move(value);
+		}
+		if (error.empty()) state.Set(changes,error,true);
+		if (!error.empty() && error != stateError) host.Log(true,error);
+		stateError = std::move(error); ApplyControlBindings();
+	}
 	void Feedback(double seconds) {
 		if (std::isfinite(seconds)) system.time = std::max(system.time,seconds);
 		for (const auto& change : interaction.TakeFeedback()) motion.Play(change.timeline,system.time);
@@ -423,7 +446,9 @@ struct Runtime::Impl {
 	}
 	void ApplyMotion() {
 		if (!document || !canonical) return;
-		for (const auto& [key,value] : motion.Values()) {
+		for (const auto& [key,animated] : motion.Values()) {
+			const auto bound = state.Properties().find(key);
+			const auto& value = bound == state.Properties().end() ? animated : bound->second;
 			const bool opacity = key.second == "opacity";
 			const auto string = opacity ? (value.data[0] < 1 ? "opacity("+value.Css()+")" : "none") :
 				value.type == ValueType::Text ? host.Translate(value.text) : value.Css();
@@ -465,6 +490,7 @@ void Runtime::Shutdown() {
 	impl->context = nullptr;
 	impl->document = nullptr;
 	impl->canonical.reset(); impl->applied.clear(); impl->motion.Reset({});
+	impl->state = {}; impl->appliedStateRevision = 0; impl->stateError.clear();
 	impl->interaction.Reset({}); impl->controls.clear(); impl->pointerPresent = false;
 	impl->initialized = false;
 	impl->system.time = 0;
@@ -476,6 +502,7 @@ void Runtime::Shutdown() {
 }
 void Runtime::CloseDocument() {
 	impl->canonical.reset(); impl->applied.clear(); impl->motion.Reset({});
+	impl->state = {}; impl->appliedStateRevision = 0; impl->stateError.clear();
 	impl->interaction.Reset({}); impl->controls.clear(); impl->pointerPresent = false;
 	if (!impl->document) return;
 	impl->document->Close();
@@ -498,6 +525,8 @@ bool Runtime::LoadDocument(const std::string& source, const std::string& sourceP
 	if (!LoadMarkup(candidate->BuildMarkup(),sourcePath)) return false;
 	impl->motion.Reset(candidate->Model());
 	impl->interaction.Reset(candidate->Model());
+	std::string stateError;
+	impl->state.Reset(candidate->Model(),stateError); // Initial state was validated by Document::Load.
 	impl->canonical = std::move(candidate);
 	std::vector<const Node*> nodes{&impl->canonical->Model().root};
 	while (!nodes.empty()) {
@@ -510,11 +539,31 @@ bool Runtime::LoadDocument(const std::string& source, const std::string& sourceP
 			static_cast<VectorElement*>(element)->Configure(*node,impl->host,impl->statistics);
 		for (const auto& child : node->children) nodes.push_back(&child);
 	}
-	impl->Feedback(impl->system.time);
+	impl->ReadStateSources(); impl->Feedback(impl->system.time);
 	impl->ApplyMotion();
 	return true;
 }
 bool Runtime::PlayTimeline(const std::string& id, double seconds) { return impl->canonical && impl->motion.Play(id,seconds); }
+bool Runtime::SetState(const StateValues& changes, std::string& error, double seconds) {
+	if (!impl->canonical) { error = "State updates require a canonical document"; return false; }
+	if (!impl->state.Set(changes,error)) return false;
+	if (std::isfinite(seconds)) impl->system.time = std::max(impl->system.time,seconds);
+	impl->ApplyControlBindings(); return true;
+}
+StateValues Runtime::GetState(bool includeHostSources) const {
+	StateValues values;
+	for (const auto& [id,value] : impl->state.Variables())
+		if (includeHostSources || impl->state.Declarations().at(id).cvar.empty()) values[id] = value;
+	return values;
+}
+std::uint64_t Runtime::StateRevision() const { return impl->state.Revision(); }
+std::optional<Value> Runtime::PresentedValue(const std::string& node, const std::string& property) const {
+	const PropertyKey key{node,property};
+	const auto bound = impl->state.Properties().find(key);
+	if (bound != impl->state.Properties().end()) return bound->second;
+	const auto animated = impl->motion.Values().find(key);
+	return animated == impl->motion.Values().end() ? std::nullopt : std::optional<Value>(animated->second);
+}
 void Runtime::PauseTimeline(const std::string& id, double seconds) { impl->motion.Pause(id,seconds); }
 void Runtime::ResumeTimeline(const std::string& id, double seconds) { impl->motion.Resume(id,seconds); }
 void Runtime::CancelTimeline(const std::string& id, CancelPolicy policy, double seconds) { impl->motion.Cancel(id,policy,seconds); }
@@ -531,6 +580,7 @@ void Runtime::Frame(const Viewport& viewport, double seconds) {
 	if (impl->pointerPresent) viewport.WindowToDocument(impl->windowPointerX,impl->windowPointerY,impl->pointerX,impl->pointerY);
 	const auto start = std::chrono::steady_clock::now();
 	if (std::isfinite(seconds)) impl->system.time = std::max(impl->system.time, seconds);
+	impl->ReadStateSources();
 	impl->motion.Advance(impl->system.time);
 	impl->ApplyMotion();
 	impl->context->SetDimensions({viewport.width, viewport.height});
@@ -580,7 +630,10 @@ void Runtime::PointerButton(bool down, double seconds) { impl->interaction.Point
 void Runtime::MenuAction(MenuInput input, bool down, double seconds) { impl->interaction.Input(input,down); impl->Feedback(seconds); }
 void Runtime::CancelInput(double seconds) { impl->pointerPresent = false; impl->interaction.Cancel(); impl->Feedback(seconds); }
 bool Runtime::FocusControl(const std::string& id, double seconds) { const bool result = impl->interaction.Focus(id); impl->Feedback(seconds); return result; }
-bool Runtime::SetControlEnabled(const std::string& id, bool enabled, double seconds) { const bool result = impl->interaction.SetEnabled(id,enabled); impl->Feedback(seconds); return result; }
+bool Runtime::SetControlEnabled(const std::string& id, bool enabled, double seconds) {
+	if (impl->state.Enabled().contains(id)) return false; // The binding owns this control's availability.
+	const bool result = impl->interaction.SetEnabled(id,enabled); impl->Feedback(seconds); return result;
+}
 bool Runtime::PushModal(const std::string& id, double seconds) { const bool result = impl->interaction.PushModal(id); impl->Feedback(seconds); return result; }
 bool Runtime::PopModal(double seconds) { const bool result = impl->interaction.PopModal(); impl->Feedback(seconds); return result; }
 std::string Runtime::FocusedControl() const { return impl->interaction.Focused(); }

@@ -1,5 +1,6 @@
 // Copyright (C) 2026 DarkMatter Productions. GPL-3.0-or-later.
 #include "Document.h"
+#include "State.h"
 #include <json/json.h>
 #include <algorithm>
 #include <charconv>
@@ -10,6 +11,43 @@
 #include <string_view>
 
 namespace openq4::ui {
+bool ValidProperty(const std::string& name, const Value& value) {
+	for (double component : value.data) if (!std::isfinite(component) || std::abs(component) > 1000000) return false;
+	if (value.type == ValueType::Colour) for (size_t i = 0; i < 4; ++i) if (value.data[i] < 0 || value.data[i] > 1) return false;
+	if (!ValidStateValue(StateValue(value.text))) return false;
+	if (value.type == ValueType::Font) {
+		if (value.text.empty() || value.text.size() > 128) return false;
+		for (unsigned char c : value.text) if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+			(c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-')) return false;
+	}
+
+		static const std::set<std::string> lengths = {"left","right","top","bottom","width","height","min-width","max-width","min-height","max-height","padding","padding-left","padding-right","padding-top","padding-bottom","margin","margin-left","margin-right","margin-top","margin-bottom","font-size","line-height","letter-spacing","border-width","border-left-width","border-right-width","border-top-width","border-bottom-width","row-gap","column-gap"};
+		static const std::set<std::string> colours = {"color","background-color","border-color","border-left-color","border-right-color","border-top-color","border-bottom-color"};
+		static const std::map<std::string,std::set<std::string>> keywords = {
+			{"position",{"absolute","relative"}}, {"display",{"block","inline","inline-block","flex","none"}},
+			{"overflow",{"visible","hidden","auto","scroll"}}, {"text-align",{"left","center","right"}},
+			{"white-space",{"normal","pre","nowrap","pre-wrap","pre-line"}},
+			{"flex-direction",{"row","row-reverse","column","column-reverse"}},
+			{"flex-wrap",{"nowrap","wrap","wrap-reverse"}},
+			{"justify-content",{"flex-start","flex-end","center","space-between","space-around","space-evenly"}},
+			{"align-items",{"stretch","flex-start","flex-end","center","baseline"}},
+			{"box-sizing",{"content-box","border-box"}}};
+		bool valid = false;
+		if (lengths.contains(name)) {
+			valid = value.type == ValueType::Length;
+			if (value.type == ValueType::Keyword && value.text == "auto") valid = name == "left" || name == "right" || name == "top" || name == "bottom" || name == "width" || name == "height" || name.starts_with("margin");
+			const bool mayNegative = name == "left" || name == "right" || name == "top" || name == "bottom" || name.starts_with("margin") || name == "letter-spacing";
+			if (value.type == ValueType::Length && !mayNegative && value.data[0] < 0) valid = false;
+			if ((name == "font-size" || name == "line-height" || name == "letter-spacing" || name.find("border") == 0) && value.unit == "%") valid = false;
+		} else if (colours.contains(name)) valid = value.type == ValueType::Colour;
+		else if (auto entry = keywords.find(name); entry != keywords.end()) valid = value.type == ValueType::Keyword && entry->second.contains(value.text);
+		else if (name == "opacity") valid = value.type == ValueType::Number && value.data[0] >= 0 && value.data[0] <= 1;
+		else if (name == "flex-grow" || name == "flex-shrink") valid = value.type == ValueType::Number && value.data[0] >= 0;
+		else if (name == "font-family") valid = value.type == ValueType::Font;
+		else if (name == "text") valid = value.type == ValueType::Text;
+		else if (name == "transform") valid = value.type == ValueType::Transform;
+		return valid;
+	}
 namespace {
 constexpr size_t MaxSourceBytes = 16 * 1024 * 1024;
 std::string Number(double value) {
@@ -161,7 +199,7 @@ public:
 	Validator(const std::string& text, std::vector<Diagnostic>& errors) : source(text), diagnostics(errors) {}
 	DocumentModel Read(const Json::Value& root) {
 		FiniteTree(root,"");
-		Fields(root,"",{"format","version","id","tokens","root","timelines","editor","extensions"});
+		Fields(root,"",{"format","version","id","tokens","root","timelines","state","bindings","editor","extensions"});
 		Require(root["format"] == "openq4-ui",root,"/format","Expected format 'openq4-ui'");
 		Require(root["version"].isUInt() && root["version"].asUInt() == 1,root["version"],"/version","Unsupported document version; expected 1");
 		model.id = Id(root["id"],"/id");
@@ -173,6 +211,7 @@ public:
 				model.tokens[name] = Typed(root["tokens"][name],"/tokens/"+PointerPart(name),false);
 			}
 		}
+		ReadState(root);
 		model.root = ReadNode(root["root"],"/root",0);
 		if (root.isMember("timelines")) {
 			Require(root["timelines"].isArray(),root["timelines"],"/timelines","Expected a timeline array");
@@ -184,9 +223,119 @@ public:
 			}
 		}
 		ValidateControls(root["root"],model.root,"/root",false);
+		ReadBindings(root);
+		State initial; std::string stateError;
+		Require(initial.Reset(model,stateError),root["bindings"],"/bindings",stateError);
 		return std::move(model);
 	}
 private:
+	void ReadState(const Json::Value& root) {
+		if (!root.isMember("state")) return;
+		const auto& values = root["state"];
+		Require(values.isObject() && values.size() <= 4096,values,"/state","Expected at most 4096 state declarations");
+		for (const auto& name : values.getMemberNames()) {
+			const auto p = "/state/"+PointerPart(name); const auto& v = values[name];
+			Require(Identifier(name),v,p,"Invalid state ID");
+			Fields(v,p,{"type","initial","cvar","extensions"});
+			Require(v["type"].isString(),v,p+"/type","Expected a state type");
+			const auto type = v["type"].asString(); StateDeclaration declaration;
+			if (type == "number") declaration.initial = Numeric(v["initial"],p+"/initial",-1000000000000.0,1000000000000.0);
+			else if (type == "boolean") {
+				Require(v["initial"].isBool(),v["initial"],p+"/initial","Expected a boolean"); declaration.initial = v["initial"].asBool();
+			} else if (type == "string") {
+				Require(v["initial"].isString(),v["initial"],p+"/initial","Expected a string"); declaration.initial = v["initial"].asString();
+				const auto& text = std::get<std::string>(declaration.initial);
+				Require(text.empty() || (text.starts_with("#str_") && Identifier(text.substr(1))),v["initial"],p+"/initial","Authored string state starts empty or with a localization key; application data arrives through state updates");
+			} else Require(false,v["type"],p+"/type","Expected number, boolean or string state");
+			Require(ValidStateValue(declaration.initial),v["initial"],p+"/initial","Invalid state value");
+			if (v.isMember("cvar")) declaration.cvar = Id(v["cvar"],p+"/cvar");
+			model.state.emplace(name,std::move(declaration));
+		}
+	}
+	Expression ReadExpression(const Json::Value& value, const std::string& path, unsigned depth = 0) {
+		Require(depth <= 32 && ++expressionCount <= 65536,value,path,"Expression node/depth budget exceeded");
+		Expression result;
+		if (value.isNumeric()) result.literal = Numeric(value,path,-1000000000000.0,1000000000000.0);
+		else if (value.isBool()) result.literal = value.asBool();
+		else if (value.isString()) result.literal = value.asString();
+		else if (value.isObject() && value.isMember("state")) {
+			Fields(value,path,{"state","extensions"}); result.state = Id(value["state"],path+"/state");
+			const auto found = model.state.find(result.state);
+			Require(found != model.state.end(),value,path,"Unknown state reference '"+result.state+"'");
+			result.type = found->second.initial.index(); return result;
+		} else {
+			Fields(value,path,{"op","args","decimals","extensions"});
+			Require(value["op"].isString(),value,path+"/op","Expected an expression operation");
+			result.op = value["op"].asString();
+			static const std::map<std::string,unsigned> arities = {{"+",2},{"-",2},{"*",2},{"/",2},{"%",2},
+				{"min",2},{"max",2},{"abs",1},{"floor",1},{"ceil",1},{"round",1},{"clamp",3},
+				{"==",2},{"!=",2},{"<",2},{"<=",2},{">",2},{">=",2},{"&&",2},{"||",2},{"!",1},{"select",3},{"numberText",1}};
+			const auto arity = arities.find(result.op);
+			Require(arity != arities.end(),value["op"],path+"/op","Unknown expression operation");
+			Require(value["args"].isArray() && value["args"].size() == arity->second,value["args"],path+"/args","Incorrect expression arity");
+			for (Json::ArrayIndex i = 0; i < value["args"].size(); ++i) result.args.push_back(ReadExpression(value["args"][i],path+"/args/"+std::to_string(i),depth+1));
+			auto types = [&](size_t expected) { return std::all_of(result.args.begin(),result.args.end(),[&](const Expression& arg) { return arg.type == expected; }); };
+			if (result.op == "select") {
+				Require(result.args[0].type == 1 && result.args[1].type == result.args[2].type,value,path,"Select requires a boolean condition and matching branches"); result.type = result.args[1].type;
+			} else if (result.op == "==" || result.op == "!=") {
+				Require(result.args[0].type == result.args[1].type,value,path,"Equality operands must have the same type"); result.type = 1;
+			} else if (result.op == "&&" || result.op == "||" || result.op == "!") {
+				Require(types(1),value,path,"Logical operators require boolean operands"); result.type = 1;
+			} else {
+				Require(types(0),value,path,"Operation requires numeric operands");
+				result.type = result.op == "numberText" ? 2 : (result.op == "<" || result.op == "<=" || result.op == ">" || result.op == ">=") ? 1 : 0;
+			}
+			if (value.isMember("decimals")) {
+				Require(result.op == "numberText" && value["decimals"].isUInt() && value["decimals"].asUInt() <= 6,value["decimals"],path+"/decimals","Number text supports 0..6 decimal places"); result.decimals = value["decimals"].asUInt();
+			}
+			return result;
+		}
+		Require(ValidStateValue(result.literal),value,path,"Invalid expression literal"); result.type = result.literal.index(); return result;
+	}
+	bool LocalizedTextResult(const Expression& expression) const {
+		if (!expression.state.empty() || expression.op == "numberText") return true;
+		if (expression.op == "select") return LocalizedTextResult(expression.args[1]) && LocalizedTextResult(expression.args[2]);
+		if (!expression.op.empty() || expression.type != 2) return false;
+		const auto& text = std::get<std::string>(expression.literal);
+		return text.empty() || (text.starts_with("#str_") && Identifier(text.substr(1)));
+	}
+	void ReadBindings(const Json::Value& root) {
+		if (!root.isMember("bindings")) return;
+		const auto& bindings = root["bindings"];
+		Require(bindings.isArray() && bindings.size() <= 8192,bindings,"/bindings","Expected at most 8192 bindings");
+		std::set<std::string> ids; std::set<std::pair<std::string,std::string>> targets;
+		for (Json::ArrayIndex i = 0; i < bindings.size(); ++i) {
+			const auto& value = bindings[i]; const auto path = "/bindings/"+std::to_string(i);
+			Fields(value,path,{"id","node","property","value","extensions"});
+			Binding binding; binding.id = Id(value["id"],path+"/id"); binding.node = Id(value["node"],path+"/node"); binding.property = Id(value["property"],path+"/property");
+			Require(ids.insert(binding.id).second,value,path,"Duplicate binding ID");
+			const Node* node = model.FindNode(binding.node);
+			Require(node != nullptr,value["node"],path+"/node","Unknown binding target");
+			const bool enabled = binding.property == "enabled";
+			Require(!enabled || node->control.has_value(),value,path,"Enabled binding requires a semantic control");
+			const auto properties = enabled ? std::vector<std::string>{"enabled"} : ExpandedProperties(binding.property);
+			for (const auto& property : properties) {
+				Require(enabled || node->properties.contains(property),value,path,"Bound properties require explicit base values");
+				Require(targets.insert({binding.node,property}).second,value,path,"Multiple bindings own the same effective property");
+				for (const auto& timeline : model.timelines) for (const auto& track : timeline.tracks)
+					Require(track.node != binding.node || track.property != property,value,path,"A binding and timeline cannot own the same property; use separate presentation/content nodes");
+				Binding effective = binding; effective.property = property;
+				if (!enabled) effective.prototype = node->properties.at(property);
+				const auto type = effective.prototype.type;
+				const size_t expected = enabled ? 1 : (type == ValueType::Text || type == ValueType::Keyword || type == ValueType::Font) ? 2 : 0;
+				const size_t count = !enabled && type == ValueType::Colour ? 4 : !enabled && type == ValueType::Transform ? 5 : 1;
+				Require(count == 1 || (value["value"].isArray() && value["value"].size() == count),value["value"],path+"/value","Binding component count does not match its target");
+				for (size_t component = 0; component < count; ++component) {
+					const auto at = count == 1 ? path+"/value" : path+"/value/"+std::to_string(component);
+					auto expression = ReadExpression(count == 1 ? value["value"] : value["value"][static_cast<Json::ArrayIndex>(component)],at);
+					Require(expression.type == expected,value["value"],at,"Expression type does not match its target");
+					if (!enabled && type == ValueType::Text) Require(LocalizedTextResult(expression),value["value"],at,"Literal display text must use localization keys");
+					effective.values.push_back(std::move(expression));
+				}
+				model.bindings.push_back(std::move(effective));
+			}
+		}
+	}
 	void Require(bool condition, const Json::Value& at, const std::string& path, const std::string& message) {
 		if (condition) return;
 		Diagnose(diagnostics,source,path,message,static_cast<size_t>(std::max<ptrdiff_t>(0,at.getOffsetStart())));
@@ -343,33 +492,9 @@ private:
 		return result;
 	}
 	void Property(const std::string& name, const Value& value, const Json::Value& at, const std::string& path) {
-		static const std::set<std::string> lengths = {"left","right","top","bottom","width","height","min-width","max-width","min-height","max-height","padding","padding-left","padding-right","padding-top","padding-bottom","margin","margin-left","margin-right","margin-top","margin-bottom","font-size","line-height","letter-spacing","border-width","border-left-width","border-right-width","border-top-width","border-bottom-width","row-gap","column-gap"};
-		static const std::set<std::string> colours = {"color","background-color","border-color","border-left-color","border-right-color","border-top-color","border-bottom-color"};
-		static const std::map<std::string,std::set<std::string>> keywords = {
-			{"position",{"absolute","relative"}}, {"display",{"block","inline","inline-block","flex","none"}},
-			{"overflow",{"visible","hidden","auto","scroll"}}, {"text-align",{"left","center","right"}},
-			{"white-space",{"normal","pre","nowrap","pre-wrap","pre-line"}},
-			{"flex-direction",{"row","row-reverse","column","column-reverse"}},
-			{"flex-wrap",{"nowrap","wrap","wrap-reverse"}},
-			{"justify-content",{"flex-start","flex-end","center","space-between","space-around","space-evenly"}},
-			{"align-items",{"stretch","flex-start","flex-end","center","baseline"}},
-			{"box-sizing",{"content-box","border-box"}}};
-		bool valid = false;
-		if (lengths.contains(name)) {
-			valid = value.type == ValueType::Length;
-			if (value.type == ValueType::Keyword && value.text == "auto") valid = name == "left" || name == "right" || name == "top" || name == "bottom" || name == "width" || name == "height" || name.starts_with("margin");
-			const bool mayNegative = name == "left" || name == "right" || name == "top" || name == "bottom" || name.starts_with("margin") || name == "letter-spacing";
-			if (value.type == ValueType::Length && !mayNegative && value.data[0] < 0) valid = false;
-			if ((name == "font-size" || name == "line-height" || name == "letter-spacing" || name.find("border") == 0) && value.unit == "%") valid = false;
-		} else if (colours.contains(name)) valid = value.type == ValueType::Colour;
-		else if (auto entry = keywords.find(name); entry != keywords.end()) valid = value.type == ValueType::Keyword && entry->second.contains(value.text);
-		else if (name == "opacity") valid = value.type == ValueType::Number && value.data[0] >= 0 && value.data[0] <= 1;
-		else if (name == "flex-grow" || name == "flex-shrink") valid = value.type == ValueType::Number && value.data[0] >= 0;
-		else if (name == "font-family") valid = value.type == ValueType::Font;
-		else if (name == "text") valid = value.type == ValueType::Text;
-		else if (name == "transform") valid = value.type == ValueType::Transform;
-		Require(valid,at,path,"Unsupported property or invalid value for '"+name+"'");
+		Require(ValidProperty(name,value),at,path,"Unsupported property or invalid value for '"+name+"'");
 	}
+
 	Node ReadNode(const Json::Value& value, const std::string& path, unsigned depth) {
 		Require(depth <= 48 && ++nodeCount <= 65536,value,path,"Document hierarchy exceeds the node/depth limit");
 		Fields(value,path,{"id","type","properties","children","paths","mask","control","extensions"});
@@ -544,6 +669,7 @@ private:
 	const std::string& source;
 	std::vector<Diagnostic>& diagnostics;
 	DocumentModel model;
+	size_t expressionCount = 0;
 	std::set<std::string> nodeIds;
 	unsigned nodeCount = 0;
 };
@@ -638,6 +764,29 @@ double Easing::Evaluate(double fraction) const {
 		if (bezier(mid,x1,x2) < x) low = mid; else high = mid;
 	}
 	return bezier((low+high)*.5,y1,y2);
+}
+bool ValidStateValue(const StateValue& value) {
+	if (const auto number = std::get_if<double>(&value)) return std::isfinite(*number) && std::abs(*number) <= 1000000000000.0;
+	if (const auto text = std::get_if<std::string>(&value)) { size_t bad = 0; return text->size() <= 65536 && Utf8(*text,bad); }
+	return true;
+}
+bool ParseStateValues(const std::string& source, StateValues& values, std::vector<Diagnostic>& diagnostics) {
+	diagnostics.clear(); Json::Value root;
+	if (!Parse(source,root,diagnostics)) return false;
+	if (!root.isObject() || root.size() > 4096) { Diagnose(diagnostics,source,"","Expected at most 4096 state values",0); return false; }
+	StateValues candidate;
+	for (const auto& name : root.getMemberNames()) {
+		const auto& value = root[name]; StateValue parsed;
+		if (value.isBool()) parsed = value.asBool();
+		else if (value.isNumeric()) parsed = value.asDouble();
+		else if (value.isString()) parsed = value.asString();
+		else { Diagnose(diagnostics,source,"/"+PointerPart(name),"State values must be numbers, booleans or strings",value.getOffsetStart()); return false; }
+		if (!Identifier(name) || !ValidStateValue(parsed)) {
+			Diagnose(diagnostics,source,"/"+PointerPart(name),"Invalid state ID/type/value",value.getOffsetStart()); return false;
+		}
+		candidate.emplace(name,std::move(parsed));
+	}
+	values = std::move(candidate); return true;
 }
 const Node* DocumentModel::FindNode(const std::string& id) const { return Find(root,id); }
 struct Document::Impl { std::string source; Json::Value root; DocumentModel model; };

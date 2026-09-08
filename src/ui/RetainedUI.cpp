@@ -39,6 +39,21 @@ public:
 	std::string Translate(const std::string& text) override {
 		return text.compare(0,5,"#str_") == 0 ? common->GetLanguageDict()->GetString(text.c_str()) : text;
 	}
+	bool ReadCVar(const std::string& name, size_t type, openq4::ui::StateValue& value) override {
+		const idCVar* cvar = cvarSystem->Find(name.c_str());
+		if (!cvar) return false;
+		if (type == 2) { value = std::string(cvar->GetString()); return true; }
+		if (type == 1) {
+			if (!(cvar->GetFlags() & CVAR_BOOL)) return false;
+			value = cvar->GetBool(); return true;
+		}
+		// Preserve the engine's numeric value and avoid raising the libc++
+		// requirement to its newer floating-point from_chars implementation.
+		if (!(cvar->GetFlags() & (CVAR_FLOAT | CVAR_INTEGER | CVAR_BOOL))) return false;
+		const double number = (cvar->GetFlags() & CVAR_INTEGER) ? static_cast<double>(cvar->GetInteger()) : static_cast<double>(cvar->GetFloat());
+		if (!std::isfinite(number)) return false;
+		value = number; return true;
+	}
 	void Log(bool error, const std::string& message) override {
 		if (error) common->Warning("retained UI: %s", message.c_str());
 		else common->DPrintf("retained UI: %s\n", message.c_str());
@@ -389,9 +404,33 @@ void Events_f(const idCmdArgs&) {
 	for (const auto& event : events) common->Printf("Retained UI action: %s document=%s node=%s action=%s\n",
 		event.kind == openq4::ui::ControlAction::Kind::Activate ? "activate" : "back",event.document.c_str(),event.node.c_str(),event.action.c_str());
 }
+void Data_f(const idCmdArgs& args) {
+	if (!runtime || args.Argc() != 2) { common->Printf("usage: ui_retainedData <VFS state.json>\n"); return; }
+	std::string source, error; openq4::ui::StateValues values; std::vector<openq4::ui::Diagnostic> diagnostics;
+	if (!host.ReadFile(args.Argv(1),source)) { common->Warning("retained UI: cannot read state data %s",args.Argv(1)); return; }
+	if (!openq4::ui::ParseStateValues(source,values,diagnostics)) {
+		for (const auto& d : diagnostics) common->Warning("retained UI: state %s:%u:%u %s: %s",args.Argv(1),static_cast<unsigned>(d.line),static_cast<unsigned>(d.column),d.pointer.c_str(),d.message.c_str()); return;
+	}
+	if (!runtime->SetState(values,error,PresentationTime())) { common->Warning("retained UI: %s",error.c_str()); return; }
+	common->Printf("Retained UI data: %s revision=%llu keys=%u\n",args.Argv(1),static_cast<unsigned long long>(runtime->StateRevision()),static_cast<unsigned>(values.size()));
+}
+void Value_f(const idCmdArgs& args) {
+	if (!runtime || args.Argc() != 3) { common->Printf("usage: ui_retainedValue <node ID> <property>\n"); return; }
+	const auto value = runtime->PresentedValue(args.Argv(1),args.Argv(2));
+	if (!value) { common->Warning("retained UI: unknown presented value %s.%s",args.Argv(1),args.Argv(2)); return; }
+	// Text remains data even in developer traces; escape controls so it cannot
+	// create another apparent log record. No parsed text becomes a command.
+	idStr text = value->type == openq4::ui::ValueType::Text ? value->text.c_str() : value->Css().c_str();
+	text.Replace("\\","\\\\"); text.Replace("\r","\\r"); text.Replace("\n","\\n"); text.Replace("\t","\\t");
+	common->Printf("Retained UI value: %s.%s=%s\n",args.Argv(1),args.Argv(2),text.c_str());
+	openq4::ui::Bounds bounds;
+	if (runtime->GetBounds(args.Argv(1),bounds)) common->Printf("Retained UI bounds: %s=%.3f,%.3f,%.3f,%.3f\n",args.Argv(1),bounds.x,bounds.y,bounds.width,bounds.height);
+}
 }
 
 void RetainedUI_Init() {
+	cmdSystem->AddCommand("ui_retainedData",Data_f,CMD_FL_SYSTEM,"apply a validated retained state batch from VFS JSON");
+	cmdSystem->AddCommand("ui_retainedValue",Value_f,CMD_FL_SYSTEM,"inspect a retained bound or animated presentation value");
 	cmdSystem->AddCommand("ui_exportLegacy",RetainedUI_ExportLegacy,CMD_FL_SYSTEM,"export native-preprocessed GUI tokens for translation without executing scripts");
 	cmdSystem->AddCommand("ui_retainedPreview",Preview_f,CMD_FL_SYSTEM,"preview a retained UI integration document");
 	cmdSystem->AddCommand("ui_retainedOpen",Open_f,CMD_FL_SYSTEM,"open a canonical retained document with application input ownership");
@@ -408,6 +447,8 @@ void RetainedUI_Init() {
 }
 void RetainedUI_Shutdown() {
 	Close();
+	cmdSystem->RemoveCommand("ui_retainedData");
+	cmdSystem->RemoveCommand("ui_retainedValue");
 	cmdSystem->RemoveCommand("ui_exportLegacy");
 	cmdSystem->RemoveCommand("ui_retainedPreview");
 	cmdSystem->RemoveCommand("ui_retainedOpen");
@@ -428,10 +469,15 @@ void RetainedUI_Draw() {
 		// Geometry owns font UVs and material handles. Recreate the preview
 		// before using any of them after an image/font generation change.
 		CancelInput(); ++inputGeneration;
+		const auto savedState = runtime->GetState(false);
 		runtime->Shutdown(); host.Reset();
 		restartGeneration = renderSystem->GetVideoRestartCount();
 		languageGeneration = LangDict_GetCodePageGeneration();
 		if (!LoadPreview(currentMarkup,currentPath)) { Close(); return; }
+		std::string stateError;
+		if (!runtime->SetState(savedState,stateError,PresentationTime()) && !savedState.empty()) {
+			common->Warning("retained UI: cannot restore state after renderer/language change: %s",stateError.c_str()); Close(); return;
+		}
 		inputFocused = WindowFocused();
 	}
 	openq4::ui::Viewport viewport;

@@ -10,6 +10,7 @@
 using namespace openq4::ui;
 namespace {
 struct BenchmarkHost final : Host {
+	bool ReadCVar(const std::string&, size_t, StateValue&) override { return false; }
 	bool ReadFile(const std::string&, std::string&) override { return false; }
 	std::string Translate(const std::string& text) override { return text; }
 	void Log(bool error, const std::string& text) override { if (error) throw std::runtime_error(text); }

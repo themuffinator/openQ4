@@ -2,6 +2,13 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- Live data development: retained interfaces now update text, gauges, layout
+  and control availability from typed state and read-only CVars without
+  rebuilding the screen. Invalid updates preserve the last valid snapshot;
+  renderer restarts retain application values. Native and SP/OpenGL/MP/Vulkan
+  checks pass; [binding evidence](ui/bindings.md) records current limits. Full
+  game integration, GUI migration and the visual editor remain in development.
+
 - Translation development: the current GUI set can now be imported through the
   engine preprocessor into ordered windows, events, expressions and dependency
   records. All 271 source hashes match in SP/OpenGL and MP/Vulkan; two unusual

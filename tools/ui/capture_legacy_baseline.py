@@ -35,6 +35,7 @@ def interaction_script(path: Path) -> str:
     # The engine lexer splits punctuation in unquoted IDs (notably '-').
     identifier = r'"[A-Za-z0-9_.-]{1,128}"'
     patterns = [rf'ui_retained(?:Focus|State) {identifier}', rf'ui_retainedEnabled {identifier} [01]',
+                rf'ui_retainedValue {identifier} {identifier}', r'ui_retainedData "retained-data/[A-Za-z0-9_-]{1,64}\.json"',
                 rf'ui_retainedModal push {identifier}', r'ui_retainedModal pop', r'ui_retainedEvents',
                 r'ui_retainedMenu (?:next|previous|up|down|left|right|accept|back) [01]', r'wait [1-9][0-9]{0,2}']
     lines = [line.strip() for line in source.splitlines() if line.strip() and not line.strip().startswith('//')]
@@ -59,6 +60,16 @@ def capture(args: argparse.Namespace) -> int:
     savepath = output / 'save'
     game = savepath / 'baseoq4'
     game.mkdir(parents=True)
+    data_files = []
+    for path in args.retained_data:
+        if not re.fullmatch(r'[A-Za-z0-9_-]{1,64}\.json',path.name) or path.name.lower() in {row['name'].lower() for row in data_files}:
+            raise ValueError('retained data files require unique simple .json names')
+        contents = path.read_bytes()
+        if len(contents) > 16*1024*1024:
+            raise ValueError('retained data exceeds the canonical 16 MiB limit')
+        (game/'retained-data').mkdir(exist_ok=True)
+        (game/'retained-data'/path.name).write_bytes(contents)
+        data_files.append({'name':path.name,'source':str(path),'sha256':hashlib.sha256(contents).hexdigest()})
     cfg_path = game / 'ui-baseline.cfg'
     import_requests = legacy_import.requests(args.legacy_export_list) if args.legacy_export_list else []
     preview = ''
@@ -131,6 +142,7 @@ def capture(args: argparse.Namespace) -> int:
                                         'replacement_acceptance': False}
         if args.retained_script:
             metadata['retained_preview']['interaction_script'] = {'source': str(args.retained_script), 'sha256': digest(args.retained_script)}
+        metadata['retained_preview']['state_data'] = data_files
 
     def save_report():
         report_path.write_text(json.dumps(metadata, indent=2) + '\n', encoding='utf-8')
@@ -184,6 +196,7 @@ def capture(args: argparse.Namespace) -> int:
         metadata['retained_preview']['interaction_trace'] = [line for line in plain_log.splitlines()
             if line.startswith(('Retained UI control:', 'Retained UI action:', 'Retained UI actions:'))]
         metadata['retained_preview']['ownership_trace'] = [line for line in plain_log.splitlines() if line.startswith('Retained UI ownership:')]
+        metadata['retained_preview']['binding_trace'] = [line for line in plain_log.splitlines() if line.startswith(('Retained UI value:', 'Retained UI data:', 'Retained UI bounds:'))]
         if args.profile_frames and (len(profiles) != (2 if args.video_restart else 1)
                                    or any(p.get('frames') != args.profile_frames for p in profiles)):
             retained_diagnostics.append('retained CPU profile did not complete for the requested frame count')
@@ -221,6 +234,7 @@ def main() -> int:
     parser.add_argument('--timeout', type=int, default=180)
     parser.add_argument('--retained-document', type=Path, help='Optional Q4UI or RML integration fixture, copied into the isolated savepath.')
     parser.add_argument('--retained-script', type=Path, help='Optional semantic control script; does not send device input.')
+    parser.add_argument('--retained-data', type=Path, action='append', default=[], help='State JSON copied to retained-data/<name>; repeat for scripted state batches.')
     parser.add_argument('--retained-open', action='store_true', help='Acquire application ownership with host input still disabled; inspect pause/resume and close.')
     parser.add_argument('--legacy-export-list', type=Path, help='JSON source/hash records to preprocess through the engine without executing GUI scripts.')
     parser.add_argument('--timeline', help='Canonical timeline to play before capture, and again after an optional video restart.')
@@ -240,6 +254,8 @@ def main() -> int:
         parser.error('--video-restart requires --retained-document')
     if args.retained_script and (not args.retained_document or args.retained_document.suffix.lower() != '.q4ui'):
         parser.error('--retained-script requires a .q4ui document')
+    if args.retained_data and (len(args.retained_data) > 16 or not args.retained_document or args.retained_document.suffix.lower() != '.q4ui'):
+        parser.error('--retained-data requires a .q4ui document and at most 16 files')
     if args.retained_open and (not args.retained_document or args.retained_document.suffix.lower() != '.q4ui'):
         parser.error('--retained-open requires a .q4ui document')
     if not 0 <= args.profile_frames <= 3600 or (args.profile_frames and not args.retained_document):
