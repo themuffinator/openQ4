@@ -163,11 +163,21 @@ def validate_build_and_ci_wiring() -> None:
         require(workflow, f"python {TEST_PATH}", workflow_path)
 
 
+def validate_compiled_map_metadata() -> None:
+    output = read("src/tools/compilers/dmap/output.cpp")
+    require(output, '"%u\\n", dmapGlobals.dmapFile->GetGeometryCRC()', "compiled geometry checksum")
+    if "1105723392" in output or "Fake CRC" in output:
+        raise AssertionError("dmap must not mark newly compiled geometry with a placeholder checksum")
+    dmap = read("src/tools/compilers/dmap/dmap.cpp")
+    require(dmap, "AAS compilation is not available", "missing navigation compiler diagnostic")
+
+
 def main() -> None:
     validate_allocator_lifecycle()
     validate_engine_tool_lifetime()
     validate_map_resolution_contract()
     validate_build_and_ci_wiring()
+    validate_compiled_map_metadata()
     print("dmap_render_geometry_lifecycle: ok")
 
 

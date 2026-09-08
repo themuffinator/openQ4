@@ -369,8 +369,10 @@ void Dmap( const idCmdArgs &args ) {
 		}
 
 		if ( !noAAS && !region ) {
-			// create AAS files
-			//RunAAS_f( args );
+			// The Quake 4 AAS compiler is not part of openQ4 yet. Do not imply
+			// that existing navigation files were rebuilt along with .proc/.cm.
+			common->Warning( "AAS compilation is not available: navigation files for '%s' were not rebuilt. "
+				"Rebuild AAS with the Quake 4 SDK tools before testing AI on changed geometry.", passedName.c_str() );
 		}
 	}
 

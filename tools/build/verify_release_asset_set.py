@@ -4,14 +4,22 @@
 from __future__ import annotations
 
 import argparse
+import gzip
+import hashlib
+import json
+import lzma
 import os
 import re
 import stat
 import sys
+import tarfile
 from pathlib import Path
+from zipfile import BadZipFile, ZipFile
 
 
 MAX_RELEASE_ASSETS = 64
+MAX_ARCHIVE_EXPANDED_BYTES = 16 * 1024 * 1024 * 1024
+MAX_ARCHIVE_MEMBERS = 100000
 SAFE_ASSET_NAME_RE = re.compile(r"openq4-[A-Za-z0-9][A-Za-z0-9._+-]{0,248}")
 
 
@@ -70,6 +78,59 @@ def validate_expected_names(expected_names: list[str]) -> tuple[str, ...]:
     return validated
 
 
+def verify_archive_integrity(path: Path) -> None:
+    """Read the entire payload, including compression trailers, before upload."""
+    try:
+        if path.name.endswith(".zip"):
+            with ZipFile(path) as archive:
+                members = archive.infolist()
+                if len(members) > MAX_ARCHIVE_MEMBERS or sum(
+                    member.file_size for member in members
+                ) > MAX_ARCHIVE_EXPANDED_BYTES:
+                    raise RuntimeError(f"release archive exceeds validation limits: {path.name}")
+                bad_member = archive.testzip()
+                if bad_member is not None:
+                    raise RuntimeError(f"release archive has a corrupt member: {path.name}: {bad_member}")
+        elif path.name.endswith((".tar.gz", ".tar.xz")):
+            opener = gzip.open if path.name.endswith(".tar.gz") else lzma.open
+            # Tar readers can stop at the end-of-archive blocks without checking
+            # the gzip/xz footer. Explicitly drain the compressed stream first.
+            expanded = 0
+            with opener(path, "rb") as stream:
+                while chunk := stream.read(1024 * 1024):
+                    expanded += len(chunk)
+                    if expanded > MAX_ARCHIVE_EXPANDED_BYTES:
+                        raise RuntimeError(f"release archive exceeds validation limits: {path.name}")
+            with tarfile.open(path, "r|*") as archive:
+                for index, member in enumerate(archive):
+                    if index >= MAX_ARCHIVE_MEMBERS:
+                        raise RuntimeError(f"release archive has too many members: {path.name}")
+                    if member.isfile():
+                        with archive.extractfile(member) as stream:
+                            while stream.read(1024 * 1024):
+                                pass
+    except (OSError, EOFError, tarfile.TarError, BadZipFile, lzma.LZMAError) as exc:
+        raise RuntimeError(f"release archive is truncated or corrupt: {path.name}: {exc}") from exc
+
+
+def verify_published_assets(
+    artifact_dir: Path, expected_names: tuple[str, ...], published: list[dict]
+) -> None:
+    """Ensure GitHub stored the exact bytes that passed local validation."""
+    if len(published) != len(expected_names) or {item["name"] for item in published} != set(expected_names):
+        raise RuntimeError("published release assets do not match the approved whitelist")
+    by_name = {item["name"]: item for item in published}
+    for name in expected_names:
+        path = require_regular_file(artifact_dir / name, "approved release artifact")
+        digest = hashlib.sha256()
+        with path.open("rb") as stream:
+            while chunk := stream.read(1024 * 1024):
+                digest.update(chunk)
+        asset = by_name[name]
+        if asset.get("size") != path.stat().st_size or asset.get("digest") != f"sha256:{digest.hexdigest()}":
+            raise RuntimeError(f"published release asset size/SHA-256 mismatch: {name}")
+
+
 def verify_asset_set(artifact_dir: Path, expected_names: list[str]) -> tuple[str, ...]:
     expected = validate_expected_names(expected_names)
     expected_set = set(expected)
@@ -118,6 +179,7 @@ def verify_asset_set(artifact_dir: Path, expected_names: list[str]) -> tuple[str
 
     for name in expected:
         require_regular_file(artifact_dir / name, f"approved release artifact {name}")
+        verify_archive_integrity(artifact_dir / name)
     return expected
 
 
@@ -136,7 +198,9 @@ def write_asset_manifest(output: Path, expected_names: tuple[str, ...]) -> None:
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--artifact-dir", required=True, type=Path)
-    parser.add_argument("--manifest", required=True, type=Path)
+    output = parser.add_mutually_exclusive_group(required=True)
+    output.add_argument("--manifest", type=Path)
+    output.add_argument("--published-assets", type=Path, help="GitHub REST assets JSON to verify after upload")
     parser.add_argument("--expected", required=True, action="append")
     return parser.parse_args(argv)
 
@@ -145,13 +209,17 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
     try:
         expected = verify_asset_set(args.artifact_dir, args.expected)
-        write_asset_manifest(args.manifest, expected)
+        if args.published_assets:
+            published = json.loads(args.published_assets.read_text(encoding="utf-8"))
+            verify_published_assets(args.artifact_dir, expected, published)
+        else:
+            write_asset_manifest(args.manifest, expected)
     except RuntimeError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     print(
         f"release artifact whitelist verified: {len(expected)} files; "
-        f"manifest={args.manifest}"
+        f"{'published size/SHA-256 verified' if args.published_assets else f'manifest={args.manifest}'}"
     )
     return 0
 

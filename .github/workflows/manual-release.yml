@@ -641,7 +641,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          fetch-depth: 1
+          # Save payloads use the engine commit count as their build number.
+          # A shallow checkout makes every release build 1 and rejects its saves.
+          fetch-depth: 0
           ref: ${{ needs.metadata.outputs.openq4_source_sha }}
 
       - name: Fetch pinned openQ4-game
@@ -2381,9 +2383,9 @@ jobs:
               --title "${name}"
               --notes-file "${notes}"
             )
-            if [ "${RELEASE_DRAFT}" = "true" ]; then
-              create_args+=(--draft)
-            fi
+            # Keep new downloads unpublished until their stored bytes have
+            # been compared with the archives that passed validation.
+            create_args+=(--draft)
             gh release create "${tag}" "${assets[@]}" "${create_args[@]}"
           fi
 
@@ -2423,6 +2425,20 @@ jobs:
               exit 1
             fi
           done
+
+          release_id="$(gh release view "${tag}" --repo "${GITHUB_REPOSITORY}" --json databaseId --jq .databaseId)"
+          published_assets_json="${RUNNER_TEMP}/openq4-published-assets.json"
+          # The whitelist allows at most 64 assets, below this single-page limit.
+          gh api "repos/${GITHUB_REPOSITORY}/releases/${release_id}/assets?per_page=100" \
+            > "${published_assets_json}"
+          expected_args=()
+          for asset_name in "${asset_names[@]}"; do
+            expected_args+=(--expected "${asset_name}")
+          done
+          python tools/build/verify_release_asset_set.py \
+            --artifact-dir "${assets_dir}" \
+            --published-assets "${published_assets_json}" \
+            "${expected_args[@]}"
 
           if [ "${RELEASE_DRAFT}" = "true" ]; then
             # A draft is not a release: GitHub creates no git tag for it, fires no

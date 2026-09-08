@@ -54,6 +54,8 @@ It is designed for players who want the original Quake 4 experience with a clean
 
 ## Why players use openQ4
 
+The [0.13.1 patch notes](docs/dev/releases/v0.13.1.md) cover the release save fix, download verification, and map-compilation corrections. Replace the complete package when upgrading.
+
 - **Modern display support** for widescreen, ultrawide, multi-monitor, borderless, and fullscreen setups.
 - **Optional visual upgrades** such as bloom, HDR, anti-aliasing, baked light grids, and enhanced shadow options, plus soft particles that fade effects into the world instead of cutting a hard edge against it.
 - **Smoother motion at high refresh rates.** The camera, weapons, movers, and everything riding them are drawn on an interpolated presentation clock between the game's 60 Hz ticks, so a 144 Hz or 240 Hz display shows motion at its own rate. Simulation, networking, collision, demos, and saves keep their original timing.

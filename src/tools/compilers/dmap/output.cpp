@@ -663,7 +663,7 @@ void WriteOutputFile( void ) {
 // jmarshall - Quake 4 proc support
 	procFile->WriteFloatString( "%s \"%s\"\n\n", PROC_FILE_ID, PROC_FILEVERSION);
 
-	procFile->WriteFloatString("%d\n", 1105723392); // Fake CRC
+	procFile->WriteFloatString( "%u\n", dmapGlobals.dmapFile->GetGeometryCRC() );
 // jmarshall end
 
 	// write the entity models and information, writing entities first

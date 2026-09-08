@@ -373,6 +373,15 @@ def main(argv: list[str]) -> int:
         iteration = validate_iteration(explicit_iteration, track)
 
     git_sha, git_dirty, commit_count = detect_git_metadata(source_root)
+    if track == "stable" and (
+        not git_sha
+        or commit_count <= 0
+        or run_git(source_root, "rev-parse", "--is-shallow-repository") != "false"
+    ):
+        raise SystemExit(
+            "stable builds require complete Git history for savegame build numbers; "
+            "use git fetch --unshallow or actions/checkout fetch-depth: 0"
+        )
     prerelease = compose_prerelease(track, iteration)
     build_metadata = compose_build_metadata(track, git_sha, git_dirty)
     version_short, version, version_tag = compose_version_strings(

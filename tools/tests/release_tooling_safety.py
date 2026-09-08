@@ -6,6 +6,7 @@ from __future__ import annotations
 import importlib.util
 import argparse
 import io
+import hashlib
 import json
 import os
 import re
@@ -15,6 +16,7 @@ import sys
 import tarfile
 import uuid
 import zlib
+from zipfile import ZipFile
 from pathlib import Path
 from types import ModuleType
 
@@ -327,6 +329,39 @@ def validate_version_header_build_refresh_contract() -> None:
 
     if "version_metadata_command + ['--header-out', generated_version_header_path]" not in meson_text:
         raise AssertionError("configure-time version header bootstrap is missing")
+
+
+def validate_release_build_history() -> None:
+    root = WORK / "version-history"
+    source = root / "source"
+    source.mkdir(parents=True)
+    subprocess.run(["git", "init", "-q", str(source)], check=True)
+    for index in range(3):
+        write_file(source / "revision.txt", str(index))
+        subprocess.run(["git", "-C", str(source), "add", "revision.txt"], check=True)
+        subprocess.run([
+            "git", "-C", str(source), "-c", "user.name=Release Test",
+            "-c", "user.email=release-test@example.invalid", "commit", "-qm", str(index),
+        ], check=True)
+    command = [
+        sys.executable, str(BUILD_DIR / "openq4_version.py"),
+        "--base-version", "0.13.1", "--track", "stable", "--source-root",
+    ]
+    full = subprocess.run(command + [str(source)], capture_output=True, text=True, check=True)
+    if "resource_build=3\n" not in full.stdout:
+        raise AssertionError("stable savegame build number must reflect complete engine history")
+    shallow = root / "shallow"
+    subprocess.run(["git", "clone", "-q", "--depth", "1", source.as_uri(), str(shallow)], check=True)
+    header = root / "rejected-version.h"
+    rejected = subprocess.run(
+        command + [str(shallow), "--header-out", str(header)], capture_output=True, text=True,
+    )
+    if rejected.returncode == 0 or "complete Git history" not in rejected.stderr or header.exists():
+        raise AssertionError("shallow stable builds must fail before writing unusable save metadata")
+    workflow = (ROOT / ".github/workflows/manual-release.yml").read_text(encoding="utf-8")
+    build_checkout = workflow.split("  builds:", 1)[1].split("- name: Fetch pinned openQ4-game", 1)[0]
+    if "fetch-depth: 0" not in build_checkout or "fetch-depth: 1" in build_checkout:
+        raise AssertionError("release compilation must use complete engine history")
 
 
 def validate_release_version_floor_and_docs_classification() -> None:
@@ -798,6 +833,11 @@ def validate_draft_releases_never_announce() -> None:
 
     release_create_offset = workflow.index("- name: Create or update release")
     release_create_step = workflow[release_create_offset:discord_offset]
+    assets_query = 'gh api "repos/${GITHUB_REPOSITORY}/releases/${release_id}/assets?per_page=100"'
+    if assets_query not in release_create_step or RELEASE_ASSET_SET.MAX_RELEASE_ASSETS > 100:
+        raise AssertionError("published asset verification must fetch the complete bounded whitelist")
+    if "--slurp" in release_create_step:
+        raise AssertionError("release asset JSON must not combine incompatible gh --slurp/--jq flags")
     for token in (
         "RELEASE_DRAFT: ${{ inputs.draft }}",
         'if [ "${RELEASE_DRAFT}" != "true" ] && [ "${RELEASE_DRAFT}" != "false" ]; then',
@@ -1557,13 +1597,45 @@ def validate_release_asset_set_helper_contracts() -> None:
         "openq4-1.2.3-linux-x64.tar.xz",
         "openq4-1.2.3-linux-arm64.tar.xz",
         "openq4-1.2.3-windows-x64.zip",
+        "openq4-1.2.3-macos-arm64-metal-unsigned.tar.gz",
     ]
+    def write_archive(path: Path) -> None:
+        payload = b"verified runtime fixture\n"
+        if path.suffix == ".zip":
+            with ZipFile(path, "w") as archive:
+                archive.writestr("runtime.txt", payload)
+        else:
+            mode = "w:gz" if path.name.endswith(".tar.gz") else "w:xz"
+            with tarfile.open(path, mode) as archive:
+                member = tarfile.TarInfo("runtime.txt")
+                member.size = len(payload)
+                archive.addfile(member, io.BytesIO(payload))
     for name in expected:
-        write_file(artifact_dir / name, name)
+        write_archive(artifact_dir / name)
 
     verified = RELEASE_ASSET_SET.verify_asset_set(artifact_dir, expected)
     if verified != tuple(expected):
         raise AssertionError("release asset whitelist changed its approved ordering")
+    published = [
+        {"name": name, "size": (artifact_dir / name).stat().st_size,
+         "digest": "sha256:" + hashlib.sha256((artifact_dir / name).read_bytes()).hexdigest()}
+        for name in expected
+    ]
+    RELEASE_ASSET_SET.verify_published_assets(artifact_dir, verified, published)
+    published[0]["digest"] = "sha256:" + "0" * 64
+    expect_runtime_error(
+        lambda: RELEASE_ASSET_SET.verify_published_assets(artifact_dir, verified, published),
+        "size/SHA-256 mismatch", "wrong uploaded bytes with the same filename and size",
+    )
+    for name in expected:
+        path = artifact_dir / name
+        intact = path.read_bytes()
+        path.write_bytes(intact[:-8])
+        expect_runtime_error(
+            lambda: RELEASE_ASSET_SET.verify_asset_set(artifact_dir, expected),
+            "truncated or corrupt", "truncated archive/footer before release upload",
+        )
+        path.write_bytes(intact)
     manifest = root / "approved-assets.txt"
     RELEASE_ASSET_SET.write_asset_manifest(manifest, verified)
     if manifest.read_text(encoding="utf-8").splitlines() != expected:
@@ -1590,7 +1662,7 @@ def validate_release_asset_set_helper_contracts() -> None:
         "missing:",
         "missing approved release artifact",
     )
-    write_file(missing)
+    write_archive(missing)
 
     directory_entry = artifact_dir / "openq4-1.2.3-unapproved-directory"
     directory_entry.mkdir()
@@ -1632,6 +1704,7 @@ def main() -> None:
         validate_changelog_output_and_override_guards()
         validate_openq4_version_iteration()
         validate_version_header_build_refresh_contract()
+        validate_release_build_history()
         validate_release_version_floor_and_docs_classification()
         validate_release_docs_output_guard()
         validate_release_docs_layout()
