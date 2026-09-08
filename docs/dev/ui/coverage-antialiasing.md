@@ -17,7 +17,7 @@ For an oriented edge, its contribution to cell `(X,Y)` is
 `integral(clamp(x-X, 0, 1) dy)` within the cell's vertical interval. This is
 Green's theorem applied to the clipped area. Horizontal edges contribute zero;
 other edges split at row boundaries and columns that they cross. The clamped
-linear integral has a direct quadratic/linear antiderivative, so coverage does
+linear integral is evaluated directly as clamped trapezoids, so coverage does
 not depend on a finite set of sample positions.
 
 All boundary contributions are summed before applying color. A hole subtracts
@@ -49,9 +49,10 @@ the coverage work retains contributions from boundaries outside those bounds;
 a huge shape surrounding the viewport still fills the viewport correctly.
 
 The retained render manager continues to own final clipping and resource
-lifetime. Its viewport/scissor bounds participate in the element's cache key,
-alongside layout, transform and opacity. Video restart recreates the geometry
-through the existing document reload path.
+lifetime. A subsequent [cache and measurement checkpoint](runtime-performance.md)
+separates opacity from path compilation and reuses whole-pixel translations with
+bounded padded coverage regions. Video restart recreates the geometry through
+the existing document reload path.
 
 The first gameplay run exposed an existing surface-capacity check that tested
 only the previous vertex count. Consecutive valid retained batches could then
@@ -146,9 +147,9 @@ font rendering and the production component/artwork corpus remain incomplete.
 Separate paint operations still compose independently; this does not provide
 an isolated layer or shared coverage between independently painted shapes.
 
-Translation and opacity currently invalidate the full element mesh. Measured
-animation costs and more selective geometry/paint caching remain required.
-The render bridge still quantizes premultiplied channels to 8 bits, and large
-coordinates still pass through libtess2's float representation. Temporal quality,
+The subsequent [performance checkpoint](runtime-performance.md) removes redundant
+compilation during opacity/whole-pixel changes and patches tessellation to double
+precision. Optimized-build and GPU costs still need qualification.
+The render bridge still quantizes premultiplied channels to 8 bits. Temporal quality,
 the full density/aspect/backend matrix, world projection and non-Windows targets
 need broader qualification before Stage 3 can close.

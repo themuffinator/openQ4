@@ -34,6 +34,16 @@ struct Glyph {
 	float u0 = 0, v0 = 0, u1 = 0, v1 = 0;
 	std::string material;
 };
+// CPU submission measurements, not GPU timings. Counts reset for each Frame;
+// resident geometry counts track resource lifetime, including hidden elements.
+struct RuntimeStatistics {
+	double frameMilliseconds = 0, updateMilliseconds = 0, renderMilliseconds = 0;
+	double vectorCompileMilliseconds = 0, vectorUploadMilliseconds = 0;
+	std::uint64_t vectorElements = 0, vectorPathsCompiled = 0, vectorCacheHits = 0, vectorUploads = 0;
+	std::uint64_t geometryCompiles = 0, drawCalls = 0, submittedVertices = 0, submittedIndices = 0;
+	std::uint64_t residentGeometryCount = 0, residentGeometryBytes = 0;
+	std::uint64_t visibleVectorCacheBytes = 0;
+};
 
 class Host {
 public:
@@ -71,6 +81,7 @@ public:
 	bool SetProperty(const std::string& id, const std::string& property, const std::string& value);
 	bool SetText(const std::string& id, const std::string& text);
 	bool IsLoaded() const;
+	RuntimeStatistics Statistics() const;
 private:
 	struct Impl;
 	std::unique_ptr<Impl> impl;

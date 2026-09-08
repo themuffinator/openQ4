@@ -117,9 +117,10 @@ normalized boundaries into coverage quads; geometric hit testing uses triangles.
 The paint compiler splits geometry at gradient stops. Native elements submit
 through RmlUi's render manager with the already
 applied transform disabled for that submission. Existing clipping, render order
-and resource lifetime remain in control. Meshes are reused while dimensions,
-transform and opacity remain unchanged. Translation and opacity currently rebuild
-meshes too; measured finer-grained caching remains required.
+and resource lifetime remain in control. The subsequent
+[performance checkpoint](runtime-performance.md) separates opacity updates from
+path compilation and reuses whole-pixel translations. It also patches the pinned
+tessellator to double precision for stable thin rails during fractional motion.
 
 Video/font generation changes recreate vector elements with their document. The
 fixture contains no baked SVG image, copied retail texture or material script.

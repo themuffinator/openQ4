@@ -47,9 +47,11 @@ def capture(args: argparse.Namespace) -> int:
         staged_name = 'retained-smoke' + fixture.suffix.lower()
         (game / staged_name).write_bytes(fixture.read_bytes())
         play = f'ui_retainedPlay "{args.timeline}"\n' if args.timeline else ''
-        preview = f'ui_retainedPreview "{staged_name}"\n' + play + 'wait 30\n'
+        profile_command = f'ui_retainedProfile {args.profile_frames}\n' if args.profile_frames else ''
+        settle = max(30, args.profile_frames + 2)
+        preview = f'ui_retainedPreview "{staged_name}"\n' + profile_command + play + f'wait {settle}\n'
         if args.video_restart:
-            preview += 'vid_restart windowed\nwait 2\n' + play + 'wait 30\n'
+            preview += 'vid_restart windowed\nwait 2\n' + profile_command + play + f'wait {settle}\n'
     cfg_path.write_text(preview + 'gfxInfo\nscreenshot "screenshots/ui-baseline.tga"\necho UI_BASELINE_CAPTURE_COMPLETE\nquit\n', encoding='utf-8')
     overrides = {
         'fs_basepath': str(args.assets.resolve()), 'fs_savepath': str(savepath), 'fs_devpath': str(savepath),
@@ -97,7 +99,8 @@ def capture(args: argparse.Namespace) -> int:
         metadata['retained_preview'] = {'source': str(args.retained_document),
                                         'sha256': digest(args.retained_document),
                                         'density_override': args.density, 'ui_scale': args.ui_scale,
-                                        'settle_frames': 30, 'video_restart': args.video_restart,
+                                        'settle_frames': settle, 'video_restart': args.video_restart,
+                                        'profile_frames': args.profile_frames,
                                         'timeline': args.timeline, 'reduced_motion': args.reduced_motion,
                                         'replacement_acceptance': False}
 
@@ -143,6 +146,11 @@ def capture(args: argparse.Namespace) -> int:
     if args.retained_document:
         retained_diagnostics = [line for line in diagnostics if 'retained UI:' in line or '_retained' in line]
         metadata['retained_preview']['diagnostics'] = retained_diagnostics
+        profiles = [json.loads(line.split('Retained UI profile: ', 1)[1]) for line in plain_log.splitlines() if 'Retained UI profile: ' in line]
+        metadata['retained_preview']['profiles'] = profiles
+        if args.profile_frames and (len(profiles) != (2 if args.video_restart else 1)
+                                   or any(p.get('frames') != args.profile_frames for p in profiles)):
+            retained_diagnostics.append('retained CPU profile did not complete for the requested frame count')
         valid = valid and 'Retained UI preview loaded:' in plain_log and not retained_diagnostics
         if args.timeline:
             played = plain_log.count(f'Retained UI timeline played: {args.timeline}')
@@ -180,6 +188,7 @@ def main() -> int:
     parser.add_argument('--density', type=float, default=0, help='Test density override; zero uses SDL display scale.')
     parser.add_argument('--ui-scale', type=float, default=1)
     parser.add_argument('--video-restart', action='store_true', help='Restart the windowed renderer with the preview loaded before capturing.')
+    parser.add_argument('--profile-frames', type=int, default=0, help='Measure 1..3600 rendered UI frames before capture; zero disables profiling.')
     args = parser.parse_args()
     if args.width < 1 or args.height < 1 or args.timeout < 1:
         parser.error('dimensions and timeout must be positive')
@@ -189,6 +198,8 @@ def main() -> int:
         parser.error('UI scale must be between 0.75 and 2')
     if args.video_restart and not args.retained_document:
         parser.error('--video-restart requires --retained-document')
+    if not 0 <= args.profile_frames <= 3600 or (args.profile_frames and not args.retained_document):
+        parser.error('--profile-frames requires a retained document and a count from 1 to 3600')
     if args.retained_document and args.retained_document.suffix.lower() not in ('.rml', '.q4ui'):
         parser.error('retained document must be .rml or .q4ui')
     if args.timeline and (not args.retained_document or args.retained_document.suffix.lower() != '.q4ui'

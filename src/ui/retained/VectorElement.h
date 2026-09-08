@@ -6,17 +6,21 @@
 
 namespace openq4::ui {
 class Host;
+struct RuntimeStatistics;
 class VectorElement final : public Rml::Element {
 public:
 	explicit VectorElement(const Rml::String& tag) : Rml::Element(tag) {}
-	void Configure(const std::vector<VectorPath>& paths, Host& host);
+	void Configure(const std::vector<VectorPath>& paths, Host& host, RuntimeStatistics& statistics);
 protected:
 	void OnRender() override;
 private:
 	std::vector<VectorPath> paths;
+	std::vector<VectorMesh> compiled;
 	std::vector<Rml::Geometry> geometry;
 	Host* host = nullptr;
-	std::array<double,13> previous{};
+	RuntimeStatistics* statistics = nullptr;
+	std::array<double,12> previous{};
+	double previousOpacity = -1;
 	bool valid = false;
 };
 } // namespace openq4::ui

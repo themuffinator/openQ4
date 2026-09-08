@@ -7,6 +7,7 @@
 #include <RmlUi/Core/RenderManager.h>
 #include <RmlUi/Core/ElementInstancer.h>
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstring>
 #include <map>
@@ -52,16 +53,23 @@ struct Geometry {
 
 class Renderer final : public Rml::RenderInterface {
 public:
-	explicit Renderer(Host& h) : host(h) {}
+	Renderer(Host& h, RuntimeStatistics& statistics) : host(h), statistics(statistics) {}
 	Rml::CompiledGeometryHandle CompileGeometry(Rml::Span<const Rml::Vertex> vertices, Rml::Span<const int> indices) override {
 		if (vertices.empty() || vertices.size() > 262144 || indices.empty() || indices.size() % 3 != 0) return 0;
 		for (const int i : indices) if (i < 0 || static_cast<size_t>(i) >= vertices.size()) return 0;
 		auto geometry = std::make_unique<Geometry>();
 		geometry->vertices.assign(vertices.begin(), vertices.end());
 		geometry->indices.assign(indices.begin(), indices.end());
+		++statistics.geometryCompiles; ++statistics.residentGeometryCount;
+		statistics.residentGeometryBytes += Bytes(*geometry);
 		return reinterpret_cast<Rml::CompiledGeometryHandle>(geometry.release());
 	}
-	void ReleaseGeometry(Rml::CompiledGeometryHandle handle) override { delete reinterpret_cast<Geometry*>(handle); }
+	void ReleaseGeometry(Rml::CompiledGeometryHandle handle) override {
+		if (!handle) return;
+		auto* geometry = reinterpret_cast<Geometry*>(handle);
+		--statistics.residentGeometryCount; statistics.residentGeometryBytes -= Bytes(*geometry);
+		delete geometry;
+	}
 	void RenderGeometry(Rml::CompiledGeometryHandle handle, Rml::Vector2f translation, Rml::TextureHandle texture) override {
 		if (!handle || (scissorEnabled && (scissor.Width() <= 0 || scissor.Height() <= 0))) return;
 		const Geometry& geometry = *reinterpret_cast<const Geometry*>(handle);
@@ -75,7 +83,7 @@ public:
 				source.tex_coord.x, source.tex_coord.y,
 				source.colour.red / 255.f, source.colour.green / 255.f, source.colour.blue / 255.f, source.colour.alpha / 255.f});
 		}
-		if (!scissorEnabled) { host.Draw(vertices, geometry.indices, texture); return; }
+		if (!scissorEnabled) { Submit(vertices, geometry.indices, texture); return; }
 		std::vector<Vertex> clipped;
 		std::vector<int> indices;
 		for (size_t i = 0; i < geometry.indices.size(); i += 3) {
@@ -91,7 +99,7 @@ public:
 				indices.insert(indices.end(), {base, base + j - 1, base + j});
 			}
 		}
-		if (!indices.empty()) host.Draw(clipped, indices, texture);
+		if (!indices.empty()) Submit(clipped, indices, texture);
 	}
 	Rml::TextureHandle LoadTexture(Rml::Vector2i& dimensions, const Rml::String& source) override {
 		return host.LoadMaterial(source, dimensions.x, dimensions.y);
@@ -108,7 +116,15 @@ public:
 		if (value) transform = *value;
 	}
 private:
+	static size_t Bytes(const Geometry& geometry) {
+		return sizeof(Geometry)+geometry.vertices.capacity()*sizeof(Rml::Vertex)+geometry.indices.capacity()*sizeof(int);
+	}
+	void Submit(const std::vector<Vertex>& vertices, const std::vector<int>& indices, std::uintptr_t texture) {
+		++statistics.drawCalls; statistics.submittedVertices += vertices.size(); statistics.submittedIndices += indices.size();
+		host.Draw(vertices,indices,texture);
+	}
 	Host& host;
+	RuntimeStatistics& statistics;
 	bool scissorEnabled = false, hasTransform = false;
 	Rml::Rectanglei scissor;
 	Rml::Matrix4f transform;
@@ -238,8 +254,9 @@ void Viewport::WindowToDocument(float x, float y, float& outX, float& outY) cons
 }
 
 struct Runtime::Impl {
-	explicit Impl(Host& host) : host(host), renderer(host), files(host), system(host), fonts(host) {}
+	explicit Impl(Host& host) : host(host), renderer(host,statistics), files(host), system(host), fonts(host) {}
 	Host& host;
+	RuntimeStatistics statistics;
 	Renderer renderer;
 	Files files;
 	System system;
@@ -344,7 +361,7 @@ bool Runtime::LoadDocument(const std::string& source, const std::string& sourceP
 		const auto* node = nodes.back(); nodes.pop_back();
 		if (node->type == "vector") {
 			auto* element = impl->document->GetElementById(node->id);
-			if (element) static_cast<VectorElement*>(element)->Configure(node->paths,impl->host);
+			if (element) static_cast<VectorElement*>(element)->Configure(node->paths,impl->host,impl->statistics);
 		}
 		for (const auto& child : node->children) nodes.push_back(&child);
 	}
@@ -357,14 +374,23 @@ void Runtime::ResumeTimeline(const std::string& id, double seconds) { impl->moti
 void Runtime::CancelTimeline(const std::string& id, CancelPolicy policy, double seconds) { impl->motion.Cancel(id,policy,seconds); }
 void Runtime::SetReducedMotion(bool enabled, double seconds) { impl->motion.SetReducedMotion(enabled,seconds); }
 void Runtime::Frame(const Viewport& viewport, double seconds) {
+	const auto residentCount = impl->statistics.residentGeometryCount, residentBytes = impl->statistics.residentGeometryBytes;
+	impl->statistics = {};
+	impl->statistics.residentGeometryCount = residentCount; impl->statistics.residentGeometryBytes = residentBytes;
 	if (!impl->context || !impl->document || viewport.width <= 0 || viewport.height <= 0) return;
+	const auto start = std::chrono::steady_clock::now();
 	if (std::isfinite(seconds)) impl->system.time = std::max(impl->system.time, seconds);
 	impl->motion.Advance(impl->system.time);
 	impl->ApplyMotion();
 	impl->context->SetDimensions({viewport.width, viewport.height});
 	impl->context->SetDensityIndependentPixelRatio(viewport.DpRatio());
 	impl->context->Update();
+	const auto updated = std::chrono::steady_clock::now();
 	impl->context->Render();
+	const auto end = std::chrono::steady_clock::now();
+	impl->statistics.updateMilliseconds = std::chrono::duration<double,std::milli>(updated-start).count();
+	impl->statistics.renderMilliseconds = std::chrono::duration<double,std::milli>(end-updated).count();
+	impl->statistics.frameMilliseconds = std::chrono::duration<double,std::milli>(end-start).count();
 }
 bool Runtime::GetBounds(const std::string& id, Bounds& bounds) const {
 	auto* element = impl->document ? impl->document->GetElementById(id) : nullptr;
@@ -387,5 +413,6 @@ bool Runtime::SetText(const std::string& id, const std::string& text) {
 	return true;
 }
 bool Runtime::IsLoaded() const { return impl->document != nullptr; }
+RuntimeStatistics Runtime::Statistics() const { return impl->statistics; }
 
 } // namespace openq4::ui

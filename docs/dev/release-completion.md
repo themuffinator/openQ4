@@ -2,6 +2,12 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- Transition development: fades and whole-pixel movement now reuse compiled
+  vector paths, with measured reductions in CPU work. A precision fix keeps thin
+  rails stable during fractional movement. The new
+  [runtime profiler and benchmarks](ui/runtime-performance.md) expose remaining
+  cold/fractional-motion costs; optimized-build and GPU qualification remain open.
+
 - Vector development: editable native paths now support responsive chamfers,
   curves, holes, strokes and fading rails through the retained engine renderer.
   [Geometry checks](ui/vector-paths.md) and SP/OpenGL and MP/Vulkan gameplay

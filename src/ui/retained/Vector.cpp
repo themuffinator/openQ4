@@ -10,8 +10,10 @@
 #include <map>
 #include <memory>
 #include <new>
+#include <sstream>
 
 namespace openq4::ui {
+static_assert(sizeof(TESSreal) == sizeof(double), "Refresh libtess2 with Meson subprojects update --reset libtess2; openQ4 requires the precision patch");
 namespace {
 constexpr double Pi = 3.14159265358979323846;
 VectorPoint operator+(VectorPoint a, VectorPoint b) { return {a.x+b.x,a.y+b.y}; }
@@ -308,8 +310,7 @@ public:
 			const int last = high == low ? first+1 : static_cast<int>(std::ceil(high));
 			for (int column = std::max(first,bounds.left); column < std::min(last,bounds.right); ++column) {
 				Charge();
-				const double average = high-low < 1e-12 ? std::clamp(low-column,0.0,1.0)
-					: (Integral(high-column)-Integral(low-column))/(high-low);
+				const double average = MeanCoverage(low-column,high-column);
 				Range(row,column,column+1,dy*average);
 			}
 		}
@@ -342,7 +343,12 @@ public:
 			while (index < events.size() && events[index].y == row) {
 				const int x = events[index].x;
 				do { sum += events[index++].delta; } while (index < events.size() && events[index].y == row && events[index].x == x);
-				Require(sum >= -1e-7 && sum <= 1+1e-7,"normalized coverage escaped zero-to-one range");
+				if (sum < -1e-7 || sum > 1+1e-7) {
+					std::ostringstream message;
+					message.precision(17);
+					message << "normalized coverage escaped zero-to-one range at " << x << "," << row << ": " << sum;
+					throw Failure{message.str()};
+				}
 				const double coverage = std::abs(sum) < 1e-10 ? 0 : std::abs(sum-1) < 1e-10 ? 1 : std::clamp(sum,0.0,1.0);
 				const int right = index < events.size() && events[index].y == row ? events[index].x : x;
 				if (x == pendingRight && std::abs(coverage-pendingCoverage) < 1e-12) pendingRight = right;
@@ -360,7 +366,15 @@ public:
 	}
 private:
 	struct Event { int y, x; double delta; };
-	static double Integral(double x) { return x <= 0 ? 0 : x >= 1 ? x-.5 : .5*x*x; }
+	static double MeanCoverage(double low, double high) {
+		if (high <= 0) return 0;
+		if (low >= 1) return 1;
+		// Subtracting antiderivatives at almost-equal endpoints loses precision
+		// on near-vertical tessellator edges. Integrate their trapezoid directly.
+		if (low >= 0 && high <= 1) return .5*(low+high);
+		const double a = std::clamp(low,0.0,1.0), b = std::clamp(high,0.0,1.0);
+		return (.5*(a+b)*(b-a)+std::max(0.0,high-1))/(high-low);
+	}
 	void Charge() { Require(++work <= 2097152,"coverage exceeds edge-work budget"); }
 	void Range(int y, int left, int right, double value) {
 		left = std::max(left,bounds.left); right = std::min(right,bounds.right);

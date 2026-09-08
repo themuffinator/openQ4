@@ -276,3 +276,7 @@ holes, strokes, gradients, responsive cuts and
 [analytic pixel coverage](../ui/coverage-antialiasing.md) are integrated.
 Compositing, broader quality/performance qualification, full art reconstruction
 and the complete Stage 3 gate remain open.
+Runtime CPU counters, repeatable native/gameplay profiles, opacity/integer-motion
+cache reuse and stable tessellation are recorded in the
+[performance checkpoint](../ui/runtime-performance.md). Optimized-build, GPU and
+full-corpus costs are still unqualified.

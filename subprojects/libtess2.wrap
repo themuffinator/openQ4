@@ -4,6 +4,7 @@ source_url = https://codeload.github.com/memononen/libtess2/tar.gz/8dbd6483e9203
 source_filename = libtess2-8dbd6483.tar.gz
 source_hash = 083f507dd3b27eba01fa540b9efe3bbeed36d5bd4ea0e8869897d21f52c5f98b
 patch_directory = libtess2
+diff_files = libtess2/double-precision.patch
 
 [provide]
 dependency_names = libtess2

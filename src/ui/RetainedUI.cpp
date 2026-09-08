@@ -3,6 +3,7 @@
 
 #ifndef ID_DEDICATED
 #include "retained/Runtime.h"
+#include <algorithm>
 #include <chrono>
 #include <cstring>
 #include <map>
@@ -120,6 +121,29 @@ std::unique_ptr<openq4::ui::Runtime> runtime;
 std::string currentPath, currentMarkup;
 int restartGeneration = -1, languageGeneration = -1;
 std::chrono::steady_clock::time_point epoch;
+struct ProfileSample { openq4::ui::RuntimeStatistics statistics; double engineMilliseconds; };
+std::vector<ProfileSample> profile;
+int profileFrames = 0;
+
+void RecordProfile(double engineMilliseconds) {
+	if (!profileFrames) return;
+	profile.push_back({runtime->Statistics(),engineMilliseconds});
+	if (static_cast<int>(profile.size()) < profileFrames) return;
+	std::vector<double> times;
+	double compileMilliseconds = 0;
+	unsigned long long paths = 0, uploads = 0, hits = 0, peakBytes = 0;
+	for (const auto& sample : profile) {
+		times.push_back(sample.engineMilliseconds);
+		compileMilliseconds += sample.statistics.vectorCompileMilliseconds;
+		paths += sample.statistics.vectorPathsCompiled; uploads += sample.statistics.vectorUploads; hits += sample.statistics.vectorCacheHits;
+		peakBytes = Max(peakBytes,static_cast<unsigned long long>(sample.statistics.residentGeometryBytes+sample.statistics.visibleVectorCacheBytes));
+	}
+	std::sort(times.begin(),times.end());
+	auto percentile = [&](double fraction) { return times[static_cast<size_t>(std::ceil(fraction*times.size()))-1]; };
+	common->Printf("Retained UI profile: {\"frames\":%d,\"engine_cpu_p50_ms\":%.6f,\"engine_cpu_p95_ms\":%.6f,\"engine_cpu_max_ms\":%.6f,\"vector_compile_ms\":%.6f,\"paths_compiled\":%llu,\"vector_uploads\":%llu,\"cache_hits\":%llu,\"tracked_peak_bytes\":%llu}\n",
+		profileFrames,percentile(.5),percentile(.95),percentile(1),compileMilliseconds,paths,uploads,hits,peakBytes);
+	profileFrames = 0; profile.clear();
+}
 
 double PresentationTime() { return std::chrono::duration<double>(std::chrono::steady_clock::now()-epoch).count(); }
 bool LoadPreview(const std::string& source, const std::string& path) {
@@ -132,6 +156,7 @@ bool LoadPreview(const std::string& source, const std::string& path) {
 }
 
 void Close() {
+	profileFrames = 0; profile.clear();
 	runtime.reset();
 	host.Reset();
 	currentPath.clear(); currentMarkup.clear();
@@ -157,18 +182,26 @@ void Play_f(const idCmdArgs& args) {
 	if (!runtime || !runtime->PlayTimeline(args.Argv(1),PresentationTime())) common->Warning("retained UI: unknown timeline %s",args.Argv(1));
 	else common->Printf("Retained UI timeline played: %s\n",args.Argv(1));
 }
+void Profile_f(const idCmdArgs& args) {
+	const int frames = args.Argc() == 2 ? atoi(args.Argv(1)) : 0;
+	if (frames < 1 || frames > 3600) { common->Printf("usage: ui_retainedProfile <1..3600 frames>\n"); return; }
+	if (!runtime || !runtime->IsLoaded()) { common->Warning("retained UI: profiling requires a loaded document"); return; }
+	profile.clear(); profile.reserve(frames); profileFrames = frames;
+}
 }
 
 void RetainedUI_Init() {
 	cmdSystem->AddCommand("ui_retainedPreview",Preview_f,CMD_FL_SYSTEM,"preview a retained UI integration document");
 	cmdSystem->AddCommand("ui_retainedClose",Close_f,CMD_FL_SYSTEM,"close the retained UI integration preview");
 	cmdSystem->AddCommand("ui_retainedPlay",Play_f,CMD_FL_SYSTEM,"play a canonical retained UI timeline");
+	cmdSystem->AddCommand("ui_retainedProfile",Profile_f,CMD_FL_SYSTEM,"measure retained UI CPU submission over bounded rendered frames");
 }
 void RetainedUI_Shutdown() {
 	Close();
 	cmdSystem->RemoveCommand("ui_retainedPreview");
 	cmdSystem->RemoveCommand("ui_retainedClose");
 	cmdSystem->RemoveCommand("ui_retainedPlay");
+	cmdSystem->RemoveCommand("ui_retainedProfile");
 }
 void RetainedUI_Draw() {
 	if (!runtime || !runtime->IsLoaded() || !renderSystem || !renderSystem->IsOpenGLRunning()) return;
@@ -190,6 +223,7 @@ void RetainedUI_Draw() {
 	viewport.pixelDensityX = engineWindowState.pixelDensityX; viewport.pixelDensityY = engineWindowState.pixelDensityY;
 	viewport.originX = static_cast<float>(engineWindowState.uiViewportX); viewport.originY = static_cast<float>(engineWindowState.uiViewportY);
 	host.viewportWidth = viewport.width; host.viewportHeight = viewport.height;
+	const auto profileStart = std::chrono::steady_clock::now();
 	const bool oldViewport = renderSystem->GetUseUIViewportFor2D();
 	renderSystem->FlushGui();
 	renderSystem->SetUseUIViewportFor2D(true);
@@ -199,6 +233,7 @@ void RetainedUI_Draw() {
 	renderSystem->FlushGui();
 	renderSystem->SetUseUIViewportFor2D(oldViewport);
 	renderSystem->SetColor4(1,1,1,1);
+	RecordProfile(std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-profileStart).count());
 }
 #else
 void RetainedUI_Init() {}

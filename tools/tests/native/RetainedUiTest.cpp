@@ -157,11 +157,16 @@ int main() {
 	  "opacity":{"type":"number","value":0.5}
 	 },"children":[{"id":"shape","type":"vector","properties":{
 	  "width":{"type":"length","value":200,"unit":"dp"},"height":{"type":"length","value":100,"unit":"dp"},
-	  "opacity":{"type":"number","value":0.5}
+	  "opacity":{"type":"number","value":0.5},"transform":{"type":"transform","unit":"px","value":[0,0,1,1,0]}
 	 },"paths":[{"id":"rectangle","fill":{"type":"solid","color":{"type":"color","value":[0.8,0.4,0.2,0.8]}},
 	  "commands":[{"id":"p0","op":"move","points":[[0,0]]},{"id":"p1","op":"line","points":[[{"fraction":1},0]]},
 	   {"id":"p2","op":"line","points":[[{"fraction":1},{"fraction":1}]]},{"id":"p3","op":"line","points":[[0,{"fraction":1}]]},
-	   {"id":"close","op":"close"}]}]}]}})json";
+	   {"id":"close","op":"close"}]}]}]},
+	 "timelines":[
+	  {"id":"fade","durationMs":1000,"tracks":[{"node":"shape","property":"opacity","keys":[{"atMs":0,"value":{"type":"number","value":0.5}},{"atMs":1000,"value":{"type":"number","value":0.25}}]}]},
+	  {"id":"move","durationMs":1000,"tracks":[{"node":"shape","property":"transform","keys":[{"atMs":0,"value":{"type":"transform","unit":"px","value":[0,0,1,1,0]}},{"atMs":1000,"value":{"type":"transform","unit":"px","value":[10,0,1,1,0]}}]}]},
+	  {"id":"fractional","durationMs":1000,"tracks":[{"node":"shape","property":"transform","keys":[{"atMs":0,"value":{"type":"transform","unit":"px","value":[10,0,1,1,0]}},{"atMs":1000,"value":{"type":"transform","unit":"px","value":[10.5,0,1,1,0]}}]}]}
+	 ]})json";
 	Check(runtime.LoadDocument(vectorDocument,"vector.q4ui",diagnostics),"load native vector element into retained tree");
 	for (int density : {1,2}) {
 		viewport.displayScale = static_cast<float>(density);
@@ -172,9 +177,38 @@ int main() {
 			Check(std::abs(v.a-.2f)<.01f && std::abs(v.r-.16f)<.01f,"vector paint alpha and inherited opacity are each applied once");
 		}
 	}
+	runtime.Frame(viewport,11);
+	Check(runtime.Statistics().vectorPathsCompiled == 0 && runtime.Statistics().vectorUploads == 0,"stationary frame reuses vector geometry");
+	Check(runtime.PlayTimeline("fade",11),"start opacity cache regression");
+	host.drawn.clear(); runtime.Frame(viewport,11.5);
+	Check(runtime.Statistics().vectorPathsCompiled == 0 && runtime.Statistics().vectorUploads == 1,"opacity refreshes tint without compiling coverage");
+	for (const auto& v : host.drawn) Check(std::abs(v.a-.15f)<.01f,"cached paint receives current animated opacity");
+	runtime.Frame(viewport,12);
+	Check(runtime.PlayTimeline("move",12),"start integer movement cache regression");
+	runtime.Frame(viewport,12.1); // May enter another padded coverage region.
+	host.drawn.clear(); runtime.Frame(viewport,12.2);
+	Check(runtime.Statistics().vectorPathsCompiled == 0 && runtime.Statistics().vectorUploads == 0,"whole-pixel movement reuses coverage and tint");
+	for (const auto& v : host.drawn) Check(v.x >= 202-.001f && v.x <= 400+.001f,"cached movement retains exact live clipping");
+	runtime.Frame(viewport,13);
+	Check(runtime.PlayTimeline("fractional",13),"start fractional coverage cache regression");
+	host.drawn.clear(); runtime.Frame(viewport,13.5);
+	Check(runtime.Statistics().vectorPathsCompiled == 1,"fractional phase changes rebuild coverage");
+	const auto cachedDraw = host.drawn;
+	Document direct;
+	Check(direct.Load(vectorDocument,diagnostics),"load fresh reference for animated cached geometry");
+	Check(direct.ReplaceValue("/root/children/0/properties/opacity/value","0.25",diagnostics),"set final reference opacity");
+	Check(direct.ReplaceValue("/root/children/0/properties/transform/value","[10.25,0,1,1,0]",diagnostics),"set final reference position");
+	Check(runtime.LoadDocument(direct.Source(),"fresh-vector.q4ui",diagnostics),"load fresh renderer reference");
+	host.drawn.clear(); runtime.Frame(viewport,14);
+	Check(host.drawn.size() == cachedDraw.size(),"fresh and cached vector submission topology agrees");
+	for (size_t i = 0; i < host.drawn.size(); ++i) {
+		const auto& a = host.drawn[i]; const auto& b = cachedDraw[i];
+		Check(std::abs(a.x-b.x)<.0001f && std::abs(a.y-b.y)<.0001f && std::abs(a.r-b.r)<.0001f && std::abs(a.a-b.a)<.0001f,"fresh compilation matches animated cached pixels and premultiplied paint");
+	}
 	runtime.CloseDocument();
 	Check(!runtime.IsLoaded(),"close document");
 	runtime.Shutdown();
+	Check(runtime.Statistics().residentGeometryCount == 0 && runtime.Statistics().residentGeometryBytes == 0,"geometry accounting returns to zero after shutdown");
 	Check(runtime.Initialize(),"restart lifetime without stale services");
 	runtime.Shutdown();
 	Check(host.errors==0,"no library warnings or errors");

@@ -140,6 +140,18 @@ static void CoverageChecks() {
 		if (Near(v.x,50.25) && v.g > .99 && v.a > .99) middle = true;
 	}
 	Check(middle,"coverage geometry retains authored middle gradient stop");
+	path = {}; path.id = "fractional-chamfer-rail"; path.stroke.paint.type = PaintType::Solid;
+	path.stroke.widthDp = 1; path.stroke.minimumPixels = 1;
+	Polygon(path,{P(12.5,.5),P(395.5,.5),P(407.5,12.5),P(407.5,237.5),P(399.5,245.5),P(8.5,245.5),P(.5,237.5),P(.5,12.5)});
+	for (int i = 1; i <= 10; ++i) {
+		const double position = static_cast<float>(48+i*.3);
+		options.transform = {2,0,0,2,position-std::floor(position),0};
+		build(path);
+		auto rawOptions = options; rawOptions.antialias = false;
+		VectorMesh raw; Check(TessellatePath(path,rawOptions,raw,error),"compile near-vertical edge reference");
+		Check(Near(AlphaMass(mesh),Area(raw),.001),"fractional chamfer rail conserves coverage despite almost-coincident edge coordinates");
+		Check(Near(SampleAlpha(mesh,791.381,.619),PixelArea(raw,791,0),.00001),"thin rail corner matches independent clipped area at troublesome fractional phases");
+	}
 	path = Rectangle(); options.transform = {1000,0,0,1000,-40000,-40000};
 	options.pixelBounds = VectorPixelBounds{0,0,4,3}; build(path);
 	Check(Near(AlphaMass(mesh),12*.88) && mesh.vertices.size() == 4,"large offscreen fill clips work and merges interior into one quad");

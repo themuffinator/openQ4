@@ -463,6 +463,13 @@ if build_engine or get_option('build_native_tests')
       install: false,
     )
     test('openq4-ui-vector', openq4_ui_vector_test, timeout: 30)
+    executable(
+      'openq4-retained-ui-benchmark',
+      files('tools/tests/native/RetainedUiBenchmark.cpp'),
+      include_directories: root_include_dir,
+      dependencies: openq4_retained_dep,
+      install: false,
+    )
   endif
 endif
 
