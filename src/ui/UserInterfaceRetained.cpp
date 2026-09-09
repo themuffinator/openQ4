@@ -6,6 +6,8 @@
 #include "SettingsService.h"
 #include "retained/Runtime.h"
 #include "retained/Input.h"
+#include "retained/TextEditCommand.h"
+#include "../sys/KeyEventMetadata.h"
 #include "application/SettingsTransaction.h"
 #include <algorithm>
 #include <charconv>
@@ -335,6 +337,49 @@ struct idUserInterfaceRetained::Impl {
 		suspended = pause;
 		return !pause;
 	}
+	bool TextCommandKey(int key, bool down, bool repeated, const openq4::KeyEventMetadata* metadata) {
+		auto* runtime = RuntimeView();
+		const auto id = runtime->FocusedControl();
+		const auto widget = runtime->GetWidgetState(id);
+		const bool editing = widget && widget->role == ControlRole::Number && widget->number && widget->number->active;
+		const bool control = metadata ? metadata->control : held.contains(K_CTRL) || idKeyInput::IsDown(K_CTRL);
+		const bool shift = metadata ? metadata->shift : held.contains(K_SHIFT) || idKeyInput::IsDown(K_SHIFT);
+		const bool alt = metadata ? metadata->alt : held.contains(K_ALT) || held.contains(K_RIGHT_ALT) || idKeyInput::IsDown(K_ALT) || idKeyInput::IsDown(K_RIGHT_ALT);
+		std::optional<TextEditCommand> command;
+		bool commit = false, undo = false, redo = false, mapped = true;
+		switch (key) {
+			case K_LEFTARROW: command = control ? TextEditCommand::WordLeft : TextEditCommand::Left; break;
+			case K_RIGHTARROW: command = control ? TextEditCommand::WordRight : TextEditCommand::Right; break;
+			case K_HOME: command = TextEditCommand::Home; break;
+			case K_END: command = TextEditCommand::End; break;
+			case K_BACKSPACE: if (!control) command = TextEditCommand::Backspace; break;
+			case K_DEL: if (!control && !shift) command = TextEditCommand::Delete; break;
+			case K_ENTER: case K_KP_ENTER: case K_JOY3: commit = true; break;
+			// Space belongs to native text delivery while a field is editing.
+			// It must not also activate the field as an ordinary menu button.
+			case K_SPACE: break;
+			case 'a': if (control) command = TextEditCommand::SelectAll; else mapped = false; break;
+			case 'z': undo = control && !shift; redo = control && shift; mapped = control; break;
+			case 'y': redo = control; mapped = control; break;
+			default: mapped = false; break;
+		}
+		const auto identity = editing ? widget->number->identity : NumberEditIdentity{};
+		const auto claim = input.ClaimTextKey(key,mapped ? identity.session : 0,down,repeated);
+		if (claim == Input::TextKey::Unclaimed) return false;
+		if (claim == Input::TextKey::Consumed || !editing || alt) return true;
+		pointerVisible = false;
+		std::string error; const double now = RetainedUI_PresentationTime();
+		// The runtime refreshes readback and validates this exact identity again.
+		// A refused edit leaves the local draft and accepted setting untouched.
+		if (command) {
+			const bool movement = *command <= TextEditCommand::WordRight;
+			runtime->NumberCommand(id,identity,*command,movement && shift,error,now);
+		} else if (claim == Input::TextKey::Press) {
+			if (undo || redo) runtime->UndoNumberEdit(id,identity,redo,error,now);
+			else if (commit) runtime->CommitNumberEdit(id,identity,error,now);
+		}
+		return true;
+	}
 	void Pointer(bool force = true) {
 		Viewport viewport;
 		if (!RetainedUI_DefaultViewport(viewport)) return;
@@ -498,9 +543,16 @@ const char* idUserInterfaceRetained::HandleEvent(const sysEvent_t* event, int ti
 		impl->pointerVisible = true; impl->Pointer();
 	} else if (event->evType == SE_KEY && event->evValue > 0 && event->evValue < K_LAST_KEY) {
 		const int key = event->evValue; const bool down = event->evValue2 != 0;
-		const bool repeated = down && impl->held.contains(key);
+		openq4::KeyEventMetadata metadata;
+		const bool hasMetadata = event->evPtrLength > 0 && openq4::DecodeKeyEventMetadata(event->evPtr,static_cast<size_t>(event->evPtrLength),metadata);
+		// Malformed optional metadata must not degrade into a shortcut with
+		// frame-global modifiers. Releases still retire quarantined sources.
+		if (event->evPtrLength && !hasMetadata) { if (!down) impl->input.ReleaseQuarantined(key); return ""; }
+		const bool repeated = down && (hasMetadata ? metadata.repeated : impl->held.contains(key));
 		if (down) impl->held.insert(key); else impl->held.erase(key);
-		if (key == K_MOUSE1) {
+		if (impl->TextCommandKey(key,down,repeated,hasMetadata ? &metadata : nullptr)) {
+			// The source remains bound to its original editor until release.
+		} else if (key == K_MOUSE1) {
 			impl->Pointer(); impl->input.Pointer(key,down,RetainedUI_PresentationTime());
 		} else if (key == K_MWHEELUP || key == K_MWHEELDOWN) {
 			if (down && !repeated) {
@@ -510,7 +562,7 @@ const char* idUserInterfaceRetained::HandleEvent(const sysEvent_t* event, int ti
 		} else {
 			MenuInput action; bool mapped = true;
 			switch (key) {
-				case K_TAB: action = (impl->held.contains(K_SHIFT) || idKeyInput::IsDown(K_SHIFT)) ? MenuInput::Previous : MenuInput::Next; break;
+				case K_TAB: action = (hasMetadata ? metadata.shift : impl->held.contains(K_SHIFT) || idKeyInput::IsDown(K_SHIFT)) ? MenuInput::Previous : MenuInput::Next; break;
 				case K_UPARROW: case K_JOY9: action = MenuInput::Up; break;
 				case K_DOWNARROW: case K_JOY10: action = MenuInput::Down; break;
 				case K_LEFTARROW: case K_JOY12: action = MenuInput::Left; break;
@@ -826,6 +878,13 @@ bool UI_RetainedDiagnostic(idUserInterface* gui, const idCmdArgs& args) {
 		};
 		if (operation == "begin" && args.Argc() == 4) okay = runtime->BeginNumberEdit(id,error,now);
 		else if (operation == "replace" && args.Argc() == 5) okay = runtime->ReplaceNumberSelection(id,identity,args.Argv(4),error,now);
+		else if (operation == "command" && (args.Argc() == 5 || (args.Argc() == 6 && !idStr::Cmp(args.Argv(5),"extend")))) {
+			const std::map<std::string,TextEditCommand> commands = {{"left",TextEditCommand::Left},{"right",TextEditCommand::Right},
+				{"home",TextEditCommand::Home},{"end",TextEditCommand::End},{"word-left",TextEditCommand::WordLeft},{"word-right",TextEditCommand::WordRight},
+				{"select-all",TextEditCommand::SelectAll},{"backspace",TextEditCommand::Backspace},{"delete",TextEditCommand::Delete}};
+			const auto command = commands.find(args.Argv(4));
+			if (command != commands.end()) okay = runtime->NumberCommand(id,identity,command->second,args.Argc() == 6,error,now);
+		}
 		else if (operation == "select" && args.Argc() == 6) {
 			std::int64_t anchor = 0, caret = 0;
 			if (integer(args.Argv(4),anchor) && integer(args.Argv(5),caret) && anchor >= 0 && caret >= 0 &&

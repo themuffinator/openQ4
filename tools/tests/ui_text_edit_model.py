@@ -37,7 +37,10 @@ def main() -> None:
         'mutant-unbounded-history': changed(source, 'while (HistoryEntries() > MaxHistoryEntries || HistoryTextBytes() > MaxHistoryTextBytes)', 'while (false)'),
         'mutant-quantized-number': changed(source, 'value = candidate; return TextNumberStatus::Valid;', 'value = std::round(candidate); return TextNumberStatus::Valid;'),
         'mutant-reset-composition-loss': changed(source, 'if (!ValidPolicy(candidatePolicy,error)', 'composition.reset();\n\tif (!ValidPolicy(candidatePolicy,error)'),
-        'mutant-no-scalar-selection-check': changed(source, 'if (!Boundary(state.text,anchor) || !Boundary(state.text,caret))', 'if (false)'),
+        'mutant-no-scalar-selection-check': changed(source,
+            'if (!Boundary(state.text,anchor) || !Boundary(state.text,caret)) return Fail(error, "Selection splits a scalar or exceeds the buffer");', ''),
+        'mutant-range-undo-selection': changed(source, 'if (candidate.text != state.text) { undo.push_back(state); redo.clear(); }',
+            'if (candidate.text != state.text) { state.anchor=anchor; state.caret=caret; undo.push_back(state); redo.clear(); }'),
     }
     compiler = next((found for name in ('clang++','g++','c++') if (found := shutil.which(name))), None)
     if not compiler:

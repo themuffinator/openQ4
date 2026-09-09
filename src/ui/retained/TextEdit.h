@@ -40,6 +40,9 @@ public:
 	// line separator and paragraph separator scalars. Single-line fields reject
 	// line breaks atomically; no silent truncation or partial insertion.
 	bool ReplaceSelection(std::string_view replacement, std::string& error);
+	// Replace a command-derived range without changing the visible selection
+	// first. Undo restores the original selection, including its direction.
+	bool ReplaceRange(std::size_t anchor, std::size_t caret, std::string_view replacement, std::string& error);
 	// Empty Commit is a no-op on text, clearing preedit only. Empty Preedit also
 	// clears preedit. A nonempty commit replaces the captured selection once.
 	bool Apply(const TextInputEvent& event, std::string& error);
@@ -59,6 +62,8 @@ public:
 		const TextEditPolicy& policy, std::string& error);
 private:
 	bool Replace(std::string_view replacement, bool fromCommit, std::string& error);
+	bool ReplaceAt(std::size_t anchor, std::size_t caret, std::string_view replacement,
+		bool fromCommit, std::string& error);
 	void TrimHistory();
 	TextEditPolicy policy;
 	TextEditState state;

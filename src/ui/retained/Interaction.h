@@ -2,6 +2,7 @@
 #pragma once
 #include "Document.h"
 #include "TextEdit.h"
+#include "TextEditCommand.h"
 #include <cstdint>
 #include <functional>
 #include <set>
@@ -135,6 +136,11 @@ public:
 		const TextInputEvent& event, std::string& error);
 	bool ReplaceNumberSelection(const std::string& id, NumberEditIdentity expected,
 		std::string_view text, std::string& error);
+	// Checked command result only; no native input authority is acquired. Empty-text
+	// replacements delete atomically, preserving the original undo selection.
+	// A validated no-op keeps the current revision and rejected presentation.
+	bool ApplyNumberOperation(const std::string& id, NumberEditIdentity expected,
+		const TextEditOperation& operation, std::string& error);
 	bool UndoNumberEdit(const std::string& id, NumberEditIdentity expected, bool redo, std::string& error);
 	// Requires Valid parsing and no preedit, conflict or outstanding proposal.
 	// Queues one exact double, independent of a sibling slider's step/decimals.

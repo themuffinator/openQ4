@@ -238,6 +238,31 @@ bool Interaction::ReplaceNumberSelection(const std::string& id, NumberEditIdenti
 bool Interaction::UndoNumberEdit(const std::string& id, NumberEditIdentity expected, bool redo, std::string& error) {
 	return ChangeNumber(id,expected,[&](TextEditBuffer& buffer,std::string& e) { return redo ? buffer.Redo(e) : buffer.Undo(e); },error);
 }
+bool Interaction::ApplyNumberOperation(const std::string& id, NumberEditIdentity expected,
+	const TextEditOperation& operation, std::string& error) {
+	auto* item = EditableNumber(id,expected,error); if (!item) return false;
+	if (item->number->buffer.Composition()) { error = "Number command is unavailable during composition"; return false; }
+	if (!operation.replacement.empty()) { error = "Number commands cannot insert replacement text"; return false; }
+	const auto& before = item->number->buffer.State();
+	TextEditBuffer candidate = item->number->buffer;
+	switch (operation.kind) {
+		case TextEditOperation::Kind::Selection:
+			if (!candidate.SetSelection(operation.anchor,operation.caret,error)) return false;
+			break;
+		case TextEditOperation::Kind::Replace:
+			if (operation.anchor >= operation.caret) { error = "Number command has an invalid deletion range"; return false; }
+			if (!candidate.ReplaceRange(operation.anchor,operation.caret,operation.replacement,error)) return false;
+			break;
+		default: error = "Unknown number command operation"; return false;
+	}
+	const auto& after = candidate.State();
+	const bool changed = before.text != after.text || before.anchor != after.anchor || before.caret != after.caret;
+	if (changed != operation.changed) { error = "Number command change flag does not match its operation"; return false; }
+	if (!changed) return true;
+	const auto revision = ProposalToken(); if (!revision) { error = "Number edit identity exhausted"; return false; }
+	item->number->buffer = std::move(candidate); item->number->identity.revision = revision;
+	item->rejected.reset(); return true;
+}
 bool Interaction::CommitNumberEdit(const std::string& id, NumberEditIdentity expected, std::string& error) {
 	auto* item = EditableNumber(id,expected,error); if (!item) return false;
 	double value = 0;

@@ -279,4 +279,25 @@ std::optional<NumberTextGeometry> NumberControlView::Geometry(const std::string&
 	if (!Finite(BoundsOf(caret)) || !Finite(BoundsOf(viewport)) || caret.Width()<=0 || caret.Height()<=0 || viewport.Width()<=0 || viewport.Height()<=0) return {};
 	return NumberTextGeometry{id,entry.identity,BoundsOf(caret),BoundsOf(viewport),entry.scroll};
 }
+std::shared_ptr<const TextRun> NumberControlView::CommandRun(const std::string& id,NumberEditIdentity expected,
+	const Interaction& interaction,std::string& error) const {
+	error.clear(); const auto found=impl->entries.find(id); const auto view=interaction.Widget(id);
+	if (found==impl->entries.end() || !view || !view->number || !view->number->active ||
+		!expected.session || !expected.revision || view->number->identity!=expected ||
+		interaction.Focused()!=id || !interaction.CanActivate(id) || view->number->composition ||
+		view->number->conflict || view->pending) { error="Number command editor is stale or unavailable"; return {}; }
+	auto* parent=impl->Element(found->second.spec.text);
+	if (!parent || !parent->IsVisible(true)) { error="Number command typography is unavailable"; return {}; }
+	// The generated #text child inherits the wrapper's resolved typography, just
+	// as in Paint. Its line text can still be an earlier edit; never measure that.
+	auto* typography=parent;
+	if (parent->GetNumChildren()==1 && parent->GetChild(0)->GetTagName()=="#text") typography=parent->GetChild(0);
+	const auto font=typography->GetFontFaceHandle();
+	if (!font || !impl->query) { error="Number command font is unavailable"; return {}; }
+	auto run=impl->query(font,view->number->state.text,typography->GetComputedValues().letter_spacing());
+	if (!run || !run->monotonicLtr || run->text!=view->number->state.text) {
+		error="Number command requires a current scalar LTR text run"; return {};
+	}
+	return run;
+}
 } // namespace openq4::ui

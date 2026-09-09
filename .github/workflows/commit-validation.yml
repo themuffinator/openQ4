@@ -286,6 +286,7 @@ jobs:
             tools/tests/sys_event_queue_ownership.py \
             tools/tests/event_journal.py \
             tools/tests/sdl3_clipboard_status.py \
+            tools/tests/sdl3_text_provenance.py \
             tools/tests/ui_text_edit_model.py \
             tools/tests/ui_text_input.py \
             tools/tests/ui_retained_input.py \
@@ -520,6 +521,7 @@ jobs:
           python tools/tests/sys_event_queue_ownership.py
           python tools/tests/event_journal.py
           python tools/tests/sdl3_clipboard_status.py
+          python tools/tests/sdl3_text_provenance.py
           python tools/tests/ui_text_edit_model.py
           python tools/tests/ui_text_input.py
           python tools/tests/ui_retained_input.py

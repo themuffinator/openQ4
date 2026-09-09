@@ -37,6 +37,37 @@ a conflict. Beginning the edit again does not discard the conflict:
 These are semantic operations. Their production controls, specific localized
 validation and integration with settings Apply/exit remain required work.
 
+## Editing commands
+
+An active numeric editor now handles Left/Right, Home/End, Shift selection,
+Backspace/Delete, Ctrl+A, Ctrl+Z, Ctrl+Shift+Z/Ctrl+Y, and Enter/keypad Enter or
+controller Accept. Enter proposes the current valid number once per press.
+Space belongs to text delivery and cannot also activate a menu control.
+Tab and the menu navigation actions retain their focus-navigation role; leaving
+the editor preserves its draft. Native character delivery remains unfinished.
+
+Commands measure the current local buffer with the current resolved typography,
+even when an earlier edit in the same event batch has not been painted. They use
+the shared scalar text run, stage range replacements atomically, and preserve the
+original directional selection for undo. Valid no-op commands retain the editor
+revision. Current composition, conflicts, pending proposals or stale ownership
+refuse mutation. Word movement has no boundary provider yet; Ctrl+Backspace,
+Ctrl+Delete and Shift+Delete are reserved until word deletion and Cut exist.
+
+The input adapter binds each held command key to its original editing session.
+Repeats cannot transfer to another field, reactivate an old session, or emit a
+menu Accept/release. Cancellation quarantines claims until release. SDL keyboard
+events carry optional fixed-byte modifier/repeat metadata, so Ctrl/Alt shortcuts
+and Shift+Tab use the state captured for that event. Older payload-free keyboard,
+mouse and controller records remain supported. Journal decoding validates the
+metadata before publication and retains the historical outer event layout.
+
+The semantic diagnostic `openq4_retainedGui number command <control> <command>`
+accepts `left`, `right`, `home`, `end`, `word-left`, `word-right`, `select-all`,
+`backspace` and `delete`; an optional final `extend` requests selection movement.
+It invokes the same Runtime command API without injecting a device event.
+See [native text delivery](text-input-routing.md) for the remaining input route.
+
 ## Authoring and rendering
 
 The control requires `value`, a typed numeric `action`, finite `minimum` and
@@ -112,13 +143,20 @@ the managed adapter. Its companion configuration uses `openq4_retainedGui number
 semantic operations and engine `screenshot` commands. It is a test fixture;
 the shipped SYSTEM page still needs a completed entry field and ordinary input.
 
-The Windows integration passes all 21 retained-UI suites. Windowed SP/OpenGL
-at 125% density and MP/Vulkan at 200% each reach gameplay before exercising
-the managed numeric fixture. These captures cover exact accepted readbacks,
-incomplete drafts, inactive save restoration, undo, selection and composition
-ink. The ordinary SYSTEM regression also preserves native-resolution UI pixels
-across the recorded render-scale cases. These are bounded semantic and rendering
-checks; they do not establish physical-device or native IME acceptance.
+The command integration passes all 27 Windows retained-UI suites. Windowed
+SP/OpenGL at 125% density and MP/Vulkan at 200% each reach gameplay before
+exercising `number-command-smoke.cfg`. Each run records 16 successful semantic
+operations and five engine screenshots. Selection of the final digit of `1.25`,
+deletion to `1.2`, undo restoring `1.25` and its directional selection, same-batch
+commands before repaint, and explicit acceptance of `1.375` are checked.
+Counted adapter tests additionally exercise ordinary key routing, held-key
+ownership and captured modifiers; these are not physical-device tests.
+
+The earlier numeric-field checkpoint at `b09d8ee` passed 21 suites and recorded
+incomplete drafts, inactive save restoration and composition ink. Its ordinary
+SYSTEM regression preserved native-resolution UI pixels across the recorded
+render-scale cases. Those historical captures retain their own source/binary
+bindings. Neither checkpoint establishes native IME or complete product acceptance.
 
 The adjacent event-journal repair bounds and validates owned event payloads
 before allocation or command dispatch, ignores recorded process pointers,

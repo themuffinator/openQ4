@@ -2,6 +2,12 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- Active numeric fields support caret movement, selection, deletion, undo/redo
+  and explicit Enter confirmation. Held editing keys cannot switch to another
+  field, and SDL shortcuts preserve the modifiers captured with each key event.
+  [Native text delivery](ui/text-input-routing.md) and production settings-field
+  completion remain in development.
+
 - Numeric-field development preserves unfinished edits and undo/redo through
   focus changes and resource restoration, with explicit recovery when a setting
   changes elsewhere. The [integration scope](ui/numeric-fields.md) separates

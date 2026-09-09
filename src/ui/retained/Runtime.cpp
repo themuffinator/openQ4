@@ -1436,6 +1436,27 @@ bool Runtime::UndoNumberEdit(const std::string& id,NumberEditIdentity expected,b
 	if (!impl->PrepareNumberEdit(seconds,error)) return false;
 	const bool result=impl->interaction.UndoNumberEdit(id,expected,redo,error); impl->Feedback(seconds); return result;
 }
+bool Runtime::NumberCommand(const std::string& id,NumberEditIdentity expected,TextEditCommand command,
+	bool extendSelection,std::string& error,double seconds) {
+	if (!impl->PrepareNumberEdit(seconds,error)) return false;
+	// Update canonical styling and resolve current inherited fonts without Paint
+	// or Render. The edit buffer may have changed repeatedly since the last frame.
+	ContextClock clock(*impl->services,impl->time);
+	impl->ApplyMotion(); impl->context->Update();
+	impl->context->GetRootElement()->UpdateGeometryForProjection();
+	impl->UpdateInteraction(seconds);
+	const auto run=impl->numberView.CommandRun(id,expected,impl->interaction,error); if (!run) return false;
+	const auto view=impl->interaction.Widget(id);
+	TextEditBoundaryMap boundaries; boundaries.text=run->text;
+	for (const auto& caret:run->carets) {
+		boundaries.visualCarets.push_back(caret.byteOffset);
+		boundaries.deletionStops.push_back(caret.byteOffset);
+	}
+	TextEditOperation operation;
+	if (!EvaluateTextEditCommand(view->number->state,boundaries,command,extendSelection,operation,error)) return false;
+	const bool result=impl->interaction.ApplyNumberOperation(id,expected,operation,error);
+	impl->Feedback(seconds); return result;
+}
 bool Runtime::CommitNumberEdit(const std::string& id,NumberEditIdentity expected,std::string& error,double seconds) {
 	if (!impl->PrepareNumberEdit(seconds,error)) return false;
 	const bool result=impl->interaction.CommitNumberEdit(id,expected,error); impl->Feedback(seconds); return result;

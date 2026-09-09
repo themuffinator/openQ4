@@ -15,6 +15,11 @@ struct RoutedInput {
 // flags; this class neither polls devices nor synthesizes platform events.
 class Input {
 public:
+	enum class TextKey { Unclaimed, Press, Repeat, Consumed };
+	// Claim command keys for one non-reused editor session. Held text keys never
+	// transfer to another editor or menu; releases and cancellation retire them.
+	// A zero session only drains a previous claim. No text or device is accessed.
+	TextKey ClaimTextKey(std::uint32_t source, std::uint64_t editorSession, bool down, bool repeated);
 	void Menu(std::uint32_t source, MenuInput action, bool down, bool repeated, double seconds);
 	void Pointer(std::uint32_t source, bool down, double seconds);
 	void Advance(double seconds);
@@ -28,7 +33,7 @@ public:
 	void ReleaseQuarantined(std::uint32_t source);
 	std::vector<RoutedInput> Take();
 private:
-	struct Source { RoutedInput::Kind kind; MenuInput action; bool blocked = false; std::uint64_t serial = 0; };
+	struct Source { RoutedInput::Kind kind; MenuInput action; bool blocked = false; std::uint64_t serial = 0, editorSession = 0; };
 	void Button(std::uint32_t source, RoutedInput::Kind kind, MenuInput action, bool down, bool repeated, double seconds);
 	void Emit(const Source& source, bool down);
 	void ChooseRepeat(double seconds);

@@ -20,7 +20,7 @@ import tempfile
 
 ROOT=Path(__file__).resolve().parents[2]
 SOURCES=["src/framework/EventLoop.cpp","src/framework/EventLoop.h","src/sys/sys_public.h",
-         "tools/tests/native/EventJournalTest.cpp","tools/tests/event_journal.py"]
+         "tools/tests/native/EventJournalTest.cpp","tools/tests/event_journal.py","src/sys/KeyEventMetadata.h"]
 
 
 def sha(path:Path)->str:
@@ -45,6 +45,7 @@ def main()->int:
     generated.write_text("#pragma once\n"+enum.group()+"\n"+record.group()+"\n",encoding="utf-8",newline="\n")
     production=(ROOT/SOURCES[0]).read_text(encoding="utf-8")
     mutations=[
+        ("key-metadata-unchecked","if ( ev.evType == SE_KEY && ev.evPtrLength )", "if ( false && ev.evType == SE_KEY && ev.evPtrLength )",1),
         ("unbounded-length","if ( length < 0 || length > MAX_JOURNAL_EVENT_PAYLOAD )","if ( false )",1),
         ("unknown-type",'return "Invalid journal event type";',"return NULL;",1),
         ("recorded-address", "candidate.evPtrLength = length;", "candidate.evPtrLength = length;\n\tmemcpy( &candidate.evPtr, header + offsetof( sysEvent_t, evPtr ), sizeof( candidate.evPtr ) );",1),
@@ -81,6 +82,9 @@ def main()->int:
                     target=alternate/SOURCES[0]
                     target.parent.mkdir(parents=True)
                     target.write_text(source,encoding="utf-8",newline="\n")
+                    metadata=alternate/"src/sys/KeyEventMetadata.h"
+                    metadata.parent.mkdir(parents=True,exist_ok=True)
+                    shutil.copyfile(ROOT/"src/sys/KeyEventMetadata.h",metadata)
                     includes=["-I",str(alternate)]
                 executable=scratch/(name+"-test"+(".exe" if os.name=="nt" else ""))
                 result=run([compiler,"-std=c++17","-O2","-Wall","-Wextra","-Werror",*includes,"-I",str(scratch),"-I",str(ROOT),

@@ -317,7 +317,36 @@ static void PairedOpenCases() {
 	Reset(); eventLoopLocal.Init();
 	Check(fileObject.opens.empty() && fileObject.closed.empty(), "disabled journaling performs no file operations");
 }
+static void KeyMetadataCases() {
+	for (unsigned flags=0; flags<16; ++flags) {
+		Reset(); const openq4::KeyEventMetadata value{(flags&1)!=0,(flags&2)!=0,(flags&4)!=0,(flags&8)!=0};
+		const auto encoded=openq4::EncodeKeyEventMetadata(value);
+		const std::vector<unsigned char> bytes(encoded.begin(),encoded.end());
+		auto event=Live(SE_KEY,bytes);event.evValue=65;event.evValue2=1;idFile file;
+		Check(EventLoop_WriteJournalEvent(&file,event)==nullptr,"key modifier record writes through actual journal");
+		sysEvent_t decoded={};Check(EventLoop_ReadJournalEvent(&file,decoded)==nullptr,"key modifier record reads through actual journal");
+		openq4::KeyEventMetadata restored;
+		Check(openq4::DecodeKeyEventMetadata(decoded.evPtr,decoded.evPtrLength,restored) && restored.control==value.control &&
+			restored.shift==value.shift && restored.alt==value.alt && restored.repeated==value.repeated,"all modifier and repeat combinations survive playback");
+		eventLoopLocal.ProcessEvent(event);eventLoopLocal.ProcessEvent(decoded);
+		Check(releases==2 && owned.empty(),"live and replayed key metadata each release exactly once");
+	}
+	const auto good=openq4::EncodeKeyEventMetadata({true,true,true,true});
+	for (std::size_t index=0;index<good.size();++index) for(unsigned byte=0;byte<256;++byte) {
+		auto damaged=good;damaged[index]=static_cast<unsigned char>(byte);
+		const bool valid=index==4 ? byte<=7 : index==5 ? byte<=1 : byte==good[index];
+		Reset();idFile file;file.bytes=Record(SE_KEY,8,{damaged.begin(),damaged.end()},65,1);
+		sysEvent_t out={};out.evValue=42;const auto before=out;
+		if(valid) {Check(EventLoop_ReadJournalEvent(&file,out)==nullptr,"legal metadata byte accepted");Mem_Free(out.evPtr);}
+		else Check(EventLoop_ReadJournalEvent(&file,out)!=nullptr && Same(out,before),"damaged key metadata rejects atomically");
+		Check(owned.empty() && releases==1,"rejected key metadata storage released");
+	}
+	for(std::size_t bytes=0;bytes<good.size();++bytes) {
+		Reset();idFile file;file.bytes=Record(SE_KEY,8,{good.begin(),good.begin()+bytes});sysEvent_t out={};
+		Check(EventLoop_ReadJournalEvent(&file,out)!=nullptr && owned.empty() && releases==1,"truncated key metadata has no partial publication");
+	}
+}
 int main() {
-	ReadCases(); WriteCases(); IntegrationCases(); PairedOpenCases(); Reset();
+	ReadCases(); WriteCases(); IntegrationCases(); PairedOpenCases(); KeyMetadataCases(); Reset();
 	std::printf("Event journal: %u checks passed (native historical layout, counted file/ownership/dispatch doubles)\n",checks);
 }

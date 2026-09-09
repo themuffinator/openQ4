@@ -1,0 +1,149 @@
+--- a/src/events/SDL_events.c
++++ b/src/events/SDL_events.c
+@@ -19,6 +19,9 @@
+   3. This notice may not be removed or altered from any source distribution.
+ */
+ #include "SDL_internal.h"
++#if defined(SDL_VIDEO_DRIVER_WINDOWS) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
++#include "../video/windows/SDL_openq4_text_provenance.h"
++#endif
+ 
+ // General event handling code for SDL
+ 
+@@ -1801,6 +1804,9 @@
+ 
+ bool SDL_PushEvent(SDL_Event *event)
+ {
++#if defined(SDL_VIDEO_DRIVER_WINDOWS) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
++    const OQ4_TextScope oq4_admission = OQ4_WIN_BeginTextAdmission(event);
++#endif
+     if (!event->common.timestamp) {
+         event->common.timestamp = SDL_GetTicksNS();
+     }
+@@ -1810,7 +1816,14 @@
+         return false;
+     }
+ 
++#if defined(SDL_VIDEO_DRIVER_WINDOWS) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
++    if (!OQ4_WIN_ValidateTextMarker(event)) return false;
++    if (event->type == SDL_EVENT_TEXT_INPUT) OQ4_WIN_AssociateText(event, oq4_admission);
++#endif
+     if (SDL_PeepEvents(event, 1, SDL_ADDEVENT, 0, 0) <= 0) {
++#if defined(SDL_VIDEO_DRIVER_WINDOWS) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
++        if (event->type == SDL_EVENT_TEXT_INPUT) OQ4_WIN_DropTextAssociation(event);
++#endif
+         return false;
+     }
+ 
+--- a/src/events/SDL_keyboard.c
++++ b/src/events/SDL_keyboard.c
+@@ -19,6 +19,9 @@
+   3. This notice may not be removed or altered from any source distribution.
+ */
+ #include "SDL_internal.h"
++#if defined(SDL_VIDEO_DRIVER_WINDOWS) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
++#include "../video/windows/SDL_openq4_text_provenance.h"
++#endif
+ 
+ // General keyboard handling code for SDL
+ 
+@@ -788,7 +791,11 @@
+         if (!event.text.text) {
+             return;
+         }
++#if defined(SDL_VIDEO_DRIVER_WINDOWS) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
++        OQ4_WIN_PushKeyboardText(&event);
++#else
+         SDL_PushEvent(&event);
++#endif
+     }
+ }
+ 
+--- a/src/video/windows/SDL_windowskeyboard.c
++++ b/src/video/windows/SDL_windowskeyboard.c
+@@ -23,6 +23,7 @@
+ #if defined(SDL_VIDEO_DRIVER_WINDOWS) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
+ 
+ #include "SDL_windowsvideo.h"
++#include "SDL_openq4_text_provenance.h"
+ 
+ #include "../../events/SDL_keyboard_c.h"
+ #include "../../events/scancodes_windows.h"
+@@ -245,6 +246,7 @@
+     }
+     SDL_zeroa(keymap_cache);
+     keymap_cache_size = 0;
++    OQ4_WIN_TextShutdown();
+ }
+ 
+ void WIN_ResetDeadKeys(void)
+@@ -280,6 +282,7 @@
+ 
+ bool WIN_StartTextInput(SDL_VideoDevice *_this, SDL_Window *window, SDL_PropertiesID props)
+ {
++    OQ4_WIN_TextSession(window, true);
+     WIN_ResetDeadKeys();
+ 
+ #ifndef SDL_DISABLE_WINDOWS_IME
+@@ -296,6 +299,7 @@
+ 
+ bool WIN_StopTextInput(SDL_VideoDevice *_this, SDL_Window *window)
+ {
++    OQ4_WIN_TextSession(window, false);
+     WIN_ResetDeadKeys();
+ 
+ #ifndef SDL_DISABLE_WINDOWS_IME
+@@ -319,6 +323,7 @@
+ 
+ bool WIN_ClearComposition(SDL_VideoDevice *_this, SDL_Window *window)
+ {
++    OQ4_WIN_TextCancel(window);
+ #ifndef SDL_DISABLE_WINDOWS_IME
+     SDL_VideoData *videodata = _this->internal;
+ 
+--- a/src/video/windows/SDL_windowsevents.c
++++ b/src/video/windows/SDL_windowsevents.c
+@@ -23,6 +23,7 @@
+ #ifdef SDL_VIDEO_DRIVER_WINDOWS
+ 
+ #include "SDL_windowsvideo.h"
++#include "SDL_openq4_text_provenance.h"
+ #include "../../events/SDL_events_c.h"
+ #include "../../events/SDL_touch_c.h"
+ #include "../../events/scancodes_windows.h"
+@@ -1158,7 +1159,7 @@
+     return false;
+ }
+ 
+-LRESULT CALLBACK WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
++static LRESULT WIN_WindowProcObserved(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+ {
+     SDL_WindowData *data;
+     LRESULT returnCode = -1;
+@@ -1196,6 +1197,7 @@
+     }
+ 
+ #if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
++    OQ4_WIN_ObserveTextMessage(data->window, msg, (uintptr_t)wParam, (intptr_t)lParam);
+     if (WIN_HandleIMEMessage(hwnd, msg, wParam, &lParam, data->videodata)) {
+         return 0;
+     }
+@@ -2513,6 +2515,18 @@
+     }
+ }
+ 
++LRESULT CALLBACK WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
++{
++#if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
++    OQ4_TextScope previous = OQ4_WIN_SaveTextScope();
++#endif
++    const LRESULT result = WIN_WindowProcObserved(hwnd, msg, wParam, lParam);
++#if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
++    OQ4_WIN_RestoreTextScope(previous);
++#endif
++    return result;
++}
++
+ int WIN_WaitEventTimeout(SDL_VideoDevice *_this, Sint64 timeoutNS)
+ {
+     if (g_WindowsEnableMessageLoop) {

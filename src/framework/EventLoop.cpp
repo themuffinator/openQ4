@@ -26,6 +26,7 @@ If you have questions concerning this license or the applicable additional terms
 ===========================================================================
 */
 #include <cstddef>
+#include "../sys/KeyEventMetadata.h"
 
 idCVar idEventLoop::com_journal( "com_journal", "0", CVAR_INIT|CVAR_SYSTEM, "1 = record journal, 2 = play back journal", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
 
@@ -61,8 +62,9 @@ static const char *EventLoop_ValidateHeader( int type, int length ) {
 		return "Invalid journal event payload length";
 	}
 	switch ( type ) {
-	case SE_NONE:
 	case SE_KEY:
+		return length == 0 || length == openq4::KeyEventMetadataBytes ? NULL : "Unexpected journal key metadata length";
+	case SE_NONE:
 	case SE_CHAR:
 	case SE_MOUSE:
 	case SE_JOYSTICK_AXIS:
@@ -78,6 +80,10 @@ static const char *EventLoop_ValidateHeader( int type, int length ) {
 static const char *EventLoop_ValidatePayload( const sysEvent_t &ev ) {
 	if ( ( ev.evPtrLength > 0 ) != ( ev.evPtr != NULL ) ) {
 		return "Invalid event payload ownership";
+	}
+	if ( ev.evType == SE_KEY && ev.evPtrLength ) {
+		openq4::KeyEventMetadata metadata;
+		if ( !openq4::DecodeKeyEventMetadata( ev.evPtr, static_cast<size_t>( ev.evPtrLength ), metadata ) ) return "Invalid journal key metadata";
 	}
 	if ( ev.evType == SE_CONSOLE && memchr( ev.evPtr, '\0', static_cast<size_t>( ev.evPtrLength ) ) == NULL ) {
 		return "Unterminated console event payload";

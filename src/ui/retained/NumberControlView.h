@@ -33,6 +33,11 @@ public:
 	std::optional<NumberTextHit> Hit(Rml::Element* actualHit,float x,float y,
 		const Interaction&,const std::string& captured = {}) const;
 	std::optional<NumberTextGeometry> Geometry(const std::string&,const Interaction&) const;
+	// Measure the current local bytes through the same resolved font/run service
+	// as Paint. The caller first updates Rml styles/layout. No stale painted line,
+	// caret geometry or native input is used or published by this scalar-LTR query.
+	std::shared_ptr<const TextRun> CommandRun(const std::string&, NumberEditIdentity,
+		const Interaction&, std::string& error) const;
 private:
 	struct Impl;
 	std::unique_ptr<Impl> impl;

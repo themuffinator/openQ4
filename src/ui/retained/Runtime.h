@@ -176,6 +176,11 @@ public:
 		const TextInputEvent& event, std::string& error, double seconds);
 	bool ReplaceNumberSelection(const std::string& id, NumberEditIdentity expected,
 		std::string_view text, std::string& error, double seconds);
+	// Local scalar-LTR editing only, using current shared font-run boundaries.
+	// Does not draw, commit accepted state, or acquire native keyboard authority.
+	// Word commands fail until the run provider supplies explicit word stops.
+	bool NumberCommand(const std::string& id, NumberEditIdentity expected,
+		TextEditCommand command, bool extendSelection, std::string& error, double seconds);
 	bool UndoNumberEdit(const std::string& id, NumberEditIdentity expected, bool redo,
 		std::string& error, double seconds);
 	bool CommitNumberEdit(const std::string& id, NumberEditIdentity expected,

@@ -33,6 +33,7 @@ along with Doom 3 Source Code.  If not, see <http://www.gnu.org/licenses/>.
 #endif
 #include "../sys_public.h"
 #include "../WindowSettings.h"
+#include "../KeyEventMetadata.h"
 #include "../../framework/Common.h"
 #include "../../framework/Console.h"
 #include "../../framework/FileSystem.h"
@@ -4939,7 +4940,12 @@ bool Sys_SDL_PumpEvents(void) {
 					const bool retained = SDL3_QueueRetainedKey(key,down,event.key.repeat,1024+static_cast<int>(event.key.scancode),eventTime);
 					// Keep parity with the old Win32 path: these are queued from keyboard polling.
 					if (!retained && key != K_PRINT_SCR && key != K_CTRL && key != K_ALT && key != K_RIGHT_ALT) {
-						Sys_QueEvent(eventTime, SE_KEY, key, down, 0, NULL);
+						const auto metadata = openq4::EncodeKeyEventMetadata({
+							(event.key.mod & SDL_KMOD_CTRL) != 0,(event.key.mod & SDL_KMOD_SHIFT) != 0,
+							(event.key.mod & SDL_KMOD_ALT) != 0,event.key.repeat});
+						void* payload = Mem_Alloc(static_cast<int>(metadata.size()));
+						memcpy(payload,metadata.data(),metadata.size());
+						Sys_QueEvent(eventTime, SE_KEY, key, down, static_cast<int>(metadata.size()), payload);
 					}
 
 					const int controlChar = SDL3_MapControlChar(key, down, event.key.mod);

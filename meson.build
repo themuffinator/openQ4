@@ -432,7 +432,8 @@ if build_engine or get_option('build_native_tests')
   libtess2_project = subproject('libtess2')
   openq4_retained_library = static_library(
     'openq4-retained-ui',
-    files('src/ui/retained/Runtime.cpp', 'src/ui/retained/Document.cpp', 'src/ui/retained/Presentation.cpp', 'src/ui/retained/Behavior.cpp', 'src/ui/retained/State.cpp', 'src/ui/retained/Motion.cpp', 'src/ui/retained/Interaction.cpp', 'src/ui/retained/ValueControlView.cpp', 'src/ui/retained/NumberControlView.cpp', 'src/ui/retained/Input.cpp', 'src/ui/retained/TextInput.cpp', 'src/ui/retained/TextEdit.cpp', 'src/ui/retained/TextRun.cpp', 'src/ui/retained/Vector.cpp', 'src/ui/retained/VectorElement.cpp', 'src/ui/application/SettingsTransaction.cpp', 'src/ui/application/SettingsJournal.cpp', 'src/ui/application/SettingsDisplayController.cpp'),
+    files('src/ui/retained/Runtime.cpp', 'src/ui/retained/Document.cpp', 'src/ui/retained/Presentation.cpp', 'src/ui/retained/Behavior.cpp', 'src/ui/retained/State.cpp', 'src/ui/retained/Motion.cpp', 'src/ui/retained/Interaction.cpp', 'src/ui/retained/ValueControlView.cpp', 'src/ui/retained/NumberControlView.cpp', 'src/ui/retained/Input.cpp', 'src/ui/retained/TextInput.cpp', 'src/ui/retained/TextEdit.cpp', 'src/ui/retained/TextEditCommand.cpp', 'src/ui/retained/TextInputBroker.cpp', 'src/ui/retained/TextRun.cpp', 'src/ui/retained/Vector.cpp', 'src/ui/retained/VectorElement.cpp', 'src/ui/application/SettingsTransaction.cpp', 'src/ui/application/SettingsJournal.cpp', 'src/ui/application/SettingsDisplayController.cpp'),
+    files('src/ui/retained/TextInputBrokerWire.cpp'),
     dependencies: [rmlui_project.get_variable('rmlui_dep'), jsoncpp_project.get_variable('jsoncpp_dep'), libtess2_project.get_variable('libtess2_dep')],
     pic: true,
     install: false,
@@ -455,6 +456,30 @@ if build_engine or get_option('build_native_tests')
       install: false,
     )
     test('openq4-ui-text-edit', openq4_ui_text_edit_test, timeout: 30)
+    openq4_ui_text_edit_command_test = executable(
+      'openq4-ui-text-edit-command-test',
+      files('tools/tests/native/UiTextEditCommandTest.cpp'),
+      include_directories: root_include_dir,
+      dependencies: openq4_retained_dep,
+      install: false,
+    )
+    test('openq4-ui-text-edit-command', openq4_ui_text_edit_command_test, timeout: 30)
+    openq4_ui_text_input_broker_test = executable(
+      'openq4-ui-text-input-broker-test',
+      files('tools/tests/native/UiTextInputBrokerTest.cpp'),
+      include_directories: root_include_dir,
+      dependencies: openq4_retained_dep,
+      install: false,
+    )
+    test('openq4-ui-text-input-broker', openq4_ui_text_input_broker_test, timeout: 30)
+    openq4_ui_text_input_broker_wire_test = executable(
+      'openq4-ui-text-input-broker-wire-test',
+      files('tools/tests/native/UiTextInputBrokerWireTest.cpp'),
+      include_directories: root_include_dir,
+      dependencies: openq4_retained_dep,
+      install: false,
+    )
+    test('openq4-ui-text-input-broker-wire', openq4_ui_text_input_broker_wire_test, timeout: 30)
     openq4_ui_text_run_test = executable(
       'openq4-ui-text-run-test',
       files('tools/tests/native/UiTextRunTest.cpp'),
@@ -488,6 +513,14 @@ if build_engine or get_option('build_native_tests')
     )
     test('openq4-ui-number-runtime', openq4_ui_number_runtime_test,
       args: [meson.project_source_root() / 'tools/ui/fixtures/number-edit-smoke.q4ui'], timeout: 30)
+    openq4_ui_number_command_test = executable(
+      'openq4-ui-number-command-test',
+      files('tools/tests/native/UiNumberCommandTest.cpp'),
+      include_directories: root_include_dir,
+      dependencies: [openq4_retained_dep, rmlui_project.get_variable('rmlui_dep'), jsoncpp_project.get_variable('jsoncpp_dep')],
+      install: false,
+    )
+    test('openq4-ui-number-command', openq4_ui_number_command_test, timeout: 30)
     openq4_ui_settings_transaction_test = executable(
       'openq4-ui-settings-transaction-test',
       files('tools/tests/native/UiSettingsTransactionTest.cpp'),
@@ -1373,6 +1406,47 @@ endif
 
 if build_engine
   client_deps += openq4_retained_dep
+endif
+
+# Native-record translation is separate from the portable runtime and engine
+# PCH. A checked package capability, not SDL's version, enables the importer.
+if build_engine or get_option('build_native_tests')
+  text_ingress_args = []
+  text_ingress_headers = []
+  if build_engine and use_sdl3_backend
+    text_ingress_headers = [sdl3_dep.partial_dependency(compile_args: true, includes: true)]
+    if cpp.compiles('''
+      #if !defined(OPENQ4_SDL3_TEXT_PROVENANCE) || OPENQ4_SDL3_TEXT_PROVENANCE != 1
+      #error No verified private provider capability
+      #endif
+      #include <SDL3/SDL_openq4_text_provenance.h>
+      int main() { OQ4_TextRecord record{}; return record.version; }
+      ''', dependencies: text_ingress_headers, name: 'verified SDL native text provenance header')
+      text_ingress_args = ['-DOPENQ4_SDL_TEXT_PROVENANCE=1']
+    endif
+  endif
+  text_ingress_library = static_library('openq4-text-ingress',
+    files('src/sys/sdl3/TextProvenanceIngress.cpp'),
+    dependencies: [openq4_retained_dep] + text_ingress_headers,
+    cpp_args: text_ingress_args, pic: true, install: false)
+  text_ingress_dep = declare_dependency(link_with: text_ingress_library)
+  if build_engine
+    client_deps += text_ingress_dep
+  endif
+  if get_option('build_native_tests') and build_engine and use_sdl3_backend
+    text_ingress_test_headers = [root_include_dir, include_directories('subprojects/packagefiles/sdl3/include')]
+    text_ingress_test = executable('openq4-ui-text-ingress-test',
+      files('tools/tests/native/UiTextProvenanceIngressTest.cpp'),
+      include_directories: text_ingress_test_headers,
+      dependencies: [openq4_retained_dep, text_ingress_dep] + text_ingress_headers,
+      cpp_args: text_ingress_args, install: false)
+    test('openq4-ui-text-ingress', text_ingress_test, timeout: 30)
+    text_ingress_unsupported_test = executable('openq4-ui-text-ingress-unsupported-test',
+      files('tools/tests/native/UiTextProvenanceIngressTest.cpp', 'src/sys/sdl3/TextProvenanceIngress.cpp'),
+      include_directories: text_ingress_test_headers,
+      dependencies: [openq4_retained_dep] + text_ingress_headers, install: false)
+    test('openq4-ui-text-ingress-unsupported', text_ingress_unsupported_test, timeout: 30)
+  endif
 endif
 
 dedicated_deps = deps

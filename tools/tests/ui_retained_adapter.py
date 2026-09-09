@@ -36,6 +36,8 @@ ENGINE = r'''
 #include <cstdarg>
 #include <charconv>
 #include "src/ui/retained/Input.h"
+#include "src/ui/retained/TextEditCommand.h"
+#include "src/sys/KeyEventMetadata.h"
 #include "src/ui/RetainedUI.h"
 #include "src/ui/SettingsService.h"
 #include "src/ui/application/SettingsTransaction.h"
@@ -48,7 +50,7 @@ template<class T> T Min(T a,T b) { return (std::min)(a,b); }
 struct idVec2 { idVec2(float=0,float=0) {} } vec2_origin;
 enum { SE_KEY=1,SE_MOUSE,K_TAB=10,K_SHIFT,K_UPARROW,K_DOWNARROW,K_LEFTARROW,K_RIGHTARROW,
        K_ENTER,K_KP_ENTER,K_SPACE,K_ESCAPE,K_MOUSE1,K_JOY3,K_JOY4,K_JOY7,K_JOY8,K_JOY9,K_JOY10,K_JOY11,K_JOY12,
-       K_HOME,K_END,K_PGUP,K_PGDN,K_MWHEELUP,K_MWHEELDOWN,K_LAST_KEY=512 };
+       K_HOME,K_END,K_PGUP,K_PGDN,K_MWHEELUP,K_MWHEELDOWN,K_CTRL,K_ALT,K_RIGHT_ALT,K_BACKSPACE,K_DEL,K_LAST_KEY=512 };
 struct idKeyInput { static inline bool shift=false; static bool IsDown(int key) { return key==K_SHIFT && shift; } };
 class idFile {
 public:
@@ -273,6 +275,20 @@ public:
     bool SetNumberSelection(const std::string& id,NumberEditIdentity expected,size_t anchor,size_t caret,std::string& error,double seconds) {
         numberCalls.push_back({"select",id,"",expected,anchor,caret,false,seconds,{}});
         return ChangeNumber(id,expected,error,[&](auto& buffer,auto& why){return buffer.SetSelection(anchor,caret,why);});
+    }
+    bool NumberCommand(const std::string& id,NumberEditIdentity expected,TextEditCommand command,bool extend,std::string& error,double seconds) {
+        numberCalls.push_back({"command",id,"",expected,static_cast<size_t>(command),0,extend,seconds,{}});
+        return ChangeNumber(id,expected,error,[&](auto& buffer,auto& why){
+            if(buffer.Composition())return false;
+            TextEditBoundaryMap map;map.text=buffer.State().text;
+            for(size_t i=0;i<=map.text.size();++i)
+                if(i==map.text.size() || (static_cast<unsigned char>(map.text[i])&0xc0)!=0x80)map.visualCarets.push_back(i);
+            map.deletionStops=map.visualCarets;
+            TextEditOperation operation;
+            if(!EvaluateTextEditCommand(buffer.State(),map,command,extend,operation,why))return false;
+            return operation.kind==TextEditOperation::Kind::Selection ? buffer.SetSelection(operation.anchor,operation.caret,why) :
+                buffer.ReplaceRange(operation.anchor,operation.caret,operation.replacement,why);
+        });
     }
     bool ApplyNumberInput(const std::string& id,NumberEditIdentity expected,const TextInputEvent& input,std::string& error,double seconds) {
         numberCalls.push_back({"input",id,input.text,expected,0,0,false,seconds,input});
@@ -1785,6 +1801,11 @@ static void CheckNumberDiagnosticBoundary() {
         }
         auto expected=identity();assert(diagnostic({"replace","root","1.25"}));
         assert(runtime.numberCalls.back().expected==expected && runtime.numberCalls.back().text=="1.25");
+        expected=identity();assert(diagnostic({"command","root","left","extend"}));
+        assert(runtime.numberCalls.back().operation=="command" && runtime.numberCalls.back().expected==expected && runtime.numberCalls.back().option &&
+            runtime.numberBuffers.at("root").State().anchor==4 && runtime.numberBuffers.at("root").State().caret==3);
+        const auto commandCalls=runtime.numberCalls.size();
+        assert(!diagnostic({"command","root","unknown"}) && !diagnostic({"command","root","left","bad"}) && runtime.numberCalls.size()==commandCalls);
         expected=identity();assert(diagnostic({"select","root","4","1"}));
         assert(runtime.numberCalls.back().expected==expected && runtime.numberCalls.back().anchor==4 && runtime.numberCalls.back().caret==1);
         assert(diagnostic({"select","root","0","4"}));expected=identity();
@@ -1848,6 +1869,92 @@ static void CheckNumberDiagnosticBoundary() {
         assert(runtime.acknowledgements.size()==acknowledgements);
     }
     assert(views.empty() && service.owners.empty());modelTemplate=original;eventPlans.clear();
+}
+static void CheckNumberKeys() {
+    assert(views.empty());const auto original=modelTemplate;
+    Expression operand;operand.type=0;operand.inputValue=true;
+    modelTemplate.actions["number.set"]={"settings.brightness.set",{{"value",operand}},std::size_t(0)};
+    consoleObject.open=false;windowFocused=true;
+    {
+        idUserInterfaceRetained gui;assert(gui.InitFromFile("test.q4ui"));gui.Activate(true,0);gui.Redraw(0);
+        auto& runtime=Live();runtime.InstallNumber("root","number.set");runtime.InstallNumber("other","number.set");runtime.selected="root";
+        std::string error;assert(runtime.BeginNumberEdit("root",error,0));
+        const auto identity=[&]{return runtime.widgets.at(runtime.selected).number->identity;};
+        const auto state=[&]{return runtime.numberBuffers.at(runtime.selected).State();};
+        const auto unchanged=[&](const TextEditState& before){const auto current=state();return current.text==before.text && current.anchor==before.anchor && current.caret==before.caret;};
+        const auto replace=[&](const std::string& text){assert(runtime.ReplaceNumberSelection(runtime.selected,identity(),text,error,0));};
+        const auto pulse=[&](int key){Key(gui,key,true);Key(gui,key,false);};
+        replace("1.25");runtime.menu.clear();
+        pulse(K_LEFTARROW);assert(state().anchor==3 && state().caret==3);
+        Key(gui,K_SHIFT,true);pulse(K_LEFTARROW);Key(gui,K_SHIFT,false);
+        assert(state().anchor==3 && state().caret==2);
+        pulse(K_BACKSPACE);assert(state().text=="1.5" && state().caret==2);
+        Key(gui,K_CTRL,true);pulse('z');Key(gui,K_CTRL,false);
+        assert(state().text=="1.25" && state().anchor==3 && state().caret==2);
+        Key(gui,K_CTRL,true);Key(gui,K_SHIFT,true);pulse('z');Key(gui,K_SHIFT,false);Key(gui,K_CTRL,false);
+        assert(state().text=="1.5");
+        Key(gui,K_CTRL,true);pulse('a');Key(gui,K_CTRL,false);
+        assert(state().anchor==0 && state().caret==3);replace("1.25");
+        pulse(K_HOME);assert(state().caret==0);pulse(K_DEL);assert(state().text==".25");
+        Key(gui,K_CTRL,true);pulse('z');Key(gui,K_CTRL,false);assert(state().text=="1.25");
+        pulse(K_END);Key(gui,K_LEFTARROW,true);assert(state().caret==3);
+        Key(gui,K_LEFTARROW,true);assert(state().caret==2); // Native repeat, same owner.
+        runtime.selected="other";assert(runtime.BeginNumberEdit("other",error,0));replace("1.75");
+        const auto other=state();const auto calls=runtime.numberCalls.size();
+        Key(gui,K_LEFTARROW,true);assert(unchanged(other) && runtime.numberCalls.size()==calls);
+        runtime.selected="root";Key(gui,K_LEFTARROW,true);assert(runtime.numberCalls.size()==calls);
+        Key(gui,K_LEFTARROW,false);pulse(K_LEFTARROW);assert(state().caret==1);
+        assert(runtime.menu.empty()); // Text commands never become menu navigation.
+        // A menu-held source cannot be reclassified as a text key mid-press.
+        Key(gui,K_HOME,true);consoleObject.open=true;gui.Redraw(0);consoleObject.open=false;gui.Redraw(0);
+        const auto suspended=state();const auto afterSuspend=runtime.numberCalls.size();
+        Key(gui,K_HOME,true);assert(unchanged(suspended) && runtime.numberCalls.size()==afterSuspend);
+        Key(gui,K_HOME,false);pulse(K_END);assert(state().caret==4);
+        runtime.menu.clear();pulse(K_SPACE);assert(runtime.menu.empty() && state().text=="1.25");
+        // SDL omits Ctrl/Alt key events. Captured per-event modifiers remain
+        // correct after the physical modifier has already been released.
+        const auto captured=[&](int key,bool down,openq4::KeyEventMetadata metadata){
+            auto bytes=openq4::EncodeKeyEventMetadata(metadata);sysEvent_t event{SE_KEY,key,down?1:0};
+            event.evPtr=bytes.data();event.evPtrLength=static_cast<int>(bytes.size());return gui.HandleEvent(&event,0,nullptr);
+        };
+        captured('a',true,{true,false,false,false});captured('a',false,{});
+        assert(state().anchor==0 && state().caret==4);
+        captured(K_END,true,{});captured(K_END,false,{});
+        captured(K_LEFTARROW,true,{false,true,false,false});captured(K_LEFTARROW,false,{});
+        assert(state().anchor==4 && state().caret==3);
+        const auto beforeAlt=state();captured('a',true,{true,false,true,false});captured('a',false,{});assert(unchanged(beforeAlt));
+        for(const auto key:{K_BACKSPACE,K_DEL}) {captured(key,true,{true,false,false,false});captured(key,false,{});assert(unchanged(beforeAlt));}
+        captured(K_DEL,true,{false,true,false,false});captured(K_DEL,false,{});assert(unchanged(beforeAlt));
+        const auto beforeOrphan=runtime.numberCalls.size();captured(K_LEFTARROW,true,{false,false,false,true});captured(K_LEFTARROW,false,{});
+        assert(runtime.numberCalls.size()==beforeOrphan);
+        captured(K_END,true,{});captured(K_END,false,{});
+        const auto writes=cvars.writes;
+        const auto* command=Key(gui,K_ENTER,true);assert(!std::strcmp(command,ActionMarker));
+        const auto beforeRepeat=runtime.numberCalls.size();Key(gui,K_ENTER,true);Key(gui,K_ENTER,false);
+        assert(runtime.numberCalls.size()==beforeRepeat && runtime.menu.empty());
+        bool close=false;assert(gui.DispatchApplicationActions(ActionMarker,close) && !close && cvars.writes==writes+1 && cvars.brightness==1.25f);
+        // Invalid local text and active preedit refuse Enter without closing.
+        Key(gui,K_CTRL,true);pulse('a');Key(gui,K_CTRL,false);replace("1e");
+        assert(!*Key(gui,K_ENTER,true));Key(gui,K_ENTER,false);assert(cvars.writes==writes+1 && state().text=="1e");
+        TextInputEvent preedit;assert(MakeTextInputPreedit("2",TextIndexUnit::Utf8Bytes,0,1,preedit,error));
+        assert(runtime.ApplyNumberInput("root",identity(),preedit,error,0));const auto composing=state();
+        pulse(K_BACKSPACE);assert(unchanged(composing) && runtime.numberBuffers.at("root").Composition());
+    }
+    modelTemplate=original;
+    // Shared source bookkeeping cannot let a held text key mask an unrelated
+    // menu Accept, emit a synthetic menu release, or survive an owner change.
+    Input input;using T=Input::TextKey;
+    assert(input.ClaimTextKey(1,41,true,false)==T::Press);
+    input.Menu(2,MenuInput::Accept,true,false,0);auto events=input.Take();assert(events.size()==1 && events[0].down);
+    input.Menu(2,MenuInput::Accept,false,false,0);events=input.Take();assert(events.size()==1 && !events[0].down);
+    assert(input.ClaimTextKey(1,42,true,true)==T::Consumed);
+    assert(input.ClaimTextKey(1,41,true,true)==T::Consumed);
+    assert(input.ClaimTextKey(1,0,false,false)==T::Consumed && input.Take().empty());
+    assert(input.ClaimTextKey(1,42,true,true)==T::Consumed);
+    assert(input.ClaimTextKey(1,42,true,false)==T::Press);
+    input.Cancel();input.Take();assert(input.ClaimTextKey(1,42,true,false)==T::Consumed);
+    input.ReleaseQuarantined(1);assert(input.ClaimTextKey(1,42,true,false)==T::Press);
+    input.Cancel(true);input.Take();assert(input.ClaimTextKey(1,42,true,true)==T::Consumed);
 }
 int main() {
     modelTemplate.id="adapter-document";
@@ -1999,6 +2106,7 @@ int main() {
     CheckSettingsExitBatchBoundary();
     CheckSettingsReturnBoundary();
     CheckNumberDiagnosticBoundary();
+    CheckNumberKeys();
     std::puts("Retained adapter: Number diagnostic transport, delayed numeric identity and readback-before-acknowledgement; exactly-once Apply-and-exit receipts after complete queued batches, stationary wheel/pointer handoff, immutable value proposals/acknowledgements, authoritative settings return and authored Back, settings capability/draw ownership and state/lifecycle boundaries, ordered event/FIFO publication, restore suppression, pending dictionary, presentation delegation, framed saves, input suspension and cursor mapping passed");
 }
 '''
@@ -2013,6 +2121,8 @@ def main():
         'src/ui/retained/Input.h', 'src/ui/retained/Input.cpp',
         'src/ui/retained/TextInput.h', 'src/ui/retained/TextInput.cpp',
         'src/ui/retained/TextEdit.h', 'src/ui/retained/TextEdit.cpp',
+        'src/ui/retained/TextEditCommand.h', 'src/ui/retained/TextEditCommand.cpp',
+        'src/sys/KeyEventMetadata.h',
         'tools/tests/ui_manager_lifecycle.py', 'tools/tests/filesystem_case_segments.py',
         'tools/tests/ui_retained_adapter.py',
     ]
@@ -2024,6 +2134,7 @@ def main():
     header = (ROOT / 'src/ui/UserInterfaceRetained.h').read_text(encoding='utf-8')
     factory = (ROOT / 'src/ui/UserInterface.cpp').read_text(encoding='utf-8')
     support = DICTIONARY_SUPPORT[:DICTIONARY_SUPPORT.index('struct idFile {')]
+    support = support.replace('int evType=0,evValue=0,evValue2=0;', 'int evType=0,evValue=0,evValue2=0,evPtrLength=0; void* evPtr=nullptr;')
     # The imported stand-in constructs length bytes even after NUL. Settings
     # prefix checks now exercise short IDs; match real idStr's bounded scan.
     old_icmpn = 'static int Icmpn(const char* a,const char* b,int length) { return Icmp(std::string(a,length).c_str(),std::string(b,length).c_str()); }'
@@ -2049,6 +2160,9 @@ def main():
     temp = Path(tempfile.mkdtemp(prefix='retained-adapter-', dir=ROOT / '.tmp'))
     environment = {**os.environ, 'TEMP': str(temp), 'TMP': str(temp), 'TMPDIR': str(temp)}
     mutations = [
+        ('text-key-owner-rebound', 'mapped ? identity.session : 0', 'mapped ? 1 : 0'),
+        ('text-key-repeat-commit', 'else if (claim == Input::TextKey::Press)', 'else if (true)'),
+        ('text-key-selection-lost', 'movement && shift,error,now', 'false,error,now'),
         ('stale-semantic-number', 'if (pending.cancellable || pending.source.editSession)', 'if (pending.cancellable)'),
         ('ack-without-publication', 'accepted && synchronized', 'accepted'),
         ('ack-before-readback',
@@ -2068,7 +2182,7 @@ def main():
             test_source.write_text(body, encoding='utf-8', newline='\n')
             command = [compiler, '-std=c++20', '-DUSE_SDL3', '-I', str(ROOT), str(test_source),
                        str(ROOT / 'src/ui/retained/Input.cpp'), str(ROOT / 'src/ui/retained/TextInput.cpp'),
-                       str(ROOT / 'src/ui/retained/TextEdit.cpp'), '-o', str(binary)]
+                       str(ROOT / 'src/ui/retained/TextEdit.cpp'), str(ROOT / 'src/ui/retained/TextEditCommand.cpp'), '-o', str(binary)]
             compiled = subprocess.run(command, capture_output=True, text=True, env=environment, timeout=120)
             compile_log = temp / (name + '-compile.log')
             compile_log.write_text(compiled.stdout + compiled.stderr, encoding='utf-8')

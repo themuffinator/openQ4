@@ -393,3 +393,12 @@ delivery, shaped/grapheme/bidirectional runs, production field artwork and
 validation, Apply/exit handling of unconfirmed drafts, and full platform
 qualification remain required. No requirement, migration or final gate becomes
 accepted merely from these integration tests.
+
+The next [editing-command and native-delivery increment](../ui/text-input-routing.md)
+adds ordinary numeric command keys, current-buffer text-run navigation, exact
+held-source ownership, per-event modifier metadata, a bounded native input broker,
+an explicit wire codec and exact SDL echo association. The reviewed Windows
+observer is compiled but remains disabled while managed owner delivery, dispatch
+fencing and native TSF ownership are implemented. This does not accept the text,
+platform, editor, migration or final product gates; every original requirement
+remains in force.

@@ -68,10 +68,18 @@ bool TextEditBuffer::ReplaceSelection(std::string_view replacement, std::string&
 	return Replace(replacement,false,error);
 }
 bool TextEditBuffer::Replace(std::string_view replacement, bool fromCommit, std::string& error) {
+	return ReplaceAt(state.anchor,state.caret,replacement,fromCommit,error);
+}
+bool TextEditBuffer::ReplaceRange(std::size_t anchor, std::size_t caret, std::string_view replacement, std::string& error) {
+	return ReplaceAt(anchor,caret,replacement,false,error);
+}
+bool TextEditBuffer::ReplaceAt(std::size_t anchor, std::size_t caret, std::string_view replacement,
+	bool fromCommit, std::string& error) {
 	if (composition && !fromCommit) return Fail(error, "Cancel composition before editing the buffer");
+	if (!Boundary(state.text,anchor) || !Boundary(state.text,caret)) return Fail(error, "Replacement range splits a scalar or exceeds the buffer");
 	std::string normalized;
 	if (!Replacement(replacement,policy,normalized,error)) return false;
-	const auto begin = std::min(state.anchor,state.caret), end = std::max(state.anchor,state.caret);
+	const auto begin = std::min(anchor,caret), end = std::max(anchor,caret);
 	if (normalized.size() > policy.maxBytes - (state.text.size()-(end-begin)))
 		return Fail(error, "Replacement exceeds the field limit");
 	TextEditState candidate;

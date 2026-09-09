@@ -236,7 +236,7 @@ typedef enum {
 
 typedef enum {
 	SE_NONE,				// evTime is still valid
-	SE_KEY,					// evValue is a key code, evValue2 is the down flag
+	SE_KEY,					// key code/down flag; optional KeyEventMetadata.h payload captures modifiers/repeat
 	SE_CHAR,				// evValue is an ascii char
 	SE_MOUSE,				// evValue and evValue2 are reletive signed x / y moves
 	SE_JOYSTICK_AXIS,		// evValue is an axis number and evValue2 is the current state (-127 to 127)

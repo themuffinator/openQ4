@@ -153,6 +153,23 @@ static void LimitsAndLines() {
 	}
 	Check(Same(edit.State(),mixedLatest),"mixed-size history retains latest endpoint");
 }
+static void CommandRanges() {
+	TextEditBuffer edit; std::string error;
+	Check(edit.Reset("12.50",{8,false,false},error) && edit.SetSelection(5,5,error),"prepare end caret for backward deletion");
+	Check(edit.ReplaceRange(4,5,"",error) && edit.State().text=="12.5" && edit.State().caret==4,"command deletes preceding unit without an intermediate selection");
+	Check(edit.Undo(error) && edit.State().text=="12.50" && edit.State().anchor==5 && edit.State().caret==5,"undo deletion restores original collapsed caret");
+	Check(edit.Redo(error) && edit.State().text=="12.5" && edit.State().caret==4,"redo returns to completed deletion");
+	Check(edit.SetSelection(4,0,error) && edit.ReplaceRange(1,3,"3",error),"range edit preserves independent reversed selection for undo");
+	Check(edit.Undo(error) && edit.State().text=="12.5" && edit.State().anchor==4 && edit.State().caret==0,"undo restores original reversed selection rather than command range");
+	const auto before=edit.State(); const auto history=edit.HistoryEntries();
+	Check(!edit.ReplaceRange(0,100,"",error) && Same(edit.State(),before) && edit.HistoryEntries()==history,"invalid range preserves selection and history");
+	Check(!edit.ReplaceRange(0,1,"123456789",error) && Same(edit.State(),before) && edit.HistoryEntries()==history,"oversized range edit preserves original draft");
+	Check(edit.Reset("1\xc3\xa9" "2",{8,false,false},error),"prepare multibyte range");
+	const auto unicode=edit.State();
+	Check(!edit.ReplaceRange(2,3,"",error) && Same(edit.State(),unicode),"command range cannot split a UTF-8 scalar");
+	Check(edit.ReplaceRange(3,1,"",error) && edit.State().text=="12","reversed command range deletes the complete supplied unit");
+	Check(edit.Undo(error) && Same(edit.State(),unicode),"Unicode range undo preserves original caret");
+}
 static void Numbers() {
 	const TextNumberPolicy policy{-1000,1000,true};
 	double value=123.0;
@@ -186,6 +203,6 @@ static void Numbers() {
 	Check(!FormatTextNumber(0,{1,0,false},text,error) && text==before,"invalid formatting policy preserves output");
 }
 int main() {
-	SelectionAndHistory(); Composition(); LimitsAndLines(); Numbers();
+	SelectionAndHistory(); Composition(); LimitsAndLines(); CommandRanges(); Numbers();
 	std::printf("PASS %u text edit/model checks (no live routing, shaping, IME or clipboard)\n",checks);
 }

@@ -6,10 +6,28 @@
 namespace openq4::ui {
 bool Input::Held(RoutedInput::Kind kind, MenuInput action) const {
 	for (const auto& [id,source] : sources)
-		if (!source.blocked && source.kind == kind && source.action == action) return true;
+		if (!source.blocked && !source.editorSession && source.kind == kind && source.action == action) return true;
 	return false;
 }
-void Input::Emit(const Source& source, bool down) { events.push_back({source.kind,source.action,down}); }
+void Input::Emit(const Source& source, bool down) {
+	if (!source.editorSession) events.push_back({source.kind,source.action,down});
+}
+Input::TextKey Input::ClaimTextKey(std::uint32_t id, std::uint64_t editorSession, bool down, bool repeated) {
+	auto found = sources.find(id);
+	if (found != sources.end()) {
+		auto& source = found->second;
+		if (!source.editorSession) return TextKey::Unclaimed;
+		if (!down) { sources.erase(found); return TextKey::Consumed; }
+		if (source.blocked || source.editorSession != editorSession) {
+			source.blocked = true; return TextKey::Consumed;
+		}
+		return TextKey::Repeat;
+	}
+	if (!down || !editorSession) return TextKey::Unclaimed;
+	if (repeated || sources.size() >= 1024) return TextKey::Consumed;
+	sources.emplace(id,Source{RoutedInput::Kind::Menu,MenuInput::Accept,false,0,editorSession});
+	return TextKey::Press;
+}
 void Input::Menu(std::uint32_t source, MenuInput action, bool down, bool repeated, double seconds) {
 	if (action < MenuInput::Next || action > MenuInput::PageDown) return;
 	Button(source,RoutedInput::Kind::Menu,action,down,repeated,seconds);
