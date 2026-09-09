@@ -88,6 +88,7 @@ void Interaction::Input(MenuInput input, bool down) {
 	Refresh();
 }
 void Interaction::Cancel() { armed.clear(); hovered.clear(); Refresh(); }
+void Interaction::ReleaseInputSources() { pointerHeld = acceptHeld = backHeld = false; }
 bool Interaction::PushModal(const std::string& root) {
 	if (!parents.contains(root) || !Within(root,Modal()) || root == Modal()) return false;
 	modals.push_back({root,focused}); armed.clear(); hovered.clear(); focused = First(); Refresh(); return true;
@@ -145,4 +146,48 @@ std::optional<ControlState> Interaction::State(const std::string& id) const { co
 void Interaction::Queue(ControlAction action) { if (actions.size() < 256) actions.push_back(std::move(action)); else overflowed = true; }
 std::vector<ControlFeedback> Interaction::TakeFeedback() { std::vector<ControlFeedback> result; result.swap(feedback); return result; }
 std::vector<ControlAction> Interaction::TakeActions() { std::vector<ControlAction> result; result.swap(actions); overflowed = false; return result; }
+InteractionSnapshot Interaction::Capture() const {
+	InteractionSnapshot result;
+	result.focus = focused;
+	for (const auto& scope : modals) result.modals.push_back({scope.root,scope.restore});
+	for (const auto& [id,item] : items) { result.enabled[id] = item.control.enabled; result.presented[id] = item.state; }
+	return result;
+}
+bool Interaction::Restore(const InteractionSnapshot& snapshot, std::string& error) {
+	error.clear();
+	auto reject = [&](const char* message) { error = message; return false; };
+	if (snapshot.enabled.size() != items.size() || snapshot.presented.size() != items.size()) return reject("Restored controls do not match the document");
+	for (const auto& [id,enabled] : snapshot.enabled) if (!items.contains(id)) return reject("Unknown restored control");
+	for (const auto& [id,state] : snapshot.presented) {
+		if (!items.contains(id) || (state != ControlState::Default && state != ControlState::Focus && state != ControlState::Disabled) ||
+			(state == ControlState::Focus) != (id == snapshot.focus)) return reject("Invalid restored persistent control presentation");
+	}
+	if (!snapshot.focus.empty() && !items.contains(snapshot.focus)) return reject("Unknown restored focus control");
+	std::string previous;
+	for (const auto& scope : snapshot.modals) {
+		if (scope.root.empty() || !parents.contains(scope.root) || scope.root == previous || !Within(scope.root,previous))
+			return reject("Invalid restored modal ancestry");
+		if (!scope.restore.empty() && (!items.contains(scope.restore) || !Within(scope.restore,previous)))
+			return reject("Invalid restored modal return focus");
+		previous = scope.root;
+	}
+	if (!snapshot.focus.empty() && !Within(snapshot.focus,previous)) return reject("Restored focus is outside its modal");
+	Interaction candidate = *this;
+	candidate.focused = snapshot.focus;
+	candidate.modals.clear();
+	for (const auto& scope : snapshot.modals) candidate.modals.push_back({scope.root,scope.restore});
+	candidate.armed.clear(); candidate.hovered.clear(); candidate.pointerArm = false;
+	candidate.feedback.clear(); candidate.actions.clear(); candidate.overflowed = false;
+	for (auto& [id,item] : candidate.items) item.control.enabled = snapshot.enabled.at(id);
+	// A host-source update may disable the saved selection. Fresh projected
+	// bounds choose the fallback; stale pre-restore geometry is not consulted.
+	if (!candidate.focused.empty() && !candidate.items.at(candidate.focused).control.enabled) candidate.focused.clear();
+	for (auto& [id,item] : candidate.items) {
+		item.state = !item.control.enabled ? ControlState::Disabled : candidate.focused == id ? ControlState::Focus : ControlState::Default;
+		item.known = true;
+		if (item.state != snapshot.presented.at(id)) candidate.feedback.push_back({id,item.control.states.at(item.state),item.state});
+	}
+	*this = std::move(candidate);
+	return true;
+}
 } // namespace openq4::ui

@@ -10,6 +10,13 @@ struct ControlAction {
 	std::string document, node, action;
 };
 struct ControlFeedback { std::string node, timeline; ControlState state = ControlState::Default; };
+struct InteractionSnapshot {
+	struct Modal { std::string root, restore; };
+	std::string focus;
+	std::vector<Modal> modals;
+	std::map<std::string,bool> enabled;
+	std::map<std::string,ControlState> presented;
+};
 
 // Pure semantic interaction shared by the game and editor. The layout adapter
 // supplies current projected boxes and hit IDs; this class never reads a device.
@@ -25,6 +32,9 @@ public:
 	// Cancel arms without forgetting held inputs. Their eventual releases must
 	// not activate a different control after replacement, focus loss or a modal.
 	void Cancel();
+	// After Cancel/Restore and adapter source quarantine, release logical held
+	// latches without changing focus, arms, feedback, actions or presentation.
+	void ReleaseInputSources();
 	bool PushModal(const std::string& root);
 	bool PopModal();
 	std::string Focused() const { return focused; }
@@ -33,6 +43,10 @@ public:
 	std::vector<ControlFeedback> TakeFeedback();
 	std::vector<ControlAction> TakeActions();
 	bool Overflowed() const { return overflowed; }
+	// Capture persistent semantics only. Restore cancels queued actions/arms and
+	// hover, preserves receiving-instance held latches, and awaits fresh bounds.
+	InteractionSnapshot Capture() const;
+	bool Restore(const InteractionSnapshot& snapshot, std::string& error);
 private:
 	struct Item { Control control; ControlBounds bounds; ControlState state = ControlState::Default; bool known = false; };
 	struct ModalScope { std::string root, restore; };

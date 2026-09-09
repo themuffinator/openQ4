@@ -8,6 +8,17 @@ namespace openq4::ui {
 using PropertyKey = std::pair<std::string, std::string>;
 using PropertyValues = std::map<PropertyKey, Value>;
 enum class CancelPolicy { Hold, RestoreBase };
+struct MotionPlayback {
+	std::string owner, node, property;
+	Value from;
+	double elapsedMs = 0, durationMs = 0;
+	bool paused = false, reduced = false;
+};
+struct MotionSnapshot {
+	PropertyValues values;
+	std::vector<MotionPlayback> playing;
+	bool reducedMotion = false;
+};
 
 // Shared presentation evaluator for runtime and editor. All times are absolute
 // monotonic seconds; sampling gaps are never clamped to simulation/frame ticks.
@@ -25,6 +36,8 @@ public:
 	// Pure authored-time sampling for editor scrubbing. Does not mutate playback,
 	// acquire ownership, or dispatch any future action/event notifications.
 	PropertyValues Scrub(const std::string& id, double milliseconds) const;
+	MotionSnapshot Capture(double seconds) const;
+	bool Restore(const MotionSnapshot& snapshot, double seconds, std::string& error);
 private:
 	struct Playing {
 		std::string owner;
@@ -32,7 +45,7 @@ private:
 		Value repeatStart;
 		double start = 0, durationMs = 0, pauseAt = 0;
 		unsigned iterations = 1;
-		bool paused = false, essential = false;
+		bool paused = false, essential = false, reduced = false;
 	};
 	static Value Sample(const Track& track, double milliseconds);
 	std::map<std::string, Timeline> timelines;

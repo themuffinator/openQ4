@@ -13,6 +13,9 @@ void RetainedUI_Init();
 void RetainedUI_Shutdown();
 void RetainedUI_Draw();
 void RetainedUI_Close();
+// Called after the shared language dictionary finishes loading, even when
+// its language/code page is unchanged. Resources rebuild on the engine thread.
+void RetainedUI_LanguageChanged();
 // IsOpen is safe for the async usercmd thread; all other entry points run on
 // the engine thread. Preview documents do not acquire application input.
 bool RetainedUI_IsOpen();

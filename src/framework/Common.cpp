@@ -34,6 +34,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "../imagetools/ImageTools.h"
 #include "../render_geo/RenderGeometry.h"
 #include "../renderer/RendererModule.h"
+#include "../ui/RetainedUI.h"
 #include "ArenaCampaign.h"
 #include "GameModuleDiagnostics.h"
 #include "RenderDoc.h"
@@ -4786,6 +4787,7 @@ void idCommonLocal::InitLanguageDict( bool applyStartupSysLang, bool allowAutoLa
 	fileSystem->FreeFileList(langFiles);
 
 	Sys_InitScanTable();
+	RetainedUI_LanguageChanged();
 }
 
 /*

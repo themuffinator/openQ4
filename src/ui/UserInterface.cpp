@@ -47,6 +47,26 @@ idCVar ui_aspectCorrection( "ui_aspectCorrection", "1", CVAR_GUI | CVAR_ARCHIVE 
 idUserInterfaceManagerLocal	uiManagerLocal;
 idUserInterfaceManager *	uiManager = &uiManagerLocal;
 
+idUserInterfaceManaged::idUserInterfaceManaged() : refs( 1 ) {
+	uiManagerLocal.RegisterAllocation( this );
+}
+
+idUserInterfaceManaged::~idUserInterfaceManaged() {
+	uiManagerLocal.UnregisterGui( this );
+}
+
+void idUserInterfaceManaged::RegisterLoaded() {
+	uiManagerLocal.RegisterGui( this );
+}
+
+void idUserInterfaceManaged::RegisterDemo() {
+	uiManagerLocal.RegisterDemoGui( this );
+}
+
+void idUserInterfaceManaged::RefreshThinking() {
+	uiManagerLocal.UpdateAlwaysThinkGui( this );
+}
+
 namespace {
 
 // Resolve presentation aliases without parser fixup. GetWinVarByName(..., true)
@@ -147,19 +167,22 @@ void idUserInterfaceManagerLocal::Init() {
 }
 
 void idUserInterfaceManagerLocal::Shutdown() {
-	RetainedUI_Shutdown();
 	cmdSystem->RemoveCommand("chatHistory");
 	idChatWindow::Reset();
-	guis.DeleteContents( true );
-	alwaysThinkGUIs.Clear();
-	demoGuis.DeleteContents( true );
+	// Destruction unregisters from every list. Take one live allocation at a
+	// time instead of iterating a container that its destructor will mutate.
+	while ( allocations.Num() > 0 ) {
+		delete allocations[ allocations.Num() - 1 ];
+	}
+	RetainedUI_Shutdown();
 	dc.Shutdown();
 }
 
 void idUserInterfaceManagerLocal::Touch( const char *name ) {
 	idUserInterface *gui = Alloc();
-	gui->InitFromFile( name );
-//	delete gui;
+	if ( !gui->InitFromFile( name ) ) {
+		delete gui;
+	}
 }
 
 void idUserInterfaceManagerLocal::WritePrecacheCommands( idFile *f ) {
@@ -188,20 +211,14 @@ void idUserInterfaceManagerLocal::SetAspectCorrection( bool enabled ) {
 void idUserInterfaceManagerLocal::BeginLevelLoad() {
 	int c = guis.Num();
 	for ( int i = 0; i < c; i++ ) {
-		if ( (guis[ i ]->GetDesktop()->GetFlags() & WIN_MENUGUI) == 0 ) {
+		if ( !guis[ i ]->IsMenuGui() ) {
 			guis[ i ]->ClearRefs();
-			/*
-			delete guis[ i ];
-			guis.RemoveIndex( i );
-			i--; c--;
-			*/
 		}
 	}
 }
 
 void idUserInterfaceManagerLocal::EndLevelLoad() {
-	int c = guis.Num();
-	for ( int i = 0; i < c; i++ ) {
+	for ( int i = 0; i < guis.Num(); ) {
 		if ( guis[i]->GetRefs() == 0 ) {
 			//common->Printf( "purging %s.\n", guis[i]->GetSourceFile() );
 
@@ -215,12 +232,11 @@ void idUserInterfaceManagerLocal::EndLevelLoad() {
 				}
 			}
 			if ( remove ) {
-				RemoveAlwaysThinkGui( guis[i] );
 				delete guis[ i ];
-				guis.RemoveIndex( i );
-				i--; c--;
+				continue;
 			}
 		}
+		i++;
 	}
 
 	// icons registered before their image was resident can be sized now
@@ -241,17 +257,27 @@ void idUserInterfaceManagerLocal::RegisterIcon( const char *code, const char *sh
 void idUserInterfaceManagerLocal::Reload( bool all ) {
 	ID_TIME_T ts;
 
-	int c = guis.Num();
-	for ( int i = 0; i < c; i++ ) {
+	const idList<idUserInterfaceManaged*> reloadGuis = guis;
+	idList<unsigned long long> identities;
+	for ( int i = 0; i < reloadGuis.Num(); i++ ) {
+		identities.Append( reloadGuis[ i ]->allocationId );
+	}
+	for ( int i = 0; i < reloadGuis.Num(); i++ ) {
+		idUserInterfaceManaged *gui = reloadGuis[ i ];
+		if ( guis.Find( gui ) == NULL || gui->allocationId != identities[ i ] ) {
+			continue;
+		}
+		// InitFromFile may replace the owned source string while parsing.
+		const idStr sourcePath = gui->GetSourceFile();
 		if ( !all ) {
-			fileSystem->ReadFile( guis[i]->GetSourceFile(), NULL, &ts );
-			if ( ts <= guis[i]->GetTimeStamp() ) {
+			fileSystem->ReadFile( sourcePath, NULL, &ts );
+			if ( ts <= gui->GetTimeStamp() ) {
 				continue;
 			}
 		}
 
-		guis[i]->InitFromFile( guis[i]->GetSourceFile() );
-		common->Printf( "reloading %s.\n", guis[i]->GetSourceFile() );
+		gui->InitFromFile( sourcePath );
+		common->Printf( "reloading %s.\n", sourcePath.c_str() );
 	}
 }
 
@@ -262,15 +288,15 @@ void idUserInterfaceManagerLocal::ListGuis() const {
 	int copies = 0;
 	int unique = 0;
 	for ( int i = 0; i < c; i++ ) {
-		idUserInterfaceLocal *gui = guis[i];
+		idUserInterfaceManaged *gui = guis[i];
 		size_t sz = gui->Size();
-		bool isUnique = guis[i]->interactive;
+		bool isUnique = gui->IsInteractive();
 		if ( isUnique ) {
 			unique++;
 		} else {
 			copies++;
 		}
-		common->Printf( "%6.1fk %4i (%s) %s ( %i transitions )\n", sz / 1024.0f, guis[i]->GetRefs(), isUnique ? "unique" : "copy", guis[i]->GetSourceFile(), guis[i]->desktop->NumTransitions() );
+		common->Printf( "%6.1fk %4i (%s) %s ( %i transitions )\n", sz / 1024.0f, gui->GetRefs(), isUnique ? "unique" : "copy", gui->GetSourceFile(), gui->NumTransitions() );
 		total += sz;
 	}
 	common->Printf( "===========\n  %i total Guis ( %i copies, %i unique ), %.2f total Mbytes", c, copies, unique, total / ( 1024.0f * 1024.0f ) );
@@ -291,12 +317,10 @@ idUserInterface *idUserInterfaceManagerLocal::Alloc( void ) const {
 
 void idUserInterfaceManagerLocal::DeAlloc( idUserInterface *gui ) {
 	if ( gui ) {
-		int c = guis.Num();
+		int c = allocations.Num();
 		for ( int i = 0; i < c; i++ ) {
-			if ( guis[i] == gui ) {
-				RemoveAlwaysThinkGui( guis[i] );
-				delete guis[i];
-				guis.RemoveIndex( i );
+			if ( allocations[i] == gui ) {
+				delete allocations[i];
 				return;
 			}
 		}
@@ -304,6 +328,9 @@ void idUserInterfaceManagerLocal::DeAlloc( idUserInterface *gui ) {
 }
 
 idUserInterface *idUserInterfaceManagerLocal::FindGui( const char *qpath, bool autoLoad, bool needUnique, bool forceNOTUnique ) {
+	if ( qpath == NULL || qpath[ 0 ] == '\0' ) {
+		return NULL;
+	}
 	int c = guis.Num();
 
 	for ( int i = 0; i < c; i++ ) {
@@ -334,6 +361,9 @@ idUserInterface *idUserInterfaceManagerLocal::FindGui( const char *qpath, bool a
 }
 
 idUserInterface *idUserInterfaceManagerLocal::FindDemoGui( const char *qpath ) {
+	if ( qpath == NULL || qpath[ 0 ] == '\0' ) {
+		return NULL;
+	}
 	int c = demoGuis.Num();
 	for ( int i = 0; i < c; i++ ) {
 		if ( !idStr::Icmp( demoGuis[i]->GetSourceFile(), qpath ) ) {
@@ -351,8 +381,29 @@ void idUserInterfaceManagerLocal::FreeListGUI( idListGUI *listgui ) {
 	delete listgui;
 }
 
-void idUserInterfaceManagerLocal::UpdateAlwaysThinkGui( idUserInterfaceLocal *gui ) {
-	if ( gui == NULL || gui->desktop == NULL || !gui->desktop->AlwaysThink() ) {
+void idUserInterfaceManagerLocal::RegisterAllocation( idUserInterfaceManaged *gui ) {
+	gui->allocationId = ++nextAllocationId;
+	allocations.AddUnique( gui );
+}
+
+void idUserInterfaceManagerLocal::RegisterGui( idUserInterfaceManaged *gui ) {
+	guis.AddUnique( gui );
+	UpdateAlwaysThinkGui( gui );
+}
+
+void idUserInterfaceManagerLocal::RegisterDemoGui( idUserInterfaceManaged *gui ) {
+	demoGuis.AddUnique( gui );
+}
+
+void idUserInterfaceManagerLocal::UnregisterGui( idUserInterfaceManaged *gui ) {
+	RemoveAlwaysThinkGui( gui );
+	guis.Remove( gui );
+	demoGuis.Remove( gui );
+	allocations.Remove( gui );
+}
+
+void idUserInterfaceManagerLocal::UpdateAlwaysThinkGui( idUserInterfaceManaged *gui ) {
+	if ( gui == NULL || guis.Find( gui ) == NULL || !gui->AlwaysThink() ) {
 		RemoveAlwaysThinkGui( gui );
 		return;
 	}
@@ -360,7 +411,7 @@ void idUserInterfaceManagerLocal::UpdateAlwaysThinkGui( idUserInterfaceLocal *gu
 	alwaysThinkGUIs.AddUnique( gui );
 }
 
-void idUserInterfaceManagerLocal::RemoveAlwaysThinkGui( idUserInterfaceLocal *gui ) {
+void idUserInterfaceManagerLocal::RemoveAlwaysThinkGui( idUserInterfaceManaged *gui ) {
 	if ( gui == NULL ) {
 		return;
 	}
@@ -369,16 +420,25 @@ void idUserInterfaceManagerLocal::RemoveAlwaysThinkGui( idUserInterfaceLocal *gu
 }
 
 void idUserInterfaceManagerLocal::RunAlwaysThinkGUIs( int time ) {
-	for ( int i = 0; i < alwaysThinkGUIs.Num(); i++ ) {
-		idUserInterfaceLocal *gui = alwaysThinkGUIs[i];
-		if ( gui == NULL || guis.Find( gui ) == NULL || gui->desktop == NULL || !gui->desktop->AlwaysThink() ) {
-			alwaysThinkGUIs.RemoveIndex( i );
-			i--;
+	// A callback can remove a view. Visit the starting set once, checking
+	// membership and allocation identity before dereferencing it; a new view
+	// at a deleted object's address still waits until the next tick.
+	const idList<idUserInterfaceManaged*> thinkers = alwaysThinkGUIs;
+	idList<unsigned long long> identities;
+	for ( int i = 0; i < thinkers.Num(); i++ ) {
+		identities.Append( thinkers[ i ]->allocationId );
+	}
+	for ( int i = 0; i < thinkers.Num(); i++ ) {
+		idUserInterfaceManaged *gui = thinkers[i];
+		if ( gui == NULL || guis.Find( gui ) == NULL || gui->allocationId != identities[ i ] ) {
+			continue;
+		}
+		if ( !gui->AlwaysThink() ) {
+			RemoveAlwaysThinkGui( gui );
 			continue;
 		}
 
-		gui->time = time;
-		gui->desktop->RunTimeEvents( time );
+		gui->RunTimeEvents( time );
 	}
 }
 
@@ -404,7 +464,7 @@ idUserInterfaceLocal::idUserInterfaceLocal() {
 	lightColorVar = NULL;
 	//so the reg eval in gui parsing doesn't get bogus values
 	time = 0;
-	refs = 1;
+	timeStamp = 0;
 }
 
 idUserInterfaceLocal::~idUserInterfaceLocal() {
@@ -510,10 +570,7 @@ bool idUserInterfaceLocal::InitFromFile( const char *qpath, bool rebuild, bool c
 	}
 	interactive = desktop->Interactive();
 
-	if ( uiManagerLocal.guis.Find( this ) == NULL ) {
-		uiManagerLocal.guis.Append( this );
-	}
-	uiManagerLocal.UpdateAlwaysThinkGui( this );
+	RegisterLoaded();
 
 	loading = false;
 	lightColorVar = NULL;
@@ -757,18 +814,7 @@ void idUserInterfaceLocal::ReadFromDemoFile( class idDemoFile *f ) {
 	f->ReadFloat( restoredCursorY );
 	SetCursor( restoredCursorX, restoredCursorY );
 
-	bool add = true;
-	int c = uiManagerLocal.demoGuis.Num();
-	for ( int i = 0; i < c; i++ ) {
-		if ( uiManagerLocal.demoGuis[i] == this ) {
-			add = false;
-			break;
-		}
-	}
-
-	if (add) {
-		uiManagerLocal.demoGuis.Append(this);
-	}
+	RegisterDemo();
 }
 
 void idUserInterfaceLocal::WriteToDemoFile( class idDemoFile *f ) {
@@ -1056,6 +1102,25 @@ size_t idUserInterfaceLocal::Size() {
 		sz += desktop->Size();
 	}
 	return sz;
+}
+
+bool idUserInterfaceLocal::IsMenuGui() const {
+	return desktop != NULL && ( desktop->GetFlags() & WIN_MENUGUI ) != 0;
+}
+
+bool idUserInterfaceLocal::AlwaysThink() const {
+	return desktop != NULL && desktop->AlwaysThink();
+}
+
+void idUserInterfaceLocal::RunTimeEvents( int _time ) {
+	time = _time;
+	if ( desktop != NULL ) {
+		desktop->RunTimeEvents( _time );
+	}
+}
+
+int idUserInterfaceLocal::NumTransitions() {
+	return desktop != NULL ? desktop->NumTransitions() : 0;
 }
 
 void idUserInterfaceLocal::RecurseSetKeyBindingNames( idWindow *window ) {

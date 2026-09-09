@@ -11,6 +11,9 @@ delivery order without reducing the complete scope below. A representative scree
 is an intermediate milestone; full implementation must deliver the complete,
 high-quality UI product at an id Tech 5 standard.
 
+The [product requirement register](../ui/product-requirements.md) tracks the
+full normative scope, milestone ownership and acceptance evidence.
+
 ## Objective and immutable completion scope
 
 Plan, implement and publish a complete idTech 5-esque replacement for openQ4's
@@ -298,6 +301,12 @@ runtime restriction, isolates state/input/layout/clocks, reuses per-view render
 backends and protects composition target identities within a host submission
 frame. Normal GUI-manager routing, coordinated engine multi-view resource
 reset, world surfaces and save restoration remain open.
+The [ownership and persistence checkpoint](../ui/instance-persistence.md)
+adds a private manager contract with safe allocation/destruction and versioned,
+transactional canonical snapshots. Preview resource reload now preserves focus,
+modal scopes, unbound control availability and transition progress as well as
+application values. The retained manager adapter, real application operations,
+world output and game-save/demo framing remain required M1 work.
 Semantic buttons now use authored state timelines, projected hit testing,
 source-order/spatial navigation and modal focus ownership. The
 [interaction checkpoint](../ui/interaction.md) records native behavior checks,

@@ -4780,11 +4780,11 @@ static void R_PerformFullVidRestart( bool forceWindow ) {
 		cvarSystem->SetCVarBool( "r_fullscreen", false );
 	}
 
-	R_InitOpenGL();
+	// Use the same backend-aware device startup as initial initialization.
+	// The low-level GL initializer cannot recreate a Vulkan device.
+	tr.InitOpenGL();
 	cvarSystem->SetCVarBool( "r_fullscreen", latchedFullscreen );
 	R_ClearActiveRenderTextures();
-
-	globalImages->ReloadImages( true );
 
 	R_InitFreeType();
 	R_RefreshConsoleFontAtlas();

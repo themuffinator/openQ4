@@ -185,8 +185,7 @@ def validate_full_vid_restart_font_contract(renderer_source: str) -> None:
     for token in (
         "R_DoneFreeType();",
         "globalImages->PurgeAllImages();",
-        "R_InitOpenGL();",
-        "globalImages->ReloadImages( true );",
+        "tr.InitOpenGL();",
         "R_InitFreeType();",
         "R_RefreshConsoleFontAtlas();",
     ):
@@ -194,12 +193,13 @@ def validate_full_vid_restart_font_contract(renderer_source: str) -> None:
     if not (
         restart.index("R_DoneFreeType();")
         < restart.index("globalImages->PurgeAllImages();")
-        < restart.index("R_InitOpenGL();")
-        < restart.index("globalImages->ReloadImages( true );")
+        < restart.index("tr.InitOpenGL();")
         < restart.index("R_InitFreeType();")
         < restart.index("R_RefreshConsoleFontAtlas();")
     ):
         raise AssertionError("Full vid_restart must release fonts before purge and rebuild them after image reload")
+    reject(restart, "R_InitOpenGL();", "backend-aware device restart")
+    reject(restart, "globalImages->ReloadImages", "single image reload owned by device startup")
 
     renderer_shutdown = function_body(
         renderer_source,
@@ -983,17 +983,27 @@ def validate_lifecycle_mutation_sensitivity() -> None:
         renderer.replace("\tR_DoneFreeType();", "", 1),
         "full vid_restart purges images without releasing font state",
     )
-    reload_images = "\tglobalImages->ReloadImages( true );\n\n\tR_InitFreeType();"
-    if renderer.count(reload_images) != 1:
-        raise AssertionError("Full vid_restart image-reload mutation anchor is not unique")
+    restart_device = "\ttr.InitOpenGL();\n\tcvarSystem->SetCVarBool( \"r_fullscreen\", latchedFullscreen );"
+    if renderer.count(restart_device) != 1:
+        raise AssertionError("Full vid_restart device-startup mutation anchor is not unique")
     expect_contract_rejection(
         validate_full_vid_restart_font_contract,
         renderer.replace(
-            reload_images,
-            "\tR_RefreshConsoleFontAtlas();\n" + reload_images,
+            restart_device,
+            "\tR_RefreshConsoleFontAtlas();\n" + restart_device,
             1,
         ),
         "console atlas refresh runs before persistent image allocation",
+    )
+    expect_contract_rejection(
+        validate_full_vid_restart_font_contract,
+        renderer.replace(restart_device, restart_device.replace("tr.InitOpenGL();", "R_InitOpenGL();"), 1),
+        "full vid_restart bypasses native Vulkan device startup",
+    )
+    expect_contract_rejection(
+        validate_full_vid_restart_font_contract,
+        renderer.replace(restart_device, "\tglobalImages->ReloadImages( true );\n" + restart_device, 1),
+        "full vid_restart reloads images outside backend device startup",
     )
 
     partial_refresh = "\t\t\tR_RefreshConsoleFontAtlas();"

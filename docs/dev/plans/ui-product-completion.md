@@ -293,9 +293,15 @@ Keep the paired revisions and evidence above. Refresh the effective inventory
 before translation and retain source hashes. Derive a requirement register from
 the normative specification and the findings here, with milestone ownership and
 evidence fields. The final requirement register is a required implementation
-deliverable; this plan does not pretend one already exists.
+deliverable; the [product requirement register](../ui/product-requirements.md)
+now records this scope, refreshed inventory evidence and milestone ownership.
 
 ### M1 — Normal application integration and durable instances
+
+Progress: the [ownership and persistence checkpoint](../ui/instance-persistence.md)
+adds private manager-neutral lifecycle operations and canonical instance
+snapshots. The normal retained adapter, application dispatcher, world surface
+contract and game-save/demo framing remain incomplete; M1 is still open.
 
 Resolve UI-01/UI-02 and the ownership/snapshot portion of UI-04/UI-12. Add the
 retained adapter, manager-neutral lifecycle, source routing, typed dispatcher,

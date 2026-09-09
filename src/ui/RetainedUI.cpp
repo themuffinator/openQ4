@@ -223,7 +223,10 @@ bool analogNeedsNeutral = true;
 std::map<int,int> inputKeys;
 std::vector<openq4::ui::ControlAction> applicationRequests;
 std::string currentPath, currentMarkup;
+// One bounded developer checkpoint; never a second owner of the document.
+std::string savedCheckpoint;
 int restartGeneration = -1, languageGeneration = -1;
+std::uint64_t languageRevision = 0, loadedLanguageRevision = (std::numeric_limits<std::uint64_t>::max)();
 std::chrono::steady_clock::time_point epoch;
 struct ProfileSample { openq4::ui::RuntimeStatistics statistics; double engineMilliseconds; };
 std::vector<ProfileSample> profile;
@@ -280,13 +283,15 @@ void ApplyInput() {
 		else runtime->MenuAction(event.menu,event.down,PresentationTime());
 	}
 }
-void CancelInput(bool forgetSources = false) {
+void CancelInput(bool forgetSources = false, bool cancelDocument = true) {
 	input.Cancel(forgetSources);
 	// The adapter owns this virtual source and will require physical neutral
 	// before pressing it again. Remove its quarantined hold before resetting
 	// the remembered direction, or it could never receive its paired release.
 	input.Menu(60000,openq4::ui::MenuInput::Next,false,false,PresentationTime());
-	ApplyInput(); analogDirection = -1; analogNeedsNeutral = true;
+	if (cancelDocument) ApplyInput();
+	else input.Take(); // RestoreSnapshot already cancelled document transients.
+	analogDirection = -1; analogNeedsNeutral = true;
 }
 void SuspendInput(bool suspend) {
 	if (inputSuspended == suspend) return;
@@ -326,32 +331,64 @@ void Close() {
 	inputSuspended = false;
 	profileFrames = 0; profile.clear();
 	runtime.reset();
-	host.Reset();
-	currentPath.clear(); currentMarkup.clear();
+	// Shared fonts and targets belong to the host, not the preview. Their
+	// bounded cache survives closing a view; shutdown/generation reset owns it.
+	currentPath.clear(); currentMarkup.clear(); savedCheckpoint.clear();
 }
-void Preview_f(const idCmdArgs& args) {
-	if (args.Argc() != 2) { common->Printf("usage: ui_retainedPreview <VFS path.q4ui or path.rml>\n"); return; }
+bool RefreshResources() {
+	if (restartGeneration == renderSystem->GetVideoRestartCount() && languageGeneration == LangDict_GetCodePageGeneration() &&
+		loadedLanguageRevision == languageRevision) return true;
+	// The engine currently owns one preview context. This boundary must include
+	// every manager-owned retained context when that adapter is connected.
+	const bool loaded = runtime && runtime->IsLoaded();
+	const bool canonical = loaded && idStr::CheckExtension(currentPath.c_str(),"q4ui");
+	std::string snapshot, error;
+	if (canonical && !runtime->SaveSnapshot(snapshot,error,PresentationTime())) {
+		common->Warning("retained UI: cannot preserve instance before renderer/language change: %s",error.c_str());
+		Close(); host.Reset(); return false;
+	}
+	if (runtime) {
+		CancelInput(); inputKeys.clear(); applicationRequests.clear(); ++inputGeneration;
+		runtime->Shutdown();
+	}
+	host.Reset();
+	restartGeneration = renderSystem->GetVideoRestartCount();
+	languageGeneration = LangDict_GetCodePageGeneration();
+	loadedLanguageRevision = languageRevision;
+	if (loaded) {
+		if (!LoadPreview(currentMarkup,currentPath)) { Close(); return false; }
+		if (canonical && !runtime->RestoreSnapshot(snapshot,error,PresentationTime())) {
+			common->Warning("retained UI: cannot restore instance after renderer/language change: %s",error.c_str()); Close(); return false;
+		}
+		if (canonical) common->Printf("Retained UI instance restored after renderer/language change: %s\n",currentPath.c_str());
+	}
+	inputFocused = WindowFocused();
+	return true;
+}
+bool Preview(const idCmdArgs& args) {
+	if (args.Argc() != 2) { common->Printf("usage: ui_retainedPreview <VFS path.q4ui or path.rml>\n"); return false; }
 	std::string markup;
-	if (!host.ReadFile(args.Argv(1),markup)) { common->Warning("retained UI: cannot read %s",args.Argv(1)); return; }
+	if (!host.ReadFile(args.Argv(1),markup)) { common->Warning("retained UI: cannot read %s",args.Argv(1)); return false; }
+	if (!RefreshResources()) return false;
 	if (!runtime) {
 		runtime = std::make_unique<openq4::ui::Runtime>(host);
 		epoch = std::chrono::steady_clock::now();
 	}
-	if (!LoadPreview(markup,args.Argv(1))) { common->Warning("retained UI: cannot load %s",args.Argv(1)); return; }
+	if (!LoadPreview(markup,args.Argv(1))) { common->Warning("retained UI: cannot load %s",args.Argv(1)); return false; }
 	SetApplicationOpen(idStr::Icmp(args.Argv(0),"ui_retainedOpen") == 0);
-	CancelInput(); applicationRequests.clear(); ++inputGeneration;
+	CancelInput(); inputKeys.clear(); applicationRequests.clear(); ++inputGeneration;
 	currentPath = args.Argv(1); currentMarkup = std::move(markup);
 	restartGeneration = renderSystem->GetVideoRestartCount();
 	languageGeneration = LangDict_GetCodePageGeneration();
 	common->Printf("Retained UI preview loaded: %s (integration spike)\n",currentPath.c_str());
+	return true;
 }
+void Preview_f(const idCmdArgs& args) { Preview(args); }
 void Open_f(const idCmdArgs& args) {
 	if (args.Argc() != 2 || !idStr::CheckExtension(args.Argv(1),"q4ui")) {
 		common->Printf("usage: ui_retainedOpen <VFS path.q4ui>\n"); return;
 	}
-	const unsigned previousGeneration = inputGeneration;
-	Preview_f(args);
-	if (inputGeneration == previousGeneration) return;
+	if (!Preview(args)) return;
 	if (console) console->Close();
 	inputFocused = WindowFocused();
 	common->Printf("Retained UI application opened: %s\n",currentPath.c_str());
@@ -362,6 +399,22 @@ void Ownership_f(const idCmdArgs&) {
 		static_cast<unsigned>(applicationRequests.size()));
 }
 void Close_f(const idCmdArgs&) { Close(); }
+void Checkpoint_f(const idCmdArgs& args) {
+	if (args.Argc() != 2 || (idStr::Cmp(args.Argv(1),"save") && idStr::Cmp(args.Argv(1),"restore"))) {
+		common->Printf("usage: ui_retainedCheckpoint <save|restore>\n"); return;
+	}
+	if (!runtime || !runtime->IsLoaded()) { common->Warning("retained UI: checkpoint requires a loaded canonical document"); return; }
+	std::string error;
+	const bool save = idStr::Cmp(args.Argv(1),"save") == 0;
+	const bool result = save ? runtime->SaveSnapshot(savedCheckpoint,error,PresentationTime()) :
+		runtime->RestoreSnapshot(savedCheckpoint,error,PresentationTime());
+	if (!result) { common->Warning("retained UI: cannot %s checkpoint: %s",args.Argv(1),error.c_str()); return; }
+	if (!save) {
+		CancelInput(false,false); inputKeys.clear(); applicationRequests.clear(); ++inputGeneration;
+		runtime->ReleaseInputSources();
+	}
+	common->Printf("Retained UI checkpoint: %s bytes=%u\n",args.Argv(1),static_cast<unsigned>(savedCheckpoint.size()));
+}
 void Play_f(const idCmdArgs& args) {
 	if (args.Argc() != 2) { common->Printf("usage: ui_retainedPlay <timeline ID>\n"); return; }
 	if (runtime) runtime->SetReducedMotion(ui_retainedReducedMotion.GetBool(),PresentationTime());
@@ -441,6 +494,7 @@ void Value_f(const idCmdArgs& args) {
 }
 
 void RetainedUI_Init() {
+	cmdSystem->AddCommand("ui_retainedCheckpoint",Checkpoint_f,CMD_FL_SYSTEM,"save or restore one bounded canonical instance checkpoint in memory");
 	cmdSystem->AddCommand("ui_retainedData",Data_f,CMD_FL_SYSTEM,"apply a validated retained state batch from VFS JSON");
 	cmdSystem->AddCommand("ui_retainedValue",Value_f,CMD_FL_SYSTEM,"inspect a retained bound or animated presentation value");
 	cmdSystem->AddCommand("ui_exportLegacy",RetainedUI_ExportLegacy,CMD_FL_SYSTEM,"export native-preprocessed GUI tokens for translation without executing scripts");
@@ -459,6 +513,8 @@ void RetainedUI_Init() {
 }
 void RetainedUI_Shutdown() {
 	Close();
+	host.Reset();
+	cmdSystem->RemoveCommand("ui_retainedCheckpoint");
 	cmdSystem->RemoveCommand("ui_retainedData");
 	cmdSystem->RemoveCommand("ui_retainedValue");
 	cmdSystem->RemoveCommand("ui_exportLegacy");
@@ -477,21 +533,7 @@ void RetainedUI_Shutdown() {
 }
 void RetainedUI_Draw() {
 	if (!runtime || !runtime->IsLoaded() || !renderSystem || !renderSystem->IsOpenGLRunning()) return;
-	if (restartGeneration != renderSystem->GetVideoRestartCount() || languageGeneration != LangDict_GetCodePageGeneration()) {
-		// Geometry owns font UVs and material handles. Recreate the preview
-		// before using any of them after an image/font generation change.
-		CancelInput(); ++inputGeneration;
-		const auto savedState = runtime->GetState(false);
-		runtime->Shutdown(); host.Reset();
-		restartGeneration = renderSystem->GetVideoRestartCount();
-		languageGeneration = LangDict_GetCodePageGeneration();
-		if (!LoadPreview(currentMarkup,currentPath)) { Close(); return; }
-		std::string stateError;
-		if (!runtime->SetState(savedState,stateError,PresentationTime()) && !savedState.empty()) {
-			common->Warning("retained UI: cannot restore state after renderer/language change: %s",stateError.c_str()); Close(); return;
-		}
-		inputFocused = WindowFocused();
-	}
+	if (!RefreshResources()) return;
 	openq4::ui::Viewport viewport;
 	viewport.width = engineWindowState.uiViewportWidth;
 	viewport.height = engineWindowState.uiViewportHeight;
@@ -514,6 +556,7 @@ void RetainedUI_Draw() {
 	RecordProfile(std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-profileStart).count());
 }
 bool RetainedUI_IsOpen() { return applicationOpen.load(std::memory_order_acquire); }
+void RetainedUI_LanguageChanged() { ++languageRevision; }
 unsigned RetainedUI_InputGeneration() { return inputGeneration; }
 void RetainedUI_Close() { Close(); }
 #if !defined(USE_SDL3)
@@ -554,7 +597,13 @@ bool RetainedUI_ProcessEvent(const sysEvent_s* event) {
 		if (decoded.kind == retainedUIInput_t::KEY && decoded.key > 0 && decoded.key < K_LAST_KEY)
 			idKeyInput::PreliminaryKeyEvent(decoded.key,decoded.down);
 		if (decoded.kind == retainedUIInput_t::FOCUS && !decoded.down) idKeyInput::ClearStates();
-		if (static_cast<unsigned>(event->evValue) != inputGeneration) return true;
+		if (static_cast<unsigned>(event->evValue) != inputGeneration) {
+			// A release already queued by the previous owner still ends its
+			// quarantine. It must never release a fresh source or reach the view.
+			if (!decoded.down && decoded.kind == retainedUIInput_t::KEY) input.ReleaseQuarantined(decoded.source);
+			else if (!decoded.down && decoded.kind == retainedUIInput_t::POINTER_BUTTON) input.ReleaseQuarantined(65536);
+			return true;
+		}
 	} else if (event->evType == SE_KEY) {
 		// Non-SDL fallback and events already queued when a menu was opened.
 		decoded.kind = retainedUIInput_t::KEY; decoded.key = event->evValue;
@@ -596,6 +645,7 @@ void RetainedUI_Init() {}
 void RetainedUI_Shutdown() {}
 void RetainedUI_Draw() {}
 void RetainedUI_Close() {}
+void RetainedUI_LanguageChanged() {}
 bool RetainedUI_IsOpen() { return false; }
 unsigned RetainedUI_InputGeneration() { return 0; }
 void RetainedUI_FrameInput() {}

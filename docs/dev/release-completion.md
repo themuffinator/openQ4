@@ -2,6 +2,18 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- Instance persistence development: retained previews preserve focus, dialogs,
+  control availability and transition progress through renderer/language
+  reloads. Restoring an instance discards pending clicks and actions. GUI
+  ownership also handles direct editor deletion and allocations made before a
+  resource is loaded. The [checkpoint](ui/instance-persistence.md) records the
+  supported subset; complete game integration, translation and visual editing
+  remain in development.
+
+- Renderer recovery: full video restarts now recreate the selected renderer,
+  allowing Vulkan menus to survive display reinitialization. The restart path
+  reloads images once before rebuilding fonts.
+
 - Instance development: retained documents can now keep separate data, focus,
   display scale and transitions while sharing engine services. Closing one view
   preserves its peers, and render targets cannot be resized underneath another

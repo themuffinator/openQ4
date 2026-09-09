@@ -107,6 +107,13 @@ public:
 	StateValues GetState(bool includeHostSources = true) const;
 	std::optional<Value> PresentedValue(const std::string& node, const std::string& property) const;
 	std::uint64_t StateRevision() const;
+	// Versioned instance data for the exact canonical source/path already loaded.
+	// Snapshot failure leaves output unchanged. Restore is transactional and
+	// reanchors presentation progress at the supplied monotonic time. Host CVar
+	// values, pending actions and transient pointer/press state are not restored.
+	static constexpr size_t MaxSnapshotBytes = 128u * 1024u * 1024u;
+	bool SaveSnapshot(std::string& snapshot, std::string& error, double monotonicSeconds) const;
+	bool RestoreSnapshot(const std::string& snapshot, std::string& error, double monotonicSeconds);
 	bool PlayTimeline(const std::string& id, double monotonicSeconds);
 	void PauseTimeline(const std::string& id, double monotonicSeconds);
 	void ResumeTimeline(const std::string& id, double monotonicSeconds);
@@ -120,6 +127,12 @@ public:
 	void PointerButton(bool down, double monotonicSeconds);
 	void MenuAction(MenuInput input, bool down, double monotonicSeconds);
 	void CancelInput(double monotonicSeconds);
+	// After successful RestoreSnapshot: quarantine adapter sources with
+	// Input::Cancel(false), discard its routed cancellation events, then call
+	// this before routing fresh input. Clears logical held latches only, so
+	// suppressed old releases cannot strand them or restart restored feedback.
+	// Also valid after CancelInput when the adapter already quarantined sources.
+	void ReleaseInputSources();
 	bool FocusControl(const std::string& id, double monotonicSeconds);
 	bool SetControlEnabled(const std::string& id, bool enabled, double monotonicSeconds);
 	bool PushModal(const std::string& root, double monotonicSeconds);

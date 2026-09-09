@@ -1300,6 +1300,7 @@ def generate_release_docs_site(
     for relative in (
         "docs/licenses/RmlUi.txt", "docs/licenses/JsonCpp.txt", "docs/licenses/libtess2.txt",
         "docs/dev/ui/migration-manifest.json",
+        "docs/dev/ui/product-requirements.json",
         "subprojects/rmlui.wrap", "subprojects/packagefiles/libtess2/double-precision.patch",
         "tools/ui/capture_legacy_baseline.py",
         "tools/ui/legacy_import.py", "tools/ui/legacy_inventory.py", "tools/ui/legacy_syntax.py",

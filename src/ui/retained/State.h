@@ -11,6 +11,9 @@ class State {
 public:
 	bool Reset(const DocumentModel& model, std::string& error);
 	bool Set(const StateValues& changes, std::string& error, bool hostSources = false);
+	// Full instance restore evaluates application and current host snapshots in
+	// one transaction, without an invalid intermediate binding evaluation.
+	bool Restore(const StateValues& application, const StateValues& hostSources, std::string& error);
 	const StateValues& Variables() const { return variables; }
 	const PropertyValues& Properties() const { return properties; }
 	const std::map<std::string,bool>& Enabled() const { return enabled; }

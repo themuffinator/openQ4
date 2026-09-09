@@ -243,6 +243,19 @@ int main() {
     payload.down=0;send(payload,inputGeneration-1);
     assert(runtime->received.empty() && !idKeyInput::IsDown(K_ENTER));
     payload.down=1;send(payload,inputGeneration-1);assert(runtime->received.empty());
+    // A release queued before the ownership change retires only quarantine;
+    // the first fresh press works, and later stale releases cannot end it.
+    send(payload);assert(runtime->received.size()==1 && runtime->received.back().down);
+    payload.down=0;send(payload,inputGeneration-1);assert(runtime->received.size()==1);
+    payload.down=1;send(payload);assert(runtime->received.size()==1);
+    payload.down=0;send(payload);assert(runtime->received.size()==2 && !runtime->received.back().down);
+    runtime->received.clear();
+    payload.kind=retainedUIInput_t::POINTER_BUTTON;payload.down=1;send(payload);
+    CancelInput();++inputGeneration;runtime->received.clear();
+    payload.down=0;send(payload,inputGeneration-1);assert(runtime->received.empty());
+    payload.down=1;send(payload);assert(runtime->received.size()==1 && runtime->received.back().down);
+    payload.down=0;send(payload);assert(runtime->received.size()==2 && !runtime->received.back().down);
+    runtime->received.clear();payload.kind=retainedUIInput_t::KEY;payload.down=1;
     send(payload,-1,0);assert(runtime->received.empty());
     payload.kind=static_cast<retainedUIInput_t::kind_t>(99);send(payload);assert(runtime->received.empty());
     payload.kind=retainedUIInput_t::KEY;payload.key=K_ESCAPE;payload.source=1102;send(payload);

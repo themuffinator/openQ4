@@ -26,11 +26,13 @@ If you have questions concerning this license or the applicable additional terms
 ===========================================================================
 */
 
+#include "UserInterfaceManaged.h"
+
 class idWindow;
 class idWinVec4;
 class idChatWindow;
 
-class idUserInterfaceLocal : public idUserInterface {
+class idUserInterfaceLocal : public idUserInterfaceManaged {
 	friend class idUserInterfaceManagerLocal;
 public:
 								idUserInterfaceLocal();
@@ -78,12 +80,16 @@ public:
 	virtual idVec4				GetLightColor(void) override;
 	virtual bool				GetMaxTextIndex( const char *windowName, const char *text, wrapInfo_t& wrapInfo ) const override;
 
-	size_t						Size();
+	virtual size_t				Size() override;
+	virtual bool				IsMenuGui() const override;
+	virtual bool				AlwaysThink() const override;
+	virtual void				RunTimeEvents( int time ) override;
+	virtual int					NumTransitions() override;
 
 	idDict *					GetStateDict() { return &state; }
 
-	const char *				GetSourceFile( void ) const { return source; }
-	ID_TIME_T						GetTimeStamp( void ) const { return timeStamp; }
+	virtual const char *		GetSourceFile( void ) const override { return source; }
+	virtual ID_TIME_T			GetTimeStamp( void ) const override { return timeStamp; }
 
 	// Legacy implementation/editor access only; not part of the game interface.
 	idWindow *					GetDesktop() const { return desktop; }
@@ -93,10 +99,6 @@ public:
 	void						SetControllerNavigation( bool enabled ) { controllerNavigation = enabled; }
 	int							GetTime() const { return time; }
 	void						SetTime( int _time ) { time = _time; }
-
-	void						ClearRefs() { refs = 0; }
-	void						AddRef() { refs++; }
-	int							GetRefs() { return refs; }
 
 	void						RecurseSetKeyBindingNames( idWindow *window );
 	idStr						&GetPendingCmd() { return pendingCmd; };
@@ -128,13 +130,12 @@ private:
 
 	int							time;
 
-	int							refs;
-
 	idWinVec4 *					lightColorVar;
 };
 
 class idUserInterfaceManagerLocal : public idUserInterfaceManager {
 	friend class idUserInterfaceLocal;
+	friend class idUserInterfaceManaged;
 
 public:
 	virtual void				Init();
@@ -158,14 +159,22 @@ public:
 	virtual void				RegisterIcon( const char *code, const char *shader, int x = -1, int y = -1, int w = -1, int h = -1 );
 
 private:
-	void						UpdateAlwaysThinkGui( idUserInterfaceLocal *gui );
-	void						RemoveAlwaysThinkGui( idUserInterfaceLocal *gui );
+	void						RegisterAllocation( idUserInterfaceManaged *gui );
+	void						RegisterGui( idUserInterfaceManaged *gui );
+	void						RegisterDemoGui( idUserInterfaceManaged *gui );
+	void						UnregisterGui( idUserInterfaceManaged *gui );
+	void						UpdateAlwaysThinkGui( idUserInterfaceManaged *gui );
+	void						RemoveAlwaysThinkGui( idUserInterfaceManaged *gui );
 
 	idRectangle					screenRect;
 	idDeviceContext				dc;
 
-	idList<idUserInterfaceLocal*> guis;
-	idList<idUserInterfaceLocal*> alwaysThinkGUIs;
-	idList<idUserInterfaceLocal*> demoGuis;
+	// Only allocations owns objects. Every other registry is a non-owning
+	// subset, removed by the managed destructor even on direct editor deletes.
+	idList<idUserInterfaceManaged*> allocations;
+	unsigned long long nextAllocationId = 0;
+	idList<idUserInterfaceManaged*> guis;
+	idList<idUserInterfaceManaged*> alwaysThinkGUIs;
+	idList<idUserInterfaceManaged*> demoGuis;
 
 };

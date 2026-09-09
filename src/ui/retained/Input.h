@@ -22,6 +22,10 @@ public:
 	// Keep held sources across document changes; forget them on focus loss where
 	// releases may occur outside the application. Unpaired OS repeats are ignored.
 	void Cancel(bool forgetSources = false);
+	// An adapter may discard a release tagged with an older input generation.
+	// Retire that source only if still quarantined, without routing an event or
+	// releasing a fresh hold that has since acquired the same source ID.
+	void ReleaseQuarantined(std::uint32_t source);
 	std::vector<RoutedInput> Take();
 private:
 	struct Source { RoutedInput::Kind kind; MenuInput action; bool blocked = false; std::uint64_t serial = 0; };

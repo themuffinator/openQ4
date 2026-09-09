@@ -68,4 +68,8 @@ void Input::Cancel(bool forgetSources) {
 	repeatSerial = 0;
 }
 std::vector<RoutedInput> Input::Take() { std::vector<RoutedInput> result; result.swap(events); return result; }
+void Input::ReleaseQuarantined(std::uint32_t source) {
+	const auto found = sources.find(source);
+	if (found != sources.end() && found->second.blocked) sources.erase(found);
+}
 } // namespace openq4::ui

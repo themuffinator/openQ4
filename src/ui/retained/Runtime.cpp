@@ -8,14 +8,90 @@
 #include <RmlUi/Core/RenderManager.h>
 #include <RmlUi/Core/ElementInstancer.h>
 #include <RmlUi/Core/ElementUtilities.h>
+#include <json/json.h>
 #include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstring>
 #include <map>
+#include <stdexcept>
+#include <string_view>
 
 namespace openq4::ui {
 namespace {
+bool SnapshotFields(const Json::Value& value, std::initializer_list<const char*> fields) {
+	if (!value.isObject() || value.size() != fields.size()) return false;
+	for (const auto* field : fields) if (!value.isMember(field)) return false;
+	return true;
+}
+Json::Value SnapshotValue(const Value& value) {
+	Json::Value result(Json::objectValue);
+	result["type"] = unsigned(value.type); result["unit"] = value.unit; result["text"] = value.text;
+	result["data"] = Json::Value(Json::arrayValue);
+	for (double component : value.data) result["data"].append(component);
+	return result;
+}
+bool ReadSnapshotValue(const Json::Value& source, Value& value) {
+	if (!SnapshotFields(source,{"type","unit","text","data"}) || !source["type"].isUInt() || source["type"].asUInt() > unsigned(ValueType::Transform) ||
+		!source["unit"].isString() || !source["text"].isString() || !source["data"].isArray() || source["data"].size() != 5) return false;
+	value.type = ValueType(source["type"].asUInt()); value.unit = source["unit"].asString(); value.text = source["text"].asString();
+	for (Json::ArrayIndex i = 0; i < 5; ++i) {
+		if (!source["data"][i].isNumeric() || !std::isfinite(source["data"][i].asDouble())) return false;
+		value.data[i] = source["data"][i].asDouble();
+	}
+	return true;
+}
+// JsonCpp accepts some non-JSON numeric spellings and raw string controls.
+// Snapshot input is strict JSON; reject those forms before parsing the DOM.
+bool SnapshotLexicalForms(const std::string& source) {
+	bool string = false;
+	auto hex4 = [&](size_t at) {
+		if (at+4 > source.size()) return -1;
+		int value = 0;
+		for (size_t n = at; n < at+4; ++n) {
+			const char c = source[n];
+			const int digit = c >= '0' && c <= '9' ? c-'0' : c >= 'a' && c <= 'f' ? c-'a'+10 : c >= 'A' && c <= 'F' ? c-'A'+10 : -1;
+			if (digit < 0) return -1;
+			value = value*16+digit;
+		}
+		return value;
+	};
+	for (size_t i = 0; i < source.size(); ++i) {
+		const char c = source[i];
+		if (c == '"') { string = !string; continue; }
+		if (string) {
+			if (static_cast<unsigned char>(c) < 0x20) return false;
+			if (c == '\\') {
+				if (++i >= source.size()) return false;
+				if (source[i] == 'u') {
+					const int cp = hex4(i+1);
+					if (cp < 0 || (cp >= 0xdc00 && cp <= 0xdfff)) return false;
+					if (cp >= 0xd800 && cp <= 0xdbff) {
+						if (i+6 >= source.size() || source[i+5] != '\\' || source[i+6] != 'u') return false;
+						const int low = hex4(i+7); if (low < 0xdc00 || low > 0xdfff) return false;
+						i += 6;
+					}
+					i += 4;
+				}
+			}
+			continue;
+		}
+		if (c != '-' && (c < '0' || c > '9')) continue;
+		size_t p = i;
+		auto digit = [&]() { return p < source.size() && source[p] >= '0' && source[p] <= '9'; };
+		if (source[p] == '-') ++p;
+		if (!digit()) return false;
+		if (source[p] == '0') ++p; else while (digit()) ++p;
+		if (p < source.size() && source[p] == '.') { ++p; if (!digit()) return false; while (digit()) ++p; }
+		if (p < source.size() && (source[p] == 'e' || source[p] == 'E')) {
+			++p; if (p < source.size() && (source[p] == '+' || source[p] == '-')) ++p;
+			if (!digit()) return false; while (digit()) ++p;
+		}
+		if (p < source.size() && std::string_view(",]} \t\r\n").find(source[p]) == std::string_view::npos) return false;
+		i = p-1;
+	}
+	return !string;
+}
 float Positive(float value, float fallback = 1) {
 	return std::isfinite(value) && value > 0 ? value : fallback;
 }
@@ -487,7 +563,7 @@ struct Runtime::Impl {
 	Backend* backend = nullptr;
 	RuntimeStatistics& Stats() { return backend ? backend->statistics : statistics; }
 	double time = 0;
-	std::string contextName;
+	std::string contextName, sourcePath;
 	Rml::Context* context = nullptr;
 	Rml::ElementDocument* document = nullptr;
 	std::unique_ptr<Document> canonical;
@@ -611,9 +687,11 @@ void Runtime::Shutdown() {
 	impl->initialized = false;
 	impl->time = 0;
 	impl->contextName.clear();
+	impl->sourcePath.clear();
 	impl->services.reset();
 }
 void Runtime::CloseDocument() {
+	impl->sourcePath.clear();
 	impl->canonical.reset(); impl->applied.clear(); impl->motion.Reset({});
 	impl->state = {}; impl->appliedStateRevision = 0; impl->stateError.clear();
 	impl->interaction.Reset({}); impl->controls.clear(); impl->pointerPresent = false;
@@ -644,6 +722,7 @@ bool Runtime::LoadDocument(const std::string& source, const std::string& sourceP
 	std::string stateError;
 	impl->state.Reset(candidate->Model(),stateError); // Initial state was validated by Document::Load.
 	impl->canonical = std::move(candidate);
+	impl->sourcePath = sourcePath;
 	std::vector<const Node*> nodes{&impl->canonical->Model().root};
 	while (!nodes.empty()) {
 		const auto* node = nodes.back(); nodes.pop_back();
@@ -673,6 +752,159 @@ StateValues Runtime::GetState(bool includeHostSources) const {
 	return values;
 }
 std::uint64_t Runtime::StateRevision() const { return impl->state.Revision(); }
+bool Runtime::SaveSnapshot(std::string& snapshot, std::string& error, double seconds) const {
+	error.clear();
+	if (!impl->canonical || !impl->document) { error = "Snapshots require a loaded canonical document"; return false; }
+	if (!std::isfinite(seconds) || seconds < 0) { error = "Invalid snapshot presentation time"; return false; }
+	try {
+		const double now = std::max(seconds,impl->time);
+		Interaction interaction = impl->interaction;
+		Motion motion = impl->motion;
+		interaction.Cancel();
+		// A press/hover is transient. Preserve a continuous transition toward
+		// its persistent focus/default feedback instead of reviving pressed ink.
+		for (const auto& feedback : interaction.TakeFeedback()) motion.Play(feedback.timeline,now);
+		const auto playback = motion.Capture(now);
+		if (!motion.Restore(playback,now,error)) return false;
+		const auto input = interaction.Capture();
+		Json::Value root(Json::objectValue);
+		root["format"] = "openq4-ui-instance"; root["version"] = 1;
+		auto& identity = root["document"];
+		identity["version"] = 1; identity["id"] = impl->canonical->Model().id;
+		identity["path"] = impl->sourcePath; identity["source"] = impl->canonical->Source();
+		root["application"] = Json::Value(Json::objectValue);
+		for (const auto& [id,value] : GetState(false))
+			std::visit([&](const auto& primitive) { root["application"][id] = primitive; },value);
+		auto& presentation = root["presentation"];
+		presentation["reducedMotion"] = playback.reducedMotion;
+		presentation["values"] = Json::Value(Json::arrayValue);
+		for (const auto& [key,value] : playback.values) {
+			Json::Value item(Json::objectValue);
+			item["node"] = key.first; item["property"] = key.second; item["value"] = SnapshotValue(value);
+			presentation["values"].append(std::move(item));
+		}
+		presentation["playing"] = Json::Value(Json::arrayValue);
+		for (const auto& saved : playback.playing) {
+			Json::Value item(Json::objectValue);
+			item["owner"] = saved.owner; item["node"] = saved.node; item["property"] = saved.property;
+			item["from"] = SnapshotValue(saved.from); item["elapsedMs"] = saved.elapsedMs; item["durationMs"] = saved.durationMs;
+			item["paused"] = saved.paused; item["reduced"] = saved.reduced;
+			presentation["playing"].append(std::move(item));
+		}
+		auto& semantics = root["interaction"];
+		semantics["focus"] = input.focus; semantics["modals"] = Json::Value(Json::arrayValue);
+		for (const auto& scope : input.modals) {
+			Json::Value item(Json::objectValue); item["root"] = scope.root; item["restore"] = scope.restore;
+			semantics["modals"].append(std::move(item));
+		}
+		semantics["enabled"] = Json::Value(Json::objectValue);
+		for (const auto& [id,enabled] : input.enabled) if (!impl->state.Enabled().contains(id)) semantics["enabled"][id] = enabled;
+		semantics["presented"] = Json::Value(Json::objectValue);
+		for (const auto& [id,state] : input.presented) semantics["presented"][id] = unsigned(state);
+		// Reserved schema slots fail closed until the actual widgets and script
+		// clocks have persistent state contracts. Empty does not imply support.
+		root["widgets"] = Json::Value(Json::objectValue);
+		Json::StreamWriterBuilder writer; writer["indentation"] = ""; writer["precision"] = 17;
+		std::string candidate = Json::writeString(writer,root);
+		if (candidate.size() > MaxSnapshotBytes) { error = "Instance snapshot exceeds the 128 MiB limit"; return false; }
+		snapshot.swap(candidate); return true;
+	} catch (const std::exception& problem) { error = std::string("Cannot save instance snapshot: ")+problem.what(); return false; }
+}
+bool Runtime::RestoreSnapshot(const std::string& snapshot, std::string& error, double seconds) {
+	error.clear();
+	auto reject = [&](const char* message) { error = message; return false; };
+	if (!impl->canonical || !impl->document) return reject("Snapshots require a loaded canonical document");
+	if (!std::isfinite(seconds) || seconds < 0) return reject("Invalid restored presentation time");
+	if (snapshot.empty() || snapshot.size() > MaxSnapshotBytes) return reject("Invalid instance snapshot size");
+	try {
+		if (!SnapshotLexicalForms(snapshot)) return reject("Invalid instance snapshot JSON lexical form");
+		Json::CharReaderBuilder builder;
+		builder["collectComments"] = false; builder["allowComments"] = false; builder["allowTrailingCommas"] = false;
+		builder["strictRoot"] = true; builder["failIfExtra"] = true; builder["rejectDupKeys"] = true;
+		builder["allowSpecialFloats"] = false; builder["stackLimit"] = 32; builder["skipBom"] = false;
+		std::unique_ptr<Json::CharReader> reader(builder.newCharReader()); Json::Value root;
+		if (!reader->parse(snapshot.data(),snapshot.data()+snapshot.size(),&root,nullptr)) return reject("Invalid instance snapshot JSON");
+		if (!SnapshotFields(root,{"format","version","document","application","presentation","interaction","widgets"}) ||
+			root["format"] != "openq4-ui-instance" || !root["version"].isUInt() || root["version"].asUInt() != 1)
+			return reject("Unsupported instance snapshot schema");
+		const auto& identity = root["document"];
+		if (!SnapshotFields(identity,{"version","id","path","source"}) || !identity["version"].isUInt() || identity["version"].asUInt() != 1 ||
+			identity["id"] != impl->canonical->Model().id || identity["path"] != impl->sourcePath || identity["source"] != impl->canonical->Source())
+			return reject("Instance snapshot document/source identity mismatch");
+		if (!root["widgets"].isObject() || !root["widgets"].empty()) return reject("Unsupported restored widget state");
+		const auto& application = root["application"];
+		if (!application.isObject()) return reject("Invalid restored application state");
+		StateValues values, sources;
+		for (const auto& id : application.getMemberNames()) {
+			const auto& value = application[id];
+			if (value.isBool()) values[id] = value.asBool();
+			else if (value.isNumeric()) values[id] = value.asDouble();
+			else if (value.isString()) values[id] = value.asString();
+			else return reject("Invalid restored application value type");
+		}
+		for (const auto& [id,declaration] : impl->state.Declarations()) if (!declaration.cvar.empty()) {
+			StateValue value;
+			if (!impl->host.ReadCVar(declaration.cvar,declaration.initial.index(),value)) { error = "Unavailable CVar source during restore: "+declaration.cvar; return false; }
+			sources.emplace(id,std::move(value));
+		}
+		State state = impl->state;
+		if (!state.Restore(values,sources,error)) return false;
+		const auto& presentation = root["presentation"];
+		if (!SnapshotFields(presentation,{"reducedMotion","values","playing"}) || !presentation["reducedMotion"].isBool() ||
+			!presentation["values"].isArray() || !presentation["playing"].isArray() ||
+			presentation["values"].size() > impl->motion.Values().size() || presentation["playing"].size() > impl->motion.Values().size())
+			return reject("Invalid restored presentation state");
+		MotionSnapshot playback; playback.reducedMotion = presentation["reducedMotion"].asBool();
+		for (const auto& item : presentation["values"]) {
+			Value value;
+			if (!SnapshotFields(item,{"node","property","value"}) || !item["node"].isString() || !item["property"].isString() || !ReadSnapshotValue(item["value"],value) ||
+				!playback.values.emplace(PropertyKey{item["node"].asString(),item["property"].asString()},std::move(value)).second)
+				return reject("Invalid or duplicate restored presentation property");
+		}
+		for (const auto& item : presentation["playing"]) {
+			MotionPlayback saved;
+			if (!SnapshotFields(item,{"owner","node","property","from","elapsedMs","durationMs","paused","reduced"}) ||
+				!item["owner"].isString() || !item["node"].isString() || !item["property"].isString() || !ReadSnapshotValue(item["from"],saved.from) ||
+				!item["elapsedMs"].isNumeric() || !item["durationMs"].isNumeric() || !item["paused"].isBool() || !item["reduced"].isBool())
+				return reject("Invalid restored timeline playback");
+			saved.owner = item["owner"].asString(); saved.node = item["node"].asString(); saved.property = item["property"].asString();
+			saved.elapsedMs = item["elapsedMs"].asDouble(); saved.durationMs = item["durationMs"].asDouble();
+			saved.paused = item["paused"].asBool(); saved.reduced = item["reduced"].asBool(); playback.playing.push_back(std::move(saved));
+		}
+		const double now = std::max(seconds,impl->time);
+		Motion motion = impl->motion;
+		if (!motion.Restore(playback,now,error)) return false;
+		const auto& semantics = root["interaction"];
+		if (!SnapshotFields(semantics,{"focus","modals","enabled","presented"}) || !semantics["focus"].isString() || !semantics["modals"].isArray() ||
+			semantics["modals"].size() > 64 || !semantics["enabled"].isObject() || !semantics["presented"].isObject()) return reject("Invalid restored interaction state");
+		InteractionSnapshot input; input.focus = semantics["focus"].asString();
+		for (const auto& scope : semantics["modals"]) {
+			if (!SnapshotFields(scope,{"root","restore"}) || !scope["root"].isString() || !scope["restore"].isString()) return reject("Invalid restored modal scope");
+			input.modals.push_back({scope["root"].asString(),scope["restore"].asString()});
+		}
+		for (const auto& id : semantics["enabled"].getMemberNames()) {
+			if (!semantics["enabled"][id].isBool() || state.Enabled().contains(id)) return reject("Invalid or binding-owned restored control override");
+			input.enabled[id] = semantics["enabled"][id].asBool();
+		}
+		for (const auto& [id,enabled] : state.Enabled()) input.enabled[id] = enabled;
+		for (const auto& id : semantics["presented"].getMemberNames()) {
+			const auto& value = semantics["presented"][id];
+			if (!value.isUInt() || value.asUInt() > unsigned(ControlState::Disabled)) return reject("Invalid restored control presentation");
+			input.presented[id] = ControlState(value.asUInt());
+		}
+		Interaction interaction = impl->interaction;
+		if (!interaction.Restore(input,error)) return false;
+		// Host bindings remain authoritative. If current CVars changed control
+		// availability, transition from the saved ink to the new semantic state.
+		for (const auto& feedback : interaction.TakeFeedback()) motion.Play(feedback.timeline,now);
+		// No live state, geometry, clock or input queues change before validation
+		// completes. Rendering applies the restored values on the next frame.
+		impl->state = std::move(state); impl->motion = std::move(motion); impl->interaction = std::move(interaction);
+		impl->time = now; impl->pointerPresent = false; impl->applied.clear();
+		impl->appliedStateRevision = impl->state.Revision(); impl->stateError.clear();
+		return true;
+	} catch (const std::exception& problem) { error = std::string("Cannot restore instance snapshot: ")+problem.what(); return false; }
+}
 std::optional<Value> Runtime::PresentedValue(const std::string& node, const std::string& property) const {
 	const PropertyKey key{node,property};
 	const auto bound = impl->state.Properties().find(key);
@@ -758,6 +990,7 @@ void Runtime::PointerMove(float x, float y, double seconds) {
 void Runtime::PointerButton(bool down, double seconds) { impl->interaction.Pointer(down); impl->Feedback(seconds); }
 void Runtime::MenuAction(MenuInput input, bool down, double seconds) { impl->interaction.Input(input,down); impl->Feedback(seconds); }
 void Runtime::CancelInput(double seconds) { impl->pointerPresent = false; impl->interaction.Cancel(); impl->Feedback(seconds); }
+void Runtime::ReleaseInputSources() { impl->interaction.ReleaseInputSources(); }
 bool Runtime::FocusControl(const std::string& id, double seconds) { const bool result = impl->interaction.Focus(id); impl->Feedback(seconds); return result; }
 bool Runtime::SetControlEnabled(const std::string& id, bool enabled, double seconds) {
 	if (impl->state.Enabled().contains(id)) return false; // The binding owns this control's availability.

@@ -37,6 +37,7 @@ def interaction_script(path: Path) -> str:
     patterns = [rf'ui_retained(?:Focus|State) {identifier}', rf'ui_retainedEnabled {identifier} [01]',
                 rf'ui_retainedValue {identifier} {identifier}', r'ui_retainedData "retained-data/[A-Za-z0-9_-]{1,64}\.json"',
                 rf'ui_retainedModal push {identifier}', r'ui_retainedModal pop', r'ui_retainedEvents',
+                r'ui_retainedCheckpoint (?:save|restore)',
                 r'ui_retainedMenu (?:next|previous|up|down|left|right|accept|back) [01]', r'wait [1-9][0-9]{0,2}']
     lines = [line.strip() for line in source.splitlines() if line.strip() and not line.strip().startswith('//')]
     if len(lines) > 256 or any(not any(re.fullmatch(pattern, line) for pattern in patterns) for line in lines):
@@ -95,8 +96,13 @@ def capture(args: argparse.Namespace) -> int:
         end = 'ui_retainedOwnership\n' if args.retained_open else ''
         load_command = 'ui_retainedOpen' if args.retained_open else 'ui_retainedPreview'
         preview = f'{load_command} "{staged_name}"\n' + begin + profile_command + play + script + f'wait {settle}\n' + end
+        if args.language_reload:
+            preview += 'reloadLanguage\nwait 2\n'
         if args.video_restart:
-            preview += 'vid_restart windowed\nwait 2\n' + begin + profile_command + play + script + f'wait {settle}\n' + end
+            # A separate resume script observes the surviving state; replaying
+            # setup after restart cannot establish instance persistence.
+            resume = interaction_script(args.retained_resume_script) if args.retained_resume_script else play + script
+            preview += 'vid_restart windowed\nwait 2\n' + begin + profile_command + resume + f'wait {settle}\n' + end
     close = 'ui_retainedClose\nwait 3\nui_retainedOwnership\n' if args.retained_open else ''
     cfg_path.write_text(presentation + preview + legacy_import.commands(import_requests) + 'gfxInfo\nscreenshot "screenshots/ui-baseline.tga"\necho UI_BASELINE_CAPTURE_COMPLETE\n' + close + 'quit\n', encoding='utf-8')
     overrides = {
@@ -147,11 +153,14 @@ def capture(args: argparse.Namespace) -> int:
                                         'sha256': digest(args.retained_document),
                                         'density_override': args.density, 'ui_scale': args.ui_scale,
                                         'settle_frames': settle, 'video_restart': args.video_restart,
+                                        'language_reload': args.language_reload,
                                         'profile_frames': args.profile_frames,
                                         'timeline': args.timeline, 'reduced_motion': args.reduced_motion,
                                         'replacement_acceptance': False}
         if args.retained_script:
             metadata['retained_preview']['interaction_script'] = {'source': str(args.retained_script), 'sha256': digest(args.retained_script)}
+        if args.retained_resume_script:
+            metadata['retained_preview']['resume_script'] = {'source': str(args.retained_resume_script), 'sha256': digest(args.retained_resume_script)}
         metadata['retained_preview']['state_data'] = data_files
 
     def save_report():
@@ -188,9 +197,9 @@ def capture(args: argparse.Namespace) -> int:
     plain_log = re.sub(r'\^[0-9]', '', log)
     if import_requests:
         metadata['legacy_import'] = legacy_import.collect(game,plain_log,import_requests)
-    diagnostics = [line for line in plain_log.splitlines() if 'WARNING:' in line or 'ERROR:' in line]
+    diagnostics = [line for line in plain_log.splitlines() if 'WARNING:' in line or 'ERROR:' in line or 'FATAL:' in line]
     metadata['diagnostics'] = {'warnings': sum('WARNING:' in line for line in diagnostics),
-                               'errors': sum('ERROR:' in line for line in diagnostics)}
+                               'errors': sum('ERROR:' in line or 'FATAL:' in line for line in diagnostics)}
     valid = metadata['returncode'] == 0 and screenshot.is_file() and 'UI_BASELINE_CAPTURE_COMPLETE' in log
     active_apis = re.findall(r'Renderer API: requested=\S+ active=(\S+) disposition=(\S+)', plain_log)
     metadata['active_renderer'] = active_apis[-1][0] if active_apis else None
@@ -222,6 +231,8 @@ def capture(args: argparse.Namespace) -> int:
             if line.startswith(('Retained UI control:', 'Retained UI action:', 'Retained UI actions:'))]
         metadata['retained_preview']['ownership_trace'] = [line for line in plain_log.splitlines() if line.startswith('Retained UI ownership:')]
         metadata['retained_preview']['binding_trace'] = [line for line in plain_log.splitlines() if line.startswith(('Retained UI value:', 'Retained UI data:', 'Retained UI bounds:'))]
+        metadata['retained_preview']['snapshot_trace'] = [line for line in plain_log.splitlines()
+            if line.startswith(('Retained UI checkpoint:', 'Retained UI instance restored after renderer/language change:'))]
         if args.profile_frames and (len(profiles) != (2 if args.video_restart else 1)
                                    or any(p.get('frames') != args.profile_frames for p in profiles)):
             retained_diagnostics.append('retained CPU profile did not complete for the requested frame count')
@@ -229,7 +240,7 @@ def capture(args: argparse.Namespace) -> int:
         if args.timeline:
             played = plain_log.count(f'Retained UI timeline played: {args.timeline}')
             metadata['retained_preview']['timeline_play_count'] = played
-            valid = valid and played == (2 if args.video_restart else 1)
+            valid = valid and played == (2 if args.video_restart and not args.retained_resume_script else 1)
     if screenshot.is_file():
         image = screenshot.read_bytes()
         if len(image) >= 18:
@@ -258,6 +269,7 @@ def main() -> int:
     parser.add_argument('--shared-gui', action='store_true', help='exercise the shared GUI renderer domain')
     parser.add_argument('--timeout', type=int, default=180)
     parser.add_argument('--retained-document', type=Path, help='Optional Q4UI or RML integration fixture, copied into the isolated savepath.')
+    parser.add_argument('--retained-resume-script', type=Path, help='Semantic checks after video restart, replacing replay of the setup script/timeline.')
     parser.add_argument('--retained-script', type=Path, help='Optional semantic control script; does not send device input.')
     parser.add_argument('--retained-data', type=Path, action='append', default=[], help='State JSON copied to retained-data/<name>; repeat for scripted state batches.')
     parser.add_argument('--retained-open', action='store_true', help='Acquire application ownership with host input still disabled; inspect pause/resume and close.')
@@ -268,6 +280,7 @@ def main() -> int:
     parser.add_argument('--density', type=float, default=0, help='Test density override; zero uses SDL display scale.')
     parser.add_argument('--ui-scale', type=float, default=1)
     parser.add_argument('--video-restart', action='store_true', help='Restart the windowed renderer with the preview loaded before capturing.')
+    parser.add_argument('--language-reload', action='store_true', help='Reload the same language dictionary with the preview loaded before optional video restart.')
     parser.add_argument('--profile-frames', type=int, default=0, help='Measure 1..3600 rendered UI frames before capture; zero disables profiling.')
     args = parser.parse_args()
     if args.width < 1 or args.height < 1 or args.timeout < 1:
@@ -278,8 +291,12 @@ def main() -> int:
         parser.error('UI scale must be between 0.75 and 2')
     if args.video_restart and not args.retained_document:
         parser.error('--video-restart requires --retained-document')
+    if args.language_reload and not args.retained_document:
+        parser.error('--language-reload requires --retained-document')
     if args.retained_script and (not args.retained_document or args.retained_document.suffix.lower() != '.q4ui'):
         parser.error('--retained-script requires a .q4ui document')
+    if args.retained_resume_script and (not args.video_restart or not args.retained_document or args.retained_document.suffix.lower() != '.q4ui'):
+        parser.error('--retained-resume-script requires --video-restart and a .q4ui document')
     if args.retained_data and (len(args.retained_data) > 16 or not args.retained_document or args.retained_document.suffix.lower() != '.q4ui'):
         parser.error('--retained-data requires a .q4ui document and at most 16 files')
     if args.retained_open and (not args.retained_document or args.retained_document.suffix.lower() != '.q4ui'):

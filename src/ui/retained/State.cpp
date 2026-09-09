@@ -102,4 +102,23 @@ bool State::Set(const StateValues& changes, std::string& error, bool hostSources
 	variables = std::move(candidate); properties = std::move(props); enabled = std::move(controls); ++revision;
 	return true;
 }
+bool State::Restore(const StateValues& application, const StateValues& hostSources, std::string& error) {
+	error.clear();
+	StateValues candidate;
+	for (const auto& [id,declaration] : declarations) {
+		const auto& source = declaration.cvar.empty() ? application : hostSources;
+		const auto found = source.find(id);
+		if (found == source.end() || found->second.index() != declaration.initial.index() || !ValidStateValue(found->second)) {
+			error = "Missing or invalid restored state '"+id+"'"; return false;
+		}
+		candidate.emplace(id,found->second);
+	}
+	if (application.size()+hostSources.size() != candidate.size()) { error = "Unexpected or wrong-owner restored state"; return false; }
+	PropertyValues props;
+	std::map<std::string,bool> controls;
+	if (!Evaluate(candidate,props,controls,error)) return false;
+	if (variables != candidate) ++revision;
+	variables = std::move(candidate); properties = std::move(props); enabled = std::move(controls);
+	return true;
+}
 } // namespace openq4::ui

@@ -590,6 +590,219 @@ int main(int argc, char** argv) {
 	Check(runtime.Initialize(),"restart lifetime without stale services");
 	runtime.Shutdown();
 	{
+		auto replace = [](std::string source, const std::string& before, const std::string& after) {
+			const auto at = source.find(before); Check(at != std::string::npos,"snapshot mutation target exists");
+			source.replace(at,before.size(),after); return source;
+		};
+		Runtime first(host), second(host);
+		std::string snapshot, error;
+		Check(first.LoadDocument(bindingSource,"snapshot-bindings.q4ui",diagnostics),"load durable state fixture");
+		Check(second.LoadDocument(bindingSource,"snapshot-bindings.q4ui",diagnostics),"load independent snapshot recipient");
+		Check(first.SetState({{"progress",37.0},{"heading",std::string("#str_test")}},error,1),"set snapshot application values");
+		first.Frame({},1); Check(first.FocusControl("reference-controls",1),"focus snapshot fixture");
+		first.MenuAction(MenuInput::Accept,true,1); first.MenuAction(MenuInput::Accept,false,1);
+		first.MenuAction(MenuInput::Accept,true,1);
+		Check(first.SaveSnapshot(snapshot,error,1.025),"serialize versioned durable snapshot");
+		Check(first.GetControlState("reference-controls")==ControlState::Pressed && first.TakeActions().size()==1,"capture leaves live press and action queue unchanged");
+		const auto savedApplication = first.GetState(false);
+		host.cvars["ui_retainedScale"] = 1.5;
+		Check(second.SetState({{"progress",80.0}},error,10),"independent recipient begins with different state");
+		Check(second.RestoreSnapshot(snapshot,error,10),"restore application, focus and current host sources together");
+		Check(second.GetState(false)==savedApplication && std::get<double>(second.GetState().at("scale"))==1.5,"snapshot never overwrites current CVar sources");
+		Check(second.FocusedControl()=="reference-controls" && second.GetControlState("reference-controls")==ControlState::Focus,"restored press is cancelled into persistent focus before layout");
+		second.MenuAction(MenuInput::Accept,false,10);
+		Check(second.TakeActions().empty(),"orphan release cannot activate restored instance");
+		second.Frame({},10.1);
+		Check(second.FocusedControl()=="reference-controls" && second.PresentedValue("reading","text")->text=="37","first post-restore layout retains valid focus and derived values");
+		Check(first.RestoreSnapshot(snapshot,error,2),"restore into currently held receiving instance");
+		first.MenuAction(MenuInput::Accept,true,2); first.MenuAction(MenuInput::Accept,false,2);
+		Check(first.TakeActions().empty(),"restore quarantines receiving-instance repeat and release");
+		first.Frame({},2.1); first.MenuAction(MenuInput::Accept,true,2.1); first.MenuAction(MenuInput::Accept,false,2.1);
+		Check(first.TakeActions().size()==1,"fresh complete activation works once after restored release");
+		std::string stable;
+		Check(second.SaveSnapshot(stable,error,10.2),"capture recipient before corrupt restore attempts");
+		const auto revision = second.StateRevision();
+		auto reject = [&](const std::string& corrupt) {
+			Check(!second.RestoreSnapshot(corrupt,error,20) && !error.empty(),"invalid snapshot rejects with diagnostic");
+			std::string after;
+			Check(second.SaveSnapshot(after,error,10.2) && after==stable && second.StateRevision()==revision,"failed restore preserves state, focus, playback and presentation clock atomically");
+		};
+		reject("{}"); reject(snapshot.substr(0,snapshot.size()-1)); reject(snapshot+" {}");
+		reject(replace(snapshot,"\"format\":\"openq4-ui-instance\"","\"format\":\"openq4-ui-instance-next\""));
+		reject(replace(snapshot,"\"version\":1","\"version\":2"));
+		reject(replace(snapshot,"\"path\":\"snapshot-bindings.q4ui\"","\"path\":\"different.q4ui\""));
+		reject(replace(snapshot,"\"progress\":37.0","\"progress\":true"));
+		reject(replace(snapshot,"\"limit\":100.0","\"limit\":0.0"));
+		reject(replace(snapshot,"\"progress\":37.0","\"progress\":1e999"));
+		reject(replace(snapshot,"\"progress\":37.0","\"progress\":037"));
+		reject(replace(snapshot,"\"progress\":37.0","\"progress\":37."));
+		reject(replace(snapshot,"\"progress\":37.0","\"progress\":37.0,\"progress\":20.0"));
+		reject(replace(snapshot,"\"heading\":\"#str_test\"","\"heading\":\"\\ud800\\u0041\""));
+		reject(replace(snapshot,"\"application\":{","\"application\":{\"scale\":9.0,"));
+		reject(replace(snapshot,"\"widgets\":{}","\"widgets\":{\"scroll\":10}"));
+		reject(replace(snapshot,"\"focus\":\"reference-controls\"","\"focus\":\"unknown\""));
+		host.cvars["ui_retainedScale"] = std::numeric_limits<double>::quiet_NaN(); reject(snapshot);
+		host.cvars["ui_retainedScale"] = 1.5;
+		Check(second.LoadDocument(bindingSource+"\n","snapshot-bindings.q4ui",diagnostics),"load source revision with unchanged IDs");
+		Check(!second.RestoreSnapshot(snapshot,error,30),"exact source changes require an explicit snapshot migration");
+		Check(second.LoadMarkup("<rml><body/></rml>","raw.rml"),"load raw markup snapshot exclusion fixture");
+		std::string unchanged="unchanged";
+		Check(!second.SaveSnapshot(unchanged,error,30) && unchanged=="unchanged" && !second.RestoreSnapshot(snapshot,error,30),"raw markup cannot claim canonical snapshot support");
+	}
+	{
+		Runtime first(host), second(host);
+		std::string snapshot, error;
+		Check(first.LoadDocument(canonical,"snapshot-motion.q4ui",diagnostics) && second.LoadDocument(canonical,"snapshot-motion.q4ui",diagnostics),"load timeline snapshot pair");
+		Check(first.PlayTimeline("slide",1),"start durable timeline");
+		Check(first.SaveSnapshot(snapshot,error,1.25) && second.RestoreSnapshot(snapshot,error,100),"reanchor active playback to independent time domain");
+		Check(Near(float(second.PresentedValue("canonical-panel","transform")->data[0]),25),"restore preserves quarter progress immediately");
+		std::string corrupt=snapshot;
+		auto at=corrupt.find("\"durationMs\":1000.0"); Check(at!=std::string::npos,"serialized duration exists");
+		corrupt.replace(at,std::string("\"durationMs\":1000.0").size(),"\"durationMs\":0.0");
+		Check(!second.RestoreSnapshot(corrupt,error,1000),"zero-duration playback cannot enter evaluator");
+		corrupt=snapshot; at=corrupt.find("\"owner\":\"slide\""); Check(at!=std::string::npos,"serialized track owner exists");
+		corrupt.replace(at,std::string("\"owner\":\"slide\"").size(),"\"owner\":\"unknown\"");
+		Check(!second.RestoreSnapshot(corrupt,error,1000),"unknown playback owner rejects atomically");
+		second.Frame({},100.25);
+		Check(Near(float(second.PresentedValue("canonical-panel","transform")->data[0]),50),"restored timeline continues at original duration");
+		Check(second.PlayTimeline("slide",100.25),"retarget restored timeline from current presentation");
+		Check(second.SaveSnapshot(snapshot,error,100.5) && first.RestoreSnapshot(snapshot,error,200),"restore partially retargeted track");
+		first.Frame({},200.25);
+		Check(Near(float(first.PresentedValue("canonical-panel","transform")->data[0]),75),"retarget source value survives round trip");
+		first.PauseTimeline("slide",200.25);
+		Check(first.SaveSnapshot(snapshot,error,300) && second.RestoreSnapshot(snapshot,error,1000),"round trip paused timeline across long idle gap");
+		second.Frame({},1100);
+		Check(Near(float(second.PresentedValue("canonical-panel","transform")->data[0]),75),"paused presentation does not consume restored wall time");
+		second.ResumeTimeline("slide",1100); second.Frame({},1100.25);
+		Check(Near(float(second.PresentedValue("canonical-panel","transform")->data[0]),87.5f),"resumed timeline consumes only unpaused time");
+		second.CancelTimeline("slide",CancelPolicy::Hold,1100.25);
+		Check(second.SaveSnapshot(snapshot,error,1100.5) && first.RestoreSnapshot(snapshot,error,2000),"round trip held presentation after cancel");
+		first.Frame({},2001);
+		Check(Near(float(first.PresentedValue("canonical-panel","transform")->data[0]),87.5f),"cancelled hold value persists without resurrecting playback");
+	}
+	{
+		std::string repeatSource=canonical;
+		const auto at=repeatSource.find("\"durationMs\":1000");
+		Check(at!=std::string::npos,"repeat test timeline exists");
+		repeatSource.insert(at,"\"iterations\":0,");
+		Runtime first(host),second(host); std::string snapshot,error;
+		Check(first.LoadDocument(repeatSource,"snapshot-repeat.q4ui",diagnostics) && second.LoadDocument(repeatSource,"snapshot-repeat.q4ui",diagnostics),"load indefinitely repeating snapshot pair");
+		first.PlayTimeline("slide",1);
+		Check(first.SaveSnapshot(snapshot,error,1000000.25) && second.RestoreSnapshot(snapshot,error,2),"unbounded repeat stores bounded phase across unrelated clocks");
+		Check(Near(float(second.PresentedValue("canonical-panel","transform")->data[0]),25),"repeat phase survives large original uptime");
+		second.Frame({},2.25);
+		Check(Near(float(second.PresentedValue("canonical-panel","transform")->data[0]),50),"restored repeat advances from authored cycle start");
+		std::string unchanged="unchanged";
+		Check(!first.SaveSnapshot(unchanged,error,1e308) && unchanged=="unchanged","overflowing repeated playback cannot produce an unrestorable snapshot");
+		Check(first.LoadDocument(vectorDocument,"snapshot-reduced.q4ui",diagnostics) && second.LoadDocument(vectorDocument,"snapshot-reduced.q4ui",diagnostics),"load reduced motion snapshot pair");
+		first.SetReducedMotion(true,10); first.PlayTimeline("fade",10);
+		Check(first.SaveSnapshot(snapshot,error,10.04) && second.RestoreSnapshot(snapshot,error,20),"restore bounded reduced-motion fade");
+		Check(Near(float(second.PresentedValue("shape","opacity")->data[0]),.375f),"reduced fade resumes at its shortened midpoint");
+		host.ClearSamples(); second.Frame({240,160,1,1},20.04);
+		Check(Near(float(second.PresentedValue("shape","opacity")->data[0]),.25f),"reduced fade completes within its original 80 ms limit");
+	}
+	{
+		const char* combined=R"json({"format":"openq4-ui","version":1,"id":"atomic-snapshot",
+		 "root":{"id":"root","type":"group","properties":{"opacity":{"type":"number","value":1}}},
+		 "state":{"amount":{"type":"number","initial":1},"host":{"type":"number","initial":1,"cvar":"snapshot_denominator"}},
+		 "bindings":[{"id":"ratio","node":"root","property":"opacity","value":{"op":"/","args":[{"state":"amount"},{"state":"host"}]}}]})json";
+		Runtime first(host),second(host); std::string snapshot,error;
+		host.cvars["snapshot_denominator"]=1.0;
+		Check(first.LoadDocument(combined,"snapshot-atomic.q4ui",diagnostics) && second.LoadDocument(combined,"snapshot-atomic.q4ui",diagnostics),"load atomic host/application fixture");
+		Check(first.SetState({{"amount",.5}},error,1) && first.SaveSnapshot(snapshot,error,1),"save application amount independently from host denominator");
+		host.cvars["snapshot_denominator"]=.5;
+		Check(second.RestoreSnapshot(snapshot,error,2) && Near(float(second.PresentedValue("root","opacity")->data[0]),1),"restore evaluates valid combined snapshot without invalid host-first intermediate");
+		Document availability;
+		Check(availability.Load(bindingSource,diagnostics) && availability.ReplaceValue("/state/available",R"({"type":"boolean","initial":true,"cvar":"snapshot_available"})",diagnostics),"compile host-owned availability fixture");
+		host.cvars["snapshot_available"]=true;
+		Check(first.LoadDocument(availability.Source(),"snapshot-availability.q4ui",diagnostics) && second.LoadDocument(availability.Source(),"snapshot-availability.q4ui",diagnostics),"load availability snapshot pair");
+		first.Frame({},3); first.FocusControl("reference-controls",3); first.Frame({},3.2);
+		Check(first.SaveSnapshot(snapshot,error,3.2),"save focused control while host permits interaction");
+		host.cvars["snapshot_available"]=false;
+		Check(second.RestoreSnapshot(snapshot,error,10),"current host may invalidate saved focus on restore");
+		Check(second.FocusedControl().empty() && second.GetControlState("reference-controls")==ControlState::Disabled,"current availability wins over saved selection");
+		second.Frame({},10.2);
+		Check(second.PresentedValue("reference-controls-focus","opacity")->data[0]<.001,"host invalidation transitions saved focus ink to disabled presentation");
+	}
+	{
+		Runtime first(host), second(host);
+		std::string snapshot,error;
+		Check(first.LoadDocument(interactionSource,"snapshot-modal.q4ui",diagnostics) && second.LoadDocument(interactionSource,"snapshot-modal.q4ui",diagnostics),"load modal snapshot pair");
+		first.Frame({},1); Check(first.FocusControl("reference-controls",1),"choose modal return focus");
+		Check(first.SetControlEnabled("reference-system",false,1),"set persistent unbound availability override");
+		Check(first.PushModal("modal-panel",1) && first.PushModal("modal-controls",1),"open nested modal scopes");
+		first.MenuAction(MenuInput::Accept,true,1);
+		Check(first.SaveSnapshot(snapshot,error,1.02) && second.RestoreSnapshot(snapshot,error,100),"restore nested modal snapshot before recipient first layout");
+		second.Frame({},100.1);
+		Check(second.FocusedControl()=="modal-controls" && !second.FocusControl("reference-controls",100.1),"restored modal constrains current focus scope");
+		Check(second.GetControlState("reference-system")==ControlState::Disabled,"unbound availability override survives restore");
+		Check(second.PopModal(100.1) && second.FocusedControl()=="modal-controls","inner modal restores its prior focus");
+		Check(second.PopModal(100.1) && second.FocusedControl()=="reference-controls","outer modal restores pre-dialog focus");
+		second.MenuAction(MenuInput::Accept,false,100.1); Check(second.TakeActions().empty(),"restored modal teardown cannot release a saved press");
+	}
+	for (int device = 0; device < 3; ++device) {
+		Runtime restored(host); Input adapter;
+		std::string snapshot,error,before,after;
+		Check(restored.LoadDocument(interactionSource,"snapshot-routed-input.q4ui",diagnostics),"load composed restore/source-quarantine fixture");
+		restored.Frame({},1); Check(restored.FocusControl("reference-controls",1),"focus composed restore target");
+		Bounds target; Check(restored.GetBounds("reference-controls",target),"get internal fixture pointer coordinates");
+		const float x=target.x+target.width*.5f,y=target.y+target.height*.5f;
+		const MenuInput action=device==1 ? MenuInput::Back : MenuInput::Accept;
+		double now=1;
+		auto route=[&]() {
+			const auto events=adapter.Take();
+			for (const auto& event : events) {
+				if (event.kind==RoutedInput::Kind::Cancel) restored.CancelInput(now);
+				else if (event.kind==RoutedInput::Kind::PointerButton) restored.PointerButton(event.down,now);
+				else restored.MenuAction(event.menu,event.down,now);
+			}
+			return events.size();
+		};
+		auto edge=[&](bool down,bool repeated=false) {
+			if (device==2) adapter.Pointer(7,down,now);
+			else adapter.Menu(7,action,down,repeated,now);
+		};
+		if (device==2) restored.PointerMove(x,y,now);
+		edge(true); Check(route()==1,"adapter delivers original logical down edge");
+		Check(restored.SaveSnapshot(snapshot,error,1.025) && restored.RestoreSnapshot(snapshot,error,10),"restore while real adapter source remains held");
+		Check(restored.SaveSnapshot(before,error,10),"capture presentation before logical source release");
+		adapter.Cancel(false); adapter.Take(); restored.ReleaseInputSources();
+		Check(restored.SaveSnapshot(after,error,10) && after==before,"source release preserves exact restored focus, modal and timeline state");
+		now=10.1;
+		edge(true,true); Check(route()==0,"quarantined source repeat cannot rearm restored view");
+		edge(false); Check(route()==0 && restored.TakeActions().empty(),"quarantined release emits no event or duplicate activation");
+		now=10.2; restored.Frame({},now);
+		if (device==2) restored.PointerMove(x,y,now);
+		edge(true); Check(route()==1,"first fresh physical press reaches released logical latches");
+		edge(true,true); Check(route()==0,"fresh held repeat remains aggregated");
+		edge(false); Check(route()==1,"fresh matching release reaches restored view");
+		const auto result=restored.TakeActions();
+		Check(result.size()==1 && result[0].kind==(device==1 ? ControlAction::Kind::Back : ControlAction::Kind::Activate),"first fresh accept, back or pointer action after restore fires exactly once");
+		if (device!=1) Check(result[0].node=="reference-controls","restored activation retains the intended control");
+	}
+	for (bool pointer : {false,true}) {
+		Input adapter;
+		const std::uint32_t source=pointer ? 65536u : 7u;
+		auto edge=[&](bool down) {
+			if (pointer) adapter.Pointer(source,down,1);
+			else adapter.Menu(source,MenuInput::Accept,down,false,1);
+		};
+		edge(true); Check(adapter.Take().size()==1,"quarantine-release fixture acquires original source");
+		adapter.Cancel(false); adapter.Take();
+		adapter.ReleaseQuarantined(source); adapter.ReleaseQuarantined(source);
+		Check(adapter.Take().empty(),"stale and duplicate stale releases retire quarantine without routed events");
+		edge(true);
+		auto events=adapter.Take();
+		Check(events.size()==1 && events[0].down,"first fresh press works after old-generation quarantine release");
+		adapter.ReleaseQuarantined(source);
+		Check(adapter.Take().empty(),"late stale release does not emit events for a fresh source hold");
+		edge(true); Check(adapter.Take().empty(),"late stale release cannot erase fresh hold and permit a duplicate down");
+		edge(false); events=adapter.Take();
+		Check(events.size()==1 && !events[0].down,"fresh hold still receives exactly its matching release");
+		adapter.ReleaseQuarantined(source); edge(false);
+		Check(adapter.Take().empty(),"stale release after completed fresh hold is harmless");
+	}
+	{
 		// Duplicate document/node IDs are local to their view. Different density,
 		// data and input must survive interleaved frames and arbitrary close order.
 		auto first = std::make_unique<Runtime>(host);
@@ -669,5 +882,5 @@ int main(int argc, char** argv) {
 	}
 	host.samplePoints.clear();
 	Check(host.errors==0,"no library warnings or errors");
-	std::puts("Retained UI: density, layout, input, clipping, motion, bindings, independent contexts, bounded backend reuse and restart passed");
+	std::puts("Retained UI: density, layout, input, clipping, motion, bindings, independent contexts, bounded backend reuse, transactional instance snapshots and restart passed");
 }
