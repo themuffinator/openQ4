@@ -6,6 +6,7 @@
 #include "SettingsService.h"
 #include "retained/Runtime.h"
 #include "retained/Input.h"
+#include "application/SettingsTransaction.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
@@ -184,7 +185,12 @@ struct idUserInterfaceRetained::Impl {
 	retainedUIView_t* view = nullptr;
 	Input input;
 	std::set<int> held;
-	struct PendingAction { ActionInvocation invocation; bool cancellable = true; };
+	struct PendingAction {
+		ActionInvocation invocation;
+		bool cancellable = true;
+		std::string control;
+		std::uint64_t proposalToken = 0;
+	};
 	std::vector<PendingAction> actions;
 	bool interactive = true, interactiveSet = false, unique = false, active = false;
 	bool suspended = false, pointerVisible = false, close = false, worldReported = false;
@@ -207,7 +213,10 @@ struct idUserInterfaceRetained::Impl {
 		// Completed programs retain their immutable invocations through input
 		// suspension. Save/resource/source replacement explicitly discards them.
 		actions.erase(std::remove_if(actions.begin(),actions.end(),[&](const PendingAction& action) {
-			return discardPrograms || action.cancellable;
+			const bool discard = discardPrograms || action.cancellable;
+			if (discard && action.proposalToken) if (auto* runtime = RuntimeView())
+				runtime->AcknowledgeControlProposal(action.control,action.proposalToken,false);
+			return discard;
 		}),actions.end());
 		if (auto* runtime = RuntimeView()) {
 			if (cancelRuntime) runtime->CancelInput(RetainedUI_PresentationTime());
@@ -286,20 +295,24 @@ struct idUserInterfaceRetained::Impl {
 	}
 	void CollectActions(bool semantic = false) {
 		for (const auto& event : RuntimeView()->TakeActions()) {
-			if (!interactive || event.document != document.Model().id) continue;
+			const auto reject = [&] { if (event.proposalToken)
+				RuntimeView()->AcknowledgeControlProposal(event.node,event.proposalToken,false); };
+			if (!interactive || event.document != document.Model().id) { reject(); continue; }
 			if (event.kind == ControlAction::Kind::Back) {
 				if (!RuntimeView()->PopModal(RetainedUI_PresentationTime())) {
-					if (semantic && actions.size() < 256) actions.push_back({{"","ui.dismiss",{}},false});
+					if (RuntimeView()->HasEvent("onBack")) RunEvent("onBack");
+					else if (semantic && actions.size() < 256) actions.push_back({{"","ui.dismiss",{}},false});
 					else if (!semantic) close = true;
 				}
 				continue;
 			}
-			if (!RuntimeView()->CanActivateControl(event.node,RetainedUI_PresentationTime())) continue;
+			if (!RuntimeView()->CanActivateControl(event.node,RetainedUI_PresentationTime())) { reject(); continue; }
 			if (!event.event.empty()) { RunEvent(event.event); continue; }
 			ActionInvocation invocation; std::string error;
-			if (!RuntimeView()->ResolveAction(event.action,invocation,error) || !ValidInvocation(invocation,error)) { Error(error); continue; }
-			if (actions.size() >= 256) { Quarantine(); Error("Application action queue exceeded 256 requests"); return; }
-			actions.push_back({std::move(invocation),!semantic});
+			if (!RuntimeView()->ResolveAction(event.action,invocation,error,event.proposal ? &*event.proposal : nullptr) ||
+				!ValidInvocation(invocation,error)) { reject(); Error(error); continue; }
+			if (actions.size() >= 256) { reject(); Quarantine(); Error("Application action queue exceeded 256 requests"); return; }
+			actions.push_back({std::move(invocation),!semantic,event.node,event.proposalToken});
 		}
 	}
 	bool AcceptInput() {
@@ -473,6 +486,11 @@ const char* idUserInterfaceRetained::HandleEvent(const sysEvent_t* event, int ti
 		if (down) impl->held.insert(key); else impl->held.erase(key);
 		if (key == K_MOUSE1) {
 			impl->Pointer(); impl->input.Pointer(key,down,RetainedUI_PresentationTime());
+		} else if (key == K_MWHEELUP || key == K_MWHEELDOWN) {
+			if (down && !repeated) {
+				impl->pointerVisible = true; impl->Pointer();
+				impl->RuntimeView()->PointerWheel(key == K_MWHEELUP ? -1 : 1,RetainedUI_PresentationTime());
+			}
 		} else {
 			MenuInput action; bool mapped = true;
 			switch (key) {
@@ -481,6 +499,10 @@ const char* idUserInterfaceRetained::HandleEvent(const sysEvent_t* event, int ti
 				case K_DOWNARROW: case K_JOY10: action = MenuInput::Down; break;
 				case K_LEFTARROW: case K_JOY12: action = MenuInput::Left; break;
 				case K_RIGHTARROW: case K_JOY11: action = MenuInput::Right; break;
+				case K_HOME: action = MenuInput::Home; break;
+				case K_END: action = MenuInput::End; break;
+				case K_PGUP: action = MenuInput::PageUp; break;
+				case K_PGDN: action = MenuInput::PageDown; break;
 				case K_ENTER: case K_KP_ENTER: case K_SPACE: case K_JOY3: action = MenuInput::Accept; break;
 				case K_ESCAPE: case K_JOY4: case K_JOY7: case K_JOY8: action = MenuInput::Back; break;
 				default: mapped = false; break;
@@ -567,25 +589,40 @@ bool idUserInterfaceRetained::DispatchApplicationActions(const char* command, bo
 	closeRequested = impl->close; impl->close = false;
 	for (const auto& pending : actions) {
 		const auto& invocation = pending.invocation;
-		if (invocation.operation == "ui.dismiss") { closeRequested = true; TraceInvocation(Name(),invocation,true); continue; }
+		if (invocation.operation == "ui.dismiss") {
+			closeRequested = true;
+			if (pending.proposalToken) impl->RuntimeView()->AcknowledgeControlProposal(pending.control,pending.proposalToken,true);
+			TraceInvocation(Name(),invocation,true); continue;
+		}
 		if (invocation.operation.starts_with("settings.system.")) {
 			std::string error;
-			if (!UI_SettingsDispatch(impl->settingsOwner,invocation,error)) impl->Error(error);
+			const bool accepted = UI_SettingsDispatch(impl->settingsOwner,invocation,error);
+			if (!accepted) impl->Error(error);
 			else impl->lastError.clear();
 			impl->SyncSettings();
+			if (pending.proposalToken) impl->RuntimeView()->AcknowledgeControlProposal(pending.control,pending.proposalToken,accepted);
 			continue;
 		}
 		const auto value = invocation.arguments.find("value");
-		if (invocation.arguments.size() != 1 || value == invocation.arguments.end()) continue;
+		bool accepted = false;
+		if (invocation.arguments.size() != 1 || value == invocation.arguments.end()) {
+			if (pending.proposalToken) impl->RuntimeView()->AcknowledgeControlProposal(pending.control,pending.proposalToken,false);
+			continue;
+		}
 		if (invocation.operation == "settings.brightness.set" && std::holds_alternative<double>(value->second)) {
 			const double number = std::get<double>(value->second);
-			if (!std::isfinite(number) || number < .5 || number > 2) { impl->Error("Brightness request must be between 0.5 and 2.0"); continue; }
-			cvarSystem->SetCVarFloat("r_brightness",static_cast<float>(number));
-			if (cvarSystem->GetCVarFloat("r_brightness") != static_cast<float>(number)) impl->Error("Brightness request was not applied");
+			if (!std::isfinite(number) || number < .5 || number > 2) impl->Error("Brightness request must be between 0.5 and 2.0");
+			else {
+				cvarSystem->SetCVarFloat("r_brightness",static_cast<float>(number));
+				accepted = cvarSystem->GetCVarFloat("r_brightness") == static_cast<float>(number);
+				if (!accepted) impl->Error("Brightness request was not applied");
+			}
 		} else if (invocation.operation == "settings.shadows.set" && std::holds_alternative<bool>(value->second)) {
 			cvarSystem->SetCVarBool("r_shadows",std::get<bool>(value->second));
-			if (cvarSystem->GetCVarBool("r_shadows") != std::get<bool>(value->second)) impl->Error("Shadows request was not applied");
+			accepted = cvarSystem->GetCVarBool("r_shadows") == std::get<bool>(value->second);
+			if (!accepted) impl->Error("Shadows request was not applied");
 		}
+		if (pending.proposalToken) impl->RuntimeView()->AcknowledgeControlProposal(pending.control,pending.proposalToken,accepted);
 		TraceInvocation(Name(),invocation,closeRequested);
 	}
 	if (impl->settingsClosePending) {
@@ -657,6 +694,34 @@ bool idUserInterfaceRetained::ReadFromSaveGame(idFile* file) {
 	SetCursor(x,y); return true;
 }
 
+bool UI_RetainedSettingsDocument(idUserInterface* gui) {
+	const auto found = std::find(diagnosticViews.begin(),diagnosticViews.end(),gui);
+	if (found == diagnosticViews.end()) return false;
+	auto& impl = *(*found)->impl;
+	if (!impl.Prepare()) return false;
+	const auto& model = impl.document.Model();
+	if (model.id != "openq4.system" || !model.events.contains("onactivate") || !model.events.contains("onback")) return false;
+	for (const auto& [key,type] : UI_SettingsStateSchema()) {
+		const auto declaration = model.state.find(key);
+		if (declaration == model.state.end() || declaration->second.initial.index() != type || !declaration->second.cvar.empty()) return false;
+	}
+	for (const auto* operation : {"settings.system.begin","settings.system.edit","settings.system.apply","settings.system.cancel"}) {
+		if (std::none_of(model.actions.begin(),model.actions.end(),[&](const auto& entry) { return entry.second.operation == operation; })) return false;
+	}
+	return true;
+}
+
+bool UI_RetainedSettingsCanReturn(idUserInterface* gui) {
+	const auto found = std::find(diagnosticViews.begin(),diagnosticViews.end(),gui);
+	if (found == diagnosticViews.end()) return false;
+	StateValues live;
+	if (!UI_SettingsRead((*found)->impl->settingsOwner,live)) return false;
+	// Read the actual service owner, never pending GUI dictionary values.
+	if (!std::get<bool>(live.at("settings.open"))) return true;
+	return !std::get<bool>(live.at("settings.dirty")) && !std::get<bool>(live.at("settings.busy")) &&
+		std::get<double>(live.at("settings.phase")) == static_cast<double>(openq4::ui::SettingsPhase::Editing);
+}
+
 bool UI_RetainedDiagnostic(idUserInterface* gui, const idCmdArgs& args) {
 	const auto found = std::find(diagnosticViews.begin(),diagnosticViews.end(),gui);
 	if (found == diagnosticViews.end() || args.Argc() < 2) return false;
@@ -693,11 +758,28 @@ bool UI_RetainedDiagnostic(idUserInterface* gui, const idCmdArgs& args) {
 			static_cast<unsigned long long>(stats.vectorUploads),static_cast<unsigned long long>(stats.vectorCacheHits),
 			static_cast<unsigned long long>(stats.submittedVertices),static_cast<unsigned long long>(stats.submittedIndices/3));
 		return true;
+	} else if (verb == "widget" && args.Argc() == 3) {
+		const std::string id(args.Argv(2));
+		const auto widget = impl.RuntimeView()->GetWidgetState(id);
+		if (!widget) return false;
+		const auto number = [](const StateValue& value) {
+			if (const auto* numeric = std::get_if<double>(&value)) return *numeric;
+			if (const auto* boolean = std::get_if<bool>(&value)) return *boolean ? 1.0 : 0.0;
+			return 0.0;
+		};
+		// String content stays out of the record; type identifies numeric/bool
+		// readbacks, and authored strings remain available through aliases.
+		common->Printf("RETAINED_GUI_WIDGET id=%s role=%u type=%u accepted=%.17g pending=%d proposed=%.17g rejected=%d token=%llu popup=%d firstVisible=%u\n",
+			id.c_str(),static_cast<unsigned>(widget->role),static_cast<unsigned>(widget->accepted.index()),number(widget->accepted),
+			widget->pending ? 1 : 0,widget->pending ? number(*widget->pending) : 0,widget->rejected ? 1 : 0,
+			static_cast<unsigned long long>(widget->proposalToken),widget->popupOpen ? 1 : 0,widget->firstVisible);
+		return true;
 	} else if (verb == "focus" && args.Argc() == 3) {
 		okay = impl.RuntimeView()->FocusControl(args.Argv(2),RetainedUI_PresentationTime());
 	} else if (verb == "menu" && args.Argc() == 4 && (!idStr::Cmp(args.Argv(3),"0") || !idStr::Cmp(args.Argv(3),"1"))) {
 		const std::map<std::string,MenuInput> inputs = {{"next",MenuInput::Next},{"previous",MenuInput::Previous},
-			{"up",MenuInput::Up},{"down",MenuInput::Down},{"left",MenuInput::Left},{"right",MenuInput::Right},{"accept",MenuInput::Accept},{"back",MenuInput::Back}};
+			{"up",MenuInput::Up},{"down",MenuInput::Down},{"left",MenuInput::Left},{"right",MenuInput::Right},{"accept",MenuInput::Accept},{"back",MenuInput::Back},
+			{"home",MenuInput::Home},{"end",MenuInput::End},{"pageUp",MenuInput::PageUp},{"pageDown",MenuInput::PageDown}};
 		const auto input = inputs.find(args.Argv(2));
 		if (input != inputs.end()) {
 			impl.RuntimeView()->MenuAction(input->second,args.Argv(3)[0] == '1',RetainedUI_PresentationTime());

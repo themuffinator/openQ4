@@ -123,7 +123,8 @@ public:
 	bool RunEvent(const std::string& name, double monotonicSeconds, EventEffects& effects,
 		std::string& error, const StateValues& application = {},
 		const ActionValidator& validate = {}, size_t maxActions = 256);
-	bool ResolveAction(const std::string& id, ActionInvocation& invocation, std::string& error) const;
+	bool ResolveAction(const std::string& id, ActionInvocation& invocation, std::string& error,
+		const StateValue* input = nullptr) const;
 	std::uint64_t StateRevision() const;
 	// Versioned instance data for the exact canonical source/path already loaded.
 	// Snapshot failure leaves output unchanged. Restore is transactional and
@@ -143,6 +144,7 @@ public:
 	// Pointer coordinates are window units, converted once using the last frame.
 	void PointerMove(float windowX, float windowY, double monotonicSeconds);
 	void PointerButton(bool down, double monotonicSeconds);
+	void PointerWheel(int rows, double monotonicSeconds);
 	void MenuAction(MenuInput input, bool down, double monotonicSeconds);
 	void CancelInput(double monotonicSeconds);
 	// After successful RestoreSnapshot: quarantine adapter sources with
@@ -157,6 +159,8 @@ public:
 	bool PopModal(double monotonicSeconds);
 	std::string FocusedControl() const;
 	std::optional<ControlState> GetControlState(const std::string& id) const;
+	std::optional<WidgetViewState> GetWidgetState(const std::string& id) const;
+	bool AcknowledgeControlProposal(const std::string& id, std::uint64_t token, bool accepted);
 	std::vector<ControlAction> TakeActions();
 	// Recheck queued activations after earlier programs may change eligibility.
 	bool CanActivateControl(const std::string& id, double monotonicSeconds);

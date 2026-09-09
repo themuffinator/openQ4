@@ -1,0 +1,67 @@
+--- a/Source/Core/Layout/ContainerBox.cpp
++++ b/Source/Core/Layout/ContainerBox.cpp
+@@ -77,7 +77,7 @@
+ 			Vector2f offset = relative_position + static_position;
+ 
+ 			// Lay out the element.
+-			FormattingContext::FormatIndependent(this, absolute_element, nullptr, FormattingContextType::Block);
++			auto positioned_box = FormattingContext::FormatIndependent(this, absolute_element, nullptr, FormattingContextType::Block);
+ 
+ 			// Now that the element's box has been built, we can offset the position we determined was appropriate for
+ 			// it by the element's margin. This is necessary because the coordinate system for the box begins at the
+@@ -87,6 +87,31 @@
+ 
+ 			// Set the offset of the element; the element itself will take care of any RCSS-defined positional offsets.
+ 			absolute_element->SetOffset(offset, element);
++
++			// openQ4: Positioned children are formatted after SubmitBox. Include
++			// their resolved, unscrolled overflow before the caller encloses this
++			// box, including overflow through nested non-clipping containers.
++			// Fixed elements do not extend a scrolling ancestor's content.
++			if (element && positioned_box && absolute_element->GetPosition() == Style::Position::Absolute)
++			{
++				const Box& parent_box = element->GetBox();
++				const Box& child_box = absolute_element->GetBox();
++				const Vector2f border_offset = absolute_element->GetRelativeOffset(BoxArea::Border);
++				const Vector2f visible_end = border_offset + positioned_box->GetVisibleOverflowSize();
++				const Vector2f margin_bottom_right = {child_box.GetEdge(BoxArea::Margin, BoxEdge::Right),
++					child_box.GetEdge(BoxArea::Margin, BoxEdge::Bottom)};
++				const Vector2f padding_bottom_right = {parent_box.GetEdge(BoxArea::Padding, BoxEdge::Right),
++					parent_box.GetEdge(BoxArea::Padding, BoxEdge::Bottom)};
++				const Vector2f margin_end = border_offset + child_box.GetSize(BoxArea::Border) + margin_bottom_right + padding_bottom_right;
++				const Vector2f old_extent = {element->GetScrollWidth(), element->GetScrollHeight()};
++				const Vector2f new_extent = Math::Max(old_extent, Math::Max(visible_end, margin_end) - parent_box.GetPosition(BoxArea::Padding));
++				element->SetScrollableOverflowRectangle(new_extent, false);
++				if (!IsScrollContainer())
++					SetVisibleOverflowSize(Math::Max(GetVisibleOverflowSize(), visible_end));
++				// This late correction does not rerun layout to add nonzero-size
++				// native auto scrollbars. Canonical openQ4 documents suppress those
++				// controls and use semantic scrolling; authored bars remain separate.
++			}
+ 		}
+ 	}
+ }
+--- a/Source/Core/Layout/BlockContainer.cpp
++++ b/Source/Core/Layout/BlockContainer.cpp
+@@ -56,6 +56,10 @@
+ 	if (!SubmitBox(content_box, inner_content_margin_size, box, max_height))
+ 		return false;
+ 
++	// openQ4: Resolve positioned descendants before propagating this box's
++	// visible overflow to its parent. OpenBlockBox already established its offset.
++	ClosePositionedElements();
++
+ 	// If we are the root of our block formatting context, this will be null. Otherwise increment our parent's cursor to account for this box.
+ 	if (parent_block_container)
+ 	{
+@@ -66,10 +70,6 @@
+ 				{box.GetEdge(BoxArea::Margin, BoxEdge::Right), box.GetEdge(BoxArea::Margin, BoxEdge::Bottom)}))
+ 			return false;
+ 	}
+-
+-	// Now that we have been sized, we can proceed with formatting and placing positioned elements that this container
+-	// acts as a containing block for.
+-	ClosePositionedElements();
+ 
+ 	// Find the element baseline which is the distance from the margin bottom of the element to its baseline.
+ 	float element_baseline = 0;

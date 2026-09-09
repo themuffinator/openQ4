@@ -1,6 +1,6 @@
 # UI product completion: implementation review and delivery plan
 
-8 September 2026. Status: reviewed plan; product implementation incomplete.
+9 September 2026. Status: reviewed plan; product implementation incomplete.
 
 Reviewed engine revision: `80bb39392299b1efc1e33a836818896b70e1d2c8` on
 `idtech5-ui`. Paired game revision:
@@ -62,6 +62,28 @@ wholesale Flash runtime port would still leave our layout, authoring, text,
 behavior migration and high-refresh requirements to implement. RmlUi remains
 the layout integration candidate; complete the screen/editor gate below before
 declaring that choice proven for the whole product.
+
+### Current implementation progress
+
+The [typed value-control increment](../ui/value-controls.md), based on engine
+`b3bf279b4347329cd8a45a4533536adc0510e860`, adds canonical toggle, stepped slider
+and constrained choice controls with authoritative readback, immutable typed
+proposals and editable vector parts. A packaged `openq4.system` document and
+default-off normal Session route connect eight initial immediate image controls
+to the settings transaction. The source includes all 53 draft/baseline fields,
+guarded dirty Back/discard behavior and the display-confirmation structure.
+
+The final Windows build/package stage, 13 native UI suites, 173 production
+Session checks and 15 capture tests with 444 rejected log mutations passed.
+Hidden windowed SP/OpenGL at 125% and MP/Vulkan at 200% each passed 18 normal
+Session stages after active gameplay; all 14 engine render-target images were
+reviewed. The [qualification record](../ui/value-controls.md#qualification-of-this-increment)
+binds the final sources/binaries and states the physical-input, motion and
+platform limits. This progress addresses parts of UI-01/UI-02/UI-03/UI-05/UI-12; it
+does not close those findings, M2 or any migration. Full controls, precise
+numeric editing/IME, the entire page and dependent flows, artwork, editor and
+platform acceptance remain required. The findings below retain the evidence
+and required resolution from the original reviewed revision.
 
 ### Findings that block product completion
 
@@ -349,12 +371,28 @@ Auto-Detect draft expansion, all production controls/artwork, the native editor
 round trip and complete platform qualification remain required. These increments
 do not complete M2 or accept the SYSTEM page, any migration entry or a product gate.
 
-Next, connect canonical toggle, constrained choice and stepped slider controls
-to the actual source-backed SYSTEM rows, with typed edit proposals and
-authoritative draft readback. Preserve stable component/source identity and
-versioned widget state for editor round trips and renderer recreation. This
-unblocks usable settings while the remaining effect executors and full page
-continue toward the same M2 exit conditions.
+The [value-control implementation](../ui/value-controls.md) now connects
+canonical toggles, constrained choices and stepped sliders to eight initial
+SYSTEM image controls. Typed proposals remain separate from authoritative
+draft readback; authored part identity and versioned widget state survive in
+the canonical model. The packaged page enters through a non-archived,
+default-off normal Session child route and retains its parent on clean return.
+Dirty Back offers continue-editing or discard-to-Editing; discard-and-exit
+remains unfinished. The source/binary-bound Windows SP/OpenGL 125% and MP/Vulkan
+200% normal-route captures qualify the initial draft/apply/discard/choice,
+resource-reset, clean-return and reopen subset at 1280x720. Eighteen ordered
+stages per run and 14 reviewed render-target images establish this bounded
+integration and static presentation only. SP had no warnings/errors; MP retained
+94 baseline warnings with no new messages or errors. The immutable record is
+`.tmp/ui/value-controls-review/capture-evidence.json`; complete input, motion,
+display/platform/language and editor qualification remains open.
+
+Next, complete the actual setting inventory and dependent controls, precise
+numeric entry/IME, display capability and resolution catalogs, preset expansion,
+remaining effect executors, complete draft/exit workflows and source-derived
+artwork. Preserve stable component/source identity and versioned widget state
+for editor round trips and renderer recreation. The same M2 exit conditions
+apply; an initial usable subset cannot replace them.
 
 Resolve the representative parts of UI-03/UI-06/UI-09/UI-10/UI-11/UI-12. Choose
 the shipped system settings page and its dependent popup/confirmation behavior

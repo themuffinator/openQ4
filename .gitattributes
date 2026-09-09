@@ -1,3 +1,6 @@
 # Auto detect text files and perform LF normalization
 *.sh text eol=lf
 * text=auto
+# Meson applies dependency patches to LF files from upstream source archives.
+# Unified-diff context prefixes legitimately precede source tabs and blank lines.
+*.patch text eol=lf -whitespace

@@ -6,6 +6,7 @@
 #include <charconv>
 #include <cmath>
 #include <functional>
+#include <limits>
 #include <set>
 #include <stdexcept>
 #include <string_view>
@@ -257,13 +258,18 @@ private:
 			model.state.emplace(name,std::move(declaration));
 		}
 	}
-	Expression ReadExpression(const Json::Value& value, const std::string& path, unsigned depth = 0, bool allowPresentation = false) {
+	Expression ReadExpression(const Json::Value& value, const std::string& path, unsigned depth = 0, bool allowPresentation = false,
+		std::optional<size_t> inputType = std::nullopt) {
 		Require(depth <= 32 && ++expressionCount <= 65536,value,path,"Expression node/depth budget exceeded");
 		Expression result;
 		if (value.isNumeric()) result.literal = Numeric(value,path,-1000000000000.0,1000000000000.0);
 		else if (value.isBool()) result.literal = value.asBool();
 		else if (value.isString()) result.literal = value.asString();
-		else if (value.isObject() && value.isMember("state")) {
+		else if (value.isObject() && value.isMember("input")) {
+			Fields(value,path,{"input","extensions"});
+			Require(inputType.has_value() && value["input"] == "value",value,path,"Invocation input requires a typed action declaration and input 'value'");
+			result.inputValue = true; result.type = *inputType; return result;
+		} else if (value.isObject() && value.isMember("state")) {
 			Fields(value,path,{"state","extensions"}); result.state = Id(value["state"],path+"/state");
 			const auto found = model.state.find(result.state);
 			Require(found != model.state.end(),value,path,"Unknown state reference '"+result.state+"'");
@@ -296,7 +302,7 @@ private:
 			const auto arity = arities.find(result.op);
 			Require(arity != arities.end(),value["op"],path+"/op","Unknown expression operation");
 			Require(value["args"].isArray() && value["args"].size() == arity->second,value["args"],path+"/args","Incorrect expression arity");
-			for (Json::ArrayIndex i = 0; i < value["args"].size(); ++i) result.args.push_back(ReadExpression(value["args"][i],path+"/args/"+std::to_string(i),depth+1,allowPresentation));
+			for (Json::ArrayIndex i = 0; i < value["args"].size(); ++i) result.args.push_back(ReadExpression(value["args"][i],path+"/args/"+std::to_string(i),depth+1,allowPresentation,inputType));
 			auto types = [&](size_t expected) { return std::all_of(result.args.begin(),result.args.end(),[&](const Expression& arg) { return arg.type == expected; }); };
 			if (result.op == "select") {
 				Require(result.args[0].type == 1 && result.args[1].type == result.args[2].type,value,path,"Select requires a boolean condition and matching branches"); result.type = result.args[1].type;
@@ -426,14 +432,21 @@ private:
 		for (const auto& id : actions.getMemberNames()) {
 			const auto& value = actions[id]; const auto path = "/actions/"+PointerPart(id);
 			Require(Identifier(id),value,path,"Invalid action ID");
-			Fields(value,path,{"operation","arguments","extensions"});
+			Fields(value,path,{"operation","arguments","input","extensions"});
 			Action action; action.operation = Id(value["operation"],path+"/operation");
+			if (value.isMember("input")) {
+				Require(value["input"].isString(),value["input"],path+"/input","Expected an action input type");
+				const std::map<std::string,size_t> types = {{"number",0},{"boolean",1},{"string",2}};
+				const auto found = types.find(value["input"].asString());
+				Require(found != types.end(),value["input"],path+"/input","Expected number, boolean or string input");
+				action.inputType = found->second;
+			}
 			const auto& arguments = value["arguments"];
 			Require(arguments.isObject() && arguments.size() <= 32,arguments,path+"/arguments","Expected at most 32 named action arguments");
 			for (const auto& name : arguments.getMemberNames()) {
 				const auto at = path+"/arguments/"+PointerPart(name);
 				Require(Identifier(name),arguments[name],at,"Invalid action argument name");
-				action.arguments.emplace(name,ReadExpression(arguments[name],at,0,true));
+				action.arguments.emplace(name,ReadExpression(arguments[name],at,0,true,action.inputType));
 			}
 			model.actions.emplace(id,std::move(action));
 		}
@@ -489,6 +502,7 @@ private:
 				Fields(value,at,{"op","action","extensions"}); step.op = EventOp::Action;
 				step.target = Id(value["action"],at+"/action");
 				Require(model.actions.contains(step.target),value["action"],at+"/action","Unknown event action descriptor");
+				Require(!model.actions.at(step.target).inputType,value["action"],at+"/action","An event cannot invoke an input-bearing action without an operand");
 			} else if (op == "call") {
 				Fields(value,at,{"op","event","extensions"}); step.op = EventOp::Call;
 				step.target = EventName(value["event"],at+"/event");
@@ -602,6 +616,12 @@ private:
 	std::string Id(const Json::Value& value, const std::string& path) {
 		Require(value.isString() && Identifier(value.asString()),value,path,"Expected a stable ID (1..128 ASCII letters, digits, '.', '_' or '-')");
 		return value.asString();
+	}
+	std::string ControlLabel(const Json::Value& value, const std::string& path) {
+		Require(value.isString(),value,path,"Control labels require a #str_ localization key");
+		const auto label = value.asString();
+		Require(label.starts_with("#str_") && Identifier(label.substr(1)),value,path,"Control labels require a #str_ localization key");
+		return label;
 	}
 	double Numeric(const Json::Value& value, const std::string& path, double low, double high) {
 		Require(value.isNumeric(),value,path,"Expected a number");
@@ -747,15 +767,95 @@ private:
 		result.type = value["type"].asString();
 		if (value.isMember("control")) {
 			const auto& control = value["control"]; const auto p = path+"/control";
-			Fields(control,p,{"role","action","event","label","enabled","states","navigation","extensions"});
-			Require(control["role"] == "button",control["role"],p+"/role","Supported control role is button");
+			Require(control.isObject() && control["role"].isString(),control,p,"Expected a semantic control role");
+			const auto role = control["role"].asString();
+			if (role == "button") Fields(control,p,{"role","action","event","label","enabled","states","navigation","extensions"});
+			else if (role == "toggle") Fields(control,p,{"role","action","label","enabled","states","navigation","value","mixed","parts","extensions"});
+			else if (role == "slider") Fields(control,p,{"role","action","label","enabled","states","navigation","value","minimum","maximum","step","decimals","orientation","parts","extensions"});
+			else if (role == "choice") Fields(control,p,{"role","action","label","enabled","states","navigation","value","parts","visibleRows","options","extensions"});
+			else Require(false,control["role"],p+"/role","Supported roles are button, toggle, slider and choice");
 			result.control.emplace(); auto& parsed = *result.control;
 			Require(control.isMember("action") != control.isMember("event"),control,p,"Controls require exactly one action or event");
 			if (control.isMember("action")) parsed.action = Id(control["action"],p+"/action");
 			else parsed.event = EventName(control["event"],p+"/event");
-			Require(control["label"].isString(),control["label"],p+"/label","Button requires a #str_ accessible label");
-			parsed.label = control["label"].asString();
-			Require(parsed.label.starts_with("#str_") && Identifier(parsed.label.substr(1)),control["label"],p+"/label","Button label must reference a #str_ localization key");
+			parsed.label = ControlLabel(control["label"],p+"/label");
+			if (role != "button") {
+				parsed.value = ReadExpression(control["value"],p+"/value");
+				const auto& parts = control["parts"]; const auto at = p+"/parts";
+				if (role == "toggle") {
+					parsed.role = ControlRole::Toggle;
+					Require(parsed.value->type == 1,control["value"],p+"/value","Toggle values must be Boolean");
+					Fields(parts,at,{"checked","mixed","extensions"});
+					ToggleSpec spec; spec.checkedPart = Id(parts["checked"],at+"/checked");
+					if (parts.isMember("mixed")) spec.mixedPart = Id(parts["mixed"],at+"/mixed");
+					if (control.isMember("mixed")) {
+						spec.mixed = ReadExpression(control["mixed"],p+"/mixed");
+						Require(spec.mixed->type == 1,control["mixed"],p+"/mixed","Mixed state must be Boolean");
+						Require(!spec.mixedPart.empty(),parts,at,"Mixed state requires an authored mixed part");
+					}
+					parsed.widget = std::move(spec);
+				} else if (role == "slider") {
+					parsed.role = ControlRole::Slider;
+					Require(parsed.value->type == 0,control["value"],p+"/value","Slider values must be numeric");
+					Fields(parts,at,{"track","fill","thumb","value","extensions"});
+					SliderSpec spec;
+					spec.minimum = Numeric(control["minimum"],p+"/minimum",-1e12,1e12);
+					spec.maximum = Numeric(control["maximum"],p+"/maximum",-1e12,1e12);
+					spec.step = Numeric(control["step"],p+"/step",0,1e12);
+					Require(spec.minimum < spec.maximum && spec.step > 0 && spec.minimum+spec.step > spec.minimum &&
+						spec.maximum-spec.step < spec.maximum,control,p,"Slider requires ordered bounds and a representable positive step");
+					const double ticks = (spec.maximum-spec.minimum)/spec.step;
+					Require(std::isfinite(ticks) && ticks >= 1 && ticks <= 1000000 &&
+						std::abs(ticks-std::round(ticks)) <= 32*std::numeric_limits<double>::epsilon()*std::max(1.0,ticks),control,p,"Slider bounds must span 1..1000000 whole steps");
+					if (control.isMember("decimals")) {
+						Require(control["decimals"].isUInt() && control["decimals"].asUInt() <= 6,control["decimals"],p+"/decimals","Slider decimals must be 0..6");
+						spec.decimals = control["decimals"].asUInt();
+					}
+					if (control.isMember("orientation")) {
+						Require(control["orientation"] == "horizontal" || control["orientation"] == "vertical",control["orientation"],p+"/orientation","Expected horizontal or vertical orientation");
+						spec.vertical = control["orientation"] == "vertical";
+					}
+					spec.track = Id(parts["track"],at+"/track"); spec.fill = Id(parts["fill"],at+"/fill");
+					spec.thumb = Id(parts["thumb"],at+"/thumb"); spec.valueText = Id(parts["value"],at+"/value");
+					parsed.widget = std::move(spec);
+				} else {
+					parsed.role = ControlRole::Choice;
+					Fields(parts,at,{"popup","viewport","content","value","extensions"});
+					ChoiceSpec spec; spec.popup = Id(parts["popup"],at+"/popup"); spec.viewport = Id(parts["viewport"],at+"/viewport");
+					spec.content = Id(parts["content"],at+"/content"); spec.valueText = Id(parts["value"],at+"/value");
+					if (control.isMember("visibleRows")) {
+						Require(control["visibleRows"].isUInt() && control["visibleRows"].asUInt() >= 1 && control["visibleRows"].asUInt() <= 32,
+							control["visibleRows"],p+"/visibleRows","Choice visible rows must be 1..32");
+						spec.visibleRows = control["visibleRows"].asUInt();
+					}
+					Require(control["options"].isArray() && !control["options"].empty() && control["options"].size() <= 256,
+						control["options"],p+"/options","Choice requires 1..256 authored options");
+					std::set<std::string> ids; std::set<StateValue> values;
+					for (Json::ArrayIndex i = 0; i < control["options"].size(); ++i) {
+						const auto& value = control["options"][i]; const auto opt = p+"/options/"+std::to_string(i);
+						Fields(value,opt,{"id","node","label","labelIndex","value","enabled","parts","extensions"});
+						ChoiceOption option; option.id = Id(value["id"],opt+"/id"); option.node = Id(value["node"],opt+"/node");
+						Require(ids.insert(option.id).second,value["id"],opt+"/id","Duplicate choice option ID");
+						option.label = ControlLabel(value["label"],opt+"/label");
+						if (value.isMember("labelIndex")) {
+							Require(value["labelIndex"].isUInt() && value["labelIndex"].asUInt() <= 255,value["labelIndex"],opt+"/labelIndex","Localized label index must be 0..255");
+							option.labelIndex = value["labelIndex"].asUInt();
+						}
+						Require(value["value"].isNumeric() || value["value"].isBool() || value["value"].isString(),value["value"],opt+"/value","Choice values must be typed literals");
+						const auto expression = ReadExpression(value["value"],opt+"/value"); option.value = expression.literal;
+						Require(expression.type == parsed.value->type,value["value"],opt+"/value","Choice options must match the authoritative value type");
+						Require(values.insert(option.value).second,value["value"],opt+"/value","Duplicate choice option value");
+						if (value.isMember("enabled")) option.enabled = ReadExpression(value["enabled"],opt+"/enabled");
+						Require(option.enabled.type == 1,value["enabled"],opt+"/enabled","Choice option availability must be Boolean");
+						Fields(value["parts"],opt+"/parts",{"label","selected","highlight","extensions"});
+						option.labelPart = Id(value["parts"]["label"],opt+"/parts/label");
+						option.selectedPart = Id(value["parts"]["selected"],opt+"/parts/selected");
+						option.highlightPart = Id(value["parts"]["highlight"],opt+"/parts/highlight");
+						spec.options.push_back(std::move(option));
+					}
+					parsed.widget = std::move(spec);
+				}
+			}
 			if (control.isMember("enabled")) {
 				Require(control["enabled"].isBool(),control["enabled"],p+"/enabled","Expected a boolean");
 				parsed.enabled = control["enabled"].asBool();
@@ -820,11 +920,124 @@ private:
 		}
 		return result;
 	}
+	bool Descendant(const std::string& child, const std::string& ancestor) const {
+		const auto* root = model.FindNode(ancestor);
+		if (!root || child == ancestor) return false;
+		std::vector<const Node*> nodes;
+		for (const auto& next : root->children) nodes.push_back(&next);
+		while (!nodes.empty()) {
+			const auto* current = nodes.back(); nodes.pop_back();
+			if (current->id == child) return true;
+			for (const auto& next : current->children) nodes.push_back(&next);
+		}
+		return false;
+	}
+	void ValidateWidgetParts(const Json::Value& value, const Node& owner, const std::string& path) {
+		const auto& control = *owner.control;
+		std::set<std::string> parts;
+		std::set<std::pair<std::string,std::string>> owned;
+		const auto part = [&](const std::string& id, const std::string& parent, const char* type, const std::string& at) {
+			const auto* node = model.FindNode(id);
+			Require(node && Descendant(id,parent),value,at,"Widget parts must be strict descendants of their authored owner");
+			Require(parts.insert(id).second,value,at,"Widget parts must name distinct nodes");
+			Require(type ? node->type == type : (node->type == "group" || node->type == "vector"),value,at,"Widget part has the wrong node type");
+		};
+		const auto reserve = [&](const std::string& id, const std::string& property) {
+			const auto* node = model.FindNode(id); const auto found = node->properties.find(property);
+			const auto expected = property == "text" ? ValueType::Text : property == "display" ? ValueType::Keyword : ValueType::Length;
+			Require(found != node->properties.end() && found->second.type == expected,value,path,
+				"Runtime-owned widget property requires an explicit typed base: '"+id+"."+property+"'");
+			owned.emplace(id,property);
+		};
+		const auto separate = [&](const std::string& a, const std::string& b) {
+			Require(!Descendant(a,b) && !Descendant(b,a),value,path,"Independent widget paint parts cannot contain one another");
+		};
+		const auto keyword = [&](const std::string& id, const char* property, const char* expected) {
+			const auto& props = model.FindNode(id)->properties; const auto found = props.find(property);
+			Require(found != props.end() && found->second.type == ValueType::Keyword && found->second.text == expected,
+				value,path,"Widget geometry requires '"+id+"."+property+":"+expected+"'");
+		};
+		const auto zero = [&](const std::string& id, const char* property) {
+			const auto& props = model.FindNode(id)->properties; const auto found = props.find(property);
+			Require(found != props.end() && found->second.type == ValueType::Length && found->second.data[0] == 0,
+				value,path,"Widget geometry requires a zero '"+id+"."+property+"' anchor");
+		};
+		if (const auto* toggle = std::get_if<ToggleSpec>(&control.widget)) {
+			part(toggle->checkedPart,owner.id,nullptr,path+"/parts/checked"); reserve(toggle->checkedPart,"display");
+			if (!toggle->mixedPart.empty()) {
+				part(toggle->mixedPart,owner.id,nullptr,path+"/parts/mixed"); reserve(toggle->mixedPart,"display");
+				separate(toggle->checkedPart,toggle->mixedPart);
+			}
+		} else if (const auto* slider = std::get_if<SliderSpec>(&control.widget)) {
+			part(slider->track,owner.id,"group",path+"/parts/track");
+			part(slider->fill,slider->track,nullptr,path+"/parts/fill");
+			part(slider->thumb,slider->track,nullptr,path+"/parts/thumb");
+			part(slider->valueText,owner.id,"text",path+"/parts/value");
+			separate(slider->fill,slider->thumb);
+			keyword(slider->thumb,"position","absolute");
+			if (slider->vertical) {
+				keyword(slider->fill,"position","absolute"); zero(slider->fill,"bottom");
+				const auto& props = model.FindNode(slider->fill)->properties;
+				if (props.contains("top")) keyword(slider->fill,"top","auto");
+			}
+			reserve(slider->fill,slider->vertical ? "height" : "width");
+			reserve(slider->thumb,slider->vertical ? "top" : "left"); reserve(slider->valueText,"text");
+		} else if (const auto* choice = std::get_if<ChoiceSpec>(&control.widget)) {
+			part(choice->popup,owner.id,"group",path+"/parts/popup");
+			part(choice->viewport,choice->popup,"group",path+"/parts/viewport");
+			part(choice->content,choice->viewport,"group",path+"/parts/content");
+			part(choice->valueText,owner.id,"text",path+"/parts/value");
+			Require(!Descendant(choice->valueText,choice->popup),value,path+"/parts/value","Collapsed choice text must remain outside its popup");
+			keyword(choice->content,"position","absolute"); zero(choice->content,"left");
+			const auto& viewportProps = model.FindNode(choice->viewport)->properties;
+			const auto position = viewportProps.find("position");
+			Require(position != viewportProps.end() && position->second.type == ValueType::Keyword &&
+				(position->second.text == "absolute" || position->second.text == "relative"),value,path,
+				"Choice viewport must establish the content's positioned containing block");
+			for (const auto* property : {"display","left","top","width","height"}) reserve(choice->popup,property);
+			// Portal placement and clipping are derived invariants. They have no
+			// required authored base, but cannot have a competing dynamic owner.
+			owned.emplace(choice->popup,"position"); owned.emplace(choice->popup,"z-index");
+			owned.emplace(choice->viewport,"overflow");
+			owned.emplace(choice->viewport,"clip");
+			reserve(choice->viewport,"height"); reserve(choice->content,"top"); reserve(choice->valueText,"text");
+			for (size_t i = 0; i < choice->options.size(); ++i) {
+				const auto& option = choice->options[i]; const auto at = path+"/options/"+std::to_string(i);
+				part(option.node,choice->content,"group",at+"/node");
+				part(option.labelPart,option.node,"text",at+"/parts/label");
+				part(option.selectedPart,option.node,nullptr,at+"/parts/selected");
+				part(option.highlightPart,option.node,nullptr,at+"/parts/highlight");
+				separate(option.selectedPart,option.highlightPart);
+				separate(option.labelPart,option.selectedPart); separate(option.labelPart,option.highlightPart);
+				reserve(option.labelPart,"text"); reserve(option.selectedPart,"display"); reserve(option.highlightPart,"display");
+				for (size_t j = 0; j < i; ++j) separate(option.node,choice->options[j].node);
+			}
+		}
+		for (const auto& binding : model.bindings)
+			Require(!owned.contains({binding.node,binding.property}),value,path,"A binding cannot own a runtime widget property");
+		for (const auto& timeline : model.timelines) for (const auto& track : timeline.tracks)
+			Require(!owned.contains({track.node,track.property}),value,path,"A timeline cannot own a runtime widget property");
+		for (const auto& [name,alias] : model.aliases) {
+			if (alias.node.empty()) continue;
+			const auto targets = alias.property == "rect" ? std::vector<std::string>{"left","top","width","height"} :
+				std::vector<std::string>{alias.property == "visible" ? "display" : alias.property == "noevents" ? "pointer-events" : alias.property};
+			for (const auto& property : targets)
+				Require(!owned.contains({alias.node,property}),value,path,"A presentation alias cannot own a runtime widget property");
+		}
+	}
 	void ValidateControls(const Json::Value& sourceNode, const Node& node, const std::string& path, bool ancestorControl) {
 		if (node.control) {
 			const auto& value = sourceNode["control"]; const auto p = path+"/control";
-			Require(!ancestorControl,value,p,"Button controls cannot be nested inside another button");
+			Require(!ancestorControl,value,p,"Semantic controls cannot be nested inside another control");
 			Require(node.control->event.empty() || model.events.contains(node.control->event),value["event"],p+"/event","Unknown control event");
+			const auto action = model.actions.find(node.control->action);
+			if (node.control->role == ControlRole::Button) {
+				Require(action == model.actions.end() || !action->second.inputType,value["action"],p+"/action","A button cannot invoke an input-bearing action without an operand");
+			} else {
+				Require(action != model.actions.end() && action->second.inputType && *action->second.inputType == node.control->value->type,
+					value["action"],p+"/action","Value controls require an action with matching typed input");
+				ValidateWidgetParts(value,node,p);
+			}
 			std::set<std::string> descendants;
 			std::vector<const Node*> nodes{&node};
 			while (!nodes.empty()) { const auto* child = nodes.back(); nodes.pop_back(); descendants.insert(child->id); for (const auto& next : child->children) nodes.push_back(&next); }
@@ -1112,7 +1325,10 @@ bool Document::ReplaceValue(const std::string& pointer, const std::string& repla
 const std::string& Document::Source() const { return impl->source; }
 const DocumentModel& Document::Model() const { return impl->model; }
 std::string Document::BuildMarkup() const {
-	std::string result = "<rml><head><style>body{margin:0;width:100%;height:100%;font-family:marine;font-size:16dp;color:#fff;}div,q4-node,q4-vector{display:block;}</style></head><body>";
+	// Native unstyled scrollbars default to the containing width and can consume
+	// the entire client area. Scrolling stays semantic until authored scrollbar
+	// parts provide the editable vector control and its pointer interactions.
+	std::string result = "<rml><head><style>body{margin:0;width:100%;height:100%;font-family:marine;font-size:16dp;color:#fff;}div,q4-node,q4-vector{display:block;}scrollbarvertical{width:0;}scrollbarhorizontal{height:0;}</style></head><body>";
 	MarkupNode(impl->model.root,result);
 	return result+"</body></rml>";
 }

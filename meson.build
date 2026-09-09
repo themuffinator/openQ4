@@ -432,7 +432,7 @@ if build_engine or get_option('build_native_tests')
   libtess2_project = subproject('libtess2')
   openq4_retained_library = static_library(
     'openq4-retained-ui',
-    files('src/ui/retained/Runtime.cpp', 'src/ui/retained/Document.cpp', 'src/ui/retained/Presentation.cpp', 'src/ui/retained/Behavior.cpp', 'src/ui/retained/State.cpp', 'src/ui/retained/Motion.cpp', 'src/ui/retained/Interaction.cpp', 'src/ui/retained/Input.cpp', 'src/ui/retained/Vector.cpp', 'src/ui/retained/VectorElement.cpp', 'src/ui/application/SettingsTransaction.cpp', 'src/ui/application/SettingsJournal.cpp', 'src/ui/application/SettingsDisplayController.cpp'),
+    files('src/ui/retained/Runtime.cpp', 'src/ui/retained/Document.cpp', 'src/ui/retained/Presentation.cpp', 'src/ui/retained/Behavior.cpp', 'src/ui/retained/State.cpp', 'src/ui/retained/Motion.cpp', 'src/ui/retained/Interaction.cpp', 'src/ui/retained/ValueControlView.cpp', 'src/ui/retained/Input.cpp', 'src/ui/retained/Vector.cpp', 'src/ui/retained/VectorElement.cpp', 'src/ui/application/SettingsTransaction.cpp', 'src/ui/application/SettingsJournal.cpp', 'src/ui/application/SettingsDisplayController.cpp'),
     dependencies: [rmlui_project.get_variable('rmlui_dep'), jsoncpp_project.get_variable('jsoncpp_dep'), libtess2_project.get_variable('libtess2_dep')],
     pic: true,
     install: false,
@@ -497,6 +497,30 @@ if build_engine or get_option('build_native_tests')
     test('openq4-retained-ui', openq4_retained_test,
       args: [meson.project_source_root() / 'tools/ui/fixtures/interaction-smoke.q4ui',
              meson.project_source_root() / 'tools/ui/fixtures/binding-smoke.q4ui'], timeout: 30)
+    openq4_ui_value_schema_test = executable(
+      'openq4-ui-value-schema-test',
+      files('tools/tests/native/UiValueControlSchemaTest.cpp'),
+      include_directories: root_include_dir,
+      dependencies: [openq4_retained_dep, jsoncpp_project.get_variable('jsoncpp_dep')],
+      install: false,
+    )
+    test('openq4-ui-value-schema', openq4_ui_value_schema_test, timeout: 30)
+    openq4_ui_value_interaction_test = executable(
+      'openq4-ui-value-interaction-test',
+      files('tools/tests/native/UiValueInteractionTest.cpp'),
+      include_directories: root_include_dir,
+      dependencies: [openq4_retained_dep, jsoncpp_project.get_variable('jsoncpp_dep')],
+      install: false,
+    )
+    test('openq4-ui-value-interaction', openq4_ui_value_interaction_test, timeout: 30)
+    openq4_ui_value_runtime_test = executable(
+      'openq4-ui-value-runtime-test',
+      files('tools/tests/native/UiValueRuntimeTest.cpp'),
+      include_directories: root_include_dir,
+      dependencies: [openq4_retained_dep, jsoncpp_project.get_variable('jsoncpp_dep')],
+      install: false,
+    )
+    test('openq4-ui-value-runtime', openq4_ui_value_runtime_test, timeout: 30)
     openq4_ui_document_test = executable(
       'openq4-ui-document-test',
       files('tools/tests/native/UiDocumentTest.cpp'),

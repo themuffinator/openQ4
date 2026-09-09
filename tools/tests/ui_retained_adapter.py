@@ -13,6 +13,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import os
 
 from filesystem_case_segments import function_body
 from ui_manager_lifecycle import SUPPORT as DICTIONARY_SUPPORT
@@ -30,6 +31,7 @@ ENGINE = r'''
 #include "src/ui/retained/Input.h"
 #include "src/ui/RetainedUI.h"
 #include "src/ui/SettingsService.h"
+#include "src/ui/application/SettingsTransaction.h"
 struct idCmdArgs {
     std::vector<std::string> values;
     int Argc() const {return static_cast<int>(values.size());}
@@ -38,7 +40,8 @@ struct idCmdArgs {
 template<class T> T Min(T a,T b) { return (std::min)(a,b); }
 struct idVec2 { idVec2(float=0,float=0) {} } vec2_origin;
 enum { SE_KEY=1,SE_MOUSE,K_TAB=10,K_SHIFT,K_UPARROW,K_DOWNARROW,K_LEFTARROW,K_RIGHTARROW,
-       K_ENTER,K_KP_ENTER,K_SPACE,K_ESCAPE,K_MOUSE1,K_JOY3,K_JOY4,K_JOY7,K_JOY8,K_JOY9,K_JOY10,K_JOY11,K_JOY12,K_LAST_KEY=512 };
+       K_ENTER,K_KP_ENTER,K_SPACE,K_ESCAPE,K_MOUSE1,K_JOY3,K_JOY4,K_JOY7,K_JOY8,K_JOY9,K_JOY10,K_JOY11,K_JOY12,
+       K_HOME,K_END,K_PGUP,K_PGDN,K_MWHEELUP,K_MWHEELDOWN,K_LAST_KEY=512 };
 struct idKeyInput { static inline bool shift=false; static bool IsDown(int key) { return key==K_SHIFT && shift; } };
 class idFile {
 public:
@@ -166,11 +169,14 @@ std::string FormatPresentationValue(const PresentationValue& value) {
     std::ostringstream text; text<<std::setprecision(17)<<value.data[0]; return text.str();
 }
 bool DocumentModel::ResolveAction(const std::string& name,const StateValues& variables,ActionInvocation& result,std::string& error,
-                                 const PresentationLookup& lookup) const {
+                                 const PresentationLookup& lookup,const StateValue* input) const {
     auto found=actions.find(name); if(found==actions.end())return false;
+    if(found->second.inputType && (!input || input->index()!=*found->second.inputType)) {error="stub input type rejected"; return false;}
     ActionInvocation candidate; candidate.action=name; candidate.operation=found->second.operation;
     for(auto& [key,expression]:found->second.arguments) {
-        if(!expression.presentation.empty()) {
+        if(expression.inputValue) {
+            if(!input) {error="stub missing input value"; return false;} candidate.arguments[key]=*input;
+        } else if(!expression.presentation.empty()) {
             if(!lookup || !lookup(expression.presentation,expression.component,candidate.arguments[key],error))return false;
         } else candidate.arguments[key]=expression.state.empty()?expression.literal:variables.at(expression.state);
     }
@@ -194,6 +200,14 @@ public:
     struct EventCall { std::string name; StateValues application; size_t maxActions; };
     std::vector<EventCall> eventCalls;
     mutable std::vector<std::string> eventQueries,resolvedActions;
+    mutable std::vector<std::optional<StateValue>> resolvedInputs;
+    struct Acknowledgement {std::string control; std::uint64_t token; bool accepted,matched;};
+    std::vector<Acknowledgement> acknowledgements;
+    std::map<std::string,std::uint64_t> latestProposal;
+    std::map<std::string,WidgetViewState> widgets;
+    std::optional<WidgetViewState> GetWidgetState(const std::string& id) const {
+        const auto found=widgets.find(id); return found==widgets.end()?std::nullopt:std::optional(found->second);
+    }
     std::vector<std::string> timelines;
     std::vector<std::pair<std::string,double>> eligibilityQueries;
     std::set<std::string> disabledControls;
@@ -226,6 +240,7 @@ public:
     std::string selected="brightness";
     std::vector<ControlAction> actions;
     std::vector<std::pair<MenuInput,bool>> menu;
+    std::vector<int> wheels;
     std::vector<StateValues> stateCalls;
     bool SetState(const StateValues& values,std::string&,double) {
         stateCalls.push_back(values);
@@ -255,13 +270,21 @@ public:
     bool CanActivateControl(const std::string& node,double seconds) {
         eligibilityQueries.emplace_back(node,seconds); return !disabledControls.contains(node);
     }
-    bool ResolveAction(const std::string& id,ActionInvocation& result,std::string& error) const {
+    bool ResolveAction(const std::string& id,ActionInvocation& result,std::string& error,const StateValue* input=nullptr) const {
         resolvedActions.push_back(id);
+        resolvedInputs.push_back(input?std::optional<StateValue>(*input):std::nullopt);
         return modelTemplate.ResolveAction(id,state,result,error,[&](const std::string& alias,int component,StateValue& value,std::string& why) {
             auto found=aliases.find(alias);
             if(found==aliases.end() || component!=-1) {why="stub presentation lookup failed"; return false;}
             value=std::stod(found->second); return true;
-        });
+        },input);
+    }
+    bool AcknowledgeControlProposal(const std::string& id,std::uint64_t token,bool accepted) {
+        const auto found=latestProposal.find(id);
+        const bool matched=token && found!=latestProposal.end() && found->second==token;
+        acknowledgements.push_back({id,token,accepted,matched});
+        if(matched)latestProposal.erase(found);
+        return matched;
     }
     bool SaveSnapshot(std::string& output,std::string&,double) const {
         if(failSave)return false;
@@ -287,6 +310,7 @@ public:
         if(action==MenuInput::Back && down)actions.push_back({ControlAction::Kind::Back,modelTemplate.id,"button",""});
     }
     void PointerMove(float x,float y,double) { pointerX=x; pointerY=y; }
+    void PointerWheel(int rows,double) { wheels.push_back(rows); }
     bool PlayTimeline(const std::string& name,double) { timelines.push_back(name); return name=="slide"; }
     bool PopModal(double) { if(!modals)return false; --modals; return true; }
     bool GetPresentationAlias(const std::string& name,std::string& output) const {
@@ -352,7 +376,8 @@ struct Service {
     std::vector<Draw> draws;
     std::map<std::uint64_t,std::string> requests;
     StateValues live{{"r_brightness",1.0},{"r_shadows",true}},baseline,draft;
-    bool readAvailable=true;
+    bool readAvailable=true,rejectDispatch=false;
+    StateValues readOverrides;
 } service;
 const std::map<std::string,std::size_t> fields{{"r_brightness",0},{"r_shadows",1}};
 }
@@ -423,6 +448,7 @@ bool UI_SettingsDispatch(std::uint64_t owner,const openq4::ui::ActionInvocation&
     service.order.push_back("dispatch:"+invocation.operation);
     service.dispatches.push_back({owner,invocation});
     if(!service.owners.contains(owner) || !UI_SettingsInvocation(invocation,error))return false;
+    if(service.rejectDispatch) {error="stub dispatch rejected"; return false;}
     const auto& op=invocation.operation;
     if(op=="settings.system.begin") {
         if(service.active && service.active!=owner) {error="stub owner busy"; return false;}
@@ -449,6 +475,7 @@ bool UI_SettingsRead(std::uint64_t owner,openq4::ui::StateValues& values) {
         for(const auto& [key,value]:service.draft)values.emplace("settings.draft."+key,value);
         for(const auto& [key,value]:service.baseline)values.emplace("settings.baseline."+key,value);
     }
+    for(const auto& [key,value]:service.readOverrides)values[key]=value;
     return true;
 }
 '''
@@ -1180,6 +1207,146 @@ static void CheckSettingsDrawBoundary() {
     }
     assert(views.empty() && service.owners.empty());
 }
+static void CheckValueProposalBoundary() {
+    assert(views.empty() && SettingsBoundary::service.owners.empty());
+    const auto original=modelTemplate; auto& service=SettingsBoundary::service;
+    service=SettingsBoundary::Service{}; eventPlans.clear(); eventHistory.clear();
+    consoleObject.open=false; windowFocused=true;
+    Expression input; input.type=0; input.inputValue=true;
+    modelTemplate.actions["value.brightness"]={"settings.brightness.set",{{"value",input}},std::size_t(0)};
+    modelTemplate.actions["value.settings"]={"settings.system.edit",{{"r_brightness",input}},std::size_t(0)};
+    modelTemplate.actions["value.dismiss"]={"ui.dismiss",{},std::size_t(0)};
+    for(const auto& [key,type]:UI_SettingsStateSchema())
+        modelTemplate.state[key]={type==0?StateValue(0.0):type==1?StateValue(false):StateValue(std::string()),""};
+    {
+        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0); gui.Redraw(0);
+        auto& runtime=Live();
+        const auto proposal=[&](std::uint64_t token,double value,const char* action="value.brightness",const char* document=nullptr) {
+            runtime.latestProposal["root"]=token;
+            runtime.actions.push_back({ControlAction::Kind::Activate,document?document:modelTemplate.id,"root",action,"",value,token});
+        };
+        const auto collect=[&] {sysEvent_t tick{}; gui.HandleEvent(&tick,0,nullptr);};
+        proposal(101,1.25); proposal(102,1.5); collect();
+        assert(runtime.resolvedInputs.size()==2 && runtime.resolvedInputs[0]==StateValue(1.25) && runtime.resolvedInputs[1]==StateValue(1.5));
+        // Mutating both source readbacks and the resolver's model after queue
+        // collection cannot rewrite the already-resolved application requests.
+        gui.SetStateFloat("number",.6f); gui.StateChanged(0);
+        modelTemplate.actions["value.brightness"].arguments["value"].inputValue=false;
+        modelTemplate.actions["value.brightness"].arguments["value"].literal=1.9;
+        Drain(gui,{{"r_brightness",1.25},{"r_brightness",1.5}});
+        assert(runtime.acknowledgements.size()==2);
+        assert(runtime.acknowledgements[0].token==101 && runtime.acknowledgements[0].accepted && !runtime.acknowledgements[0].matched);
+        assert(runtime.acknowledgements[1].token==102 && runtime.acknowledgements[1].accepted && runtime.acknowledgements[1].matched);
+        assert(runtime.latestProposal.empty());
+        modelTemplate.actions["value.brightness"].arguments["value"]=input;
+        proposal(103,99); collect(); Drain(gui,{});
+        assert(runtime.acknowledgements.back().token==103 && !runtime.acknowledgements.back().accepted && runtime.acknowledgements.back().matched);
+        proposal(104,1.3,"value.brightness","old-document"); collect(); Drain(gui,{});
+        assert(runtime.acknowledgements.back().token==104 && !runtime.acknowledgements.back().accepted);
+        runtime.disabledControls.insert("root"); proposal(105,1.3); collect(); Drain(gui,{}); runtime.disabledControls.clear();
+        assert(runtime.acknowledgements.back().token==105 && !runtime.acknowledgements.back().accepted);
+        // A physical proposal quarantined before dispatch is rejected. A newer
+        // token remains pending even when the older rejection is delivered.
+        proposal(106,1.4); collect(); runtime.latestProposal["root"]=107;
+        consoleObject.open=true; Drain(gui,{}); consoleObject.open=false; gui.Redraw(0);
+        assert(runtime.acknowledgements.back().token==106 && !runtime.acknowledgements.back().accepted && !runtime.acknowledgements.back().matched);
+        assert(runtime.latestProposal.at("root")==107);
+        runtime.latestProposal.clear();
+        SettingsEvent(gui,{SettingsAction("begin")}); Drain(gui,{});
+        proposal(108,1.6,"value.settings"); collect(); service.rejectDispatch=true; Drain(gui,{}); service.rejectDispatch=false;
+        assert(service.draft.at("r_brightness")==StateValue(1.0));
+        assert(runtime.acknowledgements.back().token==108 && !runtime.acknowledgements.back().accepted && runtime.acknowledgements.back().matched);
+        proposal(109,1.7,"value.settings"); collect(); Drain(gui,{});
+        assert(service.draft.at("r_brightness")==StateValue(1.7));
+        assert(runtime.state.at("settings.draft.r_brightness")==StateValue(1.7));
+        assert(runtime.acknowledgements.back().token==109 && runtime.acknowledgements.back().accepted && runtime.acknowledgements.back().matched);
+        // Legacy buttons pass a null input payload and require no acknowledgement.
+        const auto count=runtime.acknowledgements.size(); gui.SetStateFloat("number",1.1f); gui.StateChanged(0);
+        runtime.selected="brightness"; Key(gui,K_ENTER,true); Key(gui,K_ENTER,false); Drain(gui,{{"r_brightness",static_cast<double>(1.1f)}});
+        assert(!runtime.resolvedInputs.back() && runtime.acknowledgements.size()==count);
+        for(const auto& [key,action]:std::vector<std::pair<int,MenuInput>>{{K_HOME,MenuInput::Home},{K_END,MenuInput::End},{K_PGUP,MenuInput::PageUp},{K_PGDN,MenuInput::PageDown}}) {
+            const auto before=runtime.menu.size(); Key(gui,key,true); Key(gui,key,false);
+            assert(runtime.menu.size()==before+2 && runtime.menu[before]==std::make_pair(action,true) && runtime.menu.back()==std::make_pair(action,false));
+        }
+        Key(gui,K_MWHEELUP,true); Key(gui,K_MWHEELUP,true); Key(gui,K_MWHEELUP,false); Key(gui,K_MWHEELDOWN,true); Key(gui,K_MWHEELDOWN,false);
+        assert((runtime.wheels==std::vector<int>{-1,1}));
+        proposal(110,1.2,"value.dismiss"); collect(); Drain(gui,{},true);
+        assert(runtime.acknowledgements.back().token==110 && runtime.acknowledgements.back().accepted && runtime.acknowledgements.back().matched);
+        assert(runtime.latestProposal.empty());
+        WidgetViewState widget; widget.role=ControlRole::Slider; widget.accepted=1.05; widget.pending=1.2;
+        widget.rejected=1.1; widget.proposalToken=999; widget.firstVisible=0; runtime.widgets["root"]=widget;
+        idCmdArgs inspect; inspect.values={"retained","widget","root"};
+        assert(UI_RetainedDiagnostic(&gui,inspect));
+        const auto record=commonObject.prints.back();
+        assert(record.find("RETAINED_GUI_WIDGET id=root role=2 type=0 accepted=1.05 ")!=std::string::npos &&
+               record.find("pending=1 proposed=1.2 rejected=1 token=999 popup=0 firstVisible=0")!=std::string::npos);
+        inspect.values.back()="missing"; assert(!UI_RetainedDiagnostic(&gui,inspect));
+    }
+    assert(views.empty() && service.owners.empty()); modelTemplate=original; eventPlans.clear();
+}
+static void CheckSettingsReturnBoundary() {
+    assert(views.empty() && SettingsBoundary::service.owners.empty());
+    const auto original=modelTemplate; auto& service=SettingsBoundary::service;
+    service=SettingsBoundary::Service{}; eventPlans.clear(); eventHistory.clear();
+    modelTemplate.id="openq4.system";
+    for(const auto& [key,type]:UI_SettingsStateSchema())
+        modelTemplate.state[key]={type==0?StateValue(0.0):type==1?StateValue(false):StateValue(std::string()),""};
+    modelTemplate.events["onactivate"]={"onActivate",{}}; modelTemplate.events["onback"]={"onBack",{}};
+    modelTemplate.actions["begin"]={"settings.system.begin",{}};
+    Expression value; value.type=0; value.literal=1.25;
+    modelTemplate.actions["edit"]={"settings.system.edit",{{"r_brightness",value}}};
+    modelTemplate.actions["apply"]={"settings.system.apply",{}};
+    modelTemplate.actions["cancel"]={"settings.system.cancel",{}};
+    const auto qualified=modelTemplate;
+    assert(!UI_RetainedSettingsDocument(nullptr) && !UI_RetainedSettingsCanReturn(nullptr));
+    {
+        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0); gui.Redraw(0);
+        assert(UI_RetainedSettingsDocument(&gui) && UI_RetainedSettingsCanReturn(&gui));
+        SettingsEvent(gui,{SettingsAction("begin")}); Drain(gui,{});
+        assert(UI_RetainedSettingsCanReturn(&gui));
+        // Caller State() is a pending dictionary. Only a fresh service read may
+        // decide whether the owner has unapplied work or a device transition.
+        const auto forge=[&] {gui.SetStateBool("settings.open",false); gui.SetStateBool("settings.dirty",false); gui.SetStateBool("settings.busy",false); gui.SetStateInt("settings.phase",1);};
+        service.draft["r_brightness"]=1.6; forge(); auto reads=service.reads.size();
+        assert(!UI_RetainedSettingsCanReturn(&gui) && service.reads.size()==reads+1);
+        assert(!gui.GetStateBool("settings.open")); // Read-only guard does not silently publish over the caller dictionary.
+        service.draft=service.baseline;
+        service.readOverrides["settings.busy"]=true; forge(); assert(!UI_RetainedSettingsCanReturn(&gui));
+        service.readOverrides.clear();
+        for(const auto phase:{SettingsPhase::Confirming,SettingsPhase::RecoveryRequired,SettingsPhase::Applying,SettingsPhase::Restoring}) {
+            service.readOverrides["settings.phase"]=static_cast<double>(phase); forge(); assert(!UI_RetainedSettingsCanReturn(&gui));
+        }
+        service.readOverrides.clear();
+        gui.SetStateBool("settings.dirty",true); gui.SetStateBool("settings.busy",true); gui.SetStateInt("settings.phase",99);
+        assert(UI_RetainedSettingsCanReturn(&gui));
+        service.readAvailable=false; assert(!UI_RetainedSettingsCanReturn(&gui) && !UI_RetainedSettingsDocument(&gui)); service.readAvailable=true;
+        // Authored Back handles the user's dirty-exit flow; default dismissal
+        // must not pre-empt it. A nested semantic modal still gets first refusal.
+        eventPlans["onback"]={{{"text",std::string("authored back result")}}, {Brightness(1.4)}};
+        Key(gui,K_ESCAPE,true); Key(gui,K_ESCAPE,false); Drain(gui,{{"r_brightness",1.4}});
+        assert(std::string(gui.GetStateString("text"))=="authored back result" && eventHistory.back()=="onback");
+        const auto history=eventHistory.size(); Live().modals=1;
+        Key(gui,K_ESCAPE,true); Key(gui,K_ESCAPE,false); Drain(gui,{}); assert(eventHistory.size()==history && Live().modals==0);
+        eventPlans["onback"].fail=true;
+        Key(gui,K_ESCAPE,true); Key(gui,K_ESCAPE,false); Drain(gui,{}); // Failed authored event does not fall through to dismiss.
+        eventPlans.clear();
+    }
+    // The production helper inspects document identity, lifecycle contract,
+    // complete reserved typed schema and required catalog operations.
+    for(unsigned mutation=0;mutation<5;++mutation) {
+        modelTemplate=qualified;
+        switch(mutation) {
+            case 0: modelTemplate.id="other.page"; break;
+            case 1: modelTemplate.events.erase("onactivate"); break;
+            case 2: modelTemplate.events.erase("onback"); break;
+            case 3: modelTemplate.state.erase("settings.canRetry"); break;
+            case 4: modelTemplate.actions.erase("apply"); break;
+        }
+        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui"));
+        assert(!UI_RetainedSettingsDocument(&gui));
+    }
+    assert(views.empty() && service.owners.empty()); modelTemplate=original; eventPlans.clear();
+}
 int main() {
     modelTemplate.id="adapter-document";
     modelTemplate.state={{"number",{1.0,""}},{"flag",{true,""}},{"text",{std::string("default"),""}},{"host",{1.0,"host_cvar"}}};
@@ -1321,7 +1488,9 @@ int main() {
     CheckNodeInspection();
     CheckSettingsBoundary();
     CheckSettingsDrawBoundary();
-    std::puts("Retained adapter: settings capability/draw ownership and state/lifecycle boundaries, ordered event/FIFO publication, restore suppression, pending dictionary, presentation delegation, framed saves, input suspension and cursor mapping passed");
+    CheckValueProposalBoundary();
+    CheckSettingsReturnBoundary();
+    std::puts("Retained adapter: immutable value proposals/acknowledgements, authoritative settings return and authored Back, settings capability/draw ownership and state/lifecycle boundaries, ordered event/FIFO publication, restore suppression, pending dictionary, presentation delegation, framed saves, input suspension and cursor mapping passed");
 }
 '''
 
@@ -1355,13 +1524,14 @@ def main():
     if not compiler:
         raise RuntimeError('C++ compiler required')
     (ROOT / '.tmp').mkdir(exist_ok=True)
+    environment = {**os.environ, 'TEMP': str(ROOT / '.tmp'), 'TMP': str(ROOT / '.tmp')}
     with tempfile.TemporaryDirectory(prefix='retained-adapter-', dir=ROOT / '.tmp') as temp:
         test_source = Path(temp) / 'adapter.cpp'
         binary = Path(temp) / 'adapter.exe'
         test_source.write_text(code, encoding='utf-8')
         subprocess.run([compiler, '-std=c++20', '-DUSE_SDL3', '-I', str(ROOT), str(test_source),
-                        str(ROOT / 'src/ui/retained/Input.cpp'), '-o', str(binary)], check=True)
-        subprocess.run([str(binary)], check=True)
+                        str(ROOT / 'src/ui/retained/Input.cpp'), '-o', str(binary)], check=True, env=environment)
+        subprocess.run([str(binary)], check=True, env=environment)
 
 
 if __name__ == '__main__':

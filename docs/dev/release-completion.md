@@ -2,6 +2,14 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- Menu development: retained settings now support toggles, stepped sliders and
+  selectable lists with editable vector parts. Changes stay in the settings
+  draft until accepted, and choice lists follow animated controls and page
+  fades. An opt-in SYSTEM page uses normal menu ownership and protects
+  unresolved changes on Back. The [implementation scope](ui/value-controls.md)
+  records remaining controls, artwork and editor work; the replacement remains
+  disabled by default.
+
 - Settings files now use checked serialization and durable replacement. A failed
   save retains pending changes instead of clearing their dirty flag, and shared
   recovery locks keep a second engine process from overwriting an active display

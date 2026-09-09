@@ -7,11 +7,15 @@
 // Semantic diagnostics for a manager-created retained view. They never read
 // or inject physical input. The session dispatches any resulting typed queue.
 bool UI_RetainedDiagnostic(idUserInterface* gui, const idCmdArgs& args);
+bool UI_RetainedSettingsDocument(idUserInterface* gui);
+bool UI_RetainedSettingsCanReturn(idUserInterface* gui);
 
 // Engine adapter for explicit .q4ui resources. The public game ABI remains
 // idUserInterface; RmlUi, canonical nodes and device ownership stay private.
 class idUserInterfaceRetained final : public idUserInterfaceManaged {
 	friend bool UI_RetainedDiagnostic(idUserInterface*, const idCmdArgs&);
+	friend bool UI_RetainedSettingsDocument(idUserInterface*);
+	friend bool UI_RetainedSettingsCanReturn(idUserInterface*);
 public:
 	explicit idUserInterfaceRetained(bool managed = true);
 	~idUserInterfaceRetained() override;

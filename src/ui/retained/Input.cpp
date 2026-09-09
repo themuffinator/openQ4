@@ -11,7 +11,7 @@ bool Input::Held(RoutedInput::Kind kind, MenuInput action) const {
 }
 void Input::Emit(const Source& source, bool down) { events.push_back({source.kind,source.action,down}); }
 void Input::Menu(std::uint32_t source, MenuInput action, bool down, bool repeated, double seconds) {
-	if (action < MenuInput::Next || action > MenuInput::Back) return;
+	if (action < MenuInput::Next || action > MenuInput::PageDown) return;
 	Button(source,RoutedInput::Kind::Menu,action,down,repeated,seconds);
 }
 void Input::Pointer(std::uint32_t source, bool down, double seconds) {

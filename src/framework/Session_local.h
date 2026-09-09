@@ -207,6 +207,10 @@ public:
 	virtual void		ExitMenu();
 	virtual void		GuiFrameEvents();
 	virtual void		SetGUI( idUserInterface *gui, HandleGuiCommand_t handle );
+	bool				OpenSystemSettings();
+	bool				ReturnSystemSettings();
+	void				ReportSystemSettings();
+	void				CloseSystemSettings();
 
 	virtual const char *MessageBox( msgBoxType_t type, const char *message, const char *title = NULL, bool wait = false, const char *fire_yes = NULL, const char *fire_no = NULL, bool network = false  );
 	virtual void		StopBox( void );
@@ -370,6 +374,12 @@ public:
 
 	idUserInterface *	guiInGame;
 	idUserInterface *	guiMainMenu;
+	// Explicit opt-in child; the legacy parent remains allocated and inactive.
+	idUserInterface *	guiSystem;
+	idUserInterface *	guiSystemParent;
+	HandleGuiCommand_t	guiSystemParentHandle;
+	bool				systemGuiTransition;
+	bool				systemGuiBackEvent;
 	idListGUI *			guiMainMenu_MapList;		// easy map list handling
 	idUserInterface *	guiDemoMenu;
 	idListGUI *			guiDemoList;

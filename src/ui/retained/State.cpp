@@ -7,7 +7,14 @@
 
 namespace openq4::ui {
 namespace {
-StateValue EvaluateExpression(const Expression& e, const StateValues& variables, const PresentationLookup& presentation = {}) {
+StateValue EvaluateExpression(const Expression& e, const StateValues& variables, const PresentationLookup& presentation = {},
+	const StateValue* input = nullptr) {
+	if (e.inputValue) {
+		if (!e.op.empty() || !e.state.empty() || !e.presentation.empty() || !e.args.empty() ||
+			!input || input->index() != e.type || !ValidStateValue(*input))
+			throw std::runtime_error("Missing or invalid invocation-local input");
+		return *input;
+	}
 	if (e.op.empty()) {
 		if (!e.presentation.empty()) {
 			StateValue value; std::string error;
@@ -27,7 +34,7 @@ StateValue EvaluateExpression(const Expression& e, const StateValues& variables,
 			throw std::runtime_error(e.state.empty() ? "Invalid compiled expression literal" : "Invalid state type/value for '"+e.state+"'");
 		return *value;
 	}
-	auto arg = [&](size_t i) { return EvaluateExpression(e.args.at(i),variables,presentation); };
+	auto arg = [&](size_t i) { return EvaluateExpression(e.args.at(i),variables,presentation,input); };
 	auto number = [&](size_t i) { return std::get<double>(arg(i)); };
 	auto boolean = [&](size_t i) { return std::get<bool>(arg(i)); };
 	// Selection and boolean operations short-circuit. An unused branch cannot
@@ -72,10 +79,10 @@ StateValue EvaluateExpression(const Expression& e, const StateValues& variables,
 }
 }
 bool EvaluateStateExpression(const Expression& expression, const StateValues& variables, StateValue& value, std::string& error,
-	const PresentationLookup& presentation) {
+	const PresentationLookup& presentation, const StateValue* input) {
 	error.clear();
 	try {
-		StateValue candidate = EvaluateExpression(expression,variables,presentation);
+		StateValue candidate = EvaluateExpression(expression,variables,presentation,input);
 		if (candidate.index() != expression.type || !ValidStateValue(candidate))
 			throw std::runtime_error("Expression result violates its compiled type or supported value range");
 		value = std::move(candidate); return true;
@@ -84,14 +91,18 @@ bool EvaluateStateExpression(const Expression& expression, const StateValues& va
 	}
 }
 bool DocumentModel::ResolveAction(const std::string& id, const StateValues& variables, ActionInvocation& invocation, std::string& error,
-	const PresentationLookup& presentation) const {
+	const PresentationLookup& presentation, const StateValue* input) const {
 	error.clear();
 	const auto found = actions.find(id);
 	if (found == actions.end()) { error = "Unknown action descriptor '"+id+"'"; return false; }
+	const auto type = found->second.inputType;
+	if (type ? (!input || *type > 2 || input->index() != *type || !ValidStateValue(*input)) : input != nullptr) {
+		error = "Action '"+id+"' requires exactly its declared invocation input"; return false;
+	}
 	ActionInvocation candidate; candidate.action = id; candidate.operation = found->second.operation;
 	for (const auto& [name,expression] : found->second.arguments) {
 		StateValue value;
-		if (!EvaluateStateExpression(expression,variables,value,error,presentation)) {
+		if (!EvaluateStateExpression(expression,variables,value,error,presentation,input)) {
 			error = "Action '"+id+"' argument '"+name+"': "+error; return false;
 		}
 		candidate.arguments.emplace(name,std::move(value));
@@ -99,7 +110,7 @@ bool DocumentModel::ResolveAction(const std::string& id, const StateValues& vari
 	invocation = std::move(candidate); return true;
 }
 bool State::Evaluate(const StateValues& candidate, PropertyValues& props, std::map<std::string,bool>& controls,
-	StatePresentationSnapshot& output, std::string& error) const {
+	StatePresentationSnapshot& output, std::map<std::string,ControlReadback>& readbacks, std::string& error) const {
 	output = presentation;
 	for (const auto& binding : bindings) {
 		try {
@@ -141,18 +152,62 @@ bool State::Evaluate(const StateValues& candidate, PropertyValues& props, std::m
 		cell.value = std::move(value);
 		cell.pending = false;
 	}
+	for (const auto& [id,control] : controlDeclarations) {
+		ControlReadback value;
+		const auto reject = [&]() { error = "Control '"+id+"': "+error; return false; };
+		if (!control.value || !EvaluateStateExpression(*control.value,candidate,value.value,error)) {
+			if (error.empty()) error = "Missing authoritative value expression";
+			return reject();
+		}
+		if (control.role == ControlRole::Toggle) {
+			const auto* spec = std::get_if<ToggleSpec>(&control.widget);
+			if (!spec || !std::holds_alternative<bool>(value.value)) { error = "Invalid toggle readback type"; return reject(); }
+			if (spec->mixed) {
+				StateValue mixed;
+				if (!EvaluateStateExpression(*spec->mixed,candidate,mixed,error)) return reject();
+				const auto* flag = std::get_if<bool>(&mixed);
+				if (!flag) { error = "Mixed state must be Boolean"; return reject(); }
+				value.mixed = *flag;
+			}
+		} else if (control.role == ControlRole::Slider) {
+			if (!std::holds_alternative<SliderSpec>(control.widget) || !std::holds_alternative<double>(value.value)) {
+				error = "Invalid slider readback type"; return reject();
+			}
+		} else if (control.role == ControlRole::Choice) {
+			const auto* spec = std::get_if<ChoiceSpec>(&control.widget);
+			if (!spec) { error = "Invalid choice readback descriptor"; return reject(); }
+			for (const auto& option : spec->options) {
+				if (option.value.index() != value.value.index() || !ValidStateValue(option.value)) {
+					error = "Choice option differs from the authoritative value type"; return reject();
+				}
+				StateValue available;
+				if (!EvaluateStateExpression(option.enabled,candidate,available,error)) return reject();
+				const auto* flag = std::get_if<bool>(&available);
+				if (!flag) { error = "Choice availability must be Boolean"; return reject(); }
+				value.enabledOptions.push_back(*flag);
+			}
+		} else { error = "Unsupported value control role"; return reject(); }
+		// Bounds/list membership constrain proposals, not authoritative reads:
+		// opening a custom configuration must preserve its exact typed value.
+		readbacks.emplace(id,std::move(value));
+	}
 	return true;
 }
 bool State::Reset(const DocumentModel& model, std::string& error) {
 	State candidate;
 	candidate.declarations = model.state; candidate.bindings = model.bindings;
 	candidate.presentationDeclarations = model.presentationVariables;
+	const auto collect = [&](const auto& self, const Node& node) -> void {
+		if (node.control && node.control->role != ControlRole::Button) candidate.controlDeclarations.emplace(node.id,*node.control);
+		for (const auto& child : node.children) self(self,child);
+	};
+	collect(collect,model.root);
 	for (const auto& [id,declaration] : model.presentationVariables)
 		candidate.presentation.variables[id] = {declaration.initial,false};
 	for (const auto& [id,declaration] : model.state) candidate.variables[id] = declaration.initial;
 	error.clear();
 	StatePresentationSnapshot presentation;
-	if (!candidate.Evaluate(candidate.variables,candidate.properties,candidate.enabled,presentation,error)) return false;
+	if (!candidate.Evaluate(candidate.variables,candidate.properties,candidate.enabled,presentation,candidate.controlValues,error)) return false;
 	candidate.presentation = std::move(presentation);
 	candidate.revision = 1; *this = std::move(candidate); return true;
 }
@@ -180,9 +235,11 @@ bool State::SetCombined(const StateValues& application, const StateValues& hostS
 	for (const auto* batch : {&application,&hostSources}) for (const auto& [id,value] : *batch) candidate[id] = value;
 	PropertyValues props;
 	std::map<std::string,bool> controls;
+	std::map<std::string,ControlReadback> readbacks;
 	StatePresentationSnapshot nextPresentation;
-	if (!Evaluate(candidate,props,controls,nextPresentation,error)) return false;
+	if (!Evaluate(candidate,props,controls,nextPresentation,readbacks,error)) return false;
 	variables = std::move(candidate); properties = std::move(props); enabled = std::move(controls); ++revision;
+	controlValues = std::move(readbacks);
 	presentation = std::move(nextPresentation); presentationDirty = false;
 	return true;
 }
@@ -201,6 +258,7 @@ bool State::Restore(const StateValues& application, const StateValues& hostSourc
 	if (application.size()+hostSources.size() != candidate.size()) { error = "Unexpected or wrong-owner restored state"; return false; }
 	PropertyValues props;
 	std::map<std::string,bool> controls;
+	std::map<std::string,ControlReadback> readbacks;
 	State staged = *this;
 	// A v1 instance has no presentation table. Use declared defaults, not
 	// overrides left in the receiving live instance.
@@ -222,7 +280,7 @@ bool State::Restore(const StateValues& application, const StateValues& hostSourc
 		staged.presentation = *restoredPresentation;
 	}
 	StatePresentationSnapshot evaluated;
-	if (!staged.Evaluate(candidate,props,controls,evaluated,error)) return false;
+	if (!staged.Evaluate(candidate,props,controls,evaluated,readbacks,error)) return false;
 	// Keep saved transient writes until the next successful evaluation, just
 	// as saving before StateChanged preserves the caller's pending dictionary.
 	if (restoredPresentation) {
@@ -231,6 +289,7 @@ bool State::Restore(const StateValues& application, const StateValues& hostSourc
 		for (const auto& [id,cell] : restoredPresentation->variables) if (cell.pending) evaluated.variables[id] = cell;
 	}
 	staged.variables = std::move(candidate); staged.properties = std::move(props); staged.enabled = std::move(controls);
+	staged.controlValues = std::move(readbacks);
 	staged.presentation = std::move(evaluated); ++staged.revision;
 	staged.presentationDirty = false;
 	for (const auto& [id,cell] : staged.presentation.variables) staged.presentationDirty = staged.presentationDirty || cell.pending;

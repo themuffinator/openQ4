@@ -1,12 +1,25 @@
 // Copyright (C) 2026 DarkMatter Productions. GPL-3.0-or-later.
 #include "Interaction.h"
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <limits>
 
 namespace openq4::ui {
+namespace {
+// Process-local tokens are never recycled by Reset, restore, or another GUI.
+std::uint64_t ProposalToken() {
+	static std::atomic<std::uint64_t> next{1};
+	auto token = next.load(std::memory_order_relaxed);
+	while (token != std::numeric_limits<std::uint64_t>::max()) {
+		if (next.compare_exchange_weak(token,token+1,std::memory_order_relaxed)) return token;
+	}
+	return 0;
+}
+}
 void Interaction::Reset(const DocumentModel& model) {
 	document = model.id; focused.clear(); hovered.clear(); armed.clear();
+	CancelGesture(); pointerOption.clear(); pointerFraction.reset();
 	items.clear(); order.clear(); parents.clear(); modals.clear(); feedback.clear(); actions.clear(); overflowed = false;
 	std::vector<std::pair<const Node*,std::string>> pending{{&model.root,{}}};
 	while (!pending.empty()) {
@@ -15,6 +28,167 @@ void Interaction::Reset(const DocumentModel& model) {
 		for (auto it = node->children.rbegin(); it != node->children.rend(); ++it) pending.push_back({&*it,node->id});
 	}
 	Refresh();
+}
+bool Interaction::SetReadbacks(const std::map<std::string,ControlReadback>& readbacks, std::string& error) {
+	error.clear();
+	size_t expected = 0;
+	for (const auto& [id,item] : items) {
+		if (item.control.role == ControlRole::Button) continue;
+		++expected;
+		const auto found = readbacks.find(id);
+		if (found == readbacks.end()) { error = "Missing control readback"; return false; }
+		const auto& value = found->second;
+		if (!ValidStateValue(value.value) || !item.control.value || value.value.index() != item.control.value->type ||
+			(item.control.role != ControlRole::Toggle && value.mixed)) { error = "Invalid control readback type"; return false; }
+		if (item.control.role == ControlRole::Choice) {
+			if (value.enabledOptions.size() != std::get<ChoiceSpec>(item.control.widget).options.size()) { error = "Invalid choice availability"; return false; }
+		} else if (!value.enabledOptions.empty()) { error = "Unexpected choice availability"; return false; }
+	}
+	if (expected != readbacks.size()) { error = "Unknown control readback"; return false; }
+	for (const auto& [id,value] : readbacks) items.at(id).readback = value;
+	if (!popup.empty()) {
+		const auto& item = items.at(popup); const auto& options = std::get<ChoiceSpec>(item.control.widget).options;
+		bool eligible = false;
+		for (size_t i = 0; i < options.size(); ++i) if (options[i].id == highlight && OptionEligible(item,i)) eligible = true;
+		if (!eligible) {
+			highlight.clear(); armed.clear(); armedOption.clear(); popupAcceptArm = false;
+			for (size_t i = 0; i < options.size(); ++i) if (OptionEligible(item,i)) { highlight = options[i].id; break; }
+			KeepHighlightVisible();
+		}
+	}
+	Refresh(); return true;
+}
+const StateValue& Interaction::EditingValue(const Item& item) const { return item.pending ? *item.pending : item.readback->value; }
+bool Interaction::Propose(const std::string& id, const StateValue& value) {
+	auto& item = items.at(id);
+	if (!Eligible(id) || !item.readback || !ValidStateValue(value) || value.index() != item.readback->value.index()) return false;
+	if (actions.size() >= 256) { overflowed = true; return false; }
+	const auto token = ProposalToken(); if (!token) { overflowed = true; return false; }
+	ControlAction action{ControlAction::Kind::Activate,document,id,item.control.action,item.control.event,value,token};
+	Queue(std::move(action)); item.pending = value; item.proposalToken = token; item.rejected.reset(); return true;
+}
+void Interaction::Activate(const std::string& id) {
+	auto& item = items.at(id);
+	switch (item.control.role) {
+		case ControlRole::Button: Queue({ControlAction::Kind::Activate,document,id,item.control.action,item.control.event}); break;
+		case ControlRole::Toggle: Propose(id,item.readback->mixed && !item.pending ? true : !std::get<bool>(EditingValue(item))); break;
+		case ControlRole::Choice: OpenPopup(id); break;
+		case ControlRole::Slider: break; // Value changes have their own semantics.
+	}
+}
+bool Interaction::AcknowledgeProposal(const std::string& id, std::uint64_t token, bool accepted) {
+	const auto found = items.find(id);
+	if (found == items.end() || !token || found->second.proposalToken != token || !found->second.pending) return false;
+	auto& item = found->second;
+	if (accepted) item.rejected.reset(); else item.rejected = item.pending;
+	item.pending.reset(); item.proposalToken = 0; return true;
+}
+std::optional<WidgetViewState> Interaction::Widget(const std::string& id) const {
+	const auto found = items.find(id);
+	if (found == items.end() || found->second.control.role == ControlRole::Button || !found->second.readback) return {};
+	const auto& item = found->second;
+	WidgetViewState view;
+	view.role = item.control.role; view.accepted = item.readback->value; view.mixed = item.readback->mixed;
+	view.pending = item.pending; view.rejected = item.rejected; view.proposalToken = item.proposalToken;
+	if (dragging == id && dragPreview) view.preview = *dragPreview;
+	view.popupOpen = popup == id; if (view.popupOpen) view.highlight = highlight;
+	view.firstVisible = item.firstVisible;
+	return view;
+}
+double Interaction::SliderValue(const SliderSpec& spec, double fraction) const {
+	fraction = std::clamp(fraction,0.0,1.0);
+	if (fraction == 1) return spec.maximum;
+	const long double ticks = std::round(static_cast<long double>(fraction)*(spec.maximum-spec.minimum)/spec.step);
+	return std::clamp(static_cast<double>(spec.minimum+ticks*spec.step),spec.minimum,spec.maximum);
+}
+void Interaction::SliderKey(MenuInput input) {
+	auto& item = items.at(focused); const auto& spec = std::get<SliderSpec>(item.control.widget);
+	armed.clear();
+	double value = std::clamp(std::get<double>(EditingValue(item)),spec.minimum,spec.maximum);
+	if (input == MenuInput::Home) value = spec.minimum;
+	else if (input == MenuInput::End) value = spec.maximum;
+	else {
+		const bool increase = input == MenuInput::Right || input == MenuInput::Up || input == MenuInput::PageUp;
+		const auto ticks = (static_cast<long double>(value)-spec.minimum)/spec.step;
+		// A tiny tick tolerance removes round-trip error at an authored tick;
+		// off-grid/custom values move to the next tick in the requested direction.
+		const auto near = std::round(ticks);
+		const auto anchored = std::abs(ticks-near) <= 1e-9L ? near : ticks;
+		const int count = input == MenuInput::PageUp || input == MenuInput::PageDown ? 10 : 1;
+		const auto next = increase ? std::floor(anchored)+count : std::ceil(anchored)-count;
+		value = std::clamp(static_cast<double>(spec.minimum+next*spec.step),spec.minimum,spec.maximum);
+	}
+	if (value != std::get<double>(EditingValue(item))) Propose(focused,value);
+}
+bool Interaction::OptionEligible(const Item& item, size_t index) const {
+	return item.readback && index < item.readback->enabledOptions.size() && item.readback->enabledOptions[index];
+}
+void Interaction::OpenPopup(const std::string& id) {
+	CancelGesture(); popup = id; focused = id;
+	const auto& item = items.at(id); const auto& options = std::get<ChoiceSpec>(item.control.widget).options;
+	for (size_t i = 0; i < options.size(); ++i) if (OptionEligible(item,i)) {
+		if (highlight.empty()) highlight = options[i].id;
+		if (options[i].value == EditingValue(item)) { highlight = options[i].id; break; }
+	}
+	KeepHighlightVisible();
+}
+void Interaction::KeepHighlightVisible() {
+	if (popup.empty()) return;
+	auto& item = items.at(popup); const auto& spec = std::get<ChoiceSpec>(item.control.widget);
+	const auto rows = std::min<size_t>(spec.visibleRows,spec.options.size());
+	item.firstVisible = std::min<unsigned>(item.firstVisible,static_cast<unsigned>(spec.options.size()-rows));
+	for (size_t i = 0; i < spec.options.size(); ++i) if (spec.options[i].id == highlight) {
+		if (i < item.firstVisible) item.firstVisible = static_cast<unsigned>(i);
+		else if (i >= item.firstVisible+rows) item.firstVisible = static_cast<unsigned>(i-rows+1);
+		break;
+	}
+}
+void Interaction::PopupNavigate(MenuInput input) {
+	if (input != MenuInput::Up && input != MenuInput::Down && input != MenuInput::Home && input != MenuInput::End && input != MenuInput::PageUp && input != MenuInput::PageDown) return;
+	armed.clear(); armedOption.clear(); popupAcceptArm = false;
+	const auto& item = items.at(popup); const auto& spec = std::get<ChoiceSpec>(item.control.widget);
+	std::vector<size_t> eligible;
+	size_t current = 0;
+	for (size_t i = 0; i < spec.options.size(); ++i) if (OptionEligible(item,i)) {
+		if (spec.options[i].id == highlight) current = eligible.size();
+		eligible.push_back(i);
+	}
+	if (eligible.empty()) { highlight.clear(); return; }
+	if (input == MenuInput::Home) current = 0;
+	else if (input == MenuInput::End) current = eligible.size()-1;
+	else {
+		const size_t amount = input == MenuInput::PageUp || input == MenuInput::PageDown ? spec.visibleRows : 1;
+		if (input == MenuInput::Up || input == MenuInput::PageUp) current = current > amount ? current-amount : 0;
+		else current = std::min(current+amount,eligible.size()-1);
+	}
+	highlight = spec.options[eligible[current]].id; KeepHighlightVisible();
+}
+ValueWidgetSnapshot Interaction::CaptureWidgets() const {
+	ValueWidgetSnapshot result;
+	for (const auto& [id,item] : items) if (item.control.role != ControlRole::Button)
+		result.widgets[id] = {item.control.role,item.firstVisible};
+	return result;
+}
+bool Interaction::RestoreWidgets(const ValueWidgetSnapshot& snapshot, std::string& error) {
+	error.clear();
+	if (snapshot.version != 1 || snapshot.widgets.size() != CaptureWidgets().widgets.size()) { error = "Invalid widget snapshot version or count"; return false; }
+	for (const auto& [id,value] : snapshot.widgets) {
+		const auto found = items.find(id);
+		if (found == items.end() || value.role == ControlRole::Button || value.role != found->second.control.role) { error = "Restored widget role does not match"; return false; }
+		unsigned maximum = 0;
+		if (value.role == ControlRole::Choice) {
+			const auto& spec = std::get<ChoiceSpec>(found->second.control.widget);
+			maximum = static_cast<unsigned>(spec.options.size()-std::min<size_t>(spec.visibleRows,spec.options.size()));
+		}
+		if (value.firstVisible > maximum) { error = "Restored widget scroll is outside its range"; return false; }
+	}
+	CancelGesture(); hovered.clear(); pointerOption.clear(); pointerFraction.reset();
+	actions.clear(); feedback.clear(); overflowed = false;
+	for (auto& [id,item] : items) {
+		item.pending.reset(); item.rejected.reset(); item.proposalToken = 0;
+		if (item.control.role != ControlRole::Button) item.firstVisible = snapshot.widgets.at(id).firstVisible;
+	}
+	Refresh(); return true;
 }
 bool Interaction::Within(const std::string& id, const std::string& root) const {
 	if (root.empty()) return true;
@@ -28,7 +202,8 @@ bool Interaction::Within(const std::string& id, const std::string& root) const {
 }
 bool Interaction::Eligible(const std::string& id) const {
 	const auto found = items.find(id);
-	return found != items.end() && found->second.control.enabled && found->second.bounds.visible && Within(id,Modal());
+	return found != items.end() && found->second.control.enabled && found->second.bounds.visible && Within(id,Modal()) &&
+		(found->second.control.role == ControlRole::Button || found->second.readback.has_value());
 }
 std::string Interaction::First() const { for (const auto& id : order) if (Eligible(id)) return id; return {}; }
 void Interaction::SetBounds(const std::map<std::string,ControlBounds>& bounds) {
@@ -48,21 +223,64 @@ bool Interaction::SetEnabled(const std::string& id, bool enabled) {
 }
 bool Interaction::Focus(const std::string& id) {
 	if (!id.empty() && !Eligible(id)) return false;
-	if (focused != id) { armed.clear(); focused = id; }
+	if (focused != id) { CancelGesture(); focused = id; }
 	Refresh(); return true;
 }
-void Interaction::Hover(const std::string& id) { hovered = Eligible(id) ? id : std::string{}; Refresh(); }
+void Interaction::Hover(const std::string& id) { PointerPart(id); }
+void Interaction::PointerPart(const std::string& id, std::optional<double> fraction, const std::string& option) {
+	hovered = Eligible(id) ? id : std::string{};
+	pointerFraction = fraction && std::isfinite(*fraction) ? fraction : std::nullopt;
+	pointerOption = option;
+	if (!dragging.empty() && dragging == id) {
+		if (pointerFraction) dragPreview = SliderValue(std::get<SliderSpec>(items.at(dragging).control.widget),*pointerFraction);
+		else CancelGesture(); // A lost/singular projection cannot commit a stale preview.
+	}
+	if (!popup.empty() && hovered == popup && !option.empty()) {
+		const auto& item = items.at(popup); const auto& options = std::get<ChoiceSpec>(item.control.widget).options;
+		for (size_t i = 0; i < options.size(); ++i) if (options[i].id == option && OptionEligible(item,i)) {
+			highlight = option; KeepHighlightVisible(); break;
+		}
+	}
+	Refresh();
+}
 void Interaction::Pointer(bool down) {
 	if (down) {
 		if (pointerHeld) return;
 		pointerHeld = true;
-		if (Eligible(hovered) && armed.empty()) { Focus(hovered); armed = hovered; pointerArm = true; }
+		if (!popup.empty()) {
+			if (hovered != popup) { CancelGesture(); Refresh(); return; }
+			if (!armed.empty()) return; // The matching keyboard release owns this arm.
+			const auto& item = items.at(popup); const auto& options = std::get<ChoiceSpec>(item.control.widget).options;
+			if (pointerOption.empty()) { armed = popup; pointerArm = true; armedOption.clear(); }
+			else for (size_t i = 0; i < options.size(); ++i) if (options[i].id == pointerOption && OptionEligible(item,i)) {
+				armed = popup; pointerArm = true; armedOption = pointerOption; break;
+			}
+		} else if (Eligible(hovered) && armed.empty()) {
+			const auto id = hovered; Focus(id); armed = id; pointerArm = true;
+			if (items.at(id).control.role == ControlRole::Slider) {
+				if (pointerFraction) { dragging = id; dragPreview = SliderValue(std::get<SliderSpec>(items.at(id).control.widget),*pointerFraction); }
+				else armed.clear();
+			}
+		}
 	} else {
 		if (!pointerHeld) return;
 		pointerHeld = false;
-		if (pointerArm && !armed.empty()) {
-			if (armed == hovered && Eligible(armed)) Queue({ControlAction::Kind::Activate,document,armed,items.at(armed).control.action,items.at(armed).control.event});
-			armed.clear();
+		if (!dragging.empty()) {
+			const auto id = dragging; const auto value = dragPreview;
+			CancelGesture(); if (value && Eligible(id)) Propose(id,*value);
+		} else if (pointerArm && !armed.empty()) {
+			const auto id = armed; const auto option = armedOption; armed.clear(); armedOption.clear();
+			if (id == hovered && Eligible(id)) {
+				if (!popup.empty()) {
+					if (option.empty() && pointerOption.empty()) CancelGesture();
+					else if (!option.empty() && option == pointerOption) {
+						const auto& item = items.at(id); const auto& options = std::get<ChoiceSpec>(item.control.widget).options;
+						for (size_t i = 0; i < options.size(); ++i) if (options[i].id == option && OptionEligible(item,i)) {
+							const auto value = options[i].value; CancelGesture(); Propose(id,value); break;
+						}
+					}
+				} else Activate(id);
+			}
 		}
 	}
 	Refresh();
@@ -72,30 +290,51 @@ void Interaction::Input(MenuInput input, bool down) {
 		if (down) {
 			if (acceptHeld) return;
 			acceptHeld = true;
-			if (Eligible(focused) && armed.empty()) { armed = focused; pointerArm = false; }
+			if (Eligible(focused) && armed.empty()) { armed = focused; pointerArm = false; popupAcceptArm = !popup.empty(); armedOption = highlight; }
 		} else {
 			if (!acceptHeld) return;
 			acceptHeld = false;
 			if (!pointerArm && !armed.empty()) {
-				if (armed == focused && Eligible(armed)) Queue({ControlAction::Kind::Activate,document,armed,items.at(armed).control.action,items.at(armed).control.event});
-				armed.clear();
+				const auto id = armed; const auto option = armedOption; const bool choosing = popupAcceptArm;
+				armed.clear(); armedOption.clear(); popupAcceptArm = false;
+				if (id == focused && Eligible(id)) {
+					if (choosing && popup == id && option == highlight) {
+						const auto& item = items.at(id); const auto& options = std::get<ChoiceSpec>(item.control.widget).options;
+						for (size_t i = 0; i < options.size(); ++i) if (options[i].id == option && OptionEligible(item,i)) {
+							const auto value = options[i].value; CancelGesture(); Propose(id,value); break;
+						}
+					} else if (!choosing) Activate(id);
+				}
 			}
 		}
 	} else if (input == MenuInput::Back) {
-		if (down && !backHeld) { armed.clear(); Queue({ControlAction::Kind::Back,document,Modal(),{}}); }
+		if (down && !backHeld) {
+			if (!popup.empty() || !dragging.empty()) CancelGesture();
+			else { armed.clear(); Queue({ControlAction::Kind::Back,document,Modal(),{}}); }
+		}
 		backHeld = down;
-	} else if (down) Navigate(input);
+	} else if (down) {
+		if (!popup.empty()) PopupNavigate(input);
+		else if (!dragging.empty()) {} // A captured pointer owns its gesture.
+		else if (Eligible(focused) && items.at(focused).control.role == ControlRole::Slider &&
+			(input == MenuInput::Home || input == MenuInput::End || input == MenuInput::PageUp || input == MenuInput::PageDown ||
+			(std::get<SliderSpec>(items.at(focused).control.widget).vertical ? input == MenuInput::Up || input == MenuInput::Down : input == MenuInput::Left || input == MenuInput::Right))) SliderKey(input);
+		else Navigate(input);
+	}
 	Refresh();
 }
-void Interaction::Cancel() { armed.clear(); hovered.clear(); Refresh(); }
+void Interaction::CancelGesture() {
+	armed.clear(); dragging.clear(); dragPreview.reset(); popup.clear(); highlight.clear(); armedOption.clear(); popupAcceptArm = false;
+}
+void Interaction::Cancel() { CancelGesture(); hovered.clear(); pointerOption.clear(); pointerFraction.reset(); Refresh(); }
 void Interaction::ReleaseInputSources() { pointerHeld = acceptHeld = backHeld = false; }
 bool Interaction::PushModal(const std::string& root) {
 	if (!parents.contains(root) || !Within(root,Modal()) || root == Modal()) return false;
-	modals.push_back({root,focused}); armed.clear(); hovered.clear(); focused = First(); Refresh(); return true;
+	modals.push_back({root,focused}); CancelGesture(); hovered.clear(); focused = First(); Refresh(); return true;
 }
 bool Interaction::PopModal() {
 	if (modals.empty()) return false;
-	const auto restore = modals.back().restore; modals.pop_back(); armed.clear(); hovered.clear();
+	const auto restore = modals.back().restore; modals.pop_back(); CancelGesture(); hovered.clear();
 	focused = Eligible(restore) ? restore : First(); Refresh(); return true;
 }
 void Interaction::Navigate(MenuInput input) {
@@ -132,12 +371,13 @@ void Interaction::Navigate(MenuInput input) {
 	if (!next.empty()) Focus(next);
 }
 void Interaction::Refresh() {
+	if ((!dragging.empty() && !Eligible(dragging)) || (!popup.empty() && !Eligible(popup))) CancelGesture();
 	if (!Eligible(focused)) focused.clear();
 	if (!Eligible(hovered)) hovered.clear();
 	if (!Eligible(armed)) armed.clear();
 	for (auto& [id,item] : items) {
 		const auto state = !item.control.enabled ? ControlState::Disabled :
-			armed == id && (!pointerArm || hovered == id) ? ControlState::Pressed :
+			armed == id && (!pointerArm || hovered == id || dragging == id) ? ControlState::Pressed :
 			focused == id ? ControlState::Focus : hovered == id ? ControlState::Hover : ControlState::Default;
 		if (!item.known || item.state != state) { item.known = true; item.state = state; feedback.push_back({id,item.control.states.at(state),state}); }
 	}
@@ -176,7 +416,9 @@ bool Interaction::Restore(const InteractionSnapshot& snapshot, std::string& erro
 	candidate.focused = snapshot.focus;
 	candidate.modals.clear();
 	for (const auto& scope : snapshot.modals) candidate.modals.push_back({scope.root,scope.restore});
-	candidate.armed.clear(); candidate.hovered.clear(); candidate.pointerArm = false;
+	candidate.CancelGesture(); candidate.hovered.clear(); candidate.pointerArm = false;
+	candidate.pointerOption.clear(); candidate.pointerFraction.reset();
+	for (auto& [id,item] : candidate.items) { item.pending.reset(); item.rejected.reset(); item.proposalToken = 0; }
 	candidate.feedback.clear(); candidate.actions.clear(); candidate.overflowed = false;
 	for (auto& [id,item] : candidate.items) item.control.enabled = snapshot.enabled.at(id);
 	// A host-source update may disable the saved selection. Fresh projected

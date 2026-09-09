@@ -3729,6 +3729,9 @@ void idSessionLocal::Clear() {
 	cinematicActive = false;
 	mapSpawned = false;
 	guiActive = NULL;
+	guiSystem = guiSystemParent = NULL;
+	guiSystemParentHandle = NULL;
+	systemGuiTransition = systemGuiBackEvent = false;
 	demoReturnGui = NULL;
 	demoOverlayVisible = false;
 	demoBrowserMode = true;
@@ -4284,6 +4287,26 @@ static void Session_RetainedGui_f( const idCmdArgs &args ) {
 	}
 #endif
 	common->Printf( "openq4_retainedGui: requires a retained test/active GUI and report | focus <id> | menu <action> <0|1> | state <id> <value> | pending <key> <value> | presentation <alias> <value> <override:0|1> | event <name> | trigger | update | save | restore\n" );
+}
+
+static void Session_SystemSettings_f( const idCmdArgs &args ) {
+	if ( args.Argc() == 2 ) {
+		if ( !idStr::Icmp( args.Argv( 1 ), "open" ) ) {
+			common->Printf( "OPENQ4_SYSTEM operation=open result=%d\n", sessLocal.OpenSystemSettings() ? 1 : 0 );
+			sessLocal.ReportSystemSettings();
+			return;
+		}
+		if ( !idStr::Icmp( args.Argv( 1 ), "back" ) ) {
+			common->Printf( "OPENQ4_SYSTEM operation=back result=%d\n", sessLocal.ReturnSystemSettings() ? 1 : 0 );
+			sessLocal.ReportSystemSettings();
+			return;
+		}
+		if ( !idStr::Icmp( args.Argv( 1 ), "report" ) ) {
+			sessLocal.ReportSystemSettings();
+			return;
+		}
+	}
+	common->Printf( "usage: openq4_system open | report | back (requires ui_retainedSystem 1 and the normal main menu)\n" );
 }
 
 static void Session_OpenQ4GuiSet_f( const idCmdArgs &args ) {
@@ -5437,6 +5460,7 @@ Exits with mapSpawned = false
 */
 void idSessionLocal::UnloadMap() {
 	RetainedUI_Close();
+	CloseSystemSettings();
 	// A level-load generation owns worker-visible file handles and immutable
 	// staging buffers. Join it before any game, render-world, renderer-module,
 	// or filesystem state used by the outgoing map can be destroyed.
@@ -7459,7 +7483,7 @@ void idSessionLocal::Draw() {
 			// ordinary in-game "gameDraw" path.
 			rw->RenderScene( &currentDemoRenderView );
 			renderSystem->DrawDemoPics();
-		} else if ( guiActive->State().GetBool( "gameDraw" ) ) {
+		} else if ( guiActive == guiSystem || guiActive->State().GetBool( "gameDraw" ) ) {
 			if ( mapSpawned && !com_skipGameDraw.GetBool() && GetLocalClientNum() >= 0 ) {
 				bool gameDraw = game->Draw( GetLocalClientNum() );
 				if ( !gameDraw ) {
@@ -8153,6 +8177,7 @@ void idSessionLocal::Init() {
 	cmdSystem->AddCommand( "testGUI", Session_TestGUI_f, CMD_FL_SYSTEM, "tests a gui" );
 #ifndef ID_DEDICATED
 	cmdSystem->AddCommand( "openq4_retainedGui", Session_RetainedGui_f, CMD_FL_SYSTEM, "inspect a normal retained GUI or submit semantic diagnostics without device input" );
+	cmdSystem->AddCommand( "openq4_system", Session_SystemSettings_f, CMD_FL_SYSTEM, "open, return or inspect the opt-in normal SYSTEM child without device input" );
 #endif
 	// A rejected recoverable restart can leave no device until the next safe
 	// settings frame restores it. Never issue drawing commands into that gap.
@@ -8284,7 +8309,9 @@ void idSessionLocal::UpdateSoundWorldFocus() {
 }
 
 void idSessionLocal::SetPlayingSoundWorld() {
-	if ( guiActive && ( guiActive == guiMainMenu || guiActive == guiIntro || guiActive == guiLoading || ( guiActive == guiMsg && !mapSpawned ) ) ) {
+	const bool systemMenuActive = guiSystem != NULL &&
+		( guiActive == guiSystem || ( guiActive == guiMsg && guiMsgRestore == guiSystem ) );
+	if ( guiActive && ( guiActive == guiMainMenu || systemMenuActive || guiActive == guiIntro || guiActive == guiLoading || ( guiActive == guiMsg && !mapSpawned ) ) ) {
 		SetPlayingSoundWorld( menuSoundWorld );
 	} else {
 		SetPlayingSoundWorld( sw );

@@ -35,6 +35,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "../ui/ListGUILocal.h"
 #include "../ui/RetainedUI.h"
 #include "../ui/UserInterfaceManaged.h"
+#include "../ui/UserInterfaceRetained.h"
 #include "../sound/snd_local.h"
 
 #if defined( USE_SDL3 )
@@ -48,6 +49,7 @@ idCVar	idSessionLocal::gui_configServerRate( "gui_configServerRate", "0", CVAR_G
 idCVar gui_set_sys_scroll( "gui_set_sys_scroll", "0", CVAR_GUI | CVAR_INTEGER, "display menu scroll step", 0, 28 );
 idCVar gui_set_audio_scroll( "gui_set_audio_scroll", "0", CVAR_GUI | CVAR_INTEGER, "audio menu scroll step", 0.0f, 0.0f );
 idCVar gui_set_game_scroll( "gui_set_game_scroll", "0", CVAR_GUI | CVAR_INTEGER, "game menu scroll step", 0, 46 );
+idCVar ui_retainedSystem( "ui_retainedSystem", "0", CVAR_GUI | CVAR_BOOL, "opt in to the in-development retained SYSTEM page" );
 
 static const int MENU_CONTROLLER_AXIS_THRESHOLD = 50;
 static const int MENU_CONTROLLER_REPEAT_INITIAL_MSEC = 320;
@@ -1436,6 +1438,10 @@ static int menuProfileMainVarsMsec = 0;
 
 void idSessionLocal::StartMenu( bool playIntro ) {
 	const bool shouldPlayIntro = playIntro && !com_skipLogoVideos.GetBool();
+	if ( guiSystem != NULL && ( guiActive == guiSystem || guiMsgRestore == guiSystem ) ) {
+		ReturnSystemSettings();
+		return;
+	}
 
 	if ( guiActive == guiMainMenu ) {
 		return;
@@ -1511,6 +1517,12 @@ idSessionLocal::SetGUI
 void idSessionLocal::SetGUI( idUserInterface *gui, HandleGuiCommand_t handle ) {
 	if ( RetainedUI_IsOpen() ) RetainedUI_Close();
 	const char	*cmd;
+	const bool resumeSystemParent = guiSystem != NULL && gui == guiSystemParent;
+	if ( guiSystem != NULL && gui != guiSystem ) {
+		// Explicit replacement/stop is forced teardown. Ordinary Back uses the
+		// guarded Return operation and cannot discard a dirty/recovering owner.
+		CloseSystemSettings();
+	}
 
 	if ( guiActive && guiActive != gui ) {
 		idUserInterface *previous = guiActive;
@@ -1528,7 +1540,7 @@ void idSessionLocal::SetGUI( idUserInterface *gui, HandleGuiCommand_t handle ) {
 		return;
 	}
 
-	if ( guiActive == guiMainMenu ) {
+	if ( guiActive == guiMainMenu && !resumeSystemParent ) {
 		// Opening ESC must never wait for unbounded filesystem, device, display,
 		// or declaration enumeration. Those catalogs are refreshed when their
 		// page is opened; the title-screen path still primes them for stock GUIs.
@@ -1560,6 +1572,10 @@ idSessionLocal::ExitMenu
 ===============
 */
 void idSessionLocal::ExitMenu( void ) {
+	if ( guiSystem != NULL && ( guiActive == guiSystem || guiMsgRestore == guiSystem ) ) {
+		ReturnSystemSettings();
+		return;
+	}
 	idUserInterface *previous = guiActive;
 	guiActive = NULL;
 	if ( previous ) {
@@ -1575,6 +1591,86 @@ void idSessionLocal::ExitMenu( void ) {
 	if ( sw != NULL && sw->IsPaused() ) {
 		sw->UnPause();
 	}
+}
+
+bool idSessionLocal::OpenSystemSettings() {
+#ifdef ID_DEDICATED
+	return false;
+#else
+	if ( !ui_retainedSystem.GetBool() || systemGuiTransition || guiTest != NULL || RetainedUI_IsOpen() ) return false;
+	if ( guiSystem != NULL ) return guiActive == guiSystem;
+	if ( guiMainMenu == NULL || guiActive != guiMainMenu || guiMsgRestore != NULL ) return false;
+	// The canonical source may not exist while this opt-in route is developed.
+	// Load and validate its application contract before deactivating the parent.
+	idUserInterface *child = uiManager->FindGui( "guis/menu/settings/system.q4ui", true, true, false );
+	if ( child == NULL ) return false;
+	if ( !UI_RetainedSettingsDocument( child ) ) {
+		uiManager->DeAlloc( child );
+		return false;
+	}
+	guiSystemParent = guiActive;
+	guiSystemParentHandle = guiHandle;
+	guiSystem = child;
+	systemGuiTransition = true;
+	SetGUI( child, NULL );
+	systemGuiTransition = false;
+	SetPlayingSoundWorld();
+	return guiActive == child;
+#endif
+}
+
+bool idSessionLocal::ReturnSystemSettings() {
+#ifdef ID_DEDICATED
+	return false;
+#else
+	if ( systemGuiTransition || guiSystem == NULL || guiActive != guiSystem ) return false;
+	if ( !UI_RetainedSettingsCanReturn( guiSystem ) ) {
+		// An authored Back may open a dirty-state modal or request recovery. A
+		// recursive dismiss from that event must not replay it indefinitely.
+		if ( systemGuiBackEvent ) return false;
+		systemGuiBackEvent = true;
+		idUserInterface *child = guiSystem;
+		child->HandleNamedEvent( "onBack" );
+		PumpApplicationActions( child );
+		systemGuiBackEvent = false;
+		return guiSystem == NULL && guiActive != child;
+	}
+	idUserInterface *parent = guiSystemParent;
+	const HandleGuiCommand_t handler = guiSystemParentHandle;
+	if ( parent == NULL ) return false;
+	SetGUI( parent, handler );
+	SetPlayingSoundWorld();
+	return guiActive == parent && guiSystem == NULL;
+#endif
+}
+
+void idSessionLocal::CloseSystemSettings() {
+	if ( guiSystem == NULL ) return;
+	idUserInterface *child = guiSystem;
+	// Clear every owning/reference slot before callbacks can pump another
+	// lifecycle action. Manager dispatch permits this targeted drain before free.
+	guiSystem = guiSystemParent = NULL;
+	guiSystemParentHandle = NULL;
+	if ( guiActive == child ) guiActive = NULL;
+	if ( guiMsgRestore == child ) guiMsgRestore = NULL;
+	const bool previousTransition = systemGuiTransition;
+	systemGuiTransition = true;
+	child->Activate( false, common->GetPresentationTime() );
+	PumpApplicationActions( child );
+	uiManager->DeAlloc( child );
+	systemGuiTransition = previousTransition;
+}
+
+void idSessionLocal::ReportSystemSettings() {
+	bool canReturn = false;
+#ifndef ID_DEDICATED
+	canReturn = guiSystem != NULL && UI_RetainedSettingsCanReturn( guiSystem );
+#endif
+	common->Printf( "OPENQ4_SYSTEM enabled=%d active=%s parent=%s child=%d guiTest=%d menu=%d map=%d multiplayer=%d menuSound=%d canReturn=%d\n",
+		ui_retainedSystem.GetBool() ? 1 : 0, guiActive ? guiActive->Name() : "-",
+		guiSystemParent ? guiSystemParent->Name() : "-", guiSystem != NULL && guiActive == guiSystem ? 1 : 0,
+		guiTest != NULL ? 1 : 0, guiActive != NULL ? 1 : 0, mapSpawned ? 1 : 0, IsMultiplayer() ? 1 : 0,
+		menuSoundWorld != NULL && requestedSoundWorld == menuSoundWorld ? 1 : 0, canReturn ? 1 : 0 );
 }
 
 /*
@@ -2129,6 +2225,7 @@ idSessionLocal::SetMainMenuGuiVars
 ===============
 */
 void idSessionLocal::SetMainMenuGuiVars( bool refreshCatalogs ) {
+	guiMainMenu->SetStateBool( "retainedSystem", ui_retainedSystem.GetBool() );
 
 	guiMainMenu->SetStateString( "serverlist_sel_0", "-1" );
 	guiMainMenu->SetStateString( "serverlist_selid_0", "-1" ); 
@@ -2488,6 +2585,11 @@ void idSessionLocal::HandleMainMenuCommands( const char *menuCommand ) {
 
 		if ( !idStr::Cmp( cmd, ";" ) ) {
 			continue;
+		}
+
+		if ( !idStr::Icmp( cmd, "openRetainedSystem" ) ) {
+			OpenSystemSettings();
+			return;
 		}
 
 		if ( !idStr::Icmp( cmd, "demoOpen" ) ) {
@@ -3336,7 +3438,8 @@ void idSessionLocal::DispatchCommand( idUserInterface *gui, const char *menuComm
 	bool closeRequested = false;
 	if ( UI_DispatchApplicationActions( gui, menuCommand, closeRequested ) ) {
 		if ( closeRequested ) {
-			if ( gui == guiTest ) TestGUI( NULL );
+			if ( gui == guiSystem ) ReturnSystemSettings();
+			else if ( gui == guiTest ) TestGUI( NULL );
 			else if ( gui == guiActive ) ExitMenu();
 		}
 		return;

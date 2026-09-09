@@ -1,0 +1,33 @@
+--- a/Include/RmlUi/Core/Element.h
++++ b/Include/RmlUi/Core/Element.h
+@@ -574,6 +574,11 @@
+ 	Element* GetClosestScrollableContainer();
+ 	/// Returns the element's transform state.
+ 	const TransformState* GetTransformState() const noexcept;
++
++	/// openQ4: Refresh stacking geometry and transforms after Context::Update,
++	/// without rendering, so popup placement and projection use this layout.
++	/// Call on the context root to update ancestors before descendants.
++	void UpdateGeometryForProjection();
+ 	/// Returns the data model of this element.
+ 	DataModel* GetDataModel() const;
+ 	//@}
+--- a/Source/Core/Element.cpp
++++ b/Source/Core/Element.cpp
+@@ -177,6 +177,16 @@
+ 	}
+ }
+ 
++void Element::UpdateGeometryForProjection()
++{
++	UpdateAbsoluteOffsetAndRenderBoxData();
++	if (stacking_context_dirty)
++		BuildLocalStackingContext();
++	UpdateTransformState();
++	for (Element* element : stacking_context)
++		element->UpdateGeometryForProjection();
++}
++
+ void Element::Render()
+ {
+ #ifdef RMLUI_TRACY_PROFILING

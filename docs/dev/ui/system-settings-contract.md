@@ -16,6 +16,12 @@ writes. Production controls, editor support and full product qualification remai
 required. Earlier immediate-only evidence below describes its recorded checkpoint;
 the newer display contract defines the current integration and its limits.
 
+The subsequent [value-control increment](value-controls.md) adds typed toggle,
+slider and choice proposals plus an opt-in Session-owned SYSTEM child. The first
+production source exposes eight immediate image controls, with the rest of this
+31-option contract still required. This source is not an accepted migration or
+a completed M2 screen/editor round trip.
+
 ## Source identity and precedence
 
 The audit baseline is engine commit

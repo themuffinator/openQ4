@@ -39,6 +39,7 @@ struct Expression {
 	std::vector<Expression> args;
 	std::string presentation; // Public alias; legal only in actions and events.
 	int component = -1; // Scalar aliases have no component; vectors require one.
+	bool inputValue = false; // Invocation-local operand; never application state.
 };
 // Typed public presentation values are independent of CSS and application
 // State(). Boolean values occupy data[0] as 0/1; unused components stay zero.
@@ -66,6 +67,7 @@ std::string FormatPresentationValue(const PresentationValue& value);
 struct Action {
 	std::string operation;
 	std::map<std::string, Expression> arguments;
+	std::optional<size_t> inputType; // Declared StateValue index; absent for existing actions.
 };
 struct ActionInvocation {
 	std::string action, operation;
@@ -94,12 +96,43 @@ struct Binding {
 bool ValidProperty(const std::string& name, const Value& value);
 bool ValidStateValue(const StateValue& value);
 enum class ControlState { Default, Hover, Focus, Pressed, Disabled };
+enum class ControlRole { Button, Toggle, Slider, Choice };
+struct ToggleSpec {
+	std::optional<Expression> mixed;
+	std::string checkedPart, mixedPart;
+};
+struct SliderSpec {
+	double minimum = 0, maximum = 1, step = 1;
+	unsigned decimals = 0;
+	bool vertical = false;
+	std::string track, fill, thumb, valueText;
+};
+struct ChoiceOption {
+	std::string id, node, label;
+	StateValue value;
+	Expression enabled = [] { Expression value; value.literal = true; value.type = 1; return value; }();
+	std::string labelPart, selectedPart, highlightPart;
+	std::optional<unsigned> labelIndex; // Index in a translated semicolon list; absent means the whole label.
+};
+struct ChoiceSpec {
+	std::string popup, viewport, content, valueText;
+	unsigned visibleRows = 8;
+	std::vector<ChoiceOption> options;
+};
 struct Control {
 	std::string action, label;
 	bool enabled = true;
 	std::map<ControlState,std::string> states;
 	std::map<std::string,std::string> navigation;
 	std::string event; // Case-folded event name; mutually exclusive with action.
+	ControlRole role = ControlRole::Button;
+	std::optional<Expression> value;
+	std::variant<std::monostate, ToggleSpec, SliderSpec, ChoiceSpec> widget;
+};
+struct ControlReadback {
+	StateValue value;
+	bool mixed = false;
+	std::vector<bool> enabledOptions;
 };
 struct Node {
 	std::string id, type;
@@ -147,7 +180,8 @@ struct DocumentModel {
 	// Resolve a compiled descriptor against one supplied state snapshot.
 	// No side effects; failure preserves the caller's invocation unchanged.
 	bool ResolveAction(const std::string& id, const StateValues& variables,
-		ActionInvocation& invocation, std::string& error, const PresentationLookup& presentation = {}) const;
+		ActionInvocation& invocation, std::string& error, const PresentationLookup& presentation = {},
+		const StateValue* input = nullptr) const;
 };
 std::optional<PresentationType> PresentationAliasType(const DocumentModel& model, const std::string& name);
 struct Diagnostic {

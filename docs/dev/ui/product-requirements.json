@@ -4,7 +4,7 @@
   "date": "2026-09-09",
   "status": "Implementation incomplete; this register preserves full product scope and does not accept any production GUI.",
   "baseline": {
-    "engine_revision": "1f6bfa556941f85b245aa80d7aa54e481fa71d3c",
+    "engine_revision": "b3bf279b4347329cd8a45a4533536adc0510e860",
     "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
     "effective_gui_count": 271,
     "translated_or_accepted_resources": 0,
@@ -19,7 +19,7 @@
     "product": {
       "path": "docs/dev/plans/ui-product-completion.md",
       "authority": "normative completion scope, milestones and final audit",
-      "sha256": "eefe7defe0fbe2259ec58d65e3cd625b84a6dbf3ea3bf0064da812e363ae58b4"
+      "sha256": "29c20f925954f2a1f1737b8d057bb899576034c3199d89b4018b1b3d91345400"
     },
     "original": {
       "path": "docs/dev/plans/idtech5-ui.md",
@@ -100,7 +100,7 @@
       "kind": "source_audit",
       "path": "docs/dev/plans/ui-product-completion.md",
       "scope": "Published audit at 80bb3939; source limitations corroborated by current Document/Runtime inspection. Historical tests and captures are not a fresh product qualification.",
-      "sha256": "eefe7defe0fbe2259ec58d65e3cd625b84a6dbf3ea3bf0064da812e363ae58b4"
+      "sha256": "29c20f925954f2a1f1737b8d057bb899576034c3199d89b4018b1b3d91345400"
     },
     "document-foundation": {
       "kind": "implementation_checkpoint",
@@ -212,7 +212,7 @@
     "settings-transaction-foundation": {
       "kind": "qualified_foundation_checkpoint",
       "path": "docs/dev/ui/system-settings-contract.md",
-      "sha256": "82798a840773a335e93ec6c7af4226165515bdaadc567b6aa1a331878dc2b1ea",
+      "sha256": "0850888d4dbc60e9cc2b3496e608b74dc830eb788f0d04521fffe6a200651f30",
       "baseline_engine_revision": "15e35beaf11a1f1942ba25e9431211f64c1ef7f1",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "local_capture_summary": ".tmp/ui/settings-review/capture-evidence.json",
@@ -241,6 +241,17 @@
       "local_capture_status": "qualified_subset",
       "scope": "M2 display transaction integration: queued Apply/Keep/Revert/Retry with never-reused owner/request identities, strict actual-device matching, exact synchronous owner-frame presentation receipt followed by a fresh presentation, 15-second confirmation and 20-second device deadline. A canonical Pending/Confirmed journal, checked durable configuration replacement, exclusive process/window-placement leases, conflict-safe replay and renderer-private ABI15 strict first-device initialization protect interrupted settings changes. Native suites and counted production-method tests cover failures, partial writes, stale identities, uncertain persistence, invalid recovery records and historical display remapping. Source/binary-bound hidden windowed Windows SP/OpenGL and MP/Vulkan captures exercise two actual display changes, Keep/Revert, resource recreation and engine-rendered confirmation panels. Separate two-process recovery captures retain a real unconfirmed journal; Confirmed variants explicitly inject only the approved marker and checksum and do not claim a real Keep crash or power-cut test. This qualifies the recorded diagnostic subset only. Complete audio/resource effects, presets/Auto-Detect, production SYSTEM controls/artwork, editor round trips, visible window-manager/fullscreen/multi-monitor behavior, other platforms and the complete 271-GUI product remain unaccepted.",
       "sha256": "247b8a60f9784d438c8b261d5b01bc88d1ad730175e25c6aa80cd4673cf0623b"
+    },
+    "value-controls-foundation": {
+      "kind": "qualified_foundation_checkpoint",
+      "path": "docs/dev/ui/value-controls.md",
+      "baseline_engine_revision": "b3bf279b4347329cd8a45a4533536adc0510e860",
+      "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
+      "qualification_status": "bounded_normal_system_increment_qualified",
+      "scope": "M2 implementation subset: canonical typed toggle, stepped slider and constrained choice roles, atomic authoritative value/mixed/option readbacks, invocation-local immutable edit operands and acknowledged proposals. Authored stable vector parts have compiler-enforced geometry and property ownership; derived popup placement, tentative selection/drag state, source cancellation and versioned widget snapshots support the subset. The packaged openq4.system document declares the complete 53-field draft/baseline service schema and presents eight initial immediate image controls with local dirty-discard and eligible display-confirmation panels. A non-archived default-off ui_retainedSystem option selects the normal Session child route, preserving its exact parent and service-owned return guard. The final Windows build/package stage and 13 native UI suites pass; the production Session boundary passes 173 checks and the capture runner passes 15 tests with 444 rejected altered-log cases. Source/binary-bound hidden windowed Windows SP/OpenGL at 125% and MP/Vulkan at 200%, both at 1280x720, each pass 18 normal Session stages after active gameplay. Draft/readback/apply, dirty Back/continue/discard, tentative/committed choice, language/video recovery with an unapplied draft, exact parent return and fresh-owner reopen are covered. All 14 engine render-target images were reviewed, including column reflow, popup placement and distinct disabled Apply; SP has no warnings/errors, MP retains 94 baseline warnings with no new warning messages or errors. These are semantic integration and static-view checks, not full physical-input, transition, display/platform/language or artwork qualification. Precise numeric text entry/IME, complete controls and setting inventory, effect/preset executors, full source-derived artwork/transitions, touch/accessibility/scrollbars, editor round trips and full platform/corpus qualification remain required. Discard currently resets the draft and stays on the page. No requirement, milestone, production screen or migration entry is accepted.",
+      "local_capture_summary": ".tmp/ui/value-controls-review/capture-evidence.json",
+      "local_capture_summary_sha256": "2c5c14d4d0a9d0fb8cc8d45dab9af39fdc9e6c4ab017f93a1f6a3e49c3cf1a40",
+      "sha256": "f5c9612ba410ed50f7a69beeefabfbcc5bac76e3db038e35414bf8dd44bc9570"
     }
   },
   "groups": {
@@ -1327,10 +1338,11 @@
         "binding-foundation",
         "presentation-alias-foundation",
         "event-program-foundation",
-        "settings-transaction-foundation"
+        "settings-transaction-foundation",
+        "value-controls-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "Pending application values and fresh CVar sources validate together at event entry; ordered program writes and action arguments stage against the resulting authoritative state and commit atomically. The settings service adds a reserved read-only settings.* namespace with exact declared types, no CVar-source override, rejected program writes and authoritative publication independent of caller dictionary input. Complete widget/data-source ownership and source-bound production state semantics remain."
+      "remaining": "Application/CVar/property ownership now also covers atomically evaluated control values, mixed state and ordered option eligibility. User proposals are typed invocation-local operands; accepted service readback remains authoritative and invalid batches preserve prior state. Complete every widget/data-source ownership policy and source-bound production state contract; recorded native and normal-route Windows SP/OpenGL 125% and MP/Vulkan 200% evidence qualifies this subset only."
     },
     {
       "id": "DOC-007",
@@ -1627,10 +1639,11 @@
       "current_evidence": [
         "managed-application-foundation",
         "event-program-foundation",
-        "settings-transaction-foundation"
+        "settings-transaction-foundation",
+        "value-controls-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "Canonical programs validate typed operation arguments before local commit and preserve each invocation at its ordered state snapshot. The private Session pump dispatches brightness/shadows/dismiss plus typed settings.system begin/edit/defaults/apply/cancel/confirm/revert operations. The settings service publishes localized status keys and service-owned results, rejecting unsupported parameter types and blocked non-immediate batches. Complete session/SP/MP operations, asynchronous device results, source provenance and full translated behavior remain."
+      "remaining": "The typed settings dispatcher now accepts immutable value-control proposals and returns an owner/proposal-bound result; no temporary service-state write carries the operand. The default-off normal SYSTEM route uses the existing Session bridge. Complete the session/SP/MP operation catalog, source provenance and every translated behavior, and qualify the entire action contract. Recorded native and normal-route Windows SP/OpenGL 125% and MP/Vulkan 200% evidence qualifies this subset only."
     },
     {
       "id": "BEH-002",
@@ -1656,10 +1669,11 @@
       "current_evidence": [
         "settings-transaction-foundation",
         "display-device-foundation",
-        "display-confirmation-foundation"
+        "display-confirmation-foundation",
+        "value-controls-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "The 53-field catalog and owned transaction/service now integrate actual asynchronous display Apply/Keep/Revert/Retry, frame-bound presentation qualification, checked durable Pending/Confirmed recovery and strict first-device startup replay. Native and recorded hidden windowed Windows GL/Vulkan diagnostic evidence qualifies this subset. Finish actual audio/resource/input flows, profile and Auto-Detect draft expansion, complete dependent production controls, visible focus/window-placement/fullscreen/multi-monitor failure and timeout behavior, platform qualification and full production acceptance. CVar values alone never prove device success, and injected Confirmed startup evidence is not a real interrupted Keep or power-loss experiment."
+      "remaining": "The 53-field transaction/service and actual asynchronous display Apply/Keep/Revert/Retry retain their separately qualified diagnostic evidence. Initial normal-route controls now edit and read accepted drafts through typed proposals, with guarded dirty Back and discard-to-Editing behavior. Complete actual audio/resource/input effects, profile and Auto-Detect draft expansion, all dependent production controls and Defaults/Cancel/discard-and-exit flows, visible focus/window-placement/fullscreen/multi-monitor failure and timeout behavior, all platforms and full production acceptance. CVar values alone never prove device success; injected Confirmed startup evidence is not an interrupted Keep or power-loss test. The recorded native and normal-route Windows SP/OpenGL 125% and MP/Vulkan 200% evidence qualifies the initial controls and semantic route only."
     },
     {
       "id": "BEH-003",
@@ -2010,10 +2024,11 @@
         "instance-persistence-foundation",
         "managed-application-foundation",
         "presentation-alias-foundation",
-        "event-program-foundation"
+        "event-program-foundation",
+        "value-controls-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "Snapshots preserve committed application/presentation values and motion from successful programs; restore discards host invocations and suppresses automatic initialization replay. Selection/scroll, editable text, dynamic collections, legacy script timers and deterministic full-corpus action continuation remain."
+      "remaining": "Widget snapshot version3 adds role and choice-scroll records while preserving earlier button-instance formats; open popup, drag preview, pending proposal, armed input and queued actions are transient and canceled on restoration. Committed application/presentation values and motion retain their existing snapshot policy. Complete editable text, dynamic collections, legacy timers, all selection/scroll/modal/focus state and deterministic full-corpus continuation without replay. Recorded native and normal-route Windows resource-reset checks qualify the new widget subset only."
     },
     {
       "id": "SAVE-003",
@@ -2137,7 +2152,7 @@
         "product:3 Text, controls and accessibility",
         "product:5 Visual and interaction qualification"
       ],
-      "requirement": "Provide independently persisted UI scale default 100%, range 75\u00c3\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u0153200%; clamp extremes with reachable reset and no lost essential actions.",
+      "requirement": "Provide independently persisted UI scale default 100%, range 75\u2013200%; clamp extremes with reachable reset and no lost essential actions.",
       "dependencies": [
         "BEH-002"
       ],
@@ -2167,7 +2182,7 @@
         "product:3 Text, controls and accessibility",
         "product:5 Visual and interaction qualification"
       ],
-      "requirement": "Provide text scale default 100%, range 100\u00c3\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u0153200% independent of furniture; reflow labels, rows and forms without hiding essential actions.",
+      "requirement": "Provide text scale default 100%, range 100\u2013200% independent of furniture; reflow labels, rows and forms without hiding essential actions.",
       "dependencies": [
         "TXT-001",
         "LAY-003"
@@ -2742,10 +2757,11 @@
       ],
       "status": "partial",
       "current_evidence": [
-        "input-foundation"
+        "input-foundation",
+        "value-controls-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "The cited foundation is limited; complete and qualify the entire stated requirement before acceptance.",
+      "remaining": "The time-driven semantic repeat foundation now also drives stepped value changes and constrained option navigation, with selection remaining an immutable proposal to authoritative readback. Complete and qualify irregular-time/held-source/disabled-option behavior across the entire device and widget set; the recorded native and normal-route semantic checks do not establish full physical-device qualification.",
       "constraints": {
         "repeat_initial_ms": 320,
         "repeat_interval_ms": 110,
@@ -2776,10 +2792,11 @@
       "current_evidence": [
         "input-foundation",
         "presentation-alias-foundation",
-        "event-program-foundation"
+        "event-program-foundation",
+        "value-controls-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "Physical input requests remain cancellable while committed program invocations survive focus/console/interactivity suspension. Queued controls recheck current document, interactivity and ancestor eligibility before execution; outgoing lifecycle dismissal cannot affect the replacement. Complete device removal/reconnect, gameplay/modal ownership and all-widget held-source quarantine remain."
+      "remaining": "Value gestures add transient capture/preview, pending-proposal identity and popup dismissal to existing input quarantine. Loss of focus, eligibility or usable projection cancels a gesture; restoration does not replay transient edits. Complete and qualify physical-device removal/reconnect, gameplay/modal ownership and all-widget held-source behavior. The recorded normal-route Windows checks qualify semantic ownership and resource resets; physical-device qualification remains open."
     },
     {
       "id": "INP-005",
@@ -2829,10 +2846,11 @@
       "current_evidence": [
         "interaction-foundation",
         "presentation-alias-foundation",
-        "event-program-foundation"
+        "event-program-foundation",
+        "value-controls-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "Hidden/noevents ancestors exclude child targets and newly queued activations are revalidated after earlier programs change availability. The full widget focus-versus-selection gallery, modal stack teardown and restoration matrix remain."
+      "remaining": "Choice controls separate accepted selection from tentative highlight, consume outside dismissal and derive a popup beyond clipped ancestors. Hidden/disabled option and ancestor eligibility participates in the semantic contract. Complete the full widget state gallery, modal focus before first visible frame, stack teardown/restoration and keyboard/gamepad/accessibility matrix. The recorded native and normal-route Windows checks qualify the bounded subset only."
     },
     {
       "id": "INP-007",
@@ -2934,10 +2952,12 @@
       "acceptance_evidence_needed": [
         "Real value/action and state-gallery evidence for keyboard, pointer, gamepad and supported touch/text entry; include disabled, busy, invalid, cancel and focus cases as applicable. All named behavior must work through production routing."
       ],
-      "status": "pending",
-      "current_evidence": [],
+      "status": "partial",
+      "current_evidence": [
+        "value-controls-foundation"
+      ],
       "acceptance_evidence": [],
-      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required."
+      "remaining": "Canonical toggles now bind authoritative Boolean/mixed expressions and emit immutable typed proposals; the initial SYSTEM page authors a shared label/box target, cut outline, vector tick and mixed part. Qualify checked/unchecked/mixed, accepted/rejected edits, disabled/busy/cancel/focus states and every supported physical-device path through production routing. Complete reusable component/state-gallery and full artwork/accessibility acceptance. Recorded native and normal-route Windows checks qualify this initial control subset only."
     },
     {
       "id": "WID-003",
@@ -2983,10 +3003,12 @@
       "acceptance_evidence_needed": [
         "Real value/action and state-gallery evidence for keyboard, pointer, gamepad and supported touch/text entry; include disabled, busy, invalid, cancel and focus cases as applicable. All named behavior must work through production routing."
       ],
-      "status": "pending",
-      "current_evidence": [],
+      "status": "partial",
+      "current_evidence": [
+        "value-controls-foundation"
+      ],
       "acceptance_evidence": [],
-      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required."
+      "remaining": "Canonical stepped sliders now have authored track/fill/thumb/value parts, authoritative raw readback, captured drag previews with release proposals and keyboard step/navigation semantics. Initial brightness/ambient controls use the owned settings draft. Precise numeric entry and its caret/selection/clipboard/IME path remain mandatory; increment controls do not substitute for them. Complete interrupted binding/animation ownership, reusable artwork and all disabled/busy/invalid/cancel/focus, touch/gamepad/keyboard/pointer production cases. Recorded native and normal-route Windows checks qualify this initial control subset only."
     },
     {
       "id": "WID-005",
@@ -3008,10 +3030,12 @@
       "acceptance_evidence_needed": [
         "Real value/action and state-gallery evidence for keyboard, pointer, gamepad and supported touch/text entry; include disabled, busy, invalid, cancel and focus cases as applicable. All named behavior must work through production routing."
       ],
-      "status": "pending",
-      "current_evidence": [],
+      "status": "partial",
+      "current_evidence": [
+        "value-controls-foundation"
+      ],
       "acceptance_evidence": [],
-      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required."
+      "remaining": "Canonical constrained choices now have stable typed options and authored field/chevron/popup/row/label/selection/highlight parts, authoritative readback, tentative open/cancel/commit behavior and measured popup scrolling/placement. Initial post-AA selection uses the settings draft. Complete scrollbars, all constrained/overflow/dynamic availability cases, focus restoration, full physical-device/accessibility behavior, reusable artwork and state-gallery acceptance. Recorded native and normal-route Windows checks qualify this initial control subset only."
     },
     {
       "id": "WID-006",
@@ -3902,7 +3926,7 @@
         "product:3 Visual quality and motion",
         "original:Stage 6"
       ],
-      "requirement": "Standard panels have equal 12 dp upper/8 dp lower 45-degree cuts, 1 dp rail and 3 dp inset rail; popover cuts 6 dp, major bands 16\u00c3\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u015324 dp. Reconstruct each stepped/notched silhouette and named ornaments without stretched corners.",
+      "requirement": "Standard panels have equal 12 dp upper/8 dp lower 45-degree cuts, 1 dp rail and 3 dp inset rail; popover cuts 6 dp, major bands 16\u201324 dp. Reconstruct each stepped/notched silhouette and named ornaments without stretched corners.",
       "dependencies": [
         "ART-001",
         "REN-001"
@@ -4628,14 +4652,15 @@
       "acceptance_evidence_needed": [
         "Source/control/event coverage, normal game entry/return/reopen, real operation readback and cancellation/failure scenarios; independently reviewed full-state responsive engine captures for every mapped resource."
       ],
-      "status": "pending",
+      "status": "partial",
       "current_evidence": [
         "settings-transaction-foundation",
         "display-device-foundation",
-        "display-confirmation-foundation"
+        "display-confirmation-foundation",
+        "value-controls-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "The source-backed contract inventories 31 setting options, dependent popup/default/confirmation behavior and the complete 53-CVar page/preset union with source hashes and precedence. The transaction/catalog/service now includes real asynchronous display confirmation and durable startup recovery, exercised through source-bound diagnostic documents. No production SYSTEM document, complete control/vector-artwork set, editor round trip or full source-bound behavioral/visual screen acceptance exists. Translate the actual shipped page and dependent flows; qualify real normal entry/return/reopen and every mapped control. Diagnostic display probes cannot satisfy this requirement."
+      "remaining": "The source-backed 31-option/53-CVar contract now has a packaged openq4.system document and a default-off normal Session child route. Eight initial immediate image controls, all53 typed draft/baseline declarations, guarded Back/discard and eligible display-confirmation controls are authored. This is partial implementation, not a translated or accepted page. Complete every actual setting and dependent popup, display capability/resolution catalogs, numeric text entry, preset/Auto-Detect and remaining effects, Defaults/Cancel/discard-and-exit, source-derived visual/transitions and native editor round trip. Qualify normal SP/MP entry/return/reopen, failure/cancellation, full responsive/localized state galleries and every mapped resource. The final native and normal-route Windows SP/OpenGL 125% and MP/Vulkan 200% evidence qualifies the initial subset only; neither that evidence nor prior diagnostic probes satisfies the complete requirement."
     },
     {
       "id": "FLOW-003",

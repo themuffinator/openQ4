@@ -2,6 +2,7 @@
 #include "Runtime.h"
 #include "State.h"
 #include "VectorElement.h"
+#include "ValueControlView.h"
 
 #include <RmlUi/Core.h>
 #include <RmlUi/Core/FontEngineInterface.h>
@@ -589,11 +590,13 @@ struct Runtime::Impl {
 	std::string stateError;
 	std::uint64_t appliedStateRevision = 0;
 	Interaction interaction;
+	ValueControlView valueView;
 	Viewport viewport;
 	std::vector<std::string> controls;
 	float pointerX = 0, pointerY = 0;
 	float windowPointerX = 0, windowPointerY = 0;
 	bool pointerPresent = false;
+	bool pointerNavigation = false;
 	std::map<PropertyKey,std::string> applied;
 	bool initialized = false;
 	std::map<std::string,bool> inputAllowed;
@@ -612,6 +615,8 @@ struct Runtime::Impl {
 	}
 	void ApplyControlBindings() {
 		if (appliedStateRevision == state.Revision()) return;
+		std::string error;
+		if (!interaction.SetReadbacks(state.ControlValues(),error)) { host.Log(true,error); return; }
 		for (const auto& [id,enabled] : state.Enabled()) interaction.SetEnabled(id,enabled);
 		appliedStateRevision = state.Revision(); Feedback(time);
 	}
@@ -632,6 +637,15 @@ struct Runtime::Impl {
 	void Feedback(double seconds) {
 		if (std::isfinite(seconds)) time = std::max(time,seconds);
 		for (const auto& change : interaction.TakeFeedback()) motion.Play(change.timeline,time);
+	}
+	void RevealFocus() {
+		if (!document) return;
+		if (auto* element = document->GetElementById(interaction.Focused())) {
+			Rml::ScrollIntoViewOptions options;
+			options.vertical = options.horizontal = Rml::ScrollAlignment::Nearest;
+			options.behavior = Rml::ScrollBehavior::Instant;
+			element->ScrollIntoView(options);
+		}
 	}
 	std::string HitControl() const {
 		if (!pointerPresent || !canonical || !document || pointerX < 0 || pointerY < 0 || pointerX >= viewport.width || pointerY >= viewport.height) return {};
@@ -658,7 +672,14 @@ struct Runtime::Impl {
 			if (element && inputAllowed.at(id) && element->IsVisible(true) && Rml::ElementUtilities::GetBoundingBox(rect,element,Rml::BoxArea::Border))
 				bounds[id] = {rect.Left(),rect.Top(),rect.Width(),rect.Height(),true};
 		}
-		interaction.SetBounds(bounds); interaction.Hover(HitControl()); Feedback(time);
+		interaction.SetBounds(bounds);
+		const auto hit = HitControl();
+		auto* element = pointerPresent && pointerNavigation && pointerX >= 0 && pointerY >= 0 && pointerX < viewport.width && pointerY < viewport.height ?
+			context->GetElementAtPoint({pointerX,pointerY},nullptr,document) : nullptr;
+		const auto part = valueView.PointerPart(element,pointerX,pointerY,interaction);
+		if (part.invalidProjection) interaction.Cancel();
+		else interaction.PointerPart(part.control.empty() ? (pointerNavigation ? hit : std::string{}) : part.control,part.fraction,part.option);
+		Feedback(time);
 	}
 	void ApplyMotion() {
 		if (!document || !canonical) return;
@@ -707,6 +728,7 @@ bool Runtime::Initialize() {
 }
 void Runtime::Shutdown() {
 	if (!impl->initialized) return;
+	impl->valueView.Reset();
 	{
 		ContextClock clock(*impl->services,impl->time);
 		Rml::RemoveContext(impl->contextName);
@@ -718,7 +740,7 @@ void Runtime::Shutdown() {
 	impl->document = nullptr;
 	impl->canonical.reset(); impl->applied.clear(); impl->motion.Reset({});
 	impl->state = {}; impl->appliedStateRevision = 0; impl->stateError.clear();
-	impl->interaction.Reset({}); impl->controls.clear(); impl->pointerPresent = false;
+	impl->interaction.Reset({}); impl->controls.clear(); impl->pointerPresent = impl->pointerNavigation = false;
 	impl->initialized = false;
 	impl->time = 0;
 	impl->contextName.clear();
@@ -727,9 +749,10 @@ void Runtime::Shutdown() {
 }
 void Runtime::CloseDocument() {
 	impl->sourcePath.clear();
+	impl->valueView.Reset();
 	impl->canonical.reset(); impl->applied.clear(); impl->motion.Reset({});
 	impl->state = {}; impl->appliedStateRevision = 0; impl->stateError.clear();
-	impl->interaction.Reset({}); impl->controls.clear(); impl->pointerPresent = false;
+	impl->interaction.Reset({}); impl->controls.clear(); impl->pointerPresent = impl->pointerNavigation = false;
 	if (!impl->document) return;
 	ContextClock clock(*impl->services,impl->time);
 	impl->document->Close();
@@ -769,6 +792,10 @@ bool Runtime::LoadDocument(const std::string& source, const std::string& sourceP
 			static_cast<VectorElement*>(element)->Configure(*node,impl->host,impl->Stats());
 		for (const auto& child : node->children) nodes.push_back(&child);
 	}
+	if (!impl->valueView.Initialize(impl->canonical->Model(),*impl->document,
+		[&](const std::string& text) { return impl->host.Translate(text); },stateError)) {
+		diagnostics.push_back({"/root",stateError}); CloseDocument(); return false;
+	}
 	impl->ReadStateSources(); impl->Feedback(impl->time);
 	impl->ApplyMotion();
 	return true;
@@ -803,7 +830,8 @@ bool Runtime::SaveSnapshot(std::string& snapshot, std::string& error, double sec
 		if (!motion.Restore(playback,now,error,true)) return false;
 		const auto input = interaction.Capture();
 		Json::Value root(Json::objectValue);
-		root["format"] = "openq4-ui-instance"; root["version"] = 2;
+		const auto widgets = interaction.CaptureWidgets();
+		root["format"] = "openq4-ui-instance"; root["version"] = widgets.widgets.empty() ? 2 : 3;
 		auto& identity = root["document"];
 		identity["version"] = 1; identity["id"] = impl->canonical->Model().id;
 		identity["path"] = impl->sourcePath; identity["source"] = impl->canonical->Source();
@@ -849,9 +877,15 @@ bool Runtime::SaveSnapshot(std::string& snapshot, std::string& error, double sec
 		for (const auto& [id,enabled] : input.enabled) if (!impl->state.Enabled().contains(id)) semantics["enabled"][id] = enabled;
 		semantics["presented"] = Json::Value(Json::objectValue);
 		for (const auto& [id,state] : input.presented) semantics["presented"][id] = unsigned(state);
-		// Reserved schema slots fail closed until the actual widgets and script
-		// clocks have persistent state contracts. Empty does not imply support.
 		root["widgets"] = Json::Value(Json::objectValue);
+		if (!widgets.widgets.empty()) {
+			root["widgets"]["version"] = widgets.version;
+			root["widgets"]["controls"] = Json::Value(Json::objectValue);
+			for (const auto& [id,widget] : widgets.widgets) {
+				auto& entry = root["widgets"]["controls"][id];
+				entry["role"] = unsigned(widget.role); entry["firstVisible"] = widget.firstVisible;
+			}
+		}
 		Json::StreamWriterBuilder writer; writer["indentation"] = ""; writer["precision"] = 17;
 		std::string candidate = Json::writeString(writer,root);
 		if (candidate.size() > MaxSnapshotBytes) { error = "Instance snapshot exceeds the 128 MiB limit"; return false; }
@@ -872,16 +906,27 @@ bool Runtime::RestoreSnapshot(const std::string& snapshot, std::string& error, d
 		builder["allowSpecialFloats"] = false; builder["stackLimit"] = 32; builder["skipBom"] = false;
 		std::unique_ptr<Json::CharReader> reader(builder.newCharReader()); Json::Value root;
 		if (!reader->parse(snapshot.data(),snapshot.data()+snapshot.size(),&root,nullptr)) return reject("Invalid instance snapshot JSON");
-		if (root["format"] != "openq4-ui-instance" || !root["version"].isUInt() || (root["version"].asUInt() != 1 && root["version"].asUInt() != 2))
+		if (root["format"] != "openq4-ui-instance" || !root["version"].isUInt() || root["version"].asUInt() < 1 || root["version"].asUInt() > 3)
 			return reject("Unsupported instance snapshot schema");
-		const bool hasPresentation = root["version"].asUInt() == 2;
+		const bool hasPresentation = root["version"].asUInt() >= 2;
 		if (hasPresentation ? !SnapshotFields(root,{"format","version","document","application","presentation","interaction","widgets","presentationState"}) :
 			!SnapshotFields(root,{"format","version","document","application","presentation","interaction","widgets"})) return reject("Invalid instance snapshot fields");
 		const auto& identity = root["document"];
 		if (!SnapshotFields(identity,{"version","id","path","source"}) || !identity["version"].isUInt() || identity["version"].asUInt() != 1 ||
 			identity["id"] != impl->canonical->Model().id || identity["path"] != impl->sourcePath || identity["source"] != impl->canonical->Source())
 			return reject("Instance snapshot document/source identity mismatch");
-		if (!root["widgets"].isObject() || !root["widgets"].empty()) return reject("Unsupported restored widget state");
+		ValueWidgetSnapshot widgets;
+		if (root["version"].asUInt() == 3) {
+			const auto& saved = root["widgets"];
+			if (!SnapshotFields(saved,{"version","controls"}) || !saved["version"].isUInt() || saved["version"].asUInt() != 1 ||
+				!saved["controls"].isObject() || saved["controls"].size() > impl->controls.size()) return reject("Invalid restored widget table");
+			for (const auto& id : saved["controls"].getMemberNames()) {
+				const auto& entry = saved["controls"][id];
+				if (!SnapshotFields(entry,{"role","firstVisible"}) || !entry["role"].isUInt() || entry["role"].asUInt() < unsigned(ControlRole::Toggle) ||
+					entry["role"].asUInt() > unsigned(ControlRole::Choice) || !entry["firstVisible"].isUInt()) return reject("Invalid restored widget state");
+				widgets.widgets[id] = {ControlRole(entry["role"].asUInt()),entry["firstVisible"].asUInt()};
+			}
+		} else if (!root["widgets"].isObject() || !root["widgets"].empty()) return reject("Unsupported restored widget state");
 		const auto& application = root["application"];
 		if (!application.isObject()) return reject("Invalid restored application state");
 		StateValues values, sources;
@@ -965,6 +1010,7 @@ bool Runtime::RestoreSnapshot(const std::string& snapshot, std::string& error, d
 			input.presented[id] = ControlState(value.asUInt());
 		}
 		Interaction interaction = impl->interaction;
+		if (!interaction.SetReadbacks(state.ControlValues(),error) || !interaction.RestoreWidgets(widgets,error)) return false;
 		if (!interaction.Restore(input,error)) return false;
 		// Host bindings remain authoritative. If current CVars changed control
 		// availability, transition from the saved ink to the new semantic state.
@@ -972,7 +1018,7 @@ bool Runtime::RestoreSnapshot(const std::string& snapshot, std::string& error, d
 		// No live state, geometry, clock or input queues change before validation
 		// completes. Rendering applies the restored values on the next frame.
 		impl->state = std::move(state); impl->motion = std::move(motion); impl->interaction = std::move(interaction);
-		impl->time = now; impl->pointerPresent = false; impl->applied.clear();
+		impl->time = now; impl->pointerPresent = impl->pointerNavigation = false; impl->applied.clear();
 		impl->appliedStateRevision = impl->state.Revision(); impl->stateError.clear();
 		return true;
 	} catch (const std::exception& problem) { error = std::string("Cannot restore instance snapshot: ")+problem.what(); return false; }
@@ -1023,10 +1069,10 @@ bool Runtime::RunEvent(const std::string& name, double seconds, EventEffects& ef
 	impl->stateError.clear(); impl->ApplyControlBindings(); impl->UpdateInteraction(now);
 	effects = std::move(published); return true;
 }
-bool Runtime::ResolveAction(const std::string& id, ActionInvocation& invocation, std::string& error) const {
+bool Runtime::ResolveAction(const std::string& id, ActionInvocation& invocation, std::string& error, const StateValue* input) const {
 	if (!impl->canonical) { error = "Action requires a canonical document"; return false; }
 	return impl->canonical->Model().ResolveAction(id,impl->state.Variables(),invocation,error,
-		MakePresentationLookup(impl->canonical->Model(),impl->state,impl->motion));
+		MakePresentationLookup(impl->canonical->Model(),impl->state,impl->motion),input);
 }
 void Runtime::PauseTimeline(const std::string& id, double seconds) { impl->motion.Pause(id,seconds); }
 void Runtime::ResumeTimeline(const std::string& id, double seconds) { impl->motion.Resume(id,seconds); }
@@ -1052,6 +1098,15 @@ void Runtime::Frame(const Viewport& viewport, double seconds) {
 	impl->context->SetDimensions({viewport.width, viewport.height});
 	impl->context->SetDensityIndependentPixelRatio(viewport.DpRatio());
 	impl->context->Update();
+	// Owned widget wrappers remain derived layout. Bounded settling lets a
+	// newly opened popup measure its authored rows before its first rendering.
+	for (unsigned pass = 0; pass < 3; ++pass) {
+		impl->context->GetRootElement()->UpdateGeometryForProjection();
+		impl->UpdateInteraction();
+		if (!impl->valueView.Paint(impl->interaction,impl->state.ControlValues(),viewport.width,viewport.height,viewport.DpRatio(),
+			[&](const std::string& id) { const auto value = impl->PresentedProperty({id,"opacity"}); return value ? value->data[0] : 1.0; })) break;
+		impl->context->Update();
+	}
 	const auto updated = std::chrono::steady_clock::now();
 	impl->backend->renderer.BeginFrame(viewport.width,viewport.height);
 	impl->context->Render();
@@ -1098,16 +1153,48 @@ RuntimeStatistics Runtime::Statistics() const {
 	return statistics;
 }
 void Runtime::PointerMove(float x, float y, double seconds) {
+	impl->pointerNavigation = true;
 	impl->pointerPresent = std::isfinite(x) && std::isfinite(y);
 	impl->windowPointerX = x; impl->windowPointerY = y;
 	impl->viewport.WindowToDocument(x,y,impl->pointerX,impl->pointerY);
 	impl->UpdateInteraction(seconds); impl->Feedback(seconds);
 }
-void Runtime::PointerButton(bool down, double seconds) { impl->UpdateInteraction(seconds); impl->interaction.Pointer(down); impl->Feedback(seconds); }
-void Runtime::MenuAction(MenuInput input, bool down, double seconds) { impl->UpdateInteraction(seconds); impl->interaction.Input(input,down); impl->Feedback(seconds); }
-void Runtime::CancelInput(double seconds) { impl->pointerPresent = false; impl->interaction.Cancel(); impl->Feedback(seconds); }
+void Runtime::PointerButton(bool down, double seconds) { impl->pointerNavigation = true; impl->UpdateInteraction(seconds); impl->interaction.Pointer(down); impl->Feedback(seconds); }
+void Runtime::PointerWheel(int rows, double seconds) {
+	impl->UpdateInteraction(seconds);
+	if (!rows) return;
+	for (const auto& id : impl->controls) {
+		const auto widget = impl->interaction.Widget(id);
+		if (!widget || !widget->popupOpen) continue;
+		// One bounded row step per supplied wheel event; platform adapters do not
+		// turn accumulated input or a stalled frame into a navigation burst.
+		// Keep this selection through layout and subsequent wheel events. The
+		// stationary pointer must not reselect its old row on the next frame;
+		// an actual pointer move or button event restores pointer navigation.
+		impl->pointerNavigation = false;
+		impl->interaction.Input(rows > 0 ? MenuInput::Down : MenuInput::Up,true);
+		impl->Feedback(seconds); return;
+	}
+	if (!impl->pointerPresent || !impl->context || !impl->document || impl->pointerX < 0 || impl->pointerY < 0 ||
+		impl->pointerX >= impl->viewport.width || impl->pointerY >= impl->viewport.height) return;
+	if (auto* hit = impl->context->GetElementAtPoint({impl->pointerX,impl->pointerY},nullptr,impl->document))
+		if (auto* scroll = hit->GetClosestScrollableContainer())
+			scroll->SetScrollTop(scroll->GetScrollTop()+(rows > 0 ? 36.f : -36.f)*impl->viewport.DpRatio());
+}
+void Runtime::MenuAction(MenuInput input, bool down, double seconds) {
+	if (down && input != MenuInput::Back && !impl->interaction.CapturedPointerControl().empty()) impl->interaction.Cancel();
+	const auto before = impl->interaction.Focused();
+	impl->pointerNavigation = false; impl->UpdateInteraction(seconds); impl->interaction.Input(input,down); impl->Feedback(seconds);
+	if (impl->interaction.Focused() != before) impl->RevealFocus();
+}
+void Runtime::CancelInput(double seconds) { impl->pointerPresent = impl->pointerNavigation = false; impl->interaction.Cancel(); impl->Feedback(seconds); }
 void Runtime::ReleaseInputSources() { impl->interaction.ReleaseInputSources(); }
-bool Runtime::FocusControl(const std::string& id, double seconds) { impl->UpdateInteraction(seconds); const bool result = impl->interaction.Focus(id); impl->Feedback(seconds); return result; }
+bool Runtime::FocusControl(const std::string& id, double seconds) {
+	impl->pointerNavigation = false;
+	impl->UpdateInteraction(seconds); const bool result = impl->interaction.Focus(id);
+	if (result) impl->RevealFocus();
+	impl->Feedback(seconds); return result;
+}
 bool Runtime::SetControlEnabled(const std::string& id, bool enabled, double seconds) {
 	if (impl->state.Enabled().contains(id)) return false; // The binding owns this control's availability.
 	const bool result = impl->interaction.SetEnabled(id,enabled); impl->Feedback(seconds); return result;
@@ -1116,6 +1203,10 @@ bool Runtime::PushModal(const std::string& id, double seconds) { impl->UpdateInt
 bool Runtime::PopModal(double seconds) { impl->UpdateInteraction(seconds); const bool result = impl->interaction.PopModal(); impl->Feedback(seconds); return result; }
 std::string Runtime::FocusedControl() const { return impl->interaction.Focused(); }
 std::optional<ControlState> Runtime::GetControlState(const std::string& id) const { return impl->interaction.State(id); }
+std::optional<WidgetViewState> Runtime::GetWidgetState(const std::string& id) const { return impl->interaction.Widget(id); }
+bool Runtime::AcknowledgeControlProposal(const std::string& id, std::uint64_t token, bool accepted) {
+	return impl->interaction.AcknowledgeProposal(id,token,accepted);
+}
 bool Runtime::CanActivateControl(const std::string& id, double seconds) {
 	if (!impl->canonical || !std::isfinite(seconds) || seconds < 0) return false;
 	impl->UpdateInteraction(seconds);

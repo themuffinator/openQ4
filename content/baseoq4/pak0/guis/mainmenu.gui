@@ -18722,6 +18722,9 @@ windowDef Desktop
 			}
 
 			onAction {
+				if ("gui::retainedSystem" == 1) {
+					set "cmd" "openRetainedSystem" ;
+				} else {
 				set "cmd" "refreshSystemSettings" ;
 				set "p_settings_ctrls::visible" "0" ;
 				set "p_settings_game::visible" "0" ;
@@ -18793,6 +18796,7 @@ windowDef Desktop
 				set "set_t_b2::textscale" "0.31" ;
 				
 				set "cmd" "play main_menu_selection" ;
+				}
 			}
 
 		}
