@@ -4,7 +4,7 @@
   "date": "2026-09-09",
   "status": "Implementation incomplete; this register preserves full product scope and does not accept any production GUI.",
   "baseline": {
-    "engine_revision": "6c0defc8158c674c0e117a0a3754882a51bcef0d",
+    "engine_revision": "a8bad0f5bf69b08493714ad4faaeae7585d5abf2",
     "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
     "effective_gui_count": 271,
     "translated_or_accepted_resources": 0,
@@ -19,12 +19,12 @@
     "product": {
       "path": "docs/dev/plans/ui-product-completion.md",
       "authority": "normative completion scope, milestones and final audit",
-      "sha256": "c126dd76d4e5f3f45754ca2eb00e85996fbc3ecbea07d4aa1cadadd95510dfd1"
+      "sha256": "989e467fdf0aa4046cf89282b610d8530b9d6c7cbc24951045ac42656d4f9eca"
     },
     "original": {
       "path": "docs/dev/plans/idtech5-ui.md",
       "authority": "original immutable scope and stage gates",
-      "sha256": "c26f5a8148562f0c7af471f875eebdbbc821bcb79219da9ffe3ec0ef5b20f82e"
+      "sha256": "660bc28e57b08ba1d5b4249966be83b1eb15be9929da4cfe0a600dfc39f4c8d6"
     },
     "inventory": {
       "path": "docs/dev/ui/inventory-report.md",
@@ -100,7 +100,7 @@
       "kind": "source_audit",
       "path": "docs/dev/plans/ui-product-completion.md",
       "scope": "Published audit at 80bb3939; source limitations corroborated by current Document/Runtime inspection. Historical tests and captures are not a fresh product qualification.",
-      "sha256": "c126dd76d4e5f3f45754ca2eb00e85996fbc3ecbea07d4aa1cadadd95510dfd1"
+      "sha256": "989e467fdf0aa4046cf89282b610d8530b9d6c7cbc24951045ac42656d4f9eca"
     },
     "document-foundation": {
       "kind": "implementation_checkpoint",
@@ -263,6 +263,19 @@
       "local_capture_summary": ".tmp/ui/system-exit-review/capture-evidence.json",
       "local_capture_summary_sha256": "ddde52034403036ca1821dbb75aed11961404b311032149d1d2ff1c35f213b74",
       "sha256": "c93d056fff7fed30362b367ac09b219c38dffa9ddaf1e661c5523530ea694791"
+    },
+    "native-output-foundation": {
+      "kind": "implementation_checkpoint",
+      "path": "docs/dev/ui/native-output.md",
+      "baseline_engine_revision": "a8bad0f5bf69b08493714ad4faaeae7585d5abf2",
+      "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
+      "qualification_status": "bounded_gl_native_output_increment_qualified",
+      "scope": "Bounded OpenGL implementation: the completed-frame resolution-scale hook is inert and obsolete scene-present markers are removed. Existing main-scene sizing and spatial/temporal resolves, supersampling clamp and explicit legacy mode-0 crop are preserved. The final integrated production-method harness passes 1,220 checks and rejects seven compiled mutations against counted graphics doubles; full DrawView setup is only statically guarded. Final integrated build/tests and source/binary-bound hidden windowed Windows SP/OpenGL before/after captures at 1280x720 and 125% density qualify static unfocused UI-only RGB output for mode 1 at 50/85/125/200% and modes 2/3 at 50/85% against mode 1 at 100%. All eight compared ordinary cases have zero changed RGB channels and zero maximum delta over 2,764,800 channels each; preserved baseline differences demonstrate the former filtering. 24 engine images were reviewed. 39 unchanged baseline warnings and no new warning messages or errors in each run. Moving-world captures and recorded scene extents are supporting observations, not proof of actual world-target execution, input equality or performance. Mode 0 at 50% is measured separately and exempt; modes 2/3 above native are not in the image matrix. CRT parity, the pre-existing GL mode-3 world-filtering mismatch, dynamic resolution, every UI surface and input/cinematic/subtitle geometry, complete renderer/platform qualification and M6 remain open. No requirement or migration is accepted.",
+      "sha256": "60d520e518a67459cc738ef53203f475442a389f82f93cbc3f56799bb0c73e6c",
+      "local_capture_summary": ".tmp/ui/native-output-review/capture-evidence.json",
+      "local_capture_summary_sha256": "a609e0fb10e9cd4e9f139e5c4382330006815aa24e9940534ff19da68482cbdf",
+      "local_dependency_summary": ".tmp/ui/native-output-review/rmlui-source-qualified.json",
+      "local_dependency_summary_sha256": "0da98f7ab11fe641dec47e4fac42cb608344e7870da6716f21521cf66e16ca00"
     }
   },
   "groups": {
@@ -1978,10 +1991,12 @@
       "acceptance_evidence_needed": [
         "Paired varying world-resolution captures at constant output; UI edge/text and input-coordinate equality."
       ],
-      "status": "pending",
-      "current_evidence": [],
+      "status": "partial",
+      "current_evidence": [
+        "native-output-foundation"
+      ],
       "acceptance_evidence": [],
-      "remaining": "The SYSTEM exit render-order audit identified an OpenGL UI-only swap-tail filter that can resample completed UI without an eligible scene resolve; repair this path and independently compare constant-output UI at varying world resolutions. Ordinary world-backed GL/Vulkan ordering does not accept this requirement. Legacy whole-frame crop, CRT ordering, dynamic resolution, all surfaces and the complete renderer/platform matrix remain required."
+      "remaining": "The bounded OpenGL UI-only swap-tail filter has been removed; separately bound before/after engine images qualify static native-output edge/text preservation for the documented constant-output cases. Existing world sizing/resolves and the explicit legacy mode-0 crop retain production-method checks; those checks and moving gameplay images are not proof of actual world-target execution or performance. Complete and qualify dynamic-world scaling, input-target and cinematic/subtitle geometry equality, every UI surface, legacy crop policy, CRT ordering/parity and the full renderer/platform matrix. The pre-existing GL mode-3 sharpening versus nearest-neighbor policy remains unresolved. This subset does not accept SUR-006 or M6."
     },
     {
       "id": "SAVE-001",

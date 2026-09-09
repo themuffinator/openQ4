@@ -367,3 +367,10 @@ complete Stage 3 gate remain open.
 GL/Vulkan composition pixels pass in the current fallback draw paths; requesting
 the shared GUI owner still reports zero owned views in these captures. Shared
 ownership and total GPU image-pool trimming remain explicit follow-up work.
+
+The subsequent [native-output OpenGL repair](../ui/native-output.md) removes a
+completed-frame scale filter that could blur UI-only frames. Scene sizing and
+resolves remain in place, including the explicit legacy mode-0 crop. Bound
+Windows SP/OpenGL before/after pixels provide partial evidence for SUR-006;
+M6 and every original runtime,
+editor, artwork, migration and platform gate remain required.

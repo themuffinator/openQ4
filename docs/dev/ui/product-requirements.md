@@ -7,7 +7,7 @@ the [completion plan](../plans/ui-product-completion.md), the
 [visual specification](../ui-visual-design.md) into implementation ownership,
 dependencies, concrete evidence and explicit unfinished work.
 
-The current increment starts from engine `6c0defc8158c674c0e117a0a3754882a51bcef0d` and companion
+The current increment starts from engine `a8bad0f5bf69b08493714ad4faaeae7585d5abf2` and companion
 `1cd33980f072ac3d78978a07b388b4b6fe6b5eb2`. The register also identifies the current
 [manager/snapshot foundation](instance-persistence.md) as partial
 evidence with native and SP/OpenGL/MP/Vulkan validation. It does not treat that work as a
@@ -155,7 +155,20 @@ source-derived artwork/transitions, editor round trips and the complete
 platform/language/display/physical-input matrix remain required. No requirement,
 milestone, production screen or migration is accepted by this increment.
 
-There are **64 partial, 162 pending and one verified requirement**. `BEH-002`
+The subsequent [native-output OpenGL repair](native-output.md) removes the
+UI-only swap-tail resolution filter while retaining existing world sizing and
+resolves and the explicit legacy mode-0 crop. Its final integrated production-method
+test passes 1,220 checks and rejects seven compiled mutations. Separately bound
+Windows SP/OpenGL before/after engine images establish zero RGB differences
+from the 100% UI reference across eight ordinary-scale cases after the repair.
+The preserved baseline demonstrates the former filtering;
+`24` engine images were reviewed. `SUR-006`
+moves only from pending to partial, with acceptance evidence still empty.
+Dynamic resolution, all UI surfaces and input/cinematic/subtitle geometry,
+CRT parity, the existing GL mode-3 filtering mismatch and M6 remain open.
+Historical evidence retains its original scope and bindings.
+
+There are **65 partial, 161 pending and one verified requirement**. `BEH-002`
 remains partial for the implemented settings transaction/service boundary.
 `BEH-005` remains partial for committed action delivery and cancellation; stock
 sounds and the complete device/modal/widget behavior still require implementation
@@ -246,13 +259,16 @@ acceptance. Run the final audit after evidence documents and hashes are frozen:
 
 ```powershell
 python tools/ui/validate_product_requirements.py `
-  --baseline 6c0defc8158c674c0e117a0a3754882a51bcef0d `
-  --output .tmp/ui/system-exit-review/register-validation-final.json
+  --baseline a8bad0f5bf69b08493714ad4faaeae7585d5abf2 `
+  --partial SUR-006 `
+  --output .tmp/ui/native-output-review/register-validation-final.json
 ```
 
 Use a new output path for each audit. The optional `--defer-hashes` preparation
 mode explicitly reports incomplete source bindings and cannot serve as the
-final audit. The final strict structural/source audit is recorded at
+final audit. The native-output strict structural/source audit is recorded at
+`.tmp/ui/native-output-review/register-validation-final.json`. The historical
+SYSTEM-exit strict structural/source audit is recorded at
 `.tmp/ui/system-exit-review/register-validation-final.json`. The preparation
 audit remains at
 `.tmp/ui/system-exit-review/register-preparation-validation-final.json`. Historical

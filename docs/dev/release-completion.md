@@ -2,6 +2,11 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- OpenGL menus retain sharper text and vector edges at reduced resolution scale:
+  UI-only frames no longer receive the extra filter that softened the completed
+  image. World scaling and supersampling remain in place; the explicit legacy
+  crop mode is unchanged. See the [bounded qualification](ui/native-output.md).
+
 - The opt-in SYSTEM page adds bloom, ambient occlusion, tone mapping, CRT,
   irradiance, UI aspect, resolution scale and VSync controls. Back now lets you
   keep editing, discard and return, or apply and return after successful display

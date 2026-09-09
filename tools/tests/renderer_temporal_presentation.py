@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 
@@ -235,9 +236,8 @@ def main() -> int:
         "RB_PresentTemporalSpatialFallback(",
         "R_ScenePackets_BuildTemporalViewMotionPolicy(",
         "exactMotionDomains",
-        "rbSceneScalePresentedFrame = backEnd.frameCount;",
     ):
-        require(gl_backend if token.startswith("rbScene") else gl_resolve, token, "OpenGL temporal resolve")
+        require(gl_resolve, token, "OpenGL temporal resolve")
     for token in (
         "neighborhoodMin",
         "historyClamped",
@@ -252,29 +252,13 @@ def main() -> int:
     gl_swap_scale = function_body(
         gl_backend, "void RB_ApplyResolutionScaleToBackBuffer( void )"
     )
-    for token in (
-        "presentation.dynamicResolutionRequested",
-        "presentation.temporalAARequested",
-    ):
-        require(gl_swap_scale, token, "OpenGL native UI scale ownership")
-    temporal_guard_at = gl_swap_scale.find("presentation.dynamicResolutionRequested")
-    scene_marker_guard_at = gl_swap_scale.find(
-        "if ( rbSceneScalePresentedFrame", temporal_guard_at
-    )
-    backbuffer_copy_at = gl_swap_scale.find("sceneImage->CopyFramebuffer(")
-    if (
-        temporal_guard_at < 0
-        or scene_marker_guard_at <= temporal_guard_at
-        or backbuffer_copy_at <= scene_marker_guard_at
-    ):
-        raise AssertionError(
-            "OpenGL temporal ownership must reject swap-tail scaling before copying UI"
-        )
-    require(
-        gl_swap_scale[temporal_guard_at:scene_marker_guard_at],
-        "return;",
-        "OpenGL temporal native UI early-out",
-    )
+    # No completed-frame scaler is safe here, even when a UI-only frame has
+    # neither a temporal request nor a world-present marker. The native test
+    # renderer_native_ui_output.py executes this hook through RB_SwapBuffers
+    # alongside the real scene-size and spatial-present methods.
+    executable_scale_body = re.sub(r"//[^\n]*|/\*.*?\*/", "", gl_swap_scale, flags=re.S)
+    if executable_scale_body.strip():
+        raise AssertionError("OpenGL swap tail must not filter the native UI backbuffer")
 
     vk_backend = read(RENDERER / "Vulkan" / "vk_Backend.cpp")
     require(vk_backend, "RC_RESOLVE_TEMPORAL_PRESENTATION", "Vulkan temporal dispatch")

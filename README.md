@@ -90,6 +90,9 @@ The [product completion plan](docs/dev/plans/ui-product-completion.md) records
 the implementation audit and the gates for complete gameplay, artwork, editor
 and platform delivery. The [requirement register](docs/dev/ui/product-requirements.md)
 tracks the complete scope and required acceptance evidence.
+[OpenGL UI-only frames retain their native detail](docs/dev/ui/native-output.md)
+with ordinary resolution scaling. Legacy crop mode and remaining renderer
+effect/parity work retain their documented limits.
 
 The [0.13.1 patch notes](docs/dev/releases/v0.13.1.md) cover the release save fix, download verification, and map-compilation corrections. Replace the complete package when upgrading.
 

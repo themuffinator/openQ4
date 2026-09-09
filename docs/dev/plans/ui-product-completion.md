@@ -108,6 +108,20 @@ and dependent flows/effects, source-derived artwork and transitions, the native
 editor round trip and full platform/input/display/language qualification remain
 open; this subset cannot accept M2 or the production SYSTEM screen.
 
+The subsequent [native-output OpenGL repair](../ui/native-output.md), starting
+from `a8bad0f5bf69b08493714ad4faaeae7585d5abf2`, removes the swap-tail filter
+that could resample completed UI-only frames. Existing world scene sizing and
+spatial/temporal resolves, supersampling limits and the explicit legacy mode-0
+crop remain in place. The final integrated production-method test passes 1,220 checks and
+rejects seven compiled mutations. Separately bound Windows SP/OpenGL engine
+captures show zero RGB differences from the 100% UI reference across eight
+ordinary-scale cases; the preserved baseline demonstrates the former filtering.
+All 24 engine images were reviewed. SUR-006 is
+partial and M6 remains unaccepted. Dynamic resolution,
+all UI surfaces and input/cinematic/subtitle geometry, CRT parity, the existing
+GL mode-3 filter mismatch and the full renderer/platform matrix remain required.
+This bounded repair removes no requirement, migration or final gate.
+
 ### Findings that block product completion
 
 These findings are based on source inspection at the revisions above, except

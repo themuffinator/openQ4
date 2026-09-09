@@ -254,6 +254,7 @@ jobs:
             tools/tests/renderer_gpu_frame_timing.py \
             tools/tests/renderer_gpu_skinning.py \
             tools/tests/renderer_temporal_presentation.py \
+            tools/tests/renderer_native_ui_output.py \
             tools/tests/renderer_mp_flat_items.py \
             tools/tests/renderer_pbr_materials.py \
             tools/tests/renderer_classic_gui_domain.py \
@@ -484,6 +485,7 @@ jobs:
           python tools/tests/renderer_gpu_frame_timing.py
           python tools/tests/renderer_gpu_skinning.py
           python tools/tests/renderer_temporal_presentation.py
+          python tools/tests/renderer_native_ui_output.py
           python tools/tests/renderer_mp_flat_items.py
           python tools/tests/renderer_pbr_materials.py
           python tools/tests/renderer_classic_gui_domain.py
