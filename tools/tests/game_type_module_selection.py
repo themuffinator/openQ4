@@ -182,6 +182,9 @@ def validate_full_vid_restart_font_contract(renderer_source: str) -> None:
         "static void R_PerformFullVidRestart( bool forceWindow )",
         "full video restart",
     )
+    teardown = function_body(renderer_source, "static void R_ShutdownDeviceForRestart( void )", "restart teardown")
+    require(restart, "R_ShutdownDeviceForRestart();", "shared restart teardown")
+    restart = restart.replace("R_ShutdownDeviceForRestart();", teardown)
     for token in (
         "R_DoneFreeType();",
         "globalImages->PurgeAllImages();",
@@ -1007,11 +1010,12 @@ def validate_lifecycle_mutation_sensitivity() -> None:
     )
 
     partial_refresh = "\t\t\tR_RefreshConsoleFontAtlas();"
-    if renderer.count(partial_refresh) != 1:
+    legacy_restart = function_body(renderer, "void R_VidRestart_f", "legacy restart mutation")
+    if legacy_restart.count(partial_refresh) != 1:
         raise AssertionError("Partial vid_restart console-refresh mutation anchor is not unique")
     expect_contract_rejection(
         validate_full_vid_restart_font_contract,
-        renderer.replace(partial_refresh, "", 1),
+        renderer.replace(legacy_restart, legacy_restart.replace(partial_refresh, "", 1), 1),
         "successful partial vid_restart leaves resolution-dependent console glyphs stale",
     )
 

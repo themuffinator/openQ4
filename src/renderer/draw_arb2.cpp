@@ -16680,6 +16680,7 @@ static void RB_ErrorIfDriverRequiredSimpleInteractionFailed( void ) {
 		return;
 	}
 
+	R_RejectRecoverableRendererRestart( "Required Apple OpenGL compatibility interaction programs failed to load" );
 	common->Error(
 		"Unsupported Apple OpenGL 2.1 compatibility path: required SimpleInteraction.vfp ARB programs failed to load "
 		"(vertex: %s, fragment: %s). The ARB2 interaction renderer cannot safely continue on this driver path.",

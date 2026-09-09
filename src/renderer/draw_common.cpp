@@ -31,6 +31,7 @@ If you have questions concerning this license or the applicable additional terms
 #include <cstring>
 
 #include "tr_local.h"
+#include "OpenGL/FramebufferSamples.h"
 #include "CelShading.h"
 #include "ClassicGuiDomain.h"
 #include "ClassicCinematicPostDomain.h"
@@ -1924,7 +1925,10 @@ static bool RB_EnsureSceneRenderTexture( const viewDef_t *sceneTargetView ) {
 		scaledWidth, scaledHeight );
 	const int targetWidth = scaledScene ? scaledWidth : Max( glConfig.vidWidth, sceneTargetView->viewport.x2 + 1 );
 	const int targetHeight = scaledScene ? scaledHeight : Max( glConfig.vidHeight, sceneTargetView->viewport.y2 + 1 );
-	const int requestedSamples = Max( 0, r_multiSamples.GetInteger() );
+	// Follow the created context, which can differ from the archived preference
+	// after a strict device request or driver fallback. Unknown samples do not
+	// authorize allocating a multisampled target.
+	const int requestedSamples = Max( 0, R_DefaultFramebufferSamples() );
 	// Any non-native scene target already requires a resolve. Keep it
 	// single-sample instead of stacking an MSAA FP16 FBO on top of the scale
 	// transition; temporal AA owns antialiasing when enabled.

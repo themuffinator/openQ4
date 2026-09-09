@@ -1613,6 +1613,17 @@ const int GLS_DEFAULT							= GLS_DEPTHFUNC_ALWAYS;
 
 void R_Init( void );
 void R_InitOpenGL( void );
+// Renderer-private recoverable device route. The caller must invoke between
+// submitted frames. A refused attempt remains uninitialized and can be retried
+// with an explicit restore request; process-wide allocation failure is excluded.
+struct renderWindowRequest_s;
+bool R_TryFullVidRestart( const renderWindowRequest_s *request, char *error, int errorSize );
+bool R_IsRecoverableRendererRestart( void );
+bool R_ForceWindowForRendererRestart( void );
+const renderWindowRequest_s *R_GetRecoverableWindowRequest( void );
+// Does nothing during legacy startup; rejects a recoverable attempt without
+// entering Common::Error/FatalError and their Session/process teardown paths.
+void R_RejectRecoverableRendererRestart( const char *reason );
 
 // publish glConfig's compression capabilities into this binary's imagetools
 // copy; every backend that fills glConfig must call it

@@ -59,12 +59,66 @@ PFNWGLSETPBUFFERATTRIBARBPROC wglSetPbufferAttribARB = NULL;
 #endif
 #endif
 
+#include "../DisplayPresentation.h"
+
 // opaque handles into the engine's video instance; every operation on them
 // crosses through renderWindowServices_t
 static void *s_glWindow = NULL;
 static void *s_glContext = NULL;
 static void *s_glHDC = NULL;
 static const renderWindowServices_t *s_glWindowServices = NULL;
+// A typed device request is independent of archived preferences. Loading-screen
+// bypass toggles also set the legacy modified flag, so that flag alone cannot
+// relinquish the applied request. Only an observed CVar value edit does so.
+static bool s_strictSwapIntervalActive = false;
+static int s_strictSwapInterval = 0;
+static int s_strictSwapIntervalCvar = 0;
+
+static int SDL3_RequestedSwapInterval() {
+	if (s_strictSwapIntervalActive && r_swapInterval.GetInteger() != s_strictSwapIntervalCvar)
+		s_strictSwapIntervalActive = false;
+	return s_strictSwapIntervalActive ? s_strictSwapInterval : R_GetEffectiveSwapInterval();
+}
+
+static void SDL3_RecordDisplayParameters() {
+	int buffers = 0, samples = 0, interval = 0;
+	uint32_t valid = 0;
+	if (s_glWindowServices && s_glWindowServices->GetGLAttribute(RENDER_GLATTR_MULTISAMPLE_BUFFERS,&buffers) && buffers >= 0 &&
+		(buffers == 0 || (s_glWindowServices->GetGLAttribute(RENDER_GLATTR_MULTISAMPLE_SAMPLES,&samples) && samples > 0)))
+		valid |= RDP_PARAMETER_SAMPLES;
+	if (s_glWindowServices && s_glWindowServices->GetGLSwapInterval(&interval)) valid |= RDP_PARAMETER_SWAP_INTERVAL;
+	R_DisplayPresentationParameters(buffers == 0 ? 0 : samples,interval,-1,valid);
+}
+
+static bool SDL3_ApplyRequestedScreenParms(const renderWindowParms_t& parms) {
+	if (!s_glWindowServices) return false;
+	if (!R_IsRecoverableRendererRestart()) return s_glWindowServices->ApplyScreenParms(&parms);
+	const auto* request = R_GetRecoverableWindowRequest();
+	renderWindowState_t observed; char error[512] = {};
+	if (!request || !s_glWindowServices->ApplyScreenParmsStrict ||
+		!s_glWindowServices->ApplyScreenParmsStrict(request,&observed,error,sizeof(error))) {
+		common->Warning("SDL3: strict screen parameter application failed: %s",error);
+		R_DisplayPresentationFailed(RDP_SCREEN_FAILED); return false;
+	}
+	return true;
+}
+
+static bool SDL3_ApplyStrictSwapInterval() {
+	const auto* request = R_GetRecoverableWindowRequest();
+	int actual = 0;
+	const bool okay = request && s_glWindowServices->SetGLSwapInterval(request->swapInterval) &&
+		s_glWindowServices->GetGLSwapInterval(&actual) && actual == request->swapInterval;
+	SDL3_RecordDisplayParameters();
+	if (!okay) {
+		common->Warning("SDL3: strict swap interval application/readback failed");
+		R_DisplayPresentationFailed(RDP_SCREEN_FAILED);
+	} else {
+		s_strictSwapInterval = request->swapInterval;
+		s_strictSwapIntervalCvar = r_swapInterval.GetInteger();
+		s_strictSwapIntervalActive = true;
+	}
+	return okay;
+}
 
 static const char *R_GLVideoError(void) {
 	return ( s_glWindowServices != NULL && s_glWindowServices->GetVideoErrorString != NULL )
@@ -124,7 +178,7 @@ static bool SDL3_ApplySwapInterval(void) {
 		return false;
 	}
 
-	const int requestedInterval = R_GetEffectiveSwapInterval();
+	const int requestedInterval = SDL3_RequestedSwapInterval();
 	if (!s_glWindowServices->SetGLSwapInterval(requestedInterval)) {
 		common->Printf("SDL3: failed to set swap interval %d: %s\n", requestedInterval, R_GLVideoError());
 		return false;
@@ -441,7 +495,18 @@ static void SDL3_LogGLContextAttributes(const int requestedMultiSamples, const i
 }
 
 bool GLimp_Init(glimpParms_t parms) {
+	s_strictSwapIntervalActive = false;
+	renderDisplayChangeScope_t presentation(RDP_INIT_FAILED);
 	const char *driverName;
+	const bool strict = R_IsRecoverableRendererRestart();
+	const auto* strictRequest = R_GetRecoverableWindowRequest();
+	if (strict && !strictRequest) return false;
+	if (strict) {
+		parms.width = strictRequest->parms.width; parms.height = strictRequest->parms.height;
+		parms.fullScreen = strictRequest->parms.fullScreen; parms.borderless = strictRequest->parms.borderless;
+		parms.hiddenWindow = strictRequest->parms.hiddenWindow; parms.stereo = strictRequest->parms.stereo;
+		parms.displayHz = strictRequest->parms.displayHz; parms.multiSamples = strictRequest->parms.multiSamples;
+	}
 
 	s_glWindowServices = Sys_GetRenderWindowServices();
 	if (s_glWindowServices == NULL) {
@@ -467,13 +532,15 @@ bool GLimp_Init(glimpParms_t parms) {
 		common->Printf("SDL3: creating hidden OpenGL render window\n");
 	}
 
-	const int requestedMultiSamples = SDL3_NormalizeMSAASampleFallback(parms.multiSamples);
+	const int requestedMultiSamples = strict ? parms.multiSamples : SDL3_NormalizeMSAASampleFallback(parms.multiSamples);
+	if (strict && requestedMultiSamples < 0) return false;
 	parms.multiSamples = requestedMultiSamples;
 	int multiSampleFallbacks[5];
-	const int multiSampleFallbackCount = SDL3_BuildMSAASampleFallbacks(
+	const int multiSampleFallbackCount = strict ? 1 : SDL3_BuildMSAASampleFallbacks(
 		requestedMultiSamples,
 		multiSampleFallbacks,
 		static_cast<int>(sizeof(multiSampleFallbacks) / sizeof(multiSampleFallbacks[0])));
+	if (strict) multiSampleFallbacks[0] = requestedMultiSamples;
 	int selectedMultiSamples = 0;
 
 	renderWindowParms_t windowParms;
@@ -539,12 +606,21 @@ bool GLimp_Init(glimpParms_t parms) {
 		return false;
 	}
 	if (selectedMultiSamples != requestedMultiSamples) {
+		if (strict) { GLimp_Shutdown(); return false; }
 		common->Printf("SDL3: r_multiSamples requested %d, using %d after context creation fallback\n", requestedMultiSamples, selectedMultiSamples);
 		r_multiSamples.SetInteger(selectedMultiSamples);
 		r_multiSamples.ClearModified();
 		parms.multiSamples = selectedMultiSamples;
 	}
 	SDL3_LogGLContextAttributes(requestedMultiSamples, selectedMultiSamples);
+	SDL3_RecordDisplayParameters();
+	if (strict) {
+		renderDisplayPresentation_t actual; R_GetDisplayPresentation(&actual);
+		if (!(actual.parametersValid & RDP_PARAMETER_SAMPLES) || actual.samples != requestedMultiSamples) {
+			common->Warning("SDL3: requested MSAA %d was not created exactly",requestedMultiSamples);
+			GLimp_Shutdown(); return false;
+		}
+	}
 
 #if defined(__linux__)
 	driverName = r_glDriver.GetString()[0] ? r_glDriver.GetString() : "libGL.so.1";
@@ -560,7 +636,7 @@ bool GLimp_Init(glimpParms_t parms) {
 	}
 
 	SDL3_WindowParmsFromGlimpParms(parms, windowParms);
-	if (!s_glWindowServices->ApplyScreenParms(&windowParms)) {
+	if (!SDL3_ApplyRequestedScreenParms(windowParms)) {
 		GLimp_Shutdown();
 		return false;
 	}
@@ -568,7 +644,10 @@ bool GLimp_Init(glimpParms_t parms) {
 	s_glWindowServices->RefreshNativeWindowHandles(&windowInfo);
 	s_glHDC = windowInfo.nativeDisplayHandle;
 	SDL3_LoadWGLExtensions();
-	if (r_swapInterval.IsModified()) {
+	if (strict) {
+		if (!SDL3_ApplyStrictSwapInterval()) { GLimp_Shutdown(); return false; }
+		r_swapInterval.ClearModified();
+	} else if (r_swapInterval.IsModified()) {
 		r_swapInterval.ClearModified();
 		(void)SDL3_ApplySwapInterval();
 	}
@@ -576,14 +655,18 @@ bool GLimp_Init(glimpParms_t parms) {
 	s_glWindowServices->NotifyWindowReady();
 	GLimp_EnableLogging((r_logFile.GetInteger() != 0));
 
+	SDL3_RecordDisplayParameters();
+	presentation.Succeeded();
 	return true;
 }
 
 bool GLimp_SetScreenParms(glimpParms_t parms) {
+	renderDisplayChangeScope_t presentation(RDP_SCREEN_FAILED);
 	const renderWindowServices_t *windowServices = s_glWindowServices != NULL ? s_glWindowServices : Sys_GetRenderWindowServices();
-	if (windowServices == NULL) {
+	if (windowServices == NULL || !s_glWindow || !s_glContext) {
 		return false;
 	}
+	s_glWindowServices = windowServices;
 
 	if (parms.hiddenWindow) {
 		parms.fullScreen = false;
@@ -592,27 +675,35 @@ bool GLimp_SetScreenParms(glimpParms_t parms) {
 
 	renderWindowParms_t windowParms;
 	SDL3_WindowParmsFromGlimpParms(parms, windowParms);
-	if (!windowServices->ApplyScreenParms(&windowParms)) {
+	if (!SDL3_ApplyRequestedScreenParms(windowParms)) {
 		return false;
 	}
 
-	if (s_glWindow && s_glContext && !SDL3_EnsureGLContextCurrent("screen parm change")) {
+	if (!SDL3_EnsureGLContextCurrent("screen parm change")) {
+		R_DisplayPresentationFailed(RDP_CONTEXT_FAILED);
 		return false;
 	}
 
 	renderModuleWindowInfo_t windowInfo;
 	windowServices->RefreshNativeWindowHandles(&windowInfo);
 	s_glHDC = windowInfo.nativeDisplayHandle;
-	r_swapInterval.SetModified();
-	if (r_swapInterval.IsModified()) {
+	if (R_IsRecoverableRendererRestart()) {
+		if (!SDL3_ApplyStrictSwapInterval()) return false;
+		r_swapInterval.ClearModified();
+	} else {
+		r_swapInterval.SetModified();
 		r_swapInterval.ClearModified();
 		(void)SDL3_ApplySwapInterval();
 	}
 
+	SDL3_RecordDisplayParameters();
+	presentation.Succeeded();
 	return true;
 }
 
 void GLimp_Shutdown(void) {
+	s_strictSwapIntervalActive = false;
+	R_DisplayPresentationShutdown();
 	const renderWindowServices_t *windowServices = s_glWindowServices != NULL ? s_glWindowServices : Sys_GetRenderWindowServices();
 
 	common->Printf("Shutting down OpenGL subsystem (SDL3 backend)\n");
@@ -641,9 +732,12 @@ void GLimp_Shutdown(void) {
 }
 
 void GLimp_SwapBuffers(void) {
-	if (r_swapInterval.IsModified()) {
+	const bool hadStrictInterval = s_strictSwapIntervalActive;
+	(void)SDL3_RequestedSwapInterval();
+	if (r_swapInterval.IsModified() || (hadStrictInterval && !s_strictSwapIntervalActive)) {
 		r_swapInterval.ClearModified();
 		(void)SDL3_ApplySwapInterval();
+		SDL3_RecordDisplayParameters();
 	}
 
 	// the engine owns the window; poll its live state each present so this
@@ -663,10 +757,14 @@ void GLimp_SwapBuffers(void) {
 	}
 
 	if (!SDL3_EnsureGLContextCurrent("swap buffers")) {
+		R_DisplayPresentationFailed(RDP_CONTEXT_FAILED);
 		return;
 	}
 	if (!s_glWindowServices->SwapGLWindow()) {
 		common->Printf("SDL3: failed to swap window buffers: %s\n", R_GLVideoError());
+		R_DisplayPresentationFailed(RDP_PRESENT_FAILED);
+	} else {
+		R_DisplayPresentationSubmitted(); R_DisplayPresentationPresented();
 	}
 
 #if defined(__ANDROID__) && defined(OPENQ4_RENDERER_GLES_MODULE)

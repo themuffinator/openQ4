@@ -60,7 +60,8 @@
 // 12 - renderFramebufferDesc_t::glESProfile lets a module ask for an OpenGL ES
 //      context; a stale module would leave that byte uninitialised
 // 13 - ClearRenderTarget carries alpha for transparent retained UI layers.
-#define RENDER_API_VERSION			13
+// 14 - Strict window requests/readback and private recoverable device services.
+#define RENDER_API_VERSION			14
 #define RENDER_API_ENTRY_POINT		"GetRenderAPI"
 
 class idSys;
@@ -171,6 +172,39 @@ typedef struct renderWindowParms_s {
 	int				multiSamples;
 } renderWindowParms_t;
 
+// Immutable display request. A nonzero displayId is authoritative across display
+// enumeration changes; displayIndex is used only when displayId is zero (-1 Auto).
+// Windowed dimensions are logical window units; exclusive dimensions are pixels.
+// swapInterval and multiSamples are validated by the renderer, not SDL windowing.
+typedef struct renderWindowRequest_s {
+	renderWindowParms_t parms;
+	unsigned int displayId;
+	int displayIndex;
+	bool fullscreenDesktop;
+	bool spanDisplays;
+	int swapInterval;
+	// Explicit baseline restoration. Position is authoritative only when true;
+	// maximized is applied independently, including on positionless compositors.
+	bool restorePlacement;
+	int windowX, windowY;
+	bool maximized;
+} renderWindowRequest_t;
+
+// Observations, never echoes of requested CVars. False query/apply results leave
+// output unchanged. A failed strict apply may have partially changed the window;
+// the caller must explicitly restore its captured state before persisting it.
+typedef struct renderWindowState_s {
+	unsigned int displayId;
+	int displayIndex;
+	unsigned long long windowFlags;
+	bool fullscreen, fullscreenDesktop, borderless, hidden, minimized, maximized, focused;
+	int windowX, windowY, logicalWidth, logicalHeight, pixelWidth, pixelHeight;
+	bool positionValid, currentModeValid;
+	int modeWidth, modeHeight, modePixelWidth, modePixelHeight;
+	float refreshRate, modePixelDensity, displayScale, pixelDensityX, pixelDensityY;
+	int uiViewportX, uiViewportY, uiViewportWidth, uiViewportHeight;
+} renderWindowState_t;
+
 typedef struct renderWindowServices_s {
 	// idempotent window-system bring-up: video subsystem, hints, lifecycle
 	// watch, display enumeration/diagnostics
@@ -235,6 +269,16 @@ typedef struct renderWindowServices_s {
 	// creates a surface on the current game window; false when the window
 	// was not created with RENDER_SURFACE_VULKAN or creation fails
 	bool			( *CreateVulkanSurface )( void *vkInstance, unsigned long long *outVkSurface );
+
+	// --- version 14: strict application has no closest-mode/desktop/placement
+	// fallback. Query reads current SDL state without changing archived CVars.
+	bool			( *QueryWindowState )( renderWindowState_t *outState );
+	bool			( *ApplyScreenParmsStrict )( const renderWindowRequest_t *request,
+								renderWindowState_t *outState, char *error, int errorSize );
+	// A recoverable attempt pins the existing video subsystem so live display
+	// identities survive context/window teardown, including failed attempts.
+	bool			( *RetainVideoSystem )( void );
+	void			( *ReleaseVideoSystem )( void );
 } renderWindowServices_t;
 
 // attribute selectors for renderWindowServices_t::GetGLAttribute; the
@@ -303,6 +347,8 @@ typedef struct renderModuleDiagnostics_s {
 	bool			( *RunDeviceSelfTest )( char *outSummary, int summaryLength );
 } renderModuleDiagnostics_t;
 
+struct renderDisplayPresentation_t;
+
 typedef struct renderExport_s {
 	int										version;		// RENDER_API_VERSION
 	const char *							backendName;	// "gl" / "vulkan" -> r_actualRenderApi
@@ -317,6 +363,10 @@ typedef struct renderExport_s {
 	// releases module resources; must be safe to call before Sys_DLL_Unload
 	// whenever GetRenderAPI has been called
 	void			( *Shutdown )( void );
+	// Version 14: frame-boundary device work and actual backend presentation.
+	// A failed restart may leave no device; the caller must explicitly restore.
+	bool			( *TryDeviceRestart )( const renderWindowRequest_t *request, char *error, int errorSize );
+	void			( *GetDisplayPresentation )( renderDisplayPresentation_t *outState );
 } renderExport_t;
 
 extern "C" {

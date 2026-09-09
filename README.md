@@ -75,8 +75,10 @@ connect explicit retained documents to session callers.
 metadata and visual properties with persistent expression ownership.
 [SYSTEM settings transactions](docs/dev/ui/system-settings-contract.md) now keep
 edits in an owned draft, validate the fixed settings catalog, and apply immediate
-changes with checked readback and conflict handling. Device changes and the
-complete production settings page remain in development.
+changes with checked readback and conflict handling. A
+[private display service](docs/dev/ui/display-device-contract.md) adds actual
+device results and explicit restoration. Production display confirmation and
+the complete settings page remain in development.
 [Ordered event programs](docs/dev/ui/event-programs.md) connect data, transitions
 and typed actions to normal GUI lifecycle and session delivery. Complete GUI migration,
 the full application/control contract and the visual editor remain in development.

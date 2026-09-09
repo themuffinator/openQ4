@@ -137,6 +137,19 @@ constexpr int LegacyModes[][2] = {
 	{3200,1800},{3200,2000},{3240,2160},{3456,2160},{3456,2234},{3840,1080},{3840,1200},{3840,1600},{3840,2400},{3840,2560},
 	{4096,2160},{5120,2160},{6016,3384},{7680,2160},{7680,4320}
 };
+#if defined(USE_SDL3)
+bool DisplayModePixels(const SDL_DisplayMode* mode, int& width, int& height) {
+	if (!mode || mode->w <= 0 || mode->h <= 0 || !std::isfinite(mode->pixel_density) || mode->pixel_density <= 0) return false;
+	// Match the strict SDL window service: exclusive requests are pixels,
+	// including native mode on displays whose logical mode has higher density.
+	const double w = std::floor(static_cast<double>(mode->w) * mode->pixel_density + 0.5);
+	const double h = std::floor(static_cast<double>(mode->h) * mode->pixel_density + 0.5);
+	if (!std::isfinite(w) || !std::isfinite(h) || w < 1 || h < 1 ||
+		w > (std::numeric_limits<int>::max)() || h > (std::numeric_limits<int>::max)()) return false;
+	width = static_cast<int>(w); height = static_cast<int>(h);
+	return true;
+}
+#endif
 bool DisplayTuple(const StateValues& current, const StateValues& candidate, std::string& error) {
 	const bool windowChanged = Changed(current, candidate, "r_windowWidth") || Changed(current, candidate, "r_windowHeight") ||
 		Changed(current, candidate, "r_fullscreen");
@@ -158,7 +171,7 @@ bool DisplayTuple(const StateValues& current, const StateValues& candidate, std:
 #if defined(USE_SDL3)
 	int displayCount = 0;
 	SDL_DisplayID* displays = SDL_GetDisplays(&displayCount);
-	if (!displays || displayCount <= 0) {
+	if (!displays || displayCount <= 0 || displayCount > 1024) {
 		SDL_free(displays); return Fail(error, "r_screen", "display enumeration is unavailable");
 	}
 	const int screen = integer("r_screen");
@@ -168,11 +181,16 @@ bool DisplayTuple(const StateValues& current, const StateValues& candidate, std:
 	SDL_DisplayID display = screen >= 0 ? displays[screen] : 0;
 	if (display == 0) {
 		const renderWindowServices_t* services = Sys_GetRenderWindowServices();
-		renderModuleWindowInfo_t info{};
-		if (services && services->RefreshNativeWindowHandles) services->RefreshNativeWindowHandles(&info);
-		if (info.sdlWindow) display = SDL_GetDisplayForWindow(static_cast<SDL_Window*>(info.sdlWindow));
-		if (display == 0) display = SDL_GetPrimaryDisplay();
-		if (display == 0) display = displays[0];
+		renderWindowState_t observed{};
+		if (services && services->QueryWindowState && services->QueryWindowState(&observed)) display = observed.displayId;
+		// RefreshNativeWindowHandles also persists visible geometry. Validation
+		// must only observe, and use the same current/primary Auto policy as the
+		// strict window request when the current display is unavailable.
+		if (std::find(displays, displays + displayCount, display) == displays + displayCount)
+			display = SDL_GetPrimaryDisplay();
+	}
+	if (!display || std::find(displays, displays + displayCount, display) == displays + displayCount) {
+		SDL_free(displays); return Fail(error, "r_screen", "selected display identity is unavailable");
 	}
 	SDL_free(displays);
 	if (!std::get<bool>(candidate.at("r_fullscreen")) || std::get<bool>(candidate.at("r_fullscreenDesktop"))) return true;
@@ -180,24 +198,23 @@ bool DisplayTuple(const StateValues& current, const StateValues& candidate, std:
 	int width = 0, height = 0;
 	if (mode == -2) {
 		const SDL_DisplayMode* desktop = SDL_GetDesktopDisplayMode(display);
-		if (!desktop) return Fail(error, "r_mode", "desktop mode is unavailable");
-		width = desktop->w; height = desktop->h;
+		if (!DisplayModePixels(desktop, width, height)) return Fail(error, "r_mode", "desktop pixel mode is unavailable or invalid");
 	} else if (mode == -1) { width = integer("r_customWidth"); height = integer("r_customHeight"); }
 	else { width = LegacyModes[mode][0]; height = LegacyModes[mode][1]; }
+	if (width < 320 || width > 16384 || height < 240 || height > 16384)
+		return Fail(error, "r_mode", "exclusive pixel dimensions are outside the supported bounds");
 	int modeCount = 0;
 	SDL_DisplayMode** modes = SDL_GetFullscreenDisplayModes(display, &modeCount);
 	bool supported = false;
 	const int refresh = integer("r_displayRefresh");
 	for (int i = 0; modes && i < modeCount; ++i) {
 		const SDL_DisplayMode* option = modes[i];
-		if (!option) continue;
+		int pixelWidth = 0, pixelHeight = 0;
+		if (!DisplayModePixels(option, pixelWidth, pixelHeight) ||
+			(option->displayID && option->displayID != display)) continue;
 		// SYSTEM choices use integer refresh labels (59.94 is shown as 60).
-		const bool pointMatch = option->w == width && option->h == height;
-		const bool pixelMatch = std::isfinite(option->pixel_density) && option->pixel_density > 1 &&
-			std::abs(option->w * static_cast<double>(option->pixel_density) - width) < .5 &&
-			std::abs(option->h * static_cast<double>(option->pixel_density) - height) < .5;
-		if ((pointMatch || pixelMatch) && std::isfinite(option->refresh_rate) && option->refresh_rate >= 0 &&
-			(refresh == 0 || static_cast<int>(option->refresh_rate + .5f) == refresh)) { supported = true; break; }
+		if (pixelWidth == width && pixelHeight == height && std::isfinite(option->refresh_rate) && option->refresh_rate >= 0 &&
+			(refresh == 0 || std::floor(option->refresh_rate + .5f) == refresh)) { supported = true; break; }
 	}
 	SDL_free(modes);
 	if (!supported) return Fail(error, "r_mode", "exclusive display size and refresh are unsupported");

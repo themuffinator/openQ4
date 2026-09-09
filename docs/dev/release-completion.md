@@ -2,6 +2,16 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- Display-settings development: the renderer can attempt an exact display
+  configuration, report failure and restore a captured window/device state.
+  Presentation results distinguish a newly rendered frame from accepted
+  settings values. Production Keep/Revert and crash recovery remain in
+  development; see the [device contract](ui/display-device-contract.md).
+- Vulkan stops further presentation after unsafe submission or synchronization
+  failures until the device is restarted, avoiding reuse of synchronization
+  objects whose state is uncertain. Engine and renderer modules must be updated
+  together for the new private interface.
+
 - Settings development: retained menus can keep edits in a private draft,
   discard changes, restore SYSTEM defaults into the draft, and apply immediate
   settings with conflict checks. Drafts survive renderer/language recreation;
@@ -64,7 +74,7 @@
   stopping their expressions. Explicit overrides and focused
   text-field queries prepare the replacement interface boundary. Development
   packages must replace engine and both game modules together (game API 48;
-  renderer API 13). See the [presentation boundary](ui/presentation-bridge.md).
+  renderer API 14). See the [presentation boundary](ui/presentation-bridge.md).
   Complete GUI migration and the visual editor remain in development.
 
 - Live data development: retained interfaces now update text, gauges, layout

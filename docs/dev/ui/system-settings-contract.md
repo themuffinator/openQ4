@@ -389,6 +389,18 @@ in diagnostics, not in the menu's status text.
 
 ## Open dependencies and acceptance evidence
 
+The [private display-device service](display-device-contract.md) now supplies
+strict window requests/readback, recoverable restart/restore and actual backend
+presentation results. It is a dependency for the following work, not a reason
+to lift the production service's device gate. Its video reference must span a
+failed attempt and restoration so captured SDL display identities remain valid.
+Display preflight now uses the read-only window query when resolving Auto; it
+does not refresh native handles or persist visible geometry. Exclusive mode
+validation matches the strict device service's rounded pixel dimensions, rather
+than also accepting logical-point dimensions on high-density displays. Counted
+host regressions cover both rules. The transaction-wide persistence guard and
+canonical candidate-to-device request builder remain integration work.
+
 - Complete production mappings from every real control to the typed service,
   including inverse/facade controls, full profile/Auto-Detect draft expansion,
   dependencies and meaningful localized conflict/recovery presentation. The

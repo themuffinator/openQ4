@@ -193,15 +193,25 @@ def validate_game_module_phase_breadcrumbs() -> None:
     require(load_body, "if ( gameExportPtr == NULL ) {", "GetGameAPI NULL guard")
 
 
-def validate_renderer_startup_order() -> None:
-    init_source = read("src/renderer/RenderSystem_init.cpp")
+def validate_renderer_startup_order(init_source: str | None = None) -> None:
+    if init_source is None:
+        init_source = read("src/renderer/RenderSystem_init.cpp")
     upload_source = read("src/renderer/RendererUpload.cpp")
     common_source = read("src/renderer/draw_common.cpp")
     draw_source = read("src/renderer/draw_arb2.cpp")
     render_source = read("src/renderer/tr_render.cpp")
 
-    init_body = function_body(init_source, "void R_InitOpenGL( void ) {")
-    portable_body = function_body(init_source, "static void R_CheckPortableExtensions( void ) {")
+    wrapper_body = function_body(init_source, "void R_InitOpenGL( void ) {")
+    init_body = function_body(init_source, "static bool R_InitOpenGLInternal(")
+    context_body = function_body(init_source, "static bool R_CreateOpenGLContext(")
+    portable_body = function_body(init_source, "static bool R_CheckPortableExtensions(")
+    require(wrapper_body, "R_InitOpenGLInternal( true, false, error, sizeof( error ) )", "legacy startup shared route")
+    # Expand the actual shared context call in place; concatenating detached
+    # helpers would conceal an incorrectly moved call.
+    context_call = "if ( !R_CreateOpenGLContext( legacyPolicy, forceWindow, error, errorSize ) ) return false;"
+    if init_body.count(context_call) != 1:
+        raise AssertionError("Shared startup must invoke context creation exactly once")
+    init_body = init_body.replace(context_call, context_body, 1)
     upload_body = function_body(upload_source, "void R_RendererUpload_Init( const renderBackendCaps_t &caps ) {")
     arb_init_body = function_body(draw_source, "void R_ARB2_Init( void ) {")
     reload_body = function_body(draw_source, "void R_ReloadARBPrograms_f( const idCmdArgs &args ) {")
@@ -226,7 +236,7 @@ def validate_renderer_startup_order() -> None:
         (
             "R_RecordRendererStartupPhase( RENDERER_STARTUP_PHASE_R_INIT_OPENGL );",
             "RB_ResetARB2InteractionHandoffBreadcrumb();",
-            "R_CheckPortableExtensions();",
+            "R_CheckPortableExtensions( legacyPolicy, error, errorSize )",
             "R_ARB2_Init();",
             "R_ReloadARBPrograms_f( idCmdArgs() );",
             "R_RendererUpload_Init( glConfig.backendCaps );",
@@ -362,6 +372,32 @@ def validate_renderer_startup_order() -> None:
         reject(bypass_light_scale_section, token, "issue #73 comment 4894876958 light-scale bypass branch")
 
 
+def validate_startup_mutation_sensitivity() -> None:
+    source = read("src/renderer/RenderSystem_init.cpp")
+    for anchor in (
+        "if ( !R_CreateOpenGLContext( legacyPolicy, forceWindow, error, errorSize ) ) return false;",
+        "R_RecordRendererStartupPhase( RENDERER_STARTUP_PHASE_R_INIT_OPENGL );",
+        "R_RecordRendererStartupPhase( RENDERER_STARTUP_PHASE_R_CHECK_PORTABLE_EXTENSIONS );",
+        "R_RecordRendererStartupPhase( RENDERER_STARTUP_PHASE_READY );",
+    ):
+        if source.count(anchor) != 1:
+            raise AssertionError(f"Startup mutation anchor is not unique: {anchor!r}")
+        try:
+            validate_renderer_startup_order(source.replace(anchor, "", 1))
+        except AssertionError:
+            continue
+        raise AssertionError(f"Startup regression escaped detection: {anchor!r}")
+    early_ready = "R_RecordRendererStartupPhase( RENDERER_STARTUP_PHASE_READY );"
+    misplaced = source.replace(early_ready, "", 1).replace(
+        "R_RecordRendererStartupPhase( RENDERER_STARTUP_PHASE_R_INIT_OPENGL );",
+        "R_RecordRendererStartupPhase( RENDERER_STARTUP_PHASE_R_INIT_OPENGL );\n" + early_ready, 1)
+    try:
+        validate_renderer_startup_order(misplaced)
+    except AssertionError:
+        return
+    raise AssertionError("Premature renderer-ready phase escaped detection")
+
+
 def validate_phase2_plan_status() -> None:
     plan = read(PLAN_PATH)
 
@@ -429,6 +465,7 @@ def main() -> None:
     validate_posix_signal_bridge()
     validate_game_module_phase_breadcrumbs()
     validate_renderer_startup_order()
+    validate_startup_mutation_sensitivity()
     validate_phase2_plan_status()
     validate_docs_and_release_notes()
     validate_ci_and_local_wiring()

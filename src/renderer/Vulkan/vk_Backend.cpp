@@ -220,23 +220,39 @@ engine window for a Vulkan surface, bring up the device + swapchain, fill
 glConfig, and hand input to the engine.
 ====================
 */
+static bool VK_ApplyRequestedScreenParms( const renderWindowParms_t& parms ) {
+	if ( !R_IsRecoverableRendererRestart() ) return vkBackendServices->ApplyScreenParms( &parms );
+	const auto* request = R_GetRecoverableWindowRequest();
+	renderWindowState_t observed; char error[512] = {};
+	if ( !request || !vkBackendServices->ApplyScreenParmsStrict ||
+			!vkBackendServices->ApplyScreenParmsStrict( request, &observed, error, sizeof(error) ) ) {
+		common->Warning( "Vulkan: strict screen parameter application failed: %s", error );
+		R_DisplayPresentationFailed( RDP_SCREEN_FAILED ); return false;
+	}
+	return true;
+}
+
 bool VK_InitRenderDevice( void ) {
 	common->Printf( "----- VK_InitRenderDevice -----\n" );
 
 	vkBackendServices = Sys_GetRenderWindowServices();
 	if ( vkBackendServices == NULL ) {
+		R_DisplayPresentationFailed( RDP_INIT_FAILED );
 		common->Warning( "Vulkan: no window services on this platform backend" );
 		return false;
 	}
 	if ( !vkBackendServices->PrepareWindowSystem() ) {
+		R_DisplayPresentationFailed( RDP_INIT_FAILED );
 		common->Warning( "Vulkan: window system preparation failed" );
 		return false;
 	}
 
 	glimpParms_t parms;
 	memset( &parms, 0, sizeof( parms ) );
-	parms.fullScreen = r_fullscreen.GetBool();
-	R_GetInitialWindowSize( parms.fullScreen, &parms.width, &parms.height );
+	parms.fullScreen = r_fullscreen.GetBool() && !R_ForceWindowForRendererRestart();
+	if ( !R_GetInitialWindowSize( parms.fullScreen, &parms.width, &parms.height ) ) {
+		R_DisplayPresentationFailed( RDP_INIT_FAILED ); return false;
+	}
 	parms.borderless = !parms.fullScreen && r_borderless.GetBool();
 	parms.displayHz = r_displayRefresh.GetInteger();
 	parms.multiSamples = 0;
@@ -250,6 +266,16 @@ bool VK_InitRenderDevice( void ) {
 	windowParms.borderless = parms.borderless;
 	windowParms.hiddenWindow = r_hiddenWindow.GetBool();
 	windowParms.displayHz = parms.displayHz;
+	if ( R_IsRecoverableRendererRestart() ) {
+		const auto* request = R_GetRecoverableWindowRequest();
+		// Vulkan's current render targets are single-sample. A strict request
+		// must not silently advertise unsupported multisampling as applied.
+		if ( !request || request->parms.multiSamples != 0 || request->parms.stereo ) {
+			common->Warning( "Vulkan: strict framebuffer request is unsupported" );
+			R_DisplayPresentationFailed( RDP_INIT_FAILED ); return false;
+		}
+		windowParms = request->parms;
+	}
 
 	renderFramebufferDesc_t desc;
 	memset( &desc, 0, sizeof( desc ) );
@@ -266,6 +292,7 @@ bool VK_InitRenderDevice( void ) {
 	memset( &windowInfo, 0, sizeof( windowInfo ) );
 	bool reusedPreserved = false;
 	if ( !vkBackendServices->CreateWindowForFramebuffer( &desc, &windowParms, &windowInfo, &reusedPreserved ) ) {
+		R_DisplayPresentationFailed( RDP_INIT_FAILED );
 		common->Warning( "Vulkan: window creation failed" );
 		return false;
 	}
@@ -275,7 +302,8 @@ bool VK_InitRenderDevice( void ) {
 		return false;
 	}
 
-	if ( !vkBackendServices->ApplyScreenParms( &windowParms ) ) {
+	if ( !VK_ApplyRequestedScreenParms( windowParms ) ) {
+		R_DisplayPresentationFailed( RDP_SCREEN_FAILED );
 		common->Warning( "Vulkan: initial screen parameter application failed" );
 		// The surface still belongs to this window. Release every device /
 		// surface resource before destroying the failed attempt's window.
@@ -343,6 +371,7 @@ void GLimp_Shutdown( void ) {
 
 bool GLimp_SetScreenParms( glimpParms_t parms ) {
 	if ( vkBackendServices == NULL ) {
+		R_DisplayPresentationFailed( RDP_SCREEN_FAILED );
 		return false;
 	}
 	renderWindowParms_t windowParms;
@@ -353,7 +382,15 @@ bool GLimp_SetScreenParms( glimpParms_t parms ) {
 	windowParms.borderless = parms.borderless;
 	windowParms.hiddenWindow = parms.hiddenWindow;
 	windowParms.displayHz = parms.displayHz;
-	if ( !vkBackendServices->ApplyScreenParms( &windowParms ) ) {
+	if ( R_IsRecoverableRendererRestart() ) {
+		const auto* request = R_GetRecoverableWindowRequest();
+		if ( !request || request->parms.multiSamples != 0 || request->parms.stereo ) {
+			R_DisplayPresentationFailed( RDP_SCREEN_FAILED ); return false;
+		}
+		windowParms = request->parms;
+	}
+	if ( !VK_ApplyRequestedScreenParms( windowParms ) ) {
+		R_DisplayPresentationFailed( RDP_SCREEN_FAILED );
 		return false;
 	}
 	if ( !VK_Device_RecreateSwapchain() ) {
@@ -361,7 +398,7 @@ bool GLimp_SetScreenParms( glimpParms_t parms ) {
 	}
 	glConfig.vidWidth = (int)vkCtx.swapchainExtent.width;
 	glConfig.vidHeight = (int)vkCtx.swapchainExtent.height;
-	glConfig.isFullscreen = parms.fullScreen;
+	glConfig.isFullscreen = windowParms.fullScreen;
 	return true;
 }
 
@@ -384,7 +421,7 @@ void GLimp_SwapBuffers( void ) {
 				if ( VK_Device_RecreateSwapchain() ) {
 					glConfig.vidWidth = (int)vkCtx.swapchainExtent.width;
 					glConfig.vidHeight = (int)vkCtx.swapchainExtent.height;
-				}
+				} else return;
 			}
 		}
 	}

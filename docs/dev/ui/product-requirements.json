@@ -4,7 +4,7 @@
   "date": "2026-09-09",
   "status": "Implementation incomplete; this register preserves full product scope and does not accept any production GUI.",
   "baseline": {
-    "engine_revision": "15e35beaf11a1f1942ba25e9431211f64c1ef7f1",
+    "engine_revision": "962b179c0e4214df2ebde38e98cb3e090b75fdd6",
     "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
     "effective_gui_count": 271,
     "translated_or_accepted_resources": 0,
@@ -24,7 +24,7 @@
     "original": {
       "path": "docs/dev/plans/idtech5-ui.md",
       "authority": "original immutable scope and stage gates",
-      "sha256": "fcd2ed1df73d874feacefeae0b956bf470ff12f5c30b46ecd67b82d9be369f6d"
+      "sha256": "95ee5a82a898c959925a5fc96234501a4425b865ff5e3b96b7d29162fb364e67"
     },
     "inventory": {
       "path": "docs/dev/ui/inventory-report.md",
@@ -212,13 +212,24 @@
     "settings-transaction-foundation": {
       "kind": "qualified_foundation_checkpoint",
       "path": "docs/dev/ui/system-settings-contract.md",
-      "sha256": "fbc48b45bab99f39605b67cf80e1a9cbd67b71d821c3c1ee7c1156b7e63cf73e",
+      "sha256": "526ce6c468086450ac076fcc6de99dbaf22602069d8a1a535a703d8c3c4e8b9c",
       "baseline_engine_revision": "15e35beaf11a1f1942ba25e9431211f64c1ef7f1",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "local_capture_summary": ".tmp/ui/settings-review/capture-evidence.json",
       "local_capture_status": "qualified_subset",
       "scope": "M2 foundation: source-backed inventory of all 31 SYSTEM options, dependent popups and the 32-field preset footprint; the resulting 53-field catalog preserves registered types, defaults and custom baselines. The engine-independent transaction and normal typed service implement owned drafts, atomic edits, immediate patch apply, cancel/defaults, exact readback, conflict-safe rollback and bounded confirmation/recovery states. Service-owned read-only state, unique owner lifecycle, frame-managed abandonment and explicit/automatic config-write blocking protect pending recovery. Six native suites, the production 53-field host extraction and 15 production service scenarios pass; the service test uses a four-field host and forced confirmation, while the host test uses counted CVar/SDL stand-ins. Two source/binary/log-bound hidden windowed Windows gameplay probes, SP/OpenGL at density 125% and MP/Vulkan at density 200%, each pass 168 ordered readbacks, 19 service results and two language/video recoveries at 1280x720 with user UI scale 1.0. Reviewed render-target images preserve legible draft brightness 1.50 versus live/committed 1.25 and unclipped authored vector framing. The probes record no errors, three expected negative diagnostics each and 94 unchanged MP baseline warnings; they qualify this subset without physical input or actual device reconfiguration. Every changed non-immediate effect rejects the complete Apply batch before live writes. Typed device-result delivery with Applying/Restoring stages, actual display/audio/reload recovery and first-present verification, durable journal, profile/Auto-Detect draft expansion, production controls/artwork, complete page/editor workflows and full platform/corpus acceptance remain required. No requirement or migration entry is accepted by this checkpoint.",
       "local_capture_summary_sha256": "ca5c01358034754fdf8642a71e79ce3e4cdf6aa3a689dfd0cc160f9a2c412d6a"
+    },
+    "display-device-foundation": {
+      "kind": "qualified_foundation_checkpoint",
+      "path": "docs/dev/ui/display-device-contract.md",
+      "sha256": "8c80714a3613367f6532291c9eedb02add37a99c193deb2a462f59f59a6b685e",
+      "baseline_engine_revision": "962b179c0e4214df2ebde38e98cb3e090b75fdd6",
+      "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
+      "local_capture_summary": ".tmp/ui/display-review/capture-policy-evidence.json",
+      "local_capture_status": "qualified_subset",
+      "scope": "Private renderer ABI14 strict window request/query, active-backend recoverable restart, coherent device/presentation tracking with engine module epoch, and an SDL video reference retained across failed attempts. Five production-body native harnesses, seven adjacent Meson UI suites and a 23-test capture oracle with 281 rejected corruptions pass. Two source/binary-bound hidden windowed Windows gameplay diagnostics each pass eight device observations,32 ordered settings readbacks and four reviewed engine screenshots; requested interval and GL samples remain independent of stored preferences across fresh presents, failure and restoration. An additional five-observation SP/OpenGL capture verifies visible gameplay with a four-sample default framebuffer, explicit restoration and two reviewed screenshots. SYSTEM display preflight is read-only and matches exact pixel-mode bounds. No production settings device Apply, journal/confirmation, full render-target AA policy, physical input/compositor/platform qualification or GUI migration entry is accepted.",
+      "local_capture_summary_sha256": "02ba863b2d420ff0b9271e42e0da60e9b40ac188595afc977b8b9ddf3c76ae15"
     }
   },
   "groups": {
@@ -1632,10 +1643,11 @@
       ],
       "status": "partial",
       "current_evidence": [
-        "settings-transaction-foundation"
+        "settings-transaction-foundation",
+        "display-device-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "The owned 53-field transaction/catalog/service implements complete typed drafts, registered-default staging, validated immediate patch Apply, editing Cancel, readback, partial-failure rollback, external-conflict protection, bounded confirmation/timeout states, lifecycle abandonment and config-write protection. Native and production-body evidence plus two source-bound Windows SP/OpenGL and MP/Vulkan gameplay probes qualify only this foundation, including draft/live distinction, non-replaying GUI restore and language/video continuity. Changed non-immediate batches are blocked before writes. Actual video/audio/input flows, pure preset/Auto-Detect draft expansion, typed asynchronous Applying/Restoring results, verified device reconstruction/first present, display Keep/Revert, durable journal/process recovery and complete production acceptance remain required; CVar readback does not prove device success."
+      "remaining": "The owned 53-field transaction/catalog/service implements complete typed drafts, registered-default staging, validated immediate patch Apply, editing Cancel, readback, partial-failure rollback, external-conflict protection, bounded confirmation/timeout states, lifecycle abandonment and config-write protection. Native and production-body evidence plus two source-bound Windows SP/OpenGL and MP/Vulkan gameplay probes qualify only this foundation, including draft/live distinction, non-replaying GUI restore and language/video continuity. Changed non-immediate batches are blocked before writes. Actual video/audio/input flows, pure preset/Auto-Detect draft expansion, typed asynchronous Applying/Restoring results, verified device reconstruction/first present, display Keep/Revert, durable journal/process recovery and complete production acceptance remain required; CVar readback does not prove device success. Private strict display requests, recoverable renderer reconstruction and actual presentation observations are now implemented and exercised through a bounded engine diagnostic; they still require integration with the asynchronous settings coordinator, durable journal and confirmed visible-window restoration."
     },
     {
       "id": "BEH-003",
@@ -2113,7 +2125,7 @@
         "product:3 Text, controls and accessibility",
         "product:5 Visual and interaction qualification"
       ],
-      "requirement": "Provide independently persisted UI scale default 100%, range 75â€“200%; clamp extremes with reachable reset and no lost essential actions.",
+      "requirement": "Provide independently persisted UI scale default 100%, range 75Ã¢â‚¬â€œ200%; clamp extremes with reachable reset and no lost essential actions.",
       "dependencies": [
         "BEH-002"
       ],
@@ -2143,7 +2155,7 @@
         "product:3 Text, controls and accessibility",
         "product:5 Visual and interaction qualification"
       ],
-      "requirement": "Provide text scale default 100%, range 100â€“200% independent of furniture; reflow labels, rows and forms without hiding essential actions.",
+      "requirement": "Provide text scale default 100%, range 100Ã¢â‚¬â€œ200% independent of furniture; reflow labels, rows and forms without hiding essential actions.",
       "dependencies": [
         "TXT-001",
         "LAY-003"
@@ -3878,7 +3890,7 @@
         "product:3 Visual quality and motion",
         "original:Stage 6"
       ],
-      "requirement": "Standard panels have equal 12 dp upper/8 dp lower 45-degree cuts, 1 dp rail and 3 dp inset rail; popover cuts 6 dp, major bands 16â€“24 dp. Reconstruct each stepped/notched silhouette and named ornaments without stretched corners.",
+      "requirement": "Standard panels have equal 12 dp upper/8 dp lower 45-degree cuts, 1 dp rail and 3 dp inset rail; popover cuts 6 dp, major bands 16Ã¢â‚¬â€œ24 dp. Reconstruct each stepped/notched silhouette and named ornaments without stretched corners.",
       "dependencies": [
         "ART-001",
         "REN-001"
@@ -4606,10 +4618,11 @@
       ],
       "status": "pending",
       "current_evidence": [
-        "settings-transaction-foundation"
+        "settings-transaction-foundation",
+        "display-device-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "The source-backed contract inventories 31 current setting options, dependent popup/default/confirmation behavior and the complete 53-CVar page/preset union with source hashes and precedence. The transaction/catalog/service foundation is implemented, but no production SYSTEM document, complete controls/vector artwork, display recovery, editor round trip or source-bound behavioral/visual screen acceptance exists. Complete the actual shipped page and dependent flows; diagnostic probes cannot satisfy this requirement."
+      "remaining": "The source-backed contract inventories 31 current setting options, dependent popup/default/confirmation behavior and the complete 53-CVar page/preset union with source hashes and precedence. The transaction/catalog/service foundation is implemented, but no production SYSTEM document, complete controls/vector artwork, display recovery, editor round trip or source-bound behavioral/visual screen acceptance exists. Complete the actual shipped page and dependent flows; diagnostic probes cannot satisfy this requirement. Private strict display requests, recoverable renderer reconstruction and actual presentation observations are now implemented and exercised through a bounded engine diagnostic; they still require integration with the asynchronous settings coordinator, durable journal and confirmed visible-window restoration."
     },
     {
       "id": "FLOW-003",

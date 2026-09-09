@@ -78,6 +78,23 @@ typedef struct rendererModuleState_s {
 
 static rendererModuleState_t rm_state;
 
+// Deliberately outside rm_state and outside renderer modules: never reset when
+// their interface tables or local presentation counters are discarded.
+static uint64_t rm_displayModuleEpoch = 1;
+static const renderWindowServices_t *rm_displayVideoPin = NULL;
+static void RM_ReleaseDisplayVideoPin( void ) {
+	if ( rm_displayVideoPin != NULL ) {
+		rm_displayVideoPin->ReleaseVideoSystem();
+		rm_displayVideoPin = NULL;
+	}
+}
+static void RM_AdvanceDisplayEpoch( void ) {
+	// Exhaustion permanently disables identity-dependent observations.
+	if ( rm_displayModuleEpoch != 0 ) {
+		rm_displayModuleEpoch = rm_displayModuleEpoch == UINT64_MAX ? 0 : rm_displayModuleEpoch + 1;
+	}
+}
+
 // module binary short tags; indexed by rendererModuleApi_t
 static const char *rm_moduleBinaryTags[ RENDER_MODULE_API_COUNT ] = { "gl", "vk", "gl", "gles" };
 static const char *rm_apiNames[ RENDER_MODULE_API_COUNT ] = { "gl", "vulkan", "gl-module", "gles" };
@@ -211,6 +228,7 @@ wired into the activation branch so the flip stays a one-line policy change.
 ====================
 */
 static void RM_PublishActiveModuleInterfaces( const renderExport_t &moduleExport ) {
+	RM_AdvanceDisplayEpoch();
 	rm_state.savedRenderSystem = ::renderSystem;
 	rm_state.savedRenderModelManager = ::renderModelManager;
 	rm_state.interfacesPublished = true;
@@ -231,6 +249,7 @@ static void RM_RestorePublishedInterfaces( void ) {
 	if ( !rm_state.interfacesPublished ) {
 		return;
 	}
+	RM_AdvanceDisplayEpoch();
 	::renderSystem = rm_state.savedRenderSystem;
 	::renderModelManager = rm_state.savedRenderModelManager;
 	rm_state.savedRenderSystem = NULL;
@@ -472,6 +491,10 @@ static bool RM_ExportCanRender( const renderExport_t *moduleExport, const char *
 	}
 	if ( diagnosticsOnly ) {
 		*reason = "module is bring-up/diagnostics only";
+		return false;
+	}
+	if ( moduleExport->TryDeviceRestart == NULL || moduleExport->GetDisplayPresentation == NULL ) {
+		*reason = "module lacks version 14 device services";
 		return false;
 	}
 	return true;
@@ -740,7 +763,96 @@ static void R_UIFontParitySelfTest_f( const idCmdArgs &args ) {
 	}
 }
 
+// Bounded engine-command diagnostic: mutate only an already hidden, windowed
+// device. Save actual state rather than the unapplied archived CVar request.
+static bool rm_displayProbeSaved = false;
+static renderWindowRequest_t rm_displayProbeRestore = {};
+static uint64_t rm_displayProbeEpoch = 0;
+static bool RM_ParseProbeDimension( const char *text, int minimum, int maximum, int &value ) {
+	if ( text == NULL || *text == '\0' ) return false;
+	int parsed = 0;
+	for ( const char *digit = text; *digit != '\0'; ++digit ) {
+		if ( *digit < '0' || *digit > '9' || parsed > ( maximum - ( *digit - '0' ) ) / 10 ) return false;
+		parsed = parsed * 10 + ( *digit - '0' );
+	}
+	if ( parsed < minimum || parsed > maximum ) return false;
+	value = parsed;
+	return true;
+}
+static void R_RendererDisplayProbe_f( const idCmdArgs &args ) {
+	const char *operation = args.Argc() > 1 ? args.Argv( 1 ) : "report";
+	rendererDisplayState_t state = {};
+	const bool observed = R_RendererModule_QueryDisplay( &state );
+	bool result = observed;
+	char error[ 256 ] = {};
+	if ( idStr::Icmp( operation, "save" ) == 0 ) {
+		const uint32_t required = RDP_PARAMETER_SAMPLES | RDP_PARAMETER_SWAP_INTERVAL;
+		result = args.Argc() == 2 && observed && state.rendererReady && state.windowValid
+			&& state.window.hidden && !state.window.fullscreen && !state.window.minimized
+			&& ( state.presentation.parametersValid & required ) == required;
+		if ( result ) {
+			rm_displayProbeRestore = {};
+			rm_displayProbeRestore.parms.width = state.window.logicalWidth;
+			rm_displayProbeRestore.parms.height = state.window.logicalHeight;
+			rm_displayProbeRestore.parms.borderless = state.window.borderless;
+			rm_displayProbeRestore.parms.hiddenWindow = true;
+			rm_displayProbeRestore.parms.multiSamples = state.presentation.samples;
+			rm_displayProbeRestore.displayId = state.window.displayId;
+			rm_displayProbeRestore.displayIndex = state.window.displayIndex;
+			rm_displayProbeRestore.swapInterval = state.presentation.swapInterval;
+			rm_displayProbeRestore.restorePlacement = state.window.positionValid;
+			rm_displayProbeRestore.windowX = state.window.windowX;
+			rm_displayProbeRestore.windowY = state.window.windowY;
+			rm_displayProbeRestore.maximized = state.window.maximized;
+			rm_displayProbeEpoch = state.moduleEpoch;
+			rm_displayProbeSaved = true;
+		}
+	} else if ( idStr::Icmp( operation, "apply" ) == 0 || idStr::Icmp( operation, "restore" ) == 0
+		|| idStr::Icmp( operation, "missing-display" ) == 0 ) {
+		const bool applying = idStr::Icmp( operation, "apply" ) == 0;
+		const bool missingDisplay = idStr::Icmp( operation, "missing-display" ) == 0;
+		const bool restoring = !applying && !missingDisplay;
+		result = rm_displayProbeSaved && rm_displayProbeEpoch == rm_displayModuleEpoch
+			&& ( applying ? ( args.Argc() >= 4 && args.Argc() <= 6 ) : args.Argc() == 2 )
+			&& observed && ( state.windowValid ? state.window.hidden && !state.window.fullscreen && !state.window.minimized
+				: restoring && !state.rendererReady );
+		if ( result ) {
+			renderWindowRequest_t request = rm_displayProbeRestore;
+			if ( applying ) {
+				request.maximized = false;
+				result = RM_ParseProbeDimension( args.Argv( 2 ), 320, 16384, request.parms.width )
+					&& RM_ParseProbeDimension( args.Argv( 3 ), 240, 16384, request.parms.height );
+				if ( result && args.Argc() >= 5 ) {
+					result = RM_ParseProbeDimension( args.Argv( 4 ), 0, 1, request.swapInterval );
+				}
+				if ( result && args.Argc() == 6 ) {
+					result = RM_ParseProbeDimension( args.Argv( 5 ), 0, 16, request.parms.multiSamples )
+						&& ( request.parms.multiSamples == 0 || request.parms.multiSamples == 2
+							|| request.parms.multiSamples == 4 || request.parms.multiSamples == 8 || request.parms.multiSamples == 16 );
+				}
+			}
+			if ( missingDisplay ) request.displayId = UINT32_MAX;
+			if ( result ) result = R_RendererModule_TryDeviceRestart( &request, error, sizeof( error ) );
+		}
+	} else if ( idStr::Icmp( operation, "report" ) != 0 || args.Argc() > 2 ) result = false;
+	const bool after = R_RendererModule_QueryDisplay( &state );
+	common->Printf( "DISPLAY_PROBE operation=%s result=%d observed=%d epoch=%llu generation=%llu ready=%d window=%d "
+		"available=%u outcome=%u submitted=%llu presented=%llu failures=%llu native=%d restart=%d "
+		"logical=%dx%d pixel=%dx%d display=%u position=%d,%d hidden=%d fullscreen=%d maximized=%d samples=%d interval=%d valid=%u\n",
+		operation, result ? 1 : 0, after ? 1 : 0,
+		static_cast<unsigned long long>( state.moduleEpoch ), static_cast<unsigned long long>( state.presentation.generation ),
+		state.rendererReady ? 1 : 0, state.windowValid ? 1 : 0, state.presentation.available, state.presentation.outcome,
+		static_cast<unsigned long long>( state.presentation.submittedSequence ), static_cast<unsigned long long>( state.presentation.presentedSequence ),
+		static_cast<unsigned long long>( state.presentation.failureSequence ), state.presentation.nativeError, state.videoRestartCount,
+		state.window.logicalWidth, state.window.logicalHeight, state.window.pixelWidth, state.window.pixelHeight,
+		state.window.displayId, state.window.windowX, state.window.windowY, state.window.hidden ? 1 : 0,
+		state.window.fullscreen ? 1 : 0, state.window.maximized ? 1 : 0,
+		state.presentation.samples, state.presentation.swapInterval, state.presentation.parametersValid );
+	if ( error[ 0 ] ) common->Printf( "DISPLAY_PROBE_DETAIL %s\n", error );
+}
+
 static void RM_RegisterCommands( void ) {
+	cmdSystem->AddCommand( "rendererDisplayProbe", R_RendererDisplayProbe_f, CMD_FL_RENDERER, "observe or exercise a hidden windowed display: report/save/apply width height [interval 0 or 1] [samples 0/2/4/8/16]/restore/missing-display" );
 	cmdSystem->AddCommand( "rendererModuleSelfTest", R_RendererModuleSelfTest_f, CMD_FL_RENDERER, "run renderer module selection/loading self tests" );
 	cmdSystem->AddCommand( "rendererVkProbe", R_RendererVkProbe_f, CMD_FL_RENDERER, "load the Vulkan renderer module, run its device bring-up probe, and unload it" );
 	cmdSystem->AddCommand( "uiFontParitySelfTest", R_UIFontParitySelfTest_f, CMD_FL_RENDERER, "run GUI font retail parity self tests" );
@@ -771,7 +883,85 @@ R_RendererModule_Shutdown
 */
 void R_RendererModule_Shutdown( void ) {
 	RM_UnloadModule();
+	RM_ReleaseDisplayVideoPin();
+	RM_AdvanceDisplayEpoch();
 	rm_state.status.disposition = RENDER_MODULE_DISPOSITION_NONE;
+}
+
+bool R_RendererModule_QueryDisplay( rendererDisplayState_t *outState ) {
+	if ( outState == NULL || renderSystem == NULL || rm_displayModuleEpoch == 0 ) {
+		return false;
+	}
+	void ( *query )( renderDisplayPresentation_t * ) = NULL;
+	if ( rm_state.interfacesPublished && rm_state.moduleExportValid ) {
+		query = rm_state.moduleExport.GetDisplayPresentation;
+	}
+#if !defined( OPENQ4_RENDERER_MODULE_ONLY ) && !defined( ID_DEDICATED )
+	else if ( rm_state.status.disposition != RENDER_MODULE_DISPOSITION_NONE ) {
+		query = R_GetDisplayPresentation;
+	}
+#endif
+	if ( query == NULL ) {
+		return false;
+	}
+	rendererDisplayState_t state = {};
+	state.moduleEpoch = rm_displayModuleEpoch;
+	renderDisplayPresentation_t before = {};
+	query( &before );
+	const renderWindowServices_t *windowServices = Sys_GetRenderWindowServices();
+	state.windowValid = windowServices != NULL && windowServices->QueryWindowState != NULL
+		&& windowServices->QueryWindowState( &state.window );
+	state.rendererReady = renderSystem->IsOpenGLRunning();
+	state.videoRestartCount = renderSystem->GetVideoRestartCount();
+	query( &state.presentation );
+	// A backend frame may finish during the window query. Its latest result is
+	// useful, but never pair a window observation with a different device epoch.
+	if ( state.moduleEpoch != rm_displayModuleEpoch || before.generation != state.presentation.generation ) {
+		return false;
+	}
+	*outState = state;
+	return true;
+}
+
+bool R_RendererModule_TryDeviceRestart( const renderWindowRequest_t *request, char *error, int errorSize ) {
+	if ( error != NULL && errorSize > 0 ) {
+		error[ 0 ] = '\0';
+	}
+	const renderWindowServices_t *windowServices = Sys_GetRenderWindowServices();
+	if ( request == NULL || renderSystem == NULL || rm_displayModuleEpoch == 0 || windowServices == NULL
+		|| windowServices->ApplyScreenParmsStrict == NULL || windowServices->QueryWindowState == NULL
+		|| windowServices->RetainVideoSystem == NULL || windowServices->ReleaseVideoSystem == NULL ) {
+		if ( error != NULL && errorSize > 0 ) {
+			idStr::Copynz( error, "strict display services are unavailable", errorSize );
+		}
+		return false;
+	}
+	bool ( *restart )( const renderWindowRequest_t *, char *, int ) = NULL;
+	if ( rm_state.interfacesPublished && rm_state.moduleExportValid ) restart = rm_state.moduleExport.TryDeviceRestart;
+#if !defined( OPENQ4_RENDERER_MODULE_ONLY ) && !defined( ID_DEDICATED )
+	else if ( rm_state.status.disposition != RENDER_MODULE_DISPOSITION_NONE ) {
+		restart = R_TryFullVidRestart;
+	}
+#endif
+	if ( restart != NULL ) {
+		if ( rm_displayVideoPin == NULL ) {
+			if ( !windowServices->RetainVideoSystem() ) {
+				if ( error != NULL && errorSize > 0 ) idStr::Copynz( error, "cannot retain the active video subsystem", errorSize );
+				return false;
+			}
+			rm_displayVideoPin = windowServices;
+		}
+		const bool result = restart( request, error, errorSize );
+		// A failed attempt with no context needs this identity lease until an
+		// explicit restore. Releasing the last SDL reference would invalidate
+		// its saved display ID. A live device already holds its own reference.
+		if ( result || renderSystem->IsOpenGLRunning() ) RM_ReleaseDisplayVideoPin();
+		return result;
+	}
+	if ( error != NULL && errorSize > 0 ) {
+		idStr::Copynz( error, "active renderer has no recoverable device service", errorSize );
+	}
+	return false;
 }
 
 /*
@@ -986,6 +1176,12 @@ bool RendererModule_RunSelfTest( void ) {
 		}
 		static int dummyRenderSystemStorage;
 		testExport.renderSystem = reinterpret_cast<idRenderSystem *>( &dummyRenderSystemStorage );
+		if ( RM_ExportCanRender( &testExport, &reason ) ) {
+			common->Warning( "rendererModuleSelfTest: full export without device services must be rejected" );
+			numFailures++;
+		}
+		testExport.TryDeviceRestart = []( const renderWindowRequest_t *, char *, int ) { return false; };
+		testExport.GetDisplayPresentation = []( renderDisplayPresentation_t * ) {};
 		if ( !RM_ExportCanRender( &testExport, &reason ) ) {
 			common->Warning( "rendererModuleSelfTest: full exports must be activatable with the Phase B8 seam landed" );
 			numFailures++;

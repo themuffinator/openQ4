@@ -34,6 +34,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "CelShading.h"
 #include "RendererBootstrap.h"
 #include "RendererModule.h"
+#include "RenderModuleAPI.h"
 #include "GLDebugScope.h"
 #include "GLStateCache.h"
 #include "RendererBenchmarks.h"
@@ -73,6 +74,30 @@ If you have questions concerning this license or the applicable additional terms
 #endif
 
 // functions that are not called every frame
+
+static bool r_recoverableRendererRestart = false;
+static bool r_forceWindowRendererRestart = false;
+static bool r_recoverableRendererRestore = false;
+static const renderWindowRequest_t *r_recoverableWindowRequest = NULL;
+
+struct rendererRestartFailure_t {
+	idStr reason;
+	explicit rendererRestartFailure_t( const char *text ) : reason( text ) {}
+};
+
+bool R_IsRecoverableRendererRestart( void ) { return r_recoverableRendererRestart; }
+bool R_ForceWindowForRendererRestart( void ) { return r_forceWindowRendererRestart; }
+const renderWindowRequest_t *R_GetRecoverableWindowRequest( void ) { return r_recoverableWindowRequest; }
+void R_RejectRecoverableRendererRestart( const char *reason ) {
+	if ( r_recoverableRendererRestart ) throw rendererRestartFailure_t( reason );
+}
+
+static bool R_RendererRestartError( char *error, int errorSize, const char *reason ) {
+	if ( error != NULL && errorSize > 0 ) idStr::Copynz( error, reason, errorSize );
+	return false;
+}
+
+static bool R_InitRendererDevice( bool legacyPolicy, bool forceWindow, char *error, int errorSize );
 
 static void R_ErrorForUnsupportedCompatibilityOpenGL( void ) {
 	common->Error( "%s", common->GetLanguageDict()->GetString( "#str_41106" ) );
@@ -1146,13 +1171,9 @@ R_CheckPortableExtensions
 
 ==================
 */
-static void R_CheckPortableExtensions( void ) {
-	R_RecordRendererStartupPhase( RENDERER_STARTUP_PHASE_R_CHECK_PORTABLE_EXTENSIONS );
-	glConfig.glVersion = atof( glConfig.version_string );
-	R_ClearMissingRequiredOpenGLFeatures();
-
+static bool R_InitOpenGLExtensionLoader( char *error, int errorSize ) {
 	if ( !GLimp_EnsureActiveContext( "GLEW initialization" ) ) {
-		common->FatalError( "Unable to make OpenGL context current for GLEW initialization\n" );
+		return R_RendererRestartError( error, errorSize, "Unable to make OpenGL context current for GLEW initialization" );
 	}
 	common->Printf("Init Glew...\n");
 
@@ -1160,10 +1181,18 @@ static void R_CheckPortableExtensions( void ) {
 	const GLenum glewResult = glewInit();
 	if ( glewResult != GLEW_OK ) {
 		const GLubyte *glewError = glewGetErrorString( glewResult );
-		common->FatalError( "Failed to init GLEW: %s\n", glewError != NULL ? reinterpret_cast<const char *>( glewError ) : "unknown error" );
+		return R_RendererRestartError( error, errorSize, va( "Failed to init GLEW: %s", glewError != NULL ? reinterpret_cast<const char *>( glewError ) : "unknown error" ) );
 	}
 	while ( glGetError() != GL_NO_ERROR ) {
 	}
+	return true;
+}
+
+static bool R_CheckPortableExtensions( bool legacyPolicy, char *error, int errorSize ) {
+	R_RecordRendererStartupPhase( RENDERER_STARTUP_PHASE_R_CHECK_PORTABLE_EXTENSIONS );
+	glConfig.glVersion = atof( glConfig.version_string );
+	R_ClearMissingRequiredOpenGLFeatures();
+	if ( !R_InitOpenGLExtensionLoader( error, errorSize ) ) return false;
 
 	GLCapabilityProbe_Build( glConfig.backendCaps, glConfig.version_string, glConfig.extensions_string );
 	glConfig.extensions_string = GLCapabilityProbe_ExtensionString();
@@ -1473,7 +1502,8 @@ static void R_CheckPortableExtensions( void ) {
 	if ( !programmableOnlyProfile
 		&& ( !glConfig.multitextureAvailable || !glConfig.textureEnvCombineAvailable || !glConfig.cubeMapAvailable
 		|| !glConfig.envDot3Available ) ) {
-			R_ErrorForMissingRequiredOpenGLFeatures();
+			if ( legacyPolicy ) R_ErrorForMissingRequiredOpenGLFeatures();
+			return R_RendererRestartError( error, errorSize, "Required OpenGL compatibility features are unavailable" );
 	}
 
  	// GL_EXT_depth_bounds_test
@@ -1528,6 +1558,7 @@ static void R_CheckPortableExtensions( void ) {
 			RendererTier_Name( glConfig.rendererTier ) );
 	}
 
+	return true;
 }
 
 
@@ -1812,6 +1843,26 @@ the GL bring-up does.
 ====================
 */
 bool R_GetInitialWindowSize( bool fullScreen, int *width, int *height ) {
+	if ( R_IsRecoverableRendererRestart() ) {
+		int requestedWidth = 0, requestedHeight = 0;
+		if ( r_recoverableWindowRequest != NULL ) {
+			requestedWidth = r_recoverableWindowRequest->parms.width; requestedHeight = r_recoverableWindowRequest->parms.height;
+		} else if ( !fullScreen || R_ForceWindowForRendererRestart() || r_hiddenWindow.GetBool() ) {
+			requestedWidth = r_windowWidth.GetInteger(); requestedHeight = r_windowHeight.GetInteger();
+		} else if ( r_mode.GetInteger() == -2 ) {
+			if ( !Sys_GetDesktopResolution( &requestedWidth, &requestedHeight ) ) return false;
+		} else if ( r_mode.GetInteger() == -1 ) {
+			requestedWidth = r_customWidth.GetInteger(); requestedHeight = r_customHeight.GetInteger();
+		} else {
+			const vidmode_t *mode = R_FindVidModeByMode( r_mode.GetInteger() );
+			if ( mode == NULL ) return false;
+			requestedWidth = mode->width; requestedHeight = mode->height;
+		}
+		if ( requestedWidth < 320 || requestedWidth > 16384 || requestedHeight < 240 || requestedHeight > 16384 ) return false;
+		if ( width != NULL ) *width = requestedWidth;
+		if ( height != NULL ) *height = requestedHeight;
+		return true;
+	}
 	if ( fullScreen ) {
 		return R_GetModeInfo( width, height, r_mode.GetInteger() );
 	}
@@ -1902,8 +1953,7 @@ all renderSystem functions will still operate properly, notably the material
 and model information functions.
 ==================
 */
-void R_InitOpenGL( void ) {
-	GLint			temp;
+static bool R_CreateOpenGLContext( bool legacyPolicy, bool forceWindow, char *error, int errorSize ) {
 	glimpParms_t	parms;
 	int				i;
 
@@ -1913,7 +1963,7 @@ void R_InitOpenGL( void ) {
 	RB_ResetAppleGL21RouteCounters();
 
 	if ( glConfig.isInitialized ) {
-		common->FatalError( "R_InitOpenGL called while active" );
+		return R_RendererRestartError( error, errorSize, "R_InitOpenGL called while active" );
 	}
 
 	// every context creation starts a new handle generation; GL object handles
@@ -1925,24 +1975,21 @@ void R_InitOpenGL( void ) {
 	tr.viewportOffset[0] = 0;
 	tr.viewportOffset[1] = 0;
 
-	R_NormalizeDisplayCvars();
+	if ( legacyPolicy ) R_NormalizeDisplayCvars();
 
 	// select the rendering API path (r_renderApi) before any window or
 	// context work; a failed non-GL selection falls back closed onto GL here
-	R_RendererModule_Boot();
+	if ( legacyPolicy ) R_RendererModule_Boot();
 
 	//
 	// initialize OS specific portions of the renderSystem
 	//
-	for ( i = 0 ; i < 2 ; i++ ) {
+	for ( i = 0 ; i < ( legacyPolicy ? 2 : 1 ) ; i++ ) {
 		// set the parameters we are trying
 		parms.hiddenWindow = r_hiddenWindow.GetBool();
-		parms.fullScreen = !parms.hiddenWindow && r_fullscreen.GetBool();
-		if ( parms.fullScreen ) {
-			R_GetModeInfo( &parms.width, &parms.height, r_mode.GetInteger() );
-		} else {
-			R_GetWindowedModeInfo( &parms.width, &parms.height );
-		}
+		parms.fullScreen = !forceWindow && !parms.hiddenWindow && r_fullscreen.GetBool();
+		if ( !R_GetInitialWindowSize( parms.fullScreen, &parms.width, &parms.height ) )
+			return R_RendererRestartError( error, errorSize, "Requested display dimensions are unavailable" );
 		engineWindowState.vidWidth = parms.width;
 		engineWindowState.vidHeight = parms.height;
 		glConfig.vidWidth = parms.width;
@@ -1951,14 +1998,21 @@ void R_InitOpenGL( void ) {
 		parms.displayHz = r_displayRefresh.GetInteger();
 		parms.multiSamples = r_multiSamples.GetInteger();
 		parms.stereo = false;
+		if ( !legacyPolicy && r_recoverableWindowRequest != NULL ) {
+			const renderWindowParms_t &requested = r_recoverableWindowRequest->parms;
+			parms.width = requested.width; parms.height = requested.height;
+			parms.fullScreen = requested.fullScreen; parms.borderless = requested.borderless;
+			parms.hiddenWindow = requested.hiddenWindow; parms.displayHz = requested.displayHz;
+			parms.multiSamples = requested.multiSamples; parms.stereo = requested.stereo;
+		}
 
 		if ( GLimp_Init( parms ) ) {
 			// it worked
 			break;
 		}
 
-		if ( i == 1 ) {
-			common->FatalError( "Unable to initialize OpenGL" );
+		if ( !legacyPolicy || i == 1 ) {
+			return R_RendererRestartError( error, errorSize, "Unable to initialize OpenGL" );
 		}
 
 		// if we failed, set everything back to "safe mode"
@@ -1975,7 +2029,7 @@ void R_InitOpenGL( void ) {
 	//soundSystem->Init();
 
 	if ( !GLimp_EnsureActiveContext( "OpenGL startup string query" ) ) {
-		common->FatalError( "Unable to make OpenGL context current after window creation\n" );
+		return R_RendererRestartError( error, errorSize, "Unable to make OpenGL context current after window creation" );
 	}
 
 	// get our config strings
@@ -1984,7 +2038,7 @@ void R_InitOpenGL( void ) {
 	glConfig.version_string = (const char *)glGetString(GL_VERSION);
 	glConfig.extensions_string = (const char *)glGetString(GL_EXTENSIONS);
 	if ( glConfig.version_string == NULL ) {
-		common->FatalError( "OpenGL context did not report GL_VERSION after window creation; context may not be current\n" );
+		return R_RendererRestartError( error, errorSize, "OpenGL context did not report GL_VERSION after window creation; context may not be current" );
 	}
 	if ( glConfig.vendor_string == NULL ) {
 		glConfig.vendor_string = "unknown";
@@ -1995,6 +2049,12 @@ void R_InitOpenGL( void ) {
 	if ( glConfig.extensions_string == NULL ) {
 		glConfig.extensions_string = "";
 	}
+	return true;
+}
+
+static bool R_InitOpenGLInternal( bool legacyPolicy, bool forceWindow, char *error, int errorSize ) {
+	if ( !R_CreateOpenGLContext( legacyPolicy, forceWindow, error, errorSize ) ) return false;
+	GLint temp;
 
 	// Query the actual framebuffer bit depths from the active context.
 	// Some platform backends don't populate these fields directly.
@@ -2046,10 +2106,10 @@ void R_InitOpenGL( void ) {
 		glConfig.maxTextureSize = 256;
 	}
 
-	glConfig.isInitialized = true;
-
 	// recheck all the extensions (FIXME: this might be dangerous)
-	R_CheckPortableExtensions();
+	if ( legacyPolicy ) glConfig.isInitialized = true;
+	if ( !R_CheckPortableExtensions( legacyPolicy, error, errorSize ) ) return false;
+	glConfig.isInitialized = true;
 	R_GLDebugOutput_Init();
 
 	// parse our vertex and fragment programs, possibly disably support for
@@ -2092,7 +2152,8 @@ void R_InitOpenGL( void ) {
 		|| glConfig.backendCaps.profile == RENDERER_CONTEXT_PROFILE_CORE;
 	if ( !glConfig.allowARB2Path && !programmableOnlyProfile
 			&& !RendererBootstrap_ShouldAutoPromoteModernVisible() ) {
-		R_ErrorForMissingRequiredOpenGLFeatures();
+		if ( legacyPolicy ) R_ErrorForMissingRequiredOpenGLFeatures();
+		return R_RendererRestartError( error, errorSize, "Required OpenGL rendering backend is unavailable" );
 	}
 	if ( !glConfig.allowARB2Path && programmableOnlyProfile ) {
 		common->Printf(
@@ -2128,7 +2189,7 @@ void R_InitOpenGL( void ) {
 
 #ifdef _WIN32
 	static bool glCheck = false;
-	if ( !glCheck ) {
+	if ( legacyPolicy && !glCheck ) {
 		glCheck = true;
 		if ( !idStr::Icmp( glConfig.vendor_string, "Microsoft" ) && idStr::FindText( glConfig.renderer_string, "OpenGL-D3D" ) != -1 ) {
 			if ( cvarSystem->GetCVarBool( "r_fullscreen" ) ) {
@@ -2147,6 +2208,12 @@ void R_InitOpenGL( void ) {
 		}
 	}
 #endif
+	return true;
+}
+
+void R_InitOpenGL( void ) {
+	char error[1024];
+	if ( !R_InitOpenGLInternal( true, false, error, sizeof( error ) ) ) common->FatalError( "%s", error );
 }
 
 /*
@@ -3934,6 +4001,11 @@ GfxInfo_f
 ================
 */
 void GfxInfo_f( const idCmdArgs &args ) {
+	// Driver-owned strings may have died with a failed recoverable context.
+	if ( !glConfig.isInitialized ) {
+		common->Printf( "gfxInfo: graphics device is unavailable\n" );
+		return;
+	}
 	const char *fsstrings[] =
 	{
 		"windowed",
@@ -4741,7 +4813,7 @@ static void R_ShutdownRenderTargetsBeforeImagePurge( void ) {
 	R_ClearActiveRenderTextures();
 }
 
-static void R_PerformFullVidRestart( bool forceWindow ) {
+static void R_ShutdownDeviceForRestart( void ) {
 	R_ShutdownRenderTargetsBeforeImagePurge();
 
 	// Input is tied to the native window/context lifecycle.
@@ -4774,6 +4846,11 @@ static void R_PerformFullVidRestart( bool forceWindow ) {
 	R_GLDebugOutput_Shutdown();
 	GLimp_Shutdown();
 	glConfig.isInitialized = false;
+	R_ClearActiveRenderTextures();
+}
+
+static void R_PerformFullVidRestart( bool forceWindow ) {
+	R_ShutdownDeviceForRestart();
 
 	const bool latchedFullscreen = cvarSystem->GetCVarBool( "r_fullscreen" );
 	if ( forceWindow ) {
@@ -4788,6 +4865,82 @@ static void R_PerformFullVidRestart( bool forceWindow ) {
 
 	R_InitFreeType();
 	R_RefreshConsoleFontAtlas();
+}
+
+static bool R_TryFullVidRestartInternal( const renderWindowRequest_t *request, bool forceWindow, char *error, int errorSize ) {
+	if ( error != NULL && errorSize > 0 ) error[0] = '\0';
+	if ( r_recoverableRendererRestart ) return R_RendererRestartError( error, errorSize, "A renderer restart is already in progress" );
+	if ( globalImages == NULL || renderModelManager == NULL || ( !glConfig.isInitialized && !r_recoverableRendererRestore ) )
+		return R_RendererRestartError( error, errorSize, "A recoverable restart requires a running renderer or a failed restart to restore" );
+	if ( glConfig.isInitialized && ( frameData == NULL || frameData->cmdHead == NULL ||
+		frameData->cmdHead->commandId != RC_NOP || frameData->cmdHead->next != NULL ) )
+		return R_RendererRestartError( error, errorSize, "Renderer commands must be submitted before restarting" );
+	struct Scope {
+		Scope( const renderWindowRequest_t *request, bool forceWindow ) {
+			r_recoverableRendererRestart = true; r_forceWindowRendererRestart = forceWindow; r_recoverableWindowRequest = request;
+		}
+		~Scope() { r_recoverableRendererRestart = false; r_forceWindowRendererRestart = false; r_recoverableWindowRequest = NULL; }
+	} scope( request, forceWindow );
+	int width = 0, height = 0;
+	if ( !R_GetInitialWindowSize( r_fullscreen.GetBool(), &width, &height ) )
+		return R_RendererRestartError( error, errorSize, "Requested display dimensions are invalid or unavailable" );
+	const int samples = request != NULL ? request->parms.multiSamples : r_multiSamples.GetInteger();
+	const int refresh = request != NULL ? request->parms.displayHz : r_displayRefresh.GetInteger();
+	if ( samples != R_NormalizeMultiSamplesValue( samples ) || refresh < 0 || refresh > 1000 )
+		return R_RendererRestartError( error, errorSize, "Requested display samples or refresh rate are invalid" );
+	if ( request != NULL && ( request->displayIndex < -1 || request->swapInterval < -1 || request->swapInterval > 1 ||
+		request->parms.stereo || ( request->parms.hiddenWindow && ( request->parms.fullScreen || request->parms.borderless ) ) ||
+		( request->parms.fullScreen && request->parms.borderless ) ) )
+		return R_RendererRestartError( error, errorSize, "Requested display policy is invalid" );
+
+	// Once teardown starts, failure deliberately leaves no renderable context.
+	// The caller owns the saved display/CVar state and chooses the restore; this
+	// route never substitutes a mode or invokes startup's fatal-error policy.
+	renderDisplayPresentation_t before = {};
+	R_GetDisplayPresentation( &before );
+	r_recoverableRendererRestore = true;
+	try {
+		R_RendererMetrics_ResetGpuFrameTiming( "recoverable vid_restart" );
+		Sys_GrabMouseCursor( false );
+		renderModelManager->FreeModelVertexCaches();
+		R_FreeDerivedData();
+		if ( frameData != NULL ) { R_ToggleSmpFrame(); R_ToggleSmpFrame(); }
+		vertexCache.PurgeAll();
+		R_ShutdownDeviceForRestart();
+		tr.viewDef = NULL; tr.primaryView = NULL; backEnd.viewDef = NULL;
+		if ( R_InitRendererDevice( false, forceWindow, error, errorSize ) ) {
+			R_ClearActiveRenderTextures();
+			R_InitFreeType();
+			R_RefreshConsoleFontAtlas();
+#ifndef OPENQ4_RENDERER_VK_MODULE
+			if ( !GLimp_EnsureActiveContext( "recoverable renderer resource reload" ) || glGetError() != GL_NO_ERROR )
+				R_RejectRecoverableRendererRestart( "OpenGL context or font resource reload failed" );
+#endif
+			tr.viewCount++;
+			R_RegenerateWorld_f( idCmdArgs() );
+			// Publish only after every renderer/font/world dependency is ready.
+			tr.videoRestartCount = tr.videoRestartCount < 0x7fffffff ? tr.videoRestartCount + 1 : 1;
+			if ( session != NULL ) session->SetPlayingSoundWorld();
+			r_recoverableRendererRestore = false;
+			return true;
+		}
+	} catch ( const rendererRestartFailure_t &failure ) {
+		R_RendererRestartError( error, errorSize, failure.reason.c_str() );
+	}
+	// Expected device/program refusal reaches here without Common::Error or
+	// Session shutdown. Global allocation exhaustion/corruption is not caught.
+	R_ShutdownDeviceForRestart();
+	tr.viewDef = NULL; tr.primaryView = NULL; backEnd.viewDef = NULL;
+	renderDisplayPresentation_t failed = {};
+	R_GetDisplayPresentation( &failed );
+	if ( failed.failureSequence == before.failureSequence ) R_DisplayPresentationFailed( RDP_INIT_FAILED );
+	return false;
+}
+
+bool R_TryFullVidRestart( const renderWindowRequest_t *request, char *error, int errorSize ) {
+	if ( request == NULL ) return R_RendererRestartError( error, errorSize, "A display request is required" );
+	const renderWindowRequest_t immutable = *request;
+	return R_TryFullVidRestartInternal( &immutable, false, error, errorSize );
 }
 
 static GLenum R_ClearPendingGLErrors( void ) {
@@ -5356,9 +5509,7 @@ void idRenderSystemLocal::EndLevelLoad( void ) {
 idRenderSystemLocal::InitOpenGL
 ========================
 */
-void idRenderSystemLocal::InitOpenGL( void ) {
-	R_MigrateLegacyShadowMapContactQuality();
-
+static bool R_InitRendererDevice( bool legacyPolicy, bool forceWindow, char *error, int errorSize ) {
 	// if the device isn't started, start it now
 	if ( !glConfig.isInitialized ) {
 #ifdef OPENQ4_RENDERER_VK_MODULE
@@ -5366,7 +5517,7 @@ void idRenderSystemLocal::InitOpenGL( void ) {
 		// the window services; no GL ladder, caps probe, or program loads
 		extern bool VK_InitRenderDevice( void );
 		if ( !VK_InitRenderDevice() ) {
-			common->FatalError( "Vulkan renderer device initialization failed" );
+			return R_RendererRestartError( error, errorSize, "Vulkan renderer device initialization failed" );
 		}
 		// The Vulkan module does not run the OpenGL tier/bootstrap tail that
 		// normally initializes shared scene resources.  The classic-GUI domain
@@ -5391,16 +5542,26 @@ void idRenderSystemLocal::InitOpenGL( void ) {
 #else
 		int	err;
 
-		R_InitOpenGL();
+		if ( legacyPolicy ) R_InitOpenGL();
+		else if ( !R_InitOpenGLInternal( false, forceWindow, error, errorSize ) ) return false;
 
 		globalImages->ReloadImages(true);
 
 		err = glGetError();
 		if ( err != GL_NO_ERROR ) {
+			if ( !legacyPolicy ) return R_RendererRestartError( error, errorSize, "OpenGL image resource reload failed" );
 			common->Printf( "glGetError() = 0x%x\n", err );
 		}
 #endif
 	}
+	return true;
+}
+
+void idRenderSystemLocal::InitOpenGL( void ) {
+	R_MigrateLegacyShadowMapContactQuality();
+	char error[1024];
+	if ( !R_InitRendererDevice( true, false, error, sizeof( error ) ) ) common->FatalError( "%s", error );
+	r_recoverableRendererRestore = false;
 }
 
 /*
@@ -5409,6 +5570,7 @@ idRenderSystemLocal::ShutdownOpenGL
 ========================
 */
 void idRenderSystemLocal::ShutdownOpenGL( void ) {
+	r_recoverableRendererRestore = false;
 	if ( !glConfig.isInitialized ) {
 		R_ClearActiveRenderTextures();
 		useUIViewportFor2D = true;

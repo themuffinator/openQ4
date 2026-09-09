@@ -4,6 +4,9 @@
 #ifndef __RENDERERMODULE_H__
 #define __RENDERERMODULE_H__
 
+#include "RenderModuleAPI.h"
+#include "DisplayPresentation.h"
+
 /*
 ===============================================================================
 
@@ -77,6 +80,25 @@ void	R_RendererModule_BootEarly( void );
 void	R_RendererModule_Shutdown( void );
 
 const rendererModuleStatus_t &R_RendererModule_GetStatus( void );
+
+// Engine-owned identity survives module unload/reload. A renderer-local counter
+// alone cannot identify a device across module lifetimes. These operations run
+// on the main/video thread, serialized with module loading and frame submission.
+struct rendererDisplayState_t {
+	uint64_t moduleEpoch;
+	renderDisplayPresentation_t presentation;
+	renderWindowState_t window;
+	bool windowValid;
+	bool rendererReady;
+	int videoRestartCount;
+};
+
+// Query failure leaves output unchanged. A supported but failed/uninitialized
+// device is a successful observation with rendererReady/windowValid false.
+bool R_RendererModule_QueryDisplay( rendererDisplayState_t *outState );
+// Does not switch renderer modules, execute console commands or select fallback
+// modes. Caller must drain frame work, retain recovery state and perform rollback.
+bool R_RendererModule_TryDeviceRestart( const renderWindowRequest_t *request, char *error, int errorSize );
 
 void	RendererModule_PrintGfxInfo( void );
 

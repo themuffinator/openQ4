@@ -70,14 +70,16 @@ struct Cvars {
 } localCVarSystem,*cvarSystem=&localCVarSystem;
 
 #if defined(USE_SDL3)
+#include "src/renderer/RenderModuleAPI.h"
 using SDL_DisplayID=unsigned;
-struct SDL_Window {};
 struct SDL_DisplayMode { SDL_DisplayID displayID=1; int w=1920,h=1080; float refresh_rate=60,pixel_density=1; };
 static int displayCount=2;
-static bool haveModes=true;
+static bool haveModes=true,haveQuery=true,haveServices=true,haveQueryCallback=true,haveDesktop=true;
+static int refreshCalls=0,windowQueries=0;
+static unsigned currentDisplay=2,primaryDisplay=1;
 static SDL_DisplayID queriedDisplay=0;
 static SDL_DisplayMode desktop;
-static std::vector<SDL_DisplayMode> modes={{1,1920,1080,60,1},{1,1280,720,59.94f,1},{1,1920,1080,60,2}};
+static std::vector<SDL_DisplayMode> modes={{0,1920,1080,60,1},{0,1280,720,59.94f,1},{0,1920,1080,60,2}};
 static SDL_DisplayID* SDL_GetDisplays(int* count) {
     *count=displayCount; if(!displayCount)return nullptr;
     auto* result=static_cast<SDL_DisplayID*>(std::malloc(displayCount*sizeof(SDL_DisplayID)));
@@ -85,9 +87,8 @@ static SDL_DisplayID* SDL_GetDisplays(int* count) {
     return result;
 }
 static void SDL_free(void* p) { std::free(p); }
-static SDL_DisplayID SDL_GetPrimaryDisplay() { return 1; }
-static SDL_DisplayID SDL_GetDisplayForWindow(SDL_Window*) { return 2; }
-static const SDL_DisplayMode* SDL_GetDesktopDisplayMode(SDL_DisplayID display) { queriedDisplay=display;return &desktop; }
+static SDL_DisplayID SDL_GetPrimaryDisplay() { return primaryDisplay; }
+static const SDL_DisplayMode* SDL_GetDesktopDisplayMode(SDL_DisplayID display) { queriedDisplay=display;return haveDesktop?&desktop:nullptr; }
 static SDL_DisplayMode** SDL_GetFullscreenDisplayModes(SDL_DisplayID display,int* count) {
     queriedDisplay=display;
     *count=haveModes?static_cast<int>(modes.size()):0;
@@ -95,12 +96,17 @@ static SDL_DisplayMode** SDL_GetFullscreenDisplayModes(SDL_DisplayID display,int
     for(size_t i=0;i<modes.size();++i)result[i]=&modes[i];
     return result;
 }
-struct renderModuleWindowInfo_t { void* sdlWindow=nullptr; };
-static SDL_Window window;
-static void RefreshNativeWindowHandles(renderModuleWindowInfo_t* info) { info->sdlWindow=&window; }
-struct renderWindowServices_t { void (*RefreshNativeWindowHandles)(renderModuleWindowInfo_t*); };
+static void RefreshNativeWindowHandles(renderModuleWindowInfo_t*) {
+    ++refreshCalls;localCVarSystem.variables.at("r_windowWidth").SetString("555");
+}
+static bool QueryWindowState(renderWindowState_t* output) {
+    ++windowQueries;if(!haveQuery)return false;*output={};output->displayId=currentDisplay;return true;
+}
 static const renderWindowServices_t* Sys_GetRenderWindowServices() {
-    static renderWindowServices_t services={RefreshNativeWindowHandles}; return &services;
+    static renderWindowServices_t services={};
+    services.RefreshNativeWindowHandles=RefreshNativeWindowHandles;
+    services.QueryWindowState=haveQueryCallback?QueryWindowState:nullptr;
+    return haveServices?&services:nullptr;
 }
 #endif
 
@@ -211,6 +217,8 @@ int main() {
     }
     candidate=original;candidate["r_screen"]=1.0;
 #if defined(USE_SDL3)
+    const int preflightWrites=writes;
+    StateValues beforePreflight;assert(host.Read(beforePreflight,error));
     assert(host.Validate(original,candidate,error));
     candidate["r_screen"]=2.0;assert(!host.Validate(original,candidate,error));
     candidate=original;candidate["r_fullscreen"]=true;candidate["r_fullscreenDesktop"]=false;candidate["r_mode"]=-1.0;
@@ -220,10 +228,48 @@ int main() {
     candidate["r_displayRefresh"]=60.0;candidate["r_multiScreen"]=1.0;assert(!host.Validate(original,candidate,error));
     candidate["r_multiScreen"]=0.0;candidate["r_customWidth"]=3840.0;candidate["r_customHeight"]=2160.0;
     assert(host.Validate(original,candidate,error)); // high-density pixel mode
+    // A point-size match alone is invalid: strict exclusive requests are pixels.
+    modes={{2,1920,1080,60,2}};
+    candidate["r_customWidth"]=1920.0;candidate["r_customHeight"]=1080.0;
+    assert(!host.Validate(original,candidate,error));
+    candidate["r_customWidth"]=3840.0;candidate["r_customHeight"]=2160.0;
+    assert(host.Validate(original,candidate,error));
+    auto native=candidate;native["r_mode"]=-2.0;desktop={2,1920,1080,60,2};
+    assert(host.Validate(original,native,error)); // Native means the desktop's pixel dimensions.
+    modes={{2,3840,2160,60,1}};assert(host.Validate(original,native,error));
+    modes={{2,1920,1080,60,1}};assert(!host.Validate(original,native,error));
+    for(const auto size:std::vector<std::pair<int,int>>{{200,120},{32768,2160}}) {
+        desktop={2,size.first,size.second,60,1};modes={desktop};
+        assert(!host.Validate(original,native,error));
+    }
+    desktop={2,1920,1080,60,2};modes={desktop};
+    for(float density:{0.0f,-1.0f,std::numeric_limits<float>::infinity(),std::numeric_limits<float>::quiet_NaN()}) {
+        desktop.pixel_density=density;assert(!host.Validate(original,native,error));
+    }
+    haveDesktop=false;assert(!host.Validate(original,native,error));haveDesktop=true;
+    desktop={2,1920,1080,60,2};modes={{2,1920,1080,59.94f,2}};
+    assert(host.Validate(original,candidate,error));
+    for(float density:{0.0f,-1.0f,std::numeric_limits<float>::infinity(),std::numeric_limits<float>::quiet_NaN()}) {
+        modes[0].pixel_density=density;assert(!host.Validate(original,candidate,error));
+    }
+    modes={{2,1920,1080,59.94f,2}};modes[0].displayID=99;assert(!host.Validate(original,candidate,error));
+    modes[0].displayID=0;
+    haveQuery=false;assert(host.Validate(original,candidate,error) && queriedDisplay==1);haveQuery=true;
+    haveServices=false;assert(host.Validate(original,candidate,error) && queriedDisplay==1);haveServices=true;
+    haveQueryCallback=false;assert(host.Validate(original,candidate,error) && queriedDisplay==1);haveQueryCallback=true;
+    currentDisplay=99;assert(host.Validate(original,candidate,error) && queriedDisplay==1);
+    primaryDisplay=99;assert(!host.Validate(original,candidate,error));primaryDisplay=1;currentDisplay=2;
+    candidate["r_screen"]=0.0;const int explicitQueries=windowQueries;
+    assert(host.Validate(original,candidate,error) && queriedDisplay==1 && windowQueries==explicitQueries);
+    candidate["r_screen"]=-1.0;
     haveModes=false;assert(!host.Validate(original,candidate,error));haveModes=true;
     displayCount=0;assert(!host.Validate(original,candidate,error));displayCount=2;
+    displayCount=1025;assert(!host.Validate(original,candidate,error));displayCount=2;
     auto missingDisplay=original;missingDisplay["r_screen"]=8.0;
     assert(!host.ValidateRollback(missingDisplay,candidate,missingDisplay,error));
+    StateValues afterPreflight;assert(host.Read(afterPreflight,error));
+    assert(windowQueries>0 && refreshCalls==0 && writes==preflightWrites && afterPreflight==beforePreflight);
+    std::puts("SYSTEM display preflight: pure actual-window query, primary fallback, exact pixel/native modes and no CVar writes passed");
 #else
     assert(!host.Validate(original,candidate,error) && error.find("SDL3")!=std::string::npos);
 #endif
@@ -251,6 +297,9 @@ def source_checks(host_source):
     actual = host_source.split('constexpr int LegacyModes[][2] = {', 1)[1].split('};', 1)[0]
     assert [expected[i] for i in range(len(expected))] == [(int(w), int(h)) for w, h in re.findall(r'\{(\d+),(\d+)\}', actual)]
     assert not re.search(r'\b(?:GetFloat|SetCVar\w*|BufferCommand\w*|R_VidRestart_f|FatalError)\s*\(', host_source)
+    display = function_body(host_source, 'bool DisplayTuple(')
+    assert 'services->RefreshNativeWindowHandles(' not in display and 'SDL_GetDisplayForWindow(' not in display
+    assert 'services->QueryWindowState(&observed)' in display and 'pointMatch' not in display
 
 
 def main():

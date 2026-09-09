@@ -330,6 +330,12 @@ production host; batches requiring device/resource work are rejected before
 writes until their actual result/recovery routes are qualified. The complete
 settings screen, Keep/Revert journal, controls, editor and platform qualification
 remain required M1/M2 work.
+The [display-device foundation](../ui/display-device-contract.md) adds strict
+actual window queries, recoverable typed renderer restart/restore and backend
+presentation observations. An engine-owned SDL video reference preserves live
+display identity across failed attempts. The asynchronous settings coordinator,
+durable journal, first-present confirmation and complete platform/production
+qualification remain required; device-changing settings are still blocked.
 Semantic buttons now use authored state timelines, projected hit testing,
 source-order/spatial navigation and modal focus ownership. The
 [interaction checkpoint](../ui/interaction.md) records native behavior checks,

@@ -29,6 +29,7 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #include "tr_local.h"
+#include "OpenGL/FramebufferSamples.h"
 
 /*
 ========================
@@ -1569,10 +1570,14 @@ bool idImage::CopyDepthbuffer( int x, int y, int imageWidth, int imageHeight,
 	opts.height = imageHeight;
 
 	const bool readingFromRenderTexture = ( backEnd.renderTexture != NULL ) && ( backEnd.renderTexture->GetDepthImage() != NULL );
+	// A strict context may intentionally differ from archived r_multiSamples.
+	// Unknown actual samples cannot safely select a default-depth copy path.
+	const int defaultSamples = readingFromRenderTexture ? 0 : R_DefaultFramebufferSamples();
+	if ( defaultSamples < 0 ) return false;
 	const bool sourceDepthIsMSAA =
 		readingFromRenderTexture
 		? ( backEnd.renderTexture->GetDepthImage()->GetOpts().numMSAASamples > 1 )
-		: ( r_multiSamples.GetInteger() > 1 );
+		: ( defaultSamples > 1 );
 	const bool canBlitDepth = ( GLEW_EXT_framebuffer_blit || GLEW_ARB_framebuffer_object || GLEW_VERSION_3_0 );
 
 	// Prefer depth blits when sampling depth for SSAO, especially for MSAA sources.

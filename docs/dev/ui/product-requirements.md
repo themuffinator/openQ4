@@ -7,7 +7,7 @@ the [completion plan](../plans/ui-product-completion.md), the
 [visual specification](../ui-visual-design.md) into implementation ownership,
 dependencies, concrete evidence and explicit unfinished work.
 
-The current increment starts from engine `15e35beaf11a1f1942ba25e9431211f64c1ef7f1` and companion
+The current increment starts from engine `962b179c0e4214df2ebde38e98cb3e090b75fdd6` and companion
 `1cd33980f072ac3d78978a07b388b4b6fe6b5eb2`. The register also identifies the current
 [manager/snapshot foundation](instance-persistence.md) as partial
 evidence with native and SP/OpenGL/MP/Vulkan validation. It does not treat that work as a
@@ -53,6 +53,21 @@ ordered readbacks, 19 service results and two language/video recoveries. The
 source-bound probes and reviewed render-target images qualify this subset only;
 they do not perform real device changes or accept the production page. The
 structural register audit is `.tmp/ui/settings-review/register-validation.json`.
+
+The [display-device foundation](display-device-contract.md) supplies strict actual
+window state, recoverable typed renderer requests, video-lifetime identity
+preservation and backend presentation observations. Its diagnostic resizing and
+restore probes preserve the open draft through resource reconstruction. The
+Windows SP/OpenGL and MP/Vulkan captures each pass eight device observations,
+32 ordered settings readbacks and four reviewed render-target images, including
+gameplay after failure and restoration. Actual interval and GL sample changes
+remain independent of stored preferences; an additional SP/OpenGL run verifies
+gameplay with a four-sample default framebuffer and its restoration. Seven native UI suites, five production
+method harnesses and the 23-test capture oracle qualify this subset. The immutable
+record is `.tmp/ui/display-review/capture-policy-evidence.json`; its structural register
+audit is `.tmp/ui/display-review/register-validation.json`. The
+production settings coordinator, journal, first-present confirmation, visible
+geometry persistence and full platform qualification remain open.
 
 There are **60 partial, 166 pending and one verified requirement**. `BEH-002`
 is now partial for the implemented settings transaction/service boundary.
@@ -101,28 +116,28 @@ complete source-bound mappings and evidence.
 
 | IDs | Required area | Main accountable milestones |
 | --- | --- | --- |
-| `GOV-001`–`008` | Complete scope, source authority, requirement maintenance, canonical ownership, dependencies and publication decisions | M0–M6 |
-| `INV-001`–`013` | Fresh effective corpus, native provenance, expression/name/time semantics, full lowering, assets and special widgets | M0, M1, M5 |
-| `DOC-001`–`008` | Canonical versioned model, components/variants, structural transactions, behavior and binding ownership | M1–M3 |
-| `RUN-001`–`008` | Public retained adapter, neutral manager, source routing, independent views, application frame order and restart | M1, M6 |
-| `BEH-001`–`007` | Typed operations, settings transactions, aliases/events, exactly-once actions/sounds, pause and MP authority | M1, M2, M4 |
-| `SUR-001`–`006` | Explicit output surfaces, GPU lifetime, world density/rays, HUD/aim projection and output-resolution UI | M1, M5, M6 |
-| `SAVE-001`–`004` | Versioned instance/game-save policy, full durable state and live/level restoration | M1, M5 |
-| `LAY-001`–`012` | Exact scale/spacing/target-size values, aspect expansion, compact recovery, HUD safe areas and contrast | M1–M5 |
-| `TXT-001`–`009` | Scalable typography, shaped runs, Unicode, localization, caret/selection/clipboard/IME and platform accessibility | M2, M3 |
-| `INP-001`–`008` | Input transforms, paired activation, repeat/handoff, wheel/touch/text, modal focus and authored mask-aware hits | M1, M3 |
-| `WID-001`–`016` | Every named functional widget: actions, checkbox, radio, slider, choice, text, binding, tabs, lists, scrolling, progress, tooltip, modal, status, tree and path/color controls | M2, M3 |
-| `REN-001`–`013` | Editable paths/paints/strokes/SVG, coverage/color, isolated opacity/masks/clips, composition and recovery | M3, M6 |
-| `RES-001`–`005` | Full material/movie/model operations, generated images and actual renderer resource accounting | M3, M4 |
-| `ART-001`–`017` | Measured component/icon libraries, exact visual tokens, all eight distinct families and complex-image exceptions | M2–M5 |
-| `MOT-001`–`008` | Continuous clocks, normative timing/easing, reversal/ownership, page/modal orchestration, sound and reduced motion | M1–M3, M6 |
-| `FLOW-001`–`018` | Every menu/MP flow, HUD, communications, scope/vehicle, cinematic and scripted/world GUI | M2, M4, M5 |
-| `ED-001`–`030` | Native workspace, canvas/constraints, components, vectors, motion/behavior, persistence/recovery, diagnostics and complete SP/MP delivery | M2, M3 |
-| `PERF-001`–`008` | Named optimized baselines, separate CPU/GPU telemetry, warm/cold runs, budgets, long-run plateau and measured optimization | M3, M6 |
-| `QUAL-001`–`009` | Display/text/input/refresh/language/world extremes, independent visual review, actual platforms and evidence provenance | M6 |
-| `SHIP-001`–`006` | Complete retained routing, external-mod policy, retail-asset staging, artifact hygiene, dedicated builds and documentation | M1, M6 |
-| `GATE-001`–`007` | The seven milestone exit conditions | M0–M6 |
-| `FINAL-001`–`007` | Each numbered final product audit item | M6 |
+| `GOV-001`â€“`008` | Complete scope, source authority, requirement maintenance, canonical ownership, dependencies and publication decisions | M0â€“M6 |
+| `INV-001`â€“`013` | Fresh effective corpus, native provenance, expression/name/time semantics, full lowering, assets and special widgets | M0, M1, M5 |
+| `DOC-001`â€“`008` | Canonical versioned model, components/variants, structural transactions, behavior and binding ownership | M1â€“M3 |
+| `RUN-001`â€“`008` | Public retained adapter, neutral manager, source routing, independent views, application frame order and restart | M1, M6 |
+| `BEH-001`â€“`007` | Typed operations, settings transactions, aliases/events, exactly-once actions/sounds, pause and MP authority | M1, M2, M4 |
+| `SUR-001`â€“`006` | Explicit output surfaces, GPU lifetime, world density/rays, HUD/aim projection and output-resolution UI | M1, M5, M6 |
+| `SAVE-001`â€“`004` | Versioned instance/game-save policy, full durable state and live/level restoration | M1, M5 |
+| `LAY-001`â€“`012` | Exact scale/spacing/target-size values, aspect expansion, compact recovery, HUD safe areas and contrast | M1â€“M5 |
+| `TXT-001`â€“`009` | Scalable typography, shaped runs, Unicode, localization, caret/selection/clipboard/IME and platform accessibility | M2, M3 |
+| `INP-001`â€“`008` | Input transforms, paired activation, repeat/handoff, wheel/touch/text, modal focus and authored mask-aware hits | M1, M3 |
+| `WID-001`â€“`016` | Every named functional widget: actions, checkbox, radio, slider, choice, text, binding, tabs, lists, scrolling, progress, tooltip, modal, status, tree and path/color controls | M2, M3 |
+| `REN-001`â€“`013` | Editable paths/paints/strokes/SVG, coverage/color, isolated opacity/masks/clips, composition and recovery | M3, M6 |
+| `RES-001`â€“`005` | Full material/movie/model operations, generated images and actual renderer resource accounting | M3, M4 |
+| `ART-001`â€“`017` | Measured component/icon libraries, exact visual tokens, all eight distinct families and complex-image exceptions | M2â€“M5 |
+| `MOT-001`â€“`008` | Continuous clocks, normative timing/easing, reversal/ownership, page/modal orchestration, sound and reduced motion | M1â€“M3, M6 |
+| `FLOW-001`â€“`018` | Every menu/MP flow, HUD, communications, scope/vehicle, cinematic and scripted/world GUI | M2, M4, M5 |
+| `ED-001`â€“`030` | Native workspace, canvas/constraints, components, vectors, motion/behavior, persistence/recovery, diagnostics and complete SP/MP delivery | M2, M3 |
+| `PERF-001`â€“`008` | Named optimized baselines, separate CPU/GPU telemetry, warm/cold runs, budgets, long-run plateau and measured optimization | M3, M6 |
+| `QUAL-001`â€“`009` | Display/text/input/refresh/language/world extremes, independent visual review, actual platforms and evidence provenance | M6 |
+| `SHIP-001`â€“`006` | Complete retained routing, external-mod policy, retail-asset staging, artifact hygiene, dedicated builds and documentation | M1, M6 |
+| `GATE-001`â€“`007` | The seven milestone exit conditions | M0â€“M6 |
+| `FINAL-001`â€“`007` | Each numbered final product audit item | M6 |
 
 Numeric `constraints` retain the specification's UI/text scales, dimensions,
 spacing, typography, palette/alpha, panel/button/icon geometry, input repeat,
@@ -189,4 +204,5 @@ is not newly established as a gameplay failure. The two previously recorded
 bare-backslash alpha expressions remain explicit semantic work in `INV-010`.
 No new unrelated defect was established by this read-only inventory/register
 work. Historical MP content warnings remain a separate qualification backlog;
-this task did not run a game or remeasure them.
+that inventory-only refresh did not run a game. The later renderer probes above
+record their own gameplay and warning comparisons.

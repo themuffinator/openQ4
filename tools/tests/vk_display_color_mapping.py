@@ -82,7 +82,7 @@ struct {
     bool frameOpen=true,temporalScenePendingComposite=false,mainScopeOpen=true;
     int frameSlot=0,cmd=1,pipelineLayout=7;
 } vkExec;
-struct { int device=1; bool swapchainTransferSrc=true,depthBoundsSupported=true; VkExtent2D swapchainExtent; } vkCtx;
+struct { int device=1; bool swapchainTransferSrc=true,depthBoundsSupported=true,presentationBlocked=false; VkExtent2D swapchainExtent; } vkCtx;
 struct CVar {float value=1;float GetFloat()const{return value;}} r_brightness,r_gamma;
 namespace idMath {
 float ClampFloat(float a,float b,float v){return std::clamp(v,a,b);}
@@ -205,6 +205,16 @@ int main(){
     // A capture's resumed clear starts fresh; stale descriptors/push state
     // cannot turn a new composition into a second mapping of the old image.
     NewComposition();original=pixels;r_brightness.value=1.25f;r_gamma.value=1.6f;
+    assert(VK_GuiExecutor_EndFrameAndPresent());CheckMapping(original,1.25f,1.6f);
+    // A lost device stops before any color-mapping allocation, draw or
+    // submission, and does not falsely mark the composition mapped.
+    NewComposition();original=pixels;const auto blockedCalls=calls;
+    const int blockedDraws=draws,blockedImages=imageCreates;
+    vkCtx.presentationBlocked=true;
+    assert(!VK_GuiExecutor_EndFrameAndPresent());
+    assert(SamePixels(original) && calls==blockedCalls && draws==blockedDraws && imageCreates==blockedImages);
+    assert(vkExec.frameOpen && !vkExec.displayColorMapped);
+    vkCtx.presentationBlocked=false;
     assert(VK_GuiExecutor_EndFrameAndPresent());CheckMapping(original,1.25f,1.6f);
     std::puts("Vulkan display mapping: production pass/GLSL math, orientation/alpha, neutral bypass, composition, one-time mapping, slot reuse and reported failures passed");
 }

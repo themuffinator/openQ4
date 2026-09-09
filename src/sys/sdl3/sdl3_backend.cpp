@@ -6367,6 +6367,275 @@ static bool SDL3_WindowServices_CreateVulkanSurface(void *vkInstance, unsigned l
 	return true;
 }
 
+// Strict settings operations are separate from legacy startup negotiation.
+// Every observation comes from SDL; querying never persists placement CVars.
+struct sdl3StrictDisplayList_t {
+	int count = 0;
+	SDL_DisplayID *ids = SDL_GetDisplays(&count);
+	~sdl3StrictDisplayList_t() { if (ids) SDL_free(ids); }
+	bool Valid() const { return ids && count > 0 && count <= 1024; }
+	int Index(SDL_DisplayID display) const {
+		if (Valid()) for (int i = 0; i < count; ++i) if (ids[i] == display) return i;
+		return -1;
+	}
+};
+
+static bool SDL3_StrictModePixels(const SDL_DisplayMode *mode, int &width, int &height) {
+	if (!mode || mode->w <= 0 || mode->h <= 0 || !std::isfinite(mode->pixel_density) || mode->pixel_density <= 0) return false;
+	const double w = std::floor(static_cast<double>(mode->w) * mode->pixel_density + 0.5);
+	const double h = std::floor(static_cast<double>(mode->h) * mode->pixel_density + 0.5);
+	if (!std::isfinite(w) || !std::isfinite(h) || w < 1 || h < 1 || w > idMath::INT_MAX || h > idMath::INT_MAX) return false;
+	width = static_cast<int>(w); height = static_cast<int>(h);
+	return true;
+}
+
+static void SDL3_QueryDisplayViewport(renderWindowState_t &state) {
+	state.uiViewportX = state.uiViewportY = 0;
+	state.uiViewportWidth = state.pixelWidth; state.uiViewportHeight = state.pixelHeight;
+	if (!state.positionValid || !SDL3_UseAbsoluteWindowPlacement()) return;
+	SDL_Rect bounds;
+	const SDL_DisplayID display = SDL3_ResolveViewportDisplay();
+	if (!display || !SDL_GetDisplayBounds(display, &bounds) || bounds.w <= 0 || bounds.h <= 0) return;
+	// Same floor/ceil overlap policy as SDL3_UpdateDisplayViewport, evaluated
+	// without publishing engine state or falling back to stale cached sizes.
+	const int64_t left = state.windowX, top = state.windowY;
+	const int64_t right = left + state.logicalWidth, bottom = top + state.logicalHeight;
+	const int64_t displayRight = static_cast<int64_t>(bounds.x) + bounds.w;
+	const int64_t displayBottom = static_cast<int64_t>(bounds.y) + bounds.h;
+	const int64_t overlapLeft = left > bounds.x ? left : bounds.x;
+	const int64_t overlapTop = top > bounds.y ? top : bounds.y;
+	const int64_t overlapRight = right < displayRight ? right : displayRight;
+	const int64_t overlapBottom = bottom < displayBottom ? bottom : displayBottom;
+	if (overlapRight <= overlapLeft || overlapBottom <= overlapTop) return;
+	const double scaleX = static_cast<double>(state.pixelWidth) / state.logicalWidth;
+	const double scaleY = static_cast<double>(state.pixelHeight) / state.logicalHeight;
+	const int x = SDL3_ClampViewportPixel(std::floor((overlapLeft-left)*scaleX), 0, state.pixelWidth);
+	const int y = SDL3_ClampViewportPixel(std::floor((overlapTop-top)*scaleY), 0, state.pixelHeight);
+	const int r = SDL3_ClampViewportPixel(std::ceil((overlapRight-left)*scaleX), x, state.pixelWidth);
+	const int b = SDL3_ClampViewportPixel(std::ceil((overlapBottom-top)*scaleY), y, state.pixelHeight);
+	if (r > x && b > y) {
+		state.uiViewportX = x; state.uiViewportY = y;
+		state.uiViewportWidth = r-x; state.uiViewportHeight = b-y;
+	}
+}
+
+static bool SDL3_WindowServices_QueryWindowState(renderWindowState_t *outState) {
+	if (!outState || !s_sdlWindow) return SDL_SetError("No SDL window or window-state output");
+	renderWindowState_t state = {};
+	state.displayId = SDL_GetDisplayForWindow(s_sdlWindow);
+	sdl3StrictDisplayList_t displays;
+	state.displayIndex = displays.Index(state.displayId);
+	if (!state.displayId || state.displayIndex < 0) return SDL_SetError("The SDL window display is unavailable");
+	const SDL_WindowFlags flags = SDL_GetWindowFlags(s_sdlWindow);
+	state.windowFlags = static_cast<unsigned long long>(flags);
+	state.fullscreen = (flags & SDL_WINDOW_FULLSCREEN) != 0;
+	state.fullscreenDesktop = state.fullscreen && SDL_GetWindowFullscreenMode(s_sdlWindow) == NULL;
+	state.borderless = (flags & SDL_WINDOW_BORDERLESS) != 0;
+	state.hidden = (flags & SDL_WINDOW_HIDDEN) != 0;
+	state.minimized = (flags & SDL_WINDOW_MINIMIZED) != 0;
+	state.maximized = (flags & SDL_WINDOW_MAXIMIZED) != 0;
+	state.focused = (flags & SDL_WINDOW_INPUT_FOCUS) != 0;
+	state.positionValid = SDL3_UseAbsoluteWindowPlacement() && SDL_GetWindowPosition(s_sdlWindow, &state.windowX, &state.windowY);
+	if (!SDL_GetWindowSize(s_sdlWindow, &state.logicalWidth, &state.logicalHeight) ||
+		!SDL_GetWindowSizeInPixels(s_sdlWindow, &state.pixelWidth, &state.pixelHeight) ||
+		state.logicalWidth <= 0 || state.logicalHeight <= 0 || state.pixelWidth <= 0 || state.pixelHeight <= 0)
+		return SDL_SetError("The SDL window dimensions are unavailable or invalid");
+	state.displayScale = SDL_GetWindowDisplayScale(s_sdlWindow);
+	if (!std::isfinite(state.displayScale) || state.displayScale <= 0) return SDL_SetError("The SDL window display scale is invalid");
+	state.pixelDensityX = static_cast<float>(state.pixelWidth) / state.logicalWidth;
+	state.pixelDensityY = static_cast<float>(state.pixelHeight) / state.logicalHeight;
+	const SDL_DisplayMode *mode = SDL_GetCurrentDisplayMode(state.displayId);
+	if (SDL3_StrictModePixels(mode, state.modePixelWidth, state.modePixelHeight) &&
+		std::isfinite(mode->refresh_rate) && mode->refresh_rate >= 0) {
+		state.currentModeValid = true; state.modeWidth = mode->w; state.modeHeight = mode->h;
+		state.refreshRate = mode->refresh_rate; state.modePixelDensity = mode->pixel_density;
+	}
+	SDL3_QueryDisplayViewport(state);
+	*outState = state;
+	return true;
+}
+
+static bool SDL3_StrictWindowFailure(const char *message, char *error, int errorSize, bool fromSDL = false) {
+	if (error && errorSize > 0) idStr::snPrintf(error, errorSize, "%s%s%s", message, fromSDL ? ": " : "", fromSDL ? SDL_GetError() : "");
+	return false;
+}
+
+static bool SDL3_StrictFullscreenMode(SDL_DisplayID display, int width, int height, int refresh, SDL_DisplayMode &selected) {
+	int count = 0;
+	SDL_DisplayMode **modes = SDL_GetFullscreenDisplayModes(display, &count);
+	if (!modes) return false;
+	bool found = false;
+	for (int i = 0; i < count; ++i) {
+		int w = 0, h = 0;
+		const auto *mode = modes[i];
+		if (!SDL3_StrictModePixels(mode,w,h) || w != width || h != height ||
+			(mode->displayID && mode->displayID != display) || !std::isfinite(mode->refresh_rate) || mode->refresh_rate < 0) continue;
+		// The existing menu stores integer Hz: 59.94 belongs to the 60-Hz
+		// choice. No neighboring resolution or different refresh bucket is used.
+		if (refresh > 0 && std::floor(mode->refresh_rate + 0.5f) != refresh) continue;
+		if (!found || mode->refresh_rate > selected.refresh_rate) { selected = *mode; found = true; }
+	}
+	SDL_free(modes);
+	if (found) selected.displayID = display;
+	return found;
+}
+
+static bool SDL3_StrictDisplayBounds(const sdl3StrictDisplayList_t &displays, SDL_DisplayID selected,
+	bool span, SDL_Rect &bounds) {
+	if (!span) return SDL_GetDisplayBounds(selected, &bounds) && bounds.w > 0 && bounds.h > 0;
+	int64_t left = 0, top = 0, right = 0, bottom = 0;
+	for (int i = 0; i < displays.count; ++i) {
+		SDL_Rect current;
+		if (!SDL_GetDisplayBounds(displays.ids[i], &current) || current.w <= 0 || current.h <= 0) return false;
+		const int64_t r = static_cast<int64_t>(current.x) + current.w;
+		const int64_t b = static_cast<int64_t>(current.y) + current.h;
+		if (i == 0 || current.x < left) left = current.x;
+		if (i == 0 || current.y < top) top = current.y;
+		if (i == 0 || r > right) right = r;
+		if (i == 0 || b > bottom) bottom = b;
+	}
+	if (right-left <= 0 || bottom-top <= 0 || right-left > 16384 || bottom-top > 16384) return false;
+	bounds = {static_cast<int>(left),static_cast<int>(top),static_cast<int>(right-left),static_cast<int>(bottom-top)};
+	return true;
+}
+
+static bool SDL3_WindowServices_ApplyScreenParmsStrict(const renderWindowRequest_t *request,
+	renderWindowState_t *outState, char *error, int errorSize) {
+	if (!request || !outState || !s_sdlWindow) return SDL3_StrictWindowFailure("No SDL window, request or result",error,errorSize);
+	const renderWindowParms_t parms = request->parms;
+	if (parms.width < 320 || parms.width > 16384 || parms.height < 240 || parms.height > 16384 ||
+		parms.displayHz < 0 || parms.displayHz > 1000 || (!request->displayId && request->displayIndex < -1) ||
+		(parms.hiddenWindow && (parms.fullScreen || parms.borderless)))
+		return SDL3_StrictWindowFailure("Invalid strict window dimensions, display or hidden-window policy",error,errorSize);
+	if (s_screenParmTransitionActive) return SDL3_StrictWindowFailure("A window transition is already active",error,errorSize);
+	if (request->restorePlacement && !SDL3_UseAbsoluteWindowPlacement())
+		return SDL3_StrictWindowFailure("Absolute restore placement is unavailable on this window system",error,errorSize);
+	sdl3StrictDisplayList_t displays;
+	if (!displays.Valid()) return SDL3_StrictWindowFailure("Display enumeration failed",error,errorSize,true);
+	SDL_DisplayID display = request->displayId;
+	if (!display && request->displayIndex >= 0) {
+		if (request->displayIndex >= displays.count) return SDL3_StrictWindowFailure("Requested display index is unavailable",error,errorSize);
+		display = displays.ids[request->displayIndex];
+	}
+	if (!display) {
+		display = SDL_GetDisplayForWindow(s_sdlWindow);
+		if (displays.Index(display) < 0) display = SDL_GetPrimaryDisplay();
+	}
+	if (displays.Index(display) < 0) return SDL3_StrictWindowFailure("Requested display identity is unavailable",error,errorSize);
+	const bool spannedDesktop = parms.fullScreen && request->fullscreenDesktop && request->spanDisplays;
+	const bool borderless = (!parms.fullScreen && parms.borderless) || spannedDesktop;
+	const bool span = borderless && request->spanDisplays;
+	if (span && !SDL3_UseAbsoluteWindowPlacement()) return SDL3_StrictWindowFailure("Spanned windows are unavailable on this window system",error,errorSize);
+	SDL_Rect bounds;
+	if (!SDL3_StrictDisplayBounds(displays,display,span,bounds)) return SDL3_StrictWindowFailure("Requested display bounds are unavailable",error,errorSize,true);
+	SDL_DisplayMode selectedMode = {};
+	const bool exclusive = parms.fullScreen && !request->fullscreenDesktop;
+	if (exclusive && !SDL3_StrictFullscreenMode(display,parms.width,parms.height,parms.displayHz,selectedMode))
+		return SDL3_StrictWindowFailure("No exact fullscreen pixel mode and refresh matches the request",error,errorSize);
+	int desktopPixelWidth = 0, desktopPixelHeight = 0;
+	const bool desktopFullscreen = parms.fullScreen && request->fullscreenDesktop && !span;
+	if (desktopFullscreen && !SDL3_StrictModePixels(SDL_GetDesktopDisplayMode(display),desktopPixelWidth,desktopPixelHeight))
+		return SDL3_StrictWindowFailure("The requested desktop fullscreen mode is unavailable",error,errorSize);
+	renderWindowState_t before = {};
+	if (!SDL3_WindowServices_QueryWindowState(&before)) return SDL3_StrictWindowFailure("Cannot observe the existing window",error,errorSize,true);
+	const int targetWidth = borderless ? bounds.w : parms.width;
+	const int targetHeight = borderless ? bounds.h : parms.height;
+	if (targetWidth > 16384 || targetHeight > 16384) return SDL3_StrictWindowFailure("Requested window exceeds supported dimensions",error,errorSize);
+	// Transition suppression prevents incidental SDL events from persisting
+	// partial geometry. All returns release it; a failure is not a rollback.
+	struct Transition {
+		Transition() { s_screenParmTransitionActive = true; }
+		~Transition() { s_screenParmTransitionActive = false; }
+	} transition;
+	if (s_windowAspectSnapActive) {
+		if (!SDL_SetWindowAspectRatio(s_sdlWindow,0,0)) return SDL3_StrictWindowFailure("Cannot clear the window aspect constraint",error,errorSize,true);
+		s_windowAspectSnapActive = false; s_windowAspectSnapRatio = 0;
+	}
+	if (before.fullscreen) {
+		if (!SDL_SetWindowFullscreen(s_sdlWindow,false) || !SDL_SyncWindow(s_sdlWindow))
+			return SDL3_StrictWindowFailure("Cannot leave the previous fullscreen mode",error,errorSize,true);
+	}
+	if (before.maximized || before.minimized) {
+		if (!SDL_RestoreWindow(s_sdlWindow) || !SDL_SyncWindow(s_sdlWindow))
+			return SDL3_StrictWindowFailure("Cannot restore the previous window state",error,errorSize,true);
+	}
+	if (!SDL_SetWindowFullscreenMode(s_sdlWindow,exclusive ? &selectedMode : NULL))
+		return SDL3_StrictWindowFailure("Cannot select the requested fullscreen mode",error,errorSize,true);
+	if (!SDL_SetWindowBordered(s_sdlWindow,!borderless)) return SDL3_StrictWindowFailure("Cannot apply window borders",error,errorSize,true);
+	int x = bounds.x, y = bounds.y;
+	if (!borderless && !parms.fullScreen) {
+		if (before.positionValid && before.displayId == display) { x = before.windowX; y = before.windowY; }
+		else {
+			x = SDL3_SaturateWindowCoordinate(static_cast<int64_t>(bounds.x) + (static_cast<int64_t>(bounds.w)-targetWidth)/2);
+			y = SDL3_SaturateWindowCoordinate(static_cast<int64_t>(bounds.y) + (static_cast<int64_t>(bounds.h)-targetHeight)/2);
+		}
+	}
+	if (request->restorePlacement) { x = request->windowX; y = request->windowY; }
+	else if (!SDL3_UseAbsoluteWindowPlacement()) x = y = SDL_WINDOWPOS_CENTERED_DISPLAY(display);
+	if (!SDL_SetWindowPosition(s_sdlWindow,x,y)) return SDL3_StrictWindowFailure("Cannot place the window on the requested display",error,errorSize,true);
+	if (parms.fullScreen && !spannedDesktop) {
+		if (!SDL_SetWindowFullscreen(s_sdlWindow,true)) return SDL3_StrictWindowFailure("Cannot enter the requested fullscreen mode",error,errorSize,true);
+	} else if (!SDL_SetWindowSize(s_sdlWindow,targetWidth,targetHeight)) {
+		return SDL3_StrictWindowFailure("Cannot apply the requested logical window size",error,errorSize,true);
+	}
+	if (parms.hiddenWindow ? !SDL_HideWindow(s_sdlWindow) : !SDL_ShowWindow(s_sdlWindow))
+		return SDL3_StrictWindowFailure("Cannot apply window visibility",error,errorSize,true);
+	if (request->maximized && !SDL_MaximizeWindow(s_sdlWindow))
+		return SDL3_StrictWindowFailure("Cannot restore the maximized window state",error,errorSize,true);
+	if (!SDL_SyncWindow(s_sdlWindow)) return SDL3_StrictWindowFailure("Requested window transition did not synchronize",error,errorSize,true);
+	renderWindowState_t actual = {};
+	if (!SDL3_WindowServices_QueryWindowState(&actual)) return SDL3_StrictWindowFailure("Cannot observe the applied window",error,errorSize,true);
+	const bool fullscreen = parms.fullScreen && !spannedDesktop;
+	if (actual.fullscreen != fullscreen || (fullscreen && actual.fullscreenDesktop != request->fullscreenDesktop) ||
+		(!fullscreen && actual.borderless != borderless) || actual.hidden != parms.hiddenWindow || actual.minimized || actual.maximized != request->maximized ||
+		(!span && actual.displayId != display))
+		return SDL3_StrictWindowFailure("Observed window flags or display do not match the request",error,errorSize);
+	if (!fullscreen && (actual.logicalWidth != targetWidth || actual.logicalHeight != targetHeight))
+		return SDL3_StrictWindowFailure("Observed logical window dimensions do not match the request",error,errorSize);
+	if (request->restorePlacement && (!actual.positionValid || actual.windowX != request->windowX || actual.windowY != request->windowY))
+		return SDL3_StrictWindowFailure("Observed window placement does not match the explicit restore coordinates",error,errorSize);
+	if (borderless && SDL3_UseAbsoluteWindowPlacement() && (!actual.positionValid || actual.windowX != bounds.x || actual.windowY != bounds.y))
+		return SDL3_StrictWindowFailure("Observed borderless placement does not match the requested bounds",error,errorSize);
+	if (exclusive && (!actual.currentModeValid || actual.modePixelWidth != parms.width || actual.modePixelHeight != parms.height ||
+		actual.pixelWidth != parms.width || actual.pixelHeight != parms.height ||
+		(parms.displayHz > 0 && std::floor(actual.refreshRate + 0.5f) != parms.displayHz)))
+		return SDL3_StrictWindowFailure("Observed exclusive display mode does not match the request",error,errorSize);
+	if (desktopFullscreen && (!actual.currentModeValid || actual.modePixelWidth != desktopPixelWidth || actual.modePixelHeight != desktopPixelHeight ||
+		actual.pixelWidth != desktopPixelWidth || actual.pixelHeight != desktopPixelHeight))
+		return SDL3_StrictWindowFailure("Observed desktop fullscreen mode does not match the display",error,errorSize);
+	win32.cdsFullscreen = parms.fullScreen;
+	SDL3_SetFullscreenState(parms.fullScreen);
+	SDL3_SetVidSize(actual.pixelWidth,actual.pixelHeight);
+	SDL3_SetUIViewport(actual.uiViewportX,actual.uiViewportY,actual.uiViewportWidth,actual.uiViewportHeight);
+	engineWindowState.displayScale = actual.displayScale;
+	engineWindowState.pixelDensityX = actual.pixelDensityX; engineWindowState.pixelDensityY = actual.pixelDensityY;
+	// SDL's observation exposes the current maximized size, not its hidden
+	// normal restore rectangle. Do not replace our normal placement cache with
+	// maximized geometry or claim that the typed snapshot preserves that cache.
+	if (!parms.fullScreen && !borderless && !parms.hiddenWindow && !actual.maximized && actual.positionValid) {
+		int frameX = actual.windowX, frameY = actual.windowY;
+		SDL3_ClientOriginToFrameOrigin(actual.windowX,actual.windowY,frameX,frameY);
+		SDL3_RecordWindowedPlacement(frameX,frameY,actual.logicalWidth,actual.logicalHeight);
+	}
+	if (error && errorSize > 0) error[0] = '\0';
+	*outState = actual;
+	return true;
+}
+
+// A recoverable renderer restart must keep SDL's display enumeration alive:
+// quitting its final video reference invalidates every saved SDL_DisplayID.
+// The engine caller owns one matching release for each successful retain,
+// including across failed attempts which temporarily have no renderer window.
+static bool SDL3_WindowServices_RetainVideoSystem() {
+	if ((SDL_WasInit(SDL_INIT_VIDEO) & SDL_INIT_VIDEO) == 0)
+		return SDL_SetError("Cannot retain an inactive SDL video system");
+	return SDL_InitSubSystem(SDL_INIT_VIDEO);
+}
+
+static void SDL3_WindowServices_ReleaseVideoSystem() {
+	SDL_QuitSubSystem(SDL_INIT_VIDEO);
+}
+
 static const renderWindowServices_t s_sdl3WindowServices = {
 	SDL3_WindowServices_PrepareWindowSystem,
 	SDL3_WindowServices_CreateWindowForFramebuffer,
@@ -6394,6 +6663,10 @@ static const renderWindowServices_t s_sdl3WindowServices = {
 	SDL3_WindowServices_GrabMouseCursor,
 	SDL3_WindowServices_GetVulkanInstanceExtensions,
 	SDL3_WindowServices_CreateVulkanSurface,
+	SDL3_WindowServices_QueryWindowState,
+	SDL3_WindowServices_ApplyScreenParmsStrict,
+	SDL3_WindowServices_RetainVideoSystem,
+	SDL3_WindowServices_ReleaseVideoSystem,
 };
 
 const renderWindowServices_t *Sys_GetRenderWindowServices(void) {

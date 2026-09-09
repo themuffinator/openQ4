@@ -3134,6 +3134,9 @@ void VK_GuiExecutor_SetClearColor( const float color[ 4 ] ) {
 static bool VK_GuiExecutor_BeginFrame( void ) {
 	static bool loggedNotInitialized = false;
 	static bool loggedInitFailed = false;
+	// Failed submissions can leave an unsignaled fence or an unconsumed binary
+	// semaphore. Only a full device restart makes these handles reusable.
+	if ( vkCtx.presentationBlocked ) return false;
 	if ( vkExec.frameOpen ) {
 		return true;
 	}
@@ -3145,6 +3148,7 @@ static bool VK_GuiExecutor_BeginFrame( void ) {
 		return false;
 	}
 	if ( !VK_GuiExecutor_Init() ) {
+		R_DisplayPresentationFailed( RDP_INIT_FAILED );
 		if ( !loggedInitFailed ) {
 			loggedInitFailed = true;
 			common->Printf( "Vulkan: GUI executor init failed; frames skipped\n" );
@@ -3176,7 +3180,8 @@ static bool VK_GuiExecutor_BeginFrame( void ) {
 	vkExec.temporalSwapchainFormat = vkCtx.swapchainFormat;
 	// swapchain format changes (rare) invalidate the pipeline set
 	if ( vkExec.pipelineTargetFormat != vkCtx.swapchainFormat ) {
-		vkDeviceWaitIdle( vkCtx.device );
+		const VkResult idle = vkDeviceWaitIdle( vkCtx.device );
+		if ( idle != VK_SUCCESS ) { VK_Device_BlockPresentation( RDP_WAIT_FAILED, idle, "pipeline retirement" ); return false; }
 		for ( int i = 0; i < vkExec.numPipelines; i++ ) {
 			vkDestroyPipeline( vkCtx.device, vkExec.pipelines[ i ].pipeline, NULL );
 		}
@@ -3234,6 +3239,7 @@ static bool VK_GuiExecutor_BeginFrame( void ) {
 	const VkResult frameFenceResult = vkWaitForFences( vkCtx.device, 1,
 		&vkCtx.frameFences[ slot ], VK_TRUE, UINT64_MAX );
 	if ( frameFenceResult != VK_SUCCESS ) {
+		VK_Device_BlockPresentation( RDP_WAIT_FAILED, frameFenceResult, "frame fence wait" );
 		common->Warning( "Vulkan: frame-slot %d fence wait failed (%d)", slot,
 			static_cast<int>( frameFenceResult ) );
 		return false;
@@ -3243,6 +3249,7 @@ static bool VK_GuiExecutor_BeginFrame( void ) {
 	// batches referenced; near-free, since the batch was submitted before the
 	// previous frame's submit
 	VK_Device_WaitUploadBatch();
+	if ( vkCtx.presentationBlocked ) return false;
 	VK_Device_FlushDeferredDestroys( slot );
 	if ( vkExec.numRetiredSets[ slot ] > 0 ) {
 		vkFreeDescriptorSets( vkCtx.device, vkExec.descriptorPool,
@@ -3255,7 +3262,7 @@ static bool VK_GuiExecutor_BeginFrame( void ) {
 	// VK_Device_PresentClearFrame, which nothing calls, so toggling vsync did
 	// nothing here until something else forced a rebuild. Do it before the
 	// acquire, where the old swapchain is not yet in use this frame.
-	if ( R_GetEffectiveSwapInterval() != vkCtx.swapInterval ) {
+	if ( VK_Device_RequestedSwapInterval() != vkCtx.swapInterval ) {
 		if ( !VK_Device_RecreateSwapchain() ) {
 			return false;
 		}
@@ -3272,6 +3279,8 @@ static bool VK_GuiExecutor_BeginFrame( void ) {
 				vkCtx.acquireSemaphores[ slot ], VK_NULL_HANDLE, &imageIndex );
 	}
 	if ( res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR ) {
+		if ( res == VK_ERROR_DEVICE_LOST ) VK_Device_BlockPresentation( RDP_ACQUIRE_FAILED, res, "frame acquire" );
+		else R_DisplayPresentationFailed( RDP_ACQUIRE_FAILED, (int32_t)res );
 		return false;
 	}
 
@@ -3283,17 +3292,17 @@ static bool VK_GuiExecutor_BeginFrame( void ) {
 	// Reset/begin the command buffer BEFORE resetting the slot fence, and bail
 	// on failure (device-lost between the fence wait and here): recording the
 	// barriers below into a command buffer that was never begun is undefined
-	// behavior, and leaving the fence signaled on the failure path keeps the
-	// slot's "fence signaled == slot idle" invariant so the next frame does not
-	// deadlock. The acquired swapchain image is abandoned only on this already
-	// terminal device-lost path.
-	if ( vkResetCommandBuffer( cmd, 0 ) != VK_SUCCESS
-			|| vkBeginCommandBuffer( cmd, &cbbi ) != VK_SUCCESS ) {
-		common->Warning( "Vulkan: frame-slot %d command buffer begin failed", slot );
+	// behavior. Acquisition already signaled a semaphore, so even a recording
+	// failure requires a full restart before another frame can reuse this slot.
+	res = vkResetCommandBuffer( cmd, 0 );
+	if ( res == VK_SUCCESS ) res = vkBeginCommandBuffer( cmd, &cbbi );
+	if ( res != VK_SUCCESS ) {
+		VK_Device_BlockPresentation( RDP_RECORD_FAILED, res, "frame command begin" );
 		return false;
 	}
-	if ( vkResetFences( vkCtx.device, 1, &vkCtx.frameFences[ slot ] ) != VK_SUCCESS ) {
-		common->Warning( "Vulkan: frame-slot %d fence reset failed", slot );
+	res = vkResetFences( vkCtx.device, 1, &vkCtx.frameFences[ slot ] );
+	if ( res != VK_SUCCESS ) {
+		VK_Device_BlockPresentation( RDP_WAIT_FAILED, res, "frame fence reset" );
 		return false;
 	}
 	// The slot fence above is the sole retirement wait. Timestamp results are
@@ -5603,16 +5612,19 @@ bool VK_GuiExecutor_ReadPixels( int x, int y, int width, int height, void *pixel
 	const bool resumeAfterReadback = tr.takingScreenshot;
 	R_RendererMetrics_ResetGpuFrameTiming( "Vulkan synchronous screenshot readback" );
 	if ( !VK_GuiExecutor_SubmitFrame( !resumeAfterReadback ) ) {
-		vmaDestroyBuffer( vkCtx.allocator, readbackBuffer, readbackAllocation );
+		// Submit may have succeeded before present failed; device loss also
+		// does not prove no commands ran. Retire this buffer with the device.
+		VK_Device_DeferDestroy( VK_NULL_HANDLE, VK_NULL_HANDLE, readbackBuffer, readbackAllocation );
 		return false;
 	}
 	const VkResult readbackFenceResult = vkWaitForFences( vkCtx.device, 1,
 		&vkCtx.frameFences[ submittedSlot ], VK_TRUE, UINT64_MAX );
 	if ( readbackFenceResult != VK_SUCCESS ) {
+		VK_Device_BlockPresentation( RDP_WAIT_FAILED, readbackFenceResult, "readback fence wait" );
 		VK_GpuFrameTiming_SubmitFailed( submittedSlot );
 		common->Warning( "Vulkan: screenshot readback fence wait failed (%d)",
 			static_cast<int>( readbackFenceResult ) );
-		vmaDestroyBuffer( vkCtx.allocator, readbackBuffer, readbackAllocation );
+		VK_Device_DeferDestroy( VK_NULL_HANDLE, VK_NULL_HANDLE, readbackBuffer, readbackAllocation );
 		return false;
 	}
 	vmaInvalidateAllocation( vkCtx.allocator, readbackAllocation, 0, VK_WHOLE_SIZE );
@@ -5653,10 +5665,15 @@ bool VK_GuiExecutor_ReadPixels( int x, int y, int width, int height, void *pixel
 		// fence: if the command-buffer reset/begin fails, the fence stays
 		// signaled so the next BeginFrame's fence wait on this slot cannot
 		// deadlock on a fence that will never be submitted.
-		if ( vkResetCommandBuffer( vkExec.cmd, 0 ) != VK_SUCCESS
-				|| vkBeginCommandBuffer( vkExec.cmd, &cbbi ) != VK_SUCCESS
-				|| vkResetFences( vkCtx.device, 1, &vkCtx.frameFences[ submittedSlot ] ) != VK_SUCCESS ) {
-			common->Warning( "Vulkan: failed to resume rendering after screenshot readback" );
+		VkResult resumed = vkResetCommandBuffer( vkExec.cmd, 0 );
+		if ( resumed == VK_SUCCESS ) resumed = vkBeginCommandBuffer( vkExec.cmd, &cbbi );
+		if ( resumed != VK_SUCCESS ) {
+			VK_Device_BlockPresentation( RDP_RECORD_FAILED, resumed, "readback command resume" );
+			return false;
+		}
+		resumed = vkResetFences( vkCtx.device, 1, &vkCtx.frameFences[ submittedSlot ] );
+		if ( resumed != VK_SUCCESS ) {
+			VK_Device_BlockPresentation( RDP_WAIT_FAILED, resumed, "readback fence reset" );
 			return false;
 		}
 		vkExec.frameOpen = true;
@@ -5673,7 +5690,7 @@ bool VK_GuiExecutor_ReadPixels( int x, int y, int width, int height, void *pixel
 }
 
 static bool VK_GuiExecutor_SubmitFrame( bool present ) {
-	if ( !vkExec.frameOpen ) {
+	if ( vkCtx.presentationBlocked || !vkExec.frameOpen ) {
 		return false;
 	}
 	const int slot = vkExec.frameSlot;
@@ -5684,6 +5701,11 @@ static bool VK_GuiExecutor_SubmitFrame( bool present ) {
 	// them execute before this frame samples the images, and this frame's fence
 	// then covers them for deferred-destroy retirement
 	VK_Device_FlushUploadBatch();
+	if ( vkCtx.presentationBlocked ) {
+		VK_GpuFrameTiming_SubmitFailed( slot );
+		vkExec.acquireWaitPending = false; vkExec.frameOpen = false;
+		return false;
+	}
 
 	VK_Exec_EndMainRendering();
 	VK_Exec_TransitionActiveTargetToSampled();
@@ -5710,7 +5732,13 @@ static bool VK_GuiExecutor_SubmitFrame( bool present ) {
 	}
 
 	VK_GpuFrameTiming_EndFrame( cmd, slot );
-	vkEndCommandBuffer( cmd );
+	const VkResult ended = vkEndCommandBuffer( cmd );
+	if ( ended != VK_SUCCESS ) {
+		VK_GpuFrameTiming_SubmitFailed( slot );
+		vkExec.acquireWaitPending = false; vkExec.frameOpen = false;
+		VK_Device_BlockPresentation( RDP_RECORD_FAILED, ended, "frame command end" );
+		return false;
+	}
 
 	// Flush each ring's host-written prefix once, before the queue submit that
 	// consumes it, instead of once per allocation. vmaFlushAllocation rounds to
@@ -5724,7 +5752,10 @@ static bool VK_GuiExecutor_SubmitFrame( bool present ) {
 				const VkResult flushResult = vmaFlushAllocation( vkCtx.allocator,
 						frameRings[ r ]->allocation, 0, (VkDeviceSize)frameRings[ r ]->cursor );
 				if ( flushResult != VK_SUCCESS ) {
-					common->Warning( "Vulkan: frame ring flush failed (%d)", (int)flushResult );
+					VK_GpuFrameTiming_SubmitFailed( slot );
+					vkExec.acquireWaitPending = false; vkExec.frameOpen = false;
+					VK_Device_BlockPresentation( RDP_SUBMIT_FAILED, flushResult, "frame ring flush" );
+					return false;
 				}
 			}
 		}
@@ -5753,30 +5784,18 @@ static bool VK_GuiExecutor_SubmitFrame( bool present ) {
 	si.pCommandBufferInfos = &cmdInfo;
 	si.signalSemaphoreInfoCount = present ? 1 : 0;
 	si.pSignalSemaphoreInfos = present ? &signalInfo : NULL;
-	if ( vkQueueSubmit2( vkCtx.graphicsQueue, 1, &si, vkCtx.frameFences[ slot ] ) != VK_SUCCESS ) {
+	const VkResult submitted = vkQueueSubmit2( vkCtx.graphicsQueue, 1, &si, vkCtx.frameFences[ slot ] );
+	if ( submitted != VK_SUCCESS ) {
 		VK_GpuFrameTiming_SubmitFailed( slot );
-		// The slot fence was reset in BeginFrame; a failed submit never signals
-		// it, so a later vkWaitForFences on this slot (next BeginFrame, or a
-		// screenshot readback) would block forever. The failed submit enqueued
-		// nothing, so the reset fence is idle and can be replaced with a fresh
-		// signaled one. Swap through a temporary so a create failure leaves the
-		// old handle intact rather than a NULL handle. Also clear the frame-open
-		// state: the command buffer is already ended, so the next BeginFrame must
-		// start fresh rather than resume recording into it.
+		// OOM leaves acquisition unconsumed; device loss offers no guarantee
+		// about queued work. Do not synthesize a signaled fence or reuse either
+		// semaphore. The device latch guards all later waits and acquisitions.
 		vkExec.acquireWaitPending = false;
 		vkExec.frameOpen = false;
-		VkFenceCreateInfo fci;
-		memset( &fci, 0, sizeof( fci ) );
-		fci.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-		fci.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-		VkFence recoveredFence = VK_NULL_HANDLE;
-		if ( vkCreateFence( vkCtx.device, &fci, NULL, &recoveredFence ) == VK_SUCCESS ) {
-			vkDestroyFence( vkCtx.device, vkCtx.frameFences[ slot ], NULL );
-			vkCtx.frameFences[ slot ] = recoveredFence;
-		}
-		common->Warning( "Vulkan: frame submit failed on slot %d; recovered frame state", slot );
+		VK_Device_BlockPresentation( RDP_SUBMIT_FAILED, submitted, "frame submit" );
 		return false;
 	}
+	R_DisplayPresentationSubmitted();
 	vkExec.acquireWaitPending = false;
 	vkExec.frameOpen = false;
 	if ( !present ) {
@@ -5792,13 +5811,18 @@ static bool VK_GuiExecutor_SubmitFrame( bool present ) {
 	pi.pSwapchains = &vkCtx.swapchain;
 	pi.pImageIndices = &imageIndex;
 	const VkResult res = vkQueuePresentKHR( vkCtx.graphicsQueue, &pi );
+	if ( res == VK_SUCCESS || res == VK_SUBOPTIMAL_KHR ) R_DisplayPresentationPresented();
+	else if ( res == VK_ERROR_OUT_OF_DATE_KHR ) R_DisplayPresentationFailed( RDP_PRESENT_FAILED, (int32_t)res );
+	else { VK_Device_BlockPresentation( RDP_PRESENT_FAILED, res, "frame present" ); return false; }
 	if ( res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR ) {
-		VK_Device_RecreateSwapchain();
+		const bool recreated = VK_Device_RecreateSwapchain();
+		return recreated && res == VK_SUBOPTIMAL_KHR;
 	}
 	return true;
 }
 
 bool VK_GuiExecutor_EndFrameAndPresent( void ) {
+	if ( vkCtx.presentationBlocked ) return false;
 	(void)VK_DisplayColorMapping_Apply();
 	return VK_GuiExecutor_SubmitFrame( true );
 }

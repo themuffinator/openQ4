@@ -1280,6 +1280,7 @@ void idRenderSystemLocal::SetBackEndRenderer() {
 		backEndRenderer = R_PickBestBackEndRenderer();
 	}
 	if ( backEndRenderer == BE_BAD ) {
+		R_RejectRecoverableRendererRestart( "SetBackEndRenderer: no supported renderSystem back end is available" );
 		common->FatalError( "SetBackEndRenderer: no supported renderSystem back end is available" );
 	}
 
@@ -1312,6 +1313,7 @@ void idRenderSystemLocal::SetBackEndRenderer() {
 		backEndRendererMaxLight = 999;
 		break;
 	default:
+		R_RejectRecoverableRendererRestart( "SetBackEndRenderer: bad back end" );
 		common->FatalError( "SetbackEndRenderer: bad back end" );
 	}
 

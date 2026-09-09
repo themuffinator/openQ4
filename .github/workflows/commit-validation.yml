@@ -12,8 +12,8 @@ permissions:
   contents: read
 
 env:
-  # Pin the companion's engine-interface copies, including GAME_API 47,
-  # renderer API 13 transparent targets and the retained input event contract.
+  # Pin the companion's GAME_API 48 and retained input/presentation contract.
+  # Renderer API 14 device services are private to this engine repository.
   # Publish this companion commit before CI runs.
   OPENQ4_GAMELIBS_SHA: 1cd33980f072ac3d78978a07b388b4b6fe6b5eb2
 
@@ -48,6 +48,9 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+
+      - name: Install native display test headers
+        run: sudo apt-get update && sudo apt-get install -y libvulkan-dev
 
       - name: Install release documentation dependency
         run: python -m pip install markdown
@@ -294,6 +297,12 @@ jobs:
             tools/tests/ui_capture_managed.py \
             tools/tests/ui_capture_system_settings.py \
             tools/tests/renderer_vid_restart_route.py \
+            tools/tests/renderer_display_services.py \
+            tools/tests/renderer_display_presentation.py \
+            tools/tests/renderer_gl_display_policy.py \
+            tools/tests/sdl3_strict_window.py \
+            tools/tests/ui_capture_display_device.py \
+            tools/ui/capture_display_device.py \
             tools/tests/ui_legacy_inventory.py \
             tools/tests/ui_legacy_import.py \
             tools/ui/legacy_inventory.py \
@@ -504,6 +513,11 @@ jobs:
           python tools/tests/ui_capture_managed.py
           python tools/tests/ui_capture_system_settings.py
           python tools/tests/renderer_vid_restart_route.py
+          python tools/tests/renderer_display_services.py
+          python tools/tests/renderer_display_presentation.py
+          python tools/tests/renderer_gl_display_policy.py
+          python tools/tests/sdl3_strict_window.py
+          python tools/tests/ui_capture_display_device.py
           python tools/tests/ui_legacy_inventory.py
           python tools/tests/ui_legacy_import.py
           python tools/tests/ui_background_cursor.py

@@ -95,22 +95,53 @@ def validate_sdl3_backend_hook() -> None:
         require(glew_source, "#elif defined(_WIN32) && !defined(OPENQ4_GLEW_SDL3_LOADER)", f"{relative_path} wglew gating")
 
 
-def validate_renderer_context_guard() -> None:
-    source = read("src/renderer/RenderSystem_init.cpp")
+def validate_renderer_context_guard(source: str | None = None) -> None:
+    if source is None:
+        source = read("src/renderer/RenderSystem_init.cpp")
     header = read("src/renderer/tr_local.h")
-    extensions = function_body(source, "static void R_CheckPortableExtensions( void ) {")
-    init = function_body(source, "void R_InitOpenGL( void ) {")
+    extensions = function_body(source, "static bool R_InitOpenGLExtensionLoader(")
+    portable = function_body(source, "static bool R_CheckPortableExtensions(")
+    init = function_body(source, "static bool R_CreateOpenGLContext(")
+    internal = function_body(source, "static bool R_InitOpenGLInternal(")
+    wrapper = function_body(source, "void R_InitOpenGL( void ) {")
+
+    # Follow the shared production route; checking detached helpers would miss
+    # a startup path that stopped invoking a context/loader guard.
+    require(wrapper, 'if ( !R_InitOpenGLInternal( true, false, error, sizeof( error ) ) ) common->FatalError( "%s", error );', "legacy startup failure policy")
+    require(internal, "if ( !R_CreateOpenGLContext( legacyPolicy, forceWindow, error, errorSize ) ) return false;", "context failure propagation")
+    require(internal, "if ( !R_CheckPortableExtensions( legacyPolicy, error, errorSize ) ) return false;", "extension failure propagation")
+    require_before(internal, "R_CreateOpenGLContext(", "R_CheckPortableExtensions(", "context creation before extension loading")
+    require(portable, "if ( !R_InitOpenGLExtensionLoader( error, errorSize ) ) return false;", "loader failure propagation")
+    require_before(portable, "R_InitOpenGLExtensionLoader(", "GLCapabilityProbe_Build(", "loader before capability probing")
 
     require(header, "bool\t\tGLimp_EnsureActiveContext( const char *operation );", "renderer GL context contract declaration")
     require_before(extensions, 'GLimp_EnsureActiveContext( "GLEW initialization" )', 'common->Printf("Init Glew...', "renderer GLEW context activation")
-    require(extensions, "Unable to make OpenGL context current for GLEW initialization", "renderer GLEW context fatal diagnostic")
+    require(extensions, "Unable to make OpenGL context current for GLEW initialization", "renderer GLEW context diagnostic")
     require(extensions, "const GLenum glewResult = glewInit();", "renderer GLEW result capture")
     require(extensions, "const GLubyte *glewError = glewGetErrorString( glewResult );", "renderer GLEW error string guard")
     require(extensions, "Failed to init GLEW: %s", "renderer GLEW error diagnostics")
     require(init, "// get our config strings", "renderer GL string query block")
     require_before(init, 'GLimp_EnsureActiveContext( "OpenGL startup string query" )', "glConfig.vendor_string", "renderer GL string context activation")
-    require(init, "Unable to make OpenGL context current after window creation", "renderer startup context fatal diagnostic")
-    require(init, "OpenGL context did not report GL_VERSION after window creation", "renderer current-context fatal diagnostic")
+    require(init, "Unable to make OpenGL context current after window creation", "renderer startup context diagnostic")
+    require(init, "OpenGL context did not report GL_VERSION after window creation", "renderer current-context diagnostic")
+
+
+def validate_context_mutation_sensitivity() -> None:
+    source = read("src/renderer/RenderSystem_init.cpp")
+    for anchor in (
+        'GLimp_EnsureActiveContext( "GLEW initialization" )',
+        'GLimp_EnsureActiveContext( "OpenGL startup string query" )',
+        "if ( !R_CreateOpenGLContext( legacyPolicy, forceWindow, error, errorSize ) ) return false;",
+        "if ( !R_CheckPortableExtensions( legacyPolicy, error, errorSize ) ) return false;",
+        "if ( !R_InitOpenGLExtensionLoader( error, errorSize ) ) return false;",
+    ):
+        if source.count(anchor) != 1:
+            raise AssertionError(f"Context mutation anchor is not unique: {anchor!r}")
+        try:
+            validate_renderer_context_guard(source.replace(anchor, "true", 1))
+        except AssertionError:
+            continue
+        raise AssertionError(f"Context regression escaped detection: {anchor!r}")
 
 
 def validate_platform_context_contract() -> None:
@@ -156,6 +187,7 @@ def main() -> None:
     validate_glew_loader_hook()
     validate_sdl3_backend_hook()
     validate_renderer_context_guard()
+    validate_context_mutation_sensitivity()
     validate_platform_context_contract()
     validate_ci_smoke()
     print("linux_sdl3_glew_loader: ok")
