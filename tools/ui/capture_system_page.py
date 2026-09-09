@@ -29,7 +29,21 @@ FIELDS = ('open', 'dirty', 'busy', 'canApply', 'phase', 'discardVisible',
           'draftBrightness', 'baselineBrightness', 'draftShadows', 'baselineShadows',
           'draftPostAA', 'baselinePostAA')
 CONTROLS = ('settings_brightness', 'settings_shadows', 'settings_postaa')
-SCREENSHOTS = ('draft', 'applied', 'discard', 'choice', 'reloaded', 'returned', 'reopened')
+EXTRA_ROWS = (('settings_bloom','Bloom','r_bloom',1,0),
+              ('settings_ssao','SSAO','r_ssao',1,0),
+              ('settings_tonemap','Tonemap','r_hdrToneMap',1,0),
+              ('settings_crt','CRT','r_crt',1,0),
+              ('settings_irradiance','Irradiance','r_useLightGrid',1,0),
+              ('settings_resolution_scale','ResolutionScale','r_screenFraction',3,100),
+              ('settings_ui_aspect','UIAspect','ui_aspectCorrection',1,1))
+EXTRA_SEED = tuple(row[4] for row in EXTRA_ROWS)
+EXTRA_CHANGED = (1,1,1,1,1,85,0)
+FIELDS += tuple(prefix+row[1] for row in EXTRA_ROWS for prefix in ('draft','baseline'))
+CONTROLS += tuple(row[0] for row in EXTRA_ROWS)
+ROLES = (2,1,3)+tuple(row[3] for row in EXTRA_ROWS)
+TYPES = tuple(1 if role==1 else 0 for role in ROLES)
+VALUE_INDICES = tuple(range(6,len(FIELDS),2))
+SCREENSHOTS = ('draft', 'applied', 'discard', 'choice', 'reloaded', 'extrasapplied', 'extrasrestored', 'returned', 'reopened')
 
 
 def digest(path: Path) -> str:
@@ -136,11 +150,13 @@ def stages() -> list[dict]:
 
     def add(name, commands, *, brightness=1.1, baseline=1.1, shadows=1, postaa=0,
             dirty=0, discard=0, popup=0, live=1.1, page=True, actions=(), events=(),
-            screenshot=None, resets=0, opening=False):
+            screenshot=None, resets=0, opening=False, extras=EXTRA_SEED,
+            extra_baseline=EXTRA_SEED, resolution_first=0):
         rows.append(dict(name=name, commands=commands, page=page,
-                         values=(1, dirty, 0, dirty, 1, discard, brightness, baseline, shadows, 1, postaa, 0),
+                         values=(1, dirty, 0, dirty, 1, discard, brightness, baseline, shadows, 1, postaa, 0)
+                                +tuple(value for pair in zip(extras,extra_baseline) for value in pair),
                          popup=popup, live=live, actions=list(actions), events=list(events),
-                         screenshot=screenshot, resets=resets, opening=opening))
+                         screenshot=screenshot, resets=resets, opening=opening, resolution_first=resolution_first))
 
     add('open', ['openq4_system open'], brightness=1, baseline=1, live=1,
         actions=[('begin', 0)], events=[('onactivate', 1, 1)], opening=True)
@@ -153,19 +169,38 @@ def stages() -> list[dict]:
     add('keep_editing', activate('discard_keep_editing'), shadows=0, dirty=1,
         events=[('continueediting', 0, 1)])
     add('discarded', activate('settings_back') + ['wait 3'] + activate('discard_changes'),
-        actions=[('revert', 0)], events=[('onback', 0, 1), ('discard', 1, 1)])
+        page=False, actions=[('cancel', 0)], events=[('onback', 0, 1), ('discard', 2, 1)])
+    add('reopen_discarded', ['openq4_system open'], actions=[('begin', 0)],
+        events=[('onactivate', 1, 1)], opening=True)
     add('choice_tentative', activate('settings_postaa') + key('down'), popup=1, screenshot='choice')
     add('choice_cancelled', key('back'))
     add('choice_dirty', activate('settings_postaa') + key('down') + key('down') + key('accept'),
         postaa=2, dirty=1, actions=[('edit', 1)])
     add('choice_restored', activate('settings_back') + ['wait 3'] + activate('discard_changes'),
-        actions=[('revert', 0)], events=[('onback', 0, 1), ('discard', 1, 1)])
+        page=False, actions=[('cancel', 0)], events=[('onback', 0, 1), ('discard', 2, 1)])
+    add('reopen_choice', ['openq4_system open'], actions=[('begin', 0)],
+        events=[('onactivate', 1, 1)], opening=True)
     add('reload_draft', ['openq4_retainedGui focus "settings_brightness"'] + key('right'),
         brightness=1.2, dirty=1, actions=[('edit', 1)])
     add('language', ['reloadLanguage', 'wait 30'], brightness=1.2, dirty=1, resets=1)
     add('video', ['vid_restart windowed', 'wait 60'], brightness=1.2, dirty=1, resets=1, screenshot='reloaded')
     add('final_clean', activate('settings_back') + ['wait 3'] + activate('discard_changes'),
-        actions=[('revert', 0)], events=[('onback', 0, 1), ('discard', 1, 1)])
+        page=False, actions=[('cancel', 0)], events=[('onback', 0, 1), ('discard', 2, 1)])
+    add('reopen_clean', ['openq4_system open'], actions=[('begin', 0)],
+        events=[('onactivate', 1, 1)], opening=True)
+    extra_changed, extra_seed = [], []
+    for control,_,_,role,_ in EXTRA_ROWS:
+        if role==1:
+            extra_changed += activate(control); extra_seed += activate(control)
+        else:
+            extra_changed += activate(control)+key('home')+key('down')*4+key('accept')
+            extra_seed += activate(control)+key('home')+key('down')*5+key('accept')
+    add('extras_dirty', extra_changed, extras=EXTRA_CHANGED, dirty=1, actions=[('edit',1)]*7)
+    add('extras_applied', activate('settings_apply'), extras=EXTRA_CHANGED,
+        extra_baseline=EXTRA_CHANGED, actions=[('apply',0)], screenshot='extrasapplied')
+    add('extras_restore_draft', extra_seed, extra_baseline=EXTRA_CHANGED, dirty=1,
+        actions=[('edit',1)]*7, resolution_first=1)
+    add('extras_restored', activate('settings_apply'), actions=[('apply',0)], resolution_first=1, screenshot='extrasrestored')
     add('returned', activate('settings_back'), page=False, events=[('onback', 1, 0)], screenshot='returned')
     add('reopened', ['openq4_system open'], actions=[('begin', 0)], events=[('onactivate', 1, 1)],
         opening=True, screenshot='reopened')
@@ -218,6 +253,19 @@ def source_contract(runtime: Path) -> dict:
         target = model['aliases'][field].get('variable')
         if model.get('presentationVariables', {}).get(target, {}).get('value') != {'state':state}:
             raise ValueError(f'Production service readback alias changed: {field}')
+    for control,alias,key,role,_ in EXTRA_ROWS:
+        spec=nodes[control].get('control',{})
+        if spec.get('role')!=('toggle' if role==1 else 'choice') or spec.get('value')!={'state':'settings.draft.'+key}:
+            raise ValueError(f'Production immediate control readback changed: {control}')
+        action=model.get('actions',{}).get(spec.get('action'))
+        wanted={'input':'boolean' if role==1 else 'number','operation':'settings.system.edit','arguments':{key:{'input':'value'}}}
+        if action!=wanted: raise ValueError(f'Production immediate control proposal changed: {control}')
+        if role==3 and [option.get('value') for option in spec.get('options',[])]!=[10,25,50,75,85,100,125,150,200]:
+            raise ValueError('Production resolution scale option contract changed')
+        for prefix in ('draft','baseline'):
+            field=prefix+alias; target=model['aliases'][field].get('variable')
+            if model.get('presentationVariables',{}).get(target,{}).get('value')!={'state':'settings.'+prefix+'.'+key}:
+                raise ValueError(f'Production service readback alias changed: {field}')
     return {'document':model['id'], 'source':str(source), 'staged':binding, 'sha256':digest(source),
             'normal_filesystem_path':PAGE, 'replacement_acceptance':False}
 
@@ -326,12 +374,12 @@ def qualify(log: str, mode: str) -> dict:
             errors.append(f'{at}: page was not loaded through the expected normal route or was replayed')
         if resources != ['RETAINED_GUI_RESOURCE path='+PAGE+' event=restored'] * stage['resets']:
             errors.append(f'{at}: resource restoration missing, replayed or failed')
-        if len(dispatches) != (1 if at in ('returned','finished') else 0): errors.append(f'{at}: unexpected direct host action or repeated dismissal')
+        if len(dispatches) != int(not stage['page']): errors.append(f'{at}: unexpected direct host action or repeated dismissal')
         for row in dispatches:
             if not row or any(row[key] != value for key,value in {'path':PAGE,'operation':'ui.dismiss','value':'-','shadows':'1','close':'1'}.items()) or not _number(row['brightness'],stage['live']):
                 errors.append(f'{at}: invalid direct host dismissal')
         expected_observed = ['route'] * (2 if stage['opening'] else 1)
-        if stage['page']: expected_observed += ['read:'+field for field in FIELDS] + ['widget']*3 + ['report']
+        if stage['page']: expected_observed += ['read:'+field for field in FIELDS] + ['widget']*len(CONTROLS) + ['report']
         if observed != expected_observed: errors.append(f'{at}: readback order/count differs from fixed script')
         for route in routes:
             expected_route = {'enabled':'1', 'active':PAGE if stage['page'] else PARENT, 'parent':PARENT if stage['page'] else '-',
@@ -342,19 +390,20 @@ def qualify(log: str, mode: str) -> dict:
             if len(reads) != len(FIELDS) or any(len(row)!=2 or row[0]!=field or not _number(row[1],value)
                                               for row,field,value in zip(reads,FIELDS,stage['values'])):
                 errors.append(f'{at}: service-backed aliases differ from expected draft/baseline')
-            values = (stage['values'][6], stage['values'][8], stage['values'][10])
+            values = tuple(stage['values'][index] for index in VALUE_INDICES)
             for index, widget in enumerate(widgets):
-                if not widget or index >= 3:
+                if not widget or index >= len(CONTROLS):
                     errors.append(f'{at}: malformed widget readback'); continue
-                fixed = {'id':CONTROLS[index], 'role':str((2,1,3)[index]), 'type':str((0,1,0)[index]),
-                         'pending':'0', 'rejected':'0', 'token':'0', 'popup':str(stage['popup'] if index==2 else 0), 'firstVisible':'0'}
+                fixed = {'id':CONTROLS[index], 'role':str(ROLES[index]), 'type':str(TYPES[index]),
+                         'pending':'0', 'rejected':'0', 'token':'0', 'popup':str(stage['popup'] if index==2 else 0),
+                         'firstVisible':str(stage['resolution_first'] if CONTROLS[index]=='settings_resolution_scale' else 0)}
                 if any(widget[key] != value for key,value in fixed.items()) or not _number(widget['accepted'],values[index]) or not _number(widget['proposed'],0):
                     errors.append(f'{at}: widget accepted/pending/popup state mismatch')
             for report in reports:
                 if (not report or report['path'] != PAGE or report['active'] != '1' or report['contexts'] != '1' or
                     not re.fullmatch(r'\d+',report['revision']) or not _number(report['brightness'],stage['live']) or report['shadows'] != '1'):
                     errors.append(f'{at}: actual host/rendered owner readback mismatch')
-        expected_actions = [(operation,'0','1',str(dirty)) for operation,dirty in stage['actions']]
+        expected_actions = [(operation,'0','0' if operation=='cancel' else '1',str(dirty)) for operation,dirty in stage['actions']]
         if [(row[0],row[1],row[2],row[4]) for row in actions] != expected_actions:
             errors.append(f'{at}: settings operation failed, repeated or mutated the wrong draft')
         for row in actions:
@@ -366,11 +415,13 @@ def qualify(log: str, mode: str) -> dict:
         if [event[1:] for event in events if event[0]=='event'] != stage['events']:
             errors.append(f'{at}: authored lifecycle/Back program replay or omission')
     if owners:
-        first = owners[0][2]
-        if any(owner != first for at,_,owner in owners if at != 'reopened'):
-            errors.append('The SYSTEM editing owner changed across resource restoration')
-        reopened = [owner for at,_,owner in owners if at == 'reopened']
-        if len(reopened) != 1 or reopened[0] == first: errors.append('Reopened SYSTEM page did not create a fresh owner')
+        current_owner, prior_owners = None, set()
+        for at,operation,owner in owners:
+            if operation == 'begin':
+                if owner in prior_owners: errors.append(f'{at}: reopened SYSTEM page reused an old owner')
+                prior_owners.add(owner); current_owner = owner
+            elif owner != current_owner:
+                errors.append(f'{at}: SYSTEM editing owner changed before close or across resource restoration')
     else: errors.append('No real settings service operations were observed')
     for line in log.splitlines():
         if ('ERROR:' in line or 'FATAL:' in line or 'openq4_guiGet: unknown' in line or
@@ -399,6 +450,7 @@ def capture(args) -> int:
         'r_windowWidth':'1280', 'r_windowHeight':'720', 'r_mode':'-1', 'r_customWidth':'1280', 'r_customHeight':'720',
         'r_renderApi':args.renderer, 'r_rendererSharedGui':'1', 'r_rendererSharedInWorldGui':'0', 'r_multiSamples':'0', 'r_swapInterval':'1',
         'r_gamma':'1', 'r_brightness':'1', 'r_shadows':'1', 'r_postAA':'0',
+        **{row[2]:str(row[4]) for row in EXTRA_ROWS},
         'in_mouse':'0', 'in_joystick':'0', 'in_joystickRumble':'0', 'g_autoScreenshot':'0', 'g_autoSkipCinematics':'1',
         'g_autoExecAfterMapLoad':'system-page.cfg', 'g_autoExecAfterMapLoadDelayMs':'3000',
         'com_skipLoadingContinue':'1', 'com_loadingContinueAutoAdvance':'1', 'com_maxfps':'60',

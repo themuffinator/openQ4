@@ -134,6 +134,10 @@ struct ControlReadback {
 	bool mixed = false;
 	std::vector<bool> enabledOptions;
 };
+struct ModalSpec {
+	std::string initialFocus;
+	std::string backEvent; // Empty consumes Back; otherwise a canonical event name.
+};
 struct Node {
 	std::string id, type;
 	std::map<std::string, Value> properties;
@@ -143,6 +147,7 @@ struct Node {
 	// An explicitly empty mask hides the subtree; absence leaves it unmasked.
 	std::optional<std::vector<VectorPath>> mask;
 	std::optional<Control> control;
+	std::optional<ModalSpec> modal;
 };
 struct Easing {
 	double x1 = 0, y1 = 0, x2 = 1, y2 = 1;

@@ -984,4 +984,6 @@
 	"#str_229995"	"Revert"
 	"#str_229996"	"Retry"
 	"#str_229997"	"Settings were accepted, but saving did not finish. Retry to finish saving."
+	"#str_229998"	"10%;25%;50%;75%;85%;100%;125%;150%;200%"
+	"#str_229999"	"Keep editing"
 }

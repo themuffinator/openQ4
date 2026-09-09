@@ -508,11 +508,15 @@ int main(int argc, char** argv) {
 	Check(runtime.PushModal("modal-panel",21),"activate contained modal input scope");
 	Check(runtime.FocusedControl() == "modal-controls","modal chooses its first eligible control");
 	Check(!runtime.FocusControl("reference-controls",21),"modal rejects focus outside its subtree");
-	menu(MenuInput::Previous); Check(runtime.FocusedControl() == "modal-system","modal tab wraps within its own controls");
+	menu(MenuInput::Previous); Check(runtime.FocusedControl() == "modal-controls","held pre-modal reverse tab cannot navigate the new scope");
+	menu(MenuInput::Previous,false); menu(MenuInput::Previous); menu(MenuInput::Previous,false);
+	Check(runtime.FocusedControl() == "modal-system","fresh modal tab wraps within its own controls");
 	menu(MenuInput::Accept);
 	Check(runtime.PopModal(21),"close modal scope");
 	Check(runtime.FocusedControl() == "reference-system","modal close restores the previous eligible focus");
 	menu(MenuInput::Accept,false); Check(runtime.TakeActions().empty(),"modal teardown prevents release click-through");
+	// Finish earlier navigation holds before handing later scenarios to a new input aggregator.
+	for (const auto action : {MenuInput::Next,MenuInput::Up,MenuInput::Down}) menu(action,false);
 	menu(MenuInput::Back); menu(MenuInput::Back); menu(MenuInput::Back,false);
 	actions = runtime.TakeActions(); Check(actions.size() == 1 && actions[0].kind == ControlAction::Kind::Back,"back requests are semantic and repeated key-downs cannot duplicate them");
 	Check(runtime.SetControlEnabled("reference-system",false,21),"disable control through instance state");

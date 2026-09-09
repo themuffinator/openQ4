@@ -984,4 +984,6 @@
 	"#str_229995"	"Ripristina"
 	"#str_229996"	"Riprova"
 	"#str_229997"	"Le impostazioni sono state accettate, ma il salvataggio non è terminato. Riprova per completarlo."
+	"#str_229998"	"10%;25%;50%;75%;85%;100%;125%;150%;200%"
+	"#str_229999"	"Continua a modificare"
 }

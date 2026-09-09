@@ -2,6 +2,13 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- The opt-in SYSTEM page adds bloom, ambient occlusion, tone mapping, CRT,
+  irradiance, UI aspect, resolution scale and VSync controls. Back now lets you
+  keep editing, discard and return, or apply and return after successful display
+  confirmation. Failed changes remain available for recovery. The
+  [implementation scope](ui/system-exit.md) records the remaining work before
+  enabling the replacement by default.
+
 - Menu development: retained settings now support toggles, stepped sliders and
   selectable lists with editable vector parts. Changes stay in the settings
   draft until accepted, and choice lists follow animated controls and page

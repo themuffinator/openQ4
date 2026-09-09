@@ -307,6 +307,7 @@ jobs:
             tools/tests/ui_capture_managed.py \
             tools/tests/ui_capture_system_settings.py \
             tools/tests/ui_capture_system_page.py \
+            tools/tests/ui_capture_system_exit.py \
             tools/tests/renderer_vid_restart_route.py \
             tools/tests/renderer_display_services.py \
             tools/tests/renderer_display_presentation.py \
@@ -534,6 +535,7 @@ jobs:
           python tools/tests/ui_capture_managed.py
           python tools/tests/ui_capture_system_settings.py
           python tools/tests/ui_capture_system_page.py
+          python tools/tests/ui_capture_system_exit.py
           python tools/tests/renderer_vid_restart_route.py
           python tools/tests/renderer_display_services.py
           python tools/tests/renderer_display_presentation.py

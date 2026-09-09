@@ -29,23 +29,24 @@ def route(stage, mode):
 
 def trace(mode='sp', renderer='gl'):
     lines = ['Renderer API: requested='+renderer+' active='+renderer, 'OPENQ4_MENU_ACTIVATION PASS elapsed=13ms limit=10000ms']
+    owner = 1
     for stage in capture.stages():
         lines.append(capture.STAGE_MARKER+' '+stage['name'])
         if stage['opening']:
+            owner += 36
             lines += ['RETAINED_GUI_LOADED '+capture.PAGE, 'OPENQ4_SYSTEM operation=open result=1', route(stage,mode)]
         lines += ['RETAINED_GUI_OPERATION '+command.split()[1]+' passed' for command in stage['commands'] if command.startswith('openq4_retainedGui ')]
         lines += [f'RETAINED_GUI_EVENT name={event} actions={actions} writes={writes}' for event,actions,writes in stage['events']]
-        owner = 73 if stage['name']=='reopened' else 37
-        lines += [f'UI_SETTINGS operation=settings.system.{operation} result=0 phase=1 owner={owner} dirty={dirty}' for operation,dirty in stage['actions']]
+        lines += [f'UI_SETTINGS operation=settings.system.{operation} result=0 phase={0 if operation=="cancel" else 1} owner={owner} dirty={dirty}' for operation,dirty in stage['actions']]
         if not stage['page']:
             lines.append(f'RETAINED_GUI_DISPATCH path={capture.PAGE} operation=ui.dismiss value=- brightness=1.100000 shadows=1 close=1')
         lines += ['RETAINED_GUI_RESOURCE path='+capture.PAGE+' event=restored'] * stage['resets']
         lines.append(route(stage,mode))
         if stage['page']:
             lines += [f'GUI_VALUE {field}={value}' for field,value in zip(capture.FIELDS,stage['values'])]
-            values = (stage['values'][6],stage['values'][8],stage['values'][10])
+            values = tuple(stage['values'][index] for index in capture.VALUE_INDICES)
             for i,control in enumerate(capture.CONTROLS):
-                lines.append(f'RETAINED_GUI_WIDGET id={control} role={(2,1,3)[i]} type={(0,1,0)[i]} accepted={values[i]} pending=0 proposed=0 rejected=0 token=0 popup={stage["popup"] if i==2 else 0} firstVisible=0')
+                lines.append(f'RETAINED_GUI_WIDGET id={control} role={capture.ROLES[i]} type={capture.TYPES[i]} accepted={values[i]} pending=0 proposed=0 rejected=0 token=0 popup={stage["popup"] if i==2 else 0} firstVisible={stage["resolution_first"] if control=="settings_resolution_scale" else 0}')
             lines.append(f'RETAINED_GUI path={capture.PAGE} focus=settings_brightness revision=7 active=1 brightness={stage["live"]} shadows=1 contexts=1')
     lines += [capture.COMPLETE]
     return '\n'.join(lines)+'\n'
@@ -78,8 +79,8 @@ class SystemPageOracleTests(unittest.TestCase):
         for mode,renderer in (('sp','gl'),('mp','vulkan')):
             result = capture.qualify(trace(mode,renderer),mode)
             self.assertTrue(result['passed'],result['errors'])
-            self.assertEqual(len(result['stages']),18)
-            self.assertEqual(len(result['service_owners']),10)
+            self.assertEqual(len(result['stages']),25)
+            self.assertEqual(len(result['service_owners']),29)
             self.assertFalse(result['replacement_acceptance'])
             self.assertFalse(result['full_system_acceptance'])
         self.assertTrue(capture.qualify(trace().replace('=1.1\n','=1.1000000000000001\n'),'sp')['passed'])
@@ -138,6 +139,27 @@ class SystemPageOracleTests(unittest.TestCase):
         moved=lines.pop(action); target=next(i for i,line in enumerate(lines) if line.startswith('GUI_VALUE open=')); lines.insert(target+1,moved)
         self.reject('\n'.join(lines))
 
+    def test_all_seven_immediate_draft_apply_and_seed_readbacks(self):
+        original=trace()
+        rows={row['name']:row for row in capture.stages()}
+        for name in ('extras_dirty','extras_applied','extras_restore_draft','extras_restored'):
+            stage=rows[name]
+            start=original.index(capture.STAGE_MARKER+' '+name+'\n')
+            end=original.find(capture.STAGE_MARKER+' ',start+len(capture.STAGE_MARKER))
+            body=original[start:end]
+            for index,(control,alias,_,role,_) in enumerate(capture.EXTRA_ROWS):
+                for prefix,offset in [('draft',12+index*2),('baseline',13+index*2)]:
+                    value=stage['values'][offset]
+                    old=f'GUI_VALUE {prefix}{alias}={value}\n'
+                    self.assertIn(old,body)
+                    changed=body.replace(old,f'GUI_VALUE {prefix}{alias}={value+1}\n',1)
+                    self.reject(original[:start]+changed+original[end:])
+                old=f'RETAINED_GUI_WIDGET id={control} role={role} type={1 if role==1 else 0}'
+                changed=body.replace(old,f'RETAINED_GUI_WIDGET id={control} role={role} type={0 if role==1 else 1}',1)
+                self.reject(original[:start]+changed+original[end:])
+        self.assertEqual(rows['extras_dirty']['actions'],[('edit',1)]*7)
+        self.assertEqual(rows['extras_restore_draft']['actions'],[('edit',1)]*7)
+
     def test_errors_and_unknown_commands_fail(self):
         for error in ('ERROR: retained failure','FATAL: bad device','openq4_guiGet: unknown GUI variable',
                       'openq4_retainedGui: requires an active GUI','usage: openq4_system invalid'):
@@ -151,7 +173,7 @@ class SystemPageOracleTests(unittest.TestCase):
         self.assertEqual(commands[-2:], [['echo',capture.COMPLETE],['quit']])
         self.assertNotIn('testGUI',capture.script()); self.assertNotIn('ui_retainedPreview',capture.script())
         self.assertEqual([row for row in commands if row[0]=='vid_restart'],[['vid_restart','windowed']])
-        self.assertEqual([row for row in commands if row[0]=='openq4_system' and row[1]=='open'],[['openq4_system','open']]*2)
+        self.assertEqual([row for row in commands if row[0]=='openq4_system' and row[1]=='open'],[['openq4_system','open']]*5)
         for row in commands:
             self.assertNotIn(';',' '.join(row))
             if row[0]=='wait': self.assertTrue(1<=int(row[1])<=60)
@@ -281,13 +303,14 @@ class SystemPageOracleTests(unittest.TestCase):
                                   'r_renderApi':renderer,'ui_autoJoin':'1' if mode=='mp' else '0',
                                   'g_autoExecAfterMapLoadDelayMs':'3000','g_autoExecAfterMapLoad':'system-page.cfg'}.items():
                     self.assertEqual(values[key.lower()],value)
+                for _,_,key,_,seed in capture.EXTRA_ROWS: self.assertEqual(values[key.lower()],str(seed))
                 self.assertEqual(command[-2:],gameplay); self.assertEqual(kwargs['cwd'],runtime)
                 self.assertEqual(kwargs['env']['TEMP'],str(root/'.tmp'))
                 self.assertFalse((output/'save/baseoq4'/capture.PAGE).exists())
                 self.assertEqual((output/'save/baseoq4/system-page.cfg').read_text(encoding='utf-8'),capture.script())
                 metadata=json.loads((output/'capture.json').read_text(encoding='utf-8'))
                 self.assertEqual(metadata['status'],'failed' if changed else 'captured_pending_visual_and_warning_review')
-                self.assertEqual(len(metadata['screenshots']),7); self.assertEqual(metadata['source_unchanged'],not changed)
+                self.assertEqual(len(metadata['screenshots']),9); self.assertEqual(metadata['source_unchanged'],not changed)
                 self.assertEqual(metadata['source']['staged']['effective']['member'],capture.PAGE)
                 self.assertEqual(Path(metadata['source']['staged']['effective']['package']).name,'pak0.pk4')
                 self.assertEqual(metadata['source']['sha256'],metadata['source_after']['sha256'])

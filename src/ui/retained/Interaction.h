@@ -2,6 +2,7 @@
 #pragma once
 #include "Document.h"
 #include <cstdint>
+#include <set>
 
 namespace openq4::ui {
 enum class MenuInput { Next, Previous, Up, Down, Left, Right, Accept, Back, Home, End, PageUp, PageDown };
@@ -11,14 +12,17 @@ struct ControlAction {
 	std::string document, node, action, event;
 	std::optional<StateValue> proposal;
 	std::uint64_t proposalToken = 0;
+	std::uint64_t modalToken = 0; // Transient scope identity for every Back record.
 };
 struct ControlFeedback { std::string node, timeline; ControlState state = ControlState::Default; };
 struct InteractionSnapshot {
-	struct Modal { std::string root, restore; };
+	struct Modal { std::string root, restore; bool authored = false; };
 	std::string focus;
 	std::vector<Modal> modals;
 	std::map<std::string,bool> enabled;
 	std::map<std::string,ControlState> presented;
+	bool focusPending = false;
+	std::string pendingFocus;
 };
 struct WidgetViewState {
 	ControlRole role = ControlRole::Button;
@@ -41,7 +45,16 @@ struct ValueWidgetSnapshot {
 class Interaction {
 public:
 	void Reset(const DocumentModel& model);
-	void SetBounds(const std::map<std::string,ControlBounds>& bounds);
+	void SetBounds(const std::map<std::string,ControlBounds>& bounds, bool freshLayout = true);
+	void InvalidateLayout();
+	// Called before incoming bindings/bounds can invalidate the old selection.
+	// Visible authored scopes must form one outer-to-inner ancestry chain. A
+	// rejected chain blocks all input until a valid synchronization succeeds.
+	bool SyncAuthoredModals(const std::vector<std::string>& roots, std::string& error);
+	bool HasAuthoredModals() const { return !authoredModals.empty(); }
+	bool CanDispatchModalBack(const ControlAction& action) const;
+	bool CanDispatchControlAction(const ControlAction& action) const;
+	bool AllowsNode(const std::string& id) const { return !modalBlocked && Within(id,Modal()); }
 	// Complete evaluated value-control map; invalid input leaves all interaction
 	// state unchanged. Values outside slider bounds or choice lists remain data.
 	bool SetReadbacks(const std::map<std::string,ControlReadback>& readbacks, std::string& error);
@@ -54,6 +67,9 @@ public:
 	std::string CapturedPointerControl() const { return dragging; }
 	void Pointer(bool down);
 	void Input(MenuInput input, bool down);
+	// A wheel pulse is not a physical source release. Preserve held-source
+	// quarantine while issuing one independent navigation step.
+	void NavigationPulse(MenuInput input);
 	// Cancel arms without forgetting held inputs. Their eventual releases must
 	// not activate a different control after replacement, focus loss or a modal.
 	void Cancel();
@@ -67,7 +83,7 @@ public:
 	std::optional<ControlState> State(const std::string& id) const;
 	std::vector<ControlFeedback> TakeFeedback();
 	std::vector<ControlAction> TakeActions();
-	bool CanActivate(const std::string& id) const { return Eligible(id); }
+	bool CanActivate(const std::string& id) const { return !focusPending && Eligible(id); }
 	bool Overflowed() const { return overflowed; }
 	// Capture persistent semantics only. Restore cancels queued actions/arms and
 	// hover, preserves receiving-instance held latches, and awaits fresh bounds.
@@ -85,7 +101,7 @@ private:
 		std::uint64_t proposalToken = 0;
 		unsigned firstVisible = 0;
 	};
-	struct ModalScope { std::string root, restore; };
+	struct ModalScope { std::string root, restore; bool authored = false; };
 	bool Within(const std::string& id, const std::string& root) const;
 	bool Eligible(const std::string& id) const;
 	std::string First() const;
@@ -94,6 +110,8 @@ private:
 	bool Propose(const std::string& id, const StateValue& value);
 	const StateValue& EditingValue(const Item& item) const;
 	void CancelGesture();
+	void ModalChanged();
+	void ResolvePendingFocus();
 	void OpenPopup(const std::string& id);
 	void PopupNavigate(MenuInput input);
 	bool OptionEligible(const Item& item, size_t index) const;
@@ -108,6 +126,11 @@ private:
 	std::vector<std::string> order;
 	std::map<std::string,std::string> parents;
 	std::vector<ModalScope> modals;
+	std::map<std::string,ModalSpec> authoredModals;
+	std::uint64_t modalToken = 0;
+	bool modalBlocked = false, focusPending = false;
+	std::string pendingFocus;
+	std::set<MenuInput> heldNavigation, blockedNavigation;
 	std::vector<ControlFeedback> feedback;
 	std::vector<ControlAction> actions;
 	std::string dragging, popup, highlight, pointerOption, armedOption;

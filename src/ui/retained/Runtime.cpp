@@ -14,6 +14,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstring>
+#include <functional>
 #include <map>
 #include <stdexcept>
 #include <string_view>
@@ -600,11 +601,41 @@ struct Runtime::Impl {
 	std::map<PropertyKey,std::string> applied;
 	bool initialized = false;
 	std::map<std::string,bool> inputAllowed;
-	std::optional<Value> PresentedProperty(const PropertyKey& key) const {
+	std::string modalError;
+	static std::optional<Value> Property(const State& state, const Motion& motion, const PropertyKey& key) {
 		const auto bound = state.Properties().find(key);
 		if (bound != state.Properties().end()) return bound->second;
 		const auto animated = motion.Values().find(key);
 		return animated == motion.Values().end() ? std::nullopt : std::optional<Value>(animated->second);
+	}
+	std::optional<Value> PresentedProperty(const PropertyKey& key) const { return Property(state,motion,key); }
+	bool VisibleModals(const State& state, const Motion& motion, std::vector<std::string>& roots, std::string& error) const {
+		roots.clear(); error.clear();
+		if (!canonical || !interaction.HasAuthoredModals()) return true;
+		bool valid = true;
+		std::function<void(const Node&,bool,const std::string&)> visit = [&](const Node& node, bool inherited, const std::string& parent) {
+			const auto display = Property(state,motion,{node.id,"display"});
+			const bool visible = inherited && (!display || display->text != "none");
+			std::string scope = parent;
+			if (visible && node.modal) {
+				if (!roots.empty() && roots.back() != parent) valid = false;
+				roots.push_back(node.id); scope = node.id;
+			}
+			for (const auto& child : node.children) visit(child,visible,scope);
+		};
+		visit(canonical->Model().root,true,{});
+		if (!valid) error = "Visible authored modals must form one nested ancestry chain";
+		return valid;
+	}
+	bool ValidModals(const State& state, const Motion& motion, std::string& error) const {
+		std::vector<std::string> roots; return VisibleModals(state,motion,roots,error);
+	}
+	bool SyncModals() {
+		std::vector<std::string> roots; std::string error;
+		VisibleModals(state,motion,roots,error);
+		const bool valid = interaction.SyncAuthoredModals(roots,error);
+		if (!valid && error != modalError) host.Log(true,error);
+		modalError = std::move(error); return valid;
 	}
 	void CollectInputEligibility(const Node& node, bool inherited = true) {
 		const auto display = PresentedProperty({node.id,"display"});
@@ -614,6 +645,7 @@ struct Runtime::Impl {
 		for (const auto& child : node.children) CollectInputEligibility(child,allowed);
 	}
 	void ApplyControlBindings() {
+		SyncModals(); // Capture the opener before enabled/readback changes clear it.
 		if (appliedStateRevision == state.Revision()) return;
 		std::string error;
 		if (!interaction.SetReadbacks(state.ControlValues(),error)) { host.Log(true,error); return; }
@@ -630,7 +662,8 @@ struct Runtime::Impl {
 			}
 			changes[id] = std::move(value);
 		}
-		if (error.empty()) state.Set(changes,error,true);
+		State candidate = state;
+		if (error.empty() && candidate.Set(changes,error,true) && ValidModals(candidate,motion,error)) state = std::move(candidate);
 		if (!error.empty() && error != stateError) host.Log(true,error);
 		stateError = std::move(error); ApplyControlBindings();
 	}
@@ -662,9 +695,10 @@ struct Runtime::Impl {
 		}
 		return {};
 	}
-	void UpdateInteraction(double seconds = -1) {
+	void UpdateInteraction(double seconds = -1, bool freshLayout = false) {
 		if (!document || !canonical) return;
 		if (std::isfinite(seconds) && seconds >= 0) time = std::max(time,seconds);
+		SyncModals();
 		inputAllowed.clear(); CollectInputEligibility(canonical->Model().root);
 		std::map<std::string,ControlBounds> bounds;
 		for (const auto& id : controls) {
@@ -672,7 +706,7 @@ struct Runtime::Impl {
 			if (element && inputAllowed.at(id) && element->IsVisible(true) && Rml::ElementUtilities::GetBoundingBox(rect,element,Rml::BoxArea::Border))
 				bounds[id] = {rect.Left(),rect.Top(),rect.Width(),rect.Height(),true};
 		}
-		interaction.SetBounds(bounds);
+		interaction.SetBounds(bounds,freshLayout);
 		const auto hit = HitControl();
 		auto* element = pointerPresent && pointerNavigation && pointerX >= 0 && pointerY >= 0 && pointerX < viewport.width && pointerY < viewport.height ?
 			context->GetElementAtPoint({pointerX,pointerY},nullptr,document) : nullptr;
@@ -803,7 +837,9 @@ bool Runtime::LoadDocument(const std::string& source, const std::string& sourceP
 bool Runtime::PlayTimeline(const std::string& id, double seconds) { return impl->canonical && impl->motion.Play(id,seconds); }
 bool Runtime::SetState(const StateValues& changes, std::string& error, double seconds) {
 	if (!impl->canonical) { error = "State updates require a canonical document"; return false; }
-	if (!impl->state.Set(changes,error)) return false;
+	State candidate = impl->state;
+	if (!candidate.Set(changes,error) || !impl->ValidModals(candidate,impl->motion,error)) return false;
+	impl->state = std::move(candidate);
 	if (std::isfinite(seconds)) impl->time = std::max(impl->time,seconds);
 	impl->ApplyControlBindings(); return true;
 }
@@ -822,6 +858,11 @@ bool Runtime::SaveSnapshot(std::string& snapshot, std::string& error, double sec
 		const double now = std::max(seconds,impl->time);
 		Interaction interaction = impl->interaction;
 		Motion motion = impl->motion;
+		const bool authoredModals = interaction.HasAuthoredModals();
+		if (authoredModals) {
+			motion.Advance(now); std::vector<std::string> roots;
+			if (!impl->VisibleModals(impl->state,motion,roots,error) || !interaction.SyncAuthoredModals(roots,error)) return false;
+		}
 		interaction.Cancel();
 		// A press/hover is transient. Preserve a continuous transition toward
 		// its persistent focus/default feedback instead of reviving pressed ink.
@@ -831,13 +872,18 @@ bool Runtime::SaveSnapshot(std::string& snapshot, std::string& error, double sec
 		const auto input = interaction.Capture();
 		Json::Value root(Json::objectValue);
 		const auto widgets = interaction.CaptureWidgets();
-		root["format"] = "openq4-ui-instance"; root["version"] = widgets.widgets.empty() ? 2 : 3;
+		root["format"] = "openq4-ui-instance"; root["version"] = authoredModals ? 4 : widgets.widgets.empty() ? 2 : 3;
 		auto& identity = root["document"];
 		identity["version"] = 1; identity["id"] = impl->canonical->Model().id;
 		identity["path"] = impl->sourcePath; identity["source"] = impl->canonical->Source();
 		root["application"] = Json::Value(Json::objectValue);
 		for (const auto& [id,value] : GetState(false))
 			std::visit([&](const auto& primitive) { root["application"][id] = primitive; },value);
+		if (authoredModals) {
+			root["hostSources"] = Json::Value(Json::objectValue);
+			for (const auto& [id,declaration] : impl->state.Declarations()) if (!declaration.cvar.empty())
+				std::visit([&](const auto& primitive) { root["hostSources"][id] = primitive; },impl->state.Variables().at(id));
+		}
 		auto& aliasState = root["presentationState"];
 		aliasState["variables"] = Json::Value(Json::objectValue);
 		for (const auto& [id,cell] : impl->state.Presentation().variables) {
@@ -869,8 +915,10 @@ bool Runtime::SaveSnapshot(std::string& snapshot, std::string& error, double sec
 		}
 		auto& semantics = root["interaction"];
 		semantics["focus"] = input.focus; semantics["modals"] = Json::Value(Json::arrayValue);
+		if (authoredModals) { semantics["focusPending"] = input.focusPending; semantics["pendingFocus"] = input.pendingFocus; }
 		for (const auto& scope : input.modals) {
 			Json::Value item(Json::objectValue); item["root"] = scope.root; item["restore"] = scope.restore;
+			if (authoredModals) item["authored"] = scope.authored;
 			semantics["modals"].append(std::move(item));
 		}
 		semantics["enabled"] = Json::Value(Json::objectValue);
@@ -878,7 +926,7 @@ bool Runtime::SaveSnapshot(std::string& snapshot, std::string& error, double sec
 		semantics["presented"] = Json::Value(Json::objectValue);
 		for (const auto& [id,state] : input.presented) semantics["presented"][id] = unsigned(state);
 		root["widgets"] = Json::Value(Json::objectValue);
-		if (!widgets.widgets.empty()) {
+		if (authoredModals || !widgets.widgets.empty()) {
 			root["widgets"]["version"] = widgets.version;
 			root["widgets"]["controls"] = Json::Value(Json::objectValue);
 			for (const auto& [id,widget] : widgets.widgets) {
@@ -906,17 +954,20 @@ bool Runtime::RestoreSnapshot(const std::string& snapshot, std::string& error, d
 		builder["allowSpecialFloats"] = false; builder["stackLimit"] = 32; builder["skipBom"] = false;
 		std::unique_ptr<Json::CharReader> reader(builder.newCharReader()); Json::Value root;
 		if (!reader->parse(snapshot.data(),snapshot.data()+snapshot.size(),&root,nullptr)) return reject("Invalid instance snapshot JSON");
-		if (root["format"] != "openq4-ui-instance" || !root["version"].isUInt() || root["version"].asUInt() < 1 || root["version"].asUInt() > 3)
+		if (root["format"] != "openq4-ui-instance" || !root["version"].isUInt() || root["version"].asUInt() < 1 || root["version"].asUInt() > 4)
 			return reject("Unsupported instance snapshot schema");
+		const bool authoredModals = root["version"].asUInt() == 4;
+		if (authoredModals != impl->interaction.HasAuthoredModals()) return reject("Instance snapshot modal schema does not match the document");
 		const bool hasPresentation = root["version"].asUInt() >= 2;
-		if (hasPresentation ? !SnapshotFields(root,{"format","version","document","application","presentation","interaction","widgets","presentationState"}) :
+		if (authoredModals ? !SnapshotFields(root,{"format","version","document","application","hostSources","presentation","interaction","widgets","presentationState"}) :
+			hasPresentation ? !SnapshotFields(root,{"format","version","document","application","presentation","interaction","widgets","presentationState"}) :
 			!SnapshotFields(root,{"format","version","document","application","presentation","interaction","widgets"})) return reject("Invalid instance snapshot fields");
 		const auto& identity = root["document"];
 		if (!SnapshotFields(identity,{"version","id","path","source"}) || !identity["version"].isUInt() || identity["version"].asUInt() != 1 ||
 			identity["id"] != impl->canonical->Model().id || identity["path"] != impl->sourcePath || identity["source"] != impl->canonical->Source())
 			return reject("Instance snapshot document/source identity mismatch");
 		ValueWidgetSnapshot widgets;
-		if (root["version"].asUInt() == 3) {
+		if (root["version"].asUInt() >= 3) {
 			const auto& saved = root["widgets"];
 			if (!SnapshotFields(saved,{"version","controls"}) || !saved["version"].isUInt() || saved["version"].asUInt() != 1 ||
 				!saved["controls"].isObject() || saved["controls"].size() > impl->controls.size()) return reject("Invalid restored widget table");
@@ -992,12 +1043,18 @@ bool Runtime::RestoreSnapshot(const std::string& snapshot, std::string& error, d
 		Motion motion = impl->motion;
 		if (!motion.Restore(playback,now,error,hasPresentation)) return false;
 		const auto& semantics = root["interaction"];
-		if (!SnapshotFields(semantics,{"focus","modals","enabled","presented"}) || !semantics["focus"].isString() || !semantics["modals"].isArray() ||
+		if (!(authoredModals ? SnapshotFields(semantics,{"focus","modals","enabled","presented","focusPending","pendingFocus"}) :
+			SnapshotFields(semantics,{"focus","modals","enabled","presented"})) || !semantics["focus"].isString() || !semantics["modals"].isArray() ||
 			semantics["modals"].size() > 64 || !semantics["enabled"].isObject() || !semantics["presented"].isObject()) return reject("Invalid restored interaction state");
 		InteractionSnapshot input; input.focus = semantics["focus"].asString();
+		if (authoredModals) {
+			if (!semantics["focusPending"].isBool() || !semantics["pendingFocus"].isString()) return reject("Invalid restored pending modal focus");
+			input.focusPending = semantics["focusPending"].asBool(); input.pendingFocus = semantics["pendingFocus"].asString();
+		}
 		for (const auto& scope : semantics["modals"]) {
-			if (!SnapshotFields(scope,{"root","restore"}) || !scope["root"].isString() || !scope["restore"].isString()) return reject("Invalid restored modal scope");
-			input.modals.push_back({scope["root"].asString(),scope["restore"].asString()});
+			if (!(authoredModals ? SnapshotFields(scope,{"root","restore","authored"}) : SnapshotFields(scope,{"root","restore"})) ||
+				!scope["root"].isString() || !scope["restore"].isString() || (authoredModals && !scope["authored"].isBool())) return reject("Invalid restored modal scope");
+			input.modals.push_back({scope["root"].asString(),scope["restore"].asString(),authoredModals && scope["authored"].asBool()});
 		}
 		for (const auto& id : semantics["enabled"].getMemberNames()) {
 			if (!semantics["enabled"][id].isBool() || state.Enabled().contains(id)) return reject("Invalid or binding-owned restored control override");
@@ -1012,6 +1069,27 @@ bool Runtime::RestoreSnapshot(const std::string& snapshot, std::string& error, d
 		Interaction interaction = impl->interaction;
 		if (!interaction.SetReadbacks(state.ControlValues(),error) || !interaction.RestoreWidgets(widgets,error)) return false;
 		if (!interaction.Restore(input,error)) return false;
+		std::vector<std::string> modalRoots;
+		if (authoredModals) {
+			// Validate the saved scope chain against its own source values before
+			// reconciling fresh host state. Saved CVars never replace live CVars.
+			if (!root["hostSources"].isObject()) return reject("Invalid saved modal host sources");
+			StateValues historicalSources;
+			for (const auto& id : root["hostSources"].getMemberNames()) {
+				const auto& value = root["hostSources"][id];
+				if (value.isBool()) historicalSources[id] = value.asBool();
+				else if (value.isNumeric()) historicalSources[id] = value.asDouble();
+				else if (value.isString()) historicalSources[id] = value.asString();
+				else return reject("Invalid saved modal host value");
+			}
+			State historical = impl->state;
+			if (!historical.Restore(values,historicalSources,error,&restoredPresentation) ||
+				!impl->VisibleModals(historical,motion,modalRoots,error)) return false;
+			std::vector<std::string> savedRoots;
+			for (const auto& scope : input.modals) if (scope.authored) savedRoots.push_back(scope.root);
+			if (savedRoots != modalRoots) return reject("Saved modal scopes do not match saved visibility");
+		}
+		if (!impl->VisibleModals(state,motion,modalRoots,error) || !interaction.SyncAuthoredModals(modalRoots,error)) return false;
 		// Host bindings remain authoritative. If current CVars changed control
 		// availability, transition from the saved ink to the new semantic state.
 		for (const auto& feedback : interaction.TakeFeedback()) motion.Play(feedback.timeline,now);
@@ -1040,7 +1118,10 @@ bool Runtime::SetPresentationAlias(const std::string& name, const std::string& t
 		error = "Unavailable presentation alias '"+name+"'"; return false;
 	}
 	if (!ParsePresentationValue(current.type,text,value,error)) return false;
-	return WritePresentationAlias(impl->canonical->Model(),impl->state,impl->motion,name,value,overrideExpression,error);
+	State state = impl->state; Motion motion = impl->motion;
+	if (!WritePresentationAlias(impl->canonical->Model(),state,motion,name,value,overrideExpression,error) ||
+		!impl->ValidModals(state,motion,error)) return false;
+	impl->state = std::move(state); impl->motion = std::move(motion); impl->ApplyControlBindings(); return true;
 }
 bool Runtime::HasEvent(const std::string& name) const {
 	return impl->canonical && impl->canonical->Model().events.contains(PresentationAliasKey(name));
@@ -1064,6 +1145,7 @@ bool Runtime::RunEvent(const std::string& name, double seconds, EventEffects& ef
 	const double now = std::max(impl->time,seconds);
 	EventResult candidate;
 	if (!EvaluateEvent(model,state,impl->motion,name,now,candidate,error,validate,maxActions)) return false;
+	if (!impl->ValidModals(candidate.state,candidate.motion,error)) return false;
 	EventEffects published{std::move(candidate.stateChanges),std::move(candidate.actions)};
 	impl->state = std::move(candidate.state); impl->motion = std::move(candidate.motion); impl->time = now;
 	impl->stateError.clear(); impl->ApplyControlBindings(); impl->UpdateInteraction(now);
@@ -1085,7 +1167,7 @@ void Runtime::Frame(const Viewport& viewport, double seconds) {
 	statistics.residentGeometryCount = residentCount; statistics.residentGeometryBytes = residentBytes;
 	if (!impl->context || !impl->document) return;
 	if (viewport.width <= 0 || viewport.height <= 0) {
-		impl->interaction.SetBounds({}); impl->interaction.Cancel(); impl->Feedback(seconds); return;
+		impl->interaction.InvalidateLayout(); impl->interaction.Cancel(); impl->Feedback(seconds); return;
 	}
 	impl->viewport = viewport;
 	if (impl->pointerPresent) viewport.WindowToDocument(impl->windowPointerX,impl->windowPointerY,impl->pointerX,impl->pointerY);
@@ -1102,9 +1184,13 @@ void Runtime::Frame(const Viewport& viewport, double seconds) {
 	// newly opened popup measure its authored rows before its first rendering.
 	for (unsigned pass = 0; pass < 3; ++pass) {
 		impl->context->GetRootElement()->UpdateGeometryForProjection();
-		impl->UpdateInteraction();
-		if (!impl->valueView.Paint(impl->interaction,impl->state.ControlValues(),viewport.width,viewport.height,viewport.DpRatio(),
-			[&](const std::string& id) { const auto value = impl->PresentedProperty({id,"opacity"}); return value ? value->data[0] : 1.0; })) break;
+		const auto before = impl->interaction.Focused();
+		impl->UpdateInteraction(-1,true);
+		const bool focusChanged = before != impl->interaction.Focused();
+		if (focusChanged) { impl->RevealFocus(); impl->ApplyMotion(); }
+		const bool painted = impl->valueView.Paint(impl->interaction,impl->state.ControlValues(),viewport.width,viewport.height,viewport.DpRatio(),
+			[&](const std::string& id) { const auto value = impl->PresentedProperty({id,"opacity"}); return value ? value->data[0] : 1.0; });
+		if (!painted && !focusChanged) break;
 		impl->context->Update();
 	}
 	const auto updated = std::chrono::steady_clock::now();
@@ -1113,7 +1199,7 @@ void Runtime::Frame(const Viewport& viewport, double seconds) {
 	impl->backend->renderer.EndFrame();
 	// RmlUi resolves transform state while rendering. Hit/navigation bounds
 	// therefore follow the just-presented frame, not stale transform matrices.
-	impl->UpdateInteraction();
+	impl->UpdateInteraction(-1,true);
 	const auto end = std::chrono::steady_clock::now();
 	statistics.updateMilliseconds = std::chrono::duration<double,std::milli>(updated-start).count();
 	statistics.renderMilliseconds = std::chrono::duration<double,std::milli>(end-updated).count();
@@ -1172,13 +1258,13 @@ void Runtime::PointerWheel(int rows, double seconds) {
 		// stationary pointer must not reselect its old row on the next frame;
 		// an actual pointer move or button event restores pointer navigation.
 		impl->pointerNavigation = false;
-		impl->interaction.Input(rows > 0 ? MenuInput::Down : MenuInput::Up,true);
+		impl->interaction.NavigationPulse(rows > 0 ? MenuInput::Down : MenuInput::Up);
 		impl->Feedback(seconds); return;
 	}
 	if (!impl->pointerPresent || !impl->context || !impl->document || impl->pointerX < 0 || impl->pointerY < 0 ||
 		impl->pointerX >= impl->viewport.width || impl->pointerY >= impl->viewport.height) return;
 	if (auto* hit = impl->context->GetElementAtPoint({impl->pointerX,impl->pointerY},nullptr,impl->document))
-		if (auto* scroll = hit->GetClosestScrollableContainer())
+		if (auto* scroll = hit->GetClosestScrollableContainer(); scroll && impl->interaction.AllowsNode(scroll->GetId()))
 			scroll->SetScrollTop(scroll->GetScrollTop()+(rows > 0 ? 36.f : -36.f)*impl->viewport.DpRatio());
 }
 void Runtime::MenuAction(MenuInput input, bool down, double seconds) {
@@ -1201,6 +1287,13 @@ bool Runtime::SetControlEnabled(const std::string& id, bool enabled, double seco
 }
 bool Runtime::PushModal(const std::string& id, double seconds) { impl->UpdateInteraction(seconds); const bool result = impl->interaction.PushModal(id); impl->Feedback(seconds); return result; }
 bool Runtime::PopModal(double seconds) { impl->UpdateInteraction(seconds); const bool result = impl->interaction.PopModal(); impl->Feedback(seconds); return result; }
+bool Runtime::CanDispatchModalBack(const ControlAction& action, double seconds) {
+	impl->UpdateInteraction(seconds); return impl->interaction.CanDispatchModalBack(action);
+}
+bool Runtime::CanDispatchControlAction(const ControlAction& action, double seconds) {
+	if (!impl->canonical || !std::isfinite(seconds) || seconds < 0) return false;
+	impl->UpdateInteraction(seconds); return impl->interaction.CanDispatchControlAction(action);
+}
 std::string Runtime::FocusedControl() const { return impl->interaction.Focused(); }
 std::optional<ControlState> Runtime::GetControlState(const std::string& id) const { return impl->interaction.State(id); }
 std::optional<WidgetViewState> Runtime::GetWidgetState(const std::string& id) const { return impl->interaction.Widget(id); }

@@ -6,6 +6,8 @@
 std::uint64_t UI_SettingsCreateOwner() { return 0; }
 void UI_SettingsReleaseOwner(std::uint64_t) {}
 void UI_SettingsCloseOwner(std::uint64_t) {}
+bool UI_SettingsExitReady(std::uint64_t) { return false; }
+bool UI_SettingsConsumeExit(std::uint64_t) { return false; }
 void UI_SettingsFrame(bool) {}
 bool UI_SettingsBlocksConfigWrite() { return false; }
 bool UI_SettingsStartup(std::string&) { return true; }
@@ -39,6 +41,8 @@ struct Service {
     bool closing = false;
     std::uint64_t waitingOwner = 0;
     std::uint64_t receiptOwner = 0, receiptRequest = 0;
+    struct ExitIdentity { std::uint64_t owner = 0, request = 0; };
+    ExitIdentity exitIntent, exitReceipt;
 };
 std::unique_ptr<Service>& Instance() { static std::unique_ptr<Service> service; return service; }
 Service& Settings() { auto& service=Instance(); if (!service) service=std::make_unique<Service>(); return *service; }
@@ -67,6 +71,7 @@ double Now() {
 bool NoArguments(const std::string& operation) {
     return operation == "settings.system.begin" || operation == "settings.system.defaults" ||
         operation == "settings.system.cancel" || operation == "settings.system.apply" ||
+        operation == "settings.system.applyExit" ||
         operation == "settings.system.confirm" || operation == "settings.system.revert";
 }
 bool RequestToken(const std::string& value, std::uint64_t& token) {
@@ -78,6 +83,42 @@ bool Supported(Service& service,std::uint64_t owner) {
     const auto effects=SystemSettingsHost::ChangedEffects(service.transaction.Baseline(),service.transaction.Draft());
     return !service.device.RecoveryActive() && (effects & ~unsigned(SystemSettingDisplayRestart))==0 &&
         (!effects || service.confirmationOwners.contains(owner));
+}
+void TraceExit(const Service::ExitIdentity& identity, const char* event) {
+    if (cvarSystem->GetCVarBool("ui_retainedTrace"))
+        common->Printf("UI_SETTINGS_EXIT owner=%llu request=%llu event=%s\n",
+            static_cast<unsigned long long>(identity.owner),
+            static_cast<unsigned long long>(identity.request),event);
+}
+void CancelExitIdentity(Service::ExitIdentity& identity, std::uint64_t owner) {
+    if (owner && identity.owner == owner) { TraceExit(identity,"canceled"); identity = {}; }
+}
+void CancelExit(Service& service, std::uint64_t owner) {
+    CancelExitIdentity(service.exitIntent,owner);
+    CancelExitIdentity(service.exitReceipt,owner);
+}
+bool ForwardExitStage(SettingsDisplayStage stage) {
+    return stage == SettingsDisplayStage::QueuedApply || stage == SettingsDisplayStage::AwaitApply ||
+        stage == SettingsDisplayStage::Confirming || stage == SettingsDisplayStage::QueuedKeep ||
+        stage == SettingsDisplayStage::FinalizeKeep;
+}
+SettingsResult CompleteExit(Service& service, Service::ExitIdentity identity) {
+    // Callers must already have witnessed a successful Apply or completed Keep.
+    // These invariants guard that result; an empty/clean draft is not authority.
+    if (!identity.owner || !service.owners.contains(identity.owner) || service.closing || service.abandon ||
+        service.display.Active() || service.transaction.Owner() != identity.owner ||
+        service.transaction.Phase() != SettingsPhase::Editing ||
+        service.transaction.Draft() != service.transaction.Baseline()) {
+        CancelExit(service,identity.owner);
+        return {SettingsCode::Busy,"The completed settings transaction cannot close"};
+    }
+    const auto result = service.transaction.Cancel(identity.owner);
+    if (result.code == SettingsCode::Ok && service.transaction.Phase() == SettingsPhase::Closed &&
+        !service.transaction.Owner()) {
+        service.exitIntent = {};
+        service.exitReceipt = identity; TraceExit(identity,"ready");
+    } else CancelExit(service,identity.owner);
+    return result;
 }
 const char* Message(SettingsCode code, SettingsPhase phase, bool dirty) {
     switch (code) {
@@ -108,6 +149,7 @@ void UI_SettingsReleaseOwner(std::uint64_t owner) {
 }
 void UI_SettingsCloseOwner(std::uint64_t owner) {
     auto& service = Settings();
+    CancelExit(service,owner);
     if (service.waitingOwner == owner) service.waitingOwner = 0;
     if (!owner || service.transaction.Owner() != owner) return;
     if (service.display.Active()) {
@@ -119,13 +161,46 @@ void UI_SettingsCloseOwner(std::uint64_t owner) {
         service.transaction.Abandon(owner); service.abandon = service.closing = false;
     } else service.abandon = service.closing = true;
 }
+bool UI_SettingsExitReady(std::uint64_t owner) {
+    const auto& service = Instance();
+    return service && owner && service->owners.contains(owner) && service->exitReceipt.owner == owner &&
+        service->transaction.Phase() == SettingsPhase::Closed && !service->transaction.Owner() &&
+        !service->display.Active() && !service->closing && !service->abandon && !service->device.RecoveryActive();
+}
+bool UI_SettingsConsumeExit(std::uint64_t owner) {
+    if (!UI_SettingsExitReady(owner)) return false;
+    auto& service = *Instance();
+    const auto receipt = service.exitReceipt; service.exitReceipt = {};
+    TraceExit(receipt,"consumed"); return true;
+}
 void UI_SettingsFrame(bool allowWork) {
     auto& service = Settings();
     service.device.StartupFrame(Now(),allowWork);
     const auto owner = service.transaction.Owner();
     if (service.display.Active()) {
         const auto before=service.display.Stage(); const auto request=service.display.Request();
+        const bool exitMatches = service.exitIntent.owner == owner && service.exitIntent.request == request &&
+            service.display.Owner() == owner && service.owners.contains(owner) && !service.closing;
         service.display.Frame(Now(),service.owners.contains(service.display.Owner()) && !service.closing,allowWork);
+        auto result = service.display.LastResult();
+        if (service.exitIntent.owner) {
+            if (!exitMatches || result.code != SettingsCode::Ok || service.closing) {
+                CancelExit(service,service.exitIntent.owner);
+            } else if (!service.display.Active()) {
+                // PrepareConfirm may renew the internal token and complete in
+                // this single synchronous Frame. Only the matching Keep entry
+                // can authorize exit; restoration also returns Ok/Editing.
+                if (before == SettingsDisplayStage::QueuedKeep || before == SettingsDisplayStage::FinalizeKeep)
+                    result = CompleteExit(service,service.exitIntent);
+                else CancelExit(service,owner);
+            } else if (!ForwardExitStage(service.display.Stage()) || service.display.Owner() != owner) {
+                CancelExit(service,owner);
+            } else if (service.display.Request() != request) {
+                if (before == SettingsDisplayStage::QueuedKeep && service.display.Stage() == SettingsDisplayStage::FinalizeKeep)
+                    service.exitIntent.request = service.display.Request();
+                else CancelExit(service,owner);
+            }
+        }
         if (cvarSystem->GetCVarBool("ui_retainedTrace") && (before!=service.display.Stage() || request!=service.display.Request())) {
             common->Printf("UI_SETTINGS_DISPLAY stage=%d owner=%llu request=%llu result=%d blocked=%d detail=%s\n",
                 static_cast<int>(service.display.Stage()),static_cast<unsigned long long>(owner),
@@ -138,7 +213,7 @@ void UI_SettingsFrame(bool allowWork) {
                     static_cast<unsigned long long>(presented.epoch),static_cast<unsigned long long>(presented.generation),
                     static_cast<unsigned long long>(presented.submitted),static_cast<unsigned long long>(presented.presented),static_cast<unsigned long long>(presented.failures));
         }
-        if (service.owners.contains(owner)) service.results[owner]=service.display.LastResult();
+        if (service.owners.contains(owner)) service.results[owner]=result;
         if (!service.display.Active() && service.closing) {
             service.closing=service.abandon=false;
             if (service.waitingOwner && service.owners.contains(service.waitingOwner))
@@ -296,12 +371,18 @@ bool UI_SettingsInvocation(const ActionInvocation& action, std::string& error) {
 bool UI_SettingsDispatch(std::uint64_t owner, const ActionInvocation& action, std::string& error) {
     auto& service = Settings();
     if (!owner || !service.owners.contains(owner) || !UI_SettingsInvocation(action,error)) {
+        CancelExit(service,owner);
         if (error.empty()) error = "System settings owner is unavailable";
         return false;
     }
+    // A subsequent operation cannot spend a prior receipt. Only matching Keep
+    // may continue an existing intent; Retry recovers data, never exit intent.
+    CancelExitIdentity(service.exitReceipt,owner);
+    if (action.operation != "settings.system.confirm") CancelExitIdentity(service.exitIntent,owner);
     auto& transaction = service.transaction;
     SettingsResult result;
     if (service.device.StartupActive() || (!service.display.Active() && service.device.RecoveryActive())) {
+        CancelExit(service,owner);
         error="Settings startup recovery is unresolved"; service.results[owner]={SettingsCode::Busy,error}; return false;
     }
     if (action.operation == "settings.system.begin") {
@@ -321,7 +402,10 @@ bool UI_SettingsDispatch(std::uint64_t owner, const ActionInvocation& action, st
             result = {SettingsCode::Busy,"Settings owner recovery is pending"};
         } else {
             result = transaction.Begin(owner);
-            if (result.code == SettingsCode::Ok) service.abandon = false;
+            if (result.code == SettingsCode::Ok) {
+                service.abandon = false;
+                CancelExitIdentity(service.exitReceipt,service.exitReceipt.owner);
+            }
         }
     }
     else if (service.display.Active()) {
@@ -343,13 +427,20 @@ bool UI_SettingsDispatch(std::uint64_t owner, const ActionInvocation& action, st
     else if (action.operation == "settings.system.cancel") result = transaction.Cancel(owner);
     else if (action.operation == "settings.system.confirm") result = transaction.Confirm(owner);
     else if (action.operation == "settings.system.revert") result = transaction.Revert(owner);
-    else if (action.operation == "settings.system.apply") {
+    else if (action.operation == "settings.system.apply" || action.operation == "settings.system.applyExit") {
         if (transaction.Owner() == owner && transaction.Phase() == SettingsPhase::Editing &&
             !Supported(service,owner))
             result = {SettingsCode::Invalid,"System settings batch requires unsupported effects or an owning confirmation view"};
         else if (SystemSettingsHost::ChangedRequiresDisplayRestart(transaction.Baseline(),transaction.Draft()))
             result=service.display.Apply(owner,Now());
         else result = transaction.Apply(owner,Now());
+    }
+    if (result.code != SettingsCode::Ok) CancelExit(service,owner);
+    else if (action.operation == "settings.system.applyExit") {
+        if (service.display.Active() && service.display.Owner() == owner && !service.closing) {
+            service.exitIntent = {owner,service.display.Request()};
+            TraceExit(service.exitIntent,"armed");
+        } else result = CompleteExit(service,{owner,0});
     }
     service.results[owner] = result;
     error = result.diagnostic;

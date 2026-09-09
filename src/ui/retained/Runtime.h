@@ -164,6 +164,9 @@ public:
 	std::vector<ControlAction> TakeActions();
 	// Recheck queued activations after earlier programs may change eligibility.
 	bool CanActivateControl(const std::string& id, double monotonicSeconds);
+	// Validate every queued Back against the exact still-active scope lifetime.
+	bool CanDispatchModalBack(const ControlAction& action, double monotonicSeconds);
+	bool CanDispatchControlAction(const ControlAction& action, double monotonicSeconds);
 	bool GetBounds(const std::string& id, Bounds& bounds) const;
 	bool SetProperty(const std::string& id, const std::string& property, const std::string& value);
 	bool SetText(const std::string& id, const std::string& text);

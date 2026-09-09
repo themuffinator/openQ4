@@ -513,6 +513,22 @@ if build_engine or get_option('build_native_tests')
       install: false,
     )
     test('openq4-ui-value-interaction', openq4_ui_value_interaction_test, timeout: 30)
+    openq4_ui_modal_interaction_test = executable(
+      'openq4-ui-modal-interaction-test',
+      files('tools/tests/native/UiModalInteractionTest.cpp'),
+      include_directories: root_include_dir,
+      dependencies: [openq4_retained_dep, jsoncpp_project.get_variable('jsoncpp_dep')],
+      install: false,
+    )
+    test('openq4-ui-modal-interaction', openq4_ui_modal_interaction_test, timeout: 30)
+    openq4_ui_modal_runtime_test = executable(
+      'openq4-ui-modal-runtime-test',
+      files('tools/tests/native/UiModalRuntimeTest.cpp'),
+      include_directories: root_include_dir,
+      dependencies: [openq4_retained_dep, jsoncpp_project.get_variable('jsoncpp_dep')],
+      install: false,
+    )
+    test('openq4-ui-modal-runtime', openq4_ui_modal_runtime_test, timeout: 30)
     openq4_ui_value_runtime_test = executable(
       'openq4-ui-value-runtime-test',
       files('tools/tests/native/UiValueRuntimeTest.cpp'),

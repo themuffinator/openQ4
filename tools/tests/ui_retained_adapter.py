@@ -8,6 +8,8 @@ application action vocabulary. Event effects are prescribed boundary data;
 UiBehaviorTest covers actual ordered evaluation and rollback. The settings
 service below is a small ownership/dispatch stand-in, not the production
 catalog, transaction, persistence, or device restart implementation.
+Wheel regressions verify real adapter move/wheel handoff against a recording
+Runtime double; the separate UiValueRuntimeTest owns popup selection/geometry.
 """
 from pathlib import Path
 import shutil
@@ -190,6 +192,7 @@ struct StubEvent {
     std::vector<ActionInvocation> invocations;
     bool pendingBrightness=false,fail=false;
     std::string disableControl;
+    bool advanceModal=false;
 };
 static std::map<std::string,StubEvent> eventPlans;
 static std::vector<std::string> eventHistory;
@@ -228,6 +231,12 @@ public:
     static inline std::map<std::string,StateValues> snapshots;
     bool loaded=true,failSave=false,failRestore=false,accept=false,pointer=false;
     int cancels=0,releases=0,frames=0,modals=0;
+    std::string modalRoot="dialog",modalBack="modalback";
+    std::uint64_t modalIdentity=1;
+    bool authoredModal=false;
+    std::vector<ControlAction> modalBackQueries;
+    std::vector<ControlAction> controlActionQueries;
+    std::map<std::string,std::pair<std::string,std::string>> expectedControlDescriptors;
     float pointerX=0,pointerY=0;
     StateValues state;
     struct AliasWrite { std::string name,value; bool overrideExpression; };
@@ -241,6 +250,8 @@ public:
     std::vector<ControlAction> actions;
     std::vector<std::pair<MenuInput,bool>> menu;
     std::vector<int> wheels;
+    std::vector<std::pair<float,float>> pointerMoves;
+    std::vector<std::string> pointerTransport;
     std::vector<StateValues> stateCalls;
     bool SetState(const StateValues& values,std::string&,double) {
         stateCalls.push_back(values);
@@ -265,10 +276,17 @@ public:
         if(validate)for(const auto& action:candidate.actions) {++validations; if(!validate(action,error))return false;}
         state=std::move(next); effects=std::move(candidate);
         if(!plan.disableControl.empty())disabledControls.insert(plan.disableControl);
+        if(plan.advanceModal)++modalIdentity;
         return true;
     }
     bool CanActivateControl(const std::string& node,double seconds) {
         eligibilityQueries.emplace_back(node,seconds); return !disabledControls.contains(node);
+    }
+    bool CanDispatchControlAction(const ControlAction& action,double seconds) {
+        controlActionQueries.push_back(action);
+        const auto descriptor=expectedControlDescriptors.find(action.node);
+        if(descriptor!=expectedControlDescriptors.end() && descriptor->second!=std::make_pair(action.action,action.event))return false;
+        return action.modalToken && action.modalToken==modalIdentity && CanActivateControl(action.node,seconds);
     }
     bool ResolveAction(const std::string& id,ActionInvocation& result,std::string& error,const StateValue* input=nullptr) const {
         resolvedActions.push_back(id);
@@ -296,7 +314,15 @@ public:
     }
     void CancelInput(double) { ++cancels; accept=pointer=false; actions.clear(); }
     void ReleaseInputSources() { ++releases; accept=pointer=false; }
-    std::vector<ControlAction> TakeActions() { std::vector<ControlAction> result; result.swap(actions); return result; }
+    std::vector<ControlAction> TakeActions() {
+        std::vector<ControlAction> result; result.swap(actions);
+        // Fixture-created activations stand in for current-scope Queue output.
+        // Stamp the whole batch before lowering can replace scope ownership;
+        // explicitly supplied identities exercise stale records independently.
+        for(auto& action:result) if(action.kind==ControlAction::Kind::Activate && !action.modalToken)
+            action.modalToken=modalIdentity;
+        return result;
+    }
     void PointerButton(bool down,double) {
         if(down)pointer=true;
         else if(pointer) { pointer=false; actions.push_back({ControlAction::Kind::Activate,modelTemplate.id,"button",selected}); }
@@ -307,12 +333,21 @@ public:
             if(down)accept=true;
             else if(accept) { accept=false; actions.push_back({ControlAction::Kind::Activate,modelTemplate.id,"button",selected}); }
         }
-        if(action==MenuInput::Back && down)actions.push_back({ControlAction::Kind::Back,modelTemplate.id,"button",""});
+        if(action==MenuInput::Back && down) {
+            ControlAction back{ControlAction::Kind::Back,modelTemplate.id,"button",""};
+            back.modalToken=modalIdentity; actions.push_back(back);
+        }
     }
-    void PointerMove(float x,float y,double) { pointerX=x; pointerY=y; }
-    void PointerWheel(int rows,double) { wheels.push_back(rows); }
+    void PointerMove(float x,float y,double) { pointerX=x; pointerY=y; pointerMoves.emplace_back(x,y); pointerTransport.push_back("move"); }
+    void PointerWheel(int rows,double) { wheels.push_back(rows); pointerTransport.push_back(rows>0?"wheel-down":"wheel-up"); }
     bool PlayTimeline(const std::string& name,double) { timelines.push_back(name); return name=="slide"; }
     bool PopModal(double) { if(!modals)return false; --modals; return true; }
+    bool CanDispatchModalBack(const ControlAction& action,double) {
+        modalBackQueries.push_back(action);
+        if(!action.modalToken || action.modalToken!=modalIdentity)return false;
+        if(action.event.empty())return !authoredModal;
+        return authoredModal && modals>0 && action.node==modalRoot && action.event==modalBack;
+    }
     bool GetPresentationAlias(const std::string& name,std::string& output) const {
         aliasReads.push_back(name);
         auto found=aliases.find(name); if(found==aliases.end())return false;
@@ -352,7 +387,9 @@ bool RetainedUI_PrepareView(retainedUIView_t* view) { return view && view->runti
 bool RetainedUI_LoadView(retainedUIView_t*,const std::string&,const std::string&,std::vector<openq4::ui::Diagnostic>&) { return !rejectLoad; }
 bool RetainedUI_DefaultViewport(openq4::ui::Viewport& result) { result=viewport; return viewport.width>0 && viewport.height>0; }
 double RetainedUI_PresentationTime() { return presentationTime; }
-bool RetainedUI_DrawViewRoot(retainedUIView_t* view,const openq4::ui::Viewport&) { ++view->runtime.frames; return !rejectDraw; }
+bool RetainedUI_DrawViewRoot(retainedUIView_t* view,const openq4::ui::Viewport&) {
+    ++view->runtime.frames; view->runtime.pointerTransport.push_back("frame"); return !rejectDraw;
+}
 '''
 
 SETTINGS = r'''
@@ -367,6 +404,8 @@ struct Draw { std::uint64_t owner; std::string request; int frames; };
 struct Service {
     std::uint64_t next=1,active=0;
     std::set<std::uint64_t> owners;
+    std::set<std::uint64_t> exitReceipts;
+    std::vector<std::uint64_t> exitConsumed;
     std::vector<std::uint64_t> created,released,closed,reads;
     std::vector<Dispatch> dispatches;
     std::vector<std::string> order;
@@ -400,12 +439,23 @@ std::uint64_t UI_SettingsCreateOwner() {
 }
 void UI_SettingsCloseOwner(std::uint64_t owner) {
     auto& service=SettingsBoundary::service;
+    service.exitReceipts.erase(owner);
     service.closed.push_back(owner); service.order.push_back("close:"+std::to_string(owner));
     if(service.active==owner) {service.active=0; service.baseline.clear(); service.draft.clear();}
 }
 void UI_SettingsReleaseOwner(std::uint64_t owner) {
     auto& service=SettingsBoundary::service;
     service.released.push_back(owner); UI_SettingsCloseOwner(owner); service.owners.erase(owner);
+}
+bool UI_SettingsExitReady(std::uint64_t owner) {
+    const auto& service=SettingsBoundary::service;
+    return !service.active && service.owners.contains(owner) && service.exitReceipts.contains(owner);
+}
+bool UI_SettingsConsumeExit(std::uint64_t owner) {
+    if(!UI_SettingsExitReady(owner))return false;
+    auto& service=SettingsBoundary::service;
+    service.exitReceipts.erase(owner); service.exitConsumed.push_back(owner);
+    service.order.push_back("exit-consumed:"+std::to_string(owner)); return true;
 }
 const std::map<std::string,std::size_t>& UI_SettingsStateSchema() {
     static const auto schema=[] {
@@ -423,7 +473,8 @@ bool UI_SettingsOperation(const openq4::ui::Action& action,std::string& error) {
     auto& service=SettingsBoundary::service; service.descriptors.push_back(action);
     const auto& op=action.operation;
     if((op=="settings.system.begin" || op=="settings.system.defaults" || op=="settings.system.cancel" ||
-        op=="settings.system.apply" || op=="settings.system.confirm" || op=="settings.system.revert") && action.arguments.empty())return true;
+        op=="settings.system.apply" || op=="settings.system.applyExit" ||
+        op=="settings.system.confirm" || op=="settings.system.revert") && action.arguments.empty())return true;
     if(op=="settings.system.edit" && !action.arguments.empty()) {
         for(const auto& [key,value]:action.arguments) {
             const auto field=SettingsBoundary::fields.find(key);
@@ -447,16 +498,27 @@ bool UI_SettingsDispatch(std::uint64_t owner,const openq4::ui::ActionInvocation&
     auto& service=SettingsBoundary::service;
     service.order.push_back("dispatch:"+invocation.operation);
     service.dispatches.push_back({owner,invocation});
+    // The actual service invalidates a prior receipt for every operation by
+    // that owner, including rejected operations. Preserve that boundary rule
+    // without duplicating transaction validation or the display coordinator.
+    if(service.exitReceipts.erase(owner))service.order.push_back("exit-canceled:"+std::to_string(owner));
     if(!service.owners.contains(owner) || !UI_SettingsInvocation(invocation,error))return false;
     if(service.rejectDispatch) {error="stub dispatch rejected"; return false;}
     const auto& op=invocation.operation;
     if(op=="settings.system.begin") {
         if(service.active && service.active!=owner) {error="stub owner busy"; return false;}
+        service.exitReceipts.clear();
         if(!service.active) {service.active=owner; service.baseline=service.live; service.draft=service.live;}
     } else {
         if(service.active!=owner) {error="stub owner mismatch"; return false;}
         if(op=="settings.system.edit")for(const auto& [key,value]:invocation.arguments)service.draft.at(key)=value;
-        else if(op=="settings.system.apply") {service.live=service.draft; service.baseline=service.live;}
+        else if(op=="settings.system.apply" || op=="settings.system.applyExit") {
+            service.live=service.draft; service.baseline=service.live;
+            if(op=="settings.system.applyExit") {
+                service.active=0; service.baseline.clear(); service.draft.clear();
+                service.exitReceipts.insert(owner); service.order.push_back("exit-ready:"+std::to_string(owner));
+            }
+        }
         else if(op=="settings.system.defaults")service.draft={{"r_brightness",1.0},{"r_shadows",true}};
         else if(op=="settings.system.revert")service.draft=service.baseline;
         else if(op=="settings.system.cancel")UI_SettingsCloseOwner(owner);
@@ -799,7 +861,7 @@ static void CheckEventEligibility() {
                         {ControlAction::Kind::Activate,modelTemplate.id,"button","","invalidate"},
                         {ControlAction::Kind::Activate,modelTemplate.id,"later","brightness",""},
                         {ControlAction::Kind::Activate,modelTemplate.id,"later","","tail"},
-                        {ControlAction::Kind::Back,modelTemplate.id,"later","",""}};
+                        {ControlAction::Kind::Back,modelTemplate.id,"later","","",{},0,1}};
         gui.HandleEvent(&tick,0,nullptr);
         assert((Live().eligibilityQueries==std::vector<std::pair<std::string,double>>({
             {"button",presentationTime},{"later",presentationTime},{"later",presentationTime}})));
@@ -837,7 +899,7 @@ static void CheckEventEligibility() {
         Live().actions={{ControlAction::Kind::Activate,modelTemplate.id,"button","","disable"},
                         {ControlAction::Kind::Activate,modelTemplate.id,"later","brightness",""},
                         {ControlAction::Kind::Activate,modelTemplate.id,"later","","tail"},
-                        {ControlAction::Kind::Back,modelTemplate.id,"later","",""}};
+                        {ControlAction::Kind::Back,modelTemplate.id,"later","","",{},0,1}};
         gui.HandleEvent(&tick,0,nullptr);
         assert(!gui.IsInteractive() && gui.GetStateBool("noninteractive") && !gui.HasInteractiveOverride());
         assert(Live().eligibilityQueries.size()==checked+1 && Live().eventCalls.size()==2 && Live().modals==1);
@@ -1284,6 +1346,237 @@ static void CheckValueProposalBoundary() {
     }
     assert(views.empty() && service.owners.empty()); modelTemplate=original; eventPlans.clear();
 }
+static void CheckStationaryWheelHandoff() {
+    assert(views.empty() && SettingsBoundary::service.owners.empty());
+    consoleObject.open=false; windowFocused=true;
+    const auto savedViewport=viewport;
+    {
+        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0); gui.Redraw(0);
+        auto& runtime=Live(); runtime.pointerTransport.clear();
+        const auto wheel=[&] {Key(gui,K_MWHEELDOWN,true); Key(gui,K_MWHEELDOWN,false);};
+        gui.SetCursor(100,100);
+        wheel(); gui.Redraw(0); wheel(); gui.Redraw(0);
+        // A popup's wheel selection survives only if the adapter avoids
+        // synthesizing another PointerMove at the stationary row. This tests
+        // actual production transport; Runtime/RmlUi selection is tested by
+        // UiValueRuntimeTest, not reimplemented in this recording double.
+        assert((runtime.pointerTransport==std::vector<std::string>{"move","wheel-down","frame","wheel-down","frame"}));
+        assert(runtime.pointerMoves.size()==1 && (runtime.wheels==std::vector<int>{1,1}));
+        const auto initial=runtime.pointerMoves.back();
+        gui.SetCursor(120,100); wheel();
+        assert(runtime.pointerMoves.size()==2 && runtime.pointerMoves.back()!=initial);
+        wheel(); assert(runtime.pointerMoves.size()==2);
+        const auto current=runtime.pointerMoves.back();
+        viewport.originX+=32; wheel();
+        assert(runtime.pointerMoves.size()==3 && runtime.pointerMoves.back().first==current.first+32/viewport.pixelDensityX);
+        viewport=savedViewport; wheel();
+        assert(runtime.pointerMoves.size()==4 && runtime.pointerMoves.back()==current);
+        // Actual motion/button events reclaim pointer navigation even when
+        // their coordinates equal the last routed location.
+        sysEvent_t motion{SE_MOUSE,0,0}; gui.HandleEvent(&motion,0,nullptr);
+        assert(runtime.pointerMoves.size()==5 && runtime.pointerMoves.back()==current);
+        Key(gui,K_MOUSE1,true); Key(gui,K_MOUSE1,false);
+        assert(runtime.pointerMoves.size()==7 && runtime.pointerMoves.back()==current);
+        Drain(gui,{{"r_brightness",std::get<double>(runtime.state.at("number"))}});
+        gui.Activate(false,0); gui.Activate(true,0); gui.Redraw(0); wheel();
+        assert(runtime.pointerMoves.size()==8 && runtime.pointerMoves.back()==current);
+        views.front()->callback(views.front()->owner,retainedUIViewEvent_t::BeforeResourceReset);
+        views.front()->callback(views.front()->owner,retainedUIViewEvent_t::Restored);
+        gui.Redraw(0); wheel();
+        assert(runtime.pointerMoves.size()==9 && runtime.pointerMoves.back()==current);
+    }
+    viewport=savedViewport;
+    assert(views.empty() && SettingsBoundary::service.owners.empty());
+}
+static void CheckSettingsExitReceiptBoundary() {
+    assert(views.empty() && SettingsBoundary::service.owners.empty());
+    const auto original=modelTemplate; auto& service=SettingsBoundary::service;
+    for(const auto& [key,type]:UI_SettingsStateSchema())
+        modelTemplate.state[key]={type==0?StateValue(0.0):type==1?StateValue(false):StateValue(std::string()),""};
+    for(unsigned scenario=0;scenario<5;++scenario) {
+        service=SettingsBoundary::Service{}; eventPlans.clear(); eventHistory.clear();
+        {
+            idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0);
+            const auto owner=service.created.back();
+            // This boundary supplies a finished service receipt. The separate
+            // production service tests prove which Apply/Keep outcomes create it.
+            gui.SetStateBool("settings.exitReady",true); gui.SetStateBool("settings.exitPending",true);
+            assert(!*gui.PendingApplicationCommand());
+            if(scenario==4) {
+                const auto other=UI_SettingsCreateOwner(); service.exitReceipts.insert(other);
+                assert(!*gui.PendingApplicationCommand());
+                bool close=true; assert(gui.DispatchApplicationActions(ActionMarker,close) && !close);
+                assert(service.exitReceipts.contains(other) && service.exitConsumed.empty());
+                UI_SettingsReleaseOwner(other); continue;
+            }
+            service.exitReceipts.insert(owner);
+            assert(!std::strcmp(gui.PendingApplicationCommand(),ActionMarker));
+            assert(!std::strcmp(gui.PendingApplicationCommand(),ActionMarker) && service.exitConsumed.empty());
+            bool close=false;
+            if(scenario==1) {
+                views.front()->callback(views.front()->owner,retainedUIViewEvent_t::BeforeResourceReset);
+                Live().loaded=false;
+                assert(gui.DispatchApplicationActions(ActionMarker,close) && !close);
+                assert(service.exitReceipts.contains(owner) && service.exitConsumed.empty());
+                Live().loaded=true;
+                views.front()->callback(views.front()->owner,retainedUIViewEvent_t::Restored);
+                assert(!std::strcmp(gui.PendingApplicationCommand(),ActionMarker));
+            } else if(scenario==2) gui.Activate(false,0);
+            else if(scenario==3) SettingsEvent(gui,{SettingsAction("begin")});
+            assert(gui.DispatchApplicationActions(ActionMarker,close));
+            if(scenario<2) {
+                assert(close && service.exitConsumed==std::vector<std::uint64_t>{owner});
+                assert(!*gui.PendingApplicationCommand());
+                assert(gui.DispatchApplicationActions(ActionMarker,close) && !close && service.exitConsumed.size()==1);
+            } else {
+                assert(!close && service.exitConsumed.empty() && !service.exitReceipts.contains(owner));
+                if(scenario==3)assert(service.active==owner);
+            }
+        }
+        assert(views.empty() && service.owners.empty());
+    }
+    modelTemplate=original; eventPlans.clear();
+    assert(views.empty() && service.owners.empty());
+}
+static void CheckSettingsExitBatchBoundary() {
+    assert(views.empty() && SettingsBoundary::service.owners.empty());
+    const auto original=modelTemplate; auto& service=SettingsBoundary::service;
+    for(const auto& [key,type]:UI_SettingsStateSchema())
+        modelTemplate.state[key]={type==0?StateValue(0.0):type==1?StateValue(false):StateValue(std::string()),""};
+    for(unsigned scenario=0;scenario<4;++scenario) {
+        service=SettingsBoundary::Service{}; eventPlans.clear(); eventHistory.clear();
+        consoleObject.open=false; windowFocused=true;
+        {
+            idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0);
+            const auto owner=service.created.back();
+            SettingsEvent(gui,{SettingsAction("begin"),SettingsAction("edit",{{"r_brightness",1.6}})}); Drain(gui,{});
+            assert(service.active==owner && service.exitReceipts.empty());
+            std::vector<ActionInvocation> batch{SettingsAction("applyExit")};
+            if(scenario==1)batch.push_back(SettingsAction("begin"));
+            if(scenario==2)batch.push_back(SettingsAction("cancel"));
+            if(scenario==3)batch.push_back(SettingsAction("edit",{{"r_brightness",1.9}}));
+            const auto dispatched=service.dispatches.size(); service.order.clear();
+            SettingsEvent(gui,batch);
+            assert(*gui.PendingApplicationCommand() && service.exitReceipts.empty() && service.dispatches.size()==dispatched);
+            // Real adapter code delivers the entire immutable queue before
+            // spending the service receipt. The stand-in's immediate closure
+            // models only the already-tested service boundary, not device I/O.
+            bool close=false; assert(gui.DispatchApplicationActions(gui.PendingApplicationCommand(),close));
+            assert(close==(scenario==0) && service.dispatches.size()==dispatched+batch.size());
+            assert(service.dispatches.at(dispatched).accepted && service.live.at("r_brightness")==StateValue(1.6));
+            std::vector<std::string> order{"dispatch:settings.system.applyExit","exit-ready:"+std::to_string(owner)};
+            if(scenario==0) {
+                order.push_back("exit-consumed:"+std::to_string(owner));
+                assert(service.exitConsumed==std::vector<std::uint64_t>{owner});
+            } else {
+                order.push_back("dispatch:"+batch.back().operation);order.push_back("exit-canceled:"+std::to_string(owner));
+                assert(service.exitConsumed.empty() && service.dispatches.back().accepted==(scenario==1));
+            }
+            assert(service.order==order && service.exitReceipts.empty());
+            assert(service.active==(scenario==1?owner:0) && gui.GetStateBool("settings.open")==bool(scenario==1));
+            if(scenario==1)assert(service.draft.at("r_brightness")==StateValue(1.6));
+            assert(!*gui.PendingApplicationCommand());
+            close=true; assert(gui.DispatchApplicationActions(ActionMarker,close) && !close);
+            assert(service.dispatches.size()==dispatched+batch.size() && service.order==order);
+        }
+        assert(views.empty() && service.owners.empty());
+    }
+    modelTemplate=original; eventPlans.clear();
+}
+static void CheckAuthoredModalBackBoundary() {
+    assert(views.empty());
+    eventPlans.clear(); eventHistory.clear();
+    for(int scenario=0;scenario<9;++scenario) {
+        eventPlans["modalback"]={{{"text",std::string("modal back accepted")}}, {Brightness(1.3)}};
+        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0);
+        const std::string priorText=gui.GetStateString("text");
+        auto& runtime=Live(); runtime.modals=1; runtime.authoredModal=true;
+        runtime.modalIdentity=71;
+        ControlAction back{ControlAction::Kind::Back,modelTemplate.id,"dialog","","modalback"};
+        back.modalToken=71;
+        bool accepted=false;
+        switch(scenario) {
+            case 0: accepted=true; break;
+            case 1: back.document="previous-document"; break;
+            case 2: back.node="previous-dialog"; break;
+            case 3: back.event="differentback"; break;
+            case 4: back.modalToken=70; break;
+            case 5: back.modalToken=0; break;
+            case 6: eventPlans["modalback"].fail=true; break;
+            case 7: accepted=true; eventPlans["modalback"].advanceModal=true; break;
+            case 8: back.event.clear(); break; // Old background/manual Back cannot bypass this scope.
+        }
+        runtime.actions={back};
+        if(scenario==7)runtime.actions.push_back(back); // First event replaces modal ownership.
+        const auto history=eventHistory.size();
+        sysEvent_t tick{99,0,0}; gui.HandleEvent(&tick,0,nullptr);
+        assert(runtime.modals==1); // Authored lifetime is never popped by the adapter.
+        assert(runtime.modalBackQueries.size()==(scenario==1?0:scenario==7?2:1));
+        assert(eventHistory.size()==history+(accepted || scenario==6?1:0));
+        assert(std::string(gui.GetStateString("text"))==(accepted?"modal back accepted":priorText));
+        bool close=true; const auto writes=cvars.writes;
+        assert(gui.DispatchApplicationActions(ActionMarker,close) && !close);
+        assert(cvars.writes==writes+(accepted?1:0));
+        assert(gui.DispatchApplicationActions(ActionMarker,close) && !close);
+        assert(cvars.writes==writes+(accepted?1:0));
+    }
+    eventPlans.clear(); eventHistory.clear(); assert(views.empty());
+}
+static void CheckQueuedControlScopeBoundary() {
+    assert(views.empty()); eventPlans.clear(); eventHistory.clear();
+    eventPlans["replace"]={{}, {Brightness(1.2)}, false, false, "", true};
+    eventPlans["stale"]={{}, {Brightness(1.8)}};
+    {
+        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0);
+        auto& runtime=Live(); runtime.modalIdentity=81;
+        ControlAction replace{ControlAction::Kind::Activate,modelTemplate.id,"button","","replace"};
+        ControlAction staleEvent{ControlAction::Kind::Activate,modelTemplate.id,"same-control","","stale"};
+        ControlAction staleValue{ControlAction::Kind::Activate,modelTemplate.id,"same-control","brightness","",1.4,901};
+        replace.modalToken=staleEvent.modalToken=staleValue.modalToken=81;
+        runtime.latestProposal["same-control"]=901;
+        runtime.actions={replace,staleEvent,staleValue};
+        sysEvent_t tick{99,0,0}; gui.HandleEvent(&tick,0,nullptr);
+        assert(runtime.modalIdentity==82 && runtime.controlActionQueries.size()==3);
+        assert((eventHistory==std::vector<std::string>{"replace"}));
+        assert(runtime.resolvedActions.empty());
+        assert(runtime.acknowledgements.size()==1 && runtime.acknowledgements[0].matched && !runtime.acknowledgements[0].accepted);
+        // The first program was committed; later raw records cannot reuse the
+        // same control ID after that program replaced scope ownership.
+        Drain(gui,{{"r_brightness",1.2}});
+        staleEvent.modalToken=82; runtime.actions={staleEvent};
+        gui.HandleEvent(&tick,0,nullptr);
+        assert((eventHistory==std::vector<std::string>{"replace","stale"}));
+        Drain(gui,{{"r_brightness",1.8}});
+    }
+    eventPlans.clear(); eventHistory.clear(); assert(views.empty());
+}
+static void CheckPendingControlScopeBoundary() {
+    assert(views.empty()); eventPlans.clear(); eventHistory.clear();
+    eventPlans["committed"]={{}, {Brightness(1.6)}};
+    for(int scenario=0;scenario<3;++scenario) {
+        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0);
+        auto& runtime=Live(); runtime.modalIdentity=91; runtime.latestProposal["button"]=902;
+        runtime.expectedControlDescriptors["button"]={"brightness",""};
+        ControlAction physical{ControlAction::Kind::Activate,modelTemplate.id,"button","brightness","",1.4,902};
+        physical.modalToken=91; runtime.actions={physical};
+        sysEvent_t tick{99,0,0}; gui.HandleEvent(&tick,0,nullptr);
+        assert(runtime.resolvedActions.size()==1 && runtime.acknowledgements.empty());
+        if(scenario==0)++runtime.modalIdentity;
+        if(scenario==1)runtime.disabledControls.insert("button");
+        // A service/async transition may occur after lowering but before the
+        // session drains. Reject only that physical record, preserving programs.
+        gui.HandleNamedEvent("committed");
+        if(scenario==2)Drain(gui,{{"r_brightness",1.0},{"r_brightness",1.6}});
+        else Drain(gui,{{"r_brightness",1.6}});
+        assert(runtime.acknowledgements.size()==1 && runtime.acknowledgements[0].matched && runtime.acknowledgements[0].accepted==(scenario==2));
+        assert(runtime.controlActionQueries.back().action=="brightness" && runtime.controlActionQueries.back().event.empty());
+        runtime.disabledControls.clear();
+        assert(Semantic(gui,"accept",true) && Semantic(gui,"accept",false));
+        ++runtime.modalIdentity;
+        Drain(gui,{{"r_brightness",1.0}}); // Explicit semantic diagnostics are committed by contract.
+    }
+    eventPlans.clear(); eventHistory.clear(); assert(views.empty());
+}
 static void CheckSettingsReturnBoundary() {
     assert(views.empty() && SettingsBoundary::service.owners.empty());
     const auto original=modelTemplate; auto& service=SettingsBoundary::service;
@@ -1489,8 +1782,14 @@ int main() {
     CheckSettingsBoundary();
     CheckSettingsDrawBoundary();
     CheckValueProposalBoundary();
+    CheckStationaryWheelHandoff();
+    CheckSettingsExitReceiptBoundary();
+    CheckAuthoredModalBackBoundary();
+    CheckQueuedControlScopeBoundary();
+    CheckPendingControlScopeBoundary();
+    CheckSettingsExitBatchBoundary();
     CheckSettingsReturnBoundary();
-    std::puts("Retained adapter: immutable value proposals/acknowledgements, authoritative settings return and authored Back, settings capability/draw ownership and state/lifecycle boundaries, ordered event/FIFO publication, restore suppression, pending dictionary, presentation delegation, framed saves, input suspension and cursor mapping passed");
+    std::puts("Retained adapter: exactly-once Apply-and-exit receipts after complete queued batches, stationary wheel/pointer handoff, immutable value proposals/acknowledgements, authoritative settings return and authored Back, settings capability/draw ownership and state/lifecycle boundaries, ordered event/FIFO publication, restore suppression, pending dictionary, presentation delegation, framed saves, input suspension and cursor mapping passed");
 }
 '''
 

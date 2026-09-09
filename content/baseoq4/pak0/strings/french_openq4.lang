@@ -984,4 +984,6 @@
 	"#str_229995"	"Rétablir"
 	"#str_229996"	"Réessayer"
 	"#str_229997"	"Les paramètres ont été acceptés, mais leur enregistrement est incomplet. Réessayez pour le terminer."
+	"#str_229998"	"10%;25%;50%;75%;85%;100%;125%;150%;200%"
+	"#str_229999"	"Continuer à modifier"
 }

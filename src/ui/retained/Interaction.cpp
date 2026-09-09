@@ -21,10 +21,13 @@ void Interaction::Reset(const DocumentModel& model) {
 	document = model.id; focused.clear(); hovered.clear(); armed.clear();
 	CancelGesture(); pointerOption.clear(); pointerFraction.reset();
 	items.clear(); order.clear(); parents.clear(); modals.clear(); feedback.clear(); actions.clear(); overflowed = false;
+	authoredModals.clear(); modalBlocked = focusPending = false; pendingFocus.clear();
+	modalToken = ProposalToken(); blockedNavigation = heldNavigation;
 	std::vector<std::pair<const Node*,std::string>> pending{{&model.root,{}}};
 	while (!pending.empty()) {
 		const auto [node,parent] = pending.back(); pending.pop_back(); parents[node->id] = parent;
 		if (node->control) { items[node->id].control = *node->control; order.push_back(node->id); }
+		if (node->modal) authoredModals.emplace(node->id,*node->modal);
 		for (auto it = node->children.rbegin(); it != node->children.rend(); ++it) pending.push_back({&*it,node->id});
 	}
 	Refresh();
@@ -202,33 +205,40 @@ bool Interaction::Within(const std::string& id, const std::string& root) const {
 }
 bool Interaction::Eligible(const std::string& id) const {
 	const auto found = items.find(id);
-	return found != items.end() && found->second.control.enabled && found->second.bounds.visible && Within(id,Modal()) &&
+	return !modalBlocked && found != items.end() && found->second.control.enabled && found->second.bounds.visible && Within(id,Modal()) &&
 		(found->second.control.role == ControlRole::Button || found->second.readback.has_value());
 }
 std::string Interaction::First() const { for (const auto& id : order) if (Eligible(id)) return id; return {}; }
-void Interaction::SetBounds(const std::map<std::string,ControlBounds>& bounds) {
+void Interaction::SetBounds(const std::map<std::string,ControlBounds>& bounds, bool freshLayout) {
 	for (auto& [id,item] : items) {
 		const auto found = bounds.find(id); item.bounds = found == bounds.end() ? ControlBounds{} : found->second;
 		const auto& b = item.bounds;
 		item.bounds.visible = b.visible && std::isfinite(b.x) && std::isfinite(b.y) && std::isfinite(b.width) && std::isfinite(b.height) && b.width > 0 && b.height > 0;
 	}
-	if (!modals.empty() && !Eligible(focused)) focused = First();
+	if (freshLayout && focusPending) ResolvePendingFocus();
+	if (!focusPending && !modals.empty() && !Eligible(focused)) focused = First();
 	Refresh();
 }
 bool Interaction::SetEnabled(const std::string& id, bool enabled) {
 	auto found = items.find(id); if (found == items.end()) return false;
 	found->second.control.enabled = enabled;
-	if (!modals.empty() && !Eligible(focused)) focused = First();
+	if (!focusPending && !modals.empty() && !Eligible(focused)) focused = First();
 	Refresh(); return true;
 }
+void Interaction::InvalidateLayout() {
+	if (!focusPending && !focused.empty()) { pendingFocus = focused; focusPending = true; }
+	ModalChanged(); SetBounds({},false);
+}
 bool Interaction::Focus(const std::string& id) {
+	if (focusPending && !id.empty()) return false;
 	if (!id.empty() && !Eligible(id)) return false;
+	focusPending = false; pendingFocus.clear();
 	if (focused != id) { CancelGesture(); focused = id; }
 	Refresh(); return true;
 }
 void Interaction::Hover(const std::string& id) { PointerPart(id); }
 void Interaction::PointerPart(const std::string& id, std::optional<double> fraction, const std::string& option) {
-	hovered = Eligible(id) ? id : std::string{};
+	hovered = !focusPending && Eligible(id) ? id : std::string{};
 	pointerFraction = fraction && std::isfinite(*fraction) ? fraction : std::nullopt;
 	pointerOption = option;
 	if (!dragging.empty() && dragging == id) {
@@ -286,6 +296,11 @@ void Interaction::Pointer(bool down) {
 	Refresh();
 }
 void Interaction::Input(MenuInput input, bool down) {
+	if (input != MenuInput::Accept && input != MenuInput::Back) {
+		if (!down) { heldNavigation.erase(input); blockedNavigation.erase(input); return; }
+		heldNavigation.insert(input);
+		if (blockedNavigation.contains(input) || modalBlocked || focusPending) return;
+	}
 	if (input == MenuInput::Accept) {
 		if (down) {
 			if (acceptHeld) return;
@@ -310,7 +325,12 @@ void Interaction::Input(MenuInput input, bool down) {
 	} else if (input == MenuInput::Back) {
 		if (down && !backHeld) {
 			if (!popup.empty() || !dragging.empty()) CancelGesture();
-			else { armed.clear(); Queue({ControlAction::Kind::Back,document,Modal(),{}}); }
+			else if (!modalBlocked) {
+				armed.clear();
+				const bool authored = !modals.empty() && modals.back().authored;
+				const auto event = authored ? authoredModals.at(Modal()).backEvent : std::string{};
+				if (!authored || !event.empty()) Queue({ControlAction::Kind::Back,document,Modal(),{},event,{},0,modalToken});
+			}
 		}
 		backHeld = down;
 	} else if (down) {
@@ -327,14 +347,72 @@ void Interaction::CancelGesture() {
 	armed.clear(); dragging.clear(); dragPreview.reset(); popup.clear(); highlight.clear(); armedOption.clear(); popupAcceptArm = false;
 }
 void Interaction::Cancel() { CancelGesture(); hovered.clear(); pointerOption.clear(); pointerFraction.reset(); Refresh(); }
-void Interaction::ReleaseInputSources() { pointerHeld = acceptHeld = backHeld = false; }
+void Interaction::ReleaseInputSources() { pointerHeld = acceptHeld = backHeld = false; heldNavigation.clear(); blockedNavigation.clear(); }
+void Interaction::NavigationPulse(MenuInput input) {
+	if (input == MenuInput::Accept || input == MenuInput::Back) return;
+	const bool held = heldNavigation.erase(input) != 0;
+	const bool blocked = blockedNavigation.erase(input) != 0;
+	Input(input,true); Input(input,false);
+	if (held) heldNavigation.insert(input);
+	if (blocked) blockedNavigation.insert(input);
+}
+void Interaction::ModalChanged() {
+	modalToken = ProposalToken(); CancelGesture(); hovered.clear(); pointerOption.clear(); pointerFraction.reset();
+	blockedNavigation = heldNavigation;
+}
+void Interaction::ResolvePendingFocus() {
+	if (!focusPending || modalBlocked) return;
+	focused = Eligible(pendingFocus) ? pendingFocus : First();
+	if (!focused.empty()) { focusPending = false; pendingFocus.clear(); }
+}
+bool Interaction::SyncAuthoredModals(const std::vector<std::string>& roots, std::string& error) {
+	error.clear(); std::string previous;
+	for (const auto& root : roots) {
+		if (!authoredModals.contains(root) || root == previous || !Within(root,previous)) {
+			error = "Visible authored modals must form one nested ancestry chain";
+			if (!modalBlocked) {
+				if (!focusPending) { pendingFocus = focused; focusPending = true; }
+				modalBlocked = true; ModalChanged(); Refresh();
+			}
+			return false;
+		}
+		previous = root;
+	}
+	std::vector<std::string> current;
+	for (const auto& scope : modals) if (scope.authored) current.push_back(scope.root);
+	const bool wasBlocked = modalBlocked; modalBlocked = false;
+	if (current == roots) { if (wasBlocked) ModalChanged(); return true; }
+	size_t common = 0;
+	while (common < current.size() && common < roots.size() && current[common] == roots[common]) ++common;
+	std::string next = focusPending ? pendingFocus : focused;
+	// Manual scopes can be nested above an authored scope. An authored change
+	// replaces those transient scopes, preserving their exact return chain.
+	while (modals.size() > common) { next = modals.back().restore; modals.pop_back(); }
+	for (size_t i = common; i < roots.size(); ++i) {
+		modals.push_back({roots[i],next,true}); next = authoredModals.at(roots[i]).initialFocus;
+	}
+	pendingFocus = next; focusPending = true; focused.clear(); ModalChanged(); Refresh(); return true;
+}
+bool Interaction::CanDispatchModalBack(const ControlAction& action) const {
+	if (modalBlocked || action.kind != ControlAction::Kind::Back || action.document != document ||
+		!action.modalToken || action.modalToken != modalToken || action.node != Modal()) return false;
+	const bool authored = !modals.empty() && modals.back().authored;
+	return authored ? !action.event.empty() && action.event == authoredModals.at(Modal()).backEvent : action.event.empty();
+}
+bool Interaction::CanDispatchControlAction(const ControlAction& action) const {
+	if (action.kind == ControlAction::Kind::Back) return CanDispatchModalBack(action);
+	if (focusPending || action.document != document || !action.modalToken || action.modalToken != modalToken || !Eligible(action.node)) return false;
+	const auto& control = items.at(action.node).control;
+	return action.action == control.action && action.event == control.event;
+}
 bool Interaction::PushModal(const std::string& root) {
-	if (!parents.contains(root) || !Within(root,Modal()) || root == Modal()) return false;
-	modals.push_back({root,focused}); CancelGesture(); hovered.clear(); focused = First(); Refresh(); return true;
+	if (modalBlocked || authoredModals.contains(root) || !parents.contains(root) || !Within(root,Modal()) || root == Modal()) return false;
+	modals.push_back({root,focusPending ? pendingFocus : focused}); ModalChanged();
+	focusPending = false; pendingFocus.clear(); focused = First(); Refresh(); return true;
 }
 bool Interaction::PopModal() {
-	if (modals.empty()) return false;
-	const auto restore = modals.back().restore; modals.pop_back(); CancelGesture(); hovered.clear();
+	if (modalBlocked || modals.empty() || modals.back().authored) return false;
+	const auto restore = modals.back().restore; modals.pop_back(); ModalChanged();
 	focused = Eligible(restore) ? restore : First(); Refresh(); return true;
 }
 void Interaction::Navigate(MenuInput input) {
@@ -372,7 +450,7 @@ void Interaction::Navigate(MenuInput input) {
 }
 void Interaction::Refresh() {
 	if ((!dragging.empty() && !Eligible(dragging)) || (!popup.empty() && !Eligible(popup))) CancelGesture();
-	if (!Eligible(focused)) focused.clear();
+	if (focusPending || !Eligible(focused)) focused.clear();
 	if (!Eligible(hovered)) hovered.clear();
 	if (!Eligible(armed)) armed.clear();
 	for (auto& [id,item] : items) {
@@ -383,13 +461,18 @@ void Interaction::Refresh() {
 	}
 }
 std::optional<ControlState> Interaction::State(const std::string& id) const { const auto found = items.find(id); return found == items.end() ? std::nullopt : std::optional(found->second.state); }
-void Interaction::Queue(ControlAction action) { if (actions.size() < 256) actions.push_back(std::move(action)); else overflowed = true; }
+void Interaction::Queue(ControlAction action) {
+	action.modalToken = modalToken;
+	if (!modalToken || actions.size() >= 256) overflowed = true;
+	else actions.push_back(std::move(action));
+}
 std::vector<ControlFeedback> Interaction::TakeFeedback() { std::vector<ControlFeedback> result; result.swap(feedback); return result; }
 std::vector<ControlAction> Interaction::TakeActions() { std::vector<ControlAction> result; result.swap(actions); overflowed = false; return result; }
 InteractionSnapshot Interaction::Capture() const {
 	InteractionSnapshot result;
 	result.focus = focused;
-	for (const auto& scope : modals) result.modals.push_back({scope.root,scope.restore});
+	for (const auto& scope : modals) result.modals.push_back({scope.root,scope.restore,scope.authored});
+	result.focusPending = focusPending; result.pendingFocus = pendingFocus;
 	for (const auto& [id,item] : items) { result.enabled[id] = item.control.enabled; result.presented[id] = item.state; }
 	return result;
 }
@@ -407,15 +490,31 @@ bool Interaction::Restore(const InteractionSnapshot& snapshot, std::string& erro
 	for (const auto& scope : snapshot.modals) {
 		if (scope.root.empty() || !parents.contains(scope.root) || scope.root == previous || !Within(scope.root,previous))
 			return reject("Invalid restored modal ancestry");
+		if (scope.authored != authoredModals.contains(scope.root)) return reject("Invalid restored modal ownership");
 		if (!scope.restore.empty() && (!items.contains(scope.restore) || !Within(scope.restore,previous)))
 			return reject("Invalid restored modal return focus");
 		previous = scope.root;
 	}
 	if (!snapshot.focus.empty() && !Within(snapshot.focus,previous)) return reject("Restored focus is outside its modal");
+	if ((!snapshot.focusPending && !snapshot.pendingFocus.empty()) ||
+		(snapshot.focusPending && !snapshot.focus.empty()) ||
+		(!snapshot.pendingFocus.empty() && (!items.contains(snapshot.pendingFocus) || !Within(snapshot.pendingFocus,previous))))
+		return reject("Invalid restored pending modal focus");
 	Interaction candidate = *this;
 	candidate.focused = snapshot.focus;
 	candidate.modals.clear();
-	for (const auto& scope : snapshot.modals) candidate.modals.push_back({scope.root,scope.restore});
+	for (const auto& scope : snapshot.modals) candidate.modals.push_back({scope.root,scope.restore,scope.authored});
+	candidate.modalBlocked = false; candidate.modalToken = ProposalToken(); candidate.blockedNavigation = candidate.heldNavigation;
+	candidate.focusPending = snapshot.focusPending; candidate.pendingFocus = snapshot.pendingFocus;
+	if (candidate.HasAuthoredModals() && (candidate.focusPending || !candidate.focused.empty() || !candidate.modals.empty())) {
+		// Restored authored scopes must wait for this instance's first projected
+		// layout. Neither old geometry nor a newly enabled default may steal the
+		// exact saved selection while rebuilding resources.
+		if (!candidate.focusPending) {
+			candidate.focusPending = true; candidate.pendingFocus = candidate.focused;
+		}
+		candidate.focused.clear();
+	}
 	candidate.CancelGesture(); candidate.hovered.clear(); candidate.pointerArm = false;
 	candidate.pointerOption.clear(); candidate.pointerFraction.reset();
 	for (auto& [id,item] : candidate.items) { item.pending.reset(); item.rejected.reset(); item.proposalToken = 0; }

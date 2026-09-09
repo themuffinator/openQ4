@@ -232,9 +232,25 @@ public:
 		ValidateControls(root["root"],model.root,"/root",false);
 		State initial; std::string stateError;
 		Require(initial.Reset(model,stateError),root["bindings"],"/bindings",stateError);
+		std::string lastModal;
+		ValidateInitialModals(root["root"],model.root,"/root",initial.Properties(),true,{},lastModal);
 		return std::move(model);
 	}
 private:
+	void ValidateInitialModals(const Json::Value& sourceNode, const Node& node, const std::string& path,
+		const PropertyValues& bound, bool inherited, const std::string& parent, std::string& last) {
+		const auto expression = bound.find({node.id,"display"});
+		const auto base = node.properties.find("display");
+		const auto* display = expression != bound.end() ? &expression->second : base != node.properties.end() ? &base->second : nullptr;
+		const bool visible = inherited && (!display || display->text != "none");
+		std::string scope = parent;
+		if (visible && node.modal) {
+			Require(last.empty() || last == parent,sourceNode,path+"/modal","Initially visible authored modals must form one nested ancestry chain");
+			last = scope = node.id;
+		}
+		for (size_t i = 0; i < node.children.size(); ++i)
+			ValidateInitialModals(sourceNode["children"][static_cast<Json::ArrayIndex>(i)],node.children[i],path+"/children/"+std::to_string(i),bound,visible,scope,last);
+	}
 	void ReadState(const Json::Value& root) {
 		if (!root.isMember("state")) return;
 		const auto& values = root["state"];
@@ -759,12 +775,19 @@ private:
 
 	Node ReadNode(const Json::Value& value, const std::string& path, unsigned depth) {
 		Require(depth <= 48 && ++nodeCount <= 65536,value,path,"Document hierarchy exceeds the node/depth limit");
-		Fields(value,path,{"id","type","properties","children","paths","mask","control","extensions"});
+		Fields(value,path,{"id","type","properties","children","paths","mask","control","modal","extensions"});
 		Node result;
 		result.id = Id(value["id"],path+"/id");
 		Require(nodeIds.insert(result.id).second,value["id"],path+"/id","Duplicate node ID '"+result.id+"'");
 		Require(value["type"] == "group" || value["type"] == "text" || value["type"] == "vector",value["type"],path+"/type","Supported node types are group, text and vector; unsupported nodes cannot be silently rendered");
 		result.type = value["type"].asString();
+		if (value.isMember("modal")) {
+			const auto& modal = value["modal"]; const auto p = path+"/modal";
+			Fields(modal,p,{"initialFocus","back","extensions"});
+			Require(result.type == "group" && !value.isMember("control"),modal,p,"A modal must be a group without its own control");
+			result.modal.emplace(); result.modal->initialFocus = Id(modal["initialFocus"],p+"/initialFocus");
+			if (modal.isMember("back")) result.modal->backEvent = EventName(modal["back"],p+"/back");
+		}
 		if (value.isMember("control")) {
 			const auto& control = value["control"]; const auto p = path+"/control";
 			Require(control.isObject() && control["role"].isString(),control,p,"Expected a semantic control role");
@@ -1026,6 +1049,20 @@ private:
 		}
 	}
 	void ValidateControls(const Json::Value& sourceNode, const Node& node, const std::string& path, bool ancestorControl) {
+		if (node.modal) {
+			const auto& value = sourceNode["modal"]; const auto p = path+"/modal";
+			Require(!ancestorControl,value,p,"A modal cannot be nested inside a semantic control");
+			const auto* focus = model.FindNode(node.modal->initialFocus);
+			Require(focus && focus->control && Descendant(focus->id,node.id),value["initialFocus"],p+"/initialFocus","Initial focus must be a control inside this modal");
+			std::vector<const Node*> pending;
+			for (const auto& child : node.children) pending.push_back(&child);
+			while (!pending.empty()) {
+				const auto* child = pending.back(); pending.pop_back();
+				if (child->modal) Require(!Descendant(focus->id,child->id),value["initialFocus"],p+"/initialFocus","Initial focus cannot belong to a nested modal");
+				for (const auto& next : child->children) pending.push_back(&next);
+			}
+			Require(node.modal->backEvent.empty() || model.events.contains(node.modal->backEvent),value["back"],p+"/back","Unknown modal Back event");
+		}
 		if (node.control) {
 			const auto& value = sourceNode["control"]; const auto p = path+"/control";
 			Require(!ancestorControl,value,p,"Semantic controls cannot be nested inside another control");

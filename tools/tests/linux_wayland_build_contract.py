@@ -111,6 +111,7 @@ def validate_linux_ime_support() -> None:
     backend = read("src/sys/sdl3/sdl3_backend.cpp")
     syscon = read("src/sys/posix/posix_syscon.cpp")
     edit_window = read("src/ui/EditWindow.cpp")
+    legacy_gui = read("src/ui/UserInterface.cpp")
     for token in (
         "cdata.set('HAVE_FCITX', 1)",
         "cdata.set('SDL_USE_IME', 1)",
@@ -133,7 +134,8 @@ def validate_linux_ime_support() -> None:
     ):
         require(backend, token, "SDL native IME lifecycle")
 
-    require(backend, "dynamic_cast<idEditWindow *>(activeGui->GetDesktop()->GetFocusedChild())", "focused GUI edit-field IME gate")
+    require(backend, "activeGui->GetTextInputState(area, cursorOffset)", "active GUI text-input interface")
+    require(legacy_gui, "dynamic_cast<idEditWindow *>( desktop->GetFocusedChild() )", "legacy focused GUI edit-field IME gate")
     require(edit_window, "idEditWindow::GetTextInputState", "GUI edit-field IME geometry")
     require(edit_window, "cursorPixels - paintOffset", "GUI edit-field caret placement")
 

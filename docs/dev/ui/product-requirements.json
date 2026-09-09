@@ -4,7 +4,7 @@
   "date": "2026-09-09",
   "status": "Implementation incomplete; this register preserves full product scope and does not accept any production GUI.",
   "baseline": {
-    "engine_revision": "b3bf279b4347329cd8a45a4533536adc0510e860",
+    "engine_revision": "6c0defc8158c674c0e117a0a3754882a51bcef0d",
     "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
     "effective_gui_count": 271,
     "translated_or_accepted_resources": 0,
@@ -19,7 +19,7 @@
     "product": {
       "path": "docs/dev/plans/ui-product-completion.md",
       "authority": "normative completion scope, milestones and final audit",
-      "sha256": "29c20f925954f2a1f1737b8d057bb899576034c3199d89b4018b1b3d91345400"
+      "sha256": "c126dd76d4e5f3f45754ca2eb00e85996fbc3ecbea07d4aa1cadadd95510dfd1"
     },
     "original": {
       "path": "docs/dev/plans/idtech5-ui.md",
@@ -100,7 +100,7 @@
       "kind": "source_audit",
       "path": "docs/dev/plans/ui-product-completion.md",
       "scope": "Published audit at 80bb3939; source limitations corroborated by current Document/Runtime inspection. Historical tests and captures are not a fresh product qualification.",
-      "sha256": "29c20f925954f2a1f1737b8d057bb899576034c3199d89b4018b1b3d91345400"
+      "sha256": "c126dd76d4e5f3f45754ca2eb00e85996fbc3ecbea07d4aa1cadadd95510dfd1"
     },
     "document-foundation": {
       "kind": "implementation_checkpoint",
@@ -252,6 +252,17 @@
       "local_capture_summary": ".tmp/ui/value-controls-review/capture-evidence.json",
       "local_capture_summary_sha256": "2c5c14d4d0a9d0fb8cc8d45dab9af39fdc9e6c4ab017f93a1f6a3e49c3cf1a40",
       "sha256": "f5c9612ba410ed50f7a69beeefabfbcc5bac76e3db038e35414bf8dd44bc9570"
+    },
+    "system-exit-foundation": {
+      "kind": "implementation_checkpoint",
+      "path": "docs/dev/ui/system-exit.md",
+      "baseline_engine_revision": "6c0defc8158c674c0e117a0a3754882a51bcef0d",
+      "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
+      "qualification_status": "bounded_system_controls_and_exit_increment_qualified",
+      "scope": "Qualified M2 implementation subset: the default-off normal SYSTEM page presents 16 typed value controls, retaining 53 draft/baseline fields and editable vector parts. Dirty Back offers localized Keep editing, ordered Cancel/discard-and-exit and typed Apply-and-exit. The private one-use receipt binds owner/request and permits return only after immediate success or successful Keep and completed persistence; failures, Revert, timeout and recovery cancel exit intent. Authored modal scopes establish safe focus before first draw, restore eligible prior focus, quarantine held sources and reject stale queued Back/click/value descriptors across scope replacement. Snapshot version 4 preserves authored scope history and pending focus while fresh host readbacks win. Repeated wheel routing avoids unchanged pointer replay. The final Windows build, 15 native UI suites, 79 settings-service scenarios, 173 Session checks, adapter checks, 29 capture-tool tests, 5,747 page checks and 12 localized-label CPU layout cases passed. Four source-bound hidden windowed SP/OpenGL at 125% and MP/Vulkan at 200% normal Session captures after active gameplay cover 92 stages and 34 reviewed engine images, including VSync, Revert/Keep, parent return and persisted reopening. Source/build inputs, binaries, packages, tools, logs, images and bounded warning accounting are hash-bound. Full effects and renderer parity, UI-only native-resolution composition, precise numeric entry/IME, all 31 settings, display catalogs, Defaults/presets/Auto-Detect, complete modal/scrollbar behavior, source-derived artwork/transitions, native editor round trips and the complete platform/language/display/physical-input matrix remain required. No requirement, milestone, production screen or migration is accepted.",
+      "local_capture_summary": ".tmp/ui/system-exit-review/capture-evidence.json",
+      "local_capture_summary_sha256": "ddde52034403036ca1821dbb75aed11961404b311032149d1d2ff1c35f213b74",
+      "sha256": "c93d056fff7fed30362b367ac09b219c38dffa9ddaf1e661c5523530ea694791"
     }
   },
   "groups": {
@@ -1640,10 +1651,11 @@
         "managed-application-foundation",
         "event-program-foundation",
         "settings-transaction-foundation",
-        "value-controls-foundation"
+        "value-controls-foundation",
+        "system-exit-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "The typed settings dispatcher now accepts immutable value-control proposals and returns an owner/proposal-bound result; no temporary service-state write carries the operand. The default-off normal SYSTEM route uses the existing Session bridge. Complete the session/SP/MP operation catalog, source provenance and every translated behavior, and qualify the entire action contract. Recorded native and normal-route Windows SP/OpenGL 125% and MP/Vulkan 200% evidence qualifies this subset only."
+      "remaining": "The historical typed dispatcher accepts immutable value-control proposals and returns owner/proposal-bound results without carrying operands in temporary service state. The current default-off normal SYSTEM increment adds typed Apply-and-exit and a private one-use owner/request-bound receipt for asynchronous Session return; GUI dictionary values cannot authorize exit. The new source-bound normal Session captures qualify this bounded exit operation; full action-catalog acceptance remains open. Complete the session/SP/MP operation catalog, source provenance and every translated behavior, and qualify the entire action contract. Historical native and normal-route Windows SP/OpenGL 125% and MP/Vulkan 200% evidence retains its original subset scope and does not qualify the new exit operation."
     },
     {
       "id": "BEH-002",
@@ -1670,10 +1682,11 @@
         "settings-transaction-foundation",
         "display-device-foundation",
         "display-confirmation-foundation",
-        "value-controls-foundation"
+        "value-controls-foundation",
+        "system-exit-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "The 53-field transaction/service and actual asynchronous display Apply/Keep/Revert/Retry retain their separately qualified diagnostic evidence. Initial normal-route controls now edit and read accepted drafts through typed proposals, with guarded dirty Back and discard-to-Editing behavior. Complete actual audio/resource/input effects, profile and Auto-Detect draft expansion, all dependent production controls and Defaults/Cancel/discard-and-exit flows, visible focus/window-placement/fullscreen/multi-monitor failure and timeout behavior, all platforms and full production acceptance. CVar values alone never prove device success; injected Confirmed startup evidence is not an interrupted Keep or power-loss test. The recorded native and normal-route Windows SP/OpenGL 125% and MP/Vulkan 200% evidence qualifies the initial controls and semantic route only."
+      "remaining": "The 53-field transaction/service and actual asynchronous display Apply/Keep/Revert/Retry retain their separately qualified diagnostic evidence. The historical initial normal-route controls qualified accepted draft edits, guarded dirty Back and discard-to-Editing. The current increment implements Apply-and-exit intent, one-use owner/request-bound return after durable success, and ordered Cancel/discard-and-exit while preserving ordinary Apply-only behavior; failure, Revert, timeout and recovery cancel exit intent. The final build and normal Session gameplay/image checks qualify these recorded paths only. Complete actual audio/resource/input effects, profile and Auto-Detect draft expansion, all dependent production controls, Defaults and complete Apply/Cancel/discard-and-exit qualification, visible focus/window-placement/fullscreen/multi-monitor failure and timeout behavior, all platforms and full production acceptance. CVar values alone never prove device success; injected Confirmed startup evidence is not an interrupted Keep or power-loss test. Prior native and normal-route Windows evidence qualifies its recorded subset only."
     },
     {
       "id": "BEH-003",
@@ -1968,7 +1981,7 @@
       "status": "pending",
       "current_evidence": [],
       "acceptance_evidence": [],
-      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required."
+      "remaining": "The SYSTEM exit render-order audit identified an OpenGL UI-only swap-tail filter that can resample completed UI without an eligible scene resolve; repair this path and independently compare constant-output UI at varying world resolutions. Ordinary world-backed GL/Vulkan ordering does not accept this requirement. Legacy whole-frame crop, CRT ordering, dynamic resolution, all surfaces and the complete renderer/platform matrix remain required."
     },
     {
       "id": "SAVE-001",
@@ -2054,10 +2067,11 @@
       "current_evidence": [
         "instance-persistence-foundation",
         "managed-application-foundation",
-        "presentation-alias-foundation"
+        "presentation-alias-foundation",
+        "system-exit-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "The current subset reconstructs metadata/property values and expression ownership with existing focus/modal/motion state. Complete viewport/monitor/font/text/world/widget continuity and the full engine mutation matrix remain required."
+      "remaining": "Authored modal ownership, pending safe/return focus and fresh-source reconciliation are integrated and checked through snapshot/resource reconstruction for the SYSTEM exit increment; complete platform/device and useful-state restoration remains required. The current subset reconstructs metadata/property values and expression ownership with existing focus/modal/motion state. Complete viewport/monitor/font/text/world/widget continuity and the full engine mutation matrix remain required."
     },
     {
       "id": "SAVE-004",
@@ -2152,7 +2166,7 @@
         "product:3 Text, controls and accessibility",
         "product:5 Visual and interaction qualification"
       ],
-      "requirement": "Provide independently persisted UI scale default 100%, range 75\u2013200%; clamp extremes with reachable reset and no lost essential actions.",
+      "requirement": "Provide independently persisted UI scale default 100%, range 75–200%; clamp extremes with reachable reset and no lost essential actions.",
       "dependencies": [
         "BEH-002"
       ],
@@ -2182,7 +2196,7 @@
         "product:3 Text, controls and accessibility",
         "product:5 Visual and interaction qualification"
       ],
-      "requirement": "Provide text scale default 100%, range 100\u2013200% independent of furniture; reflow labels, rows and forms without hiding essential actions.",
+      "requirement": "Provide text scale default 100%, range 100–200% independent of furniture; reflow labels, rows and forms without hiding essential actions.",
       "dependencies": [
         "TXT-001",
         "LAY-003"
@@ -2793,10 +2807,11 @@
         "input-foundation",
         "presentation-alias-foundation",
         "event-program-foundation",
-        "value-controls-foundation"
+        "value-controls-foundation",
+        "system-exit-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "Value gestures add transient capture/preview, pending-proposal identity and popup dismissal to existing input quarantine. Loss of focus, eligibility or usable projection cancels a gesture; restoration does not replay transient edits. Complete and qualify physical-device removal/reconnect, gameplay/modal ownership and all-widget held-source behavior. The recorded normal-route Windows checks qualify semantic ownership and resource resets; physical-device qualification remains open."
+      "remaining": "The system-exit increment adds authored modal scope transitions and generation-bound queued Back routing; held-source quarantine and restoration pass bounded native/runtime and normal Session qualification. Value gestures add transient capture/preview, pending-proposal identity and popup dismissal to existing input quarantine. Loss of focus, eligibility or usable projection cancels a gesture; restoration does not replay transient edits. Complete and qualify physical-device removal/reconnect, gameplay/modal ownership and all-widget held-source behavior. The recorded normal-route Windows checks qualify semantic ownership and resource resets; physical-device qualification remains open."
     },
     {
       "id": "INP-005",
@@ -2818,9 +2833,11 @@
         "Internal fixture and supported-host operation matrix covering each event kind and resulting control value/focus/scroll."
       ],
       "status": "pending",
-      "current_evidence": [],
+      "current_evidence": [
+        "system-exit-foundation"
+      ],
       "acceptance_evidence": [],
-      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required."
+      "remaining": "The current adapter change preserves consecutive stationary-pointer choice-popup wheel navigation by avoiding unchanged pointer-move replay while allowing changed coordinates, explicit movement and button input to reclaim pointer navigation. Mapping caches invalidate at quarantine and resource reconstruction. Production-adapter and real Interaction/Runtime checks cover the bounded wheel path; physical-device coverage remains open. Complete production wheel/touch scrolling, Unicode text/composition payloads, keyboard/gamepad repeats and reconnect behavior across the entire widget and supported-host event matrix; require resulting value/focus/scroll evidence for every event kind. The requirement remains pending and no physical-input or full payload acceptance is inferred."
     },
     {
       "id": "INP-006",
@@ -2847,10 +2864,11 @@
         "interaction-foundation",
         "presentation-alias-foundation",
         "event-program-foundation",
-        "value-controls-foundation"
+        "value-controls-foundation",
+        "system-exit-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "Choice controls separate accepted selection from tentative highlight, consume outside dismissal and derive a popup beyond clipped ancestors. Hidden/disabled option and ancestor eligibility participates in the semantic contract. Complete the full widget state gallery, modal focus before first visible frame, stack teardown/restoration and keyboard/gamepad/accessibility matrix. The recorded native and normal-route Windows checks qualify the bounded subset only."
+      "remaining": "The system-exit increment adds authored modal initial-focus and Back metadata for dirty and display-confirmation panels; first-frame containment, safe focus and restoration pass bounded native/runtime and normal Session qualification. Choice controls separate accepted selection from tentative highlight, consume outside dismissal and derive a popup beyond clipped ancestors. Hidden/disabled option and ancestor eligibility participates in the semantic contract. Complete the full widget state gallery, modal focus before first visible frame, stack teardown/restoration and keyboard/gamepad/accessibility matrix. The recorded native and normal-route Windows checks qualify the bounded subset only."
     },
     {
       "id": "INP-007",
@@ -3926,7 +3944,7 @@
         "product:3 Visual quality and motion",
         "original:Stage 6"
       ],
-      "requirement": "Standard panels have equal 12 dp upper/8 dp lower 45-degree cuts, 1 dp rail and 3 dp inset rail; popover cuts 6 dp, major bands 16\u201324 dp. Reconstruct each stepped/notched silhouette and named ornaments without stretched corners.",
+      "requirement": "Standard panels have equal 12 dp upper/8 dp lower 45-degree cuts, 1 dp rail and 3 dp inset rail; popover cuts 6 dp, major bands 16–24 dp. Reconstruct each stepped/notched silhouette and named ornaments without stretched corners.",
       "dependencies": [
         "ART-001",
         "REN-001"
@@ -4657,10 +4675,11 @@
         "settings-transaction-foundation",
         "display-device-foundation",
         "display-confirmation-foundation",
-        "value-controls-foundation"
+        "value-controls-foundation",
+        "system-exit-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "The source-backed 31-option/53-CVar contract now has a packaged openq4.system document and a default-off normal Session child route. Eight initial immediate image controls, all53 typed draft/baseline declarations, guarded Back/discard and eligible display-confirmation controls are authored. This is partial implementation, not a translated or accepted page. Complete every actual setting and dependent popup, display capability/resolution catalogs, numeric text entry, preset/Auto-Detect and remaining effects, Defaults/Cancel/discard-and-exit, source-derived visual/transitions and native editor round trip. Qualify normal SP/MP entry/return/reopen, failure/cancellation, full responsive/localized state galleries and every mapped resource. The final native and normal-route Windows SP/OpenGL 125% and MP/Vulkan 200% evidence qualifies the initial subset only; neither that evidence nor prior diagnostic probes satisfies the complete requirement."
+      "remaining": "The source-backed 31-option/53-CVar contract has a packaged openq4.system document and a default-off normal Session child route. The current increment expands the historical eight initial controls to 16 value controls, preserves all 53 typed draft/baseline declarations and eligible display confirmation, and implements guarded Apply-and-exit, Cancel/discard-and-exit and continue-editing behavior. Final build/gameplay/image qualification covers the recorded 16-control subset; this remains partial implementation, not a translated or accepted page. Complete every actual setting and dependent popup, display capability/resolution catalogs, numeric text entry, preset/Auto-Detect and remaining effects, Defaults and complete Apply/Cancel/exit flows, source-derived visuals/transitions and native editor round trip. Qualify normal SP/MP entry/return/reopen, failure/cancellation, full responsive/localized state galleries and every mapped resource. Historical native and normal-route Windows SP/OpenGL 125% and MP/Vulkan 200% evidence retains its initial subset scope; those earlier captures and diagnostic probes do not qualify the new increment; its separate bounded record does not accept the complete requirement."
     },
     {
       "id": "FLOW-003",

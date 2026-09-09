@@ -10,6 +10,12 @@
 std::uint64_t UI_SettingsCreateOwner();
 void UI_SettingsReleaseOwner(std::uint64_t owner);
 void UI_SettingsCloseOwner(std::uint64_t owner);
+// A successful applyExit closes its owning transaction before publishing this
+// service-only receipt. Peek is read-only; consumption succeeds exactly once.
+// New operations and owner closure invalidate receipts before a GUI can reuse
+// them to close a replacement transaction. No document state authorizes exit.
+bool UI_SettingsExitReady(std::uint64_t owner);
+bool UI_SettingsConsumeExit(std::uint64_t owner);
 void UI_SettingsFrame(bool allowWork = true);
 bool UI_SettingsBlocksConfigWrite();
 bool UI_SettingsStartup(std::string& error);

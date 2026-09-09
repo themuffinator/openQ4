@@ -190,6 +190,7 @@ struct idUserInterfaceRetained::Impl {
 		bool cancellable = true;
 		std::string control;
 		std::uint64_t proposalToken = 0;
+		ControlAction source;
 	};
 	std::vector<PendingAction> actions;
 	bool interactive = true, interactiveSet = false, unique = false, active = false;
@@ -199,6 +200,8 @@ struct idUserInterfaceRetained::Impl {
 	bool settingsFields = false, settingsClosePending = false;
 	std::uint64_t settingsOwner = UI_SettingsCreateOwner();
 	float cursorX = 320, cursorY = 240;
+	float routedPointerX = 0, routedPointerY = 0;
+	bool routedPointerValid = false;
 	std::string lastError;
 	std::string checkpoint;
 
@@ -210,6 +213,7 @@ struct idUserInterfaceRetained::Impl {
 	}
 	void Quarantine(bool forget = false, bool cancelRuntime = true, bool discardPrograms = false) {
 		input.Cancel(forget); input.Take(); held.clear(); close = false; pointerVisible = false;
+		routedPointerValid = false;
 		// Completed programs retain their immutable invocations through input
 		// suspension. Save/resource/source replacement explicitly discards them.
 		actions.erase(std::remove_if(actions.begin(),actions.end(),[&](const PendingAction& action) {
@@ -299,6 +303,11 @@ struct idUserInterfaceRetained::Impl {
 				RuntimeView()->AcknowledgeControlProposal(event.node,event.proposalToken,false); };
 			if (!interactive || event.document != document.Model().id) { reject(); continue; }
 			if (event.kind == ControlAction::Kind::Back) {
+				if (!RuntimeView()->CanDispatchModalBack(event,RetainedUI_PresentationTime())) continue;
+				if (!event.event.empty()) {
+					RunEvent(event.event);
+					continue;
+				}
 				if (!RuntimeView()->PopModal(RetainedUI_PresentationTime())) {
 					if (RuntimeView()->HasEvent("onBack")) RunEvent("onBack");
 					else if (semantic && actions.size() < 256) actions.push_back({{"","ui.dismiss",{}},false});
@@ -306,13 +315,13 @@ struct idUserInterfaceRetained::Impl {
 				}
 				continue;
 			}
-			if (!RuntimeView()->CanActivateControl(event.node,RetainedUI_PresentationTime())) { reject(); continue; }
+			if (!RuntimeView()->CanDispatchControlAction(event,RetainedUI_PresentationTime())) { reject(); continue; }
 			if (!event.event.empty()) { RunEvent(event.event); continue; }
 			ActionInvocation invocation; std::string error;
 			if (!RuntimeView()->ResolveAction(event.action,invocation,error,event.proposal ? &*event.proposal : nullptr) ||
 				!ValidInvocation(invocation,error)) { reject(); Error(error); continue; }
 			if (actions.size() >= 256) { reject(); Quarantine(); Error("Application action queue exceeded 256 requests"); return; }
-			actions.push_back({std::move(invocation),!semantic,event.node,event.proposalToken});
+			actions.push_back({std::move(invocation),!semantic,event.node,event.proposalToken,event});
 		}
 	}
 	bool AcceptInput() {
@@ -325,12 +334,18 @@ struct idUserInterfaceRetained::Impl {
 		suspended = pause;
 		return !pause;
 	}
-	void Pointer() {
+	void Pointer(bool force = true) {
 		Viewport viewport;
 		if (!RetainedUI_DefaultViewport(viewport)) return;
 		const CursorTransform transform(viewport);
-		RuntimeView()->PointerMove((cursorX*transform.sx+transform.ox+viewport.originX)/viewport.pixelDensityX,
-			(cursorY*transform.sy+transform.oy+viewport.originY)/viewport.pixelDensityY,RetainedUI_PresentationTime());
+		const float x = (cursorX*transform.sx+transform.ox+viewport.originX)/viewport.pixelDensityX;
+		const float y = (cursorY*transform.sy+transform.oy+viewport.originY)/viewport.pixelDensityY;
+		// Wheel input needs current coordinates, but an unchanged position must
+		// not reclaim hover from the popup's previous wheel selection. Actual
+		// pointer motion and button events still reclaim it even at this point.
+		if (!force && routedPointerValid && x == routedPointerX && y == routedPointerY) return;
+		RuntimeView()->PointerMove(x,y,RetainedUI_PresentationTime());
+		routedPointerX = x; routedPointerY = y; routedPointerValid = true;
 	}
 };
 
@@ -488,7 +503,7 @@ const char* idUserInterfaceRetained::HandleEvent(const sysEvent_t* event, int ti
 			impl->Pointer(); impl->input.Pointer(key,down,RetainedUI_PresentationTime());
 		} else if (key == K_MWHEELUP || key == K_MWHEELDOWN) {
 			if (down && !repeated) {
-				impl->pointerVisible = true; impl->Pointer();
+				impl->pointerVisible = true; impl->Pointer(false);
 				impl->RuntimeView()->PointerWheel(key == K_MWHEELUP ? -1 : 1,RetainedUI_PresentationTime());
 			}
 		} else {
@@ -569,7 +584,8 @@ void idUserInterfaceRetained::DrawCursor() {
 }
 
 const char* idUserInterfaceRetained::PendingApplicationCommand() const {
-	return impl->close || impl->settingsClosePending || !impl->actions.empty() ? ActionMarker : "";
+	const bool settingsExit = impl->active && impl->settingsFields && UI_SettingsExitReady(impl->settingsOwner);
+	return impl->close || impl->settingsClosePending || !impl->actions.empty() || settingsExit ? ActionMarker : "";
 }
 bool idUserInterfaceRetained::DispatchApplicationActions(const char* command, bool& closeRequested) {
 	closeRequested = false;
@@ -588,6 +604,12 @@ bool idUserInterfaceRetained::DispatchApplicationActions(const char* command, bo
 	auto actions = std::move(impl->actions); impl->actions.clear();
 	closeRequested = impl->close; impl->close = false;
 	for (const auto& pending : actions) {
+		if (pending.cancellable) {
+			if (!impl->RuntimeView()->CanDispatchControlAction(pending.source,RetainedUI_PresentationTime())) {
+				if (pending.proposalToken) impl->RuntimeView()->AcknowledgeControlProposal(pending.control,pending.proposalToken,false);
+				continue;
+			}
+		}
 		const auto& invocation = pending.invocation;
 		if (invocation.operation == "ui.dismiss") {
 			closeRequested = true;
@@ -628,6 +650,14 @@ bool idUserInterfaceRetained::DispatchApplicationActions(const char* command, bo
 	if (impl->settingsClosePending) {
 		UI_SettingsCloseOwner(impl->settingsOwner); impl->settingsClosePending = false;
 		impl->SyncSettings();
+	}
+	// The settings service alone completes Apply-and-exit. Consume after this
+	// ordered batch so a later Begin/Cancel cannot leave a stale close receipt.
+	// Session still rechecks the actual owner before returning to its parent.
+	if (impl->active && impl->settingsFields && UI_SettingsConsumeExit(impl->settingsOwner)) {
+		closeRequested = true;
+		if (cvarSystem->GetCVarBool("ui_retainedTrace")) common->Printf("RETAINED_GUI_EXIT path=%s owner=%llu source=applyExit\n",
+			Name(),static_cast<unsigned long long>(impl->settingsOwner));
 	}
 	return true;
 }

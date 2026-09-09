@@ -157,7 +157,7 @@ struct idCommonLocal {
 // request identities, transaction writes and service ownership use production.
 static struct DeviceData {
     SettingsDisplayObservation observation{1,1,0,0,0,true,false,true,false};
-    bool held=false,startup=false,blocked=false,refusePrepare=false,refusePersist=false;
+    bool held=false,startup=false,blocked=false,refusePrepare=false,refusePersist=false,refuseRestart=false,refuseFinish=false;
     int prepares=0,cancels=0,restarts=0,restores=0,observes=0,persists=0,finishes=0,startups=0,frames=0,shutdowns=0;
 } deviceData;
 class EngineSettingsDisplayHost final:public SettingsDisplayHost {
@@ -168,8 +168,9 @@ public:
         if(deviceData.refusePrepare){error="native preparation refused";return false;}return true;
     }
     bool CancelPreparation(std::string&)override{++deviceData.cancels;deviceData.held=false;return true;}
-    bool Restart(bool restoring,SettingsDisplayObservation& observed,std::string&)override{
+    bool Restart(bool restoring,SettingsDisplayObservation& observed,std::string& error)override{
         ++deviceData.restarts;if(restoring)++deviceData.restores;
+        if(deviceData.refuseRestart){error="native restart refused";return false;}
         ++deviceData.observation.generation;
         deviceData.observation.submitted=deviceData.observation.presented=0;
         observed=deviceData.observation;return true;
@@ -183,7 +184,10 @@ public:
         if(!commonLocal.WriteConfigToFileChecked(CONFIG_FILE,true,error))return false;
         cvars.ClearModifiedFlags(CVAR_ARCHIVE);return true;
     }
-    bool Finish(bool,std::string&)override{++deviceData.finishes;deviceData.held=false;return true;}
+    bool Finish(bool,std::string& error)override{
+        ++deviceData.finishes;if(deviceData.refuseFinish){error="journal removal refused";return false;}
+        deviceData.held=false;return true;
+    }
     bool Startup(std::string&) {++deviceData.startups;return !deviceData.blocked;}
     bool InitializeDisplay(std::string&) {return !deviceData.blocked;}
     void StartupFrame(double,bool) {++deviceData.frames;}
@@ -260,7 +264,7 @@ static void Validation() {
         {"settings.canConfirm",1},{"settings.canRevert",1},{"settings.canRetry",1},{"settings.remaining",0}})
         Check(schema.at(key)==type,"display confirmation status schema types");
     std::string error;
-    for(const char* operation:{"begin","defaults","cancel","apply","confirm","revert"}) {
+    for(const char* operation:{"begin","defaults","cancel","apply","applyExit","confirm","revert"}) {
         auto invocation=Invocation(operation);Check(UI_SettingsInvocation(invocation,error),"known no-argument operation");
         invocation.arguments={{"r_brightness",1.0}};
         Check(!UI_SettingsInvocation(invocation,error),"no-argument operation rejects extras");
@@ -294,7 +298,7 @@ static void Ownership() {
     const auto first=Begin(),second=UI_SettingsCreateOwner();Check(second!=first,"owner tokens unique");
     Check(Dispatch(first,"edit",{{"r_brightness",1.5}}),"owner edits draft");
     const auto draft=Read(first);const int reads=host.reads,validations=host.validations;
-    for(const char* op:{"begin","edit","defaults","apply","confirm","revert","cancel"}) {
+    for(const char* op:{"begin","edit","defaults","apply","applyExit","confirm","revert","cancel"}) {
         Check(!Dispatch(second,op,std::string(op)=="edit"?StateValues{{"r_shadows",false}}:StateValues{}),"foreign operation rejected");
         Private(second,true);Expect(second,"message",std::string("#str_229983"));
     }
@@ -496,9 +500,9 @@ static void ConfirmationCapability() {
     UI_SettingsConfirmationDocument(owner,DocumentModel{});Check(Dispatch(owner,"revert"),"clear mixed draft");
     Check(Dispatch(owner,"edit",{{"r_mode",1.0}}),"display redraft");Expect(owner,"canApply",false);
 }
-static std::string AwaitDisplay(std::uint64_t owner) {
+static std::string AwaitDisplay(std::uint64_t owner,const char* operation="apply") {
     UI_SettingsConfirmationDocument(owner,ConfirmationDocument());
-    Check(Dispatch(owner,"edit",{{"r_mode",1.0},{"r_brightness",1.5}}) && Dispatch(owner,"apply"),"capable owner queues typed display apply");
+    Check(Dispatch(owner,"edit",{{"r_mode",1.0},{"r_brightness",1.5}}) && Dispatch(owner,operation),"capable owner queues typed display apply");
     const auto request=std::get<std::string>(Read(owner).at("settings.request"));
     Check(!request.empty() && host.writes.empty() && deviceData.prepares==0 && UI_SettingsBlocksConfigWrite(),"actions only freeze request before frame work");
     Expect(owner,"phase",static_cast<double>(SettingsPhase::Applying));Expect(owner,"confirmationVisible",false);
@@ -692,6 +696,153 @@ static void TimeoutFrame() {
     Check(host.live==Initial() && !UI_SettingsBlocksConfigWrite(),"normal frame expires and rolls back confirmation");
     Expect(owner,"phase",static_cast<double>(SettingsPhase::Editing));Expect(owner,"message",std::string("#str_229982"));
 }
+static void NoExit(std::uint64_t owner) {
+    Check(!UI_SettingsExitReady(owner) && !UI_SettingsConsumeExit(owner) && !UI_SettingsExitReady(owner),
+        "no exit receipt without successful service-owned closure");
+}
+static void ExitImmediate(bool noop) {
+    const auto owner=Begin(),other=UI_SettingsCreateOwner();cvars.trace=true;
+    NoExit(owner);
+    Check(Dispatch(owner,"apply"),"ordinary clean apply remains open");NoExit(owner);
+    if(!noop)Check(Dispatch(owner,"edit",{{"r_brightness",1.5},{"r_shadows",false}}),"immediate draft before apply-exit");
+    const auto expected=noop?Initial():StateValues{{"r_brightness",1.5},{"r_mode",0.0},{"r_renderer",std::string("best")},{"r_shadows",false}};
+    const auto writes=host.writes.size();
+    Check(Dispatch(owner,"applyExit"),"successful immediate/no-op apply-exit");
+    Check(host.live==expected && host.writes.size()==writes+(noop?0:1),"exact apply patch and no cancellation writes");
+    Expect(owner,"open",false);Expect(owner,"phase",0.0);
+    Check(!UI_SettingsBlocksConfigWrite(),"closed immediate transaction releases config guard");
+    const auto reads=host.reads,validations=host.validations;
+    Check(UI_SettingsExitReady(owner) && UI_SettingsExitReady(owner),"peek preserves successful receipt");
+    NoExit(other);NoExit(0);NoExit(99999);
+    UI_SettingsFrame(false);UI_SettingsFrame();
+    Check(UI_SettingsExitReady(owner) && host.reads==reads && host.validations==validations,"receipt polling/frames do no host work");
+    Check(UI_SettingsConsumeExit(owner),"own successful closure consumes exactly once");NoExit(owner);
+    int ready=0,consumed=0,canceled=0;
+    for(const auto& line:commonObject.lines)if(line.starts_with("UI_SETTINGS_EXIT ")) {
+        Check(line.find("owner="+std::to_string(owner)+" request=0 ")!=std::string::npos,"immediate trace binds owner and no device request");
+        ready+=line.find("event=ready")!=std::string::npos;
+        consumed+=line.find("event=consumed")!=std::string::npos;
+        canceled+=line.find("event=canceled")!=std::string::npos;
+    }
+    Check(ready==1 && consumed==1 && canceled==0,"one successful receipt trace, never canceled on success");
+    Check(!Dispatch(owner,"applyExit"),"closed transaction cannot manufacture another exit");NoExit(owner);
+}
+static void ExitInvalidate(const std::string& operation) {
+    const auto owner=Begin();Check(Dispatch(owner,"applyExit") && UI_SettingsExitReady(owner),"seed legitimate unconsumed receipt");
+    if(operation=="begin")Check(Dispatch(owner,"begin"),"new transaction for same owner");
+    else if(operation=="other_begin") {
+        const auto other=Begin();NoExit(owner);Check(Dispatch(other,"cancel"),"closing replacement never revives prior receipt");
+    } else if(operation=="close")UI_SettingsCloseOwner(owner);
+    else if(operation=="release")UI_SettingsReleaseOwner(owner);
+    else if(operation=="shutdown") {UI_SettingsShutdown();Check(UI_SettingsCreateOwner()>owner,"shutdown invalidates receipt identity");}
+    else if(operation=="invalid")Check(!Dispatch(owner,"applyExit",{{"exit",true}}),"dictionary flag cannot authorize exit");
+    else if(operation=="edit")Check(!Dispatch(owner,"edit",{{"r_brightness",1.7}}),"new operation invalidates old receipt even when closed");
+    else Check(!Dispatch(owner,operation),"closed transaction operation fails");
+    NoExit(owner);Check(host.writes.empty(),"receipt invalidation never writes CVars");
+}
+static void ExitFailure(const std::string& failure) {
+    const auto owner=Begin();
+    Check(Dispatch(owner,"edit",{{"r_brightness",1.5},{"r_shadows",false}}),"draft before failed apply-exit");
+    if(failure=="unsupported")Check(Dispatch(owner,"edit",{{"r_renderer",std::string("arb2")}}),"unsupported effect remains a valid draft");
+    else if(failure=="no_view")Check(Dispatch(owner,"edit",{{"r_mode",1.0}}),"display draft without owner confirmation view");
+    else if(failure=="write")host.refuseWrite=true;
+    else if(failure=="partial")host.partialWrite=true;
+    else if(failure=="read")host.failRead=true;
+    else if(failure=="conflict")host.live.at("r_shadows")=false;
+    else if(failure=="confirmation")host.confirm=true; // Never infer completion from a successful but provisional write.
+    else Check(false,"unknown immediate apply-exit failure");
+    Check(!Dispatch(owner,"applyExit"),"unsuccessful or provisional apply cannot close");NoExit(owner);
+    Expect(owner,"open",true);
+    host.refuseWrite=host.failRead=false;
+    if(failure=="confirmation")Check(Dispatch(owner,"confirm"),"legacy compatibility confirmation remains usable");
+    if(failure=="unsupported" || failure=="no_view" || failure=="read")Check(host.writes.empty(),"preflight refuses whole batch before write");
+    if(failure=="partial")Check(host.live==Initial() && host.writes.size()==2,"partial write rolls back without exit");
+    NoExit(owner);
+}
+static void FinishDisplayRestore(std::uint64_t owner) {
+    UI_SettingsFrame();
+    if(Settings().display.Stage()==SettingsDisplayStage::AwaitRestore) {
+        ++deviceData.observation.submitted;++deviceData.observation.presented;UI_SettingsFrame();
+    }
+    Check(!UI_SettingsBlocksConfigWrite(),"restoration is fully finalized");NoExit(owner);
+}
+static void ExitDisplayKeep(const std::string& cancellation) {
+    const auto owner=Begin(),other=UI_SettingsCreateOwner();cvars.trace=true;
+    const auto request=AwaitDisplay(owner,"applyExit");NoExit(owner);Presented(owner,request);NoExit(owner);
+    // Resource re-registration and another owner cannot consume/cancel intent.
+    UI_SettingsConfirmationDocument(owner,ConfirmationDocument());
+    Check(!Dispatch(other,"confirm",{{"request",request}}),"foreign owner cannot confirm another transaction");NoExit(other);
+    if(cancellation=="stale")Check(!Dispatch(owner,"confirm",{{"request",std::string("999999")}}),"stale request fails and cancels owning exit intent");
+    else if(cancellation=="invalid")Check(!Dispatch(owner,"confirm",{{"request",1.0}}),"invalid own command cancels exit intent");
+    else if(cancellation=="edit")Check(!Dispatch(owner,"edit",{{"r_brightness",1.7}}),"new draft operation during confirmation cancels exit intent");
+    else Check(cancellation.empty(),"known Keep cancellation");
+    Check(Dispatch(owner,"confirm",{{"request",request}}),"matching Keep queues persistence");NoExit(owner);
+    UI_SettingsFrame(false);Check(deviceData.persists==0,"poll-only frame cannot authorize exit");NoExit(owner);
+    UI_SettingsFrame();
+    Check(deviceData.persists==1 && deviceData.finishes==1 && !deviceData.held,"Keep persisted and finished before exit eligibility");
+    if(cancellation.empty()) {
+        Expect(owner,"open",false);Check(UI_SettingsExitReady(owner),"successful persisted Keep closes owning transaction");
+        Check(UI_SettingsConsumeExit(owner),"asynchronous receipt consumed once");NoExit(owner);
+    } else {Expect(owner,"open",true);Expect(owner,"dirty",false);NoExit(owner);}
+    int ready=0,consumed=0,armed=0,canceled=0;
+    for(const auto& line:commonObject.lines)if(line.starts_with("UI_SETTINGS_EXIT ")) {
+        Check(line.find("owner="+std::to_string(owner)+" request="+request+" ")!=std::string::npos,"exit trace retains matching displayed apply request");
+        ready+=line.find("event=ready")!=std::string::npos;consumed+=line.find("event=consumed")!=std::string::npos;
+        armed+=line.find("event=armed")!=std::string::npos;canceled+=line.find("event=canceled")!=std::string::npos;
+    }
+    Check(armed==1 && ready==(cancellation.empty()?1:0) && consumed==ready && canceled==(cancellation.empty()?0:1),
+        "qualified Keep has one receipt; canceled intent never revives on later successful Keep");
+}
+static void ExitDisplayRestore(const std::string& cancellation) {
+    const auto owner=Begin();const auto request=AwaitDisplay(owner,"applyExit");Presented(owner,request);
+    if(cancellation=="revert")Check(Dispatch(owner,"revert",{{"request",request}}),"Revert cancels pending exit");
+    else if(cancellation=="cancel")Check(Dispatch(owner,"cancel"),"Cancel cancels pending exit");
+    else if(cancellation=="close")UI_SettingsCloseOwner(owner);
+    else if(cancellation=="release")UI_SettingsReleaseOwner(owner);
+    else if(cancellation=="failure") {++deviceData.observation.failures;UI_SettingsFrame(false);}
+    else Check(false,"unknown display restoration cancellation");
+    NoExit(owner);FinishDisplayRestore(owner);
+    Check(host.live==Initial(),"Revert/close restores original values without authorizing exit");
+    if(cancellation=="revert" || cancellation=="cancel") {
+        Expect(owner,"open",true);Expect(owner,"dirty",false);
+        Check(Dispatch(owner,"apply"),"later ordinary no-op apply stays open");NoExit(owner);
+    }
+}
+static void ExitDisplayRetry(const std::string& failure) {
+    const auto owner=Begin();const auto request=AwaitDisplay(owner,"applyExit");Presented(owner,request);
+    Check(Dispatch(owner,"confirm",{{"request",request}}),"Keep before durable failure");
+    if(failure=="persist")deviceData.refusePersist=true;
+    else if(failure=="config")files.commitFailure=true;
+    else if(failure=="finish")deviceData.refuseFinish=true;
+    else Check(false,"unknown Keep failure");
+    UI_SettingsFrame();NoExit(owner);
+    Expect(owner,"canRetry",true);Expect(owner,"open",true);
+    if(failure=="finish")Expect(owner,"dirty",false); // Clean state still has an unresolved journal.
+    const auto retry=std::get<std::string>(Read(owner).at("settings.request"));
+    Check(retry!=request,"confirmation preparation renews request before I/O");
+    Check(!Dispatch(owner,"retry",{{"request",request}}),"stale retry cannot mutate current recovery");
+    deviceData.refusePersist=deviceData.refuseFinish=files.commitFailure=false;
+    Check(Dispatch(owner,"retry",{{"request",retry}}),"explicit Retry completes durable recovery");
+    UI_SettingsFrame();NoExit(owner);Expect(owner,"open",true);Expect(owner,"dirty",false);
+    Check(!deviceData.held && !UI_SettingsBlocksConfigWrite(),"recovered Keep is retained but canceled exit remains canceled");
+    Check(Dispatch(owner,"applyExit") && UI_SettingsConsumeExit(owner),"fresh explicit apply-exit can close recovered clean transaction");NoExit(owner);
+}
+static void ExitDisplayApplyFailure(const std::string& failure) {
+    const auto owner=Begin();UI_SettingsConfirmationDocument(owner,ConfirmationDocument());
+    Check(Dispatch(owner,"edit",{{"r_mode",1.0},{"r_brightness",1.5}}) && Dispatch(owner,"applyExit"),"freeze display exit before execution");
+    const auto request=std::get<std::string>(Read(owner).at("settings.request"));
+    if(failure=="prepare")deviceData.refusePrepare=true;
+    else if(failure=="partial")host.partialWrite=true;
+    else if(failure=="restart")deviceData.refuseRestart=true;
+    else if(failure=="close")UI_SettingsCloseOwner(owner);
+    else if(failure=="release")UI_SettingsReleaseOwner(owner);
+    else Check(false,"unknown queued display failure");
+    UI_SettingsFrame();NoExit(owner);
+    deviceData.refusePrepare=deviceData.refuseRestart=false;
+    if(failure=="prepare")Check(Dispatch(owner,"retry",{{"request",request}}),"retry cancels uncertain unwritten preparation");
+    FinishDisplayRestore(owner);Check(host.live==Initial(),"failed display Apply leaves baseline restored");
+    if(failure=="close" || failure=="release")Check(host.writes.empty() && deviceData.restarts==0,"unwritten owner close only cancels queued attempt");
+}
 int main(int argc,char** argv) {
     Check(argc==2,"scenario required");const std::string name=argv[1];
     if(name=="validation")Validation();else if(name=="ownership")Ownership();
@@ -706,6 +857,14 @@ int main(int argc,char** argv) {
     else if(name=="display_close_queued")DisplayClose(false);else if(name=="display_close_written")DisplayClose(true);
     else if(name=="startup_shutdown")StartupShutdown();else if(name=="stale_display_actions")StaleDisplayActions();
     else if(name=="frame_trace")FrameReceiptTrace();
+    else if(name=="exit_immediate")ExitImmediate(false);else if(name=="exit_noop")ExitImmediate(true);
+    else if(name.starts_with("exit_invalidate_"))ExitInvalidate(name.substr(16));
+    else if(name.starts_with("exit_failure_"))ExitFailure(name.substr(13));
+    else if(name=="exit_display_keep")ExitDisplayKeep("");
+    else if(name.starts_with("exit_display_keep_"))ExitDisplayKeep(name.substr(18));
+    else if(name.starts_with("exit_display_restore_"))ExitDisplayRestore(name.substr(21));
+    else if(name.starts_with("exit_display_retry_"))ExitDisplayRetry(name.substr(19));
+    else if(name.starts_with("exit_display_apply_"))ExitDisplayApplyFailure(name.substr(19));
     else if(name.starts_with("frame_identity_"))FrameReceiptIdentity(name.substr(15));
     else if(name.starts_with("frame_"))FrameReceipt(name.substr(6));
     else Check(false,"unknown scenario");
@@ -725,6 +884,16 @@ SCENARIOS = (
     'frame_draw_aborted','frame_wrong_owner','frame_revoked','frame_trace',
     'frame_historical_offset','frame_identity_epoch','frame_identity_generation','frame_identity_failure',
     'frame_identity_not_ready','frame_identity_counter_regression',
+    'exit_immediate','exit_noop',
+    'exit_invalidate_begin','exit_invalidate_other_begin','exit_invalidate_close','exit_invalidate_release',
+    'exit_invalidate_shutdown','exit_invalidate_invalid','exit_invalidate_edit','exit_invalidate_cancel','exit_invalidate_revert',
+    'exit_failure_unsupported','exit_failure_no_view','exit_failure_write','exit_failure_partial',
+    'exit_failure_read','exit_failure_conflict','exit_failure_confirmation',
+    'exit_display_keep','exit_display_keep_stale','exit_display_keep_invalid','exit_display_keep_edit',
+    'exit_display_restore_revert','exit_display_restore_cancel','exit_display_restore_close','exit_display_restore_release',
+    'exit_display_restore_failure','exit_display_retry_persist','exit_display_retry_config','exit_display_retry_finish',
+    'exit_display_apply_prepare','exit_display_apply_partial','exit_display_apply_restart',
+    'exit_display_apply_close','exit_display_apply_release',
 )
 
 
@@ -804,6 +973,7 @@ def main():
         dedicated.write_text('#define ID_DEDICATED\n#include <cassert>\n#include "src/ui/SettingsService.h"\n' +
                              service + '\nint main() { assert(UI_SettingsCreateOwner()==0); '
                              'UI_SettingsCloseOwner(1); UI_SettingsReleaseOwner(1); UI_SettingsFrame(); '
+                             'assert(!UI_SettingsExitReady(1) && !UI_SettingsConsumeExit(1)); '
                              'assert(!UI_SettingsBlocksConfigWrite()); }\n', encoding='utf-8')
         dedicated_binary = Path(directory) / 'dedicated.exe'
         subprocess.run([compiler, '-std=c++20', '-I', str(ROOT), str(dedicated), '-o', str(dedicated_binary)], check=True, env=environment)

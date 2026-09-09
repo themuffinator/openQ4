@@ -7,7 +7,7 @@ the [completion plan](../plans/ui-product-completion.md), the
 [visual specification](../ui-visual-design.md) into implementation ownership,
 dependencies, concrete evidence and explicit unfinished work.
 
-The current increment starts from engine `b3bf279b4347329cd8a45a4533536adc0510e860` and companion
+The current increment starts from engine `6c0defc8158c674c0e117a0a3754882a51bcef0d` and companion
 `1cd33980f072ac3d78978a07b388b4b6fe6b5eb2`. The register also identifies the current
 [manager/snapshot foundation](instance-persistence.md) as partial
 evidence with native and SP/OpenGL/MP/Vulkan validation. It does not treat that work as a
@@ -92,14 +92,15 @@ engine screenshots. Its register audit is
 `.tmp/ui/confirmation-review/register-validation.json`. Requirement statuses,
 acceptance criteria and migration entries remain unchanged.
 
-The [typed value-control increment](value-controls.md) adds canonical toggles,
+The historical [typed value-control increment](value-controls.md), based on engine
+`b3bf279b4347329cd8a45a4533536adc0510e860`, added canonical toggles,
 stepped sliders and constrained choices with authoritative typed readback,
 immutable invocation-local proposals and authored vector parts. The packaged
 `guis/menu/settings/system.q4ui` declares all 53 draft/baseline fields and
 presents eight initial immediate image controls. Its default-off,
 non-archived `ui_retainedSystem` option uses normal Session ownership and
 preserves the exact parent on a clean return. Dirty Back opens a local prompt;
-discard currently resets the draft and stays on the page. The document also
+at that checkpoint, discard reset the draft and stayed on the page. The document also
 provides the existing eligible Keep/Revert/Retry confirmation structure.
 
 The final Windows build/package stage and 13 native UI suites passed. The
@@ -120,7 +121,7 @@ It binds 8,778 final build inputs, seven runtime binaries, packaged source and
 supporting logs, images and tests. The strict register audit is
 `.tmp/ui/value-controls-review/register-validation-final.json`.
 
-The new implementation does not establish full control, screen or artwork
+That checkpoint did not establish full control, screen or artwork
 acceptance. Precise numeric entry and IME, the full
 setting inventory and dependent popups, remaining effects and presets,
 Defaults/Cancel/discard-and-exit, accessibility, physical-device and display
@@ -128,13 +129,43 @@ qualification, component authoring and the native editor round trip remain
 required. Historical display-confirmation captures cannot qualify these new
 controls or normal entry/return behavior.
 
+The subsequent [SYSTEM controls and transactional exit increment](system-exit.md)
+adds seven immediate settings and VSync to the packaged page, bringing it to
+16 value controls while preserving all 53 draft/baseline fields. Dirty Back now
+offers Apply changes, Discard changes and continue editing. The ordinary Apply
+button stays on the page. Apply-and-exit uses a typed service operation and a
+one-use owner/request-bound receipt; asynchronous return requires successful
+Keep and completed persistence. Revert, timeout, failure and recovery cancel
+exit intent, and GUI dictionary values cannot authorize return. Repeated wheel
+events no longer replay an unchanged pointer move; actual movement and button
+input retain pointer-navigation reclamation. Authored modal scopes establish
+safe default focus before drawing, restore prior focus and invalidate stale
+queued input across scope replacement and instance reconstruction.
+
+The final Windows build, 15 native suites and four staged normal Session runs
+passed. All 34 engine images from 92 semantic stages were reviewed. The local
+record `.tmp/ui/system-exit-review/capture-evidence.json` binds final sources,
+packages, binaries, tools, logs and images. The
+[qualification and limits](system-exit.md#qualification-and-remaining-work)
+include localized-label CPU layout checks and outstanding native-resolution
+composition/effect-parity findings. Earlier captures retain their original scope.
+The complete settings inventory and dependent flows, numeric text entry/IME,
+remaining effects and presets, Defaults, full modal/scrollbar behavior,
+source-derived artwork/transitions, editor round trips and the complete
+platform/language/display/physical-input matrix remain required. No requirement,
+milestone, production screen or migration is accepted by this increment.
+
 There are **64 partial, 162 pending and one verified requirement**. `BEH-002`
 remains partial for the implemented settings transaction/service boundary.
 `BEH-005` remains partial for committed action delivery and cancellation; stock
 sounds and the complete device/modal/widget behavior still require implementation
-and evidence. `WID-002`, `WID-004`, `WID-005` and `FLOW-002` move from pending to
-partial for their implemented subset; every remaining conjunct and acceptance
+and evidence. `WID-002`, `WID-004`, `WID-005` and `FLOW-002` moved from pending to
+partial at the historical value-control checkpoint; every remaining conjunct and acceptance
 criterion is preserved.
+The SYSTEM exit increment adds bounded qualification evidence for `BEH-001`,
+`BEH-002`, `SAVE-003`, `INP-004`, `INP-005`, `INP-006` and `FLOW-002` without
+changing any status; `INP-005` remains
+pending for the complete wheel, touch, text, composition and device contract.
 The verified requirement, `INV-001`, covers the fresh effective-source inventory only. All
 seven final product gates and all **271 migration entries remain unaccepted**.
 These counts describe evidence state, not percentage of implementation effort
@@ -215,15 +246,18 @@ acceptance. Run the final audit after evidence documents and hashes are frozen:
 
 ```powershell
 python tools/ui/validate_product_requirements.py `
-  --baseline b3bf279b4347329cd8a45a4533536adc0510e860 `
-  --partial WID-002 --partial WID-004 --partial WID-005 --partial FLOW-002 `
-  --output .tmp/ui/value-controls-review/register-validation-final.json
+  --baseline 6c0defc8158c674c0e117a0a3754882a51bcef0d `
+  --output .tmp/ui/system-exit-review/register-validation-final.json
 ```
 
 Use a new output path for each audit. The optional `--defer-hashes` preparation
 mode explicitly reports incomplete source bindings and cannot serve as the
-final audit. Preparation, negative-case checks and the final strict audit are
-under `.tmp/ui/value-controls-review/`. Three pre-existing historical summary
+final audit. The final strict structural/source audit is recorded at
+`.tmp/ui/system-exit-review/register-validation-final.json`. The preparation
+audit remains at
+`.tmp/ui/system-exit-review/register-preparation-validation-final.json`. Historical
+preparation, negative-case checks and the previous strict audit remain under
+`.tmp/ui/value-controls-review/`. Three pre-existing historical summary
 pointers have no recorded capture hash; the audit reports them as unbound and
 does not turn their currently observed hashes into historical qualification.
 

@@ -65,7 +65,7 @@ declaring that choice proven for the whole product.
 
 ### Current implementation progress
 
-The [typed value-control increment](../ui/value-controls.md), based on engine
+The historical [typed value-control increment](../ui/value-controls.md), based on engine
 `b3bf279b4347329cd8a45a4533536adc0510e860`, adds canonical toggle, stepped slider
 and constrained choice controls with authoritative readback, immutable typed
 proposals and editable vector parts. A packaged `openq4.system` document and
@@ -84,6 +84,29 @@ does not close those findings, M2 or any migration. Full controls, precise
 numeric editing/IME, the entire page and dependent flows, artwork, editor and
 platform acceptance remain required. The findings below retain the evidence
 and required resolution from the original reviewed revision.
+
+The subsequent [SYSTEM controls and transactional exit increment](../ui/system-exit.md)
+starts from engine `6c0defc8158c674c0e117a0a3754882a51bcef0d`. It expands the
+normal page to 16 value controls with seven additional immediate settings and
+VSync, retaining the full 53-field schema. Dirty Back offers Apply changes,
+Discard changes and continue editing. A typed Apply-and-exit operation binds
+exit intent to the live owner/request and returns through a private, one-use
+receipt only after successful immediate application or Keep and completed
+persistence. Revert, timeout, failure and recovery cancel exit intent; the
+ordinary Apply button remains on the page. The adapter also preserves repeated
+wheel navigation without replaying an unchanged pointer move. Authored modal
+scopes establish safe focus before the first draw, restore prior focus and reject
+stale input across scope replacement and snapshot reconstruction. The final
+Windows build, 15 native UI suites, four staged normal Session runs (92 stages)
+and review of all 34 engine images passed; the
+[bounded qualification](../ui/system-exit.md#qualification-and-remaining-work)
+records source/binary/log/image bindings and the remaining rendering findings.
+This increment changes no
+requirement status: all 227 requirements, 271 pending GUI migrations and seven
+final gates remain required. Complete controls, numeric editing/IME, all settings
+and dependent flows/effects, source-derived artwork and transitions, the native
+editor round trip and full platform/input/display/language qualification remain
+open; this subset cannot accept M2 or the production SYSTEM screen.
 
 ### Findings that block product completion
 
@@ -371,14 +394,16 @@ Auto-Detect draft expansion, all production controls/artwork, the native editor
 round trip and complete platform qualification remain required. These increments
 do not complete M2 or accept the SYSTEM page, any migration entry or a product gate.
 
-The [value-control implementation](../ui/value-controls.md) now connects
+The historical [value-control implementation](../ui/value-controls.md) connected
 canonical toggles, constrained choices and stepped sliders to eight initial
 SYSTEM image controls. Typed proposals remain separate from authoritative
 draft readback; authored part identity and versioned widget state survive in
 the canonical model. The packaged page enters through a non-archived,
 default-off normal Session child route and retains its parent on clean return.
-Dirty Back offers continue-editing or discard-to-Editing; discard-and-exit
-remains unfinished. The source/binary-bound Windows SP/OpenGL 125% and MP/Vulkan
+At that checkpoint, dirty Back offered continue-editing or discard-to-Editing;
+discard-and-exit remained unfinished. The subsequent
+[SYSTEM exit increment](../ui/system-exit.md) implements that flow and records
+its qualification separately. The source/binary-bound Windows SP/OpenGL 125% and MP/Vulkan
 200% normal-route captures qualify the initial draft/apply/discard/choice,
 resource-reset, clean-return and reopen subset at 1280x720. Eighteen ordered
 stages per run and 14 reviewed render-target images establish this bounded
