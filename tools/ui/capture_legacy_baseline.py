@@ -20,6 +20,7 @@ import subprocess
 import time
 import legacy_import
 import system_settings_probe
+import display_settings_probe
 
 ROOT = Path(__file__).resolve().parents[2]
 ALIAS_FIXTURE = ROOT / 'tools/ui/fixtures/presentation-alias-smoke'
@@ -48,6 +49,7 @@ def interaction_script(path: Path, *, managed: bool = False, observe_only: bool 
                 r'ui_retainedMenu (?:next|previous|up|down|left|right|accept|back) [01]', r'wait [1-9][0-9]{0,2}']
     if managed:
         patterns = [r'openq4_retainedGui report',
+                    rf'openq4_retainedGui inspect {identifier}',
                     rf'openq4_guiGet {alias}',
                     r'wait [1-9][0-9]{0,2}']
         if not observe_only:
@@ -79,6 +81,9 @@ def retained_commands(args: argparse.Namespace, staged_name: str) -> tuple[str, 
     """Build the captured semantic script without starting a process."""
     settle = max(30, args.profile_frames + 2)
     script = interaction_script(args.retained_script, managed=args.retained_managed) if args.retained_script else ''
+    if getattr(args, 'display_settings_probe', False):
+        display_settings_probe.sources(args)
+        script = display_settings_probe.inject_screenshots(script)
     if args.retained_managed:
         peer = f'ui_retainedPreview "{staged_name}"\n' if args.retained_peer else ''
         commands = 'ui_retainedOwnership\n' + peer + f'testGUI "{staged_name}"\nwait 2\nui_retainedOwnership\n'
@@ -485,6 +490,7 @@ def capture(args: argparse.Namespace) -> int:
     alias_sources = presentation_alias_sources(args) if args.presentation_alias_probe else None
     event_sources = event_program_sources(args) if args.event_program_probe else None
     system_sources = system_settings_probe.sources(args) if args.system_settings_probe else None
+    display_sources = display_settings_probe.sources(args) if getattr(args, 'display_settings_probe', False) else None
     output = args.output.resolve()
     if output.exists():
         raise ValueError('use a new output directory to preserve previous capture evidence')
@@ -526,7 +532,8 @@ def capture(args: argparse.Namespace) -> int:
         staged_name = 'retained-smoke' + fixture.suffix.lower()
         (game / staged_name).write_bytes(fixture.read_bytes())
         preview, close, settle = retained_commands(args, staged_name)
-    cfg_path.write_text(presentation + preview + legacy_import.commands(import_requests) + 'gfxInfo\nscreenshot "screenshots/ui-baseline.tga"\necho UI_BASELINE_CAPTURE_COMPLETE\n' + close + 'quit\n', encoding='utf-8')
+    final_inspection = 'openq4_retainedGui inspect "settings-panel"\n' if display_sources else ''
+    cfg_path.write_text(presentation + preview + legacy_import.commands(import_requests) + 'gfxInfo\nscreenshot "screenshots/ui-baseline.tga"\n' + final_inspection + 'echo UI_BASELINE_CAPTURE_COMPLETE\n' + close + 'quit\n', encoding='utf-8')
     overrides = {
         'fs_basepath': str(args.assets.resolve()), 'fs_savepath': str(savepath), 'fs_devpath': str(savepath),
         'fs_game': 'baseoq4', 'logFile': '2', 'logFileName': 'logs/openq4.log',
@@ -543,7 +550,7 @@ def capture(args: argparse.Namespace) -> int:
         'com_maxfps': '60', 'ui_autoJoin': '1' if args.mode == 'mp' else '0',
         'ui_retainedScale': str(args.ui_scale), 'ui_retainedDensity': str(args.density),
         'ui_retainedReducedMotion': '1' if args.reduced_motion else '0',
-        'ui_retainedTrace': '1' if args.event_program_probe or args.system_settings_probe else '0',
+        'ui_retainedTrace': '1' if args.event_program_probe or args.system_settings_probe or display_sources or args.retained_trace else '0',
     }
     if args.retained_managed:
         # Isolated, explicit host defaults make the action/readback sequence
@@ -561,6 +568,10 @@ def capture(args: argparse.Namespace) -> int:
         else:
             retained.append(original[i])
             i += 1
+    if display_sources:
+        # This dimensions-only fixture must begin from the same supported
+        # framebuffer on GL and Vulkan, independent of archived menu defaults.
+        overrides['r_multiSamples'] = '0'
     command = [str(executable)]
     for key, value in overrides.items():
         command.extend(['+set', key, value])
@@ -601,6 +612,8 @@ def capture(args: argparse.Namespace) -> int:
                 metadata['retained_preview']['presentation_alias_probe'] = alias_sources
             if event_sources:
                 metadata['retained_preview']['event_program_probe'] = event_sources
+            if display_sources:
+                metadata['retained_preview']['display_settings_probe'] = display_sources
             if args.retained_peer:
                 metadata['retained_preview']['peer_source'] = {'source': str(args.retained_document),
                     'sha256': digest(args.retained_document), 'loader': 'ui_retainedPreview', 'closed_after_screenshot': False}
@@ -680,7 +693,7 @@ def capture(args: argparse.Namespace) -> int:
             retained_diagnostics.append('retained CPU profile did not complete for the requested frame count')
         if args.retained_managed:
             evidence = managed_evidence(plain_log, preview + close, peer=args.retained_peer,
-                resource_resets=int(args.language_reload) + int(args.video_restart),
+                resource_resets=int(args.language_reload) + int(args.video_restart) + (3 if display_sources else 0),
                 settings_fixture=args.retained_document.resolve() == ROOT / 'tools/ui/fixtures/managed-settings-smoke.q4ui',
                 mode=args.mode, alias_fixture=args.presentation_alias_probe, event_fixture=args.event_program_probe,
                 initial_brightness=args.brightness)
@@ -695,6 +708,12 @@ def capture(args: argparse.Namespace) -> int:
                 if system['passed']:
                     retained_diagnostics = [line for line in retained_diagnostics
                         if line.strip() not in system_settings_probe.EXPECTED_DIAGNOSTICS]
+            if display_sources:
+                display = display_settings_probe.evidence(plain_log, game=game,
+                    resets=int(args.language_reload) + int(args.video_restart))
+                display['sources'] = display_sources
+                evidence['display_settings_contract'] = display
+                evidence['passed'] = evidence['passed'] and display['passed']
             metadata['retained_preview']['managed_trace'] = evidence.pop('managed_trace')
             metadata['retained_preview']['managed_validation'] = evidence
             valid = valid and evidence['passed'] and not retained_diagnostics
@@ -710,7 +729,8 @@ def capture(args: argparse.Namespace) -> int:
             width, height = struct.unpack_from('<HH', image, 12)
             metadata['screenshot'] = {'path': str(screenshot.relative_to(output)), 'width': width,
                                       'height': height, 'sha256': digest(screenshot)}
-            valid = valid and width == args.width and height == args.height
+            expected_size = display_settings_probe.FINAL_SIZE if display_sources else (args.width, args.height)
+            valid = valid and (width, height) == expected_size
         else:
             valid = False
     metadata['status'] = 'captured_pending_visual_review' if valid else 'failed'
@@ -734,6 +754,7 @@ def main() -> int:
     parser.add_argument('--retained-document', type=Path, help='Optional Q4UI or RML integration fixture, copied into the isolated savepath.')
     parser.add_argument('--retained-resume-script', type=Path, help='Checks after video restart; managed mode reads surviving state after each language/video reset without setup replay.')
     parser.add_argument('--retained-script', type=Path, help='Optional semantic control script; does not send device input.')
+    parser.add_argument('--retained-trace', action='store_true', help='Record retained application and display transaction diagnostics.')
     parser.add_argument('--retained-data', type=Path, action='append', default=[], help='State JSON copied to retained-data/<name>; repeat for scripted state batches.')
     ownership = parser.add_mutually_exclusive_group()
     ownership.add_argument('--retained-open', action='store_true', help='Acquire preview application ownership with host input still disabled; inspect pause/resume and close.')
@@ -744,6 +765,7 @@ def main() -> int:
     parser.add_argument('--presentation-alias-probe', action='store_true', help='Managed mode: qualify exact authored presentation-alias-smoke sources; defaults document/setup/resume paths and checks alias ownership and reload readbacks.')
     parser.add_argument('--event-program-probe', action='store_true', help='Managed mode: qualify exact event-program-smoke sources, lifecycle/ordered-program state and actual application dispatch; enables bounded retained tracing.')
     parser.add_argument('--system-settings-probe', action='store_true', help='Managed mode: qualify owned SYSTEM drafts, immediate application, conflicts and resource persistence; device changes are rejected before writes.')
+    parser.add_argument('--display-settings-probe', action='store_true', help='Managed mode: qualify exact display fixture Apply/Keep/Apply/Revert, owning-view presentation witnesses, durable journal traces and four engine screenshots; final size is 960x540.')
     parser.add_argument('--gamma', type=float, default=1, help='Explicit renderer gamma, finite 0.1..3 (default 1).')
     parser.add_argument('--brightness', type=float, default=1, help='Explicit initial renderer brightness, finite 0..2 (default 1); settings scripts may subsequently change it.')
     parser.add_argument('--timeline', help='Canonical timeline to play before capture, and again after an optional video restart.')
@@ -754,6 +776,13 @@ def main() -> int:
     parser.add_argument('--language-reload', action='store_true', help='Reload the same language dictionary with the preview loaded before optional video restart.')
     parser.add_argument('--profile-frames', type=int, default=0, help='Measure 1..3600 rendered UI frames before capture; zero disables profiling.')
     args = parser.parse_args()
+    if args.display_settings_probe:
+        if not args.retained_managed or args.retained_peer or args.presentation_probe or args.presentation_alias_probe or args.event_program_probe or args.system_settings_probe:
+            parser.error('--display-settings-probe requires one --retained-managed owner and cannot combine with another probe')
+        args.retained_document = args.retained_document or Path(str(display_settings_probe.FIXTURE) + '.q4ui')
+        args.retained_script = args.retained_script or Path(str(display_settings_probe.FIXTURE) + '.cfg')
+        if args.language_reload or args.video_restart:
+            args.retained_resume_script = args.retained_resume_script or Path(str(display_settings_probe.FIXTURE) + '-resume.cfg')
     if args.system_settings_probe:
         if not args.retained_managed or args.presentation_probe or args.presentation_alias_probe or args.event_program_probe:
             parser.error('--system-settings-probe requires --retained-managed and cannot combine with another presentation probe')

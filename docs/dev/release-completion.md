@@ -2,11 +2,20 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- Settings files now use checked serialization and durable replacement. A failed
+  save retains pending changes instead of clearing their dirty flag, and shared
+  recovery locks keep a second engine process from overwriting an active display
+  transaction. Retained confirmation views add Apply, Keep, Revert and a distinct
+  Retry action, with crash recovery and a countdown armed by the owning view's
+  presentation. The [integration scope](ui/display-confirmation.md) keeps full
+  production GUI/editor/platform acceptance separate from these implemented paths.
+
 - Display-settings development: the renderer can attempt an exact display
   configuration, report failure and restore a captured window/device state.
   Presentation results distinguish a newly rendered frame from accepted
-  settings values. Production Keep/Revert and crash recovery remain in
-  development; see the [device contract](ui/display-device-contract.md).
+  settings values. The [confirmation integration](ui/display-confirmation.md)
+  now connects Keep/Revert and crash recovery; complete production settings
+  coverage remains in development.
 - Vulkan stops further presentation after unsafe submission or synchronization
   failures until the device is restarted, avoiding reuse of synchronization
   objects whose state is uncertain. Engine and renderer modules must be updated
@@ -17,8 +26,8 @@
   settings with conflict checks. Drafts survive renderer/language recreation;
   closing an editor releases its ownership. The
   [SYSTEM contract](ui/system-settings-contract.md) records the supported scope.
-  Display/audio/resource application, confirmation recovery and the complete
-  production screen remain in development.
+  Audio/resource application and the complete production screen remain in
+  development; display confirmation is implemented for eligible retained views.
 
 - Vulkan display initialization and partial display changes now report failed
   window or swapchain setup instead of publishing a successful configuration.

@@ -99,6 +99,11 @@ bool R_RendererModule_QueryDisplay( rendererDisplayState_t *outState );
 // Does not switch renderer modules, execute console commands or select fallback
 // modes. Caller must drain frame work, retain recovery state and perform rollback.
 bool R_RendererModule_TryDeviceRestart( const renderWindowRequest_t *request, char *error, int errorSize );
+// Strict first device only, after Init and before any world/UI frame. The caller
+// prepares SDL video, resolves portable monitor identity and journals before
+// calling. Failure keeps the video identity pin until explicit retry or unload;
+// success means device resources ready, never proof of a submitted/presented frame.
+bool R_RendererModule_TryInitializeDisplay( const renderWindowRequest_t *request, char *error, int errorSize );
 
 void	RendererModule_PrintGfxInfo( void );
 

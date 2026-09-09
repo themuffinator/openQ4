@@ -79,6 +79,9 @@ static bool r_recoverableRendererRestart = false;
 static bool r_forceWindowRendererRestart = false;
 static bool r_recoverableRendererRestore = false;
 static const renderWindowRequest_t *r_recoverableWindowRequest = NULL;
+// Only Init opens this gate. Device success closes it permanently until a full
+// renderer Init, so a normal ShutdownOpenGL cannot masquerade as cold recovery.
+static bool r_initialRendererDevicePending = false;
 
 struct rendererRestartFailure_t {
 	idStr reason;
@@ -4943,6 +4946,50 @@ bool R_TryFullVidRestart( const renderWindowRequest_t *request, char *error, int
 	return R_TryFullVidRestartInternal( &immutable, false, error, errorSize );
 }
 
+bool R_TryInitializeDisplay( const renderWindowRequest_t *request, char *error, int errorSize ) {
+	if ( error != NULL && errorSize > 0 ) error[0] = '\0';
+	if ( request == NULL ) return R_RendererRestartError( error, errorSize, "A display request is required" );
+	if ( r_recoverableRendererRestart ) return R_RendererRestartError( error, errorSize, "A renderer device operation is already in progress" );
+	if ( !r_initialRendererDevicePending || globalImages == NULL || renderModelManager == NULL ||
+		glConfig.isInitialized || r_recoverableRendererRestore || frameData != NULL ||
+		tr.worlds.Num() != 0 || tr.primaryWorld != NULL || tr.viewDef != NULL || tr.primaryView != NULL || backEnd.viewDef != NULL )
+		return R_RendererRestartError( error, errorSize, "Strict initial display requires an initialized renderer before its first device or world" );
+	const renderWindowRequest_t immutable = *request;
+	struct Scope {
+		explicit Scope( const renderWindowRequest_t *request ) {
+			r_recoverableRendererRestart = true; r_forceWindowRendererRestart = false; r_recoverableWindowRequest = request;
+		}
+		~Scope() { r_recoverableRendererRestart = false; r_forceWindowRendererRestart = false; r_recoverableWindowRequest = NULL; }
+	} scope( &immutable );
+	int width = 0, height = 0;
+	if ( !R_GetInitialWindowSize( immutable.parms.fullScreen, &width, &height ) )
+		return R_RendererRestartError( error, errorSize, "Requested display dimensions are invalid or unavailable" );
+	if ( immutable.parms.multiSamples != R_NormalizeMultiSamplesValue( immutable.parms.multiSamples ) ||
+		immutable.parms.displayHz < 0 || immutable.parms.displayHz > 1000 )
+		return R_RendererRestartError( error, errorSize, "Requested display samples or refresh rate are invalid" );
+	if ( immutable.displayIndex < -1 || immutable.swapInterval < -1 || immutable.swapInterval > 1 ||
+		immutable.parms.stereo || ( immutable.parms.hiddenWindow && ( immutable.parms.fullScreen || immutable.parms.borderless ) ) ||
+		( immutable.parms.fullScreen && immutable.parms.borderless ) )
+		return R_RendererRestartError( error, errorSize, "Requested display policy is invalid" );
+
+	renderDisplayPresentation_t before = {};
+	R_GetDisplayPresentation( &before );
+	try {
+		// This is initial resource creation, not a restart. Init already built the
+		// CPU-side images/models; no world, session sound or UI font atlas exists.
+		// The shared device helper publishes no successful presentation here.
+		if ( R_InitRendererDevice( false, false, error, errorSize ) ) return true;
+	} catch ( const rendererRestartFailure_t &failure ) {
+		R_RendererRestartError( error, errorSize, failure.reason.c_str() );
+	}
+	R_ShutdownDeviceForRestart();
+	tr.viewDef = NULL; tr.primaryView = NULL; backEnd.viewDef = NULL;
+	renderDisplayPresentation_t failed = {};
+	R_GetDisplayPresentation( &failed );
+	if ( failed.failureSequence == before.failureSequence ) R_DisplayPresentationFailed( RDP_INIT_FAILED );
+	return false;
+}
+
 static GLenum R_ClearPendingGLErrors( void ) {
 	GLenum err = GL_NO_ERROR;
 	GLenum lastErr = GL_NO_ERROR;
@@ -5337,6 +5384,7 @@ idRenderSystemLocal::Init
 ===============
 */
 void idRenderSystemLocal::Init( void ) {
+	r_initialRendererDevicePending = false;
 
 	common->Printf( "------- Initializing renderSystem --------\n" );
 	R_RendererMetrics_ResetGpuFrameTiming( "renderer init" );
@@ -5397,6 +5445,7 @@ void idRenderSystemLocal::Init( void ) {
 
 	common->Printf( "renderSystem initialized.\n" );
 	common->Printf( "--------------------------------------\n" );
+	r_initialRendererDevicePending = true;
 }
 
 /*
@@ -5404,7 +5453,8 @@ void idRenderSystemLocal::Init( void ) {
 idRenderSystemLocal::Shutdown
 ===============
 */
-void idRenderSystemLocal::Shutdown( void ) {	
+void idRenderSystemLocal::Shutdown( void ) {
+	r_initialRendererDevicePending = false;
 	common->Printf( "idRenderSystem::Shutdown()\n" );
 	R_RendererMetrics_ResetGpuFrameTiming( "renderer shutdown" );
 
@@ -5554,6 +5604,7 @@ static bool R_InitRendererDevice( bool legacyPolicy, bool forceWindow, char *err
 		}
 #endif
 	}
+	r_initialRendererDevicePending = false;
 	return true;
 }
 

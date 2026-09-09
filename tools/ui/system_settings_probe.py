@@ -9,7 +9,7 @@ FIELDS = ['live', 'draft', 'baseline', 'dirty', 'open', 'canApply', 'phase',
           'liveShadows', 'draftShadows', 'liveWidth', 'draftWidth', 'spare']
 EXPECTED_DIAGNOSTICS = [
     'WARNING: retained GUI retained-smoke.q4ui: r_brightness: outside the registered CVar range',
-    'WARNING: retained GUI retained-smoke.q4ui: System settings batch requires device work without a qualified result route',
+    'WARNING: retained GUI retained-smoke.q4ui: System settings batch requires unsupported effects or an owning confirmation view',
     'WARNING: retained GUI retained-smoke.q4ui: Settings changed outside this session; reopen before applying',
 ]
 

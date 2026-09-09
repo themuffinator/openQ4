@@ -1,11 +1,21 @@
 // Copyright (C) 2026 DarkMatter Productions. GPL-3.0-or-later.
 #include "SettingsTransaction.h"
+#include <atomic>
 #include <cmath>
 #include <exception>
 #include <utility>
 
 namespace openq4::ui {
 namespace {
+std::atomic<std::uint64_t> lastRequest{0};
+std::uint64_t NewRequest() {
+	std::uint64_t previous = lastRequest.load(std::memory_order_relaxed);
+	while (previous != UINT64_MAX) {
+		if (lastRequest.compare_exchange_weak(previous,previous+1,std::memory_order_relaxed)) return previous+1;
+	}
+	return 0;
+}
+
 struct Operation {
 	bool& busy;
 	explicit Operation(bool& busy) : busy(busy) { busy = true; }
@@ -79,6 +89,13 @@ SettingsResult SettingsTransaction::Access(std::uint64_t requestedOwner) {
 	return {};
 }
 
+SettingsResult SettingsTransaction::AccessAttempt(std::uint64_t requestedOwner, std::uint64_t request) {
+	if (auto access = Access(requestedOwner); access.code != SettingsCode::Ok) return access;
+	if (!request || request != pending.request)
+		return Result(SettingsCode::Invalid,"The settings request is stale or invalid");
+	return {};
+}
+
 bool SettingsTransaction::Read(StateValues& values, std::string& error, bool requireSchema) {
 	StateValues candidate;
 	if (!Invoke([&] { return host.Read(candidate,error); },error) ||
@@ -94,6 +111,11 @@ bool SettingsTransaction::Validate(const StateValues& candidate, std::string& er
 void SettingsTransaction::Close() {
 	phase = SettingsPhase::Closed; owner = 0; deadline = 0; lastTime = -1;
 	baseline.clear(); draft.clear(); lastApplied.clear(); written.clear();
+	ClearAttempt();
+}
+
+void SettingsTransaction::ClearAttempt() {
+	pending = {}; attemptedEdits.clear(); attemptStage = AttemptStage::None;
 }
 
 SettingsResult SettingsTransaction::Begin(std::uint64_t requestedOwner) {
@@ -146,6 +168,7 @@ SettingsResult SettingsTransaction::Cancel(std::uint64_t requestedOwner) {
 	if (busy) return Reentrant();
 	Operation operation(busy);
 	if (auto access = Access(requestedOwner); access.code != SettingsCode::Ok) return access;
+	if (AsyncPending()) return Result(SettingsCode::Busy,"The display coordinator must finish or restore this request");
 	if (phase != SettingsPhase::Editing) return Rollback(false);
 	Close(); return Result(SettingsCode::Ok);
 }
@@ -184,6 +207,189 @@ SettingsResult SettingsTransaction::Apply(std::uint64_t requestedOwner, double n
 	} else {
 		baseline = current; draft = std::move(current); written.clear(); deadline = 0;
 	}
+	return Result(SettingsCode::Ok);
+}
+
+SettingsResult SettingsTransaction::PrepareApply(std::uint64_t requestedOwner, double now, SettingsAttempt& attempt) {
+	if (busy) return Reentrant();
+	Operation operation(busy);
+	if (auto access = Access(requestedOwner); access.code != SettingsCode::Ok) return access;
+	if (phase != SettingsPhase::Editing || AsyncPending()) return Result(SettingsCode::Busy,"A settings request is already pending");
+	if (!ValidTime(now,lastTime)) return Result(SettingsCode::Invalid,"Settings preparation time is invalid or moved backwards");
+	StateValues current; std::string error;
+	if (!Read(current,error)) return Result(SettingsCode::ApplyFailed,std::move(error));
+	if (current != baseline) return Result(SettingsCode::Conflict,"Settings changed outside this session; reopen before applying");
+	if (!Validate(draft,error)) return Result(SettingsCode::Invalid,std::move(error));
+	SettingsAttempt prepared{owner,0,current,draft,Changes(current,draft)};
+	prepared.request = NewRequest();
+	if (!prepared.request) return Result(SettingsCode::Invalid,"Settings request identities are exhausted");
+	attempt = prepared; pending = std::move(prepared);
+	attemptedEdits = pending.patch;
+	phase = SettingsPhase::Applying; attemptStage = AttemptStage::ApplyPrepared; lastTime = now; deadline = 0;
+	return Result(SettingsCode::Ok);
+}
+
+SettingsResult SettingsTransaction::ExecuteApply(std::uint64_t requestedOwner, std::uint64_t request) {
+	if (busy) return Reentrant();
+	Operation operation(busy);
+	if (auto access = AccessAttempt(requestedOwner,request); access.code != SettingsCode::Ok) return access;
+	if (phase != SettingsPhase::Applying || attemptStage != AttemptStage::ApplyPrepared)
+		return Result(SettingsCode::Busy,"This settings apply cannot execute again");
+	attemptStage = AttemptStage::ApplyExecuted;
+	StateValues current; std::string error;
+	if (!Read(current,error)) return Result(SettingsCode::ApplyFailed,std::move(error));
+	if (current != pending.baseline) return Result(SettingsCode::Conflict,"Settings changed after apply was prepared");
+	if (!Validate(pending.target,error)) return Result(SettingsCode::Invalid,std::move(error));
+	// Ownership precedes the callback: false/throw can follow a partial write.
+	written = pending.patch; lastApplied = pending.target;
+	const bool wrote = written.empty() || Invoke([&] { return host.Write(written,error); },error);
+	const std::string writeError = error;
+	if (!Read(current,error)) return Result(SettingsCode::ApplyFailed,Because(writeError,error));
+	if (!wrote) return Result(SettingsCode::ApplyFailed,writeError);
+	if (current != pending.target) return Result(SettingsCode::ApplyFailed,"Settings apply readback did not match the frozen target");
+	attemptStage = AttemptStage::ApplyWritten;
+	return Result(SettingsCode::Ok);
+}
+
+SettingsResult SettingsTransaction::CompleteApply(std::uint64_t requestedOwner, std::uint64_t request, double now, double timeout) {
+	if (busy) return Reentrant();
+	Operation operation(busy);
+	if (auto access = AccessAttempt(requestedOwner,request); access.code != SettingsCode::Ok) return access;
+	if (phase != SettingsPhase::Applying || attemptStage != AttemptStage::ApplyWritten)
+		return Result(SettingsCode::Busy,"The settings apply has not executed successfully");
+	if (!ValidTime(now,lastTime) || !std::isfinite(timeout) || timeout <= 0 ||
+		!std::isfinite(now+timeout) || now+timeout <= now)
+		return Result(SettingsCode::Invalid,"Settings confirmation time is invalid or moved backwards");
+	StateValues current; std::string error;
+	if (!Read(current,error)) return Result(SettingsCode::ApplyFailed,std::move(error));
+	if (current != pending.target) return Result(SettingsCode::Conflict,"Settings changed before device completion");
+	lastTime = now; deadline = now+timeout; phase = SettingsPhase::Confirming; attemptStage = AttemptStage::Confirming;
+	return Result(SettingsCode::Ok);
+}
+
+SettingsResult SettingsTransaction::CancelPreparedApply(std::uint64_t requestedOwner, std::uint64_t request) {
+	if (busy) return Reentrant();
+	Operation operation(busy);
+	if (auto access = AccessAttempt(requestedOwner,request); access.code != SettingsCode::Ok) return access;
+	if (phase != SettingsPhase::Applying || attemptStage != AttemptStage::ApplyPrepared)
+		return Result(SettingsCode::Busy,"Only a queued, unexecuted apply can be cancelled");
+	ClearAttempt(); phase = SettingsPhase::Editing;
+	return Result(SettingsCode::Ok);
+}
+
+SettingsResult SettingsTransaction::PrepareRestore(std::uint64_t requestedOwner, std::uint64_t request, SettingsAttempt& attempt) {
+	if (busy) return Reentrant();
+	Operation operation(busy);
+	if (auto access = AccessAttempt(requestedOwner,request); access.code != SettingsCode::Ok) return access;
+	if (attemptStage == AttemptStage::RestorePrepared)
+		return Result(SettingsCode::Busy,"A prepared settings restore is already pending");
+	StateValues current; std::string error;
+	if (!Read(current,error)) return Result(SettingsCode::RollbackFailed,std::move(error));
+	StateValues candidate = current, patch;
+	for (const auto& [key,target] : written) {
+		const auto& original = baseline.at(key);
+		if (current.at(key) != original && current.at(key) == target) {
+			candidate[key] = original; patch.emplace(key,original);
+		}
+	}
+	if (!ValidSnapshot(candidate,&baseline,error) || (!patch.empty() &&
+		!Invoke([&] { return host.ValidateRollback(baseline,current,candidate,error); },error)))
+		return Result(SettingsCode::RollbackFailed,std::move(error));
+	SettingsAttempt prepared{owner,NewRequest(),std::move(current),std::move(candidate),std::move(patch)};
+	if (!prepared.request) return Result(SettingsCode::Invalid,"Settings request identities are exhausted");
+	attempt = prepared; pending = std::move(prepared);
+	phase = SettingsPhase::Restoring; attemptStage = AttemptStage::RestorePrepared; deadline = 0;
+	return Result(SettingsCode::Ok);
+}
+
+SettingsResult SettingsTransaction::ExecuteRestore(std::uint64_t requestedOwner, std::uint64_t request) {
+	if (busy) return Reentrant();
+	Operation operation(busy);
+	if (auto access = AccessAttempt(requestedOwner,request); access.code != SettingsCode::Ok) return access;
+	if (phase != SettingsPhase::Restoring || attemptStage != AttemptStage::RestorePrepared)
+		return Result(SettingsCode::Busy,"This settings restore cannot execute again");
+	attemptStage = AttemptStage::RestoreExecuted;
+	StateValues current; std::string error;
+	if (!Read(current,error)) return Result(SettingsCode::RollbackFailed,std::move(error));
+	if (current != pending.baseline) return Result(SettingsCode::Conflict,"Settings changed after restore was prepared");
+	if (!pending.patch.empty() && !Invoke([&] { return host.ValidateRollback(baseline,current,pending.target,error); },error))
+		return Result(SettingsCode::RollbackFailed,std::move(error));
+	const bool wrote = pending.patch.empty() || Invoke([&] { return host.Write(pending.patch,error); },error);
+	const std::string writeError = error;
+	if (!Read(current,error)) return Result(SettingsCode::RollbackFailed,Because(writeError,error));
+	bool incomplete = false, conflict = false;
+	for (const auto& [key,target] : written) {
+		if (current.at(key) == baseline.at(key)) continue;
+		incomplete = true;
+		if (current.at(key) != target) conflict = true;
+	}
+	if (conflict) return Result(SettingsCode::Conflict,"An externally changed setting cannot be restored safely");
+	if (incomplete) return Result(SettingsCode::RollbackFailed,writeError.empty() ? "Settings restore readback did not match" : writeError);
+	if (current != pending.target) return Result(SettingsCode::Conflict,"Settings changed during restore execution");
+	// A refused/throwing callback can still have completed its entire patch.
+	// Fresh exact readback is authoritative, but proves no device restoration.
+	(void)wrote;
+	attemptStage = AttemptStage::RestoreWritten;
+	return Result(SettingsCode::Ok);
+}
+
+SettingsResult SettingsTransaction::CompleteRestore(std::uint64_t requestedOwner, std::uint64_t request,
+	bool preserveDraft, SettingsCode recoveredCode, const std::string& reason) {
+	if (busy) return Reentrant();
+	Operation operation(busy);
+	if (auto access = AccessAttempt(requestedOwner,request); access.code != SettingsCode::Ok) return access;
+	if (phase != SettingsPhase::Restoring || attemptStage != AttemptStage::RestoreWritten)
+		return Result(SettingsCode::Busy,"The settings restore has not executed successfully");
+	StateValues current; std::string error;
+	if (!Read(current,error)) return Result(SettingsCode::RollbackFailed,Because(reason,error));
+	if (current != pending.target) return Result(SettingsCode::Conflict,Because(reason,"Settings changed before restoration completed"));
+	StateValues refreshedDraft = current;
+	if (preserveDraft) for (const auto& [key,target] : attemptedEdits) refreshedDraft[key] = target;
+	if (!ValidSnapshot(refreshedDraft,&baseline,error)) return Result(SettingsCode::RollbackFailed,Because(reason,error));
+	baseline = current; draft = std::move(refreshedDraft); lastApplied = std::move(current);
+	written.clear(); deadline = 0; phase = SettingsPhase::Editing; ClearAttempt();
+	return Result(recoveredCode,reason);
+}
+
+SettingsResult SettingsTransaction::PrepareConfirm(std::uint64_t requestedOwner, std::uint64_t request,
+	double now, SettingsAttempt& attempt) {
+	if (busy) return Reentrant();
+	Operation operation(busy);
+	if (auto access = AccessAttempt(requestedOwner,request); access.code != SettingsCode::Ok) return access;
+	if (phase != SettingsPhase::Confirming || attemptStage != AttemptStage::Confirming)
+		return Result(SettingsCode::Busy,"No settings confirmation can be prepared");
+	if (!ValidTime(now,lastTime) || now >= deadline)
+		return Result(SettingsCode::Invalid,"The settings confirmation deadline has expired or time is invalid");
+	StateValues current; std::string error;
+	if (!Read(current,error)) return Result(SettingsCode::ApplyFailed,std::move(error));
+	if (current != lastApplied) return Result(SettingsCode::Conflict,"Settings changed before confirmation");
+	SettingsAttempt prepared{owner,NewRequest(),baseline,std::move(current),written};
+	if (!prepared.request) return Result(SettingsCode::Invalid,"Settings request identities are exhausted");
+	attempt = prepared; pending = std::move(prepared);
+	attemptStage = AttemptStage::ConfirmPrepared; lastTime = now;
+	return Result(SettingsCode::Ok);
+}
+
+SettingsResult SettingsTransaction::CompleteConfirm(std::uint64_t requestedOwner, std::uint64_t request) {
+	if (busy) return Reentrant();
+	Operation operation(busy);
+	if (auto access = AccessAttempt(requestedOwner,request); access.code != SettingsCode::Ok) return access;
+	if (phase != SettingsPhase::Confirming || attemptStage != AttemptStage::ConfirmPrepared)
+		return Result(SettingsCode::Busy,"Settings confirmation has not been prepared");
+	StateValues current; std::string error;
+	if (!Read(current,error)) return Result(SettingsCode::ApplyFailed,std::move(error));
+	if (current != pending.target) return Result(SettingsCode::Conflict,"Settings changed during confirmation persistence");
+	baseline = current; draft = std::move(current); written.clear(); deadline = 0; phase = SettingsPhase::Editing;
+	ClearAttempt(); return Result(SettingsCode::Ok);
+}
+
+SettingsResult SettingsTransaction::CancelPreparedConfirm(std::uint64_t requestedOwner, std::uint64_t request) {
+	if (busy) return Reentrant();
+	Operation operation(busy);
+	if (auto access = AccessAttempt(requestedOwner,request); access.code != SettingsCode::Ok) return access;
+	if (phase != SettingsPhase::Confirming || attemptStage != AttemptStage::ConfirmPrepared)
+		return Result(SettingsCode::Busy,"Settings confirmation has not been prepared");
+	attemptStage = AttemptStage::Confirming;
 	return Result(SettingsCode::Ok);
 }
 
@@ -245,6 +451,7 @@ SettingsResult SettingsTransaction::Confirm(std::uint64_t requestedOwner) {
 	if (busy) return Reentrant();
 	Operation operation(busy);
 	if (auto access = Access(requestedOwner); access.code != SettingsCode::Ok) return access;
+	if (AsyncPending()) return Result(SettingsCode::Busy,"The display coordinator must persist this confirmation");
 	if (phase != SettingsPhase::Confirming) return Result(SettingsCode::Busy,"No settings confirmation is pending");
 	StateValues current; std::string error;
 	if (!Read(current,error)) return Rollback(false,SettingsCode::ApplyFailed,error);
@@ -257,6 +464,7 @@ SettingsResult SettingsTransaction::Revert(std::uint64_t requestedOwner) {
 	if (busy) return Reentrant();
 	Operation operation(busy);
 	if (auto access = Access(requestedOwner); access.code != SettingsCode::Ok) return access;
+	if (AsyncPending()) return Result(SettingsCode::Busy,"The display coordinator must restore this request");
 	if (phase == SettingsPhase::Editing) { draft = baseline; return Result(SettingsCode::Ok); }
 	return Rollback(false);
 }
@@ -268,6 +476,7 @@ SettingsResult SettingsTransaction::Tick(double now) {
 		return Result(SettingsCode::Invalid,"Settings presentation time is invalid or moved backwards");
 	if (phase == SettingsPhase::Closed) return lastResult;
 	lastTime = now;
+	if (AsyncPending()) return {SettingsCode::Busy,"The display coordinator owns this pending request"};
 	if (phase == SettingsPhase::RecoveryRequired) return lastResult;
 	if (phase == SettingsPhase::Confirming && now >= deadline) return Rollback(false);
 	return lastResult;
@@ -277,6 +486,7 @@ SettingsResult SettingsTransaction::Abandon(std::uint64_t requestedOwner) {
 	if (busy) return Reentrant();
 	Operation operation(busy);
 	if (auto access = Access(requestedOwner); access.code != SettingsCode::Ok) return access;
+	if (AsyncPending()) return Result(SettingsCode::Busy,"The display coordinator must restore or cancel this request");
 	if (phase != SettingsPhase::Editing) {
 		const auto result = Rollback(false);
 		if (result.code != SettingsCode::Ok) return result;

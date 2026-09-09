@@ -388,6 +388,18 @@ void ReentrancyAndIndependentInstances() {
 		Expect(transaction.Revert(7),SettingsCode::Busy,"reentrant revert blocked");
 		Expect(transaction.Tick(0),SettingsCode::Busy,"reentrant tick blocked");
 		Expect(transaction.Abandon(7),SettingsCode::Busy,"reentrant abandon blocked");
+		SettingsAttempt untouched{99,100,{{"sentinel",true}},{},{}};
+		Expect(transaction.PrepareApply(7,0,untouched),SettingsCode::Busy,"reentrant prepare apply blocked");
+		Expect(transaction.ExecuteApply(7,transaction.Request()),SettingsCode::Busy,"reentrant execute apply blocked");
+		Expect(transaction.CompleteApply(7,transaction.Request(),0),SettingsCode::Busy,"reentrant complete apply blocked");
+		Expect(transaction.CancelPreparedApply(7,transaction.Request()),SettingsCode::Busy,"reentrant queued cancellation blocked");
+		Expect(transaction.PrepareRestore(7,transaction.Request(),untouched),SettingsCode::Busy,"reentrant prepare restore blocked");
+		Expect(transaction.ExecuteRestore(7,transaction.Request()),SettingsCode::Busy,"reentrant execute restore blocked");
+		Expect(transaction.CompleteRestore(7,transaction.Request()),SettingsCode::Busy,"reentrant complete restore blocked");
+		Expect(transaction.PrepareConfirm(7,transaction.Request(),0,untouched),SettingsCode::Busy,"reentrant prepare confirm blocked");
+		Expect(transaction.CompleteConfirm(7,transaction.Request()),SettingsCode::Busy,"reentrant complete confirm blocked");
+		Expect(transaction.CancelPreparedConfirm(7,transaction.Request()),SettingsCode::Busy,"reentrant cancel confirm blocked");
+		Check(untouched.owner == 99 && untouched.request == 100 && untouched.baseline == StateValues({{"sentinel",true}}),"reentrant prepares leave caller output unchanged");
 		Check(transaction.Phase() == phase && transaction.Owner() == owner && transaction.Baseline() == baseline &&
 			transaction.Draft() == draft && transaction.LastApplied() == applied && transaction.Deadline() == deadline &&
 			transaction.LastResult().code == result.code && transaction.LastResult().diagnostic == result.diagnostic,
@@ -399,6 +411,15 @@ void ReentrancyAndIndependentInstances() {
 	Expect(transaction.Apply(7,1),SettingsCode::Ok,"guard classification, patch and readback callbacks");
 	Expect(transaction.Revert(7),SettingsCode::Ok,"guard rollback callbacks");
 	Check(callbacks == std::set<std::string>({"Read","Defaults","Validate","NeedsConfirmation","Write","ValidateRollback"}),"every host callback boundary exercises all mutating reentry guards");
+	SettingsAttempt async;
+	Expect(transaction.PrepareApply(7,2,async),SettingsCode::Ok,"async prepare guards host callbacks");
+	Expect(transaction.ExecuteApply(7,async.request),SettingsCode::Ok,"async execution guards host callbacks");
+	Expect(transaction.CompleteApply(7,async.request,3),SettingsCode::Ok,"async completion guards host callbacks");
+	Expect(transaction.PrepareConfirm(7,async.request,4,async),SettingsCode::Ok,"async confirmation guards host callbacks");
+	Expect(transaction.CancelPreparedConfirm(7,async.request),SettingsCode::Ok,"cancel durable preparation before recovery");
+	Expect(transaction.PrepareRestore(7,async.request,async),SettingsCode::Ok,"async restoration guards host callbacks");
+	Expect(transaction.ExecuteRestore(7,async.request),SettingsCode::Ok,"async restoration execution guards host callbacks");
+	Expect(transaction.CompleteRestore(7,async.request),SettingsCode::Ok,"async restoration completion guards host callbacks");
 	Expect(transaction.Cancel(7),SettingsCode::Ok,"operation guard releases after callbacks");
 
 	FakeHost shared; SettingsTransaction first(shared), second(shared);
@@ -447,6 +468,216 @@ void MergedRecoveryBudgets() {
 	Expect(retained.Revert(7),SettingsCode::Ok,"explicit revert discards attempted draft and adopts bounded live state");
 	Check(retained.Baseline() == retry.live && retained.Draft() == retry.live,"retry budget recovery preserves all external values");
 }
+
+void AsyncStagesAndIdentity() {
+	static_assert(static_cast<int>(SettingsPhase::Closed) == 0 && static_cast<int>(SettingsPhase::Editing) == 1 &&
+		static_cast<int>(SettingsPhase::Confirming) == 2 && static_cast<int>(SettingsPhase::RecoveryRequired) == 3 &&
+		static_cast<int>(SettingsPhase::Applying) == 4 && static_cast<int>(SettingsPhase::Restoring) == 5);
+	FakeHost host; SettingsTransaction transaction(host); Begin(host,transaction);
+	Expect(transaction.Edit(7,{{"brightness",1.5},{"mode",1.0}}),SettingsCode::Ok,"async draft edit");
+	SettingsAttempt attempt;
+	Expect(transaction.PrepareApply(7,1,attempt),SettingsCode::Ok,"prepare freezes without writes");
+	const auto cancelled = attempt.request;
+	Check(cancelled && transaction.Request() == cancelled && transaction.AsyncPending() &&
+		transaction.Phase() == SettingsPhase::Applying && transaction.Deadline() == 0 && host.writes.empty(),"queued apply has no device or host success");
+	Check(attempt.owner == 7 && attempt.baseline == Initial() && attempt.target == transaction.Draft() &&
+		attempt.patch == StateValues({{"brightness",1.5},{"mode",1.0}}),"prepared apply exposes a complete typed snapshot and patch");
+	SettingsAttempt sentinel{88,99,{{"sentinel",true}},{},{}};
+	Expect(transaction.PrepareApply(7,2,sentinel),SettingsCode::Busy,"duplicate prepare rejected");
+	Check(sentinel.owner == 88 && sentinel.request == 99 && sentinel.baseline == StateValues({{"sentinel",true}}),"failed prepare output is atomic");
+	Expect(transaction.CompleteApply(7,cancelled,2),SettingsCode::Busy,"cannot claim unwritten apply complete");
+	Expect(transaction.ExecuteRestore(7,cancelled),SettingsCode::Busy,"wrong direction rejected");
+	const int reads = host.reads;
+	Expect(transaction.ExecuteApply(8,cancelled),SettingsCode::Busy,"wrong owner cannot execute");
+	Expect(transaction.ExecuteApply(7,cancelled+1),SettingsCode::Invalid,"wrong token cannot execute");
+	Expect(transaction.CancelPreparedApply(7,cancelled),SettingsCode::Ok,"queued apply cancels without writes");
+	Check(!transaction.AsyncPending() && host.reads == reads && host.writes.empty() && transaction.Draft().at("mode") == StateValue(1.0),"queue cancellation preserves draft and performs no callbacks");
+	Expect(transaction.PrepareApply(7,3,attempt),SettingsCode::Ok,"new queued apply");
+	const auto apply = attempt.request;
+	Check(apply > cancelled,"requests never reuse cancelled identities");
+	attempt.patch.clear(); attempt.target["mode"] = 2.0; attempt.baseline.clear();
+	Expect(transaction.ExecuteApply(7,cancelled),SettingsCode::Invalid,"stale apply cannot execute a later attempt");
+	Expect(transaction.ExecuteApply(7,apply),SettingsCode::Ok,"execute immutable internal patch");
+	Check(host.writes.size() == 1 && host.live.at("mode") == StateValue(1.0) && transaction.Phase() == SettingsPhase::Applying && transaction.Deadline() == 0,"CVar readback does not start confirmation");
+	Expect(transaction.ExecuteApply(7,apply),SettingsCode::Busy,"apply writes exactly once");
+	Expect(transaction.CancelPreparedApply(7,apply),SettingsCode::Busy,"written apply cannot discard recovery ownership");
+	Expect(transaction.Tick(20),SettingsCode::Busy,"pending device tick delegates without rollback");
+	Expect(transaction.CompleteApply(7,apply,19),SettingsCode::Invalid,"qualified completion still requires monotonic time");
+	Check(transaction.Phase() == SettingsPhase::Applying && transaction.Deadline() == 0,"invalid completion cannot publish confirmation");
+	Expect(transaction.CompleteApply(7,apply,30,5),SettingsCode::Ok,"qualified coordinator completion starts deadline");
+	Check(transaction.Phase() == SettingsPhase::Confirming && transaction.Deadline() == 35,"deadline begins after qualified presentation");
+	Expect(transaction.CompleteApply(7,apply,31),SettingsCode::Busy,"duplicate apply completion rejected");
+	for (auto result : {transaction.Cancel(7),transaction.Revert(7),transaction.Abandon(7),transaction.Confirm(7)})
+		Expect(result,SettingsCode::Busy,"legacy operation cannot mutate async confirmation");
+	const auto prior = transaction.LastResult();
+	Expect(transaction.Tick(100),SettingsCode::Busy,"expired async request remains coordinator-owned");
+	Check(host.writes.size() == 1 && transaction.Owner() == 7 && transaction.Deadline() == 35 && transaction.LastResult().code == prior.code,"timeout performs no synchronous rollback or error replacement");
+	Expect(transaction.PrepareConfirm(7,apply,100,sentinel),SettingsCode::Invalid,"expired confirmation cannot be persisted");
+	Expect(transaction.PrepareRestore(7,apply,attempt),SettingsCode::Ok,"prepare timeout recovery");
+	const auto restore = attempt.request;
+	Check(restore > apply && attempt.baseline == host.live && attempt.target == Initial() && transaction.Baseline() == Initial(),"restore gets fresh frame and new identity while retaining original baseline");
+	Expect(transaction.CompleteApply(7,apply,100),SettingsCode::Invalid,"late apply completion cannot finish restoration");
+	Expect(transaction.CompleteRestore(7,restore),SettingsCode::Busy,"unwritten restore cannot complete");
+	Expect(transaction.ExecuteRestore(7,restore),SettingsCode::Ok,"execute restore patch");
+	Check(transaction.Phase() == SettingsPhase::Restoring && transaction.AsyncPending() && host.live == Initial(),"restored CVars do not prove device restoration");
+	Expect(transaction.CompleteRestore(7,restore),SettingsCode::Ok,"qualified device restore rebases");
+	Check(transaction.Phase() == SettingsPhase::Editing && !transaction.AsyncPending() && transaction.Draft() == host.live,"recovery clears only after completion");
+	Expect(transaction.CompleteRestore(7,restore),SettingsCode::Invalid,"duplicate restore completion rejected");
+	Expect(transaction.Cancel(7),SettingsCode::Ok,"completed async session can close");
+	Begin(host,transaction);Expect(transaction.PrepareApply(7,0,attempt),SettingsCode::Ok,"new session resets time only");
+	Check(attempt.request > restore,"Close and Begin never reset request identity");
+	FakeHost otherHost; SettingsTransaction other(otherHost); Begin(otherHost,other,9); SettingsAttempt otherAttempt;
+	Expect(other.PrepareApply(9,0,otherAttempt),SettingsCode::Ok,"independent transaction prepares");
+	Check(otherAttempt.request > attempt.request,"independent transactions do not reuse identities");
+}
+
+void AsyncPersistenceAndConflicts() {
+	FakeHost host; SettingsTransaction transaction(host); Begin(host,transaction); SettingsAttempt attempt;
+	Expect(transaction.Edit(7,{{"mode",1.0}}),SettingsCode::Ok,"edit before async confirmation");
+	Expect(transaction.PrepareApply(7,1,attempt),SettingsCode::Ok,"prepare async confirmation");
+	Expect(transaction.ExecuteApply(7,attempt.request),SettingsCode::Ok,"write before async confirmation");
+	Expect(transaction.CompleteApply(7,attempt.request,10),SettingsCode::Ok,"qualify device before confirmation");
+	const auto applied = attempt.request;
+	Expect(transaction.CompleteConfirm(7,applied),SettingsCode::Busy,"durable preparation required before commit");
+	Expect(transaction.PrepareConfirm(7,applied,11,attempt),SettingsCode::Ok,"freeze confirmation for journal and config");
+	const auto firstConfirm = attempt.request;
+	Check(firstConfirm > applied && attempt.baseline == Initial() && attempt.target == host.live && transaction.Baseline() == Initial(),"confirmation preparation retains recovery baseline");
+	Expect(transaction.CancelPreparedConfirm(7,firstConfirm),SettingsCode::Ok,"failed persistence can unfreeze without writes");
+	Expect(transaction.CompleteConfirm(7,firstConfirm),SettingsCode::Busy,"cancelled confirmation cannot complete");
+	Expect(transaction.PrepareConfirm(7,firstConfirm,12,attempt),SettingsCode::Ok,"retry confirmation has fresh token");
+	Expect(transaction.CompleteConfirm(7,firstConfirm),SettingsCode::Invalid,"late old persistence result cannot complete a retry");
+	host.live["volume"] = 0.9;
+	Expect(transaction.CompleteConfirm(7,attempt.request),SettingsCode::Conflict,"commit rechecks host after persistence boundary");
+	Check(transaction.AsyncPending() && transaction.Baseline() == Initial() && host.writes.size() == 1,"failed commit retains complete recovery ownership");
+	Expect(transaction.PrepareRestore(7,attempt.request,attempt),SettingsCode::Ok,"prepare conflict restoration");
+	Check(attempt.target.at("volume") == StateValue(0.9) && !attempt.patch.contains("volume"),"restore preserves unrelated external updates");
+	Expect(transaction.ExecuteRestore(7,attempt.request),SettingsCode::Ok,"restore only owned mode");
+	Expect(transaction.CompleteRestore(7,attempt.request),SettingsCode::Ok,"qualified restore rebases external values");
+	Check(transaction.Baseline() == host.live && transaction.Draft() == host.live && host.live.at("volume") == StateValue(0.9),"fresh external state survives confirmed restoration");
+	Expect(transaction.Edit(7,{{"mode",2.0}}),SettingsCode::Ok,"new confirmation draft");
+	Expect(transaction.PrepareApply(7,13,attempt),SettingsCode::Ok,"new confirmation prepare");
+	Expect(transaction.ExecuteApply(7,attempt.request),SettingsCode::Ok,"new confirmation execute");
+	Expect(transaction.CompleteApply(7,attempt.request,14),SettingsCode::Ok,"new confirmation qualify");
+	Expect(transaction.PrepareConfirm(7,attempt.request,15,attempt),SettingsCode::Ok,"new confirmation persistence prepare");
+	const auto committed = attempt.request;
+	attempt.target.clear(); // Caller cannot alter the frozen acceptance frame.
+	Expect(transaction.CompleteConfirm(7,committed),SettingsCode::Ok,"durable confirmation finalizes verified frame");
+	Check(!transaction.AsyncPending() && transaction.Phase() == SettingsPhase::Editing && transaction.Baseline() == host.live,"commit releases recovery only after persistence");
+	Expect(transaction.CompleteConfirm(7,committed),SettingsCode::Invalid,"committed token is consumed");
+}
+
+void AsyncPartialWritesAndRetry() {
+	FakeHost host; SettingsTransaction transaction(host); Begin(host,transaction); SettingsAttempt attempt;
+	Expect(transaction.Edit(7,{{"brightness",1.5},{"mode",1.0}}),SettingsCode::Ok,"partial async batch");
+	Expect(transaction.PrepareApply(7,1,attempt),SettingsCode::Ok,"prepare partial async batch");
+	host.writeHook = [&](const StateValues& patch,std::string& error) {
+		host.live["brightness"] = patch.at("brightness"); host.live["volume"] = 0.75;
+		error = "second key refused"; return false;
+	};
+	Expect(transaction.ExecuteApply(7,attempt.request),SettingsCode::ApplyFailed,"partial async failure does not roll back automatically");
+	Check(host.writes.size() == 1 && transaction.Phase() == SettingsPhase::Applying && transaction.Baseline() == Initial(),"partial failure keeps original owner and recovery frame");
+	Expect(transaction.CompleteApply(7,attempt.request,2),SettingsCode::Busy,"failed apply cannot enter confirmation");
+	host.writeHook = {};
+	Expect(transaction.PrepareRestore(7,attempt.request,attempt),SettingsCode::Ok,"prepare partial recovery");
+	Check(attempt.patch == StateValues({{"brightness",1.0}}) && attempt.target.at("volume") == StateValue(0.75),"only actually changed owned keys need recovery writes");
+	const auto restoring = attempt.request;
+	attempt.patch["volume"] = 0.0;
+	Expect(transaction.ExecuteRestore(7,restoring),SettingsCode::Ok,"caller cannot inject writes into restore patch");
+	Check(host.writes.back() == StateValues({{"brightness",1.0}}),"frozen restore patch remains exact");
+	Expect(transaction.CompleteRestore(7,restoring,true,SettingsCode::ApplyFailed,"device refused"),SettingsCode::ApplyFailed,"qualified recovery retains original error");
+	Check(transaction.Phase() == SettingsPhase::Editing && !transaction.AsyncPending() && transaction.Baseline() == host.live &&
+		transaction.Draft().at("brightness") == StateValue(1.5) && transaction.Draft().at("mode") == StateValue(1.0) &&
+		transaction.Draft().at("volume") == StateValue(0.75),"retry draft preserves attempted keys and rebases untouched external keys");
+	Expect(transaction.PrepareApply(7,2,attempt),SettingsCode::Ok,"prepare retry after recovery");
+	Expect(transaction.ExecuteApply(7,attempt.request),SettingsCode::Ok,"execute retry");
+	host.live["brightness"] = 1.8;
+	Expect(transaction.PrepareRestore(7,attempt.request,attempt),SettingsCode::Ok,"freeze safe subset around conflict");
+	const auto conflicting = attempt.request;
+	Check(attempt.patch == StateValues({{"mode",0.0}}),"divergent owned brightness is not overwritten");
+	Expect(transaction.ExecuteRestore(7,conflicting),SettingsCode::Conflict,"safe subset restores while divergent ownership remains explicit");
+	Check(host.live.at("brightness") == StateValue(1.8) && host.live.at("mode") == StateValue(0.0) && transaction.AsyncPending(),"conflicting value and recovery information survive");
+	Expect(transaction.CompleteRestore(7,conflicting),SettingsCode::Busy,"conflicted restoration cannot be declared complete");
+	host.live["brightness"] = 1.0;
+	Expect(transaction.PrepareRestore(7,conflicting,attempt),SettingsCode::Ok,"resolved conflict gets new recovery attempt");
+	const auto retry = attempt.request; const auto writes = host.writes.size();
+	Expect(transaction.ExecuteRestore(7,retry),SettingsCode::Ok,"already restored state needs no writes");
+	Expect(transaction.CompleteRestore(7,conflicting),SettingsCode::Invalid,"late prior restoration result cannot finish retry");
+	Expect(transaction.CompleteRestore(7,retry),SettingsCode::Ok,"qualified retry completes recovery");
+	Check(host.writes.size() == writes,"already restored values are never redundantly written");
+	// An apply that never reached Write still retains the desired retry draft.
+	Expect(transaction.Edit(7,{{"mode",2.0}}),SettingsCode::Ok,"draft before pre-write conflict");
+	Expect(transaction.PrepareApply(7,3,attempt),SettingsCode::Ok,"prepare before external update");
+	host.live["volume"] = 0.8;
+	Expect(transaction.ExecuteApply(7,attempt.request),SettingsCode::Conflict,"pre-write conflict stops host mutation");
+	Expect(transaction.PrepareRestore(7,attempt.request,attempt),SettingsCode::Ok,"prepare no-write recovery");
+	Expect(transaction.ExecuteRestore(7,attempt.request),SettingsCode::Ok,"verify no-write recovery");
+	Expect(transaction.CompleteRestore(7,attempt.request,true),SettingsCode::Ok,"retain unexecuted intended edits");
+	Check(transaction.Draft().at("mode") == StateValue(2.0) && transaction.Draft().at("volume") == StateValue(0.8) && host.writes.size() == writes,"unwritten recovery preserves draft without touching host");
+}
+
+void AsyncFailureBoundaries() {
+	for (int failure = 0; failure < 3; ++failure) {
+		FakeHost host; SettingsTransaction transaction(host); Begin(host,transaction); SettingsAttempt attempt;
+		Expect(transaction.Edit(7,{{"mode",1.0}}),SettingsCode::Ok,"edit failing async attempt");
+		Expect(transaction.PrepareApply(7,1,attempt),SettingsCode::Ok,"prepare failing async attempt");
+		host.writeHook = [&](const StateValues& patch,std::string& error) {
+			if (failure == 0) { error = "refused"; return false; }
+			host.Patch(patch);
+			if (failure == 1) throw std::runtime_error("threw after complete write");
+			return true;
+		};
+		int reads = 0;
+		if (failure == 2) host.readHook = [&](StateValues& output,std::string& error) {
+			if (++reads == 2) { error = "unavailable readback"; return false; }
+			output = host.live; return true;
+		};
+		Expect(transaction.ExecuteApply(7,attempt.request),SettingsCode::ApplyFailed,"write/refusal/readback failure stays pending");
+		Check(host.writes.size() == 1 && transaction.Phase() == SettingsPhase::Applying && transaction.Deadline() == 0,"no failure path invokes hidden rollback or confirms");
+		Expect(transaction.CompleteApply(7,attempt.request,2),SettingsCode::Busy,"even a throwing complete write needs explicit recovery");
+		host.readHook = {};
+		SettingsAttempt untouched{23,24,{{"sentinel",true}},{},{}};
+		host.readHook = [](StateValues&,std::string& error) { error = "recovery read unavailable"; return false; };
+		const auto beforeRequest = transaction.Request();
+		Expect(transaction.PrepareRestore(7,beforeRequest,untouched),SettingsCode::RollbackFailed,"restore cannot prepare without a fresh frame");
+		Check(untouched.owner == 23 && untouched.request == 24 && transaction.Request() == beforeRequest &&
+			transaction.Baseline() == Initial() && host.writes.size() == 1,"failed recovery prepare preserves output and ownership");
+		host.readHook = {};
+		Expect(transaction.PrepareRestore(7,beforeRequest,attempt),SettingsCode::Ok,"recovery can prepare after host reads return");
+		host.writeHook = [&](const StateValues& patch,std::string&) -> bool { host.Patch(patch); throw 42; };
+		Expect(transaction.ExecuteRestore(7,attempt.request),SettingsCode::Ok,"exact restored readback is authoritative after a throwing rollback");
+		Expect(transaction.CompleteRestore(7,attempt.request,true),SettingsCode::Ok,"qualified recovered state completes");
+		Check(host.live == Initial() && transaction.Draft().at("mode") == StateValue(1.0),"failed attempt remains editable after verified recovery");
+	}
+
+	FakeHost host; SettingsTransaction transaction(host); Begin(host,transaction); SettingsAttempt attempt;
+	Expect(transaction.Edit(7,{{"mode",1.0}}),SettingsCode::Ok,"edit refused restoration");
+	Expect(transaction.PrepareApply(7,1,attempt),SettingsCode::Ok,"prepare refused restoration");
+	Expect(transaction.ExecuteApply(7,attempt.request),SettingsCode::Ok,"apply before refused restoration");
+	Expect(transaction.PrepareRestore(7,attempt.request,attempt),SettingsCode::Ok,"prepare first restoration");
+	const auto failed = attempt.request;
+	host.writeHook = [](const StateValues&,std::string& error) { error = "restore refused"; return false; };
+	Expect(transaction.ExecuteRestore(7,failed),SettingsCode::RollbackFailed,"refused restore preserves pending identity");
+	const auto writes = host.writes.size(); const int reads = host.reads;
+	Expect(transaction.Tick(20),SettingsCode::Busy,"failed async restore is never retried every frame");
+	Expect(transaction.Abandon(7),SettingsCode::Busy,"orphan close cannot synchronously repeat failed restoration");
+	Check(transaction.Phase() == SettingsPhase::Restoring && host.reads == reads && host.writes.size() == writes,"failed restore freezes without callbacks");
+	host.writeHook = {};
+	Expect(transaction.PrepareRestore(7,failed,attempt),SettingsCode::Ok,"explicit restore retry changes identity");
+	Expect(transaction.ExecuteRestore(7,attempt.request),SettingsCode::Ok,"retry restores host");
+	Expect(transaction.CompleteRestore(7,failed),SettingsCode::Invalid,"stale failed attempt cannot complete new retry");
+	const auto beforeExternal = attempt.request;
+	host.live["volume"] = 0.9;
+	Expect(transaction.CompleteRestore(7,beforeExternal),SettingsCode::Conflict,"device wait cannot hide a changed host frame");
+	Check(transaction.AsyncPending() && transaction.Baseline() == Initial(),"late external change retains recovery data");
+	Expect(transaction.PrepareRestore(7,beforeExternal,attempt),SettingsCode::Ok,"fresh retry captures unrelated external value");
+	Expect(transaction.ExecuteRestore(7,attempt.request),SettingsCode::Ok,"fresh already-restored frame needs no writes");
+	Expect(transaction.CompleteRestore(7,attempt.request),SettingsCode::Ok,"verified fresh restoration rebases");
+	Check(transaction.Baseline() == host.live && host.live.at("volume") == StateValue(0.9),"late unrelated updates survive complete recovery");
+	SettingsAttempt untouched{23,24,{{"sentinel",true}},{},{}};
+	const auto noWrites = host.writes.size();
+	Expect(transaction.PrepareApply(7,std::numeric_limits<double>::quiet_NaN(),untouched),SettingsCode::Invalid,"invalid async time rejected before preparation");
+	Check(untouched.owner == 23 && untouched.request == 24 && !transaction.AsyncPending() && host.writes.size() == noWrites,"invalid async prepare is atomic");
+}
 } // namespace
 
 int main() {
@@ -459,5 +690,9 @@ int main() {
 	ConfirmationConflictAndRollbackPolicy();
 	ReentrancyAndIndependentInstances();
 	MergedRecoveryBudgets();
-	std::puts("UI settings: owned drafts, bounded typed edits, patch apply, conflict-safe rollback, confirmation, recovery and reentrancy passed");
+	AsyncStagesAndIdentity();
+	AsyncPersistenceAndConflicts();
+	AsyncPartialWritesAndRetry();
+	AsyncFailureBoundaries();
+	std::puts("UI settings: owned drafts, bounded edits, synchronous compatibility, async prepare/execute/complete, unique tokens, durable confirmation boundary, conflict-safe recovery and reentrancy passed");
 }

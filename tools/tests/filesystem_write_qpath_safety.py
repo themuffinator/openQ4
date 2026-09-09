@@ -360,7 +360,7 @@ def validate_source_contract() -> None:
 
     device_helper = function_body(source, "static bool FS_IsWindowsDeviceQPathSegment(")
     parent_os_path_helper = function_body(source, "static bool FS_HasParentOSPathSegment(")
-    validator = function_body(source, "static bool FS_ValidateRelativeWritePath(")
+    validator = function_body(source, "bool FS_ValidateRelativeWritePath(")
     open_write = function_body(source, "idFile *idFileSystemLocal::OpenFileWrite(")
     open_append = function_body(source, "idFile *idFileSystemLocal::OpenFileAppend(")
     remove_file = function_body(source, "void idFileSystemLocal::RemoveFile(")

@@ -974,4 +974,14 @@
 	"#str_42909"	"Arma precedente"
 	"#str_42910"	"Tasti di movimento (WASD)"
 	"#str_42911"	"Clic sinistro"
+
+	// Display application, confirmation and durable recovery.
+	"#str_229990"	"Applicazione delle impostazioni dello schermo…"
+	"#str_229991"	"Ripristino delle impostazioni dello schermo precedenti…"
+	"#str_229992"	"Salvataggio delle impostazioni dello schermo…"
+	"#str_229993"	"Mantenere queste impostazioni dello schermo?"
+	"#str_229994"	"Mantieni"
+	"#str_229995"	"Ripristina"
+	"#str_229996"	"Riprova"
+	"#str_229997"	"Le impostazioni sono state accettate, ma il salvataggio non è terminato. Riprova per completarlo."
 }

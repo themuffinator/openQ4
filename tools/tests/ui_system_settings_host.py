@@ -5,6 +5,7 @@ Uses the real host implementation, presentation codec and UTF-8 validation with
 counted CVar/SDL doubles. No engine, display or input-device operation is run.
 """
 from pathlib import Path
+import os
 import re
 import shutil
 import subprocess
@@ -321,17 +322,18 @@ def main():
         raise RuntimeError('C++ compiler required')
     (ROOT / '.tmp').mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='ui-settings-host-', dir=ROOT / '.tmp') as temp:
+        environment = dict(os.environ, TEMP=temp, TMP=temp)
         source = Path(temp) / 'host.cpp'
         source.write_text(code, encoding='utf-8')
         for sdl in (False, True):
             binary = Path(temp) / ('sdl.exe' if sdl else 'plain.exe')
             defines = ['-DUSE_SDL3'] if sdl else []
             subprocess.run([compiler, '-std=c++20', *defines, '-I', str(ROOT), str(source),
-                            str(ROOT / 'src/ui/retained/Presentation.cpp'), '-o', str(binary)], check=True)
-            subprocess.run([str(binary)], check=True)
+                            str(ROOT / 'src/ui/retained/Presentation.cpp'), '-o', str(binary)], check=True, env=environment)
+            subprocess.run([str(binary)], check=True, env=environment)
         dedicated = Path(temp) / 'dedicated.cpp'
         dedicated.write_text('#define ID_DEDICATED\n' + host + '\nint main() {}\n', encoding='utf-8')
-        subprocess.run([compiler, '-std=c++20', str(dedicated), '-o', str(Path(temp) / 'dedicated.exe')], check=True)
+        subprocess.run([compiler, '-std=c++20', str(dedicated), '-o', str(Path(temp) / 'dedicated.exe')], check=True, env=environment)
 
 
 if __name__ == '__main__':

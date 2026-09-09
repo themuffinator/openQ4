@@ -51,6 +51,7 @@ If you have questions concerning this license or the applicable additional terms
 #undef private
 #include "../imagetools/ImageTools.h"
 #include "../ui/RetainedUI.h"
+#include "../ui/SettingsService.h"
 #include "../ui/UserInterfaceManaged.h"
 #include "../ui/UserInterfaceRetained.h"
 
@@ -7642,16 +7643,19 @@ void idSessionLocal::UpdateScreen( bool outOfSequence ) {
 
 	renderSystem->SetLoadingScreenSwapIntervalBypass( insideExecuteMapChange );
 
+	UI_SettingsRenderFrame settingsFrame;
 	renderSystem->BeginFrame( renderSystem->GetScreenWidth(), renderSystem->GetScreenHeight() );
 
 	// draw everything
 	Draw();
 
+	settingsFrame.Submitting();
 	if ( com_speeds.GetBool() ) {
 		renderSystem->EndFrame( &time_frontend, &time_backend );
 	} else {
 		renderSystem->EndFrame( NULL, NULL );
 	}
+	settingsFrame.Presented();
 	RetainedUI_FrameSubmitted();
 
 	insideUpdateScreen = false;
@@ -8150,6 +8154,9 @@ void idSessionLocal::Init() {
 #ifndef ID_DEDICATED
 	cmdSystem->AddCommand( "openq4_retainedGui", Session_RetainedGui_f, CMD_FL_SYSTEM, "inspect a normal retained GUI or submit semantic diagnostics without device input" );
 #endif
+	// A rejected recoverable restart can leave no device until the next safe
+	// settings frame restores it. Never issue drawing commands into that gap.
+	if ( !renderSystem || !renderSystem->IsOpenGLRunning() ) return;
 
 #ifndef	ID_DEDICATED
 	cmdSystem->AddCommand( "GuiEvent", Session_GuiEvent_f, CMD_FL_SYSTEM, "sends a named event to the active gui" );

@@ -7,13 +7,14 @@ the [visual design requirements](../ui-visual-design.md) and the
 screen or an acceptance record for the shipped GUI corpus.
 
 The transaction core, fixed 53-field engine catalog and typed application service
-are implemented as a bounded foundation. Immediate changes can be drafted,
-validated, applied, canceled and restored through the service. Every changed
-non-immediate effect currently blocks the complete Apply batch before live
-writes. Complete display, audio and resource-reload result routing, a durable
-recovery journal, production controls, editor support and product qualification
-are still required. Native tests and two source-bound gameplay probes qualify
-only the implementation subset described below.
+are implemented. Immediate changes can be drafted, validated, applied, canceled
+and restored through the service. The [display confirmation integration](display-confirmation.md)
+adds frame-owned Apply/Keep/Revert, durable recovery and strict initial-device
+recovery for eligible confirmation documents. Audio, image/resource reload,
+next-map and preset-expansion effects still block the complete batch before live
+writes. Production controls, editor support and full product qualification remain
+required. Earlier immediate-only evidence below describes its recorded checkpoint;
+the newer display contract defines the current integration and its limits.
 
 ## Source identity and precedence
 

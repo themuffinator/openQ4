@@ -493,8 +493,8 @@ static bool RM_ExportCanRender( const renderExport_t *moduleExport, const char *
 		*reason = "module is bring-up/diagnostics only";
 		return false;
 	}
-	if ( moduleExport->TryDeviceRestart == NULL || moduleExport->GetDisplayPresentation == NULL ) {
-		*reason = "module lacks version 14 device services";
+	if ( moduleExport->TryDeviceRestart == NULL || moduleExport->GetDisplayPresentation == NULL || moduleExport->TryInitializeDisplay == NULL ) {
+		*reason = "module lacks version 15 device services";
 		return false;
 	}
 	return true;
@@ -964,6 +964,43 @@ bool R_RendererModule_TryDeviceRestart( const renderWindowRequest_t *request, ch
 	return false;
 }
 
+bool R_RendererModule_TryInitializeDisplay( const renderWindowRequest_t *request, char *error, int errorSize ) {
+	if ( error != NULL && errorSize > 0 ) error[0] = '\0';
+	const renderWindowServices_t *windowServices = Sys_GetRenderWindowServices();
+	if ( request == NULL || renderSystem == NULL || rm_displayModuleEpoch == 0 || renderSystem->IsOpenGLRunning() || windowServices == NULL ||
+		windowServices->ApplyScreenParmsStrict == NULL || windowServices->QueryWindowState == NULL ||
+		windowServices->RetainVideoSystem == NULL || windowServices->ReleaseVideoSystem == NULL ) {
+		if ( error != NULL && errorSize > 0 ) idStr::Copynz( error, "strict initial display services are unavailable or the renderer is already running", errorSize );
+		return false;
+	}
+	bool ( *initialize )( const renderWindowRequest_t *, char *, int ) = NULL;
+	if ( rm_state.interfacesPublished && rm_state.moduleExportValid ) initialize = rm_state.moduleExport.TryInitializeDisplay;
+#if !defined( OPENQ4_RENDERER_MODULE_ONLY ) && !defined( ID_DEDICATED )
+	else if ( rm_state.status.disposition != RENDER_MODULE_DISPOSITION_NONE ) initialize = R_TryInitializeDisplay;
+#endif
+	if ( initialize == NULL ) {
+		if ( error != NULL && errorSize > 0 ) idStr::Copynz( error, "active renderer has no strict initial display service", errorSize );
+		return false;
+	}
+	// Startup prepares video before resolving portable monitor identities. Pin
+	// that same SDL lifetime across partial initialization cleanup and explicit
+	// retries, just as a failed live-device restart pins its original identity.
+	if ( rm_displayVideoPin == NULL ) {
+		if ( !windowServices->RetainVideoSystem() ) {
+			if ( error != NULL && errorSize > 0 ) idStr::Copynz( error, "cannot retain the prepared video subsystem", errorSize );
+			return false;
+		}
+		rm_displayVideoPin = windowServices;
+	}
+	const bool result = initialize( request, error, errorSize );
+	if ( result && renderSystem->IsOpenGLRunning() ) {
+		RM_ReleaseDisplayVideoPin();
+		return true;
+	}
+	if ( result && error != NULL && errorSize > 0 ) idStr::Copynz( error, "initial display service returned without a ready renderer", errorSize );
+	return false;
+}
+
 /*
 ====================
 R_RendererModule_GetStatus
@@ -1182,6 +1219,11 @@ bool RendererModule_RunSelfTest( void ) {
 		}
 		testExport.TryDeviceRestart = []( const renderWindowRequest_t *, char *, int ) { return false; };
 		testExport.GetDisplayPresentation = []( renderDisplayPresentation_t * ) {};
+		if ( RM_ExportCanRender( &testExport, &reason ) ) {
+			common->Warning( "rendererModuleSelfTest: full export without strict initial device service must be rejected" );
+			numFailures++;
+		}
+		testExport.TryInitializeDisplay = []( const renderWindowRequest_t *, char *, int ) { return false; };
 		if ( !RM_ExportCanRender( &testExport, &reason ) ) {
 			common->Warning( "rendererModuleSelfTest: full exports must be activatable with the Phase B8 seam landed" );
 			numFailures++;

@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """Exercise production settings service, transaction and config-write guards.
 
-Compiles the real service/transaction and Common persistence function bodies,
-with real public headers and value validation. A four-field SystemSettingsHost
-and counted engine I/O stand in for the 53-CVar catalog, devices and filesystem.
-Forced confirmation models service lifecycle states; it does not qualify any
-display/audio restart, recovery journal, rendering, production page or editor.
+Compiles the real service/transaction/display controller and Common public
+config wrappers, with real core headers and value validation. A four-field host,
+counted device observations and checked-config edge stand in for engine I/O.
+The checked writer itself has native fault tests in
+settings_configuration_persistence.py. No synthetic observation qualifies an
+actual display/audio restart, journal, renderer, production page or editor.
 Each scenario starts a fresh process, preserving the production singleton.
 """
 from pathlib import Path
+import os
 import shutil
 import subprocess
 import tempfile
@@ -20,18 +22,23 @@ ROOT = Path(__file__).resolve().parents[2]
 SUPPORT = r'''
 #include <algorithm>
 #include <cassert>
+#include <charconv>
+#include <cstdarg>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <functional>
 #include <limits>
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
 #include <utility>
 #include <vector>
 #include "src/ui/SettingsService.h"
 #include "src/ui/application/SystemSettingsHost.h"
+#include "src/ui/application/SettingsDisplayController.h"
 using namespace openq4::ui;
 static void Check(bool condition,const char* message) {
     if(!condition) { std::fprintf(stderr,"FAIL: %s\n",message);std::exit(1); }
@@ -89,19 +96,32 @@ bool SystemSettingsHost::Write(const StateValues& patch,std::string& error) {
 bool SystemSettingsHost::RequiresDeviceWork(const StateValues& before,const StateValues& target) {
     return before.at("r_mode")!=target.at("r_mode") || before.at("r_renderer")!=target.at("r_renderer");
 }
+unsigned SystemSettingsHost::ChangedEffects(const StateValues& before,const StateValues& target) {
+    if(before.empty() || target.empty())return 0;
+    return (before.at("r_mode")!=target.at("r_mode")?unsigned(SystemSettingDisplayRestart):0u) |
+        (before.at("r_renderer")!=target.at("r_renderer")?unsigned(SystemSettingRendererResources):0u);
+}
+bool SystemSettingsHost::ChangedRequiresDisplayRestart(const StateValues& before,const StateValues& target) {
+    return (ChangedEffects(before,target)&SystemSettingDisplayRestart)!=0;
+}
 bool SystemSettingsHost::NeedsConfirmation(const StateValues&,const StateValues&) const {
     return host.confirm; // Fault-injected service state, never a device result.
 }
 }
 struct Common {
     int warnings=0,prints=0;
+    std::vector<std::string> lines;
     void Warning(const char*,...) { ++warnings; }
-    void Printf(const char*,...) { ++prints; }
+    void Printf(const char* format,...) {
+        ++prints;char line[2048];va_list args;va_start(args,format);
+        std::vsnprintf(line,sizeof(line),format,args);va_end(args);lines.emplace_back(line);
+    }
 } commonObject,*common=&commonObject;
 enum { CVAR_ARCHIVE=1 };
 struct idFile {} file;
 struct Files {
     int opens=0,closes=0;
+    bool lockFailure=false,commitFailure=false;
     idFile* OpenFileWrite(const char*) { ++opens;return &file; }
     void CloseFile(idFile* value) { Check(value==&file,"close correct file");++closes; }
 } files,*fileSystem=&files;
@@ -122,10 +142,77 @@ static bool com_fullyInitialized=true;
 static const char* CONFIG_FILE="test.cfg";
 struct Session { int writes=0;void WriteCDKey() { ++writes; } } sessionObject,*session=&sessionObject;
 struct idCommonLocal {
+    bool WriteConfigToFileChecked(const char*,bool coordinatorOwnsLock,std::string& error) {
+        if((!coordinatorOwnsLock && UI_SettingsBlocksConfigWrite()) || files.lockFailure){error="blocked/locked";return false;}
+        ++files.opens;++files.closes;++cvars.serializations;++idKeyInput::serializations;
+        if(files.commitFailure){error="durable commit failed";return false;}
+        error.clear();return true;
+    }
     void WriteConfigToFile(const char* filename);
     void WriteConfiguration();
     void Printf(const char*,...) {}
 } commonLocal;
+
+// The engine adapter's platform edge is deliberately isolated. All sequencing,
+// request identities, transaction writes and service ownership use production.
+static struct DeviceData {
+    SettingsDisplayObservation observation{1,1,0,0,0,true,false,true,false};
+    bool held=false,startup=false,blocked=false,refusePrepare=false,refusePersist=false;
+    int prepares=0,cancels=0,restarts=0,restores=0,observes=0,persists=0,finishes=0,startups=0,frames=0,shutdowns=0;
+} deviceData;
+class EngineSettingsDisplayHost final:public SettingsDisplayHost {
+public:
+    explicit EngineSettingsDisplayHost(SystemSettingsHost&){}
+    bool Prepare(const SettingsAttempt&,std::string& error)override{
+        ++deviceData.prepares;deviceData.held=true;
+        if(deviceData.refusePrepare){error="native preparation refused";return false;}return true;
+    }
+    bool CancelPreparation(std::string&)override{++deviceData.cancels;deviceData.held=false;return true;}
+    bool Restart(bool restoring,SettingsDisplayObservation& observed,std::string&)override{
+        ++deviceData.restarts;if(restoring)++deviceData.restores;
+        ++deviceData.observation.generation;
+        deviceData.observation.submitted=deviceData.observation.presented=0;
+        observed=deviceData.observation;return true;
+    }
+    bool Observe(bool,SettingsDisplayObservation& observed,std::string&)override{
+        ++deviceData.observes;observed=deviceData.observation;return true;
+    }
+    bool PersistConfirmation(const SettingsAttempt&,std::string& error)override{
+        ++deviceData.persists;
+        if(deviceData.refusePersist){error="durable confirmation refused";return false;}
+        if(!commonLocal.WriteConfigToFileChecked(CONFIG_FILE,true,error))return false;
+        cvars.ClearModifiedFlags(CVAR_ARCHIVE);return true;
+    }
+    bool Finish(bool,std::string&)override{++deviceData.finishes;deviceData.held=false;return true;}
+    bool Startup(std::string&) {++deviceData.startups;return !deviceData.blocked;}
+    bool InitializeDisplay(std::string&) {return !deviceData.blocked;}
+    void StartupFrame(double,bool) {++deviceData.frames;}
+    void Shutdown(){++deviceData.shutdowns;deviceData.held=false;}
+    bool RecoveryActive()const noexcept{return deviceData.held || deviceData.startup || deviceData.blocked;}
+    bool StartupActive()const noexcept{return deviceData.startup;}
+};
+// Execute the production Session::UpdateScreen frame boundary with a counted
+// synchronous renderer. No window, GPU or input APIs are used by these doubles.
+static std::function<void()> beginHook, drawHook, endHook;
+static int completedFrames=0;
+struct FrameRenderer {
+    int GetScreenWidth()const{return 1280;}
+    int GetScreenHeight()const{return 720;}
+    void SetLoadingScreenSwapIntervalBypass(bool){}
+    void BeginFrame(int,int){if(beginHook)beginHook();}
+    void EndFrame(int*,int*){if(endHook)endHook();}
+} frameRenderer,*renderSystem=&frameRenderer;
+struct Speeds {bool value=false;bool GetBool()const{return value;}} com_speeds;
+static int com_editors=0;
+static bool Sys_IsWindowVisible(){return true;}
+static void Sys_GrabMouseCursor(bool){Check(false,"input path forbidden in test");}
+static void RetainedUI_FrameSubmitted(){++completedFrames;}
+struct idSessionLocal {
+    bool insideUpdateScreen=false,insideExecuteMapChange=false;
+    int time_frontend=0,time_backend=0;
+    void Draw(){if(drawHook)drawHook();}
+    void UpdateScreen(bool outOfSequence=false);
+};
 '''
 
 MAIN = r'''
@@ -151,7 +238,7 @@ static std::uint64_t Begin() {
 }
 static void Private(std::uint64_t owner,bool busy) {
     const auto values=Read(owner);
-    Check(values.size()==6,"nonowner gets status only, no catalog snapshots");
+    Check(values.size()==12,"nonowner gets status only, no catalog snapshots");
     Check(values.at("settings.open")==StateValue(false) && values.at("settings.busy")==StateValue(busy),"nonowner ownership flags");
     Check(values.at("settings.dirty")==StateValue(false) && values.at("settings.canApply")==StateValue(false),"nonowner cannot inspect draft");
     Check(values.at("settings.phase")==StateValue(0.0),"nonowner phase is closed");
@@ -165,10 +252,13 @@ static std::uint64_t Pending() {
 }
 static void Validation() {
     const auto& schema=UI_SettingsStateSchema();
-    Check(schema.size()==14 && schema.at("settings.message")==2 && schema.at("settings.open")==1 &&
+    Check(schema.size()==20 && schema.at("settings.message")==2 && schema.at("settings.open")==1 &&
           schema.at("settings.phase")==0,"service status schema types");
     for(const auto& [key,type]:SystemSettingsHost::Schema())
         Check(schema.at("settings.draft."+key)==type && schema.at("settings.baseline."+key)==type,"typed snapshot schema");
+    for(const auto& [key,type]:std::map<std::string,size_t>{{"settings.request",2},{"settings.confirmationVisible",1},
+        {"settings.canConfirm",1},{"settings.canRevert",1},{"settings.canRetry",1},{"settings.remaining",0}})
+        Check(schema.at(key)==type,"display confirmation status schema types");
     std::string error;
     for(const char* operation:{"begin","defaults","cancel","apply","confirm","revert"}) {
         auto invocation=Invocation(operation);Check(UI_SettingsInvocation(invocation,error),"known no-argument operation");
@@ -176,6 +266,12 @@ static void Validation() {
         Check(!UI_SettingsInvocation(invocation,error),"no-argument operation rejects extras");
     }
     Check(UI_SettingsInvocation(Invocation("edit",Initial()),error),"typed complete edit shape accepted");
+    for(const char* op:{"confirm","revert","retry"}) {
+        Check(UI_SettingsInvocation(Invocation(op,{{"request",std::string("123")}}),error),"typed displayed request accepted");
+        Check(!UI_SettingsInvocation(Invocation(op,{{"request",123.0}}),error),"request token is never an imprecise number");
+        Check(!UI_SettingsInvocation(Invocation(op,{{"request",std::string("123")},{"extra",true}}),error),"request argument has exact shape");
+    }
+    Check(!UI_SettingsInvocation(Invocation("retry"),error),"retry always requires displayed request identity");
     for(const auto& patch:std::vector<StateValues>{{},{{"unknown",true}},{{"r_brightness",true}},
         {{"r_shadows",1.0}},{{"r_renderer",0.0}},{{"r_brightness",std::numeric_limits<double>::infinity()}},
         {{"r_brightness",std::numeric_limits<double>::quiet_NaN()}},{{"r_brightness",1e13}},
@@ -340,6 +436,250 @@ static void Persistence() {
     commonLocal.WriteConfiguration();Check(files.opens==1,"clean archive does not rewrite");
     Check(Dispatch(owner,"edit",{{"r_brightness",1.5}}),"draft after recovery");
     commonLocal.WriteConfigToFile("explicit.cfg");Check(files.opens==2 && host.live==Initial(),"editing may serialize committed host state without applying draft");
+    cvars.flags=CVAR_ARCHIVE;files.lockFailure=true;
+    const int clears=cvars.clears,writes=sessionObject.writes;
+    commonLocal.WriteConfiguration();commonLocal.WriteConfigToFile("locked.cfg");
+    Check(files.opens==2 && cvars.flags==CVAR_ARCHIVE && cvars.clears==clears && sessionObject.writes==writes,"checked lease failure preserves archive dirty and ancillary writes");
+    files.lockFailure=false;files.commitFailure=true;commonLocal.WriteConfiguration();
+    Check(files.opens==3 && cvars.flags==CVAR_ARCHIVE && cvars.clears==clears && sessionObject.writes==writes,"checked durability failure preserves archive dirty and ancillary writes");
+    files.commitFailure=false;commonLocal.WriteConfiguration();
+    Check(files.opens==4 && cvars.flags==0 && cvars.clears==clears+1 && sessionObject.writes==writes+1,"successful retry clears archive dirty exactly once");
+}
+static DocumentModel ConfirmationDocument() {
+    DocumentModel document;
+    for(const auto& [key,type]:UI_SettingsStateSchema()) {
+        StateDeclaration declaration;
+        declaration.initial=type==0?StateValue(0.0):type==1?StateValue(false):StateValue(std::string());
+        document.state.emplace(key,declaration);
+    }
+    for(const auto& [id,operation]:std::map<std::string,std::string>{{"settings_keep","confirm"},{"settings_revert","revert"},{"settings_retry","retry"}}) {
+        Node node;node.id=id;node.control=Control{};node.control->label="#str_fixture_label";node.control->action=id;
+        document.root.children.push_back(node);
+        Action action;action.operation="settings.system."+operation;
+        Expression request;request.type=2;request.state="settings.request"; // Canonical direct state lookup has an empty op.
+        action.arguments["request"]=request;document.actions[id]=action;
+    }
+    return document;
+}
+static void ConfirmationCapability() {
+    const auto owner=Begin();
+    Check(Dispatch(owner,"edit",{{"r_mode",1.0}}),"draft display value before capability proof");
+    Expect(owner,"canApply",false);
+    const auto valid=ConfirmationDocument();
+    UI_SettingsConfirmationDocument(owner,valid);Expect(owner,"canApply",true);
+    for(const char* key:{"settings.request","settings.confirmationVisible","settings.canConfirm","settings.canRevert","settings.canRetry","settings.remaining"}) {
+        auto invalid=valid;invalid.state.erase(key);
+        UI_SettingsConfirmationDocument(owner,invalid);Expect(owner,"canApply",false);
+        invalid=valid;invalid.state[key].cvar="r_mode";
+        UI_SettingsConfirmationDocument(owner,invalid);Expect(owner,"canApply",false);
+        invalid=valid;invalid.state[key].initial=key==std::string("settings.request")?StateValue(false):StateValue(std::string());
+        UI_SettingsConfirmationDocument(owner,invalid);Expect(owner,"canApply",false);
+    }
+    for(int control=0;control<3;++control) {
+        for(int defect=0;defect<8;++defect) {
+            auto invalid=valid;auto& node=invalid.root.children[control];auto& action=invalid.actions.at(node.control->action);
+            if(defect==0)node.id="wrong-id";
+            if(defect==1)node.control.reset();
+            if(defect==2)node.control->label.clear();
+            if(defect==3)action.operation="settings.system.cancel";
+            if(defect==4)action.arguments.at("request").op="state"; // Not the compiler's canonical state representation.
+            if(defect==5)action.arguments.at("request").state="old.request";
+            if(defect==6)action.arguments.emplace("extra",Expression{});
+            if(defect==7)action.arguments.at("request").op="literal";
+            UI_SettingsConfirmationDocument(owner,invalid);Expect(owner,"canApply",false);
+        }
+    }
+    UI_SettingsConfirmationDocument(owner,valid);Expect(owner,"canApply",true);
+    Check(Dispatch(owner,"edit",{{"r_renderer",std::string("arb2")},{"r_brightness",1.5}}),"mixed unsupported resource batch can be drafted");
+    Expect(owner,"canApply",false);
+    Check(!Dispatch(owner,"apply") && host.writes.empty() && deviceData.prepares==0,"capability cannot authorize unsupported effects in a mixed batch");
+    UI_SettingsConfirmationDocument(owner,DocumentModel{});Check(Dispatch(owner,"revert"),"clear mixed draft");
+    Check(Dispatch(owner,"edit",{{"r_mode",1.0}}),"display redraft");Expect(owner,"canApply",false);
+}
+static std::string AwaitDisplay(std::uint64_t owner) {
+    UI_SettingsConfirmationDocument(owner,ConfirmationDocument());
+    Check(Dispatch(owner,"edit",{{"r_mode",1.0},{"r_brightness",1.5}}) && Dispatch(owner,"apply"),"capable owner queues typed display apply");
+    const auto request=std::get<std::string>(Read(owner).at("settings.request"));
+    Check(!request.empty() && host.writes.empty() && deviceData.prepares==0 && UI_SettingsBlocksConfigWrite(),"actions only freeze request before frame work");
+    Expect(owner,"phase",static_cast<double>(SettingsPhase::Applying));Expect(owner,"confirmationVisible",false);
+    UI_SettingsFrame(false);
+    Check(host.writes.empty() && deviceData.prepares==0,"loading frame never starts device or persistence work");
+    UI_SettingsFrame();
+    Check(host.writes.size()==1 && deviceData.prepares==1 && deviceData.restarts==1,"normal frame journals then writes and requests restart");
+    Expect(owner,"confirmationVisible",true);Expect(owner,"canConfirm",false);
+    return request;
+}
+static void Presented(std::uint64_t owner,const std::string& request) {
+    idSessionLocal screen;
+    drawHook=[&]{UI_SettingsOwnerDrawn(owner,request);};
+    endHook=[] {++deviceData.observation.submitted;++deviceData.observation.presented;};
+    screen.UpdateScreen();UI_SettingsFrame(false);
+    Expect(owner,"canConfirm",false);
+    // A second receipt must not move the first acknowledged counter threshold.
+    screen.UpdateScreen();
+    UI_SettingsFrame(false);
+    Expect(owner,"phase",static_cast<double>(SettingsPhase::Confirming));Expect(owner,"canConfirm",true);
+    Check(std::get<double>(Read(owner).at("settings.remaining"))>0,"countdown starts after exact owner frame receipt and one conservative later present");
+    drawHook={};endHook={};
+}
+static void FrameReceipt(const std::string& defect) {
+    const auto owner=Begin();const auto request=AwaitDisplay(owner);
+    idSessionLocal screen;
+    auto present=[] {++deviceData.observation.submitted;++deviceData.observation.presented;};
+    drawHook=[&]{UI_SettingsOwnerDrawn(owner,request);};endHook=present;
+    if(defect=="outside") {
+        UI_SettingsOwnerDrawn(owner,request);drawHook={};
+    } else if(defect=="skipped") endHook=[]{};
+    else if(defect=="submit_only")endHook=[] {++deviceData.observation.submitted;};
+    else if(defect=="present_only")endHook=[] {++deviceData.observation.presented;};
+    else if(defect=="readback_before_draw")beginHook=[] {++deviceData.observation.submitted;};
+    else if(defect=="readback_after_draw")drawHook=[&] {UI_SettingsOwnerDrawn(owner,request);++deviceData.observation.submitted;};
+    else if(defect=="readback_during_end")endHook=[] {deviceData.observation.submitted+=2;++deviceData.observation.presented;};
+    else if(defect=="nested")drawHook=[&] {
+        UI_SettingsOwnerDrawn(owner,request);
+        UI_SettingsRenderFrame nested;UI_SettingsOwnerDrawn(owner,request);nested.Submitting();nested.Presented();
+    };
+    else if(defect=="aborted")endHook=[&] {present();throw 7;};
+    else if(defect=="begin_aborted")beginHook=[] {throw 7;};
+    else if(defect=="draw_aborted")drawHook=[&] {UI_SettingsOwnerDrawn(owner,request);throw 7;};
+    else if(defect=="wrong_request")drawHook=[&] {UI_SettingsOwnerDrawn(owner,"99999");};
+    else if(defect=="wrong_owner")drawHook=[&] {UI_SettingsOwnerDrawn(UI_SettingsCreateOwner(),request);};
+    else if(defect=="revoked")drawHook=[&] {UI_SettingsOwnerDrawn(owner,request);UI_SettingsConfirmationDocument(owner,DocumentModel{});};
+    else if(defect=="shutdown")drawHook=[] {UI_SettingsShutdown();};
+    else if(defect=="historical_offset")deviceData.observation.submitted=17;
+    else Check(false,"unknown frame receipt defect");
+    try {screen.UpdateScreen();} catch(int value){Check(value==7,"expected bounded renderer abort");}
+    beginHook={};drawHook={};endHook=present;
+    if(defect=="revoked")UI_SettingsConfirmationDocument(owner,ConfirmationDocument());
+    // A later frame without this owner must never revive an aborted/skipped
+    // draw. Use a new Session stand-in after abort; scope cleanup is production.
+    idSessionLocal next;next.UpdateScreen();UI_SettingsFrame(false);
+    if(defect=="shutdown") {
+        Check(!UI_SettingsBlocksConfigWrite(),"shutdown abandons only this in-memory frame latch");return;
+    }
+    if(defect=="historical_offset") {
+        Expect(owner,"canConfirm",true);
+        Check(deviceData.observation.submitted-deviceData.observation.presented==17,"historical no-present readback offset preserved");
+    } else {
+        Expect(owner,"canConfirm",false);
+        Presented(owner,request); // A fresh healthy owner frame can still qualify.
+    }
+}
+static void FrameReceiptTrace() {
+    const auto owner=Begin();const auto request=AwaitDisplay(owner);
+    deviceData.observation.submitted=23;deviceData.observation.presented=7;cvars.trace=true;
+    Presented(owner,request);
+    int views=0,presents=0;
+    for(const auto& line:commonObject.lines) {
+        if(line.starts_with("UI_SETTINGS_VIEW ")) {
+            ++views;Check(line.find("submitted=24 presented=8 failures=0")!=std::string::npos,
+                "VIEW is exact post-EndFrame receipt, never the earlier draw counter");
+        }
+        if(line.starts_with("UI_SETTINGS_PRESENT ")) {
+            ++presents;Check(line.find("submitted=25 presented=9 failures=0")!=std::string::npos,
+                "PRESENT follows immutable receipt by one conservative presented frame");
+        }
+    }
+    Check(views==1 && presents==1,"one receipt and one confirmation trace per request despite repeated owner redraw");
+}
+static void FrameReceiptIdentity(const std::string& defect) {
+    const auto owner=Begin();const auto request=AwaitDisplay(owner);
+    const auto original=deviceData.observation;
+    idSessionLocal screen;drawHook=[&]{UI_SettingsOwnerDrawn(owner,request);};
+    endHook=[&] {
+        ++deviceData.observation.submitted;++deviceData.observation.presented;
+        if(defect=="epoch")++deviceData.observation.epoch;
+        else if(defect=="generation")++deviceData.observation.generation;
+        else if(defect=="failure")++deviceData.observation.failures;
+        else if(defect=="not_ready")deviceData.observation.ready=false;
+        else if(defect=="counter_regression")deviceData.observation.submitted=0;
+        else Check(false,"unknown receipt identity defect");
+    };
+    screen.UpdateScreen();drawHook={};endHook=[]{};
+    // Restore the observation before a later unrelated healthy frame. Without
+    // frame-scoped rejection, a stale marker could otherwise qualify here.
+    deviceData.observation=original;
+    ++deviceData.observation.submitted;++deviceData.observation.presented;
+    UI_SettingsFrame(false);Expect(owner,"canConfirm",false);
+    Presented(owner,request);
+}
+static void DisplayDelivery(bool failPersistence) {
+    const auto owner=Begin(),other=UI_SettingsCreateOwner();
+    const auto request=AwaitDisplay(owner);
+    int observations=deviceData.observes;
+    UI_SettingsOwnerDrawn(other,request);
+    for(const char* invalid:{"","0","01","-1","+1","1x","18446744073709551616"}) {
+        UI_SettingsOwnerDrawn(owner,invalid);
+        Check(!Dispatch(owner,"confirm",{{"request",std::string(invalid)}}),"malformed displayed request rejected");
+    }
+    Check(deviceData.observes==observations,"unqualified draw cannot furnish presentation witness");
+    Check(!Dispatch(owner,"confirm") && !Dispatch(other,"confirm",{{"request",request}}),"active display requires identity and owner");
+    Presented(owner,request);Private(other,true);
+    Check(Dispatch(owner,"confirm",{{"request",request}}) && deviceData.persists==0,"Keep queues its durable boundary");
+    UI_SettingsFrame(false);Check(deviceData.persists==0,"loading frame cannot persist Keep");
+    deviceData.refusePersist=failPersistence;UI_SettingsFrame();
+    if(failPersistence) {
+        Check(deviceData.persists==1 && deviceData.held && UI_SettingsBlocksConfigWrite(),"uncertain Keep retains journal ownership and write block");
+        Expect(owner,"phase",static_cast<double>(SettingsPhase::RecoveryRequired));
+        const auto nextRequest=std::get<std::string>(Read(owner).at("settings.request"));
+        Check(nextRequest!=request && !Dispatch(owner,"retry",{{"request",request}}),"prepare-confirm renews identity and rejects stale button data");
+        Expect(owner,"canRetry",true);Expect(owner,"canRevert",false);
+        Check(!Dispatch(owner,"revert",{{"request",nextRequest}}),"Revert never silently retries approved Keep");
+        UI_SettingsFrame();Check(deviceData.persists==1,"recovery does not blindly repeat persistence");
+        deviceData.refusePersist=false;
+        Check(Dispatch(owner,"retry",{{"request",nextRequest}}),"explicit recovery retries immutable Keep intent");
+        UI_SettingsFrame();
+    }
+    Check(!UI_SettingsBlocksConfigWrite() && !deviceData.held && deviceData.finishes==1 && deviceData.restores==0,"qualified durable Keep releases once without reverting accepted values");
+    Expect(owner,"phase",static_cast<double>(SettingsPhase::Editing));Expect(owner,"baseline.r_mode",1.0);Expect(owner,"request",std::string());
+}
+static void DisplayClose(bool written) {
+    const auto owner=Begin();
+    if(written)AwaitDisplay(owner);
+    else {
+        UI_SettingsConfirmationDocument(owner,ConfirmationDocument());
+        Check(Dispatch(owner,"edit",{{"r_mode",1.0}}) && Dispatch(owner,"apply"),"queue unwritten display before close");
+    }
+    const auto writes=host.writes.size();UI_SettingsReleaseOwner(owner);
+    Check(host.writes.size()==writes && UI_SettingsBlocksConfigWrite(),"GUI destructor only queues cleanup");
+    UI_SettingsFrame(false);Check(host.writes.size()==writes,"loading frame cannot restore display");
+    UI_SettingsFrame();
+    if(written) {
+        Check(deviceData.restores==1 && UI_SettingsBlocksConfigWrite(),"restoration waits for separate presentation witness");
+        ++deviceData.observation.submitted;++deviceData.observation.presented;
+        UI_SettingsFrame();
+    }
+    Check(!UI_SettingsBlocksConfigWrite() && host.live==Initial(),"closed display returns verified baseline before release");
+    if(!written)Check(host.writes.empty() && deviceData.prepares==0 && deviceData.restarts==0,"queued cancellation performs no host or device work");
+    Begin();
+}
+static void StartupShutdown() {
+    std::string error;
+    Check(UI_SettingsStartup(error) && UI_SettingsInitializeDisplay(error) && !UI_SettingsStartupActive(),"service startup routes engine adapter");
+    deviceData.startup=true;
+    const auto owner=UI_SettingsCreateOwner();
+    Check(UI_SettingsStartupActive() && UI_SettingsBlocksConfigWrite() && !Dispatch(owner,"begin"),"startup recovery blocks editing and configuration");
+    UI_SettingsFrame(false);Check(deviceData.frames==1,"loading frame forwards poll-only recovery");
+    deviceData.startup=false;Check(Dispatch(owner,"begin"),"settled startup admits owner");
+    UI_SettingsShutdown();Check(deviceData.shutdowns==1,"service shutdown releases engine host once");
+    const auto replacement=UI_SettingsCreateOwner();Check(replacement>owner,"service recreation never reuses owner identity");
+    StateValues sentinel={{"sentinel",true}},output=sentinel;
+    Check(!UI_SettingsRead(owner,output) && output==sentinel,"old owner is invalid after shutdown");
+}
+static void StaleDisplayActions() {
+    const auto owner=Begin();
+    const auto request=AwaitDisplay(owner);Presented(owner,request);
+    Check(Dispatch(owner,"confirm",{{"request",request}}),"queue Keep before stale action replay");
+    UI_SettingsFrame();
+    Check(Dispatch(owner,"edit",{{"r_brightness",1.7}}),"edit a later draft after display completion");
+    const auto writes=host.writes.size();
+    for(const char* operation:{"revert","confirm","retry"}) {
+        Check(!Dispatch(owner,operation,{{"request",request}}),"stale display identity cannot enter immediate draft path");
+        Expect(owner,"draft.r_brightness",1.7);Expect(owner,"baseline.r_brightness",1.5);
+        Check(host.writes.size()==writes && !UI_SettingsBlocksConfigWrite(),"stale display action has no host side effect");
+    }
+    Check(Dispatch(owner,"revert"),"legacy no-argument draft revert remains available");
+    Expect(owner,"draft.r_brightness",1.5);
 }
 static void TimeoutFrame() {
     const auto owner=Begin();host.confirm=true;
@@ -361,7 +701,14 @@ int main(int argc,char** argv) {
     else if(name=="abandon_pending")AbandonPending();else if(name=="orphan_refusal")Orphan(false);
     else if(name=="orphan_divergence")Orphan(true);else if(name=="waiting_close")Waiting(false);
     else if(name=="waiting_release")Waiting(true);else if(name=="persistence")Persistence();
-    else if(name=="timeout_frame")TimeoutFrame();else Check(false,"unknown scenario");
+    else if(name=="timeout_frame")TimeoutFrame();else if(name=="capability")ConfirmationCapability();
+    else if(name=="display_keep")DisplayDelivery(false);else if(name=="display_persist_failure")DisplayDelivery(true);
+    else if(name=="display_close_queued")DisplayClose(false);else if(name=="display_close_written")DisplayClose(true);
+    else if(name=="startup_shutdown")StartupShutdown();else if(name=="stale_display_actions")StaleDisplayActions();
+    else if(name=="frame_trace")FrameReceiptTrace();
+    else if(name.starts_with("frame_identity_"))FrameReceiptIdentity(name.substr(15));
+    else if(name.starts_with("frame_"))FrameReceipt(name.substr(6));
+    else Check(false,"unknown scenario");
     std::printf("settings service: %s passed\n",name.c_str());
 }
 '''
@@ -370,7 +717,14 @@ SCENARIOS = (
     'validation', 'ownership', 'drafts', 'devices', 'conflict', 'apply_failure',
     'confirmation', 'abandon_editing', 'abandon_pending', 'orphan_refusal',
     'orphan_divergence', 'waiting_close', 'waiting_release', 'persistence',
-    'timeout_frame',
+    'timeout_frame', 'capability', 'display_keep', 'display_persist_failure',
+    'display_close_queued', 'display_close_written', 'startup_shutdown', 'stale_display_actions',
+    'frame_outside','frame_skipped','frame_submit_only','frame_present_only',
+    'frame_readback_before_draw','frame_readback_after_draw','frame_readback_during_end',
+    'frame_nested','frame_aborted','frame_begin_aborted','frame_wrong_request','frame_shutdown',
+    'frame_draw_aborted','frame_wrong_owner','frame_revoked','frame_trace',
+    'frame_historical_offset','frame_identity_epoch','frame_identity_generation','frame_identity_failure',
+    'frame_identity_not_ready','frame_identity_counter_regression',
 )
 
 
@@ -384,19 +738,54 @@ def persistence_bodies():
     automatic = function_body(source, 'void idCommonLocal::WriteConfiguration(')
     frame = function_body(source, 'void idCommonLocal::Frame(')
     guard = 'if ( UI_SettingsBlocksConfigWrite() ) return;'
-    require_order(explicit, guard, 'OpenFileWrite(', 'explicit config guard')
+    checked = function_body(source, 'bool idCommonLocal::WriteConfigToFileChecked(')
+    require_order(explicit, guard, 'WriteConfigToFileChecked(', 'explicit config guard')
     require_order(automatic, guard, 'ClearModifiedFlags(', 'automatic archive dirty guard')
-    require_order(automatic, guard, 'WriteConfigToFile(', 'automatic config guard')
+    require_order(automatic, guard, 'WriteConfigToFileChecked(', 'automatic config guard')
+    require_order(automatic, 'WriteConfigToFileChecked(', 'ClearModifiedFlags(', 'archive dirty retained until checked success')
+    require_order(checked, 'lease.TryAcquire(', 'DurableReadExact(', 'lease held while inspecting journal')
+    require_order(checked, 'DurableReadExact(', 'DurableReplaceExact(', 'journal exclusion before config commit')
     require_order(frame, 'UI_SettingsFrame();', 'WriteConfiguration();', 'frame recovery before persistence')
     return explicit + '\n' + automatic
+
+
+def render_frame_body():
+    session = (ROOT / 'src/framework/Session.cpp').read_text(encoding='utf-8')
+    body = function_body(session, 'void idSessionLocal::UpdateScreen(')
+    common = (ROOT / 'src/framework/Common.cpp').read_text(encoding='utf-8')
+    # Common's standalone splash frame is also bracketed, so it cannot borrow
+    # an owner marker from an earlier Session frame or nested loading callback.
+    splash = common[common.index('UI_SettingsRenderFrame settingsFrame;'):common.index('UI_SettingsRenderFrame settingsFrame;') + 7000]
+    splash = splash[:splash.index('UI_SettingsFrame( false );')]
+    for label, source in (('Session frame',body),('Common splash frame',splash)):
+        require_order(source,'UI_SettingsRenderFrame settingsFrame;','renderSystem->BeginFrame(',label+' scope before renderer begin')
+        require_order(source,'renderSystem->BeginFrame(','settingsFrame.Submitting();',label+' pre-submit observation')
+        require_order(source,'settingsFrame.Submitting();','renderSystem->EndFrame(',label+' exact EndFrame bracket')
+        require_order(source,'renderSystem->EndFrame(','settingsFrame.Presented();',label+' receipt after synchronous end')
+        require_order(source,'settingsFrame.Presented();','RetainedUI_FrameSubmitted();',label+' receipt before unrelated callbacks')
+    # This engine-only receipt relies explicitly on today's synchronous backend
+    # dispatch. If it becomes asynchronous these guards require a frame-tag API.
+    renderer = (ROOT / 'src/renderer/RenderSystem.cpp').read_text(encoding='utf-8')
+    issue = function_body(renderer,'static void R_IssueRenderCommands(')
+    require_order(issue,'RB_ExecuteBackEndCommands( frameData->cmdHead );','R_ClearCommandChain();','synchronous backend consumption')
+    end = function_body(renderer,'void idRenderSystemLocal::EndFrame(')
+    require_order(end,'cmd->commandId = RC_SWAP_BUFFERS;','R_IssueRenderCommands();','swap belongs to exact EndFrame batch')
+    vk = function_body((ROOT/'src/renderer/Vulkan/vk_GuiExecutor.cpp').read_text(encoding='utf-8'),'static bool VK_GuiExecutor_SubmitFrame( bool present ) {')
+    require_order(vk,'vkQueueSubmit2(','R_DisplayPresentationSubmitted();','Vulkan successful submission counter')
+    require_order(vk,'R_DisplayPresentationSubmitted();','vkQueuePresentKHR(','Vulkan same-stack present')
+    require_order(vk,'vkQueuePresentKHR(','R_DisplayPresentationPresented();','Vulkan accepted API present counter')
+    gl = function_body((ROOT/'src/renderer/OpenGL/gl_ContextSDL3.cpp').read_text(encoding='utf-8'),'void GLimp_SwapBuffers(')
+    require_order(gl,'s_glWindowServices->SwapGLWindow()','R_DisplayPresentationSubmitted(); R_DisplayPresentationPresented();','GL accepted synchronous swap counters')
+    return body
 
 
 def main():
     service = without_includes((ROOT / 'src/ui/SettingsService.cpp').read_text(encoding='utf-8'))
     document = (ROOT / 'src/ui/retained/Document.cpp').read_text(encoding='utf-8')
-    validation = '\n'.join(function_body(document, name) for name in ('bool Utf8(', 'bool ValidStateValue('))
+    validation = '\n'.join(function_body(document, name) for name in (
+        'bool Utf8(', 'bool ValidStateValue(', 'const Node* Find(', 'const Node* DocumentModel::FindNode('))
     code = (SUPPORT + '\nnamespace openq4::ui {\n' + validation + '\n}\n' +
-            service + '\n' + persistence_bodies() + MAIN)
+            service + '\n' + persistence_bodies() + '\n' + render_frame_body() + MAIN)
     compiler = next((path for name in ('clang++', 'g++', 'c++') if (path := shutil.which(name))), None)
     if not compiler:
         raise RuntimeError('C++ compiler required')
@@ -405,8 +794,10 @@ def main():
         source = Path(directory) / 'service.cpp'
         binary = Path(directory) / 'service.exe'
         source.write_text(code, encoding='utf-8')
+        environment = dict(os.environ, TEMP=directory, TMP=directory, TMPDIR=directory)
         subprocess.run([compiler, '-std=c++20', '-I', str(ROOT), str(source),
-                        str(ROOT / 'src/ui/application/SettingsTransaction.cpp'), '-o', str(binary)], check=True)
+                        str(ROOT / 'src/ui/application/SettingsTransaction.cpp'),
+                        str(ROOT / 'src/ui/application/SettingsDisplayController.cpp'), '-o', str(binary)], check=True, env=environment)
         for scenario in SCENARIOS:
             subprocess.run([str(binary), scenario], check=True)
         dedicated = Path(directory) / 'dedicated.cpp'
@@ -415,7 +806,7 @@ def main():
                              'UI_SettingsCloseOwner(1); UI_SettingsReleaseOwner(1); UI_SettingsFrame(); '
                              'assert(!UI_SettingsBlocksConfigWrite()); }\n', encoding='utf-8')
         dedicated_binary = Path(directory) / 'dedicated.exe'
-        subprocess.run([compiler, '-std=c++20', '-I', str(ROOT), str(dedicated), '-o', str(dedicated_binary)], check=True)
+        subprocess.run([compiler, '-std=c++20', '-I', str(ROOT), str(dedicated), '-o', str(dedicated_binary)], check=True, env=environment)
         subprocess.run([str(dedicated_binary)], check=True)
         print(f'settings service: {len(SCENARIOS)} production-body scenarios, dedicated stubs and config/frame source guards passed', flush=True)
 

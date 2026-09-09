@@ -974,4 +974,14 @@
 	"#str_42909"	"Arme précédente"
 	"#str_42910"	"Touches de déplacement (WASD)"
 	"#str_42911"	"Clic gauche"
+
+	// Display application, confirmation and durable recovery.
+	"#str_229990"	"Application des paramètres d’affichage…"
+	"#str_229991"	"Restauration des paramètres d’affichage précédents…"
+	"#str_229992"	"Enregistrement des paramètres d’affichage…"
+	"#str_229993"	"Conserver ces paramètres d’affichage ?"
+	"#str_229994"	"Conserver"
+	"#str_229995"	"Rétablir"
+	"#str_229996"	"Réessayer"
+	"#str_229997"	"Les paramètres ont été acceptés, mais leur enregistrement est incomplet. Réessayez pour le terminer."
 }

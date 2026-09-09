@@ -6,6 +6,7 @@ their real calls and preprocessor branches; no window, GPU or input is opened.
 """
 
 from pathlib import Path
+import os
 import shutil
 import subprocess
 import tempfile
@@ -32,6 +33,8 @@ static bool nestRestart=false;
 static bool contextCurrent=true;
 static int pendingGLError=0;
 static bool r_recoverableRendererRestart=false,r_forceWindowRendererRestart=false,r_recoverableRendererRestore=false;
+static bool r_initialRendererDevicePending=false;
+static bool nestInitial=false;
 struct renderWindowParms_t {
     int width=1280,height=720; bool fullScreen=false,borderless=false,hiddenWindow=false,stereo=false;
     int displayHz=0,multiSamples=0;
@@ -40,6 +43,7 @@ struct renderWindowRequest_t {
     renderWindowParms_t parms; unsigned displayId=0; int displayIndex=-1;
     bool fullscreenDesktop=false,spanDisplays=false; int swapInterval=1;
 };
+static renderWindowRequest_t* mutableInitialRequest=nullptr;
 static const renderWindowRequest_t* r_recoverableWindowRequest=nullptr;
 struct idStr:std::string {
     using std::string::string;
@@ -54,6 +58,7 @@ bool R_ForceWindowForRendererRestart();
 const renderWindowRequest_t* R_GetRecoverableWindowRequest();
 void R_RejectRecoverableRendererRestart(const char*);
 bool R_TryFullVidRestart(const renderWindowRequest_t*,char*,int);
+bool R_TryInitializeDisplay(const renderWindowRequest_t*,char*,int);
 static renderDisplayPresentation_t devicePresentation={};
 void R_GetDisplayPresentation(renderDisplayPresentation_t* output){*output=devicePresentation;}
 void R_DisplayPresentationFailed(renderDisplayOutcome_t outcome,int32_t nativeError){
@@ -116,6 +121,8 @@ struct idRenderSystemLocal {
     int videoRestartCount=0,viewCount=0;
     int glContextGeneration=0,viewportOffset[2]={0,0};
     void *viewDef=nullptr,*primaryView=nullptr;
+    struct Worlds { int count=0; int Num()const{return count;} } worlds;
+    void* primaryWorld=nullptr;
     void InitOpenGL();
     void SetBackEndRenderer() { Record("backend-selection"); }
 } tr;
@@ -131,6 +138,12 @@ static void StartDevice(const char* backend) {
 }
 static bool TryStartDevice(const char* backend) {
     if(nestRestart){char error[64];assert(!R_TryFullVidRestart(R_GetRecoverableWindowRequest(),error,sizeof(error)));assert(*error);}
+    if(nestInitial){char error[64];assert(!R_TryInitializeDisplay(R_GetRecoverableWindowRequest(),error,sizeof(error)));assert(*error);}
+    if(mutableInitialRequest){
+        const auto* actual=R_GetRecoverableWindowRequest();assert(actual && actual!=mutableInitialRequest);
+        const int width=actual->parms.width;mutableInitialRequest->parms.width=333;
+        assert(actual->parms.width==width);mutableInitialRequest=nullptr;
+    }
     if(failure==1)return false;
     StartDevice(backend);
     if(failure==2){R_DisplayPresentationFailed(RDP_CONTEXT_FAILED,-123);return false;}
@@ -207,6 +220,7 @@ static void R_RegenerateWorld_f(const idCmdArgs&){assert(fontsAlive && deviceAli
 
 CONTEXT = r'''
 bool R_TryFullVidRestart(const renderWindowRequest_t*,char*,int){assert(false);return false;}
+bool R_TryInitializeDisplay(const renderWindowRequest_t*,char*,int){assert(false);return false;}
 using GLint=int;using GLenum=unsigned;using GLubyte=unsigned char;
 using glimpParms_t=renderWindowParms_t;
 static const int GL_VENDOR=1,GL_RENDERER=2,GL_VERSION=3,GL_EXTENSIONS=4,GL_TRUE=1,GLEW_OK=0;
@@ -275,12 +289,80 @@ static size_t Position(const char* event) {
     assert(found!=events.end());
     return static_cast<size_t>(found-events.begin());
 }
+static void ColdInitialize() {
+    char error[128]="sentinel";renderWindowRequest_t request;request.parms.width=1024;request.parms.height=768;
+    assert(!R_TryInitializeDisplay(&request,error,sizeof(error)) && *error && events.empty());
+    r_initialRendererDevicePending=true; // renderer Init completion is source-guarded below
+    assert(!R_TryInitializeDisplay(nullptr,error,sizeof(error)) && events.empty());
+    globalImages=nullptr;assert(!R_TryInitializeDisplay(&request,error,sizeof(error)));globalImages=&images;
+    renderModelManager=nullptr;assert(!R_TryInitializeDisplay(&request,error,sizeof(error)));renderModelManager=&models;
+    glConfig.isInitialized=true;assert(!R_TryInitializeDisplay(&request,error,sizeof(error)));glConfig.isInitialized=false;
+    r_recoverableRendererRestore=true;assert(!R_TryInitializeDisplay(&request,error,sizeof(error)));r_recoverableRendererRestore=false;
+    r_recoverableRendererRestart=true;assert(!R_TryInitializeDisplay(&request,error,sizeof(error)));r_recoverableRendererRestart=false;
+    frameData=&frameObject;assert(!R_TryInitializeDisplay(&request,error,sizeof(error)));frameData=nullptr;
+    tr.worlds.count=1;assert(!R_TryInitializeDisplay(&request,error,sizeof(error)));tr.worlds.count=0;
+    for(void** pointer:{&tr.primaryWorld,&tr.viewDef,&tr.primaryView,&backEnd.viewDef}){
+        *pointer=&images;assert(!R_TryInitializeDisplay(&request,error,sizeof(error)));*pointer=nullptr;
+    }
+    std::vector<renderWindowRequest_t> malformed;
+    for(int value:{-1,0,319,16385}){auto bad=request;bad.parms.width=value;malformed.push_back(bad);}
+    for(int value:{-1,0,239,16385}){auto bad=request;bad.parms.height=value;malformed.push_back(bad);}
+    for(int value:{-1,1,3,17}){auto bad=request;bad.parms.multiSamples=value;malformed.push_back(bad);}
+    for(int value:{-1,1001}){auto bad=request;bad.parms.displayHz=value;malformed.push_back(bad);}
+    for(int value:{-2,2}){auto bad=request;bad.swapInterval=value;malformed.push_back(bad);}
+    auto bad=request;bad.displayIndex=-2;malformed.push_back(bad);
+    bad=request;bad.parms.stereo=true;malformed.push_back(bad);
+    bad=request;bad.parms.hiddenWindow=bad.parms.fullScreen=true;malformed.push_back(bad);
+    bad=request;bad.parms.hiddenWindow=bad.parms.borderless=true;malformed.push_back(bad);
+    bad=request;bad.parms.fullScreen=bad.parms.borderless=true;malformed.push_back(bad);
+    for(const auto& invalid:malformed){
+        assert(!R_TryInitializeDisplay(&invalid,error,sizeof(error)) && *error);
+        assert(events.empty() && !deviceStarts && r_initialRendererDevicePending && !R_GetRecoverableWindowRequest());
+    }
+    std::vector<int> refused{1,2,3};
+#ifndef OPENQ4_RENDERER_VK_MODULE
+    refused.push_back(6);
+#endif
+    for(int code:refused){
+        failure=code;const auto failures=devicePresentation.failureSequence;
+        assert(!R_TryInitializeDisplay(&request,error,sizeof(error)) && *error);
+        assert(!deviceAlive && !glConfig.isInitialized && !frameData && !fontsAlive);
+        assert(r_initialRendererDevicePending && !r_recoverableRendererRestore);
+        assert(!R_GetRecoverableWindowRequest() && !R_IsRecoverableRendererRestart());
+        assert(devicePresentation.failureSequence==failures+1 && !devicePresentation.presentedSequence);
+        assert(devicePresentation.outcome==(code==2?RDP_CONTEXT_FAILED:RDP_INIT_FAILED));
+        assert(devicePresentation.nativeError==(code==2?-123:0));
+        assert(!tr.videoRestartCount && !tr.viewCount);
+        for(const char* absent:{"cvar-write","fonts-init","font-atlas","world-ready","sound-world","model-purge","derived-free","cursor-release"})
+            assert(std::find(events.begin(),events.end(),absent)==events.end());
+        events.clear();
+        // A failed cold start does not enable the live restart route.
+        assert(!R_TryFullVidRestart(&request,error,sizeof(error)) && events.empty());
+    }
+    failure=0;nestInitial=nestRestart=true;mutableInitialRequest=&request;
+    assert(R_TryInitializeDisplay(&request,error,sizeof(error)) && !*error);
+    nestInitial=nestRestart=false;
+    assert(request.parms.width==333 && deviceAlive && glConfig.isInitialized && frameData);
+    assert(!r_initialRendererDevicePending && !r_recoverableRendererRestore && !fontsAlive);
+    assert(!R_GetRecoverableWindowRequest() && !R_IsRecoverableRendererRestart());
+    assert(!tr.videoRestartCount && !tr.viewCount && !devicePresentation.presentedSequence);
+    for(const char* absent:{"cvar-write","fonts-init","font-atlas","world-ready","sound-world","model-purge","derived-free","cursor-release"})
+        assert(std::find(events.begin(),events.end(),absent)==events.end());
+    events.clear();assert(!R_TryInitializeDisplay(&request,error,sizeof(error)) && events.empty());
+    R_ShutdownDeviceForRestart();events.clear();
+    assert(!R_TryInitializeDisplay(&request,error,sizeof(error)) && events.empty());
+    // Reset stand-in counters for the legacy/restart cases below, without
+    // granting cold-start permission after a successful device shutdown.
+    deviceStarts=imageReloads=imagePurges=0;devicePresentation={};
+    std::puts("Strict first device: Init-only gate, immutable request, preflight, GL/VK failure cleanup, explicit cold retry, no world/font/action replay or false present passed");
+}
 int main() {
 #ifdef OPENQ4_RENDERER_VK_MODULE
     const char* backend="vulkan";
 #else
     const char* backend="opengl";
 #endif
+    ColdInitialize();
     tr.InitOpenGL();
     assert(deviceStarts==1 && imageReloads==1 && createdFullscreen);
     assert(Position(backend)<Position("reload"));
@@ -587,6 +669,13 @@ int main() {
 
 def main():
     source = (ROOT / 'src/renderer/RenderSystem_init.cpp').read_text(encoding='utf-8')
+    init_body = function_body(source, 'void idRenderSystemLocal::Init( void )')
+    assert init_body.index('r_initialRendererDevicePending = false;') < init_body.index('globalImages->Init();')
+    assert init_body.index('r_initialRendererDevicePending = true;') > init_body.index('renderModelManager->Init();')
+    assert 'r_initialRendererDevicePending = false;' in function_body(source, 'void idRenderSystemLocal::Shutdown( void )')
+    assert 'r_initialRendererDevicePending = true;' not in function_body(source, 'void idRenderSystemLocal::ShutdownOpenGL( void )')
+    glue = (ROOT / 'src/renderer/RendererGLModule.cpp').read_text(encoding='utf-8')
+    assert 'rgm_export.TryInitializeDisplay = R_TryInitializeDisplay;' in glue
     code = SUPPORT + '\n'.join(function_body(source, signature) for signature in (
         'bool R_IsRecoverableRendererRestart( void )',
         'bool R_ForceWindowForRendererRestart( void )',
@@ -601,19 +690,21 @@ def main():
         'static void R_PerformFullVidRestart( bool forceWindow )',
         'static bool R_TryFullVidRestartInternal( const renderWindowRequest_t *request, bool forceWindow, char *error, int errorSize )',
         'bool R_TryFullVidRestart( const renderWindowRequest_t *request, char *error, int errorSize )',
+        'bool R_TryInitializeDisplay( const renderWindowRequest_t *request, char *error, int errorSize )',
     )) + MAIN
     compiler = next((found for name in ('clang++', 'g++', 'c++') if (found := shutil.which(name))), None)
     if not compiler:
         raise RuntimeError('C++ compiler required')
     (ROOT / '.tmp').mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='vid-restart-', dir=ROOT / '.tmp') as temp:
+        env = dict(os.environ, TEMP=temp, TMP=temp)
         test_source = Path(temp) / 'restart.cpp'
         test_source.write_text(code, encoding='utf-8')
         for backend in ('opengl', 'vulkan'):
             binary = Path(temp) / f'{backend}.exe'
             define = ['-DOPENQ4_RENDERER_VK_MODULE'] if backend == 'vulkan' else []
-            subprocess.run([compiler, '-std=c++17', *define, '-I', str(ROOT), str(test_source), '-o', str(binary)], check=True)
-            subprocess.run([str(binary)], check=True)
+            subprocess.run([compiler, '-std=c++17', *define, '-I', str(ROOT), str(test_source), '-o', str(binary)], check=True, env=env)
+            subprocess.run([str(binary)], check=True, env=env)
         context_source = Path(temp) / 'context.cpp'
         context_source.write_text(SUPPORT + CONTEXT + '\n'.join(function_body(source, signature) for signature in (
             'bool R_IsRecoverableRendererRestart( void )',
@@ -626,23 +717,23 @@ def main():
             'static bool R_CreateOpenGLContext( bool legacyPolicy, bool forceWindow, char *error, int errorSize )',
         )) + CONTEXT_MAIN, encoding='utf-8')
         binary = Path(temp) / 'context.exe'
-        subprocess.run([compiler, '-std=c++17', '-I', str(ROOT), str(context_source), '-o', str(binary)], check=True)
-        subprocess.run([str(binary)], check=True)
+        subprocess.run([compiler, '-std=c++17', '-I', str(ROOT), str(context_source), '-o', str(binary)], check=True, env=env)
+        subprocess.run([str(binary)], check=True, env=env)
         backend_source = (ROOT / 'src/renderer/Vulkan/vk_Backend.cpp').read_text(encoding='utf-8')
         screen_source = Path(temp) / 'screen.cpp'
         screen_source.write_text(SCREEN + function_body(backend_source,
             'static bool VK_ApplyRequestedScreenParms( const renderWindowParms_t& parms )') + function_body(backend_source,
             'bool GLimp_SetScreenParms( glimpParms_t parms )') + SCREEN_MAIN, encoding='utf-8')
         binary = Path(temp) / 'screen.exe'
-        subprocess.run([compiler, '-std=c++17', '-I', str(ROOT), str(screen_source), '-o', str(binary)], check=True)
-        subprocess.run([str(binary)], check=True)
+        subprocess.run([compiler, '-std=c++17', '-I', str(ROOT), str(screen_source), '-o', str(binary)], check=True, env=env)
+        subprocess.run([str(binary)], check=True, env=env)
         init_source = Path(temp) / 'device-init.cpp'
         init_source.write_text(DEVICE_INIT + function_body(backend_source,
             'static bool VK_ApplyRequestedScreenParms( const renderWindowParms_t& parms )') + function_body(backend_source,
             'bool VK_InitRenderDevice( void )') + DEVICE_INIT_MAIN, encoding='utf-8')
         binary = Path(temp) / 'device-init.exe'
-        subprocess.run([compiler, '-std=c++17', '-I', str(ROOT), str(init_source), '-o', str(binary)], check=True)
-        subprocess.run([str(binary)], check=True)
+        subprocess.run([compiler, '-std=c++17', '-I', str(ROOT), str(init_source), '-o', str(binary)], check=True, env=env)
+        subprocess.run([str(binary)], check=True, env=env)
 
 
 if __name__ == '__main__':

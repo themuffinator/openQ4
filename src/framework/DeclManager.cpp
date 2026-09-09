@@ -3906,8 +3906,10 @@ void idDeclLocal::ParseLocal( bool noCaching ) {
 	// These are generated render resources, created on demand for retained
 	// geometry and font pages. Ordinary image/material assets still require
 	// precaching; an explicit declaration using this name is not exempt.
+	// tr_fontTTF creates Latin slots as _ttfatlas_ and extended Unicode pages
+	// as _ttfatlasx_; both exist only after runtime rasterization.
 	const bool generatedRetainedResource = type == DECL_MATERIAL && generatedDefaultText && IsImplicit() &&
-		( name.Icmp("_retainedsolid") == 0 || name.Icmpn("_retained/_ttfatlas_",20) == 0 || name.Icmpn("_retainedLayer/",15) == 0 || name.Icmpn("_retainedMask/",14) == 0 );
+		( name.Icmp("_retainedsolid") == 0 || name.Icmpn("_retained/_ttfatlas_",20) == 0 || name.Icmpn("_retained/_ttfatlasx_",21) == 0 || name.Icmpn("_retainedLayer/",15) == 0 || name.Icmpn("_retainedMask/",14) == 0 );
 	if ( common->IsInitialized() && !declManagerLocal.GetInsideLoad() && !openQ4_IsAnyToolActive() && !generatedRetainedResource ) {
 		common->Warning( "Loading non pre-cached %s decl %s", declManagerLocal.GetDeclNameFromType( type ), name.c_str() );
 	}

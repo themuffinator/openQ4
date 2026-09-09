@@ -983,4 +983,14 @@
 	"#str_42909"	"Poprzednia broń"
 	"#str_42910"	"Przyciski ruchu (WASD)"
 	"#str_42911"	"Lewy przycisk myszy"
+
+	// Display application, confirmation and durable recovery.
+	"#str_229990"	"Stosowanie ustawień wyświetlania…"
+	"#str_229991"	"Przywracanie poprzednich ustawień wyświetlania…"
+	"#str_229992"	"Zapisywanie ustawień wyświetlania…"
+	"#str_229993"	"Zachować te ustawienia wyświetlania?"
+	"#str_229994"	"Zachowaj"
+	"#str_229995"	"Przywróć"
+	"#str_229996"	"Ponów"
+	"#str_229997"	"Ustawienia zostały zaakceptowane, ale zapis nie został ukończony. Ponów próbę, aby dokończyć zapis."
 }

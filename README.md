@@ -76,9 +76,11 @@ metadata and visual properties with persistent expression ownership.
 [SYSTEM settings transactions](docs/dev/ui/system-settings-contract.md) now keep
 edits in an owned draft, validate the fixed settings catalog, and apply immediate
 changes with checked readback and conflict handling. A
-[private display service](docs/dev/ui/display-device-contract.md) adds actual
-device results and explicit restoration. Production display confirmation and
-the complete settings page remain in development.
+[private display service](docs/dev/ui/display-device-contract.md) supplies actual
+device results and strict restoration. Eligible retained confirmation views use
+[Apply/Keep/Revert and durable recovery](docs/dev/ui/display-confirmation.md),
+including a countdown after the owning view presents and recovery after restart.
+Audio/resource effects and the complete production settings page remain in development.
 [Ordered event programs](docs/dev/ui/event-programs.md) connect data, transitions
 and typed actions to normal GUI lifecycle and session delivery. Complete GUI migration,
 the full application/control contract and the visual editor remain in development.

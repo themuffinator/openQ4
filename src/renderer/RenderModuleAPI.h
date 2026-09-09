@@ -61,7 +61,8 @@
 //      context; a stale module would leave that byte uninitialised
 // 13 - ClearRenderTarget carries alpha for transparent retained UI layers.
 // 14 - Strict window requests/readback and private recoverable device services.
-#define RENDER_API_VERSION			14
+// 15 - Private strict first-device initialization for durable display recovery.
+#define RENDER_API_VERSION			15
 #define RENDER_API_ENTRY_POINT		"GetRenderAPI"
 
 class idSys;
@@ -367,6 +368,10 @@ typedef struct renderExport_s {
 	// A failed restart may leave no device; the caller must explicitly restore.
 	bool			( *TryDeviceRestart )( const renderWindowRequest_t *request, char *error, int errorSize );
 	void			( *GetDisplayPresentation )( renderDisplayPresentation_t *outState );
+	// Version 15: only after renderSystem->Init and before the first device/world.
+	// Failure leaves no device; an explicit retry retains the caller's request.
+	// This never runs the legacy startup fallback or the world/font restart tail.
+	bool			( *TryInitializeDisplay )( const renderWindowRequest_t *request, char *error, int errorSize );
 } renderExport_t;
 
 extern "C" {

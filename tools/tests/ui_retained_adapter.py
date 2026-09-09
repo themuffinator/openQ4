@@ -26,6 +26,7 @@ ENGINE = r'''
 #include <set>
 #include <iomanip>
 #include <sstream>
+#include <cstdarg>
 #include "src/ui/retained/Input.h"
 #include "src/ui/RetainedUI.h"
 #include "src/ui/SettingsService.h"
@@ -88,8 +89,12 @@ struct Files {
 } files,*fileSystem=&files;
 struct Common {
     int warnings=0;
+    std::vector<std::string> prints;
     void Warning(const char*,...) { ++warnings; }
-    void Printf(const char*,...) {}
+    void Printf(const char* format,...) {
+        char text[4096]; va_list args; va_start(args,format); std::vsnprintf(text,sizeof(text),format,args); va_end(args);
+        prints.emplace_back(text);
+    }
     int GetPresentationTime() const {return 0;}
 } commonObject,*common=&commonObject;
 struct CVars {
@@ -121,6 +126,7 @@ struct Decls { const void* FindMaterial(const char*) { return nullptr; } } decls
 
 RUNTIME = r'''
 namespace openq4::ui {
+struct Bounds { float x=0,y=0,width=0,height=0; };
 struct Viewport {
     int width=1920,height=1080;
     float displayScale=1,userScale=1,pixelDensityX=2,pixelDensityY=2,originX=80,originY=40;
@@ -138,6 +144,14 @@ bool Document::Load(const std::string& source,std::vector<Diagnostic>&) {
 }
 const std::string& Document::Source() const { return impl->source; }
 const DocumentModel& Document::Model() const { return impl->model; }
+const Node* DocumentModel::FindNode(const std::string& id) const {
+    std::vector<const Node*> pending{&root};
+    while(!pending.empty()) { const auto* node=pending.back(); pending.pop_back();
+        if(node->id==id)return node;
+        for(const auto& child:node->children)pending.push_back(&child);
+    }
+    return nullptr;
+}
 bool ValidStateValue(const StateValue& value) {
     return !std::holds_alternative<double>(value) || std::isfinite(std::get<double>(value));
 }
@@ -186,8 +200,15 @@ public:
     int validations=0;
     std::string FocusedControl() const {return selected;}
     unsigned long long StateRevision() const {return 0;}
-    struct Stats {unsigned long long activeContexts=1;};
-    Stats Statistics() const {return {};}
+    struct Stats {unsigned long long activeContexts=1,vectorElements=0,vectorPathsCompiled=0,vectorUploads=0,vectorCacheHits=0,submittedVertices=0,submittedIndices=0;};
+    Stats stats;
+    Stats Statistics() const {return stats;}
+    Bounds bounds{1,2,3,4};
+    bool boundsAvailable=true;
+    mutable std::vector<std::string> boundReads;
+    bool GetBounds(const std::string& name,Bounds& result) const {
+        boundReads.push_back(name); if(!boundsAvailable)return false; result=bounds; return true;
+    }
     bool FocusControl(const std::string& name,double) {selected=name; return true;}
     static constexpr size_t MaxSnapshotBytes=128u*1024u*1024u;
     static inline std::map<std::string,StateValues> snapshots;
@@ -292,7 +313,7 @@ struct retainedUIView_t {
     void* owner;
 };
 static std::vector<retainedUIView_t*> views;
-static bool rejectLoad=false;
+static bool rejectLoad=false,rejectDraw=false;
 static double presentationTime=1;
 static openq4::ui::Viewport viewport;
 retainedUIView_t* RetainedUI_CreateView(retainedUIViewCallback_t callback,void* owner) {
@@ -307,7 +328,7 @@ bool RetainedUI_PrepareView(retainedUIView_t* view) { return view && view->runti
 bool RetainedUI_LoadView(retainedUIView_t*,const std::string&,const std::string&,std::vector<openq4::ui::Diagnostic>&) { return !rejectLoad; }
 bool RetainedUI_DefaultViewport(openq4::ui::Viewport& result) { result=viewport; return viewport.width>0 && viewport.height>0; }
 double RetainedUI_PresentationTime() { return presentationTime; }
-bool RetainedUI_DrawViewRoot(retainedUIView_t* view,const openq4::ui::Viewport&) { ++view->runtime.frames; return true; }
+bool RetainedUI_DrawViewRoot(retainedUIView_t* view,const openq4::ui::Viewport&) { ++view->runtime.frames; return !rejectDraw; }
 '''
 
 SETTINGS = r'''
@@ -318,6 +339,7 @@ SETTINGS = r'''
 namespace SettingsBoundary {
 using namespace openq4::ui;
 struct Dispatch { std::uint64_t owner; ActionInvocation invocation; bool accepted=false; };
+struct Draw { std::uint64_t owner; std::string request; int frames; };
 struct Service {
     std::uint64_t next=1,active=0;
     std::set<std::uint64_t> owners;
@@ -326,10 +348,26 @@ struct Service {
     std::vector<std::string> order;
     std::vector<Action> descriptors;
     std::vector<ActionInvocation> invocations;
+    std::vector<std::pair<std::uint64_t,DocumentModel>> registrations;
+    std::vector<Draw> draws;
+    std::map<std::uint64_t,std::string> requests;
     StateValues live{{"r_brightness",1.0},{"r_shadows",true}},baseline,draft;
     bool readAvailable=true;
 } service;
 const std::map<std::string,std::size_t> fields{{"r_brightness",0},{"r_shadows",1}};
+}
+void UI_SettingsConfirmationDocument(std::uint64_t owner,const openq4::ui::DocumentModel& document) {
+    auto& service=SettingsBoundary::service;
+    assert(service.owners.contains(owner));
+    service.registrations.emplace_back(owner,document);
+}
+void UI_SettingsOwnerDrawn(std::uint64_t owner,const std::string& request) {
+    auto& service=SettingsBoundary::service;
+    assert(service.owners.contains(owner));
+    // This records only the adapter's draw intent. SettingsService tests own
+    // EndFrame receipt qualification and the controller's later presentation.
+    assert(!views.empty());
+    service.draws.push_back({owner,request,views.back()->runtime.frames});
 }
 std::uint64_t UI_SettingsCreateOwner() {
     auto& service=SettingsBoundary::service;
@@ -347,7 +385,9 @@ void UI_SettingsReleaseOwner(std::uint64_t owner) {
 const std::map<std::string,std::size_t>& UI_SettingsStateSchema() {
     static const auto schema=[] {
         std::map<std::string,std::size_t> result{{"settings.open",1},{"settings.dirty",1},
-            {"settings.busy",1},{"settings.canApply",1},{"settings.phase",0},{"settings.message",2}};
+            {"settings.busy",1},{"settings.canApply",1},{"settings.phase",0},{"settings.message",2},
+            {"settings.request",2},{"settings.canConfirm",1},{"settings.canRevert",1},{"settings.canRetry",1},
+            {"settings.remaining",0},{"settings.confirmationVisible",1}};
         for(const auto& [key,type]:SettingsBoundary::fields) {
             result.emplace("settings.draft."+key,type); result.emplace("settings.baseline."+key,type);
         }
@@ -402,7 +442,9 @@ bool UI_SettingsRead(std::uint64_t owner,openq4::ui::StateValues& values) {
     if(!service.readAvailable || !service.owners.contains(owner))return false;
     const bool own=service.active==owner,dirty=own && service.draft!=service.baseline;
     values={{"settings.open",own},{"settings.dirty",dirty},{"settings.busy",service.active!=0 && !own},
-        {"settings.canApply",dirty},{"settings.phase",own?1.0:0.0},{"settings.message",std::string("#str_stub_settings")}};
+        {"settings.canApply",dirty},{"settings.phase",own?1.0:0.0},{"settings.message",std::string("#str_stub_settings")},
+        {"settings.request",service.requests[owner]},{"settings.canConfirm",false},{"settings.canRevert",false},
+        {"settings.canRetry",false},{"settings.remaining",0.0},{"settings.confirmationVisible",false}};
     if(own) {
         for(const auto& [key,value]:service.draft)values.emplace("settings.draft."+key,value);
         for(const auto& [key,value]:service.baseline)values.emplace("settings.baseline."+key,value);
@@ -1026,6 +1068,118 @@ static void CheckSettingsBoundary() {
     assert(views.empty() && service.owners.empty());
     modelTemplate=originalModel; eventPlans.clear(); eventHistory.clear();
 }
+static void CheckNodeInspection() {
+    assert(views.empty());
+    idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui"));
+    auto inspect=[&](const std::string& id) {return UI_RetainedDiagnostic(&gui,idCmdArgs{{"openq4_retainedGui","inspect",id}});};
+    auto& runtime=Live();
+    runtime.bounds={32,32,864,462}; runtime.stats={1,13,4,4,9,300,450};
+    Value opacity; opacity.type=ValueType::Number; opacity.data[0]=.2;
+    Value display; display.type=ValueType::Keyword; display.text="block";
+    runtime.properties[{"root","opacity"}]=opacity; runtime.properties[{"root","display"}]=display;
+    const auto state=Dictionary(gui); const auto calls=runtime.stateCalls;
+    const auto events=eventHistory; const auto frames=runtime.frames;
+    assert(inspect("root"));
+    assert(commonObject.prints.back()=="RETAINED_GUI_NODE id=root bounds=32,32,864,462 opacity=0.2 display=block authoredPaths=0 statistics=view vectorElements=13 pathsCompiled=4 uploads=4 cacheHits=9 vertices=300 triangles=150\n");
+    assert(Dictionary(gui)==state && runtime.stateCalls==calls && runtime.frames==frames && eventHistory==events);
+    assert(runtime.boundReads.back()=="root");
+    for(const auto& id:std::vector<std::string>{"missing","ROOT","","root;quit","root\nquit","root::other",std::string(129,'x')}) {
+        const auto prints=commonObject.prints.size(); assert(!inspect(id)); assert(commonObject.prints.size()==prints);
+    }
+    runtime.boundsAvailable=false; assert(!inspect("root")); runtime.boundsAvailable=true;
+    runtime.bounds.width=std::numeric_limits<float>::infinity(); assert(!inspect("root")); runtime.bounds.width=864;
+    runtime.properties[{"root","display"}].text="block\nFAKE_RECORD";
+    assert(inspect("root") && commonObject.prints.back().find("display=invalid ")!=std::string::npos);
+    assert(commonObject.prints.back().find("FAKE_RECORD")==std::string::npos);
+    runtime.properties.clear(); assert(inspect("root"));
+    assert(commonObject.prints.back().find("opacity=1 display=default ")!=std::string::npos);
+}
+static void CheckSettingsDrawBoundary() {
+    assert(views.empty() && SettingsBoundary::service.owners.empty());
+    const auto originalModel=modelTemplate;
+    auto& service=SettingsBoundary::service;
+    service=SettingsBoundary::Service{}; eventPlans.clear();
+    consoleObject.open=false; windowFocused=true;
+    for(const auto& [key,type]:UI_SettingsStateSchema())
+        modelTemplate.state[key]={type==0?StateValue(0.0):type==1?StateValue(false):StateValue(std::string()),""};
+    modelTemplate.root.children.push_back(Node{});
+    modelTemplate.root.children.back().id="settings_revert";
+    modelTemplate.root.children.back().control=Control{};
+    modelTemplate.root.children.back().control->label="#str_229989";
+    modelTemplate.root.children.back().control->action="dismiss";
+    {
+        idUserInterfaceRetained gui;
+        const auto registrations=service.registrations.size();
+        assert(!gui.InitFromFile("bad.q4ui") && service.registrations.size()==registrations);
+        rejectLoad=true; assert(!gui.InitFromFile("test.q4ui")); rejectLoad=false;
+        assert(service.registrations.size()==registrations);
+        assert(gui.InitFromFile("test.q4ui"));
+        const auto owner=service.created.back();
+        assert(service.registrations.size()==registrations+1 && service.registrations.back().first==owner);
+        const auto& registered=service.registrations.back().second;
+        assert(registered.id==modelTemplate.id && registered.state.size()==modelTemplate.state.size());
+        assert(registered.state.at("settings.request").initial==StateValue(std::string()));
+        assert(registered.root.children.back().id=="settings_revert" &&
+               registered.root.children.back().control->label=="#str_229989");
+        service.requests[owner]="18446744073709551614";
+        gui.Redraw(0); assert(service.draws.empty()); // Inactive owners cannot acknowledge a frame.
+        gui.Activate(true,0);
+        gui.SetStateString("settings.request","forged pending caller value");
+        const int frames=Live().frames;
+        gui.Redraw(0);
+        assert(service.draws.size()==1 && service.draws.back().frames==frames+1);
+        assert(service.draws.back().owner==owner && service.draws.back().request==service.requests.at(owner));
+        assert(Live().eligibilityQueries.back().first=="settings_revert");
+        const auto draws=service.draws.size();
+        rejectDraw=true; gui.Redraw(0); rejectDraw=false;
+        Live().disabledControls.insert("settings_revert"); gui.Redraw(0); Live().disabledControls.clear();
+        gui.SetInteractive(false); gui.Redraw(0); gui.SetInteractive(true);
+        Live().loaded=false; gui.Redraw(0); Live().loaded=true;
+        service.readAvailable=false; gui.Redraw(0); service.readAvailable=true;
+        const auto savedViewport=viewport; viewport.width=0; gui.Redraw(0); viewport=savedViewport;
+        gui.Redraw(0,false);
+        assert(service.draws.size()==draws);
+        // A draw intent does not dispatch programs. Repeated redraws preserve
+        // committed work, and the normal pending pump delivers it once.
+        eventPlans["ondrawtest"]={{},{SettingsAction("begin")}};
+        gui.HandleNamedEvent("ondrawtest");
+        const auto dispatched=service.dispatches.size();
+        gui.Redraw(0); gui.Redraw(0);
+        assert(service.dispatches.size()==dispatched && *gui.PendingApplicationCommand());
+        Drain(gui,{}); Drain(gui,{});
+        assert(service.dispatches.size()==dispatched+1);
+        const auto count=service.registrations.size();
+        idFile_Memory saved; assert(gui.WriteToSaveGame(&saved));
+        saved.position=0; assert(gui.ReadFromSaveGame(&saved));
+        views.front()->callback(views.front()->owner,retainedUIViewEvent_t::BeforeResourceReset);
+        views.front()->callback(views.front()->owner,retainedUIViewEvent_t::Restored);
+        gui.Redraw(0);
+        assert(service.registrations.size()==count && service.draws.back().owner==owner);
+        assert(service.dispatches.size()==dispatched+1);
+        assert(gui.InitFromFile("test.q4ui"));
+        assert(service.registrations.size()==count+1 && service.registrations.back().first==owner);
+        rejectLoad=true; assert(!gui.InitFromFile("next.q4ui")); rejectLoad=false;
+        assert(service.registrations.size()==count+1 && service.owners.contains(owner));
+        modelTemplate.id="replacement-document";
+        assert(gui.InitFromFile("next.q4ui"));
+        const auto replacement=service.created.back();
+        assert(replacement!=owner && !service.owners.contains(owner));
+        assert(service.registrations.size()==count+2 && service.registrations.back().first==replacement &&
+               service.registrations.back().second.id=="replacement-document");
+        service.requests[replacement]="27";
+        gui.Redraw(0);
+        assert(service.draws.back().owner==replacement && service.draws.back().request=="27");
+        assert(service.dispatches.size()==dispatched+1);
+    }
+    assert(views.empty() && service.owners.empty());
+    modelTemplate=originalModel; eventPlans.clear();
+    const auto draws=service.draws.size();
+    {
+        idUserInterfaceRetained plain; assert(plain.InitFromFile("test.q4ui")); plain.Activate(true,0); plain.Redraw(0);
+        assert(service.draws.size()==draws); // Unrelated retained pages make no settings draw claim.
+    }
+    assert(views.empty() && service.owners.empty());
+}
 int main() {
     modelTemplate.id="adapter-document";
     modelTemplate.state={{"number",{1.0,""}},{"flag",{true,""}},{"text",{std::string("default"),""}},{"host",{1.0,"host_cvar"}}};
@@ -1164,8 +1318,10 @@ int main() {
     unsafe=modelTemplate; unsafe.state["NaMe"]={1.0,""}; assert(!ValidateApplication(unsafe,error));
     CheckEventBridge();
     CheckEventEligibility();
+    CheckNodeInspection();
     CheckSettingsBoundary();
-    std::puts("Retained adapter: settings ownership/state/lifecycle boundaries, ordered event/FIFO publication, restore suppression, pending dictionary, presentation delegation, framed saves, input suspension and cursor mapping passed");
+    CheckSettingsDrawBoundary();
+    std::puts("Retained adapter: settings capability/draw ownership and state/lifecycle boundaries, ordered event/FIFO publication, restore suppression, pending dictionary, presentation delegation, framed saves, input suspension and cursor mapping passed");
 }
 '''
 

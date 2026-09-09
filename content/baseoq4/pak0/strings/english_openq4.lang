@@ -974,4 +974,14 @@
 	"#str_42909"	"Previous weapon"
 	"#str_42910"	"Movement buttons (WASD)"
 	"#str_42911"	"Left click"
+
+	// Display application, confirmation and durable recovery.
+	"#str_229990"	"Applying display settings…"
+	"#str_229991"	"Restoring previous display settings…"
+	"#str_229992"	"Saving display settings…"
+	"#str_229993"	"Keep these display settings?"
+	"#str_229994"	"Keep"
+	"#str_229995"	"Revert"
+	"#str_229996"	"Retry"
+	"#str_229997"	"Settings were accepted, but saving did not finish. Retry to finish saving."
 }

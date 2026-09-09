@@ -385,6 +385,7 @@ bool idUserInterfaceRetained::InitFromFile(const char* qpath, bool rebuild, bool
 	}
 	impl->settingsFields = std::any_of(impl->document.Model().state.begin(),impl->document.Model().state.end(),
 		[](const auto& field) { return field.first.starts_with("settings."); });
+	UI_SettingsConfirmationDocument(impl->settingsOwner,impl->document.Model());
 	impl->state.Set("name",path.c_str()); impl->lastError.clear();
 	if (!impl->interactiveSet) impl->interactive = HasControls(impl->document.Model().root) && !NonInteractive(impl->state);
 	RegisterLoaded(); RefreshThinking();
@@ -521,7 +522,13 @@ void idUserInterfaceRetained::Redraw(int time, bool useAspectCorrection) {
 		if (!impl->RuntimeView()->HasEvent("onInit") || impl->RunEvent("onInit")) impl->initialized = true;
 	}
 	impl->AcceptInput();
-	if (RetainedUI_DrawViewRoot(impl->view,viewport) && impl->active && impl->interactive) DrawCursor();
+	if (RetainedUI_DrawViewRoot(impl->view,viewport) && impl->active && impl->interactive) {
+		// A restored world frame alone cannot arm Keep. Require this owner and
+		// its actually activatable Revert control to have reached the draw path.
+		if (impl->settingsFields && impl->RuntimeView()->CanActivateControl("settings_revert",RetainedUI_PresentationTime()))
+			UI_SettingsOwnerDrawn(impl->settingsOwner,impl->state.GetString("settings.request"));
+		DrawCursor();
+	}
 }
 void idUserInterfaceRetained::DrawCursor() {
 	if (!impl->pointerVisible || impl->suspended) return;
@@ -661,6 +668,30 @@ bool UI_RetainedDiagnostic(idUserInterface* gui, const idCmdArgs& args) {
 			owner.Name(),impl.RuntimeView()->FocusedControl().c_str(),static_cast<unsigned long long>(impl.RuntimeView()->StateRevision()),
 			impl.active ? 1 : 0,cvarSystem->GetCVarFloat("r_brightness"),cvarSystem->GetCVarBool("r_shadows") ? 1 : 0,
 			static_cast<unsigned long long>(impl.RuntimeView()->Statistics().activeContexts));
+		return true;
+	} else if (verb == "inspect" && args.Argc() == 3) {
+		const std::string id(args.Argv(2));
+		if (id.empty() || id.size() > 128 || std::any_of(id.begin(),id.end(),[](unsigned char c) {
+			return !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '.' || c == '-');
+		})) return false;
+		const auto* node = impl.document.Model().FindNode(id);
+		Bounds bounds;
+		if (!node || !impl.RuntimeView()->GetBounds(id,bounds)) return false;
+		const auto opacity = impl.RuntimeView()->PresentedValue(id,"opacity");
+		const auto display = impl.RuntimeView()->PresentedValue(id,"display");
+		const double alpha = opacity && opacity->type == ValueType::Number ? opacity->data[0] : 1;
+		if (!std::isfinite(alpha) || !std::isfinite(bounds.x) || !std::isfinite(bounds.y) ||
+			!std::isfinite(bounds.width) || !std::isfinite(bounds.height)) return false;
+		const std::set<std::string> displays{"block","none","flex","inline","inline-block"};
+		const char* shown = !display ? "default" : display->type == ValueType::Keyword && displays.contains(display->text) ? display->text.c_str() : "invalid";
+		const auto stats = impl.RuntimeView()->Statistics();
+		// Bounds/properties are this node's current layout and canonical state;
+		// counters describe the last complete view frame, not this node's ink.
+		common->Printf("RETAINED_GUI_NODE id=%s bounds=%.9g,%.9g,%.9g,%.9g opacity=%.9g display=%s authoredPaths=%llu statistics=view vectorElements=%llu pathsCompiled=%llu uploads=%llu cacheHits=%llu vertices=%llu triangles=%llu\n",
+			id.c_str(),bounds.x,bounds.y,bounds.width,bounds.height,alpha,shown,static_cast<unsigned long long>(node->paths.size()),
+			static_cast<unsigned long long>(stats.vectorElements),static_cast<unsigned long long>(stats.vectorPathsCompiled),
+			static_cast<unsigned long long>(stats.vectorUploads),static_cast<unsigned long long>(stats.vectorCacheHits),
+			static_cast<unsigned long long>(stats.submittedVertices),static_cast<unsigned long long>(stats.submittedIndices/3));
 		return true;
 	} else if (verb == "focus" && args.Argc() == 3) {
 		okay = impl.RuntimeView()->FocusControl(args.Argv(2),RetainedUI_PresentationTime());

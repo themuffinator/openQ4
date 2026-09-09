@@ -294,6 +294,15 @@ jobs:
             tools/tests/ui_retained_adapter.py \
             tools/tests/ui_system_settings_host.py \
             tools/tests/ui_settings_service.py \
+            tools/tests/durable_file.py \
+            tools/tests/settings_configuration_persistence.py \
+            tools/tests/sdl3_settings_placement.py \
+            tools/tests/ui_system_display.py \
+            tools/tests/ui_settings_display_service.py \
+            tools/tests/ui_display_settings_fixture.py \
+            tools/tests/ui_generated_font_precache.py \
+            tools/tests/ui_capture_display_settings.py \
+            tools/tests/ui_capture_settings_recovery.py \
             tools/tests/ui_capture_managed.py \
             tools/tests/ui_capture_system_settings.py \
             tools/tests/renderer_vid_restart_route.py \
@@ -510,6 +519,15 @@ jobs:
           python tools/tests/ui_retained_adapter.py
           python tools/tests/ui_system_settings_host.py
           python tools/tests/ui_settings_service.py
+          python tools/tests/durable_file.py
+          python tools/tests/settings_configuration_persistence.py
+          python tools/tests/sdl3_settings_placement.py
+          python tools/tests/ui_system_display.py
+          python tools/tests/ui_settings_display_service.py
+          python tools/tests/ui_display_settings_fixture.py
+          python tools/tests/ui_generated_font_precache.py
+          python tools/tests/ui_capture_display_settings.py
+          python tools/tests/ui_capture_settings_recovery.py
           python tools/tests/ui_capture_managed.py
           python tools/tests/ui_capture_system_settings.py
           python tools/tests/renderer_vid_restart_route.py

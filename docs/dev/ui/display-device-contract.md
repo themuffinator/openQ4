@@ -1,8 +1,12 @@
 # Display device request and observation contract
 
-Status: renderer foundation, 9 September 2026. API 14 provides strict window
-requests, nonfatal device restart attempts and observed presentation results.
-The full SYSTEM settings flow remains blocked on the integration gates below.
+Status: renderer foundation and confirmation integration, 9 September 2026.
+API 15 provides strict window requests, nonfatal device restart attempts,
+strict first-device initialization and observed presentation results.
+The [confirmation integration](display-confirmation.md) implements the coordinator,
+journal, owner-present countdown and startup recovery. The historical integration
+gate list below remains useful as the implementation audit; full production and
+platform acceptance still require the complete SYSTEM plan.
 This checkpoint accepts none of the 271 GUI migration entries or the complete
 [UI product](../plans/ui-product-completion.md).
 
@@ -29,6 +33,7 @@ a recovery journal must re-resolve monitors after process restart.
 | --- | --- |
 | `R_RendererModule_QueryDisplay` | Reads renderer status and actual SDL window state. Failure leaves output unchanged. An unavailable device can still be observed successfully; inspect `rendererReady`, `windowValid` and presentation `available`. |
 | `R_RendererModule_TryDeviceRestart` | Attempts the immutable request on the active renderer. It neither switches renderer modules nor selects a fallback mode. The caller owns recovery and must submit queued frontend commands first. |
+| `R_RendererModule_TryInitializeDisplay` | Performs strict first-device creation after renderer front-end initialization. It refuses an already running device and performs no world/session restart tail or mode fallback. Startup recovery retains the journal until actual state and presentation are verified. |
 
 Call these services on the main/video thread, serialized with module loading and
 frame submission. The query samples renderer generation before and after the SDL
@@ -37,9 +42,9 @@ observations from different device lifetimes.
 
 Pair renderer-local `generation` with the engine-owned `moduleEpoch`. Local
 counters disappear when a module unloads; a generation or frame count alone is
-not a cross-module identity. Bind future asynchronous results to the request
-token and settings owner as well as this pair. The current services do not
-provide that transaction scheduler.
+not a cross-module identity. The application coordinator binds asynchronous
+results to the request token and settings owner as well as this pair; these
+low-level services do not own transaction or confirmation policy.
 
 ## SDL request and readback rules
 
@@ -72,10 +77,11 @@ dimensions, identity, applicable placement and mode with the request. Every
 failure preserves the output object, but may leave a partially changed window.
 **Failure is not rollback.** The caller must explicitly restore captured state.
 
-Transition suppression covers the synchronous SDL apply and avoids publishing
-partial state from that call. It does not yet qualify suppression/reconciliation
-of later visible-window geometry events and CVar persistence over an entire
-settings transaction. Maximized state can be requested and observed, but the
+At the ABI14 checkpoint, transition suppression covered only synchronous SDL
+apply. The subsequent [confirmation integration](display-confirmation.md) adds
+a placement lease across the entire settings transaction; actual visible-window
+event behavior still needs platform qualification. Maximized state can be
+requested and observed, but the
 POD does not capture the compositor's hidden normal restore rectangle. The
 normal placement cache is not replaced by observed maximized geometry.
 
@@ -265,9 +271,10 @@ are overrides, not observed operating-system DPI changes. No physical input,
 visible compositor transition, fullscreen, monitor hotplug, physical scanout,
 driver device-loss recovery or non-Windows platform qualification is claimed.
 
-## Gate before enabling production display Apply
+## Historical gate before settings-service display Apply
 
-The [SYSTEM settings contract](system-settings-contract.md) still requires:
+At the ABI14 checkpoint, the [SYSTEM contract](system-settings-contract.md)
+identified the following integration and qualification work:
 
 - A durable recovery journal and frame-scheduled asynchronous `Applying` and
   `Restoring` phases with stale-result rejection by owner/request identity.
@@ -280,6 +287,9 @@ The [SYSTEM settings contract](system-settings-contract.md) still requires:
 - Qualification of maximized/hidden normal restore geometry, monitor changes,
   compositor positioning, focus and supported platform/backend combinations.
 
-Until these are implemented and evidenced, non-immediate settings batches remain
-blocked. The complete production page, editor workflows, visual quality and all
-271 GUI migrations remain pending.
+The [display confirmation implementation](display-confirmation.md) now supplies
+the journal, asynchronous coordinator, owner-frame receipt, placement lease and
+conflict recovery. Eligible retained documents can apply DisplayRestart batches;
+other non-immediate effects remain blocked. Visible geometry, focus, monitor and
+platform qualification, the complete production page, editor workflows, visual
+quality and all 271 GUI migrations remain pending.

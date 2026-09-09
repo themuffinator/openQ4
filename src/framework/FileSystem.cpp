@@ -149,7 +149,7 @@ the caller-controlled value to a writable root so platform normalization can
 never reinterpret a segment or escape the game directory.
 ========================
 */
-static bool FS_ValidateRelativeWritePath( const char *relativePath, const char **reason ) {
+bool FS_ValidateRelativeWritePath( const char *relativePath, const char **reason ) {
 	if ( reason != NULL ) {
 		*reason = NULL;
 	}

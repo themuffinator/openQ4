@@ -40,6 +40,9 @@ If you have questions concerning this license or the applicable additional terms
 #include "GameModuleDiagnostics.h"
 #include "RenderDoc.h"
 #include "ParallelJobSystem.h"
+#include "DurableFile.h"
+#include "SettingsPersistence.h"
+#include "FileSystemPathValidation.h"
 #include "../sys/NetworkEndpoint.h"
 
 #if defined( USE_SDL3 )
@@ -718,6 +721,7 @@ public:
 	virtual rvISourceControl *	GetSourceControl( void );
 	virtual void				ActivateTool( bool active );
 	virtual void				WriteConfigToFile( const char *filename );
+	bool					WriteConfigToFileChecked( const char *filename, bool coordinatorOwnsLock, std::string& error );
 	virtual void				WriteFlaggedCVarsToFile( const char *filename, int flags, const char *setCmd );
 	virtual void				ModViewThink( void );
 	virtual void				RunAlwaysThinkGUIs( int time );
@@ -2062,43 +2066,198 @@ void idCommonLocal::WriteFlaggedCVarsToFile( const char *filename, int flags, co
 idCommonLocal::WriteConfigToFile
 ==================
 */
-void idCommonLocal::WriteConfigToFile( const char *filename ) {
-	// Never persist an unconfirmed or incompletely restored settings batch,
-	// including explicit writeConfig calls. Keep the archive dirty flags intact.
-	if ( UI_SettingsBlocksConfigWrite() ) return;
-	idFile *f;
-#ifdef ID_WRITE_VERSION
-	ID_TIME_T t;
-	char *curtime;
-	idStr runtag;
-	idFile_Memory compressed( "compressed" );
-	idBase64 out;
-#endif
-
-	f = fileSystem->OpenFileWrite( filename );
-	if ( !f ) {
-		Printf ("Couldn't write %s.\n", filename );
-		return;
+// The legacy serializers ignore Write/Printf return values. Record failures in
+// the sink, including formatting truncation, before publishing any bytes.
+class idCheckedConfigMemory : public idFile_Memory {
+public:
+	explicit idCheckedConfigMemory( const char *name ) : idFile_Memory( name ), failed( false ) {}
+	bool Failed() const { return failed; }
+	int Write( const void *buffer, int len ) override {
+		if ( failed || len < 0 || ( len > 0 && buffer == NULL ) ||
+			static_cast<size_t>( len ) > openq4::DurableFileMaxBytes - static_cast<size_t>( Length() ) ) {
+			failed = true;
+			return 0;
+		}
+		if ( len == 0 ) return 0;
+		const int written = idFile_Memory::Write( buffer, len );
+		if ( written != len ) failed = true;
+		return written;
 	}
+	int Printf( const char *fmt, ... ) override {
+		va_list args;
+		va_start( args, fmt );
+		const int written = Format( fmt, args, true );
+		va_end( args );
+		return written;
+	}
+	int VPrintf( const char *fmt, va_list args ) override { return Format( fmt, args, false ); }
+private:
+	int Format( const char *fmt, va_list args, bool crlf ) {
+		char buffer[4096];
+		const int length = idStr::vsnPrintf( buffer, sizeof( buffer ), fmt, args );
+		if ( length < 0 || length >= static_cast<int>( sizeof( buffer ) ) ) {
+			failed = true;
+			return 0;
+		}
+		if ( !crlf ) return Write( buffer, length );
+		idStr text( buffer );
+		text.Replace( "\n", "\r\n" );
+		return Write( text.c_str(), text.Length() );
+	}
+	bool failed;
+};
 
+static bool Common_SettingsSaveDirectory( std::string& directory, std::string& error ) {
+	if ( fileSystem == NULL || !fileSystem->IsInitialized() || cvarSystem == NULL ) {
+		error = "configuration filesystem is unavailable";
+		return false;
+	}
+	std::string root = cvarSystem->GetCVarString( "fs_savepath" );
+	if ( root.empty() || root.size() > 32768 ) {
+		error = "configuration save root is empty or oversized";
+		return false;
+	}
+	size_t prefix = 0;
+#ifdef _WIN32
+	for ( char& c : root ) if ( c == '\\' ) c = '/';
+	if ( root.size() >= 3 && ( ( root[0] >= 'A' && root[0] <= 'Z' ) || ( root[0] >= 'a' && root[0] <= 'z' ) ) &&
+		root[1] == ':' && root[2] == '/' ) {
+		prefix = 3;
+	} else if ( root.size() > 2 && root[0] == '/' && root[1] == '/' ) {
+		// UNC paths require both a server and a share before our game directory.
+		const size_t share = root.find( '/', 2 );
+		if ( share != std::string::npos && share + 1 < root.size() ) prefix = 2;
+	}
+#else
+	if ( root[0] == '/' ) prefix = 1;
+#endif
+	if ( prefix == 0 ) {
+		error = "configuration save root must be an absolute native path";
+		return false;
+	}
+	if ( root.size() > prefix && root.back() == '/' ) root.pop_back();
+	const char *reason = NULL;
+	if ( root.size() > prefix && !FS_ValidateRelativeWritePath( root.c_str() + prefix, &reason ) ) {
+		error = std::string( "invalid configuration save root: " ) + reason;
+		return false;
+	}
+	if ( root.back() != '/' ) root += '/';
+	directory = root + "baseoq4/";
+	error.clear();
+	return true;
+}
+
+static void Common_CreateSettingsParent( const std::string& path ) {
+	// CreateOSPath recognizes only the native separator. DurableFile accepts
+	// these exact slash paths without VFS case correction or search fallbacks.
+	std::string nativePath = path;
+#ifdef _WIN32
+	for ( char& c : nativePath ) if ( c == '/' ) c = '\\';
+#endif
+	fileSystem->CreateOSPath( nativePath.c_str() );
+}
+
+bool Common_SettingsPersistencePaths( std::string& journal, std::string& lock, std::string& error ) {
+	std::string directory;
+	if ( !Common_SettingsSaveDirectory( directory, error ) ) return false;
+	const std::string resolvedJournal = directory + "ui-settings-recovery.dat";
+	const std::string resolvedLock = directory + ".settings-recovery.lock";
+	Common_CreateSettingsParent( resolvedJournal );
+	journal = resolvedJournal;
+	lock = resolvedLock;
+	error.clear();
+	return true;
+}
+
+bool idCommonLocal::WriteConfigToFileChecked( const char *filename, bool coordinatorOwnsLock, std::string& error ) {
+	if ( !coordinatorOwnsLock && UI_SettingsBlocksConfigWrite() ) {
+		error = "settings recovery blocks configuration writes";
+		return false;
+	}
+	const char *reason = NULL;
+	if ( !FS_ValidateRelativeWritePath( filename, &reason ) ) {
+		error = std::string( "invalid configuration filename: " ) + reason;
+		return false;
+	}
+	const std::string firstSegment = std::string( filename ).substr( 0, std::string( filename ).find( '/' ) );
+	if ( idStr::Icmp( firstSegment.c_str(), "ui-settings-recovery.dat" ) == 0 ||
+		idStr::Icmp( firstSegment.c_str(), ".settings-recovery.lock" ) == 0 ) {
+		error = "configuration filename is reserved for settings recovery";
+		return false;
+	}
+	// Callbacks from serialization must not enter a second write, even when the
+	// coordinator already owns the process-external lease.
+	static bool writing = false;
+	if ( writing ) { error = "configuration write is already active"; return false; }
+	struct WriteScope {
+		bool& active;
+		explicit WriteScope( bool& value ) : active( value ) { active = true; }
+		~WriteScope() { active = false; }
+	} scope( writing );
+
+	std::string journal, lock;
+	if ( !Common_SettingsPersistencePaths( journal, lock, error ) ) return false;
+	openq4::DurableFileLease lease;
+	if ( !coordinatorOwnsLock ) {
+		if ( !lease.TryAcquire( lock, error ) ) return false;
+		std::string pending;
+		const openq4::DurableReadResult status = openq4::DurableReadExact( journal, openq4::DurableFileMaxBytes, pending, error );
+		if ( status == openq4::DurableReadResult::Failed ) return false;
+		if ( status == openq4::DurableReadResult::Present ) {
+			error = "settings recovery journal blocks configuration writes";
+			return false;
+		}
+	}
+	// Derive the destination from the same root snapshot used by the lease,
+	// rather than re-reading a CVar or consulting the active mod's search path.
+	const std::string destination = journal.substr( 0, journal.find_last_of( '/' ) + 1 ) + filename;
+	idCheckedConfigMemory memory( "configuration" );
 #ifdef ID_WRITE_VERSION
-	assert( config_compressor );
-	t = time( NULL );
-	curtime = ctime( &t );
-	runtag = cvarSystem->GetCVarString( "si_version" );
+	if ( config_compressor == NULL ) { error = "configuration version compressor is unavailable"; return false; }
+	ID_TIME_T t = time( NULL );
+	const char *curtime = ctime( &t );
+	if ( curtime == NULL ) { error = "configuration version timestamp is unavailable"; return false; }
+	idStr runtag = cvarSystem->GetCVarString( "si_version" );
 	runtag += " - ";
 	runtag += curtime;
+	idCheckedConfigMemory compressed( "compressed" );
 	config_compressor->Init( &compressed, true, 8 );
-	config_compressor->Write( runtag.c_str(), runtag.Length() );
-	config_compressor->FinishCompress( );
+	const int consumed = config_compressor->Write( runtag.c_str(), runtag.Length() );
+	config_compressor->FinishCompress();
+	if ( consumed != runtag.Length() || compressed.Failed() ) {
+		error = "configuration version compression failed";
+		return false;
+	}
+	idBase64 out;
 	out.Encode( (const byte *)compressed.GetDataPtr(), compressed.Length() );
-	f->Printf( "// %s\n", out.c_str() );
+	memory.Printf( "// %s\n", out.c_str() );
 #endif
-
-	idKeyInput::WriteBindings( f );
-	cvarSystem->WriteFlaggedVariables( CVAR_ARCHIVE, "seta", f );
-	fileSystem->CloseFile( f );
+	idKeyInput::WriteBindings( &memory );
+	cvarSystem->WriteFlaggedVariables( CVAR_ARCHIVE, "seta", &memory );
+	if ( memory.Failed() ) { error = "configuration serialization failed or exceeded its size limit"; return false; }
+	const std::string bytes( memory.GetDataPtr(), memory.Length() );
+	Common_CreateSettingsParent( destination );
+	const bool committed = openq4::DurableReplaceExact( destination, bytes, error );
+	// A failed durability barrier may follow an already-visible rename.
+	fileSystem->ClearDirCache();
+	return committed;
 }
+
+bool Common_WriteSettingsConfiguration( bool coordinatorOwnsLock, std::string& error ) {
+	if ( !commonLocal.WriteConfigToFileChecked( CONFIG_FILE, coordinatorOwnsLock, error ) ) return false;
+	cvarSystem->ClearModifiedFlags( CVAR_ARCHIVE );
+	return true;
+}
+
+void idCommonLocal::WriteConfigToFile( const char *filename ) {
+	// Keep the public void ABI; the settings coordinator uses the checked API.
+	if ( UI_SettingsBlocksConfigWrite() ) return;
+	std::string error;
+	if ( !WriteConfigToFileChecked( filename, false, error ) ) {
+		Printf( "Couldn't write configuration: %s.\n", error.c_str() );
+	}
+}
+
 
 /*
 ===============
@@ -2126,17 +2285,10 @@ void idCommonLocal::WriteConfiguration( void ) {
 	if ( !( cvarSystem->GetModifiedFlags() & CVAR_ARCHIVE ) ) {
 		return;
 	}
+	std::string error;
+	if ( !WriteConfigToFileChecked( CONFIG_FILE, false, error ) ) return;
 	cvarSystem->ClearModifiedFlags( CVAR_ARCHIVE );
-
-	// disable printing out the "Writing to:" message
-	bool developer = com_developer.GetBool();
-	com_developer.SetBool( false );
-
-	WriteConfigToFile( CONFIG_FILE );
-	session->WriteCDKey( );
-
-	// restore the developer cvar
-	com_developer.SetBool( developer );
+	session->WriteCDKey();
 }
 
 /*
@@ -5579,7 +5731,13 @@ void idCommonLocal::InitRenderSystem( void ) {
 		return;
 	}
 
-	renderSystem->InitOpenGL();
+	if ( UI_SettingsStartupActive() ) {
+		std::string recoveryError;
+		if ( !UI_SettingsInitializeDisplay( recoveryError ) ) {
+			FatalError( "Settings display recovery failed: %s. Recovery data was retained.", recoveryError.c_str() );
+			return;
+		}
+	} else renderSystem->InitOpenGL();
 
 	// imagetools is a static library, so the executable and the renderer module
 	// each hold a private copy of the texture-compression capability block that
@@ -5671,10 +5829,11 @@ static void Common_DrawScaledSmallString( float x, float y, float charWidth, flo
 }
 
 void idCommonLocal::PrintLoadingMessage( const char *msg ) {
-	if ( !( msg && *msg ) ) {
+	if ( !( msg && *msg ) || !renderSystem || !renderSystem->IsOpenGLRunning() ) {
 		return;
 	}
 
+	UI_SettingsRenderFrame settingsFrame;
 	renderSystem->BeginFrame( renderSystem->GetScreenWidth(), renderSystem->GetScreenHeight() );
 
 	const float virtualWidth = static_cast<float>( SCREEN_WIDTH );
@@ -5734,8 +5893,11 @@ void idCommonLocal::PrintLoadingMessage( const char *msg ) {
 	Common_DrawScaledSmallString( textX, textY, charWidth, charHeight, msg,
 		idVec4( 0.94f, 0.62f, 0.05f, 1.0f ), true, declManager->FindMaterial( "fonts/english/bigchars", false ) );
 	renderSystem->SetColor( idVec4( 1.0f, 1.0f, 1.0f, 1.0f ) );
+	settingsFrame.Submitting();
 	renderSystem->EndFrame( NULL, NULL );
+	settingsFrame.Presented();
 	RetainedUI_FrameSubmitted();
+	UI_SettingsFrame( false ); // Startup/loading may observe recovery, never perform device or file work.
 }
 
 /*
@@ -5836,6 +5998,7 @@ idCommonLocal::GUIFrame
 void idCommonLocal::GUIFrame( bool execCmd, bool network ) {
 	openQ4_BeginPresentationFrame();
 	Sys_GenerateEvents();
+	UI_SettingsFrame( false ); // Poll only: loading callbacks must never restart recursively.
 	eventLoop->RunEventLoop( execCmd );	// and execute any commands
 	com_frameTime = GetUserCmdTime( com_ticNumber );
 	if ( network ) {
@@ -6946,6 +7109,11 @@ void idCommonLocal::InitGame( void ) {
 
 	// cvars are initialized, but not the rendering system. Allow preference startup dialog
 	Sys_DoPreferences();
+	std::string settingsRecoveryError;
+	if ( !UI_SettingsStartup( settingsRecoveryError ) ) {
+		FatalError( "Settings startup recovery failed: %s. Recovery data was retained.", settingsRecoveryError.c_str() );
+		return;
+	}
 
 	// init the user command input code
 	usercmdGen->Init();
@@ -7000,7 +7168,7 @@ void idCommonLocal::InitGame( void ) {
 	// have to do this twice.. first one sets the correct r_mode for the renderer init
 	// this time around the backend is all setup correct.. a bit fugly but do not want
 	// to mess with all the gl init at this point.. an old vid card will never qualify for 
-	if ( sysDetect ) {
+	if ( sysDetect && !UI_SettingsStartupActive() ) {
 		SetMachineSpec();
 		Com_ExecMachineSpec_f( args );
 		cvarSystem->SetCVarInteger( "s_numberOfSpeakers", 6 );
@@ -7015,6 +7183,7 @@ idCommonLocal::ShutdownGame
 =================
 */
 void idCommonLocal::ShutdownGame( bool reloading ) {
+	UI_SettingsShutdown();
 	// Stop advertising a ready single-player module before any shutdown work can
 	// race the async thread or mutate game-owned state.
 	openQ4_singleplayerGameModuleReady.store( false, std::memory_order_release );

@@ -7,6 +7,7 @@ are stand-ins. Covers builtin, module-only and dedicated compilation branches.
 """
 
 from pathlib import Path
+import os
 import shutil
 import subprocess
 import tempfile
@@ -73,7 +74,9 @@ static renderWindowServices_t windowServices={};
 static const renderWindowServices_t* rm_displayVideoPin=nullptr;
 static bool servicesAvailable=true,windowAvailable=true,restartOkay=true,queryRace=false,epochRace=false,throwBackend=false;
 static bool retainOkay=true,destroyDeviceOnFailure=false;
+static bool initializeOkay=true,initialReady=true;
 static int moduleQueries=0,builtinQueries=0,moduleRestarts=0,builtinRestarts=0;
+static int moduleInitializes=0,builtinInitializes=0;
 static int videoRetains=0,videoReleases=0,videoReferences=0;
 static std::vector<std::string> lifetime;
 static void RM_RestorePublishedInterfaces();
@@ -101,10 +104,20 @@ bool R_TryFullVidRestart(const renderWindowRequest_t* request,char* error,int si
     assert(rm_displayVideoPin==&windowServices && videoReferences==1);lifetime.push_back("restart");
     ++builtinRestarts;submitted=*request;if(!restartOkay)idStr::Copynz(error,"builtin refused",size);return restartOkay;
 }
+static bool InitialDevice(const renderWindowRequest_t* request,char* error,int size){
+    assert(rm_displayVideoPin==&windowServices && videoReferences==1 && !renderSystem->ready);
+    lifetime.push_back("initialize");submitted=*request;
+    if(throwBackend)throw std::runtime_error("backend failure");
+    if(initializeOkay)renderSystem->ready=initialReady;
+    else idStr::Copynz(error,"initial device refused",size);
+    return initializeOkay;
+}
+static bool ModuleInitialize(const renderWindowRequest_t* request,char* error,int size){++moduleInitializes;return InitialDevice(request,error,size);}
+bool R_TryInitializeDisplay(const renderWindowRequest_t* request,char* error,int size){++builtinInitializes;return InitialDevice(request,error,size);}
 static renderExport_t Export(){
     renderExport_t result={};result.version=RENDER_API_VERSION;result.backendName="test";
     result.renderSystem=&moduleRenderer;result.renderModelManager=&moduleModels;
-    result.TryDeviceRestart=ModuleRestart;result.GetDisplayPresentation=ModuleQuery;return result;
+    result.TryDeviceRestart=ModuleRestart;result.GetDisplayPresentation=ModuleQuery;result.TryInitializeDisplay=ModuleInitialize;return result;
 }
 static void Reset(){
     assert(!rm_displayVideoPin && !videoReferences);
@@ -112,6 +125,7 @@ static void Reset(){
     renderSystem=&builtinRenderer;renderModelManager=&builtinModels;builtinRenderer={};moduleRenderer={};
     servicesAvailable=windowAvailable=restartOkay=true;queryRace=epochRace=throwBackend=false;
     retainOkay=true;destroyDeviceOnFailure=false;videoRetains=videoReleases=0;lifetime.clear();
+    initializeOkay=initialReady=true;moduleInitializes=builtinInitializes=0;
     moduleQueries=builtinQueries=moduleRestarts=builtinRestarts=0;logs.clear();submitted={};
     windowServices={};windowServices.QueryWindowState=QueryWindow;windowServices.ApplyScreenParmsStrict=ApplyWindow;
     windowServices.RetainVideoSystem=RetainVideo;windowServices.ReleaseVideoSystem=ReleaseVideo;
@@ -138,6 +152,7 @@ static void Activation(){
     table=Export();table.renderSystem=nullptr;assert(!RM_ExportCanRender(&table,&reason));
     table=Export();table.TryDeviceRestart=nullptr;assert(!RM_ExportCanRender(&table,&reason));
     table=Export();table.GetDisplayPresentation=nullptr;assert(!RM_ExportCanRender(&table,&reason));
+    table=Export();table.TryInitializeDisplay=nullptr;assert(!RM_ExportCanRender(&table,&reason));
     Activate();assert(rm_displayModuleEpoch==2 && renderSystem==&moduleRenderer && renderModelManager==&moduleModels);
     RM_RestorePublishedInterfaces();assert(rm_displayModuleEpoch==3 && renderSystem==&builtinRenderer && renderModelManager==&builtinModels);
     RM_RestorePublishedInterfaces();assert(rm_displayModuleEpoch==3);
@@ -223,6 +238,56 @@ static void VideoLifetime(){
     assert((lifetime==std::vector<std::string>{"unload","release"}));
     R_RendererModule_Shutdown();assert(videoReleases==4);
 }
+static void ColdDispatch(){
+    Reset();Activate();renderWindowRequest_t request={};request.parms.width=960;request.parms.height=540;
+    request.displayId=57;request.displayIndex=3;request.restorePlacement=true;request.windowX=27;request.windowY=31;request.maximized=true;
+    char error[128]="sentinel";
+    assert(!R_RendererModule_TryInitializeDisplay(&request,error,sizeof(error)) && *error && !moduleInitializes && !videoRetains);
+    moduleRenderer.ready=false;
+    assert(!R_RendererModule_TryInitializeDisplay(nullptr,error,sizeof(error)) && !moduleInitializes);
+    rm_displayModuleEpoch=0;assert(!R_RendererModule_TryInitializeDisplay(&request,error,sizeof(error)));rm_displayModuleEpoch=2;
+    renderSystem=nullptr;assert(!R_RendererModule_TryInitializeDisplay(&request,error,sizeof(error)));renderSystem=&moduleRenderer;
+    servicesAvailable=false;assert(!R_RendererModule_TryInitializeDisplay(&request,error,sizeof(error)));servicesAvailable=true;
+    windowServices.QueryWindowState=nullptr;assert(!R_RendererModule_TryInitializeDisplay(&request,error,sizeof(error)));windowServices.QueryWindowState=QueryWindow;
+    windowServices.ApplyScreenParmsStrict=nullptr;assert(!R_RendererModule_TryInitializeDisplay(&request,error,sizeof(error)));windowServices.ApplyScreenParmsStrict=ApplyWindow;
+    windowServices.RetainVideoSystem=nullptr;assert(!R_RendererModule_TryInitializeDisplay(&request,error,sizeof(error)));windowServices.RetainVideoSystem=RetainVideo;
+    windowServices.ReleaseVideoSystem=nullptr;assert(!R_RendererModule_TryInitializeDisplay(&request,error,sizeof(error)));windowServices.ReleaseVideoSystem=ReleaseVideo;
+    rm_state.moduleExport.TryInitializeDisplay=nullptr;assert(!R_RendererModule_TryInitializeDisplay(&request,error,sizeof(error)));rm_state.moduleExport.TryInitializeDisplay=ModuleInitialize;
+    assert(!moduleInitializes && !builtinInitializes && !videoRetains && !videoReferences);
+    retainOkay=false;assert(!R_RendererModule_TryInitializeDisplay(&request,error,sizeof(error)) && !moduleInitializes);
+    assert(videoRetains==1 && !videoReleases && !videoReferences);retainOkay=true;lifetime.clear();
+    initializeOkay=false;
+    assert(!R_RendererModule_TryInitializeDisplay(&request,error,sizeof(error)) && std::string(error)=="initial device refused");
+    assert(moduleInitializes==1 && !moduleRestarts && !builtinInitializes && videoReferences==1 && videoRetains==2 && !videoReleases);
+    assert(!moduleRenderer.ready && rm_displayVideoPin==&windowServices);
+    assert(!std::memcmp(&request,&submitted,sizeof(request)));
+    assert(!R_RendererModule_TryInitializeDisplay(nullptr,error,sizeof(error)) && videoReferences==1);
+    servicesAvailable=false;assert(!R_RendererModule_TryInitializeDisplay(&request,error,sizeof(error)) && videoReferences==1);servicesAvailable=true;
+    initializeOkay=true;initialReady=false;
+    assert(!R_RendererModule_TryInitializeDisplay(&request,error,sizeof(error)) && std::string(error).find("without a ready renderer")!=std::string::npos);
+    assert(moduleInitializes==2 && !videoReleases && videoReferences==1 && videoRetains==2);
+    initialReady=true;
+    assert(R_RendererModule_TryInitializeDisplay(&request,error,sizeof(error)) && !*error && moduleRenderer.ready);
+    assert(moduleInitializes==3 && videoRetains==2 && videoReleases==1 && !videoReferences && !rm_displayVideoPin);
+    assert((lifetime==std::vector<std::string>{"retain","initialize","initialize","initialize","release"}));
+    assert(!R_RendererModule_TryInitializeDisplay(&request,error,sizeof(error)) && moduleInitializes==3 && videoRetains==2);
+    // Fatal backend exceptions propagate; unloading is the only automatic
+    // release after an incomplete initialization, never a fallback attempt.
+    moduleRenderer.ready=false;throwBackend=true;bool threw=false;
+    try{R_RendererModule_TryInitializeDisplay(&request,error,sizeof(error));}catch(const std::runtime_error&){threw=true;}
+    assert(threw && videoReferences==1 && !moduleRestarts);throwBackend=false;
+    lifetime.clear();R_RendererModule_Shutdown();assert(!videoReferences && !rm_displayVideoPin);
+    assert((lifetime==std::vector<std::string>{"unload","release"}));
+    Reset();rm_state.status.disposition=RENDER_MODULE_DISPOSITION_BUILTIN;builtinRenderer.ready=false;
+#if !defined(OPENQ4_RENDERER_MODULE_ONLY) && !defined(ID_DEDICATED)
+    assert(R_RendererModule_TryInitializeDisplay(&request,error,sizeof(error)) && builtinInitializes==1 && !moduleInitializes);
+    assert(!std::memcmp(&request,&submitted,sizeof(request)) && videoRetains==1 && videoReleases==1 && !videoReferences);
+#else
+    assert(!R_RendererModule_TryInitializeDisplay(&request,error,sizeof(error)) && !builtinInitializes && !moduleInitializes);
+    assert(!videoRetains && !videoReleases && !rm_displayVideoPin);
+#endif
+    std::puts("Strict first display service: ABI15 required export, module/static dispatch, prepared video pin across cold refusal/retry, false readiness and unavailable services fail closed passed");
+}
 static void BoundedProbe(){
     Reset();Activate();assert(Probe({"rendererDisplayProbe"}));assert(Probe({"rendererDisplayProbe","REPORT"}));
     assert(!Probe({"rendererDisplayProbe","report","extra"}));assert(!Probe({"rendererDisplayProbe","unknown"}));
@@ -277,7 +342,7 @@ static void BoundedProbe(){
     assert(Probe({"rendererDisplayProbe","restore"}) && moduleRestarts==calls+1);
     RM_AdvanceDisplayEpoch();assert(!Probe({"rendererDisplayProbe","restore"}) && moduleRestarts==calls+1);
 }
-int main(){Activation();Query();Dispatch();VideoLifetime();BoundedProbe();std::puts("Renderer display services: ABI activation, coherent observation, identity exhaustion, exact backend dispatch, balanced video lease and bounded actual-state probe passed");}
+int main(){Activation();Query();Dispatch();VideoLifetime();ColdDispatch();BoundedProbe();std::puts("Renderer display services: ABI activation, coherent observation, identity exhaustion, exact backend dispatch, balanced video lease and bounded actual-state probe passed");}
 '''
 
 
@@ -293,6 +358,7 @@ def main():
         'void R_RendererModule_Shutdown( void )',
         'bool R_RendererModule_QueryDisplay( rendererDisplayState_t *outState )',
         'bool R_RendererModule_TryDeviceRestart( const renderWindowRequest_t *request, char *error, int errorSize )',
+        'bool R_RendererModule_TryInitializeDisplay( const renderWindowRequest_t *request, char *error, int errorSize )',
         'static bool RM_ParseProbeDimension( const char *text, int minimum, int maximum, int &value )',
         'static void R_RendererDisplayProbe_f( const idCmdArgs &args )',
     )
@@ -302,12 +368,13 @@ def main():
         raise RuntimeError('C++ compiler required')
     (ROOT / '.tmp').mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='display-services-', dir=ROOT / '.tmp') as temp:
+        env = dict(os.environ, TEMP=temp, TMP=temp)
         test_source = Path(temp) / 'services.cpp'
         test_source.write_text(code, encoding='utf-8')
         for name, defines in (('builtin', []), ('module-only', ['-DOPENQ4_RENDERER_MODULE_ONLY']), ('dedicated', ['-DID_DEDICATED'])):
             binary = Path(temp) / f'{name}.exe'
-            subprocess.run([compiler, '-std=c++17', *defines, '-I', str(ROOT), str(test_source), '-o', str(binary)], check=True)
-            subprocess.run([str(binary)], check=True)
+            subprocess.run([compiler, '-std=c++17', *defines, '-I', str(ROOT), str(test_source), '-o', str(binary)], check=True, env=env)
+            subprocess.run([str(binary)], check=True, env=env)
 
 
 if __name__ == '__main__':

@@ -326,16 +326,18 @@ The [SYSTEM settings increment](../ui/system-settings-contract.md) adds a fixed
 53-field catalog, owned drafts, typed application operations, conflict-safe
 rollback and frame-owned closure/recovery. Reserved settings state cannot be
 overwritten by GUI programs or pending caller data. Immediate changes use the
-production host; batches requiring device/resource work are rejected before
-writes until their actual result/recovery routes are qualified. The complete
-settings screen, Keep/Revert journal, controls, editor and platform qualification
-remain required M1/M2 work.
+production host. Eligible confirmation documents can now apply display batches
+through the [durable confirmation coordinator](../ui/display-confirmation.md);
+audio/resource, next-map and preset effects still reject the entire batch before
+writes. Complete settings controls, editor and platform qualification remain
+required M1/M2 work.
 The [display-device foundation](../ui/display-device-contract.md) adds strict
 actual window queries, recoverable typed renderer restart/restore and backend
 presentation observations. An engine-owned SDL video reference preserves live
 display identity across failed attempts. The asynchronous settings coordinator,
-durable journal, first-present confirmation and complete platform/production
-qualification remain required; device-changing settings are still blocked.
+durable journal, owner-present confirmation and strict startup recovery are now
+implemented. Complete platform/production qualification remains required, and
+this integration accepts none of the 271 production GUI entries.
 Semantic buttons now use authored state timelines, projected hit testing,
 source-order/spatial navigation and modal focus ownership. The
 [interaction checkpoint](../ui/interaction.md) records native behavior checks,

@@ -32,6 +32,7 @@ along with Doom 3 Source Code.  If not, see <http://www.gnu.org/licenses/>.
 #include "../win32/win_local.h"
 #endif
 #include "../sys_public.h"
+#include "../WindowSettings.h"
 #include "../../framework/Common.h"
 #include "../../framework/Console.h"
 #include "../../framework/FileSystem.h"
@@ -366,6 +367,10 @@ typedef struct {
 } sdl3WindowedPlacement_t;
 
 static sdl3WindowedPlacement_t s_windowedPlacement = { 0, 0, 0, 0, false };
+#ifndef ID_DEDICATED
+static uint64_t s_windowPlacementLease = 0;
+static sysWindowPlacementSnapshot_t s_windowPlacementBaseline;
+#endif
 
 void* GLimp_ExtensionPointer(const char* name);
 
@@ -3948,7 +3953,7 @@ static void SDL3_UpdateFullWindowViewport(int pixelWidth, int pixelHeight) {
 }
 
 static void SDL3_RecordWindowedPlacement(int x, int y, int width, int height) {
-	if (width <= 0 || height <= 0) {
+	if (Sys_WindowPlacementLeaseActive() || width <= 0 || height <= 0) {
 		return;
 	}
 
@@ -4000,7 +4005,7 @@ static void SDL3_RefreshWindowPlacement(void) {
 	// button) never set win32.cdsFullscreen, and persisting the fullscreen
 	// space's forced move/resize would corrupt the saved windowed placement.
 	const bool windowIsFullscreen = (windowFlags & SDL_WINDOW_FULLSCREEN) != 0;
-	const bool canPersistWindowedPlacement = !windowIsHidden && !windowIsFullscreen && !win32.cdsFullscreen && !s_screenParmTransitionActive;
+	const bool canPersistWindowedPlacement = !windowIsHidden && !windowIsFullscreen && !win32.cdsFullscreen && !s_screenParmTransitionActive && !Sys_WindowPlacementLeaseActive();
 	const bool isWindowedResizable = (windowFlags & SDL_WINDOW_BORDERLESS) == 0;
 
 	const bool haveWindowPosition = SDL_GetWindowPosition(s_sdlWindow, &x, &y);
@@ -6366,6 +6371,90 @@ static bool SDL3_WindowServices_CreateVulkanSurface(void *vkInstance, unsigned l
 	*outVkSurface = (unsigned long long)surface;
 	return true;
 }
+
+#ifndef ID_DEDICATED
+static bool SDL3_PlacementError(const char* reason, char* error, int size) {
+	if (error && size>0) idStr::snPrintf(error,size,"%s",reason);
+	return false;
+}
+static sysWindowPlacementSnapshot_t SDL3_ReadPlacementSettings() {
+	sysWindowPlacementSnapshot_t value;
+	value.x=win32.win_xpos.GetInteger(); value.y=win32.win_ypos.GetInteger();
+	value.width=r_windowWidth.GetInteger(); value.height=r_windowHeight.GetInteger();
+	value.normalX=s_windowedPlacement.x; value.normalY=s_windowedPlacement.y;
+	value.normalWidth=s_windowedPlacement.width; value.normalHeight=s_windowedPlacement.height; value.normalValid=s_windowedPlacement.valid;
+	return value;
+}
+static bool SDL3_SamePlacement(const sysWindowPlacementSnapshot_t& a, const sysWindowPlacementSnapshot_t& b) {
+	return a.x==b.x && a.y==b.y && a.width==b.width && a.height==b.height &&
+		a.normalX==b.normalX && a.normalY==b.normalY && a.normalWidth==b.normalWidth && a.normalHeight==b.normalHeight && a.normalValid==b.normalValid;
+}
+bool Sys_WindowPlacementLeaseActive() { return s_windowPlacementLease!=0; }
+bool Sys_BeginWindowPlacementLease(uint64_t token, sysWindowPlacementSnapshot_t* baseline, char* error, int errorSize) {
+	if (!token || !baseline || s_windowPlacementLease) return SDL3_PlacementError("Window placement is already leased or the request is invalid",error,errorSize);
+	s_windowPlacementBaseline=SDL3_ReadPlacementSettings(); s_windowPlacementLease=token;
+	*baseline=s_windowPlacementBaseline; if (error && errorSize>0) error[0]='\0'; return true;
+}
+bool Sys_ReadWindowPlacementLease(uint64_t token, sysWindowPlacementSnapshot_t* current, char* error, int errorSize) {
+	if (!token || token!=s_windowPlacementLease || !current) return SDL3_PlacementError("Window placement lease is unavailable",error,errorSize);
+	*current=SDL3_ReadPlacementSettings(); if (error && errorSize>0) error[0]='\0'; return true;
+}
+bool Sys_BuildWindowPlacementCommit(uint64_t token, const sysWindowPlacementSnapshot_t* expectedCurrent,
+	const renderWindowState_s* actual, sysWindowPlacementSnapshot_t* committed, char* error, int errorSize) {
+	if (!token || token!=s_windowPlacementLease || !expectedCurrent || !actual || !committed || !s_sdlWindow)
+		return SDL3_PlacementError("Window placement commit requires a live lease and window",error,errorSize);
+	if (!SDL3_SamePlacement(SDL3_ReadPlacementSettings(),*expectedCurrent))
+		return SDL3_PlacementError("Window placement changed outside the settings attempt",error,errorSize);
+	if (actual->logicalWidth<=0 || actual->logicalHeight<=0 || actual->minimized)
+		return SDL3_PlacementError("Window placement commit requires valid actual dimensions",error,errorSize);
+	sysWindowPlacementSnapshot_t result=*expectedCurrent;
+	if (!actual->fullscreen && !actual->borderless && !actual->hidden && !actual->maximized) {
+		result.width=actual->logicalWidth; result.height=actual->logicalHeight;
+		if (actual->positionValid && SDL3_UseAbsoluteWindowPlacement()) {
+			int top=0,left=0,bottom=0,right=0;
+			bool borders=SDL_GetWindowBordersSize(s_sdlWindow,&top,&left,&bottom,&right);
+#if defined(OPENQ4_SDL3_DARWIN_HOST)
+			if (!borders) borders=Sys_SDL_GetNativeWindowBorders(s_sdlWindow,&top,&left,&bottom,&right);
+#endif
+			if (!borders || top<0 || left<0 || bottom<0 || right<0 || top>16384 || left>16384 || bottom>16384 || right>16384)
+				return SDL3_PlacementError("Actual window frame offsets are unavailable",error,errorSize);
+			result.x=SDL3_SaturateWindowCoordinate(int64_t(actual->windowX)-left);
+			result.y=SDL3_SaturateWindowCoordinate(int64_t(actual->windowY)-top);
+			result.normalX=result.x; result.normalY=result.y; result.normalWidth=result.width; result.normalHeight=result.height; result.normalValid=true;
+		}
+	}
+	// Maximized/fullscreen/borderless/hidden observations never overwrite the
+	// captured normal rectangle. SDL cannot expose its compositor-internal copy.
+	*committed=result; if (error && errorSize>0) error[0]='\0'; return true;
+}
+bool Sys_ApplyWindowPlacementLease(uint64_t token, const sysWindowPlacementSnapshot_t* expectedCurrent,
+	const sysWindowPlacementSnapshot_t* finalState, char* error, int errorSize) {
+	if (!token || token!=s_windowPlacementLease || !expectedCurrent || !finalState)
+		return SDL3_PlacementError("Window placement lease is unavailable",error,errorSize);
+	if (!SDL3_SamePlacement(SDL3_ReadPlacementSettings(),*expectedCurrent))
+		return SDL3_PlacementError("Window placement changed outside the settings attempt",error,errorSize);
+	if (finalState->normalValid && (finalState->normalWidth<=0 || finalState->normalHeight<=0))
+		return SDL3_PlacementError("The normal window restore rectangle is invalid",error,errorSize);
+	// Validate all ownership before the first setter; a later setter refusal
+	// remains a partial failure with the lease retained. No modified flags are
+	// cleared, so unrelated/archive persistence remains the coordinator's choice.
+	if (expectedCurrent->x!=finalState->x) win32.win_xpos.SetInteger(finalState->x);
+	if (expectedCurrent->y!=finalState->y) win32.win_ypos.SetInteger(finalState->y);
+	if (expectedCurrent->width!=finalState->width) r_windowWidth.SetInteger(finalState->width);
+	if (expectedCurrent->height!=finalState->height) r_windowHeight.SetInteger(finalState->height);
+	const auto observed=SDL3_ReadPlacementSettings();
+	if (observed.x!=finalState->x || observed.y!=finalState->y || observed.width!=finalState->width || observed.height!=finalState->height)
+		return SDL3_PlacementError("Window placement write was refused or normalized",error,errorSize);
+	s_windowedPlacement.x=finalState->normalX; s_windowedPlacement.y=finalState->normalY;
+	s_windowedPlacement.width=finalState->normalWidth; s_windowedPlacement.height=finalState->normalHeight; s_windowedPlacement.valid=finalState->normalValid;
+	if (error && errorSize>0) error[0]='\0'; return true;
+}
+bool Sys_FinishWindowPlacementLease(uint64_t token, const sysWindowPlacementSnapshot_t* expectedCurrent,
+	const sysWindowPlacementSnapshot_t* finalState, char* error, int errorSize) {
+	if (!Sys_ApplyWindowPlacementLease(token,expectedCurrent,finalState,error,errorSize)) return false;
+	s_windowPlacementLease=0; s_windowPlacementBaseline={}; return true;
+}
+#endif
 
 // Strict settings operations are separate from legacy startup negotiation.
 // Every observation comes from SDL; querying never persists placement CVars.

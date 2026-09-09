@@ -4,7 +4,7 @@
   "date": "2026-09-09",
   "status": "Implementation incomplete; this register preserves full product scope and does not accept any production GUI.",
   "baseline": {
-    "engine_revision": "962b179c0e4214df2ebde38e98cb3e090b75fdd6",
+    "engine_revision": "1f6bfa556941f85b245aa80d7aa54e481fa71d3c",
     "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
     "effective_gui_count": 271,
     "translated_or_accepted_resources": 0,
@@ -19,12 +19,12 @@
     "product": {
       "path": "docs/dev/plans/ui-product-completion.md",
       "authority": "normative completion scope, milestones and final audit",
-      "sha256": "729023d610c3846e5a6444836b9ce8fcb7ce803087f9174147a789077473ba1a"
+      "sha256": "eefe7defe0fbe2259ec58d65e3cd625b84a6dbf3ea3bf0064da812e363ae58b4"
     },
     "original": {
       "path": "docs/dev/plans/idtech5-ui.md",
       "authority": "original immutable scope and stage gates",
-      "sha256": "95ee5a82a898c959925a5fc96234501a4425b865ff5e3b96b7d29162fb364e67"
+      "sha256": "c26f5a8148562f0c7af471f875eebdbbc821bcb79219da9ffe3ec0ef5b20f82e"
     },
     "inventory": {
       "path": "docs/dev/ui/inventory-report.md",
@@ -100,7 +100,7 @@
       "kind": "source_audit",
       "path": "docs/dev/plans/ui-product-completion.md",
       "scope": "Published audit at 80bb3939; source limitations corroborated by current Document/Runtime inspection. Historical tests and captures are not a fresh product qualification.",
-      "sha256": "729023d610c3846e5a6444836b9ce8fcb7ce803087f9174147a789077473ba1a"
+      "sha256": "eefe7defe0fbe2259ec58d65e3cd625b84a6dbf3ea3bf0064da812e363ae58b4"
     },
     "document-foundation": {
       "kind": "implementation_checkpoint",
@@ -212,7 +212,7 @@
     "settings-transaction-foundation": {
       "kind": "qualified_foundation_checkpoint",
       "path": "docs/dev/ui/system-settings-contract.md",
-      "sha256": "526ce6c468086450ac076fcc6de99dbaf22602069d8a1a535a703d8c3c4e8b9c",
+      "sha256": "82798a840773a335e93ec6c7af4226165515bdaadc567b6aa1a331878dc2b1ea",
       "baseline_engine_revision": "15e35beaf11a1f1942ba25e9431211f64c1ef7f1",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "local_capture_summary": ".tmp/ui/settings-review/capture-evidence.json",
@@ -223,13 +223,24 @@
     "display-device-foundation": {
       "kind": "qualified_foundation_checkpoint",
       "path": "docs/dev/ui/display-device-contract.md",
-      "sha256": "8c80714a3613367f6532291c9eedb02add37a99c193deb2a462f59f59a6b685e",
+      "sha256": "b7931802d466377f3039fb9152581cc88666e356251cf5c6f7bf59c982b135ce",
       "baseline_engine_revision": "962b179c0e4214df2ebde38e98cb3e090b75fdd6",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "local_capture_summary": ".tmp/ui/display-review/capture-policy-evidence.json",
       "local_capture_status": "qualified_subset",
       "scope": "Private renderer ABI14 strict window request/query, active-backend recoverable restart, coherent device/presentation tracking with engine module epoch, and an SDL video reference retained across failed attempts. Five production-body native harnesses, seven adjacent Meson UI suites and a 23-test capture oracle with 281 rejected corruptions pass. Two source/binary-bound hidden windowed Windows gameplay diagnostics each pass eight device observations,32 ordered settings readbacks and four reviewed engine screenshots; requested interval and GL samples remain independent of stored preferences across fresh presents, failure and restoration. An additional five-observation SP/OpenGL capture verifies visible gameplay with a four-sample default framebuffer, explicit restoration and two reviewed screenshots. SYSTEM display preflight is read-only and matches exact pixel-mode bounds. No production settings device Apply, journal/confirmation, full render-target AA policy, physical input/compositor/platform qualification or GUI migration entry is accepted.",
       "local_capture_summary_sha256": "02ba863b2d420ff0b9271e42e0da60e9b40ac188595afc977b8b9ddf3c76ae15"
+    },
+    "display-confirmation-foundation": {
+      "kind": "qualified_foundation_checkpoint",
+      "path": "docs/dev/ui/display-confirmation.md",
+      "baseline_engine_revision": "1f6bfa556941f85b245aa80d7aa54e481fa71d3c",
+      "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
+      "local_capture_summary": ".tmp/ui/confirmation-review/capture-evidence.json",
+      "local_capture_summary_sha256": "1f3e66f316a689ccaae2bf0c1e08c322deb296a0539852047a8a0c9ef0b00521",
+      "local_capture_status": "qualified_subset",
+      "scope": "M2 display transaction integration: queued Apply/Keep/Revert/Retry with never-reused owner/request identities, strict actual-device matching, exact synchronous owner-frame presentation receipt followed by a fresh presentation, 15-second confirmation and 20-second device deadline. A canonical Pending/Confirmed journal, checked durable configuration replacement, exclusive process/window-placement leases, conflict-safe replay and renderer-private ABI15 strict first-device initialization protect interrupted settings changes. Native suites and counted production-method tests cover failures, partial writes, stale identities, uncertain persistence, invalid recovery records and historical display remapping. Source/binary-bound hidden windowed Windows SP/OpenGL and MP/Vulkan captures exercise two actual display changes, Keep/Revert, resource recreation and engine-rendered confirmation panels. Separate two-process recovery captures retain a real unconfirmed journal; Confirmed variants explicitly inject only the approved marker and checksum and do not claim a real Keep crash or power-cut test. This qualifies the recorded diagnostic subset only. Complete audio/resource effects, presets/Auto-Detect, production SYSTEM controls/artwork, editor round trips, visible window-manager/fullscreen/multi-monitor behavior, other platforms and the complete 271-GUI product remain unaccepted.",
+      "sha256": "247b8a60f9784d438c8b261d5b01bc88d1ad730175e25c6aa80cd4673cf0623b"
     }
   },
   "groups": {
@@ -1644,10 +1655,11 @@
       "status": "partial",
       "current_evidence": [
         "settings-transaction-foundation",
-        "display-device-foundation"
+        "display-device-foundation",
+        "display-confirmation-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "The owned 53-field transaction/catalog/service implements complete typed drafts, registered-default staging, validated immediate patch Apply, editing Cancel, readback, partial-failure rollback, external-conflict protection, bounded confirmation/timeout states, lifecycle abandonment and config-write protection. Native and production-body evidence plus two source-bound Windows SP/OpenGL and MP/Vulkan gameplay probes qualify only this foundation, including draft/live distinction, non-replaying GUI restore and language/video continuity. Changed non-immediate batches are blocked before writes. Actual video/audio/input flows, pure preset/Auto-Detect draft expansion, typed asynchronous Applying/Restoring results, verified device reconstruction/first present, display Keep/Revert, durable journal/process recovery and complete production acceptance remain required; CVar readback does not prove device success. Private strict display requests, recoverable renderer reconstruction and actual presentation observations are now implemented and exercised through a bounded engine diagnostic; they still require integration with the asynchronous settings coordinator, durable journal and confirmed visible-window restoration."
+      "remaining": "The 53-field catalog and owned transaction/service now integrate actual asynchronous display Apply/Keep/Revert/Retry, frame-bound presentation qualification, checked durable Pending/Confirmed recovery and strict first-device startup replay. Native and recorded hidden windowed Windows GL/Vulkan diagnostic evidence qualifies this subset. Finish actual audio/resource/input flows, profile and Auto-Detect draft expansion, complete dependent production controls, visible focus/window-placement/fullscreen/multi-monitor failure and timeout behavior, platform qualification and full production acceptance. CVar values alone never prove device success, and injected Confirmed startup evidence is not a real interrupted Keep or power-loss experiment."
     },
     {
       "id": "BEH-003",
@@ -2125,7 +2137,7 @@
         "product:3 Text, controls and accessibility",
         "product:5 Visual and interaction qualification"
       ],
-      "requirement": "Provide independently persisted UI scale default 100%, range 75Ã¢â‚¬â€œ200%; clamp extremes with reachable reset and no lost essential actions.",
+      "requirement": "Provide independently persisted UI scale default 100%, range 75\u00c3\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u0153200%; clamp extremes with reachable reset and no lost essential actions.",
       "dependencies": [
         "BEH-002"
       ],
@@ -2155,7 +2167,7 @@
         "product:3 Text, controls and accessibility",
         "product:5 Visual and interaction qualification"
       ],
-      "requirement": "Provide text scale default 100%, range 100Ã¢â‚¬â€œ200% independent of furniture; reflow labels, rows and forms without hiding essential actions.",
+      "requirement": "Provide text scale default 100%, range 100\u00c3\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u0153200% independent of furniture; reflow labels, rows and forms without hiding essential actions.",
       "dependencies": [
         "TXT-001",
         "LAY-003"
@@ -3890,7 +3902,7 @@
         "product:3 Visual quality and motion",
         "original:Stage 6"
       ],
-      "requirement": "Standard panels have equal 12 dp upper/8 dp lower 45-degree cuts, 1 dp rail and 3 dp inset rail; popover cuts 6 dp, major bands 16Ã¢â‚¬â€œ24 dp. Reconstruct each stepped/notched silhouette and named ornaments without stretched corners.",
+      "requirement": "Standard panels have equal 12 dp upper/8 dp lower 45-degree cuts, 1 dp rail and 3 dp inset rail; popover cuts 6 dp, major bands 16\u00c3\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u015324 dp. Reconstruct each stepped/notched silhouette and named ornaments without stretched corners.",
       "dependencies": [
         "ART-001",
         "REN-001"
@@ -4619,10 +4631,11 @@
       "status": "pending",
       "current_evidence": [
         "settings-transaction-foundation",
-        "display-device-foundation"
+        "display-device-foundation",
+        "display-confirmation-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "The source-backed contract inventories 31 current setting options, dependent popup/default/confirmation behavior and the complete 53-CVar page/preset union with source hashes and precedence. The transaction/catalog/service foundation is implemented, but no production SYSTEM document, complete controls/vector artwork, display recovery, editor round trip or source-bound behavioral/visual screen acceptance exists. Complete the actual shipped page and dependent flows; diagnostic probes cannot satisfy this requirement. Private strict display requests, recoverable renderer reconstruction and actual presentation observations are now implemented and exercised through a bounded engine diagnostic; they still require integration with the asynchronous settings coordinator, durable journal and confirmed visible-window restoration."
+      "remaining": "The source-backed contract inventories 31 setting options, dependent popup/default/confirmation behavior and the complete 53-CVar page/preset union with source hashes and precedence. The transaction/catalog/service now includes real asynchronous display confirmation and durable startup recovery, exercised through source-bound diagnostic documents. No production SYSTEM document, complete control/vector-artwork set, editor round trip or full source-bound behavioral/visual screen acceptance exists. Translate the actual shipped page and dependent flows; qualify real normal entry/return/reopen and every mapped control. Diagnostic display probes cannot satisfy this requirement."
     },
     {
       "id": "FLOW-003",

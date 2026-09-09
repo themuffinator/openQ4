@@ -7,7 +7,7 @@ the [completion plan](../plans/ui-product-completion.md), the
 [visual specification](../ui-visual-design.md) into implementation ownership,
 dependencies, concrete evidence and explicit unfinished work.
 
-The current increment starts from engine `962b179c0e4214df2ebde38e98cb3e090b75fdd6` and companion
+The current increment starts from engine `1f6bfa556941f85b245aa80d7aa54e481fa71d3c` and companion
 `1cd33980f072ac3d78978a07b388b4b6fe6b5eb2`. The register also identifies the current
 [manager/snapshot foundation](instance-persistence.md) as partial
 evidence with native and SP/OpenGL/MP/Vulkan validation. It does not treat that work as a
@@ -43,10 +43,10 @@ source/control contract, complete 53-field host catalog, bounded transaction cor
 and normal typed service operations. Owned draft edits, immediate Apply/Cancel/
 Defaults, conflict-safe rollback, read-only service state, lifecycle abandonment
 and config-write protection have native and production-body test evidence.
-The service test passes 15 scenarios; the separate host test covers the full
-catalog. Any changed non-immediate field rejects the entire Apply batch before
-writes. Actual device-result/recovery routing, profile expansion, complete
-production controls and the native editor remain open. Gameplay evidence is
+That checkpoint's service test passes 15 scenarios; the separate host test covers
+the full catalog. At that checkpoint, any changed non-immediate field rejected
+the entire Apply batch before writes. Profile expansion, complete production
+controls and the native editor remain open. Its gameplay evidence is
 recorded at `.tmp/ui/settings-review/capture-evidence.json`:
 hidden windowed Windows SP/OpenGL at density 125% and MP/Vulkan at density 200% each pass 168
 ordered readbacks, 19 service results and two language/video recoveries. The
@@ -66,8 +66,31 @@ gameplay with a four-sample default framebuffer and its restoration. Seven nativ
 method harnesses and the 23-test capture oracle qualify this subset. The immutable
 record is `.tmp/ui/display-review/capture-policy-evidence.json`; its structural register
 audit is `.tmp/ui/display-review/register-validation.json`. The
-production settings coordinator, journal, first-present confirmation, visible
-geometry persistence and full platform qualification remain open.
+full production settings page, visible geometry behavior and platform
+qualification remained open at that checkpoint.
+
+The subsequent [display confirmation implementation](display-confirmation.md)
+adds queued Apply/Keep/Revert/Retry, durable Pending/Confirmed recovery records,
+checked atomic configuration writes, native settings/window-placement leases and
+strict first-device startup recovery. Confirmation requires an eligible owning
+view and successful presentation; request identities prevent stale actions from
+affecting a later draft. The new native and gameplay qualification is recorded
+separately from the immutable display-device checkpoint. This work remains
+partial evidence for `BEH-002` and `FLOW-002`; it does not accept the production
+SYSTEM screen, audio/resource effects, preset expansion, the native editor or any
+of the 271 GUI migrations.
+
+Its immutable local checkpoint is
+`.tmp/ui/confirmation-review/capture-evidence.json`, SHA-256
+`1f3e66f316a689ccaae2bf0c1e08c322deb296a0539852047a8a0c9ef0b00521`.
+Two inspected display probes and four two-process recovery cases passed on
+hidden windowed Windows SP/OpenGL and MP/Vulkan. The approved recovery cases
+explicitly inject a Confirmed marker into a real Pending journal; they do not
+qualify an actual interrupted Keep or power cut. The checkpoint binds the
+tested source/binaries, native checks, configurations, journal bytes, logs and
+engine screenshots. Its register audit is
+`.tmp/ui/confirmation-review/register-validation.json`. Requirement statuses,
+acceptance criteria and migration entries remain unchanged.
 
 There are **60 partial, 166 pending and one verified requirement**. `BEH-002`
 is now partial for the implemented settings transaction/service boundary.

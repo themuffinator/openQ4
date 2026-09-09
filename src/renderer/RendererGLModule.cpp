@@ -522,6 +522,7 @@ renderExport_t *GetRenderAPI( renderImport_t *moduleImport ) {
 	rgm_export.renderModelManager = renderModelManager;
 	rgm_export.TryDeviceRestart = R_TryFullVidRestart;
 	rgm_export.GetDisplayPresentation = R_GetDisplayPresentation;
+	rgm_export.TryInitializeDisplay = R_TryInitializeDisplay;
 #ifdef OPENQ4_RENDERER_VK_MODULE
 	// the Vulkan backend keeps its bring-up diagnostics surface for the
 	// on-demand rendererVkProbe flow

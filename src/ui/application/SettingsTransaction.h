@@ -7,11 +7,19 @@
 
 namespace openq4::ui {
 
-enum class SettingsPhase { Closed, Editing, Confirming, RecoveryRequired };
+enum class SettingsPhase { Closed, Editing, Confirming, RecoveryRequired, Applying, Restoring };
 enum class SettingsCode { Ok, Busy, NotOpen, Invalid, Conflict, ApplyFailed, RollbackFailed };
 struct SettingsResult {
 	SettingsCode code = SettingsCode::Ok;
 	std::string diagnostic; // Bounded developer diagnostic; localize user text by code.
+};
+
+// A value copy for a serialized coordinator, never a mutable view of transaction
+// state. Restore.baseline is the fresh pre-restore frame; the transaction keeps
+// its original baseline until the device restoration is explicitly completed.
+struct SettingsAttempt {
+	std::uint64_t owner = 0, request = 0;
+	StateValues baseline, target, patch;
 };
 
 // The host supplies one stable, complete, typed catalog. Read/Defaults/Validate
@@ -65,6 +73,30 @@ public:
 	SettingsResult Tick(double now);
 	SettingsResult Abandon(std::uint64_t owner);
 
+	// Asynchronous device path. Preparing freezes values without host writes;
+	// execution changes only CVars; completion is the coordinator's assertion
+	// that the requested device and owning view have actually presented. Request
+	// IDs are process-wide and never reused, including across Close/Begin. Each
+	// successful prepare returns a new ID; restore/confirm take the current ID
+	// to authorize the transition, then return the replacement in attempt.request.
+	SettingsResult PrepareApply(std::uint64_t owner, double now, SettingsAttempt& attempt);
+	SettingsResult ExecuteApply(std::uint64_t owner, std::uint64_t request);
+	SettingsResult CompleteApply(std::uint64_t owner, std::uint64_t request, double now, double timeout = 15.0);
+	SettingsResult CancelPreparedApply(std::uint64_t owner, std::uint64_t request);
+	// Restore freezes a fresh conflict-safe patch. Execution can restore safe
+	// owned keys while reporting Conflict for divergent ones; such a result must
+	// never be completed as recovery. Explicitly prepare again after resolving
+	// the conflict. No failed operation discards the original ownership data.
+	SettingsResult PrepareRestore(std::uint64_t owner, std::uint64_t request, SettingsAttempt& attempt);
+	SettingsResult ExecuteRestore(std::uint64_t owner, std::uint64_t request);
+	SettingsResult CompleteRestore(std::uint64_t owner, std::uint64_t request, bool preserveDraft = false,
+		SettingsCode recoveredCode = SettingsCode::Ok, const std::string& reason = {});
+	// Prepare validates confirmation before durable journal/configuration work.
+	// Complete rechecks the frozen host frame before releasing recovery ownership.
+	SettingsResult PrepareConfirm(std::uint64_t owner, std::uint64_t request, double now, SettingsAttempt& attempt);
+	SettingsResult CompleteConfirm(std::uint64_t owner, std::uint64_t request);
+	SettingsResult CancelPreparedConfirm(std::uint64_t owner, std::uint64_t request);
+
 	std::uint64_t Owner() const noexcept { return owner; }
 	SettingsPhase Phase() const noexcept { return phase; }
 	const StateValues& Baseline() const noexcept { return baseline; }
@@ -72,21 +104,30 @@ public:
 	const StateValues& LastApplied() const noexcept { return lastApplied; }
 	double Deadline() const noexcept { return deadline; }
 	const SettingsResult& LastResult() const noexcept { return lastResult; }
+	std::uint64_t Request() const noexcept { return pending.request; }
+	bool AsyncPending() const noexcept { return pending.request != 0; }
 
 private:
 	SettingsResult Result(SettingsCode code, std::string diagnostic = {});
 	SettingsResult Access(std::uint64_t requestedOwner);
+	SettingsResult AccessAttempt(std::uint64_t requestedOwner, std::uint64_t request);
 	bool Read(StateValues& values, std::string& error, bool requireSchema = true);
 	bool Validate(const StateValues& candidate, std::string& error);
 	SettingsResult Rollback(bool preserveDraft, SettingsCode recoveredCode = SettingsCode::Ok,
 		const std::string& reason = {});
 	void Close();
+	void ClearAttempt();
+	enum class AttemptStage { None, ApplyPrepared, ApplyExecuted, ApplyWritten, Confirming, ConfirmPrepared,
+		RestorePrepared, RestoreExecuted, RestoreWritten };
 	SettingsHost& host;
 	std::uint64_t owner = 0;
 	SettingsPhase phase = SettingsPhase::Closed;
 	StateValues baseline, draft, lastApplied, written;
 	double deadline = 0, lastTime = -1;
 	bool busy = false;
+	SettingsAttempt pending;
+	StateValues attemptedEdits;
+	AttemptStage attemptStage = AttemptStage::None;
 	SettingsResult lastResult;
 };
 

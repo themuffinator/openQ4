@@ -10,6 +10,7 @@ The POD observes maximized geometry; it does not expose the compositor's hidden
 normal restore rectangle, so complete restore-rectangle fidelity is unqualified.
 """
 from pathlib import Path
+import os
 import shutil
 import subprocess
 import tempfile
@@ -166,6 +167,7 @@ struct idMath {
     static int ClampInt(int low,int high,int value) { return std::clamp(value,low,high); }
 };
 static bool SDL3_UseAbsoluteWindowPlacement() { return !wayland; }
+static bool Sys_WindowPlacementLeaseActive() { return false; }
 static unsigned SDL3_ResolveViewportDisplay() { return viewportDisplay; }
 static int SDL3_SaturateWindowCoordinate(int64_t value) {
     return static_cast<int>(std::clamp(value,static_cast<int64_t>(-2147483647)-1,static_cast<int64_t>(2147483647)));
@@ -357,11 +359,12 @@ def main():
         raise RuntimeError('C++ compiler required')
     (ROOT / '.tmp').mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='sdl3-strict-window-', dir=ROOT / '.tmp') as directory:
+        environment = dict(os.environ, TEMP=directory, TMP=directory)
         test = Path(directory) / 'window.cpp'
         binary = Path(directory) / 'window.exe'
         test.write_text(SUPPORT + dependencies + strict + MAIN, encoding='utf-8')
-        subprocess.run([compiler, '-std=c++20', '-I', str(ROOT), str(test), '-o', str(binary)], check=True)
-        subprocess.run([str(binary)], check=True)
+        subprocess.run([compiler, '-std=c++20', '-I', str(ROOT), str(test), '-o', str(binary)], check=True, env=environment)
+        subprocess.run([str(binary)], check=True, env=environment)
 
 
 if __name__ == '__main__':

@@ -33,12 +33,19 @@ class SystemSettingsHost final : public SettingsHost {
 public:
 	static const std::vector<SystemSettingDescriptor>& Catalog();
 	static const std::map<std::string, size_t>& Schema();
+	static unsigned ChangedEffects(const StateValues& before, const StateValues& target);
+	static bool ResolveModeDimensions(int mode, int customWidth, int customHeight,
+		int desktopPixelWidth, int desktopPixelHeight, int& width, int& height);
 	static bool ChangedRequiresDisplayRestart(const StateValues& before, const StateValues& target);
 	static bool RequiresDeviceWork(const StateValues& before, const StateValues& target);
 
 	bool Read(StateValues& values, std::string& error) override;
 	bool Defaults(StateValues& values, std::string& error) override;
 	bool Validate(const StateValues& baseline, const StateValues& candidate, std::string& error) override;
+	// Validate the recorded original edit using registered/catalog constraints.
+	// Its historical display topology is verified separately by recovery records;
+	// an unused historical monitor must not be required on the current host.
+	bool ValidateSavedTarget(const StateValues& baseline, const StateValues& candidate, std::string& error);
 	bool ValidateRollback(const StateValues& original, const StateValues& current,
 		const StateValues& target, std::string& error) override;
 	bool Write(const StateValues& changes, std::string& error) override;

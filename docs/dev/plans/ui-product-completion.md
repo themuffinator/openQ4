@@ -339,12 +339,22 @@ language/video recoveries, with no errors and only the documented baseline and
 three deliberate negative-case warnings. Source-bound evidence and reviewed
 render-target images are under `.tmp/ui/settings-review/capture-evidence.json`.
 
-Every changed non-immediate field currently rejects the entire Apply batch
-before live writes, including renderer/audio/reload, next-map and preset effects.
-Actual device-result delivery, display Keep/Revert and durable recovery, pure
-preset/Auto-Detect draft expansion, all production controls/artwork and the native
-editor round trip remain required. This increment does not complete M2 or accept
-the SYSTEM page, any migration entry or a product gate.
+The subsequent [display confirmation integration](../ui/display-confirmation.md)
+implements asynchronous Apply/Keep/Revert/Retry, owner-present countdown, durable
+Pending/Confirmed recovery, exact native file leases, checked config persistence
+and strict first-device startup recovery. Eligible confirmation documents can
+apply Immediate + DisplayRestart batches. Audio/image/resource, next-map and
+preset effects still reject the entire batch before live writes. Pure preset/
+Auto-Detect draft expansion, all production controls/artwork, the native editor
+round trip and complete platform qualification remain required. These increments
+do not complete M2 or accept the SYSTEM page, any migration entry or a product gate.
+
+Next, connect canonical toggle, constrained choice and stepped slider controls
+to the actual source-backed SYSTEM rows, with typed edit proposals and
+authoritative draft readback. Preserve stable component/source identity and
+versioned widget state for editor round trips and renderer recreation. This
+unblocks usable settings while the remaining effect executors and full page
+continue toward the same M2 exit conditions.
 
 Resolve the representative parts of UI-03/UI-06/UI-09/UI-10/UI-11/UI-12. Choose
 the shipped system settings page and its dependent popup/confirmation behavior

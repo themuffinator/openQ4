@@ -974,4 +974,14 @@
 	"#str_42909"	"Arma anterior"
 	"#str_42910"	"Botones de movimiento (WASD)"
 	"#str_42911"	"Clic izquierdo"
+
+	// Display application, confirmation and durable recovery.
+	"#str_229990"	"Aplicando ajustes de pantalla…"
+	"#str_229991"	"Restaurando los ajustes de pantalla anteriores…"
+	"#str_229992"	"Guardando ajustes de pantalla…"
+	"#str_229993"	"¿Mantener estos ajustes de pantalla?"
+	"#str_229994"	"Mantener"
+	"#str_229995"	"Revertir"
+	"#str_229996"	"Reintentar"
+	"#str_229997"	"Se han aceptado los ajustes, pero no se han terminado de guardar. Reintenta para completar el guardado."
 }

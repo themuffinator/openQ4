@@ -432,7 +432,7 @@ if build_engine or get_option('build_native_tests')
   libtess2_project = subproject('libtess2')
   openq4_retained_library = static_library(
     'openq4-retained-ui',
-    files('src/ui/retained/Runtime.cpp', 'src/ui/retained/Document.cpp', 'src/ui/retained/Presentation.cpp', 'src/ui/retained/Behavior.cpp', 'src/ui/retained/State.cpp', 'src/ui/retained/Motion.cpp', 'src/ui/retained/Interaction.cpp', 'src/ui/retained/Input.cpp', 'src/ui/retained/Vector.cpp', 'src/ui/retained/VectorElement.cpp', 'src/ui/application/SettingsTransaction.cpp'),
+    files('src/ui/retained/Runtime.cpp', 'src/ui/retained/Document.cpp', 'src/ui/retained/Presentation.cpp', 'src/ui/retained/Behavior.cpp', 'src/ui/retained/State.cpp', 'src/ui/retained/Motion.cpp', 'src/ui/retained/Interaction.cpp', 'src/ui/retained/Input.cpp', 'src/ui/retained/Vector.cpp', 'src/ui/retained/VectorElement.cpp', 'src/ui/application/SettingsTransaction.cpp', 'src/ui/application/SettingsJournal.cpp', 'src/ui/application/SettingsDisplayController.cpp'),
     dependencies: [rmlui_project.get_variable('rmlui_dep'), jsoncpp_project.get_variable('jsoncpp_dep'), libtess2_project.get_variable('libtess2_dep')],
     pic: true,
     install: false,
@@ -447,6 +447,22 @@ if build_engine or get_option('build_native_tests')
       install: false,
     )
     test('openq4-ui-settings-transaction', openq4_ui_settings_transaction_test, timeout: 30)
+    openq4_ui_settings_journal_test = executable(
+      'openq4-ui-settings-journal-test',
+      files('tools/tests/native/UiSettingsJournalTest.cpp'),
+      include_directories: root_include_dir,
+      dependencies: openq4_retained_dep,
+      install: false,
+    )
+    test('openq4-ui-settings-journal', openq4_ui_settings_journal_test, timeout: 30)
+    openq4_ui_settings_display_test = executable(
+      'openq4-ui-settings-display-test',
+      files('tools/tests/native/UiSettingsDisplayControllerTest.cpp'),
+      dependencies: openq4_retained_dep,
+      include_directories: root_include_dir,
+      install: false,
+    )
+    test('openq4-ui-settings-display', openq4_ui_settings_display_test, timeout: 30)
     openq4_ui_behavior_test = executable(
       'openq4-ui-behavior-test',
       files('tools/tests/native/UiBehaviorTest.cpp'),
@@ -755,7 +771,7 @@ engine_source_discovery = run_command(
 )
 
 engine_source_paths = engine_source_discovery.stdout().strip().split('\n')
-engine_source_paths += ['src/ui/application/SystemSettingsHost.cpp']
+engine_source_paths += ['src/ui/application/SystemSettingsHost.cpp', 'src/ui/application/SystemDisplay.cpp']
 if engine_source_paths.length() == 0
   error('tools/build/meson_sources.py returned no engine source files.')
 endif

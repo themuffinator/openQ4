@@ -253,6 +253,15 @@ class ManagedCapture(unittest.TestCase):
             with self.subTest(command=command), self.assertRaises(ValueError):
                 self.check_script('openq4_retainedGui ' + command, managed=True, observe_only=True)
 
+    def test_inspect_is_bounded_and_read_only(self):
+        command = 'openq4_retainedGui inspect "settings-panel"\n'
+        for observe_only in (False, True):
+            self.assertEqual(self.check_script(command, managed=True, observe_only=observe_only), command)
+        for value in ('""', '"' + 'x'*129 + '"', '"x;y"', '"x::y"', '"x\\y"',
+                      '"x"; quit', '"x" "y"', '"x\ny"', 'x', '"x" 1'):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                self.check_script('openq4_retainedGui inspect ' + value, managed=True)
+
     def test_event_commands_are_semantic_bounded_and_resume_is_read_only(self):
         valid = ('openq4_retainedGui pending "draft" "13"\n'
                  'openq4_retainedGui pending "gate" "false"\n'

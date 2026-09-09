@@ -224,7 +224,7 @@ bool DisplayTuple(const StateValues& current, const StateValues& candidate, std:
 #endif
 }
 bool ValidateCandidate(const StateValues* original, const StateValues& current,
-	const StateValues& candidate, std::string& error) {
+	const StateValues& candidate, std::string& error, bool checkDisplay = true) {
 	if (!Complete(current, error) || !Complete(candidate, error) || (original && !Complete(*original, error))) return false;
 	for (const auto& item : SystemSettingsHost::Catalog()) {
 		idCVar* variable = Registered(item, error);
@@ -236,7 +236,7 @@ bool ValidateCandidate(const StateValues* original, const StateValues& current,
 		const bool restoring = original && original->at(item.key) == value;
 		if (!restoring && !EditorValue(item, value, error)) return false;
 	}
-	if (!DisplayTuple(current, candidate, error)) return false;
+	if (checkDisplay && !DisplayTuple(current, candidate, error)) return false;
 	error.clear(); return true;
 }
 } // namespace
@@ -296,12 +296,23 @@ const std::map<std::string, size_t>& SystemSettingsHost::Schema() {
 	return schema;
 }
 bool SystemSettingsHost::ChangedRequiresDisplayRestart(const StateValues& before, const StateValues& target) {
-	for (const auto& item : Catalog()) if ((item.effects & SystemSettingDisplayRestart) && Changed(before, target, item.key)) return true;
-	return false;
+	return (ChangedEffects(before,target) & SystemSettingDisplayRestart) != 0;
 }
 bool SystemSettingsHost::RequiresDeviceWork(const StateValues& before, const StateValues& target) {
-	for (const auto& item : Catalog()) if (item.effects != SystemSettingImmediate && Changed(before, target, item.key)) return true;
-	return false;
+	return ChangedEffects(before,target) != 0;
+}
+unsigned SystemSettingsHost::ChangedEffects(const StateValues& before, const StateValues& target) {
+	unsigned result=0;
+	for (const auto& item:Catalog()) if (Changed(before,target,item.key)) result|=item.effects;
+	return result;
+}
+bool SystemSettingsHost::ResolveModeDimensions(int mode, int customWidth, int customHeight,
+	int desktopPixelWidth, int desktopPixelHeight, int& width, int& height) {
+	if (mode < -2 || mode >= int(sizeof(LegacyModes)/sizeof(LegacyModes[0]))) return false;
+	const int w=mode==-2?desktopPixelWidth:mode==-1?customWidth:LegacyModes[mode][0];
+	const int h=mode==-2?desktopPixelHeight:mode==-1?customHeight:LegacyModes[mode][1];
+	if (w<320 || w>16384 || h<240 || h>16384) return false;
+	width=w; height=h; return true;
 }
 bool SystemSettingsHost::Read(StateValues& values, std::string& error) {
 	StateValues candidate;
@@ -327,6 +338,9 @@ bool SystemSettingsHost::Defaults(StateValues& values, std::string& error) {
 }
 bool SystemSettingsHost::Validate(const StateValues& baseline, const StateValues& candidate, std::string& error) {
 	return ValidateCandidate(nullptr, baseline, candidate, error);
+}
+bool SystemSettingsHost::ValidateSavedTarget(const StateValues& baseline, const StateValues& candidate, std::string& error) {
+	return ValidateCandidate(nullptr,baseline,candidate,error,false);
 }
 bool SystemSettingsHost::ValidateRollback(const StateValues& original, const StateValues& current,
 	const StateValues& target, std::string& error) {

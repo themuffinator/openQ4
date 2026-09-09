@@ -1618,6 +1618,7 @@ void R_InitOpenGL( void );
 // with an explicit restore request; process-wide allocation failure is excluded.
 struct renderWindowRequest_s;
 bool R_TryFullVidRestart( const renderWindowRequest_s *request, char *error, int errorSize );
+bool R_TryInitializeDisplay( const renderWindowRequest_s *request, char *error, int errorSize );
 bool R_IsRecoverableRendererRestart( void );
 bool R_ForceWindowForRendererRestart( void );
 const renderWindowRequest_s *R_GetRecoverableWindowRequest( void );
