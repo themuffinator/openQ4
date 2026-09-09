@@ -2,6 +2,14 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- Application integration development: retained menu documents can use normal
+  GUI loading and submit brightness/shadow changes through typed settings operations.
+  Multiple views share resource recovery, and restored GUI state discards old
+  clicks. [Integration scope](ui/managed-application.md) records the current
+  limits, including Vulkan's existing missing visual brightness adjustment;
+  the full settings screen, GUI translation and visual editor remain
+  in development.
+
 - Instance persistence development: retained previews preserve focus, dialogs,
   control availability and transition progress through renderer/language
   reloads. Restoring an instance discards pending clicks and actions. GUI

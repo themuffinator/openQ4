@@ -27,7 +27,7 @@ def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def interaction_script(path: Path) -> str:
+def interaction_script(path: Path, *, managed: bool = False, observe_only: bool = False) -> str:
     """Allow semantic runtime operations and bounded waits; no device commands."""
     source = path.read_text(encoding='utf-8')
     if len(source) > 32768:
@@ -39,12 +39,177 @@ def interaction_script(path: Path) -> str:
                 rf'ui_retainedModal push {identifier}', r'ui_retainedModal pop', r'ui_retainedEvents',
                 r'ui_retainedCheckpoint (?:save|restore)',
                 r'ui_retainedMenu (?:next|previous|up|down|left|right|accept|back) [01]', r'wait [1-9][0-9]{0,2}']
+    if managed:
+        patterns = [r'openq4_retainedGui report',
+                    r'openq4_guiGet "[A-Za-z0-9_.-]{1,128}::[A-Za-z0-9_.-]{1,128}"',
+                    r'wait [1-9][0-9]{0,2}']
+        if not observe_only:
+            literal = r'"(?:true|false|-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)"'
+            patterns += [rf'openq4_retainedGui focus {identifier}',
+                         r'openq4_retainedGui menu (?:next|previous|up|down|left|right|accept|back) [01]',
+                         rf'openq4_retainedGui state {identifier} {literal}',
+                         r'openq4_retainedGui (?:save|restore)']
     lines = [line.strip() for line in source.splitlines() if line.strip() and not line.strip().startswith('//')]
     if len(lines) > 256 or any(not any(re.fullmatch(pattern, line) for pattern in patterns) for line in lines):
         raise ValueError('retained script must contain only semantic control commands and bounded waits')
     if sum(int(line.split()[1]) for line in lines if line.startswith('wait ')) > 3600:
         raise ValueError('retained script waits exceed 3600 frames')
+    for line in lines:
+        if line.startswith('openq4_retainedGui state '):
+            value = json.loads(line.rsplit(' ', 1)[1])
+            if value not in ('true', 'false') and (not math.isfinite(float(value)) or abs(float(value)) > 1e12):
+                raise ValueError('managed numeric state exceeds the canonical finite +/-1e12 limit')
     return '\n'.join(lines)+'\n'
+
+
+def retained_commands(args: argparse.Namespace, staged_name: str) -> tuple[str, str, int]:
+    """Build the captured semantic script without starting a process."""
+    settle = max(30, args.profile_frames + 2)
+    script = interaction_script(args.retained_script, managed=args.retained_managed) if args.retained_script else ''
+    if args.retained_managed:
+        peer = f'ui_retainedPreview "{staged_name}"\n' if args.retained_peer else ''
+        commands = 'ui_retainedOwnership\n' + peer + f'testGUI "{staged_name}"\nwait 2\nui_retainedOwnership\n'
+        commands += script + f'wait {settle}\nopenq4_retainedGui report\nui_retainedOwnership\n'
+        # Managed instances must survive without action/setup replay. The same
+        # read-only resume checks run after each separate resource barrier.
+        resume = interaction_script(args.retained_resume_script, managed=True, observe_only=True) if args.retained_resume_script else 'openq4_retainedGui report\n'
+        for enabled, command in ((args.language_reload, 'reloadLanguage'), (args.video_restart, 'vid_restart windowed')):
+            if enabled:
+                commands += command + '\nwait 2\n' + resume + f'wait {settle}\nui_retainedOwnership\n'
+        # Observe both contexts through the resets, then remove the overlay so
+        # the engine screenshot shows this managed instance's actual focus.
+        if args.retained_peer:
+            commands += 'ui_retainedClose\nwait 2\nopenq4_retainedGui report\nui_retainedOwnership\n'
+        return commands, 'testGUI\nwait 3\nui_retainedOwnership\n', settle
+    play = f'ui_retainedPlay "{args.timeline}"\n' if args.timeline else ''
+    profile = f'ui_retainedProfile {args.profile_frames}\n' if args.profile_frames else ''
+    script = 'wait 2\n' + script if script else ''
+    begin = 'wait 2\nui_retainedOwnership\n' if args.retained_open else ''
+    end = 'ui_retainedOwnership\n' if args.retained_open else ''
+    loader = 'ui_retainedOpen' if args.retained_open else 'ui_retainedPreview'
+    commands = f'{loader} "{staged_name}"\n' + begin + profile + play + script + f'wait {settle}\n' + end
+    if args.language_reload:
+        commands += 'reloadLanguage\nwait 2\n'
+    if args.video_restart:
+        resume = interaction_script(args.retained_resume_script) if args.retained_resume_script else play + script
+        commands += 'vid_restart windowed\nwait 2\n' + begin + profile + resume + f'wait {settle}\n' + end
+    close = 'ui_retainedClose\nwait 3\nui_retainedOwnership\n' if args.retained_open else ''
+    return commands, close, settle
+
+
+def managed_evidence(log: str, commands: str, *, peer: bool, resource_resets: int, settings_fixture: bool, mode: str | None = None) -> dict:
+    """Check actual adapter results; an image alone does not qualify actions."""
+    lines = log.splitlines()
+    errors = []
+    trace = [line for line in lines if line.startswith(('RETAINED_GUI', 'GUI_VALUE ', 'Retained UI ownership:'))]
+    reports = []
+    resource_epoch = observation_segment = 0
+    observed_revision = None
+    pattern = r'RETAINED_GUI path=(\S+) focus=(\S*) revision=([0-9]+) active=([01]) brightness=(\S+) shadows=([01]) contexts=([0-9]+)'
+    for line in lines:
+        if line == 'RETAINED_GUI_RESOURCE path=retained-smoke.q4ui event=restored':
+            resource_epoch += 1
+            observation_segment += 1
+            observed_revision = None
+        elif re.fullmatch(r'RETAINED_GUI_OPERATION (?:menu|state|restore) passed', line):
+            observation_segment += 1
+            observed_revision = None
+        if not line.startswith('RETAINED_GUI '):
+            continue
+        match = re.fullmatch(pattern, line)
+        if not match:
+            errors.append('malformed managed report')
+            continue
+        path, focus, revision, active, brightness, shadows, contexts = match.groups()
+        try:
+            number = float(brightness)
+        except ValueError:
+            number = math.nan
+        if not math.isfinite(number):
+            errors.append('non-finite managed brightness readback')
+            number = None
+        revision = int(revision)
+        # StateRevision belongs to the current runtime epoch; snapshots do not
+        # serialize it. Only observations without intervening state/action
+        # work or a successful resource recreation share a revision contract.
+        if settings_fixture and observed_revision is not None and revision != observed_revision:
+            errors.append('managed state revision changed within a read-only resource-epoch segment')
+        observed_revision = revision
+        reports.append(dict(path=path, focus=focus, revision=revision, active=int(active), brightness=number,
+                            shadows=int(shadows), contexts=int(contexts), resource_epoch=resource_epoch,
+                            observation_segment=observation_segment))
+    operations = [line for line in lines if line.startswith('RETAINED_GUI_OPERATION ')]
+    expected_operations = ['RETAINED_GUI_OPERATION ' + match.group(1) + ' passed'
+        for match in re.finditer(r'^openq4_retainedGui (focus|menu|state|save|restore)(?: |$)', commands, re.MULTILINE)]
+    if operations != expected_operations:
+        errors.append('managed operation results do not match the submitted script or an operation failed')
+    expected_reports = len(re.findall(r'^openq4_retainedGui report$', commands, re.MULTILINE))
+    if not reports or len(reports) != expected_reports:
+        errors.append('managed report count differs from the submitted script')
+    loaded = [line for line in lines if line.startswith('RETAINED_GUI_LOADED ')]
+    if loaded != ['RETAINED_GUI_LOADED retained-smoke.q4ui']:
+        errors.append('normal manager did not load exactly one retained fixture')
+    resources = [line for line in lines if line.startswith('RETAINED_GUI_RESOURCE ')]
+    if resources != ['RETAINED_GUI_RESOURCE path=retained-smoke.q4ui event=restored'] * resource_resets:
+        errors.append('managed resource restoration did not complete once per requested reset')
+    for index, report in enumerate(reports):
+        expected_contexts = 1 if not peer or index == len(reports)-1 else 2
+        if report['path'] != 'retained-smoke.q4ui' or report['active'] != 1 or report['contexts'] != expected_contexts:
+            errors.append('managed owner, activity or peer context count changed unexpectedly')
+            break
+    if peer and 'Retained UI preview loaded:' not in log:
+        errors.append('peer preview was not loaded')
+    reads = re.findall(r'^GUI_VALUE ([^=]+)=(.*)$', log, re.MULTILINE)
+    expected_reads = re.findall(r'^openq4_guiGet "([^"]+)"$', commands, re.MULTILINE)
+    managed_reads = [(name, value) for name, value in reads if name in expected_reads]
+    if [name for name, _ in managed_reads] != expected_reads:
+        errors.append('managed presentation readback sequence differs from the submitted script')
+    if any(line.startswith(('openq4_retainedGui:', 'usage: openq4_retainedGui', 'usage: openq4_guiGet')) for line in lines):
+        errors.append('managed diagnostic command was rejected')
+    ownership = []
+    for line in lines:
+        if not line.startswith('Retained UI ownership:'):
+            continue
+        match = re.fullmatch(r'Retained UI ownership: open=([01]) suspended=([01]) session_gui=([01]) game_time=(-?[0-9]+) requests=([0-9]+)', line)
+        if not match:
+            errors.append('malformed managed session ownership observation')
+            continue
+        ownership.append(dict(zip(('open', 'suspended', 'session_gui', 'game_time', 'requests'), map(int, match.groups()))))
+    expected_ownership = len(re.findall(r'^ui_retainedOwnership$', commands, re.MULTILINE))
+    ownership_passed = None
+    if expected_ownership or mode is not None:
+        ownership_passed = len(ownership) == expected_ownership and len(ownership) >= 4
+        if ownership_passed:
+            ownership_passed = all(row['open'] == 0 and row['requests'] == 0 and row['game_time'] >= 0 for row in ownership)
+            ownership_passed = ownership_passed and ownership[0]['session_gui'] == 0 and ownership[-1]['session_gui'] == 0
+            ownership_passed = ownership_passed and all(row['session_gui'] == 1 for row in ownership[1:-1])
+            times = [row['game_time'] for row in ownership[1:-1]]
+            if mode == 'sp':
+                ownership_passed = ownership_passed and len(set(times)) == 1
+            elif mode == 'mp':
+                ownership_passed = ownership_passed and times[1] > times[0] and all(a <= b for a, b in zip(times, times[1:]))
+            ownership_passed = ownership_passed and ownership[-1]['game_time'] > times[-1]
+        if not ownership_passed:
+            errors.append('managed session ownership or SP pause/resume / MP continuation contract failed')
+    if settings_fixture:
+        # Five scripted reports establish both settings mutations and restore;
+        # every subsequent report must observe the same final live host values.
+        expected_host = [(1, 1), (1.5, 1), (1.5, 0), (1.25, 1), (1.25, 1)]
+        expected_host += [(1.25, 1)] * max(0, len(reports)-5)
+        if len(reports) < 6 or [(r['brightness'], r['shadows']) for r in reports] != expected_host:
+            errors.append('managed settings host readback or non-replaying restore contract failed')
+        if len(reports) >= 5 and any(r['focus'] != 'managed-shadows' for r in reports[2:]):
+            errors.append('managed focus did not survive settings save/restore and resource reload')
+        expected_values = [('brightness-target-reading::text', '1.25'), ('shadows-target-reading::text', '1')]
+        restored_values = [('brightness-reading::text', '1.25'), ('shadows-reading::text', '#str_200157'),
+                           ('brightness-target-reading::text', '1.50'), ('shadows-target-reading::text', '0')]
+        expected_values += restored_values * (1 + resource_resets)
+        if managed_reads != expected_values:
+            errors.append('managed host bindings or restored application presentation values differ')
+    return {'passed': not errors, 'errors': errors, 'managed_trace': trace, 'reports': reports,
+            'operations': operations, 'resource_events': resources, 'presentation_values': managed_reads,
+            'ownership': ownership, 'ownership_passed': ownership_passed, 'session_mode': mode,
+            'settings_fixture_contract': settings_fixture, 'replacement_acceptance': False}
 
 
 def capture(args: argparse.Namespace) -> int:
@@ -83,27 +248,12 @@ def capture(args: argparse.Namespace) -> int:
             else:
                 presentation = fixture.read_text(encoding='utf-8')
     import_requests = legacy_import.requests(args.legacy_export_list) if args.legacy_export_list else []
-    preview = ''
+    preview = close = ''
     if args.retained_document:
         fixture = args.retained_document.resolve()
         staged_name = 'retained-smoke' + fixture.suffix.lower()
         (game / staged_name).write_bytes(fixture.read_bytes())
-        play = f'ui_retainedPlay "{args.timeline}"\n' if args.timeline else ''
-        profile_command = f'ui_retainedProfile {args.profile_frames}\n' if args.profile_frames else ''
-        settle = max(30, args.profile_frames + 2)
-        script = 'wait 2\n'+interaction_script(args.retained_script) if args.retained_script else ''
-        begin = 'wait 2\nui_retainedOwnership\n' if args.retained_open else ''
-        end = 'ui_retainedOwnership\n' if args.retained_open else ''
-        load_command = 'ui_retainedOpen' if args.retained_open else 'ui_retainedPreview'
-        preview = f'{load_command} "{staged_name}"\n' + begin + profile_command + play + script + f'wait {settle}\n' + end
-        if args.language_reload:
-            preview += 'reloadLanguage\nwait 2\n'
-        if args.video_restart:
-            # A separate resume script observes the surviving state; replaying
-            # setup after restart cannot establish instance persistence.
-            resume = interaction_script(args.retained_resume_script) if args.retained_resume_script else play + script
-            preview += 'vid_restart windowed\nwait 2\n' + begin + profile_command + resume + f'wait {settle}\n' + end
-    close = 'ui_retainedClose\nwait 3\nui_retainedOwnership\n' if args.retained_open else ''
+        preview, close, settle = retained_commands(args, staged_name)
     cfg_path.write_text(presentation + preview + legacy_import.commands(import_requests) + 'gfxInfo\nscreenshot "screenshots/ui-baseline.tga"\necho UI_BASELINE_CAPTURE_COMPLETE\n' + close + 'quit\n', encoding='utf-8')
     overrides = {
         'fs_basepath': str(args.assets.resolve()), 'fs_savepath': str(savepath), 'fs_devpath': str(savepath),
@@ -121,6 +271,10 @@ def capture(args: argparse.Namespace) -> int:
         'ui_retainedScale': str(args.ui_scale), 'ui_retainedDensity': str(args.density),
         'ui_retainedReducedMotion': '1' if args.reduced_motion else '0',
     }
+    if args.retained_managed:
+        # Isolated, explicit host defaults make the action/readback sequence
+        # independent of archived settings in any interactive installation.
+        overrides.update({'r_brightness': '1', 'r_shadows': '1'})
     override_keys = {key.lower() for key in overrides}
     retained = []
     original = profile['args']
@@ -150,6 +304,9 @@ def capture(args: argparse.Namespace) -> int:
     if args.retained_document:
         metadata['retained_preview'] = {'source': str(args.retained_document),
                                         'application_open': args.retained_open,
+                                        'managed_application': args.retained_managed,
+                                        'peer_preview': args.retained_peer,
+                                        'loader': 'testGUI' if args.retained_managed else 'ui_retainedOpen' if args.retained_open else 'ui_retainedPreview',
                                         'sha256': digest(args.retained_document),
                                         'density_override': args.density, 'ui_scale': args.ui_scale,
                                         'settle_frames': settle, 'video_restart': args.video_restart,
@@ -162,6 +319,12 @@ def capture(args: argparse.Namespace) -> int:
         if args.retained_resume_script:
             metadata['retained_preview']['resume_script'] = {'source': str(args.retained_resume_script), 'sha256': digest(args.retained_resume_script)}
         metadata['retained_preview']['state_data'] = data_files
+        if args.retained_managed:
+            metadata['retained_preview']['managed_initial_host_state'] = {'r_brightness': 1, 'r_shadows': True}
+            metadata['retained_preview']['resource_resume_replays_setup'] = False
+            if args.retained_peer:
+                metadata['retained_preview']['peer_source'] = {'source': str(args.retained_document),
+                    'sha256': digest(args.retained_document), 'loader': 'ui_retainedPreview', 'closed_after_screenshot': False}
 
     def save_report():
         report_path.write_text(json.dumps(metadata, indent=2) + '\n', encoding='utf-8')
@@ -222,7 +385,7 @@ def capture(args: argparse.Namespace) -> int:
     if import_requests:
         valid = valid and metadata['legacy_import']['passed']
     if args.retained_document:
-        retained_diagnostics = [line for line in diagnostics if 'retained UI:' in line or '_retained' in line]
+        retained_diagnostics = [line for line in diagnostics if 'retained UI:' in line or 'retained GUI ' in line or '_retained' in line]
         retained_diagnostics += [line for line in plain_log.splitlines() if line.startswith('usage: ui_retained')]
         metadata['retained_preview']['diagnostics'] = retained_diagnostics
         profiles = [json.loads(line.split('Retained UI profile: ', 1)[1]) for line in plain_log.splitlines() if 'Retained UI profile: ' in line]
@@ -236,7 +399,15 @@ def capture(args: argparse.Namespace) -> int:
         if args.profile_frames and (len(profiles) != (2 if args.video_restart else 1)
                                    or any(p.get('frames') != args.profile_frames for p in profiles)):
             retained_diagnostics.append('retained CPU profile did not complete for the requested frame count')
-        valid = valid and 'Retained UI preview loaded:' in plain_log and not retained_diagnostics
+        if args.retained_managed:
+            evidence = managed_evidence(plain_log, preview + close, peer=args.retained_peer,
+                resource_resets=int(args.language_reload) + int(args.video_restart),
+                settings_fixture=args.retained_document.resolve() == ROOT / 'tools/ui/fixtures/managed-settings-smoke.q4ui', mode=args.mode)
+            metadata['retained_preview']['managed_trace'] = evidence.pop('managed_trace')
+            metadata['retained_preview']['managed_validation'] = evidence
+            valid = valid and evidence['passed'] and not retained_diagnostics
+        else:
+            valid = valid and 'Retained UI preview loaded:' in plain_log and not retained_diagnostics
         if args.timeline:
             played = plain_log.count(f'Retained UI timeline played: {args.timeline}')
             metadata['retained_preview']['timeline_play_count'] = played
@@ -269,10 +440,13 @@ def main() -> int:
     parser.add_argument('--shared-gui', action='store_true', help='exercise the shared GUI renderer domain')
     parser.add_argument('--timeout', type=int, default=180)
     parser.add_argument('--retained-document', type=Path, help='Optional Q4UI or RML integration fixture, copied into the isolated savepath.')
-    parser.add_argument('--retained-resume-script', type=Path, help='Semantic checks after video restart, replacing replay of the setup script/timeline.')
+    parser.add_argument('--retained-resume-script', type=Path, help='Checks after video restart; managed mode reads surviving state after each language/video reset without setup replay.')
     parser.add_argument('--retained-script', type=Path, help='Optional semantic control script; does not send device input.')
     parser.add_argument('--retained-data', type=Path, action='append', default=[], help='State JSON copied to retained-data/<name>; repeat for scripted state batches.')
-    parser.add_argument('--retained-open', action='store_true', help='Acquire application ownership with host input still disabled; inspect pause/resume and close.')
+    ownership = parser.add_mutually_exclusive_group()
+    ownership.add_argument('--retained-open', action='store_true', help='Acquire preview application ownership with host input still disabled; inspect pause/resume and close.')
+    ownership.add_argument('--retained-managed', action='store_true', help='Load a normal manager-owned .q4ui with testGUI and qualify typed application actions.')
+    parser.add_argument('--retained-peer', action='store_true', help='Managed mode only: keep an independent preview of the same document alive across resets, then close the peer and report the managed owner.')
     parser.add_argument('--legacy-export-list', type=Path, help='JSON source/hash records to preprocess through the engine without executing GUI scripts.')
     parser.add_argument('--presentation-probe', action='store_true', help='Exercise production presentation reads/writes with an authored legacy fixture after map gameplay; no host input.')
     parser.add_argument('--timeline', help='Canonical timeline to play before capture, and again after an optional video restart.')
@@ -295,12 +469,19 @@ def main() -> int:
         parser.error('--language-reload requires --retained-document')
     if args.retained_script and (not args.retained_document or args.retained_document.suffix.lower() != '.q4ui'):
         parser.error('--retained-script requires a .q4ui document')
-    if args.retained_resume_script and (not args.video_restart or not args.retained_document or args.retained_document.suffix.lower() != '.q4ui'):
-        parser.error('--retained-resume-script requires --video-restart and a .q4ui document')
+    if args.retained_resume_script and (not (args.video_restart or (args.retained_managed and args.language_reload))
+                                       or not args.retained_document or args.retained_document.suffix.lower() != '.q4ui'):
+        parser.error('--retained-resume-script requires a .q4ui document and video restart (or managed language reload)')
     if args.retained_data and (len(args.retained_data) > 16 or not args.retained_document or args.retained_document.suffix.lower() != '.q4ui'):
         parser.error('--retained-data requires a .q4ui document and at most 16 files')
     if args.retained_open and (not args.retained_document or args.retained_document.suffix.lower() != '.q4ui'):
         parser.error('--retained-open requires a .q4ui document')
+    if args.retained_managed and (not args.retained_document or args.retained_document.suffix.lower() != '.q4ui'):
+        parser.error('--retained-managed requires a .q4ui document')
+    if args.retained_peer and not args.retained_managed:
+        parser.error('--retained-peer requires --retained-managed')
+    if args.retained_managed and (args.timeline or args.profile_frames or args.retained_data):
+        parser.error('managed mode uses its semantic script; preview timeline/profile/state-data commands are unsupported')
     if not 0 <= args.profile_frames <= 3600 or (args.profile_frames and not args.retained_document):
         parser.error('--profile-frames requires a retained document and a count from 1 to 3600')
     if args.retained_document and args.retained_document.suffix.lower() not in ('.rml', '.q4ui'):

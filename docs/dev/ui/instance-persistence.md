@@ -27,7 +27,10 @@ unowned, uninitialized debug/demo allocations. They also remove manager
 dereferences of legacy desktops. The existing editor continues to receive its
 concrete legacy implementation for `.guied` sources. Pathless allocation and
 normal loading still construct the legacy implementation at this checkpoint;
-the separate retained adapter and deferred resource selection remain M1 work.
+the separate retained adapter and deferred resource selection were subsequent M1
+work. The newer [application integration checkpoint](managed-application.md)
+adds those routes and coordinates all registered engine views; this document
+retains the original checkpoint's evidence and limits.
 
 ## Snapshot contract
 

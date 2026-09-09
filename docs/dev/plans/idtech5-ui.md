@@ -307,6 +307,12 @@ transactional canonical snapshots. Preview resource reload now preserves focus,
 modal scopes, unbound control availability and transition progress as well as
 application values. The retained manager adapter, real application operations,
 world output and game-save/demo framing remain required M1 work.
+The subsequent [application integration checkpoint](../ui/managed-application.md)
+adds explicit retained/deferred normal loading, typed brightness/shadow operations,
+bounded per-GUI save framing and coordinated engine view invalidation. Complete
+events/aliases, text/control contracts, production mappings, world surfaces and
+the surrounding game save/demo format remain M1 work. This does not accept a
+production GUI or close the complete system-screen/editor milestone.
 Semantic buttons now use authored state timelines, projected hit testing,
 source-order/spatial navigation and modal focus ownership. The
 [interaction checkpoint](../ui/interaction.md) records native behavior checks,

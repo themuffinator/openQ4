@@ -3,6 +3,7 @@
 
 #ifndef ID_DEDICATED
 #include "LegacyGuiImport.h"
+#include "UserInterfaceManaged.h"
 #include "retained/Runtime.h"
 #include "retained/Input.h"
 #include "../renderer/RendererModule.h"
@@ -15,6 +16,14 @@
 #if defined(USE_SDL3)
 bool Sys_SDL_IsGameWindowFocused(void);
 #endif
+
+struct retainedUIView_t {
+	std::unique_ptr<openq4::ui::Runtime> runtime;
+	std::string source, path;
+	retainedUIViewCallback_t callback = nullptr;
+	void* owner = nullptr;
+	bool canonical = true, failed = false;
+};
 
 namespace {
 idCVar ui_retainedScale("ui_retainedScale", "1", CVAR_GUI | CVAR_FLOAT | CVAR_ARCHIVE,
@@ -213,21 +222,26 @@ private:
 };
 
 EngineHost host;
-std::unique_ptr<openq4::ui::Runtime> runtime;
+std::vector<retainedUIView_t*> views;
+retainedUIView_t* previewView = nullptr;
+openq4::ui::Runtime* runtime = nullptr; // Non-owning alias for preview commands.
+bool resourcesRefreshing = false;
+bool rootSubmissionPending = false;
+std::uint64_t rootSubmissionFrame = 0;
 openq4::ui::Input input;
 std::atomic<bool> applicationOpen{false};
 unsigned inputGeneration = 0;
-bool inputFocused = true, inputSuspended = false;
+bool inputFocused = true, inputSuspended = false, inputResourceSuspended = false;
 int analogDirection = -1;
 bool analogNeedsNeutral = true;
 std::map<int,int> inputKeys;
 std::vector<openq4::ui::ControlAction> applicationRequests;
-std::string currentPath, currentMarkup;
+std::string currentPath;
 // One bounded developer checkpoint; never a second owner of the document.
 std::string savedCheckpoint;
 int restartGeneration = -1, languageGeneration = -1;
 std::uint64_t languageRevision = 0, loadedLanguageRevision = (std::numeric_limits<std::uint64_t>::max)();
-std::chrono::steady_clock::time_point epoch;
+const std::chrono::steady_clock::time_point epoch = std::chrono::steady_clock::now();
 struct ProfileSample { openq4::ui::RuntimeStatistics statistics; double engineMilliseconds; };
 std::vector<ProfileSample> profile;
 int profileFrames = 0;
@@ -298,6 +312,11 @@ void SuspendInput(bool suspend) {
 	inputSuspended = suspend;
 	CancelInput(true); inputKeys.clear();
 }
+void ReleaseQuarantinedInput(const retainedUIInput_t& event) {
+	if (event.down) return;
+	if (event.kind == retainedUIInput_t::KEY) input.ReleaseQuarantined(event.source);
+	else if (event.kind == retainedUIInput_t::POINTER_BUTTON) input.ReleaseQuarantined(65536);
+}
 bool MapMenuKey(int key, openq4::ui::MenuInput& action) {
 	using openq4::ui::MenuInput;
 	switch (key) {
@@ -315,54 +334,111 @@ bool MapMenuKey(int key, openq4::ui::MenuInput& action) {
 		default: return false;
 	}
 }
-bool LoadPreview(const std::string& source, const std::string& path) {
-	if (!idStr::CheckExtension(path.c_str(),"q4ui")) return runtime->LoadMarkup(source,path);
-	std::vector<openq4::ui::Diagnostic> diagnostics;
-	if (runtime->LoadDocument(source,path,diagnostics)) return true;
+bool RegisteredView(const retainedUIView_t* view) {
+	return view && std::find(views.begin(),views.end(),view) != views.end();
+}
+bool LoadViewDocument(retainedUIView_t& view, const std::string& source, const std::string& path,
+	bool canonical, std::vector<openq4::ui::Diagnostic>& diagnostics) {
+	diagnostics.clear();
+	if (canonical ? !view.runtime->LoadDocument(source,path,diagnostics) : !view.runtime->LoadMarkup(source,path)) return false;
+	view.source = source; view.path = path; view.canonical = canonical; view.failed = false;
+	return true;
+}
+void ReportViewDiagnostics(const std::string& path, const std::vector<openq4::ui::Diagnostic>& diagnostics) {
 	for (const auto& d : diagnostics) common->Warning("retained UI: %s:%u:%u %s: %s",path.c_str(),
 		static_cast<unsigned>(d.line),static_cast<unsigned>(d.column),d.pointer.c_str(),d.message.c_str());
-	return false;
+}
+bool LoadPreview(const std::string& source, const std::string& path) {
+	std::vector<openq4::ui::Diagnostic> diagnostics;
+	if (LoadViewDocument(*previewView,source,path,UI_IsRetainedPath(path.c_str()),diagnostics)) return true;
+	ReportViewDiagnostics(path,diagnostics); return false;
+}
+void PreviewResourceEvent(void*, retainedUIViewEvent_t event) {
+	if (event == retainedUIViewEvent_t::BeforeResourceReset) {
+		// Save already cancelled transient presentation on its private copy.
+		// Quarantine only the transport here; replaying CancelInput would start
+		// fresh feedback that is discarded by the coordinated document rebuild.
+		CancelInput(false,false); inputKeys.clear(); applicationRequests.clear(); ++inputGeneration;
+	} else if (event == retainedUIViewEvent_t::Failed) {
+		SetApplicationOpen(false); profileFrames = 0; profile.clear();
+	}
+	inputFocused = WindowFocused();
 }
 
 void Close() {
 	SetApplicationOpen(false); ++inputGeneration;
 	CancelInput(true); inputKeys.clear(); applicationRequests.clear();
 	input = openq4::ui::Input{}; analogDirection = -1; analogNeedsNeutral = true;
-	inputSuspended = false;
+	inputSuspended = inputResourceSuspended = false;
 	profileFrames = 0; profile.clear();
-	runtime.reset();
+	RetainedUI_DestroyView(previewView); previewView = nullptr; runtime = nullptr;
 	// Shared fonts and targets belong to the host, not the preview. Their
 	// bounded cache survives closing a view; shutdown/generation reset owns it.
-	currentPath.clear(); currentMarkup.clear(); savedCheckpoint.clear();
+	currentPath.clear(); savedCheckpoint.clear();
 }
 bool RefreshResources() {
+	if (!renderSystem || resourcesRefreshing) return false;
 	if (restartGeneration == renderSystem->GetVideoRestartCount() && languageGeneration == LangDict_GetCodePageGeneration() &&
 		loadedLanguageRevision == languageRevision) return true;
-	// The engine currently owns one preview context. This boundary must include
-	// every manager-owned retained context when that adapter is connected.
-	const bool loaded = runtime && runtime->IsLoaded();
-	const bool canonical = loaded && idStr::CheckExtension(currentPath.c_str(),"q4ui");
-	std::string snapshot, error;
-	if (canonical && !runtime->SaveSnapshot(snapshot,error,PresentationTime())) {
-		common->Warning("retained UI: cannot preserve instance before renderer/language change: %s",error.c_str());
-		Close(); host.Reset(); return false;
+	if (rootSubmissionPending) {
+		// ClearLayers/CreateImage may reallocate names still referenced by this
+		// frame's queued draws. FlushGui only emits commands; it does not execute
+		// them. Defer a dirty generation until EndFrame has consumed that chain,
+		// or until a later frame token proves the old front-end frame has ended.
+		if (rootSubmissionFrame == host.RenderFrame()) return false;
+		rootSubmissionPending = false;
 	}
-	if (runtime) {
-		CancelInput(); inputKeys.clear(); applicationRequests.clear(); ++inputGeneration;
-		runtime->Shutdown();
+	resourcesRefreshing = true;
+	struct SavedView { retainedUIView_t* view; bool loaded = false, valid = true, reloaded = false; std::string snapshot; };
+	std::vector<SavedView> saved;
+	const double savedTime = PresentationTime();
+	// Capture every document before any callbacks, shutdown or shared resource
+	// mutation. One failed instance must not prevent healthy peers rebuilding.
+	for (auto* view : views) {
+		SavedView entry{view,view->runtime->IsLoaded()};
+		std::string error;
+		if (entry.loaded && view->canonical && !view->runtime->SaveSnapshot(entry.snapshot,error,savedTime)) {
+			entry.valid = false;
+			common->Warning("retained UI: cannot preserve %s before renderer/language change: %s",view->path.c_str(),error.c_str());
+		}
+		saved.push_back(std::move(entry));
 	}
+	for (const auto& entry : saved) {
+		if (entry.loaded && entry.view->callback) entry.view->callback(entry.view->owner,retainedUIViewEvent_t::BeforeResourceReset);
+	}
+	for (const auto& entry : saved) entry.view->runtime->Shutdown();
+	// All contexts and their RmlUi resource managers are gone before the host
+	// invalidates cached fonts or render targets. Keep Runtime object addresses.
 	host.Reset();
 	restartGeneration = renderSystem->GetVideoRestartCount();
 	languageGeneration = LangDict_GetCodePageGeneration();
 	loadedLanguageRevision = languageRevision;
-	if (loaded) {
-		if (!LoadPreview(currentMarkup,currentPath)) { Close(); return false; }
-		if (canonical && !runtime->RestoreSnapshot(snapshot,error,PresentationTime())) {
-			common->Warning("retained UI: cannot restore instance after renderer/language change: %s",error.c_str()); Close(); return false;
-		}
-		if (canonical) common->Printf("Retained UI instance restored after renderer/language change: %s\n",currentPath.c_str());
+	for (auto& entry : saved) {
+		if (!entry.loaded) continue;
+		auto& view = *entry.view;
+		std::vector<openq4::ui::Diagnostic> diagnostics;
+		entry.reloaded = entry.valid && LoadViewDocument(view,view.source,view.path,view.canonical,diagnostics);
+		if (!diagnostics.empty()) ReportViewDiagnostics(view.path,diagnostics);
 	}
-	inputFocused = WindowFocused();
+	// Reanchor only after every document has loaded. Slow compilation of a
+	// neighboring view must not consume another view's saved transition time.
+	const double restoredTime = PresentationTime();
+	for (const auto& entry : saved) {
+		if (!entry.loaded) continue;
+		auto& view = *entry.view;
+		std::string error;
+		bool restored = entry.reloaded;
+		if (restored && view.canonical) restored = view.runtime->RestoreSnapshot(entry.snapshot,error,restoredTime);
+		if (restored) {
+			view.runtime->ReleaseInputSources();
+			if (view.canonical) common->Printf("Retained UI instance restored after renderer/language change: %s\n",view.path.c_str());
+		} else {
+			view.runtime->Shutdown(); view.failed = true;
+			common->Warning("retained UI: cannot restore %s after renderer/language change%s%s",view.path.c_str(),error.empty() ? "" : ": ",error.c_str());
+		}
+		if (view.callback) view.callback(view.owner,restored ? retainedUIViewEvent_t::Restored : retainedUIViewEvent_t::Failed);
+	}
+	resourcesRefreshing = false;
 	return true;
 }
 bool Preview(const idCmdArgs& args) {
@@ -371,13 +447,14 @@ bool Preview(const idCmdArgs& args) {
 	if (!host.ReadFile(args.Argv(1),markup)) { common->Warning("retained UI: cannot read %s",args.Argv(1)); return false; }
 	if (!RefreshResources()) return false;
 	if (!runtime) {
-		runtime = std::make_unique<openq4::ui::Runtime>(host);
-		epoch = std::chrono::steady_clock::now();
+		previewView = RetainedUI_CreateView(PreviewResourceEvent,nullptr);
+		if (!previewView) return false;
+		runtime = RetainedUI_ViewRuntime(previewView);
 	}
 	if (!LoadPreview(markup,args.Argv(1))) { common->Warning("retained UI: cannot load %s",args.Argv(1)); return false; }
 	SetApplicationOpen(idStr::Icmp(args.Argv(0),"ui_retainedOpen") == 0);
 	CancelInput(); inputKeys.clear(); applicationRequests.clear(); ++inputGeneration;
-	currentPath = args.Argv(1); currentMarkup = std::move(markup);
+	currentPath = args.Argv(1);
 	restartGeneration = renderSystem->GetVideoRestartCount();
 	languageGeneration = LangDict_GetCodePageGeneration();
 	common->Printf("Retained UI preview loaded: %s (integration spike)\n",currentPath.c_str());
@@ -385,7 +462,7 @@ bool Preview(const idCmdArgs& args) {
 }
 void Preview_f(const idCmdArgs& args) { Preview(args); }
 void Open_f(const idCmdArgs& args) {
-	if (args.Argc() != 2 || !idStr::CheckExtension(args.Argv(1),"q4ui")) {
+	if (args.Argc() != 2 || !UI_IsRetainedPath(args.Argv(1))) {
 		common->Printf("usage: ui_retainedOpen <VFS path.q4ui>\n"); return;
 	}
 	if (!Preview(args)) return;
@@ -399,11 +476,24 @@ void Ownership_f(const idCmdArgs&) {
 		static_cast<unsigned>(applicationRequests.size()));
 }
 void Close_f(const idCmdArgs&) { Close(); }
+bool PreviewReady() { return RetainedUI_PrepareView(previewView); }
+bool PreviewInputReady() {
+	const bool ready = PreviewReady();
+	if (!ready && !inputResourceSuspended) {
+		// Resource waits can span several events in the same frame. Disarm once
+		// while preserving held-source quarantine until real releases arrive.
+		CancelInput(false); inputKeys.clear();
+	}
+	// Recovery must not cancel the presentation restored by the coordinator,
+	// or forget physical holds which have yet to release.
+	inputResourceSuspended = !ready;
+	return ready;
+}
 void Checkpoint_f(const idCmdArgs& args) {
 	if (args.Argc() != 2 || (idStr::Cmp(args.Argv(1),"save") && idStr::Cmp(args.Argv(1),"restore"))) {
 		common->Printf("usage: ui_retainedCheckpoint <save|restore>\n"); return;
 	}
-	if (!runtime || !runtime->IsLoaded()) { common->Warning("retained UI: checkpoint requires a loaded canonical document"); return; }
+	if (!PreviewReady()) { common->Warning("retained UI: checkpoint requires a loaded canonical document"); return; }
 	std::string error;
 	const bool save = idStr::Cmp(args.Argv(1),"save") == 0;
 	const bool result = save ? runtime->SaveSnapshot(savedCheckpoint,error,PresentationTime()) :
@@ -417,19 +507,20 @@ void Checkpoint_f(const idCmdArgs& args) {
 }
 void Play_f(const idCmdArgs& args) {
 	if (args.Argc() != 2) { common->Printf("usage: ui_retainedPlay <timeline ID>\n"); return; }
-	if (runtime) runtime->SetReducedMotion(ui_retainedReducedMotion.GetBool(),PresentationTime());
-	if (!runtime || !runtime->PlayTimeline(args.Argv(1),PresentationTime())) common->Warning("retained UI: unknown timeline %s",args.Argv(1));
+	const bool ready = PreviewReady();
+	if (ready) runtime->SetReducedMotion(ui_retainedReducedMotion.GetBool(),PresentationTime());
+	if (!ready || !runtime->PlayTimeline(args.Argv(1),PresentationTime())) common->Warning("retained UI: unknown timeline %s",args.Argv(1));
 	else common->Printf("Retained UI timeline played: %s\n",args.Argv(1));
 }
 void Profile_f(const idCmdArgs& args) {
 	const int frames = args.Argc() == 2 ? atoi(args.Argv(1)) : 0;
 	if (frames < 1 || frames > 3600) { common->Printf("usage: ui_retainedProfile <1..3600 frames>\n"); return; }
-	if (!runtime || !runtime->IsLoaded()) { common->Warning("retained UI: profiling requires a loaded document"); return; }
+	if (!PreviewReady()) { common->Warning("retained UI: profiling requires a loaded document"); return; }
 	profile.clear(); profile.reserve(frames); profileFrames = frames;
 }
 void Focus_f(const idCmdArgs& args) {
 	if (args.Argc() != 2) { common->Printf("usage: ui_retainedFocus <control ID>\n"); return; }
-	if (!runtime || !runtime->FocusControl(args.Argv(1),PresentationTime())) common->Warning("retained UI: cannot focus %s",args.Argv(1));
+	if (!PreviewReady() || !runtime->FocusControl(args.Argv(1),PresentationTime())) common->Warning("retained UI: cannot focus %s",args.Argv(1));
 }
 void Menu_f(const idCmdArgs& args) {
 	const std::map<std::string,openq4::ui::MenuInput> inputs = {{"next",openq4::ui::MenuInput::Next},{"previous",openq4::ui::MenuInput::Previous},
@@ -439,22 +530,23 @@ void Menu_f(const idCmdArgs& args) {
 	if (found == inputs.end() || (idStr::Cmp(args.Argv(2),"0") && idStr::Cmp(args.Argv(2),"1"))) {
 		common->Printf("usage: ui_retainedMenu <next|previous|up|down|left|right|accept|back> <0|1>\n"); return;
 	}
-	if (runtime) runtime->MenuAction(found->second,args.Argv(2)[0] == '1',PresentationTime());
+	if (PreviewReady()) runtime->MenuAction(found->second,args.Argv(2)[0] == '1',PresentationTime());
 }
 void Enabled_f(const idCmdArgs& args) {
 	if (args.Argc() != 3 || (idStr::Cmp(args.Argv(2),"0") && idStr::Cmp(args.Argv(2),"1"))) {
 		common->Printf("usage: ui_retainedEnabled <control ID> <0|1>\n"); return;
 	}
-	if (!runtime || !runtime->SetControlEnabled(args.Argv(1),args.Argv(2)[0] == '1',PresentationTime())) common->Warning("retained UI: unknown control %s",args.Argv(1));
+	if (!PreviewReady() || !runtime->SetControlEnabled(args.Argv(1),args.Argv(2)[0] == '1',PresentationTime())) common->Warning("retained UI: unknown control %s",args.Argv(1));
 }
 void Modal_f(const idCmdArgs& args) {
 	bool result = false;
-	if (runtime && args.Argc() == 3 && idStr::Cmp(args.Argv(1),"push") == 0) result = runtime->PushModal(args.Argv(2),PresentationTime());
-	else if (runtime && args.Argc() == 2 && idStr::Cmp(args.Argv(1),"pop") == 0) result = runtime->PopModal(PresentationTime());
+	const bool ready = PreviewReady();
+	if (ready && args.Argc() == 3 && idStr::Cmp(args.Argv(1),"push") == 0) result = runtime->PushModal(args.Argv(2),PresentationTime());
+	else if (ready && args.Argc() == 2 && idStr::Cmp(args.Argv(1),"pop") == 0) result = runtime->PopModal(PresentationTime());
 	if (!result) common->Warning("retained UI: expected a valid ui_retainedModal push <scope ID> or pop");
 }
 void State_f(const idCmdArgs& args) {
-	if (!runtime || args.Argc() != 2) { common->Printf("usage: ui_retainedState <control ID>\n"); return; }
+	if (!PreviewReady() || args.Argc() != 2) { common->Printf("usage: ui_retainedState <control ID>\n"); return; }
 	const auto state = runtime->GetControlState(args.Argv(1));
 	if (!state) { common->Warning("retained UI: unknown control %s",args.Argv(1)); return; }
 	const char* names[] = {"default","hover","focus","pressed","disabled"};
@@ -462,7 +554,7 @@ void State_f(const idCmdArgs& args) {
 	common->Printf("Retained UI control: %s state=%s focus=%s bounds=%.3f,%.3f,%.3f,%.3f\n",args.Argv(1),names[static_cast<unsigned>(*state)],runtime->FocusedControl().c_str(),bounds.x,bounds.y,bounds.width,bounds.height);
 }
 void Events_f(const idCmdArgs&) {
-	if (!runtime) return;
+	if (!PreviewReady()) return;
 	auto events = runtime->TakeActions();
 	events.insert(events.begin(),applicationRequests.begin(),applicationRequests.end()); applicationRequests.clear();
 	common->Printf("Retained UI actions: %u\n",static_cast<unsigned>(events.size()));
@@ -470,7 +562,7 @@ void Events_f(const idCmdArgs&) {
 		event.kind == openq4::ui::ControlAction::Kind::Activate ? "activate" : "back",event.document.c_str(),event.node.c_str(),event.action.c_str());
 }
 void Data_f(const idCmdArgs& args) {
-	if (!runtime || args.Argc() != 2) { common->Printf("usage: ui_retainedData <VFS state.json>\n"); return; }
+	if (!PreviewReady() || args.Argc() != 2) { common->Printf("usage: ui_retainedData <VFS state.json>\n"); return; }
 	std::string source, error; openq4::ui::StateValues values; std::vector<openq4::ui::Diagnostic> diagnostics;
 	if (!host.ReadFile(args.Argv(1),source)) { common->Warning("retained UI: cannot read state data %s",args.Argv(1)); return; }
 	if (!openq4::ui::ParseStateValues(source,values,diagnostics)) {
@@ -480,7 +572,7 @@ void Data_f(const idCmdArgs& args) {
 	common->Printf("Retained UI data: %s revision=%llu keys=%u\n",args.Argv(1),static_cast<unsigned long long>(runtime->StateRevision()),static_cast<unsigned>(values.size()));
 }
 void Value_f(const idCmdArgs& args) {
-	if (!runtime || args.Argc() != 3) { common->Printf("usage: ui_retainedValue <node ID> <property>\n"); return; }
+	if (!PreviewReady() || args.Argc() != 3) { common->Printf("usage: ui_retainedValue <node ID> <property>\n"); return; }
 	const auto value = runtime->PresentedValue(args.Argv(1),args.Argv(2));
 	if (!value) { common->Warning("retained UI: unknown presented value %s.%s",args.Argv(1),args.Argv(2)); return; }
 	// Text remains data even in developer traces; escape controls so it cannot
@@ -491,6 +583,65 @@ void Value_f(const idCmdArgs& args) {
 	openq4::ui::Bounds bounds;
 	if (runtime->GetBounds(args.Argv(1),bounds)) common->Printf("Retained UI bounds: %s=%.3f,%.3f,%.3f,%.3f\n",args.Argv(1),bounds.x,bounds.y,bounds.width,bounds.height);
 }
+}
+
+retainedUIView_t* RetainedUI_CreateView(retainedUIViewCallback_t callback, void* owner) {
+	if (resourcesRefreshing) { common->Warning("retained UI: cannot register a view during resource callbacks"); return nullptr; }
+	auto view = std::make_unique<retainedUIView_t>();
+	view->runtime = std::make_unique<openq4::ui::Runtime>(host);
+	view->callback = callback; view->owner = owner;
+	views.push_back(view.get());
+	return view.release();
+}
+void RetainedUI_DestroyView(retainedUIView_t* view) {
+	if (!RegisteredView(view)) return;
+	if (resourcesRefreshing) { common->FatalError("Retained UI views cannot be destroyed during resource callbacks"); return; }
+	views.erase(std::find(views.begin(),views.end(),view));
+	delete view;
+}
+openq4::ui::Runtime* RetainedUI_ViewRuntime(retainedUIView_t* view) {
+	return RegisteredView(view) ? view->runtime.get() : nullptr;
+}
+bool RetainedUI_LoadView(retainedUIView_t* view, const std::string& source, const std::string& path,
+	std::vector<openq4::ui::Diagnostic>& diagnostics) {
+	diagnostics.clear();
+	if (!RegisteredView(view) || !RefreshResources()) {
+		diagnostics.push_back({"","Retained view is unavailable during resource lifecycle changes"}); return false;
+	}
+	return LoadViewDocument(*view,source,path,true,diagnostics);
+}
+bool RetainedUI_PrepareView(retainedUIView_t* view) {
+	return RegisteredView(view) && RefreshResources() && !view->failed && view->runtime->IsLoaded();
+}
+bool RetainedUI_DefaultViewport(openq4::ui::Viewport& viewport) {
+	viewport = {};
+	viewport.width = engineWindowState.uiViewportWidth;
+	viewport.height = engineWindowState.uiViewportHeight;
+	viewport.displayScale = ui_retainedDensity.GetFloat() > 0 ? ui_retainedDensity.GetFloat() : engineWindowState.displayScale;
+	viewport.userScale = ui_retainedScale.GetFloat();
+	viewport.pixelDensityX = engineWindowState.pixelDensityX; viewport.pixelDensityY = engineWindowState.pixelDensityY;
+	viewport.originX = static_cast<float>(engineWindowState.uiViewportX); viewport.originY = static_cast<float>(engineWindowState.uiViewportY);
+	return viewport.width > 0 && viewport.height > 0;
+}
+double RetainedUI_PresentationTime() { return PresentationTime(); }
+void RetainedUI_FrameSubmitted() { rootSubmissionPending = false; }
+bool RetainedUI_DrawViewRoot(retainedUIView_t* view, const openq4::ui::Viewport& viewport) {
+	if (!renderSystem || !renderSystem->IsOpenGLRunning() || viewport.width <= 0 || viewport.height <= 0 || !RetainedUI_PrepareView(view)) return false;
+	const int oldWidth = host.viewportWidth, oldHeight = host.viewportHeight;
+	const bool oldViewport = renderSystem->GetUseUIViewportFor2D();
+	renderSystem->FlushGui();
+	renderSystem->BindRenderTexture(nullptr,nullptr);
+	renderSystem->SetUseUIViewportFor2D(true);
+	host.viewportWidth = viewport.width; host.viewportHeight = viewport.height;
+	rootSubmissionPending = true; rootSubmissionFrame = host.RenderFrame();
+	const double now = PresentationTime();
+	view->runtime->SetReducedMotion(ui_retainedReducedMotion.GetBool(),now);
+	view->runtime->Frame(viewport,now);
+	renderSystem->FlushGui();
+	renderSystem->SetUseUIViewportFor2D(oldViewport);
+	renderSystem->SetColor4(1,1,1,1);
+	host.viewportWidth = oldWidth; host.viewportHeight = oldHeight;
+	return true;
 }
 
 void RetainedUI_Init() {
@@ -513,7 +664,20 @@ void RetainedUI_Init() {
 }
 void RetainedUI_Shutdown() {
 	Close();
+	// The manager normally destroys its owners first. Explicitly release any
+	// remaining registered contexts before engine resource teardown, without
+	// deleting owner-held view handles or leaving a live shared font consumer.
+	resourcesRefreshing = true;
+	for (auto* view : views) {
+		if (view->runtime->IsLoaded() && view->callback) view->callback(view->owner,retainedUIViewEvent_t::BeforeResourceReset);
+	}
+	for (auto* view : views) { view->runtime->Shutdown(); view->failed = true; }
 	host.Reset();
+	for (auto* view : views) if (view->callback) view->callback(view->owner,retainedUIViewEvent_t::Failed);
+	resourcesRefreshing = false;
+	rootSubmissionPending = false;
+	restartGeneration = languageGeneration = -1;
+	loadedLanguageRevision = (std::numeric_limits<std::uint64_t>::max)();
 	cmdSystem->RemoveCommand("ui_retainedCheckpoint");
 	cmdSystem->RemoveCommand("ui_retainedData");
 	cmdSystem->RemoveCommand("ui_retainedValue");
@@ -533,27 +697,10 @@ void RetainedUI_Shutdown() {
 }
 void RetainedUI_Draw() {
 	if (!runtime || !runtime->IsLoaded() || !renderSystem || !renderSystem->IsOpenGLRunning()) return;
-	if (!RefreshResources()) return;
 	openq4::ui::Viewport viewport;
-	viewport.width = engineWindowState.uiViewportWidth;
-	viewport.height = engineWindowState.uiViewportHeight;
-	if (viewport.width <= 0 || viewport.height <= 0) return;
-	viewport.displayScale = ui_retainedDensity.GetFloat() > 0 ? ui_retainedDensity.GetFloat() : engineWindowState.displayScale;
-	viewport.userScale = ui_retainedScale.GetFloat();
-	viewport.pixelDensityX = engineWindowState.pixelDensityX; viewport.pixelDensityY = engineWindowState.pixelDensityY;
-	viewport.originX = static_cast<float>(engineWindowState.uiViewportX); viewport.originY = static_cast<float>(engineWindowState.uiViewportY);
-	host.viewportWidth = viewport.width; host.viewportHeight = viewport.height;
+	if (!RetainedUI_DefaultViewport(viewport)) return;
 	const auto profileStart = std::chrono::steady_clock::now();
-	const bool oldViewport = renderSystem->GetUseUIViewportFor2D();
-	renderSystem->FlushGui();
-	renderSystem->SetUseUIViewportFor2D(true);
-	const double now = PresentationTime();
-	runtime->SetReducedMotion(ui_retainedReducedMotion.GetBool(),now);
-	runtime->Frame(viewport,now);
-	renderSystem->FlushGui();
-	renderSystem->SetUseUIViewportFor2D(oldViewport);
-	renderSystem->SetColor4(1,1,1,1);
-	RecordProfile(std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-profileStart).count());
+	if (RetainedUI_DrawViewRoot(previewView,viewport)) RecordProfile(std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-profileStart).count());
 }
 bool RetainedUI_IsOpen() { return applicationOpen.load(std::memory_order_acquire); }
 void RetainedUI_LanguageChanged() { ++languageRevision; }
@@ -563,9 +710,10 @@ void RetainedUI_Close() { Close(); }
 void RetainedUI_QueueInput(const retainedUIInput_t&, int) {}
 #endif
 void RetainedUI_FrameInput() {
-	if (!RetainedUI_IsOpen() || !runtime) return;
+	if (!RetainedUI_IsOpen()) return;
+	const bool ready = PreviewInputReady();
 	SuspendInput(!inputFocused || (console && console->Active()) || engineWindowState.uiViewportWidth <= 0 || engineWindowState.uiViewportHeight <= 0);
-	if (inputSuspended) return;
+	if (!ready || inputSuspended) return;
 	int x = 0, y = 0;
 	Sys_GetJoystickAxisState(AXIS_YAW,x); Sys_GetJoystickAxisState(AXIS_PITCH,y);
 	const int extent = Max(idMath::Abs(x),idMath::Abs(y));
@@ -585,6 +733,9 @@ void RetainedUI_FrameInput() {
 }
 bool RetainedUI_ProcessEvent(const sysEvent_s* event) {
 	const bool transport = event->evType == SE_RETAINED_UI;
+	// Refresh before checking transport generation, so input queued for a
+	// pre-restart view cannot be delivered after callbacks quarantine its owner.
+	const bool ready = RetainedUI_IsOpen() && PreviewInputReady();
 	retainedUIInput_t decoded;
 	if (transport) {
 		if (!event->evPtr || event->evPtrLength != sizeof(decoded)) return true;
@@ -600,8 +751,7 @@ bool RetainedUI_ProcessEvent(const sysEvent_s* event) {
 		if (static_cast<unsigned>(event->evValue) != inputGeneration) {
 			// A release already queued by the previous owner still ends its
 			// quarantine. It must never release a fresh source or reach the view.
-			if (!decoded.down && decoded.kind == retainedUIInput_t::KEY) input.ReleaseQuarantined(decoded.source);
-			else if (!decoded.down && decoded.kind == retainedUIInput_t::POINTER_BUTTON) input.ReleaseQuarantined(65536);
+			ReleaseQuarantinedInput(decoded);
 			return true;
 		}
 	} else if (event->evType == SE_KEY) {
@@ -610,12 +760,19 @@ bool RetainedUI_ProcessEvent(const sysEvent_s* event) {
 		decoded.source = event->evValue; decoded.down = event->evValue2 != 0;
 	} else return RetainedUI_IsOpen();
 	if (!RetainedUI_IsOpen() || !runtime) return transport;
+	if (decoded.kind == retainedUIInput_t::FOCUS) inputFocused = decoded.down;
+	if (!ready) {
+		// Keep focus/console suspension policy, but a resource wait alone must
+		// retain quarantine. Releases still retire it without reaching the view.
+		SuspendInput(!inputFocused || (console && console->Active()) || engineWindowState.uiViewportWidth <= 0 || engineWindowState.uiViewportHeight <= 0);
+		ReleaseQuarantinedInput(decoded);
+		return true;
+	}
 	// Device removal/disable queues cancellation before artificial key-ups.
 	// Do not advance navigation repeat or activate a pending release first.
 	if (decoded.kind == retainedUIInput_t::CANCEL) { CancelInput(); return true; }
-	if (decoded.kind == retainedUIInput_t::FOCUS) inputFocused = decoded.down;
 	RetainedUI_FrameInput();
-	if (inputSuspended) return true;
+	if (inputSuspended || inputResourceSuspended) { ReleaseQuarantinedInput(decoded); return true; }
 	if (decoded.kind == retainedUIInput_t::KEY) {
 		if (decoded.key <= 0 || decoded.key >= K_LAST_KEY || decoded.source < 0 || decoded.source > 65535) return true;
 		if (decoded.down && !decoded.repeated && inputKeys.size() < 1024) inputKeys[decoded.source] = decoded.key;
@@ -641,6 +798,15 @@ bool RetainedUI_ProcessEvent(const sysEvent_s* event) {
 	return true;
 }
 #else
+retainedUIView_t* RetainedUI_CreateView(retainedUIViewCallback_t,void*) { return nullptr; }
+void RetainedUI_DestroyView(retainedUIView_t*) {}
+openq4::ui::Runtime* RetainedUI_ViewRuntime(retainedUIView_t*) { return nullptr; }
+bool RetainedUI_LoadView(retainedUIView_t*,const std::string&,const std::string&,std::vector<openq4::ui::Diagnostic>&) { return false; }
+bool RetainedUI_PrepareView(retainedUIView_t*) { return false; }
+bool RetainedUI_DrawViewRoot(retainedUIView_t*,const openq4::ui::Viewport&) { return false; }
+bool RetainedUI_DefaultViewport(openq4::ui::Viewport&) { return false; }
+double RetainedUI_PresentationTime() { return 0; }
+void RetainedUI_FrameSubmitted() {}
 void RetainedUI_Init() {}
 void RetainedUI_Shutdown() {}
 void RetainedUI_Draw() {}

@@ -35,7 +35,7 @@ class idChatWindow;
 class idUserInterfaceLocal : public idUserInterfaceManaged {
 	friend class idUserInterfaceManagerLocal;
 public:
-								idUserInterfaceLocal();
+								idUserInterfaceLocal( bool managed = true );
 	virtual						~idUserInterfaceLocal();
 
 	virtual const char *		Name() const;
@@ -94,7 +94,7 @@ public:
 	// Legacy implementation/editor access only; not part of the game interface.
 	idWindow *					GetDesktop() const { return desktop; }
 	void						SetBindHandler( idWindow *win ) { bindHandler = win; }
-	bool						Active() const { return active; }
+	bool						Active() const override { return active; }
 	bool						ControllerNavigation() const { return controllerNavigation; }
 	void						SetControllerNavigation( bool enabled ) { controllerNavigation = enabled; }
 	int							GetTime() const { return time; }
@@ -157,6 +157,7 @@ public:
 	virtual void				FreeListGUI( idListGUI *listgui );
 	virtual void				RunAlwaysThinkGUIs( int time );
 	virtual void				RegisterIcon( const char *code, const char *shader, int x = -1, int y = -1, int w = -1, int h = -1 );
+	bool DispatchApplicationActions( idUserInterface *gui, const char *command, bool &closeRequested );
 
 private:
 	void						RegisterAllocation( idUserInterfaceManaged *gui );

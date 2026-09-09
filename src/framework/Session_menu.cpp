@@ -34,6 +34,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "ArenaCampaign.h"
 #include "../ui/ListGUILocal.h"
 #include "../ui/RetainedUI.h"
+#include "../ui/UserInterfaceManaged.h"
 #include "../sound/snd_local.h"
 
 #if defined( USE_SDL3 )
@@ -1511,6 +1512,7 @@ void idSessionLocal::SetGUI( idUserInterface *gui, HandleGuiCommand_t handle ) {
 	if ( RetainedUI_IsOpen() ) RetainedUI_Close();
 	const char	*cmd;
 
+	if ( guiActive && guiActive != gui ) guiActive->Activate( false, common->GetPresentationTime() );
 	guiActive = gui;
 	guiHandle = handle;
 	if ( guiMsgRestore ) {
@@ -1552,6 +1554,7 @@ idSessionLocal::ExitMenu
 ===============
 */
 void idSessionLocal::ExitMenu( void ) {
+	if ( guiActive ) guiActive->Activate( false, common->GetPresentationTime() );
 	guiActive = NULL;
 
 	// go back to the game sounds
@@ -3311,6 +3314,14 @@ void idSessionLocal::DispatchCommand( idUserInterface *gui, const char *menuComm
 	if ( !gui ) {
 		gui = guiActive;
 	}
+	bool closeRequested = false;
+	if ( UI_DispatchApplicationActions( gui, menuCommand, closeRequested ) ) {
+		if ( closeRequested ) {
+			if ( gui == guiTest ) TestGUI( NULL );
+			else if ( gui == guiActive ) ExitMenu();
+		}
+		return;
+	}
 
 	if ( gui == guiMainMenu ) {
 		HandleMainMenuCommands( menuCommand );
@@ -3724,7 +3735,7 @@ void idSessionLocal::GuiFrameEvents() {
 
 	// stop generating move and button commands when a local console or menu is active
 	// running here so SP, async networking and no game all go through it
-	if ( console->Active() || guiActive || RetainedUI_IsOpen() ) {
+	if ( console->Active() || guiActive || guiTest || RetainedUI_IsOpen() ) {
 		usercmdGen->InhibitUsercmd( INHIBIT_SESSION, true );
 	} else {
 		usercmdGen->InhibitUsercmd( INHIBIT_SESSION, false );
@@ -3763,9 +3774,10 @@ void idSessionLocal::GuiFrameEvents() {
 	ev.evType = SE_NONE;
 	cmd = gui->HandleEvent( &ev, common->GetPresentationTime() );
 	if ( cmd && cmd[0] ) {
-		DispatchCommand( guiActive, cmd );
+		DispatchCommand( gui, cmd );
 	}
-	SyncMainMenuSettingsScrollPages( gui );
+	// Dispatch can close and release a test instance or install another menu.
+	SyncMainMenuSettingsScrollPages( guiTest != NULL ? guiTest : guiActive );
 }
 
 /*

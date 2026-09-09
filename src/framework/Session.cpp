@@ -51,6 +51,8 @@ If you have questions concerning this license or the applicable additional terms
 #undef private
 #include "../imagetools/ImageTools.h"
 #include "../ui/RetainedUI.h"
+#include "../ui/UserInterfaceManaged.h"
+#include "../ui/UserInterfaceRetained.h"
 
 idCVar	idSessionLocal::com_showAngles( "com_showAngles", "0", CVAR_SYSTEM | CVAR_BOOL, "" );
 idCVar	idSessionLocal::com_minTics( "com_minTics", "1", CVAR_SYSTEM, "" );
@@ -4272,6 +4274,17 @@ static void Session_OpenQ4GuiGet_f( const idCmdArgs &args ) {
 	common->Printf( "GUI_VALUE %s=%s\n", args.Argv( 1 ), value.c_str() );
 }
 
+static void Session_RetainedGui_f( const idCmdArgs &args ) {
+#ifndef ID_DEDICATED
+	idUserInterface* gui = sessLocal.GetActiveGUI();
+	if ( UI_RetainedDiagnostic( gui, args ) ) {
+		sessLocal.DispatchCommand( gui, "openq4-retained-actions" );
+		return;
+	}
+#endif
+	common->Printf( "openq4_retainedGui: requires a retained test/active GUI and report | focus <id> | menu <action> <0|1> | state <id> <value> | save | restore\n" );
+}
+
 static void Session_OpenQ4GuiSet_f( const idCmdArgs &args ) {
 	idUserInterface *gui = session->GetActiveGUI();
 	if ( args.Argc() != 3 || gui == NULL ) {
@@ -4310,11 +4323,22 @@ idSessionLocal::TestGUI
 ================
 */
 void idSessionLocal::TestGUI( const char *guiName ) {
-	if ( guiName && *guiName ) {
-		guiTest = uiManager->FindGui( guiName, true, false, true );
-	} else {
-		guiTest = NULL;
+	// The name can point into the current test instance. Stage a distinct view
+	// before releasing it, and retain the live test if replacement fails.
+	const idStr path( guiName != NULL ? guiName : "" );
+	idUserInterface *next = NULL;
+	if ( !path.IsEmpty() ) {
+		next = uiManager->FindGui( path, true, true, false );
+		if ( next == NULL ) { return; }
 	}
+	idUserInterface *previous = guiTest;
+	guiTest = NULL;
+	if ( previous != NULL && previous != guiActive ) {
+		previous->Activate( false, common->GetPresentationTime() );
+		uiManager->DeAlloc( previous );
+	}
+	guiTest = next;
+	if ( guiTest != NULL ) { guiTest->Activate( true, common->GetPresentationTime() ); }
 }
 
 /*
@@ -6920,7 +6944,7 @@ bool idSessionLocal::IsGUIActive() const {
 bool idSessionLocal::ProcessEvent( const sysEvent_t *event ) {
 	if ( event->evType == SE_RETAINED_UI ) return RetainedUI_ProcessEvent( event );
 	// hitting escape anywhere brings up the menu
-	if ( !guiActive && !RetainedUI_IsOpen() && event->evType == SE_KEY && event->evValue2 == 1 &&
+	if ( !guiActive && !guiTest && !RetainedUI_IsOpen() && event->evType == SE_KEY && event->evValue2 == 1 &&
 		( event->evValue == K_ESCAPE || event->evValue == K_JOY7 || event->evValue == K_JOY8 ) ) {
 		console->Close();
 		if ( IsDemoPlaybackActive() ) {
@@ -6953,14 +6977,17 @@ bool idSessionLocal::ProcessEvent( const sysEvent_t *event ) {
 	if ( guiTest ) {
 		// hitting escape exits the testgui
 		if ( event->evType == SE_KEY && event->evValue2 == 1 && event->evValue == K_ESCAPE ) {
-			guiTest = NULL;
+			TestGUI( NULL );
 			return true;
 		}
 		
 		static const char *cmd;
 		cmd = guiTest->HandleEvent( event, common->GetPresentationTime() );
 		if ( cmd && cmd[0] ) {
-			common->Printf( "testGui event returned: '%s'\n", cmd );
+			bool closeRequested = false;
+			if ( UI_DispatchApplicationActions( guiTest, cmd, closeRequested ) ) {
+				if ( closeRequested ) TestGUI( NULL );
+			} else common->Printf( "testGui event returned: '%s'\n", cmd );
 		}
 		return true;
 	}
@@ -7620,6 +7647,7 @@ void idSessionLocal::UpdateScreen( bool outOfSequence ) {
 	} else {
 		renderSystem->EndFrame( NULL, NULL );
 	}
+	RetainedUI_FrameSubmitted();
 
 	insideUpdateScreen = false;
 }
@@ -7764,7 +7792,7 @@ void idSessionLocal::Frame() {
 
 	//------------ single player game tics --------------
 
-	if ( !mapSpawned || guiActive || RetainedUI_IsOpen() ) {
+	if ( !mapSpawned || IsGUIActive() ) {
 		if ( !com_asyncInput.GetBool() ) {
 			// early exit, won't do RunGameTic .. but still need to update mouse position for GUIs
 			usercmdGen->GetDirectUsercmd();
@@ -7776,7 +7804,7 @@ void idSessionLocal::Frame() {
 		return;
 	}
 
-	if ( guiActive || RetainedUI_IsOpen() ) {
+	if ( IsGUIActive() ) {
 		lastGameTic = latchedTicNumber;
 		UpdateFramePacingStats( frameStartMsec, requestedWaitMsec, actualWaitMsec, 0 );
 		return;
@@ -8114,6 +8142,9 @@ void idSessionLocal::Init() {
 
 	cmdSystem->AddCommand( "demoShot", Session_DemoShot_f, CMD_FL_SYSTEM, "writes a screenshot for a demo" );
 	cmdSystem->AddCommand( "testGUI", Session_TestGUI_f, CMD_FL_SYSTEM, "tests a gui" );
+#ifndef ID_DEDICATED
+	cmdSystem->AddCommand( "openq4_retainedGui", Session_RetainedGui_f, CMD_FL_SYSTEM, "inspect a normal retained GUI or submit semantic diagnostics without device input" );
+#endif
 
 #ifndef	ID_DEDICATED
 	cmdSystem->AddCommand( "GuiEvent", Session_GuiEvent_f, CMD_FL_SYSTEM, "sends a named event to the active gui" );

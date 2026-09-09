@@ -199,7 +199,7 @@ public:
 	Validator(const std::string& text, std::vector<Diagnostic>& errors) : source(text), diagnostics(errors) {}
 	DocumentModel Read(const Json::Value& root) {
 		FiniteTree(root,"");
-		Fields(root,"",{"format","version","id","tokens","root","timelines","state","bindings","editor","extensions"});
+		Fields(root,"",{"format","version","id","tokens","root","timelines","state","bindings","actions","editor","extensions"});
 		Require(root["format"] == "openq4-ui",root,"/format","Expected format 'openq4-ui'");
 		Require(root["version"].isUInt() && root["version"].asUInt() == 1,root["version"],"/version","Unsupported document version; expected 1");
 		model.id = Id(root["id"],"/id");
@@ -212,6 +212,7 @@ public:
 			}
 		}
 		ReadState(root);
+		ReadActions(root);
 		model.root = ReadNode(root["root"],"/root",0);
 		if (root.isMember("timelines")) {
 			Require(root["timelines"].isArray(),root["timelines"],"/timelines","Expected a timeline array");
@@ -291,6 +292,25 @@ private:
 			return result;
 		}
 		Require(ValidStateValue(result.literal),value,path,"Invalid expression literal"); result.type = result.literal.index(); return result;
+	}
+	void ReadActions(const Json::Value& root) {
+		if (!root.isMember("actions")) return;
+		const auto& actions = root["actions"];
+		Require(actions.isObject() && actions.size() <= 4096,actions,"/actions","Expected at most 4096 action descriptors");
+		for (const auto& id : actions.getMemberNames()) {
+			const auto& value = actions[id]; const auto path = "/actions/"+PointerPart(id);
+			Require(Identifier(id),value,path,"Invalid action ID");
+			Fields(value,path,{"operation","arguments","extensions"});
+			Action action; action.operation = Id(value["operation"],path+"/operation");
+			const auto& arguments = value["arguments"];
+			Require(arguments.isObject() && arguments.size() <= 32,arguments,path+"/arguments","Expected at most 32 named action arguments");
+			for (const auto& name : arguments.getMemberNames()) {
+				const auto at = path+"/arguments/"+PointerPart(name);
+				Require(Identifier(name),arguments[name],at,"Invalid action argument name");
+				action.arguments.emplace(name,ReadExpression(arguments[name],at));
+			}
+			model.actions.emplace(id,std::move(action));
+		}
 	}
 	bool LocalizedTextResult(const Expression& expression) const {
 		if (!expression.state.empty() || expression.op == "numberText") return true;

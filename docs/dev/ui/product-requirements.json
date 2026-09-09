@@ -24,7 +24,7 @@
     "original": {
       "path": "docs/dev/plans/idtech5-ui.md",
       "authority": "original immutable scope and stage gates",
-      "sha256": "e98c13908b579f008bd9e87cccc7bb8d0da8d74e896716a550f8b42371c74178"
+      "sha256": "491f417467ea3bf4eb92adaea656d40feb0558e34d4dec8a397a45df787cb240"
     },
     "inventory": {
       "path": "docs/dev/ui/inventory-report.md",
@@ -177,9 +177,18 @@
     "instance-persistence-foundation": {
       "kind": "qualified_foundation_checkpoint",
       "path": "docs/dev/ui/instance-persistence.md",
-      "scope": "M1 foundation: private manager-neutral ownership, canonical subset snapshots, preview renderer/language restoration and backend-aware full restart. Native and production-method tests pass; reviewed hidden windowed SP/OpenGL 125% and MP/Vulkan 200% gameplay captures preserve checkpoint, modal/focus/availability and input ownership through same-language reload and full video restart. Normal retained adapter, complete widget/script snapshots, engine multi-view/world rendering and game-save framing remain unfinished. No production GUI or final gate accepted.",
-      "sha256": "c73882baf670668d2a4de7c293501a84b922f097beb59593f187d3a22916324b",
+      "scope": "Historical checkpoint b87b703b: M1 foundation: private manager-neutral ownership, canonical subset snapshots, preview renderer/language restoration and backend-aware full restart. Native and production-method tests pass; reviewed hidden windowed SP/OpenGL 125% and MP/Vulkan 200% gameplay captures preserve checkpoint, modal/focus/availability and input ownership through same-language reload and full video restart. Normal retained adapter, complete widget/script snapshots, engine multi-view/world rendering and game-save framing remain unfinished. No production GUI or final gate accepted.",
+      "sha256": "1db931d2854b760153343af5eb3a1f4eb4831a4666a5f94c1dea8d80ed14b6a5",
       "local_capture_summary": ".tmp/ui/persistence-review/summary.json"
+    },
+    "managed-application-foundation": {
+      "kind": "qualified_foundation_checkpoint",
+      "path": "docs/dev/ui/managed-application.md",
+      "sha256": "16b03ac8222efd34205bb1bdc853f514d62ffcc8509a23b647bcffb3d785a89c",
+      "baseline_engine_revision": "b87b703b799cbf120d74b4aed122883a42b0ad68",
+      "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
+      "local_capture_summary": ".tmp/ui/managed-review/summary.json",
+      "scope": "M1 foundation: explicit retained/deferred normal GUI loading, typed brightness/shadow operations, pending/committed state save framing, normal session cancellation and shared engine-view invalidation. Native and production-method tests plus source/binary-bound hidden windowed SP/OpenGL and MP/Vulkan fixtures qualify only this subset. Full aliases/events/widgets, production mappings, world output, real game save/demo containers, GPU/platform qualification and complete product/editor remain unaccepted."
     }
   },
   "groups": {
@@ -1331,10 +1340,12 @@
       "acceptance_evidence_needed": [
         "Public-method contract matrix plus actual menu/game caller tests; normal callers do not depend on preview commands."
       ],
-      "status": "pending",
-      "current_evidence": [],
+      "status": "partial",
+      "current_evidence": [
+        "managed-application-foundation"
+      ],
       "acceptance_evidence": [],
-      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required."
+      "remaining": "Normal retained adapter exists for the current root/button subset. Complete writable aliases, text/caret/wrapping, key-binding widgets, full ordered events and game caller/save/world contracts before accepting the public method matrix."
     },
     {
       "id": "RUN-002",
@@ -1356,7 +1367,8 @@
       ],
       "status": "partial",
       "current_evidence": [
-        "instance-persistence-foundation"
+        "instance-persistence-foundation",
+        "managed-application-foundation"
       ],
       "acceptance_evidence": [],
       "remaining": "The cited foundation is limited; complete and qualify the entire stated requirement before acceptance."
@@ -1381,7 +1393,8 @@
       ],
       "status": "partial",
       "current_evidence": [
-        "instance-foundation"
+        "instance-foundation",
+        "managed-application-foundation"
       ],
       "acceptance_evidence": [],
       "remaining": "The cited foundation is limited; complete and qualify the entire stated requirement before acceptance."
@@ -1430,10 +1443,12 @@
       "acceptance_evidence_needed": [
         "Time/order traces through pause, navigation, state change and rendering; input uses the same presented transform."
       ],
-      "status": "pending",
-      "current_evidence": [],
+      "status": "partial",
+      "current_evidence": [
+        "managed-application-foundation"
+      ],
       "acceptance_evidence": [],
-      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required."
+      "remaining": "Normal session/frame order and inverse cursor transport are documented and tested for the root/button subset. Complete game clocks, translated event scheduling, all widgets and transformed/world hit paths."
     },
     {
       "id": "RUN-006",
@@ -1455,10 +1470,12 @@
       "acceptance_evidence_needed": [
         "SP and MP gameplay entry, operation trace/readback and return/reopen; invalid actions/data are atomic and diagnostic."
       ],
-      "status": "pending",
-      "current_evidence": [],
+      "status": "partial",
+      "current_evidence": [
+        "managed-application-foundation"
+      ],
       "acceptance_evidence": [],
-      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required."
+      "remaining": "Normal testGUI/session callers change and read back two real settings in SP/MP fixtures. Production source mappings, complete settings transactions, real reopen/failure paths and full screen acceptance remain."
     },
     {
       "id": "RUN-007",
@@ -1483,7 +1500,8 @@
       "status": "partial",
       "current_evidence": [
         "instance-foundation",
-        "instance-persistence-foundation"
+        "instance-persistence-foundation",
+        "managed-application-foundation"
       ],
       "acceptance_evidence": [],
       "remaining": "The cited foundation is limited; complete and qualify the entire stated requirement before acceptance."
@@ -1531,10 +1549,12 @@
       "acceptance_evidence_needed": [
         "Production operation tests and trace from authored activation to application result; invalid operation/parameter cases do not execute partial side effects."
       ],
-      "status": "pending",
-      "current_evidence": [],
+      "status": "partial",
+      "current_evidence": [
+        "managed-application-foundation"
+      ],
       "acceptance_evidence": [],
-      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required."
+      "remaining": "Generic typed argument resolution and a fixed three-operation session catalog are implemented. Complete session/SP/MP operations, structured user-visible results, provenance and full translated behavior remain."
     },
     {
       "id": "BEH-002",
@@ -1559,7 +1579,7 @@
       "status": "pending",
       "current_evidence": [],
       "acceptance_evidence": [],
-      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required."
+      "remaining": "Complete the full validated settings transaction and its acceptance evidence. Vulkan visual brightness/gamma also requires the existing H3 final pass (docs/dev/plans/2026-07-22-vulkan-phase-h.md); successful typed CVar dispatch/readback alone does not qualify display settings."
     },
     {
       "id": "BEH-003",
@@ -1582,7 +1602,8 @@
       ],
       "status": "partial",
       "current_evidence": [
-        "bridge-foundation"
+        "bridge-foundation",
+        "managed-application-foundation"
       ],
       "acceptance_evidence": [],
       "remaining": "The cited foundation is limited; complete and qualify the entire stated requirement before acceptance."
@@ -1607,10 +1628,12 @@
       "acceptance_evidence_needed": [
         "Real session/game caller traces including nested events, relative timers, source visibility and teardown; exactly-once command returns."
       ],
-      "status": "pending",
-      "current_evidence": [],
+      "status": "partial",
+      "current_evidence": [
+        "managed-application-foundation"
+      ],
       "acceptance_evidence": [],
-      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required."
+      "remaining": "Activation/trigger/named calls start exact authored timelines and cancel normal input ownership. Complete ordered action/event scripts, nested events, timers, completion/cancellation results and legacy lowering remain."
     },
     {
       "id": "BEH-005",
@@ -1736,7 +1759,8 @@
       ],
       "status": "partial",
       "current_evidence": [
-        "instance-foundation"
+        "instance-foundation",
+        "managed-application-foundation"
       ],
       "acceptance_evidence": [],
       "remaining": "The cited foundation is limited; complete and qualify the entire stated requirement before acceptance."
@@ -1868,7 +1892,8 @@
       ],
       "status": "partial",
       "current_evidence": [
-        "instance-persistence-foundation"
+        "instance-persistence-foundation",
+        "managed-application-foundation"
       ],
       "acceptance_evidence": [],
       "remaining": "The cited foundation is limited; complete and qualify the entire stated requirement before acceptance."
@@ -1896,7 +1921,8 @@
       ],
       "status": "partial",
       "current_evidence": [
-        "instance-persistence-foundation"
+        "instance-persistence-foundation",
+        "managed-application-foundation"
       ],
       "acceptance_evidence": [],
       "remaining": "The cited foundation is limited; complete and qualify the entire stated requirement before acceptance."
@@ -1923,7 +1949,8 @@
       ],
       "status": "partial",
       "current_evidence": [
-        "instance-persistence-foundation"
+        "instance-persistence-foundation",
+        "managed-application-foundation"
       ],
       "acceptance_evidence": [],
       "remaining": "The cited foundation is limited; complete and qualify the entire stated requirement before acceptance."

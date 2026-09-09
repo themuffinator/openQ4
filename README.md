@@ -68,8 +68,10 @@ GUI set's structure, expressions and dependency references. A
 [presentation boundary](docs/dev/ui/presentation-bridge.md) separates game and
 menu consumers from legacy window objects, and the runtime now supports
 [independent document instances](docs/dev/ui/instances.md) with
-[durable instance state and manager ownership](docs/dev/ui/instance-persistence.md). Complete GUI migration,
-game action integration and the visual editor remain in development.
+[durable instance state and manager ownership](docs/dev/ui/instance-persistence.md).
+[Normal GUI loading and typed settings operations](docs/dev/ui/managed-application.md)
+connect explicit retained documents to session callers. Complete GUI migration,
+the full application/control contract and the visual editor remain in development.
 The [product completion plan](docs/dev/plans/ui-product-completion.md) records
 the implementation audit and the gates for complete gameplay, artwork, editor
 and platform delivery. The [requirement register](docs/dev/ui/product-requirements.md)

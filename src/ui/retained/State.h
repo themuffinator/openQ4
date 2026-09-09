@@ -5,6 +5,11 @@
 
 namespace openq4::ui {
 
+// Evaluate a compiled expression as bounded typed data, without changing its
+// variables or the previous result on failure. Unselected branches stay lazy.
+bool EvaluateStateExpression(const Expression& expression, const StateValues& variables,
+	StateValue& value, std::string& error);
+
 // Application and host batches commit together with all derived properties.
 // Evaluating expressions never executes commands or changes authored source.
 class State {

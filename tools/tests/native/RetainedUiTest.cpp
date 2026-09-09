@@ -7,12 +7,106 @@
 #include <fstream>
 #include <iterator>
 #include "src/ui/retained/Input.h"
+#include "src/ui/retained/State.h"
 
 using namespace openq4::ui;
 static void Check(bool condition, const char* message) {
 	if (!condition) { std::fprintf(stderr,"FAIL: %s\n",message); std::exit(1); }
 }
 static bool Near(float a, float b) { return std::abs(a-b) < .1f; }
+static void CheckTypedActionDescriptors() {
+	const std::string source = R"json({
+	 "format":"openq4-ui","version":1,"id":"application-actions",
+	 "state":{
+	  "brightness":{"type":"number","initial":1},
+	  "shadows":{"type":"boolean","initial":true},
+	  "divisor":{"type":"number","initial":0},
+	  "chooseDivision":{"type":"boolean","initial":false},
+	  "playerData":{"type":"string","initial":""}
+	 },
+	 "actions":{
+	  "brighten":{"operation":"settings.brightness.set","arguments":{"value":{"op":"+","args":[{"state":"brightness"},0.25]}}},
+	  "shadows":{"operation":"settings.shadows.set","arguments":{"value":{"op":"!","args":[{"state":"shadows"}]}}},
+	  "lazy":{"operation":"settings.brightness.set","arguments":{"value":{"op":"select","args":[{"state":"chooseDivision"},{"op":"/","args":[1,{"state":"divisor"}]},1.25]}}},
+	  "failure":{"operation":"fixture.failure","arguments":{"first":1,"last":{"op":"/","args":[1,{"state":"divisor"}]}}},
+	  "overflow":{"operation":"fixture.overflow","arguments":{"value":{"op":"*","args":[1000000000000,1000000000000]}}},
+	  "data":{"operation":"fixture.data","arguments":{"literal":"set r_fullscreen 1; quit","player":{"state":"playerData"}}},
+	  "none":{"operation":"fixture.none","arguments":{},"extensions":{"future":{"retained":true}}}
+	 },
+	 "root":{"id":"root","type":"group"},
+	 "extensions":{"sourceComment":"retained outside edited action"}
+	})json";
+	Document document; std::vector<Diagnostic> diagnostics; std::string error;
+	Check(document.Load(source,diagnostics),"compile generic typed application descriptors without dispatching them");
+	Check(document.Source()==source && document.Model().actions.size()==7,"action source round trip retains extensions and all descriptors");
+	Check(document.Model().actions.at("brighten").arguments.at("value").type==0 &&
+		document.Model().actions.at("shadows").arguments.at("value").type==1,"action argument expressions retain compiler-resolved numeric and boolean types");
+	State state; Check(state.Reset(document.Model(),error),"invalid uninvoked arithmetic does not prevent document initialization");
+	ActionInvocation invocation;
+	Check(document.Model().ResolveAction("brighten",state.Variables(),invocation,error) &&
+		invocation.action=="brighten" && invocation.operation=="settings.brightness.set" &&
+		std::get<double>(invocation.arguments.at("value"))==1.25,"action resolves typed numeric value from one state snapshot");
+	Check(document.Model().ResolveAction("shadows",state.Variables(),invocation,error) &&
+		!std::get<bool>(invocation.arguments.at("value")),"boolean application operation resolves without numeric coercion");
+	Check(document.Model().ResolveAction("lazy",state.Variables(),invocation,error) &&
+		std::get<double>(invocation.arguments.at("value"))==1.25,"unused invalid action expression branches remain lazy");
+	Check(state.Set({{"playerData",std::string("Player; \"quit\" <tag>")}},error),"supply application-owned string data");
+	Check(document.Model().ResolveAction("data",state.Variables(),invocation,error) &&
+		std::get<std::string>(invocation.arguments.at("literal"))=="set r_fullscreen 1; quit" &&
+		std::get<std::string>(invocation.arguments.at("player"))=="Player; \"quit\" <tag>","argument strings remain data, without tokenization or command execution");
+	Check(document.Model().ResolveAction("none",state.Variables(),invocation,error) && invocation.arguments.empty(),"argument-free descriptor replaces the complete invocation");
+	const auto variables = state.Variables(); const auto revision = state.Revision();
+	const ActionInvocation unchanged{"previous","previous.operation",{{"keep",std::string("unchanged")}}};
+	invocation = unchanged;
+	auto rejectResolution = [&](const std::string& id, const StateValues& candidate) {
+		Check(!document.Model().ResolveAction(id,candidate,invocation,error) && !error.empty(),"invalid action resolution returns a diagnostic");
+		Check(invocation.action==unchanged.action && invocation.operation==unchanged.operation && invocation.arguments==unchanged.arguments,
+			"failed resolution preserves the entire previous invocation even after earlier arguments evaluated");
+		Check(state.Variables()==variables && state.Revision()==revision,"resolving an action never mutates application state or revision");
+	};
+	rejectResolution("missing",variables);
+	rejectResolution("failure",variables); Check(error.find("argument 'last'")!=std::string::npos,"action failure identifies its argument");
+	rejectResolution("overflow",variables);
+	StateValues candidate=variables; candidate.erase("brightness"); rejectResolution("brighten",candidate);
+	candidate=variables; candidate["brightness"]=true; rejectResolution("brighten",candidate);
+	candidate=variables; candidate["brightness"]=std::numeric_limits<double>::infinity(); rejectResolution("brighten",candidate);
+	candidate=variables; candidate["brightness"]=1000000000001.0; rejectResolution("brighten",candidate);
+	candidate=variables; candidate["shadows"]=1.0; rejectResolution("shadows",candidate);
+	candidate=variables; candidate["playerData"]=std::string("a\0b",3); rejectResolution("data",candidate);
+	candidate=variables; candidate["playerData"]=std::string(65537,'a'); rejectResolution("data",candidate);
+	candidate=variables; candidate["chooseDivision"]=true; rejectResolution("lazy",candidate);
+	StateValue previous=std::string("previous result");
+	Check(!EvaluateStateExpression(document.Model().actions.at("failure").arguments.at("last"),variables,previous,error) &&
+		std::get<std::string>(previous)=="previous result","shared expression helper is transactional on failure");
+	Check(EvaluateStateExpression(document.Model().actions.at("lazy").arguments.at("value"),variables,previous,error) &&
+		std::get<double>(previous)==1.25 && error.empty(),"shared expression helper preserves lazy evaluation and clears stale error");
+	auto rejectSource = [&](const std::string& pointer, const std::string& value) {
+		Check(!document.ReplaceValue(pointer,value,diagnostics) && !diagnostics.empty(),"invalid action schema edit diagnosed");
+		Check(document.Source()==source,"invalid action schema edit preserves the last valid document");
+		Check(diagnostics.front().pointer.starts_with("/actions"),"action schema diagnostic carries an actionable source pointer");
+	};
+	rejectSource("/actions","[]");
+	rejectSource("/actions/brighten/operation","\"settings.brightness.set;quit\"");
+	rejectSource("/actions/brighten/operation","false");
+	rejectSource("/actions/brighten/arguments","[]");
+	rejectSource("/actions/brighten/arguments","{\"bad name\":1}");
+	rejectSource("/actions/brighten/arguments/value","{\"state\":\"missing\"}");
+	rejectSource("/actions/brighten/arguments/value","{\"op\":\"+\",\"args\":[true,1]}");
+	rejectSource("/actions/brighten/arguments/value","{\"op\":\"exec\",\"args\":[]}");
+	rejectSource("/actions/brighten/arguments/value","{\"op\":\"!\",\"args\":[true,false]}");
+	rejectSource("/actions/brighten","{\"operation\":\"fixture.operation\",\"arguments\":{},\"command\":\"quit\"}");
+	rejectSource("/actions/brighten","{\"operation\":\"fixture.operation\"}");
+	rejectSource("/actions","{\"bad action\":{\"operation\":\"fixture.operation\",\"arguments\":{}}}");
+	std::string tooMany="{";
+	for (int i=0;i<33;++i) tooMany+=(i?",":"")+std::string("\"arg")+std::to_string(i)+"\":0";
+	rejectSource("/actions/brighten/arguments",tooMany+"}");
+	tooMany="{";
+	for (int i=0;i<4097;++i) tooMany+=(i?",":"")+std::string("\"action")+std::to_string(i)+"\":{\"operation\":\"fixture.operation\",\"arguments\":{}}";
+	rejectSource("/actions",tooMany+"}");
+	Check(document.ReplaceValue("/actions/brighten/arguments/value/args/1","0.5",diagnostics),"action expression is editable through canonical source transactions");
+	Check(document.Model().ResolveAction("brighten",variables,invocation,error) && std::get<double>(invocation.arguments.at("value"))==1.5,
+		"edited canonical action uses recompiled expression without host execution");
+}
 struct TestHost final : Host {
 	int drawCalls = 0, errors = 0;
 	std::vector<Vertex> drawn;
@@ -107,6 +201,7 @@ struct TestHost final : Host {
 };
 
 int main(int argc, char** argv) {
+	CheckTypedActionDescriptors();
 	Viewport viewport;
 	viewport.displayScale = 1.5f;
 	viewport.userScale = 1.25f;
@@ -596,8 +691,15 @@ int main(int argc, char** argv) {
 		};
 		Runtime first(host), second(host);
 		std::string snapshot, error;
-		Check(first.LoadDocument(bindingSource,"snapshot-bindings.q4ui",diagnostics),"load durable state fixture");
-		Check(second.LoadDocument(bindingSource,"snapshot-bindings.q4ui",diagnostics),"load independent snapshot recipient");
+		std::string actionBindingSource=bindingSource;
+		actionBindingSource.insert(actionBindingSource.rfind('}'),R"json(,
+		 "actions":{"menu.controls":{"operation":"fixture.capture","arguments":{
+		  "progress":{"state":"progress"},"scale":{"state":"scale"}
+		 }}})json");
+		Document snapshotActions;
+		Check(snapshotActions.Load(actionBindingSource,diagnostics),"compile action descriptor for existing opaque semantic control");
+		Check(first.LoadDocument(actionBindingSource,"snapshot-bindings.q4ui",diagnostics),"load durable state fixture");
+		Check(second.LoadDocument(actionBindingSource,"snapshot-bindings.q4ui",diagnostics),"load independent snapshot recipient");
 		Check(first.SetState({{"progress",37.0},{"heading",std::string("#str_test")}},error,1),"set snapshot application values");
 		first.Frame({},1); Check(first.FocusControl("reference-controls",1),"focus snapshot fixture");
 		first.MenuAction(MenuInput::Accept,true,1); first.MenuAction(MenuInput::Accept,false,1);
@@ -609,6 +711,11 @@ int main(int argc, char** argv) {
 		Check(second.SetState({{"progress",80.0}},error,10),"independent recipient begins with different state");
 		Check(second.RestoreSnapshot(snapshot,error,10),"restore application, focus and current host sources together");
 		Check(second.GetState(false)==savedApplication && std::get<double>(second.GetState().at("scale"))==1.5,"snapshot never overwrites current CVar sources");
+		ActionInvocation restoredAction;
+		Check(snapshotActions.Model().ResolveAction("menu.controls",second.GetState(),restoredAction,error) &&
+			std::get<double>(restoredAction.arguments.at("progress"))==37 && std::get<double>(restoredAction.arguments.at("scale"))==1.5,
+			"action parameters resolve saved application data with current authoritative host sources after restore");
+		Check(second.TakeActions().empty(),"descriptor resolution and snapshot restore cannot replay an application activation");
 		Check(second.FocusedControl()=="reference-controls" && second.GetControlState("reference-controls")==ControlState::Focus,"restored press is cancelled into persistent focus before layout");
 		second.MenuAction(MenuInput::Accept,false,10);
 		Check(second.TakeActions().empty(),"orphan release cannot activate restored instance");

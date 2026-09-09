@@ -36,6 +36,17 @@ struct Expression {
 	unsigned decimals = 0;
 	std::vector<Expression> args;
 };
+// Application operations are typed data. The engine validates the supported
+// operation/argument contract before loading a production document and before
+// dispatch; the shared model neither interprets commands nor writes CVars.
+struct Action {
+	std::string operation;
+	std::map<std::string, Expression> arguments;
+};
+struct ActionInvocation {
+	std::string action, operation;
+	StateValues arguments;
+};
 struct Binding {
 	std::string id, node, property;
 	Value prototype;
@@ -87,7 +98,12 @@ struct DocumentModel {
 	std::vector<Timeline> timelines;
 	std::map<std::string, StateDeclaration> state;
 	std::vector<Binding> bindings;
+	std::map<std::string, Action> actions;
 	const Node* FindNode(const std::string& id) const;
+	// Resolve a compiled descriptor against one supplied state snapshot.
+	// No side effects; failure preserves the caller's invocation unchanged.
+	bool ResolveAction(const std::string& id, const StateValues& variables,
+		ActionInvocation& invocation, std::string& error) const;
 };
 struct Diagnostic {
 	std::string pointer, message;

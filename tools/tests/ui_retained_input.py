@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Execute production retained key routing and usercmd release gates in memory.
 
-SDL queue/window services are counted stubs. No device is polled, no OS event is
-injected, and no game window is controlled by this test.
+SDL queue/window services and shared-view readiness are counted stubs. The
+resource coordinator has separate lifecycle coverage. No device is polled, no
+OS event is injected, and no game window is controlled by this test.
 """
 from pathlib import Path
 import re
@@ -91,7 +92,7 @@ struct FakeRuntime {
 };
 std::unique_ptr<FakeRuntime> runtime;
 openq4::ui::Input input;
-bool inputFocused=true,inputSuspended=false,analogNeedsNeutral=true;
+bool inputFocused=true,inputSuspended=false,inputResourceSuspended=false,analogNeedsNeutral=true;
 int analogDirection=-1;
 unsigned inputGeneration=1,closes=0;
 double now=0;
@@ -101,6 +102,19 @@ struct { int uiViewportWidth=1280,uiViewportHeight=720; } engineWindowState;
 struct Common { void Warning(const char*) { assert(false); } } commonObject;
 Common* common=&commonObject;
 void Close() { ++closes;retainedOpen=false; }
+// Only model the coordinator's readiness and ownership-change boundary here;
+// ui_retained_resource_lifecycle.py executes its production lifecycle code.
+void CancelInput(bool forgetSources, bool cancelDocument);
+bool mockReady=true, mockRefreshGeneration=false;
+unsigned readyChecks=0;
+bool PreviewReady() {
+    ++readyChecks;
+    if(mockRefreshGeneration) {
+        mockRefreshGeneration=false;
+        CancelInput(false,false);inputKeys.clear();++inputGeneration;
+    }
+    return mockReady && runtime!=nullptr;
+}
 '''
 
 MAIN = r'''
@@ -188,7 +202,15 @@ int main() {
     // sink's real layout, hit testing, feedback and action behavior.
     physicalAxes[AXIS_YAW]=0; idKeyInput::ClearStates(); queued.clear(); inputKeys.clear();
     runtime=std::make_unique<FakeRuntime>(); retainedOpen=true;
-    physicalAxes[AXIS_YAW]=90;RetainedUI_FrameInput();assert(runtime->received.empty());
+    mockReady=false;RetainedUI_FrameInput();
+    assert(readyChecks==1 && analogNeedsNeutral && inputResourceSuspended && runtime->cancels==1);
+    for(const auto& event:runtime->received) assert(!event.down);
+    runtime->received.clear();RetainedUI_FrameInput();
+    assert(runtime->cancels==1 && runtime->received.empty());
+    const int initialCancels=runtime->cancels;
+    mockReady=true;
+    physicalAxes[AXIS_YAW]=90;RetainedUI_FrameInput();
+    assert(runtime->received.empty() && !inputResourceSuspended && runtime->cancels==initialCancels);
     physicalAxes[AXIS_YAW]=0;RetainedUI_FrameInput();assert(!analogNeedsNeutral);
     physicalAxes[AXIS_YAW]=60;RetainedUI_FrameInput();
     assert(runtime->received.size()==1 && runtime->received.back().menu==MenuInput::Right && runtime->received.back().down);
@@ -209,6 +231,22 @@ int main() {
     payload.source=1101;payload.key=K_KP_ENTER;send(payload);assert(runtime->received.size()==2 && !runtime->received.back().down);
     payload.kind=retainedUIInput_t::POINTER;payload.x=83.125f;payload.y=57.375f;send(payload);
     assert(runtime->x==83.125f && runtime->y==57.375f);
+    // Readiness can refresh ownership during dispatch. The old-generation
+    // event must be checked after that refresh, before it reaches the runtime.
+    runtime->received.clear();
+    payload.kind=retainedUIInput_t::KEY;payload.source=1100;payload.key=K_ENTER;payload.down=1;
+    const unsigned queuedGeneration=inputGeneration, checksBeforeRefresh=readyChecks;
+    mockRefreshGeneration=true;send(payload,queuedGeneration);
+    assert(inputGeneration==queuedGeneration+1 && readyChecks==checksBeforeRefresh+1);
+    assert(runtime->received.empty() && idKeyInput::IsDown(K_ENTER));
+    send(payload);assert(runtime->received.size()==1 && runtime->received.back().down);
+    // If the refresh instead meets an already queued release, quarantine is
+    // retired immediately, and the next fresh full press routes exactly once.
+    const unsigned heldGeneration=inputGeneration;
+    runtime->received.clear();payload.down=0;mockRefreshGeneration=true;send(payload,heldGeneration);
+    assert(inputGeneration==heldGeneration+1 && runtime->received.empty() && !idKeyInput::IsDown(K_ENTER));
+    payload.down=1;send(payload);assert(runtime->received.size()==1 && runtime->received.back().down);
+    payload.down=0;send(payload);assert(runtime->received.size()==2 && !runtime->received.back().down);
     // Execute actual SDL device-release ordering through the actual decoder.
     // Cancellation disarms first; artificial ups only remove quarantined holds.
     runtime->received.clear();queued.clear();
@@ -216,7 +254,7 @@ int main() {
     assert(runtime->received.size()==1 && runtime->received.back().down);
     s_gamepadButtonsDown[0]=true;queued.clear();SDL3_ReleaseGamepadState(13);
     assert(queued.size()==2 && queued[0].kind==retainedUIInput_t::CANCEL);
-    send(queued[0]);assert(runtime->cancels==1 && analogNeedsNeutral);
+    send(queued[0]);assert(runtime->cancels==initialCancels+1 && analogNeedsNeutral);
     runtime->received.clear();send(queued[1]);assert(runtime->received.empty());
     queued.clear();SDL3_PostControllerKeyEvent(K_JOY3,true,14);send(queued.back());
     assert(runtime->received.size()==1 && runtime->received.back().down);
@@ -234,7 +272,7 @@ int main() {
     physicalAxes[AXIS_YAW]=0;RetainedUI_FrameInput();runtime->received.clear();
     payload.kind=retainedUIInput_t::KEY;payload.source=1100;payload.key=K_ENTER;payload.down=1;send(payload);
     payload.kind=retainedUIInput_t::FOCUS;payload.down=0;send(payload);
-    assert(inputSuspended && runtime->cancels==3 && !idKeyInput::IsDown(K_ENTER));
+    assert(inputSuspended && runtime->cancels==initialCancels+3 && !idKeyInput::IsDown(K_ENTER));
     payload.down=1;send(payload);assert(!inputSuspended);
     runtime->received.clear();payload.kind=retainedUIInput_t::KEY;payload.source=1100;payload.key=K_ENTER;payload.repeated=1;send(payload);
     assert(runtime->received.empty());
@@ -255,6 +293,52 @@ int main() {
     payload.down=0;send(payload,inputGeneration-1);assert(runtime->received.empty());
     payload.down=1;send(payload);assert(runtime->received.size()==1 && runtime->received.back().down);
     payload.down=0;send(payload);assert(runtime->received.size()==2 && !runtime->received.back().down);
+    // A resource wait quarantines every held source once, blocks direct
+    // actions and pointer motion, and consumes releases without activation.
+    runtime->received.clear();
+    payload.kind=retainedUIInput_t::KEY;payload.source=1200;payload.key=K_ENTER;payload.down=1;send(payload);
+    payload.kind=retainedUIInput_t::POINTER_BUTTON;send(payload);
+    assert(runtime->received.size()==2);
+    runtime->received.clear();
+    const int beforeResourceWait=runtime->cancels;
+    const float savedX=runtime->x,savedY=runtime->y;
+    // The very first unavailable event may already be the held key's release.
+    mockReady=false;payload.kind=retainedUIInput_t::KEY;payload.down=0;send(payload);
+    assert(inputResourceSuspended && runtime->cancels==beforeResourceWait+1);
+    for(const auto& event:runtime->received) assert(!event.down);
+    assert(!idKeyInput::IsDown(K_ENTER));
+    assert(runtime->x==savedX && runtime->y==savedY && runtime->actions.empty());
+    runtime->received.clear();
+    payload.kind=retainedUIInput_t::POINTER;payload.x=901;payload.y=502;send(payload);
+    payload.kind=retainedUIInput_t::KEY;payload.key=K_ESCAPE;payload.source=1201;payload.down=1;send(payload);
+    assert(idKeyInput::IsDown(K_ESCAPE) && closes==0 && runtime->received.empty());
+    payload.down=0;send(payload);assert(!idKeyInput::IsDown(K_ESCAPE));
+    payload.source=1200;payload.key=K_ENTER;send(payload);
+    assert(!idKeyInput::IsDown(K_ENTER) && runtime->received.empty());
+    payload.kind=retainedUIInput_t::POINTER_BUTTON;send(payload,inputGeneration-1);
+    payload.kind=retainedUIInput_t::POINTER_LEAVE;send(payload);
+    RetainedUI_FrameInput();RetainedUI_FrameInput();
+    assert(runtime->cancels==beforeResourceWait+1 && runtime->received.empty());
+    assert(runtime->x==savedX && runtime->y==savedY && runtime->actions.empty());
+    mockReady=true;
+    payload.kind=retainedUIInput_t::KEY;payload.down=1;send(payload);send(payload);
+    assert(runtime->received.size()==1 && runtime->received.back().down);
+    payload.kind=retainedUIInput_t::POINTER_BUTTON;send(payload);send(payload);
+    assert(runtime->received.size()==2 && runtime->received.back().down);
+    payload.down=0;send(payload);
+    payload.kind=retainedUIInput_t::KEY;send(payload);
+    assert(runtime->received.size()==4 && !runtime->received[2].down && !runtime->received[3].down);
+    // A hold which outlives the wait remains quarantined on recovery. Neither
+    // an unflagged duplicate nor an OS repeat may rearm it before its release.
+    runtime->received.clear();payload.down=1;send(payload);
+    mockReady=false;RetainedUI_FrameInput();runtime->received.clear();
+    const int beforeResourceRecovery=runtime->cancels;
+    mockReady=true;RetainedUI_FrameInput();send(payload);
+    payload.repeated=1;send(payload);
+    assert(runtime->cancels==beforeResourceRecovery && runtime->received.empty());
+    payload.repeated=0;payload.down=0;send(payload);assert(runtime->received.empty());
+    payload.down=1;send(payload);payload.down=0;send(payload);
+    assert(runtime->received.size()==2 && runtime->received[0].down && !runtime->received[1].down);
     runtime->received.clear();payload.kind=retainedUIInput_t::KEY;payload.down=1;
     send(payload,-1,0);assert(runtime->received.empty());
     payload.kind=static_cast<retainedUIInput_t::kind_t>(99);send(payload);assert(runtime->received.empty());
@@ -262,7 +346,7 @@ int main() {
     assert(closes==1 && !retainedOpen);
     runtime->received.clear();payload.key=K_ENTER;payload.source=1100;payload.down=0;send(payload);
     assert(runtime->received.empty() && !idKeyInput::IsDown(K_ENTER));
-    std::puts("retained input: production source mapping, transport generations/focus/disconnect/close, stick recovery, console routing, absolute coordinates and gameplay release gates passed");
+    std::puts("retained input: production source mapping, readiness/transport generations/focus/disconnect/close, stick recovery, console routing, absolute coordinates and gameplay release gates passed");
 }
 '''
 
@@ -279,6 +363,7 @@ def main():
     functions='\n'.join(function_body(source,signature) for source,signature in [
         (ui,'bool MapMenuKey('),
         (ui,'void ApplyInput('), (ui,'void CancelInput('), (ui,'void SuspendInput('),
+        (ui,'void ReleaseQuarantinedInput('), (ui,'bool PreviewInputReady('),
         (ui,'void RetainedUI_FrameInput('), (ui,'bool RetainedUI_ProcessEvent('),
         (sdl,'static bool SDL3_QueueRetainedKey('),
         (sdl,'static void SDL3_QueueRetainedPointer('),

@@ -12,8 +12,11 @@ The baseline is engine `a9919d1be2dd9ce43e19ec16bb0392e947ce8576` and companion
 [manager/snapshot foundation](instance-persistence.md) as partial
 evidence with native and SP/OpenGL/MP/Vulkan validation. It does not treat that work as a
 finished adapter, complete widget persistence or game-save compatibility.
+The subsequent [application integration checkpoint](managed-application.md)
+adds normal retained loading, two typed settings operations and coordinated
+engine views. These remain partial evidence for the full application contract.
 
-There are **53 partial, 173 pending and one verified requirement**. The verified
+There are **58 partial, 168 pending and one verified requirement**. The verified
 requirement, `INV-001`, covers the fresh effective-source inventory only. All
 seven final product gates and all **271 migration entries remain unaccepted**.
 These counts describe evidence state, not percentage of implementation effort

@@ -8,7 +8,17 @@
 namespace openq4::ui {
 namespace {
 StateValue EvaluateExpression(const Expression& e, const StateValues& variables) {
-	if (e.op.empty()) return e.state.empty() ? e.literal : variables.at(e.state);
+	if (e.op.empty()) {
+		const StateValue* value = &e.literal;
+		if (!e.state.empty()) {
+			const auto found = variables.find(e.state);
+			if (found == variables.end()) throw std::runtime_error("Missing state variable '"+e.state+"'");
+			value = &found->second;
+		}
+		if (value->index() != e.type || !ValidStateValue(*value))
+			throw std::runtime_error(e.state.empty() ? "Invalid compiled expression literal" : "Invalid state type/value for '"+e.state+"'");
+		return *value;
+	}
 	auto arg = [&](size_t i) { return EvaluateExpression(e.args.at(i),variables); };
 	auto number = [&](size_t i) { return std::get<double>(arg(i)); };
 	auto boolean = [&](size_t i) { return std::get<bool>(arg(i)); };
@@ -52,6 +62,31 @@ StateValue EvaluateExpression(const Expression& e, const StateValues& variables)
 	if (!std::isfinite(value)) throw std::runtime_error("Expression produced a non-finite number");
 	return value;
 }
+}
+bool EvaluateStateExpression(const Expression& expression, const StateValues& variables, StateValue& value, std::string& error) {
+	error.clear();
+	try {
+		StateValue candidate = EvaluateExpression(expression,variables);
+		if (candidate.index() != expression.type || !ValidStateValue(candidate))
+			throw std::runtime_error("Expression result violates its compiled type or supported value range");
+		value = std::move(candidate); return true;
+	} catch (const std::exception& problem) {
+		error = problem.what(); return false;
+	}
+}
+bool DocumentModel::ResolveAction(const std::string& id, const StateValues& variables, ActionInvocation& invocation, std::string& error) const {
+	error.clear();
+	const auto found = actions.find(id);
+	if (found == actions.end()) { error = "Unknown action descriptor '"+id+"'"; return false; }
+	ActionInvocation candidate; candidate.action = id; candidate.operation = found->second.operation;
+	for (const auto& [name,expression] : found->second.arguments) {
+		StateValue value;
+		if (!EvaluateStateExpression(expression,variables,value,error)) {
+			error = "Action '"+id+"' argument '"+name+"': "+error; return false;
+		}
+		candidate.arguments.emplace(name,std::move(value));
+	}
+	invocation = std::move(candidate); return true;
 }
 bool State::Evaluate(const StateValues& candidate, PropertyValues& props, std::map<std::string,bool>& controls, std::string& error) const {
 	for (const auto& binding : bindings) {

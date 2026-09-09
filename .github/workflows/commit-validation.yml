@@ -284,6 +284,10 @@ jobs:
             tools/tests/ui_presentation_bridge.py \
             tools/tests/ui_retained_layer_pool.py \
             tools/tests/ui_manager_lifecycle.py \
+            tools/tests/ui_session_test_gui.py \
+            tools/tests/ui_retained_resource_lifecycle.py \
+            tools/tests/ui_retained_adapter.py \
+            tools/tests/ui_capture_managed.py \
             tools/tests/renderer_vid_restart_route.py \
             tools/tests/ui_legacy_inventory.py \
             tools/tests/ui_legacy_import.py \
@@ -482,6 +486,10 @@ jobs:
           python tools/tests/ui_presentation_bridge.py
           python tools/tests/ui_retained_layer_pool.py
           python tools/tests/ui_manager_lifecycle.py
+          python tools/tests/ui_session_test_gui.py
+          python tools/tests/ui_retained_resource_lifecycle.py
+          python tools/tests/ui_retained_adapter.py
+          python tools/tests/ui_capture_managed.py
           python tools/tests/renderer_vid_restart_route.py
           python tools/tests/ui_legacy_inventory.py
           python tools/tests/ui_legacy_import.py

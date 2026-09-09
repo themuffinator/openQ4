@@ -33,6 +33,10 @@ If you have questions concerning this license or the applicable additional terms
 #include "DeviceContext.h"
 #include "Window.h"
 #include "UserInterfaceLocal.h"
+#include "UserInterfaceDeferred.h"
+#ifndef ID_DEDICATED
+#include "UserInterfaceRetained.h"
+#endif
 #include "ChatWindow.h"
 #include "EditWindow.h"
 #include "SimpleWindow.h"
@@ -47,24 +51,65 @@ idCVar ui_aspectCorrection( "ui_aspectCorrection", "1", CVAR_GUI | CVAR_ARCHIVE 
 idUserInterfaceManagerLocal	uiManagerLocal;
 idUserInterfaceManager *	uiManager = &uiManagerLocal;
 
-idUserInterfaceManaged::idUserInterfaceManaged() : refs( 1 ) {
-	uiManagerLocal.RegisterAllocation( this );
+idUserInterfaceManaged::idUserInterfaceManaged( bool managed ) : refs( 1 ), allocationId( 0 ), managed( managed ) {
+	if ( managed ) {
+		uiManagerLocal.RegisterAllocation( this );
+	}
 }
 
 idUserInterfaceManaged::~idUserInterfaceManaged() {
-	uiManagerLocal.UnregisterGui( this );
+	if ( managed ) {
+		uiManagerLocal.UnregisterGui( this );
+	}
 }
 
 void idUserInterfaceManaged::RegisterLoaded() {
-	uiManagerLocal.RegisterGui( this );
+	if ( managed ) {
+		uiManagerLocal.RegisterGui( this );
+	}
 }
 
 void idUserInterfaceManaged::RegisterDemo() {
-	uiManagerLocal.RegisterDemoGui( this );
+	if ( managed ) {
+		uiManagerLocal.RegisterDemoGui( this );
+	}
 }
 
 void idUserInterfaceManaged::RefreshThinking() {
-	uiManagerLocal.UpdateAlwaysThinkGui( this );
+	if ( managed ) {
+		uiManagerLocal.UpdateAlwaysThinkGui( this );
+	}
+}
+
+bool UI_IsRetainedPath( const char *qpath ) {
+	if ( qpath == NULL ) { return false; }
+	const int length = idStr::Length( qpath );
+	return length >= 5 && idStr::Icmp( qpath + length - 5, ".q4ui" ) == 0;
+}
+
+idUserInterfaceManaged *UI_CreateForPath( const char *qpath, bool managed ) {
+	if ( UI_IsRetainedPath( qpath ) ) {
+#ifndef ID_DEDICATED
+		return new idUserInterfaceRetained( managed );
+#else
+		return NULL;
+#endif
+	}
+	return new idUserInterfaceLocal( managed );
+}
+
+bool UI_DispatchApplicationActions( idUserInterface *gui, const char *command, bool &closeRequested ) {
+	return uiManagerLocal.DispatchApplicationActions( gui, command, closeRequested );
+}
+
+bool idUserInterfaceManagerLocal::DispatchApplicationActions( idUserInterface *gui, const char *command, bool &closeRequested ) {
+	closeRequested = false;
+	for ( int i = 0; i < allocations.Num(); ++i ) {
+		if ( allocations[i] == gui ) {
+			return allocations[i]->DispatchApplicationActions( command, closeRequested );
+		}
+	}
+	return false;
 }
 
 namespace {
@@ -312,7 +357,7 @@ bool idUserInterfaceManagerLocal::CheckGui( const char *qpath ) const {
 }
 
 idUserInterface *idUserInterfaceManagerLocal::Alloc( void ) const {
-	return new idUserInterfaceLocal();
+	return new idUserInterfaceDeferred();
 }
 
 void idUserInterfaceManagerLocal::DeAlloc( idUserInterface *gui ) {
@@ -345,8 +390,10 @@ idUserInterface *idUserInterfaceManagerLocal::FindGui( const char *qpath, bool a
 	}
 
 	if ( autoLoad ) {
-		idUserInterface *gui = Alloc();
-		if ( gui->InitFromFile( qpath ) ) {
+		// Editors use concrete legacy access for .guied documents. Only pathless
+		// Alloc needs a deferred identity; named loads select their backend now.
+		idUserInterface *gui = UI_CreateForPath( qpath );
+		if ( gui != NULL && gui->InitFromFile( qpath ) ) {
 			gui->SetUniqued( forceNOTUnique ? false : needUnique );
 			return gui;
 		} else {
@@ -450,7 +497,7 @@ void idUserInterfaceManagerLocal::RunAlwaysThinkGUIs( int time ) {
 ===============================================================================
 */
 
-idUserInterfaceLocal::idUserInterfaceLocal() {
+idUserInterfaceLocal::idUserInterfaceLocal( bool managed ) : idUserInterfaceManaged( managed ) {
 	chatWindow = NULL;
 	cursorX = cursorY = 0.0;
 	desktop = NULL;

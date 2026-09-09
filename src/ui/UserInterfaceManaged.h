@@ -10,16 +10,24 @@
 class idUserInterfaceManaged : public idUserInterface {
 	friend class idUserInterfaceManagerLocal;
 public:
-	idUserInterfaceManaged();
+	explicit idUserInterfaceManaged( bool managed = true );
 	virtual ~idUserInterfaceManaged();
 
 	virtual const char *GetSourceFile() const = 0;
 	virtual ID_TIME_T GetTimeStamp() const = 0;
+	virtual bool Active() const = 0;
+	// Legacy interactivity is re-derived by InitFromFile/StateChanged, and its
+	// save payload has no persistent override provenance. Retained overrides
+	// report that policy separately from their current effective value.
+	virtual bool HasInteractiveOverride() const { return false; }
 	virtual bool IsMenuGui() const = 0;
 	virtual bool AlwaysThink() const = 0;
 	virtual void RunTimeEvents( int time ) = 0;
 	virtual size_t Size() = 0;
 	virtual int NumTransitions() = 0;
+	// False leaves legacy command dispatch in charge. Retained events carry
+	// typed invocations inside the engine instead of console command strings.
+	virtual bool DispatchApplicationActions( const char *command, bool &closeRequested ) { return false; }
 
 	void ClearRefs() { refs = 0; }
 	void AddRef() { refs++; }
@@ -37,4 +45,11 @@ private:
 	idUserInterfaceManaged &operator=( const idUserInterfaceManaged & ) = delete;
 	int refs;
 	unsigned long long allocationId;
+	bool managed;
 };
+
+// Explicit retained documents use the retained backend; stock GUI/editor
+// sources stay legacy. Unmanaged results belong to a deferred wrapper only.
+idUserInterfaceManaged *UI_CreateForPath( const char *qpath, bool managed = true );
+bool UI_IsRetainedPath( const char *qpath );
+bool UI_DispatchApplicationActions( idUserInterface *gui, const char *command, bool &closeRequested );

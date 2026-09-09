@@ -5730,6 +5730,7 @@ void idCommonLocal::PrintLoadingMessage( const char *msg ) {
 		idVec4( 0.94f, 0.62f, 0.05f, 1.0f ), true, declManager->FindMaterial( "fonts/english/bigchars", false ) );
 	renderSystem->SetColor( idVec4( 1.0f, 1.0f, 1.0f, 1.0f ) );
 	renderSystem->EndFrame( NULL, NULL );
+	RetainedUI_FrameSubmitted();
 }
 
 /*

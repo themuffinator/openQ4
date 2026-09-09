@@ -1,5 +1,34 @@
 // Copyright (C) 2026 DarkMatter Productions. GPL-3.0-or-later.
 #pragma once
+#include <string>
+#include <vector>
+
+namespace openq4::ui { class Runtime; struct Viewport; struct Diagnostic; }
+struct retainedUIView_t;
+enum class retainedUIViewEvent_t { BeforeResourceReset, Restored, Failed };
+using retainedUIViewCallback_t = void (*)(void*, retainedUIViewEvent_t);
+
+// Engine-thread registration for independent retained documents. Each view owns
+// a stable Runtime object sharing the engine's font/material/composition host.
+// Callbacks may quarantine owner input/commands; they must not create/destroy
+// views, render, or reenter this service. Destroy a view before its owner dies.
+retainedUIView_t* RetainedUI_CreateView(retainedUIViewCallback_t callback = nullptr, void* owner = nullptr);
+void RetainedUI_DestroyView(retainedUIView_t* view);
+openq4::ui::Runtime* RetainedUI_ViewRuntime(retainedUIView_t* view);
+bool RetainedUI_LoadView(retainedUIView_t* view, const std::string& source, const std::string& path,
+	std::vector<openq4::ui::Diagnostic>& diagnostics);
+// Prepare before calling Runtime operations. Resource changes rebuild all live
+// views together. A failed view remains registered/address-stable but unloaded.
+bool RetainedUI_PrepareView(retainedUIView_t* view);
+// Root/UI-viewport output only. This does not render world surfaces or permit
+// callers to reuse layer zero as an arbitrary render texture.
+bool RetainedUI_DrawViewRoot(retainedUIView_t* view, const openq4::ui::Viewport& viewport);
+bool RetainedUI_DefaultViewport(openq4::ui::Viewport& viewport);
+double RetainedUI_PresentationTime();
+// Call immediately after renderSystem->EndFrame has consumed its front-end
+// command chain. Allows a deferred resource rebuild before the next draw; this
+// is not a GPU fence and does not replace renderer-owned resource retirement.
+void RetainedUI_FrameSubmitted();
 
 struct sysEvent_s;
 struct retainedUIInput_t {
