@@ -6,6 +6,11 @@ allocation and session dispatch. It is part of M1 in the
 any of the 271 shipped GUI resources or complete the production settings page.
 The [full requirement register](product-requirements.md) remains authoritative.
 
+The method coverage and validation below describe commit `e075e4a2`. The
+subsequent [presentation alias checkpoint](presentation-aliases.md) implements
+writable exports and snapshot version 2, and addresses the Vulkan brightness
+limitation identified by this earlier build.
+
 ## Loading and ownership
 
 `FindGui` selects the retained implementation only for a complete,
@@ -80,11 +85,12 @@ not require video restart. They are not a substitute for its 28 choices, three
 sliders, six numeric edits, display catalogs, Auto Detect, apply/revert and
 failure-recovery flows.
 
-Brightness dispatch/readback works on both renderers, but Vulkan still lacks
-the existing planned [H3 final brightness/gamma pass](../plans/2026-07-22-vulkan-phase-h.md).
-Its visual effect is therefore qualified only on OpenGL. Completing the Vulkan
-pass, including screenshot readback, is required before accepting display
-settings for the full product.
+At this checkpoint's `e075e4a2` revision, brightness dispatch/readback worked on
+both renderers, but Vulkan lacked the planned
+[H3 final brightness/gamma pass](../plans/2026-07-22-vulkan-phase-h.md).
+Its visual effect was therefore qualified only on OpenGL. The subsequent
+[presentation alias checkpoint](presentation-aliases.md) implements that pass
+and records SDR screenshot parity; full display-settings acceptance remains open.
 
 The public command string carries only a fixed queue marker. The manager checks
 the public interface's allocation identity, then delegates to its private backend.

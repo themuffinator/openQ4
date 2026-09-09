@@ -300,8 +300,12 @@ now records this scope, refreshed inventory evidence and milestone ownership.
 
 Progress: the [ownership and persistence checkpoint](../ui/instance-persistence.md)
 adds private manager-neutral lifecycle operations and canonical instance
-snapshots. The normal retained adapter, application dispatcher, world surface
-contract and game-save/demo framing remain incomplete; M1 is still open.
+snapshots. [Normal application integration](../ui/managed-application.md) adds
+explicit retained loading and typed session operations;
+[presentation aliases](../ui/presentation-aliases.md) add writable metadata and
+visual properties with persistent expression ownership. Complete event/action
+lowering, the world surface contract and game-save/demo framing remain incomplete;
+M1 is still open.
 
 Resolve UI-01/UI-02 and the ownership/snapshot portion of UI-04/UI-12. Add the
 retained adapter, manager-neutral lifecycle, source routing, typed dispatcher,

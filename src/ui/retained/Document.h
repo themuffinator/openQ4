@@ -36,6 +36,26 @@ struct Expression {
 	unsigned decimals = 0;
 	std::vector<Expression> args;
 };
+// Typed public presentation values are independent of CSS and application
+// State(). Boolean values occupy data[0] as 0/1; unused components stay zero.
+enum class PresentationType { Number, Boolean, String, Vector2, Vector3, Vector4 };
+struct PresentationValue {
+	PresentationType type = PresentationType::Number;
+	std::array<double,4> data{};
+	std::string text;
+};
+struct PresentationVariable {
+	PresentationValue initial;
+	std::vector<Expression> expressions;
+};
+struct PresentationAlias {
+	std::string node, property, variable, shown;
+};
+bool ValidPresentationValue(const PresentationValue& value);
+std::string PresentationAliasKey(const std::string& name);
+bool ParsePresentationValue(PresentationType type, const std::string& text,
+	PresentationValue& value, std::string& error);
+std::string FormatPresentationValue(const PresentationValue& value);
 // Application operations are typed data. The engine validates the supported
 // operation/argument contract before loading a production document and before
 // dispatch; the shared model neither interprets commands nor writes CVars.
@@ -99,6 +119,9 @@ struct DocumentModel {
 	std::map<std::string, StateDeclaration> state;
 	std::vector<Binding> bindings;
 	std::map<std::string, Action> actions;
+	std::map<std::string, PresentationVariable> presentationVariables;
+	// Alias keys are ASCII case-folded public names; targets retain exact IDs.
+	std::map<std::string, PresentationAlias> aliases;
 	const Node* FindNode(const std::string& id) const;
 	// Resolve a compiled descriptor against one supplied state snapshot.
 	// No side effects; failure preserves the caller's invocation unchanged.

@@ -25,6 +25,7 @@ bool ValidProperty(const std::string& name, const Value& value) {
 		static const std::set<std::string> colours = {"color","background-color","border-color","border-left-color","border-right-color","border-top-color","border-bottom-color"};
 		static const std::map<std::string,std::set<std::string>> keywords = {
 			{"position",{"absolute","relative"}}, {"display",{"block","inline","inline-block","flex","none"}},
+			{"pointer-events",{"auto","none"}},
 			{"overflow",{"visible","hidden","auto","scroll"}}, {"text-align",{"left","center","right"}},
 			{"white-space",{"normal","pre","nowrap","pre-wrap","pre-line"}},
 			{"flex-direction",{"row","row-reverse","column","column-reverse"}},
@@ -199,7 +200,7 @@ public:
 	Validator(const std::string& text, std::vector<Diagnostic>& errors) : source(text), diagnostics(errors) {}
 	DocumentModel Read(const Json::Value& root) {
 		FiniteTree(root,"");
-		Fields(root,"",{"format","version","id","tokens","root","timelines","state","bindings","actions","editor","extensions"});
+		Fields(root,"",{"format","version","id","tokens","root","timelines","state","bindings","actions","presentationVariables","aliases","editor","extensions"});
 		Require(root["format"] == "openq4-ui",root,"/format","Expected format 'openq4-ui'");
 		Require(root["version"].isUInt() && root["version"].asUInt() == 1,root["version"],"/version","Unsupported document version; expected 1");
 		model.id = Id(root["id"],"/id");
@@ -213,6 +214,7 @@ public:
 		}
 		ReadState(root);
 		ReadActions(root);
+		ReadPresentationVariables(root);
 		model.root = ReadNode(root["root"],"/root",0);
 		if (root.isMember("timelines")) {
 			Require(root["timelines"].isArray(),root["timelines"],"/timelines","Expected a timeline array");
@@ -225,6 +227,7 @@ public:
 		}
 		ValidateControls(root["root"],model.root,"/root",false);
 		ReadBindings(root);
+		ReadAliases(root);
 		State initial; std::string stateError;
 		Require(initial.Reset(model,stateError),root["bindings"],"/bindings",stateError);
 		return std::move(model);
@@ -292,6 +295,110 @@ private:
 			return result;
 		}
 		Require(ValidStateValue(result.literal),value,path,"Invalid expression literal"); result.type = result.literal.index(); return result;
+	}
+	void ReadPresentationVariables(const Json::Value& root) {
+		if (!root.isMember("presentationVariables")) return;
+		const auto& values = root["presentationVariables"];
+		Require(values.isObject() && values.size() <= 4096,values,"/presentationVariables","Expected at most 4096 presentation variables");
+		StateValues initialState;
+		for (const auto& [id,state] : model.state) initialState.emplace(id,state.initial);
+		for (const auto& id : values.getMemberNames()) {
+			const auto path = "/presentationVariables/"+PointerPart(id); const auto& value = values[id];
+			Require(Identifier(id),value,path,"Invalid presentation variable ID");
+			Fields(value,path,{"type","initial","value","extensions"});
+			Require(value["type"].isString(),value["type"],path+"/type","Expected a presentation variable type");
+			static const std::map<std::string,PresentationType> types = {
+				{"number",PresentationType::Number},{"boolean",PresentationType::Boolean},{"string",PresentationType::String},
+				{"vector2",PresentationType::Vector2},{"vector3",PresentationType::Vector3},{"vector4",PresentationType::Vector4}};
+			const auto type = types.find(value["type"].asString());
+			Require(type != types.end(),value["type"],path+"/type","Unknown presentation variable type");
+			PresentationVariable variable; variable.initial.type = type->second;
+			const bool vector = type->second >= PresentationType::Vector2;
+			const size_t count = vector ? static_cast<size_t>(type->second)-static_cast<size_t>(PresentationType::Vector2)+2 : 1;
+			const auto& initial = value["initial"];
+			if (vector) Require(initial.isArray() && initial.size() == count,initial,path+"/initial","Presentation vector initial value has the wrong component count");
+			if (type->second == PresentationType::String) {
+				Require(initial.isString(),initial,path+"/initial","Expected a presentation string"); variable.initial.text = initial.asString();
+			} else if (type->second == PresentationType::Boolean) {
+				Require(initial.isBool(),initial,path+"/initial","Expected a presentation boolean"); variable.initial.data[0] = initial.asBool() ? 1 : 0;
+			} else for (size_t i = 0; i < count; ++i) {
+				variable.initial.data[i] = Numeric(vector ? initial[static_cast<Json::ArrayIndex>(i)] : initial,
+					path+"/initial"+(vector ? "/"+std::to_string(i) : ""),-1000000000000.0,1000000000000.0);
+			}
+			Require(ValidPresentationValue(variable.initial),initial,path+"/initial","Invalid presentation initial value");
+			if (value.isMember("value")) {
+				const auto& expressions = value["value"];
+				Require(!vector || (expressions.isArray() && expressions.size() == count),expressions,path+"/value","Presentation vector expression has the wrong component count");
+				const size_t expected = type->second == PresentationType::Boolean ? 1 : type->second == PresentationType::String ? 2 : 0;
+				PresentationValue evaluated; evaluated.type = type->second;
+				for (size_t i = 0; i < count; ++i) {
+					const auto at = path+"/value"+(vector ? "/"+std::to_string(i) : "");
+					const auto& sourceValue = vector ? expressions[static_cast<Json::ArrayIndex>(i)] : expressions;
+					auto expression = ReadExpression(sourceValue,at);
+					Require(expression.type == expected,sourceValue,at,"Expression type does not match its presentation variable");
+					StateValue result; std::string error;
+					Require(EvaluateStateExpression(expression,initialState,result,error),sourceValue,at,error);
+					if (expected == 2) evaluated.text = std::get<std::string>(result);
+					else if (expected == 1) evaluated.data[0] = std::get<bool>(result) ? 1 : 0;
+					else evaluated.data[i] = std::get<double>(result);
+					variable.expressions.push_back(std::move(expression));
+				}
+				Require(ValidPresentationValue(evaluated),expressions,path+"/value","Invalid initial presentation expression result");
+			}
+			model.presentationVariables.emplace(id,std::move(variable));
+		}
+	}
+	void ReadAliases(const Json::Value& root) {
+		if (!root.isMember("aliases")) return;
+		const auto& aliases = root["aliases"];
+		Require(aliases.isObject() && aliases.size() <= 8192,aliases,"/aliases","Expected at most 8192 presentation aliases");
+		for (const auto& name : aliases.getMemberNames()) {
+			const auto path = "/aliases/"+PointerPart(name); const auto& value = aliases[name];
+			const auto separator = name.find("::");
+			const bool qualified = separator != std::string::npos;
+			Require(qualified ? Identifier(name.substr(0,separator)) && Identifier(name.substr(separator+2)) : Identifier(name),
+				value,path,"Alias names require one stable ID or two IDs separated by ::");
+			const auto key = PresentationAliasKey(name);
+			Require(!key.empty() && !key.starts_with("gui::"),value,path,"The gui:: application-state namespace is not a presentation alias");
+			Require(!model.aliases.contains(key),value,path,"Presentation aliases collide after case folding");
+			Fields(value,path,{"node","property","variable","shown","extensions"});
+			PresentationAlias alias;
+			if (value.isMember("variable")) {
+				Require(!value.isMember("node") && !value.isMember("property") && !value.isMember("shown"),value,path,"A variable alias cannot also target rendered properties");
+				alias.variable = Id(value["variable"],path+"/variable");
+				Require(model.presentationVariables.contains(alias.variable),value["variable"],path+"/variable","Unknown presentation variable target");
+			} else {
+				alias.node = Id(value["node"],path+"/node"); alias.property = Id(value["property"],path+"/property");
+				const auto* node = model.FindNode(alias.node);
+				Require(node != nullptr,value["node"],path+"/node","Unknown presentation node target");
+				Require(alias.property == "visible" || !value.isMember("shown"),value,path,"Only visible aliases declare a shown display value");
+				if (alias.property == "rect") {
+					for (const auto* property : {"left","top","width","height"}) {
+						const auto found = node->properties.find(property);
+						Require(found != node->properties.end() && found->second.type == ValueType::Length && found->second.unit == "dp",
+							value,path,"Rectangle aliases require explicit left/top/width/height lengths in dp");
+					}
+				} else if (alias.property == "visible" || alias.property == "noevents") {
+					const std::string property = alias.property == "visible" ? "display" : "pointer-events";
+					const auto found = node->properties.find(property);
+					Require(found != node->properties.end() && found->second.type == ValueType::Keyword,value,path,"Semantic aliases require an explicit canonical keyword base");
+					if (alias.property == "visible") {
+						Require(value["shown"].isString(),value["shown"],path+"/shown","Visible aliases require a shown display keyword");
+						alias.shown = value["shown"].asString(); Value shown; shown.type = ValueType::Keyword; shown.text = alias.shown;
+						Require(alias.shown != "none" && ValidProperty("display",shown),value["shown"],path+"/shown","Invalid shown display keyword");
+					}
+				} else {
+					const auto found = node->properties.find(alias.property);
+					Require(found != node->properties.end(),value["property"],path+"/property","Presentation aliases require an explicit canonical property base");
+					const auto& base = found->second;
+					const bool supported = base.type == ValueType::Number || base.type == ValueType::Length || base.type == ValueType::Colour ||
+						base.type == ValueType::Text || base.type == ValueType::Keyword || base.type == ValueType::Font;
+					Require(supported && (base.type != ValueType::Length || base.unit == "dp" || base.unit == "px"),
+						value,path,"Presentation property type or unit is unsupported");
+				}
+			}
+			model.aliases.emplace(key,std::move(alias));
+		}
 	}
 	void ReadActions(const Json::Value& root) {
 		if (!root.isMember("actions")) return;

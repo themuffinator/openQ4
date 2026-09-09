@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Exercise production retained GUI adapter state, save frames, actions and input.
+"""Exercise production retained GUI adapter state, aliases, save frames and input.
 
 The adapter/public headers and Input.cpp are real. Engine I/O, canonical
 document loading and runtime rendering are bounded stand-ins; this does not
-qualify parsing, GPU output or the complete application action vocabulary.
+qualify alias expression ownership, parsing, GPU output or the complete
+application action vocabulary.
 """
 from pathlib import Path
 import shutil
@@ -141,6 +142,13 @@ public:
     int cancels=0,releases=0,frames=0,modals=0;
     float pointerX=0,pointerY=0;
     StateValues state;
+    struct AliasWrite { std::string name,value; bool overrideExpression; };
+    std::map<std::string,std::string> aliases;
+    std::map<std::pair<std::string,std::string>,Value> properties;
+    mutable std::vector<std::string> aliasReads;
+    mutable std::vector<std::pair<std::string,std::string>> propertyReads;
+    std::vector<AliasWrite> aliasWrites;
+    bool failAliasWrite=false;
     std::string selected="brightness";
     std::vector<ControlAction> actions;
     std::vector<std::pair<MenuInput,bool>> menu;
@@ -172,7 +180,22 @@ public:
     void PointerMove(float x,float y,double) { pointerX=x; pointerY=y; }
     bool PlayTimeline(const std::string&,double) { return true; }
     bool PopModal(double) { if(!modals)return false; --modals; return true; }
-    std::optional<Value> PresentedValue(const std::string&,const std::string&) const { return std::nullopt; }
+    bool GetPresentationAlias(const std::string& name,std::string& output) const {
+        aliasReads.push_back(name);
+        auto found=aliases.find(name); if(found==aliases.end())return false;
+        output=found->second; return true;
+    }
+    bool SetPresentationAlias(const std::string& name,const std::string& value,bool overrideExpression,std::string& error) {
+        aliasWrites.push_back({name,value,overrideExpression});
+        auto found=aliases.find(name);
+        if(failAliasWrite || found==aliases.end()) { error="Presentation alias write rejected"; return false; }
+        found->second=value; return true;
+    }
+    std::optional<Value> PresentedValue(const std::string& node,const std::string& property) const {
+        propertyReads.emplace_back(node,property);
+        auto found=properties.find({node,property});
+        return found==properties.end()?std::nullopt:std::optional<Value>(found->second);
+    }
 };
 }
 struct retainedUIView_t {
@@ -210,6 +233,110 @@ void idUserInterfaceManaged::RefreshThinking() {}
 MAIN = r'''
 using namespace openq4::ui;
 static Runtime& Live() { assert(views.size()==1); return views.front()->runtime; }
+static std::vector<std::pair<std::string,std::string>> Dictionary(const idUserInterfaceRetained& gui) {
+    std::vector<std::pair<std::string,std::string>> result;
+    for(int i=0;i<gui.State().GetNumKeyVals();++i) {
+        const auto* entry=gui.State().GetKeyVal(i);
+        result.emplace_back(entry->GetKey(),entry->GetValue());
+    }
+    return result;
+}
+static void CheckPresentationBridge() {
+    assert(views.empty());
+    idUserInterfaceRetained gui;
+    idStr output="unchanged";
+    assert(!gui.GetPresentationValue(nullptr,output) && output=="unchanged");
+    assert(!gui.GetPresentationValue("curr",output) && output=="unchanged");
+    assert(!gui.SetPresentationValue(nullptr,"1",true));
+    assert(!gui.SetPresentationValue("curr",nullptr,false));
+    assert(!gui.SetPresentationValue("curr","1",true));
+    assert(views.empty());
+    gui.SetStateFloat("number",1.25f);
+    gui.SetStateString("curr","dictionary page");
+    gui.SetStateString("desktop::curr","dictionary qualified page");
+    gui.SetStateString("dictionaryOnly","not an exported presentation variable");
+    assert(gui.InitFromFile("test.q4ui"));
+    auto& runtime=Live();
+    runtime.aliases={{"CuRR","22"},{"desktop::curr","23"},{"number","24"},{"metadata",""}};
+    Value numeric; numeric.type=ValueType::Number; numeric.text="0.35";
+    Value text; text.type=ValueType::Text; text.text="literal <span> ; quit";
+    runtime.properties={{{"desktop","curr"},numeric},{{"root","opacity"},numeric},{{"label","text"},text}};
+    const auto dictionary=Dictionary(gui);
+    const auto state=runtime.state;
+    const int cvarWrites=cvars.writes;
+
+    // The adapter forwards authored names unchanged. Runtime owns case folding,
+    // typing and expressions; the caller dictionary is a separate namespace.
+    assert(gui.GetPresentationValue("CuRR",output) && output=="22");
+    assert(runtime.aliasReads.back()=="CuRR" && runtime.propertyReads.empty());
+    assert(gui.GetPresentationValue("number",output) && output=="24");
+    assert(gui.GetPresentationValue("desktop::curr",output) && output=="23");
+    assert(runtime.aliasReads.back()=="desktop::curr" && runtime.propertyReads.empty());
+    assert(gui.GetPresentationValue("metadata",output) && output.empty());
+
+    // Qualified property diagnostics remain readable only after alias lookup
+    // fails. A qualified export wins even when a property has that same name.
+    assert(gui.GetPresentationValue("root::opacity",output) && output=="0.35");
+    assert(runtime.aliasReads.back()=="root::opacity");
+    assert(runtime.propertyReads.back()==std::make_pair(std::string("root"),std::string("opacity")));
+    assert(gui.GetPresentationValue("label::text",output) && output==text.text);
+    const auto readCount=runtime.aliasReads.size(),propertyCount=runtime.propertyReads.size();
+    output="unchanged";
+    assert(!gui.GetPresentationValue(nullptr,output) && output=="unchanged");
+    assert(runtime.aliasReads.size()==readCount && runtime.propertyReads.size()==propertyCount);
+    for(const char* missing:{"","missing","dictionaryOnly","missing::text"}) {
+        assert(!gui.GetPresentationValue(missing,output) && output=="unchanged");
+        assert(runtime.aliasReads.back()==missing);
+    }
+    assert(Dictionary(gui)==dictionary && runtime.state==state);
+
+    const auto writeCount=runtime.aliasWrites.size();
+    assert(!gui.SetPresentationValue(nullptr,"1",true));
+    assert(!gui.SetPresentationValue("CuRR",nullptr,false));
+    assert(runtime.aliasWrites.size()==writeCount);
+    assert(gui.SetPresentationValue("CuRR"," 27 ",true));
+    assert(runtime.aliasWrites.back().name=="CuRR" && runtime.aliasWrites.back().value==" 27 ");
+    assert(runtime.aliasWrites.back().overrideExpression && runtime.aliases.at("CuRR")==" 27 ");
+    assert(gui.SetPresentationValue("desktop::curr","28",false));
+    assert(!runtime.aliasWrites.back().overrideExpression && runtime.aliasWrites.back().name=="desktop::curr");
+    const char* literal="literal ; quit\n<span>data</span>";
+    assert(gui.SetPresentationValue("metadata",literal,false));
+    assert(runtime.aliasWrites.back().value==literal && !runtime.aliasWrites.back().overrideExpression);
+    assert(gui.GetPresentationValue("metadata",output) && output==literal);
+    assert(gui.SetPresentationValue("metadata","",true));
+    assert(gui.GetPresentationValue("metadata",output) && output.empty());
+
+    const auto aliases=runtime.aliases;
+    const auto fallbackCount=runtime.propertyReads.size();
+    for(const char* missing:{"","missing","dictionaryOnly","root::opacity"}) {
+        assert(!gui.SetPresentationValue(missing,"99",true));
+        assert(runtime.aliasWrites.back().name==missing && runtime.aliasWrites.back().value=="99");
+        assert(runtime.aliases==aliases && runtime.propertyReads.size()==fallbackCount);
+    }
+    // A successful delegation clears the adapter error, so a subsequent
+    // runtime validation failure is reported once and preserves the value.
+    assert(gui.SetPresentationValue("CuRR"," 27 ",false));
+    const int warnings=common->warnings;
+    runtime.failAliasWrite=true;
+    assert(!gui.SetPresentationValue("CuRR","invalid",true) && common->warnings==warnings+1);
+    assert(!gui.SetPresentationValue("CuRR","invalid",false) && common->warnings==warnings+1);
+    assert(runtime.aliases==aliases);
+    runtime.failAliasWrite=false;
+    assert(gui.SetPresentationValue("CuRR"," 27 ",false));
+    runtime.failAliasWrite=true;
+    assert(!gui.SetPresentationValue("CuRR","invalid",false) && common->warnings==warnings+2);
+    runtime.failAliasWrite=false;
+
+    const auto finalReads=runtime.aliasReads.size(),finalWrites=runtime.aliasWrites.size();
+    runtime.loaded=false;
+    output="unavailable";
+    assert(!gui.GetPresentationValue("CuRR",output) && output=="unavailable");
+    assert(!gui.SetPresentationValue("CuRR","99",true));
+    assert(runtime.aliasReads.size()==finalReads && runtime.aliasWrites.size()==finalWrites);
+    runtime.loaded=true;
+    assert(gui.GetPresentationValue("CuRR",output) && output==" 27 ");
+    assert(Dictionary(gui)==dictionary && runtime.state==state && cvars.writes==cvarWrites);
+}
 static const char* Key(idUserInterfaceRetained& gui,int key,bool down) {
     sysEvent_t event{SE_KEY,key,down?1:0}; return gui.HandleEvent(&event,0,nullptr);
 }
@@ -244,6 +371,7 @@ int main() {
     modelTemplate.root.id="root";
     modelTemplate.root.control=Control{}; modelTemplate.root.control->action="brightness";
     files.sources={{"test.q4ui","valid"},{"bad.q4ui","invalid"},{"next.q4ui","next"},{"menuXq4ui","valid"}};
+    CheckPresentationBridge();
     {
         idUserInterfaceRetained gui;
         gui.SetStateFloat("number",1.25f); gui.SetStateBool("flag",true);
@@ -369,7 +497,7 @@ int main() {
     unsafe=modelTemplate; unsafe.actions["brightness"].arguments["extra"]=Expression{}; assert(!ValidateApplication(unsafe,error));
     unsafe=modelTemplate; unsafe.state["NUMBER"]={1.0,""}; assert(!ValidateApplication(unsafe,error));
     unsafe=modelTemplate; unsafe.state["NaMe"]={1.0,""}; assert(!ValidateApplication(unsafe,error));
-    std::puts("Retained adapter: pending/committed state, framed saves/sentinel/truncation atomicity, typed actions, cancellation/repeat and cursor mapping passed");
+    std::puts("Retained adapter: presentation alias delegation/fallback/atomic failure, pending/committed state, framed saves/sentinel/truncation atomicity, typed actions, cancellation/repeat and cursor mapping passed");
 }
 '''
 

@@ -15,6 +15,14 @@ finished adapter, complete widget persistence or game-save compatibility.
 The subsequent [application integration checkpoint](managed-application.md)
 adds normal retained loading, two typed settings operations and coordinated
 engine views. These remain partial evidence for the full application contract.
+The [presentation alias checkpoint](presentation-aliases.md) adds explicit shared
+metadata and rendered-property aliases, transient/explicit expression ownership,
+snapshot version 2 and immediate ancestor visibility/input eligibility. The
+checkpoint records native checks, five alias gameplay captures and a sixth
+typed-settings regression across Windows SP/OpenGL and MP/Vulkan. These qualify
+the authored subset and retain their stated display/platform limitations.
+Semantic lowering for the shipped corpus, components and ordered events,
+production GUI flows and the complete native editor remain open.
 
 There are **58 partial, 168 pending and one verified requirement**. The verified
 requirement, `INV-001`, covers the fresh effective-source inventory only. All
@@ -129,6 +137,10 @@ and `register-validation.json` under `.tmp/ui/requirements/`. The inventory SHA-
 is `d48708c473d52e140c11143083d8bbf9d2de8b30086c8cbe1221d9a4622caae0`;
 the unchanged migration-manifest SHA-256 is
 `82120ffe3e07964828b5a05e538c797c99f4de6b4e43f9d58c6121377d45f04a`.
+
+The alias checkpoint's refreshed structural/source-hash check is recorded in
+`.tmp/ui/aliases-review/register-validation.json`. It preserves the original
+inventory evidence and all requirement acceptance states.
 
 Register checks confirmed unique IDs, valid milestone/source/evidence references,
 resolved dependencies with no cycles, all twelve audit-finding mappings and all

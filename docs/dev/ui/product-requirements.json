@@ -19,12 +19,12 @@
     "product": {
       "path": "docs/dev/plans/ui-product-completion.md",
       "authority": "normative completion scope, milestones and final audit",
-      "sha256": "e7bc31e6722a06b90462427b0cff50fb5956a5589d01a2a90e0ffa00e4a3408e"
+      "sha256": "3cf7f648c6dd7ad6943bee595ad70cbea6a785735f7aa399db7208924ad16df4"
     },
     "original": {
       "path": "docs/dev/plans/idtech5-ui.md",
       "authority": "original immutable scope and stage gates",
-      "sha256": "491f417467ea3bf4eb92adaea656d40feb0558e34d4dec8a397a45df787cb240"
+      "sha256": "dc819fdfdb05f9d6b993b5bf6e197808664c8f55044574465ce90ae7a9238185"
     },
     "inventory": {
       "path": "docs/dev/ui/inventory-report.md",
@@ -100,7 +100,7 @@
       "kind": "source_audit",
       "path": "docs/dev/plans/ui-product-completion.md",
       "scope": "Published audit at 80bb3939; source limitations corroborated by current Document/Runtime inspection. Historical tests and captures are not a fresh product qualification.",
-      "sha256": "e7bc31e6722a06b90462427b0cff50fb5956a5589d01a2a90e0ffa00e4a3408e"
+      "sha256": "3cf7f648c6dd7ad6943bee595ad70cbea6a785735f7aa399db7208924ad16df4"
     },
     "document-foundation": {
       "kind": "implementation_checkpoint",
@@ -160,7 +160,7 @@
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/presentation-bridge.md",
       "scope": "Backend-neutral public presentation operations; retained alias mapping and application dispatcher unfinished.",
-      "sha256": "00e197b175d51388574d335ac0129f192f2f166ccc1a11d8343ed336a5378b8d"
+      "sha256": "9582c744b0948968c9d3e1e9d4cea8eaebd330b9e7448bee4b67edcc0b3e883b"
     },
     "import-foundation": {
       "kind": "implementation_checkpoint",
@@ -184,11 +184,20 @@
     "managed-application-foundation": {
       "kind": "qualified_foundation_checkpoint",
       "path": "docs/dev/ui/managed-application.md",
-      "sha256": "16b03ac8222efd34205bb1bdc853f514d62ffcc8509a23b647bcffb3d785a89c",
+      "sha256": "128cc449315ed1321675facd4c0610e10ebf59e45d13e726457c5d5b815ec8b0",
       "baseline_engine_revision": "b87b703b799cbf120d74b4aed122883a42b0ad68",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "local_capture_summary": ".tmp/ui/managed-review/summary.json",
       "scope": "M1 foundation: explicit retained/deferred normal GUI loading, typed brightness/shadow operations, pending/committed state save framing, normal session cancellation and shared engine-view invalidation. Native and production-method tests plus source/binary-bound hidden windowed SP/OpenGL and MP/Vulkan fixtures qualify only this subset. Full aliases/events/widgets, production mappings, world output, real game save/demo containers, GPU/platform qualification and complete product/editor remain unaccepted."
+    },
+    "presentation-alias-foundation": {
+      "kind": "qualified_foundation_checkpoint",
+      "path": "docs/dev/ui/presentation-aliases.md",
+      "sha256": "96bb49dc57ef23bf94fbea310a04f8ba7491ee3cd15e3ed02f98730ca21687d6",
+      "scope": "M1 subset: explicit root/qualified aliases, shared typed metadata independent of State(), canonical property/rect/visible/noevents conversion, atomic explicit/transient expression ownership, snapshot version 2 with exact-source version 1 reads, and immediate ancestor input eligibility. Six native suites and the production adapter harness qualify this implementation subset. Five source/binary-bound hidden windowed Windows SP/OpenGL and MP/Vulkan alias captures plus a sixth typed-settings regression passed their semantic oracles; four alias captures include independent peer lifetime and same-language/video reconstruction. Reviewed SDR render-target images and brightness/gamma comparisons remain limited to the recorded host/backend cases. Full semantic lowering, components/events, material/vector paint mappings, production GUI acceptance, game-save/demo compatibility and the native editor remain open. No requirement or migration entry is accepted by this checkpoint.",
+      "baseline_engine_revision": "e075e4a2e64e0ff790a1f435ae0854aa51650308",
+      "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
+      "local_capture_summary": ".tmp/ui/aliases-review/summary.json"
     }
   },
   "groups": {
@@ -967,10 +976,11 @@
       "status": "partial",
       "current_evidence": [
         "import-foundation",
-        "bridge-foundation"
+        "bridge-foundation",
+        "presentation-alias-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "The cited foundation is limited; complete and qualify the entire stated requirement before acceptance."
+      "remaining": "Explicit case-folded aliases now map shared presentation variables or declared node properties without creating application dictionary keys. Complete legacy duplicate/window-merge resolution, local/global and gui:: ownership, dictionary-bound variable semantics and source-bound generated aliases remain."
     },
     {
       "id": "INV-009",
@@ -1142,10 +1152,11 @@
       ],
       "status": "partial",
       "current_evidence": [
-        "document-foundation"
+        "document-foundation",
+        "presentation-alias-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "The cited foundation is limited; complete and qualify the entire stated requirement before acceptance."
+      "remaining": "Typed presentation-variable/alias declarations extend the canonical JSONC schema with stable targets and source-preserving edits. Complete component/instance/constraint/editor metadata, structural reference stability and full source round trips remain."
     },
     {
       "id": "DOC-002",
@@ -1168,10 +1179,11 @@
       "status": "partial",
       "current_evidence": [
         "document-foundation",
-        "instance-foundation"
+        "instance-foundation",
+        "presentation-alias-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "The cited foundation is limited; complete and qualify the entire stated requirement before acceptance."
+      "remaining": "Alias compilation now rejects invalid names, collisions, targets, fields, types, units, bounds and initial expressions transactionally. Validation for the complete future model and editor error navigation still requires implementation and acceptance evidence."
     },
     {
       "id": "DOC-003",
@@ -1216,10 +1228,11 @@
       ],
       "status": "partial",
       "current_evidence": [
-        "binding-foundation"
+        "binding-foundation",
+        "presentation-alias-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "The cited foundation is limited; complete and qualify the entire stated requirement before acceptance."
+      "remaining": "The shared model now declares typed actions plus explicit metadata/property aliases and expression ownership. Complete state variants/graphs, ordered events, resource operations, component behavior and editor metadata remain."
     },
     {
       "id": "DOC-005",
@@ -1265,10 +1278,11 @@
       ],
       "status": "partial",
       "current_evidence": [
-        "binding-foundation"
+        "binding-foundation",
+        "presentation-alias-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "The cited foundation is limited; complete and qualify the entire stated requirement before acceptance."
+      "remaining": "Application/CVar state and typed presentation variables remain separate; metadata and mixed bound/unbound property writes validate before commit. Complete widget/data-source ownership and source-bound production state semantics remain."
     },
     {
       "id": "DOC-007",
@@ -1315,10 +1329,11 @@
       ],
       "status": "partial",
       "current_evidence": [
-        "instance-foundation"
+        "instance-foundation",
+        "presentation-alias-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "The cited foundation is limited; complete and qualify the entire stated requirement before acceptance."
+      "remaining": "Presentation cells and override ownership are per instance and mutable values remain separate from immutable authored bases. Shared compiled components/resource caches and full widget, scroll, timer and command-result state still need implementation and qualification."
     },
     {
       "id": "RUN-001",
@@ -1342,10 +1357,11 @@
       ],
       "status": "partial",
       "current_evidence": [
-        "managed-application-foundation"
+        "managed-application-foundation",
+        "presentation-alias-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "Normal retained adapter exists for the current root/button subset. Complete writable aliases, text/caret/wrapping, key-binding widgets, full ordered events and game caller/save/world contracts before accepting the public method matrix."
+      "remaining": "Normal retained methods now delegate explicit root/qualified presentation reads and typed writes, preserving failed outputs and application state. Complete semantic alias generation, text/caret/wrapping, key-binding widgets, ordered events and game caller/save/world contracts remain before accepting the public method matrix."
     },
     {
       "id": "RUN-002",
@@ -1394,10 +1410,11 @@
       "status": "partial",
       "current_evidence": [
         "instance-foundation",
-        "managed-application-foundation"
+        "managed-application-foundation",
+        "presentation-alias-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "The cited foundation is limited; complete and qualify the entire stated requirement before acceptance."
+      "remaining": "Independent runtime instances now preserve their own presentation cells and override flags as well as the existing subset state. Differently sized editor/HUD/world targets, complete widget state, repeated churn and creator/peer resource-lifetime qualification remain."
     },
     {
       "id": "RUN-004",
@@ -1445,10 +1462,11 @@
       ],
       "status": "partial",
       "current_evidence": [
-        "managed-application-foundation"
+        "managed-application-foundation",
+        "presentation-alias-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "Normal session/frame order and inverse cursor transport are documented and tested for the root/button subset. Complete game clocks, translated event scheduling, all widgets and transformed/world hit paths."
+      "remaining": "Alias mutations update canonical values atomically, and ancestor visibility/noevents eligibility refreshes before input dispatch. Complete game-clock/event evaluation, translated scheduling, all widgets and transformed/world hit geometry still require the documented production order and evidence."
     },
     {
       "id": "RUN-006",
@@ -1501,10 +1519,11 @@
       "current_evidence": [
         "instance-foundation",
         "instance-persistence-foundation",
-        "managed-application-foundation"
+        "managed-application-foundation",
+        "presentation-alias-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "The cited foundation is limited; complete and qualify the entire stated requirement before acceptance."
+      "remaining": "Snapshot reconstruction now includes presentation variables and property/expression ownership. Complete live-view font/monitor/renderer invalidation with widget text, selection/scroll, world targets and failed recreation remains unaccepted."
     },
     {
       "id": "RUN-008",
@@ -1603,10 +1622,11 @@
       "status": "partial",
       "current_evidence": [
         "bridge-foundation",
-        "managed-application-foundation"
+        "managed-application-foundation",
+        "presentation-alias-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "The cited foundation is limited; complete and qualify the entire stated requirement before acceptance."
+      "remaining": "Explicit root/qualified aliases now share typed metadata or canonical rendered targets, preserve reads, and distinguish transient versus explicit ownership even after save/restore. Complete generated mappings for all required legacy names, dictionary-bound variables, component/vector/material paint targets and actual production caller/event/merge semantics remain."
     },
     {
       "id": "BEH-004",
@@ -1893,10 +1913,11 @@
       "status": "partial",
       "current_evidence": [
         "instance-persistence-foundation",
-        "managed-application-foundation"
+        "managed-application-foundation",
+        "presentation-alias-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "The cited foundation is limited; complete and qualify the entire stated requirement before acceptance."
+      "remaining": "Canonical snapshot version 2 preserves new presentation tables and reads exact-source version 1 payloads; the outer length-framed Q4UI adapter remains version 1. Full engine/SP/MP game-save and demo migration, old-save policy and missing-resource corpus qualification remain."
     },
     {
       "id": "SAVE-002",
@@ -1922,10 +1943,11 @@
       "status": "partial",
       "current_evidence": [
         "instance-persistence-foundation",
-        "managed-application-foundation"
+        "managed-application-foundation",
+        "presentation-alias-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "The cited foundation is limited; complete and qualify the entire stated requirement before acceptance."
+      "remaining": "Snapshots now include metadata values, expression-disable flags, pending transient values, bound overrides and unanimated mutable properties. Selection/scroll, editable text, dynamic collections, script timers and deterministic full-corpus action continuation remain."
     },
     {
       "id": "SAVE-003",
@@ -1950,10 +1972,11 @@
       "status": "partial",
       "current_evidence": [
         "instance-persistence-foundation",
-        "managed-application-foundation"
+        "managed-application-foundation",
+        "presentation-alias-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "The cited foundation is limited; complete and qualify the entire stated requirement before acceptance."
+      "remaining": "The current subset reconstructs metadata/property values and expression ownership with existing focus/modal/motion state. Complete viewport/monitor/font/text/world/widget continuity and the full engine mutation matrix remain required."
     },
     {
       "id": "SAVE-004",
@@ -2599,10 +2622,11 @@
       ],
       "status": "partial",
       "current_evidence": [
-        "input-foundation"
+        "input-foundation",
+        "presentation-alias-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "The cited foundation is limited; complete and qualify the entire stated requirement before acceptance."
+      "remaining": "Normal semantic button dispatch now excludes ancestors marked hidden or noevents before input runs. Wheel/touch/text/composition, full widget/device behavior and projected world inputs through complete composed transforms remain."
     },
     {
       "id": "INP-002",
@@ -2625,10 +2649,11 @@
       ],
       "status": "partial",
       "current_evidence": [
-        "input-foundation"
+        "input-foundation",
+        "presentation-alias-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "The cited foundation is limited; complete and qualify the entire stated requirement before acceptance."
+      "remaining": "Native and adapter button checks cover matched releases, multiple sources and cancellation when ancestor eligibility changes. The complete widget/device matrix, including supported-host gamepad/pointer scenarios, remains unaccepted."
     },
     {
       "id": "INP-003",
@@ -2683,10 +2708,11 @@
       ],
       "status": "partial",
       "current_evidence": [
-        "input-foundation"
+        "input-foundation",
+        "presentation-alias-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "The cited foundation is limited; complete and qualify the entire stated requirement before acceptance."
+      "remaining": "Ancestor visibility/noevents changes cancel armed child activation before a release can dispatch, including writes before the next frame. Full device removal/reconnect, gameplay/modal ownership transitions and held-source quarantine across all controls still require implementation and qualification."
     },
     {
       "id": "INP-005",
@@ -2734,10 +2760,11 @@
       ],
       "status": "partial",
       "current_evidence": [
-        "interaction-foundation"
+        "interaction-foundation",
+        "presentation-alias-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "The cited foundation is limited; complete and qualify the entire stated requirement before acceptance."
+      "remaining": "Hidden/noevents ancestors now exclude child pointer/navigation/direct-focus targets while preserving the existing button/modal subset contract. The full widget focus-versus-selection gallery, stack teardown and restoration matrix remain."
     },
     {
       "id": "INP-007",
@@ -2762,10 +2789,11 @@
       ],
       "status": "partial",
       "current_evidence": [
-        "interaction-foundation"
+        "interaction-foundation",
+        "presentation-alias-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "The cited foundation is limited; complete and qualify the entire stated requirement before acceptance."
+      "remaining": "Ancestor display/noevents eligibility is enforced before semantic or pointer input. Complete authored ergonomic regions, transformed clips, path/mask holes and partial clipping still require an independent render/input oracle and engine evidence."
     },
     {
       "id": "INP-008",
@@ -4257,10 +4285,11 @@
       ],
       "status": "partial",
       "current_evidence": [
-        "document-foundation"
+        "document-foundation",
+        "presentation-alias-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "The cited foundation is limited; complete and qualify the entire stated requirement before acceptance."
+      "remaining": "External property writes preserve active transition ownership, unrelated tracks and immutable authored bases; mutable values now survive snapshots. Smooth authoritative binding retargeting and complete production page/theme/resize/reversal/teardown continuity remain."
     },
     {
       "id": "MOT-003",

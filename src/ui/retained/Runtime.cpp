@@ -41,6 +41,23 @@ bool ReadSnapshotValue(const Json::Value& source, Value& value) {
 	}
 	return true;
 }
+Json::Value SnapshotPresentationValue(const PresentationValue& value) {
+	Json::Value result(Json::objectValue);
+	result["type"] = unsigned(value.type); result["text"] = value.text;
+	result["data"] = Json::Value(Json::arrayValue);
+	for (double part : value.data) result["data"].append(part);
+	return result;
+}
+bool ReadSnapshotPresentationValue(const Json::Value& source, PresentationValue& value) {
+	if (!SnapshotFields(source,{"type","text","data"}) || !source["type"].isUInt() || source["type"].asUInt() > unsigned(PresentationType::Vector4) ||
+		!source["text"].isString() || !source["data"].isArray() || source["data"].size() != 4) return false;
+	value.type = PresentationType(source["type"].asUInt()); value.text = source["text"].asString();
+	for (Json::ArrayIndex i = 0; i < 4; ++i) {
+		if (!source["data"][i].isNumeric()) return false;
+		value.data[i] = source["data"][i].asDouble();
+	}
+	return ValidPresentationValue(value);
+}
 // JsonCpp accepts some non-JSON numeric spellings and raw string controls.
 // Snapshot input is strict JSON; reject those forms before parsing the DOM.
 bool SnapshotLexicalForms(const std::string& source) {
@@ -579,6 +596,20 @@ struct Runtime::Impl {
 	bool pointerPresent = false;
 	std::map<PropertyKey,std::string> applied;
 	bool initialized = false;
+	std::map<std::string,bool> inputAllowed;
+	std::optional<Value> PresentedProperty(const PropertyKey& key) const {
+		const auto bound = state.Properties().find(key);
+		if (bound != state.Properties().end()) return bound->second;
+		const auto animated = motion.Values().find(key);
+		return animated == motion.Values().end() ? std::nullopt : std::optional<Value>(animated->second);
+	}
+	void CollectInputEligibility(const Node& node, bool inherited = true) {
+		const auto display = PresentedProperty({node.id,"display"});
+		const auto events = PresentedProperty({node.id,"pointer-events"});
+		const bool allowed = inherited && (!display || display->text != "none") && (!events || events->text != "none");
+		inputAllowed[node.id] = allowed;
+		for (const auto& child : node.children) CollectInputEligibility(child,allowed);
+	}
 	void ApplyControlBindings() {
 		if (appliedStateRevision == state.Revision()) return;
 		for (const auto& [id,enabled] : state.Enabled()) interaction.SetEnabled(id,enabled);
@@ -611,16 +642,20 @@ struct Runtime::Impl {
 				// Decorative/translated child ink never enlarges the button's
 				// stable hit box, including during pressed-state movement.
 				Rml::Vector2f local(pointerX,pointerY);
-				return element->Project(local) && element->IsPointWithinElement(local) ? node->id : std::string{};
+				const auto allowed = inputAllowed.find(node->id);
+				return allowed != inputAllowed.end() && allowed->second && element->Project(local) && element->IsPointWithinElement(local) ? node->id : std::string{};
 			}
 		}
 		return {};
 	}
-	void UpdateInteraction() {
+	void UpdateInteraction(double seconds = -1) {
+		if (!document || !canonical) return;
+		if (std::isfinite(seconds) && seconds >= 0) time = std::max(time,seconds);
+		inputAllowed.clear(); CollectInputEligibility(canonical->Model().root);
 		std::map<std::string,ControlBounds> bounds;
 		for (const auto& id : controls) {
 			auto* element = document->GetElementById(id); Rml::Rectanglef rect;
-			if (element && element->IsVisible(true) && Rml::ElementUtilities::GetBoundingBox(rect,element,Rml::BoxArea::Border))
+			if (element && inputAllowed.at(id) && element->IsVisible(true) && Rml::ElementUtilities::GetBoundingBox(rect,element,Rml::BoxArea::Border))
 				bounds[id] = {rect.Left(),rect.Top(),rect.Width(),rect.Height(),true};
 		}
 		interaction.SetBounds(bounds); interaction.Hover(HitControl()); Feedback(time);
@@ -765,16 +800,29 @@ bool Runtime::SaveSnapshot(std::string& snapshot, std::string& error, double sec
 		// its persistent focus/default feedback instead of reviving pressed ink.
 		for (const auto& feedback : interaction.TakeFeedback()) motion.Play(feedback.timeline,now);
 		const auto playback = motion.Capture(now);
-		if (!motion.Restore(playback,now,error)) return false;
+		if (!motion.Restore(playback,now,error,true)) return false;
 		const auto input = interaction.Capture();
 		Json::Value root(Json::objectValue);
-		root["format"] = "openq4-ui-instance"; root["version"] = 1;
+		root["format"] = "openq4-ui-instance"; root["version"] = 2;
 		auto& identity = root["document"];
 		identity["version"] = 1; identity["id"] = impl->canonical->Model().id;
 		identity["path"] = impl->sourcePath; identity["source"] = impl->canonical->Source();
 		root["application"] = Json::Value(Json::objectValue);
 		for (const auto& [id,value] : GetState(false))
 			std::visit([&](const auto& primitive) { root["application"][id] = primitive; },value);
+		auto& aliasState = root["presentationState"];
+		aliasState["variables"] = Json::Value(Json::objectValue);
+		for (const auto& [id,cell] : impl->state.Presentation().variables) {
+			auto& item = aliasState["variables"][id]; item["value"] = SnapshotPresentationValue(cell.value);
+			item["expressionDisabled"] = cell.expressionDisabled; item["pending"] = cell.pending;
+		}
+		aliasState["properties"] = Json::Value(Json::arrayValue);
+		for (const auto& [key,cell] : impl->state.Presentation().properties) {
+			Json::Value item(Json::objectValue);
+			item["node"] = key.first; item["property"] = key.second; item["value"] = SnapshotValue(cell.value);
+			item["expressionDisabled"] = cell.expressionDisabled;
+			aliasState["properties"].append(std::move(item));
+		}
 		auto& presentation = root["presentation"];
 		presentation["reducedMotion"] = playback.reducedMotion;
 		presentation["values"] = Json::Value(Json::arrayValue);
@@ -824,9 +872,11 @@ bool Runtime::RestoreSnapshot(const std::string& snapshot, std::string& error, d
 		builder["allowSpecialFloats"] = false; builder["stackLimit"] = 32; builder["skipBom"] = false;
 		std::unique_ptr<Json::CharReader> reader(builder.newCharReader()); Json::Value root;
 		if (!reader->parse(snapshot.data(),snapshot.data()+snapshot.size(),&root,nullptr)) return reject("Invalid instance snapshot JSON");
-		if (!SnapshotFields(root,{"format","version","document","application","presentation","interaction","widgets"}) ||
-			root["format"] != "openq4-ui-instance" || !root["version"].isUInt() || root["version"].asUInt() != 1)
+		if (root["format"] != "openq4-ui-instance" || !root["version"].isUInt() || (root["version"].asUInt() != 1 && root["version"].asUInt() != 2))
 			return reject("Unsupported instance snapshot schema");
+		const bool hasPresentation = root["version"].asUInt() == 2;
+		if (hasPresentation ? !SnapshotFields(root,{"format","version","document","application","presentation","interaction","widgets","presentationState"}) :
+			!SnapshotFields(root,{"format","version","document","application","presentation","interaction","widgets"})) return reject("Invalid instance snapshot fields");
 		const auto& identity = root["document"];
 		if (!SnapshotFields(identity,{"version","id","path","source"}) || !identity["version"].isUInt() || identity["version"].asUInt() != 1 ||
 			identity["id"] != impl->canonical->Model().id || identity["path"] != impl->sourcePath || identity["source"] != impl->canonical->Source())
@@ -848,7 +898,29 @@ bool Runtime::RestoreSnapshot(const std::string& snapshot, std::string& error, d
 			sources.emplace(id,std::move(value));
 		}
 		State state = impl->state;
-		if (!state.Restore(values,sources,error)) return false;
+		StatePresentationSnapshot restoredPresentation;
+		if (hasPresentation) {
+			const auto& aliasState = root["presentationState"];
+			if (!SnapshotFields(aliasState,{"variables","properties"}) || !aliasState["variables"].isObject() ||
+				!aliasState["properties"].isArray() || aliasState["properties"].size() > impl->canonical->Model().bindings.size() ||
+				aliasState["variables"].size() != impl->canonical->Model().presentationVariables.size()) return reject("Invalid restored presentation tables");
+			for (const auto& id : aliasState["variables"].getMemberNames()) {
+				const auto& item = aliasState["variables"][id]; PresentationCell cell;
+				if (!SnapshotFields(item,{"value","expressionDisabled","pending"}) || !item["expressionDisabled"].isBool() || !item["pending"].isBool() ||
+					!ReadSnapshotPresentationValue(item["value"],cell.value)) return reject("Invalid restored presentation cell");
+				cell.expressionDisabled = item["expressionDisabled"].asBool(); cell.pending = item["pending"].asBool();
+				restoredPresentation.variables.emplace(id,std::move(cell));
+			}
+			for (const auto& item : aliasState["properties"]) {
+				PresentationPropertyOverride cell;
+				if (!SnapshotFields(item,{"node","property","value","expressionDisabled"}) || !item["node"].isString() || !item["property"].isString() ||
+					!item["expressionDisabled"].isBool() || !ReadSnapshotValue(item["value"],cell.value)) return reject("Invalid restored presentation override");
+				cell.expressionDisabled = item["expressionDisabled"].asBool();
+				if (!restoredPresentation.properties.emplace(PropertyKey{item["node"].asString(),item["property"].asString()},std::move(cell)).second)
+					return reject("Duplicate restored presentation override");
+			}
+		}
+		if (!state.Restore(values,sources,error,hasPresentation ? &restoredPresentation : nullptr)) return false;
 		const auto& presentation = root["presentation"];
 		if (!SnapshotFields(presentation,{"reducedMotion","values","playing"}) || !presentation["reducedMotion"].isBool() ||
 			!presentation["values"].isArray() || !presentation["playing"].isArray() ||
@@ -873,7 +945,7 @@ bool Runtime::RestoreSnapshot(const std::string& snapshot, std::string& error, d
 		}
 		const double now = std::max(seconds,impl->time);
 		Motion motion = impl->motion;
-		if (!motion.Restore(playback,now,error)) return false;
+		if (!motion.Restore(playback,now,error,hasPresentation)) return false;
 		const auto& semantics = root["interaction"];
 		if (!SnapshotFields(semantics,{"focus","modals","enabled","presented"}) || !semantics["focus"].isString() || !semantics["modals"].isArray() ||
 			semantics["modals"].size() > 64 || !semantics["enabled"].isObject() || !semantics["presented"].isObject()) return reject("Invalid restored interaction state");
@@ -906,11 +978,80 @@ bool Runtime::RestoreSnapshot(const std::string& snapshot, std::string& error, d
 	} catch (const std::exception& problem) { error = std::string("Cannot restore instance snapshot: ")+problem.what(); return false; }
 }
 std::optional<Value> Runtime::PresentedValue(const std::string& node, const std::string& property) const {
-	const PropertyKey key{node,property};
-	const auto bound = impl->state.Properties().find(key);
-	if (bound != impl->state.Properties().end()) return bound->second;
-	const auto animated = impl->motion.Values().find(key);
-	return animated == impl->motion.Values().end() ? std::nullopt : std::optional<Value>(animated->second);
+	return impl->PresentedProperty({node,property});
+}
+namespace {
+std::vector<std::string> AliasProperties(const PresentationAlias& alias) {
+	if (alias.property == "rect") return {"left","top","width","height"};
+	if (alias.property == "visible") return {"display"};
+	if (alias.property == "noevents") return {"pointer-events"};
+	return {alias.property};
+}
+bool ReadAlias(const PresentationAlias& alias, const Runtime& runtime, PresentationValue& value) {
+	if (alias.property == "rect") {
+		value.type = PresentationType::Vector4;
+		const auto properties = AliasProperties(alias);
+		for (size_t i = 0; i < properties.size(); ++i) {
+			const auto part = runtime.PresentedValue(alias.node,properties[i]);
+			if (!part || part->type != ValueType::Length || part->unit != "dp") return false;
+			value.data[i] = part->data[0];
+		}
+		return true;
+	}
+	const auto property = runtime.PresentedValue(alias.node,AliasProperties(alias).front());
+	if (!property) return false;
+	if (alias.property == "visible" || alias.property == "noevents") {
+		value.type = PresentationType::Boolean;
+		value.data[0] = (alias.property == "visible" ? property->text != "none" : property->text == "none") ? 1 : 0;
+	} else if (property->type == ValueType::Number || property->type == ValueType::Length) {
+		value.type = PresentationType::Number; value.data[0] = property->data[0];
+	} else if (property->type == ValueType::Colour) {
+		value.type = PresentationType::Vector4; std::copy_n(property->data.begin(),4,value.data.begin());
+	} else if (property->type == ValueType::Text || property->type == ValueType::Keyword || property->type == ValueType::Font) {
+		value.type = PresentationType::String; value.text = property->text;
+	} else return false;
+	return ValidPresentationValue(value);
+}
+}
+bool Runtime::GetPresentationAlias(const std::string& name, std::string& value) const {
+	if (!impl->canonical) return false;
+	const auto found = impl->canonical->Model().aliases.find(PresentationAliasKey(name));
+	if (found == impl->canonical->Model().aliases.end()) return false;
+	PresentationValue result;
+	if (!found->second.variable.empty()) result = impl->state.Presentation().variables.at(found->second.variable).value;
+	else if (!ReadAlias(found->second,*this,result)) return false;
+	value = FormatPresentationValue(result); return true;
+}
+bool Runtime::SetPresentationAlias(const std::string& name, const std::string& text, bool overrideExpression, std::string& error) {
+	error.clear();
+	if (!impl->canonical) { error = "Presentation writes require a canonical document"; return false; }
+	const auto found = impl->canonical->Model().aliases.find(PresentationAliasKey(name));
+	if (found == impl->canonical->Model().aliases.end()) { error = "Unknown presentation alias '"+name+"'"; return false; }
+	const auto& alias = found->second;
+	PresentationValue current, value;
+	if (!alias.variable.empty()) current = impl->state.Presentation().variables.at(alias.variable).value;
+	else if (!ReadAlias(alias,*this,current)) { error = "Unavailable presentation target"; return false; }
+	if (!ParsePresentationValue(current.type,text,value,error)) return false;
+	if (!alias.variable.empty()) return impl->state.WritePresentationVariable(alias.variable,value,overrideExpression,error);
+	PropertyValues bound, unbound;
+	const auto properties = AliasProperties(alias);
+	for (size_t i = 0; i < properties.size(); ++i) {
+		const PropertyKey key{alias.node,properties[i]};
+		auto target = *PresentedValue(key.first,key.second);
+		if (alias.property == "rect") target.data[0] = value.data[i];
+		else if (alias.property == "visible") target.text = value.data[0] != 0 ? alias.shown : "none";
+		else if (alias.property == "noevents") target.text = value.data[0] != 0 ? "none" : "auto";
+		else if (value.type == PresentationType::String) target.text = value.text;
+		else if (value.type == PresentationType::Vector4) std::copy_n(value.data.begin(),4,target.data.begin());
+		else target.data[0] = value.data[0];
+		(impl->state.Properties().contains(key) ? bound : unbound)[key] = std::move(target);
+	}
+	// A rectangle may mix bound and unbound components. Both owners validate
+	// before either is committed, and no setter invokes an action or a redraw.
+	State state = impl->state; Motion motion = impl->motion;
+	if (!state.OverrideProperties(bound,overrideExpression,error) || !motion.WriteValues(unbound,error)) return false;
+	impl->state = std::move(state); impl->motion = std::move(motion);
+	return true;
 }
 void Runtime::PauseTimeline(const std::string& id, double seconds) { impl->motion.Pause(id,seconds); }
 void Runtime::ResumeTimeline(const std::string& id, double seconds) { impl->motion.Resume(id,seconds); }
@@ -985,19 +1126,19 @@ void Runtime::PointerMove(float x, float y, double seconds) {
 	impl->pointerPresent = std::isfinite(x) && std::isfinite(y);
 	impl->windowPointerX = x; impl->windowPointerY = y;
 	impl->viewport.WindowToDocument(x,y,impl->pointerX,impl->pointerY);
-	impl->interaction.Hover(impl->HitControl()); impl->Feedback(seconds);
+	impl->UpdateInteraction(seconds); impl->Feedback(seconds);
 }
-void Runtime::PointerButton(bool down, double seconds) { impl->interaction.Pointer(down); impl->Feedback(seconds); }
-void Runtime::MenuAction(MenuInput input, bool down, double seconds) { impl->interaction.Input(input,down); impl->Feedback(seconds); }
+void Runtime::PointerButton(bool down, double seconds) { impl->UpdateInteraction(seconds); impl->interaction.Pointer(down); impl->Feedback(seconds); }
+void Runtime::MenuAction(MenuInput input, bool down, double seconds) { impl->UpdateInteraction(seconds); impl->interaction.Input(input,down); impl->Feedback(seconds); }
 void Runtime::CancelInput(double seconds) { impl->pointerPresent = false; impl->interaction.Cancel(); impl->Feedback(seconds); }
 void Runtime::ReleaseInputSources() { impl->interaction.ReleaseInputSources(); }
-bool Runtime::FocusControl(const std::string& id, double seconds) { const bool result = impl->interaction.Focus(id); impl->Feedback(seconds); return result; }
+bool Runtime::FocusControl(const std::string& id, double seconds) { impl->UpdateInteraction(seconds); const bool result = impl->interaction.Focus(id); impl->Feedback(seconds); return result; }
 bool Runtime::SetControlEnabled(const std::string& id, bool enabled, double seconds) {
 	if (impl->state.Enabled().contains(id)) return false; // The binding owns this control's availability.
 	const bool result = impl->interaction.SetEnabled(id,enabled); impl->Feedback(seconds); return result;
 }
-bool Runtime::PushModal(const std::string& id, double seconds) { const bool result = impl->interaction.PushModal(id); impl->Feedback(seconds); return result; }
-bool Runtime::PopModal(double seconds) { const bool result = impl->interaction.PopModal(); impl->Feedback(seconds); return result; }
+bool Runtime::PushModal(const std::string& id, double seconds) { impl->UpdateInteraction(seconds); const bool result = impl->interaction.PushModal(id); impl->Feedback(seconds); return result; }
+bool Runtime::PopModal(double seconds) { impl->UpdateInteraction(seconds); const bool result = impl->interaction.PopModal(); impl->Feedback(seconds); return result; }
 std::string Runtime::FocusedControl() const { return impl->interaction.Focused(); }
 std::optional<ControlState> Runtime::GetControlState(const std::string& id) const { return impl->interaction.State(id); }
 std::vector<ControlAction> Runtime::TakeActions() {

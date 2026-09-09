@@ -9,6 +9,26 @@ renders correctly on Vulkan; the RC_* render-texture command family works
 instead of being dropped; screenshots produce real images; gamma/brightness
 pass matches GL; strict out-of-box defaults stay byte-identical.
 
+## H3 implementation update — 9 September 2026
+
+The native executor now applies the final brightness/gamma shader after scene
+and GUI composition, before both presentation and screenshot readback. Neutral
+settings bypass all pass allocation/copy/drawing. Per-frame-slot scratch images
+use existing image ownership and retirement; a composition flag prevents
+double correction when readback and presentation share a frame. Resource and
+pipeline failures produce a throttled diagnostic and retain the uncorrected
+frame.
+
+Production-controller/math and shader-regeneration tests pass. Windowed
+SP/OpenGL and MP/Vulkan retained-menu captures at 1280x720/125%, after language
+and video restart, agree within one 8-bit channel value at neutral settings and
+at brightness 1.25/gamma 1.3. The
+[presentation checkpoint](../ui/presentation-aliases.md) records commands,
+pixel-oracle results and evidence limits. This qualifies the observed SDR menu
+path; it does not close full Phase H, HDR/color-space, driver validation,
+all-GPU/platform or release-performance gates. The recon and stage descriptions
+below retain their historical scope.
+
 ## Decisions locked by recon (phase-h-recon/*)
 
 - Strict out-of-box defaults need ZERO post work: g_renderFastNoPost 1 +

@@ -66,6 +66,7 @@
 #include "vk_ShadowMap.h"
 #include "shaders/gui_shaders_spv.h"
 #include "shaders/temporal_resolve_spv.h"
+#include "shaders/display_color_mapping_spv.h"
 
 extern idCVar r_skipDynamicTextures;
 
@@ -341,6 +342,11 @@ typedef struct vkGuiExecutor_s {
 	VkShaderModule		gpuSkinningModule;
 	VkShaderModule		temporalResolveVertModule;
 	VkShaderModule		temporalResolveFragModule;
+	VkShaderModule		displayColorFragModule;
+	VkPipeline			displayColorPipeline;
+	idImage *			displayColorSourceImages[ VK_FRAMES_IN_FLIGHT ];
+	bool				displayColorMapped;
+	bool				displayColorMappingWarned;
 	VkDescriptorSetLayout setLayout;
 	VkDescriptorSetLayout uboSetLayout;		// one dynamic uniform buffer (interaction block ring)
 	// shadow receiver set: binding 0 = atlas + compare sampler (fragment),
@@ -2925,6 +2931,12 @@ void VK_GuiExecutor_Shutdown( void ) {
 				vkExec.temporalResolvePipelines[i].pipeline, NULL );
 		}
 	}
+	if ( vkExec.displayColorPipeline != VK_NULL_HANDLE ) {
+		vkDestroyPipeline( vkCtx.device, vkExec.displayColorPipeline, NULL );
+	}
+	if ( vkExec.displayColorFragModule != VK_NULL_HANDLE ) {
+		vkDestroyShaderModule( vkCtx.device, vkExec.displayColorFragModule, NULL );
+	}
 	if ( vkExec.pipelineLayout != VK_NULL_HANDLE ) {
 		vkDestroyPipelineLayout( vkCtx.device, vkExec.pipelineLayout, NULL );
 	}
@@ -3208,6 +3220,10 @@ static bool VK_GuiExecutor_BeginFrame( void ) {
 				vkExec.temporalResolvePipelines[i].pipeline, NULL );
 		}
 		vkExec.numTemporalResolvePipelines = 0;
+		if ( vkExec.displayColorPipeline != VK_NULL_HANDLE ) {
+			vkDestroyPipeline( vkCtx.device, vkExec.displayColorPipeline, NULL );
+			vkExec.displayColorPipeline = VK_NULL_HANDLE;
+		}
 		vkExec.pipelineTargetFormat = vkCtx.swapchainFormat;
 	}
 
@@ -3324,6 +3340,7 @@ static bool VK_GuiExecutor_BeginFrame( void ) {
 	vkExec.activePipelineTarget = VK_Exec_SwapchainPipelineTarget();
 	vkExec.frameOpen = true;
 	vkExec.acquireWaitPending = true;
+	vkExec.displayColorMapped = false;
 	VK_Exec_BeginMainRendering( true );
 
 	vkExec.vertexRings[ slot ].cursor = 0;
@@ -5364,6 +5381,117 @@ bool VK_Exec_ResolveRenderTargets( idRenderTexture *sourceRenderTexture,
 	return depthResolved;
 }
 
+static bool VK_DisplayColorMapping_Failed( const char *reason ) {
+	if ( !vkExec.displayColorMappingWarned ) {
+		common->Warning( "Vulkan: r_brightness/r_gamma could not be applied (%s); keeping the uncorrected frame", reason );
+		vkExec.displayColorMappingWarned = true;
+	}
+	return false;
+}
+
+static VkPipeline VK_DisplayColorMapping_GetPipeline( void ) {
+	if ( vkExec.displayColorPipeline != VK_NULL_HANDLE ) {
+		return vkExec.displayColorPipeline;
+	}
+	if ( vkExec.displayColorFragModule == VK_NULL_HANDLE ) {
+		VkShaderModuleCreateInfo info;
+		memset( &info, 0, sizeof( info ) );
+		info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+		info.codeSize = vk_display_color_mapping_frag_spv_size;
+		info.pCode = (const uint32_t *)vk_display_color_mapping_frag_spv;
+		if ( vkCreateShaderModule( vkCtx.device, &info, NULL,
+				&vkExec.displayColorFragModule ) != VK_SUCCESS ) {
+			return VK_NULL_HANDLE;
+		}
+	}
+	VkPipelineVertexInputStateCreateInfo vertexInput;
+	memset( &vertexInput, 0, sizeof( vertexInput ) );
+	vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+	vkExec.displayColorPipeline = VK_Exec_CreatePipeline(
+		vkExec.temporalResolveVertModule, vkExec.displayColorFragModule,
+		&vertexInput, GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO,
+		vkExec.pipelineLayout, false, false, VK_Exec_SwapchainPipelineTarget() );
+	return vkExec.displayColorPipeline;
+}
+
+// Final display correction is deliberately independent of scene post effects.
+// Both native and shared GUI/overlay draws are already in the swapchain. The
+// neutral path must not allocate, copy, change draw state or quantize any pixel.
+static bool VK_DisplayColorMapping_Apply( void ) {
+	const float brightness = idMath::ClampFloat( 0.0f, 16.0f, r_brightness.GetFloat() );
+	const float gamma = Max( r_gamma.GetFloat(), 0.001f );
+	if ( vkExec.displayColorMapped || ( idMath::Fabs( brightness - 1.0f ) <= 0.0001f
+			&& idMath::Fabs( gamma - 1.0f ) <= 0.0001f ) ) {
+		return true;
+	}
+	if ( !vkExec.frameOpen || !vkCtx.swapchainTransferSrc ) {
+		return VK_DisplayColorMapping_Failed( "swapchain copy unavailable" );
+	}
+	if ( vkExec.temporalScenePendingComposite
+			&& !VK_TemporalPresentation_CompositePendingScene() ) {
+		return VK_DisplayColorMapping_Failed( "scene composition unavailable" );
+	}
+	if ( !VK_Exec_SetRenderTarget( NULL ) ) {
+		return VK_DisplayColorMapping_Failed( "swapchain target unavailable" );
+	}
+	const VkPipeline pipeline = VK_DisplayColorMapping_GetPipeline();
+	if ( pipeline == VK_NULL_HANDLE ) {
+		return VK_DisplayColorMapping_Failed( "display shader/pipeline unavailable" );
+	}
+	const int width = (int)vkCtx.swapchainExtent.width;
+	const int height = (int)vkCtx.swapchainExtent.height;
+	idImage *&source = vkExec.displayColorSourceImages[ vkExec.frameSlot ];
+	if ( source == NULL || !source->IsLoaded() ) {
+		idImageOpts opts;
+		opts.width = width; opts.height = height; opts.format = FMT_RGBA8;
+		opts.numLevels = 1; opts.numMSAASamples = 0; opts.isPersistant = true;
+		source = globalImages->ScratchImage( va( "_vkDisplayColorSource%d", vkExec.frameSlot ),
+			&opts, TF_NEAREST, TR_CLAMP, TD_DEFAULT );
+	}
+	if ( source == NULL ) {
+		return VK_DisplayColorMapping_Failed( "display copy image unavailable" );
+	}
+	// Images and their deferred GPU retirement remain owned by the image
+	// manager. Per-slot copies are reused only after the executor's slot fence,
+	// including resize/restart and the explicitly retired screenshot resume.
+	if ( !source->IsLoaded()
+			|| !VK_Exec_CopyRender( source, 0, 0, width, height, 0, false ) ) {
+		return VK_DisplayColorMapping_Failed( "display framebuffer copy failed" );
+	}
+	const VkDescriptorSet sourceSet = VK_GuiExecutor_GetImageDescriptor( source->GetDeviceHandle() );
+	if ( sourceSet == VK_NULL_HANDLE || !vkExec.mainScopeOpen ) {
+		return VK_DisplayColorMapping_Failed( "display copy descriptor/scope unavailable" );
+	}
+	// A positive viewport follows Vulkan image-memory coordinates. The fragment
+	// shader reverses CopyRender's GL-oriented rows using exact texel fetches.
+	VkViewport viewport;
+	memset( &viewport, 0, sizeof( viewport ) );
+	viewport.width = (float)width; viewport.height = (float)height; viewport.maxDepth = 1.0f;
+	VkRect2D scissor;
+	memset( &scissor, 0, sizeof( scissor ) );
+	scissor.extent = vkCtx.swapchainExtent;
+	vkCmdSetViewport( vkExec.cmd, 0, 1, &viewport );
+	vkCmdSetScissor( vkExec.cmd, 0, 1, &scissor );
+	vkCmdSetDepthTestEnable( vkExec.cmd, VK_FALSE );
+	vkCmdSetDepthWriteEnable( vkExec.cmd, VK_FALSE );
+	vkCmdSetDepthCompareOp( vkExec.cmd, VK_COMPARE_OP_ALWAYS );
+	vkCmdSetCullMode( vkExec.cmd, VK_CULL_MODE_NONE );
+	vkCmdSetFrontFace( vkExec.cmd, VK_FRONT_FACE_COUNTER_CLOCKWISE );
+	vkCmdSetDepthBiasEnable( vkExec.cmd, VK_FALSE );
+	vkCmdSetStencilTestEnable( vkExec.cmd, VK_FALSE );
+	if ( vkCtx.depthBoundsSupported ) vkCmdSetDepthBoundsTestEnable( vkExec.cmd, VK_FALSE );
+	vkCmdBindPipeline( vkExec.cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline );
+	vkCmdBindDescriptorSets( vkExec.cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+		vkExec.pipelineLayout, 0, 1, &sourceSet, 0, NULL );
+	const float mapping[ 4 ] = { brightness, gamma, 0, 0 };
+	vkCmdPushConstants( vkExec.cmd, vkExec.pipelineLayout,
+		VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( mapping ), mapping );
+	vkCmdDraw( vkExec.cmd, 3, 1, 0, 0 );
+	vkExec.displayColorMapped = true;
+	vkExec.displayColorMappingWarned = false;
+	return true;
+}
+
 /*
 ====================
 VK_GuiExecutor_ReadPixels
@@ -5421,6 +5549,9 @@ bool VK_GuiExecutor_ReadPixels( int x, int y, int width, int height, void *pixel
 				(int)vkCtx.swapchainFormat );
 		return false;
 	}
+	// Capture the same final pixels that ordinary presentation displays. A
+	// failed pass warns and leaves the complete original composition intact.
+	(void)VK_DisplayColorMapping_Apply();
 
 	const VkDeviceSize readbackBytes = (VkDeviceSize)width * (VkDeviceSize)height * 4;
 	VkBufferCreateInfo bci;
@@ -5530,6 +5661,9 @@ bool VK_GuiExecutor_ReadPixels( int x, int y, int width, int height, void *pixel
 		}
 		vkExec.frameOpen = true;
 		vkExec.mainScopeOpen = false;
+		// The captured composition was submitted and retired above. The clear
+		// starts a new composition on this acquired image, with fresh draw state.
+		vkExec.displayColorMapped = false;
 		// The screenshot path explicitly retired this same slot; start a fresh
 		// timing epoch for the real frame recorded after the crop.
 		VK_GpuFrameTiming_BeginFrame( vkExec.cmd, submittedSlot, tr.frameCount );
@@ -5665,6 +5799,7 @@ static bool VK_GuiExecutor_SubmitFrame( bool present ) {
 }
 
 bool VK_GuiExecutor_EndFrameAndPresent( void ) {
+	(void)VK_DisplayColorMapping_Apply();
 	return VK_GuiExecutor_SubmitFrame( true );
 }
 

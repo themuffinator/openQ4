@@ -132,7 +132,18 @@ MotionSnapshot Motion::Capture(double seconds) const {
 	}
 	return result;
 }
-bool Motion::Restore(const MotionSnapshot& snapshot, double seconds, std::string& error) {
+bool Motion::WriteValues(const PropertyValues& changes, std::string& error) {
+	error.clear();
+	for (const auto& [key,value] : changes) {
+		const auto original = base.find(key);
+		if (original == base.end() || value.type != original->second.type || value.unit != original->second.unit || !ValidProperty(key.second,value)) {
+			error = "Invalid presentation property '"+key.first+"."+key.second+"'"; return false;
+		}
+	}
+	for (const auto& [key,value] : changes) values[key] = value;
+	return true;
+}
+bool Motion::Restore(const MotionSnapshot& snapshot, double seconds, std::string& error, bool allowStaticValues) {
 	error.clear();
 	auto reject = [&](const char* message) { error = message; return false; };
 	if (!std::isfinite(seconds) || seconds < 0) return reject("Invalid restored presentation time");
@@ -143,7 +154,8 @@ bool Motion::Restore(const MotionSnapshot& snapshot, double seconds, std::string
 	for (const auto& [id,timeline] : timelines) for (const auto& track : timeline.tracks) animated.emplace(track.node,track.property);
 	for (const auto& [key,value] : snapshot.values) {
 		const auto original = base.find(key);
-		if (!animated.contains(key) || original == base.end() || !original->second.CanInterpolate(value) || !ValidProperty(key.second,value))
+		if ((!allowStaticValues && !animated.contains(key)) || original == base.end() ||
+			value.type != original->second.type || value.unit != original->second.unit || !ValidProperty(key.second,value))
 			return reject("Invalid restored presentation property");
 		candidate.values[key] = value;
 	}

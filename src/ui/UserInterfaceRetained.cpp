@@ -289,13 +289,21 @@ void idUserInterfaceRetained::StateChanged(int time, bool redraw) {
 
 bool idUserInterfaceRetained::GetPresentationValue(const char* name, idStr& value) const {
 	if (!name || !impl->Prepare()) return false;
+	std::string exported;
+	if (impl->RuntimeView()->GetPresentationAlias(name,exported)) { value = exported.c_str(); return true; }
 	const std::string alias(name); const auto separator = alias.find("::");
 	if (separator == std::string::npos) return false;
+	if (idStr::Icmp(alias.substr(0,separator).c_str(),"gui") == 0) return false;
 	const auto property = impl->RuntimeView()->PresentedValue(alias.substr(0,separator),alias.substr(separator+2));
 	if (!property) return false;
 	value = (property->type == ValueType::Text ? property->text : property->Css()).c_str(); return true;
 }
-bool idUserInterfaceRetained::SetPresentationValue(const char*, const char*, bool) { return false; }
+bool idUserInterfaceRetained::SetPresentationValue(const char* name, const char* value, bool overrideExpression) {
+	if (!name || !value || !impl->Prepare()) return false;
+	std::string error;
+	if (!impl->RuntimeView()->SetPresentationAlias(name,value,overrideExpression,error)) { impl->Error(error); return false; }
+	impl->lastError.clear(); return true;
+}
 bool idUserInterfaceRetained::GetTextInputState(idRectangle&, float&) const { return false; }
 bool idUserInterfaceRetained::GetMaxTextIndex(const char*, const char*, wrapInfo_t&) const { return false; }
 void idUserInterfaceRetained::SetKeyBindingNames() {}
@@ -493,6 +501,10 @@ bool UI_RetainedDiagnostic(idUserInterface* gui, const idCmdArgs& args) {
 		}
 	} else if (verb == "state" && args.Argc() == 4) {
 		owner.SetStateString(args.Argv(2),args.Argv(3)); owner.StateChanged(common->GetPresentationTime()); okay = impl.lastError.empty();
+	} else if (verb == "presentation" && args.Argc() == 5 && (!idStr::Cmp(args.Argv(4),"0") || !idStr::Cmp(args.Argv(4),"1"))) {
+		okay = owner.SetPresentationValue(args.Argv(2),args.Argv(3),args.Argv(4)[0] == '1');
+	} else if (verb == "update" && args.Argc() == 2) {
+		owner.StateChanged(common->GetPresentationTime()); okay = impl.lastError.empty();
 	} else if (verb == "save" && args.Argc() == 2) {
 		idFile_Memory save;
 		if (owner.WriteToSaveGame(&save) && save.WriteUnsignedInt(0x53454e54) == 4) {

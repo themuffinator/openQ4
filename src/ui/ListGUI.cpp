@@ -68,19 +68,15 @@ idListGUILocal::GetSelection
 ====================
 */
 int idListGUILocal::GetSelection( char *s, int size, int _sel ) const {
-	if ( s ) {		
+	if ( s && size > 0 ) {
 		s[ 0 ] = '\0';
 	}
-	int sel = m_pGUI->State().GetInt( va( "%s_sel_%i", m_name.c_str(), _sel ), "-1" );
-	if ( sel == -1 || sel >= m_ids.Num() ) {
+	const int sel = m_pGUI->State().GetInt( va( "%s_sel_%i", m_name.c_str(), _sel ), "-1" );
+	if ( sel < 0 || sel >= m_ids.Num() ) {
 		return -1;
 	}
-	if ( s ) {
-		idStr::snPrintf( s, size, m_pGUI->State().GetString( va( "%s_item_%i", m_name.c_str(), sel ), "" ) );
-	}
-	// don't let overflow
-	if ( sel >= m_ids.Num() ) {
-		sel = 0;
+	if ( s && size > 0 ) {
+		idStr::Copynz( s, m_pGUI->State().GetString( va( "%s_item_%i", m_name.c_str(), sel ), "" ), size );
 	}
 	m_pGUI->SetStateInt( va( "%s_selid_0", m_name.c_str() ), m_ids[ sel ] ); 
 	return m_ids[ sel ];

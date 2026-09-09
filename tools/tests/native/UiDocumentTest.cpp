@@ -48,7 +48,158 @@ static const char* Source = R"json(
 }
 // Keep this trailer too.
 )json";
+static void CheckPresentationSchema() {
+	const std::string source = R"json(
+// Public metadata is typed data, independent of rendered properties.
+{
+ "format":"openq4-ui", "version":1, "id":"presentation-schema",
+ "state":{"source":{"type":"number","initial":3},"allowed":{"type":"boolean","initial":true}},
+ "presentationVariables":{
+  "page":{"type":"number","initial":22,"value":{"state":"source"}},
+  "flag":{"type":"boolean","initial":true,"value":{"state":"allowed"}},
+  "metadata":{"type":"string","initial":"metadata <script>data</script>","value":"unlocalized metadata"},
+  "pair":{"type":"vector2","initial":[1,2],"value":[{"state":"source"},4]},
+  "triple":{"type":"vector3","initial":[-1,2,3]},
+  "quad":{"type":"vector4","initial":[-1,2,3,4],"value":[1,2,3,{"op":"+","args":[{"state":"source"},1]}]}
+ },
+ "aliases":{
+  "CuRR":{"variable":"page","extensions":{"keep":"alias metadata"}},
+  "desktop::curr":{"variable":"page"},
+  "dpadGUI":{"variable":"flag"},
+  "metadata":{"variable":"metadata"},
+  "point":{"variable":"pair"},
+  "volume":{"variable":"triple"},
+  "bounds":{"variable":"quad"},
+  "PANEL::rect":{"node":"panel","property":"rect"},
+  "panel::visible":{"node":"panel","property":"visible","shown":"flex"},
+  "panel::noevents":{"node":"panel","property":"noevents"},
+  "panel::opacity":{"node":"panel","property":"opacity"},
+  "panel::min-width":{"node":"panel","property":"min-width"},
+  "panel::color":{"node":"panel","property":"color"},
+  "panel::font":{"node":"panel","property":"font-family"},
+  "panel::display":{"node":"panel","property":"display"},
+  "label::text":{"node":"label","property":"text"}
+ },
+ "root":{"id":"panel","type":"group","properties":{
+  "left":{"type":"length","value":10,"unit":"dp"},
+  "top":{"type":"length","value":20,"unit":"dp"},
+  "width":{"type":"length","value":300,"unit":"dp"},
+  "height":{"type":"length","value":120,"unit":"dp"},
+  "min-width":{"type":"length","value":1,"unit":"px"},
+  "right":{"type":"length","value":0,"unit":"%"},
+  "display":{"type":"keyword","value":"flex"},
+  "pointer-events":{"type":"keyword","value":"auto"},
+  "position":{"type":"keyword","value":"absolute"},
+  "opacity":{"type":"number","value":0.5},
+  "color":{"type":"color","value":[0.1,0.2,0.3,1]},
+  "font-family":{"type":"font","value":"marine"},
+  "transform":{"type":"transform","value":[0,0,1,1,0],"unit":"dp"}
+ },"children":[{"id":"label","type":"text","properties":{"text":{"type":"text","value":"#str_test"}}}]},
+ "extensions":{"keep":"source-preserving sentinel"}
+}
+// Keep this presentation trailer.
+)json";
+	Document document; std::vector<Diagnostic> errors;
+	Check(document.Load(source,errors),"parse explicit presentation metadata, aliases and fixed-unit rendered targets");
+	Check(document.Source() == source && document.Model().presentationVariables.size() == 6 && document.Model().aliases.size() == 16,
+		"presentation declarations preserve source and compile without creating rendered nodes");
+	const auto& variables = document.Model().presentationVariables;
+	Check(variables.at("page").initial.type == PresentationType::Number && variables.at("page").initial.data[0] == 22 &&
+		variables.at("page").expressions.front().type == 0,"number metadata retains authored initial and compiled expression");
+	Check(variables.at("flag").initial.type == PresentationType::Boolean && variables.at("flag").initial.data[0] == 1 &&
+		variables.at("flag").expressions.front().type == 1,"boolean presentation declaration is distinct from a CSS value");
+	Check(variables.at("metadata").initial.text == "metadata <script>data</script>" && variables.at("metadata").expressions.front().type == 2,
+		"non-rendered strings are bounded data and do not require display localization keys");
+	Check(variables.at("pair").initial.type == PresentationType::Vector2 && variables.at("pair").expressions.size() == 2 &&
+		variables.at("triple").initial.type == PresentationType::Vector3 && variables.at("quad").expressions.size() == 4,
+		"vector metadata keeps declared dimensions and component expression types");
+	Check(document.Model().aliases.at("curr").variable == "page" && document.Model().aliases.at("desktop::curr").variable == "page" &&
+		document.Model().aliases.at("dpadgui").variable == "flag","public alias names case-fold and qualified/root synonyms share exact targets");
+	Check(document.Model().aliases.at("panel::rect").node == "panel" && document.Model().aliases.at("panel::visible").shown == "flex",
+		"rect and visibility targets compile independently of their public spelling");
+	Check(document.BuildMarkup().find("<script>") == std::string::npos && document.BuildMarkup().find("unlocalized metadata") == std::string::npos,
+		"presentation metadata never becomes markup");
+	Check(document.ReplaceValue("/presentationVariables/page/initial","23",errors),"edit presentation metadata through canonical source spans");
+	std::string expected = source;
+	expected.replace(expected.find("\"initial\":22"),12,"\"initial\":23");
+	Check(document.Source() == expected && document.Model().presentationVariables.at("page").initial.data[0] == 23,
+		"presentation metadata edit preserves all other bytes and comments");
+	const auto beforeInvalid = document.Source();
+	auto reject = [&](const std::string& pointer, const std::string& value, const char* message) {
+		Check(!document.ReplaceValue(pointer,value,errors),message);
+		Check(!errors.empty() && document.Source() == beforeInvalid && document.Model().aliases.at("curr").variable == "page",
+			"invalid presentation edits preserve source/model and report a diagnostic");
+	};
+	reject("/presentationVariables","[]","presentation variable declarations require an object");
+	reject("/presentationVariables/page",R"({"type":"integer","initial":1})","reject unsupported presentation types");
+	reject("/presentationVariables/page",R"({"type":"number"})","presentation variables require initial values");
+	reject("/presentationVariables/page",R"({"type":"number","initial":1,"cvar":"r_gamma"})","metadata cannot introduce an implicit CVar owner");
+	reject("/presentationVariables/page/initial","true","numbers cannot silently consume booleans");
+	reject("/presentationVariables/page/initial","1000000000001","reject out-of-range scalar metadata");
+	reject("/presentationVariables/flag/initial","1","booleans require exact boolean JSON");
+	reject("/presentationVariables/metadata/initial","\""+std::string(65537,'a')+"\"","metadata strings retain the 64 KiB bound");
+	reject("/presentationVariables/metadata/initial",R"("bad\u0000text")","metadata strings reject embedded NUL");
+	reject("/presentationVariables/pair/initial","[1]","vectors require exact initial component counts");
+	reject("/presentationVariables/pair/initial","[1,true]","vector components are exactly numeric");
+	reject("/presentationVariables/quad/initial","[1,2,3,-1000000000001]","all vector components are bounded");
+	reject("/presentationVariables/page/value","[1]","scalar expressions cannot use vector encoding");
+	reject("/presentationVariables/page/value","true","presentation expressions must match the declared scalar type");
+	reject("/presentationVariables/pair/value","[1]","presentation vector expression counts are exact");
+	reject("/presentationVariables/pair/value","[1,false]","presentation vector expression types are numeric");
+	reject("/presentationVariables/page/value",R"({"state":"page"})","presentation variables cannot masquerade as state references");
+	reject("/presentationVariables/page/value",R"({"op":"/","args":[1,0]})","invalid initial expressions fail document compilation");
+	reject("/presentationVariables/page/value",R"({"op":"*","args":[1000000000000,2]})","initial expression results obey presentation bounds");
+	reject("/presentationVariables/metadata/value","false","string expression types cannot silently convert booleans");
+	reject("/aliases","[]","presentation aliases require an object");
+	reject("/aliases",R"({"curr":{"variable":"page"},"CURR":{"variable":"page"}})","case-fold collisions are rejected even for the same target");
+	reject("/aliases",R"({"GUI::source":{"variable":"page"}})","application gui namespace is forbidden case-insensitively");
+	reject("/aliases",R"({"a::b::c":{"variable":"page"}})","aliases allow at most one qualification separator");
+	reject("/aliases",R"({"::x":{"variable":"page"}})","aliases cannot have an empty node qualifier");
+	reject("/aliases",R"({"x::":{"variable":"page"}})","aliases cannot have an empty variable qualifier");
+	reject("/aliases",R"({"bad alias":{"variable":"page"}})","alias components use bounded stable ID syntax");
+	reject("/aliases",R"({"a":{"variable":"Page"}})","presentation variable target IDs retain exact case");
+	reject("/aliases",R"({"a":{"variable":"page","node":"panel"}})","metadata aliases cannot also project a node");
+	reject("/aliases",R"({"a":{"variable":"page","shown":"block"}})","metadata aliases reject rendered-only fields");
+	reject("/aliases",R"({"a":{"node":"Panel","property":"opacity"}})","rendered target IDs retain exact case");
+	reject("/aliases",R"({"a":{"node":"panel","property":"absent"}})","aliases cannot create missing canonical properties");
+	reject("/aliases",R"({"a":{"node":"panel","property":"transform"}})","five-component transforms are not silently truncated to vectors");
+	reject("/aliases",R"({"a":{"node":"panel","property":"right"}})","single property aliases reject percentage lengths");
+	reject("/aliases",R"({"a":{"node":"panel","property":"visible"}})","visible aliases require a declared shown display mode");
+	reject("/aliases",R"({"a":{"node":"panel","property":"visible","shown":"none"}})","visible true cannot mean none");
+	reject("/aliases",R"({"a":{"node":"panel","property":"visible","shown":"grid"}})","shown values use the supported canonical display registry");
+	reject("/aliases",R"({"a":{"node":"panel","property":"noevents","shown":"block"}})","noevents aliases reject unrelated shown fields");
+	reject("/aliases",R"({"a":{"node":"label","property":"visible","shown":"block"}})","visible aliases need an explicit display base");
+	reject("/aliases",R"({"a":{"node":"label","property":"noevents"}})","noevents aliases need an explicit pointer-events base");
+	reject("/aliases",R"({"a":{"node":"panel","property":"opacity","css":"raw"}})","unknown alias fields fail closed");
+	reject("/root/properties/pointer-events/value",R"("all")","pointer events accept only auto or none");
+	reject("/root/properties/left/unit",R"("px")","rect aliases cannot mix px and dp");
+	reject("/root/properties/top",R"({"type":"keyword","value":"auto"})","rect aliases require fixed numeric lengths");
+	Check(document.ReplaceValue("/presentationVariables/page/value",R"({"op":"select","args":[true,4,{"op":"/","args":[1,0]}]})",errors),
+		"initial presentation evaluation preserves lazy unused expression branches");
+	Check(document.ReplaceValue("/root/properties/pointer-events/value",R"("none")",errors),"pointer-events none is a canonical keyword");
+
+	const std::string prefix = R"({"format":"openq4-ui","version":1,"id":"presentation-limits","root":{"id":"root","type":"group"},"presentationVariables":)";
+	auto declarations = [](unsigned count,bool aliases) {
+		std::string result="{";
+		for (unsigned i=0;i<count;++i) {
+			if(i)result+=',';
+			result+='"'+std::string("v")+std::to_string(i)+"\":";
+			result+=aliases ? R"({"variable":"page"})" : R"({"type":"number","initial":0})";
+		}
+		return result+'}';
+	};
+	Document bounded;
+	Check(bounded.Load(prefix+declarations(4096,false)+'}',errors),"maximum presentation variable count is supported");
+	const auto boundedSource = bounded.Source();
+	Check(!bounded.Load(prefix+declarations(4097,false)+'}',errors) && errors.front().pointer == "/presentationVariables" && bounded.Source()==boundedSource,
+		"presentation variable limit fails atomically before expensive declaration work");
+	const std::string aliasPrefix = prefix+R"({"page":{"type":"number","initial":0}},"aliases":)";
+	Check(bounded.Load(aliasPrefix+declarations(8192,true)+'}',errors),"maximum alias count is supported");
+	Check(!bounded.Load(aliasPrefix+declarations(8193,true)+'}',errors) && errors.front().pointer == "/aliases",
+		"presentation alias declarations have an explicit count budget");
+}
 int main() {
+	CheckPresentationSchema();
 	Document document;
 	std::vector<Diagnostic> errors;
 	Check(document.Load(Source,errors),"parse typed commented document");

@@ -10,6 +10,20 @@ namespace openq4::ui {
 bool EvaluateStateExpression(const Expression& expression, const StateValues& variables,
 	StateValue& value, std::string& error);
 
+struct PresentationCell {
+	PresentationValue value;
+	bool expressionDisabled = false;
+	bool pending = false; // Transient write awaiting the next expression evaluation.
+};
+struct PresentationPropertyOverride {
+	Value value;
+	bool expressionDisabled = false;
+};
+struct StatePresentationSnapshot {
+	std::map<std::string,PresentationCell> variables;
+	std::map<PropertyKey,PresentationPropertyOverride> properties;
+};
+
 // Application and host batches commit together with all derived properties.
 // Evaluating expressions never executes commands or changes authored source.
 class State {
@@ -18,20 +32,31 @@ public:
 	bool Set(const StateValues& changes, std::string& error, bool hostSources = false);
 	// Full instance restore evaluates application and current host snapshots in
 	// one transaction, without an invalid intermediate binding evaluation.
-	bool Restore(const StateValues& application, const StateValues& hostSources, std::string& error);
+	bool Restore(const StateValues& application, const StateValues& hostSources, std::string& error,
+		const StatePresentationSnapshot* presentation = nullptr);
+	bool WritePresentationVariable(const std::string& id, const PresentationValue& value,
+		bool overrideExpression, std::string& error);
+	// All members must be binding-owned properties. Stage multi-property writes
+	// together; overrideExpression=false never revives a disabled expression.
+	bool OverrideProperties(const PropertyValues& values, bool overrideExpression, std::string& error);
+	const StatePresentationSnapshot& Presentation() const { return presentation; }
 	const StateValues& Variables() const { return variables; }
 	const PropertyValues& Properties() const { return properties; }
 	const std::map<std::string,bool>& Enabled() const { return enabled; }
 	const std::map<std::string,StateDeclaration>& Declarations() const { return declarations; }
 	std::uint64_t Revision() const { return revision; }
 private:
-	bool Evaluate(const StateValues& candidate, PropertyValues& props, std::map<std::string,bool>& controls, std::string& error) const;
+	bool Evaluate(const StateValues& candidate, PropertyValues& props, std::map<std::string,bool>& controls,
+		StatePresentationSnapshot& output, std::string& error) const;
 	std::map<std::string,StateDeclaration> declarations;
 	std::vector<Binding> bindings;
+	std::map<std::string,PresentationVariable> presentationDeclarations;
+	StatePresentationSnapshot presentation;
 	StateValues variables;
 	PropertyValues properties;
 	std::map<std::string,bool> enabled;
 	std::uint64_t revision = 0;
+	bool presentationDirty = false;
 };
 
 } // namespace openq4::ui

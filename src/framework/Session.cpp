@@ -4282,7 +4282,7 @@ static void Session_RetainedGui_f( const idCmdArgs &args ) {
 		return;
 	}
 #endif
-	common->Printf( "openq4_retainedGui: requires a retained test/active GUI and report | focus <id> | menu <action> <0|1> | state <id> <value> | save | restore\n" );
+	common->Printf( "openq4_retainedGui: requires a retained test/active GUI and report | focus <id> | menu <action> <0|1> | state <id> <value> | presentation <alias> <value> <override:0|1> | update | save | restore\n" );
 }
 
 static void Session_OpenQ4GuiSet_f( const idCmdArgs &args ) {

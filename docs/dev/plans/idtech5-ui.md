@@ -313,6 +313,10 @@ bounded per-GUI save framing and coordinated engine view invalidation. Complete
 events/aliases, text/control contracts, production mappings, world surfaces and
 the surrounding game save/demo format remain M1 work. This does not accept a
 production GUI or close the complete system-screen/editor milestone.
+The [writable presentation alias checkpoint](../ui/presentation-aliases.md)
+extends this integration with shared metadata slots, typed property conversion
+and durable expression ownership. Full semantic lowering and production screen
+acceptance remain open.
 Semantic buttons now use authored state timelines, projected hit testing,
 source-order/spatial navigation and modal focus ownership. The
 [interaction checkpoint](../ui/interaction.md) records native behavior checks,

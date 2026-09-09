@@ -37,7 +37,10 @@ public:
 	// acquire ownership, or dispatch any future action/event notifications.
 	PropertyValues Scrub(const std::string& id, double milliseconds) const;
 	MotionSnapshot Capture(double seconds) const;
-	bool Restore(const MotionSnapshot& snapshot, double seconds, std::string& error);
+	bool Restore(const MotionSnapshot& snapshot, double seconds, std::string& error, bool allowStaticValues = false);
+	// External presentation writes change current values without cancelling any
+	// track. An existing animation can write again on its next sample.
+	bool WriteValues(const PropertyValues& changes, std::string& error);
 private:
 	struct Playing {
 		std::string owner;

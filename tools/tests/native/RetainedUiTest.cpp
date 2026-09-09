@@ -736,7 +736,7 @@ int main(int argc, char** argv) {
 		};
 		reject("{}"); reject(snapshot.substr(0,snapshot.size()-1)); reject(snapshot+" {}");
 		reject(replace(snapshot,"\"format\":\"openq4-ui-instance\"","\"format\":\"openq4-ui-instance-next\""));
-		reject(replace(snapshot,"\"version\":1","\"version\":2"));
+		reject(replace(snapshot,"\"version\":2","\"version\":3"));
 		reject(replace(snapshot,"\"path\":\"snapshot-bindings.q4ui\"","\"path\":\"different.q4ui\""));
 		reject(replace(snapshot,"\"progress\":37.0","\"progress\":true"));
 		reject(replace(snapshot,"\"limit\":100.0","\"limit\":0.0"));

@@ -2,12 +2,24 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- Presentation development: retained menus now support named values shared by
+  game callers, typed layout/text/color updates, and expression overrides that
+  survive GUI saves and renderer/language reloads. Hidden or input-blocked
+  panels cancel pending button activations. The
+  [alias checkpoint](ui/presentation-aliases.md) records the supported contract;
+  full GUI translation, controls and visual editing remain in development.
+
+- Vulkan now applies brightness and gamma to the completed image, including
+  menus and engine screenshots. Neutral settings bypass the correction pass.
+
+- Legacy list selection rejects invalid negative/out-of-range rows and displays
+  percent characters in row labels literally.
+
 - Application integration development: retained menu documents can use normal
   GUI loading and submit brightness/shadow changes through typed settings operations.
   Multiple views share resource recovery, and restored GUI state discards old
   clicks. [Integration scope](ui/managed-application.md) records the current
-  limits, including Vulkan's existing missing visual brightness adjustment;
-  the full settings screen, GUI translation and visual editor remain
+  limits; the full settings screen, GUI translation and visual editor remain
   in development.
 
 - Instance persistence development: retained previews preserve focus, dialogs,

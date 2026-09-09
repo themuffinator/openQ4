@@ -21,7 +21,9 @@ The legacy implementation accepts a root variable or `element::variable`.
 Qualified lookup uses the existing first-match window traversal, including
 optimized simple windows. A replacement document will need corresponding
 stable aliases for callers that retain these names. This alias mapping and its
-typed conversions are still to be implemented in the retained adapter.
+typed conversions are now implemented by the subsequent
+[retained presentation alias checkpoint](presentation-aliases.md). Per-resource
+semantic lowering and production GUI acceptance remain open.
 
 Missing names and malformed qualifications fail without adding variables or
 elements. `gui::name` dictionary allocation is not part of presentation lookup;

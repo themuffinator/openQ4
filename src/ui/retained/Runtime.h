@@ -106,6 +106,11 @@ public:
 	bool SetState(const StateValues& changes, std::string& error, double monotonicSeconds);
 	StateValues GetState(bool includeHostSources = true) const;
 	std::optional<Value> PresentedValue(const std::string& node, const std::string& property) const;
+	// Public legacy names are explicitly mapped by the canonical document.
+	// Values are data, never CSS/markup. Failures leave outputs/state untouched.
+	bool GetPresentationAlias(const std::string& name, std::string& value) const;
+	bool SetPresentationAlias(const std::string& name, const std::string& value,
+		bool overrideExpression, std::string& error);
 	std::uint64_t StateRevision() const;
 	// Versioned instance data for the exact canonical source/path already loaded.
 	// Snapshot failure leaves output unchanged. Restore is transactional and

@@ -70,7 +70,9 @@ menu consumers from legacy window objects, and the runtime now supports
 [independent document instances](docs/dev/ui/instances.md) with
 [durable instance state and manager ownership](docs/dev/ui/instance-persistence.md).
 [Normal GUI loading and typed settings operations](docs/dev/ui/managed-application.md)
-connect explicit retained documents to session callers. Complete GUI migration,
+connect explicit retained documents to session callers.
+[Presentation aliases](docs/dev/ui/presentation-aliases.md) provide writable menu
+metadata and visual properties with persistent expression ownership. Complete GUI migration,
 the full application/control contract and the visual editor remain in development.
 The [product completion plan](docs/dev/plans/ui-product-completion.md) records
 the implementation audit and the gates for complete gameplay, artwork, editor
