@@ -1,0 +1,142 @@
+--- a/src/video/windows/SDL_windowsclipboard.c
++++ b/src/video/windows/SDL_windowsclipboard.c
+@@ -49,6 +49,7 @@
+     const int MAX_ATTEMPTS = 3;
+     int attempt;
+     HWND hwnd = NULL;
++    DWORD last_error = ERROR_SUCCESS;
+ 
+     if (_this->windows) {
+         hwnd = _this->windows->internal->hwnd;
+@@ -57,8 +58,11 @@
+         if (OpenClipboard(hwnd)) {
+             return TRUE;
+         }
++        last_error = GetLastError();
+         SDL_Delay(10);
+     }
++    SetLastError(last_error);
++    WIN_SetError("Couldn't open clipboard");
+     return FALSE;
+ }
+ 
+@@ -250,10 +254,15 @@
+                 }
+                 *dst = 0;
+                 GlobalUnlock(hMem);
+-            }
+-
+-            if (!SetClipboardData(CF_UNICODETEXT, hMem)) {
++            } else {
++                result = WIN_SetError("Couldn't lock clipboard data");
++                GlobalFree(hMem);
++                hMem = NULL;
++            }
++
++            if (hMem && !SetClipboardData(CF_UNICODETEXT, hMem)) {
+                 result = WIN_SetError("Couldn't set clipboard data");
++                GlobalFree(hMem);
+             }
+         } else {
+             result = SDL_OutOfMemory();
+@@ -275,7 +284,11 @@
+      */
+ 
+     if (WIN_OpenClipboard(_this)) {
+-        EmptyClipboard();
++        if (!EmptyClipboard()) {
++            result = WIN_SetError("Couldn't empty clipboard");
++            WIN_CloseClipboard();
++            return result;
++        }
+ 
+         // Set the clipboard text
+         for (i = 0; i < _this->num_clipboard_mime_types; ++i) {
+@@ -306,7 +319,8 @@
+         data->clipboard_count = GetClipboardSequenceNumber();
+         WIN_CloseClipboard();
+     } else {
+-        result = WIN_SetError("Couldn't open clipboard");
++        // WIN_OpenClipboard preserved the failed OpenClipboard error.
++        result = false;
+     }
+     return result;
+ }
+@@ -318,7 +332,9 @@
+     if (SDL_IsTextMimeType(mime_type)) {
+         char *text = NULL;
+ 
+-        if (IsClipboardFormatAvailable(CF_UNICODETEXT)) {
++        // Windows synthesizes Unicode from ANSI/OEM text using the clipboard
++        // locale. Never interpret legacy bytes directly as UTF-8.
++        if (IsClipboardFormatAvailable(CF_UNICODETEXT) || IsClipboardFormatAvailable(CF_TEXT) || IsClipboardFormatAvailable(CF_OEMTEXT)) {
+             if (WIN_OpenClipboard(_this)) {
+                 HANDLE hMem;
+                 LPTSTR str;
+@@ -328,6 +344,9 @@
+                     str = (LPTSTR)GlobalLock(hMem);
+                     if (str) {
+                         text = WIN_StringToUTF8W(str);
++                        if (!text) {
++                            SDL_SetError("Couldn't convert clipboard text to UTF-8");
++                        }
+                         GlobalUnlock(hMem);
+                     } else {
+                         WIN_SetError("Couldn't lock clipboard data");
+@@ -337,31 +356,12 @@
+                 }
+                 WIN_CloseClipboard();
+             }
+-        } else if (IsClipboardFormatAvailable(CF_TEXT)) {
+-            if (WIN_OpenClipboard(_this)) {
+-                HANDLE hMem;
+-                LPCSTR str;
+-
+-                hMem = GetClipboardData(CF_TEXT);
+-                if (hMem) {
+-                    str = (LPCSTR)GlobalLock(hMem);
+-                    if (str) {
+-                        text = SDL_strdup(str);
+-                        GlobalUnlock(hMem);
+-                    } else {
+-                        WIN_SetError("Couldn't lock clipboard data");
+-                    }
+-                } else {
+-                    WIN_SetError("Couldn't get clipboard data");
+-                }
+-                WIN_CloseClipboard();
+-            }
+         }
+         if (!text) {
+             text = SDL_strdup("");
+         }
+         data = text;
+-        *size = SDL_strlen(text);
++        *size = text ? SDL_strlen(text) : 0;
+ 
+     } else if (SDL_strcmp(mime_type, "image/bmp") == 0) {
+         if (IsClipboardFormatAvailable(CF_DIBV5)) {
+@@ -419,7 +419,7 @@
+ bool WIN_HasClipboardData(SDL_VideoDevice *_this, const char *mime_type)
+ {
+     if (SDL_IsTextMimeType(mime_type)) {
+-        if (IsClipboardFormatAvailable(CF_UNICODETEXT) || IsClipboardFormatAvailable(CF_TEXT)) {
++        if (IsClipboardFormatAvailable(CF_UNICODETEXT) || IsClipboardFormatAvailable(CF_TEXT) || IsClipboardFormatAvailable(CF_OEMTEXT)) {
+             return true;
+         }
+     } else if (SDL_strcmp(mime_type, "image/bmp") == 0) {
+--- a/src/video/SDL_clipboard.c
++++ b/src/video/SDL_clipboard.c
+@@ -364,7 +364,11 @@
+     if (text && *text) {
+         text_mime_types = SDL_GetTextMimeTypes(_this, &num_mime_types);
+ 
+-        return SDL_SetClipboardData(SDL_ClipboardTextCallback, SDL_free, SDL_strdup(text), text_mime_types, num_mime_types);
++        char *copy = SDL_strdup(text);
++        if (!copy) {
++            return SDL_OutOfMemory();
++        }
++        return SDL_SetClipboardData(SDL_ClipboardTextCallback, SDL_free, copy, text_mime_types, num_mime_types);
+     }
+     return SDL_ClearClipboardData();
+ }

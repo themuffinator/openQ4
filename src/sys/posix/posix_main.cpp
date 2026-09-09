@@ -451,6 +451,21 @@ EVENT LOOP
 static sysEvent_t eventQue[MAX_QUED_EVENTS];
 static int eventHead, eventTail;
 
+// Only pending queue entries own their payload. Dequeued slots may still hold
+// a pointer whose ownership has already transferred to the event consumer.
+static void Sys_DiscardQueuedEvent( sysEvent_t &event ) {
+	if ( event.evPtr != NULL ) {
+		// Discarded console input can contain private CVar values. Wipe all
+		// bounded console bytes without parsing text during queue teardown.
+		if ( event.evType == SE_CONSOLE && event.evPtrLength > 0 ) {
+			memset( event.evPtr, 0, static_cast<size_t>( event.evPtrLength ) );
+		}
+		Mem_Free( event.evPtr );
+	}
+	event.evPtr = NULL;
+	event.evPtrLength = 0;
+}
+
 /*
 ================
 Posix_QueEvent
@@ -467,10 +482,7 @@ void Posix_QueEvent( sysEventType_t type, int value, int value2,
 		common->Printf( "Posix_QueEvent: overflow\n" );
 		// we are discarding an event, but don't leak memory
 		// TTimo: verbose dropped event types?
-		if (ev->evPtr) {
-			Mem_Free(ev->evPtr);
-			ev->evPtr = NULL;
-		}
+		Sys_DiscardQueuedEvent( *ev );
 		eventTail++;
 	}
 
@@ -512,6 +524,10 @@ Sys_ClearEvents
 ================
 */
 void Sys_ClearEvents( void ) {
+	while ( eventHead > eventTail ) {
+		Sys_DiscardQueuedEvent( eventQue[ eventTail & MASK_QUED_EVENTS ] );
+		eventTail++;
+	}
 	eventHead = eventTail = 0;
 }
 

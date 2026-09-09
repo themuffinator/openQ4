@@ -374,3 +374,10 @@ resolves remain in place, including the explicit legacy mode-0 crop. Bound
 Windows SP/OpenGL before/after pixels provide partial evidence for SUR-006;
 M6 and every original runtime,
 editor, artwork, migration and platform gate remain required.
+
+The subsequent [text-entry foundation](../ui/text-entry-foundation.md) adds
+atomic Unicode editing, bounded undo/redo, exact numeric parsing, checked
+Windows clipboard primitives and pending event-payload cleanup. These are
+build-integrated services. Live text fields, ordered native/IME delivery,
+shared shaping/caret geometry and local dirty-edit handling still form the
+next production slice. This checkpoint accepts no original stage gate.

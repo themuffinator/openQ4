@@ -54,7 +54,7 @@ or flip inside the drawable viewport. Their scroll position uses measured row
 geometry. Canonical popup and ancestor opacity multiply after reparenting, so
 page fades also affect the popup. Positioning and clipping invariants are
 reasserted after layout and restore. A small
-[RmlUi extension](../../../subprojects/packagefiles/rmlui/projection-geometry.patch)
+[RmlUi extension](https://github.com/themuffinator/openQ4/blob/e3e65887480368191df154a9b52cce69d8e72140/subprojects/packagefiles/rmlui/projection-geometry.patch)
 updates stacking geometry and transforms after layout and before popup
 placement, without an additional rendering pass. This makes placement use the
 same animated transform as the frame being rendered. RmlUi remains pinned to
@@ -65,7 +65,7 @@ unrelated scroll positions. Pointer-wheel events scroll the nearest actual
 scrollable container when a choice popup does not own input. Wheel events are
 bounded rather than replayed as a backlog after a stalled frame.
 
-A second [RmlUi extension](../../../subprojects/packagefiles/rmlui/positioned-overflow.patch)
+A second [RmlUi extension](https://github.com/themuffinator/openQ4/blob/e3e65887480368191df154a9b52cce69d8e72140/subprojects/packagefiles/rmlui/positioned-overflow.patch)
 includes absolutely positioned descendants in scroll extents before a containing
 block propagates its visible overflow. Fixed elements do not extend a scrolling
 ancestor, and clipped descendants stop at their container. Canonical documents

@@ -7,7 +7,7 @@ the [completion plan](../plans/ui-product-completion.md), the
 [visual specification](../ui-visual-design.md) into implementation ownership,
 dependencies, concrete evidence and explicit unfinished work.
 
-The current increment starts from engine `a8bad0f5bf69b08493714ad4faaeae7585d5abf2` and companion
+The current increment starts from engine `e3e65887480368191df154a9b52cce69d8e72140` and companion
 `1cd33980f072ac3d78978a07b388b4b6fe6b5eb2`. The register also identifies the current
 [manager/snapshot foundation](instance-persistence.md) as partial
 evidence with native and SP/OpenGL/MP/Vulkan validation. It does not treat that work as a
@@ -168,6 +168,17 @@ Dynamic resolution, all UI surfaces and input/cinematic/subtitle geometry,
 CRT parity, the existing GL mode-3 filtering mismatch and M6 remain open.
 Historical evidence retains its original scope and bindings.
 
+The subsequent [text-entry foundation](text-entry-foundation.md) integrates
+validated Unicode commits/preedit, bounded local editing, exact numeric parsing
+and checked Windows clipboard primitives. Pending event payloads are released
+on queue clear/overflow. Native and compiled-method tests and a Windows
+SP/OpenGL gameplay/menu smoke qualify this bounded integration. Live fields,
+ordered native ownership, IME, shared shaped caret/grapheme/bidi editing and
+the complete authoring application remain required. The final local record is
+`.tmp/ui/text-input-foundation/validation-evidence.json`; the strict structural
+audit is `.tmp/ui/text-input-foundation/register-validation-final.json`.
+No status, migration entry or final gate is accepted by this increment.
+
 There are **65 partial, 161 pending and one verified requirement**. `BEH-002`
 remains partial for the implemented settings transaction/service boundary.
 `BEH-005` remains partial for committed action delivery and cancellation; stock
@@ -250,7 +261,7 @@ motion tokens and proposed performance limits. Family/source exceptions require
 documented rationale and review; numerical tokens do not replace composition
 or visual fidelity review.
 
-The reusable [register validator](../../../tools/ui/validate_product_requirements.py)
+The reusable [register validator](https://github.com/themuffinator/openQ4/blob/e3e65887480368191df154a9b52cce69d8e72140/tools/ui/validate_product_requirements.py)
 compares an increment with its immutable Git baseline. It preserves requirement
 scope, constraints, owners, dependencies and acceptance fields, checks explicit
 pending-to-partial transitions, historical evidence, source hashes and unchanged

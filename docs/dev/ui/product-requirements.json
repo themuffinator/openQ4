@@ -4,7 +4,7 @@
   "date": "2026-09-09",
   "status": "Implementation incomplete; this register preserves full product scope and does not accept any production GUI.",
   "baseline": {
-    "engine_revision": "a8bad0f5bf69b08493714ad4faaeae7585d5abf2",
+    "engine_revision": "e3e65887480368191df154a9b52cce69d8e72140",
     "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
     "effective_gui_count": 271,
     "translated_or_accepted_resources": 0,
@@ -19,12 +19,12 @@
     "product": {
       "path": "docs/dev/plans/ui-product-completion.md",
       "authority": "normative completion scope, milestones and final audit",
-      "sha256": "989e467fdf0aa4046cf89282b610d8530b9d6c7cbc24951045ac42656d4f9eca"
+      "sha256": "590776931993dcd0b6073abc02ae420327b66aac8189a1a4f63f38cb76b4da8d"
     },
     "original": {
       "path": "docs/dev/plans/idtech5-ui.md",
       "authority": "original immutable scope and stage gates",
-      "sha256": "660bc28e57b08ba1d5b4249966be83b1eb15be9929da4cfe0a600dfc39f4c8d6"
+      "sha256": "875432c08e69dd1deb8b7292a12cf1f1df80bed066e63c52b8f9caa35ccc85dc"
     },
     "inventory": {
       "path": "docs/dev/ui/inventory-report.md",
@@ -100,7 +100,7 @@
       "kind": "source_audit",
       "path": "docs/dev/plans/ui-product-completion.md",
       "scope": "Published audit at 80bb3939; source limitations corroborated by current Document/Runtime inspection. Historical tests and captures are not a fresh product qualification.",
-      "sha256": "989e467fdf0aa4046cf89282b610d8530b9d6c7cbc24951045ac42656d4f9eca"
+      "sha256": "590776931993dcd0b6073abc02ae420327b66aac8189a1a4f63f38cb76b4da8d"
     },
     "document-foundation": {
       "kind": "implementation_checkpoint",
@@ -223,7 +223,7 @@
     "display-device-foundation": {
       "kind": "qualified_foundation_checkpoint",
       "path": "docs/dev/ui/display-device-contract.md",
-      "sha256": "b7931802d466377f3039fb9152581cc88666e356251cf5c6f7bf59c982b135ce",
+      "sha256": "47e78250425fbe0f0e390b5612d6e08260e77e002021f76d5998eb84a29a3569",
       "baseline_engine_revision": "962b179c0e4214df2ebde38e98cb3e090b75fdd6",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "local_capture_summary": ".tmp/ui/display-review/capture-policy-evidence.json",
@@ -240,7 +240,7 @@
       "local_capture_summary_sha256": "1f3e66f316a689ccaae2bf0c1e08c322deb296a0539852047a8a0c9ef0b00521",
       "local_capture_status": "qualified_subset",
       "scope": "M2 display transaction integration: queued Apply/Keep/Revert/Retry with never-reused owner/request identities, strict actual-device matching, exact synchronous owner-frame presentation receipt followed by a fresh presentation, 15-second confirmation and 20-second device deadline. A canonical Pending/Confirmed journal, checked durable configuration replacement, exclusive process/window-placement leases, conflict-safe replay and renderer-private ABI15 strict first-device initialization protect interrupted settings changes. Native suites and counted production-method tests cover failures, partial writes, stale identities, uncertain persistence, invalid recovery records and historical display remapping. Source/binary-bound hidden windowed Windows SP/OpenGL and MP/Vulkan captures exercise two actual display changes, Keep/Revert, resource recreation and engine-rendered confirmation panels. Separate two-process recovery captures retain a real unconfirmed journal; Confirmed variants explicitly inject only the approved marker and checksum and do not claim a real Keep crash or power-cut test. This qualifies the recorded diagnostic subset only. Complete audio/resource effects, presets/Auto-Detect, production SYSTEM controls/artwork, editor round trips, visible window-manager/fullscreen/multi-monitor behavior, other platforms and the complete 271-GUI product remain unaccepted.",
-      "sha256": "247b8a60f9784d438c8b261d5b01bc88d1ad730175e25c6aa80cd4673cf0623b"
+      "sha256": "acf5fbf9023cbf00b98270f3ac1253a8b3d21d55a6d0beb10d317b753ef68742"
     },
     "value-controls-foundation": {
       "kind": "qualified_foundation_checkpoint",
@@ -251,7 +251,7 @@
       "scope": "M2 implementation subset: canonical typed toggle, stepped slider and constrained choice roles, atomic authoritative value/mixed/option readbacks, invocation-local immutable edit operands and acknowledged proposals. Authored stable vector parts have compiler-enforced geometry and property ownership; derived popup placement, tentative selection/drag state, source cancellation and versioned widget snapshots support the subset. The packaged openq4.system document declares the complete 53-field draft/baseline service schema and presents eight initial immediate image controls with local dirty-discard and eligible display-confirmation panels. A non-archived default-off ui_retainedSystem option selects the normal Session child route, preserving its exact parent and service-owned return guard. The final Windows build/package stage and 13 native UI suites pass; the production Session boundary passes 173 checks and the capture runner passes 15 tests with 444 rejected altered-log cases. Source/binary-bound hidden windowed Windows SP/OpenGL at 125% and MP/Vulkan at 200%, both at 1280x720, each pass 18 normal Session stages after active gameplay. Draft/readback/apply, dirty Back/continue/discard, tentative/committed choice, language/video recovery with an unapplied draft, exact parent return and fresh-owner reopen are covered. All 14 engine render-target images were reviewed, including column reflow, popup placement and distinct disabled Apply; SP has no warnings/errors, MP retains 94 baseline warnings with no new warning messages or errors. These are semantic integration and static-view checks, not full physical-input, transition, display/platform/language or artwork qualification. Precise numeric text entry/IME, complete controls and setting inventory, effect/preset executors, full source-derived artwork/transitions, touch/accessibility/scrollbars, editor round trips and full platform/corpus qualification remain required. Discard currently resets the draft and stays on the page. No requirement, milestone, production screen or migration entry is accepted.",
       "local_capture_summary": ".tmp/ui/value-controls-review/capture-evidence.json",
       "local_capture_summary_sha256": "2c5c14d4d0a9d0fb8cc8d45dab9af39fdc9e6c4ab017f93a1f6a3e49c3cf1a40",
-      "sha256": "f5c9612ba410ed50f7a69beeefabfbcc5bac76e3db038e35414bf8dd44bc9570"
+      "sha256": "948cfd1c87e67ab38ea25a0dc33fd995553472b4ab19dd44d7010ae4713412d1"
     },
     "system-exit-foundation": {
       "kind": "implementation_checkpoint",
@@ -262,7 +262,7 @@
       "scope": "Qualified M2 implementation subset: the default-off normal SYSTEM page presents 16 typed value controls, retaining 53 draft/baseline fields and editable vector parts. Dirty Back offers localized Keep editing, ordered Cancel/discard-and-exit and typed Apply-and-exit. The private one-use receipt binds owner/request and permits return only after immediate success or successful Keep and completed persistence; failures, Revert, timeout and recovery cancel exit intent. Authored modal scopes establish safe focus before first draw, restore eligible prior focus, quarantine held sources and reject stale queued Back/click/value descriptors across scope replacement. Snapshot version 4 preserves authored scope history and pending focus while fresh host readbacks win. Repeated wheel routing avoids unchanged pointer replay. The final Windows build, 15 native UI suites, 79 settings-service scenarios, 173 Session checks, adapter checks, 29 capture-tool tests, 5,747 page checks and 12 localized-label CPU layout cases passed. Four source-bound hidden windowed SP/OpenGL at 125% and MP/Vulkan at 200% normal Session captures after active gameplay cover 92 stages and 34 reviewed engine images, including VSync, Revert/Keep, parent return and persisted reopening. Source/build inputs, binaries, packages, tools, logs, images and bounded warning accounting are hash-bound. Full effects and renderer parity, UI-only native-resolution composition, precise numeric entry/IME, all 31 settings, display catalogs, Defaults/presets/Auto-Detect, complete modal/scrollbar behavior, source-derived artwork/transitions, native editor round trips and the complete platform/language/display/physical-input matrix remain required. No requirement, milestone, production screen or migration is accepted.",
       "local_capture_summary": ".tmp/ui/system-exit-review/capture-evidence.json",
       "local_capture_summary_sha256": "ddde52034403036ca1821dbb75aed11961404b311032149d1d2ff1c35f213b74",
-      "sha256": "c93d056fff7fed30362b367ac09b219c38dffa9ddaf1e661c5523530ea694791"
+      "sha256": "0d3574ce89791c03cccc514a2a65ef12487c0b199de2c3b92e2320008c26502a"
     },
     "native-output-foundation": {
       "kind": "implementation_checkpoint",
@@ -276,6 +276,16 @@
       "local_capture_summary_sha256": "a609e0fb10e9cd4e9f139e5c4382330006815aa24e9940534ff19da68482cbdf",
       "local_dependency_summary": ".tmp/ui/native-output-review/rmlui-source-qualified.json",
       "local_dependency_summary_sha256": "0da98f7ab11fe641dec47e4fac42cb608344e7870da6716f21521cf66e16ca00"
+    },
+    "text-entry-foundation": {
+      "kind": "implementation_checkpoint",
+      "path": "docs/dev/ui/text-entry-foundation.md",
+      "sha256": "90022c241469f232d2ba5fe9bc6646efbc3255482ae0181c0edc6b8703f71fb0",
+      "baseline_engine_revision": "e3e65887480368191df154a9b52cce69d8e72140",
+      "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
+      "scope": "Validated scalar UTF-8 commit/preedit records, atomic local edit buffer, bounded undo/redo and exact finite numeric parsing/formatting. Checked clipboard primitives enabled only for patched bundled Windows SDL; other providers make no SDL calls. Pending-only event-payload cleanup on Windows/POSIX. Integrated Windows build, four native suites, compiled actual-method checks and hidden SP/OpenGL gameplay/menu smoke pass within their recorded scope. No live field, native clipboard exchange, owner-aware IME delivery, shared shaped caret/grapheme/bidi editing, migration or product acceptance.",
+      "local_capture_summary": ".tmp/ui/text-input-foundation/validation-evidence.json",
+      "local_capture_summary_sha256": "1c79d7a1c6b422584d4cb95d19df2965b3f755e4467d8f498e6f847c388cd802"
     }
   },
   "groups": {
@@ -2660,9 +2670,11 @@
         "Actual text/numeric/chat field operation scenarios for selection ranges, combining glyphs, scrolling, invalid input and focus changes."
       ],
       "status": "pending",
-      "current_evidence": [],
+      "current_evidence": [
+        "text-entry-foundation"
+      ],
       "acceptance_evidence": [],
-      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required."
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required. The text-entry foundation now preserves scalar-aligned selections and rejected edits with bounded undo/redo. Shared shaped display/caret runs, grapheme and visual navigation, horizontal field scrolling and authored field qualification remain required."
     },
     {
       "id": "TXT-008",
@@ -2683,9 +2695,11 @@
         "Internal composition/text fixtures and supported host IME qualification with exact caret/candidate geometry; direct host input only with specific authorization."
       ],
       "status": "pending",
-      "current_evidence": [],
+      "current_evidence": [
+        "text-entry-foundation"
+      ],
       "acceptance_evidence": [],
-      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required."
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required. Logical composition records and checked patched-Windows clipboard primitives are tested. Live owner-aware IME, candidate geometry, clipboard field commands and every supported native backend remain required."
     },
     {
       "id": "TXT-009",
@@ -2849,10 +2863,11 @@
       ],
       "status": "pending",
       "current_evidence": [
-        "system-exit-foundation"
+        "system-exit-foundation",
+        "text-entry-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "The current adapter change preserves consecutive stationary-pointer choice-popup wheel navigation by avoiding unchanged pointer-move replay while allowing changed coordinates, explicit movement and button input to reclaim pointer navigation. Mapping caches invalidate at quarantine and resource reconstruction. Production-adapter and real Interaction/Runtime checks cover the bounded wheel path; physical-device coverage remains open. Complete production wheel/touch scrolling, Unicode text/composition payloads, keyboard/gamepad repeats and reconnect behavior across the entire widget and supported-host event matrix; require resulting value/focus/scroll evidence for every event kind. The requirement remains pending and no physical-input or full payload acceptance is inferred."
+      "remaining": "The current adapter change preserves consecutive stationary-pointer choice-popup wheel navigation by avoiding unchanged pointer-move replay while allowing changed coordinates, explicit movement and button input to reclaim pointer navigation. Mapping caches invalidate at quarantine and resource reconstruction. Production-adapter and real Interaction/Runtime checks cover the bounded wheel path; physical-device coverage remains open. Complete production wheel/touch scrolling, Unicode text/composition payloads, keyboard/gamepad repeats and reconnect behavior across the entire widget and supported-host event matrix; require resulting value/focus/scroll evidence for every event kind. The requirement remains pending and no physical-input or full payload acceptance is inferred. Validated UTF-8 payload models and pending-only queue cleanup are implemented. Ordered native delivery, composition ownership and the complete wheel/touch/text/reconnect operation matrix remain required."
     },
     {
       "id": "INP-006",
@@ -3038,10 +3053,11 @@
       ],
       "status": "partial",
       "current_evidence": [
-        "value-controls-foundation"
+        "value-controls-foundation",
+        "text-entry-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "Canonical stepped sliders now have authored track/fill/thumb/value parts, authoritative raw readback, captured drag previews with release proposals and keyboard step/navigation semantics. Initial brightness/ambient controls use the owned settings draft. Precise numeric entry and its caret/selection/clipboard/IME path remain mandatory; increment controls do not substitute for them. Complete interrupted binding/animation ownership, reusable artwork and all disabled/busy/invalid/cancel/focus, touch/gamepad/keyboard/pointer production cases. Recorded native and normal-route Windows checks qualify this initial control subset only."
+      "remaining": "Canonical stepped sliders now have authored track/fill/thumb/value parts, authoritative raw readback, captured drag previews with release proposals and keyboard step/navigation semantics. Initial brightness/ambient controls use the owned settings draft. Precise numeric entry and its caret/selection/clipboard/IME path remain mandatory; increment controls do not substitute for them. Complete interrupted binding/animation ownership, reusable artwork and all disabled/busy/invalid/cancel/focus, touch/gamepad/keyboard/pointer production cases. Recorded native and normal-route Windows checks qualify this initial control subset only. Exact numeric editing now distinguishes incomplete, malformed, out-of-range and valid text without step quantization. Precise-entry slider integration, field artwork, focus/selection/clipboard/IME behavior and draft validation remain required."
     },
     {
       "id": "WID-005",
@@ -3090,9 +3106,11 @@
         "Real value/action and state-gallery evidence for keyboard, pointer, gamepad and supported touch/text entry; include disabled, busy, invalid, cancel and focus cases as applicable. All named behavior must work through production routing."
       ],
       "status": "pending",
-      "current_evidence": [],
+      "current_evidence": [
+        "text-entry-foundation"
+      ],
       "acceptance_evidence": [],
-      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required."
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required. The local edit buffer and numeric policy are tested. Authored field controls, rendered caret/selection/preedit, localized correction feedback, proposals, persistence and live clipboard/IME routes remain required."
     },
     {
       "id": "WID-007",

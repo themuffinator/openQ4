@@ -90,7 +90,7 @@ application does not replay its initialization/actions.
 
 Progress, prompt and Keep/Revert/Retry labels are localized in all six current
 language tables (`#str_229990`–`#str_229997`). Numeric dimensions, request IDs and
-device names are data. The [diagnostic fixture](../../../tools/ui/fixtures/display-settings-smoke.q4ui)
+device names are data. The [diagnostic fixture](https://github.com/themuffinator/openQ4/blob/e3e65887480368191df154a9b52cce69d8e72140/tools/ui/fixtures/display-settings-smoke.q4ui)
 uses editable first-party vectors and the established 45-degree framing; it is
 not a substitute for the complete production settings component set.
 

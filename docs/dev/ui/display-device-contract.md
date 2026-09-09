@@ -12,7 +12,7 @@ This checkpoint accepts none of the 271 GUI migration entries or the complete
 
 ## Private services and ownership
 
-[RenderModuleAPI.h](../../../src/renderer/RenderModuleAPI.h) adds
+[RenderModuleAPI.h](https://github.com/themuffinator/openQ4/blob/e3e65887480368191df154a9b52cce69d8e72140/src/renderer/RenderModuleAPI.h) adds
 `QueryWindowState` and `ApplyScreenParmsStrict` to the engine window services,
 and `TryDeviceRestart` and `GetDisplayPresentation` to renderer exports. Engine
 and renderer modules must use the same ABI version. These are private engine
@@ -27,7 +27,7 @@ invalidates the captured display IDs before they can be used for restoration.
 This lease preserves identities only in the current process/video lifetime;
 a recovery journal must re-resolve monitors after process restart.
 
-[RendererModule.h](../../../src/renderer/RendererModule.h) exposes:
+[RendererModule.h](https://github.com/themuffinator/openQ4/blob/e3e65887480368191df154a9b52cce69d8e72140/src/renderer/RendererModule.h) exposes:
 
 | Operation | Contract |
 | --- | --- |
@@ -121,7 +121,7 @@ must not be used as proof of a typed request's actual default-framebuffer or
 scene-target samples. The private observation is the authority for context
 samples. Complete scene/AA telemetry remains part of graphics-quality integration.
 
-[DisplayPresentation.h](../../../src/renderer/DisplayPresentation.h) defines a
+[DisplayPresentation.h](https://github.com/themuffinator/openQ4/blob/e3e65887480368191df154a9b52cce69d8e72140/src/renderer/DisplayPresentation.h) defines a
 coherent POD observation with device/display generation, cumulative submitted,
 presented and failure sequences, availability, outcome and native error.
 Initialization/recreation starts a generation in `RDP_PENDING`; it does not count
@@ -188,7 +188,7 @@ optional diagnostic interval accepts only 0 or 1; samples accept 0, 2, 4, 8 or 1
 Mutation is restricted to
 an already hidden, windowed device with a saved actual baseline. Its saved state
 is rejected after a module-epoch change. This diagnostic is not a production
-settings action. [capture_display_device.py](../../../tools/ui/capture_display_device.py)
+settings action. [capture_display_device.py](https://github.com/themuffinator/openQ4/blob/e3e65887480368191df154a9b52cce69d8e72140/tools/ui/capture_display_device.py)
 drives it through the appropriate SP/MP gameplay profile, disables host input,
 forces hidden/windowed rendering and uses registered engine screenshots. Example:
 

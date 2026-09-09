@@ -432,13 +432,29 @@ if build_engine or get_option('build_native_tests')
   libtess2_project = subproject('libtess2')
   openq4_retained_library = static_library(
     'openq4-retained-ui',
-    files('src/ui/retained/Runtime.cpp', 'src/ui/retained/Document.cpp', 'src/ui/retained/Presentation.cpp', 'src/ui/retained/Behavior.cpp', 'src/ui/retained/State.cpp', 'src/ui/retained/Motion.cpp', 'src/ui/retained/Interaction.cpp', 'src/ui/retained/ValueControlView.cpp', 'src/ui/retained/Input.cpp', 'src/ui/retained/Vector.cpp', 'src/ui/retained/VectorElement.cpp', 'src/ui/application/SettingsTransaction.cpp', 'src/ui/application/SettingsJournal.cpp', 'src/ui/application/SettingsDisplayController.cpp'),
+    files('src/ui/retained/Runtime.cpp', 'src/ui/retained/Document.cpp', 'src/ui/retained/Presentation.cpp', 'src/ui/retained/Behavior.cpp', 'src/ui/retained/State.cpp', 'src/ui/retained/Motion.cpp', 'src/ui/retained/Interaction.cpp', 'src/ui/retained/ValueControlView.cpp', 'src/ui/retained/Input.cpp', 'src/ui/retained/TextInput.cpp', 'src/ui/retained/TextEdit.cpp', 'src/ui/retained/Vector.cpp', 'src/ui/retained/VectorElement.cpp', 'src/ui/application/SettingsTransaction.cpp', 'src/ui/application/SettingsJournal.cpp', 'src/ui/application/SettingsDisplayController.cpp'),
     dependencies: [rmlui_project.get_variable('rmlui_dep'), jsoncpp_project.get_variable('jsoncpp_dep'), libtess2_project.get_variable('libtess2_dep')],
     pic: true,
     install: false,
   )
   openq4_retained_dep = declare_dependency(link_with: openq4_retained_library)
   if get_option('build_native_tests')
+    openq4_ui_text_input_test = executable(
+      'openq4-ui-text-input-test',
+      files('tools/tests/native/UiTextInputTest.cpp'),
+      include_directories: root_include_dir,
+      dependencies: openq4_retained_dep,
+      install: false,
+    )
+    test('openq4-ui-text-input', openq4_ui_text_input_test, timeout: 30)
+    openq4_ui_text_edit_test = executable(
+      'openq4-ui-text-edit-test',
+      files('tools/tests/native/UiTextEditTest.cpp'),
+      include_directories: root_include_dir,
+      dependencies: openq4_retained_dep,
+      install: false,
+    )
+    test('openq4-ui-text-edit', openq4_ui_text_edit_test, timeout: 30)
     openq4_ui_settings_transaction_test = executable(
       'openq4-ui-settings-transaction-test',
       files('tools/tests/native/UiSettingsTransactionTest.cpp'),

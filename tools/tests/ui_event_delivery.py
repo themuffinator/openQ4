@@ -33,7 +33,8 @@ struct SoundWorld { bool paused=true; bool IsPaused() const { return paused; } v
 struct Game { const char* HandleGuiCommands(const char*) { assert(false); return ""; } } *game=nullptr;
 struct idSessionLocal {
     idUserInterface *guiTest=nullptr,*guiActive=nullptr,*guiMainMenu=nullptr,*guiRestartMenu=nullptr,
-        *guiMsgRestore=nullptr,*guiMsg=nullptr,*guiDemoMenu=nullptr,*guiIntro=nullptr,*guiTakeNotes=nullptr;
+        *guiMsgRestore=nullptr,*guiMsg=nullptr,*guiDemoMenu=nullptr,*guiIntro=nullptr,*guiTakeNotes=nullptr,
+        *guiSystem=nullptr,*guiSystemParent=nullptr;
     HandleGuiCommand_t guiHandle=nullptr;
     bool mapSpawned=false;
     int menuProfileSaveVarsMsec=0,menuProfileMainVarsMsec=0,legacyDispatches=0,soundSelections=0;
@@ -55,6 +56,10 @@ struct idSessionLocal {
     void HandleNoteCommands(const char*) { ++legacyDispatches; }
     void HandleRestartMenuCommands(const char*) { ++legacyDispatches; }
     void HandleInGameCommands(const char*) { ++legacyDispatches; }
+    // This suite isolates generic GUI lifetime delivery. SYSTEM's transactional
+    // return/close paths are exercised by ui_system_session_route.py.
+    void ReturnSystemSettings() { assert(false); }
+    void CloseSystemSettings() { assert(false); }
     void StartMenu() { assert(false); }
 };
 static void PumpControllerMenuNavigation(idSessionLocal*) {}

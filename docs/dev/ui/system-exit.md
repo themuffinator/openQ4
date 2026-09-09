@@ -131,7 +131,7 @@ entire platform/display matrix. CI wiring is present; cross-platform CI executio
 is not inferred from these Windows results.
 
 Render-order review also found required follow-up work. OpenGL's
-[swap-tail resolution filter](../../../src/renderer/draw_common.cpp) can filter
+[swap-tail resolution filter](https://github.com/themuffinator/openQ4/blob/e3e65887480368191df154a9b52cce69d8e72140/src/renderer/draw_common.cpp) can filter
 the completed UI in a UI-only frame without an eligible world-scene resolve.
 Ordinary world-backed GL and Vulkan paths resolve before retained UI; the
 legacy whole-frame crop mode remains a separate exception. OpenGL applies CRT

@@ -2,6 +2,12 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- Repeated map loads release discarded input data, avoiding an event-queue
+  memory leak. Windows clipboard handling also checks transfer failures and
+  converts legacy text through the operating system's Unicode path. The
+  [text-entry foundation](ui/text-entry-foundation.md) records the scope;
+  editable retained fields and native IME integration are still in development.
+
 - OpenGL menus retain sharper text and vector edges at reduced resolution scale:
   UI-only frames no longer receive the extra filter that softened the completed
   image. World scaling and supersampling remain in place; the explicit legacy

@@ -283,6 +283,10 @@ jobs:
             tools/tests/savegame_pointer_width_safety.py \
             tools/tests/savegame_v3_contract.py \
             tools/tests/sdl3_input_parity.py \
+            tools/tests/sys_event_queue_ownership.py \
+            tools/tests/sdl3_clipboard_status.py \
+            tools/tests/ui_text_edit_model.py \
+            tools/tests/ui_text_input.py \
             tools/tests/ui_retained_input.py \
             tools/tests/ui_retained_state_sources.py \
             tools/tests/ui_presentation_bridge.py \
@@ -512,6 +516,10 @@ jobs:
           python tools/tests/savegame_pointer_width_safety.py
           python tools/tests/savegame_v3_contract.py
           python tools/tests/sdl3_input_parity.py
+          python tools/tests/sys_event_queue_ownership.py
+          python tools/tests/sdl3_clipboard_status.py
+          python tools/tests/ui_text_edit_model.py
+          python tools/tests/ui_text_input.py
           python tools/tests/ui_retained_input.py
           python tools/tests/ui_retained_state_sources.py
           python tools/tests/ui_presentation_bridge.py

@@ -122,6 +122,16 @@ all UI surfaces and input/cinematic/subtitle geometry, CRT parity, the existing
 GL mode-3 filter mismatch and the full renderer/platform matrix remain required.
 This bounded repair removes no requirement, migration or final gate.
 
+The subsequent [text-entry foundation](../ui/text-entry-foundation.md), starting
+from `e3e65887480368191df154a9b52cce69d8e72140`, integrates validated Unicode
+commits/preedit, an atomic bounded edit buffer, exact decimal parsing and checked
+Windows clipboard primitives. Pending event-payload cleanup is repaired on both
+queue implementations. Native and compiled-method checks cover these services;
+live fields, ordered owner-aware delivery, native composition provenance,
+shaping/caret geometry and unconfirmed-edit Apply/exit guards remain required.
+The full 227-requirement scope, 271 migration records and seven final gates stay
+unchanged and unaccepted by this increment.
+
 ### Findings that block product completion
 
 These findings are based on source inspection at the revisions above, except

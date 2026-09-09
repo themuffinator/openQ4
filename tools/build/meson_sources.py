@@ -70,6 +70,7 @@ ENGINE_SOURCE_GLOBS = [
     "sound/*.cpp",
     "sound/OpenAL/*.cpp",
     "sys/*.cpp",
+    "sys/sdl3/TextClipboard.cpp",
     "ui/*.cpp",
 ]
 

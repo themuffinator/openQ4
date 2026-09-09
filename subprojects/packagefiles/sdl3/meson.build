@@ -566,6 +566,9 @@ sdl_lib = library(
 sdl3_dep = declare_dependency(
   include_directories: 'include',
   link_with: sdl_lib,
+  # Only the patched Windows native status paths are currently qualified.
+  # The same version or another native backend does not imply this contract.
+  compile_args: host_machine.system() == 'windows' ? ['-DOPENQ4_SDL3_CHECKED_CLIPBOARD=1'] : [],
 )
 
 meson.override_dependency('sdl3', sdl3_dep)
