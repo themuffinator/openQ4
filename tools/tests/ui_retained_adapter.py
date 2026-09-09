@@ -5,7 +5,9 @@ The adapter/public headers and Input.cpp are real. Engine I/O, canonical
 document loading and runtime rendering are bounded stand-ins; this does not
 qualify alias expression ownership, parsing, GPU output or the complete
 application action vocabulary. Event effects are prescribed boundary data;
-UiBehaviorTest covers actual ordered evaluation and rollback.
+UiBehaviorTest covers actual ordered evaluation and rollback. The settings
+service below is a small ownership/dispatch stand-in, not the production
+catalog, transaction, persistence, or device restart implementation.
 """
 from pathlib import Path
 import shutil
@@ -26,6 +28,7 @@ ENGINE = r'''
 #include <sstream>
 #include "src/ui/retained/Input.h"
 #include "src/ui/RetainedUI.h"
+#include "src/ui/SettingsService.h"
 struct idCmdArgs {
     std::vector<std::string> values;
     int Argc() const {return static_cast<int>(values.size());}
@@ -202,7 +205,12 @@ public:
     std::string selected="brightness";
     std::vector<ControlAction> actions;
     std::vector<std::pair<MenuInput,bool>> menu;
-    bool SetState(const StateValues& values,std::string&,double) { state=values; return true; }
+    std::vector<StateValues> stateCalls;
+    bool SetState(const StateValues& values,std::string&,double) {
+        stateCalls.push_back(values);
+        for(const auto& [key,value]:values)state[key]=value;
+        return true;
+    }
     StateValues GetState(bool=true) const { return state; }
     bool HasEvent(const std::string& name) const { eventQueries.push_back(name); return eventPlans.contains(PresentationAliasKey(name)); }
     bool RunEvent(const std::string& name,double,EventEffects& effects,std::string& error,
@@ -300,6 +308,107 @@ bool RetainedUI_LoadView(retainedUIView_t*,const std::string&,const std::string&
 bool RetainedUI_DefaultViewport(openq4::ui::Viewport& result) { result=viewport; return viewport.width>0 && viewport.height>0; }
 double RetainedUI_PresentationTime() { return presentationTime; }
 bool RetainedUI_DrawViewRoot(retainedUIView_t* view,const openq4::ui::Viewport&) { ++view->runtime.frames; return true; }
+'''
+
+SETTINGS = r'''
+// Deliberately small service boundary: real adapter code must validate reserved
+// declarations, forward owner tokens, and publish only the fields it receives.
+// Transaction validation, conflict/rollback and the actual catalog have their
+// own production tests; prescribed service values here establish none of those.
+namespace SettingsBoundary {
+using namespace openq4::ui;
+struct Dispatch { std::uint64_t owner; ActionInvocation invocation; bool accepted=false; };
+struct Service {
+    std::uint64_t next=1,active=0;
+    std::set<std::uint64_t> owners;
+    std::vector<std::uint64_t> created,released,closed,reads;
+    std::vector<Dispatch> dispatches;
+    std::vector<std::string> order;
+    std::vector<Action> descriptors;
+    std::vector<ActionInvocation> invocations;
+    StateValues live{{"r_brightness",1.0},{"r_shadows",true}},baseline,draft;
+    bool readAvailable=true;
+} service;
+const std::map<std::string,std::size_t> fields{{"r_brightness",0},{"r_shadows",1}};
+}
+std::uint64_t UI_SettingsCreateOwner() {
+    auto& service=SettingsBoundary::service;
+    const auto owner=service.next++; service.owners.insert(owner); service.created.push_back(owner); return owner;
+}
+void UI_SettingsCloseOwner(std::uint64_t owner) {
+    auto& service=SettingsBoundary::service;
+    service.closed.push_back(owner); service.order.push_back("close:"+std::to_string(owner));
+    if(service.active==owner) {service.active=0; service.baseline.clear(); service.draft.clear();}
+}
+void UI_SettingsReleaseOwner(std::uint64_t owner) {
+    auto& service=SettingsBoundary::service;
+    service.released.push_back(owner); UI_SettingsCloseOwner(owner); service.owners.erase(owner);
+}
+const std::map<std::string,std::size_t>& UI_SettingsStateSchema() {
+    static const auto schema=[] {
+        std::map<std::string,std::size_t> result{{"settings.open",1},{"settings.dirty",1},
+            {"settings.busy",1},{"settings.canApply",1},{"settings.phase",0},{"settings.message",2}};
+        for(const auto& [key,type]:SettingsBoundary::fields) {
+            result.emplace("settings.draft."+key,type); result.emplace("settings.baseline."+key,type);
+        }
+        return result;
+    }(); return schema;
+}
+bool UI_SettingsOperation(const openq4::ui::Action& action,std::string& error) {
+    auto& service=SettingsBoundary::service; service.descriptors.push_back(action);
+    const auto& op=action.operation;
+    if((op=="settings.system.begin" || op=="settings.system.defaults" || op=="settings.system.cancel" ||
+        op=="settings.system.apply" || op=="settings.system.confirm" || op=="settings.system.revert") && action.arguments.empty())return true;
+    if(op=="settings.system.edit" && !action.arguments.empty()) {
+        for(const auto& [key,value]:action.arguments) {
+            const auto field=SettingsBoundary::fields.find(key);
+            if(field==SettingsBoundary::fields.end() || field->second!=value.type) {error="stub field/type rejected"; return false;}
+        }
+        return true;
+    }
+    error="stub operation shape rejected"; return false;
+}
+bool UI_SettingsInvocation(const openq4::ui::ActionInvocation& invocation,std::string& error) {
+    using namespace openq4::ui;
+    SettingsBoundary::service.invocations.push_back(invocation);
+    Action action; action.operation=invocation.operation;
+    for(const auto& [key,value]:invocation.arguments) {
+        if(!ValidStateValue(value)) {error="stub value rejected"; return false;}
+        Expression expression; expression.type=value.index(); action.arguments.emplace(key,expression);
+    }
+    return UI_SettingsOperation(action,error);
+}
+bool UI_SettingsDispatch(std::uint64_t owner,const openq4::ui::ActionInvocation& invocation,std::string& error) {
+    auto& service=SettingsBoundary::service;
+    service.order.push_back("dispatch:"+invocation.operation);
+    service.dispatches.push_back({owner,invocation});
+    if(!service.owners.contains(owner) || !UI_SettingsInvocation(invocation,error))return false;
+    const auto& op=invocation.operation;
+    if(op=="settings.system.begin") {
+        if(service.active && service.active!=owner) {error="stub owner busy"; return false;}
+        if(!service.active) {service.active=owner; service.baseline=service.live; service.draft=service.live;}
+    } else {
+        if(service.active!=owner) {error="stub owner mismatch"; return false;}
+        if(op=="settings.system.edit")for(const auto& [key,value]:invocation.arguments)service.draft.at(key)=value;
+        else if(op=="settings.system.apply") {service.live=service.draft; service.baseline=service.live;}
+        else if(op=="settings.system.defaults")service.draft={{"r_brightness",1.0},{"r_shadows",true}};
+        else if(op=="settings.system.revert")service.draft=service.baseline;
+        else if(op=="settings.system.cancel")UI_SettingsCloseOwner(owner);
+    }
+    service.dispatches.back().accepted=true; return true;
+}
+bool UI_SettingsRead(std::uint64_t owner,openq4::ui::StateValues& values) {
+    auto& service=SettingsBoundary::service; service.reads.push_back(owner);
+    if(!service.readAvailable || !service.owners.contains(owner))return false;
+    const bool own=service.active==owner,dirty=own && service.draft!=service.baseline;
+    values={{"settings.open",own},{"settings.dirty",dirty},{"settings.busy",service.active!=0 && !own},
+        {"settings.canApply",dirty},{"settings.phase",own?1.0:0.0},{"settings.message",std::string("#str_stub_settings")}};
+    if(own) {
+        for(const auto& [key,value]:service.draft)values.emplace("settings.draft."+key,value);
+        for(const auto& [key,value]:service.baseline)values.emplace("settings.baseline."+key,value);
+    }
+    return true;
+}
 '''
 
 BASE = r'''
@@ -687,6 +796,236 @@ static void CheckEventEligibility() {
     }
     assert(views.empty());
 }
+static ActionInvocation SettingsAction(const std::string& operation,StateValues values={}) {
+    return {"stub.settings", "settings.system."+operation, std::move(values)};
+}
+static void SettingsEvent(idUserInterfaceRetained& gui,const std::vector<ActionInvocation>& actions) {
+    eventPlans["settingsboundary"]={{},actions};
+    gui.HandleNamedEvent("settingsboundary");
+}
+static void CheckSettingsBoundary() {
+    assert(views.empty() && SettingsBoundary::service.owners.empty());
+    const auto originalModel=modelTemplate;
+    auto& service=SettingsBoundary::service;
+    service=SettingsBoundary::Service{};
+    eventPlans.clear(); eventHistory.clear();
+    for(const auto& [key,type]:UI_SettingsStateSchema()) {
+        StateValue value=type==0?StateValue(0.0):type==1?StateValue(false):StateValue(std::string("#str_authored_fallback"));
+        modelTemplate.state.emplace(key,StateDeclaration{value,""});
+    }
+    modelTemplate.actions.emplace("settings.begin",Action{"settings.system.begin",{}});
+    Expression setting; setting.type=0; setting.state="settings.draft.r_brightness";
+    modelTemplate.actions.emplace("settings.edit",Action{"settings.system.edit",{{"r_brightness",setting}}});
+    std::string error;
+    assert(ValidateApplication(modelTemplate,error));
+    assert(!service.descriptors.empty());
+    // These are actual production ValidateApplication/ValidInvocation methods.
+    // JSON parsing and the complete catalog remain outside this harness.
+    for(const auto& key:{"settings.unknown","Settings.open","settings.OPEN"}) {
+        auto bad=modelTemplate; bad.state[key]={false,""}; assert(!ValidateApplication(bad,error));
+    }
+    for(const auto& [key,type]:UI_SettingsStateSchema()) {
+        auto bad=modelTemplate; bad.state[key].cvar="r_brightness"; assert(!ValidateApplication(bad,error));
+        bad=modelTemplate; bad.state[key].initial=type==0?StateValue(false):StateValue(0.0);
+        assert(!ValidateApplication(bad,error));
+    }
+    for(int branch=0;branch<3;++branch) {
+        auto bad=modelTemplate; EventStep write; write.op=EventOp::SetState; write.values["settings.open"]=Expression{};
+        EventStep nested; nested.op=EventOp::If;
+        if(branch==0)bad.events["reserved"].steps.push_back(write);
+        else {
+            (branch==1?nested.thenSteps:nested.elseSteps).push_back(write);
+            bad.events["reserved"].steps.push_back(nested);
+        }
+        assert(!ValidateApplication(bad,error));
+    }
+    auto bad=modelTemplate; bad.events["reserved"].steps.push_back(EventStep{});
+    bad.events["reserved"].steps[0].values["SETTINGS.open"]=Expression{};
+    assert(!ValidateApplication(bad,error));
+    bad=modelTemplate; bad.actions["settings.edit"].arguments["r_brightness"].type=1;
+    assert(!ValidateApplication(bad,error));
+    bad=modelTemplate; bad.actions["settings.begin"].arguments["extra"]=Expression{};
+    assert(!ValidateApplication(bad,error));
+    bad=modelTemplate; bad.actions["settings.begin"].operation="settings.system.exec";
+    assert(!ValidateApplication(bad,error));
+    assert(!ValidInvocation(SettingsAction("edit",{{"r_brightness",true}}),error));
+    assert(!ValidInvocation(SettingsAction("edit",{{"r_brightness",std::numeric_limits<double>::infinity()}}),error));
+    assert(ValidInvocation(SettingsAction("edit",{{"r_brightness",1.6}}),error));
+    std::uint64_t oldOwner=0;
+    {
+        idUserInterfaceRetained gui;
+        gui.SetStateFloat("number",1.25f);
+        gui.SetStateString("settings.draft.r_brightness","caller cannot initialize service values");
+        assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0); gui.Redraw(0);
+        assert(gui.GetStateBool("settings.open")==false);
+        SettingsEvent(gui,{SettingsAction("begin")}); Drain(gui,{});
+        oldOwner=service.active;
+        assert(oldOwner && service.owners.contains(oldOwner) && service.dispatches.back().owner==oldOwner);
+        assert(gui.GetStateBool("settings.open") && gui.GetStateFloat("settings.draft.r_brightness")==1);
+        gui.SetStateString("number","1.7500"); gui.SetStateString("text","unrelated pending text");
+        gui.SetStateString("unrelated","preserve this key");
+        gui.SetStateString("settings.draft.r_brightness","not a number"); gui.SetStateBool("SETTINGS.OPEN",false);
+        service.draft["r_brightness"]=1.6;
+        const auto calls=Live().stateCalls.size();
+        gui.Redraw(0);
+        assert(Live().stateCalls.size()==calls+1);
+        for(const auto& [key,value]:Live().stateCalls.back())assert(key.starts_with("settings."));
+        assert(Live().state.at("number")==StateValue(1.25));
+        assert(std::string(gui.GetStateString("number"))=="1.7500" && std::string(gui.GetStateString("text"))=="unrelated pending text");
+        assert(std::string(gui.GetStateString("unrelated"))=="preserve this key");
+        assert(gui.GetStateBool("settings.open") && std::abs(gui.GetStateFloat("settings.draft.r_brightness")-1.6f)<.0001f);
+        assert(Live().state.at("settings.draft.r_brightness")==StateValue(1.6));
+        assert(std::string(gui.GetStateString("settings.message"))=="#str_stub_settings");
+        const auto dispatches=service.dispatches.size();
+        gui.SetStateString("settings.phase","nan"); gui.SetStateFloat("settings.draft.r_brightness",99);
+        SettingsEvent(gui,{});
+        assert(service.dispatches.size()==dispatches && Live().eventCalls.back().application.at("number")==StateValue(1.75));
+        for(const auto& [key,value]:Live().eventCalls.back().application)assert(!key.starts_with("settings."));
+        assert(Live().state.at("settings.draft.r_brightness")==StateValue(1.6));
+        gui.SetStateFloat("settings.draft.r_brightness",99); gui.StateChanged(0);
+        assert(Live().state.at("settings.draft.r_brightness")==StateValue(1.6));
+        for(const auto& [key,value]:Live().stateCalls.back())assert(!key.starts_with("settings."));
+        // Same source replacement and renderer callbacks retain the service
+        // owner even though the adapter's Runtime resource may be recreated.
+        const auto creates=service.created.size(),releases=service.released.size();
+        assert(gui.InitFromFile("test.q4ui")); gui.Redraw(0);
+        assert(service.created.size()==creates && service.released.size()==releases && service.reads.back()==oldOwner && service.active==oldOwner);
+        views.front()->callback(views.front()->owner,retainedUIViewEvent_t::BeforeResourceReset);
+        views.front()->callback(views.front()->owner,retainedUIViewEvent_t::Restored); gui.Redraw(0);
+        assert(service.reads.back()==oldOwner && service.released.size()==releases);
+        rejectLoad=true; assert(!gui.InitFromFile("next.q4ui")); rejectLoad=false;
+        assert(service.active==oldOwner && service.released.size()==releases);
+        SettingsEvent(gui,{SettingsAction("edit",{{"r_brightness",1.9}})});
+        const auto delivered=service.dispatches.size();
+        assert(gui.InitFromFile("next.q4ui")); gui.Redraw(0); Drain(gui,{});
+        assert(service.dispatches.size()==delivered && service.released.back()==oldOwner && !service.owners.contains(oldOwner));
+        assert(service.reads.back()!=oldOwner && service.active==0 && !gui.GetStateBool("settings.open"));
+        SettingsEvent(gui,{SettingsAction("begin")}); Drain(gui,{});
+        oldOwner=service.active;
+        const auto previous=oldOwner;
+        const auto oldSource=files.sources.at("next.q4ui"); files.sources["next.q4ui"]="edited body at the same path";
+        assert(gui.InitFromFile("next.q4ui")); gui.Redraw(0);
+        assert(service.released.back()==previous && !service.owners.contains(previous) && service.active==0);
+        SettingsEvent(gui,{SettingsAction("begin")}); Drain(gui,{});
+        oldOwner=service.active; assert(oldOwner!=previous);
+        files.sources["next.q4ui"]=oldSource;
+    }
+    assert(views.empty() && service.owners.empty() && service.active==0 && service.released.back()==oldOwner);
+    // Two adapters forward distinct stable owners; a busy response is scoped
+    // to the requester and cannot change the first adapter's draft.
+    {
+        idUserInterfaceRetained first,second;
+        assert(first.InitFromFile("test.q4ui") && second.InitFromFile("test.q4ui"));
+        first.Activate(true,0); second.Activate(true,0);
+        SettingsEvent(first,{SettingsAction("begin"),SettingsAction("edit",{{"r_brightness",1.4}})}); Drain(first,{});
+        const auto firstOwner=service.active;
+        SettingsEvent(second,{SettingsAction("begin"),SettingsAction("edit",{{"r_brightness",1.9}})}); Drain(second,{});
+        const auto secondOwner=service.dispatches.back().owner;
+        assert(secondOwner!=firstOwner && !service.dispatches.back().accepted);
+        assert(service.active==firstOwner && service.draft.at("r_brightness")==StateValue(1.4));
+        assert(second.GetStateBool("settings.busy") && !second.GetStateBool("settings.open"));
+        first.Redraw(0); assert(first.GetStateBool("settings.open") && !first.GetStateBool("settings.busy"));
+        assert(!*first.Activate(false,0));
+        assert(service.active==0 && service.owners.contains(firstOwner));
+        SettingsEvent(second,{SettingsAction("begin")}); Drain(second,{});
+        assert(service.active==secondOwner);
+    }
+    assert(views.empty() && service.owners.empty());
+    // A cached outgoing GUI must finish committed lifecycle actions before it
+    // closes settings. The token remains available for a later activation.
+    {
+        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0);
+        SettingsEvent(gui,{SettingsAction("begin")}); Drain(gui,{});
+        const auto owner=service.active;
+        SettingsEvent(gui,{SettingsAction("edit",{{"r_brightness",1.6}})});
+        eventPlans["ondeactivate"]={{},{SettingsAction("edit",{{"r_brightness",1.7}}),SettingsAction("apply")}};
+        service.order.clear(); const auto closed=service.closed.size();
+        assert(*gui.Activate(false,0) && service.active==owner && service.closed.size()==closed);
+        Drain(gui,{});
+        assert(service.order==std::vector<std::string>({"dispatch:settings.system.edit","dispatch:settings.system.edit",
+            "dispatch:settings.system.apply","close:"+std::to_string(owner)}));
+        assert(service.live.at("r_brightness")==StateValue(1.7) && !gui.GetStateBool("settings.open") && service.owners.contains(owner));
+        gui.Activate(true,0); SettingsEvent(gui,{SettingsAction("begin")}); Drain(gui,{});
+        assert(service.active==owner);
+        assert(*gui.Activate(false,0));
+        gui.Activate(true,0); service.order.clear(); Drain(gui,{});
+        assert(service.active==owner && std::none_of(service.order.begin(),service.order.end(),[](const auto& item){return item.starts_with("close:");}));
+        // If resources disappear before the outgoing queue is dispatched, its
+        // actions are discarded but the pending settings close still happens.
+        assert(*gui.Activate(false,0)); const auto dispatched=service.dispatches.size();
+        Live().loaded=false; Drain(gui,{});
+        assert(service.dispatches.size()==dispatched && service.active==0 && service.owners.contains(owner));
+        Live().loaded=true; gui.Redraw(0); assert(!gui.GetStateBool("settings.open"));
+        for(const auto event:{retainedUIViewEvent_t::Restored,retainedUIViewEvent_t::Failed}) {
+            gui.Activate(true,0); SettingsEvent(gui,{SettingsAction("begin")}); Drain(gui,{});
+            assert(service.active==owner && *gui.Activate(false,0));
+            const auto before=service.dispatches.size();
+            views.front()->callback(views.front()->owner,retainedUIViewEvent_t::BeforeResourceReset);
+            if(event==retainedUIViewEvent_t::Failed)Live().loaded=false;
+            views.front()->callback(views.front()->owner,event);
+            // The resource callback discards every program, but pending owner
+            // closure must itself keep the manager's dispatch marker alive.
+            assert(*gui.PendingApplicationCommand()); Drain(gui,{});
+            assert(service.dispatches.size()==before && service.active==0 && service.owners.contains(owner));
+            Live().loaded=true;
+        }
+        eventPlans.erase("ondeactivate");
+        gui.Activate(true,0); SettingsEvent(gui,{SettingsAction("begin")}); Drain(gui,{});
+        assert(!*gui.Activate(false,0) && service.active==0 && !gui.GetStateBool("settings.open"));
+    }
+    assert(views.empty() && service.owners.empty());
+    {
+        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui"));
+        idFile_Memory inactive; assert(gui.WriteToSaveGame(&inactive));
+        gui.Activate(true,0);
+        SettingsEvent(gui,{SettingsAction("begin"),SettingsAction("edit",{{"r_brightness",1.4}})}); Drain(gui,{});
+        const auto owner=service.active;
+        gui.SetStateString("number","1.2500");
+        idFile_Memory active; assert(gui.WriteToSaveGame(&active));
+        SettingsEvent(gui,{SettingsAction("edit",{{"r_brightness",1.8}})}); Drain(gui,{});
+        gui.SetStateString("number","1.9000");
+        eventPlans["ondeactivate"]={{},{SettingsAction("edit",{{"r_brightness",1.9}})}};
+        assert(*gui.Activate(false,0));
+        const auto dispatched=service.dispatches.size(),closed=service.closed.size();
+        Live().failRestore=true; active.position=0;
+        assert(!gui.ReadFromSaveGame(&active)); Live().failRestore=false;
+        assert(service.active==owner && service.draft.at("r_brightness")==StateValue(1.8) &&
+            service.closed.size()==closed && *gui.PendingApplicationCommand());
+        active.position=0; assert(gui.ReadFromSaveGame(&active));
+        assert(gui.Active() && !*gui.PendingApplicationCommand() && service.dispatches.size()==dispatched);
+        assert(service.active==owner && service.draft.at("r_brightness")==StateValue(1.8) && service.closed.size()==closed);
+        // The engine draft is not serialized in the GUI frame. The next
+        // preparation republishes it over saved service presentation fields,
+        // while retaining the saved ordinary pending/committed distinction.
+        gui.Redraw(0);
+        assert(std::abs(gui.GetStateFloat("settings.draft.r_brightness")-1.8f)<.0001f &&
+            Live().state.at("settings.draft.r_brightness")==StateValue(1.8));
+        assert(std::string(gui.GetStateString("number"))=="1.2500" && Live().state.at("number")==StateValue(1.0));
+        assert(*gui.Activate(false,0));
+        inactive.position=0; assert(gui.ReadFromSaveGame(&inactive));
+        assert(!gui.Active() && !*gui.PendingApplicationCommand() && service.active==0 && service.owners.contains(owner));
+        assert(service.dispatches.size()==dispatched && service.closed.size()==closed+1);
+        gui.Redraw(0); assert(!gui.GetStateBool("settings.open"));
+        // Same-source recreation keeps the token, but cannot lose an already
+        // requested inactive close when it discards the outgoing action queue.
+        gui.Activate(true,0); SettingsEvent(gui,{SettingsAction("begin")}); Drain(gui,{});
+        assert(service.active==owner && *gui.Activate(false,0));
+        const auto released=service.released.size();
+        rejectLoad=true; assert(!gui.InitFromFile("test.q4ui")); rejectLoad=false;
+        assert(service.active==owner && *gui.PendingApplicationCommand() && service.released.size()==released);
+        assert(gui.InitFromFile("test.q4ui"));
+        assert(!*gui.PendingApplicationCommand() && service.active==0 && service.owners.contains(owner) && service.released.size()==released);
+        gui.Activate(true,0); SettingsEvent(gui,{SettingsAction("begin")}); Drain(gui,{});
+        assert(*gui.Activate(false,0));
+        assert(gui.InitFromFile("next.q4ui") && !*gui.PendingApplicationCommand());
+        assert(!service.owners.contains(owner) && service.active==0);
+        SettingsEvent(gui,{SettingsAction("begin")}); Drain(gui,{});
+        assert(service.active!=0 && service.active!=owner);
+        eventPlans.erase("ondeactivate");
+    }
+    assert(views.empty() && service.owners.empty());
+    modelTemplate=originalModel; eventPlans.clear(); eventHistory.clear();
+}
 int main() {
     modelTemplate.id="adapter-document";
     modelTemplate.state={{"number",{1.0,""}},{"flag",{true,""}},{"text",{std::string("default"),""}},{"host",{1.0,"host_cvar"}}};
@@ -825,7 +1164,8 @@ int main() {
     unsafe=modelTemplate; unsafe.state["NaMe"]={1.0,""}; assert(!ValidateApplication(unsafe,error));
     CheckEventBridge();
     CheckEventEligibility();
-    std::puts("Retained adapter: ordered event/FIFO publication, lifecycle/restore suppression, pending dictionary, presentation delegation, framed save atomicity, actions, suspension and cursor mapping passed");
+    CheckSettingsBoundary();
+    std::puts("Retained adapter: settings ownership/state/lifecycle boundaries, ordered event/FIFO publication, restore suppression, pending dictionary, presentation delegation, framed saves, input suspension and cursor mapping passed");
 }
 '''
 
@@ -836,7 +1176,19 @@ def main():
     managed = (ROOT / 'src/ui/UserInterfaceManaged.h').read_text(encoding='utf-8')
     header = (ROOT / 'src/ui/UserInterfaceRetained.h').read_text(encoding='utf-8')
     factory = (ROOT / 'src/ui/UserInterface.cpp').read_text(encoding='utf-8')
-    code = DICTIONARY_SUPPORT[:DICTIONARY_SUPPORT.index('struct idFile {')] + ENGINE + RUNTIME
+    support = DICTIONARY_SUPPORT[:DICTIONARY_SUPPORT.index('struct idFile {')]
+    # The imported stand-in constructs length bytes even after NUL. Settings
+    # prefix checks now exercise short IDs; match real idStr's bounded scan.
+    old_icmpn = 'static int Icmpn(const char* a,const char* b,int length) { return Icmp(std::string(a,length).c_str(),std::string(b,length).c_str()); }'
+    assert old_icmpn in support
+    support = support.replace(old_icmpn, '''static int Icmpn(const char* a,const char* b,int length) {
+        for(int i=0;i<length;++i) {
+            const int x=std::tolower(static_cast<unsigned char>(a[i])),y=std::tolower(static_cast<unsigned char>(b[i]));
+            if(x!=y || !x || !y)return x-y;
+        }
+        return 0;
+    }''')
+    code = support + ENGINE + RUNTIME + SETTINGS
     code += function_body(public, 'class idUserInterface {') + ';\n'
     code += function_body(managed, 'class idUserInterfaceManaged :') + ';\n'
     code += function_body(header, 'class idUserInterfaceRetained final :') + ';\n' + BASE

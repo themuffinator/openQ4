@@ -140,6 +140,16 @@
 	"#str_229977"	"Minimo;Basso consumo;Prestazioni;Bilanciato;Qualita;Ultra"
 	"#str_229978"	"Auto-rileva"
 	"#str_229979"	"Indicatore di colpo"
+
+	// Settings transaction status.
+	"#str_229982"	"Pronto"
+	"#str_229983"	"Un'altra finestra delle impostazioni sta modificando queste opzioni."
+	"#str_229984"	"Apri le impostazioni prima di modificarle."
+	"#str_229985"	"Non è stato possibile applicare queste modifiche."
+	"#str_229986"	"Le impostazioni sono state modificate altrove. Controllale e riprova."
+	"#str_229987"	"Non è stato possibile ripristinare le impostazioni precedenti."
+	"#str_229988"	"Le modifiche sono in attesa di conferma."
+	"#str_229989"	"Modifiche non salvate."
 	"#str_41200"	"Off"
 	"#str_41201"	"Self"
 	"#str_41202"	"Enemy"

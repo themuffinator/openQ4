@@ -7,7 +7,7 @@ the [completion plan](../plans/ui-product-completion.md), the
 [visual specification](../ui-visual-design.md) into implementation ownership,
 dependencies, concrete evidence and explicit unfinished work.
 
-The baseline is engine `25813aaf96f0a9dfe36e1be0fd29bbce8cea93df` and companion
+The current increment starts from engine `15e35beaf11a1f1942ba25e9431211f64c1ef7f1` and companion
 `1cd33980f072ac3d78978a07b388b4b6fe6b5eb2`. The register also identifies the current
 [manager/snapshot foundation](instance-persistence.md) as partial
 evidence with native and SP/OpenGL/MP/Vulkan validation. It does not treat that work as a
@@ -30,17 +30,35 @@ Five native suites, production-method checks and two source/binary-bound Windows
 gameplay captures cover this subset: SP/OpenGL at 125% and MP/Vulkan at 200% passed
 their event, ownership and outgoing-lifecycle checks and render-target visual
 review. The captures include non-replaying save restore, language/video recovery,
-independent peers and SP/MP pause behavior. The typed catalog still contains only
-brightness, shadows and dismissal. Full legacy broadcast/timer/native-CVar
+independent peers and SP/MP pause behavior. That historical checkpoint's catalog
+contains brightness, shadows and dismissal. Full legacy broadcast/timer/native-CVar
 semantics, production GUI flows, complete widgets, world/game-save/demo contracts,
 physical-device/platform/performance qualification and the native editor remain
 open. The immutable local evidence is
 `.tmp/ui/events-review/capture-evidence.json`; the separate register audit is
 `.tmp/ui/events-review/register-validation.json`.
 
-There are **59 partial, 167 pending and one verified requirement**. `BEH-005` is
-now partial for committed action delivery and cancellation; stock sounds and the
-complete device/modal/widget behavior still require implementation and evidence.
+The [SYSTEM settings increment](system-settings-contract.md) adds the actual
+source/control contract, complete 53-field host catalog, bounded transaction core
+and normal typed service operations. Owned draft edits, immediate Apply/Cancel/
+Defaults, conflict-safe rollback, read-only service state, lifecycle abandonment
+and config-write protection have native and production-body test evidence.
+The service test passes 15 scenarios; the separate host test covers the full
+catalog. Any changed non-immediate field rejects the entire Apply batch before
+writes. Actual device-result/recovery routing, profile expansion, complete
+production controls and the native editor remain open. Gameplay evidence is
+recorded at `.tmp/ui/settings-review/capture-evidence.json`:
+hidden windowed Windows SP/OpenGL at density 125% and MP/Vulkan at density 200% each pass 168
+ordered readbacks, 19 service results and two language/video recoveries. The
+source-bound probes and reviewed render-target images qualify this subset only;
+they do not perform real device changes or accept the production page. The
+structural register audit is `.tmp/ui/settings-review/register-validation.json`.
+
+There are **60 partial, 166 pending and one verified requirement**. `BEH-002`
+is now partial for the implemented settings transaction/service boundary.
+`BEH-005` remains partial for committed action delivery and cancellation; stock
+sounds and the complete device/modal/widget behavior still require implementation
+and evidence. `FLOW-002` remains pending for the complete production SYSTEM page.
 The verified requirement, `INV-001`, covers the fresh effective-source inventory only. All
 seven final product gates and all **271 migration entries remain unaccepted**.
 These counts describe evidence state, not percentage of implementation effort

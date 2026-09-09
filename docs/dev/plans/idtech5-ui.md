@@ -322,6 +322,14 @@ state/presentation/motion programs, typed action capture and lifecycle delivery
 through normal session ownership. Source-specific legacy lowering, complete
 widgets, world/save/demo integration and production GUI/editor acceptance remain
 required work; this does not close Stage 2 or M1.
+The [SYSTEM settings increment](../ui/system-settings-contract.md) adds a fixed
+53-field catalog, owned drafts, typed application operations, conflict-safe
+rollback and frame-owned closure/recovery. Reserved settings state cannot be
+overwritten by GUI programs or pending caller data. Immediate changes use the
+production host; batches requiring device/resource work are rejected before
+writes until their actual result/recovery routes are qualified. The complete
+settings screen, Keep/Revert journal, controls, editor and platform qualification
+remain required M1/M2 work.
 Semantic buttons now use authored state timelines, projected hit testing,
 source-order/spatial navigation and modal focus ownership. The
 [interaction checkpoint](../ui/interaction.md) records native behavior checks,

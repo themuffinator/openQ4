@@ -3,6 +3,7 @@
 #include "UserInterfaceRetained.h"
 #ifndef ID_DEDICATED
 #include "RetainedUI.h"
+#include "SettingsService.h"
 #include "retained/Runtime.h"
 #include "retained/Input.h"
 #include <algorithm>
@@ -43,7 +44,7 @@ bool ConvertState(const char* text, size_t type, StateValue& value) {
 
 bool ApplicationState(const DocumentModel& model, const idDict& dictionary, StateValues& result, std::string& error) {
 	for (const auto& [name,declaration] : model.state) {
-		if (!declaration.cvar.empty()) continue;
+		if (!declaration.cvar.empty() || name.starts_with("settings.")) continue;
 		StateValue value = declaration.initial;
 		const auto* entry = dictionary.FindKey(name.c_str());
 		if (entry && !ConvertState(entry->GetValue().c_str(),declaration.initial.index(),value)) {
@@ -55,6 +56,7 @@ bool ApplicationState(const DocumentModel& model, const idDict& dictionary, Stat
 }
 
 bool ValidOperation(const Action& action) {
+	if (action.operation.starts_with("settings.system.")) { std::string error; return UI_SettingsOperation(action,error); }
 	if (action.operation == "ui.dismiss") return action.arguments.empty();
 	const auto value = action.arguments.find("value");
 	if (action.arguments.size() != 1 || value == action.arguments.end()) return false;
@@ -63,6 +65,7 @@ bool ValidOperation(const Action& action) {
 }
 
 bool ValidInvocation(const ActionInvocation& invocation, std::string& error) {
+	if (invocation.operation.starts_with("settings.system.")) return UI_SettingsInvocation(invocation,error);
 	if (invocation.operation == "ui.dismiss" && invocation.arguments.empty()) return true;
 	const auto value = invocation.arguments.find("value");
 	if (invocation.arguments.size() == 1 && value != invocation.arguments.end() && ValidStateValue(value->second)) {
@@ -96,7 +99,25 @@ bool ValidateApplication(const DocumentModel& model, std::string& error) {
 	for (const auto& [name,declaration] : model.state) {
 		if (!idStr::Icmp(name.c_str(),"name")) { error = "State ID is reserved by the GUI source contract: " + name; return false; }
 		if (names.FindKey(name.c_str())) { error = "State IDs collide in the game dictionary: " + name; return false; }
+		if (!idStr::Icmpn(name.c_str(),"settings.",9)) {
+			const auto& schema = UI_SettingsStateSchema(); const auto field = schema.find(name);
+			if (field == schema.end() || field->second != declaration.initial.index() || !declaration.cvar.empty()) {
+				error = "Invalid service-owned settings state declaration: " + name; return false;
+			}
+		}
 		names.Set(name.c_str(),"1");
+	}
+	for (const auto& [name,event] : model.events) {
+		std::vector<const EventStep*> steps;
+		for (const auto& step : event.steps) steps.push_back(&step);
+		while (!steps.empty()) {
+			const auto* step = steps.back(); steps.pop_back();
+			for (const auto& [key,value] : step->values) if (!idStr::Icmpn(key.c_str(),"settings.",9)) {
+				error = "Programs cannot overwrite service-owned settings state: " + key; return false;
+			}
+			for (const auto& child : step->thenSteps) steps.push_back(&child);
+			for (const auto& child : step->elseSteps) steps.push_back(&child);
+		}
 	}
 	for (const auto& [name,action] : model.actions) {
 		if (!ValidOperation(action)) { error = "Unsupported application operation or arguments: " + name; return false; }
@@ -169,11 +190,13 @@ struct idUserInterfaceRetained::Impl {
 	bool suspended = false, pointerVisible = false, close = false, worldReported = false;
 	bool unavailable = false;
 	bool initialized = false;
+	bool settingsFields = false, settingsClosePending = false;
+	std::uint64_t settingsOwner = UI_SettingsCreateOwner();
 	float cursorX = 320, cursorY = 240;
 	std::string lastError;
 	std::string checkpoint;
 
-	~Impl() { RetainedUI_DestroyView(view); }
+	~Impl() { UI_SettingsReleaseOwner(settingsOwner); RetainedUI_DestroyView(view); }
 	Runtime* RuntimeView() const { return RetainedUI_ViewRuntime(view); }
 	void Error(const std::string& message) {
 		if (message != lastError) common->Warning("retained GUI %s: %s",path.c_str(),message.c_str());
@@ -202,7 +225,30 @@ struct idUserInterfaceRetained::Impl {
 		const bool ready = view && RetainedUI_PrepareView(view);
 		if (!ready && !unavailable) Quarantine();
 		unavailable = !ready;
-		return ready;
+		return ready && SyncSettings();
+	}
+	bool SyncSettings() {
+		if (!settingsFields) return true;
+		StateValues current;
+		if (!UI_SettingsRead(settingsOwner,current)) return false;
+		StateValues updates, published; const auto live = RuntimeView()->GetState(false);
+		for (const auto& [key,declaration] : document.Model().state) if (key.starts_with("settings.")) {
+			const auto source = current.find(key);
+			const auto& value = source == current.end() ? declaration.initial : source->second;
+			published.emplace(key,value);
+			const auto before = live.find(key);
+			if (before == live.end() || before->second != value) updates.emplace(key,value);
+		}
+		std::string error;
+		if (!updates.empty() && !RuntimeView()->SetState(updates,error,RetainedUI_PresentationTime())) { Error(error); return false; }
+		for (const auto& [key,value] : published) {
+			PresentationValue text;
+			if (std::holds_alternative<std::string>(value)) { text.type = PresentationType::String; text.text = std::get<std::string>(value); }
+			else if (std::holds_alternative<bool>(value)) { text.type = PresentationType::Boolean; text.data[0] = std::get<bool>(value) ? 1 : 0; }
+			else text.data[0] = std::get<double>(value);
+			state.Set(key.c_str(),FormatPresentationValue(text).c_str());
+		}
+		return true;
 	}
 	void ApplyInput() {
 		for (const auto& event : input.Take()) {
@@ -328,10 +374,17 @@ bool idUserInterfaceRetained::InitFromFile(const char* qpath, bool rebuild, bool
 		return false;
 	}
 	impl->Quarantine(false,false,true);
+	if (same && impl->settingsClosePending) UI_SettingsCloseOwner(impl->settingsOwner);
+	impl->settingsClosePending = false;
 	RetainedUI_DestroyView(impl->view); impl->view = view;
 	impl->RuntimeView()->ReleaseInputSources();
 	impl->document = std::move(candidate); impl->path = path.c_str(); impl->stamp = stamp;
-	if (!same) impl->initialized = false;
+	if (!same) {
+		impl->initialized = false;
+		UI_SettingsReleaseOwner(impl->settingsOwner); impl->settingsOwner = UI_SettingsCreateOwner();
+	}
+	impl->settingsFields = std::any_of(impl->document.Model().state.begin(),impl->document.Model().state.end(),
+		[](const auto& field) { return field.first.starts_with("settings."); });
 	impl->state.Set("name",path.c_str()); impl->lastError.clear();
 	if (!impl->interactiveSet) impl->interactive = HasControls(impl->document.Model().root) && !NonInteractive(impl->state);
 	RegisterLoaded(); RefreshThinking();
@@ -447,7 +500,12 @@ void idUserInterfaceRetained::HandleNamedEvent(const char* name) {
 const char* idUserInterfaceRetained::Activate(bool value, int time) {
 	if (impl->active != value) impl->Quarantine();
 	impl->active = value;
+	impl->settingsClosePending = !value;
 	HandleNamedEvent(value ? "onActivate" : "onDeactivate");
+	if (!value && impl->actions.empty()) {
+		UI_SettingsCloseOwner(impl->settingsOwner); impl->settingsClosePending = false;
+		if (impl->view) impl->Prepare();
+	}
 	return PendingApplicationCommand();
 }
 void idUserInterfaceRetained::Trigger(int time) { HandleNamedEvent("onTrigger"); }
@@ -482,14 +540,18 @@ void idUserInterfaceRetained::DrawCursor() {
 }
 
 const char* idUserInterfaceRetained::PendingApplicationCommand() const {
-	return impl->close || !impl->actions.empty() ? ActionMarker : "";
+	return impl->close || impl->settingsClosePending || !impl->actions.empty() ? ActionMarker : "";
 }
 bool idUserInterfaceRetained::DispatchApplicationActions(const char* command, bool& closeRequested) {
 	closeRequested = false;
 	// The marker carries no untrusted parameters. Only this live instance's
 	// typed queue can request host operations; all other commands are consumed.
 	if (!command || idStr::Cmp(command,ActionMarker)) return true;
-	if (!impl->Prepare()) { closeRequested = impl->close; impl->close = false; impl->actions.clear(); return true; }
+	if (!impl->Prepare()) {
+		closeRequested = impl->close; impl->close = false; impl->actions.clear();
+		if (impl->settingsClosePending) { UI_SettingsCloseOwner(impl->settingsOwner); impl->settingsClosePending = false; }
+		return true;
+	}
 	// The session pump precedes ordinary input delivery. Observe focus/console
 	// suspension now so it cannot dispatch a stale physical activation first.
 	// Completed programs and explicit semantic diagnostics remain committed.
@@ -499,6 +561,13 @@ bool idUserInterfaceRetained::DispatchApplicationActions(const char* command, bo
 	for (const auto& pending : actions) {
 		const auto& invocation = pending.invocation;
 		if (invocation.operation == "ui.dismiss") { closeRequested = true; TraceInvocation(Name(),invocation,true); continue; }
+		if (invocation.operation.starts_with("settings.system.")) {
+			std::string error;
+			if (!UI_SettingsDispatch(impl->settingsOwner,invocation,error)) impl->Error(error);
+			else impl->lastError.clear();
+			impl->SyncSettings();
+			continue;
+		}
 		const auto value = invocation.arguments.find("value");
 		if (invocation.arguments.size() != 1 || value == invocation.arguments.end()) continue;
 		if (invocation.operation == "settings.brightness.set" && std::holds_alternative<double>(value->second)) {
@@ -511,6 +580,10 @@ bool idUserInterfaceRetained::DispatchApplicationActions(const char* command, bo
 			if (cvarSystem->GetCVarBool("r_shadows") != std::get<bool>(value->second)) impl->Error("Shadows request was not applied");
 		}
 		TraceInvocation(Name(),invocation,closeRequested);
+	}
+	if (impl->settingsClosePending) {
+		UI_SettingsCloseOwner(impl->settingsOwner); impl->settingsClosePending = false;
+		impl->SyncSettings();
 	}
 	return true;
 }
@@ -564,11 +637,16 @@ bool idUserInterfaceRetained::ReadFromSaveGame(idFile* file) {
 	// Snapshot validation is atomic; outer dictionary/flags follow on success.
 	if (!impl->RuntimeView()->RestoreSnapshot(snapshot,error,RetainedUI_PresentationTime())) { impl->Error(error); return false; }
 	impl->Quarantine(false,false,true); impl->state = state; impl->state.Set("name",Name());
+	impl->settingsClosePending = false;
 	// Save restoration suppresses automatic initialization just as legacy load
 	// does. Lifecycle/program side effects never replay while restoring a GUI.
 	impl->initialized = true;
 	impl->active = (flags & 1) != 0; impl->interactive = (flags & 2) != 0; impl->unique = (flags & 4) != 0;
 	impl->interactiveSet = (flags & 8) != 0;
+	// A snapshot cannot rewind an engine-owned settings draft. An inactive
+	// restore does close the existing session, even when this cached GUI never
+	// receives another Activate(false); failed restores leave it untouched.
+	if (!impl->active) UI_SettingsCloseOwner(impl->settingsOwner);
 	SetCursor(x,y); return true;
 }
 

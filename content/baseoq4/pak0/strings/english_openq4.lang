@@ -140,6 +140,16 @@
 	"#str_229977"	"Minimum;Low Power;Performance;Balanced;Quality;Ultra"
 	"#str_229978"	"Auto-Detect"
 	"#str_229979"	"Hit Marker"
+
+	// Settings transaction status.
+	"#str_229982"	"Ready"
+	"#str_229983"	"Another settings window is editing these options."
+	"#str_229984"	"Open settings before editing."
+	"#str_229985"	"These changes could not be applied."
+	"#str_229986"	"Settings changed elsewhere. Review them and try again."
+	"#str_229987"	"The previous settings could not be restored."
+	"#str_229988"	"Changes are waiting for confirmation."
+	"#str_229989"	"Unsaved changes."
 	"#str_41200"	"Off"
 	"#str_41201"	"Self"
 	"#str_41202"	"Enemy"

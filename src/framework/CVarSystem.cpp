@@ -31,6 +31,7 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "../idlib/PrivateCommand.h"
 #include "RemoteCVarPolicy.h"
+#include "CVarDefaults.h"
 
 idCVar * idCVar::staticVars = NULL;
 
@@ -44,6 +45,7 @@ idCVar * idCVar::staticVars = NULL;
 
 class idInternalCVar : public idCVar {
 	friend class idCVarSystemLocal;
+	friend bool CVar_ReadDefault(const char* name, idStr& output);
 public:
 							idInternalCVar( void );
 							idInternalCVar( const char *newName, const char *newValue, int newFlags );
@@ -564,6 +566,14 @@ idCVarSystemLocal			localCVarSystem;
 idCVarSystem *				cvarSystem = &localCVarSystem;
 
 idDict						idCVarSystemLocal::moveCVarsToDict;
+
+bool CVar_ReadDefault(const char* name, idStr& output) {
+	if (name == NULL || name[0] == '\0') return false;
+	const idInternalCVar* variable = localCVarSystem.FindInternal(name);
+	if (variable == NULL || (variable->GetFlags() & CVAR_PRIVATE) != 0) return false;
+	output = variable->resetString;
+	return true;
+}
 
 #define NUM_COLUMNS				77		// 78 - 1
 #define NUM_NAME_CHARS			33

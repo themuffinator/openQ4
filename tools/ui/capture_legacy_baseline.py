@@ -19,6 +19,7 @@ import struct
 import subprocess
 import time
 import legacy_import
+import system_settings_probe
 
 ROOT = Path(__file__).resolve().parents[2]
 ALIAS_FIXTURE = ROOT / 'tools/ui/fixtures/presentation-alias-smoke'
@@ -483,6 +484,7 @@ def presentation_alias_evidence(log: str, commands: str, reports: list[dict], re
 def capture(args: argparse.Namespace) -> int:
     alias_sources = presentation_alias_sources(args) if args.presentation_alias_probe else None
     event_sources = event_program_sources(args) if args.event_program_probe else None
+    system_sources = system_settings_probe.sources(args) if args.system_settings_probe else None
     output = args.output.resolve()
     if output.exists():
         raise ValueError('use a new output directory to preserve previous capture evidence')
@@ -541,7 +543,7 @@ def capture(args: argparse.Namespace) -> int:
         'com_maxfps': '60', 'ui_autoJoin': '1' if args.mode == 'mp' else '0',
         'ui_retainedScale': str(args.ui_scale), 'ui_retainedDensity': str(args.density),
         'ui_retainedReducedMotion': '1' if args.reduced_motion else '0',
-        'ui_retainedTrace': '1' if args.event_program_probe else '0',
+        'ui_retainedTrace': '1' if args.event_program_probe or args.system_settings_probe else '0',
     }
     if args.retained_managed:
         # Isolated, explicit host defaults make the action/readback sequence
@@ -682,6 +684,17 @@ def capture(args: argparse.Namespace) -> int:
                 settings_fixture=args.retained_document.resolve() == ROOT / 'tools/ui/fixtures/managed-settings-smoke.q4ui',
                 mode=args.mode, alias_fixture=args.presentation_alias_probe, event_fixture=args.event_program_probe,
                 initial_brightness=args.brightness)
+            if args.system_settings_probe:
+                system = system_settings_probe.evidence(plain_log, width=args.width,
+                    resets=int(args.language_reload) + int(args.video_restart))
+                system['sources'] = system_sources
+                evidence['system_settings_contract'] = system
+                evidence['passed'] = evidence['passed'] and system['passed']
+                # Only the exact, source-bound negative cases are expected;
+                # preserve every diagnostic in the report and reject extras.
+                if system['passed']:
+                    retained_diagnostics = [line for line in retained_diagnostics
+                        if line.strip() not in system_settings_probe.EXPECTED_DIAGNOSTICS]
             metadata['retained_preview']['managed_trace'] = evidence.pop('managed_trace')
             metadata['retained_preview']['managed_validation'] = evidence
             valid = valid and evidence['passed'] and not retained_diagnostics
@@ -730,6 +743,7 @@ def main() -> int:
     parser.add_argument('--presentation-probe', action='store_true', help='Exercise production presentation reads/writes with an authored legacy fixture after map gameplay; no host input.')
     parser.add_argument('--presentation-alias-probe', action='store_true', help='Managed mode: qualify exact authored presentation-alias-smoke sources; defaults document/setup/resume paths and checks alias ownership and reload readbacks.')
     parser.add_argument('--event-program-probe', action='store_true', help='Managed mode: qualify exact event-program-smoke sources, lifecycle/ordered-program state and actual application dispatch; enables bounded retained tracing.')
+    parser.add_argument('--system-settings-probe', action='store_true', help='Managed mode: qualify owned SYSTEM drafts, immediate application, conflicts and resource persistence; device changes are rejected before writes.')
     parser.add_argument('--gamma', type=float, default=1, help='Explicit renderer gamma, finite 0.1..3 (default 1).')
     parser.add_argument('--brightness', type=float, default=1, help='Explicit initial renderer brightness, finite 0..2 (default 1); settings scripts may subsequently change it.')
     parser.add_argument('--timeline', help='Canonical timeline to play before capture, and again after an optional video restart.')
@@ -740,6 +754,13 @@ def main() -> int:
     parser.add_argument('--language-reload', action='store_true', help='Reload the same language dictionary with the preview loaded before optional video restart.')
     parser.add_argument('--profile-frames', type=int, default=0, help='Measure 1..3600 rendered UI frames before capture; zero disables profiling.')
     args = parser.parse_args()
+    if args.system_settings_probe:
+        if not args.retained_managed or args.presentation_probe or args.presentation_alias_probe or args.event_program_probe:
+            parser.error('--system-settings-probe requires --retained-managed and cannot combine with another presentation probe')
+        args.retained_document = args.retained_document or Path(str(system_settings_probe.FIXTURE) + '.q4ui')
+        args.retained_script = args.retained_script or Path(str(system_settings_probe.FIXTURE) + '.cfg')
+        if args.language_reload or args.video_restart:
+            args.retained_resume_script = args.retained_resume_script or Path(str(system_settings_probe.FIXTURE) + '-resume.cfg')
     if args.event_program_probe:
         if not args.retained_managed or args.presentation_probe or args.presentation_alias_probe:
             parser.error('--event-program-probe requires --retained-managed and cannot combine with other presentation probes')

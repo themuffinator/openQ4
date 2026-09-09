@@ -170,6 +170,179 @@ int main() {
 }
 '''
 
+SCREEN = r'''
+#include <cassert>
+#include <cstring>
+#include <cstdio>
+struct glimpParms_t { int width=0,height=0,displayHz=0; bool fullScreen=false,borderless=false,hiddenWindow=false; };
+using renderWindowParms_t = glimpParms_t;
+struct { int vidWidth=640,vidHeight=480; bool isFullscreen=false; } glConfig;
+struct { struct { unsigned width=1600,height=900; } swapchainExtent; } vkCtx;
+static bool windowOkay=true,swapchainOkay=true;
+static int windows=0,swaps=0;
+struct Services {
+    bool ApplyScreenParms(const renderWindowParms_t* p) {
+        ++windows; assert(p->width==1920 && p->height==1080 && p->fullScreen);
+        return windowOkay;
+    }
+} services,*vkBackendServices=nullptr;
+static bool VK_Device_RecreateSwapchain() { ++swaps; return swapchainOkay; }
+'''
+
+SCREEN_MAIN = r'''
+int main() {
+    glimpParms_t p; p.width=1920; p.height=1080; p.fullScreen=true;
+    assert(!GLimp_SetScreenParms(p) && !windows && !swaps);
+    vkBackendServices=&services; windowOkay=false;
+    assert(!GLimp_SetScreenParms(p) && windows==1 && !swaps);
+    windowOkay=true; swapchainOkay=false;
+    assert(!GLimp_SetScreenParms(p) && windows==2 && swaps==1);
+    assert(glConfig.vidWidth==640 && glConfig.vidHeight==480 && !glConfig.isFullscreen);
+    swapchainOkay=true;
+    assert(GLimp_SetScreenParms(p) && windows==3 && swaps==2);
+    assert(glConfig.vidWidth==1600 && glConfig.vidHeight==900 && glConfig.isFullscreen);
+    std::puts("Vulkan screen apply: window/swapchain failure propagates without publishing stale dimensions");
+}
+'''
+
+DEVICE_INIT = r'''
+#include <cassert>
+#include <cstring>
+#include <cstdint>
+#include <cstdio>
+#include <string>
+#include <vector>
+static std::vector<std::string> events;
+static bool servicesAvailable=true,prepareOkay=true,createOkay=true,deviceOkay=true;
+static bool applyOkay=true,recreateOkay=true,preserved=false,deviceAlive=false,windowAlive=false;
+static int pixelWidth=1280,pixelHeight=720;
+struct glimpParms_t {
+    int width,height,displayHz,multiSamples;
+    bool fullScreen,borderless,hiddenWindow,stereo;
+};
+using renderWindowParms_t=glimpParms_t;
+struct renderFramebufferDesc_t {
+    int surfaceKind,redBits,greenBits,blueBits,alphaBits,depthBits,stencilBits;
+    bool doubleBuffer;
+};
+static const int RENDER_SURFACE_VULKAN=1;
+struct renderModuleWindowInfo_t {
+    int pixelWidth,pixelHeight,uiViewportX,uiViewportY,uiViewportWidth,uiViewportHeight;
+};
+struct {
+    bool isInitialized=false;
+    int uiViewportX=0,uiViewportY=0,uiViewportWidth=0,uiViewportHeight=0;
+    const char* renderer_string="test";
+    const char* version_string="test";
+} glConfig;
+struct { struct { uint32_t width=640,height=480; } swapchainExtent; } vkCtx;
+struct CVar { bool GetBool() const { return false; } int GetInteger() const { return 0; } };
+static CVar r_fullscreen,r_borderless,r_displayRefresh,r_hiddenWindow;
+struct Common {
+    void Printf(const char*,...) {}
+    void Warning(const char*,...) { events.emplace_back("warning"); }
+} commonObject,*common=&commonObject;
+struct Services {
+    bool PrepareWindowSystem() { events.emplace_back("prepare"); return prepareOkay; }
+    bool CreateWindowForFramebuffer(const renderFramebufferDesc_t* desc,const renderWindowParms_t* parms,
+                                   renderModuleWindowInfo_t*,bool* reused) {
+        assert(desc->surfaceKind==RENDER_SURFACE_VULKAN && parms->width==640 && parms->height==480);
+        events.emplace_back("window-create"); *reused=preserved;
+        if(createOkay)windowAlive=true;
+        return createOkay;
+    }
+    bool ApplyScreenParms(const renderWindowParms_t*) {
+        assert(deviceAlive && windowAlive && !glConfig.isInitialized);
+        events.emplace_back("window-apply"); return applyOkay;
+    }
+    void RefreshNativeWindowHandles(renderModuleWindowInfo_t* info) {
+        assert(deviceAlive && windowAlive && applyOkay);
+        events.emplace_back("refresh"); info->pixelWidth=pixelWidth;info->pixelHeight=pixelHeight;
+        info->uiViewportX=11;info->uiViewportY=17;
+        info->uiViewportWidth=1000;info->uiViewportHeight=600;
+    }
+    void DestroyAttemptWindow() {
+        assert(!deviceAlive && !glConfig.isInitialized);
+        events.emplace_back("window-destroy"); if(!preserved)windowAlive=false;
+    }
+    void NotifyWindowReady() {
+        assert(deviceAlive && windowAlive && glConfig.isInitialized && events.back()=="config");
+        events.emplace_back("ready");
+    }
+} services,*vkBackendServices=nullptr;
+static Services* Sys_GetRenderWindowServices() { return servicesAvailable?&services:nullptr; }
+static void R_GetInitialWindowSize(bool,int* width,int* height) { *width=640;*height=480; }
+static bool VK_Device_Init(Services* value) {
+    assert(value==&services && windowAlive && !deviceAlive && !glConfig.isInitialized);
+    events.emplace_back("device-init"); deviceAlive=deviceOkay;
+    vkCtx.swapchainExtent={640,480}; return deviceOkay;
+}
+static void VK_Device_Shutdown() {
+    assert(deviceAlive && windowAlive && !glConfig.isInitialized);
+    events.emplace_back("device-shutdown");deviceAlive=false;
+}
+static bool VK_Device_RecreateSwapchain() {
+    assert(deviceAlive && windowAlive && !glConfig.isInitialized);
+    events.emplace_back("recreate");
+    // A failed replacement can retire the old chain: keeping the device
+    // alive is not evidence that it can submit another frame.
+    vkCtx.swapchainExtent={};
+    if(recreateOkay)vkCtx.swapchainExtent={static_cast<uint32_t>(pixelWidth),static_cast<uint32_t>(pixelHeight)};
+    return recreateOkay;
+}
+static void VK_FillGLConfigFromDevice() {
+    assert(deviceAlive && windowAlive && applyOkay && !glConfig.isInitialized);
+    assert(vkCtx.swapchainExtent.width && vkCtx.swapchainExtent.height);
+    events.emplace_back("config");
+}
+static void Sys_InitInput() {
+    assert(glConfig.isInitialized && events.back()=="ready");events.emplace_back("input");
+}
+static void Reset() {
+    events.clear(); servicesAvailable=prepareOkay=createOkay=deviceOkay=applyOkay=recreateOkay=true;
+    preserved=deviceAlive=windowAlive=false;glConfig={};pixelWidth=1280;pixelHeight=720;
+}
+static void Expect(std::initializer_list<const char*> expected) {
+    std::vector<std::string> names;for(const char* value:expected)names.emplace_back(value);
+    assert(events==names);
+}
+'''
+
+DEVICE_INIT_MAIN = r'''
+int main() {
+    Reset();servicesAvailable=false;
+    assert(!VK_InitRenderDevice());Expect({"warning"});
+    Reset();prepareOkay=false;
+    assert(!VK_InitRenderDevice());Expect({"prepare","warning"});
+    Reset();createOkay=false;
+    assert(!VK_InitRenderDevice());Expect({"prepare","window-create","warning"});
+    Reset();deviceOkay=false;
+    assert(!VK_InitRenderDevice());Expect({"prepare","window-create","device-init","window-destroy"});
+    for(bool keepWindow:{false,true}) {
+        for(bool failWindow:{false,true}) {
+            Reset();preserved=keepWindow;
+            applyOkay=!failWindow;recreateOkay=failWindow;
+            assert(!VK_InitRenderDevice());
+            if(failWindow)Expect({"prepare","window-create","device-init","window-apply","warning","device-shutdown","window-destroy"});
+            else Expect({"prepare","window-create","device-init","window-apply","refresh","recreate","warning","device-shutdown","window-destroy"});
+            assert(!deviceAlive && !glConfig.isInitialized && windowAlive==keepWindow);
+            assert(!glConfig.uiViewportWidth && !glConfig.uiViewportHeight);
+            // A clean attempt can follow either refusal without a stale live
+            // device, even when the engine preserved its native window.
+            events.clear();applyOkay=recreateOkay=true;
+            assert(VK_InitRenderDevice());
+            Expect({"prepare","window-create","device-init","window-apply","refresh","recreate","config","ready","input"});
+            assert(deviceAlive && windowAlive && glConfig.isInitialized);
+            assert(glConfig.uiViewportX==11 && glConfig.uiViewportY==17 && glConfig.uiViewportWidth==1000 && glConfig.uiViewportHeight==600);
+        }
+    }
+    Reset();pixelWidth=640;pixelHeight=480;
+    assert(VK_InitRenderDevice());
+    Expect({"prepare","window-create","device-init","window-apply","refresh","config","ready","input"});
+    std::puts("Vulkan startup: screen/swapchain refusal cleans device before attempt window, skips publication/input and permits retry");
+}
+'''
+
 
 def main():
     source = (ROOT / 'src/renderer/RenderSystem_init.cpp').read_text(encoding='utf-8')
@@ -189,6 +362,19 @@ def main():
             define = ['-DOPENQ4_RENDERER_VK_MODULE'] if backend == 'vulkan' else []
             subprocess.run([compiler, '-std=c++17', *define, str(test_source), '-o', str(binary)], check=True)
             subprocess.run([str(binary)], check=True)
+        backend_source = (ROOT / 'src/renderer/Vulkan/vk_Backend.cpp').read_text(encoding='utf-8')
+        screen_source = Path(temp) / 'screen.cpp'
+        screen_source.write_text(SCREEN + function_body(backend_source,
+            'bool GLimp_SetScreenParms( glimpParms_t parms )') + SCREEN_MAIN, encoding='utf-8')
+        binary = Path(temp) / 'screen.exe'
+        subprocess.run([compiler, '-std=c++17', str(screen_source), '-o', str(binary)], check=True)
+        subprocess.run([str(binary)], check=True)
+        init_source = Path(temp) / 'device-init.cpp'
+        init_source.write_text(DEVICE_INIT + function_body(backend_source,
+            'bool VK_InitRenderDevice( void )') + DEVICE_INIT_MAIN, encoding='utf-8')
+        binary = Path(temp) / 'device-init.exe'
+        subprocess.run([compiler, '-std=c++17', str(init_source), '-o', str(binary)], check=True)
+        subprocess.run([str(binary)], check=True)
 
 
 if __name__ == '__main__':

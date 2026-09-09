@@ -2,6 +2,18 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- Settings development: retained menus can keep edits in a private draft,
+  discard changes, restore SYSTEM defaults into the draft, and apply immediate
+  settings with conflict checks. Drafts survive renderer/language recreation;
+  closing an editor releases its ownership. The
+  [SYSTEM contract](ui/system-settings-contract.md) records the supported scope.
+  Display/audio/resource application, confirmation recovery and the complete
+  production screen remain in development.
+
+- Vulkan display initialization and partial display changes now report failed
+  window or swapchain setup instead of publishing a successful configuration.
+  Failed initialization cleans up its attempted device before releasing its window.
+
 - Behavior development: retained menus can initialize data, branch, run ordered
   transitions and submit typed settings actions through named events. Pending
   game data reaches handlers immediately, completed actions survive input

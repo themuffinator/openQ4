@@ -4,7 +4,7 @@
   "date": "2026-09-09",
   "status": "Implementation incomplete; this register preserves full product scope and does not accept any production GUI.",
   "baseline": {
-    "engine_revision": "25813aaf96f0a9dfe36e1be0fd29bbce8cea93df",
+    "engine_revision": "15e35beaf11a1f1942ba25e9431211f64c1ef7f1",
     "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
     "effective_gui_count": 271,
     "translated_or_accepted_resources": 0,
@@ -19,12 +19,12 @@
     "product": {
       "path": "docs/dev/plans/ui-product-completion.md",
       "authority": "normative completion scope, milestones and final audit",
-      "sha256": "54875323dca60bfbe548a42fef98475b77497cb617e26d2bb2f5ee07bc6634a1"
+      "sha256": "729023d610c3846e5a6444836b9ce8fcb7ce803087f9174147a789077473ba1a"
     },
     "original": {
       "path": "docs/dev/plans/idtech5-ui.md",
       "authority": "original immutable scope and stage gates",
-      "sha256": "53a9d46d179ed755ca97dd401ee1ab4d85d62dc713fde49b555704903fec30a1"
+      "sha256": "fcd2ed1df73d874feacefeae0b956bf470ff12f5c30b46ecd67b82d9be369f6d"
     },
     "inventory": {
       "path": "docs/dev/ui/inventory-report.md",
@@ -100,7 +100,7 @@
       "kind": "source_audit",
       "path": "docs/dev/plans/ui-product-completion.md",
       "scope": "Published audit at 80bb3939; source limitations corroborated by current Document/Runtime inspection. Historical tests and captures are not a fresh product qualification.",
-      "sha256": "54875323dca60bfbe548a42fef98475b77497cb617e26d2bb2f5ee07bc6634a1"
+      "sha256": "729023d610c3846e5a6444836b9ce8fcb7ce803087f9174147a789077473ba1a"
     },
     "document-foundation": {
       "kind": "implementation_checkpoint",
@@ -208,6 +208,17 @@
       "local_capture_summary": ".tmp/ui/events-review/capture-evidence.json",
       "scope": "M1 subset: canonical ordered state/presentation writes, conditional and nested event calls, named motion operations and immutable typed action arguments; pending application input and fresh host sources enter one atomic transaction. Normal named/init/activation/trigger methods, per-record control/document eligibility, effective interactivity and the private Session pump preserve input cancellation and committed program delivery through lifecycle teardown. Five native suites, production-method tests and two source/binary-bound hidden windowed Windows gameplay captures qualify this bounded implementation: SP/OpenGL at 125% and MP/Vulkan at 200% pass event/ownership/outgoing-lifecycle oracles and render-target visual review. The captures include pending-state entry, ordered action arguments, non-replaying restore, language/video recovery, independent peers and SP/MP pause behavior. The catalog remains brightness, shadows and dismissal. Full legacy broadcast/register/timer/native-CVar-control lowering, resource/game operations, world output, game-save/demo compatibility, complete widgets/editor, physical-device/platform/performance qualification and production GUI acceptance remain open. No requirement or migration entry is accepted by this checkpoint.",
       "local_capture_summary_sha256": "421d9d4d77d634ae1da2fdd98849f9cfa861d64fb7efd1e5fdc30977f7d66065"
+    },
+    "settings-transaction-foundation": {
+      "kind": "qualified_foundation_checkpoint",
+      "path": "docs/dev/ui/system-settings-contract.md",
+      "sha256": "fbc48b45bab99f39605b67cf80e1a9cbd67b71d821c3c1ee7c1156b7e63cf73e",
+      "baseline_engine_revision": "15e35beaf11a1f1942ba25e9431211f64c1ef7f1",
+      "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
+      "local_capture_summary": ".tmp/ui/settings-review/capture-evidence.json",
+      "local_capture_status": "qualified_subset",
+      "scope": "M2 foundation: source-backed inventory of all 31 SYSTEM options, dependent popups and the 32-field preset footprint; the resulting 53-field catalog preserves registered types, defaults and custom baselines. The engine-independent transaction and normal typed service implement owned drafts, atomic edits, immediate patch apply, cancel/defaults, exact readback, conflict-safe rollback and bounded confirmation/recovery states. Service-owned read-only state, unique owner lifecycle, frame-managed abandonment and explicit/automatic config-write blocking protect pending recovery. Six native suites, the production 53-field host extraction and 15 production service scenarios pass; the service test uses a four-field host and forced confirmation, while the host test uses counted CVar/SDL stand-ins. Two source/binary/log-bound hidden windowed Windows gameplay probes, SP/OpenGL at density 125% and MP/Vulkan at density 200%, each pass 168 ordered readbacks, 19 service results and two language/video recoveries at 1280x720 with user UI scale 1.0. Reviewed render-target images preserve legible draft brightness 1.50 versus live/committed 1.25 and unclipped authored vector framing. The probes record no errors, three expected negative diagnostics each and 94 unchanged MP baseline warnings; they qualify this subset without physical input or actual device reconfiguration. Every changed non-immediate effect rejects the complete Apply batch before live writes. Typed device-result delivery with Applying/Restoring stages, actual display/audio/reload recovery and first-present verification, durable journal, profile/Auto-Detect draft expansion, production controls/artwork, complete page/editor workflows and full platform/corpus acceptance remain required. No requirement or migration entry is accepted by this checkpoint.",
+      "local_capture_summary_sha256": "ca5c01358034754fdf8642a71e79ce3e4cdf6aa3a689dfd0cc160f9a2c412d6a"
     }
   },
   "groups": {
@@ -1293,10 +1304,11 @@
       "current_evidence": [
         "binding-foundation",
         "presentation-alias-foundation",
-        "event-program-foundation"
+        "event-program-foundation",
+        "settings-transaction-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "Pending application values and fresh CVar sources validate together at event entry; ordered program writes and action arguments stage against the resulting authoritative state and commit atomically. Complete widget/data-source ownership and source-bound production state semantics remain."
+      "remaining": "Pending application values and fresh CVar sources validate together at event entry; ordered program writes and action arguments stage against the resulting authoritative state and commit atomically. The settings service adds a reserved read-only settings.* namespace with exact declared types, no CVar-source override, rejected program writes and authoritative publication independent of caller dictionary input. Complete widget/data-source ownership and source-bound production state semantics remain."
     },
     {
       "id": "DOC-007",
@@ -1482,10 +1494,11 @@
       "current_evidence": [
         "managed-application-foundation",
         "presentation-alias-foundation",
-        "event-program-foundation"
+        "event-program-foundation",
+        "settings-transaction-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "Canonical events stage pending application input with fresh host sources, evaluate ordered local changes and capture action arguments before commit; current control/document/ancestor eligibility is checked before queued activations execute. Session delivers committed invocations independently of physical input. Authoritative game-clock scheduling, full legacy timers, all widgets and transformed/world hit geometry remain required."
+      "remaining": "Canonical events stage pending application input with fresh host sources, evaluate ordered local changes and capture action arguments before commit; current control/document/ancestor eligibility is checked before queued activations execute. Session delivers committed invocations independently of physical input. Settings recovery/timeout runs from Common::Frame before automatic configuration persistence; owner destruction queues pending recovery rather than executing host writes. Authoritative game-clock scheduling, full legacy timers, all widgets and transformed/world hit geometry remain required."
     },
     {
       "id": "RUN-006",
@@ -1509,10 +1522,11 @@
       ],
       "status": "partial",
       "current_evidence": [
-        "managed-application-foundation"
+        "managed-application-foundation",
+        "settings-transaction-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "Normal testGUI/session callers change and read back two real settings in SP/MP fixtures. Production source mappings, complete settings transactions, real reopen/failure paths and full screen acceptance remain."
+      "remaining": "Normal testGUI/session callers change and read back two real settings in historical SP/MP fixtures. The current service extends normal typed dispatch to the 53-field SYSTEM transaction catalog; native/production-body evidence qualifies immediate operations and owner/failure boundaries, and two source-bound Windows SP/OpenGL and MP/Vulkan gameplay probes each pass 168 ordered readbacks, 19 service results and two language/video recoveries for the bounded fixture. Production source mappings, complete settings/device transactions, real production reopen/failure paths and full screen acceptance remain."
     },
     {
       "id": "RUN-007",
@@ -1590,10 +1604,11 @@
       "status": "partial",
       "current_evidence": [
         "managed-application-foundation",
-        "event-program-foundation"
+        "event-program-foundation",
+        "settings-transaction-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "Canonical programs validate typed operation arguments before local commit and preserve each invocation at its ordered state snapshot. The private Session pump dispatches the existing brightness/shadows/dismiss catalog. Complete session/SP/MP operations, structured user-visible and asynchronous results, source provenance and full translated behavior remain."
+      "remaining": "Canonical programs validate typed operation arguments before local commit and preserve each invocation at its ordered state snapshot. The private Session pump dispatches brightness/shadows/dismiss plus typed settings.system begin/edit/defaults/apply/cancel/confirm/revert operations. The settings service publishes localized status keys and service-owned results, rejecting unsupported parameter types and blocked non-immediate batches. Complete session/SP/MP operations, asynchronous device results, source provenance and full translated behavior remain."
     },
     {
       "id": "BEH-002",
@@ -1615,10 +1630,12 @@
       "acceptance_evidence_needed": [
         "Change actual video/audio/input options, apply/cancel/default, force failure/timeout and reopen with correct readback; controlled settings changes through internal fixtures."
       ],
-      "status": "pending",
-      "current_evidence": [],
+      "status": "partial",
+      "current_evidence": [
+        "settings-transaction-foundation"
+      ],
       "acceptance_evidence": [],
-      "remaining": "Complete the full validated settings transaction and its acceptance evidence. Vulkan visual brightness/gamma also requires the existing H3 final pass (docs/dev/plans/2026-07-22-vulkan-phase-h.md); successful typed CVar dispatch/readback alone does not qualify display settings."
+      "remaining": "The owned 53-field transaction/catalog/service implements complete typed drafts, registered-default staging, validated immediate patch Apply, editing Cancel, readback, partial-failure rollback, external-conflict protection, bounded confirmation/timeout states, lifecycle abandonment and config-write protection. Native and production-body evidence plus two source-bound Windows SP/OpenGL and MP/Vulkan gameplay probes qualify only this foundation, including draft/live distinction, non-replaying GUI restore and language/video continuity. Changed non-immediate batches are blocked before writes. Actual video/audio/input flows, pure preset/Auto-Detect draft expansion, typed asynchronous Applying/Restoring results, verified device reconstruction/first present, display Keep/Revert, durable journal/process recovery and complete production acceptance remain required; CVar readback does not prove device success."
     },
     {
       "id": "BEH-003",
@@ -4588,9 +4605,11 @@
         "Source/control/event coverage, normal game entry/return/reopen, real operation readback and cancellation/failure scenarios; independently reviewed full-state responsive engine captures for every mapped resource."
       ],
       "status": "pending",
-      "current_evidence": [],
+      "current_evidence": [
+        "settings-transaction-foundation"
+      ],
       "acceptance_evidence": [],
-      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required."
+      "remaining": "The source-backed contract inventories 31 current setting options, dependent popup/default/confirmation behavior and the complete 53-CVar page/preset union with source hashes and precedence. The transaction/catalog/service foundation is implemented, but no production SYSTEM document, complete controls/vector artwork, display recovery, editor round trip or source-bound behavioral/visual screen acceptance exists. Complete the actual shipped page and dependent flows; diagnostic probes cannot satisfy this requirement."
     },
     {
       "id": "FLOW-003",

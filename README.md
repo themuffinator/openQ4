@@ -73,6 +73,10 @@ menu consumers from legacy window objects, and the runtime now supports
 connect explicit retained documents to session callers.
 [Presentation aliases](docs/dev/ui/presentation-aliases.md) provide writable menu
 metadata and visual properties with persistent expression ownership.
+[SYSTEM settings transactions](docs/dev/ui/system-settings-contract.md) now keep
+edits in an owned draft, validate the fixed settings catalog, and apply immediate
+changes with checked readback and conflict handling. Device changes and the
+complete production settings page remain in development.
 [Ordered event programs](docs/dev/ui/event-programs.md) connect data, transitions
 and typed actions to normal GUI lifecycle and session delivery. Complete GUI migration,
 the full application/control contract and the visual editor remain in development.

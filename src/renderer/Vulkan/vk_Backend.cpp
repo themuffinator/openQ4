@@ -275,13 +275,29 @@ bool VK_InitRenderDevice( void ) {
 		return false;
 	}
 
-	(void)vkBackendServices->ApplyScreenParms( &windowParms );
+	if ( !vkBackendServices->ApplyScreenParms( &windowParms ) ) {
+		common->Warning( "Vulkan: initial screen parameter application failed" );
+		// The surface still belongs to this window. Release every device /
+		// surface resource before destroying the failed attempt's window.
+		VK_Device_Shutdown();
+		vkBackendServices->DestroyAttemptWindow();
+		glConfig.isInitialized = false;
+		return false;
+	}
 	vkBackendServices->RefreshNativeWindowHandles( &windowInfo );
 	if ( windowInfo.pixelWidth > 0 && windowInfo.pixelHeight > 0
 			&& ( (uint32_t)windowInfo.pixelWidth != vkCtx.swapchainExtent.width
 				|| (uint32_t)windowInfo.pixelHeight != vkCtx.swapchainExtent.height ) ) {
 		// fullscreen/mode application changed the drawable size
-		(void)VK_Device_RecreateSwapchain();
+		if ( !VK_Device_RecreateSwapchain() ) {
+			common->Warning( "Vulkan: initial screen resize swapchain recreation failed" );
+			// Recreation may already have retired the original swapchain.
+			// Do not publish a ready renderer with incomplete replacement data.
+			VK_Device_Shutdown();
+			vkBackendServices->DestroyAttemptWindow();
+			glConfig.isInitialized = false;
+			return false;
+		}
 	}
 
 	VK_FillGLConfigFromDevice();
@@ -340,7 +356,9 @@ bool GLimp_SetScreenParms( glimpParms_t parms ) {
 	if ( !vkBackendServices->ApplyScreenParms( &windowParms ) ) {
 		return false;
 	}
-	(void)VK_Device_RecreateSwapchain();
+	if ( !VK_Device_RecreateSwapchain() ) {
+		return false;
+	}
 	glConfig.vidWidth = (int)vkCtx.swapchainExtent.width;
 	glConfig.vidHeight = (int)vkCtx.swapchainExtent.height;
 	glConfig.isFullscreen = parms.fullScreen;

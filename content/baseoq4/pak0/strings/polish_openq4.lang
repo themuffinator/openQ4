@@ -149,6 +149,16 @@
 	"#str_229977"	"Minimalne;Niski pobór;Wydajność;Zrównoważone;Jakość;Ultra"
 	"#str_229978"	"Wykryj automatycznie"
 	"#str_229979"	"Znacznik trafienia"
+
+	// Settings transaction status.
+	"#str_229982"	"Gotowe"
+	"#str_229983"	"Te opcje są edytowane w innym oknie ustawień."
+	"#str_229984"	"Otwórz ustawienia przed ich edycją."
+	"#str_229985"	"Nie udało się zastosować tych zmian."
+	"#str_229986"	"Ustawienia zostały zmienione w innym miejscu. Sprawdź je i spróbuj ponownie."
+	"#str_229987"	"Nie udało się przywrócić poprzednich ustawień."
+	"#str_229988"	"Zmiany oczekują na potwierdzenie."
+	"#str_229989"	"Niezapisane zmiany."
 	"#str_41200"	"Wył."
 	"#str_41201"	"Siebie"
 	"#str_41202"	"Wroga"

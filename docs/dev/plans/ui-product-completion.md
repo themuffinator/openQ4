@@ -326,6 +326,26 @@ may establish the adapter, but is not accepted as a finished screen.
 
 ### M2 — One production settings screen and the first editor round trip
 
+Progress: the [source-backed SYSTEM contract](../ui/system-settings-contract.md)
+inventories all 31 current options, dependent popups and the 32-field preset
+footprint. The resulting 53-field catalog, engine-independent transaction core
+and typed application service implement owned drafts, validated immediate
+Apply/Cancel/Defaults, conflict-safe rollback, service-owned read-only state and
+frame-managed owner cleanup. Pending/recovery transactions block automatic and
+explicit config writes. The native core, 53-field host extraction and 15-scenario
+production service tests pass. Hidden windowed SP/OpenGL density 125% and MP/Vulkan density 200%
+gameplay probes each pass 168 ordered readbacks, 19 service results and two
+language/video recoveries, with no errors and only the documented baseline and
+three deliberate negative-case warnings. Source-bound evidence and reviewed
+render-target images are under `.tmp/ui/settings-review/capture-evidence.json`.
+
+Every changed non-immediate field currently rejects the entire Apply batch
+before live writes, including renderer/audio/reload, next-map and preset effects.
+Actual device-result delivery, display Keep/Revert and durable recovery, pure
+preset/Auto-Detect draft expansion, all production controls/artwork and the native
+editor round trip remain required. This increment does not complete M2 or accept
+the SYSTEM page, any migration entry or a product gate.
+
 Resolve the representative parts of UI-03/UI-06/UI-09/UI-10/UI-11/UI-12. Choose
 the shipped system settings page and its dependent popup/confirmation behavior
 as the first complete screen; inventory its actual controls and references before

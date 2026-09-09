@@ -140,6 +140,16 @@
 	"#str_229977"	"Minimo;Bajo consumo;Rendimiento;Equilibrado;Calidad;Ultra"
 	"#str_229978"	"Auto-detectar"
 	"#str_229979"	"Marcador de impacto"
+
+	// Settings transaction status.
+	"#str_229982"	"Listo"
+	"#str_229983"	"Otra ventana de ajustes está modificando estas opciones."
+	"#str_229984"	"Abre los ajustes antes de modificarlos."
+	"#str_229985"	"No se han podido aplicar estos cambios."
+	"#str_229986"	"Los ajustes se han modificado en otra parte. Revísalos e inténtalo de nuevo."
+	"#str_229987"	"No se han podido restaurar los ajustes anteriores."
+	"#str_229988"	"Hay cambios pendientes de confirmación."
+	"#str_229989"	"Cambios sin guardar."
 	"#str_41200"	"Off"
 	"#str_41201"	"Self"
 	"#str_41202"	"Enemy"

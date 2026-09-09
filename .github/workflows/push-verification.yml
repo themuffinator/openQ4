@@ -289,7 +289,10 @@ jobs:
             tools/tests/ui_session_test_gui.py \
             tools/tests/ui_retained_resource_lifecycle.py \
             tools/tests/ui_retained_adapter.py \
+            tools/tests/ui_system_settings_host.py \
+            tools/tests/ui_settings_service.py \
             tools/tests/ui_capture_managed.py \
+            tools/tests/ui_capture_system_settings.py \
             tools/tests/renderer_vid_restart_route.py \
             tools/tests/ui_legacy_inventory.py \
             tools/tests/ui_legacy_import.py \
@@ -496,7 +499,10 @@ jobs:
           python tools/tests/ui_session_test_gui.py
           python tools/tests/ui_retained_resource_lifecycle.py
           python tools/tests/ui_retained_adapter.py
+          python tools/tests/ui_system_settings_host.py
+          python tools/tests/ui_settings_service.py
           python tools/tests/ui_capture_managed.py
+          python tools/tests/ui_capture_system_settings.py
           python tools/tests/renderer_vid_restart_route.py
           python tools/tests/ui_legacy_inventory.py
           python tools/tests/ui_legacy_import.py

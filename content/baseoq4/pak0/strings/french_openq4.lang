@@ -140,6 +140,16 @@
 	"#str_229977"	"Minimum;Basse conso;Performance;Equilibre;Qualite;Ultra"
 	"#str_229978"	"Detection auto"
 	"#str_229979"	"Marqueur de touche"
+
+	// Settings transaction status.
+	"#str_229982"	"Prêt"
+	"#str_229983"	"Une autre fenêtre de paramètres modifie ces options."
+	"#str_229984"	"Ouvrez les paramètres avant de les modifier."
+	"#str_229985"	"Ces modifications n'ont pas pu être appliquées."
+	"#str_229986"	"Les paramètres ont été modifiés ailleurs. Vérifiez-les et réessayez."
+	"#str_229987"	"Les paramètres précédents n'ont pas pu être rétablis."
+	"#str_229988"	"Des modifications sont en attente de confirmation."
+	"#str_229989"	"Modifications non enregistrées."
 	"#str_41200"	"Off"
 	"#str_41201"	"Self"
 	"#str_41202"	"Enemy"

@@ -35,6 +35,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "../render_geo/RenderGeometry.h"
 #include "../renderer/RendererModule.h"
 #include "../ui/RetainedUI.h"
+#include "../ui/SettingsService.h"
 #include "ArenaCampaign.h"
 #include "GameModuleDiagnostics.h"
 #include "RenderDoc.h"
@@ -2062,6 +2063,9 @@ idCommonLocal::WriteConfigToFile
 ==================
 */
 void idCommonLocal::WriteConfigToFile( const char *filename ) {
+	// Never persist an unconfirmed or incompletely restored settings batch,
+	// including explicit writeConfig calls. Keep the archive dirty flags intact.
+	if ( UI_SettingsBlocksConfigWrite() ) return;
 	idFile *f;
 #ifdef ID_WRITE_VERSION
 	ID_TIME_T t;
@@ -2109,6 +2113,7 @@ void idCommonLocal::WriteConfiguration( void ) {
 	if ( !com_fullyInitialized ) {
 		return;
 	}
+	if ( UI_SettingsBlocksConfigWrite() ) return;
 #ifndef ID_DEDICATED
 	// Arena owns a temporary transaction of archived multiplayer rules. Do not
 	// serialize that transaction; once it restores the player's values, the
@@ -5756,6 +5761,9 @@ void idCommonLocal::Frame( void ) {
 		// pump all the events
 		Sys_GenerateEvents();
 
+		// Settings cleanup/confirmation is independent of GUI/input ownership and
+		// SP pause. Finish it before deciding which values may reach disk.
+		UI_SettingsFrame();
 		// write config file if anything changed
 		WriteConfiguration(); 
 
