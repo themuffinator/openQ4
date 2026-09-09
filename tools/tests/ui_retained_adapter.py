@@ -10,12 +10,16 @@ service below is a small ownership/dispatch stand-in, not the production
 catalog, transaction, persistence, or device restart implementation.
 Wheel regressions verify real adapter move/wheel handoff against a recording
 Runtime double; the separate UiValueRuntimeTest owns popup selection/geometry.
+Number diagnostics use the actual TextEdit/TextInput models behind counted
+Runtime methods; native ownership and rendering remain separate qualifications.
 """
 from pathlib import Path
 import shutil
 import subprocess
 import tempfile
 import os
+import hashlib
+import json
 
 from filesystem_case_segments import function_body
 from ui_manager_lifecycle import SUPPORT as DICTIONARY_SUPPORT
@@ -30,6 +34,7 @@ ENGINE = r'''
 #include <iomanip>
 #include <sstream>
 #include <cstdarg>
+#include <charconv>
 #include "src/ui/retained/Input.h"
 #include "src/ui/RetainedUI.h"
 #include "src/ui/SettingsService.h"
@@ -204,10 +209,105 @@ public:
     std::vector<EventCall> eventCalls;
     mutable std::vector<std::string> eventQueries,resolvedActions;
     mutable std::vector<std::optional<StateValue>> resolvedInputs;
-    struct Acknowledgement {std::string control; std::uint64_t token; bool accepted,matched;};
+    struct Acknowledgement {std::string control; std::uint64_t token; bool accepted,matched; StateValues readback;};
     std::vector<Acknowledgement> acknowledgements;
     std::map<std::string,std::uint64_t> latestProposal;
     std::map<std::string,WidgetViewState> widgets;
+    // These methods record the actual adapter boundary and use the production
+    // UTF-8/edit buffer. They are not a replacement for Interaction/Runtime
+    // ownership tests or a claim that a native text lease exists.
+    struct NumberCall {
+        std::string operation,id,text;
+        NumberEditIdentity expected;
+        size_t anchor=0,caret=0;
+        bool option=false;
+        double seconds=0;
+        std::optional<TextInputEvent> input;
+    };
+    std::vector<NumberCall> numberCalls;
+    mutable std::vector<std::string> numberGeometryReads;
+    std::map<std::string,TextEditBuffer> numberBuffers;
+    std::map<std::string,std::string> numberActions,numberBaselines;
+    static inline std::uint64_t numberToken=10000;
+    void InstallNumber(const std::string& id,const std::string& action) {
+        WidgetViewState widget;widget.role=ControlRole::Number;widget.accepted=1.0;
+        widgets[id]=widget;numberActions[id]=action;expectedControlDescriptors[id]={action,{}};
+    }
+    void UpdateNumber(const std::string& id) {
+        auto& view=*widgets.at(id).number;const auto& buffer=numberBuffers.at(id);
+        view.state=buffer.State();view.composition=buffer.Composition();
+        double value=0;view.status=ParseTextNumber(view.state.text,{.5,2,false},value);
+        view.dirty=view.state.text!=numberBaselines.at(id) || view.composition.has_value();
+        view.canUndo=buffer.CanUndo();view.canRedo=buffer.CanRedo();
+    }
+    bool NumberOwner(const std::string& id,NumberEditIdentity expected,std::string& error) {
+        const auto found=widgets.find(id);
+        if(found==widgets.end() || !found->second.number || !found->second.number->active ||
+           !expected.session || !expected.revision || expected!=found->second.number->identity ||
+           selected!=id || disabledControls.contains(id)) {error="stub stale numeric owner";return false;}
+        return true;
+    }
+    bool BeginNumberEdit(const std::string& id,std::string& error,double seconds) {
+        numberCalls.push_back({"begin",id,"",{},0,0,false,seconds,{}});
+        const auto found=widgets.find(id);
+        if(found==widgets.end() || found->second.role!=ControlRole::Number || selected!=id || disabledControls.contains(id)) {error="stub number unavailable";return false;}
+        auto& widget=found->second;
+        if(!widget.number) {
+            std::string text;if(!FormatTextNumber(std::get<double>(widget.accepted),{.5,2,false},text,error))return false;
+            TextEditBuffer buffer;if(!buffer.Reset(text,{64,false,false},error) || !buffer.SetSelection(0,text.size(),error))return false;
+            numberBuffers[id]=std::move(buffer);numberBaselines[id]=text;widget.number=NumberEditView{};
+        }
+        if(!widget.number->active) {widget.number->active=true;widget.number->identity={++numberToken,++numberToken};}
+        UpdateNumber(id);return true;
+    }
+    bool ChangeNumber(const std::string& id,NumberEditIdentity expected,std::string& error,
+                      const std::function<bool(TextEditBuffer&,std::string&)>& change) {
+        if(!NumberOwner(id,expected,error) || widgets.at(id).number->conflict || latestProposal.contains(id))return false;
+        auto candidate=numberBuffers.at(id);if(!change(candidate,error))return false;
+        numberBuffers[id]=std::move(candidate);widgets.at(id).number->identity.revision=++numberToken;UpdateNumber(id);return true;
+    }
+    bool ReplaceNumberSelection(const std::string& id,NumberEditIdentity expected,std::string_view text,std::string& error,double seconds) {
+        numberCalls.push_back({"replace",id,std::string(text),expected,0,0,false,seconds,{}});
+        return ChangeNumber(id,expected,error,[&](auto& buffer,auto& why){return buffer.ReplaceSelection(text,why);});
+    }
+    bool SetNumberSelection(const std::string& id,NumberEditIdentity expected,size_t anchor,size_t caret,std::string& error,double seconds) {
+        numberCalls.push_back({"select",id,"",expected,anchor,caret,false,seconds,{}});
+        return ChangeNumber(id,expected,error,[&](auto& buffer,auto& why){return buffer.SetSelection(anchor,caret,why);});
+    }
+    bool ApplyNumberInput(const std::string& id,NumberEditIdentity expected,const TextInputEvent& input,std::string& error,double seconds) {
+        numberCalls.push_back({"input",id,input.text,expected,0,0,false,seconds,input});
+        return ChangeNumber(id,expected,error,[&](auto& buffer,auto& why){return buffer.Apply(input,why);});
+    }
+    bool UndoNumberEdit(const std::string& id,NumberEditIdentity expected,bool redo,std::string& error,double seconds) {
+        numberCalls.push_back({"history",id,"",expected,0,0,redo,seconds,{}});
+        return ChangeNumber(id,expected,error,[&](auto& buffer,auto& why){return redo?buffer.Redo(why):buffer.Undo(why);});
+    }
+    bool CommitNumberEdit(const std::string& id,NumberEditIdentity expected,std::string& error,double seconds) {
+        numberCalls.push_back({"commit",id,"",expected,0,0,false,seconds,{}});
+        if(!NumberOwner(id,expected,error) || widgets.at(id).number->conflict || latestProposal.contains(id))return false;
+        const auto& buffer=numberBuffers.at(id);double value=0;
+        if(buffer.Composition() || ParseTextNumber(buffer.State().text,{.5,2,false},value)!=TextNumberStatus::Valid) {error="stub numeric text cannot commit";return false;}
+        const auto token=++numberToken;latestProposal[id]=token;widgets.at(id).pending=value;widgets.at(id).proposalToken=token;
+        actions.push_back({ControlAction::Kind::Activate,modelTemplate.id,id,numberActions.at(id),{},value,token,modalIdentity,expected.session,expected.revision});return true;
+    }
+    bool ResolveNumberConflict(const std::string& id,NumberEditIdentity expected,bool keepDraft,std::string& error,double seconds) {
+        numberCalls.push_back({"resolve",id,"",expected,0,0,keepDraft,seconds,{}});
+        if(!NumberOwner(id,expected,error) || !widgets.at(id).number->conflict)return false;
+        std::string text;if(!FormatTextNumber(std::get<double>(widgets.at(id).accepted),{.5,2,false},text,error))return false;
+        auto candidate=numberBuffers.at(id);
+        if(keepDraft)candidate.CancelComposition();else if(!candidate.Reset(text,{64,false,false},error))return false;
+        numberBuffers[id]=std::move(candidate);numberBaselines[id]=text;widgets.at(id).number->conflict=false;
+        widgets.at(id).number->identity.revision=++numberToken;UpdateNumber(id);return true;
+    }
+    bool CancelNumberEdit(const std::string& id,NumberEditIdentity expected,double seconds) {
+        numberCalls.push_back({"cancel",id,"",expected,0,0,false,seconds,{}});std::string error;
+        if(!NumberOwner(id,expected,error))return false;
+        widgets.at(id).number.reset();widgets.at(id).pending.reset();numberBuffers.erase(id);latestProposal.erase(id);return true;
+    }
+    std::optional<int> GetNumberGeometry(const std::string& id) const {
+        numberGeometryReads.push_back(id);const auto found=widgets.find(id);
+        return found!=widgets.end() && found->second.number && found->second.number->active ? std::optional<int>(1) : std::nullopt;
+    }
     std::optional<WidgetViewState> GetWidgetState(const std::string& id) const {
         const auto found=widgets.find(id); return found==widgets.end()?std::nullopt:std::optional(found->second);
     }
@@ -253,9 +353,13 @@ public:
     std::vector<std::pair<float,float>> pointerMoves;
     std::vector<std::string> pointerTransport;
     std::vector<StateValues> stateCalls;
-    bool SetState(const StateValues& values,std::string&,double) {
+    bool failState=false;
+    bool SetState(const StateValues& values,std::string& error,double) {
         stateCalls.push_back(values);
+        if(failState) {error="stub state publication failed";return false;}
         for(const auto& [key,value]:values)state[key]=value;
+        if(values.contains("settings.draft.r_brightness")) for(auto& [id,widget]:widgets)
+            if(widget.role==ControlRole::Number)widget.accepted=values.at("settings.draft.r_brightness");
         return true;
     }
     StateValues GetState(bool=true) const { return state; }
@@ -286,6 +390,13 @@ public:
         controlActionQueries.push_back(action);
         const auto descriptor=expectedControlDescriptors.find(action.node);
         if(descriptor!=expectedControlDescriptors.end() && descriptor->second!=std::make_pair(action.action,action.event))return false;
+        if(action.editSession) {
+            const auto found=widgets.find(action.node);
+            if(found==widgets.end() || !found->second.number || !found->second.number->active || found->second.number->conflict ||
+               found->second.number->identity!=NumberEditIdentity{action.editSession,action.editRevision} ||
+               found->second.pending!=action.proposal || !latestProposal.contains(action.node) ||
+               latestProposal.at(action.node)!=action.proposalToken || selected!=action.node)return false;
+        }
         return action.modalToken && action.modalToken==modalIdentity && CanActivateControl(action.node,seconds);
     }
     bool ResolveAction(const std::string& id,ActionInvocation& result,std::string& error,const StateValue* input=nullptr) const {
@@ -300,8 +411,11 @@ public:
     bool AcknowledgeControlProposal(const std::string& id,std::uint64_t token,bool accepted) {
         const auto found=latestProposal.find(id);
         const bool matched=token && found!=latestProposal.end() && found->second==token;
-        acknowledgements.push_back({id,token,accepted,matched});
-        if(matched)latestProposal.erase(found);
+        acknowledgements.push_back({id,token,accepted,matched,state});
+        if(matched) {
+            latestProposal.erase(found);
+            if(widgets.contains(id))widgets.at(id).pending.reset();
+        }
         return matched;
     }
     bool SaveSnapshot(std::string& output,std::string&,double) const {
@@ -416,6 +530,7 @@ struct Service {
     std::map<std::uint64_t,std::string> requests;
     StateValues live{{"r_brightness",1.0},{"r_shadows",true}},baseline,draft;
     bool readAvailable=true,rejectDispatch=false;
+    std::function<void()> afterDispatch;
     StateValues readOverrides;
 } service;
 const std::map<std::string,std::size_t> fields{{"r_brightness",0},{"r_shadows",1}};
@@ -523,7 +638,7 @@ bool UI_SettingsDispatch(std::uint64_t owner,const openq4::ui::ActionInvocation&
         else if(op=="settings.system.revert")service.draft=service.baseline;
         else if(op=="settings.system.cancel")UI_SettingsCloseOwner(owner);
     }
-    service.dispatches.back().accepted=true; return true;
+    service.dispatches.back().accepted=true; if(service.afterDispatch)service.afterDispatch(); return true;
 }
 bool UI_SettingsRead(std::uint64_t owner,openq4::ui::StateValues& values) {
     auto& service=SettingsBoundary::service; service.reads.push_back(owner);
@@ -1640,6 +1755,100 @@ static void CheckSettingsReturnBoundary() {
     }
     assert(views.empty() && service.owners.empty()); modelTemplate=original; eventPlans.clear();
 }
+static void CheckNumberDiagnosticBoundary() {
+    assert(views.empty() && SettingsBoundary::service.owners.empty());
+    const auto original=modelTemplate;auto& service=SettingsBoundary::service;
+    service=SettingsBoundary::Service{};eventPlans.clear();consoleObject.open=false;windowFocused=true;
+    Expression operand;operand.type=0;operand.inputValue=true;
+    modelTemplate.actions["number.settings"]={"settings.system.edit",{{"r_brightness",operand}},std::size_t(0)};
+    for(const auto& [key,type]:UI_SettingsStateSchema())
+        modelTemplate.state[key]={type==0?StateValue(0.0):type==1?StateValue(false):StateValue(std::string()),""};
+    {
+        idUserInterfaceRetained gui;assert(gui.InitFromFile("test.q4ui"));gui.Activate(true,0);gui.Redraw(0);
+        SettingsEvent(gui,{SettingsAction("begin")});Drain(gui,{});
+        auto& runtime=Live();runtime.InstallNumber("root","number.settings");
+        assert(UI_RetainedDiagnostic(&gui,idCmdArgs{{"retained","focus","root"}}));
+        const auto diagnostic=[&](std::vector<std::string> args) {
+            args.insert(args.begin(),{"retained","number"});return UI_RetainedDiagnostic(&gui,idCmdArgs{std::move(args)});
+        };
+        const auto identity=[&]{return runtime.widgets.at("root").number->identity;};
+        assert(diagnostic({"begin","root"}));assert(runtime.numberCalls.back().operation=="begin" && runtime.numberCalls.back().seconds==presentationTime);
+        for(const auto& args:std::vector<std::vector<std::string>>{
+            {"select","root","-1","0"},{"select","root","0","65537"},{"select","root","0","1junk"},
+            {"select","root","99999999999999999999999","0"},{"select","root","+1","0"},
+            {"select","root","","0"},{"begin","root","extra"},{"unknown","root"},
+            {"preedit","root","\xc3\xa9","1","0"},{"preedit","root","x","-1","1"},
+            {"preedit","root","x","0junk","1"},{"input","root","\xc0\xaf"},
+            {"replace","root"},{"undo","root","extra"}}) {
+            const auto calls=runtime.numberCalls.size();const auto before=identity();
+            assert(!diagnostic(args) && runtime.numberCalls.size()==calls && identity()==before);
+        }
+        auto expected=identity();assert(diagnostic({"replace","root","1.25"}));
+        assert(runtime.numberCalls.back().expected==expected && runtime.numberCalls.back().text=="1.25");
+        expected=identity();assert(diagnostic({"select","root","4","1"}));
+        assert(runtime.numberCalls.back().expected==expected && runtime.numberCalls.back().anchor==4 && runtime.numberCalls.back().caret==1);
+        assert(diagnostic({"select","root","0","4"}));expected=identity();
+        assert(diagnostic({"preedit","root","\xc3\xa9","0","2"}));
+        const auto packet=runtime.numberCalls.back();assert(packet.expected==expected && packet.input && packet.input->kind==TextInputKind::Preedit &&
+            packet.input->text=="\xc3\xa9" && packet.input->selectionStart==0 && packet.input->selectionLength==2);
+        expected=identity();assert(diagnostic({"input","root","1.75"}));
+        assert(runtime.numberCalls.back().expected==expected && runtime.numberCalls.back().input->kind==TextInputKind::Commit &&
+            runtime.numberBuffers.at("root").State().text=="1.75");
+        expected=identity();assert(diagnostic({"undo","root"}));
+        assert(runtime.numberCalls.back().expected==expected && !runtime.numberCalls.back().option && runtime.numberBuffers.at("root").State().text=="1.25");
+        expected=identity();assert(diagnostic({"redo","root"}));
+        assert(runtime.numberCalls.back().expected==expected && runtime.numberCalls.back().option && runtime.numberBuffers.at("root").State().text=="1.75");
+        runtime.widgets.at("root").number->conflict=true;expected=identity();assert(diagnostic({"keep","root"}));
+        assert(runtime.numberCalls.back().expected==expected && runtime.numberCalls.back().option && runtime.numberBuffers.at("root").State().text=="1.75");
+        runtime.widgets.at("root").number->conflict=true;expected=identity();assert(diagnostic({"reload","root"}));
+        assert(runtime.numberCalls.back().expected==expected && !runtime.numberCalls.back().option && runtime.numberBuffers.at("root").State().text=="1");
+        assert(diagnostic({"select","root","0","1"}) && diagnostic({"replace","root","private;quit"}));
+        const auto writes=service.dispatches.size();assert(!diagnostic({"commit","root"}) && service.dispatches.size()==writes && !*gui.PendingApplicationCommand());
+        commonObject.prints.clear();assert(UI_RetainedDiagnostic(&gui,idCmdArgs{{"retained","widget","root"}}));
+        assert(runtime.numberGeometryReads.back()=="root");
+        assert(commonObject.prints.back().find("RETAINED_GUI_NUMBER id=root active=1 bytes=12 ")!=std::string::npos);
+        for(const auto& line:commonObject.prints)assert(line.find("private;quit")==std::string::npos);
+        expected=identity();assert(diagnostic({"cancel","root"}));
+        assert(runtime.numberCalls.back().expected==expected && !runtime.widgets.at("root").number);
+        assert(!diagnostic({"replace","root","2"}) && !diagnostic({"begin","missing"}));
+        // Every valid semantic proposal must still retain and recheck its edit
+        // descriptor at actual dispatch, even though ordinary semantic actions
+        // are not physical-input-cancellable.
+        for(unsigned stale=0;stale<3;++stale) {
+            assert(diagnostic({"begin","root"}));assert(diagnostic({"replace","root","1.25"}));
+            const auto source=identity();assert(diagnostic({"commit","root"}));
+            const auto token=runtime.latestProposal.at("root");const auto dispatches=service.dispatches.size();
+            if(stale==0)++runtime.widgets.at("root").number->identity.revision;
+            if(stale==1)++runtime.widgets.at("root").number->identity.session;
+            if(stale==2)++runtime.modalIdentity;
+            Drain(gui,{});
+            const auto& query=runtime.controlActionQueries.back();
+            assert(query.editSession==source.session && query.editRevision==source.revision && query.proposalToken==token && query.action=="number.settings" && query.proposal==StateValue(1.25));
+            assert(service.dispatches.size()==dispatches && !runtime.acknowledgements.back().accepted && runtime.acknowledgements.back().token==token);
+            assert(diagnostic({"cancel","root"}));
+        }
+        assert(diagnostic({"begin","root"}));assert(diagnostic({"replace","root","1.375"}));
+        const auto source=identity();assert(diagnostic({"commit","root"}));const auto token=runtime.latestProposal.at("root");
+        Drain(gui,{});
+        const auto& accepted=runtime.acknowledgements.back();
+        assert(accepted.token==token && accepted.accepted && accepted.matched && accepted.readback.at("settings.draft.r_brightness")==StateValue(1.375));
+        assert(runtime.controlActionQueries.back().editSession==source.session && runtime.controlActionQueries.back().editRevision==source.revision);
+        // A successful service write is insufficient when publishing its fresh
+        // authoritative state into Runtime fails. The Ack must remain false.
+        assert(diagnostic({"cancel","root"}) && diagnostic({"begin","root"}));
+        assert(diagnostic({"replace","root","1.625"}) && diagnostic({"commit","root"}));
+        const auto failedToken=runtime.latestProposal.at("root");
+        service.afterDispatch=[&]{runtime.failState=true;};
+        bool close=false;assert(gui.DispatchApplicationActions(ActionMarker,close) && !close);
+        const auto& failed=runtime.acknowledgements.back();
+        assert(failed.token==failedToken && !failed.accepted && failed.matched && failed.readback.at("settings.draft.r_brightness")==StateValue(1.375));
+        assert(service.draft.at("r_brightness")==StateValue(1.625));
+        service.afterDispatch={};runtime.failState=false;
+        const auto acknowledgements=runtime.acknowledgements.size();assert(gui.DispatchApplicationActions(ActionMarker,close));
+        assert(runtime.acknowledgements.size()==acknowledgements);
+    }
+    assert(views.empty() && service.owners.empty());modelTemplate=original;eventPlans.clear();
+}
 int main() {
     modelTemplate.id="adapter-document";
     modelTemplate.state={{"number",{1.0,""}},{"flag",{true,""}},{"text",{std::string("default"),""}},{"host",{1.0,"host_cvar"}}};
@@ -1789,12 +1998,26 @@ int main() {
     CheckPendingControlScopeBoundary();
     CheckSettingsExitBatchBoundary();
     CheckSettingsReturnBoundary();
-    std::puts("Retained adapter: exactly-once Apply-and-exit receipts after complete queued batches, stationary wheel/pointer handoff, immutable value proposals/acknowledgements, authoritative settings return and authored Back, settings capability/draw ownership and state/lifecycle boundaries, ordered event/FIFO publication, restore suppression, pending dictionary, presentation delegation, framed saves, input suspension and cursor mapping passed");
+    CheckNumberDiagnosticBoundary();
+    std::puts("Retained adapter: Number diagnostic transport, delayed numeric identity and readback-before-acknowledgement; exactly-once Apply-and-exit receipts after complete queued batches, stationary wheel/pointer handoff, immutable value proposals/acknowledgements, authoritative settings return and authored Back, settings capability/draw ownership and state/lifecycle boundaries, ordered event/FIFO publication, restore suppression, pending dictionary, presentation delegation, framed saves, input suspension and cursor mapping passed");
 }
 '''
 
 
 def main():
+    dependencies = [
+        'src/ui/UserInterfaceRetained.cpp', 'src/ui/UserInterface.h', 'src/ui/UserInterfaceManaged.h',
+        'src/ui/UserInterfaceRetained.h', 'src/ui/UserInterface.cpp', 'src/ui/RetainedUI.h',
+        'src/ui/SettingsService.h', 'src/ui/application/SettingsTransaction.h',
+        'src/ui/retained/Document.h', 'src/ui/retained/Interaction.h',
+        'src/ui/retained/Input.h', 'src/ui/retained/Input.cpp',
+        'src/ui/retained/TextInput.h', 'src/ui/retained/TextInput.cpp',
+        'src/ui/retained/TextEdit.h', 'src/ui/retained/TextEdit.cpp',
+        'tools/tests/ui_manager_lifecycle.py', 'tools/tests/filesystem_case_segments.py',
+        'tools/tests/ui_retained_adapter.py',
+    ]
+    digest = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
+    before = {path: digest(ROOT / path) for path in dependencies}
     source = (ROOT / 'src/ui/UserInterfaceRetained.cpp').read_text(encoding='utf-8')
     public = (ROOT / 'src/ui/UserInterface.h').read_text(encoding='utf-8')
     managed = (ROOT / 'src/ui/UserInterfaceManaged.h').read_text(encoding='utf-8')
@@ -1823,15 +2046,60 @@ def main():
     if not compiler:
         raise RuntimeError('C++ compiler required')
     (ROOT / '.tmp').mkdir(exist_ok=True)
-    environment = {**os.environ, 'TEMP': str(ROOT / '.tmp'), 'TMP': str(ROOT / '.tmp')}
-    with tempfile.TemporaryDirectory(prefix='retained-adapter-', dir=ROOT / '.tmp') as temp:
-        test_source = Path(temp) / 'adapter.cpp'
-        binary = Path(temp) / 'adapter.exe'
-        test_source.write_text(code, encoding='utf-8')
-        subprocess.run([compiler, '-std=c++20', '-DUSE_SDL3', '-I', str(ROOT), str(test_source),
-                        str(ROOT / 'src/ui/retained/Input.cpp'), '-o', str(binary)], check=True, env=environment)
-        subprocess.run([str(binary)], check=True, env=environment)
+    temp = Path(tempfile.mkdtemp(prefix='retained-adapter-', dir=ROOT / '.tmp'))
+    environment = {**os.environ, 'TEMP': str(temp), 'TMP': str(temp), 'TMPDIR': str(temp)}
+    mutations = [
+        ('stale-semantic-number', 'if (pending.cancellable || pending.source.editSession)', 'if (pending.cancellable)'),
+        ('ack-without-publication', 'accepted && synchronized', 'accepted'),
+        ('ack-before-readback',
+         'const bool synchronized = impl->SyncSettings();\n\t\t\tif (pending.proposalToken) impl->RuntimeView()->AcknowledgeControlProposal(pending.control,pending.proposalToken,accepted && synchronized);',
+         'if (pending.proposalToken) impl->RuntimeView()->AcknowledgeControlProposal(pending.control,pending.proposalToken,accepted);\n\t\t\timpl->SyncSettings();'),
+    ]
+    cases = [('production', code)]
+    for name, old, new in mutations:
+        if code.count(old) != 1:
+            raise RuntimeError(f'Production mutation anchor is not unique: {name}')
+        cases.append((name, code.replace(old, new)))
+    report = {'passed': False, 'sources': before, 'scope': __doc__.strip(), 'cases': []}
+    try:
+        for name, body in cases:
+            test_source = temp / (name + '.cpp')
+            binary = temp / (name + ('.exe' if os.name == 'nt' else '-test'))
+            test_source.write_text(body, encoding='utf-8', newline='\n')
+            command = [compiler, '-std=c++20', '-DUSE_SDL3', '-I', str(ROOT), str(test_source),
+                       str(ROOT / 'src/ui/retained/Input.cpp'), str(ROOT / 'src/ui/retained/TextInput.cpp'),
+                       str(ROOT / 'src/ui/retained/TextEdit.cpp'), '-o', str(binary)]
+            compiled = subprocess.run(command, capture_output=True, text=True, env=environment, timeout=120)
+            compile_log = temp / (name + '-compile.log')
+            compile_log.write_text(compiled.stdout + compiled.stderr, encoding='utf-8')
+            record = {'name': name, 'command': command, 'compile_exit': compiled.returncode,
+                      'compile_log_sha256': digest(compile_log), 'extracted_source_sha256': digest(test_source)}
+            report['cases'].append(record)
+            if compiled.returncode:
+                raise RuntimeError(compiled.stdout + compiled.stderr)
+            run = subprocess.run([str(binary)], capture_output=True, text=True, env=environment, timeout=120)
+            run_log = temp / (name + '-run.log')
+            run_log.write_text(run.stdout + run.stderr, encoding='utf-8')
+            record.update(exit_code=run.returncode, output=run.stdout + run.stderr,
+                          run_log_sha256=digest(run_log), binary_sha256=digest(binary))
+            if name == 'production':
+                if run.returncode:
+                    raise RuntimeError(run.stdout + run.stderr)
+                print(run.stdout.strip())
+            elif not run.returncode or 'assertion' not in (run.stdout + run.stderr).lower():
+                raise RuntimeError(f'Compiled mutation did not fail a behavioral assertion: {name}')
+            else:
+                print(f'Rejected compiled adapter mutation: {name}')
+        report['passed'] = True
+    except Exception as error:
+        report['failure'] = str(error)
+        print(error)
+    report['sources_unchanged'] = before == {path: digest(ROOT / path) for path in dependencies}
+    report['passed'] &= report['sources_unchanged']
+    (temp / 'result.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
+    print(f'Retained adapter evidence: {temp / "result.json"}')
+    return 0 if report['passed'] else 1
 
 
 if __name__ == '__main__':
-    main()
+    raise SystemExit(main())

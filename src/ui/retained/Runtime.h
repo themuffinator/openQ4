@@ -30,6 +30,12 @@ struct Vertex {
 };
 
 struct Bounds { float x = 0, y = 0, width = 0, height = 0; };
+struct NumberTextGeometry {
+	std::string control;
+	NumberEditIdentity identity;
+	Bounds caret, viewport; // Projected document pixels, before engine conversion.
+	float scroll = 0;
+};
 struct FontMetrics { float ascent = 0, descent = 0, lineSpacing = 0, xHeight = 0; };
 struct Glyph {
 	float advance = 0, left = 0, top = 0, width = 0, height = 0;
@@ -161,6 +167,25 @@ public:
 	std::optional<ControlState> GetControlState(const std::string& id) const;
 	std::optional<WidgetViewState> GetWidgetState(const std::string& id) const;
 	bool AcknowledgeControlProposal(const std::string& id, std::uint64_t token, bool accepted);
+	// Local edit operations require focused eligibility and the current exact
+	// edit identity. They never write an accepted setting or access a device.
+	bool BeginNumberEdit(const std::string& id, std::string& error, double seconds);
+	bool SetNumberSelection(const std::string& id, NumberEditIdentity expected,
+		std::size_t anchor, std::size_t caret, std::string& error, double seconds);
+	bool ApplyNumberInput(const std::string& id, NumberEditIdentity expected,
+		const TextInputEvent& event, std::string& error, double seconds);
+	bool ReplaceNumberSelection(const std::string& id, NumberEditIdentity expected,
+		std::string_view text, std::string& error, double seconds);
+	bool UndoNumberEdit(const std::string& id, NumberEditIdentity expected, bool redo,
+		std::string& error, double seconds);
+	bool CommitNumberEdit(const std::string& id, NumberEditIdentity expected,
+		std::string& error, double seconds);
+	// Explicit conflict recovery. Keeping a draft only acknowledges the current
+	// baseline; a separate validated commit still proposes the local number.
+	bool ResolveNumberConflict(const std::string& id, NumberEditIdentity expected,
+		bool keepDraft, std::string& error, double seconds);
+	bool CancelNumberEdit(const std::string& id, NumberEditIdentity expected, double seconds);
+	std::optional<NumberTextGeometry> GetNumberGeometry(const std::string& id) const;
 	std::vector<ControlAction> TakeActions();
 	// Recheck queued activations after earlier programs may change eligibility.
 	bool CanActivateControl(const std::string& id, double monotonicSeconds);

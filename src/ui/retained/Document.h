@@ -96,7 +96,7 @@ struct Binding {
 bool ValidProperty(const std::string& name, const Value& value);
 bool ValidStateValue(const StateValue& value);
 enum class ControlState { Default, Hover, Focus, Pressed, Disabled };
-enum class ControlRole { Button, Toggle, Slider, Choice };
+enum class ControlRole { Button, Toggle, Slider, Choice, Number };
 struct ToggleSpec {
 	std::optional<Expression> mixed;
 	std::string checkedPart, mixedPart;
@@ -119,6 +119,14 @@ struct ChoiceSpec {
 	unsigned visibleRows = 8;
 	std::vector<ChoiceOption> options;
 };
+struct NumberSpec {
+	double minimum = 0, maximum = 1;
+	bool exponent = true;
+	unsigned maxBytes = 1024;
+	// A positioned/clipped viewport owns direct absolute text and paint parts.
+	// Their transform is shared through the viewport; validation stays outside.
+	std::string viewport, text, selection, caret, composition, validation;
+};
 struct Control {
 	std::string action, label;
 	bool enabled = true;
@@ -127,7 +135,7 @@ struct Control {
 	std::string event; // Case-folded event name; mutually exclusive with action.
 	ControlRole role = ControlRole::Button;
 	std::optional<Expression> value;
-	std::variant<std::monostate, ToggleSpec, SliderSpec, ChoiceSpec> widget;
+	std::variant<std::monostate, ToggleSpec, SliderSpec, ChoiceSpec, NumberSpec> widget;
 };
 struct ControlReadback {
 	StateValue value;

@@ -4,7 +4,7 @@
   "date": "2026-09-09",
   "status": "Implementation incomplete; this register preserves full product scope and does not accept any production GUI.",
   "baseline": {
-    "engine_revision": "e3e65887480368191df154a9b52cce69d8e72140",
+    "engine_revision": "17b106daa1827d6e50c786f99ea5970b1e8b91cf",
     "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
     "effective_gui_count": 271,
     "translated_or_accepted_resources": 0,
@@ -24,7 +24,7 @@
     "original": {
       "path": "docs/dev/plans/idtech5-ui.md",
       "authority": "original immutable scope and stage gates",
-      "sha256": "875432c08e69dd1deb8b7292a12cf1f1df80bed066e63c52b8f9caa35ccc85dc"
+      "sha256": "655483c484ffa7fc03763eb0c6917ee957a2674f429978c332b78dfa69699306"
     },
     "inventory": {
       "path": "docs/dev/ui/inventory-report.md",
@@ -286,6 +286,16 @@
       "scope": "Validated scalar UTF-8 commit/preedit records, atomic local edit buffer, bounded undo/redo and exact finite numeric parsing/formatting. Checked clipboard primitives enabled only for patched bundled Windows SDL; other providers make no SDL calls. Pending-only event-payload cleanup on Windows/POSIX. Integrated Windows build, four native suites, compiled actual-method checks and hidden SP/OpenGL gameplay/menu smoke pass within their recorded scope. No live field, native clipboard exchange, owner-aware IME delivery, shared shaped caret/grapheme/bidi editing, migration or product acceptance.",
       "local_capture_summary": ".tmp/ui/text-input-foundation/validation-evidence.json",
       "local_capture_summary_sha256": "1c79d7a1c6b422584d4cb95d19df2965b3f755e4467d8f498e6f847c388cd802"
+    },
+    "numeric-fields": {
+      "kind": "implementation_checkpoint",
+      "path": "docs/dev/ui/numeric-fields.md",
+      "sha256": "8ce10e44a62aa9525b6a0bbb2884b54ad3c36dd8f569a649df9b2487fc4cf3ac",
+      "baseline_engine_revision": "17b106daa1827d6e50c786f99ea5970b1e8b91cf",
+      "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
+      "scope": "Canonical Number role with exact decimal proposals, local invalid/conflicting drafts, explicit conflict decisions, bounded undo/redo and inactive snapshot restoration. Font drawing and numeric geometry share bounded immutable unshaped scalar runs; authored selection/caret/preedit ink uses actual Rml line placement and scroll. Current host readbacks guard edits, numeric dispatch and success acknowledgement. Final Windows build and21 retained-UI suites pass. Hidden windowed SP/OpenGL125% and MP/Vulkan200% managed diagnostic fixtures after gameplay qualify the recorded semantic/rendered subset; ordinary SYSTEM regression preserves tested native UI pixels. Event-journal decoding/ownership checks retain historical native layout. No native field keyboard/clipboard/IME route, full shaping/grapheme/bidi, production precise-entry integration, editor, screen/migration or product acceptance.",
+      "local_capture_summary": ".tmp/ui/number-field-integration/validation-evidence.json",
+      "local_capture_summary_sha256": "1ddcceee5494ff43a97a7e687ede8c9182e295df91cded6d29f8f36e6dffaef6"
     }
   },
   "groups": {
@@ -2063,10 +2073,11 @@
         "managed-application-foundation",
         "presentation-alias-foundation",
         "event-program-foundation",
-        "value-controls-foundation"
+        "value-controls-foundation",
+        "numeric-fields"
       ],
       "acceptance_evidence": [],
-      "remaining": "Widget snapshot version3 adds role and choice-scroll records while preserving earlier button-instance formats; open popup, drag preview, pending proposal, armed input and queued actions are transient and canceled on restoration. Committed application/presentation values and motion retain their existing snapshot policy. Complete editable text, dynamic collections, legacy timers, all selection/scroll/modal/focus state and deterministic full-corpus continuation without replay. Recorded native and normal-route Windows resource-reset checks qualify the new widget subset only."
+      "remaining": "Widget snapshot version3 adds role and choice-scroll records while preserving earlier button-instance formats; open popup, drag preview, pending proposal, armed input and queued actions are transient and canceled on restoration. Committed application/presentation values and motion retain their existing snapshot policy. Complete editable text, dynamic collections, legacy timers, all selection/scroll/modal/focus state and deterministic full-corpus continuation without replay. Recorded native and normal-route Windows resource-reset checks qualify the new widget subset only. Nested widget version2 now persists bounded numeric text/selection/undo/redo/baseline/conflict; native origins, composition, live editor identities and proposals are transient. Restoring preserves persistent focus until fresh layout and reconciles current host values. Full text/collection/timer/world/game-save continuation remains required."
     },
     {
       "id": "SAVE-003",
@@ -2671,10 +2682,11 @@
       ],
       "status": "pending",
       "current_evidence": [
-        "text-entry-foundation"
+        "text-entry-foundation",
+        "numeric-fields"
       ],
       "acceptance_evidence": [],
-      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required. The text-entry foundation now preserves scalar-aligned selections and rejected edits with bounded undo/redo. Shared shaped display/caret runs, grapheme and visual navigation, horizontal field scrolling and authored field qualification remain required."
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required. The text-entry foundation now preserves scalar-aligned selections and rejected edits with bounded undo/redo. Shared shaped display/caret runs, grapheme and visual navigation, horizontal field scrolling and authored field qualification remain required. Numeric fields now use shared immutable scalar runs for drawing, caret/selection/preedit geometry and horizontal scroll, including fractional density and inactive draft restoration. Full grapheme/shaping/bidi/fallback-font runs, visual navigation, production fields and the complete language/display/device matrix remain required."
     },
     {
       "id": "TXT-008",
@@ -2696,10 +2708,11 @@
       ],
       "status": "pending",
       "current_evidence": [
-        "text-entry-foundation"
+        "text-entry-foundation",
+        "numeric-fields"
       ],
       "acceptance_evidence": [],
-      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required. Logical composition records and checked patched-Windows clipboard primitives are tested. Live owner-aware IME, candidate geometry, clipboard field commands and every supported native backend remain required."
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required. Logical composition records and checked patched-Windows clipboard primitives are tested. Live owner-aware IME, candidate geometry, clipboard field commands and every supported native backend remain required. The numeric runtime now exposes fresh physical-document caret geometry bound to exact active editor identity; stale or inactive layouts expose none. Native candidate positioning, clipboard commands, ordered native IME lifecycle and all supported platform backends remain required."
     },
     {
       "id": "TXT-009",
@@ -2864,10 +2877,11 @@
       "status": "pending",
       "current_evidence": [
         "system-exit-foundation",
-        "text-entry-foundation"
+        "text-entry-foundation",
+        "numeric-fields"
       ],
       "acceptance_evidence": [],
-      "remaining": "The current adapter change preserves consecutive stationary-pointer choice-popup wheel navigation by avoiding unchanged pointer-move replay while allowing changed coordinates, explicit movement and button input to reclaim pointer navigation. Mapping caches invalidate at quarantine and resource reconstruction. Production-adapter and real Interaction/Runtime checks cover the bounded wheel path; physical-device coverage remains open. Complete production wheel/touch scrolling, Unicode text/composition payloads, keyboard/gamepad repeats and reconnect behavior across the entire widget and supported-host event matrix; require resulting value/focus/scroll evidence for every event kind. The requirement remains pending and no physical-input or full payload acceptance is inferred. Validated UTF-8 payload models and pending-only queue cleanup are implemented. Ordered native delivery, composition ownership and the complete wheel/touch/text/reconnect operation matrix remain required."
+      "remaining": "The current adapter change preserves consecutive stationary-pointer choice-popup wheel navigation by avoiding unchanged pointer-move replay while allowing changed coordinates, explicit movement and button input to reclaim pointer navigation. Mapping caches invalidate at quarantine and resource reconstruction. Production-adapter and real Interaction/Runtime checks cover the bounded wheel path; physical-device coverage remains open. Complete production wheel/touch scrolling, Unicode text/composition payloads, keyboard/gamepad repeats and reconnect behavior across the entire widget and supported-host event matrix; require resulting value/focus/scroll evidence for every event kind. The requirement remains pending and no physical-input or full payload acceptance is inferred. Validated UTF-8 payload models and pending-only queue cleanup are implemented. Ordered native delivery, composition ownership and the complete wheel/touch/text/reconnect operation matrix remain required. Managed semantic numeric operations validate editor identity; journal reads bound payloads and ignore recorded pointers. Native keyboard/text routing, provenance, complete input matrix and deterministic replay remain required."
     },
     {
       "id": "INP-006",
@@ -3054,10 +3068,11 @@
       "status": "partial",
       "current_evidence": [
         "value-controls-foundation",
-        "text-entry-foundation"
+        "text-entry-foundation",
+        "numeric-fields"
       ],
       "acceptance_evidence": [],
-      "remaining": "Canonical stepped sliders now have authored track/fill/thumb/value parts, authoritative raw readback, captured drag previews with release proposals and keyboard step/navigation semantics. Initial brightness/ambient controls use the owned settings draft. Precise numeric entry and its caret/selection/clipboard/IME path remain mandatory; increment controls do not substitute for them. Complete interrupted binding/animation ownership, reusable artwork and all disabled/busy/invalid/cancel/focus, touch/gamepad/keyboard/pointer production cases. Recorded native and normal-route Windows checks qualify this initial control subset only. Exact numeric editing now distinguishes incomplete, malformed, out-of-range and valid text without step quantization. Precise-entry slider integration, field artwork, focus/selection/clipboard/IME behavior and draft validation remain required."
+      "remaining": "Canonical stepped sliders now have authored track/fill/thumb/value parts, authoritative raw readback, captured drag previews with release proposals and keyboard step/navigation semantics. Initial brightness/ambient controls use the owned settings draft. Precise numeric entry and its caret/selection/clipboard/IME path remain mandatory; increment controls do not substitute for them. Complete interrupted binding/animation ownership, reusable artwork and all disabled/busy/invalid/cancel/focus, touch/gamepad/keyboard/pointer production cases. Recorded native and normal-route Windows checks qualify this initial control subset only. Exact numeric editing now distinguishes incomplete, malformed, out-of-range and valid text without step quantization. Precise-entry slider integration, field artwork, focus/selection/clipboard/IME behavior and draft validation remain required. A canonical Number sibling is implemented as an independent exact proposal/draft model and managed diagnostic fixture. Production slider pairing, ordinary editing commands, specific localized correction feedback and complete settings Apply/exit behavior remain required."
     },
     {
       "id": "WID-005",
@@ -3107,10 +3122,11 @@
       ],
       "status": "pending",
       "current_evidence": [
-        "text-entry-foundation"
+        "text-entry-foundation",
+        "numeric-fields"
       ],
       "acceptance_evidence": [],
-      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required. The local edit buffer and numeric policy are tested. Authored field controls, rendered caret/selection/preedit, localized correction feedback, proposals, persistence and live clipboard/IME routes remain required."
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required. The local edit buffer and numeric policy are tested. Authored field controls, rendered caret/selection/preedit, localized correction feedback, proposals, persistence and live clipboard/IME routes remain required. Canonical Number parts now render literal text, selection, caret, preedit and preserved validation; local drafts/conflicts/history survive inactive snapshot restore. Current readbacks reject stale queued edits before host writes. Production field styling/feedback, pointer/keyboard navigation, clipboard/native IME and complete typed-field qualification remain required."
     },
     {
       "id": "WID-007",

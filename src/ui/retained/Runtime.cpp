@@ -3,6 +3,8 @@
 #include "State.h"
 #include "VectorElement.h"
 #include "ValueControlView.h"
+#include "TextRun.h"
+#include "NumberControlView.h"
 
 #include <RmlUi/Core.h>
 #include <RmlUi/Core/FontEngineInterface.h>
@@ -24,6 +26,52 @@ namespace {
 bool SnapshotFields(const Json::Value& value, std::initializer_list<const char*> fields) {
 	if (!value.isObject() || value.size() != fields.size()) return false;
 	for (const auto* field : fields) if (!value.isMember(field)) return false;
+	return true;
+}
+Json::Value SnapshotTextEditState(const TextEditState& state) {
+	Json::Value result(Json::objectValue);
+	result["text"] = state.text;
+	result["anchor"] = Json::UInt64(state.anchor); result["caret"] = Json::UInt64(state.caret);
+	return result;
+}
+// Bound decoded payloads before copying JSON strings into the edit model. The
+// model additionally validates UTF-8 boundaries, field policy and history.
+bool ReadSnapshotText(const Json::Value& source, std::string& text, std::size_t& remaining) {
+	const char* begin = nullptr; const char* end = nullptr;
+	if (!source.getString(&begin,&end)) return false;
+	const auto size = static_cast<std::size_t>(end-begin);
+	if (size > TextInputMaxBytes || size > remaining) return false;
+	text.assign(begin,end); remaining -= size; return true;
+}
+bool ReadSnapshotTextEditState(const Json::Value& source, TextEditState& state, std::size_t& remaining) {
+	if (!SnapshotFields(source,{"text","anchor","caret"}) || !source["anchor"].isUInt64() || !source["caret"].isUInt64() ||
+		!ReadSnapshotText(source["text"],state.text,remaining) || source["anchor"].asUInt64() > state.text.size() ||
+		source["caret"].asUInt64() > state.text.size()) return false;
+	state.anchor = static_cast<std::size_t>(source["anchor"].asUInt64());
+	state.caret = static_cast<std::size_t>(source["caret"].asUInt64()); return true;
+}
+Json::Value SnapshotNumberEditor(const NumberEditorSnapshot& editor) {
+	Json::Value result(Json::objectValue); result["state"] = SnapshotTextEditState(editor.state);
+	for (const auto* name : {"undo","redo"}) result[name] = Json::Value(Json::arrayValue);
+	for (const auto& state : editor.undo) result["undo"].append(SnapshotTextEditState(state));
+	for (const auto& state : editor.redo) result["redo"].append(SnapshotTextEditState(state));
+	result["baselineValue"] = editor.baselineValue; result["baselineText"] = editor.baselineText; result["conflict"] = editor.conflict;
+	return result;
+}
+bool ReadSnapshotNumberEditor(const Json::Value& source, NumberEditorSnapshot& editor, std::size_t& remaining) {
+	if (!SnapshotFields(source,{"state","undo","redo","baselineValue","baselineText","conflict"}) ||
+		!source["baselineValue"].isNumeric() || !std::isfinite(source["baselineValue"].asDouble()) || !source["conflict"].isBool() ||
+		!source["undo"].isArray() || !source["redo"].isArray() || source["undo"].size() > TextEditBuffer::MaxHistoryEntries ||
+		source["redo"].size() > TextEditBuffer::MaxHistoryEntries-source["undo"].size() ||
+		!ReadSnapshotTextEditState(source["state"],editor.state,remaining) || !ReadSnapshotText(source["baselineText"],editor.baselineText,remaining)) return false;
+	editor.baselineValue = source["baselineValue"].asDouble(); editor.conflict = source["conflict"].asBool();
+	std::size_t historyRemaining = TextEditBuffer::MaxHistoryTextBytes;
+	for (const auto* name : {"undo","redo"}) for (const auto& item : source[name]) {
+		TextEditState state;
+		if (!ReadSnapshotTextEditState(item,state,historyRemaining) || state.text.size() > remaining) return false;
+		remaining -= state.text.size();
+		(std::strcmp(name,"undo") == 0 ? editor.undo : editor.redo).push_back(std::move(state));
+	}
 	return true;
 }
 Json::Value SnapshotValue(const Value& value) {
@@ -451,20 +499,32 @@ public:
 		return reinterpret_cast<Rml::FontFaceHandle>(face.get());
 	}
 	const Rml::FontMetrics& GetFontMetrics(Rml::FontFaceHandle handle) override { return reinterpret_cast<Face*>(handle)->metrics; }
+	// Number-field geometry queries this same immutable run as measurement and
+	// font submission. Unknown/released handles and non-editable strings fail
+	// without dereferencing a stale face or changing the legacy streaming path.
+	std::shared_ptr<const TextRun> QueryRun(std::uintptr_t handle, std::string_view string, float letterSpacing) {
+		const Face* face = nullptr;
+		for (const auto& item : faces) if (reinterpret_cast<std::uintptr_t>(item.second.get()) == handle) { face = item.second.get(); break; }
+		if (!face) return {};
+		std::string error;
+		return runs.Get(handle, string, letterSpacing,
+			[&](std::uint32_t codepoint) { return host.GetGlyph(face->family, face->size, codepoint); }, error);
+	}
 	int GetStringWidth(Rml::FontFaceHandle handle, Rml::StringView string, const Rml::TextShapingContext& shaping, Rml::Character) override {
+		const std::string_view text(string.begin(), string.size());
+		if (const auto run = QueryRun(handle, text, shaping.letter_spacing)) return run->roundedWidth;
 		const auto& face = *reinterpret_cast<Face*>(handle);
-		float width = 0;
-		for (Rml::StringIteratorU8 it(string); it; ++it) width += host.GetGlyph(face.family, face.size, static_cast<std::uint32_t>(*it)).advance + shaping.letter_spacing;
+		const float width = WalkTextRun(text, shaping.letter_spacing,
+			[&](std::uint32_t codepoint) { return host.GetGlyph(face.family, face.size, codepoint); });
 		return static_cast<int>(std::lround(width));
 	}
 	int GenerateString(Rml::RenderManager& manager, Rml::FontFaceHandle handle, Rml::FontEffectsHandle,
 		Rml::StringView string, Rml::Vector2f position, Rml::ColourbPremultiplied colour, float,
 		const Rml::TextShapingContext& shaping, Rml::TexturedMeshList& meshes) override {
-		const auto& face = *reinterpret_cast<Face*>(handle);
-		float width = 0;
+		const std::string_view text(string.begin(), string.size());
 		std::string lastMaterial;
-		for (Rml::StringIteratorU8 it(string); it; ++it) {
-			const auto glyph = host.GetGlyph(face.family, face.size, static_cast<std::uint32_t>(*it));
+		const auto emit = [&](const TextRunGlyph& record) {
+			const auto& glyph = record.glyph;
 			if (!glyph.material.empty() && glyph.width > 0 && glyph.height > 0) {
 				if (meshes.empty() || lastMaterial != glyph.material) {
 					meshes.push_back({{}, manager.LoadTexture("material:" + glyph.material)});
@@ -472,20 +532,27 @@ public:
 				}
 				auto& mesh = meshes.back().mesh;
 				const int base = static_cast<int>(mesh.vertices.size());
-				const float x = position.x + width + glyph.left, y = position.y + glyph.top;
+				const float x = position.x + record.penX + glyph.left, y = position.y + glyph.top;
 				mesh.vertices.insert(mesh.vertices.end(), {
 					{{x,y},colour,{glyph.u0,glyph.v0}}, {{x+glyph.width,y},colour,{glyph.u1,glyph.v0}},
 					{{x+glyph.width,y+glyph.height},colour,{glyph.u1,glyph.v1}}, {{x,y+glyph.height},colour,{glyph.u0,glyph.v1}}});
 				mesh.indices.insert(mesh.indices.end(), {base,base+3,base+1,base+1,base+3,base+2});
 			}
-			width += glyph.advance + shaping.letter_spacing;
+		};
+		if (const auto run = QueryRun(handle, text, shaping.letter_spacing)) {
+			for (const auto& record : run->glyphs) emit(record);
+			return run->roundedWidth;
 		}
+		const auto& face = *reinterpret_cast<Face*>(handle);
+		const float width = WalkTextRun(text, shaping.letter_spacing,
+			[&](std::uint32_t codepoint) { return host.GetGlyph(face.family, face.size, codepoint); }, emit);
 		return static_cast<int>(std::lround(width));
 	}
-	void ReleaseFontResources() override { faces.clear(); }
-	void Shutdown() override { faces.clear(); }
+	void ReleaseFontResources() override { runs.Clear(); faces.clear(); }
+	void Shutdown() override { runs.Clear(); faces.clear(); }
 private:
 	Host& host;
+	TextRunCache runs;
 	std::map<std::string, std::unique_ptr<Face>> faces;
 };
 
@@ -592,6 +659,7 @@ struct Runtime::Impl {
 	std::uint64_t appliedStateRevision = 0;
 	Interaction interaction;
 	ValueControlView valueView;
+	NumberControlView numberView;
 	Viewport viewport;
 	std::vector<std::string> controls;
 	float pointerX = 0, pointerY = 0;
@@ -602,6 +670,14 @@ struct Runtime::Impl {
 	bool initialized = false;
 	std::map<std::string,bool> inputAllowed;
 	std::string modalError;
+	bool PrepareNumberEdit(double seconds, std::string& error) {
+		if (!canonical || !document || !std::isfinite(seconds) || seconds < 0) {
+			error = "Number editing requires a canonical document and valid presentation time"; return false;
+		}
+		ReadStateSources();
+		if (!stateError.empty()) { error = stateError; return false; }
+		UpdateInteraction(seconds); return true;
+	}
 	static std::optional<Value> Property(const State& state, const Motion& motion, const PropertyKey& key) {
 		const auto bound = state.Properties().find(key);
 		if (bound != state.Properties().end()) return bound->second;
@@ -763,6 +839,7 @@ bool Runtime::Initialize() {
 void Runtime::Shutdown() {
 	if (!impl->initialized) return;
 	impl->valueView.Reset();
+	impl->numberView.Reset();
 	{
 		ContextClock clock(*impl->services,impl->time);
 		Rml::RemoveContext(impl->contextName);
@@ -784,6 +861,7 @@ void Runtime::Shutdown() {
 void Runtime::CloseDocument() {
 	impl->sourcePath.clear();
 	impl->valueView.Reset();
+	impl->numberView.Reset();
 	impl->canonical.reset(); impl->applied.clear(); impl->motion.Reset({});
 	impl->state = {}; impl->appliedStateRevision = 0; impl->stateError.clear();
 	impl->interaction.Reset({}); impl->controls.clear(); impl->pointerPresent = impl->pointerNavigation = false;
@@ -830,6 +908,11 @@ bool Runtime::LoadDocument(const std::string& source, const std::string& sourceP
 		[&](const std::string& text) { return impl->host.Translate(text); },stateError)) {
 		diagnostics.push_back({"/root",stateError}); CloseDocument(); return false;
 	}
+	if (!impl->numberView.Initialize(impl->canonical->Model(),*impl->document,
+		[&](std::uintptr_t face,std::string_view text,float spacing) { return impl->services->fonts.QueryRun(face,text,spacing); },
+		[&](const std::string& text) { return impl->host.Translate(text); },{},stateError)) {
+		diagnostics.push_back({"/root",stateError}); CloseDocument(); return false;
+	}
 	impl->ReadStateSources(); impl->Feedback(impl->time);
 	impl->ApplyMotion();
 	return true;
@@ -856,6 +939,10 @@ bool Runtime::SaveSnapshot(std::string& snapshot, std::string& error, double sec
 	if (!std::isfinite(seconds) || seconds < 0) { error = "Invalid snapshot presentation time"; return false; }
 	try {
 		const double now = std::max(seconds,impl->time);
+		// Save durable drafts before copying interaction state. This checked
+		// boundary rejects excessive aggregate text/history without truncation.
+		ValueWidgetSnapshot widgets;
+		if (!impl->interaction.CaptureWidgets(widgets,error)) return false;
 		Interaction interaction = impl->interaction;
 		Motion motion = impl->motion;
 		const bool authoredModals = interaction.HasAuthoredModals();
@@ -871,7 +958,6 @@ bool Runtime::SaveSnapshot(std::string& snapshot, std::string& error, double sec
 		if (!motion.Restore(playback,now,error,true)) return false;
 		const auto input = interaction.Capture();
 		Json::Value root(Json::objectValue);
-		const auto widgets = interaction.CaptureWidgets();
 		root["format"] = "openq4-ui-instance"; root["version"] = authoredModals ? 4 : widgets.widgets.empty() ? 2 : 3;
 		auto& identity = root["document"];
 		identity["version"] = 1; identity["id"] = impl->canonical->Model().id;
@@ -932,6 +1018,7 @@ bool Runtime::SaveSnapshot(std::string& snapshot, std::string& error, double sec
 			for (const auto& [id,widget] : widgets.widgets) {
 				auto& entry = root["widgets"]["controls"][id];
 				entry["role"] = unsigned(widget.role); entry["firstVisible"] = widget.firstVisible;
+				if (widget.number) entry["number"] = SnapshotNumberEditor(*widget.number);
 			}
 		}
 		Json::StreamWriterBuilder writer; writer["indentation"] = ""; writer["precision"] = 17;
@@ -967,15 +1054,27 @@ bool Runtime::RestoreSnapshot(const std::string& snapshot, std::string& error, d
 			identity["id"] != impl->canonical->Model().id || identity["path"] != impl->sourcePath || identity["source"] != impl->canonical->Source())
 			return reject("Instance snapshot document/source identity mismatch");
 		ValueWidgetSnapshot widgets;
+		std::size_t numberEditors = 0, numberTextRemaining = ValueWidgetSnapshot::MaxNumberTextBytes;
 		if (root["version"].asUInt() >= 3) {
 			const auto& saved = root["widgets"];
-			if (!SnapshotFields(saved,{"version","controls"}) || !saved["version"].isUInt() || saved["version"].asUInt() != 1 ||
+			if (!SnapshotFields(saved,{"version","controls"}) || !saved["version"].isUInt() || saved["version"].asUInt() < 1 || saved["version"].asUInt() > 2 ||
 				!saved["controls"].isObject() || saved["controls"].size() > impl->controls.size()) return reject("Invalid restored widget table");
+			widgets.version = saved["version"].asUInt();
 			for (const auto& id : saved["controls"].getMemberNames()) {
 				const auto& entry = saved["controls"][id];
-				if (!SnapshotFields(entry,{"role","firstVisible"}) || !entry["role"].isUInt() || entry["role"].asUInt() < unsigned(ControlRole::Toggle) ||
-					entry["role"].asUInt() > unsigned(ControlRole::Choice) || !entry["firstVisible"].isUInt()) return reject("Invalid restored widget state");
-				widgets.widgets[id] = {ControlRole(entry["role"].asUInt()),entry["firstVisible"].asUInt()};
+				const bool hasNumber = widgets.version == 2 && entry.isMember("number");
+				if (!(hasNumber ? SnapshotFields(entry,{"role","firstVisible","number"}) : SnapshotFields(entry,{"role","firstVisible"})) ||
+					!entry["role"].isUInt() || entry["role"].asUInt() < unsigned(ControlRole::Toggle) ||
+					entry["role"].asUInt() > unsigned(widgets.version == 2 ? ControlRole::Number : ControlRole::Choice) ||
+					!entry["firstVisible"].isUInt()) return reject("Invalid restored widget state");
+				ValueWidgetSnapshot::Widget widget{ControlRole(entry["role"].asUInt()),entry["firstVisible"].asUInt()};
+				if (hasNumber) {
+					if (widget.role != ControlRole::Number || ++numberEditors > ValueWidgetSnapshot::MaxNumberEditors)
+						return reject("Invalid restored number editor table");
+					widget.number.emplace();
+					if (!ReadSnapshotNumberEditor(entry["number"],*widget.number,numberTextRemaining)) return reject("Invalid restored number editor");
+				}
+				widgets.widgets.emplace(id,std::move(widget));
 			}
 		} else if (!root["widgets"].isObject() || !root["widgets"].empty()) return reject("Unsupported restored widget state");
 		const auto& application = root["application"];
@@ -1067,8 +1166,9 @@ bool Runtime::RestoreSnapshot(const std::string& snapshot, std::string& error, d
 			input.presented[id] = ControlState(value.asUInt());
 		}
 		Interaction interaction = impl->interaction;
-		if (!interaction.SetReadbacks(state.ControlValues(),error) || !interaction.RestoreWidgets(widgets,error)) return false;
-		if (!interaction.Restore(input,error)) return false;
+		if (!interaction.SetReadbacks(state.ControlValues(),error) || !interaction.Restore(input,error)) return false;
+		const auto restoredFeedback = interaction.TakeFeedback();
+		if (!interaction.RestoreWidgets(widgets,error)) return false;
 		std::vector<std::string> modalRoots;
 		if (authoredModals) {
 			// Validate the saved scope chain against its own source values before
@@ -1092,6 +1192,7 @@ bool Runtime::RestoreSnapshot(const std::string& snapshot, std::string& error, d
 		if (!impl->VisibleModals(state,motion,modalRoots,error) || !interaction.SyncAuthoredModals(modalRoots,error)) return false;
 		// Host bindings remain authoritative. If current CVars changed control
 		// availability, transition from the saved ink to the new semantic state.
+		for (const auto& feedback : restoredFeedback) motion.Play(feedback.timeline,now);
 		for (const auto& feedback : interaction.TakeFeedback()) motion.Play(feedback.timeline,now);
 		// No live state, geometry, clock or input queues change before validation
 		// completes. Rendering applies the restored values on the next frame.
@@ -1188,8 +1289,9 @@ void Runtime::Frame(const Viewport& viewport, double seconds) {
 		impl->UpdateInteraction(-1,true);
 		const bool focusChanged = before != impl->interaction.Focused();
 		if (focusChanged) { impl->RevealFocus(); impl->ApplyMotion(); }
-		const bool painted = impl->valueView.Paint(impl->interaction,impl->state.ControlValues(),viewport.width,viewport.height,viewport.DpRatio(),
+		bool painted = impl->valueView.Paint(impl->interaction,impl->state.ControlValues(),viewport.width,viewport.height,viewport.DpRatio(),
 			[&](const std::string& id) { const auto value = impl->PresentedProperty({id,"opacity"}); return value ? value->data[0] : 1.0; });
+		painted |= impl->numberView.Paint(impl->interaction,viewport.DpRatio(),impl->time,impl->motion.ReducedMotion());
 		if (!painted && !focusChanged) break;
 		impl->context->Update();
 	}
@@ -1292,13 +1394,62 @@ bool Runtime::CanDispatchModalBack(const ControlAction& action, double seconds) 
 }
 bool Runtime::CanDispatchControlAction(const ControlAction& action, double seconds) {
 	if (!impl->canonical || !std::isfinite(seconds) || seconds < 0) return false;
+	// A host source may change after a proposal is queued, including between
+	// commands in one application pump. Retire stale numeric proposals before
+	// their side effect, not only when acknowledging the resulting readback.
+	if (action.editSession) {
+		impl->ReadStateSources();
+		if (!impl->stateError.empty()) return false;
+	}
 	impl->UpdateInteraction(seconds); return impl->interaction.CanDispatchControlAction(action);
 }
 std::string Runtime::FocusedControl() const { return impl->interaction.Focused(); }
 std::optional<ControlState> Runtime::GetControlState(const std::string& id) const { return impl->interaction.State(id); }
 std::optional<WidgetViewState> Runtime::GetWidgetState(const std::string& id) const { return impl->interaction.Widget(id); }
 bool Runtime::AcknowledgeControlProposal(const std::string& id, std::uint64_t token, bool accepted) {
+	// Host-backed actions can complete between frames. Observe their actual
+	// readback before acknowledging a local editor, including normalization or
+	// an intervening external change; success alone cannot set accepted data.
+	if (accepted && impl->canonical) {
+		impl->ReadStateSources();
+		if (!impl->stateError.empty()) accepted = false;
+	}
 	return impl->interaction.AcknowledgeProposal(id,token,accepted);
+}
+bool Runtime::BeginNumberEdit(const std::string& id,std::string& error,double seconds) {
+	if (!impl->PrepareNumberEdit(seconds,error)) return false;
+	const bool result=impl->interaction.BeginNumberEdit(id,error); impl->Feedback(seconds); return result;
+}
+bool Runtime::SetNumberSelection(const std::string& id,NumberEditIdentity expected,std::size_t anchor,std::size_t caret,std::string& error,double seconds) {
+	if (!impl->PrepareNumberEdit(seconds,error)) return false;
+	const bool result=impl->interaction.SetNumberSelection(id,expected,anchor,caret,error); impl->Feedback(seconds); return result;
+}
+bool Runtime::ApplyNumberInput(const std::string& id,NumberEditIdentity expected,const TextInputEvent& event,std::string& error,double seconds) {
+	if (!impl->PrepareNumberEdit(seconds,error)) return false;
+	const bool result=impl->interaction.ApplyNumberInput(id,expected,event,error); impl->Feedback(seconds); return result;
+}
+bool Runtime::ReplaceNumberSelection(const std::string& id,NumberEditIdentity expected,std::string_view text,std::string& error,double seconds) {
+	if (!impl->PrepareNumberEdit(seconds,error)) return false;
+	const bool result=impl->interaction.ReplaceNumberSelection(id,expected,text,error); impl->Feedback(seconds); return result;
+}
+bool Runtime::UndoNumberEdit(const std::string& id,NumberEditIdentity expected,bool redo,std::string& error,double seconds) {
+	if (!impl->PrepareNumberEdit(seconds,error)) return false;
+	const bool result=impl->interaction.UndoNumberEdit(id,expected,redo,error); impl->Feedback(seconds); return result;
+}
+bool Runtime::CommitNumberEdit(const std::string& id,NumberEditIdentity expected,std::string& error,double seconds) {
+	if (!impl->PrepareNumberEdit(seconds,error)) return false;
+	const bool result=impl->interaction.CommitNumberEdit(id,expected,error); impl->Feedback(seconds); return result;
+}
+bool Runtime::ResolveNumberConflict(const std::string& id,NumberEditIdentity expected,bool keepDraft,std::string& error,double seconds) {
+	if (!impl->PrepareNumberEdit(seconds,error)) return false;
+	const bool result=impl->interaction.ResolveNumberConflict(id,expected,keepDraft,error); impl->Feedback(seconds); return result;
+}
+bool Runtime::CancelNumberEdit(const std::string& id,NumberEditIdentity expected,double seconds) {
+	std::string error; if (!impl->PrepareNumberEdit(seconds,error)) return false;
+	const bool result=impl->interaction.CancelNumberEdit(id,expected); impl->Feedback(seconds); return result;
+}
+std::optional<NumberTextGeometry> Runtime::GetNumberGeometry(const std::string& id) const {
+	return impl->numberView.Geometry(id,impl->interaction);
 }
 bool Runtime::CanActivateControl(const std::string& id, double seconds) {
 	if (!impl->canonical || !std::isfinite(seconds) || seconds < 0) return false;

@@ -8,6 +8,7 @@
 #include "retained/Input.h"
 #include "application/SettingsTransaction.h"
 #include <algorithm>
+#include <charconv>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -604,7 +605,7 @@ bool idUserInterfaceRetained::DispatchApplicationActions(const char* command, bo
 	auto actions = std::move(impl->actions); impl->actions.clear();
 	closeRequested = impl->close; impl->close = false;
 	for (const auto& pending : actions) {
-		if (pending.cancellable) {
+		if (pending.cancellable || pending.source.editSession) {
 			if (!impl->RuntimeView()->CanDispatchControlAction(pending.source,RetainedUI_PresentationTime())) {
 				if (pending.proposalToken) impl->RuntimeView()->AcknowledgeControlProposal(pending.control,pending.proposalToken,false);
 				continue;
@@ -621,8 +622,8 @@ bool idUserInterfaceRetained::DispatchApplicationActions(const char* command, bo
 			const bool accepted = UI_SettingsDispatch(impl->settingsOwner,invocation,error);
 			if (!accepted) impl->Error(error);
 			else impl->lastError.clear();
-			impl->SyncSettings();
-			if (pending.proposalToken) impl->RuntimeView()->AcknowledgeControlProposal(pending.control,pending.proposalToken,accepted);
+			const bool synchronized = impl->SyncSettings();
+			if (pending.proposalToken) impl->RuntimeView()->AcknowledgeControlProposal(pending.control,pending.proposalToken,accepted && synchronized);
 			continue;
 		}
 		const auto value = invocation.arguments.find("value");
@@ -803,7 +804,49 @@ bool UI_RetainedDiagnostic(idUserInterface* gui, const idCmdArgs& args) {
 			id.c_str(),static_cast<unsigned>(widget->role),static_cast<unsigned>(widget->accepted.index()),number(widget->accepted),
 			widget->pending ? 1 : 0,widget->pending ? number(*widget->pending) : 0,widget->rejected ? 1 : 0,
 			static_cast<unsigned long long>(widget->proposalToken),widget->popupOpen ? 1 : 0,widget->firstVisible);
+		if (widget->number) {
+			const auto& edit = *widget->number; const auto geometry = impl.RuntimeView()->GetNumberGeometry(id);
+			common->Printf("RETAINED_GUI_NUMBER id=%s active=%d bytes=%llu anchor=%llu caret=%llu status=%u dirty=%d conflict=%d undo=%d redo=%d session=%llu revision=%llu geometry=%d\n",
+				id.c_str(),edit.active ? 1 : 0,static_cast<unsigned long long>(edit.state.text.size()),
+				static_cast<unsigned long long>(edit.state.anchor),static_cast<unsigned long long>(edit.state.caret),static_cast<unsigned>(edit.status),
+				edit.dirty ? 1 : 0,edit.conflict ? 1 : 0,edit.canUndo ? 1 : 0,edit.canRedo ? 1 : 0,
+				static_cast<unsigned long long>(edit.identity.session),static_cast<unsigned long long>(edit.identity.revision),geometry ? 1 : 0);
+		}
 		return true;
+	} else if (verb == "number" && args.Argc() >= 4) {
+		// Semantic diagnostics use the same guarded editor operations as normal
+		// input. They do not synthesize device events or access the clipboard.
+		const std::string operation(args.Argv(2)), id(args.Argv(3)); std::string error;
+		auto* runtime = impl.RuntimeView(); const double now = RetainedUI_PresentationTime();
+		const auto widget = runtime->GetWidgetState(id);
+		const auto identity = widget && widget->number ? widget->number->identity : NumberEditIdentity{};
+		const auto integer = [](const char* text, std::int64_t& value) {
+			const auto end = text+std::strlen(text); const auto result = std::from_chars(text,end,value);
+			return result.ec == std::errc{} && result.ptr == end;
+		};
+		if (operation == "begin" && args.Argc() == 4) okay = runtime->BeginNumberEdit(id,error,now);
+		else if (operation == "replace" && args.Argc() == 5) okay = runtime->ReplaceNumberSelection(id,identity,args.Argv(4),error,now);
+		else if (operation == "select" && args.Argc() == 6) {
+			std::int64_t anchor = 0, caret = 0;
+			if (integer(args.Argv(4),anchor) && integer(args.Argv(5),caret) && anchor >= 0 && caret >= 0 &&
+				anchor <= static_cast<std::int64_t>(TextInputMaxBytes) && caret <= static_cast<std::int64_t>(TextInputMaxBytes))
+				okay = runtime->SetNumberSelection(id,identity,static_cast<std::size_t>(anchor),static_cast<std::size_t>(caret),error,now);
+		} else if (operation == "preedit" && args.Argc() == 7) {
+			std::int64_t start = 0, length = 0; TextInputEvent event;
+			if (integer(args.Argv(5),start) && integer(args.Argv(6),length) &&
+				MakeTextInputPreedit(args.Argv(4),TextIndexUnit::Utf8Bytes,start,length,event,error))
+				okay = runtime->ApplyNumberInput(id,identity,event,error,now);
+		} else if (operation == "input" && args.Argc() == 5) {
+			TextInputEvent event;
+			if (MakeTextInputCommit(args.Argv(4),event,error)) okay = runtime->ApplyNumberInput(id,identity,event,error,now);
+		} else if (operation == "undo" && args.Argc() == 4) okay = runtime->UndoNumberEdit(id,identity,false,error,now);
+		else if (operation == "redo" && args.Argc() == 4) okay = runtime->UndoNumberEdit(id,identity,true,error,now);
+		else if (operation == "commit" && args.Argc() == 4) {
+			okay = runtime->CommitNumberEdit(id,identity,error,now); if (okay) impl.CollectActions(true);
+		} else if (operation == "keep" && args.Argc() == 4) okay = runtime->ResolveNumberConflict(id,identity,true,error,now);
+		else if (operation == "reload" && args.Argc() == 4) okay = runtime->ResolveNumberConflict(id,identity,false,error,now);
+		else if (operation == "cancel" && args.Argc() == 4) okay = runtime->CancelNumberEdit(id,identity,now);
+		if (!okay && !error.empty()) impl.Error(error);
 	} else if (verb == "focus" && args.Argc() == 3) {
 		okay = impl.RuntimeView()->FocusControl(args.Argv(2),RetainedUI_PresentationTime());
 	} else if (verb == "menu" && args.Argc() == 4 && (!idStr::Cmp(args.Argv(3),"0") || !idStr::Cmp(args.Argv(3),"1"))) {

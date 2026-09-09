@@ -7,7 +7,7 @@ the [completion plan](../plans/ui-product-completion.md), the
 [visual specification](../ui-visual-design.md) into implementation ownership,
 dependencies, concrete evidence and explicit unfinished work.
 
-The current increment starts from engine `e3e65887480368191df154a9b52cce69d8e72140` and companion
+The current increment starts from engine `17b106daa1827d6e50c786f99ea5970b1e8b91cf` and companion
 `1cd33980f072ac3d78978a07b388b4b6fe6b5eb2`. The register also identifies the current
 [manager/snapshot foundation](instance-persistence.md) as partial
 evidence with native and SP/OpenGL/MP/Vulkan validation. It does not treat that work as a
@@ -177,6 +177,21 @@ ordered native ownership, IME, shared shaped caret/grapheme/bidi editing and
 the complete authoring application remain required. The final local record is
 `.tmp/ui/text-input-foundation/validation-evidence.json`; the strict structural
 audit is `.tmp/ui/text-input-foundation/register-validation-final.json`.
+
+The [numeric-field increment](numeric-fields.md) adds a canonical exact-entry
+model, authored selection/caret/preedit rendering, shared scalar font runs and
+bounded inactive draft/history restoration. Fresh host values guard edits,
+queued numeric dispatch and accepted acknowledgements. The final Windows build,
+21 retained-UI suites, SP/OpenGL at 125% and MP/Vulkan at 200% managed fixture
+captures after gameplay, and an ordinary SYSTEM rendering regression qualify
+this subset. The journal repair bounds historical-layout payloads and lifetime
+cleanup. Its local record is
+`.tmp/ui/number-field-integration/validation-evidence.json`; its structural
+audit is `.tmp/ui/number-field-integration/register-validation-final.json`.
+Native keyboard/clipboard/IME routes, complete shaped/grapheme/bidi editing,
+production precise-entry settings, editor round trips and full product/platform
+qualification remain required. No requirement status, milestone, gate or GUI
+migration is accepted by this increment.
 No status, migration entry or final gate is accepted by this increment.
 
 There are **65 partial, 161 pending and one verified requirement**. `BEH-002`

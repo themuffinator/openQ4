@@ -173,6 +173,10 @@ bool State::Evaluate(const StateValues& candidate, PropertyValues& props, std::m
 			if (!std::holds_alternative<SliderSpec>(control.widget) || !std::holds_alternative<double>(value.value)) {
 				error = "Invalid slider readback type"; return reject();
 			}
+		} else if (control.role == ControlRole::Number) {
+			if (!std::holds_alternative<NumberSpec>(control.widget) || !std::holds_alternative<double>(value.value)) {
+				error = "Invalid number readback type"; return reject();
+			}
 		} else if (control.role == ControlRole::Choice) {
 			const auto* spec = std::get_if<ChoiceSpec>(&control.widget);
 			if (!spec) { error = "Invalid choice readback descriptor"; return reject(); }

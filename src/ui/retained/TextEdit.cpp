@@ -95,6 +95,30 @@ bool TextEditBuffer::Apply(const TextInputEvent& event, std::string& error) {
 	composition = event; error.clear(); return true;
 }
 void TextEditBuffer::CancelComposition() { composition.reset(); }
+TextEditHistory TextEditBuffer::CaptureHistory() const { return {undo,redo}; }
+bool TextEditBuffer::RestoreHistory(const TextEditState& saved, const TextEditHistory& history,
+	const TextEditPolicy& savedPolicy, std::string& error) {
+	if (!ValidPolicy(savedPolicy,error)) return false;
+	if (history.undo.size() > MaxHistoryEntries || history.redo.size() > MaxHistoryEntries-history.undo.size())
+		return Fail(error,"Restored text history exceeds the entry limit");
+	auto valid = [&](const TextEditState& entry) {
+		if (!FieldText(entry.text,savedPolicy,error)) return false;
+		if (!Boundary(entry.text,entry.anchor) || !Boundary(entry.text,entry.caret))
+			return Fail(error,"Restored text selection splits a scalar or exceeds the buffer");
+		return true;
+	};
+	if (!valid(saved)) return false;
+	std::size_t bytes = 0;
+	for (const auto* entries : {&history.undo,&history.redo}) for (const auto& entry : *entries) {
+		if (!valid(entry)) return false;
+		if (entry.text.size() > MaxHistoryTextBytes-bytes) return Fail(error,"Restored text history exceeds the byte limit");
+		bytes += entry.text.size();
+	}
+	TextEditBuffer candidate;
+	candidate.policy = savedPolicy; candidate.state = saved;
+	candidate.undo = history.undo; candidate.redo = history.redo;
+	*this = std::move(candidate); error.clear(); return true;
+}
 std::size_t TextEditBuffer::HistoryTextBytes() const {
 	std::size_t bytes = 0;
 	for (const auto& entry : undo) bytes += entry.text.size();

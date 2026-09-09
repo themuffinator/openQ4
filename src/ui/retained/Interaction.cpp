@@ -4,6 +4,7 @@
 #include <atomic>
 #include <cmath>
 #include <limits>
+#include <stdexcept>
 
 namespace openq4::ui {
 namespace {
@@ -15,6 +16,15 @@ std::uint64_t ProposalToken() {
 		if (next.compare_exchange_weak(token,token+1,std::memory_order_relaxed)) return token;
 	}
 	return 0;
+}
+bool ValidNumber(const Control& control) {
+	const auto* spec = std::get_if<NumberSpec>(&control.widget);
+	return spec && control.value && control.value->type == 0 && std::isfinite(spec->minimum) &&
+		std::isfinite(spec->maximum) && spec->minimum <= spec->maximum && spec->maxBytes > 0 && spec->maxBytes <= TextInputMaxBytes;
+}
+TextNumberPolicy NumberPolicy(const Control& control) {
+	const auto& spec = std::get<NumberSpec>(control.widget);
+	return {spec.minimum,spec.maximum,spec.exponent};
 }
 }
 void Interaction::Reset(const DocumentModel& model) {
@@ -41,6 +51,7 @@ bool Interaction::SetReadbacks(const std::map<std::string,ControlReadback>& read
 		const auto found = readbacks.find(id);
 		if (found == readbacks.end()) { error = "Missing control readback"; return false; }
 		const auto& value = found->second;
+		if (item.control.role == ControlRole::Number && !ValidNumber(item.control)) { error = "Invalid number control policy"; return false; }
 		if (!ValidStateValue(value.value) || !item.control.value || value.value.index() != item.control.value->type ||
 			(item.control.role != ControlRole::Toggle && value.mixed)) { error = "Invalid control readback type"; return false; }
 		if (item.control.role == ControlRole::Choice) {
@@ -48,7 +59,24 @@ bool Interaction::SetReadbacks(const std::map<std::string,ControlReadback>& read
 		} else if (!value.enabledOptions.empty()) { error = "Unexpected choice availability"; return false; }
 	}
 	if (expected != readbacks.size()) { error = "Unknown control readback"; return false; }
-	for (const auto& [id,value] : readbacks) items.at(id).readback = value;
+	for (const auto& [id,value] : readbacks) {
+		auto& item = items.at(id);
+		const bool changed = !item.readback || item.readback->value != value.value;
+		item.readback = value;
+		if (changed && item.number && (!item.pending || *item.pending != value.value)) {
+			item.pending.reset(); item.proposalToken = 0; item.rejected.reset();
+			std::erase_if(actions,[&](const ControlAction& action) { return action.node == id && action.editSession != 0; });
+			if (item.number->buffer.State().text == item.number->baselineText && !item.number->buffer.Composition()) {
+				std::string unused;
+				if (!RebaseNumber(item,unused)) RetireNumber(id,item);
+			} else {
+				// Preserve the local text for review, but invalidate its former
+				// owner revision and queued proposal when authoritative data wins.
+				item.number->buffer.CancelComposition(); item.number->conflict = true;
+				if (!item.number->detached) item.number->identity.revision = ProposalToken();
+			}
+		}
+	}
 	if (!popup.empty()) {
 		const auto& item = items.at(popup); const auto& options = std::get<ChoiceSpec>(item.control.widget).options;
 		bool eligible = false;
@@ -77,12 +105,23 @@ void Interaction::Activate(const std::string& id) {
 		case ControlRole::Toggle: Propose(id,item.readback->mixed && !item.pending ? true : !std::get<bool>(EditingValue(item))); break;
 		case ControlRole::Choice: OpenPopup(id); break;
 		case ControlRole::Slider: break; // Value changes have their own semantics.
+		case ControlRole::Number: { std::string unused; BeginNumberEdit(id,unused); break; }
 	}
 }
 bool Interaction::AcknowledgeProposal(const std::string& id, std::uint64_t token, bool accepted) {
 	const auto found = items.find(id);
 	if (found == items.end() || !token || found->second.proposalToken != token || !found->second.pending) return false;
 	auto& item = found->second;
+	if (item.control.role == ControlRole::Number && item.number) {
+		if (accepted && item.readback && item.readback->value == *item.pending) {
+			std::string unused;
+			if (!RebaseNumber(item,unused)) RetireNumber(id,item);
+		} else {
+			item.number->identity.revision = ProposalToken();
+			// An acknowledgement alone cannot manufacture an accepted value.
+			if (accepted) item.number->conflict = true;
+		}
+	}
 	if (accepted) item.rejected.reset(); else item.rejected = item.pending;
 	item.pending.reset(); item.proposalToken = 0; return true;
 }
@@ -96,7 +135,134 @@ std::optional<WidgetViewState> Interaction::Widget(const std::string& id) const 
 	if (dragging == id && dragPreview) view.preview = *dragPreview;
 	view.popupOpen = popup == id; if (view.popupOpen) view.highlight = highlight;
 	view.firstVisible = item.firstVisible;
+	if (item.number) {
+		const auto& editor = *item.number;
+		NumberEditView number;
+		number.state = editor.buffer.State(); number.composition = editor.buffer.Composition(); number.identity = editor.identity;
+		double parsed = 0;
+		number.status = ParseTextNumber(number.state.text,NumberPolicy(item.control),parsed);
+		number.dirty = number.state.text != editor.baselineText || number.composition.has_value();
+		number.conflict = editor.conflict; number.canUndo = editor.buffer.CanUndo(); number.canRedo = editor.buffer.CanRedo();
+		number.active = !editor.detached;
+		view.number = std::move(number);
+	}
 	return view;
+}
+bool Interaction::RebaseNumber(Item& item, std::string& error) {
+	NumberEditor editor;
+	const auto& spec = std::get<NumberSpec>(item.control.widget);
+	editor.baselineValue = std::get<double>(item.readback->value);
+	editor.detached = !item.number || item.number->detached;
+	if (!FormatTextNumber(editor.baselineValue,NumberPolicy(item.control),editor.baselineText,error) ||
+		!editor.buffer.Reset(editor.baselineText,{spec.maxBytes,false,false},error) ||
+		!editor.buffer.SetSelection(0,editor.baselineText.size(),error)) return false;
+	if (!editor.detached) {
+		editor.identity = {ProposalToken(),ProposalToken()};
+		if (!editor.identity.session || !editor.identity.revision) { error = "Number edit identity exhausted"; return false; }
+	}
+	item.number = std::move(editor); return true;
+}
+bool Interaction::BeginNumberEdit(const std::string& id, std::string& error) {
+	error.clear(); const auto found = items.find(id);
+	if (found == items.end() || found->second.control.role != ControlRole::Number || !ValidNumber(found->second.control) ||
+		focusPending || focused != id || !Eligible(id) || !found->second.readback || found->second.pending) {
+		error = "Number control is not available for editing"; return false;
+	}
+	auto& item = found->second;
+	std::optional<NumberEditor> created;
+	if (!item.number) {
+		Item staged; staged.control = item.control; staged.readback = item.readback;
+		if (!RebaseNumber(staged,error)) return false;
+		created = std::move(staged.number);
+	}
+	auto& editor = item.number ? *item.number : *created;
+	if (editor.detached) {
+		const NumberEditIdentity identity{ProposalToken(),ProposalToken()};
+		if (!identity.session || !identity.revision) { error = "Number edit identity exhausted"; return false; }
+		editor.identity = identity; editor.detached = false;
+	}
+	if (created) item.number = std::move(created);
+	item.rejected.reset(); return true;
+}
+bool Interaction::ResolveNumberConflict(const std::string& id, NumberEditIdentity expected,
+	bool keepDraft, std::string& error) {
+	error.clear(); const auto found = items.find(id);
+	if (found == items.end() || !found->second.number || !found->second.number->conflict ||
+		!expected.session || !expected.revision || expected != found->second.number->identity ||
+		found->second.number->detached || focused != id || focusPending || !Eligible(id) ||
+		found->second.pending || !found->second.readback) {
+		error = "Numeric conflict identity is stale or unavailable"; return false;
+	}
+	auto& item = found->second; NumberEditor candidate = *item.number;
+	const auto& spec = std::get<NumberSpec>(item.control.widget);
+	candidate.baselineValue = std::get<double>(item.readback->value);
+	if (!FormatTextNumber(candidate.baselineValue,NumberPolicy(item.control),candidate.baselineText,error)) return false;
+	TextEditBuffer baseline;
+	if (!baseline.Reset(candidate.baselineText,{spec.maxBytes,false,false},error) ||
+		!baseline.SetSelection(0,candidate.baselineText.size(),error)) return false;
+	if (keepDraft) candidate.buffer.CancelComposition(); else candidate.buffer = std::move(baseline);
+	const auto revision = ProposalToken(); if (!revision) { error = "Number edit identity exhausted"; return false; }
+	candidate.identity.revision = revision; candidate.conflict = false;
+	item.number = std::move(candidate); item.pending.reset(); item.rejected.reset(); item.proposalToken = 0;
+	std::erase_if(actions,[&](const ControlAction& action) { return action.node == id && action.editSession != 0; });
+	return true;
+}
+Interaction::Item* Interaction::EditableNumber(const std::string& id, NumberEditIdentity expected, std::string& error) {
+	error.clear(); const auto found = items.find(id);
+	if (found == items.end() || !found->second.number || !expected.session || !expected.revision ||
+		expected != found->second.number->identity || found->second.number->detached || focused != id || focusPending || !Eligible(id) ||
+		found->second.number->conflict || found->second.pending) {
+		error = "Number edit identity is stale or unavailable"; return nullptr;
+	}
+	return &found->second;
+}
+bool Interaction::ChangeNumber(const std::string& id, NumberEditIdentity expected,
+	const std::function<bool(TextEditBuffer&,std::string&)>& change, std::string& error) {
+	auto* item = EditableNumber(id,expected,error); if (!item) return false;
+	TextEditBuffer candidate = item->number->buffer;
+	if (!change(candidate,error)) return false;
+	const auto revision = ProposalToken(); if (!revision) { error = "Number edit identity exhausted"; return false; }
+	item->number->buffer = std::move(candidate); item->number->identity.revision = revision;
+	item->rejected.reset(); return true;
+}
+bool Interaction::SetNumberSelection(const std::string& id, NumberEditIdentity expected,
+	std::size_t anchor, std::size_t caret, std::string& error) {
+	return ChangeNumber(id,expected,[&](TextEditBuffer& buffer,std::string& e) { return buffer.SetSelection(anchor,caret,e); },error);
+}
+bool Interaction::ApplyNumberInput(const std::string& id, NumberEditIdentity expected, const TextInputEvent& event, std::string& error) {
+	return ChangeNumber(id,expected,[&](TextEditBuffer& buffer,std::string& e) { return buffer.Apply(event,e); },error);
+}
+bool Interaction::ReplaceNumberSelection(const std::string& id, NumberEditIdentity expected, std::string_view text, std::string& error) {
+	return ChangeNumber(id,expected,[&](TextEditBuffer& buffer,std::string& e) { return buffer.ReplaceSelection(text,e); },error);
+}
+bool Interaction::UndoNumberEdit(const std::string& id, NumberEditIdentity expected, bool redo, std::string& error) {
+	return ChangeNumber(id,expected,[&](TextEditBuffer& buffer,std::string& e) { return redo ? buffer.Redo(e) : buffer.Undo(e); },error);
+}
+bool Interaction::CommitNumberEdit(const std::string& id, NumberEditIdentity expected, std::string& error) {
+	auto* item = EditableNumber(id,expected,error); if (!item) return false;
+	double value = 0;
+	if (item->number->buffer.Composition() || ParseTextNumber(item->number->buffer.State().text,NumberPolicy(item->control),value) != TextNumberStatus::Valid) {
+		error = "Number text is incomplete, invalid, out of range or composing"; return false;
+	}
+	if (!modalToken || !Propose(id,value)) { error = "Number proposal could not be queued"; return false; }
+	actions.back().editSession = expected.session; actions.back().editRevision = expected.revision; return true;
+}
+void Interaction::RetireNumber(const std::string& id, Item& item) {
+	if (item.control.role != ControlRole::Number) return;
+	item.number.reset(); item.pending.reset(); item.rejected.reset(); item.proposalToken = 0;
+	std::erase_if(actions,[&](const ControlAction& action) { return action.node == id && action.editSession != 0; });
+}
+void Interaction::DetachNumber(const std::string& id, Item& item) {
+	if (!item.number) return;
+	item.number->buffer.CancelComposition(); item.number->identity = {}; item.number->detached = true;
+	item.pending.reset(); item.rejected.reset(); item.proposalToken = 0;
+	std::erase_if(actions,[&](const ControlAction& action) { return action.node == id && action.editSession != 0; });
+}
+bool Interaction::CancelNumberEdit(const std::string& id, NumberEditIdentity expected) {
+	const auto found = items.find(id);
+	if (found == items.end() || !found->second.number ||
+		((expected.session || expected.revision) && expected != found->second.number->identity)) return false;
+	RetireNumber(id,found->second); return true;
 }
 double Interaction::SliderValue(const SliderSpec& spec, double fraction) const {
 	fraction = std::clamp(fraction,0.0,1.0);
@@ -167,14 +333,53 @@ void Interaction::PopupNavigate(MenuInput input) {
 	highlight = spec.options[eligible[current]].id; KeepHighlightVisible();
 }
 ValueWidgetSnapshot Interaction::CaptureWidgets() const {
-	ValueWidgetSnapshot result;
-	for (const auto& [id,item] : items) if (item.control.role != ControlRole::Button)
-		result.widgets[id] = {item.control.role,item.firstVisible};
+	ValueWidgetSnapshot result; std::string error;
+	if (!CaptureWidgets(result,error)) throw std::runtime_error(error);
 	return result;
+}
+bool Interaction::CaptureWidgets(ValueWidgetSnapshot& out, std::string& error) const {
+	error.clear(); std::size_t count = 0, bytes = 0;
+	for (const auto& [id,item] : items) if (item.number) {
+		if (++count > ValueWidgetSnapshot::MaxNumberEditors) { error = "Too many saved numeric drafts"; return false; }
+		for (const auto size : {item.number->buffer.State().text.size(),item.number->baselineText.size(),item.number->buffer.HistoryTextBytes()}) {
+			if (size > ValueWidgetSnapshot::MaxNumberTextBytes-bytes) { error = "Saved numeric drafts exceed the text budget"; return false; }
+			bytes += size;
+		}
+	}
+	ValueWidgetSnapshot result;
+	for (const auto& [id,item] : items) if (item.control.role != ControlRole::Button) {
+		ValueWidgetSnapshot::Widget widget{item.control.role,item.firstVisible,{}};
+		if (item.number) {
+			const auto& editor = *item.number; auto history = editor.buffer.CaptureHistory();
+			widget.number = NumberEditorSnapshot{editor.buffer.State(),std::move(history.undo),std::move(history.redo),
+				editor.baselineValue,editor.baselineText,editor.conflict};
+		}
+		result.widgets.emplace(id,std::move(widget));
+	}
+	out = std::move(result); return true;
 }
 bool Interaction::RestoreWidgets(const ValueWidgetSnapshot& snapshot, std::string& error) {
 	error.clear();
-	if (snapshot.version != 1 || snapshot.widgets.size() != CaptureWidgets().widgets.size()) { error = "Invalid widget snapshot version or count"; return false; }
+	std::size_t expected = 0, count = 0, bytes = 0;
+	for (const auto& [id,item] : items) if (item.control.role != ControlRole::Button) ++expected;
+	if ((snapshot.version != 1 && snapshot.version != 2) || snapshot.widgets.size() != expected) { error = "Invalid widget snapshot version or count"; return false; }
+	// Preflight aggregate budgets before allocating candidate editors/history.
+	for (const auto& [id,widget] : snapshot.widgets) if (widget.number) {
+		if (snapshot.version != 2 || widget.role != ControlRole::Number || ++count > ValueWidgetSnapshot::MaxNumberEditors) {
+			error = "Invalid restored numeric draft count or version"; return false;
+		}
+		const auto& editor = *widget.number;
+		if (editor.undo.size() > TextEditBuffer::MaxHistoryEntries || editor.redo.size() > TextEditBuffer::MaxHistoryEntries-editor.undo.size()) {
+			error = "Restored numeric history exceeds the entry limit"; return false;
+		}
+		auto add = [&](std::size_t size) {
+			if (size > ValueWidgetSnapshot::MaxNumberTextBytes-bytes) { error = "Restored numeric drafts exceed the text budget"; return false; }
+			bytes += size; return true;
+		};
+		if (!add(editor.state.text.size()) || !add(editor.baselineText.size())) return false;
+		for (const auto* history : {&editor.undo,&editor.redo}) for (const auto& entry : *history) if (!add(entry.text.size())) return false;
+	}
+	std::map<std::string,NumberEditor> editors;
 	for (const auto& [id,value] : snapshot.widgets) {
 		const auto found = items.find(id);
 		if (found == items.end() || value.role == ControlRole::Button || value.role != found->second.control.role) { error = "Restored widget role does not match"; return false; }
@@ -184,14 +389,49 @@ bool Interaction::RestoreWidgets(const ValueWidgetSnapshot& snapshot, std::strin
 			maximum = static_cast<unsigned>(spec.options.size()-std::min<size_t>(spec.visibleRows,spec.options.size()));
 		}
 		if (value.firstVisible > maximum) { error = "Restored widget scroll is outside its range"; return false; }
+		if (value.number) {
+			const auto& item = found->second; const auto& saved = *value.number;
+			if (!ValidNumber(item.control) || !item.readback || !std::holds_alternative<double>(item.readback->value) ||
+				!ValidStateValue(saved.baselineValue)) { error = "Invalid restored numeric source or baseline"; return false; }
+			const auto& spec = std::get<NumberSpec>(item.control.widget);
+			std::string canonical;
+			if (!FormatTextNumber(saved.baselineValue,NumberPolicy(item.control),canonical,error)) return false;
+			if (canonical != saved.baselineText) { error = "Restored numeric baseline is not canonical for its source policy"; return false; }
+			TextEditBuffer baseline;
+			if (!baseline.Reset(saved.baselineText,{spec.maxBytes,false,false},error)) return false;
+			NumberEditor editor;
+			if (!editor.buffer.RestoreHistory(saved.state,{saved.undo,saved.redo},{spec.maxBytes,false,false},error)) return false;
+			editor.baselineText = saved.baselineText; editor.baselineValue = saved.baselineValue; editor.conflict = saved.conflict;
+			if (std::get<double>(item.readback->value) != saved.baselineValue) {
+				if (saved.state.text != saved.baselineText || saved.conflict) editor.conflict = true;
+				else {
+					editor.baselineValue = std::get<double>(item.readback->value);
+					if (!FormatTextNumber(editor.baselineValue,NumberPolicy(item.control),editor.baselineText,error) ||
+						!editor.buffer.Reset(editor.baselineText,{spec.maxBytes,false,false},error) ||
+						!editor.buffer.SetSelection(0,editor.baselineText.size(),error)) return false;
+				}
+			}
+			editors.emplace(id,std::move(editor));
+		}
 	}
-	CancelGesture(); hovered.clear(); pointerOption.clear(); pointerFraction.reset();
-	actions.clear(); feedback.clear(); overflowed = false;
-	for (auto& [id,item] : items) {
-		item.pending.reset(); item.rejected.reset(); item.proposalToken = 0;
+	Interaction candidate = *this;
+	candidate.CancelGesture(); candidate.hovered.clear(); candidate.pointerOption.clear(); candidate.pointerFraction.reset();
+	candidate.actions.clear(); candidate.feedback.clear(); candidate.overflowed = false;
+	for (auto& [id,item] : candidate.items) {
+		item.pending.reset(); item.rejected.reset(); item.proposalToken = 0; item.number.reset();
 		if (item.control.role != ControlRole::Button) item.firstVisible = snapshot.widgets.at(id).firstVisible;
+		if (auto editor = editors.find(id); editor != editors.end()) item.number = std::move(editor->second);
+		// Widget restoration changes durable local values, not the persistent
+		// focus/modal semantics restored just before it. The receiving instance
+		// may not have a first layout yet; do not consult stale bounds here.
+		const auto state = !item.control.enabled ? ControlState::Disabled :
+			candidate.focused == id ? ControlState::Focus : ControlState::Default;
+		if (!item.known || item.state != state) {
+			item.known = true; item.state = state;
+			candidate.feedback.push_back({id,item.control.states.at(state),state});
+		}
 	}
-	Refresh(); return true;
+	*this = std::move(candidate); return true;
 }
 bool Interaction::Within(const std::string& id, const std::string& root) const {
 	if (root.empty()) return true;
@@ -325,6 +565,12 @@ void Interaction::Input(MenuInput input, bool down) {
 	} else if (input == MenuInput::Back) {
 		if (down && !backHeld) {
 			if (!popup.empty() || !dragging.empty()) CancelGesture();
+			else if (items.contains(focused) && items.at(focused).number) {
+				auto& item = items.at(focused);
+				if (item.number->buffer.Composition()) {
+					item.number->buffer.CancelComposition(); item.number->identity.revision = ProposalToken();
+				} else RetireNumber(focused,item);
+			}
 			else if (!modalBlocked) {
 				armed.clear();
 				const bool authored = !modals.empty() && modals.back().authored;
@@ -346,7 +592,11 @@ void Interaction::Input(MenuInput input, bool down) {
 void Interaction::CancelGesture() {
 	armed.clear(); dragging.clear(); dragPreview.reset(); popup.clear(); highlight.clear(); armedOption.clear(); popupAcceptArm = false;
 }
-void Interaction::Cancel() { CancelGesture(); hovered.clear(); pointerOption.clear(); pointerFraction.reset(); Refresh(); }
+void Interaction::Cancel() {
+	CancelGesture(); hovered.clear(); pointerOption.clear(); pointerFraction.reset();
+	for (auto& [id,item] : items) DetachNumber(id,item);
+	Refresh();
+}
 void Interaction::ReleaseInputSources() { pointerHeld = acceptHeld = backHeld = false; heldNavigation.clear(); blockedNavigation.clear(); }
 void Interaction::NavigationPulse(MenuInput input) {
 	if (input == MenuInput::Accept || input == MenuInput::Back) return;
@@ -358,6 +608,7 @@ void Interaction::NavigationPulse(MenuInput input) {
 }
 void Interaction::ModalChanged() {
 	modalToken = ProposalToken(); CancelGesture(); hovered.clear(); pointerOption.clear(); pointerFraction.reset();
+	for (auto& [id,item] : items) DetachNumber(id,item);
 	blockedNavigation = heldNavigation;
 }
 void Interaction::ResolvePendingFocus() {
@@ -402,8 +653,13 @@ bool Interaction::CanDispatchModalBack(const ControlAction& action) const {
 bool Interaction::CanDispatchControlAction(const ControlAction& action) const {
 	if (action.kind == ControlAction::Kind::Back) return CanDispatchModalBack(action);
 	if (focusPending || action.document != document || !action.modalToken || action.modalToken != modalToken || !Eligible(action.node)) return false;
-	const auto& control = items.at(action.node).control;
-	return action.action == control.action && action.event == control.event;
+	const auto& item = items.at(action.node); const auto& control = item.control;
+	if (action.action != control.action || action.event != control.event) return false;
+	if (control.role == ControlRole::Number)
+		return focused == action.node && item.number && !item.number->detached && !item.number->conflict && item.pending && action.proposal == item.pending &&
+			action.proposalToken != 0 && action.proposalToken == item.proposalToken &&
+			action.editSession == item.number->identity.session && action.editRevision == item.number->identity.revision;
+	return true;
 }
 bool Interaction::PushModal(const std::string& root) {
 	if (modalBlocked || authoredModals.contains(root) || !parents.contains(root) || !Within(root,Modal()) || root == Modal()) return false;
@@ -454,6 +710,7 @@ void Interaction::Refresh() {
 	if (!Eligible(hovered)) hovered.clear();
 	if (!Eligible(armed)) armed.clear();
 	for (auto& [id,item] : items) {
+		if (item.number && !item.number->detached && (focused != id || focusPending || !Eligible(id))) DetachNumber(id,item);
 		const auto state = !item.control.enabled ? ControlState::Disabled :
 			armed == id && (!pointerArm || hovered == id || dragging == id) ? ControlState::Pressed :
 			focused == id ? ControlState::Focus : hovered == id ? ControlState::Hover : ControlState::Default;
@@ -517,7 +774,7 @@ bool Interaction::Restore(const InteractionSnapshot& snapshot, std::string& erro
 	}
 	candidate.CancelGesture(); candidate.hovered.clear(); candidate.pointerArm = false;
 	candidate.pointerOption.clear(); candidate.pointerFraction.reset();
-	for (auto& [id,item] : candidate.items) { item.pending.reset(); item.rejected.reset(); item.proposalToken = 0; }
+	for (auto& [id,item] : candidate.items) { item.pending.reset(); item.rejected.reset(); item.proposalToken = 0; item.number.reset(); }
 	candidate.feedback.clear(); candidate.actions.clear(); candidate.overflowed = false;
 	for (auto& [id,item] : candidate.items) item.control.enabled = snapshot.enabled.at(id);
 	// A host-source update may disable the saved selection. Fresh projected

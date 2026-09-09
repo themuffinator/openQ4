@@ -2,6 +2,16 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- Numeric-field development preserves unfinished edits and undo/redo through
+  focus changes and resource restoration, with explicit recovery when a setting
+  changes elsewhere. The [integration scope](ui/numeric-fields.md) separates
+  the rendered editor and semantic diagnostics from the ordinary input and
+  native IME work still needed before players can use the field.
+
+- Event journals reject malformed input records before allocating or dispatching
+  their payloads and release owned data on failures. Recording still uses its
+  existing platform-dependent format.
+
 - Repeated map loads release discarded input data, avoiding an event-queue
   memory leak. Windows clipboard handling also checks transfer failures and
   converts legacy text through the operating system's Unicode path. The

@@ -31,6 +31,7 @@ public:
 	void Resume(const std::string& id, double seconds);
 	void Cancel(const std::string& id, CancelPolicy policy, double seconds);
 	void SetReducedMotion(bool enabled, double seconds);
+	bool ReducedMotion() const { return reducedMotion; }
 	const PropertyValues& Values() const { return values; }
 	bool IsPlaying(const std::string& id) const;
 	// Pure authored-time sampling for editor scrubbing. Does not mutate playback,

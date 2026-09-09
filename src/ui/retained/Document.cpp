@@ -796,7 +796,8 @@ private:
 			else if (role == "toggle") Fields(control,p,{"role","action","label","enabled","states","navigation","value","mixed","parts","extensions"});
 			else if (role == "slider") Fields(control,p,{"role","action","label","enabled","states","navigation","value","minimum","maximum","step","decimals","orientation","parts","extensions"});
 			else if (role == "choice") Fields(control,p,{"role","action","label","enabled","states","navigation","value","parts","visibleRows","options","extensions"});
-			else Require(false,control["role"],p+"/role","Supported roles are button, toggle, slider and choice");
+			else if (role == "number") Fields(control,p,{"role","action","label","enabled","states","navigation","value","minimum","maximum","exponent","maxBytes","parts","extensions"});
+			else Require(false,control["role"],p+"/role","Supported roles are button, toggle, slider, choice and number");
 			result.control.emplace(); auto& parsed = *result.control;
 			Require(control.isMember("action") != control.isMember("event"),control,p,"Controls require exactly one action or event");
 			if (control.isMember("action")) parsed.action = Id(control["action"],p+"/action");
@@ -840,6 +841,27 @@ private:
 					}
 					spec.track = Id(parts["track"],at+"/track"); spec.fill = Id(parts["fill"],at+"/fill");
 					spec.thumb = Id(parts["thumb"],at+"/thumb"); spec.valueText = Id(parts["value"],at+"/value");
+					parsed.widget = std::move(spec);
+				} else if (role == "number") {
+					parsed.role = ControlRole::Number;
+					Require(parsed.value->type == 0,control["value"],p+"/value","Number values must be numeric");
+					Fields(parts,at,{"viewport","text","selection","caret","composition","validation","extensions"});
+					NumberSpec spec;
+					spec.minimum = Numeric(control["minimum"],p+"/minimum",-1e12,1e12);
+					spec.maximum = Numeric(control["maximum"],p+"/maximum",-1e12,1e12);
+					Require(spec.minimum <= spec.maximum,control,p,"Number bounds must be ordered");
+					if (control.isMember("exponent")) {
+						Require(control["exponent"].isBool(),control["exponent"],p+"/exponent","Number exponent policy must be Boolean");
+						spec.exponent = control["exponent"].asBool();
+					}
+					if (control.isMember("maxBytes")) {
+						Require(control["maxBytes"].isUInt() && control["maxBytes"].asUInt() >= 1 && control["maxBytes"].asUInt() <= 65536,
+							control["maxBytes"],p+"/maxBytes","Number edit size must be 1..65536 bytes");
+						spec.maxBytes = control["maxBytes"].asUInt();
+					}
+					spec.viewport = Id(parts["viewport"],at+"/viewport"); spec.text = Id(parts["text"],at+"/text");
+					spec.selection = Id(parts["selection"],at+"/selection"); spec.caret = Id(parts["caret"],at+"/caret");
+					spec.composition = Id(parts["composition"],at+"/composition"); spec.validation = Id(parts["validation"],at+"/validation");
 					parsed.widget = std::move(spec);
 				} else {
 					parsed.role = ControlRole::Choice;
@@ -1005,6 +1027,44 @@ private:
 			}
 			reserve(slider->fill,slider->vertical ? "height" : "width");
 			reserve(slider->thumb,slider->vertical ? "top" : "left"); reserve(slider->valueText,"text");
+		} else if (const auto* number = std::get_if<NumberSpec>(&control.widget)) {
+			part(number->viewport,owner.id,"group",path+"/parts/viewport");
+			const auto* viewport = model.FindNode(number->viewport);
+			const auto position = viewport->properties.find("position");
+			Require(position != viewport->properties.end() && position->second.type == ValueType::Keyword &&
+				(position->second.text == "absolute" || position->second.text == "relative"),value,path,
+				"Number viewport must establish an absolute or relative containing block");
+			owned.emplace(number->viewport,"position");
+			// One common containing block keeps glyphs, selection, composition
+			// and caret in the same scroll/transform frame. Transform the viewport.
+			const auto fieldPaint = [&](const std::string& id) {
+				Require(std::any_of(viewport->children.begin(),viewport->children.end(),[&](const Node& child) { return child.id == id; }),
+					value,path,"Number paint parts must be direct children of the viewport");
+				Require(!model.FindNode(id)->properties.contains("transform"),value,path,"Number paint parts cannot have individual transforms");
+				owned.emplace(id,"transform");
+			};
+			part(number->text,number->viewport,"text",path+"/parts/text");
+			fieldPaint(number->text);
+			part(number->validation,owner.id,"text",path+"/parts/validation");
+			Require(!Descendant(number->validation,number->viewport),value,path+"/parts/validation","Number validation must remain outside the clipped text viewport");
+			keyword(number->viewport,"overflow","hidden"); owned.emplace(number->viewport,"overflow"); owned.emplace(number->viewport,"clip");
+			keyword(number->text,"position","absolute"); keyword(number->text,"white-space","pre"); keyword(number->text,"text-align","left");
+			owned.emplace(number->text,"position"); owned.emplace(number->text,"white-space"); owned.emplace(number->text,"text-align");
+			owned.emplace(number->text,"text-transform");
+			reserve(number->text,"left"); reserve(number->text,"text");
+			reserve(number->validation,"text"); reserve(number->validation,"display");
+			std::vector<std::string> paint{number->text};
+			for (const auto& id : {number->selection,number->caret,number->composition}) {
+				part(id,number->viewport,nullptr,path+"/parts"); fieldPaint(id); keyword(id,"position","absolute"); owned.emplace(id,"position");
+				for (const auto* property : {"left","top","width","height","display"}) reserve(id,property);
+				for (const auto& other : paint) separate(id,other);
+				paint.push_back(id);
+			}
+			const auto& caretProperties = model.FindNode(number->caret)->properties;
+			const auto opacity = caretProperties.find("opacity");
+			Require(opacity != caretProperties.end() && opacity->second.type == ValueType::Number,value,path,
+				"Number caret blink requires an explicit numeric opacity base");
+			owned.emplace(number->caret,"opacity");
 		} else if (const auto* choice = std::get_if<ChoiceSpec>(&control.widget)) {
 			part(choice->popup,owner.id,"group",path+"/parts/popup");
 			part(choice->viewport,choice->popup,"group",path+"/parts/viewport");

@@ -378,6 +378,18 @@ editor, artwork, migration and platform gate remain required.
 The subsequent [text-entry foundation](../ui/text-entry-foundation.md) adds
 atomic Unicode editing, bounded undo/redo, exact numeric parsing, checked
 Windows clipboard primitives and pending event-payload cleanup. These are
-build-integrated services. Live text fields, ordered native/IME delivery,
-shared shaping/caret geometry and local dirty-edit handling still form the
-next production slice. This checkpoint accepts no original stage gate.
+build-integrated services. This checkpoint accepts no original stage gate.
+
+The [numeric field integration](../ui/numeric-fields.md) adds the canonical
+Number role, actual RmlUi caret/selection/composition rendering from shared
+scalar runs, precise typed proposals and durable local drafts. Focus and input
+loss retire composition and edit identities while preserving text/history;
+explicit Keep/Reload decisions resolve authoritative-source conflicts. Nested
+widget snapshot version 2 restores drafts inactive and rejects malformed or
+over-budget state atomically. Semantic adapter diagnostics exercise this layer
+without device input. Event-journal ownership/validation is hardened as an
+adjacent prerequisite for additional owned input records. Ordered native/IME
+delivery, shaped/grapheme/bidirectional runs, production field artwork and
+validation, Apply/exit handling of unconfirmed drafts, and full platform
+qualification remain required. No requirement, migration or final gate becomes
+accepted merely from these integration tests.

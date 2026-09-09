@@ -174,12 +174,12 @@ static void ChoicePointerAndReadback() {
 }
 static void PersistenceAndLifetime() {
 	Fixture f; f.Accept("choice"); f.Press(MenuInput::End); auto snapshot = f.input.CaptureWidgets();
-	Check(snapshot.version == 1 && snapshot.widgets.size() == 3 && snapshot.widgets.at("choice").firstVisible == 5,"widget snapshot records exact roles and bounded scroll only");
+	Check(snapshot.version == 2 && snapshot.widgets.size() == 3 && snapshot.widgets.at("choice").firstVisible == 5,"widget snapshot records exact roles and bounded scroll");
 	f.Press(MenuInput::Accept); auto old = f.Actions()[0]; f.input.PointerPart("slider",.6); f.input.Pointer(true);
 	for (unsigned mutation = 0; mutation < 5; ++mutation) {
 		auto bad = snapshot;
 		switch (mutation) {
-			case 0: bad.version = 2; break;
+			case 0: bad.version = 3; break;
 			case 1: bad.widgets.erase("toggle"); break;
 			case 2: bad.widgets["choice"].role = ControlRole::Toggle; break;
 			case 3: bad.widgets["choice"].firstVisible = 6; break;

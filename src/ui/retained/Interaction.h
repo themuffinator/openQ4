@@ -1,7 +1,9 @@
 // Copyright (C) 2026 DarkMatter Productions. GPL-3.0-or-later.
 #pragma once
 #include "Document.h"
+#include "TextEdit.h"
 #include <cstdint>
+#include <functional>
 #include <set>
 
 namespace openq4::ui {
@@ -13,6 +15,7 @@ struct ControlAction {
 	std::optional<StateValue> proposal;
 	std::uint64_t proposalToken = 0;
 	std::uint64_t modalToken = 0; // Transient scope identity for every Back record.
+	std::uint64_t editSession = 0, editRevision = 0; // Number proposals only; never persisted.
 };
 struct ControlFeedback { std::string node, timeline; ControlState state = ControlState::Default; };
 struct InteractionSnapshot {
@@ -24,6 +27,18 @@ struct InteractionSnapshot {
 	bool focusPending = false;
 	std::string pendingFocus;
 };
+struct NumberEditIdentity {
+	std::uint64_t session = 0, revision = 0;
+	bool operator==(const NumberEditIdentity&) const = default;
+};
+struct NumberEditView {
+	TextEditState state;
+	std::optional<TextInputEvent> composition;
+	NumberEditIdentity identity;
+	TextNumberStatus status = TextNumberStatus::Empty;
+	bool dirty = false, conflict = false, canUndo = false, canRedo = false;
+	bool active = false; // Restored text waits for fresh eligible focus.
+};
 struct WidgetViewState {
 	ControlRole role = ControlRole::Button;
 	StateValue accepted;
@@ -33,10 +48,24 @@ struct WidgetViewState {
 	bool popupOpen = false;
 	std::string highlight;
 	unsigned firstVisible = 0;
+	std::optional<NumberEditView> number;
+};
+struct NumberEditorSnapshot {
+	TextEditState state;
+	std::vector<TextEditState> undo, redo;
+	double baselineValue = 0;
+	std::string baselineText;
+	bool conflict = false;
 };
 struct ValueWidgetSnapshot {
-	struct Widget { ControlRole role = ControlRole::Button; unsigned firstVisible = 0; };
-	unsigned version = 1;
+	static constexpr std::size_t MaxNumberEditors = 256;
+	static constexpr std::size_t MaxNumberTextBytes = 16 * 1024 * 1024;
+	struct Widget {
+		ControlRole role = ControlRole::Button;
+		unsigned firstVisible = 0;
+		std::optional<NumberEditorSnapshot> number;
+	};
+	unsigned version = 2;
 	std::map<std::string,Widget> widgets;
 };
 
@@ -91,15 +120,49 @@ public:
 	bool Restore(const InteractionSnapshot& snapshot, std::string& error);
 	std::optional<WidgetViewState> Widget(const std::string& id) const;
 	bool AcknowledgeProposal(const std::string& id, std::uint64_t token, bool accepted);
+	// Explicit local editing. Begin requires focused eligibility; repeated Begin
+	// preserves an existing non-conflicted buffer. No method writes accepted state.
+	// Every mutation checks the exact session/revision exposed by Widget().number.
+	bool BeginNumberEdit(const std::string& id, std::string& error);
+	// Explicit conflict decision, separate from focusing/resuming a draft.
+	// Keep adopts the current baseline without committing text; Reload replaces
+	// local text/history. Both require the exact active edit identity.
+	bool ResolveNumberConflict(const std::string& id, NumberEditIdentity expected,
+		bool keepDraft, std::string& error);
+	bool SetNumberSelection(const std::string& id, NumberEditIdentity expected,
+		std::size_t anchor, std::size_t caret, std::string& error);
+	bool ApplyNumberInput(const std::string& id, NumberEditIdentity expected,
+		const TextInputEvent& event, std::string& error);
+	bool ReplaceNumberSelection(const std::string& id, NumberEditIdentity expected,
+		std::string_view text, std::string& error);
+	bool UndoNumberEdit(const std::string& id, NumberEditIdentity expected, bool redo, std::string& error);
+	// Requires Valid parsing and no preedit, conflict or outstanding proposal.
+	// Queues one exact double, independent of a sibling slider's step/decimals.
+	bool CommitNumberEdit(const std::string& id, NumberEditIdentity expected, std::string& error);
+	// Cancellation is an engine-owner operation; a supplied identity additionally
+	// protects a deferred cancel. No native composition identity is stored here.
+	bool CancelNumberEdit(const std::string& id, NumberEditIdentity expected = {});
 	ValueWidgetSnapshot CaptureWidgets() const;
+	// Checked production save boundary; exceeding the aggregate draft budgets
+	// fails without copying/truncating drafts or replacing out.
+	bool CaptureWidgets(ValueWidgetSnapshot& out, std::string& error) const;
 	bool RestoreWidgets(const ValueWidgetSnapshot& snapshot, std::string& error);
 private:
+	struct NumberEditor {
+		TextEditBuffer buffer;
+		std::string baselineText;
+		double baselineValue = 0;
+		NumberEditIdentity identity;
+		bool conflict = false;
+		bool detached = true;
+	};
 	struct Item {
 		Control control; ControlBounds bounds; ControlState state = ControlState::Default; bool known = false;
 		std::optional<ControlReadback> readback;
 		std::optional<StateValue> pending, rejected;
 		std::uint64_t proposalToken = 0;
 		unsigned firstVisible = 0;
+		std::optional<NumberEditor> number;
 	};
 	struct ModalScope { std::string root, restore; bool authored = false; };
 	bool Within(const std::string& id, const std::string& root) const;
@@ -108,6 +171,12 @@ private:
 	void Navigate(MenuInput input);
 	void Activate(const std::string& id);
 	bool Propose(const std::string& id, const StateValue& value);
+	Item* EditableNumber(const std::string& id, NumberEditIdentity expected, std::string& error);
+	bool ChangeNumber(const std::string& id, NumberEditIdentity expected,
+		const std::function<bool(TextEditBuffer&,std::string&)>& change, std::string& error);
+	bool RebaseNumber(Item& item, std::string& error);
+	void RetireNumber(const std::string& id, Item& item);
+	void DetachNumber(const std::string& id, Item& item);
 	const StateValue& EditingValue(const Item& item) const;
 	void CancelGesture();
 	void ModalChanged();

@@ -25,9 +25,7 @@ If you have questions concerning this license or the applicable additional terms
 
 ===========================================================================
 */
-
-
-
+#include <cstddef>
 
 idCVar idEventLoop::com_journal( "com_journal", "0", CVAR_INIT|CVAR_SYSTEM, "1 = record journal, 2 = play back journal", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
 
@@ -44,6 +42,132 @@ static bool EventLoop_IsPrivateConsoleEvent( const sysEvent_t &event ) {
 		return true;
 	}
 	return cvarSystem->CommandContainsPrivateCVar( static_cast<const char *>( event.evPtr ) );
+}
+
+// Journals retain the historical native sysEvent_t layout and payload order.
+// They are not portable between ABIs and remain trusted command recordings.
+// The pointer bytes are historical padding only: never deserialize an address.
+static const int MAX_JOURNAL_EVENT_PAYLOAD = 1024 * 1024;
+static_assert( sizeof( sysEventType_t ) == sizeof( int ), "Historical journal event type width changed" );
+
+static int EventLoop_EventType( const sysEvent_t &ev ) {
+	int type;
+	memcpy( &type, &ev.evType, sizeof( type ) );
+	return type;
+}
+
+static const char *EventLoop_ValidateHeader( int type, int length ) {
+	if ( length < 0 || length > MAX_JOURNAL_EVENT_PAYLOAD ) {
+		return "Invalid journal event payload length";
+	}
+	switch ( type ) {
+	case SE_NONE:
+	case SE_KEY:
+	case SE_CHAR:
+	case SE_MOUSE:
+	case SE_JOYSTICK_AXIS:
+		return length == 0 ? NULL : "Unexpected journal event payload";
+	case SE_CONSOLE:
+	case SE_RETAINED_UI:
+		return length > 0 ? NULL : "Missing journal event payload";
+	default:
+		return "Invalid journal event type";
+	}
+}
+
+static const char *EventLoop_ValidatePayload( const sysEvent_t &ev ) {
+	if ( ( ev.evPtrLength > 0 ) != ( ev.evPtr != NULL ) ) {
+		return "Invalid event payload ownership";
+	}
+	if ( ev.evType == SE_CONSOLE && memchr( ev.evPtr, '\0', static_cast<size_t>( ev.evPtrLength ) ) == NULL ) {
+		return "Unterminated console event payload";
+	}
+	return NULL;
+}
+
+// Reader allocations and live queue payloads are owned exactly once. Explicit
+// Reset precedes FatalError (which can exit without unwinding); the destructor
+// also covers exceptions from file operations or dispatched engine callbacks.
+class idScopedEventPayload {
+public:
+	idScopedEventPayload( sysEvent_t &event, bool clearConsole ) : ev( event ), clear( clearConsole ), owned( true ) {}
+	~idScopedEventPayload() { Reset(); }
+	void Release() { owned = false; }
+	void Reset() {
+		if ( owned && ev.evPtr ) {
+			if ( clear && ev.evType == SE_CONSOLE && ev.evPtrLength > 0 ) {
+				memset( ev.evPtr, 0, ev.evPtrLength );
+			}
+			Mem_Free( ev.evPtr );
+			ev.evPtr = NULL;
+			ev.evPtrLength = 0;
+		}
+		owned = false;
+	}
+private:
+	idScopedEventPayload( const idScopedEventPayload & ) = delete;
+	idScopedEventPayload &operator=( const idScopedEventPayload & ) = delete;
+	sysEvent_t &ev;
+	bool clear, owned;
+};
+
+static const char *EventLoop_ReadJournalEvent( idFile *file, sysEvent_t &out ) {
+	if ( file == NULL ) return "Journal file is unavailable";
+	unsigned char header[sizeof( sysEvent_t )];
+	if ( file->Read( header, sizeof( header ) ) != static_cast<int>( sizeof( header ) ) ) {
+		return "Error reading journal event header";
+	}
+	// Decode into integers before forming an enum, so even an invalid recorded
+	// enum representation is rejected without evaluating it as a C++ enum.
+	int type, length;
+	memcpy( &type, header + offsetof( sysEvent_t, evType ), sizeof( type ) );
+	memcpy( &length, header + offsetof( sysEvent_t, evPtrLength ), sizeof( length ) );
+	const char *error = EventLoop_ValidateHeader( type, length );
+	if ( error != NULL ) return error;
+	sysEvent_t candidate = {};
+	candidate.evType = static_cast<sysEventType_t>( type );
+	candidate.evPtrLength = length;
+	memcpy( &candidate.evValue, header + offsetof( sysEvent_t, evValue ), sizeof( candidate.evValue ) );
+	memcpy( &candidate.evValue2, header + offsetof( sysEvent_t, evValue2 ), sizeof( candidate.evValue2 ) );
+	idScopedEventPayload payload( candidate, true );
+	if ( length > 0 ) {
+		candidate.evPtr = Mem_ClearedAlloc( length );
+		if ( candidate.evPtr == NULL ) return "Unable to allocate journal event payload";
+		if ( file->Read( candidate.evPtr, length ) != length ) return "Error reading journal event payload";
+	}
+	error = EventLoop_ValidatePayload( candidate );
+	if ( error != NULL ) return error;
+	out = candidate;
+	payload.Release();
+	return NULL;
+}
+
+static const char *EventLoop_WriteJournalEvent( idFile *file, const sysEvent_t &ev ) {
+	if ( file == NULL ) return "Journal file is unavailable";
+	const char *error = EventLoop_ValidateHeader( EventLoop_EventType( ev ), ev.evPtrLength );
+	if ( error != NULL ) return error;
+	error = EventLoop_ValidatePayload( ev );
+	if ( error != NULL ) return error;
+	static const char PRIVATE_EVENT_TEXT[] = "";
+	sysEvent_t journalEvent;
+	memset( &journalEvent, 0, sizeof( journalEvent ) );
+	journalEvent.evType = ev.evType;
+	journalEvent.evValue = ev.evValue;
+	journalEvent.evValue2 = ev.evValue2;
+	journalEvent.evPtrLength = ev.evPtrLength;
+	journalEvent.evPtr = NULL;
+	const void *journalData = ev.evPtr;
+	if ( EventLoop_IsPrivateConsoleEvent( ev ) ) {
+		journalEvent.evPtrLength = sizeof( PRIVATE_EVENT_TEXT );
+		journalData = PRIVATE_EVENT_TEXT;
+	}
+	if ( file->Write( &journalEvent, sizeof( journalEvent ) ) != static_cast<int>( sizeof( journalEvent ) ) ) {
+		return "Error writing journal event header";
+	}
+	if ( journalEvent.evPtrLength > 0 && file->Write( journalData, journalEvent.evPtrLength ) != journalEvent.evPtrLength ) {
+		return "Error writing journal event payload";
+	}
+	return NULL;
 }
 
 
@@ -72,45 +196,36 @@ idEventLoop::GetRealEvent
 =================
 */
 sysEvent_t	idEventLoop::GetRealEvent( void ) {
-	int			r;
-	sysEvent_t	ev;
+	sysEvent_t ev = {};
 
 	// either get an event from the system or the journal file
 	if ( com_journal.GetInteger() == 2 ) {
-		r = com_journalFile->Read( &ev, sizeof(ev) );
-		if ( r != sizeof(ev) ) {
-			common->FatalError( "Error reading from journal file" );
-		}
-		if ( ev.evPtrLength ) {
-			ev.evPtr = Mem_ClearedAlloc( ev.evPtrLength );
-			r = com_journalFile->Read( ev.evPtr, ev.evPtrLength );
-			if ( r != ev.evPtrLength ) {
-				common->FatalError( "Error reading from journal file" );
-			}
+		const char *error = EventLoop_ReadJournalEvent( com_journalFile, ev );
+		if ( error != NULL ) {
+			common->FatalError( "%s", error );
+			return sysEvent_t{};
 		}
 	} else {
 		ev = Sys_GetEvent();
+		const char *error = EventLoop_ValidateHeader( EventLoop_EventType( ev ), ev.evPtrLength );
+		idScopedEventPayload payload( ev, error == NULL );
+		if ( error == NULL ) error = EventLoop_ValidatePayload( ev );
+		if ( error != NULL ) {
+			payload.Reset();
+			common->FatalError( "%s", error );
+			return sysEvent_t{};
+		}
 
 		// write the journal value out if needed
 		if ( com_journal.GetInteger() == 1 ) {
-			static const char PRIVATE_EVENT_TEXT[] = "";
-			sysEvent_t journalEvent = ev;
-			const void *journalData = ev.evPtr;
-			if ( EventLoop_IsPrivateConsoleEvent( ev ) ) {
-				journalEvent.evPtrLength = sizeof( PRIVATE_EVENT_TEXT );
-				journalData = PRIVATE_EVENT_TEXT;
-			}
-			r = com_journalFile->Write( &journalEvent, sizeof(journalEvent) );
-			if ( r != sizeof(ev) ) {
-				common->FatalError( "Error writing to journal file" );
-			}
-			if ( journalEvent.evPtrLength ) {
-				r = com_journalFile->Write( journalData, journalEvent.evPtrLength );
-				if ( r != journalEvent.evPtrLength ) {
-					common->FatalError( "Error writing to journal file" );
-				}
+			error = EventLoop_WriteJournalEvent( com_journalFile, ev );
+			if ( error != NULL ) {
+				payload.Reset();
+				common->FatalError( "%s", error );
+				return sysEvent_t{};
 			}
 		}
+		payload.Release();
 	}
 
 	return ev;
@@ -169,6 +284,7 @@ idEventLoop::ProcessEvent
 =================
 */
 void idEventLoop::ProcessEvent( sysEvent_t ev ) {
+	idScopedEventPayload payload( ev, true );
 	// track key up / down states
 	if ( ev.evType == SE_KEY ) {
 		idKeyInput::PreliminaryKeyEvent( ev.evValue, ( ev.evValue2 != 0 ) );
@@ -186,13 +302,7 @@ void idEventLoop::ProcessEvent( sysEvent_t ev ) {
 		session->ProcessEvent( &ev );
 	}
 
-	// free any block data
-	if ( ev.evPtr ) {
-		if ( EventLoop_IsPrivateConsoleEvent( ev ) ) {
-			memset( ev.evPtr, 0, ev.evPtrLength );
-		}
-		Mem_Free( ev.evPtr );
-	}
+	// The scope also releases payloads when a command/session callback throws.
 }
 
 /*
@@ -245,6 +355,10 @@ void idEventLoop::Init( void ) {
 
 	if ( com_journal.GetInteger() != 0 && ( !com_journalFile || !com_journalDataFile ) ) {
 		com_journal.SetInteger( 0 );
+		// Opening the pair can succeed only partially. Retire any acquired
+		// handle before clearing the pair and disabling this journal attempt.
+		if ( com_journalFile ) fileSystem->CloseFile( com_journalFile );
+		if ( com_journalDataFile ) fileSystem->CloseFile( com_journalDataFile );
 		com_journalFile = 0;
 		com_journalDataFile = 0;
 		common->Printf( "Couldn't open journal files\n" );

@@ -15,6 +15,9 @@ struct TextEditState {
 	std::string text;
 	std::size_t anchor = 0, caret = 0;
 };
+struct TextEditHistory {
+	std::vector<TextEditState> undo, redo;
+};
 
 // Local edit buffer only. It never changes an accepted setting, reads a device
 // or clipboard, shapes text, or owns a native composition lease. Offsets are
@@ -48,6 +51,12 @@ public:
 	std::size_t HistoryEntries() const { return undo.size() + redo.size(); }
 	// Payload accounting, not an allocator/resident-memory measurement.
 	std::size_t HistoryTextBytes() const;
+	// Persistent local edits only. Composition and any native ownership are
+	// deliberately excluded. Restore validates every entry under current source
+	// policy and the combined history budgets before publishing anything.
+	TextEditHistory CaptureHistory() const;
+	bool RestoreHistory(const TextEditState& state, const TextEditHistory& history,
+		const TextEditPolicy& policy, std::string& error);
 private:
 	bool Replace(std::string_view replacement, bool fromCommit, std::string& error);
 	void TrimHistory();
