@@ -101,6 +101,8 @@ struct idSessionLocal {
     int dispatches=0;
     void TestGUI(const char* guiName);
     void GuiFrameEvents();
+    // Pending typed-action delivery has its own production-method harness.
+    void PumpApplicationActions(idUserInterface* = nullptr) {}
     void DispatchCommand(idUserInterface* gui,const char* command) {
         assert(gui && !gui->retired && command && *command);
         ++dispatches;

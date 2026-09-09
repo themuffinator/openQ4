@@ -7,7 +7,7 @@ the [completion plan](../plans/ui-product-completion.md), the
 [visual specification](../ui-visual-design.md) into implementation ownership,
 dependencies, concrete evidence and explicit unfinished work.
 
-The baseline is engine `a9919d1be2dd9ce43e19ec16bb0392e947ce8576` and companion
+The baseline is engine `25813aaf96f0a9dfe36e1be0fd29bbce8cea93df` and companion
 `1cd33980f072ac3d78978a07b388b4b6fe6b5eb2`. The register also identifies the current
 [manager/snapshot foundation](instance-persistence.md) as partial
 evidence with native and SP/OpenGL/MP/Vulkan validation. It does not treat that work as a
@@ -21,11 +21,27 @@ snapshot version 2 and immediate ancestor visibility/input eligibility. The
 checkpoint records native checks, five alias gameplay captures and a sixth
 typed-settings regression across Windows SP/OpenGL and MP/Vulkan. These qualify
 the authored subset and retain their stated display/platform limitations.
-Semantic lowering for the shipped corpus, components and ordered events,
-production GUI flows and the complete native editor remain open.
+The [event-program checkpoint](event-programs.md) adds canonical ordered
+state/presentation/motion programs, conditional and nested calls, immutable typed
+action arguments, atomic pending-dictionary/host-state entry and normal GUI
+lifecycle delivery. The Session pump delivers completed programs independently
+of physical input; queued controls recheck document and input eligibility.
+Five native suites, production-method checks and two source/binary-bound Windows
+gameplay captures cover this subset: SP/OpenGL at 125% and MP/Vulkan at 200% passed
+their event, ownership and outgoing-lifecycle checks and render-target visual
+review. The captures include non-replaying save restore, language/video recovery,
+independent peers and SP/MP pause behavior. The typed catalog still contains only
+brightness, shadows and dismissal. Full legacy broadcast/timer/native-CVar
+semantics, production GUI flows, complete widgets, world/game-save/demo contracts,
+physical-device/platform/performance qualification and the native editor remain
+open. The immutable local evidence is
+`.tmp/ui/events-review/capture-evidence.json`; the separate register audit is
+`.tmp/ui/events-review/register-validation.json`.
 
-There are **58 partial, 168 pending and one verified requirement**. The verified
-requirement, `INV-001`, covers the fresh effective-source inventory only. All
+There are **59 partial, 167 pending and one verified requirement**. `BEH-005` is
+now partial for committed action delivery and cancellation; stock sounds and the
+complete device/modal/widget behavior still require implementation and evidence.
+The verified requirement, `INV-001`, covers the fresh effective-source inventory only. All
 seven final product gates and all **271 migration entries remain unaccepted**.
 These counts describe evidence state, not percentage of implementation effort
 or product quality.

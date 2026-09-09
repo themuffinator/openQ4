@@ -317,6 +317,11 @@ The [writable presentation alias checkpoint](../ui/presentation-aliases.md)
 extends this integration with shared metadata slots, typed property conversion
 and durable expression ownership. Full semantic lowering and production screen
 acceptance remain open.
+The [event-program increment](../ui/event-programs.md) adds ordered canonical
+state/presentation/motion programs, typed action capture and lifecycle delivery
+through normal session ownership. Source-specific legacy lowering, complete
+widgets, world/save/demo integration and production GUI/editor acceptance remain
+required work; this does not close Stage 2 or M1.
 Semantic buttons now use authored state timelines, projected hit testing,
 source-order/spatial navigation and modal focus ownership. The
 [interaction checkpoint](../ui/interaction.md) records native behavior checks,

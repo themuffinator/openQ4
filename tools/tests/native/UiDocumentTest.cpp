@@ -1,6 +1,7 @@
 // Copyright (C) 2026 DarkMatter Productions. GPL-3.0-or-later.
 #include "src/ui/retained/Document.h"
 #include "src/ui/retained/Motion.h"
+#include "src/ui/retained/State.h"
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -198,7 +199,172 @@ static void CheckPresentationSchema() {
 	Check(!bounded.Load(aliasPrefix+declarations(8193,true)+'}',errors) && errors.front().pointer == "/aliases",
 		"presentation alias declarations have an explicit count budget");
 }
+static void CheckEventSchema() {
+	const std::string source = R"json(
+// Ordered authored programs, including forward and recursive named calls.
+{"format":"openq4-ui","version":1,"id":"event-schema",
+ "state":{"count":{"type":"number","initial":2},"gate":{"type":"boolean","initial":true},
+          "host":{"type":"number","initial":1,"cvar":"host_value"}},
+ "presentationVariables":{"page":{"type":"number","initial":0,"value":{"state":"count"}},
+  "flag":{"type":"boolean","initial":true},"caption":{"type":"string","initial":"metadata data"},
+  "pair":{"type":"vector2","initial":[1,2]},"triple":{"type":"vector3","initial":[1,2,3]}},
+ "aliases":{"curr":{"variable":"page"},"desktop::curr":{"variable":"page"},
+  "allowed":{"variable":"flag"},"caption":{"variable":"caption"},"pair":{"variable":"pair"},"triple":{"variable":"triple"},
+  "panel::rect":{"node":"root","property":"rect"},"panel::visible":{"node":"root","property":"visible","shown":"block"},
+  "panel::noevents":{"node":"root","property":"noevents"},"panel::tint":{"node":"root","property":"color"},
+  "panel::pixels":{"node":"root","property":"min-width"},"label::text":{"node":"label","property":"text"}},
+ "root":{"id":"root","type":"group","properties":{
+  "left":{"type":"length","value":0,"unit":"dp"},"top":{"type":"length","value":0,"unit":"dp"},
+  "width":{"type":"length","value":100,"unit":"dp"},"height":{"type":"length","value":50,"unit":"dp"},
+  "min-width":{"type":"length","value":5,"unit":"px"},"opacity":{"type":"number","value":1},
+  "display":{"type":"keyword","value":"block"},"pointer-events":{"type":"keyword","value":"auto"},
+  "color":{"type":"color","value":[1,1,1,1]}},"children":[
+   {"id":"label","type":"text","properties":{"text":{"type":"text","value":"#str_test"}}},
+   {"id":"button","type":"group","properties":{"opacity":{"type":"number","value":1}},
+    "control":{"role":"button","event":"ROOT::Later","label":"#str_test",
+     "states":{"default":"pulse","hover":"pulse","focus":"pulse","pressed":"pulse","disabled":"pulse"}}}]},
+ "bindings":[{"id":"opacity","node":"root","property":"opacity","value":{"state":"host"}}],
+ "timelines":[{"id":"pulse","durationMs":100,"tracks":[{"node":"button","property":"opacity","keys":[
+  {"atMs":0,"value":{"type":"number","value":1}},{"atMs":100,"value":{"type":"number","value":0.5}}]}]}],
+ "actions":{"inspect":{"operation":"test.inspect","arguments":{
+  "number":{"presentation":"CuRR"},"flag":{"presentation":"allowed"},"text":{"presentation":"caption"},
+  "width":{"presentation":"panel::rect","component":2},"pair":{"presentation":"pair","component":1},
+  "triple":{"presentation":"triple","component":2},"tint":{"presentation":"panel::tint","component":3}}}},
+ "events":{"OnActivate":[
+  {"op":"setState","values":{"count":{"op":"+","args":[{"presentation":"CuRR"},1]},"gate":{"presentation":"allowed"}}},
+  {"op":"setPresentation","alias":"desktop::curr","value":{"state":"count"},"overrideExpression":true},
+  {"op":"setPresentation","alias":"panel::rect","value":[1,2,{"presentation":"panel::rect","component":2},50],"overrideExpression":false},
+  {"op":"setPresentation","alias":"panel::visible","value":{"presentation":"allowed"},"overrideExpression":true},
+  {"op":"setPresentation","alias":"caption","value":"arbitrary metadata remains data","overrideExpression":true},
+  {"op":"setPresentation","alias":"label::text","value":"#str_test","overrideExpression":false},
+  {"op":"if","condition":{"op":"&&","args":[{"state":"gate"},{"presentation":"allowed"}]},
+   "then":[{"op":"action","action":"inspect"},{"op":"call","event":"ROOT::Later"}],"else":[{"op":"setState","values":{}}]},
+  {"op":"playTimeline","timeline":"pulse"},{"op":"pauseTimeline","timeline":"pulse"},
+  {"op":"resumeTimeline","timeline":"pulse"},{"op":"cancelTimeline","timeline":"pulse","policy":"hold"},
+  {"op":"cancelTimeline","timeline":"pulse","policy":"base","extensions":{"note":"preserve"}}],
+  "root::Later":[{"op":"call","event":"ONACTIVATE"}]},
+ "extensions":{"event-test":"source bytes remain authored"}}
+// Keep this trailer.
+)json";
+	Document document; std::vector<Diagnostic> errors;
+	if (!document.Load(source,errors)) for (const auto& error : errors) std::fprintf(stderr,"%s: %s\n",error.pointer.c_str(),error.message.c_str());
+	Check(errors.empty() && document.Source()==source,"ordered event source compiles without executing its recursive programs");
+	const auto& model = document.Model();
+	Check(model.events.size()==2 && model.events.at("onactivate").name=="OnActivate","event keys fold case while diagnostic names stay authored");
+	Check(model.FindNode("button")->control->event=="root::later" && model.FindNode("button")->control->action.empty(),"event control uses forward-declared qualified event");
+	const auto& steps = model.events.at("onactivate").steps;
+	Check(steps.size()==12 && steps[0].op==EventOp::SetState && steps[0].values.size()==2,"event ordering and atomic state batches are retained");
+	Check(steps[2].op==EventOp::SetPresentation && steps[2].presentation.size()==4 && !steps[2].overrideExpression,"vector event write retains expressions and explicit ownership flag");
+	Check(steps[6].condition.type==1 && steps[6].thenSteps[1].target=="root::later" && steps[6].elseSteps.size()==1,"conditional branches and forward calls compile");
+	Check(steps[7].op==EventOp::PlayTimeline && steps[8].op==EventOp::PauseTimeline && steps[9].op==EventOp::ResumeTimeline &&
+		steps[10].op==EventOp::CancelTimeline && !steps[10].restoreBase && steps[11].restoreBase,"all timeline commands and cancellation policies remain distinct");
+	for (const auto& [name,type] : std::map<std::string,PresentationType>{{"CURR",PresentationType::Number},{"caption",PresentationType::String},
+		{"allowed",PresentationType::Boolean},{"pair",PresentationType::Vector2},{"triple",PresentationType::Vector3},
+		{"panel::rect",PresentationType::Vector4},{"panel::tint",PresentationType::Vector4},{"panel::visible",PresentationType::Boolean},
+		{"panel::noevents",PresentationType::Boolean},{"panel::pixels",PresentationType::Number},{"label::text",PresentationType::String}})
+		Check(PresentationAliasType(model,name)==type,"shared alias typing covers metadata and rendered forms");
+	Check(!PresentationAliasType(model,"missing") && !PresentationAliasType(model,"gui::curr"),"unknown and application namespace aliases have no presentation type");
+	auto broken = model; broken.root.properties.erase("height");
+	Check(!PresentationAliasType(broken,"panel::rect"),"alias type query fails safely for missing rectangle parts");
+	broken = model; broken.aliases.at("panel::visible").shown="none";
+	Check(!PresentationAliasType(broken,"panel::visible"),"alias type query rejects an invalid shown mode");
+	std::vector<std::pair<std::string,int>> reads;
+	const PresentationLookup lookup = [&](const std::string& name, int component, StateValue& value, std::string&) {
+		reads.emplace_back(name,component);
+		if (name=="CuRR") value=9.0;
+		else if (name=="allowed") value=true;
+		else if (name=="caption") value=std::string("literal ; quit <span>data</span>");
+		else if (name=="panel::rect" && component==2) value=100.0;
+		else if (name=="pair" && component==1) value=2.0;
+		else if (name=="triple" && component==2) value=3.0;
+		else if (name=="panel::tint" && component==3) value=1.0;
+		else return false;
+		return true;
+	};
+	StateValue value=std::string("previous"); std::string error;
+	Check(EvaluateStateExpression(steps[0].values.at("count"),{},value,error,lookup) && std::get<double>(value)==10,
+		"nested expressions forward presentation lookup and preserve scalar component sentinel");
+	Check(reads.back()==std::make_pair(std::string("CuRR"),-1),"scalar alias read forwards original name and absent component");
+	ActionInvocation invocation;
+	Check(model.ResolveAction("inspect",{},invocation,error,lookup) && invocation.arguments.size()==7 && std::get<double>(invocation.arguments.at("width"))==100,
+		"action arguments resolve typed live presentation values including vector components");
+	Check(std::get<std::string>(invocation.arguments.at("text"))=="literal ; quit <span>data</span>","presentation strings remain action data");
+	const auto before = invocation;
+	Check(!model.ResolveAction("inspect",{},invocation,error) && invocation.arguments==before.arguments && invocation.operation==before.operation,
+		"missing presentation callback rejects the action without a partial invocation");
+	const Expression expression = model.actions.at("inspect").arguments.at("number");
+	value=std::string("previous");
+	for (const auto& bad : std::vector<PresentationLookup>{
+		[](const std::string&,int,StateValue& result,std::string& message) { result=4.0; message="unavailable target"; return false; },
+		[](const std::string&,int,StateValue& result,std::string&) { result=true; return true; },
+		[](const std::string&,int,StateValue& result,std::string&) { result=std::numeric_limits<double>::infinity(); return true; }})
+		Check(!EvaluateStateExpression(expression,{},value,error,bad) && !error.empty() && std::get<std::string>(value)=="previous",
+			"failed, wrong-type and invalid-value lookups preserve the previous expression result");
+	Check(document.ReplaceValue("/actions/inspect/arguments/number",R"({"op":"select","args":[true,5,{"presentation":"curr"}]})",errors),"compile lazy presentation read");
+	Check(EvaluateStateExpression(document.Model().actions.at("inspect").arguments.at("number"),{},value,error) && std::get<double>(value)==5,
+		"unused presentation branches require no callback");
+	Check(document.Load(source,errors),"restore event source for transactional edits");
+	Check(document.ReplaceValue("/events/OnActivate/0/values/count/args/1","3",errors),"edit an actual event expression through canonical source offsets");
+	std::string expected=source; const auto position=expected.find("\"CuRR\"},1]")+std::string("\"CuRR\"},").size(); expected.replace(position,1,"3");
+	Check(document.Source()==expected,"event edit preserves all comments, extensions and unrelated source bytes");
+	Check(document.Load(source,errors),"restore event source for negative cases");
+	auto reject = [&](const char* pointer,const char* replacement) {
+		Check(!document.ReplaceValue(pointer,replacement,errors) && !errors.empty() && document.Source()==source,"invalid event edit preserves the prior complete document");
+	};
+	for (const auto* bad : {R"({"presentation":"missing"})",R"({"presentation":"curr","component":0})",
+		R"({"presentation":"pair"})",R"({"presentation":"pair","component":2})",R"({"presentation":"pair","component":-1})",
+		R"({"presentation":"pair","component":1.0})",R"({"presentation":"pair","component":true})",R"({"presentation":"pair","component":"1"})",
+		R"({"presentation":"panel::rect","component":4})",R"({"presentation":"curr","state":"count"})",
+		R"({"presentation":"curr","op":"+","args":[1,2]})",R"({"presentation":1})"})
+		reject("/actions/inspect/arguments/number",bad);
+	reject("/bindings/0/value",R"({"presentation":"curr"})");
+	reject("/bindings/0/value",R"({"op":"select","args":[true,1,{"presentation":"curr"}]})");
+	reject("/presentationVariables/page/value",R"({"presentation":"curr"})");
+	reject("/presentationVariables/page/value",R"({"op":"+","args":[1,{"presentation":"curr"}]})");
+	for (const auto* bad : {R"([])",R"({"":[]})",R"({"GUI::event":[]})",R"({"a::b::c":[]})",R"({"OnActivate":[],"onactivate":[]})",
+		R"({"OnActivate":{}})",R"({"root::Later":[{"op":"call","event":"missing"}]})"}) reject("/events",bad);
+	for (const auto* bad : {R"({"op":"setState","values":{"host":2}})",R"({"op":"setState","values":{"missing":2}})",
+		R"({"op":"setState","values":{"count":true}})",R"({"op":"setState","values":[]})",
+		R"({"op":"setState","values":{},"action":"inspect"})",R"({"op":"setPresentation","alias":"missing","value":1,"overrideExpression":true})",
+		R"({"op":"setPresentation","alias":"curr","value":1})",R"({"op":"setPresentation","alias":"curr","value":1,"overrideExpression":1})",
+		R"({"op":"setPresentation","alias":"curr","value":true,"overrideExpression":true})",
+		R"({"op":"setPresentation","alias":"panel::visible","value":1,"overrideExpression":true})",
+		R"({"op":"setPresentation","alias":"panel::rect","value":[1,2,3],"overrideExpression":true})",
+		R"({"op":"setPresentation","alias":"panel::rect","value":[1,2,true,4],"overrideExpression":true})",
+		R"({"op":"setPresentation","alias":"curr","value":[1],"overrideExpression":false})",
+		R"({"op":"setPresentation","alias":"label::text","value":"hardcoded label","overrideExpression":false})",
+		R"({"op":"action","action":"missing"})",R"({"op":"call","event":"GUI::OnActivate"})",R"({"op":"call","event":"missing"})",
+		R"({"op":"if","condition":1,"then":[]})",R"({"op":"if","condition":true})",R"({"op":"if","condition":true,"then":[],"else":{}})",
+		R"({"op":"playTimeline","timeline":"missing"})",R"({"op":"pauseTimeline","timeline":"PULSE"})",
+		R"({"op":"resumeTimeline","timeline":"pulse","policy":"hold"})",R"({"op":"cancelTimeline","timeline":"pulse"})",
+		R"({"op":"cancelTimeline","timeline":"pulse","policy":"unknown"})",R"({"op":"exec","command":"quit"})",R"({"op":"action","action":"inspect","extensions":[]})"})
+		reject("/events/OnActivate/0",bad);
+	reject("/root/children/1/control/event",R"("missing")");
+	reject("/root/children/1/control",R"({"role":"button","event":"OnActivate","action":"inspect","label":"#str_test","states":{}})");
+	reject("/root/children/1/control",R"({"role":"button","label":"#str_test","states":{}})");
+	const auto bounded = [](const std::string& events) {
+		return "{\"format\":\"openq4-ui\",\"version\":1,\"id\":\"limits\",\"root\":{\"id\":\"root\",\"type\":\"group\"},\"events\":"+events+"}";
+	};
+	for (const unsigned count : {1024u,1025u}) {
+		std::string events="{";
+		for (unsigned i=0;i<count;++i) events+=(i?",":"")+std::string("\"event")+std::to_string(i)+"\":[]";
+		events+="}";
+		Check(document.Load(bounded(events),errors)==(count==1024),"named event budget includes its exact boundary");
+	}
+	for (const unsigned count : {8192u,8193u}) {
+		std::string events="{\"event\":[";
+		for (unsigned i=0;i<count;++i) events+=(i?",":"")+std::string("{\"op\":\"setState\",\"values\":{}}");
+		events+="]}";
+		Check(document.Load(bounded(events),errors)==(count==8192),"aggregate event step budget includes its exact boundary");
+	}
+	for (const unsigned depth : {32u,33u}) {
+		std::string step="{\"op\":\"setState\",\"values\":{}}";
+		for (unsigned i=0;i<depth;++i) step="{\"op\":\"if\",\"condition\":true,\"then\":["+step+"]}";
+		Check(document.Load(bounded("{\"event\":["+step+"]}"),errors)==(depth==32),"event structural depth includes its exact boundary");
+	}
+}
 int main() {
+	CheckEventSchema();
 	CheckPresentationSchema();
 	Document document;
 	std::vector<Diagnostic> errors;

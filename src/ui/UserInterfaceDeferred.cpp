@@ -161,6 +161,9 @@ void idUserInterfaceDeferred::RunTimeEvents( int newTime ) {
 bool idUserInterfaceDeferred::DispatchApplicationActions( const char *command, bool &closeRequested ) {
 	return backend != NULL && backend->DispatchApplicationActions( command, closeRequested );
 }
+const char *idUserInterfaceDeferred::PendingApplicationCommand() const {
+	return backend != NULL ? backend->PendingApplicationCommand() : "";
+}
 bool idUserInterfaceDeferred::WriteToSaveGame( idFile *file ) const { return backend != NULL && backend->WriteToSaveGame( file ); }
 bool idUserInterfaceDeferred::ReadFromSaveGame( idFile *file ) {
 	if ( backend == NULL ) { return false; }

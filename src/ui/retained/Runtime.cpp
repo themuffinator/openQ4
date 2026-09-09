@@ -980,78 +980,53 @@ bool Runtime::RestoreSnapshot(const std::string& snapshot, std::string& error, d
 std::optional<Value> Runtime::PresentedValue(const std::string& node, const std::string& property) const {
 	return impl->PresentedProperty({node,property});
 }
-namespace {
-std::vector<std::string> AliasProperties(const PresentationAlias& alias) {
-	if (alias.property == "rect") return {"left","top","width","height"};
-	if (alias.property == "visible") return {"display"};
-	if (alias.property == "noevents") return {"pointer-events"};
-	return {alias.property};
-}
-bool ReadAlias(const PresentationAlias& alias, const Runtime& runtime, PresentationValue& value) {
-	if (alias.property == "rect") {
-		value.type = PresentationType::Vector4;
-		const auto properties = AliasProperties(alias);
-		for (size_t i = 0; i < properties.size(); ++i) {
-			const auto part = runtime.PresentedValue(alias.node,properties[i]);
-			if (!part || part->type != ValueType::Length || part->unit != "dp") return false;
-			value.data[i] = part->data[0];
-		}
-		return true;
-	}
-	const auto property = runtime.PresentedValue(alias.node,AliasProperties(alias).front());
-	if (!property) return false;
-	if (alias.property == "visible" || alias.property == "noevents") {
-		value.type = PresentationType::Boolean;
-		value.data[0] = (alias.property == "visible" ? property->text != "none" : property->text == "none") ? 1 : 0;
-	} else if (property->type == ValueType::Number || property->type == ValueType::Length) {
-		value.type = PresentationType::Number; value.data[0] = property->data[0];
-	} else if (property->type == ValueType::Colour) {
-		value.type = PresentationType::Vector4; std::copy_n(property->data.begin(),4,value.data.begin());
-	} else if (property->type == ValueType::Text || property->type == ValueType::Keyword || property->type == ValueType::Font) {
-		value.type = PresentationType::String; value.text = property->text;
-	} else return false;
-	return ValidPresentationValue(value);
-}
-}
 bool Runtime::GetPresentationAlias(const std::string& name, std::string& value) const {
 	if (!impl->canonical) return false;
-	const auto found = impl->canonical->Model().aliases.find(PresentationAliasKey(name));
-	if (found == impl->canonical->Model().aliases.end()) return false;
 	PresentationValue result;
-	if (!found->second.variable.empty()) result = impl->state.Presentation().variables.at(found->second.variable).value;
-	else if (!ReadAlias(found->second,*this,result)) return false;
+	if (!ReadPresentationAlias(impl->canonical->Model(),impl->state,impl->motion,name,result)) return false;
 	value = FormatPresentationValue(result); return true;
 }
 bool Runtime::SetPresentationAlias(const std::string& name, const std::string& text, bool overrideExpression, std::string& error) {
 	error.clear();
 	if (!impl->canonical) { error = "Presentation writes require a canonical document"; return false; }
-	const auto found = impl->canonical->Model().aliases.find(PresentationAliasKey(name));
-	if (found == impl->canonical->Model().aliases.end()) { error = "Unknown presentation alias '"+name+"'"; return false; }
-	const auto& alias = found->second;
 	PresentationValue current, value;
-	if (!alias.variable.empty()) current = impl->state.Presentation().variables.at(alias.variable).value;
-	else if (!ReadAlias(alias,*this,current)) { error = "Unavailable presentation target"; return false; }
-	if (!ParsePresentationValue(current.type,text,value,error)) return false;
-	if (!alias.variable.empty()) return impl->state.WritePresentationVariable(alias.variable,value,overrideExpression,error);
-	PropertyValues bound, unbound;
-	const auto properties = AliasProperties(alias);
-	for (size_t i = 0; i < properties.size(); ++i) {
-		const PropertyKey key{alias.node,properties[i]};
-		auto target = *PresentedValue(key.first,key.second);
-		if (alias.property == "rect") target.data[0] = value.data[i];
-		else if (alias.property == "visible") target.text = value.data[0] != 0 ? alias.shown : "none";
-		else if (alias.property == "noevents") target.text = value.data[0] != 0 ? "none" : "auto";
-		else if (value.type == PresentationType::String) target.text = value.text;
-		else if (value.type == PresentationType::Vector4) std::copy_n(value.data.begin(),4,target.data.begin());
-		else target.data[0] = value.data[0];
-		(impl->state.Properties().contains(key) ? bound : unbound)[key] = std::move(target);
+	if (!ReadPresentationAlias(impl->canonical->Model(),impl->state,impl->motion,name,current)) {
+		error = "Unavailable presentation alias '"+name+"'"; return false;
 	}
-	// A rectangle may mix bound and unbound components. Both owners validate
-	// before either is committed, and no setter invokes an action or a redraw.
-	State state = impl->state; Motion motion = impl->motion;
-	if (!state.OverrideProperties(bound,overrideExpression,error) || !motion.WriteValues(unbound,error)) return false;
-	impl->state = std::move(state); impl->motion = std::move(motion);
-	return true;
+	if (!ParsePresentationValue(current.type,text,value,error)) return false;
+	return WritePresentationAlias(impl->canonical->Model(),impl->state,impl->motion,name,value,overrideExpression,error);
+}
+bool Runtime::HasEvent(const std::string& name) const {
+	return impl->canonical && impl->canonical->Model().events.contains(PresentationAliasKey(name));
+}
+bool Runtime::RunEvent(const std::string& name, double seconds, EventEffects& effects, std::string& error,
+	const StateValues& application, const ActionValidator& validate, size_t maxActions) {
+	error.clear();
+	if (!impl->canonical || !std::isfinite(seconds) || seconds < 0) { error = "Event requires a canonical document and valid presentation time"; return false; }
+	const auto& model = impl->canonical->Model();
+	StateValues sources;
+	for (const auto& [id,declaration] : model.state) {
+		if (declaration.cvar.empty()) continue;
+		StateValue value;
+		if (!impl->host.ReadCVar(declaration.cvar,declaration.initial.index(),value)) {
+			error = "Unavailable CVar source '"+declaration.cvar+"' at event entry"; return false;
+		}
+		sources[id] = std::move(value);
+	}
+	State state = impl->state;
+	if (!state.SetCombined(application,sources,error)) return false;
+	const double now = std::max(impl->time,seconds);
+	EventResult candidate;
+	if (!EvaluateEvent(model,state,impl->motion,name,now,candidate,error,validate,maxActions)) return false;
+	EventEffects published{std::move(candidate.stateChanges),std::move(candidate.actions)};
+	impl->state = std::move(candidate.state); impl->motion = std::move(candidate.motion); impl->time = now;
+	impl->stateError.clear(); impl->ApplyControlBindings(); impl->UpdateInteraction(now);
+	effects = std::move(published); return true;
+}
+bool Runtime::ResolveAction(const std::string& id, ActionInvocation& invocation, std::string& error) const {
+	if (!impl->canonical) { error = "Action requires a canonical document"; return false; }
+	return impl->canonical->Model().ResolveAction(id,impl->state.Variables(),invocation,error,
+		MakePresentationLookup(impl->canonical->Model(),impl->state,impl->motion));
 }
 void Runtime::PauseTimeline(const std::string& id, double seconds) { impl->motion.Pause(id,seconds); }
 void Runtime::ResumeTimeline(const std::string& id, double seconds) { impl->motion.Resume(id,seconds); }
@@ -1141,6 +1116,11 @@ bool Runtime::PushModal(const std::string& id, double seconds) { impl->UpdateInt
 bool Runtime::PopModal(double seconds) { impl->UpdateInteraction(seconds); const bool result = impl->interaction.PopModal(); impl->Feedback(seconds); return result; }
 std::string Runtime::FocusedControl() const { return impl->interaction.Focused(); }
 std::optional<ControlState> Runtime::GetControlState(const std::string& id) const { return impl->interaction.State(id); }
+bool Runtime::CanActivateControl(const std::string& id, double seconds) {
+	if (!impl->canonical || !std::isfinite(seconds) || seconds < 0) return false;
+	impl->UpdateInteraction(seconds);
+	return impl->interaction.CanActivate(id);
+}
 std::vector<ControlAction> Runtime::TakeActions() {
 	if (impl->interaction.Overflowed()) impl->host.Log(true,"Retained control action queue overflow");
 	return impl->interaction.TakeActions();

@@ -306,6 +306,10 @@ explicit retained loading and typed session operations;
 visual properties with persistent expression ownership. Complete event/action
 lowering, the world surface contract and game-save/demo framing remain incomplete;
 M1 is still open.
+The [event-program increment](../ui/event-programs.md) adds transactional ordered
+canonical behavior, lifecycle entry and independent session delivery. It supplies
+the application mechanism; full legacy broadcast/timer/native-control semantics,
+production component behavior and the remaining M1 boundaries still require work.
 
 Resolve UI-01/UI-02 and the ownership/snapshot portion of UI-04/UI-12. Add the
 retained adapter, manager-neutral lifecycle, source routing, typed dispatcher,

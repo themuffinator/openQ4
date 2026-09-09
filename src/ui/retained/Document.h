@@ -2,6 +2,7 @@
 #pragma once
 
 #include <array>
+#include <functional>
 #include <map>
 #include <memory>
 #include <optional>
@@ -25,6 +26,7 @@ struct Value {
 };
 using StateValue = std::variant<double, bool, std::string>;
 using StateValues = std::map<std::string, StateValue>;
+using PresentationLookup = std::function<bool(const std::string&, int, StateValue&, std::string&)>;
 struct StateDeclaration {
 	StateValue initial;
 	std::string cvar; // Optional read-only host source; empty means application-owned.
@@ -35,6 +37,8 @@ struct Expression {
 	size_t type = 0; // StateValue variant index, resolved by the document compiler.
 	unsigned decimals = 0;
 	std::vector<Expression> args;
+	std::string presentation; // Public alias; legal only in actions and events.
+	int component = -1; // Scalar aliases have no component; vectors require one.
 };
 // Typed public presentation values are independent of CSS and application
 // State(). Boolean values occupy data[0] as 0/1; unused components stay zero.
@@ -67,6 +71,21 @@ struct ActionInvocation {
 	std::string action, operation;
 	StateValues arguments;
 };
+enum class EventOp { SetState, SetPresentation, Action, Call, If, PlayTimeline, PauseTimeline, ResumeTimeline, CancelTimeline };
+struct EventStep {
+	EventOp op = EventOp::SetState;
+	std::string target;
+	std::map<std::string,Expression> values;
+	std::vector<Expression> presentation;
+	bool overrideExpression = true;
+	Expression condition;
+	std::vector<EventStep> thenSteps, elseSteps;
+	bool restoreBase = false;
+};
+struct EventProgram {
+	std::string name; // Authored name retained for diagnostics.
+	std::vector<EventStep> steps;
+};
 struct Binding {
 	std::string id, node, property;
 	Value prototype;
@@ -80,6 +99,7 @@ struct Control {
 	bool enabled = true;
 	std::map<ControlState,std::string> states;
 	std::map<std::string,std::string> navigation;
+	std::string event; // Case-folded event name; mutually exclusive with action.
 };
 struct Node {
 	std::string id, type;
@@ -122,12 +142,14 @@ struct DocumentModel {
 	std::map<std::string, PresentationVariable> presentationVariables;
 	// Alias keys are ASCII case-folded public names; targets retain exact IDs.
 	std::map<std::string, PresentationAlias> aliases;
+	std::map<std::string, EventProgram> events; // Case-folded public event names.
 	const Node* FindNode(const std::string& id) const;
 	// Resolve a compiled descriptor against one supplied state snapshot.
 	// No side effects; failure preserves the caller's invocation unchanged.
 	bool ResolveAction(const std::string& id, const StateValues& variables,
-		ActionInvocation& invocation, std::string& error) const;
+		ActionInvocation& invocation, std::string& error, const PresentationLookup& presentation = {}) const;
 };
+std::optional<PresentationType> PresentationAliasType(const DocumentModel& model, const std::string& name);
 struct Diagnostic {
 	std::string pointer, message;
 	size_t byte = 0, line = 1, column = 1;

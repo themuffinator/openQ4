@@ -4282,7 +4282,7 @@ static void Session_RetainedGui_f( const idCmdArgs &args ) {
 		return;
 	}
 #endif
-	common->Printf( "openq4_retainedGui: requires a retained test/active GUI and report | focus <id> | menu <action> <0|1> | state <id> <value> | presentation <alias> <value> <override:0|1> | update | save | restore\n" );
+	common->Printf( "openq4_retainedGui: requires a retained test/active GUI and report | focus <id> | menu <action> <0|1> | state <id> <value> | pending <key> <value> | presentation <alias> <value> <override:0|1> | event <name> | trigger | update | save | restore\n" );
 }
 
 static void Session_OpenQ4GuiSet_f( const idCmdArgs &args ) {
@@ -4314,6 +4314,7 @@ static void Session_GuiEvent_f( const idCmdArgs &args ) {
 	}
 
 	activeGui->HandleNamedEvent( eventName );
+	sessLocal.PumpApplicationActions( activeGui );
 }
 #endif
 
@@ -4335,10 +4336,14 @@ void idSessionLocal::TestGUI( const char *guiName ) {
 	guiTest = NULL;
 	if ( previous != NULL && previous != guiActive ) {
 		previous->Activate( false, common->GetPresentationTime() );
+		PumpApplicationActions( previous );
 		uiManager->DeAlloc( previous );
 	}
 	guiTest = next;
-	if ( guiTest != NULL ) { guiTest->Activate( true, common->GetPresentationTime() ); }
+	if ( guiTest != NULL ) {
+		guiTest->Activate( true, common->GetPresentationTime() );
+		PumpApplicationActions( guiTest );
+	}
 }
 
 /*

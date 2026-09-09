@@ -62,6 +62,35 @@ bool ValidOperation(const Action& action) {
 		(action.operation == "settings.shadows.set" && value->second.type == 1);
 }
 
+bool ValidInvocation(const ActionInvocation& invocation, std::string& error) {
+	if (invocation.operation == "ui.dismiss" && invocation.arguments.empty()) return true;
+	const auto value = invocation.arguments.find("value");
+	if (invocation.arguments.size() == 1 && value != invocation.arguments.end() && ValidStateValue(value->second)) {
+		if (invocation.operation == "settings.brightness.set" && std::holds_alternative<double>(value->second)) {
+			const double number = std::get<double>(value->second);
+			if (number >= .5 && number <= 2) return true;
+			error = "Brightness request must be between 0.5 and 2.0"; return false;
+		}
+		if (invocation.operation == "settings.shadows.set" && std::holds_alternative<bool>(value->second)) return true;
+	}
+	error = "Unsupported application invocation or arguments: "+invocation.action; return false;
+}
+
+void TraceInvocation(const char* path, const ActionInvocation& invocation, bool close) {
+	if (!cvarSystem->GetCVarBool("ui_retainedTrace")) return;
+	std::string text = "-";
+	const auto value = invocation.arguments.find("value");
+	if (value != invocation.arguments.end()) {
+		PresentationValue number;
+		if (std::holds_alternative<double>(value->second)) number.data[0] = std::get<double>(value->second);
+		else if (std::holds_alternative<bool>(value->second)) { number.type = PresentationType::Boolean; number.data[0] = std::get<bool>(value->second) ? 1 : 0; }
+		text = FormatPresentationValue(number);
+	}
+	common->Printf("RETAINED_GUI_DISPATCH path=%s operation=%s value=%s brightness=%.6f shadows=%d close=%d\n",
+		path,invocation.operation.c_str(),text.c_str(),cvarSystem->GetCVarFloat("r_brightness"),
+		cvarSystem->GetCVarBool("r_shadows") ? 1 : 0,close ? 1 : 0);
+}
+
 bool ValidateApplication(const DocumentModel& model, std::string& error) {
 	idDict names;
 	for (const auto& [name,declaration] : model.state) {
@@ -75,8 +104,9 @@ bool ValidateApplication(const DocumentModel& model, std::string& error) {
 	std::vector<const Node*> pending{&model.root};
 	while (!pending.empty()) {
 		const auto* node = pending.back(); pending.pop_back();
-		if (node->control && !model.actions.contains(node->control->action)) {
-			error = "Control has no typed application action: " + node->id; return false;
+		if (node->control && (node->control->event.empty() ? !model.actions.contains(node->control->action) :
+			!model.events.contains(PresentationAliasKey(node->control->event)))) {
+			error = "Control has no typed application action or event: " + node->id; return false;
 		}
 		for (const auto& child : node->children) pending.push_back(&child);
 	}
@@ -87,6 +117,13 @@ bool HasControls(const Node& node) {
 	if (node.control) return true;
 	for (const auto& child : node.children) if (HasControls(child)) return true;
 	return false;
+}
+
+bool NonInteractive(const idDict& dictionary) {
+	StateValue value;
+	if (ConvertState(dictionary.GetString("noninteractive","0"),1,value)) return std::get<bool>(value);
+	// Undeclared legacy caller flags retain their numeric dictionary semantics.
+	return dictionary.GetBool("noninteractive");
 }
 
 // The existing game/SDL interface transports a 640x480 aspect-corrected
@@ -126,10 +163,12 @@ struct idUserInterfaceRetained::Impl {
 	retainedUIView_t* view = nullptr;
 	Input input;
 	std::set<int> held;
-	std::vector<ActionInvocation> actions;
+	struct PendingAction { ActionInvocation invocation; bool cancellable = true; };
+	std::vector<PendingAction> actions;
 	bool interactive = true, interactiveSet = false, unique = false, active = false;
 	bool suspended = false, pointerVisible = false, close = false, worldReported = false;
 	bool unavailable = false;
+	bool initialized = false;
 	float cursorX = 320, cursorY = 240;
 	std::string lastError;
 	std::string checkpoint;
@@ -140,8 +179,13 @@ struct idUserInterfaceRetained::Impl {
 		if (message != lastError) common->Warning("retained GUI %s: %s",path.c_str(),message.c_str());
 		lastError = message;
 	}
-	void Quarantine(bool forget = false, bool cancelRuntime = true) {
-		input.Cancel(forget); input.Take(); held.clear(); actions.clear(); close = false; pointerVisible = false;
+	void Quarantine(bool forget = false, bool cancelRuntime = true, bool discardPrograms = false) {
+		input.Cancel(forget); input.Take(); held.clear(); close = false; pointerVisible = false;
+		// Completed programs retain their immutable invocations through input
+		// suspension. Save/resource/source replacement explicitly discards them.
+		actions.erase(std::remove_if(actions.begin(),actions.end(),[&](const PendingAction& action) {
+			return discardPrograms || action.cancellable;
+		}),actions.end());
 		if (auto* runtime = RuntimeView()) {
 			if (cancelRuntime) runtime->CancelInput(RetainedUI_PresentationTime());
 			runtime->ReleaseInputSources(); runtime->TakeActions();
@@ -149,8 +193,8 @@ struct idUserInterfaceRetained::Impl {
 	}
 	static void ResourceEvent(void* owner, retainedUIViewEvent_t event) {
 		auto& self = *static_cast<Impl*>(owner);
-		if (event == retainedUIViewEvent_t::BeforeResourceReset) self.Quarantine(false,false);
-		else if (event == retainedUIViewEvent_t::Failed) self.Quarantine(false,false);
+		if (event == retainedUIViewEvent_t::BeforeResourceReset) self.Quarantine(false,false,true);
+		else if (event == retainedUIViewEvent_t::Failed) self.Quarantine(false,false,true);
 		if (event != retainedUIViewEvent_t::BeforeResourceReset) common->Printf("RETAINED_GUI_RESOURCE path=%s event=%s\n",
 			self.path.c_str(),event == retainedUIViewEvent_t::Restored ? "restored" : "failed");
 	}
@@ -167,16 +211,49 @@ struct idUserInterfaceRetained::Impl {
 			else RuntimeView()->MenuAction(event.menu,event.down,RetainedUI_PresentationTime());
 		}
 	}
-	void CollectActions() {
+	bool RunEvent(const std::string& name) {
+		StateValues application; std::string error;
+		if (!ApplicationState(document.Model(),state,application,error)) { Error(error); return false; }
+		Runtime::EventEffects effects;
+		if (!RuntimeView()->RunEvent(name,RetainedUI_PresentationTime(),effects,error,application,ValidInvocation,256-actions.size())) {
+			Error(error); return false;
+		}
+		// Preserve undeclared and unrelated pending dictionary keys. Publish only
+		// the program's explicit application writes, using round-trip numbers.
+		for (const auto& [id,value] : effects.stateChanges) {
+			PresentationValue text;
+			if (std::holds_alternative<std::string>(value)) { text.type = PresentationType::String; text.text = std::get<std::string>(value); }
+			else if (std::holds_alternative<bool>(value)) { text.type = PresentationType::Boolean; text.data[0] = std::get<bool>(value) ? 1 : 0; }
+			else text.data[0] = std::get<double>(value);
+			state.Set(id.c_str(),FormatPresentationValue(text).c_str());
+		}
+		const auto count = effects.actions.size();
+		for (auto& action : effects.actions) actions.push_back({std::move(action),false});
+		if (!interactiveSet) {
+			interactive = HasControls(document.Model().root) && !NonInteractive(state);
+			if (!interactive) Quarantine();
+		}
+		lastError.clear();
+		if (cvarSystem->GetCVarBool("ui_retainedTrace")) common->Printf("RETAINED_GUI_EVENT name=%s actions=%u writes=%u\n",name.c_str(),
+			static_cast<unsigned>(count),static_cast<unsigned>(effects.stateChanges.size()));
+		return true;
+	}
+	void CollectActions(bool semantic = false) {
 		for (const auto& event : RuntimeView()->TakeActions()) {
+			if (!interactive || event.document != document.Model().id) continue;
 			if (event.kind == ControlAction::Kind::Back) {
-				if (!RuntimeView()->PopModal(RetainedUI_PresentationTime())) close = true;
+				if (!RuntimeView()->PopModal(RetainedUI_PresentationTime())) {
+					if (semantic && actions.size() < 256) actions.push_back({{"","ui.dismiss",{}},false});
+					else if (!semantic) close = true;
+				}
 				continue;
 			}
+			if (!RuntimeView()->CanActivateControl(event.node,RetainedUI_PresentationTime())) continue;
+			if (!event.event.empty()) { RunEvent(event.event); continue; }
 			ActionInvocation invocation; std::string error;
-			if (!document.Model().ResolveAction(event.action,RuntimeView()->GetState(),invocation,error)) { Error(error); continue; }
+			if (!RuntimeView()->ResolveAction(event.action,invocation,error) || !ValidInvocation(invocation,error)) { Error(error); continue; }
 			if (actions.size() >= 256) { Quarantine(); Error("Application action queue exceeded 256 requests"); return; }
-			actions.push_back(std::move(invocation));
+			actions.push_back({std::move(invocation),!semantic});
 		}
 	}
 	bool AcceptInput() {
@@ -250,12 +327,13 @@ bool idUserInterfaceRetained::InitFromFile(const char* qpath, bool rebuild, bool
 		for (const auto& diagnostic : diagnostics) impl->Error(diagnostic.message);
 		return false;
 	}
-	impl->Quarantine(false,false);
+	impl->Quarantine(false,false,true);
 	RetainedUI_DestroyView(impl->view); impl->view = view;
 	impl->RuntimeView()->ReleaseInputSources();
 	impl->document = std::move(candidate); impl->path = path.c_str(); impl->stamp = stamp;
+	if (!same) impl->initialized = false;
 	impl->state.Set("name",path.c_str()); impl->lastError.clear();
-	if (!impl->interactiveSet) impl->interactive = HasControls(impl->document.Model().root) && !impl->state.GetBool("noninteractive");
+	if (!impl->interactiveSet) impl->interactive = HasControls(impl->document.Model().root) && !NonInteractive(impl->state);
 	RegisterLoaded(); RefreshThinking();
 	common->Printf("RETAINED_GUI_LOADED %s\n",path.c_str());
 	return true;
@@ -280,7 +358,7 @@ void idUserInterfaceRetained::StateChanged(int time, bool redraw) {
 	else {
 		impl->lastError.clear();
 		if (!impl->interactiveSet) {
-			impl->interactive = HasControls(impl->document.Model().root) && !impl->state.GetBool("noninteractive");
+			impl->interactive = HasControls(impl->document.Model().root) && !NonInteractive(impl->state);
 			if (!impl->interactive) impl->Quarantine();
 		}
 	}
@@ -362,13 +440,15 @@ const char* idUserInterfaceRetained::HandleEvent(const sysEvent_t* event, int ti
 }
 
 void idUserInterfaceRetained::HandleNamedEvent(const char* name) {
-	if (name && impl->Prepare()) impl->RuntimeView()->PlayTimeline(name,RetainedUI_PresentationTime());
+	if (!name || !impl->Prepare()) return;
+	if (impl->RuntimeView()->HasEvent(name)) impl->RunEvent(name);
+	else impl->RuntimeView()->PlayTimeline(name,RetainedUI_PresentationTime());
 }
 const char* idUserInterfaceRetained::Activate(bool value, int time) {
 	if (impl->active != value) impl->Quarantine();
 	impl->active = value;
 	HandleNamedEvent(value ? "onActivate" : "onDeactivate");
-	return "";
+	return PendingApplicationCommand();
 }
 void idUserInterfaceRetained::Trigger(int time) { HandleNamedEvent("onTrigger"); }
 void idUserInterfaceRetained::RunTimeEvents(int time) { /* Retained motion advances on the presentation clock in Frame. */ }
@@ -379,6 +459,9 @@ void idUserInterfaceRetained::Redraw(int time, bool useAspectCorrection) {
 	}
 	Viewport viewport;
 	if (!RetainedUI_DefaultViewport(viewport) || !impl->Prepare()) return;
+	if (!impl->initialized) {
+		if (!impl->RuntimeView()->HasEvent("onInit") || impl->RunEvent("onInit")) impl->initialized = true;
+	}
 	impl->AcceptInput();
 	if (RetainedUI_DrawViewRoot(impl->view,viewport) && impl->active && impl->interactive) DrawCursor();
 }
@@ -398,16 +481,24 @@ void idUserInterfaceRetained::DrawCursor() {
 	renderSystem->FlushGui(); renderSystem->SetUseUIViewportFor2D(oldViewport); renderSystem->SetColor4(1,1,1,1);
 }
 
+const char* idUserInterfaceRetained::PendingApplicationCommand() const {
+	return impl->close || !impl->actions.empty() ? ActionMarker : "";
+}
 bool idUserInterfaceRetained::DispatchApplicationActions(const char* command, bool& closeRequested) {
 	closeRequested = false;
 	// The marker carries no untrusted parameters. Only this live instance's
 	// typed queue can request host operations; all other commands are consumed.
 	if (!command || idStr::Cmp(command,ActionMarker)) return true;
 	if (!impl->Prepare()) { closeRequested = impl->close; impl->close = false; impl->actions.clear(); return true; }
+	// The session pump precedes ordinary input delivery. Observe focus/console
+	// suspension now so it cannot dispatch a stale physical activation first.
+	// Completed programs and explicit semantic diagnostics remain committed.
+	impl->AcceptInput();
 	auto actions = std::move(impl->actions); impl->actions.clear();
 	closeRequested = impl->close; impl->close = false;
-	for (const auto& invocation : actions) {
-		if (invocation.operation == "ui.dismiss") { closeRequested = true; break; }
+	for (const auto& pending : actions) {
+		const auto& invocation = pending.invocation;
+		if (invocation.operation == "ui.dismiss") { closeRequested = true; TraceInvocation(Name(),invocation,true); continue; }
 		const auto value = invocation.arguments.find("value");
 		if (invocation.arguments.size() != 1 || value == invocation.arguments.end()) continue;
 		if (invocation.operation == "settings.brightness.set" && std::holds_alternative<double>(value->second)) {
@@ -419,6 +510,7 @@ bool idUserInterfaceRetained::DispatchApplicationActions(const char* command, bo
 			cvarSystem->SetCVarBool("r_shadows",std::get<bool>(value->second));
 			if (cvarSystem->GetCVarBool("r_shadows") != std::get<bool>(value->second)) impl->Error("Shadows request was not applied");
 		}
+		TraceInvocation(Name(),invocation,closeRequested);
 	}
 	return true;
 }
@@ -471,7 +563,10 @@ bool idUserInterfaceRetained::ReadFromSaveGame(idFile* file) {
 	// caller input. Restoring must not implicitly commit it or replay actions.
 	// Snapshot validation is atomic; outer dictionary/flags follow on success.
 	if (!impl->RuntimeView()->RestoreSnapshot(snapshot,error,RetainedUI_PresentationTime())) { impl->Error(error); return false; }
-	impl->Quarantine(false,false); impl->state = state; impl->state.Set("name",Name());
+	impl->Quarantine(false,false,true); impl->state = state; impl->state.Set("name",Name());
+	// Save restoration suppresses automatic initialization just as legacy load
+	// does. Lifecycle/program side effects never replay while restoring a GUI.
+	impl->initialized = true;
 	impl->active = (flags & 1) != 0; impl->interactive = (flags & 2) != 0; impl->unique = (flags & 4) != 0;
 	impl->interactiveSet = (flags & 8) != 0;
 	SetCursor(x,y); return true;
@@ -497,10 +592,16 @@ bool UI_RetainedDiagnostic(idUserInterface* gui, const idCmdArgs& args) {
 		const auto input = inputs.find(args.Argv(2));
 		if (input != inputs.end()) {
 			impl.RuntimeView()->MenuAction(input->second,args.Argv(3)[0] == '1',RetainedUI_PresentationTime());
-			impl.CollectActions(); okay = true;
+			impl.CollectActions(true); okay = true;
 		}
 	} else if (verb == "state" && args.Argc() == 4) {
 		owner.SetStateString(args.Argv(2),args.Argv(3)); owner.StateChanged(common->GetPresentationTime()); okay = impl.lastError.empty();
+	} else if (verb == "pending" && args.Argc() == 4) {
+		owner.SetStateString(args.Argv(2),args.Argv(3)); okay = true;
+	} else if (verb == "event" && args.Argc() == 3) {
+		owner.HandleNamedEvent(args.Argv(2)); okay = impl.lastError.empty();
+	} else if (verb == "trigger" && args.Argc() == 2) {
+		owner.Trigger(common->GetPresentationTime()); okay = impl.lastError.empty();
 	} else if (verb == "presentation" && args.Argc() == 5 && (!idStr::Cmp(args.Argv(4),"0") || !idStr::Cmp(args.Argv(4),"1"))) {
 		okay = owner.SetPresentationValue(args.Argv(2),args.Argv(3),args.Argv(4)[0] == '1');
 	} else if (verb == "update" && args.Argc() == 2) {

@@ -32,6 +32,8 @@ idCVar ui_retainedDensity("ui_retainedDensity", "0", CVAR_GUI | CVAR_FLOAT,
 	"retained UI test density override; zero uses the window display scale", 0.f, 8.f);
 idCVar ui_retainedReducedMotion("ui_retainedReducedMotion", "0", CVAR_GUI | CVAR_BOOL | CVAR_ARCHIVE,
 	"reduce decorative motion in the retained UI preview");
+idCVar ui_retainedTrace("ui_retainedTrace", "0", CVAR_GUI | CVAR_BOOL,
+	"trace retained event commits and typed application dispatch for semantic validation");
 
 class EngineHost final : public openq4::ui::Host {
 public:

@@ -7,8 +7,16 @@
 
 namespace openq4::ui {
 namespace {
-StateValue EvaluateExpression(const Expression& e, const StateValues& variables) {
+StateValue EvaluateExpression(const Expression& e, const StateValues& variables, const PresentationLookup& presentation = {}) {
 	if (e.op.empty()) {
+		if (!e.presentation.empty()) {
+			StateValue value; std::string error;
+			if (!presentation || !presentation(e.presentation,e.component,value,error))
+				throw std::runtime_error(error.empty() ? "Unavailable presentation alias '"+e.presentation+"'" : error);
+			if (value.index() != e.type || !ValidStateValue(value))
+				throw std::runtime_error("Invalid presentation type/value for '"+e.presentation+"'");
+			return value;
+		}
 		const StateValue* value = &e.literal;
 		if (!e.state.empty()) {
 			const auto found = variables.find(e.state);
@@ -19,7 +27,7 @@ StateValue EvaluateExpression(const Expression& e, const StateValues& variables)
 			throw std::runtime_error(e.state.empty() ? "Invalid compiled expression literal" : "Invalid state type/value for '"+e.state+"'");
 		return *value;
 	}
-	auto arg = [&](size_t i) { return EvaluateExpression(e.args.at(i),variables); };
+	auto arg = [&](size_t i) { return EvaluateExpression(e.args.at(i),variables,presentation); };
 	auto number = [&](size_t i) { return std::get<double>(arg(i)); };
 	auto boolean = [&](size_t i) { return std::get<bool>(arg(i)); };
 	// Selection and boolean operations short-circuit. An unused branch cannot
@@ -63,10 +71,11 @@ StateValue EvaluateExpression(const Expression& e, const StateValues& variables)
 	return value;
 }
 }
-bool EvaluateStateExpression(const Expression& expression, const StateValues& variables, StateValue& value, std::string& error) {
+bool EvaluateStateExpression(const Expression& expression, const StateValues& variables, StateValue& value, std::string& error,
+	const PresentationLookup& presentation) {
 	error.clear();
 	try {
-		StateValue candidate = EvaluateExpression(expression,variables);
+		StateValue candidate = EvaluateExpression(expression,variables,presentation);
 		if (candidate.index() != expression.type || !ValidStateValue(candidate))
 			throw std::runtime_error("Expression result violates its compiled type or supported value range");
 		value = std::move(candidate); return true;
@@ -74,14 +83,15 @@ bool EvaluateStateExpression(const Expression& expression, const StateValues& va
 		error = problem.what(); return false;
 	}
 }
-bool DocumentModel::ResolveAction(const std::string& id, const StateValues& variables, ActionInvocation& invocation, std::string& error) const {
+bool DocumentModel::ResolveAction(const std::string& id, const StateValues& variables, ActionInvocation& invocation, std::string& error,
+	const PresentationLookup& presentation) const {
 	error.clear();
 	const auto found = actions.find(id);
 	if (found == actions.end()) { error = "Unknown action descriptor '"+id+"'"; return false; }
 	ActionInvocation candidate; candidate.action = id; candidate.operation = found->second.operation;
 	for (const auto& [name,expression] : found->second.arguments) {
 		StateValue value;
-		if (!EvaluateStateExpression(expression,variables,value,error)) {
+		if (!EvaluateStateExpression(expression,variables,value,error,presentation)) {
 			error = "Action '"+id+"' argument '"+name+"': "+error; return false;
 		}
 		candidate.arguments.emplace(name,std::move(value));
@@ -147,20 +157,27 @@ bool State::Reset(const DocumentModel& model, std::string& error) {
 	candidate.revision = 1; *this = std::move(candidate); return true;
 }
 bool State::Set(const StateValues& changes, std::string& error, bool hostSources) {
+	return hostSources ? SetCombined({},changes,error) : SetCombined(changes,{},error);
+}
+bool State::SetCombined(const StateValues& application, const StateValues& hostSources, std::string& error) {
 	error.clear();
 	bool changed = false;
-	for (const auto& [id,value] : changes) {
-		auto declaration = declarations.find(id);
-		if (declaration == declarations.end()) { error = "Unknown state variable '"+id+"'"; return false; }
-		if (declaration->second.cvar.empty() == hostSources) { error = "State source ownership mismatch for '"+id+"'"; return false; }
-		if (value.index() != declaration->second.initial.index() || !ValidStateValue(value)) {
-			error = "Invalid state type/value for '"+id+"'"; return false;
+	const auto validate = [&](const StateValues& batch, bool host) {
+		for (const auto& [id,value] : batch) {
+			auto declaration = declarations.find(id);
+			if (declaration == declarations.end()) { error = "Unknown state variable '"+id+"'"; return false; }
+			if (declaration->second.cvar.empty() == host) { error = "State source ownership mismatch for '"+id+"'"; return false; }
+			if (value.index() != declaration->second.initial.index() || !ValidStateValue(value)) {
+				error = "Invalid state type/value for '"+id+"'"; return false;
+			}
+			changed = changed || variables.at(id) != value;
 		}
-		changed = changed || variables.at(id) != value;
-	}
+		return true;
+	};
+	if (!validate(application,false) || !validate(hostSources,true)) return false;
 	if (!changed && !presentationDirty) return true;
 	StateValues candidate = variables;
-	for (const auto& [id,value] : changes) candidate[id] = value;
+	for (const auto* batch : {&application,&hostSources}) for (const auto& [id,value] : *batch) candidate[id] = value;
 	PropertyValues props;
 	std::map<std::string,bool> controls;
 	StatePresentationSnapshot nextPresentation;

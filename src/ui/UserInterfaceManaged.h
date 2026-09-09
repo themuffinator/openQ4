@@ -28,6 +28,7 @@ public:
 	// False leaves legacy command dispatch in charge. Retained events carry
 	// typed invocations inside the engine instead of console command strings.
 	virtual bool DispatchApplicationActions( const char *command, bool &closeRequested ) { return false; }
+	virtual const char *PendingApplicationCommand() const { return ""; }
 
 	void ClearRefs() { refs = 0; }
 	void AddRef() { refs++; }
@@ -53,3 +54,7 @@ private:
 idUserInterfaceManaged *UI_CreateForPath( const char *qpath, bool managed = true );
 bool UI_IsRetainedPath( const char *qpath );
 bool UI_DispatchApplicationActions( idUserInterface *gui, const char *command, bool &closeRequested );
+typedef void (*UI_ApplicationCommandCallback)( idUserInterface *gui, const char *command, void *context );
+// Pump only private typed requests. A null owner snapshots all pending managed
+// allocations; a specific owner drains a lifecycle queue before its release.
+void UI_PumpApplicationActions( UI_ApplicationCommandCallback callback, void *context, idUserInterface *only = NULL );

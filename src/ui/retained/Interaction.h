@@ -7,7 +7,7 @@ enum class MenuInput { Next, Previous, Up, Down, Left, Right, Accept, Back };
 struct ControlBounds { float x = 0, y = 0, width = 0, height = 0; bool visible = false; };
 struct ControlAction {
 	enum class Kind { Activate, Back } kind = Kind::Activate;
-	std::string document, node, action;
+	std::string document, node, action, event;
 };
 struct ControlFeedback { std::string node, timeline; ControlState state = ControlState::Default; };
 struct InteractionSnapshot {
@@ -42,6 +42,7 @@ public:
 	std::optional<ControlState> State(const std::string& id) const;
 	std::vector<ControlFeedback> TakeFeedback();
 	std::vector<ControlAction> TakeActions();
+	bool CanActivate(const std::string& id) const { return Eligible(id); }
 	bool Overflowed() const { return overflowed; }
 	// Capture persistent semantics only. Restore cancels queued actions/arms and
 	// hover, preserves receiving-instance held latches, and awaits fresh bounds.

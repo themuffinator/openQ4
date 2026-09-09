@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Exercise production retained GUI adapter state, aliases, save frames and input.
+"""Exercise production retained GUI adapter state, event queues, saves and input.
 
 The adapter/public headers and Input.cpp are real. Engine I/O, canonical
 document loading and runtime rendering are bounded stand-ins; this does not
 qualify alias expression ownership, parsing, GPU output or the complete
-application action vocabulary.
+application action vocabulary. Event effects are prescribed boundary data;
+UiBehaviorTest covers actual ordered evaluation and rollback.
 """
 from pathlib import Path
 import shutil
@@ -21,9 +22,15 @@ ENGINE = r'''
 #include <limits>
 #include <map>
 #include <set>
+#include <iomanip>
+#include <sstream>
 #include "src/ui/retained/Input.h"
 #include "src/ui/RetainedUI.h"
-struct idCmdArgs;
+struct idCmdArgs {
+    std::vector<std::string> values;
+    int Argc() const {return static_cast<int>(values.size());}
+    const char* Argv(int index) const {return values.at(index).c_str();}
+};
 template<class T> T Min(T a,T b) { return (std::min)(a,b); }
 struct idVec2 { idVec2(float=0,float=0) {} } vec2_origin;
 enum { SE_KEY=1,SE_MOUSE,K_TAB=10,K_SHIFT,K_UPARROW,K_DOWNARROW,K_LEFTARROW,K_RIGHTARROW,
@@ -80,15 +87,20 @@ struct Common {
     int warnings=0;
     void Warning(const char*,...) { ++warnings; }
     void Printf(const char*,...) {}
+    int GetPresentationTime() const {return 0;}
 } commonObject,*common=&commonObject;
 struct CVars {
     bool aspect=true,shadows=true;
     float brightness=1;
     int writes=0;
-    bool GetCVarBool(const char* name) const { return !std::strcmp(name,"ui_aspectCorrection")?aspect:shadows; }
+    std::vector<std::pair<std::string,double>> history;
+    bool GetCVarBool(const char* name) const {
+        if(!std::strcmp(name,"ui_aspectCorrection"))return aspect;
+        return !std::strcmp(name,"r_shadows") && shadows;
+    }
     float GetCVarFloat(const char*) const { return brightness; }
-    void SetCVarFloat(const char* name,float value) { assert(!std::strcmp(name,"r_brightness")); brightness=value; ++writes; }
-    void SetCVarBool(const char* name,bool value) { assert(!std::strcmp(name,"r_shadows")); shadows=value; ++writes; }
+    void SetCVarFloat(const char* name,float value) { assert(!std::strcmp(name,"r_brightness")); brightness=value; ++writes; history.emplace_back(name,value); }
+    void SetCVarBool(const char* name,bool value) { assert(!std::strcmp(name,"r_shadows")); shadows=value; ++writes; history.emplace_back(name,value?1:0); }
 } cvars,*cvarSystem=&cvars;
 struct Console { bool open=false; bool Active() const { return open; } } consoleObject,*console=&consoleObject;
 static bool windowFocused=true;
@@ -127,15 +139,53 @@ bool ValidStateValue(const StateValue& value) {
     return !std::holds_alternative<double>(value) || std::isfinite(std::get<double>(value));
 }
 std::string Value::Css() const { return text; }
-bool DocumentModel::ResolveAction(const std::string& name,const StateValues& variables,ActionInvocation& result,std::string&) const {
+std::string PresentationAliasKey(const std::string& name) {
+    std::string folded=name;
+    std::transform(folded.begin(),folded.end(),folded.begin(),[](unsigned char c){return static_cast<char>(std::tolower(c));});
+    return folded;
+}
+std::string FormatPresentationValue(const PresentationValue& value) {
+    if(value.type==PresentationType::String)return value.text;
+    std::ostringstream text; text<<std::setprecision(17)<<value.data[0]; return text.str();
+}
+bool DocumentModel::ResolveAction(const std::string& name,const StateValues& variables,ActionInvocation& result,std::string& error,
+                                 const PresentationLookup& lookup) const {
     auto found=actions.find(name); if(found==actions.end())return false;
-    result.action=name; result.operation=found->second.operation;
-    for(auto& [key,expression]:found->second.arguments)
-        result.arguments[key]=expression.state.empty()?expression.literal:variables.at(expression.state);
+    ActionInvocation candidate; candidate.action=name; candidate.operation=found->second.operation;
+    for(auto& [key,expression]:found->second.arguments) {
+        if(!expression.presentation.empty()) {
+            if(!lookup || !lookup(expression.presentation,expression.component,candidate.arguments[key],error))return false;
+        } else candidate.arguments[key]=expression.state.empty()?expression.literal:variables.at(expression.state);
+    }
+    result=std::move(candidate);
     return true;
 }
+// Event effects are prescribed boundary data. Core evaluation/rollback/math is
+// exercised by UiBehaviorTest; this harness checks adapter calls and publication.
+struct StubEvent {
+    StateValues changes;
+    std::vector<ActionInvocation> invocations;
+    bool pendingBrightness=false,fail=false;
+    std::string disableControl;
+};
+static std::map<std::string,StubEvent> eventPlans;
+static std::vector<std::string> eventHistory;
 class Runtime {
 public:
+    using ActionValidator=std::function<bool(const ActionInvocation&,std::string&)>;
+    struct EventEffects { StateValues stateChanges; std::vector<ActionInvocation> actions; };
+    struct EventCall { std::string name; StateValues application; size_t maxActions; };
+    std::vector<EventCall> eventCalls;
+    mutable std::vector<std::string> eventQueries,resolvedActions;
+    std::vector<std::string> timelines;
+    std::vector<std::pair<std::string,double>> eligibilityQueries;
+    std::set<std::string> disabledControls;
+    int validations=0;
+    std::string FocusedControl() const {return selected;}
+    unsigned long long StateRevision() const {return 0;}
+    struct Stats {unsigned long long activeContexts=1;};
+    Stats Statistics() const {return {};}
+    bool FocusControl(const std::string& name,double) {selected=name; return true;}
     static constexpr size_t MaxSnapshotBytes=128u*1024u*1024u;
     static inline std::map<std::string,StateValues> snapshots;
     bool loaded=true,failSave=false,failRestore=false,accept=false,pointer=false;
@@ -154,6 +204,36 @@ public:
     std::vector<std::pair<MenuInput,bool>> menu;
     bool SetState(const StateValues& values,std::string&,double) { state=values; return true; }
     StateValues GetState(bool=true) const { return state; }
+    bool HasEvent(const std::string& name) const { eventQueries.push_back(name); return eventPlans.contains(PresentationAliasKey(name)); }
+    bool RunEvent(const std::string& name,double,EventEffects& effects,std::string& error,
+                  const StateValues& application={},const ActionValidator& validate={},size_t maxActions=256) {
+        const auto key=PresentationAliasKey(name);
+        eventCalls.push_back({name,application,maxActions}); eventHistory.push_back(key);
+        auto found=eventPlans.find(key);
+        if(found==eventPlans.end() || found->second.fail) {error="stub event rejected"; return false;}
+        const auto& plan=found->second;
+        if(maxActions>256 || plan.invocations.size()>maxActions) {error="stub action budget exceeded"; return false;}
+        EventEffects candidate{plan.changes,plan.invocations};
+        StateValues next=state;
+        for(const auto& [id,value]:application)next[id]=value;
+        for(const auto& [id,value]:candidate.stateChanges)next[id]=value;
+        if(plan.pendingBrightness)candidate.actions.at(0).arguments["value"]=application.at("number");
+        if(validate)for(const auto& action:candidate.actions) {++validations; if(!validate(action,error))return false;}
+        state=std::move(next); effects=std::move(candidate);
+        if(!plan.disableControl.empty())disabledControls.insert(plan.disableControl);
+        return true;
+    }
+    bool CanActivateControl(const std::string& node,double seconds) {
+        eligibilityQueries.emplace_back(node,seconds); return !disabledControls.contains(node);
+    }
+    bool ResolveAction(const std::string& id,ActionInvocation& result,std::string& error) const {
+        resolvedActions.push_back(id);
+        return modelTemplate.ResolveAction(id,state,result,error,[&](const std::string& alias,int component,StateValue& value,std::string& why) {
+            auto found=aliases.find(alias);
+            if(found==aliases.end() || component!=-1) {why="stub presentation lookup failed"; return false;}
+            value=std::stod(found->second); return true;
+        });
+    }
     bool SaveSnapshot(std::string& output,std::string&,double) const {
         if(failSave)return false;
         output="snapshot-"+std::to_string(snapshots.size()); snapshots.emplace(output,state); return true;
@@ -167,18 +247,18 @@ public:
     std::vector<ControlAction> TakeActions() { std::vector<ControlAction> result; result.swap(actions); return result; }
     void PointerButton(bool down,double) {
         if(down)pointer=true;
-        else if(pointer) { pointer=false; actions.push_back({ControlAction::Kind::Activate,"doc","button",selected}); }
+        else if(pointer) { pointer=false; actions.push_back({ControlAction::Kind::Activate,modelTemplate.id,"button",selected}); }
     }
     void MenuAction(MenuInput action,bool down,double) {
         menu.emplace_back(action,down);
         if(action==MenuInput::Accept) {
             if(down)accept=true;
-            else if(accept) { accept=false; actions.push_back({ControlAction::Kind::Activate,"doc","button",selected}); }
+            else if(accept) { accept=false; actions.push_back({ControlAction::Kind::Activate,modelTemplate.id,"button",selected}); }
         }
-        if(action==MenuInput::Back && down)actions.push_back({ControlAction::Kind::Back,"doc","button",""});
+        if(action==MenuInput::Back && down)actions.push_back({ControlAction::Kind::Back,modelTemplate.id,"button",""});
     }
     void PointerMove(float x,float y,double) { pointerX=x; pointerY=y; }
-    bool PlayTimeline(const std::string&,double) { return true; }
+    bool PlayTimeline(const std::string& name,double) { timelines.push_back(name); return name=="slide"; }
     bool PopModal(double) { if(!modals)return false; --modals; return true; }
     bool GetPresentationAlias(const std::string& name,std::string& output) const {
         aliasReads.push_back(name);
@@ -362,7 +442,253 @@ static std::string Frame(const std::vector<std::pair<std::string,std::string>>& 
     frame.WriteUnsignedInt(SaveTag); frame.WriteInt(1); frame.WriteInt(payload.Length()); frame.Write(payload.GetDataPtr(),payload.Length());
     return frame.bytes;
 }
+static ActionInvocation Brightness(double value) {return {"program.brightness","settings.brightness.set",{{"value",value}}};}
+static ActionInvocation Shadows(bool value) {return {"program.shadows","settings.shadows.set",{{"value",value}}};}
+static void Drain(idUserInterfaceRetained& gui,const std::vector<std::pair<std::string,double>>& expected,bool expectedClose=false) {
+    const auto before=cvars.history.size(); bool close=false;
+    assert(gui.DispatchApplicationActions(gui.PendingApplicationCommand(),close) && close==expectedClose);
+    assert(cvars.history.size()==before+expected.size());
+    for(size_t i=0;i<expected.size();++i) {
+        const auto& actual=cvars.history[before+i];
+        assert(actual.first==expected[i].first && std::abs(actual.second-expected[i].second)<.00001);
+    }
+    assert(!*gui.PendingApplicationCommand());
+    gui.DispatchApplicationActions(ActionMarker,close);
+    assert(!close && cvars.history.size()==before+expected.size());
+}
+static bool Semantic(idUserInterfaceRetained& gui,const char* input,bool down) {
+    return UI_RetainedDiagnostic(&gui,idCmdArgs{{"openq4_retainedGui","menu",input,down?"1":"0"}});
+}
+static void CheckEventBridge() {
+    assert(views.empty()); cvars=CVars{}; consoleObject.open=false; windowFocused=true;
+    eventPlans={{"batch",{{{"flag",false}},{Brightness(0),Shadows(false),Brightness(1.4)},true}},
+                {"tail",{{},{Brightness(.9)}}}};
+    eventHistory.clear();
+    {
+        idUserInterfaceRetained gui;
+        assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0);
+        gui.SetStateString("number","1.7500"); gui.SetStateString("text","pending ; data");
+        gui.SetStateString("unrelated","unmodified"); gui.SetStateString("host","caller cannot own this");
+        assert(std::get<double>(Live().state.at("number"))==1);
+        gui.HandleNamedEvent("BaTcH");
+        assert(Live().eventCalls.size()==1 && Live().eventCalls.back().name=="BaTcH");
+        assert(Live().eventCalls.back().maxActions==256 && Live().validations==3);
+        const auto& application=Live().eventCalls.back().application;
+        assert(std::get<double>(application.at("number"))==1.75 && !application.contains("host"));
+        assert(std::get<std::string>(application.at("text"))=="pending ; data");
+        assert(std::get<double>(Live().state.at("number"))==1.75 && !gui.GetStateBool("flag"));
+        assert(std::string(gui.GetStateString("number"))=="1.7500" &&
+               std::string(gui.GetStateString("unrelated"))=="unmodified" &&
+               std::string(gui.GetStateString("host"))=="caller cannot own this");
+        assert(cvars.writes==0 && !std::strcmp(gui.PendingApplicationCommand(),ActionMarker));
+        // Captured invocations remain immutable if the caller changes state before draining.
+        gui.SetStateFloat("number",1.6f); gui.StateChanged(0);
+        bool close=false; gui.DispatchApplicationActions("quit; set r_gamma 99",close);
+        assert(cvars.writes==0 && *gui.PendingApplicationCommand());
+        Drain(gui,{{"r_brightness",1.75},{"r_shadows",0},{"r_brightness",1.4}});
+
+        // One collected sequence can mix physical actions and a completed program.
+        Live().actions={{ControlAction::Kind::Activate,modelTemplate.id,"button","brightness",""},
+                        {ControlAction::Kind::Activate,modelTemplate.id,"button","","batch"},
+                        {ControlAction::Kind::Activate,modelTemplate.id,"button","shadows",""}};
+        sysEvent_t tick{}; gui.HandleEvent(&tick,0,nullptr); gui.HandleNamedEvent("tail");
+        assert(Live().resolvedActions.size()==2 && Live().resolvedActions[0]=="brightness" && Live().resolvedActions[1]=="shadows");
+        assert(Live().eventCalls[1].maxActions==255 && Live().eventCalls[2].maxActions==251);
+        Drain(gui,{{"r_brightness",1.6},{"r_brightness",1.6},{"r_shadows",0},
+                   {"r_brightness",1.4},{"r_shadows",0},{"r_brightness",.9}});
+
+        // The global pump may run before another input event or redraw. It must
+        // discard a stale physical click while retaining program and diagnostic effects.
+        for(bool focusLoss:{false,true}) {
+            gui.HandleNamedEvent("tail"); Key(gui,K_ENTER,true); Key(gui,K_ENTER,false);
+            assert(Semantic(gui,"accept",true) && Semantic(gui,"accept",false));
+            if(focusLoss)windowFocused=false; else consoleObject.open=true;
+            assert(*gui.PendingApplicationCommand());
+            Drain(gui,{{"r_brightness",.9},{"r_brightness",1.6}});
+            assert(Semantic(gui,"back",true) && Semantic(gui,"back",false));
+            Drain(gui,{},true);
+            windowFocused=true; consoleObject.open=false; gui.HandleEvent(&tick,0,nullptr);
+        }
+
+        // Complete programs are discarded at resource replacement and never replayed.
+        for(auto event:{retainedUIViewEvent_t::BeforeResourceReset,retainedUIViewEvent_t::Failed}) {
+            gui.HandleNamedEvent("tail"); const auto before=eventHistory.size();
+            views.front()->callback(views.front()->owner,event);
+            views.front()->callback(views.front()->owner,retainedUIViewEvent_t::Restored);
+            assert(!*gui.PendingApplicationCommand() && eventHistory.size()==before); Drain(gui,{});
+        }
+        gui.HandleNamedEvent("tail"); idFile_Memory saved; assert(gui.WriteToSaveGame(&saved));
+        idFile_Memory restore("programs",saved.GetDataPtr(),saved.Length());
+        assert(gui.ReadFromSaveGame(&restore)); Drain(gui,{});
+        gui.HandleNamedEvent("tail"); assert(gui.InitFromFile("test.q4ui")); Drain(gui,{});
+        gui.HandleNamedEvent("tail"); assert(gui.InitFromFile("next.q4ui")); Drain(gui,{});
+
+        // Validation is real adapter code; late rejection leaves runtime, public
+        // dictionary and FIFO unchanged. No partial CVar write can escape.
+        eventPlans["invalid"]={{{"number",.8}},{Brightness(1.1),Brightness(9)}};
+        gui.HandleNamedEvent("tail");
+        const auto oldState=Live().state; const auto oldDictionary=Dictionary(gui);
+        const int oldWrites=cvars.writes,oldValidations=Live().validations;
+        gui.HandleNamedEvent("invalid");
+        assert(Live().validations==oldValidations+2 && Live().state==oldState && Dictionary(gui)==oldDictionary);
+        assert(*gui.PendingApplicationCommand() && cvars.writes==oldWrites);
+        Drain(gui,{{"r_brightness",.9}});
+        gui.SetStateString("number","invalid pending number");
+        const auto calls=Live().eventCalls.size(); gui.HandleNamedEvent("tail");
+        assert(Live().eventCalls.size()==calls && !*gui.PendingApplicationCommand());
+        gui.SetStateString("number","1.6000");
+        const auto beforeUnknown=Dictionary(gui); const auto beforeQueries=Live().eventQueries.size();
+        gui.HandleNamedEvent(nullptr); assert(Live().eventQueries.size()==beforeQueries);
+        gui.HandleNamedEvent("missing");
+        assert(Live().timelines.back()=="missing" && Live().eventCalls.size()==calls && Dictionary(gui)==beforeUnknown);
+        Live().loaded=false; gui.HandleNamedEvent("tail");
+        assert(Live().eventCalls.size()==calls); Live().loaded=true;
+
+        // Capacity is passed to Runtime before publication; committed programs
+        // remain intact when a later whole program cannot fit.
+        eventPlans["full"]={{},std::vector<ActionInvocation>(256,{"dismiss","ui.dismiss",{}})};
+        gui.HandleNamedEvent("full"); gui.HandleNamedEvent("tail");
+        assert(Live().eventCalls.back().maxActions==0 && *gui.PendingApplicationCommand()); Drain(gui,{},true);
+    }
+    eventPlans.clear(); eventHistory.clear();
+    {
+        // ResolveAction delegates through Runtime's presentation-aware lookup.
+        auto saved=modelTemplate.actions.at("brightness");
+        auto& expression=modelTemplate.actions["brightness"].arguments["value"];
+        expression.state.clear(); expression.presentation="setting";
+        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0);
+        Live().aliases["setting"]="1.3"; Key(gui,K_ENTER,true); Key(gui,K_ENTER,false);
+        assert(Live().resolvedActions==std::vector<std::string>{"brightness"}); Drain(gui,{{"r_brightness",1.3}});
+        modelTemplate.actions["brightness"]=std::move(saved);
+    }
+    {
+        eventPlans={{"oninit",{{{"number",1.125}},{Brightness(1.125)}}},
+                    {"onactivate",{{},{Shadows(false)}}}, {"ondeactivate",{{},{Brightness(.9)}}},
+                    {"ontrigger",{{},{Brightness(1.7)}}}};
+        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui") && eventHistory.empty());
+        assert(*gui.Activate(true,0)); gui.Redraw(0); gui.Redraw(0);
+        assert(eventHistory==std::vector<std::string>({"onactivate","oninit"}));
+        assert(gui.GetStateFloat("number")==1.125f); Drain(gui,{{"r_shadows",0},{"r_brightness",1.125}});
+        gui.Trigger(0); assert(*gui.Activate(false,0)); Drain(gui,{{"r_brightness",1.7},{"r_brightness",.9}});
+        const auto beforeReload=eventHistory.size();
+        assert(gui.InitFromFile("test.q4ui")); gui.Redraw(0); assert(eventHistory.size()==beforeReload);
+        idFile_Memory save; assert(gui.WriteToSaveGame(&save));
+        idFile_Memory restored("lifecycle",save.GetDataPtr(),save.Length());
+        assert(gui.ReadFromSaveGame(&restored)); gui.Redraw(0); assert(eventHistory.size()==beforeReload);
+        views.front()->callback(views.front()->owner,retainedUIViewEvent_t::BeforeResourceReset);
+        views.front()->callback(views.front()->owner,retainedUIViewEvent_t::Restored);
+        gui.Redraw(0); assert(eventHistory.size()==beforeReload);
+        assert(gui.InitFromFile("next.q4ui")); eventPlans["oninit"].fail=true;
+        gui.Redraw(0); assert(eventHistory.size()==beforeReload+1 && !*gui.PendingApplicationCommand());
+        eventPlans["oninit"].fail=false; gui.Redraw(0); gui.Redraw(0);
+        assert(eventHistory.size()==beforeReload+2); Drain(gui,{{"r_brightness",1.125}});
+    }
+    eventHistory.clear();
+    {
+        // Restoring a GUI that has never drawn must still suppress automatic init.
+        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui"));
+        idFile_Memory save; assert(gui.WriteToSaveGame(&save));
+        idFile_Memory restored("before-init",save.GetDataPtr(),save.Length());
+        assert(gui.ReadFromSaveGame(&restored)); gui.Redraw(0);
+        assert(eventHistory.empty() && !*gui.PendingApplicationCommand());
+    }
+    eventPlans.clear(); eventHistory.clear();
+    std::string error;
+    assert(ValidInvocation(Brightness(.5),error) && ValidInvocation(Brightness(2),error));
+    assert(!ValidInvocation(Brightness(std::numeric_limits<double>::infinity()),error));
+    assert(!ValidInvocation({"x","settings.brightness.set",{{"value",true}}},error));
+    assert(!ValidInvocation({"x","ui.dismiss",{{"value",1.0}}},error));
+    assert(!ValidInvocation({"x","exec",{}},error));
+    auto eventControl=modelTemplate; eventControl.events["selected"]={"selected",{}};
+    eventControl.root.control->action.clear(); eventControl.root.control->event="SELECTED";
+    assert(ValidateApplication(eventControl,error)); eventControl.events.clear(); assert(!ValidateApplication(eventControl,error));
+    assert(views.empty());
+}
+static void CheckEventEligibility() {
+    assert(views.empty());
+    const auto originalModel=modelTemplate;
+    modelTemplate.state["noninteractive"]={false,""};
+    eventPlans={{"tail",{{},{Brightness(.9)}}},
+                {"disable",{{{"noninteractive",true}},{Brightness(1.25)}}},
+                {"invalidate",{{},{Shadows(false)}}}};
+    eventPlans["invalidate"].disableControl="later";
+    sysEvent_t tick{};
+    {
+        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0);
+        gui.HandleNamedEvent("tail"); Live().modals=1;
+        Live().actions={{ControlAction::Kind::Activate,"stale-document","button","brightness",""},
+                        {ControlAction::Kind::Back,"stale-document","button","",""},
+                        {ControlAction::Kind::Activate,modelTemplate.id,"button","","invalidate"},
+                        {ControlAction::Kind::Activate,modelTemplate.id,"later","brightness",""},
+                        {ControlAction::Kind::Activate,modelTemplate.id,"later","","tail"},
+                        {ControlAction::Kind::Back,modelTemplate.id,"later","",""}};
+        gui.HandleEvent(&tick,0,nullptr);
+        assert((Live().eligibilityQueries==std::vector<std::pair<std::string,double>>({
+            {"button",presentationTime},{"later",presentationTime},{"later",presentationTime}})));
+        assert(Live().eventCalls.size()==2 && Live().resolvedActions.empty() && Live().modals==0);
+        // A committed program survives; stale document records never reach
+        // eligibility/modal checks, and current Back does not require a control.
+        Drain(gui,{{"r_brightness",.9},{"r_shadows",0}});
+    }
+    {
+        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0);
+        Key(gui,K_ENTER,true); Key(gui,K_ENTER,false); // Pending physical invocation.
+        gui.SetStateString("noninteractive","true");
+        assert(gui.IsInteractive() && !std::get<bool>(Live().state.at("noninteractive")));
+        gui.HandleNamedEvent("tail");
+        assert(!gui.IsInteractive() && !gui.HasInteractiveOverride());
+        assert(std::get<bool>(Live().eventCalls.back().application.at("noninteractive")) &&
+               std::get<bool>(Live().state.at("noninteractive")));
+        assert(std::string(gui.GetStateString("noninteractive"))=="true");
+        Drain(gui,{{"r_brightness",.9}}); // Quarantine removed the physical action only.
+        gui.SetStateString("noninteractive","false"); gui.HandleNamedEvent("tail");
+        assert(gui.IsInteractive() && !gui.HasInteractiveOverride()); Drain(gui,{{"r_brightness",.9}});
+    }
+    {
+        idUserInterfaceRetained gui; gui.SetStateString("noninteractive","true");
+        assert(gui.InitFromFile("test.q4ui") && !gui.IsInteractive());
+        gui.SetStateString("noninteractive","false"); gui.StateChanged(0); assert(gui.IsInteractive());
+        gui.SetStateString("noninteractive","1"); gui.StateChanged(0); assert(!gui.IsInteractive());
+        gui.SetStateString("noninteractive","0"); gui.StateChanged(0); assert(gui.IsInteractive());
+    }
+    {
+        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0);
+        Key(gui,K_ENTER,true); Key(gui,K_ENTER,false);
+        gui.HandleNamedEvent("tail"); Live().modals=1;
+        const auto checked=Live().eligibilityQueries.size();
+        Live().actions={{ControlAction::Kind::Activate,modelTemplate.id,"button","","disable"},
+                        {ControlAction::Kind::Activate,modelTemplate.id,"later","brightness",""},
+                        {ControlAction::Kind::Activate,modelTemplate.id,"later","","tail"},
+                        {ControlAction::Kind::Back,modelTemplate.id,"later","",""}};
+        gui.HandleEvent(&tick,0,nullptr);
+        assert(!gui.IsInteractive() && gui.GetStateBool("noninteractive") && !gui.HasInteractiveOverride());
+        assert(Live().eligibilityQueries.size()==checked+1 && Live().eventCalls.size()==2 && Live().modals==1);
+        // The first program disables interactivity. Later activation, program
+        // and Back records from the already-collected batch are all skipped.
+        Drain(gui,{{"r_brightness",.9},{"r_brightness",1.25}});
+    }
+    for(bool interactive:{false,true}) {
+        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0);
+        gui.SetInteractive(interactive); gui.SetStateBool("noninteractive",true);
+        gui.HandleNamedEvent("disable");
+        assert(gui.HasInteractiveOverride() && gui.IsInteractive()==interactive && gui.GetStateBool("noninteractive"));
+        const auto queries=Live().eligibilityQueries.size();
+        assert(Semantic(gui,"accept",true) && Semantic(gui,"accept",false));
+        assert(Live().eligibilityQueries.size()==queries+(interactive?1:0));
+        if(interactive)Drain(gui,{{"r_brightness",1.25},{"r_brightness",1}});
+        else Drain(gui,{{"r_brightness",1.25}});
+    }
+    eventPlans.clear(); eventHistory.clear(); modelTemplate=originalModel;
+    // Undeclared legacy numeric flags retain the dictionary's nonzero behavior.
+    for(const char* value:{"2","-1"}) {
+        idUserInterfaceRetained gui; gui.SetStateString("noninteractive",value);
+        assert(gui.InitFromFile("test.q4ui") && !gui.IsInteractive());
+        gui.SetStateString("noninteractive","0"); gui.StateChanged(0); assert(gui.IsInteractive());
+    }
+    assert(views.empty());
+}
 int main() {
+    modelTemplate.id="adapter-document";
     modelTemplate.state={{"number",{1.0,""}},{"flag",{true,""}},{"text",{std::string("default"),""}},{"host",{1.0,"host_cvar"}}};
     Expression number; number.type=0; number.state="number";
     Expression flag; flag.type=1; flag.state="flag";
@@ -497,7 +823,9 @@ int main() {
     unsafe=modelTemplate; unsafe.actions["brightness"].arguments["extra"]=Expression{}; assert(!ValidateApplication(unsafe,error));
     unsafe=modelTemplate; unsafe.state["NUMBER"]={1.0,""}; assert(!ValidateApplication(unsafe,error));
     unsafe=modelTemplate; unsafe.state["NaMe"]={1.0,""}; assert(!ValidateApplication(unsafe,error));
-    std::puts("Retained adapter: presentation alias delegation/fallback/atomic failure, pending/committed state, framed saves/sentinel/truncation atomicity, typed actions, cancellation/repeat and cursor mapping passed");
+    CheckEventBridge();
+    CheckEventEligibility();
+    std::puts("Retained adapter: ordered event/FIFO publication, lifecycle/restore suppression, pending dictionary, presentation delegation, framed save atomicity, actions, suspension and cursor mapping passed");
 }
 '''
 
@@ -513,7 +841,8 @@ def main():
     code += function_body(managed, 'class idUserInterfaceManaged :') + ';\n'
     code += function_body(header, 'class idUserInterfaceRetained final :') + ';\n' + BASE
     code += function_body(factory, 'bool UI_IsRetainedPath(')
-    code += source[source.index('namespace {'):source.index('bool UI_RetainedDiagnostic(')] + MAIN
+    code += source[source.index('namespace {'):source.index('bool UI_RetainedDiagnostic(')]
+    code += function_body(source, 'bool UI_RetainedDiagnostic(') + MAIN
     compiler = next((found for name in ('clang++', 'g++', 'c++') if (found := shutil.which(name))), None)
     if not compiler:
         raise RuntimeError('C++ compiler required')

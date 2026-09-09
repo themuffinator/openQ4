@@ -61,7 +61,7 @@ void Interaction::Pointer(bool down) {
 		if (!pointerHeld) return;
 		pointerHeld = false;
 		if (pointerArm && !armed.empty()) {
-			if (armed == hovered && Eligible(armed)) Queue({ControlAction::Kind::Activate,document,armed,items.at(armed).control.action});
+			if (armed == hovered && Eligible(armed)) Queue({ControlAction::Kind::Activate,document,armed,items.at(armed).control.action,items.at(armed).control.event});
 			armed.clear();
 		}
 	}
@@ -77,7 +77,7 @@ void Interaction::Input(MenuInput input, bool down) {
 			if (!acceptHeld) return;
 			acceptHeld = false;
 			if (!pointerArm && !armed.empty()) {
-				if (armed == focused && Eligible(armed)) Queue({ControlAction::Kind::Activate,document,armed,items.at(armed).control.action});
+				if (armed == focused && Eligible(armed)) Queue({ControlAction::Kind::Activate,document,armed,items.at(armed).control.action,items.at(armed).control.event});
 				armed.clear();
 			}
 		}

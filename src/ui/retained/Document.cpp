@@ -200,7 +200,7 @@ public:
 	Validator(const std::string& text, std::vector<Diagnostic>& errors) : source(text), diagnostics(errors) {}
 	DocumentModel Read(const Json::Value& root) {
 		FiniteTree(root,"");
-		Fields(root,"",{"format","version","id","tokens","root","timelines","state","bindings","actions","presentationVariables","aliases","editor","extensions"});
+		Fields(root,"",{"format","version","id","tokens","root","timelines","state","bindings","actions","presentationVariables","aliases","events","editor","extensions"});
 		Require(root["format"] == "openq4-ui",root,"/format","Expected format 'openq4-ui'");
 		Require(root["version"].isUInt() && root["version"].asUInt() == 1,root["version"],"/version","Unsupported document version; expected 1");
 		model.id = Id(root["id"],"/id");
@@ -213,7 +213,6 @@ public:
 			}
 		}
 		ReadState(root);
-		ReadActions(root);
 		ReadPresentationVariables(root);
 		model.root = ReadNode(root["root"],"/root",0);
 		if (root.isMember("timelines")) {
@@ -225,9 +224,11 @@ public:
 				model.timelines.push_back(std::move(timeline));
 			}
 		}
-		ValidateControls(root["root"],model.root,"/root",false);
 		ReadBindings(root);
 		ReadAliases(root);
+		ReadActions(root);
+		ReadEvents(root);
+		ValidateControls(root["root"],model.root,"/root",false);
 		State initial; std::string stateError;
 		Require(initial.Reset(model,stateError),root["bindings"],"/bindings",stateError);
 		return std::move(model);
@@ -256,7 +257,7 @@ private:
 			model.state.emplace(name,std::move(declaration));
 		}
 	}
-	Expression ReadExpression(const Json::Value& value, const std::string& path, unsigned depth = 0) {
+	Expression ReadExpression(const Json::Value& value, const std::string& path, unsigned depth = 0, bool allowPresentation = false) {
 		Require(depth <= 32 && ++expressionCount <= 65536,value,path,"Expression node/depth budget exceeded");
 		Expression result;
 		if (value.isNumeric()) result.literal = Numeric(value,path,-1000000000000.0,1000000000000.0);
@@ -267,6 +268,24 @@ private:
 			const auto found = model.state.find(result.state);
 			Require(found != model.state.end(),value,path,"Unknown state reference '"+result.state+"'");
 			result.type = found->second.initial.index(); return result;
+		} else if (value.isObject() && value.isMember("presentation")) {
+			Fields(value,path,{"presentation","component","extensions"});
+			Require(allowPresentation,value,path,"Presentation references are allowed only in actions and events");
+			Require(value["presentation"].isString(),value["presentation"],path+"/presentation","Expected a presentation alias name");
+			result.presentation = value["presentation"].asString();
+			const auto type = PresentationAliasType(model,result.presentation);
+			Require(type.has_value(),value["presentation"],path+"/presentation","Unknown or unsupported presentation alias");
+			if (*type >= PresentationType::Vector2) {
+				const int count = static_cast<int>(*type)-static_cast<int>(PresentationType::Vector2)+2;
+				Require((value["component"].type() == Json::intValue || value["component"].type() == Json::uintValue) &&
+					value["component"].isUInt() && value["component"].asUInt() < static_cast<unsigned>(count),
+					value["component"],path+"/component","Vector presentation reads require an in-range component index");
+				result.component = value["component"].asInt(); result.type = 0;
+			} else {
+				Require(!value.isMember("component"),value["component"],path+"/component","Scalar presentation reads cannot select a component");
+				result.type = *type == PresentationType::Boolean ? 1 : *type == PresentationType::String ? 2 : 0;
+			}
+			return result;
 		} else {
 			Fields(value,path,{"op","args","decimals","extensions"});
 			Require(value["op"].isString(),value,path+"/op","Expected an expression operation");
@@ -277,7 +296,7 @@ private:
 			const auto arity = arities.find(result.op);
 			Require(arity != arities.end(),value["op"],path+"/op","Unknown expression operation");
 			Require(value["args"].isArray() && value["args"].size() == arity->second,value["args"],path+"/args","Incorrect expression arity");
-			for (Json::ArrayIndex i = 0; i < value["args"].size(); ++i) result.args.push_back(ReadExpression(value["args"][i],path+"/args/"+std::to_string(i),depth+1));
+			for (Json::ArrayIndex i = 0; i < value["args"].size(); ++i) result.args.push_back(ReadExpression(value["args"][i],path+"/args/"+std::to_string(i),depth+1,allowPresentation));
 			auto types = [&](size_t expected) { return std::all_of(result.args.begin(),result.args.end(),[&](const Expression& arg) { return arg.type == expected; }); };
 			if (result.op == "select") {
 				Require(result.args[0].type == 1 && result.args[1].type == result.args[2].type,value,path,"Select requires a boolean condition and matching branches"); result.type = result.args[1].type;
@@ -414,13 +433,109 @@ private:
 			for (const auto& name : arguments.getMemberNames()) {
 				const auto at = path+"/arguments/"+PointerPart(name);
 				Require(Identifier(name),arguments[name],at,"Invalid action argument name");
-				action.arguments.emplace(name,ReadExpression(arguments[name],at));
+				action.arguments.emplace(name,ReadExpression(arguments[name],at,0,true));
 			}
 			model.actions.emplace(id,std::move(action));
 		}
 	}
+	std::string EventName(const Json::Value& value, const std::string& path) {
+		Require(value.isString(),value,path,"Expected a public event or alias name");
+		const auto key = PresentationAliasKey(value.asString());
+		Require(!key.empty(),value,path,"Expected one identifier or a qualified name outside gui::");
+		return key;
+	}
+	std::vector<EventStep> ReadSteps(const Json::Value& values, const std::string& path, unsigned depth) {
+		Require(values.isArray(),values,path,"Expected an ordered event step array");
+		Require(depth <= 32,values,path,"Event structural depth exceeds 32");
+		std::vector<EventStep> result;
+		for (Json::ArrayIndex i = 0; i < values.size(); ++i) {
+			const auto& value = values[i]; const auto at = path+"/"+std::to_string(i);
+			Require(++eventStepCount <= 8192,value,at,"Event step count exceeds 8192");
+			Require(value.isObject() && value["op"].isString(),value,at,"Expected an event operation object");
+			EventStep step; const auto op = value["op"].asString();
+			if (op == "setState") {
+				Fields(value,at,{"op","values","extensions"}); step.op = EventOp::SetState;
+				const auto& batch = value["values"];
+				Require(batch.isObject() && batch.size() <= 4096,batch,at+"/values","Expected at most 4096 application state values");
+				for (const auto& id : batch.getMemberNames()) {
+					const auto p = at+"/values/"+PointerPart(id); const auto found = model.state.find(id);
+					Require(found != model.state.end() && found->second.cvar.empty(),batch[id],p,"Event writes require declared application-owned state");
+					auto expression = ReadExpression(batch[id],p,0,true);
+					Require(expression.type == found->second.initial.index(),batch[id],p,"Event state expression has the wrong type");
+					step.values.emplace(id,std::move(expression));
+				}
+			} else if (op == "setPresentation") {
+				Fields(value,at,{"op","alias","value","overrideExpression","extensions"}); step.op = EventOp::SetPresentation;
+				step.target = EventName(value["alias"],at+"/alias");
+				const auto type = PresentationAliasType(model,step.target);
+				Require(type.has_value(),value["alias"],at+"/alias","Unknown or unsupported presentation alias");
+				Require(value["overrideExpression"].isBool(),value["overrideExpression"],at+"/overrideExpression","Presentation writes require an explicit Boolean ownership flag");
+				step.overrideExpression = value["overrideExpression"].asBool();
+				const bool vector = *type >= PresentationType::Vector2;
+				const size_t count = vector ? static_cast<size_t>(*type)-static_cast<size_t>(PresentationType::Vector2)+2 : 1;
+				const size_t expected = *type == PresentationType::Boolean ? 1 : *type == PresentationType::String ? 2 : 0;
+				const auto& expressions = value["value"];
+				Require(!vector || (expressions.isArray() && expressions.size() == count),expressions,at+"/value","Presentation event tuple has the wrong component count");
+				for (size_t j = 0; j < count; ++j) {
+					const auto p = at+"/value"+(vector ? "/"+std::to_string(j) : "");
+					const auto& part = vector ? expressions[static_cast<Json::ArrayIndex>(j)] : expressions;
+					auto expression = ReadExpression(part,p,0,true);
+					Require(expression.type == expected,part,p,"Presentation event expression has the wrong type");
+					const auto& alias = model.aliases.at(step.target);
+					if (alias.property == "text") Require(LocalizedTextResult(expression),part,p,"Literal display text must use localization keys");
+					step.presentation.push_back(std::move(expression));
+				}
+			} else if (op == "action") {
+				Fields(value,at,{"op","action","extensions"}); step.op = EventOp::Action;
+				step.target = Id(value["action"],at+"/action");
+				Require(model.actions.contains(step.target),value["action"],at+"/action","Unknown event action descriptor");
+			} else if (op == "call") {
+				Fields(value,at,{"op","event","extensions"}); step.op = EventOp::Call;
+				step.target = EventName(value["event"],at+"/event");
+				Require(model.events.contains(step.target),value["event"],at+"/event","Unknown called event");
+			} else if (op == "if") {
+				Fields(value,at,{"op","condition","then","else","extensions"}); step.op = EventOp::If;
+				step.condition = ReadExpression(value["condition"],at+"/condition",0,true);
+				Require(step.condition.type == 1,value["condition"],at+"/condition","Event condition requires a Boolean expression");
+				step.thenSteps = ReadSteps(value["then"],at+"/then",depth+1);
+				if (value.isMember("else")) step.elseSteps = ReadSteps(value["else"],at+"/else",depth+1);
+			} else {
+				const bool cancel = op == "cancelTimeline";
+				if (cancel) Fields(value,at,{"op","timeline","policy","extensions"});
+				else Fields(value,at,{"op","timeline","extensions"});
+				static const std::map<std::string,EventOp> timelineOps = {{"playTimeline",EventOp::PlayTimeline},
+					{"pauseTimeline",EventOp::PauseTimeline},{"resumeTimeline",EventOp::ResumeTimeline},{"cancelTimeline",EventOp::CancelTimeline}};
+				const auto found = timelineOps.find(op);
+				Require(found != timelineOps.end(),value["op"],at+"/op","Unknown event operation"); step.op = found->second;
+				step.target = Id(value["timeline"],at+"/timeline");
+				Require(std::any_of(model.timelines.begin(),model.timelines.end(),[&](const Timeline& item) { return item.id == step.target; }),
+					value["timeline"],at+"/timeline","Unknown event timeline");
+				if (cancel) {
+					Require(value["policy"] == "hold" || value["policy"] == "base",value["policy"],at+"/policy","Timeline cancellation requires hold or base policy");
+					step.restoreBase = value["policy"] == "base";
+				}
+			}
+			result.push_back(std::move(step));
+		}
+		return result;
+	}
+	void ReadEvents(const Json::Value& root) {
+		if (!root.isMember("events")) return;
+		const auto& events = root["events"];
+		Require(events.isObject() && events.size() <= 1024,events,"/events","Expected at most 1024 named event programs");
+		// Declare every name first: forward and recursive calls are legal. The
+		// behavior executor bounds dynamic call depth and total executed steps.
+		for (const auto& name : events.getMemberNames()) {
+			const auto path = "/events/"+PointerPart(name); const auto key = PresentationAliasKey(name);
+			Require(!key.empty(),events[name],path,"Expected one event identifier or a qualified name outside gui::");
+			Require(!model.events.contains(key),events[name],path,"Event names collide after case folding");
+			model.events.emplace(key,EventProgram{name,{}});
+		}
+		for (const auto& name : events.getMemberNames())
+			model.events.at(PresentationAliasKey(name)).steps = ReadSteps(events[name],"/events/"+PointerPart(name),0);
+	}
 	bool LocalizedTextResult(const Expression& expression) const {
-		if (!expression.state.empty() || expression.op == "numberText") return true;
+		if (!expression.state.empty() || !expression.presentation.empty() || expression.op == "numberText") return true;
 		if (expression.op == "select") return LocalizedTextResult(expression.args[1]) && LocalizedTextResult(expression.args[2]);
 		if (!expression.op.empty() || expression.type != 2) return false;
 		const auto& text = std::get<std::string>(expression.literal);
@@ -632,10 +747,12 @@ private:
 		result.type = value["type"].asString();
 		if (value.isMember("control")) {
 			const auto& control = value["control"]; const auto p = path+"/control";
-			Fields(control,p,{"role","action","label","enabled","states","navigation","extensions"});
+			Fields(control,p,{"role","action","event","label","enabled","states","navigation","extensions"});
 			Require(control["role"] == "button",control["role"],p+"/role","Supported control role is button");
 			result.control.emplace(); auto& parsed = *result.control;
-			parsed.action = Id(control["action"],p+"/action");
+			Require(control.isMember("action") != control.isMember("event"),control,p,"Controls require exactly one action or event");
+			if (control.isMember("action")) parsed.action = Id(control["action"],p+"/action");
+			else parsed.event = EventName(control["event"],p+"/event");
 			Require(control["label"].isString(),control["label"],p+"/label","Button requires a #str_ accessible label");
 			parsed.label = control["label"].asString();
 			Require(parsed.label.starts_with("#str_") && Identifier(parsed.label.substr(1)),control["label"],p+"/label","Button label must reference a #str_ localization key");
@@ -707,6 +824,7 @@ private:
 		if (node.control) {
 			const auto& value = sourceNode["control"]; const auto p = path+"/control";
 			Require(!ancestorControl,value,p,"Button controls cannot be nested inside another button");
+			Require(node.control->event.empty() || model.events.contains(node.control->event),value["event"],p+"/event","Unknown control event");
 			std::set<std::string> descendants;
 			std::vector<const Node*> nodes{&node};
 			while (!nodes.empty()) { const auto* child = nodes.back(); nodes.pop_back(); descendants.insert(child->id); for (const auto& next : child->children) nodes.push_back(&next); }
@@ -797,6 +915,7 @@ private:
 	std::vector<Diagnostic>& diagnostics;
 	DocumentModel model;
 	size_t expressionCount = 0;
+	size_t eventStepCount = 0;
 	std::set<std::string> nodeIds;
 	unsigned nodeCount = 0;
 };
@@ -916,6 +1035,45 @@ bool ParseStateValues(const std::string& source, StateValues& values, std::vecto
 	values = std::move(candidate); return true;
 }
 const Node* DocumentModel::FindNode(const std::string& id) const { return Find(root,id); }
+std::optional<PresentationType> PresentationAliasType(const DocumentModel& model, const std::string& name) {
+	const auto key = PresentationAliasKey(name);
+	if (key.empty()) return std::nullopt;
+	const auto found = model.aliases.find(key);
+	if (found == model.aliases.end()) return std::nullopt;
+	const auto& alias = found->second;
+	if (!alias.variable.empty()) {
+		const auto variable = model.presentationVariables.find(alias.variable);
+		if (!alias.node.empty() || !alias.property.empty() || !alias.shown.empty() || variable == model.presentationVariables.end() ||
+			!ValidPresentationValue(variable->second.initial)) return std::nullopt;
+		return variable->second.initial.type;
+	}
+	const auto* node = model.FindNode(alias.node);
+	if (!node || (alias.property != "visible" && !alias.shown.empty())) return std::nullopt;
+	if (alias.property == "rect") {
+		for (const auto* property : {"left","top","width","height"}) {
+			const auto value = node->properties.find(property);
+			if (value == node->properties.end() || value->second.type != ValueType::Length ||
+				value->second.unit != "dp" || !ValidProperty(property,value->second)) return std::nullopt;
+		}
+		return PresentationType::Vector4;
+	}
+	const std::string property = alias.property == "visible" ? "display" : alias.property == "noevents" ? "pointer-events" : alias.property;
+	const auto value = node->properties.find(property);
+	if (value == node->properties.end() || !ValidProperty(property,value->second)) return std::nullopt;
+	const auto& base = value->second;
+	if (alias.property == "visible" || alias.property == "noevents") {
+		if (base.type != ValueType::Keyword) return std::nullopt;
+		if (alias.property == "visible") {
+			Value shown = base; shown.text = alias.shown;
+			if (shown.text == "none" || !ValidProperty("display",shown)) return std::nullopt;
+		}
+		return PresentationType::Boolean;
+	}
+	if (base.type == ValueType::Number || (base.type == ValueType::Length && (base.unit == "dp" || base.unit == "px"))) return PresentationType::Number;
+	if (base.type == ValueType::Colour) return PresentationType::Vector4;
+	if (base.type == ValueType::Text || base.type == ValueType::Keyword || base.type == ValueType::Font) return PresentationType::String;
+	return std::nullopt;
+}
 struct Document::Impl { std::string source; Json::Value root; DocumentModel model; };
 Document::Document() : impl(std::make_unique<Impl>()) {}
 Document::~Document() = default;

@@ -1,0 +1,3889 @@
+// Authored vector controls adapted from presentation-alias-smoke.q4ui.
+// Bounded ordered-event qualification; no shipped menu replacement acceptance.
+{
+  "format": "openq4-ui",
+  "version": 1,
+  "id": "event-program-smoke",
+  "tokens": {
+    "marine.olive": {
+      "type": "color",
+      "value": [
+        0.5451,
+        0.5882,
+        0.2941,
+        1
+      ]
+    },
+    "marine.orange": {
+      "type": "color",
+      "value": [
+        0.8902,
+        0.5373,
+        0,
+        1
+      ]
+    },
+    "marine.panel": {
+      "type": "color",
+      "value": [
+        0.0902,
+        0.1098,
+        0.0706,
+        0.9333
+      ]
+    },
+    "space.frame": {
+      "type": "length",
+      "value": 24,
+      "unit": "dp"
+    }
+  },
+  "root": {
+    "id": "screen",
+    "type": "group",
+    "properties": {
+      "width": {
+        "type": "length",
+        "value": 100,
+        "unit": "%"
+      },
+      "height": {
+        "type": "length",
+        "value": 100,
+        "unit": "%"
+      },
+      "font-family": {
+        "type": "font",
+        "value": "marine"
+      },
+      "font-size": {
+        "type": "length",
+        "value": 18,
+        "unit": "dp"
+      },
+      "color": {
+        "type": "color",
+        "value": [
+          1,
+          1,
+          1,
+          0.8
+        ]
+      },
+      "background-color": {
+        "type": "color",
+        "value": [
+          0.25,
+          0.3,
+          0.35,
+          1
+        ]
+      }
+    },
+    "children": [
+      {
+        "id": "managed-panel",
+        "type": "vector",
+        "properties": {
+          "position": {
+            "type": "keyword",
+            "value": "absolute"
+          },
+          "left": {
+            "type": "length",
+            "value": 24,
+            "unit": "dp"
+          },
+          "top": {
+            "type": "length",
+            "value": 32,
+            "unit": "dp"
+          },
+          "width": {
+            "type": "length",
+            "value": 432,
+            "unit": "dp"
+          },
+          "padding": {
+            "type": "token",
+            "value": "space.frame"
+          },
+          "opacity": {
+            "type": "number",
+            "value": 1
+          },
+          "transform": {
+            "type": "transform",
+            "unit": "dp",
+            "value": [
+              0,
+              0,
+              1,
+              1,
+              0
+            ]
+          },
+          "height": {
+            "type": "length",
+            "value": 200,
+            "unit": "dp"
+          },
+          "display": {
+            "type": "keyword",
+            "value": "block"
+          },
+          "pointer-events": {
+            "type": "keyword",
+            "value": "auto"
+          }
+        },
+        "children": [
+          {
+            "id": "managed-title",
+            "type": "text",
+            "properties": {
+              "text": {
+                "type": "text",
+                "value": "#str_200009"
+              },
+              "font-size": {
+                "type": "length",
+                "value": 28,
+                "unit": "dp"
+              },
+              "line-height": {
+                "type": "length",
+                "value": 34,
+                "unit": "dp"
+              },
+              "margin-bottom": {
+                "type": "length",
+                "value": 20,
+                "unit": "dp"
+              },
+              "color": {
+                "type": "color",
+                "value": [
+                  1,
+                  1,
+                  1,
+                  1
+                ]
+              }
+            }
+          },
+          {
+            "id": "managed-brightness",
+            "type": "vector",
+            "properties": {
+              "height": {
+                "type": "length",
+                "value": 40,
+                "unit": "dp"
+              },
+              "line-height": {
+                "type": "length",
+                "value": 40,
+                "unit": "dp"
+              },
+              "margin-bottom": {
+                "type": "length",
+                "value": 8,
+                "unit": "dp"
+              },
+              "opacity": {
+                "type": "number",
+                "value": 1
+              },
+              "position": {
+                "type": "keyword",
+                "value": "relative"
+              }
+            },
+            "paths": [
+              {
+                "id": "action-plate",
+                "commands": [
+                  {
+                    "id": "p0",
+                    "op": "move",
+                    "points": [
+                      [
+                        0,
+                        0
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "p1",
+                    "op": "line",
+                    "points": [
+                      [
+                        {
+                          "fraction": 1,
+                          "dp": 0
+                        },
+                        0
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "p2",
+                    "op": "line",
+                    "points": [
+                      [
+                        {
+                          "fraction": 1,
+                          "dp": 0
+                        },
+                        {
+                          "fraction": 1,
+                          "dp": 0
+                        }
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "p3",
+                    "op": "line",
+                    "points": [
+                      [
+                        12,
+                        {
+                          "fraction": 1,
+                          "dp": 0
+                        }
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "p4",
+                    "op": "line",
+                    "points": [
+                      [
+                        0,
+                        {
+                          "fraction": 1,
+                          "dp": -12
+                        }
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "close",
+                    "op": "close"
+                  }
+                ],
+                "fill": {
+                  "type": "solid",
+                  "color": {
+                    "type": "color",
+                    "value": [
+                      0.8902,
+                      0.5373,
+                      0,
+                      0.62
+                    ]
+                  }
+                }
+              },
+              {
+                "id": "leading-bottom-rail",
+                "commands": [
+                  {
+                    "id": "start",
+                    "op": "move",
+                    "points": [
+                      [
+                        0.5,
+                        0.5
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "lower-left",
+                    "op": "line",
+                    "points": [
+                      [
+                        0.5,
+                        {
+                          "fraction": 1,
+                          "dp": -12.5
+                        }
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "cut",
+                    "op": "line",
+                    "points": [
+                      [
+                        12.5,
+                        {
+                          "fraction": 1,
+                          "dp": -0.5
+                        }
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "end",
+                    "op": "line",
+                    "points": [
+                      [
+                        {
+                          "fraction": 1,
+                          "dp": -0.5
+                        },
+                        {
+                          "fraction": 1,
+                          "dp": -0.5
+                        }
+                      ]
+                    ]
+                  }
+                ],
+                "stroke": {
+                  "paint": {
+                    "type": "linear",
+                    "from": [
+                      0,
+                      0
+                    ],
+                    "to": [
+                      {
+                        "fraction": 1,
+                        "dp": 0
+                      },
+                      0
+                    ],
+                    "stops": [
+                      {
+                        "at": 0,
+                        "color": {
+                          "type": "color",
+                          "value": [
+                            0.8902,
+                            0.5373,
+                            0,
+                            1
+                          ]
+                        }
+                      },
+                      {
+                        "at": 1,
+                        "color": {
+                          "type": "color",
+                          "value": [
+                            0.8902,
+                            0.5373,
+                            0,
+                            0
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  "widthDp": 1,
+                  "minimumPixels": 1,
+                  "join": "miter"
+                }
+              },
+              {
+                "id": "triangle-marker",
+                "commands": [
+                  {
+                    "id": "p0",
+                    "op": "move",
+                    "points": [
+                      [
+                        12,
+                        16
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "p1",
+                    "op": "line",
+                    "points": [
+                      [
+                        20,
+                        20
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "p2",
+                    "op": "line",
+                    "points": [
+                      [
+                        12,
+                        24
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "close",
+                    "op": "close"
+                  }
+                ],
+                "fill": {
+                  "type": "solid",
+                  "color": {
+                    "type": "color",
+                    "value": [
+                      0.8902,
+                      0.5373,
+                      0,
+                      1
+                    ]
+                  }
+                }
+              }
+            ],
+            "children": [
+              {
+                "id": "managed-brightness-label",
+                "type": "text",
+                "properties": {
+                  "text": {
+                    "type": "text",
+                    "value": "#str_200148"
+                  },
+                  "line-height": {
+                    "type": "length",
+                    "value": 40,
+                    "unit": "dp"
+                  },
+                  "padding-left": {
+                    "type": "length",
+                    "value": 28,
+                    "unit": "dp"
+                  },
+                  "color": {
+                    "type": "color",
+                    "value": [
+                      0.92,
+                      0.94,
+                      0.85,
+                      1
+                    ]
+                  },
+                  "transform": {
+                    "type": "transform",
+                    "value": [
+                      0,
+                      0,
+                      1,
+                      1,
+                      0
+                    ],
+                    "unit": "dp"
+                  },
+                  "padding-right": {
+                    "type": "length",
+                    "value": 88,
+                    "unit": "dp"
+                  }
+                }
+              },
+              {
+                "id": "managed-brightness-focus",
+                "type": "vector",
+                "properties": {
+                  "position": {
+                    "type": "keyword",
+                    "value": "absolute"
+                  },
+                  "left": {
+                    "type": "length",
+                    "value": 3,
+                    "unit": "dp"
+                  },
+                  "top": {
+                    "type": "length",
+                    "value": 3,
+                    "unit": "dp"
+                  },
+                  "right": {
+                    "type": "length",
+                    "value": 3,
+                    "unit": "dp"
+                  },
+                  "bottom": {
+                    "type": "length",
+                    "value": 3,
+                    "unit": "dp"
+                  },
+                  "width": {
+                    "type": "keyword",
+                    "value": "auto"
+                  },
+                  "height": {
+                    "type": "keyword",
+                    "value": "auto"
+                  },
+                  "opacity": {
+                    "type": "number",
+                    "value": 0
+                  }
+                },
+                "paths": [
+                  {
+                    "id": "shape",
+                    "commands": [
+                      {
+                        "id": "p0",
+                        "op": "move",
+                        "points": [
+                          [
+                            0.5,
+                            0.5
+                          ]
+                        ]
+                      },
+                      {
+                        "id": "p1",
+                        "op": "line",
+                        "points": [
+                          [
+                            {
+                              "fraction": 1,
+                              "dp": -0.5
+                            },
+                            0.5
+                          ]
+                        ]
+                      },
+                      {
+                        "id": "p2",
+                        "op": "line",
+                        "points": [
+                          [
+                            {
+                              "fraction": 1,
+                              "dp": -0.5
+                            },
+                            {
+                              "fraction": 1,
+                              "dp": -0.5
+                            }
+                          ]
+                        ]
+                      },
+                      {
+                        "id": "p3",
+                        "op": "line",
+                        "points": [
+                          [
+                            9.5,
+                            {
+                              "fraction": 1,
+                              "dp": -0.5
+                            }
+                          ]
+                        ]
+                      },
+                      {
+                        "id": "p4",
+                        "op": "line",
+                        "points": [
+                          [
+                            0.5,
+                            {
+                              "fraction": 1,
+                              "dp": -9.5
+                            }
+                          ]
+                        ]
+                      },
+                      {
+                        "id": "close",
+                        "op": "close"
+                      }
+                    ],
+                    "stroke": {
+                      "widthDp": 1,
+                      "minimumPixels": 1,
+                      "paint": {
+                        "type": "solid",
+                        "color": {
+                          "type": "color",
+                          "value": [
+                            1,
+                            0.58,
+                            0,
+                            1
+                          ]
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "brightness-reading",
+                "type": "text",
+                "properties": {
+                  "position": {
+                    "type": "keyword",
+                    "value": "absolute"
+                  },
+                  "right": {
+                    "type": "length",
+                    "value": 12,
+                    "unit": "dp"
+                  },
+                  "top": {
+                    "type": "length",
+                    "value": 0,
+                    "unit": "dp"
+                  },
+                  "text": {
+                    "type": "text",
+                    "value": "#str_200148"
+                  },
+                  "text-align": {
+                    "type": "keyword",
+                    "value": "right"
+                  }
+                }
+              }
+            ],
+            "control": {
+              "role": "button",
+              "label": "#str_200148",
+              "enabled": true,
+              "states": {
+                "default": "managed-brightness.default",
+                "hover": "managed-brightness.hover",
+                "focus": "managed-brightness.focus",
+                "pressed": "managed-brightness.pressed",
+                "disabled": "managed-brightness.disabled"
+              },
+              "event": "control::brightness"
+            }
+          },
+          {
+            "id": "managed-shadows",
+            "type": "vector",
+            "properties": {
+              "height": {
+                "type": "length",
+                "value": 40,
+                "unit": "dp"
+              },
+              "line-height": {
+                "type": "length",
+                "value": 40,
+                "unit": "dp"
+              },
+              "margin-bottom": {
+                "type": "length",
+                "value": 8,
+                "unit": "dp"
+              },
+              "opacity": {
+                "type": "number",
+                "value": 1
+              },
+              "position": {
+                "type": "keyword",
+                "value": "relative"
+              }
+            },
+            "paths": [
+              {
+                "id": "action-plate",
+                "commands": [
+                  {
+                    "id": "p0",
+                    "op": "move",
+                    "points": [
+                      [
+                        0,
+                        0
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "p1",
+                    "op": "line",
+                    "points": [
+                      [
+                        {
+                          "fraction": 1,
+                          "dp": 0
+                        },
+                        0
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "p2",
+                    "op": "line",
+                    "points": [
+                      [
+                        {
+                          "fraction": 1,
+                          "dp": 0
+                        },
+                        {
+                          "fraction": 1,
+                          "dp": 0
+                        }
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "p3",
+                    "op": "line",
+                    "points": [
+                      [
+                        12,
+                        {
+                          "fraction": 1,
+                          "dp": 0
+                        }
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "p4",
+                    "op": "line",
+                    "points": [
+                      [
+                        0,
+                        {
+                          "fraction": 1,
+                          "dp": -12
+                        }
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "close",
+                    "op": "close"
+                  }
+                ],
+                "fill": {
+                  "type": "solid",
+                  "color": {
+                    "type": "color",
+                    "value": [
+                      0.5451,
+                      0.5882,
+                      0.2941,
+                      0.28
+                    ]
+                  }
+                }
+              },
+              {
+                "id": "leading-bottom-rail",
+                "commands": [
+                  {
+                    "id": "start",
+                    "op": "move",
+                    "points": [
+                      [
+                        0.5,
+                        0.5
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "lower-left",
+                    "op": "line",
+                    "points": [
+                      [
+                        0.5,
+                        {
+                          "fraction": 1,
+                          "dp": -12.5
+                        }
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "cut",
+                    "op": "line",
+                    "points": [
+                      [
+                        12.5,
+                        {
+                          "fraction": 1,
+                          "dp": -0.5
+                        }
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "end",
+                    "op": "line",
+                    "points": [
+                      [
+                        {
+                          "fraction": 1,
+                          "dp": -0.5
+                        },
+                        {
+                          "fraction": 1,
+                          "dp": -0.5
+                        }
+                      ]
+                    ]
+                  }
+                ],
+                "stroke": {
+                  "paint": {
+                    "type": "linear",
+                    "from": [
+                      0,
+                      0
+                    ],
+                    "to": [
+                      {
+                        "fraction": 1,
+                        "dp": 0
+                      },
+                      0
+                    ],
+                    "stops": [
+                      {
+                        "at": 0,
+                        "color": {
+                          "type": "color",
+                          "value": [
+                            0.5451,
+                            0.5882,
+                            0.2941,
+                            1
+                          ]
+                        }
+                      },
+                      {
+                        "at": 1,
+                        "color": {
+                          "type": "color",
+                          "value": [
+                            0.5451,
+                            0.5882,
+                            0.2941,
+                            0
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  "widthDp": 1,
+                  "minimumPixels": 1,
+                  "join": "miter"
+                }
+              },
+              {
+                "id": "triangle-marker",
+                "commands": [
+                  {
+                    "id": "p0",
+                    "op": "move",
+                    "points": [
+                      [
+                        12,
+                        16
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "p1",
+                    "op": "line",
+                    "points": [
+                      [
+                        20,
+                        20
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "p2",
+                    "op": "line",
+                    "points": [
+                      [
+                        12,
+                        24
+                      ]
+                    ]
+                  },
+                  {
+                    "id": "close",
+                    "op": "close"
+                  }
+                ],
+                "fill": {
+                  "type": "solid",
+                  "color": {
+                    "type": "color",
+                    "value": [
+                      0.5451,
+                      0.5882,
+                      0.2941,
+                      0.4
+                    ]
+                  }
+                }
+              }
+            ],
+            "children": [
+              {
+                "id": "managed-shadows-label",
+                "type": "text",
+                "properties": {
+                  "text": {
+                    "type": "text",
+                    "value": "#str_200160"
+                  },
+                  "line-height": {
+                    "type": "length",
+                    "value": 40,
+                    "unit": "dp"
+                  },
+                  "padding-left": {
+                    "type": "length",
+                    "value": 28,
+                    "unit": "dp"
+                  },
+                  "color": {
+                    "type": "color",
+                    "value": [
+                      0.92,
+                      0.94,
+                      0.85,
+                      1
+                    ]
+                  },
+                  "transform": {
+                    "type": "transform",
+                    "value": [
+                      0,
+                      0,
+                      1,
+                      1,
+                      0
+                    ],
+                    "unit": "dp"
+                  },
+                  "padding-right": {
+                    "type": "length",
+                    "value": 88,
+                    "unit": "dp"
+                  }
+                }
+              },
+              {
+                "id": "managed-shadows-focus",
+                "type": "vector",
+                "properties": {
+                  "position": {
+                    "type": "keyword",
+                    "value": "absolute"
+                  },
+                  "left": {
+                    "type": "length",
+                    "value": 3,
+                    "unit": "dp"
+                  },
+                  "top": {
+                    "type": "length",
+                    "value": 3,
+                    "unit": "dp"
+                  },
+                  "right": {
+                    "type": "length",
+                    "value": 3,
+                    "unit": "dp"
+                  },
+                  "bottom": {
+                    "type": "length",
+                    "value": 3,
+                    "unit": "dp"
+                  },
+                  "width": {
+                    "type": "keyword",
+                    "value": "auto"
+                  },
+                  "height": {
+                    "type": "keyword",
+                    "value": "auto"
+                  },
+                  "opacity": {
+                    "type": "number",
+                    "value": 0
+                  }
+                },
+                "paths": [
+                  {
+                    "id": "shape",
+                    "commands": [
+                      {
+                        "id": "p0",
+                        "op": "move",
+                        "points": [
+                          [
+                            0.5,
+                            0.5
+                          ]
+                        ]
+                      },
+                      {
+                        "id": "p1",
+                        "op": "line",
+                        "points": [
+                          [
+                            {
+                              "fraction": 1,
+                              "dp": -0.5
+                            },
+                            0.5
+                          ]
+                        ]
+                      },
+                      {
+                        "id": "p2",
+                        "op": "line",
+                        "points": [
+                          [
+                            {
+                              "fraction": 1,
+                              "dp": -0.5
+                            },
+                            {
+                              "fraction": 1,
+                              "dp": -0.5
+                            }
+                          ]
+                        ]
+                      },
+                      {
+                        "id": "p3",
+                        "op": "line",
+                        "points": [
+                          [
+                            9.5,
+                            {
+                              "fraction": 1,
+                              "dp": -0.5
+                            }
+                          ]
+                        ]
+                      },
+                      {
+                        "id": "p4",
+                        "op": "line",
+                        "points": [
+                          [
+                            0.5,
+                            {
+                              "fraction": 1,
+                              "dp": -9.5
+                            }
+                          ]
+                        ]
+                      },
+                      {
+                        "id": "close",
+                        "op": "close"
+                      }
+                    ],
+                    "stroke": {
+                      "widthDp": 1,
+                      "minimumPixels": 1,
+                      "paint": {
+                        "type": "solid",
+                        "color": {
+                          "type": "color",
+                          "value": [
+                            1,
+                            0.58,
+                            0,
+                            1
+                          ]
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "shadows-reading",
+                "type": "text",
+                "properties": {
+                  "position": {
+                    "type": "keyword",
+                    "value": "absolute"
+                  },
+                  "right": {
+                    "type": "length",
+                    "value": 12,
+                    "unit": "dp"
+                  },
+                  "top": {
+                    "type": "length",
+                    "value": 0,
+                    "unit": "dp"
+                  },
+                  "text": {
+                    "type": "text",
+                    "value": "#str_200158"
+                  },
+                  "text-align": {
+                    "type": "keyword",
+                    "value": "right"
+                  }
+                }
+              }
+            ],
+            "control": {
+              "role": "button",
+              "label": "#str_200160",
+              "enabled": true,
+              "states": {
+                "default": "managed-shadows.default",
+                "hover": "managed-shadows.hover",
+                "focus": "managed-shadows.focus",
+                "pressed": "managed-shadows.pressed",
+                "disabled": "managed-shadows.disabled"
+              },
+              "event": "control::shadows"
+            }
+          },
+          {
+            "id": "brightness-target-reading",
+            "type": "text",
+            "properties": {
+              "text": {
+                "type": "text",
+                "value": "#str_200148"
+              },
+              "display": {
+                "type": "keyword",
+                "value": "none"
+              }
+            }
+          },
+          {
+            "id": "shadows-target-reading",
+            "type": "text",
+            "properties": {
+              "text": {
+                "type": "text",
+                "value": "#str_200160"
+              },
+              "display": {
+                "type": "keyword",
+                "value": "none"
+              }
+            }
+          }
+        ],
+        "paths": [
+          {
+            "id": "inset-plate",
+            "commands": [
+              {
+                "id": "p0",
+                "op": "move",
+                "points": [
+                  [
+                    12,
+                    0
+                  ]
+                ]
+              },
+              {
+                "id": "p1",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1,
+                      "dp": -12
+                    },
+                    0
+                  ]
+                ]
+              },
+              {
+                "id": "p2",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1,
+                      "dp": 0
+                    },
+                    12
+                  ]
+                ]
+              },
+              {
+                "id": "p3",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1,
+                      "dp": 0
+                    },
+                    {
+                      "fraction": 1,
+                      "dp": -8
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p4",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1,
+                      "dp": -8
+                    },
+                    {
+                      "fraction": 1,
+                      "dp": 0
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p5",
+                "op": "line",
+                "points": [
+                  [
+                    8,
+                    {
+                      "fraction": 1,
+                      "dp": 0
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p6",
+                "op": "line",
+                "points": [
+                  [
+                    0,
+                    {
+                      "fraction": 1,
+                      "dp": -8
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p7",
+                "op": "line",
+                "points": [
+                  [
+                    0,
+                    12
+                  ]
+                ]
+              },
+              {
+                "id": "close",
+                "op": "close"
+              }
+            ],
+            "fill": {
+              "type": "solid",
+              "color": {
+                "type": "color",
+                "value": [
+                  0.09,
+                  0.11,
+                  0.07,
+                  0.88
+                ]
+              }
+            }
+          },
+          {
+            "id": "outer-rail",
+            "commands": [
+              {
+                "id": "p0",
+                "op": "move",
+                "points": [
+                  [
+                    12.5,
+                    0.5
+                  ]
+                ]
+              },
+              {
+                "id": "p1",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1,
+                      "dp": -12.5
+                    },
+                    0.5
+                  ]
+                ]
+              },
+              {
+                "id": "p2",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1,
+                      "dp": -0.5
+                    },
+                    12.5
+                  ]
+                ]
+              },
+              {
+                "id": "p3",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1,
+                      "dp": -0.5
+                    },
+                    {
+                      "fraction": 1,
+                      "dp": -8.5
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p4",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1,
+                      "dp": -8.5
+                    },
+                    {
+                      "fraction": 1,
+                      "dp": -0.5
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p5",
+                "op": "line",
+                "points": [
+                  [
+                    8.5,
+                    {
+                      "fraction": 1,
+                      "dp": -0.5
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p6",
+                "op": "line",
+                "points": [
+                  [
+                    0.5,
+                    {
+                      "fraction": 1,
+                      "dp": -8.5
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p7",
+                "op": "line",
+                "points": [
+                  [
+                    0.5,
+                    12.5
+                  ]
+                ]
+              },
+              {
+                "id": "close",
+                "op": "close"
+              }
+            ],
+            "stroke": {
+              "paint": {
+                "type": "solid",
+                "color": {
+                  "type": "color",
+                  "value": [
+                    0.545,
+                    0.588,
+                    0.294,
+                    0.95
+                  ]
+                }
+              },
+              "widthDp": 1,
+              "minimumPixels": 1,
+              "join": "miter"
+            }
+          },
+          {
+            "id": "inner-rail",
+            "commands": [
+              {
+                "id": "p0",
+                "op": "move",
+                "points": [
+                  [
+                    13.5,
+                    3.5
+                  ]
+                ]
+              },
+              {
+                "id": "p1",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1,
+                      "dp": -13.5
+                    },
+                    3.5
+                  ]
+                ]
+              },
+              {
+                "id": "p2",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1,
+                      "dp": -3.5
+                    },
+                    13.5
+                  ]
+                ]
+              },
+              {
+                "id": "p3",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1,
+                      "dp": -3.5
+                    },
+                    {
+                      "fraction": 1,
+                      "dp": -9.5
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p4",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1,
+                      "dp": -9.5
+                    },
+                    {
+                      "fraction": 1,
+                      "dp": -3.5
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p5",
+                "op": "line",
+                "points": [
+                  [
+                    9.5,
+                    {
+                      "fraction": 1,
+                      "dp": -3.5
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p6",
+                "op": "line",
+                "points": [
+                  [
+                    3.5,
+                    {
+                      "fraction": 1,
+                      "dp": -9.5
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p7",
+                "op": "line",
+                "points": [
+                  [
+                    3.5,
+                    13.5
+                  ]
+                ]
+              },
+              {
+                "id": "close",
+                "op": "close"
+              }
+            ],
+            "stroke": {
+              "paint": {
+                "type": "solid",
+                "color": {
+                  "type": "color",
+                  "value": [
+                    0.545,
+                    0.588,
+                    0.294,
+                    0.28
+                  ]
+                }
+              },
+              "widthDp": 1,
+              "minimumPixels": 1,
+              "join": "miter"
+            }
+          },
+          {
+            "id": "header-wash",
+            "commands": [
+              {
+                "id": "p0",
+                "op": "move",
+                "points": [
+                  [
+                    15,
+                    4
+                  ]
+                ]
+              },
+              {
+                "id": "p1",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1,
+                      "dp": -15
+                    },
+                    4
+                  ]
+                ]
+              },
+              {
+                "id": "p2",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1,
+                      "dp": -4
+                    },
+                    15
+                  ]
+                ]
+              },
+              {
+                "id": "p3",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1,
+                      "dp": -4
+                    },
+                    62
+                  ]
+                ]
+              },
+              {
+                "id": "p4",
+                "op": "line",
+                "points": [
+                  [
+                    4,
+                    62
+                  ]
+                ]
+              },
+              {
+                "id": "p5",
+                "op": "line",
+                "points": [
+                  [
+                    4,
+                    15
+                  ]
+                ]
+              },
+              {
+                "id": "close",
+                "op": "close"
+              }
+            ],
+            "fill": {
+              "type": "linear",
+              "from": [
+                0,
+                0
+              ],
+              "to": [
+                {
+                  "fraction": 1,
+                  "dp": 0
+                },
+                0
+              ],
+              "stops": [
+                {
+                  "at": 0,
+                  "color": {
+                    "type": "color",
+                    "value": [
+                      0.545,
+                      0.588,
+                      0.294,
+                      0.16
+                    ]
+                  }
+                },
+                {
+                  "at": 1,
+                  "color": {
+                    "type": "color",
+                    "value": [
+                      0.545,
+                      0.588,
+                      0.294,
+                      0
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "timelines": [
+    {
+      "id": "managed-brightness.default",
+      "durationMs": 300,
+      "tracks": [
+        {
+          "node": "managed-brightness-focus",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 0
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 300,
+              "value": {
+                "type": "number",
+                "value": 0
+              }
+            }
+          ]
+        },
+        {
+          "node": "managed-brightness-label",
+          "property": "color",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "color",
+                "value": [
+                  0.92,
+                  0.94,
+                  0.85,
+                  1
+                ]
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 300,
+              "value": {
+                "type": "color",
+                "value": [
+                  0.92,
+                  0.94,
+                  0.85,
+                  1
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "node": "managed-brightness-label",
+          "property": "transform",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "transform",
+                "value": [
+                  0,
+                  0,
+                  1,
+                  1,
+                  0
+                ],
+                "unit": "dp"
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 300,
+              "value": {
+                "type": "transform",
+                "value": [
+                  0,
+                  0,
+                  1,
+                  1,
+                  0
+                ],
+                "unit": "dp"
+              }
+            }
+          ]
+        },
+        {
+          "node": "managed-brightness",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 1
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 300,
+              "value": {
+                "type": "number",
+                "value": 1
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "managed-brightness.hover",
+      "durationMs": 60,
+      "tracks": [
+        {
+          "node": "managed-brightness-focus",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 0
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 60,
+              "value": {
+                "type": "number",
+                "value": 0.35
+              }
+            }
+          ]
+        },
+        {
+          "node": "managed-brightness-label",
+          "property": "color",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "color",
+                "value": [
+                  0.92,
+                  0.94,
+                  0.85,
+                  1
+                ]
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 60,
+              "value": {
+                "type": "color",
+                "value": [
+                  1,
+                  0.75,
+                  0.4,
+                  1
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "node": "managed-brightness-label",
+          "property": "transform",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "transform",
+                "value": [
+                  0,
+                  0,
+                  1,
+                  1,
+                  0
+                ],
+                "unit": "dp"
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 60,
+              "value": {
+                "type": "transform",
+                "value": [
+                  0,
+                  0,
+                  1,
+                  1,
+                  0
+                ],
+                "unit": "dp"
+              }
+            }
+          ]
+        },
+        {
+          "node": "managed-brightness",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 1
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 60,
+              "value": {
+                "type": "number",
+                "value": 1
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "managed-brightness.focus",
+      "durationMs": 80,
+      "tracks": [
+        {
+          "node": "managed-brightness-focus",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 0
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 80,
+              "value": {
+                "type": "number",
+                "value": 1
+              }
+            }
+          ]
+        },
+        {
+          "node": "managed-brightness-label",
+          "property": "color",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "color",
+                "value": [
+                  0.92,
+                  0.94,
+                  0.85,
+                  1
+                ]
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 80,
+              "value": {
+                "type": "color",
+                "value": [
+                  1,
+                  0.85,
+                  0.6,
+                  1
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "node": "managed-brightness-label",
+          "property": "transform",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "transform",
+                "value": [
+                  0,
+                  0,
+                  1,
+                  1,
+                  0
+                ],
+                "unit": "dp"
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 80,
+              "value": {
+                "type": "transform",
+                "value": [
+                  0,
+                  0,
+                  1,
+                  1,
+                  0
+                ],
+                "unit": "dp"
+              }
+            }
+          ]
+        },
+        {
+          "node": "managed-brightness",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 1
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 80,
+              "value": {
+                "type": "number",
+                "value": 1
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "managed-brightness.pressed",
+      "durationMs": 60,
+      "tracks": [
+        {
+          "node": "managed-brightness-focus",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 0
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 60,
+              "value": {
+                "type": "number",
+                "value": 1
+              }
+            }
+          ]
+        },
+        {
+          "node": "managed-brightness-label",
+          "property": "color",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "color",
+                "value": [
+                  0.92,
+                  0.94,
+                  0.85,
+                  1
+                ]
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 60,
+              "value": {
+                "type": "color",
+                "value": [
+                  1,
+                  1,
+                  0.9,
+                  1
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "node": "managed-brightness-label",
+          "property": "transform",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "transform",
+                "value": [
+                  0,
+                  0,
+                  1,
+                  1,
+                  0
+                ],
+                "unit": "dp"
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 60,
+              "value": {
+                "type": "transform",
+                "value": [
+                  1,
+                  1,
+                  1,
+                  1,
+                  0
+                ],
+                "unit": "dp"
+              }
+            }
+          ]
+        },
+        {
+          "node": "managed-brightness",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 1
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 60,
+              "value": {
+                "type": "number",
+                "value": 1
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "managed-brightness.disabled",
+      "durationMs": 80,
+      "tracks": [
+        {
+          "node": "managed-brightness-focus",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 0
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 80,
+              "value": {
+                "type": "number",
+                "value": 0
+              }
+            }
+          ]
+        },
+        {
+          "node": "managed-brightness-label",
+          "property": "color",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "color",
+                "value": [
+                  0.92,
+                  0.94,
+                  0.85,
+                  1
+                ]
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 80,
+              "value": {
+                "type": "color",
+                "value": [
+                  0.6,
+                  0.62,
+                  0.54,
+                  1
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "node": "managed-brightness-label",
+          "property": "transform",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "transform",
+                "value": [
+                  0,
+                  0,
+                  1,
+                  1,
+                  0
+                ],
+                "unit": "dp"
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 80,
+              "value": {
+                "type": "transform",
+                "value": [
+                  0,
+                  0,
+                  1,
+                  1,
+                  0
+                ],
+                "unit": "dp"
+              }
+            }
+          ]
+        },
+        {
+          "node": "managed-brightness",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 1
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 80,
+              "value": {
+                "type": "number",
+                "value": 0.35
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "managed-shadows.default",
+      "durationMs": 300,
+      "tracks": [
+        {
+          "node": "managed-shadows-focus",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 0
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 300,
+              "value": {
+                "type": "number",
+                "value": 0
+              }
+            }
+          ]
+        },
+        {
+          "node": "managed-shadows-label",
+          "property": "color",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "color",
+                "value": [
+                  0.92,
+                  0.94,
+                  0.85,
+                  1
+                ]
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 300,
+              "value": {
+                "type": "color",
+                "value": [
+                  0.92,
+                  0.94,
+                  0.85,
+                  1
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "node": "managed-shadows-label",
+          "property": "transform",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "transform",
+                "value": [
+                  0,
+                  0,
+                  1,
+                  1,
+                  0
+                ],
+                "unit": "dp"
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 300,
+              "value": {
+                "type": "transform",
+                "value": [
+                  0,
+                  0,
+                  1,
+                  1,
+                  0
+                ],
+                "unit": "dp"
+              }
+            }
+          ]
+        },
+        {
+          "node": "managed-shadows",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 1
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 300,
+              "value": {
+                "type": "number",
+                "value": 1
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "managed-shadows.hover",
+      "durationMs": 60,
+      "tracks": [
+        {
+          "node": "managed-shadows-focus",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 0
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 60,
+              "value": {
+                "type": "number",
+                "value": 0.35
+              }
+            }
+          ]
+        },
+        {
+          "node": "managed-shadows-label",
+          "property": "color",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "color",
+                "value": [
+                  0.92,
+                  0.94,
+                  0.85,
+                  1
+                ]
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 60,
+              "value": {
+                "type": "color",
+                "value": [
+                  1,
+                  0.75,
+                  0.4,
+                  1
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "node": "managed-shadows-label",
+          "property": "transform",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "transform",
+                "value": [
+                  0,
+                  0,
+                  1,
+                  1,
+                  0
+                ],
+                "unit": "dp"
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 60,
+              "value": {
+                "type": "transform",
+                "value": [
+                  0,
+                  0,
+                  1,
+                  1,
+                  0
+                ],
+                "unit": "dp"
+              }
+            }
+          ]
+        },
+        {
+          "node": "managed-shadows",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 1
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 60,
+              "value": {
+                "type": "number",
+                "value": 1
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "managed-shadows.focus",
+      "durationMs": 80,
+      "tracks": [
+        {
+          "node": "managed-shadows-focus",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 0
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 80,
+              "value": {
+                "type": "number",
+                "value": 1
+              }
+            }
+          ]
+        },
+        {
+          "node": "managed-shadows-label",
+          "property": "color",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "color",
+                "value": [
+                  0.92,
+                  0.94,
+                  0.85,
+                  1
+                ]
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 80,
+              "value": {
+                "type": "color",
+                "value": [
+                  1,
+                  0.85,
+                  0.6,
+                  1
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "node": "managed-shadows-label",
+          "property": "transform",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "transform",
+                "value": [
+                  0,
+                  0,
+                  1,
+                  1,
+                  0
+                ],
+                "unit": "dp"
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 80,
+              "value": {
+                "type": "transform",
+                "value": [
+                  0,
+                  0,
+                  1,
+                  1,
+                  0
+                ],
+                "unit": "dp"
+              }
+            }
+          ]
+        },
+        {
+          "node": "managed-shadows",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 1
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 80,
+              "value": {
+                "type": "number",
+                "value": 1
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "managed-shadows.pressed",
+      "durationMs": 60,
+      "tracks": [
+        {
+          "node": "managed-shadows-focus",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 0
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 60,
+              "value": {
+                "type": "number",
+                "value": 1
+              }
+            }
+          ]
+        },
+        {
+          "node": "managed-shadows-label",
+          "property": "color",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "color",
+                "value": [
+                  0.92,
+                  0.94,
+                  0.85,
+                  1
+                ]
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 60,
+              "value": {
+                "type": "color",
+                "value": [
+                  1,
+                  1,
+                  0.9,
+                  1
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "node": "managed-shadows-label",
+          "property": "transform",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "transform",
+                "value": [
+                  0,
+                  0,
+                  1,
+                  1,
+                  0
+                ],
+                "unit": "dp"
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 60,
+              "value": {
+                "type": "transform",
+                "value": [
+                  1,
+                  1,
+                  1,
+                  1,
+                  0
+                ],
+                "unit": "dp"
+              }
+            }
+          ]
+        },
+        {
+          "node": "managed-shadows",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 1
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 60,
+              "value": {
+                "type": "number",
+                "value": 1
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "managed-shadows.disabled",
+      "durationMs": 80,
+      "tracks": [
+        {
+          "node": "managed-shadows-focus",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 0
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 80,
+              "value": {
+                "type": "number",
+                "value": 0
+              }
+            }
+          ]
+        },
+        {
+          "node": "managed-shadows-label",
+          "property": "color",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "color",
+                "value": [
+                  0.92,
+                  0.94,
+                  0.85,
+                  1
+                ]
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 80,
+              "value": {
+                "type": "color",
+                "value": [
+                  0.6,
+                  0.62,
+                  0.54,
+                  1
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "node": "managed-shadows-label",
+          "property": "transform",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "transform",
+                "value": [
+                  0,
+                  0,
+                  1,
+                  1,
+                  0
+                ],
+                "unit": "dp"
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 80,
+              "value": {
+                "type": "transform",
+                "value": [
+                  0,
+                  0,
+                  1,
+                  1,
+                  0
+                ],
+                "unit": "dp"
+              }
+            }
+          ]
+        },
+        {
+          "node": "managed-shadows",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 1
+              },
+              "easing": [
+                0.16,
+                1,
+                0.3,
+                1
+              ]
+            },
+            {
+              "atMs": 80,
+              "value": {
+                "type": "number",
+                "value": 0.35
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "editor": {
+    "zoom": 1,
+    "selection": [
+      "managed-panel"
+    ]
+  },
+  "extensions": {
+    "openq4.fixture": {
+      "productionDesign": false,
+      "interactive": true,
+      "nativeVectors": true,
+      "replacementAcceptance": false,
+      "purpose": "Ordered event, lifecycle, typed action and persistence qualification; two diagnostic buttons, not a complete settings page."
+    }
+  },
+  "state": {
+    "brightnessTarget": {
+      "type": "number",
+      "initial": 1.5
+    },
+    "shadowsTarget": {
+      "type": "boolean",
+      "initial": false
+    },
+    "brightness": {
+      "type": "number",
+      "initial": 1,
+      "cvar": "r_brightness"
+    },
+    "shadows": {
+      "type": "boolean",
+      "initial": true,
+      "cvar": "r_shadows"
+    },
+    "aliasSource": {
+      "type": "number",
+      "initial": 2
+    },
+    "aliasOpacity": {
+      "type": "number",
+      "initial": 1
+    },
+    "activationCount": {
+      "type": "number",
+      "initial": 0
+    },
+    "initCount": {
+      "type": "number",
+      "initial": 0
+    },
+    "triggerCount": {
+      "type": "number",
+      "initial": 0
+    },
+    "mainCount": {
+      "type": "number",
+      "initial": 0
+    },
+    "nestedCount": {
+      "type": "number",
+      "initial": 0
+    },
+    "blockedCount": {
+      "type": "number",
+      "initial": 0
+    },
+    "controlCount": {
+      "type": "number",
+      "initial": 0
+    },
+    "brightnessClicks": {
+      "type": "number",
+      "initial": 0
+    },
+    "deactivationCount": {
+      "type": "number",
+      "initial": 0
+    },
+    "seenPending": {
+      "type": "number",
+      "initial": 0
+    },
+    "seenWidth": {
+      "type": "number",
+      "initial": 0
+    },
+    "draft": {
+      "type": "number",
+      "initial": 2
+    },
+    "gate": {
+      "type": "boolean",
+      "initial": true
+    }
+  },
+  "actions": {
+    "settings.brightness": {
+      "operation": "settings.brightness.set",
+      "arguments": {
+        "value": {
+          "presentation": "brightness-request"
+        }
+      }
+    },
+    "settings.brightness.state": {
+      "operation": "settings.brightness.set",
+      "arguments": {
+        "value": {
+          "state": "brightnessTarget"
+        }
+      }
+    },
+    "settings.shadows": {
+      "operation": "settings.shadows.set",
+      "arguments": {
+        "value": {
+          "state": "shadowsTarget"
+        }
+      }
+    },
+    "dismiss": {
+      "operation": "ui.dismiss",
+      "arguments": {}
+    }
+  },
+  "bindings": [
+    {
+      "id": "brightness-readback",
+      "node": "brightness-reading",
+      "property": "text",
+      "value": {
+        "op": "numberText",
+        "args": [
+          {
+            "state": "brightness"
+          }
+        ],
+        "decimals": 2
+      }
+    },
+    {
+      "id": "shadows-readback",
+      "node": "shadows-reading",
+      "property": "text",
+      "value": {
+        "op": "select",
+        "args": [
+          {
+            "state": "shadows"
+          },
+          "#str_200157",
+          "#str_200158"
+        ]
+      }
+    },
+    {
+      "id": "brightness-target-check",
+      "node": "brightness-target-reading",
+      "property": "text",
+      "value": {
+        "op": "numberText",
+        "args": [
+          {
+            "state": "brightnessTarget"
+          }
+        ],
+        "decimals": 2
+      }
+    },
+    {
+      "id": "shadows-target-check",
+      "node": "shadows-target-reading",
+      "property": "text",
+      "value": {
+        "op": "numberText",
+        "args": [
+          {
+            "op": "select",
+            "args": [
+              {
+                "state": "shadowsTarget"
+              },
+              1,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "alias-opacity",
+      "node": "managed-panel",
+      "property": "opacity",
+      "value": {
+        "state": "aliasOpacity"
+      }
+    }
+  ],
+  "presentationVariables": {
+    "page": {
+      "type": "number",
+      "initial": 0,
+      "value": {
+        "state": "aliasSource"
+      }
+    },
+    "activationCountReading": {
+      "type": "number",
+      "initial": 0,
+      "value": {
+        "state": "activationCount"
+      }
+    },
+    "initCountReading": {
+      "type": "number",
+      "initial": 0,
+      "value": {
+        "state": "initCount"
+      }
+    },
+    "triggerCountReading": {
+      "type": "number",
+      "initial": 0,
+      "value": {
+        "state": "triggerCount"
+      }
+    },
+    "mainCountReading": {
+      "type": "number",
+      "initial": 0,
+      "value": {
+        "state": "mainCount"
+      }
+    },
+    "nestedCountReading": {
+      "type": "number",
+      "initial": 0,
+      "value": {
+        "state": "nestedCount"
+      }
+    },
+    "blockedCountReading": {
+      "type": "number",
+      "initial": 0,
+      "value": {
+        "state": "blockedCount"
+      }
+    },
+    "controlCountReading": {
+      "type": "number",
+      "initial": 0,
+      "value": {
+        "state": "controlCount"
+      }
+    },
+    "brightnessClicksReading": {
+      "type": "number",
+      "initial": 0,
+      "value": {
+        "state": "brightnessClicks"
+      }
+    },
+    "draftReading": {
+      "type": "number",
+      "initial": 0,
+      "value": {
+        "state": "draft"
+      }
+    },
+    "seenPendingReading": {
+      "type": "number",
+      "initial": 0,
+      "value": {
+        "state": "seenPending"
+      }
+    },
+    "seenWidthReading": {
+      "type": "number",
+      "initial": 0,
+      "value": {
+        "state": "seenWidth"
+      }
+    },
+    "brightnessRequest": {
+      "type": "number",
+      "initial": 1.25
+    }
+  },
+  "aliases": {
+    "curr": {
+      "variable": "page"
+    },
+    "desktop::curr": {
+      "variable": "page"
+    },
+    "panel::rect": {
+      "node": "managed-panel",
+      "property": "rect"
+    },
+    "panel::visible": {
+      "node": "managed-panel",
+      "property": "visible",
+      "shown": "block"
+    },
+    "panel::noevents": {
+      "node": "managed-panel",
+      "property": "noevents"
+    },
+    "panel::opacity": {
+      "node": "managed-panel",
+      "property": "opacity"
+    },
+    "title::color": {
+      "node": "managed-title",
+      "property": "color"
+    },
+    "title::text": {
+      "node": "managed-title",
+      "property": "text"
+    },
+    "activated": {
+      "variable": "activationCountReading"
+    },
+    "initialized": {
+      "variable": "initCountReading"
+    },
+    "triggered": {
+      "variable": "triggerCountReading"
+    },
+    "eventsSeen": {
+      "variable": "mainCountReading"
+    },
+    "nested": {
+      "variable": "nestedCountReading"
+    },
+    "blocked": {
+      "variable": "blockedCountReading"
+    },
+    "controls": {
+      "variable": "controlCountReading"
+    },
+    "brightnessClicks": {
+      "variable": "brightnessClicksReading"
+    },
+    "draftReading": {
+      "variable": "draftReading"
+    },
+    "seenPending": {
+      "variable": "seenPendingReading"
+    },
+    "seenWidth": {
+      "variable": "seenWidthReading"
+    },
+    "brightness-request": {
+      "variable": "brightnessRequest"
+    }
+  },
+  "events": {
+    "onActivate": [
+      {
+        "op": "setState",
+        "values": {
+          "activationCount": {
+            "op": "+",
+            "args": [
+              {
+                "state": "activationCount"
+              },
+              1
+            ]
+          },
+          "brightnessTarget": 1.25
+        }
+      },
+      {
+        "op": "action",
+        "action": "settings.brightness.state"
+      }
+    ],
+    "onInit": [
+      {
+        "op": "setState",
+        "values": {
+          "initCount": {
+            "op": "+",
+            "args": [
+              {
+                "state": "initCount"
+              },
+              1
+            ]
+          }
+        }
+      }
+    ],
+    "probe::main": [
+      {
+        "op": "setState",
+        "values": {
+          "seenPending": {
+            "state": "draft"
+          },
+          "draft": {
+            "op": "+",
+            "args": [
+              {
+                "state": "draft"
+              },
+              1
+            ]
+          },
+          "mainCount": {
+            "op": "+",
+            "args": [
+              {
+                "state": "mainCount"
+              },
+              1
+            ]
+          },
+          "seenWidth": {
+            "presentation": "panel::rect",
+            "component": 2
+          }
+        }
+      },
+      {
+        "op": "setState",
+        "values": {
+          "aliasSource": {
+            "state": "draft"
+          }
+        }
+      },
+      {
+        "op": "setPresentation",
+        "alias": "curr",
+        "value": {
+          "state": "aliasSource"
+        },
+        "overrideExpression": true
+      },
+      {
+        "op": "call",
+        "event": "probe::nested"
+      },
+      {
+        "op": "setPresentation",
+        "alias": "brightness-request",
+        "value": 1.5,
+        "overrideExpression": false
+      },
+      {
+        "op": "action",
+        "action": "settings.brightness"
+      },
+      {
+        "op": "setPresentation",
+        "alias": "brightness-request",
+        "value": 1.75,
+        "overrideExpression": false
+      },
+      {
+        "op": "action",
+        "action": "settings.brightness"
+      },
+      {
+        "op": "setPresentation",
+        "alias": "brightness-request",
+        "value": 0.75,
+        "overrideExpression": false
+      },
+      {
+        "op": "action",
+        "action": "settings.shadows"
+      },
+      {
+        "op": "setState",
+        "values": {
+          "shadowsTarget": true
+        }
+      },
+      {
+        "op": "playTimeline",
+        "timeline": "managed-brightness.hover"
+      },
+      {
+        "op": "pauseTimeline",
+        "timeline": "managed-brightness.hover"
+      },
+      {
+        "op": "resumeTimeline",
+        "timeline": "managed-brightness.hover"
+      },
+      {
+        "op": "cancelTimeline",
+        "timeline": "managed-brightness.hover",
+        "policy": "hold"
+      },
+      {
+        "op": "playTimeline",
+        "timeline": "managed-brightness.default"
+      },
+      {
+        "op": "cancelTimeline",
+        "timeline": "managed-brightness.default",
+        "policy": "base"
+      }
+    ],
+    "probe::nested": [
+      {
+        "op": "setState",
+        "values": {
+          "nestedCount": {
+            "op": "+",
+            "args": [
+              {
+                "state": "nestedCount"
+              },
+              1
+            ]
+          }
+        }
+      },
+      {
+        "op": "if",
+        "condition": {
+          "op": "||",
+          "args": [
+            true,
+            {
+              "op": ">",
+              "args": [
+                {
+                  "op": "/",
+                  "args": [
+                    1,
+                    0
+                  ]
+                },
+                0
+              ]
+            }
+          ]
+        },
+        "then": [
+          {
+            "op": "setPresentation",
+            "alias": "panel::rect",
+            "value": [
+              32,
+              32,
+              {
+                "presentation": "panel::rect",
+                "component": 2
+              },
+              200
+            ],
+            "overrideExpression": true
+          },
+          {
+            "op": "setPresentation",
+            "alias": "title::color",
+            "value": [
+              1,
+              0.875,
+              0.5,
+              1
+            ],
+            "overrideExpression": true
+          }
+        ],
+        "else": [
+          {
+            "op": "setState",
+            "values": {
+              "seenPending": 99
+            }
+          }
+        ]
+      }
+    ],
+    "control::shadows": [
+      {
+        "op": "if",
+        "condition": {
+          "state": "gate"
+        },
+        "then": [
+          {
+            "op": "setState",
+            "values": {
+              "controlCount": {
+                "op": "+",
+                "args": [
+                  {
+                    "state": "controlCount"
+                  },
+                  1
+                ]
+              },
+              "shadowsTarget": {
+                "op": "!",
+                "args": [
+                  {
+                    "state": "shadows"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "op": "action",
+            "action": "settings.shadows"
+          }
+        ],
+        "else": [
+          {
+            "op": "setState",
+            "values": {
+              "blockedCount": {
+                "op": "+",
+                "args": [
+                  {
+                    "state": "blockedCount"
+                  },
+                  1
+                ]
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "control::brightness": [
+      {
+        "op": "setState",
+        "values": {
+          "brightnessTarget": 1.25,
+          "brightnessClicks": {
+            "op": "+",
+            "args": [
+              {
+                "state": "brightnessClicks"
+              },
+              1
+            ]
+          }
+        }
+      },
+      {
+        "op": "action",
+        "action": "settings.brightness.state"
+      },
+      {
+        "op": "setState",
+        "values": {
+          "brightnessTarget": 1.75
+        }
+      }
+    ],
+    "onTrigger": [
+      {
+        "op": "setState",
+        "values": {
+          "triggerCount": {
+            "op": "+",
+            "args": [
+              {
+                "state": "triggerCount"
+              },
+              1
+            ]
+          }
+        }
+      },
+      {
+        "op": "setPresentation",
+        "alias": "curr",
+        "value": {
+          "op": "+",
+          "args": [
+            {
+              "presentation": "desktop::curr"
+            },
+            1
+          ]
+        },
+        "overrideExpression": false
+      }
+    ],
+    "probe::disturb": [
+      {
+        "op": "setState",
+        "values": {
+          "activationCount": {
+            "op": "+",
+            "args": [
+              {
+                "state": "activationCount"
+              },
+              5
+            ]
+          },
+          "initCount": {
+            "op": "+",
+            "args": [
+              {
+                "state": "initCount"
+              },
+              5
+            ]
+          },
+          "triggerCount": {
+            "op": "+",
+            "args": [
+              {
+                "state": "triggerCount"
+              },
+              5
+            ]
+          },
+          "mainCount": {
+            "op": "+",
+            "args": [
+              {
+                "state": "mainCount"
+              },
+              5
+            ]
+          },
+          "nestedCount": {
+            "op": "+",
+            "args": [
+              {
+                "state": "nestedCount"
+              },
+              5
+            ]
+          },
+          "blockedCount": {
+            "op": "+",
+            "args": [
+              {
+                "state": "blockedCount"
+              },
+              5
+            ]
+          },
+          "controlCount": {
+            "op": "+",
+            "args": [
+              {
+                "state": "controlCount"
+              },
+              5
+            ]
+          },
+          "brightnessClicks": {
+            "op": "+",
+            "args": [
+              {
+                "state": "brightnessClicks"
+              },
+              5
+            ]
+          },
+          "draft": {
+            "op": "+",
+            "args": [
+              {
+                "state": "draft"
+              },
+              1
+            ]
+          },
+          "seenPending": 0,
+          "seenWidth": 0,
+          "shadowsTarget": false,
+          "brightnessTarget": 1.5
+        }
+      },
+      {
+        "op": "setPresentation",
+        "alias": "curr",
+        "value": 99,
+        "overrideExpression": true
+      },
+      {
+        "op": "setPresentation",
+        "alias": "brightness-request",
+        "value": 1.5,
+        "overrideExpression": false
+      },
+      {
+        "op": "setPresentation",
+        "alias": "panel::rect",
+        "value": [
+          48,
+          32,
+          432,
+          200
+        ],
+        "overrideExpression": true
+      },
+      {
+        "op": "setPresentation",
+        "alias": "title::color",
+        "value": [
+          0.5,
+          0.75,
+          1,
+          1
+        ],
+        "overrideExpression": true
+      },
+      {
+        "op": "action",
+        "action": "settings.brightness.state"
+      },
+      {
+        "op": "action",
+        "action": "settings.shadows"
+      }
+    ],
+    "onDeactivate": [
+      {
+        "op": "setState",
+        "values": {
+          "deactivationCount": {
+            "op": "+",
+            "args": [
+              {
+                "state": "deactivationCount"
+              },
+              1
+            ]
+          },
+          "brightnessTarget": 1
+        }
+      },
+      {
+        "op": "action",
+        "action": "settings.brightness.state"
+      },
+      {
+        "op": "action",
+        "action": "dismiss"
+      }
+    ]
+  }
+}

@@ -158,6 +158,7 @@ public:
 	virtual void				RunAlwaysThinkGUIs( int time );
 	virtual void				RegisterIcon( const char *code, const char *shader, int x = -1, int y = -1, int w = -1, int h = -1 );
 	bool DispatchApplicationActions( idUserInterface *gui, const char *command, bool &closeRequested );
+	void PumpApplicationActions( UI_ApplicationCommandCallback callback, void *context, idUserInterface *only );
 
 private:
 	void						RegisterAllocation( idUserInterfaceManaged *gui );
@@ -174,6 +175,8 @@ private:
 	// subset, removed by the managed destructor even on direct editor deletes.
 	idList<idUserInterfaceManaged*> allocations;
 	unsigned long long nextAllocationId = 0;
+	int applicationPumpDepth = 0;
+	int applicationPumpBudget = 0;
 	idList<idUserInterfaceManaged*> guis;
 	idList<idUserInterfaceManaged*> alwaysThinkGUIs;
 	idList<idUserInterfaceManaged*> demoGuis;

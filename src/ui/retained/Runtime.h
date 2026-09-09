@@ -7,6 +7,7 @@
 #include <vector>
 #include "Document.h"
 #include "Motion.h"
+#include "Behavior.h"
 #include "Interaction.h"
 
 namespace openq4::ui {
@@ -111,6 +112,18 @@ public:
 	bool GetPresentationAlias(const std::string& name, std::string& value) const;
 	bool SetPresentationAlias(const std::string& name, const std::string& value,
 		bool overrideExpression, std::string& error);
+	struct EventEffects {
+		StateValues stateChanges;
+		std::vector<ActionInvocation> actions;
+	};
+	bool HasEvent(const std::string& name) const;
+	// Pending caller values and fresh host sources enter the same transaction as
+	// the program. Effects contain only committed explicit writes/invocations;
+	// the adapter publishes them without replay during restore or resource reset.
+	bool RunEvent(const std::string& name, double monotonicSeconds, EventEffects& effects,
+		std::string& error, const StateValues& application = {},
+		const ActionValidator& validate = {}, size_t maxActions = 256);
+	bool ResolveAction(const std::string& id, ActionInvocation& invocation, std::string& error) const;
 	std::uint64_t StateRevision() const;
 	// Versioned instance data for the exact canonical source/path already loaded.
 	// Snapshot failure leaves output unchanged. Restore is transactional and
@@ -145,6 +158,8 @@ public:
 	std::string FocusedControl() const;
 	std::optional<ControlState> GetControlState(const std::string& id) const;
 	std::vector<ControlAction> TakeActions();
+	// Recheck queued activations after earlier programs may change eligibility.
+	bool CanActivateControl(const std::string& id, double monotonicSeconds);
 	bool GetBounds(const std::string& id, Bounds& bounds) const;
 	bool SetProperty(const std::string& id, const std::string& property, const std::string& value);
 	bool SetText(const std::string& id, const std::string& text);

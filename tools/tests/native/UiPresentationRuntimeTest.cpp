@@ -144,8 +144,13 @@ struct TestHost final : Host {
 	std::vector<Vertex> vertices;
 	std::set<std::string> materials;
 	std::set<std::uint32_t> glyphs;
+	double eventHost = 1;
+	bool eventHostAvailable = true;
 	bool ReadFile(const std::string&, std::string&) override { return false; }
-	bool ReadCVar(const std::string&, size_t, StateValue&) override { return false; }
+	bool ReadCVar(const std::string& name, size_t type, StateValue& value) override {
+		if (name != "r_eventHost" || type != 0 || !eventHostAvailable) return false;
+		value = eventHost; return true;
+	}
 	std::string Translate(const std::string& value) override { return value == "#str_test" ? "Localised" : value; }
 	void Log(bool error, const std::string& message) override {
 		if (error) { ++errors; std::fprintf(stderr,"Runtime: %s\n",message.c_str()); }
@@ -378,10 +383,79 @@ static void CheckInputSuppression(TestHost& host) {
 		"showing a group restores its authored flex layout and descendant input");
 }
 
+static void CheckEventRuntime(TestHost& host) {
+	Json::Value source = JsonData(Source());
+	source["state"]["pair"]["type"] = "number"; source["state"]["pair"]["initial"] = 1;
+	source["state"]["host"]["type"] = "number"; source["state"]["host"]["initial"] = 1;
+	source["state"]["host"]["cvar"] = "r_eventHost";
+	auto op = [](const char* name, std::initializer_list<Json::Value> args) {
+		Json::Value result; result["op"] = name; result["args"] = Json::Value(Json::arrayValue);
+		for (const auto& value : args) result["args"].append(value); return result;
+	};
+	// Setting pending pair=2 before reading fresh host=2 would divide by zero.
+	for (auto& binding : source["bindings"]) if (binding["id"] == "width")
+		binding["value"] = op("/",{100,op("+",{op("-",{StateRef("host"),StateRef("pair")}),1})});
+	Json::Value page; page["presentation"] = "desktop::curr";
+	source["actions"]["capture"]["operation"] = "test.capture";
+	source["actions"]["capture"]["arguments"]["value"] = page;
+	Json::Value write; write["op"] = "setState"; write["values"]["page"] = op("+",{page,1});
+	Json::Value block; block["op"] = "setPresentation"; block["alias"] = "menu::noevents";
+	block["value"] = true; block["overrideExpression"] = true;
+	Json::Value action; action["op"] = "action"; action["action"] = "capture";
+	source["events"]["onTrigger"] = Json::Value(Json::arrayValue);
+	for (const auto& step : {write,block,action}) source["events"]["onTrigger"].append(step);
+	// Event controls report their program distinctly from direct actions.
+	auto& control = source["root"]["children"][4]["children"][0]["control"];
+	control.removeMember("action"); control["event"] = "ONTRIGGER";
+	Runtime runtime(host), peer(host);
+	Check(runtime.Initialize() && peer.Initialize(),"event contexts initialize");
+	Load(runtime,JsonText(source)); Load(peer,JsonText(source)); Frame(host,runtime,1);
+	Check(runtime.HasEvent("ONTRIGGER") && !runtime.HasEvent("absent"),"runtime event lookup is explicit and case folded");
+	Check(runtime.FocusControl("first",1),"event control focuses");
+	runtime.MenuAction(MenuInput::Accept,true,1); runtime.MenuAction(MenuInput::Accept,false,1);
+	const auto requests = runtime.TakeActions();
+	Check(requests.size() == 1 && requests[0].event == "ontrigger" && requests[0].action.empty(),"button activation carries its compiled event target");
+	Check(runtime.CanActivateControl("first",1) && !runtime.CanActivateControl("missing",1),"queued activation eligibility validates a current control");
+	host.eventHost = 2;
+	Runtime::EventEffects effects; effects.stateChanges["sentinel"] = true;
+	std::string error;
+	const StateValues pending{{"pair",2.0},{"page",44.0}};
+	Check(runtime.RunEvent("ONTRIGGER",2,effects,error,pending),"pending application and fresh host enter program atomically");
+	Check(Read(runtime,"curr") == "45" && std::get<double>(runtime.GetState().at("host")) == 2 &&
+		Near(runtime.PresentedValue("panel","width")->data[0],100),"program sees pending dictionary and current host values");
+	Check(effects.stateChanges.size() == 1 && std::get<double>(effects.stateChanges.at("page")) == 45 &&
+		effects.actions.size() == 1 && std::get<double>(effects.actions[0].arguments.at("value")) == 45,
+		"effects publish only program-written keys and resolved presentation action arguments");
+	Check(runtime.FocusedControl().empty() && !runtime.FocusControl("first",2),"event visibility/input writes take effect before another frame");
+	Check(!runtime.CanActivateControl("first",2) && runtime.CanActivateControl("outside",2),"earlier program invalidates queued subtree activations while unrelated controls remain eligible");
+	Check(Read(peer,"curr") == "22","event does not mutate independent instance");
+	const auto saved = Snapshot(runtime,2);
+	const auto revision = runtime.StateRevision();
+	Runtime::EventEffects rejected; rejected.stateChanges["sentinel"] = true;
+	unsigned validations = 0;
+	Check(!runtime.RunEvent("onTrigger",3,rejected,error,{{"page",70.0}},[&](const ActionInvocation&,std::string& why) {
+		++validations; why = "rejected host operation"; return false;
+	}),"host validation failure rejects entire runtime event");
+	Check(validations == 1 && runtime.StateRevision() == revision && Snapshot(runtime,2) == saved &&
+		rejected.stateChanges.size() == 1 && rejected.stateChanges.contains("sentinel"),"rejected event preserves input state, clock and prior output");
+	host.eventHostAvailable = false;
+	Check(!runtime.RunEvent("onTrigger",4,rejected,error,pending) && runtime.StateRevision() == revision,"unavailable host source rejects before commit");
+	host.eventHostAvailable = true;
+	Check(!runtime.RunEvent("absent",4,rejected,error) && runtime.StateRevision() == revision,"unknown direct runtime program cannot mutate state");
+	Check(!runtime.RunEvent("onTrigger",4,rejected,error,{{"page",std::string("bad")}}),"invalid pending type rejects event entry");
+	ActionInvocation invocation;
+	Check(runtime.ResolveAction("capture",invocation,error) && std::get<double>(invocation.arguments.at("value")) == 45,
+		"direct control action resolution also supports typed presentation lookup");
+	Restore(runtime,saved,5);
+	Check(Read(runtime,"curr") == "45" && runtime.TakeActions().empty(),"snapshot restore retains event effects without producing new activations");
+	host.eventHost = 1;
+}
+
 int main() {
 	TestHost host;
 	CheckAliasesAndOwnership(host); CheckDisabledExpressions(host); CheckTextAndColour(host); CheckSnapshots(host);
 	CheckVersionOne(host); CheckTimelineWrites(host); CheckInputSuppression(host);
+	CheckEventRuntime(host);
 	Check(host.draws > 0 && host.errors == 0,"real runtime integration completes with geometry and no host diagnostics");
 	std::puts("PASS: runtime presentation aliases, binding ownership, snapshots, atomic rollback and subtree input suppression");
 	return 0;

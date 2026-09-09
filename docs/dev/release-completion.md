@@ -2,6 +2,13 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- Behavior development: retained menus can initialize data, branch, run ordered
+  transitions and submit typed settings actions through named events. Pending
+  game data reaches handlers immediately, completed actions survive input
+  suspension, and outgoing menus finish their lifecycle safely. The
+  [event-program scope](ui/event-programs.md) records the current subset;
+  production GUI translation, full controls and visual editing remain open.
+
 - Presentation development: retained menus now support named values shared by
   game callers, typed layout/text/color updates, and expression overrides that
   survive GUI saves and renderer/language reloads. Hidden or input-blocked

@@ -24,7 +24,7 @@ def options(**changes):
                   retained_resume_script=FIXTURES / 'managed-settings-smoke-resume.cfg',
                   language_reload=True, video_restart=True, profile_frames=0, timeline=None,
                   retained_document=FIXTURES / 'managed-settings-smoke.q4ui',
-                  presentation_alias_probe=False, gamma=1, brightness=1)
+                  presentation_alias_probe=False, event_program_probe=False, gamma=1, brightness=1)
     values.update(changes)
     return SimpleNamespace(**values)
 
@@ -136,6 +136,93 @@ def alias_log(args):
     return '\n'.join(rows) + '\n', commands + close
 
 
+def event_options(**changes):
+    values = dict(event_program_probe=True,
+                  retained_document=FIXTURES / 'event-program-smoke.q4ui',
+                  retained_script=FIXTURES / 'event-program-smoke.cfg',
+                  retained_resume_script=FIXTURES / 'event-program-smoke-resume.cfg')
+    values.update(changes)
+    return options(**values)
+
+
+def event_log(args):
+    """Model trace timing, including asynchronous application dispatch."""
+    commands, close, _ = capture.retained_commands(args, 'retained-smoke.q4ui')
+    values = iter(capture.event_program_expected_values(int(args.language_reload) + int(args.video_restart)))
+    events = iter(capture.EVENT_PROGRAM_TRACE)
+    dispatches = iter(capture.EVENT_PROGRAM_DISPATCH)
+    hosts = [(1.25, 1), (1.75, 0), (1.75, 0), (1.75, 1), (1.25, 1), (1.5, 0), (1.5, 0), (1.25, 0)]
+    rows = []
+    queued = 0
+    active = peer = opened = False
+    focus = ''
+    report = 0
+
+    def event(name):
+        nonlocal queued
+        expected, actions, writes = next(events)
+        assert name == expected, (name, expected)
+        rows.append(f'RETAINED_GUI_EVENT name={name} actions={actions} writes={writes}')
+        queued += actions
+
+    def pump():
+        nonlocal queued
+        for _ in range(queued):
+            operation, value, brightness, shadows, close_requested = next(dispatches)
+            rows.append(f'RETAINED_GUI_DISPATCH path=retained-smoke.q4ui operation={operation} value={value} '
+                        f'brightness={brightness:.6f} shadows={shadows} close={close_requested}')
+        queued = 0
+
+    for command in (commands + 'echo UI_BASELINE_CAPTURE_COMPLETE\n' + close).splitlines():
+        if command.startswith('ui_retainedPreview '):
+            peer = True
+            rows.append('Retained UI preview loaded: retained-smoke.q4ui')
+        elif command.startswith('testGUI '):
+            active = opened = True
+            rows.append('RETAINED_GUI_LOADED retained-smoke.q4ui')
+            event('onActivate')
+            pump()
+            event('onInit')
+        elif command == 'testGUI':
+            active = False
+            event('onDeactivate')
+            pump()
+        elif command == 'ui_retainedClose':
+            peer = False
+        elif command == 'echo UI_BASELINE_CAPTURE_COMPLETE':
+            rows.append('UI_BASELINE_CAPTURE_COMPLETE')
+        elif command == 'ui_retainedOwnership':
+            tick = 1000 if active else 1100 if opened else 900
+            rows.append(f'Retained UI ownership: open=0 suspended=1 session_gui={int(active)} game_time={tick} requests=0')
+        elif command in ('reloadLanguage', 'vid_restart windowed'):
+            rows.append('RETAINED_GUI_RESOURCE path=retained-smoke.q4ui event=restored')
+        elif command == 'openq4_retainedGui report':
+            brightness, shadows = hosts[report] if report < len(hosts) else (1.25, 0)
+            rows.append(f'RETAINED_GUI path=retained-smoke.q4ui focus={focus} revision=1 active=1 '
+                        f'brightness={brightness:.6f} shadows={shadows} contexts={1+int(peer)}')
+            report += 1
+        elif command.startswith('openq4_retainedGui '):
+            verb = command.split()[1]
+            if verb == 'focus':
+                focus = command.split('"')[1]
+            elif verb == 'event':
+                event(command.split('"')[1])
+            elif verb == 'trigger':
+                event('onTrigger')
+            elif command == 'openq4_retainedGui menu accept 0':
+                event('control::' + focus.removeprefix('managed-'))
+            rows.append(f'RETAINED_GUI_OPERATION {verb} passed')
+        elif command.startswith('openq4_guiGet '):
+            name, value = next(values)
+            assert command == f'openq4_guiGet "{name}"'
+            text = value if isinstance(value, str) else ' '.join(map(str, value))
+            rows.append(f'GUI_VALUE {name}={text}')
+        elif command.startswith('wait '):
+            pump()
+    assert next(events, None) is None and next(dispatches, None) is None and next(values, None) is None
+    return '\n'.join(rows) + '\n', commands + close
+
+
 class ManagedCapture(unittest.TestCase):
     def check_script(self, source, **kwargs):
         with tempfile.TemporaryDirectory(dir=ROOT / '.tmp', prefix='managed-capture-') as directory:
@@ -162,9 +249,160 @@ class ManagedCapture(unittest.TestCase):
         resume = capture.interaction_script(FIXTURES / 'managed-settings-smoke-resume.cfg', managed=True, observe_only=True)
         self.assertIn('openq4_guiGet "brightness-reading::text"', resume)
         for command in ('focus "x"', 'menu accept 1', 'state "x" "1"', 'save', 'restore',
-                        'presentation "x" "1" 0', 'update'):
+                        'presentation "x" "1" 0', 'update', 'pending "x" "1"', 'event "onInit"', 'trigger'):
             with self.subTest(command=command), self.assertRaises(ValueError):
                 self.check_script('openq4_retainedGui ' + command, managed=True, observe_only=True)
+
+    def test_event_commands_are_semantic_bounded_and_resume_is_read_only(self):
+        valid = ('openq4_retainedGui pending "draft" "13"\n'
+                 'openq4_retainedGui pending "gate" "false"\n'
+                 'openq4_retainedGui event "Probe::Main"\nopenq4_retainedGui trigger\n')
+        self.assertEqual(self.check_script(valid, managed=True), valid)
+        for command in ('pending "draft" "1e999"', 'pending "draft" "1e13"',
+                        'pending "draft" "exec config.cfg"', 'pending "draft" "1"; quit',
+                        'event "x::y::z"', 'event "GUI::state"', 'event ""', 'event "x y"', 'event "onInit"; quit',
+                        'event "onInit\nonDeactivate"', 'trigger 1', 'trigger; quit'):
+            with self.subTest(command=command), self.assertRaises(ValueError):
+                self.check_script('openq4_retainedGui ' + command, managed=True)
+        self.assertIn('event "Probe::Main"', capture.interaction_script(FIXTURES / 'event-program-smoke.cfg', managed=True))
+        resume = capture.interaction_script(FIXTURES / 'event-program-smoke-resume.cfg', managed=True, observe_only=True)
+        self.assertIn('openq4_guiGet "initialized"', resume)
+        self.assertNotIn(' event ', resume)
+
+    def test_event_fixture_declares_event_controls_localized_art_and_typed_programs(self):
+        source = (FIXTURES / 'event-program-smoke.q4ui').read_text(encoding='utf-8')
+        document = json.loads(source[source.index('{'):])
+        self.assertEqual(document['id'], 'event-program-smoke')
+        self.assertEqual(document['aliases']['curr'], document['aliases']['desktop::curr'])
+        self.assertEqual(document['state']['brightness']['cvar'], 'r_brightness')
+        self.assertEqual(document['state']['shadows']['cvar'], 'r_shadows')
+        controls = []
+        def visit(node):
+            text = node.get('properties', {}).get('text')
+            if text:
+                self.assertRegex(text['value'], r'^#str_[A-Za-z0-9_.-]+$')
+            if 'control' in node:
+                controls.append(node['control'])
+                self.assertNotIn('action', node['control'])
+                self.assertIn(node['control']['event'], document['events'])
+            for child in node.get('children', []):
+                visit(child)
+        visit(document['root'])
+        self.assertEqual(len(controls), 2)
+        for lifecycle in ('onActivate', 'onInit', 'onTrigger', 'onDeactivate'):
+            self.assertIn(lifecycle, document['events'])
+        self.assertEqual(document['events']['probe::main'][0]['values']['seenPending'], {'state': 'draft'})
+        self.assertEqual(document['events']['probe::main'][0]['values']['seenWidth'], {'presentation': 'panel::rect', 'component': 2})
+        self.assertEqual(document['actions']['settings.brightness']['arguments']['value'], {'presentation': 'brightness-request'})
+        self.assertEqual(document['events']['onDeactivate'][-1], {'op': 'action', 'action': 'dismiss'})
+        self.assertNotIn('"presentation"', json.dumps(document['bindings']))
+        self.assertNotIn('"presentation"', json.dumps(document['presentationVariables']))
+
+    def test_event_contract_requires_exact_sources_and_cli_defaults(self):
+        args = event_options()
+        self.assertEqual(capture.event_program_sources(args)['id'], 'event-program-smoke-v1')
+        with tempfile.TemporaryDirectory(dir=ROOT / '.tmp', prefix='event-identity-') as directory:
+            for attribute in ('retained_document', 'retained_script', 'retained_resume_script'):
+                original = getattr(args, attribute)
+                copied = Path(directory) / original.name
+                copied.write_bytes(original.read_bytes())
+                altered = event_options(**{attribute: copied})
+                self.assertEqual(capture.event_program_sources(altered)['sources'][attribute]['sha256'], capture.digest(original))
+                copied.write_bytes(copied.read_bytes() + b'\n// Unqualified edit\n')
+                with self.subTest(attribute=attribute), self.assertRaises(ValueError):
+                    capture.event_program_sources(altered)
+        base = ['capture', '--mode', 'sp', '--renderer', 'gl', '--assets', '.', '--output', '.tmp/unlaunched']
+        good = ['--retained-managed', '--event-program-probe', '--language-reload', '--video-restart']
+        with patch.object(sys, 'argv', base + good), patch.object(capture, 'capture', return_value=0) as launch:
+            self.assertEqual(capture.main(), 0)
+        parsed = launch.call_args.args[0]
+        self.assertEqual(parsed.retained_document, FIXTURES / 'event-program-smoke.q4ui')
+        self.assertEqual(parsed.retained_script, FIXTURES / 'event-program-smoke.cfg')
+        self.assertEqual(parsed.retained_resume_script, FIXTURES / 'event-program-smoke-resume.cfg')
+        for arguments in (['--event-program-probe'], good + ['--presentation-probe'], good + ['--presentation-alias-probe']):
+            with self.subTest(arguments=arguments), patch.object(sys, 'argv', base + arguments), \
+                    patch.object(capture, 'capture') as launch, contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                capture.main()
+            launch.assert_not_called()
+
+    def test_event_oracle_checks_ordered_values_lifecycle_and_actual_dispatch(self):
+        args = event_options(retained_peer=True)
+        log, commands = event_log(args)
+        def validate(text, *, qualify=True):
+            return capture.managed_evidence(text, commands, peer=True, resource_resets=2, settings_fixture=False,
+                                            event_fixture=qualify, mode='sp')
+        result = validate(log)
+        self.assertTrue(result['passed'], result['errors'])
+        self.assertTrue(result['event_program_contract']['outgoing_lifecycle_passed'])
+        self.assertIsNone(validate(log, qualify=False)['event_program_contract'])
+        failures = {
+            'pending applied before event': log.replace('GUI_VALUE draftReading=2\nRETAINED_GUI_EVENT name=Probe::Main',
+                                                       'GUI_VALUE draftReading=13\nRETAINED_GUI_EVENT name=Probe::Main', 1),
+            'batch lost pre-write value': log.replace('GUI_VALUE seenPending=13', 'GUI_VALUE seenPending=14', 1),
+            'wrong vector component': log.replace('GUI_VALUE seenWidth=432', 'GUI_VALUE seenWidth=32', 1),
+            'nested program skipped': log.replace('GUI_VALUE nested=1', 'GUI_VALUE nested=0', 1),
+            'shared aliases diverged': log.replace('GUI_VALUE desktop::curr=14', 'GUI_VALUE desktop::curr=2', 1),
+            'false override reenabled expression': log.replace('GUI_VALUE curr=15', 'GUI_VALUE curr=14', 1),
+            'captured action changed later': log.replace('operation=settings.brightness.set value=1.5 ',
+                                                        'operation=settings.brightness.set value=0.75 ', 1),
+            'state action captured final draft': log.replace('operation=settings.brightness.set value=1.25 ',
+                                                            'operation=settings.brightness.set value=1.75 ', 1),
+            'conditional false branch dispatched': change_report(log, 2, 'shadows=0', 'shadows=1'),
+            'host-source branch stale': change_report(log, 3, 'shadows=1', 'shadows=0'),
+            'snapshot restored host effects': change_report(log, 6, 'brightness=1.500000', 'brightness=1.250000'),
+            'fresh restored control failed': change_report(log, 7, 'brightness=1.250000', 'brightness=1.500000'),
+            'lifecycle replayed': log.replace('RETAINED_GUI_OPERATION restore passed',
+                                              'RETAINED_GUI_OPERATION restore passed\nRETAINED_GUI_EVENT name=onInit actions=0 writes=1', 1),
+            'lifecycle counter not restored': 'GUI_VALUE initialized=6'.join(log.rsplit('GUI_VALUE initialized=1', 1)),
+            'partial tuple restored': 'GUI_VALUE panel::rect=32 32 432'.join(log.rsplit('GUI_VALUE panel::rect=32 32 432 200', 1)),
+            'wrong commit writes': log.replace('name=Probe::Main actions=3 writes=7', 'name=Probe::Main actions=3 writes=6'),
+            'wrong event source': log.replace('name=onTrigger actions=0 writes=1', 'name=onInit actions=0 writes=1'),
+            'missing external event': log.replace('RETAINED_GUI_EVENT name=Probe::Main actions=3 writes=7\n', ''),
+            'commit after result': log.replace('RETAINED_GUI_EVENT name=Probe::Main actions=3 writes=7\nRETAINED_GUI_OPERATION event passed',
+                                               'RETAINED_GUI_OPERATION event passed\nRETAINED_GUI_EVENT name=Probe::Main actions=3 writes=7'),
+            'deactivation missing': log.replace('RETAINED_GUI_EVENT name=onDeactivate actions=2 writes=2\n', ''),
+            'close setting incorrect': log.replace('operation=settings.brightness.set value=1 brightness=1.000000',
+                                                    'operation=settings.brightness.set value=1 brightness=1.250000'),
+            'dismiss not dispatched': log.replace('operation=ui.dismiss value=- brightness=1.000000 shadows=0 close=1',
+                                                   'operation=ui.dismiss value=- brightness=1.000000 shadows=0 close=0'),
+            'deactivation before capture': log.replace('UI_BASELINE_CAPTURE_COMPLETE\n', '') + 'UI_BASELINE_CAPTURE_COMPLETE\n',
+            'nonfinite dispatch': log.replace('operation=settings.brightness.set value=1.5 ',
+                                               'operation=settings.brightness.set value=NaN ', 1),
+            'unrelated instance dispatched': log.replace('RETAINED_GUI_DISPATCH path=retained-smoke.q4ui',
+                                                          'RETAINED_GUI_DISPATCH path=peer.q4ui', 1),
+        }
+        for name, text in failures.items():
+            with self.subTest(name=name):
+                self.assertNotEqual(text, log, 'negative mutation did not alter the evidence')
+                self.assertFalse(validate(text)['passed'])
+        for changes in ({'retained_peer': False}, {'language_reload': False, 'video_restart': False},
+                        {'language_reload': True, 'video_restart': False}):
+            varied = event_options(**changes)
+            text, script = event_log(varied)
+            measured = capture.managed_evidence(text, script, peer=varied.retained_peer,
+                resource_resets=int(varied.language_reload) + int(varied.video_restart), settings_fixture=False,
+                event_fixture=True, mode='sp')
+            self.assertTrue(measured['passed'], measured['errors'])
+
+    def test_event_capture_marker_allows_only_surrounding_whitespace(self):
+        args = event_options(retained_peer=True)
+        log, commands = event_log(args)
+        marker = 'UI_BASELINE_CAPTURE_COMPLETE\n'
+        def validate(text):
+            return capture.managed_evidence(text, commands, peer=True, resource_resets=2,
+                                            settings_fixture=False, event_fixture=True, mode='sp')
+        for replacement in ('UI_BASELINE_CAPTURE_COMPLETE \n', ' \tUI_BASELINE_CAPTURE_COMPLETE \t\n'):
+            with self.subTest(replacement=replacement):
+                result = validate(log.replace(marker, replacement))
+                self.assertTrue(result['passed'], result['errors'])
+                self.assertTrue(result['event_program_contract']['outgoing_lifecycle_passed'])
+        for replacement in ('echo UI_BASELINE_CAPTURE_COMPLETE\n', 'prefixUI_BASELINE_CAPTURE_COMPLETE\n',
+                            'UI_BASELINE_CAPTURE_COMPLETEsuffix\n', 'UI_BASELINE_CAPTURE_COMPLETE suffix\n',
+                            marker * 2, marker + ' UI_BASELINE_CAPTURE_COMPLETE \t\n'):
+            with self.subTest(replacement=replacement):
+                result = validate(log.replace(marker, replacement))
+                self.assertFalse(result['passed'])
+                self.assertFalse(result['event_program_contract']['outgoing_lifecycle_passed'])
 
     def test_alias_semantic_literals_are_bounded_data(self):
         valid = ('openq4_guiGet "curr"\nopenq4_guiGet "desktop::curr"\n'

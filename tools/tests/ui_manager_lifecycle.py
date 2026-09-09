@@ -36,6 +36,8 @@ struct idStr : std::string {
     int Length() const { return static_cast<int>(size()); }
     bool IsEmpty() const { return empty(); }
     static int Cmp(const char* a,const char* b) { return std::string(a).compare(b); }
+    void StripLeading(char value) { erase(0,find_first_not_of(value)); }
+    static int Icmpn(const char* a,const char* b,int length) { return Icmp(std::string(a,length).c_str(),std::string(b,length).c_str()); }
     static int Length(const char* value) { return static_cast<int>(std::char_traits<char>::length(value)); }
     static bool CheckExtension(const char* name,const char* extension) {
         const size_t n=std::char_traits<char>::length(name), e=std::char_traits<char>::length(extension);
@@ -131,13 +133,16 @@ public:
     void RemoveAlwaysThinkGui(idUserInterfaceManaged*);
     void RunAlwaysThinkGUIs(int);
     bool DispatchApplicationActions(idUserInterface*,const char*,bool&);
+    void PumpApplicationActions(UI_ApplicationCommandCallback,void*,idUserInterface*);
     idList<idUserInterfaceManaged*> allocations,guis,alwaysThinkGUIs,demoGuis;
     unsigned long long nextAllocationId=0;
+    int applicationPumpDepth=0,applicationPumpBudget=0;
     struct Context { void SizeIcons() {} void Shutdown() {} } dc;
 } uiManagerLocal;
 static int destroyed=0,retainedShutdowns=0;
 static bool recycleAllocation=false;
 static void* recycledAllocation=nullptr;
+static std::vector<std::string> applicationActions;
 class idUserInterfaceLocal : public idUserInterfaceManaged {
 public:
     explicit idUserInterfaceLocal(bool managed=true) : idUserInterfaceManaged(managed) {}
@@ -149,6 +154,7 @@ public:
     virtual int Kind() const { return 1; }
     int ticks=0,loads=0,lastTime=-1;
     std::function<void()> onThink,onLoad;
+    std::function<void(bool)> onActivate;
     ~idUserInterfaceLocal() override { ++destroyed; }
     static void* operator new(size_t bytes) {
         if(recycledAllocation) {
@@ -185,7 +191,7 @@ public:
     bool SetPresentationValue(const char*,const char*,bool) override { return true; }
     bool GetTextInputState(idRectangle&,float& offset) const override { offset=5; return true; }
     void StateChanged(int time,bool) override { lastTime=time; }
-    const char* Activate(bool value,int time) override { active=value; lastTime=time; return "activate"; }
+    const char* Activate(bool value,int time) override { active=value; lastTime=time; if(onActivate)onActivate(value); return "activate"; }
     void Trigger(int time) override { lastTime=time; }
     const char* HandleEvent(const sysEvent_t*,int time,bool* visuals) override { lastTime=time; if(visuals)*visuals=true; return "event"; }
     void HandleNamedEvent(const char* name) override { ChangeThinking(!idStr::Icmp(name,"think")); }
@@ -225,6 +231,8 @@ public:
 };
 class idUserInterfaceRetained : public idUserInterfaceLocal {
 public:
+    std::vector<std::string> pendingActions;
+    std::function<void()> onDispatch;
     bool interactiveOverride=false;
     explicit idUserInterfaceRetained(bool managed=true) : idUserInterfaceLocal(managed) { interactive=true; }
     int Kind() const override { return 2; }
@@ -243,7 +251,21 @@ public:
         interactiveOverride=file->interactiveOverride; return true;
     }
     bool DispatchApplicationActions(const char* command,bool& close) override {
-        close=command && !idStr::Icmp(command,"retained-back"); return true;
+        close=command && !idStr::Icmp(command,"retained-back");
+        if(command && !idStr::Cmp(command,"retained-pending")) {
+            auto actions=std::move(pendingActions); pendingActions.clear();
+            for(const auto& action:actions) {
+                if(action=="dismiss")close=true;
+                else applicationActions.push_back(action);
+            }
+            auto callback=onDispatch; if(callback)callback();
+        }
+        return true;
+    }
+    const char* PendingApplicationCommand() const override { return pendingActions.empty()?"":"retained-pending"; }
+    void HandleNamedEvent(const char* name) override {
+        if(!idStr::Cmp(name,"queue"))pendingActions.push_back(state.GetString("queuedAction","named"));
+        else idUserInterfaceLocal::HandleNamedEvent(name);
     }
 };
 struct Commands { void RemoveCommand(const char*) {} } commands;
@@ -255,6 +277,8 @@ void RetainedUI_Shutdown() {
 }
 struct Common {
     void Printf(const char*,...) {}
+    void DPrintf(const char*,...) {}
+    int GetPresentationTime() const { return 1234; }
     void Error(const char*,...) { throw std::runtime_error("missing save GUI"); }
 } commonObject;
 Common* common=&commonObject;
@@ -394,6 +418,9 @@ int main() {
     assert(deferred->WriteToSaveGame(&save) && save.kind==2 && save.writes==2);
     assert(UI_DispatchApplicationActions(deferred,"retained-back",close) && close);
     assert(UI_DispatchApplicationActions(deferred,"untrusted text",close) && !close);
+    // Only the wrapper is registered; its unregistered child still exposes
+    // pending requests through the private managed virtual.
+    assert(std::string(static_cast<idUserInterfaceManaged*>(deferred)->PendingApplicationCommand()).empty());
     auto retained=manager.FindGui("direct.q4ui",true);
     assert(dynamic_cast<idUserInterfaceRetained*>(retained)!=nullptr);
     assert(manager.FindGui("DIRECT.Q4UI",false,false,true)==retained);
@@ -533,7 +560,7 @@ int main() {
 '''
 
 
-def main():
+def production_source():
     source = (ROOT / 'src/ui/UserInterface.cpp').read_text(encoding='utf-8')
     header = (ROOT / 'src/ui/UserInterfaceManaged.h').read_text(encoding='utf-8')
     public_header = (ROOT / 'src/ui/UserInterface.h').read_text(encoding='utf-8')
@@ -553,6 +580,8 @@ def main():
         'bool UI_IsRetainedPath(',
         'bool UI_DispatchApplicationActions(',
         'bool idUserInterfaceManagerLocal::DispatchApplicationActions(',
+        'void UI_PumpApplicationActions(',
+        'void idUserInterfaceManagerLocal::PumpApplicationActions(',
         'void idUserInterfaceManagerLocal::Shutdown()',
         'void idUserInterfaceManagerLocal::Touch(',
         'void idUserInterfaceManagerLocal::BeginLevelLoad()',
@@ -571,9 +600,13 @@ def main():
         'void idUserInterfaceManagerLocal::RemoveAlwaysThinkGui(',
         'void idUserInterfaceManagerLocal::RunAlwaysThinkGUIs(',
     )
-    code = (SUPPORT + public + managed + declarations + deferred + MANAGER +
+    return (SUPPORT + public + managed + declarations + deferred + MANAGER +
             '\n'.join(function_body(source, signature) for signature in signatures) +
-            deferred_source[deferred_source.index('idUserInterfaceDeferred::idUserInterfaceDeferred()'):] + MAIN)
+            deferred_source[deferred_source.index('idUserInterfaceDeferred::idUserInterfaceDeferred()'):])
+
+
+def main():
+    code = production_source() + MAIN
     compiler = next((found for name in ('clang++', 'g++', 'c++') if (found := shutil.which(name))), None)
     if not compiler:
         raise RuntimeError('C++ compiler required')

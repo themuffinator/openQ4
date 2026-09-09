@@ -11,7 +11,45 @@ static void Check(bool good, const char* message) {
 	if (!good) { std::fprintf(stderr,"FAIL: %s\n",message); std::exit(1); }
 }
 static bool Near(double a, double b) { return std::abs(a-b)<.0001; }
+static void CheckCombinedSources() {
+	const std::string source = R"({"format":"openq4-ui","version":1,"id":"combined-state",
+ "root":{"id":"root","type":"group","properties":{"left":{"type":"length","value":1,"unit":"dp"}}},
+ "state":{"application":{"type":"number","initial":2},"host":{"type":"number","initial":1,"cvar":"host_value"}},
+ "presentationVariables":{"pending":{"type":"number","initial":0,"value":{"state":"application"}}},
+ "bindings":[{"id":"dependent","node":"root","property":"left","value":
+  {"op":"/","args":[1,{"op":"-","args":[{"state":"application"},{"state":"host"}]}]}}]})";
+	Document document; std::vector<Diagnostic> diagnostics; std::string error;
+	Check(document.Load(source,diagnostics),"compile cross-owner state dependency");
+	State state; Check(state.Reset(document.Model(),error),"initialize cross-owner state");
+	Check(!state.Set({{"application",1.0}},error) && !state.Set({{"host",2.0}},error,true),
+		"either sequential update order would expose an invalid intermediate binding");
+	PresentationValue transient; transient.data[0]=99;
+	Check(state.WritePresentationVariable("pending",transient,false,error),"stage a transient expression value before event entry");
+	const auto variables=state.Variables(); const auto revision=state.Revision();
+	Check(!state.SetCombined({{"application",1.0}},{{"host",true}},error),"combined update rejects a late host type error");
+	Check(state.Variables()==variables && state.Revision()==revision && state.Presentation().variables.at("pending").pending &&
+		Near(state.Presentation().variables.at("pending").value.data[0],99),"failed combined validation preserves pending expression ownership and both source groups");
+	Check(state.SetCombined({{"application",1.0}},{{"host",2.0}},error),"combined update evaluates only the final valid source pair");
+	Check(Near(state.Properties().at({"root","left"}).data[0],-1) && state.Revision()==revision+1 &&
+		!state.Presentation().variables.at("pending").pending && Near(state.Presentation().variables.at("pending").value.data[0],1),
+		"combined source commit replaces transient values in one revision");
+	transient.data[0]=88;
+	Check(state.WritePresentationVariable("pending",transient,true,error) &&
+		state.SetCombined({{"application",2.0}},{{"host",3.0}},error),"combined refresh retains explicit expression suppression");
+	Check(state.Presentation().variables.at("pending").expressionDisabled && Near(state.Presentation().variables.at("pending").value.data[0],88),
+		"explicit presentation owner survives combined source changes");
+	const auto committed=state.Variables(); const auto committedRevision=state.Revision();
+	Check(state.SetCombined({{"application",2.0}},{{"host",3.0}},error) && state.Revision()==committedRevision,
+		"unchanged clean combined sources do not advance revision");
+	const StateValues sameBatch{{"host",4.0}};
+	Check(!state.SetCombined(sameBatch,sameBatch,error),"aliased batch arguments cannot bypass source ownership");
+	Check(!state.SetCombined({{"host",4.0}},{},error) && !state.SetCombined({},{{"application",4.0}},error),"both combined source ownership directions are enforced");
+	Check(!state.SetCombined({{"application",4.0}},{{"host",4.0}},error),"combined binding failure rolls back the entire refresh");
+	Check(state.Variables()==committed && state.Revision()==committedRevision && Near(state.Properties().at({"root","left"}).data[0],-1) &&
+		Near(state.Presentation().variables.at("pending").value.data[0],88),"combined failures preserve variables, properties, revision and explicit owner");
+}
 int main(int argc, char** argv) {
+	CheckCombinedSources();
 	std::ifstream file(argc>1 ? argv[1] : "tools/ui/fixtures/binding-smoke.q4ui",std::ios::binary);
 	Check(file.good(),"binding fixture exists");
 	const std::string source((std::istreambuf_iterator<char>(file)),std::istreambuf_iterator<char>());

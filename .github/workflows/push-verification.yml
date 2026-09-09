@@ -284,6 +284,7 @@ jobs:
             tools/tests/ui_presentation_bridge.py \
             tools/tests/ui_retained_layer_pool.py \
             tools/tests/ui_manager_lifecycle.py \
+            tools/tests/ui_event_delivery.py \
             tools/tests/ui_list_selection_safety.py \
             tools/tests/ui_session_test_gui.py \
             tools/tests/ui_retained_resource_lifecycle.py \
@@ -490,6 +491,7 @@ jobs:
           python tools/tests/ui_presentation_bridge.py
           python tools/tests/ui_retained_layer_pool.py
           python tools/tests/ui_manager_lifecycle.py
+          python tools/tests/ui_event_delivery.py
           python tools/tests/ui_list_selection_safety.py
           python tools/tests/ui_session_test_gui.py
           python tools/tests/ui_retained_resource_lifecycle.py

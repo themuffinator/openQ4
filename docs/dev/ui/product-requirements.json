@@ -4,7 +4,7 @@
   "date": "2026-09-09",
   "status": "Implementation incomplete; this register preserves full product scope and does not accept any production GUI.",
   "baseline": {
-    "engine_revision": "a9919d1be2dd9ce43e19ec16bb0392e947ce8576",
+    "engine_revision": "25813aaf96f0a9dfe36e1be0fd29bbce8cea93df",
     "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
     "effective_gui_count": 271,
     "translated_or_accepted_resources": 0,
@@ -19,12 +19,12 @@
     "product": {
       "path": "docs/dev/plans/ui-product-completion.md",
       "authority": "normative completion scope, milestones and final audit",
-      "sha256": "3cf7f648c6dd7ad6943bee595ad70cbea6a785735f7aa399db7208924ad16df4"
+      "sha256": "54875323dca60bfbe548a42fef98475b77497cb617e26d2bb2f5ee07bc6634a1"
     },
     "original": {
       "path": "docs/dev/plans/idtech5-ui.md",
       "authority": "original immutable scope and stage gates",
-      "sha256": "dc819fdfdb05f9d6b993b5bf6e197808664c8f55044574465ce90ae7a9238185"
+      "sha256": "53a9d46d179ed755ca97dd401ee1ab4d85d62dc713fde49b555704903fec30a1"
     },
     "inventory": {
       "path": "docs/dev/ui/inventory-report.md",
@@ -100,7 +100,7 @@
       "kind": "source_audit",
       "path": "docs/dev/plans/ui-product-completion.md",
       "scope": "Published audit at 80bb3939; source limitations corroborated by current Document/Runtime inspection. Historical tests and captures are not a fresh product qualification.",
-      "sha256": "3cf7f648c6dd7ad6943bee595ad70cbea6a785735f7aa399db7208924ad16df4"
+      "sha256": "54875323dca60bfbe548a42fef98475b77497cb617e26d2bb2f5ee07bc6634a1"
     },
     "document-foundation": {
       "kind": "implementation_checkpoint",
@@ -198,6 +198,16 @@
       "baseline_engine_revision": "e075e4a2e64e0ff790a1f435ae0854aa51650308",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "local_capture_summary": ".tmp/ui/aliases-review/summary.json"
+    },
+    "event-program-foundation": {
+      "kind": "qualified_foundation_checkpoint",
+      "path": "docs/dev/ui/event-programs.md",
+      "sha256": "7afc2263f5324754ace56159e329403a02f30190eab67e4366dcfff7c3e8e727",
+      "baseline_engine_revision": "25813aaf96f0a9dfe36e1be0fd29bbce8cea93df",
+      "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
+      "local_capture_summary": ".tmp/ui/events-review/capture-evidence.json",
+      "scope": "M1 subset: canonical ordered state/presentation writes, conditional and nested event calls, named motion operations and immutable typed action arguments; pending application input and fresh host sources enter one atomic transaction. Normal named/init/activation/trigger methods, per-record control/document eligibility, effective interactivity and the private Session pump preserve input cancellation and committed program delivery through lifecycle teardown. Five native suites, production-method tests and two source/binary-bound hidden windowed Windows gameplay captures qualify this bounded implementation: SP/OpenGL at 125% and MP/Vulkan at 200% pass event/ownership/outgoing-lifecycle oracles and render-target visual review. The captures include pending-state entry, ordered action arguments, non-replaying restore, language/video recovery, independent peers and SP/MP pause behavior. The catalog remains brightness, shadows and dismissal. Full legacy broadcast/register/timer/native-CVar-control lowering, resource/game operations, world output, game-save/demo compatibility, complete widgets/editor, physical-device/platform/performance qualification and production GUI acceptance remain open. No requirement or migration entry is accepted by this checkpoint.",
+      "local_capture_summary_sha256": "421d9d4d77d634ae1da2fdd98849f9cfa861d64fb7efd1e5fdc30977f7d66065"
     }
   },
   "groups": {
@@ -1153,10 +1163,11 @@
       "status": "partial",
       "current_evidence": [
         "document-foundation",
-        "presentation-alias-foundation"
+        "presentation-alias-foundation",
+        "event-program-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "Typed presentation-variable/alias declarations extend the canonical JSONC schema with stable targets and source-preserving edits. Complete component/instance/constraint/editor metadata, structural reference stability and full source round trips remain."
+      "remaining": "Typed presentation aliases and ordered event programs extend the canonical JSONC model with stable explicit targets. Complete component/instance/constraint/editor metadata, structural reference stability and full source round trips remain."
     },
     {
       "id": "DOC-002",
@@ -1180,10 +1191,11 @@
       "current_evidence": [
         "document-foundation",
         "instance-foundation",
-        "presentation-alias-foundation"
+        "presentation-alias-foundation",
+        "event-program-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "Alias compilation now rejects invalid names, collisions, targets, fields, types, units, bounds and initial expressions transactionally. Validation for the complete future model and editor error navigation still requires implementation and acceptance evidence."
+      "remaining": "Alias and event compilation reject invalid names, collisions, targets, fields, types, units, expressions and structural budgets before replacing the document. Program evaluation also rejects invalid values, calls and execution budgets atomically. Validation for the complete model and editor error navigation remains unaccepted."
     },
     {
       "id": "DOC-003",
@@ -1229,10 +1241,11 @@
       "status": "partial",
       "current_evidence": [
         "binding-foundation",
-        "presentation-alias-foundation"
+        "presentation-alias-foundation",
+        "event-program-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "The shared model now declares typed actions plus explicit metadata/property aliases and expression ownership. Complete state variants/graphs, ordered events, resource operations, component behavior and editor metadata remain."
+      "remaining": "The shared model now includes typed actions, aliases and ordered state/presentation/motion programs with conditions and nested calls. Complete state variants/graphs, resource operations, component behavior, timeline event markers and editor metadata remain."
     },
     {
       "id": "DOC-005",
@@ -1279,10 +1292,11 @@
       "status": "partial",
       "current_evidence": [
         "binding-foundation",
-        "presentation-alias-foundation"
+        "presentation-alias-foundation",
+        "event-program-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "Application/CVar state and typed presentation variables remain separate; metadata and mixed bound/unbound property writes validate before commit. Complete widget/data-source ownership and source-bound production state semantics remain."
+      "remaining": "Pending application values and fresh CVar sources validate together at event entry; ordered program writes and action arguments stage against the resulting authoritative state and commit atomically. Complete widget/data-source ownership and source-bound production state semantics remain."
     },
     {
       "id": "DOC-007",
@@ -1330,10 +1344,11 @@
       "status": "partial",
       "current_evidence": [
         "instance-foundation",
-        "presentation-alias-foundation"
+        "presentation-alias-foundation",
+        "event-program-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "Presentation cells and override ownership are per instance and mutable values remain separate from immutable authored bases. Shared compiled components/resource caches and full widget, scroll, timer and command-result state still need implementation and qualification."
+      "remaining": "Mutable presentation cells, event state/motion and pending application invocations belong to each instance. Shared compiled components/resource caches and full widget, scroll, script-timer and command-result state still need implementation and qualification."
     },
     {
       "id": "RUN-001",
@@ -1358,10 +1373,11 @@
       "status": "partial",
       "current_evidence": [
         "managed-application-foundation",
-        "presentation-alias-foundation"
+        "presentation-alias-foundation",
+        "event-program-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "Normal retained methods now delegate explicit root/qualified presentation reads and typed writes, preserving failed outputs and application state. Complete semantic alias generation, text/caret/wrapping, key-binding widgets, ordered events and game caller/save/world contracts remain before accepting the public method matrix."
+      "remaining": "Normal retained methods now support explicit presentation aliases, canonical ordered named/init/activation/trigger programs and independent typed-action delivery. Complete generated legacy mappings, text/caret/wrapping, key-binding widgets, relative script timers and game caller/save/world/demo contracts remain before accepting the public method matrix."
     },
     {
       "id": "RUN-002",
@@ -1384,10 +1400,11 @@
       "status": "partial",
       "current_evidence": [
         "instance-persistence-foundation",
-        "managed-application-foundation"
+        "managed-application-foundation",
+        "event-program-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "The cited foundation is limited; complete and qualify the entire stated requirement before acceptance."
+      "remaining": "The private manager owns deferred/retained identities and now snapshots pending-action owners with allocation serial checks, bounded callbacks and lifecycle drains before test-instance deletion. Full level-load, diagnostics, reload, editor and complete-corpus ownership qualification remains."
     },
     {
       "id": "RUN-003",
@@ -1411,10 +1428,11 @@
       "current_evidence": [
         "instance-foundation",
         "managed-application-foundation",
-        "presentation-alias-foundation"
+        "presentation-alias-foundation",
+        "event-program-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "Independent runtime instances now preserve their own presentation cells and override flags as well as the existing subset state. Differently sized editor/HUD/world targets, complete widget state, repeated churn and creator/peer resource-lifetime qualification remain."
+      "remaining": "Each runtime retains its own presentation ownership, event state/motion and queued typed invocations; the pump rejects deleted or reused owners. Differently sized editor/HUD/world targets, complete widget state, repeated churn and creator/peer resource-lifetime qualification remain."
     },
     {
       "id": "RUN-004",
@@ -1463,10 +1481,11 @@
       "status": "partial",
       "current_evidence": [
         "managed-application-foundation",
-        "presentation-alias-foundation"
+        "presentation-alias-foundation",
+        "event-program-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "Alias mutations update canonical values atomically, and ancestor visibility/noevents eligibility refreshes before input dispatch. Complete game-clock/event evaluation, translated scheduling, all widgets and transformed/world hit geometry still require the documented production order and evidence."
+      "remaining": "Canonical events stage pending application input with fresh host sources, evaluate ordered local changes and capture action arguments before commit; current control/document/ancestor eligibility is checked before queued activations execute. Session delivers committed invocations independently of physical input. Authoritative game-clock scheduling, full legacy timers, all widgets and transformed/world hit geometry remain required."
     },
     {
       "id": "RUN-006",
@@ -1570,10 +1589,11 @@
       ],
       "status": "partial",
       "current_evidence": [
-        "managed-application-foundation"
+        "managed-application-foundation",
+        "event-program-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "Generic typed argument resolution and a fixed three-operation session catalog are implemented. Complete session/SP/MP operations, structured user-visible results, provenance and full translated behavior remain."
+      "remaining": "Canonical programs validate typed operation arguments before local commit and preserve each invocation at its ordered state snapshot. The private Session pump dispatches the existing brightness/shadows/dismiss catalog. Complete session/SP/MP operations, structured user-visible and asynchronous results, source provenance and full translated behavior remain."
     },
     {
       "id": "BEH-002",
@@ -1623,10 +1643,11 @@
       "current_evidence": [
         "bridge-foundation",
         "managed-application-foundation",
-        "presentation-alias-foundation"
+        "presentation-alias-foundation",
+        "event-program-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "Explicit root/qualified aliases now share typed metadata or canonical rendered targets, preserve reads, and distinguish transient versus explicit ownership even after save/restore. Complete generated mappings for all required legacy names, dictionary-bound variables, component/vector/material paint targets and actual production caller/event/merge semantics remain."
+      "remaining": "Root/qualified aliases share typed metadata or canonical rendered targets; event expressions read them and ordered writes preserve explicit/transient ownership. Complete generated legacy mappings, dictionary-bound variables, component/vector/material paint targets and production caller/merge semantics remain."
     },
     {
       "id": "BEH-004",
@@ -1650,10 +1671,11 @@
       ],
       "status": "partial",
       "current_evidence": [
-        "managed-application-foundation"
+        "managed-application-foundation",
+        "event-program-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "Activation/trigger/named calls start exact authored timelines and cancel normal input ownership. Complete ordered action/event scripts, nested events, timers, completion/cancellation results and legacy lowering remain."
+      "remaining": "Normal named/init/activation/trigger entry points execute canonical ordered programs, conditional/nested calls and named motion operations, with atomic failure and independent typed-action delivery. Legacy root/subtree broadcasts, duplicate-name rules, cached registers, relative/due/rearm timers, native CVar groups, complete cancellation/completion results and corpus lowering remain."
     },
     {
       "id": "BEH-005",
@@ -1676,10 +1698,12 @@
       "acceptance_evidence_needed": [
         "Paired press/release and canceled action traces with operation/sound counters through device/modal/menu handoff."
       ],
-      "status": "pending",
-      "current_evidence": [],
+      "status": "partial",
+      "current_evidence": [
+        "event-program-foundation"
+      ],
       "acceptance_evidence": [],
-      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required."
+      "remaining": "Committed typed program invocations retain FIFO order and drain once across input suspension and activation/deactivation; physical requests remain cancellable, queued controls recheck eligibility, and allocation-identity guards prevent delivery to deleted or reused instances. Stock semantic sound routing, animation/server refresh behavior and the complete device/modal/widget activation matrix remain unaccepted."
     },
     {
       "id": "BEH-006",
@@ -1944,10 +1968,11 @@
       "current_evidence": [
         "instance-persistence-foundation",
         "managed-application-foundation",
-        "presentation-alias-foundation"
+        "presentation-alias-foundation",
+        "event-program-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "Snapshots now include metadata values, expression-disable flags, pending transient values, bound overrides and unanimated mutable properties. Selection/scroll, editable text, dynamic collections, script timers and deterministic full-corpus action continuation remain."
+      "remaining": "Snapshots preserve committed application/presentation values and motion from successful programs; restore discards host invocations and suppresses automatic initialization replay. Selection/scroll, editable text, dynamic collections, legacy script timers and deterministic full-corpus action continuation remain."
     },
     {
       "id": "SAVE-003",
@@ -2709,10 +2734,11 @@
       "status": "partial",
       "current_evidence": [
         "input-foundation",
-        "presentation-alias-foundation"
+        "presentation-alias-foundation",
+        "event-program-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "Ancestor visibility/noevents changes cancel armed child activation before a release can dispatch, including writes before the next frame. Full device removal/reconnect, gameplay/modal ownership transitions and held-source quarantine across all controls still require implementation and qualification."
+      "remaining": "Physical input requests remain cancellable while committed program invocations survive focus/console/interactivity suspension. Queued controls recheck current document, interactivity and ancestor eligibility before execution; outgoing lifecycle dismissal cannot affect the replacement. Complete device removal/reconnect, gameplay/modal ownership and all-widget held-source quarantine remain."
     },
     {
       "id": "INP-005",
@@ -2761,10 +2787,11 @@
       "status": "partial",
       "current_evidence": [
         "interaction-foundation",
-        "presentation-alias-foundation"
+        "presentation-alias-foundation",
+        "event-program-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "Hidden/noevents ancestors now exclude child pointer/navigation/direct-focus targets while preserving the existing button/modal subset contract. The full widget focus-versus-selection gallery, stack teardown and restoration matrix remain."
+      "remaining": "Hidden/noevents ancestors exclude child targets and newly queued activations are revalidated after earlier programs change availability. The full widget focus-versus-selection gallery, modal stack teardown and restoration matrix remain."
     },
     {
       "id": "INP-007",
@@ -4260,10 +4287,11 @@
       ],
       "status": "partial",
       "current_evidence": [
-        "document-foundation"
+        "document-foundation",
+        "event-program-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "The cited foundation is limited; complete and qualify the entire stated requirement before acceptance."
+      "remaining": "Canonical event transactions use one monotonic presentation sample for motion operations and do not commit clock advancement on failure. Authoritative game-time script scheduling and the complete refresh-rate, dropped-frame and SP/MP pause qualification remain."
     },
     {
       "id": "MOT-002",
@@ -4286,10 +4314,11 @@
       "status": "partial",
       "current_evidence": [
         "document-foundation",
-        "presentation-alias-foundation"
+        "presentation-alias-foundation",
+        "event-program-foundation"
       ],
       "acceptance_evidence": [],
-      "remaining": "External property writes preserve active transition ownership, unrelated tracks and immutable authored bases; mutable values now survive snapshots. Smooth authoritative binding retargeting and complete production page/theme/resize/reversal/teardown continuity remain."
+      "remaining": "Ordered event programs play, pause, resume and cancel named timelines at one presentation time while preserving existing sampled retargeting, ownership and snapshot values. Smooth authoritative binding retargeting and complete production page/theme/resize/reversal/completion/teardown continuity remain."
     },
     {
       "id": "MOT-003",

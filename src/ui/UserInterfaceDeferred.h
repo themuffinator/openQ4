@@ -55,6 +55,7 @@ public:
 	size_t Size() override;
 	int NumTransitions() override;
 	bool DispatchApplicationActions( const char *command, bool &closeRequested ) override;
+	const char *PendingApplicationCommand() const override;
 
 private:
 	idUserInterfaceManaged *backend;

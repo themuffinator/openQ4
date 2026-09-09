@@ -8,7 +8,7 @@ namespace openq4::ui {
 // Evaluate a compiled expression as bounded typed data, without changing its
 // variables or the previous result on failure. Unselected branches stay lazy.
 bool EvaluateStateExpression(const Expression& expression, const StateValues& variables,
-	StateValue& value, std::string& error);
+	StateValue& value, std::string& error, const PresentationLookup& presentation = {});
 
 struct PresentationCell {
 	PresentationValue value;
@@ -30,6 +30,9 @@ class State {
 public:
 	bool Reset(const DocumentModel& model, std::string& error);
 	bool Set(const StateValues& changes, std::string& error, bool hostSources = false);
+	// Event entry refreshes pending application and current host values in one
+	// evaluation; neither batch can expose an invalid intermediate binding.
+	bool SetCombined(const StateValues& application, const StateValues& hostSources, std::string& error);
 	// Full instance restore evaluates application and current host snapshots in
 	// one transaction, without an invalid intermediate binding evaluation.
 	bool Restore(const StateValues& application, const StateValues& hostSources, std::string& error,

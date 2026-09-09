@@ -505,6 +505,7 @@ public:
 	idUserInterface *	GetActiveMenu();
 
 	void				DispatchCommand( idUserInterface *gui, const char *menuCommand, bool doIngame = true );
+	void				PumpApplicationActions( idUserInterface *only = NULL );
 	void				MenuEvent( const sysEvent_t *event );
 	bool				HandleSaveGameMenuCommand( idCmdArgs &args, int &icmd );
 	void				HandleInGameCommands( const char *menuCommand );

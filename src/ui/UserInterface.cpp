@@ -112,6 +112,42 @@ bool idUserInterfaceManagerLocal::DispatchApplicationActions( idUserInterface *g
 	return false;
 }
 
+void UI_PumpApplicationActions( UI_ApplicationCommandCallback callback, void *context, idUserInterface *only ) {
+	uiManagerLocal.PumpApplicationActions( callback, context, only );
+}
+
+void idUserInterfaceManagerLocal::PumpApplicationActions( UI_ApplicationCommandCallback callback, void *context, idUserInterface *only ) {
+	// Nested global pumps cannot replay the current batch. A targeted lifecycle
+	// drain may run inside a close callback, before an outgoing test GUI is freed.
+	if ( callback == NULL || ( applicationPumpDepth != 0 && only == NULL ) || applicationPumpDepth >= 8 ) return;
+	if ( applicationPumpDepth == 0 ) applicationPumpBudget = 256;
+	struct DepthScope {
+		int &depth;
+		explicit DepthScope( int &value ) : depth( value ) { ++depth; }
+		~DepthScope() { --depth; }
+	} scope( applicationPumpDepth );
+	idList<idUserInterfaceManaged*> ready;
+	idList<unsigned long long> identities;
+	idList<idStr> commands;
+	for ( int i = 0; i < allocations.Num() && ready.Num() < applicationPumpBudget; ++i ) {
+		idUserInterfaceManaged *gui = allocations[ i ];
+		if ( only != NULL && only != gui ) continue;
+		const char *command = gui->PendingApplicationCommand();
+		if ( command == NULL || command[ 0 ] == '\0' ) continue;
+		ready.Append( gui );
+		identities.Append( gui->allocationId );
+		commands.Append( idStr( command ) );
+	}
+	for ( int i = 0; i < ready.Num() && applicationPumpBudget > 0; ++i ) {
+		idUserInterfaceManaged *gui = ready[ i ];
+		if ( allocations.Find( gui ) == NULL || gui->allocationId != identities[ i ] ) continue;
+		--applicationPumpBudget;
+		callback( gui, commands[ i ].c_str(), context );
+		// The callback may delete this or any peer, including reusing its address.
+		// Never retain a registry iterator or dereference the owner afterward.
+	}
+}
+
 namespace {
 
 // Resolve presentation aliases without parser fixup. GetWinVarByName(..., true)

@@ -432,13 +432,21 @@ if build_engine or get_option('build_native_tests')
   libtess2_project = subproject('libtess2')
   openq4_retained_library = static_library(
     'openq4-retained-ui',
-    files('src/ui/retained/Runtime.cpp', 'src/ui/retained/Document.cpp', 'src/ui/retained/Presentation.cpp', 'src/ui/retained/State.cpp', 'src/ui/retained/Motion.cpp', 'src/ui/retained/Interaction.cpp', 'src/ui/retained/Input.cpp', 'src/ui/retained/Vector.cpp', 'src/ui/retained/VectorElement.cpp'),
+    files('src/ui/retained/Runtime.cpp', 'src/ui/retained/Document.cpp', 'src/ui/retained/Presentation.cpp', 'src/ui/retained/Behavior.cpp', 'src/ui/retained/State.cpp', 'src/ui/retained/Motion.cpp', 'src/ui/retained/Interaction.cpp', 'src/ui/retained/Input.cpp', 'src/ui/retained/Vector.cpp', 'src/ui/retained/VectorElement.cpp'),
     dependencies: [rmlui_project.get_variable('rmlui_dep'), jsoncpp_project.get_variable('jsoncpp_dep'), libtess2_project.get_variable('libtess2_dep')],
     pic: true,
     install: false,
   )
   openq4_retained_dep = declare_dependency(link_with: openq4_retained_library)
   if get_option('build_native_tests')
+    openq4_ui_behavior_test = executable(
+      'openq4-ui-behavior-test',
+      files('tools/tests/native/UiBehaviorTest.cpp'),
+      include_directories: root_include_dir,
+      dependencies: openq4_retained_dep,
+      install: false,
+    )
+    test('openq4-ui-behavior', openq4_ui_behavior_test, timeout: 30)
     openq4_ui_presentation_test = executable(
       'openq4-ui-presentation-test',
       files('tools/tests/native/UiPresentationTest.cpp'),

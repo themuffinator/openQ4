@@ -1512,7 +1512,12 @@ void idSessionLocal::SetGUI( idUserInterface *gui, HandleGuiCommand_t handle ) {
 	if ( RetainedUI_IsOpen() ) RetainedUI_Close();
 	const char	*cmd;
 
-	if ( guiActive && guiActive != gui ) guiActive->Activate( false, common->GetPresentationTime() );
+	if ( guiActive && guiActive != gui ) {
+		idUserInterface *previous = guiActive;
+		guiActive = NULL;
+		previous->Activate( false, common->GetPresentationTime() );
+		PumpApplicationActions( previous );
+	}
 	guiActive = gui;
 	guiHandle = handle;
 	if ( guiMsgRestore ) {
@@ -1546,6 +1551,7 @@ void idSessionLocal::SetGUI( idUserInterface *gui, HandleGuiCommand_t handle ) {
 
 	cmd = guiActive->HandleEvent( &ev, common->GetPresentationTime() );
 	guiActive->Activate( true, common->GetPresentationTime() );
+	PumpApplicationActions( guiActive );
 }
 
 /*
@@ -1554,8 +1560,13 @@ idSessionLocal::ExitMenu
 ===============
 */
 void idSessionLocal::ExitMenu( void ) {
-	if ( guiActive ) guiActive->Activate( false, common->GetPresentationTime() );
+	idUserInterface *previous = guiActive;
 	guiActive = NULL;
+	if ( previous ) {
+		previous->Activate( false, common->GetPresentationTime() );
+		PumpApplicationActions( previous );
+	}
+	if ( guiActive != NULL ) return;
 
 	// go back to the game sounds
 	SetPlayingSoundWorld( sw );
@@ -3309,6 +3320,14 @@ void idSessionLocal::HandleInGameCommands( const char *menuCommand ) {
 idSessionLocal::DispatchCommand
 ==============
 */
+static void Session_DispatchApplicationCommand( idUserInterface *gui, const char *command, void *context ) {
+	static_cast<idSessionLocal*>( context )->DispatchCommand( gui, command );
+}
+
+void idSessionLocal::PumpApplicationActions( idUserInterface *only ) {
+	UI_PumpApplicationActions( Session_DispatchApplicationCommand, this, only );
+}
+
 void idSessionLocal::DispatchCommand( idUserInterface *gui, const char *menuCommand, bool doIngame ) {
 
 	if ( !gui ) {
@@ -3729,6 +3748,9 @@ idSessionLocal::GuiFrameEvents
 =================
 */
 void idSessionLocal::GuiFrameEvents() {
+	// Programmatic events and deactivation actions are independent of input
+	// focus, the console, and which GUI currently receives physical events.
+	PumpApplicationActions();
 	const char	*cmd;
 	sysEvent_t  ev;
 	idUserInterface	*gui;

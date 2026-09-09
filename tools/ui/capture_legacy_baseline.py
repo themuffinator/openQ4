@@ -22,6 +22,7 @@ import legacy_import
 
 ROOT = Path(__file__).resolve().parents[2]
 ALIAS_FIXTURE = ROOT / 'tools/ui/fixtures/presentation-alias-smoke'
+EVENT_FIXTURE = ROOT / 'tools/ui/fixtures/event-program-smoke'
 
 
 def digest(path: Path) -> str:
@@ -53,16 +54,19 @@ def interaction_script(path: Path, *, managed: bool = False, observe_only: bool 
             presentation = rf'"(?:true|false|#str_[A-Za-z0-9_.-]+|{number}(?: +{number}){{0,3}}|{number}(?:,{number}){{1,3}})"'
             patterns += [rf'openq4_retainedGui focus {identifier}',
                          r'openq4_retainedGui menu (?:next|previous|up|down|left|right|accept|back) [01]',
-                         rf'openq4_retainedGui state {identifier} {literal}',
+                         rf'openq4_retainedGui (?:state|pending) {identifier} {literal}',
+                         rf'openq4_retainedGui event {alias}',
                          rf'openq4_retainedGui presentation {alias} {presentation} [01]',
-                         r'openq4_retainedGui (?:save|restore|update)']
+                         r'openq4_retainedGui (?:save|restore|update|trigger)']
     lines = [line.strip() for line in source.splitlines() if line.strip() and not line.strip().startswith('//')]
     if len(lines) > 256 or any(not any(re.fullmatch(pattern, line) for pattern in patterns) for line in lines):
         raise ValueError('retained script must contain only semantic control commands and bounded waits')
     if sum(int(line.split()[1]) for line in lines if line.startswith('wait ')) > 3600:
         raise ValueError('retained script waits exceed 3600 frames')
     for line in lines:
-        if line.startswith(('openq4_retainedGui state ', 'openq4_retainedGui presentation ')):
+        if line.startswith('openq4_retainedGui event ') and line.split('"')[1].lower().startswith('gui::'):
+            raise ValueError('managed event names cannot use the reserved gui:: namespace')
+        if line.startswith(('openq4_retainedGui state ', 'openq4_retainedGui pending ', 'openq4_retainedGui presentation ')):
             value = re.findall(r'"([^"]*)"', line)[1]
             if value not in ('true', 'false') and not value.startswith('#str_'):
                 if any(not math.isfinite(float(part)) or abs(float(part)) > 1e12 for part in re.split(r'[, ]+', value)):
@@ -106,7 +110,8 @@ def retained_commands(args: argparse.Namespace, staged_name: str) -> tuple[str, 
 
 
 def managed_evidence(log: str, commands: str, *, peer: bool, resource_resets: int, settings_fixture: bool,
-                     mode: str | None = None, alias_fixture: bool = False, initial_brightness: float = 1) -> dict:
+                     mode: str | None = None, alias_fixture: bool = False, event_fixture: bool = False,
+                     initial_brightness: float = 1) -> dict:
     """Check actual adapter results; an image alone does not qualify actions."""
     lines = log.splitlines()
     errors = []
@@ -120,7 +125,7 @@ def managed_evidence(log: str, commands: str, *, peer: bool, resource_resets: in
             resource_epoch += 1
             observation_segment += 1
             observed_revision = None
-        elif re.fullmatch(r'RETAINED_GUI_OPERATION (?:menu|state|restore|presentation|update) passed', line):
+        elif re.fullmatch(r'RETAINED_GUI_OPERATION (?:menu|state|restore|presentation|update|event|trigger) passed', line):
             observation_segment += 1
             observed_revision = None
         if not line.startswith('RETAINED_GUI '):
@@ -141,7 +146,7 @@ def managed_evidence(log: str, commands: str, *, peer: bool, resource_resets: in
         # StateRevision belongs to the current runtime epoch; snapshots do not
         # serialize it. Only observations without intervening state/action
         # work or a successful resource recreation share a revision contract.
-        if (settings_fixture or alias_fixture) and observed_revision is not None and revision != observed_revision:
+        if (settings_fixture or alias_fixture or event_fixture) and observed_revision is not None and revision != observed_revision:
             errors.append('managed state revision changed within a read-only resource-epoch segment')
         observed_revision = revision
         reports.append(dict(path=path, focus=focus, revision=revision, active=int(active), brightness=number,
@@ -149,7 +154,7 @@ def managed_evidence(log: str, commands: str, *, peer: bool, resource_resets: in
                             observation_segment=observation_segment))
     operations = [line for line in lines if line.startswith('RETAINED_GUI_OPERATION ')]
     expected_operations = ['RETAINED_GUI_OPERATION ' + match.group(1) + ' passed'
-        for match in re.finditer(r'^openq4_retainedGui (focus|menu|state|save|restore|presentation|update)(?: |$)', commands, re.MULTILINE)]
+        for match in re.finditer(r'^openq4_retainedGui (focus|menu|state|pending|save|restore|presentation|update|event|trigger)(?: |$)', commands, re.MULTILINE)]
     if operations != expected_operations:
         errors.append('managed operation results do not match the submitted script or an operation failed')
     expected_reports = len(re.findall(r'^openq4_retainedGui report$', commands, re.MULTILINE))
@@ -222,10 +227,15 @@ def managed_evidence(log: str, commands: str, *, peer: bool, resource_resets: in
         alias_contract = presentation_alias_evidence(log, commands, reports, managed_reads,
                                                      resource_resets=resource_resets, brightness=initial_brightness)
         errors.extend(alias_contract['errors'])
+    event_contract = None
+    if event_fixture:
+        event_contract = event_program_evidence(log, commands, reports, managed_reads, resource_resets=resource_resets)
+        errors.extend(event_contract['errors'])
     return {'passed': not errors, 'errors': errors, 'managed_trace': trace, 'reports': reports,
             'operations': operations, 'resource_events': resources, 'presentation_values': managed_reads,
             'ownership': ownership, 'ownership_passed': ownership_passed, 'session_mode': mode,
             'settings_fixture_contract': settings_fixture, 'presentation_alias_contract': alias_contract,
+            'event_program_contract': event_contract,
             'replacement_acceptance': False}
 
 
@@ -242,6 +252,162 @@ def presentation_alias_sources(args: argparse.Namespace) -> dict:
             raise ValueError('--presentation-alias-probe requires the exact presentation-alias-smoke document and scripts')
         sources[attribute] = {'source': str(supplied), 'sha256': digest(supplied)}
     return {'id': 'presentation-alias-smoke-v1', 'sources': sources}
+
+
+def event_program_sources(args: argparse.Namespace) -> dict:
+    """Event acceptance is scoped to the exact document/setup/resume bytes."""
+    sources = {}
+    for attribute, suffix in (('retained_document', '.q4ui'), ('retained_script', '.cfg'),
+                              ('retained_resume_script', '-resume.cfg')):
+        canonical = Path(str(EVENT_FIXTURE) + suffix)
+        supplied = getattr(args, attribute)
+        if attribute == 'retained_resume_script' and not (args.language_reload or args.video_restart):
+            continue
+        if supplied is None or digest(supplied) != digest(canonical):
+            raise ValueError('--event-program-probe requires the exact event-program-smoke document and scripts')
+        sources[attribute] = {'source': str(supplied), 'sha256': digest(supplied)}
+    return {'id': 'event-program-smoke-v1', 'sources': sources}
+
+
+def event_program_expected_values(resource_resets: int) -> list[tuple[str, str | list[float]]]:
+    """Independent values for the fixed event sequence, including restore."""
+    def final(clicks: int, brightness: str) -> list[tuple[str, str | list[float]]]:
+        return [('activated', [1]), ('initialized', [1]), ('triggered', [1]), ('eventsSeen', [1]),
+                ('nested', [1]), ('blocked', [1]), ('controls', [1]), ('brightnessClicks', [clicks]),
+                ('draftReading', [14]), ('seenPending', [13]), ('seenWidth', [432]),
+                ('curr', [15]), ('desktop::curr', [15]), ('brightness-request', [.75]),
+                ('brightness-target-reading::text', '1.75'), ('panel::rect', [32, 32, 432, 200]),
+                ('title::color', [1, .875, .5, 1]), ('title::text', '#str_200009'),
+                ('panel::visible', [1]), ('panel::noevents', [0]),
+                ('brightness-reading::text', brightness), ('shadows-reading::text', '#str_200158')]
+    initial = [('activated', [1]), ('initialized', [1]), ('triggered', [0]), ('draftReading', [2]), ('curr', [2]),
+               ('draftReading', [2]), ('seenPending', [13]), ('draftReading', [14]), ('seenWidth', [432]),
+               ('curr', [14]), ('desktop::curr', [14]), ('eventsSeen', [1]), ('nested', [1]),
+               ('brightness-request', [.75]), ('shadows-target-reading::text', '1'),
+               ('panel::rect', [32, 32, 432, 200]), ('title::color', [1, .875, .5, 1]),
+               ('blocked', [1]), ('controls', [0]), ('blocked', [1]), ('controls', [1]),
+               ('brightnessClicks', [1]), ('brightness-target-reading::text', '1.75'),
+               ('triggered', [1]), ('curr', [15])]
+    disturbed = [(name, [6]) for name in ('activated', 'initialized', 'triggered', 'eventsSeen',
+                                         'nested', 'blocked', 'controls', 'brightnessClicks')]
+    disturbed += [('draftReading', [42]), ('curr', [99]), ('panel::rect', [48, 32, 432, 200]), ('brightness-request', [1.5])]
+    return initial + disturbed + final(1, '1.50') + final(2, '1.25') * (1 + resource_resets)
+
+
+EVENT_PROGRAM_TRACE = [('onActivate', 1, 2), ('onInit', 0, 1), ('Probe::Main', 3, 7),
+                       ('control::shadows', 0, 1), ('control::shadows', 1, 2),
+                       ('control::brightness', 1, 2), ('onTrigger', 0, 1),
+                       ('probe::disturb', 2, 13), ('control::brightness', 1, 2), ('onDeactivate', 2, 2)]
+EVENT_PROGRAM_DISPATCH = [('settings.brightness.set', 1.25, 1.25, 1, 0),
+                          ('settings.brightness.set', 1.5, 1.5, 1, 0),
+                          ('settings.brightness.set', 1.75, 1.75, 1, 0),
+                          ('settings.shadows.set', 0, 1.75, 0, 0),
+                          ('settings.shadows.set', 1, 1.75, 1, 0),
+                          ('settings.brightness.set', 1.25, 1.25, 1, 0),
+                          ('settings.brightness.set', 1.5, 1.5, 1, 0),
+                          ('settings.shadows.set', 0, 1.5, 0, 0),
+                          ('settings.brightness.set', 1.25, 1.25, 0, 0),
+                          ('settings.brightness.set', 1, 1, 0, 0), ('ui.dismiss', '-', 1, 0, 1)]
+
+
+def event_program_evidence(log: str, commands: str, reports: list[dict], reads: list[tuple[str, str]],
+                           *, resource_resets: int) -> dict:
+    errors = []
+    expected_values = event_program_expected_values(resource_resets)
+    matches = len(reads) == len(expected_values)
+    for (name, value), (target, wanted) in zip(reads, expected_values):
+        if name != target:
+            matches = False
+        if isinstance(wanted, str):
+            matches = matches and value == wanted
+        else:
+            try:
+                numbers = [float(part) for part in re.split(r'[,\s]+', value.strip())]
+                matches = matches and len(numbers) == len(wanted) and all(
+                    math.isfinite(a) and math.isclose(a, b, rel_tol=1e-9, abs_tol=1e-9) for a, b in zip(numbers, wanted))
+            except ValueError:
+                matches = False
+    if not matches:
+        errors.append('event values violate pending/batch order, shared presentation, conditional execution or non-replaying save/reload contract')
+    expected_host = [(1.25, 1), (1.75, 0), (1.75, 0), (1.75, 1), (1.25, 1), (1.5, 0), (1.5, 0), (1.25, 0)]
+    expected_host += [(1.25, 0)] * max(0, len(reports)-8)
+    if len(reports) < 9 or any(row['brightness'] is None or
+            not math.isclose(row['brightness'], brightness, abs_tol=1e-6) or row['shadows'] != shadows
+            for row, (brightness, shadows) in zip(reports, expected_host)):
+        errors.append('event host readbacks violate ordered action capture, conditional control or restore-with-live-host contract')
+    if any(row['focus'] != 'managed-shadows' for row in reports[2:4]) or any(
+            row['focus'] != 'managed-brightness' for row in reports[4:]):
+        errors.append('event control focus did not survive activation, save/restore and resource recreation')
+    lines = log.splitlines()
+    event_lines = [line for line in lines if line.startswith('RETAINED_GUI_EVENT ')]
+    expected_events = [f'RETAINED_GUI_EVENT name={name} actions={actions} writes={writes}'
+                       for name, actions, writes in EVENT_PROGRAM_TRACE]
+    if event_lines != expected_events:
+        errors.append('event commit trace differs: lifecycle replay, missing program, unexpected branch or incorrect action/write count')
+    dispatch = []
+    dispatch_lines = [line for line in lines if line.startswith('RETAINED_GUI_DISPATCH ')]
+    for line in dispatch_lines:
+        match = re.fullmatch(r'RETAINED_GUI_DISPATCH path=(\S+) operation=(\S+) value=(\S+) brightness=(\S+) shadows=([01]) close=([01])', line)
+        if match:
+            path, operation, value, brightness, shadows, close = match.groups()
+            try:
+                item = (operation, value if value == '-' else float(value), float(brightness), int(shadows), int(close))
+                if path == 'retained-smoke.q4ui' and math.isfinite(item[2]) and (value == '-' or math.isfinite(item[1])):
+                    dispatch.append(item)
+                    continue
+            except ValueError:
+                pass
+        errors.append('malformed or non-finite event application dispatch trace')
+    if dispatch != EVENT_PROGRAM_DISPATCH:
+        errors.append('event application dispatch values/order or final deactivation brightness/dismissal differ')
+    # Program traces belong to their initiating semantic command, never to
+    # restore or resource recreation. Dispatch itself may wait for the pump.
+    expected_order = []
+    focus = ''
+    for line in commands.splitlines():
+        if line.startswith('openq4_guiGet '):
+            expected_order.append(('read', line.split('"')[1]))
+        elif line.startswith('openq4_retainedGui '):
+            verb = line.split()[1]
+            if verb == 'focus':
+                focus = line.split('"')[1]
+            if verb == 'event':
+                expected_order.append(('event', line.split('"')[1]))
+            elif verb == 'trigger':
+                expected_order.append(('event', 'onTrigger'))
+            elif line == 'openq4_retainedGui menu accept 0':
+                expected_order.append(('event', 'control::' + focus.removeprefix('managed-')))
+            expected_order.append(('report', '') if verb == 'report' else ('operation', verb))
+    actual_order = []
+    for line in lines:
+        if line.startswith('GUI_VALUE '):
+            actual_order.append(('read', line[len('GUI_VALUE '):].split('=', 1)[0]))
+        elif line.startswith('RETAINED_GUI_OPERATION '):
+            actual_order.append(('operation', line.split()[1]))
+        elif line.startswith('RETAINED_GUI path='):
+            actual_order.append(('report', ''))
+        elif line.startswith('RETAINED_GUI_EVENT '):
+            name = line.split()[1].removeprefix('name=')
+            if name not in ('onActivate', 'onInit', 'onDeactivate'):
+                actual_order.append(('event', name))
+    if actual_order != expected_order:
+        errors.append('event commits, semantic results and readbacks occurred out of the submitted order')
+    # Require the outgoing lifecycle and its host effects after the rendered
+    # capture, then prove the session resumed via the shared ownership oracle.
+    # Engine echo appends a space. Accept surrounding horizontal whitespace,
+    # while requiring one standalone marker rather than a substring match.
+    markers = [i for i, line in enumerate(lines) if line.strip(' \t') == 'UI_BASELINE_CAPTURE_COMPLETE']
+    first_report = next((i for i, line in enumerate(lines) if line.startswith('RETAINED_GUI path=')), -1)
+    lifecycle_valid = len(markers) == 1 and event_lines == expected_events and len(dispatch_lines) == 11
+    if lifecycle_valid:
+        lifecycle_valid = (lines.index(expected_events[0]) < lines.index(expected_events[1]) < first_report < markers[0]
+            < lines.index(expected_events[-1]) < lines.index(dispatch_lines[-2]) < lines.index(dispatch_lines[-1]))
+    if not lifecycle_valid:
+        errors.append('event lifecycle initialization or completed outgoing deactivation was not observed at the capture boundary')
+    return {'id': 'event-program-smoke-v1', 'passed': not errors, 'errors': errors,
+            'expected_values': expected_values, 'event_trace': event_lines, 'dispatch_trace': dispatch_lines,
+            'resource_recreations': resource_resets, 'outgoing_lifecycle_passed': lifecycle_valid,
+            'replacement_acceptance': False}
 
 
 def presentation_alias_expected_values(resource_resets: int, brightness: float) -> list[tuple[str, str | list[float]]]:
@@ -316,6 +482,7 @@ def presentation_alias_evidence(log: str, commands: str, reports: list[dict], re
 
 def capture(args: argparse.Namespace) -> int:
     alias_sources = presentation_alias_sources(args) if args.presentation_alias_probe else None
+    event_sources = event_program_sources(args) if args.event_program_probe else None
     output = args.output.resolve()
     if output.exists():
         raise ValueError('use a new output directory to preserve previous capture evidence')
@@ -374,6 +541,7 @@ def capture(args: argparse.Namespace) -> int:
         'com_maxfps': '60', 'ui_autoJoin': '1' if args.mode == 'mp' else '0',
         'ui_retainedScale': str(args.ui_scale), 'ui_retainedDensity': str(args.density),
         'ui_retainedReducedMotion': '1' if args.reduced_motion else '0',
+        'ui_retainedTrace': '1' if args.event_program_probe else '0',
     }
     if args.retained_managed:
         # Isolated, explicit host defaults make the action/readback sequence
@@ -429,6 +597,8 @@ def capture(args: argparse.Namespace) -> int:
             metadata['retained_preview']['resource_resume_replays_setup'] = False
             if alias_sources:
                 metadata['retained_preview']['presentation_alias_probe'] = alias_sources
+            if event_sources:
+                metadata['retained_preview']['event_program_probe'] = event_sources
             if args.retained_peer:
                 metadata['retained_preview']['peer_source'] = {'source': str(args.retained_document),
                     'sha256': digest(args.retained_document), 'loader': 'ui_retainedPreview', 'closed_after_screenshot': False}
@@ -510,7 +680,8 @@ def capture(args: argparse.Namespace) -> int:
             evidence = managed_evidence(plain_log, preview + close, peer=args.retained_peer,
                 resource_resets=int(args.language_reload) + int(args.video_restart),
                 settings_fixture=args.retained_document.resolve() == ROOT / 'tools/ui/fixtures/managed-settings-smoke.q4ui',
-                mode=args.mode, alias_fixture=args.presentation_alias_probe, initial_brightness=args.brightness)
+                mode=args.mode, alias_fixture=args.presentation_alias_probe, event_fixture=args.event_program_probe,
+                initial_brightness=args.brightness)
             metadata['retained_preview']['managed_trace'] = evidence.pop('managed_trace')
             metadata['retained_preview']['managed_validation'] = evidence
             valid = valid and evidence['passed'] and not retained_diagnostics
@@ -558,6 +729,7 @@ def main() -> int:
     parser.add_argument('--legacy-export-list', type=Path, help='JSON source/hash records to preprocess through the engine without executing GUI scripts.')
     parser.add_argument('--presentation-probe', action='store_true', help='Exercise production presentation reads/writes with an authored legacy fixture after map gameplay; no host input.')
     parser.add_argument('--presentation-alias-probe', action='store_true', help='Managed mode: qualify exact authored presentation-alias-smoke sources; defaults document/setup/resume paths and checks alias ownership and reload readbacks.')
+    parser.add_argument('--event-program-probe', action='store_true', help='Managed mode: qualify exact event-program-smoke sources, lifecycle/ordered-program state and actual application dispatch; enables bounded retained tracing.')
     parser.add_argument('--gamma', type=float, default=1, help='Explicit renderer gamma, finite 0.1..3 (default 1).')
     parser.add_argument('--brightness', type=float, default=1, help='Explicit initial renderer brightness, finite 0..2 (default 1); settings scripts may subsequently change it.')
     parser.add_argument('--timeline', help='Canonical timeline to play before capture, and again after an optional video restart.')
@@ -568,6 +740,13 @@ def main() -> int:
     parser.add_argument('--language-reload', action='store_true', help='Reload the same language dictionary with the preview loaded before optional video restart.')
     parser.add_argument('--profile-frames', type=int, default=0, help='Measure 1..3600 rendered UI frames before capture; zero disables profiling.')
     args = parser.parse_args()
+    if args.event_program_probe:
+        if not args.retained_managed or args.presentation_probe or args.presentation_alias_probe:
+            parser.error('--event-program-probe requires --retained-managed and cannot combine with other presentation probes')
+        args.retained_document = args.retained_document or Path(str(EVENT_FIXTURE) + '.q4ui')
+        args.retained_script = args.retained_script or Path(str(EVENT_FIXTURE) + '.cfg')
+        if args.language_reload or args.video_restart:
+            args.retained_resume_script = args.retained_resume_script or Path(str(EVENT_FIXTURE) + '-resume.cfg')
     if args.presentation_alias_probe:
         if not args.retained_managed or args.presentation_probe:
             parser.error('--presentation-alias-probe requires --retained-managed and cannot combine with --presentation-probe')
