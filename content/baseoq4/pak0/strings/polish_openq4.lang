@@ -995,4 +995,14 @@
 	"#str_229997"	"Ustawienia zostały zaakceptowane, ale zapis nie został ukończony. Ponów próbę, aby dokończyć zapis."
 	"#str_229998"	"10%;25%;50%;75%;85%;100%;125%;150%;200%"
 	"#str_229999"	"Kontynuuj edycję"
+
+	// Transient numeric editor clipboard feedback.
+	"#str_230001"	"Nie można odczytać schowka. Spróbuj ponownie."
+	"#str_230002"	"Nie można skopiować do schowka. Twój tekst pozostał bez zmian."
+	"#str_230003"	"Tekst ze schowka nie pasuje do tego jednowierszowego pola."
+
+	// Precise SYSTEM numeric field validation (decimal point input).
+	"#str_230004"	"Wpisz liczbę od 0.5 do 2."
+	"#str_230005"	"Wpisz liczbę od 0 do 1."
+	"#str_230006"	"Zatwierdź każde pole lub odrzuć niedokończone zmiany."
 }

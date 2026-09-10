@@ -435,6 +435,7 @@ if build_engine or get_option('build_native_tests')
     files('src/ui/retained/Runtime.cpp', 'src/ui/retained/Document.cpp', 'src/ui/retained/Presentation.cpp', 'src/ui/retained/Behavior.cpp', 'src/ui/retained/State.cpp', 'src/ui/retained/Motion.cpp', 'src/ui/retained/Interaction.cpp', 'src/ui/retained/ValueControlView.cpp', 'src/ui/retained/NumberControlView.cpp', 'src/ui/retained/Input.cpp', 'src/ui/retained/TextInput.cpp', 'src/ui/retained/TextEdit.cpp', 'src/ui/retained/TextEditCommand.cpp', 'src/ui/retained/TextInputBroker.cpp', 'src/ui/retained/TextRun.cpp', 'src/ui/retained/Vector.cpp', 'src/ui/retained/VectorElement.cpp', 'src/ui/application/SettingsTransaction.cpp', 'src/ui/application/SettingsJournal.cpp', 'src/ui/application/SettingsDisplayController.cpp'),
     files('src/ui/retained/TextInputBrokerWire.cpp'),
     files('src/ui/retained/NativeTextDocument.cpp'),
+    files('src/ui/retained/NativeTextEditor.cpp'),
     dependencies: [rmlui_project.get_variable('rmlui_dep'), jsoncpp_project.get_variable('jsoncpp_dep'), libtess2_project.get_variable('libtess2_dep')],
     pic: true,
     install: false,
@@ -504,6 +505,30 @@ if build_engine or get_option('build_native_tests')
       install: false,
     )
     test('openq4-ui-native-text-document', openq4_ui_native_text_document_test, timeout: 30)
+    openq4_ui_native_text_editor_test = executable(
+      'openq4-ui-native-text-editor-test',
+      files('tools/tests/native/UiNativeTextEditorTest.cpp'),
+      include_directories: include_directories('src'),
+      dependencies: openq4_retained_dep,
+      install: false,
+    )
+    test('openq4-ui-native-text-editor', openq4_ui_native_text_editor_test, timeout: 30)
+    openq4_ui_native_text_collection_test = executable(
+      'openq4-ui-native-text-collection-test',
+      files('tools/tests/native/UiNativeTextCollectionTest.cpp'),
+      include_directories: include_directories('src'),
+      dependencies: openq4_retained_dep,
+      install: false,
+    )
+    test('openq4-ui-native-text-collection', openq4_ui_native_text_collection_test, timeout: 30)
+    openq4_ui_number_draft_test = executable(
+      'openq4-ui-number-draft-test',
+      files('tools/tests/native/UiNumberDraftTest.cpp'),
+      include_directories: root_include_dir,
+      dependencies: openq4_retained_dep,
+      install: false,
+    )
+    test('openq4-ui-number-draft', openq4_ui_number_draft_test, timeout: 30)
     openq4_ui_text_run_test = executable(
       'openq4-ui-text-run-test',
       files('tools/tests/native/UiTextRunTest.cpp'),
@@ -1459,6 +1484,14 @@ if build_engine or get_option('build_native_tests')
   text_ingress_dep = declare_dependency(link_with: text_ingress_library)
   if build_engine
     client_deps += text_ingress_dep
+  endif
+  if build_engine and use_sdl3_backend
+    native_queue_library = static_library('openq4-native-queue',
+      files('src/sys/sdl3/NativeQueueBatch.cpp', 'src/sys/sdl3/NativeQueueSource.cpp'),
+      include_directories: [root_include_dir, include_directories('subprojects/packagefiles/sdl3/include')],
+      dependencies: [openq4_retained_dep] + text_ingress_headers,
+      cpp_args: ['-DUSE_SDL3'], pic: true, install: false)
+    client_deps += declare_dependency(link_with: native_queue_library)
   endif
   if get_option('build_native_tests') and build_engine and use_sdl3_backend
     text_ingress_test_headers = [root_include_dir, include_directories('subprojects/packagefiles/sdl3/include')]

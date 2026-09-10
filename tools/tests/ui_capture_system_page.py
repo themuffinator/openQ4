@@ -36,7 +36,10 @@ def trace(mode='sp', renderer='gl'):
             owner += 36
             lines += ['RETAINED_GUI_LOADED '+capture.PAGE, 'OPENQ4_SYSTEM operation=open result=1', route(stage,mode)]
         lines += ['RETAINED_GUI_OPERATION '+command.split()[1]+' passed' for command in stage['commands'] if command.startswith('openq4_retainedGui ')]
-        lines += [f'RETAINED_GUI_EVENT name={event} actions={actions} writes={writes}' for event,actions,writes in stage['events']]
+        # Pin the changed production event shapes independently of stages().
+        events = [('apply',1,0)] if stage['name'] in ('applied','extras_applied','extras_restored') else \
+                 [('continueediting',1,1)] if stage['name']=='keep_editing' else stage['events']
+        lines += [f'RETAINED_GUI_EVENT name={event} actions={actions} writes={writes}' for event,actions,writes in events]
         lines += [f'UI_SETTINGS operation=settings.system.{operation} result=0 phase={0 if operation=="cancel" else 1} owner={owner} dirty={dirty}' for operation,dirty in stage['actions']]
         if not stage['page']:
             lines.append(f'RETAINED_GUI_DISPATCH path={capture.PAGE} operation=ui.dismiss value=- brightness=1.100000 shadows=1 close=1')
@@ -66,6 +69,58 @@ def package(path, members):
             for name,raw in members: archive.writestr(name,raw)
 
 
+def number_contract_mutations(original):
+    """Independent canonical-source changes shared by both runner preflights."""
+    def node(model,name):
+        pending=[model['root']]
+        while pending:
+            item=pending.pop()
+            if item['id']==name:return item
+            pending.extend(item.get('children',[]))
+        raise AssertionError('missing canonical node '+name)
+    def binding(model,name):return next(item for item in model['bindings'] if item['id']==name)
+    mutations=[
+        ('pending-source-removed',lambda m:m['state'].pop('ui.numberDraftsPending')),
+        ('pending-host-owned',lambda m:m['state']['ui.numberDraftsPending'].update(cvar='r_brightness')),
+        ('pending-wrong-type',lambda m:m['state']['ui.numberDraftsPending'].update(type='number',initial=0)),
+        ('pending-numeric-false',lambda m:m['state']['ui.numberDraftsPending'].update(initial=0)),
+        ('message-caller-write',lambda m:m['events']['apply'][0]['then'].append({'op':'setState','values':{'ui.numberDraftMessage':'forged'}})),
+        ('apply-guard-removed',lambda m:m['events']['apply'][0].update(condition=True)),
+        ('apply-direct-bypass',lambda m:node(m,'settings_apply')['control'].update(action='apply')),
+        ('apply-local-write',lambda m:m['events']['apply'][0]['then'].append({'op':'setState','values':{'page.discardVisible':False}})),
+        ('apply-enabled-bypass',lambda m:binding(m,'settings_apply.enabled').update(value={'state':'settings.canApply'})),
+        ('apply-opaque-while-disabled',lambda m:binding(m,'settings_apply.opacity').update(value=1)),
+        ('apply-exit-guard-removed',lambda m:m['events']['applyExit'][0].update(condition=True)),
+        ('apply-exit-availability-bypass',lambda m:binding(m,'discard_apply_changes.enabled').update(value=True)),
+        ('back-ignores-local-only',lambda m:m['events']['onBack'][0]['else'][0]['then'][0].update(condition={'state':'settings.dirty'})),
+        ('back-modal-no-refocus',lambda m:m['events']['onBack'][0].update(then=[{'op':'setState','values':{'page.discardVisible':False}}])),
+        ('continue-drops-refocus',lambda m:m['events']['continueEditing'].pop()),
+        ('continue-focus-before-hide',lambda m:m['events']['continueEditing'].reverse()),
+        ('focus-action-wrong-target',lambda m:m['actions']['focusNumberDraft'].update(operation='ui.dismiss')),
+        ('focus-action-arguments',lambda m:m['actions']['focusNumberDraft'].update(arguments={'value':1})),
+        ('discard-guard-removed',lambda m:m['events']['discard'][0].update(condition=True)),
+        ('discard-closed-local-unavailable',lambda m:m['events']['discard'][0].update(condition={'state':'settings.open'})),
+        ('discard-close-before-cancel',lambda m:m['events']['discard'][0]['then'].reverse()),
+        ('discard-disabled-closed',lambda m:binding(m,'discard_changes.enabled').update(value={'state':'settings.open'})),
+        ('discard-panel-hides-local-only',lambda m:binding(m,'discard-panel.display').update(value='none')),
+        ('local-guidance-hides-recovery',lambda m:binding(m,'settings-message.text').update(value={'op':'select','args':[{'state':'ui.numberDraftsPending'},{'state':'ui.numberDraftMessage'},{'state':'settings.message'}]})),
+        ('number-baseline-source',lambda m:node(m,'settings_brightness_number')['control'].update(value={'state':'settings.baseline.r_brightness'})),
+        ('number-wrong-typed-action',lambda m:node(m,'settings_brightness_number')['control'].update(action='edit.r_forceAmbient')),
+        ('number-range-drift',lambda m:node(m,'settings_ambient_number')['control'].update(maximum=2)),
+        ('number-quantization',lambda m:node(m,'settings_brightness_number')['control'].update(step=.1)),
+        ('number-unbounded',lambda m:node(m,'settings_brightness_number')['control'].update(maxBytes=65536)),
+        ('number-no-exponent',lambda m:node(m,'settings_brightness_number')['control'].update(exponent=False)),
+        ('number-numeric-boolean',lambda m:node(m,'settings_brightness_number')['control'].update(exponent=1)),
+        ('number-unclipped',lambda m:node(m,'settings_brightness_number-viewport')['properties'].update(overflow={'type':'keyword','value':'visible'})),
+        ('number-reordered-focus',lambda m:node(m,'settings_brightness_row-controls')['children'].reverse()),
+        ('number-no-wrap',lambda m:node(m,'settings_brightness_row-controls')['properties'].update({'flex-wrap':{'type':'keyword','value':'nowrap'}})),
+        ('number-nested-role',lambda m:node(m,'settings_brightness_row-controls').update(control={'role':'button'})),
+        ('number-availability-bypass',lambda m:binding(m,'settings_brightness_number.enabled').update(value=True)),
+    ]
+    for name,change in mutations:
+        model=copy.deepcopy(original);change(model);yield name,model
+
+
 class SystemPageOracleTests(unittest.TestCase):
     negative_cases = 0
 
@@ -84,6 +139,30 @@ class SystemPageOracleTests(unittest.TestCase):
             self.assertFalse(result['replacement_acceptance'])
             self.assertFalse(result['full_system_acceptance'])
         self.assertTrue(capture.qualify(trace().replace('=1.1\n','=1.1000000000000001\n'),'sp')['passed'])
+
+    def test_exact_apply_continue_program_counts_and_order(self):
+        original=trace();apply='RETAINED_GUI_EVENT name=apply actions=1 writes=0'
+        continued='RETAINED_GUI_EVENT name=continueediting actions=1 writes=1'
+        self.assertEqual(original.count(apply),3);self.assertEqual(original.count(continued),1)
+        for old in (apply,continued):
+            for changed in (old.replace('actions=1','actions=0'),old.replace('actions=1','actions=2'),
+                            old.replace('writes=0','writes=1') if old==apply else old.replace('writes=1','writes=0'),
+                            old+'\n'+old,old.replace('name=','name=wrong_')):
+                self.reject(original.replace(old,changed,1))
+        lines=original.splitlines();at=lines.index(apply);service=next(i for i in range(at+1,len(lines)) if lines[i].startswith('UI_SETTINGS operation=settings.system.apply '))
+        lines[at],lines[service]=lines[service],lines[at];self.reject('\n'.join(lines))
+
+    def test_matched_staged_source_cannot_weaken_local_draft_guards(self):
+        raw=(ROOT/'content/baseoq4/pak0'/capture.PAGE).read_text(encoding='utf-8')
+        original=json.loads('\n'.join(line for line in raw.splitlines() if not line.lstrip().startswith('//')))
+        for name,model in number_contract_mutations(original):
+            with self.subTest(name=name),tempfile.TemporaryDirectory(prefix='system-number-contract-',dir=ROOT/'.tmp') as directory:
+                root=Path(directory);runtime=root/'.install';data=json.dumps(model).encode('utf-8')
+                source=root/'content/baseoq4/pak0'/capture.PAGE;source.parent.mkdir(parents=True);source.write_bytes(data)
+                package(runtime/'baseoq4/pak0.pk4',[(capture.PAGE,data)])
+                with patch.object(capture,'ROOT',root):
+                    with self.assertRaises(ValueError):capture.source_contract(runtime)
+                type(self).negative_cases += 1
 
     def test_every_required_observation_is_required_and_ordered(self):
         original = trace().splitlines()

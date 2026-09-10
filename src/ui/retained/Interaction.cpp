@@ -32,7 +32,7 @@ void Interaction::Reset(const DocumentModel& model) {
 	CancelGesture(); pointerOption.clear(); pointerFraction.reset();
 	items.clear(); order.clear(); parents.clear(); modals.clear(); feedback.clear(); actions.clear(); overflowed = false;
 	authoredModals.clear(); modalBlocked = focusPending = false; pendingFocus.clear();
-	modalToken = ProposalToken(); blockedNavigation = heldNavigation;
+	modalToken = ProposalToken(); numberEpoch = ProposalToken(); blockedNavigation = heldNavigation;
 	std::vector<std::pair<const Node*,std::string>> pending{{&model.root,{}}};
 	while (!pending.empty()) {
 		const auto [node,parent] = pending.back(); pending.pop_back(); parents[node->id] = parent;
@@ -59,10 +59,22 @@ bool Interaction::SetReadbacks(const std::map<std::string,ControlReadback>& read
 		} else if (!value.enabledOptions.empty()) { error = "Unexpected choice availability"; return false; }
 	}
 	if (expected != readbacks.size()) { error = "Unknown control readback"; return false; }
+	// Reserve every changed draft stamp before publishing any new readback.
+	// Matching pending readback is still a change until acknowledgement rebases.
+	std::map<std::string,std::uint64_t> revisions;
+	for (const auto& [id,value] : readbacks) {
+		const auto& item = items.at(id);
+		if (item.number && (!item.readback || item.readback->value != value.value)) {
+			const auto revision = ProposalToken();
+			if (!revision) { error = "Number draft identity exhausted"; return false; }
+			revisions.emplace(id,revision);
+		}
+	}
 	for (const auto& [id,value] : readbacks) {
 		auto& item = items.at(id);
 		const bool changed = !item.readback || item.readback->value != value.value;
 		item.readback = value;
+		if (changed && item.number) item.number->draftRevision = revisions.at(id);
 		if (changed && item.number && (!item.pending || *item.pending != value.value)) {
 			item.pending.reset(); item.proposalToken = 0; item.rejected.reset();
 			std::erase_if(actions,[&](const ControlAction& action) { return action.node == id && action.editSession != 0; });
@@ -72,8 +84,8 @@ bool Interaction::SetReadbacks(const std::map<std::string,ControlReadback>& read
 			} else {
 				// Preserve the local text for review, but invalidate its former
 				// owner revision and queued proposal when authoritative data wins.
-				item.number->buffer.CancelComposition(); item.number->conflict = true;
-				if (!item.number->detached) item.number->identity.revision = ProposalToken();
+				item.number->buffer.CancelComposition(); item.number->conflict = true; item.number->notice = NumberEditNotice::None;
+				if (!item.number->detached) item.number->identity.revision = item.number->draftRevision;
 			}
 		}
 	}
@@ -96,7 +108,9 @@ bool Interaction::Propose(const std::string& id, const StateValue& value) {
 	if (actions.size() >= 256) { overflowed = true; return false; }
 	const auto token = ProposalToken(); if (!token) { overflowed = true; return false; }
 	ControlAction action{ControlAction::Kind::Activate,document,id,item.control.action,item.control.event,value,token};
-	Queue(std::move(action)); item.pending = value; item.proposalToken = token; item.rejected.reset(); return true;
+	Queue(std::move(action)); item.pending = value; item.proposalToken = token; item.rejected.reset();
+	if (item.number) item.number->draftRevision = token;
+	return true;
 }
 void Interaction::Activate(const std::string& id) {
 	auto& item = items.at(id);
@@ -117,7 +131,9 @@ bool Interaction::AcknowledgeProposal(const std::string& id, std::uint64_t token
 			std::string unused;
 			if (!RebaseNumber(item,unused)) RetireNumber(id,item);
 		} else {
-			item.number->identity.revision = ProposalToken();
+			const auto revision = ProposalToken();
+			if (!revision) return false;
+			item.number->identity.revision = item.number->draftRevision = revision;
 			// An acknowledgement alone cannot manufacture an accepted value.
 			if (accepted) item.number->conflict = true;
 		}
@@ -143,13 +159,15 @@ std::optional<WidgetViewState> Interaction::Widget(const std::string& id) const 
 		number.status = ParseTextNumber(number.state.text,NumberPolicy(item.control),parsed);
 		number.dirty = number.state.text != editor.baselineText || number.composition.has_value();
 		number.conflict = editor.conflict; number.canUndo = editor.buffer.CanUndo(); number.canRedo = editor.buffer.CanRedo();
-		number.active = !editor.detached;
+		number.active = !editor.detached; number.notice = editor.notice;
 		view.number = std::move(number);
 	}
 	return view;
 }
 bool Interaction::RebaseNumber(Item& item, std::string& error) {
 	NumberEditor editor;
+	editor.draftLifetime = editor.draftRevision = ProposalToken();
+	if (!editor.draftLifetime) { error = "Number draft identity exhausted"; return false; }
 	const auto& spec = std::get<NumberSpec>(item.control.widget);
 	editor.baselineValue = std::get<double>(item.readback->value);
 	editor.detached = !item.number || item.number->detached;
@@ -179,7 +197,7 @@ bool Interaction::BeginNumberEdit(const std::string& id, std::string& error) {
 	if (editor.detached) {
 		const NumberEditIdentity identity{ProposalToken(),ProposalToken()};
 		if (!identity.session || !identity.revision) { error = "Number edit identity exhausted"; return false; }
-		editor.identity = identity; editor.detached = false;
+		editor.identity = identity; editor.draftRevision = identity.revision; editor.detached = false;
 	}
 	if (created) item.number = std::move(created);
 	item.rejected.reset(); return true;
@@ -202,7 +220,7 @@ bool Interaction::ResolveNumberConflict(const std::string& id, NumberEditIdentit
 		!baseline.SetSelection(0,candidate.baselineText.size(),error)) return false;
 	if (keepDraft) candidate.buffer.CancelComposition(); else candidate.buffer = std::move(baseline);
 	const auto revision = ProposalToken(); if (!revision) { error = "Number edit identity exhausted"; return false; }
-	candidate.identity.revision = revision; candidate.conflict = false;
+	candidate.identity.revision = candidate.draftRevision = revision; candidate.conflict = false; candidate.notice = NumberEditNotice::None;
 	item.number = std::move(candidate); item.pending.reset(); item.rejected.reset(); item.proposalToken = 0;
 	std::erase_if(actions,[&](const ControlAction& action) { return action.node == id && action.editSession != 0; });
 	return true;
@@ -222,7 +240,8 @@ bool Interaction::ChangeNumber(const std::string& id, NumberEditIdentity expecte
 	TextEditBuffer candidate = item->number->buffer;
 	if (!change(candidate,error)) return false;
 	const auto revision = ProposalToken(); if (!revision) { error = "Number edit identity exhausted"; return false; }
-	item->number->buffer = std::move(candidate); item->number->identity.revision = revision;
+	item->number->buffer = std::move(candidate); item->number->identity.revision = item->number->draftRevision = revision;
+	item->number->notice = NumberEditNotice::None;
 	item->rejected.reset(); return true;
 }
 bool Interaction::SetNumberSelection(const std::string& id, NumberEditIdentity expected,
@@ -231,6 +250,13 @@ bool Interaction::SetNumberSelection(const std::string& id, NumberEditIdentity e
 }
 bool Interaction::ApplyNumberInput(const std::string& id, NumberEditIdentity expected, const TextInputEvent& event, std::string& error) {
 	return ChangeNumber(id,expected,[&](TextEditBuffer& buffer,std::string& e) { return buffer.Apply(event,e); },error);
+}
+bool Interaction::SetNumberNotice(const std::string& id, NumberEditIdentity expected, NumberEditNotice notice, std::string& error) {
+	auto* item = EditableNumber(id,expected,error); if (!item) return false;
+	if (notice < NumberEditNotice::None || notice > NumberEditNotice::ClipboardRejected || item->number->buffer.Composition()) {
+		error = "Number clipboard notice is invalid or composing"; return false;
+	}
+	item->number->notice = notice; return true;
 }
 bool Interaction::ReplaceNumberSelection(const std::string& id, NumberEditIdentity expected, std::string_view text, std::string& error) {
 	return ChangeNumber(id,expected,[&](TextEditBuffer& buffer,std::string& e) { return buffer.ReplaceSelection(text,e); },error);
@@ -258,9 +284,10 @@ bool Interaction::ApplyNumberOperation(const std::string& id, NumberEditIdentity
 	const auto& after = candidate.State();
 	const bool changed = before.text != after.text || before.anchor != after.anchor || before.caret != after.caret;
 	if (changed != operation.changed) { error = "Number command change flag does not match its operation"; return false; }
-	if (!changed) return true;
+	if (!changed) { item->number->notice = NumberEditNotice::None; return true; }
 	const auto revision = ProposalToken(); if (!revision) { error = "Number edit identity exhausted"; return false; }
-	item->number->buffer = std::move(candidate); item->number->identity.revision = revision;
+	item->number->buffer = std::move(candidate); item->number->identity.revision = item->number->draftRevision = revision;
+	item->number->notice = NumberEditNotice::None;
 	item->rejected.reset(); return true;
 }
 bool Interaction::CommitNumberEdit(const std::string& id, NumberEditIdentity expected, std::string& error) {
@@ -270,16 +297,23 @@ bool Interaction::CommitNumberEdit(const std::string& id, NumberEditIdentity exp
 		error = "Number text is incomplete, invalid, out of range or composing"; return false;
 	}
 	if (!modalToken || !Propose(id,value)) { error = "Number proposal could not be queued"; return false; }
+	item->number->notice = NumberEditNotice::None;
 	actions.back().editSession = expected.session; actions.back().editRevision = expected.revision; return true;
 }
 void Interaction::RetireNumber(const std::string& id, Item& item) {
 	if (item.control.role != ControlRole::Number) return;
+	// Inventory epochs prevent an empty -> editor -> empty ABA from authorizing
+	// a previously captured discard. Exhaustion fails all future guard queries.
+	if (item.number) numberEpoch = ProposalToken();
 	item.number.reset(); item.pending.reset(); item.rejected.reset(); item.proposalToken = 0;
 	std::erase_if(actions,[&](const ControlAction& action) { return action.node == id && action.editSession != 0; });
 }
 void Interaction::DetachNumber(const std::string& id, Item& item) {
 	if (!item.number) return;
+	if (!item.number->detached || item.number->buffer.Composition() || item.pending || item.proposalToken)
+		item.number->draftRevision = ProposalToken();
 	item.number->buffer.CancelComposition(); item.number->identity = {}; item.number->detached = true;
+	item.number->notice = NumberEditNotice::None;
 	item.pending.reset(); item.rejected.reset(); item.proposalToken = 0;
 	std::erase_if(actions,[&](const ControlAction& action) { return action.node == id && action.editSession != 0; });
 }
@@ -288,6 +322,55 @@ bool Interaction::CancelNumberEdit(const std::string& id, NumberEditIdentity exp
 	if (found == items.end() || !found->second.number ||
 		((expected.session || expected.revision) && expected != found->second.number->identity)) return false;
 	RetireNumber(id,found->second); return true;
+}
+bool Interaction::QueryNumberDrafts(NumberDraftSummary& out, std::string& error) const {
+	error.clear();
+	if (!numberEpoch) { error = "Number draft barrier is unavailable"; return false; }
+	NumberDraftSummary candidate; candidate.barrier.instance = numberEpoch;
+	for (const auto& id : order) {
+		const auto& item = items.at(id);
+		if (!item.number) continue;
+		const auto& editor = *item.number;
+		if (!editor.draftLifetime || !editor.draftRevision || candidate.barrier.editors.size() >= ValueWidgetSnapshot::MaxNumberEditors) {
+			error = "Number draft barrier exceeds its identity or count budget"; return false;
+		}
+		candidate.barrier.editors.push_back({id,editor.draftLifetime,editor.draftRevision});
+		const bool composing = editor.buffer.Composition().has_value();
+		const bool dirty = editor.buffer.State().text != editor.baselineText || composing;
+		if (!dirty && !editor.conflict && !item.pending && !composing) continue;
+		double value = 0;
+		candidate.blocking.push_back({id,ParseTextNumber(editor.buffer.State().text,NumberPolicy(item.control),value),
+			dirty,editor.conflict,item.pending.has_value(),composing,!editor.detached,false});
+	}
+	out = std::move(candidate); return true;
+}
+bool Interaction::DiscardNumberDrafts(const NumberDraftBarrier& expected, std::string& error) {
+	NumberDraftSummary current;
+	if (!QueryNumberDrafts(current,error)) return false;
+	if (expected != current.barrier) { error = "Number draft barrier is stale"; return false; }
+	const auto epoch = ProposalToken();
+	if (!epoch) { error = "Number draft identity exhausted"; return false; }
+	// All fallible validation precedes deletion. One new epoch invalidates even
+	// an empty accepted inventory, without introducing per-field partial failure.
+	for (auto& [id,item] : items) if (item.number) {
+		item.number.reset(); item.pending.reset(); item.rejected.reset(); item.proposalToken = 0;
+	}
+	std::erase_if(actions,[](const ControlAction& action) { return action.editSession != 0; });
+	numberEpoch = epoch; return true;
+}
+bool Interaction::FocusNumberDraft(const NumberDraftBarrier& expected, const std::string& control, std::string& error) {
+	NumberDraftSummary current;
+	if (!QueryNumberDrafts(current,error)) return false;
+	if (expected != current.barrier) { error = "Number draft barrier is stale"; return false; }
+	if (std::none_of(current.blocking.begin(),current.blocking.end(),[&](const NumberDraftStatus& status) { return status.control == control; })) {
+		error = "Number control has no blocking local draft"; return false;
+	}
+	// Focus can detach another editor. Stage the entire semantic change so a
+	// disabled/modal-ineligible/pending target or identity failure changes none.
+	Interaction candidate = *this;
+	if (!candidate.Focus(control)) { error = "Number draft is not eligible for focus"; return false; }
+	if (!candidate.BeginNumberEdit(control,error)) return false;
+	*this = std::move(candidate); return true;
 }
 double Interaction::SliderValue(const SliderSpec& spec, double fraction) const {
 	fraction = std::clamp(fraction,0.0,1.0);
@@ -425,6 +508,8 @@ bool Interaction::RestoreWidgets(const ValueWidgetSnapshot& snapshot, std::strin
 			TextEditBuffer baseline;
 			if (!baseline.Reset(saved.baselineText,{spec.maxBytes,false,false},error)) return false;
 			NumberEditor editor;
+			editor.draftLifetime = editor.draftRevision = ProposalToken();
+			if (!editor.draftLifetime) { error = "Number draft identity exhausted"; return false; }
 			if (!editor.buffer.RestoreHistory(saved.state,{saved.undo,saved.redo},{spec.maxBytes,false,false},error)) return false;
 			editor.baselineText = saved.baselineText; editor.baselineValue = saved.baselineValue; editor.conflict = saved.conflict;
 			if (std::get<double>(item.readback->value) != saved.baselineValue) {
@@ -440,6 +525,8 @@ bool Interaction::RestoreWidgets(const ValueWidgetSnapshot& snapshot, std::strin
 		}
 	}
 	Interaction candidate = *this;
+	candidate.numberEpoch = ProposalToken();
+	if (!candidate.numberEpoch) { error = "Number draft identity exhausted"; return false; }
 	candidate.CancelGesture(); candidate.hovered.clear(); candidate.pointerOption.clear(); candidate.pointerFraction.reset();
 	candidate.actions.clear(); candidate.feedback.clear(); candidate.overflowed = false;
 	for (auto& [id,item] : candidate.items) {
@@ -593,7 +680,7 @@ void Interaction::Input(MenuInput input, bool down) {
 			else if (items.contains(focused) && items.at(focused).number) {
 				auto& item = items.at(focused);
 				if (item.number->buffer.Composition()) {
-					item.number->buffer.CancelComposition(); item.number->identity.revision = ProposalToken();
+					item.number->buffer.CancelComposition(); item.number->identity.revision = item.number->draftRevision = ProposalToken();
 				} else RetireNumber(focused,item);
 			}
 			else if (!modalBlocked) {
@@ -783,6 +870,8 @@ bool Interaction::Restore(const InteractionSnapshot& snapshot, std::string& erro
 		(!snapshot.pendingFocus.empty() && (!items.contains(snapshot.pendingFocus) || !Within(snapshot.pendingFocus,previous))))
 		return reject("Invalid restored pending modal focus");
 	Interaction candidate = *this;
+	candidate.numberEpoch = ProposalToken();
+	if (!candidate.numberEpoch) return reject("Number draft identity exhausted");
 	candidate.focused = snapshot.focus;
 	candidate.modals.clear();
 	for (const auto& scope : snapshot.modals) candidate.modals.push_back({scope.root,scope.restore,scope.authored});

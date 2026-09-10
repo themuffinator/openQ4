@@ -333,8 +333,14 @@ static void Drafts() {
     host.live["r_brightness"]=1.8;
     Check(Dispatch(owner,"cancel") && host.writes.size()==writes && host.reads==reads,"cancel closes without host I/O");
     Private(owner,false);Check(host.live.at("r_brightness")==StateValue(1.8),"cancel preserves external host values");
-    Check(!Dispatch(owner,"edit",{{"r_brightness",1.4}}),"closed edit rejected");
-    Expect(owner,"message",std::string("#str_229984"));
+    Check(Dispatch(owner,"cancel") && host.writes.size()==writes && host.reads==reads,
+        "repeated closed cancel permits local-only discard without host I/O");
+    UI_SettingsReleaseOwner(owner);
+    Check(!Dispatch(owner,"cancel"),"closed cancel still requires a registered live owner");
+    const auto fresh=UI_SettingsCreateOwner();
+    Check(Dispatch(fresh,"cancel"),"registered local-only owner can discard without opening a transaction");
+    Check(!Dispatch(fresh,"edit",{{"r_brightness",1.4}}),"closed edit rejected");
+    Expect(fresh,"message",std::string("#str_229984"));
 }
 static void Devices() {
     const auto owner=Begin();
@@ -663,8 +669,11 @@ static void StartupShutdown() {
     deviceData.startup=true;
     const auto owner=UI_SettingsCreateOwner();
     Check(UI_SettingsStartupActive() && UI_SettingsBlocksConfigWrite() && !Dispatch(owner,"begin"),"startup recovery blocks editing and configuration");
+    Check(!Dispatch(owner,"cancel"),"closed cancel cannot bypass startup recovery");
     UI_SettingsFrame(false);Check(deviceData.frames==1,"loading frame forwards poll-only recovery");
     deviceData.startup=false;Check(Dispatch(owner,"begin"),"settled startup admits owner");
+    Check(Dispatch(owner,"cancel"),"close owner before separate recovery");
+    deviceData.blocked=true;Check(!Dispatch(owner,"cancel"),"closed cancel cannot bypass unresolved device recovery");deviceData.blocked=false;
     UI_SettingsShutdown();Check(deviceData.shutdowns==1,"service shutdown releases engine host once");
     const auto replacement=UI_SettingsCreateOwner();Check(replacement>owner,"service recreation never reuses owner identity");
     StateValues sentinel={{"sentinel",true}},output=sentinel;
@@ -737,6 +746,7 @@ static void ExitInvalidate(const std::string& operation) {
     else if(operation=="shutdown") {UI_SettingsShutdown();Check(UI_SettingsCreateOwner()>owner,"shutdown invalidates receipt identity");}
     else if(operation=="invalid")Check(!Dispatch(owner,"applyExit",{{"exit",true}}),"dictionary flag cannot authorize exit");
     else if(operation=="edit")Check(!Dispatch(owner,"edit",{{"r_brightness",1.7}}),"new operation invalidates old receipt even when closed");
+    else if(operation=="cancel")Check(Dispatch(owner,"cancel"),"closed cancel succeeds but invalidates old exit receipt");
     else Check(!Dispatch(owner,operation),"closed transaction operation fails");
     NoExit(owner);Check(host.writes.empty(),"receipt invalidation never writes CVars");
 }

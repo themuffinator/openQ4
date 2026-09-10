@@ -182,6 +182,7 @@ private:
 	idList<idUserInterfaceManaged*> allocations;
 	unsigned long long nextAllocationId = 0;
 	bool textBoundaryActive = false, textBoundaryFailed = false;
+	bool clipboardBoundaryActive = false, clipboardBoundaryFailed = false;
 	int applicationPumpDepth = 0;
 	int applicationPumpBudget = 0;
 	idList<idUserInterfaceManaged*> guis;

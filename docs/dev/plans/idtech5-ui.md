@@ -413,3 +413,21 @@ still needs checked queue consumption before activation. Native field routing,
 composition reconciliation, complete text shaping, production controls, artwork,
 editor and every migration/final gate remain required. Evidence is preserved in
 `.tmp/ui/native-owner-integration/validation-evidence.json`.
+
+The precise SYSTEM-field increment pairs the original Brightness and Ambient
+Brightness sliders with numeric entry, localized validation and checked
+clipboard commands. Unfinished active or inactive text blocks conflicting
+settings work and exit; Keep Editing resumes the draft, and Discard waits for
+completed service cancellation before clearing local text. The production
+modal-focus path refreshes projected layout before resuming the field. The
+Windows build and 32 UI suites cover these changes, including an actual-Rml
+same-dispatch modal regression and growing-validation scroll checks. SP/OpenGL
+at 125% density and MP/Vulkan at 200% each pass 37 semantic operations with 17
+reviewed engine images after gameplay; notices, safe draft continuation, Apply,
+Discard and reopen are covered. The scoped record is
+`.tmp/ui/native-editing-integration/validation-evidence.json`.
+Checked SDL queue consumption, owned event
+collections and the portable multi-transaction composition reconciler are also
+implemented, with native activation still disabled. The scoped evidence remains
+separate from complete native input, international text, all production pages,
+the editor, every migration and all final gates. No acceptance status changes.

@@ -396,6 +396,17 @@ in diagnostics, not in the menu's status text.
 
 ## Open dependencies and acceptance evidence
 
+The opt-in retained SYSTEM page now pairs its Brightness and Ambient Brightness
+sliders with precise numeric fields. Both controls address the same typed service
+draft, while unconfirmed text stays local to its field. The adapter blocks Apply,
+Apply and Exit, Defaults and a colliding sibling edit until each local draft is
+committed or explicitly discarded. Back opens the existing discard dialog for
+local-only changes as well as service changes. Keep Editing returns to the first
+blocking field; successful completed cancellation is required before local text
+can be discarded. Queued device rollback and stale readback preserve the draft.
+See [numeric field ownership and validation](numeric-fields.md). These behaviors
+do not qualify ordinary native text entry or accept the complete SYSTEM page.
+
 The [private display-device service](display-device-contract.md) now supplies
 strict window requests/readback, recoverable restart/restore and actual backend
 presentation results. It is a dependency for the following work, not a reason

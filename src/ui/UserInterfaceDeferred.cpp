@@ -192,3 +192,18 @@ idVec4 idUserInterfaceDeferred::GetLightColor() { return backend != NULL ? backe
 bool idUserInterfaceDeferred::GetMaxTextIndex( const char *windowName, const char *text, wrapInfo_t &wrapInfo ) const {
 	return backend != NULL && backend->GetMaxTextIndex( windowName, text, wrapInfo );
 }
+
+bool idUserInterfaceDeferred::TakeClipboardRequest(const char* command, uiClipboardRequest_t& out) {
+	return backend != NULL && backend->TakeClipboardRequest(command,out);
+}
+bool idUserInterfaceDeferred::QueryClipboardEditor(uiNumberEditorSnapshot_t& out, std::string& error) {
+	return backend != NULL && backend->QueryClipboardEditor(out,error);
+}
+bool idUserInterfaceDeferred::ReplaceClipboardSelection(const uiNumberEditorTarget_t& expected,
+	std::string_view text, std::string& error) {
+	return backend != NULL && backend->ReplaceClipboardSelection(expected,text,error);
+}
+bool idUserInterfaceDeferred::SetClipboardNotice(const uiNumberEditorTarget_t& expected,
+	openq4::ui::NumberEditNotice notice, std::string& error) {
+	return backend != NULL && backend->SetClipboardNotice(expected,notice,error);
+}

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 from functools import cmp_to_key
+from functools import reduce
 import hashlib
 import json
 import math
@@ -162,12 +163,12 @@ def stages() -> list[dict]:
         actions=[('begin', 0)], events=[('onactivate', 1, 1)], opening=True)
     add('brightness_dirty', ['openq4_retainedGui focus "settings_brightness"'] + key('right'),
         baseline=1, dirty=1, live=1, actions=[('edit', 1)], screenshot='draft')
-    add('applied', activate('settings_apply'), actions=[('apply', 0)], screenshot='applied')
+    add('applied', activate('settings_apply'), actions=[('apply', 0)], events=[('apply', 1, 0)], screenshot='applied')
     add('shadow_dirty', activate('settings_shadows'), shadows=0, dirty=1, actions=[('edit', 1)])
     add('discard_dialog', activate('settings_back'), shadows=0, dirty=1, discard=1,
         events=[('onback', 0, 1)], screenshot='discard')
     add('keep_editing', activate('discard_keep_editing'), shadows=0, dirty=1,
-        events=[('continueediting', 0, 1)])
+        events=[('continueediting', 1, 1)])
     add('discarded', activate('settings_back') + ['wait 3'] + activate('discard_changes'),
         page=False, actions=[('cancel', 0)], events=[('onback', 0, 1), ('discard', 2, 1)])
     add('reopen_discarded', ['openq4_system open'], actions=[('begin', 0)],
@@ -197,10 +198,10 @@ def stages() -> list[dict]:
             extra_seed += activate(control)+key('home')+key('down')*5+key('accept')
     add('extras_dirty', extra_changed, extras=EXTRA_CHANGED, dirty=1, actions=[('edit',1)]*7)
     add('extras_applied', activate('settings_apply'), extras=EXTRA_CHANGED,
-        extra_baseline=EXTRA_CHANGED, actions=[('apply',0)], screenshot='extrasapplied')
+        extra_baseline=EXTRA_CHANGED, actions=[('apply',0)], events=[('apply',1,0)], screenshot='extrasapplied')
     add('extras_restore_draft', extra_seed, extra_baseline=EXTRA_CHANGED, dirty=1,
         actions=[('edit',1)]*7, resolution_first=1)
-    add('extras_restored', activate('settings_apply'), actions=[('apply',0)], resolution_first=1, screenshot='extrasrestored')
+    add('extras_restored', activate('settings_apply'), actions=[('apply',0)], events=[('apply',1,0)], resolution_first=1, screenshot='extrasrestored')
     add('returned', activate('settings_back'), page=False, events=[('onback', 1, 0)], screenshot='returned')
     add('reopened', ['openq4_system open'], actions=[('begin', 0)], events=[('onactivate', 1, 1)],
         opening=True, screenshot='reopened')
@@ -236,11 +237,13 @@ def source_contract(runtime: Path) -> dict:
     nodes, pending = {}, [model['root']]
     while pending:
         node = pending.pop()
+        if node['id'] in nodes: raise ValueError('Duplicate SYSTEM node')
         nodes[node['id']] = node
         pending.extend(node.get('children', []))
     required = CONTROLS + ('settings_apply', 'settings_back', 'discard_changes', 'discard_keep_editing')
     if any(node not in nodes for node in required) or any(field not in model.get('aliases', {}) for field in FIELDS):
         raise ValueError('Production SYSTEM probe controls or readback aliases changed')
+    number_contract(model,nodes)
     slider = nodes['settings_brightness']['control']
     if (slider.get('role') != 'slider' or slider.get('minimum') != .5 or slider.get('maximum') != 2 or slider.get('step') != .1):
         raise ValueError('Production brightness tick contract changed')
@@ -268,6 +271,97 @@ def source_contract(runtime: Path) -> dict:
                 raise ValueError(f'Production service readback alias changed: {field}')
     return {'document':model['id'], 'source':str(source), 'staged':binding, 'sha256':digest(source),
             'normal_filesystem_path':PAGE, 'replacement_acceptance':False}
+
+
+def number_contract(model: dict, nodes: dict) -> None:
+    """Pin authored local-draft guards independently of the content generator.
+
+    Both capture profiles still gesture the original sliders. This source
+    preflight verifies their paired Number ownership and exact guard programs;
+    it does not claim that either script exercises native text entry.
+    """
+    def same(actual, expected):
+        # Python's True == 1 must not turn a malformed typed JSON guard into
+        # the expected boolean/number declaration or comparison operand.
+        if isinstance(actual,bool) or isinstance(expected,bool):return type(actual) is type(expected) and actual == expected
+        if isinstance(expected,dict):return isinstance(actual,dict) and actual.keys()==expected.keys() and all(same(actual[k],v) for k,v in expected.items())
+        if isinstance(expected,list):return isinstance(actual,list) and len(actual)==len(expected) and all(same(a,b) for a,b in zip(actual,expected))
+        return actual == expected
+    def require(actual, expected, label):
+        if not same(actual,expected): raise ValueError('Production numeric draft contract changed: '+label)
+    state = lambda key: {'state':key}
+    op = lambda name,*args: {'op':name,'args':list(args)}
+    both = lambda *args: reduce(lambda a,b:op('&&',a,b),args)
+    pending = state('ui.numberDraftsPending')
+    editing = both(state('settings.open'),op('==',state('settings.phase'),1))
+    closed = both(op('!',state('settings.open')),op('==',state('settings.phase'),0))
+    idle = both(op('!',state('settings.busy')),op('!',state('settings.confirmationVisible')))
+    dialog = both(state('page.discardVisible'),idle,op('||',editing,both(closed,pending)))
+    continuing = both(state('page.discardVisible'),idle,editing)
+    apply = both(state('settings.canApply'),op('!',pending))
+    apply_exit = both(continuing,state('settings.dirty'),apply)
+    local_message = both(pending,idle,op('||',op('==',state('settings.phase'),0),op('==',state('settings.phase'),1)))
+    declarations=model.get('state',{});actions=model.get('actions',{});events=model.get('events',{})
+    require(declarations.get('ui.numberDraftsPending'),{'type':'boolean','initial':False},'pending authority')
+    require(declarations.get('ui.numberDraftMessage'),{'type':'string','initial':'#str_229982'},'message authority')
+    for name,operation in (('focusNumberDraft','ui.numberDrafts.focus'),('apply','settings.system.apply'),
+                           ('applyExit','settings.system.applyExit'),('cancel','settings.system.cancel'),('dismiss','ui.dismiss')):
+        require(actions.get(name),{'operation':operation,'arguments':{}},'action '+name)
+    continue_program=[{'op':'setState','values':{'page.discardVisible':False}}, {'op':'action','action':'focusNumberDraft'}]
+    require(events.get('continueEditing'),continue_program,'continueEditing hide before focus')
+    require(events.get('onBack'),[{'op':'if','condition':state('page.discardVisible'),
+        'then':[{'op':'call','event':'continueEditing'}],
+        'else':[{'op':'if','condition':both(op('!',state('settings.busy')),op('||',op('==',state('settings.phase'),0),op('==',state('settings.phase'),1))),
+            'then':[{'op':'if','condition':op('||',state('settings.dirty'),pending),
+                'then':[{'op':'setState','values':{'page.discardVisible':True}}],
+                'else':[{'op':'action','action':'dismiss'}]}]}]}],'onBack service-or-local dirty decision')
+    require(events.get('apply'),[{'op':'if','condition':apply,'then':[{'op':'action','action':'apply'}]}],'Apply one action and no state write')
+    require(events.get('applyExit'),[{'op':'if','condition':apply_exit,'then':[
+        {'op':'setState','values':{'page.discardVisible':False}},{'op':'action','action':'applyExit'}]}],'ApplyExit guard')
+    require(events.get('discard'),[{'op':'if','condition':dialog,'then':[
+        {'op':'action','action':'cancel'},{'op':'setState','values':{'page.discardVisible':False}},
+        {'op':'action','action':'dismiss'}]}],'Discard closed local-only recovery and action order')
+    for control,event in (('settings_apply','apply'),('settings_back','onBack'),('discard_keep_editing','continueEditing'),
+                          ('discard_changes','discard'),('discard_apply_changes','applyExit')):
+        spec=nodes.get(control,{}).get('control',{})
+        require(spec.get('event'),event,'control '+control)
+        if 'action' in spec: raise ValueError('Production numeric guard bypassed by direct action: '+control)
+    bindings={}
+    for binding in model.get('bindings',[]):
+        key=(binding.get('node'),binding.get('property'))
+        if key in bindings: raise ValueError('Duplicate SYSTEM bound property')
+        bindings[key]=binding.get('value')
+    for control,condition in (('settings_apply',apply),('discard_apply_changes',apply_exit),
+                               ('discard_changes',dialog),('discard_keep_editing',continuing)):
+        require(bindings.get((control,'enabled')),condition,'availability '+control)
+        require(bindings.get((control,'opacity')),op('select',condition,1,.4),'disabled presentation '+control)
+    require(bindings.get(('discard-panel','display')),op('select',dialog,'flex','none'),'closed local-only dialog visibility')
+    require(bindings.get(('settings-message','text')),op('select',local_message,state('ui.numberDraftMessage'),state('settings.message')),'urgent service message priority')
+    pairs={'settings_brightness':('r_brightness',.5,2), 'settings_ambient':('r_forceAmbient',0,1)}
+    require({id for id,node in nodes.items() if node.get('control',{}).get('role')=='number'},
+            {id+'_number' for id in pairs},'complete paired Number inventory')
+    for slider_id,(key,minimum,maximum) in pairs.items():
+        number_id=slider_id+'_number';slider=nodes.get(slider_id,{}).get('control',{});number=nodes[number_id].get('control',{})
+        require(slider.get('role'),'slider','original slider identity '+slider_id)
+        for spec in (slider,number):
+            require(spec.get('value'),state('settings.draft.'+key),'paired draft source '+slider_id)
+            require((spec.get('minimum'),spec.get('maximum')),(minimum,maximum),'paired finite range '+slider_id)
+            require(actions.get(spec.get('action')),{'input':'number','operation':'settings.system.edit','arguments':{key:{'input':'value'}}},'paired typed proposal '+slider_id)
+        require(number.get('maxBytes'),128,'bounded Number '+number_id);require(number.get('exponent'),True,'precise Number syntax')
+        if 'step' in number or 'decimals' in number: raise ValueError('Production Number was quantized to slider increments')
+        parts={part:number_id+'-'+part for part in ('viewport','text','selection','caret','composition','validation')}
+        require(number.get('parts'),parts,'authored Number parts')
+        viewport=nodes.get(parts['viewport'],{})
+        require(viewport.get('properties',{}).get('overflow'),{'type':'keyword','value':'hidden'},'clipped numeric text viewport')
+        direct={node.get('id') for node in viewport.get('children',[])}
+        if not {parts[p] for p in ('text','selection','caret','composition')} <= direct:
+            raise ValueError('Production Number paint parts no longer share a viewport')
+        row=nodes.get(slider_id+'_row-controls',{})
+        require([node['id'] for node in row.get('children',[])],[slider_id,number_id],'sibling focus order')
+        require(row.get('properties',{}).get('flex-wrap'),{'type':'keyword','value':'wrap'},'responsive paired row')
+        if 'control' in row or 'control' in nodes.get(slider_id+'_row',{}):
+            raise ValueError('Production paired numeric row acquired a nested semantic control')
+        require(bindings.get((number_id,'enabled')),bindings.get((slider_id,'enabled')),'paired availability')
 
 
 def _fields(line: str, prefix: str, expected: set[str]) -> dict | None:
@@ -414,6 +508,11 @@ def qualify(log: str, mode: str) -> dict:
             errors.append(f'{at}: semantic input operation sequence mismatch')
         if [event[1:] for event in events if event[0]=='event'] != stage['events']:
             errors.append(f'{at}: authored lifecycle/Back program replay or omission')
+        if ('apply',1,0) in stage['events']:
+            program = [i for i,line in enumerate(lines) if line == 'RETAINED_GUI_EVENT name=apply actions=1 writes=0']
+            service = [i for i,line in enumerate(lines) if line.startswith('UI_SETTINGS operation=settings.system.apply ')]
+            if len(program)!=1 or len(service)!=1 or program[0]>=service[0]:
+                errors.append(f'{at}: Apply service dispatch preceded or bypassed its guarded program')
     if owners:
         current_owner, prior_owners = None, set()
         for at,operation,owner in owners:

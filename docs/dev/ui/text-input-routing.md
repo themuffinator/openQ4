@@ -110,6 +110,36 @@ and acknowledges that exact fence. One group includes the synchronous callbacks
 inside message collection and dispatch. A later pump must not bypass the hold;
 teardown must retire ownership before draining its native messages.
 
+The bundled SDL queue now associates each admitted entry with its exact provider
+generation, queue sequence and native group ordinal. A checked poll consumes
+one entry; copying or acknowledging a fence requires that exact consumed fence.
+Another consumer, filtering or flushing the held group retires its validity.
+Ordinary poll-sentinel maintenance can leave sequence gaps without inventing
+missing group members. Provider enablement remains off by default.
+
+The portable `NativeQueueIngress` owns copied event values and bounded text or
+candidate payloads before a complete native collection becomes available to
+Session. It verifies the group and copied fence before publication and exposes
+`Validate` for the caller to recheck provider generation and engine queue
+continuity before each effect. This caller integration remains pending. It requires
+the exact external acknowledgement before finishing a collection. A provider
+reset requires an observed disabled generation followed by a fresh generation.
+Queue membership alone does not prove physical input or native text origin.
+Connecting this ingress to Session and qualifying SDL's actual temporary-payload
+lifetime are still required; counted queue tests cannot establish either.
+
+The portable `NativeTextEditor` reconciler keeps stable local text/history
+separate from a complete native snapshot, including directional selection and
+all concurrent composition ranges. It validates every ordered ACP operation
+against the full editor/document/revision barrier. A checked collection spans
+all offers up to its explicitly observed final transaction sequence, so an
+insertion before Begin and later composition metadata share one undo group.
+Stable history remains frozen until the collection is complete and composition
+has ended; an explicit settlement makes the group one local edit. Clone/swap
+publication checks the originating barrier again, and retirement restores the
+stable draft. These value contracts are implemented and tested; live field
+binding, native activation and platform qualification remain in development.
+
 Activation must establish a newly observed text session: enabling the observer
 while SDL text input is already active emits no retroactive SessionBegin.
 Likewise, native Reset clears its active session without emitting SessionEnd,

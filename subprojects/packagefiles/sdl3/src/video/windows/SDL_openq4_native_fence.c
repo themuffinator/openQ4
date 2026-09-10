@@ -12,7 +12,7 @@ static Uint32 oq4_fence_type, oq4_fence_marker;
 static SDL_AtomicInt oq4_fence_public_type;
 static Uint64 oq4_fence_dispatch, oq4_fence_sequence;
 static OQ4_NativeFence oq4_fence_pending;
-static const SDL_Event *oq4_fence_admission;
+static const SDL_Event *oq4_fence_admission, *oq4_fence_queue_admission;
 
 static bool OQ4_FenceMain(void)
 {
@@ -33,6 +33,7 @@ static bool OQ4_FenceMarkerMatches(const SDL_Event *event)
 bool OQ4_WindowsNativeFenceRetire(void)
 {
     if (!OQ4_FenceMain()) return false;
+    OQ4_WIN_QueueRetire();
     oq4_fence_enabled = oq4_fence_healthy = oq4_fence_collecting = false;
     oq4_fence_held = oq4_fence_published = oq4_fence_copied = oq4_fence_activity = false;
     /* A reentrant native teardown may invalidate the emitting marker, but must
@@ -45,7 +46,7 @@ bool OQ4_WindowsNativeFenceEnable(bool enabled)
     if (!OQ4_FenceMain()) return false;
     if (enabled && (oq4_fence_emitting || oq4_fence_in_pump)) return false;
     if (!enabled) return OQ4_WindowsNativeFenceRetire();
-    if (oq4_fence_enabled) return oq4_fence_healthy;
+    if (oq4_fence_enabled) return oq4_fence_healthy && OQ4_WIN_QueueHealthy();
     if (oq4_fence_collecting || oq4_fence_held || oq4_fence_dispatch == SDL_MAX_UINT64 ||
         oq4_fence_sequence == SDL_MAX_UINT64 || oq4_fence_marker == 0x7fffffffu) return false;
     if (!oq4_fence_type) {
@@ -53,31 +54,34 @@ bool OQ4_WindowsNativeFenceEnable(bool enabled)
         if (!oq4_fence_type) return false;
         SDL_SetAtomicInt(&oq4_fence_public_type, (int)oq4_fence_type);
     }
+    if (!OQ4_WIN_QueueEnable()) return false;
     oq4_fence_enabled = oq4_fence_healthy = true;
     return true;
 }
-bool OQ4_WindowsNativeFenceHealthy(void) { return OQ4_FenceMain() && oq4_fence_enabled && oq4_fence_healthy; }
+bool OQ4_WindowsNativeFenceHealthy(void) { return OQ4_FenceMain() && oq4_fence_enabled && oq4_fence_healthy && OQ4_WIN_QueueHealthy(); }
 Uint32 OQ4_WindowsNativeFenceEventType(void) { return OQ4_FenceMain() ? oq4_fence_type : 0; }
 bool OQ4_WindowsNativeFencePending(OQ4_NativeFence *out)
 {
-    if (!OQ4_FenceMain() || !out || !oq4_fence_enabled || !oq4_fence_healthy || !oq4_fence_held ||
+    if (!OQ4_FenceMain() || !out || !oq4_fence_enabled || (!oq4_fence_healthy || !OQ4_WIN_QueueHealthy()) || !oq4_fence_held ||
         !oq4_fence_published || oq4_fence_collecting || oq4_fence_emitting) return false;
     *out = oq4_fence_pending;
     return true;
 }
 bool OQ4_WindowsNativeFenceCopy(const SDL_Event *marker, OQ4_NativeFence *out)
 {
-    if (!OQ4_FenceMain() || !out || !oq4_fence_enabled || !oq4_fence_healthy || !oq4_fence_held ||
-        !oq4_fence_published || oq4_fence_collecting || oq4_fence_emitting || !OQ4_FenceMarkerMatches(marker)) return false;
+    if (!OQ4_FenceMain() || !out || !oq4_fence_enabled || (!oq4_fence_healthy || !OQ4_WIN_QueueHealthy()) || !oq4_fence_held ||
+        !oq4_fence_published || oq4_fence_collecting || oq4_fence_emitting || !OQ4_FenceMarkerMatches(marker) ||
+        !OQ4_WIN_QueueVerified(oq4_fence_pending.dispatch, oq4_fence_pending.sequence)) return false;
     *out = oq4_fence_pending;
     oq4_fence_copied = true;
     return true;
 }
 bool OQ4_WindowsNativeFenceAck(Uint64 dispatch, Uint64 sequence)
 {
-    if (!OQ4_FenceMain() || !oq4_fence_enabled || !oq4_fence_healthy || !oq4_fence_held ||
+    if (!OQ4_FenceMain() || !oq4_fence_enabled || (!oq4_fence_healthy || !OQ4_WIN_QueueHealthy()) || !oq4_fence_held ||
         !oq4_fence_published || !oq4_fence_copied || oq4_fence_collecting || oq4_fence_emitting ||
         !dispatch || dispatch != oq4_fence_pending.dispatch || !sequence || sequence != oq4_fence_pending.sequence) return false;
+    if (!OQ4_WIN_QueueAcknowledge(dispatch, sequence)) return false;
     oq4_fence_held = oq4_fence_published = oq4_fence_copied = false;
     SDL_zero(oq4_fence_pending);
     return true;
@@ -87,7 +91,7 @@ bool OQ4_WIN_NativeFenceBlocked(void)
 {
     if (!SDL_IsMainThread()) return true;
     return oq4_fence_in_pump || oq4_fence_emitting ||
-        (oq4_fence_enabled && (!oq4_fence_healthy || oq4_fence_collecting || oq4_fence_held));
+        (oq4_fence_enabled && ((!oq4_fence_healthy || !OQ4_WIN_QueueHealthy()) || oq4_fence_collecting || oq4_fence_held));
 }
 bool OQ4_WIN_BeginNativeCollection(void)
 {
@@ -98,6 +102,7 @@ bool OQ4_WIN_BeginNativeCollection(void)
     SDL_zero(oq4_fence_pending);
     oq4_fence_pending.version = 1;
     oq4_fence_pending.dispatch = ++oq4_fence_dispatch;
+    if (!OQ4_WIN_QueueBegin(oq4_fence_pending.dispatch)) { OQ4_FenceFault(); return false; }
     oq4_fence_in_pump = oq4_fence_collecting = true;
     oq4_fence_activity = false;
     return true;
@@ -110,8 +115,10 @@ void OQ4_WIN_EndNativeCollection(bool removed_message)
     oq4_fence_in_pump = false;
     if (!oq4_fence_enabled || !oq4_fence_collecting) return;
     oq4_fence_collecting = false;
-    if (!oq4_fence_healthy) return;
+    if ((!oq4_fence_healthy || !OQ4_WIN_QueueHealthy())) return;
+    if (!OQ4_WIN_QueueEnd(oq4_fence_pending.dispatch, &oq4_fence_pending.event_count)) { OQ4_FenceFault(); return; }
     if (!removed_message && !oq4_fence_activity && !oq4_fence_pending.event_count) {
+        OQ4_WIN_QueueEmpty(oq4_fence_pending.dispatch);
         SDL_zero(oq4_fence_pending); return;
     }
     if (oq4_fence_marker == 0x7fffffffu || oq4_fence_sequence == SDL_MAX_UINT64) { OQ4_FenceFault(); return; }
@@ -130,13 +137,13 @@ void OQ4_WIN_EndNativeCollection(bool removed_message)
 #ifdef _MSC_VER
     } __finally {
 #endif
-        oq4_fence_admission = NULL;
+        oq4_fence_admission = oq4_fence_queue_admission = NULL;
         oq4_fence_emitting = false;
         if (!returned) OQ4_FenceFault();
 #ifdef _MSC_VER
     }
 #endif
-    if (!oq4_fence_enabled || !oq4_fence_healthy || !queued || !intact) { OQ4_FenceFault(); return; }
+    if (!oq4_fence_enabled || (!oq4_fence_healthy || !OQ4_WIN_QueueHealthy()) || !queued || !intact) { OQ4_FenceFault(); return; }
     oq4_fence_published = true;
 }
 void OQ4_WIN_AbortNativeCollection(void)
@@ -160,16 +167,16 @@ void OQ4_WIN_NativeFenceMessage(unsigned int message)
 {
     if (!SDL_IsMainThread() || !oq4_fence_enabled) return;
     if (message == WM_DESTROY || message == WM_NCDESTROY) { OQ4_WIN_NativeFenceLifecycle(); return; }
-    if (!oq4_fence_collecting || !oq4_fence_healthy) { OQ4_FenceFault(); return; }
+    if (!oq4_fence_collecting || (!oq4_fence_healthy || !OQ4_WIN_QueueHealthy())) { OQ4_FenceFault(); return; }
     oq4_fence_activity = true;
 }
 Uint64 OQ4_WIN_CurrentNativeDispatch(void)
 {
-    return SDL_IsMainThread() && oq4_fence_enabled && oq4_fence_healthy && oq4_fence_collecting ? oq4_fence_pending.dispatch : 0;
+    return SDL_IsMainThread() && oq4_fence_enabled && oq4_fence_healthy && OQ4_WIN_QueueHealthy() && oq4_fence_collecting ? oq4_fence_pending.dispatch : 0;
 }
 bool OQ4_WIN_BeginFenceAdmission(const SDL_Event *event)
 {
-    if (!SDL_IsMainThread() || !oq4_fence_enabled || !oq4_fence_healthy || !oq4_fence_emitting ||
+    if (!SDL_IsMainThread() || !oq4_fence_enabled || (!oq4_fence_healthy || !OQ4_WIN_QueueHealthy()) || !oq4_fence_emitting ||
         event != oq4_fence_admission || !OQ4_FenceMarkerMatches(event)) return false;
     oq4_fence_admission = NULL;
     return true;
@@ -181,9 +188,10 @@ bool OQ4_WIN_ValidateFenceAdmission(const SDL_Event *event, bool admission)
         return !event || !type || event->type != type;
     }
     if (admission) {
-        if (!oq4_fence_enabled || !oq4_fence_healthy || !oq4_fence_emitting || !OQ4_FenceMarkerMatches(event)) {
+        if (!oq4_fence_enabled || (!oq4_fence_healthy || !OQ4_WIN_QueueHealthy()) || !oq4_fence_emitting || !OQ4_FenceMarkerMatches(event)) {
             OQ4_FenceFault(); return false;
         }
+        oq4_fence_queue_admission = event;
     } else if (event && oq4_fence_type && event->type == oq4_fence_type) {
         /* Reserved private markers have exactly one emission admission. */
         if (oq4_fence_enabled) OQ4_FenceFault();
@@ -191,13 +199,27 @@ bool OQ4_WIN_ValidateFenceAdmission(const SDL_Event *event, bool admission)
     }
     return true;
 }
+bool OQ4_WIN_FenceCanPoll(void)
+{
+    return SDL_IsMainThread() && oq4_fence_enabled && oq4_fence_healthy && OQ4_WIN_QueueHealthy() &&
+        !oq4_fence_in_pump && !oq4_fence_collecting && !oq4_fence_emitting;
+}
+int OQ4_WIN_ClaimFenceQueueAdmission(const SDL_Event *event, Uint64 *dispatch, Uint64 *sequence)
+{
+    const Uint32 type = (Uint32)SDL_GetAtomicInt(&oq4_fence_public_type);
+    if (!type || event->type != type) return 0;
+    if (!SDL_IsMainThread()) return -1;
+    if (!oq4_fence_enabled || !oq4_fence_healthy || !OQ4_WIN_QueueHealthy() || !oq4_fence_emitting ||
+        event != oq4_fence_queue_admission || !OQ4_FenceMarkerMatches(event)) return -1;
+    oq4_fence_queue_admission = NULL;
+    *dispatch = oq4_fence_pending.dispatch; *sequence = oq4_fence_pending.sequence;
+    return 1;
+}
 void OQ4_WIN_CompleteFenceEvent(const SDL_Event *event, bool accepted)
 {
-    if (!SDL_IsMainThread() || !oq4_fence_enabled || !oq4_fence_collecting || !oq4_fence_healthy) return;
-    if (!accepted || !event || oq4_fence_pending.event_count == OQ4_FENCE_MAX_EVENTS || oq4_fence_sequence == SDL_MAX_UINT64) {
-        OQ4_FenceFault(); return;
-    }
-    ++oq4_fence_sequence;
-    ++oq4_fence_pending.event_count;
+    if (!SDL_IsMainThread() || !oq4_fence_enabled || !oq4_fence_collecting) return;
+    /* Actual successful admission is counted at SDL_AddEvent, including Peep.
+     * Public filter rejection still poisons this native collection. */
+    if (!accepted || !event) OQ4_FenceFault();
 }
 #endif

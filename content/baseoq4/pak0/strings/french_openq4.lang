@@ -986,4 +986,14 @@
 	"#str_229997"	"Les paramètres ont été acceptés, mais leur enregistrement est incomplet. Réessayez pour le terminer."
 	"#str_229998"	"10%;25%;50%;75%;85%;100%;125%;150%;200%"
 	"#str_229999"	"Continuer à modifier"
+
+	// Transient numeric editor clipboard feedback.
+	"#str_230001"	"Impossible de lire le presse-papiers. Réessayez."
+	"#str_230002"	"Impossible de copier dans le presse-papiers. Votre texte reste inchangé."
+	"#str_230003"	"Le texte du presse-papiers ne convient pas à ce champ sur une seule ligne."
+
+	// Precise SYSTEM numeric field validation (decimal point input).
+	"#str_230004"	"Saisissez un nombre de 0.5 à 2."
+	"#str_230005"	"Saisissez un nombre de 0 à 1."
+	"#str_230006"	"Validez chaque champ ou abandonnez les modifications inachevées."
 }

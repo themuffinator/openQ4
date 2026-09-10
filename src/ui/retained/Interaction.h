@@ -32,13 +32,38 @@ struct NumberEditIdentity {
 	std::uint64_t session = 0, revision = 0;
 	bool operator==(const NumberEditIdentity&) const = default;
 };
+enum class NumberEditNotice { None, ClipboardReadFailed, ClipboardWriteFailed, ClipboardRejected };
 struct NumberEditView {
+	NumberEditNotice notice = NumberEditNotice::None;
 	TextEditState state;
 	std::optional<TextInputEvent> composition;
 	NumberEditIdentity identity;
 	TextNumberStatus status = TextNumberStatus::Empty;
 	bool dirty = false, conflict = false, canUndo = false, canRedo = false;
 	bool active = false; // Restored text waits for fresh eligible focus.
+};
+struct NumberDraftStamp {
+	std::string control;
+	std::uint64_t lifetime = 0, revision = 0;
+	bool operator==(const NumberDraftStamp&) const = default;
+};
+struct NumberDraftBarrier {
+	std::uint64_t instance = 0;
+	// Every extant editor, including clean/inactive editors, in document order.
+	std::vector<NumberDraftStamp> editors;
+	bool operator==(const NumberDraftBarrier&) const = default;
+};
+struct NumberDraftStatus {
+	std::string control;
+	TextNumberStatus status = TextNumberStatus::Empty;
+	bool dirty = false, conflict = false, pending = false, composing = false, active = false;
+	// Reserved for checked native-editor integration. The current local editor
+	// cannot observe a native document/queued native mutation; this stays false.
+	bool nativeUnsettled = false;
+};
+struct NumberDraftSummary {
+	NumberDraftBarrier barrier;
+	std::vector<NumberDraftStatus> blocking;
 };
 struct WidgetViewState {
 	ControlRole role = ControlRole::Button;
@@ -135,6 +160,9 @@ public:
 		std::size_t anchor, std::size_t caret, std::string& error);
 	bool ApplyNumberInput(const std::string& id, NumberEditIdentity expected,
 		const TextInputEvent& event, std::string& error);
+	// Presentation only: checked exact editor, no history/revision/proposal change.
+	bool SetNumberNotice(const std::string& id, NumberEditIdentity expected,
+		NumberEditNotice notice, std::string& error);
 	bool ReplaceNumberSelection(const std::string& id, NumberEditIdentity expected,
 		std::string_view text, std::string& error);
 	// Checked command result only; no native input authority is acquired. Empty-text
@@ -149,6 +177,16 @@ public:
 	// Cancellation is an engine-owner operation; a supplied identity additionally
 	// protects a deferred cancel. No native composition identity is stored here.
 	bool CancelNumberEdit(const std::string& id, NumberEditIdentity expected = {});
+	// Process-local exact barriers, never serialized. Save alone does not retire
+	// a barrier; restore/reset, inventory ABA and relevant editor changes do.
+	// Query copies status/stamps only, not buffers/history. Failure preserves out.
+	bool QueryNumberDrafts(NumberDraftSummary& out, std::string& error) const;
+	// Validate the whole inventory before discarding any local draft. Accepted
+	// readbacks and application state are unchanged; queued Number proposals die.
+	bool DiscardNumberDrafts(const NumberDraftBarrier& expected, std::string& error);
+	// Focus/resume one blocking draft after exact inventory + eligibility checks.
+	// Never rebase a conflict or commit a value. Failure preserves interaction.
+	bool FocusNumberDraft(const NumberDraftBarrier& expected, const std::string& control, std::string& error);
 	ValueWidgetSnapshot CaptureWidgets() const;
 	// Checked production save boundary; exceeding the aggregate draft budgets
 	// fails without copying/truncating drafts or replacing out.
@@ -156,10 +194,12 @@ public:
 	bool RestoreWidgets(const ValueWidgetSnapshot& snapshot, std::string& error);
 private:
 	struct NumberEditor {
+		NumberEditNotice notice = NumberEditNotice::None;
 		TextEditBuffer buffer;
 		std::string baselineText;
 		double baselineValue = 0;
 		NumberEditIdentity identity;
+		std::uint64_t draftLifetime = 0, draftRevision = 0;
 		bool conflict = false;
 		bool detached = true;
 	};
@@ -204,6 +244,7 @@ private:
 	std::vector<ModalScope> modals;
 	std::map<std::string,ModalSpec> authoredModals;
 	std::uint64_t modalToken = 0;
+	std::uint64_t numberEpoch = 0;
 	bool modalBlocked = false, focusPending = false;
 	std::string pendingFocus;
 	std::set<MenuInput> heldNavigation, blockedNavigation;

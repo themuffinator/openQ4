@@ -30,6 +30,12 @@ constexpr int MaxStateBytes = 16 * 1024 * 1024;
 constexpr int MaxFrameBytes = static_cast<int>(Runtime::MaxSnapshotBytes) + MaxStateBytes + MaxStateEntries*8 + 64;
 std::vector<idUserInterfaceRetained*> diagnosticViews;
 
+constexpr const char* NumberDraftPending = "ui.numberDraftsPending";
+constexpr const char* NumberDraftMessage = "ui.numberDraftMessage";
+bool NumberDraftState(const char* name) {
+	return name && (!idStr::Icmp(name,NumberDraftPending) || !idStr::Icmp(name,NumberDraftMessage));
+}
+
 bool ConvertState(const char* text, size_t type, StateValue& value) {
 	if (!text) return false;
 	if (type == 2) value = std::string(text);
@@ -48,7 +54,7 @@ bool ConvertState(const char* text, size_t type, StateValue& value) {
 
 bool ApplicationState(const DocumentModel& model, const idDict& dictionary, StateValues& result, std::string& error) {
 	for (const auto& [name,declaration] : model.state) {
-		if (!declaration.cvar.empty() || name.starts_with("settings.")) continue;
+		if (!declaration.cvar.empty() || name.starts_with("settings.") || NumberDraftState(name.c_str())) continue;
 		StateValue value = declaration.initial;
 		const auto* entry = dictionary.FindKey(name.c_str());
 		if (entry && !ConvertState(entry->GetValue().c_str(),declaration.initial.index(),value)) {
@@ -61,7 +67,7 @@ bool ApplicationState(const DocumentModel& model, const idDict& dictionary, Stat
 
 bool ValidOperation(const Action& action) {
 	if (action.operation.starts_with("settings.system.")) { std::string error; return UI_SettingsOperation(action,error); }
-	if (action.operation == "ui.dismiss") return action.arguments.empty();
+	if (action.operation == "ui.dismiss" || action.operation == "ui.numberDrafts.focus") return action.arguments.empty();
 	const auto value = action.arguments.find("value");
 	if (action.arguments.size() != 1 || value == action.arguments.end()) return false;
 	return (action.operation == "settings.brightness.set" && value->second.type == 0) ||
@@ -70,7 +76,7 @@ bool ValidOperation(const Action& action) {
 
 bool ValidInvocation(const ActionInvocation& invocation, std::string& error) {
 	if (invocation.operation.starts_with("settings.system.")) return UI_SettingsInvocation(invocation,error);
-	if (invocation.operation == "ui.dismiss" && invocation.arguments.empty()) return true;
+	if ((invocation.operation == "ui.dismiss" || invocation.operation == "ui.numberDrafts.focus") && invocation.arguments.empty()) return true;
 	const auto value = invocation.arguments.find("value");
 	if (invocation.arguments.size() == 1 && value != invocation.arguments.end() && ValidStateValue(value->second)) {
 		if (invocation.operation == "settings.brightness.set" && std::holds_alternative<double>(value->second)) {
@@ -103,6 +109,11 @@ bool ValidateApplication(const DocumentModel& model, std::string& error) {
 	for (const auto& [name,declaration] : model.state) {
 		if (!idStr::Icmp(name.c_str(),"name")) { error = "State ID is reserved by the GUI source contract: " + name; return false; }
 		if (names.FindKey(name.c_str())) { error = "State IDs collide in the game dictionary: " + name; return false; }
+		if (NumberDraftState(name.c_str()) && (!declaration.cvar.empty() ||
+			(name != NumberDraftPending && name != NumberDraftMessage) ||
+			declaration.initial.index() != (name == NumberDraftPending ? 1u : 2u))) {
+			error = "Invalid adapter-owned number draft declaration: " + name; return false;
+		}
 		if (!idStr::Icmpn(name.c_str(),"settings.",9)) {
 			const auto& schema = UI_SettingsStateSchema(); const auto field = schema.find(name);
 			if (field == schema.end() || field->second != declaration.initial.index() || !declaration.cvar.empty()) {
@@ -116,8 +127,8 @@ bool ValidateApplication(const DocumentModel& model, std::string& error) {
 		for (const auto& step : event.steps) steps.push_back(&step);
 		while (!steps.empty()) {
 			const auto* step = steps.back(); steps.pop_back();
-			for (const auto& [key,value] : step->values) if (!idStr::Icmpn(key.c_str(),"settings.",9)) {
-				error = "Programs cannot overwrite service-owned settings state: " + key; return false;
+			for (const auto& [key,value] : step->values) if (!idStr::Icmpn(key.c_str(),"settings.",9) || NumberDraftState(key.c_str())) {
+				error = "Programs cannot overwrite engine-owned state: " + key; return false;
 			}
 			for (const auto& child : step->thenSteps) steps.push_back(&child);
 			for (const auto& child : step->elseSteps) steps.push_back(&child);
@@ -196,6 +207,7 @@ struct idUserInterfaceRetained::Impl {
 		std::string control;
 		std::uint64_t proposalToken = 0;
 		ControlAction source;
+		std::optional<uiClipboardRequest_t> clipboard;
 	};
 	std::vector<PendingAction> actions;
 	bool interactive = true, interactiveSet = false, unique = false, active = false;
@@ -215,6 +227,10 @@ struct idUserInterfaceRetained::Impl {
 	void Error(const std::string& message) {
 		if (message != lastError) common->Warning("retained GUI %s: %s",path.c_str(),message.c_str());
 		lastError = message;
+	}
+	bool CallerState(const char* name) {
+		if (!NumberDraftState(name)) return true;
+		Error("Callers cannot overwrite adapter-owned number draft state"); return false;
 	}
 	void Quarantine(bool forget = false, bool cancelRuntime = true, bool discardPrograms = false) {
 		input.Cancel(forget); input.Take(); held.clear(); close = false; pointerVisible = false;
@@ -252,7 +268,7 @@ struct idUserInterfaceRetained::Impl {
 		return ready && SyncSettings();
 	}
 	bool SyncSettings() {
-		if (!settingsFields) return true;
+		if (!settingsFields) return SyncNumberDrafts();
 		StateValues current;
 		if (!UI_SettingsRead(settingsOwner,current)) return false;
 		StateValues updates, published; const auto live = RuntimeView()->GetState(false);
@@ -272,7 +288,56 @@ struct idUserInterfaceRetained::Impl {
 			else text.data[0] = std::get<double>(value);
 			state.Set(key.c_str(),FormatPresentationValue(text).c_str());
 		}
+		return SyncNumberDrafts();
+	}
+	bool QueryNumberDrafts(NumberDraftSummary& summary) {
+		std::string error;
+		if (!RuntimeView()->QueryNumberDrafts(summary,error,RetainedUI_PresentationTime())) { Error(error); return false; }
 		return true;
+	}
+	bool SyncNumberDrafts() {
+		const auto& declarations = document.Model().state;
+		if (!declarations.contains(NumberDraftPending) && !declarations.contains(NumberDraftMessage)) return true;
+		NumberDraftSummary summary; if (!QueryNumberDrafts(summary)) return false;
+		StateValues values;
+		if (declarations.contains(NumberDraftPending)) values.emplace(NumberDraftPending,!summary.blocking.empty());
+		if (declarations.contains(NumberDraftMessage)) values.emplace(NumberDraftMessage,
+			std::string(summary.blocking.empty() ? "" : "#str_230006"));
+		const auto live = RuntimeView()->GetState(false); StateValues changes;
+		for (const auto& [key,value] : values) if (!live.contains(key) || live.at(key) != value) changes.emplace(key,value);
+		std::string error;
+		if (!changes.empty() && !RuntimeView()->SetState(changes,error,RetainedUI_PresentationTime())) { Error(error); return false; }
+		for (const auto& [key,value] : values) {
+			if (std::holds_alternative<bool>(value)) state.SetBool(key.c_str(),std::get<bool>(value));
+			else state.Set(key.c_str(),std::get<std::string>(value).c_str());
+		}
+		return true;
+	}
+	bool FocusNumberDraft() {
+		NumberDraftSummary summary; if (!QueryNumberDrafts(summary)) return false;
+		if (summary.blocking.empty()) return true;
+		std::string error;
+		if (!RuntimeView()->FocusNumberDraft(summary.barrier,summary.blocking.front().control,error,RetainedUI_PresentationTime())) {
+			Error(error); return false;
+		}
+		return SyncNumberDrafts();
+	}
+	bool ConflictsWithNumberDraft(const PendingAction& pending, const NumberDraftSummary& summary) const {
+		if (summary.blocking.empty()) return false;
+		const auto& operation = pending.invocation.operation;
+		if (operation == "settings.system.apply" || operation == "settings.system.applyExit" || operation == "settings.system.defaults") return true;
+		if (operation != "settings.system.edit") return false;
+		// A sibling slider or toggle shares the Number's typed setting keys.
+		// Leave the local text intact until its owner commits or discards it.
+		for (const auto& draft : summary.blocking) {
+			if (pending.source.editSession && draft.control == pending.control) continue;
+			const auto* node = document.Model().FindNode(draft.control);
+			if (!node || !node->control) return true;
+			const auto action = document.Model().actions.find(node->control->action);
+			if (action == document.Model().actions.end()) return true;
+			for (const auto& [key,value] : action->second.arguments) if (pending.invocation.arguments.contains(key)) return true;
+		}
+		return false;
 	}
 	void ApplyInput() {
 		for (const auto& event : input.Take()) {
@@ -282,6 +347,9 @@ struct idUserInterfaceRetained::Impl {
 		}
 	}
 	bool RunEvent(const std::string& name) {
+		// A click can detach a field after Prepare. Programs must see its fresh
+		// local draft status before deciding whether Back may close the page.
+		if (!SyncNumberDrafts()) return false;
 		StateValues application; std::string error;
 		if (!ApplicationState(document.Model(),state,application,error)) { Error(error); return false; }
 		Runtime::EventEffects effects;
@@ -354,6 +422,7 @@ struct idUserInterfaceRetained::Impl {
 		const bool shift = metadata ? metadata->shift : held.contains(K_SHIFT) || idKeyInput::IsDown(K_SHIFT);
 		const bool alt = metadata ? metadata->alt : held.contains(K_ALT) || held.contains(K_RIGHT_ALT) || idKeyInput::IsDown(K_ALT) || idKeyInput::IsDown(K_RIGHT_ALT);
 		std::optional<TextEditCommand> command;
+		std::optional<uiClipboardOperation_t> clipboard;
 		bool commit = false, undo = false, redo = false, mapped = true;
 		switch (key) {
 			case K_LEFTARROW: command = control ? TextEditCommand::WordLeft : TextEditCommand::Left; break;
@@ -361,7 +430,17 @@ struct idUserInterfaceRetained::Impl {
 			case K_HOME: command = TextEditCommand::Home; break;
 			case K_END: command = TextEditCommand::End; break;
 			case K_BACKSPACE: if (!control) command = TextEditCommand::Backspace; break;
-			case K_DEL: if (!control && !shift) command = TextEditCommand::Delete; break;
+			case K_DEL:
+				if (!control && shift) clipboard = uiClipboardOperation_t::Cut;
+				else if (!control && !shift) command = TextEditCommand::Delete;
+				break;
+			case K_INS:
+				if (control && !shift) clipboard = uiClipboardOperation_t::Copy;
+				else if (shift && !control) clipboard = uiClipboardOperation_t::Paste;
+				break;
+			case 'c': if (control && !shift) clipboard = uiClipboardOperation_t::Copy; mapped = control; break;
+			case 'x': if (control && !shift) clipboard = uiClipboardOperation_t::Cut; mapped = control; break;
+			case 'v': if (control && !shift) clipboard = uiClipboardOperation_t::Paste; mapped = control; break;
 			case K_ENTER: case K_KP_ENTER: case K_JOY3: commit = true; break;
 			// Space belongs to native text delivery while a field is editing.
 			// It must not also activate the field as an ordinary menu button.
@@ -383,7 +462,18 @@ struct idUserInterfaceRetained::Impl {
 			const bool movement = *command <= TextEditCommand::WordRight;
 			runtime->NumberCommand(id,identity,*command,movement && shift,error,now);
 		} else if (claim == Input::TextKey::Press) {
-			if (undo || redo) runtime->UndoNumberEdit(id,identity,redo,error,now);
+			if (clipboard) {
+				// Fresh host/readback query cannot start or rebase an inactive draft.
+				const auto current = runtime->QueryNumberEditor(error,now);
+				if (current && current->control == id && current->editor.identity == identity &&
+					!current->editor.composition && textBackend && textDocument) {
+					if (actions.size() >= 256) { Error("Application action queue exceeded 256 requests"); return true; }
+					PendingAction pending;
+					pending.clipboard = uiClipboardRequest_t{*clipboard,
+						{textBackend,textDocument,current->modalToken,id,identity}};
+					actions.push_back(std::move(pending));
+				}
+			} else if (undo || redo) runtime->UndoNumberEdit(id,identity,redo,error,now);
 			else if (commit) runtime->CommitNumberEdit(id,identity,error,now);
 		}
 		return true;
@@ -479,12 +569,12 @@ bool idUserInterfaceRetained::InitFromFile(const char* qpath, bool rebuild, bool
 }
 
 const idDict& idUserInterfaceRetained::State() const { return impl->state; }
-void idUserInterfaceRetained::DeleteStateVar(const char* name) { impl->state.Delete(name); }
-void idUserInterfaceRetained::SetStateString(const char* name, const char* value) { impl->state.Set(name,value); }
-void idUserInterfaceRetained::SetStateBool(const char* name, bool value) { impl->state.SetBool(name,value); }
-void idUserInterfaceRetained::SetStateInt(const char* name, int value) { impl->state.SetInt(name,value); }
-void idUserInterfaceRetained::SetStateFloat(const char* name, float value) { impl->state.SetFloat(name,value); }
-void idUserInterfaceRetained::SetStateVec4(const char* name, const idVec4& value) { impl->state.SetVec4(name,value); }
+void idUserInterfaceRetained::DeleteStateVar(const char* name) { if (impl->CallerState(name)) impl->state.Delete(name); }
+void idUserInterfaceRetained::SetStateString(const char* name, const char* value) { if (impl->CallerState(name)) impl->state.Set(name,value); }
+void idUserInterfaceRetained::SetStateBool(const char* name, bool value) { if (impl->CallerState(name)) impl->state.SetBool(name,value); }
+void idUserInterfaceRetained::SetStateInt(const char* name, int value) { if (impl->CallerState(name)) impl->state.SetInt(name,value); }
+void idUserInterfaceRetained::SetStateFloat(const char* name, float value) { if (impl->CallerState(name)) impl->state.SetFloat(name,value); }
+void idUserInterfaceRetained::SetStateVec4(const char* name, const idVec4& value) { if (impl->CallerState(name)) impl->state.SetVec4(name,value); }
 const char* idUserInterfaceRetained::GetStateString(const char* name, const char* fallback) const { return impl->state.GetString(name,fallback); }
 bool idUserInterfaceRetained::GetStateBool(const char* name, const char* fallback) const { return impl->state.GetBool(name,fallback); }
 int idUserInterfaceRetained::GetStateInt(const char* name, const char* fallback) const { return impl->state.GetInt(name,fallback); }
@@ -693,7 +783,19 @@ bool idUserInterfaceRetained::DispatchApplicationActions(const char* command, bo
 	impl->AcceptInput();
 	auto actions = std::move(impl->actions); impl->actions.clear();
 	closeRequested = impl->close; impl->close = false;
-	for (const auto& pending : actions) {
+	for (size_t index = 0; index < actions.size(); ++index) {
+		const auto& pending = actions[index];
+		if (pending.clipboard) {
+			// A preceding close skips native access, but committed actions later
+			// in this batch still run in order before Session receives the close.
+			if (closeRequested) continue;
+			// Return before the native callback. Preserve this immutable suffix
+			// ahead of any new actions queued while processing the earlier prefix.
+			std::vector<Impl::PendingAction> suffix;
+			std::move(actions.begin()+index,actions.end(),std::back_inserter(suffix));
+			std::move(impl->actions.begin(),impl->actions.end(),std::back_inserter(suffix));
+			impl->actions = std::move(suffix); return true;
+		}
 		if (pending.cancellable || pending.source.editSession) {
 			if (!impl->RuntimeView()->CanDispatchControlAction(pending.source,RetainedUI_PresentationTime())) {
 				if (pending.proposalToken) impl->RuntimeView()->AcknowledgeControlProposal(pending.control,pending.proposalToken,false);
@@ -701,14 +803,44 @@ bool idUserInterfaceRetained::DispatchApplicationActions(const char* command, bo
 			}
 		}
 		const auto& invocation = pending.invocation;
+		if (invocation.operation == "ui.numberDrafts.focus") {
+			const bool accepted = impl->FocusNumberDraft();
+			if (pending.proposalToken) impl->RuntimeView()->AcknowledgeControlProposal(pending.control,pending.proposalToken,accepted);
+			continue;
+		}
 		if (invocation.operation == "ui.dismiss") {
+			NumberDraftSummary drafts;
+			if (!impl->QueryNumberDrafts(drafts) || !drafts.blocking.empty()) {
+				if (pending.proposalToken) impl->RuntimeView()->AcknowledgeControlProposal(pending.control,pending.proposalToken,false);
+				impl->SyncNumberDrafts(); continue;
+			}
 			closeRequested = true;
 			if (pending.proposalToken) impl->RuntimeView()->AcknowledgeControlProposal(pending.control,pending.proposalToken,true);
 			TraceInvocation(Name(),invocation,true); continue;
 		}
 		if (invocation.operation.starts_with("settings.system.")) {
 			std::string error;
-			const bool accepted = UI_SettingsDispatch(impl->settingsOwner,invocation,error);
+			NumberDraftSummary drafts;
+			if (!impl->QueryNumberDrafts(drafts) || impl->ConflictsWithNumberDraft(pending,drafts)) {
+				if (pending.proposalToken) impl->RuntimeView()->AcknowledgeControlProposal(pending.control,pending.proposalToken,false);
+				impl->SyncNumberDrafts(); continue;
+			}
+			bool accepted = UI_SettingsDispatch(impl->settingsOwner,invocation,error);
+			// Cancel is the explicit discard decision. A failed service rollback
+			// preserves field text; a callback changing a field invalidates the
+			// whole captured inventory before any local draft can be discarded.
+			if (accepted && invocation.operation == "settings.system.cancel") {
+				StateValues completed;
+				if (!UI_SettingsRead(impl->settingsOwner,completed)) {
+					error = "Cannot verify completed settings cancellation"; accepted = false;
+				} else if (!std::get<bool>(completed.at("settings.open")) && !std::get<bool>(completed.at("settings.busy")) &&
+					std::get<double>(completed.at("settings.phase")) == static_cast<double>(SettingsPhase::Closed)) {
+					accepted = impl->RuntimeView()->DiscardNumberDrafts(drafts.barrier,error,RetainedUI_PresentationTime());
+				}
+				// Accepted display Revert may only queue a rollback. Preserve local
+				// text until that operation settles and a later explicit discard
+				// closes the service; never replay a deferred discard implicitly.
+			}
 			if (!accepted) impl->Error(error);
 			else impl->lastError.clear();
 			const bool synchronized = impl->SyncSettings();
@@ -737,6 +869,7 @@ bool idUserInterfaceRetained::DispatchApplicationActions(const char* command, bo
 		if (pending.proposalToken) impl->RuntimeView()->AcknowledgeControlProposal(pending.control,pending.proposalToken,accepted);
 		TraceInvocation(Name(),invocation,closeRequested);
 	}
+	if (!impl->actions.empty() && !closeRequested) return true;
 	if (impl->settingsClosePending) {
 		UI_SettingsCloseOwner(impl->settingsOwner); impl->settingsClosePending = false;
 		impl->SyncSettings();
@@ -749,7 +882,35 @@ bool idUserInterfaceRetained::DispatchApplicationActions(const char* command, bo
 		if (cvarSystem->GetCVarBool("ui_retainedTrace")) common->Printf("RETAINED_GUI_EXIT path=%s owner=%llu source=applyExit\n",
 			Name(),static_cast<unsigned long long>(impl->settingsOwner));
 	}
+	if (closeRequested) {
+		NumberDraftSummary drafts;
+		if (!impl->QueryNumberDrafts(drafts) || !drafts.blocking.empty()) closeRequested = false;
+	}
 	return true;
+}
+
+bool idUserInterfaceRetained::TakeClipboardRequest(const char* command, uiClipboardRequest_t& out) {
+	if (!command || idStr::Cmp(command,ActionMarker) || impl->actions.empty() || !impl->actions.front().clipboard) return false;
+	out = *impl->actions.front().clipboard; impl->actions.erase(impl->actions.begin()); return true;
+}
+bool idUserInterfaceRetained::QueryClipboardEditor(uiNumberEditorSnapshot_t& out, std::string& error) {
+	if (!impl->Prepare() || !impl->AcceptInput() || !impl->textBackend || !impl->textDocument) return false;
+	const auto current = impl->RuntimeView()->QueryNumberEditor(error,RetainedUI_PresentationTime());
+	if (!current || !current->modalToken || current->editor.composition) return false;
+	out = {{impl->textBackend,impl->textDocument,current->modalToken,current->control,current->editor.identity},current->editor};
+	return true;
+}
+bool idUserInterfaceRetained::ReplaceClipboardSelection(const uiNumberEditorTarget_t& expected,
+	std::string_view text, std::string& error) {
+	uiNumberEditorSnapshot_t current;
+	if (!QueryClipboardEditor(current,error) || current.target != expected) return false;
+	return impl->RuntimeView()->ReplaceNumberSelection(expected.control,expected.edit,text,error,RetainedUI_PresentationTime());
+}
+bool idUserInterfaceRetained::SetClipboardNotice(const uiNumberEditorTarget_t& expected,
+	NumberEditNotice notice, std::string& error) {
+	uiNumberEditorSnapshot_t current;
+	if (!QueryClipboardEditor(current,error) || current.target != expected) return false;
+	return impl->RuntimeView()->SetNumberNotice(expected.control,expected.edit,notice,error,RetainedUI_PresentationTime());
 }
 
 bool idUserInterfaceRetained::WriteToSaveGame(idFile* file) const {
@@ -837,6 +998,8 @@ bool UI_RetainedSettingsDocument(idUserInterface* gui) {
 bool UI_RetainedSettingsCanReturn(idUserInterface* gui) {
 	const auto found = std::find(diagnosticViews.begin(),diagnosticViews.end(),gui);
 	if (found == diagnosticViews.end()) return false;
+	NumberDraftSummary drafts;
+	if (!(*found)->impl->QueryNumberDrafts(drafts) || !drafts.blocking.empty()) return false;
 	StateValues live;
 	if (!UI_SettingsRead((*found)->impl->settingsOwner,live)) return false;
 	// Read the actual service owner, never pending GUI dictionary values.
@@ -918,6 +1081,13 @@ bool UI_RetainedDiagnostic(idUserInterface* gui, const idCmdArgs& args) {
 		};
 		if (operation == "begin" && args.Argc() == 4) okay = runtime->BeginNumberEdit(id,error,now);
 		else if (operation == "replace" && args.Argc() == 5) okay = runtime->ReplaceNumberSelection(id,identity,args.Argv(4),error,now);
+		else if (operation == "notice" && args.Argc() == 5) {
+			const std::map<std::string,NumberEditNotice> notices = {{"none",NumberEditNotice::None},
+				{"read",NumberEditNotice::ClipboardReadFailed},{"write",NumberEditNotice::ClipboardWriteFailed},
+				{"rejected",NumberEditNotice::ClipboardRejected}};
+			const auto notice = notices.find(args.Argv(4));
+			if (notice != notices.end()) okay = runtime->SetNumberNotice(id,identity,notice->second,error,now);
+		}
 		else if (operation == "command" && (args.Argc() == 5 || (args.Argc() == 6 && !idStr::Cmp(args.Argv(5),"extend")))) {
 			const std::map<std::string,TextEditCommand> commands = {{"left",TextEditCommand::Left},{"right",TextEditCommand::Right},
 				{"home",TextEditCommand::Home},{"end",TextEditCommand::End},{"word-left",TextEditCommand::WordLeft},{"word-right",TextEditCommand::WordRight},
@@ -958,8 +1128,10 @@ bool UI_RetainedDiagnostic(idUserInterface* gui, const idCmdArgs& args) {
 			impl.CollectActions(true); okay = true;
 		}
 	} else if (verb == "state" && args.Argc() == 4) {
+		if (NumberDraftState(args.Argv(2))) return false;
 		owner.SetStateString(args.Argv(2),args.Argv(3)); owner.StateChanged(common->GetPresentationTime()); okay = impl.lastError.empty();
 	} else if (verb == "pending" && args.Argc() == 4) {
+		if (NumberDraftState(args.Argv(2))) return false;
 		owner.SetStateString(args.Argv(2),args.Argv(3)); okay = true;
 	} else if (verb == "event" && args.Argc() == 3) {
 		owner.HandleNamedEvent(args.Argv(2)); okay = impl.lastError.empty();

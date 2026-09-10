@@ -34,8 +34,10 @@ a conflict. Beginning the edit again does not discard the conflict:
 - **Reload:** replace the draft with the current accepted value and clear its
   history.
 
-These are semantic operations. Their production controls, specific localized
-validation and integration with settings Apply/exit remain required work.
+These are semantic operations. The opt-in SYSTEM page now pairs Brightness and
+Ambient Brightness sliders with numeric fields, localized validation and guarded
+Apply/exit behavior. Complete conflict controls, native character delivery and
+the remaining production field families still require implementation.
 
 ## Editing commands
 
@@ -51,8 +53,42 @@ even when an earlier edit in the same event batch has not been painted. They use
 the shared scalar text run, stage range replacements atomically, and preserve the
 original directional selection for undo. Valid no-op commands retain the editor
 revision. Current composition, conflicts, pending proposals or stale ownership
-refuse mutation. Word movement has no boundary provider yet; Ctrl+Backspace,
-Ctrl+Delete and Shift+Delete are reserved until word deletion and Cut exist.
+refuse mutation. Word movement has no boundary provider yet; Ctrl+Backspace and
+Ctrl+Delete remain reserved until word deletion is implemented.
+
+Ctrl+C/X/V, Ctrl+Insert, Shift+Insert and Shift+Delete request Copy, Cut or Paste.
+The request carries its operation and original editor through the ordered
+application queue. After earlier actions drain, the manager copies the current
+buffer. Managed allocation, backend, document, modal and edit identity
+are checked again before and after native clipboard access. Cut removes selected
+text only after a successful write. Empty Paste does not delete selection, and
+malformed, excessive or multiline text is rejected atomically. AltGr combinations
+cannot become clipboard shortcuts. Localized notices distinguish read failure,
+write failure and rejected text without changing the text or its undo history.
+
+## SYSTEM draft handling
+
+Brightness accepts finite values from 0.5 to 2; Ambient Brightness accepts 0 to 1.
+Explicit field commits retain precision independently of the paired slider's
+step. The responsive row keeps the label above the slider and field; validation
+wraps below the field within its editable vector framing.
+
+An unfinished local edit blocks Apply, Apply and Exit, Defaults and a conflicting
+edit from a sibling control, including when the field is inactive. Unrelated
+settings remain editable. Back considers both service changes and local drafts.
+Keep Editing closes the dialog and returns to the first blocking draft without
+committing or rebasing it. Discard clears local text only after the settings
+service has completed cancellation. A queued display rollback, failed readback
+or changed editor inventory preserves the text. A later explicit Discard can
+clear a local-only draft even when the settings transaction is already closed.
+
+The Runtime supplies a complete, bounded inventory of local editors with
+non-reused lifetime/revision stamps. The adapter alone publishes
+`ui.numberDraftsPending` and `ui.numberDraftMessage`; authored programs and
+external GUI state cannot write those authorities. Every destructive decision
+checks the current full inventory. Service recovery/confirmation messages take
+priority over local draft guidance. Completion of asynchronous cancellation
+never silently replays an earlier local discard request.
 
 The input adapter binds each held command key to its original editing session.
 Repeats cannot transfer to another field, reactivate an old session, or emit a
@@ -141,7 +177,8 @@ These tests do not operate a native device or qualify native IME behavior.
 `tools/ui/fixtures/number-edit-smoke.q4ui` supplies first-party vector artwork for
 the managed adapter. Its companion configuration uses `openq4_retainedGui number`
 semantic operations and engine `screenshot` commands. It is a test fixture;
-the shipped SYSTEM page still needs a completed entry field and ordinary input.
+at that checkpoint the shipped SYSTEM page still needed an entry field and
+ordinary input.
 
 The command integration passes all 27 Windows retained-UI suites. Windowed
 SP/OpenGL at 125% density and MP/Vulkan at 200% each reach gameplay before
@@ -163,3 +200,25 @@ before allocation or command dispatch, ignores recorded process pointers,
 releases payloads on error, and closes partial journal-file opens. It retains
 the historical native journal layout and does not establish portable or
 deterministic native text replay.
+
+The precise SYSTEM-field checkpoint passes 32 Windows UI suites, including
+same-dispatch modal focus restoration and growing-validation scroll regressions.
+Windowed SP/OpenGL at 125% density and MP/Vulkan at 200% each reach gameplay,
+then pass 37 semantic operations with 17 engine screenshots. The reviewed
+sequence preserves a local `1.375` draft, displays all three clipboard notices,
+resumes editing through the safe modal default, commits the field before Apply,
+discards invalid `1e`, reopens the accepted value and restores brightness to `1`.
+New validation text scrolls into view when the focused field grows; unchanged
+frames preserve deliberate user scrolling. At 200%, the field's external label
+can scroll above the viewport, so this does not qualify the entire page layout.
+The immutable local record is
+`.tmp/ui/native-editing-integration/validation-evidence.json`. Native OS clipboard
+and character input, IME/shaping, other languages, full-page and product acceptance
+remain separate requirements.
+
+The follow-up precision audit found two open defects: generated slider ticks can
+expose floating-point tails in the paired entry, and very small ambient values
+such as `1e-7` fail SYSTEM CVar string readback after legacy exponent
+normalization. The recorded `1.375` flow does not cover those cases. Generated
+tick canonicalization and fixed-decimal host serialization are the next fixes;
+typed Number drafts must retain their exact value.

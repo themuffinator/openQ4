@@ -101,25 +101,47 @@ not adopt the GUI that might be selected when those queued keys are later handle
 
 After that complete step, a bounded payload-free marker holds subsequent native
 pumps and waits until the engine copies the matching published fence and explicitly
-acknowledges its exact dispatch/sequence. Queued events remain consumable. Empty
+acknowledges its exact dispatch/sequence after checked consumption. Empty
 held waits return promptly, including SDL periodic-poll and fallback paths, without
 another native Peek. A synchronous nested pump cannot start a second collection.
 Filters, failed queue insertion, mutated/forged fence admissions, unsolicited
 callbacks outside a collection and counter/event-budget exhaustion invalidate
-health. An already queued marker removed by a later filter or flush still leaves
-the hold in place; this extension does not claim immediate detection of every
-external queue mutation. Engine queue continuity and native-provider health are
-separate checks required before every delivery and acknowledgement. In this first
-boundary, `event_count` is a diagnostic Push-admission count, not proof that all
-public SDL events were consumed. Removing an earlier public event while preserving
-the marker is not detected by Copy/Ack. Preexisting events, direct Peep additions
-and coalescing prevent sound verification by total-count comparison. This fence
-must remain inactive for native delivery until a checked exclusive SDL consumer
-and discard boundary is integrated; the engine token cannot detect upstream SDL
-loss by itself.
+health. Engine queue continuity and native-provider health remain separate checks
+required before every delivery and acknowledgement.
+
+`queue-consumer.patch` is the additional openQ4-authored checked consumption guard,
+advertised only by this bundled Windows provider through
+`OPENQ4_SDL3_CHECKED_NATIVE_QUEUE=1`. It tags private SDL queue entries at actual
+admission, including direct `SDL_PeepEvents` additions, without changing public
+event layouts. `OQ4_WindowsNativeFencePoll` removes one actual FIFO entry without
+pumping. It returns 1 for a record, 0 for an empty queue and -1 when unavailable;
+both outputs remain unchanged on 0/-1. Dynamic payloads retain SDL's ordinary
+borrowed lifetime and must be copied immediately by the engine.
+
+Records distinguish preexisting/worker/outside events, poll sentinels, native
+collection entries and the fence. `event_count` counts actual collection entries;
+each has an ordered ordinal. Copy/Ack require the actual checked fence receipt
+after every collection ordinal, so matching fabricated marker bytes cannot
+authorize acknowledgement. The engine must buffer the full ordered group through
+that receipt before native mutations, preserving interleaved outside records.
+Sentinel maintenance is harmless and excluded from group counts; it can create
+gaps in the otherwise increasing queue sequence. Total queue counts or sequence
+contiguity must not be used to infer collection membership.
+
+While enabled, another consumer's non-sentinel GET, flush, filter removal or
+coalescing discard faults health immediately, including outside/prefix events.
+In-place filters that mutate an already queued event union also fault. Ordinary
+pre-admission watchers retain their existing SDL/observer transformation rules;
+rejected native admissions fault the collection. The guard does not deep-copy
+caller-owned payload memory. Queue state is protected by SDL's event-queue lock;
+workers observe only atomic provider health and cannot adopt main-thread native
+scope. Stopping the event subsystem retires the queue lease before freeing it;
+starting it again cannot revive the old lease. Disabled ordinary queue behavior
+and its failure diagnostics remain unchanged.
 
 The API is main-thread-only. Failed Pending/Copy calls preserve output, and merely
-reading Pending does not authorize acknowledgement. Dispatch and sequence use
+reading Pending does not authorize acknowledgement. Successful checked Poll alone
+also does not replace the matching Copy before Ack. Dispatch and sequence use
 non-reused 64-bit counters; marker codes use a non-reused positive 31-bit counter.
 A collection accepts at most 4,096 queued SDL events before health fails closed.
 No native payload is allocated by this fence. A provider reload requires a separate
@@ -132,8 +154,20 @@ required before re-enabling. The existing legacy dispatcher continues running.
 MSVC-compatible Windows builds restore the observer scope and fault/clean up a
 collection or marker emission on abnormal SEH unwinding. On other C toolchains,
 nonlocal unwinding through SDL callbacks remains outside the supported C callback
-contract; a callback must return normally. Tests compile the five production C
-translation units against the pinned headers and execute complete pump, admission,
-wait and fence methods with native doubles, including synthetic SEH failures. They
+contract; a callback must return normally. SDL queue allocators, filters and logging
+callbacks retain that normal-return contract on every toolchain; arbitrary nonlocal
+unwinding through SDL's locked queue internals is not made safe by this extension.
+Tests compile the five production C translation units against the pinned headers
+and execute complete pump, admission, wait and fence methods plus SDL's actual
+Add/Cut/Peep/Flush/Filter/Start/Stop bodies with native doubles, real worker threads
+and synthetic SEH failures at the guarded Windows seams. They
 do not qualify a real OS message queue, installed IME, TSF document, engine owner
 handoff or completed retained text editing.
+
+`queue-generation.patch` adds a main-thread, queue-locked read of the healthy
+active generation (zero when unavailable). It allows the engine's owned ingress
+to bind the enable lifetime before its first checked Poll and to recheck it after
+copying each borrowed event. It does not enable, pump, consume or acknowledge the
+queue. Module epochs remain engine-owned and cannot be invented by constructing
+another ingress object. The owned batch preserves ordering only; neither a queue
+collection nor a verified fence proves physical-key or text-composition origin.

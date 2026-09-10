@@ -36,7 +36,8 @@ def main() -> int:
     source,provision,_=helper.provision_source(args.sdl_source,dict(wrap['wrap-file']),scratch)
     projection=scratch/'sdl'
     for name in FILES:
-        target=projection/name;target.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(source/name,target)
+        target=projection/name;target.parent.mkdir(parents=True,exist_ok=True)
+        target.write_bytes((source/name).read_bytes().replace(b'\r\n',b'\n'))
     shutil.copyfile(source/'LICENSE.txt',projection/'LICENSE.txt')
     patch=PACKAGE/'text-provenance.patch'
     env=os.environ.copy();env['TEMP']=env['TMP']=str(scratch)
@@ -47,6 +48,20 @@ def main() -> int:
     initialized=run(['git','-C',str(projection),'init','--quiet'],'git-init.log')
     if initialized.returncode: raise RuntimeError(initialized.stdout)
     fence=PACKAGE/'dispatch-fence.patch'
+    queue=PACKAGE/'queue-consumer.patch'
+    generation=PACKAGE/'queue-generation.patch'
+    generated='OQ4_WindowsNativeFenceQueueGeneration' in (projection/FILES[0]).read_text(encoding='utf-8')
+    if generated:
+        reverse=run(['git','-C',str(projection),'apply','--reverse','--check',str(generation)],'generation-reverse-check.log')
+        if reverse.returncode: raise RuntimeError('SDL source does not match the reviewed queue generation query')
+        reverse=run(['git','-C',str(projection),'apply','--reverse',str(generation)],'generation-reverse.log')
+        if reverse.returncode: raise RuntimeError(reverse.stdout)
+    queued='OQ4_QueueAdmissionBegin' in (projection/FILES[0]).read_text(encoding='utf-8')
+    if queued:
+        reverse=run(['git','-C',str(projection),'apply','--reverse','--check',str(queue)],'queue-reverse-check.log')
+        if reverse.returncode: raise RuntimeError('SDL source does not match the reviewed checked queue')
+        reverse=run(['git','-C',str(projection),'apply','--reverse',str(queue)],'queue-reverse.log')
+        if reverse.returncode: raise RuntimeError(reverse.stdout)
     fenced='OQ4_WIN_BeginFenceAdmission' in (projection/FILES[0]).read_text(encoding='utf-8')
     if fenced:
         # Validate the underlying observer patch independently, then restore
@@ -64,6 +79,12 @@ def main() -> int:
         if reverse.returncode: raise RuntimeError('SDL source matches neither original nor patched private observer sources')
     if fenced:
         applied=run(['git','-C',str(projection),'apply',str(fence)],'fence-restore.log')
+        if applied.returncode: raise RuntimeError(applied.stdout)
+    if queued:
+        applied=run(['git','-C',str(projection),'apply',str(queue)],'queue-restore.log')
+        if applied.returncode: raise RuntimeError(applied.stdout)
+    if generated:
+        applied=run(['git','-C',str(projection),'apply',str(generation)],'generation-restore.log')
         if applied.returncode: raise RuntimeError(applied.stdout)
     decoded={name:(projection/name).read_bytes().decode('utf-8').replace('\r\n','\n') for name in FILES}
     public=PACKAGE/'include/SDL3/SDL_openq4_text_provenance.h'
@@ -124,7 +145,7 @@ def main() -> int:
                 mutation_results[name]={'compiled':True,'rejected':True,'exit_code':r.returncode}
             finally: path.write_text(before,encoding='utf-8')
     result={'status':'passed','checks':int(re.search(r'PASS (\d+) checks',tested.stdout)[1]),'mutations':mutation_results,'provision':provision,
-            'sources':{str(path.relative_to(ROOT)):sha(path) for path in [public,internal,implementation,patch,fence,support,Path(__file__)]},
+            'sources':{str(path.relative_to(ROOT)):sha(path) for path in [public,internal,implementation,patch,fence,queue,generation,support,Path(__file__)]},
             'native_projection':{name:sha(projection/name) for name in FILES},'command':command,
             'scope':'Production observer and SDL admission/scope/session methods against counted native/queue doubles; any fence calls use explicitly disabled-provider doubles. Full Windows message dispatch, enabled combined providers and OS IME/TSF/UI behavior unqualified.'}
     (scratch/'result.json').write_text(json.dumps(result,indent=2)+'\n',encoding='utf-8')

@@ -2,6 +2,16 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- The opt-in SYSTEM page pairs Brightness and Ambient Brightness sliders with
+  precise numeric fields. Unfinished edits are preserved when leaving a field;
+  Apply and exit require an explicit commit or discard. Native character entry
+  and complete field qualification remain in development.
+
+- Numeric fields add Copy, Cut and Paste shortcuts with localized failure
+  messages. A failed Cut preserves the selection, and rejected clipboard text
+  cannot replace a draft. Complete native input and platform validation remain
+  required before the retained UI is ready for general use.
+
 - Text-entry development now checks field ownership across backend replacement
   and input-queue resets. A Windows text-store foundation keeps application
   edits and native text-service revisions synchronized; live native text and

@@ -986,4 +986,14 @@
 	"#str_229997"	"Settings were accepted, but saving did not finish. Retry to finish saving."
 	"#str_229998"	"10%;25%;50%;75%;85%;100%;125%;150%;200%"
 	"#str_229999"	"Keep editing"
+
+	// Transient numeric editor clipboard feedback.
+	"#str_230001"	"Could not read the clipboard. Try again."
+	"#str_230002"	"Could not copy to the clipboard. Your text is unchanged."
+	"#str_230003"	"Clipboard text does not fit this single-line field."
+
+	// Precise SYSTEM numeric field validation (decimal point input).
+	"#str_230004"	"Enter a number from 0.5 to 2."
+	"#str_230005"	"Enter a number from 0 to 1."
+	"#str_230006"	"Commit each field, or discard your unfinished edits."
 }

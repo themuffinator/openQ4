@@ -424,7 +424,14 @@ bool UI_SettingsDispatch(std::uint64_t owner, const ActionInvocation& action, st
         result={SettingsCode::Busy,"The display action belongs to a completed or stale request"};
     else if (action.operation == "settings.system.edit") result = transaction.Edit(owner,action.arguments);
     else if (action.operation == "settings.system.defaults") result = transaction.Defaults(owner);
-    else if (action.operation == "settings.system.cancel") result = transaction.Cancel(owner);
+    else if (action.operation == "settings.system.cancel") {
+        // Local Number drafts can outlive a completed service cancel when a
+        // callback invalidates their exact discard snapshot. A later explicit
+        // discard may finish without reopening or writing accepted settings.
+        // Display/startup/recovery and registered-owner checks still run above.
+        result = !transaction.Owner() && transaction.Phase() == SettingsPhase::Closed ?
+            SettingsResult{SettingsCode::Ok,{}} : transaction.Cancel(owner);
+    }
     else if (action.operation == "settings.system.confirm") result = transaction.Confirm(owner);
     else if (action.operation == "settings.system.revert") result = transaction.Revert(owner);
     else if (action.operation == "settings.system.apply" || action.operation == "settings.system.applyExit") {

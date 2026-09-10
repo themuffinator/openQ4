@@ -37,6 +37,7 @@ ENGINE = r'''
 #include <charconv>
 #include "src/ui/retained/Input.h"
 #include "src/ui/UserInterfaceText.h"
+#include "src/ui/UserInterfaceClipboard.h"
 #include "src/ui/retained/TextEditCommand.h"
 #include "src/sys/KeyEventMetadata.h"
 #include "src/ui/RetainedUI.h"
@@ -51,7 +52,7 @@ template<class T> T Min(T a,T b) { return (std::min)(a,b); }
 struct idVec2 { idVec2(float=0,float=0) {} } vec2_origin;
 enum { SE_KEY=1,SE_MOUSE,K_TAB=10,K_SHIFT,K_UPARROW,K_DOWNARROW,K_LEFTARROW,K_RIGHTARROW,
        K_ENTER,K_KP_ENTER,K_SPACE,K_ESCAPE,K_MOUSE1,K_JOY3,K_JOY4,K_JOY7,K_JOY8,K_JOY9,K_JOY10,K_JOY11,K_JOY12,
-       K_HOME,K_END,K_PGUP,K_PGDN,K_MWHEELUP,K_MWHEELDOWN,K_CTRL,K_ALT,K_RIGHT_ALT,K_BACKSPACE,K_DEL,K_LAST_KEY=512 };
+       K_HOME,K_END,K_PGUP,K_PGDN,K_MWHEELUP,K_MWHEELDOWN,K_CTRL,K_ALT,K_RIGHT_ALT,K_BACKSPACE,K_DEL,K_INS,K_LAST_KEY=512 };
 struct idKeyInput { static inline bool shift=false; static bool IsDown(int key) { return key==K_SHIFT && shift; } };
 class idFile {
 public:
@@ -207,6 +208,36 @@ static std::vector<std::string> eventHistory;
 struct NumberEditorContext {std::string control;NumberEditView editor;std::uint64_t modalToken=0;};
 class Runtime {
 public:
+    bool draftQueryAvailable=true,failDraftDiscard=false;
+    std::vector<std::string> draftFocusCalls;
+    unsigned draftDiscardCalls=0;
+    bool QueryNumberDrafts(NumberDraftSummary& out,std::string& error,double) {
+        error.clear();if(!loaded || !draftQueryAvailable) {error="stub draft query unavailable";return false;}
+        NumberDraftSummary result;result.barrier.instance=numberToken;
+        for(const auto& [id,widget]:widgets) if(widget.number) {
+            const auto& editor=*widget.number;
+            if(editor.dirty || editor.conflict || widget.pending || editor.composition) {
+                NumberDraftStatus draft;draft.control=id;draft.status=editor.status;draft.dirty=editor.dirty;
+                draft.conflict=editor.conflict;draft.pending=widget.pending.has_value();
+                draft.composing=editor.composition.has_value();draft.active=editor.active;
+                result.blocking.push_back(std::move(draft));
+            }
+        }
+        out=std::move(result);return true;
+    }
+    bool DiscardNumberDrafts(const NumberDraftBarrier& expected,std::string& error,double seconds) {
+        ++draftDiscardCalls;NumberDraftSummary current;
+        if(!QueryNumberDrafts(current,error,seconds) || current.barrier!=expected || failDraftDiscard) {error="stub stale discard";return false;}
+        for(auto& [id,widget]:widgets) {widget.number.reset();widget.pending.reset();}
+        numberBuffers.clear();latestProposal.clear();++numberToken;return true;
+    }
+    bool FocusNumberDraft(const NumberDraftBarrier& expected,const std::string& id,std::string& error,double seconds) {
+        draftFocusCalls.push_back(id);NumberDraftSummary current;
+        if(!QueryNumberDrafts(current,error,seconds) || current.barrier!=expected ||
+           std::none_of(current.blocking.begin(),current.blocking.end(),[&](const auto& draft){return draft.control==id;}))return false;
+        if(!FocusControl(id,seconds))return false;
+        return BeginNumberEdit(id,error,seconds);
+    }
     std::optional<NumberEditorContext> QueryNumberEditor(std::string& error,double) {
         error.clear();const auto found=widgets.find(selected);
         if(!loaded || found==widgets.end() || disabledControls.contains(selected) || !found->second.number ||
@@ -275,7 +306,11 @@ public:
                       const std::function<bool(TextEditBuffer&,std::string&)>& change) {
         if(!NumberOwner(id,expected,error) || widgets.at(id).number->conflict || latestProposal.contains(id))return false;
         auto candidate=numberBuffers.at(id);if(!change(candidate,error))return false;
-        numberBuffers[id]=std::move(candidate);widgets.at(id).number->identity.revision=++numberToken;UpdateNumber(id);return true;
+        numberBuffers[id]=std::move(candidate);widgets.at(id).number->identity.revision=++numberToken;widgets.at(id).number->notice=NumberEditNotice::None;UpdateNumber(id);return true;
+    }
+    bool SetNumberNotice(const std::string& id,NumberEditIdentity expected,NumberEditNotice notice,std::string& error,double) {
+        if(!NumberOwner(id,expected,error) || widgets.at(id).number->composition || widgets.at(id).number->conflict || widgets.at(id).pending)return false;
+        widgets.at(id).number->notice=notice;return true;
     }
     bool ReplaceNumberSelection(const std::string& id,NumberEditIdentity expected,std::string_view text,std::string& error,double seconds) {
         numberCalls.push_back({"replace",id,std::string(text),expected,0,0,false,seconds,{}});
@@ -554,7 +589,7 @@ struct Service {
     std::vector<Draw> draws;
     std::map<std::uint64_t,std::string> requests;
     StateValues live{{"r_brightness",1.0},{"r_shadows",true}},baseline,draft;
-    bool readAvailable=true,rejectDispatch=false;
+    bool readAvailable=true,rejectDispatch=false,cancelQueuesRestore=false;
     std::function<void()> afterDispatch;
     StateValues readOverrides;
 } service;
@@ -649,6 +684,9 @@ bool UI_SettingsDispatch(std::uint64_t owner,const openq4::ui::ActionInvocation&
         if(service.active && service.active!=owner) {error="stub owner busy"; return false;}
         service.exitReceipts.clear();
         if(!service.active) {service.active=owner; service.baseline=service.live; service.draft=service.live;}
+    } else if(op=="settings.system.cancel" && !service.active) {
+        // Production cancel permits explicit completion of local-only discard
+        // after an earlier service cancel already closed its transaction.
     } else {
         if(service.active!=owner) {error="stub owner mismatch"; return false;}
         if(op=="settings.system.edit")for(const auto& [key,value]:invocation.arguments)service.draft.at(key)=value;
@@ -661,7 +699,12 @@ bool UI_SettingsDispatch(std::uint64_t owner,const openq4::ui::ActionInvocation&
         }
         else if(op=="settings.system.defaults")service.draft={{"r_brightness",1.0},{"r_shadows",true}};
         else if(op=="settings.system.revert")service.draft=service.baseline;
-        else if(op=="settings.system.cancel")UI_SettingsCloseOwner(owner);
+        else if(op=="settings.system.cancel") {
+            if(service.cancelQueuesRestore) {
+                service.readOverrides["settings.busy"]=true;
+                service.readOverrides["settings.phase"]=static_cast<double>(openq4::ui::SettingsPhase::Restoring);
+            } else UI_SettingsCloseOwner(owner);
+        }
     }
     service.dispatches.back().accepted=true; if(service.afterDispatch)service.afterDispatch(); return true;
 }
@@ -1610,7 +1653,7 @@ static void CheckSettingsExitBatchBoundary() {
                 assert(service.exitConsumed==std::vector<std::uint64_t>{owner});
             } else {
                 order.push_back("dispatch:"+batch.back().operation);order.push_back("exit-canceled:"+std::to_string(owner));
-                assert(service.exitConsumed.empty() && service.dispatches.back().accepted==(scenario==1));
+                assert(service.exitConsumed.empty() && service.dispatches.back().accepted==(scenario==1 || scenario==2));
             }
             assert(service.order==order && service.exitReceipts.empty());
             assert(service.active==(scenario==1?owner:0) && gui.GetStateBool("settings.open")==bool(scenario==1));
@@ -1780,6 +1823,102 @@ static void CheckSettingsReturnBoundary() {
     }
     assert(views.empty() && service.owners.empty()); modelTemplate=original; eventPlans.clear();
 }
+static void CheckNumberDraftBoundary() {
+    assert(views.empty() && SettingsBoundary::service.owners.empty());
+    const auto original=modelTemplate;auto& service=SettingsBoundary::service;
+    service=SettingsBoundary::Service{};eventPlans.clear();consoleObject.open=false;windowFocused=true;
+    for(const auto& [key,type]:UI_SettingsStateSchema())
+        modelTemplate.state[key]={type==0?StateValue(0.0):type==1?StateValue(false):StateValue(std::string()),""};
+    modelTemplate.state["ui.numberDraftsPending"]={false,""};
+    modelTemplate.state["ui.numberDraftMessage"]={std::string(),""};
+    Expression operand;operand.type=0;operand.inputValue=true;
+    modelTemplate.actions["number.settings"]={"settings.system.edit",{{"r_brightness",operand}},std::size_t(0)};
+    modelTemplate.root.control->action="number.settings";
+    std::string error;
+    for(unsigned variant=0;variant<4;++variant) {
+        auto bad=modelTemplate;
+        if(variant==0)bad.state["ui.numberDraftsPending"].cvar="r_shadows";
+        if(variant==1)bad.state["ui.numberDraftsPending"].initial=1.0;
+        if(variant==2) {bad.state.erase("ui.numberDraftsPending");bad.state["UI.NUMBERDRAFTSPENDING"]={false,""};}
+        if(variant==3) {EventStep step;step.values["UI.NUMBERDRAFTSPENDING"]=Expression{};bad.events["forge"].steps.push_back(step);}
+        assert(!ValidateApplication(bad,error));
+    }
+    {
+        idUserInterfaceRetained gui;assert(gui.InitFromFile("test.q4ui"));gui.Activate(true,0);gui.Redraw(0);
+        SettingsEvent(gui,{SettingsAction("begin")});Drain(gui,{});
+        auto& runtime=Live();runtime.InstallNumber("root","number.settings");runtime.selected="root";
+        assert(runtime.BeginNumberEdit("root",error,0));
+        assert(runtime.ReplaceNumberSelection("root",runtime.widgets.at("root").number->identity,"1.375",error,0));
+        runtime.widgets.at("root").number->active=false;runtime.selected="other";
+        gui.Redraw(0);
+        assert(gui.GetStateBool("ui.numberDraftsPending") && !gui.GetStateBool("settings.dirty"));
+        assert(std::string(gui.GetStateString("ui.numberDraftMessage"))=="#str_230006");
+        assert(!UI_RetainedSettingsCanReturn(&gui));
+        const auto text=runtime.numberBuffers.at("root").State().text;
+        gui.SetStateBool("UI.NUMBERDRAFTSPENDING",false);gui.DeleteStateVar("ui.numberDraftMessage");
+        assert(gui.GetStateBool("ui.numberDraftsPending") && std::string(gui.GetStateString("ui.numberDraftMessage"))=="#str_230006");
+        StateValues caller;assert(ApplicationState(modelTemplate,gui.State(),caller,error));
+        assert(!caller.contains("ui.numberDraftsPending") && !caller.contains("ui.numberDraftMessage"));
+        assert(!UI_RetainedDiagnostic(&gui,idCmdArgs{{"retained","state","ui.numberDraftsPending","0"}}));
+        assert(!UI_RetainedDiagnostic(&gui,idCmdArgs{{"retained","pending","UI.NUMBERDRAFTMESSAGE","fake"}}));
+        for(const auto& action:std::vector<ActionInvocation>{SettingsAction("apply"),SettingsAction("applyExit"),SettingsAction("defaults"),
+                SettingsAction("edit",{{"r_brightness",1.75}}),{"dismiss","ui.dismiss",{}}}) {
+            const auto dispatched=service.dispatches.size();SettingsEvent(gui,{action});Drain(gui,{});
+            assert(service.dispatches.size()==dispatched && runtime.numberBuffers.at("root").State().text==text);
+        }
+        // Independent setting edits stay available, with the local field intact.
+        SettingsEvent(gui,{SettingsAction("edit",{{"r_shadows",false}})});Drain(gui,{});
+        assert(service.draft.at("r_shadows")==StateValue(false) && runtime.numberBuffers.at("root").State().text==text);
+        SettingsEvent(gui,{{"focus-draft","ui.numberDrafts.focus",{}}});Drain(gui,{});
+        assert(runtime.selected=="root" && runtime.widgets.at("root").number->active && runtime.draftFocusCalls.back()=="root");
+        assert(runtime.numberBuffers.at("root").State().text==text);
+        runtime.draftQueryAvailable=false;assert(!UI_RetainedSettingsCanReturn(&gui));runtime.draftQueryAvailable=true;
+        // Explicit discard does not lose text if service rollback fails.
+        service.rejectDispatch=true;const auto discards=runtime.draftDiscardCalls;
+        SettingsEvent(gui,{SettingsAction("cancel"),{"dismiss","ui.dismiss",{}}});Drain(gui,{});
+        assert(runtime.draftDiscardCalls==discards && runtime.numberBuffers.at("root").State().text==text);
+        service.rejectDispatch=false;
+        // An accepted display cancel is only a queued rollback. A failed or
+        // unfinished restore must retain field text and cannot authorize close.
+        service.cancelQueuesRestore=true;
+        SettingsEvent(gui,{SettingsAction("cancel"),{"dismiss","ui.dismiss",{}}});Drain(gui,{});
+        assert(runtime.draftDiscardCalls==discards && runtime.numberBuffers.at("root").State().text==text);
+        assert(!UI_RetainedSettingsCanReturn(&gui));
+        service.cancelQueuesRestore=false;service.readOverrides.clear();
+        // A callback changing the captured draft rejects the whole local discard.
+        service.afterDispatch=[&] {++Runtime::numberToken;};
+        SettingsEvent(gui,{SettingsAction("cancel"),{"dismiss","ui.dismiss",{}}});Drain(gui,{});
+        service.afterDispatch={};
+        assert(runtime.draftDiscardCalls==discards+1 && runtime.numberBuffers.at("root").State().text==text);
+        assert(!UI_RetainedSettingsCanReturn(&gui)); // Service is closed; local text still blocks return.
+        service.rejectDispatch=true;
+        SettingsEvent(gui,{SettingsAction("cancel")});Drain(gui,{});
+        assert(runtime.draftDiscardCalls==discards+1 && runtime.numberBuffers.at("root").State().text==text);
+        service.rejectDispatch=false;
+        // A rejected earlier Dismiss cannot become valid retroactively when a
+        // later explicit discard removes the draft in the same action batch.
+        SettingsEvent(gui,{{"dismiss","ui.dismiss",{}},SettingsAction("cancel")});Drain(gui,{});
+        assert(!runtime.widgets.at("root").number && UI_RetainedSettingsCanReturn(&gui));
+        SettingsEvent(gui,{{"dismiss","ui.dismiss",{}}});Drain(gui,{},true);
+    }
+    {
+        // A completed Apply-and-exit callback can introduce a new local draft.
+        // Consume the service receipt once, then refuse the stale close result.
+        idUserInterfaceRetained gui;assert(gui.InitFromFile("test.q4ui"));gui.Activate(true,0);gui.Redraw(0);
+        SettingsEvent(gui,{SettingsAction("begin")});Drain(gui,{});
+        auto& runtime=Live();runtime.InstallNumber("root","number.settings");runtime.selected="root";
+        service.afterDispatch=[&] {
+            assert(runtime.BeginNumberEdit("root",error,0));
+            assert(runtime.ReplaceNumberSelection("root",runtime.widgets.at("root").number->identity,"1.625",error,0));
+        };
+        const auto consumed=service.exitConsumed.size();
+        SettingsEvent(gui,{SettingsAction("applyExit")});Drain(gui,{});service.afterDispatch={};
+        assert(service.exitConsumed.size()==consumed+1 && service.exitReceipts.empty());
+        assert(!UI_RetainedSettingsCanReturn(&gui) && runtime.numberBuffers.at("root").State().text=="1.625");
+        SettingsEvent(gui,{SettingsAction("cancel"),{"dismiss","ui.dismiss",{}}});Drain(gui,{},true);
+    }
+    modelTemplate=original;eventPlans.clear();assert(views.empty() && service.owners.empty());
+}
 static void CheckNumberDiagnosticBoundary() {
     assert(views.empty() && SettingsBoundary::service.owners.empty());
     const auto original=modelTemplate;auto& service=SettingsBoundary::service;
@@ -1817,6 +1956,12 @@ static void CheckNumberDiagnosticBoundary() {
         assert(!diagnostic({"command","root","unknown"}) && !diagnostic({"command","root","left","bad"}) && runtime.numberCalls.size()==commandCalls);
         expected=identity();assert(diagnostic({"select","root","4","1"}));
         assert(runtime.numberCalls.back().expected==expected && runtime.numberCalls.back().anchor==4 && runtime.numberCalls.back().caret==1);
+        for(const auto& [name,notice]:std::map<std::string,NumberEditNotice>{{"read",NumberEditNotice::ClipboardReadFailed},
+                {"write",NumberEditNotice::ClipboardWriteFailed},{"rejected",NumberEditNotice::ClipboardRejected},{"none",NumberEditNotice::None}}) {
+            const auto before=identity();assert(diagnostic({"notice","root",name}));
+            assert(identity()==before && runtime.widgets.at("root").number->notice==notice);
+        }
+        assert(!diagnostic({"notice","root","raw-native-error"}));
         assert(diagnostic({"select","root","0","4"}));expected=identity();
         assert(diagnostic({"preedit","root","\xc3\xa9","0","2"}));
         const auto packet=runtime.numberCalls.back();assert(packet.expected==expected && packet.input && packet.input->kind==TextInputKind::Preedit &&
@@ -1934,6 +2079,7 @@ static void CheckNumberKeys() {
         const auto beforeAlt=state();captured('a',true,{true,false,true,false});captured('a',false,{});assert(unchanged(beforeAlt));
         for(const auto key:{K_BACKSPACE,K_DEL}) {captured(key,true,{true,false,false,false});captured(key,false,{});assert(unchanged(beforeAlt));}
         captured(K_DEL,true,{false,true,false,false});captured(K_DEL,false,{});assert(unchanged(beforeAlt));
+        uiClipboardRequest_t cut;assert(gui.TakeClipboardRequest(ActionMarker,cut) && cut.operation==uiClipboardOperation_t::Cut);
         const auto beforeOrphan=runtime.numberCalls.size();captured(K_LEFTARROW,true,{false,false,false,true});captured(K_LEFTARROW,false,{});
         assert(runtime.numberCalls.size()==beforeOrphan);
         captured(K_END,true,{});captured(K_END,false,{});
@@ -2114,6 +2260,7 @@ int main() {
     CheckPendingControlScopeBoundary();
     CheckSettingsExitBatchBoundary();
     CheckSettingsReturnBoundary();
+    CheckNumberDraftBoundary();
     CheckNumberDiagnosticBoundary();
     CheckNumberKeys();
     std::puts("Retained adapter: Number diagnostic transport, delayed numeric identity and readback-before-acknowledgement; exactly-once Apply-and-exit receipts after complete queued batches, stationary wheel/pointer handoff, immutable value proposals/acknowledgements, authoritative settings return and authored Back, settings capability/draw ownership and state/lifecycle boundaries, ordered event/FIFO publication, restore suppression, pending dictionary, presentation delegation, framed saves, input suspension and cursor mapping passed");
@@ -2170,6 +2317,23 @@ def main():
     temp = Path(tempfile.mkdtemp(prefix='retained-adapter-', dir=ROOT / '.tmp'))
     environment = {**os.environ, 'TEMP': str(temp), 'TMP': str(temp), 'TMPDIR': str(temp)}
     mutations = [
+        ('draft-caller-authority', 'if (!NumberDraftState(name)) return true;', 'return true;'),
+        ('draft-application-authority', ' || NumberDraftState(name.c_str())) continue;', ') continue;'),
+        ('draft-settings-dispatch', 'impl->ConflictsWithNumberDraft(pending,drafts)', 'false'),
+        ('draft-dismiss',
+         'if (!impl->QueryNumberDrafts(drafts) || !drafts.blocking.empty()) {',
+         'if (!impl->QueryNumberDrafts(drafts)) {'),
+        ('draft-final-close',
+         'if (!impl->QueryNumberDrafts(drafts) || !drafts.blocking.empty()) closeRequested = false;',
+         'if (!impl->QueryNumberDrafts(drafts)) closeRequested = false;'),
+        ('draft-parent-return',
+         'if (!(*found)->impl->QueryNumberDrafts(drafts) || !drafts.blocking.empty()) return false;',
+         'if (!(*found)->impl->QueryNumberDrafts(drafts)) return false;'),
+        ('draft-failed-cancel', 'if (accepted && invocation.operation == "settings.system.cancel")',
+         'if (invocation.operation == "settings.system.cancel")'),
+        ('draft-queued-rollback',
+         '!std::get<bool>(completed.at("settings.open")) && !std::get<bool>(completed.at("settings.busy")) &&\n\t\t\t\t\tstd::get<double>(completed.at("settings.phase")) == static_cast<double>(SettingsPhase::Closed)',
+         'true'),
         ('text-key-owner-rebound', 'mapped ? identity.session : 0', 'mapped ? 1 : 0'),
         ('text-key-repeat-commit', 'else if (claim == Input::TextKey::Press)', 'else if (true)'),
         ('text-key-selection-lost', 'movement && shift,error,now', 'false,error,now'),

@@ -288,8 +288,15 @@ jobs:
             tools/tests/sdl3_clipboard_status.py \
             tools/tests/sdl3_text_provenance.py \
             tools/tests/sdl3_native_fence.py \
+            tools/tests/native_queue_batch.py \
             tools/tests/ui_text_edit_model.py \
             tools/tests/ui_native_text_document.py \
+            tools/tests/ui_native_text_editor.py \
+            tools/tests/ui_native_text_collection.py \
+            tools/tests/ui_number_clipboard.py \
+            tools/tests/ui_number_drafts.py \
+            tools/tests/ui_system_number_fields.py \
+            tools/ui/update_system_number_fields.py \
             tools/tests/windows_text_store.py \
             tools/tests/ui_text_input.py \
             tools/tests/ui_retained_input.py \
@@ -527,8 +534,15 @@ jobs:
           python tools/tests/sdl3_clipboard_status.py
           python tools/tests/sdl3_text_provenance.py
           python tools/tests/sdl3_native_fence.py
+          python tools/tests/native_queue_batch.py
           python tools/tests/ui_text_edit_model.py
           python tools/tests/ui_native_text_document.py
+          python tools/tests/ui_native_text_editor.py
+          python tools/tests/ui_native_text_collection.py
+          python tools/tests/ui_number_clipboard.py
+          python tools/tests/ui_number_drafts.py
+          python tools/tests/ui_system_number_fields.py
+          python tools/ui/update_system_number_fields.py --check
           python tools/tests/ui_text_input.py
           python tools/tests/ui_retained_input.py
           python tools/tests/ui_retained_state_sources.py

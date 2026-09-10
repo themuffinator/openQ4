@@ -1,0 +1,348 @@
+--- a/src/events/SDL_events.c
++++ b/src/events/SDL_events.c
+@@ -148,6 +148,9 @@
+ typedef struct SDL_EventEntry
+ {
+     SDL_Event event;
++#if defined(SDL_VIDEO_DRIVER_WINDOWS) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
++    OQ4_NativeQueueRecord oq4_record;
++#endif
+     SDL_TemporaryMemory *memory;
+     struct SDL_EventEntry *prev;
+     struct SDL_EventEntry *next;
+@@ -163,6 +166,198 @@
+     SDL_EventEntry *tail;
+     SDL_EventEntry *free;
+ } SDL_EventQ = { NULL, false, { 0 }, 0, NULL, NULL, NULL };
++
++#if defined(SDL_VIDEO_DRIVER_WINDOWS) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
++/* openQ4 private queue guard. All mutable fields below are protected by the
++ * event queue lock. Only the atomic health summary is read without that lock. */
++static bool oq4_queue_polling, oq4_queue_active, oq4_queue_closed, oq4_queue_fence_queued, oq4_queue_verified;
++static SDL_AtomicInt oq4_queue_health;
++static Uint64 oq4_queue_generation, oq4_queue_sequence, oq4_queue_dispatch, oq4_queue_fence_sequence;
++static Uint32 oq4_queue_count, oq4_queue_consumed;
++static SDL_EventEntry *oq4_queue_get_entry;
++static void OQ4_QueueFault(void)
++{
++    if (oq4_queue_active) {
++        SDL_SetAtomicInt(&oq4_queue_health, 0);
++        SDL_SetError("openQ4 native SDL queue continuity was lost");
++    }
++}
++static void OQ4_QueueRetireLocked(void)
++{
++    oq4_queue_active = oq4_queue_closed = oq4_queue_fence_queued = oq4_queue_verified = false;
++    oq4_queue_dispatch = oq4_queue_fence_sequence = 0;
++    oq4_queue_count = oq4_queue_consumed = 0;
++    oq4_queue_get_entry = NULL;
++    SDL_SetAtomicInt(&oq4_queue_health, 0);
++}
++bool OQ4_WIN_QueueHealthy(void) { return SDL_GetAtomicInt(&oq4_queue_health) != 0; }
++void OQ4_WIN_QueueRetire(void)
++{
++    SDL_LockMutex(SDL_EventQ.lock);
++    OQ4_QueueRetireLocked();
++    SDL_UnlockMutex(SDL_EventQ.lock);
++}
++bool OQ4_WIN_QueueEnable(void)
++{
++    SDL_EventEntry *entry;
++    bool ready = false;
++    if (!SDL_IsMainThread()) return false;
++    SDL_LockMutex(SDL_EventQ.lock);
++    if (SDL_EventQ.active && !oq4_queue_active && !oq4_queue_polling && oq4_queue_generation < SDL_MAX_UINT64 && oq4_queue_sequence < SDL_MAX_UINT64 &&
++        SDL_GetAtomicInt(&SDL_EventQ.count) >= 0 &&
++        (Uint64)SDL_GetAtomicInt(&SDL_EventQ.count) <= SDL_MAX_UINT64 - oq4_queue_sequence) {
++        ++oq4_queue_generation;
++        for (entry = SDL_EventQ.head; entry; entry = entry->next) {
++            SDL_zero(entry->oq4_record);
++            entry->oq4_record.version = 1;
++            entry->oq4_record.kind = entry->event.type == SDL_EVENT_POLL_SENTINEL ? OQ4_QUEUE_SENTINEL : OQ4_QUEUE_OUTSIDE;
++            entry->oq4_record.generation = oq4_queue_generation;
++            entry->oq4_record.queue_sequence = ++oq4_queue_sequence;
++        }
++        oq4_queue_active = true;
++        SDL_SetAtomicInt(&oq4_queue_health, 1);
++        ready = true;
++    }
++    SDL_UnlockMutex(SDL_EventQ.lock);
++    return ready;
++}
++bool OQ4_WIN_QueueBegin(Uint64 dispatch)
++{
++    bool ready = false;
++    SDL_LockMutex(SDL_EventQ.lock);
++    if (oq4_queue_active && OQ4_WIN_QueueHealthy() && dispatch && !oq4_queue_dispatch) {
++        oq4_queue_dispatch = dispatch;
++        oq4_queue_count = oq4_queue_consumed = 0;
++        oq4_queue_closed = oq4_queue_fence_queued = oq4_queue_verified = false;
++        ready = true;
++    }
++    SDL_UnlockMutex(SDL_EventQ.lock);
++    return ready;
++}
++bool OQ4_WIN_QueueEnd(Uint64 dispatch, Uint32 *count)
++{
++    bool ready = false;
++    SDL_LockMutex(SDL_EventQ.lock);
++    if (oq4_queue_active && OQ4_WIN_QueueHealthy() && dispatch == oq4_queue_dispatch && !oq4_queue_closed) {
++        oq4_queue_closed = true;
++        *count = oq4_queue_count;
++        ready = true;
++    }
++    SDL_UnlockMutex(SDL_EventQ.lock);
++    return ready;
++}
++void OQ4_WIN_QueueEmpty(Uint64 dispatch)
++{
++    SDL_LockMutex(SDL_EventQ.lock);
++    if (dispatch == oq4_queue_dispatch && !oq4_queue_count && !oq4_queue_fence_queued) {
++        oq4_queue_dispatch = 0;
++        oq4_queue_closed = false;
++    } else OQ4_QueueFault();
++    SDL_UnlockMutex(SDL_EventQ.lock);
++}
++static bool OQ4_QueueVerifiedLocked(Uint64 dispatch, Uint64 sequence)
++{
++    return oq4_queue_active && OQ4_WIN_QueueHealthy() && oq4_queue_verified &&
++        dispatch && dispatch == oq4_queue_dispatch && sequence && sequence == oq4_queue_fence_sequence &&
++        oq4_queue_closed && oq4_queue_consumed == oq4_queue_count;
++}
++bool OQ4_WIN_QueueVerified(Uint64 dispatch, Uint64 sequence)
++{
++    bool verified;
++    SDL_LockMutex(SDL_EventQ.lock);
++    verified = OQ4_QueueVerifiedLocked(dispatch, sequence);
++    SDL_UnlockMutex(SDL_EventQ.lock);
++    return verified;
++}
++bool OQ4_WIN_QueueAcknowledge(Uint64 dispatch, Uint64 sequence)
++{
++    bool verified;
++    SDL_LockMutex(SDL_EventQ.lock);
++    verified = OQ4_QueueVerifiedLocked(dispatch, sequence);
++    if (verified) {
++        oq4_queue_dispatch = oq4_queue_fence_sequence = 0;
++        oq4_queue_count = oq4_queue_consumed = 0;
++        oq4_queue_closed = oq4_queue_verified = oq4_queue_fence_queued = false;
++    }
++    SDL_UnlockMutex(SDL_EventQ.lock);
++    return verified;
++}
++/* Capture before allocator/log callbacks; assign actual ordinal only at link. */
++typedef struct OQ4_QueueAdmission {
++    Uint64 generation, dispatch, fence_sequence;
++    int fence;
++    SDL_Event marker;
++} OQ4_QueueAdmission;
++static bool OQ4_QueueAdmissionBegin(const SDL_Event *event, OQ4_QueueAdmission *out)
++{
++    SDL_zero(*out);
++    out->fence = OQ4_WIN_ClaimFenceQueueAdmission(event, &out->dispatch, &out->fence_sequence);
++    if (out->fence < 0) { OQ4_QueueFault(); return false; }
++    if (oq4_queue_active) {
++        if (!OQ4_WIN_QueueHealthy()) return true; /* legacy queue remains available after fault */
++        out->generation = oq4_queue_generation;
++        if (out->fence) { SDL_copyp(&out->marker, event); }
++        else out->dispatch = OQ4_WIN_CurrentNativeDispatch(); /* worker additions are explicit Outside */
++    }
++    return true;
++}
++static bool OQ4_QueueAdmissionCommit(SDL_EventEntry *entry, const SDL_Event *event, const OQ4_QueueAdmission *origin)
++{
++    SDL_zero(entry->oq4_record);
++    if (!oq4_queue_active) return origin->fence == 0;
++    if (!OQ4_WIN_QueueHealthy()) return origin->fence == 0;
++    if (!origin->generation || origin->generation != oq4_queue_generation || oq4_queue_sequence == SDL_MAX_UINT64) {
++        OQ4_QueueFault(); return false;
++    }
++    entry->oq4_record.version = 1;
++    entry->oq4_record.generation = oq4_queue_generation;
++    entry->oq4_record.kind = event->type == SDL_EVENT_POLL_SENTINEL ? OQ4_QUEUE_SENTINEL : OQ4_QUEUE_OUTSIDE;
++    if (origin->fence) {
++        if (!oq4_queue_closed || oq4_queue_fence_queued || origin->dispatch != oq4_queue_dispatch ||
++            !origin->fence_sequence || SDL_memcmp(event, &origin->marker, sizeof(*event))) {
++            OQ4_QueueFault(); return false;
++        }
++        entry->oq4_record.kind = OQ4_QUEUE_FENCE;
++        entry->oq4_record.dispatch = origin->dispatch;
++        entry->oq4_record.ordinal = oq4_queue_count;
++        entry->oq4_record.fence_sequence = origin->fence_sequence;
++        oq4_queue_fence_sequence = origin->fence_sequence;
++        oq4_queue_fence_queued = true;
++    } else if (origin->dispatch && entry->oq4_record.kind != OQ4_QUEUE_SENTINEL) {
++        if (oq4_queue_closed || origin->dispatch != oq4_queue_dispatch || oq4_queue_count == 4096) {
++            OQ4_QueueFault(); return false;
++        }
++        entry->oq4_record.kind = OQ4_QUEUE_COLLECTION;
++        entry->oq4_record.dispatch = origin->dispatch;
++        entry->oq4_record.ordinal = ++oq4_queue_count;
++    }
++    entry->oq4_record.queue_sequence = ++oq4_queue_sequence;
++    return true;
++}
++static void OQ4_QueueRemoved(SDL_EventEntry *entry)
++{
++    const bool authorized = entry == oq4_queue_get_entry;
++    oq4_queue_get_entry = NULL; /* one exact Cut, never a reentrant blanket permit */
++    if (!oq4_queue_active) return;
++    if (entry->oq4_record.kind == OQ4_QUEUE_SENTINEL && entry->event.type == SDL_EVENT_POLL_SENTINEL) return;
++    if (!authorized || entry->oq4_record.generation != oq4_queue_generation) OQ4_QueueFault();
++}
++/* Called instead of invoking mutable queue filters directly. A false result is
++ * still removed by legacy SDL; either mutation or removal invalidates affinity. */
++static bool OQ4_QueueFilter(SDL_EventFilter filter, void *userdata, SDL_EventEntry *entry)
++{
++    SDL_Event before;
++    const bool guarded = oq4_queue_active;
++    const Uint64 generation = oq4_queue_generation;
++    bool accepted;
++    SDL_copyp(&before, &entry->event);
++    accepted = filter(userdata, &entry->event);
++    if (guarded && oq4_queue_active && generation == oq4_queue_generation && OQ4_WIN_QueueHealthy() &&
++        SDL_memcmp(&before, &entry->event, sizeof(before))) OQ4_QueueFault();
++    return accepted;
++}
++#endif
++
+ 
+ 
+ static void SDL_CleanupTemporaryMemory(void *data)
+@@ -959,6 +1154,9 @@
+ 
+     SDL_LockMutex(SDL_EventQ.lock);
+ 
++#if defined(SDL_VIDEO_DRIVER_WINDOWS) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
++    OQ4_QueueRetireLocked();
++#endif
+     SDL_EventQ.active = false;
+ 
+     if (report && SDL_atoi(report)) {
+@@ -1049,15 +1247,25 @@
+     SDL_EventEntry *entry;
+     const int initial_count = SDL_GetAtomicInt(&SDL_EventQ.count);
+     int final_count;
++#if defined(SDL_VIDEO_DRIVER_WINDOWS) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
++    OQ4_QueueAdmission oq4_origin;
++    if (!OQ4_QueueAdmissionBegin(event, &oq4_origin)) return 0;
++#endif
+ 
+     if (initial_count >= SDL_MAX_QUEUED_EVENTS) {
+         SDL_SetError("Event queue is full (%d events)", initial_count);
++#if defined(SDL_VIDEO_DRIVER_WINDOWS) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
++        OQ4_QueueFault();
++#endif
+         return 0;
+     }
+ 
+     if (SDL_EventQ.free == NULL) {
+         entry = (SDL_EventEntry *)SDL_malloc(sizeof(*entry));
+         if (entry == NULL) {
++#if defined(SDL_VIDEO_DRIVER_WINDOWS) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
++            OQ4_QueueFault();
++#endif
+             return 0;
+         }
+     } else {
+@@ -1069,6 +1277,13 @@
+         SDL_LogEvent(event);
+     }
+ 
++#if defined(SDL_VIDEO_DRIVER_WINDOWS) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
++    if (!OQ4_QueueAdmissionCommit(entry, event, &oq4_origin)) {
++        entry->next = SDL_EventQ.free;
++        SDL_EventQ.free = entry;
++        return 0;
++    }
++#endif
+     SDL_copyp(&entry->event, event);
+     if (event->type == SDL_EVENT_POLL_SENTINEL) {
+         SDL_AddAtomicInt(&SDL_sentinel_pending, 1);
+@@ -1102,6 +1317,9 @@
+ // Remove an event from the queue -- called with the queue locked
+ static void SDL_CutEvent(SDL_EventEntry *entry)
+ {
++#if defined(SDL_VIDEO_DRIVER_WINDOWS) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
++    OQ4_QueueRemoved(entry);
++#endif
+     SDL_TransferTemporaryMemoryFromEvent(entry);
+ 
+     if (entry->prev) {
+@@ -1129,6 +1347,48 @@
+     SDL_assert(SDL_GetAtomicInt(&SDL_EventQ.count) > 0);
+     SDL_AddAtomicInt(&SDL_EventQ.count, -1);
+ }
++
++#if defined(SDL_VIDEO_DRIVER_WINDOWS) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
++int OQ4_WindowsNativeFencePoll(SDL_Event *event, OQ4_NativeQueueRecord *record)
++{
++    SDL_Event candidate;
++    OQ4_NativeQueueRecord receipt;
++    SDL_EventEntry *entry;
++    int result = -1;
++    bool owns_poll = false;
++    if (!event || !record || !SDL_IsMainThread() || !OQ4_WIN_FenceCanPoll()) return -1;
++    SDL_LockMutex(SDL_EventQ.lock);
++    if (!SDL_EventQ.active || !oq4_queue_active || !OQ4_WIN_QueueHealthy() || oq4_queue_polling) goto done;
++    oq4_queue_polling = owns_poll = true;
++    entry = SDL_EventQ.head;
++    if (!entry) { result = 0; goto done; }
++    receipt = entry->oq4_record;
++    if (receipt.version != 1 || receipt.generation != oq4_queue_generation || !receipt.queue_sequence ||
++        receipt.kind > OQ4_QUEUE_FENCE || receipt.reserved) { OQ4_QueueFault(); goto done; }
++    if (receipt.kind == OQ4_QUEUE_COLLECTION) {
++        if (receipt.dispatch != oq4_queue_dispatch || receipt.ordinal != oq4_queue_consumed + 1 ||
++            receipt.ordinal > oq4_queue_count || receipt.fence_sequence || oq4_queue_verified) { OQ4_QueueFault(); goto done; }
++    } else if (receipt.kind == OQ4_QUEUE_FENCE) {
++        if (!oq4_queue_closed || !oq4_queue_fence_queued || oq4_queue_verified || receipt.dispatch != oq4_queue_dispatch ||
++            receipt.ordinal != oq4_queue_count || oq4_queue_consumed != oq4_queue_count ||
++            receipt.fence_sequence != oq4_queue_fence_sequence) { OQ4_QueueFault(); goto done; }
++    } else if (receipt.dispatch || receipt.ordinal || receipt.fence_sequence ||
++        (receipt.kind == OQ4_QUEUE_SENTINEL) != (entry->event.type == SDL_EVENT_POLL_SENTINEL)) {
++        OQ4_QueueFault(); goto done;
++    }
++    SDL_copyp(&candidate, &entry->event);
++    oq4_queue_get_entry = entry;
++    SDL_CutEvent(entry);
++    if (!oq4_queue_active || !OQ4_WIN_QueueHealthy()) goto done;
++    if (receipt.kind == OQ4_QUEUE_COLLECTION) ++oq4_queue_consumed;
++    if (receipt.kind == OQ4_QUEUE_FENCE) oq4_queue_verified = true;
++    *event = candidate; *record = receipt; result = 1;
++done:
++    if (owns_poll) { oq4_queue_get_entry = NULL; oq4_queue_polling = false; }
++    SDL_UnlockMutex(SDL_EventQ.lock);
++    return result;
++}
++#endif
+ 
+ static void SDL_SendWakeupEvent(void)
+ {
+@@ -1864,7 +2124,12 @@
+             {
+                 for (event = SDL_EventQ.head; event; event = next) {
+                     next = event->next;
+-                    if (!filter(userdata, &event->event)) {
++#if defined(SDL_VIDEO_DRIVER_WINDOWS) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
++                    if (!OQ4_QueueFilter(filter, userdata, event))
++#else
++                    if (!filter(userdata, &event->event))
++#endif
++                    {
+                         SDL_CutEvent(event);
+                     }
+                 }
+@@ -1911,7 +2176,12 @@
+         SDL_EventEntry *entry, *next;
+         for (entry = SDL_EventQ.head; entry; entry = next) {
+             next = entry->next;
+-            if (!filter(userdata, &entry->event)) {
++#if defined(SDL_VIDEO_DRIVER_WINDOWS) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
++            if (!OQ4_QueueFilter(filter, userdata, entry))
++#else
++            if (!filter(userdata, &entry->event))
++#endif
++            {
+                 SDL_CutEvent(entry);
+             }
+         }

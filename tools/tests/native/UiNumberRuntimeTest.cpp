@@ -348,8 +348,71 @@ static void AuthoredFixture(const char* path){
 	std::vector<const Node*> nodes{&document.Model().root};bool number=false;while(!nodes.empty()){const auto* node=nodes.back();nodes.pop_back();number|=node->control&&node->control->role==ControlRole::Number;for(const auto& child:node->children)nodes.push_back(&child);}
 	Check(number,"authored smoke fixture actually contains a Number control");
 }
+static void DraftFocusAfterModalProgram(){
+	for(float density:{1.25f,2.f})for(bool hideField:{false,true}){
+		auto source=Parse(Source());
+		source["state"]["dialogOpen"]["type"]="boolean";source["state"]["dialogOpen"]["initial"]=false;
+		source["state"]["fieldVisible"]["type"]="boolean";source["state"]["fieldVisible"]["initial"]=true;
+		auto modal=Box("draftDialog",20,160,400,100);modal["modal"]["initialFocus"]="continue";
+		auto button=Box("continue",10,10,160,40);auto& control=button["control"];
+		control["role"]="button";control["event"]="close";control["label"]="#str_continue";
+		for(const auto* state:{"default","hover","focus","pressed","disabled"})control["states"][state]="dialogFeedback";
+		auto timeline=source["timelines"][0];timeline["id"]="dialogFeedback";timeline["tracks"][0]["node"]="continue";source["timelines"].append(timeline);
+		modal["children"].append(button);source["root"]["children"].append(modal);
+		for(const auto& [node,state]:std::vector<std::pair<const char*,const char*>>{{"draftDialog","dialogOpen"},{"number","fieldVisible"}}){
+			Json::Value binding;binding["id"]=std::string(node)+"Display";binding["node"]=node;binding["property"]="display";
+			binding["value"]["op"]="select";Json::Value ref;ref["state"]=state;
+			binding["value"]["args"].append(ref);binding["value"]["args"].append("block");binding["value"]["args"].append("none");source["bindings"].append(binding);
+		}
+		Json::Value open;open["op"]="setState";open["values"]["dialogOpen"]=true;source["events"]["open"].append(open);
+		auto close=open;close["values"]["dialogOpen"]=false;close["values"]["fieldVisible"]=!hideField;source["events"]["close"].append(close);
+		TestHost host;Runtime runtime(host);Viewport viewport;viewport.displayScale=density;std::vector<Diagnostic> diagnostics;std::string error;
+		const bool loaded=runtime.LoadDocument(Encode(source),"number-modal.q4ui",diagnostics);
+		for(const auto& d:diagnostics)std::fprintf(stderr,"%s: %s\n",d.pointer.c_str(),d.message.c_str());Check(loaded,"numeric modal fixture loads");
+		runtime.Frame(viewport,1);Check(runtime.FocusControl("number",1)&&runtime.BeginNumberEdit("number",error,1),"edit number before modal");
+		auto edit=runtime.GetWidgetState("number")->number.value();
+		Check(runtime.SetNumberSelection("number",edit.identity,0,edit.state.text.size(),error,1),"select draft before modal");
+		Check(runtime.ReplaceNumberSelection("number",runtime.GetWidgetState("number")->number->identity,"1.375",error,1),"precise local modal draft");
+		Runtime::EventEffects effects;Check(runtime.RunEvent("open",1,effects,error),"open authored modal through program");runtime.Frame(viewport,1.1);
+		NumberDraftSummary drafts;Check(runtime.QueryNumberDrafts(drafts,error,1.1)&&drafts.blocking.size()==1,"modal preserves detached draft");
+		Check(!runtime.FocusNumberDraft(drafts.barrier,"number",error,1.1),"visible modal still prevents field focus");
+		Check(runtime.RunEvent("close",1.1,effects,error)&&runtime.QueryNumberDrafts(drafts,error,1.1),"close program immediately followed by draft query");
+		const auto drawCount=host.draws.size();
+		Check(runtime.FocusNumberDraft(drafts.barrier,"number",error,1.1)==!hideField,"same-dispatch focus uses fresh projected visibility");
+		const auto after=runtime.GetWidgetState("number")->number.value();
+		Check(after.state.text=="1.375"&&after.dirty&&after.active==!hideField&&after.canUndo,"draft text/history survive modal focus decision");
+		Check(host.draws.size()==drawCount&&runtime.TakeActions().empty()&&host.errors==0,"layout synchronization neither renders nor submits a value");
+		if(!hideField){runtime.Frame(viewport,1.2);Check(runtime.FocusedControl()=="number"&&runtime.GetNumberGeometry("number").has_value(),"resumed editor has current caret on next frame");}
+	}
+}
+static void GrowingValidationRevealsField(){
+	for(float density:{1.25f,2.f}){
+		auto source=Parse(Source());auto number=source["root"]["children"][0];
+		number["properties"]["height"]=Typed("keyword","auto");number["properties"]["top"]=Typed("length",90,"dp");
+		auto& viewport=number["children"][0];viewport["properties"]["position"]=Typed("keyword","relative");viewport["properties"]["top"]=Typed("length",0,"dp");
+		auto& validation=number["children"][1];validation["properties"]["position"]=Typed("keyword","relative");validation["properties"]["top"]=Typed("length",0,"dp");
+		validation["properties"]["width"]=Typed("length",150,"dp");validation["properties"]["height"]=Typed("keyword","auto");
+		auto scroller=Box("scroller",20,20,400,150);scroller["properties"]["overflow"]=Typed("keyword","auto");scroller["children"].append(number);
+		source["root"]["children"].clear();source["root"]["children"].append(scroller);
+		TestHost host;Runtime runtime(host);Viewport screen;screen.displayScale=density;std::vector<Diagnostic> diagnostics;std::string error;
+		const bool loaded=runtime.LoadDocument(Encode(source),"number-validation-scroll.q4ui",diagnostics);
+		for(const auto& d:diagnostics)std::fprintf(stderr,"%s: %s\n",d.pointer.c_str(),d.message.c_str());Check(loaded,"growing validation fixture loads");
+		runtime.Frame(screen,1);Check(runtime.FocusControl("number",1)&&runtime.BeginNumberEdit("number",error,1),"focus number in scrolling body");runtime.Frame(screen,1.1);
+		auto edit=runtime.GetWidgetState("number")->number.value();
+		Check(runtime.SetNumberSelection("number",edit.identity,0,edit.state.text.size(),error,1.1),"select valid field text before invalid edit");
+		Check(runtime.ReplaceNumberSelection("number",runtime.GetWidgetState("number")->number->identity,"-",error,1.1),"unfinished value remains a local draft");runtime.Frame(screen,1.2);
+		auto* doc=Rml::GetContext(0)->GetDocument(0);auto* scroll=doc->GetElementById("scroller");
+		Bounds body,message;Check(runtime.GetBounds("scroller",body)&&runtime.GetBounds("validation",message),"new validation has actual Rml bounds");
+		Check(scroll->GetScrollTop()>0&&message.y+message.height<=body.y+body.height+.1f,"new validation is fully revealed in the same frame");
+		Check(runtime.FocusedControl()=="number"&&runtime.GetWidgetState("number")->number->state.text=="-"&&runtime.TakeActions().empty(),"scroll correction preserves focus and local value");
+		scroll->SetScrollTop(0);runtime.Frame(screen,1.3);
+		Check(scroll->GetScrollTop()==0&&host.errors==0,"unchanged field does not override later deliberate scrolling");
+	}
+}
 int main(int argc,char** argv){
 	Check(argc<=2,"only optional authored fixture path accepted");if(argc==2)AuthoredFixture(argv[1]);
 	for(const auto& [name,test]:std::vector<std::pair<const char*,void(*)()>>{{"fractional-density",FractionalDrawingAndDensity},{"framed-transform",FramedReversedSelectionAndTransforms},{"scroll-empty-preedit",ScrollEmptyAndPreedit},{"validation-proposals",ValidationProposalsAndIdentity},{"detached-draft",DetachedDraftAndNativeAffinity},{"unavailable-layout",UnavailableLayoutHidesStaleInk},{"snapshot-recreation",SnapshotDraftsAndResourceRecreation},{"snapshot-conflict",SnapshotFreshHostConflict},{"snapshot-pending",SnapshotPendingProposalDoesNotReplay},{"host-acknowledgement",HostAcknowledgementBetweenFrames},{"host-before-dispatch",HostChangeBeforeDispatch}}){currentCase=name;test();}
+	currentCase="modal-draft-focus";DraftFocusAfterModalProgram();
+	currentCase="validation-scroll";GrowingValidationRevealsField();
 	std::printf("UiNumberRuntimeTest: %u checks passed (actual Runtime/Rml, no devices or GPU).\n",checks);return 0;
 }

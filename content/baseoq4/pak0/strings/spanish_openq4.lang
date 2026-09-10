@@ -986,4 +986,14 @@
 	"#str_229997"	"Se han aceptado los ajustes, pero no se han terminado de guardar. Reintenta para completar el guardado."
 	"#str_229998"	"10%;25%;50%;75%;85%;100%;125%;150%;200%"
 	"#str_229999"	"Seguir editando"
+
+	// Transient numeric editor clipboard feedback.
+	"#str_230001"	"No se pudo leer el portapapeles. Inténtalo de nuevo."
+	"#str_230002"	"No se pudo copiar al portapapeles. El texto no ha cambiado."
+	"#str_230003"	"El texto del portapapeles no es válido para este campo de una sola línea."
+
+	// Precise SYSTEM numeric field validation (decimal point input).
+	"#str_230004"	"Introduce un número de 0.5 a 2."
+	"#str_230005"	"Introduce un número de 0 a 1."
+	"#str_230006"	"Confirma cada campo o descarta los cambios sin terminar."
 }

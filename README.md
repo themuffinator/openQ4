@@ -98,11 +98,12 @@ The [text-entry foundation](docs/dev/ui/text-entry-foundation.md) provides
 validated Unicode editing, exact numeric parsing and checked clipboard services
 for upcoming retained fields. [Numeric field integration](docs/dev/ui/numeric-fields.md)
 adds shared caret geometry, explicit precise proposals and restorable drafts with
-undo/redo and conflict recovery. Active numeric fields also support caret,
-selection and editing command keys. [Native text delivery](docs/dev/ui/text-input-routing.md)
-now has checked editor ownership, queue continuity and a Windows SDK text store
-with atomic range transactions and application change notifications. Native
-activation and complete IME integration remain in development.
+undo/redo and conflict recovery. The opt-in SYSTEM page pairs brightness sliders
+with precise fields and protects unfinished edits during Apply and exit. Numeric
+fields support editing and checked clipboard commands with localized errors.
+[Native text delivery](docs/dev/ui/text-input-routing.md) has checked editor
+ownership, owned event collections, a composition reconciler and a Windows SDK
+text store. Native activation and complete IME integration remain in development.
 
 The [0.13.1 patch notes](docs/dev/releases/v0.13.1.md) cover the release save fix, download verification, and map-compilation corrections. Replace the complete package when upgrading.
 

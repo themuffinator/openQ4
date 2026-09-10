@@ -986,4 +986,14 @@
 	"#str_229997"	"Le impostazioni sono state accettate, ma il salvataggio non è terminato. Riprova per completarlo."
 	"#str_229998"	"10%;25%;50%;75%;85%;100%;125%;150%;200%"
 	"#str_229999"	"Continua a modificare"
+
+	// Transient numeric editor clipboard feedback.
+	"#str_230001"	"Impossibile leggere gli appunti. Riprova."
+	"#str_230002"	"Impossibile copiare negli appunti. Il testo non è stato modificato."
+	"#str_230003"	"Il testo degli appunti non è adatto a questo campo su una sola riga."
+
+	// Precise SYSTEM numeric field validation (decimal point input).
+	"#str_230004"	"Inserisci un numero da 0.5 a 2."
+	"#str_230005"	"Inserisci un numero da 0 a 1."
+	"#str_230006"	"Conferma ogni campo o scarta le modifiche incomplete."
 }

@@ -29,6 +29,9 @@ If you have questions concerning this license or the applicable additional terms
 
 
 
+#ifndef ID_DEDICATED
+#include "../sys/sdl3/TextClipboard.h"
+#endif
 #include "ListGUILocal.h"
 #include "DeviceContext.h"
 #include "Window.h"
@@ -207,12 +210,93 @@ uiTextDeliveryResult_t idUserInterfaceManagerLocal::DeliverTextInput(idUserInter
 
 bool idUserInterfaceManagerLocal::DispatchApplicationActions( idUserInterface *gui, const char *command, bool &closeRequested ) {
 	closeRequested = false;
-	for ( int i = 0; i < allocations.Num(); ++i ) {
-		if ( allocations[i] == gui ) {
-			return allocations[i]->DispatchApplicationActions( command, closeRequested );
-		}
+#ifdef ID_DEDICATED
+	for (int i = 0; i < allocations.Num(); ++i) {
+		if (allocations[i] == gui) return allocations[i]->DispatchApplicationActions(command,closeRequested);
 	}
 	return false;
+#else
+	using namespace openq4::ui;
+	if (clipboardBoundaryActive) { clipboardBoundaryFailed = true; return true; }
+	unsigned long long allocation = 0;
+	for (int i = 0; i < allocations.Num(); ++i) if (allocations[i] == gui) { allocation = allocations[i]->allocationId; break; }
+	if (!allocation) return false;
+	// command may point into the backend being replaced by the native callback.
+	const std::string marker = command ? command : "";
+	auto resolve = [&]() -> idUserInterfaceManaged* {
+		for (int i = 0; i < allocations.Num(); ++i)
+			if (allocations[i] == gui && allocations[i]->allocationId == allocation) return allocations[i];
+		return nullptr;
+	};
+	clipboardBoundaryActive = true; clipboardBoundaryFailed = false;
+	struct Guard { bool& active; ~Guard() { active = false; } } guard{clipboardBoundaryActive};
+	bool handled = false;
+	try {
+		for (unsigned count = 0; count <= 256; ++count) {
+			auto* owner = resolve(); if (!owner || clipboardBoundaryFailed) { closeRequested = false; return true; }
+			handled = owner->DispatchApplicationActions(marker.c_str(),closeRequested);
+			owner = resolve();
+			if (!owner || clipboardBoundaryFailed) { closeRequested = false; return true; }
+			if (!handled || closeRequested) return handled;
+			uiClipboardRequest_t request;
+			if (count == 256 || !owner->TakeClipboardRequest(marker.c_str(),request)) return handled;
+			// All following work uses copied values. No backend method is on the
+			// stack when clipboard access can pump/re-enter or replace that backend.
+			uiNumberEditorSnapshot_t before; std::string error;
+			auto query = [&](uiNumberEditorSnapshot_t& out) {
+				auto* live = resolve();
+				if (!live || clipboardBoundaryFailed || !live->QueryClipboardEditor(out,error)) return false;
+				return !clipboardBoundaryFailed && resolve() && out.target == request.target &&
+					out.target.backend && out.target.document && out.target.modal && !out.target.control.empty() &&
+					out.target.edit.session && out.target.edit.revision && out.editor.identity == out.target.edit &&
+					out.editor.active && !out.editor.conflict && !out.editor.composition;
+			};
+			if (!query(before)) continue;
+			const auto& state = before.editor.state;
+			TextInputEvent checked;
+			if (!MakeTextInputCommit(state.text,checked,error) || state.anchor > state.text.size() || state.caret > state.text.size()) continue;
+			const auto boundary = [&](std::size_t offset) {
+				return offset == state.text.size() || (static_cast<unsigned char>(state.text[offset]) & 0xc0) != 0x80;
+			};
+			if (!boundary(state.anchor) || !boundary(state.caret)) continue;
+			const auto first = (std::min)(state.anchor,state.caret), last = (std::max)(state.anchor,state.caret);
+			const std::string selection = state.text.substr(first,last-first);
+			if (!MakeTextInputCommit(selection,checked,error)) continue;
+			if (request.operation != uiClipboardOperation_t::Copy && request.operation != uiClipboardOperation_t::Cut &&
+				request.operation != uiClipboardOperation_t::Paste) continue;
+			std::string paste; bool succeeded = true;
+			NumberEditNotice notice = NumberEditNotice::None;
+			try {
+				if (request.operation == uiClipboardOperation_t::Paste) {
+					succeeded = openq4::SDL3_ReadTextClipboard(paste,error);
+					if (!succeeded) notice = NumberEditNotice::ClipboardReadFailed;
+				} else if (!selection.empty()) {
+					succeeded = openq4::SDL3_WriteTextClipboard(selection,error);
+					if (!succeeded) notice = NumberEditNotice::ClipboardWriteFailed;
+				}
+			} catch (...) {
+				succeeded = false;
+				notice = request.operation == uiClipboardOperation_t::Paste ? NumberEditNotice::ClipboardReadFailed : NumberEditNotice::ClipboardWriteFailed;
+			}
+			uiNumberEditorSnapshot_t after;
+			if (!query(after) || after.editor.state.text != state.text || after.editor.state.anchor != state.anchor ||
+				after.editor.state.caret != state.caret) continue;
+			// Empty Paste is a successful no-op, never deletion of the selection.
+			if (succeeded && ((request.operation == uiClipboardOperation_t::Cut && !selection.empty()) ||
+				(request.operation == uiClipboardOperation_t::Paste && !paste.empty()))) {
+				if (!MakeTextInputCommit(paste,checked,error)) notice = NumberEditNotice::ClipboardRejected;
+				else if (auto* live = resolve()) {
+					if (live->ReplaceClipboardSelection(request.target,paste,error)) continue;
+					notice = NumberEditNotice::ClipboardRejected;
+				}
+			}
+			// A refusal reports only a fixed localized category to the same live
+			// editor. Native diagnostics never become authored field contents.
+			if (!clipboardBoundaryFailed) if (auto* live = resolve()) live->SetClipboardNotice(request.target,notice,error);
+		}
+	} catch (...) { closeRequested = false; return true; }
+	return handled;
+#endif
 }
 
 void UI_PumpApplicationActions( UI_ApplicationCommandCallback callback, void *context, idUserInterface *only ) {

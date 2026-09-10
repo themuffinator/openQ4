@@ -18,6 +18,7 @@ from zipfile import ZipFile, ZIP_DEFLATED
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'tools/ui'))
 import capture_system_exit as capture
+from ui_capture_system_page import number_contract_mutations
 
 VK_INIT='Vulkan renderer initialized: Fixture GPU (Vulkan 1.4.325)'
 CACHE_WARNING='WARNING: vertex array range in virtual memory (SLOW)'
@@ -52,7 +53,8 @@ def trace(mode='sp',renderer='gl'):
         if stage['display']=='restore': active_request=request+1
         lines += ['RETAINED_GUI_OPERATION '+command.split()[1]+' passed' for command in stage['commands'] if command.startswith('openq4_retainedGui ')]
         # Pin the production lifecycle spelling independently of the oracle.
-        events = [('onActivate',1,1)] if stage['opening'] else stage['events']
+        events = [('onActivate',1,1)] if stage['opening'] else \
+                 [('continueediting',1,1)] if stage['name']=='continued' else stage['events']
         lines += [f'RETAINED_GUI_EVENT name={name} actions={actions} writes={writes}' for name,actions,writes in events]
         def exit_event(event,token=request): lines.append(f'UI_SETTINGS_EXIT owner={owner} request={token} event={event}')
         if stage['name']=='immediate_exit': exit_event('ready',0)
@@ -145,6 +147,26 @@ class ExitOracleTests(unittest.TestCase):
         for name in ('onactivate','OnActivate','onDeactivate','onInit','unknown'):
             with self.subTest(name=name):
                 self.reject(log.replace(lifecycle,lifecycle.replace('onActivate',name),1))
+
+    def test_continue_keeps_one_focus_action_and_one_local_write(self):
+        original=trace();continued='RETAINED_GUI_EVENT name=continueediting actions=1 writes=1'
+        self.assertEqual(original.count(continued),1)
+        for changed in (continued.replace('actions=1','actions=0'),continued.replace('actions=1','actions=2'),
+                        continued.replace('writes=1','writes=0'),continued+'\n'+continued,
+                        continued.replace('continueediting','continueEditing')):
+            self.reject(original.replace(continued,changed,1))
+
+    def test_matched_source_cannot_weaken_numeric_exit_guards(self):
+        raw=(ROOT/'content/baseoq4/pak0'/capture.PAGE).read_text(encoding='utf-8')
+        original=json.loads('\n'.join(line for line in raw.splitlines() if not line.lstrip().startswith('//')))
+        for name,model in number_contract_mutations(original):
+            with self.subTest(name=name),tempfile.TemporaryDirectory(prefix='system-number-exit-contract-',dir=ROOT/'.tmp') as directory:
+                root=Path(directory);runtime=root/'.install';data=json.dumps(model).encode('utf-8')
+                source=root/'content/baseoq4/pak0'/capture.PAGE;source.parent.mkdir(parents=True);source.write_bytes(data)
+                package(runtime/'baseoq4/pak0.pk4',data)
+                with patch.object(capture,'ROOT',root):
+                    with self.assertRaises(ValueError):capture.source_contract(runtime)
+                type(self).mutations += 1
 
     def test_false_markers_malformed_and_outside(self):
         for marker in (capture.COMPLETE,capture.STAGE_MARKER+' open'):

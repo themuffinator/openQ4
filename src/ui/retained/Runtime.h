@@ -179,6 +179,8 @@ public:
 		std::size_t anchor, std::size_t caret, std::string& error, double seconds);
 	bool ApplyNumberInput(const std::string& id, NumberEditIdentity expected,
 		const TextInputEvent& event, std::string& error, double seconds);
+	bool SetNumberNotice(const std::string& id, NumberEditIdentity expected,
+		NumberEditNotice notice, std::string& error, double seconds);
 	bool ReplaceNumberSelection(const std::string& id, NumberEditIdentity expected,
 		std::string_view text, std::string& error, double seconds);
 	// Local scalar-LTR editing only, using current shared font-run boundaries.
@@ -195,6 +197,11 @@ public:
 	bool ResolveNumberConflict(const std::string& id, NumberEditIdentity expected,
 		bool keepDraft, std::string& error, double seconds);
 	bool CancelNumberEdit(const std::string& id, NumberEditIdentity expected, double seconds);
+	// Observe fresh host readbacks before querying/consuming a local-draft barrier.
+	// These guard local buffers only; native queued/document state is not attached.
+	bool QueryNumberDrafts(NumberDraftSummary& out, std::string& error, double seconds);
+	bool DiscardNumberDrafts(const NumberDraftBarrier& expected, std::string& error, double seconds);
+	bool FocusNumberDraft(const NumberDraftBarrier& expected, const std::string& control, std::string& error, double seconds);
 	std::optional<NumberTextGeometry> GetNumberGeometry(const std::string& id) const;
 	// Refresh host values and current eligibility, then copy the focused active
 	// editor. Never starts/rebases an inactive draft or serializes a live token.

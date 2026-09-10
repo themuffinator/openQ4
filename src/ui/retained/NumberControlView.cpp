@@ -173,10 +173,14 @@ bool NumberControlView::Paint(const Interaction& interaction,float ratio,double 
 		for (const auto& part:{spec.text,spec.selection,spec.caret,spec.composition}) {
 			changed|=impl->Property(part,"position","absolute"); changed|=impl->Property(part,"transform","none");
 		}
-		const bool invalid=edit && (edit->conflict || edit->status!=TextNumberStatus::Valid || view->rejected);
+		const bool invalid=edit && (edit->conflict || edit->status!=TextNumberStatus::Valid || view->rejected || edit->notice!=NumberEditNotice::None);
 		std::string message;
 		if (invalid) {
-			if (impl->validation) message=impl->validation(spec,*edit,view->rejected.has_value());
+			if (edit->notice!=NumberEditNotice::None) {
+				const char* key=edit->notice==NumberEditNotice::ClipboardReadFailed ? "#str_230001" :
+					edit->notice==NumberEditNotice::ClipboardWriteFailed ? "#str_230002" : "#str_230003";
+				message=impl->translate ? impl->translate(key) : key;
+			} else if (impl->validation) message=impl->validation(spec,*edit,view->rejected.has_value());
 			else { message=impl->authored.at(spec.validation).at("text").text; if (impl->translate) message=impl->translate(message); }
 		}
 		changed|=impl->Text(spec.validation,message); changed|=impl->Display(spec.validation,invalid);

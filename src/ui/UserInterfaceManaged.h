@@ -3,6 +3,7 @@
 
 #include "UserInterface.h"
 #include "UserInterfaceText.h"
+#include "UserInterfaceClipboard.h"
 
 // Engine-private ownership and scheduling contract. Game modules continue to
 // use idUserInterface; neither legacy windows nor these manager operations
@@ -39,6 +40,15 @@ public:
 	}
 	virtual bool ApplyTextInput(const openq4::ui::TextBrokerContext& expected,
 		const openq4::ui::TextInputEvent& input, std::string& error) { return false; }
+
+	// Clipboard work leaves every backend method stack before the manager calls
+	// the native service. Take only the front FIFO request for this exact marker.
+	virtual bool TakeClipboardRequest(const char* command, uiClipboardRequest_t& out) { return false; }
+	virtual bool QueryClipboardEditor(uiNumberEditorSnapshot_t& out, std::string& error) { return false; }
+	virtual bool ReplaceClipboardSelection(const uiNumberEditorTarget_t& expected,
+		std::string_view text, std::string& error) { return false; }
+	virtual bool SetClipboardNotice(const uiNumberEditorTarget_t& expected,
+		openq4::ui::NumberEditNotice notice, std::string& error) { return false; }
 
 	void ClearRefs() { refs = 0; }
 	void AddRef() { refs++; }

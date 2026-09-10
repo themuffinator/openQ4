@@ -678,6 +678,18 @@ struct Runtime::Impl {
 		if (!stateError.empty()) { error = stateError; return false; }
 		UpdateInteraction(seconds); return true;
 	}
+	bool RefreshNumberFocusLayout(std::string& error) {
+		if (!context || viewport.width <= 0 || viewport.height <= 0) {
+			error = "Number focus requires a usable layout viewport"; return false;
+		}
+		// A program can hide its modal and request draft focus in the same
+		// dispatch. Resolve the resulting pending focus from newly projected
+		// layout, before testing the requested field's actual eligibility.
+		ContextClock clock(*services,time);
+		ApplyMotion(); context->Update();
+		context->GetRootElement()->UpdateGeometryForProjection();
+		UpdateInteraction(-1,true); return true;
+	}
 	static std::optional<Value> Property(const State& state, const Motion& motion, const PropertyKey& key) {
 		const auto bound = state.Properties().find(key);
 		if (bound != state.Properties().end()) return bound->second;
@@ -1289,11 +1301,20 @@ void Runtime::Frame(const Viewport& viewport, double seconds) {
 		impl->UpdateInteraction(-1,true);
 		const bool focusChanged = before != impl->interaction.Focused();
 		if (focusChanged) { impl->RevealFocus(); impl->ApplyMotion(); }
+		const auto* focusedNode = impl->canonical ? impl->canonical->Model().FindNode(impl->interaction.Focused()) : nullptr;
+		auto* focusedNumber = focusedNode && focusedNode->control && focusedNode->control->role == ControlRole::Number ?
+			impl->document->GetElementById(focusedNode->id) : nullptr;
+		const auto numberSize = focusedNumber ? focusedNumber->GetBox().GetSize(Rml::BoxArea::Border) : Rml::Vector2f{};
 		bool painted = impl->valueView.Paint(impl->interaction,impl->state.ControlValues(),viewport.width,viewport.height,viewport.DpRatio(),
 			[&](const std::string& id) { const auto value = impl->PresentedProperty({id,"opacity"}); return value ? value->data[0] : 1.0; });
 		painted |= impl->numberView.Paint(impl->interaction,viewport.DpRatio(),impl->time,impl->motion.ReducedMotion());
 		if (!painted && !focusChanged) break;
 		impl->context->Update();
+		if (focusedNumber && focusedNumber->GetBox().GetSize(Rml::BoxArea::Border) != numberSize) {
+			// Validation can grow the focused field without changing focus.
+			// Reveal its new extent once; unchanged frames preserve user scroll.
+			impl->RevealFocus(); impl->context->Update();
+		}
 	}
 	const auto updated = std::chrono::steady_clock::now();
 	impl->backend->renderer.BeginFrame(viewport.width,viewport.height);
@@ -1428,6 +1449,10 @@ bool Runtime::ApplyNumberInput(const std::string& id,NumberEditIdentity expected
 	if (!impl->PrepareNumberEdit(seconds,error)) return false;
 	const bool result=impl->interaction.ApplyNumberInput(id,expected,event,error); impl->Feedback(seconds); return result;
 }
+bool Runtime::SetNumberNotice(const std::string& id,NumberEditIdentity expected,NumberEditNotice notice,std::string& error,double seconds) {
+	if (!impl->PrepareNumberEdit(seconds,error)) return false;
+	return impl->interaction.SetNumberNotice(id,expected,notice,error);
+}
 bool Runtime::ReplaceNumberSelection(const std::string& id,NumberEditIdentity expected,std::string_view text,std::string& error,double seconds) {
 	if (!impl->PrepareNumberEdit(seconds,error)) return false;
 	const bool result=impl->interaction.ReplaceNumberSelection(id,expected,text,error); impl->Feedback(seconds); return result;
@@ -1468,6 +1493,21 @@ bool Runtime::ResolveNumberConflict(const std::string& id,NumberEditIdentity exp
 bool Runtime::CancelNumberEdit(const std::string& id,NumberEditIdentity expected,double seconds) {
 	std::string error; if (!impl->PrepareNumberEdit(seconds,error)) return false;
 	const bool result=impl->interaction.CancelNumberEdit(id,expected); impl->Feedback(seconds); return result;
+}
+bool Runtime::QueryNumberDrafts(NumberDraftSummary& out,std::string& error,double seconds) {
+	if (!impl->PrepareNumberEdit(seconds,error)) return false;
+	return impl->interaction.QueryNumberDrafts(out,error);
+}
+bool Runtime::DiscardNumberDrafts(const NumberDraftBarrier& expected,std::string& error,double seconds) {
+	if (!impl->PrepareNumberEdit(seconds,error)) return false;
+	const bool result=impl->interaction.DiscardNumberDrafts(expected,error); impl->Feedback(seconds); return result;
+}
+bool Runtime::FocusNumberDraft(const NumberDraftBarrier& expected,const std::string& control,std::string& error,double seconds) {
+	if (!impl->PrepareNumberEdit(seconds,error)) return false;
+	if (!impl->RefreshNumberFocusLayout(error)) return false;
+	const bool result=impl->interaction.FocusNumberDraft(expected,control,error);
+	if (result) { impl->pointerNavigation = false; impl->RevealFocus(); }
+	impl->Feedback(seconds); return result;
 }
 std::optional<NumberTextGeometry> Runtime::GetNumberGeometry(const std::string& id) const {
 	return impl->numberView.Geometry(id,impl->interaction);

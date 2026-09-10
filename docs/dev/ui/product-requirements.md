@@ -207,6 +207,22 @@ remains disabled and does not prove earlier-event consumption; checked queue
 delivery, live native editing, complete IME/shaping, production fields, the
 editor and all migrations/gates remain open. No acceptance state changes.
 
+The precise SYSTEM-field increment adds the two paired brightness fields,
+localized validation, checked clipboard commands and explicit handling of
+unfinished local edits during Apply/exit. A completed service cancellation and
+an unchanged full editor inventory are required before local Discard. Keep
+Editing synchronizes projected layout before resuming the field in the same
+dispatch. Growing validation scrolls into view without overriding later user
+scrolling. The Windows build and 32 UI suites pass. SP/OpenGL at 125% and
+MP/Vulkan at 200% each pass 37 semantic operations with 17 reviewed engine
+images after gameplay, recorded in
+`.tmp/ui/native-editing-integration/validation-evidence.json`.
+Checked queue consumption,
+owned SDL event collections and a portable composition reconciler extend the
+native-input foundation; field activation and complete IME delivery remain
+unfinished. The new evidence supplements the existing scope and accepts no
+requirement, GUI migration or final gate.
+
 There are **65 partial, 161 pending and one verified requirement**. `BEH-002`
 remains partial for the implemented settings transaction/service boundary.
 `BEH-005` remains partial for committed action delivery and cancellation; stock

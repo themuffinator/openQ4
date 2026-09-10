@@ -61,6 +61,13 @@ public:
 	bool ApplyTextInput(const openq4::ui::TextBrokerContext& expected,
 		const openq4::ui::TextInputEvent& input, std::string& error) override;
 
+	bool TakeClipboardRequest(const char* command, uiClipboardRequest_t& out) override;
+	bool QueryClipboardEditor(uiNumberEditorSnapshot_t& out, std::string& error) override;
+	bool ReplaceClipboardSelection(const uiNumberEditorTarget_t& expected,
+		std::string_view text, std::string& error) override;
+	bool SetClipboardNotice(const uiNumberEditorTarget_t& expected,
+		openq4::ui::NumberEditNotice notice, std::string& error) override;
+
 private:
 	idUserInterfaceManaged *backend;
 	idDict pendingState;

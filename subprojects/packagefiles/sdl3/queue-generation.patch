@@ -1,0 +1,18 @@
+--- a/src/events/SDL_events.c
++++ b/src/events/SDL_events.c
+@@ -195,6 +195,15 @@
+     SDL_SetAtomicInt(&oq4_queue_health, 0);
+ }
+ bool OQ4_WIN_QueueHealthy(void) { return SDL_GetAtomicInt(&oq4_queue_health) != 0; }
++Uint64 OQ4_WindowsNativeFenceQueueGeneration(void)
++{
++    Uint64 generation = 0;
++    if (!SDL_IsMainThread()) return 0;
++    SDL_LockMutex(SDL_EventQ.lock);
++    if (SDL_EventQ.active && oq4_queue_active && OQ4_WIN_QueueHealthy()) generation = oq4_queue_generation;
++    SDL_UnlockMutex(SDL_EventQ.lock);
++    return generation;
++}
+ void OQ4_WIN_QueueRetire(void)
+ {
+     SDL_LockMutex(SDL_EventQ.lock);

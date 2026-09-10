@@ -69,7 +69,7 @@ def stages():
         live=1, events=back)
     # Accept the modal's safe initial focus without a diagnostic Focus command.
     add('continued', key('accept'), baseline=1, dirty=1, live=1,
-        events=[('continueediting', 0, 1)], shot='continued')
+        events=[('continueediting', 1, 1)], shot='continued')
     add('immediate_dialog', activate('settings_back'), baseline=1, dirty=1, discard=1,
         live=1, events=back)
     add('immediate_exit', activate('discard_apply_changes'), child=False,
@@ -126,6 +126,7 @@ def source_contract(runtime):
         if node['id'] in nodes: raise ValueError('Duplicate SYSTEM node')
         nodes[node['id']] = node
         pending.extend(node.get('children', []))
+    page.number_contract(model,nodes)
     expected = {'settings_back':('event','onBack'), 'discard_changes':('event','discard'),
                 'discard_keep_editing':('event','continueEditing'),
                 'discard_apply_changes':('event','applyExit'),
