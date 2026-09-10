@@ -209,8 +209,158 @@ void Budgets() {
 	NativeTextLockScope unchanged{{99,99},99,NativeTextAccess::Read}, next=unchanged;
 	Check(sequence.RequestLock(Owner,NativeTextAccess::Read,true,next,error)==NativeTextLockResult::Refused&&next==unchanged,"callback serial lifetime bound never reuses identity");
 }
+void PendingCollectionWatermarks() {
+	NativeTextDocument doc;NativeTextPendingSnapshot out{{99,98},97,96,95,94,93,92,91};const auto sentinel=out;
+	Check(!doc.QueryPendingCollection(Owner,100,0,1,77,out,error)&&out==sentinel,"unopened query leaves output untouched");
+	Open(doc);
+	const NativeTextDocument& readOnly=doc;
+	Check(readOnly.QueryPendingCollection(Owner,100,0,1,77,out,error),"empty read-only pending query");
+	Check((out==NativeTextPendingSnapshot{Owner,100,0,1,1,77,0,0}),"empty query exact copied values");
+	for(int field=0;field<5;++field) {
+		out=sentinel;auto id=Owner;std::uint64_t revision=100,sequence=0,shadow=1,dispatch=77;
+		if(field==0)id=Other;
+		if(field==1)revision=101;
+		if(field==2)sequence=1;
+		if(field==3)shadow=2;
+		if(field==4)dispatch=0;
+		Check(!doc.QueryPendingCollection(id,revision,sequence,shadow,dispatch,out,error)&&out==sentinel,"empty query checks full owner and ACKed state");
+	}
+	auto scope=Lock(doc);Check(doc.SelectACP(scope,1,1,error),"first queued selection");Finish(doc,scope,77);
+	scope=Lock(doc);Check(doc.SelectACP(scope,2,2,error),"second queued selection");Finish(doc,scope,77);
+	const auto bytes=doc.PendingBytes();const auto copied=Offer(doc);NativeTextPendingSnapshot saved;
+	Check(doc.QueryPendingCollection(Owner,100,0,1,77,saved,error),"copied immutable offer does not create a lease");
+	Check((saved==NativeTextPendingSnapshot{Owner,100,0,1,3,77,2,2}),"all pending offers observed before first ACK");
+	Check(Offer(doc)==copied && doc.PendingCount()==2 && doc.PendingBytes()==bytes && doc.EngineRevision()==100 && doc.ShadowRevision()==3,"query did not offer, ACK, rebind or advance model");
+	out=sentinel;Check(!doc.QueryPendingCollection(Owner,101,1,2,77,out,error)&&out==sentinel,"applied but unacknowledged editor cannot query advanced state");
+	Ack(doc);Check(doc.QueryPendingCollection(Owner,101,1,2,77,out,error),"query after exact first ACK");
+	Check((out==NativeTextPendingSnapshot{Owner,101,1,2,3,77,2,1}),"remaining queue retains exact final watermark");
+	Check(saved.count==2 && saved.acknowledgedSequence==0 && copied.transaction.sequence==1,"copied query and offer remain immutable after ACK");
+	out=sentinel;Check(!doc.QueryPendingCollection(Owner,100,0,1,77,out,error)&&out==sentinel,"old ACKed barrier refused after progress");
+	Ack(doc);Check(doc.QueryPendingCollection(Owner,102,2,3,999,out,error)&&out.count==0&&out.lastSequence==2,"empty query accepts observational dispatch without claiming participation");
+	Check(doc.SyncEngine(Owner,102,3,103,"xyz",2,0,error),"application shadow synchronization");
+	out=sentinel;Check(!doc.QueryPendingCollection(Owner,103,2,3,77,out,error)&&out==sentinel,"app synchronization invalidates old ACKed shadow");
+	Check(doc.QueryPendingCollection(Owner,103,2,4,77,out,error)&&out.shadowRevision==4&&out.acknowledgedSequence==2,"shadow progress is independent from transaction sequence");
+	Check(doc.Retire(Owner,error),"retire queried document");out=sentinel;
+	Check(!doc.QueryPendingCollection(Owner,103,2,4,77,out,error)&&out==sentinel,"retired document query refused");
+	NativeTextDocument mixed;Open(mixed);scope=Lock(mixed);Check(mixed.SelectACP(scope,1,1,error),"first mixed dispatch");Finish(mixed,scope,77);
+	scope=Lock(mixed);Check(mixed.SelectACP(scope,2,2,error),"second mixed dispatch");Finish(mixed,scope,78);
+	for(auto dispatch:{77u,78u}) {out=sentinel;Check(!mixed.QueryPendingCollection(Owner,100,0,1,dispatch,out,error)&&out==sentinel,"mixed pending dispatch rejected unchanged");}
+	Ack(mixed);Check(mixed.QueryPendingCollection(Owner,101,1,2,78,out,error)&&out.count==1,"next homogeneous queue matches new acknowledged barrier");
+	NativeTextDocument zero;Open(zero);scope=Lock(zero);Check(zero.SelectACP(scope,1,1,error),"unscoped queued transaction");Finish(zero,scope,0);out=sentinel;
+	Check(!zero.QueryPendingCollection(Owner,100,0,1,77,out,error)&&out==sentinel,"zero-dispatch offer cannot borrow external collection identity");
+}
+void PendingCollectionLocksAndBounds() {
+	NativeTextDocument doc;Open(doc);NativeTextPendingSnapshot out{{9,8},7,6,5,4,3,2,1};const auto sentinel=out;
+	auto scope=Lock(doc,NativeTextAccess::Read);NativeTextLockScope deferred;
+	Check(!doc.QueryPendingCollection(Owner,100,0,1,77,out,error)&&out==sentinel,"query refuses active read callback");
+	Check(doc.RequestLock(Owner,NativeTextAccess::ReadWrite,false,deferred,error)==NativeTextLockResult::Deferred,"defer native write callback");Finish(doc,scope);
+	Check(!doc.QueryPendingCollection(Owner,100,0,1,77,out,error)&&out==sentinel,"query refuses deferred write before grant");
+	Check(doc.GrantDeferredWrite(Owner,deferred,error),"grant deferred callback");
+	Check(!doc.QueryPendingCollection(Owner,100,0,1,77,out,error)&&out==sentinel,"query refuses active deferred write callback");
+	Check(doc.SelectACP(deferred,1,1,error),"query failure did not poison candidate");Finish(doc,deferred,77);
+	Check(doc.QueryPendingCollection(Owner,100,0,1,77,out,error)&&out.count==1,"query after completed write callback");
+	NativeTextDocument full;Open(full);
+	for(unsigned i=0;i<32;++i){scope=Lock(full);Check(full.SelectACP(scope,i%2?0:1,i%2?0:1,error),"bounded queued selection");Finish(full,scope,99);}
+	Check(full.QueryPendingCollection(Owner,100,0,1,99,out,error)&&out.count==32&&out.lastSequence==32&&out.shadowRevision==33,"maximum32 copied queue count");
+	scope=Lock(full);Check(full.SelectACP(scope,1,1,error),"overflow candidate");std::uint64_t receipt=88;
+	Check(!full.FinishLock(scope,99,receipt,error)&&receipt==88,"producer refuses33rd pending offer");
+	Check(full.QueryPendingCollection(Owner,100,0,1,99,out,error)&&out.count==32,"failed overflow preserves query watermark");
+	NativeTextLimits limits;limits.sequence=1;NativeTextDocument exhausted(limits);Open(exhausted);
+	for(unsigned i=0;i<16;++i)Check(exhausted.QueryPendingCollection(Owner,100,0,1,55,out,error)&&out.count==0,"read-only query consumes no callback/revision serial");
+	scope=Lock(exhausted,NativeTextAccess::Read);Finish(exhausted,scope);
+	NativeTextLockScope another;Check(exhausted.RequestLock(Owner,NativeTextAccess::Read,true,another,error)==NativeTextLockResult::Refused,"single callback budget exhausted");
+	Check(exhausted.QueryPendingCollection(Owner,100,0,1,55,out,error)&&out.count==0,"read-only query available at exhausted lock budget");
+}
+NativeTextMetadataObservation Observe(NativeTextDocument& doc,std::uint64_t dispatch=77) {
+	NativeTextMetadataObservation result;Check(doc.CaptureCompositionObservation(Owner,dispatch,result,error),"capture native composition observation");return result;
+}
+std::uint64_t Metadata(NativeTextDocument& doc,NativeTextOperationKind kind,std::uint64_t token,std::uint32_t first=0,std::uint32_t last=0,std::uint64_t dispatch=77) {
+	const auto observation=Observe(doc,dispatch);std::uint64_t published=999;
+	Check(doc.PublishCompositionObservation(observation,{kind,first,last,{},token},published,error),"publish observed composition metadata");return published;
+}
+void ObservedCompositionLifecycle() {
+	NativeTextDocument doc;Open(doc,"A\xf0\x9f\x98\x80Z",6,1);
+	const auto before=Observe(doc);Check((before==NativeTextMetadataObservation{Owner,100,1,0,0,77}),"complete initial copied observation");
+	Check(Metadata(doc,NativeTextOperationKind::BeginComposition,1,1,3)==1,"idle Begin gets first published identity");
+	const auto first=Offer(doc);Check(!first.transaction.documentChanged && first.transaction.after.text=="A\xf0\x9f\x98\x80Z" &&
+		first.transaction.after.anchor==6 && first.transaction.after.caret==1,"metadata never changes text or directional selection");
+	Check(first.transaction.classification==NativeTextClassification::CompositionRelated && first.transaction.after.compositions.at(1)==NativeTextRange{1,5},"nonBMP ACP composition extent");
+	Check(first.transaction.operations.size()==1 && first.transaction.operations[0].kind==NativeTextOperationKind::BeginComposition,"one observed callback is one ordered metadata operation");
+	std::uint64_t output=999;Check(!doc.PublishCompositionObservation(before,{NativeTextOperationKind::EndComposition,0,0,{},1},output,error)&&output==999,"old shadow observation cannot terminate new composition");
+	Check(Metadata(doc,NativeTextOperationKind::UpdateComposition,1,0,1)==2,"idle Update ordered after Begin");
+	Check(Offer(doc)==first,"later metadata does not rewrite original offer");
+	auto lock=Lock(doc);Check(lock.serial==1,"metadata captures and publishes no text-store lock serial");
+	Check(doc.ReplaceACP(lock,0,1,"XY",error) && doc.EndComposition(lock,1,error),"real write scope owns range edit and End");
+	Check(Finish(doc,lock)==3,"in-lock text and metadata share one publication");
+	NativeTextPendingSnapshot queue;Check(doc.QueryPendingCollection(Owner,100,0,1,77,queue,error)&&queue.count==3&&queue.lastSequence==3,"pending collection sees idle and locked metadata together");
+	const auto preAck=Observe(doc);Ack(doc,0);
+	output=999;Check(!doc.PublishCompositionObservation(preAck,{NativeTextOperationKind::BeginComposition,0,0,{},2},output,error)&&output==999,"same-revision metadata ACK invalidates observation");
+	const auto second=Offer(doc);Check(second.transaction.operations[0].first==0 && second.transaction.operations[0].last==1,"Update extent preserved in immutable offer");Ack(doc,0);
+	const auto third=Offer(doc);Check(third.transaction.documentChanged && third.transaction.after.text=="XY\xf0\x9f\x98\x80Z" && third.transaction.after.compositions.empty(),"real lock ends composition without metadata flattening");Ack(doc);
+	Check(Metadata(doc,NativeTextOperationKind::BeginComposition,2,0,0)==4,"healthy later composition gets distinct token and empty range");
+	Check(Metadata(doc,NativeTextOperationKind::BeginComposition,3,0,2)==5,"second concurrent composition retained");
+	Check(Metadata(doc,NativeTextOperationKind::EndComposition,2)==6 && Metadata(doc,NativeTextOperationKind::EndComposition,3)==7,"concurrent terminations ordered independently");
+	const auto active=State(doc);Check(active.compositions.empty() && active.text==third.transaction.after.text,"End is metadata only, never accepts or rolls back text");
+	const auto saved=Observe(doc);output=999;
+	Check(!doc.PublishCompositionObservation(saved,{NativeTextOperationKind::BeginComposition,0,0,{},2},output,error)&&output==999,"ended identities never reused");
+	Check(doc.Retire(Owner,error),"explicit cancellation authority retires native document");
+	Check(!doc.PublishCompositionObservation(saved,{NativeTextOperationKind::BeginComposition,0,0,{},4},output,error)&&output==999,"late callback cannot resurrect canceled owner");
+}
+void ObservedCompositionFailures() {
+	NativeTextDocument doc;NativeTextMetadataObservation sentinel{{90,91},92,93,94,95,96},out=sentinel;
+	Check(!doc.CaptureCompositionObservation(Owner,77,out,error)&&out==sentinel,"unopened observation unchanged");Open(doc,"a\xf0\x9f\x98\x80z");
+	Check(!doc.CaptureCompositionObservation(Other,77,out,error)&&out==sentinel,"wrong observation owner unchanged");
+	Check(!doc.CaptureCompositionObservation(Owner,0,out,error)&&out==sentinel,"unobserved dispatch refused");
+	const auto original=Observe(doc);const auto initial=State(doc);
+	for(int field=0;field<6;++field) {
+		auto bad=original;
+		if(field==0)bad.identity=Other;
+		if(field==1)++bad.engineRevision;
+		if(field==2)++bad.shadowRevision;
+		if(field==3)++bad.transactionSequence;
+		if(field==4)++bad.acknowledgedSequence;
+		if(field==5)bad.dispatch=0;
+		std::uint64_t published=999;Check(!doc.PublishCompositionObservation(bad,{NativeTextOperationKind::BeginComposition,0,1,{},1},published,error)&&published==999,"wrong exact metadata observation rejected");
+	}
+	const std::vector<NativeTextOperation> invalid{
+		{NativeTextOperationKind::Replace,0,1,"x",0},{NativeTextOperationKind::Select,0,1,{},0},
+		{static_cast<NativeTextOperationKind>(99),0,0,{},1},{NativeTextOperationKind::BeginComposition,0,1,"x",1},
+		{NativeTextOperationKind::BeginComposition,0,1,{},0},{NativeTextOperationKind::BeginComposition,2,3,{},1},
+		{NativeTextOperationKind::BeginComposition,4,1,{},1},{NativeTextOperationKind::BeginComposition,0,99,{},1},
+		{NativeTextOperationKind::UpdateComposition,0,1,{},1},{NativeTextOperationKind::EndComposition,0,0,{},1},
+		{NativeTextOperationKind::EndComposition,0,1,{},1}};
+	for(const auto& operation:invalid) {
+		std::uint64_t published=999;Check(!doc.PublishCompositionObservation(original,operation,published,error)&&published==999,"malformed metadata cannot publish a partial candidate");
+		Check(State(doc)==initial && doc.PendingCount()==0 && Observe(doc)==original,"failed metadata preserves all public state and token budget");
+	}
+	Metadata(doc,NativeTextOperationKind::BeginComposition,1,0,1);const auto current=Observe(doc);
+	const auto live=Offer(doc);std::uint64_t rejected=999;
+	Check(!doc.PublishCompositionObservation(current,{NativeTextOperationKind::UpdateComposition,2,3,{},1},rejected,error)&&rejected==999&&Offer(doc)==live,"bad Update cannot alter a live range or queued Begin");
+	auto scope=Lock(doc,NativeTextAccess::Read);std::uint64_t published=999;
+	Check(!doc.CaptureCompositionObservation(Owner,77,out,error)&&out==sentinel,"active read prevents idle observation");
+	Check(!doc.PublishCompositionObservation(current,{NativeTextOperationKind::EndComposition,0,0,{},1},published,error)&&published==999,"metadata does not upgrade read scope");
+	NativeTextLockScope waiting;Check(doc.RequestLock(Owner,NativeTextAccess::ReadWrite,false,waiting,error)==NativeTextLockResult::Deferred,"stage deferred callback");Finish(doc,scope);
+	Check(!doc.CaptureCompositionObservation(Owner,77,out,error)&&out==sentinel,"pending deferred write prevents idle observation");
+	Check(!doc.PublishCompositionObservation(current,{NativeTextOperationKind::EndComposition,0,0,{},1},published,error)&&published==999,"pending deferred callback owns next change");
+	Check(doc.GrantDeferredWrite(Owner,waiting,error),"grant original deferred callback");
+	Check(!doc.CaptureCompositionObservation(Owner,77,out,error)&&out==sentinel,"active write prevents separate observation");
+	Check(doc.EndComposition(waiting,1,error),"blocked idle metadata has not poisoned real callback");Finish(doc,waiting);
+	NativeTextLimits limits;limits.pendingTransactions=1;NativeTextDocument bounded(limits);Open(bounded);Metadata(bounded,NativeTextOperationKind::BeginComposition,1,0,1);
+	const auto full=Observe(bounded);const auto saved=Offer(bounded);published=999;
+	Check(!bounded.PublishCompositionObservation(full,{NativeTextOperationKind::EndComposition,0,0,{},1},published,error)&&published==999&&Offer(bounded)==saved,"queue overflow cannot partly end composition");
+	Ack(bounded,0);Metadata(bounded,NativeTextOperationKind::EndComposition,1);
+	limits={};limits.retainedCompositions=1;NativeTextDocument retained(limits);Open(retained);Metadata(retained,NativeTextOperationKind::BeginComposition,1,0,1);Metadata(retained,NativeTextOperationKind::EndComposition,1);
+	const auto ended=Observe(retained);published=999;
+	Check(!retained.PublishCompositionObservation(ended,{NativeTextOperationKind::BeginComposition,0,0,{},2},published,error)&&published==999,"pending ended tokens still consume composition budget");
+	Ack(retained,0);Ack(retained,0);Metadata(retained,NativeTextOperationKind::BeginComposition,2,0,0);
+	limits={};limits.sequence=2;NativeTextDocument exhausted(limits);Open(exhausted);Metadata(exhausted,NativeTextOperationKind::BeginComposition,1,0,0);Ack(exhausted,0);published=999;
+	Check(!exhausted.PublishCompositionObservation(Observe(exhausted),{NativeTextOperationKind::EndComposition,0,0,{},1},published,error)&&published==999,"metadata shadow revision budget does not wrap");
+	limits={};limits.pendingBytes=1;NativeTextDocument bytes(limits);Open(bytes);const auto byteBarrier=Observe(bytes);published=999;
+	Check(!bytes.PublishCompositionObservation(byteBarrier,{NativeTextOperationKind::BeginComposition,0,1,{},1},published,error)&&published==999,"metadata payload bound refuses publication");
+	Check(bytes.PendingCount()==0 && bytes.PendingBytes()==0 && Observe(bytes)==byteBarrier && State(bytes).compositions.empty(),"payload refusal keeps text, composition and all counters unchanged");
+}
 } // namespace
 int main() { try {
-	Mapping(); OpenAndScope(); AtomicTransactions(); CompositionClassification(); AcknowledgementAndSync(); DeferredAndRetirement(); Budgets();
+	Mapping(); OpenAndScope(); AtomicTransactions(); CompositionClassification(); AcknowledgementAndSync(); DeferredAndRetirement(); Budgets(); PendingCollectionWatermarks(); PendingCollectionLocksAndBounds(); ObservedCompositionLifecycle(); ObservedCompositionFailures();
 	std::cout<<"PASS "<<checks<<" checks\n"; return 0;
 } catch (const std::exception& e) { std::cerr<<"FAIL after "<<checks<<": "<<e.what()<<'\n'; return 1; } }

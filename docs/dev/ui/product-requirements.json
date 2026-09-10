@@ -4,7 +4,7 @@
   "date": "2026-09-10",
   "status": "Implementation incomplete; this register preserves full product scope and does not accept any production GUI.",
   "baseline": {
-    "engine_revision": "a20fd8dde759b0f056b3f0ba438af803a272350b",
+    "engine_revision": "7a8036ac87dde9d29eb279a9c6ecc31cf187df55",
     "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
     "effective_gui_count": 271,
     "translated_or_accepted_resources": 0,
@@ -290,7 +290,7 @@
     "numeric-fields": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/numeric-fields.md",
-      "sha256": "91b973ab0d630ed31c027ad94d73fe0417b4780a938f67335c02ed4669bbb874",
+      "sha256": "b5dd660f22f1ef86d2510859567e70f38baa678ced605076d9a7c4c5b122f022",
       "baseline_engine_revision": "17b106daa1827d6e50c786f99ea5970b1e8b91cf",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "scope": "Canonical Number role with exact decimal proposals, local invalid/conflicting drafts, explicit conflict decisions, bounded undo/redo and inactive snapshot restoration. Font drawing and numeric geometry share bounded immutable unshaped scalar runs; authored selection/caret/preedit ink uses actual Rml line placement and scroll. Current host readbacks guard edits, numeric dispatch and success acknowledgement. Final Windows build and21 retained-UI suites pass. Hidden windowed SP/OpenGL125% and MP/Vulkan200% managed diagnostic fixtures after gameplay qualify the recorded semantic/rendered subset; ordinary SYSTEM regression preserves tested native UI pixels. Event-journal decoding/ownership checks retain historical native layout. No native field keyboard/clipboard/IME route, full shaping/grapheme/bidi, production precise-entry integration, editor, screen/migration or product acceptance.",
@@ -305,7 +305,7 @@
       "scope": "Current-buffer numeric editing commands, atomic range undo, held-key owner isolation and per-event captured modifier/repeat metadata. Portable native-text broker, strict wire codec, SDL ingress and reviewed Windows observer foundation; observer disabled pending owner/ordered native dispatch integration. Windows build and 27 retained-UI suites pass; two windowed gameplay-based semantic command captures cover 32 operations and ten engine images at SP/OpenGL125% and MP/Vulkan200%. Counted adapter, journal, edit-buffer and actual SDL observer tests reject behavioral mutations. No native character/clipboard/IME field route, physical-device acceptance, full international text, production precise-entry screen, migration, editor or product acceptance.",
       "local_capture_summary": ".tmp/ui/text-routing-integration/validation-evidence.json",
       "local_capture_summary_sha256": "1d62bddd483805ef0576b87571a5d4bae0d7a93c70283e15f8c1d8c366552bc4",
-      "sha256": "44480dd81778188fb948f3829dbfbcdf8b5c4c6708ac285bc80bc376c02ce769"
+      "sha256": "b75b1737ec24f14ab785e0bf6e07604cde124ff7ae2f467595bbbff1b585bbb6"
     },
     "native-owner-store": {
       "kind": "implementation_checkpoint",
@@ -315,7 +315,7 @@
       "scope": "Exact managed editor ownership, engine queue continuity, portable native shadow document and actual Windows SDK text store with application-origin text/selection/layout notifications. First disabled SDL dispatch fence does not prove lossless earlier-event consumption. Windows build and29UI suites plus updatedCOM suite pass; source-bound SP/GL125% and MP/Vulkan200% gameplay captures cover32semantic operations and10engine images. Native field routing, checked queue consumer, complete composition/shaping, production controls, editor, migrations and final gates remain unaccepted.",
       "local_capture_summary": ".tmp/ui/native-owner-integration/validation-evidence.json",
       "local_capture_summary_sha256": "c9313dc2a1361368626a4d5b225e19f39be03fbe8e330bc573c42e8f6aaa168b",
-      "sha256": "44480dd81778188fb948f3829dbfbcdf8b5c4c6708ac285bc80bc376c02ce769"
+      "sha256": "b75b1737ec24f14ab785e0bf6e07604cde124ff7ae2f467595bbbff1b585bbb6"
     },
     "precise-system-fields": {
       "kind": "implementation_checkpoint",
@@ -323,9 +323,19 @@
       "baseline_engine_revision": "a20fd8dde759b0f056b3f0ba438af803a272350b",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "scope": "Paired precise SYSTEM brightness fields, localized validation and checked clipboard commands; complete local draft barriers guard Apply, Defaults, colliding edits and exit. Completed cancellation precedes local Discard; Keep Editing refreshes real projected layout before resuming the field. Windows build and 32 UI suites pass, including real-Rml modal focus and growing-validation scroll regressions. SP/OpenGL at 125% and MP/Vulkan at 200% each reach gameplay, then pass 37 semantic operations with 17 reviewed engine images; notices, safe draft continuation, Apply, Discard and reopen are covered within this subset. Generated slider tick noise and very small ambient CVar readback remain open precision defects. SDL checked consumption and owned event collections plus portable multi-offer composition reconciliation are implemented; native activation remains disabled. No native character/IME, full international text, complete page/editor, platform, migration or product acceptance.",
-      "sha256": "91b973ab0d630ed31c027ad94d73fe0417b4780a938f67335c02ed4669bbb874",
+      "sha256": "b5dd660f22f1ef86d2510859567e70f38baa678ced605076d9a7c4c5b122f022",
       "local_capture_summary": ".tmp/ui/native-editing-integration/validation-evidence.json",
       "local_capture_summary_sha256": "42a470e87f6fc1e0014c62a21cc4bb7fd4c313a697f9e5f86833420f1ab4e5f3"
+    },
+    "native-field-binding": {
+      "kind": "implementation_checkpoint",
+      "path": "docs/dev/ui/numeric-fields.md",
+      "baseline_engine_revision": "7a8036ac87dde9d29eb279a9c6ecc31cf187df55",
+      "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
+      "scope": "SYSTEM authored slider ticks retain clean decimal text and fixed CVar serialization preserves tested small and custom values. Windows build and 36 UI suites pass; SP/OpenGL 125% and MP/Vulkan 200% each pass 38 semantic operations with 12 reviewed engine images after gameplay. Actual Runtime/Rml owns complete native Number presentation, directed selection and all composition ranges while preserving stable local history; checked preparation precedes native synchronization and allocation-free local publication. Windows SDK collection scopes and copied SDL hooks admit exact callbacks, while the portable coordinator reconciles owned FIFO offers. Live managed/provider/Session integration remains pending and native activation is disabled. Focus reveal spacing, exact persistent recovery, actual native IME, full page/editor/platform/migration and product qualification remain open.",
+      "local_capture_summary": ".tmp/ui/native-field-binding-integration/validation-evidence.json",
+      "local_capture_summary_sha256": "60fcd7fdb106e2ce6c0fa27372e09a8a48ba93c06cba59a629d4fa6330582720",
+      "sha256": "b5dd660f22f1ef86d2510859567e70f38baa678ced605076d9a7c4c5b122f022"
     }
   },
   "groups": {
@@ -1747,10 +1757,11 @@
         "display-confirmation-foundation",
         "value-controls-foundation",
         "system-exit-foundation",
-        "precise-system-fields"
+        "precise-system-fields",
+        "native-field-binding"
       ],
       "acceptance_evidence": [],
-      "remaining": "The typed settings service and asynchronous display confirmation retain their previously qualified scopes. Local numeric drafts now guard Apply, Apply and Exit, Defaults, colliding sibling edits and dismissal; Discard requires completed service cancellation and an unchanged complete local editor inventory. Queued rollback, stale callbacks and recovery preserve unfinished text. Complete actual audio/resource/input effects, profile and Auto-Detect draft expansion, all dependent production controls, Defaults and the full Apply/Cancel/discard-and-exit matrix. Qualify visible focus/window-placement/fullscreen/multi-monitor failures and timeout/restart recovery across supported platforms. CVar values alone never prove device success, and synthetic startup evidence is not a power-loss or interrupted-confirmation test."
+      "remaining": "The typed settings service and asynchronous display confirmation retain their previously qualified scopes. Local numeric drafts now guard Apply, Apply and Exit, Defaults, colliding sibling edits and dismissal; Discard requires completed service cancellation and an unchanged complete local editor inventory. Queued rollback, stale callbacks and recovery preserve unfinished text. Complete actual audio/resource/input effects, profile and Auto-Detect draft expansion, all dependent production controls, Defaults and the full Apply/Cancel/discard-and-exit matrix. Qualify visible focus/window-placement/fullscreen/multi-monitor failures and timeout/restart recovery across supported platforms. CVar values alone never prove device success, and synthetic startup evidence is not a power-loss or interrupted-confirmation test. Tested small/custom SYSTEM values now survive fixed CVar writes; exact transaction, journal and startup recovery under FTZ/DAZ still require completion."
     },
     {
       "id": "BEH-003",
@@ -2744,10 +2755,11 @@
         "numeric-fields",
         "text-command-routing",
         "native-owner-store",
-        "precise-system-fields"
+        "precise-system-fields",
+        "native-field-binding"
       ],
       "acceptance_evidence": [],
-      "remaining": "Checked clipboard field commands, a portable native document/reconciler, reviewed SDL queue contracts and the Windows SDK text store provide bounded implementation evidence. Connect owned native collections to the live field and native provider; implement candidate layout, full composition lifecycle, monitor/language/DPI updates and all supported native backends. Qualify actual clipboard exchange and supported host IMEs, including correct caret/candidate geometry without losing an edit. Counted callbacks and semantic render captures do not establish installed text-service behavior or the complete requirement."
+      "remaining": "Checked clipboard field commands, a portable native document/reconciler, reviewed SDL queue contracts and the Windows SDK text store provide bounded implementation evidence. Runtime now owns the native field presentation and the coordinator validates closed owned collections. Connect the managed editor, Windows hook bridge and Session to the live native provider; implement candidate layout, full composition lifecycle, monitor/language/DPI updates and all supported native backends. Qualify actual clipboard exchange and supported host IMEs, including correct caret/candidate geometry without losing an edit. Counted callbacks and semantic render captures do not establish installed text-service behavior or the complete requirement."
     },
     {
       "id": "TXT-009",
@@ -2916,7 +2928,8 @@
         "numeric-fields",
         "text-command-routing",
         "native-owner-store",
-        "precise-system-fields"
+        "precise-system-fields",
+        "native-field-binding"
       ],
       "acceptance_evidence": [],
       "remaining": "Existing wheel, numeric command and exact managed-owner tests retain their bounded evidence. Checked SDL consumption now copies full bounded native event collections, retaining provider generation and engine queue continuity through later effects. Connect this ingress to Session with native provenance, actual provider activation and verified payload lifetime. Complete production wheel/touch scrolling, Unicode text/composition, keyboard/gamepad repeat/reconnect behavior, deterministic replay and the full supported-host/widget operation matrix with value, focus and scroll evidence. No physical-input or complete payload acceptance is inferred."
@@ -3165,10 +3178,11 @@
         "numeric-fields",
         "text-command-routing",
         "native-owner-store",
-        "precise-system-fields"
+        "precise-system-fields",
+        "native-field-binding"
       ],
       "acceptance_evidence": [],
-      "remaining": "The canonical Number model renders authored text/caret/selection/legacy composition and keeps local drafts, conflicts and history through inactive restoration. SYSTEM now pairs its brightness sliders with precise fields, localized validation, checked clipboard commands and guarded Apply/exit behavior. Connect native character/composition delivery and full native presentation to the field; finish pointer/word/grapheme/bidi navigation, general text controls, visible conflict correction and all field states. Qualify production keyboard, pointer, gamepad and supported touch/text routes, actual clipboard/IME, the complete state gallery and every supported platform."
+      "remaining": "The canonical Number model renders authored text/caret/selection/legacy composition and keeps local drafts, conflicts and history through inactive restoration. SYSTEM now pairs its brightness sliders with precise fields, localized validation, checked clipboard commands and guarded Apply/exit behavior. Full native presentation and prepared stable settlement now reach actual Runtime/Rml; connect live native character/composition delivery, improve focus reveal spacing at high density, finish pointer/word/grapheme/bidi navigation, general text controls, visible conflict correction and all field states. Qualify production keyboard, pointer, gamepad and supported touch/text routes, actual clipboard/IME, the complete state gallery and every supported platform."
     },
     {
       "id": "WID-007",
@@ -4768,7 +4782,8 @@
         "display-confirmation-foundation",
         "value-controls-foundation",
         "system-exit-foundation",
-        "precise-system-fields"
+        "precise-system-fields",
+        "native-field-binding"
       ],
       "acceptance_evidence": [],
       "remaining": "The source-backed 31-option/53-CVar contract has a packaged opt-in SYSTEM document and normal Session child route. Previously qualified controls and exit flows now include precise Brightness/Ambient Brightness fields, localized validation, local draft protection and same-dispatch Keep Editing focus. This remains partial implementation, not an accepted translation. Complete every actual setting and dependent popup, display capability/resolution catalogs, native numeric text entry, presets/Auto-Detect, remaining effects, Defaults, full Apply/Cancel/exit behavior, source-derived visuals/transitions and the native editor round trip. Qualify normal SP/MP entry/return/reopen, failure/cancellation, complete responsive/localized state galleries and every mapped resource; historical and current bounded captures do not accept the full requirement."

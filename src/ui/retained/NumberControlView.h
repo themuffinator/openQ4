@@ -15,7 +15,11 @@ struct NumberTextHit {
 	std::size_t byteOffset = 0;
 };
 // Derived field ink and hit geometry. The Interaction buffer is the only text
-// authority. No native input, clipboard, settings, focus or action is changed.
+// authority. Native presentation is a complete byte-indexed snapshot, never a
+// splice of the stable local draft. Up to 32 concurrent ranges share the authored
+// vector composition artwork; derived DOM copies have no canonical IDs. All ink
+// remains clipped by the authored viewport. No native input, clipboard, settings,
+// focus or action is changed. Scalar LTR geometry does not qualify shaping/IME.
 class NumberControlView {
 public:
 	NumberControlView();
@@ -33,7 +37,8 @@ public:
 	std::optional<NumberTextHit> Hit(Rml::Element* actualHit,float x,float y,
 		const Interaction&,const std::string& captured = {}) const;
 	std::optional<NumberTextGeometry> Geometry(const std::string&,const Interaction&) const;
-	// Measure the current local bytes through the same resolved font/run service
+	// Reject attached/unsettled native editors. Measure current local bytes through
+	// the same resolved font/run service
 	// as Paint. The caller first updates Rml styles/layout. No stale painted line,
 	// caret geometry or native input is used or published by this scalar-LTR query.
 	std::shared_ptr<const TextRun> CommandRun(const std::string&, NumberEditIdentity,

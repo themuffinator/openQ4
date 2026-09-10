@@ -1208,7 +1208,10 @@ bool Runtime::RestoreSnapshot(const std::string& snapshot, std::string& error, d
 		for (const auto& feedback : interaction.TakeFeedback()) motion.Play(feedback.timeline,now);
 		// No live state, geometry, clock or input queues change before validation
 		// completes. Rendering applies the restored values on the next frame.
-		impl->state = std::move(state); impl->motion = std::move(motion); impl->interaction = std::move(interaction);
+		// Native editor ownership may have changed while preparing the restore.
+		// Publish its checked adoption before any state or presentation changes.
+		if (!impl->interaction.Adopt(std::move(interaction),error)) return false;
+		impl->state = std::move(state); impl->motion = std::move(motion);
 		impl->time = now; impl->pointerPresent = impl->pointerNavigation = false; impl->applied.clear();
 		impl->appliedStateRevision = impl->state.Revision(); impl->stateError.clear();
 		return true;
@@ -1520,6 +1523,7 @@ std::optional<NumberEditorContext> Runtime::QueryNumberEditor(std::string& error
 	const auto modal = impl->interaction.ModalToken();
 	if (!modal || !impl->interaction.CanActivate(id) || !view || view->role != ControlRole::Number ||
 		view->pending || !view->number || !view->number->active || view->number->conflict ||
+		view->number->nativePresentation || view->number->nativeUnsettled ||
 		!view->number->identity.session || !view->number->identity.revision) return std::nullopt;
 	return NumberEditorContext{id,*view->number,modal};
 }
@@ -1527,6 +1531,52 @@ bool Runtime::CanActivateControl(const std::string& id, double seconds) {
 	if (!impl->canonical || !std::isfinite(seconds) || seconds < 0) return false;
 	impl->UpdateInteraction(seconds);
 	return impl->interaction.CanActivate(id);
+}
+bool Runtime::AttachNumberNative(const TextEditorIdentity& owner, NativeTextIdentity native,
+	NativeTextEditorBarrier& out, std::string& error, double seconds) {
+	const auto current = QueryNumberEditor(error,seconds);
+	if (!current || current->control != owner.control || current->modalToken != owner.modal ||
+		current->editor.identity.session != owner.session || current->editor.identity.revision != owner.revision) return false;
+	return impl->interaction.AttachNumberNative(owner.control,current->editor.identity,owner,native,out,error);
+}
+bool Runtime::RefreshNumberNative(const NativeTextEditorBarrier& expected,
+	NativeTextEditorView& out, std::string& error, double seconds) {
+	if (!impl->PrepareNumberEdit(seconds,error)) return false;
+	NativeTextEditorView candidate;
+	if (!impl->interaction.QueryNumberNative(expected.editor.control,expected.editor,candidate,error) ||
+		candidate.barrier != expected) return false;
+	out = std::move(candidate); return true;
+}
+bool Runtime::BeginNumberNativeCollection(const NativeTextEditorBarrier& expected, const NativeTextCollection& collection,
+	NativeTextEditorBarrier& out, std::string& error) {
+	return impl->canonical && impl->document && impl->interaction.BeginNumberNativeCollection(expected,collection,out,error);
+}
+bool Runtime::IsNumberNativeCurrent(const NativeTextEditorBarrier& expected) const noexcept {
+	return impl->canonical && impl->document && impl->interaction.IsNumberNativeCurrent(expected);
+}
+bool Runtime::ApplyNumberNative(const NativeTextEditorBarrier& expected, const NativeTextOffer& offer,
+	NativeTextEditorReceipt& out, std::string& error) {
+	return impl->canonical && impl->document && impl->interaction.ApplyNumberNative(expected,offer,out,error);
+}
+bool Runtime::CompleteNumberNativeCollection(const NativeTextEditorBarrier& expected, const NativeTextCollection& collection,
+	NativeTextEditorBarrier& out, std::string& error) {
+	return impl->canonical && impl->document && impl->interaction.CompleteNumberNativeCollection(expected,collection,out,error);
+}
+bool Runtime::SettleNumberNative(const NativeTextEditorBarrier& expected, NativeTextEditorReceipt& out, std::string& error) {
+	return impl->canonical && impl->document && impl->interaction.SettleNumberNative(expected,out,error);
+}
+std::unique_ptr<Interaction::NativeSettlement> Runtime::PrepareNumberNativeSettlement(const NativeTextEditorBarrier& expected, std::string& error) {
+	if (!impl->canonical || !impl->document) return {};
+	return impl->interaction.PrepareNumberNativeSettlement(expected,error);
+}
+bool Runtime::PublishNumberNativeSettlement(Interaction::NativeSettlement& prepared, NativeTextEditorReceipt& out) noexcept {
+	return impl->canonical && impl->document && impl->interaction.PublishNumberNativeSettlement(prepared,out);
+}
+bool Runtime::RetireNumberNative(const NativeTextEditorBarrier& expected, NativeTextEditorReceipt& out, std::string& error) {
+	return impl->canonical && impl->document && impl->interaction.RetireNumberNative(expected,out,error);
+}
+bool Runtime::RetireNumberNativeExact(NativeTextIdentity native, const TextEditorIdentity& owner) noexcept {
+	return impl->canonical && impl->document && impl->interaction.RetireNumberNativeExact(native,owner);
 }
 std::vector<ControlAction> Runtime::TakeActions() {
 	if (impl->interaction.Overflowed()) impl->host.Log(true,"Retained control action queue overflow");

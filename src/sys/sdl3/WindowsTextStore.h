@@ -29,6 +29,30 @@ struct WindowsTextLayout {
 	std::vector<WindowsTextCell> cells;
 };
 
+enum class WindowsTextCollectionKind { Pump, Lifecycle };
+struct WindowsTextCollection {
+	ui::NativeTextIdentity identity;
+	std::uint64_t serial = 0, dispatch = 0;
+	WindowsTextCollectionKind kind = WindowsTextCollectionKind::Pump;
+	bool operator==(const WindowsTextCollection&) const = default;
+};
+struct WindowsTextCollectionReceipt {
+	WindowsTextCollection collection;
+	ui::NativeTextPendingSnapshot pending;
+	std::uint64_t admittedCallbacks = 0;
+	bool operator==(const WindowsTextCollectionReceipt&) const = default;
+};
+struct WindowsTextLifecycle {
+	ui::NativeTextIdentity identity;
+	std::uint64_t engineRevision = 0, shadowRevision = 0;
+	std::uint64_t acknowledgedSequence = 0, acknowledgedShadowRevision = 0;
+	std::uint64_t lastDispatch = 0, lastScopeSerial = 0, admittedCallbacks = 0;
+	std::uint32_t pending = 0, retainedCompositions = 0, liveCompositions = 0;
+	bool healthy = false, collectionOpen = false, renewalRequired = false, safeToRenew = false;
+	WindowsTextCollection collection;
+	bool operator==(const WindowsTextLifecycle&) const = default;
+};
+
 // STA-owned standalone store, not TSF activation or a native input route.
 // The owner creates/binds/retires it on one thread. All COM calls except the
 // atomic IUnknown refcount require that thread; final Release must also occur
@@ -36,13 +60,21 @@ struct WindowsTextLayout {
 // HWND is observational only. This object never calls a GUI, renderer, SDL,
 // thread manager, clipboard, native window or message-pump API.
 //
-// This initial adapter accepts composition mutations only in OnLockGranted's
-// write callback. OnEndEdit is a checked read-only receipt, not a publication
-// barrier or permission to change/reclassify an already published transaction.
-// Out-of-lock Begin is declined; unexpected active Update/End faults and retires
-// the store. Arbitrary multi-lock TSF edit-session aggregation remains unsupported.
+// Composition metadata inside an actual OnLockGranted write callback remains
+// in that atomic transaction. Idle native composition callbacks append separate
+// observed metadata offers, without inventing a lock or relabeling earlier text.
+// OnEndEdit is a checked read-only receipt, not a completed collection/fence.
+// Metadata during read/deferred/application-notification callbacks remains
+// unsupported: Begin is declined; unrepresentable active Update/End retires.
+// The owner must still supply the verified dispatch/collection boundary before
+// editor settlement; composition End alone gives no accept/cancel authority.
 // Failed callbacks/Finish/allocation retire the document: a pure rollback cannot
 // undo changes already acknowledged synchronously to a text service.
+// Native writes and composition metadata additionally require an explicit open
+// collection. The descriptor binds callback lifetime, not a physical input or
+// verified provider fence. Ordinary read locks remain available outside it.
+// Outside collections, application notices permit reads but refuse all writes;
+// lifecycle collections permit writes deferred until the whole notice returns.
 class WindowsTextStore final : public ITextStoreACP,
 	public ITfContextOwnerCompositionSink, public ITfTextEditSink {
 public:
@@ -59,13 +91,33 @@ public:
 		std::uint64_t expectedShadowRevision, std::uint64_t engineRevision,
 		std::string_view text, std::size_t anchor, std::size_t caret) noexcept;
 	HRESULT Peek(ui::NativeTextIdentity, ui::NativeTextOffer&) noexcept;
+	// Read-only copied queue boundary, with no sink calls or native fence proof.
+	// The caller separately verifies provider health and the observed dispatch.
+	HRESULT QueryPendingCollection(ui::NativeTextIdentity, std::uint64_t expectedEngineRevision,
+		std::uint64_t expectedAcknowledgedSequence, std::uint64_t expectedAcknowledgedShadowRevision,
+		std::uint64_t externallyObservedDispatch, ui::NativeTextPendingSnapshot& out) noexcept;
 	HRESULT Acknowledge(ui::NativeTextIdentity, std::uint64_t transaction,
 		std::uint64_t shadowAfter, std::uint64_t expectedEngineRevision,
 		std::uint64_t acceptedEngineRevision) noexcept;
 	HRESULT Reject(ui::NativeTextIdentity, std::uint64_t transaction,
 		std::uint64_t expectedEngineRevision) noexcept;
 	HRESULT Retire(ui::NativeTextIdentity) noexcept;
-	// Observational dispatch ID: no proof of a native fence or physical input.
+	// Open requires a fully acknowledged idle document, an exact editor barrier,
+	// and a strictly newer nonzero dispatch. All outputs stay unchanged on failure.
+	HRESULT OpenCollection(ui::NativeTextIdentity, std::uint64_t expectedEngineRevision,
+		std::uint64_t expectedAcknowledgedSequence, std::uint64_t expectedAcknowledgedShadowRevision,
+		std::uint64_t externallyObservedDispatch, WindowsTextCollectionKind,
+		WindowsTextCollection& out) noexcept;
+	// Close removes callback authority and copies the complete pending watermark.
+	// No ACK, text insertion, provider receipt or editor settlement is performed.
+	HRESULT CloseCollection(const WindowsTextCollection&, WindowsTextCollectionReceipt& out) noexcept;
+	// Exact-scope abort retires without allocation, including during a callback.
+	HRESULT AbortCollection(const WindowsTextCollection&) noexcept;
+	// No callbacks or live references. Fails during callbacks/locks/notifications.
+	// safeToRenew means native quiescence only: caller must also prove the editor
+	// is settled and the provider fence is complete. Never clears retained IDs.
+	HRESULT QueryLifecycle(ui::NativeTextIdentity, WindowsTextLifecycle& out) noexcept;
+	// Observation only: does not open a collection or authorize later callbacks.
 	HRESULT SetDispatch(ui::NativeTextIdentity, std::uint64_t) noexcept;
 	bool Healthy() const noexcept;
 	std::uint64_t EditReceipts() const noexcept;

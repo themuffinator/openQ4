@@ -7,9 +7,17 @@
 #include <functional>
 #include <thread>
 #include <stdexcept>
+#include <new>
 using namespace openq4::sys;
 using namespace openq4::ui;
 static unsigned checks=0;
+static bool rejectAllocations=false;
+void* operator new(std::size_t size){if(rejectAllocations)throw std::bad_alloc();if(void* p=std::malloc(size?size:1))return p;throw std::bad_alloc();}
+void* operator new[](std::size_t size){return ::operator new(size);}
+void operator delete(void* p) noexcept{std::free(p);}
+void operator delete[](void* p) noexcept{std::free(p);}
+void operator delete(void* p,std::size_t) noexcept{std::free(p);}
+void operator delete[](void* p,std::size_t) noexcept{std::free(p);}
 #define CHECK(x) do {++checks;if(!(x)){std::fprintf(stderr,"FAIL line %d: %s\n",__LINE__,#x);std::exit(1);}}while(false)
 #define OK(x) CHECK((x)==S_OK)
 
@@ -25,6 +33,9 @@ template<class T> struct Counted : T {
 };
 struct Sink : Counted<ITextStoreACPSink> {
 	std::function<HRESULT(DWORD)> callback;
+	std::function<void()> referenceCallback;
+	ULONG STDMETHODCALLTYPE AddRef() override{const auto count=Counted::AddRef();if(referenceCallback)referenceCallback();return count;}
+	ULONG STDMETHODCALLTYPE Release() override{const auto count=Counted::Release();if(referenceCallback)referenceCallback();return count;}
 	std::function<HRESULT(DWORD,const TS_TEXTCHANGE*)> notice;
 	unsigned notifications=0, calls=0;
 	unsigned layoutNotices=0;
@@ -61,11 +72,14 @@ struct EditRecord : Counted<ITfEditRecord> {
 struct Range : Counted<ITfRangeACP> {
 	Context* context=nullptr; LONG start=0,length=0;
 	std::function<void()> reenter;
+	std::function<void()> releasing;
+	unsigned extentCalls=0;HRESULT extentResult=S_OK;
 	HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid,void** out) override {
 		if(iid==__uuidof(ITfRange)) {if(!out)return E_POINTER;*out=static_cast<ITfRange*>(this);AddRef();return S_OK;}
 		return Counted::QueryInterface(iid,out);
 	}
-	HRESULT STDMETHODCALLTYPE GetExtent(LONG* first,LONG* count) override{if(reenter) reenter();*first=start;*count=length;return S_OK;}
+	ULONG STDMETHODCALLTYPE Release() override{const auto result=Counted::Release();if(releasing)releasing();return result;}
+	HRESULT STDMETHODCALLTYPE GetExtent(LONG* first,LONG* count) override{++extentCalls;if(reenter) reenter();*first=start;*count=length;return extentResult;}
 	HRESULT STDMETHODCALLTYPE SetExtent(LONG first,LONG count) override{start=first;length=count;return S_OK;}
 	HRESULT STDMETHODCALLTYPE GetContext(ITfContext** out) override{if(!context)return E_FAIL;context->AddRef();*out=context;return S_OK;}
 	HRESULT STDMETHODCALLTYPE GetText(TfEditCookie,DWORD,WCHAR*,ULONG,ULONG*) override{return E_NOTIMPL;}
@@ -90,10 +104,11 @@ struct Range : Counted<ITfRangeACP> {
 	HRESULT STDMETHODCALLTYPE SetGravity(TfEditCookie,TfGravity,TfGravity) override{return E_NOTIMPL;}
 	HRESULT STDMETHODCALLTYPE Clone(ITfRange**) override{return E_NOTIMPL;}
 };
-struct Composition : Counted<ITfCompositionView> {
+struct Composition final : Counted<ITfCompositionView> {
 	Range range;
+	unsigned rangeCalls=0;HRESULT rangeResult=S_OK;
 	HRESULT STDMETHODCALLTYPE GetOwnerClsid(CLSID*) override{return E_NOTIMPL;}
-	HRESULT STDMETHODCALLTYPE GetRange(ITfRange** out) override{range.AddRef();*out=&range;return S_OK;}
+	HRESULT STDMETHODCALLTYPE GetRange(ITfRange** out) override{++rangeCalls;if(FAILED(rangeResult))return rangeResult;range.AddRef();*out=&range;return S_OK;}
 };
 struct Fixture {
 	Sink sink; Context context; WindowsTextStore* store=nullptr;
@@ -102,12 +117,21 @@ struct Fixture {
 		OK(WindowsTextStore::Create(id,10,text,0,0,reinterpret_cast<HWND>(1),&store,limits));
 		OK(store->AdviseSink(__uuidof(ITextStoreACPSink),&sink,TS_AS_ALL_SINKS));
 		OK(store->BindContext(id,&context));
+		Begin();
 	}
 	~Fixture(){if(store){OK(store->UnadviseSink(&sink));OK(store->Retire(id));CHECK(store->Release()==0);}CHECK(sink.refs==1 && context.refs==1);CHECK(!sink.notifications);}
 	void Lock(DWORD flags,const std::function<void()>& f) {
+		Begin();
 		sink.callback=[&](DWORD got){CHECK(got==flags);f();return S_OK;};HRESULT result=E_FAIL;OK(store->RequestLock(flags,&result));OK(result);sink.callback={};
 	}
-	NativeTextOffer Offer(){NativeTextOffer offer;OK(store->Peek(id,offer));return offer;}
+	void Close(){WindowsTextLifecycle state;OK(store->QueryLifecycle(id,state));if(state.collectionOpen){WindowsTextCollectionReceipt receipt;OK(store->CloseCollection(state.collection,receipt));}}
+	void Begin(std::uint64_t dispatch=0,WindowsTextCollectionKind kind=WindowsTextCollectionKind::Lifecycle){
+		WindowsTextLifecycle state;OK(store->QueryLifecycle(id,state));
+		if(state.collectionOpen){if(!dispatch)return;Close();OK(store->QueryLifecycle(id,state));}
+		WindowsTextCollection scope;OK(store->OpenCollection(id,state.engineRevision,state.acknowledgedSequence,state.acknowledgedShadowRevision,
+			dispatch?dispatch:state.lastDispatch+1,kind,scope));
+	}
+	NativeTextOffer Offer(){Close();NativeTextOffer offer;OK(store->Peek(id,offer));return offer;}
 	void Ack(){const auto offer=Offer();OK(store->Acknowledge(id,offer.transaction.sequence,offer.transaction.shadowAfter,offer.expectedEngineRevision,offer.expectedEngineRevision+1));}
 };
 static std::wstring Read(WindowsTextStore* store) {
@@ -183,6 +207,7 @@ static void Utf16AndEdits() {
 static void CompositionsAndLateMetadata() {
 	Composition composition;Fixture f;
 	composition.range.context=&f.context;composition.range.start=0;composition.range.length=2;
+	f.Close();
 	BOOL accepted=TRUE;OK(f.store->OnStartComposition(&composition,&accepted));CHECK(!accepted);
 	f.Lock(TS_LF_READWRITE,[&]{
 		TS_TEXTCHANGE change;OK(f.store->SetText(0,0,1,L"XY",2,&change));
@@ -277,7 +302,7 @@ static void MetadataAcknowledgements() {
 	CHECK(f.store->Acknowledge(f.id,offer.transaction.sequence,offer.transaction.shadowAfter,10,9)==E_INVALIDARG);
 	CHECK(f.Offer()==offer);OK(f.store->Acknowledge(f.id,offer.transaction.sequence,offer.transaction.shadowAfter,10,10));
 	CHECK(f.store->Reject(f.id,offer.transaction.sequence,10)==E_INVALIDARG && f.store->Healthy());
-	OK(f.store->SetDispatch(f.id,100));CHECK(f.store->SetDispatch(f.id,99)==E_UNEXPECTED);
+	f.Begin(100);CHECK(f.store->SetDispatch(f.id,99)==E_UNEXPECTED);
 	f.Lock(TS_LF_READWRITE,[&]{TS_TEXTCHANGE change;OK(f.store->SetText(0,0,1,L"x",1,&change));CHECK(f.store->SetDispatch(f.id,101)==E_UNEXPECTED);});
 	CHECK(f.Offer().transaction.nativeDispatch==100);const auto queued=f.Offer();
 	OK(f.store->Reject(f.id,queued.transaction.sequence,10));CHECK(!f.store->Healthy());
@@ -385,4 +410,257 @@ static void ApplicationNoticeFaultsAndLayout() {
 	CHECK(FAILED(deferred.store->SyncEngine(deferred.id,10,1,11,"x",0,0)) && !deferred.store->Healthy());
 	CHECK(deferred.sink.calls==1);deferred.sink.notifications=0;
 }
-int main(){IdentityAndLocks();Utf16AndEdits();CompositionsAndLateMetadata();ForeignContextAndPendingBegin();FaultsAndReentry();LayoutAndUnsupported();MetadataAcknowledgements();CompositionAcrossLocks();DeferredSinkChange();ApplicationNotifications();ApplicationNoticeFaultsAndLayout();std::printf("PASS %u checks\n",checks);}
+static void PendingCollectionQueries(){
+	Fixture f;NativeTextPendingSnapshot out{{99,98},97,96,95,94,93,92,91};const auto sentinel=out;
+	f.Close();
+	const auto calls=f.sink.calls,notices=f.sink.notifications,layoutNotices=f.sink.layoutNotices;const auto refs=f.sink.refs;
+	OK(f.store->QueryPendingCollection(f.id,10,0,1,77,out));CHECK((out==NativeTextPendingSnapshot{f.id,10,0,1,1,77,0,0}));
+	CHECK(f.sink.calls==calls && f.sink.notifications==notices && f.sink.layoutNotices==layoutNotices && f.sink.refs==refs);
+	for(int field=0;field<5;++field){out=sentinel;auto id=f.id;std::uint64_t revision=10,sequence=0,shadow=1,dispatch=77;
+		if(field==0)++id.editorLease;if(field==1)++revision;if(field==2)++sequence;if(field==3)++shadow;if(field==4)dispatch=0;
+		CHECK(f.store->QueryPendingCollection(id,revision,sequence,shadow,dispatch,out)==E_INVALIDARG && out==sentinel);
+	}
+	f.Begin(77);f.Lock(TS_LF_READWRITE,[&]{TS_TEXTCHANGE changed;OK(f.store->SetText(0,0,1,L"X",1,&changed));});
+	f.Lock(TS_LF_READWRITE,[&]{TS_TEXTCHANGE changed;OK(f.store->SetText(0,1,2,L"Y",1,&changed));});
+	const auto copied=f.Offer();const auto priorCalls=f.sink.calls;NativeTextPendingSnapshot saved;
+	OK(f.store->QueryPendingCollection(f.id,10,0,1,77,saved));CHECK((saved==NativeTextPendingSnapshot{f.id,10,0,1,3,77,2,2}));CHECK(f.Offer()==copied && f.sink.calls==priorCalls);
+	out=sentinel;CHECK(f.store->QueryPendingCollection(f.id,11,1,2,77,out)==E_INVALIDARG && out==sentinel);
+	f.Ack();OK(f.store->QueryPendingCollection(f.id,11,1,2,77,out));CHECK(out.count==1 && out.lastSequence==2 && out.shadowRevision==3);CHECK(saved.count==2 && saved.engineRevision==10);
+	f.Ack();OK(f.store->QueryPendingCollection(f.id,12,2,3,88,out));CHECK(out.count==0 && out.dispatch==88);
+	CHECK(f.sink.notifications==notices && f.sink.layoutNotices==layoutNotices);
+	f.Begin(78);f.Lock(TS_LF_READWRITE,[&]{TS_TEXTCHANGE changed;OK(f.store->SetText(0,0,1,L"Z",1,&changed));});
+	f.Close();WindowsTextCollection rejected;
+	CHECK(f.store->OpenCollection(f.id,12,2,3,79,WindowsTextCollectionKind::Pump,rejected)==E_INVALIDARG);
+	OK(f.store->QueryPendingCollection(f.id,12,2,3,78,out));CHECK(out.count==1);
+	out=sentinel;CHECK(f.store->QueryPendingCollection(f.id,12,2,3,79,out)==E_INVALIDARG && out==sentinel);
+	out=sentinel;HRESULT threadResult=S_OK;std::thread worker([&]{threadResult=f.store->QueryPendingCollection(f.id,12,2,3,78,out);});worker.join();CHECK(threadResult==RPC_E_WRONG_THREAD && out==sentinel);
+	OK(f.store->Retire(f.id));CHECK(f.store->QueryPendingCollection(f.id,12,2,3,78,out)==E_UNEXPECTED && out==sentinel);
+}
+static void PendingCollectionCallbackGates(){
+	Fixture f;NativeTextPendingSnapshot out{{99,98},97,96,95,94,93,92,91};const auto sentinel=out;
+	for(auto access:{DWORD(TS_LF_READ),DWORD(TS_LF_READWRITE)})f.Lock(access,[&]{CHECK(f.store->QueryPendingCollection(f.id,10,0,1,77,out)==E_UNEXPECTED && out==sentinel);});
+	unsigned callbacks=0;f.sink.callback=[&](DWORD flags){++callbacks;CHECK(f.store->QueryPendingCollection(f.id,10,0,1,77,out)==E_UNEXPECTED && out==sentinel);
+		if(flags==TS_LF_READ){HRESULT result=E_FAIL;OK(f.store->RequestLock(TS_LF_READWRITE,&result));CHECK(result==TS_S_ASYNC);}else CHECK(flags==TS_LF_READWRITE);
+		return S_OK;};
+	HRESULT session=E_FAIL;OK(f.store->RequestLock(TS_LF_READ,&session));OK(session);CHECK(callbacks==2);f.sink.callback={};
+	f.Close();
+	OK(f.store->QueryPendingCollection(f.id,10,0,1,77,out));CHECK(out.count==0);
+	// Reentry while acquiring a foreign canonical COM identity is refused.
+	struct QueryIdentity : Counted<IUnknown> {
+		std::function<void()> query;
+		HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid,void** result) override{query();return Counted<IUnknown>::QueryInterface(iid,result);}
+	} identity;
+	out=sentinel;identity.query=[&]{CHECK(f.store->QueryPendingCollection(f.id,10,0,1,77,out)==E_UNEXPECTED && out==sentinel);};
+	CHECK(f.store->BindContext(f.id,&identity)==E_UNEXPECTED);CHECK(identity.refs==1 && f.store->Healthy());
+	// Application notice has a current snapshot, but cannot expose a boundary
+	// before its whole callback/deferred-write batch has finished.
+	f.Begin();
+	f.sink.notice=[&](DWORD kind,const TS_TEXTCHANGE*){CHECK(kind==TS_AS_TEXT_CHANGE);CHECK(f.store->QueryPendingCollection(f.id,11,0,2,77,out)==E_UNEXPECTED && out==sentinel);HRESULT result=E_FAIL;OK(f.store->RequestLock(TS_LF_READWRITE,&result));CHECK(result==TS_S_ASYNC);return S_OK;};
+	f.sink.callback=[&](DWORD flags){CHECK(flags==TS_LF_READWRITE);CHECK(f.store->QueryPendingCollection(f.id,11,0,2,77,out)==E_UNEXPECTED && out==sentinel);return S_OK;};
+	OK(f.store->SyncEngine(f.id,10,1,11,"xyz",0,0));CHECK(f.sink.notifications==1);f.sink.notifications=0;f.sink.notice={};f.sink.callback={};
+	f.Close();
+	const auto calls=f.sink.calls;OK(f.store->QueryPendingCollection(f.id,11,0,2,77,out));CHECK(out.count==0 && out.acknowledgedShadowRevision==2 && f.sink.calls==calls);
+	Fixture zero;zero.Lock(TS_LF_READWRITE,[&]{TS_TEXTCHANGE changed;OK(zero.store->SetText(0,0,1,L"!",1,&changed));});out=sentinel;
+	zero.Close();
+	CHECK(zero.store->QueryPendingCollection(zero.id,10,0,1,77,out)==E_INVALIDARG && out==sentinel);
+}
+static void IdleCompositionLifecycle(){
+	Composition first,second;Fixture f("A\xf0\x9f\x98\x80Z");first.range.context=&f.context;first.range.start=1;first.range.length=2;
+	second.range.context=&f.context;second.range.start=0;second.range.length=0;f.Begin(77);
+	BOOL accepted=FALSE;OK(f.store->OnStartComposition(&first,&accepted));CHECK(accepted && f.sink.calls==0 && first.rangeCalls==1);
+	OK(f.store->OnStartComposition(&first,&accepted));CHECK(!accepted && f.sink.calls==0);
+	OK(f.store->OnStartComposition(&second,&accepted));CHECK(accepted);
+	Range next;next.context=&f.context;next.start=0;next.length=1;OK(f.store->OnUpdateComposition(&first,&next));
+	CHECK(next.extentCalls==1 && first.rangeCalls==1 && f.sink.calls==0);
+	first.rangeResult=E_UNEXPECTED;second.rangeResult=E_UNEXPECTED;
+	OK(f.store->OnEndComposition(&first));OK(f.store->OnEndComposition(&second));CHECK(first.rangeCalls==1 && second.rangeCalls==1);
+	const auto begin=f.Offer();CHECK(begin.transaction.sequence==1 && begin.transaction.shadowBefore==1 && begin.transaction.shadowAfter==2 && !begin.transaction.documentChanged);
+	CHECK((begin.transaction.operations.size()==1 && begin.transaction.after.text=="A\xf0\x9f\x98\x80Z" && begin.transaction.after.compositions.at(1)==NativeTextRange{1,5}));
+	CHECK(begin.transaction.classification==NativeTextClassification::CompositionRelated && begin.transaction.nativeDispatch==77);
+	NativeTextPendingSnapshot pending;OK(f.store->QueryPendingCollection(f.id,10,0,1,77,pending));CHECK(pending.count==5 && pending.lastSequence==5 && pending.shadowRevision==6);
+	for(unsigned sequence=1;sequence<=5;++sequence){const auto offer=f.Offer();CHECK(offer.transaction.sequence==sequence && !offer.transaction.documentChanged && offer.expectedEngineRevision==10);
+		if(sequence==3)CHECK((offer.transaction.after.compositions.at(1)==NativeTextRange{0,1} && offer.transaction.after.compositions.contains(2)));
+		if(sequence==5)CHECK(offer.transaction.after.compositions.empty());
+		OK(f.store->Acknowledge(f.id,sequence,offer.transaction.shadowAfter,10,10));}
+	f.Begin(78);OK(f.store->OnStartComposition(&first,&accepted));CHECK(!accepted && first.rangeCalls==1);
+	Composition third;third.range.context=&f.context;third.range.length=1;OK(f.store->OnStartComposition(&third,&accepted));CHECK(accepted);
+	OK(f.store->OnEndComposition(&third));CHECK(f.sink.calls==0);
+	CHECK(f.Offer().transaction.after.compositions.contains(3));
+	OK(f.store->Retire(f.id));CHECK(f.store->OnUpdateComposition(&third,nullptr)==TF_E_DISCONNECTED && f.store->OnEndComposition(&third)==TF_E_DISCONNECTED);
+}
+static void IdleMetadataOrdering(){
+	Composition composition;Fixture f;composition.range.context=&f.context;composition.range.length=2;f.Begin(91);
+	f.Lock(TS_LF_READWRITE,[&]{TS_TEXTCHANGE change;OK(f.store->SetText(0,0,1,L"XY",2,&change));});
+	BOOL accepted=FALSE;OK(f.store->OnStartComposition(&composition,&accepted));CHECK(accepted && f.sink.calls==1);
+	f.Lock(TS_LF_READWRITE,[&]{TS_TEXTCHANGE change;OK(f.store->SetText(0,0,1,L"Z",1,&change));});
+	OK(f.store->OnEndComposition(&composition));
+	// End in one native callback does not prevent a later lock in the same
+	// externally tagged collection, and it never relabels this later insertion.
+	f.Lock(TS_LF_READWRITE,[&]{TS_TEXTCHANGE change;OK(f.store->SetText(0,0,1,L"Q",1,&change));});
+	const auto insertion=f.Offer();CHECK(insertion.transaction.classification==NativeTextClassification::Unclassified);
+	NativeTextPendingSnapshot pending;OK(f.store->QueryPendingCollection(f.id,10,0,1,91,pending));CHECK(pending.count==5 && f.sink.calls==3);
+	for(unsigned i=1;i<=5;++i){auto offer=f.Offer();CHECK(offer.transaction.sequence==i && offer.transaction.nativeDispatch==91);
+		CHECK(offer.transaction.classification==((i==1||i==5)?NativeTextClassification::Unclassified:NativeTextClassification::CompositionRelated));
+		CHECK(offer.transaction.documentChanged==(i==1||i==3||i==5));f.Ack();}
+}
+static void IdleMetadataReentryAndFaults(){
+	Composition first,nested;Fixture f;first.range.context=&f.context;first.range.length=1;nested.range.context=&f.context;nested.range.length=0;f.Begin(88);
+	unsigned attempts=0;auto reenter=[&]{++attempts;BOOL accepted=TRUE;CHECK(f.store->OnStartComposition(&nested,&accepted)==TF_E_DISCONNECTED && !accepted);
+		HRESULT session=E_ABORT;CHECK(f.store->RequestLock(TS_LF_READWRITE,&session)==E_UNEXPECTED && session==E_ABORT);
+		CHECK(f.store->SetDispatch(f.id,89)==E_UNEXPECTED);CHECK(f.store->BindContext(f.id,&f.context)==E_UNEXPECTED);
+		CHECK(f.store->SyncEngine(f.id,10,1,11,"changed",0,0)==E_UNEXPECTED);
+		NativeTextPendingSnapshot out{{9,9},9,9,9,9,9,9,9},saved=out;CHECK(f.store->QueryPendingCollection(f.id,10,0,1,88,out)==E_UNEXPECTED && out==saved);
+		CHECK(f.store->Acknowledge(f.id,1,2,10,10)==E_UNEXPECTED);CHECK(f.store->UnadviseSink(&f.sink)==E_UNEXPECTED);
+		TS_SELECTION_ACP selection{0,0,{TS_AE_END,FALSE}};CHECK(f.store->SetSelection(1,&selection)==E_UNEXPECTED);};
+	first.range.reenter=reenter;first.range.releasing=reenter;BOOL accepted=FALSE;OK(f.store->OnStartComposition(&first,&accepted));first.range.reenter={};first.range.releasing={};
+	CHECK(accepted && attempts>=2 && f.sink.calls==0 && f.store->Healthy());OK(f.store->OnEndComposition(&first));
+	for(int mode=0;mode<6;++mode){Composition bad;Context other;Fixture g("A\xf0\x9f\x98\x80Z");g.Begin(77);bad.range.context=&g.context;bad.range.length=1;
+		if(mode==0)bad.range.context=&other;
+		if(mode==1){bad.range.start=2;bad.range.length=1;}
+		if(mode==2)bad.range.extentResult=E_FAIL;
+		if(mode==3)bad.range.reenter=[&]{OK(g.store->Retire(g.id));};
+		if(mode==4)bad.range.releasing=[&]{OK(g.store->Retire(g.id));};
+		if(mode==5)bad.range.reenter=[] {throw std::bad_alloc();};
+		accepted=TRUE;CHECK(FAILED(g.store->OnStartComposition(&bad,&accepted)) && !accepted && !g.store->Healthy());
+		bad.range.reenter={};bad.range.releasing={};CHECK(g.sink.calls==0 && bad.refs==1 && bad.range.refs==1);
+	}
+	Composition wrongThread;Fixture thread;wrongThread.range.context=&thread.context;thread.Begin(77);HRESULT result=S_OK;accepted=TRUE;
+	std::thread worker([&]{result=thread.store->OnStartComposition(&wrongThread,&accepted);});worker.join();CHECK(result==RPC_E_WRONG_THREAD && accepted && wrongThread.rangeCalls==0);
+	Composition stale;Fixture retired;stale.range.context=&retired.context;retired.Begin(77);OK(retired.store->Retire(retired.id));
+	CHECK(retired.store->OnStartComposition(&stale,&accepted)==TF_E_DISCONNECTED && !accepted && stale.rangeCalls==0);
+}
+static void IdleMetadataLimitsAndUnsupported(){
+	Composition comp;NativeTextLimits limits;limits.pendingTransactions=1;Fixture full("abc",limits);comp.range.context=&full.context;comp.range.length=1;full.Begin(77);BOOL accepted=FALSE;
+	OK(full.store->OnStartComposition(&comp,&accepted));CHECK(accepted);CHECK(full.store->OnEndComposition(&comp)==E_FAIL && !full.store->Healthy() && full.sink.calls==0);
+	Composition unknown;Fixture wrong;unknown.range.context=&wrong.context;wrong.Begin(77);CHECK(wrong.store->OnEndComposition(&unknown)==E_UNEXPECTED && !wrong.store->Healthy() && unknown.rangeCalls==0);
+	Composition readOnly;Fixture read;readOnly.range.context=&read.context;read.Begin(77);read.Lock(TS_LF_READ,[&]{OK(read.store->OnStartComposition(&readOnly,&accepted));CHECK(!accepted);});CHECK(read.store->Healthy() && readOnly.rangeCalls==0);
+	Composition notice;Fixture app;notice.range.context=&app.context;app.Begin(77);
+	app.sink.notice=[&](DWORD kind,const TS_TEXTCHANGE*){CHECK(kind==TS_AS_TEXT_CHANGE);OK(app.store->OnStartComposition(&notice,&accepted));CHECK(!accepted);return S_OK;};
+	OK(app.store->SyncEngine(app.id,10,1,11,"xyz",0,0));CHECK(app.store->Healthy() && notice.rangeCalls==0 && app.sink.notifications==1);app.sink.notifications=0;
+	Composition ending;Fixture notification;ending.range.context=&notification.context;ending.range.length=1;notification.Begin(77);OK(notification.store->OnStartComposition(&ending,&accepted));CHECK(accepted);const auto begin=notification.Offer();OK(notification.store->Acknowledge(notification.id,1,2,10,10));
+	notification.sink.notice=[&](DWORD kind,const TS_TEXTCHANGE*){CHECK(kind==TS_AS_LAYOUT_CHANGE);CHECK(notification.store->OnEndComposition(&ending)==E_UNEXPECTED);return S_OK;};
+	auto layout=Layout(notification);layout.shadowRevision=2;CHECK(notification.store->SetLayout(layout)==TF_E_DISCONNECTED && !notification.store->Healthy());CHECK(begin.transaction.after.compositions.contains(1));
+}
+static WindowsTextLifecycle Status(Fixture& f){WindowsTextLifecycle state;OK(f.store->QueryLifecycle(f.id,state));return state;}
+static void CallbackScopeAuthority(){
+	Composition composition;Fixture f;composition.range.context=&f.context;f.Close();
+	const auto idle=Status(f);CHECK(idle.healthy && idle.safeToRenew && !idle.collectionOpen && idle.pending==0);
+	OK(f.store->SetDispatch(f.id,90));CHECK(Status(f)==idle); // Observation alone grants no authority.
+	unsigned reads=0;f.sink.callback=[&](DWORD flags){CHECK(flags==TS_LF_READ);++reads;CHECK(Read(f.store)==L"abc");
+		NativeTextPendingSnapshot pending;CHECK(f.store->QueryPendingCollection(f.id,10,0,1,90,pending)==E_UNEXPECTED);
+		HRESULT nested=E_ABORT;OK(f.store->RequestLock(TS_LF_READWRITE,&nested));CHECK(nested==TS_E_NOLOCK);return S_OK;};
+	HRESULT session=E_ABORT;OK(f.store->RequestLock(TS_LF_READ,&session));OK(session);CHECK(reads==1 && Status(f)==idle);
+	for(DWORD flags:{DWORD(TS_LF_READWRITE),DWORD(TS_LF_SYNC|TS_LF_READWRITE)}){session=E_ABORT;OK(f.store->RequestLock(flags,&session));CHECK(session==TS_E_NOLOCK && reads==1);}
+	BOOL accepted=TRUE;OK(f.store->OnStartComposition(&composition,&accepted));CHECK(!accepted && composition.rangeCalls==0 && Status(f)==idle);
+	f.sink.callback={};WindowsTextCollection out{{900,901},902,903,WindowsTextCollectionKind::Lifecycle},saved=out;
+	for(unsigned i=0;i<7;++i){auto id=f.id;std::uint64_t engine=10,ack=0,shadow=1,dispatch=91;auto kind=WindowsTextCollectionKind::Pump;
+		if(i==0)++id.document;if(i==1)++engine;if(i==2)++ack;if(i==3)++shadow;if(i==4)dispatch=0;if(i==5)dispatch=89;if(i==6)kind=static_cast<WindowsTextCollectionKind>(99);
+		const auto hr=f.store->OpenCollection(id,engine,ack,shadow,dispatch,kind,out);CHECK(hr==(i==0?E_UNEXPECTED:E_INVALIDARG));
+		CHECK(out==saved && Status(f)==idle);
+	}
+	OK(f.store->OpenCollection(f.id,10,0,1,91,WindowsTextCollectionKind::Pump,out));const auto active=out;
+	CHECK(active.identity==f.id && active.serial==idle.lastScopeSerial+1 && active.dispatch==91);
+	CHECK(Status(f).collection==active && !Status(f).safeToRenew);
+	CHECK(f.store->SyncEngine(f.id,10,1,11,"z",0,0)==E_UNEXPECTED);CHECK(f.store->BindContext(f.id,&f.context)==E_UNEXPECTED);
+	CHECK(f.store->SetLayout(Layout(f))==E_INVALIDARG && f.store->SetDispatch(f.id,92)==E_UNEXPECTED);
+	WindowsTextCollectionReceipt receipt;receipt.admittedCallbacks=999;const auto prior=receipt;
+	for(unsigned i=0;i<5;++i){auto wrong=active;if(i==0)++wrong.identity.document;if(i==1)++wrong.identity.editorLease;if(i==2)++wrong.serial;if(i==3)++wrong.dispatch;if(i==4)wrong.kind=WindowsTextCollectionKind::Lifecycle;
+		CHECK(f.store->CloseCollection(wrong,receipt)==E_UNEXPECTED && receipt==prior);CHECK(f.store->AbortCollection(wrong)==E_INVALIDARG && Status(f).collection==active);}
+	NativeTextOffer offer;CHECK(f.store->Peek(f.id,offer)==E_UNEXPECTED);
+	NativeTextPendingSnapshot pending;CHECK(f.store->QueryPendingCollection(f.id,10,0,1,91,pending)==E_UNEXPECTED);
+	CHECK(f.store->Acknowledge(f.id,1,2,10,11)==E_UNEXPECTED);
+	WindowsTextCollection another;CHECK(f.store->OpenCollection(f.id,10,0,1,92,WindowsTextCollectionKind::Pump,another)==E_UNEXPECTED);
+	// An admitted read callback with no writes still requires a provider fence.
+	f.Lock(TS_LF_READ,[&]{CHECK(Read(f.store)==L"abc");});
+	OK(f.store->CloseCollection(active,receipt));CHECK(receipt.collection==active && receipt.admittedCallbacks==1 && receipt.pending.count==0 && receipt.pending.dispatch==91);
+	const auto immutable=receipt;CHECK(f.store->CloseCollection(active,receipt)==E_UNEXPECTED && receipt==immutable);
+	CHECK(f.store->OpenCollection(f.id,10,0,1,91,WindowsTextCollectionKind::Pump,another)==E_INVALIDARG);
+	OK(f.store->OpenCollection(f.id,10,0,1,92,WindowsTextCollectionKind::Pump,another));CHECK(another.serial>active.serial);
+	CHECK(f.store->AbortCollection(active)==E_INVALIDARG);OK(f.store->CloseCollection(another,receipt));CHECK(receipt.admittedCallbacks==0 && receipt.pending.count==0 && immutable.admittedCallbacks==1);
+}
+static void ScopeReentryAbortAndActivity(){
+	Fixture f;const auto scope=Status(f).collection;WindowsTextCollectionReceipt receipt;receipt.admittedCallbacks=999;const auto saved=receipt;
+	unsigned steps=0;f.sink.callback=[&](DWORD flags){++steps;
+		WindowsTextLifecycle state;state.pending=999;const auto previous=state;CHECK(f.store->QueryLifecycle(f.id,state)==E_UNEXPECTED && state==previous);
+		CHECK(f.store->CloseCollection(scope,receipt)==E_UNEXPECTED && receipt==saved);
+		WindowsTextCollection opened{{1,2},3,4,WindowsTextCollectionKind::Pump},prior=opened;
+		CHECK(f.store->OpenCollection(f.id,10,0,1,2,WindowsTextCollectionKind::Pump,opened)==E_UNEXPECTED && opened==prior);
+		if(flags==TS_LF_READ){HRESULT next=E_ABORT;OK(f.store->RequestLock(TS_LF_READWRITE,&next));CHECK(next==TS_S_ASYNC);}
+		else {CHECK(flags==TS_LF_READWRITE);TS_TEXTCHANGE change;OK(f.store->SetText(0,0,1,L"!",1,&change));}
+		return S_OK;};
+	HRESULT session=E_ABORT;OK(f.store->RequestLock(TS_LF_READ,&session));OK(session);CHECK(steps==2);
+	OK(f.store->CloseCollection(scope,receipt));CHECK(receipt.admittedCallbacks==2 && receipt.pending.count==1 && receipt.pending.lastSequence==1 && receipt.pending.shadowRevision==2);
+	CHECK(!Status(f).safeToRenew);f.Ack();CHECK(Status(f).safeToRenew);
+	f.Begin();Composition unsolicited;unsolicited.range.context=&f.context;unsigned referenceCalls=0;
+	f.sink.referenceCallback=[&]{++referenceCalls;HRESULT reentered=E_ABORT;CHECK(f.store->RequestLock(TS_LF_READWRITE,&reentered)==E_UNEXPECTED && reentered==E_ABORT);
+		BOOL accepted=TRUE;CHECK(f.store->OnStartComposition(&unsolicited,&accepted)==TF_E_DISCONNECTED && !accepted);
+		CHECK(f.store->OnUpdateComposition(&unsolicited,nullptr)==TF_E_DISCONNECTED && f.store->OnEndComposition(&unsolicited)==TF_E_DISCONNECTED);
+		CHECK(f.store->Healthy());};
+	f.sink.callback=[](DWORD){return S_OK;};session=E_ABORT;OK(f.store->RequestLock(TS_LF_READWRITE,&session));OK(session);
+	f.sink.referenceCallback={};CHECK(referenceCalls==2);f.Close();
+	{
+		Fixture beforeGrant;const auto abortScope=Status(beforeGrant).collection;unsigned references=0;
+		beforeGrant.sink.referenceCallback=[&]{if(references++==0)OK(beforeGrant.store->AbortCollection(abortScope));};
+		HRESULT untouched=E_ABORT;CHECK(beforeGrant.store->RequestLock(TS_LF_READWRITE,&untouched)==TF_E_DISCONNECTED && untouched==E_ABORT);
+		beforeGrant.sink.referenceCallback={};CHECK(!beforeGrant.store->Healthy() && beforeGrant.sink.calls==0);
+	}
+	// Wrong-thread outputs, stale close and exact abort are independently checked.
+	f.Begin();const auto next=Status(f).collection;WindowsTextLifecycle unchanged;unchanged.pending=99;const auto sentinel=unchanged;
+	HRESULT foreign=S_OK;std::thread worker([&]{foreign=f.store->QueryLifecycle(f.id,unchanged);});worker.join();CHECK(foreign==RPC_E_WRONG_THREAD && unchanged==sentinel);
+	f.sink.callback=[&](DWORD){TS_TEXTCHANGE change;OK(f.store->SetText(0,0,1,L"x",1,&change));
+		rejectAllocations=true;const HRESULT aborted=f.store->AbortCollection(next);rejectAllocations=false;OK(aborted);return S_OK;};
+	session=E_ABORT;OK(f.store->RequestLock(TS_LF_READWRITE,&session));CHECK(session==TF_E_DISCONNECTED && !f.store->Healthy());
+	receipt=saved;CHECK(f.store->CloseCollection(next,receipt)==E_UNEXPECTED && receipt==saved);
+	CHECK(!Status(f).healthy && !Status(f).safeToRenew && Status(f).pending==0);
+	CHECK(f.store->AbortCollection(next)==E_INVALIDARG);
+	Composition range;Fixture g;range.range.context=&g.context;range.range.length=1;const auto metadataScope=Status(g).collection;
+	range.range.reenter=[&]{WindowsTextCollectionReceipt output=saved;CHECK(g.store->CloseCollection(metadataScope,output)==E_UNEXPECTED && output==saved);WindowsTextLifecycle status;CHECK(g.store->QueryLifecycle(g.id,status)==E_UNEXPECTED);};
+	BOOL accepted=FALSE;OK(g.store->OnStartComposition(&range,&accepted));CHECK(accepted);range.range.reenter={};
+	OK(g.store->OnEndComposition(&range));g.Close();CHECK(Status(g).admittedCallbacks==2 && Status(g).retainedCompositions==1 && Status(g).liveCompositions==0);
+}
+static void LifecycleNoticeScopeAndLateCallbacks(){
+	Fixture outside;outside.Close();unsigned writes=0,reads=0;
+	outside.sink.callback=[&](DWORD flags){CHECK(flags==TS_LF_READ);++reads;return S_OK;};
+	outside.sink.notice=[&](DWORD,const TS_TEXTCHANGE*){HRESULT session=E_ABORT;
+		NativeTextPendingSnapshot pending;CHECK(outside.store->QueryPendingCollection(outside.id,11,0,2,1,pending)==E_UNEXPECTED);
+		for(DWORD flags:{DWORD(TS_LF_READWRITE),DWORD(TS_LF_SYNC|TS_LF_READWRITE)}){OK(outside.store->RequestLock(flags,&session));CHECK(session==TS_E_NOLOCK);}
+		OK(outside.store->RequestLock(TS_LF_READ,&session));OK(session);return S_OK;};
+	OK(outside.store->SyncEngine(outside.id,10,1,11,"new",0,0));CHECK(outside.store->Healthy() && reads==1 && writes==0 && Status(outside).pending==0);
+	outside.sink.notifications=0;outside.sink.notice={};outside.sink.callback={};
+	outside.Begin(20,WindowsTextCollectionKind::Lifecycle);const auto lifecycle=Status(outside).collection;
+	outside.sink.notice=[&](DWORD,const TS_TEXTCHANGE*){HRESULT session=E_ABORT;OK(outside.store->RequestLock(TS_LF_READWRITE,&session));CHECK(session==TS_S_ASYNC && writes==0);return S_OK;};
+	outside.sink.callback=[&](DWORD flags){CHECK(flags==TS_LF_READWRITE);++writes;TS_TEXTCHANGE change;OK(outside.store->SetText(0,0,1,L"!",1,&change));return S_OK;};
+	OK(outside.store->SyncEngine(outside.id,11,2,12,"NEW",0,0));CHECK(writes==1);
+	WindowsTextCollectionReceipt receipt;OK(outside.store->CloseCollection(lifecycle,receipt));
+	CHECK(receipt.collection==lifecycle && receipt.pending.engineRevision==12 && receipt.pending.acknowledgedShadowRevision==3 && receipt.pending.shadowRevision==4 && receipt.pending.count==1 && receipt.admittedCallbacks==1);
+	CHECK(outside.Offer().transaction.nativeDispatch==20);outside.Ack();outside.sink.notifications=0;outside.sink.notice={};outside.sink.callback={};
+	// Engine revision changes in a lifecycle collection do not alter its identity.
+	outside.Begin(21,WindowsTextCollectionKind::Lifecycle);const auto emptyScope=Status(outside).collection;
+	OK(outside.store->SyncEngine(outside.id,13,4,14,"!EW",1,1));
+	OK(outside.store->CloseCollection(emptyScope,receipt));CHECK(receipt.collection==emptyScope && receipt.pending.engineRevision==14 && receipt.pending.shadowRevision==4 && !receipt.pending.count);
+	for(bool update:{false,true}){Composition composition;Fixture f;composition.range.context=&f.context;composition.range.length=1;BOOL accepted=FALSE;
+		OK(f.store->OnStartComposition(&composition,&accepted));CHECK(accepted);f.Close();const auto rangeCalls=composition.rangeCalls;
+		const auto begin=f.Offer();OK(f.store->Acknowledge(f.id,begin.transaction.sequence,begin.transaction.shadowAfter,10,10));
+		CHECK(Status(f).liveCompositions==1 && !Status(f).pending && !Status(f).safeToRenew);
+		OK(f.store->SetDispatch(f.id,99));const HRESULT late=update?f.store->OnUpdateComposition(&composition,nullptr):f.store->OnEndComposition(&composition);
+		CHECK(late==E_UNEXPECTED && !f.store->Healthy() && composition.rangeCalls==rangeCalls);
+	}
+}
+static void ScopeCompositionBudget(){
+	std::vector<std::unique_ptr<Composition>> objects;objects.reserve(257);Fixture f;
+	for(unsigned i=0;i<256;++i){objects.push_back(std::make_unique<Composition>());auto& c=*objects.back();c.range.context=&f.context;c.range.length=1;
+		f.Lock(TS_LF_READWRITE,[&]{BOOL accepted=FALSE;OK(f.store->OnStartComposition(&c,&accepted));CHECK(accepted);OK(f.store->OnEndComposition(&c));});
+		const auto offer=f.Offer();CHECK(offer.transaction.after.compositions.empty());OK(f.store->Acknowledge(f.id,offer.transaction.sequence,offer.transaction.shadowAfter,10,10));
+		const auto state=Status(f);CHECK(state.retainedCompositions==i+1 && !state.liveCompositions && !state.pending && state.safeToRenew && !state.renewalRequired);
+	}
+	const auto stable=Status(f);CHECK(stable.retainedCompositions==256 && objects.front()->refs==2);
+	f.Begin();const auto scope=Status(f).collection;objects.push_back(std::make_unique<Composition>());auto& extra=*objects.back();extra.range.context=&f.context;
+	BOOL accepted=TRUE;OK(f.store->OnStartComposition(&extra,&accepted));CHECK(!accepted && extra.rangeCalls==0);
+	CHECK(Status(f).renewalRequired && !Status(f).safeToRenew && Status(f).retainedCompositions==256);
+	WindowsTextCollectionReceipt receipt;receipt.admittedCallbacks=991;const auto unchanged=receipt;
+	CHECK(f.store->CloseCollection(scope,receipt)==E_FAIL && receipt==unchanged && !f.store->Healthy());
+	CHECK(Status(f).renewalRequired && !Status(f).safeToRenew && Status(f).retainedCompositions==256);
+	// Retirement keeps anti-reuse references until this old store is destroyed.
+	CHECK(objects.front()->refs==2 && f.store->OnStartComposition(objects.front().get(),&accepted)==TF_E_DISCONNECTED && !accepted);
+}
+int main(){IdentityAndLocks();Utf16AndEdits();CompositionsAndLateMetadata();ForeignContextAndPendingBegin();FaultsAndReentry();LayoutAndUnsupported();MetadataAcknowledgements();CompositionAcrossLocks();DeferredSinkChange();ApplicationNotifications();ApplicationNoticeFaultsAndLayout();PendingCollectionQueries();PendingCollectionCallbackGates();IdleCompositionLifecycle();IdleMetadataOrdering();IdleMetadataReentryAndFaults();IdleMetadataLimitsAndUnsupported();CallbackScopeAuthority();ScopeReentryAbortAndActivity();LifecycleNoticeScopeAndLateCallbacks();ScopeCompositionBudget();std::printf("PASS %u checks\n",checks);}

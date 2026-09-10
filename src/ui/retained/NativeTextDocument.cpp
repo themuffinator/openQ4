@@ -115,6 +115,26 @@ struct NativeTextDocument::Impl {
 		for (const auto& transaction:pending) add(transaction.after,transaction.operations);
 		return ids.size()<=limits.retainedCompositions;
 	}
+	bool Compose(Frame& candidate,const NativeTextOperation& operation,std::size_t first,std::size_t last,std::string& error) {
+		auto& working=candidate.working;
+		switch(operation.kind) {
+		case NativeTextOperationKind::BeginComposition:
+			if (!operation.composition || operation.composition<=candidate.compositionHigh)
+				return Fail(error,"Native composition identity was reused or unordered");
+			candidate.compositionHigh=operation.composition;
+			working.compositions.emplace(operation.composition,NativeTextRange{first,last}); break;
+		case NativeTextOperationKind::UpdateComposition: {
+			const auto found=working.compositions.find(operation.composition);
+			if (found==working.compositions.end()) return Fail(error,"Native composition update has no live origin");
+			found->second={first,last}; break;
+		}
+		case NativeTextOperationKind::EndComposition:
+			if (!working.compositions.erase(operation.composition)) return Fail(error,"Native composition end has no live origin");
+			break;
+		default: return Fail(error,"Unknown native composition operation");
+		}
+		candidate.related=true;return true;
+	}
 	bool Mutate(const NativeTextLockScope& scope,NativeTextOperation operation,std::string& error) {
 		if (!Scope(scope,true,error)) return false;
 		if (frame->operations.size()>=limits.operations) return Poison(error,"Native transaction operation budget exhausted");
@@ -144,18 +164,10 @@ struct NativeTextDocument::Impl {
 		}
 		case NativeTextOperationKind::Select: working.anchor=first; working.caret=last; break;
 		case NativeTextOperationKind::BeginComposition:
-			if (!operation.composition || operation.composition<=candidate.compositionHigh)
-				return Poison(error,"Native composition identity was reused or unordered");
-			candidate.compositionHigh=operation.composition;
-			working.compositions.emplace(operation.composition,NativeTextRange{first,last}); candidate.related=true; break;
-		case NativeTextOperationKind::UpdateComposition: {
-			const auto found=working.compositions.find(operation.composition);
-			if (found==working.compositions.end()) return Poison(error,"Native composition update has no live origin");
-			found->second={first,last}; candidate.related=true; break;
-		}
+		case NativeTextOperationKind::UpdateComposition:
 		case NativeTextOperationKind::EndComposition:
-			if (!working.compositions.erase(operation.composition)) return Poison(error,"Native composition end has no live origin");
-			candidate.related=true; break;
+			if (!Compose(candidate,operation,first,last,error)) {frame->poisoned=true;return false;}
+			break;
 		default: return Poison(error,"Unknown native text operation");
 		}
 		candidate.operations.push_back(std::move(operation));
@@ -247,6 +259,53 @@ bool NativeTextDocument::UpdateComposition(const NativeTextLockScope& scope,std:
 bool NativeTextDocument::EndComposition(const NativeTextLockScope& scope,std::uint64_t token,std::string& error) {
 	return impl->Mutate(scope,{NativeTextOperationKind::EndComposition,0,0,{},token},error);
 }
+bool NativeTextDocument::CaptureCompositionObservation(NativeTextIdentity identity,std::uint64_t dispatch,
+	NativeTextMetadataObservation& out,std::string& error) const {
+	if (!impl->Owner(identity,error)) return false;
+	if (impl->frame || impl->deferredWrite || !dispatch || impl->pending.size()>32 || impl->pending.size()>impl->transactionSequence)
+		return Fail(error,"Native composition observation requires an idle document and observed dispatch");
+	const NativeTextMetadataObservation candidate{identity,impl->engineRevision,impl->shadowRevision,impl->transactionSequence,
+		impl->transactionSequence-impl->pending.size(),dispatch};
+	out=candidate;error.clear();return true;
+}
+bool NativeTextDocument::PublishCompositionObservation(const NativeTextMetadataObservation& observed,
+	const NativeTextOperation& operation,std::uint64_t& published,std::string& error) {
+	if (!impl->Owner(observed.identity,error)) return false;
+	if (impl->frame || impl->deferredWrite || !observed.dispatch || observed.engineRevision!=impl->engineRevision ||
+		observed.shadowRevision!=impl->shadowRevision || observed.transactionSequence!=impl->transactionSequence ||
+		impl->pending.size()>32 || impl->pending.size()>impl->transactionSequence ||
+		observed.acknowledgedSequence!=impl->transactionSequence-impl->pending.size())
+		return Fail(error,"Native composition callback observation is stale or blocked");
+	if ((operation.kind!=NativeTextOperationKind::BeginComposition && operation.kind!=NativeTextOperationKind::UpdateComposition &&
+		operation.kind!=NativeTextOperationKind::EndComposition) || !operation.composition || !operation.text.empty() ||
+		(operation.kind==NativeTextOperationKind::EndComposition && (operation.first || operation.last)))
+		return Fail(error,"Native composition callback must contain only exact metadata");
+	Impl::Frame candidate;candidate.working=impl->state;candidate.compositionHigh=impl->compositionHigh;
+	std::vector<NativeTextBoundary> map;std::size_t first=0,last=0;
+	if (!BuildNativeTextMap(candidate.working.text,map,error)) return false;
+	if (operation.kind!=NativeTextOperationKind::EndComposition &&
+		(!FindAcp(map,operation.first,first) || !FindAcp(map,operation.last,last) || first>last))
+		return Fail(error,"Native composition ACP range splits a scalar or exceeds the document");
+	if (!impl->Compose(candidate,operation,first,last,error)) return false;
+	candidate.operations.push_back(operation);
+	if (!impl->Retained(candidate)) return Fail(error,"Native retained composition budget exhausted");
+	if (impl->pending.size()>=impl->limits.pendingTransactions || impl->shadowRevision>=impl->limits.sequence ||
+		impl->transactionSequence>=impl->limits.sequence || impl->pendingBytes>impl->limits.pendingBytes)
+		return Fail(error,"Native composition pending transaction or revision budget exhausted");
+	NativeTextTransaction transaction;
+	transaction.identity=observed.identity;transaction.sequence=impl->transactionSequence+1;transaction.nativeDispatch=observed.dispatch;
+	transaction.shadowBefore=impl->shadowRevision;transaction.shadowAfter=impl->shadowRevision+1;
+	transaction.classification=NativeTextClassification::CompositionRelated;transaction.documentChanged=false;
+	transaction.operations=std::move(candidate.operations);transaction.after=candidate.working;
+	std::size_t cost;
+	if (!Cost(transaction,impl->limits.pendingBytes-impl->pendingBytes,cost)) return Fail(error,"Native composition pending payload budget exhausted");
+	// Every allocation precedes publication. Metadata changes neither text nor
+	// directional selection; the existing FIFO acknowledgement owns editor revision.
+	impl->pending.push_back(std::move(transaction));
+	impl->state=std::move(candidate.working);impl->compositionHigh=candidate.compositionHigh;
+	++impl->shadowRevision;++impl->transactionSequence;impl->pendingBytes+=cost;
+	published=impl->transactionSequence;error.clear();return true;
+}
 
 bool NativeTextDocument::FinishLock(const NativeTextLockScope& scope,std::uint64_t dispatch,std::uint64_t& published,std::string& error) {
 	if (!impl->Scope(scope,false,error,true)) return false;
@@ -285,6 +344,34 @@ bool NativeTextDocument::PeekOffer(NativeTextIdentity identity,NativeTextOffer& 
 	if (impl->frame || impl->pending.empty()) return Fail(error,"Native offer is unavailable during a lock or without pending work");
 	NativeTextOffer candidate{impl->pending.front(),impl->engineRevision}; out=std::move(candidate); error.clear(); return true;
 }
+bool NativeTextDocument::QueryPendingCollection(NativeTextIdentity identity,std::uint64_t expectedEngine,
+	std::uint64_t expectedAcknowledged,std::uint64_t expectedAcknowledgedShadow,std::uint64_t dispatch,
+	NativeTextPendingSnapshot& out,std::string& error) const {
+	if (!impl->Owner(identity,error)) return false;
+	const auto count=impl->pending.size();
+	// Check arithmetic bounds before subtraction or narrowing, even though the
+	// normal producer also bounds its private queue at publication.
+	if (impl->frame || impl->deferredWrite || !dispatch || count>32 || count>impl->transactionSequence ||
+		expectedEngine!=impl->engineRevision)
+		return Fail(error,"Native pending collection is locked, stale or malformed");
+	const auto acknowledged=impl->transactionSequence-count;
+	const auto acknowledgedShadow=count?impl->pending.front().shadowBefore:impl->shadowRevision;
+	if (expectedAcknowledged!=acknowledged || expectedAcknowledgedShadow!=acknowledgedShadow)
+		return Fail(error,"Native pending collection does not match the acknowledged editor barrier");
+	auto sequence=acknowledged,shadow=acknowledgedShadow;
+	for (const auto& transaction:impl->pending) {
+		if (sequence==UINT64_MAX || shadow==UINT64_MAX || transaction.identity!=identity ||
+			transaction.sequence!=sequence+1 || transaction.nativeDispatch!=dispatch || transaction.shadowBefore!=shadow ||
+			transaction.shadowAfter!=shadow+1)
+			return Fail(error,"Native pending collection has mixed dispatch or discontinuous transactions");
+		sequence=transaction.sequence;shadow=transaction.shadowAfter;
+	}
+	if (sequence!=impl->transactionSequence || shadow!=impl->shadowRevision)
+		return Fail(error,"Native pending collection does not reach the published watermark");
+	const NativeTextPendingSnapshot candidate{identity,impl->engineRevision,acknowledged,acknowledgedShadow,
+		impl->shadowRevision,dispatch,impl->transactionSequence,static_cast<std::uint32_t>(count)};
+	out=candidate;error.clear();return true;
+}
 bool NativeTextDocument::Acknowledge(NativeTextIdentity identity,std::uint64_t transaction,std::uint64_t shadowAfter,
 	std::uint64_t expected,std::uint64_t accepted,std::string& error) {
 	if (!impl->Owner(identity,error)) return false;
@@ -316,8 +403,12 @@ bool NativeTextDocument::SyncEngine(NativeTextIdentity identity,std::uint64_t ex
 	error.clear(); return true;
 }
 bool NativeTextDocument::Retire(NativeTextIdentity identity,std::string& error) {
-	if (!impl->opened || identity!=impl->identity) return Fail(error,"Native retirement identity does not match");
-	impl->retired=true; impl->frame.reset(); impl->deferredWrite=false; impl->pending.clear(); impl->pendingBytes=0;
+	if (!Retire(identity)) return Fail(error,"Native retirement identity does not match");
 	error.clear(); return true;
+}
+bool NativeTextDocument::Retire(NativeTextIdentity identity) noexcept {
+	if (!impl->opened || identity!=impl->identity) return false;
+	impl->retired=true; impl->frame.reset(); impl->deferredWrite=false; impl->pending.clear(); impl->pendingBytes=0;
+	return true;
 }
 } // namespace openq4::ui

@@ -223,6 +223,18 @@ native-input foundation; field activation and complete IME delivery remain
 unfinished. The new evidence supplements the existing scope and accepts no
 requirement, GUI migration or final gate.
 
+The subsequent [native field binding and precision checkpoint](numeric-fields.md)
+starts from engine `7a8036ac87dde9d29eb279a9c6ecc31cf187df55`. It adds clean authored
+slider ticks, fixed CVar writes for small and custom numbers, complete native
+Number presentation, checked collection scopes and prepared stable settlement.
+The Windows build and 36 UI suites pass. SP/OpenGL at 125% and MP/Vulkan at 200%
+each pass 38 semantic operations and 12 reviewed engine images after gameplay.
+The immutable evidence is `.tmp/ui/native-field-binding-integration/validation-evidence.json`.
+At 200%, focused controls still meet the scroll boundary; page layout qualification
+remains open. Live managed/provider/Session integration, exact persistent recovery,
+native IME, the complete editor and all production migrations remain unfinished.
+No requirement status or acceptance gate changes in this increment.
+
 There are **65 partial, 161 pending and one verified requirement**. `BEH-002`
 remains partial for the implemented settings transaction/service boundary.
 `BEH-005` remains partial for committed action delivery and cancellation; stock

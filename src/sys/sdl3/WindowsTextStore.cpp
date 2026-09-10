@@ -65,7 +65,7 @@ struct WindowsTextStore::Impl {
 	NativeTextIdentity identity;
 	HWND window=nullptr;
 	bool healthy=true, upgrading=false;
-	unsigned foreign=0;
+	unsigned foreign=0, compositionCallback=0, nativeCallback=0;
 	unsigned notifying=0;
 	bool notificationWrite=false;
 	ITextStoreACPSink* sink=nullptr;
@@ -75,6 +75,10 @@ struct WindowsTextStore::Impl {
 	std::optional<NativeTextLockScope> scope;
 	std::optional<WindowsTextLayout> layout;
 	std::uint64_t dispatch=0, compositionHigh=0, receipts=0, layoutHigh=0;
+	std::uint64_t collectionHigh=0, dispatchHigh=0, admittedCallbacks=0;
+	std::uint64_t acknowledgedSequence=0, acknowledgedShadow=1;
+	std::optional<WindowsTextCollection> collection;
+	bool renewalRequired=false;
 	struct Composition { IUnknown* identity; std::uint64_t token; bool ended; };
 	std::vector<Composition> compositions; // Up to 256 lifetime identities, refs prevent pointer reuse.
 	explicit Impl(NativeTextLimits limits) : document(limits) {}
@@ -86,13 +90,19 @@ struct WindowsTextStore::Impl {
 	bool Owner() const {return std::this_thread::get_id()==thread;}
 	void Fault() noexcept {
 		healthy=false; scope.reset(); layout.reset(); upgrading=false;
-		notificationWrite=false;
-		try {std::string e; (void)document.Retire(identity,e);} catch (...) {}
+		notificationWrite=false; collection.reset();
+		(void)document.Retire(identity);
 	}
+	bool Busy() const {return scope || foreign || compositionCallback || nativeCallback || notifying || upgrading || notificationWrite;}
+	bool Activity() noexcept {
+		if(!collection || admittedCallbacks==UINT64_MAX) {Fault();return false;}
+		++admittedCallbacks;return true;
+	}
+	bool AppAllowed() const {return !collection || collection->kind==WindowsTextCollectionKind::Lifecycle;}
 	HRESULT Gate(bool write=false) const {
 		if (!Owner()) return RPC_E_WRONG_THREAD;
 		if (!healthy || !document.Active()) return TF_E_DISCONNECTED;
-		if (foreign) return E_UNEXPECTED;
+		if (foreign || compositionCallback) return E_UNEXPECTED;
 		if (!scope || (write && scope->access!=NativeTextAccess::ReadWrite)) return TS_E_NOLOCK;
 		return S_OK;
 	}
@@ -191,28 +201,76 @@ ULONG WindowsTextStore::Release(){const ULONG left=--impl->refs;if(!left) delete
 bool WindowsTextStore::Healthy() const noexcept{return impl->Owner() && impl->healthy && impl->document.Active();}
 std::uint64_t WindowsTextStore::EditReceipts() const noexcept{return impl->Owner()?impl->receipts:0;}
 HRESULT WindowsTextStore::BindContext(NativeTextIdentity id,IUnknown* context) noexcept {return Safe([&]() -> HRESULT {
-	if(id!=impl->identity || !Healthy() || impl->scope || impl->foreign || impl->notifying) return E_UNEXPECTED;
+	if(id!=impl->identity || !Healthy() || impl->Busy() || !impl->AppAllowed()) return E_UNEXPECTED;
 	Ref<IUnknown> identity;HRESULT hr=impl->Canonical(context,identity);if(FAILED(hr)) return hr;
 	if(!Healthy() || !identity.p) return TF_E_DISCONNECTED;
 	if(impl->context) return impl->context==identity.p?S_OK:E_UNEXPECTED;
 	impl->context=identity.Take();return S_OK;
 });}
 HRESULT WindowsTextStore::SetDispatch(NativeTextIdentity id,std::uint64_t value) noexcept {return Safe([&]() -> HRESULT {
-	if(id!=impl->identity || !Healthy() || impl->scope || impl->foreign || impl->notifying || value<impl->dispatch) return E_UNEXPECTED;
+	if(id!=impl->identity || !Healthy() || impl->Busy() || impl->collection || value<impl->dispatch) return E_UNEXPECTED;
 	impl->dispatch=value;return S_OK;
 });}
+HRESULT WindowsTextStore::OpenCollection(NativeTextIdentity id,std::uint64_t engine,
+	std::uint64_t acknowledged,std::uint64_t shadow,std::uint64_t dispatch,
+	WindowsTextCollectionKind kind,WindowsTextCollection& out) noexcept {return Safe([&]() -> HRESULT {
+	if(id!=impl->identity || !Healthy() || impl->Busy() || impl->collection || impl->renewalRequired) return E_UNEXPECTED;
+	if((kind!=WindowsTextCollectionKind::Pump && kind!=WindowsTextCollectionKind::Lifecycle) || !dispatch ||
+		dispatch<=impl->dispatchHigh || dispatch<impl->dispatch || impl->collectionHigh==UINT64_MAX) return E_INVALIDARG;
+	NativeTextPendingSnapshot pending;std::string error;
+	if(!impl->document.QueryPendingCollection(id,engine,acknowledged,shadow,dispatch,pending,error) || pending.count) return E_INVALIDARG;
+	const WindowsTextCollection candidate{id,impl->collectionHigh+1,dispatch,kind};
+	impl->collection=candidate;impl->collectionHigh=candidate.serial;impl->dispatchHigh=dispatch;impl->dispatch=dispatch;
+	impl->acknowledgedSequence=acknowledged;impl->acknowledgedShadow=shadow;impl->admittedCallbacks=0;
+	out=candidate;return S_OK;
+});}
+HRESULT WindowsTextStore::CloseCollection(const WindowsTextCollection& scope,WindowsTextCollectionReceipt& out) noexcept {return Safe([&]() -> HRESULT {
+	if(!Healthy() || impl->Busy() || !impl->collection || scope!=*impl->collection) return E_UNEXPECTED;
+	if(impl->renewalRequired) {impl->Fault();return E_FAIL;}
+	WindowsTextCollectionReceipt candidate;candidate.collection=scope;candidate.admittedCallbacks=impl->admittedCallbacks;
+	std::string error;
+	if(!impl->document.QueryPendingCollection(impl->identity,impl->document.EngineRevision(),impl->acknowledgedSequence,
+		impl->acknowledgedShadow,scope.dispatch,candidate.pending,error)) {impl->Fault();return E_FAIL;}
+	impl->collection.reset();out=candidate;return S_OK;
+});}
+HRESULT WindowsTextStore::AbortCollection(const WindowsTextCollection& scope) noexcept {return Safe([&]() -> HRESULT {
+	if(!impl->collection || scope!=*impl->collection) return E_INVALIDARG;
+	impl->Fault();return S_OK;
+});}
+HRESULT WindowsTextStore::QueryLifecycle(NativeTextIdentity id,WindowsTextLifecycle& out) noexcept {return Safe([&]() -> HRESULT {
+	if(id!=impl->identity) return E_INVALIDARG;
+	if(impl->Busy()) return E_UNEXPECTED;
+	WindowsTextLifecycle candidate;candidate.identity=id;candidate.engineRevision=impl->document.EngineRevision();
+	candidate.shadowRevision=impl->document.ShadowRevision();candidate.acknowledgedSequence=impl->acknowledgedSequence;
+	candidate.acknowledgedShadowRevision=impl->acknowledgedShadow;candidate.lastDispatch=impl->dispatchHigh;
+	candidate.lastScopeSerial=impl->collectionHigh;candidate.admittedCallbacks=impl->admittedCallbacks;
+	candidate.pending=static_cast<std::uint32_t>(impl->document.PendingCount());
+	candidate.retainedCompositions=static_cast<std::uint32_t>(impl->compositions.size());
+	for(const auto& c:impl->compositions) if(!c.ended) ++candidate.liveCompositions;
+	candidate.healthy=Healthy();candidate.collectionOpen=bool(impl->collection);candidate.renewalRequired=impl->renewalRequired;
+	if(impl->collection) candidate.collection=*impl->collection;
+	candidate.safeToRenew=candidate.healthy && !candidate.collectionOpen && !candidate.pending && !candidate.liveCompositions;
+	out=candidate;return S_OK;
+});}
 HRESULT WindowsTextStore::Peek(NativeTextIdentity id,NativeTextOffer& out) noexcept {return Safe([&]() -> HRESULT {
-	if(id!=impl->identity || !Healthy() || impl->scope || impl->foreign || impl->notifying) return E_UNEXPECTED;
+	if(id!=impl->identity || !Healthy() || impl->Busy() || impl->collection) return E_UNEXPECTED;
 	if(!impl->document.PendingCount()) return S_FALSE;
 	std::string e;return impl->document.PeekOffer(id,out,e)?S_OK:E_FAIL;
 });}
+HRESULT WindowsTextStore::QueryPendingCollection(NativeTextIdentity id,std::uint64_t expectedEngine,
+	std::uint64_t expectedAcknowledged,std::uint64_t expectedAcknowledgedShadow,std::uint64_t dispatch,
+	NativeTextPendingSnapshot& out) noexcept {return Safe([&]() -> HRESULT {
+	if(!Healthy() || impl->Busy() || impl->collection) return E_UNEXPECTED;
+	std::string error;
+	return impl->document.QueryPendingCollection(id,expectedEngine,expectedAcknowledged,expectedAcknowledgedShadow,dispatch,out,error)?S_OK:E_INVALIDARG;
+});}
 HRESULT WindowsTextStore::Acknowledge(NativeTextIdentity id,std::uint64_t tx,std::uint64_t shadow,std::uint64_t expected,std::uint64_t accepted) noexcept {return Safe([&]() -> HRESULT {
-	if(impl->foreign || impl->notifying || impl->scope || !Healthy()) return E_UNEXPECTED;
+	if(impl->Busy() || impl->collection || !Healthy()) return E_UNEXPECTED;
 	std::string e;if(!impl->document.Acknowledge(id,tx,shadow,expected,accepted,e)) return E_INVALIDARG;
-	impl->layout.reset();return S_OK;
+	impl->acknowledgedSequence=tx;impl->acknowledgedShadow=shadow;impl->layout.reset();return S_OK;
 });}
 HRESULT WindowsTextStore::Reject(NativeTextIdentity id,std::uint64_t tx,std::uint64_t expected) noexcept {return Safe([&]() -> HRESULT {
-	if(impl->foreign || impl->notifying || impl->scope || !Healthy()) return E_UNEXPECTED;
+	if(impl->Busy() || impl->collection || !Healthy()) return E_UNEXPECTED;
 	std::string e;if(!impl->document.Reject(id,tx,expected,e)) return E_INVALIDARG;
 	impl->Fault();return S_OK;
 });}
@@ -254,12 +312,13 @@ HRESULT WindowsTextStore::Notify(DWORD requested,const TS_TEXTCHANGE* change) {
 HRESULT WindowsTextStore::SyncEngine(NativeTextIdentity id,std::uint64_t expectedEngine,
 	std::uint64_t expectedShadow,std::uint64_t revision,std::string_view text,
 	std::size_t anchor,std::size_t caret) noexcept {return Safe([&]() -> HRESULT {
-	if(!Healthy() || impl->foreign || impl->notifying || impl->scope) return E_UNEXPECTED;
+	if(!Healthy() || impl->Busy() || !impl->AppAllowed()) return E_UNEXPECTED;
 	NativeTextSnapshot before;std::string e;
 	if(!impl->Snapshot(before)) return E_FAIL;
 	// Own the request before any foreign callback; model validation is atomic.
 	const std::string candidate(text);
 	if(!impl->document.SyncEngine(id,expectedEngine,expectedShadow,revision,candidate,anchor,caret,e)) return E_INVALIDARG;
+	impl->acknowledgedShadow=impl->document.ShadowRevision();
 	DWORD mask=0;TS_TEXTCHANGE change{};
 	if(before.text!=candidate) {
 		// A full-field range remains exact for all UTF-16 scalars and keeps
@@ -273,7 +332,7 @@ HRESULT WindowsTextStore::SyncEngine(NativeTextIdentity id,std::uint64_t expecte
 });}
 
 HRESULT WindowsTextStore::AdviseSink(REFIID iid,IUnknown* source,DWORD mask) {return Safe([&]() -> HRESULT {
-	if(impl->foreign || impl->notifying || !Healthy()) return E_UNEXPECTED;
+	if(impl->foreign || impl->compositionCallback || impl->notifying || !Healthy()) return E_UNEXPECTED;
 	if(iid!=__uuidof(ITextStoreACPSink) || !source || (mask&~TS_AS_ALL_SINKS)) return E_INVALIDARG;
 	Ref<IUnknown> identity;HRESULT hr=impl->Canonical(source,identity);if(FAILED(hr) || !identity.p) return E_UNEXPECTED;
 	if(!Healthy()) return TF_E_DISCONNECTED;
@@ -285,7 +344,7 @@ HRESULT WindowsTextStore::AdviseSink(REFIID iid,IUnknown* source,DWORD mask) {re
 	impl->sinkIdentity=identity.p;impl->sink=sink.Take();impl->mask=mask;return S_OK;
 });}
 HRESULT WindowsTextStore::UnadviseSink(IUnknown* source) {return Safe([&]() -> HRESULT {
-	if(impl->foreign || impl->notifying) return E_UNEXPECTED;
+	if(impl->foreign || impl->compositionCallback || impl->notifying) return E_UNEXPECTED;
 	Ref<IUnknown> identity;HRESULT hr=impl->Canonical(source,identity);if(FAILED(hr)) return E_INVALIDARG;
 	if(!impl->sink || identity.p!=impl->sinkIdentity) return CONNECT_E_NOCONNECTION;
 	ITextStoreACPSink* old=impl->sink;impl->sink=nullptr;impl->sinkIdentity=nullptr;impl->mask=0;
@@ -294,9 +353,10 @@ HRESULT WindowsTextStore::UnadviseSink(IUnknown* source) {return Safe([&]() -> H
 });}
 HRESULT WindowsTextStore::RequestLock(DWORD flags,HRESULT* session) {return Safe([&]() -> HRESULT {
 	if(!session || (flags&~(TS_LF_SYNC|TS_LF_READWRITE)) || ((flags&TS_LF_READWRITE)!=TS_LF_READ && (flags&TS_LF_READWRITE)!=TS_LF_READWRITE)) return E_INVALIDARG;
-	if(!Healthy() || impl->foreign || !impl->sink) return E_UNEXPECTED;
+	if(!Healthy() || impl->foreign || impl->compositionCallback || (impl->nativeCallback && !impl->scope) || !impl->sink) return E_UNEXPECTED;
 	NativeTextLockScope granted;std::string e;
 	const auto access=(flags&TS_LF_READWRITE)==TS_LF_READWRITE?NativeTextAccess::ReadWrite:NativeTextAccess::Read;
+	if(access==NativeTextAccess::ReadWrite && !impl->collection) {*session=TS_E_NOLOCK;return S_OK;}
 	if(impl->notifying && access==NativeTextAccess::ReadWrite) {
 		if(flags&TS_LF_SYNC) {*session=TS_E_SYNCHRONOUS;return S_OK;}
 		impl->notificationWrite=true;*session=TS_S_ASYNC;return S_OK;
@@ -304,7 +364,10 @@ HRESULT WindowsTextStore::RequestLock(DWORD flags,HRESULT* session) {return Safe
 	const auto result=impl->document.RequestLock(impl->identity,access,(flags&TS_LF_SYNC)!=0,granted,e);
 	if(result==NativeTextLockResult::Deferred) {impl->upgrading=true;*session=TS_S_ASYNC;return S_OK;}
 	if(result==NativeTextLockResult::Refused) {*session=TS_E_SYNCHRONOUS;return S_OK;}
+	if(impl->collection && !impl->Activity()) return E_FAIL;
+	CounterScope nativeCallback(impl->nativeCallback);
 	Ref<ITextStoreACPSink> sink(impl->sink);
+	if(!Healthy() || impl->sink!=sink.p) {impl->Fault();return TF_E_DISCONNECTED;}
 	auto callback=[&](NativeTextLockScope scope,DWORD callbackFlags) -> HRESULT {
 		impl->scope=scope;
 		HRESULT hr=sink.p->OnLockGranted(callbackFlags);
@@ -316,19 +379,19 @@ HRESULT WindowsTextStore::RequestLock(DWORD flags,HRESULT* session) {return Safe
 	*session=callback(granted,flags);
 	if(impl->upgrading && Healthy()) {
 		impl->upgrading=false;
-		if(impl->sink!=sink.p || !impl->document.GrantDeferredWrite(impl->identity,granted,e)) {impl->Fault();return E_FAIL;}
+		if(!impl->collection || impl->sink!=sink.p || !impl->document.GrantDeferredWrite(impl->identity,granted,e) || !impl->Activity()) {impl->Fault();return E_FAIL;}
 		if(FAILED(callback(granted,TS_LF_READWRITE))) return E_FAIL;
 	}
 	return S_OK;
 });}
 
 HRESULT WindowsTextStore::GetStatus(TS_STATUS* out) {return Safe([&]() -> HRESULT {
-	if(!out) return E_INVALIDARG;if(impl->foreign) return E_UNEXPECTED;
+	if(!out) return E_INVALIDARG;if(impl->foreign || impl->compositionCallback) return E_UNEXPECTED;
 	*out={Healthy()?0u:DWORD(TS_SD_READONLY),TS_SS_NOHIDDENTEXT};return S_OK;
 });}
 HRESULT WindowsTextStore::QueryInsert(LONG first,LONG last,ULONG count,LONG* outFirst,LONG* outLast) {return Safe([&]() -> HRESULT {
 	if(!outFirst || !outLast || count>65536) return E_INVALIDARG;
-	if(!Healthy() || impl->foreign) return E_UNEXPECTED;
+	if(!Healthy() || impl->foreign || impl->compositionCallback) return E_UNEXPECTED;
 	NativeTextSnapshot snapshot;std::vector<NativeTextBoundary> map;std::string e;
 	if(!impl->Snapshot(snapshot) || !BuildNativeTextMap(snapshot.text,map,e)) return E_FAIL;
 	auto boundary=[&](LONG acp){return acp>=0 && std::any_of(map.begin(),map.end(),[&](const auto& b){return b.acp==static_cast<std::uint32_t>(acp);});};
@@ -383,7 +446,7 @@ HRESULT WindowsTextStore::GetEndACP(LONG* end) {return Safe([&]() -> HRESULT {
 });}
 
 HRESULT WindowsTextStore::SetLayout(const WindowsTextLayout& value) noexcept {return Safe([&]() -> HRESULT {
-	if(!Healthy() || impl->foreign || impl->notifying || impl->scope || impl->document.PendingCount() || value.identity!=impl->identity || value.engineRevision!=impl->document.EngineRevision() ||
+	if(!Healthy() || impl->Busy() || !impl->AppAllowed() || impl->document.PendingCount() || value.identity!=impl->identity || value.engineRevision!=impl->document.EngineRevision() ||
 		value.shadowRevision!=impl->document.ShadowRevision() || !value.layoutRevision || !RectValid(value.screen)) return E_INVALIDARG;
 	if(value.layoutRevision<=impl->layoutHigh) return E_INVALIDARG;
 	NativeTextSnapshot snapshot;std::string e;std::vector<NativeTextBoundary> map;
@@ -395,10 +458,10 @@ HRESULT WindowsTextStore::SetLayout(const WindowsTextLayout& value) noexcept {re
 	WindowsTextLayout candidate=value;impl->layout=std::move(candidate);impl->layoutHigh=value.layoutRevision;
 	return Notify(TS_AS_LAYOUT_CHANGE,nullptr);
 });}
-HRESULT WindowsTextStore::GetActiveView(TsViewCookie* out) {return Safe([&]() -> HRESULT {if(!out) return E_INVALIDARG;if(!Healthy() || impl->foreign) return E_UNEXPECTED;*out=1;return S_OK;});}
-HRESULT WindowsTextStore::GetWnd(TsViewCookie view,HWND* out) {return Safe([&]() -> HRESULT {if(!out || view!=1) return E_INVALIDARG;if(!Healthy() || impl->foreign) return E_UNEXPECTED;*out=impl->window;return S_OK;});}
+HRESULT WindowsTextStore::GetActiveView(TsViewCookie* out) {return Safe([&]() -> HRESULT {if(!out) return E_INVALIDARG;if(!Healthy() || impl->foreign || impl->compositionCallback) return E_UNEXPECTED;*out=1;return S_OK;});}
+HRESULT WindowsTextStore::GetWnd(TsViewCookie view,HWND* out) {return Safe([&]() -> HRESULT {if(!out || view!=1) return E_INVALIDARG;if(!Healthy() || impl->foreign || impl->compositionCallback) return E_UNEXPECTED;*out=impl->window;return S_OK;});}
 HRESULT WindowsTextStore::GetScreenExt(TsViewCookie view,RECT* out) {return Safe([&]() -> HRESULT {
-	if(view!=1 || !out) return E_INVALIDARG;if(!Healthy() || impl->foreign) return E_UNEXPECTED;
+	if(view!=1 || !out) return E_INVALIDARG;if(!Healthy() || impl->foreign || impl->compositionCallback) return E_UNEXPECTED;
 	HRESULT hr=impl->LayoutReady();if(FAILED(hr)) return hr;*out=impl->layout->visible?impl->layout->screen:RECT{};return S_OK;
 });}
 HRESULT WindowsTextStore::GetTextExt(TsViewCookie view,LONG first,LONG last,RECT* out,BOOL* clipped) {return Safe([&]() -> HRESULT {
@@ -413,7 +476,7 @@ HRESULT WindowsTextStore::GetTextExt(TsViewCookie view,LONG first,LONG last,RECT
 });}
 HRESULT WindowsTextStore::GetACPFromPoint(TsViewCookie view,const POINT* point,DWORD flags,LONG* out) {return Safe([&]() -> HRESULT {
 	if(view!=1 || !point || !out || (flags&~(GXFPF_NEAREST|GXFPF_ROUND_NEAREST))) return E_INVALIDARG;
-	if(!Healthy() || impl->foreign) return E_UNEXPECTED;HRESULT hr=impl->LayoutReady();if(FAILED(hr)) return hr;
+	if(!Healthy() || impl->foreign || impl->compositionCallback) return E_UNEXPECTED;HRESULT hr=impl->LayoutReady();if(FAILED(hr)) return hr;
 	if(!impl->layout->visible) return TS_E_INVALIDPOINT;
 	const WindowsTextCell* hit=nullptr;
 	for(const auto& c:impl->layout->cells) if(Contains(c.ink,*point)) {hit=&c;break;}
@@ -429,34 +492,73 @@ HRESULT WindowsTextStore::GetACPFromPoint(TsViewCookie view,const POINT* point,D
 HRESULT WindowsTextStore::OnStartComposition(ITfCompositionView* source,BOOL* accepted) {return Safe([&]() -> HRESULT {
 	if(!accepted || !source) return E_INVALIDARG;
 	*accepted=FALSE;
-	if(impl->foreign || !Healthy()) return TF_E_DISCONNECTED;
-	if(!impl->scope || impl->scope->access!=NativeTextAccess::ReadWrite) return S_OK;
-	Ref<IUnknown> identity;HRESULT hr=impl->Canonical(source,identity);if(FAILED(hr) || !identity.p) {impl->Fault();return E_FAIL;}
+	if(impl->foreign || impl->compositionCallback || (impl->nativeCallback && !impl->scope) || !Healthy()) return TF_E_DISCONNECTED;
+	if(!impl->collection) return S_OK;
+	if(!impl->Activity()) return E_FAIL;
+	// Native metadata is separately observed only while idle; never turn a read
+	// or an application-notification callback into a fabricated write lock.
+	if(impl->notifying || impl->upgrading || impl->notificationWrite ||
+		(impl->scope && impl->scope->access!=NativeTextAccess::ReadWrite)) return S_OK;
+	NativeTextMetadataObservation observed;std::string e;
+	if(!impl->scope && !impl->document.CaptureCompositionObservation(impl->identity,impl->dispatch,observed,e)) return S_OK;
+	CounterScope callback(impl->compositionCallback);
+	Ref<IUnknown> identity;HRESULT hr=impl->Canonical(source,identity);
+	if(FAILED(hr) || !identity.p || !Healthy()) {impl->Fault();return E_FAIL;}
 	for(const auto& c:impl->compositions) if(c.identity==identity.p) return S_OK;
-	if(impl->compositions.size()>=256 || impl->compositionHigh==UINT64_MAX) return S_OK;
+	if(impl->compositions.size()>=256 || impl->compositionHigh==UINT64_MAX) {impl->renewalRequired=true;return S_OK;}
 	LONG first,last;hr=impl->Extent(source,nullptr,first,last);if(FAILED(hr) || !Healthy()) {impl->Fault();return E_FAIL;}
-	impl->compositions.reserve(impl->compositions.size()+1);std::string e;
-	const auto token=impl->compositionHigh+1;
-	if(!impl->document.BeginComposition(*impl->scope,token,first,last,e)) {impl->Fault();return E_FAIL;}
-	impl->compositions.push_back({identity.Take(),token,false});impl->compositionHigh=token;*accepted=TRUE;return S_OK;
+	impl->compositions.reserve(impl->compositions.size()+1);
+	const auto token=impl->compositionHigh+1;std::uint64_t published=0;
+	const bool changed=impl->scope ? impl->document.BeginComposition(*impl->scope,token,first,last,e) :
+		impl->document.PublishCompositionObservation(observed,{NativeTextOperationKind::BeginComposition,static_cast<std::uint32_t>(first),static_cast<std::uint32_t>(last),{},token},published,e);
+	if(!changed) {impl->Fault();return E_FAIL;}
+	impl->compositions.push_back({identity.Take(),token,false});impl->compositionHigh=token;impl->layout.reset();*accepted=TRUE;return S_OK;
 });}
 HRESULT WindowsTextStore::OnUpdateComposition(ITfCompositionView* source,ITfRange* range) {return Safe([&]() -> HRESULT {
-	if(!source) return E_INVALIDARG;if(!Healthy() || impl->foreign) return TF_E_DISCONNECTED;
-	Ref<IUnknown> identity;HRESULT hr=impl->Canonical(source,identity);if(FAILED(hr)) {impl->Fault();return E_FAIL;}
+	if(!source) return E_INVALIDARG;if(!Healthy() || impl->foreign || impl->compositionCallback || (impl->nativeCallback && !impl->scope)) return TF_E_DISCONNECTED;
+	if(!impl->collection) {impl->Fault();return E_UNEXPECTED;}
+	if(!impl->Activity()) return E_FAIL;
+	if(impl->notifying || impl->upgrading || impl->notificationWrite ||
+		(impl->scope && impl->scope->access!=NativeTextAccess::ReadWrite)) {impl->Fault();return E_UNEXPECTED;}
+	NativeTextMetadataObservation observed;std::string e;
+	if(!impl->scope && !impl->document.CaptureCompositionObservation(impl->identity,impl->dispatch,observed,e)) {impl->Fault();return E_UNEXPECTED;}
+	CounterScope callback(impl->compositionCallback);
+	Ref<IUnknown> identity;HRESULT hr=impl->Canonical(source,identity);
+	if(FAILED(hr) || !identity.p || !Healthy()) {impl->Fault();return E_FAIL;}
 	auto found=std::find_if(impl->compositions.begin(),impl->compositions.end(),[&](const auto& c){return c.identity==identity.p;});
-	if(found==impl->compositions.end() || found->ended || FAILED(impl->Gate(true))) {impl->Fault();return E_UNEXPECTED;}
+	if(found==impl->compositions.end() || found->ended) {impl->Fault();return E_UNEXPECTED;}
+	// Supplied pRangeNew is authoritative: GetRange still describes the old
+	// range until this callback returns (the SDK permits a zero-length range).
 	LONG first,last;hr=impl->Extent(source,range,first,last);if(FAILED(hr) || !Healthy()) {impl->Fault();return E_FAIL;}
-	std::string e;if(!impl->document.UpdateComposition(*impl->scope,found->token,first,last,e)) {impl->Fault();return E_FAIL;}return S_OK;
+	std::uint64_t published=0;
+	const bool changed=impl->scope ? impl->document.UpdateComposition(*impl->scope,found->token,first,last,e) :
+		impl->document.PublishCompositionObservation(observed,{NativeTextOperationKind::UpdateComposition,static_cast<std::uint32_t>(first),static_cast<std::uint32_t>(last),{},found->token},published,e);
+	if(!changed) {impl->Fault();return E_FAIL;}impl->layout.reset();return S_OK;
 });}
 HRESULT WindowsTextStore::OnEndComposition(ITfCompositionView* source) {return Safe([&]() -> HRESULT {
-	if(!source) return E_INVALIDARG;if(!Healthy() || impl->foreign) return TF_E_DISCONNECTED;
-	Ref<IUnknown> identity;HRESULT hr=impl->Canonical(source,identity);if(FAILED(hr)) {impl->Fault();return E_FAIL;}
+	if(!source) return E_INVALIDARG;if(!Healthy() || impl->foreign || impl->compositionCallback || (impl->nativeCallback && !impl->scope)) return TF_E_DISCONNECTED;
+	if(!impl->collection) {impl->Fault();return E_UNEXPECTED;}
+	if(!impl->Activity()) return E_FAIL;
+	if(impl->notifying || impl->upgrading || impl->notificationWrite ||
+		(impl->scope && impl->scope->access!=NativeTextAccess::ReadWrite)) {impl->Fault();return E_UNEXPECTED;}
+	NativeTextMetadataObservation observed;std::string e;
+	if(!impl->scope && !impl->document.CaptureCompositionObservation(impl->identity,impl->dispatch,observed,e)) {impl->Fault();return E_UNEXPECTED;}
+	CounterScope callback(impl->compositionCallback);
+	Ref<IUnknown> identity;HRESULT hr=impl->Canonical(source,identity);
+	if(FAILED(hr) || !identity.p || !Healthy()) {impl->Fault();return E_FAIL;}
 	auto found=std::find_if(impl->compositions.begin(),impl->compositions.end(),[&](const auto& c){return c.identity==identity.p;});
-	if(found==impl->compositions.end() || found->ended || FAILED(impl->Gate(true))) {impl->Fault();return E_UNEXPECTED;}
-	std::string e;if(!impl->document.EndComposition(*impl->scope,found->token,e)) {impl->Fault();return E_FAIL;}found->ended=true;return S_OK;
+	if(found==impl->compositions.end() || found->ended) {impl->Fault();return E_UNEXPECTED;}
+	// Terminated views may no longer provide GetRange. End preserves the last
+	// checked extent in earlier offers and records termination, never acceptance.
+	std::uint64_t published=0;
+	const bool changed=impl->scope ? impl->document.EndComposition(*impl->scope,found->token,e) :
+		impl->document.PublishCompositionObservation(observed,{NativeTextOperationKind::EndComposition,0,0,{},found->token},published,e);
+	if(!changed) {impl->Fault();return E_FAIL;}found->ended=true;impl->layout.reset();return S_OK;
 });}
 HRESULT WindowsTextStore::OnEndEdit(ITfContext* context,TfEditCookie,ITfEditRecord* record) {return Safe([&]() -> HRESULT {
-	if(!context || !record) return E_INVALIDARG;if(!Healthy() || impl->foreign) return TF_E_DISCONNECTED;
+	if(!context || !record) return E_INVALIDARG;if(!Healthy() || impl->foreign || impl->compositionCallback) return TF_E_DISCONNECTED;
+	if(impl->collection && !impl->Activity()) return E_FAIL;
+	CounterScope callback(impl->nativeCallback);
 	Ref<IUnknown> identity;HRESULT hr=impl->Canonical(context,identity);if(FAILED(hr)) return hr;
 	if(!Healthy()) return TF_E_DISCONNECTED;
 	if(!impl->context || identity.p!=impl->context) return E_UNEXPECTED;
@@ -471,10 +573,10 @@ HRESULT WindowsTextStore::GetEmbedded(LONG,REFGUID,REFIID,IUnknown** out) {retur
 HRESULT WindowsTextStore::QueryInsertEmbedded(const GUID*,const FORMATETC*,BOOL* out) {return Safe([&]() -> HRESULT {if(!out)return E_INVALIDARG;HRESULT hr=impl->Gate();if(FAILED(hr))return hr;*out=FALSE;return S_OK;});}
 HRESULT WindowsTextStore::InsertEmbedded(DWORD,LONG,LONG,IDataObject*,TS_TEXTCHANGE*) {return Safe([&]() -> HRESULT {HRESULT hr=impl->Gate(true);return FAILED(hr)?hr:TS_E_FORMAT;});}
 HRESULT WindowsTextStore::InsertEmbeddedAtSelection(DWORD,IDataObject*,LONG*,LONG*,TS_TEXTCHANGE*) {return Safe([&]() -> HRESULT {HRESULT hr=impl->Gate(true);return FAILED(hr)?hr:TS_E_FORMAT;});}
-HRESULT WindowsTextStore::RequestSupportedAttrs(DWORD flags,ULONG count,const TS_ATTRID* attrs) {return Safe([&]() -> HRESULT {if((flags&~TS_ATTR_FIND_WANT_VALUE) || count>256 || (count && !attrs))return E_INVALIDARG;if(!Healthy() || impl->foreign)return E_UNEXPECTED;return S_OK;});}
+HRESULT WindowsTextStore::RequestSupportedAttrs(DWORD flags,ULONG count,const TS_ATTRID* attrs) {return Safe([&]() -> HRESULT {if((flags&~TS_ATTR_FIND_WANT_VALUE) || count>256 || (count && !attrs))return E_INVALIDARG;if(!Healthy() || impl->foreign || impl->compositionCallback)return E_UNEXPECTED;return S_OK;});}
 HRESULT WindowsTextStore::RequestAttrsAtPosition(LONG position,ULONG count,const TS_ATTRID* attrs,DWORD flags) {return Safe([&]() -> HRESULT {if((flags&~TS_ATTR_FIND_WANT_VALUE) || count>256 || (count && !attrs))return E_INVALIDARG;HRESULT hr=impl->Gate();if(FAILED(hr))return hr;return impl->Range(position,position);});}
 HRESULT WindowsTextStore::RequestAttrsTransitioningAtPosition(LONG position,ULONG count,const TS_ATTRID* attrs,DWORD flags) {return RequestAttrsAtPosition(position,count,attrs,flags);}
 HRESULT WindowsTextStore::FindNextAttrTransition(LONG first,LONG halt,ULONG count,const TS_ATTRID* attrs,DWORD flags,LONG* next,BOOL* found,LONG* offset) {return Safe([&]() -> HRESULT {if(!next || !found || !offset || (flags&~(TS_ATTR_FIND_BACKWARDS|TS_ATTR_FIND_WANT_OFFSET)) || count>256 || (count && !attrs))return E_INVALIDARG;HRESULT hr=impl->Gate();if(FAILED(hr))return hr;hr=impl->Range(std::min(first,halt),std::max(first,halt));if(FAILED(hr))return hr;*next=halt;*found=FALSE;*offset=0;return S_OK;});}
-HRESULT WindowsTextStore::RetrieveRequestedAttrs(ULONG count,TS_ATTRVAL* out,ULONG* fetched) {return Safe([&]() -> HRESULT {if(!fetched || (count && !out))return E_INVALIDARG;if(!Healthy() || impl->foreign)return E_UNEXPECTED;*fetched=0;return S_OK;});}
+HRESULT WindowsTextStore::RetrieveRequestedAttrs(ULONG count,TS_ATTRVAL* out,ULONG* fetched) {return Safe([&]() -> HRESULT {if(!fetched || (count && !out))return E_INVALIDARG;if(!Healthy() || impl->foreign || impl->compositionCallback)return E_UNEXPECTED;*fetched=0;return S_OK;});}
 } // namespace openq4::sys
 #endif

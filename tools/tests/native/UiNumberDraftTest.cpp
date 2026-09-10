@@ -15,7 +15,7 @@ struct Fixture {
 	DocumentModel model; Interaction input; std::string error;
 	std::map<std::string,ControlBounds> bounds;
 	std::map<std::string,ControlReadback> readbacks;
-	explicit Fixture(unsigned count=2, std::size_t maxBytes=64) {
+	explicit Fixture(unsigned count=2, std::uint32_t maxBytes=64) {
 		model.id="numbers"; model.root.id="root";
 		for (unsigned i=0;i<count;++i) {
 			const std::string id="n"+std::to_string(i);

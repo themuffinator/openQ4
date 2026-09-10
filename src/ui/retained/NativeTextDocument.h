@@ -67,11 +67,24 @@ struct NativeTextOffer {
 	std::uint64_t expectedEngineRevision = 0;
 	bool operator==(const NativeTextOffer&) const = default;
 };
+struct NativeTextPendingSnapshot {
+	NativeTextIdentity identity;
+	std::uint64_t engineRevision=0, acknowledgedSequence=0, acknowledgedShadowRevision=0;
+	std::uint64_t shadowRevision=0, dispatch=0, lastSequence=0;
+	std::uint32_t count=0;
+	bool operator==(const NativeTextPendingSnapshot&) const = default;
+};
+// A copied native callback observation, not a lock, lease or input authority.
+struct NativeTextMetadataObservation {
+	NativeTextIdentity identity;
+	std::uint64_t engineRevision=0, shadowRevision=0, transactionSequence=0, acknowledgedSequence=0, dispatch=0;
+	bool operator==(const NativeTextMetadataObservation&) const = default;
+};
 struct NativeTextLimits {
 	std::size_t documentBytes = 65536, pendingTransactions = 32;
 	std::size_t pendingBytes = 1024 * 1024, operations = 256, retainedCompositions = 32;
 	// A lower lifetime budget is useful to hosts and deterministic exhaustion tests.
-	std::uint64_t sequence = std::numeric_limits<std::uint64_t>::max();
+	std::uint64_t sequence = (std::numeric_limits<std::uint64_t>::max)();
 };
 
 // Pure shadow text store, not a COM adapter, event pump, native input provider or
@@ -121,6 +134,17 @@ public:
 	bool UpdateComposition(const NativeTextLockScope&, std::uint64_t token,
 		std::uint32_t first, std::uint32_t last, std::string& error);
 	bool EndComposition(const NativeTextLockScope&, std::uint64_t token, std::string& error);
+	// Separately observed composition callbacks outside actual text-store locks.
+	// Capture before querying foreign ranges; Publish rechecks the complete value.
+	// Only Begin/Update/End with empty text are allowed. End requires zero range.
+	// No text/selection or prior transaction is changed/reclassified. One success
+	// appends one metadata-only offer using the ordinary queue/ACK/shadow order.
+	// Both outputs remain unchanged on refusal; caller provides native dispatch
+	// provenance separately. No callback, lock serial or OnLockGranted is invented.
+	bool CaptureCompositionObservation(NativeTextIdentity, std::uint64_t externallyObservedDispatch,
+		NativeTextMetadataObservation& out, std::string& error) const;
+	bool PublishCompositionObservation(const NativeTextMetadataObservation&, const NativeTextOperation&,
+		std::uint64_t& published, std::string& error);
 
 	// A bad write poisons only this candidate. Matching Finish refuses, unlocks
 	// deterministically and leaves published state intact; Abort also unlocks.
@@ -133,6 +157,15 @@ public:
 	// Only FIFO front is offered. Its payload is immutable; the separate expected
 	// engine revision is bound when it becomes front, after the preceding ACK.
 	bool PeekOffer(NativeTextIdentity, NativeTextOffer& out, std::string& error) const;
+	// Read-only queue watermark; returns copied values, never offers or authority.
+	// Caller supplies a separately verified held dispatch/fence and the editor's
+	// exact ACKed sequence/shadow/revision. A copied immutable Peek is harmless;
+	// an applied-but-unacknowledged offer no longer matches that editor barrier.
+	// Empty queues still require exact identity/revisions and nonzero dispatch,
+	// but do not prove this document participated in the supplied dispatch.
+	bool QueryPendingCollection(NativeTextIdentity, std::uint64_t expectedEngineRevision,
+		std::uint64_t expectedAcknowledgedSequence, std::uint64_t expectedAcknowledgedShadowRevision,
+		std::uint64_t externallyObservedDispatch, NativeTextPendingSnapshot& out, std::string& error) const;
 	bool Acknowledge(NativeTextIdentity, std::uint64_t transaction, std::uint64_t shadowAfter,
 		std::uint64_t expectedEngineRevision, std::uint64_t acceptedEngineRevision, std::string& error);
 	// Rejection retires the original document and drops every dependent offer.
@@ -142,6 +175,9 @@ public:
 		std::uint64_t expectedShadowRevision, std::uint64_t newEngineRevision,
 		std::string_view text, std::size_t anchor, std::size_t caret, std::string& error);
 	bool Retire(NativeTextIdentity, std::string& error);
+	// Exact retirement for failure/teardown paths. No diagnostic construction or
+	// allocation, including with MSVC debug iterator proxies enabled.
+	bool Retire(NativeTextIdentity) noexcept;
 private:
 	struct Impl;
 	std::unique_ptr<Impl> impl;

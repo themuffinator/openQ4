@@ -2,6 +2,11 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- SYSTEM precision work removes stray decimal digits from generated slider
+  values and preserves small numeric settings through Apply. Custom values keep
+  their precision. Native text composition, recovery and platform qualification
+  remain in development.
+
 - The opt-in SYSTEM page pairs Brightness and Ambient Brightness sliders with
   precise numeric fields. Unfinished edits are preserved when leaving a field;
   Apply and exit require an explicit commit or discard. Native character entry

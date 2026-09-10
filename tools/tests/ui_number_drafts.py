@@ -19,6 +19,7 @@ def runtime_unit():
     return fixture+'''\nstruct GuardImpl {
       bool canonical=true,document=true,pointerNavigation=true,valid=true;
       Interaction interaction; std::map<std::string,ControlReadback> readbacks;std::map<std::string,ControlBounds> bounds;
+      explicit GuardImpl(Interaction&& owned):interaction(std::move(owned)){}
       std::string stateError;unsigned reads=0,updates=0,reveals=0,feedback=0,focusLayouts=0;
       bool layoutValid=true;
       void ReadStateSources(){++reads;if(!valid){stateError="bad host value";return;}stateError.clear();interaction.SetReadbacks(readbacks,stateError);}
@@ -33,7 +34,7 @@ def runtime_unit():
     };
     '''+methods+'''
     int main(){
-      Fixture f;f.Begin();f.Text("-");f.input.Cancel();GuardImpl impl;impl.interaction=f.input;impl.readbacks=f.readbacks;impl.bounds=f.bounds;Runtime runtime{&impl};
+      Fixture f;f.Begin();f.Text("-");f.input.Cancel();GuardImpl impl{std::move(f.input)};impl.readbacks=f.readbacks;impl.bounds=f.bounds;Runtime runtime{&impl};
       NumberDraftSummary result;std::string error;
       Check(runtime.QueryNumberDrafts(result,error,1)&&result.blocking.size()==1&&impl.reads==1&&impl.updates==1,"query observes host before inventory");
       const auto before=result;impl.valid=false;
@@ -59,7 +60,7 @@ def main():
     temp=Path(tempfile.mkdtemp(prefix='number-drafts-',dir=ROOT/'.tmp'))
     env={**os.environ,'TEMP':str(temp),'TMP':str(temp),'TMPDIR':str(temp)}
     digest=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
-    paths=[CORE/n for n in ('Interaction.h','Interaction.cpp','Runtime.h','Runtime.cpp','Document.h','Document.cpp','TextInput.h','TextInput.cpp','TextEdit.h','TextEdit.cpp','TextEditCommand.h')]+[ROOT/'tools/tests/native/UiNumberDraftTest.cpp',Path(__file__)]
+    paths=[CORE/n for n in ('Interaction.h','Interaction.cpp','Runtime.h','Runtime.cpp','Document.h','Document.cpp','TextInput.h','TextInput.cpp','TextEdit.h','TextEdit.cpp','TextEditCommand.h','NativeTextDocument.h','NativeTextDocument.cpp','NativeTextEditor.h','NativeTextEditor.cpp')]+[ROOT/'tools/tests/native/UiNumberDraftTest.cpp',Path(__file__)]
     sources={p.relative_to(ROOT).as_posix():digest(p) for p in paths}
     doc=(CORE/'Document.cpp').read_text(encoding='utf-8');valid=temp/'valid.cpp'
     valid.write_text('#include "Interaction.h"\n#include <cmath>\nnamespace openq4::ui {\n'+function_body(doc,'bool Utf8(')+function_body(doc,'bool ValidStateValue(')+'}\n',encoding='utf-8',newline='\n')
@@ -68,7 +69,7 @@ def main():
     mutations=[
       ('inactive-ignored','if (!item.number) continue;','if (!item.number || item.number->detached) continue;'),
       ('discard-stale-accepted','if (expected != current.barrier) { error = "Number draft barrier is stale"; return false; }','if (false) { error = "Number draft barrier is stale"; return false; }'),
-      ('pending-not-blocking','if (!dirty && !editor.conflict && !item.pending && !composing) continue;','if (item.pending || (!dirty && !editor.conflict && !composing)) continue;'),
+      ('pending-not-blocking','if (!dirty && !editor.conflict && !item.pending && !composing && !nativeUnsettled) continue;','if (item.pending || (!dirty && !editor.conflict && !composing && !nativeUnsettled)) continue;'),
       ('readback-stamp-not-updated','if (changed && item.number) item.number->draftRevision = revisions.at(id);','if (false) item.number->draftRevision = revisions.at(id);'),
       ('proposal-stamp-not-updated','if (item.number) item.number->draftRevision = token;','if (false) item.number->draftRevision = token;'),
       ('detach-stamp-not-updated','item.number->draftRevision = ProposalToken();','item.number->draftRevision = item.number->draftRevision;'),
@@ -82,7 +83,7 @@ def main():
     try:
       for name,body,core,mutant in cases:
         source=temp/(name+'.cpp');source.write_text(body,encoding='utf-8',newline='\n');part=temp/(name+'-interaction.cpp');part.write_text(core,encoding='utf-8',newline='\n');binary=temp/(name+('.exe' if os.name=='nt' else '-test'))
-        command=[compiler,'-std=c++20','-I',str(ROOT),'-I',str(CORE),str(source),str(part),str(valid),str(CORE/'TextInput.cpp'),str(CORE/'TextEdit.cpp'),'-o',str(binary)]
+        command=[compiler,'-std=c++20','-I',str(ROOT),'-I',str(CORE),str(source),str(part),str(valid),str(CORE/'TextInput.cpp'),str(CORE/'TextEdit.cpp'),str(CORE/'NativeTextDocument.cpp'),str(CORE/'NativeTextEditor.cpp'),'-o',str(binary)]
         if os.name!='nt':command[1:1]=['-fsanitize=address,undefined','-fno-omit-frame-pointer']
         built=subprocess.run(command,env=env,capture_output=True,text=True,timeout=120);log=temp/(name+'-compile.log');log.write_text(built.stdout+built.stderr,encoding='utf-8')
         entry={'name':name,'compile_exit':built.returncode,'compile_log':str(log),'compile_log_sha256':digest(log),'command':command,'source_sha256':digest(source),'interaction_sha256':digest(part)};report['cases'].append(entry)

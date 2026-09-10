@@ -18,6 +18,9 @@ ROOT = Path(__file__).resolve().parents[2]
 SUPPORT = r'''
 #include <algorithm>
 #include <cassert>
+#include <bit>
+#include <charconv>
+#include <cstdint>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -103,7 +106,7 @@ static void RefreshNativeWindowHandles(renderModuleWindowInfo_t*) {
 static bool QueryWindowState(renderWindowState_t* output) {
     ++windowQueries;if(!haveQuery)return false;*output={};output->displayId=currentDisplay;return true;
 }
-static const renderWindowServices_t* Sys_GetRenderWindowServices() {
+const renderWindowServices_t* Sys_GetRenderWindowServices() {
     static renderWindowServices_t services={};
     services.RefreshNativeWindowHandles=RefreshNativeWindowHandles;
     services.QueryWindowState=haveQueryCallback?QueryWindowState:nullptr;

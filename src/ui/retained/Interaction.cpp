@@ -2,9 +2,11 @@
 #include "Interaction.h"
 #include <algorithm>
 #include <atomic>
+#include <charconv>
 #include <cmath>
 #include <limits>
 #include <stdexcept>
+#include <type_traits>
 
 namespace openq4::ui {
 namespace {
@@ -22,12 +24,117 @@ bool ValidNumber(const Control& control) {
 	return spec && control.value && control.value->type == 0 && std::isfinite(spec->minimum) &&
 		std::isfinite(spec->maximum) && spec->minimum <= spec->maximum && spec->maxBytes > 0 && spec->maxBytes <= TextInputMaxBytes;
 }
+// JSON numeric authoring expresses a decimal lattice. Floating multiply/add
+// can land one ULP beside that lattice (3 * .025 -> .07500000000000001).
+// Recover its scale from the shortest authored values, not display decimals,
+// then canonicalize only generated ticks. Custom readbacks and Number edits
+// never pass through this path. At most 324 fractional digits are required.
+int SliderDecimalPlaces(double value) {
+	char text[64]; const auto formatted=std::to_chars(text,text+sizeof(text),value);
+	if (formatted.ec!=std::errc{}) return 0;
+	const auto end=formatted.ptr; const auto exponent=std::find(text,end,'e');
+	int power=0;
+	if (exponent!=end) {
+		const char* first=exponent+1; if (first!=end && *first=='+') ++first;
+		const auto parsed=std::from_chars(first,static_cast<const char*>(end),power);
+		if (parsed.ec!=std::errc{} || parsed.ptr!=end) return 0;
+	}
+	const auto point=std::find(text,exponent,'.');
+	return std::max(0,static_cast<int>(point==exponent ? 0 : exponent-point-1)-power);
+}
+double SliderTickValue(const SliderSpec& spec,long double tick) {
+	if (tick<=0) return spec.minimum;
+	const double value=std::clamp(static_cast<double>(spec.minimum+tick*spec.step),spec.minimum,spec.maximum);
+	if (value==spec.minimum || value==spec.maximum) return value;
+	char text[768]; const int places=std::max(SliderDecimalPlaces(spec.minimum),SliderDecimalPlaces(spec.step));
+	const auto formatted=std::to_chars(text,text+sizeof(text),value,std::chars_format::fixed,places);
+	if (formatted.ec!=std::errc{}) return value;
+	double canonical=0;
+	const auto parsed=std::from_chars(text,formatted.ptr,canonical,std::chars_format::fixed);
+	if (parsed.ec!=std::errc{} || parsed.ptr!=formatted.ptr || !std::isfinite(canonical)) return value;
+	return std::clamp(canonical,spec.minimum,spec.maximum);
+}
 TextNumberPolicy NumberPolicy(const Control& control) {
 	const auto& spec = std::get<NumberSpec>(control.widget);
 	return {spec.minimum,spec.maximum,spec.exponent};
 }
+bool NativeUnsettled(const NativeTextEditorView& view) {
+	return view.barrier.collectionOpen || view.barrier.group || view.awaitingSettlement || !view.presentation.compositions.empty();
+}
+}
+// Keep copy preparation separate from native authority. All plain semantic
+// fields are copied; the mutable reconciler is moved only by checked adoption
+// or an actual move construction. Native views themselves are immutable.
+#define OQ4_INTERACTION_FIELDS(X) \
+	X(document) X(focused) X(hovered) X(armed) X(pointerHeld) X(acceptHeld) X(backHeld) X(pointerArm) X(overflowed) \
+	X(items) X(order) X(parents) X(modals) X(authoredModals) X(modalToken) X(numberEpoch) X(modalBlocked) X(focusPending) \
+	X(pendingFocus) X(heldNavigation) X(blockedNavigation) X(feedback) X(actions) X(dragging) X(popup) X(highlight) \
+	X(pointerOption) X(armedOption) X(pointerFraction) X(dragPreview) X(popupAcceptArm) X(nativeControl)
+Interaction::Interaction() : authority(ProposalToken()) {}
+Interaction::~Interaction() = default;
+Interaction::Interaction(const Interaction& other) : authority(other.authority), candidate(true) {
+#define COPY(field) field = other.field;
+	OQ4_INTERACTION_FIELDS(COPY)
+#undef COPY
+	std::string error;
+	NumberDraftSummary summary;
+	if (other.numberEpoch && !other.QueryNumberDrafts(summary,error)) throw std::runtime_error(error);
+	parentDrafts = std::move(summary.barrier);
+	if (!other.nativeControl.empty()) {
+		const auto& item = other.items.at(other.nativeControl);
+		if (item.number && item.number->native) parentNative = item.number->native->barrier;
+	}
+	originDrafts = other.candidate ? other.originDrafts : parentDrafts;
+	originNative = other.candidate ? other.originNative : parentNative;
+}
+void Interaction::MoveFields(Interaction& other) noexcept {
+#define MOVE(field) static_assert(std::is_nothrow_move_assignable_v<decltype(field)>); field = std::move(other.field);
+	OQ4_INTERACTION_FIELDS(MOVE)
+#undef MOVE
+	nativeModel = std::move(other.nativeModel);
+}
+#undef OQ4_INTERACTION_FIELDS
+Interaction::Interaction(Interaction&& other) noexcept : authority(other.authority), candidate(other.candidate),
+	originDrafts(std::move(other.originDrafts)), originNative(std::move(other.originNative)),
+	parentDrafts(std::move(other.parentDrafts)), parentNative(std::move(other.parentNative)) {
+	MoveFields(other); other.authority = 0; other.candidate = true;
+}
+bool Interaction::CanAdopt(const Interaction& prepared, std::string& error) const {
+	error.clear();
+	if (this == &prepared || !authority || prepared.authority != authority || !prepared.candidate) {
+		error = "Interaction candidate has no matching live origin"; return false;
+	}
+	NumberDraftSummary current;
+	if (numberEpoch && !QueryNumberDrafts(current,error)) return false;
+	std::optional<NativeTextEditorBarrier> native;
+	if (!nativeControl.empty()) {
+		const auto& item = items.at(nativeControl);
+		if (item.number && item.number->native) native = item.number->native->barrier;
+	}
+	const auto& expectedDrafts = candidate ? prepared.parentDrafts : prepared.originDrafts;
+	const auto& expectedNative = candidate ? prepared.parentNative : prepared.originNative;
+	if (current.barrier != expectedDrafts || native != expectedNative ||
+		(candidate && (originDrafts != prepared.originDrafts || originNative != prepared.originNative))) {
+		error = "Interaction candidate predates the current draft or native collection"; return false;
+	}
+	return true;
+}
+bool Interaction::Adopt(Interaction&& prepared, std::string& error) {
+	if (!CanAdopt(prepared,error)) return false;
+	// Work only on the candidate until every retirement revision is available.
+	// Generic state publication never transfers a native lease from a copy.
+	for (auto& [id,item] : prepared.items) if (item.number && item.number->native) {
+		(void)id;
+		const auto revision = ProposalToken();
+		if (!revision) { error = "Number native retirement identity exhausted"; return false; }
+		item.number->native.reset(); item.number->draftRevision = revision;
+		if (!item.number->detached) item.number->identity.revision = revision;
+	}
+	prepared.nativeControl.clear(); prepared.nativeModel.reset();
+	MoveFields(prepared); prepared.authority = 0; return true;
 }
 void Interaction::Reset(const DocumentModel& model) {
+	nativeModel.reset(); nativeControl.clear();
 	document = model.id; focused.clear(); hovered.clear(); armed.clear();
 	CancelGesture(); pointerOption.clear(); pointerFraction.reset();
 	items.clear(); order.clear(); parents.clear(); modals.clear(); feedback.clear(); actions.clear(); overflowed = false;
@@ -75,6 +182,7 @@ bool Interaction::SetReadbacks(const std::map<std::string,ControlReadback>& read
 		const bool changed = !item.readback || item.readback->value != value.value;
 		item.readback = value;
 		if (changed && item.number) item.number->draftRevision = revisions.at(id);
+		if (changed && item.number && item.number->native) DropNumberNative(id,item);
 		if (changed && item.number && (!item.pending || *item.pending != value.value)) {
 			item.pending.reset(); item.proposalToken = 0; item.rejected.reset();
 			std::erase_if(actions,[&](const ControlAction& action) { return action.node == id && action.editSession != 0; });
@@ -160,6 +268,13 @@ std::optional<WidgetViewState> Interaction::Widget(const std::string& id) const 
 		number.dirty = number.state.text != editor.baselineText || number.composition.has_value();
 		number.conflict = editor.conflict; number.canUndo = editor.buffer.CanUndo(); number.canRedo = editor.buffer.CanRedo();
 		number.active = !editor.detached; number.notice = editor.notice;
+		if (editor.native) {
+			number.nativePresentation = editor.native->presentation;
+			number.nativeUnsettled = NativeUnsettled(*editor.native);
+			number.status = ParseTextNumber(number.nativePresentation->text,NumberPolicy(item.control),parsed);
+			number.dirty = number.dirty || number.nativePresentation->text != editor.baselineText;
+			number.canUndo = number.canRedo = false;
+		}
 		view.number = std::move(number);
 	}
 	return view;
@@ -178,6 +293,7 @@ bool Interaction::RebaseNumber(Item& item, std::string& error) {
 		editor.identity = {ProposalToken(),ProposalToken()};
 		if (!editor.identity.session || !editor.identity.revision) { error = "Number edit identity exhausted"; return false; }
 	}
+	if (item.number && item.number->native) DropNumberNative(item.number->native->barrier.editor.control,item);
 	item.number = std::move(editor); return true;
 }
 bool Interaction::BeginNumberEdit(const std::string& id, std::string& error) {
@@ -232,7 +348,207 @@ Interaction::Item* Interaction::EditableNumber(const std::string& id, NumberEdit
 		found->second.number->conflict || found->second.pending) {
 		error = "Number edit identity is stale or unavailable"; return nullptr;
 	}
+	if (found->second.number->native) { error = "Retire the native Number binding before local editing"; return nullptr; }
 	return &found->second;
+}
+bool Interaction::AttachNumberNative(const std::string& id, NumberEditIdentity expected,
+	const TextEditorIdentity& owner, NativeTextIdentity native, NativeTextEditorBarrier& out, std::string& error) {
+	if (candidate || !authority || nativeModel) { error = "Native Number attachment requires an unbound live Interaction"; return false; }
+	auto* item = EditableNumber(id,expected,error); if (!item) return false;
+	if (item->number->buffer.Composition() || owner.control != id || owner.session != expected.session ||
+		owner.revision != expected.revision || owner.modal != modalToken) {
+		error = "Native Number attachment does not match the complete active editor"; return false;
+	}
+	auto model = std::make_unique<NativeTextEditor>();
+	if (!model->Open(native,owner,item->number->buffer,error)) return false;
+	auto view = std::make_shared<const NativeTextEditorView>(model->View());
+	NativeTextEditorBarrier receipt = view->barrier;
+	std::string control = id;
+	const auto revision = ProposalToken();
+	if (!revision) { error = "Number native attachment identity exhausted"; return false; }
+	item->number->native = std::move(view); item->number->draftRevision = revision;
+	nativeControl = std::move(control); nativeModel = std::move(model);
+	out = std::move(receipt); error.clear(); return true;
+}
+bool Interaction::IsNumberNativeCurrent(const NativeTextEditorBarrier& expected) const noexcept {
+	const auto found = items.find(expected.editor.control);
+	if (candidate || !authority || !nativeModel || nativeControl != expected.editor.control ||
+		found == items.end() || !found->second.number || !found->second.number->native ||
+		!nativeModel->Active() || found->second.number->native->barrier != expected ||
+		found->second.number->identity != NumberEditIdentity{expected.editor.session,expected.editor.revision} ||
+		found->second.number->detached || found->second.number->conflict || found->second.pending ||
+		focused != nativeControl || focusPending || modalBlocked || !found->second.control.enabled ||
+		!found->second.bounds.visible || !found->second.readback || expected.editor.modal != modalToken) return false;
+	if (modals.empty()) return true;
+	for (const std::string* current = &nativeControl; !current->empty();) {
+		if (*current == modals.back().root) return true;
+		const auto parent = parents.find(*current);
+		if (parent == parents.end()) break;
+		current = &parent->second;
+	}
+	return false;
+}
+Interaction::Item* Interaction::NativeNumber(const NativeTextEditorBarrier& expected, std::string& error) {
+	error.clear();
+	if (!IsNumberNativeCurrent(expected)) {
+		error = "Native Number authority, editor or collection barrier is stale"; return nullptr;
+	}
+	return &items.find(expected.editor.control)->second;
+}
+bool Interaction::QueryNumberNative(const std::string& id, const TextEditorIdentity& expected,
+	NativeTextEditorView& out, std::string& error) const {
+	error.clear(); const auto found = items.find(id);
+	if (candidate || !nativeModel || nativeControl != id || id != expected.control ||
+		found == items.end() || !found->second.number || !found->second.number->native ||
+		found->second.number->native->barrier.editor != expected ||
+		found->second.number->identity != NumberEditIdentity{expected.session,expected.revision} ||
+		found->second.number->detached || found->second.number->conflict || found->second.pending ||
+		focused != id || focusPending || !Eligible(id) || expected.modal != modalToken ||
+		nativeModel->Barrier() != found->second.number->native->barrier) {
+		error = "Native Number query has no matching live editor"; return false;
+	}
+	NativeTextEditorView result = *found->second.number->native;
+	out = std::move(result); return true;
+}
+bool Interaction::PublishNumberNative(const NativeTextEditorBarrier& expected,
+	std::unique_ptr<NativeTextEditor> prepared, std::shared_ptr<const NativeTextEditorView> view,
+	NumberEditor&& editor, std::string& error) {
+	auto* item = NativeNumber(expected,error); if (!item) return false;
+	if (!prepared || !view || prepared->Barrier() != view->barrier ||
+		editor.identity != NumberEditIdentity{view->barrier.editor.session,view->barrier.editor.revision} ||
+		!nativeModel->Swap(expected,*prepared)) {
+		error = "Native Number candidate does not originate at this exact publication"; return false;
+	}
+	static_assert(std::is_nothrow_move_assignable_v<NumberEditor>);
+	item->number = std::move(editor);
+	if (!view->active) { nativeModel.reset(); nativeControl.clear(); }
+	return true;
+}
+bool Interaction::NativeCollection(bool begin, const NativeTextEditorBarrier& expected,
+	const NativeTextCollection& collection, NativeTextEditorBarrier& out, std::string& error) {
+	auto* item = NativeNumber(expected,error); if (!item) return false;
+	auto prepared = nativeModel->Clone(); NativeTextEditorBarrier receipt;
+	if (!(begin ? prepared->BeginCollection(expected,collection,receipt,error) :
+		prepared->CompleteCollection(expected,collection,receipt,error))) return false;
+	auto view = std::make_shared<const NativeTextEditorView>(prepared->View());
+	NumberEditor editor = *item->number; editor.native = view;
+	const auto revision = ProposalToken();
+	if (!revision) { error = "Number native collection identity exhausted"; return false; }
+	// Protocol changes invalidate draft/candidate guards without manufacturing
+	// native acknowledgement or changing the current engine editing revision.
+	editor.draftRevision = revision;
+	if (!PublishNumberNative(expected,std::move(prepared),std::move(view),std::move(editor),error)) return false;
+	out = std::move(receipt); error.clear(); return true;
+}
+bool Interaction::BeginNumberNativeCollection(const NativeTextEditorBarrier& expected,
+	const NativeTextCollection& collection, NativeTextEditorBarrier& out, std::string& error) {
+	return NativeCollection(true,expected,collection,out,error);
+}
+bool Interaction::CompleteNumberNativeCollection(const NativeTextEditorBarrier& expected,
+	const NativeTextCollection& collection, NativeTextEditorBarrier& out, std::string& error) {
+	return NativeCollection(false,expected,collection,out,error);
+}
+bool Interaction::ApplyNumberNative(const NativeTextEditorBarrier& expected, const NativeTextOffer& offer,
+	NativeTextEditorReceipt& out, std::string& error) {
+	auto* item = NativeNumber(expected,error); if (!item) return false;
+	if (!expected.collectionOpen) { error = "Native Number offer requires a verified open collection"; return false; }
+	const auto revision = ProposalToken();
+	if (!revision) { error = "Number native revision exhausted"; return false; }
+	auto prepared = nativeModel->Clone(); NativeTextEditorReceipt receipt;
+	if (!prepared->Apply(offer,expected.editor,revision,receipt,error)) return false;
+	auto view = std::make_shared<const NativeTextEditorView>(prepared->View());
+	NumberEditor editor = *item->number;
+	// Collection Apply changes only native presentation; stable local history is
+	// deliberately untouched until explicit complete-collection settlement.
+	editor.native = view; editor.identity.revision = editor.draftRevision = revision;
+	editor.notice = NumberEditNotice::None;
+	if (!PublishNumberNative(expected,std::move(prepared),std::move(view),std::move(editor),error)) return false;
+	out = std::move(receipt); error.clear(); return true;
+}
+bool Interaction::NativeCompletion(bool retire, const NativeTextEditorBarrier& expected,
+	NativeTextEditorReceipt& out, std::string& error) {
+	auto* item = NativeNumber(expected,error); if (!item) return false;
+	const auto revision = ProposalToken();
+	if (!revision) { error = "Number native completion identity exhausted"; return false; }
+	auto prepared = nativeModel->Clone(); NativeTextEditorReceipt receipt;
+	if (!(retire ? prepared->Retire(expected,revision,receipt,error) : prepared->SettleComposition(expected,revision,receipt,error))) return false;
+	auto view = std::make_shared<const NativeTextEditorView>(prepared->View());
+	NumberEditor editor = *item->number;
+	if (!retire && !editor.buffer.RestoreHistory(view->draft,view->history,view->policy,error)) return false;
+	editor.native = retire ? nullptr : view;
+	editor.identity.revision = editor.draftRevision = revision; editor.notice = NumberEditNotice::None;
+	if (!PublishNumberNative(expected,std::move(prepared),std::move(view),std::move(editor),error)) return false;
+	out = std::move(receipt); error.clear(); return true;
+}
+bool Interaction::SettleNumberNative(const NativeTextEditorBarrier& expected, NativeTextEditorReceipt& out, std::string& error) {
+	return NativeCompletion(false,expected,out,error);
+}
+struct Interaction::NativeSettlement::Impl {
+	std::uint64_t authority = 0;
+	std::shared_ptr<const NativeTextEditorView> origin;
+	std::shared_ptr<const NativeTextEditorView> view;
+	std::unique_ptr<NativeTextEditor> model;
+	NumberEditor editor;
+	NativeTextEditorReceipt receipt;
+	NativeTextEditorReceipt outputReceipt;
+};
+Interaction::NativeSettlement::NativeSettlement() : impl(std::make_unique<Impl>()) {}
+Interaction::NativeSettlement::~NativeSettlement() = default;
+const NativeTextEditorReceipt& Interaction::NativeSettlement::Receipt() const { return impl->receipt; }
+const NativeTextSnapshot& Interaction::NativeSettlement::Presentation() const { return impl->view->presentation; }
+std::unique_ptr<Interaction::NativeSettlement> Interaction::PrepareNumberNativeSettlement(
+	const NativeTextEditorBarrier& expected, std::string& error) {
+	auto* item = NativeNumber(expected,error); if (!item) return {};
+	auto staged = std::unique_ptr<NativeSettlement>(new NativeSettlement());
+	auto& data = *staged->impl;
+	data.authority = authority; data.origin = item->number->native;
+	const auto revision = ProposalToken();
+	if (!revision) { error = "Number native settlement identity exhausted"; return {}; }
+	data.model = nativeModel->Clone();
+	if (!data.model->SettleComposition(expected,revision,data.receipt,error)) return {};
+	auto view = std::make_shared<const NativeTextEditorView>(data.model->View());
+	data.view = view; data.outputReceipt = data.receipt;
+	data.editor = *item->number;
+	if (!data.editor.buffer.RestoreHistory(view->draft,view->history,view->policy,error)) return {};
+	data.editor.native = std::move(view);
+	data.editor.identity.revision = data.editor.draftRevision = revision;
+	data.editor.notice = NumberEditNotice::None;
+	error.clear(); return staged;
+}
+bool Interaction::PublishNumberNativeSettlement(NativeSettlement& staged, NativeTextEditorReceipt& out) noexcept {
+	auto& data = *staged.impl;
+	const auto& before = data.receipt.before;
+	const auto found = items.find(before.editor.control);
+	if (!IsNumberNativeCurrent(before) || authority != data.authority || !data.model ||
+		found->second.number->native != data.origin ||
+		!nativeModel->Swap(before,*data.model)) return false;
+	static_assert(std::is_nothrow_move_assignable_v<NumberEditor>);
+	static_assert(std::is_nothrow_move_assignable_v<NativeTextEditorReceipt>);
+	found->second.number = std::move(data.editor);
+	out = std::move(data.outputReceipt); data.authority = 0; data.model.reset(); return true;
+}
+bool Interaction::RetireNumberNative(const NativeTextEditorBarrier& expected, NativeTextEditorReceipt& out, std::string& error) {
+	return NativeCompletion(true,expected,out,error);
+}
+bool Interaction::RetireNumberNativeExact(NativeTextIdentity native, const TextEditorIdentity& owner) noexcept {
+	const auto found = items.find(owner.control);
+	if (candidate || !authority || !nativeModel || nativeControl != owner.control || found == items.end() ||
+		!found->second.number || !found->second.number->native) return false;
+	const auto& before = found->second.number->native->barrier;
+	const auto& current = before.editor;
+	if (before.native != native || current.allocation != owner.allocation || current.backend != owner.backend ||
+		current.document != owner.document || current.modal != owner.modal || current.window != owner.window ||
+		current.session != owner.session || current.control != owner.control) return false;
+	DropNumberNative(owner.control,found->second);
+	auto& editor = *found->second.number;
+	editor.identity.revision = editor.draftRevision = ProposalToken();
+	if (!editor.identity.revision) editor.detached = true;
+	return true;
+}
+void Interaction::DropNumberNative(const std::string& id, Item& item) {
+	const bool owns = nativeControl == id; // id may refer to the immutable view.
+	if (item.number) item.number->native.reset();
+	if (owns) { nativeModel.reset(); nativeControl.clear(); }
 }
 bool Interaction::ChangeNumber(const std::string& id, NumberEditIdentity expected,
 	const std::function<bool(TextEditBuffer&,std::string&)>& change, std::string& error) {
@@ -302,6 +618,14 @@ bool Interaction::CommitNumberEdit(const std::string& id, NumberEditIdentity exp
 }
 void Interaction::RetireNumber(const std::string& id, Item& item) {
 	if (item.control.role != ControlRole::Number) return;
+	if (item.number && item.number->native) {
+		// The first cancel abandons transient native presentation, preserving the
+		// stable local edit. A later explicit local cancel may discard that draft.
+		const auto revision = ProposalToken();
+		DropNumberNative(id,item); item.number->draftRevision = revision;
+		if (!item.number->detached) item.number->identity.revision = revision;
+		return;
+	}
 	// Inventory epochs prevent an empty -> editor -> empty ABA from authorizing
 	// a previously captured discard. Exhaustion fails all future guard queries.
 	if (item.number) numberEpoch = ProposalToken();
@@ -310,6 +634,7 @@ void Interaction::RetireNumber(const std::string& id, Item& item) {
 }
 void Interaction::DetachNumber(const std::string& id, Item& item) {
 	if (!item.number) return;
+	DropNumberNative(id,item);
 	if (!item.number->detached || item.number->buffer.Composition() || item.pending || item.proposalToken)
 		item.number->draftRevision = ProposalToken();
 	item.number->buffer.CancelComposition(); item.number->identity = {}; item.number->detached = true;
@@ -335,12 +660,14 @@ bool Interaction::QueryNumberDrafts(NumberDraftSummary& out, std::string& error)
 			error = "Number draft barrier exceeds its identity or count budget"; return false;
 		}
 		candidate.barrier.editors.push_back({id,editor.draftLifetime,editor.draftRevision});
-		const bool composing = editor.buffer.Composition().has_value();
-		const bool dirty = editor.buffer.State().text != editor.baselineText || composing;
-		if (!dirty && !editor.conflict && !item.pending && !composing) continue;
+		const bool nativeUnsettled = editor.native && NativeUnsettled(*editor.native);
+		const bool composing = editor.buffer.Composition().has_value() || (editor.native && !editor.native->presentation.compositions.empty());
+		const auto& text = editor.native ? editor.native->presentation.text : editor.buffer.State().text;
+		const bool dirty = editor.buffer.State().text != editor.baselineText || text != editor.baselineText || composing;
+		if (!dirty && !editor.conflict && !item.pending && !composing && !nativeUnsettled) continue;
 		double value = 0;
-		candidate.blocking.push_back({id,ParseTextNumber(editor.buffer.State().text,NumberPolicy(item.control),value),
-			dirty,editor.conflict,item.pending.has_value(),composing,!editor.detached,false});
+		candidate.blocking.push_back({id,ParseTextNumber(text,NumberPolicy(item.control),value),
+			dirty,editor.conflict,item.pending.has_value(),composing,!editor.detached,nativeUnsettled});
 	}
 	out = std::move(candidate); return true;
 }
@@ -355,6 +682,7 @@ bool Interaction::DiscardNumberDrafts(const NumberDraftBarrier& expected, std::s
 	for (auto& [id,item] : items) if (item.number) {
 		item.number.reset(); item.pending.reset(); item.rejected.reset(); item.proposalToken = 0;
 	}
+	nativeModel.reset(); nativeControl.clear();
 	std::erase_if(actions,[](const ControlAction& action) { return action.editSession != 0; });
 	numberEpoch = epoch; return true;
 }
@@ -365,18 +693,22 @@ bool Interaction::FocusNumberDraft(const NumberDraftBarrier& expected, const std
 	if (std::none_of(current.blocking.begin(),current.blocking.end(),[&](const NumberDraftStatus& status) { return status.control == control; })) {
 		error = "Number control has no blocking local draft"; return false;
 	}
+	if (items.at(control).number && items.at(control).number->native) {
+		if (focused == control && !focusPending && Eligible(control)) return true;
+		error = "Retire the native Number binding before changing its focus"; return false;
+	}
 	// Focus can detach another editor. Stage the entire semantic change so a
 	// disabled/modal-ineligible/pending target or identity failure changes none.
 	Interaction candidate = *this;
 	if (!candidate.Focus(control)) { error = "Number draft is not eligible for focus"; return false; }
 	if (!candidate.BeginNumberEdit(control,error)) return false;
-	*this = std::move(candidate); return true;
+	return Adopt(std::move(candidate),error);
 }
 double Interaction::SliderValue(const SliderSpec& spec, double fraction) const {
 	fraction = std::clamp(fraction,0.0,1.0);
 	if (fraction == 1) return spec.maximum;
 	const long double ticks = std::round(static_cast<long double>(fraction)*(spec.maximum-spec.minimum)/spec.step);
-	return std::clamp(static_cast<double>(spec.minimum+ticks*spec.step),spec.minimum,spec.maximum);
+	return SliderTickValue(spec,ticks);
 }
 void Interaction::SliderKey(MenuInput input) {
 	auto& item = items.at(focused); const auto& spec = std::get<SliderSpec>(item.control.widget);
@@ -387,13 +719,14 @@ void Interaction::SliderKey(MenuInput input) {
 	else {
 		const bool increase = input == MenuInput::Right || input == MenuInput::Up || input == MenuInput::PageUp;
 		const auto ticks = (static_cast<long double>(value)-spec.minimum)/spec.step;
-		// A tiny tick tolerance removes round-trip error at an authored tick;
+		// Recognize the canonical tick even when subtracting a large minimum
+		// loses relative precision. Keep the existing tiny round-trip tolerance;
 		// off-grid/custom values move to the next tick in the requested direction.
 		const auto near = std::round(ticks);
-		const auto anchored = std::abs(ticks-near) <= 1e-9L ? near : ticks;
+		const auto anchored = value == SliderTickValue(spec,near) || std::abs(ticks-near) <= 1e-9L ? near : ticks;
 		const int count = input == MenuInput::PageUp || input == MenuInput::PageDown ? 10 : 1;
 		const auto next = increase ? std::floor(anchored)+count : std::ceil(anchored)-count;
-		value = std::clamp(static_cast<double>(spec.minimum+next*spec.step),spec.minimum,spec.maximum);
+		value = SliderTickValue(spec,next);
 	}
 	if (value != std::get<double>(EditingValue(item))) Propose(focused,value);
 }
@@ -543,7 +876,7 @@ bool Interaction::RestoreWidgets(const ValueWidgetSnapshot& snapshot, std::strin
 			candidate.feedback.push_back({id,item.control.states.at(state),state});
 		}
 	}
-	*this = std::move(candidate); return true;
+	return Adopt(std::move(candidate),error);
 }
 bool Interaction::Within(const std::string& id, const std::string& root) const {
 	if (root.empty()) return true;
@@ -899,7 +1232,6 @@ bool Interaction::Restore(const InteractionSnapshot& snapshot, std::string& erro
 		item.known = true;
 		if (item.state != snapshot.presented.at(id)) candidate.feedback.push_back({id,item.control.states.at(item.state),item.state});
 	}
-	*this = std::move(candidate);
-	return true;
+	return Adopt(std::move(candidate),error);
 }
 } // namespace openq4::ui

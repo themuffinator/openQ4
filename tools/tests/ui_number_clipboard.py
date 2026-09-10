@@ -338,7 +338,7 @@ def main():
             source=temp/(name+'.cpp');source.write_text(body,encoding='utf-8',newline='\n');binary=temp/(name+('.exe' if os.name=='nt' else '-test'))
             command=[compiler,'-std=c++20','-I',str(ROOT),str(source),str(ROOT/'src/ui/retained/TextInput.cpp'),str(ROOT/'src/ui/retained/TextEdit.cpp'),'-o',str(binary)]
             if name.startswith('adapter'):command[1:1]=['-DUSE_SDL3'];command[-2:-2]=[str(ROOT/'src/ui/retained/Input.cpp'),str(ROOT/'src/ui/retained/TextEditCommand.cpp')]
-            if name.startswith('interaction'):command[-2:-2]=[str(ROOT/'src/ui/retained/Interaction.cpp')]
+            if name.startswith('interaction'):command[-2:-2]=[str(ROOT/'src/ui/retained'/n) for n in ('Interaction.cpp','NativeTextDocument.cpp','NativeTextEditor.cpp')]
             if os.name!='nt':command[1:1]=['-fsanitize=address,undefined','-fno-omit-frame-pointer']
             built=subprocess.run(command,env=env,capture_output=True,text=True,timeout=120);log=temp/(name+'-compile.log');log.write_text(built.stdout+built.stderr,encoding='utf-8')
             record={'name':name,'command':command,'compile_exit':built.returncode,'compile_log':str(log),'compile_log_sha256':digest(log),'source_sha256':digest(source)};report['cases'].append(record)

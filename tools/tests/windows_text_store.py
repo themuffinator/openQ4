@@ -35,6 +35,7 @@ def main() -> int:
         'src/ui/retained/TextInput.cpp', 'src/ui/retained/TextInput.h',
         'tools/tests/native/WindowsTextStoreTest.cpp', 'tools/tests/windows_text_store.py')]
     raw = paths[0].read_bytes()
+    initial_hashes = {str(p.relative_to(ROOT)): sha(p) for p in paths}
     original = raw.decode('utf-8').replace('\r\n', '\n')
     working = scratch / 'WindowsTextStore.cpp'
     working.write_bytes(raw)
@@ -57,6 +58,17 @@ def main() -> int:
     if baseline.returncode:
         raise RuntimeError(baseline.stdout)
     mutations = {
+        'idle-begin-declined': [('if(impl->notifying || impl->upgrading || impl->notificationWrite ||', 'if(!impl->scope || impl->notifying || impl->upgrading || impl->notificationWrite ||')],
+        'idle-end-queries-terminated-range': [('// Terminated views may no longer provide GetRange.', 'LONG first,last;if(FAILED(impl->Extent(source,nullptr,first,last))) return E_FAIL;\n\t// Terminated views may no longer provide GetRange.')],
+        'idle-metadata-callback-quarantine-removed': [('CounterScope callback(impl->compositionCallback);', '/* callback quarantine omitted */')],
+        'idle-metadata-without-observed-dispatch': [('impl->identity,impl->dispatch,observed,e)', 'impl->identity,77,observed,e)')],
+        'idle-metadata-publication-failure-ignored': [('if(!changed) {impl->Fault();return E_FAIL;}', 'if(!changed) {return S_OK;}')],
+        'idle-metadata-during-application-notice': [('if(impl->notifying || impl->upgrading || impl->notificationWrite ||', 'if(impl->upgrading || impl->notificationWrite ||')],
+        'pending-query-during-foreign-callback': [('return scope || foreign || compositionCallback || nativeCallback || notifying || upgrading || notificationWrite;', 'return scope || compositionCallback || nativeCallback || notifying || upgrading || notificationWrite;')],
+        'pending-query-during-notification': [('return scope || foreign || compositionCallback || nativeCallback || notifying || upgrading || notificationWrite;', 'return scope || foreign || compositionCallback || nativeCallback || upgrading || notificationWrite;')],
+        'pending-query-lock-HRESULT-lost': [('return scope || foreign || compositionCallback || nativeCallback || notifying || upgrading || notificationWrite;', 'return foreign || compositionCallback || notifying || upgrading || notificationWrite;')],
+        'pending-query-engine-not-forwarded': [('QueryPendingCollection(id,expectedEngine,expectedAcknowledged,expectedAcknowledgedShadow,dispatch,out,error)', 'QueryPendingCollection(id,(void(expectedEngine),impl->document.EngineRevision()),expectedAcknowledged,expectedAcknowledgedShadow,dispatch,out,error)')],
+        'pending-query-dispatch-not-forwarded': [('QueryPendingCollection(id,expectedEngine,expectedAcknowledged,expectedAcknowledgedShadow,dispatch,out,error)', 'QueryPendingCollection(id,expectedEngine,expectedAcknowledged,expectedAcknowledgedShadow,(void(dispatch),77),out,error)')],
         'application-notifications-omitted': [('return Notify(mask,&change);', '(void)change;return S_OK;')],
         'layout-notification-omitted': [('return Notify(TS_AS_LAYOUT_CHANGE,nullptr);', 'return S_OK;')],
         'application-stale-revision-adopted': [('document.SyncEngine(id,expectedEngine,expectedShadow,revision,candidate,anchor,caret,e)',
@@ -84,6 +96,25 @@ def main() -> int:
                                         'for(const auto& c:impl->compositions) if(c.identity==identity.p && !c.ended) return S_OK;')],
         'candidate-context-range-not-updated': [('if(supplied) {supplied->AddRef();range.p=supplied;} else hr=composition->GetRange(&range.p);',
                                                '(void)supplied; hr=composition->GetRange(&range.p);')],
+        'scope-less-write-admitted': [('if(access==NativeTextAccess::ReadWrite && !impl->collection)', 'if(false && access==NativeTextAccess::ReadWrite && !impl->collection)')],
+        'scope-less-metadata-admitted': [('if(!impl->collection) return S_OK;', '/* last dispatch incorrectly acts as authority */')],
+        'scope-close-reuses-wrong-identity': [('scope!=*impl->collection) return E_UNEXPECTED;', '(void(scope),false)) return E_UNEXPECTED;')],
+        'scope-abort-reuses-wrong-identity': [('scope!=*impl->collection) return E_INVALIDARG;', '(void(scope),false)) return E_INVALIDARG;')],
+        'scope-close-keeps-authority': [('impl->collection.reset();out=candidate;return S_OK;', 'out=candidate;return S_OK;')],
+        'scope-dispatch-reused': [('dispatch<=impl->dispatchHigh ||', 'false ||')],
+        'scope-open-stale-engine': [('QueryPendingCollection(id,engine,acknowledged,shadow,dispatch,pending,error)', 'QueryPendingCollection(id,(void(engine),impl->document.EngineRevision()),acknowledged,shadow,dispatch,pending,error)')],
+        'scope-open-with-pending-offers': [
+            ('|| pending.count) return E_INVALIDARG;', ') return E_INVALIDARG;'),
+            ('QueryPendingCollection(id,engine,acknowledged,shadow,dispatch,pending,error)',
+             'QueryPendingCollection(id,engine,acknowledged,shadow,impl->document.PendingCount()?impl->dispatchHigh:dispatch,pending,error)')],
+        'scope-activity-not-recorded': [('++admittedCallbacks;return true;', 'return true;')],
+        'scope-refused-quota-closes-empty': [('if(impl->renewalRequired) {impl->Fault();return E_FAIL;}', '/* declined quota incorrectly treated as empty success */')],
+        'scope-pump-allows-app-mutation': [('return !collection || collection->kind==WindowsTextCollectionKind::Lifecycle;', 'return true;')],
+        'scope-renewal-ignores-pending': [('&& !candidate.pending && !candidate.liveCompositions;', '&& !candidate.liveCompositions;')],
+        'scope-renewal-ignores-live-composition': [('&& !candidate.pending && !candidate.liveCompositions;', '&& !candidate.pending;')],
+        'scope-notice-keeps-stale-acked-shadow': [('impl->acknowledgedShadow=impl->document.ShadowRevision();', '/* application-origin acknowledged shadow lost */')],
+        'scope-reference-reentry-allowed': [(' || (impl->nativeCallback && !impl->scope)', '')],
+        'scope-retired-reference-still-granted': [('if(!Healthy() || impl->sink!=sink.p) {impl->Fault();return TF_E_DISCONNECTED;}', '/* foreign AddRef retirement ignored */')],
     }
     outcomes = {}
     if not args.no_mutations:
@@ -123,6 +154,8 @@ def main() -> int:
                 sdk[str(file)] = sha(file)
     if len(sdk) != 3:
         raise RuntimeError('Actual SDK textstor/msctf/olectl headers were not identified.')
+    if initial_hashes != {str(p.relative_to(ROOT)): sha(p) for p in paths}:
+        raise RuntimeError('Source or test changed during the run; preserve logs, but do not publish mixed-source evidence.')
     record = {'status': 'passed', 'checks': int(re.search(r'PASS (\d+) checks', baseline.stdout)[1]),
               'command': command, 'mutations': outcomes, 'sdk_headers': sdk,
               'sources': {str(p.relative_to(ROOT)): sha(p) for p in paths},

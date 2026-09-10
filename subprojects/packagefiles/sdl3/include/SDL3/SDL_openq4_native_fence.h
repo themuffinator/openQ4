@@ -27,6 +27,41 @@ typedef struct OQ4_NativeFence {
     Uint32 version, event_count;
     Uint64 dispatch, sequence;
 } OQ4_NativeFence;
+typedef enum OQ4_NativeCollectionKind {
+    OQ4_COLLECTION_PUMP = 1, OQ4_COLLECTION_LIFECYCLE = 2
+} OQ4_NativeCollectionKind;
+typedef struct OQ4_NativeCollectionContext {
+    Uint32 version, kind;
+    Uint64 generation, dispatch;
+} OQ4_NativeCollectionContext;
+typedef bool (SDLCALL *OQ4_NativeCollectionPrepare)(void *userdata, const OQ4_NativeCollectionContext *context);
+typedef bool (SDLCALL *OQ4_NativeCollectionFinish)(void *userdata, const OQ4_NativeCollectionContext *context, bool aborted);
+typedef bool (SDLCALL *OQ4_NativeCollectionWork)(void *userdata, const OQ4_NativeCollectionContext *context);
+typedef struct OQ4_NativeCollectionHooks {
+    Uint32 version;
+    void *userdata;
+    OQ4_NativeCollectionPrepare Prepare;
+    OQ4_NativeCollectionFinish Finish;
+} OQ4_NativeCollectionHooks;
+/* Copied table; userdata remains caller-owned until successful unregister.
+ * Register/unregister (NULL) only while disabled, on the main thread, with no
+ * pump/emission/callback/cleanup outstanding. Both callbacks are required.
+ * Prepare runs after queue collection admission and before native processing.
+ * Finish runs once for EVERY attempted Prepare, even failed/retired/unwound,
+ * before queue close/marker publication. Track whether your Prepare opened a
+ * native store scope; failed Prepare must not close an older scope.
+ * Callbacks may retire; no nested pump/lifecycle or registration is permitted.
+ * They must not enter a GUI/Session. Context values are observation/order only,
+ * not physical input, text ownership or a completed native fence. */
+extern SDL_DECLSPEC bool SDLCALL OQ4_WindowsNativeFenceRegisterHooks(const OQ4_NativeCollectionHooks *hooks);
+/* Exact current context only, including during Prepare/work/Finish. No implicit
+ * pump, ownership or transaction. Preserves a fence for zero-SDL-event work. */
+extern SDL_DECLSPEC bool SDLCALL OQ4_WindowsNativeFenceMarkActivity(const OQ4_NativeCollectionContext *context);
+/* Enabled healthy provider only. One checked lifecycle collection, no Peek.
+ * Forces a held fence even for no public events; never drains or acknowledges.
+ * Work/Prepare/Finish failure faults the provider; Retire is then required.
+ * MSVC SEH cleanup preserves callback pairing; callbacks must not longjmp. */
+extern SDL_DECLSPEC bool SDLCALL OQ4_WindowsNativeFenceRunLifecycle(OQ4_NativeCollectionWork work, void *userdata);
 /* Desktop Windows, main thread only. Disabled by default. A collection is one
  * guarded PeekMessage plus optional Translate/Dispatch of its returned message,
  * including its existing input housekeeping and ALL synchronous callbacks. This is deliberately

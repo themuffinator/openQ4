@@ -529,6 +529,30 @@ if build_engine or get_option('build_native_tests')
       install: false,
     )
     test('openq4-ui-number-draft', openq4_ui_number_draft_test, timeout: 30)
+    openq4_ui_number_native_test = executable(
+      'openq4-ui-number-native-test',
+      files('tools/tests/native/UiNumberNativeTest.cpp'),
+      include_directories: root_include_dir,
+      dependencies: openq4_retained_dep,
+      install: false,
+    )
+    test('openq4-ui-number-native', openq4_ui_number_native_test, timeout: 30)
+    openq4_ui_slider_decimal_test = executable(
+      'openq4-ui-slider-decimal-test',
+      files('tools/tests/native/UiSliderDecimalTest.cpp'),
+      include_directories: root_include_dir,
+      dependencies: openq4_retained_dep,
+      install: false,
+    )
+    test('openq4-ui-slider-decimal', openq4_ui_slider_decimal_test, timeout: 30)
+    openq4_ui_number_native_view_test = executable(
+      'openq4-ui-number-native-view-test',
+      files('tools/tests/native/UiNumberNativeViewTest.cpp'),
+      include_directories: root_include_dir,
+      dependencies: [openq4_retained_dep, rmlui_project.get_variable('rmlui_dep'), jsoncpp_project.get_variable('jsoncpp_dep')],
+      install: false,
+    )
+    test('openq4-ui-number-native-view', openq4_ui_number_native_view_test, timeout: 30)
     openq4_ui_text_run_test = executable(
       'openq4-ui-text-run-test',
       files('tools/tests/native/UiTextRunTest.cpp'),
@@ -1488,13 +1512,20 @@ if build_engine or get_option('build_native_tests')
   if build_engine and use_sdl3_backend
     native_queue_library = static_library('openq4-native-queue',
       files('src/sys/sdl3/NativeQueueBatch.cpp', 'src/sys/sdl3/NativeQueueSource.cpp'),
+      files('src/ui/application/NativeTextCollectionCoordinator.cpp'),
       include_directories: [root_include_dir, include_directories('subprojects/packagefiles/sdl3/include')],
       dependencies: [openq4_retained_dep] + text_ingress_headers,
       cpp_args: ['-DUSE_SDL3'], pic: true, install: false)
-    client_deps += declare_dependency(link_with: native_queue_library)
+    native_queue_dep = declare_dependency(link_with: native_queue_library)
+    client_deps += native_queue_dep
   endif
   if get_option('build_native_tests') and build_engine and use_sdl3_backend
     text_ingress_test_headers = [root_include_dir, include_directories('subprojects/packagefiles/sdl3/include')]
+    native_collection_coordinator_test = executable('openq4-ui-native-collection-coordinator-test',
+      files('tools/tests/native/UiNativeCollectionCoordinatorTest.cpp'),
+      include_directories: text_ingress_test_headers,
+      dependencies: [openq4_retained_dep, native_queue_dep] + text_ingress_headers, install: false)
+    test('openq4-ui-native-collection-coordinator', native_collection_coordinator_test, timeout: 30)
     text_ingress_test = executable('openq4-ui-text-ingress-test',
       files('tools/tests/native/UiTextProvenanceIngressTest.cpp'),
       include_directories: text_ingress_test_headers,

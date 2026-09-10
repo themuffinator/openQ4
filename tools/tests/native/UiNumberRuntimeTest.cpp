@@ -409,10 +409,86 @@ static void GrowingValidationRevealsField(){
 		Check(scroll->GetScrollTop()==0&&host.errors==0,"unchanged field does not override later deliberate scrolling");
 	}
 }
+// Drive the real Runtime, projection, Rml artwork and snapshot boundary through
+// checked native offers. This fixture supplies no OS input or provider authority.
+struct NativeRuntime {
+	View view; NativeTextDocument document; NativeTextIdentity native{100,200};
+	NativeTextEditorBarrier barrier; std::uint64_t dispatch=10,fence=20;
+	NativeRuntime(float density,bool host=false):view(density,false,true,host){
+		view.Begin();view.Text("1.25");view.Selection(4,1);view.Frame();
+		const auto current=view.runtime.QueryNumberEditor(view.error,view.time);
+		Check(current.has_value(),"current runtime editor available before native attachment");
+		const TextEditorIdentity owner{1,2,3,current->modalToken,5,current->editor.identity.session,current->editor.identity.revision,"number"};
+		Check(view.runtime.AttachNumberNative(owner,native,barrier,view.error,view.time),"attach exact current runtime Number owner");
+		Check(document.Open(native,owner.revision,current->editor.state.text,current->editor.state.anchor,current->editor.state.caret,view.error),"open matching shadow document");
+	}
+	void Apply(const std::function<void(const NativeTextLockScope&)>& operations){
+		NativeTextLockScope lock;Check(document.RequestLock(native,NativeTextAccess::ReadWrite,true,lock,view.error)==NativeTextLockResult::Granted,"native runtime fixture write lock");
+		operations(lock);std::uint64_t sequence=0;
+		Check(document.FinishLock(lock,dispatch,sequence,view.error)&&sequence,"publish actual native document transaction");
+		NativeTextOffer offer;Check(document.PeekOffer(native,offer,view.error),"copy ordered native offer");
+		NativeTextEditorBarrier begun;Check(view.runtime.BeginNumberNativeCollection(barrier,{dispatch,fence,sequence},begun,view.error),"begin runtime native collection");barrier=std::move(begun);
+		NativeTextEditorReceipt receipt;Check(view.runtime.ApplyNumberNative(barrier,offer,receipt,view.error),"apply checked native offer to actual runtime");
+		Check(receipt.effect==NativeTextEditorEffect::Acknowledge&&document.Acknowledge(native,receipt.after.sequence,receipt.after.shadowRevision,receipt.before.editor.revision,receipt.after.editor.revision,view.error),"acknowledge exact applied revision");barrier=std::move(receipt.after);
+	}
+	void Compose(){Apply([&](auto lock){
+		Check(document.ReplaceACP(lock,0,4,"12.375",view.error),"native replacement differs from stable draft");
+		Check(document.BeginComposition(lock,1,0,2,view.error)&&document.BeginComposition(lock,2,3,6,view.error)&&document.BeginComposition(lock,3,6,6,view.error),"concurrent disjoint and empty composition ranges");
+		Check(document.SelectACP(lock,6,1,view.error),"native reverse selection");
+	});}
+	void Complete(){NativeTextEditorBarrier out;Check(view.runtime.CompleteNumberNativeCollection(barrier,barrier.collection,out,view.error),"complete exact native collection");barrier=std::move(out);++dispatch;++fence;}
+};
+static void NativeRuntimePresentationAndSettlement(){
+	for(float density:{1.25f,2.f}){
+		NativeRuntime f(density);auto& v=f.view;f.Compose();v.Frame();
+		const auto edit=v.Widget().number.value();
+		Check(edit.state.text=="1.25"&&edit.state.anchor==4&&edit.state.caret==1&&edit.nativeUnsettled,"runtime keeps stable draft and directed selection during composition");
+		Check(edit.nativePresentation&&edit.nativePresentation->text=="12.375"&&edit.nativePresentation->anchor==6&&edit.nativePresentation->caret==1&&edit.nativePresentation->compositions.size()==3,"runtime exposes complete native bytes and all ranges");
+		Check(v.host.Ink('3')&&v.host.Ink('7')&&v.host.Colour(0,1,0)&&v.host.Colour(1,0,0)&&v.host.Colour(0,0,1),"actual Rml draw includes native glyphs, underline, selection and caret");
+		const auto geometry=v.Geometry();const auto underline=v.host.Colour(0,1,0).value();
+		Check(underline.x>=geometry.viewport.x-.05f&&underline.x+underline.width<=geometry.viewport.x+geometry.viewport.width+.05f,"native composition artwork stays in the density-scaled viewport");
+		Check(!v.runtime.QueryNumberEditor(v.error,v.time)&&!v.runtime.CommitNumberEdit("number",v.Identity(),v.error,v.time),"native lease excludes ordinary clipboard ownership and local commit");
+		NativeTextEditorView refreshed;Check(v.runtime.RefreshNumberNative(f.barrier,refreshed,v.error,v.time)&&refreshed.presentation==*edit.nativePresentation,"fresh runtime native query retains complete authoritative presentation");
+		std::string snapshot;Check(v.runtime.SaveSnapshot(snapshot,v.error,v.time)&&snapshot.find("12.375")==std::string::npos,"save excludes unconfirmed native bytes");
+		Check(v.runtime.RefreshNumberNative(f.barrier,refreshed,v.error,v.time),"save alone preserves the live native lease");
+		NativeTextEditorReceipt receipt;Check(!v.runtime.SettleNumberNative(f.barrier,receipt,v.error),"open collection cannot settle");f.Complete();
+		Check(!v.runtime.SettleNumberNative(f.barrier,receipt,v.error),"live composition cannot settle at collection boundary");
+		f.Apply([&](auto lock){for(auto token:{1u,2u,3u})Check(f.document.EndComposition(lock,token,v.error),"end each native composition");});
+		Check(v.Widget().number->state.text=="1.25","end callback alone cannot commit native group");f.Complete();
+		auto prepared=v.runtime.PrepareNumberNativeSettlement(f.barrier,v.error);
+		Check(prepared&&prepared->Receipt().effect==NativeTextEditorEffect::SyncEngine&&v.runtime.IsNumberNativeCurrent(f.barrier),"completed group prepares a sync receipt without publishing local text");
+		const auto& sync=prepared->Receipt();const auto& presentation=prepared->Presentation();
+		Check(v.Widget().number->state.text=="1.25"&&f.document.SyncEngine(f.native,sync.before.editor.revision,sync.before.shadowRevision,sync.after.editor.revision,presentation.text,presentation.anchor,presentation.caret,v.error),"test owner services native sync before stable local publication");
+		Check(v.runtime.PublishNumberNativeSettlement(*prepared,receipt)&&receipt.after==sync.after,"publish checked prepared runtime settlement after sync");f.barrier=receipt.after;
+		const auto settled=v.Widget().number.value();
+		Check(settled.state.text=="12.375"&&settled.state.anchor==6&&settled.state.caret==1&&!settled.nativeUnsettled&&std::get<double>(v.Widget().accepted)==1.05&&v.runtime.TakeActions().empty(),"settlement changes local draft only with directed selection preserved");
+		Check(v.runtime.RetireNumberNative(f.barrier,receipt,v.error)&&f.document.Retire(f.native),"explicitly retire both ends before local commands");
+		Check(v.runtime.UndoNumberEdit("number",v.Identity(),false,v.error,v.time)&&v.Widget().number->state.text=="1.25","one undo restores whole pre-composition draft");
+		Check(v.runtime.UndoNumberEdit("number",v.Identity(),true,v.error,v.time)&&v.Widget().number->state.text=="12.375","one redo restores complete settled group");v.Frame();
+		Check(!v.host.Colour(0,1,0)&&!v.Widget().number->nativePresentation,"retirement removes all derived composition ink");
+	}
+}
+static void NativeRuntimeRestoreAndHostChange(){
+	for(bool hostChange:{false,true}){
+		NativeRuntime f(1.25f,hostChange);auto& v=f.view;f.Compose();f.Complete();v.Frame();
+		std::string saved;Check(v.runtime.SaveSnapshot(saved,v.error,v.time),"save stable draft while native ranges are live");
+		NativeTextEditorView rejected;rejected.presentation.text="untouched";
+		if(hostChange){v.host.readback=1.75;Check(!v.runtime.RefreshNumberNative(f.barrier,rejected,v.error,v.time),"fresh host change retires attached editor before reconciliation");}
+		else {Check(v.runtime.RestoreSnapshot(saved,v.error,v.time),"runtime snapshot restores through checked Interaction adoption");Check(!v.runtime.RefreshNumberNative(f.barrier,rejected,v.error,v.time),"restored draft rejects old process-local native owner");}
+		Check(rejected.presentation.text=="untouched","failed native query leaves caller output unchanged");v.Frame();
+		const auto edit=v.Widget().number.value();Check(edit.state.text=="1.25"&&!edit.nativePresentation&&!edit.nativeUnsettled&&edit.conflict==hostChange,"stable draft survives host change or restore without native affinity");
+		Check(!v.host.Colour(0,1,0)&&v.runtime.TakeActions().empty(),"retired native ink and offers cannot cause setting writes");
+		NativeTextEditorBarrier out;out.sequence=999;
+		Check(!v.runtime.BeginNumberNativeCollection(f.barrier,{f.dispatch,f.fence,2},out,v.error)&&out.sequence==999,"stale native collection cannot mutate restored or conflicting editor");
+		Check(f.document.Retire(f.native),"test provider retires original native document explicitly");
+	}
+}
 int main(int argc,char** argv){
 	Check(argc<=2,"only optional authored fixture path accepted");if(argc==2)AuthoredFixture(argv[1]);
 	for(const auto& [name,test]:std::vector<std::pair<const char*,void(*)()>>{{"fractional-density",FractionalDrawingAndDensity},{"framed-transform",FramedReversedSelectionAndTransforms},{"scroll-empty-preedit",ScrollEmptyAndPreedit},{"validation-proposals",ValidationProposalsAndIdentity},{"detached-draft",DetachedDraftAndNativeAffinity},{"unavailable-layout",UnavailableLayoutHidesStaleInk},{"snapshot-recreation",SnapshotDraftsAndResourceRecreation},{"snapshot-conflict",SnapshotFreshHostConflict},{"snapshot-pending",SnapshotPendingProposalDoesNotReplay},{"host-acknowledgement",HostAcknowledgementBetweenFrames},{"host-before-dispatch",HostChangeBeforeDispatch}}){currentCase=name;test();}
 	currentCase="modal-draft-focus";DraftFocusAfterModalProgram();
 	currentCase="validation-scroll";GrowingValidationRevealsField();
+	currentCase="native-runtime";NativeRuntimePresentationAndSettlement();
+	currentCase="native-retirement";NativeRuntimeRestoreAndHostChange();
 	std::printf("UiNumberRuntimeTest: %u checks passed (actual Runtime/Rml, no devices or GPU).\n",checks);return 0;
 }

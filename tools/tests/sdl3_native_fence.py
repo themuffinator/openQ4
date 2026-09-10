@@ -14,6 +14,8 @@ def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 def main():
  parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--sdl-source',type=Path);parser.add_argument('--compiler',default='clang++');parser.add_argument('--no-mutations',action='store_true');parser.add_argument('--sdl-config',type=Path,help='Optional existing generated SDL config directory for Windows C17 syntax checks');parser.add_argument('--native-compiler',default='clang-cl');args=parser.parse_args()
  (ROOT/'.tmp').mkdir(exist_ok=True);scratch=Path(tempfile.mkdtemp(prefix='sdl-native-fence-',dir=ROOT/'.tmp'))
+ bound=[PACKAGE/'include/SDL3/SDL_openq4_native_fence.h',PACKAGE/'src/video/windows/SDL_openq4_native_fence.h',PACKAGE/'src/video/windows/SDL_openq4_native_fence.c',PACKAGE/'dispatch-fence.patch',PACKAGE/'queue-consumer.patch',PACKAGE/'queue-generation.patch',PACKAGE/'text-provenance.patch',ROOT/'tools/tests/native/SdlNativeFenceTest.cpp',Path(__file__),ROOT/'tools/tests/sdl3_clipboard_status.py',ROOT/'subprojects/sdl3.wrap']
+ before_hashes={str(p.relative_to(ROOT)):sha(p) for p in bound}
  spec=importlib.util.spec_from_file_location('source_helper',ROOT/'tools/tests/sdl3_clipboard_status.py');helper=importlib.util.module_from_spec(spec);spec.loader.exec_module(helper);helper.ROOT=ROOT;helper.FILES=FILES
  wrap=configparser.ConfigParser();wrap.read(ROOT/'subprojects/sdl3.wrap',encoding='utf-8');source,provision,_=helper.provision_source(args.sdl_source,dict(wrap['wrap-file']),scratch)
  env=os.environ.copy();env['TEMP']=env['TMP']=str(scratch)
@@ -117,6 +119,23 @@ def main():
  'queue-counter-wrap-accepted':('queue-state.inc','oq4_queue_sequence < SDL_MAX_UINT64 &&',''),
  'forget-abnormal-scope-cleanup':('window-scope.inc','        OQ4_WIN_RestoreTextScope(previous);','        (void)previous;'),
  'forget-abnormal-pump-cleanup':('pump.inc','else OQ4_WIN_AbortNativeCollection();','else (void)completed;'),
+ 'hook-table-borrowed-or-lost':('fence.inc','if (hooks) oq4_fence_hooks = *hooks;', 'if (hooks) SDL_zero(oq4_fence_hooks);'),
+ 'hook-registration-enabled':('fence.inc','!OQ4_FenceMain() || oq4_fence_enabled || oq4_fence_in_pump || oq4_fence_collecting ||','!OQ4_FenceMain() || oq4_fence_in_pump || oq4_fence_collecting ||'),
+ 'hook-mark-wrong-generation':('fence.inc','context->generation == oq4_fence_context.generation &&','true &&'),
+ 'hook-mark-wrong-dispatch':('fence.inc','context->dispatch == oq4_fence_context.dispatch;','true;'),
+ 'hook-mark-wrong-kind':('fence.inc','context->kind == oq4_fence_context.kind &&','true &&'),
+ 'hook-activity-discarded':('fence.inc','    oq4_fence_activity = true;\n    return true;','    return true;'),
+ 'hook-prepare-failure-ignored':('fence.inc','ready = accepted && oq4_fence_enabled','ready = (accepted || true) && oq4_fence_enabled'),
+ 'hook-finish-failure-ignored':('fence.inc','accepted = oq4_fence_hooks.Finish(oq4_fence_hooks.userdata, &context, aborted);','accepted = oq4_fence_hooks.Finish(oq4_fence_hooks.userdata, &context, aborted) || true;'),
+ 'hook-forget-prepare-attempt':('fence.inc','oq4_fence_prepare_attempted = true;','oq4_fence_prepare_attempted = false;'),
+ 'hook-abort-reported-normal':('fence.inc','oq4_fence_hooks.userdata, &context, aborted','oq4_fence_hooks.userdata, &context, false'),
+ 'hook-register-during-retired-cleanup':('fence.inc','oq4_fence_in_pump || oq4_fence_collecting ||\n        oq4_fence_emitting || oq4_fence_callback_depth || oq4_fence_prepare_attempted || oq4_fence_context_active','oq4_fence_collecting || oq4_fence_emitting'),
+ 'hook-work-context-change-accepted':('fence.inc','completed = completed && OQ4_FenceContextMatches(&context) &&','completed = completed &&'),
+ 'hook-lifecycle-ordinary-kind':('fence.inc','OQ4_FenceBeginCollection(OQ4_COLLECTION_LIFECYCLE)','OQ4_FenceBeginCollection(OQ4_COLLECTION_PUMP)'),
+ 'hook-lifecycle-zero-event-dropped':('fence.inc','if (completed) OQ4_WIN_EndNativeCollection(true);','if (completed) OQ4_WIN_EndNativeCollection(false);'),
+ 'hook-work-refusal-ignored':('fence.inc','completed = completed && OQ4_FenceContextMatches(&context) &&','completed = OQ4_FenceContextMatches(&context) &&'),
+ 'hook-unwind-prepare-cleanup-lost':('fence.inc','(void)OQ4_FenceCloseHooks(true);\n            oq4_fence_collecting','/* no aborted Prepare cleanup */\n            oq4_fence_collecting'),
+ 'hook-unwind-lifecycle-cleanup-lost':('fence.inc','if (completed) OQ4_WIN_EndNativeCollection(true); else OQ4_WIN_AbortNativeCollection();','if (completed) OQ4_WIN_EndNativeCollection(true);'),
  }
  outcomes={}
  skipped={}
@@ -135,7 +154,8 @@ def main():
     if not failed.returncode:raise RuntimeError('mutation survived '+name)
     outcomes[name]={'compiled':True,'rejected':True,'exit_code':failed.returncode}
    finally:p.write_text(before,newline='\n')
- paths=[public,private,implementation,PACKAGE/'dispatch-fence.patch',PACKAGE/'queue-consumer.patch',PACKAGE/'text-provenance.patch',support,Path(__file__),ROOT/'tools/tests/sdl3_clipboard_status.py',ROOT/'subprojects/sdl3.wrap']
+ paths=bound
+ if before_hashes!={str(p.relative_to(ROOT)):sha(p) for p in paths}:raise RuntimeError('Sources changed during test; preserve logs but do not publish mixed-source evidence')
  result={'status':'passed','native_syntax':syntax,'checks':int(re.search(r'PASS (\d+) checks',r.stdout)[1]),'mutations':outcomes,'skipped_mutations':skipped,'test_binary_sha256':sha(scratch/'test.exe'),'logs':{p.name:sha(p) for p in sorted(scratch.glob('*.log'))},'sources':{str(p.relative_to(ROOT)):sha(p) for p in paths},'projection':{n:sha(projection/n) for n in FILES},'source_input':{n:sha(source/n) for n in FILES},'provision':provision,'command':command,'scope':'Actual native fence, SDL queue admission, complete pump/internal/lifecycle drain/wait/window wrapper with counted Windows/SDL doubles. No real message queue, native TSF/IME, engine owner bridge or frame qualification. MSVC abnormal unwind tested with synthetic exception only.'}
  (scratch/'result.json').write_text(json.dumps(result,indent=2)+'\n',encoding='utf-8');print(r.stdout.strip());print(scratch/'result.json');return 0
 if __name__=='__main__':raise SystemExit(main())

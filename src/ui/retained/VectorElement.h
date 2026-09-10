@@ -12,6 +12,9 @@ struct RuntimeStatistics;
 class VectorGeometry {
 public:
 	void Configure(const std::vector<VectorPath>& paths, Host& host, RuntimeStatistics& statistics);
+	// Copy authored paths and shared host ownership only; compiled geometry is
+	// always invalidated, including when replacing an already rendered copy.
+	void CopyArtworkFrom(const VectorGeometry& source);
 	void Render(Rml::Element& element, bool inheritOpacity);
 private:
 	std::vector<VectorPath> paths;
@@ -27,6 +30,7 @@ class VectorElement final : public Rml::Element {
 public:
 	explicit VectorElement(const Rml::String& tag) : Rml::Element(tag) {}
 	void Configure(const Node& node, Host& host, RuntimeStatistics& statistics);
+	void CopyArtworkFrom(const VectorElement& source);
 	void RenderMask() { mask.Render(*this,false); }
 protected:
 	void OnRender() override { paint.Render(*this,true); }

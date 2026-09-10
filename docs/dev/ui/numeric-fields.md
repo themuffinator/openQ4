@@ -25,8 +25,9 @@ including actions completed between presentation frames.
 
 Leaving a field, changing modal scope or losing usable input retires the live
 session and composition while preserving the draft and its undo/redo history.
-Returning to the field starts a fresh session. Explicit cancellation discards
-that field's draft. An external setting change preserves dirty text and marks
+Returning to the field starts a fresh session. For a bound native editor,
+cancellation first abandons native presentation and preserves the stable draft;
+a later explicit local cancellation discards it. An external setting change preserves dirty text and marks
 a conflict. Beginning the edit again does not discard the conflict:
 
 - **Keep draft:** explicitly adopt the current accepted baseline while retaining
@@ -131,7 +132,13 @@ the renderer's snapped text translation, actual line baseline, margins, padding,
 clipping and horizontal scroll. Invalid or unsettled geometry cannot supply a
 native candidate anchor or keep stale editing ink visible. Inactive drafts keep
 their text and validation but have no editing ink or live hit geometry. Reduced
-motion gives a steady caret.
+motion gives a steady caret. Native presentation supplies the full displayed
+text, directional selection and every composition range. Bounded copies of the
+authored vector underline share the viewport clip, carry no canonical IDs and
+are removed when the document or editor retires. Empty ranges retain native
+ownership without drawing false underline extent. Geometry caches include exact
+native presentation and unsettled state; matching local edit IDs alone are
+insufficient to reuse a caret or candidate anchor.
 
 These runs currently describe unshaped scalar text. They are not evidence of
 grapheme, bidirectional, fallback-font or general international text completion.
@@ -216,9 +223,28 @@ The immutable local record is
 and character input, IME/shaping, other languages, full-page and product acceptance
 remain separate requirements.
 
-The follow-up precision audit found two open defects: generated slider ticks can
-expose floating-point tails in the paired entry, and very small ambient values
-such as `1e-7` fail SYSTEM CVar string readback after legacy exponent
-normalization. The recorded `1.375` flow does not cover those cases. Generated
-tick canonicalization and fixed-decimal host serialization are the next fixes;
-typed Number drafts must retain their exact value.
+The follow-up precision audit found generated slider ticks with floating-point
+tails and small ambient values such as `1e-7` lost by legacy CVar exponent
+normalization. Generated ticks now use the authored minimum/step decimal scale;
+custom readbacks and typed drafts retain their exact value. SYSTEM writes use
+fixed decimal text and reject new values that narrow to a nonfinite or zero
+float. This does not increase the renderer's float precision. Exact recovery of
+observed originals under FTZ/DAZ is being extended through the transaction and
+persistent recovery journal.
+
+The native field binding regression now drives actual Runtime/Rml at 125% and
+200% density through complete native text, reverse selection, concurrent and
+empty composition ranges, stable-only snapshots, host conflicts, checked
+restoration and one-group undo/redo. Native synchronization precedes prepared
+local settlement. The combined Windows build passes 36 UI suites; standalone
+checks additionally cover the actual Windows SDK store and CVar normalization.
+Windowed SP/OpenGL at 125% and MP/Vulkan at 200% each reach gameplay and pass
+38 semantic operations with 12 reviewed engine screenshots. The sequence checks
+clean `0.075` slider text, exact accepted readbacks for `1e-7` and custom `0.1375`,
+the next authored slider tick `0.15`, Apply, restoration and return to the parent.
+SP has no warnings; MP retains the preceding checkpoint's same 93 warnings.
+At 200%, the focused control still sits against the body's scroll boundary;
+focus reveal spacing and full-page layout remain unfinished. These captures
+do not operate native character or IME input. The immutable local record is
+`.tmp/ui/native-field-binding-integration/validation-evidence.json`;
+live native provider integration and final product acceptance remain open.

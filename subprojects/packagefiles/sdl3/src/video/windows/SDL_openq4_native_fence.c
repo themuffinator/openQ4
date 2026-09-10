@@ -1,5 +1,5 @@
 /* openQ4 private Windows native dispatch fence. Copyright (C) 2026 DarkMatter
- * Productions. Distributed under SDL's zlib license. No GUI/COM callbacks. */
+ * Productions. Distributed under SDL's zlib license. No GUI/Session calls. */
 #include "SDL_internal.h"
 #if defined(SDL_VIDEO_DRIVER_WINDOWS) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
 #include "SDL_windowsvideo.h"
@@ -13,6 +13,10 @@ static SDL_AtomicInt oq4_fence_public_type;
 static Uint64 oq4_fence_dispatch, oq4_fence_sequence;
 static OQ4_NativeFence oq4_fence_pending;
 static const SDL_Event *oq4_fence_admission, *oq4_fence_queue_admission;
+static OQ4_NativeCollectionHooks oq4_fence_hooks;
+static OQ4_NativeCollectionContext oq4_fence_context;
+static bool oq4_fence_context_active, oq4_fence_prepare_attempted;
+static unsigned oq4_fence_callback_depth;
 
 static bool OQ4_FenceMain(void)
 {
@@ -30,6 +34,67 @@ static bool OQ4_FenceMarkerMatches(const SDL_Event *event)
         event->user.code > 0 && (Uint32)event->user.code == oq4_fence_marker &&
         !event->user.windowID && !event->user.reserved && !event->user.data1 && !event->user.data2;
 }
+static bool OQ4_FenceContextMatches(const OQ4_NativeCollectionContext *context)
+{
+    return context && oq4_fence_context_active && context->version == 1 &&
+        context->kind == oq4_fence_context.kind && context->generation == oq4_fence_context.generation &&
+        context->dispatch == oq4_fence_context.dispatch;
+}
+bool OQ4_WindowsNativeFenceRegisterHooks(const OQ4_NativeCollectionHooks *hooks)
+{
+    if (!OQ4_FenceMain() || oq4_fence_enabled || oq4_fence_in_pump || oq4_fence_collecting ||
+        oq4_fence_emitting || oq4_fence_callback_depth || oq4_fence_prepare_attempted || oq4_fence_context_active) return false;
+    if (hooks && (hooks->version != 1 || !hooks->Prepare || !hooks->Finish)) return false;
+    if (hooks) oq4_fence_hooks = *hooks; else SDL_zero(oq4_fence_hooks);
+    return true;
+}
+bool OQ4_WindowsNativeFenceMarkActivity(const OQ4_NativeCollectionContext *context)
+{
+    if (!OQ4_FenceMain() || !OQ4_FenceContextMatches(context) || !oq4_fence_enabled || !oq4_fence_collecting ||
+        !oq4_fence_healthy || !OQ4_WIN_QueueHealthy() ||
+        OQ4_WindowsNativeFenceQueueGeneration() != context->generation) return false;
+    oq4_fence_activity = true;
+    return true;
+}
+/* Pairing survives retirement clearing public pending state. No new registration
+ * can replace the copied callbacks/userdata until this cleanup has unwound. */
+static bool OQ4_FenceCloseHooks(bool aborted)
+{
+    bool returned = false, accepted = true;
+    OQ4_NativeCollectionContext context = oq4_fence_context;
+#ifdef _MSC_VER
+    __try {
+#endif
+        if (oq4_fence_prepare_attempted) {
+            oq4_fence_prepare_attempted = false;
+            ++oq4_fence_callback_depth;
+#ifdef _MSC_VER
+            __try {
+#endif
+                accepted = oq4_fence_hooks.Finish(oq4_fence_hooks.userdata, &context, aborted);
+#ifdef _MSC_VER
+            } __finally {
+#endif
+                --oq4_fence_callback_depth;
+#ifdef _MSC_VER
+            }
+#endif
+            accepted = accepted && OQ4_FenceContextMatches(&context);
+        }
+        returned = true;
+#ifdef _MSC_VER
+    } __finally {
+#endif
+        oq4_fence_prepare_attempted = false;
+        oq4_fence_context_active = false;
+        oq4_fence_in_pump = false;
+        if (aborted || !returned || !accepted) oq4_fence_collecting = false;
+        if (!returned || !accepted) OQ4_FenceFault();
+#ifdef _MSC_VER
+    }
+#endif
+    return accepted;
+}
 bool OQ4_WindowsNativeFenceRetire(void)
 {
     if (!OQ4_FenceMain()) return false;
@@ -44,7 +109,7 @@ bool OQ4_WindowsNativeFenceRetire(void)
 bool OQ4_WindowsNativeFenceEnable(bool enabled)
 {
     if (!OQ4_FenceMain()) return false;
-    if (enabled && (oq4_fence_emitting || oq4_fence_in_pump)) return false;
+    if (enabled && (oq4_fence_emitting || oq4_fence_in_pump || oq4_fence_callback_depth || oq4_fence_prepare_attempted || oq4_fence_context_active)) return false;
     if (!enabled) return OQ4_WindowsNativeFenceRetire();
     if (oq4_fence_enabled) return oq4_fence_healthy && OQ4_WIN_QueueHealthy();
     if (oq4_fence_collecting || oq4_fence_held || oq4_fence_dispatch == SDL_MAX_UINT64 ||
@@ -90,11 +155,12 @@ bool OQ4_WIN_NativeFenceEnabled(void) { return SDL_IsMainThread() && oq4_fence_e
 bool OQ4_WIN_NativeFenceBlocked(void)
 {
     if (!SDL_IsMainThread()) return true;
-    return oq4_fence_in_pump || oq4_fence_emitting ||
+    return oq4_fence_in_pump || oq4_fence_emitting || oq4_fence_callback_depth || oq4_fence_prepare_attempted ||
         (oq4_fence_enabled && ((!oq4_fence_healthy || !OQ4_WIN_QueueHealthy()) || oq4_fence_collecting || oq4_fence_held));
 }
-bool OQ4_WIN_BeginNativeCollection(void)
+static bool OQ4_FenceBeginCollection(Uint32 kind)
 {
+    bool ready = false;
     if (!SDL_IsMainThread()) return false;
     if (!oq4_fence_enabled) return true;
     if (OQ4_WIN_NativeFenceBlocked()) return false;
@@ -105,14 +171,55 @@ bool OQ4_WIN_BeginNativeCollection(void)
     if (!OQ4_WIN_QueueBegin(oq4_fence_pending.dispatch)) { OQ4_FenceFault(); return false; }
     oq4_fence_in_pump = oq4_fence_collecting = true;
     oq4_fence_activity = false;
-    return true;
+    oq4_fence_context.version = 1;
+    oq4_fence_context.kind = kind;
+    oq4_fence_context.generation = OQ4_WindowsNativeFenceQueueGeneration();
+    oq4_fence_context.dispatch = oq4_fence_pending.dispatch;
+    oq4_fence_context_active = true;
+#ifdef _MSC_VER
+    __try {
+#endif
+        bool accepted = true;
+        if (oq4_fence_hooks.Prepare) {
+            OQ4_NativeCollectionContext context = oq4_fence_context;
+            oq4_fence_prepare_attempted = true;
+            ++oq4_fence_callback_depth;
+#ifdef _MSC_VER
+            __try {
+#endif
+                accepted = oq4_fence_hooks.Prepare(oq4_fence_hooks.userdata, &context);
+#ifdef _MSC_VER
+            } __finally {
+#endif
+                --oq4_fence_callback_depth;
+#ifdef _MSC_VER
+            }
+#endif
+            accepted = accepted && OQ4_FenceContextMatches(&context);
+        }
+        ready = accepted && oq4_fence_enabled && oq4_fence_collecting && oq4_fence_healthy && OQ4_WIN_QueueHealthy() &&
+            oq4_fence_context.generation && OQ4_WindowsNativeFenceQueueGeneration() == oq4_fence_context.generation;
+#ifdef _MSC_VER
+    } __finally {
+#endif
+        if (!ready) {
+            OQ4_FenceFault();
+            (void)OQ4_FenceCloseHooks(true);
+            oq4_fence_collecting = false;
+        }
+#ifdef _MSC_VER
+    }
+#endif
+    return ready;
 }
+bool OQ4_WIN_BeginNativeCollection(void) { return OQ4_FenceBeginCollection(OQ4_COLLECTION_PUMP); }
 void OQ4_WIN_EndNativeCollection(bool removed_message)
 {
     SDL_Event marker;
     bool queued = false, intact = false, returned = false;
     if (!SDL_IsMainThread()) return;
-    oq4_fence_in_pump = false;
+    if (oq4_fence_callback_depth) { OQ4_FenceFault(); return; }
+    if (!OQ4_FenceCloseHooks(!oq4_fence_enabled || !oq4_fence_collecting || !oq4_fence_healthy || !OQ4_WIN_QueueHealthy())) return;
     if (!oq4_fence_enabled || !oq4_fence_collecting) return;
     oq4_fence_collecting = false;
     if ((!oq4_fence_healthy || !OQ4_WIN_QueueHealthy())) return;
@@ -149,8 +256,43 @@ void OQ4_WIN_EndNativeCollection(bool removed_message)
 void OQ4_WIN_AbortNativeCollection(void)
 {
     if (!SDL_IsMainThread()) return;
-    oq4_fence_in_pump = oq4_fence_collecting = false;
+    if (oq4_fence_callback_depth) { OQ4_FenceFault(); return; }
+    (void)OQ4_FenceCloseHooks(true);
+    oq4_fence_collecting = false;
     if (oq4_fence_enabled) OQ4_FenceFault();
+}
+bool OQ4_WindowsNativeFenceRunLifecycle(OQ4_NativeCollectionWork work, void *userdata)
+{
+    bool completed = false;
+    OQ4_NativeCollectionContext context;
+    if (!OQ4_FenceMain() || !work || !oq4_fence_enabled || OQ4_WIN_NativeFenceBlocked()) return false;
+    if (!OQ4_FenceBeginCollection(OQ4_COLLECTION_LIFECYCLE)) return false;
+    context = oq4_fence_context;
+#ifdef _MSC_VER
+    __try {
+#endif
+        ++oq4_fence_callback_depth;
+#ifdef _MSC_VER
+        __try {
+#endif
+            completed = work(userdata, &context);
+#ifdef _MSC_VER
+        } __finally {
+#endif
+            --oq4_fence_callback_depth;
+#ifdef _MSC_VER
+        }
+#endif
+        completed = completed && OQ4_FenceContextMatches(&context) && oq4_fence_enabled && oq4_fence_collecting &&
+            oq4_fence_healthy && OQ4_WIN_QueueHealthy();
+#ifdef _MSC_VER
+    } __finally {
+#endif
+        if (completed) OQ4_WIN_EndNativeCollection(true); else OQ4_WIN_AbortNativeCollection();
+#ifdef _MSC_VER
+    }
+#endif
+    return completed && oq4_fence_enabled && oq4_fence_healthy && OQ4_WIN_QueueHealthy() && oq4_fence_published;
 }
 void OQ4_WIN_NativeFenceLifecycle(void)
 {

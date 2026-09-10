@@ -357,7 +357,7 @@ int main() {
     view->editor.state.text="copy";assert(interaction.widget->number->state.text=="1.25");
     impl.onRead=[&]{interaction.widget->number->identity.revision=33;};
     view=runtime.QueryNumberEditor(error,1);assert(view && view->editor.identity.revision==33);impl.onRead={};
-    for(int unavailable=0;unavailable<11;++unavailable) {
+    for(int unavailable=0;unavailable<13;++unavailable) {
         interaction.widget=widget;interaction.eligible=true;interaction.modalBlocked=false;interaction.modalToken=21;
         switch(unavailable) {
         case 0:interaction.widget.reset();break;
@@ -371,6 +371,8 @@ int main() {
         case 8:interaction.modalToken=0;break;
         case 9:interaction.modalBlocked=true;break;
         case 10:interaction.widget->number->conflict=true;break;
+        case 11:interaction.widget->number->nativePresentation=NativeTextSnapshot{};break;
+        case 12:interaction.widget->number->nativeUnsettled=true;break;
         }
         assert(!runtime.QueryNumberEditor(error,1) && error.empty());
     }
@@ -426,6 +428,8 @@ def main():
             ('runtime', 'pending', 'view->pending ||', 'false ||'),
             ('runtime', 'modal', 'return modalBlocked ? 0 : modalToken;', 'return modalToken;'),
             ('runtime', 'conflict', 'view->number->conflict ||', 'false ||'),
+            ('runtime', 'native-presentation', 'view->number->nativePresentation ||', 'false ||'),
+            ('runtime', 'native-unsettled', 'view->number->nativeUnsettled ||', 'false ||'),
         ]
         cases = [(name, source, False) for name, source in sources.items()]
         for unit, name, old, new in mutations:

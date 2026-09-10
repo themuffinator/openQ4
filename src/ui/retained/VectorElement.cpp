@@ -14,6 +14,13 @@ void VectorGeometry::Configure(const std::vector<VectorPath>& source, Host& owne
 	paths = source; host = &owner; statistics = &measurements;
 	compiled.clear(); geometry.clear(); valid = false; previousOpacity = -1;
 }
+void VectorGeometry::CopyArtworkFrom(const VectorGeometry& source) {
+	paths = source.paths; host = source.host; statistics = source.statistics;
+	compiled.clear(); geometry.clear(); valid = false; previousOpacity = -1;
+}
+void VectorElement::CopyArtworkFrom(const VectorElement& source) {
+	paint.CopyArtworkFrom(source.paint); mask.CopyArtworkFrom(source.mask);
+}
 void VectorGeometry::Render(Rml::Element& element, bool inheritOpacity) {
 	auto* manager = element.GetRenderManager();
 	if (paths.empty() || !host || !manager || !element.GetContext()) return;

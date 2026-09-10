@@ -198,14 +198,39 @@ public:
 		bool keepDraft, std::string& error, double seconds);
 	bool CancelNumberEdit(const std::string& id, NumberEditIdentity expected, double seconds);
 	// Observe fresh host readbacks before querying/consuming a local-draft barrier.
-	// These guard local buffers only; native queued/document state is not attached.
+	// Includes attached native presentation and unsettled-group blockers. The
+	// caller separately owns provider queues and external native retirement.
 	bool QueryNumberDrafts(NumberDraftSummary& out, std::string& error, double seconds);
 	bool DiscardNumberDrafts(const NumberDraftBarrier& expected, std::string& error, double seconds);
 	bool FocusNumberDraft(const NumberDraftBarrier& expected, const std::string& control, std::string& error, double seconds);
 	std::optional<NumberTextGeometry> GetNumberGeometry(const std::string& id) const;
 	// Refresh host values and current eligibility, then copy the focused active
-	// editor. Never starts/rebases an inactive draft or serializes a live token.
+	// ordinary editor. Attached native presentation has its own authority and is
+	// unavailable here, including after settlement. Never starts/rebases an
+	// inactive draft or serializes a live token.
 	std::optional<NumberEditorContext> QueryNumberEditor(std::string& error, double seconds);
+	// Native attachment and observation refresh host state. The caller validates
+	// its managed allocation, window and provider collection separately. No native
+	// device is activated here, and attachment never starts an inactive editor.
+	bool AttachNumberNative(const TextEditorIdentity& owner, NativeTextIdentity native,
+		NativeTextEditorBarrier& out, std::string& error, double seconds);
+	bool RefreshNumberNative(const NativeTextEditorBarrier& expected,
+		NativeTextEditorView& out, std::string& error, double seconds);
+	bool IsNumberNativeCurrent(const NativeTextEditorBarrier&) const noexcept;
+	// These model operations invoke no Host callbacks. A collection coordinator
+	// must refresh and validate the live owner/provider before each operation,
+	// then execute returned native receipts in the same checked boundary.
+	bool BeginNumberNativeCollection(const NativeTextEditorBarrier&, const NativeTextCollection&,
+		NativeTextEditorBarrier& out, std::string& error);
+	bool ApplyNumberNative(const NativeTextEditorBarrier&, const NativeTextOffer&,
+		NativeTextEditorReceipt& out, std::string& error);
+	bool CompleteNumberNativeCollection(const NativeTextEditorBarrier&, const NativeTextCollection&,
+		NativeTextEditorBarrier& out, std::string& error);
+	bool SettleNumberNative(const NativeTextEditorBarrier&, NativeTextEditorReceipt& out, std::string& error);
+	std::unique_ptr<Interaction::NativeSettlement> PrepareNumberNativeSettlement(const NativeTextEditorBarrier&, std::string& error);
+	bool PublishNumberNativeSettlement(Interaction::NativeSettlement&, NativeTextEditorReceipt& out) noexcept;
+	bool RetireNumberNative(const NativeTextEditorBarrier&, NativeTextEditorReceipt& out, std::string& error);
+	bool RetireNumberNativeExact(NativeTextIdentity, const TextEditorIdentity&) noexcept;
 	std::vector<ControlAction> TakeActions();
 	// Recheck queued activations after earlier programs may change eligibility.
 	bool CanActivateControl(const std::string& id, double monotonicSeconds);

@@ -37,7 +37,7 @@ def main() -> int:
                '-I', str(ROOT / 'src/ui/retained'), str(working), str(sources[2]), str(sources[4]),
                '-o', str(scratch / 'test.exe')]
     if args.sanitize:
-        command[1:1] = ['-fsanitize=address,undefined', '-fno-omit-frame-pointer']
+        command[1:1] = ['-fsanitize=address,undefined', '-fno-omit-frame-pointer', '-no-pie']
     env = os.environ.copy()
     env['TEMP'] = env['TMP'] = env['TMPDIR'] = str(scratch)
     def run(argv: list[str], log: str) -> subprocess.CompletedProcess[str]:
@@ -52,6 +52,25 @@ def main() -> int:
     if tested.returncode:
         raise RuntimeError(tested.stdout)
     mutations = {
+        'metadata-acked-observation-reused': [('observed.acknowledgedSequence!=impl->transactionSequence-impl->pending.size()', 'false')],
+        'metadata-stale-engine-observation': [('observed.engineRevision!=impl->engineRevision ||', 'false ||')],
+        'metadata-stale-shadow-observation': [('observed.shadowRevision!=impl->shadowRevision ||', 'false ||')],
+        'metadata-stale-sequence-observation': [('observed.transactionSequence!=impl->transactionSequence ||', 'false ||')],
+        'metadata-marked-document-change': [('transaction.documentChanged=false;', 'transaction.documentChanged=true;')],
+        'metadata-loses-classification': [('transaction.classification=NativeTextClassification::CompositionRelated;', 'transaction.classification=NativeTextClassification::Unclassified;')],
+        'metadata-dispatch-lost': [('transaction.nativeDispatch=observed.dispatch;', 'transaction.nativeDispatch=0;')],
+        'metadata-text-payload-admitted': [('|| !operation.text.empty() ||', '|| false ||')],
+        'metadata-capture-during-read': [('if (impl->frame || impl->deferredWrite || !dispatch || impl->pending.size()>32', 'if (impl->deferredWrite || !dispatch || impl->pending.size()>32')],
+        'metadata-capture-invents-lock-serial': [('out=candidate;error.clear();return true;\n}\nbool NativeTextDocument::PublishCompositionObservation', '++impl->lockSequence;out=candidate;error.clear();return true;\n}\nbool NativeTextDocument::PublishCompositionObservation')],
+        'metadata-ended-identities-unbudgeted': [('if (!impl->Retained(candidate)) return Fail(error,"Native retained composition budget exhausted");', 'if (false) return Fail(error,"Native retained composition budget exhausted");')],
+        'pending-query-stale-engine': [('expectedEngine!=impl->engineRevision)', '(void(expectedEngine),false))')],
+        'pending-query-stale-ack': [('expectedAcknowledged!=acknowledged ||', '(void(expectedAcknowledged),false) ||')],
+        'pending-query-stale-shadow': [('expectedAcknowledgedShadow!=acknowledgedShadow)', '(void(expectedAcknowledgedShadow),false))')],
+        'pending-query-mixed-dispatch': [('transaction.nativeDispatch!=dispatch ||', 'false ||')],
+        'pending-query-empty-zero-dispatch': [('impl->deferredWrite || !dispatch || count>32', 'impl->deferredWrite || count>32')],
+        'pending-query-during-read': [('if (impl->frame || impl->deferredWrite || !dispatch || count>32', 'if (impl->deferredWrite || !dispatch || count>32')],
+        'pending-query-during-deferred-write': [('impl->frame || impl->deferredWrite || !dispatch || count>32', 'impl->frame || !dispatch || count>32')],
+        'pending-query-wrong-count': [('impl->transactionSequence,static_cast<std::uint32_t>(count)', 'impl->transactionSequence,static_cast<std::uint32_t>(count+1)')],
         'surrogate-split-accepted': [('found==map.end() || found->acp!=acp', 'found==map.end()')],
         'partial-candidate-published': [('if (impl->frame->poisoned) { impl->frame.reset();',
                                         'if (impl->frame->poisoned) { impl->state=std::move(impl->frame->working); impl->frame.reset();')],

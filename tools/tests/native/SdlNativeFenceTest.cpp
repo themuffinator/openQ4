@@ -198,6 +198,7 @@ static void SDL_SetAtomicPointer(void**p,void*v){*p=v;}
 #include "wait.inc"
 static void Reset(){
  mainThread=true;OQ4_WindowsNativeFenceRetire();admissionCallback={};transferCallback={};SDL_StopEventLoop();CHECK(SDL_StartEventLoop());oq4_fence_in_pump=oq4_fence_emitting=false;oq4_fence_admission=nullptr;
+ CHECK(!oq4_fence_callback_depth&&!oq4_fence_prepare_attempted&&!oq4_fence_context_active);CHECK(OQ4_WindowsNativeFenceRegisterHooks(nullptr));
  nativeQueue.clear();events.clear();inPeek={};inDispatch={};inHousekeeping={};filter={};queueFails=false;g_WindowsMessageHook=nullptr;
  peeks=dispatches=translations=waits=gameUpdates=tailUpdates=queueAttempts=0;g_WindowsEnableMessageLoop=true;SDL_processing_messages=false;
  videoData.gameinput_context=nullptr;video.windows=nullptr;focus=nullptr;SDL_last_warp_time=0;std::memset(keys,0,sizeof(keys));error.clear();
@@ -353,18 +354,111 @@ static void Bounds(){
  Reset();CHECK(OQ4_WindowsNativeFenceEnable(true));auto s=oq4_fence_sequence;oq4_fence_sequence=UINT64_MAX;Posted();WIN_PumpEvents(&video);CHECK(!OQ4_WindowsNativeFenceHealthy()&&events.empty());oq4_fence_sequence=s;
  Reset();CHECK(OQ4_WindowsNativeFenceEnable(true));auto m=oq4_fence_marker;oq4_fence_marker=0x7fffffffu;Posted();WIN_PumpEvents(&video);CHECK(!OQ4_WindowsNativeFenceHealthy()&&events.empty());oq4_fence_marker=m;
 }
+struct HookState {
+ int prepared=0,finished=0,worked=0;bool aborted=false;
+ OQ4_NativeCollectionContext context{};
+ std::function<bool(const OQ4_NativeCollectionContext*)> prepare,work;
+ std::function<bool(const OQ4_NativeCollectionContext*,bool)> finish;
+};
+static bool PrepareHook(void* userdata,const OQ4_NativeCollectionContext* context){
+ auto& h=*static_cast<HookState*>(userdata);++h.prepared;h.context=*context;
+ CHECK(context->version==1&&context->generation&&context->dispatch);CHECK(OQ4_WIN_CurrentNativeDispatch()==context->dispatch);
+ return h.prepare?h.prepare(context):true;
+}
+static bool FinishHook(void* userdata,const OQ4_NativeCollectionContext* context,bool aborted){
+ auto& h=*static_cast<HookState*>(userdata);++h.finished;h.aborted=aborted;
+ CHECK(std::memcmp(context,&h.context,sizeof(*context))==0);
+ return h.finish?h.finish(context,aborted):true;
+}
+static bool LifecycleWork(void* userdata,const OQ4_NativeCollectionContext* context){
+ auto& h=*static_cast<HookState*>(userdata);++h.worked;CHECK(context->kind==OQ4_COLLECTION_LIFECYCLE);
+ return h.work?h.work(context):true;
+}
+static void Register(HookState& h){OQ4_NativeCollectionHooks hooks{1,&h,PrepareHook,FinishHook};CHECK(OQ4_WindowsNativeFenceRegisterHooks(&hooks));}
+static void HooksAndZeroEvent(){
+ Reset();HookState h;OQ4_NativeCollectionHooks hooks{1,&h,PrepareHook,FinishHook};
+ auto bad=hooks;bad.version=2;CHECK(!OQ4_WindowsNativeFenceRegisterHooks(&bad));bad=hooks;bad.Prepare=nullptr;CHECK(!OQ4_WindowsNativeFenceRegisterHooks(&bad));bad=hooks;bad.Finish=nullptr;CHECK(!OQ4_WindowsNativeFenceRegisterHooks(&bad));
+ bool worker=true;std::thread other([&]{worker=OQ4_WindowsNativeFenceRegisterHooks(&hooks);});other.join();CHECK(!worker);
+ CHECK(OQ4_WindowsNativeFenceRegisterHooks(&hooks));hooks.Prepare=nullptr;hooks.Finish=nullptr;hooks.userdata=nullptr; // copied table, not borrowed
+ CHECK(!OQ4_WindowsNativeFenceRunLifecycle(LifecycleWork,&h)&&h.worked==0);
+ CHECK(OQ4_WindowsNativeFenceEnable(true));CHECK(!OQ4_WindowsNativeFenceRegisterHooks(nullptr));
+ h.prepare=[&](const auto* context){CHECK(peeks==0&&tailUpdates==0);CHECK(context->kind==OQ4_COLLECTION_PUMP);return true;};
+ bool observed=false;inPeek=[&]{observed=true;CHECK(h.prepared==1&&h.finished==0);};
+ h.finish=[&](const auto* context,bool aborted){CHECK(!aborted&&observed&&tailUpdates==1&&h.finished==1);OQ4_NativeFence pending{};CHECK(!OQ4_WindowsNativeFencePending(&pending));CHECK(events.empty());return OQ4_WindowsNativeFenceMarkActivity(context);};
+ WIN_PumpEvents(&video);CHECK(h.prepared==1&&h.finished==1&&!h.aborted&&Current().event_count==0);const auto stale=h.context;CHECK(!OQ4_WindowsNativeFenceMarkActivity(&stale));Ack();
+ h.prepare={};h.finish={};WIN_PumpEvents(&video);CHECK(h.prepared==2&&h.finished==2&&events.empty()&&!OQ4_WIN_NativeFenceBlocked());
+ CHECK(h.context.dispatch>stale.dispatch);
+ CHECK(OQ4_WindowsNativeFenceRetire());CHECK(OQ4_WindowsNativeFenceRegisterHooks(nullptr));
+ CHECK(OQ4_WindowsNativeFenceEnable(true));WIN_PumpEvents(&video);CHECK(h.prepared==2&&h.finished==2);
+}
+static void ExactHookContextAndReentry(){
+ Reset();HookState h;Register(h);CHECK(OQ4_WindowsNativeFenceEnable(true));
+ h.prepare=[&](const auto* context){
+  for(unsigned field=0;field<4;++field){auto wrong=*context;if(field==0)++wrong.version;if(field==1)wrong.kind=OQ4_COLLECTION_LIFECYCLE;if(field==2)++wrong.generation;if(field==3)++wrong.dispatch;CHECK(!OQ4_WindowsNativeFenceMarkActivity(&wrong));}
+  bool worker=true;std::thread t([&]{worker=OQ4_WindowsNativeFenceMarkActivity(context);});t.join();CHECK(!worker);
+  CHECK(!OQ4_WindowsNativeFenceMarkActivity(nullptr));CHECK(OQ4_WindowsNativeFenceMarkActivity(context));
+  CHECK(!OQ4_WindowsNativeFenceRegisterHooks(nullptr)&&!OQ4_WindowsNativeFenceEnable(true));
+  const int before=peeks;WIN_PumpEvents(&video);CHECK(peeks==before);CHECK(!OQ4_WindowsNativeFenceRunLifecycle(LifecycleWork,&h));return true;
+ };
+ h.finish=[&](const auto* context,bool aborted){CHECK(!aborted);const int before=peeks;WIN_PumpEvents(&video);CHECK(peeks==before);CHECK(!OQ4_WindowsNativeFenceRunLifecycle(LifecycleWork,&h));CHECK(!OQ4_WindowsNativeFenceRegisterHooks(nullptr)&&!OQ4_WindowsNativeFenceEnable(true));return OQ4_WindowsNativeFenceMarkActivity(context);};
+ WIN_PumpEvents(&video);CHECK(h.worked==0&&h.prepared==1&&h.finished==1);Ack();
+ const auto stale=h.context;CHECK(OQ4_WindowsNativeFenceRetire());CHECK(OQ4_WindowsNativeFenceEnable(true));
+ h.prepare=[&](const auto* context){CHECK(context->generation>stale.generation);CHECK(!OQ4_WindowsNativeFenceMarkActivity(&stale));return true;};
+ WIN_PumpEvents(&video);Ack();
+}
+static void HookFailuresAndRetirement(){
+ for(int failure=0;failure<7;++failure){Reset();HookState h;Register(h);CHECK(OQ4_WindowsNativeFenceEnable(true));Posted();
+  h.prepare=[&](const auto* context){if(failure==0)return false;if(failure==1){CHECK(OQ4_WindowsNativeFenceRetire());CHECK(!OQ4_WindowsNativeFenceEnable(true)&&!OQ4_WindowsNativeFenceRegisterHooks(nullptr));}
+   if(failure==2)++const_cast<OQ4_NativeCollectionContext*>(context)->dispatch;return true;};
+  h.finish=[&](const auto* context,bool aborted){CHECK(h.finished==1);CHECK(!OQ4_WindowsNativeFenceRegisterHooks(nullptr));
+   if(failure<3||failure==6)CHECK(aborted);else CHECK(!aborted);
+   if(failure==3)return false;if(failure==4){CHECK(OQ4_WindowsNativeFenceRetire());CHECK(!OQ4_WindowsNativeFenceEnable(true));}
+   if(failure==5)++const_cast<OQ4_NativeCollectionContext*>(context)->generation;return true;};
+  if(failure==6)inDispatch=[] {CHECK(OQ4_WindowsNativeFenceRetire());};
+  WIN_PumpEvents(&video);CHECK(h.prepared==1&&h.finished==1&&!OQ4_WindowsNativeFenceHealthy()&&events.empty());
+  CHECK(peeks==(failure<3?0:1));CHECK(!oq4_fence_context_active&&!oq4_fence_prepare_attempted&&!oq4_fence_callback_depth&&!oq4_fence_in_pump);
+  CHECK(OQ4_WindowsNativeFenceRetire());CHECK(OQ4_WindowsNativeFenceRegisterHooks(nullptr));CHECK(OQ4_WindowsNativeFenceEnable(true));
+ }
+}
+static void LifecycleCollections(){
+ Reset();HookState h;CHECK(!OQ4_WindowsNativeFenceRunLifecycle(LifecycleWork,&h));CHECK(OQ4_WindowsNativeFenceEnable(true));
+ CHECK(!OQ4_WindowsNativeFenceRunLifecycle(nullptr,&h));CHECK(OQ4_WindowsNativeFenceRunLifecycle(LifecycleWork,&h));CHECK(h.worked==1&&peeks==0&&Current().event_count==0);Ack();
+ CHECK(OQ4_WindowsNativeFenceRetire());Register(h);CHECK(OQ4_WindowsNativeFenceEnable(true));
+ h.prepare=[&](const auto* context){CHECK(context->kind==OQ4_COLLECTION_LIFECYCLE&&peeks==0);return true;};
+ h.work=[&](const auto* context){CHECK(h.prepared==1&&h.finished==0);CHECK(OQ4_WIN_CurrentNativeDispatch()==context->dispatch);CHECK(!OQ4_WindowsNativeFenceRunLifecycle(LifecycleWork,&h));WIN_PumpEvents(&video);CHECK(peeks==0);Emit(881);return true;};
+ // Pending is deliberately unavailable until Finish returns; don't use Current helper here.
+ h.finish=[&](const auto*,bool aborted){CHECK(!aborted&&h.worked==2);OQ4_NativeFence pending{};CHECK(!OQ4_WindowsNativeFencePending(&pending));return true;};
+ CHECK(OQ4_WindowsNativeFenceRunLifecycle(LifecycleWork,&h));CHECK(h.finished==1&&Current().event_count==1&&peeks==0);Ack();
+ for(int mode=0;mode<3;++mode){Reset();HookState fail;Register(fail);CHECK(OQ4_WindowsNativeFenceEnable(true));
+  fail.work=[&](const auto* context){if(mode==0)return false;if(mode==1){CHECK(OQ4_WindowsNativeFenceRetire());CHECK(!OQ4_WindowsNativeFenceRegisterHooks(nullptr)&&!OQ4_WindowsNativeFenceEnable(true));}else ++const_cast<OQ4_NativeCollectionContext*>(context)->kind;return true;};
+  CHECK(!OQ4_WindowsNativeFenceRunLifecycle(LifecycleWork,&fail));CHECK(fail.prepared==1&&fail.worked==1&&fail.finished==1&&fail.aborted&&peeks==0&&!OQ4_WindowsNativeFenceHealthy());
+ }
+}
 #ifdef _MSC_VER
 extern "C" __declspec(dllimport) void __stdcall RaiseException(DWORD,DWORD,DWORD,const uintptr_t*);
 static void Raise(){RaiseException(0xe1234567u,0,0,nullptr);}
 static bool CatchPump(){__try {WIN_PumpEvents(&video);}__except(1){return true;}return false;}
+static bool CatchLifecycle(HookState* hooks){__try {(void)OQ4_WindowsNativeFenceRunLifecycle(LifecycleWork,hooks);}__except(1){return true;}return false;}
 static void Abnormal(){
  Reset();CHECK(OQ4_WindowsNativeFenceEnable(true));Posted();inDispatch=Raise;CHECK(CatchPump());CHECK(!OQ4_WindowsNativeFenceHealthy()&&OQ4_WIN_NativeFenceBlocked());CHECK(!SDL_processing_messages&&!oq4_fence_collecting&&!oq4_fence_in_pump&&scopeDepth==0);CHECK(events.empty());
  Reset();CHECK(OQ4_WindowsNativeFenceEnable(true));Posted();filter=[](SDL_Event*ev){if(ev->type==OQ4_WindowsNativeFenceEventType())Raise();return true;};CHECK(CatchPump());CHECK(!OQ4_WindowsNativeFenceHealthy()&&OQ4_WIN_NativeFenceBlocked());CHECK(!oq4_fence_emitting&&!oq4_fence_admission);
 }
+static void AbnormalHooks(){
+ for(int mode=0;mode<8;++mode){Reset();HookState h;Register(h);CHECK(OQ4_WindowsNativeFenceEnable(true));
+  h.prepare=[&](const auto*){if(mode==0||mode==4){Raise();}if(mode==3||mode==7){CHECK(OQ4_WindowsNativeFenceRetire());Raise();}return true;};
+  h.finish=[&](const auto*,bool aborted){CHECK(h.finished==1);if(mode==1||mode==5){CHECK(!aborted);Raise();}else CHECK(aborted);return true;};
+  if(mode<4){Posted();if(mode==2)inDispatch=Raise;CHECK(CatchPump());}
+  else {if(mode==6)h.work=[](const auto*)->bool {Raise();return true;};CHECK(CatchLifecycle(&h));}
+  CHECK(h.prepared==1&&h.finished==1&&!OQ4_WindowsNativeFenceHealthy());
+  CHECK(!oq4_fence_prepare_attempted&&!oq4_fence_callback_depth&&!oq4_fence_context_active&&!oq4_fence_in_pump&&!oq4_fence_collecting);
+  CHECK(OQ4_WindowsNativeFenceRetire());CHECK(OQ4_WindowsNativeFenceRegisterHooks(nullptr));CHECK(OQ4_WindowsNativeFenceEnable(true));
+ }
+}
 #endif
-int main(){DisabledAndCollection();EmptySentAndHousekeeping();EarlyExits();FailuresAndAtomicity();ReentryAndLifecycle();HeldWait();QueueStream();QueueLoss();QueueForgeryAndLifecycle();QueueBounds();QueueForgedMetadata();Bounds();
+int main(){DisabledAndCollection();EmptySentAndHousekeeping();EarlyExits();FailuresAndAtomicity();ReentryAndLifecycle();HeldWait();QueueStream();QueueLoss();QueueForgeryAndLifecycle();QueueBounds();QueueForgedMetadata();Bounds();HooksAndZeroEvent();ExactHookContextAndReentry();HookFailuresAndRetirement();LifecycleCollections();
 #ifdef _MSC_VER
 Abnormal();
+AbnormalHooks();
 #endif
 #ifdef _MSC_VER
 std::printf("SEH cleanup enabled\n");

@@ -4,6 +4,9 @@
 #include "SystemSettingsHost.h"
 #include "../../framework/CVarDefaults.h"
 #include <algorithm>
+#include <bit>
+#include <charconv>
+#include <cstdint>
 #include <cmath>
 #include <limits>
 #include <utility>
@@ -35,9 +38,22 @@ const SystemSettingDescriptor* Descriptor(const std::string& key) {
 	const auto found = std::find_if(catalog.begin(), catalog.end(), [&](const auto& item) { return item.key == key; });
 	return found == catalog.end() ? nullptr : &*found;
 }
+bool SameValue(const StateValue& a, const StateValue& b) {
+	if (a.index() != b.index()) return false;
+	if (const double* number = std::get_if<double>(&a)) {
+		// The renderer enables DAZ. Keep exact catalog comparisons independent
+		// of that mode; a tiny observed original must not become equal to zero.
+		// Volatile integer observations prevent folding this into FP equality.
+		static_assert(sizeof(double) == sizeof(std::uint64_t) && std::numeric_limits<double>::is_iec559);
+		const volatile std::uint64_t left = std::bit_cast<std::uint64_t>(*number);
+		const volatile std::uint64_t right = std::bit_cast<std::uint64_t>(std::get<double>(b));
+		return left == right || (((left | right) & 0x7fffffffffffffffULL) == 0);
+	}
+	return a == b;
+}
 bool Changed(const StateValues& before, const StateValues& target, const std::string& key) {
 	const auto old = before.find(key), next = target.find(key);
-	return old == before.end() || next == target.end() || old->second != next->second;
+	return old == before.end() || next == target.end() || !SameValue(old->second, next->second);
 }
 bool Typed(const SystemSettingDescriptor& item, const StateValue& value, std::string& error) {
 	if (value.index() != item.type || !ValidStateValue(value)) return Fail(error, item.key, "invalid setting type or value");
@@ -74,9 +90,40 @@ bool Parse(const SystemSettingDescriptor& item, const char* text, StateValue& ou
 	output = std::move(candidate);
 	return true;
 }
+std::string SubnormalText(std::uint64_t bits) {
+	// Some standard-library to_chars implementations treat subnormal inputs
+	// as zero under DAZ. Expand the exact fraction using integers for this
+	// rare recovery path: fraction * 2^-1074 = fraction * 5^1074 / 10^1074.
+	// At most 1077 characters; no floating-mode mutation or approximate zero.
+	std::uint64_t fraction = bits & 0x000fffffffffffffULL;
+	unsigned places = 1074;
+	while ((fraction & 1) == 0) { fraction >>= 1; --places; }
+	std::string digits = std::to_string(fraction);
+	for (unsigned power = 0; power < places; ++power) {
+		unsigned carry = 0;
+		for (size_t i = digits.size(); i-- > 0;) {
+			const unsigned value = unsigned(digits[i] - '0') * 5 + carry;
+			digits[i] = char('0' + value % 10); carry = value / 10;
+		}
+		if (carry) digits.insert(digits.begin(), char('0' + carry));
+	}
+	return std::string(bits >> 63 ? "-0." : "0.") + std::string(places - digits.size(), '0') + digits;
+}
 std::string Serialize(const StateValue& value) {
 	PresentationValue converted;
-	if (const double* number = std::get_if<double>(&value)) converted.data[0] = *number;
+	if (const double* number = std::get_if<double>(&value)) {
+		// CVar's legacy IsNumeric grammar excludes exponents. Passing scientific
+		// notation would replace the string with a six-decimal float rendering,
+		// losing small/custom values before exact readback. Fixed shortest form
+		// retains the requested binary64 decimal and does not change CVar policy.
+		const volatile std::uint64_t representation = std::bit_cast<std::uint64_t>(*number);
+		const std::uint64_t bits = representation;
+		if ((bits & 0x7ff0000000000000ULL) == 0 && (bits & 0x000fffffffffffffULL) != 0)
+			return SubnormalText(bits);
+		char text[768];
+		const auto formatted=std::to_chars(text,text+sizeof(text),*number,std::chars_format::fixed);
+		return formatted.ec==std::errc{} ? std::string(text,formatted.ptr) : std::string{};
+	}
 	else if (const bool* boolean = std::get_if<bool>(&value)) {
 		converted.type = PresentationType::Boolean; converted.data[0] = *boolean ? 1 : 0;
 	} else { converted.type = PresentationType::String; converted.text = std::get<std::string>(value); }
@@ -108,6 +155,21 @@ bool EditorValue(const SystemSettingDescriptor& item, const StateValue& value, s
 	if (item.type == 0) {
 		const double number = std::get<double>(value);
 		if (number < item.minimum || number > item.maximum) return Fail(error, item.key, "outside the settings range");
+		if (!item.integer) {
+			// New edits must survive the actual float conversion, including the
+			// engine's FTZ/DAZ mode. Inspect double zero by representation so DAZ
+			// cannot make a nonzero binary64 subnormal look like an explicit zero.
+			// Observe both values explicitly: optimizers otherwise assume gradual
+			// underflow and may fold the integer test back into an FP comparison.
+			static_assert(sizeof(double)==sizeof(std::uint64_t) && std::numeric_limits<double>::is_iec559);
+			const volatile std::uint64_t magnitude=std::bit_cast<std::uint64_t>(number)&0x7fffffffffffffffULL;
+			const bool nonzero=magnitude!=0;
+			const volatile float converted=static_cast<float>(number);
+			const float actual=converted;
+			if (!std::isfinite(actual) || (nonzero && actual==0))
+				return Fail(error, item.key, "value is not representable by the float setting");
+		}
+
 		if (!item.numberChoices.empty() && std::find(item.numberChoices.begin(), item.numberChoices.end(), number) == item.numberChoices.end())
 			return Fail(error, item.key, "not a supported settings choice");
 	} else if (item.type == 2 && !item.stringChoices.empty() &&
@@ -233,7 +295,7 @@ bool ValidateCandidate(const StateValues* original, const StateValues& current,
 		const StateValue& value = candidate.at(item.key);
 		if (!Writable(item, *variable, error) || !RegisteredValue(item, *variable, value, error)) return false;
 		// Recovery may restore an observed custom value outside UI-only choices.
-		const bool restoring = original && original->at(item.key) == value;
+		const bool restoring = original && SameValue(original->at(item.key), value);
 		if (!restoring && !EditorValue(item, value, error)) return false;
 	}
 	if (checkDisplay && !DisplayTuple(current, candidate, error)) return false;
@@ -358,9 +420,11 @@ bool SystemSettingsHost::Write(const StateValues& changes, std::string& error) {
 		if (!variable || !RegisteredValue(*item, *variable, value, error)) return false;
 		StateValue previous;
 		if (!Parse(*item, variable->GetString(), previous, error)) return false;
-		if (previous == value) continue;
+		if (SameValue(previous, value)) continue;
 		if (!Writable(*item, *variable, error)) return false;
-		pending.push_back({item, value, Serialize(value)});
+		std::string text=Serialize(value);
+		if (item->type==0 && text.empty()) return Fail(error,key,"cannot serialize numeric setting");
+		pending.push_back({item, value, std::move(text)});
 	}
 	for (const auto& write : pending) {
 		// Reacquire the registered owner; never create unknown CVars or retain a
@@ -372,7 +436,7 @@ bool SystemSettingsHost::Write(const StateValues& changes, std::string& error) {
 		variable = Registered(*write.item, error);
 		StateValue actual;
 		if (!variable || !Parse(*write.item, variable->GetString(), actual, error)) return false;
-		if (actual != write.value) return Fail(error, write.item->key, "CVar rejected or normalized the requested value");
+		if (!SameValue(actual, write.value)) return Fail(error, write.item->key, "CVar rejected or normalized the requested value");
 	}
 	error.clear(); return true;
 }

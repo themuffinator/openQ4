@@ -75,9 +75,11 @@ The Windows-only text store now implements the actual SDK `ITextStoreACP`,
 composition-sink and edit-sink interfaces. It checks apartment ownership,
 callback-scoped locks, context identity, deferred write upgrades, copied range
 layout revisions and transaction acknowledgements. It is not activated or
-connected to a field. Composition changes currently require an active write
-callback; arbitrary multi-lock composition sessions and production candidate
-placement remain required. A failed
+connected to a field. Composition metadata outside a write callback uses a
+copied revision/sequence observation and revalidates it after foreign range
+queries. Metadata within a write callback stays in its atomic transaction.
+Update uses the supplied range; End does not query a terminated composition's
+range or imply acceptance/cancellation. A failed
 callback retires the document because a text service may already have accepted
 the synchronous edit. Counted SDK callback tests do not qualify an installed TIP.
 
@@ -85,9 +87,10 @@ Application-origin snapshots use a separate exact-revision `SyncEngine` call.
 It refuses pending native edits, locks or composition, updates the document
 atomically and then reports actual text/selection changes outside the native
 lock. A revision-only synchronization produces no false text change or native
-shadow increment. Notification callbacks can obtain read locks; synchronous
-write requests are refused and asynchronous writes are served once after the
-whole batch. Application mutations and sink replacement cannot reenter that
+shadow increment. Notification callbacks can obtain read locks. Outside an
+explicit collection, all writes are refused; inside a lifecycle collection,
+asynchronous writes are served once after the whole notification batch.
+Application mutations and sink replacement cannot reenter that
 batch. A failing callback retires the store and requires retirement of the
 paired engine binding. Native edits and acknowledgements never emit these
 application-origin notifications. A fresh copied layout emits its own layout
@@ -128,6 +131,22 @@ Queue membership alone does not prove physical input or native text origin.
 Connecting this ingress to Session and qualifying SDL's actual temporary-payload
 lifetime are still required; counted queue tests cannot establish either.
 
+The private SDL provider also supports copied Prepare/Finish collection hooks.
+Registration requires a disabled, idle main-thread provider; caller-owned hook
+storage remains alive through successful unregister. Prepare precedes native
+processing, and Finish pairs with every attempted Prepare, including failure,
+retirement and supported abnormal unwind. An exact context can mark native
+activity even without SDL events. Controlled lifecycle work produces a held
+fence without pumping or acknowledging it. These hooks remain disabled until
+the engine supplies the complete ownership and provider integration.
+
+The Windows store separately opens and closes explicit Pump or Lifecycle
+collections. A dispatch number alone grants no write or composition authority.
+Close removes callback admission and returns a copied final queue watermark;
+it performs no acknowledgement or editor settlement. Exact-scope abort retires
+without allocating, including with MSVC debug iterators. Queries distinguish
+native quiescence from the separate editor/provider proof needed for renewal.
+
 The portable `NativeTextEditor` reconciler keeps stable local text/history
 separate from a complete native snapshot, including directional selection and
 all concurrent composition ranges. It validates every ordered ACP operation
@@ -137,8 +156,36 @@ insertion before Begin and later composition metadata share one undo group.
 Stable history remains frozen until the collection is complete and composition
 has ended; an explicit settlement makes the group one local edit. Clone/swap
 publication checks the originating barrier again, and retirement restores the
-stable draft. These value contracts are implemented and tested; live field
-binding, native activation and platform qualification remain in development.
+stable draft.
+
+Number interaction now owns the reconciler and exposes immutable full native
+presentation independently from stable local text/history. Local commands,
+clipboard authority and setting commit require native retirement first, even
+when a native group has settled. Save-only copies carry no native mutation
+authority; checked adoption must succeed before Runtime state or motion can
+change. The Number view paints every concurrent nonempty composition range
+using bounded copies of the authored vector underline and invalidates cached
+geometry on exact native snapshot changes. Native provider activation and
+platform qualification remain in development.
+
+`NativeTextCollectionCoordinator` joins a checked owned event batch, an exact
+closed Pump receipt and the original editor lease. It validates again after
+foreign observations, applies and acknowledges the complete FIFO, and prepares
+all stable-text/history allocations before native synchronization. Final local
+publication checks the original authority and allocates nothing. Fence
+completion is separate: Session must account for every ordinary event first.
+Failure retires only the original lease and never consumes another owner's
+input. Runtime exposes the matching checked methods; its allocation-free exact
+retirement preserves stable draft/history. The managed owner adapter, Windows
+store hook consumer and Session activation are still being integrated.
+
+The Windows activation audit confirms that this SDL version owns IMM, with no
+active SDL TSF thread manager to deactivate. The engine provider still requires
+an exclusive per-window handoff, collection scope established before Peek,
+activity marking for callbacks that produce no SDL events, and controlled
+lifecycle collections. Ordinary character association, native candidate
+geometry, graceful termination before store retirement, and fresh-context
+renewal of the bounded composition identity budget remain explicit dependencies.
 
 Activation must establish a newly observed text session: enabling the observer
 while SDL text input is already active emits no retroactive SessionBegin.

@@ -3,6 +3,7 @@
 #include "Document.h"
 #include "TextEdit.h"
 #include "TextEditCommand.h"
+#include "NativeTextEditor.h"
 #include <cstdint>
 #include <functional>
 #include <set>
@@ -41,6 +42,9 @@ struct NumberEditView {
 	TextNumberStatus status = TextNumberStatus::Empty;
 	bool dirty = false, conflict = false, canUndo = false, canRedo = false;
 	bool active = false; // Restored text waits for fresh eligible focus.
+	// Full native bytes/ranges, separate from stable state and the legacy overlay.
+	std::optional<NativeTextSnapshot> nativePresentation;
+	bool nativeUnsettled = false;
 };
 struct NumberDraftStamp {
 	std::string control;
@@ -57,8 +61,7 @@ struct NumberDraftStatus {
 	std::string control;
 	TextNumberStatus status = TextNumberStatus::Empty;
 	bool dirty = false, conflict = false, pending = false, composing = false, active = false;
-	// Reserved for checked native-editor integration. The current local editor
-	// cannot observe a native document/queued native mutation; this stays false.
+	// Collection/group presentation has not settled into stable local history.
 	bool nativeUnsettled = false;
 };
 struct NumberDraftSummary {
@@ -99,6 +102,18 @@ struct ValueWidgetSnapshot {
 // supplies current projected boxes and hit IDs; this class never reads a device.
 class Interaction {
 public:
+	Interaction();
+	~Interaction();
+	Interaction(const Interaction&);
+	Interaction(Interaction&&) noexcept;
+	Interaction& operator=(const Interaction&) = delete;
+	Interaction& operator=(Interaction&&) = delete;
+	// Copies are pure preparation views, never native authorities. Validate the
+	// original complete draft/native barriers before replacing the live state.
+	// Adopt stages retirement first; success retires any live native binding.
+	// Save-only copies and failed adoption cannot retire the originating binding.
+	bool CanAdopt(const Interaction& candidate, std::string& error) const;
+	bool Adopt(Interaction&& candidate, std::string& error);
 	void Reset(const DocumentModel& model);
 	void SetBounds(const std::map<std::string,ControlBounds>& bounds, bool freshLayout = true);
 	void InvalidateLayout();
@@ -175,8 +190,54 @@ public:
 	// Queues one exact double, independent of a sibling slider's step/decimals.
 	bool CommitNumberEdit(const std::string& id, NumberEditIdentity expected, std::string& error);
 	// Cancellation is an engine-owner operation; a supplied identity additionally
-	// protects a deferred cancel. No native composition identity is stored here.
+	// protects a deferred cancel. For a native binding the first cancel restores
+	// stable local text and retires that binding; a later local cancel discards it.
+	// The host must retire its external native document when this binding dies.
 	bool CancelNumberEdit(const std::string& id, NumberEditIdentity expected = {});
+	// Pure native reconciliation only. Full owner identity must match this exact
+	// active Number editor and modal. The caller separately proves native queue,
+	// provider and host ownership before each call and executes returned receipts.
+	// No keyboard/clipboard/setting authority is conferred by these methods.
+	// Bound local edits/commands/commit require explicit retirement first.
+	bool AttachNumberNative(const std::string& id, NumberEditIdentity expected,
+		const TextEditorIdentity& owner, NativeTextIdentity native,
+		NativeTextEditorBarrier& out, std::string& error);
+	bool QueryNumberNative(const std::string& id, const TextEditorIdentity& expected,
+		NativeTextEditorView& out, std::string& error) const;
+	// Callback/allocation-free check after foreign provider/owner observations.
+	bool IsNumberNativeCurrent(const NativeTextEditorBarrier& expected) const noexcept;
+	bool BeginNumberNativeCollection(const NativeTextEditorBarrier& expected,
+		const NativeTextCollection& collection, NativeTextEditorBarrier& out, std::string& error);
+	bool CompleteNumberNativeCollection(const NativeTextEditorBarrier& expected,
+		const NativeTextCollection& collection, NativeTextEditorBarrier& out, std::string& error);
+	bool ApplyNumberNative(const NativeTextEditorBarrier& expected, const NativeTextOffer& offer,
+		NativeTextEditorReceipt& out, std::string& error);
+	// Stage settlement before a foreign native SyncEngine call. The sealed object
+	// owns every allocation; it confers no native authority and may be discarded.
+	// Publish rechecks this live originating instance, exact barrier and current
+	// eligibility, then installs without allocation. Copies cannot prepare/publish.
+	class NativeSettlement {
+	public:
+		~NativeSettlement();
+		NativeSettlement(const NativeSettlement&) = delete;
+		NativeSettlement& operator=(const NativeSettlement&) = delete;
+		const NativeTextEditorReceipt& Receipt() const;
+		const NativeTextSnapshot& Presentation() const;
+	private:
+		NativeSettlement();
+		struct Impl;
+		std::unique_ptr<Impl> impl;
+		friend class Interaction;
+	};
+	std::unique_ptr<NativeSettlement> PrepareNumberNativeSettlement(const NativeTextEditorBarrier& expected,
+		std::string& error);
+	bool PublishNumberNativeSettlement(NativeSettlement&, NativeTextEditorReceipt& out) noexcept;
+	bool SettleNumberNative(const NativeTextEditorBarrier& expected, NativeTextEditorReceipt& out, std::string& error);
+	bool RetireNumberNative(const NativeTextEditorBarrier& expected, NativeTextEditorReceipt& out, std::string& error);
+	// Emergency teardown matches the original native lease and every owner field
+	// except the evolving editing revision. It preserves stable text/history and
+	// never allocates, refreshes eligibility or touches a replacement attachment.
+	bool RetireNumberNativeExact(NativeTextIdentity, const TextEditorIdentity&) noexcept;
 	// Process-local exact barriers, never serialized. Save alone does not retire
 	// a barrier; restore/reset, inventory ABA and relevant editor changes do.
 	// Query copies status/stamps only, not buffers/history. Failure preserves out.
@@ -202,6 +263,7 @@ private:
 		std::uint64_t draftLifetime = 0, draftRevision = 0;
 		bool conflict = false;
 		bool detached = true;
+		std::shared_ptr<const NativeTextEditorView> native;
 	};
 	struct Item {
 		Control control; ControlBounds bounds; ControlState state = ControlState::Default; bool known = false;
@@ -224,6 +286,22 @@ private:
 	bool RebaseNumber(Item& item, std::string& error);
 	void RetireNumber(const std::string& id, Item& item);
 	void DetachNumber(const std::string& id, Item& item);
+	void DropNumberNative(const std::string& id, Item& item);
+	Item* NativeNumber(const NativeTextEditorBarrier& expected, std::string& error);
+	bool PublishNumberNative(const NativeTextEditorBarrier& expected, std::unique_ptr<NativeTextEditor> prepared,
+		std::shared_ptr<const NativeTextEditorView> view, NumberEditor&& editor, std::string& error);
+	bool NativeCollection(bool begin, const NativeTextEditorBarrier& expected,
+		const NativeTextCollection& collection, NativeTextEditorBarrier& out, std::string& error);
+	bool NativeCompletion(bool retire, const NativeTextEditorBarrier& expected, NativeTextEditorReceipt& out, std::string& error);
+	void MoveFields(Interaction& source) noexcept;
+	std::uint64_t authority = 0;
+	bool candidate = false;
+	NumberDraftBarrier originDrafts;
+	std::optional<NativeTextEditorBarrier> originNative;
+	NumberDraftBarrier parentDrafts;
+	std::optional<NativeTextEditorBarrier> parentNative;
+	std::unique_ptr<NativeTextEditor> nativeModel;
+	std::string nativeControl;
 	const StateValue& EditingValue(const Item& item) const;
 	void CancelGesture();
 	void ModalChanged();
