@@ -6,6 +6,7 @@
 
 #include "RenderModuleAPI.h"
 #include "DisplayPresentation.h"
+#include "RendererResourceSettings.h"
 
 /*
 ===============================================================================
@@ -99,6 +100,14 @@ bool R_RendererModule_QueryDisplay( rendererDisplayState_t *outState );
 // Does not switch renderer modules, execute console commands or select fallback
 // modes. Caller must drain frame work, retain recovery state and perform rollback.
 bool R_RendererModule_TryDeviceRestart( const renderWindowRequest_t *request, char *error, int errorSize );
+struct rendererImagePolicyResult_t {
+    uint64_t moduleEpoch;
+    renderImagePolicyResult_t resources;
+};
+// Copies request; false leaves output unchanged. Holds the same video identity
+// lease as display restart until success/live context or explicit restoration.
+bool R_RendererModule_TryImagePolicyRestart(const renderImagePolicyRequest_t* request,
+    rendererImagePolicyResult_t* output, char* error, int errorSize);
 // Strict first device only, after Init and before any world/UI frame. The caller
 // prepares SDL video, resolves portable monitor identity and journals before
 // calling. Failure keeps the video identity pin until explicit retry or unload;

@@ -4,7 +4,7 @@
   "date": "2026-09-10",
   "status": "Implementation incomplete; this register preserves full product scope and does not accept any production GUI.",
   "baseline": {
-    "engine_revision": "efcfdb0ffe6eaffa11dbf2ced026495539156478",
+    "engine_revision": "d6abeabc7e2e348ea11ce50a7671b830e77a15b1",
     "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
     "effective_gui_count": 271,
     "translated_or_accepted_resources": 0,
@@ -24,7 +24,7 @@
     "original": {
       "path": "docs/dev/plans/idtech5-ui.md",
       "authority": "original immutable scope and stage gates",
-      "sha256": "0d7ad15e8d91096108608251bf314a577316980042952f90bffc0be112c69e8a"
+      "sha256": "712fb2715efa80966b9d50d5cb171cd005611d249e8bac981ed51075db7b48a0"
     },
     "inventory": {
       "path": "docs/dev/ui/inventory-report.md",
@@ -371,7 +371,7 @@
     "settings-effect-foundations": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/settings-effect-execution.md",
-      "sha256": "71f8dbfd8e7d081c26a0be0928124104557c4442b963c4f6976b4e3fb8047a52",
+      "sha256": "1136ecd52ec02d5765e6afd85e1fe2763e608a9f310caca3dbabba84d48f3a18",
       "baseline_engine_revision": "efcfdb0ffe6eaffa11dbf2ced026495539156478",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "scope": "Automatic completion waits for real effect readiness and a fresh present; owner close during commit preparation restores before persistence. Checked OpenAL leases gain untouched cancellation and non-releasing finalization. Schema2 adds strict versioned effect-plan envelopes and immutable decoding while the production host remains schema1. Full mixed execution, portable renderer/audio reconstruction and live recovery remain required.",
@@ -397,6 +397,16 @@
       "scope": "Compact preset row and asymmetric wrapping footer preserve one-line real Marine-font Apply text and the complete first brightness row at 200% in reviewed English Vulkan gameplay. OpenGL at 125% also reviewed. All47 integrated UI suites pass including 41,623 deterministic Runtime checks across48 locale/wider-glyph/density/resize cases. Visible scrollbar, complete controls, every real-font/platform state and product acceptance remain required.",
       "local_capture_summary": ".tmp/ui/native-effects-integration/validation-evidence.json",
       "local_capture_summary_sha256": "909df76b2aea07f6641eece8550cd90bd1d3d354e84acf1ffe5ad06c0dbd6457"
+    },
+    "renderer-image-recovery": {
+      "kind": "implementation_checkpoint",
+      "path": "docs/dev/ui/settings-effect-execution.md",
+      "sha256": "1136ecd52ec02d5765e6afd85e1fe2763e608a9f310caca3dbabba84d48f3a18",
+      "baseline_engine_revision": "d6abeabc7e2e348ea11ce50a7671b830e77a15b1",
+      "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
+      "scope": "Checked coalesced image/material restart, original failed-recovery inventory, monotonic resource instance IDs and metadata mutation invalidation. Full engine/modules and49 UI suites pass. Four render-target images after SP/OpenGL125% and MP/Vulkan200% gameplay/ordinary restart qualify compatibility only. Actual checked-policy Apply, portable consumed-policy/content reconstruction, complete settings/editor/migration remain unaccepted.",
+      "local_capture_summary": ".tmp/ui/renderer-effects-integration/validation-evidence.json",
+      "local_capture_summary_sha256": "38ec300cd73f59baca9761b21351f3daa8612d6dbc73b98b0f420f4089975ad2"
     }
   },
   "groups": {
@@ -1825,7 +1835,8 @@
         "native-field-binding",
         "native-managed-bridge",
         "performance-preset-drafts",
-        "settings-effect-foundations"
+        "settings-effect-foundations",
+        "renderer-image-recovery"
       ],
       "acceptance_evidence": [],
       "remaining": "The typed settings service and asynchronous display confirmation retain their previously qualified scopes. Local numeric drafts guard Apply, Apply and Exit, Defaults, colliding sibling edits and dismissal; Discard requires completed service cancellation and an unchanged complete local editor inventory. Queued rollback, stale callbacks and recovery preserve unfinished text. Exact typed comparison and FTZ/DAZ-independent journal number serialization now cover transaction, display validation and startup recovery, preserving observed originals while signed zeros share the canonical zero representation. Shared profile and Auto-Detect draft expansion now preserve all unrelated edits with guarded atomic publication. Complete actual audio/resource/input effects, preset execution and persistence, all dependent production controls, Defaults and the full Apply/Cancel/discard-and-exit matrix. Qualify visible focus/window-placement/fullscreen/multi-monitor failures and timeout/restart recovery across supported platforms. CVar values alone never prove device success; counted recovery and synthetic startup evidence do not qualify a power loss, actual interrupted confirmation or every persistent recovery path."
@@ -4867,7 +4878,8 @@
         "native-managed-bridge",
         "performance-preset-drafts",
         "settings-effect-foundations",
-        "system-compact-opening"
+        "system-compact-opening",
+        "renderer-image-recovery"
       ],
       "acceptance_evidence": [],
       "remaining": "The production page now includes source-derived preset and Auto-Detect controls with localized flowing labels, guarded proposals, actual shared draft expansion and bounded Runtime/gameplay validation. The source-backed 31-option/53-CVar contract retains its packaged opt-in SYSTEM route and precise Brightness/Ambient Brightness fields, localized validation and local draft barriers. Exact numeric recovery and bounded full-border focus reveal extend this implementation; neither accepts the translated page. Complete every actual setting and dependent popup, display capability/resolution catalogs, native numeric text entry, complete preset/Auto-Detect effect execution and persistence, remaining effects, Defaults, full Apply/Cancel/exit behavior, source-derived visuals/transitions and the native editor round trip. Qualify normal SP/MP entry/return/reopen, failure/cancellation, complete responsive/localized state galleries and every mapped resource; historical and current bounded captures do not accept the full requirement."

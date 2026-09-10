@@ -30,6 +30,7 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #include "tr_local.h"
+#include "RendererResourceSettings.h"
 #include "../imagetools/DXT/DXTCodec.h"
 #include "CelShading.h"
 #include "RendererBootstrap.h"
@@ -2237,6 +2238,7 @@ void GL_CheckErrors( void ) {
 		if ( err == GL_NO_ERROR ) {
 			return;
 		}
+		R_ImagePolicyObserveError( "OpenGL resource error", err );
 		switch( err ) {
 			case GL_INVALID_ENUM:
 				strcpy( s, "GL_INVALID_ENUM" );
@@ -4909,9 +4911,12 @@ static bool R_TryFullVidRestartInternal( const renderWindowRequest_t *request, b
 		R_FreeDerivedData();
 		if ( frameData != NULL ) { R_ToggleSmpFrame(); R_ToggleSmpFrame(); }
 		vertexCache.PurgeAll();
+		if ( !R_ImagePolicyBeforeTeardown( error, errorSize ) ) R_RejectRecoverableRendererRestart( error );
 		R_ShutdownDeviceForRestart();
 		tr.viewDef = NULL; tr.primaryView = NULL; backEnd.viewDef = NULL;
+		R_ImagePolicyBeginDeviceReload();
 		if ( R_InitRendererDevice( false, forceWindow, error, errorSize ) ) {
+			if ( !R_ImagePolicyAfterDeviceReload( error, errorSize ) ) R_RejectRecoverableRendererRestart( error );
 			R_ClearActiveRenderTextures();
 			R_InitFreeType();
 			R_RefreshConsoleFontAtlas();
@@ -4921,9 +4926,11 @@ static bool R_TryFullVidRestartInternal( const renderWindowRequest_t *request, b
 #endif
 			tr.viewCount++;
 			R_RegenerateWorld_f( idCmdArgs() );
+			if ( R_ImagePolicyActive() && session != NULL ) session->SetPlayingSoundWorld();
+			if ( !R_ImagePolicyFinish( error, errorSize ) ) R_RejectRecoverableRendererRestart( error );
 			// Publish only after every renderer/font/world dependency is ready.
 			tr.videoRestartCount = tr.videoRestartCount < 0x7fffffff ? tr.videoRestartCount + 1 : 1;
-			if ( session != NULL ) session->SetPlayingSoundWorld();
+			if ( !R_ImagePolicyActive() && session != NULL ) session->SetPlayingSoundWorld();
 			r_recoverableRendererRestore = false;
 			return true;
 		}
@@ -4941,12 +4948,19 @@ static bool R_TryFullVidRestartInternal( const renderWindowRequest_t *request, b
 }
 
 bool R_TryFullVidRestart( const renderWindowRequest_t *request, char *error, int errorSize ) {
+	if ( R_ImagePolicyActive() ) { R_ImagePolicyObserveError( "Reentrant display restart during image policy work" ); return R_RendererRestartError( error, errorSize, "Image policy restart is active" ); }
 	if ( request == NULL ) return R_RendererRestartError( error, errorSize, "A display request is required" );
 	const renderWindowRequest_t immutable = *request;
 	return R_TryFullVidRestartInternal( &immutable, false, error, errorSize );
 }
 
+bool R_TryFullVidRestartForImagePolicy( const renderWindowRequest_t *request, char *error, int errorSize ) {
+	if ( !R_ImagePolicyActive() || !R_ImagePolicyOperationAllowed() || !request ) return R_RendererRestartError( error, errorSize, "No active image policy request" );
+	return R_TryFullVidRestartInternal( request, false, error, errorSize );
+}
+
 bool R_TryInitializeDisplay( const renderWindowRequest_t *request, char *error, int errorSize ) {
+	if ( R_ImagePolicyActive() ) { R_ImagePolicyObserveError( "Reentrant initial display during image policy work" ); return R_RendererRestartError( error, errorSize, "Image policy restart is active" ); }
 	if ( error != NULL && errorSize > 0 ) error[0] = '\0';
 	if ( request == NULL ) return R_RendererRestartError( error, errorSize, "A display request is required" );
 	if ( r_recoverableRendererRestart ) return R_RendererRestartError( error, errorSize, "A renderer device operation is already in progress" );
@@ -5560,6 +5574,7 @@ idRenderSystemLocal::InitOpenGL
 ========================
 */
 static bool R_InitRendererDevice( bool legacyPolicy, bool forceWindow, char *error, int errorSize ) {
+	R_ImagePolicyBindRendererThread();
 	// if the device isn't started, start it now
 	if ( !glConfig.isInitialized ) {
 #ifdef OPENQ4_RENDERER_VK_MODULE

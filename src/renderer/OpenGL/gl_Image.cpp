@@ -35,6 +35,7 @@ Contains the Image implementation for OpenGL.
 */
 
 #include "../tr_local.h"
+#include "../RendererResourceSettings.h"
 
 /*
 ================================================================================================
@@ -103,6 +104,9 @@ idImage::SubImageUpload
 ========================
 */
 void idImage::SubImageUpload( int mipLevel, int x, int y, int z, int width, int height, const void * pic, int pixelPitch ) const {
+	renderImageOperation_t imageOperation( this, true, mipLevel, z, x == 0 && y == 0 ? width : 0, height );
+	if ( !imageOperation.Allowed() ) return;
+
 	assert( x >= 0 && y >= 0 && mipLevel >= 0 && width >= 0 && height >= 0 && mipLevel < opts.numLevels );
 	const int mipWidth = Max( 1, opts.width >> mipLevel );
 	const int mipHeight = Max( 1, opts.height >> mipLevel );
@@ -214,6 +218,9 @@ void idImage::SubImageUpload( int mipLevel, int x, int y, int z, int width, int 
 	if ( pixelPitch != 0 ) {
 		glPixelStorei( GL_UNPACK_ROW_LENGTH, 0 );
 	}
+
+	if ( R_ImagePolicyActive() ) GL_CheckErrors();
+	imageOperation.Succeeded();
 }
 
 /*
@@ -426,6 +433,9 @@ This should not be done during normal game-play, if you can avoid it.
 ========================
 */
 void idImage::AllocImage() {
+	renderImageOperation_t imageOperation( this );
+	if ( !imageOperation.Allowed() ) return;
+
 	GL_CheckErrors();
 	PurgeImage();
 	storageGeneration++;
@@ -515,6 +525,7 @@ void idImage::AllocImage() {
 		break;
 	case FMT_BC7:
 		if ( !glConfig.bptcTextureCompressionAvailable ) {
+			R_ImagePolicyObserveError( "Requested GL BC7/BPTC image format is unsupported" );
 			// This used to be a fatal idLib::Error raised from inside texture
 			// upload, i.e. in the middle of a map load. Every other BC7 gate in
 			// the tree warns and degrades (R_BinaryImageHeaderSupportedByRenderer,
@@ -534,6 +545,7 @@ void idImage::AllocImage() {
 	case FMT_ETC2_RGBA8:
 	case FMT_EAC_RG11:
 		if ( !glConfig.etc2TextureCompressionAvailable ) {
+			R_ImagePolicyObserveError( "Requested GL ETC2/EAC image format is unsupported" );
 			// Same shape as the BC7 gate above: degrade one texture rather than
 			// take the session down from inside a mid-load upload. Reaching here
 			// means a generated cache file outlived the context that produced
@@ -584,6 +596,7 @@ void idImage::AllocImage() {
 		dataType = GL_UNSIGNED_SHORT;
 		break;
 	default:
+		if ( R_ImagePolicyActive() ) { R_ImagePolicyObserveError( "Unhandled GL image format" ); return; }
 		idLib::Error( "Unhandled image format %d in %s\n", opts.format, GetName() );
 	}
 
@@ -610,6 +623,7 @@ void idImage::AllocImage() {
 	if ( wantsMSAA ) {
 		if ( glTexImage2DMultisample == NULL || !( glConfig.backendCaps.glVersion >= 3.2f ||
 			GLCapabilityProbe_HasExtension( "GL_ARB_texture_multisample" ) ) ) {
+			R_ImagePolicyObserveError( "Requested GL image capability is unsupported" );
 			common->Warning( "MSAA textures not supported, disabling for %s", GetName() );
 			opts.numMSAASamples = 0;
 			wantsMSAA = false;
@@ -650,6 +664,7 @@ void idImage::AllocImage() {
 #endif
 		glTexImage2DMultisample( GL_TEXTURE_2D_MULTISAMPLE, samples, internalFormat, opts.width, opts.height, GL_TRUE );
 		GL_CheckErrors();
+		imageOperation.Succeeded();
 		return;
 	}
 
@@ -708,6 +723,8 @@ void idImage::AllocImage() {
 	SetTexParameters();
 
 	GL_CheckErrors();
+
+	imageOperation.Succeeded();
 }
 
 /*
@@ -716,6 +733,7 @@ idImage::PurgeImage
 ========================
 */
 void idImage::PurgeImage() {
+	if ( !R_ImagePolicyContentMutation() ) return;
 	if ( texnum != TEXTURE_NOT_LOADED ) {
 		glDeleteTextures( 1, (GLuint *)&texnum );	// this should be the ONLY place it is ever called!
 		texnum = TEXTURE_NOT_LOADED;
@@ -736,6 +754,7 @@ void idImage::Resize( int width, int height ) {
 	if ( opts.width == width && opts.height == height ) {
 		return;
 	}
+	if ( !R_ImagePolicyContentMutation() ) return;
 	opts.width = width;
 	opts.height = height;
 	AllocImage();

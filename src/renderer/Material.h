@@ -553,6 +553,9 @@ class idSoundEmitter;
 class idMaterial : public idDecl {
 public:
 	idMaterial();
+	idMaterial(const idMaterial&) = delete;
+	idMaterial& operator=(const idMaterial&) = delete;
+	uint64_t GetImagePolicyIdentity() const { return imagePolicyIdentity; }
 	virtual				~idMaterial();
 
 	virtual size_t		Size(void) const;
@@ -881,6 +884,7 @@ public:
 	virtual void		ResolveUse();
 
 private:
+	const uint64_t imagePolicyIdentity;
 	// parse the entire material
 	void				CommonInit();
 	void				ParseMaterial(idLexer& src);

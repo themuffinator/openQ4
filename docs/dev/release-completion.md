@@ -2,6 +2,10 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- Image-quality settings gain checked renderer recovery foundations that reject
+  stale texture and material state after a failed restart. Complete preset Apply
+  remains in development; this does not enable unfinished mixed settings changes.
+
 - SYSTEM uses a compact preset selector and a wrapping status/action footer to
   keep more settings visible at large UI scales. Essential controls retain
   their full-size targets and text can grow with translated labels.

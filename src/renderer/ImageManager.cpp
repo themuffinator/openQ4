@@ -31,6 +31,7 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #include "tr_local.h"
+#include "RendererResourceSettings.h"
 
 bool R_IsMutableRenderImageName( const char *name ) {
 	if ( name == NULL || name[0] == '\0' ) {
@@ -827,6 +828,7 @@ idImage	*idImageManager::ImageFromFile( const char *_name, textureFilter_t filte
 
 			const bool mergedAllowDownSize = image->allowDownSize && allowDownSize;
 			const bool allowDownSizeChanged = image->allowDownSize != mergedAllowDownSize;
+			if ( allowDownSizeChanged && !R_ImagePolicyContentMutation() ) return image;
 			image->allowDownSize = mergedAllowDownSize;
 			image->usage = usage;
 			image->levelLoadReferenced = true;
@@ -904,7 +906,9 @@ idImage *idImageManager::ImageHandleDeferred( const char *_name, textureFilter_t
 			if ( image->usage != usage || image->flags != flags ) {
 				continue;
 			}
-			image->allowDownSize = image->allowDownSize && allowDownSize;
+			const bool mergedAllowDownSize = image->allowDownSize && allowDownSize;
+			if ( image->allowDownSize != mergedAllowDownSize && !R_ImagePolicyContentMutation() ) return image;
+			image->allowDownSize = mergedAllowDownSize;
 			return image;
 		}
 	}
@@ -945,6 +949,7 @@ idImage * idImageManager::ScratchImage( const char *_name, idImageOpts *imgOpts,
 	for ( int i = imageHash.First( hash ); i != -1; i = imageHash.Next( i ) ) {
 		idImage	* image = images[i];
 		if ( name.Icmp( image->GetName() ) == 0 ) {
+			if ( ( !image->scratchImage || image->usage != usage ) && !R_ImagePolicyContentMutation() ) return image;
 			image->scratchImage = true;
 			image->usage = usage;
 			image->levelLoadReferenced = true;
@@ -1031,12 +1036,13 @@ ReloadImages
 ===============
 */
 void idImageManager::ReloadImages( bool all ) {
+	if ( !R_ImagePolicyOperationAllowed() ) return;
 	// a reload exists to observe files dropped since the last level load;
 	// never let it consult (or leave behind) memoized probe results
 	R_SetDDSProbeCacheActive( false );
 
 	for ( int i = 0 ; i < globalImages->images.Num() ; i++ ) {
-		globalImages->images[ i ]->Reload( all );
+		if ( R_ImagePolicyShouldReload( globalImages->images[ i ] ) ) globalImages->images[ i ]->Reload( all );
 	}
 }
 
@@ -1190,6 +1196,7 @@ Init
 ===============
 */
 void idImageManager::Init() {
+	R_ImagePolicyLifecycleChanged();
 
 	images.Resize( 1024, 1024 );
 	imageHash.ResizeIndex( 1024 );
@@ -1214,6 +1221,7 @@ Shutdown
 ===============
 */
 void idImageManager::Shutdown() {
+	R_ImagePolicyLifecycleChanged();
 	images.DeleteContents( true );
 	imageHash.Clear();
 
@@ -1226,6 +1234,7 @@ Frees all images used by the previous level
 ====================
 */
 void idImageManager::BeginLevelLoad() {
+	R_ImagePolicyLifecycleChanged();
 	insideLevelLoad = true;
 
 	// search paths are stable for the whole load, so DDS replacement probes
@@ -1468,4 +1477,13 @@ void idImageManager::PrintMemInfo( MemInfo_t *mi ) {
 
 	f->Printf( "\nTotal image bytes allocated: %s\n", idStr::FormatNumber( total ).c_str() );
 	fileSystem->CloseFile( f );
+}
+
+// The checked service has already compared the exact eight-field policy. Other
+// reduction/sampler edits remain pending for their ordinary lifecycle.
+void idImageManager::ClearCheckedImagePolicyChanges() {
+    image_downSize.ClearModified(); image_downSizeLimit.ClearModified();
+    image_downSizeSpecular.ClearModified(); image_downSizeSpecularLimit.ClearModified();
+    image_downSizeBump.ClearModified(); image_downSizeBumpLimit.ClearModified();
+    image_ignoreHighQuality.ClearModified();
 }

@@ -62,7 +62,8 @@
 // 13 - ClearRenderTarget carries alpha for transparent retained UI layers.
 // 14 - Strict window requests/readback and private recoverable device services.
 // 15 - Private strict first-device initialization for durable display recovery.
-#define RENDER_API_VERSION			15
+// 16 - Checked image/material policy restart receipt (private renderer service).
+#define RENDER_API_VERSION			16
 #define RENDER_API_ENTRY_POINT		"GetRenderAPI"
 
 class idSys;
@@ -349,6 +350,8 @@ typedef struct renderModuleDiagnostics_s {
 } renderModuleDiagnostics_t;
 
 struct renderDisplayPresentation_t;
+struct renderImagePolicyRequest_t;
+struct renderImagePolicyResult_t;
 
 typedef struct renderExport_s {
 	int										version;		// RENDER_API_VERSION
@@ -372,6 +375,10 @@ typedef struct renderExport_s {
 	// Failure leaves no device; an explicit retry retains the caller's request.
 	// This never runs the legacy startup fallback or the world/font restart tail.
 	bool			( *TryInitializeDisplay )( const renderWindowRequest_t *request, char *error, int errorSize );
+    // Version 16: synchronous upload/material work; not a first-present receipt.
+    // False preserves output even when the failed attempt requires explicit restore.
+    bool (*TryImagePolicyRestart)(const renderImagePolicyRequest_t* request,
+        renderImagePolicyResult_t* output, char* error, int errorSize);
 } renderExport_t;
 
 extern "C" {

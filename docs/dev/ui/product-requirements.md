@@ -259,6 +259,10 @@ The [compact SYSTEM layout](performance-presets.md) keeps the real Marine-font A
 
 The source-bound checkpoint starts from engine `efcfdb0ffe6eaffa11dbf2ced026495539156478`; local evidence `.tmp/ui/native-effects-integration/validation-evidence.json` has SHA-256 `909df76b2aea07f6641eece8550cd90bd1d3d354e84acf1ffe5ad06c0dbd6457`. Earlier failed layout captures and the corrected pack-only staging failure remain recorded. No requirement, GUI migration or final gate is accepted by this checkpoint.
 
+The [checked image/material restart](settings-effect-execution.md) preserves original recovery inventories and rejects stale instance or metadata ownership. The full engine and renderer modules build; all 49 UI suites pass. Windowed SP/OpenGL at 125% and MP/Vulkan at 200% return to SYSTEM after ordinary video restart, with four reviewed engine render-target images and no injected or controlled input. This qualifies ordinary compatibility; the checked image-policy Apply operation still needs live qualification and portable consumed-policy/content recovery. SP logs no warnings; MP logs the previous 93 plus a vertex-cache virtual-memory warning during restart.
+
+The checkpoint begins at engine `d6abeabc7e2e348ea11ce50a7671b830e77a15b1`. Its local record `.tmp/ui/renderer-effects-integration/validation-evidence.json` has SHA-256 `38ec300cd73f59baca9761b21351f3daa8612d6dbc73b98b0f420f4089975ad2`. Full settings, native input, editor, every GUI migration and all final gates remain required.
+
 There are **65 partial, 161 pending and one verified requirement**. `BEH-002`
 remains partial for the implemented settings transaction/service boundary.
 `BEH-005` remains partial for committed action delivery and cancellation; stock

@@ -30,6 +30,7 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #include "tr_local.h"
+#include "RendererResourceSettings.h"
 
 #include <cstdlib>
 
@@ -346,7 +347,7 @@ void idMaterial::CommonInit() {
 idMaterial::idMaterial
 =============
 */
-idMaterial::idMaterial() {
+idMaterial::idMaterial() : imagePolicyIdentity(R_ImagePolicyNewResourceIdentity()) {
 	CommonInit();
 
 	// we put this here instead of in CommonInit, because
@@ -360,6 +361,7 @@ idMaterial::~idMaterial
 =============
 */
 idMaterial::~idMaterial() {
+	R_ImagePolicyResourceDestroyed();
 }
 
 /*
@@ -394,6 +396,7 @@ idMaterial::FreeData
 ===============
 */
 void idMaterial::FreeData() {
+	if ( !R_ImagePolicyContentMutation() ) return;
 	int i;
 
 	if ( stages ) {
@@ -3888,6 +3891,7 @@ Parses the current material definition and finds all necessary images.
 =========================
 */
 bool idMaterial::Parse( const char *text, const int textLength ) {
+	if ( !R_ImagePolicyContentMutation() ) return false;
 	idLexer	src;
 	idToken	token;
 	mtrParsingData_t parsingData;

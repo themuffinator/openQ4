@@ -29,6 +29,7 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #include "tr_local.h"
+#include "RendererResourceSettings.h"
 #include "OpenGL/FramebufferSamples.h"
 
 /*
@@ -457,6 +458,8 @@ idImage::AllocImage
 ========================
 */
 void idImage::AllocImage( const idImageOpts &imgOpts, textureFilter_t tf, textureRepeat_t tr ) {
+	if ( !R_ImagePolicyOperationAllowed() ) return;
+	if ( ( filter != tf || repeat != tr || !( opts == imgOpts ) || defaulted || !imgOpts.isPersistant ) && !R_ImagePolicyContentMutation() ) return;
 	filter = tf;
 	repeat = tr;
 	opts = imgOpts;
@@ -471,6 +474,8 @@ GenerateImage
 ================
 */
 void idImage::GenerateImage( const byte *pic, int width, int height, textureFilter_t filterParm, textureRepeat_t repeatParm, textureUsage_t usageParm ) {
+	if ( !R_ImagePolicyOperationAllowed() ) return;
+	if ( IsFileBacked() && !R_ImagePolicyContentMutation() ) return;
 	PurgeImage();
 
 	filter = filterParm;
@@ -514,6 +519,8 @@ Non-square cube sides are not allowed
 ====================
 */
 void idImage::GenerateCubeImage( const byte *pic[6], int size, textureFilter_t filterParm, textureUsage_t usageParm ) {
+	if ( !R_ImagePolicyOperationAllowed() ) return;
+	if ( IsFileBacked() && !R_ImagePolicyContentMutation() ) return;
 	PurgeImage();
 
 	filter = filterParm;
@@ -605,6 +612,9 @@ On exit, the idImage will have a valid OpenGL texture number that can be bound
 ===============
 */
 void idImage::ActuallyLoadImage( bool fromBackEnd ) {
+	if ( !R_ImagePolicyOperationAllowed() ) return;
+	if ( !R_ImagePolicyContentMutation() ) return;
+
 
 	// if we don't have a rendering context yet, just return
 	if ( !tr.IsOpenGLRunning() ) {
@@ -1380,7 +1390,6 @@ bool idImage::CopyFramebuffer( int x, int y, int imageWidth, int imageHeight,
 	const GLenum textureTarget = isCube ? GL_TEXTURE_CUBE_MAP_EXT : GL_TEXTURE_2D;
 	const GLenum copyTarget = isCube
 		? GL_TEXTURE_CUBE_MAP_POSITIVE_X_EXT + cubeFace : GL_TEXTURE_2D;
-	R_BindTextureForDirectAccess( textureTarget, texnum );
 
 	const bool readingFromRenderTexture = ( backEnd.renderTexture != NULL ) && ( backEnd.renderTexture->GetNumColorImages() > 0 );
 	const GLenum readAttachment = GL_COLOR_ATTACHMENT0;
@@ -1403,6 +1412,7 @@ bool idImage::CopyFramebuffer( int x, int y, int imageWidth, int imageHeight,
 			|| internalFormat == GL_RGB565 || internalFormat == GL_RGB5_A1
 			|| internalFormat == GL_RGBA4;
 		if ( !destIsFixedPoint ) {
+			if ( !R_ImagePolicyContentMutation() ) return false;
 			opts.format = FMT_RGBA8;
 			internalFormat = GL_RGBA8;
 			dataFormat = GL_RGBA;
@@ -1411,6 +1421,8 @@ bool idImage::CopyFramebuffer( int x, int y, int imageWidth, int imageHeight,
 		}
 	}
 
+	if ( ( opts.width != imageWidth || opts.height != imageHeight || IsFileBacked() ) && !R_ImagePolicyContentMutation() ) return false;
+	R_BindTextureForDirectAccess( textureTarget, texnum );
 	opts.width = imageWidth;
 	opts.height = imageHeight;
 
@@ -1543,7 +1555,6 @@ bool idImage::CopyDepthbuffer( int x, int y, int imageWidth, int imageHeight,
 	const GLenum textureTarget = isCube ? GL_TEXTURE_CUBE_MAP_EXT : GL_TEXTURE_2D;
 	const GLenum copyTarget = isCube
 		? GL_TEXTURE_CUBE_MAP_POSITIVE_X_EXT + cubeFace : GL_TEXTURE_2D;
-	R_BindTextureForDirectAccess( textureTarget, texnum );
 
 	// The destination must hold depth-renderable storage: it gets attached to
 	// GL_DEPTH_ATTACHMENT for the blit path and receives GL_DEPTH_COMPONENT
@@ -1558,6 +1569,8 @@ bool idImage::CopyDepthbuffer( int x, int y, int imageWidth, int imageHeight,
 		|| internalFormat == GL_DEPTH_COMPONENT32F
 		|| internalFormat == GL_DEPTH24_STENCIL8
 		|| internalFormat == GL_DEPTH32F_STENCIL8;
+	if ( ( !hasDepthStorage || opts.width != imageWidth || opts.height != imageHeight || IsFileBacked() ) && !R_ImagePolicyContentMutation() ) return false;
+	R_BindTextureForDirectAccess( textureTarget, texnum );
 	if ( !hasDepthStorage ) {
 		internalFormat = GL_DEPTH_COMPONENT24;
 		dataFormat = GL_DEPTH_COMPONENT;
@@ -1781,6 +1794,7 @@ void idImage::UploadScratch( const byte * data, int cols, int rows ) {
 			return;
 		}
 		if ( opts.width != cols || opts.height != rows ) {
+			if ( !R_ImagePolicyContentMutation() ) return;
 			opts.width = cols;
 			opts.height = rows;
 			AllocImage();
@@ -1796,6 +1810,7 @@ void idImage::UploadScratch( const byte * data, int cols, int rows ) {
 			return;
 		}
 		if ( opts.width != cols || opts.height != rows ) {
+			if ( !R_ImagePolicyContentMutation() ) return;
 			opts.width = cols;
 			opts.height = rows;
 			AllocImage();
@@ -1933,6 +1948,9 @@ idImage::Reload
 ===============
 */
 void idImage::Reload( bool force ) {
+	if ( !R_ImagePolicyOperationAllowed() ) return;
+	if ( !R_ImagePolicyContentMutation() ) return;
+
 	// always regenerate functional images
 	if ( generatorFunction ) {
 		common->DPrintf( "regenerating %s.\n", GetName() );
@@ -2004,6 +2022,7 @@ void idImage::SetSamplerState( textureFilter_t tf, textureRepeat_t tr ) {
 	if ( tf == filter && tr == repeat ) {
 		return;
 	}
+	if ( !R_ImagePolicyContentMutation() ) return;
 	filter = tf;
 	repeat = tr;
 	R_BindTextureForDirectAccess( ( opts.textureType == TT_CUBIC ) ? GL_TEXTURE_CUBE_MAP_EXT : GL_TEXTURE_2D, texnum );

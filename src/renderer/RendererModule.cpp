@@ -964,6 +964,61 @@ bool R_RendererModule_TryDeviceRestart( const renderWindowRequest_t *request, ch
 	return false;
 }
 
+bool R_RendererModule_TryImagePolicyRestart(const renderImagePolicyRequest_t* request,
+        rendererImagePolicyResult_t* output, char* error, int errorSize) {
+    if (error && errorSize > 0) error[0] = '\0';
+    if (!request || !output) {
+        if (error && errorSize > 0) idStr::Copynz(error, "image policy request and output are required", errorSize);
+        return false;
+    }
+    const renderImagePolicyRequest_t immutable = *request;
+    const uint64_t epoch = rm_displayModuleEpoch;
+    const renderWindowServices_t* services = Sys_GetRenderWindowServices();
+    if (!renderSystem || !epoch || !services || !services->ApplyScreenParmsStrict || !services->QueryWindowState ||
+        !services->RetainVideoSystem || !services->ReleaseVideoSystem) {
+        if (error && errorSize > 0) idStr::Copynz(error, "strict image policy services are unavailable", errorSize);
+        return false;
+    }
+    bool (*restart)(const renderImagePolicyRequest_t*, renderImagePolicyResult_t*, char*, int) = NULL;
+    if (rm_state.interfacesPublished && rm_state.moduleExportValid) restart = rm_state.moduleExport.TryImagePolicyRestart;
+#if !defined(OPENQ4_RENDERER_MODULE_ONLY) && !defined(ID_DEDICATED)
+    else if (rm_state.status.disposition != RENDER_MODULE_DISPOSITION_NONE) restart = R_TryImagePolicyRestart;
+#endif
+    if (!restart) {
+        if (error && errorSize > 0) idStr::Copynz(error, "renderer has no checked image policy service", errorSize);
+        return false;
+    }
+    // This wrapper is main/video-thread only, like module loading. Native calls
+    // never run under a lock. Reject recursion before retaining video services.
+    static bool busy = false;
+    if (busy) {
+        if (error && errorSize > 0) idStr::Copynz(error, "image policy service is already active", errorSize);
+        return false;
+    }
+    struct Scope { bool& flag; explicit Scope(bool& b) : flag(b) { flag = true; } ~Scope() { flag = false; } } scope(busy);
+    if (!rm_displayVideoPin) {
+        if (!services->RetainVideoSystem()) {
+            if (error && errorSize > 0) idStr::Copynz(error, "cannot retain the active video subsystem", errorSize);
+            return false;
+        }
+        rm_displayVideoPin = services;
+    }
+    rendererImagePolicyResult_t result{}; result.moduleEpoch = epoch;
+    if (epoch != rm_displayModuleEpoch || services != Sys_GetRenderWindowServices()) {
+        if (error && errorSize > 0) idStr::Copynz(error, "renderer ownership changed during video retention", errorSize);
+        return false;
+    }
+    const bool succeeded = restart(&immutable, &result.resources, error, errorSize);
+    if (succeeded || (renderSystem && renderSystem->IsOpenGLRunning())) RM_ReleaseDisplayVideoPin();
+    if (!succeeded) return false;
+    if (epoch != rm_displayModuleEpoch || services != Sys_GetRenderWindowServices()) {
+        if (error && errorSize > 0) idStr::Copynz(error, "renderer ownership changed during image policy restart", errorSize);
+        return false;
+    }
+    *output = result;
+    return true;
+}
+
 bool R_RendererModule_TryInitializeDisplay( const renderWindowRequest_t *request, char *error, int errorSize ) {
 	if ( error != NULL && errorSize > 0 ) error[0] = '\0';
 	const renderWindowServices_t *windowServices = Sys_GetRenderWindowServices();

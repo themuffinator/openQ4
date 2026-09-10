@@ -21,6 +21,7 @@
 
 #include "../../idlib/precompiled.h"
 #pragma hdrstop
+#include "../RendererResourceSettings.h"
 
 #include "../tr_local.h"
 #include "../RenderModuleAPI.h"
@@ -255,6 +256,7 @@ static VkSampler VK_Image_GetSampler( textureFilter_t filter, textureRepeat_t re
 		}
 	}
 	if ( vkNumSamplers >= VK_MAX_SAMPLERS ) {
+		R_ImagePolicyObserveError( "Vulkan sampler cache exhausted" );
 		common->Warning( "Vulkan: sampler cache exhausted" );
 		return vkSamplers[ 0 ];
 	}
@@ -312,7 +314,9 @@ static VkSampler VK_Image_GetSampler( textureFilter_t filter, textureRepeat_t re
 	}
 
 	VkSampler sampler = VK_NULL_HANDLE;
-	if ( vkCreateSampler( vkCtx.device, &sci, NULL, &sampler ) != VK_SUCCESS ) {
+	const VkResult samplerResult = vkCreateSampler( vkCtx.device, &sci, NULL, &sampler );
+	if ( samplerResult != VK_SUCCESS ) {
+		R_ImagePolicyObserveError( "Vulkan sampler creation failed", samplerResult );
 		common->Warning( "Vulkan: sampler creation failed" );
 		return vkNumSamplers > 0 ? vkSamplers[ 0 ] : VK_NULL_HANDLE;
 	}
@@ -363,6 +367,7 @@ idImage::PurgeImage
 ====================
 */
 void idImage::PurgeImage( void ) {
+	if ( !R_ImagePolicyContentMutation() ) return;
 	vkImageEntry_t *entry = VK_Image_GetEntry( texnum );
 	if ( entry != NULL ) {
 		// the image may still be referenced by an in-flight frame
@@ -448,6 +453,9 @@ exactly like the GL half without a context; the InitOpenGL seam reloads.
 ====================
 */
 void idImage::AllocImage( void ) {
+	renderImageOperation_t imageOperation( this );
+	if ( !imageOperation.Allowed() ) return;
+
 	PurgeImage();
 	storageGeneration++;
 
@@ -522,7 +530,9 @@ void idImage::AllocImage( void ) {
 	vkImageEntry_t &entry = vkImages[ slot ];
 	memset( &entry, 0, sizeof( entry ) );
 
-	if ( vmaCreateImage( vkCtx.allocator, &ici, &vaci, &entry.image, &entry.allocation, NULL ) != VK_SUCCESS ) {
+	const VkResult imageResult = vmaCreateImage( vkCtx.allocator, &ici, &vaci, &entry.image, &entry.allocation, NULL );
+	if ( imageResult != VK_SUCCESS ) {
+		R_ImagePolicyObserveError( "Vulkan image resource creation failed", imageResult );
 		common->Warning( "Vulkan: image creation failed (%dx%d fmt %d)", opts.width, opts.height, (int)opts.format );
 		return;
 	}
@@ -537,7 +547,9 @@ void idImage::AllocImage( void ) {
 	ivci.subresourceRange.aspectMask = sampledAspect;
 	ivci.subresourceRange.levelCount = (uint32_t)numMips;
 	ivci.subresourceRange.layerCount = isCube ? 6 : 1;
-	if ( vkCreateImageView( vkCtx.device, &ivci, NULL, &entry.view ) != VK_SUCCESS ) {
+	const VkResult viewResult = vkCreateImageView( vkCtx.device, &ivci, NULL, &entry.view );
+	if ( viewResult != VK_SUCCESS ) {
+		R_ImagePolicyObserveError( "Vulkan image resource creation failed", viewResult );
 		common->Warning( "Vulkan: image view creation failed" );
 		vmaDestroyImage( vkCtx.allocator, entry.image, entry.allocation );
 		memset( &entry, 0, sizeof( entry ) );
@@ -546,7 +558,9 @@ void idImage::AllocImage( void ) {
 	entry.attachmentView = entry.view;
 	if ( attachmentAspect != sampledAspect ) {
 		ivci.subresourceRange.aspectMask = attachmentAspect;
-		if ( vkCreateImageView( vkCtx.device, &ivci, NULL, &entry.attachmentView ) != VK_SUCCESS ) {
+		const VkResult attachmentResult = vkCreateImageView( vkCtx.device, &ivci, NULL, &entry.attachmentView );
+	if ( attachmentResult != VK_SUCCESS ) {
+		R_ImagePolicyObserveError( "Vulkan image resource creation failed", attachmentResult );
 			common->Warning( "Vulkan: depth/stencil attachment view creation failed" );
 			vkDestroyImageView( vkCtx.device, entry.view, NULL );
 			vmaDestroyImage( vkCtx.allocator, entry.image, entry.allocation );
@@ -569,8 +583,11 @@ void idImage::AllocImage( void ) {
 	entry.everUploaded = false;
 	entry.generation = vkImageGenerationCounter++;
 	entry.sampler = VK_Image_GetSampler( filter, repeat, numMips > 1 );
+	if ( entry.sampler == VK_NULL_HANDLE ) R_ImagePolicyObserveError( "Vulkan image sampler creation failed" );
 
 	texnum = (unsigned int)slot;
+
+	imageOperation.Succeeded();
 }
 
 /*
@@ -768,6 +785,9 @@ static void VK_Image_RecordUpload( VkCommandBuffer cmd, void *user ) {
 }
 
 void idImage::SubImageUpload( int mipLevel, int x, int y, int z, int width, int height, const void *pic, int pixelPitch ) const {
+	renderImageOperation_t imageOperation( this, true, mipLevel, z, x == 0 && y == 0 ? width : 0, height );
+	if ( !imageOperation.Allowed() ) return;
+
 	vkImageEntry_t *entry = VK_Image_GetEntry( texnum );
 	if ( entry == NULL || pic == NULL || width <= 0 || height <= 0
 			|| entry->samples != VK_SAMPLE_COUNT_1_BIT
@@ -807,7 +827,9 @@ void idImage::SubImageUpload( int mipLevel, int x, int y, int z, int width, int 
 	VkBuffer staging = VK_NULL_HANDLE;
 	VmaAllocation stagingAlloc = NULL;
 	VmaAllocationInfo stagingInfo;
-	if ( vmaCreateBuffer( vkCtx.allocator, &bci, &vaci, &staging, &stagingAlloc, &stagingInfo ) != VK_SUCCESS ) {
+	const VkResult stagingResult = vmaCreateBuffer( vkCtx.allocator, &bci, &vaci, &staging, &stagingAlloc, &stagingInfo );
+	if ( stagingResult != VK_SUCCESS ) {
+		R_ImagePolicyObserveError( "Vulkan image resource creation failed", stagingResult );
 		common->Warning( "Vulkan: staging buffer creation failed (%d bytes)", (int)dataBytes );
 		return;
 	}
@@ -845,6 +867,7 @@ void idImage::SubImageUpload( int mipLevel, int x, int y, int z, int width, int 
 	const VkResult flushResult = vmaFlushAllocation(
 			vkCtx.allocator, stagingAlloc, 0, (VkDeviceSize)dataBytes );
 	if ( flushResult != VK_SUCCESS ) {
+		R_ImagePolicyObserveError( "Vulkan image staging flush failed", flushResult );
 		common->Warning( "Vulkan: staging buffer flush failed (%d)",
 				(int)flushResult );
 		VK_Device_DeferDestroy(
@@ -872,7 +895,10 @@ void idImage::SubImageUpload( int mipLevel, int x, int y, int z, int width, int 
 		// nothing recorded: release the staging buffer through the normal
 		// deferred path, matching the old no-device fallback
 		VK_Device_DeferDestroy( VK_NULL_HANDLE, VK_NULL_HANDLE, staging, stagingAlloc );
+		return;
 	}
+
+	imageOperation.Succeeded();
 }
 
 /*
@@ -907,6 +933,7 @@ void idImage::Resize( int width, int height ) {
 	if ( opts.width == width && opts.height == height ) {
 		return;
 	}
+	if ( !R_ImagePolicyContentMutation() ) return;
 	opts.width = width;
 	opts.height = height;
 	AllocImage();

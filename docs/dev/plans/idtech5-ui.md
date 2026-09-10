@@ -473,3 +473,11 @@ and mixed settings Apply remain gated while their complete integration is built.
 The source-bound record is
 `.tmp/ui/native-effects-integration/validation-evidence.json`. No product,
 migration or final gate is accepted by these foundation tests.
+
+The checked renderer image/material restart now retains original recovery
+inventories and invalidates them on instance replacement or metadata-only
+changes. Full module linking, 49 UI suites and windowed gameplay through ordinary
+video restart pass. See [effect execution](../ui/settings-effect-execution.md)
+and `.tmp/ui/renderer-effects-integration/validation-evidence.json` for the
+bounded result. Historical consumed policy, portable content reconstruction,
+mixed Apply and every remaining product/editor/migration gate are still required.

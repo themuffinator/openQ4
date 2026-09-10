@@ -611,6 +611,11 @@ if build_engine or get_option('build_native_tests')
     )
     test('openq4-ui-settings-transaction', openq4_ui_settings_transaction_test, timeout: 30)
     ui_test_cpp = meson.get_compiler('cpp')
+    foreach image_policy_suite : ['restart', 'metadata']
+      test('openq4-ui-image-policy-' + image_policy_suite, py,
+        args: [meson.project_source_root() / ('tools/tests/renderer_image_policy_' + image_policy_suite + '.py'),
+          '--compiler', ui_test_cpp.cmd_array()[-1]], timeout: 180)
+    endforeach
     test('openq4-ui-input-disposition', py,
       args: [meson.project_source_root() / 'tools/tests/sdl3_input_disposition.py',
         '--compiler', ui_test_cpp.cmd_array()[-1], '--no-mutations'], timeout: 120)

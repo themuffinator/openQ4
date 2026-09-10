@@ -155,9 +155,16 @@ imageFilterState_t R_GetDefaultImageFilterState();
 
 #define	MAX_IMAGE_NAME	256
 
+uint64_t R_ImagePolicyNewResourceIdentity() noexcept;
+void R_ImagePolicyResourceDestroyed() noexcept;
+
 class idImage {
 public:
 	idImage(const char* name);
+	~idImage() { R_ImagePolicyResourceDestroyed(); }
+	idImage(const idImage&) = delete;
+	idImage& operator=(const idImage&) = delete;
+	uint64_t GetImagePolicyIdentity() const { return imagePolicyIdentity; }
 
 	const char* GetName() const { return imgName; }
 
@@ -207,6 +214,7 @@ public:
 	textureUsage_t GetUsage() const { return usage; }
 	bool		IsDefaulted() const { return defaulted; }
 	bool		IsScratchImage() const { return scratchImage; }
+	bool IsFileBacked() const { return generatorFunction == NULL && !opts.isPersistant && !scratchImage; }
 
 	void		SetReferencedOutsideLevelLoad() { referencedOutsideLevelLoad = true; }
 	void		SetReferencedInsideLevelLoad() { levelLoadReferenced = true; }
@@ -303,11 +311,12 @@ private:
 	unsigned int				dataFormat;
 	unsigned int				dataType;
 	uint64_t			storageGeneration;
+	const uint64_t		imagePolicyIdentity;
 
 
 };
 
-ID_INLINE idImage::idImage(const char* name) : imgName(name) {
+ID_INLINE idImage::idImage(const char* name) : imgName(name), imagePolicyIdentity(R_ImagePolicyNewResourceIdentity()) {
 	texnum = TEXTURE_NOT_LOADED;
 	internalFormat = 0;
 	dataFormat = 0;
@@ -390,6 +399,7 @@ public:
 
 	// reloads all apropriate images after a vid_restart
 	void				ReloadImages(bool all);
+	void ClearCheckedImagePolicyChanges(); // Only after an exact checked restart.
 
 	// reloads every image when a texture reduction cvar changed this frame
 	void				CheckCvars();

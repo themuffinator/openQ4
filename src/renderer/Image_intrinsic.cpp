@@ -31,6 +31,7 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #include "tr_local.h"
+#include "RendererResourceSettings.h"
 #include "smaa/AreaTex.h"
 #include "smaa/SearchTex.h"
 
@@ -96,6 +97,7 @@ void idImage::MakeDefault() {
 		DEFAULT_SIZE, DEFAULT_SIZE, 
 		TF_DEFAULT, TR_REPEAT, TD_DEFAULT );
 
+	if ( !defaulted && !R_ImagePolicyContentMutation() ) return;
 	defaulted = true;
 }
 

@@ -29,6 +29,7 @@
 #endif
 
 #include "tr_local.h"
+#include "RendererResourceSettings.h"
 #include "RenderModuleAPI.h"
 #include "RendererModule.h"
 #include "../bse/BSEInterface.h"
@@ -523,6 +524,7 @@ renderExport_t *GetRenderAPI( renderImport_t *moduleImport ) {
 	rgm_export.TryDeviceRestart = R_TryFullVidRestart;
 	rgm_export.GetDisplayPresentation = R_GetDisplayPresentation;
 	rgm_export.TryInitializeDisplay = R_TryInitializeDisplay;
+	rgm_export.TryImagePolicyRestart = R_TryImagePolicyRestart;
 #ifdef OPENQ4_RENDERER_VK_MODULE
 	// the Vulkan backend keeps its bring-up diagnostics surface for the
 	// on-demand rendererVkProbe flow

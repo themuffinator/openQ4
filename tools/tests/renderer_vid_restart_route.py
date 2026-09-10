@@ -24,6 +24,14 @@ SUPPORT = r'''
 #include <stdexcept>
 #include <string>
 #include <vector>
+static bool R_ImagePolicyActive(){return false;}
+static bool R_ImagePolicyOperationAllowed(){return true;}
+static void R_ImagePolicyObserveError(const char*,int=0){}
+static void R_ImagePolicyBindRendererThread(){}
+static bool R_ImagePolicyBeforeTeardown(char*,int){return true;}
+static void R_ImagePolicyBeginDeviceReload(){}
+static bool R_ImagePolicyAfterDeviceReload(char*,int){return true;}
+static bool R_ImagePolicyFinish(char*,int){return true;}
 static std::vector<std::string> events;
 static bool deviceAlive=false, fontsAlive=false, configuredFullscreen=true;
 static bool createdFullscreen=false;

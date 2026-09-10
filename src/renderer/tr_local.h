@@ -1617,6 +1617,8 @@ void R_InitOpenGL( void );
 // submitted frames. A refused attempt remains uninitialized and can be retried
 // with an explicit restore request; process-wide allocation failure is excluded.
 struct renderWindowRequest_s;
+// Called only by the active checked image-policy coordinator.
+bool R_TryFullVidRestartForImagePolicy(const renderWindowRequest_s* request, char* error, int errorSize);
 bool R_TryFullVidRestart( const renderWindowRequest_s *request, char *error, int errorSize );
 bool R_TryInitializeDisplay( const renderWindowRequest_s *request, char *error, int errorSize );
 bool R_IsRecoverableRendererRestart( void );

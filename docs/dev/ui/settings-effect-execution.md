@@ -211,6 +211,40 @@ Production startup and live persistence remain on schema 1 until the existing
 host can validate, execute, observe and recover every schema-2 domain. This
 increment creates no second journal or independently committing controller.
 
+## Checked image and material restart
+
+The renderer now exposes one checked image-policy restart through module API 16.
+It copies the requested policy, coalesces device and image work through the full
+video restart, reparses supported quality-sensitive retained material sources,
+and checks allocation, mip/layer uploads, backend completion and default outcomes.
+Its result identifies the module epoch, attempt and device generation. This is
+resource evidence; later UI/font drawing and a fresh present remain necessary.
+
+A failed attempt retains its original private inventory. Nonreused image and
+material instance IDs prevent address reuse from inheriting old default
+allowances. Destruction, manager lifecycle changes and unowned content changes
+invalidate that inventory permanently for the renderer lifetime. Metadata-only
+paths participate too: deferred downsize permission, scratch-image usage,
+samplers, persistent options, dimensions and copy formats cannot silently change
+the recorded resources. Guards act at method entry and receipt publication;
+arbitrary concurrent destruction inside an executing resource method is unsupported.
+
+The full engine and both renderer modules build, all 49 integrated UI suites
+pass, and focused production-method tests cover metadata, native boundaries,
+instance construction and the full restart route. Windowed SP/OpenGL at 125%
+and MP/Vulkan at 200% pass gameplay, ordinary video restart and SYSTEM opening,
+with four reviewed engine render-target images. These runs exercise ordinary
+restart compatibility, not the checked image-policy Apply operation. SP logs no
+warnings. MP retains the earlier 93 warnings and additionally reports a vertex
+cache virtual-memory warning during restart; that warning remains under review.
+
+The source-bound record is
+`.tmp/ui/renderer-effects-integration/validation-evidence.json`. The current
+policy request is not a record of policy historically consumed by resident
+resources. Portable consumed-policy/content descriptors, exact handling of
+insufficient authored DDS mip chains and cold reconstruction remain required.
+SYSTEM mixed effects stay disabled until the durable host owns those guarantees.
+
 ## Qualification
 
 Extend the existing transaction, controller, journal, persistence, renderer and
