@@ -19,7 +19,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 PACKAGE = ROOT / 'subprojects/packagefiles/sdl3'
-FILES = ['src/events/SDL_events.c', 'src/events/SDL_keyboard.c', 'src/video/windows/SDL_windowskeyboard.c', 'src/video/windows/SDL_windowsevents.c']
+FILES = ['src/events/SDL_events.c', 'src/events/SDL_keyboard.c', 'src/video/windows/SDL_windowskeyboard.c', 'src/video/windows/SDL_windowsevents.c', 'src/video/windows/SDL_windowswindow.c', 'src/video/windows/SDL_windowsvideo.c']
 def sha(path: Path) -> str: return hashlib.sha256(path.read_bytes()).hexdigest()
 def main() -> int:
     parser=argparse.ArgumentParser(description=__doc__)
@@ -46,6 +46,15 @@ def main() -> int:
     # A supplied tree may already contain precisely the patch.
     initialized=run(['git','-C',str(projection),'init','--quiet'],'git-init.log')
     if initialized.returncode: raise RuntimeError(initialized.stdout)
+    fence=PACKAGE/'dispatch-fence.patch'
+    fenced='OQ4_WIN_BeginFenceAdmission' in (projection/FILES[0]).read_text(encoding='utf-8')
+    if fenced:
+        # Validate the underlying observer patch independently, then restore
+        # the exact combined admission body for the disabled-fence tests.
+        reverse=run(['git','-C',str(projection),'apply','--reverse','--check',str(fence)],'fence-reverse-check.log')
+        if reverse.returncode: raise RuntimeError('SDL source does not match the reviewed native fence')
+        reverse=run(['git','-C',str(projection),'apply','--reverse',str(fence)],'fence-reverse.log')
+        if reverse.returncode: raise RuntimeError(reverse.stdout)
     check=run(['git','-C',str(projection),'apply','--check',str(patch)],'patch-check.log')
     if check.returncode==0:
         applied=run(['git','-C',str(projection),'apply',str(patch)],'patch.log')
@@ -53,6 +62,9 @@ def main() -> int:
     else:
         reverse=run(['git','-C',str(projection),'apply','--reverse','--check',str(patch)],'patch-reverse-check.log')
         if reverse.returncode: raise RuntimeError('SDL source matches neither original nor patched private observer sources')
+    if fenced:
+        applied=run(['git','-C',str(projection),'apply',str(fence)],'fence-restore.log')
+        if applied.returncode: raise RuntimeError(applied.stdout)
     decoded={name:(projection/name).read_bytes().decode('utf-8').replace('\r\n','\n') for name in FILES}
     public=PACKAGE/'include/SDL3/SDL_openq4_text_provenance.h'
     internal=PACKAGE/'src/video/windows/SDL_openq4_text_provenance.h'
@@ -92,7 +104,7 @@ def main() -> int:
         'nested-keyboard-inherits-native-scope':('provenance.inc','if (!previous_push) oq4_keyboard_scope = oq4_scope;','oq4_keyboard_scope = oq4_scope;'),
         'native-admission-reused':('provenance.inc','oq4_keyboard_event = NULL;','(void)oq4_keyboard_event;'),
         'marker-integrity-unchecked':('provenance.inc','return oq4_healthy && oq4_marker_expected && event->type == oq4_marker_expected->type &&','return true || (oq4_healthy && oq4_marker_expected && event->type == oq4_marker_expected->type &&'),
-        'marker-check-after-admission-only':('admission.inc','if (!OQ4_WIN_ValidateTextMarker(event)) return false;','(void)event;'),
+        'marker-check-after-admission-only':('admission.inc','!OQ4_WIN_ValidateTextMarker(event)','false'),
         'disabled-destruction-leaks-registry':('provenance.inc','if (msg == WM_NCDESTROY && (state = OQ4_Window(window, false))) SDL_zero(*state);','(void)window;'),
     }
     mutation_results={}
@@ -112,9 +124,9 @@ def main() -> int:
                 mutation_results[name]={'compiled':True,'rejected':True,'exit_code':r.returncode}
             finally: path.write_text(before,encoding='utf-8')
     result={'status':'passed','checks':int(re.search(r'PASS (\d+) checks',tested.stdout)[1]),'mutations':mutation_results,'provision':provision,
-            'sources':{str(path.relative_to(ROOT)):sha(path) for path in [public,internal,implementation,patch,support,Path(__file__)]},
+            'sources':{str(path.relative_to(ROOT)):sha(path) for path in [public,internal,implementation,patch,fence,support,Path(__file__)]},
             'native_projection':{name:sha(projection/name) for name in FILES},'command':command,
-            'scope':'Production observer and SDL admission/scope/session methods against counted native/queue doubles. Full Windows message dispatch and OS IME/TSF/UI behavior unqualified.'}
+            'scope':'Production observer and SDL admission/scope/session methods against counted native/queue doubles; any fence calls use explicitly disabled-provider doubles. Full Windows message dispatch, enabled combined providers and OS IME/TSF/UI behavior unqualified.'}
     (scratch/'result.json').write_text(json.dumps(result,indent=2)+'\n',encoding='utf-8')
     print(tested.stdout.strip());print(scratch/'result.json');return 0
 if __name__=='__main__': raise SystemExit(main())

@@ -346,7 +346,22 @@ static void KeyMetadataCases() {
 		Check(EventLoop_ReadJournalEvent(&file,out)!=nullptr && owned.empty() && releases==1,"truncated key metadata has no partial publication");
 	}
 }
+static void ContinuityCases() {
+	Reset(); const auto before=Sys_EventQueueToken(); eventLoopLocal.Init();
+	Check(Sys_EventQueueToken()!=before,"event loop initialization retires prior native delivery continuity");
+	const auto initialized=Sys_EventQueueToken(); eventLoopLocal.Shutdown();
+	Check(Sys_EventQueueToken()!=initialized,"event loop shutdown retires native delivery continuity");
+	eventLoopLocal.com_pushedEventsHead=eventLoopLocal.com_pushedEventsTail=0;
+	const auto token=Sys_EventQueueToken();
+	for (int i=0;i<MAX_PUSHED_EVENTS;++i) {sysEvent_t event={};event.evType=SE_CHAR;event.evValue=i;eventLoopLocal.PushEvent(&event);}
+	Check(Sys_EventQueueToken()==token,"a full lossless pushed queue preserves continuity");
+	sysEvent_t next={};next.evType=SE_CHAR;next.evValue=MAX_PUSHED_EVENTS;eventLoopLocal.PushEvent(&next);
+	Check(Sys_EventQueueToken()==token+1,"pushed overflow invalidates before native delivery can use surviving events");
+	for(int i=1;i<=MAX_PUSHED_EVENTS;++i) Check(eventLoopLocal.GetEvent().evValue==i,"pushed overflow preserves surviving FIFO values");
+	Check(Sys_EventQueueToken()==token+1,"draining surviving events cannot reset a lost native stream");
+}
 int main() {
 	ReadCases(); WriteCases(); IntegrationCases(); PairedOpenCases(); KeyMetadataCases(); Reset();
+	ContinuityCases(); Reset();
 	std::printf("Event journal: %u checks passed (native historical layout, counted file/ownership/dispatch doubles)\n",checks);
 }

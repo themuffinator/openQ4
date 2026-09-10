@@ -134,6 +134,17 @@ unchanged and unaccepted by this increment.
 
 ### Findings that block product completion
 
+The [native text owner/store checkpoint](../ui/text-input-routing.md), based on
+`f2afdd1ce62201137f9513ed4dea6bf4ad481733`, adds allocation/backend/document/editor
+ownership checks, engine queue-continuity signals, a portable native shadow
+document and an actual Windows SDK text store. Application-origin notifications
+allow reads and defer writes until the complete batch has returned. A first
+disabled SDL native dispatch fence bounds collection; its publication marker
+alone does not prove that earlier SDL events were consumed without loss. The
+checked queue consumer, native activation and editor range reconciliation remain
+required. Native field use, complete composition/shaping, production screens,
+the editor, every migration and all final product gates remain open.
+
 These findings are based on source inspection at the revisions above, except
 where a test or capture is explicitly named. They are not all new regressions.
 Priority P0 blocks replacement correctness; P1 blocks the required quality or

@@ -194,6 +194,19 @@ qualification remain required. No requirement status, milestone, gate or GUI
 migration is accepted by this increment.
 No status, migration entry or final gate is accepted by this increment.
 
+The native owner/store checkpoint adds exact managed editor ownership, engine
+queue-continuity checks, a portable shadow document and an actual Windows SDK
+text store. Application text/selection notifications allow reads and defer
+writes until the full batch completes. The Windows build, 29 UI suites and the
+updated text-store suite pass; counted SDK tests cover 729 checks and reject
+18 compiled fault variants. Source-bound windowed SP/OpenGL at 125% and
+MP/Vulkan at 200% captures pass 32 semantic operations with ten reviewed engine
+images. The immutable evidence is
+`.tmp/ui/native-owner-integration/validation-evidence.json`. The first SDL fence
+remains disabled and does not prove earlier-event consumption; checked queue
+delivery, live native editing, complete IME/shaping, production fields, the
+editor and all migrations/gates remain open. No acceptance state changes.
+
 There are **65 partial, 161 pending and one verified requirement**. `BEH-002`
 remains partial for the implemented settings transaction/service boundary.
 `BEH-005` remains partial for committed action delivery and cancellation; stock

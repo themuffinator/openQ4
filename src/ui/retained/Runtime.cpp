@@ -1472,6 +1472,17 @@ bool Runtime::CancelNumberEdit(const std::string& id,NumberEditIdentity expected
 std::optional<NumberTextGeometry> Runtime::GetNumberGeometry(const std::string& id) const {
 	return impl->numberView.Geometry(id,impl->interaction);
 }
+std::optional<NumberEditorContext> Runtime::QueryNumberEditor(std::string& error, double seconds) {
+	error.clear();
+	if (!impl->PrepareNumberEdit(seconds,error)) return std::nullopt;
+	const auto id = impl->interaction.Focused();
+	const auto view = impl->interaction.Widget(id);
+	const auto modal = impl->interaction.ModalToken();
+	if (!modal || !impl->interaction.CanActivate(id) || !view || view->role != ControlRole::Number ||
+		view->pending || !view->number || !view->number->active || view->number->conflict ||
+		!view->number->identity.session || !view->number->identity.revision) return std::nullopt;
+	return NumberEditorContext{id,*view->number,modal};
+}
 bool Runtime::CanActivateControl(const std::string& id, double seconds) {
 	if (!impl->canonical || !std::isfinite(seconds) || seconds < 0) return false;
 	impl->UpdateInteraction(seconds);

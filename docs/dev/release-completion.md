@@ -2,6 +2,11 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- Text-entry development now checks field ownership across backend replacement
+  and input-queue resets. A Windows text-store foundation keeps application
+  edits and native text-service revisions synchronized; live native text and
+  complete IME behavior remain in development.
+
 - Active numeric fields support caret movement, selection, deletion, undo/redo
   and explicit Enter confirmation. Held editing keys cannot switch to another
   field, and SDL shortcuts preserve the modifiers captured with each key event.

@@ -445,6 +445,8 @@ EVENT LOOP
 ============================================================================
 */
 
+#include "../EventQueueContinuity.h"
+
 #define	MAX_QUED_EVENTS		256
 #define	MASK_QUED_EVENTS	( MAX_QUED_EVENTS - 1 )
 
@@ -479,6 +481,7 @@ void Posix_QueEvent( sysEventType_t type, int value, int value2,
 
 	ev = &eventQue[eventHead & MASK_QUED_EVENTS];
 	if (eventHead - eventTail >= MAX_QUED_EVENTS) {
+		Sys_InvalidateEventQueue();
 		common->Printf( "Posix_QueEvent: overflow\n" );
 		// we are discarding an event, but don't leak memory
 		// TTimo: verbose dropped event types?
@@ -524,6 +527,7 @@ Sys_ClearEvents
 ================
 */
 void Sys_ClearEvents( void ) {
+	Sys_InvalidateEventQueue();
 	while ( eventHead > eventTail ) {
 		Sys_DiscardQueuedEvent( eventQue[ eventTail & MASK_QUED_EVENTS ] );
 		eventTail++;

@@ -36,6 +36,16 @@ associations latch failure. Engine queue loss/flush and native provider failure
 must also retire delivery before any editor mutation; the ledger cannot observe
 a loss inside the existing void event-queue API by itself.
 
+The engine now exposes a process-local queue continuity token. Both platform
+queues invalidate it before overflow discards an event and before every explicit
+clear, including an empty clear after the final event was removed. The pushed
+event queue and event-loop initialization/shutdown invalidate the same token.
+Ordinary enqueue/dequeue preserves it. Exhaustion produces permanent zero;
+neither zero nor a recorded token can authorize native input. Native integration
+must capture the token before collection and check it before each mutation and
+acknowledgement, alongside provider health and the exact native fence. This signal
+does not make the existing queues safe for concurrent producers.
+
 ## Windows provider and remaining integration
 
 The bundled SDL patch observes native composition scope and exact admission of
@@ -51,6 +61,47 @@ taints the surviving window. Repeated production IME editing therefore requires
 the planned TSF text-store provider, with immutable document/composition identity,
 atomic range transactions, checked locks and separate native/engine revisions.
 The current observer is not production IME qualification.
+
+The portable native text-document model is now implemented. It keeps an immutable
+document/editor lease, separate native-shadow and accepted engine revisions,
+checked read/write callback scopes, strict UTF-8/UTF-16 ACP boundaries and bounded
+FIFO range transactions. A failed operation prevents partial publication, and a
+rejected front transaction retires its dependent work. Composition identity is
+transient and never restored from an editor save. Classification occurs at the
+complete transaction boundary, including insertion before a composition begins
+inside that boundary. The model does not prove that all TSF callbacks share one lock.
+
+The Windows-only text store now implements the actual SDK `ITextStoreACP`,
+composition-sink and edit-sink interfaces. It checks apartment ownership,
+callback-scoped locks, context identity, deferred write upgrades, copied range
+layout revisions and transaction acknowledgements. It is not activated or
+connected to a field. Composition changes currently require an active write
+callback; arbitrary multi-lock composition sessions and production candidate
+placement remain required. A failed
+callback retires the document because a text service may already have accepted
+the synchronous edit. Counted SDK callback tests do not qualify an installed TIP.
+
+Application-origin snapshots use a separate exact-revision `SyncEngine` call.
+It refuses pending native edits, locks or composition, updates the document
+atomically and then reports actual text/selection changes outside the native
+lock. A revision-only synchronization produces no false text change or native
+shadow increment. Notification callbacks can obtain read locks; synchronous
+write requests are refused and asynchronous writes are served once after the
+whole batch. Application mutations and sink replacement cannot reenter that
+batch. A failing callback retires the store and requires retirement of the
+paired engine binding. Native edits and acknowledgements never emit these
+application-origin notifications. A fresh copied layout emits its own layout
+notification after installation. These rules follow Microsoft's
+[OnTextChange](https://learn.microsoft.com/en-us/windows/win32/api/textstor/nf-textstor-itextstoreacpsink-ontextchange),
+[RequestLock](https://learn.microsoft.com/en-us/windows/win32/api/textstor/nf-textstor-itextstoreacp-requestlock)
+and [OnLayoutChange](https://learn.microsoft.com/en-us/windows/win32/api/textstor/nf-textstor-itextstoreacpsink-onlayoutchange)
+contracts; the engine-to-native receipt path remains to be connected.
+
+The adapter follows the SDK's range-query and insertion contracts, including
+query-only insertion and unavailable stale layout. See Microsoft's
+[ITextStoreACP interface](https://learn.microsoft.com/en-us/windows/win32/api/textstor/nn-textstor-itextstoreacp),
+[InsertTextAtSelection](https://learn.microsoft.com/en-us/windows/win32/api/textstor/nf-textstor-itextstoreacp-inserttextatselection)
+and [GetTextExt](https://learn.microsoft.com/en-us/windows/win32/api/textstor/nf-textstor-itextstoreacp-gettextext).
 
 SDL can collect several native messages before Session handles the resulting
 events. A private dispatch fence must hold collection after a native group until

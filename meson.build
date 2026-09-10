@@ -434,11 +434,27 @@ if build_engine or get_option('build_native_tests')
     'openq4-retained-ui',
     files('src/ui/retained/Runtime.cpp', 'src/ui/retained/Document.cpp', 'src/ui/retained/Presentation.cpp', 'src/ui/retained/Behavior.cpp', 'src/ui/retained/State.cpp', 'src/ui/retained/Motion.cpp', 'src/ui/retained/Interaction.cpp', 'src/ui/retained/ValueControlView.cpp', 'src/ui/retained/NumberControlView.cpp', 'src/ui/retained/Input.cpp', 'src/ui/retained/TextInput.cpp', 'src/ui/retained/TextEdit.cpp', 'src/ui/retained/TextEditCommand.cpp', 'src/ui/retained/TextInputBroker.cpp', 'src/ui/retained/TextRun.cpp', 'src/ui/retained/Vector.cpp', 'src/ui/retained/VectorElement.cpp', 'src/ui/application/SettingsTransaction.cpp', 'src/ui/application/SettingsJournal.cpp', 'src/ui/application/SettingsDisplayController.cpp'),
     files('src/ui/retained/TextInputBrokerWire.cpp'),
+    files('src/ui/retained/NativeTextDocument.cpp'),
     dependencies: [rmlui_project.get_variable('rmlui_dep'), jsoncpp_project.get_variable('jsoncpp_dep'), libtess2_project.get_variable('libtess2_dep')],
     pic: true,
     install: false,
   )
   openq4_retained_dep = declare_dependency(link_with: openq4_retained_library)
+  # Actual Windows SDK interfaces stay outside the portable runtime and engine
+  # PCH. This object has no native activation, SDL or dedicated-server dependency.
+  if host_system == 'windows'
+    openq4_windows_text_store_library = static_library('openq4-windows-text-store',
+      files('src/sys/sdl3/WindowsTextStore.cpp'),
+      dependencies: openq4_retained_dep, install: false)
+    openq4_windows_text_store_dep = declare_dependency(link_with: openq4_windows_text_store_library)
+    if get_option('build_native_tests')
+      openq4_windows_text_store_test = executable('openq4-ui-windows-text-store-test',
+        files('tools/tests/native/WindowsTextStoreTest.cpp'),
+        include_directories: include_directories('src'),
+        dependencies: [openq4_windows_text_store_dep, openq4_retained_dep], install: false)
+      test('openq4-ui-windows-text-store', openq4_windows_text_store_test, timeout: 30)
+    endif
+  endif
   if get_option('build_native_tests')
     openq4_ui_text_input_test = executable(
       'openq4-ui-text-input-test',
@@ -480,6 +496,14 @@ if build_engine or get_option('build_native_tests')
       install: false,
     )
     test('openq4-ui-text-input-broker-wire', openq4_ui_text_input_broker_wire_test, timeout: 30)
+    openq4_ui_native_text_document_test = executable(
+      'openq4-ui-native-text-document-test',
+      files('tools/tests/native/UiNativeTextDocumentTest.cpp'),
+      include_directories: include_directories('src'),
+      dependencies: openq4_retained_dep,
+      install: false,
+    )
+    test('openq4-ui-native-text-document', openq4_ui_native_text_document_test, timeout: 30)
     openq4_ui_text_run_test = executable(
       'openq4-ui-text-run-test',
       files('tools/tests/native/UiTextRunTest.cpp'),
@@ -1406,6 +1430,9 @@ endif
 
 if build_engine
   client_deps += openq4_retained_dep
+  if host_system == 'windows'
+    client_deps += openq4_windows_text_store_dep
+  endif
 endif
 
 # Native-record translation is separate from the portable runtime and engine

@@ -27,6 +27,7 @@ SUPPORT = r'''
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "src/sys/EventQueueContinuity.h"
 static unsigned checks=0, frees=0, warnings=0;
 static void Check(bool value,const char* message) {
     ++checks;
@@ -95,8 +96,10 @@ static void CheckCleared() {
     Check(eventHead==0 && eventTail==0,"clear resets both cursors");
     Empty();
     const unsigned before=frees;
+    const auto token=Sys_EventQueueToken();
     Sys_ClearEvents();
     Check(frees==before,"repeated clear is harmless");
+    Check(token!=0 && Sys_EventQueueToken()>token,"even an empty explicit flush invalidates native stream continuity");
 }
 static void PendingOnly() {
     Sys_ClearEvents(); CheckCleared();
@@ -191,11 +194,13 @@ static void OverflowOrder() {
     const int extra=37;
     std::vector<void*> pointers;
     const auto previousWarnings=warnings;
+    const auto previousToken=Sys_EventQueueToken();
     for(int i=0;i<MAX_QUED_EVENTS+extra;++i) {
         pointers.push_back(Allocate(10));
         Queue(i%2?SE_RETAINED_UI:SE_CONSOLE,i,10,pointers.back());
     }
     Check(warnings==previousWarnings+extra,"each overflow discards exactly one oldest entry");
+    Check(Sys_EventQueueToken()==previousToken+extra,"every loss advances continuity before surviving events can be used");
     for(int i=0;i<extra;++i) {
         Check(Freed(pointers[i]),"overflow releases evicted oldest payload");
         ExpectBytes(pointers[i],i%2==0);
@@ -208,7 +213,21 @@ static void OverflowOrder() {
     }
     Empty(); Sys_ClearEvents(); CheckCleared();
 }
+static void ContinuityCases() {
+    openq4::EventQueueContinuity local(3), unavailable(0);
+    Check(local.Matches(1) && !local.Matches(0) && !unavailable.Matches(0),"only nonzero exact continuity tokens are usable");
+    local.Invalidate(); Check(local.Matches(2) && !local.Matches(1),"invalidation never matches the prior collection");
+    local.Invalidate(); Check(local.Matches(3),"last nonreused token can be observed");
+    local.Invalidate(); Check(local.Token()==0 && !local.Matches(3),"exhaustion cannot wrap to an old native owner");
+    local.Invalidate(); unavailable.Invalidate(); Check(local.Token()==0 && unavailable.Token()==0,"unavailable continuity cannot be reset");
+    Sys_ClearEvents(); const auto token=Sys_EventQueueToken();
+    Queue(SE_KEY,12,0,nullptr); Queue(SE_KEY,13,0,nullptr);
+    Sys_GetEvent(); Sys_GetEvent(); Empty();
+    Check(Sys_EventQueueToken()==token,"ordinary enqueue/dequeue does not fabricate loss");
+    Sys_ClearEvents(); Check(Sys_EventQueueToken()!=token,"flush after final dequeue retires an outstanding native owner");
+}
 int main() {
+    ContinuityCases();
     PendingOnly(); InvalidLengths(); DrainedSlotsAndReuse(); WrappedPendingRange(); OverflowOrder();
     Check(frees==blocks.size(),"all allocations have exactly one owner release");
     for(const auto& block:blocks) Check(block.freed,"no outstanding allocation remains");
@@ -255,6 +274,8 @@ def main():
     env = dict(os.environ, TEMP=str(directory), TMP=str(directory), TMPDIR=str(directory))
     results = {"scope": "compiled actual Windows and POSIX queue bodies on this host; no engine/platform/input launch",
                "files": {"src/sys/sys_public.h": digest(ROOT / "src/sys/sys_public.h"),
+                         "src/sys/EventQueueContinuity.h": digest(ROOT / "src/sys/EventQueueContinuity.h"),
+                         "src/sys/EventQueueContinuity.cpp": digest(ROOT / "src/sys/EventQueueContinuity.cpp"),
                          "tools/tests/sys_event_queue_ownership.py": digest(Path(__file__))}, "cases": {}}
     for platform in ("windows", "posix"):
         relative, original, clear = production(platform)
@@ -264,12 +285,14 @@ def main():
             "legacy-clear-leak": original.replace(clear, "void Sys_ClearEvents() { eventHead=eventTail=0; }"),
             "clear-dequeued-slots": original.replace(clear, clear.replace("{", "{\n eventTail=0;", 1)),
             "omit-console-wipe": original.replace("event.evType == SE_CONSOLE && event.evPtrLength > 0", "false"),
+            "overflow-continuity-lost": original.replace("\t\tSys_InvalidateEventQueue();", "\t\t// Lost stream invalidation."),
+            "clear-continuity-lost": original.replace(clear, clear.replace("\tSys_InvalidateEventQueue();", "\t// Lost empty flush invalidation.")),
         }
         for name, source in mutations.items():
             label = platform + "-" + name
             cpp, exe = directory / (label + ".cpp"), directory / (label + ".exe")
             cpp.write_text(source, encoding="utf-8")
-            command = [compiler, "-std=c++17", "-Wall", "-Wextra", "-Werror", "-Wno-unused-parameter", str(cpp), "-o", str(exe)]
+            command = [compiler, "-std=c++17", "-Wall", "-Wextra", "-Werror", "-Wno-unused-parameter", "-I", str(ROOT), str(cpp), str(ROOT / "src/sys/EventQueueContinuity.cpp"), "-o", str(exe)]
             compiled = subprocess.run(command, text=True, capture_output=True, env=env)
             (directory / (label + "-compile.log")).write_text(compiled.stdout + compiled.stderr, encoding="utf-8")
             if compiled.returncode:
@@ -287,7 +310,7 @@ def main():
     (directory / "result.json").write_text(json.dumps(results, indent=2) + "\n", encoding="utf-8")
     for platform in ("windows", "posix"):
         print(platform + ": " + results["cases"][platform + "-production"]["output"].strip())
-    print("PASS: six compiled leak/stale-ownership/erasure mutants rejected")
+    print("PASS: ten compiled ownership/erasure/continuity mutants rejected")
     print("Evidence: " + str(directory / "result.json"))
 
 

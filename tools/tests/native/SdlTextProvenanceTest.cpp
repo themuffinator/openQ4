@@ -84,6 +84,12 @@ bool SDL_PushEvent(SDL_Event*);
 void SDL_SendKeyboardText(const char*);
 static bool SDL_CallEventWatchers(SDL_Event*);
 static int SDL_PeepEvents(SDL_Event*,int,int,int,int);
+// This suite isolates the observer with the adjacent fence disabled. Enabled
+// collection/queue-consumer behavior belongs to SdlNativeFenceTest.
+static bool OQ4_WIN_BeginFenceAdmission(const SDL_Event*) { return false; }
+static bool OQ4_WIN_ValidateFenceAdmission(const SDL_Event*,bool) { return true; }
+static void OQ4_WIN_CompleteFenceEvent(const SDL_Event*,bool) {}
+static void OQ4_WIN_NativeFenceMessage(unsigned int) {}
 static void WIN_ResetDeadKeys(){++deadKeys;}
 static bool WIN_UpdateTextInputArea(SDL_VideoDevice*,SDL_Window*){++legacyCalls;return true;}
 #include "provenance-api.inc"

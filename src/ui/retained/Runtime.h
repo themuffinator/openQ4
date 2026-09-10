@@ -36,6 +36,11 @@ struct NumberTextGeometry {
 	Bounds caret, viewport; // Projected document pixels, before engine conversion.
 	float scroll = 0;
 };
+struct NumberEditorContext {
+	std::string control;
+	NumberEditView editor;
+	std::uint64_t modalToken = 0;
+};
 struct FontMetrics { float ascent = 0, descent = 0, lineSpacing = 0, xHeight = 0; };
 struct Glyph {
 	float advance = 0, left = 0, top = 0, width = 0, height = 0;
@@ -191,6 +196,9 @@ public:
 		bool keepDraft, std::string& error, double seconds);
 	bool CancelNumberEdit(const std::string& id, NumberEditIdentity expected, double seconds);
 	std::optional<NumberTextGeometry> GetNumberGeometry(const std::string& id) const;
+	// Refresh host values and current eligibility, then copy the focused active
+	// editor. Never starts/rebases an inactive draft or serializes a live token.
+	std::optional<NumberEditorContext> QueryNumberEditor(std::string& error, double seconds);
 	std::vector<ControlAction> TakeActions();
 	// Recheck queued activations after earlier programs may change eligibility.
 	bool CanActivateControl(const std::string& id, double monotonicSeconds);

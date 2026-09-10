@@ -159,6 +159,12 @@ public:
 	virtual void				RegisterIcon( const char *code, const char *shader, int x = -1, int y = -1, int w = -1, int h = -1 );
 	bool DispatchApplicationActions( idUserInterface *gui, const char *command, bool &closeRequested );
 	void PumpApplicationActions( UI_ApplicationCommandCallback callback, void *context, idUserInterface *only );
+	openq4::ui::TextBrokerContext QueryTextContext(idUserInterface* current,
+		std::uint64_t nativeWindow, std::uint64_t nativeSession);
+	uiTextDeliveryResult_t DeliverTextInput(idUserInterface* current,
+		std::uint64_t nativeWindow, std::uint64_t nativeSession,
+		const openq4::ui::TextBrokerContext& authorizedContext,
+		const openq4::ui::TextBrokerDelivery& delivery);
 
 private:
 	void						RegisterAllocation( idUserInterfaceManaged *gui );
@@ -175,6 +181,7 @@ private:
 	// subset, removed by the managed destructor even on direct editor deletes.
 	idList<idUserInterfaceManaged*> allocations;
 	unsigned long long nextAllocationId = 0;
+	bool textBoundaryActive = false, textBoundaryFailed = false;
 	int applicationPumpDepth = 0;
 	int applicationPumpBudget = 0;
 	idList<idUserInterfaceManaged*> guis;

@@ -36,6 +36,7 @@ ENGINE = r'''
 #include <cstdarg>
 #include <charconv>
 #include "src/ui/retained/Input.h"
+#include "src/ui/UserInterfaceText.h"
 #include "src/ui/retained/TextEditCommand.h"
 #include "src/sys/KeyEventMetadata.h"
 #include "src/ui/RetainedUI.h"
@@ -203,8 +204,16 @@ struct StubEvent {
 };
 static std::map<std::string,StubEvent> eventPlans;
 static std::vector<std::string> eventHistory;
+struct NumberEditorContext {std::string control;NumberEditView editor;std::uint64_t modalToken=0;};
 class Runtime {
 public:
+    std::optional<NumberEditorContext> QueryNumberEditor(std::string& error,double) {
+        error.clear();const auto found=widgets.find(selected);
+        if(!loaded || found==widgets.end() || disabledControls.contains(selected) || !found->second.number ||
+           !found->second.number->active || found->second.number->conflict || found->second.pending)return {};
+        return NumberEditorContext{selected,*found->second.number,modalIdentity};
+    }
+
     using ActionValidator=std::function<bool(const ActionInvocation&,std::string&)>;
     struct EventEffects { StateValues stateChanges; std::vector<ActionInvocation> actions; };
     struct EventCall { std::string name; StateValues application; size_t maxActions; };
@@ -2114,7 +2123,7 @@ int main() {
 
 def main():
     dependencies = [
-        'src/ui/UserInterfaceRetained.cpp', 'src/ui/UserInterface.h', 'src/ui/UserInterfaceManaged.h',
+        'src/ui/UserInterfaceRetained.cpp', 'src/ui/UserInterface.h', 'src/ui/UserInterfaceManaged.h', 'src/ui/UserInterfaceText.h',
         'src/ui/UserInterfaceRetained.h', 'src/ui/UserInterface.cpp', 'src/ui/RetainedUI.h',
         'src/ui/SettingsService.h', 'src/ui/application/SettingsTransaction.h',
         'src/ui/retained/Document.h', 'src/ui/retained/Interaction.h',
@@ -2150,6 +2159,7 @@ def main():
     code += function_body(public, 'class idUserInterface {') + ';\n'
     code += function_body(managed, 'class idUserInterfaceManaged :') + ';\n'
     code += function_body(header, 'class idUserInterfaceRetained final :') + ';\n' + BASE
+    code += function_body(factory, 'std::uint64_t UI_NextTextLifetime(')
     code += function_body(factory, 'bool UI_IsRetainedPath(')
     code += source[source.index('namespace {'):source.index('bool UI_RetainedDiagnostic(')]
     code += function_body(source, 'bool UI_RetainedDiagnostic(') + MAIN

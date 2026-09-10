@@ -186,6 +186,8 @@ struct idUserInterfaceRetained::Impl {
 	ID_TIME_T stamp = 0;
 	Document document;
 	retainedUIView_t* view = nullptr;
+	const std::uint64_t textBackend = UI_NextTextLifetime();
+	std::uint64_t textDocument = 0;
 	Input input;
 	std::set<int> held;
 	struct PendingAction {
@@ -232,6 +234,12 @@ struct idUserInterfaceRetained::Impl {
 	}
 	static void ResourceEvent(void* owner, retainedUIViewEvent_t event) {
 		auto& self = *static_cast<Impl*>(owner);
+		// Allocate before teardown. Exhaustion permanently disables text ownership
+		// for this document; restored editors cannot inherit its old native lease.
+		if (event == retainedUIViewEvent_t::BeforeResourceReset) {
+			self.textDocument = UI_NextTextLifetime();
+			if (!self.textDocument) self.Error("GUI text lifetime exhausted");
+		}
 		if (event == retainedUIViewEvent_t::BeforeResourceReset) self.Quarantine(false,false,true);
 		else if (event == retainedUIViewEvent_t::Failed) self.Quarantine(false,false,true);
 		if (event != retainedUIViewEvent_t::BeforeResourceReset) common->Printf("RETAINED_GUI_RESOURCE path=%s event=%s\n",
@@ -436,6 +444,8 @@ bool idUserInterfaceRetained::InitFromFile(const char* qpath, bool rebuild, bool
 	const bool same = impl->Prepare() && path == impl->path.c_str() && source == impl->document.Source();
 	if (!same && !ApplicationState(candidate.Model(),impl->state,application,error)) { impl->Error(error); return false; }
 	if (same && !impl->RuntimeView()->SaveSnapshot(snapshot,error,RetainedUI_PresentationTime())) { impl->Error(error); return false; }
+	const auto textDocument = UI_NextTextLifetime();
+	if (!impl->textBackend || !textDocument) { impl->Error("GUI text lifetime exhausted"); return false; }
 	auto* view = RetainedUI_CreateView(Impl::ResourceEvent,impl.get());
 	if (!view) return false;
 	bool valid = RetainedUI_LoadView(view,source,path,diagnostics);
@@ -448,6 +458,7 @@ bool idUserInterfaceRetained::InitFromFile(const char* qpath, bool rebuild, bool
 		return false;
 	}
 	impl->Quarantine(false,false,true);
+	impl->textDocument = textDocument;
 	if (same && impl->settingsClosePending) UI_SettingsCloseOwner(impl->settingsOwner);
 	impl->settingsClosePending = false;
 	RetainedUI_DestroyView(impl->view); impl->view = view;
@@ -511,6 +522,32 @@ bool idUserInterfaceRetained::SetPresentationValue(const char* name, const char*
 	impl->lastError.clear(); return true;
 }
 bool idUserInterfaceRetained::GetTextInputState(idRectangle&, float&) const { return false; }
+
+TextBrokerContext idUserInterfaceRetained::QueryTextContext(std::uint64_t allocation,
+	std::uint64_t window, std::uint64_t session) {
+	TextBrokerContext result{TextBrokerRoute::Retained,window,session,{}};
+	if (!allocation || !window || !session || !impl->Prepare() || !impl->AcceptInput() ||
+		!impl->textBackend || !impl->textDocument) return result;
+	std::string error;
+	const auto current = impl->RuntimeView()->QueryNumberEditor(error,RetainedUI_PresentationTime());
+	if (!error.empty()) impl->Error(error);
+	if (!current) return result;
+	result.editor = TextEditorIdentity{allocation,impl->textBackend,impl->textDocument,current->modalToken,
+		window,current->editor.identity.session,current->editor.identity.revision,current->control};
+	return result;
+}
+
+bool idUserInterfaceRetained::ApplyTextInput(const TextBrokerContext& expected,
+	const TextInputEvent& input, std::string& error) {
+	error.clear();
+	if (expected.route != TextBrokerRoute::Retained || !expected.editor ||
+		QueryTextContext(expected.editor->allocation,expected.nativeWindow,expected.nativeSession) != expected) {
+		error = "Retained text editor identity changed before delivery"; return false;
+	}
+	const auto& target = *expected.editor;
+	return impl->RuntimeView()->ApplyNumberInput(target.control,{target.session,target.revision},
+		input,error,RetainedUI_PresentationTime());
+}
 bool idUserInterfaceRetained::GetMaxTextIndex(const char*, const char*, wrapInfo_t&) const { return false; }
 void idUserInterfaceRetained::SetKeyBindingNames() {}
 
@@ -762,7 +799,10 @@ bool idUserInterfaceRetained::ReadFromSaveGame(idFile* file) {
 	// the snapshot is committed presentation state; the dictionary is pending
 	// caller input. Restoring must not implicitly commit it or replay actions.
 	// Snapshot validation is atomic; outer dictionary/flags follow on success.
+	const auto textDocument = UI_NextTextLifetime();
+	if (!textDocument) { impl->Error("GUI text lifetime exhausted"); return false; }
 	if (!impl->RuntimeView()->RestoreSnapshot(snapshot,error,RetainedUI_PresentationTime())) { impl->Error(error); return false; }
+	impl->textDocument = textDocument;
 	impl->Quarantine(false,false,true); impl->state = state; impl->state.Set("name",Name());
 	impl->settingsClosePending = false;
 	// Save restoration suppresses automatic initialization just as legacy load

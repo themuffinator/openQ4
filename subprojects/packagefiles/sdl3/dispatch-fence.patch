@@ -1,0 +1,255 @@
+--- a/src/events/SDL_events.c
++++ b/src/events/SDL_events.c
+@@ -21,6 +21,7 @@
+ #include "SDL_internal.h"
+ #if defined(SDL_VIDEO_DRIVER_WINDOWS) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
+ #include "../video/windows/SDL_openq4_text_provenance.h"
++#include "../video/windows/SDL_openq4_native_fence.h"
+ #endif
+ 
+ // General event handling code for SDL
+@@ -1618,6 +1619,9 @@
+             // There is an event, we can return.
+             return 1;
+         }
++#if defined(SDL_VIDEO_DRIVER_WINDOWS) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
++        if (OQ4_WIN_NativeFenceBlocked()) return 0;
++#endif
+         // No events found in the queue, call WaitEventTimeout to wait for an event.
+         if (timeoutNS > 0) {
+             Sint64 elapsed = SDL_GetTicksNS() - start;
+@@ -1723,6 +1727,9 @@
+         }
+     }
+     if (result == 0) {
++#if defined(SDL_VIDEO_DRIVER_WINDOWS) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
++        if (OQ4_WIN_NativeFenceBlocked()) return false;
++#endif
+         if (timeoutNS == 0) {
+             // No events available, and not willing to wait
+             return false;
+@@ -1778,6 +1785,9 @@
+         if (SDL_PeepEvents(event, 1, SDL_GETEVENT, SDL_EVENT_FIRST, SDL_EVENT_LAST) > 0) {
+             return true;
+         }
++#if defined(SDL_VIDEO_DRIVER_WINDOWS) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
++        if (OQ4_WIN_NativeFenceBlocked()) return false;
++#endif
+ 
+         Uint64 delay = EVENT_POLL_INTERVAL_NS;
+         if (timeoutNS > 0) {
+@@ -1806,6 +1816,7 @@
+ {
+ #if defined(SDL_VIDEO_DRIVER_WINDOWS) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
+     const OQ4_TextScope oq4_admission = OQ4_WIN_BeginTextAdmission(event);
++    const bool oq4_fence = OQ4_WIN_BeginFenceAdmission(event);
+ #endif
+     if (!event->common.timestamp) {
+         event->common.timestamp = SDL_GetTicksNS();
+@@ -1813,20 +1824,29 @@
+ 
+     if (!SDL_CallEventWatchers(event)) {
+         SDL_ClearError();
++#if defined(SDL_VIDEO_DRIVER_WINDOWS) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
++        OQ4_WIN_CompleteFenceEvent(event, false);
++#endif
+         return false;
+     }
+ 
+ #if defined(SDL_VIDEO_DRIVER_WINDOWS) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
+-    if (!OQ4_WIN_ValidateTextMarker(event)) return false;
++    if (!OQ4_WIN_ValidateFenceAdmission(event, oq4_fence) || !OQ4_WIN_ValidateTextMarker(event)) {
++        OQ4_WIN_CompleteFenceEvent(event, false);
++        return false;
++    }
+     if (event->type == SDL_EVENT_TEXT_INPUT) OQ4_WIN_AssociateText(event, oq4_admission);
+ #endif
+     if (SDL_PeepEvents(event, 1, SDL_ADDEVENT, 0, 0) <= 0) {
+ #if defined(SDL_VIDEO_DRIVER_WINDOWS) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
+         if (event->type == SDL_EVENT_TEXT_INPUT) OQ4_WIN_DropTextAssociation(event);
++        OQ4_WIN_CompleteFenceEvent(event, false);
+ #endif
+         return false;
+     }
+-
++#if defined(SDL_VIDEO_DRIVER_WINDOWS) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
++    OQ4_WIN_CompleteFenceEvent(event, true);
++#endif
+     return true;
+ }
+ 
+--- a/src/video/windows/SDL_windowsevents.c
++++ b/src/video/windows/SDL_windowsevents.c
+@@ -24,6 +24,7 @@
+ 
+ #include "SDL_windowsvideo.h"
+ #include "SDL_openq4_text_provenance.h"
++#include "SDL_openq4_native_fence.h"
+ #include "../../events/SDL_events_c.h"
+ #include "../../events/SDL_touch_c.h"
+ #include "../../events/scancodes_windows.h"
+@@ -1126,6 +1127,7 @@
+     // is a RALT message. In that case, this is a false LCTRL!
+     MSG next_msg;
+     DWORD msg_time = GetMessageTime();
++    if (OQ4_WIN_NativeFenceBlocked() && !OQ4_WIN_CurrentNativeDispatch()) return false;
+     if (PeekMessage(&next_msg, NULL, 0, 0, PM_NOREMOVE)) {
+         if (next_msg.message == WM_KEYDOWN ||
+             next_msg.message == WM_SYSKEYDOWN) {
+@@ -2519,16 +2521,31 @@
+ {
+ #if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
+     OQ4_TextScope previous = OQ4_WIN_SaveTextScope();
+-#endif
++    OQ4_WIN_NativeFenceMessage(msg);
++#ifdef _MSC_VER
++    LRESULT result;
++    __try {
++        result = WIN_WindowProcObserved(hwnd, msg, wParam, lParam);
++    } __finally {
++        OQ4_WIN_RestoreTextScope(previous);
++    }
++    return result;
++#endif
++#endif
++#if !defined(_MSC_VER) || defined(SDL_PLATFORM_XBOXONE) || defined(SDL_PLATFORM_XBOXSERIES)
+     const LRESULT result = WIN_WindowProcObserved(hwnd, msg, wParam, lParam);
+ #if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
+     OQ4_WIN_RestoreTextScope(previous);
+ #endif
+     return result;
++#endif
+ }
+ 
+ int WIN_WaitEventTimeout(SDL_VideoDevice *_this, Sint64 timeoutNS)
+ {
++#if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
++    if (OQ4_WIN_NativeFenceBlocked()) return 0;
++#endif
+     if (g_WindowsEnableMessageLoop) {
+ #if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
+         DWORD timeout, ret;
+@@ -2586,6 +2603,10 @@
+ void WIN_PumpEventsForHWND(SDL_VideoDevice *_this, HWND hwnd)
+ {
+     MSG msg;
++#if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
++    /* Creation/destruction drains cannot wait for an engine acknowledgement. */
++    OQ4_WIN_NativeFenceLifecycle();
++#endif
+ 
+     if (g_WindowsEnableMessageLoop) {
+         SDL_processing_messages = true;
+@@ -2602,9 +2623,10 @@
+     }
+ }
+ 
+-void WIN_PumpEvents(SDL_VideoDevice *_this)
++static void WIN_PumpEventsInternal(SDL_VideoDevice *_this, bool one_collection, bool *removed_message)
+ {
+     MSG msg;
++    bool peeked = false;
+ #ifdef _MSC_VER // We explicitly want to use GetTickCount(), not GetTickCount64()
+ #pragma warning(push)
+ #pragma warning(disable : 28159)
+@@ -2622,7 +2644,8 @@
+     if (g_WindowsEnableMessageLoop) {
+         SDL_processing_messages = true;
+ 
+-        while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
++        while ((!one_collection || !peeked) && (peeked = true, PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))) {
++            if (removed_message) *removed_message = true;
+             if (g_WindowsMessageHook) {
+                 if (!g_WindowsMessageHook(g_WindowsMessageHookData, &msg)) {
+                     continue;
+@@ -2762,6 +2785,36 @@
+ #endif
+ }
+ 
++/* One strict collection includes existing input housekeeping and at most one
++ * PeekMessage(PM_REMOVE), including sent callbacks inside Peek and the returned
++ * message's Translate/Dispatch. No native callback enters the engine GUI. */
++void WIN_PumpEvents(SDL_VideoDevice *_this)
++{
++#if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
++    bool completed = false, removed_message = false;
++    if (OQ4_WIN_NativeFenceBlocked()) return;
++    if (OQ4_WIN_NativeFenceEnabled()) {
++        if (!OQ4_WIN_BeginNativeCollection()) return;
++#ifdef _MSC_VER
++        __try {
++#endif
++            WIN_PumpEventsInternal(_this, true, &removed_message);
++            completed = true;
++#ifdef _MSC_VER
++        } __finally {
++#endif
++            SDL_processing_messages = false;
++            if (completed) OQ4_WIN_EndNativeCollection(removed_message);
++            else OQ4_WIN_AbortNativeCollection();
++#ifdef _MSC_VER
++        }
++#endif
++        return;
++    }
++#endif
++    WIN_PumpEventsInternal(_this, false, NULL);
++}
++
+ static int app_registered = 0;
+ LPTSTR SDL_Appname = NULL;
+ Uint32 SDL_Appstyle = 0;
+--- a/src/video/windows/SDL_windowswindow.c
++++ b/src/video/windows/SDL_windowswindow.c
+@@ -33,6 +33,9 @@
+ #include "../SDL_sysvideo.h"
+ 
+ #include "SDL_windowsvideo.h"
++#if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
++#include "SDL_openq4_native_fence.h"
++#endif
+ #include "SDL_windowskeyboard.h"
+ #include "SDL_windowswindow.h"
+ 
+@@ -691,6 +694,9 @@
+ 
+ bool WIN_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_PropertiesID create_props)
+ {
++#if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
++    OQ4_WIN_NativeFenceLifecycle();
++#endif
+     SDL_VideoData *videodata = _this->internal;
+     HWND hwnd = (HWND)SDL_GetPointerProperty(create_props, SDL_PROP_WINDOW_CREATE_WIN32_HWND_POINTER, SDL_GetPointerProperty(create_props, "sdl2-compat.external_window", NULL));
+     HWND parent = NULL;
+@@ -1503,6 +1509,9 @@
+ 
+ void WIN_DestroyWindow(SDL_VideoDevice *_this, SDL_Window *window)
+ {
++#if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
++    OQ4_WIN_NativeFenceLifecycle();
++#endif
+     CleanupWindowData(_this, window);
+ }
+ 
+--- a/src/video/windows/SDL_windowsvideo.c
++++ b/src/video/windows/SDL_windowsvideo.c
+@@ -31,6 +31,9 @@
+ #include "../../core/windows/SDL_hid.h"
+ 
+ #include "SDL_windowsvideo.h"
++#if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
++#include "SDL_openq4_native_fence.h"
++#endif
+ #include "SDL_windowsframebuffer.h"
+ #include "SDL_windowsmessagebox.h"
+ #include "SDL_windowsrawinput.h"
+@@ -662,6 +665,9 @@
+ 
+ void WIN_VideoQuit(SDL_VideoDevice *_this)
+ {
++#if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
++    OQ4_WIN_NativeFenceShutdown();
++#endif
+     SDL_VideoData *data = _this->internal;
+ 
+     SDL_RemoveHintCallback(SDL_HINT_WINDOWS_RAW_KEYBOARD, UpdateWindowsRawKeyboard, _this);

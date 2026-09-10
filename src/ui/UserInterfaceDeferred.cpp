@@ -164,6 +164,14 @@ bool idUserInterfaceDeferred::DispatchApplicationActions( const char *command, b
 const char *idUserInterfaceDeferred::PendingApplicationCommand() const {
 	return backend != NULL ? backend->PendingApplicationCommand() : "";
 }
+openq4::ui::TextBrokerContext idUserInterfaceDeferred::QueryTextContext(std::uint64_t allocation,
+	std::uint64_t window, std::uint64_t session) {
+	return backend != NULL ? backend->QueryTextContext(allocation,window,session) : openq4::ui::TextBrokerContext{};
+}
+bool idUserInterfaceDeferred::ApplyTextInput(const openq4::ui::TextBrokerContext& expected,
+	const openq4::ui::TextInputEvent& input, std::string& error) {
+	return backend != NULL && backend->ApplyTextInput(expected,input,error);
+}
 bool idUserInterfaceDeferred::WriteToSaveGame( idFile *file ) const { return backend != NULL && backend->WriteToSaveGame( file ); }
 bool idUserInterfaceDeferred::ReadFromSaveGame( idFile *file ) {
 	if ( backend == NULL ) { return false; }

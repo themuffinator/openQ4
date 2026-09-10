@@ -100,7 +100,9 @@ for upcoming retained fields. [Numeric field integration](docs/dev/ui/numeric-fi
 adds shared caret geometry, explicit precise proposals and restorable drafts with
 undo/redo and conflict recovery. Active numeric fields also support caret,
 selection and editing command keys. [Native text delivery](docs/dev/ui/text-input-routing.md)
-and IME integration remain in development.
+now has checked editor ownership, queue continuity and a Windows SDK text store
+with atomic range transactions and application change notifications. Native
+activation and complete IME integration remain in development.
 
 The [0.13.1 patch notes](docs/dev/releases/v0.13.1.md) cover the release save fix, download verification, and map-compilation corrections. Replace the complete package when upgrading.
 

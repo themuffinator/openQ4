@@ -20,7 +20,8 @@ import tempfile
 
 ROOT=Path(__file__).resolve().parents[2]
 SOURCES=["src/framework/EventLoop.cpp","src/framework/EventLoop.h","src/sys/sys_public.h",
-         "tools/tests/native/EventJournalTest.cpp","tools/tests/event_journal.py","src/sys/KeyEventMetadata.h"]
+         "tools/tests/native/EventJournalTest.cpp","tools/tests/event_journal.py","src/sys/KeyEventMetadata.h",
+         "src/sys/EventQueueContinuity.h","src/sys/EventQueueContinuity.cpp"]
 
 
 def sha(path:Path)->str:
@@ -45,6 +46,8 @@ def main()->int:
     generated.write_text("#pragma once\n"+enum.group()+"\n"+record.group()+"\n",encoding="utf-8",newline="\n")
     production=(ROOT/SOURCES[0]).read_text(encoding="utf-8")
     mutations=[
+        ("pushed-continuity-lost","\t\tSys_InvalidateEventQueue();", "\t\t// Lost pushed-queue invalidation.",1),
+        ("lifecycle-continuity-lost","\tSys_InvalidateEventQueue();", "\t// Lost event-loop lifecycle invalidation.",3),
         ("key-metadata-unchecked","if ( ev.evType == SE_KEY && ev.evPtrLength )", "if ( false && ev.evType == SE_KEY && ev.evPtrLength )",1),
         ("unbounded-length","if ( length < 0 || length > MAX_JOURNAL_EVENT_PAYLOAD )","if ( false )",1),
         ("unknown-type",'return "Invalid journal event type";',"return NULL;",1),
@@ -85,10 +88,11 @@ def main()->int:
                     metadata=alternate/"src/sys/KeyEventMetadata.h"
                     metadata.parent.mkdir(parents=True,exist_ok=True)
                     shutil.copyfile(ROOT/"src/sys/KeyEventMetadata.h",metadata)
+                    shutil.copyfile(ROOT/"src/sys/EventQueueContinuity.h",metadata.with_name("EventQueueContinuity.h"))
                     includes=["-I",str(alternate)]
                 executable=scratch/(name+"-test"+(".exe" if os.name=="nt" else ""))
                 result=run([compiler,"-std=c++17","-O2","-Wall","-Wextra","-Werror",*includes,"-I",str(scratch),"-I",str(ROOT),
-                            str(ROOT/SOURCES[3]),"-o",str(executable)])
+                            str(ROOT/SOURCES[3]),str(ROOT/"src/sys/EventQueueContinuity.cpp"),"-o",str(executable)])
                 if result.returncode:
                     raise RuntimeError(f"{name} compilation failed:\n{result.stdout}")
                 result=run([str(executable)])

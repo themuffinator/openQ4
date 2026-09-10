@@ -2,6 +2,7 @@
 #pragma once
 
 #include "UserInterface.h"
+#include "UserInterfaceText.h"
 
 // Engine-private ownership and scheduling contract. Game modules continue to
 // use idUserInterface; neither legacy windows nor these manager operations
@@ -29,6 +30,15 @@ public:
 	// typed invocations inside the engine instead of console command strings.
 	virtual bool DispatchApplicationActions( const char *command, bool &closeRequested ) { return false; }
 	virtual const char *PendingApplicationCommand() const { return ""; }
+	// Only the manager calls these with an already checked outer allocation.
+	// Deferred wrappers forward that identity to their unregistered backend.
+	virtual openq4::ui::TextBrokerContext QueryTextContext(std::uint64_t allocation,
+		std::uint64_t window, std::uint64_t session) {
+		return {Active() ? openq4::ui::TextBrokerRoute::Legacy : openq4::ui::TextBrokerRoute::Unavailable,
+			window,session,{}};
+	}
+	virtual bool ApplyTextInput(const openq4::ui::TextBrokerContext& expected,
+		const openq4::ui::TextInputEvent& input, std::string& error) { return false; }
 
 	void ClearRefs() { refs = 0; }
 	void AddRef() { refs++; }

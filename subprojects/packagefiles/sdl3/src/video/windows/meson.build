@@ -1,4 +1,5 @@
 sources += files(
+  'SDL_openq4_native_fence.c',
   'SDL_openq4_text_provenance.c',
   'SDL_windowsclipboard.c',
   'SDL_windowsevents.c',

@@ -287,7 +287,10 @@ jobs:
             tools/tests/event_journal.py \
             tools/tests/sdl3_clipboard_status.py \
             tools/tests/sdl3_text_provenance.py \
+            tools/tests/sdl3_native_fence.py \
             tools/tests/ui_text_edit_model.py \
+            tools/tests/ui_native_text_document.py \
+            tools/tests/windows_text_store.py \
             tools/tests/ui_text_input.py \
             tools/tests/ui_retained_input.py \
             tools/tests/ui_retained_state_sources.py \
@@ -300,6 +303,7 @@ jobs:
             tools/tests/ui_system_session_route.py \
             tools/tests/ui_retained_resource_lifecycle.py \
             tools/tests/ui_retained_adapter.py \
+            tools/tests/ui_text_owner.py \
             tools/tests/ui_system_settings_host.py \
             tools/tests/ui_settings_service.py \
             tools/tests/durable_file.py \
@@ -522,7 +526,9 @@ jobs:
           python tools/tests/event_journal.py
           python tools/tests/sdl3_clipboard_status.py
           python tools/tests/sdl3_text_provenance.py
+          python tools/tests/sdl3_native_fence.py
           python tools/tests/ui_text_edit_model.py
+          python tools/tests/ui_native_text_document.py
           python tools/tests/ui_text_input.py
           python tools/tests/ui_retained_input.py
           python tools/tests/ui_retained_state_sources.py
@@ -535,6 +541,7 @@ jobs:
           python tools/tests/ui_system_session_route.py
           python tools/tests/ui_retained_resource_lifecycle.py
           python tools/tests/ui_retained_adapter.py
+          python tools/tests/ui_text_owner.py
           python tools/tests/ui_system_settings_host.py
           python tools/tests/ui_settings_service.py
           python tools/tests/durable_file.py
@@ -886,6 +893,13 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           python tools/analysis/clang_tidy_input_safety.py --build-dir builddir
+
+      - name: Validate Windows text-store SDK boundary
+        shell: cmd
+        run: |
+          call tools\build\openq4_devcmd.cmd
+          if errorlevel 1 exit /b 1
+          python tools\tests\windows_text_store.py
 
       - name: Publish staged payload
         if: always()

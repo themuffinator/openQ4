@@ -1498,6 +1498,8 @@ EVENT LOOP
 ========================================================================
 */
 
+#include "../EventQueueContinuity.h"
+
 #define	MAX_QUED_EVENTS		256
 #define	MASK_QUED_EVENTS	( MAX_QUED_EVENTS - 1 )
 
@@ -1534,6 +1536,7 @@ void Sys_QueEvent(int time, sysEventType_t type, int value, int value2, int ptrL
 	ev = &eventQue[eventHead & MASK_QUED_EVENTS];
 
 	if (eventHead - eventTail >= MAX_QUED_EVENTS) {
+		Sys_InvalidateEventQueue();
 		common->Printf("Sys_QueEvent: overflow\n");
 		// we are discarding an event, but don't leak memory
 		Sys_DiscardQueuedEvent( *ev );
@@ -1635,6 +1638,7 @@ Sys_ClearEvents
 ================
 */
 void Sys_ClearEvents(void) {
+	Sys_InvalidateEventQueue();
 	while ( eventHead > eventTail ) {
 		Sys_DiscardQueuedEvent( eventQue[ eventTail & MASK_QUED_EVENTS ] );
 		eventTail++;

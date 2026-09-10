@@ -394,7 +394,7 @@ validation, Apply/exit handling of unconfirmed drafts, and full platform
 qualification remain required. No requirement, migration or final gate becomes
 accepted merely from these integration tests.
 
-The next [editing-command and native-delivery increment](../ui/text-input-routing.md)
+The [editing-command and native-delivery increment](../ui/text-input-routing.md)
 adds ordinary numeric command keys, current-buffer text-run navigation, exact
 held-source ownership, per-event modifier metadata, a bounded native input broker,
 an explicit wire codec and exact SDL echo association. The reviewed Windows
@@ -402,3 +402,14 @@ observer is compiled but remains disabled while managed owner delivery, dispatch
 fencing and native TSF ownership are implemented. This does not accept the text,
 platform, editor, migration or final product gates; every original requirement
 remains in force.
+
+The subsequent owner/store checkpoint adds exact managed allocation, backend,
+document and editor checks; event-queue continuity; a portable native shadow
+document; and an actual Windows SDK text store with application change and
+layout notifications. Its final Windows build and 29 UI suites pass, including
+the updated text-store suite. Two windowed gameplay captures cover 32 semantic
+operations and ten render-target images. The first disabled SDL dispatch fence
+still needs checked queue consumption before activation. Native field routing,
+composition reconciliation, complete text shaping, production controls, artwork,
+editor and every migration/final gate remain required. Evidence is preserved in
+`.tmp/ui/native-owner-integration/validation-evidence.json`.

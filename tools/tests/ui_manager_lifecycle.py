@@ -276,6 +276,7 @@ void RetainedUI_Shutdown() {
     ++retainedShutdowns;
 }
 struct Common {
+    void FatalError(const char*) { throw std::runtime_error("GUI identity exhausted"); }
     void Printf(const char*,...) {}
     void DPrintf(const char*,...) {}
     int GetPresentationTime() const { return 1234; }
@@ -600,7 +601,7 @@ def production_source():
         'void idUserInterfaceManagerLocal::RemoveAlwaysThinkGui(',
         'void idUserInterfaceManagerLocal::RunAlwaysThinkGUIs(',
     )
-    return (SUPPORT + public + managed + declarations + deferred + MANAGER +
+    return ('#include "src/ui/UserInterfaceText.h"\n#include <limits>\n' + SUPPORT + public + managed + declarations + deferred + MANAGER +
             '\n'.join(function_body(source, signature) for signature in signatures) +
             deferred_source[deferred_source.index('idUserInterfaceDeferred::idUserInterfaceDeferred()'):])
 
@@ -617,7 +618,7 @@ def main():
         for dedicated in (False, True):
             binary = Path(temp) / ('dedicated.exe' if dedicated else 'client.exe')
             defines = ['-DID_DEDICATED'] if dedicated else []
-            subprocess.run([compiler, '-std=c++17', *defines, str(test_source), '-o', str(binary)], check=True)
+            subprocess.run([compiler, '-std=c++20', '-I', str(ROOT), *defines, str(test_source), '-o', str(binary)], check=True)
             subprocess.run([str(binary)], check=True)
 
 

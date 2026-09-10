@@ -83,6 +83,7 @@ public:
 	bool SyncAuthoredModals(const std::vector<std::string>& roots, std::string& error);
 	bool HasAuthoredModals() const { return !authoredModals.empty(); }
 	bool CanDispatchModalBack(const ControlAction& action) const;
+	std::uint64_t ModalToken() const { return modalBlocked ? 0 : modalToken; }
 	bool CanDispatchControlAction(const ControlAction& action) const;
 	bool AllowsNode(const std::string& id) const { return !modalBlocked && Within(id,Modal()); }
 	// Complete evaluated value-control map; invalid input leaves all interaction

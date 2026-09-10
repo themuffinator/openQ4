@@ -27,6 +27,7 @@ If you have questions concerning this license or the applicable additional terms
 */
 #include <cstddef>
 #include "../sys/KeyEventMetadata.h"
+#include "../sys/EventQueueContinuity.h"
 
 idCVar idEventLoop::com_journal( "com_journal", "0", CVAR_INIT|CVAR_SYSTEM, "1 = record journal, 2 = play back journal", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
 
@@ -249,6 +250,7 @@ void idEventLoop::PushEvent( sysEvent_t *event ) {
 	ev = &com_pushedEvents[ com_pushedEventsHead & (MAX_PUSHED_EVENTS-1) ];
 
 	if ( com_pushedEventsHead - com_pushedEventsTail >= MAX_PUSHED_EVENTS ) {
+		Sys_InvalidateEventQueue();
 
 		// don't print the warning constantly, or it can give time for more...
 		if ( !printedWarning ) {
@@ -344,6 +346,7 @@ idEventLoop::Init
 =============
 */
 void idEventLoop::Init( void ) {
+	Sys_InvalidateEventQueue();
 
 	initialTimeOffset = Sys_Milliseconds();
 
@@ -377,6 +380,7 @@ idEventLoop::Shutdown
 =============
 */
 void idEventLoop::Shutdown( void ) {
+	Sys_InvalidateEventQueue();
 	if ( com_journalFile ) {
 		fileSystem->CloseFile( com_journalFile );
 		com_journalFile = NULL;

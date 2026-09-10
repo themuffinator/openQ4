@@ -42,6 +42,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "SimpleWindow.h"
 #include "../framework/Session.h"
 #include "RetainedUI.h"
+#include <limits>
 
 extern idCVar r_skipGuiShaders;		// 1 = don't render any gui elements on surfaces
 extern idCVar gui_debugScript;
@@ -100,6 +101,108 @@ idUserInterfaceManaged *UI_CreateForPath( const char *qpath, bool managed ) {
 
 bool UI_DispatchApplicationActions( idUserInterface *gui, const char *command, bool &closeRequested ) {
 	return uiManagerLocal.DispatchApplicationActions( gui, command, closeRequested );
+}
+
+std::uint64_t UI_NextTextLifetime() {
+	// Engine-thread confined; never reset on manager or renderer shutdown.
+	static std::uint64_t next = 0;
+	if (next == (std::numeric_limits<std::uint64_t>::max)()) return 0;
+	return ++next;
+}
+
+openq4::ui::TextBrokerContext UI_QueryTextContext(idUserInterface* current,
+	std::uint64_t nativeWindow, std::uint64_t nativeSession) {
+	return uiManagerLocal.QueryTextContext(current,nativeWindow,nativeSession);
+}
+
+uiTextDeliveryResult_t UI_DeliverTextInput(idUserInterface* current,
+	std::uint64_t nativeWindow, std::uint64_t nativeSession,
+	const openq4::ui::TextBrokerContext& authorizedContext,
+	const openq4::ui::TextBrokerDelivery& delivery) {
+	return uiManagerLocal.DeliverTextInput(current,nativeWindow,nativeSession,authorizedContext,delivery);
+}
+
+openq4::ui::TextBrokerContext idUserInterfaceManagerLocal::QueryTextContext(idUserInterface* current,
+	std::uint64_t nativeWindow, std::uint64_t nativeSession) {
+#ifdef ID_DEDICATED
+	(void)current; (void)nativeWindow; (void)nativeSession;
+	return {};
+#else
+	if (textBoundaryActive) { textBoundaryFailed = true; return {}; }
+	if (!current || !nativeWindow || !nativeSession) return {};
+	textBoundaryActive = true; textBoundaryFailed = false;
+	struct Guard { bool& active; ~Guard() { active = false; } } guard{textBoundaryActive};
+	try {
+		for (int i = 0; i < allocations.Num(); ++i) {
+			if (allocations[i] != current || !allocations[i]->allocationId) continue;
+			const auto allocation = allocations[i]->allocationId;
+			const auto result = allocations[i]->QueryTextContext(allocation,nativeWindow,nativeSession);
+			if (textBoundaryFailed) return {};
+			// Refresh may invalidate membership. Do not dereference a saved pointer.
+			for (int j = 0; j < allocations.Num(); ++j)
+				if (allocations[j] == current && allocations[j]->allocationId == allocation) return result;
+			return {};
+		}
+	} catch (...) { return {}; }
+	return {};
+#endif
+}
+
+uiTextDeliveryResult_t idUserInterfaceManagerLocal::DeliverTextInput(idUserInterface* current,
+	std::uint64_t nativeWindow, std::uint64_t nativeSession,
+	const openq4::ui::TextBrokerContext& authorizedContext,
+	const openq4::ui::TextBrokerDelivery& delivery) {
+#ifdef ID_DEDICATED
+	(void)current; (void)nativeWindow; (void)nativeSession; (void)authorizedContext; (void)delivery;
+	return {openq4::ui::TextDeliveryOutcome::Rejected,{},"GUI text delivery is unavailable in a dedicated server"};
+#else
+	using namespace openq4::ui;
+	uiTextDeliveryResult_t result;
+	if (textBoundaryActive) {
+		textBoundaryFailed = true; result.diagnostic = "Reentrant GUI text delivery"; return result;
+	}
+	if (!current || !nativeWindow || !nativeSession || !delivery.token || !delivery.sequence || !delivery.target.allocation) {
+		result.diagnostic = "Invalid GUI text delivery identity"; return result;
+	}
+	textBoundaryActive = true; textBoundaryFailed = false;
+	struct Guard { bool& active; ~Guard() { active = false; } } guard{textBoundaryActive};
+	try {
+		// Freeze the authorized context and payload before callbacks can refresh
+		// resources. Native session and edit session are different identities.
+		const TextBrokerContext expected = authorizedContext;
+		if (expected.route != TextBrokerRoute::Retained || !expected.editor || *expected.editor != delivery.target) {
+			result.diagnostic = "GUI text authorization does not match its delivery"; return result;
+		}
+		if (!ValidateTextInputEvent(delivery.input,result.diagnostic)) return result;
+		const TextBrokerDelivery request = delivery;
+		const auto resolve = [&]() -> idUserInterfaceManaged* {
+			for (int i = 0; i < allocations.Num(); ++i)
+				if (allocations[i] == current && allocations[i]->allocationId == request.target.allocation) return allocations[i];
+			return NULL;
+		};
+		auto* gui = resolve();
+		if (!gui) { result.diagnostic = "GUI text allocation is no longer current"; return result; }
+		result.context = gui->QueryTextContext(request.target.allocation,nativeWindow,nativeSession);
+		gui = resolve();
+		if (textBoundaryFailed || !gui) {
+			result.context = {}; result.diagnostic = "GUI text query invalidated its owner"; return result;
+		}
+		if (result.context != expected) { result.diagnostic = "GUI text editor identity changed"; return result; }
+		const bool applied = gui->ApplyTextInput(expected,request.input,result.diagnostic);
+		gui = resolve();
+		if (textBoundaryFailed || !gui) {
+			result.context = {}; result.diagnostic = "GUI text delivery invalidated its owner"; return result;
+		}
+		result.context = gui->QueryTextContext(request.target.allocation,nativeWindow,nativeSession);
+		if (textBoundaryFailed || !resolve()) {
+			result.context = {}; result.diagnostic = "GUI text receipt invalidated its owner"; return result;
+		}
+		if (applied) result.outcome = result.context.editor && result.context.editor->revision == request.target.revision ?
+			TextDeliveryOutcome::AppliedNoChange : TextDeliveryOutcome::AppliedChanged;
+		// Complete() checks this actual receipt; never relabel a new editor as old.
+	} catch (...) { result.context = {}; result.diagnostic = "GUI text boundary failed"; }
+	return result;
+#endif
 }
 
 bool idUserInterfaceManagerLocal::DispatchApplicationActions( idUserInterface *gui, const char *command, bool &closeRequested ) {
@@ -465,6 +568,9 @@ void idUserInterfaceManagerLocal::FreeListGUI( idListGUI *listgui ) {
 }
 
 void idUserInterfaceManagerLocal::RegisterAllocation( idUserInterfaceManaged *gui ) {
+	if (nextAllocationId == (std::numeric_limits<unsigned long long>::max)()) {
+		common->FatalError("GUI allocation identity exhausted"); return;
+	}
 	gui->allocationId = ++nextAllocationId;
 	allocations.AddUnique( gui );
 }
