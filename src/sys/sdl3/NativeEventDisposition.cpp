@@ -277,4 +277,18 @@ bool NativeEventDispositionLedger::Retire() noexcept {
 bool NativeEventDispositionLedger::NeedsRetirement() const noexcept {
     return thread == std::this_thread::get_id() && phase == Phase::Retired;
 }
+bool NativeEventDispositionLedger::InspectIssuedForRetirement(NativeDispositionTicket ticket,
+    NativeIssuedEmission& out) const noexcept {
+    if (thread != std::this_thread::get_id() || calling || phase != Phase::Retired || !PlannedTicketMatches(ticket)) return false;
+    const auto& emission = emissions[static_cast<std::size_t>(ticket.emission - 1)];
+    NativeIssuedEmission result;
+    result.ticket = ticket;
+    result.pass = emission.pass;
+    result.admissionSerial = emission.admission;
+    result.terminal = emission.done;
+    result.inFlight = inFlight && plannedInFlight == ticket.emission;
+    if (emission.trigger) result.trigger = {ticket.record, emission.trigger};
+    out = result;
+    return true;
+}
 } // namespace openq4

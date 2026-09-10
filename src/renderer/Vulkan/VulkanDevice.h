@@ -146,6 +146,7 @@ typedef struct vkDeviceContext_s {
 	// with a CPU wait at wait-idle teardown points
 	VkCommandBuffer		uploadCommandBuffer;
 	VkFence				uploadFence;
+	uint64_t            uploadBatchSerial, uploadBatchCompletedSerial;
 	bool				uploadBatchOpen;		// commands recorded, not yet submitted
 	bool				uploadBatchInFlight;	// submitted, uploadFence not yet waited
 	int					numUploadBatchPending;
@@ -193,7 +194,7 @@ typedef void ( *vkImmediateRecord_t )( VkCommandBuffer cmd, void *user );
 // the GPU before the next frame or clear-frame submission. Returns false
 // without recording when no device/upload command buffer exists.
 bool	VK_Device_BatchedUpload( vkImmediateRecord_t record, void *user,
-			VkBuffer staging, VmaAllocation stagingAllocation, VkDeviceSize stagingBytes );
+			VkBuffer staging, VmaAllocation stagingAllocation, VkDeviceSize stagingBytes, uint64_t* acceptedBatch = nullptr );
 // submits the open upload batch (if any) without a CPU wait; must run before
 // every queue submission so consuming work executes after its uploads
 void	VK_Device_FlushUploadBatch( void );

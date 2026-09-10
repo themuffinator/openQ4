@@ -887,8 +887,9 @@ void idImage::SubImageUpload( int mipLevel, int x, int y, int z, int width, int 
 	ctx.bufferRowLengthTexels = rowLengthTexels;
 	ctx.oldLayout = entry->layout;
 
+	uint64_t consumedBatch = 0;
 	if ( VK_Device_BatchedUpload( VK_Image_RecordUpload, &ctx, staging, stagingAlloc,
-			(VkDeviceSize)dataBytes ) ) {
+			(VkDeviceSize)dataBytes, &consumedBatch ) ) {
 		entry->everUploaded = true;
 		entry->layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	} else {
@@ -898,7 +899,7 @@ void idImage::SubImageUpload( int mipLevel, int x, int y, int z, int width, int 
 		return;
 	}
 
-	imageOperation.Succeeded();
+	imageOperation.Succeeded(consumedBatch);
 }
 
 /*

@@ -28,6 +28,7 @@ If you have questions concerning this license or the applicable additional terms
 
 #ifndef __MATERIAL_H__
 #define __MATERIAL_H__
+#include "RendererConsumedPolicy.h"
 
 /*
 ===============================================================================
@@ -556,6 +557,7 @@ public:
 	idMaterial(const idMaterial&) = delete;
 	idMaterial& operator=(const idMaterial&) = delete;
 	uint64_t GetImagePolicyIdentity() const { return imagePolicyIdentity; }
+	bool GetConsumedPolicy(materialConsumedPolicy_t& output) const;
 	virtual				~idMaterial();
 
 	virtual size_t		Size(void) const;
@@ -884,6 +886,9 @@ public:
 	virtual void		ResolveUse();
 
 private:
+	materialConsumedPolicy_t consumedPolicy{};
+	uint64_t consumedParseRevision = 0;
+	uint32_t consumedParseDepth = 0;
 	const uint64_t imagePolicyIdentity;
 	// parse the entire material
 	void				CommonInit();

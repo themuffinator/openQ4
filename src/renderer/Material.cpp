@@ -69,6 +69,7 @@ typedef struct mtrParsingData_s {
 
 	bool			registersAreConstant;
 	bool			forceOverlays;
+	materialQualityInputs_t qualityInputs;
 } mtrParsingData_t;
 
 static void R_ResetSpecularProbeMaterialInfo( specularProbeMaterialInfo_t &info ) {
@@ -222,21 +223,21 @@ static textureUsage_t R_DefaultStageUsageForMaterial( const char *materialName )
 	return TD_DEFAULT;
 }
 
-static textureUsage_t R_ApplyMaterialHighQualityUsage( textureUsage_t usage, bool forceHighQuality ) {
+textureUsage_t R_ResolveMaterialHighQualityUsage( const materialQualityInputs_t& inputs, textureUsage_t usage, bool forceHighQuality ) {
 	// Retail Quake 4 routes authored "highquality"/"uncompressed" image hints
 	// through a distinct usage bucket. openQ4 keeps that separate identity so
 	// those stages do not collapse onto generic caches, while still letting the
 	// modern loader keep its higher-quality uncompressed binary-image pipeline.
-	if ( forceHighQuality || !image_ignoreHighQuality.GetBool() ) {
+	if ( forceHighQuality || !inputs.ignoreHighQuality ) {
 		return TD_HIGH_QUALITY;
 	}
 	return usage;
 }
 
-static unsigned int R_ApplyMaterialNoMipFlags( unsigned int flags ) {
+unsigned int R_ResolveMaterialNoMipFlags( const materialQualityInputs_t& inputs, unsigned int flags ) {
 	// Retail only promoted "nomips" while resource builds were active. openQ4's
 	// equivalent build switch is the boolean com_makingBuild cvar.
-	if ( com_makingBuild.GetBool() ) {
+	if ( inputs.makingBuild ) {
 		flags |= IMAGEFLAG_NOMIPS;
 	}
 	return flags;
@@ -397,6 +398,7 @@ idMaterial::FreeData
 */
 void idMaterial::FreeData() {
 	if ( !R_ImagePolicyContentMutation() ) return;
+	if (R_ConsumedPolicyThread()) { consumedPolicy = {}; consumedParseRevision = R_ImagePolicyNewResourceIdentity(); }
 	int i;
 
 	if ( stages ) {
@@ -1417,12 +1419,12 @@ void idMaterial::ParseFragmentMap( idLexer &src, newShaderStage_t *newStage ) {
 			continue;
 		}
 		if ( !token.Icmp( "forceHighQuality" ) ) {
-			td = R_ApplyMaterialHighQualityUsage( td, true );
+			td = R_ResolveMaterialHighQualityUsage( pd->qualityInputs, td, true );
 			continue;
 		}
 
 		if ( !token.Icmp( "uncompressed" ) || !token.Icmp( "highquality" ) ) {
-			td = R_ApplyMaterialHighQualityUsage( td, false );
+			td = R_ResolveMaterialHighQualityUsage( pd->qualityInputs, td, false );
 			continue;
 		}
 		if ( !token.Icmp( "nopicmip" ) ) {
@@ -1430,7 +1432,7 @@ void idMaterial::ParseFragmentMap( idLexer &src, newShaderStage_t *newStage ) {
 			continue;
 		}
 		if ( !token.Icmp( "nomips" ) ) {
-			imageFlags = R_ApplyMaterialNoMipFlags( imageFlags );
+			imageFlags = R_ResolveMaterialNoMipFlags( pd->qualityInputs, imageFlags );
 			continue;
 		}
 
@@ -1769,11 +1771,11 @@ void idMaterial::ParseShaderTexture( idLexer &src, newShaderStage_t *newStage ) 
 			continue;
 		}
 		if ( !token.Icmp( "forceHighQuality" ) ) {
-			td = R_ApplyMaterialHighQualityUsage( td, true );
+			td = R_ResolveMaterialHighQualityUsage( pd->qualityInputs, td, true );
 			continue;
 		}
 		if ( !token.Icmp( "uncompressed" ) || !token.Icmp( "highquality" ) ) {
-			td = R_ApplyMaterialHighQualityUsage( td, false );
+			td = R_ResolveMaterialHighQualityUsage( pd->qualityInputs, td, false );
 			continue;
 		}
 		if ( !token.Icmp( "nopicmip" ) ) {
@@ -1781,7 +1783,7 @@ void idMaterial::ParseShaderTexture( idLexer &src, newShaderStage_t *newStage ) 
 			continue;
 		}
 		if ( !token.Icmp( "nomips" ) ) {
-			imageFlags = R_ApplyMaterialNoMipFlags( imageFlags );
+			imageFlags = R_ResolveMaterialNoMipFlags( pd->qualityInputs, imageFlags );
 			continue;
 		}
 
@@ -1984,7 +1986,7 @@ void idMaterial::ParseStage( idLexer &src, const textureRepeat_t trpDefault ) {
 
 // jmarshall: quake 4 materials
 		if (!token.Icmp("nomips")) {
-			imageFlags = R_ApplyMaterialNoMipFlags( imageFlags );
+			imageFlags = R_ResolveMaterialNoMipFlags( pd->qualityInputs, imageFlags );
 			continue;
 		}
 // jmarshall end
@@ -2116,11 +2118,11 @@ void idMaterial::ParseStage( idLexer &src, const textureRepeat_t trpDefault ) {
 			continue;
 		}
 		if ( !token.Icmp( "uncompressed" ) || !token.Icmp( "highquality" ) ) {
-			td = R_ApplyMaterialHighQualityUsage( td, false );
+			td = R_ResolveMaterialHighQualityUsage( pd->qualityInputs, td, false );
 			continue;
 		}
 		if ( !token.Icmp( "forceHighQuality" ) ) {
-			td = R_ApplyMaterialHighQualityUsage( td, true );
+			td = R_ResolveMaterialHighQualityUsage( pd->qualityInputs, td, true );
 			continue;
 		}
 		if ( !token.Icmp( "nopicmip" ) ) {
@@ -2626,7 +2628,7 @@ bool idMaterial::ParsePBRImage( idLexer &src, pbrMaterialTexture_t &target, cons
 		}
 		if ( !token.Icmp( "nomips" ) ) {
 			noMips = true;
-			imageFlags = R_ApplyMaterialNoMipFlags( imageFlags );
+			imageFlags = R_ResolveMaterialNoMipFlags( pd->qualityInputs, imageFlags );
 			continue;
 		}
 		if ( !token.Icmp( "forceHighQuality" ) ) {
@@ -3892,6 +3894,26 @@ Parses the current material definition and finds all necessary images.
 */
 bool idMaterial::Parse( const char *text, const int textLength ) {
 	if ( !R_ImagePolicyContentMutation() ) return false;
+    const bool observedThread = R_ConsumedPolicyThread();
+    if (observedThread) consumedPolicy = {};
+    uint32_t* observedDepth = nullptr;
+    if (observedThread) {
+        if (consumedParseDepth != UINT32_MAX) { ++consumedParseDepth; observedDepth = &consumedParseDepth; }
+        else R_ConsumedPolicyInvalidateThread();
+    }
+    struct ParseObservation {
+        materialConsumedPolicy_t* record;
+        uint32_t* depth;
+        bool published = false;
+        ~ParseObservation() {
+            if (record && !published) *record = {};
+            if (depth) --*depth;
+        }
+    } parseObservation{observedThread ? &consumedPolicy : nullptr, observedDepth};
+    const materialQualityInputs_t qualityInputs = {image_ignoreHighQuality.GetBool(), com_makingBuild.GetBool()};
+    const uint64_t parseRevision = R_ImagePolicyNewResourceIdentity();
+    if (observedThread) consumedParseRevision = parseRevision;
+    const uint64_t observationEpoch = R_ConsumedPolicyObservationEpoch();
 	idLexer	src;
 	idToken	token;
 	mtrParsingData_t parsingData;
@@ -3906,6 +3928,7 @@ bool idMaterial::Parse( const char *text, const int textLength ) {
 	memset( &parsingData, 0, sizeof( parsingData ) );
 
 	pd = &parsingData;	// this is only valid during parse
+	pd->qualityInputs = qualityInputs;
 
 	// parse it
 	ParseMaterial( src );
@@ -4118,8 +4141,13 @@ bool idMaterial::Parse( const char *text, const int textLength ) {
 	// finish things up
 	if ( TestMaterialFlag( MF_DEFAULTED ) ) {
 		MakeDefault();
+        if (observedThread) consumedPolicy = {}; // A recursive default parse is not this source's success.
 		return false;
 	}
+    if (observedThread && parseRevision && consumedParseRevision == parseRevision && observationEpoch == R_ConsumedPolicyObservationEpoch()) {
+        consumedPolicy = {imagePolicyIdentity, parseRevision, observationEpoch, qualityInputs, true};
+        parseObservation.published = true;
+    }
 	return true;
 }
 

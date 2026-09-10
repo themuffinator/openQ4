@@ -241,6 +241,10 @@ std::unique_ptr<openq4::ui::Interaction::NativeSettlement> idUserInterfaceDeferr
 bool idUserInterfaceDeferred::PublishNativeTextSettlement(openq4::ui::Interaction::NativeSettlement& prepared, openq4::ui::NativeTextEditorReceipt& out) noexcept {
 	return backend != NULL ? backend->PublishNativeTextSettlement(prepared,out) : false;
 }
+openq4::ui::NativeTextPresence idUserInterfaceDeferred::QueryNativeTextPresence(openq4::ui::NativeTextIdentity native,
+    const openq4::ui::TextEditorIdentity& owner) const noexcept {
+    return backend!=NULL?backend->QueryNativeTextPresence(native,owner):openq4::ui::NativeTextPresence::AbsentOriginal;
+}
 bool idUserInterfaceDeferred::RetireNativeTextExact(openq4::ui::NativeTextIdentity native, const openq4::ui::TextEditorIdentity& owner) noexcept {
 	return backend != NULL ? backend->RetireNativeTextExact(native,owner) : false;
 }

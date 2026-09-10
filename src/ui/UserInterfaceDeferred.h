@@ -78,6 +78,7 @@ public:
 	std::unique_ptr<openq4::ui::Interaction::NativeSettlement> PrepareNativeTextSettlement(const openq4::ui::NativeTextEditorBarrier& expected, std::string& error) override;
 	bool PublishNativeTextSettlement(openq4::ui::Interaction::NativeSettlement& prepared, openq4::ui::NativeTextEditorReceipt& out) noexcept override;
 	bool RetireNativeTextExact(openq4::ui::NativeTextIdentity native, const openq4::ui::TextEditorIdentity& owner) noexcept override;
+	openq4::ui::NativeTextPresence QueryNativeTextPresence(openq4::ui::NativeTextIdentity, const openq4::ui::TextEditorIdentity&) const noexcept override;
 
 private:
 	idUserInterfaceManaged *backend;

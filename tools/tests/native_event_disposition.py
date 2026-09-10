@@ -140,6 +140,13 @@ def main():
             'skip-batch-completion': ('phase != Phase::Between || next != records.size() || inFlight || completed != issued', 'phase == Phase::Retired'),
         }
         planned_mutations = {
+            'retired-inspection-before-retire': ('calling || phase != Phase::Retired || !PlannedTicketMatches(ticket)', 'calling || !PlannedTicketMatches(ticket)'),
+            'retired-inspection-reentry': ('calling || phase != Phase::Retired || !PlannedTicketMatches(ticket)', 'phase != Phase::Retired || !PlannedTicketMatches(ticket)'),
+            'retired-inspection-foreign-thread': ('if (thread != std::this_thread::get_id() || calling || phase != Phase::Retired || !PlannedTicketMatches(ticket))', 'if (calling || phase != Phase::Retired || !PlannedTicketMatches(ticket))'),
+            'retired-inspection-requires-admission': ('const auto& emission = emissions[static_cast<std::size_t>(ticket.emission - 1)];\n    NativeIssuedEmission result;', 'const auto& emission = emissions[static_cast<std::size_t>(ticket.emission - 1)];\n    if (!emission.admission) return false;\n    NativeIssuedEmission result;'),
+            'retired-inspection-fabricates-terminal': ('result.terminal = emission.done;', 'result.terminal = true;'),
+            'retired-inspection-loses-inflight': ('result.inFlight = inFlight && plannedInFlight == ticket.emission;', 'result.inFlight = false;'),
+            'retired-inspection-loses-trigger': ('if (emission.trigger) result.trigger = {ticket.record, emission.trigger};', 'if (false) result.trigger = {ticket.record, emission.trigger};'),
             'schedule-default-changed': ('return BeginPlanned(input, provider, batch, NativeDispositionSchedule::BeforeSessionDrain, error);', 'return BeginPlanned(input, provider, batch, NativeDispositionSchedule::AtMousePollEntry, error);'),
             'schedule-unknown-accepted': ('if (schedule != NativeDispositionSchedule::BeforeSessionDrain && schedule != NativeDispositionSchedule::AtMousePollEntry)', 'if (false)'),
             'schedule-selection-swapped': ('? PollFirstOrder : SessionFirstOrder', '? SessionFirstOrder : PollFirstOrder'),

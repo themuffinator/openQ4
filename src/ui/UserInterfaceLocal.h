@@ -26,6 +26,7 @@ If you have questions concerning this license or the applicable additional terms
 ===========================================================================
 */
 
+#include <thread>
 #include "UserInterfaceManaged.h"
 
 class idWindow;
@@ -182,6 +183,7 @@ std::unique_ptr<openq4::ui::Interaction::NativeSettlement> NativeTextPrepareSett
 bool NativeTextPublishSettlement(uiNativeTextRouteProbe_t,void*,
 	openq4::ui::Interaction::NativeSettlement&,openq4::ui::NativeTextEditorReceipt&) noexcept;
 bool NativeTextRetireExact(openq4::ui::NativeTextIdentity,const openq4::ui::TextEditorIdentity&) noexcept;
+openq4::ui::NativeTextPresence NativeTextPresence(openq4::ui::NativeTextIdentity,const openq4::ui::TextEditorIdentity&) const noexcept;
 
 private:
 	bool NativeTextEnter() noexcept;
@@ -202,6 +204,7 @@ private:
 	idList<idUserInterfaceManaged*> allocations;
 	unsigned long long nextAllocationId = 0;
 	bool textBoundaryActive = false, textBoundaryFailed = false;
+	const std::thread::id nativePresenceThread = std::this_thread::get_id();
 	bool nativeBoundaryActive = false, nativeBoundaryFailed = false;
 	bool clipboardBoundaryActive = false, clipboardBoundaryFailed = false;
 	int applicationPumpDepth = 0;

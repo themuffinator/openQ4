@@ -231,6 +231,7 @@ public:
 	bool PublishNumberNativeSettlement(Interaction::NativeSettlement&, NativeTextEditorReceipt& out) noexcept;
 	bool RetireNumberNative(const NativeTextEditorBarrier&, NativeTextEditorReceipt& out, std::string& error);
 	bool RetireNumberNativeExact(NativeTextIdentity, const TextEditorIdentity&) noexcept;
+	NativeTextPresence QueryNumberNativePresence(NativeTextIdentity, const TextEditorIdentity&) const noexcept;
 	std::vector<ControlAction> TakeActions();
 	// Recheck queued activations after earlier programs may change eligibility.
 	bool CanActivateControl(const std::string& id, double monotonicSeconds);

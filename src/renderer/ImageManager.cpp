@@ -205,8 +205,8 @@ static bool R_IsImageProgramNameChar( char c ) {
 	return ( c >= 'a' && c <= 'z' ) || ( c >= 'A' && c <= 'Z' ) || ( c >= '0' && c <= '9' ) || c == '_';
 }
 
-static bool R_ImagePicmipFilterAllows( const char *name ) {
-	const int filter = image_picmipFilter.GetInteger() & PICMIP_FILTER_MASK;
+static bool R_ImagePicmipFilterAllows( const char *name, int value ) {
+	const int filter = value & PICMIP_FILTER_MASK;
 	if ( filter == PICMIP_FILTER_ALL ) {
 		return true;
 	}
@@ -252,7 +252,17 @@ is derived from it, so a cvar change always produces a cache miss rather than a
 stale texture at the previous size.
 ===============
 */
-void R_GetImageDownsizePolicy( const char *name, textureUsage_t usage, bool allowDownSize, imageDownsizePolicy_t &policy ) {
+imageDownsizeInputs_t R_ReadImageDownsizeInputs() {
+    return {image_downSize.GetInteger(), image_downSizeLimit.GetInteger(),
+        image_downSizeSpecular.GetInteger(), image_downSizeSpecularLimit.GetInteger(),
+        image_downSizeBump.GetInteger(), image_downSizeBumpLimit.GetInteger(),
+        image_picmip.GetInteger(), image_picmipFilter.GetInteger(), image_picmipMinSize.GetInteger()};
+}
+void R_GetImageDownsizePolicy( const char* name, textureUsage_t usage, bool allowDownSize, imageDownsizePolicy_t& policy ) {
+    const imageDownsizeInputs_t inputs = R_ReadImageDownsizeInputs();
+    R_ResolveImageDownsizePolicy(inputs, name, usage, allowDownSize, policy);
+}
+void R_ResolveImageDownsizePolicy( const imageDownsizeInputs_t& inputs, const char *name, textureUsage_t usage, bool allowDownSize, imageDownsizePolicy_t &policy ) {
 	policy = imageDownsizePolicy_t();
 
 	// 'nopicmip' materials and the presentation namespaces opt out entirely
@@ -260,12 +270,12 @@ void R_GetImageDownsizePolicy( const char *name, textureUsage_t usage, bool allo
 		return;
 	}
 
-	if ( usage == TD_SPECULAR && image_downSizeSpecular.GetInteger() != 0 ) {
-		policy.maxDimension = image_downSizeSpecularLimit.GetInteger();
-	} else if ( usage == TD_BUMP && image_downSizeBump.GetInteger() != 0 ) {
-		policy.maxDimension = image_downSizeBumpLimit.GetInteger();
-	} else if ( image_downSize.GetInteger() != 0 ) {
-		policy.maxDimension = image_downSizeLimit.GetInteger();
+	if ( usage == TD_SPECULAR && inputs.downSizeSpecular != 0 ) {
+		policy.maxDimension = inputs.downSizeSpecularLimit;
+	} else if ( usage == TD_BUMP && inputs.downSizeBump != 0 ) {
+		policy.maxDimension = inputs.downSizeBumpLimit;
+	} else if ( inputs.downSize != 0 ) {
+		policy.maxDimension = inputs.downSizeLimit;
 	}
 	if ( policy.maxDimension < 0 ) {
 		policy.maxDimension = 0;
@@ -274,10 +284,10 @@ void R_GetImageDownsizePolicy( const char *name, textureUsage_t usage, bool allo
 	// picmip is deliberately narrower than the downsize limits: it only touches
 	// the diffuse layer, so bump and specular detail, lighting, sky, decals, and
 	// every 2D surface keep their authored resolution.
-	if ( usage == TD_DIFFUSE && R_ImagePicmipFilterAllows( name ) ) {
-		policy.mipShift = Max( 0, image_picmip.GetInteger() );
+	if ( usage == TD_DIFFUSE && R_ImagePicmipFilterAllows( name, inputs.picmipFilter ) ) {
+		policy.mipShift = Max( 0, inputs.picmip );
 	}
-	policy.minDimension = Max( 1, image_picmipMinSize.GetInteger() );
+	policy.minDimension = Max( 1, inputs.picmipMinSize );
 }
 
 /*

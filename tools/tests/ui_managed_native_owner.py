@@ -13,10 +13,11 @@ ROOT=Path(__file__).resolve().parents[2]
 
 def manager_source(full=False):
     manager.ROOT=ROOT
-    source='#include "src/ui/UserInterfaceNativeText.h"\n'+manager.production_source()
+    source='#include <thread>\n#include "src/ui/UserInterfaceNativeText.h"\n'+manager.production_source()
     header=(ROOT/'src/ui/UserInterfaceLocal.h').read_text()
     declarations=header[header.index('bool NativeTextAttach('):header.index('\n\tvoid\t',header.index('bool NativeTextEnter('))]
     declarations=declarations.replace('private:','public:')
+    declarations+='\n'+re.search(r'const std::thread::id nativePresenceThread[^;]+;',header).group(0)+'\n'
     declarations+='\n bool textBoundaryActive=false,textBoundaryFailed=false;\n'
     if full:
         declarations+=header[header.index('\topenq4::ui::TextBrokerContext QueryTextContext('):header.index('\nbool NativeTextAttach(')]
@@ -31,7 +32,7 @@ def manager_source(full=False):
         rt=(ROOT/'src/ui/retained/Runtime.cpp').read_text()
         rtheader=(ROOT/'src/ui/retained/Runtime.h').read_text()
         declarations=[];bodies=[]
-        for name in ['AttachNumberNative','RefreshNumberNative','BeginNumberNativeCollection','IsNumberNativeCurrent','ApplyNumberNative','CompleteNumberNativeCollection','SettleNumberNative','PrepareNumberNativeSettlement','PublishNumberNativeSettlement','RetireNumberNative','RetireNumberNativeExact']:
+        for name in ['AttachNumberNative','RefreshNumberNative','BeginNumberNativeCollection','IsNumberNativeCurrent','ApplyNumberNative','CompleteNumberNativeCollection','SettleNumberNative','PrepareNumberNativeSettlement','PublishNumberNativeSettlement','RetireNumberNative','RetireNumberNativeExact','QueryNumberNativePresence']:
             start=rt.rfind('\n',0,rt.index('Runtime::'+name+'('))+1
             body=function_body(rt,rt[start:rt.index('(',start)+1])
             declarations.append(body[:body.index('{')].replace('Runtime::','').strip()+';')
@@ -126,7 +127,13 @@ int main() {
     std::string error;openq4::ui::NativeTextEditorView out;out.presentation.text="untouched";
     assert(!UI_NativeTextRefresh(Probe,&route,expected,out,error));assert(out.presentation.text=="untouched");
     assert(!UI_NativeTextCurrent(Probe,&route,expected));
-    assert(!UI_NativeTextRetireExact(expected.native,expected.editor));delete legacy;
+    assert(!UI_NativeTextRetireExact(expected.native,expected.editor));
+    assert(UI_NativeTextPresence(expected.native,expected.editor)==openq4::ui::NativeTextPresence::BusyOrUnknown);delete legacy;
+#ifdef ID_DEDICATED
+    assert(UI_NativeTextPresence(expected.native,expected.editor)==openq4::ui::NativeTextPresence::BusyOrUnknown);
+#else
+    assert(UI_NativeTextPresence(expected.native,expected.editor)==openq4::ui::NativeTextPresence::AbsentOriginal);
+#endif
     std::puts("Managed native legacy/default gates passed.");
 }
 '''
@@ -186,6 +193,18 @@ int main() {
         'allocate-at-publication':('const auto& expected=prepared.Receipt().before;','const auto expected=prepared.Receipt().before;'),
         'prepare-inside-current':('return owner && owner->CurrentNativeText(expected);','return owner && owner->PrepareNativeText(expected.editor) && owner->CurrentNativeText(expected);'),
         'omit-current-native-barrier':('return runtime && runtime->IsNumberNativeCurrent(expected);','return runtime != nullptr;'),
+        'presence-global-thread-identity':('const std::thread::id nativePresenceThread = std::this_thread::get_id();','inline static const std::thread::id nativePresenceThread = std::this_thread::get_id();'),
+        'presence-on-wrong-thread':('std::this_thread::get_id()!=nativePresenceThread || nativeBoundaryActive','nativeBoundaryActive'),
+        'presence-in-native-callback':('nativePresenceThread || nativeBoundaryActive || textBoundaryActive','nativePresenceThread || textBoundaryActive'),
+        'presence-in-text-callback':('nativeBoundaryActive || textBoundaryActive ||\n        clipboardBoundaryActive','nativeBoundaryActive ||\n        clipboardBoundaryActive'),
+        'presence-in-clipboard-callback':('clipboardBoundaryActive || applicationPumpDepth || !native.document','applicationPumpDepth || !native.document'),
+        'presence-in-application-pump':('clipboardBoundaryActive || applicationPumpDepth || !native.document','clipboardBoundaryActive || !native.document'),
+        'presence-unissued-allocation':('owner.allocation>nextAllocationId || !owner.backend','!owner.backend'),
+        'presence-missing-runtime-absent':('runtime?runtime->QueryNumberNativePresence(native,owner):NativeTextPresence::BusyOrUnknown','runtime?runtime->QueryNumberNativePresence(native,owner):NativeTextPresence::AbsentOriginal'),
+        'presence-generation-means-absence':('return runtime?runtime->QueryNumberNativePresence(native,owner):NativeTextPresence::BusyOrUnknown;','if(!impl->NativeOwnerMatches(owner,false))return NativeTextPresence::AbsentOriginal; return runtime?runtime->QueryNumberNativePresence(native,owner):NativeTextPresence::BusyOrUnknown;'),
+        'presence-prepares-host':('return runtime?runtime->QueryNumberNativePresence(native,owner):NativeTextPresence::BusyOrUnknown;','impl->Prepare(); return runtime?runtime->QueryNumberNativePresence(native,owner):NativeTextPresence::BusyOrUnknown;'),
+        'presence-runtime-document-gate':('return impl?impl->interaction.QueryNumberNativePresence(native,owner):NativeTextPresence::BusyOrUnknown;','return impl && impl->document?impl->interaction.QueryNumberNativePresence(native,owner):NativeTextPresence::BusyOrUnknown;'),
+        'presence-missing-allocation-present':('return Presence::AbsentOriginal;','return Presence::PresentExact;'),
         'deferred-drops-retirement':('return backend != NULL ? backend->RetireNativeTextExact(native,owner) : false;','return false;'),
     }
     try:
@@ -202,6 +221,32 @@ int main() {
                 expected=2 if name in ['native-text-reentry-allowed','dont-poison-outer-text','dont-poison-outer-clipboard'] else 1
                 if source.count(old)!=expected:raise RuntimeError('Mutation anchor count '+str(source.count(old))+': '+name)
                 case(name,source.replace(old,new),objects,mutant=True)
+            interaction=(core/'Interaction.cpp').read_text()
+            original=function_body(interaction,'NativeTextPresence Interaction::QueryNumberNativePresence(')
+            native_mutations={
+                'presence-candidate-absent':('candidate || !authority ||','!authority ||'),
+                'presence-copies-barrier':('const auto& before=view.barrier;','const auto before=view.barrier;'),
+                'presence-revision-equality':('current.session==owner.session && current.control==owner.control','current.session==owner.session && current.revision==owner.revision && current.control==owner.control'),
+                'presence-forgets-native-document':('before.native==native &&','before.native.editorLease==native.editorLease &&'),
+                'presence-forgets-native-lease':('before.native==native &&','before.native.document==native.document &&'),
+                'presence-forgets-allocation':('current.allocation==owner.allocation &&',''),
+                'presence-forgets-backend':('current.backend==owner.backend &&',''),
+                'presence-forgets-document':('current.document==owner.document &&',''),
+                'presence-forgets-modal':('current.modal==owner.modal &&',''),
+                'presence-forgets-window':('current.window==owner.window &&',''),
+                'presence-forgets-session':('current.session==owner.session &&',''),
+                'presence-forgets-control':(' && current.control==owner.control;',';'),
+            }
+            for name,(old,new) in native_mutations.items():
+                if original.count(old)!=1:raise RuntimeError('Native presence mutation anchor: '+name)
+                path=out/(name+'-Interaction.cpp');path.write_text(interaction.replace(original,original.replace(old,new)),newline='\n')
+                obj=out/(name+('.obj' if args.msvc else '.o'))
+                command=flags+['/c',str(path),'/Fo:'+str(obj)] if args.msvc else flags+['-c',str(path),'-o',str(obj)]
+                r,log=run(command,name+'-model-compile')
+                if r.returncode:raise RuntimeError(r.stdout+r.stderr)
+                report['objects'].append({'name':obj.name,'sha256':sha(obj),'source':str(path),'source_sha256':sha(path),'command':command,'compile_log_sha256':sha(log)})
+                mutant_objects=[obj if value.stem=='Interaction' else value for value in objects]
+                case(name,source,mutant_objects,mutant=True)
         report['passed']=True
     except Exception as error:report['failure']=str(error);print(error,flush=True)
     report['sources_unchanged']=before=={str(p.relative_to(ROOT)):sha(p) for p in paths}

@@ -1525,16 +1525,31 @@ void VK_Device_WaitUploadBatch( void ) {
 	if ( !vkCtx.uploadBatchInFlight || vkCtx.presentationBlocked ) {
 		return;
 	}
+	const uint64_t completedBatch = vkCtx.uploadBatchSerial;
+	const VkDevice completedDevice = vkCtx.device;
 	VkResult res = vkWaitForFences( vkCtx.device, 1, &vkCtx.uploadFence, VK_TRUE, UINT64_MAX );
 	if ( res != VK_SUCCESS ) { VK_Device_BlockPresentation( RDP_WAIT_FAILED, res, "upload fence wait" ); return; }
+    if (!completedBatch || vkCtx.uploadBatchSerial != completedBatch || vkCtx.device != completedDevice ||
+        !vkCtx.uploadBatchInFlight || vkCtx.presentationBlocked) {
+        VK_Device_BlockPresentation(RDP_WAIT_FAILED, VK_ERROR_UNKNOWN, "upload completion identity changed"); return;
+    }
 	res = vkResetFences( vkCtx.device, 1, &vkCtx.uploadFence );
 	if ( res != VK_SUCCESS ) { VK_Device_BlockPresentation( RDP_WAIT_FAILED, res, "upload fence reset" ); return; }
+    if (!completedBatch || vkCtx.uploadBatchSerial != completedBatch || vkCtx.device != completedDevice ||
+        !vkCtx.uploadBatchInFlight || vkCtx.presentationBlocked) {
+        VK_Device_BlockPresentation(RDP_WAIT_FAILED, VK_ERROR_UNKNOWN, "upload completion identity changed"); return;
+    }
 	for ( int i = 0; i < vkCtx.numUploadBatchInFlight; i++ ) {
 		vmaDestroyBuffer( vkCtx.allocator, vkCtx.uploadBatchInFlightBuffers[ i ],
 				vkCtx.uploadBatchInFlightAllocations[ i ] );
 	}
+    if (!completedBatch || vkCtx.uploadBatchSerial != completedBatch || vkCtx.device != completedDevice ||
+        !vkCtx.uploadBatchInFlight || vkCtx.presentationBlocked) {
+        VK_Device_BlockPresentation(RDP_WAIT_FAILED, VK_ERROR_UNKNOWN, "upload completion identity changed"); return;
+    }
 	vkCtx.numUploadBatchInFlight = 0;
 	vkCtx.uploadBatchInFlight = false;
+	vkCtx.uploadBatchCompletedSerial = completedBatch;
 }
 
 void VK_Device_FlushUploadBatch( void ) {
@@ -1570,7 +1585,7 @@ void VK_Device_FlushUploadBatch( void ) {
 }
 
 bool VK_Device_BatchedUpload( vkImmediateRecord_t record, void *user,
-		VkBuffer staging, VmaAllocation stagingAllocation, VkDeviceSize stagingBytes ) {
+		VkBuffer staging, VmaAllocation stagingAllocation, VkDeviceSize stagingBytes, uint64_t* acceptedBatch ) {
 	if ( vkCtx.device == VK_NULL_HANDLE || vkCtx.uploadCommandBuffer == VK_NULL_HANDLE || vkCtx.presentationBlocked ) {
 		return false;
 	}
@@ -1578,6 +1593,11 @@ bool VK_Device_BatchedUpload( vkImmediateRecord_t record, void *user,
 	if ( !vkCtx.uploadBatchOpen ) {
 		VK_Device_WaitUploadBatch();
 		if ( vkCtx.presentationBlocked ) return false;
+        const uint64_t nextBatch = R_ImagePolicyNewResourceIdentity();
+        if (!nextBatch) {
+            VK_Device_BlockPresentation(RDP_RECORD_FAILED, VK_ERROR_UNKNOWN, "upload observation serial exhausted");
+            return false;
+        }
 		VkResult res = vkResetCommandBuffer( vkCtx.uploadCommandBuffer, 0 );
 		if ( res != VK_SUCCESS ) { VK_Device_BlockPresentation( RDP_RECORD_FAILED, res, "upload command reset" ); return false; }
 		VkCommandBufferBeginInfo cbbi;
@@ -1589,10 +1609,12 @@ bool VK_Device_BatchedUpload( vkImmediateRecord_t record, void *user,
 			VK_Device_BlockPresentation( RDP_RECORD_FAILED, res, "upload command begin" );
 			return false;
 		}
+        vkCtx.uploadBatchSerial = nextBatch;
 		vkCtx.uploadBatchOpen = true;
 	}
 
 	record( vkCtx.uploadCommandBuffer, user );
+	if (acceptedBatch) *acceptedBatch = vkCtx.uploadBatchSerial;
 
 	if ( staging != VK_NULL_HANDLE ) {
 		vkCtx.uploadBatchPendingBuffers[ vkCtx.numUploadBatchPending ] = staging;

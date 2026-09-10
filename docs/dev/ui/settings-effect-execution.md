@@ -245,6 +245,64 @@ resources. Portable consumed-policy/content descriptors, exact handling of
 insufficient authored DDS mip chains and cold reconstruction remain required.
 SYSTEM mixed effects stay disabled until the durable host owns those guarantees.
 
+## Portable audio record increment
+
+The audio executor now captures immutable requested and observed recovery
+records separately. The bounded version-1 grammar records the OpenAL provider,
+logical output device and HRTF specifier, actual output mode, requested speaker
+and emitter policy, and the supported no-effect state. Runtime handles, process
+tokens, HRTF indices and mute state never enter the portable record. Resolution
+requires unique current device/specifier matches and produces a fresh HRTF index.
+The default device at capture is diagnostic: changing the system default does
+not invalidate an explicitly selected original device that is still available.
+
+Capture keeps the live executor lease and checks its dependencies around native
+queries. It refuses actual effect, slot or filter resources, including filters
+owned by idle voices, and refuses enabling new effects. A completed in-place
+transition can be observed without releasing its recovery ownership. These are
+portable logical descriptors, not physical endpoint identities or permission
+to recreate a device from a copied enumeration.
+
+The codec/capture suite and the existing checked audio suite pass on Windows
+Clang, MSVC debug and Linux GCC with sanitizers. Eleven compiled mutations cover
+the new grammar/capture; the original 34 audio mutations remain covered. Full
+effect parameters, cold initialization, live audibility and integration with the
+shared durable host remain required. Startup and live persistence still use
+schema 1. The new runner's repository-default path was corrected after the
+integrated Meson run exposed its snapshot-only assumption; the failing run and
+successful rerun are retained under `.tmp/ui/native-retirement-integration/`.
+
+## Consumed image-policy observations
+
+Image loads and material parses now retain the policy values they actually
+used. The loader freezes its downsize/picmip inputs once for cache naming and
+CPU reduction; material parsing similarly freezes quality/no-mip inputs. Each
+observation belongs to a nonreused resource instance and load/parse revision.
+Nested parses, exceptions, mutation and replacement cannot publish an unfinished
+or stale observation. Early renderer initialization establishes its owning
+thread before resource callbacks; genuinely earlier parses remain unobserved.
+
+Images remain pending until allocation, complete mip/layer uploads and backend
+completion are observed. OpenGL uses an explicit bulk completion boundary;
+Vulkan uses the existing upload batch and successful fence retirement, with
+nonreused batch identities. Getters do not call a graphics API. No per-image
+wait is added, and a failed Vulkan submission retains staging ownership.
+
+These records describe consumed policy and admitted output, not source-content
+identity. Generated-cache classification does not prove how the cached bytes
+were produced. Direct DDS mip reachability, partial cube reduction, portable
+content reconstruction and the durable host still need completion. Default,
+unobserved and unsupported paths refuse capture. SYSTEM gains no mixed Apply
+capability from these internal observations alone.
+
+The frozen suites cover actual resolvers, publication boundaries and batch
+methods on Windows Clang, MSVC debug and sanitized Linux GCC. New observer and
+batch tests reject 23 compiled mutations on Windows/Linux; the adjacent
+coordinator, metadata and boundary tests retain their 41 mutation checks.
+Twenty-six translation units compile against production headers. Main engine
+linking and runtime qualification are recorded separately in the integration
+folder; these isolated tests do not establish driver or hardware behavior.
+
 ## Qualification
 
 Extend the existing transaction, controller, journal, persistence, renderer and

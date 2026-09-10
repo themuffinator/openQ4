@@ -152,7 +152,7 @@ def unit(repository, changes=None):
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--repository',type=Path,default=ROOT);parser.add_argument('--headers',type=Path,default=ROOT);parser.add_argument('--sanitize',action='store_true');parser.add_argument('--mutations',action='store_true');parser.add_argument('--compiler');args=parser.parse_args()
     root=args.repository.resolve();headers=args.headers.resolve()
-    names=['src/renderer/RendererResourceSettings.cpp','src/renderer/RendererResourceSettings.h','src/renderer/RenderModuleAPI.h','src/renderer/DisplayPresentation.h','src/renderer/ImageManager.cpp','src/renderer/Image_intrinsic.cpp','src/renderer/Image_load.cpp','src/renderer/OpenGL/gl_Image.cpp','src/renderer/Vulkan/vk_Image.cpp','tools/tests/renderer_image_policy_metadata.py','tools/tests/renderer_image_policy_restart.py','tools/tests/renderer_image_policy_boundaries.py']
+    names=['src/renderer/RendererResourceSettings.cpp','src/renderer/RendererResourceSettings.h','src/renderer/RendererConsumedPolicy.h','src/renderer/RenderModuleAPI.h','src/renderer/DisplayPresentation.h','src/renderer/ImageManager.cpp','src/renderer/Image_intrinsic.cpp','src/renderer/Image_load.cpp','src/renderer/OpenGL/gl_Image.cpp','src/renderer/Vulkan/vk_Image.cpp','tools/tests/renderer_image_policy_metadata.py','tools/tests/renderer_image_policy_restart.py','tools/tests/renderer_image_policy_boundaries.py']
     def hashes():return {str(root/p):hashlib.sha256((root/p).read_bytes()).hexdigest() for p in names}
     before=hashes();cases=[('baseline',None)]
     if args.mutations:

@@ -62,6 +62,12 @@ bool SoundSettings_Query(SoundSettingsLease, SoundSettingsObservation&, char*, i
 // request caches through the caller's durable decision/configuration work.
 // This observation is not a reusable authorization to release a later backend.
 bool SoundSettings_CheckCompletion(SoundSettingsLease, SoundSettingsObservation&, char*, int);
+class SoundRecoveryRecord;
+// Read-only portable v1 capture under the exact live lease. Captured preparation
+// or a completed Applied/Restored generation only; does not adopt/release policy.
+// V1 refuses effect/slot and direct/auxiliary filter resources because their
+// full historical parameter submission is not yet portable. Mute is excluded.
+bool SoundSettings_CaptureRecovery(SoundSettingsLease, SoundRecoveryRecord&, char*, int);
 bool SoundSettings_Finish(SoundSettingsLease, SoundSettingsObservation&, char*, int);
 // Allocation-free abandonment keeps automatic restart blocked until explicit
 // restore/Finish or hardware destruction. It never overwrites external settings.

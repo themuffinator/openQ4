@@ -63,6 +63,8 @@ public:
 	virtual bool CompleteNativeText(const openq4::ui::NativeTextEditorBarrier& expected, const openq4::ui::NativeTextCollection& collection, openq4::ui::NativeTextEditorBarrier& out, std::string& error) { return false; }
 	virtual std::unique_ptr<openq4::ui::Interaction::NativeSettlement> PrepareNativeTextSettlement(const openq4::ui::NativeTextEditorBarrier& expected, std::string& error) { return nullptr; }
 	virtual bool PublishNativeTextSettlement(openq4::ui::Interaction::NativeSettlement& prepared, openq4::ui::NativeTextEditorReceipt& out) noexcept { return false; }
+	virtual openq4::ui::NativeTextPresence QueryNativeTextPresence(openq4::ui::NativeTextIdentity,
+        const openq4::ui::TextEditorIdentity&) const noexcept { return openq4::ui::NativeTextPresence::BusyOrUnknown; }
 	virtual bool RetireNativeTextExact(openq4::ui::NativeTextIdentity native, const openq4::ui::TextEditorIdentity& owner) noexcept { return false; }
 
 	void ClearRefs() { refs = 0; }

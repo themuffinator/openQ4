@@ -436,6 +436,7 @@ if build_engine or get_option('build_native_tests')
     files('src/ui/retained/TextInputBrokerWire.cpp'),
     files('src/ui/retained/NativeTextDocument.cpp'),
     files('src/ui/retained/NativeTextEditor.cpp'),
+    files('src/ui/retained/ScrollGeometry.cpp'),
     dependencies: [rmlui_project.get_variable('rmlui_dep'), jsoncpp_project.get_variable('jsoncpp_dep'), libtess2_project.get_variable('libtess2_dep')],
     pic: true,
     install: false,
@@ -457,6 +458,10 @@ if build_engine or get_option('build_native_tests')
     endif
   endif
   if get_option('build_native_tests')
+    openq4_ui_scroll_geometry_test = executable('openq4-ui-scroll-geometry-test',
+      files('tools/tests/native/UiScrollGeometryTest.cpp'),
+      dependencies: openq4_retained_dep, install: false)
+    test('openq4-ui-scroll-geometry', openq4_ui_scroll_geometry_test, timeout: 30)
     openq4_ui_text_input_test = executable(
       'openq4-ui-text-input-test',
       files('tools/tests/native/UiTextInputTest.cpp'),
@@ -611,6 +616,29 @@ if build_engine or get_option('build_native_tests')
     )
     test('openq4-ui-settings-transaction', openq4_ui_settings_transaction_test, timeout: 30)
     ui_test_cpp = meson.get_compiler('cpp')
+    ui_native_owner_args = [meson.project_source_root() / 'tools/tests/ui_managed_native_owner.py',
+      '--compiler', ui_test_cpp.cmd_array()[-1], '--no-mutations']
+    if ui_test_cpp.get_id() == 'msvc'
+      ui_native_owner_args += ['--msvc', '--debug-crt']
+    endif
+    test('openq4-ui-managed-native-owner', py, args: ui_native_owner_args, timeout: 180)
+    foreach consumed_backend : ['gl', 'vulkan']
+      consumed_args = [meson.project_source_root() / 'tools/tests/renderer_consumed_policy.py',
+        '--compiler', ui_test_cpp.cmd_array()[-1]]
+      if consumed_backend == 'vulkan'
+        consumed_args += ['--vulkan']
+      endif
+      test('openq4-ui-consumed-policy-' + consumed_backend, py, args: consumed_args, timeout: 120)
+    endforeach
+    test('openq4-ui-consumed-upload-batches', py,
+      args: [meson.project_source_root() / 'tools/tests/renderer_consumed_upload_batches.py',
+        '--compiler', ui_test_cpp.cmd_array()[-1]], timeout: 120)
+    test('openq4-ui-native-input-route', py,
+      args: [meson.project_source_root() / 'tools/tests/native_input_route.py',
+        '--compiler', ui_test_cpp.cmd_array()[-1], '--no-mutations'], timeout: 120)
+    test('openq4-ui-sound-recovery', py,
+      args: [meson.project_source_root() / 'tools/tests/sound_recovery.py',
+        '--compiler', ui_test_cpp.cmd_array()[-1], '--no-mutations'], timeout: 180)
     foreach image_policy_suite : ['restart', 'metadata']
       test('openq4-ui-image-policy-' + image_policy_suite, py,
         args: [meson.project_source_root() / ('tools/tests/renderer_image_policy_' + image_policy_suite + '.py'),

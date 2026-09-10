@@ -36,3 +36,9 @@ bool UI_NativeTextPublishSettlement(uiNativeTextRouteProbe_t,void*,
 // original allocation/backend/document/native/editor lease can be retired;
 // editing revision progress does not redirect cleanup to a replacement lease.
 bool UI_NativeTextRetireExact(openq4::ui::NativeTextIdentity,const openq4::ui::TextEditorIdentity&) noexcept;
+// Callback/allocation-free inspection of the ORIGINAL allocation and actual
+// stored native barrier. No route probe, resource preparation or policy check.
+// Current document-generation invalidation alone cannot prove lease absence.
+// Busy/unknown never authorizes disposal; this does not retire store/provider.
+openq4::ui::NativeTextPresence UI_NativeTextPresence(openq4::ui::NativeTextIdentity,
+    const openq4::ui::TextEditorIdentity&) noexcept;

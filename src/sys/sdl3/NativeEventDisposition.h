@@ -48,6 +48,18 @@ struct NativeDispositionAdmission {
     std::uint64_t serial = 0;
     bool operator==(const NativeDispositionAdmission&) const = default;
 };
+
+// Historical issued-slot facts, never a receipt for delivery, storage removal,
+// provider retirement or cancellation authority. Planned ledgers retain these
+// facts after retirement even when their original provider/ingress is gone.
+struct NativeIssuedEmission {
+    NativeDispositionTicket ticket{};
+    NativeDispositionPass pass = NativeDispositionPass::SessionInitial;
+    NativeDispositionTicket trigger{};
+    std::uint64_t admissionSerial = 0;
+    bool terminal = false, inFlight = false;
+    bool operator==(const NativeIssuedEmission&) const = default;
+};
 enum class NativeRecordDisposition {
     // The matching engine branch handled the event without a queued emission.
     Immediate,
@@ -124,6 +136,14 @@ public:
     bool Current(NativeDispositionReceipt) const noexcept;
     bool Retire() noexcept;
     bool NeedsRetirement() const noexcept;
+    // Constructing thread only, outside an executing ledger call, after Retire
+    // or a latched protocol failure. No source/probe call or allocation. A
+    // successful storage transfer followed by failed Admit still has an issued
+    // slot; callers must compare it to the actual exact head and separately
+    // prove original-route/provider/UI retirement before disposing anything.
+    // Serial Begin mode has no retained per-emission metadata and refuses.
+    // False preserves output. This never changes terminal state or grants ACK.
+    bool InspectIssuedForRetirement(NativeDispositionTicket, NativeIssuedEmission& out) const noexcept;
 private:
     enum class Phase { Empty, Between, Translating, Delivering, Complete, Retired };
     struct Record { OQ4_NativeQueueRecord tag{}; bool ignored = false; };

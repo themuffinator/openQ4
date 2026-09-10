@@ -5,6 +5,8 @@
 - Image-quality settings gain checked renderer recovery foundations that reject
   stale texture and material state after a failed restart. Complete preset Apply
   remains in development; this does not enable unfinished mixed settings changes.
+  Recovery development now retains the quality policy actually used by supported
+  resources and distinguishes requested audio output from observed output.
 
 - SYSTEM uses a compact preset selector and a wrapping status/action footer to
   keep more settings visible at large UI scales. Essential controls retain

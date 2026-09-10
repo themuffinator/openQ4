@@ -41,6 +41,7 @@ void R_ImagePolicyResourceDestroyed() noexcept;
 void R_ImagePolicyLifecycleChanged() noexcept;
 bool R_ImagePolicyContentMutation();
 bool R_ImagePolicyActive();
+bool R_ImagePolicyRendererThread();
 void R_ImagePolicyObserveError(const char* reason, int32_t nativeError = 0);
 void R_ImagePolicyBindRendererThread();
 bool R_ImagePolicyShouldReload(const class idImage* image);
@@ -57,13 +58,14 @@ public:
     explicit renderImageOperation_t(const idImage* image, bool upload = false,
         int mip = 0, int layer = 0, int width = 0, int height = 0);
     ~renderImageOperation_t();
-    void Succeeded();
+    void Succeeded(uint64_t uploadBatch = 0);
     bool Allowed() const { return allowed; }
     renderImageOperation_t(const renderImageOperation_t&) = delete;
     renderImageOperation_t& operator=(const renderImageOperation_t&) = delete;
 private:
     const idImage* image;
     uint64_t attempt;
+    uint64_t uploadBatch = 0;
     bool upload, allowed, succeeded;
     int mip, layer, width, height;
 };

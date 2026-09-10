@@ -5398,6 +5398,7 @@ idRenderSystemLocal::Init
 ===============
 */
 void idRenderSystemLocal::Init( void ) {
+	R_ImagePolicyBindRendererThread();
 	r_initialRendererDevicePending = false;
 
 	common->Printf( "------- Initializing renderSystem --------\n" );

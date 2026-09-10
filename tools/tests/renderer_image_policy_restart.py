@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 SUPPORT = r'''
 #include "RendererResourceSettings.h"
+#include "RendererConsumedPolicy.h"
 #include "DisplayPresentation.h"
 #include <algorithm>
 #include <cassert>
@@ -33,6 +34,11 @@ SUPPORT = r'''
 #include <string>
 #include <thread>
 #include <vector>
+// Consumed-policy behavior has its own actual-method suite; keep this fixture
+// focused on the existing checked restart collector and its allocation sweep.
+void R_ConsumedPolicyObserveError(){}
+void imageConsumedLoad_t::BeforeOperation(const idImage*){}
+void imageConsumedLoad_t::Operation(const idImage*,bool,bool,int,int,int,int,uint64_t){}
 static int allocationBudget=-1,allocationCalls=0;
 void* operator new(std::size_t n){++allocationCalls;if(allocationBudget==0)throw std::bad_alloc();if(allocationBudget>0)--allocationBudget;if(void* p=std::malloc(n?n:1))return p;throw std::bad_alloc();}
 void operator delete(void* p)noexcept{std::free(p);}void operator delete(void* p,std::size_t)noexcept{std::free(p);}
@@ -296,7 +302,7 @@ def main():
     args = parser.parse_args()
     repository, headers = args.repository.resolve(), args.headers.resolve()
     inputs = [repository / name for name in (
-        'src/renderer/RendererResourceSettings.cpp', 'src/renderer/RendererResourceSettings.h',
+        'src/renderer/RendererResourceSettings.cpp', 'src/renderer/RendererResourceSettings.h', 'src/renderer/RendererConsumedPolicy.h',
         'src/renderer/RenderModuleAPI.h', 'tools/tests/renderer_image_policy_restart.py')]
     inputs += [headers / 'src/renderer/DisplayPresentation.h']
     def hashes():

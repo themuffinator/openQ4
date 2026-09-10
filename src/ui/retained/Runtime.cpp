@@ -1628,6 +1628,9 @@ bool Runtime::PublishNumberNativeSettlement(Interaction::NativeSettlement& prepa
 bool Runtime::RetireNumberNative(const NativeTextEditorBarrier& expected, NativeTextEditorReceipt& out, std::string& error) {
 	return impl->canonical && impl->document && impl->interaction.RetireNumberNative(expected,out,error);
 }
+NativeTextPresence Runtime::QueryNumberNativePresence(NativeTextIdentity native, const TextEditorIdentity& owner) const noexcept {
+    return impl?impl->interaction.QueryNumberNativePresence(native,owner):NativeTextPresence::BusyOrUnknown;
+}
 bool Runtime::RetireNumberNativeExact(NativeTextIdentity native, const TextEditorIdentity& owner) noexcept {
 	return impl->canonical && impl->document && impl->interaction.RetireNumberNativeExact(native,owner);
 }

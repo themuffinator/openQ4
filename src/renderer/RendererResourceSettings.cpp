@@ -3,6 +3,7 @@
 #pragma hdrstop
 #include "tr_local.h"
 #include "RendererResourceSettings.h"
+#include "RendererConsumedPolicy.h"
 #include "DisplayPresentation.h"
 #ifdef OPENQ4_RENDERER_VK_MODULE
 #include "Vulkan/VulkanDevice.h"
@@ -416,6 +417,10 @@ void R_ImagePolicyBindRendererThread() {
     if (rendererThread == std::thread::id()) rendererThread = std::this_thread::get_id();
     else if (rendererThread != std::this_thread::get_id()) FailLocked("Renderer initialization changed threads");
 }
+bool R_ImagePolicyRendererThread() {
+    const std::lock_guard<std::mutex> lock(policyMutex);
+    return rendererThread != std::thread::id() && rendererThread == std::this_thread::get_id();
+}
 bool R_ImagePolicyActive() {
     const std::lock_guard<std::mutex> lock(policyMutex);
     return active != nullptr;
@@ -434,18 +439,21 @@ bool R_ImagePolicyOperationAllowed() {
     return !active->failure[0];
 }
 void R_ImagePolicyObserveError(const char* reason, int32_t nativeError) {
+    R_ConsumedPolicyObserveError();
     const std::lock_guard<std::mutex> lock(policyMutex);
     FailLocked(reason, nativeError);
 }
 renderImageOperation_t::renderImageOperation_t(const idImage* image, bool upload, int mip, int layer, int width, int height)
     : image(image), attempt(0), upload(upload), allowed(R_ImagePolicyOperationAllowed()), succeeded(false),
       mip(mip), layer(layer), width(width), height(height) {
+    imageConsumedLoad_t::BeforeOperation(image);
     if (allowed && image && image->IsFileBacked()) allowed = R_ImagePolicyContentMutation();
     const std::lock_guard<std::mutex> lock(policyMutex);
     if (active && allowed && active->recording) attempt = active->result.attempt;
 }
-void renderImageOperation_t::Succeeded() { succeeded = true; }
+void renderImageOperation_t::Succeeded(uint64_t batch) { succeeded = true; uploadBatch = batch; }
 renderImageOperation_t::~renderImageOperation_t() {
+    imageConsumedLoad_t::Operation(image, upload, allowed && succeeded, mip, layer, width, height, uploadBatch);
     if (!attempt) return;
     renderDisplayPresentation_t device{}; R_GetDisplayPresentation(&device);
     const std::lock_guard<std::mutex> lock(policyMutex);

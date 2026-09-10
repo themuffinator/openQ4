@@ -220,6 +220,22 @@ void NativeOwnerDiagnostic(std::string& error,const char* message) noexcept {
     try {error=message;} catch (...) {error.clear();}
 }
 }
+openq4::ui::NativeTextPresence idUserInterfaceManagerLocal::NativeTextPresence(openq4::ui::NativeTextIdentity native,
+    const openq4::ui::TextEditorIdentity& owner) const noexcept {
+    using Presence=openq4::ui::NativeTextPresence;
+    if (std::this_thread::get_id()!=nativePresenceThread || nativeBoundaryActive || textBoundaryActive ||
+        clipboardBoundaryActive || applicationPumpDepth || !native.document || !native.editorLease ||
+        !owner.allocation || owner.allocation>nextAllocationId || !owner.backend || !owner.document ||
+        !owner.modal || !owner.window || !owner.session || !owner.revision || owner.control.empty() ||
+        owner.control.size()>128 || owner.control.find('\0')!=std::string::npos) return Presence::BusyOrUnknown;
+#ifdef ID_DEDICATED
+    return Presence::BusyOrUnknown;
+#else
+    for (int i=0;i<allocations.Num();++i)
+        if (allocations[i]->allocationId==owner.allocation) return allocations[i]->QueryNativeTextPresence(native,owner);
+    return Presence::AbsentOriginal;
+#endif
+}
 bool idUserInterfaceManagerLocal::NativeTextEnter() noexcept {
     if(nativeBoundaryActive || textBoundaryActive || clipboardBoundaryActive) {
         nativeBoundaryFailed=true;
@@ -401,6 +417,10 @@ std::unique_ptr<openq4::ui::Interaction::NativeSettlement> UI_NativeTextPrepareS
     return uiManagerLocal.NativeTextPrepareSettlement(probe,context,expected,error);
 }
 
+openq4::ui::NativeTextPresence UI_NativeTextPresence(openq4::ui::NativeTextIdentity native,
+    const openq4::ui::TextEditorIdentity& owner) noexcept {
+    return uiManagerLocal.NativeTextPresence(native,owner);
+}
 bool UI_NativeTextRetireExact(openq4::ui::NativeTextIdentity native,const openq4::ui::TextEditorIdentity& owner) noexcept {
     return uiManagerLocal.NativeTextRetireExact(native,owner);
 }

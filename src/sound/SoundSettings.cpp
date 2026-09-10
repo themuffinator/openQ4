@@ -1,5 +1,6 @@
 // First-party openQ4 checked audio settings. GPL-3.0-or-later.
 #include "SoundSettings.h"
+#include "SoundRecovery.h"
 #include <atomic>
 #include <cstring>
 #include <limits>
@@ -105,6 +106,15 @@ bool KnownOutput(int mode) noexcept {
 // state returned only after the complete query. Slot/effect queries are real;
 // source routes below deliberately use checked setter receipts instead.
 struct SoundSettingsAccess {
+	static bool PortableNone() noexcept {
+		const auto& h=soundSystemLocal.hardware;
+		if (h.efxEnabled || h.auxEffectSlot || h.auxReverbEffect || h.voices.Num()>96) return false;
+		// Retained filters on an idle voice are resources too. BaselineSources
+		// intentionally inventories active source receipts only.
+		for (int i=0;i<h.voices.Num();++i)
+			if (h.voices[i].openalDirectFilter || h.voices[i].openalAuxFilter) return false;
+		return true;
+	}
 	static bool Read(SoundSettingsObservation& out, bool effectProof=true) {
 		auto& h=soundSystemLocal.hardware;
 		const auto startedLifetime=deviceLifetimeSerial, startedEvents=eventSerial.load(std::memory_order_acquire), startedToken=state.lease.token;
@@ -446,6 +456,104 @@ bool SoundSettings_CheckCompletion(SoundSettingsLease lease,SoundSettingsObserva
 	if (!entry.entered) return Fail(error,size,"Audio settings owner is not current.");
 	return Completion(lease,out,error,size);
 }
+bool SoundSettings_CaptureRecovery(SoundSettingsLease lease,SoundRecoveryRecord& out,char* error,int size) {
+	Entry entry;
+	if (!entry.entered || !Same(lease,state.lease) ||
+		(state.phase!=SoundSettingsPhase::Captured && state.phase!=SoundSettingsPhase::Applied && state.phase!=SoundSettingsPhase::Restored))
+		return Fail(error,size,"Audio recovery capture has no current completed owner.");
+	if (state.target.efx && state.target.efx!=state.baseline.requested.efx)
+		return Fail(error,size,"Portable effect-enabled targets are not qualified.");
+	const auto phase=state.phase;
+	const auto serial=generation;
+	state.operationToken=lease.token;
+	state.operationPolicy=phase==SoundSettingsPhase::Applied?state.target:state.baseline.requested;
+	const auto current=[&] {return Same(lease,state.lease) && state.phase==phase && generation==serial && Owned();};
+	try {
+		SoundSettingsObservation observed;
+		if (phase==SoundSettingsPhase::Captured) {
+			if (!current() || !SoundSettingsAccess::Read(observed) || !current() || !Actual(observed,state.baseline))
+				return Fail(error,size,"The actual audio preparation baseline changed.");
+		} else if (!Completion(lease,observed,error,size) || !current()) return false;
+		const auto inventory=[&](SoundSettingsObservation& observation) {
+			if (observation.efx || observation.effect || observation.slot || !observation.effectsVerified || !SoundSettingsAccess::PortableNone()) return false;
+			observation.sourceCount=0;
+			if (!SoundSettingsAccess::BaselineSources(observation) || !current()) return false;
+			for (unsigned i=0;i<observation.sourceCount;++i)
+				if (observation.sources[i].directFilter || observation.sources[i].auxiliaryFilter) return false;
+			return SoundSettingsAccess::PortableNone();
+		};
+		if (!inventory(observed)) return Fail(error,size,"Portable effect and filter resource history is not qualified.");
+		SoundRecoveryData data;data.requested=observed.requested;data.hrtfPolicy=observed.requestedHrtf;data.efxDebug=state.debug;
+		data.requestedDevice=observed.requestedDevice;data.actualDevice=observed.actualDevice;data.defaultDevice=observed.defaultDevice;
+		data.hrtf=observed.hrtf?SoundRecoveryHrtf::ExactOn:SoundRecoveryHrtf::ExactOff;data.hrtfReason=observed.hrtfStatus;
+		switch(observed.outputMode) {
+		case ALC_MONO_SOFT:data.mode=SoundRecoveryMode::Mono;break;case ALC_STEREO_SOFT:data.mode=SoundRecoveryMode::Stereo;break;
+		case ALC_STEREO_BASIC_SOFT:data.mode=SoundRecoveryMode::StereoBasic;break;case ALC_STEREO_UHJ_SOFT:data.mode=SoundRecoveryMode::StereoUhj;break;
+		case ALC_STEREO_HRTF_SOFT:data.mode=SoundRecoveryMode::StereoHrtf;break;case ALC_QUAD_SOFT:data.mode=SoundRecoveryMode::Quad;break;
+		case ALC_SURROUND_5_1_SOFT:data.mode=SoundRecoveryMode::Surround51;break;case ALC_SURROUND_6_1_SOFT:data.mode=SoundRecoveryMode::Surround61;break;
+		case ALC_SURROUND_7_1_SOFT:data.mode=SoundRecoveryMode::Surround71;break;
+		default:return Fail(error,size,"Audio output has no exact portable meaning.");
+		}
+		auto* const device=reinterpret_cast<ALCdevice*>(observed.device);
+		const auto call=[&](auto&& operation) {return current() && Native(operation) && current();};
+		const auto string=[&](auto&& operation,std::string& result) {
+			const char* value=nullptr;char copied[1024]{};
+			if (!call([&] {value=operation();return value!=nullptr;}) || !Copy(copied,value) || !current()) return false;
+			result=copied;return current();
+		};
+		if (!string([] {return reinterpret_cast<const char*>(alGetString(AL_VENDOR));},data.provider.vendor) ||
+			!string([] {return reinterpret_cast<const char*>(alGetString(AL_RENDERER));},data.provider.renderer) ||
+			!string([] {return reinterpret_cast<const char*>(alGetString(AL_VERSION));},data.provider.version))
+			return Fail(error,size,"Audio provider identity is unavailable.");
+		if (observed.hrtf && !string([&] {return alcGetString(device,ALC_HRTF_SPECIFIER_SOFT);},data.hrtfSpecifier))
+			return Fail(error,size,"Active HRTF identity is unavailable.");
+		SoundRecoveryEnumeration enumeration;enumeration.provider=data.provider;enumeration.hrtfDevice=data.actualDevice;
+		// Allocate empty storage before copying strings: debug STL's noexcept
+		// string move can allocate during vector growth and terminate on denial.
+		enumeration.devices.reserve(SoundRecoveryMaxDevices);
+		enumeration.hrtfs.reserve(SoundRecoveryMaxHrtfs);
+		bool all=false,enumerationAvailable=false;
+		if (!call([&] {all=alcIsExtensionPresent(nullptr,"ALC_ENUMERATE_ALL_EXT")!=ALC_FALSE;return true;}) ||
+			(!all && !call([&] {enumerationAvailable=alcIsExtensionPresent(nullptr,"ALC_ENUMERATION_EXT")!=ALC_FALSE;return true;})) || (!all && !enumerationAvailable))
+			return Fail(error,size,"Unique logical audio device enumeration is unavailable.");
+		const char* names=nullptr;
+		if (!call([&] {names=alcGetString(nullptr,all?ALC_ALL_DEVICES_SPECIFIER:ALC_DEVICE_SPECIFIER);return names!=nullptr;}))
+			return Fail(error,size,"Audio device enumeration failed.");
+		std::size_t used=0;
+		while (used<SoundRecoveryMaxBytes && names[used]) {
+			const std::size_t start=used;
+			while (used<SoundRecoveryMaxBytes && used-start<=SoundRecoveryMaxString && names[used]) ++used;
+			if (used==SoundRecoveryMaxBytes || used-start>SoundRecoveryMaxString || enumeration.devices.size()==SoundRecoveryMaxDevices)
+				return Fail(error,size,"Audio device enumeration exceeds its bound.");
+			enumeration.devices.emplace_back(names+start,used-start);++used;
+		}
+		if (used==SoundRecoveryMaxBytes || !current()) return Fail(error,size,"Audio device enumeration changed.");
+		ALCint hrtfCount=0;
+		if (!call([&] {alcGetIntegerv(device,ALC_NUM_HRTF_SPECIFIERS_SOFT,1,&hrtfCount);return true;}) ||
+			hrtfCount<0 || hrtfCount>static_cast<int>(SoundRecoveryMaxHrtfs)) return Fail(error,size,"HRTF enumeration exceeds its bound.");
+		LPALCGETSTRINGISOFT getStringi=nullptr;
+		if (hrtfCount && !call([&] {getStringi=reinterpret_cast<LPALCGETSTRINGISOFT>(alcGetProcAddress(device,"alcGetStringiSOFT"));return getStringi!=nullptr;}))
+			return Fail(error,size,"HRTF enumeration entry point is unavailable.");
+		for (ALCint i=0;i<hrtfCount;++i) {
+			std::string name(0,'\0');
+			if (!string([&] {return getStringi(device,ALC_HRTF_SPECIFIER_SOFT,i);},name)) return Fail(error,size,"HRTF enumeration failed.");
+			enumeration.hrtfs.push_back(name);
+		}
+		if (!call([&] {return alcGetError(device)==ALC_NO_ERROR;}) || !call([] {return alcGetError(nullptr)==ALC_NO_ERROR;}) ||
+			!call([] {return alGetError()==AL_NO_ERROR;})) return Fail(error,size,"Audio identity query failed.");
+		std::string diagnostic(0,'\0');SoundRecoveryRecord candidate;SoundRecoveryResolved resolved;
+		if (!SoundRecovery_BuildObserved(data,candidate,diagnostic) || !SoundRecovery_Resolve(candidate,enumeration,resolved,diagnostic))
+			return Fail(error,size,diagnostic.c_str());
+		SoundSettingsObservation final;
+		if (!current() || !SoundSettingsAccess::Read(final) || !current() || !Actual(final,observed) || !inventory(final))
+			return Fail(error,size,"Audio state changed while capturing portable recovery.");
+		std::string hrtf(0,'\0');
+		if (observed.hrtf && (!string([&] {return alcGetString(device,ALC_HRTF_SPECIFIER_SOFT);},hrtf) || hrtf!=data.hrtfSpecifier))
+			return Fail(error,size,"Active HRTF changed while capturing recovery.");
+		if (!call([&] {return alcGetError(device)==ALC_NO_ERROR;}) || !current()) return Fail(error,size,"Audio capture lost its owner.");
+		out=std::move(candidate);return true;
+	} catch (...) { return Fail(error,size,"Portable audio capture allocation failed."); }
+}
 bool SoundSettings_Finish(SoundSettingsLease lease,SoundSettingsObservation& out,char* error,int size) {
 	Entry entry;
 	SoundSettingsObservation current;
@@ -505,6 +613,7 @@ bool SoundSettings_TryRestore(SoundSettingsLease,SoundSettingsObservation&,char*
 bool SoundSettings_RevalidateRestore(SoundSettingsLease,SoundSettingsObservation&,char* e,int n) { return Unsupported(e,n); }
 bool SoundSettings_Query(SoundSettingsLease,SoundSettingsObservation&,char* e,int n) { return Unsupported(e,n); }
 bool SoundSettings_CheckCompletion(SoundSettingsLease,SoundSettingsObservation&,char* e,int n) { return Unsupported(e,n); }
+bool SoundSettings_CaptureRecovery(SoundSettingsLease,SoundRecoveryRecord&,char* e,int n) { return Unsupported(e,n); }
 bool SoundSettings_Finish(SoundSettingsLease,SoundSettingsObservation&,char* e,int n) { return Unsupported(e,n); }
 void SoundSettings_Abandon(SoundSettingsLease) noexcept {}
 bool SoundSettings_BlockAutomaticRestart() noexcept { return false; }

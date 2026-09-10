@@ -481,3 +481,12 @@ video restart pass. See [effect execution](../ui/settings-effect-execution.md)
 and `.tmp/ui/renderer-effects-integration/validation-evidence.json` for the
 bounded result. Historical consumed policy, portable content reconstruction,
 mixed Apply and every remaining product/editor/migration gate are still required.
+
+The following increment adds exact [native input retirement](../ui/native-input-retirement.md)
+inspection and original-editor presence checks, plus portable audio records and
+historically consumed image/material policy observations. The engine and both
+renderer modules build, and all 56 integrated UI suites pass. Native activation,
+actual queue disposal, complete audio/image reconstruction and the unified
+durable Apply path remain in development. Scrollbar geometry and editable SYSTEM
+artwork are prepared; shared schema, interaction and rendered qualification are
+being implemented. This progress does not accept any migration or final gate.

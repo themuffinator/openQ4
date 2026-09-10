@@ -1063,6 +1063,12 @@ bool idUserInterfaceRetained::PublishNativeTextSettlement(Interaction::NativeSet
     if (!CurrentNativeText(prepared.Receipt().before)) return false;
     return impl->RuntimeView()->PublishNumberNativeSettlement(prepared,out);
 }
+NativeTextPresence idUserInterfaceRetained::QueryNativeTextPresence(NativeTextIdentity native, const TextEditorIdentity& owner) const noexcept {
+    // BeforeResourceReset advances textDocument before the old Runtime model
+    // is destroyed. Only the actual stored barrier can prove lease presence.
+    auto* runtime=impl->RuntimeView();
+    return runtime?runtime->QueryNumberNativePresence(native,owner):NativeTextPresence::BusyOrUnknown;
+}
 bool idUserInterfaceRetained::RetireNativeTextExact(NativeTextIdentity native, const TextEditorIdentity& owner) noexcept {
     if (!impl->NativeOwnerMatches(owner,false)) return false;
     auto* runtime=impl->RuntimeView();

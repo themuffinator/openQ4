@@ -530,6 +530,32 @@ bool Interaction::PublishNumberNativeSettlement(NativeSettlement& staged, Native
 bool Interaction::RetireNumberNative(const NativeTextEditorBarrier& expected, NativeTextEditorReceipt& out, std::string& error) {
 	return NativeCompletion(true,expected,out,error);
 }
+NativeTextPresence Interaction::QueryNumberNativePresence(NativeTextIdentity native, const TextEditorIdentity& owner) const noexcept {
+    if (candidate || !authority || !native.document || !native.editorLease || !owner.allocation || !owner.backend ||
+        !owner.document || !owner.modal || !owner.window || !owner.session || !owner.revision ||
+        owner.control.empty() || owner.control.size()>128 || owner.control.find('\0')!=std::string::npos)
+        return NativeTextPresence::BusyOrUnknown;
+    if (!nativeModel) {
+        if (!nativeControl.empty()) return NativeTextPresence::BusyOrUnknown;
+        for (const auto& [id,item]:items) { (void)id;if (item.number && item.number->native) return NativeTextPresence::BusyOrUnknown; }
+        return NativeTextPresence::AbsentOriginal;
+    }
+    const auto found=items.find(nativeControl);
+    if (nativeControl.empty() || found==items.end() || !found->second.number || !found->second.number->native ||
+        !nativeModel->Active()) return NativeTextPresence::BusyOrUnknown;
+    const auto& view=*found->second.number->native;
+    const auto& before=view.barrier;
+    const auto& current=before.editor;
+    if (!view.active || current.control!=nativeControl ||
+        found->second.number->identity!=NumberEditIdentity{current.session,current.revision})
+        return NativeTextPresence::BusyOrUnknown;
+    // Read the immutable published barrier directly. No Barrier()/View() copy,
+    // current modal token, bounds, focus, readback or accepted-setting lookup.
+    const bool exact=before.native==native && current.allocation==owner.allocation && current.backend==owner.backend &&
+        current.document==owner.document && current.modal==owner.modal && current.window==owner.window &&
+        current.session==owner.session && current.control==owner.control;
+    return exact?NativeTextPresence::PresentExact:NativeTextPresence::AbsentOriginal;
+}
 bool Interaction::RetireNumberNativeExact(NativeTextIdentity native, const TextEditorIdentity& owner) noexcept {
 	const auto found = items.find(owner.control);
 	if (candidate || !authority || !nativeModel || nativeControl != owner.control || found == items.end() ||

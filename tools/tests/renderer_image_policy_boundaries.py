@@ -56,7 +56,7 @@ struct renderImageOperation_t {
  bool done=false,permit;
  explicit renderImageOperation_t(const idImage*,bool=false,int=0,int=0,int=0,int=0):permit(R_ImagePolicyOperationAllowed()){++started;}
  ~renderImageOperation_t(){if(permit){if(done)++succeeded;else ++refused;}}
- bool Allowed()const{return permit;}void Succeeded(){done=true;}
+ bool Allowed()const{return permit;}void Succeeded(uint64_t=0){done=true;}
 };
 struct idImage {idImageOpts opts;int usage=0;textureFilter_t filter=TF_DEFAULT;textureRepeat_t repeat=TR_REPEAT;unsigned texnum=99;uint64_t storageGeneration=0;
  bool IsFileBacked()const{return true;}void PurgeImage(){++native;texnum=99;}void AllocImage();void SubImageUpload(int,int,int,int,int,int,const void*,int)const;};
@@ -94,7 +94,7 @@ VK_AFTER_ENTRY = r'''
 static vkImageEntry_t vkImages[4]{};static unsigned vkImageGenerationCounter=1;
 vkImageEntry_t* VK_Image_GetEntry(unsigned i){++native;return i<4&&vkImages[i].inUse?&vkImages[i]:nullptr;}
 void VK_Image_RecordUpload(VkCommandBuffer,void*){}
-bool VK_Device_BatchedUpload(void(*)(VkCommandBuffer,void*),void*,VkBuffer,VmaAllocation,VkDeviceSize){++native;return batchOK;}
+bool VK_Device_BatchedUpload(void(*)(VkCommandBuffer,void*),void*,VkBuffer,VmaAllocation,VkDeviceSize,uint64_t* batch){++native;if(batchOK&&batch)*batch=1;return batchOK;}
 '''
 
 VK_MAIN = r'''
@@ -262,7 +262,7 @@ def build_units(repository, headers):
     # The release upload boundary must preserve errors before program loaders or
     # other consumers can issue a direct glGetError and erase the observation.
     gl_upload = method((renderer / 'OpenGL/gl_Image.cpp').read_text(encoding='utf-8'), 'void idImage::SubImageUpload(')
-    if 'if ( R_ImagePolicyActive() ) GL_CheckErrors();\n\timageOperation.Succeeded();' not in gl_upload:
+    if 'if ( R_ImagePolicyActive() || imageConsumedLoad_t::Active(this) ) GL_CheckErrors();\n\timageOperation.Succeeded();' not in gl_upload:
         raise AssertionError('checked GL upload completion must collect errors before success')
     module = (renderer / 'RendererModule.cpp').read_text(encoding='utf-8')
     module = MODULE_SUPPORT + method(module, 'static void RM_ReleaseDisplayVideoPin(') + method(module, 'bool R_RendererModule_TryImagePolicyRestart(') + MODULE_MAIN
@@ -308,7 +308,7 @@ def main():
         changes = [
             ('sampler-refusal', 'R_ImagePolicyObserveError( "Vulkan sampler creation failed", samplerResult );', '(void)samplerResult;'),
             ('sampler-capacity', 'R_ImagePolicyObserveError( "Vulkan sampler cache exhausted" );', '(void)0;'),
-            ('batch-refusal', 'VK_Device_DeferDestroy( VK_NULL_HANDLE, VK_NULL_HANDLE, staging, stagingAlloc );\n\t\treturn;\n\t}\n\n\timageOperation.Succeeded();', 'VK_Device_DeferDestroy( VK_NULL_HANDLE, VK_NULL_HANDLE, staging, stagingAlloc );\n\t}\n\n\timageOperation.Succeeded();'),
+            ('batch-refusal', 'VK_Device_DeferDestroy( VK_NULL_HANDLE, VK_NULL_HANDLE, staging, stagingAlloc );\n\t\treturn;\n\t}\n\n\timageOperation.Succeeded(consumedBatch);', 'VK_Device_DeferDestroy( VK_NULL_HANDLE, VK_NULL_HANDLE, staging, stagingAlloc );\n\t}\n\n\timageOperation.Succeeded(consumedBatch);'),
         ]
         cases += [('vulkan', name, mutate(vk, old, new)) for name, old, new in changes]
         entries = units['entries']

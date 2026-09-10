@@ -219,7 +219,7 @@ void idImage::SubImageUpload( int mipLevel, int x, int y, int z, int width, int 
 		glPixelStorei( GL_UNPACK_ROW_LENGTH, 0 );
 	}
 
-	if ( R_ImagePolicyActive() ) GL_CheckErrors();
+	if ( R_ImagePolicyActive() || imageConsumedLoad_t::Active(this) ) GL_CheckErrors();
 	imageOperation.Succeeded();
 }
 
@@ -734,6 +734,7 @@ idImage::PurgeImage
 */
 void idImage::PurgeImage() {
 	if ( !R_ImagePolicyContentMutation() ) return;
+	InvalidateConsumedPolicy();
 	if ( texnum != TEXTURE_NOT_LOADED ) {
 		glDeleteTextures( 1, (GLuint *)&texnum );	// this should be the ONLY place it is ever called!
 		texnum = TEXTURE_NOT_LOADED;

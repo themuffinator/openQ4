@@ -36,16 +36,21 @@ def main():
     nan=next(line for line in math.splitlines() if line.startswith('#define') and 'FLOAT_IS_NAN(x)' in line)
     helpers='struct idMath { static float ClampFloat(float a,float b,float c){return std::clamp(c,a,b);} static float Pow(float x,float y){return std::pow(x,y);} };\n'+db+'\n'+bits+'\n'+nan+'\n'
     generated=paths[-1].read_text().replace('// @PRODUCTION@',helpers+production)
+    # The portable capture entry point is linked in this same production TU.
+    # Its new provider-string query is deliberately unused by the original
+    # suite; sound_recovery.py qualifies the actual capture/enumeration path.
+    generated=generated.replace('extern "C" {', 'extern "C" {\nconst ALchar* AL_APIENTRY alGetString(ALenum) noexcept { Fake::Tick(); return "unused-counted-provider"; }',1)
+    recovery_source=ROOT/'src/sound/SoundRecovery.cpp'
     working=scratch/'test.cpp';working.write_text(generated)
     # Mutations that restore a borrowed public POD parameter must also change
     # its actual declaration, so they execute instead of merely failing linkage.
     header=paths[1].read_text();header_copy=scratch/'SoundSettings.h';header_copy.write_text(header)
-    cmd=[a.compiler,'-std=c++20','-Wall','-Wextra','-Werror','-Wno-unused-but-set-variable','-DUSE_OPENAL','-DUSE_SDL3','-DOPENQ4_OPENAL_EFX_SUPPORTED=1','-I',str(ROOT/'src/sound'),'-I',str(repo/'subprojects/openal-soft-prebuilt/include'),str(working),'-o',str(scratch/'test.exe')]
+    cmd=[a.compiler,'-std=c++20','-Wall','-Wextra','-Werror','-Wno-unused-but-set-variable','-DUSE_OPENAL','-DUSE_SDL3','-DOPENQ4_OPENAL_EFX_SUPPORTED=1','-I',str(ROOT/'src/sound'),'-I',str(repo/'subprojects/openal-soft-prebuilt/include'),str(working),str(recovery_source),'-o',str(scratch/'test.exe')]
     if Path(a.compiler).name.lower() in ('cl','cl.exe'):
         cmd=[a.compiler,'/nologo','/std:c++20','/EHsc','/W4','/WX','/permissive-', '/MTd',
              '/DUSE_OPENAL','/DUSE_SDL3','/DOPENQ4_OPENAL_EFX_SUPPORTED=1',
-             '/I'+str(ROOT/'src/sound'),'/I'+str(repo/'subprojects/openal-soft-prebuilt/include'),str(working),
-             '/Fe:'+str(scratch/'test.exe'),'/Fo:'+str(scratch/'test.obj')]
+             '/I'+str(ROOT/'src/sound'),'/I'+str(repo/'subprojects/openal-soft-prebuilt/include'),str(working),str(recovery_source),
+             '/Fe:'+str(scratch/'test.exe'),'/Fo:'+str(scratch)+os.sep]
     elif a.sanitize:cmd[1:1]=['-fsanitize=address,undefined','-fno-omit-frame-pointer','-no-pie']
     env=os.environ.copy();env.update(TEMP=str(scratch),TMP=str(scratch),TMPDIR=str(scratch))
     def run(command,log):
@@ -59,6 +64,7 @@ def main():
         commands[name]=command
         return command,exe
     result={'sources':{str(p.relative_to(ROOT)):sha(p) for p in paths},'command':cmd,'limitations':['Counted API doubles; no actual device, mixer, audibility, playback continuity or hardware error timing qualification.','Real OpenAL public declarations; bounded engine/CVar/container doubles. Production API, complete checked voice route and normal Render/hardware Update bodies execute.','Legacy Init/Shutdown/Restart/monitoring integration guarded by source checks, not whole-engine compilation.']}
+    result['sources'].update({str(p.relative_to(ROOT)):sha(p) for p in [recovery_source,ROOT/'src/sound/SoundRecovery.h']})
     dependencies=['src/idlib/math/Math.h','src/sound/snd_local.h','src/sound/snd_world.cpp','src/sound/SoundVoice.h']+['subprojects/openal-soft-prebuilt/include/AL/'+f for f in ('al.h','alc.h','alext.h','efx.h')]
     result['read_only_dependencies']={f:sha(repo/f) for f in dependencies}
     c=run(cmd,'compile.log');result['compile']=c.returncode
@@ -122,6 +128,12 @@ return 0;}
         for name,(old,new) in mutants.items():
             assert old in generated,name
             altered=generated.replace(old,new,-1 if name in ('recovery-nonbaseline-accepted','cancel-touched-audio') else 1)
+            if name=='skip-baseline-source':
+                # New portable resource preflight has another voice walk; this
+                # existing mutation must still target BaselineSources itself.
+                exact=body(generated,'static bool BaselineSources(')
+                assert old in exact
+                altered=generated.replace(exact,exact.replace(old,new,1),1)
             altered_header=header
             if name=='borrow-caller-policy':
                 altered=generated.replace('SoundSettingsPolicy target,','const SoundSettingsPolicy& target,')

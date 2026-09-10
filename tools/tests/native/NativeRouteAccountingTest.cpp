@@ -316,8 +316,73 @@ static void EmptyScheduledLanes() {
     text.Deliver(ticket);CHECK(text.ledger.CompletePass(NativeDispositionPass::SessionInitial,text.error));
     CHECK(text.ledger.CompletePass(NativeDispositionPass::SessionDeferred,text.error));text.Finish();
 }
+static void IssuedRetirementInspection() {
+    PlannedFixture f;
+    const auto record=f.Open(0);
+    const auto session=f.Plan(record,NativeDispositionPass::SessionInitial);
+    const auto keyboard=f.Plan(record,NativeDispositionPass::KeyboardPoll);
+    const auto child=f.Plan(record,NativeDispositionPass::SessionDeferred,keyboard);
+    const auto admitted=f.Admit(session);
+    NativeIssuedEmission sentinel;
+    sentinel.ticket.emission=999;sentinel.admissionSerial=888;sentinel.terminal=true;
+    auto output=sentinel;
+    CHECK(!f.ledger.InspectIssuedForRetirement(session,output) && output==sentinel);
+    CHECK(f.ledger.Retire());
+    // These providers can no longer establish live authority. Historical
+    // inspection must not invoke them or infer successful delivery from storage.
+    f.source.claim=false;f.source.unavailable=true;f.source.continuity.Invalidate();
+    const unsigned observed=f.source.observations;
+    denyAllocation=true;
+    CHECK(f.ledger.InspectIssuedForRetirement(session,output));
+    CHECK(output.ticket==session && output.pass==NativeDispositionPass::SessionInitial &&
+        output.admissionSerial==admitted.serial && !output.terminal && !output.inFlight && output.trigger==NativeDispositionTicket{});
+    CHECK(f.ledger.InspectIssuedForRetirement(keyboard,output));
+    CHECK(output.ticket==keyboard && output.pass==NativeDispositionPass::KeyboardPoll && !output.admissionSerial && !output.terminal);
+    CHECK(f.ledger.InspectIssuedForRetirement(child,output));
+    CHECK(output.trigger==keyboard && output.pass==NativeDispositionPass::SessionDeferred && !output.admissionSerial);
+    denyAllocation=false;
+    CHECK(f.source.observations==observed);
+    for(unsigned field=0;field<8;++field) {
+        auto wrong=keyboard;
+        switch(field) {
+        case 0:++wrong.record.receipt.batch.ingress;break;case 1:++wrong.record.receipt.batch.serial;break;
+        case 2:++wrong.record.receipt.ledger;break;case 3:++wrong.record.receipt.serial;break;
+        case 4:++wrong.record.queueSequence;break;case 5:++wrong.record.index;break;
+        case 6:wrong.emission=0;break;case 7:wrong.emission=NativeEventDispositionLedger::MaxEmissions+1;break;
+        }
+        output=sentinel;CHECK(!f.ledger.InspectIssuedForRetirement(wrong,output) && output==sentinel);
+    }
+    bool foreign=false;output=sentinel;
+    std::thread worker([&]{foreign=f.ledger.InspectIssuedForRetirement(keyboard,output);});worker.join();
+    CHECK(!foreign && output==sentinel);
+    CHECK(f.ledger.Retire());CHECK(f.ledger.InspectIssuedForRetirement(keyboard,output));
+    PlannedFixture other;CHECK(other.ledger.Retire());output=sentinel;
+    CHECK(!other.ledger.InspectIssuedForRetirement(keyboard,output) && output==sentinel);
+    // An exact slot survives a failed Admit after a hypothetical actual storage
+    // transfer; this test supplies no storage-transfer or cancellation receipt.
+    PlannedFixture partial;auto pr=partial.Open(0);auto pt=partial.Plan(pr,NativeDispositionPass::SessionInitial);
+    partial.source.claim=false;NativeDispositionAdmission unused;
+    CHECK(!partial.ledger.Admit(pt,unused,partial.error));
+    CHECK(partial.ledger.InspectIssuedForRetirement(pt,output) && !output.admissionSerial && !output.terminal);
+    PlannedFixture progress;progress.Translate();CHECK(progress.ledger.SealTranslation(progress.error));
+    progress.Initial();progress.Mouse();CHECK(progress.ledger.BeginDelivery(progress.firstPoll,progress.error));
+    CHECK(progress.ledger.Retire());
+    CHECK(progress.ledger.InspectIssuedForRetirement(progress.firstKey,output) && output.terminal && !output.inFlight);
+    CHECK(progress.ledger.InspectIssuedForRetirement(progress.firstPoll,output) && output.inFlight && !output.terminal);
+    CHECK(progress.ledger.InspectIssuedForRetirement(progress.deferred,output) && !output.inFlight && !output.terminal);
+    // Retire inside a source callback cannot expose facts until the outer call
+    // unwinds; otherwise a partially executing publisher could lend authority.
+    PlannedFixture nested;auto nr=nested.Open(0);auto nt=nested.Plan(nr,NativeDispositionPass::SessionInitial);
+    nested.source.observe=[&]{CHECK(nested.ledger.Retire());output=sentinel;
+        CHECK(!nested.ledger.InspectIssuedForRetirement(nt,output) && output==sentinel);};
+    NativeDispositionTicket rejected;CHECK(!nested.ledger.Issue(nr,{NativeDispositionPass::KeyboardPoll,{}},rejected,nested.error));
+    CHECK(nested.ledger.InspectIssuedForRetirement(nt,output));
+    Fixture serial;serial.Begin();auto sr=serial.Open();auto st=serial.Issue(sr);CHECK(serial.ledger.Retire());output=sentinel;
+    CHECK(!serial.ledger.InspectIssuedForRetirement(st,output) && output==sentinel);
+}
 int main() {
     SerialDispositionMain();SinkOrder();PlanFailures();AdmissionAndEmptyPasses();PlannedBudgetAndRetirement();FailedIngressPrefix();IngressBoundaryFailures();IngressAllocationFailure();
     BothEntrySchedules();ScheduleFailures();EmptyScheduledLanes();
+    IssuedRetirementInspection();
     std::printf("PASS %u checks\n",checks);
 }

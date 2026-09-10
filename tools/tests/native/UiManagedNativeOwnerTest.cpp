@@ -184,13 +184,137 @@ static void AtomicPublication() {
     CHECK(!unavailable.owner.Refresh(unavailable.barrier,view,unavailable.error));CHECK(view.presentation.text=="untouched" && !uiManagerLocal.nativeBoundaryActive);
     unavailable.gui->impl->callback={};CHECK(unavailable.owner.Current(unavailable.barrier));
 }
+
+static NativeTextPresence Presence(const Fixture& f) noexcept {return UI_NativeTextPresence(f.nativeId,f.editor);}
+static void PresenceQueries() {
+    using P=NativeTextPresence;
+    for(bool deferred:{false,true}) {
+        Fixture f(deferred);
+        denyAllocation=true;CHECK(Presence(f)==P::AbsentOriginal);denyAllocation=false;
+        f.Attach();const auto stable=f.View();const auto original=f.barrier;
+        const auto preparations=f.gui->impl->prepares,host=f.runtime->impl->prepares;
+        f.gui->impl->callback=[] {CHECK(false);};f.runtime->impl->callback=[] {CHECK(false);};
+        denyAllocation=true;CHECK(Presence(f)==P::PresentExact);denyAllocation=false;
+        CHECK(f.gui->impl->prepares==preparations && f.runtime->impl->prepares==host);
+        f.gui->impl->callback={};f.runtime->impl->callback={};
+        // The presence query has no current-route, geometry or eligibility gate.
+        for(int flag=0;flag<15;++flag) {
+            auto& p=*f.gui->impl;auto route=f.route;
+            switch(flag){case 0:f.route.current=nullptr;break;case 1:++f.route.window;break;case 2:f.route.inputAllowed=false;break;
+            case 3:p.initialized=false;break;case 4:p.active=false;break;case 5:p.interactive=false;break;
+            case 6:p.suspended=true;break;case 7:p.unavailable=true;break;case 8:p.close=true;break;
+            case 9:f.runtime->impl->canonical=false;break;case 10:f.runtime->impl->document=false;break;
+            case 11:f.runtime->impl->available=false;break;
+            // Exact production BeforeResourceReset ordering advances this scalar
+            // while Quarantine(cancelRuntime=false) leaves the old model alive.
+            case 12:p.textDocument=UI_NextTextLifetime();break;
+            case 13:p.textBackend=UI_NextTextLifetime();break;
+            case 14:windowFocused=false;break;}
+            denyAllocation=true;CHECK(Presence(f)==P::PresentExact);denyAllocation=false;
+            if(flag==12 || flag==13) CHECK(!UI_NativeTextRetireExact(f.nativeId,f.editor));
+            f.route=route;p.initialized=true;p.active=true;p.interactive=true;p.suspended=false;p.unavailable=false;p.close=false;
+            p.textDocument=f.editor.document;p.textBackend=f.editor.backend;
+            f.runtime->impl->canonical=true;f.runtime->impl->document=true;f.runtime->impl->available=true;windowFocused=true;
+        }
+        // Every immutable identity component matters; editor revision is allowed
+        // to progress independently. A changed control cannot conceal the actual
+        // stored native model by selecting an empty item first.
+        for(int field=0;field<10;++field) {
+            auto owner=f.editor;auto native=f.nativeId;
+            switch(field){case 0:++owner.backend;break;case 1:++owner.document;break;case 2:++owner.modal;break;
+            case 3:++owner.window;break;case 4:++owner.session;break;case 5:owner.control="other";break;
+            case 6:++native.document;break;case 7:++native.editorLease;break;case 8:++owner.revision;break;case 9:owner.revision=1;break;}
+            denyAllocation=true;CHECK(UI_NativeTextPresence(native,owner)==(field>=8?P::PresentExact:P::AbsentOriginal));denyAllocation=false;
+        }
+        auto foreignAllocation=f.editor;++foreignAllocation.allocation;
+        denyAllocation=true;CHECK(f.runtime->QueryNumberNativePresence(f.nativeId,foreignAllocation)==P::AbsentOriginal);denyAllocation=false;
+        auto copy=f.runtime->impl->interaction;
+        denyAllocation=true;CHECK(copy.QueryNumberNativePresence(f.nativeId,f.editor)==P::BusyOrUnknown);denyAllocation=false;
+        auto savedRuntime=f.gui->impl->runtime;f.gui->impl->runtime.reset();
+        denyAllocation=true;CHECK(Presence(f)==P::BusyOrUnknown);denyAllocation=false;
+        f.gui->impl->runtime=savedRuntime;
+        auto savedImpl=f.runtime->impl;f.runtime->impl.reset();
+        denyAllocation=true;CHECK(Presence(f)==P::BusyOrUnknown);denyAllocation=false;
+        f.runtime->impl=savedImpl;
+        auto prepared=f.Prepare();CHECK(f.barrier.editor.revision!=original.editor.revision);
+        denyAllocation=true;CHECK(Presence(f)==P::PresentExact);denyAllocation=false;
+        // Presence neither settles an open native group nor changes draft/history.
+        CHECK(f.View().state.text==stable.state.text && f.View().nativePresentation->text=="1.75");
+        const auto receipt=prepared->Receipt();const auto presentation=prepared->Presentation();
+        CHECK(f.native.SyncEngine(f.nativeId,receipt.before.editor.revision,receipt.before.shadowRevision,receipt.after.editor.revision,presentation.text,presentation.anchor,presentation.caret,f.error));
+        NativeTextEditorReceipt published;
+        denyAllocation=true;CHECK(f.owner.PublishSettlement(*prepared,published));CHECK(Presence(f)==P::PresentExact);
+        CHECK(UI_NativeTextRetireExact(f.nativeId,f.editor));CHECK(Presence(f)==P::AbsentOriginal);denyAllocation=false;
+        // A fresh native binding does not resurrect the original lease.
+        auto current=f.View();auto editor=f.editor;editor.session=current.identity.session;editor.revision=current.identity.revision;
+        const NativeTextIdentity replacement{f.nativeId.document+10,f.nativeId.editorLease+10};NativeTextEditorBarrier attached;
+        CHECK(f.owner.Attach(editor,replacement,attached,f.error));
+        denyAllocation=true;CHECK(Presence(f)==P::AbsentOriginal);CHECK(UI_NativeTextPresence(replacement,editor)==P::PresentExact);denyAllocation=false;
+    }
+}
+static void PresenceBoundaryAndLifetime() {
+    using P=NativeTextPresence;
+    Fixture f;f.Attach();
+    Interaction empty;Interaction emptyCandidate(empty);Interaction moved(std::move(empty));
+    denyAllocation=true;CHECK(emptyCandidate.QueryNumberNativePresence(f.nativeId,f.editor)==P::BusyOrUnknown);
+    CHECK(empty.QueryNumberNativePresence(f.nativeId,f.editor)==P::BusyOrUnknown);
+    CHECK(moved.QueryNumberNativePresence(f.nativeId,f.editor)==P::AbsentOriginal);denyAllocation=false;
+    auto* legacy=new idUserInterfaceLocal;auto legacyOwner=f.editor;legacyOwner.allocation=legacy->allocationId;
+    denyAllocation=true;CHECK(UI_NativeTextPresence(f.nativeId,legacyOwner)==P::BusyOrUnknown);denyAllocation=false;delete legacy;
+    for(int flag=0;flag<4;++flag) {
+        switch(flag){case 0:uiManagerLocal.nativeBoundaryActive=true;break;case 1:uiManagerLocal.textBoundaryActive=true;break;
+        case 2:uiManagerLocal.clipboardBoundaryActive=true;break;case 3:++uiManagerLocal.applicationPumpDepth;break;}
+        denyAllocation=true;CHECK(Presence(f)==P::BusyOrUnknown);denyAllocation=false;
+        uiManagerLocal.nativeBoundaryActive=false;uiManagerLocal.textBoundaryActive=false;uiManagerLocal.clipboardBoundaryActive=false;uiManagerLocal.applicationPumpDepth=0;
+    }
+    // Querying from real native prepare callbacks observes Busy without invoking
+    // a probe/host or poisoning the permitted outer operation.
+    for(bool host:{false,true}) {
+        auto callback=[&]{denyAllocation=true;CHECK(Presence(f)==P::BusyOrUnknown);denyAllocation=false;};
+        if(host)f.runtime->impl->callback=callback;else f.gui->impl->callback=callback;
+        NativeTextEditorView out;CHECK(f.owner.Refresh(f.barrier,out,f.error));
+        f.gui->impl->callback={};f.runtime->impl->callback={};CHECK(Presence(f)==P::PresentExact);
+    }
+    f.gui->onTextQuery=[&]{denyAllocation=true;CHECK(Presence(f)==P::BusyOrUnknown);denyAllocation=false;};
+    CHECK(UI_QueryTextContext(f.outer,17,19).editor);f.gui->onTextQuery={};
+    f.gui->onDispatch=[&]{denyAllocation=true;CHECK(Presence(f)==P::BusyOrUnknown);denyAllocation=false;};
+    f.gui->pendingActions.push_back("dismiss");bool close=false;CHECK(UI_DispatchApplicationActions(f.outer,"retained-pending",close));f.gui->onDispatch={};
+    NativeTextPresence worker=P::PresentExact;std::thread thread([&]{worker=Presence(f);});thread.join();CHECK(worker==P::BusyOrUnknown);
+    // An independent manager owns its constructing thread, not a namespace
+    // initializer or the global manager's thread. No GUI/backend is installed.
+    std::unique_ptr<idUserInterfaceManagerLocal> other;P ownThread=P::BusyOrUnknown;
+    std::thread constructor([&]{other=std::make_unique<idUserInterfaceManagerLocal>();other->nextAllocationId=f.editor.allocation;
+        ownThread=other->NativeTextPresence(f.nativeId,f.editor);});constructor.join();
+    CHECK(ownThread==P::AbsentOriginal);
+    denyAllocation=true;CHECK(other->NativeTextPresence(f.nativeId,f.editor)==P::BusyOrUnknown);denyAllocation=false;
+
+    for(int field=0;field<13;++field) {
+        auto owner=f.editor;auto native=f.nativeId;
+        switch(field){case 0:owner.allocation=0;break;case 1:owner.allocation=uiManagerLocal.nextAllocationId+1;break;
+        case 2:owner.backend=0;break;case 3:owner.document=0;break;case 4:owner.modal=0;break;case 5:owner.window=0;break;
+        case 6:owner.session=0;break;case 7:owner.revision=0;break;case 8:owner.control.clear();break;
+        case 9:owner.control.assign(129,'x');break;case 10:owner.control.assign("a\0b",3);break;case 11:native.document=0;break;case 12:native.editorLease=0;break;}
+        denyAllocation=true;CHECK(UI_NativeTextPresence(native,owner)==P::BusyOrUnknown);denyAllocation=false;
+    }
+    auto* unloaded=new idUserInterfaceDeferred;auto unloadedOwner=f.editor;unloadedOwner.allocation=unloaded->allocationId;
+    denyAllocation=true;CHECK(UI_NativeTextPresence(f.nativeId,unloadedOwner)==P::AbsentOriginal);denyAllocation=false;CHECK(!unloaded->backend);delete unloaded;
+    Fixture old;old.Attach();auto native=old.nativeId;auto owner=old.editor;
+    auto* address=old.outer;recycleAllocation=true;delete old.outer;old.outer=new idUserInterfaceRetained;
+    CHECK(old.outer==address && old.outer->allocationId!=owner.allocation);old.gui=nullptr;
+    denyAllocation=true;CHECK(UI_NativeTextPresence(native,owner)==P::AbsentOriginal);denyAllocation=false;recycleAllocation=false;
+    // A loaded deferred backend replacement destroys its original binding. The
+    // new empty Runtime proves absence; no original current-route test is used.
+    Fixture replaced(true);replaced.Attach();auto* deferred=static_cast<idUserInterfaceDeferred*>(replaced.outer);
+    CHECK(deferred->InitFromFile("replacement.q4ui"));
+    denyAllocation=true;CHECK(Presence(replaced)==P::AbsentOriginal);denyAllocation=false;
+}
 int main() {
 #if defined(_MSC_VER) && defined(_DEBUG)
     _CrtSetReportMode(_CRT_WARN,_CRTDBG_MODE_FILE);_CrtSetReportFile(_CRT_WARN,_CRTDBG_FILE_STDERR);
     _CrtSetReportMode(_CRT_ERROR,_CRTDBG_MODE_FILE);_CrtSetReportFile(_CRT_ERROR,_CRTDBG_FILE_STDERR);
     _CrtSetReportMode(_CRT_ASSERT,_CRTDBG_MODE_FILE);_CrtSetReportFile(_CRT_ASSERT,_CRTDBG_FILE_STDERR);
 #endif
-    Happy(false);Happy(true);Gates();Replacement();Reentry();AtomicPublication();
+    Happy(false);Happy(true);Gates();Replacement();Reentry();AtomicPublication();PresenceQueries();PresenceBoundaryAndLifetime();
     CHECK(uiManagerLocal.allocations.Num()==0);
     std::printf("Managed native owner: %u checks passed; actual manager/deferred/retained/Runtime methods and editor models; counted host, no SDL/COM/Session activation.\n",checks);
 }

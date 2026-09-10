@@ -263,6 +263,12 @@ The [checked image/material restart](settings-effect-execution.md) preserves ori
 
 The checkpoint begins at engine `d6abeabc7e2e348ea11ce50a7671b830e77a15b1`. Its local record `.tmp/ui/renderer-effects-integration/validation-evidence.json` has SHA-256 `38ec300cd73f59baca9761b21351f3daa8612d6dbc73b98b0f420f4089975ad2`. Full settings, native input, editor, every GUI migration and all final gates remain required.
 
+The [native retirement foundations](native-input-retirement.md) preserve the original route and distinguish an absent original native model from one whose adapter generation has changed. The [settings recovery increment](settings-effect-execution.md) records portable requested/observed audio state and immutable renderer policy consumed by completed output. These are qualified internal contracts; actual storage retirement, production native publishers, complete resource reconstruction and mixed settings Apply remain underway. Scroll geometry and vector scrollbar composition are prepared, while Runtime interaction and production scrollbar content remain pending.
+
+The full engine and renderer modules build, and all 56 UI suites pass. Four reviewed engine render-target images cover actual SP/OpenGL gameplay at 125% and MP/Vulkan gameplay at 200%, followed by ordinary video restart and SYSTEM. There was no injected or controlled input. SP logs no warnings; MP has the same 94 warnings as the preceding restart checkpoint. The audio test runner initially failed because its snapshot-specific default path was incorrect; the correction passes the targeted and full suites.
+
+This checkpoint begins at engine `b2cb00dfb87cc8663cd8e895dcccce37d9c1faa1`. Its local record `.tmp/ui/native-retirement-integration/validation-evidence.json` has SHA-256 `fffcbfd8ec790ea00f764ce774044406ba1392aa13ed10e6958d140e5f14b372`. Requirement statuses and all seven final gate decisions are unchanged.
+
 There are **65 partial, 161 pending and one verified requirement**. `BEH-002`
 remains partial for the implemented settings transaction/service boundary.
 `BEH-005` remains partial for committed action delivery and cancellation; stock

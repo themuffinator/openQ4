@@ -9,6 +9,8 @@
 #include <set>
 
 namespace openq4::ui {
+// Exact original bound lease presence, independent of current input eligibility.
+enum class NativeTextPresence { PresentExact, AbsentOriginal, BusyOrUnknown };
 enum class MenuInput { Next, Previous, Up, Down, Left, Right, Accept, Back, Home, End, PageUp, PageDown };
 struct ControlBounds { float x = 0, y = 0, width = 0, height = 0; bool visible = false; };
 struct ControlAction {
@@ -238,6 +240,7 @@ public:
 	// except the evolving editing revision. It preserves stable text/history and
 	// never allocates, refreshes eligibility or touches a replacement attachment.
 	bool RetireNumberNativeExact(NativeTextIdentity, const TextEditorIdentity&) noexcept;
+	NativeTextPresence QueryNumberNativePresence(NativeTextIdentity, const TextEditorIdentity&) const noexcept;
 	// Process-local exact barriers, never serialized. Save alone does not retire
 	// a barrier; restore/reset, inventory ABA and relevant editor changes do.
 	// Query copies status/stamps only, not buffers/history. Failure preserves out.

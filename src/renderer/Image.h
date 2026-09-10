@@ -38,6 +38,8 @@ No texture is ever used that does not have a corresponding idImage.
 ====================================================================
 */
 
+#include "RendererConsumedPolicy.h"
+
 static const int	MAX_TEXTURE_LEVELS = 14;
 
 // How is this texture used?  Determines the storage and color format
@@ -106,19 +108,12 @@ clamped; applying them the other way round would let a low ceiling silently
 swallow the first few picmip steps.
 ================================================
 */
-struct imageDownsizePolicy_t {
-	int			maxDimension;	// hard ceiling on either axis, 0 = no ceiling
-	int			mipShift;		// whole mip levels dropped after the ceiling
-	int			minDimension;	// mipShift stops once the larger axis reaches this
-
-	imageDownsizePolicy_t() : maxDimension( 0 ), mipShift( 0 ), minDimension( 1 ) {}
-
-	bool		IsActive() const { return maxDimension > 0 || mipShift > 0; }
-};
-
 // Resolves the image reduction cvars for one image. Implemented next to those
 // cvars in ImageManager.cpp; every loader path and the cache key go through it.
 void R_GetImageDownsizePolicy( const char *name, textureUsage_t usage, bool allowDownSize, imageDownsizePolicy_t &policy );
+void R_ResolveImageDownsizePolicy( const imageDownsizeInputs_t& inputs, const char* name, textureUsage_t usage, bool allowDownSize, imageDownsizePolicy_t& policy );
+textureUsage_t R_ResolveMaterialHighQualityUsage( const materialQualityInputs_t& inputs, textureUsage_t usage, bool forceHighQuality );
+unsigned int R_ResolveMaterialNoMipFlags( const materialQualityInputs_t& inputs, unsigned int flags );
 
 // Reduces width/height in place. Safe for non power of two and degenerate sizes.
 void R_ApplyImageDownsizePolicy( const imageDownsizePolicy_t &policy, int &width, int &height );
@@ -165,6 +160,9 @@ public:
 	idImage(const idImage&) = delete;
 	idImage& operator=(const idImage&) = delete;
 	uint64_t GetImagePolicyIdentity() const { return imagePolicyIdentity; }
+	// Callback-free; complete observations only. False preserves output.
+	bool GetConsumedPolicy(imageConsumedPolicy_t& output) const;
+	void InvalidateConsumedPolicy();
 
 	const char* GetName() const { return imgName; }
 
@@ -269,7 +267,7 @@ public:
 	// against. It differs from _name whenever a dds/ replacement supplies the
 	// pixels, and passing it keeps the cache key in step with the reduction that
 	// is actually applied to those pixels.
-	static void			GetGeneratedName(idStr& _name, const char* _policyName, const textureUsage_t& _usage, const cubeFiles_t& _cube, bool allowDownSize = true, unsigned int flags = 0);
+	static void			GetGeneratedName(idStr& _name, const char* _policyName, const textureUsage_t& _usage, const cubeFiles_t& _cube, bool allowDownSize = true, unsigned int flags = 0, const imageDownsizePolicy_t* consumed = NULL);
 
 	unsigned int		GetDeviceHandle(void) { return texnum; }
 private:
@@ -311,6 +309,9 @@ private:
 	unsigned int				dataFormat;
 	unsigned int				dataType;
 	uint64_t			storageGeneration;
+	friend class imageConsumedLoad_t;
+	imageConsumedPolicy_t consumedPolicy{};
+	uint64_t consumedLoadRevision = 0;
 	const uint64_t		imagePolicyIdentity;
 
 
