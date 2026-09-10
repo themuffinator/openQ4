@@ -49,8 +49,9 @@ third-party `noexcept` operations or persistent process-wide memory exhaustion.
 The opt-in production page places the selector and Auto-Detect action in a
 wrapping band above the existing image/render columns. Their editable vector
 parts come from the existing Post AA selector and Back button. All six language
-tables supply the existing profile labels and Auto-Detect text; selected values
-and labels flow vertically when translations need more room. Both controls
+tables supply the existing profile labels and Auto-Detect text. The compact
+selector places its title and value on one row when they fit and wraps them
+when translations need more room. Both controls
 require an open, idle editing session without a confirmation, discard dialog
 or unfinished local Number edit. Named Auto-Detect events use the same guard.
 
@@ -62,7 +63,11 @@ source-bound resource recreation without replaying an action.
 The actual Runtime/RmlUi suite covers all six profiles and 48 combinations of
 locale, wider deterministic glyph metrics, density and resized viewport.
 It inspects every popup label, the longest collapsed translation, popup bounds
-and focused Auto-Detect reveal. Its counted host does not qualify the actual
+and focused Auto-Detect reveal. Opening-layout checks also preserve complete
+footer targets, flowing status text and room for numeric controls at 200%.
+The status and actions share a wrapping footer, while explicit button widths
+prevent accidental full-row flex sizing. Buttons retain 44 dp minimum targets
+and the visual contract's 18/24 dp action typography. Its counted host does not qualify the actual
 engine font, device or settings-service route; gameplay captures provide
 separate evidence for those integration boundaries.
 

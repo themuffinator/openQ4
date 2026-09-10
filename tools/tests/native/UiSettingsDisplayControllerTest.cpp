@@ -32,10 +32,13 @@ struct Storage final : SettingsHost {
     StateValues live = Initial();
     int writes = 0, reads = 0;
     bool readOkay = true, validateOkay = true;
+    bool forceConfirmation = false;
+    std::function<void()> readHook, policyHook;
     std::function<bool(const StateValues&,std::string&)> writeHook;
     explicit Storage(Boundary& boundary) : boundary(boundary) {}
     bool Read(StateValues& out, std::string& error) override {
         ++reads; boundary.trace.push_back("read");
+        if (readHook) readHook();
         if (!readOkay) { error = "injected read refusal"; return false; }
         out = live; return true;
     }
@@ -54,7 +57,10 @@ struct Storage final : SettingsHost {
         for (const auto& [key,value] : patch) live.at(key) = value;
         return true;
     }
-    bool NeedsConfirmation(const StateValues&, const StateValues&) const override { return true; }
+    bool NeedsConfirmation(const StateValues& before, const StateValues& target) const override {
+        if (policyHook) policyHook();
+        return forceConfirmation || before.at("width") != target.at("width") || before.at("samples") != target.at("samples");
+    }
 };
 struct Display final : SettingsDisplayHost {
     Boundary& boundary;
@@ -401,11 +407,158 @@ void ThrowingBoundaries() {
         "throwing persistence retains uncertain Keep intent and configuration guard");
       f.controller.Frame(3,true); Check(f.display.persists == 1 && f.display.restores == 0,"throwing Keep cannot blindly persist or restore"); }
 }
+void AutomaticEdit(Fixture& f) {
+    Code(f.transaction.Edit(f.owner,{{"width",1280.0},{"samples",0.0},{"volume",0.75}}),SettingsCode::Ok,"prepare resource-only edit");
+}
+void AutomaticCompletion() {
+    {
+        Fixture f;
+        Code(f.controller.Apply(f.owner,0,SettingsCompletion::Automatic),SettingsCode::Invalid,"display cannot bypass confirmation");
+        Check(!f.controller.Active() && !f.transaction.AsyncPending() && !f.storage.writes,"invalid automatic mode has no owned effects");
+        AutomaticEdit(f);
+        Code(f.controller.Apply(f.owner,0,SettingsCompletion::Automatic),SettingsCode::Ok,"queue automatic operation");
+        const auto request=f.controller.Request();
+        Check(!f.controller.ConfirmationVisible() && !f.controller.CanConfirm(0),"automatic work exposes no Keep UI");
+        f.controller.Frame(0,true,false);
+        Check(!f.storage.writes && !f.display.preparations,"nested automatic frame cannot start effects");
+        f.controller.Frame(0,true);
+        Check(f.display.applies==1 && f.storage.writes==1 && f.boundary.journal,"automatic request uses the existing journal and effect owner");
+        Code(f.transaction.CompleteApply(f.owner,request,0),SettingsCode::Busy,"automatic request cannot become a user confirmation");
+        Check(!f.controller.OwnerDrawn(f.owner,request),"automatic request cannot adopt a fake confirmation draw");
+        Code(f.controller.Keep(f.owner,request,0),SettingsCode::Busy,"automatic request rejects invented Keep");
+        f.display.current.effectsReady=false; f.display.Present(); f.controller.Frame(1,true);
+        Check(!f.display.persists && f.controller.Active(),"presentation alone does not prove pending effects");
+        f.display.current.effectsReady=true; f.controller.Frame(2,true,false);
+        Check(!f.display.persists && f.controller.Stage()==SettingsDisplayStage::QueuedAutomaticCommit,"ready effects only queue work in nested frames");
+        f.controller.Frame(2,true);
+        Check(f.display.persists==1 && f.display.finishes==1 && !f.controller.Active() && !f.boundary.journal,"fresh effects complete without Keep");
+        Check(f.transaction.Phase()==SettingsPhase::Editing && !f.transaction.AsyncPending() && !f.transaction.Dirty(),"automatic commit returns a clean editing session");
+        Check(std::get<double>(f.storage.live.at("volume"))==0.75,"automatic change is retained");
+    }
+    for(int failure=0;failure<6;++failure) {
+        Fixture f;AutomaticEdit(f);
+        Code(f.controller.Apply(f.owner,0,SettingsCompletion::Automatic),SettingsCode::Ok,"queue failing automatic case");
+        f.controller.Frame(0,true);f.display.Present();
+        if(failure==0)f.display.observeOkay=false;
+        if(failure==1)f.storage.live["volume"]=0.875;
+        if(failure==2)f.storage.forceConfirmation=true;
+        if(failure==3)f.controller.Close(f.owner);
+        if(failure==4){f.display.current.effectsReady=false;f.controller.Frame(21,true,false);}
+        if(failure==5){f.controller.Frame(1,true,false);f.display.current.effectsReady=false;}
+        f.controller.Frame(failure==4?22:2,true);
+        Check(!f.display.persists && !f.controller.Approved(),"failure never enters durable commit intent");
+        Check(f.controller.Active() && f.boundary.journal,"failed automatic work preserves recovery ownership");
+    }
+    for(bool close:{false,true}) {
+        Fixture f;AutomaticEdit(f);
+        Code(f.controller.Apply(f.owner,0,SettingsCompletion::Automatic),SettingsCode::Ok,"queue uncertain automatic case");
+        f.controller.Frame(0,true);f.display.Present();f.display.persistOkay=false;
+        f.controller.Frame(1,true);
+        Check(f.controller.CanRetry() && f.controller.Approved() && f.display.persists==1 && f.boundary.journal,"uncertain automatic persistence keeps monotonic commit intent");
+        if(close)f.controller.Close(f.owner);
+        Code(f.controller.Revert(f.owner,f.controller.Request()),SettingsCode::Busy,"uncertain automatic commit cannot roll back");
+        f.controller.Frame(2,!close);Check(f.display.persists==1 && f.display.restores==0,"uncertain work never retries or restores implicitly");
+        f.display.persistOkay=true;
+        Code(f.controller.Retry(f.owner,f.controller.Request()),SettingsCode::Ok,"explicit automatic finalization retry");
+        f.controller.Frame(3,!close);
+        Check(!f.controller.Active() && !f.boundary.journal && f.display.persists==2 && f.display.restores==0,"automatic retry preserves target and completes cleanup");
+        Check(f.transaction.Phase()==(close?SettingsPhase::Closed:SettingsPhase::Editing),"close completes only after durable automatic result");
+    }
+    {
+        Fixture f;AutomaticEdit(f);
+        Code(f.controller.Apply(f.owner,0,SettingsCompletion::Automatic),SettingsCode::Ok,"queue reversible automatic case");
+        f.controller.Frame(0,true);f.controller.Close(f.owner);f.controller.Frame(1,false);
+        f.display.current.effectsReady=false;f.display.Present();f.controller.Frame(2,false);
+        Check(f.controller.Active() && f.boundary.journal && !f.display.finishes,"restoration waits for actual effects too");
+        f.display.current.effectsReady=true;f.controller.Frame(3,false);
+        Check(!f.controller.Active() && !f.boundary.journal && f.transaction.Phase()==SettingsPhase::Closed,"restoration completes the original close");
+        Check(f.storage.live==Initial() && f.display.restores==1 && f.display.persists==0,"cancelled automatic apply restores baseline");
+    }
+    {
+        Fixture f;AutomaticEdit(f);
+        Code(f.controller.Apply(f.owner,0,SettingsCompletion::Automatic),SettingsCode::Ok,"queue background automatic work");
+        f.controller.Frame(0,true);f.display.current.focused=false;f.display.Present();f.controller.Frame(1,true);
+        Check(!f.controller.Active() && f.display.persists==1,"resource-only completion does not require display focus confirmation");
+    }
+    for(bool automatic:{false,true}) {
+        Fixture f;
+        if(automatic) {
+            AutomaticEdit(f);Code(f.controller.Apply(f.owner,0,SettingsCompletion::Automatic),SettingsCode::Ok,"queue callback-close automatic request");
+            f.controller.Frame(0,true);f.display.Present();
+        } else {
+            f.Confirming();Code(f.controller.Keep(f.owner,f.controller.Request(),1),SettingsCode::Ok,"queue callback-close confirmed request");
+        }
+        f.storage.readHook=[&]{f.controller.Close(f.owner);};
+        f.controller.Frame(2,true);
+        Check(!f.display.persists && !f.controller.Approved() && f.controller.Stage()==SettingsDisplayStage::QueuedRestore,
+            "owner close during commit preparation cannot be overwritten by commit intent");
+        f.storage.readHook={};f.controller.Frame(3,false);f.display.Present();f.controller.Frame(4,false);
+        Check(!f.controller.Active() && f.storage.live==Initial() && f.transaction.Phase()==SettingsPhase::Closed,
+            "commit preparation close restores actual baseline and completes close");
+    }
+    {
+        Fixture f;AutomaticEdit(f);
+        Code(f.controller.Apply(f.owner,0,SettingsCompletion::Automatic),SettingsCode::Ok,"queue classification drift before writes");
+        f.storage.forceConfirmation=true;f.controller.Frame(0,true);
+        Check(!f.storage.writes && !f.display.applies && !f.display.persists,"execution rechecks automatic classification before writes");
+    }
+    {
+        Fixture f;AutomaticEdit(f);
+        Code(f.controller.Apply(f.owner,0,SettingsCompletion::Automatic),SettingsCode::Ok,"queue incomplete presentation");
+        f.controller.Frame(0,true);++f.display.current.submitted;f.controller.Frame(1,true);
+        Check(!f.display.persists && f.controller.Stage()==SettingsDisplayStage::AwaitApply,"submit without actual present cannot complete automatic work");
+        ++f.display.current.presented;f.controller.Frame(2,true);
+        Check(f.display.persists==1 && !f.controller.Active(),"matching real presentation permits completion");
+    }
+}
+void AutomaticTransactionAuthority() {
+    {
+        Fixture f;AutomaticEdit(f);SettingsAttempt untouched{999,777,{},{},{}};
+        Code(f.transaction.PrepareApply(f.owner,0,untouched,static_cast<SettingsCompletion>(255)),SettingsCode::Invalid,"unknown automatic policy refuses");
+        Check(untouched.owner==999 && untouched.request==777 && !f.transaction.AsyncPending(),"refused preparation preserves output and ownership");
+    }
+    {
+        Fixture f;f.Execute();SettingsAttempt result;
+        Code(f.transaction.PrepareAutomaticCommit(f.owner,f.controller.Request(),1,result),SettingsCode::Busy,"manual apply cannot use automatic commit");
+        Code(f.transaction.CompleteAutomaticCommit(f.owner,f.controller.Request()),SettingsCode::Busy,"manual apply cannot use automatic finalization");
+    }
+    for(int defect=0;defect<7;++defect) {
+        Fixture f;AutomaticEdit(f);SettingsAttempt applying,committing{999,777,{},{},{}};
+        Code(f.transaction.PrepareApply(f.owner,2,applying,SettingsCompletion::Automatic),SettingsCode::Ok,"prepare independent automatic authority test");
+        Code(f.transaction.PrepareAutomaticCommit(f.owner,applying.request,2,committing),SettingsCode::Busy,"unwritten target cannot commit");
+        f.boundary.journal=true;
+        Code(f.transaction.ExecuteApply(f.owner,applying.request),SettingsCode::Ok,"write independent automatic target");
+        Code(f.transaction.CompleteAutomaticCommit(f.owner,applying.request),SettingsCode::Busy,"unprepared target cannot finalize");
+        const auto oldRequest=applying.request;
+        if(defect==0)f.storage.live["volume"]=0.875;
+        if(defect==1)f.storage.readOkay=false;
+        if(defect==2)f.storage.forceConfirmation=true;
+        if(defect==3)f.storage.policyHook=[]{throw std::runtime_error("classification failure");};
+        if(defect<4) {
+            const auto result=f.transaction.PrepareAutomaticCommit(f.owner,oldRequest,3,committing);
+            Check(result.code!=SettingsCode::Ok && committing.owner==999 && committing.request==777 && f.transaction.AsyncPending(),"refused automatic acceptance preserves exact owner and caller output");
+            continue;
+        }
+        Code(f.transaction.PrepareAutomaticCommit(f.owner,oldRequest,1,committing),SettingsCode::Invalid,"automatic acceptance rejects backwards time");
+        Code(f.transaction.PrepareAutomaticCommit(f.owner,oldRequest,std::numeric_limits<double>::quiet_NaN(),committing),SettingsCode::Invalid,"automatic acceptance rejects invalid time");
+        Code(f.transaction.PrepareAutomaticCommit(f.owner,oldRequest,3,committing),SettingsCode::Ok,"prepare explicit automatic acceptance");
+        Check(committing.request!=oldRequest && committing.completion==SettingsCompletion::Automatic && f.transaction.Phase()==SettingsPhase::Applying,"automatic acceptance renews authority without entering Confirming");
+        Code(f.transaction.CompleteAutomaticCommit(f.owner,oldRequest),SettingsCode::Invalid,"stale automatic request cannot finalize");
+        Code(f.transaction.CompleteConfirm(f.owner,committing.request),SettingsCode::Busy,"automatic acceptance cannot use manual finalization");
+        if(defect==4)f.storage.live["volume"]=0.875;
+        if(defect==5)f.storage.readOkay=false;
+        const auto result=f.transaction.CompleteAutomaticCommit(f.owner,committing.request);
+        if(defect<6)Check(result.code!=SettingsCode::Ok && f.transaction.AsyncPending(),"post-persistence drift or unreadable values retain automatic recovery ownership");
+        else Check(result.code==SettingsCode::Ok && !f.transaction.AsyncPending() && !f.transaction.Dirty(),"only current prepared acceptance can finalize");
+    }
+}
 } // namespace
 
 int main() {
     OrderingAndIdentity(); PreparationAndClose(); PresentationAndDeadlines();
     PartialFailureAndRecovery(); KeepUncertaintyAndFinish(); CallbackClose();
     CrossInstanceAndRestoreObservation(); ThrowingBoundaries();
+    AutomaticCompletion();
+    AutomaticTransactionAuthority();
     std::printf("UiSettingsDisplayControllerTest passed: %d checks\n",checks);
 }

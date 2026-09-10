@@ -28,6 +28,7 @@ If you have questions concerning this license or the applicable additional terms
 */
 
 #include "snd_local.h"
+#include "SoundSettings.h"
 
 idCVar s_noSound( "s_noSound", "0", CVAR_BOOL, "returns NULL for all sounds loaded and does not update the sound rendering" );
 idCVar s_volume( "s_volume", "0.5", CVAR_ARCHIVE | CVAR_FLOAT, "master volume (0-1)", 0.0f, 1.0f );
@@ -304,6 +305,7 @@ idSoundSystemLocal::Restart
 */
 void idSoundSystemLocal::Restart()
 {
+	if (SoundSettings_BlockAutomaticRestart()) return;
 	const bool wasMuted = IsMuted();
 	SetMute( true );
 
@@ -562,13 +564,14 @@ void idSoundSystemLocal::Render()
 		return;
 	}
 
-	if( needsRestart )
+	if( needsRestart && !SoundSettings_BlockAutomaticRestart() )
 	{
 		needsRestart = false;
 		Restart();
 	}
 
 //	SCOPED_PROFILE_EVENT( "SoundSystem::Render" );
+	SoundSettingsNormalUpdateScope settingsUpdate;
 
 	if( currentSoundWorld != NULL )
 	{
@@ -583,6 +586,7 @@ void idSoundSystemLocal::Render()
 
 	// The sound system doesn't use game time or anything like that because the sounds are decoded in real time.
 	soundTime = Sys_Milliseconds();
+	settingsUpdate.completed = true;
 }
 
 /*

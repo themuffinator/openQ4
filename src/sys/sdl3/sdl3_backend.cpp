@@ -34,6 +34,9 @@ along with Doom 3 Source Code.  If not, see <http://www.gnu.org/licenses/>.
 #include "../sys_public.h"
 #include "../WindowSettings.h"
 #include "../KeyEventMetadata.h"
+#include "../EventQueueContinuity.h"
+#include "InputDisposition.h"
+#include <limits>
 #include "../../framework/Common.h"
 #include "../../framework/Console.h"
 #include "../../framework/FileSystem.h"
@@ -275,6 +278,26 @@ static sdlKeyboardEvent_t s_polledKeyboard[SDL3_INPUT_QUEUE_SIZE];
 static sdlMouseEvent_t s_polledMouse[SDL3_INPUT_QUEUE_SIZE];
 static int s_polledKeyboardCount = 0;
 static int s_polledMouseCount = 0;
+
+// Protected by CRITICAL_SECTION_ONE, including checked polled-slice ownership.
+static sysKeyboardDisposition_t s_keyboardDisposition[SDL3_INPUT_QUEUE_SIZE];
+static sysEventDispositionTag_t s_mouseDisposition[SDL3_INPUT_QUEUE_SIZE];
+static sysKeyboardDisposition_t s_polledKeyboardDisposition[SDL3_INPUT_QUEUE_SIZE];
+static sysEventDispositionTag_t s_polledMouseDisposition[SDL3_INPUT_QUEUE_SIZE];
+struct sdlInputDispositionState_t {
+    sysInputDispositionSlice_t slice;
+    unsigned next = 0;
+    bool checked = false;
+};
+static sdlInputDispositionState_t s_keyboardDispositionState, s_mouseDispositionState;
+static std::uint64_t s_inputDispositionHighwater = 0;
+class SDL3_InputStorageLock {
+public:
+    SDL3_InputStorageLock() { Sys_EnterCriticalSection(CRITICAL_SECTION_ONE); }
+    ~SDL3_InputStorageLock() { Sys_LeaveCriticalSection(CRITICAL_SECTION_ONE); }
+    SDL3_InputStorageLock(const SDL3_InputStorageLock&) = delete;
+    SDL3_InputStorageLock& operator=(const SDL3_InputStorageLock&) = delete;
+};
 static sdlJoystickAxisEvent_t s_polledJoystick[MAX_JOYSTICK_AXIS];
 static int s_polledJoystickCount = 0;
 
@@ -393,6 +416,15 @@ static int SDL3_EventMilliseconds(Uint64 timestampNs) {
 
 static void SDL3_ClearInputQueues(void) {
 	Sys_EnterCriticalSection(CRITICAL_SECTION_ONE);
+	Sys_InvalidateEventQueue(); // Invalidate before clearing even an empty slice.
+	for (int i = 0; i < SDL3_INPUT_QUEUE_SIZE; ++i) {
+		s_keyboardQueue[i] = {}; s_mouseQueue[i] = {};
+		s_polledKeyboard[i] = {}; s_polledMouse[i] = {};
+		s_keyboardDisposition[i] = {}; s_mouseDisposition[i] = {};
+		s_polledKeyboardDisposition[i] = {}; s_polledMouseDisposition[i] = {};
+	}
+	s_keyboardDispositionState = {}; s_mouseDispositionState = {};
+	// s_inputDispositionHighwater deliberately survives clear/shutdown/re-init.
 	s_keyboardHead = s_keyboardTail = 0;
 	s_mouseHead = s_mouseTail = 0;
 	s_polledKeyboardCount = 0;
@@ -840,8 +872,11 @@ static void SDL3_QueueKeyboardInput(int key, bool down, int time) {
 	Sys_EnterCriticalSection(CRITICAL_SECTION_ONE);
 	const int next = (s_keyboardHead + 1) & SDL3_INPUT_QUEUE_MASK;
 	if (next == s_keyboardTail) {
+		Sys_InvalidateEventQueue(); // Legacy eviction is observable before loss.
+		s_keyboardDisposition[s_keyboardTail] = {};
 		s_keyboardTail = (s_keyboardTail + 1) & SDL3_INPUT_QUEUE_MASK;
 	}
+	s_keyboardDisposition[s_keyboardHead] = {};
 	s_keyboardQueue[s_keyboardHead].key = key;
 	s_keyboardQueue[s_keyboardHead].down = down;
 	s_keyboardQueue[s_keyboardHead].time = time;
@@ -856,8 +891,11 @@ static void SDL3_QueueMouseInput(int action, int value, int time) {
 	Sys_EnterCriticalSection(CRITICAL_SECTION_ONE);
 	const int next = (s_mouseHead + 1) & SDL3_INPUT_QUEUE_MASK;
 	if (next == s_mouseTail) {
+		Sys_InvalidateEventQueue(); // Legacy eviction is observable before loss.
+		s_mouseDisposition[s_mouseTail] = {};
 		s_mouseTail = (s_mouseTail + 1) & SDL3_INPUT_QUEUE_MASK;
 	}
+	s_mouseDisposition[s_mouseHead] = {};
 	s_mouseQueue[s_mouseHead].action = action;
 	s_mouseQueue[s_mouseHead].value = value;
 	s_mouseQueue[s_mouseHead].time = time;
@@ -5638,83 +5676,225 @@ void Sys_ClearInputEvents(void) {
 	SDL3_ClearInputQueues();
 }
 
+// All checked methods acquire SDL storage first, then observe the disposition
+// mutex. No disposition method holds that mutex while acquiring SDL storage.
+static bool SDL3_DeferredKeyboardKey(int key) {
+    return key == K_PRINT_SCR || key == K_CTRL || key == K_ALT || key == K_RIGHT_ALT;
+}
+static bool SDL3_InputValid(const sdlKeyboardEvent_t& value, const sysKeyboardDisposition_t& tag) {
+    return value.key > 0 && value.key < K_LAST_KEY && value.time >= 0 &&
+        (tag.Empty() || (Sys_EventDispositionTagCurrent(tag.parent) &&
+        (!tag.deferredEmission || (SDL3_DeferredKeyboardKey(value.key) && tag.deferredEmission != tag.parent.emission))));
+}
+static bool SDL3_InputValid(const sdlMouseEvent_t& value, const sysEventDispositionTag_t& tag) {
+    return SDL3_ShouldQueueMousePoll(value.action, value.value) && value.time >= 0 &&
+        (tag.Empty() || Sys_EventDispositionTagCurrent(tag));
+}
+static sysKeyboardInputDisposition_t SDL3_TrackedInput(const sdlKeyboardEvent_t& value, const sysKeyboardDisposition_t& tag) {
+    return {value.key, value.down, value.time, tag};
+}
+static sysMouseInputDisposition_t SDL3_TrackedInput(const sdlMouseEvent_t& value, const sysEventDispositionTag_t& tag) {
+    return {value.action, value.value, value.time, tag};
+}
+
+bool Sys_QueKeyboardInputWithDisposition(sysKeyboardInputDisposition_t& input) noexcept {
+    SDL3_InputStorageLock lock;
+    const sdlKeyboardEvent_t value{input.key, input.down, input.time};
+    if (input.disposition.Empty() || !SDL3_InputValid(value, input.disposition)) return false;
+    const int next = (s_keyboardHead + 1) & SDL3_INPUT_QUEUE_MASK;
+    if (next == s_keyboardTail) {
+        Sys_InvalidateEventQueue(); return false; // Preserve full ring and caller.
+    }
+    s_keyboardQueue[s_keyboardHead] = value;
+    s_keyboardDisposition[s_keyboardHead] = input.disposition;
+    s_keyboardHead = next;
+    input = {};
+    return true;
+}
+bool Sys_QueMouseInputWithDisposition(sysMouseInputDisposition_t& input) noexcept {
+    SDL3_InputStorageLock lock;
+    const sdlMouseEvent_t value{input.action, input.value, input.time};
+    if (input.disposition.Empty() || !SDL3_InputValid(value, input.disposition)) return false;
+    const int next = (s_mouseHead + 1) & SDL3_INPUT_QUEUE_MASK;
+    if (next == s_mouseTail) {
+        Sys_InvalidateEventQueue(); return false; // Preserve full ring and caller.
+    }
+    s_mouseQueue[s_mouseHead] = value;
+    s_mouseDisposition[s_mouseHead] = input.disposition;
+    s_mouseHead = next;
+    input = {};
+    return true;
+}
+
+template<class Value, class Tag>
+static bool SDL3_PollInputWithDisposition(Value (&queue)[SDL3_INPUT_QUEUE_SIZE], Tag (&tags)[SDL3_INPUT_QUEUE_SIZE],
+    const int& head, int& tail, Value (&polled)[SDL3_INPUT_QUEUE_SIZE], Tag (&polledTags)[SDL3_INPUT_QUEUE_SIZE],
+    int& count, sdlInputDispositionState_t& state, sysInputDispositionLane_t lane, sysInputDispositionSlice_t& out) {
+    SDL3_InputStorageLock lock;
+    const auto epoch = Sys_EventDispositionEpoch(), token = Sys_EventQueueToken();
+    if (!epoch || !token || state.checked || count != 0 ||
+        s_inputDispositionHighwater == (std::numeric_limits<std::uint64_t>::max)()) return false;
+    // Preflight the entire queued inventory before moving any ownership.
+    for (int i = tail; i != head; i = (i + 1) & SDL3_INPUT_QUEUE_MASK) {
+        if (!SDL3_InputValid(queue[i], tags[i])) return false;
+    }
+    if (epoch != Sys_EventDispositionEpoch() || token != Sys_EventQueueToken()) return false;
+    while (tail != head) {
+        polled[count] = queue[tail]; polledTags[count] = tags[tail];
+        queue[tail] = {}; tags[tail] = {};
+        ++count; tail = (tail + 1) & SDL3_INPUT_QUEUE_MASK;
+    }
+    state.slice = {epoch, token, ++s_inputDispositionHighwater, lane, static_cast<unsigned>(count)};
+    state.next = 0; state.checked = true;
+    out = state.slice;
+    return true;
+}
+bool Sys_PollKeyboardInputWithDisposition(sysInputDispositionSlice_t& out) noexcept {
+    return SDL3_PollInputWithDisposition(s_keyboardQueue, s_keyboardDisposition, s_keyboardHead, s_keyboardTail,
+        s_polledKeyboard, s_polledKeyboardDisposition, s_polledKeyboardCount, s_keyboardDispositionState,
+        sysInputDispositionLane_t::Keyboard, out);
+}
+bool Sys_PollMouseInputWithDisposition(sysInputDispositionSlice_t& out) noexcept {
+    return SDL3_PollInputWithDisposition(s_mouseQueue, s_mouseDisposition, s_mouseHead, s_mouseTail,
+        s_polledMouse, s_polledMouseDisposition, s_polledMouseCount, s_mouseDispositionState,
+        sysInputDispositionLane_t::Mouse, out);
+}
+
+static bool SDL3_InputSliceCurrent(const sysInputDispositionSlice_t& expected, const sdlInputDispositionState_t& state) {
+    return state.checked && expected == state.slice && expected.serial &&
+        expected.epoch && expected.epoch == Sys_EventDispositionEpoch() &&
+        expected.streamToken && expected.streamToken == Sys_EventQueueToken();
+}
+template<class Value, class Tag, class Output>
+static sysEventTransfer_t SDL3_PeekInputWithDisposition(const sysInputDispositionSlice_t& expected,
+    const sdlInputDispositionState_t& state, const Value (&polled)[SDL3_INPUT_QUEUE_SIZE],
+    const Tag (&tags)[SDL3_INPUT_QUEUE_SIZE], sysInputDispositionSlot_t& slot, Output& out) {
+    SDL3_InputStorageLock lock;
+    if (!SDL3_InputSliceCurrent(expected, state)) return sysEventTransfer_t::Refused;
+    if (state.next == state.slice.count) return sysEventTransfer_t::Empty;
+    if (!SDL3_InputValid(polled[state.next], tags[state.next])) return sysEventTransfer_t::Refused;
+    out = SDL3_TrackedInput(polled[state.next], tags[state.next]);
+    slot = {state.slice, state.next};
+    return sysEventTransfer_t::Ready;
+}
+template<class Value, class Tag, class Output>
+static sysEventTransfer_t SDL3_TakeInputWithDisposition(const sysInputDispositionSlot_t& expected,
+    sdlInputDispositionState_t& state, Value (&polled)[SDL3_INPUT_QUEUE_SIZE],
+    Tag (&tags)[SDL3_INPUT_QUEUE_SIZE], Output& out) {
+    SDL3_InputStorageLock lock;
+    if (!SDL3_InputSliceCurrent(expected.slice, state) || expected.index != state.next ||
+        state.next >= state.slice.count || !SDL3_InputValid(polled[state.next], tags[state.next]))
+        return sysEventTransfer_t::Refused;
+    out = SDL3_TrackedInput(polled[state.next], tags[state.next]);
+    polled[state.next] = {}; tags[state.next] = {};
+    ++state.next;
+    return sysEventTransfer_t::Ready;
+}
+sysEventTransfer_t Sys_PeekKeyboardInputWithDisposition(const sysInputDispositionSlice_t& slice,
+    sysInputDispositionSlot_t& slot, sysKeyboardInputDisposition_t& out) noexcept {
+    return SDL3_PeekInputWithDisposition(slice, s_keyboardDispositionState, s_polledKeyboard, s_polledKeyboardDisposition, slot, out);
+}
+sysEventTransfer_t Sys_PeekMouseInputWithDisposition(const sysInputDispositionSlice_t& slice,
+    sysInputDispositionSlot_t& slot, sysMouseInputDisposition_t& out) noexcept {
+    return SDL3_PeekInputWithDisposition(slice, s_mouseDispositionState, s_polledMouse, s_polledMouseDisposition, slot, out);
+}
+sysEventTransfer_t Sys_TakeKeyboardInputWithDisposition(const sysInputDispositionSlot_t& slot,
+    sysKeyboardInputDisposition_t& out) noexcept {
+    return SDL3_TakeInputWithDisposition(slot, s_keyboardDispositionState, s_polledKeyboard, s_polledKeyboardDisposition, out);
+}
+sysEventTransfer_t Sys_TakeMouseInputWithDisposition(const sysInputDispositionSlot_t& slot,
+    sysMouseInputDisposition_t& out) noexcept {
+    return SDL3_TakeInputWithDisposition(slot, s_mouseDispositionState, s_polledMouse, s_polledMouseDisposition, out);
+}
+static bool SDL3_EndInputWithDisposition(const sysInputDispositionSlice_t& expected, sdlInputDispositionState_t& state, int& count) {
+    SDL3_InputStorageLock lock;
+    if (!SDL3_InputSliceCurrent(expected, state) || state.next != state.slice.count) return false;
+    state = {}; count = 0;
+    return true;
+}
+bool Sys_EndKeyboardInputWithDisposition(const sysInputDispositionSlice_t& expected) noexcept {
+    return SDL3_EndInputWithDisposition(expected, s_keyboardDispositionState, s_polledKeyboardCount);
+}
+bool Sys_EndMouseInputWithDisposition(const sysInputDispositionSlice_t& expected) noexcept {
+    return SDL3_EndInputWithDisposition(expected, s_mouseDispositionState, s_polledMouseCount);
+}
+
 int Sys_PollKeyboardInputEvents(void) {
-	Sys_EnterCriticalSection(CRITICAL_SECTION_ONE);
-
-	s_polledKeyboardCount = 0;
-	while (s_keyboardTail != s_keyboardHead && s_polledKeyboardCount < SDL3_INPUT_QUEUE_SIZE) {
-		s_polledKeyboard[s_polledKeyboardCount] = s_keyboardQueue[s_keyboardTail];
-		s_polledKeyboardCount++;
-		s_keyboardTail = (s_keyboardTail + 1) & SDL3_INPUT_QUEUE_MASK;
-	}
-
-	Sys_LeaveCriticalSection(CRITICAL_SECTION_ONE);
-	return s_polledKeyboardCount;
+    SDL3_InputStorageLock lock;
+    if (s_keyboardDispositionState.checked) { Sys_InvalidateEventQueue(); return 0; }
+    s_polledKeyboardCount = 0;
+    while (s_keyboardTail != s_keyboardHead && s_polledKeyboardCount < SDL3_INPUT_QUEUE_SIZE) {
+        if (!s_keyboardDisposition[s_keyboardTail].Empty()) { Sys_InvalidateEventQueue(); break; }
+        s_polledKeyboard[s_polledKeyboardCount] = s_keyboardQueue[s_keyboardTail];
+        s_polledKeyboardDisposition[s_polledKeyboardCount] = {};
+        s_keyboardQueue[s_keyboardTail] = {};
+        ++s_polledKeyboardCount;
+        s_keyboardTail = (s_keyboardTail + 1) & SDL3_INPUT_QUEUE_MASK;
+    }
+    return s_polledKeyboardCount;
 }
 
 int Sys_ReturnKeyboardInputEvent(const int n, int &ch, bool &state) {
-	if (n < 0 || n >= s_polledKeyboardCount) {
-		ch = 0;
-		state = false;
-		return 0;
-	}
-
-	ch = s_polledKeyboard[n].key;
-	state = s_polledKeyboard[n].down;
-
-	if (ch <= 0 || ch >= K_LAST_KEY) {
-		ch = 0;
-		state = false;
-		return 0;
-	}
-
-	if (ch == K_PRINT_SCR || ch == K_CTRL || ch == K_ALT || ch == K_RIGHT_ALT) {
-		Sys_QueEvent(s_polledKeyboard[n].time, SE_KEY, ch, state, 0, NULL);
-	}
-
-	return ch;
+    sdlKeyboardEvent_t value{};
+    {
+        SDL3_InputStorageLock lock;
+        if (s_keyboardDispositionState.checked) {
+            Sys_InvalidateEventQueue(); ch = 0; state = false; return 0;
+        }
+        if (n < 0 || n >= s_polledKeyboardCount) { ch = 0; state = false; return 0; }
+        if (!s_polledKeyboardDisposition[n].Empty()) {
+            Sys_InvalidateEventQueue(); ch = 0; state = false; return 0;
+        }
+        value = s_polledKeyboard[n];
+    }
+    ch = value.key; state = value.down;
+    if (ch <= 0 || ch >= K_LAST_KEY) { ch = 0; state = false; return 0; }
+    if (SDL3_DeferredKeyboardKey(ch)) Sys_QueEvent(value.time, SE_KEY, ch, state, 0, NULL);
+    return ch;
 }
 
 void Sys_EndKeyboardInputEvents(void) {
+    SDL3_InputStorageLock lock;
+    if (s_keyboardDispositionState.checked) { Sys_InvalidateEventQueue(); return; }
+    s_polledKeyboardCount = 0;
 }
 
 int Sys_PollMouseInputEvents(void) {
 #if defined(OPENQ4_SDL3_POSIX_HOST)
-	(void)Sys_SDL_PumpEvents();
+    (void)Sys_SDL_PumpEvents();
 #endif
-	Sys_EnterCriticalSection(CRITICAL_SECTION_ONE);
-
-	s_polledMouseCount = 0;
-	while (s_mouseTail != s_mouseHead && s_polledMouseCount < SDL3_INPUT_QUEUE_SIZE) {
-		s_polledMouse[s_polledMouseCount] = s_mouseQueue[s_mouseTail];
-		s_polledMouseCount++;
-		s_mouseTail = (s_mouseTail + 1) & SDL3_INPUT_QUEUE_MASK;
-	}
-
-	Sys_LeaveCriticalSection(CRITICAL_SECTION_ONE);
-	return s_polledMouseCount;
+    SDL3_InputStorageLock lock;
+    if (s_mouseDispositionState.checked) { Sys_InvalidateEventQueue(); return 0; }
+    s_polledMouseCount = 0;
+    while (s_mouseTail != s_mouseHead && s_polledMouseCount < SDL3_INPUT_QUEUE_SIZE) {
+        if (!s_mouseDisposition[s_mouseTail].Empty()) { Sys_InvalidateEventQueue(); break; }
+        s_polledMouse[s_polledMouseCount] = s_mouseQueue[s_mouseTail];
+        s_polledMouseDisposition[s_polledMouseCount] = {};
+        s_mouseQueue[s_mouseTail] = {};
+        ++s_polledMouseCount;
+        s_mouseTail = (s_mouseTail + 1) & SDL3_INPUT_QUEUE_MASK;
+    }
+    return s_polledMouseCount;
 }
 
 int Sys_ReturnMouseInputEvent(const int n, int &action, int &value) {
-	if (n < 0 || n >= s_polledMouseCount) {
-		action = 0;
-		value = 0;
-		return 0;
-	}
-
-	action = s_polledMouse[n].action;
-	value = s_polledMouse[n].value;
-
-	if (!SDL3_ShouldQueueMousePoll(action, value)) {
-		action = 0;
-		value = 0;
-		return 0;
-	}
-
-	return 1;
+    SDL3_InputStorageLock lock;
+    if (s_mouseDispositionState.checked) {
+        Sys_InvalidateEventQueue(); action = 0; value = 0; return 0;
+    }
+    if (n < 0 || n >= s_polledMouseCount) { action = 0; value = 0; return 0; }
+    if (!s_polledMouseDisposition[n].Empty()) {
+        Sys_InvalidateEventQueue(); action = 0; value = 0; return 0;
+    }
+    action = s_polledMouse[n].action; value = s_polledMouse[n].value;
+    if (!SDL3_ShouldQueueMousePoll(action, value)) { action = 0; value = 0; return 0; }
+    return 1;
 }
 
 void Sys_EndMouseInputEvents(void) {
+    SDL3_InputStorageLock lock;
+    if (s_mouseDispositionState.checked) { Sys_InvalidateEventQueue(); return; }
+    s_polledMouseCount = 0;
 }
 
 int Sys_PollJoystickInputEvents(void) {

@@ -58,6 +58,9 @@ def compose(document):
     choice = renamed(index['settings_postaa'], 'settings_postaa', 'settings_preset')
     auto = renamed(index['settings_back'], 'settings_back', 'settings_autodetect')
     choice['properties'].update({'width': length(320), 'min-width': length(240),
+                                 'display': keyword('flex'), 'flex-wrap': keyword('wrap'),
+                                 'align-items': keyword('center'), 'column-gap': length(8), 'row-gap': length(2),
+                                 'min-height': length(44), 'padding': length(10),
                                  'flex-grow': number(2), 'flex-shrink': number(1), 'margin-bottom': length(0)})
     c = choice['control']
     c.update(label='#str_229976', action='preset', value={'state': 'settings.draft.com_performancePreset'})
@@ -75,12 +78,14 @@ def compose(document):
         nodes(item)[ident + '-label']['properties']['text'] = typed('text', '#str_229977')
         ci['settings_preset-content']['children'].append(item)
     ci['settings_preset-label']['properties']['text'] = typed('text', '#str_229976')
-    # Both translated title and selected option wrap in normal flow. The arrow
-    # stays in the value's reserved right margin when either line grows.
+    # The title and selected option share a row when space permits. Both remain
+    # in normal flow and wrap at narrow widths or with expanded translations.
+    ci['settings_preset-label']['properties'].update({'flex-grow': number(1), 'flex-shrink': number(1)})
     ci['settings_preset-value']['properties'].pop('height', None)
-    ci['settings_preset-value']['properties']['min-height'] = length(28)
+    ci['settings_preset-value']['properties'].update({'min-height': length(23),
+        'margin-top': length(0), 'flex-shrink': number(1)})
     ci['settings_preset-chevron']['properties'].pop('top', None)
-    ci['settings_preset-chevron']['properties']['bottom'] = length(23)
+    ci['settings_preset-chevron']['properties']['bottom'] = length(18)
     auto['properties'].pop('margin-right', None)
     auto['properties'].update({'width': length(200), 'min-width': length(176),
                               'flex-grow': number(1), 'flex-shrink': number(1)})

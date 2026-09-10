@@ -37,7 +37,7 @@ def main():
              'ui_settings_display_service.py', 'ui_system_display.py', 'filesystem_case_segments.py')]
     paths += [r / 'tools/tests/native' / (n + '.cpp') for n in native_names]
     paths += [r / 'src/ui/application' / (n + ext) for n in (
-        'SettingsTransaction', 'SettingsDisplayController', 'SettingsJournal',
+        'SettingsTransaction', 'SettingsDisplayController', 'SettingsJournal', 'SettingsEffectPlan',
         'SystemSettingsHost', 'SystemDisplay') for ext in ('.h', '.cpp')]
     paths += [r / 'src/ui/application/SettingsValue.h']
     paths += [r / 'src/ui' / (n + ext) for n in ('SettingsService', 'SettingsDisplayService') for ext in ('.h', '.cpp')]
@@ -106,12 +106,13 @@ def main():
         tx = r / 'src/ui/application/SettingsTransaction.cpp'
         controller = r / 'src/ui/application/SettingsDisplayController.cpp'
         journal = r / 'src/ui/application/SettingsJournal.cpp'
+        effect_plan = r / 'src/ui/application/SettingsEffectPlan.cpp'
         exact_test = r / 'tools/tests/native/UiSettingsExactValueTest.cpp'
         journal_test = r / 'tools/tests/native/UiSettingsJournalExactTest.cpp'
         json_sources = [jsoncpp / 'src/lib_json' / ('json_' + n + '.cpp') for n in ('reader', 'value', 'writer')]
         for name in native_names:
             sources = [r / 'tools/tests/native' / (name + '.cpp'), tx]
-            sources += [journal, parsed, *json_sources] if 'Journal' in name else [valid]
+            sources += [journal, effect_plan, parsed, *json_sources] if 'Journal' in name else [valid]
             if name == 'UiSettingsDisplayControllerTest':
                 sources += [controller]
             build(name, sources)
@@ -152,7 +153,8 @@ def main():
                 (app / 'SettingsTransaction.cpp').write_bytes(tx.read_bytes())
                 if label == 'general-truncates':
                     (app / 'SettingsJournal.cpp').write_bytes(journal.read_bytes())
-                    sources = [journal_test, app / 'SettingsTransaction.cpp', app / 'SettingsJournal.cpp', parsed, *json_sources]
+                    (app / 'SettingsEffectPlan.cpp').write_bytes(effect_plan.read_bytes())
+                    sources = [journal_test, app / 'SettingsTransaction.cpp', app / 'SettingsJournal.cpp', app / 'SettingsEffectPlan.cpp', parsed, *json_sources]
                 else:
                     sources = [exact_test, app / 'SettingsTransaction.cpp', valid]
                 build(label, sources, True, ['-I', str(shadow)])
@@ -166,7 +168,7 @@ def main():
             for label, old, new in journal_changes:
                 path = out / (label + '.cpp')
                 path.write_text(mutation(journal_source, old, new, label), encoding='utf-8')
-                build(label, [journal_test, path, tx, parsed, *json_sources], True)
+                build(label, [journal_test, path, tx, effect_plan, parsed, *json_sources], True)
 
             # Existing production-body harnesses publish no state when each of
             # these exact comparison guards is removed. All other cases remain.

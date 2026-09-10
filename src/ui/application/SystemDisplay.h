@@ -57,6 +57,13 @@ bool InspectDisplayRecovery(const StateValues& saved, SystemDisplayPlan& output,
 // The selected recovery direction must still Resolve against fresh topology.
 bool ValidateDisplayRecoveryPair(const StateValues& savedRestore, const StateValues& savedTarget,
 	const StateValues& catalogTarget, std::string& error);
+// Coalesced image/resource rebuild with no catalog display edit: both portable
+// plans must preserve the same captured actual display. Archived intent may
+// differ from that actual baseline (for example a prior legacy fallback).
+// Placement metadata/catalog dimensions are checked by the journal envelope;
+// selected-direction topology resolution and fresh readiness are still required.
+bool ValidateDisplayPreserveActualPair(const StateValues& savedRestore, const StateValues& savedTarget,
+	const StateValues& catalogBaseline, const StateValues& catalogTarget, std::string& error);
 bool ResolveDisplayRecovery(const StateValues& saved, const SystemDisplayTopology& freshTopology,
 	SystemDisplayPlan& output, std::string& error);
 

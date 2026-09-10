@@ -168,6 +168,8 @@ idSoundVoice_OpenAL::idSoundVoice_OpenAL
 idSoundVoice_OpenAL::idSoundVoice_OpenAL()
 	:
 	openalSource( 0 ),
+	soundSettingsSourceGeneration( 0 ),
+	soundSettingsDeleteFilters( NULL ),
 	openalDirectFilter( 0 ),
 	openalAuxFilter( 0 ),
 	nextQueuedSample( NULL ),
@@ -553,6 +555,7 @@ void idSoundVoice_OpenAL::Create( const idSoundSample* leadinSample_, const idSo
 			return;
 		}
 
+		soundSettingsSourceGeneration = SoundSettings_SourceCreated();
 		alSourcef( openalSource, AL_ROLLOFF_FACTOR, 0.0f );
 	}
 
@@ -614,6 +617,7 @@ void idSoundVoice_OpenAL::DestroyInternal()
 		FlushSourceBuffers();
 		alDeleteSources( 1, &openalSource );
 		openalSource = 0;
+		soundSettingsSourceGeneration = 0;
 		hasVUMeter = false;
 	}
 	DeleteStreamingBuffers();
@@ -1570,6 +1574,10 @@ void idSoundVoice_OpenAL::DestroyWetDryFilters()
 		{
 			qalDeleteFilters( 1, &openalDirectFilter );
 		}
+		else if( soundSettingsDeleteFilters != NULL )
+		{
+			soundSettingsDeleteFilters( 1, &openalDirectFilter );
+		}
 		openalDirectFilter = 0;
 	}
 	if( openalAuxFilter != 0 )
@@ -1578,8 +1586,13 @@ void idSoundVoice_OpenAL::DestroyWetDryFilters()
 		{
 			qalDeleteFilters( 1, &openalAuxFilter );
 		}
+		else if( soundSettingsDeleteFilters != NULL )
+		{
+			soundSettingsDeleteFilters( 1, &openalAuxFilter );
+		}
 		openalAuxFilter = 0;
 	}
+	soundSettingsDeleteFilters = NULL;
 #endif
 }
 
@@ -1657,6 +1670,74 @@ void idSoundVoice_OpenAL::ApplyWetDryRouting()
 idSoundVoice_OpenAL::OnBufferStart
 ========================
 */
+// Kept separate from the legacy best-effort path: no consumed warning/fallback
+// can turn a failed filter/source operation into a successful settings receipt.
+bool idSoundVoice_OpenAL::ApplyWetDryRoutingChecked(bool filters, bool wet, ALuint slot, SoundSettingsSourceReceipt& out)
+{
+	const ALuint source=openalSource;
+	const auto lifetime=soundSettingsSourceGeneration;
+	auto sameSource=[&] {return source==openalSource && lifetime==soundSettingsSourceGeneration;};
+	auto current=[&] {return SoundSettings_NativeOperationCurrent() && sameSource();};
+	auto call=[&](auto&& f) {if(!current())return false;const bool result=f();return current() && result;};
+#define SOUND_VOICE_TEST(expr) do {if (!call([&] {return bool(expr);})) return false;} while(false)
+#define SOUND_VOICE_CALL(expr) SOUND_VOICE_TEST(((expr),true))
+	if (!source || !lifetime) return false;
+	SOUND_VOICE_TEST(alGetError()==AL_NO_ERROR); SOUND_VOICE_TEST(alIsSource(source));
+	float dry=OpenQ4_SanitizeUnitValue(dryLevel), send=OpenQ4_SanitizeUnitValue(wetLevel);
+	if (s_openALEfxDebugMode.GetInteger()==1) {dry=0.0f;send=1.0f;}
+	if (s_openALEfxDebugMode.GetInteger()==2) {dry=1.0f;send=0.0f;}
+	const auto occluded=OpenQ4_BuildOcclusionFilter(occlusion,environmentMuffle);
+	const float direct=dry*occluded.directGain, auxiliary=send*occluded.wetGain;
+	const float effectiveGain=OpenQ4_SanitizeSourceGain(gain);
+	SoundSettingsSourceReceipt receipt;receipt.source=source;receipt.lifetime=lifetime;
+#if OPENQ4_OPENAL_EFX_SUPPORTED
+	if (filters) {
+		LPALGENFILTERS gen=nullptr;LPALDELETEFILTERS del=nullptr;LPALFILTERI filteri=nullptr;LPALFILTERF filterf=nullptr;
+		SOUND_VOICE_CALL(gen=reinterpret_cast<LPALGENFILTERS>(alGetProcAddress("alGenFilters")));
+		SOUND_VOICE_CALL(del=reinterpret_cast<LPALDELETEFILTERS>(alGetProcAddress("alDeleteFilters")));
+		SOUND_VOICE_CALL(filteri=reinterpret_cast<LPALFILTERI>(alGetProcAddress("alFilteri")));
+		SOUND_VOICE_CALL(filterf=reinterpret_cast<LPALFILTERF>(alGetProcAddress("alFilterf")));
+		if (!gen || !del || !filteri || !filterf || (wet && !slot)) return false;
+		SOUND_VOICE_TEST(alGetError()==AL_NO_ERROR);
+		if (!openalDirectFilter) {
+			ALuint allocated=0;const bool result=call([&] {gen(1,&allocated);return true;});
+			if (sameSource()) {openalDirectFilter=allocated;soundSettingsDeleteFilters=del;}
+			if (!result) return false;
+			SOUND_VOICE_TEST(alGetError()==AL_NO_ERROR);
+			if (!allocated) return false;
+		}
+		if (!openalAuxFilter) {
+			ALuint allocated=0;const bool result=call([&] {gen(1,&allocated);return true;});
+			if (sameSource()) {openalAuxFilter=allocated;soundSettingsDeleteFilters=del;}
+			if (!result) return false;
+			SOUND_VOICE_TEST(alGetError()==AL_NO_ERROR);
+			if (!allocated) return false;
+		}
+		SOUND_VOICE_CALL(filteri(openalDirectFilter,AL_FILTER_TYPE,AL_FILTER_LOWPASS));SOUND_VOICE_TEST(alGetError()==AL_NO_ERROR);
+		SOUND_VOICE_CALL(filterf(openalDirectFilter,AL_LOWPASS_GAIN,direct));SOUND_VOICE_TEST(alGetError()==AL_NO_ERROR);
+		SOUND_VOICE_CALL(filterf(openalDirectFilter,AL_LOWPASS_GAINHF,occluded.directGainHF));SOUND_VOICE_TEST(alGetError()==AL_NO_ERROR);
+		SOUND_VOICE_CALL(alSourcei(source,AL_DIRECT_FILTER,openalDirectFilter));SOUND_VOICE_TEST(alGetError()==AL_NO_ERROR);
+		SOUND_VOICE_CALL(alSourcef(source,AL_GAIN,effectiveGain));SOUND_VOICE_TEST(alGetError()==AL_NO_ERROR);
+		const bool route=wet && auxiliary>0.0f;
+		if (route) {
+			SOUND_VOICE_CALL(filteri(openalAuxFilter,AL_FILTER_TYPE,AL_FILTER_LOWPASS));SOUND_VOICE_TEST(alGetError()==AL_NO_ERROR);
+			SOUND_VOICE_CALL(filterf(openalAuxFilter,AL_LOWPASS_GAIN,auxiliary));SOUND_VOICE_TEST(alGetError()==AL_NO_ERROR);
+			SOUND_VOICE_CALL(filterf(openalAuxFilter,AL_LOWPASS_GAINHF,occluded.wetGainHF));SOUND_VOICE_TEST(alGetError()==AL_NO_ERROR);
+		}
+		SOUND_VOICE_CALL(alSource3i(source,AL_AUXILIARY_SEND_FILTER,route?slot:AL_EFFECTSLOT_NULL,0,route?openalAuxFilter:AL_FILTER_NULL));SOUND_VOICE_TEST(alGetError()==AL_NO_ERROR);
+		receipt.directFilter=openalDirectFilter;receipt.auxiliaryFilter=route?openalAuxFilter:0;receipt.slot=route?slot:0;
+	} else
+#endif
+	{
+		if (filters || wet || slot) return false;
+		SOUND_VOICE_CALL(alSourcef(source,AL_GAIN,effectiveGain*direct));SOUND_VOICE_TEST(alGetError()==AL_NO_ERROR);
+	}
+	SOUND_VOICE_TEST(alIsSource(source));SOUND_VOICE_TEST(alGetError()==AL_NO_ERROR);
+	out=receipt;return true;
+#undef SOUND_VOICE_TEST
+#undef SOUND_VOICE_CALL
+}
+
 void idSoundVoice_OpenAL::OnBufferStart( idSoundSample_OpenAL* sample, int bufferNumber )
 {
 	//SetSampleRate( sample->SampleRate(), XAUDIO2_COMMIT_NOW );

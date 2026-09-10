@@ -252,7 +252,7 @@ SettingsResult SettingsTransaction::Apply(std::uint64_t requestedOwner, double n
 	return Result(SettingsCode::Ok);
 }
 
-SettingsResult SettingsTransaction::PrepareApply(std::uint64_t requestedOwner, double now, SettingsAttempt& attempt) {
+SettingsResult SettingsTransaction::PrepareApply(std::uint64_t requestedOwner, double now, SettingsAttempt& attempt, SettingsCompletion completion) {
 	if (busy) return RejectReentry();
 	Operation operation(busy);
 	if (auto access = Access(requestedOwner); access.code != SettingsCode::Ok) return access;
@@ -262,7 +262,12 @@ SettingsResult SettingsTransaction::PrepareApply(std::uint64_t requestedOwner, d
 	if (!Read(current,error)) return Result(SettingsCode::ApplyFailed,std::move(error));
 	if (!SettingsValuesEqual(current,baseline)) return Result(SettingsCode::Conflict,"Settings changed outside this session; reopen before applying");
 	if (!Validate(draft,error)) return Result(SettingsCode::Invalid,std::move(error));
-	SettingsAttempt prepared{owner,0,current,draft,Changes(current,draft)};
+	if (completion != SettingsCompletion::UserConfirmation && completion != SettingsCompletion::Automatic)
+		return Result(SettingsCode::Invalid,"Unknown settings completion policy");
+	if (completion == SettingsCompletion::Automatic &&
+		!Invoke([&] { return !host.NeedsConfirmation(current,draft); },error))
+		return Result(SettingsCode::Invalid,"This settings change requires user confirmation");
+	SettingsAttempt prepared{owner,0,current,draft,Changes(current,draft),completion};
 	prepared.request = NewRequest();
 	if (!prepared.request) return Result(SettingsCode::Invalid,"Settings request identities are exhausted");
 	attempt = prepared; pending = std::move(prepared);
@@ -282,6 +287,9 @@ SettingsResult SettingsTransaction::ExecuteApply(std::uint64_t requestedOwner, s
 	if (!Read(current,error)) return Result(SettingsCode::ApplyFailed,std::move(error));
 	if (!SettingsValuesEqual(current,pending.baseline)) return Result(SettingsCode::Conflict,"Settings changed after apply was prepared");
 	if (!Validate(pending.target,error)) return Result(SettingsCode::Invalid,std::move(error));
+	if (pending.completion == SettingsCompletion::Automatic &&
+		!Invoke([&] { return !host.NeedsConfirmation(pending.baseline,pending.target); },error))
+		return Result(SettingsCode::ApplyFailed,"Settings confirmation policy changed before execution");
 	// Ownership precedes the callback: false/throw can follow a partial write.
 	written = pending.patch; lastApplied = pending.target;
 	const bool wrote = written.empty() || Invoke([&] { return host.Write(written,error); },error);
@@ -297,7 +305,8 @@ SettingsResult SettingsTransaction::CompleteApply(std::uint64_t requestedOwner, 
 	if (busy) return RejectReentry();
 	Operation operation(busy);
 	if (auto access = AccessAttempt(requestedOwner,request); access.code != SettingsCode::Ok) return access;
-	if (phase != SettingsPhase::Applying || attemptStage != AttemptStage::ApplyWritten)
+	if (phase != SettingsPhase::Applying || attemptStage != AttemptStage::ApplyWritten ||
+		pending.completion != SettingsCompletion::UserConfirmation)
 		return Result(SettingsCode::Busy,"The settings apply has not executed successfully");
 	if (!ValidTime(now,lastTime) || !std::isfinite(timeout) || timeout <= 0 ||
 		!std::isfinite(now+timeout) || now+timeout <= now)
@@ -307,6 +316,37 @@ SettingsResult SettingsTransaction::CompleteApply(std::uint64_t requestedOwner, 
 	if (!SettingsValuesEqual(current,pending.target)) return Result(SettingsCode::Conflict,"Settings changed before device completion");
 	lastTime = now; deadline = now+timeout; phase = SettingsPhase::Confirming; attemptStage = AttemptStage::Confirming;
 	return Result(SettingsCode::Ok);
+}
+
+SettingsResult SettingsTransaction::PrepareAutomaticCommit(std::uint64_t requestedOwner, std::uint64_t request,
+	double now, SettingsAttempt& attempt) {
+	if (busy) return RejectReentry();
+	Operation operation(busy);
+	if (auto access = AccessAttempt(requestedOwner,request); access.code != SettingsCode::Ok) return access;
+	if (phase != SettingsPhase::Applying || attemptStage != AttemptStage::ApplyWritten ||
+		pending.completion != SettingsCompletion::Automatic)
+		return Result(SettingsCode::Busy,"No completed automatic settings request can commit");
+	if (!ValidTime(now,lastTime)) return Result(SettingsCode::Invalid,"Automatic completion time is invalid");
+	StateValues current; std::string error;
+	if (!Read(current,error)) return Result(SettingsCode::ApplyFailed,std::move(error));
+	if (!SettingsValuesEqual(current,pending.target)) return Result(SettingsCode::Conflict,"Settings changed before automatic completion");
+	if (!Invoke([&] { return !host.NeedsConfirmation(pending.baseline,pending.target); },error))
+		return Result(SettingsCode::Invalid,"This settings request now requires user confirmation");
+	SettingsAttempt prepared{owner,NewRequest(),baseline,std::move(current),written,SettingsCompletion::Automatic};
+	if (!prepared.request) return Result(SettingsCode::Invalid,"Settings request identities are exhausted");
+	attempt = prepared; pending = std::move(prepared);
+	attemptStage = AttemptStage::AutomaticCommitPrepared; lastTime = now;
+	return Result(SettingsCode::Ok);
+}
+
+SettingsResult SettingsTransaction::CompleteAutomaticCommit(std::uint64_t requestedOwner, std::uint64_t request) {
+	if (busy) return RejectReentry();
+	Operation operation(busy);
+	if (auto access = AccessAttempt(requestedOwner,request); access.code != SettingsCode::Ok) return access;
+	if (phase != SettingsPhase::Applying || attemptStage != AttemptStage::AutomaticCommitPrepared ||
+		pending.completion != SettingsCompletion::Automatic)
+		return Result(SettingsCode::Busy,"Automatic settings commit has not been prepared");
+	return CompletePreparedCommit();
 }
 
 SettingsResult SettingsTransaction::CancelPreparedApply(std::uint64_t requestedOwner, std::uint64_t request) {
@@ -337,7 +377,7 @@ SettingsResult SettingsTransaction::PrepareRestore(std::uint64_t requestedOwner,
 	if (!ValidSnapshot(candidate,&baseline,error) || (!patch.empty() &&
 		!Invoke([&] { return host.ValidateRollback(baseline,current,candidate,error); },error)))
 		return Result(SettingsCode::RollbackFailed,std::move(error));
-	SettingsAttempt prepared{owner,NewRequest(),std::move(current),std::move(candidate),std::move(patch)};
+	SettingsAttempt prepared{owner,NewRequest(),std::move(current),std::move(candidate),std::move(patch),pending.completion};
 	if (!prepared.request) return Result(SettingsCode::Invalid,"Settings request identities are exhausted");
 	attempt = prepared; pending = std::move(prepared);
 	phase = SettingsPhase::Restoring; attemptStage = AttemptStage::RestorePrepared; deadline = 0;
@@ -418,6 +458,10 @@ SettingsResult SettingsTransaction::CompleteConfirm(std::uint64_t requestedOwner
 	if (auto access = AccessAttempt(requestedOwner,request); access.code != SettingsCode::Ok) return access;
 	if (phase != SettingsPhase::Confirming || attemptStage != AttemptStage::ConfirmPrepared)
 		return Result(SettingsCode::Busy,"Settings confirmation has not been prepared");
+	return CompletePreparedCommit();
+}
+
+SettingsResult SettingsTransaction::CompletePreparedCommit() {
 	StateValues current; std::string error;
 	if (!Read(current,error)) return Result(SettingsCode::ApplyFailed,std::move(error));
 	if (!SettingsValuesEqual(current,pending.target)) return Result(SettingsCode::Conflict,"Settings changed during confirmation persistence");

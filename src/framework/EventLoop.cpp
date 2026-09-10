@@ -187,6 +187,9 @@ idEventLoop::idEventLoop( void ) {
 	com_journalFile = NULL;
 	com_journalDataFile = NULL;
 	initialTimeOffset = 0;
+	com_pushedEventsHead = com_pushedEventsTail = 0;
+	memset( com_pushedEvents, 0, sizeof( com_pushedEvents ) );
+	for ( auto& tag : com_pushedDisposition ) tag = {};
 }
 
 /*
@@ -270,7 +273,50 @@ void idEventLoop::PushEvent( sysEvent_t *event ) {
 	}
 
 	*ev = *event;
+	com_pushedDisposition[ev - com_pushedEvents] = {};
 	com_pushedEventsHead++;
+}
+
+bool idEventLoop::PushEventWithDisposition( sysEvent_t& event, sysEventDispositionTag_t& tag ) noexcept {
+	const int type = EventLoop_EventType( event );
+	if ( !Sys_EventDispositionTagCurrent( tag ) || com_journal.GetInteger() != 0 ||
+		type == SE_NONE || EventLoop_ValidateHeader( type, event.evPtrLength ) != NULL ||
+		EventLoop_ValidatePayload( event ) != NULL ) return false;
+	if ( com_pushedEventsHead - com_pushedEventsTail >= MAX_PUSHED_EVENTS ) {
+		Sys_InvalidateEventQueue();
+		return false; // Preserve all queued ownership and both caller inputs.
+	}
+	const int slot = com_pushedEventsHead & ( MAX_PUSHED_EVENTS - 1 );
+	com_pushedEvents[slot] = event;
+	com_pushedDisposition[slot] = tag;
+	++com_pushedEventsHead;
+	event = {}; tag = {};
+	return true;
+}
+
+sysEventTransfer_t idEventLoop::TakeEventWithDisposition( sysEvent_t& event, sysEventDispositionTag_t& tag ) noexcept {
+	if ( !Sys_EventDispositionEpoch() || com_journal.GetInteger() != 0 ) return sysEventTransfer_t::Refused;
+	if ( com_pushedEventsHead > com_pushedEventsTail ) {
+		const int slot = com_pushedEventsTail & ( MAX_PUSHED_EVENTS - 1 );
+		const auto ownedTag = com_pushedDisposition[slot];
+		if ( !ownedTag.Empty() && !Sys_EventDispositionTagCurrent( ownedTag ) ) return sysEventTransfer_t::Refused;
+		const auto ownedEvent = com_pushedEvents[slot];
+		com_pushedEvents[slot] = {}; com_pushedDisposition[slot] = {};
+		++com_pushedEventsTail;
+		event = ownedEvent; tag = ownedTag;
+		return sysEventTransfer_t::Ready;
+	}
+	return Sys_TakeEventWithDisposition( event, tag );
+}
+
+void idEventLoop::ClearPushedEvents( void ) {
+	while ( com_pushedEventsHead > com_pushedEventsTail ) {
+		const int slot = com_pushedEventsTail & ( MAX_PUSHED_EVENTS - 1 );
+		idScopedEventPayload payload( com_pushedEvents[slot], true );
+		com_pushedDisposition[slot] = {};
+		++com_pushedEventsTail;
+	}
+	com_pushedEventsHead = com_pushedEventsTail = 0;
 }
 
 /*
@@ -280,6 +326,10 @@ idEventLoop::GetEvent
 */
 sysEvent_t idEventLoop::GetEvent( void ) {
 	if ( com_pushedEventsHead > com_pushedEventsTail ) {
+		if ( !com_pushedDisposition[com_pushedEventsTail & (MAX_PUSHED_EVENTS-1)].Empty() ) {
+			Sys_InvalidateEventQueue();
+			return sysEvent_t{}; // A failed tracked route never becomes untracked input.
+		}
 		com_pushedEventsTail++;
 		return com_pushedEvents[ (com_pushedEventsTail-1) & (MAX_PUSHED_EVENTS-1) ];
 	}
@@ -347,6 +397,8 @@ idEventLoop::Init
 */
 void idEventLoop::Init( void ) {
 	Sys_InvalidateEventQueue();
+	ClearPushedEvents();
+	(void)Sys_BindEventDispositionThread();
 
 	initialTimeOffset = Sys_Milliseconds();
 
@@ -381,6 +433,8 @@ idEventLoop::Shutdown
 */
 void idEventLoop::Shutdown( void ) {
 	Sys_InvalidateEventQueue();
+	(void)Sys_RetireEventDispositionThread();
+	ClearPushedEvents();
 	if ( com_journalFile ) {
 		fileSystem->CloseFile( com_journalFile );
 		com_journalFile = NULL;

@@ -102,9 +102,14 @@ static void Dynamic(){
     for(int bad=0;bad<8;++bad){
         Source f;f.Add(SDL_EVENT_TEXT_EDITING_CANDIDATES);const char* items[]={"okay",nullptr};
         auto&e=f.queue.back().first.edit_candidates;e.candidates=items;e.num_candidates=1;e.selected_candidate=-1;
-        if(bad==0)e.num_candidates=-1;if(bad==1)e.num_candidates=257;if(bad==2)e.candidates=nullptr;
-        if(bad==3)e.selected_candidate=1;if(bad==4)e.selected_candidate=-2;if(bad==5)e.num_candidates=2;
-        if(bad==6)items[0]="\xc0\x80";if(bad==7){f.borrowed.assign(65537,'a');items[0]=f.borrowed.c_str();}
+        if(bad==0)e.num_candidates=-1;
+        if(bad==1)e.num_candidates=257;
+        if(bad==2)e.candidates=nullptr;
+        if(bad==3)e.selected_candidate=1;
+        if(bad==4)e.selected_candidate=-2;
+        if(bad==5)e.num_candidates=2;
+        if(bad==6)items[0]="\xc0\x80";
+        if(bad==7){f.borrowed.assign(65537,'a');items[0]=f.borrowed.c_str();}
         NativeQueueIngress x;Batch candidate;CHECK(x.Read(f,candidate,error)==NativeQueueRead::RetireRequired);CHECK(!candidate&&x.NeedsRetirement());
     }
 }
@@ -114,16 +119,32 @@ static void Malformed(){
     for(int bad=0;bad<18;++bad){
         Source s;s.Group(1);s.Add(SDL_EVENT_KEY_DOWN,OQ4_QUEUE_COLLECTION,1);s.Fence();
         auto&e=s.queue.front().first;auto&r=s.queue.front().second;
-        if(bad==0)r.version=2;if(bad==1)r.reserved=1;if(bad==2)++r.generation;if(bad==3)r.queue_sequence=0;
-        if(bad==4)r.kind=9;if(bad==5)++r.dispatch;if(bad==6)++r.ordinal;if(bad==7)r.fence_sequence=1;
-        if(bad==8)e.type=SDL_EVENT_POLL_SENTINEL;if(bad==9)e.type=0x9876;
-        if(bad==10)s.queue.back().second.ordinal=2;if(bad==11)s.queue.back().second.fence_sequence++;
-        if(bad==12)s.queue.back().second.dispatch++;if(bad==13)s.queue.back().first.type=SDL_EVENT_KEY_UP;
+        if(bad==0)r.version=2;
+        if(bad==1)r.reserved=1;
+        if(bad==2)++r.generation;
+        if(bad==3)r.queue_sequence=0;
+        if(bad==4)r.kind=9;
+        if(bad==5)++r.dispatch;
+        if(bad==6)++r.ordinal;
+        if(bad==7)r.fence_sequence=1;
+        if(bad==8)e.type=SDL_EVENT_POLL_SENTINEL;
+        if(bad==9)e.type=0x9876;
+        if(bad==10)s.queue.back().second.ordinal=2;
+        if(bad==11)s.queue.back().second.fence_sequence++;
+        if(bad==12)s.queue.back().second.dispatch++;
+        if(bad==13)s.queue.back().first.type=SDL_EVENT_KEY_UP;
         if(bad==14)s.queue.back().first.user.data1=reinterpret_cast<void*>(1);
-        if(bad==15)s.queue.pop_back();if(bad==16)s.queue.back().second.queue_sequence=1;if(bad==17)s.copyOkay=false;
+        if(bad==15)s.queue.pop_back();
+        if(bad==16)s.queue.back().second.queue_sequence=1;
+        if(bad==17)s.copyOkay=false;
         NativeQueueIngress ingress;Batch out;CHECK(ingress.Read(s,out,error)==NativeQueueRead::RetireRequired);CHECK(!out&&ingress.NeedsRetirement());
         const auto pollsBefore=s.pollCount;CHECK(ingress.Read(s,out,error)==NativeQueueRead::RetireRequired&&s.pollCount==pollsBefore);
-        CHECK(!ingress.ResetAfterRetirement(s,error));s.Retired();CHECK(ingress.ResetAfterRetirement(s,error));
+        CHECK(!ingress.ResetAfterRetirement(s,error));s.Retired();
+        CHECK(!ingress.ResetAfterRetirement(s,error));
+        std::unique_ptr<const NativeQueueQuarantine> quarantine;
+        CHECK(ingress.TakeQuarantine(quarantine)&&quarantine);
+        s.Fresh(3);CHECK(!ingress.ResetAfterRetirement(s,error));s.Retired();
+        CHECK(ingress.ResetAfterRetirement(s,error));
         s.Fresh(3);CHECK(ingress.Read(s,out,error)==NativeQueueRead::RetireRequired);
         s.Retired();CHECK(ingress.ResetAfterRetirement(s,error));s.Fresh(4);s.Add(SDL_EVENT_KEY_UP);
         CHECK(ingress.Read(s,out,error)==NativeQueueRead::Ready);
@@ -152,6 +173,8 @@ static void ProbeFailures(){
     Source s;s.Add(SDL_EVENT_KEY_DOWN);NativeQueueIngress ingress;Batch out;
     s.pollHook=[&]{Batch nested;CHECK(ingress.Read(s,nested,error)==NativeQueueRead::RetireRequired);};
     CHECK(ingress.Read(s,out,error)==NativeQueueRead::RetireRequired&&!out);
+    std::unique_ptr<const NativeQueueQuarantine> quarantine;
+    CHECK(ingress.TakeQuarantine(quarantine)&&quarantine);
     s.Retired();s.pollHook={};s.observeHook=[&]{CHECK(!ingress.ResetAfterRetirement(s,error));};
     CHECK(!ingress.ResetAfterRetirement(s,error));
 }

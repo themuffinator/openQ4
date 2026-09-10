@@ -253,6 +253,12 @@ The full engine build and all 44 UI suites passed, including 28,802 production R
 
 Full effect execution and recovery follow the [unified settings direction](settings-effect-execution.md). Complete settings, native input/shaping, the editor, all 271 GUI migrations and every final gate remain required. No requirement status or acceptance changes.
 
+The [settings effect foundations](settings-effect-execution.md) add automatic completion, checked audio finalization and a strict schema2 recovery envelope. Production startup and live settings still use schema1; complete mixed effects and portable reconstruction remain required. The [native disposition increment](text-input-routing.md) accounts for both fixed Session/poll schedules and preserves ownership through platform, pushed and scalar polled storage. Live native activation remains disconnected.
+
+The [compact SYSTEM layout](performance-presets.md) keeps the real Marine-font Apply label on one line and the complete first brightness control visible at 200%. Full engine build, staging and all 47 UI suites passed, including 41,623 Runtime checks over 48 locale/wider-glyph/density/resize cases. Four engine render-target images were reviewed after windowed gameplay: English SP/OpenGL at 125% and MP/Vulkan at 200%. No input was injected or controlled and no mixed-effect Apply was performed. SP logged no warnings; MP retained 93 existing warnings. A visible authored scrollbar, full page interaction and all real-font/platform states remain required.
+
+The source-bound checkpoint starts from engine `efcfdb0ffe6eaffa11dbf2ced026495539156478`; local evidence `.tmp/ui/native-effects-integration/validation-evidence.json` has SHA-256 `909df76b2aea07f6641eece8550cd90bd1d3d354e84acf1ffe5ad06c0dbd6457`. Earlier failed layout captures and the corrected pack-only staging failure remain recorded. No requirement, GUI migration or final gate is accepted by this checkpoint.
+
 There are **65 partial, 161 pending and one verified requirement**. `BEH-002`
 remains partial for the implemented settings transaction/service boundary.
 `BEH-005` remains partial for committed action delivery and cancellation; stock

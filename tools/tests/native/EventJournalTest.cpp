@@ -144,6 +144,12 @@ static sysEvent_t Sys_GetEvent() {
 #define private public
 #include "src/framework/EventLoop.h"
 #undef private
+sysEventTransfer_t Sys_TakeEventWithDisposition(sysEvent_t& event, sysEventDispositionTag_t& tag) noexcept {
+	if (!Sys_EventDispositionEpoch()) return sysEventTransfer_t::Refused;
+	if (queued.empty()) return sysEventTransfer_t::Empty;
+	event=queued.front(); queued.pop_front(); tag={};
+	return sysEventTransfer_t::Ready;
+}
 #include "src/framework/EventLoop.cpp"
 
 static void Reset() {
@@ -197,7 +203,7 @@ static void ReadCases() {
 		Check(EventLoop_ReadJournalEvent(&file,out)!=nullptr && Same(out,before), "every truncated header rejects atomically");
 		Check(allocations==0, "no allocation from a partial header");
 	}
-	for (const auto item : std::vector<std::pair<int,int>>{{-1,0},{999,0},{SE_CONSOLE,-1},{SE_RETAINED_UI,-1},{SE_CONSOLE,1024*1024+1},
+	for (const auto& item : std::vector<std::pair<int,int>>{{-1,0},{999,0},{SE_CONSOLE,-1},{SE_RETAINED_UI,-1},{SE_CONSOLE,1024*1024+1},
 		{SE_RETAINED_UI,(std::numeric_limits<int>::max)()},{SE_NONE,1},{SE_KEY,1},{SE_CHAR,1},{SE_MOUSE,1},{SE_JOYSTICK_AXIS,1},{SE_CONSOLE,0},{SE_RETAINED_UI,0}}) {
 		Reset(); idFile file; file.bytes=Record(item.first,item.second); sysEvent_t out={}; out.evValue=42; const auto before=out;
 		Check(EventLoop_ReadJournalEvent(&file,out)!=nullptr && Same(out,before), "invalid type/length/shape rejects atomically");

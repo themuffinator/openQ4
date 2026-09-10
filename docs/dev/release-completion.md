@@ -2,6 +2,15 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- SYSTEM uses a compact preset selector and a wrapping status/action footer to
+  keep more settings visible at large UI scales. Essential controls retain
+  their full-size targets and text can grow with translated labels.
+
+- Closing SYSTEM during preparation of a settings commit now cancels the
+  operation before persistence begins. The shared settings controller also gains
+  automatic completion for future resource-only changes, retaining recovery on
+  uncertain saves. Complete preset Apply remains in development.
+
 - The opt-in SYSTEM page adds the six performance presets and Auto-Detect to
   its settings draft. Custom brightness edits are preserved, and canceling a
   preset list keeps the previous selection. Labels wrap across the existing

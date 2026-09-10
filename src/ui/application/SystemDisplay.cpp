@@ -20,6 +20,7 @@ bool MatchesDisplay(const SystemDisplayPlan&,const rendererDisplayState_t&,std::
 bool CaptureDisplayRecovery(const SystemDisplayPlan&,const SystemDisplayTopology&,StateValues&,std::string& error) { return Unsupported(error); }
 bool InspectDisplayRecovery(const StateValues&,SystemDisplayPlan&,SystemDisplayTopology&,std::string& error) { return Unsupported(error); }
 bool ValidateDisplayRecoveryPair(const StateValues&,const StateValues&,const StateValues&,std::string& error) { return Unsupported(error); }
+bool ValidateDisplayPreserveActualPair(const StateValues&,const StateValues&,const StateValues&,const StateValues&,std::string& error) { return Unsupported(error); }
 bool ResolveDisplayRecovery(const StateValues&,const SystemDisplayTopology&,SystemDisplayPlan&,std::string& error) { return Unsupported(error); }
 #else
 namespace {
@@ -395,6 +396,19 @@ bool InspectDisplayRecovery(const StateValues& saved,SystemDisplayPlan& output,
 	r.displayIndex=e.displayIndex=0;
 	if (!RecoveryPlan(plan,topology,error)) return false;
 	output=std::move(plan); recordedTopology=std::move(topology); error.clear(); return true;
+}
+
+bool ValidateDisplayPreserveActualPair(const StateValues& savedRestore,const StateValues& savedTarget,
+ const StateValues& catalogBaseline,const StateValues& catalogTarget,std::string& error) {
+ if (!Candidate(catalogBaseline,error) || !Candidate(catalogTarget,error)) return false;
+ for (const auto& item:SystemSettingsHost::Catalog()) if ((item.effects & SystemSettingDisplayRestart) &&
+  !SettingsValueEqual(catalogBaseline.at(item.key),catalogTarget.at(item.key)))
+  return Fail(error,"Preserve-actual recovery contains a catalog display change");
+ SystemDisplayPlan restore,target; SystemDisplayTopology oldTopology,newTopology;
+ if (!InspectDisplayRecovery(savedRestore,restore,oldTopology,error) ||
+  !InspectDisplayRecovery(savedTarget,target,newTopology,error)) return false;
+ if (!SettingsValuesEqual(savedRestore,savedTarget)) return Fail(error,"Preserve-actual recovery changes the captured display");
+ error.clear(); return true;
 }
 
 bool ValidateDisplayRecoveryPair(const StateValues& savedRestore,const StateValues& savedTarget,

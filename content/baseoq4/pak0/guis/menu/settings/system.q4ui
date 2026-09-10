@@ -7933,7 +7933,7 @@
           },
           "padding": {
             "type": "length",
-            "value": 20,
+            "value": 16,
             "unit": "dp"
           },
           "flex-direction": {
@@ -8061,12 +8061,12 @@
               },
               "margin-top": {
                 "type": "length",
-                "value": 16,
+                "value": 8,
                 "unit": "dp"
               },
               "margin-bottom": {
                 "type": "length",
-                "value": 12,
+                "value": 8,
                 "unit": "dp"
               }
             },
@@ -8126,7 +8126,7 @@
                       },
                       "display": {
                         "type": "keyword",
-                        "value": "block"
+                        "value": "flex"
                       },
                       "box-sizing": {
                         "type": "keyword",
@@ -8143,12 +8143,12 @@
                       },
                       "min-height": {
                         "type": "length",
-                        "value": 80,
+                        "value": 44,
                         "unit": "dp"
                       },
                       "padding": {
                         "type": "length",
-                        "value": 12,
+                        "value": 10,
                         "unit": "dp"
                       },
                       "margin-bottom": {
@@ -8159,6 +8159,24 @@
                       "min-width": {
                         "type": "length",
                         "value": 240,
+                        "unit": "dp"
+                      },
+                      "flex-wrap": {
+                        "type": "keyword",
+                        "value": "wrap"
+                      },
+                      "align-items": {
+                        "type": "keyword",
+                        "value": "center"
+                      },
+                      "column-gap": {
+                        "type": "length",
+                        "value": 8,
+                        "unit": "dp"
+                      },
+                      "row-gap": {
+                        "type": "length",
+                        "value": 2,
                         "unit": "dp"
                       },
                       "flex-grow": {
@@ -8565,6 +8583,14 @@
                           "white-space": {
                             "type": "keyword",
                             "value": "normal"
+                          },
+                          "flex-grow": {
+                            "type": "number",
+                            "value": 1
+                          },
+                          "flex-shrink": {
+                            "type": "number",
+                            "value": 1
                           }
                         }
                       },
@@ -8621,7 +8647,7 @@
                           },
                           "margin-top": {
                             "type": "length",
-                            "value": 6,
+                            "value": 0,
                             "unit": "dp"
                           },
                           "padding-right": {
@@ -8631,8 +8657,12 @@
                           },
                           "min-height": {
                             "type": "length",
-                            "value": 28,
+                            "value": 23,
                             "unit": "dp"
+                          },
+                          "flex-shrink": {
+                            "type": "number",
+                            "value": 1
                           }
                         }
                       },
@@ -8677,7 +8707,7 @@
                           },
                           "bottom": {
                             "type": "length",
-                            "value": 23,
+                            "value": 18,
                             "unit": "dp"
                           }
                         },
@@ -12761,12 +12791,12 @@
                           },
                           "font-size": {
                             "type": "length",
-                            "value": 16,
+                            "value": 18,
                             "unit": "dp"
                           },
                           "line-height": {
                             "type": "length",
-                            "value": 23,
+                            "value": 24,
                             "unit": "dp"
                           },
                           "color": {
@@ -39659,74 +39689,7 @@
             ]
           },
           {
-            "id": "settings-message",
-            "type": "text",
-            "properties": {
-              "position": {
-                "type": "keyword",
-                "value": "relative"
-              },
-              "display": {
-                "type": "keyword",
-                "value": "block"
-              },
-              "box-sizing": {
-                "type": "keyword",
-                "value": "border-box"
-              },
-              "opacity": {
-                "type": "number",
-                "value": 1
-              },
-              "text": {
-                "type": "text",
-                "value": "#str_229982"
-              },
-              "font-family": {
-                "type": "font",
-                "value": "marine"
-              },
-              "font-size": {
-                "type": "length",
-                "value": 14,
-                "unit": "dp"
-              },
-              "line-height": {
-                "type": "length",
-                "value": 20,
-                "unit": "dp"
-              },
-              "color": {
-                "type": "color",
-                "value": [
-                  0.72,
-                  0.76,
-                  0.62,
-                  1
-                ]
-              },
-              "white-space": {
-                "type": "keyword",
-                "value": "normal"
-              },
-              "min-height": {
-                "type": "length",
-                "value": 24,
-                "unit": "dp"
-              },
-              "margin-bottom": {
-                "type": "length",
-                "value": 8,
-                "unit": "dp"
-              },
-              "flex-shrink": {
-                "type": "number",
-                "value": 0
-              }
-            }
-          },
-          {
-            "id": "settings-actions",
+            "id": "settings-footer",
             "type": "group",
             "properties": {
               "position": {
@@ -39745,14 +39708,28 @@
                 "type": "number",
                 "value": 1
               },
+              "width": {
+                "type": "length",
+                "value": 100,
+                "unit": "%"
+              },
               "flex-wrap": {
                 "type": "keyword",
                 "value": "wrap"
+              },
+              "column-gap": {
+                "type": "length",
+                "value": 16,
+                "unit": "dp"
               },
               "row-gap": {
                 "type": "length",
                 "value": 8,
                 "unit": "dp"
+              },
+              "align-items": {
+                "type": "keyword",
+                "value": "center"
               },
               "flex-shrink": {
                 "type": "number",
@@ -39761,8 +39738,8 @@
             },
             "children": [
               {
-                "id": "settings_back",
-                "type": "group",
+                "id": "settings-message",
+                "type": "text",
                 "properties": {
                   "position": {
                     "type": "keyword",
@@ -39780,449 +39757,69 @@
                     "type": "number",
                     "value": 1
                   },
+                  "text": {
+                    "type": "text",
+                    "value": "#str_229982"
+                  },
+                  "font-family": {
+                    "type": "font",
+                    "value": "marine"
+                  },
+                  "font-size": {
+                    "type": "length",
+                    "value": 14,
+                    "unit": "dp"
+                  },
+                  "line-height": {
+                    "type": "length",
+                    "value": 20,
+                    "unit": "dp"
+                  },
+                  "color": {
+                    "type": "color",
+                    "value": [
+                      0.72,
+                      0.76,
+                      0.62,
+                      1
+                    ]
+                  },
+                  "white-space": {
+                    "type": "keyword",
+                    "value": "normal"
+                  },
+                  "min-height": {
+                    "type": "length",
+                    "value": 20,
+                    "unit": "dp"
+                  },
+                  "margin-bottom": {
+                    "type": "length",
+                    "value": 0,
+                    "unit": "dp"
+                  },
+                  "flex-shrink": {
+                    "type": "number",
+                    "value": 1
+                  },
+                  "width": {
+                    "type": "length",
+                    "value": 128,
+                    "unit": "dp"
+                  },
                   "min-width": {
                     "type": "length",
                     "value": 128,
                     "unit": "dp"
                   },
-                  "min-height": {
-                    "type": "length",
-                    "value": 44,
-                    "unit": "dp"
-                  },
                   "flex-grow": {
                     "type": "number",
                     "value": 1
-                  },
-                  "padding": {
-                    "type": "length",
-                    "value": 10,
-                    "unit": "dp"
-                  },
-                  "margin-right": {
-                    "type": "length",
-                    "value": 8,
-                    "unit": "dp"
                   }
-                },
-                "children": [
-                  {
-                    "id": "settings_back-plate",
-                    "type": "vector",
-                    "properties": {
-                      "position": {
-                        "type": "keyword",
-                        "value": "absolute"
-                      },
-                      "display": {
-                        "type": "keyword",
-                        "value": "block"
-                      },
-                      "box-sizing": {
-                        "type": "keyword",
-                        "value": "border-box"
-                      },
-                      "opacity": {
-                        "type": "number",
-                        "value": 1
-                      },
-                      "left": {
-                        "type": "length",
-                        "value": 0,
-                        "unit": "dp"
-                      },
-                      "top": {
-                        "type": "length",
-                        "value": 0,
-                        "unit": "dp"
-                      },
-                      "width": {
-                        "type": "length",
-                        "value": 100,
-                        "unit": "%"
-                      },
-                      "height": {
-                        "type": "length",
-                        "value": 100,
-                        "unit": "%"
-                      },
-                      "pointer-events": {
-                        "type": "keyword",
-                        "value": "none"
-                      }
-                    },
-                    "children": [],
-                    "paths": [
-                      {
-                        "id": "field",
-                        "commands": [
-                          {
-                            "id": "point-0",
-                            "op": "move",
-                            "points": [
-                              [
-                                6,
-                                0
-                              ]
-                            ]
-                          },
-                          {
-                            "id": "point-1",
-                            "op": "line",
-                            "points": [
-                              [
-                                {
-                                  "fraction": 1,
-                                  "dp": -6
-                                },
-                                0
-                              ]
-                            ]
-                          },
-                          {
-                            "id": "point-2",
-                            "op": "line",
-                            "points": [
-                              [
-                                {
-                                  "fraction": 1,
-                                  "dp": 0
-                                },
-                                6
-                              ]
-                            ]
-                          },
-                          {
-                            "id": "point-3",
-                            "op": "line",
-                            "points": [
-                              [
-                                {
-                                  "fraction": 1,
-                                  "dp": 0
-                                },
-                                {
-                                  "fraction": 1,
-                                  "dp": -6
-                                }
-                              ]
-                            ]
-                          },
-                          {
-                            "id": "point-4",
-                            "op": "line",
-                            "points": [
-                              [
-                                {
-                                  "fraction": 1,
-                                  "dp": -6
-                                },
-                                {
-                                  "fraction": 1,
-                                  "dp": 0
-                                }
-                              ]
-                            ]
-                          },
-                          {
-                            "id": "point-5",
-                            "op": "line",
-                            "points": [
-                              [
-                                0,
-                                {
-                                  "fraction": 1,
-                                  "dp": 0
-                                }
-                              ]
-                            ]
-                          },
-                          {
-                            "id": "point-6",
-                            "op": "line",
-                            "points": [
-                              [
-                                0,
-                                6
-                              ]
-                            ]
-                          },
-                          {
-                            "id": "close",
-                            "op": "close"
-                          }
-                        ],
-                        "fill": {
-                          "type": "solid",
-                          "color": {
-                            "type": "color",
-                            "value": [
-                              0.035,
-                              0.047,
-                              0.031,
-                              0.96
-                            ]
-                          }
-                        },
-                        "stroke": {
-                          "paint": {
-                            "type": "solid",
-                            "color": {
-                              "type": "color",
-                              "value": [
-                                0.5451,
-                                0.5882,
-                                0.2941,
-                                0.32
-                              ]
-                            }
-                          },
-                          "widthDp": 1,
-                          "minimumPixels": 1,
-                          "join": "miter"
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "id": "settings_back-focus",
-                    "type": "vector",
-                    "properties": {
-                      "position": {
-                        "type": "keyword",
-                        "value": "absolute"
-                      },
-                      "display": {
-                        "type": "keyword",
-                        "value": "block"
-                      },
-                      "box-sizing": {
-                        "type": "keyword",
-                        "value": "border-box"
-                      },
-                      "opacity": {
-                        "type": "number",
-                        "value": 0.12
-                      },
-                      "left": {
-                        "type": "length",
-                        "value": 0,
-                        "unit": "dp"
-                      },
-                      "top": {
-                        "type": "length",
-                        "value": 0,
-                        "unit": "dp"
-                      },
-                      "width": {
-                        "type": "length",
-                        "value": 100,
-                        "unit": "%"
-                      },
-                      "height": {
-                        "type": "length",
-                        "value": 100,
-                        "unit": "%"
-                      },
-                      "pointer-events": {
-                        "type": "keyword",
-                        "value": "none"
-                      }
-                    },
-                    "children": [],
-                    "paths": [
-                      {
-                        "id": "focus",
-                        "commands": [
-                          {
-                            "id": "point-0",
-                            "op": "move",
-                            "points": [
-                              [
-                                6,
-                                0
-                              ]
-                            ]
-                          },
-                          {
-                            "id": "point-1",
-                            "op": "line",
-                            "points": [
-                              [
-                                {
-                                  "fraction": 1,
-                                  "dp": -6
-                                },
-                                0
-                              ]
-                            ]
-                          },
-                          {
-                            "id": "point-2",
-                            "op": "line",
-                            "points": [
-                              [
-                                {
-                                  "fraction": 1,
-                                  "dp": 0
-                                },
-                                6
-                              ]
-                            ]
-                          },
-                          {
-                            "id": "point-3",
-                            "op": "line",
-                            "points": [
-                              [
-                                {
-                                  "fraction": 1,
-                                  "dp": 0
-                                },
-                                {
-                                  "fraction": 1,
-                                  "dp": -6
-                                }
-                              ]
-                            ]
-                          },
-                          {
-                            "id": "point-4",
-                            "op": "line",
-                            "points": [
-                              [
-                                {
-                                  "fraction": 1,
-                                  "dp": -6
-                                },
-                                {
-                                  "fraction": 1,
-                                  "dp": 0
-                                }
-                              ]
-                            ]
-                          },
-                          {
-                            "id": "point-5",
-                            "op": "line",
-                            "points": [
-                              [
-                                0,
-                                {
-                                  "fraction": 1,
-                                  "dp": 0
-                                }
-                              ]
-                            ]
-                          },
-                          {
-                            "id": "point-6",
-                            "op": "line",
-                            "points": [
-                              [
-                                0,
-                                6
-                              ]
-                            ]
-                          },
-                          {
-                            "id": "close",
-                            "op": "close"
-                          }
-                        ],
-                        "stroke": {
-                          "paint": {
-                            "type": "solid",
-                            "color": {
-                              "type": "color",
-                              "value": [
-                                0.8902,
-                                0.5373,
-                                0,
-                                1
-                              ]
-                            }
-                          },
-                          "widthDp": 1,
-                          "minimumPixels": 1,
-                          "join": "miter"
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "id": "settings_back-label",
-                    "type": "text",
-                    "properties": {
-                      "position": {
-                        "type": "keyword",
-                        "value": "relative"
-                      },
-                      "display": {
-                        "type": "keyword",
-                        "value": "block"
-                      },
-                      "box-sizing": {
-                        "type": "keyword",
-                        "value": "border-box"
-                      },
-                      "opacity": {
-                        "type": "number",
-                        "value": 1
-                      },
-                      "text": {
-                        "type": "text",
-                        "value": "#str_42005"
-                      },
-                      "font-family": {
-                        "type": "font",
-                        "value": "marine"
-                      },
-                      "font-size": {
-                        "type": "length",
-                        "value": 16,
-                        "unit": "dp"
-                      },
-                      "line-height": {
-                        "type": "length",
-                        "value": 23,
-                        "unit": "dp"
-                      },
-                      "color": {
-                        "type": "color",
-                        "value": [
-                          1,
-                          1,
-                          1,
-                          0.88
-                        ]
-                      },
-                      "white-space": {
-                        "type": "keyword",
-                        "value": "normal"
-                      },
-                      "text-align": {
-                        "type": "keyword",
-                        "value": "center"
-                      }
-                    }
-                  }
-                ],
-                "control": {
-                  "role": "button",
-                  "label": "#str_42005",
-                  "states": {
-                    "default": "settings_back.default",
-                    "hover": "settings_back.hover",
-                    "focus": "settings_back.focus",
-                    "pressed": "settings_back.pressed",
-                    "disabled": "settings_back.disabled"
-                  },
-                  "event": "onBack"
                 }
               },
               {
-                "id": "settings_apply",
+                "id": "settings-actions",
                 "type": "group",
                 "properties": {
                   "position": {
@@ -40231,7 +39828,7 @@
                   },
                   "display": {
                     "type": "keyword",
-                    "value": "block"
+                    "value": "flex"
                   },
                   "box-sizing": {
                     "type": "keyword",
@@ -40241,379 +39838,43 @@
                     "type": "number",
                     "value": 1
                   },
-                  "min-width": {
+                  "flex-wrap": {
+                    "type": "keyword",
+                    "value": "wrap"
+                  },
+                  "row-gap": {
                     "type": "length",
-                    "value": 128,
+                    "value": 8,
                     "unit": "dp"
                   },
-                  "min-height": {
+                  "flex-shrink": {
+                    "type": "number",
+                    "value": 1
+                  },
+                  "width": {
                     "type": "length",
-                    "value": 44,
+                    "value": 416,
+                    "unit": "dp"
+                  },
+                  "min-width": {
+                    "type": "length",
+                    "value": 400,
                     "unit": "dp"
                   },
                   "flex-grow": {
                     "type": "number",
-                    "value": 1
+                    "value": 0
                   },
-                  "padding": {
+                  "column-gap": {
                     "type": "length",
-                    "value": 10,
-                    "unit": "dp"
-                  },
-                  "margin-right": {
-                    "type": "length",
-                    "value": 8,
+                    "value": 16,
                     "unit": "dp"
                   }
                 },
                 "children": [
                   {
-                    "id": "settings_apply-plate",
-                    "type": "vector",
-                    "properties": {
-                      "position": {
-                        "type": "keyword",
-                        "value": "absolute"
-                      },
-                      "display": {
-                        "type": "keyword",
-                        "value": "block"
-                      },
-                      "box-sizing": {
-                        "type": "keyword",
-                        "value": "border-box"
-                      },
-                      "opacity": {
-                        "type": "number",
-                        "value": 1
-                      },
-                      "left": {
-                        "type": "length",
-                        "value": 0,
-                        "unit": "dp"
-                      },
-                      "top": {
-                        "type": "length",
-                        "value": 0,
-                        "unit": "dp"
-                      },
-                      "width": {
-                        "type": "length",
-                        "value": 100,
-                        "unit": "%"
-                      },
-                      "height": {
-                        "type": "length",
-                        "value": 100,
-                        "unit": "%"
-                      },
-                      "pointer-events": {
-                        "type": "keyword",
-                        "value": "none"
-                      }
-                    },
-                    "children": [],
-                    "paths": [
-                      {
-                        "id": "field",
-                        "commands": [
-                          {
-                            "id": "point-0",
-                            "op": "move",
-                            "points": [
-                              [
-                                6,
-                                0
-                              ]
-                            ]
-                          },
-                          {
-                            "id": "point-1",
-                            "op": "line",
-                            "points": [
-                              [
-                                {
-                                  "fraction": 1,
-                                  "dp": -6
-                                },
-                                0
-                              ]
-                            ]
-                          },
-                          {
-                            "id": "point-2",
-                            "op": "line",
-                            "points": [
-                              [
-                                {
-                                  "fraction": 1,
-                                  "dp": 0
-                                },
-                                6
-                              ]
-                            ]
-                          },
-                          {
-                            "id": "point-3",
-                            "op": "line",
-                            "points": [
-                              [
-                                {
-                                  "fraction": 1,
-                                  "dp": 0
-                                },
-                                {
-                                  "fraction": 1,
-                                  "dp": -6
-                                }
-                              ]
-                            ]
-                          },
-                          {
-                            "id": "point-4",
-                            "op": "line",
-                            "points": [
-                              [
-                                {
-                                  "fraction": 1,
-                                  "dp": -6
-                                },
-                                {
-                                  "fraction": 1,
-                                  "dp": 0
-                                }
-                              ]
-                            ]
-                          },
-                          {
-                            "id": "point-5",
-                            "op": "line",
-                            "points": [
-                              [
-                                0,
-                                {
-                                  "fraction": 1,
-                                  "dp": 0
-                                }
-                              ]
-                            ]
-                          },
-                          {
-                            "id": "point-6",
-                            "op": "line",
-                            "points": [
-                              [
-                                0,
-                                6
-                              ]
-                            ]
-                          },
-                          {
-                            "id": "close",
-                            "op": "close"
-                          }
-                        ],
-                        "fill": {
-                          "type": "solid",
-                          "color": {
-                            "type": "color",
-                            "value": [
-                              0.035,
-                              0.047,
-                              0.031,
-                              0.96
-                            ]
-                          }
-                        },
-                        "stroke": {
-                          "paint": {
-                            "type": "solid",
-                            "color": {
-                              "type": "color",
-                              "value": [
-                                0.5451,
-                                0.5882,
-                                0.2941,
-                                0.32
-                              ]
-                            }
-                          },
-                          "widthDp": 1,
-                          "minimumPixels": 1,
-                          "join": "miter"
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "id": "settings_apply-focus",
-                    "type": "vector",
-                    "properties": {
-                      "position": {
-                        "type": "keyword",
-                        "value": "absolute"
-                      },
-                      "display": {
-                        "type": "keyword",
-                        "value": "block"
-                      },
-                      "box-sizing": {
-                        "type": "keyword",
-                        "value": "border-box"
-                      },
-                      "opacity": {
-                        "type": "number",
-                        "value": 0.12
-                      },
-                      "left": {
-                        "type": "length",
-                        "value": 0,
-                        "unit": "dp"
-                      },
-                      "top": {
-                        "type": "length",
-                        "value": 0,
-                        "unit": "dp"
-                      },
-                      "width": {
-                        "type": "length",
-                        "value": 100,
-                        "unit": "%"
-                      },
-                      "height": {
-                        "type": "length",
-                        "value": 100,
-                        "unit": "%"
-                      },
-                      "pointer-events": {
-                        "type": "keyword",
-                        "value": "none"
-                      }
-                    },
-                    "children": [],
-                    "paths": [
-                      {
-                        "id": "focus",
-                        "commands": [
-                          {
-                            "id": "point-0",
-                            "op": "move",
-                            "points": [
-                              [
-                                6,
-                                0
-                              ]
-                            ]
-                          },
-                          {
-                            "id": "point-1",
-                            "op": "line",
-                            "points": [
-                              [
-                                {
-                                  "fraction": 1,
-                                  "dp": -6
-                                },
-                                0
-                              ]
-                            ]
-                          },
-                          {
-                            "id": "point-2",
-                            "op": "line",
-                            "points": [
-                              [
-                                {
-                                  "fraction": 1,
-                                  "dp": 0
-                                },
-                                6
-                              ]
-                            ]
-                          },
-                          {
-                            "id": "point-3",
-                            "op": "line",
-                            "points": [
-                              [
-                                {
-                                  "fraction": 1,
-                                  "dp": 0
-                                },
-                                {
-                                  "fraction": 1,
-                                  "dp": -6
-                                }
-                              ]
-                            ]
-                          },
-                          {
-                            "id": "point-4",
-                            "op": "line",
-                            "points": [
-                              [
-                                {
-                                  "fraction": 1,
-                                  "dp": -6
-                                },
-                                {
-                                  "fraction": 1,
-                                  "dp": 0
-                                }
-                              ]
-                            ]
-                          },
-                          {
-                            "id": "point-5",
-                            "op": "line",
-                            "points": [
-                              [
-                                0,
-                                {
-                                  "fraction": 1,
-                                  "dp": 0
-                                }
-                              ]
-                            ]
-                          },
-                          {
-                            "id": "point-6",
-                            "op": "line",
-                            "points": [
-                              [
-                                0,
-                                6
-                              ]
-                            ]
-                          },
-                          {
-                            "id": "close",
-                            "op": "close"
-                          }
-                        ],
-                        "stroke": {
-                          "paint": {
-                            "type": "solid",
-                            "color": {
-                              "type": "color",
-                              "value": [
-                                0.8902,
-                                0.5373,
-                                0,
-                                1
-                              ]
-                            }
-                          },
-                          "widthDp": 1,
-                          "minimumPixels": 1,
-                          "join": "miter"
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "id": "settings_apply-label",
-                    "type": "text",
+                    "id": "settings_back",
+                    "type": "group",
                     "properties": {
                       "position": {
                         "type": "keyword",
@@ -40631,56 +39892,909 @@
                         "type": "number",
                         "value": 1
                       },
-                      "text": {
-                        "type": "text",
-                        "value": "#str_200241"
-                      },
-                      "font-family": {
-                        "type": "font",
-                        "value": "marine"
-                      },
-                      "font-size": {
+                      "min-width": {
                         "type": "length",
-                        "value": 16,
+                        "value": 128,
                         "unit": "dp"
                       },
-                      "line-height": {
+                      "min-height": {
                         "type": "length",
-                        "value": 23,
+                        "value": 44,
                         "unit": "dp"
                       },
-                      "color": {
-                        "type": "color",
-                        "value": [
-                          1,
-                          1,
-                          1,
-                          0.88
+                      "flex-grow": {
+                        "type": "number",
+                        "value": 1
+                      },
+                      "padding": {
+                        "type": "length",
+                        "value": 10,
+                        "unit": "dp"
+                      },
+                      "width": {
+                        "type": "length",
+                        "value": 160,
+                        "unit": "dp"
+                      }
+                    },
+                    "children": [
+                      {
+                        "id": "settings_back-plate",
+                        "type": "vector",
+                        "properties": {
+                          "position": {
+                            "type": "keyword",
+                            "value": "absolute"
+                          },
+                          "display": {
+                            "type": "keyword",
+                            "value": "block"
+                          },
+                          "box-sizing": {
+                            "type": "keyword",
+                            "value": "border-box"
+                          },
+                          "opacity": {
+                            "type": "number",
+                            "value": 1
+                          },
+                          "left": {
+                            "type": "length",
+                            "value": 0,
+                            "unit": "dp"
+                          },
+                          "top": {
+                            "type": "length",
+                            "value": 0,
+                            "unit": "dp"
+                          },
+                          "width": {
+                            "type": "length",
+                            "value": 100,
+                            "unit": "%"
+                          },
+                          "height": {
+                            "type": "length",
+                            "value": 100,
+                            "unit": "%"
+                          },
+                          "pointer-events": {
+                            "type": "keyword",
+                            "value": "none"
+                          }
+                        },
+                        "children": [],
+                        "paths": [
+                          {
+                            "id": "field",
+                            "commands": [
+                              {
+                                "id": "point-0",
+                                "op": "move",
+                                "points": [
+                                  [
+                                    6,
+                                    0
+                                  ]
+                                ]
+                              },
+                              {
+                                "id": "point-1",
+                                "op": "line",
+                                "points": [
+                                  [
+                                    {
+                                      "fraction": 1,
+                                      "dp": -6
+                                    },
+                                    0
+                                  ]
+                                ]
+                              },
+                              {
+                                "id": "point-2",
+                                "op": "line",
+                                "points": [
+                                  [
+                                    {
+                                      "fraction": 1,
+                                      "dp": 0
+                                    },
+                                    6
+                                  ]
+                                ]
+                              },
+                              {
+                                "id": "point-3",
+                                "op": "line",
+                                "points": [
+                                  [
+                                    {
+                                      "fraction": 1,
+                                      "dp": 0
+                                    },
+                                    {
+                                      "fraction": 1,
+                                      "dp": -6
+                                    }
+                                  ]
+                                ]
+                              },
+                              {
+                                "id": "point-4",
+                                "op": "line",
+                                "points": [
+                                  [
+                                    {
+                                      "fraction": 1,
+                                      "dp": -6
+                                    },
+                                    {
+                                      "fraction": 1,
+                                      "dp": 0
+                                    }
+                                  ]
+                                ]
+                              },
+                              {
+                                "id": "point-5",
+                                "op": "line",
+                                "points": [
+                                  [
+                                    0,
+                                    {
+                                      "fraction": 1,
+                                      "dp": 0
+                                    }
+                                  ]
+                                ]
+                              },
+                              {
+                                "id": "point-6",
+                                "op": "line",
+                                "points": [
+                                  [
+                                    0,
+                                    6
+                                  ]
+                                ]
+                              },
+                              {
+                                "id": "close",
+                                "op": "close"
+                              }
+                            ],
+                            "fill": {
+                              "type": "solid",
+                              "color": {
+                                "type": "color",
+                                "value": [
+                                  0.035,
+                                  0.047,
+                                  0.031,
+                                  0.96
+                                ]
+                              }
+                            },
+                            "stroke": {
+                              "paint": {
+                                "type": "solid",
+                                "color": {
+                                  "type": "color",
+                                  "value": [
+                                    0.5451,
+                                    0.5882,
+                                    0.2941,
+                                    0.32
+                                  ]
+                                }
+                              },
+                              "widthDp": 1,
+                              "minimumPixels": 1,
+                              "join": "miter"
+                            }
+                          }
                         ]
                       },
-                      "white-space": {
-                        "type": "keyword",
-                        "value": "normal"
+                      {
+                        "id": "settings_back-focus",
+                        "type": "vector",
+                        "properties": {
+                          "position": {
+                            "type": "keyword",
+                            "value": "absolute"
+                          },
+                          "display": {
+                            "type": "keyword",
+                            "value": "block"
+                          },
+                          "box-sizing": {
+                            "type": "keyword",
+                            "value": "border-box"
+                          },
+                          "opacity": {
+                            "type": "number",
+                            "value": 0.12
+                          },
+                          "left": {
+                            "type": "length",
+                            "value": 0,
+                            "unit": "dp"
+                          },
+                          "top": {
+                            "type": "length",
+                            "value": 0,
+                            "unit": "dp"
+                          },
+                          "width": {
+                            "type": "length",
+                            "value": 100,
+                            "unit": "%"
+                          },
+                          "height": {
+                            "type": "length",
+                            "value": 100,
+                            "unit": "%"
+                          },
+                          "pointer-events": {
+                            "type": "keyword",
+                            "value": "none"
+                          }
+                        },
+                        "children": [],
+                        "paths": [
+                          {
+                            "id": "focus",
+                            "commands": [
+                              {
+                                "id": "point-0",
+                                "op": "move",
+                                "points": [
+                                  [
+                                    6,
+                                    0
+                                  ]
+                                ]
+                              },
+                              {
+                                "id": "point-1",
+                                "op": "line",
+                                "points": [
+                                  [
+                                    {
+                                      "fraction": 1,
+                                      "dp": -6
+                                    },
+                                    0
+                                  ]
+                                ]
+                              },
+                              {
+                                "id": "point-2",
+                                "op": "line",
+                                "points": [
+                                  [
+                                    {
+                                      "fraction": 1,
+                                      "dp": 0
+                                    },
+                                    6
+                                  ]
+                                ]
+                              },
+                              {
+                                "id": "point-3",
+                                "op": "line",
+                                "points": [
+                                  [
+                                    {
+                                      "fraction": 1,
+                                      "dp": 0
+                                    },
+                                    {
+                                      "fraction": 1,
+                                      "dp": -6
+                                    }
+                                  ]
+                                ]
+                              },
+                              {
+                                "id": "point-4",
+                                "op": "line",
+                                "points": [
+                                  [
+                                    {
+                                      "fraction": 1,
+                                      "dp": -6
+                                    },
+                                    {
+                                      "fraction": 1,
+                                      "dp": 0
+                                    }
+                                  ]
+                                ]
+                              },
+                              {
+                                "id": "point-5",
+                                "op": "line",
+                                "points": [
+                                  [
+                                    0,
+                                    {
+                                      "fraction": 1,
+                                      "dp": 0
+                                    }
+                                  ]
+                                ]
+                              },
+                              {
+                                "id": "point-6",
+                                "op": "line",
+                                "points": [
+                                  [
+                                    0,
+                                    6
+                                  ]
+                                ]
+                              },
+                              {
+                                "id": "close",
+                                "op": "close"
+                              }
+                            ],
+                            "stroke": {
+                              "paint": {
+                                "type": "solid",
+                                "color": {
+                                  "type": "color",
+                                  "value": [
+                                    0.8902,
+                                    0.5373,
+                                    0,
+                                    1
+                                  ]
+                                }
+                              },
+                              "widthDp": 1,
+                              "minimumPixels": 1,
+                              "join": "miter"
+                            }
+                          }
+                        ]
                       },
-                      "text-align": {
-                        "type": "keyword",
-                        "value": "center"
+                      {
+                        "id": "settings_back-label",
+                        "type": "text",
+                        "properties": {
+                          "position": {
+                            "type": "keyword",
+                            "value": "relative"
+                          },
+                          "display": {
+                            "type": "keyword",
+                            "value": "block"
+                          },
+                          "box-sizing": {
+                            "type": "keyword",
+                            "value": "border-box"
+                          },
+                          "opacity": {
+                            "type": "number",
+                            "value": 1
+                          },
+                          "text": {
+                            "type": "text",
+                            "value": "#str_42005"
+                          },
+                          "font-family": {
+                            "type": "font",
+                            "value": "marine"
+                          },
+                          "font-size": {
+                            "type": "length",
+                            "value": 18,
+                            "unit": "dp"
+                          },
+                          "line-height": {
+                            "type": "length",
+                            "value": 24,
+                            "unit": "dp"
+                          },
+                          "color": {
+                            "type": "color",
+                            "value": [
+                              1,
+                              1,
+                              1,
+                              0.88
+                            ]
+                          },
+                          "white-space": {
+                            "type": "keyword",
+                            "value": "normal"
+                          },
+                          "text-align": {
+                            "type": "keyword",
+                            "value": "center"
+                          }
+                        }
                       }
+                    ],
+                    "control": {
+                      "role": "button",
+                      "label": "#str_42005",
+                      "states": {
+                        "default": "settings_back.default",
+                        "hover": "settings_back.hover",
+                        "focus": "settings_back.focus",
+                        "pressed": "settings_back.pressed",
+                        "disabled": "settings_back.disabled"
+                      },
+                      "event": "onBack"
+                    }
+                  },
+                  {
+                    "id": "settings_apply",
+                    "type": "group",
+                    "properties": {
+                      "position": {
+                        "type": "keyword",
+                        "value": "relative"
+                      },
+                      "display": {
+                        "type": "keyword",
+                        "value": "block"
+                      },
+                      "box-sizing": {
+                        "type": "keyword",
+                        "value": "border-box"
+                      },
+                      "opacity": {
+                        "type": "number",
+                        "value": 1
+                      },
+                      "min-width": {
+                        "type": "length",
+                        "value": 128,
+                        "unit": "dp"
+                      },
+                      "min-height": {
+                        "type": "length",
+                        "value": 44,
+                        "unit": "dp"
+                      },
+                      "flex-grow": {
+                        "type": "number",
+                        "value": 1
+                      },
+                      "padding": {
+                        "type": "length",
+                        "value": 10,
+                        "unit": "dp"
+                      },
+                      "width": {
+                        "type": "length",
+                        "value": 240,
+                        "unit": "dp"
+                      }
+                    },
+                    "children": [
+                      {
+                        "id": "settings_apply-plate",
+                        "type": "vector",
+                        "properties": {
+                          "position": {
+                            "type": "keyword",
+                            "value": "absolute"
+                          },
+                          "display": {
+                            "type": "keyword",
+                            "value": "block"
+                          },
+                          "box-sizing": {
+                            "type": "keyword",
+                            "value": "border-box"
+                          },
+                          "opacity": {
+                            "type": "number",
+                            "value": 1
+                          },
+                          "left": {
+                            "type": "length",
+                            "value": 0,
+                            "unit": "dp"
+                          },
+                          "top": {
+                            "type": "length",
+                            "value": 0,
+                            "unit": "dp"
+                          },
+                          "width": {
+                            "type": "length",
+                            "value": 100,
+                            "unit": "%"
+                          },
+                          "height": {
+                            "type": "length",
+                            "value": 100,
+                            "unit": "%"
+                          },
+                          "pointer-events": {
+                            "type": "keyword",
+                            "value": "none"
+                          }
+                        },
+                        "children": [],
+                        "paths": [
+                          {
+                            "id": "field",
+                            "commands": [
+                              {
+                                "id": "point-0",
+                                "op": "move",
+                                "points": [
+                                  [
+                                    6,
+                                    0
+                                  ]
+                                ]
+                              },
+                              {
+                                "id": "point-1",
+                                "op": "line",
+                                "points": [
+                                  [
+                                    {
+                                      "fraction": 1,
+                                      "dp": -6
+                                    },
+                                    0
+                                  ]
+                                ]
+                              },
+                              {
+                                "id": "point-2",
+                                "op": "line",
+                                "points": [
+                                  [
+                                    {
+                                      "fraction": 1,
+                                      "dp": 0
+                                    },
+                                    6
+                                  ]
+                                ]
+                              },
+                              {
+                                "id": "point-3",
+                                "op": "line",
+                                "points": [
+                                  [
+                                    {
+                                      "fraction": 1,
+                                      "dp": 0
+                                    },
+                                    {
+                                      "fraction": 1,
+                                      "dp": -6
+                                    }
+                                  ]
+                                ]
+                              },
+                              {
+                                "id": "point-4",
+                                "op": "line",
+                                "points": [
+                                  [
+                                    {
+                                      "fraction": 1,
+                                      "dp": -6
+                                    },
+                                    {
+                                      "fraction": 1,
+                                      "dp": 0
+                                    }
+                                  ]
+                                ]
+                              },
+                              {
+                                "id": "point-5",
+                                "op": "line",
+                                "points": [
+                                  [
+                                    0,
+                                    {
+                                      "fraction": 1,
+                                      "dp": 0
+                                    }
+                                  ]
+                                ]
+                              },
+                              {
+                                "id": "point-6",
+                                "op": "line",
+                                "points": [
+                                  [
+                                    0,
+                                    6
+                                  ]
+                                ]
+                              },
+                              {
+                                "id": "close",
+                                "op": "close"
+                              }
+                            ],
+                            "fill": {
+                              "type": "solid",
+                              "color": {
+                                "type": "color",
+                                "value": [
+                                  0.035,
+                                  0.047,
+                                  0.031,
+                                  0.96
+                                ]
+                              }
+                            },
+                            "stroke": {
+                              "paint": {
+                                "type": "solid",
+                                "color": {
+                                  "type": "color",
+                                  "value": [
+                                    0.5451,
+                                    0.5882,
+                                    0.2941,
+                                    0.32
+                                  ]
+                                }
+                              },
+                              "widthDp": 1,
+                              "minimumPixels": 1,
+                              "join": "miter"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "id": "settings_apply-focus",
+                        "type": "vector",
+                        "properties": {
+                          "position": {
+                            "type": "keyword",
+                            "value": "absolute"
+                          },
+                          "display": {
+                            "type": "keyword",
+                            "value": "block"
+                          },
+                          "box-sizing": {
+                            "type": "keyword",
+                            "value": "border-box"
+                          },
+                          "opacity": {
+                            "type": "number",
+                            "value": 0.12
+                          },
+                          "left": {
+                            "type": "length",
+                            "value": 0,
+                            "unit": "dp"
+                          },
+                          "top": {
+                            "type": "length",
+                            "value": 0,
+                            "unit": "dp"
+                          },
+                          "width": {
+                            "type": "length",
+                            "value": 100,
+                            "unit": "%"
+                          },
+                          "height": {
+                            "type": "length",
+                            "value": 100,
+                            "unit": "%"
+                          },
+                          "pointer-events": {
+                            "type": "keyword",
+                            "value": "none"
+                          }
+                        },
+                        "children": [],
+                        "paths": [
+                          {
+                            "id": "focus",
+                            "commands": [
+                              {
+                                "id": "point-0",
+                                "op": "move",
+                                "points": [
+                                  [
+                                    6,
+                                    0
+                                  ]
+                                ]
+                              },
+                              {
+                                "id": "point-1",
+                                "op": "line",
+                                "points": [
+                                  [
+                                    {
+                                      "fraction": 1,
+                                      "dp": -6
+                                    },
+                                    0
+                                  ]
+                                ]
+                              },
+                              {
+                                "id": "point-2",
+                                "op": "line",
+                                "points": [
+                                  [
+                                    {
+                                      "fraction": 1,
+                                      "dp": 0
+                                    },
+                                    6
+                                  ]
+                                ]
+                              },
+                              {
+                                "id": "point-3",
+                                "op": "line",
+                                "points": [
+                                  [
+                                    {
+                                      "fraction": 1,
+                                      "dp": 0
+                                    },
+                                    {
+                                      "fraction": 1,
+                                      "dp": -6
+                                    }
+                                  ]
+                                ]
+                              },
+                              {
+                                "id": "point-4",
+                                "op": "line",
+                                "points": [
+                                  [
+                                    {
+                                      "fraction": 1,
+                                      "dp": -6
+                                    },
+                                    {
+                                      "fraction": 1,
+                                      "dp": 0
+                                    }
+                                  ]
+                                ]
+                              },
+                              {
+                                "id": "point-5",
+                                "op": "line",
+                                "points": [
+                                  [
+                                    0,
+                                    {
+                                      "fraction": 1,
+                                      "dp": 0
+                                    }
+                                  ]
+                                ]
+                              },
+                              {
+                                "id": "point-6",
+                                "op": "line",
+                                "points": [
+                                  [
+                                    0,
+                                    6
+                                  ]
+                                ]
+                              },
+                              {
+                                "id": "close",
+                                "op": "close"
+                              }
+                            ],
+                            "stroke": {
+                              "paint": {
+                                "type": "solid",
+                                "color": {
+                                  "type": "color",
+                                  "value": [
+                                    0.8902,
+                                    0.5373,
+                                    0,
+                                    1
+                                  ]
+                                }
+                              },
+                              "widthDp": 1,
+                              "minimumPixels": 1,
+                              "join": "miter"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "id": "settings_apply-label",
+                        "type": "text",
+                        "properties": {
+                          "position": {
+                            "type": "keyword",
+                            "value": "relative"
+                          },
+                          "display": {
+                            "type": "keyword",
+                            "value": "block"
+                          },
+                          "box-sizing": {
+                            "type": "keyword",
+                            "value": "border-box"
+                          },
+                          "opacity": {
+                            "type": "number",
+                            "value": 1
+                          },
+                          "text": {
+                            "type": "text",
+                            "value": "#str_200241"
+                          },
+                          "font-family": {
+                            "type": "font",
+                            "value": "marine"
+                          },
+                          "font-size": {
+                            "type": "length",
+                            "value": 18,
+                            "unit": "dp"
+                          },
+                          "line-height": {
+                            "type": "length",
+                            "value": 24,
+                            "unit": "dp"
+                          },
+                          "color": {
+                            "type": "color",
+                            "value": [
+                              1,
+                              1,
+                              1,
+                              0.88
+                            ]
+                          },
+                          "white-space": {
+                            "type": "keyword",
+                            "value": "normal"
+                          },
+                          "text-align": {
+                            "type": "keyword",
+                            "value": "center"
+                          }
+                        }
+                      }
+                    ],
+                    "control": {
+                      "role": "button",
+                      "label": "#str_200241",
+                      "states": {
+                        "default": "settings_apply.default",
+                        "hover": "settings_apply.hover",
+                        "focus": "settings_apply.focus",
+                        "pressed": "settings_apply.pressed",
+                        "disabled": "settings_apply.disabled"
+                      },
+                      "event": "apply"
                     }
                   }
-                ],
-                "control": {
-                  "role": "button",
-                  "label": "#str_200241",
-                  "states": {
-                    "default": "settings_apply.default",
-                    "hover": "settings_apply.hover",
-                    "focus": "settings_apply.focus",
-                    "pressed": "settings_apply.pressed",
-                    "disabled": "settings_apply.disabled"
-                  },
-                  "event": "apply"
-                }
+                ]
               }
             ]
           }

@@ -7,10 +7,13 @@ namespace openq4::ui {
 struct SettingsDisplayObservation {
 	std::uint64_t epoch = 0, generation = 0, submitted = 0, presented = 0, failures = 0;
 	bool ready = false, hidden = false, focused = false, minimized = false;
+	// A ready device can still await a subsequent normal audio/resource update.
+	// False means pending, not successful completion or an observed failure.
+	bool effectsReady = true;
 };
 enum class SettingsDisplayStage {
 	Idle, QueuedApply, AwaitApply, Confirming, QueuedKeep, QueuedRestore,
-	AwaitRestore, FinalizeKeep, FinalizeRestore, Recovery
+	AwaitRestore, FinalizeKeep, FinalizeRestore, Recovery, QueuedAutomaticCommit
 };
 
 // Serialized engine adapter. Prepare captures actual baseline/policy, obtains
@@ -42,7 +45,8 @@ class SettingsDisplayController {
 public:
 	SettingsDisplayController(SettingsTransaction& transaction, SettingsDisplayHost& host)
 		: transaction(transaction), host(host) {}
-	SettingsResult Apply(std::uint64_t owner, double now);
+	SettingsResult Apply(std::uint64_t owner, double now,
+		SettingsCompletion completion = SettingsCompletion::UserConfirmation);
 	SettingsResult Keep(std::uint64_t owner, std::uint64_t request, double now);
 	SettingsResult Revert(std::uint64_t owner, std::uint64_t request);
 	SettingsResult Retry(std::uint64_t owner, std::uint64_t request);

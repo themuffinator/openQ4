@@ -265,6 +265,65 @@ the same held-collection policy as SDL. Exclusive IMM handoff, native character
 association, TSF keystroke routing, candidate geometry, renewal and live platform
 qualification remain required.
 
+## Ordinary event ownership and delivery accounting
+
+`EventDisposition` supplies a private, fixed-size ownership tag beside platform
+and pushed event storage. It leaves `sysEvent_t` and the journal wire format
+unchanged. Tracked admission transfers the payload and tag together only after
+storage succeeds. A legacy getter encountering a tagged head leaves it queued
+and invalidates continuity; it cannot silently strip the tag and deliver the
+event. Clear, overflow and shutdown release pending payloads without claiming
+delivery. The storage epoch belongs to the constructing main thread and is
+retired with the event loop. This does not qualify asynchronous input.
+
+`NativeEventDispositionLedger` separately accounts for immutable source
+records and every resulting emission. Translation reserves tickets before
+storage admission. Real delivery must begin and complete against the exact
+ticket; issuing a ticket or calling a poll function is insufficient. Keyboard
+delivery may admit only its pre-reserved, same-record deferred Session child.
+A parent cannot complete while that child remains unadmitted. Every pass,
+including a sealed empty pass, needs an explicit checkpoint. Completion requires
+all tickets to be terminal and fresh ingress/ownership observations before the
+final receipt.
+
+There are two fixed schedules. Collection before the normal Session drain uses
+Session, mouse polling, keyboard polling, then deferred Session delivery.
+Collection at the POSIX mouse-poll entry uses mouse, keyboard, initial Session,
+then deferred Session delivery. The entry point selects the schedule once;
+SP/MP mode and GUI visibility cannot infer it. Neither schedule adds a frame,
+forces an early Session drain, or treats an uncalled user-command loop as
+delivery. A later poll cannot consume an already completed ticket again.
+
+Failed collection retains its safely copied prefix in `NativeQueueQuarantine`,
+with a failure boundary describing uncertainty around removal/copying. It emits
+no successful batch receipt. Unpolled queue entries remain untouched. Taking
+the quarantine and retiring the actual provider are separate required steps;
+reset cannot discard a held quarantine or manufacture acknowledgement.
+
+The platform/pushed-storage harness passes 66,581 checks and rejects 15 compiled
+mutations. The combined ingress and two-schedule accounting harness passes
+117,398 checks on Windows Clang, MSVC debug STL and Linux GCC; Clang and
+sanitized GCC each reject 43 compiled mutations. These exercise actual storage
+and accounting source with counted delivery boundaries.
+
+SDL keyboard and mouse rings now carry parallel bounded tags into immutable
+polled slices. Checked enqueue refuses full rings without eviction; checked
+polling refuses unread prior ownership, validates the whole ring, and never
+pumps SDL. Peek/Take/End require exact lane, epoch, continuity, slice serial and
+next-slot identity. Legacy polling stops before a tagged head and cannot consume
+a checked slice. Clear and ordinary overflow invalidate continuity before loss.
+The shared lock order is SDL storage, then the disposition mutex; no disposition
+method acquires an SDL lock. The constructing-thread query remains available
+after epoch retirement without making stale tags current.
+
+The actual polled-method harness passes 122,976 checks across its Windows and
+POSIX branches on Windows Clang, MSVC debug STL and sanitized Linux GCC; Clang
+and GCC each reject 21 compiled mutations. These are scalar storage transfers,
+not proof that user-command or Session effects ran. Deferred modifier emission
+still requires checked admission around the actual keyboard route. Session
+delivery, stale-route retirement and production native text activation remain
+disconnected and unqualified.
+
 ## Validation boundary
 
 Pure tests exercise production broker/codec/decoder source, explicit echo

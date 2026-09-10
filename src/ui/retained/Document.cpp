@@ -175,7 +175,7 @@ bool Parse(const std::string& source, Json::Value& root, std::vector<Diagnostic>
 	builder["skipBom"] = false;
 	// Upstream skipBom moves its offset origin forward by three bytes. Parse
 	// equivalent whitespace instead so every span still addresses original bytes.
-	std::string paddedBom;
+	std::string paddedBom(0,'\0');
 	const char* input = source.data();
 	if (source.starts_with("\xef\xbb\xbf")) { paddedBom = source; paddedBom.replace(0,3,"   "); input = paddedBom.data(); }
 	try {

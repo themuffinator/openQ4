@@ -458,3 +458,18 @@ The [unified effect direction](../ui/settings-effect-execution.md) preserves one
 durable operation across renderer, image, audio and deferred policy. Full
 implementation, editor, platform qualification and all migration/final gates
 remain required; this increment changes no acceptance status.
+
+The effect/input increment adds explicit automatic completion to the same
+settings transaction/controller, and checked in-place audio ownership with
+untouched-preparation cancellation and nonreleasing completion readback.
+See [effect execution](../ui/settings-effect-execution.md) for its qualified
+boundaries, the explicit schema-2 envelope and remaining portable recovery work.
+Native event-storage sidecars and immutable polled slices retain original route
+identity and payload ownership without changing the event wire format. Two
+fixed schedules account for the real Session-first and POSIX poll-first entry
+points. The SYSTEM opening layout gains a compact preset and wrapping footer
+while retaining full-size targets and flowing text. Ordinary native delivery
+and mixed settings Apply remain gated while their complete integration is built.
+The source-bound record is
+`.tmp/ui/native-effects-integration/validation-evidence.json`. No product,
+migration or final gate is accepted by these foundation tests.

@@ -29,6 +29,7 @@ If you have questions concerning this license or the applicable additional terms
 */
 
 #include "../snd_local.h"
+#include "../SoundSettings.h"
 #if defined(USE_DOOMCLASSIC)
 	#include "../../../doomclassic/doom/i_sound.h"
 #endif
@@ -166,6 +167,7 @@ static void ALC_APIENTRY openQ4_OpenALDeviceEventCallback( ALCenum eventType, AL
 	const int flag = openQ4_DeviceEventFlagForType( eventType );
 	if( flag != 0 )
 	{
+		SoundSettings_DeviceEvent();
 		openQ4_PendingOpenALDeviceEvents.fetch_or( flag, std::memory_order_relaxed );
 	}
 }
@@ -979,6 +981,8 @@ void idSoundHardware_OpenAL::EndDeferredUpdates() {
 }
 
 bool idSoundHardware_OpenAL::UpdateDeviceMonitoring() {
+	// The owned settings lease queries drift and keeps recovery authority.
+	if (SoundSettings_BlockAutomaticRestart()) return false;
 	const int nowTime = Sys_Milliseconds();
 	const int pendingDeviceEventFlags = openQ4_ConsumePendingDeviceEventFlags();
 	if( pendingDeviceEventFlags != 0 )
@@ -1175,6 +1179,8 @@ idSoundHardware_OpenAL::Init
 */
 void idSoundHardware_OpenAL::Init()
 {
+	if (SoundSettings_BlockAutomaticRestart()) return;
+	SoundSettings_DeviceInitialized();
 	static bool listDevicesCommandAdded = false;
 	if( !listDevicesCommandAdded )
 	{
@@ -1503,6 +1509,7 @@ idSoundHardware_OpenAL::Shutdown
 */
 void idSoundHardware_OpenAL::Shutdown()
 {
+	SoundSettings_DeviceDestroyed();
 	EndDeferredUpdates();
 	DisableDeviceEventMonitoring();
 

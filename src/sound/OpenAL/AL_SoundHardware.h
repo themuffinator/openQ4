@@ -111,6 +111,7 @@ protected:
 	friend class idSoundVoice_OpenAL;
 
 private:
+	friend struct SoundSettingsAccess;
 	/*
 	IXAudio2* pXAudio2;
 	IXAudio2MasteringVoice* pMasterVoice;

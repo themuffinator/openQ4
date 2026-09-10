@@ -91,6 +91,7 @@ def main():
         p=out/n;p.parent.mkdir(parents=True,exist_ok=True);p.write_text((ROOT/n).read_text(),newline='\n')
     flags=[args.compiler,'-std=c++20','-Wall','-Wextra','-Werror','-DSDL_STATIC_LIB',
            '-I'+str(out),'-I'+str(ROOT/'subprojects/packagefiles/sdl3/include'),'-I'+str(sdl_source/'include')]
+    if os.name!='nt':flags+=['-pthread']
     if args.sanitizers:flags+=['-fsanitize=address,undefined','-fno-omit-frame-pointer','-g0']
     files=[str(out/n) for n in names if n.endswith('.cpp')]
     command=flags+['-DUSE_SDL3','-DOPENQ4_SDL3_CHECKED_NATIVE_QUEUE=1']+files+['-o',str(out/'test.exe')]

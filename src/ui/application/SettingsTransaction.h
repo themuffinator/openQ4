@@ -10,6 +10,7 @@ namespace openq4::ui {
 
 enum class SettingsPhase { Closed, Editing, Confirming, RecoveryRequired, Applying, Restoring };
 enum class SettingsCode { Ok, Busy, NotOpen, Invalid, Conflict, ApplyFailed, RollbackFailed };
+enum class SettingsCompletion { UserConfirmation, Automatic };
 struct SettingsResult {
 	SettingsCode code = SettingsCode::Ok;
 	std::string diagnostic; // Bounded developer diagnostic; localize user text by code.
@@ -21,6 +22,7 @@ struct SettingsResult {
 struct SettingsAttempt {
 	std::uint64_t owner = 0, request = 0;
 	StateValues baseline, target, patch;
+	SettingsCompletion completion = SettingsCompletion::UserConfirmation;
 };
 
 // The host supplies one stable, complete, typed catalog. Read/Defaults/Validate
@@ -85,9 +87,15 @@ public:
 	// IDs are process-wide and never reused, including across Close/Begin. Each
 	// successful prepare returns a new ID; restore/confirm take the current ID
 	// to authorize the transition, then return the replacement in attempt.request.
-	SettingsResult PrepareApply(std::uint64_t owner, double now, SettingsAttempt& attempt);
+	SettingsResult PrepareApply(std::uint64_t owner, double now, SettingsAttempt& attempt,
+		SettingsCompletion completion = SettingsCompletion::UserConfirmation);
 	SettingsResult ExecuteApply(std::uint64_t owner, std::uint64_t request);
 	SettingsResult CompleteApply(std::uint64_t owner, std::uint64_t request, double now, double timeout = 15.0);
+	// For a frozen Automatic request only, after the coordinator has verified
+	// every actual effect. Rechecks that the host needs no user confirmation and
+	// freezes a new commit identity without entering Confirming or inventing Keep.
+	SettingsResult PrepareAutomaticCommit(std::uint64_t owner, std::uint64_t request, double now, SettingsAttempt& attempt);
+	SettingsResult CompleteAutomaticCommit(std::uint64_t owner, std::uint64_t request);
 	SettingsResult CancelPreparedApply(std::uint64_t owner, std::uint64_t request);
 	// Restore freezes a fresh conflict-safe patch. Execution can restore safe
 	// owned keys while reporting Conflict for divergent ones; such a result must
@@ -126,7 +134,8 @@ private:
 		const std::string& reason = {});
 	void Close();
 	void ClearAttempt();
-	enum class AttemptStage { None, ApplyPrepared, ApplyExecuted, ApplyWritten, Confirming, ConfirmPrepared,
+	SettingsResult CompletePreparedCommit();
+	enum class AttemptStage { None, ApplyPrepared, ApplyExecuted, ApplyWritten, Confirming, ConfirmPrepared, AutomaticCommitPrepared,
 		RestorePrepared, RestoreExecuted, RestoreWritten };
 	SettingsHost& host;
 	std::uint64_t owner = 0;

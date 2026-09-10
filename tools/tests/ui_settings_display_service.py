@@ -395,6 +395,7 @@ def main(production_mutations=()):
     jsoncpp = ROOT / "subprojects/jsoncpp-1.9.6"
     command = [compiler, "-std=c++20", "-DUSE_SDL3", "-I", str(ROOT), "-I", str(jsoncpp / "include"),
                str(source), str(values), str(ROOT / "src/ui/application/SettingsJournal.cpp"),
+               str(ROOT / "src/ui/application/SettingsEffectPlan.cpp"),
                str(ROOT / "src/ui/retained/Presentation.cpp"), str(ROOT / "src/framework/PerformancePreset.cpp"),
                *(str(jsoncpp / "src/lib_json" / f"json_{name}.cpp") for name in ("reader", "value", "writer")),
                "-o", str(executable)]
@@ -405,6 +406,7 @@ def main(production_mutations=()):
                   "src/ui/application/SystemDisplay.h", "src/ui/application/SystemDisplay.cpp",
                   "src/framework/PerformancePreset.h", "src/framework/PerformancePreset.cpp", "src/ui/application/SystemSettingsHost.h", "src/ui/application/SystemSettingsHost.cpp",
                   "src/ui/application/SettingsJournal.h", "src/ui/application/SettingsJournal.cpp",
+                  "src/ui/application/SettingsEffectPlan.h", "src/ui/application/SettingsEffectPlan.cpp",
                   "src/ui/application/SettingsValue.h", "src/ui/application/SettingsTransaction.h",
                   "src/ui/retained/Document.h", "src/ui/retained/Document.cpp",
                   "src/ui/retained/Presentation.cpp"))]

@@ -29,6 +29,8 @@ If you have questions concerning this license or the applicable additional terms
 #ifndef __AL_SOUNDVOICE_H__
 #define __AL_SOUNDVOICE_H__
 
+#include "../SoundSettings.h"
+
 static const int MAX_QUEUED_BUFFERS = 3;
 
 /*
@@ -132,6 +134,7 @@ public:
 	void					OnBufferStart( idSoundSample_OpenAL* sample, int bufferNumber );
 
 private:
+	friend struct SoundSettingsAccess;
 	friend class idSoundHardware_OpenAL;
 
 	// Returns true when all the buffers are finished processing
@@ -168,11 +171,14 @@ private:
 	void					SetSampleRate( uint32 newSampleRate, uint32 operationSet );
 	void					ResetSourceMixState();
 	void					ApplyWetDryRouting();
+	bool ApplyWetDryRoutingChecked(bool filters, bool wet, ALuint slot, SoundSettingsSourceReceipt& out);
 	void					CreateWetDryFilters();
 	void					DestroyWetDryFilters();
 
 	//IXAudio2SourceVoice* 	pSourceVoice;
 	ALuint					openalSource;
+	std::uint64_t soundSettingsSourceGeneration;
+	void (AL_APIENTRY *soundSettingsDeleteFilters)(ALsizei, const ALuint*);
 	ALuint					openalStreamingBuffer[3];
 	bool					openalStreamingBufferQueued[3];
 	ALuint					openalDirectFilter;

@@ -432,7 +432,7 @@ if build_engine or get_option('build_native_tests')
   libtess2_project = subproject('libtess2')
   openq4_retained_library = static_library(
     'openq4-retained-ui',
-    files('src/ui/retained/Runtime.cpp', 'src/ui/retained/Document.cpp', 'src/ui/retained/Presentation.cpp', 'src/ui/retained/Behavior.cpp', 'src/ui/retained/State.cpp', 'src/ui/retained/Motion.cpp', 'src/ui/retained/Interaction.cpp', 'src/ui/retained/ValueControlView.cpp', 'src/ui/retained/NumberControlView.cpp', 'src/ui/retained/Input.cpp', 'src/ui/retained/TextInput.cpp', 'src/ui/retained/TextEdit.cpp', 'src/ui/retained/TextEditCommand.cpp', 'src/ui/retained/TextInputBroker.cpp', 'src/ui/retained/TextRun.cpp', 'src/ui/retained/Vector.cpp', 'src/ui/retained/VectorElement.cpp', 'src/ui/application/SettingsTransaction.cpp', 'src/ui/application/SettingsJournal.cpp', 'src/ui/application/SettingsDisplayController.cpp'),
+    files('src/ui/retained/Runtime.cpp', 'src/ui/retained/Document.cpp', 'src/ui/retained/Presentation.cpp', 'src/ui/retained/Behavior.cpp', 'src/ui/retained/State.cpp', 'src/ui/retained/Motion.cpp', 'src/ui/retained/Interaction.cpp', 'src/ui/retained/ValueControlView.cpp', 'src/ui/retained/NumberControlView.cpp', 'src/ui/retained/Input.cpp', 'src/ui/retained/TextInput.cpp', 'src/ui/retained/TextEdit.cpp', 'src/ui/retained/TextEditCommand.cpp', 'src/ui/retained/TextInputBroker.cpp', 'src/ui/retained/TextRun.cpp', 'src/ui/retained/Vector.cpp', 'src/ui/retained/VectorElement.cpp', 'src/ui/application/SettingsTransaction.cpp', 'src/ui/application/SettingsJournal.cpp', 'src/ui/application/SettingsEffectPlan.cpp', 'src/ui/application/SettingsDisplayController.cpp'),
     files('src/ui/retained/TextInputBrokerWire.cpp'),
     files('src/ui/retained/NativeTextDocument.cpp'),
     files('src/ui/retained/NativeTextEditor.cpp'),
@@ -610,6 +610,13 @@ if build_engine or get_option('build_native_tests')
       install: false,
     )
     test('openq4-ui-settings-transaction', openq4_ui_settings_transaction_test, timeout: 30)
+    ui_test_cpp = meson.get_compiler('cpp')
+    test('openq4-ui-input-disposition', py,
+      args: [meson.project_source_root() / 'tools/tests/sdl3_input_disposition.py',
+        '--compiler', ui_test_cpp.cmd_array()[-1], '--no-mutations'], timeout: 120)
+    test('openq4-ui-settings-effect-journal', py,
+      args: [meson.project_source_root() / 'tools/tests/ui_settings_effect_journal.py',
+        '--compiler', ui_test_cpp.cmd_array()[-1], '--no-mutations'], timeout: 180)
     openq4_ui_performance_presets_test = executable(
       'openq4-ui-performance-presets-test',
       files('tools/tests/native/UiPerformancePresetTest.cpp', 'src/framework/PerformancePreset.cpp'),
@@ -1549,7 +1556,8 @@ if build_engine or get_option('build_native_tests')
   endif
   if build_engine and use_sdl3_backend
     native_queue_library = static_library('openq4-native-queue',
-      files('src/sys/sdl3/NativeQueueBatch.cpp', 'src/sys/sdl3/NativeQueueSource.cpp'),
+      files('src/sys/sdl3/NativeQueueBatch.cpp', 'src/sys/sdl3/NativeQueueSource.cpp',
+        'src/sys/sdl3/NativeEventDisposition.cpp'),
       files('src/ui/application/NativeTextCollectionCoordinator.cpp'),
       files('src/ui/application/ManagedNativeTextOwner.cpp'),
       include_directories: [root_include_dir, include_directories('subprojects/packagefiles/sdl3/include')],
@@ -1585,6 +1593,11 @@ if build_engine or get_option('build_native_tests')
       include_directories: text_ingress_test_headers,
       dependencies: [openq4_retained_dep, native_queue_dep] + text_ingress_headers, install: false)
     test('openq4-ui-native-collection-coordinator', native_collection_coordinator_test, timeout: 30)
+    native_event_disposition_test = executable('openq4-ui-native-event-disposition-test',
+      files('tools/tests/native/NativeRouteAccountingTest.cpp'),
+      include_directories: text_ingress_test_headers,
+      dependencies: [openq4_retained_dep, native_queue_dep] + text_ingress_headers, install: false)
+    test('openq4-ui-native-event-disposition', native_event_disposition_test, timeout: 30)
     if host_system == 'windows'
       windows_collection_bridge_test = executable('openq4-ui-windows-text-collection-bridge-test',
         files('tools/tests/native/WindowsTextCollectionBridgeTest.cpp'),

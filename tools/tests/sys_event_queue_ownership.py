@@ -28,6 +28,7 @@ SUPPORT = r'''
 #include <unordered_map>
 #include <vector>
 #include "src/sys/EventQueueContinuity.h"
+#include "src/sys/EventDisposition.h"
 static unsigned checks=0, frees=0, warnings=0;
 static void Check(bool value,const char* message) {
     ++checks;
@@ -52,7 +53,7 @@ static void* Allocate(std::size_t bytes) {
     for(std::size_t i=0;i<bytes;++i) block.memory[i]=static_cast<unsigned char>(0x20+(i%90));
     // Include embedded zero bytes in arbitrary binary payloads.
     if(bytes>4) block.memory[3]=0;
-    std::fill_n(block.memory.get()+bytes,8,0xa5);
+    std::fill_n(block.memory.get()+bytes,8,static_cast<unsigned char>(0xa5));
     block.original.assign(block.memory.get(),block.memory.get()+bytes);
     void* pointer=block.memory.get();
     Check(indices.emplace(pointer,blocks.size()).second,"distinct live allocation");
@@ -275,6 +276,7 @@ def main():
     results = {"scope": "compiled actual Windows and POSIX queue bodies on this host; no engine/platform/input launch",
                "files": {"src/sys/sys_public.h": digest(ROOT / "src/sys/sys_public.h"),
                          "src/sys/EventQueueContinuity.h": digest(ROOT / "src/sys/EventQueueContinuity.h"),
+                         "src/sys/EventDisposition.h": digest(ROOT / "src/sys/EventDisposition.h"),
                          "src/sys/EventQueueContinuity.cpp": digest(ROOT / "src/sys/EventQueueContinuity.cpp"),
                          "tools/tests/sys_event_queue_ownership.py": digest(Path(__file__))}, "cases": {}}
     for platform in ("windows", "posix"):

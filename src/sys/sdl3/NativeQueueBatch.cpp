@@ -57,7 +57,7 @@ bool CopyEvent(const SDL_Event& e,const OQ4_NativeQueueRecord& tag,OwnedNativeQu
             e.edit_candidates.selected_candidate < -1 || e.edit_candidates.selected_candidate>=e.edit_candidates.num_candidates ||
             (e.edit_candidates.num_candidates && !e.edit_candidates.candidates)) { error="Invalid SDL candidate table"; return false; }
         for(int i=0;i<e.edit_candidates.num_candidates;++i) {
-            std::string text;
+            std::string text(0, '\0');
             if(!CopyText(e.edit_candidates.candidates[i],text,bytes,error)) return false;
             out.candidates.push_back(std::move(text));
         }
@@ -101,18 +101,39 @@ NativeQueueIngress::NativeQueueIngress() {
     while(value && !nextIngress.compare_exchange_weak(value,value==(std::numeric_limits<std::uint64_t>::max)()?0:value+1)) {}
     identity=value;
 }
-bool NativeQueueIngress::Fail(std::string& error,const char* message) { phase=Phase::Retire; error=message; return false; }
+bool NativeQueueIngress::Fail(std::string& error,const char* message) noexcept {
+    phase=Phase::Retire; try { error=message; } catch (...) { error.clear(); } return false;
+}
 bool NativeQueueIngress::CheckSource(NativeQueueSource& source,const NativeQueueStatus& expected,bool fence,std::string& error) {
     NativeQueueStatus current;
     if(!source.Observe(current,error) || phase==Phase::Retire || !SameStatus(current,expected,fence)) return Fail(error,"Native queue source changed; retirement required");
     return true;
 }
 NativeQueueRead NativeQueueIngress::Read(NativeQueueSource& source,std::unique_ptr<const NativeQueueBatch>& out,std::string& error) {
+    if (std::this_thread::get_id()!=thread) { try { error="Native ingress is owned by another thread"; } catch (...) { error.clear(); } return NativeQueueRead::RetireRequired; }
     if(calling) { reentered=true; Fail(error,"Reentrant native ingress"); return NativeQueueRead::RetireRequired; }
-    if(phase==Phase::Retire) { error="Native ingress requires retirement"; return NativeQueueRead::RetireRequired; }
+    if(phase==Phase::Retire) { Fail(error,"Native ingress requires retirement"); return NativeQueueRead::RetireRequired; }
     if(phase==Phase::Published) { error="Native batch is still published"; return NativeQueueRead::Busy; }
-    CallGuard guard(calling); reentered=false;
+    CallGuard guard(calling); reentered=false; failure={};
+    std::unique_ptr<NativeQueueQuarantine> candidate;
+    bool provisional=false;
+    // Move the already-owned prefix on every failure without allocating. Even
+    // the last successfully copied entry precedes the next foreign observation.
+    struct Preserve {
+        NativeQueueIngress& owner;
+        std::unique_ptr<NativeQueueQuarantine>& candidate;
+        bool& provisional;
+        ~Preserve() {
+            if (candidate && provisional) candidate->prefix->events.pop_back();
+            if (owner.phase==Phase::Retire && candidate) {
+                owner.failure.copiedEvents=candidate->prefix->events.size();
+                candidate->boundary=owner.failure;
+                owner.quarantine=std::move(candidate);
+            }
+        }
+    } preserve{*this,candidate,provisional};
     try {
+        failure.reason=NativeQueueFailure::SourceBeforePoll;
         NativeQueueStatus status;
         if(!identity || serial==(std::numeric_limits<std::uint64_t>::max)() || !source.Observe(status,error) || phase==Phase::Retire || !ValidStatus(status) ||
             status.providerEpoch<lastEpoch || (requireFreshGeneration && status.providerEpoch!=retirementEpoch) ||
@@ -120,24 +141,38 @@ NativeQueueRead NativeQueueIngress::Read(NativeQueueSource& source,std::unique_p
             (status.generation<lastGeneration || (requireFreshGeneration && status.generation<=lastGeneration)))) {
             Fail(error,"Unavailable or stale native queue source"); return NativeQueueRead::RetireRequired;
         }
-        auto candidate=std::unique_ptr<NativeQueueBatch>(new NativeQueueBatch);
-        candidate->status=status;
-        std::size_t bytes=0,ordinal=0;
         auto sequence=(status.providerEpoch==lastEpoch && status.generation==lastGeneration)?lastSequence:0;
-        // Capture the generation before any Poll, including failed attempts.
+        // Remember the real observed generation even if allocation fails before
+        // the first Poll. Reset cannot later recycle that attempted lifetime.
         lastEpoch=status.providerEpoch; lastGeneration=status.generation; lastSequence=sequence;
+        candidate.reset(new NativeQueueQuarantine);
+        auto& batch=*candidate->prefix;
+        batch.status=status;
+        // One provisional slot permits identifying an over-budget removed
+        // entry without allocating after Poll or exposing it as copied.
+        batch.events.reserve(MaxEvents+1);
+        std::size_t bytes=0,ordinal=0;
         for(;;) {
+            failure={}; failure.reason=NativeQueueFailure::SourceBeforePoll;
             if(!CheckSource(source,status,true,error)) return NativeQueueRead::RetireRequired;
+            batch.events.emplace_back(); provisional=true;
+            auto& owned=batch.events.back(); // Empty-container allocation is before Poll.
             SDL_Event event{}; OQ4_NativeQueueRecord record{};
+            failure.reason=NativeQueueFailure::PollFailed; failure.removalUncertain=true;
             const int read=source.Poll(event,record);
+            failure.removalUncertain=read<0 || read>1;
+            if(read==1) { failure.returnedOne=true; failure.eventType=event.type; failure.record=record; }
             if(phase==Phase::Retire || read<0 || read>1) { Fail(error,"Checked native Poll failed"); return NativeQueueRead::RetireRequired; }
             if(!read) {
+                batch.events.pop_back(); provisional=false;
+                failure.reason=NativeQueueFailure::SourceAfterCopy;
                 if(!CheckSource(source,status,true,error)) return NativeQueueRead::RetireRequired;
-                if(status.pending) { Fail(error,"Native collection ended without verified fence"); return NativeQueueRead::RetireRequired; }
-                if(candidate->events.empty()) { requireFreshGeneration=false; error.clear(); return NativeQueueRead::Empty; }
+                if(status.pending) { failure.reason=NativeQueueFailure::TruncatedCollection; Fail(error,"Native collection ended without verified fence"); return NativeQueueRead::RetireRequired; }
+                if(batch.events.empty()) { requireFreshGeneration=false; failure={}; error.clear(); return NativeQueueRead::Empty; }
                 break;
             }
-            if(candidate->events.size()==MaxEvents || record.version!=1 || record.reserved || record.generation!=status.generation ||
+            failure.reason=NativeQueueFailure::HeaderRejected;
+            if(batch.events.size()>MaxEvents || record.version!=1 || record.reserved || record.generation!=status.generation ||
                 !record.queue_sequence || record.queue_sequence<=sequence || record.kind>OQ4_QUEUE_FENCE ||
                 (event.type==SDL_EVENT_POLL_SENTINEL && record.kind!=OQ4_QUEUE_SENTINEL)) {
                 Fail(error,"Invalid native queue entry or budget exceeded"); return NativeQueueRead::RetireRequired;
@@ -157,11 +192,15 @@ NativeQueueRead NativeQueueIngress::Read(NativeQueueSource& source,std::unique_p
                 ((record.kind==OQ4_QUEUE_SENTINEL)!=(event.type==SDL_EVENT_POLL_SENTINEL))) {
                 Fail(error,"Invalid outside/sentinel native record"); return NativeQueueRead::RetireRequired;
             }
-            OwnedNativeQueueEvent owned;
+            failure.reason=NativeQueueFailure::PayloadRejected;
             if(!CopyEvent(event,record,owned,bytes,error)) { phase=Phase::Retire; return NativeQueueRead::RetireRequired; }
+            // The final owning slot already exists. Moving a debug-STL string
+            // or vector here could allocate after its borrowed payload was copied.
+            provisional=false;
+            failure.copied=true; failure.reason=NativeQueueFailure::SourceAfterCopy;
             if(!CheckSource(source,status,true,error)) return NativeQueueRead::RetireRequired;
-            candidate->events.push_back(std::move(owned));
             if(record.kind==OQ4_QUEUE_FENCE) {
+                failure.reason=NativeQueueFailure::FenceRejected;
                 OQ4_NativeFence proof{};
                 if(!source.CopyFence(event,proof) || !SameFence(proof,status.pending) || !CheckSource(source,status,true,error)) {
                     Fail(error,"Native fence receipt acquisition failed"); return NativeQueueRead::RetireRequired;
@@ -169,13 +208,28 @@ NativeQueueRead NativeQueueIngress::Read(NativeQueueSource& source,std::unique_p
                 break;
             }
         }
+        failure.reason=NativeQueueFailure::SourceAfterCopy;
         if(!CheckSource(source,status,true,error)) return NativeQueueRead::RetireRequired;
-        published=status; candidate->receipt={identity,++serial};
+        published=status; batch.receipt={identity,++serial};
         lastSequence=sequence; requireFreshGeneration=false; phase=Phase::Published;
-        out=std::move(candidate); error.clear(); return NativeQueueRead::Ready;
-    } catch(...) { Fail(error,"Native ingress allocation or source failure"); return NativeQueueRead::RetireRequired; }
+        out=std::move(candidate->prefix); candidate.reset(); failure={}; error.clear(); return NativeQueueRead::Ready;
+    } catch(...) {
+        failure.reason=NativeQueueFailure::AllocationOrSourceException;
+        Fail(error,"Native ingress allocation or source failure"); return NativeQueueRead::RetireRequired;
+    }
+}
+bool NativeQueueIngress::TakeQuarantine(std::unique_ptr<const NativeQueueQuarantine>& out) noexcept {
+    if (std::this_thread::get_id()!=thread) return false;
+    if (calling) { reentered=true; phase=Phase::Retire; return false; }
+    if (phase!=Phase::Retire || !quarantine) return false;
+    out=std::move(quarantine); return true;
+}
+NativeQueueFailureBoundary NativeQueueIngress::FailureBoundary() const noexcept {
+    if (std::this_thread::get_id()!=thread || calling || phase!=Phase::Retire) return {};
+    return failure;
 }
 bool NativeQueueIngress::Validate(NativeQueueSource& source,NativeQueueReceipt expected,std::string& error) {
+    if (std::this_thread::get_id()!=thread) { try { error="Native ingress is owned by another thread"; } catch (...) { error.clear(); } return false; }
     if(calling) { reentered=true; return Fail(error,"Reentrant native ingress"); }
     if(phase!=Phase::Published || expected!=NativeQueueReceipt{identity,serial}) { error="Stale native batch receipt"; return false; }
     CallGuard guard(calling);
@@ -183,6 +237,7 @@ bool NativeQueueIngress::Validate(NativeQueueSource& source,NativeQueueReceipt e
     catch(...) { return Fail(error,"Native source validation failed"); }
 }
 bool NativeQueueIngress::Finish(NativeQueueSource& source,NativeQueueReceipt expected,std::string& error) {
+    if (std::this_thread::get_id()!=thread) { try { error="Native ingress is owned by another thread"; } catch (...) { error.clear(); } return false; }
     if(calling) { reentered=true; return Fail(error,"Reentrant native ingress"); }
     if(phase!=Phase::Published || expected!=NativeQueueReceipt{identity,serial}) { error="Stale native batch receipt"; return false; }
     CallGuard guard(calling);
@@ -197,13 +252,15 @@ bool NativeQueueIngress::Finish(NativeQueueSource& source,NativeQueueReceipt exp
     } catch(...) { return Fail(error,"Native source completion failed"); }
 }
 bool NativeQueueIngress::ResetAfterRetirement(NativeQueueSource& source,std::string& error) {
+    if (std::this_thread::get_id()!=thread) { try { error="Native ingress is owned by another thread"; } catch (...) { error.clear(); } return false; }
     if(calling) { reentered=true; return Fail(error,"Reentrant native ingress"); }
     CallGuard guard(calling); reentered=false;
+    if (quarantine) return Fail(error,"Failed native prefix still awaits explicit ownership extraction");
     try {
         NativeQueueStatus status;
         if(!source.Observe(status,error) || reentered || !status.mainThread || !status.providerEpoch || status.providerEpoch<lastEpoch || status.healthy || status.generation || status.pending)
             return Fail(error,"Native provider has not retired");
-        phase=Phase::Idle; requireFreshGeneration=true; retirementEpoch=status.providerEpoch; published={}; error.clear(); return true;
+        phase=Phase::Idle; requireFreshGeneration=true; retirementEpoch=status.providerEpoch; published={}; failure={}; error.clear(); return true;
     } catch(...) { return Fail(error,"Native source retirement observation failed"); }
 }
 } // namespace openq4

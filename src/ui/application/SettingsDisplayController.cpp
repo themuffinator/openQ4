@@ -32,11 +32,11 @@ void SettingsDisplayController::Restore(SettingsCode code, const std::string& re
 	restoreCode = code; restoreReason = reason; preserveDraft = retainDraft;
 	stage = SettingsDisplayStage::QueuedRestore; drawn = false; SetResult(code,reason);
 }
-SettingsResult SettingsDisplayController::Apply(std::uint64_t owner, double now) {
+SettingsResult SettingsDisplayController::Apply(std::uint64_t owner, double now, SettingsCompletion completion) {
 	if (busy || Active()) return {SettingsCode::Busy,"A display operation is pending"};
 	if (!Clock(now,-1) || !std::isfinite(now+DeviceTimeout)) return SetResult(SettingsCode::Invalid,"Invalid display request time");
 	SettingsAttempt candidate;
-	const auto preparedResult = transaction.PrepareApply(owner,now,candidate);
+	const auto preparedResult = transaction.PrepareApply(owner,now,candidate,completion);
 	if (preparedResult.code != SettingsCode::Ok) { result = preparedResult; return result; }
 	if (candidate.patch.empty()) {
 		transaction.CancelPreparedApply(owner,candidate.request);
@@ -64,7 +64,8 @@ SettingsResult SettingsDisplayController::Revert(std::uint64_t owner, std::uint6
 SettingsResult SettingsDisplayController::Retry(std::uint64_t owner, std::uint64_t request) {
 	if (busy || !CanRetry() || !owner || owner != attempt.owner || !request || request != attempt.request)
 		return {SettingsCode::Busy,"No matching display recovery can be retried"};
-	if (commitIntent) stage = completed ? SettingsDisplayStage::FinalizeKeep : SettingsDisplayStage::QueuedKeep;
+	if (commitIntent) stage = completed ? SettingsDisplayStage::FinalizeKeep :
+		(attempt.completion == SettingsCompletion::Automatic ? SettingsDisplayStage::QueuedAutomaticCommit : SettingsDisplayStage::QueuedKeep);
 	else if (completed) stage = SettingsDisplayStage::FinalizeRestore;
 	else stage = SettingsDisplayStage::QueuedRestore;
 	return SetResult(SettingsCode::Ok);
@@ -80,7 +81,8 @@ bool SettingsDisplayController::CanConfirm(double now) const noexcept {
 	return stage == SettingsDisplayStage::Confirming && !closing && Clock(now,lastTime) && now < transaction.Deadline();
 }
 bool SettingsDisplayController::ConfirmationVisible() const noexcept {
-	return stage == SettingsDisplayStage::AwaitApply || stage == SettingsDisplayStage::Confirming || stage == SettingsDisplayStage::QueuedKeep || stage == SettingsDisplayStage::Recovery;
+	return stage == SettingsDisplayStage::Recovery || (attempt.completion == SettingsCompletion::UserConfirmation &&
+		(stage == SettingsDisplayStage::AwaitApply || stage == SettingsDisplayStage::Confirming || stage == SettingsDisplayStage::QueuedKeep));
 }
 double SettingsDisplayController::Remaining(double now) const noexcept {
 	return CanConfirm(now) ? (std::max)(0.0,transaction.Deadline()-now) : 0.0;
@@ -98,7 +100,8 @@ bool SettingsDisplayController::Observe(bool restoring, SettingsDisplayObservati
 	return true;
 }
 bool SettingsDisplayController::OwnerDrawn(std::uint64_t owner, std::uint64_t request, SettingsDisplayObservation* acknowledged) {
-	if (busy || stage != SettingsDisplayStage::AwaitApply || closing || owner != attempt.owner || request != attempt.request) return false;
+	if (busy || stage != SettingsDisplayStage::AwaitApply || attempt.completion != SettingsCompletion::UserConfirmation ||
+		closing || owner != attempt.owner || request != attempt.request) return false;
 	SettingsDisplayObservation observation; std::string error;
 	if (!Observe(false,observation,error)) return false;
 	ownerDraw = observation; drawn = true;
@@ -116,20 +119,28 @@ void SettingsDisplayController::Frame(double now, bool ownerAlive, bool allowWor
 	if (!ownerAlive) Close(attempt.owner);
 	std::string error;
 	if (stage == SettingsDisplayStage::AwaitApply || stage == SettingsDisplayStage::AwaitRestore ||
-		stage == SettingsDisplayStage::Confirming || stage == SettingsDisplayStage::QueuedKeep) {
+		stage == SettingsDisplayStage::Confirming || stage == SettingsDisplayStage::QueuedKeep ||
+		stage == SettingsDisplayStage::QueuedAutomaticCommit) {
 		const bool restoring = stage == SettingsDisplayStage::AwaitRestore;
 		SettingsDisplayObservation observed;
 		if (!Observe(restoring,observed,error)) {
 			if (restoring) Recover(SettingsCode::RollbackFailed,error);
 			else Restore(SettingsCode::ApplyFailed,error,true);
-		} else if (!restoring && (!observed.hidden && (!observed.focused || observed.minimized))) {
+		} else if (!restoring && attempt.completion == SettingsCompletion::UserConfirmation &&
+			(!observed.hidden && (!observed.focused || observed.minimized))) {
 			Restore(SettingsCode::ApplyFailed,"The confirmation window lost focus or became minimized",true);
+		} else if (!observed.effectsReady && (stage == SettingsDisplayStage::Confirming ||
+			stage == SettingsDisplayStage::QueuedKeep || stage == SettingsDisplayStage::QueuedAutomaticCommit)) {
+			Restore(SettingsCode::ApplyFailed,"Settings effect readiness changed before completion",true);
 		} else if ((stage == SettingsDisplayStage::AwaitApply || restoring) && now >= waitDeadline) {
 			if (restoring) Recover(SettingsCode::RollbackFailed,"Restored display did not present before its deadline");
 			else Restore(SettingsCode::ApplyFailed,"Owning confirmation view did not present before its deadline",true);
-		} else if (restoring && Fresh(observed,device)) {
+		} else if (restoring && observed.effectsReady && Fresh(observed,device)) {
 			stage = SettingsDisplayStage::FinalizeRestore;
-		} else if (stage == SettingsDisplayStage::AwaitApply && drawn && Fresh(observed,ownerDraw)) {
+		} else if (stage == SettingsDisplayStage::AwaitApply && observed.effectsReady &&
+			attempt.completion == SettingsCompletion::Automatic && Fresh(observed,device)) {
+			stage = SettingsDisplayStage::QueuedAutomaticCommit;
+		} else if (stage == SettingsDisplayStage::AwaitApply && observed.effectsReady && drawn && Fresh(observed,ownerDraw)) {
 			const auto complete = transaction.CompleteApply(attempt.owner,attempt.request,now,ConfirmationTimeout);
 			if (complete.code == SettingsCode::Ok) { stage = SettingsDisplayStage::Confirming; result = complete; }
 			else Restore(complete.code,complete.diagnostic,true);
@@ -173,13 +184,16 @@ void SettingsDisplayController::Frame(double now, bool ownerAlive, bool allowWor
 			Recover(SettingsCode::RollbackFailed,error.empty()?"Display restoration did not return a ready device":error); return;
 		}
 		waitDeadline = now+DeviceTimeout; stage = SettingsDisplayStage::AwaitRestore;
-	} else if (stage == SettingsDisplayStage::QueuedKeep) {
+	} else if (stage == SettingsDisplayStage::QueuedKeep || stage == SettingsDisplayStage::QueuedAutomaticCommit) {
 		if (!confirmPrepared) {
 			SettingsAttempt confirmation;
-			const auto preparation = transaction.PrepareConfirm(attempt.owner,attempt.request,now,confirmation);
+			const auto preparation = attempt.completion == SettingsCompletion::Automatic ?
+				transaction.PrepareAutomaticCommit(attempt.owner,attempt.request,now,confirmation) :
+				transaction.PrepareConfirm(attempt.owner,attempt.request,now,confirmation);
 			if (preparation.code != SettingsCode::Ok) { Restore(preparation.code,preparation.diagnostic,true); return; }
 			attempt = std::move(confirmation); confirmPrepared = true;
 		}
+		if (closing && !commitIntent) { Restore(SettingsCode::Ok,{},false); return; }
 		commitIntent = true;
 		if (!Invoke([&]{ return host.PersistConfirmation(attempt,error); },error)) { Recover(SettingsCode::ApplyFailed,error); return; }
 		stage = SettingsDisplayStage::FinalizeKeep;
@@ -188,7 +202,8 @@ void SettingsDisplayController::Frame(double now, bool ownerAlive, bool allowWor
 		const bool restoring = stage == SettingsDisplayStage::FinalizeRestore;
 		if (!completed) {
 			const auto completion = restoring ? transaction.CompleteRestore(attempt.owner,attempt.request,preserveDraft,restoreCode,restoreReason)
-				: transaction.CompleteConfirm(attempt.owner,attempt.request);
+				: (attempt.completion == SettingsCompletion::Automatic ? transaction.CompleteAutomaticCommit(attempt.owner,attempt.request) :
+					transaction.CompleteConfirm(attempt.owner,attempt.request));
 			if (transaction.AsyncPending()) { Recover(completion.code,completion.diagnostic); return; }
 			completed = true; result = completion;
 		}

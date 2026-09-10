@@ -1499,11 +1499,13 @@ EVENT LOOP
 */
 
 #include "../EventQueueContinuity.h"
+#include "../EventDisposition.h"
 
 #define	MAX_QUED_EVENTS		256
 #define	MASK_QUED_EVENTS	( MAX_QUED_EVENTS - 1 )
 
 sysEvent_t	eventQue[MAX_QUED_EVENTS];
+static sysEventDispositionTag_t eventDispositionTags[MAX_QUED_EVENTS];
 int			eventHead = 0;
 int			eventTail = 0;
 
@@ -1550,6 +1552,38 @@ void Sys_QueEvent(int time, sysEventType_t type, int value, int value2, int ptrL
 	ev->evValue2 = value2;
 	ev->evPtrLength = ptrLength;
 	ev->evPtr = ptr;
+	eventDispositionTags[ev - eventQue] = {};
+}
+
+bool Sys_QueTrackedEvent(sysEvent_t& event, sysEventDispositionTag_t& tag) noexcept {
+	int type = 0;
+	memcpy(&type, &event.evType, sizeof(type));
+	if (!Sys_EventDispositionTagCurrent(tag) || type <= SE_NONE || type > SE_RETAINED_UI ||
+		event.evPtrLength < 0 || event.evPtrLength > 1024 * 1024 ||
+		((event.evPtrLength != 0) != (event.evPtr != NULL))) return false;
+	if (eventHead - eventTail >= MAX_QUED_EVENTS) {
+		Sys_InvalidateEventQueue();
+		return false; // No eviction, ownership transfer or callback on failed admission.
+	}
+	const int slot = eventHead & MASK_QUED_EVENTS;
+	eventQue[slot] = event;
+	eventDispositionTags[slot] = tag;
+	++eventHead;
+	event = {}; tag = {};
+	return true;
+}
+
+sysEventTransfer_t Sys_TakeEventWithDisposition(sysEvent_t& event, sysEventDispositionTag_t& tag) noexcept {
+	if (!Sys_EventDispositionEpoch()) return sysEventTransfer_t::Refused;
+	if (eventHead <= eventTail) return sysEventTransfer_t::Empty;
+	const int slot = eventTail & MASK_QUED_EVENTS;
+	const auto ownedTag = eventDispositionTags[slot];
+	if (!ownedTag.Empty() && !Sys_EventDispositionTagCurrent(ownedTag)) return sysEventTransfer_t::Refused;
+	const auto ownedEvent = eventQue[slot];
+	eventQue[slot] = {}; eventDispositionTags[slot] = {};
+	++eventTail;
+	event = ownedEvent; tag = ownedTag;
+	return sysEventTransfer_t::Ready;
 }
 
 /*
@@ -1641,6 +1675,7 @@ void Sys_ClearEvents(void) {
 	Sys_InvalidateEventQueue();
 	while ( eventHead > eventTail ) {
 		Sys_DiscardQueuedEvent( eventQue[ eventTail & MASK_QUED_EVENTS ] );
+		eventDispositionTags[eventTail & MASK_QUED_EVENTS] = {};
 		eventTail++;
 	}
 	eventHead = eventTail = 0;
@@ -1656,6 +1691,10 @@ sysEvent_t Sys_GetEvent(void) {
 
 	// return if we have data
 	if (eventHead > eventTail) {
+		if (!eventDispositionTags[eventTail & MASK_QUED_EVENTS].Empty()) {
+			Sys_InvalidateEventQueue();
+			return sysEvent_t{}; // Preserve original tagged ownership for explicit retirement.
+		}
 		eventTail++;
 		return eventQue[(eventTail - 1) & MASK_QUED_EVENTS];
 	}
