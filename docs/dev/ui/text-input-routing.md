@@ -176,8 +176,34 @@ publication checks the original authority and allocates nothing. Fence
 completion is separate: Session must account for every ordinary event first.
 Failure retires only the original lease and never consumes another owner's
 input. Runtime exposes the matching checked methods; its allocation-free exact
-retirement preserves stable draft/history. The managed owner adapter, Windows
-store hook consumer and Session activation are still being integrated.
+retirement preserves stable draft/history. An explicit lifecycle entry requires
+the exact copied closed receipt from the caller's checked application operation;
+the ordinary entry still accepts Pump scopes only. Lifecycle callbacks retain
+the same owner, revision, FIFO, settlement and fence checks. Cleanup of an
+ineligible editor cannot use this path to publish edits.
+An idle coordinator can return an owned copy of its last complete barrier.
+The query refuses busy, retired and wrong-thread calls, preserves output on
+allocation failure, and performs no owner or provider callbacks. The caller
+must still establish current route eligibility before using that snapshot.
+
+`WindowsTextCollectionBridge` connects the copied SDL hook table to the actual
+SDK store. Fresh attachment requires no prior collection or composition lease;
+the externally checked module epoch and provider generation are bound before
+pumping. Prepare opens an exact scope, and Finish closes only its own successful
+Open. Callback activity preserves a fence even without SDL text events. The
+bridge validates the immutable closed watermark through acknowledgements and
+native synchronization, including allocation-free terminal checks. Lifecycle
+scopes cannot silently adopt a changed application revision. Destruction and
+final COM release remain on the creating apartment, after disabled hook removal.
+`ManagedNativeTextOwner` supplies the coordinator's private GUI endpoints. Each
+call re-observes an engine-owned, callback-free route probe and resolves the
+original allocation/backend/document again. Resource preparation returns before
+the manager resolves the backend for the next effect. Native calls interlock
+with ordinary text and clipboard boundaries; exact retirement preserves the
+stable draft even after route eligibility changes. Current-owner checks, prepared
+publication and exact retirement allocate nothing. Unloaded deferred GUIs and
+dedicated builds refuse native entry without loading a retained backend.
+Session routing, the route probe implementation and native activation remain open.
 
 The Windows activation audit confirms that this SDL version owns IMM, with no
 active SDL TSF thread manager to deactivate. The engine provider still requires

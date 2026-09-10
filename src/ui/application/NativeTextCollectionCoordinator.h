@@ -71,7 +71,10 @@ struct NativeTextCollectionResult {
 // never physical/direct origin or permission to insert text.
 //
 // Reconcile starts only from an owned verified batch and a separate exact CLOSED
-// Pump scope. Apply publishes transient native presentation and ACKs its exact
+// Pump scope. ReconcileLifecycle additionally requires the exact immutable
+// Lifecycle receipt returned by the caller's checked application operation.
+// Neither entry invents native input origin or changes application revisions.
+// Apply publishes transient native presentation and ACKs its exact
 // offers; stable text/history wait for complete verified settlement. A prepared
 // settlement is synced natively before callback-free checked local publication.
 // Live ranges can span collections and make one undo group when finally settled.
@@ -95,11 +98,24 @@ public:
 	NativeTextCollectionCoordinator& operator=(const NativeTextCollectionCoordinator&) = delete;
 	bool Reconcile(NativeQueueIngress&, NativeQueueSource&, const NativeQueueBatch&,
 		NativeTextCollectionOwner&, NativeTextCollectionStore&, NativeTextCollectionResult& out, std::string& error);
+	// The caller supplies its completed checked lifecycle operation's store seal,
+	// not an inferred kind or dispatch. The full seal must match the live bridge.
+	// The original editor must still be eligible. Cleanup of an ineligible owner
+	// uses exact retirement and cannot publish native cleanup text to another GUI.
+	bool ReconcileLifecycle(const NativeClosedTextCollection&, NativeQueueIngress&, NativeQueueSource&, const NativeQueueBatch&,
+		NativeTextCollectionOwner&, NativeTextCollectionStore&, NativeTextCollectionResult& out, std::string& error);
 	bool CompleteFence(NativeQueueIngress&, NativeQueueSource&, const NativeTextCollectionCompletion&,
 		NativeTextCollectionOwner&, NativeTextCollectionStore&, NativeTextCollectionFence&, std::string& error);
+	// Copy the last complete barrier only while idle (Ready or AwaitingFence).
+	// This is an observation, not owner eligibility or permission to settle. It
+	// performs no callbacks, refuses busy/retired/worker calls without changing
+	// coordinator state, and preserves out if its owned string cannot be copied.
+	bool QueryBarrier(NativeTextEditorBarrier& out, std::string& error) const noexcept;
 	bool NeedsRetirement() const noexcept { return std::this_thread::get_id()!=thread || phase == Phase::RetireRequired; }
 private:
 	enum class Phase { Ready, Reconciling, AwaitingFence, RetireRequired };
+	bool ReconcileKind(std::optional<NativeClosedTextCollection>, NativeQueueIngress&, NativeQueueSource&, const NativeQueueBatch&,
+		NativeTextCollectionOwner&, NativeTextCollectionStore&, NativeTextCollectionResult&, std::string&);
 	bool Check(NativeQueueIngress&, NativeQueueSource&, NativeTextCollectionOwner&, NativeTextCollectionStore&, std::string&);
 	bool CheckPending(NativeTextCollectionStore&, std::uint32_t remaining, std::string&);
 	bool Fail(std::string&, const char*) noexcept;

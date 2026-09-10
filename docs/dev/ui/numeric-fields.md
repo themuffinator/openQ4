@@ -228,9 +228,14 @@ tails and small ambient values such as `1e-7` lost by legacy CVar exponent
 normalization. Generated ticks now use the authored minimum/step decimal scale;
 custom readbacks and typed drafts retain their exact value. SYSTEM writes use
 fixed decimal text and reject new values that narrow to a nonfinite or zero
-float. This does not increase the renderer's float precision. Exact recovery of
-observed originals under FTZ/DAZ is being extended through the transaction and
-persistent recovery journal.
+float. This does not increase the renderer's float precision. Exact typed
+comparison now extends through transactions, display validation and startup
+recovery. Journal serialization preserves its schema-1 general/max-digits spelling
+while encoding subnormal values independently of FTZ/DAZ. Signed zeros share the
+canonical `0` spelling; existing journals retain their schema and checksum rules.
+Observed originals stay distinct from zero during conflict checks and rollback.
+Counted Windows/Linux recovery tests do not establish real interrupted-device or
+power-loss behavior.
 
 The native field binding regression now drives actual Runtime/Rml at 125% and
 200% density through complete native text, reverse selection, concurrent and
@@ -243,8 +248,27 @@ Windowed SP/OpenGL at 125% and MP/Vulkan at 200% each reach gameplay and pass
 clean `0.075` slider text, exact accepted readbacks for `1e-7` and custom `0.1375`,
 the next authored slider tick `0.15`, Apply, restoration and return to the parent.
 SP has no warnings; MP retains the preceding checkpoint's same 93 warnings.
-At 200%, the focused control still sits against the body's scroll boundary;
-focus reveal spacing and full-page layout remain unfinished. These captures
+At that checkpoint's 200% scale, the focused control sat against the body's
+scroll boundary; focus reveal spacing and full-page layout were unfinished. Those captures
 do not operate native character or IME input. The immutable local record is
 `.tmp/ui/native-field-binding-integration/validation-evidence.json`;
 live native provider integration and final product acceptance remain open.
+
+The next increment joins the managed owner endpoints and Windows collection
+bridge, extends exact numeric handling through recovery, and fixes shared
+[focus reveal](focus-reveal.md). The Windows engine build and all 40 UI suites
+pass. Final windowed SP/OpenGL at 125% and MP/Vulkan at 200% each reach gameplay,
+pass 38 semantic operations and produce 12 reviewed engine screenshots. The
+focused ambient field now ends at pixel 464 inside a body ending at 472 in the
+200% capture, preserving the intended 4 dp inset. Small and custom values,
+authored slider ticks, Apply, restoration and return retain their exact readbacks.
+SP has no warnings; MP retains the previous 93 warnings. The verified installation
+path replaces a stale test reference; engine package checksums match the earlier
+capture. The immutable local record is
+`.tmp/ui/native-managed-bridge-integration/validation-evidence.json`.
+
+Counted tests cover the managed allocation registry, SDK collection hooks,
+lifecycle receipts, copied idle barriers and exact journal/recovery values.
+These tests do not activate an installed text service. Production Session/native
+input integration, candidate geometry, international text, complete responsive
+page layout, every migration and the full editor remain required.

@@ -39,17 +39,7 @@ const SystemSettingDescriptor* Descriptor(const std::string& key) {
 	return found == catalog.end() ? nullptr : &*found;
 }
 bool SameValue(const StateValue& a, const StateValue& b) {
-	if (a.index() != b.index()) return false;
-	if (const double* number = std::get_if<double>(&a)) {
-		// The renderer enables DAZ. Keep exact catalog comparisons independent
-		// of that mode; a tiny observed original must not become equal to zero.
-		// Volatile integer observations prevent folding this into FP equality.
-		static_assert(sizeof(double) == sizeof(std::uint64_t) && std::numeric_limits<double>::is_iec559);
-		const volatile std::uint64_t left = std::bit_cast<std::uint64_t>(*number);
-		const volatile std::uint64_t right = std::bit_cast<std::uint64_t>(std::get<double>(b));
-		return left == right || (((left | right) & 0x7fffffffffffffffULL) == 0);
-	}
-	return a == b;
+	return SettingsValueEqual(a,b);
 }
 bool Changed(const StateValues& before, const StateValues& target, const std::string& key) {
 	const auto old = before.find(key), next = target.find(key);
@@ -90,25 +80,6 @@ bool Parse(const SystemSettingDescriptor& item, const char* text, StateValue& ou
 	output = std::move(candidate);
 	return true;
 }
-std::string SubnormalText(std::uint64_t bits) {
-	// Some standard-library to_chars implementations treat subnormal inputs
-	// as zero under DAZ. Expand the exact fraction using integers for this
-	// rare recovery path: fraction * 2^-1074 = fraction * 5^1074 / 10^1074.
-	// At most 1077 characters; no floating-mode mutation or approximate zero.
-	std::uint64_t fraction = bits & 0x000fffffffffffffULL;
-	unsigned places = 1074;
-	while ((fraction & 1) == 0) { fraction >>= 1; --places; }
-	std::string digits = std::to_string(fraction);
-	for (unsigned power = 0; power < places; ++power) {
-		unsigned carry = 0;
-		for (size_t i = digits.size(); i-- > 0;) {
-			const unsigned value = unsigned(digits[i] - '0') * 5 + carry;
-			digits[i] = char('0' + value % 10); carry = value / 10;
-		}
-		if (carry) digits.insert(digits.begin(), char('0' + carry));
-	}
-	return std::string(bits >> 63 ? "-0." : "0.") + std::string(places - digits.size(), '0') + digits;
-}
 std::string Serialize(const StateValue& value) {
 	PresentationValue converted;
 	if (const double* number = std::get_if<double>(&value)) {
@@ -116,13 +87,8 @@ std::string Serialize(const StateValue& value) {
 		// notation would replace the string with a six-decimal float rendering,
 		// losing small/custom values before exact readback. Fixed shortest form
 		// retains the requested binary64 decimal and does not change CVar policy.
-		const volatile std::uint64_t representation = std::bit_cast<std::uint64_t>(*number);
-		const std::uint64_t bits = representation;
-		if ((bits & 0x7ff0000000000000ULL) == 0 && (bits & 0x000fffffffffffffULL) != 0)
-			return SubnormalText(bits);
-		char text[768];
-		const auto formatted=std::to_chars(text,text+sizeof(text),*number,std::chars_format::fixed);
-		return formatted.ec==std::errc{} ? std::string(text,formatted.ptr) : std::string{};
+		std::string text;
+		return SettingsNumberText(*number,SettingsNumberFormat::FixedShortest,text) ? text : std::string{};
 	}
 	else if (const bool* boolean = std::get_if<bool>(&value)) {
 		converted.type = PresentationType::Boolean; converted.data[0] = *boolean ? 1 : 0;

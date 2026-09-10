@@ -136,7 +136,7 @@ def main():
     compiler=options.compiler or next((p for name in ('clang++','g++','c++') if(p:=shutil.which(name))),None)
     if not compiler:raise RuntimeError('C++20 compiler required')
     (ROOT/'.tmp').mkdir(exist_ok=True)
-    dependencies=[Path(__file__),ROOT/'tools/tests/ui_system_settings_host.py',ROOT/'tools/tests/filesystem_case_segments.py',ROOT/'src/framework/CVarSystem.cpp',ROOT/'src/idlib/Str.h',ROOT/'src/idlib/NumericString.h',ROOT/'src/ui/application/SystemSettingsHost.cpp',ROOT/'src/ui/application/SystemSettingsHost.h',ROOT/'src/ui/application/SettingsTransaction.h',ROOT/'src/ui/retained/Presentation.cpp',ROOT/'src/ui/retained/Document.cpp',ROOT/'src/ui/retained/Document.h',ROOT/'src/ui/retained/Vector.h']
+    dependencies=[Path(__file__),ROOT/'tools/tests/ui_system_settings_host.py',ROOT/'tools/tests/filesystem_case_segments.py',ROOT/'src/framework/CVarSystem.cpp',ROOT/'src/idlib/Str.h',ROOT/'src/idlib/NumericString.h',ROOT/'src/ui/application/SystemSettingsHost.cpp',ROOT/'src/ui/application/SystemSettingsHost.h',ROOT/'src/ui/application/SettingsTransaction.h',ROOT/'src/ui/application/SettingsValue.h',ROOT/'src/ui/retained/Presentation.cpp',ROOT/'src/ui/retained/Document.cpp',ROOT/'src/ui/retained/Document.h',ROOT/'src/ui/retained/Vector.h']
     before={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in dependencies}
     out=Path(tempfile.mkdtemp(prefix='settings-decimal-',dir=ROOT/'.tmp'));code=out/'host.cpp';code.write_text(source(),encoding='utf-8',newline='\n')
     binary=out/('test.exe' if os.name=='nt' else 'test');args=[compiler,'-std=c++20','-O2','-D_CRT_SECURE_NO_WARNINGS','-I',str(ROOT),str(code),str(ROOT/'src/ui/retained/Presentation.cpp'),'-o',str(binary)]

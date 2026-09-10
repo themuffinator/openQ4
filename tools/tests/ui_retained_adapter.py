@@ -38,6 +38,7 @@ ENGINE = r'''
 #include "src/ui/retained/Input.h"
 #include "src/ui/UserInterfaceText.h"
 #include "src/ui/UserInterfaceClipboard.h"
+#include "src/ui/UserInterfaceNativeText.h"
 #include "src/ui/retained/TextEditCommand.h"
 #include "src/sys/KeyEventMetadata.h"
 #include "src/ui/RetainedUI.h"
@@ -140,6 +141,12 @@ struct Decls { const void* FindMaterial(const char*) { return nullptr; } } decls
 
 RUNTIME = r'''
 namespace openq4::ui {
+// This ordinary-input fixture has no native owner/provider. Abort if a native
+// endpoint is unexpectedly reached; ui_managed_native_owner compiles the real
+// Runtime/Interaction settlement path including allocation-free publication.
+struct Interaction::NativeSettlement::Impl {};
+Interaction::NativeSettlement::~NativeSettlement() { std::abort(); }
+const NativeTextEditorReceipt& Interaction::NativeSettlement::Receipt() const { std::abort(); }
 struct Bounds { float x=0,y=0,width=0,height=0; };
 struct Viewport {
     int width=1920,height=1080;
@@ -208,6 +215,15 @@ static std::vector<std::string> eventHistory;
 struct NumberEditorContext {std::string control;NumberEditView editor;std::uint64_t modalToken=0;};
 class Runtime {
 public:
+    bool AttachNumberNative(const TextEditorIdentity&,NativeTextIdentity,NativeTextEditorBarrier&,std::string&,double) { std::abort(); }
+    bool RefreshNumberNative(const NativeTextEditorBarrier&,NativeTextEditorView&,std::string&,double) { std::abort(); }
+    bool IsNumberNativeCurrent(const NativeTextEditorBarrier&) const noexcept { std::abort(); }
+    bool BeginNumberNativeCollection(const NativeTextEditorBarrier&,const NativeTextCollection&,NativeTextEditorBarrier&,std::string&) { std::abort(); }
+    bool ApplyNumberNative(const NativeTextEditorBarrier&,const NativeTextOffer&,NativeTextEditorReceipt&,std::string&) { std::abort(); }
+    bool CompleteNumberNativeCollection(const NativeTextEditorBarrier&,const NativeTextCollection&,NativeTextEditorBarrier&,std::string&) { std::abort(); }
+    std::unique_ptr<Interaction::NativeSettlement> PrepareNumberNativeSettlement(const NativeTextEditorBarrier&,std::string&) { std::abort(); }
+    bool PublishNumberNativeSettlement(Interaction::NativeSettlement&,NativeTextEditorReceipt&) noexcept { std::abort(); }
+    bool RetireNumberNativeExact(NativeTextIdentity,const TextEditorIdentity&) noexcept { std::abort(); }
     bool draftQueryAvailable=true,failDraftDiscard=false;
     std::vector<std::string> draftFocusCalls;
     unsigned draftDiscardCalls=0;
@@ -2270,7 +2286,7 @@ int main() {
 
 def main():
     dependencies = [
-        'src/ui/UserInterfaceRetained.cpp', 'src/ui/UserInterface.h', 'src/ui/UserInterfaceManaged.h', 'src/ui/UserInterfaceText.h',
+        'src/ui/UserInterfaceRetained.cpp', 'src/ui/UserInterface.h', 'src/ui/UserInterfaceManaged.h', 'src/ui/UserInterfaceText.h', 'src/ui/UserInterfaceNativeText.h',
         'src/ui/UserInterfaceRetained.h', 'src/ui/UserInterface.cpp', 'src/ui/RetainedUI.h',
         'src/ui/SettingsService.h', 'src/ui/application/SettingsTransaction.h',
         'src/ui/retained/Document.h', 'src/ui/retained/Interaction.h',

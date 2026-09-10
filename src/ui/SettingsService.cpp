@@ -108,7 +108,7 @@ SettingsResult CompleteExit(Service& service, Service::ExitIdentity identity) {
     if (!identity.owner || !service.owners.contains(identity.owner) || service.closing || service.abandon ||
         service.display.Active() || service.transaction.Owner() != identity.owner ||
         service.transaction.Phase() != SettingsPhase::Editing ||
-        service.transaction.Draft() != service.transaction.Baseline()) {
+        service.transaction.Dirty()) {
         CancelExit(service,identity.owner);
         return {SettingsCode::Busy,"The completed settings transaction cannot close"};
     }
@@ -454,7 +454,7 @@ bool UI_SettingsDispatch(std::uint64_t owner, const ActionInvocation& action, st
     if (cvarSystem->GetCVarBool("ui_retainedTrace"))
         common->Printf("UI_SETTINGS operation=%s result=%d phase=%d owner=%llu dirty=%d\n",action.operation.c_str(),
             static_cast<int>(result.code),static_cast<int>(transaction.Phase()),static_cast<unsigned long long>(owner),
-            transaction.Draft() != transaction.Baseline() ? 1 : 0);
+            transaction.Dirty() ? 1 : 0);
     return result.code == SettingsCode::Ok;
 }
 const std::map<std::string,std::size_t>& UI_SettingsStateSchema() {
@@ -477,7 +477,7 @@ bool UI_SettingsRead(std::uint64_t owner, StateValues& values) {
     const bool own = transaction.Owner() == owner;
     auto phase = own ? transaction.Phase() : SettingsPhase::Closed;
     if (own && service.display.Stage()==SettingsDisplayStage::Recovery) phase=SettingsPhase::RecoveryRequired;
-    const bool dirty = own && transaction.Draft() != transaction.Baseline();
+    const bool dirty = own && transaction.Dirty();
     const auto result = service.results.find(owner);
     const auto code = result == service.results.end() ? SettingsCode::Ok : result->second.code;
     StateValues candidate{{"settings.open",own},{"settings.dirty",dirty},

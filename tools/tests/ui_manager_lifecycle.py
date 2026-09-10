@@ -137,6 +137,7 @@ public:
     idList<idUserInterfaceManaged*> allocations,guis,alwaysThinkGUIs,demoGuis;
     unsigned long long nextAllocationId=0;
     bool clipboardBoundaryActive=false,clipboardBoundaryFailed=false;
+    bool nativeBoundaryActive=false,nativeBoundaryFailed=false;
     int applicationPumpDepth=0,applicationPumpBudget=0;
     struct Context { void SizeIcons() {} void Shutdown() {} } dc;
 } uiManagerLocal;
@@ -602,7 +603,7 @@ def production_source():
         'void idUserInterfaceManagerLocal::RemoveAlwaysThinkGui(',
         'void idUserInterfaceManagerLocal::RunAlwaysThinkGUIs(',
     )
-    return ('#include "src/ui/UserInterfaceText.h"\n#include "src/ui/UserInterfaceClipboard.h"\n#include <limits>\n' +
+    return ('#include "src/ui/UserInterfaceText.h"\n#include "src/ui/UserInterfaceClipboard.h"\n#include "src/ui/UserInterfaceNativeText.h"\n#include <limits>\n' +
             'namespace openq4 { bool SDL3_ReadTextClipboard(std::string&,std::string&) { return false; } bool SDL3_WriteTextClipboard(const std::string&,std::string&) { return false; } }\n' + SUPPORT + public + managed + declarations + deferred + MANAGER +
             '\n'.join(function_body(source, signature) for signature in signatures) +
             deferred_source[deferred_source.index('idUserInterfaceDeferred::idUserInterfaceDeferred()'):])

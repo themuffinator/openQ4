@@ -224,6 +224,11 @@ struct idUserInterfaceRetained::Impl {
 
 	~Impl() { UI_SettingsReleaseOwner(settingsOwner); RetainedUI_DestroyView(view); }
 	Runtime* RuntimeView() const { return RetainedUI_ViewRuntime(view); }
+	bool NativeOwnerMatches(const TextEditorIdentity& owner, bool eligible) const noexcept {
+		return owner.allocation && owner.backend && owner.document &&
+			owner.backend == textBackend && owner.document == textDocument &&
+			(!eligible || (initialized && active && interactive && !suspended && !unavailable && !close));
+	}
 	void Error(const std::string& message) {
 		if (message != lastError) common->Warning("retained GUI %s: %s",path.c_str(),message.c_str());
 		lastError = message;
@@ -1008,6 +1013,61 @@ bool UI_RetainedSettingsCanReturn(idUserInterface* gui) {
 		std::get<double>(live.at("settings.phase")) == static_cast<double>(openq4::ui::SettingsPhase::Editing);
 }
 
+// Native collection endpoints have no authored action or state-dictionary path.
+bool idUserInterfaceRetained::PrepareNativeText(const TextEditorIdentity& owner) {
+    if (!impl->NativeOwnerMatches(owner,false) || !impl->initialized || !impl->active || !impl->interactive || impl->close) return false;
+    // Tail return: manager must re-resolve the outer allocation and backend after
+    // this resource/host preparation before invoking any further backend method.
+    return impl->Prepare();
+}
+bool idUserInterfaceRetained::AttachNativeText(const TextEditorIdentity& owner, NativeTextIdentity native,
+    NativeTextEditorBarrier& out, std::string& error) {
+    if (!impl->NativeOwnerMatches(owner,false) || !impl->AcceptInput() || !impl->NativeOwnerMatches(owner,true)) return false;
+    auto* runtime=impl->RuntimeView();
+    return runtime && runtime->AttachNumberNative(owner,native,out,error,RetainedUI_PresentationTime());
+}
+bool idUserInterfaceRetained::RefreshNativeText(const NativeTextEditorBarrier& expected,
+    NativeTextEditorView& out, std::string& error) {
+    if (!impl->NativeOwnerMatches(expected.editor,false) || !impl->AcceptInput() || !impl->NativeOwnerMatches(expected.editor,true)) return false;
+    auto* runtime=impl->RuntimeView();
+    return runtime && runtime->RefreshNumberNative(expected,out,error,RetainedUI_PresentationTime());
+}
+bool idUserInterfaceRetained::CurrentNativeText(const NativeTextEditorBarrier& expected) const noexcept {
+    if (!impl->NativeOwnerMatches(expected.editor,true)) return false;
+    auto* runtime=impl->RuntimeView();
+    return runtime && runtime->IsNumberNativeCurrent(expected);
+}
+bool idUserInterfaceRetained::BeginNativeText(const NativeTextEditorBarrier& expected, const NativeTextCollection& collection,
+    NativeTextEditorBarrier& out, std::string& error) {
+    if (!CurrentNativeText(expected)) return false;
+    return impl->RuntimeView()->BeginNumberNativeCollection(expected,collection,out,error);
+}
+bool idUserInterfaceRetained::ApplyNativeText(const NativeTextEditorBarrier& expected, const NativeTextOffer& offer,
+    NativeTextEditorReceipt& out, std::string& error) {
+    if (!CurrentNativeText(expected)) return false;
+    return impl->RuntimeView()->ApplyNumberNative(expected,offer,out,error);
+}
+bool idUserInterfaceRetained::CompleteNativeText(const NativeTextEditorBarrier& expected, const NativeTextCollection& collection,
+    NativeTextEditorBarrier& out, std::string& error) {
+    if (!CurrentNativeText(expected)) return false;
+    return impl->RuntimeView()->CompleteNumberNativeCollection(expected,collection,out,error);
+}
+std::unique_ptr<Interaction::NativeSettlement> idUserInterfaceRetained::PrepareNativeTextSettlement(
+    const NativeTextEditorBarrier& expected, std::string& error) {
+    if (!CurrentNativeText(expected)) return {};
+    return impl->RuntimeView()->PrepareNumberNativeSettlement(expected,error);
+}
+bool idUserInterfaceRetained::PublishNativeTextSettlement(Interaction::NativeSettlement& prepared,
+    NativeTextEditorReceipt& out) noexcept {
+    if (!CurrentNativeText(prepared.Receipt().before)) return false;
+    return impl->RuntimeView()->PublishNumberNativeSettlement(prepared,out);
+}
+bool idUserInterfaceRetained::RetireNativeTextExact(NativeTextIdentity native, const TextEditorIdentity& owner) noexcept {
+    if (!impl->NativeOwnerMatches(owner,false)) return false;
+    auto* runtime=impl->RuntimeView();
+    return runtime && runtime->RetireNumberNativeExact(native,owner);
+}
+
 bool UI_RetainedDiagnostic(idUserInterface* gui, const idCmdArgs& args) {
 	const auto found = std::find(diagnosticViews.begin(),diagnosticViews.end(),gui);
 	if (found == diagnosticViews.end() || args.Argc() < 2) return false;
@@ -1154,4 +1214,5 @@ bool UI_RetainedDiagnostic(idUserInterface* gui, const idCmdArgs& args) {
 	common->Printf("RETAINED_GUI_OPERATION %s %s\n",verb.c_str(),okay ? "passed" : "failed");
 	return okay;
 }
+
 #endif

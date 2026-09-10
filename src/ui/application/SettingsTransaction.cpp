@@ -63,7 +63,7 @@ bool ValidSnapshot(const StateValues& values, const StateValues* schema, std::st
 
 StateValues Changes(const StateValues& before, const StateValues& target) {
 	StateValues changes;
-	for (const auto& [key,value] : target) if (before.at(key) != value) changes.emplace(key,value);
+	for (const auto& [key,value] : target) if (!SettingsValueEqual(before.at(key),value)) changes.emplace(key,value);
 	return changes;
 }
 
@@ -184,7 +184,7 @@ SettingsResult SettingsTransaction::Apply(std::uint64_t requestedOwner, double n
 	lastTime = now;
 	StateValues current; std::string error;
 	if (!Read(current,error)) return Result(SettingsCode::ApplyFailed,std::move(error));
-	if (current != baseline) return Result(SettingsCode::Conflict,"Settings changed outside this session; reopen before applying");
+	if (!SettingsValuesEqual(current,baseline)) return Result(SettingsCode::Conflict,"Settings changed outside this session; reopen before applying");
 	if (!Validate(draft,error)) return Result(SettingsCode::Invalid,std::move(error));
 	StateValues patch = Changes(current,draft);
 	if (patch.empty()) {
@@ -200,7 +200,7 @@ SettingsResult SettingsTransaction::Apply(std::uint64_t requestedOwner, double n
 	if (!Invoke([&] { return host.Write(written,error); },error))
 		return Rollback(true,SettingsCode::ApplyFailed,error);
 	if (!Read(current,error)) return Rollback(true,SettingsCode::ApplyFailed,error);
-	if (current != lastApplied)
+	if (!SettingsValuesEqual(current,lastApplied))
 		return Rollback(true,SettingsCode::ApplyFailed,"Settings readback did not match the requested values");
 	if (confirmation) {
 		phase = SettingsPhase::Confirming; deadline = now + timeout;
@@ -218,7 +218,7 @@ SettingsResult SettingsTransaction::PrepareApply(std::uint64_t requestedOwner, d
 	if (!ValidTime(now,lastTime)) return Result(SettingsCode::Invalid,"Settings preparation time is invalid or moved backwards");
 	StateValues current; std::string error;
 	if (!Read(current,error)) return Result(SettingsCode::ApplyFailed,std::move(error));
-	if (current != baseline) return Result(SettingsCode::Conflict,"Settings changed outside this session; reopen before applying");
+	if (!SettingsValuesEqual(current,baseline)) return Result(SettingsCode::Conflict,"Settings changed outside this session; reopen before applying");
 	if (!Validate(draft,error)) return Result(SettingsCode::Invalid,std::move(error));
 	SettingsAttempt prepared{owner,0,current,draft,Changes(current,draft)};
 	prepared.request = NewRequest();
@@ -238,7 +238,7 @@ SettingsResult SettingsTransaction::ExecuteApply(std::uint64_t requestedOwner, s
 	attemptStage = AttemptStage::ApplyExecuted;
 	StateValues current; std::string error;
 	if (!Read(current,error)) return Result(SettingsCode::ApplyFailed,std::move(error));
-	if (current != pending.baseline) return Result(SettingsCode::Conflict,"Settings changed after apply was prepared");
+	if (!SettingsValuesEqual(current,pending.baseline)) return Result(SettingsCode::Conflict,"Settings changed after apply was prepared");
 	if (!Validate(pending.target,error)) return Result(SettingsCode::Invalid,std::move(error));
 	// Ownership precedes the callback: false/throw can follow a partial write.
 	written = pending.patch; lastApplied = pending.target;
@@ -246,7 +246,7 @@ SettingsResult SettingsTransaction::ExecuteApply(std::uint64_t requestedOwner, s
 	const std::string writeError = error;
 	if (!Read(current,error)) return Result(SettingsCode::ApplyFailed,Because(writeError,error));
 	if (!wrote) return Result(SettingsCode::ApplyFailed,writeError);
-	if (current != pending.target) return Result(SettingsCode::ApplyFailed,"Settings apply readback did not match the frozen target");
+	if (!SettingsValuesEqual(current,pending.target)) return Result(SettingsCode::ApplyFailed,"Settings apply readback did not match the frozen target");
 	attemptStage = AttemptStage::ApplyWritten;
 	return Result(SettingsCode::Ok);
 }
@@ -262,7 +262,7 @@ SettingsResult SettingsTransaction::CompleteApply(std::uint64_t requestedOwner, 
 		return Result(SettingsCode::Invalid,"Settings confirmation time is invalid or moved backwards");
 	StateValues current; std::string error;
 	if (!Read(current,error)) return Result(SettingsCode::ApplyFailed,std::move(error));
-	if (current != pending.target) return Result(SettingsCode::Conflict,"Settings changed before device completion");
+	if (!SettingsValuesEqual(current,pending.target)) return Result(SettingsCode::Conflict,"Settings changed before device completion");
 	lastTime = now; deadline = now+timeout; phase = SettingsPhase::Confirming; attemptStage = AttemptStage::Confirming;
 	return Result(SettingsCode::Ok);
 }
@@ -288,7 +288,7 @@ SettingsResult SettingsTransaction::PrepareRestore(std::uint64_t requestedOwner,
 	StateValues candidate = current, patch;
 	for (const auto& [key,target] : written) {
 		const auto& original = baseline.at(key);
-		if (current.at(key) != original && current.at(key) == target) {
+		if (!SettingsValueEqual(current.at(key),original) && SettingsValueEqual(current.at(key),target)) {
 			candidate[key] = original; patch.emplace(key,original);
 		}
 	}
@@ -311,7 +311,7 @@ SettingsResult SettingsTransaction::ExecuteRestore(std::uint64_t requestedOwner,
 	attemptStage = AttemptStage::RestoreExecuted;
 	StateValues current; std::string error;
 	if (!Read(current,error)) return Result(SettingsCode::RollbackFailed,std::move(error));
-	if (current != pending.baseline) return Result(SettingsCode::Conflict,"Settings changed after restore was prepared");
+	if (!SettingsValuesEqual(current,pending.baseline)) return Result(SettingsCode::Conflict,"Settings changed after restore was prepared");
 	if (!pending.patch.empty() && !Invoke([&] { return host.ValidateRollback(baseline,current,pending.target,error); },error))
 		return Result(SettingsCode::RollbackFailed,std::move(error));
 	const bool wrote = pending.patch.empty() || Invoke([&] { return host.Write(pending.patch,error); },error);
@@ -319,13 +319,13 @@ SettingsResult SettingsTransaction::ExecuteRestore(std::uint64_t requestedOwner,
 	if (!Read(current,error)) return Result(SettingsCode::RollbackFailed,Because(writeError,error));
 	bool incomplete = false, conflict = false;
 	for (const auto& [key,target] : written) {
-		if (current.at(key) == baseline.at(key)) continue;
+		if (SettingsValueEqual(current.at(key),baseline.at(key))) continue;
 		incomplete = true;
-		if (current.at(key) != target) conflict = true;
+		if (!SettingsValueEqual(current.at(key),target)) conflict = true;
 	}
 	if (conflict) return Result(SettingsCode::Conflict,"An externally changed setting cannot be restored safely");
 	if (incomplete) return Result(SettingsCode::RollbackFailed,writeError.empty() ? "Settings restore readback did not match" : writeError);
-	if (current != pending.target) return Result(SettingsCode::Conflict,"Settings changed during restore execution");
+	if (!SettingsValuesEqual(current,pending.target)) return Result(SettingsCode::Conflict,"Settings changed during restore execution");
 	// A refused/throwing callback can still have completed its entire patch.
 	// Fresh exact readback is authoritative, but proves no device restoration.
 	(void)wrote;
@@ -342,7 +342,7 @@ SettingsResult SettingsTransaction::CompleteRestore(std::uint64_t requestedOwner
 		return Result(SettingsCode::Busy,"The settings restore has not executed successfully");
 	StateValues current; std::string error;
 	if (!Read(current,error)) return Result(SettingsCode::RollbackFailed,Because(reason,error));
-	if (current != pending.target) return Result(SettingsCode::Conflict,Because(reason,"Settings changed before restoration completed"));
+	if (!SettingsValuesEqual(current,pending.target)) return Result(SettingsCode::Conflict,Because(reason,"Settings changed before restoration completed"));
 	StateValues refreshedDraft = current;
 	if (preserveDraft) for (const auto& [key,target] : attemptedEdits) refreshedDraft[key] = target;
 	if (!ValidSnapshot(refreshedDraft,&baseline,error)) return Result(SettingsCode::RollbackFailed,Because(reason,error));
@@ -362,7 +362,7 @@ SettingsResult SettingsTransaction::PrepareConfirm(std::uint64_t requestedOwner,
 		return Result(SettingsCode::Invalid,"The settings confirmation deadline has expired or time is invalid");
 	StateValues current; std::string error;
 	if (!Read(current,error)) return Result(SettingsCode::ApplyFailed,std::move(error));
-	if (current != lastApplied) return Result(SettingsCode::Conflict,"Settings changed before confirmation");
+	if (!SettingsValuesEqual(current,lastApplied)) return Result(SettingsCode::Conflict,"Settings changed before confirmation");
 	SettingsAttempt prepared{owner,NewRequest(),baseline,std::move(current),written};
 	if (!prepared.request) return Result(SettingsCode::Invalid,"Settings request identities are exhausted");
 	attempt = prepared; pending = std::move(prepared);
@@ -378,7 +378,7 @@ SettingsResult SettingsTransaction::CompleteConfirm(std::uint64_t requestedOwner
 		return Result(SettingsCode::Busy,"Settings confirmation has not been prepared");
 	StateValues current; std::string error;
 	if (!Read(current,error)) return Result(SettingsCode::ApplyFailed,std::move(error));
-	if (current != pending.target) return Result(SettingsCode::Conflict,"Settings changed during confirmation persistence");
+	if (!SettingsValuesEqual(current,pending.target)) return Result(SettingsCode::Conflict,"Settings changed during confirmation persistence");
 	baseline = current; draft = std::move(current); written.clear(); deadline = 0; phase = SettingsPhase::Editing;
 	ClearAttempt(); return Result(SettingsCode::Ok);
 }
@@ -403,8 +403,8 @@ SettingsResult SettingsTransaction::Rollback(bool preserveDraft, SettingsCode re
 	bool conflict = false;
 	for (const auto& [key,target] : written) {
 		const auto& original = baseline.at(key);
-		if (current.at(key) == original) continue;
-		if (current.at(key) != target) { conflict = true; continue; }
+		if (SettingsValueEqual(current.at(key),original)) continue;
+		if (!SettingsValueEqual(current.at(key),target)) { conflict = true; continue; }
 		restore.emplace(key,original); candidate[key] = original;
 	}
 	if (!restore.empty()) {
@@ -424,13 +424,13 @@ SettingsResult SettingsTransaction::Rollback(bool preserveDraft, SettingsCode re
 		// A refused/throwing partial rollback may nevertheless have restored all
 		// values. Verified state is authoritative; otherwise retain recovery.
 		for (const auto& [key,target] : written) {
-			if (current.at(key) == baseline.at(key)) continue;
-			if (current.at(key) != target) conflict = true;
+			if (SettingsValueEqual(current.at(key),baseline.at(key))) continue;
+			if (!SettingsValueEqual(current.at(key),target)) conflict = true;
 			else if (!writeOk) error = writeError;
 		}
 	}
 	bool restored = true;
-	for (const auto& [key,target] : written) if (current.at(key) != baseline.at(key)) restored = false;
+	for (const auto& [key,target] : written) if (!SettingsValueEqual(current.at(key),baseline.at(key))) restored = false;
 	if (!restored) {
 		phase = SettingsPhase::RecoveryRequired; deadline = 0;
 		if (conflict) return Result(SettingsCode::Conflict,Because(reason,"An externally changed setting cannot be rolled back safely"));
@@ -455,7 +455,7 @@ SettingsResult SettingsTransaction::Confirm(std::uint64_t requestedOwner) {
 	if (phase != SettingsPhase::Confirming) return Result(SettingsCode::Busy,"No settings confirmation is pending");
 	StateValues current; std::string error;
 	if (!Read(current,error)) return Rollback(false,SettingsCode::ApplyFailed,error);
-	if (current != lastApplied) return Rollback(false,SettingsCode::Conflict,"Settings changed before confirmation");
+	if (!SettingsValuesEqual(current,lastApplied)) return Rollback(false,SettingsCode::Conflict,"Settings changed before confirmation");
 	baseline = current; draft = std::move(current); written.clear(); deadline = 0; phase = SettingsPhase::Editing;
 	return Result(SettingsCode::Ok);
 }

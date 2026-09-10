@@ -166,7 +166,27 @@ public:
 		const openq4::ui::TextBrokerContext& authorizedContext,
 		const openq4::ui::TextBrokerDelivery& delivery);
 
+bool NativeTextAttach(uiNativeTextRouteProbe_t,void*,const openq4::ui::TextEditorIdentity&,
+	openq4::ui::NativeTextIdentity,openq4::ui::NativeTextEditorBarrier&,std::string&);
+bool NativeTextRefresh(uiNativeTextRouteProbe_t,void*,const openq4::ui::NativeTextEditorBarrier&,
+	openq4::ui::NativeTextEditorView&,std::string&);
+bool NativeTextCurrent(uiNativeTextRouteProbe_t,void*,const openq4::ui::NativeTextEditorBarrier&) noexcept;
+bool NativeTextBegin(uiNativeTextRouteProbe_t,void*,const openq4::ui::NativeTextEditorBarrier&,
+	const openq4::ui::NativeTextCollection&,openq4::ui::NativeTextEditorBarrier&,std::string&);
+bool NativeTextApply(uiNativeTextRouteProbe_t,void*,const openq4::ui::NativeTextEditorBarrier&,
+	const openq4::ui::NativeTextOffer&,openq4::ui::NativeTextEditorReceipt&,std::string&);
+bool NativeTextComplete(uiNativeTextRouteProbe_t,void*,const openq4::ui::NativeTextEditorBarrier&,
+	const openq4::ui::NativeTextCollection&,openq4::ui::NativeTextEditorBarrier&,std::string&);
+std::unique_ptr<openq4::ui::Interaction::NativeSettlement> NativeTextPrepareSettlement(
+	uiNativeTextRouteProbe_t,void*,const openq4::ui::NativeTextEditorBarrier&,std::string&);
+bool NativeTextPublishSettlement(uiNativeTextRouteProbe_t,void*,
+	openq4::ui::Interaction::NativeSettlement&,openq4::ui::NativeTextEditorReceipt&) noexcept;
+bool NativeTextRetireExact(openq4::ui::NativeTextIdentity,const openq4::ui::TextEditorIdentity&) noexcept;
+
 private:
+	bool NativeTextEnter() noexcept;
+	idUserInterfaceManaged* NativeTextResolve(uiNativeTextRouteProbe_t,void*,const openq4::ui::TextEditorIdentity&) const noexcept;
+	bool NativeTextCheck(uiNativeTextRouteProbe_t,void*,const openq4::ui::NativeTextEditorBarrier&) const noexcept;
 	void						RegisterAllocation( idUserInterfaceManaged *gui );
 	void						RegisterGui( idUserInterfaceManaged *gui );
 	void						RegisterDemoGui( idUserInterfaceManaged *gui );
@@ -182,6 +202,7 @@ private:
 	idList<idUserInterfaceManaged*> allocations;
 	unsigned long long nextAllocationId = 0;
 	bool textBoundaryActive = false, textBoundaryFailed = false;
+	bool nativeBoundaryActive = false, nativeBoundaryFailed = false;
 	bool clipboardBoundaryActive = false, clipboardBoundaryFailed = false;
 	int applicationPumpDepth = 0;
 	int applicationPumpBudget = 0;

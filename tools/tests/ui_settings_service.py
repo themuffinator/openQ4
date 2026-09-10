@@ -36,6 +36,9 @@ SUPPORT = r'''
 #include <string>
 #include <utility>
 #include <vector>
+#if defined(__SSE__) || defined(_M_X64)
+#include <xmmintrin.h>
+#endif
 #include "src/ui/SettingsService.h"
 #include "src/ui/application/SystemSettingsHost.h"
 #include "src/ui/application/SettingsDisplayController.h"
@@ -51,6 +54,7 @@ static struct HostData {
     int reads=0,defaultReads=0,validations=0;
     std::vector<StateValues> writes;
     bool failRead=false,failDefaults=false,refuseWrite=false,partialWrite=false,confirm=false;
+    bool allowNearZero=false; // Comparison-only fixture: continuous zero-capable numeric setting.
 } host;
 namespace openq4::ui {
 const std::map<std::string,size_t>& SystemSettingsHost::Schema() {
@@ -74,7 +78,7 @@ bool SystemSettingsHost::Validate(const StateValues&,const StateValues& target,s
     }
     double brightness=std::get<double>(target.at("r_brightness")),mode=std::get<double>(target.at("r_mode"));
     const auto& renderer=std::get<std::string>(target.at("r_renderer"));
-    if(brightness<.5 || brightness>2 || mode<0 || mode>2 || mode!=std::floor(mode) ||
+    if(brightness<(host.allowNearZero?0:.5) || brightness>2 || mode<0 || mode>2 || mode!=std::floor(mode) ||
        (renderer!="best" && renderer!="arb2")) { error="bounded range/choice";return false; }
     return true;
 }
@@ -853,9 +857,38 @@ static void ExitDisplayApplyFailure(const std::string& failure) {
     FinishDisplayRestore(owner);Check(host.live==Initial(),"failed display Apply leaves baseline restored");
     if(failure=="close" || failure=="release")Check(host.writes.empty() && deviceData.restarts==0,"unwritten owner close only cancels queued attempt");
 }
+static void ExactValues(const std::string& scenario) {
+    // No renderer/native service runs. The bounded four-field host uses a
+    // zero-capable continuous numeric range for this exact comparison probe.
+    struct Mode {
+#if defined(__SSE__) || defined(_M_X64)
+        unsigned old=_mm_getcsr();Mode(){_mm_setcsr((old&~0x6000u)|0x8040u);}~Mode(){_mm_setcsr(old);}
+#endif
+    } mode;
+    host.allowNearZero=true;host.live["r_brightness"]=std::bit_cast<double>(std::uint64_t(1));cvars.trace=true;
+    const auto owner=Begin();Check(Dispatch(owner,"edit",{{"r_brightness",0.0}}),"edit observed subnormal to explicit zero");
+    Expect(owner,"dirty",true);Expect(owner,"canApply",true);
+    Check(std::any_of(commonObject.lines.begin(),commonObject.lines.end(),[](const auto& line){return line.find("operation=settings.system.edit")!=std::string::npos&&line.find("dirty=1")!=std::string::npos;}),"trace reports exact dirty numeric draft");
+    if(scenario=="dirty_apply") {
+        Check(Dispatch(owner,"applyExit"),"zero reset succeeds before exit");
+        Check(host.writes.size()==1&&host.writes[0].size()==1&&SettingsValueEqual(host.writes[0].at("r_brightness"),0.0),"zero reset cannot vanish from actual patch");
+        Check(UI_SettingsExitReady(owner)&&UI_SettingsConsumeExit(owner),"successful exact Apply closes with one receipt");
+        Check(!UI_SettingsConsumeExit(owner),"receipt remains one-shot");
+    } else if(scenario=="exit_guard") {
+        const auto result=CompleteExit(Settings(),{owner,0});
+        Check(result.code!=SettingsCode::Ok,"dirty exact draft cannot receive a close receipt");
+        Expect(owner,"open",true);Expect(owner,"dirty",true);Check(host.writes.empty()&&!UI_SettingsExitReady(owner),"refused close preserves unsaved draft and ownership");
+    } else {
+        Check(scenario=="conflict","known exact comparison case");
+        host.live["r_brightness"]=std::bit_cast<double>(std::uint64_t(2));
+        Check(!Dispatch(owner,"applyExit"),"changed tiny external value blocks overwrite and exit");
+        Check(host.writes.empty()&&!UI_SettingsExitReady(owner),"external conflict has no write/close side effect");
+        Expect(owner,"open",true);Expect(owner,"dirty",true);
+    }
+}
 int main(int argc,char** argv) {
     Check(argc==2,"scenario required");const std::string name=argv[1];
-    if(name=="validation")Validation();else if(name=="ownership")Ownership();
+    if(name.starts_with("exact_"))ExactValues(name.substr(6));else if(name=="validation")Validation();else if(name=="ownership")Ownership();
     else if(name=="drafts")Drafts();else if(name=="devices")Devices();
     else if(name=="conflict")Conflict();else if(name=="apply_failure")ApplyFailure();
     else if(name=="confirmation")Confirmation();else if(name=="abandon_editing")AbandonEditing();
@@ -883,6 +916,7 @@ int main(int argc,char** argv) {
 '''
 
 SCENARIOS = (
+    'exact_dirty_apply','exact_exit_guard','exact_conflict',
     'validation', 'ownership', 'drafts', 'devices', 'conflict', 'apply_failure',
     'confirmation', 'abandon_editing', 'abandon_pending', 'orphan_refusal',
     'orphan_divergence', 'waiting_close', 'waiting_release', 'persistence',
@@ -958,8 +992,12 @@ def render_frame_body():
     return body
 
 
-def main():
+def main(production_mutations=()):
     service = without_includes((ROOT / 'src/ui/SettingsService.cpp').read_text(encoding='utf-8'))
+    for old, new in production_mutations:
+        if service.count(old) != 1:
+            raise RuntimeError('Production mutation anchor is not unique')
+        service = service.replace(old, new)
     document = (ROOT / 'src/ui/retained/Document.cpp').read_text(encoding='utf-8')
     validation = '\n'.join(function_body(document, name) for name in (
         'bool Utf8(', 'bool ValidStateValue(', 'const Node* Find(', 'const Node* DocumentModel::FindNode('))

@@ -4,6 +4,7 @@
 #include "UserInterface.h"
 #include "UserInterfaceText.h"
 #include "UserInterfaceClipboard.h"
+#include "UserInterfaceNativeText.h"
 
 // Engine-private ownership and scheduling contract. Game modules continue to
 // use idUserInterface; neither legacy windows nor these manager operations
@@ -49,6 +50,20 @@ public:
 		std::string_view text, std::string& error) { return false; }
 	virtual bool SetClipboardNotice(const uiNumberEditorTarget_t& expected,
 		openq4::ui::NumberEditNotice notice, std::string& error) { return false; }
+
+	// Engine-private native owner endpoints. Legacy and unloaded backends refuse.
+	// Prepare and Refresh may call host code; manager re-resolves afterward.
+	// Current, Publish and Retire must not allocate or enter foreign callbacks.
+	virtual bool PrepareNativeText(const openq4::ui::TextEditorIdentity& owner) { return false; }
+	virtual bool AttachNativeText(const openq4::ui::TextEditorIdentity& owner, openq4::ui::NativeTextIdentity native, openq4::ui::NativeTextEditorBarrier& out, std::string& error) { return false; }
+	virtual bool RefreshNativeText(const openq4::ui::NativeTextEditorBarrier& expected, openq4::ui::NativeTextEditorView& out, std::string& error) { return false; }
+	virtual bool CurrentNativeText(const openq4::ui::NativeTextEditorBarrier& expected) const noexcept { return false; }
+	virtual bool BeginNativeText(const openq4::ui::NativeTextEditorBarrier& expected, const openq4::ui::NativeTextCollection& collection, openq4::ui::NativeTextEditorBarrier& out, std::string& error) { return false; }
+	virtual bool ApplyNativeText(const openq4::ui::NativeTextEditorBarrier& expected, const openq4::ui::NativeTextOffer& offer, openq4::ui::NativeTextEditorReceipt& out, std::string& error) { return false; }
+	virtual bool CompleteNativeText(const openq4::ui::NativeTextEditorBarrier& expected, const openq4::ui::NativeTextCollection& collection, openq4::ui::NativeTextEditorBarrier& out, std::string& error) { return false; }
+	virtual std::unique_ptr<openq4::ui::Interaction::NativeSettlement> PrepareNativeTextSettlement(const openq4::ui::NativeTextEditorBarrier& expected, std::string& error) { return nullptr; }
+	virtual bool PublishNativeTextSettlement(openq4::ui::Interaction::NativeSettlement& prepared, openq4::ui::NativeTextEditorReceipt& out) noexcept { return false; }
+	virtual bool RetireNativeTextExact(openq4::ui::NativeTextIdentity native, const openq4::ui::TextEditorIdentity& owner) noexcept { return false; }
 
 	void ClearRefs() { refs = 0; }
 	void AddRef() { refs++; }

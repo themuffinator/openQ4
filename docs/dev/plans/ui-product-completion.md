@@ -132,6 +132,16 @@ shaping/caret geometry and unconfirmed-edit Apply/exit guards remain required.
 The full 227-requirement scope, 271 migration records and seven final gates stay
 unchanged and unaccepted by this increment.
 
+The native managed-bridge increment, based on engine
+`59dbfa9429056a85ead40fff5e8f4f5b38be4225`, extends the [numeric field contract](../ui/numeric-fields.md)
+and [native text boundary](../ui/text-input-routing.md). Exact typed settings comparisons and FTZ/DAZ-independent journal number serialization extend through transaction, display validation and startup recovery. Managed native-owner endpoints re-resolve the registered allocation/backend/document after resource preparation; copied owner barriers and exact retirement preserve stable drafts. The Windows hook-to-store bridge binds one checked provider generation and native/editor lease, preserves the immutable closed receipt through FIFO acknowledgements and synchronization, and closes its own callback scope before fence publication. Explicit lifecycle reconciliation and a checked idle barrier query supplement the ordinary Pump path. Shared focus reveal uses exact projected border corners, a density-aware 4dp inset where authored scroll ranges permit it, nested transformed scroll planes and the owning view clock without repeated pointer-scroll takeover.
+
+The Windows engine build and all 40 UI suites pass. Windowed SP/OpenGL at 125% and MP/Vulkan at 200% each reach gameplay, pass 38 semantic operations and produce 12 reviewed engine screenshots. The focused field retains the checked 4 dp body inset; at 200% its bottom is pixel 464 inside a body ending at 472. Raw screenshots and PNG previews have identical RGB pixels. SP has no warnings; MP retains the previous 93 warnings. Final captures use the verified E: installation, whose engine package checksums match the earlier capture.
+
+The coordinator passes MSVC debug checks with 18 rejected mutations, Clang with 19 (including allocation failure), and Linux sanitizer checks. SDK bridge, managed-owner and exact recovery tests retain their own frozen source bindings and explicit limits. The immutable combined record is `.tmp/ui/native-managed-bridge-integration/validation-evidence.json`. Earlier timeout, harness-path and asset-discovery runs remain preserved; they are not substituted for the final qualification.
+
+Native activation, the production Session route/probe, ordinary native character association, candidate geometry, complete composition/shaping, full page/editor/platform qualification, all 271 migrations and seven final gates remain open. Counted SDK callbacks, semantic controls and bounded focus geometry do not establish installed IME behavior, physical-input qualification or real interrupted-device/power-loss recovery. No requirement status or product acceptance changes.
+
 ### Findings that block product completion
 
 The [native text owner/store checkpoint](../ui/text-input-routing.md), based on

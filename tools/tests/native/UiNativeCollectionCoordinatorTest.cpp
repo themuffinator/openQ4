@@ -91,7 +91,8 @@ struct Source final:NativeQueueSource {
 	explicit Source(Hooks& h):hooks(h) {}
 	bool Observe(NativeQueueStatus& out,std::string&) override { ++observations;hooks.At("observe");out=status;return true; }
 	int Poll(SDL_Event& e,OQ4_NativeQueueRecord& r) override {
-		if(records.empty())return 0;e=records.front().first;r=records.front().second;records.pop_front();return 1;
+		if(records.empty())return 0;
+		e=records.front().first;r=records.front().second;records.pop_front();return 1;
 	}
 	bool CopyFence(const SDL_Event&,OQ4_NativeFence& out) override {if(!status.pending)return false;out=*status.pending;return true;}
 	void Add(Uint32 type,Uint32 kind=OQ4_QUEUE_OUTSIDE,Uint32 ordinal=0) {
@@ -129,7 +130,8 @@ struct Owner final:NativeTextCollectionOwner {
 		++prepares;hooks.At("prepare");return replaced?nullptr:f.input.PrepareNumberNativeSettlement(b,error);
 	}
 	bool PublishSettlement(Interaction::NativeSettlement& p,NativeTextEditorReceipt& out) noexcept override {
-		++publishes;if(publishNoAllocation)failAfter=0;
+		++publishes;
+		if(publishNoAllocation)failAfter=0;
 		const bool result=!replaced && f.input.PublishNumberNativeSettlement(p,out);
 		failAfter=-1;noAllocation=false;return result;
 	}
@@ -153,18 +155,21 @@ struct Store final:NativeTextCollectionStore {
 	bool StillClosed(const NativeClosedTextCollection& expected) const noexcept override {return closed && expected==seal;}
 	bool Pending(const NativeTextEditorBarrier& b,std::uint64_t dispatch,NativeTextPendingSnapshot& out,std::string& error) override {
 		hooks.At("pending");const bool okay=f.native.QueryPendingCollection(b.native,b.editor.revision,b.sequence,b.shadowRevision,dispatch,out,error);
-		if(okay && badPendingFinal)++out.lastSequence;return okay;
+		if(okay && badPendingFinal)++out.lastSequence;
+		return okay;
 	}
 	bool Peek(const NativeTextIdentity& id,NativeTextOffer& out,std::string& error) override {
 		hooks.At("peek");return f.native.PeekOffer(id,out,error);
 	}
 	bool Acknowledge(const NativeTextEditorReceipt& r,std::string& error) override {
-		++acks;hooks.At("ack");if(!ackOkay)return false;
+		++acks;hooks.At("ack");
+		if(!ackOkay)return false;
 		const bool okay=f.native.Acknowledge(r.after.native,r.after.sequence,r.after.shadowRevision,r.before.editor.revision,r.after.editor.revision,error);
 		hooks.At("acked");return okay && !failAfterAck;
 	}
 	bool Sync(const NativeTextEditorReceipt& r,const NativeTextSnapshot& p,std::string& error) override {
-		++syncs;hooks.At("sync");if(!syncOkay)return false;
+		++syncs;hooks.At("sync");
+		if(!syncOkay)return false;
 		const bool okay=f.native.SyncEngine(r.before.native,r.before.editor.revision,r.before.shadowRevision,r.after.editor.revision,p.text,p.anchor,p.caret,error);
 		hooks.At("synced");return okay && !failAfterSync;
 	}
@@ -176,7 +181,8 @@ struct Fence final:NativeTextCollectionFence {
 	Source& source;Hooks& hooks;unsigned acks=0;bool okay=true,failAfterAck=false;
 	Fence(Source& s,Hooks& h):source(s),hooks(h) {}
 	bool Acknowledge(const NativeQueueStatus& expected,std::string&) override {
-		++acks;hooks.At("fence");if(!okay)return false;
+		++acks;hooks.At("fence");
+		if(!okay)return false;
 		CHECK(source.status.pending && source.status.pending->sequence==expected.pending->sequence);
 		source.status.pending.reset();hooks.At("fenced");return !failAfterAck;
 	}
@@ -196,7 +202,8 @@ struct Run {
 	}
 	void Read(unsigned serial=1) {
 		store.Seal(serial);source.Group(f.dispatch,f.fence);
-		const auto result=ingress.Read(source,batch,f.error);if(result!=NativeQueueRead::Ready)std::fprintf(stderr,"Read failed: %s\n",f.error.c_str());
+		const auto result=ingress.Read(source,batch,f.error);
+		if(result!=NativeQueueRead::Ready)std::fprintf(stderr,"Read failed: %s\n",f.error.c_str());
 		CHECK(result==NativeQueueRead::Ready && batch->Events().size()==5);
 	}
 	bool Reconcile(NativeTextCollectionResult& out) {return coordinator->Reconcile(ingress,source,*batch,owner,store,out,f.error);}
@@ -230,12 +237,71 @@ static void AcrossCollections() {
 	CHECK(r.Reconcile(out) && !out.composing && out.settled && r.store.syncs==1);
 	CHECK(r.f.View().state.text=="1.75");r.Complete(out);
 }
+static void LifecycleCollections() {
+	// Explicit application callbacks can start a native group, which completes
+	// in a later ordinary pump. SDL text remains an owned record, not inserted.
+	Run r;const auto stable=r.f.View().state;r.Offer("1.7",true);r.Read();
+	r.store.seal.kind=NativeClosedCollectionKind::Lifecycle;
+	auto requested=r.store.seal;NativeTextCollectionResult out;
+	bool observed=false;r.hooks.callback=[&](const char* site) {
+		if(!observed && std::string_view(site)=="observe") {observed=true;++requested.serial;}
+	};
+	CHECK(r.coordinator->ReconcileLifecycle(requested,r.ingress,r.source,*r.batch,r.owner,r.store,out,r.f.error));
+	CHECK(observed && out.composing && !out.settled && out.transactions==1 && Same(r.f.View().state,stable));
+	CHECK(r.batch->Events().size()==5 && r.batch->Events()[2].text=="not insertion authority");
+	r.hooks.callback={};r.Complete(out);
+	++r.f.dispatch;++r.f.fence;r.Offer("1.75",false,true);r.Read(2);
+	r.hooks.callback=[](const char* site){if(std::string_view(site)=="synced")noAllocation=true;};
+	CHECK(r.Reconcile(out) && out.settled && !out.composing);r.Complete(out);
+	CHECK(r.f.View().state.text=="1.75" && r.f.Save().widgets.at("n0").number->undo.size()==2);
+	// An explicitly empty lifecycle still has a real zero-event fence. It adds
+	// no editor text/history and cannot bypass ordinary fence completion.
+	++r.f.dispatch;++r.f.fence;r.store.Seal(3);r.store.seal.kind=NativeClosedCollectionKind::Lifecycle;
+	r.store.seal.admittedCallbacks=0;
+	r.source.status.pending=OQ4_NativeFence{1,0,r.f.dispatch,r.f.fence};
+	r.source.Add(r.source.status.fenceEventType,OQ4_QUEUE_FENCE,0);
+	CHECK(r.ingress.Read(r.source,r.batch,r.f.error)==NativeQueueRead::Ready && r.batch->Events().size()==1);
+	CHECK(r.coordinator->ReconcileLifecycle(r.store.seal,r.ingress,r.source,*r.batch,r.owner,r.store,out,r.f.error));
+	CHECK(!out.settled && !out.composing && out.transactions==0 && r.fence.acks==2);r.Complete(out);
+	// Every supplied seal field is bound independently to the actual closed
+	// application collection. A changed owner is never cleanup-write authority.
+	for(unsigned bad=0;bad<17;++bad) {
+		Run f;f.Offer("1.5");f.Read();f.store.seal.kind=NativeClosedCollectionKind::Lifecycle;
+		auto wrong=f.store.seal;
+		if(bad==0)wrong.kind=NativeClosedCollectionKind::Pump;
+		if(bad==1)wrong.kind=static_cast<NativeClosedCollectionKind>(99);
+		if(bad==2)++wrong.identity.document;
+		if(bad==3)++wrong.identity.editorLease;
+		if(bad==4)++wrong.serial;
+		if(bad==5)++wrong.dispatch;
+		if(bad==6)++wrong.pending.identity.document;
+		if(bad==7)++wrong.pending.identity.editorLease;
+		if(bad==8)++wrong.pending.engineRevision;
+		if(bad==9)++wrong.pending.acknowledgedSequence;
+		if(bad==10)++wrong.pending.acknowledgedShadowRevision;
+		if(bad==11)++wrong.pending.lastSequence;
+		if(bad==12)++wrong.pending.shadowRevision;
+		if(bad==13)++wrong.pending.dispatch;
+		if(bad==14)++wrong.pending.count;
+		if(bad==15)++wrong.admittedCallbacks;
+		if(bad==16)f.owner.replaced=true;
+		out.transactions=999;
+		CHECK(!f.coordinator->ReconcileLifecycle(wrong,f.ingress,f.source,*f.batch,f.owner,f.store,out,f.f.error));
+		CHECK(out.transactions==999 && f.owner.begins==0 && f.store.acks==0 && f.owner.retired==1 && f.store.retired==1);
+	}
+	// The lifecycle entry never accepts a Pump receipt, even when both sides
+	// agree on its bytes. Ordinary entry still rejects Lifecycle in BadReceipts.
+	Run pump;pump.Read();
+	CHECK(!pump.coordinator->ReconcileLifecycle(pump.store.seal,pump.ingress,pump.source,*pump.batch,pump.owner,pump.store,out,pump.f.error));
+	CHECK(pump.owner.begins==0 && pump.fence.acks==0);
+}
 static void Failures() {
 	for(const char* site:{"observe","closed","refresh","begin","pending","peek","apply","ack","acked","complete","prepare","sync","synced"}) {
 		for(unsigned failure=0;failure<5;++failure) {
 			Run r;r.Offer("1.75");r.Read();const auto stable=r.f.View().state;
 			bool fired=false;r.hooks.callback=[&](const char* current) {
-				if(fired || std::string_view(current)!=site)return;fired=true;
+				if(fired || std::string_view(current)!=site)return;
+				fired=true;
 				if(failure==0)++r.source.status.engineToken;
 				if(failure==1)r.owner.replaced=true;
 				if(failure==2)r.store.closed=false;
@@ -258,17 +324,28 @@ static void Failures() {
 static void BadReceipts() {
 	for(unsigned bad=0;bad<12;++bad) {
 		Run r;r.Offer("1.5");r.Read();auto& s=r.store.seal;
-		if(bad==0)++s.identity.document;if(bad==1)s.serial=0;if(bad==2)++s.dispatch;
-		if(bad==3)s.kind=NativeClosedCollectionKind::Lifecycle;if(bad==4)++s.pending.engineRevision;
-		if(bad==5)++s.pending.acknowledgedSequence;if(bad==6)++s.pending.acknowledgedShadowRevision;
-		if(bad==7)++s.pending.shadowRevision;if(bad==8)++s.pending.lastSequence;
-		if(bad==9)s.admittedCallbacks=0;if(bad==10)s.pending.count=33;if(bad==11)++s.pending.identity.editorLease;
+		if(bad==0)++s.identity.document;
+		if(bad==1)s.serial=0;
+		if(bad==2)++s.dispatch;
+		if(bad==3)s.kind=NativeClosedCollectionKind::Lifecycle;
+		if(bad==4)++s.pending.engineRevision;
+		if(bad==5)++s.pending.acknowledgedSequence;
+		if(bad==6)++s.pending.acknowledgedShadowRevision;
+		if(bad==7)++s.pending.shadowRevision;
+		if(bad==8)++s.pending.lastSequence;
+		if(bad==9)s.admittedCallbacks=0;
+		if(bad==10)s.pending.count=33;
+		if(bad==11)++s.pending.identity.editorLease;
 		NativeTextCollectionResult out;CHECK(!r.Reconcile(out) && r.owner.begins==0 && r.store.acks==0);
 	}
 	for(unsigned bad=0;bad<8;++bad) {
 		Run r;r.Offer("1.5");r.Read();NativeTextCollectionResult out;CHECK(r.Reconcile(out));
-		if(bad==0)++out.completion.serial;if(bad==1)++out.completion.coordinator;if(bad==2)++out.completion.batch.serial;
-		if(bad==3)r.fence.okay=false;if(bad==4)++r.source.status.engineToken;if(bad==5)r.owner.replaced=true;
+		if(bad==0)++out.completion.serial;
+		if(bad==1)++out.completion.coordinator;
+		if(bad==2)++out.completion.batch.serial;
+		if(bad==3)r.fence.okay=false;
+		if(bad==4)++r.source.status.engineToken;
+		if(bad==5)r.owner.replaced=true;
 		if(bad==6)r.hooks.callback=[&](const char* s){if(std::string_view(s)=="fenced")++r.source.status.engineToken;};
 		if(bad==7)r.fence.failAfterAck=true;
 		CHECK(!r.coordinator->CompleteFence(r.ingress,r.source,out.completion,r.owner,r.store,r.fence,r.f.error));
@@ -277,7 +354,9 @@ static void BadReceipts() {
 	}
 	for(unsigned bad=0;bad<3;++bad) {
 		Run r;r.Offer("1.5");r.Read();
-		if(bad==0)r.store.failAfterAck=true;if(bad==1)r.store.failAfterSync=true;if(bad==2)r.store.badPendingFinal=true;
+		if(bad==0)r.store.failAfterAck=true;
+		if(bad==1)r.store.failAfterSync=true;
+		if(bad==2)r.store.badPendingFinal=true;
 		NativeTextCollectionResult out;CHECK(!r.Reconcile(out) && r.owner.publishes==0 && r.f.View().state.text=="1.25");
 		if(bad==2)CHECK(r.owner.applies==0 && r.store.acks==0);
 	}
@@ -292,7 +371,8 @@ static void Prepared() {
 		std::unique_ptr<Interaction::NativeSettlement> prepared;failAfter=allocationSweep?point:-1;
 		try {prepared=r.f.input.PrepareNumberNativeSettlement(r.f.barrier,r.f.error);}catch(const std::bad_alloc&) {}failAfter=-1;
 		CHECK(Same(r.f.View().state,stable) && r.f.input.IsNumberNativeCurrent(r.f.barrier));
-		if(!prepared)continue;success=true;NativeTextEditorReceipt receipt;receipt.after.sequence=999;
+		if(!prepared)continue;
+		success=true;NativeTextEditorReceipt receipt;receipt.after.sequence=999;
 		Interaction copy=r.f.input;CHECK(!copy.PublishNumberNativeSettlement(*prepared,receipt) && receipt.after.sequence==999);
 		failAfter=0;CHECK(r.f.input.IsNumberNativeCurrent(r.f.barrier));CHECK(r.f.input.PublishNumberNativeSettlement(*prepared,receipt));failAfter=-1;
 		CHECK(receipt.effect==NativeTextEditorEffect::SyncEngine && r.f.View().state.text==std::string(100,'7'));
@@ -342,7 +422,8 @@ static void ThreadAndProtocol() {
 	for(const char* site:{"fence","fenced"})for(unsigned fault=0;fault<3;++fault) {
 		Run f;f.Offer("1.5");f.Read();NativeTextCollectionResult ready;CHECK(f.Reconcile(ready));
 		bool fired=false;f.hooks.callback=[&](const char* current) {
-			if(fired || std::string_view(current)!=site)return;fired=true;
+			if(fired || std::string_view(current)!=site)return;
+			fired=true;
 			if(fault==0)f.owner.replaced=true;
 			if(fault==1)f.store.closed=false;
 			if(fault==2)CHECK(!f.coordinator->CompleteFence(f.ingress,f.source,ready.completion,f.owner,f.store,f.fence,f.f.error));
@@ -350,6 +431,46 @@ static void ThreadAndProtocol() {
 		CHECK(!f.coordinator->CompleteFence(f.ingress,f.source,ready.completion,f.owner,f.store,f.fence,f.f.error));
 		CHECK(fired && f.fence.acks==1 && f.owner.retired==1 && f.f.View().state.text=="1.5");
 	}
+}
+static void BarrierQueries() {
+	Run r;NativeTextEditorBarrier out;out.native={999,998};out.editor.control="unchanged";
+	const auto sentinel=out;
+	CHECK(r.coordinator->QueryBarrier(out,r.f.error) && out==r.f.barrier && r.source.observations==0);
+	out=sentinel;bool workerResult=true;
+	std::thread worker([&]{std::string error;workerResult=r.coordinator->QueryBarrier(out,error);});worker.join();
+	CHECK(!workerResult && out==sentinel && !r.coordinator->NeedsRetirement());
+	r.Offer("1.75");r.Read();unsigned refused=0;
+	r.hooks.callback=[&](const char*) {
+		NativeTextEditorBarrier nested=sentinel;std::string error;
+		CHECK(!r.coordinator->QueryBarrier(nested,error) && nested==sentinel);++refused;
+	};
+	NativeTextCollectionResult result;CHECK(r.Reconcile(result) && refused && !r.coordinator->NeedsRetirement());
+	r.hooks.callback={};
+	CHECK(r.coordinator->QueryBarrier(out,r.f.error) && out.editor.revision>r.f.barrier.editor.revision && out.sequence==1 && !out.collectionOpen);
+	const auto settled=out;r.Complete(result);
+	CHECK(r.coordinator->QueryBarrier(out,r.f.error) && out==settled);
+	CHECK(!r.coordinator->CompleteFence(r.ingress,r.source,result.completion,r.owner,r.store,r.fence,r.f.error));
+	out=sentinel;CHECK(!r.coordinator->QueryBarrier(out,r.f.error) && out==sentinel);
+	for(unsigned invalid=0;invalid<4;++invalid) {
+		auto attached=r.f.barrier;
+		if(invalid==0)attached.native.document=0;
+		if(invalid==1)attached.native.editorLease=0;
+		if(invalid==2)attached.editor.revision=0;
+		if(invalid==3)attached.collectionOpen=true;
+		NativeTextCollectionCoordinator bad(attached);
+		CHECK(!bad.QueryBarrier(out,r.f.error) && out==sentinel);
+	}
+	// A long owned name forces a copy allocation after different leading IDs;
+	// failure must not publish even the trivially copyable fields of the barrier.
+	auto attached=r.f.barrier;attached.editor.control=std::string(256,'q');
+	NativeTextCollectionCoordinator longName(attached);
+	if(allocationSweep) {
+		failAfter=0;const bool copied=longName.QueryBarrier(out,r.f.error);failAfter=-1;
+		CHECK(!copied && out==sentinel && !longName.NeedsRetirement());
+	}
+	CHECK(longName.QueryBarrier(out,r.f.error) && out==attached);
+	out.editor.control="caller-owned";
+	CHECK(longName.QueryBarrier(out,r.f.error) && out==attached);
 }
 static void LongModalOwnerPredicate() {
 	Fixture f;const std::string root(80,'r'),control(90,'n');
@@ -363,9 +484,14 @@ static void LongModalOwnerPredicate() {
 	noAllocation=true;CHECK(f.input.IsNumberNativeCurrent(barrier));noAllocation=false;
 	for(unsigned field=0;field<8;++field) {
 		auto wrong=barrier;
-		if(field==0)++wrong.editor.allocation;if(field==1)++wrong.editor.backend;if(field==2)++wrong.editor.document;
-		if(field==3)++wrong.editor.modal;if(field==4)++wrong.editor.window;if(field==5)++wrong.editor.session;
-		if(field==6)++wrong.editor.revision;if(field==7)++wrong.native.editorLease;
+		if(field==0)++wrong.editor.allocation;
+		if(field==1)++wrong.editor.backend;
+		if(field==2)++wrong.editor.document;
+		if(field==3)++wrong.editor.modal;
+		if(field==4)++wrong.editor.window;
+		if(field==5)++wrong.editor.session;
+		if(field==6)++wrong.editor.revision;
+		if(field==7)++wrong.native.editorLease;
 		noAllocation=true;CHECK(!f.input.IsNumberNativeCurrent(wrong));noAllocation=false;
 	}
 	CHECK(f.input.SetEnabled(control,false));noAllocation=true;CHECK(!f.input.IsNumberNativeCurrent(barrier));noAllocation=false;
@@ -377,6 +503,6 @@ int main() {
 	}
 #endif
 	if(!allocationSweep)std::puts("Allocation sweep unsupported with debug STL iterator proxies; functional and no-allocation final publication checks remain enabled.");
-	Success();AcrossCollections();Failures();BadReceipts();Prepared();FinalBoundary();ThreadAndProtocol();LongModalOwnerPredicate();
+	Success();AcrossCollections();LifecycleCollections();Failures();BadReceipts();Prepared();FinalBoundary();ThreadAndProtocol();BarrierQueries();LongModalOwnerPredicate();
 	std::printf("Native collection coordinator: %u checks passed.\n",checks);return 0;
 }

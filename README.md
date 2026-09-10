@@ -101,9 +101,13 @@ adds shared caret geometry, explicit precise proposals and restorable drafts wit
 undo/redo and conflict recovery. The opt-in SYSTEM page pairs brightness sliders
 with precise fields and protects unfinished edits during Apply and exit. Numeric
 fields support editing and checked clipboard commands with localized errors.
+Exact values survive rollback and recovery records, and shared
+[focus reveal](docs/dev/ui/focus-reveal.md) keeps focused borders clear of scroll
+edges at high density within the authored layout limits.
 [Native text delivery](docs/dev/ui/text-input-routing.md) has checked editor
 ownership, owned event collections, a composition reconciler and a Windows SDK
-text store. Native activation and complete IME integration remain in development.
+text store with managed-owner and collection-hook adapters. Native activation
+and complete IME integration remain in development.
 
 The [0.13.1 patch notes](docs/dev/releases/v0.13.1.md) cover the release save fix, download verification, and map-compilation corrections. Replace the complete package when upgrading.
 
@@ -242,7 +246,7 @@ Bug reports, compatibility reports, testing feedback, and code contributions are
 - **themuffinator** - openQ4 development and maintenance
 - **[Emile Belanger (emileb)](https://github.com/emileb)** - contributor and original author of the Android port, SigmaTouch integration, OpenGL ES 3.0 renderer, GLES shader variants, ETC2/EAC compression, and associated mobile memory/loading work. This integration builds on his [Android branch](https://github.com/emileb/openQ4/tree/android) and [GLES shader-variants branch](https://github.com/emileb/openQ4/tree/gles-shader-variants); see the [contribution and adaptation record](docs/dev/android-gles-integration.md).
 - **DarkMatter Productions** - project stewardship and website
-- **[The RmlUi Team, CodePoint, Shift Technology and contributors](https://github.com/mikke89/RmlUi/tree/6.3)** - MIT-licensed retained layout library used by the `idtech5-ui` runtime integration, with openQ4 extensions for [geometry synchronization](https://github.com/themuffinator/openQ4/blob/e3e65887480368191df154a9b52cce69d8e72140/subprojects/packagefiles/rmlui/projection-geometry.patch) and [positioned overflow](https://github.com/themuffinator/openQ4/blob/e3e65887480368191df154a9b52cce69d8e72140/subprojects/packagefiles/rmlui/positioned-overflow.patch); [retained licence notice](docs/licenses/RmlUi.txt).
+- **[The RmlUi Team, CodePoint, Shift Technology and contributors](https://github.com/mikke89/RmlUi/tree/6.3)** - MIT-licensed retained layout library used by the `idtech5-ui` runtime integration, with openQ4 extensions for [geometry synchronization](https://github.com/themuffinator/openQ4/blob/e3e65887480368191df154a9b52cce69d8e72140/subprojects/packagefiles/rmlui/projection-geometry.patch), [positioned overflow](https://github.com/themuffinator/openQ4/blob/e3e65887480368191df154a9b52cce69d8e72140/subprojects/packagefiles/rmlui/positioned-overflow.patch) and [exact focus geometry](subprojects/packagefiles/rmlui/README.openq4.md); [retained licence notice](docs/licenses/RmlUi.txt).
 - **[Baptiste Lepilleur and the JsonCpp authors](https://github.com/open-source-parsers/jsoncpp/tree/1.9.6)** - JSON document parser used under its MIT option for editable retained UI sources; [retained licence notice](docs/licenses/JsonCpp.txt).
 - **[Mikko Mononen, Eric Veach and the libtess2 contributors](https://github.com/memononen/libtess2/tree/8dbd6483e920311a58c9af10a10beb278efebc36)** - SGI-B-2.0 polygon tessellator used by native retained vector paths with an [openQ4 precision patch](subprojects/packagefiles/libtess2/double-precision.patch); [retained licence notice](docs/licenses/libtess2.txt).
 - **[Q2REX Project Team](https://github.com/themuffinator/Q2REX)** - design reference for the native [multiplayer chat panel, scaling and history](docs/user/multiplayer-chat.md)

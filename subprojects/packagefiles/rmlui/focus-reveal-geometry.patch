@@ -1,0 +1,61 @@
+--- a/Include/RmlUi/Core/ElementUtilities.h
++++ b/Include/RmlUi/Core/ElementUtilities.h
+@@ -78,6 +78,11 @@
+ 	/// @return True on success, otherwise false.
+ 	static bool GetBoundingBox(Rectanglef& out_rectangle, Element* element, BoxArea area);
+ 
++	/// openQ4: Exact projected border corners in window coordinates, clockwise
++	/// from top-left. Refresh geometry before querying. No clipping is performed;
++	/// nonfinite, nonpositive-w or depth-clipped projection leaves output unchanged.
++	static bool GetBorderBoxQuad(Array<Vector2f, 4>& out_quad, Element* element);
++
+ 	/// Formats the contents of an element. This does not need to be called for ordinary elements, but can be useful
+ 	/// for non-DOM elements of custom elements.
+ 	/// @param[in] element The element to lay out.
+--- a/Source/Core/ElementUtilities.cpp
++++ b/Source/Core/ElementUtilities.cpp
+@@ -19,6 +19,7 @@
+ #include "Layout/LayoutEngine.h"
+ #include "TransformState.h"
+ #include <limits>
++#include <cmath>
+ 
+ namespace Rml {
+ 
+@@ -229,6 +230,36 @@
+ 
+ 	render_manager.SetClipMask(std::move(clip_mask_list));
+ 
++	return true;
++}
++
++// openQ4 addition, distributed under RmlUi's MIT license. Uses the same
++// accumulated transform/depth contract as GetBoundingBox without losing corners
++// to a window-axis bounding rectangle before ancestor-local projection.
++bool ElementUtilities::GetBorderBoxQuad(Array<Vector2f, 4>& out_quad, Element* element)
++{
++	if (!element)
++		return false;
++	const Vector2f origin = element->GetAbsoluteOffset(BoxArea::Border);
++	const Vector2f size = element->GetBox().GetSize(BoxArea::Border);
++	if (!std::isfinite(origin.x) || !std::isfinite(origin.y) || !std::isfinite(size.x) || !std::isfinite(size.y) || size.x < 0 || size.y < 0)
++		return false;
++	Array<Vector2f, 4> candidate = {origin, origin + Vector2f(size.x, 0), origin + size, origin + Vector2f(0, size.y)};
++	const TransformState* state = element->GetTransformState();
++	const Matrix4f* transform = state ? state->GetTransform() : nullptr;
++	for (Vector2f& corner : candidate)
++	{
++		const Vector4f point(corner.x, corner.y, 0, 1);
++		const Vector4f projected = transform ? (*transform) * point : point;
++		constexpr float z_clip = 10'000.f;
++		if (!std::isfinite(projected.x) || !std::isfinite(projected.y) || !std::isfinite(projected.z) || !std::isfinite(projected.w) ||
++			projected.w <= 0 || projected.z < -z_clip * projected.w || projected.z > z_clip * projected.w)
++			return false;
++		corner = {projected.x / projected.w, projected.y / projected.w};
++		if (!std::isfinite(corner.x) || !std::isfinite(corner.y))
++			return false;
++	}
++	out_quad = candidate;
+ 	return true;
+ }
+ 

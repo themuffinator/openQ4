@@ -2,10 +2,15 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- Retained menu focus keeps the complete control border inset from scroll-area
+  edges at high UI scales. Resizing reveals the focused field again, while
+  ordinary frames preserve deliberate scrolling. Full-page qualification
+  remains in development.
+
 - SYSTEM precision work removes stray decimal digits from generated slider
   values and preserves small numeric settings through Apply. Custom values keep
-  their precision. Native text composition, recovery and platform qualification
-  remain in development.
+  their precision, including through rollback and recovery records. Native text
+  composition and complete platform qualification remain in development.
 
 - The opt-in SYSTEM page pairs Brightness and Ambient Brightness sliders with
   precise numeric fields. Unfinished edits are preserved when leaving a field;

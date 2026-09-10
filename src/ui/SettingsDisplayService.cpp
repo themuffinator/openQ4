@@ -86,7 +86,7 @@ bool EngineSettingsDisplayHost::WriteJournal(std::string& error) {
 }
 bool EngineSettingsDisplayHost::ValidateLive(const StateValues& target, std::string& error) {
 	StateValues current;
-	return settings.Read(current,error) && (current==target || Fail(error,"Settings changed outside the frozen display operation"));
+	return settings.Read(current,error) && (SettingsValuesEqual(current,target) || Fail(error,"Settings changed outside the frozen display operation"));
 }
 bool EngineSettingsDisplayHost::CommitConfiguration(std::string& error) {
 	std::string currentJournal,currentLock;
@@ -249,9 +249,9 @@ bool EngineSettingsDisplayHost::Startup(std::string& error) {
 	startupTarget=live; StateValues patch;
 	for (const auto& [key,value]:journal.patch) {
 		const bool remappedSelection=key=="r_screen" && explicitDisplay && live.at(key)==StateValue(resolvedIndex);
-		if (live.at(key)!=journal.baseline.at(key) && live.at(key)!=value && !remappedSelection) return Fail(error,"A settings recovery key changed outside the saved attempt");
+		if (!SettingsValueEqual(live.at(key),journal.baseline.at(key)) && !SettingsValueEqual(live.at(key),value) && !remappedSelection) return Fail(error,"A settings recovery key changed outside the saved attempt");
 		startupTarget[key]=desired.at(key);
-		if (live.at(key)!=desired.at(key)) patch[key]=desired.at(key);
+		if (!SettingsValueEqual(live.at(key),desired.at(key))) patch[key]=desired.at(key);
 	}
 	// Numeric monitor indexes can change across processes. Recover the recorded
 	// unique descriptor, then archive its current index without touching a new

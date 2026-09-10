@@ -21,6 +21,9 @@ ROOT = Path(__file__).resolve().parents[2]
 
 BOUNDARIES = r'''
 #include <cstring>
+#if defined(__SSE__) || defined(_M_X64)
+#include <xmmintrin.h>
+#endif
 #include "src/ui/SettingsDisplayService.h"
 #include "src/framework/SettingsPersistence.h"
 using namespace openq4;
@@ -293,12 +296,64 @@ static void UnusedTopologyCases(){
      EngineSettingsDisplayHost host(settings);Check(host.Startup(error),"Confirmed recovery only needs approved target on current topology");host.Shutdown();}
 }
 
-int main(){RuntimeJournal();StartupCases();GeometryAndStartupFailures();StartupClockCases();CommitOwnershipCases();ReindexedStartupRetry();UnusedTopologyCases();std::printf("UI settings display service passed: %d checks\n",checks);}
+
+// Full production catalog with an observed custom ambient subnormal. The host
+// allows restoration of this original, but new edits still enforce float-cache
+// representability; these cases request zero and never introduce a tiny edit.
+struct ExactMode {
+#if defined(__SSE__) || defined(_M_X64)
+    unsigned old=_mm_getcsr();ExactMode(){_mm_setcsr((old&~0xe040u)|0x8040u);}~ExactMode(){_mm_setcsr(old);}
+#endif
+};
+static void SetExactAmbient(std::uint64_t bits){
+    std::string text;Check(SettingsNumberText(std::bit_cast<double>(bits),SettingsNumberFormat::FixedShortest,text),"serialize exact observed ambient fixture");
+    localCVarSystem.variables.at("r_forceAmbient").value=text;
+}
+static bool AmbientIs(SystemSettingsHost& settings,std::uint64_t bits){
+    return std::bit_cast<std::uint64_t>(std::get<double>(Live(settings).at("r_forceAmbient")))==bits;
+}
+static void ExactCatalogCases(){
+    ExactMode mode;
+    // Complete-catalog freeze catches even an untouched key's exact external
+    // change before durable preparation or a renderer restart can be authorized.
+    {ResetFixture();SystemSettingsHost settings;SetExactAmbient(1);auto a=Attempt(settings);
+     SetExactAmbient(2);EngineSettingsDisplayHost host(settings);
+     Check(!host.Prepare(a,error) && writes==0 && files.empty() && restarts==0 && geometryToken==0,
+       "display preparation rejects bit-distinct complete-catalog baseline");host.Shutdown();}
+    for(bool confirmed:{false,true})for(bool conflict:{false,true}){
+     ResetFixture();SystemSettingsHost settings;SetExactAmbient(1);auto a=Attempt(settings);
+     a.target["r_forceAmbient"]=0.0;a.patch["r_forceAmbient"]=0.0;
+     Check(settings.Validate(a.baseline,a.target,error),"observed tiny to explicit zero is a valid new edit");
+     {EngineSettingsDisplayHost preparing(settings);Check(preparing.Prepare(a,error),"prepare exact ambient/display journal");
+      if(confirmed){Check(settings.Write(a.patch,error),"write exact zero target");SettingsDisplayObservation observation;
+       Check(preparing.Restart(false,observation,error),"restart exact target");Present();Check(preparing.PersistConfirmation(a,error),"persist exact target");}
+      preparing.Shutdown();}
+     auto saved=Journal();Check(saved.patch.contains("r_forceAmbient") &&
+       std::bit_cast<std::uint64_t>(std::get<double>(saved.baseline.at("r_forceAmbient")))==1,"journal keeps exact original and explicit zero patch");
+     // Simulate either archive side after a crash, or a third-party different
+     // subnormal which neither the original nor this transaction ever owned.
+     SetExactAmbient(conflict?2:confirmed?1:0);writes=configWrites=0;trace.clear();
+     EngineSettingsDisplayHost replay(settings);
+     if(conflict){const auto bytes=files.at(journalFile);
+      Check(!replay.Startup(error) && writes==0 && configWrites==0 && geometryToken==0,
+       "startup rejects bit-distinct divergent owned field before all writes");
+      Check(AmbientIs(settings,2) && files.at(journalFile)==bytes,"conflicting replay preserves live value and exact evidence");}
+     else{
+      Check(replay.Startup(error),"startup restores exact zero/subnormal direction");
+      Check(AmbientIs(settings,confirmed?0:1),"startup emits required zero or original tiny patch");
+      Check(writes>0 && configWrites==0,"startup changed owned value without premature archive");
+      Check(replay.InitializeDisplay(error),"initialize exact recovered display");Present();replay.StartupFrame(1,true);
+      Check(configWrites==1 && !files.contains(journalFile) && !replay.RecoveryActive(),"qualified exact recovery commits then removes journal");}
+     replay.Shutdown();
+    }
+}
+
+int main(){ExactCatalogCases();RuntimeJournal();StartupCases();GeometryAndStartupFailures();StartupClockCases();CommitOwnershipCases();ReindexedStartupRetry();UnusedTopologyCases();std::printf("UI settings display service passed: %d checks\n",checks);}
 
 '''
 
 
-def main():
+def main(production_mutations=()):
     text = lambda path: (ROOT / path).read_text(encoding="utf-8")
     document = text("src/ui/retained/Document.cpp")
     names = ("bool Identifier(", "std::string PointerPart(", "void Diagnose(", "bool Utf8(",
@@ -313,6 +368,10 @@ def main():
     production = '\n'.join(line for line in (text("src/ui/application/SystemSettingsHost.cpp") + '\n' +
                  '#define Fail DisplayHelperFail\n' + text("src/ui/application/SystemDisplay.cpp") + '\n#undef Fail\n' + text("src/ui/SettingsDisplayService.cpp")).splitlines()
                  if not line.startswith("#include "))
+    for old, new in production_mutations:
+        if production.count(old) != 1:
+            raise RuntimeError("Production mutation anchor is not unique")
+        production = production.replace(old, new)
     actual = function_body(display_test.MAIN, "static rendererDisplayState_t Actual(")
     # Reuse the production presentation conversion rather than formatting typed
     # fixture values with locale-dependent or lossy decimal output.
@@ -346,6 +405,7 @@ def main():
                   "src/ui/application/SystemDisplay.h", "src/ui/application/SystemDisplay.cpp",
                   "src/ui/application/SystemSettingsHost.h", "src/ui/application/SystemSettingsHost.cpp",
                   "src/ui/application/SettingsJournal.h", "src/ui/application/SettingsJournal.cpp",
+                  "src/ui/application/SettingsValue.h", "src/ui/application/SettingsTransaction.h",
                   "src/ui/retained/Document.h", "src/ui/retained/Document.cpp",
                   "src/ui/retained/Presentation.cpp"))]
     hashes = {str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest() for path in inputs}

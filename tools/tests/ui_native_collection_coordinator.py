@@ -74,6 +74,9 @@ def main():
             if r.returncode:raise RuntimeError(r.stdout+r.stderr)
             entry['output']=r.stdout.strip();print(r.stdout.strip(),flush=True)
     mutations={
+        'barrier-query-worker-accepted':('controller','if (std::this_thread::get_id()!=thread) return reject("Native barrier query requires its engine thread");','if (false) return reject("Native barrier query requires its engine thread");'),
+        'barrier-query-busy-accepted':('controller','calling || retired || (phase!=Phase::Ready && phase!=Phase::AwaitingFence) ||','false ||'),
+        'barrier-query-partial-output':('controller','auto snapshot=current;\n\t\tstatic_assert(std::is_nothrow_move_assignable_v<NativeTextEditorBarrier>);\n\t\tout=std::move(snapshot);error.clear();return true;','out=current;error.clear();return true;'),
         'accept-unclosed-store':('controller','!owner.Current(current) || !store.StillClosed(closed)', '!owner.Current(current) || (void(store),false)'),
         'reentry-no-latch':('controller','if (calling) return Fail(error,"Reentrant native collection reconciliation");','if (calling) return false;'),
         'sync-result-ignored':('controller','!store.Sync(receipt,prepared->Presentation(),error)', '(store.Sync(receipt,prepared->Presentation(),error),false)'),
@@ -82,12 +85,18 @@ def main():
         'fence-ack-ignored':('controller','!fence.Acknowledge(*queue,error)', '(fence.Acknowledge(*queue,error),false)'),
         'unclassified-native-participation':('controller','(seal.pending.count && !seal.admittedCallbacks)', 'false'),
         'lifecycle-accepted':('controller','seal.kind!=NativeClosedCollectionKind::Pump', 'false'),
+        'lifecycle-receipt-ignored':('controller','requested ? seal!=*requested :', 'requested ? false :'),
+        'lifecycle-kind-ignored':('controller','(requested && requested->kind!=NativeClosedCollectionKind::Lifecycle)', 'false'),
+        'lifecycle-receipt-forgotten':('controller','return ReconcileKind(completed,ingress,source,batch,owner,store,out,error);', '(void)completed;return ReconcileKind({},ingress,source,batch,owner,store,out,error);'),
         'pending-watermark-ignored':('controller','pending.lastSequence!=closed.pending.lastSequence', 'false'),
         'sync-allocating-owner-copy':('controller','!ingress.Validate(source,completion.batch,error) || phase==Phase::RetireRequired ||\n\t\t\t\t!owner.Current(current) || !store.StillClosed(closed)', '!Check(ingress,source,owner,store,error)'),
         'omit-final-model-swap':('interaction','!nativeModel->Swap(before,*data.model)', 'false'),
         'omit-prepared-history':('interaction','data.editor.buffer.RestoreHistory(view->draft,view->history,view->policy,error)', 'data.editor.buffer.RestoreHistory(view->draft,{},view->policy,error)'),
         'omit-final-editor-publication':('interaction','found->second.number = std::move(data.editor);', '(void)data.editor;'),
     }
+    if args.msvc and args.debug_crt:
+        del mutations['barrier-query-partial-output']
+        report['unsupported_mutations']=['barrier-query-partial-output: debug STL iterator proxy allocation sweep is unsupported']
     try:
         for test in tests:case(test.removesuffix('.cpp'),test)
         if not args.no_mutations:

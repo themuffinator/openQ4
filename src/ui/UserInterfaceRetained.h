@@ -76,6 +76,17 @@ public:
 	bool SetClipboardNotice(const uiNumberEditorTarget_t& expected,
 		openq4::ui::NumberEditNotice notice, std::string& error) override;
 
+	bool PrepareNativeText(const openq4::ui::TextEditorIdentity& owner) override;
+	bool AttachNativeText(const openq4::ui::TextEditorIdentity& owner, openq4::ui::NativeTextIdentity native, openq4::ui::NativeTextEditorBarrier& out, std::string& error) override;
+	bool RefreshNativeText(const openq4::ui::NativeTextEditorBarrier& expected, openq4::ui::NativeTextEditorView& out, std::string& error) override;
+	bool CurrentNativeText(const openq4::ui::NativeTextEditorBarrier& expected) const noexcept override;
+	bool BeginNativeText(const openq4::ui::NativeTextEditorBarrier& expected, const openq4::ui::NativeTextCollection& collection, openq4::ui::NativeTextEditorBarrier& out, std::string& error) override;
+	bool ApplyNativeText(const openq4::ui::NativeTextEditorBarrier& expected, const openq4::ui::NativeTextOffer& offer, openq4::ui::NativeTextEditorReceipt& out, std::string& error) override;
+	bool CompleteNativeText(const openq4::ui::NativeTextEditorBarrier& expected, const openq4::ui::NativeTextCollection& collection, openq4::ui::NativeTextEditorBarrier& out, std::string& error) override;
+	std::unique_ptr<openq4::ui::Interaction::NativeSettlement> PrepareNativeTextSettlement(const openq4::ui::NativeTextEditorBarrier& expected, std::string& error) override;
+	bool PublishNativeTextSettlement(openq4::ui::Interaction::NativeSettlement& prepared, openq4::ui::NativeTextEditorReceipt& out) noexcept override;
+	bool RetireNativeTextExact(openq4::ui::NativeTextIdentity native, const openq4::ui::TextEditorIdentity& owner) noexcept override;
+
 private:
 	struct Impl;
 	std::unique_ptr<Impl> impl;

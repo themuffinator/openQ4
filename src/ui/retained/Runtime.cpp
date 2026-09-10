@@ -759,14 +759,64 @@ struct Runtime::Impl {
 		if (std::isfinite(seconds)) time = std::max(time,seconds);
 		for (const auto& change : interaction.TakeFeedback()) motion.Play(change.timeline,time);
 	}
-	void RevealFocus() {
-		if (!document) return;
-		if (auto* element = document->GetElementById(interaction.Focused())) {
-			Rml::ScrollIntoViewOptions options;
-			options.vertical = options.horizontal = Rml::ScrollAlignment::Nearest;
-			options.behavior = Rml::ScrollBehavior::Instant;
-			element->ScrollIntoView(options);
+	bool RevealFocus() {
+		if (!document || !context) return false;
+		auto* element = document->GetElementById(interaction.Focused());
+		if (!element) return false;
+		const float margin = 4.f * viewport.DpRatio();
+		if (!std::isfinite(margin) || margin <= 0) return false;
+		ContextClock clock(*services,time);
+		context->Update();
+		context->GetRootElement()->UpdateGeometryForProjection();
+		// Measure exact corners in each ancestor's own scroll plane. A window
+		// axis bounding box would overestimate rotated controls and scrollers.
+		bool changed = false;
+		for (auto* parent = element->GetParentNode(); parent; parent = parent->GetParentNode()) {
+			const auto& style = parent->GetComputedValues();
+			using Rml::Style::Overflow;
+			const bool scrollX = style.overflow_x() != Overflow::Visible && style.overflow_x() != Overflow::Hidden &&
+				parent->GetScrollWidth() > parent->GetClientWidth();
+			const bool scrollY = style.overflow_y() != Overflow::Visible && style.overflow_y() != Overflow::Hidden &&
+				parent->GetScrollHeight() > parent->GetClientHeight();
+			if (!scrollX && !scrollY) continue;
+			Rml::Array<Rml::Vector2f,4> quad;
+			if (!Rml::ElementUtilities::GetBorderBoxQuad(quad,element)) break;
+			const auto origin = parent->GetAbsoluteOffset(Rml::BoxArea::Border) +
+				Rml::Vector2f(parent->GetClientLeft(),parent->GetClientTop());
+			Rml::Vector2f minimum, maximum;
+			bool valid = true;
+			for (size_t i = 0; i < quad.size(); ++i) {
+				auto point = quad[i];
+				if (!parent->Project(point) || !std::isfinite(point.x) || !std::isfinite(point.y)) { valid = false; break; }
+				point -= origin;
+				if (i == 0) minimum = maximum = point;
+				else { minimum.x = std::min(minimum.x,point.x); minimum.y = std::min(minimum.y,point.y);
+					maximum.x = std::max(maximum.x,point.x); maximum.y = std::max(maximum.y,point.y); }
+			}
+			if (!valid) break;
+			const auto delta = [margin](float low, float high, float client) {
+				if (!std::isfinite(client) || client <= 0) return 0.f;
+				// Reduce the inset for a nearly full-size control. An oversized
+				// control keeps nearest-edge behavior instead of oscillating.
+				const float inset = std::min(margin,std::max(0.f,(client-(high-low))*.5f));
+				const float start = low-inset, end = high-(client-inset);
+				const float correction = start < 0 && end < 0 ? std::max(start,end) :
+					start > 0 && end > 0 ? std::min(start,end) : 0.f;
+				// Rml scroll offsets are integral layout pixels. Round outward so
+				// the focus ink retains its inset after that pixel quantization.
+				return correction > .01f ? std::ceil(correction) : correction < -.01f ? std::floor(correction) : 0.f;
+			};
+			const float oldX = parent->GetScrollLeft(), oldY = parent->GetScrollTop();
+			if (scrollX) parent->SetScrollLeft(oldX + delta(minimum.x,maximum.x,parent->GetClientWidth()));
+			if (scrollY) parent->SetScrollTop(oldY + delta(minimum.y,maximum.y,parent->GetClientHeight()));
+			if (oldX != parent->GetScrollLeft() || oldY != parent->GetScrollTop()) {
+				// Setters clamp to authored overflow; never manufacture scroll range.
+				changed = true;
+				context->Update();
+				context->GetRootElement()->UpdateGeometryForProjection();
+			}
 		}
+		return changed;
 	}
 	std::string HitControl() const {
 		if (!pointerPresent || !canonical || !document || pointerX < 0 || pointerY < 0 || pointerX >= viewport.width || pointerY >= viewport.height) return {};
@@ -1285,6 +1335,8 @@ void Runtime::Frame(const Viewport& viewport, double seconds) {
 	if (viewport.width <= 0 || viewport.height <= 0) {
 		impl->interaction.InvalidateLayout(); impl->interaction.Cancel(); impl->Feedback(seconds); return;
 	}
+	const bool viewportChanged = impl->viewport.width != viewport.width || impl->viewport.height != viewport.height ||
+		impl->viewport.DpRatio() != viewport.DpRatio();
 	impl->viewport = viewport;
 	if (impl->pointerPresent) viewport.WindowToDocument(impl->windowPointerX,impl->windowPointerY,impl->pointerX,impl->pointerY);
 	const auto start = std::chrono::steady_clock::now();
@@ -1303,7 +1355,8 @@ void Runtime::Frame(const Viewport& viewport, double seconds) {
 		const auto before = impl->interaction.Focused();
 		impl->UpdateInteraction(-1,true);
 		const bool focusChanged = before != impl->interaction.Focused();
-		if (focusChanged) { impl->RevealFocus(); impl->ApplyMotion(); }
+		const bool revealed = (focusChanged || (pass == 0 && viewportChanged)) && impl->RevealFocus();
+		if (focusChanged) impl->ApplyMotion();
 		const auto* focusedNode = impl->canonical ? impl->canonical->Model().FindNode(impl->interaction.Focused()) : nullptr;
 		auto* focusedNumber = focusedNode && focusedNode->control && focusedNode->control->role == ControlRole::Number ?
 			impl->document->GetElementById(focusedNode->id) : nullptr;
@@ -1311,7 +1364,7 @@ void Runtime::Frame(const Viewport& viewport, double seconds) {
 		bool painted = impl->valueView.Paint(impl->interaction,impl->state.ControlValues(),viewport.width,viewport.height,viewport.DpRatio(),
 			[&](const std::string& id) { const auto value = impl->PresentedProperty({id,"opacity"}); return value ? value->data[0] : 1.0; });
 		painted |= impl->numberView.Paint(impl->interaction,viewport.DpRatio(),impl->time,impl->motion.ReducedMotion());
-		if (!painted && !focusChanged) break;
+		if (!painted && !focusChanged && !revealed) break;
 		impl->context->Update();
 		if (focusedNumber && focusedNumber->GetBox().GetSize(Rml::BoxArea::Border) != numberSize) {
 			// Validation can grow the focused field without changing focus.

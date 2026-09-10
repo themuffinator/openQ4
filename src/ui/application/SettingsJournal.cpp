@@ -60,9 +60,9 @@ bool Valid(const SettingsRecoveryJournal& journal, const std::map<std::string,st
 		const auto old = journal.baseline.find(key), target = journal.target.find(key);
 		if (old == journal.baseline.end() || target == journal.target.end() || old->second.index() != type || target->second.index() != type)
 			return Fail(error,"Settings journal catalog keys or types changed");
-		if (old->second != target->second) expected.emplace(key,target->second);
+		if (!SettingsValueEqual(old->second,target->second)) expected.emplace(key,target->second);
 	}
-	if (expected.empty() || expected != journal.patch) return Fail(error,"Settings journal patch does not match its snapshots");
+	if (expected.empty() || !SettingsValuesEqual(expected,journal.patch)) return Fail(error,"Settings journal patch does not match its snapshots");
 	return true;
 }
 void Append(StateValues& flat, const char* prefix, const StateValues& values) {
@@ -83,10 +83,11 @@ bool EncodeSettingsJournal(const SettingsRecoveryJournal& journal,
 		if (payload.size() > 2) payload += ",\n";
 		payload += Quote(key) + ":";
 		if (const auto number = std::get_if<double>(&value)) {
-			char buffer[64];
-			const auto result = std::to_chars(buffer,buffer+sizeof(buffer),*number,std::chars_format::general,std::numeric_limits<double>::max_digits10);
-			if (result.ec != std::errc()) return Fail(error,"Cannot serialize settings journal number");
-			payload.append(buffer,result.ptr);
+			std::string encoded;
+			const double canonical = SettingsValueEqual(value,StateValue(0.0)) ? 0.0 : *number;
+			if (!SettingsNumberText(canonical,SettingsNumberFormat::GeneralRoundTrip,encoded))
+				return Fail(error,"Cannot serialize settings journal number");
+			payload += encoded;
 		} else if (const auto boolean = std::get_if<bool>(&value)) payload += *boolean ? "true" : "false";
 		else payload += Quote(std::get<std::string>(value));
 	}

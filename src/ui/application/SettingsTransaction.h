@@ -1,7 +1,7 @@
 // Copyright (C) 2026 DarkMatter Productions. GPL-3.0-or-later.
 #pragma once
 
-#include "../retained/Document.h"
+#include "SettingsValue.h"
 #include <cstddef>
 #include <cstdint>
 
@@ -106,6 +106,7 @@ public:
 	const SettingsResult& LastResult() const noexcept { return lastResult; }
 	std::uint64_t Request() const noexcept { return pending.request; }
 	bool AsyncPending() const noexcept { return pending.request != 0; }
+	bool Dirty() const noexcept { return !SettingsValuesEqual(draft,baseline); }
 
 private:
 	SettingsResult Result(SettingsCode code, std::string diagnostic = {});

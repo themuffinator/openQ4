@@ -431,3 +431,17 @@ collections and the portable multi-transaction composition reconciler are also
 implemented, with native activation still disabled. The scoped evidence remains
 separate from complete native input, international text, all production pages,
 the editor, every migration and all final gates. No acceptance status changes.
+
+The [managed native bridge and focus increment](../ui/numeric-fields.md) connects
+the private managed-owner endpoints and Windows collection hooks, with exact
+lifecycle receipts and copied idle coordinator barriers. Exact numeric values
+also survive transaction, journal and startup-recovery comparisons. Shared
+[focus reveal](../ui/focus-reveal.md) keeps the complete focused control border
+inset within authored scroll limits. The Windows build and all 40 UI suites pass;
+SP/OpenGL at 125% and MP/Vulkan at 200% each pass 38 semantic operations and
+12 reviewed engine images after gameplay. At 200%, the focused field has the
+intended 8-pixel gap inside its scroll body. The source-bound record is
+`.tmp/ui/native-managed-bridge-integration/validation-evidence.json`.
+Native activation, production Session delivery, complete settings effects,
+international text, full layouts and editor support remain in development.
+The full original scope, all 271 migrations and every final gate remain open.

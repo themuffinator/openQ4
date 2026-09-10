@@ -323,7 +323,7 @@ def main():
         ('manager-owner-not-checked',manager_code,'out.target == request.target &&','true &&'),
         ('manager-postquery-skipped',manager_code,'if (!query(after) || after.editor.state.text != state.text ||','after = before; if (false || after.editor.state.text != state.text ||'),
         ('manager-native-error-is-success',manager_code,'succeeded = openq4::SDL3_ReadTextClipboard(paste,error);','openq4::SDL3_ReadTextClipboard(paste,error); succeeded = true;'),
-        ('manager-reentry-not-retired',manager_code,'if (clipboardBoundaryActive) { clipboardBoundaryFailed = true; return true; }','if (clipboardBoundaryActive) { return true; }'),
+        ('manager-reentry-not-retired',manager_code,'if (clipboardBoundaryActive || nativeBoundaryActive) { clipboardBoundaryFailed = true; if(nativeBoundaryActive)nativeBoundaryFailed=true; return true; }','if (clipboardBoundaryActive || nativeBoundaryActive) { return true; }'),
         ('adapter-repeat-transfers',adapter_code,'else if (claim == Input::TextKey::Press)','else if (true)'),
         ('adapter-altgr-transfers',adapter_code,' || !editing || alt',' || !editing'),
         ('adapter-fifo-boundary-lost',adapter_code,'if (pending.clipboard) {','if (false) {'),

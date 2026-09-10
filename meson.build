@@ -586,6 +586,14 @@ if build_engine or get_option('build_native_tests')
     )
     test('openq4-ui-number-runtime', openq4_ui_number_runtime_test,
       args: [meson.project_source_root() / 'tools/ui/fixtures/number-edit-smoke.q4ui'], timeout: 30)
+    openq4_ui_focus_reveal_test = executable(
+      'openq4-ui-focus-reveal-test',
+      files('tools/tests/native/UiFocusRevealTest.cpp'),
+      include_directories: root_include_dir,
+      dependencies: [openq4_retained_dep, rmlui_project.get_variable('rmlui_dep'), jsoncpp_project.get_variable('jsoncpp_dep')],
+      install: false,
+    )
+    test('openq4-ui-focus-reveal', openq4_ui_focus_reveal_test, timeout: 30)
     openq4_ui_number_command_test = executable(
       'openq4-ui-number-command-test',
       files('tools/tests/native/UiNumberCommandTest.cpp'),
@@ -602,6 +610,11 @@ if build_engine or get_option('build_native_tests')
       install: false,
     )
     test('openq4-ui-settings-transaction', openq4_ui_settings_transaction_test, timeout: 30)
+    openq4_ui_settings_exact_test = executable(
+      'openq4-ui-settings-exact-test', files('tools/tests/native/UiSettingsExactValueTest.cpp'),
+      include_directories: root_include_dir, dependencies: openq4_retained_dep, install: false,
+    )
+    test('openq4-ui-settings-exact', openq4_ui_settings_exact_test, timeout: 30)
     openq4_ui_settings_journal_test = executable(
       'openq4-ui-settings-journal-test',
       files('tools/tests/native/UiSettingsJournalTest.cpp'),
@@ -610,6 +623,11 @@ if build_engine or get_option('build_native_tests')
       install: false,
     )
     test('openq4-ui-settings-journal', openq4_ui_settings_journal_test, timeout: 30)
+    openq4_ui_settings_journal_exact_test = executable(
+      'openq4-ui-settings-journal-exact-test', files('tools/tests/native/UiSettingsJournalExactTest.cpp'),
+      include_directories: root_include_dir, dependencies: openq4_retained_dep, install: false,
+    )
+    test('openq4-ui-settings-journal-exact', openq4_ui_settings_journal_exact_test, timeout: 30)
     openq4_ui_settings_display_test = executable(
       'openq4-ui-settings-display-test',
       files('tools/tests/native/UiSettingsDisplayControllerTest.cpp'),
@@ -1513,11 +1531,22 @@ if build_engine or get_option('build_native_tests')
     native_queue_library = static_library('openq4-native-queue',
       files('src/sys/sdl3/NativeQueueBatch.cpp', 'src/sys/sdl3/NativeQueueSource.cpp'),
       files('src/ui/application/NativeTextCollectionCoordinator.cpp'),
+      files('src/ui/application/ManagedNativeTextOwner.cpp'),
       include_directories: [root_include_dir, include_directories('subprojects/packagefiles/sdl3/include')],
       dependencies: [openq4_retained_dep] + text_ingress_headers,
       cpp_args: ['-DUSE_SDL3'], pic: true, install: false)
     native_queue_dep = declare_dependency(link_with: native_queue_library)
     client_deps += native_queue_dep
+    if host_system == 'windows'
+      # Exact store/provider collection adapter; creation never enables input.
+      windows_collection_bridge_library = static_library('openq4-windows-text-collection-bridge',
+        files('src/sys/sdl3/WindowsTextCollectionBridge.cpp'),
+        include_directories: [root_include_dir, include_directories('subprojects/packagefiles/sdl3/include')],
+        dependencies: [openq4_windows_text_store_dep, openq4_retained_dep] + text_ingress_headers,
+        cpp_args: ['-DUSE_SDL3'], install: false)
+      windows_collection_bridge_dep = declare_dependency(link_with: windows_collection_bridge_library)
+      client_deps += windows_collection_bridge_dep
+    endif
   endif
   if get_option('build_native_tests') and build_engine and use_sdl3_backend
     text_ingress_test_headers = [root_include_dir, include_directories('subprojects/packagefiles/sdl3/include')]
@@ -1526,6 +1555,14 @@ if build_engine or get_option('build_native_tests')
       include_directories: text_ingress_test_headers,
       dependencies: [openq4_retained_dep, native_queue_dep] + text_ingress_headers, install: false)
     test('openq4-ui-native-collection-coordinator', native_collection_coordinator_test, timeout: 30)
+    if host_system == 'windows'
+      windows_collection_bridge_test = executable('openq4-ui-windows-text-collection-bridge-test',
+        files('tools/tests/native/WindowsTextCollectionBridgeTest.cpp'),
+        include_directories: text_ingress_test_headers + [include_directories('src')],
+        dependencies: [windows_collection_bridge_dep, openq4_windows_text_store_dep, openq4_retained_dep] + text_ingress_headers,
+        cpp_args: ['-DUSE_SDL3'], install: false)
+      test('openq4-ui-windows-text-collection-bridge', windows_collection_bridge_test, timeout: 30)
+    endif
     text_ingress_test = executable('openq4-ui-text-ingress-test',
       files('tools/tests/native/UiTextProvenanceIngressTest.cpp'),
       include_directories: text_ingress_test_headers,

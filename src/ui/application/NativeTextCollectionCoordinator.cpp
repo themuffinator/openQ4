@@ -29,6 +29,23 @@ bool GoodTransition(const NativeTextEditorBarrier& before,const NativeTextEditor
 }
 NativeTextCollectionCoordinator::NativeTextCollectionCoordinator(const NativeTextEditorBarrier& attached)
 	:identity(Identity()),current(attached) {}
+bool NativeTextCollectionCoordinator::QueryBarrier(NativeTextEditorBarrier& out,std::string& error) const noexcept {
+	const auto reject=[&](const char* message) {
+		try { error=message; } catch (...) { error.clear(); }
+		return false;
+	};
+	// Check the thread before reading mutable coordinator state.
+	if (std::this_thread::get_id()!=thread) return reject("Native barrier query requires its engine thread");
+	if (calling || retired || (phase!=Phase::Ready && phase!=Phase::AwaitingFence) ||
+		!identity || current.collectionOpen || !current.native.document ||
+		!current.native.editorLease || !current.editor.revision)
+		return reject("Native barrier query requires an idle attached coordinator");
+	try {
+		auto snapshot=current;
+		static_assert(std::is_nothrow_move_assignable_v<NativeTextEditorBarrier>);
+		out=std::move(snapshot);error.clear();return true;
+	} catch (...) { return reject("Native barrier snapshot allocation failed"); }
+}
 bool NativeTextCollectionCoordinator::Fail(std::string& error,const char* message) noexcept {
 	phase=Phase::RetireRequired;
 	try {error=message;} catch (...) {error.clear();}
@@ -66,12 +83,25 @@ bool NativeTextCollectionCoordinator::CheckPending(NativeTextCollectionStore& st
 bool NativeTextCollectionCoordinator::Reconcile(NativeQueueIngress& ingress,NativeQueueSource& source,
 	const NativeQueueBatch& batch,NativeTextCollectionOwner& owner,NativeTextCollectionStore& store,
 	NativeTextCollectionResult& out,std::string& error) {
+	return ReconcileKind({},ingress,source,batch,owner,store,out,error);
+}
+bool NativeTextCollectionCoordinator::ReconcileLifecycle(const NativeClosedTextCollection& completed,
+	NativeQueueIngress& ingress,NativeQueueSource& source,const NativeQueueBatch& batch,
+	NativeTextCollectionOwner& owner,NativeTextCollectionStore& store,NativeTextCollectionResult& out,std::string& error) {
+	// The receipt contains only bounded value fields. Freeze it before any foreign
+	// observation; callbacks cannot mutate the requested lifecycle identity.
+	return ReconcileKind(completed,ingress,source,batch,owner,store,out,error);
+}
+bool NativeTextCollectionCoordinator::ReconcileKind(std::optional<NativeClosedTextCollection> requested,
+	NativeQueueIngress& ingress,NativeQueueSource& source,const NativeQueueBatch& batch,
+	NativeTextCollectionOwner& owner,NativeTextCollectionStore& store,NativeTextCollectionResult& out,std::string& error) {
 	if (std::this_thread::get_id()!=thread) { error="Native collection requires its engine thread";return false; }
 	if (calling) return Fail(error,"Reentrant native collection reconciliation");
 	Calling guard(calling);
 	const auto reject=[&](const char* message) { Fail(error,message);Retire(owner,store);return false; };
 	try {
-		if (phase!=Phase::Ready || !identity || serial==UINT64_MAX || !batch.Status().pending || batch.Events().empty() ||
+		if ((requested && requested->kind!=NativeClosedCollectionKind::Lifecycle) ||
+			phase!=Phase::Ready || !identity || serial==UINT64_MAX || !batch.Status().pending || batch.Events().empty() ||
 			batch.Events().back().record.kind!=OQ4_QUEUE_FENCE || current.collectionOpen ||
 			!current.native.document || !current.native.editorLease || !current.editor.revision)
 			return reject("Native reconciliation requires a fresh owned fence and attached editor");
@@ -82,7 +112,8 @@ bool NativeTextCollectionCoordinator::Reconcile(NativeQueueIngress& ingress,Nati
 			return reject("Native collection initial queue or owner proof failed");
 		NativeClosedTextCollection seal;
 		if (!store.Closed(current,queue->pending->dispatch,seal,error) || phase==Phase::RetireRequired ||
-			seal.identity!=current.native || !seal.serial || seal.serial<=lastScope || seal.kind!=NativeClosedCollectionKind::Pump ||
+			seal.identity!=current.native || !seal.serial || seal.serial<=lastScope ||
+			(requested ? seal!=*requested : seal.kind!=NativeClosedCollectionKind::Pump) ||
 			seal.dispatch!=queue->pending->dispatch || seal.pending.identity!=current.native ||
 			seal.pending.dispatch!=seal.dispatch || seal.pending.engineRevision!=current.editor.revision ||
 			seal.pending.acknowledgedSequence!=current.sequence || seal.pending.acknowledgedShadowRevision!=current.shadowRevision ||

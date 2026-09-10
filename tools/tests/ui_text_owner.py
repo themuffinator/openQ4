@@ -395,7 +395,7 @@ def main():
     compiler = next((x for name in ('clang++', 'g++', 'c++') if (x := shutil.which(name))), None)
     if not compiler:
         raise RuntimeError('C++20 compiler required')
-    paths = ['src/ui/UserInterface.cpp', 'src/ui/UserInterfaceText.h', 'src/ui/UserInterfaceManaged.h',
+    paths = ['src/ui/UserInterface.cpp', 'src/ui/UserInterfaceText.h', 'src/ui/UserInterfaceManaged.h', 'src/ui/UserInterfaceNativeText.h',
              'src/ui/UserInterfaceLocal.h', 'src/ui/UserInterfaceRetained.cpp', 'src/ui/UserInterfaceRetained.h',
              'src/ui/UserInterfaceDeferred.cpp', 'src/ui/UserInterfaceDeferred.h',
              'src/ui/retained/Runtime.cpp', 'src/ui/retained/Runtime.h', 'src/ui/retained/Interaction.h',
