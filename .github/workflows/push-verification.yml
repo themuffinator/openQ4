@@ -289,6 +289,7 @@ jobs:
             tools/tests/sdl3_input_disposition.py \
             tools/tests/native_event_disposition.py \
             tools/tests/native_input_route.py \
+            tools/tests/native_event_retirement.py \
             tools/tests/sdl3_clipboard_status.py \
             tools/tests/sdl3_text_provenance.py \
             tools/tests/sdl3_native_fence.py \
@@ -303,6 +304,8 @@ jobs:
             tools/tests/ui_native_collection_coordinator.py \
             tools/tests/ui_managed_native_owner.py \
             tools/tests/ui_focus_reveal.py \
+            tools/tests/ui_scrollbar_interaction.py \
+            tools/tests/ui_scrollbar_runtime.py \
             tools/tests/ui_settings_decimal_precision.py \
             tools/tests/ui_settings_exact_values.py \
             tools/tests/ui_settings_automatic.py \
@@ -354,6 +357,8 @@ jobs:
             tools/tests/renderer_image_policy_metadata.py \
             tools/tests/renderer_consumed_policy.py \
             tools/tests/renderer_consumed_upload_batches.py \
+            tools/tests/renderer_upload_storage.py \
+            tools/tests/renderer_image_reduction.py \
             tools/tests/renderer_display_services.py \
             tools/tests/renderer_display_presentation.py \
             tools/tests/renderer_gl_display_policy.py \
@@ -562,6 +567,7 @@ jobs:
           python tools/tests/sdl3_input_disposition.py
           python tools/tests/native_event_disposition.py
           python tools/tests/native_input_route.py
+          python tools/tests/native_event_retirement.py
           python tools/tests/sdl3_clipboard_status.py
           python tools/tests/sdl3_text_provenance.py
           python tools/tests/sdl3_native_fence.py
@@ -599,6 +605,7 @@ jobs:
           python tools/tests/ui_system_session_route.py
           python tools/tests/ui_retained_resource_lifecycle.py
           python tools/tests/ui_retained_adapter.py
+          python tools/tests/ui_scrollbar_interaction.py --mutations
           python tools/tests/ui_text_owner.py
           python tools/tests/ui_system_settings_host.py
           python tools/tests/ui_settings_service.py
@@ -623,6 +630,8 @@ jobs:
           python tools/tests/renderer_consumed_policy.py --mutations
           python tools/tests/renderer_consumed_policy.py --vulkan --mutations
           python tools/tests/renderer_consumed_upload_batches.py --mutations
+          python tools/tests/renderer_upload_storage.py --mutations
+          python tools/tests/renderer_image_reduction.py --mutations
           python tools/tests/renderer_display_services.py
           python tools/tests/renderer_display_presentation.py
           python tools/tests/renderer_gl_display_policy.py

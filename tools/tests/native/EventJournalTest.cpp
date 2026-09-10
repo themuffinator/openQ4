@@ -141,6 +141,7 @@ static sysEvent_t Sys_GetEvent() {
 	if (queued.empty()) return sysEvent_t{};
 	const auto event=queued.front(); queued.pop_front(); return event;
 }
+#include "src/sys/EventRetirement.h"
 #define private public
 #include "src/framework/EventLoop.h"
 #undef private
@@ -149,6 +150,15 @@ sysEventTransfer_t Sys_TakeEventWithDisposition(sysEvent_t& event, sysEventDispo
 	if (queued.empty()) return sysEventTransfer_t::Empty;
 	event=queued.front(); queued.pop_front(); tag={};
 	return sysEventTransfer_t::Ready;
+}
+// This fixture supplies ordinary platform events only. The dedicated retirement
+// suite compiles actual platform storage; journal tests must never invoke it.
+sysEventTransfer_t Sys_PeekEventForRetirement(openq4::NativeInputHead&) noexcept {
+    Check(false,"journal-only fixture cannot retire platform input");return sysEventTransfer_t::Refused;
+}
+sysEventTransfer_t Sys_TakeEventForRetirement(openq4::NativeInputRoute&,
+    const openq4::NativeInputRoute::CancellationPermit&,sysEvent_t&,sysEventDispositionTag_t&) noexcept {
+    Check(false,"journal-only fixture cannot cancel platform input");return sysEventTransfer_t::Refused;
 }
 #include "src/framework/EventLoop.cpp"
 

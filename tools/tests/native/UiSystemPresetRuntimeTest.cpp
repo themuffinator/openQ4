@@ -63,6 +63,7 @@ static void Opening(View& v,float density,int width,int height,bool wholeFirstSe
  v.Element("settings-body")->SetScrollTop(0);v.Frame();
  auto body=v.Box("settings-body"),first=v.Box("settings_brightness_row"),footer=v.Box("settings-footer");
  Check(body.height>=92*density,"opening retains room for a complete numeric control");
+ if(!(footer.y>=body.y+body.height&&footer.y+footer.height<=height+.5f))std::fprintf(stderr,"footer=%g,%g body=%g,%g viewport=%dx%d density=%g\n",footer.y,footer.height,body.y,body.height,width,height,density);
  Check(footer.y>=body.y+body.height&&footer.y+footer.height<=height+.5f,"footer remains visible below scrolling settings");
  for(auto* id:{"settings_back","settings_apply"}){auto b=v.Box(id);Check(b.height>=44*density-.5f&&b.x>=0&&b.x+b.width<=width+.5f,"footer preserves full size targets inside viewport");}
  for(auto* id:{"settings-title","settings-message","settings_back-label","settings_apply-label"})TextFits(v,id);

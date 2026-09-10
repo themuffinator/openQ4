@@ -29,7 +29,9 @@ bool Within(Rml::Element* element, Rml::Element* root) {
 }
 float CssExtent(Rml::Element* element, float borderExtent, bool vertical) {
 	if (element->GetComputedValues().box_sizing() == Rml::Style::BoxSizing::BorderBox) return std::max(0.0f,borderExtent);
-	const auto frame = element->GetBox().GetFrameSize(Rml::BoxArea::Border);
+	// CSS content sizes exclude both the border and padding edges.
+	const auto frame = element->GetBox().GetFrameSize(Rml::BoxArea::Border) +
+		element->GetBox().GetFrameSize(Rml::BoxArea::Padding);
 	return std::max(0.0f,borderExtent-(vertical ? frame.y : frame.x));
 }
 }

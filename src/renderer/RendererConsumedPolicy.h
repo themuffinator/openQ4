@@ -12,6 +12,18 @@ struct imageDownsizePolicy_t {
     int maxDimension = 0, mipShift = 0, minDimension = 1;
     bool IsActive() const { return maxDimension > 0 || mipShift > 0; }
 };
+// Exact CPU/header dimension evidence, not content identity. Generated caches do
+// not contain original source extents and therefore retain IR_UNOBSERVED.
+enum imageReductionStatus_t : uint32_t {
+    IR_UNOBSERVED = 0, IR_EXACT, IR_INSUFFICIENT_MIPS, IR_FAILED
+};
+struct imageReductionResult_t {
+    int sourceWidth = 0, sourceHeight = 0;
+    int requestedWidth = 0, requestedHeight = 0;
+    int selectedWidth = 0, selectedHeight = 0;
+    int authoredLevels = 0, firstLevel = 0;
+    uint32_t status = IR_UNOBSERVED;
+};
 struct materialQualityInputs_t { bool ignoreHighQuality, makingBuild; };
 struct materialConsumedPolicy_t {
     uint64_t instance = 0, revision = 0, observationEpoch = 0;
@@ -30,6 +42,7 @@ struct imageConsumedPolicy_t {
     uint64_t device = 0, deviceFailures = 0, storage = 0, batch = 0;
     imageDownsizeInputs_t inputs{};
     imageDownsizePolicy_t resolved{};
+    imageReductionResult_t reduction{};
     int usage = 0, filter = 0, repeat = 0, cube = 0;
     unsigned int flags = 0;
     bool allowDownSize = false;
@@ -53,6 +66,7 @@ public:
     ~imageConsumedLoad_t();
     const imageDownsizePolicy_t& Policy() const { return candidate.resolved; }
     void Loaded(imageConsumedSource_t source);
+    void Reduction(const imageReductionResult_t& value) { candidate.reduction = value; }
     static void BeforeOperation(const idImage* image);
     static bool Active(const idImage* image);
     static void Operation(const idImage* image, bool upload, bool succeeded,

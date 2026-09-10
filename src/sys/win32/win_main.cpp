@@ -1500,12 +1500,15 @@ EVENT LOOP
 
 #include "../EventQueueContinuity.h"
 #include "../EventDisposition.h"
+#include "../EventRetirement.h"
 
 #define	MAX_QUED_EVENTS		256
 #define	MASK_QUED_EVENTS	( MAX_QUED_EVENTS - 1 )
 
 sysEvent_t	eventQue[MAX_QUED_EVENTS];
 static sysEventDispositionTag_t eventDispositionTags[MAX_QUED_EVENTS];
+static std::uint64_t eventRetirementSerials[MAX_QUED_EVENTS];
+static std::uint64_t eventRetirementHighwater = 0; // Never reset by clear/rebind.
 int			eventHead = 0;
 int			eventTail = 0;
 
@@ -1553,6 +1556,7 @@ void Sys_QueEvent(int time, sysEventType_t type, int value, int value2, int ptrL
 	ev->evPtrLength = ptrLength;
 	ev->evPtr = ptr;
 	eventDispositionTags[ev - eventQue] = {};
+	eventRetirementSerials[ev - eventQue] = 0;
 }
 
 bool Sys_QueTrackedEvent(sysEvent_t& event, sysEventDispositionTag_t& tag) noexcept {
@@ -1565,12 +1569,38 @@ bool Sys_QueTrackedEvent(sysEvent_t& event, sysEventDispositionTag_t& tag) noexc
 		Sys_InvalidateEventQueue();
 		return false; // No eviction, ownership transfer or callback on failed admission.
 	}
+	if (eventRetirementHighwater == (std::numeric_limits<std::uint64_t>::max)()) return false;
 	const int slot = eventHead & MASK_QUED_EVENTS;
 	eventQue[slot] = event;
 	eventDispositionTags[slot] = tag;
+	eventRetirementSerials[slot] = ++eventRetirementHighwater;
 	++eventHead;
 	event = {}; tag = {};
 	return true;
+}
+
+
+sysEventTransfer_t Sys_PeekEventForRetirement(openq4::NativeInputHead& out) noexcept {
+    if (!Sys_EventDispositionBoundThread()) return sysEventTransfer_t::Refused;
+    if (eventHead <= eventTail) return sysEventTransfer_t::Empty;
+    const unsigned slot = static_cast<unsigned>(eventTail & MASK_QUED_EVENTS);
+    if (!eventRetirementSerials[slot] || !eventDispositionTags[slot].ShapeValid()) return sysEventTransfer_t::Refused;
+    out = Sys_EventRetirementHead(openq4::NativeInputLane::Platform, eventRetirementSerials[slot], slot,
+        eventQue[slot], eventDispositionTags[slot]);
+    return sysEventTransfer_t::Ready;
+}
+sysEventTransfer_t Sys_TakeEventForRetirement(openq4::NativeInputRoute& route,
+    const openq4::NativeInputRoute::CancellationPermit& permit, sysEvent_t& event, sysEventDispositionTag_t& tag) noexcept {
+    openq4::NativeInputHead head;
+    const auto status = Sys_PeekEventForRetirement(head);
+    if (status != sysEventTransfer_t::Ready) return status;
+    if (!route.AllowsCancellation(permit, head)) return sysEventTransfer_t::Refused;
+    // Serialized original event thread; no foreign call between comparison and transfer.
+    const auto ownedEvent = eventQue[head.slot]; const auto ownedTag = eventDispositionTags[head.slot];
+    eventQue[head.slot] = {}; eventDispositionTags[head.slot] = {}; eventRetirementSerials[head.slot] = 0;
+    ++eventTail;
+    event = ownedEvent; tag = ownedTag;
+    return sysEventTransfer_t::Ready;
 }
 
 sysEventTransfer_t Sys_TakeEventWithDisposition(sysEvent_t& event, sysEventDispositionTag_t& tag) noexcept {
@@ -1581,6 +1611,7 @@ sysEventTransfer_t Sys_TakeEventWithDisposition(sysEvent_t& event, sysEventDispo
 	if (!ownedTag.Empty() && !Sys_EventDispositionTagCurrent(ownedTag)) return sysEventTransfer_t::Refused;
 	const auto ownedEvent = eventQue[slot];
 	eventQue[slot] = {}; eventDispositionTags[slot] = {};
+	eventRetirementSerials[slot] = 0;
 	++eventTail;
 	event = ownedEvent; tag = ownedTag;
 	return sysEventTransfer_t::Ready;
@@ -1676,6 +1707,7 @@ void Sys_ClearEvents(void) {
 	while ( eventHead > eventTail ) {
 		Sys_DiscardQueuedEvent( eventQue[ eventTail & MASK_QUED_EVENTS ] );
 		eventDispositionTags[eventTail & MASK_QUED_EVENTS] = {};
+		eventRetirementSerials[eventTail & MASK_QUED_EVENTS] = 0;
 		eventTail++;
 	}
 	eventHead = eventTail = 0;

@@ -82,7 +82,8 @@ device results and strict restoration. Eligible retained confirmation views use
 including a countdown after the owning view presents and recovery after restart.
 The opt-in [SYSTEM page](docs/dev/ui/system-exit.md) has precise brightness
 fields, [performance preset and Auto-Detect draft controls](docs/dev/ui/performance-presets.md),
-and guarded discard/apply-and-return flows with authored modal focus ownership.
+[an authored vector scrollbar](docs/dev/ui/scrollbars.md), and guarded
+discard/apply-and-return flows with authored modal focus ownership.
 The shared [effect coordinator](docs/dev/ui/settings-effect-execution.md) adds
 automatic completion and a checked in-place audio foundation. Mixed effect
 execution, portable recovery and the complete settings page remain in development.

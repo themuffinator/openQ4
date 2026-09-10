@@ -99,23 +99,24 @@ public:
 // a provider, attaches an editor, retires native state, removes input or ACKs.
 // Root's driver owns every referenced source, controller, batch and ledger until
 // Release succeeds. This object's address also outlives all probe/permit calls.
+// Kept at namespace scope so shared engine/game declarations can forward-declare
+// this opaque type without importing retained UI's C++20 implementation headers.
+// Only PrepareCancellation can mint a permit. Storage must still compare and
+// transfer its exact current head once. Copies are not disposition receipts.
+// New preparation or exact revoke/release attempts invalidate previous permits.
+class NativeInputCancellationPermit {
+public:
+    NativeInputCancellationPermit() = default;
+private:
+    friend class NativeInputRoute;
+    std::uint64_t route = 0, serial = 0;
+    NativeInputHead head;
+};
+
 class NativeInputRoute final {
 public:
     enum class Phase { Empty, Bound, Revoked, DrainOnly, Unavailable };
-    // Opaque copied predicate capability. Only PrepareCancellation can mint one.
-    // It is not a dequeue/disposition receipt. Actual storage must compare its
-    // current head and clear/transfer that head once. Copies cannot bypass that.
-    // Another preparation or exact revoke/release attempt invalidates it, even
-    // when the caller's output remains unchanged. External publishers must revoke
-    // before changing pinned facts; this local predicate cannot observe them.
-    class CancellationPermit {
-    public:
-        CancellationPermit() = default;
-    private:
-        friend class NativeInputRoute;
-        std::uint64_t route = 0, serial = 0;
-        NativeInputHead head;
-    };
+    using CancellationPermit = NativeInputCancellationPermit;
     explicit NativeInputRoute(NativeInputRouteSource&) noexcept;
     ~NativeInputRoute();
     NativeInputRoute(const NativeInputRoute&) = delete;

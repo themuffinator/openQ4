@@ -53,7 +53,7 @@ Windows Clang and sanitized Linux GCC, with positive MSVC debug qualification.
 The route helper passes 4,203 checks and 33 mutations on Windows Clang and
 sanitized Linux; MSVC debug passes 4,193 checks with its documented string-copy
 allocation-sweep limitation. The tests bind production helpers to counted facts.
-They do not establish production publishers, actual queue cancellation,
+They do not establish production publishers, terminal queue cancellation,
 held-source inhibition, native character provenance or installed IME behavior.
 Those remaining seams and the complete native activation matrix are required.
 The managed presence query passes 1,234 actual-method/model checks on all three
@@ -65,3 +65,33 @@ The import receipts and qualification records are preserved under
 `.tmp/ui/native-retirement-integration/`. Actual storage retirement and original
 UI presence observations remain separate proofs; native activation stays
 disabled until the complete driver and lifecycle contracts are implemented.
+
+## Actual storage transfer
+
+The platform, pushed, SDL keyboard and SDL mouse stores now expose exact
+retirement Peek/Take operations. A retained checked SDL slice precedes its ring;
+pushed events precede platform events. Untagged heads and legacy slices obstruct
+cleanup rather than being skipped. A nonreused storage serial prevents a reused
+ring slot from satisfying an old permit. The original bound event thread remains
+required after its active dispatch epoch has retired.
+
+Permit construction stays outside storage locks. The actual Take compares the
+current head under SDL's existing storage lock, or the platform/pushed store's
+existing serialized thread ownership, and transfers that head's payload and
+complete sidecar once. Keyboard retirement preserves its reserved deferred-child
+identity without emitting that child. A separate End releases only an exactly
+identified, already empty checked slice. Journal mode does not prevent cleanup;
+these operations neither read nor write journal records and do not deliver input.
+
+The actual store methods pass 2,221 checks on Windows Clang, MSVC debug and
+sanitized Linux, with 30 compiled mutations on Clang and Linux. Existing queue,
+SDL poll, journal and legacy ownership suites also pass. Full engine integration
+found and corrected a shared-header dependency: the opaque cancellation permit
+is forward declared, preserving the game modules' C++17 boundary. The resulting
+engine/modules build and all 57 integrated UI suites pass. Terminal disposition,
+native ACKs, held-source inhibition and production route activation remain
+separate required integration work.
+
+An unrelated legacy issue remains: platform and pushed head/tail counters are
+signed integers that can eventually overflow without a queue Clear. The new
+retirement serials do not change that ordinary queue arithmetic.

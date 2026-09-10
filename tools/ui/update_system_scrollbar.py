@@ -68,7 +68,7 @@ def compose(document):
         'children': [track]}
     wrapper = {'id': 'settings-scroll-region', 'type': 'group', 'properties': {
         'position': keyword('relative'), 'display': keyword('flex'), 'box-sizing': keyword('border-box'),
-        'width': length(100, '%'), 'flex-grow': number(1), 'flex-shrink': number(1),
+        'width': length(100, '%'), 'height': length(0), 'flex-grow': number(1), 'flex-shrink': number(1),
         'min-height': length(0), 'column-gap': length(8), 'margin-top': length(8), 'margin-bottom': length(8),
         'align-items': keyword('stretch'), 'opacity': number(1)}, 'children': [body, bar]}
     for i, child in enumerate(panel['children']):

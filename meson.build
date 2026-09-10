@@ -437,6 +437,7 @@ if build_engine or get_option('build_native_tests')
     files('src/ui/retained/NativeTextDocument.cpp'),
     files('src/ui/retained/NativeTextEditor.cpp'),
     files('src/ui/retained/ScrollGeometry.cpp'),
+    files('src/ui/retained/ScrollbarView.cpp'),
     dependencies: [rmlui_project.get_variable('rmlui_dep'), jsoncpp_project.get_variable('jsoncpp_dep'), libtess2_project.get_variable('libtess2_dep')],
     pic: true,
     install: false,
@@ -462,6 +463,17 @@ if build_engine or get_option('build_native_tests')
       files('tools/tests/native/UiScrollGeometryTest.cpp'),
       dependencies: openq4_retained_dep, install: false)
     test('openq4-ui-scroll-geometry', openq4_ui_scroll_geometry_test, timeout: 30)
+    openq4_ui_scrollbar_interaction_test = executable('openq4-ui-scrollbar-interaction-test',
+      files('tools/tests/native/UiScrollbarInteractionTest.cpp'),
+      include_directories: [root_include_dir, include_directories('src/ui/retained')],
+      dependencies: [openq4_retained_dep, jsoncpp_project.get_variable('jsoncpp_dep')], install: false)
+    test('openq4-ui-scrollbar-interaction', openq4_ui_scrollbar_interaction_test, timeout: 30)
+    openq4_ui_scrollbar_runtime_test = executable('openq4-ui-scrollbar-runtime-test',
+      files('tools/tests/native/UiScrollbarRuntimeTest.cpp'),
+      include_directories: root_include_dir,
+      dependencies: [openq4_retained_dep, rmlui_project.get_variable('rmlui_dep'), jsoncpp_project.get_variable('jsoncpp_dep')], install: false)
+    test('openq4-ui-scrollbar-runtime', openq4_ui_scrollbar_runtime_test,
+      args: [meson.project_source_root() / 'content/baseoq4/pak0/guis/menu/settings/system.q4ui'], timeout: 30)
     openq4_ui_text_input_test = executable(
       'openq4-ui-text-input-test',
       files('tools/tests/native/UiTextInputTest.cpp'),
@@ -633,9 +645,21 @@ if build_engine or get_option('build_native_tests')
     test('openq4-ui-consumed-upload-batches', py,
       args: [meson.project_source_root() / 'tools/tests/renderer_consumed_upload_batches.py',
         '--compiler', ui_test_cpp.cmd_array()[-1]], timeout: 120)
+    test('openq4-ui-upload-storage', py,
+      args: [meson.project_source_root() / 'tools/tests/renderer_upload_storage.py',
+        '--compiler', ui_test_cpp.cmd_array()[-1]], timeout: 120)
+    test('openq4-ui-image-reduction', py,
+      args: [meson.project_source_root() / 'tools/tests/renderer_image_reduction.py',
+        '--compiler', ui_test_cpp.cmd_array()[-1]], timeout: 180)
     test('openq4-ui-native-input-route', py,
       args: [meson.project_source_root() / 'tools/tests/native_input_route.py',
         '--compiler', ui_test_cpp.cmd_array()[-1], '--no-mutations'], timeout: 120)
+    retirement_args = [meson.project_source_root() / 'tools/tests/native_event_retirement.py',
+      '--compiler', ui_test_cpp.cmd_array()[-1], '--no-mutations']
+    if ui_test_cpp.get_id() == 'msvc'
+      retirement_args += ['--msvc-debug']
+    endif
+    test('openq4-ui-native-event-retirement', py, args: retirement_args, timeout: 180)
     test('openq4-ui-sound-recovery', py,
       args: [meson.project_source_root() / 'tools/tests/sound_recovery.py',
         '--compiler', ui_test_cpp.cmd_array()[-1], '--no-mutations'], timeout: 180)
@@ -766,7 +790,7 @@ if build_engine or get_option('build_native_tests')
       'openq4-ui-value-runtime-test',
       files('tools/tests/native/UiValueRuntimeTest.cpp'),
       include_directories: root_include_dir,
-      dependencies: [openq4_retained_dep, jsoncpp_project.get_variable('jsoncpp_dep')],
+      dependencies: [openq4_retained_dep, rmlui_project.get_variable('rmlui_dep'), jsoncpp_project.get_variable('jsoncpp_dep')],
       install: false,
     )
     test('openq4-ui-value-runtime', openq4_ui_value_runtime_test, timeout: 30)

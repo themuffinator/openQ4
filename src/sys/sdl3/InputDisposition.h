@@ -1,6 +1,7 @@
 // Copyright (C) 2026 DarkMatter Productions. GPL-3.0-or-later.
 #pragma once
 #include "../EventDisposition.h"
+#include "../EventRetirement.h"
 
 // Private scalar SDL poll storage, not sysEvent_t/journal data or delivery proof.
 // The parent tag identifies the exact KeyboardPoll emission. A nonzero deferred
@@ -74,3 +75,22 @@ sysEventTransfer_t Sys_TakeMouseInputWithDisposition(const sysInputDispositionSl
     sysMouseInputDisposition_t&) noexcept;
 bool Sys_EndKeyboardInputWithDisposition(const sysInputDispositionSlice_t&) noexcept;
 bool Sys_EndMouseInputWithDisposition(const sysInputDispositionSlice_t&) noexcept;
+
+// Exact original-thread cleanup, never pumping or delivering. A retained checked
+// slice precedes its ring; a legacy slice or untagged next entry obstructs. Peek
+// copies NativeInputHead without permission lookup. Take calls only the route's
+// callback-free permit predicate under the SDL lock, then transfers one value.
+// Keyboard output retains its reserved deferred child but never queues that child.
+// Footprints use type SE_KEY/SE_MOUSE, value key/action, value2 down/value and
+// original time. That shape does not imply a Session emission or input authority.
+sysEventTransfer_t Sys_PeekKeyboardInputForRetirement(openq4::NativeInputHead&) noexcept;
+sysEventTransfer_t Sys_PeekMouseInputForRetirement(openq4::NativeInputHead&) noexcept;
+sysEventTransfer_t Sys_TakeKeyboardInputForRetirement(openq4::NativeInputRoute&,
+    const openq4::NativeInputRoute::CancellationPermit&, sysKeyboardInputDisposition_t&) noexcept;
+sysEventTransfer_t Sys_TakeMouseInputForRetirement(openq4::NativeInputRoute&,
+    const openq4::NativeInputRoute::CancellationPermit&, sysMouseInputDisposition_t&) noexcept;
+// Empty metadata release only: exact original slice, next==count, original bound
+// thread. Active epoch/continuity may be retired. No remaining entry is discarded,
+// and success proves neither event disposition, provider retirement nor an ACK.
+bool Sys_EndKeyboardInputForRetirement(const sysInputDispositionSlice_t&) noexcept;
+bool Sys_EndMouseInputForRetirement(const sysInputDispositionSlice_t&) noexcept;

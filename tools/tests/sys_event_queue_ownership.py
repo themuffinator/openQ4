@@ -29,6 +29,7 @@ SUPPORT = r'''
 #include <vector>
 #include "src/sys/EventQueueContinuity.h"
 #include "src/sys/EventDisposition.h"
+#include "src/sys/EventRetirement.h"
 static unsigned checks=0, frees=0, warnings=0;
 static void Check(bool value,const char* message) {
     ++checks;
@@ -258,6 +259,7 @@ def production(platform):
     get = function_body(source, "sysEvent_t Sys_GetEvent(")
     clear = function_body(source, "void Sys_ClearEvents(")
     globals_ = source[source.index("#define\tMAX_QUED_EVENTS"):source.index("// Only pending queue entries")]
+    globals_ = globals_.replace("static std::uint64_t eventRetirementHighwater", "[[maybe_unused]] static std::uint64_t eventRetirementHighwater")
     if "256" not in globals_ or "eventQue[MAX_QUED_EVENTS]" not in globals_:
         raise AssertionError("production queue declaration changed")
     call = "Sys_QueEvent(0,type,value,-value,length,pointer);" if platform == "windows" else "Posix_QueEvent(type,value,-value,length,pointer);"
@@ -277,6 +279,7 @@ def main():
                "files": {"src/sys/sys_public.h": digest(ROOT / "src/sys/sys_public.h"),
                          "src/sys/EventQueueContinuity.h": digest(ROOT / "src/sys/EventQueueContinuity.h"),
                          "src/sys/EventDisposition.h": digest(ROOT / "src/sys/EventDisposition.h"),
+                         **{name:digest(ROOT/name) for name in ['src/sys/EventRetirement.h', 'src/framework/NativeInputRoute.h', 'src/framework/NativeInputRoute.cpp', 'src/ui/retained/TextInputBroker.h', 'src/ui/retained/TextInput.h', 'src/ui/retained/NativeTextDocument.h']},
                          "src/sys/EventQueueContinuity.cpp": digest(ROOT / "src/sys/EventQueueContinuity.cpp"),
                          "tools/tests/sys_event_queue_ownership.py": digest(Path(__file__))}, "cases": {}}
     for platform in ("windows", "posix"):
@@ -294,7 +297,7 @@ def main():
             label = platform + "-" + name
             cpp, exe = directory / (label + ".cpp"), directory / (label + ".exe")
             cpp.write_text(source, encoding="utf-8")
-            command = [compiler, "-std=c++17", "-Wall", "-Wextra", "-Werror", "-Wno-unused-parameter", "-I", str(ROOT), str(cpp), str(ROOT / "src/sys/EventQueueContinuity.cpp"), "-o", str(exe)]
+            command = [compiler, "-std=c++20", "-Wall", "-Wextra", "-Werror", "-Wno-unused-parameter", "-I", str(ROOT), str(cpp), str(ROOT / "src/sys/EventQueueContinuity.cpp"), "-o", str(exe)]
             compiled = subprocess.run(command, text=True, capture_output=True, env=env)
             (directory / (label + "-compile.log")).write_text(compiled.stdout + compiled.stderr, encoding="utf-8")
             if compiled.returncode:

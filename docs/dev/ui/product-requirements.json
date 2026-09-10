@@ -4,7 +4,7 @@
   "date": "2026-09-10",
   "status": "Implementation incomplete; this register preserves full product scope and does not accept any production GUI.",
   "baseline": {
-    "engine_revision": "b2cb00dfb87cc8663cd8e895dcccce37d9c1faa1",
+    "engine_revision": "5e0d3ebf20234415815a72c914fe788953e4367b",
     "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
     "effective_gui_count": 271,
     "translated_or_accepted_resources": 0,
@@ -19,7 +19,7 @@
     "product": {
       "path": "docs/dev/plans/ui-product-completion.md",
       "authority": "normative completion scope, milestones and final audit",
-      "sha256": "4b7971f78c9f4bbbc74e97596286d8ecabc0d736021d0ea60d400c2cc2674a2f"
+      "sha256": "e1cf18b658d866ddd2b964fa7859dce67519f7b48b458d45199b883f01fa7fa9"
     },
     "original": {
       "path": "docs/dev/plans/idtech5-ui.md",
@@ -100,7 +100,7 @@
       "kind": "source_audit",
       "path": "docs/dev/plans/ui-product-completion.md",
       "scope": "Published audit at 80bb3939; source limitations corroborated by current Document/Runtime inspection. Historical tests and captures are not a fresh product qualification.",
-      "sha256": "4b7971f78c9f4bbbc74e97596286d8ecabc0d736021d0ea60d400c2cc2674a2f"
+      "sha256": "e1cf18b658d866ddd2b964fa7859dce67519f7b48b458d45199b883f01fa7fa9"
     },
     "document-foundation": {
       "kind": "implementation_checkpoint",
@@ -371,7 +371,7 @@
     "settings-effect-foundations": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/settings-effect-execution.md",
-      "sha256": "cabf7dfc9461d8522691e496b76ab23e6f2051838f0b83660eb534fab34d1a75",
+      "sha256": "7c4e93c8cf58caee8f0adc5be69a3c9895b22d35e975a0842a27ed53b55bb03a",
       "baseline_engine_revision": "efcfdb0ffe6eaffa11dbf2ced026495539156478",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "scope": "Automatic completion waits for real effect readiness and a fresh present; owner close during commit preparation restores before persistence. Checked OpenAL leases gain untouched cancellation and non-releasing finalization. Schema2 adds strict versioned effect-plan envelopes and immutable decoding while the production host remains schema1. Full mixed execution, portable renderer/audio reconstruction and live recovery remain required.",
@@ -401,7 +401,7 @@
     "renderer-image-recovery": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/settings-effect-execution.md",
-      "sha256": "cabf7dfc9461d8522691e496b76ab23e6f2051838f0b83660eb534fab34d1a75",
+      "sha256": "7c4e93c8cf58caee8f0adc5be69a3c9895b22d35e975a0842a27ed53b55bb03a",
       "baseline_engine_revision": "d6abeabc7e2e348ea11ce50a7671b830e77a15b1",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "scope": "Checked coalesced image/material restart, original failed-recovery inventory, monotonic resource instance IDs and metadata mutation invalidation. Full engine/modules and49 UI suites pass. Four render-target images after SP/OpenGL125% and MP/Vulkan200% gameplay/ordinary restart qualify compatibility only. Actual checked-policy Apply, portable consumed-policy/content reconstruction, complete settings/editor/migration remain unaccepted.",
@@ -411,7 +411,7 @@
     "native-retirement-foundations": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/native-input-retirement.md",
-      "sha256": "03e8429d7061b0eb091e29647bf45e42a0ca0106353f6c29550c4743900a8323",
+      "sha256": "4ec8612da8f93927831545832e180b641d6708d5140d1e30c76a21675c264b6a",
       "baseline_engine_revision": "b2cb00dfb87cc8663cd8e895dcccce37d9c1faa1",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "scope": "Original native route, retired issued-ticket observation and exact managed UI presence are qualified as independent proofs. Actual store cancellation and production publishers remain in progress; native input is not enabled.",
@@ -421,12 +421,52 @@
     "consumed-settings-recovery": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/settings-effect-execution.md",
-      "sha256": "cabf7dfc9461d8522691e496b76ab23e6f2051838f0b83660eb534fab34d1a75",
+      "sha256": "7c4e93c8cf58caee8f0adc5be69a3c9895b22d35e975a0842a27ed53b55bb03a",
       "baseline_engine_revision": "b2cb00dfb87cc8663cd8e895dcccce37d9c1faa1",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "scope": "Portable no-effect audio requested/observed state and captured renderer policy/output completion records. Full build and56 UI suites pass; four reviewed render-target images after windowed gameplay and ordinary video restart qualify compatibility only. Content identity, DDS/cube exact reduction, cold recovery, full EFX and mixed settings Apply remain unaccepted.",
       "local_capture_summary": ".tmp/ui/native-retirement-integration/validation-evidence.json",
       "local_capture_summary_sha256": "fffcbfd8ec790ea00f764ce774044406ba1392aa13ed10e6958d140e5f14b372"
+    },
+    "native-retirement-storage": {
+      "kind": "implementation_checkpoint",
+      "path": "docs/dev/ui/native-input-retirement.md",
+      "sha256": "4ec8612da8f93927831545832e180b641d6708d5140d1e30c76a21675c264b6a",
+      "baseline_engine_revision": "5e0d3ebf20234415815a72c914fe788953e4367b",
+      "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
+      "scope": "Exact original-head Peek/Take transfers payload and complete sidecar ownership once; checked empty slices release separately. Full engine integration preserves the game C++17 boundary. Terminal disposition, native ACK, production publishers/driver and held-source inhibition remain required; live native input is not enabled.",
+      "local_capture_summary": ".tmp/ui/production-retirement-integration/validation-evidence.json",
+      "local_capture_summary_sha256": "5a638d3df286ca14adf225ff16a99f3e6140dc25fbf13bfddbc7f7db8e7d5407"
+    },
+    "checked-image-reduction": {
+      "kind": "implementation_checkpoint",
+      "path": "docs/dev/ui/settings-effect-execution.md",
+      "sha256": "7c4e93c8cf58caee8f0adc5be69a3c9895b22d35e975a0842a27ed53b55bb03a",
+      "baseline_engine_revision": "5e0d3ebf20234415815a72c914fe788953e4367b",
+      "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
+      "scope": "DDS mip reachability resolves once from the original source; decoded cube reduction is atomic across six faces, resampling is exact or refused, and binary 2D/cube assembly checks every allocation/caller. Full build and ordinary windowed GL/Vulkan gameplay/restart qualify compatibility. Content identity, portable reconstruction, checked driver failure and mixed SYSTEM Apply remain unaccepted.",
+      "local_capture_summary": ".tmp/ui/production-retirement-integration/validation-evidence.json",
+      "local_capture_summary_sha256": "5a638d3df286ca14adf225ff16a99f3e6140dc25fbf13bfddbc7f7db8e7d5407"
+    },
+    "checked-upload-storage": {
+      "kind": "implementation_checkpoint",
+      "path": "docs/dev/ui/settings-effect-execution.md",
+      "sha256": "7c4e93c8cf58caee8f0adc5be69a3c9895b22d35e975a0842a27ed53b55bb03a",
+      "baseline_engine_revision": "5e0d3ebf20234415815a72c914fe788953e4367b",
+      "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
+      "scope": "Actual GL dynamic upload allocation metadata, partial cleanup and persistent-to-streaming fallback bookkeeping are qualified by production-method tests and ordinary gameplay. Queries preserve outputs on refusal and call no graphics getter. Upload completion, Vulkan allocation readback and complete renderer resource accounting remain required.",
+      "local_capture_summary": ".tmp/ui/production-retirement-integration/validation-evidence.json",
+      "local_capture_summary_sha256": "5a638d3df286ca14adf225ff16a99f3e6140dc25fbf13bfddbc7f7db8e7d5407"
+    },
+    "authored-scrollbars": {
+      "kind": "implementation_checkpoint",
+      "path": "docs/dev/ui/scrollbars.md",
+      "sha256": "c552d411c3d1cc536fdc5f7123d6b3d4eca30aa760c9fd0d77c6596f4e828c52",
+      "baseline_engine_revision": "5e0d3ebf20234415815a72c914fe788953e4367b",
+      "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
+      "scope": "Canonical authored vector scrollbar and actual Rml scroll geometry with bounded local commands, pointer-focus preservation, modal/source cancellation, measured thumb drag/paging/wheel/navigation and one-time logical dp restoration/clamping. SYSTEM composition has reviewed engine opening captures at125% GL/SP and200% Vulkan/MP after gameplay and ordinary restart. 61 integrated UI suites pass. Touch/physical-device qualification, complete artwork/state galleries, editor support, remaining screens and full platform acceptance remain required.",
+      "local_capture_summary": ".tmp/ui/production-retirement-integration/validation-evidence.json",
+      "local_capture_summary_sha256": "5a638d3df286ca14adf225ff16a99f3e6140dc25fbf13bfddbc7f7db8e7d5407"
     }
   },
   "groups": {
@@ -1857,7 +1897,9 @@
         "performance-preset-drafts",
         "settings-effect-foundations",
         "renderer-image-recovery",
-        "consumed-settings-recovery"
+        "consumed-settings-recovery",
+        "checked-image-reduction",
+        "checked-upload-storage"
       ],
       "acceptance_evidence": [],
       "remaining": "The typed settings service and asynchronous display confirmation retain their previously qualified scopes. Local numeric drafts guard Apply, Apply and Exit, Defaults, colliding sibling edits and dismissal; Discard requires completed service cancellation and an unchanged complete local editor inventory. Queued rollback, stale callbacks and recovery preserve unfinished text. Exact typed comparison and FTZ/DAZ-independent journal number serialization now cover transaction, display validation and startup recovery, preserving observed originals while signed zeros share the canonical zero representation. Shared profile and Auto-Detect draft expansion now preserve all unrelated edits with guarded atomic publication. Complete actual audio/resource/input effects, preset execution and persistence, all dependent production controls, Defaults and the full Apply/Cancel/discard-and-exit matrix. Qualify visible focus/window-placement/fullscreen/multi-monitor failures and timeout/restart recovery across supported platforms. CVar values alone never prove device success; counted recovery and synthetic startup evidence do not qualify a power loss, actual interrupted confirmation or every persistent recovery path."
@@ -2215,10 +2257,11 @@
         "presentation-alias-foundation",
         "event-program-foundation",
         "value-controls-foundation",
-        "numeric-fields"
+        "numeric-fields",
+        "authored-scrollbars"
       ],
       "acceptance_evidence": [],
-      "remaining": "Widget snapshot version3 adds role and choice-scroll records while preserving earlier button-instance formats; open popup, drag preview, pending proposal, armed input and queued actions are transient and canceled on restoration. Committed application/presentation values and motion retain their existing snapshot policy. Complete editable text, dynamic collections, legacy timers, all selection/scroll/modal/focus state and deterministic full-corpus continuation without replay. Recorded native and normal-route Windows resource-reset checks qualify the new widget subset only. Nested widget version2 now persists bounded numeric text/selection/undo/redo/baseline/conflict; native origins, composition, live editor identities and proposals are transient. Restoring preserves persistent focus until fresh layout and reconciles current host values. Full text/collection/timer/world/game-save continuation remains required."
+      "remaining": "Outer instance snapshot version3 adds role and choice-scroll records while preserving earlier button-instance formats; open popup, drag preview, pending proposal, armed input and queued actions are transient and canceled on restoration. Committed application/presentation values and motion retain their existing snapshot policy. Complete editable text, dynamic collections, legacy timers, all selection/scroll/modal/focus state and deterministic full-corpus continuation without replay. Recorded native and normal-route Windows resource-reset checks qualify the new widget subset only. Nested widget version2 now persists bounded numeric text/selection/undo/redo/baseline/conflict; native origins, composition, live editor identities and proposals are transient. Restoring preserves persistent focus until fresh layout and reconciles current host values. Full text/collection/timer/world/game-save continuation remains required. Scrollbar documents now use nested widget-table version3 with logical dp offsets, while numeric-only widget tables remain version2. Outer instance versions2/3/4 continue to follow the existing no-widget/widget/authored-modal feature rules."
     },
     {
       "id": "SAVE-003",
@@ -2246,10 +2289,11 @@
         "managed-application-foundation",
         "presentation-alias-foundation",
         "system-exit-foundation",
-        "native-managed-bridge"
+        "native-managed-bridge",
+        "authored-scrollbars"
       ],
       "acceptance_evidence": [],
-      "remaining": "Authored modal ownership, pending safe/return focus and fresh-source reconciliation retain their bounded snapshot/resource evidence. Shared focus reveal now recomputes projected control extents after viewport or density changes and requests a 4dp inset within existing scroll limits; unchanged frames preserve deliberate scrolling. Exact native-owner retirement preserves stable local text/history instead of applying late work to a replacement instance. Complete and qualify useful focus/scroll/modal/timeline/value continuity through all viewport, monitor, font, language, renderer, world and widget changes; settings-number recovery and bounded geometry tests do not establish the full engine mutation matrix."
+      "remaining": "Authored modal ownership, pending safe/return focus and fresh-source reconciliation retain their bounded snapshot/resource evidence. Shared focus reveal requests a 4dp inset within existing scroll limits. Legacy documents reveal after viewport/density changes; authored scrollbar documents restore and clamp logical dp offsets once without letting unchanged focus override deliberate scrolling. Fresh focus/navigation and validation extent changes still reveal their target. Exact native-owner retirement preserves stable local text/history instead of applying late work to a replacement instance. Complete and qualify useful focus/scroll/modal/timeline/value continuity through all viewport, monitor, font, language, renderer, world and widget changes; settings-number recovery and bounded geometry tests do not establish the full engine mutation matrix."
     },
     {
       "id": "SAVE-004",
@@ -3001,7 +3045,9 @@
         "event-program-foundation",
         "value-controls-foundation",
         "system-exit-foundation",
-        "native-retirement-foundations"
+        "native-retirement-foundations",
+        "native-retirement-storage",
+        "authored-scrollbars"
       ],
       "acceptance_evidence": [],
       "remaining": "The system-exit increment adds authored modal scope transitions and generation-bound queued Back routing; held-source quarantine and restoration pass bounded native/runtime and normal Session qualification. Value gestures add transient capture/preview, pending-proposal identity and popup dismissal to existing input quarantine. Loss of focus, eligibility or usable projection cancels a gesture; restoration does not replay transient edits. Complete and qualify physical-device removal/reconnect, gameplay/modal ownership and all-widget held-source behavior. The recorded normal-route Windows checks qualify semantic ownership and resource resets; physical-device qualification remains open."
@@ -3037,7 +3083,9 @@
         "native-managed-bridge",
         "windows-text-session",
         "native-disposition-storage",
-        "native-retirement-foundations"
+        "native-retirement-foundations",
+        "native-retirement-storage",
+        "authored-scrollbars"
       ],
       "acceptance_evidence": [],
       "remaining": "The checked Windows text-session controller now owns SDK activation/quiescence and exact final provider/ledger acknowledgement, with counted SDK evidence and production activation still disabled. Existing wheel, numeric command, checked queue-consumption and owned native-collection evidence remains bounded. Managed owner endpoints, the Windows hook-to-store bridge and explicit lifecycle reconciliation preserve exact owner, provider generation, queue continuity and copied receipt ordering without enabling a native provider. Connect this ingress to the production Session route with native provenance, actual provider activation and verified payload lifetime. Complete production wheel/touch scrolling, Unicode text/composition, keyboard/gamepad repeat/reconnect behavior, deterministic replay and the full supported-host/widget operation matrix with value, focus and scroll evidence. No physical-input or complete payload acceptance is inferred."
@@ -3070,7 +3118,8 @@
         "value-controls-foundation",
         "system-exit-foundation",
         "native-managed-bridge",
-        "native-retirement-foundations"
+        "native-retirement-foundations",
+        "authored-scrollbars"
       ],
       "acceptance_evidence": [],
       "remaining": "Authored modal initial-focus/Back metadata and choice selection/highlight retain their bounded native/runtime and normal Session evidence. Shared focus reveal now measures exact projected border corners through nested scroll planes and requests 4dp of density-aware inset, retaining native range clamps and avoiding repeated pointer-scroll takeover. Nearly full-size controls use a reduced inset; oversized controls and authored range ends retain their explicit limits. Complete the entire widget state gallery, first-visible-frame modal containment, stack teardown/restoration and keyboard/gamepad/accessibility matrix. Qualify complete focused-control artwork and responsive layouts across supported densities, transforms and devices; a bounded geometry repair does not accept every frame, mask or control."
@@ -3263,7 +3312,7 @@
         "performance-preset-drafts"
       ],
       "acceptance_evidence": [],
-      "remaining": "Canonical constrained choices now have stable typed options and authored field/chevron/popup/row/label/selection/highlight parts, authoritative readback, tentative open/cancel/commit behavior and measured popup scrolling/placement. Initial post-AA selection uses the settings draft. Complete scrollbars, all constrained/overflow/dynamic availability cases, focus restoration, full physical-device/accessibility behavior, reusable artwork and state-gallery acceptance. Recorded native and normal-route Windows checks qualify this initial control subset only."
+      "remaining": "Canonical constrained choices now have stable typed options and authored field/chevron/popup/row/label/selection/highlight parts, authoritative readback, tentative open/cancel/commit behavior and measured popup scrolling/placement. Initial post-AA selection uses the settings draft. Complete choice-popup scrollbar integration, all constrained/overflow/dynamic availability cases, focus restoration, full physical-device/accessibility behavior, reusable artwork and state-gallery acceptance. Recorded native and normal-route Windows checks qualify this initial control subset only."
     },
     {
       "id": "WID-006",
@@ -3392,10 +3441,12 @@
       "acceptance_evidence_needed": [
         "Real value/action and state-gallery evidence for keyboard, pointer, gamepad and supported touch/text entry; include disabled, busy, invalid, cancel and focus cases as applicable. All named behavior must work through production routing."
       ],
-      "status": "pending",
-      "current_evidence": [],
+      "status": "partial",
+      "current_evidence": [
+        "authored-scrollbars"
+      ],
       "acceptance_evidence": [],
-      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required."
+      "remaining": "Authored SYSTEM scrollbar now measures and paints the actual range, supports bounded semantic drag/paging/wheel/navigation and preserves logical offsets through density/layout restoration. Complete touch/physical-device routing, constrained choice-popup integration, full artwork and interaction-state galleries, editor authoring and all production screen/platform acceptance remain required."
     },
     {
       "id": "WID-011",
@@ -4026,7 +4077,9 @@
         "Resource counters correlated with actual backend allocation/retirement and repeated lifecycle plateau, budget and shutdown assertions."
       ],
       "status": "pending",
-      "current_evidence": [],
+      "current_evidence": [
+        "checked-upload-storage"
+      ],
       "acceptance_evidence": [],
       "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required."
     },
@@ -4904,7 +4957,10 @@
         "settings-effect-foundations",
         "system-compact-opening",
         "renderer-image-recovery",
-        "consumed-settings-recovery"
+        "consumed-settings-recovery",
+        "checked-image-reduction",
+        "checked-upload-storage",
+        "authored-scrollbars"
       ],
       "acceptance_evidence": [],
       "remaining": "The production page now includes source-derived preset and Auto-Detect controls with localized flowing labels, guarded proposals, actual shared draft expansion and bounded Runtime/gameplay validation. The source-backed 31-option/53-CVar contract retains its packaged opt-in SYSTEM route and precise Brightness/Ambient Brightness fields, localized validation and local draft barriers. Exact numeric recovery and bounded full-border focus reveal extend this implementation; neither accepts the translated page. Complete every actual setting and dependent popup, display capability/resolution catalogs, native numeric text entry, complete preset/Auto-Detect effect execution and persistence, remaining effects, Defaults, full Apply/Cancel/exit behavior, source-derived visuals/transitions and the native editor round trip. Qualify normal SP/MP entry/return/reopen, failure/cancellation, complete responsive/localized state galleries and every mapped resource; historical and current bounded captures do not accept the full requirement."

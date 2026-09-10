@@ -166,8 +166,18 @@ static void R_PadRGBAImageTo4x4Blocks( const byte *src, int width, int height,
 idBinaryImage::Load2DFromMemory
 ========================
 */
-void idBinaryImage::Load2DFromMemory( int width, int height, const byte * pic_const, int numLevels, textureFormat_t & textureFormat, textureColor_t & colorFormat, bool gammaMips, bool filterNeutralAlpha ) {
-	Clear();
+bool idBinaryImage::Load2DFromMemory( int width, int height, const byte * pic_const, int numLevels, textureFormat_t & textureFormatOutput, textureColor_t & colorFormatOutput, bool gammaMips, bool filterNeutralAlpha ) {
+    Clear();
+    if (!pic_const || width < 1 || height < 1 || width > MAX_BINARY_IMAGE_DIMENSION || height > MAX_BINARY_IMAGE_DIMENSION ||
+        uint64_t(width) * uint64_t(height) * 4 > uint64_t(MAX_BINARY_IMAGE_DATA_SIZE) ||
+        numLevels < 1 || numLevels > MAX_BINARY_IMAGE_LEVELS) return false;
+    int maxLevels = 1;
+    for (int size = Max(width, height); size > 1; size >>= 1) ++maxLevels;
+    if (numLevels > maxLevels) return false;
+    bool complete = false;
+    struct Rollback { idBinaryImage& image; bool& complete; ~Rollback() { if (!complete) image.Clear(); } } rollback{*this, complete};
+    textureFormat_t textureFormat = textureFormatOutput;
+    textureColor_t colorFormat = colorFormatOutput;
 
 	fileData.textureType = TT_2D;
 	fileData.format = textureFormat;
@@ -182,6 +192,7 @@ void idBinaryImage::Load2DFromMemory( int width, int height, const byte * pic_co
 	// the first mip downsample).
 	const byte * pic = pic_const;
 	bool picOwned = false;
+    struct ReleasePixels { const byte*& pic; bool& owned; ~ReleasePixels() { if (owned) Mem_Free((void*)pic); } } releasePixels{pic, picOwned};
 
 	const bool needsMutableCopy =
 		( colorFormat == CFM_YCOCG_DXT5 ) ||
@@ -189,6 +200,8 @@ void idBinaryImage::Load2DFromMemory( int width, int height, const byte * pic_co
 		( colorFormat == CFM_GREEN_ALPHA );
 	if ( needsMutableCopy ) {
 		byte * converted = (byte *)Mem_Alloc( width * height * 4 );
+        if (!converted) return false;
+        pic = converted; picOwned = true;
 		memcpy( converted, pic_const, width * height * 4 );
 		if ( colorFormat == CFM_YCOCG_DXT5 ) {
 			// convert the image data to YCoCg and use the YCoCgDXT5 compressor
@@ -208,8 +221,6 @@ void idBinaryImage::Load2DFromMemory( int width, int height, const byte * pic_co
 				converted[i*4+3] = 0;
 			}
 		}
-		pic = converted;
-		picOwned = true;
 	}
 
 	int	scaledWidth = width;
@@ -218,9 +229,12 @@ void idBinaryImage::Load2DFromMemory( int width, int height, const byte * pic_co
 	for ( int level = 0; level < images.Num(); level++ ) {
 		idBinaryImageData &img = images[ level ];
 		const byte *uploadPic = pic;
+        byte *filtered = NULL, *padded = NULL;
+        struct ReleaseLevel { byte*& filtered; byte*& padded; ~ReleaseLevel() { if (filtered) Mem_Free(filtered); if (padded) Mem_Free(padded); } } releaseLevel{filtered, padded};
 
 		if ( filterNeutralAlpha ) {
-			byte * filtered = (byte *)Mem_Alloc( scaledWidth * scaledHeight * 4 );
+			filtered = (byte *)Mem_Alloc( scaledWidth * scaledHeight * 4 );
+            if (!filtered) return false;
 			memcpy( filtered, pic, scaledWidth * scaledHeight * 4 );
 			R_ApplyFilterNeutralAlpha( filtered, scaledWidth * scaledHeight );
 			uploadPic = filtered;
@@ -238,7 +252,8 @@ void idBinaryImage::Load2DFromMemory( int width, int height, const byte * pic_co
 			if ( ( scaledWidth & 3 ) || ( scaledHeight & 3 ) ) {
 				dxtWidth = ( scaledWidth + 3 ) & ~3;
 				dxtHeight = ( scaledHeight + 3 ) & ~3;
-				byte * padded = (byte *)Mem_Alloc( dxtWidth*4*dxtHeight );
+				padded = (byte *)Mem_Alloc( dxtWidth*4*dxtHeight );
+                if (!padded) return false;
 				// Out-of-image texels still influence the block fit. Replicate the
 				// edge instead of introducing black/transparent samples, especially
 				// for the 1x1 and 2x2 mip levels used by distant surfaces.
@@ -260,6 +275,7 @@ void idBinaryImage::Load2DFromMemory( int width, int height, const byte * pic_co
 		if ( textureFormat == FMT_DXT1 ) {
 			idDxtEncoder dxt;
 			img.Alloc( dxtWidth * dxtHeight / 2 );
+            if (!img.data) return false;
 			if ( image_highQualityCompression.GetBool() ) {
 				dxt.CompressImageDXT1HQ( dxtPic, img.data, dxtWidth, dxtHeight );
 			} else {
@@ -268,6 +284,7 @@ void idBinaryImage::Load2DFromMemory( int width, int height, const byte * pic_co
 		} else if ( textureFormat == FMT_DXT5 ) {
 			idDxtEncoder dxt;
 			img.Alloc( dxtWidth * dxtHeight );
+            if (!img.data) return false;
 			if ( colorFormat == CFM_NORMAL_DXT5 ) {
 				if ( image_highQualityCompression.GetBool() ) {
 					dxt.CompressNormalMapDXT5HQ( dxtPic, img.data, dxtWidth, dxtHeight );
@@ -291,10 +308,12 @@ void idBinaryImage::Load2DFromMemory( int width, int height, const byte * pic_co
 		} else if ( textureFormat == FMT_ETC2_RGB8 ) {
 			idEtcEncoder etc;
 			img.Alloc( dxtWidth * dxtHeight / 2 );
+            if (!img.data) return false;
 			etc.CompressImageETC2_RGB8( dxtPic, img.data, dxtWidth, dxtHeight );
 		} else if ( textureFormat == FMT_ETC2_RGBA8 ) {
 			idEtcEncoder etc;
 			img.Alloc( dxtWidth * dxtHeight );
+            if (!img.data) return false;
 			etc.CompressImageETC2_RGBA8( dxtPic, img.data, dxtWidth, dxtHeight );
 		} else if ( textureFormat == FMT_EAC_RG11 ) {
 			// Normal maps only, and they reach here with X already in red and Y
@@ -305,28 +324,33 @@ void idBinaryImage::Load2DFromMemory( int width, int height, const byte * pic_co
 			// does not run.
 			idEtcEncoder etc;
 			img.Alloc( dxtWidth * dxtHeight );
+            if (!img.data) return false;
 			etc.CompressImageEAC_RG11( dxtPic, img.data, dxtWidth, dxtHeight );
 		} else if ( textureFormat == FMT_LUM8 || textureFormat == FMT_INT8 ) {
 			// LUM8 and INT8 just read the red channel
 			img.Alloc( scaledWidth * scaledHeight );
+            if (!img.data) return false;
 			for ( int i = 0; i < img.dataSize; i++ ) {
 				img.data[ i ] = uploadPic[ i * 4 ];
 			}
 		} else if ( textureFormat == FMT_ALPHA ) {
 			// ALPHA reads the alpha channel
 			img.Alloc( scaledWidth * scaledHeight );
+            if (!img.data) return false;
 			for ( int i = 0; i < img.dataSize; i++ ) {
 				img.data[ i ] = uploadPic[ i * 4 + 3 ];
 			}
 		} else if ( textureFormat == FMT_L8A8 ) {
 			// L8A8 reads the alpha and red channels
 			img.Alloc( scaledWidth * scaledHeight * 2 );
+            if (!img.data) return false;
 			for ( int i = 0; i < img.dataSize / 2; i++ ) {
 				img.data[ i * 2 + 0 ] = uploadPic[ i * 4 + 0 ];
 				img.data[ i * 2 + 1 ] = uploadPic[ i * 4 + 3 ];
 			}
 		} else if ( textureFormat == FMT_RGB565 ) {
 			img.Alloc( scaledWidth * scaledHeight * 2 );
+            if (!img.data) return false;
 			for ( int i = 0; i < img.dataSize / 2; i++ ) {
 				unsigned short color = ( ( uploadPic[ i * 4 + 0 ] >> 3 ) << 11 ) | ( ( uploadPic[ i * 4 + 1 ] >> 2 ) << 5 ) | ( uploadPic[ i * 4 + 2 ] >> 3 );
 				img.data[ i * 2 + 0 ] = ( color >> 8 ) & 0xFF;
@@ -335,18 +359,12 @@ void idBinaryImage::Load2DFromMemory( int width, int height, const byte * pic_co
 		} else {
 			fileData.format = textureFormat = FMT_RGBA8;
 			img.Alloc( scaledWidth * scaledHeight * 4 );
+            if (!img.data) return false;
 			memcpy( img.data, uploadPic, img.dataSize );
 		}
 
-		// if we had to pad to quads, free the padded version
-		if ( uploadPic != dxtPic ) {
-			Mem_Free( (void *)dxtPic );
-			dxtPic = NULL;
-		}
-		if ( uploadPic != pic ) {
-			Mem_Free( (void *)uploadPic );
-			uploadPic = NULL;
-		}
+        if (padded) { Mem_Free(padded); padded = NULL; }
+        if (filtered) { Mem_Free(filtered); filtered = NULL; }
 
 		// downsample for the next level; the final level has no next level to feed
 		if ( level + 1 < images.Num() ) {
@@ -356,6 +374,7 @@ void idBinaryImage::Load2DFromMemory( int width, int height, const byte * pic_co
 			} else {
 				shrunk = R_MipMap( pic, scaledWidth, scaledHeight );
 			}
+			if (!shrunk) return false;
 			if ( picOwned ) {
 				Mem_Free( (void *)pic );
 			}
@@ -367,9 +386,10 @@ void idBinaryImage::Load2DFromMemory( int width, int height, const byte * pic_co
 		scaledHeight = Max( 1, scaledHeight >> 1 );
 	}
 
-	if ( picOwned ) {
-		Mem_Free( (void *)pic );
-	}
+    textureFormatOutput = textureFormat;
+    colorFormatOutput = colorFormat;
+    complete = true;
+    return true;
 }
 
 /*
@@ -418,9 +438,10 @@ void idBinaryImage::Load2DFromOwnedCompressedData( int width, int height, int nu
 	fileData.height = height;
 	fileData.numLevels = numLevels;
 
-	loadedFileData = fileBuffer;
-
-	images.SetNum( numLevels );
+	// Reserve all image entries before taking ownership: the caller retains
+    // the buffer if an allocation unwinds this method.
+    images.SetNum( numLevels );
+    loadedFileData = fileBuffer;
 	int levelWidth = width;
 	int levelHeight = height;
 	for ( int level = 0; level < numLevels; level++ ) {
@@ -441,8 +462,19 @@ void idBinaryImage::Load2DFromOwnedCompressedData( int width, int height, int nu
 idBinaryImage::LoadCubeFromMemory
 ========================
 */
-void idBinaryImage::LoadCubeFromMemory( int width, const byte * pics[6], int numLevels, textureFormat_t & textureFormat, bool gammaMips ) {
-	Clear();
+bool idBinaryImage::LoadCubeFromMemory( int width, const byte * pics[6], int numLevels, textureFormat_t & textureFormat, bool gammaMips ) {
+    Clear();
+    // No partial binary cube may reach a renderer. Inputs remain borrowed.
+    if (!pics || width < 1 || width > MAX_BINARY_IMAGE_DIMENSION ||
+        uint64_t(width) * uint64_t(width) * 4 > uint64_t(MAX_BINARY_IMAGE_DATA_SIZE) ||
+        numLevels < 1 || numLevels > MAX_BINARY_IMAGE_LEVELS) return false;
+    int maxLevels = 1;
+    for (int size = width; size > 1; size >>= 1) ++maxLevels;
+    if (numLevels > maxLevels) return false;
+    for (int side = 0; side < 6; ++side) if (!pics[side]) return false;
+    bool complete = false;
+    struct Rollback { idBinaryImage& image; bool& complete; ~Rollback() { if (!complete) image.Clear(); } } rollback{*this, complete};
+    const textureFormat_t requestedFormat = textureFormat;
 
 	fileData.textureType = TT_CUBIC;
 	fileData.format = textureFormat;
@@ -454,24 +486,33 @@ void idBinaryImage::LoadCubeFromMemory( int width, const byte * pics[6], int num
 
 	for ( int side = 0; side < 6; side++ ) {
 		const byte *orig = pics[side];
-		const byte *pic = orig;
+        const byte *pic = orig;
+        struct ReleaseMip { const byte*& pic; const byte* original; ~ReleaseMip() { if (pic != original) Mem_Free((void*)pic); } } releaseMip{pic, orig};
 		int	scaledWidth = fileData.width;
 		for ( int level = 0; level < fileData.numLevels; level++ ) {
 			// compress data or convert floats as necessary
 			idBinaryImageData &img = images[ level * 6 + side ];
 
-			// handle padding blocks less than 4x4 for the DXT compressors
-			ALIGN16( byte padBlock[64] );
-			int		padSize;
-			const byte *padSrc;
-			if ( scaledWidth < 4 && ( textureFormat == FMT_DXT1 || textureFormat == FMT_DXT5 ) ) {
-				PadImageTo4x4( pic, scaledWidth, scaledWidth, padBlock );
-				padSize = 4;
-				padSrc = padBlock;
-			} else {
-				padSize = scaledWidth;
-				padSrc = pic;
-			}
+            // Block compression also needs padding for odd extents >= 4,
+            // not just the final 1x1/2x2 mips. Headers retain logical dimensions.
+            ALIGN16(byte smallBlock[64]);
+            int padSize = scaledWidth;
+            const byte *padSrc = pic;
+            byte *padding = NULL;
+            struct ReleasePadding { byte*& pixels; ~ReleasePadding() { if (pixels) Mem_Free(pixels); } } releasePadding{padding};
+            if (textureFormat == FMT_DXT1 || textureFormat == FMT_DXT5) {
+                padSize = (scaledWidth + 3) & ~3;
+                if (scaledWidth < 4) {
+                    // Preserve the existing repeated small-mip texels exactly.
+                    PadImageTo4x4(pic, scaledWidth, scaledWidth, smallBlock);
+                    padSrc = smallBlock;
+                } else if (padSize != scaledWidth) {
+                    padding = (byte*)Mem_Alloc(size_t(padSize) * size_t(padSize) * 4);
+                    if (!padding) return false;
+                    R_PadRGBAImageTo4x4Blocks(pic, scaledWidth, scaledWidth, padding, padSize, padSize);
+                    padSrc = padding;
+                }
+            }
 
 			img.level = level;
 			img.destZ = side;
@@ -482,15 +523,18 @@ void idBinaryImage::LoadCubeFromMemory( int width, const byte * pics[6], int num
 			img.height = scaledWidth;
 			if ( textureFormat == FMT_DXT1 ) {
 				img.Alloc( padSize * padSize / 2 );
+                if (!img.data) return false;
 				idDxtEncoder dxt;
 				dxt.CompressImageDXT1Fast( padSrc, img.data, padSize, padSize );
 			} else if ( textureFormat == FMT_DXT5 ) {
 				img.Alloc( padSize * padSize );
+                if (!img.data) return false;
 				idDxtEncoder dxt;
 				dxt.CompressImageDXT5Fast( padSrc, img.data, padSize, padSize );
 			} else {
-				fileData.format = textureFormat = FMT_RGBA8;
+				fileData.format = FMT_RGBA8;
 				img.Alloc( padSize * padSize * 4 );
+                if (!img.data) return false;
 				memcpy( img.data, pic, img.dataSize );
 			}
 
@@ -502,6 +546,7 @@ void idBinaryImage::LoadCubeFromMemory( int width, const byte * pics[6], int num
 				} else {
 					shrunk = R_MipMap( pic, scaledWidth, scaledWidth );
 				}
+				if (!shrunk) return false;
 				if ( pic != orig ) {
 					Mem_Free( (void *)pic );
 					pic = NULL;
@@ -511,12 +556,10 @@ void idBinaryImage::LoadCubeFromMemory( int width, const byte * pics[6], int num
 
 			scaledWidth = Max( 1, scaledWidth >> 1 );
 		}
-		if ( pic != orig ) {
-			// free the down sampled version
-			Mem_Free( (void *)pic );
-			pic = NULL;
-		}
 	}
+    textureFormat = requestedFormat == FMT_DXT1 || requestedFormat == FMT_DXT5 ? requestedFormat : FMT_RGBA8;
+    complete = true;
+    return true;
 }
 
 /*

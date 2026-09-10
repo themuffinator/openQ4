@@ -300,6 +300,7 @@ typedef void ( GL_APIENTRY *GLDEBUGPROC )( GLenum source, GLenum type, GLuint id
 #define glDisableVertexAttribArrayARB	glDisableVertexAttribArray
 #define glEnableVertexAttribArrayARB	glEnableVertexAttribArray
 #define glGenBuffersARB					glGenBuffers
+#define glGetBufferParameterivARB		glGetBufferParameteriv
 #define glGetUniformLocationARB			glGetUniformLocation
 #define glLinkProgramARB				glLinkProgram
 #define glShaderSourceARB				glShaderSource

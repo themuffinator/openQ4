@@ -1666,6 +1666,7 @@ static bool LightGrid_WritePackImagePayload( idFile *file, const char *baseName,
 
 	idStr sourceName = va( "env/%s/area%i_lightgrid_%s.tga", baseName, chunk.areaIndex, suffix );
 	byte *pic = NULL;
+    struct ReleasePixels { byte*& pic; ~ReleasePixels() { if (pic) R_StaticFree(pic); } } releasePixels{pic};
 	int width = 0;
 	int height = 0;
 	ID_TIME_T timestamp = FILE_NOT_FOUND_TIMESTAMP;
@@ -1683,7 +1684,6 @@ static bool LightGrid_WritePackImagePayload( idFile *file, const char *baseName,
 			height,
 			chunk.width,
 			chunk.height );
-		R_StaticFree( pic );
 		return false;
 	}
 
@@ -1697,12 +1697,11 @@ static bool LightGrid_WritePackImagePayload( idFile *file, const char *baseName,
 	}
 
 	idBinaryImage packedImage( sourceName.c_str() );
-	packedImage.Load2DFromMemory( width, height, pic, 1, textureFormat, colorFormat, gammaMips );
+	if (!packedImage.Load2DFromMemory( width, height, pic, 1, textureFormat, colorFormat, gammaMips )) return false;
 	chunk.dataOffset = file->Tell();
 	const bool wrote = packedImage.WriteToFile( file, timestamp );
 	chunk.dataBytes = file->Tell() - chunk.dataOffset;
 	chunk.format = packedImage.GetFileHeader().format;
-	R_StaticFree( pic );
 	if ( !wrote ) {
 		common->Warning( "LightGrid pack: failed to write payload for %s", sourceName.c_str() );
 		return false;

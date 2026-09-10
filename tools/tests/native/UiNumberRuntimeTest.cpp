@@ -483,7 +483,35 @@ static void NativeRuntimeRestoreAndHostChange(){
 		Check(f.document.Retire(f.native),"test provider retires original native document explicitly");
 	}
 }
+
+static void PaddedEditingRectangles(){
+    for(float ratio:{1.f,1.25f,2.f})for(bool borderBox:{true,false}){
+        View v(ratio,false,true);auto source=Parse(v.source);
+        auto& viewport=source["root"]["children"][0]["children"][0];
+        for(auto& part:viewport["children"])if(part["id"]!="text"){
+            auto& p=part["properties"];p["box-sizing"]=Typed("keyword",borderBox?"border-box":"content-box");
+            p["border-width"]=Typed("length",.25,"dp");p["padding-left"]=Typed("length",.5,"dp");p["padding-right"]=Typed("length",.75,"dp");
+            p["padding-top"]=Typed("length",.5,"dp");p["padding-bottom"]=Typed("length",.75,"dp");
+            if(part["id"]=="caret")p["width"]=Typed("length",4,"dp");
+            if(part["id"]=="composition")p["height"]=Typed("length",4,"dp");
+        }
+        v.runtime.CloseDocument();Json::StreamWriterBuilder writer;writer["indentation"]="";std::vector<Diagnostic> diagnostics;
+        Check(v.runtime.LoadDocument(Json::writeString(writer,source),"padded-number.q4ui",diagnostics),"padded Number parts are valid authored source");v.Frame();v.Begin();v.Selection(4,1);v.Frame();
+        const auto geometry=v.Geometry();const auto caret=v.BoxOf("caret"),selection=v.BoxOf("selection");
+        Check(Near(caret.width,4*ratio)&&Near(caret.height,geometry.caret.height)&&Near(caret.x,geometry.caret.x)&&Near(caret.y,geometry.caret.y),"padded caret actual border matches exact candidate geometry");
+        const int size=v.host.FontSize();const float spacing=.25f*ratio;
+        const float expected=TestHost::Advance(size,'.')+TestHost::Advance(size,'0')+TestHost::Advance(size,'5')+3*spacing;
+        Check(Near(selection.width,expected)&&Near(selection.height,geometry.caret.height),"padded directed selection matches fractional text run");
+        v.Selection(1,3);TextInputEvent event;Check(MakeTextInputPreedit("75",TextIndexUnit::Utf8Bytes,1,1,event,v.error),"padded preedit input valid");
+        Check(v.runtime.ApplyNumberInput("number",v.Identity(),event,v.error,v.time),"padded preedit remains local");v.Frame();v.Geometry();
+        Check(Near(v.BoxOf("composition").height,4*ratio),"padded composition underline keeps its authored border thickness");
+        const auto stable=v.Geometry();v.Frame(0);Check(Same(stable.caret,v.Geometry().caret)&&v.runtime.Statistics().geometryCompiles==0,"padded Number ink settles at fixed time");
+        Check(v.runtime.TakeActions().empty(),"padded local editing never accepts a settings change");
+    }
+}
+
 int main(int argc,char** argv){
+	PaddedEditingRectangles();
 	Check(argc<=2,"only optional authored fixture path accepted");if(argc==2)AuthoredFixture(argv[1]);
 	for(const auto& [name,test]:std::vector<std::pair<const char*,void(*)()>>{{"fractional-density",FractionalDrawingAndDensity},{"framed-transform",FramedReversedSelectionAndTransforms},{"scroll-empty-preedit",ScrollEmptyAndPreedit},{"validation-proposals",ValidationProposalsAndIdentity},{"detached-draft",DetachedDraftAndNativeAffinity},{"unavailable-layout",UnavailableLayoutHidesStaleInk},{"snapshot-recreation",SnapshotDraftsAndResourceRecreation},{"snapshot-conflict",SnapshotFreshHostConflict},{"snapshot-pending",SnapshotPendingProposalDoesNotReplay},{"host-acknowledgement",HostAcknowledgementBetweenFrames},{"host-before-dispatch",HostChangeBeforeDispatch}}){currentCase=name;test();}
 	currentCase="modal-draft-focus";DraftFocusAfterModalProgram();

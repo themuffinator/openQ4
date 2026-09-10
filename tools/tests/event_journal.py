@@ -24,6 +24,8 @@ SOURCES=["src/framework/EventLoop.cpp","src/framework/EventLoop.h","src/sys/sys_
          "src/sys/EventQueueContinuity.h","src/sys/EventQueueContinuity.cpp","src/sys/EventDisposition.h","src/sys/EventDisposition.cpp"]
 
 
+SOURCES += ['src/sys/EventRetirement.h', 'src/framework/NativeInputRoute.h', 'src/framework/NativeInputRoute.cpp', 'src/ui/retained/TextInputBroker.h', 'src/ui/retained/TextInput.h', 'src/ui/retained/NativeTextDocument.h']
+
 def sha(path:Path)->str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -90,10 +92,13 @@ def main()->int:
                     shutil.copyfile(ROOT/"src/sys/KeyEventMetadata.h",metadata)
                     shutil.copyfile(ROOT/"src/sys/EventQueueContinuity.h",metadata.with_name("EventQueueContinuity.h"))
                     shutil.copyfile(ROOT/"src/sys/EventDisposition.h",metadata.with_name("EventDisposition.h"))
+                    for relative in ['src/framework/EventLoop.h', 'src/sys/EventRetirement.h', 'src/framework/NativeInputRoute.h', 'src/framework/NativeInputRoute.cpp', 'src/ui/retained/TextInputBroker.h', 'src/ui/retained/TextInput.h', 'src/ui/retained/NativeTextDocument.h']:
+                        destination=alternate/relative; destination.parent.mkdir(parents=True,exist_ok=True)
+                        shutil.copyfile(ROOT/relative,destination)
                     includes=["-I",str(alternate)]
                 executable=scratch/(name+"-test"+(".exe" if os.name=="nt" else ""))
-                result=run([compiler,"-std=c++17","-O2","-Wall","-Wextra","-Werror",*includes,"-I",str(scratch),"-I",str(ROOT),
-                            str(ROOT/SOURCES[3]),str(ROOT/"src/sys/EventQueueContinuity.cpp"),str(ROOT/"src/sys/EventDisposition.cpp"),"-o",str(executable)])
+                result=run([compiler,"-std=c++20","-O2","-Wall","-Wextra","-Werror",*includes,"-I",str(scratch),"-I",str(ROOT),
+                            str(ROOT/SOURCES[3]),str(ROOT/"src/sys/EventQueueContinuity.cpp"),str(ROOT/"src/sys/EventDisposition.cpp"),str(ROOT/"src/framework/NativeInputRoute.cpp"),"-o",str(executable)])
                 if result.returncode:
                     raise RuntimeError(f"{name} compilation failed:\n{result.stdout}")
                 result=run([str(executable)])

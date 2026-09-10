@@ -21,6 +21,21 @@ draft expansion is described separately in [performance presets](performance-pre
 | Audio | Actual output mode, device readiness, EFX routing and a subsequent normal audio update agree with the owned request. |
 | Deferred loading | Committed desired policy, currently effective policy and its pending load boundary are reported separately. |
 
+The GL upload manager now checks native buffer creation, allocated byte sizes
+and persistent mappings before publishing its storage as ready. Partial failures
+release every owned buffer; a supported persistent-to-streaming fallback updates
+the allocator, synchronization and reported path together. Failed frame orphaning
+disables the dynamic stream and lets ordinary uploads use their legacy fallback.
+It preserves existing static geometry. No per-frame GPU completion wait is added.
+
+`R_RendererUpload_QueryStorage` returns copied actual allocation metadata on the
+renderer thread, with a nonreused manager generation and the separately captured
+request. It calls no native getter and does not infer allocation from requested
+statistics. This is a GL storage observation, not upload completion, portable
+recovery, renderer-path acceptance or settings Apply authorization. Vulkan's
+separate staging allocator refuses this GL-specific query. The unified resource
+executor still needs its own complete requested/actual policy and recovery path.
+
 The audit found several reasons why a CVar write followed by a console restart
 is insufficient:
 
@@ -241,8 +256,8 @@ cache virtual-memory warning during restart; that warning remains under review.
 The source-bound record is
 `.tmp/ui/renderer-effects-integration/validation-evidence.json`. The current
 policy request is not a record of policy historically consumed by resident
-resources. Portable consumed-policy/content descriptors, exact handling of
-insufficient authored DDS mip chains and cold reconstruction remain required.
+resources. The later increments below add consumed-policy observations and exact
+DDS reduction checks; portable content descriptors and cold reconstruction remain required.
 SYSTEM mixed effects stay disabled until the durable host owns those guarantees.
 
 ## Portable audio record increment
@@ -290,8 +305,9 @@ wait is added, and a failed Vulkan submission retains staging ownership.
 
 These records describe consumed policy and admitted output, not source-content
 identity. Generated-cache classification does not prove how the cached bytes
-were produced. Direct DDS mip reachability, partial cube reduction, portable
-content reconstruction and the durable host still need completion. Default,
+were produced. The exact reduction increment below adds direct DDS mip reachability
+and atomic cube reduction. Portable content reconstruction and the durable host
+still need completion. Default,
 unobserved and unsupported paths refuse capture. SYSTEM gains no mixed Apply
 capability from these internal observations alone.
 
@@ -302,6 +318,40 @@ coordinator, metadata and boundary tests retain their 41 mutation checks.
 Twenty-six translation units compile against production headers. Main engine
 linking and runtime qualification are recorded separately in the integration
 folder; these isolated tests do not establish driver or hardware behavior.
+
+## Exact source-image reduction
+
+DDS loading resolves the requested size once from the original image dimensions.
+The loader reports the selected authored mip and whether that chain reaches the
+requested target. Ordinary stock loading can retain the best available mip when
+the chain is too short, while an exact consumed-policy observation refuses that
+fallback. An impossible authored mip count cannot become successful evidence.
+File buffers and mip views transfer ownership only after setup succeeds.
+
+Decoded cube reduction stages all six faces before replacing any original face
+or the common size. The shared RGBA resampler returns the exact requested extent
+or refuses it; it no longer silently clamps output axes to 4096. Its explicit
+limits are 32768 pixels per axis and 256 MiB for each input or output buffer.
+Both 2D and cube binary assemblers check allocations and release partial work
+before failure. Image loading, generated images and lightgrid writing check their
+results before native upload or payload writing. Odd compressed cube sizes use
+the existing edge padding while preserving logical mip dimensions.
+
+The generated cache revision changes for the corrected reduction and cube
+assembly. Failed reduction cannot populate a cache under the requested target.
+Generated cache records still have no original source dimensions or content
+identity and therefore clear source-reduction evidence. The observation continues
+to require full native mip/layer coverage and backend completion.
+
+The frozen Windows Clang, MSVC debug and sanitized Linux GCC suites pass
+3,528,082 CPU checks, 601 OpenGL/material observation checks and 31 Vulkan
+observation checks, plus the existing block-mip and picmip suites. Windows and
+Linux reject all 32 compiled mutations; thirteen full production translation
+units compile across GL, GLES, Vulkan and dedicated configurations. This is CPU
+loading and process-local observation qualification; source-content identity,
+portable reconstruction, native-driver qualification and mixed SYSTEM Apply
+remain separate requirements. The frozen handoff is
+`.tmp/ui-image-reduction-exact/.tmp/handoff.json`.
 
 ## Qualification
 

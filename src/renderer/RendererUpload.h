@@ -3,6 +3,17 @@
 
 #ifndef __RENDERER_UPLOAD_H__
 #define __RENDERER_UPLOAD_H__
+#include <stdint.h>
+
+// Actual GL upload storage created by the current manager. This process-local
+// allocation observation is not upload completion or a portable recovery plan.
+struct rendererUploadStorage_t {
+	uint64_t generation;
+	int requestedMegs, requestedBuffers;
+	int bytesPerBuffer, bufferCount;
+	unsigned int path; // 1 subdata, 2 map-range, 3 persistent.
+	bool persistentFallback;
+};
 
 typedef struct rendererUploadStats_s {
 	int		frameUploadBytes;
@@ -138,6 +149,7 @@ public:
 	bool DynamicFrameBridgeAvailable( void ) const;
 	bool StaticBufferAllocatorAvailable( void ) const;
 	int FrameCapacity( void ) const;
+	bool QueryStorage( rendererUploadStorage_t &output ) const;
 
 private:
 	enum uploadPath_t {
@@ -175,6 +187,8 @@ private:
 	int						frameBufferCount;
 	bool					initialized;
 	bool					hasSync;
+	rendererUploadStorage_t storage{};
+	bool storageReady = false;
 };
 
 void R_RendererUpload_Init( const renderBackendCaps_t &caps );
@@ -190,6 +204,9 @@ const rendererUploadStats_t &R_RendererUpload_Stats( void );
 bool R_RendererUpload_DynamicFrameBridgeAvailable( void );
 bool R_RendererUpload_StaticBufferAllocatorAvailable( void );
 int R_RendererUpload_FrameCapacity( void );
+// Renderer thread only, no native calls. False preserves output. Vulkan has a
+// different staging allocator and refuses this GL-specific storage observation.
+bool R_RendererUpload_QueryStorage( rendererUploadStorage_t &output );
 bool RendererUpload_RunSelfTest( void );
 
 #endif /* !__RENDERER_UPLOAD_H__ */

@@ -291,6 +291,9 @@ struct sdlInputDispositionState_t {
 };
 static sdlInputDispositionState_t s_keyboardDispositionState, s_mouseDispositionState;
 static std::uint64_t s_inputDispositionHighwater = 0;
+// Ring admission and checked slice serials share one never-reset namespace.
+static std::uint64_t s_keyboardRetirementSerials[SDL3_INPUT_QUEUE_SIZE];
+static std::uint64_t s_mouseRetirementSerials[SDL3_INPUT_QUEUE_SIZE];
 class SDL3_InputStorageLock {
 public:
     SDL3_InputStorageLock() { Sys_EnterCriticalSection(CRITICAL_SECTION_ONE); }
@@ -422,6 +425,7 @@ static void SDL3_ClearInputQueues(void) {
 		s_polledKeyboard[i] = {}; s_polledMouse[i] = {};
 		s_keyboardDisposition[i] = {}; s_mouseDisposition[i] = {};
 		s_polledKeyboardDisposition[i] = {}; s_polledMouseDisposition[i] = {};
+        s_keyboardRetirementSerials[i] = 0; s_mouseRetirementSerials[i] = 0;
 	}
 	s_keyboardDispositionState = {}; s_mouseDispositionState = {};
 	// s_inputDispositionHighwater deliberately survives clear/shutdown/re-init.
@@ -874,9 +878,11 @@ static void SDL3_QueueKeyboardInput(int key, bool down, int time) {
 	if (next == s_keyboardTail) {
 		Sys_InvalidateEventQueue(); // Legacy eviction is observable before loss.
 		s_keyboardDisposition[s_keyboardTail] = {};
+        s_keyboardRetirementSerials[s_keyboardTail] = 0;
 		s_keyboardTail = (s_keyboardTail + 1) & SDL3_INPUT_QUEUE_MASK;
 	}
 	s_keyboardDisposition[s_keyboardHead] = {};
+    s_keyboardRetirementSerials[s_keyboardHead] = 0;
 	s_keyboardQueue[s_keyboardHead].key = key;
 	s_keyboardQueue[s_keyboardHead].down = down;
 	s_keyboardQueue[s_keyboardHead].time = time;
@@ -893,9 +899,11 @@ static void SDL3_QueueMouseInput(int action, int value, int time) {
 	if (next == s_mouseTail) {
 		Sys_InvalidateEventQueue(); // Legacy eviction is observable before loss.
 		s_mouseDisposition[s_mouseTail] = {};
+        s_mouseRetirementSerials[s_mouseTail] = 0;
 		s_mouseTail = (s_mouseTail + 1) & SDL3_INPUT_QUEUE_MASK;
 	}
 	s_mouseDisposition[s_mouseHead] = {};
+    s_mouseRetirementSerials[s_mouseHead] = 0;
 	s_mouseQueue[s_mouseHead].action = action;
 	s_mouseQueue[s_mouseHead].value = value;
 	s_mouseQueue[s_mouseHead].time = time;
@@ -5705,8 +5713,10 @@ bool Sys_QueKeyboardInputWithDisposition(sysKeyboardInputDisposition_t& input) n
     if (next == s_keyboardTail) {
         Sys_InvalidateEventQueue(); return false; // Preserve full ring and caller.
     }
+    if (s_inputDispositionHighwater == (std::numeric_limits<std::uint64_t>::max)()) return false;
     s_keyboardQueue[s_keyboardHead] = value;
     s_keyboardDisposition[s_keyboardHead] = input.disposition;
+    s_keyboardRetirementSerials[s_keyboardHead] = ++s_inputDispositionHighwater;
     s_keyboardHead = next;
     input = {};
     return true;
@@ -5719,8 +5729,10 @@ bool Sys_QueMouseInputWithDisposition(sysMouseInputDisposition_t& input) noexcep
     if (next == s_mouseTail) {
         Sys_InvalidateEventQueue(); return false; // Preserve full ring and caller.
     }
+    if (s_inputDispositionHighwater == (std::numeric_limits<std::uint64_t>::max)()) return false;
     s_mouseQueue[s_mouseHead] = value;
     s_mouseDisposition[s_mouseHead] = input.disposition;
+    s_mouseRetirementSerials[s_mouseHead] = ++s_inputDispositionHighwater;
     s_mouseHead = next;
     input = {};
     return true;
@@ -5728,7 +5740,7 @@ bool Sys_QueMouseInputWithDisposition(sysMouseInputDisposition_t& input) noexcep
 
 template<class Value, class Tag>
 static bool SDL3_PollInputWithDisposition(Value (&queue)[SDL3_INPUT_QUEUE_SIZE], Tag (&tags)[SDL3_INPUT_QUEUE_SIZE],
-    const int& head, int& tail, Value (&polled)[SDL3_INPUT_QUEUE_SIZE], Tag (&polledTags)[SDL3_INPUT_QUEUE_SIZE],
+    std::uint64_t (&serials)[SDL3_INPUT_QUEUE_SIZE], const int& head, int& tail, Value (&polled)[SDL3_INPUT_QUEUE_SIZE], Tag (&polledTags)[SDL3_INPUT_QUEUE_SIZE],
     int& count, sdlInputDispositionState_t& state, sysInputDispositionLane_t lane, sysInputDispositionSlice_t& out) {
     SDL3_InputStorageLock lock;
     const auto epoch = Sys_EventDispositionEpoch(), token = Sys_EventQueueToken();
@@ -5741,7 +5753,7 @@ static bool SDL3_PollInputWithDisposition(Value (&queue)[SDL3_INPUT_QUEUE_SIZE],
     if (epoch != Sys_EventDispositionEpoch() || token != Sys_EventQueueToken()) return false;
     while (tail != head) {
         polled[count] = queue[tail]; polledTags[count] = tags[tail];
-        queue[tail] = {}; tags[tail] = {};
+        queue[tail] = {}; tags[tail] = {}; serials[tail] = 0;
         ++count; tail = (tail + 1) & SDL3_INPUT_QUEUE_MASK;
     }
     state.slice = {epoch, token, ++s_inputDispositionHighwater, lane, static_cast<unsigned>(count)};
@@ -5750,12 +5762,12 @@ static bool SDL3_PollInputWithDisposition(Value (&queue)[SDL3_INPUT_QUEUE_SIZE],
     return true;
 }
 bool Sys_PollKeyboardInputWithDisposition(sysInputDispositionSlice_t& out) noexcept {
-    return SDL3_PollInputWithDisposition(s_keyboardQueue, s_keyboardDisposition, s_keyboardHead, s_keyboardTail,
+    return SDL3_PollInputWithDisposition(s_keyboardQueue, s_keyboardDisposition, s_keyboardRetirementSerials, s_keyboardHead, s_keyboardTail,
         s_polledKeyboard, s_polledKeyboardDisposition, s_polledKeyboardCount, s_keyboardDispositionState,
         sysInputDispositionLane_t::Keyboard, out);
 }
 bool Sys_PollMouseInputWithDisposition(sysInputDispositionSlice_t& out) noexcept {
-    return SDL3_PollInputWithDisposition(s_mouseQueue, s_mouseDisposition, s_mouseHead, s_mouseTail,
+    return SDL3_PollInputWithDisposition(s_mouseQueue, s_mouseDisposition, s_mouseRetirementSerials, s_mouseHead, s_mouseTail,
         s_polledMouse, s_polledMouseDisposition, s_polledMouseCount, s_mouseDispositionState,
         sysInputDispositionLane_t::Mouse, out);
 }
@@ -5819,6 +5831,107 @@ bool Sys_EndMouseInputWithDisposition(const sysInputDispositionSlice_t& expected
     return SDL3_EndInputWithDisposition(expected, s_mouseDispositionState, s_polledMouseCount);
 }
 
+
+static bool SDL3_RetirementValue(const sdlKeyboardEvent_t& value, const sysKeyboardDisposition_t& tag) {
+    return value.key > 0 && value.key < K_LAST_KEY && value.time >= 0 && tag.parent.ShapeValid() &&
+        (!tag.deferredEmission || (SDL3_DeferredKeyboardKey(value.key) && tag.deferredEmission != tag.parent.emission));
+}
+static bool SDL3_RetirementValue(const sdlMouseEvent_t& value, const sysEventDispositionTag_t& tag) {
+    return SDL3_ShouldQueueMousePoll(value.action, value.value) && value.time >= 0 && tag.ShapeValid();
+}
+static openq4::NativeInputHead SDL3_RetirementHead(const sdlKeyboardEvent_t& value, const sysKeyboardDisposition_t& tag,
+    openq4::NativeInputLane lane, std::uint64_t serial, unsigned slot) {
+    return {lane, serial, slot, tag.parent, {SE_KEY, value.key, value.down ? 1 : 0, value.time, 0, 0, tag.deferredEmission}};
+}
+static openq4::NativeInputHead SDL3_RetirementHead(const sdlMouseEvent_t& value, const sysEventDispositionTag_t& tag,
+    openq4::NativeInputLane lane, std::uint64_t serial, unsigned slot) {
+    return {lane, serial, slot, tag, {SE_MOUSE, value.action, value.value, value.time, 0, 0, 0}};
+}
+// Caller already owns SDL storage. No Source lookup, active epoch requirement,
+// native callback or mutation; legacy slices and untagged prefixes obstruct.
+template<class Value, class Tag>
+static sysEventTransfer_t SDL3_PeekRetirementInput(const sdlInputDispositionState_t& state, int count,
+    const Value (&polled)[SDL3_INPUT_QUEUE_SIZE], const Tag (&polledTags)[SDL3_INPUT_QUEUE_SIZE],
+    const Value (&queue)[SDL3_INPUT_QUEUE_SIZE], const Tag (&tags)[SDL3_INPUT_QUEUE_SIZE],
+    const std::uint64_t (&serials)[SDL3_INPUT_QUEUE_SIZE], int head, int tail,
+    openq4::NativeInputLane lane, openq4::NativeInputHead& out) {
+    if (!Sys_EventDispositionBoundThread()) return sysEventTransfer_t::Refused;
+    if (state.checked) {
+        if (count < 0 || state.slice.count != static_cast<unsigned>(count) || state.slice.count > SDL3_INPUT_QUEUE_SIZE ||
+            !state.slice.serial || state.next > state.slice.count) return sysEventTransfer_t::Refused;
+        if (state.next == state.slice.count) return sysEventTransfer_t::Empty; // Exact empty End precedes ring access.
+        if (!SDL3_RetirementValue(polled[state.next], polledTags[state.next])) return sysEventTransfer_t::Refused;
+        const auto candidate = SDL3_RetirementHead(polled[state.next], polledTags[state.next], lane, state.slice.serial, state.next);
+        const auto expectedLane = lane == openq4::NativeInputLane::Keyboard ? sysInputDispositionLane_t::Keyboard : sysInputDispositionLane_t::Mouse;
+        if (state.slice.lane != expectedLane || state.slice.epoch != candidate.tag.dispatchEpoch ||
+            state.slice.streamToken != candidate.tag.streamToken) return sysEventTransfer_t::Refused;
+        out = candidate;
+        return sysEventTransfer_t::Ready;
+    }
+    if (count != 0) return sysEventTransfer_t::Refused; // Unread legacy slice ownership is not inferred.
+    if (head == tail) return sysEventTransfer_t::Empty;
+    if (!serials[tail] || !SDL3_RetirementValue(queue[tail], tags[tail])) return sysEventTransfer_t::Refused;
+    out = SDL3_RetirementHead(queue[tail], tags[tail], lane, serials[tail], static_cast<unsigned>(tail));
+    return sysEventTransfer_t::Ready;
+}
+template<class Value, class Tag, class Output>
+static sysEventTransfer_t SDL3_TakeRetirementInput(sdlInputDispositionState_t& state, int count,
+    Value (&polled)[SDL3_INPUT_QUEUE_SIZE], Tag (&polledTags)[SDL3_INPUT_QUEUE_SIZE],
+    Value (&queue)[SDL3_INPUT_QUEUE_SIZE], Tag (&tags)[SDL3_INPUT_QUEUE_SIZE],
+    std::uint64_t (&serials)[SDL3_INPUT_QUEUE_SIZE], int head, int& tail, openq4::NativeInputLane lane,
+    openq4::NativeInputRoute& route, const openq4::NativeInputRoute::CancellationPermit& permit, Output& out) {
+    openq4::NativeInputHead actual;
+    const auto status = SDL3_PeekRetirementInput(state,count,polled,polledTags,queue,tags,serials,head,tail,lane,actual);
+    if (status != sysEventTransfer_t::Ready) return status;
+    if (!route.AllowsCancellation(permit,actual)) return sysEventTransfer_t::Refused;
+    if (state.checked) {
+        const auto owned = SDL3_TrackedInput(polled[state.next],polledTags[state.next]);
+        polled[state.next] = {}; polledTags[state.next] = {}; ++state.next;
+        out = owned;
+    } else {
+        const auto owned = SDL3_TrackedInput(queue[tail],tags[tail]);
+        queue[tail] = {}; tags[tail] = {}; serials[tail] = 0;
+        tail = (tail + 1) & SDL3_INPUT_QUEUE_MASK;
+        out = owned;
+    }
+    return sysEventTransfer_t::Ready;
+}
+sysEventTransfer_t Sys_PeekKeyboardInputForRetirement(openq4::NativeInputHead& out) noexcept {
+    SDL3_InputStorageLock lock;
+    return SDL3_PeekRetirementInput(s_keyboardDispositionState,s_polledKeyboardCount,s_polledKeyboard,s_polledKeyboardDisposition,
+        s_keyboardQueue,s_keyboardDisposition,s_keyboardRetirementSerials,s_keyboardHead,s_keyboardTail,openq4::NativeInputLane::Keyboard,out);
+}
+sysEventTransfer_t Sys_PeekMouseInputForRetirement(openq4::NativeInputHead& out) noexcept {
+    SDL3_InputStorageLock lock;
+    return SDL3_PeekRetirementInput(s_mouseDispositionState,s_polledMouseCount,s_polledMouse,s_polledMouseDisposition,
+        s_mouseQueue,s_mouseDisposition,s_mouseRetirementSerials,s_mouseHead,s_mouseTail,openq4::NativeInputLane::Mouse,out);
+}
+sysEventTransfer_t Sys_TakeKeyboardInputForRetirement(openq4::NativeInputRoute& route,
+    const openq4::NativeInputRoute::CancellationPermit& permit, sysKeyboardInputDisposition_t& out) noexcept {
+    SDL3_InputStorageLock lock;
+    return SDL3_TakeRetirementInput(s_keyboardDispositionState,s_polledKeyboardCount,s_polledKeyboard,s_polledKeyboardDisposition,
+        s_keyboardQueue,s_keyboardDisposition,s_keyboardRetirementSerials,s_keyboardHead,s_keyboardTail,openq4::NativeInputLane::Keyboard,route,permit,out);
+}
+sysEventTransfer_t Sys_TakeMouseInputForRetirement(openq4::NativeInputRoute& route,
+    const openq4::NativeInputRoute::CancellationPermit& permit, sysMouseInputDisposition_t& out) noexcept {
+    SDL3_InputStorageLock lock;
+    return SDL3_TakeRetirementInput(s_mouseDispositionState,s_polledMouseCount,s_polledMouse,s_polledMouseDisposition,
+        s_mouseQueue,s_mouseDisposition,s_mouseRetirementSerials,s_mouseHead,s_mouseTail,openq4::NativeInputLane::Mouse,route,permit,out);
+}
+static bool SDL3_EndRetirementInput(const sysInputDispositionSlice_t& expected, sdlInputDispositionState_t& state, int& count) {
+    SDL3_InputStorageLock lock;
+    if (!Sys_EventDispositionBoundThread() || !state.checked || !expected.serial || expected != state.slice ||
+        count < 0 || expected.count != static_cast<unsigned>(count) || state.next != expected.count) return false;
+    state = {}; count = 0;
+    return true; // Empty metadata only, never a receipt for queued input.
+}
+bool Sys_EndKeyboardInputForRetirement(const sysInputDispositionSlice_t& expected) noexcept {
+    return SDL3_EndRetirementInput(expected,s_keyboardDispositionState,s_polledKeyboardCount);
+}
+bool Sys_EndMouseInputForRetirement(const sysInputDispositionSlice_t& expected) noexcept {
+    return SDL3_EndRetirementInput(expected,s_mouseDispositionState,s_polledMouseCount);
+}
+
 int Sys_PollKeyboardInputEvents(void) {
     SDL3_InputStorageLock lock;
     if (s_keyboardDispositionState.checked) { Sys_InvalidateEventQueue(); return 0; }
@@ -5828,6 +5941,7 @@ int Sys_PollKeyboardInputEvents(void) {
         s_polledKeyboard[s_polledKeyboardCount] = s_keyboardQueue[s_keyboardTail];
         s_polledKeyboardDisposition[s_polledKeyboardCount] = {};
         s_keyboardQueue[s_keyboardTail] = {};
+        s_keyboardRetirementSerials[s_keyboardTail] = 0;
         ++s_polledKeyboardCount;
         s_keyboardTail = (s_keyboardTail + 1) & SDL3_INPUT_QUEUE_MASK;
     }
@@ -5871,6 +5985,7 @@ int Sys_PollMouseInputEvents(void) {
         s_polledMouse[s_polledMouseCount] = s_mouseQueue[s_mouseTail];
         s_polledMouseDisposition[s_polledMouseCount] = {};
         s_mouseQueue[s_mouseTail] = {};
+        s_mouseRetirementSerials[s_mouseTail] = 0;
         ++s_polledMouseCount;
         s_mouseTail = (s_mouseTail + 1) & SDL3_INPUT_QUEUE_MASK;
     }

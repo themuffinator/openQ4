@@ -269,7 +269,13 @@ The full engine and renderer modules build, and all 56 UI suites pass. Four revi
 
 This checkpoint begins at engine `b2cb00dfb87cc8663cd8e895dcccce37d9c1faa1`. Its local record `.tmp/ui/native-retirement-integration/validation-evidence.json` has SHA-256 `fffcbfd8ec790ea00f764ce774044406ba1392aa13ed10e6958d140e5f14b372`. Requirement statuses and all seven final gate decisions are unchanged.
 
-There are **65 partial, 161 pending and one verified requirement**. `BEH-002`
+The current [authored scrollbar increment](scrollbars.md) integrates the SYSTEM vector trough/thumb with actual Rml scroll geometry, local ownership-aware commands and logical offset persistence. [Actual retirement storage](native-input-retirement.md) now transfers exact original heads and releases checked empty slices. [Renderer recovery foundations](settings-effect-execution.md) additionally check DDS/decoded image reduction and real GL stream allocation. Earlier statements that these pieces were pending describe their historical checkpoints. Terminal native disposition/activation, complete content reconstruction and mixed SYSTEM Apply remain underway.
+
+The full engine and renderer modules build, and all 61 UI suites pass. Four reviewed render-target images cover actual windowed SP/OpenGL gameplay at125% and MP/Vulkan gameplay at200%, followed by ordinary video restart and SYSTEM. The scrollbar geometry is read from the actual runtime; no input was injected or controlled. This qualifies the recorded opening views, not full physical-device or transition acceptance.
+
+This increment begins at engine `5e0d3ebf20234415815a72c914fe788953e4367b`. Its record `.tmp/ui/production-retirement-integration/validation-evidence.json` has SHA-256 `5a638d3df286ca14adf225ff16a99f3e6140dc25fbf13bfddbc7f7db8e7d5407`. Only `WID-010` advances from pending to partial; no acceptance evidence, migration acceptance or final gate changes.
+
+There are **66 partial, 160 pending and one verified requirement**. `BEH-002`
 remains partial for the implemented settings transaction/service boundary.
 `BEH-005` remains partial for committed action delivery and cancellation; stock
 sounds and the complete device/modal/widget behavior still require implementation

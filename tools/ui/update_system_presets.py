@@ -57,7 +57,7 @@ def compose(document):
     index = nodes(result['root'])
     choice = renamed(index['settings_postaa'], 'settings_postaa', 'settings_preset')
     auto = renamed(index['settings_back'], 'settings_back', 'settings_autodetect')
-    choice['properties'].update({'width': length(320), 'min-width': length(240),
+    choice['properties'].update({'width': length(280), 'min-width': length(240),
                                  'display': keyword('flex'), 'flex-wrap': keyword('wrap'),
                                  'align-items': keyword('center'), 'column-gap': length(8), 'row-gap': length(2),
                                  'min-height': length(44), 'padding': length(10),
@@ -87,7 +87,7 @@ def compose(document):
     ci['settings_preset-chevron']['properties'].pop('top', None)
     ci['settings_preset-chevron']['properties']['bottom'] = length(18)
     auto['properties'].pop('margin-right', None)
-    auto['properties'].update({'width': length(200), 'min-width': length(176),
+    auto['properties'].update({'width': length(208), 'min-width': length(176),
                               'flex-grow': number(1), 'flex-shrink': number(1)})
     auto['control'].update(label='#str_229978', event='autoDetect')
     nodes(auto)['settings_autodetect-label']['properties']['text'] = typed('text', '#str_229978')

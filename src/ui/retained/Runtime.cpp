@@ -3,6 +3,7 @@
 #include "State.h"
 #include "VectorElement.h"
 #include "ValueControlView.h"
+#include "ScrollbarView.h"
 #include "TextRun.h"
 #include "NumberControlView.h"
 
@@ -20,6 +21,7 @@
 #include <map>
 #include <stdexcept>
 #include <string_view>
+#include <utility>
 
 namespace openq4::ui {
 namespace {
@@ -659,6 +661,8 @@ struct Runtime::Impl {
 	std::uint64_t appliedStateRevision = 0;
 	Interaction interaction;
 	ValueControlView valueView;
+	ScrollbarView scrollView;
+	bool scrollLayoutDirty=false, preserveRestoredScroll=false;
 	NumberControlView numberView;
 	Viewport viewport;
 	std::vector<std::string> controls;
@@ -759,7 +763,7 @@ struct Runtime::Impl {
 		if (std::isfinite(seconds)) time = std::max(time,seconds);
 		for (const auto& change : interaction.TakeFeedback()) motion.Play(change.timeline,time);
 	}
-	bool RevealFocus() {
+	bool RevealFocus(bool preserveAuthoredAxes = false) {
 		if (!document || !context) return false;
 		auto* element = document->GetElementById(interaction.Focused());
 		if (!element) return false;
@@ -774,9 +778,9 @@ struct Runtime::Impl {
 		for (auto* parent = element->GetParentNode(); parent; parent = parent->GetParentNode()) {
 			const auto& style = parent->GetComputedValues();
 			using Rml::Style::Overflow;
-			const bool scrollX = style.overflow_x() != Overflow::Visible && style.overflow_x() != Overflow::Hidden &&
+			const bool scrollX = !(preserveAuthoredAxes && scrollView.OwnsAxis(parent,false)) && style.overflow_x() != Overflow::Visible && style.overflow_x() != Overflow::Hidden &&
 				parent->GetScrollWidth() > parent->GetClientWidth();
-			const bool scrollY = style.overflow_y() != Overflow::Visible && style.overflow_y() != Overflow::Hidden &&
+			const bool scrollY = !(preserveAuthoredAxes && scrollView.OwnsAxis(parent,true)) && style.overflow_y() != Overflow::Visible && style.overflow_y() != Overflow::Hidden &&
 				parent->GetScrollHeight() > parent->GetClientHeight();
 			if (!scrollX && !scrollY) continue;
 			Rml::Array<Rml::Vector2f,4> quad;
@@ -833,11 +837,23 @@ struct Runtime::Impl {
 		}
 		return {};
 	}
-	void UpdateInteraction(double seconds = -1, bool freshLayout = false) {
-		if (!document || !canonical) return;
+	void ApplyScrollCommands() {
+        if(!context)return;
+        ContextClock clock(*services,time);
+        if(!scrollView.ApplyCommands(interaction))return;
+        context->Update();context->GetRootElement()->UpdateGeometryForProjection();
+        std::string error;scrollLayoutDirty|=scrollView.Sync(interaction,viewport.DpRatio(),false,error);
+        if(!error.empty())host.Log(true,error);
+    }
+    void UpdateInteraction(double seconds = -1, bool freshLayout = false) {
+		if (!document || !canonical || viewport.width<=0 || viewport.height<=0) return;
 		if (std::isfinite(seconds) && seconds >= 0) time = std::max(time,seconds);
 		SyncModals();
 		inputAllowed.clear(); CollectInputEligibility(canonical->Model().root);
+        // Publish scrollbar metrics and projected bounds as one eligibility update.
+        // Restored focus must never be tested against this instance's old bounds.
+        std::string scrollError;scrollLayoutDirty|=scrollView.Sync(interaction,viewport.DpRatio(),freshLayout,scrollError,true);
+        if(!scrollError.empty())host.Log(true,scrollError);
 		std::map<std::string,ControlBounds> bounds;
 		for (const auto& id : controls) {
 			auto* element = document->GetElementById(id); Rml::Rectanglef rect;
@@ -848,9 +864,14 @@ struct Runtime::Impl {
 		const auto hit = HitControl();
 		auto* element = pointerPresent && pointerNavigation && pointerX >= 0 && pointerY >= 0 && pointerX < viewport.width && pointerY < viewport.height ?
 			context->GetElementAtPoint({pointerX,pointerY},nullptr,document) : nullptr;
-		const auto part = valueView.PointerPart(element,pointerX,pointerY,interaction);
-		if (part.invalidProjection) interaction.Cancel();
-		else interaction.PointerPart(part.control.empty() ? (pointerNavigation ? hit : std::string{}) : part.control,part.fraction,part.option);
+		const auto scrollbar=scrollView.PointerPart(element,pointerX,pointerY,interaction);
+        if(!scrollbar.control.empty()) interaction.PointerPart(scrollbar.control,scrollbar.invalidProjection?std::nullopt:scrollbar.fraction,{},scrollbar.thumb);
+        else {
+            const auto part = valueView.PointerPart(element,pointerX,pointerY,interaction);
+            if (part.invalidProjection) interaction.Cancel();
+            else interaction.PointerPart(part.control.empty() ? (pointerNavigation ? hit : std::string{}) : part.control,part.fraction,part.option);
+        }
+        ApplyScrollCommands();
 		Feedback(time);
 	}
 	void ApplyMotion() {
@@ -901,6 +922,7 @@ bool Runtime::Initialize() {
 void Runtime::Shutdown() {
 	if (!impl->initialized) return;
 	impl->valueView.Reset();
+	impl->scrollView.Reset();impl->scrollLayoutDirty=impl->preserveRestoredScroll=false;
 	impl->numberView.Reset();
 	{
 		ContextClock clock(*impl->services,impl->time);
@@ -923,6 +945,7 @@ void Runtime::Shutdown() {
 void Runtime::CloseDocument() {
 	impl->sourcePath.clear();
 	impl->valueView.Reset();
+	impl->scrollView.Reset();impl->scrollLayoutDirty=impl->preserveRestoredScroll=false;
 	impl->numberView.Reset();
 	impl->canonical.reset(); impl->applied.clear(); impl->motion.Reset({});
 	impl->state = {}; impl->appliedStateRevision = 0; impl->stateError.clear();
@@ -970,7 +993,10 @@ bool Runtime::LoadDocument(const std::string& source, const std::string& sourceP
 		[&](const std::string& text) { return impl->host.Translate(text); },stateError)) {
 		diagnostics.push_back({"/root",stateError}); CloseDocument(); return false;
 	}
-	if (!impl->numberView.Initialize(impl->canonical->Model(),*impl->document,
+	if (!impl->scrollView.Initialize(impl->canonical->Model(),*impl->document,stateError)) {
+        diagnostics.push_back({"/root",stateError}); CloseDocument(); return false;
+    }
+    if (!impl->numberView.Initialize(impl->canonical->Model(),*impl->document,
 		[&](std::uintptr_t face,std::string_view text,float spacing) { return impl->services->fonts.QueryRun(face,text,spacing); },
 		[&](const std::string& text) { return impl->host.Translate(text); },{},stateError)) {
 		diagnostics.push_back({"/root",stateError}); CloseDocument(); return false;
@@ -1005,6 +1031,10 @@ bool Runtime::SaveSnapshot(std::string& snapshot, std::string& error, double sec
 		// boundary rejects excessive aggregate text/history without truncation.
 		ValueWidgetSnapshot widgets;
 		if (!impl->interaction.CaptureWidgets(widgets,error)) return false;
+        for(const auto& [id,offset]:impl->scrollView.CaptureOffsets(impl->interaction)) {
+            if(!std::isfinite(offset)||offset<0||offset>1e12) {error="Saved scroll offset is outside its bounded range";return false;}
+            widgets.widgets.at(id).scrollOffsetDp=offset;
+        }
 		Interaction interaction = impl->interaction;
 		Motion motion = impl->motion;
 		const bool authoredModals = interaction.HasAuthoredModals();
@@ -1081,6 +1111,7 @@ bool Runtime::SaveSnapshot(std::string& snapshot, std::string& error, double sec
 				auto& entry = root["widgets"]["controls"][id];
 				entry["role"] = unsigned(widget.role); entry["firstVisible"] = widget.firstVisible;
 				if (widget.number) entry["number"] = SnapshotNumberEditor(*widget.number);
+                if(widget.scrollOffsetDp) entry["scrollOffsetDp"]=*widget.scrollOffsetDp;
 			}
 		}
 		Json::StreamWriterBuilder writer; writer["indentation"] = ""; writer["precision"] = 17;
@@ -1119,19 +1150,26 @@ bool Runtime::RestoreSnapshot(const std::string& snapshot, std::string& error, d
 		std::size_t numberEditors = 0, numberTextRemaining = ValueWidgetSnapshot::MaxNumberTextBytes;
 		if (root["version"].asUInt() >= 3) {
 			const auto& saved = root["widgets"];
-			if (!SnapshotFields(saved,{"version","controls"}) || !saved["version"].isUInt() || saved["version"].asUInt() < 1 || saved["version"].asUInt() > 2 ||
+			if (!SnapshotFields(saved,{"version","controls"}) || !saved["version"].isUInt() || saved["version"].asUInt() < 1 || saved["version"].asUInt() > 3 ||
 				!saved["controls"].isObject() || saved["controls"].size() > impl->controls.size()) return reject("Invalid restored widget table");
 			widgets.version = saved["version"].asUInt();
 			for (const auto& id : saved["controls"].getMemberNames()) {
 				const auto& entry = saved["controls"][id];
-				const bool hasNumber = widgets.version == 2 && entry.isMember("number");
-				if (!(hasNumber ? SnapshotFields(entry,{"role","firstVisible","number"}) : SnapshotFields(entry,{"role","firstVisible"})) ||
+				const bool hasNumber = widgets.version >= 2 && entry.isMember("number");
+                const bool hasScroll = widgets.version == 3 && entry.isMember("scrollOffsetDp");
+				if (!(hasNumber ? SnapshotFields(entry,{"role","firstVisible","number"}) : hasScroll ? SnapshotFields(entry,{"role","firstVisible","scrollOffsetDp"}) : SnapshotFields(entry,{"role","firstVisible"})) ||
 					!entry["role"].isUInt() || entry["role"].asUInt() < unsigned(ControlRole::Toggle) ||
-					entry["role"].asUInt() > unsigned(widgets.version == 2 ? ControlRole::Number : ControlRole::Choice) ||
+					entry["role"].asUInt() > unsigned(widgets.version == 3 ? ControlRole::Scrollbar : widgets.version == 2 ? ControlRole::Number : ControlRole::Choice) ||
 					!entry["firstVisible"].isUInt()) return reject("Invalid restored widget state");
 				ValueWidgetSnapshot::Widget widget{ControlRole(entry["role"].asUInt()),entry["firstVisible"].asUInt()};
-				if (hasNumber) {
-					if (widget.role != ControlRole::Number || ++numberEditors > ValueWidgetSnapshot::MaxNumberEditors)
+				if(hasScroll) {
+                    if(widget.role!=ControlRole::Scrollbar || !entry["scrollOffsetDp"].isNumeric() ||
+                        !std::isfinite(entry["scrollOffsetDp"].asDouble()) || entry["scrollOffsetDp"].asDouble()<0 || entry["scrollOffsetDp"].asDouble()>1e12)
+                        return reject("Invalid restored scrollbar offset");
+                    widget.scrollOffsetDp=entry["scrollOffsetDp"].asDouble();
+                }
+                if (hasNumber) {
+                    if (widget.role != ControlRole::Number || ++numberEditors > ValueWidgetSnapshot::MaxNumberEditors)
 						return reject("Invalid restored number editor table");
 					widget.number.emplace();
 					if (!ReadSnapshotNumberEditor(entry["number"],*widget.number,numberTextRemaining)) return reject("Invalid restored number editor");
@@ -1263,6 +1301,7 @@ bool Runtime::RestoreSnapshot(const std::string& snapshot, std::string& error, d
 		if (!impl->interaction.Adopt(std::move(interaction),error)) return false;
 		impl->state = std::move(state); impl->motion = std::move(motion);
 		impl->time = now; impl->pointerPresent = impl->pointerNavigation = false; impl->applied.clear();
+        impl->preserveRestoredScroll=widgets.version==3;
 		impl->appliedStateRevision = impl->state.Revision(); impl->stateError.clear();
 		return true;
 	} catch (const std::exception& problem) { error = std::string("Cannot restore instance snapshot: ")+problem.what(); return false; }
@@ -1333,10 +1372,14 @@ void Runtime::Frame(const Viewport& viewport, double seconds) {
 	statistics.residentGeometryCount = residentCount; statistics.residentGeometryBytes = residentBytes;
 	if (!impl->context || !impl->document) return;
 	if (viewport.width <= 0 || viewport.height <= 0) {
+        // Keep invalid dimensions visible to input; old Rml boxes must not be
+        // republished before a later valid Frame measures layout again.
+        impl->viewport.width=viewport.width;impl->viewport.height=viewport.height;
 		impl->interaction.InvalidateLayout(); impl->interaction.Cancel(); impl->Feedback(seconds); return;
 	}
 	const bool viewportChanged = impl->viewport.width != viewport.width || impl->viewport.height != viewport.height ||
 		impl->viewport.DpRatio() != viewport.DpRatio();
+	impl->scrollView.PreserveDensity(viewport.DpRatio());
 	impl->viewport = viewport;
 	if (impl->pointerPresent) viewport.WindowToDocument(impl->windowPointerX,impl->windowPointerY,impl->pointerX,impl->pointerY);
 	const auto start = std::chrono::steady_clock::now();
@@ -1355,7 +1398,10 @@ void Runtime::Frame(const Viewport& viewport, double seconds) {
 		const auto before = impl->interaction.Focused();
 		impl->UpdateInteraction(-1,true);
 		const bool focusChanged = before != impl->interaction.Focused();
-		const bool revealed = (focusChanged || (pass == 0 && viewportChanged)) && impl->RevealFocus();
+		// Preserve restored/reflowed offsets only on axes owned by authored bars.
+		// Other axes and legacy ancestors still reveal the current control.
+		const bool preserveAuthoredAxes = impl->preserveRestoredScroll || (viewportChanged && !focusChanged);
+		const bool revealed = (focusChanged || (pass == 0 && (viewportChanged || impl->preserveRestoredScroll))) && impl->RevealFocus(preserveAuthoredAxes);
 		if (focusChanged) impl->ApplyMotion();
 		const auto* focusedNode = impl->canonical ? impl->canonical->Model().FindNode(impl->interaction.Focused()) : nullptr;
 		auto* focusedNumber = focusedNode && focusedNode->control && focusedNode->control->role == ControlRole::Number ?
@@ -1363,15 +1409,17 @@ void Runtime::Frame(const Viewport& viewport, double seconds) {
 		const auto numberSize = focusedNumber ? focusedNumber->GetBox().GetSize(Rml::BoxArea::Border) : Rml::Vector2f{};
 		bool painted = impl->valueView.Paint(impl->interaction,impl->state.ControlValues(),viewport.width,viewport.height,viewport.DpRatio(),
 			[&](const std::string& id) { const auto value = impl->PresentedProperty({id,"opacity"}); return value ? value->data[0] : 1.0; });
+		painted |= std::exchange(impl->scrollLayoutDirty,false);
 		painted |= impl->numberView.Paint(impl->interaction,viewport.DpRatio(),impl->time,impl->motion.ReducedMotion());
 		if (!painted && !focusChanged && !revealed) break;
 		impl->context->Update();
 		if (focusedNumber && focusedNumber->GetBox().GetSize(Rml::BoxArea::Border) != numberSize) {
 			// Validation can grow the focused field without changing focus.
 			// Reveal its new extent once; unchanged frames preserve user scroll.
-			impl->RevealFocus(); impl->context->Update();
+			impl->RevealFocus(preserveAuthoredAxes); impl->context->Update();
 		}
 	}
+	impl->preserveRestoredScroll=false;
 	const auto updated = std::chrono::steady_clock::now();
 	impl->backend->renderer.BeginFrame(viewport.width,viewport.height);
 	impl->context->Render();
@@ -1385,6 +1433,7 @@ void Runtime::Frame(const Viewport& viewport, double seconds) {
 	statistics.frameMilliseconds = std::chrono::duration<double,std::milli>(end-start).count();
 }
 bool Runtime::GetBounds(const std::string& id, Bounds& bounds) const {
+    if(impl->viewport.width<=0 || impl->viewport.height<=0)return false;
 	auto* element = impl->document ? impl->document->GetElementById(id) : nullptr;
 	if (!element) return false;
 	const auto position = element->GetAbsoluteOffset(Rml::BoxArea::Border);
@@ -1424,7 +1473,7 @@ void Runtime::PointerMove(float x, float y, double seconds) {
 	impl->viewport.WindowToDocument(x,y,impl->pointerX,impl->pointerY);
 	impl->UpdateInteraction(seconds); impl->Feedback(seconds);
 }
-void Runtime::PointerButton(bool down, double seconds) { impl->pointerNavigation = true; impl->UpdateInteraction(seconds); impl->interaction.Pointer(down); impl->Feedback(seconds); }
+void Runtime::PointerButton(bool down, double seconds) { impl->pointerNavigation = true; impl->UpdateInteraction(seconds); impl->interaction.Pointer(down); impl->ApplyScrollCommands(); impl->Feedback(seconds); }
 void Runtime::PointerWheel(int rows, double seconds) {
 	impl->UpdateInteraction(seconds);
 	if (!rows) return;
@@ -1442,14 +1491,21 @@ void Runtime::PointerWheel(int rows, double seconds) {
 	}
 	if (!impl->pointerPresent || !impl->context || !impl->document || impl->pointerX < 0 || impl->pointerY < 0 ||
 		impl->pointerX >= impl->viewport.width || impl->pointerY >= impl->viewport.height) return;
-	if (auto* hit = impl->context->GetElementAtPoint({impl->pointerX,impl->pointerY},nullptr,impl->document))
-		if (auto* scroll = hit->GetClosestScrollableContainer(); scroll && impl->interaction.AllowsNode(scroll->GetId()))
-			scroll->SetScrollTop(scroll->GetScrollTop()+(rows > 0 ? 36.f : -36.f)*impl->viewport.DpRatio());
+	if (auto* hit = impl->context->GetElementAtPoint({impl->pointerX,impl->pointerY},nullptr,impl->document)) {
+        const auto target=impl->scrollView.WheelTarget(hit,impl->interaction);
+        if(!target.empty()) {
+            impl->interaction.ScrollPulse(target,rows>0?ScrollStep::LineForward:ScrollStep::LineBackward);
+            impl->ApplyScrollCommands();impl->Feedback(seconds);return;
+        }
+        if (auto* scroll = hit->GetClosestScrollableContainer(); scroll && impl->interaction.AllowsNode(scroll->GetId()))
+            scroll->SetScrollTop(scroll->GetScrollTop()+(rows > 0 ? 36.f : -36.f)*impl->viewport.DpRatio());
+    }
 }
 void Runtime::MenuAction(MenuInput input, bool down, double seconds) {
+    if(impl->viewport.width<=0 || impl->viewport.height<=0) {impl->interaction.QuarantineInput(input,down);return;}
 	if (down && input != MenuInput::Back && !impl->interaction.CapturedPointerControl().empty()) impl->interaction.Cancel();
 	const auto before = impl->interaction.Focused();
-	impl->pointerNavigation = false; impl->UpdateInteraction(seconds); impl->interaction.Input(input,down); impl->Feedback(seconds);
+	impl->pointerNavigation = false; impl->UpdateInteraction(seconds); impl->interaction.Input(input,down); impl->ApplyScrollCommands(); impl->Feedback(seconds);
 	if (impl->interaction.Focused() != before) impl->RevealFocus();
 }
 void Runtime::CancelInput(double seconds) { impl->pointerPresent = impl->pointerNavigation = false; impl->interaction.Cancel(); impl->Feedback(seconds); }
@@ -1482,7 +1538,11 @@ bool Runtime::CanDispatchControlAction(const ControlAction& action, double secon
 }
 std::string Runtime::FocusedControl() const { return impl->interaction.Focused(); }
 std::optional<ControlState> Runtime::GetControlState(const std::string& id) const { return impl->interaction.State(id); }
-std::optional<WidgetViewState> Runtime::GetWidgetState(const std::string& id) const { return impl->interaction.Widget(id); }
+std::optional<WidgetViewState> Runtime::GetWidgetState(const std::string& id) const {
+    auto value=impl->interaction.Widget(id);
+    if(value && value->scroll && (impl->viewport.width<=0 || impl->viewport.height<=0))value->scroll->available=false;
+    return value;
+}
 bool Runtime::AcknowledgeControlProposal(const std::string& id, std::uint64_t token, bool accepted) {
 	// Host-backed actions can complete between frames. Observe their actual
 	// readback before acknowledging a local editor, including normalization or
@@ -1566,6 +1626,7 @@ bool Runtime::FocusNumberDraft(const NumberDraftBarrier& expected,const std::str
 	impl->Feedback(seconds); return result;
 }
 std::optional<NumberTextGeometry> Runtime::GetNumberGeometry(const std::string& id) const {
+    if(impl->viewport.width<=0 || impl->viewport.height<=0)return std::nullopt;
 	return impl->numberView.Geometry(id,impl->interaction);
 }
 std::optional<NumberEditorContext> Runtime::QueryNumberEditor(std::string& error, double seconds) {

@@ -1,6 +1,7 @@
 // Copyright (C) 2026 DarkMatter Productions. GPL-3.0-or-later.
 #pragma once
 #include "Document.h"
+#include "ScrollGeometry.h"
 #include "TextEdit.h"
 #include "TextEditCommand.h"
 #include "NativeTextEditor.h"
@@ -70,6 +71,19 @@ struct NumberDraftSummary {
 	NumberDraftBarrier barrier;
 	std::vector<NumberDraftStatus> blocking;
 };
+struct ScrollReadback {
+    ScrollGeometry geometry;
+    double dpRatio = 1, lineStep = 36; // Measured local pixels, converted once from authored dp.
+    std::uint64_t geometryToken = 0;
+    bool available = false;
+};
+struct ScrollCommand {
+    std::string control;
+    std::uint64_t modalToken = 0, geometryToken = 0, sourceToken = 0;
+    ScrollStep step = ScrollStep::LineForward;
+    bool drag = false;
+    double pointer = 0, grabFraction = 0;
+};
 struct WidgetViewState {
 	ControlRole role = ControlRole::Button;
 	StateValue accepted;
@@ -80,6 +94,7 @@ struct WidgetViewState {
 	std::string highlight;
 	unsigned firstVisible = 0;
 	std::optional<NumberEditView> number;
+	std::optional<ScrollReadback> scroll;
 };
 struct NumberEditorSnapshot {
 	TextEditState state;
@@ -95,6 +110,7 @@ struct ValueWidgetSnapshot {
 		ControlRole role = ControlRole::Button;
 		unsigned firstVisible = 0;
 		std::optional<NumberEditorSnapshot> number;
+		std::optional<double> scrollOffsetDp;
 	};
 	unsigned version = 2;
 	std::map<std::string,Widget> widgets;
@@ -131,15 +147,26 @@ public:
 	// Complete evaluated value-control map; invalid input leaves all interaction
 	// state unchanged. Values outside slider bounds or choice lists remain data.
 	bool SetReadbacks(const std::map<std::string,ControlReadback>& readbacks, std::string& error);
+    // Complete actual-layout table; no application value or action is involved.
+    // A coordinated layout may defer eligibility until its immediately following
+    // SetBounds call; ordinary readback updates still invalidate input at once.
+    bool SetScrollReadbacks(const std::map<std::string,ScrollReadback>&, std::string& error, bool deferRefresh = false);
+    std::optional<double> PendingScrollOffset(const std::string&) const;
+    bool AcknowledgeScrollRestore(const std::string&, double offsetDp);
+    std::vector<ScrollCommand> TakeScrollCommands();
+    bool CanDispatchScrollCommand(const ScrollCommand&) const;
+    bool ScrollPulse(const std::string&, ScrollStep);
 	bool SetEnabled(const std::string& id, bool enabled);
 	bool Focus(const std::string& id);
 	void Hover(const std::string& id);
 	// Layout supplies a track fraction (increasing toward maximum, including
 	// outside-track values during capture) or a stable popup option ID.
-	void PointerPart(const std::string& id, std::optional<double> trackFraction = {}, const std::string& option = {});
+	void PointerPart(const std::string& id, std::optional<double> trackFraction = {}, const std::string& option = {}, bool scrollThumb = false);
 	std::string CapturedPointerControl() const { return dragging; }
 	void Pointer(bool down);
 	void Input(MenuInput input, bool down);
+    // Record held sources while native layout is unavailable, without dispatch.
+    void QuarantineInput(MenuInput input, bool down);
 	// A wheel pulse is not a physical source release. Preserve held-source
 	// quarantine while issuing one independent navigation step.
 	void NavigationPulse(MenuInput input);
@@ -271,6 +298,8 @@ private:
 	struct Item {
 		Control control; ControlBounds bounds; ControlState state = ControlState::Default; bool known = false;
 		std::optional<ControlReadback> readback;
+		std::optional<ScrollReadback> scroll;
+		std::optional<double> scrollRestore;
 		std::optional<StateValue> pending, rejected;
 		std::uint64_t proposalToken = 0;
 		unsigned firstVisible = 0;
@@ -314,6 +343,8 @@ private:
 	bool OptionEligible(const Item& item, size_t index) const;
 	void KeepHighlightVisible();
 	void SliderKey(MenuInput input);
+	void ScrollKey(MenuInput input);
+	void QueueScroll(const std::string&, ScrollStep, bool drag = false);
 	double SliderValue(const SliderSpec& spec, double fraction) const;
 	void Refresh();
 	void Queue(ControlAction action);
@@ -334,5 +365,9 @@ private:
 	std::string dragging, popup, highlight, pointerOption, armedOption;
 	std::optional<double> pointerFraction, dragPreview;
 	bool popupAcceptArm = false;
+    bool pointerScrollThumb = false;
+    double scrollGrabFraction = 0;
+    std::uint64_t scrollSource = 0;
+    std::vector<ScrollCommand> scrollCommands;
 };
 } // namespace openq4::ui

@@ -32,6 +32,8 @@
 // NULL when the image could not be loaded
 void	R_LoadImage( const char *name, byte **pic, int *width, int *height, ID_TIME_T *timestamp, bool makePowerOf2 );
 
+// Returns exactly outwidth*outheight RGBA pixels, or NULL without touching in.
+// Each axis is bounded to 32768; each input/output byte extent to 256 MiB.
 byte *	R_ResampleTexture( const byte *in, int inwidth, int inheight, int outwidth, int outheight );
 
 // default arguments stay on the renderer-internal declaration in Image.h

@@ -224,6 +224,7 @@ public:
     std::unique_ptr<Interaction::NativeSettlement> PrepareNumberNativeSettlement(const NativeTextEditorBarrier&,std::string&) { std::abort(); }
     bool PublishNumberNativeSettlement(Interaction::NativeSettlement&,NativeTextEditorReceipt&) noexcept { std::abort(); }
     bool RetireNumberNativeExact(NativeTextIdentity,const TextEditorIdentity&) noexcept { std::abort(); }
+    NativeTextPresence QueryNumberNativePresence(NativeTextIdentity,const TextEditorIdentity&) const noexcept { return NativeTextPresence::BusyOrUnknown; }
     bool draftQueryAvailable=true,failDraftDiscard=false;
     std::vector<std::string> draftFocusCalls;
     unsigned draftDiscardCalls=0;
@@ -1041,6 +1042,33 @@ static void CheckEventBridge() {
     auto eventControl=modelTemplate; eventControl.events["selected"]={"selected",{}};
     eventControl.root.control->action.clear(); eventControl.root.control->event="SELECTED";
     assert(ValidateApplication(eventControl,error)); eventControl.events.clear(); assert(!ValidateApplication(eventControl,error));
+    // Exercise the engine adapter's real load boundary for local scroll controls.
+    auto scrollModel=modelTemplate;
+    scrollModel.root.control=Control{};
+    scrollModel.root.control->role=ControlRole::Scrollbar;
+    scrollModel.root.control->widget=ScrollSpec{"viewport","track","thumb"};
+    assert(ValidateApplication(scrollModel,error));
+    auto invalidScroll=scrollModel; invalidScroll.root.control->action="brightness";
+    assert(!ValidateApplication(invalidScroll,error));
+    invalidScroll=scrollModel; invalidScroll.root.control->event="selected";
+    invalidScroll.events["selected"]={"selected",{}};
+    assert(!ValidateApplication(invalidScroll,error));
+    invalidScroll=scrollModel; invalidScroll.root.control->value=Expression{};
+    assert(!ValidateApplication(invalidScroll,error));
+    invalidScroll=scrollModel; invalidScroll.root.control->widget=std::monostate{};
+    assert(!ValidateApplication(invalidScroll,error));
+    auto nestedScroll=modelTemplate; nestedScroll.root.children.push_back(scrollModel.root);
+    assert(ValidateApplication(nestedScroll,error));
+    auto missingAction=modelTemplate; missingAction.root.control->action.clear();
+    assert(!ValidateApplication(missingAction,error));
+    const auto applicationModel=modelTemplate;
+    modelTemplate=scrollModel;
+    {
+        idUserInterfaceRetained gui;
+        assert(gui.InitFromFile("test.q4ui") && gui.IsInteractive());
+        assert(!*gui.PendingApplicationCommand());
+    }
+    modelTemplate=applicationModel;
     assert(views.empty());
 }
 static void CheckEventEligibility() {
@@ -2333,6 +2361,12 @@ def main():
     temp = Path(tempfile.mkdtemp(prefix='retained-adapter-', dir=ROOT / '.tmp'))
     environment = {**os.environ, 'TEMP': str(temp), 'TMP': str(temp), 'TMPDIR': str(temp)}
     mutations = [
+        ('scrollbar-load-rejected',
+         'node->control && node->control->role == ControlRole::Scrollbar', 'false'),
+        ('scrollbar-output-accepted',
+         'if (!control.action.empty() || !control.event.empty() || control.value ||', 'if (false ||'),
+        ('ordinary-action-check-skipped',
+         '} else if (node->control && (node->control->event.empty() ?', '} else if (false && (node->control->event.empty() ?'),
         ('draft-caller-authority', 'if (!NumberDraftState(name)) return true;', 'return true;'),
         ('draft-application-authority', ' || NumberDraftState(name.c_str())) continue;', ') continue;'),
         ('draft-settings-dispatch', 'impl->ConflictsWithNumberDraft(pending,drafts)', 'false'),

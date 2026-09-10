@@ -130,17 +130,17 @@ def test_one_policy_drives_every_loader_path():
     )
 
     assert_true(
-        "bool R_LoadPrecompressedDDS(const char* name, idBinaryImage& image, ID_TIME_T* timestamp, textureUsage_t usage, const imageDownsizePolicy_t& downsizePolicy, bool useMipmaps);" in image_h,
+        "bool R_LoadPrecompressedDDS(const char* name, idBinaryImage& image, ID_TIME_T* timestamp, textureUsage_t usage, const imageDownsizePolicy_t& downsizePolicy, bool useMipmaps, imageReductionResult_t* reduction = NULL);" in image_h,
         "the DDS loader must take the full policy, not just a size ceiling",
     )
     assert_true(
-        "const int firstLevel = R_ImageDownsizePolicyMipSkip( downsizePolicy, selectedWidth, selectedHeight, (int)info.numLevels );" in image_files,
+        "if (!R_ResolveImageReduction(downsizePolicy, info.width, info.height, info.numLevels, selected)) break;" in image_files,
         "the DDS loader should select a mip level instead of decompressing and resampling",
     )
 
     assert_true("const imageDownsizePolicy_t& consumedDownsize = consumedLoad.Policy();" in image_load,
                 "all loader branches must use the one captured per-load value")
-    assert_true(image_load.count("if ( consumed ) policy = *consumed;") == 3,
+    assert_true(image_load.count("if ( consumed ) policy = *consumed;") == 2 and "if (consumed) policy = *consumed;" in image_load,
                 "cache-key and raw/cube helpers must prefer the immutable supplied value")
     for call in (
         "precompressedDownsizePolicy = consumedDownsize;",
@@ -195,7 +195,7 @@ def test_generated_cache_key_tracks_the_active_reduction():
     # here and in Image_load.cpp together whenever the pixels a given policy
     # produces change, or players keep serving stale sizes out of their cache.
     assert_true(
-        "unsigned int signature = ( static_cast<unsigned int>( policy.maxDimension ) << 8 ) ^ static_cast<unsigned int>( usage ) ^ 0x6F713401u;" in image_load,
+        "unsigned int signature = ( static_cast<unsigned int>( policy.maxDimension ) << 8 ) ^ static_cast<unsigned int>( usage ) ^ 0x6F713402u;" in image_load,
         "the reduction revision byte must match the current shrink filter",
     )
     for snippet in (
@@ -214,7 +214,7 @@ def test_exact_halvings_reuse_the_mip_chain_filter():
         "the shrink path should detect an exact power-of-two reduction",
     )
     assert_true(
-        "byte *next = gammaMips ? R_MipMapWithGamma( source, level, levelHeight ) : R_MipMap( source, level, levelHeight );" in image_load,
+        "byte *next = gammaMips ? R_MipMapWithGamma(source, level, levelHeight) : R_MipMap(source, level, levelHeight);" in image_load,
         "an exact reduction should use the same filter that builds the mip chain, so image_picmip N matches mip level N",
     )
     assert_true(
@@ -226,8 +226,8 @@ def test_exact_halvings_reuse_the_mip_chain_filter():
         "gamma mips are used for font, light, and explicitly color-managed PBR buckets",
     )
     assert_true(
-        image_load.count("return R_ResampleTexture( pic, width, height, scaledWidth, scaledHeight );") >= 3,
-        "non power-of-two and failed reductions must fall back to the general resampler with the original source size",
+        image_load.count("return R_ResampleTexture( pic, width, height, scaledWidth, scaledHeight );") == 1 and "if (!next) return NULL;" in image_load,
+        "only non power-of-two reductions resample; failed exact mip chains preserve original input",
     )
 
 

@@ -114,9 +114,18 @@ imageConsumedLoad_t::~imageConsumedLoad_t() {
     renderDisplayPresentation_t device{}; R_GetDisplayPresentation(&device);
     if (candidate.device != device.generation || candidate.deviceFailures != device.failureSequence ||
         candidate.storage != image.storageGeneration) { image.consumedPolicy = candidate; return; }
-    // Cube partial resampling and direct DDS authored-mip reachability need a
-    // separate exact-result observer. Retain the classification but refuse capture.
-    if (candidate.source == ICS_DIRECT_DDS || candidate.source == ICS_DECODED_CUBE) {
+    // Actual DDS/decoded dimensions must match the once-resolved request.
+    // Generated cache headers have no original source extents: their existing
+    // completion proves admitted cache bytes/output only, not reconstruction.
+    if (candidate.source == ICS_GENERATED) candidate.reduction = {};
+    const imageReductionResult_t& reduction = candidate.reduction;
+    const bool decoded = candidate.source == ICS_DECODED_2D || candidate.source == ICS_DECODED_CUBE;
+    const bool direct = candidate.source == ICS_DIRECT_DDS;
+    if ((decoded || direct) && (!R_ImageReductionIsExact(candidate.resolved, reduction) ||
+        reduction.selectedWidth != opts.width || reduction.selectedHeight != opts.height ||
+        (decoded && reduction.authoredLevels != 0) ||
+        (direct && (candidate.layers != 1 || reduction.authoredLevels <= 0 || opts.numLevels > reduction.authoredLevels - reduction.firstLevel)) ||
+        (candidate.source == ICS_DECODED_CUBE && (candidate.layers != 6 || reduction.sourceWidth != reduction.sourceHeight)))) {
         candidate.completion = ICC_UNSUPPORTED;
     } else {
 #ifndef OPENQ4_RENDERER_VK_MODULE

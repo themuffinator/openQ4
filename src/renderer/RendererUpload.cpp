@@ -5,6 +5,9 @@
 #include "RendererUpload.h"
 #include "RendererMetrics.h"
 #include "GLStateCache.h"
+#include "RendererResourceSettings.h"
+#include <atomic>
+#include <limits>
 
 static const int RENDERER_UPLOAD_MIN_FRAME_BUFFERS = 3;
 static const int RENDERER_UPLOAD_MIN_MEGS = 1;
@@ -20,6 +23,33 @@ static const int RENDERER_UPLOAD_POOL_MAX_BUFFER_BYTES = 4 << 20;
 static const int RENDERER_UPLOAD_POOL_MAX_TOTAL_BYTES = 32 << 20;
 
 static idUploadManager rg_uploadManager;
+static std::atomic<uint64_t> rg_uploadStorageGeneration{1};
+
+static uint64_t R_RendererUpload_NextStorageGeneration() {
+	uint64_t value = rg_uploadStorageGeneration.load();
+	while (value != (std::numeric_limits<uint64_t>::max)()) {
+		if (rg_uploadStorageGeneration.compare_exchange_weak(value, value + 1)) return value;
+	}
+	return 0;
+}
+
+// Drain a bounded number of native errors. They are failures for this storage
+// operation, including pre-existing errors; none may turn into a ready receipt.
+static bool R_RendererUpload_StorageErrorsClear() {
+	bool clean = true;
+	for (int i = 0; i < 32; ++i) {
+		if (glGetError() == GL_NO_ERROR) return clean;
+		clean = false;
+	}
+	return false;
+}
+
+static bool R_RendererUpload_BoundStorageMatches(int expectedBytes) {
+	if (glGetBufferParameterivARB == NULL || expectedBytes <= 0) return false;
+	GLint actualBytes = 0;
+	glGetBufferParameterivARB(GL_ARRAY_BUFFER, GL_BUFFER_SIZE, &actualBytes);
+	return R_RendererUpload_StorageErrorsClear() && actualBytes == expectedBytes;
+}
 
 static void R_RendererUpload_DeleteBufferName( unsigned int &vbo ) {
 	if ( vbo == 0 ) {
@@ -341,6 +371,9 @@ idUploadManager::idUploadManager() {
 
 void idUploadManager::Init( const renderBackendCaps_t &caps ) {
 	Shutdown();
+	storage.generation = R_RendererUpload_NextStorageGeneration();
+	storage.requestedMegs = r_rendererUploadMegs.GetInteger();
+	storage.requestedBuffers = r_rendererUploadFrameBuffers.GetInteger();
 
 	const bool driverQuirkPersistentDisabled =
 		( RendererDriverQuirks_LastReport().flags & RENDERER_DRIVER_QUIRK_DISABLE_PERSISTENT_UPLOADS ) != 0;
@@ -353,9 +386,9 @@ void idUploadManager::Init( const renderBackendCaps_t &caps ) {
 	// contract the CPU can overwrite bytes that the GPU is still consuming.
 	const bool usePersistent = lowOverheadPersistentDefault && syncAvailable && caps.hasBufferStorage && caps.hasMapBufferRange && glBufferStorage != NULL && glMapBufferRange != NULL;
 	const bool useMapRange = caps.hasMapBufferRange && glMapBufferRange != NULL;
-	const int ringMegs = idMath::ClampInt( RENDERER_UPLOAD_MIN_MEGS, RENDERER_UPLOAD_MAX_MEGS, r_rendererUploadMegs.GetInteger() );
+	const int ringMegs = idMath::ClampInt( RENDERER_UPLOAD_MIN_MEGS, RENDERER_UPLOAD_MAX_MEGS, storage.requestedMegs );
 	const int ringBytes = ringMegs * 1024 * 1024;
-	frameBufferCount = idMath::ClampInt( RENDERER_UPLOAD_MIN_FRAME_BUFFERS, RENDERER_UPLOAD_MAX_FRAME_BUFFERS, r_rendererUploadFrameBuffers.GetInteger() );
+	frameBufferCount = idMath::ClampInt( RENDERER_UPLOAD_MIN_FRAME_BUFFERS, RENDERER_UPLOAD_MAX_FRAME_BUFFERS, storage.requestedBuffers );
 	uploadPath_t requestedPath = UPLOAD_PATH_DISABLED;
 
 	if ( caps.hasVBO ) {
@@ -399,16 +432,34 @@ void idUploadManager::Init( const renderBackendCaps_t &caps ) {
 			"Renderer upload manager: persistent mapped uploads disabled by driver quirk; using the orphaned map-range stream without persistent-path fences for capture interoperability\n" );
 	}
 
-	if ( requestedPath != UPLOAD_PATH_DISABLED ) {
-		if ( !CreateFrameBuffers( requestedPath ) && requestedPath == UPLOAD_PATH_PERSISTENT ) {
+	bool created = requestedPath != UPLOAD_PATH_DISABLED && storage.generation && CreateFrameBuffers(requestedPath);
+	if (!created && requestedPath == UPLOAD_PATH_PERSISTENT && storage.generation) {
 			common->Warning( "Renderer upload manager: persistent mapped stream failed, falling back to map-range streaming" );
 			ShutdownFrameBuffers();
 			requestedPath = useMapRange ? UPLOAD_PATH_MAP_RANGE : UPLOAD_PATH_SUBDATA;
-			stats.persistentMapped = false;
-			stats.mapRangeFallback = requestedPath == UPLOAD_PATH_MAP_RANGE;
-			CreateFrameBuffers( requestedPath );
-		}
+			storage.persistentFallback = true;
+			created = CreateFrameBuffers(requestedPath);
 	}
+	if (!created) {
+		ShutdownFrameBuffers();
+		path = UPLOAD_PATH_DISABLED;
+		frameBufferCount = 0;
+		ring.Shutdown();
+		stats.ringSizeBytes = stats.ringBufferCount = 0;
+		if (requestedPath != UPLOAD_PATH_DISABLED)
+			common->Warning("Renderer upload manager: frame storage allocation failed; using legacy uploads");
+	}
+	stats.persistentMapped = path == UPLOAD_PATH_PERSISTENT;
+	stats.mapRangeFallback = path == UPLOAD_PATH_MAP_RANGE;
+	hasSync = path == UPLOAD_PATH_PERSISTENT && syncAvailable;
+	stats.fenceSyncAvailable = hasSync;
+	// Allocator bookkeeping must follow the actual fallback, too.
+	allocator.Init(created ? activeRingBytes : 0, stats.persistentMapped);
+	ring.Init(created ? activeRingBytes : 0, stats.persistentMapped);
+	storage.bytesPerBuffer = created ? activeRingBytes : 0;
+	storage.bufferCount = frameBufferCount;
+	storage.path = static_cast<unsigned int>(path);
+	storageReady = created;
 
 	initialized = true;
 	stats.dynamicFrameBridge = path != UPLOAD_PATH_DISABLED;
@@ -428,11 +479,12 @@ void idUploadManager::Init( const renderBackendCaps_t &caps ) {
 		PathName(),
 		stats.staticBufferAllocator ? "yes" : "no",
 		frameBufferCount,
-		activeRingBytes / 1024,
+		stats.ringSizeBytes / 1024,
 		hasSync ? "yes" : "no" );
 }
 
 void idUploadManager::Shutdown( void ) {
+	storageReady = false;
 	ShutdownFrameBuffers();
 	allocator.Shutdown();
 	ring.Shutdown();
@@ -442,6 +494,7 @@ void idUploadManager::Shutdown( void ) {
 	frameBufferCount = 0;
 	initialized = false;
 	hasSync = false;
+	storage = {};
 }
 
 void idUploadManager::BeginFrame( int frameCount ) {
@@ -479,14 +532,29 @@ void idUploadManager::BeginFrame( int frameCount ) {
 	frameBuffer_t &frame = frameBuffers[currentFrameBuffer];
 
 	if ( path != UPLOAD_PATH_PERSISTENT ) {
+		storageReady = false;
 		// The modern executor may have rebound GL_ARRAY_BUFFER through its state
 		// cache since the legacy vertex-cache shadow was last updated. Force the
 		// real buffer bind before orphaning this frame slot so the orphan cannot
 		// accidentally apply to the most recently submitted geometry VBO.
 		idVertexCache::InvalidateBufferBindings();
 		idVertexCache::BindArrayBuffer( frame.vbo );
-		glBufferDataARB( GL_ARRAY_BUFFER_ARB, (GLsizeiptrARB)stats.ringSizeBytes, NULL, GL_STREAM_DRAW_ARB );
+		const bool clean = R_RendererUpload_StorageErrorsClear();
+		if (clean) {
+			glBufferDataARB( GL_ARRAY_BUFFER_ARB, (GLsizeiptrARB)stats.ringSizeBytes, NULL, GL_STREAM_DRAW_ARB );
+			storageReady = R_RendererUpload_BoundStorageMatches(stats.ringSizeBytes);
+		}
 		R_GLStateCache_InvalidateBufferBinding( GL_ARRAY_BUFFER, "renderer upload frame orphan" );
+		if (!storageReady) {
+			// Preserve already allocated static geometry; only the failed dynamic
+			// stream retires and ordinary callers fall back to legacy uploads.
+			ShutdownFrameBuffers();
+			path = UPLOAD_PATH_DISABLED;
+			frameBufferCount = 0;
+			ring.Shutdown();
+			stats.ringSizeBytes = stats.ringBufferCount = 0;
+			stats.dynamicFrameBridge = stats.persistentMapped = stats.mapRangeFallback = false;
+		}
 	}
 }
 
@@ -635,6 +703,7 @@ int idUploadManager::FrameCapacity( void ) const {
 }
 
 bool idUploadManager::CreateFrameBuffers( uploadPath_t requestedPath ) {
+	storageReady = false;
 	path = requestedPath;
 	if ( path == UPLOAD_PATH_DISABLED ) {
 		return false;
@@ -642,29 +711,35 @@ bool idUploadManager::CreateFrameBuffers( uploadPath_t requestedPath ) {
 
 	const GLbitfield persistentFlags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_DYNAMIC_STORAGE_BIT;
 	const GLbitfield mapFlags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
+	if (!R_RendererUpload_StorageErrorsClear()) return false;
 
 	for ( int i = 0; i < frameBufferCount; ++i ) {
 		glGenBuffersARB( 1, &frameBuffers[i].vbo );
+		if (!R_RendererUpload_StorageErrorsClear() || frameBuffers[i].vbo == 0) return false;
 		idVertexCache::InvalidateBufferBindings();
 		idVertexCache::BindArrayBuffer( frameBuffers[i].vbo );
+		if (!R_RendererUpload_StorageErrorsClear()) return false;
 
 		if ( path == UPLOAD_PATH_PERSISTENT ) {
 			glBufferStorage( GL_ARRAY_BUFFER, (GLsizeiptr)stats.ringSizeBytes, NULL, persistentFlags );
+			if (!R_RendererUpload_BoundStorageMatches(stats.ringSizeBytes)) return false;
 			frameBuffers[i].mapped = static_cast<byte *>( glMapBufferRange( GL_ARRAY_BUFFER, 0, stats.ringSizeBytes, mapFlags ) );
-			if ( frameBuffers[i].mapped == NULL ) {
+			if ( !R_RendererUpload_StorageErrorsClear() || frameBuffers[i].mapped == NULL ) {
 				return false;
 			}
 		} else {
 			glBufferDataARB( GL_ARRAY_BUFFER_ARB, (GLsizeiptrARB)stats.ringSizeBytes, NULL, GL_STREAM_DRAW_ARB );
+			if (!R_RendererUpload_BoundStorageMatches(stats.ringSizeBytes)) return false;
 		}
 	}
 
 	idVertexCache::BindArrayBuffer( 0 );
 	R_GLStateCache_InvalidateBufferBinding( GL_ARRAY_BUFFER, "renderer upload init" );
-	return true;
+	return R_RendererUpload_StorageErrorsClear();
 }
 
 void idUploadManager::ShutdownFrameBuffers( void ) {
+	storageReady = false;
 	// the shadow may be stale at teardown (the modern executor binds the real
 	// GL_ARRAY_BUFFER behind it), so force the unmap binds below to be real
 	idVertexCache::InvalidateBufferBindings();
@@ -685,6 +760,23 @@ void idUploadManager::ShutdownFrameBuffers( void ) {
 	idVertexCache::InvalidateBufferBindings();
 	idVertexCache::BindArrayBuffer( 0 );
 	R_GLStateCache_InvalidateBufferBinding( GL_ARRAY_BUFFER, "renderer upload shutdown" );
+}
+
+bool idUploadManager::QueryStorage(rendererUploadStorage_t& output) const {
+	if (!R_ImagePolicyRendererThread() || !initialized || !storageReady || !storage.generation ||
+		path == UPLOAD_PATH_DISABLED || storage.path != static_cast<unsigned int>(path) ||
+		storage.bufferCount != frameBufferCount || storage.bytesPerBuffer != ring.Capacity() ||
+		storage.bytesPerBuffer <= 0 || frameBufferCount < RENDERER_UPLOAD_MIN_FRAME_BUFFERS ||
+		frameBufferCount > RENDERER_UPLOAD_MAX_FRAME_BUFFERS) return false;
+	for (int i = 0; i < frameBufferCount; ++i) {
+		if (!frameBuffers[i].vbo || (path == UPLOAD_PATH_PERSISTENT && !frameBuffers[i].mapped)) return false;
+	}
+	output = storage;
+	return true;
+}
+
+bool R_RendererUpload_QueryStorage(rendererUploadStorage_t& output) {
+	return rg_uploadManager.QueryStorage(output);
 }
 
 static bool R_RendererUpload_FenceSignaled( GLenum result ) {

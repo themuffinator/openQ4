@@ -28,6 +28,10 @@ If you have questions concerning this license or the applicable additional terms
 #include <cstddef>
 #include "../sys/KeyEventMetadata.h"
 #include "../sys/EventQueueContinuity.h"
+#include "../sys/EventRetirement.h"
+
+// Process lifetime, including idEventLoop recreation; never reset by clear/shutdown.
+static std::uint64_t pushedRetirementHighwater = 0;
 
 idCVar idEventLoop::com_journal( "com_journal", "0", CVAR_INIT|CVAR_SYSTEM, "1 = record journal, 2 = play back journal", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
 
@@ -190,6 +194,7 @@ idEventLoop::idEventLoop( void ) {
 	com_pushedEventsHead = com_pushedEventsTail = 0;
 	memset( com_pushedEvents, 0, sizeof( com_pushedEvents ) );
 	for ( auto& tag : com_pushedDisposition ) tag = {};
+    for ( auto& serial : com_pushedRetirementSerials ) serial = 0;
 }
 
 /*
@@ -274,6 +279,7 @@ void idEventLoop::PushEvent( sysEvent_t *event ) {
 
 	*ev = *event;
 	com_pushedDisposition[ev - com_pushedEvents] = {};
+    com_pushedRetirementSerials[ev - com_pushedEvents] = 0;
 	com_pushedEventsHead++;
 }
 
@@ -286,9 +292,11 @@ bool idEventLoop::PushEventWithDisposition( sysEvent_t& event, sysEventDispositi
 		Sys_InvalidateEventQueue();
 		return false; // Preserve all queued ownership and both caller inputs.
 	}
+	if (pushedRetirementHighwater == (std::numeric_limits<std::uint64_t>::max)()) return false;
 	const int slot = com_pushedEventsHead & ( MAX_PUSHED_EVENTS - 1 );
 	com_pushedEvents[slot] = event;
 	com_pushedDisposition[slot] = tag;
+    com_pushedRetirementSerials[slot] = ++pushedRetirementHighwater;
 	++com_pushedEventsHead;
 	event = {}; tag = {};
 	return true;
@@ -302,6 +310,7 @@ sysEventTransfer_t idEventLoop::TakeEventWithDisposition( sysEvent_t& event, sys
 		if ( !ownedTag.Empty() && !Sys_EventDispositionTagCurrent( ownedTag ) ) return sysEventTransfer_t::Refused;
 		const auto ownedEvent = com_pushedEvents[slot];
 		com_pushedEvents[slot] = {}; com_pushedDisposition[slot] = {};
+        com_pushedRetirementSerials[slot] = 0;
 		++com_pushedEventsTail;
 		event = ownedEvent; tag = ownedTag;
 		return sysEventTransfer_t::Ready;
@@ -309,11 +318,41 @@ sysEventTransfer_t idEventLoop::TakeEventWithDisposition( sysEvent_t& event, sys
 	return Sys_TakeEventWithDisposition( event, tag );
 }
 
+
+sysEventTransfer_t idEventLoop::PeekEventForRetirement(openq4::NativeInputHead& out) noexcept {
+    if (!Sys_EventDispositionBoundThread()) return sysEventTransfer_t::Refused;
+    if (com_pushedEventsHead > com_pushedEventsTail) {
+        const unsigned slot = static_cast<unsigned>(com_pushedEventsTail & (MAX_PUSHED_EVENTS-1));
+        if (!com_pushedRetirementSerials[slot] || !com_pushedDisposition[slot].ShapeValid()) return sysEventTransfer_t::Refused;
+        out = Sys_EventRetirementHead(openq4::NativeInputLane::Pushed, com_pushedRetirementSerials[slot], slot,
+            com_pushedEvents[slot], com_pushedDisposition[slot]);
+        return sysEventTransfer_t::Ready;
+    }
+    return Sys_PeekEventForRetirement(out);
+}
+sysEventTransfer_t idEventLoop::TakeEventForRetirement(openq4::NativeInputRoute& route,
+    const openq4::NativeInputRoute::CancellationPermit& permit, sysEvent_t& event, sysEventDispositionTag_t& tag) noexcept {
+    if (!Sys_EventDispositionBoundThread()) return sysEventTransfer_t::Refused;
+    // The present pushed head always takes precedence, including a refused or
+    // untagged head. Never fall through to a previously peeked platform record.
+    if (com_pushedEventsHead <= com_pushedEventsTail) return Sys_TakeEventForRetirement(route, permit, event, tag);
+    openq4::NativeInputHead head;
+    const auto status = PeekEventForRetirement(head);
+    if (status != sysEventTransfer_t::Ready) return status;
+    if (!route.AllowsCancellation(permit, head)) return sysEventTransfer_t::Refused;
+    const auto ownedEvent = com_pushedEvents[head.slot]; const auto ownedTag = com_pushedDisposition[head.slot];
+    com_pushedEvents[head.slot] = {}; com_pushedDisposition[head.slot] = {}; com_pushedRetirementSerials[head.slot] = 0;
+    ++com_pushedEventsTail;
+    event = ownedEvent; tag = ownedTag;
+    return sysEventTransfer_t::Ready;
+}
+
 void idEventLoop::ClearPushedEvents( void ) {
 	while ( com_pushedEventsHead > com_pushedEventsTail ) {
 		const int slot = com_pushedEventsTail & ( MAX_PUSHED_EVENTS - 1 );
 		idScopedEventPayload payload( com_pushedEvents[slot], true );
 		com_pushedDisposition[slot] = {};
+        com_pushedRetirementSerials[slot] = 0;
 		++com_pushedEventsTail;
 	}
 	com_pushedEventsHead = com_pushedEventsTail = 0;

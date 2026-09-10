@@ -1,6 +1,8 @@
 // Copyright (C) 2026 DarkMatter Productions. GPL-3.0-or-later.
 #include "src/ui/retained/Runtime.h"
 #include <json/json.h>
+#include <RmlUi/Core.h>
+#include <RmlUi/Core/ElementDocument.h>
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -347,8 +349,49 @@ static void PositionedOverflowBoundaries(TestHost& host) {
 		Check(runtime.GetBounds("marker",after)&&Near(after.y,before.y),"fixed child does not manufacture ancestor scroll range");
 	}
 }
+
+static Json::Value* BoxFrameNode(Json::Value& node,const char* id) {
+    if(node["id"].asString()==id)return &node;
+    if(!node.isMember("children"))return nullptr;
+    for(auto& child:node["children"])if(auto* found=BoxFrameNode(child,id))return found;
+    return nullptr;
+}
+static void PaddedValueParts(TestHost& host) {
+    for(float ratio:{1.f,1.25f,2.f})for(bool borderBox:{true,false}) {
+        auto source=Parse(Source());
+        for(const auto* id:{"slider-fill","vertical-fill","popup","viewport"}) {
+            auto* node=BoxFrameNode(source["root"],id);Check(node!=nullptr,"framed value part exists");auto& p=(*node)["properties"];
+            p["box-sizing"]=Typed("keyword",borderBox?"border-box":"content-box");
+            p["border-width"]=Typed("length",1,"dp");
+            p["padding-left"]=Typed("length",2,"dp");p["padding-right"]=Typed("length",3,"dp");
+            p["padding-top"]=Typed("length",4,"dp");p["padding-bottom"]=Typed("length",5,"dp");
+        }
+        View view(host,Text(source));view.viewport.width=1280;view.viewport.height=800;view.viewport.displayScale=ratio;view.runtime.SetReducedMotion(true,view.time);view.Frame();
+        Check(Near(view.BoxOf("slider-fill").width,105*ratio),"padded horizontal fill border extent matches exact accepted fraction");
+        Check(Near(view.BoxOf("vertical-fill").height,100*ratio),"padded vertical fill border extent matches exact accepted fraction");
+        view.State({{"level",1.5},{"verticalLevel",1.5}});view.Frame();
+        Check(Near(view.BoxOf("slider-fill").width,150*ratio)&&Near(view.BoxOf("vertical-fill").height,150*ratio),"framed fills follow authoritative changes in both box models");
+        Check(view.runtime.FocusControl("choice",view.time),"focus padded choice");view.Key(MenuInput::Accept);view.Frame();
+        auto popup=view.BoxOf("popup"),anchor=view.BoxOf("choice");
+        Check(Near(popup.width,anchor.width),"padded popup actual border width matches its anchor");
+        auto* document=Rml::GetContext(0)->GetDocument(0);auto* clip=document->GetElementById("viewport");
+        auto* first=document->GetElementById("option-0");auto* second=document->GetElementById("option-1");
+        Check(clip&&first&&second,"padded choice keeps actual authored row parts");
+        const float firstTop=first->GetAbsoluteOffset(Rml::BoxArea::Border).y;
+        const float lastBottom=second->GetAbsoluteOffset(Rml::BoxArea::Border).y+second->GetBox().GetSize(Rml::BoxArea::Border).y;
+        const float clipTop=clip->GetAbsoluteOffset(Rml::BoxArea::Padding).y;
+        Check(Near(clip->GetClientHeight(),lastBottom-firstTop)&&firstTop>=clipTop-.05&&lastBottom<=clipTop+clip->GetClientHeight()+.05,
+            "padded popup clipping area contains exactly the requested complete rows");
+        Check(popup.x>=0&&popup.y>=0&&popup.x+popup.width<=view.viewport.width+.05&&popup.y+popup.height<=view.viewport.height+.05,"padded popup stays within actual host viewport");
+        const auto before=popup;view.Frame();popup=view.BoxOf("popup");
+        Check(Near(before.x,popup.x)&&Near(before.y,popup.y)&&Near(before.width,popup.width)&&Near(before.height,popup.height)&&view.runtime.Statistics().geometryCompiles==0,"framed popup settles without repeated geometry work");
+        Check(view.runtime.TakeActions().empty(),"padding changes never create accepted value proposals");
+        view.Key(MenuInput::Back);view.Frame();Check(!view.Widget("choice").popupOpen,"framed popup closes through existing ownership");
+    }
+}
+
 int main() {
-	TestHost host;ReadbackAndToggle(host);ProjectedDragAndHandoff(host);PopupAndPersistence(host);ScrollBodyAndFocusReveal(host);PositionedOverflowBoundaries(host);
+	TestHost host;PaddedValueParts(host);ReadbackAndToggle(host);ProjectedDragAndHandoff(host);PopupAndPersistence(host);ScrollBodyAndFocusReveal(host);PositionedOverflowBoundaries(host);
 	Check(host.errors==0,"real Runtime/RmlUi reports no errors");
 	std::printf("Value Runtime: %u checks passed\n",checks);
 }

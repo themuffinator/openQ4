@@ -53,6 +53,9 @@ void R_GetDisplayPresentation(renderDisplayPresentation_t* out);
 bool R_ImagePolicyRendererThread();
 uint64_t R_ImagePolicyNewResourceIdentity() noexcept;
 void GL_CheckErrors();void glFinish();
+void R_ApplyImageDownsizePolicy(const imageDownsizePolicy_t&,int&,int&);
+bool R_ResolveImageReduction(const imageDownsizePolicy_t&,int,int,int,imageReductionResult_t&);
+bool R_ImageReductionIsExact(const imageDownsizePolicy_t&,const imageReductionResult_t&);
 void R_ResolveImageDownsizePolicy(const imageDownsizeInputs_t&,const char*,int,bool,imageDownsizePolicy_t&);
 textureUsage_t R_ResolveMaterialHighQualityUsage(const materialQualityInputs_t&,textureUsage_t,bool);
 unsigned int R_ResolveMaterialNoMipFlags(const materialQualityInputs_t&,unsigned int);
@@ -99,6 +102,7 @@ uint64_t R_ImagePolicyNewResourceIdentity()noexcept{return nextIdentity++;}
 imageDownsizeInputs_t R_ReadImageDownsizeInputs(){return liveInputs;}
 void GL_CheckErrors(){if(failNative)R_ConsumedPolicyObserveError();}
 void glFinish(){++nativeFinishes;if(nativeCallback)nativeCallback();}
+static void Prove(imageConsumedLoad_t& scope,idImage& image){imageReductionResult_t r;TEST(R_ResolveImageReduction(scope.Policy(),image.opts.width,image.opts.height,0,r));scope.Reduction(r);}
 static void Upload(idImage& image,bool omit=false,bool refuse=false){
  ++image.storageGeneration;
  imageConsumedLoad_t::Operation(&image,false,!refuse,0,0,0,0,0);
@@ -106,7 +110,7 @@ static void Upload(idImage& image,bool omit=false,bool refuse=false){
   imageConsumedLoad_t::Operation(&image,true,true,i,0,Max(1,image.opts.width>>i),Max(1,image.opts.height>>i),1);
 }
 static void Load(idImage& image,bool omit=false,bool refuse=false,imageConsumedSource_t source=ICS_DECODED_2D){
- imageConsumedLoad_t scope(image);Upload(image,omit,refuse);scope.Loaded(source);
+ imageConsumedLoad_t scope(image);Upload(image,omit,refuse);Prove(scope,image);scope.Loaded(source);
 }
 static void Unavailable(idImage& image){imageConsumedPolicy_t out;out.revision=998;TEST(!image.GetConsumedPolicy(out));TEST(out.revision==998);}
 int main(){try{
@@ -141,7 +145,7 @@ int main(){try{
  a.InvalidateConsumedPolicy();Unavailable(a);Load(a);TEST(a.consumedPolicy.revision!=first.revision);Unavailable(a);
  TEST(R_CompleteConsumedImageUploads());TEST(a.GetConsumedPolicy(out));
  imageConsumedLoad_t::BeforeOperation(&a);Unavailable(a); // Invalidate before a native callback can query.
- for(int mode=0;mode<7;++mode){idImage i;{imageConsumedLoad_t load(i);Upload(i,mode==1,mode==2);
+ for(int mode=0;mode<7;++mode){idImage i;{imageConsumedLoad_t load(i);Upload(i,mode==1,mode==2);Prove(load,i);
   if(mode==3)imageConsumedLoad_t::Error();if(mode==4)++i.storageGeneration;if(mode==5)++nativeDevice.generation;
   if(mode!=0)load.Loaded(mode==6?ICS_DIRECT_DDS:ICS_DECODED_2D);
  }TEST(R_CompleteConsumedImageUploads());Unavailable(i);}
@@ -151,11 +155,24 @@ int main(){try{
  {idImage i;Load(i);nativeCallback=[](){throw std::runtime_error("native completion");};TEST(!R_CompleteConsumedImageUploads());nativeCallback={};TEST(R_CompleteConsumedImageUploads());Unavailable(i);}
  {idImage i;Load(i);TEST(R_CompleteConsumedImageUploads());TEST(i.GetConsumedPolicy(out));
   std::thread other([&](){imageConsumedLoad_t load(i);});other.join();Unavailable(i);}
- {idImage i;imageConsumedLoad_t load(i);TEST(!R_CompleteConsumedImageUploads());Upload(i);load.Loaded(ICS_DECODED_2D);}
- {idImage outer,inner;{imageConsumedLoad_t l(outer);Upload(outer);Load(inner);l.Loaded(ICS_DECODED_2D);}TEST(R_CompleteConsumedImageUploads());TEST(outer.GetConsumedPolicy(out));TEST(inner.GetConsumedPolicy(out));}
+ {idImage i;imageConsumedLoad_t load(i);TEST(!R_CompleteConsumedImageUploads());Upload(i);Prove(load,i);load.Loaded(ICS_DECODED_2D);}
+ {idImage outer,inner;{imageConsumedLoad_t l(outer);Upload(outer);Load(inner);Prove(l,outer);l.Loaded(ICS_DECODED_2D);}TEST(R_CompleteConsumedImageUploads());TEST(outer.GetConsumedPolicy(out));TEST(inner.GetConsumedPolicy(out));}
  {idImage i;{imageConsumedLoad_t l(i);Upload(i);Load(i);l.Loaded(ICS_DECODED_2D);}TEST(R_CompleteConsumedImageUploads());Unavailable(i);}
  {idImage i;try{imageConsumedLoad_t l(i);Upload(i);l.Loaded(ICS_DECODED_2D);throw std::runtime_error("load");}catch(...){}TEST(R_CompleteConsumedImageUploads());Unavailable(i);}
  {idImage old,late;Load(old);nativeCallback=[&](){Load(late);};TEST(R_CompleteConsumedImageUploads());nativeCallback={};TEST(old.GetConsumedPolicy(out));Unavailable(late);TEST(R_CompleteConsumedImageUploads());TEST(late.GetConsumedPolicy(out));}
+
+ // Exact source evidence and actual full-layer upload coverage are independent.
+ for(auto source:{ICS_DIRECT_DDS,ICS_DECODED_CUBE})for(int mode=0;mode<7;++mode){
+  liveInputs={0,0,0,0,0,0,2,1,1};idImage i;i.opts.width=4;i.opts.height=4;i.opts.numLevels=3;i.opts.textureType=source==ICS_DIRECT_DDS?TT_2D:TT_CUBIC;
+  {imageConsumedLoad_t scope(i);imageReductionResult_t r;TEST(R_ResolveImageReduction(scope.Policy(),16,16,source==ICS_DIRECT_DDS?5:0,r));
+   if(mode==2)r.status=IR_INSUFFICIENT_MIPS;if(mode==3)++r.requestedWidth;if(mode==4)i.opts.width=8;
+   if(mode==5)r.authoredLevels=4;if(mode==6)i.opts.textureType=source==ICS_DIRECT_DDS?TT_CUBIC:TT_2D;
+   if(mode!=1)scope.Reduction(r);++i.storageGeneration;imageConsumedLoad_t::Operation(&i,false,true,0,0,0,0,0);
+   for(int face=0;face<(i.opts.textureType==TT_CUBIC?6:1);++face)for(int mip=0;mip<i.opts.numLevels;++mip)imageConsumedLoad_t::Operation(&i,true,true,mip,face,Max(1,i.opts.width>>mip),Max(1,i.opts.height>>mip),1);
+   scope.Loaded(source);
+  }TEST(R_CompleteConsumedImageUploads());if(mode==0){TEST(i.GetConsumedPolicy(out));TEST(out.reduction.status==IR_EXACT&&out.reduction.sourceWidth==16&&out.reduction.requestedWidth==4);}else Unavailable(i);
+ }
+ {idImage i;{imageConsumedLoad_t scope(i);imageReductionResult_t forged;forged.status=IR_EXACT;forged.sourceWidth=998;scope.Reduction(forged);Upload(i);scope.Loaded(ICS_GENERATED);}TEST(R_CompleteConsumedImageUploads());TEST(i.GetConsumedPolicy(out));TEST(out.reduction.status==IR_UNOBSERVED&&out.reduction.sourceWidth==0);}
  idMaterial material;materialConsumedPolicy_t materialOut;materialOut.revision=99;TEST(!material.GetConsumedPolicy(materialOut)&&materialOut.revision==99);
  image_ignoreHighQuality.value=false;com_makingBuild.value=true;
  parserContinuation=[](idMaterial&,materialQualityInputs_t in){TEST(!in.ignoreHighQuality&&in.makingBuild);image_ignoreHighQuality.value=true;com_makingBuild.value=false;};
@@ -198,7 +215,7 @@ static void Load(idImage& image,bool missingBatch=false){imageConsumedLoad_t sco
   VK_Device_FlushUploadBatch();VK_Device_WaitUploadBatch();
   vkCtx.uploadBatchSerial=R_ImagePolicyNewResourceIdentity();vkCtx.uploadBatchOpen=true;
   imageConsumedLoad_t::Operation(&image,true,true,i,0,Max(1,image.opts.width>>i),Max(1,image.opts.height>>i),missingBatch&&i==1?0:vkCtx.uploadBatchSerial);
- }scope.Loaded(ICS_DECODED_2D);
+ }imageReductionResult_t reduction;TEST(R_ResolveImageReduction(scope.Policy(),image.opts.width,image.opts.height,0,reduction));scope.Reduction(reduction);scope.Loaded(ICS_DECODED_2D);
 }
 static void Unavailable(idImage& image){imageConsumedPolicy_t out;out.revision=998;TEST(!image.GetConsumedPolicy(out));TEST(out.revision==998);}
 int main(){try{
@@ -231,6 +248,7 @@ def main():
     root = args.repository.resolve()
     names = ['src/renderer/'+name for name in ['RendererConsumedPolicy.h', 'RendererConsumedPolicy.cpp', 'ImageManager.cpp', 'Image_load.cpp', 'Material.cpp', 'Material.h', 'Image.h', 'RendererResourceSettings.cpp', 'RendererResourceSettings.h', 'OpenGL/gl_Image.cpp', 'Vulkan/vk_Image.cpp', 'Vulkan/VulkanDevice.cpp', 'Vulkan/VulkanDevice.h', 'RenderSystem_init.cpp']]
     names.append('tools/tests/renderer_consumed_policy.py')
+    names.append("src/imagetools/Image_process.cpp")
     def hashes():
         return {name: hashlib.sha256((root/name).read_bytes()).hexdigest() for name in names}
     before = hashes()
@@ -251,8 +269,11 @@ def main():
     assert 'R_GetImageDownsizePolicy(' not in actual_load
     assert actual_load.count('flags, &consumedDownsize );') == 2
     assert 'consumedLoad.Loaded(consumedSource);' in actual_load
-    assert 'width != expectedWidth || height != expectedHeight' in actual_load
+    assert 'exactDecodedReduction = width == expectedWidth && height == expectedHeight;' in actual_load
+    assert 'consumedLoad.Reduction(consumedReduction);' in actual_load
     extracted = '\n'.join(method(manager, sig) for sig in ['static bool R_ImagePathStartsWith(', 'static bool R_IsImageProgramNameChar(', 'static bool R_ImagePicmipFilterAllows(', 'void R_ResolveImageDownsizePolicy('])
+    process = (root/'src/imagetools/Image_process.cpp').read_text()
+    extracted += '\n'+'\n'.join(method(process, sig) for sig in ['void R_ApplyImageDownsizePolicy(', 'int R_ImageDownsizePolicyMipSkip(', 'bool R_ResolveImageReduction(', 'bool R_ImageReductionIsExact('])
     extracted += '\n'+'\n'.join(method(material, sig) for sig in ['textureUsage_t R_ResolveMaterialHighQualityUsage(', 'unsigned int R_ResolveMaterialNoMipFlags('])
     parse = method(material, 'bool idMaterial::Parse( const char *text, const int textLength )')
     prefix = parse[:parse.index('\tidLexer')]
@@ -288,6 +309,8 @@ def main():
             ('bulk-no-finish', 'glFinish();', '(void)0;'),
             ('late-work-complete', 'completedGL = through;', 'completedGL = issuedGL;'),
             ('active-parse', ' || consumedParseDepth ||', ' || false ||'),
+            ('unproved-reduction', 'if ((decoded || direct) &&', 'if (false &&'),
+            ('generated-source-proof', 'if (candidate.source == ICS_GENERATED) candidate.reduction = {};', '(void)0;'),
         ]
         if args.vulkan:
             edits = [

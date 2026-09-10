@@ -121,6 +121,10 @@ void R_ApplyImageDownsizePolicy( const imageDownsizePolicy_t &policy, int &width
 // Number of whole mip levels between the source size and the policy result, for
 // loaders that select a level out of an existing mip chain instead of resampling.
 int R_ImageDownsizePolicyMipSkip( const imageDownsizePolicy_t &policy, int width, int height, int availableLevels );
+// authoredLevels == 0 selects decoded resampling; positive levels select only
+// stored DDS mips. False leaves output unchanged.
+bool R_ResolveImageReduction(const imageDownsizePolicy_t& policy, int width, int height, int authoredLevels, imageReductionResult_t& output);
+bool R_ImageReductionIsExact(const imageDownsizePolicy_t& policy, const imageReductionResult_t& result);
 
 // User-selectable sampling for TF_DEFAULT images. The names intentionally
 // mirror Quake 4's image_filter values, while this backend-neutral state keeps
@@ -534,7 +538,7 @@ bool R_ResolvePreferredDDSImageSource(const char* name, idStr& ddsName, ID_TIME_
 // enables per-candidate DDS probe memoization for the duration of a level
 // load; disabling also clears all memoized probe results
 void R_SetDDSProbeCacheActive(bool active);
-bool R_LoadPrecompressedDDS(const char* name, idBinaryImage& image, ID_TIME_T* timestamp, textureUsage_t usage, const imageDownsizePolicy_t& downsizePolicy, bool useMipmaps);
+bool R_LoadPrecompressedDDS(const char* name, idBinaryImage& image, ID_TIME_T* timestamp, textureUsage_t usage, const imageDownsizePolicy_t& downsizePolicy, bool useMipmaps, imageReductionResult_t* reduction = NULL);
 bool R_ImageDDS_RunSelfTest();
 // pic is in top to bottom raster format
 bool R_LoadCubeImages(const char* cname, cubeFiles_t extensions, byte* pic[6], int* size, ID_TIME_T* timestamp);

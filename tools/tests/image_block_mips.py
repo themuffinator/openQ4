@@ -23,10 +23,12 @@ def main():
     source = (ROOT / "src/imagetools/BinaryImage.cpp").read_text(encoding="utf-8")
     padding = function(source, "static void R_PadRGBAImageTo4x4Blocks(")
     cube_padding = function(source, "static void PadImageTo4x4(")
-    cube = function(source, "void idBinaryImage::LoadCubeFromMemory(")
+    cube = function(source, "bool idBinaryImage::LoadCubeFromMemory(")
     harness = r'''
 #include <algorithm>
 #include <cassert>
+#include <cstdint>
+static const int MAX_BINARY_IMAGE_DIMENSION=32768,MAX_BINARY_IMAGE_LEVELS=32,MAX_BINARY_IMAGE_DATA_SIZE=1<<30;
 #include <cstdlib>
 #include <cstring>
 #include <vector>
@@ -37,6 +39,7 @@ template<class T> T Max(T a, T b) { return std::max(a, b); }
 enum textureFormat_t { FMT_DXT1, FMT_DXT5, FMT_RGBA8, FMT_OTHER };
 enum { TT_CUBIC, CFM_DEFAULT };
 static int mipAllocations = 0, gammaCalls = 0;
+void* Mem_Alloc(size_t n) { ++mipAllocations; return std::malloc(n); }
 void Mem_Free(void *p) { --mipAllocations; std::free(p); }
 byte *R_MipMap(const byte *src, int width, int height) {
     int size = Max(1, width / 2) * Max(1, height / 2) * 4;
@@ -70,7 +73,7 @@ struct idBinaryImage {
     struct Header { int textureType, colorFormat, width, height, numLevels; textureFormat_t format; } fileData{};
     List<idBinaryImageData> images;
     void Clear() { images.clear(); fileData = {}; }
-    void LoadCubeFromMemory(int, const byte *[6], int, textureFormat_t &, bool);
+    bool LoadCubeFromMemory(int, const byte *[6], int, textureFormat_t &, bool);
 };
 ''' + padding + cube_padding + cube + r'''
 int main() {
@@ -104,7 +107,7 @@ int main() {
             }
             int previousGamma = gammaCalls;
             auto format = inputFormat;
-            image.LoadCubeFromMemory(width, pics, levels, format, gamma);
+            assert(image.LoadCubeFromMemory(width, pics, levels, format, gamma));
             assert(mipAllocations == 0);
             assert(gammaCalls - previousGamma == (gamma ? 6 * (levels - 1) : 0));
             assert(image.fileData.width == width && image.fileData.height == width);

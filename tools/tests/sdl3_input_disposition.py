@@ -25,6 +25,8 @@ FILES=['src/sys/sdl3/sdl3_backend.cpp','src/sys/sdl3/InputDisposition.h',
        'src/sys/sys_public.h','src/framework/KeyInput.h',
        'tools/tests/native/InputDispositionStorageTest.cpp','tools/tests/sdl3_input_disposition.py',
        'tools/tests/filesystem_case_segments.py']
+FILES += ['src/sys/EventRetirement.h', 'src/framework/NativeInputRoute.h', 'src/framework/NativeInputRoute.cpp', 'src/ui/retained/TextInputBroker.h', 'src/ui/retained/TextInput.h', 'src/ui/retained/NativeTextDocument.h']
+
 def sha(path): return hashlib.sha256(path.read_bytes()).hexdigest()
 def replace(text,old,new,count=1):
     if text.count(old)!=count: raise RuntimeError(f'Nonunique mutation {old!r}: {text.count(old)} != {count}')
@@ -153,17 +155,17 @@ def main():
                 selected=replace(source,old,new,count) if part=='source' else source
                 selectedService=replace(service,old,new,count) if part=='service' else service
                 unit=variant/'unit.cpp';unit.write_text(projection(selected),encoding='utf-8',newline='\n')
-                for relative in ('src/sys/EventDisposition.h','src/sys/EventQueueContinuity.h','src/sys/sdl3/InputDisposition.h'):
+                for relative in ['src/sys/EventDisposition.h','src/sys/EventQueueContinuity.h','src/sys/sdl3/InputDisposition.h'] + ['src/sys/EventRetirement.h', 'src/framework/NativeInputRoute.h', 'src/framework/NativeInputRoute.cpp', 'src/ui/retained/TextInputBroker.h', 'src/ui/retained/TextInput.h', 'src/ui/retained/NativeTextDocument.h']:
                     path=variant/relative;path.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(ROOT/relative,path)
                 servicepath=variant/'src/sys/EventDisposition.cpp';servicepath.write_text(selectedService,encoding='utf-8',newline='\n')
                 output=variant/('test.exe' if os.name=='nt' else 'test')
-                sources=[str(unit),str(servicepath),str(ROOT/'src/sys/EventQueueContinuity.cpp')]
+                sources=[str(unit),str(servicepath),str(ROOT/'src/sys/EventQueueContinuity.cpp'),str(ROOT/'src/framework/NativeInputRoute.cpp')]
                 if msvc:
-                    command=[compiler,'/nologo','/std:c++17','/EHsc','/W4','/WX','/wd4505','/MTd' if args.msvc_debug else '/MT','/Od' if args.msvc_debug else '/O2']
+                    command=[compiler,'/nologo','/std:c++20','/EHsc','/W4','/WX','/wd4505','/MTd' if args.msvc_debug else '/MT','/Od' if args.msvc_debug else '/O2']
                     if host=='posix':command+=['/DOPENQ4_SDL3_POSIX_HOST=1']
                     command+=['/I'+str(variant),'/I'+str(ROOT),*sources,'/Fo'+str(variant)+os.sep,'/Fe'+str(output)]
                 else:
-                    command=[compiler,'-std=c++17','-O1' if args.sanitizers else '-O2','-Wall','-Wextra','-Werror','-Wno-unused-function','-Wno-unused-const-variable']
+                    command=[compiler,'-std=c++20','-O1' if args.sanitizers else '-O2','-Wall','-Wextra','-Werror','-Wno-unused-function','-Wno-unused-const-variable']
                     if host=='posix':command+=['-DOPENQ4_SDL3_POSIX_HOST=1']
                     if args.sanitizers:command+=['-fsanitize=address,undefined','-fno-omit-frame-pointer','-g']
                     if os.name!='nt':command+=['-pthread']

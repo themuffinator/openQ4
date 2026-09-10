@@ -797,14 +797,28 @@ private:
 			else if (role == "slider") Fields(control,p,{"role","action","label","enabled","states","navigation","value","minimum","maximum","step","decimals","orientation","parts","extensions"});
 			else if (role == "choice") Fields(control,p,{"role","action","label","enabled","states","navigation","value","parts","visibleRows","options","extensions"});
 			else if (role == "number") Fields(control,p,{"role","action","label","enabled","states","navigation","value","minimum","maximum","exponent","maxBytes","parts","extensions"});
-			else Require(false,control["role"],p+"/role","Supported roles are button, toggle, slider, choice and number");
+			else if (role == "scrollbar") Fields(control,p,{"role","label","enabled","states","navigation","viewport","orientation","lineStep","minimumThumb","parts","extensions"});
+            else Require(false,control["role"],p+"/role","Supported roles are button, toggle, slider, choice, number and scrollbar");
 			result.control.emplace(); auto& parsed = *result.control;
-			Require(control.isMember("action") != control.isMember("event"),control,p,"Controls require exactly one action or event");
+			Require(role == "scrollbar" || control.isMember("action") != control.isMember("event"),control,p,"Controls require exactly one action or event");
 			if (control.isMember("action")) parsed.action = Id(control["action"],p+"/action");
-			else parsed.event = EventName(control["event"],p+"/event");
+			else if (role != "scrollbar") parsed.event = EventName(control["event"],p+"/event");
 			parsed.label = ControlLabel(control["label"],p+"/label");
-			if (role != "button") {
-				parsed.value = ReadExpression(control["value"],p+"/value");
+			if (role == "scrollbar") {
+                parsed.role = ControlRole::Scrollbar;ScrollSpec spec;
+                spec.viewport = Id(control["viewport"],p+"/viewport");
+                Fields(control["parts"],p+"/parts",{"track","thumb","extensions"});
+                spec.track = Id(control["parts"]["track"],p+"/parts/track");
+                spec.thumb = Id(control["parts"]["thumb"],p+"/parts/thumb");
+                if (control.isMember("orientation")) {
+                    Require(control["orientation"] == "horizontal" || control["orientation"] == "vertical",control["orientation"],p+"/orientation","Expected horizontal or vertical orientation");
+                    spec.vertical = control["orientation"] == "vertical";
+                }
+                if (control.isMember("lineStep")) spec.lineStep = Numeric(control["lineStep"],p+"/lineStep",1,4096);
+                if (control.isMember("minimumThumb")) spec.minimumThumb = Numeric(control["minimumThumb"],p+"/minimumThumb",1,4096);
+                parsed.widget = std::move(spec);
+            } else if (role != "button") {
+                parsed.value = ReadExpression(control["value"],p+"/value");
 				const auto& parts = control["parts"]; const auto at = p+"/parts";
 				if (role == "toggle") {
 					parsed.role = ControlRole::Toggle;
@@ -1013,7 +1027,50 @@ private:
 				part(toggle->mixedPart,owner.id,nullptr,path+"/parts/mixed"); reserve(toggle->mixedPart,"display");
 				separate(toggle->checkedPart,toggle->mixedPart);
 			}
-		} else if (const auto* slider = std::get_if<SliderSpec>(&control.widget)) {
+		} else if (const auto* scroll = std::get_if<ScrollSpec>(&control.widget)) {
+            const auto parentOf = [&](const std::string& id) {
+                const Node* found=nullptr;std::vector<const Node*> pending{&model.root};
+                while(!pending.empty()) {const auto* next=pending.back();pending.pop_back();
+                    for(const auto& child:next->children) {if(child.id==id) found=next;pending.push_back(&child);}}
+                return found;
+            };
+            const auto* viewport=model.FindNode(scroll->viewport);
+            Require(viewport && viewport->type=="group" && !viewport->control && !viewport->modal &&
+                viewport!=&owner && parentOf(viewport->id)==parentOf(owner.id),value,path+"/viewport",
+                "Scrollbar viewport must be a sibling group in the same modal scope");
+            const auto overflow=viewport->properties.find("overflow");
+            Require(overflow!=viewport->properties.end() && overflow->second.type==ValueType::Keyword &&
+                (overflow->second.text=="auto" || overflow->second.text=="scroll"),value,path+"/viewport",
+                "Scrollbar viewport requires authored auto or scroll overflow");
+            std::vector<const Node*> pending{&model.root};
+            while(!pending.empty()) {const auto* next=pending.back();pending.pop_back();
+                if(next!=&owner && next->control) if(const auto* other=std::get_if<ScrollSpec>(&next->control->widget))
+                    Require(other->viewport!=scroll->viewport || other->vertical!=scroll->vertical,value,path,
+                        "A viewport axis has exactly one authored scrollbar owner");
+                for(const auto& child:next->children) pending.push_back(&child);
+            }
+            part(scroll->track,owner.id,"group",path+"/parts/track");
+            part(scroll->thumb,scroll->track,nullptr,path+"/parts/thumb");
+            Require(parentOf(scroll->track)==&owner && parentOf(scroll->thumb)==model.FindNode(scroll->track),value,path,
+                "Scrollbar track and thumb must be direct authored children of their containing part");
+            const auto* track=model.FindNode(scroll->track);const auto position=track->properties.find("position");
+            Require(position!=track->properties.end() && position->second.type==ValueType::Keyword &&
+                (position->second.text=="relative" || position->second.text=="absolute"),value,path,
+                "Scrollbar track must establish a positioned containing block");
+            owned.emplace(scroll->track,"position");keyword(scroll->thumb,"position","absolute");owned.emplace(scroll->thumb,"position");
+            const auto* thumb=model.FindNode(scroll->thumb);
+            Require(!thumb->properties.contains("transform"),value,path,"Scrollbar thumb cannot have an independent transform");
+            owned.emplace(scroll->thumb,"transform");
+            const auto* axis=scroll->vertical?"height":"width";const auto* offset=scroll->vertical?"top":"left";
+            const auto* opposite=scroll->vertical?"bottom":"right";
+            reserve(scroll->thumb,axis);reserve(scroll->thumb,offset);
+            if(thumb->properties.contains(opposite)) keyword(scroll->thumb,opposite,"auto");
+            owned.emplace(scroll->thumb,opposite);
+            for(const std::string prefix:{"min-","max-"}) {
+                Require(!thumb->properties.contains(prefix+axis),value,path,"Scrollbar thumb axis constraints are derived from actual scroll extent");
+                owned.emplace(scroll->thumb,prefix+axis);
+            }
+        } else if (const auto* slider = std::get_if<SliderSpec>(&control.widget)) {
 			part(slider->track,owner.id,"group",path+"/parts/track");
 			part(slider->fill,slider->track,nullptr,path+"/parts/fill");
 			part(slider->thumb,slider->track,nullptr,path+"/parts/thumb");
@@ -1128,7 +1185,9 @@ private:
 			Require(!ancestorControl,value,p,"Semantic controls cannot be nested inside another control");
 			Require(node.control->event.empty() || model.events.contains(node.control->event),value["event"],p+"/event","Unknown control event");
 			const auto action = model.actions.find(node.control->action);
-			if (node.control->role == ControlRole::Button) {
+			if (node.control->role == ControlRole::Scrollbar) {
+                ValidateWidgetParts(value,node,p);
+            } else if (node.control->role == ControlRole::Button) {
 				Require(action == model.actions.end() || !action->second.inputType,value["action"],p+"/action","A button cannot invoke an input-bearing action without an operand");
 			} else {
 				Require(action != model.actions.end() && action->second.inputType && *action->second.inputType == node.control->value->type,

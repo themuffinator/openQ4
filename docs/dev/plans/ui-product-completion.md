@@ -142,6 +142,8 @@ The coordinator passes MSVC debug checks with 18 rejected mutations, Clang with 
 
 Native activation, the production Session route/probe, ordinary native character association, candidate geometry, complete composition/shaping, full page/editor/platform qualification, all 271 migrations and seven final gates remain open. Counted SDK callbacks, semantic controls and bounded focus geometry do not establish installed IME behavior, physical-input qualification or real interrupted-device/power-loss recovery. No requirement status or product acceptance changes.
 
+The current [scrollbar integration](../ui/scrollbars.md), beginning at engine `5e0d3ebf20234415815a72c914fe788953e4367b`, adds actual authored SYSTEM scroll geometry and dp persistence. The same scoped increment checks original native-store transfer, exact image reductions and actual GL upload allocation. The full build and 61 UI suites pass, with reviewed windowed GL/SP and Vulkan/MP gameplay/restart/SYSTEM captures. `WID-010` is partial; the register retains 227 requirements, 271 unaccepted migrations and seven open final gates. Native activation, mixed settings recovery, complete controls/screens, editor and full platform/artwork acceptance remain required. The revision-bound findings below remain historical audit evidence.
+
 ### Findings that block product completion
 
 The [native text owner/store checkpoint](../ui/text-input-routing.md), based on

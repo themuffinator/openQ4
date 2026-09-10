@@ -1277,7 +1277,7 @@ bool R_ResolvePreferredDDSImageSource( const char *cname, idStr &ddsName, ID_TIM
 R_LoadPrecompressedDDS
 =============
 */
-bool R_LoadPrecompressedDDS( const char *cname, idBinaryImage &image, ID_TIME_T *timestamp, textureUsage_t usage, const imageDownsizePolicy_t &downsizePolicy, bool useMipmaps ) {
+bool R_LoadPrecompressedDDS( const char *cname, idBinaryImage &image, ID_TIME_T *timestamp, textureUsage_t usage, const imageDownsizePolicy_t &downsizePolicy, bool useMipmaps, imageReductionResult_t* reduction ) {
 	if ( cname == NULL || cname[0] == '\0' ) {
 		return false;
 	}
@@ -1296,6 +1296,7 @@ bool R_LoadPrecompressedDDS( const char *cname, idBinaryImage &image, ID_TIME_T 
 	// eventual Mem_Free in idBinaryImage::Clear must pair with this binary's
 	// allocator (the renderer modules carry their own idlib heap).
 	idFile *ddsFile = fileSystem->OpenFileRead( name.c_str() );
+    struct CloseFile { idFile*& file; ~CloseFile() { if (file) fileSystem->CloseFile(file); } } closeFile{ddsFile};
 	if ( ddsFile == NULL ) {
 		if ( timestamp != NULL ) {
 			*timestamp = FILE_NOT_FOUND_TIMESTAMP;
@@ -1307,14 +1308,11 @@ bool R_LoadPrecompressedDDS( const char *cname, idBinaryImage &image, ID_TIME_T 
 	}
 	const int fileSize = ddsFile->Length();
 	byte *buffer = fileSize >= DDS_HEADER_BYTES ? (byte *)Mem_Alloc( fileSize ) : NULL;
+    struct ReleaseBuffer { byte*& bytes; ~ReleaseBuffer() { if (bytes) Mem_Free(bytes); } } releaseBuffer{buffer};
 	const bool readOk = buffer != NULL && ddsFile->Read( buffer, fileSize ) == fileSize;
 	fileSystem->CloseFile( ddsFile );
-	if ( !readOk ) {
-		if ( buffer != NULL ) {
-			Mem_Free( buffer );
-		}
-		return false;
-	}
+    ddsFile = NULL;
+	if ( !readOk ) return false;
 
 	bool loaded = false;
 	do {
@@ -1347,13 +1345,11 @@ bool R_LoadPrecompressedDDS( const char *cname, idBinaryImage &image, ID_TIME_T 
 		// full chain; a replacement exported without one simply runs out of levels
 		// and stays larger, which the caller reports under
 		// image_showPrecompressedTextures.
-		int selectedWidth = (int)info.width;
-		int selectedHeight = (int)info.height;
-		const int firstLevel = R_ImageDownsizePolicyMipSkip( downsizePolicy, selectedWidth, selectedHeight, (int)info.numLevels );
-		for ( int i = 0; i < firstLevel; i++ ) {
-			selectedWidth = Max( 1, selectedWidth >> 1 );
-			selectedHeight = Max( 1, selectedHeight >> 1 );
-		}
+        imageReductionResult_t selected{};
+        if (!R_ResolveImageReduction(downsizePolicy, info.width, info.height, info.numLevels, selected)) break;
+        const int selectedWidth = selected.selectedWidth;
+        const int selectedHeight = selected.selectedHeight;
+        const int firstLevel = selected.firstLevel;
 
 		const int selectedLevels = useMipmaps ? info.numLevels - firstLevel : 1;
 		textureFormat_t textureFormat = FMT_NONE;
@@ -1388,12 +1384,10 @@ bool R_LoadPrecompressedDDS( const char *cname, idBinaryImage &image, ID_TIME_T 
 		image.Load2DFromOwnedCompressedData( selectedWidth, selectedHeight, selectedLevels, textureFormat, colorFormat,
 			buffer, levelOffsets.Ptr() + firstLevel, levelSizes.Ptr() + firstLevel );
 		buffer = NULL;	// the binary image now owns the file buffer
+        if (reduction) *reduction = selected;
 		loaded = true;
 	} while ( false );
 
-	if ( buffer != NULL ) {
-		Mem_Free( buffer );
-	}
 	return loaded;
 }
 
@@ -1812,7 +1806,7 @@ bool R_LoadCubeImages( const char *imgName, cubeFiles_t extensions, byte *pics[6
 		} else {
 			R_LoadImageProgram( fullName, &pics[i], &width, &height, &thisTime );
 		}
-		if ( thisTime == FILE_NOT_FOUND_TIMESTAMP ) {
+		if ( thisTime == FILE_NOT_FOUND_TIMESTAMP || (pics && !pics[i]) ) {
 			break;
 		}
 		if ( i == 0 ) {

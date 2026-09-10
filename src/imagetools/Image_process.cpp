@@ -106,6 +106,38 @@ int R_ImageDownsizePolicyMipSkip( const imageDownsizePolicy_t &policy, int width
 	return skip;
 }
 
+bool R_ResolveImageReduction(const imageDownsizePolicy_t& policy, int width, int height, int authoredLevels, imageReductionResult_t& output) {
+    if (width <= 0 || height <= 0 || authoredLevels < 0 || authoredLevels > 32) return false;
+    int maxLevels = 1;
+    for (int size = Max(width, height); size > 1; size >>= 1) ++maxLevels;
+    if (authoredLevels > maxLevels) return false;
+    imageReductionResult_t result{};
+    result.sourceWidth = width; result.sourceHeight = height;
+    result.requestedWidth = width; result.requestedHeight = height;
+    R_ApplyImageDownsizePolicy(policy, result.requestedWidth, result.requestedHeight);
+    result.authoredLevels = authoredLevels;
+    if (authoredLevels) {
+        result.firstLevel = R_ImageDownsizePolicyMipSkip(policy, width, height, authoredLevels);
+        for (int i = 0; i < result.firstLevel; ++i) {
+            width = Max(1, width >> 1); height = Max(1, height >> 1);
+        }
+    } else {
+        width = result.requestedWidth; height = result.requestedHeight;
+    }
+    result.selectedWidth = width; result.selectedHeight = height;
+    result.status = width == result.requestedWidth && height == result.requestedHeight ? IR_EXACT : IR_INSUFFICIENT_MIPS;
+    output = result;
+    return true;
+}
+
+bool R_ImageReductionIsExact(const imageDownsizePolicy_t& policy, const imageReductionResult_t& value) {
+    imageReductionResult_t expected{};
+    return value.status == IR_EXACT && R_ResolveImageReduction(policy, value.sourceWidth, value.sourceHeight, value.authoredLevels, expected) &&
+        expected.status == IR_EXACT && value.firstLevel == expected.firstLevel &&
+        value.requestedWidth == expected.requestedWidth && value.requestedHeight == expected.requestedHeight &&
+        value.selectedWidth == expected.selectedWidth && value.selectedHeight == expected.selectedHeight;
+}
+
 /*
 ================
 R_ResampleTexture
@@ -119,56 +151,38 @@ If a larger shrinking is needed, use the mipmap function
 after resampling to the next lower power of two.
 ================
 */
-#define	MAX_DIMENSION	4096
-byte *R_ResampleTexture( const byte *in, int inwidth, int inheight,  
-							int outwidth, int outheight ) {
-	int		i, j;
-	const byte	*inrow, *inrow2;
-	unsigned int	frac, fracstep;
-	unsigned int	p1[MAX_DIMENSION], p2[MAX_DIMENSION];
-	const byte		*pix1, *pix2, *pix3, *pix4;
-	byte		*out, *out_p;
-
-	if ( outwidth > MAX_DIMENSION ) {
-		outwidth = MAX_DIMENSION;
-	}
-	if ( outheight > MAX_DIMENSION ) {
-		outheight = MAX_DIMENSION;
-	}
-
-	out = (byte *)R_StaticAlloc( outwidth * outheight * 4 );
-	out_p = out;
-
-	fracstep = inwidth*0x10000/outwidth;
-
-	frac = fracstep>>2;
-	for ( i=0 ; i<outwidth ; i++ ) {
-		p1[i] = 4*(frac>>16);
-		frac += fracstep;
-	}
-	frac = 3*(fracstep>>2);
-	for ( i=0 ; i<outwidth ; i++ ) {
-		p2[i] = 4*(frac>>16);
-		frac += fracstep;
-	}
-
-	for (i=0 ; i<outheight ; i++, out_p += outwidth*4 ) {
-		inrow = in + 4 * inwidth * (int)( ( i + 0.25f ) * inheight / outheight );
-		inrow2 = in + 4 * inwidth * (int)( ( i + 0.75f ) * inheight / outheight );
-		frac = fracstep >> 1;
-		for (j=0 ; j<outwidth ; j++) {
-			pix1 = inrow + p1[j];
-			pix2 = inrow + p2[j];
-			pix3 = inrow2 + p1[j];
-			pix4 = inrow2 + p2[j];
-			out_p[j*4+0] = (pix1[0] + pix2[0] + pix3[0] + pix4[0])>>2;
-			out_p[j*4+1] = (pix1[1] + pix2[1] + pix3[1] + pix4[1])>>2;
-			out_p[j*4+2] = (pix1[2] + pix2[2] + pix3[2] + pix4[2])>>2;
-			out_p[j*4+3] = (pix1[3] + pix2[3] + pix3[3] + pix4[3])>>2;
-		}
-	}
-
-	return out;
+byte *R_ResampleTexture( const byte *in, int inwidth, int inheight, int outwidth, int outheight ) {
+    // Checked limits belong to this CPU filter, not to the renderer/device.
+    // The old 4096-entry index table silently truncated the allocation while
+    // callers published the requested size. Refuse unsupported work explicitly.
+    const uint64_t maxBytes = uint64_t(256) * 1024 * 1024;
+    if (!in || inwidth < 1 || inheight < 1 || outwidth < 1 || outheight < 1 ||
+        inwidth > 32768 || inheight > 32768 || outwidth > 32768 || outheight > 32768 ||
+        uint64_t(inwidth) * uint64_t(inheight) * 4 > maxBytes ||
+        uint64_t(outwidth) * uint64_t(outheight) * 4 > maxBytes) return NULL;
+    const size_t outputBytes = size_t(outwidth) * size_t(outheight) * 4;
+    byte *out = (byte *)R_StaticAlloc(outputBytes);
+    if (!out) return NULL;
+    // Preserve the existing quarter/three-quarter horizontal fixed-point taps,
+    // using wide arithmetic even when an input axis reaches 32768. Computing
+    // offsets directly removes the fixed table limit without more allocations.
+    const uint64_t fracstep = (uint64_t(inwidth) << 16) / uint64_t(outwidth);
+    for (int i = 0; i < outheight; ++i) {
+        const size_t row1 = size_t((uint64_t(i) * 4 + 1) * uint64_t(inheight) / (uint64_t(outheight) * 4));
+        const size_t row2 = size_t((uint64_t(i) * 4 + 3) * uint64_t(inheight) / (uint64_t(outheight) * 4));
+        const byte *inrow = in + size_t(inwidth) * 4 * row1;
+        const byte *inrow2 = in + size_t(inwidth) * 4 * row2;
+        byte *outrow = out + size_t(i) * size_t(outwidth) * 4;
+        for (int j = 0; j < outwidth; ++j) {
+            const size_t p1 = size_t(((fracstep >> 2) + uint64_t(j) * fracstep) >> 16) * 4;
+            const size_t p2 = size_t((3 * (fracstep >> 2) + uint64_t(j) * fracstep) >> 16) * 4;
+            for (int channel = 0; channel < 4; ++channel) {
+                outrow[size_t(j) * 4 + channel] = (inrow[p1 + channel] + inrow[p2 + channel] +
+                    inrow2[p1 + channel] + inrow2[p2 + channel]) >> 2;
+            }
+        }
+    }
+    return out;
 }
 
 /*
@@ -313,6 +327,7 @@ byte *R_MipMapWithAlphaSpecularity( const byte *in, int width, int height ) {
 		newHeight = 1;
 	}
 	out = (byte *)R_StaticAlloc( newWidth * newHeight * 4 );
+    if (!out) return NULL;
 	out_p = out;
 
 	in_p = in;
@@ -402,6 +417,7 @@ byte * R_MipMapWithGamma( const byte *in, int width, int height ) {
 		newHeight = 1;
 	}
 	out = (byte *)R_StaticAlloc( newWidth * newHeight * 4 );
+    if (!out) return NULL;
 	out_p = out;
 
 	in_p = in;
@@ -478,6 +494,7 @@ byte * R_MipMap( const byte *in, int width, int height ) {
 		newHeight = 1;
 	}
 	out = (byte *)R_StaticAlloc( newWidth * newHeight * 4 );
+    if (!out) return NULL;
 	out_p = out;
 
 	in_p = in;

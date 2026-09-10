@@ -29,6 +29,11 @@ If you have questions concerning this license or the applicable additional terms
 #ifndef __EVENTLOOP_H__
 #define __EVENTLOOP_H__
 #include "../sys/EventDisposition.h"
+namespace openq4 {
+class NativeInputRoute;
+class NativeInputCancellationPermit;
+struct NativeInputHead;
+}
 
 /*
 ===============================================================================
@@ -59,6 +64,10 @@ public:
 	// Ready transfers payload+sidecar; refusal/empty preserves both outputs.
 	sysEventTransfer_t TakeEventWithDisposition( sysEvent_t&, sysEventDispositionTag_t& ) noexcept;
 	bool PushEventWithDisposition( sysEvent_t&, sysEventDispositionTag_t& ) noexcept;
+    // Aggregate retirement view/take preserves pushed-before-platform FIFO.
+    sysEventTransfer_t PeekEventForRetirement(openq4::NativeInputHead&) noexcept;
+    sysEventTransfer_t TakeEventForRetirement(openq4::NativeInputRoute&,
+        const openq4::NativeInputCancellationPermit&, sysEvent_t&, sysEventDispositionTag_t&) noexcept;
 
 					// Dispatches all pending events and returns the current time.
 	int				RunEventLoop( bool commandExecution = true );
@@ -83,6 +92,7 @@ private:
 	int				com_pushedEventsHead, com_pushedEventsTail;
 	sysEvent_t		com_pushedEvents[MAX_PUSHED_EVENTS];
 	sysEventDispositionTag_t com_pushedDisposition[MAX_PUSHED_EVENTS];
+    std::uint64_t com_pushedRetirementSerials[MAX_PUSHED_EVENTS];
 
 	static idCVar	com_journal;
 

@@ -1304,6 +1304,8 @@ const modernGLShaderProgramInfo_t *R_ModernGLShaderLibrary_FindProgram( modernGL
 }
 
 // --- upload ring stats (Vulkan staging ring replaces it in Phase D) ---
+bool R_RendererUpload_QueryStorage(rendererUploadStorage_t&) { return false; }
+
 const rendererUploadStats_t &R_RendererUpload_Stats( void ) {
 	static rendererUploadStats_t stats;
 	memset( &stats, 0, sizeof( stats ) );

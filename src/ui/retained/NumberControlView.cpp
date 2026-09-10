@@ -210,7 +210,10 @@ struct NumberControlView::Impl {
 	bool Rectangle(const Entry& entry,Rml::Element* element,float x,float y,float width,float height) {
 		auto* viewport=Element(entry.spec.viewport);
 		const auto paddingOrigin=viewport->GetAbsoluteOffset(Rml::BoxArea::Padding);
-		const auto& box=element->GetBox(); const auto frame=box.GetFrameSize(Rml::BoxArea::Border);
+		const auto& box=element->GetBox();
+		// The requested rectangle is a border box; content-box CSS excludes
+		// both border and padding, including on replicated native range parts.
+		const auto frame=box.GetFrameSize(Rml::BoxArea::Border)+box.GetFrameSize(Rml::BoxArea::Padding);
 		// Absolute children use the viewport's padding box as their containing
 		// block. CSS left/top locate the margin edge, not the painted border edge.
 		const float left=x-paddingOrigin.x+viewport->GetScrollLeft()-box.GetEdge(Rml::BoxArea::Margin,Rml::BoxEdge::Left);

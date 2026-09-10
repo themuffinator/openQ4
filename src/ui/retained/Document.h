@@ -96,7 +96,7 @@ struct Binding {
 bool ValidProperty(const std::string& name, const Value& value);
 bool ValidStateValue(const StateValue& value);
 enum class ControlState { Default, Hover, Focus, Pressed, Disabled };
-enum class ControlRole { Button, Toggle, Slider, Choice, Number };
+enum class ControlRole { Button, Toggle, Slider, Choice, Number, Scrollbar };
 struct ToggleSpec {
 	std::optional<Expression> mixed;
 	std::string checkedPart, mixedPart;
@@ -127,6 +127,11 @@ struct NumberSpec {
 	// Their transform is shared through the viewport; validation stays outside.
 	std::string viewport, text, selection, caret, composition, validation;
 };
+struct ScrollSpec {
+    std::string viewport, track, thumb;
+    bool vertical = true;
+    double lineStep = 36, minimumThumb = 36; // Authored dp, converted once by layout.
+};
 struct Control {
 	std::string action, label;
 	bool enabled = true;
@@ -135,7 +140,7 @@ struct Control {
 	std::string event; // Case-folded event name; mutually exclusive with action.
 	ControlRole role = ControlRole::Button;
 	std::optional<Expression> value;
-	std::variant<std::monostate, ToggleSpec, SliderSpec, ChoiceSpec, NumberSpec> widget;
+	std::variant<std::monostate, ToggleSpec, SliderSpec, ChoiceSpec, NumberSpec, ScrollSpec> widget;
 };
 struct ControlReadback {
 	StateValue value;

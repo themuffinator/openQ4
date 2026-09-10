@@ -2,6 +2,19 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- SYSTEM gains an editable vector scrollbar with a generous target, a narrow
+  trough and a cut-corner thumb. Its range follows the actual settings content;
+  deliberate scroll position survives UI-scale changes and window resizing.
+
+- Texture loading now handles incomplete mip chains and failed image allocations
+  without publishing partially assembled images. Large decoded textures retain
+  their requested dimensions, and cube faces stay consistent when a reduction
+  fails. Generated caches rebuild as needed for the corrected image processing.
+
+- Renderer upload buffers now verify their actual allocated size and clean up
+  partial failures. If the dynamic stream cannot be created or reused, rendering
+  falls back to legacy uploads instead of using unverified storage.
+
 - Image-quality settings gain checked renderer recovery foundations that reject
   stale texture and material state after a failed restart. Complete preset Apply
   remains in development; this does not enable unfinished mixed settings changes.
@@ -30,8 +43,9 @@
   a prior console preset command.
 
 - Retained menu focus keeps the complete control border inset from scroll-area
-  edges at high UI scales. Resizing reveals the focused field again, while
-  ordinary frames preserve deliberate scrolling. Full-page qualification
+  edges at high UI scales. Authored scrollbars preserve deliberate scrolling
+  through resizing and UI-scale changes; fresh navigation reveals its target.
+  Full-page qualification
   remains in development.
 
 - SYSTEM precision work removes stray decimal digits from generated slider

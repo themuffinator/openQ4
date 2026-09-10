@@ -7,9 +7,11 @@ round outward to layout pixels and clamp to the authored range. The inset
 shrinks when a control nearly fills the viewport; oversized controls retain
 nearest-edge behavior without alternating between edges on subsequent frames.
 
-Reveal runs on a focus change, an explicit focus request, a viewport or density
-change, and focused Number validation that changes the field's size. Ordinary
-unchanged frames preserve deliberate wheel scrolling. Hidden or visible overflow
+Reveal runs on a focus change, an explicit focus request, and focused Number
+validation that changes the field's size. Legacy documents also reveal on a
+viewport or density change. Documents with [authored scrollbars](scrollbars.md)
+instead preserve and clamp their logical scroll offsets across those changes.
+Ordinary unchanged frames preserve deliberate wheel scrolling. Hidden or visible overflow
 does not become a scroll area, and reveal creates no extra content range.
 External labels and controls larger than their available region still need
 appropriate page layout; this shared behavior does not qualify a complete page.

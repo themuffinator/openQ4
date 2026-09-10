@@ -140,7 +140,14 @@ bool ValidateApplication(const DocumentModel& model, std::string& error) {
 	std::vector<const Node*> pending{&model.root};
 	while (!pending.empty()) {
 		const auto* node = pending.back(); pending.pop_back();
-		if (node->control && (node->control->event.empty() ? !model.actions.contains(node->control->action) :
+		if (node->control && node->control->role == ControlRole::Scrollbar) {
+			// Scrolling changes the runtime viewport; it never dispatches an application action.
+			const auto& control = *node->control;
+			if (!control.action.empty() || !control.event.empty() || control.value ||
+				!std::holds_alternative<ScrollSpec>(control.widget)) {
+				error = "Scrollbar has invalid application output: " + node->id; return false;
+			}
+		} else if (node->control && (node->control->event.empty() ? !model.actions.contains(node->control->action) :
 			!model.events.contains(PresentationAliasKey(node->control->event)))) {
 			error = "Control has no typed application action or event: " + node->id; return false;
 		}
@@ -1115,6 +1122,16 @@ bool UI_RetainedDiagnostic(idUserInterface* gui, const idCmdArgs& args) {
 		const std::string id(args.Argv(2));
 		const auto widget = impl.RuntimeView()->GetWidgetState(id);
 		if (!widget) return false;
+		if (widget->role == ControlRole::Scrollbar) {
+			if (!widget->scroll) return false;
+			const auto& view = *widget->scroll;
+			const auto& geometry = view.geometry;
+			common->Printf("RETAINED_GUI_SCROLL id=%s available=%d usable=%d density=%.9g viewport=%.9g range=%.9g offset=%.9g track=%.9g thumb=%.9g position=%.9g travel=%.9g token=%llu\n",
+				id.c_str(),view.available ? 1 : 0,geometry.usable ? 1 : 0,view.dpRatio,
+				geometry.viewport,geometry.range,geometry.offset,geometry.track,geometry.thumb,geometry.position,geometry.travel,
+				static_cast<unsigned long long>(view.geometryToken));
+			return true;
+		}
 		const auto number = [](const StateValue& value) {
 			if (const auto* numeric = std::get_if<double>(&value)) return *numeric;
 			if (const auto* boolean = std::get_if<bool>(&value)) return *boolean ? 1.0 : 0.0;

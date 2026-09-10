@@ -202,7 +202,7 @@ bool State::Reset(const DocumentModel& model, std::string& error) {
 	candidate.declarations = model.state; candidate.bindings = model.bindings;
 	candidate.presentationDeclarations = model.presentationVariables;
 	const auto collect = [&](const auto& self, const Node& node) -> void {
-		if (node.control && node.control->role != ControlRole::Button) candidate.controlDeclarations.emplace(node.id,*node.control);
+		if (node.control && node.control->role != ControlRole::Button && node.control->role != ControlRole::Scrollbar) candidate.controlDeclarations.emplace(node.id,*node.control);
 		for (const auto& child : node.children) self(self,child);
 	};
 	collect(collect,model.root);
