@@ -2,6 +2,18 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- The opt-in SYSTEM page adds the six performance presets and Auto-Detect to
+  its settings draft. Custom brightness edits are preserved, and canceling a
+  preset list keeps the previous selection. Labels wrap across the existing
+  translations and larger UI scales. Applying complete presets remains in
+  development while their renderer, image and audio effects gain checked
+  execution and recovery.
+
+- Refresh rate, sky rendering, emitter limits and generated-image cache
+  preferences now participate in normal saved settings. Lower performance
+  presets can edit their sound budget from a fresh start without requiring
+  a prior console preset command.
+
 - Retained menu focus keeps the complete control border inset from scroll-area
   edges at high UI scales. Resizing reveals the focused field again, while
   ordinary frames preserve deliberate scrolling. Full-page qualification

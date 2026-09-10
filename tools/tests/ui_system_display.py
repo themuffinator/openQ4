@@ -289,7 +289,7 @@ def main():
             binary = temp / ('sdl.exe' if sdl else 'plain.exe')
             flags = ['-DUSE_SDL3'] if sdl else []
             subprocess.run([compiler, '-std=c++20', *flags, '-I', str(ROOT), str(source),
-                            str(ROOT / 'src/ui/retained/Presentation.cpp'), '-o', str(binary)], check=True, env=environment)
+                            str(ROOT / 'src/ui/retained/Presentation.cpp'), str(ROOT / 'src/framework/PerformancePreset.cpp'), '-o', str(binary)], check=True, env=environment)
             subprocess.run([str(binary)], check=True, env=environment)
         source.write_text('#define ID_DEDICATED\n#include "src/ui/application/SystemDisplay.h"\n#include <cassert>\n'+
                           '\n'.join(line for line in display.splitlines() if not line.startswith('#include '))+

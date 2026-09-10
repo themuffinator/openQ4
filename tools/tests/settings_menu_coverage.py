@@ -283,9 +283,11 @@ def validate_performance_preset_wiring(
     ):
         require(common_cpp, token, "Performance preset engine wiring")
 
-    implementation_start = common_cpp.index("typedef struct openQ4PerformancePreset_s")
+    implementation_start = common_cpp.index("using openQ4PerformancePreset_t = openq4::PerformancePreset;")
     implementation_end = common_cpp.index("Com_ReloadEngine_f", implementation_start)
-    implementation = common_cpp[implementation_start:implementation_end]
+    implementation = common_cpp[implementation_start:implementation_end] + read(ROOT / "src/framework/PerformancePreset.cpp")
+    for shared in ("openq4::PerformancePresets()", "openq4::PerformancePresetTargets()", "openq4::ExpandPerformancePreset(preset,expansion,expansionError)", "openq4::DetectPerformancePreset(signals)"):
+        require(common_cpp, shared, "shared performance preset source")
     for obsolete_target in (
         "OPENQ4_PERFORMANCE_PRESET_DYNAMIC_CVARS",
         '"image_filter"',
@@ -1013,7 +1015,7 @@ def main() -> None:
         "MAINMENU_SETTINGS_SCROLL_PAGES",
         "ApplyMainMenuSettingsScrollPage( gui, page, next, true )",
         "SyncMainMenuSettingsScrollPages( guiActive )",
-        "SyncMainMenuSettingsScrollPages( gui )",
+        "SyncMainMenuSettingsScrollPages( guiTest != NULL ? guiTest : guiActive )",
         'if ( !idStr::Icmp( cmd, "applySettingsScroll" ) )',
         '"set_game_content::rect"',
         '"set_sys_content::rect"',

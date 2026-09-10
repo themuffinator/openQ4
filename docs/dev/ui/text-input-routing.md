@@ -226,6 +226,45 @@ qualify shaping, graphemes, bidi affinity, CJK composition or general text layou
 Native process IDs also confer no journal replay authority; live editor delivery
 must reject recorded native origins until a separate replay design is qualified.
 
+## Windows text-session lifecycle
+
+`WindowsTextSession` owns one non-renewable editor, native document, window and
+provider lease. Its SDK construction creates the thread manager, document,
+context and subscriptions inside a checked lifecycle collection. The previous
+window association is retained for guarded restoration. Activation returns a
+closed collection; it requires both native reconciliation and an exact ledger
+receipt for every ordinary event before its fence can complete.
+
+Graceful cleanup first retires the original engine adoption lease, terminates
+composition from an idle native scope, restores the owned window association,
+unsubscribes, pops the context and deactivates the manager. Cleanup edits cannot
+replace the stable engine draft. After all ordinary events receive their
+disposition, the controller retires the store, completes the checked fence,
+disables the provider, removes its hooks and releases SDK objects on their
+constructing apartment.
+
+Fault cleanup preserves queued ordinary events. It cannot retire or unregister
+a replacement module or provider registration. Failed unregister retains the
+object and hook userdata; checked destruction refuses an incompletely released
+session. Engine-owned window, association and registration probes must remain
+valid through their respective release boundaries.
+
+The actual SDK/controller tests use counted COM and SDL providers. They cover
+construction/cleanup failures, stale leases, ordinary disposition, reentry and
+allocation denial. A regression changes provider ownership during the final
+queue observation after store retirement: the final fence check rejects that
+change before acknowledgement. The corrected standalone Windows suite passes
+4,544 checks and rejects 19 compiled mutations; the actual MSVC debug-library
+run also passes 4,544 checks. These do not invoke the system COM factory or an
+installed text service.
+
+Production activation remains disabled. Session must provide the checked
+route/window/registration probes and account for deferred engine events before
+the ledger can issue a receipt. The Windows fallback message loop also needs
+the same held-collection policy as SDL. Exclusive IMM handoff, native character
+association, TSF keystroke routing, candidate geometry, renewal and live platform
+qualification remain required.
+
 ## Validation boundary
 
 Pure tests exercise production broker/codec/decoder source, explicit echo

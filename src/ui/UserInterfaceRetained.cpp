@@ -330,7 +330,8 @@ struct idUserInterfaceRetained::Impl {
 	bool ConflictsWithNumberDraft(const PendingAction& pending, const NumberDraftSummary& summary) const {
 		if (summary.blocking.empty()) return false;
 		const auto& operation = pending.invocation.operation;
-		if (operation == "settings.system.apply" || operation == "settings.system.applyExit" || operation == "settings.system.defaults") return true;
+		if (operation == "settings.system.apply" || operation == "settings.system.applyExit" || operation == "settings.system.defaults" ||
+            operation == "settings.system.preset" || operation == "settings.system.autodetect") return true;
 		if (operation != "settings.system.edit") return false;
 		// A sibling slider or toggle shares the Number's typed setting keys.
 		// Leave the local text intact until its owner commits or discards it.

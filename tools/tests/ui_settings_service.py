@@ -51,7 +51,8 @@ static StateValues Initial() {
 }
 static struct HostData {
     StateValues live=Initial(),defaults=Initial();
-    int reads=0,defaultReads=0,validations=0;
+    int reads=0,defaultReads=0,validations=0,presetReads=0;
+    std::function<void()> presetCallback;bool failPreset=false;
     std::vector<StateValues> writes;
     bool failRead=false,failDefaults=false,refuseWrite=false,partialWrite=false,confirm=false;
     bool allowNearZero=false; // Comparison-only fixture: continuous zero-capable numeric setting.
@@ -64,6 +65,14 @@ const std::map<std::string,size_t>& SystemSettingsHost::Schema() {
 bool SystemSettingsHost::Read(StateValues& result,std::string& error) {
     ++host.reads;if(host.failRead) { error="bounded host read failed";return false; }
     result=host.live;return true;
+}
+bool SystemSettingsHost::BuildPreset(const std::string& name,StateValues& result,std::string& error) {
+    ++host.presetReads;if(host.presetCallback)host.presetCallback();
+    if(host.failPreset || name!="performance"){error="bounded profile refused";return false;}
+    result={{"r_brightness",1.5},{"r_renderer",std::string("arb2")}};return true;
+}
+bool SystemSettingsHost::BuildDetectedPreset(StateValues& result,std::string& error) {
+    return BuildPreset("performance",result,error);
 }
 bool SystemSettingsHost::Defaults(StateValues& result,std::string& error) {
     ++host.defaultReads;if(host.failDefaults) { error="bounded defaults failed";return false; }
@@ -886,9 +895,44 @@ static void ExactValues(const std::string& scenario) {
         Expect(owner,"open",true);Expect(owner,"dirty",true);
     }
 }
+static void Presets(const std::string& scenario) {
+    const auto owner=Begin();const auto original=host.live;std::string error;
+    if(scenario=="shapes") {
+        for(const auto& operation:std::vector<std::string>{"preset","autodetect"}) {
+            Check(!Dispatch(owner,operation,{{"unexpected",true}}),"unknown profile arguments rejected");
+            Check(!Dispatch(owner,operation,{{"name",1.0}}),"numeric profile name rejected");
+        }
+        Check(!Dispatch(owner,"preset"),"profile name required");
+        Check(!Dispatch(owner,"preset",{{"name",std::string("missing")}}),"unknown profile refused");
+        Check(!Dispatch(owner,"preset",{{"name",std::string("performance")},{"extra",true}}),"extra argument rejected");
+        Check(!Dispatch(owner,"preset",{{"name",std::string("performance\0evil",16)}}),"NUL name rejected");
+    } else if(scenario=="owner") {
+        const auto other=UI_SettingsCreateOwner();
+        Check(!Dispatch(other,"autodetect")&&host.presetReads==0,"foreign owner cannot read hardware");
+        UI_SettingsReleaseOwner(other);UI_SettingsCloseOwner(owner);
+        Check(!Dispatch(owner,"autodetect")&&host.presetReads==0,"closed owner cannot detect");
+    } else if(scenario=="release"||scenario=="close"||scenario=="reentry"||scenario=="failure") {
+        host.presetCallback=[&]{
+            if(scenario=="release")UI_SettingsReleaseOwner(owner);
+            else if(scenario=="close")UI_SettingsCloseOwner(owner);
+            else if(scenario=="reentry")Check(!Dispatch(owner,"edit",{{"r_brightness",1.9}}),"nested edit refused");
+        };
+        host.failPreset=scenario=="failure";
+        Check(!Dispatch(owner,"autodetect"),"interrupted generated edit refused");
+        host.presetCallback={};
+        if(scenario!="release")Expect(owner,"draft.r_brightness",1.0);
+    } else {
+        Check(Dispatch(owner,"edit",{{"r_shadows",false}}),"outside fixture draft");
+        Check(Dispatch(owner,scenario=="auto"?"autodetect":"preset",scenario=="auto"?StateValues{}:StateValues{{"name",std::string("performance")}}),"profile staged");
+        Expect(owner,"draft.r_brightness",1.5);Expect(owner,"draft.r_shadows",false);
+        Expect(owner,"baseline.r_brightness",1.0);Expect(owner,"canApply",false);
+        Check(!Dispatch(owner,"apply")&&!Dispatch(owner,"applyExit"),"unsupported profile effects remain refused");
+    }
+    Check(host.live==original&&host.writes.empty(),"all generated service paths have zero live writes");
+}
 int main(int argc,char** argv) {
     Check(argc==2,"scenario required");const std::string name=argv[1];
-    if(name.starts_with("exact_"))ExactValues(name.substr(6));else if(name=="validation")Validation();else if(name=="ownership")Ownership();
+    if(name.starts_with("preset_"))Presets(name.substr(7));else if(name.starts_with("exact_"))ExactValues(name.substr(6));else if(name=="validation")Validation();else if(name=="ownership")Ownership();
     else if(name=="drafts")Drafts();else if(name=="devices")Devices();
     else if(name=="conflict")Conflict();else if(name=="apply_failure")ApplyFailure();
     else if(name=="confirmation")Confirmation();else if(name=="abandon_editing")AbandonEditing();
@@ -916,6 +960,7 @@ int main(int argc,char** argv) {
 '''
 
 SCENARIOS = (
+    'preset_named','preset_auto','preset_shapes','preset_owner','preset_release','preset_close','preset_reentry','preset_failure',
     'exact_dirty_apply','exact_exit_guard','exact_conflict',
     'validation', 'ownership', 'drafts', 'devices', 'conflict', 'apply_failure',
     'confirmation', 'abandon_editing', 'abandon_pending', 'orphan_refusal',

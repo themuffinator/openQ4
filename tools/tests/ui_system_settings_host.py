@@ -26,12 +26,23 @@ SUPPORT = r'''
 #include <cstdlib>
 #include <limits>
 #include <map>
+#include <functional>
 #include <string>
 #include <vector>
 #include "src/ui/application/SystemSettingsHost.h"
+#include "src/framework/PerformancePreset.h"
 struct idStr : std::string { using std::string::string; using std::string::operator=; };
 enum { CVAR_BOOL=1, CVAR_INTEGER=2, CVAR_FLOAT=4, CVAR_ROM=8, CVAR_INIT=16,
     CVAR_NETWORKSYNC=32, CVAR_CHEAT=64, CVAR_PRIVATE=128 };
+static openq4::PerformancePresetSignals presetSignals;
+static bool failPresetSignals=false;
+static int presetSignalReads=0;
+static std::function<void()> presetSignalCallback;
+bool Common_CapturePerformancePresetSignals(openq4::PerformancePresetSignals& output,std::string& error) {
+ ++presetSignalReads;if(presetSignalCallback)presetSignalCallback();
+ if(failPresetSignals){error="signal read refused";return false;}
+ output=presetSignals;return true;
+}
 static int writes=0;
 static std::string refuse;
 struct idCVar {
@@ -287,7 +298,9 @@ int main() {
 
 def source_checks(host_source):
     common = (ROOT / 'src/framework/Common.cpp').read_text(encoding='utf-8')
-    preset = common.split('OPENQ4_PERFORMANCE_PRESET_TOUCHED_CVARS[] = {', 1)[1].split('};', 1)[0]
+    model = (ROOT / 'src/framework/PerformancePreset.cpp').read_text(encoding='utf-8')
+    preset = model.split('PerformancePresetTargetCount> Targets{{', 1)[1].split('}};', 1)[0]
+    assert 'openq4::PerformancePresetTargets()' in common and 'openq4::ExpandPerformancePreset(preset,expansion,expansionError)' in common
     preset_keys = set(re.findall(r'"([a-zA-Z0-9_]+)"', preset))
     system = (ROOT / 'content/baseoq4/pak0/guis/menu/settings/system.gui').read_text(encoding='utf-8')
     page = set(re.findall(r'\bcvar\s+"?([a-zA-Z_]\w*)', system)) - {'gui_set_sys_scroll'}
@@ -332,7 +345,7 @@ def main():
             binary = Path(temp) / ('sdl.exe' if sdl else 'plain.exe')
             defines = ['-DUSE_SDL3'] if sdl else []
             subprocess.run([compiler, '-std=c++20', *defines, '-I', str(ROOT), str(source),
-                            str(ROOT / 'src/ui/retained/Presentation.cpp'), '-o', str(binary)], check=True, env=environment)
+                            str(ROOT / 'src/ui/retained/Presentation.cpp'), str(ROOT / 'src/framework/PerformancePreset.cpp'), '-o', str(binary)], check=True, env=environment)
             subprocess.run([str(binary)], check=True, env=environment)
         dedicated = Path(temp) / 'dedicated.cpp'
         dedicated.write_text('#define ID_DEDICATED\n' + host + '\nint main() {}\n', encoding='utf-8')

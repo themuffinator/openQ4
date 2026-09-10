@@ -610,6 +610,26 @@ if build_engine or get_option('build_native_tests')
       install: false,
     )
     test('openq4-ui-settings-transaction', openq4_ui_settings_transaction_test, timeout: 30)
+    openq4_ui_performance_presets_test = executable(
+      'openq4-ui-performance-presets-test',
+      files('tools/tests/native/UiPerformancePresetTest.cpp', 'src/framework/PerformancePreset.cpp'),
+      include_directories: root_include_dir,
+      dependencies: openq4_retained_dep,
+      install: false,
+    )
+    test('openq4-ui-performance-presets', openq4_ui_performance_presets_test, timeout: 30)
+    openq4_ui_system_presets_test = executable(
+      'openq4-ui-system-presets-test',
+      files('tools/tests/native/UiSystemPresetRuntimeTest.cpp', 'src/framework/PerformancePreset.cpp'),
+      include_directories: root_include_dir,
+      dependencies: [openq4_retained_dep, rmlui_project.get_variable('rmlui_dep'), jsoncpp_project.get_variable('jsoncpp_dep')],
+      install: false,
+    )
+    test('openq4-ui-system-presets', openq4_ui_system_presets_test,
+      args: [meson.project_source_root() / 'content/baseoq4/pak0/guis/menu/settings/system.q4ui',
+        meson.project_source_root() / 'content/baseoq4/pak0/strings'], timeout: 900)
+    test('openq4-ui-system-presets-source', py,
+      args: [meson.project_source_root() / 'tools/tests/ui_system_presets.py'], timeout: 30)
     openq4_ui_settings_exact_test = executable(
       'openq4-ui-settings-exact-test', files('tools/tests/native/UiSettingsExactValueTest.cpp'),
       include_directories: root_include_dir, dependencies: openq4_retained_dep, install: false,
@@ -1546,6 +1566,16 @@ if build_engine or get_option('build_native_tests')
         cpp_args: ['-DUSE_SDL3'], install: false)
       windows_collection_bridge_dep = declare_dependency(link_with: windows_collection_bridge_library)
       client_deps += windows_collection_bridge_dep
+      # Native construction/cleanup stay outside the engine PCH. The controller
+      # requires explicit checked Session admission; linking never enables it.
+      windows_text_session_sdk_deps = [windows_ole_dep, cc.find_library('uuid', required: true)]
+      windows_text_session_library = static_library('openq4-windows-text-session',
+        files('src/sys/sdl3/WindowsTextSession.cpp'),
+        include_directories: [root_include_dir, include_directories('subprojects/packagefiles/sdl3/include')],
+        dependencies: [windows_collection_bridge_dep, openq4_windows_text_store_dep, openq4_retained_dep, native_queue_dep] + text_ingress_headers + windows_text_session_sdk_deps,
+        cpp_args: ['-DUSE_SDL3'], install: false)
+      windows_text_session_dep = declare_dependency(link_with: windows_text_session_library, dependencies: windows_text_session_sdk_deps)
+      client_deps += windows_text_session_dep
     endif
   endif
   if get_option('build_native_tests') and build_engine and use_sdl3_backend
@@ -1562,6 +1592,12 @@ if build_engine or get_option('build_native_tests')
         dependencies: [windows_collection_bridge_dep, openq4_windows_text_store_dep, openq4_retained_dep] + text_ingress_headers,
         cpp_args: ['-DUSE_SDL3'], install: false)
       test('openq4-ui-windows-text-collection-bridge', windows_collection_bridge_test, timeout: 30)
+      windows_text_session_test = executable('openq4-ui-windows-text-session-test',
+        files('tools/tests/native/WindowsTextSessionTest.cpp'),
+        include_directories: text_ingress_test_headers + [include_directories('src')],
+        dependencies: [windows_text_session_dep, windows_collection_bridge_dep, openq4_windows_text_store_dep, openq4_retained_dep, native_queue_dep] + text_ingress_headers,
+        cpp_args: ['-DUSE_SDL3'], install: false)
+      test('openq4-ui-windows-text-session', windows_text_session_test, timeout: 30)
     endif
     text_ingress_test = executable('openq4-ui-text-ingress-test',
       files('tools/tests/native/UiTextProvenanceIngressTest.cpp'),

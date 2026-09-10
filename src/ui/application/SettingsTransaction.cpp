@@ -119,7 +119,7 @@ void SettingsTransaction::ClearAttempt() {
 }
 
 SettingsResult SettingsTransaction::Begin(std::uint64_t requestedOwner) {
-	if (busy) return Reentrant();
+	if (busy) return RejectReentry();
 	Operation operation(busy);
 	if (!requestedOwner) return Result(SettingsCode::Invalid,"A settings owner must be nonzero");
 	if (phase != SettingsPhase::Closed) {
@@ -133,27 +133,69 @@ SettingsResult SettingsTransaction::Begin(std::uint64_t requestedOwner) {
 	return Result(SettingsCode::Ok);
 }
 
-SettingsResult SettingsTransaction::Edit(std::uint64_t requestedOwner, const StateValues& partial) {
-	if (busy) return Reentrant();
-	Operation operation(busy);
-	if (auto access = Access(requestedOwner); access.code != SettingsCode::Ok) return access;
-	if (phase != SettingsPhase::Editing) return Result(SettingsCode::Busy,"Settings are awaiting confirmation or recovery");
-	std::string error;
-	if (!ValidSnapshot(partial,nullptr,error)) return Result(SettingsCode::Invalid,std::move(error));
-	StateValues candidate = draft;
-	for (const auto& [key,value] : partial) {
-		const auto declaration = baseline.find(key);
-		if (declaration == baseline.end() || declaration->second.index() != value.index())
-			return Result(SettingsCode::Invalid,"An edit has an unknown key or incorrect type");
-		candidate[key] = value;
-	}
-	if (!Validate(candidate,error)) return Result(SettingsCode::Invalid,std::move(error));
-	draft = std::move(candidate);
-	return Result(SettingsCode::Ok);
+SettingsResult SettingsTransaction::RejectReentry() {
+ if(generatedReentry)*generatedReentry=true;
+ return Reentrant();
+}
+bool SettingsTransaction::MergeEdit(const StateValues& partial,StateValues& output,std::string& error) {
+ if(!ValidSnapshot(partial,nullptr,error))return false;
+ StateValues candidate=draft;
+ for(const auto& [key,value]:partial){
+  const auto declaration=baseline.find(key);
+  if(declaration==baseline.end()||declaration->second.index()!=value.index()){
+   error="An edit has an unknown key or incorrect type";return false;
+  }
+  candidate[key]=value;
+ }
+ if(!Validate(candidate,error))return false;
+ output.swap(candidate);return true;
+}
+SettingsResult SettingsTransaction::Edit(std::uint64_t requestedOwner,const StateValues& partial) {
+ if(busy)return RejectReentry();
+ Operation operation(busy);
+ if(auto access=Access(requestedOwner);access.code!=SettingsCode::Ok)return access;
+ if(phase!=SettingsPhase::Editing)return Result(SettingsCode::Busy,"Settings are awaiting confirmation or recovery");
+ StateValues candidate;std::string error;
+ if(!MergeEdit(partial,candidate,error))return Result(SettingsCode::Invalid,std::move(error));
+ draft.swap(candidate);return Result(SettingsCode::Ok);
+}
+SettingsResult SettingsTransaction::EditGenerated(std::uint64_t requestedOwner,const EditGenerator& generator) {
+ if(busy)return RejectReentry();
+ Operation operation(busy);
+ try {
+  if(auto access=Access(requestedOwner);access.code!=SettingsCode::Ok)return access;
+  if(phase!=SettingsPhase::Editing)return Result(SettingsCode::Busy,"Settings are awaiting confirmation or recovery");
+  if(!generator)return Result(SettingsCode::Invalid,"A settings edit generator is required");
+  bool reentered=false;
+  struct Guard{bool*& slot;Guard(bool*& slot,bool& observed):slot(slot){slot=&observed;}~Guard(){slot=nullptr;}} guard(generatedReentry,reentered);
+  const SettingsResult success{SettingsCode::Ok,{}};
+  StateValues partial,candidate;std::string error;
+  const bool accepted=Invoke([&]{return generator(partial,error)&&MergeEdit(partial,candidate,error);},error);
+  if(reentered)return Result(SettingsCode::Busy,"Generated settings edit was interrupted by reentry");
+  if(!accepted)return Result(SettingsCode::Invalid,std::move(error));
+  // Construct the caller's actual return storage before publishing. Even an
+  // empty string can allocate a debug-STL proxy, and a named return may move
+  // through another allocating proxy. This explicit prvalue is guaranteed to
+  // be elided; unwinding its construction leaves the draft unchanged.
+  static_assert(noexcept(draft.swap(candidate)));
+  struct Publish {
+   StateValues& draft;StateValues& candidate;SettingsResult& last;
+   int exceptions=std::uncaught_exceptions();
+   ~Publish() noexcept {
+    if(std::uncaught_exceptions()!=exceptions)return;
+    draft.swap(candidate);last.code=SettingsCode::Ok;last.diagnostic.clear();
+   }
+  } publish{draft,candidate,lastResult};
+  return SettingsResult(success);
+ } catch (const std::exception&) {
+  // Covers construction of empty map sentinels and success return storage,
+  // in addition to the generator and complete merged candidate validation.
+  return Result(SettingsCode::Invalid,"Cannot allocate generated settings edit");
+ }
 }
 
 SettingsResult SettingsTransaction::Defaults(std::uint64_t requestedOwner) {
-	if (busy) return Reentrant();
+	if (busy) return RejectReentry();
 	Operation operation(busy);
 	if (auto access = Access(requestedOwner); access.code != SettingsCode::Ok) return access;
 	if (phase != SettingsPhase::Editing) return Result(SettingsCode::Busy,"Settings are awaiting confirmation or recovery");
@@ -165,7 +207,7 @@ SettingsResult SettingsTransaction::Defaults(std::uint64_t requestedOwner) {
 }
 
 SettingsResult SettingsTransaction::Cancel(std::uint64_t requestedOwner) {
-	if (busy) return Reentrant();
+	if (busy) return RejectReentry();
 	Operation operation(busy);
 	if (auto access = Access(requestedOwner); access.code != SettingsCode::Ok) return access;
 	if (AsyncPending()) return Result(SettingsCode::Busy,"The display coordinator must finish or restore this request");
@@ -174,7 +216,7 @@ SettingsResult SettingsTransaction::Cancel(std::uint64_t requestedOwner) {
 }
 
 SettingsResult SettingsTransaction::Apply(std::uint64_t requestedOwner, double now, double timeout) {
-	if (busy) return Reentrant();
+	if (busy) return RejectReentry();
 	Operation operation(busy);
 	if (auto access = Access(requestedOwner); access.code != SettingsCode::Ok) return access;
 	if (phase != SettingsPhase::Editing) return Result(SettingsCode::Busy,"Settings are awaiting confirmation or recovery");
@@ -211,7 +253,7 @@ SettingsResult SettingsTransaction::Apply(std::uint64_t requestedOwner, double n
 }
 
 SettingsResult SettingsTransaction::PrepareApply(std::uint64_t requestedOwner, double now, SettingsAttempt& attempt) {
-	if (busy) return Reentrant();
+	if (busy) return RejectReentry();
 	Operation operation(busy);
 	if (auto access = Access(requestedOwner); access.code != SettingsCode::Ok) return access;
 	if (phase != SettingsPhase::Editing || AsyncPending()) return Result(SettingsCode::Busy,"A settings request is already pending");
@@ -230,7 +272,7 @@ SettingsResult SettingsTransaction::PrepareApply(std::uint64_t requestedOwner, d
 }
 
 SettingsResult SettingsTransaction::ExecuteApply(std::uint64_t requestedOwner, std::uint64_t request) {
-	if (busy) return Reentrant();
+	if (busy) return RejectReentry();
 	Operation operation(busy);
 	if (auto access = AccessAttempt(requestedOwner,request); access.code != SettingsCode::Ok) return access;
 	if (phase != SettingsPhase::Applying || attemptStage != AttemptStage::ApplyPrepared)
@@ -252,7 +294,7 @@ SettingsResult SettingsTransaction::ExecuteApply(std::uint64_t requestedOwner, s
 }
 
 SettingsResult SettingsTransaction::CompleteApply(std::uint64_t requestedOwner, std::uint64_t request, double now, double timeout) {
-	if (busy) return Reentrant();
+	if (busy) return RejectReentry();
 	Operation operation(busy);
 	if (auto access = AccessAttempt(requestedOwner,request); access.code != SettingsCode::Ok) return access;
 	if (phase != SettingsPhase::Applying || attemptStage != AttemptStage::ApplyWritten)
@@ -268,7 +310,7 @@ SettingsResult SettingsTransaction::CompleteApply(std::uint64_t requestedOwner, 
 }
 
 SettingsResult SettingsTransaction::CancelPreparedApply(std::uint64_t requestedOwner, std::uint64_t request) {
-	if (busy) return Reentrant();
+	if (busy) return RejectReentry();
 	Operation operation(busy);
 	if (auto access = AccessAttempt(requestedOwner,request); access.code != SettingsCode::Ok) return access;
 	if (phase != SettingsPhase::Applying || attemptStage != AttemptStage::ApplyPrepared)
@@ -278,7 +320,7 @@ SettingsResult SettingsTransaction::CancelPreparedApply(std::uint64_t requestedO
 }
 
 SettingsResult SettingsTransaction::PrepareRestore(std::uint64_t requestedOwner, std::uint64_t request, SettingsAttempt& attempt) {
-	if (busy) return Reentrant();
+	if (busy) return RejectReentry();
 	Operation operation(busy);
 	if (auto access = AccessAttempt(requestedOwner,request); access.code != SettingsCode::Ok) return access;
 	if (attemptStage == AttemptStage::RestorePrepared)
@@ -303,7 +345,7 @@ SettingsResult SettingsTransaction::PrepareRestore(std::uint64_t requestedOwner,
 }
 
 SettingsResult SettingsTransaction::ExecuteRestore(std::uint64_t requestedOwner, std::uint64_t request) {
-	if (busy) return Reentrant();
+	if (busy) return RejectReentry();
 	Operation operation(busy);
 	if (auto access = AccessAttempt(requestedOwner,request); access.code != SettingsCode::Ok) return access;
 	if (phase != SettingsPhase::Restoring || attemptStage != AttemptStage::RestorePrepared)
@@ -335,7 +377,7 @@ SettingsResult SettingsTransaction::ExecuteRestore(std::uint64_t requestedOwner,
 
 SettingsResult SettingsTransaction::CompleteRestore(std::uint64_t requestedOwner, std::uint64_t request,
 	bool preserveDraft, SettingsCode recoveredCode, const std::string& reason) {
-	if (busy) return Reentrant();
+	if (busy) return RejectReentry();
 	Operation operation(busy);
 	if (auto access = AccessAttempt(requestedOwner,request); access.code != SettingsCode::Ok) return access;
 	if (phase != SettingsPhase::Restoring || attemptStage != AttemptStage::RestoreWritten)
@@ -353,7 +395,7 @@ SettingsResult SettingsTransaction::CompleteRestore(std::uint64_t requestedOwner
 
 SettingsResult SettingsTransaction::PrepareConfirm(std::uint64_t requestedOwner, std::uint64_t request,
 	double now, SettingsAttempt& attempt) {
-	if (busy) return Reentrant();
+	if (busy) return RejectReentry();
 	Operation operation(busy);
 	if (auto access = AccessAttempt(requestedOwner,request); access.code != SettingsCode::Ok) return access;
 	if (phase != SettingsPhase::Confirming || attemptStage != AttemptStage::Confirming)
@@ -371,7 +413,7 @@ SettingsResult SettingsTransaction::PrepareConfirm(std::uint64_t requestedOwner,
 }
 
 SettingsResult SettingsTransaction::CompleteConfirm(std::uint64_t requestedOwner, std::uint64_t request) {
-	if (busy) return Reentrant();
+	if (busy) return RejectReentry();
 	Operation operation(busy);
 	if (auto access = AccessAttempt(requestedOwner,request); access.code != SettingsCode::Ok) return access;
 	if (phase != SettingsPhase::Confirming || attemptStage != AttemptStage::ConfirmPrepared)
@@ -384,7 +426,7 @@ SettingsResult SettingsTransaction::CompleteConfirm(std::uint64_t requestedOwner
 }
 
 SettingsResult SettingsTransaction::CancelPreparedConfirm(std::uint64_t requestedOwner, std::uint64_t request) {
-	if (busy) return Reentrant();
+	if (busy) return RejectReentry();
 	Operation operation(busy);
 	if (auto access = AccessAttempt(requestedOwner,request); access.code != SettingsCode::Ok) return access;
 	if (phase != SettingsPhase::Confirming || attemptStage != AttemptStage::ConfirmPrepared)
@@ -448,7 +490,7 @@ SettingsResult SettingsTransaction::Rollback(bool preserveDraft, SettingsCode re
 }
 
 SettingsResult SettingsTransaction::Confirm(std::uint64_t requestedOwner) {
-	if (busy) return Reentrant();
+	if (busy) return RejectReentry();
 	Operation operation(busy);
 	if (auto access = Access(requestedOwner); access.code != SettingsCode::Ok) return access;
 	if (AsyncPending()) return Result(SettingsCode::Busy,"The display coordinator must persist this confirmation");
@@ -461,7 +503,7 @@ SettingsResult SettingsTransaction::Confirm(std::uint64_t requestedOwner) {
 }
 
 SettingsResult SettingsTransaction::Revert(std::uint64_t requestedOwner) {
-	if (busy) return Reentrant();
+	if (busy) return RejectReentry();
 	Operation operation(busy);
 	if (auto access = Access(requestedOwner); access.code != SettingsCode::Ok) return access;
 	if (AsyncPending()) return Result(SettingsCode::Busy,"The display coordinator must restore this request");
@@ -470,7 +512,7 @@ SettingsResult SettingsTransaction::Revert(std::uint64_t requestedOwner) {
 }
 
 SettingsResult SettingsTransaction::Tick(double now) {
-	if (busy) return Reentrant();
+	if (busy) return RejectReentry();
 	Operation operation(busy);
 	if (!ValidTime(now,phase == SettingsPhase::Closed ? -1 : lastTime))
 		return Result(SettingsCode::Invalid,"Settings presentation time is invalid or moved backwards");
@@ -483,7 +525,7 @@ SettingsResult SettingsTransaction::Tick(double now) {
 }
 
 SettingsResult SettingsTransaction::Abandon(std::uint64_t requestedOwner) {
-	if (busy) return Reentrant();
+	if (busy) return RejectReentry();
 	Operation operation(busy);
 	if (auto access = Access(requestedOwner); access.code != SettingsCode::Ok) return access;
 	if (AsyncPending()) return Result(SettingsCode::Busy,"The display coordinator must restore or cancel this request");

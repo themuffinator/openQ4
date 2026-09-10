@@ -4,6 +4,7 @@
 #include "SettingsValue.h"
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 
 namespace openq4::ui {
 
@@ -55,6 +56,11 @@ public:
 
 	SettingsResult Begin(std::uint64_t owner);
 	SettingsResult Edit(std::uint64_t owner, const StateValues& partial);
+ // A synchronous read-only producer builds a partial edit under this owner's
+ // Editing/reentrancy guard. Generation, allocation, validation or attempted
+ // reentry failure preserves the live draft; no callback may retain references.
+ using EditGenerator=std::function<bool(StateValues& partial,std::string& error)>;
+ SettingsResult EditGenerated(std::uint64_t owner,const EditGenerator& generator);
 	SettingsResult Defaults(std::uint64_t owner);
 	// Cancel closes an editing session; during confirmation/recovery it first
 	// reverts to Editing. Abandon also closes after a successful revert.
@@ -111,6 +117,8 @@ public:
 private:
 	SettingsResult Result(SettingsCode code, std::string diagnostic = {});
 	SettingsResult Access(std::uint64_t requestedOwner);
+ SettingsResult RejectReentry();
+ bool MergeEdit(const StateValues& partial,StateValues& candidate,std::string& error);
 	SettingsResult AccessAttempt(std::uint64_t requestedOwner, std::uint64_t request);
 	bool Read(StateValues& values, std::string& error, bool requireSchema = true);
 	bool Validate(const StateValues& candidate, std::string& error);
@@ -126,6 +134,7 @@ private:
 	StateValues baseline, draft, lastApplied, written;
 	double deadline = 0, lastTime = -1;
 	bool busy = false;
+ bool* generatedReentry=nullptr; // Stack-scoped observer only during EditGenerated.
 	SettingsAttempt pending;
 	StateValues attemptedEdits;
 	AttemptStage attemptStage = AttemptStage::None;

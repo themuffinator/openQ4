@@ -301,10 +301,16 @@ jobs:
             tools/tests/ui_focus_reveal.py \
             tools/tests/ui_settings_decimal_precision.py \
             tools/tests/ui_settings_exact_values.py \
+            tools/tests/ui_performance_presets.py \
             tools/tests/ui_system_number_fields.py \
+            tools/tests/ui_system_presets.py \
+            tools/tests/system_settings_archive_policy.py \
+            tools/tests/ui_system_presets_runtime.py \
+            tools/ui/update_system_presets.py \
             tools/ui/update_system_number_fields.py \
             tools/tests/windows_text_store.py \
             tools/tests/windows_text_collection_bridge.py \
+            tools/tests/windows_text_session.py \
             tools/tests/ui_text_input.py \
             tools/tests/ui_retained_input.py \
             tools/tests/ui_retained_state_sources.py \
@@ -553,7 +559,11 @@ jobs:
           python tools/tests/ui_managed_native_owner.py
           python tools/tests/ui_settings_decimal_precision.py
           python tools/tests/ui_settings_exact_values.py --mutations
+          python tools/tests/ui_performance_presets.py --mutations --adjacent
           python tools/tests/ui_system_number_fields.py
+          python tools/tests/ui_system_presets.py
+          python tools/tests/system_settings_archive_policy.py
+          python tools/ui/update_system_presets.py --check
           python tools/ui/update_system_number_fields.py --check
           python tools/tests/ui_text_input.py
           python tools/tests/ui_retained_input.py
@@ -697,6 +707,10 @@ jobs:
           python tools\tests\windows_text_collection_bridge.py --compiler cl --msvc-debug --sdl-include subprojects/SDL3-3.4.10/include
           if errorlevel 1 exit /b 1
           python tools\tests\windows_text_collection_bridge.py --unsupported --sdl-include subprojects/SDL3-3.4.10/include
+          if errorlevel 1 exit /b 1
+          python tools\tests\windows_text_session.py --sdl-include subprojects/SDL3-3.4.10/include
+          if errorlevel 1 exit /b 1
+          python tools\tests\windows_text_session.py --compiler cl --msvc-debug --no-mutations --sdl-include subprojects/SDL3-3.4.10/include
 
   linux-arm64:
     name: Linux ARM64 Commit Validation

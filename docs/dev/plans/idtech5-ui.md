@@ -445,3 +445,16 @@ intended 8-pixel gap inside its scroll body. The source-bound record is
 Native activation, production Session delivery, complete settings effects,
 international text, full layouts and editor support remain in development.
 The full original scope, all 271 migrations and every final gate remain open.
+
+The preset and Windows text-session increment adds shared six-profile draft
+expansion and source-derived localized controls to the opt-in SYSTEM page.
+Guarded publication preserves unrelated edits; incomplete local Number edits
+prevent conflicting actions. A checked constructing-STA controller owns Windows
+text-service activation and quiescence, with live activation still disabled.
+See [performance presets](../ui/performance-presets.md),
+[native text routing](../ui/text-input-routing.md) and the source-bound record
+`.tmp/ui/preset-session-integration/validation-evidence.json`.
+The [unified effect direction](../ui/settings-effect-execution.md) preserves one
+durable operation across renderer, image, audio and deferred policy. Full
+implementation, editor, platform qualification and all migration/final gates
+remain required; this increment changes no acceptance status.

@@ -43,7 +43,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "Color/ColorSpace.h"
 
 idCVar image_highQualityCompression( "image_highQualityCompression", "0", CVAR_BOOL, "Use high quality (slow) compression" );
-idCVar image_writeGeneratedImages( "image_writeGeneratedImages", "1", CVAR_RENDERER | CVAR_BOOL, "write generated binary image cache files during runtime loads" );
+idCVar image_writeGeneratedImages( "image_writeGeneratedImages", "1", CVAR_RENDERER | CVAR_BOOL | CVAR_ARCHIVE, "write generated binary image cache files during runtime loads" );
 idCVar image_showGeneratedImageWrites( "image_showGeneratedImageWrites", "0", CVAR_RENDERER | CVAR_BOOL, "print each generated binary image cache write" );
 
 static const int MAX_BINARY_IMAGE_DIMENSION = 32768;

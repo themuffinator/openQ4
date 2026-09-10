@@ -39,6 +39,10 @@ public:
 	static bool ChangedRequiresDisplayRestart(const StateValues& before, const StateValues& target);
 	static bool RequiresDeviceWork(const StateValues& before, const StateValues& target);
 
+ // Pure typed profile expansion. Caller publishes with EditGenerated so
+ // ownership and complete merged validation enclose capability observation.
+ bool BuildPreset(const std::string& name,StateValues& patch,std::string& error);
+ bool BuildDetectedPreset(StateValues& patch,std::string& error);
 	bool Read(StateValues& values, std::string& error) override;
 	bool Defaults(StateValues& values, std::string& error) override;
 	bool Validate(const StateValues& baseline, const StateValues& candidate, std::string& error) override;

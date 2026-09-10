@@ -42,6 +42,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "ParallelJobSystem.h"
 #include "DurableFile.h"
 #include "SettingsPersistence.h"
+#include "PerformancePreset.h"
 #include "FileSystemPathValidation.h"
 #include "../sys/NetworkEndpoint.h"
 
@@ -2768,122 +2769,22 @@ void Com_ExecMachineSpec_f( const idCmdArgs &args ) {
 #endif
 }
 
-typedef struct openQ4PerformancePreset_s {
-	const char *name;
-	int machineSpec;
-	const char *rendererBenchmarkPreset;
-	int screenFraction;
-	int multiSamples;
-	int postAA;
-	int maxFps;
-	int anisotropy;
-	int downSizeLimit;
-	int downSize;
-	int ignoreHighQuality;
-	int usePrecompressedTextures;
-	int maxSoundsPerShader;
-	int useShadowMap;
-	int shadowMapSize;
-	int shadowMapMaxUpdates;
-	int bloom;
-	int ssao;
-	int hdrToneMap;
-	int motionBlur;
-	int crt;
-	int useLightGrid;
-	int uploadMegs;
-	int uploadFrameBuffers;
-	int numberOfSpeakers;
-	int useEAXReverb;
-	int maxEmitterChannels;
-} openQ4PerformancePreset_t;
-
-static const openQ4PerformancePreset_t OPENQ4_PERFORMANCE_PRESETS[] = {
-	{ "minimum", 0, "low",
-		50, 0, 0, 30,
-		1, 512, 1, 1, 1, 1,
-		0, 512, 1, 0, 0, 0, 0, 0, 1, 8, 3,
-		2, 0, 24 },
-	{ "lowpower", 0, "low",
-		75, 0, 0, 30,
-		1, 1024, 1, 1, 1, 1,
-		0, 512, 1, 0, 0, 0, 0, 0, 1, 8, 3,
-		2, 0, 32 },
-	{ "performance", 1, "baseline",
-		85, 0, 1, 60,
-		2, 0, 0, 0, 1, 0,
-		0, 1024, 2, 0, 0, 0, 0, 0, 1, 16, 4,
-		2, 0, 40 },
-	{ "balanced", 2, "baseline",
-		100, 2, 1, 120,
-		4, 0, 0, 0, 1, 0,
-		0, 1024, 0, 0, 0, 0, 0, 0, 1, 16, 4,
-		6, 1, 48 },
-	{ "quality", 3, "modern",
-		100, 4, 1, 144,
-		8, 0, 0, 0, 1, 0,
-		0, 1024, 0, 0, 0, 0, 0, 0, 1, 32, 4,
-		6, 1, 48 },
-	// image_usePrecompressedTextures stays at 1 here even though retail's top
-	// machine spec used 0. In openQ4 that cvar also gates user-supplied DDS
-	// replacement packs, so 0 silently discarded a player's high-resolution BC7
-	// art the moment they touched the settings menu - the reverse of what the
-	// highest preset should do.
-	{ "ultra", 3, "high-end",
-		100, 8, 1, 240,
-		16, 0, 0, 0, 1, 0,
-		0, 2048, 0, 0, 0, 0, 0, 0, 1, 32, 4,
-		6, 1, 48 }
-};
-
-static const int OPENQ4_PERFORMANCE_PRESET_COUNT = static_cast<int>( sizeof( OPENQ4_PERFORMANCE_PRESETS ) / sizeof( OPENQ4_PERFORMANCE_PRESETS[0] ) );
-static const char *OPENQ4_DEFAULT_PERFORMANCE_PRESET = "balanced";
+using openQ4PerformancePreset_t = openq4::PerformancePreset;
+static const auto& OPENQ4_PERFORMANCE_PRESETS = openq4::PerformancePresets();
+static const int OPENQ4_PERFORMANCE_PRESET_COUNT = openq4::PerformancePresetCount;
+static const char *OPENQ4_DEFAULT_PERFORMANCE_PRESET = openq4::PerformancePresetDefaultName;
 static const int OPENQ4_PERFORMANCE_PRESET_MAX_SHADOW_UPDATES = 1024;
 static const int OPENQ4_PERFORMANCE_PRESET_MIN_UPLOAD_FRAME_BUFFERS = 3;
 static const int OPENQ4_PERFORMANCE_PRESET_MAX_UPLOAD_FRAME_BUFFERS = 8;
 static const int OPENQ4_PERFORMANCE_PRESET_MAX_EMITTER_CHANNELS = 48;
 static const int OPENQ4_PERFORMANCE_PRESET_UNLIMITED_BUDGET_RANK = 0x7fffffff;
-static const int OPENQ4_PERFORMANCE_PRESET_UNKNOWN_SYSTEM_RAM_MB = 8192;
-static const int OPENQ4_PERFORMANCE_PRESET_UNKNOWN_VIDEO_RAM_MB = 2048;
-static const int OPENQ4_PERFORMANCE_PRESET_MAX_REASONABLE_SYSTEM_RAM_MB = 4 * 1024 * 1024;
-static const int OPENQ4_PERFORMANCE_PRESET_MAX_REASONABLE_VIDEO_RAM_MB = 256 * 1024;
+static const int OPENQ4_PERFORMANCE_PRESET_UNKNOWN_SYSTEM_RAM_MB = openq4::PerformancePresetUnknownSystemRamMB;
+static const int OPENQ4_PERFORMANCE_PRESET_UNKNOWN_VIDEO_RAM_MB = openq4::PerformancePresetUnknownVideoRamMB;
+static const int OPENQ4_PERFORMANCE_PRESET_MAX_REASONABLE_SYSTEM_RAM_MB = openq4::PerformancePresetMaxSystemRamMB;
+static const int OPENQ4_PERFORMANCE_PRESET_MAX_REASONABLE_VIDEO_RAM_MB = openq4::PerformancePresetMaxVideoRamMB;
 
-static const char *OPENQ4_PERFORMANCE_PRESET_TOUCHED_CVARS[] = {
-	"com_performancePreset",
-	"com_machineSpec",
-	"r_rendererBenchmarkPreset",
-	"r_screenFraction",
-	"r_multiSamples",
-	"r_postAA",
-	"com_maxfps",
-	"image_anisotropy",
-	"image_usePrecompressedTextures",
-	"image_downSize",
-	"image_downSizeLimit",
-	"image_downSizeSpecular",
-	"image_downSizeBump",
-	"image_downSizeSpecularLimit",
-	"image_downSizeBumpLimit",
-	"image_ignoreHighQuality",
-	"image_writeGeneratedImages",
-	"s_maxSoundsPerShader",
-	"r_useShadowMap",
-	"r_shadowMapSize",
-	"r_shadowMapMaxUpdatesPerView",
-	"r_bloom",
-	"r_ssao",
-	"r_hdrToneMap",
-	"r_motionBlur",
-	"r_crt",
-	"r_useLightGrid",
-	"r_rendererUploadMegs",
-	"r_rendererUploadFrameBuffers",
-	"s_numberOfSpeakers",
-	"s_useEAXReverb",
-	"s_maxEmitterChannels"
-};
-
-static const int OPENQ4_PERFORMANCE_PRESET_TOUCHED_CVAR_COUNT = static_cast<int>( sizeof( OPENQ4_PERFORMANCE_PRESET_TOUCHED_CVARS ) / sizeof( OPENQ4_PERFORMANCE_PRESET_TOUCHED_CVARS[0] ) );
+static const auto& OPENQ4_PERFORMANCE_PRESET_TOUCHED_CVARS = openq4::PerformancePresetTargets();
+static const int OPENQ4_PERFORMANCE_PRESET_TOUCHED_CVAR_COUNT = openq4::PerformancePresetTargetCount;
 
 static bool Common_PerformancePresetTargetIsDeclared( const char *name ) {
 	if ( name == NULL || name[0] == '\0' ) {
@@ -2898,16 +2799,7 @@ static bool Common_PerformancePresetTargetIsDeclared( const char *name ) {
 }
 
 static const openQ4PerformancePreset_t *Common_FindPerformancePreset( const char *name ) {
-	if ( name == NULL || name[0] == '\0' ) {
-		return NULL;
-	}
-
-	for ( int i = 0; i < OPENQ4_PERFORMANCE_PRESET_COUNT; ++i ) {
-		if ( idStr::Icmp( OPENQ4_PERFORMANCE_PRESETS[i].name, name ) == 0 ) {
-			return &OPENQ4_PERFORMANCE_PRESETS[i];
-		}
-	}
-	return NULL;
+ return name != NULL ? openq4::FindPerformancePreset(name) : NULL;
 }
 
 static const openQ4PerformancePreset_t *Common_DefaultPerformancePreset( void ) {
@@ -3065,49 +2957,23 @@ static bool Common_ApplyPerformancePreset( const openQ4PerformancePreset_t &pres
 		return false;
 	}
 
+ openq4::PerformancePresetAssignments expansion; std::string expansionError;
+ if (!openq4::ExpandPerformancePreset(preset,expansion,expansionError)) {
+  if (!quiet) common->Warning("Performance preset '%s' could not expand: %s",preset.name,expansionError.c_str());
+  return false;
+ }
+
 	openQ4PerformancePresetCVarBackup_t backups[OPENQ4_PERFORMANCE_PRESET_TOUCHED_CVAR_COUNT];
 	const int savedModifiedFlags = cvarSystem->GetModifiedFlags();
 	Common_BackupPerformancePresetCVars( backups );
 
-	bool applied = true;
-	applied &= Common_SetPerformancePresetInt( preset.name, "com_machineSpec", preset.machineSpec, quiet );
-
-	applied &= Common_SetPerformancePresetString( preset.name, "r_rendererBenchmarkPreset", preset.rendererBenchmarkPreset, quiet );
-	applied &= Common_SetPerformancePresetInt( preset.name, "r_screenFraction", preset.screenFraction, quiet );
-	applied &= Common_SetPerformancePresetInt( preset.name, "r_multiSamples", preset.multiSamples, quiet );
-	applied &= Common_SetPerformancePresetInt( preset.name, "r_postAA", preset.postAA, quiet );
-	applied &= Common_SetPerformancePresetInt( preset.name, "com_maxfps", preset.maxFps, quiet );
-
-	applied &= Common_SetPerformancePresetInt( preset.name, "image_anisotropy", preset.anisotropy, quiet );
-	applied &= Common_SetPerformancePresetInt( preset.name, "image_usePrecompressedTextures", preset.usePrecompressedTextures, quiet );
-	applied &= Common_SetPerformancePresetInt( preset.name, "image_downSize", preset.downSize, quiet );
-	applied &= Common_SetPerformancePresetInt( preset.name, "image_downSizeLimit", preset.downSizeLimit, quiet );
-	applied &= Common_SetPerformancePresetInt( preset.name, "image_downSizeSpecular", preset.downSize, quiet );
-	applied &= Common_SetPerformancePresetInt( preset.name, "image_downSizeBump", preset.downSize, quiet );
-	applied &= Common_SetPerformancePresetInt( preset.name, "image_downSizeSpecularLimit", 64, quiet );
-	applied &= Common_SetPerformancePresetInt( preset.name, "image_downSizeBumpLimit", preset.downSize != 0 ? 256 : 0, quiet );
-	applied &= Common_SetPerformancePresetInt( preset.name, "image_ignoreHighQuality", preset.ignoreHighQuality, quiet );
-	// 1 at every preset: the generated image cache is a load-time win at any
-	// quality level, and the downsize cvars above are part of its cache key, so
-	// a preset change is exactly when the new variants need to be written out
-	applied &= Common_SetPerformancePresetInt( preset.name, "image_writeGeneratedImages", 1, quiet );
-	applied &= Common_SetPerformancePresetInt( preset.name, "s_maxSoundsPerShader", preset.maxSoundsPerShader, quiet );
-
-	applied &= Common_SetPerformancePresetInt( preset.name, "r_useShadowMap", preset.useShadowMap, quiet );
-	applied &= Common_SetPerformancePresetInt( preset.name, "r_shadowMapSize", preset.shadowMapSize, quiet );
-	applied &= Common_SetPerformancePresetInt( preset.name, "r_shadowMapMaxUpdatesPerView", preset.shadowMapMaxUpdates, quiet );
-	applied &= Common_SetPerformancePresetInt( preset.name, "r_bloom", preset.bloom, quiet );
-	applied &= Common_SetPerformancePresetInt( preset.name, "r_ssao", preset.ssao, quiet );
-	applied &= Common_SetPerformancePresetInt( preset.name, "r_hdrToneMap", preset.hdrToneMap, quiet );
-	applied &= Common_SetPerformancePresetInt( preset.name, "r_motionBlur", preset.motionBlur, quiet );
-	applied &= Common_SetPerformancePresetInt( preset.name, "r_crt", preset.crt, quiet );
-	applied &= Common_SetPerformancePresetInt( preset.name, "r_useLightGrid", preset.useLightGrid, quiet );
-	applied &= Common_SetPerformancePresetInt( preset.name, "r_rendererUploadMegs", preset.uploadMegs, quiet );
-	applied &= Common_SetPerformancePresetInt( preset.name, "r_rendererUploadFrameBuffers", preset.uploadFrameBuffers, quiet );
-
-	applied &= Common_SetPerformancePresetInt( preset.name, "s_numberOfSpeakers", preset.numberOfSpeakers, quiet );
-	applied &= Common_SetPerformancePresetInt( preset.name, "s_useEAXReverb", preset.useEAXReverb, quiet );
-	applied &= Common_SetPerformancePresetInt( preset.name, "s_maxEmitterChannels", preset.maxEmitterChannels, quiet );
+ bool applied = true;
+ for (size_t i=0;i+1<expansion.size();++i) {
+  const auto& assignment=expansion[i];
+  if (const auto number=std::get_if<int>(&assignment.value))
+   applied &= Common_SetPerformancePresetInt(preset.name,assignment.key,*number,quiet);
+  else applied &= Common_SetPerformancePresetString(preset.name,assignment.key,std::get<std::string>(assignment.value).c_str(),quiet);
+ }
 
 	// Commit the public selection marker only after every profile target accepted
 	// its value. Any unexpected normalization failure rolls the whole apply back.
@@ -3129,10 +2995,7 @@ static bool Common_ApplyPerformancePreset( const openQ4PerformancePreset_t &pres
 }
 
 static int Common_SanitizePerformancePresetMemoryMB( int rawMegabytes, int fallbackMegabytes, int maxReasonableMegabytes ) {
-	if ( rawMegabytes <= 0 || rawMegabytes > maxReasonableMegabytes ) {
-		return fallbackMegabytes;
-	}
-	return rawMegabytes;
+ return openq4::SanitizePerformancePresetMemoryMB(rawMegabytes,fallbackMegabytes,maxReasonableMegabytes);
 }
 
 static idStr Common_FormatPerformancePresetMemorySignal( int rawMegabytes, int effectiveMegabytes ) {
@@ -3145,69 +3008,45 @@ static idStr Common_FormatPerformancePresetMemorySignal( int rawMegabytes, int e
 	return text;
 }
 
+bool Common_CapturePerformancePresetSignals(openq4::PerformancePresetSignals& output,std::string& error) {
+ openq4::PerformancePresetSignals signals;
+ signals.explicitLowPower=Common_HasExplicitLowPowerHostSignal();
+ if (!signals.explicitLowPower) {
+  signals.raspberryPi=Common_HasRaspberryPiHostSignal();
+  if (!signals.raspberryPi) {
+   signals.steamDeck=idStr::Icmp(com_platformProfile.GetString(),"steamdeck")==0 || Common_HasSteamDeckHostSignal();
+   if (!signals.steamDeck) {
+    if (!renderSystem) { error="Renderer capability observation is unavailable";return false; }
+    signals.systemRamMB=Sys_GetSystemRam();signals.videoRamMB=Sys_GetVideoRam();
+    bool nv10or20=false;renderSystem->GetCardCaps(signals.legacyRenderer,nv10or20);
+    if (!signals.legacyRenderer) signals.arm64=Common_HostCpuIsArm64();
+   }
+  }
+ }
+ output=signals;error.clear();return true;
+}
 static const char *Common_DetectPerformancePresetName( idStr &reason ) {
-	if ( Common_HasExplicitLowPowerHostSignal() ) {
-		reason = "explicit low-power environment signal";
-		return "lowpower";
-	}
-
-	if ( Common_HasRaspberryPiHostSignal() ) {
-		reason = "Raspberry Pi host signal";
-		return "lowpower";
-	}
-
-	if ( idStr::Icmp( com_platformProfile.GetString(), "steamdeck" ) == 0 || Common_HasSteamDeckHostSignal() ) {
-		reason = "Steam Deck platform profile";
-		return "performance";
-	}
-
-	const int rawSysRam = Sys_GetSystemRam();
-	const int rawVidRam = Sys_GetVideoRam();
-	const int sysRam = Common_SanitizePerformancePresetMemoryMB(
-		rawSysRam,
-		OPENQ4_PERFORMANCE_PRESET_UNKNOWN_SYSTEM_RAM_MB,
-		OPENQ4_PERFORMANCE_PRESET_MAX_REASONABLE_SYSTEM_RAM_MB );
-	const int vidRam = Common_SanitizePerformancePresetMemoryMB(
-		rawVidRam,
-		OPENQ4_PERFORMANCE_PRESET_UNKNOWN_VIDEO_RAM_MB,
-		OPENQ4_PERFORMANCE_PRESET_MAX_REASONABLE_VIDEO_RAM_MB );
-	const idStr sysRamReason = Common_FormatPerformancePresetMemorySignal( rawSysRam, sysRam );
-	const idStr vidRamReason = Common_FormatPerformancePresetMemorySignal( rawVidRam, vidRam );
-	bool oldCard = false;
-	bool nv10or20 = false;
-	renderSystem->GetCardCaps( oldCard, nv10or20 );
-
-	if ( oldCard ) {
-		reason = "legacy renderer architecture";
-		return "minimum";
-	}
-
-	if ( Common_HostCpuIsArm64() ) {
-		if ( sysRam <= 4096 || vidRam <= 1024 ) {
-			reason = va( "ARM64 with constrained memory (%s RAM, %s VRAM)", sysRamReason.c_str(), vidRamReason.c_str() );
-			return "lowpower";
-		}
-		reason = va( "ARM64 host (%s RAM, %s VRAM)", sysRamReason.c_str(), vidRamReason.c_str() );
-		return "performance";
-	}
-
-	if ( sysRam <= 4096 || vidRam <= 1024 ) {
-		reason = va( "constrained memory (%s RAM, %s VRAM)", sysRamReason.c_str(), vidRamReason.c_str() );
-		return "lowpower";
-	}
-
-	if ( sysRam <= 8192 || vidRam <= 2048 ) {
-		reason = va( "modest memory/GPU budget (%s RAM, %s VRAM)", sysRamReason.c_str(), vidRamReason.c_str() );
-		return "performance";
-	}
-
-	if ( sysRam >= 16384 && vidRam >= 6144 ) {
-		reason = va( "high memory/GPU budget (%s RAM, %s VRAM)", sysRamReason.c_str(), vidRamReason.c_str() );
-		return "quality";
-	}
-
-	reason = va( "standard desktop budget (%s RAM, %s VRAM)", sysRamReason.c_str(), vidRamReason.c_str() );
-	return "balanced";
+ openq4::PerformancePresetSignals signals;std::string error;
+ if (!Common_CapturePerformancePresetSignals(signals,error)) {reason=error.c_str();return OPENQ4_DEFAULT_PERFORMANCE_PRESET;}
+ const auto detected=openq4::DetectPerformancePreset(signals);
+ using Reason=openq4::PerformancePresetReason;
+ if(detected.reason==Reason::ExplicitLowPower)reason="explicit low-power environment signal";
+ else if(detected.reason==Reason::RaspberryPi)reason="Raspberry Pi host signal";
+ else if(detected.reason==Reason::SteamDeck)reason="Steam Deck platform profile";
+ else if(detected.reason==Reason::LegacyRenderer)reason="legacy renderer architecture";
+ else{
+  const idStr sysRamReason=Common_FormatPerformancePresetMemorySignal(signals.systemRamMB,detected.systemRamMB);
+  const idStr vidRamReason=Common_FormatPerformancePresetMemorySignal(signals.videoRamMB,detected.videoRamMB);
+  switch(detected.reason){
+   case Reason::ArmLowMemory:reason=va("ARM64 with constrained memory (%s RAM, %s VRAM)",sysRamReason.c_str(),vidRamReason.c_str());break;
+   case Reason::Arm:reason=va("ARM64 host (%s RAM, %s VRAM)",sysRamReason.c_str(),vidRamReason.c_str());break;
+   case Reason::LowMemory:reason=va("constrained memory (%s RAM, %s VRAM)",sysRamReason.c_str(),vidRamReason.c_str());break;
+   case Reason::ModestMemory:reason=va("modest memory/GPU budget (%s RAM, %s VRAM)",sysRamReason.c_str(),vidRamReason.c_str());break;
+   case Reason::HighMemory:reason=va("high memory/GPU budget (%s RAM, %s VRAM)",sysRamReason.c_str(),vidRamReason.c_str());break;
+   default:reason=va("standard desktop budget (%s RAM, %s VRAM)",sysRamReason.c_str(),vidRamReason.c_str());break;
+  }
+ }
+ return detected.preset->name;
 }
 
 static bool Common_ApplyPerformancePresetCommand( const idCmdArgs &args, bool quiet = false ) {

@@ -69,7 +69,7 @@ double Now() {
     return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 bool NoArguments(const std::string& operation) {
-    return operation == "settings.system.begin" || operation == "settings.system.defaults" ||
+    return operation == "settings.system.begin" || operation == "settings.system.defaults" || operation == "settings.system.autodetect" ||
         operation == "settings.system.cancel" || operation == "settings.system.apply" ||
         operation == "settings.system.applyExit" ||
         operation == "settings.system.confirm" || operation == "settings.system.revert";
@@ -347,6 +347,8 @@ bool UI_SettingsOperation(const Action& action, std::string& error) {
     if (NoArguments(action.operation) && action.arguments.empty()) return true;
     if ((action.operation=="settings.system.confirm" || action.operation=="settings.system.revert" || action.operation=="settings.system.retry") &&
         action.arguments.size()==1 && action.arguments.contains("request") && action.arguments.at("request").type==2) return true;
+    if (action.operation=="settings.system.preset" && action.arguments.size()==1 &&
+        action.arguments.contains("name") && action.arguments.at("name").type==2) return true;
     if (action.operation == "settings.system.edit" && !action.arguments.empty()) {
         const auto& schema = SystemSettingsHost::Schema();
         for (const auto& [key,value] : action.arguments) {
@@ -422,6 +424,19 @@ bool UI_SettingsDispatch(std::uint64_t owner, const ActionInvocation& action, st
     else if (action.operation=="settings.system.retry" ||
         ((action.operation=="settings.system.confirm" || action.operation=="settings.system.revert") && !action.arguments.empty()))
         result={SettingsCode::Busy,"The display action belongs to a completed or stale request"};
+    else if (action.operation=="settings.system.preset" || action.operation=="settings.system.autodetect") {
+        if(service.closing || service.abandon) result={SettingsCode::Busy,"Settings owner is closing"};
+        else result=transaction.EditGenerated(owner,[&](StateValues& patch,std::string& diagnostic){
+            const bool expanded=action.operation=="settings.system.preset" ?
+                service.host.BuildPreset(std::get<std::string>(action.arguments.at("name")),patch,diagnostic) :
+                service.host.BuildDetectedPreset(patch,diagnostic);
+            if(!expanded)return false;
+            if(!service.owners.contains(owner) || service.closing || service.abandon){
+                diagnostic="Settings owner changed during profile observation";return false;
+            }
+            return true;
+        });
+    }
     else if (action.operation == "settings.system.edit") result = transaction.Edit(owner,action.arguments);
     else if (action.operation == "settings.system.defaults") result = transaction.Defaults(owner);
     else if (action.operation == "settings.system.cancel") {

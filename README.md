@@ -80,8 +80,9 @@ changes with checked readback and conflict handling. A
 device results and strict restoration. Eligible retained confirmation views use
 [Apply/Keep/Revert and durable recovery](docs/dev/ui/display-confirmation.md),
 including a countdown after the owning view presents and recovery after restart.
-The opt-in [SYSTEM page](docs/dev/ui/system-exit.md) has 16 value controls and
-guarded discard/apply-and-return flows with authored modal focus ownership.
+The opt-in [SYSTEM page](docs/dev/ui/system-exit.md) has precise brightness
+fields, [performance preset and Auto-Detect draft controls](docs/dev/ui/performance-presets.md),
+and guarded discard/apply-and-return flows with authored modal focus ownership.
 Audio/resource effects and the complete production settings page remain in development.
 [Ordered event programs](docs/dev/ui/event-programs.md) connect data, transitions
 and typed actions to normal GUI lifecycle and session delivery. Complete GUI migration,

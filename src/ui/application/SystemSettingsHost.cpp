@@ -2,6 +2,7 @@
 #include "../../idlib/precompiled.h"
 #ifndef ID_DEDICATED
 #include "SystemSettingsHost.h"
+#include "../../framework/PerformancePreset.h"
 #include "../../framework/CVarDefaults.h"
 #include <algorithm>
 #include <bit>
@@ -341,6 +342,36 @@ bool SystemSettingsHost::ResolveModeDimensions(int mode, int customWidth, int cu
 	const int h=mode==-2?desktopPixelHeight:mode==-1?customHeight:LegacyModes[mode][1];
 	if (w<320 || w>16384 || h<240 || h>16384) return false;
 	width=w; height=h; return true;
+}
+bool SystemSettingsHost::BuildPreset(const std::string& name,StateValues& patch,std::string& error) {
+ const auto* preset=openq4::FindPerformancePreset(name);
+ if(!preset)return Fail(error,"com_performancePreset","unknown performance profile");
+ openq4::PerformancePresetAssignments assignments;
+ if(!openq4::ExpandPerformancePreset(*preset,assignments,error))return false;
+ StateValues candidate;
+ for(const auto& assignment:assignments){
+  const auto field=Schema().find(assignment.key);
+  if(field==Schema().end())return Fail(error,assignment.key,"profile target is not in the settings catalog");
+  StateValue value;
+  if(const auto number=std::get_if<int>(&assignment.value)){
+   if(field->second==0)value=double(*number);
+   else if(field->second==1&&(*number==0||*number==1))value=*number!=0;
+   else return Fail(error,assignment.key,"profile target has an invalid Boolean or numeric type");
+  }else{
+   if(field->second!=2)return Fail(error,assignment.key,"profile target has an invalid string type");
+   value=std::get<std::string>(assignment.value);
+  }
+  if(!candidate.emplace(assignment.key,std::move(value)).second)return Fail(error,assignment.key,"profile target is duplicated");
+ }
+ if(candidate.size()!=openq4::PerformancePresetTargetCount)return Fail(error,"com_performancePreset","profile footprint is incomplete");
+ patch.swap(candidate);error.clear();return true;
+}
+bool SystemSettingsHost::BuildDetectedPreset(StateValues& patch,std::string& error) {
+ openq4::PerformancePresetSignals signals;
+ if(!Common_CapturePerformancePresetSignals(signals,error))return false;
+ const auto detection=openq4::DetectPerformancePreset(signals);
+ if(!detection.preset)return Fail(error,"com_performancePreset","detected profile is unavailable");
+ return BuildPreset(detection.preset->name,patch,error);
 }
 bool SystemSettingsHost::Read(StateValues& values, std::string& error) {
 	StateValues candidate;

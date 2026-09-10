@@ -4,7 +4,7 @@
   "date": "2026-09-10",
   "status": "Implementation incomplete; this register preserves full product scope and does not accept any production GUI.",
   "baseline": {
-    "engine_revision": "59dbfa9429056a85ead40fff5e8f4f5b38be4225",
+    "engine_revision": "b542315efd4b724c458bc9cd0f6310c76afd71e8",
     "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
     "effective_gui_count": 271,
     "translated_or_accepted_resources": 0,
@@ -24,7 +24,7 @@
     "original": {
       "path": "docs/dev/plans/idtech5-ui.md",
       "authority": "original immutable scope and stage gates",
-      "sha256": "49b52e018525e8fc5a746c0aa182d057d4d201eb33d6d4205d9e72a2e2e71b89"
+      "sha256": "18856b4b396c54ca571b7776c56a650f6188711b244ff9336ecb92f34c890721"
     },
     "inventory": {
       "path": "docs/dev/ui/inventory-report.md",
@@ -305,7 +305,7 @@
       "scope": "Current-buffer numeric editing commands, atomic range undo, held-key owner isolation and per-event captured modifier/repeat metadata. Portable native-text broker, strict wire codec, SDL ingress and reviewed Windows observer foundation; observer disabled pending owner/ordered native dispatch integration. Windows build and 27 retained-UI suites pass; two windowed gameplay-based semantic command captures cover 32 operations and ten engine images at SP/OpenGL125% and MP/Vulkan200%. Counted adapter, journal, edit-buffer and actual SDL observer tests reject behavioral mutations. No native character/clipboard/IME field route, physical-device acceptance, full international text, production precise-entry screen, migration, editor or product acceptance.",
       "local_capture_summary": ".tmp/ui/text-routing-integration/validation-evidence.json",
       "local_capture_summary_sha256": "1d62bddd483805ef0576b87571a5d4bae0d7a93c70283e15f8c1d8c366552bc4",
-      "sha256": "addcbeef929de156650259dcf80cb411705f7164ed21a26bb3eb9a017b4b69ef"
+      "sha256": "fecdd9d80c9c8c5b39c82971ab5374bbc5785744d675cf1cc5f0466a7a5a2d38"
     },
     "native-owner-store": {
       "kind": "implementation_checkpoint",
@@ -315,7 +315,7 @@
       "scope": "Exact managed editor ownership, engine queue continuity, portable native shadow document and actual Windows SDK text store with application-origin text/selection/layout notifications. First disabled SDL dispatch fence does not prove lossless earlier-event consumption. Windows build and29UI suites plus updatedCOM suite pass; source-bound SP/GL125% and MP/Vulkan200% gameplay captures cover32semantic operations and10engine images. Native field routing, checked queue consumer, complete composition/shaping, production controls, editor, migrations and final gates remain unaccepted.",
       "local_capture_summary": ".tmp/ui/native-owner-integration/validation-evidence.json",
       "local_capture_summary_sha256": "c9313dc2a1361368626a4d5b225e19f39be03fbe8e330bc573c42e8f6aaa168b",
-      "sha256": "addcbeef929de156650259dcf80cb411705f7164ed21a26bb3eb9a017b4b69ef"
+      "sha256": "fecdd9d80c9c8c5b39c82971ab5374bbc5785744d675cf1cc5f0466a7a5a2d38"
     },
     "precise-system-fields": {
       "kind": "implementation_checkpoint",
@@ -347,6 +347,26 @@
       "local_capture_summary": ".tmp/ui/native-managed-bridge-integration/validation-evidence.json",
       "local_capture_summary_sha256": "bf2732fa8c57a7947b73af55ccc525d3856220080badd6eab1b0e1039b9f8573",
       "sha256": "2d12f462f97a77acbcbbccde45fb16db2c5da0a91dc182b6e4097fd1cbffacc8"
+    },
+    "performance-preset-drafts": {
+      "kind": "implementation_checkpoint",
+      "path": "docs/dev/ui/performance-presets.md",
+      "baseline_engine_revision": "b542315efd4b724c458bc9cd0f6310c76afd71e8",
+      "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
+      "scope": "Shared six-profile catalog and ordered 32 assignments preserve Common behavior; typed preset/Auto-Detect operations merge under an owned guarded transaction with exact failure atomicity and all 21 unrelated fields preserved. Production SYSTEM uses source-derived vector controls, six existing locale tables, guarded local Number drafts, transient highlight and authoritative readback before proposal acknowledgement. Native Runtime/RmlUi covers 48 locale/wider-glyph/density/resize cases; integrated gameplay evidence is bounded separately. Complete effect execution/persistence, actual font/platform matrix, every production page, editor and migration remain unaccepted.",
+      "local_capture_summary": ".tmp/ui/preset-session-integration/validation-evidence.json",
+      "local_capture_summary_sha256": "69ccd3f6872a47cf9fa66f632c969c426e9e95f61098ee7b93f9f7c317e526b8",
+      "sha256": "14cff3ee63dd2426f91c8fe3bfe6b84739bbfa31c26ee665caa916e5ad135448"
+    },
+    "windows-text-session": {
+      "kind": "implementation_checkpoint",
+      "path": "docs/dev/ui/text-input-routing.md",
+      "baseline_engine_revision": "b542315efd4b724c458bc9cd0f6310c76afd71e8",
+      "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
+      "scope": "One constructing-STA Windows text-session controller binds exact editor/native/window/module/association/registration leases through checked SDK activation and quiescence collections. Cleanup retires the engine adoption lease, requires ordinary disposition, retires the store and uses a fresh provider/ledger gate before native ACK. Replacement ownership cannot be disabled or unregistered by fault cleanup. Counted SDK 4544 checks and 19 compiled mutations cover this boundary; the OS COM factory and installed text services are not invoked. Production activation, Session sidecars/pumps, native text/composition/candidate routing, all host input and full text/editor/product qualification remain incomplete.",
+      "local_capture_summary": ".tmp/ui/preset-session-integration/validation-evidence.json",
+      "local_capture_summary_sha256": "69ccd3f6872a47cf9fa66f632c969c426e9e95f61098ee7b93f9f7c317e526b8",
+      "sha256": "fecdd9d80c9c8c5b39c82971ab5374bbc5785744d675cf1cc5f0466a7a5a2d38"
     }
   },
   "groups": {
@@ -1543,10 +1563,11 @@
         "instance-persistence-foundation",
         "managed-application-foundation",
         "event-program-foundation",
-        "native-managed-bridge"
+        "native-managed-bridge",
+        "windows-text-session"
       ],
       "acceptance_evidence": [],
-      "remaining": "The private manager retains deferred/retained identities, pending-action allocation serials and lifecycle drains. Managed native-owner endpoints now re-observe the route and registered allocation/backend/document after resource preparation; callback-free current-owner/publication checks and exact old-lease retirement preserve stable drafts. The route probe and live Session/provider ownership still need integration. Complete normal reference/uniqueness, lists, diagnostics, level-load, reload, editor and complete-corpus ownership qualification; bounded extracted manager tests do not accept the full backend-neutral contract."
+      "remaining": "The checked Windows text-session controller now owns SDK activation/quiescence and exact final provider/ledger acknowledgement, with counted SDK evidence and production activation still disabled. The private manager retains deferred/retained identities, pending-action allocation serials and lifecycle drains. Managed native-owner endpoints now re-observe the route and registered allocation/backend/document after resource preparation; callback-free current-owner/publication checks and exact old-lease retirement preserve stable drafts. The route probe and live Session/provider ownership still need integration. Complete normal reference/uniqueness, lists, diagnostics, level-load, reload, editor and complete-corpus ownership qualification; bounded extracted manager tests do not accept the full backend-neutral contract."
     },
     {
       "id": "RUN-003",
@@ -1771,10 +1792,11 @@
         "system-exit-foundation",
         "precise-system-fields",
         "native-field-binding",
-        "native-managed-bridge"
+        "native-managed-bridge",
+        "performance-preset-drafts"
       ],
       "acceptance_evidence": [],
-      "remaining": "The typed settings service and asynchronous display confirmation retain their previously qualified scopes. Local numeric drafts guard Apply, Apply and Exit, Defaults, colliding sibling edits and dismissal; Discard requires completed service cancellation and an unchanged complete local editor inventory. Queued rollback, stale callbacks and recovery preserve unfinished text. Exact typed comparison and FTZ/DAZ-independent journal number serialization now cover transaction, display validation and startup recovery, preserving observed originals while signed zeros share the canonical zero representation. Complete actual audio/resource/input effects, profile and Auto-Detect draft expansion, all dependent production controls, Defaults and the full Apply/Cancel/discard-and-exit matrix. Qualify visible focus/window-placement/fullscreen/multi-monitor failures and timeout/restart recovery across supported platforms. CVar values alone never prove device success; counted recovery and synthetic startup evidence do not qualify a power loss, actual interrupted confirmation or every persistent recovery path."
+      "remaining": "The typed settings service and asynchronous display confirmation retain their previously qualified scopes. Local numeric drafts guard Apply, Apply and Exit, Defaults, colliding sibling edits and dismissal; Discard requires completed service cancellation and an unchanged complete local editor inventory. Queued rollback, stale callbacks and recovery preserve unfinished text. Exact typed comparison and FTZ/DAZ-independent journal number serialization now cover transaction, display validation and startup recovery, preserving observed originals while signed zeros share the canonical zero representation. Shared profile and Auto-Detect draft expansion now preserve all unrelated edits with guarded atomic publication. Complete actual audio/resource/input effects, preset execution and persistence, all dependent production controls, Defaults and the full Apply/Cancel/discard-and-exit matrix. Qualify visible focus/window-placement/fullscreen/multi-monitor failures and timeout/restart recovery across supported platforms. CVar values alone never prove device success; counted recovery and synthetic startup evidence do not qualify a power loss, actual interrupted confirmation or every persistent recovery path."
     },
     {
       "id": "BEH-003",
@@ -2771,10 +2793,11 @@
         "native-owner-store",
         "precise-system-fields",
         "native-field-binding",
-        "native-managed-bridge"
+        "native-managed-bridge",
+        "windows-text-session"
       ],
       "acceptance_evidence": [],
-      "remaining": "Checked clipboard commands, the portable native document/reconciler and Windows SDK store retain their bounded evidence. Managed owner endpoints and the checked Windows hook bridge now connect the existing coordinator/store layers, including exact lifecycle receipts and idle copied barriers. Connect the production Session route/probe and an exclusive live native provider; implement ordinary native character association, candidate layout, full composition lifecycle and renewal, monitor/language/DPI updates and every supported backend. Qualify actual clipboard exchange and installed host IMEs with correct caret/candidate geometry and preserved edits. Counted callbacks and semantic render captures do not establish installed text-service behavior or this entire requirement."
+      "remaining": "The checked Windows text-session controller now owns SDK activation/quiescence and exact final provider/ledger acknowledgement, with counted SDK evidence and production activation still disabled. Checked clipboard commands, the portable native document/reconciler and Windows SDK store retain their bounded evidence. Managed owner endpoints and the checked Windows hook bridge now connect the existing coordinator/store layers, including exact lifecycle receipts and idle copied barriers. Connect the production Session route/probe and an exclusive live native provider; implement ordinary native character association, candidate layout, full composition lifecycle and renewal, monitor/language/DPI updates and every supported backend. Qualify actual clipboard exchange and installed host IMEs with correct caret/candidate geometry and preserved edits. Counted callbacks and semantic render captures do not establish installed text-service behavior or this entire requirement."
     },
     {
       "id": "TXT-009",
@@ -2945,10 +2968,11 @@
         "native-owner-store",
         "precise-system-fields",
         "native-field-binding",
-        "native-managed-bridge"
+        "native-managed-bridge",
+        "windows-text-session"
       ],
       "acceptance_evidence": [],
-      "remaining": "Existing wheel, numeric command, checked queue-consumption and owned native-collection evidence remains bounded. Managed owner endpoints, the Windows hook-to-store bridge and explicit lifecycle reconciliation preserve exact owner, provider generation, queue continuity and copied receipt ordering without enabling a native provider. Connect this ingress to the production Session route with native provenance, actual provider activation and verified payload lifetime. Complete production wheel/touch scrolling, Unicode text/composition, keyboard/gamepad repeat/reconnect behavior, deterministic replay and the full supported-host/widget operation matrix with value, focus and scroll evidence. No physical-input or complete payload acceptance is inferred."
+      "remaining": "The checked Windows text-session controller now owns SDK activation/quiescence and exact final provider/ledger acknowledgement, with counted SDK evidence and production activation still disabled. Existing wheel, numeric command, checked queue-consumption and owned native-collection evidence remains bounded. Managed owner endpoints, the Windows hook-to-store bridge and explicit lifecycle reconciliation preserve exact owner, provider generation, queue continuity and copied receipt ordering without enabling a native provider. Connect this ingress to the production Session route with native provenance, actual provider activation and verified payload lifetime. Complete production wheel/touch scrolling, Unicode text/composition, keyboard/gamepad repeat/reconnect behavior, deterministic replay and the full supported-host/widget operation matrix with value, focus and scroll evidence. No physical-input or complete payload acceptance is inferred."
     },
     {
       "id": "INP-006",
@@ -3165,7 +3189,8 @@
       ],
       "status": "partial",
       "current_evidence": [
-        "value-controls-foundation"
+        "value-controls-foundation",
+        "performance-preset-drafts"
       ],
       "acceptance_evidence": [],
       "remaining": "Canonical constrained choices now have stable typed options and authored field/chevron/popup/row/label/selection/highlight parts, authoritative readback, tentative open/cancel/commit behavior and measured popup scrolling/placement. Initial post-AA selection uses the settings draft. Complete scrollbars, all constrained/overflow/dynamic availability cases, focus restoration, full physical-device/accessibility behavior, reusable artwork and state-gallery acceptance. Recorded native and normal-route Windows checks qualify this initial control subset only."
@@ -3197,10 +3222,11 @@
         "native-owner-store",
         "precise-system-fields",
         "native-field-binding",
-        "native-managed-bridge"
+        "native-managed-bridge",
+        "windows-text-session"
       ],
       "acceptance_evidence": [],
-      "remaining": "The canonical Number model keeps local drafts, conflicts and history through inactive restoration; SYSTEM pairs brightness sliders with precise fields, localized validation, checked clipboard commands and guarded Apply/exit. Complete native presentation and prepared stable settlement reach Runtime/Rml, and managed owner/Windows bridge endpoints now preserve their exact lease boundaries. Shared projected focus reveal adds a bounded 4dp inset without modifying authored scroll ranges. Connect live native character/composition delivery; finish pointer/word/grapheme/bidi navigation, general text controls, visible conflict correction and all field states. Qualify production keyboard, pointer, gamepad and supported touch/text routes, actual clipboard/IME, full focus artwork, the complete state gallery and every supported platform."
+      "remaining": "The checked Windows text-session controller now owns SDK activation/quiescence and exact final provider/ledger acknowledgement, with counted SDK evidence and production activation still disabled. The canonical Number model keeps local drafts, conflicts and history through inactive restoration; SYSTEM pairs brightness sliders with precise fields, localized validation, checked clipboard commands and guarded Apply/exit. Complete native presentation and prepared stable settlement reach Runtime/Rml, and managed owner/Windows bridge endpoints now preserve their exact lease boundaries. Shared projected focus reveal adds a bounded 4dp inset without modifying authored scroll ranges. Connect live native character/composition delivery; finish pointer/word/grapheme/bidi navigation, general text controls, visible conflict correction and all field states. Qualify production keyboard, pointer, gamepad and supported touch/text routes, actual clipboard/IME, full focus artwork, the complete state gallery and every supported platform."
     },
     {
       "id": "WID-007",
@@ -4802,10 +4828,11 @@
         "system-exit-foundation",
         "precise-system-fields",
         "native-field-binding",
-        "native-managed-bridge"
+        "native-managed-bridge",
+        "performance-preset-drafts"
       ],
       "acceptance_evidence": [],
-      "remaining": "The source-backed 31-option/53-CVar contract retains its packaged opt-in SYSTEM route and precise Brightness/Ambient Brightness fields, localized validation and local draft barriers. Exact numeric recovery and bounded full-border focus reveal extend this implementation; neither accepts the translated page. Complete every actual setting and dependent popup, display capability/resolution catalogs, native numeric text entry, presets/Auto-Detect, remaining effects, Defaults, full Apply/Cancel/exit behavior, source-derived visuals/transitions and the native editor round trip. Qualify normal SP/MP entry/return/reopen, failure/cancellation, complete responsive/localized state galleries and every mapped resource; historical and current bounded captures do not accept the full requirement."
+      "remaining": "The production page now includes source-derived preset and Auto-Detect controls with localized flowing labels, guarded proposals, actual shared draft expansion and bounded Runtime/gameplay validation. The source-backed 31-option/53-CVar contract retains its packaged opt-in SYSTEM route and precise Brightness/Ambient Brightness fields, localized validation and local draft barriers. Exact numeric recovery and bounded full-border focus reveal extend this implementation; neither accepts the translated page. Complete every actual setting and dependent popup, display capability/resolution catalogs, native numeric text entry, complete preset/Auto-Detect effect execution and persistence, remaining effects, Defaults, full Apply/Cancel/exit behavior, source-derived visuals/transitions and the native editor round trip. Qualify normal SP/MP entry/return/reopen, failure/cancellation, complete responsive/localized state galleries and every mapped resource; historical and current bounded captures do not accept the full requirement."
     },
     {
       "id": "FLOW-003",
