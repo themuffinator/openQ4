@@ -1,5 +1,6 @@
 // Copyright (C) 2026 DarkMatter Productions. GPL-3.0-or-later.
 #include "../idlib/precompiled.h"
+#include "../framework/NativeInputPublications.h"
 #include "UserInterfaceRetained.h"
 #ifndef ID_DEDICATED
 #include "RetainedUI.h"
@@ -229,7 +230,7 @@ struct idUserInterfaceRetained::Impl {
 	std::string lastError;
 	std::string checkpoint;
 
-	~Impl() { UI_SettingsReleaseOwner(settingsOwner); RetainedUI_DestroyView(view); }
+	~Impl() { openq4::NativeInputBeforeUiChange(0,textBackend); UI_SettingsReleaseOwner(settingsOwner); RetainedUI_DestroyView(view); }
 	Runtime* RuntimeView() const { return RetainedUI_ViewRuntime(view); }
 	bool NativeOwnerMatches(const TextEditorIdentity& owner, bool eligible) const noexcept {
 		return owner.allocation && owner.backend && owner.document &&
@@ -245,6 +246,7 @@ struct idUserInterfaceRetained::Impl {
 		Error("Callers cannot overwrite adapter-owned number draft state"); return false;
 	}
 	void Quarantine(bool forget = false, bool cancelRuntime = true, bool discardPrograms = false) {
+		openq4::NativeInputBeforeUiChange(0,textBackend);
 		input.Cancel(forget); input.Take(); held.clear(); close = false; pointerVisible = false;
 		routedPointerValid = false;
 		// Completed programs retain their immutable invocations through input
@@ -265,6 +267,7 @@ struct idUserInterfaceRetained::Impl {
 		// Allocate before teardown. Exhaustion permanently disables text ownership
 		// for this document; restored editors cannot inherit its old native lease.
 		if (event == retainedUIViewEvent_t::BeforeResourceReset) {
+			openq4::NativeInputBeforeUiChange(0,self.textBackend);
 			self.textDocument = UI_NextTextLifetime();
 			if (!self.textDocument) self.Error("GUI text lifetime exhausted");
 		}
@@ -381,7 +384,9 @@ struct idUserInterfaceRetained::Impl {
 		const auto count = effects.actions.size();
 		for (auto& action : effects.actions) actions.push_back({std::move(action),false});
 		if (!interactiveSet) {
-			interactive = HasControls(document.Model().root) && !NonInteractive(state);
+			const bool nextInteractive = HasControls(document.Model().root) && !NonInteractive(state);
+			if (nextInteractive != interactive) openq4::NativeInputBeforeUiChange(0,textBackend);
+			interactive = nextInteractive;
 			if (!interactive) Quarantine();
 		}
 		lastError.clear();
@@ -403,7 +408,10 @@ struct idUserInterfaceRetained::Impl {
 				if (!RuntimeView()->PopModal(RetainedUI_PresentationTime())) {
 					if (RuntimeView()->HasEvent("onBack")) RunEvent("onBack");
 					else if (semantic && actions.size() < 256) actions.push_back({{"","ui.dismiss",{}},false});
-					else if (!semantic) close = true;
+					else if (!semantic) {
+						openq4::NativeInputBeforeUiChange(0,textBackend);
+						close = true;
+					}
 				}
 				continue;
 			}
@@ -507,7 +515,7 @@ struct idUserInterfaceRetained::Impl {
 };
 
 idUserInterfaceRetained::idUserInterfaceRetained(bool managed) : idUserInterfaceManaged(managed), impl(std::make_unique<Impl>()) { diagnosticViews.push_back(this); }
-idUserInterfaceRetained::~idUserInterfaceRetained() { diagnosticViews.erase(std::remove(diagnosticViews.begin(),diagnosticViews.end(),this),diagnosticViews.end()); }
+idUserInterfaceRetained::~idUserInterfaceRetained() { MarkNativeInputClosing(); openq4::NativeInputBeforeUiChange(0,impl->textBackend); diagnosticViews.erase(std::remove(diagnosticViews.begin(),diagnosticViews.end(),this),diagnosticViews.end()); }
 const char* idUserInterfaceRetained::Name() const { return impl->path.c_str(); }
 const char* idUserInterfaceRetained::Comment() const { return "Canonical retained UI"; }
 const char* idUserInterfaceRetained::GetSourceFile() const { return Name(); }
@@ -517,7 +525,7 @@ bool idUserInterfaceRetained::HasInteractiveOverride() const { return impl->inte
 bool idUserInterfaceRetained::IsMenuGui() const { return true; }
 bool idUserInterfaceRetained::AlwaysThink() const { return false; }
 bool idUserInterfaceRetained::IsInteractive() const { return impl->interactive; }
-void idUserInterfaceRetained::SetInteractive(bool value) { impl->interactiveSet = true; impl->interactive = value; if (!value) impl->Quarantine(); }
+void idUserInterfaceRetained::SetInteractive(bool value) { if (value != impl->interactive) openq4::NativeInputBeforeUiChange(0,impl->textBackend); impl->interactiveSet = true; impl->interactive = value; if (!value) impl->Quarantine(); }
 bool idUserInterfaceRetained::IsUniqued() const { return impl->unique; }
 void idUserInterfaceRetained::SetUniqued(bool value) { impl->unique = value; }
 size_t idUserInterfaceRetained::Size() { return sizeof(*this)+sizeof(Impl)+impl->state.Allocated()+impl->document.Source().size(); }
@@ -561,6 +569,7 @@ bool idUserInterfaceRetained::InitFromFile(const char* qpath, bool rebuild, bool
 		return false;
 	}
 	impl->Quarantine(false,false,true);
+	openq4::NativeInputBeforeUiChange(0,impl->textBackend);
 	impl->textDocument = textDocument;
 	if (same && impl->settingsClosePending) UI_SettingsCloseOwner(impl->settingsOwner);
 	impl->settingsClosePending = false;
@@ -600,7 +609,9 @@ void idUserInterfaceRetained::StateChanged(int time, bool redraw) {
 	else {
 		impl->lastError.clear();
 		if (!impl->interactiveSet) {
-			impl->interactive = HasControls(impl->document.Model().root) && !NonInteractive(impl->state);
+			const bool nextInteractive = HasControls(impl->document.Model().root) && !NonInteractive(impl->state);
+			if (nextInteractive != impl->interactive) openq4::NativeInputBeforeUiChange(0,impl->textBackend);
+			impl->interactive = nextInteractive;
 			if (!impl->interactive) impl->Quarantine();
 		}
 	}
@@ -671,7 +682,10 @@ const char* idUserInterfaceRetained::HandleEvent(const sysEvent_t* event, int ti
 		if (event->evType == SE_KEY && !event->evValue2) impl->input.ReleaseQuarantined(event->evValue);
 		// Failure must never strand the session behind an unavailable menu.
 		if (impl->active && event->evType == SE_KEY && event->evValue2 &&
-			(event->evValue == K_ESCAPE || event->evValue == K_JOY4 || event->evValue == K_JOY7 || event->evValue == K_JOY8)) impl->close = true;
+			(event->evValue == K_ESCAPE || event->evValue == K_JOY4 || event->evValue == K_JOY7 || event->evValue == K_JOY8)) {
+			openq4::NativeInputBeforeUiChange(0,impl->textBackend);
+			impl->close = true;
+		}
 		return impl->close ? ActionMarker : "";
 	}
 	if (!impl->AcceptInput()) {
@@ -949,6 +963,7 @@ bool idUserInterfaceRetained::WriteToSaveGame(idFile* file) const {
 }
 
 bool idUserInterfaceRetained::ReadFromSaveGame(idFile* file) {
+	openq4::NativeInputBeforeUiChange(0,impl->textBackend);
 	if (!file || !impl->Prepare()) return false;
 	unsigned tag = 0; int version = 0, length = 0;
 	if (file->ReadUnsignedInt(tag) != 4 || file->ReadInt(version) != 4 || file->ReadInt(length) != 4 ||
@@ -976,6 +991,7 @@ bool idUserInterfaceRetained::ReadFromSaveGame(idFile* file) {
 	const auto textDocument = UI_NextTextLifetime();
 	if (!textDocument) { impl->Error("GUI text lifetime exhausted"); return false; }
 	if (!impl->RuntimeView()->RestoreSnapshot(snapshot,error,RetainedUI_PresentationTime())) { impl->Error(error); return false; }
+	openq4::NativeInputBeforeUiChange(0,impl->textBackend);
 	impl->textDocument = textDocument;
 	impl->Quarantine(false,false,true); impl->state = state; impl->state.Set("name",Name());
 	impl->settingsClosePending = false;

@@ -660,6 +660,12 @@ if build_engine or get_option('build_native_tests')
       retirement_args += ['--msvc-debug']
     endif
     test('openq4-ui-native-event-retirement', py, args: retirement_args, timeout: 180)
+    lifecycle_args = [meson.project_source_root() / 'tools/tests/native_input_lifecycle.py',
+      '--compiler', ui_test_cpp.cmd_array()[-1], '--no-mutations']
+    if ui_test_cpp.get_id() == 'msvc'
+      lifecycle_args += ['--msvc-debug']
+    endif
+    test('openq4-ui-native-input-lifecycle', py, args: lifecycle_args, timeout: 180)
     test('openq4-ui-sound-recovery', py,
       args: [meson.project_source_root() / 'tools/tests/sound_recovery.py',
         '--compiler', ui_test_cpp.cmd_array()[-1], '--no-mutations'], timeout: 180)
@@ -1635,7 +1641,7 @@ if build_engine or get_option('build_native_tests')
       # requires explicit checked Session admission; linking never enables it.
       windows_text_session_sdk_deps = [windows_ole_dep, cc.find_library('uuid', required: true)]
       windows_text_session_library = static_library('openq4-windows-text-session',
-        files('src/sys/sdl3/WindowsTextSession.cpp'),
+        files('src/sys/sdl3/WindowsTextSession.cpp', 'src/sys/sdl3/WindowsNativeInputRouteSource.cpp'),
         include_directories: [root_include_dir, include_directories('subprojects/packagefiles/sdl3/include')],
         dependencies: [windows_collection_bridge_dep, openq4_windows_text_store_dep, openq4_retained_dep, native_queue_dep] + text_ingress_headers + windows_text_session_sdk_deps,
         cpp_args: ['-DUSE_SDL3'], install: false)
@@ -1645,6 +1651,22 @@ if build_engine or get_option('build_native_tests')
   endif
   if get_option('build_native_tests') and build_engine and use_sdl3_backend
     text_ingress_test_headers = [root_include_dir, include_directories('subprojects/packagefiles/sdl3/include')]
+    # Match the explicitly prepared SDL tree used by the SDK CI qualification.
+    native_facts_sdl_headers = meson.project_source_root() / 'subprojects/SDL3-3.4.10/include'
+    if fs_mod.is_file(native_facts_sdl_headers / 'SDL3/SDL_events.h')
+      native_facts_args = ['--compiler', cpp.cmd_array()[-1], '--no-mutations',
+        '--sdl-include', native_facts_sdl_headers]
+      if cpp.get_id() == 'msvc'
+        native_facts_args += ['--msvc-debug']
+      endif
+      test('openq4-ui-native-input-facts', py,
+        args: [meson.project_source_root() / 'tools/tests/native_input_facts.py'] + native_facts_args, timeout: 180)
+      if host_system == 'windows'
+        test('openq4-ui-windows-native-input-facts', py,
+          args: [meson.project_source_root() / 'tools/tests/windows_text_session.py', '--route-facts'] + native_facts_args,
+          timeout: 180)
+      endif
+    endif
     native_collection_coordinator_test = executable('openq4-ui-native-collection-coordinator-test',
       files('tools/tests/native/UiNativeCollectionCoordinatorTest.cpp'),
       include_directories: text_ingress_test_headers,
@@ -1985,6 +2007,12 @@ if build_engine
     if build_games
       openq4_dedicated_sources += [savegame_compat_header]
     endif
+  endif
+
+  # The inventory calls the client owned-queue ledger. Keep it out of dedicated
+  # sources, which deliberately do not link the client native queue library.
+  if use_sdl3_backend
+    openq4_engine_sources += files('src/sys/sdl3/NativeInputEmissionInventory.cpp')
   endif
 
   bse_library = static_library(

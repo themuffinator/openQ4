@@ -275,6 +275,8 @@ The full engine and renderer modules build, and all 61 UI suites pass. Four revi
 
 This increment begins at engine `5e0d3ebf20234415815a72c914fe788953e4367b`. Its record `.tmp/ui/production-retirement-integration/validation-evidence.json` has SHA-256 `5a638d3df286ca14adf225ff16a99f3e6140dc25fbf13bfddbc7f7db8e7d5407`. Only `WID-010` advances from pending to partial; no acceptance evidence, migration acceptance or final gate changes.
 
+The [native ownership publication increment](native-input-publication.md), based on engine `d16c5b9e7935a273e274ea6c5956729d0da62c85`, connects actual Session, managed-GUI and SDL-window ownership to the route and typed emission inventory. The same checkpoint adds [conditional native alpha semantics](legacy-import.md) without accepting either affected GUI. The full build and64 integrated suites pass, together with the17-case adapter mutation check and four reviewed windowed GL/SP and Vulkan/MP gameplay/restart/menu images. Native activation/disposal and live legacy-alpha observation remain required. Its record `.tmp/ui/native-publication-integration/validation-evidence.json` has SHA-256 `10dfc153acc3d0a6e26fe398cee80dc8098893e702656ca35df93e8b821bc7ae`. No status, acceptance, migration or gate changes.
+
 There are **66 partial, 160 pending and one verified requirement**. `BEH-002`
 remains partial for the implemented settings transaction/service boundary.
 `BEH-005` remains partial for committed action delivery and cancellation; stock

@@ -149,6 +149,42 @@ class SyntaxTests(unittest.TestCase):
         self.assertTrue(result['complete_token_coverage'])
         self.assertEqual(result['statements'][0]['children'][0]['values'][3]['kind'],'unresolved_reference')
         self.assertEqual(result['diagnostics'][0]['code'],'unresolved_legacy_term')
+        term = result['statements'][0]['children'][0]['values'][3]
+        self.assertEqual(term['name'],'\\')
+        self.assertEqual(term['span'],[10,11])
+        self.assertEqual(term['native_semantics'],{'lookup':'table-then-window-variable',
+            'fixup':'once-after-window-parse','unbound_after_fixup':0.0,'constant_lowering':False})
+        self.assertIn('tokens alone do not authorize constant lowering',result['diagnostics'][0]['message'])
+        self.assertEqual(result['diagnostics'][0]['token'],10)
+        self.assertEqual(result['diagnostics'][0]['parser_source'],'guis/test.gui')
+
+    def test_backslash_following_literal_n_is_not_repaired_as_an_escape(self):
+        for split in (False,True):
+            tail = [('n','matscalex'),('-','1')] if split else [('n','matscalex','-','1')]
+            source = data(('windowDef','D','{','matcolor','1',',','1',',','1',',','\\'),*tail,('}',))
+            source['tokens'][10][0] = 5
+            result = Parser(source,self.rules).parse()
+            self.assertTrue(result['complete_token_coverage'])
+            self.assertFalse(result['complete_syntax'])
+            self.assertFalse(result['replacement_acceptance'])
+            props=result['statements'][0]['children']
+            self.assertEqual(props[0]['values'][3]['native_semantics']['unbound_after_fixup'],0)
+            self.assertEqual(props[1]['name'],'n')
+            self.assertEqual(props[1]['tokens'],['matscalex'] if split else ['matscalex','-','1'])
+            if split:
+                self.assertEqual(props[2]['name'],'-')
+                self.assertEqual(props[2]['tokens'],['1'])
+
+    def test_possible_backslash_definition_does_not_become_a_constant(self):
+        source=data(('windowDef','D','{','matcolor','1',',','1',',','1',',','\\'),
+                    ('float',Quoted('\\'),'0.375'),('}',))
+        source['tokens'][10][0]=5
+        result=Parser(source,self.rules).parse()
+        self.assertTrue(result['complete_token_coverage'])
+        term=result['statements'][0]['children'][0]['values'][3]
+        self.assertEqual(term['kind'],'unresolved_reference')
+        self.assertFalse(term['native_semantics']['constant_lowering'])
+        self.assertEqual(result['statements'][0]['children'][1]['name'],'\\')
 
     def test_consuming_last_token_does_not_hide_incomplete_structure(self):
         result = Parser(data(('windowDef','D','{','rect','0',',','0',',','1',',','1')),self.rules).parse()

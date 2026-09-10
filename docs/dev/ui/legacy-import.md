@@ -97,9 +97,29 @@ intentionally differ from the earlier unexpanded lexical inventory.
 Two shipped sources require explicit expression review:
 `guis/monitors/strogg/core/core4.gui:635` and
 `guis/monitors/strogg/hub/hub4.gui:631` contain a bare backslash in a color alpha
-expression. Native `ParseTerm` can defer this as a variable reference. The
-importer preserves the hierarchy and flags the unresolved term; it does not
-silently substitute an alpha. Other unusual custom fields remain pending.
+expression. Native `ParseTerm` checks a declaration table first, then the
+owning window's variables. If neither resolves the term, it emits a deferred
+variable operation. `FixupParms` retries the variable lookup once after parsing;
+`EvaluateRegisters` writes **zero** when the resulting pointer is null. An
+existing variable, a definition encountered before fixup, or a matching table
+can change that result. An immediate float lookup also calls `Init`/`Set` with
+the token spelling (which is nonnumeric here); late fixup does not reinitialize
+the variable. An unqualified name does not inherit a parent's variable.
+
+The importer now records this conditional native fallback beside the original
+term, token span and diagnostic. It still refuses unconditional constant
+lowering: exported tokens do not observe the live declaration/variable inventory.
+The following literal `n` and `matscalex` tokens are separate native custom
+properties, not a newline escape to repair. Their original line grouping is
+preserved, including the separate `-` property in `core4.gui`.
+
+`tools/tests/ui_legacy_expression.py` compiles the actual native lookup,
+expression, fixup and evaluator method bodies against counted surrounding
+services. It proves the unresolved-zero path, table precedence, immediate/late
+local definitions, parent/qualified lookup, and both trailing-token layouts.
+This establishes the native fallback; it does not instantiate these monitors,
+observe a live table inventory, qualify later script writes, or accept their
+replacement GUIs. Other unusual custom fields remain pending.
 
 The earlier lexical brace observation for `guis/maps/tram1/bridge1.gui` does
 not prevent complete preprocessed structure import. Instantiation and behavior
@@ -122,11 +142,13 @@ python tools/ui/legacy_syntax.py .tmp/ui/import/sp-gl --output .tmp/ui/import/sy
 python tools/ui/legacy_syntax.py .tmp/ui/import/mp-vulkan --output .tmp/ui/import/syntax-mp
 python tools/tests/ui_legacy_inventory.py
 python tools/tests/ui_legacy_import.py
+python tools/tests/ui_legacy_expression.py --mutations
 ```
 
-Both capture and analysis require fresh output directories. Tests are included
-in commit-validation and push-verification script smoke jobs. The 14 inventory
-tests exercise effective VFS selection and exported request hashes; the 17
+Both capture and analysis require fresh output directories. The inventory and
+structured-import tests are included in commit-validation and push-verification
+script smoke jobs. The 14 inventory
+tests exercise effective VFS selection and exported request hashes; the 19
 import tests cover expression grouping, branches, duplicate declarations,
 timelines, dependency data, incomplete structures and source/log validation.
 

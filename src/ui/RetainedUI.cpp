@@ -1,5 +1,6 @@
 // Copyright (C) 2026 DarkMatter Productions. GPL-3.0-or-later.
 #include "RetainedUI.h"
+#include "../framework/NativeInputPublications.h"
 
 #ifndef ID_DEDICATED
 #include "LegacyGuiImport.h"
@@ -284,6 +285,7 @@ bool WindowFocused() {
 }
 void SetApplicationOpen(bool value) {
 	if (RetainedUI_IsOpen() == value) return;
+	openq4::NativeInputBeforeInputBlockerChange();
 	Sys_EnterCriticalSection();
 	applicationOpen.store(value,std::memory_order_release);
 	Usercmd_RetainedInputChanged();

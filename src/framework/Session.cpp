@@ -30,6 +30,7 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #include "Session_local.h"
+#include "NativeInputPublications.h"
 #include "ArenaCampaign.h"
 #include "BuildVersion.h"
 #include "../sys/NetworkEndpoint.h"
@@ -3678,10 +3679,12 @@ void idSessionLocal::Clear() {
 	
 	insideUpdateScreen = false;
 	insidePacifierUpdate = false;
+	openq4::NativeInputBeforeSessionChange();
 	insideExecuteMapChange = false;
 	stopDepth = 0;
 	preserveWipeDuringStop = false;
 
+	openq4::NativeInputBeforeSessionChange();
 	loadingSaveGame = false;
 	savegameFile = NULL;
 	savegameVersion = 0;
@@ -3728,6 +3731,7 @@ void idSessionLocal::Clear() {
 	cinematicStateValid = false;
 	cinematicActive = false;
 	mapSpawned = false;
+	openq4::NativeInputBeforeSessionChange();
 	guiActive = NULL;
 	guiSystem = guiSystemParent = NULL;
 	guiSystemParentHandle = NULL;
@@ -3786,6 +3790,7 @@ idSessionLocal::idSessionLocal
 ===============
 */
 idSessionLocal::idSessionLocal() {
+	openq4::NativeInputBeforeSessionChange();
 	guiInGame = guiMainMenu = guiIntro \
 		= guiRestartMenu = guiLoading = guiGameOver = guiActive \
 		= guiTest = guiMsg = guiMsgRestore = guiTakeNotes = guiDemoMenu = NULL;
@@ -3855,6 +3860,7 @@ void idSessionLocal::StopInternal( bool preserveWipe ) {
 		if ( outermostStop && savegameFile != NULL ) {
 			fileSystem->CloseFile( savegameFile );
 			savegameFile = NULL;
+			openq4::NativeInputBeforeSessionChange();
 			loadingSaveGame = false;
 		}
 
@@ -3874,6 +3880,7 @@ void idSessionLocal::StopInternal( bool preserveWipe ) {
 		}
 
 		insideUpdateScreen = false;
+		openq4::NativeInputBeforeSessionChange();
 		insideExecuteMapChange = false;
 
 		// drop all guis
@@ -4357,12 +4364,14 @@ void idSessionLocal::TestGUI( const char *guiName ) {
 		if ( next == NULL ) { return; }
 	}
 	idUserInterface *previous = guiTest;
+	openq4::NativeInputBeforeSessionChange();
 	guiTest = NULL;
 	if ( previous != NULL && previous != guiActive ) {
 		previous->Activate( false, common->GetPresentationTime() );
 		PumpApplicationActions( previous );
 		uiManager->DeAlloc( previous );
 	}
+	openq4::NativeInputBeforeSessionChange();
 	guiTest = next;
 	if ( guiTest != NULL ) {
 		guiTest->Activate( true, common->GetPresentationTime() );
@@ -4785,8 +4794,10 @@ void idSessionLocal::StartPlayingRenderDemo( idStr demoName ) {
 		}
 	}
 
+	openq4::NativeInputBeforeSessionChange();
 	insideExecuteMapChange = true;
 	UpdateScreen();
+	openq4::NativeInputBeforeSessionChange();
 	insideExecuteMapChange = false;
 	guiLoading->SetStateString( "demo", "" );
 
@@ -4844,8 +4855,10 @@ void idSessionLocal::TimeRenderDemo( const char *demoName, bool twice ) {
 		guiLoading->SetStateString( "demo", common->GetLanguageDict()->GetString( "#str_04852" ) );
 		guiLoading->StateChanged( common->GetPresentationTime() );
 		while ( readDemo ) {
+			openq4::NativeInputBeforeSessionChange();
 			insideExecuteMapChange = true;
 			UpdateScreen();
+			openq4::NativeInputBeforeSessionChange();
 			insideExecuteMapChange = false;
 			AdvanceRenderDemo( true );
 		}
@@ -5896,6 +5909,7 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 
 	// cause prints to force screen updates as a pacifier,
 	// and draw the loading gui instead of game draws
+	openq4::NativeInputBeforeSessionChange();
 	insideExecuteMapChange = true;
 
 	// if this works out we will probably want all the sizes in a def file although this solution will 
@@ -5964,6 +5978,7 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 	if ( loadingSaveGame && savegameFile ) {
 		if ( game->InitFromSaveGame( fullMapName, rw, savegameFile ) == false ) {
 			// If the loadgame failed, restart the map with the player persistent data
+			openq4::NativeInputBeforeSessionChange();
 			loadingSaveGame = false;
 			fileSystem->CloseFile( savegameFile );
 			savegameFile = NULL;
@@ -6202,6 +6217,7 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 	console->ClearNotifyLines();
 
 	// stop drawing the laoding screen
+	openq4::NativeInputBeforeSessionChange();
 	insideExecuteMapChange = false;
 
 	Sys_SetPhysicalWorkMemory( -1, -1 );
@@ -6813,6 +6829,7 @@ bool idSessionLocal::LoadGame( const char *saveName ) {
 		return false;
 	}
 
+	openq4::NativeInputBeforeSessionChange();
 	loadingSaveGame = false;
 	savegameFile = NULL;
 
@@ -6878,6 +6895,7 @@ bool idSessionLocal::LoadGame( const char *saveName ) {
 	}
 	savegameVersion = loadedSavegameVersion;
 
+	openq4::NativeInputBeforeSessionChange();
 	loadingSaveGame = true;
 	savegameFile = loadGameFile;
 	loadGameFile = NULL;
@@ -6908,6 +6926,7 @@ bool idSessionLocal::LoadGame( const char *saveName ) {
 
 	if ( loadingSaveGame ) {
 		fileSystem->CloseFile( savegameFile );
+		openq4::NativeInputBeforeSessionChange();
 		loadingSaveGame = false;
 		savegameFile = NULL;
 	}
@@ -6967,6 +6986,19 @@ bool idSessionLocal::DeleteGame( const char *saveName ) {
 idSessionLocal::ProcessEvent
 ===============
 */
+bool idSessionLocal::QueryNativeInputPublication(openq4::NativeSessionPublication& out) const noexcept {
+    if (!Sys_EventDispositionBoundThread()) return false;
+    const auto transition = openq4::NativeInputSessionTransition();
+    openq4::NativeSessionPublication value;
+    value.current = reinterpret_cast<std::uintptr_t>(guiTest ? guiTest : guiActive);
+    value.transition = transition;
+    value.inputAllowed = transition && value.current && !insideExecuteMapChange && !loadingSaveGame &&
+        !com_asyncInput.GetBool() && !openq4::Console_BlocksNativeInput() && !RetainedUI_IsOpen();
+    out = value; return true;
+}
+bool openq4::Session_QueryNativeInputPublication(NativeSessionPublication& out) noexcept {
+    return sessLocal.QueryNativeInputPublication(out);
+}
 bool idSessionLocal::IsGUIActive() const {
 	return guiActive != NULL || guiTest != NULL || RetainedUI_IsOpen();
 }
@@ -8236,8 +8268,10 @@ void idSessionLocal::Init() {
 	whiteMaterial = declManager->FindMaterial( "_white" );
 
 	guiInGame = NULL;
+	openq4::NativeInputBeforeSessionChange();
 	guiTest = NULL;
 
+	openq4::NativeInputBeforeSessionChange();
 	guiActive = NULL;
 	guiHandle = NULL;
 

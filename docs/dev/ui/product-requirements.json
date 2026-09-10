@@ -4,7 +4,7 @@
   "date": "2026-09-10",
   "status": "Implementation incomplete; this register preserves full product scope and does not accept any production GUI.",
   "baseline": {
-    "engine_revision": "5e0d3ebf20234415815a72c914fe788953e4367b",
+    "engine_revision": "d16c5b9e7935a273e274ea6c5956729d0da62c85",
     "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
     "effective_gui_count": 271,
     "translated_or_accepted_resources": 0,
@@ -19,7 +19,7 @@
     "product": {
       "path": "docs/dev/plans/ui-product-completion.md",
       "authority": "normative completion scope, milestones and final audit",
-      "sha256": "e1cf18b658d866ddd2b964fa7859dce67519f7b48b458d45199b883f01fa7fa9"
+      "sha256": "e4e86a46b6706b4504bba9533e9d21bf371d44de118e622b5289bbdee83cee07"
     },
     "original": {
       "path": "docs/dev/plans/idtech5-ui.md",
@@ -34,7 +34,7 @@
     "import": {
       "path": "docs/dev/ui/legacy-import.md",
       "authority": "native import evidence and unresolved semantics",
-      "sha256": "5a8346ac18496180ad2d59f40373ee81d1020b0c609f3be8fb831974f73d1a7b"
+      "sha256": "37ddfba95dc43df8e2bd1a4b5d461c3c9ebf7ac78803f914cba7dfd5b084a5e1"
     }
   },
   "milestones": {
@@ -100,7 +100,7 @@
       "kind": "source_audit",
       "path": "docs/dev/plans/ui-product-completion.md",
       "scope": "Published audit at 80bb3939; source limitations corroborated by current Document/Runtime inspection. Historical tests and captures are not a fresh product qualification.",
-      "sha256": "e1cf18b658d866ddd2b964fa7859dce67519f7b48b458d45199b883f01fa7fa9"
+      "sha256": "e4e86a46b6706b4504bba9533e9d21bf371d44de118e622b5289bbdee83cee07"
     },
     "document-foundation": {
       "kind": "implementation_checkpoint",
@@ -166,7 +166,7 @@
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/legacy-import.md",
       "scope": "271 native exports, 269 syntax-clean records; no semantic/behavioral/visual acceptance.",
-      "sha256": "5a8346ac18496180ad2d59f40373ee81d1020b0c609f3be8fb831974f73d1a7b"
+      "sha256": "37ddfba95dc43df8e2bd1a4b5d461c3c9ebf7ac78803f914cba7dfd5b084a5e1"
     },
     "performance-foundation": {
       "kind": "implementation_checkpoint",
@@ -411,7 +411,7 @@
     "native-retirement-foundations": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/native-input-retirement.md",
-      "sha256": "4ec8612da8f93927831545832e180b641d6708d5140d1e30c76a21675c264b6a",
+      "sha256": "3f2f8ec996b4fc2286755e3db6856655b87222b9ee213af625005ddb0eb42e41",
       "baseline_engine_revision": "b2cb00dfb87cc8663cd8e895dcccce37d9c1faa1",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "scope": "Original native route, retired issued-ticket observation and exact managed UI presence are qualified as independent proofs. Actual store cancellation and production publishers remain in progress; native input is not enabled.",
@@ -431,7 +431,7 @@
     "native-retirement-storage": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/native-input-retirement.md",
-      "sha256": "4ec8612da8f93927831545832e180b641d6708d5140d1e30c76a21675c264b6a",
+      "sha256": "3f2f8ec996b4fc2286755e3db6856655b87222b9ee213af625005ddb0eb42e41",
       "baseline_engine_revision": "5e0d3ebf20234415815a72c914fe788953e4367b",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "scope": "Exact original-head Peek/Take transfers payload and complete sidecar ownership once; checked empty slices release separately. Full engine integration preserves the game C++17 boundary. Terminal disposition, native ACK, production publishers/driver and held-source inhibition remain required; live native input is not enabled.",
@@ -467,6 +467,26 @@
       "scope": "Canonical authored vector scrollbar and actual Rml scroll geometry with bounded local commands, pointer-focus preservation, modal/source cancellation, measured thumb drag/paging/wheel/navigation and one-time logical dp restoration/clamping. SYSTEM composition has reviewed engine opening captures at125% GL/SP and200% Vulkan/MP after gameplay and ordinary restart. 61 integrated UI suites pass. Touch/physical-device qualification, complete artwork/state galleries, editor support, remaining screens and full platform acceptance remain required.",
       "local_capture_summary": ".tmp/ui/production-retirement-integration/validation-evidence.json",
       "local_capture_summary_sha256": "5a638d3df286ca14adf225ff16a99f3e6140dc25fbf13bfddbc7f7db8e7d5407"
+    },
+    "native-route-publication": {
+      "kind": "implementation_checkpoint",
+      "path": "docs/dev/ui/native-input-publication.md",
+      "sha256": "fb894d9ccefa0dc153d621934bed73a411977195da62d353822b98fa01486a3f",
+      "baseline_engine_revision": "d16c5b9e7935a273e274ea6c5956729d0da62c85",
+      "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
+      "scope": "Production Session/managed-GUI/SDL-window publications invalidate original ownership before mutation; exact binding and typed emission inventory retain failed-admission and deferred-child identity. Copied controller retirement facts remain separate. Full build,64 UI suites,17 adapter mutations and reviewed windowed gameplay/restart/SYSTEM captures pass. No live native activation or terminal backlog disposal is claimed.",
+      "local_capture_summary": ".tmp/ui/native-publication-integration/validation-evidence.json",
+      "local_capture_summary_sha256": "10dfc153acc3d0a6e26fe398cee80dc8098893e702656ca35df93e8b821bc7ae"
+    },
+    "legacy-alpha-semantics": {
+      "kind": "implementation_checkpoint",
+      "path": "docs/dev/ui/legacy-import.md",
+      "sha256": "37ddfba95dc43df8e2bd1a4b5d461c3c9ebf7ac78803f914cba7dfd5b084a5e1",
+      "baseline_engine_revision": "d16c5b9e7935a273e274ea6c5956729d0da62c85",
+      "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
+      "scope": "Native expression/fixup methods establish conditional unbound-after-fixup zero semantics for bare-backslash alpha terms. The importer preserves unresolved source/span/diagnostic and custom fragments. Windows/Linux63 actual-method assertions with8 mutants and19 importer tests pass; exact live table/window binding and evaluated alpha remain required. No GUI acceptance or unconditional lowering.",
+      "local_capture_summary": ".tmp/ui/native-publication-integration/validation-evidence.json",
+      "local_capture_summary_sha256": "10dfc153acc3d0a6e26fe398cee80dc8098893e702656ca35df93e8b821bc7ae"
     }
   },
   "groups": {
@@ -1305,10 +1325,11 @@
       ],
       "status": "partial",
       "current_evidence": [
-        "import-foundation"
+        "import-foundation",
+        "legacy-alpha-semantics"
       ],
       "acceptance_evidence": [],
-      "remaining": "The cited foundation is limited; complete and qualify the entire stated requirement before acceptance."
+      "remaining": "The structured importer preserves both bare-backslash alpha terms and explains the conditional native fallback after fixup. Qualify the exact live table/owning-window binding and evaluated alpha, then resolve all remaining native variables/game actions and incomplete source diagnostics before accepting the complete requirement."
     },
     {
       "id": "INV-011",
@@ -3047,7 +3068,8 @@
         "system-exit-foundation",
         "native-retirement-foundations",
         "native-retirement-storage",
-        "authored-scrollbars"
+        "authored-scrollbars",
+        "native-route-publication"
       ],
       "acceptance_evidence": [],
       "remaining": "The system-exit increment adds authored modal scope transitions and generation-bound queued Back routing; held-source quarantine and restoration pass bounded native/runtime and normal Session qualification. Value gestures add transient capture/preview, pending-proposal identity and popup dismissal to existing input quarantine. Loss of focus, eligibility or usable projection cancels a gesture; restoration does not replay transient edits. Complete and qualify physical-device removal/reconnect, gameplay/modal ownership and all-widget held-source behavior. The recorded normal-route Windows checks qualify semantic ownership and resource resets; physical-device qualification remains open."
@@ -3085,10 +3107,11 @@
         "native-disposition-storage",
         "native-retirement-foundations",
         "native-retirement-storage",
-        "authored-scrollbars"
+        "authored-scrollbars",
+        "native-route-publication"
       ],
       "acceptance_evidence": [],
-      "remaining": "The checked Windows text-session controller now owns SDK activation/quiescence and exact final provider/ledger acknowledgement, with counted SDK evidence and production activation still disabled. Existing wheel, numeric command, checked queue-consumption and owned native-collection evidence remains bounded. Managed owner endpoints, the Windows hook-to-store bridge and explicit lifecycle reconciliation preserve exact owner, provider generation, queue continuity and copied receipt ordering without enabling a native provider. Connect this ingress to the production Session route with native provenance, actual provider activation and verified payload lifetime. Complete production wheel/touch scrolling, Unicode text/composition, keyboard/gamepad repeat/reconnect behavior, deterministic replay and the full supported-host/widget operation matrix with value, focus and scroll evidence. No physical-input or complete payload acceptance is inferred."
+      "remaining": "The checked Windows text-session controller now owns SDK activation/quiescence and exact final provider/ledger acknowledgement, with counted SDK evidence and production activation still disabled. Existing wheel, numeric command, checked queue-consumption and owned native-collection evidence remains bounded. Managed owner endpoints, the Windows hook-to-store bridge and explicit lifecycle reconciliation preserve exact owner, provider generation, queue continuity and copied receipt ordering without enabling a native provider. Connect this ingress to the production Session route with native provenance, actual provider activation and verified payload lifetime. Complete production wheel/touch scrolling, Unicode text/composition, keyboard/gamepad repeat/reconnect behavior, deterministic replay and the full supported-host/widget operation matrix with value, focus and scroll evidence. No physical-input or complete payload acceptance is inferred. Production ownership publishers and typed issued-emission inventory are now connected and qualified without activation. Exact terminal transfer/disposal, held-source inhibition, full sink schedules and checked collaborator release remain required."
     },
     {
       "id": "INP-006",

@@ -289,6 +289,8 @@ jobs:
             tools/tests/sdl3_input_disposition.py \
             tools/tests/native_event_disposition.py \
             tools/tests/native_input_route.py \
+            tools/tests/native_input_facts.py \
+            tools/tests/native_input_lifecycle.py \
             tools/tests/native_event_retirement.py \
             tools/tests/sdl3_clipboard_status.py \
             tools/tests/sdl3_text_provenance.py \
@@ -367,6 +369,7 @@ jobs:
             tools/ui/capture_display_device.py \
             tools/tests/ui_legacy_inventory.py \
             tools/tests/ui_legacy_import.py \
+            tools/tests/ui_legacy_expression.py \
             tools/ui/legacy_inventory.py \
             tools/ui/legacy_import.py \
             tools/ui/legacy_syntax.py \
@@ -567,6 +570,8 @@ jobs:
           python tools/tests/sdl3_input_disposition.py
           python tools/tests/native_event_disposition.py
           python tools/tests/native_input_route.py
+          python tools/tests/native_input_lifecycle.py
+          python tools/tests/native_input_facts.py
           python tools/tests/native_event_retirement.py
           python tools/tests/sdl3_clipboard_status.py
           python tools/tests/sdl3_text_provenance.py
@@ -639,6 +644,7 @@ jobs:
           python tools/tests/ui_capture_display_device.py
           python tools/tests/ui_legacy_inventory.py
           python tools/tests/ui_legacy_import.py
+          python tools/tests/ui_legacy_expression.py --mutations
           python tools/tests/ui_background_cursor.py
           python tools/tests/menu_controller_navigation.py
           python tools/tests/sdl3_multidisplay_windowing.py
@@ -749,6 +755,10 @@ jobs:
           python tools\tests\windows_text_session.py --sdl-include subprojects/SDL3-3.4.10/include
           if errorlevel 1 exit /b 1
           python tools\tests\windows_text_session.py --compiler cl --msvc-debug --no-mutations --sdl-include subprojects/SDL3-3.4.10/include
+          if errorlevel 1 exit /b 1
+          python tools\tests\windows_text_session.py --route-facts --sdl-include subprojects/SDL3-3.4.10/include
+          if errorlevel 1 exit /b 1
+          python tools\tests\native_input_facts.py --compiler cl --msvc-debug --no-mutations --sdl-include subprojects/SDL3-3.4.10/include
 
   linux-arm64:
     name: Linux ARM64 Commit Validation

@@ -1,5 +1,6 @@
 // Copyright (C) 2026 DarkMatter Productions. GPL-3.0-or-later.
 #include "WindowsTextSession.h"
+#include "../../framework/NativeInputPublications.h"
 #if defined(_WIN32)
 #include <SDL3/SDL_init.h>
 #include <atomic>
@@ -53,6 +54,7 @@ struct WindowsTextSession::Impl {
     Phase phase=Phase::Created;
     bool busy=false,fault=false,hooks=false,apartment=false,activated=false,pushAttempted=false,associated=false;
     bool ownerRetired=false,associationLost=false,associationRestored=true,cleanupWork=false,terminated=false;
+    bool storeWasRetired=false,providerWasRetired=false;
     Impl(const NativeTextEditorBarrier& b,const WindowsTextSessionWindow& w,WindowsTextSessionPlatform& p,
         WindowsTextSessionWindowProbe& v,NativeTextCollectionOwner& o):original(b),current(b),window(w),platform(p),probe(v),owner(o){}
     ~Impl(){bridge.reset();if(store)store->Release();}
@@ -183,6 +185,11 @@ struct WindowsTextSession::Impl {
         if(associated || sinkCookie!=TF_INVALID_COOKIE || pushAttempted || activated)return result;
         // Store holds context/sink/composition references. All of them leave on
         // this apartment before balancing our own successful initialization.
+        if(store) {
+            WindowsTextLifecycle stopped;
+            storeWasRetired=store->QueryLifecycle(original.native,stopped)==S_OK &&
+                !stopped.healthy && !stopped.collectionOpen;
+        }
         bridge.reset();if(store){auto* s=std::exchange(store,nullptr);s->Release();}
         Release(composition);Release(editSource);Release(context);Release(previous);Release(document);Release(manager);
         if(apartment){apartment=false;platform.UninitializeSta();}
@@ -217,6 +224,24 @@ bool WindowsTextSession::Destroy(WindowsTextSession*& session) noexcept {
     auto* old=std::exchange(session,nullptr);delete old;return true;
 }
 WindowsTextSession::Phase WindowsTextSession::State() const noexcept {return impl->Thread()?impl->phase:Phase::Fault;}
+bool WindowsTextSession::QueryRetirement(NativeTextIdentity native,const TextEditorIdentity& owner,
+    const WindowsTextSessionWindow& window,WindowsTextSessionRetirement& out) const noexcept {
+    const auto& p=*impl;
+    if(!p.Thread() || p.busy || native!=p.original.native || !SameOwner(owner,p.original.editor) ||
+        !owner.revision || window!=p.window)return false;
+    WindowsTextSessionRetirement candidate;
+    candidate.session=p.identity;candidate.generation=p.baseline.generation;candidate.native=native;candidate.window=window;
+    candidate.storeRetired=p.storeWasRetired;
+    if(p.store){
+        WindowsTextLifecycle stopped;
+        if(p.store->QueryLifecycle(native,stopped)!=S_OK)return false;
+        candidate.storeRetired=!stopped.healthy && !stopped.collectionOpen;
+    }
+    candidate.providerRetired=p.providerWasRetired;
+    candidate.hooksRemoved=!p.hooks;
+    candidate.nativeReleased=p.phase==Phase::Released;
+    out=candidate;return true;
+}
 NativeTextCollectionStore& WindowsTextSession::Collections() noexcept {return *impl->bridge;}
 bool WindowsTextSession::Register(std::string& error) {
     auto& p=*impl;if(!p.Enter(error))return false;Busy guard(p.busy);
@@ -281,6 +306,7 @@ bool WindowsTextSession::FinishActivation(NativeTextCollectionCoordinator& coord
 bool WindowsTextSession::Quiesce(NativeTextCollectionCoordinator& coordinator,NativeQueueSource& source,
     WindowsTextSessionCleanup& out,std::string& error) {
     auto& p=*impl;if(!p.Enter(error))return false;Busy guard(p.busy);
+    openq4::NativeInputBeforeUiChange(p.original.editor.allocation,p.original.editor.backend);
     try{
         NativeTextEditorBarrier current;
         if(p.phase!=Phase::Active || !coordinator.QueryBarrier(current,error) || !p.Exact(current) ||
@@ -314,6 +340,7 @@ bool WindowsTextSession::FinishQuiesce(const WindowsTextSessionCleanup& requeste
             !ingress.Finish(source,batch.Receipt(),error) || p.fault || !p.Observe(source,false,error))
             return p.Fail(error,"Windows text cleanup fence lost continuity");
         if(!OQ4_WindowsNativeFenceEnable(false) || p.fault)return p.Fail(error,"Windows text provider could not disable after cleanup");
+        p.providerWasRetired=true;
         const auto result=p.ReleaseNative(true,true);
         if(!result.hooksRemoved || !result.nativeReleased || !result.graceful)return p.Fail(error,"Windows text cleanup release is incomplete");
         out=result;error.clear();return true;
@@ -322,6 +349,7 @@ bool WindowsTextSession::FinishQuiesce(const WindowsTextSessionCleanup& requeste
 WindowsTextSessionRelease WindowsTextSession::FaultRetirePreservingEvents() noexcept {
     auto& p=*impl;
     if(!p.Thread())return {};
+    openq4::NativeInputBeforeUiChange(p.original.editor.allocation,p.original.editor.backend);
     if(p.busy){p.fault=true;p.phase=Phase::Fault;return {};}
     Busy guard(p.busy);p.fault=true;
     if(p.phase==Phase::Released)return {true,true,true,p.associationRestored,false};
@@ -332,7 +360,10 @@ WindowsTextSessionRelease WindowsTextSession::FaultRetirePreservingEvents() noex
     bool retired=!p.hooks;
     if(p.hooks && p.ProviderClaim()){
         const auto active=OQ4_WindowsNativeFenceQueueGeneration();
-        if((!p.baseline.generation || !active || active==p.baseline.generation) && p.ProviderClaim())retired=OQ4_WindowsNativeFenceRetire();
+        if((!p.baseline.generation || !active || active==p.baseline.generation) && p.ProviderClaim()){
+            retired=OQ4_WindowsNativeFenceRetire();
+            if(retired)p.providerWasRetired=true;
+        }
     }
     return p.ReleaseNative(retired,false);
 }

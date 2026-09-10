@@ -16,6 +16,7 @@ from filesystem_case_segments import function_body
 ROOT = Path(__file__).resolve().parents[2]
 
 SUPPORT = r'''
+#include "src/framework/NativeInputPublications.h"
 #include <algorithm>
 #include <cassert>
 #include <cctype>
@@ -28,6 +29,8 @@ SUPPORT = r'''
 #include <stdexcept>
 #include <string>
 #include <vector>
+static unsigned nativePublicationInvalidations=0;
+namespace openq4 { void NativeInputBeforeUiChange(std::uint64_t,std::uint64_t) noexcept {++nativePublicationInvalidations;} }
 using ID_TIME_T = long long;
 struct idStr : std::string {
     using std::string::string;
@@ -142,6 +145,7 @@ public:
     struct Context { void SizeIcons() {} void Shutdown() {} } dc;
 } uiManagerLocal;
 static int destroyed=0,retainedShutdowns=0;
+static std::function<void()> onBackendDestroy;
 static bool recycleAllocation=false;
 static void* recycledAllocation=nullptr;
 static std::vector<std::string> applicationActions;
@@ -157,7 +161,7 @@ public:
     int ticks=0,loads=0,lastTime=-1;
     std::function<void()> onThink,onLoad;
     std::function<void(bool)> onActivate;
-    ~idUserInterfaceLocal() override { ++destroyed; }
+    ~idUserInterfaceLocal() override { auto call=std::move(onBackendDestroy);if(call)call();++destroyed; }
     static void* operator new(size_t bytes) {
         if(recycledAllocation) {
             void* result=recycledAllocation; recycledAllocation=nullptr; return result;
@@ -576,6 +580,8 @@ def production_source():
     signatures = (
         'idUserInterfaceManaged::idUserInterfaceManaged(',
         'idUserInterfaceManaged::~idUserInterfaceManaged()',
+        'void idUserInterfaceManaged::MarkNativeInputClosing(',
+        'void idUserInterfaceManaged::SetNativeInputChanging(',
         'void idUserInterfaceManaged::RegisterLoaded()',
         'void idUserInterfaceManaged::RegisterDemo()',
         'void idUserInterfaceManaged::RefreshThinking()',

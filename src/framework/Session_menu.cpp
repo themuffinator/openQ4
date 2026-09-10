@@ -30,6 +30,7 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #include "Session_local.h"
+#include "NativeInputPublications.h"
 #include "../ui/Rectangle.h"
 #include "ArenaCampaign.h"
 #include "../ui/ListGUILocal.h"
@@ -1526,10 +1527,12 @@ void idSessionLocal::SetGUI( idUserInterface *gui, HandleGuiCommand_t handle ) {
 
 	if ( guiActive && guiActive != gui ) {
 		idUserInterface *previous = guiActive;
+		openq4::NativeInputBeforeSessionChange();
 		guiActive = NULL;
 		previous->Activate( false, common->GetPresentationTime() );
 		PumpApplicationActions( previous );
 	}
+	openq4::NativeInputBeforeSessionChange();
 	guiActive = gui;
 	guiHandle = handle;
 	if ( guiMsgRestore ) {
@@ -1577,6 +1580,7 @@ void idSessionLocal::ExitMenu( void ) {
 		return;
 	}
 	idUserInterface *previous = guiActive;
+	openq4::NativeInputBeforeSessionChange();
 	guiActive = NULL;
 	if ( previous ) {
 		previous->Activate( false, common->GetPresentationTime() );
@@ -1651,7 +1655,7 @@ void idSessionLocal::CloseSystemSettings() {
 	// lifecycle action. Manager dispatch permits this targeted drain before free.
 	guiSystem = guiSystemParent = NULL;
 	guiSystemParentHandle = NULL;
-	if ( guiActive == child ) guiActive = NULL;
+	if ( guiActive == child ) { openq4::NativeInputBeforeSessionChange(); guiActive = NULL; }
 	if ( guiMsgRestore == child ) guiMsgRestore = NULL;
 	const bool previousTransition = systemGuiTransition;
 	systemGuiTransition = true;
@@ -3412,6 +3416,7 @@ void idSessionLocal::HandleInGameCommands( const char *menuCommand ) {
 			const char	*cmd;
 			cmd = guiActive->HandleEvent( &ev, common->GetPresentationTime() );
 			guiActive->Activate( false, common->GetPresentationTime() );
+			openq4::NativeInputBeforeSessionChange();
 			guiActive = NULL;
 		}
 	}
@@ -3465,6 +3470,7 @@ void idSessionLocal::DispatchCommand( idUserInterface *gui, const char *menuComm
 	} else if ( game && guiActive && guiActive->State().GetBool( "gameDraw" ) ) {
 		const char *cmd = game->HandleGuiCommands( menuCommand );
 		if ( !cmd ) {
+			openq4::NativeInputBeforeSessionChange();
 			guiActive = NULL;
 		} else if ( idStr::Icmp( cmd, "main" ) == 0 ) {
 			StartMenu();
@@ -4004,6 +4010,7 @@ const char* idSessionLocal::MessageBox( msgBoxType_t type, const char *message, 
 	msgFireBack[ 0 ] = fire_yes ? fire_yes : "";
 	msgFireBack[ 1 ] = fire_no ? fire_no : "";
 	guiMsgRestore = guiActive;
+	openq4::NativeInputBeforeSessionChange();
 	guiActive = guiMsg;
 	guiMsg->SetCursor( 325, 290 );
 	guiActive->Activate( true, common->GetPresentationTime() );
@@ -4138,6 +4145,7 @@ void idSessionLocal::DownloadProgressBox( backgroundDownload_t *bgl, const char 
 	guiMsg->SetStateString( "message", "Connecting.." );
 
 	guiMsgRestore = guiActive;
+	openq4::NativeInputBeforeSessionChange();
 	guiActive = guiMsg;
 	msgRunning = true;
 
@@ -4145,6 +4153,7 @@ void idSessionLocal::DownloadProgressBox( backgroundDownload_t *bgl, const char 
 		while ( msgRunning ) {
 			common->GUIFrame( true, false );
 			if ( bgl->completed ) {
+				openq4::NativeInputBeforeSessionChange();
 				guiActive = guiMsgRestore;
 				guiMsgRestore = NULL;
 				return;
@@ -4203,6 +4212,7 @@ void idSessionLocal::DownloadProgressBox( backgroundDownload_t *bgl, const char 
 		guiMsg->SetStateString( "visible_mid", "0" );
 		// continue looping
 		guiMsgRestore = guiActive;
+		openq4::NativeInputBeforeSessionChange();
 		guiActive = guiMsg;
 		msgRunning = true;
 	}
@@ -4235,6 +4245,7 @@ void idSessionLocal::HandleMsgCommands( const char *menuCommand ) {
 	// "stop" works even on first frame
 	if ( idStr::Icmp( cmd, "stop" ) == 0 ) {
 		// force hiding the current dialog
+		openq4::NativeInputBeforeSessionChange();
 		guiActive = guiMsgRestore;
 		guiMsgRestore = NULL;
 		msgRunning = false;
@@ -4245,12 +4256,14 @@ void idSessionLocal::HandleMsgCommands( const char *menuCommand ) {
 		return;
 	}
 	if ( idStr::Icmp( cmd, "mid" ) == 0 || idStr::Icmp( cmd, "left" ) == 0 ) {
+		openq4::NativeInputBeforeSessionChange();
 		guiActive = guiMsgRestore;
 		guiMsgRestore = NULL;
 		msgRunning = false;
 		msgRetIndex = 0;
 		DispatchCommand( guiActive, msgFireBack[ 0 ].c_str() );
 	} else if ( idStr::Icmp( cmd, "right" ) == 0 ) {
+		openq4::NativeInputBeforeSessionChange();
 		guiActive = guiMsgRestore;
 		guiMsgRestore = NULL;
 		msgRunning = false;
@@ -4267,6 +4280,7 @@ idSessionLocal::HandleNoteCommands
 #define NOTEDATFILE "C:/notenumber.dat"
 
 void idSessionLocal::HandleNoteCommands( const char *menuCommand ) {
+	openq4::NativeInputBeforeSessionChange();
 	guiActive = NULL;
 
 	if ( idStr::Icmp( menuCommand,  "note" ) == 0 && mapSpawned ) {

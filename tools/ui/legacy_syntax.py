@@ -167,11 +167,18 @@ class Parser:
                             'resolution':'table-or-vector-pending'}
                     self.take(']')
             elif value == '\\':
-                # Two shipped monitor sources contain a bare backslash where
-                # a color alpha belongs. Native ParseTerm defers this as a
-                # variable name. Retain its structure and require review.
-                node = {'kind':'unresolved_reference','name':value,'token_type':token[0]}
-                self.diagnostic('unresolved_legacy_term','bare backslash is treated as a variable by the legacy parser',start)
+                # ParseTerm first checks DECL_TABLE, then the owning window's
+                # variables. An absent name is fixed up once after parsing;
+                # EvaluateRegisters returns zero if that lookup remains null.
+                # Tokens alone cannot prove the live table/variable inventory.
+                # Preserve the term and diagnostic instead of folding to zero.
+                node = {'kind':'unresolved_reference','name':value,'token_type':token[0],
+                        'native_semantics':{'lookup':'table-then-window-variable',
+                            'fixup':'once-after-window-parse','unbound_after_fixup':0.0,
+                            'constant_lowering':False}}
+                self.diagnostic('unresolved_legacy_term',
+                    'bare backslash uses native table/variable lookup; an unresolved variable '
+                    'evaluates to zero after fixup, but tokens alone do not authorize constant lowering',start)
             else:
                 raise SyntaxError(f'invalid expression term {value!r}')
         else:

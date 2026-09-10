@@ -30,6 +30,7 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #include "Session_local.h"
+#include "NativeInputPublications.h"
 
 void SCR_DrawTextLeftAlign( float &y, const char *text, ... ) id_attribute((format(printf,2,3)));
 void SCR_DrawTextRightAlign( float &y, const char *text, ... ) id_attribute((format(printf,2,3)));
@@ -82,6 +83,7 @@ public:
 	virtual	void		LoadGraphics( void );
 	virtual	bool		ProcessEvent( const sysEvent_t *event, bool forceAccept );
 	virtual	bool		Active( void );
+	bool NativeInputBlocked() const noexcept { return keyCatching; }
 	virtual	void		ClearNotifyLines( void );
 	virtual	void		Close( void );
 	virtual void		SetProcFileOutOfDate( bool state );
@@ -1284,6 +1286,8 @@ idConsoleLocal::Init
 void idConsoleLocal::Init( void ) {
 	int		i;
 
+	openq4::NativeInputBeforeInputBlockerChange();
+
 	keyCatching = false;
 	procFileOutOfDate = false;
 	aasFileOutOfDate = false;
@@ -1403,6 +1407,8 @@ void idConsoleLocal::LoadGraphics() {
 idConsoleLocal::Active
 ================
 */
+bool openq4::Console_BlocksNativeInput() noexcept { return localConsole.NativeInputBlocked(); }
+
 bool	idConsoleLocal::Active( void ) {
 	return keyCatching;
 }
@@ -1426,6 +1432,7 @@ idConsoleLocal::Close
 ================
 */
 void	idConsoleLocal::Close() {
+	openq4::NativeInputBeforeInputBlockerChange();
 	keyCatching = false;
 	SetDisplayFraction( 0 );
 	displayFrac = 0;	// don't scroll to that point, go immediately
@@ -4343,6 +4350,7 @@ bool	idConsoleLocal::ProcessEvent( const sysEvent_t *event, bool forceAccept ) {
 			cvarSystem->SetCVarBool( "ui_chat", false );
 		} else {
 			consoleField.Clear();
+			openq4::NativeInputBeforeInputBlockerChange();
 			keyCatching = true;
 			focus = CON_FOCUS_INPUT;
 			mouseInitialized = false;
@@ -4885,6 +4893,7 @@ void	idConsoleLocal::Draw( bool forceFullScreen ) {
 		// we want the console closed when we go back to a session state
 		Close();
 		// we are however catching keyboard input
+		openq4::NativeInputBeforeInputBlockerChange();
 		keyCatching = true;
 	}
 

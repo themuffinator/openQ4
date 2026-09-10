@@ -28,6 +28,7 @@ If you have questions concerning this license or the applicable additional terms
 
 #ifndef __SESSIONLOCAL_H__
 #define __SESSIONLOCAL_H__
+#include "NativeInputPublications.h"
 
 /*
 
@@ -199,6 +200,7 @@ public:
 	virtual bool		IsGUIActive() const;
 	bool				IsMapSpawned() const { return mapSpawned; }
 	virtual idUserInterface *GetActiveGUI() const { return ( guiTest != NULL ) ? guiTest : guiActive; }
+	bool QueryNativeInputPublication(openq4::NativeSessionPublication&) const noexcept;
 	virtual bool		IsMainMenuIntroPlaying() const;
 
 	virtual bool		ProcessEvent( const sysEvent_t *event );

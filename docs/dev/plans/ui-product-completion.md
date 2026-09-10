@@ -144,6 +144,8 @@ Native activation, the production Session route/probe, ordinary native character
 
 The current [scrollbar integration](../ui/scrollbars.md), beginning at engine `5e0d3ebf20234415815a72c914fe788953e4367b`, adds actual authored SYSTEM scroll geometry and dp persistence. The same scoped increment checks original native-store transfer, exact image reductions and actual GL upload allocation. The full build and 61 UI suites pass, with reviewed windowed GL/SP and Vulkan/MP gameplay/restart/SYSTEM captures. `WID-010` is partial; the register retains 227 requirements, 271 unaccepted migrations and seven open final gates. Native activation, mixed settings recovery, complete controls/screens, editor and full platform/artwork acceptance remain required. The revision-bound findings below remain historical audit evidence.
 
+The subsequent [native ownership publication increment](../ui/native-input-publication.md), based on engine `d16c5b9e7935a273e274ea6c5956729d0da62c85`, connects production Session/GUI/window facts and typed issued-emission inventory while retaining default-off activation. Conditional legacy-alpha metadata preserves original unresolved source rather than accepting incomplete migration. The full build,64 UI suites and reviewed windowed GL/SP and Vulkan/MP gameplay/restart/menu views pass. Terminal event disposal/release, live native routing and exact native expression observations remain underway. Requirement/migration counts and final gates do not change.
+
 ### Findings that block product completion
 
 The [native text owner/store checkpoint](../ui/text-input-routing.md), based on

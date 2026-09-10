@@ -1,4 +1,7 @@
 // Copyright (C) 2026 DarkMatter Productions. GPL-3.0-or-later.
+#include "src/framework/NativeInputPublications.h"
+static unsigned routeInvalidations=0;
+namespace openq4 { void NativeInputBeforeUiChange(std::uint64_t,std::uint64_t) noexcept {++routeInvalidations;} }
 // Actual SDK controller/store/bridge/coordinator/Interaction and owned ingress.
 // Counted COM factory and SDL provider only: no activation, windows, or input.
 #include "sys/sdl3/WindowsTextSession.h"

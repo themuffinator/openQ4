@@ -749,6 +749,9 @@ void idUserInterfaceManaged::RegisterLoaded() {}
 void idUserInterfaceManaged::RegisterDemo() {}
 void idUserInterfaceManaged::RefreshThinking() {}
 '''
+_native_lifetime_source = (ROOT / 'src/ui/UserInterface.cpp').read_text(encoding='utf-8')
+BASE += function_body(_native_lifetime_source, 'void idUserInterfaceManaged::MarkNativeInputClosing(')
+BASE += function_body(_native_lifetime_source, 'void idUserInterfaceManaged::SetNativeInputChanging(')
 
 MAIN = r'''
 using namespace openq4::ui;

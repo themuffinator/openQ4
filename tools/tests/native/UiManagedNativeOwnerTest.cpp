@@ -305,7 +305,20 @@ static void PresenceBoundaryAndLifetime() {
     // A loaded deferred backend replacement destroys its original binding. The
     // new empty Runtime proves absence; no original current-route test is used.
     Fixture replaced(true);replaced.Attach();auto* deferred=static_cast<idUserInterfaceDeferred*>(replaced.outer);
+    unsigned changingCallbacks=0;
+    onBackendDestroy=[&]{
+        ++changingCallbacks;
+        CHECK(deferred->nativeInputChanging);
+        CHECK(Presence(replaced)==P::BusyOrUnknown);
+        CHECK(!replaced.owner.Current(replaced.barrier));
+        CHECK(!UI_NativeTextRetireExact(replaced.nativeId,replaced.editor));
+    };
     CHECK(deferred->InitFromFile("replacement.q4ui"));
+    CHECK(changingCallbacks==1 && !deferred->nativeInputChanging);
+    Fixture closing;closing.Attach();closing.gui->MarkNativeInputClosing();
+    CHECK(Presence(closing)==P::BusyOrUnknown);
+    CHECK(!UI_NativeTextRetireExact(closing.nativeId,closing.editor));
+    CHECK(closing.View().nativePresentation.has_value());
     denyAllocation=true;CHECK(Presence(replaced)==P::AbsentOriginal);denyAllocation=false;
 }
 int main() {

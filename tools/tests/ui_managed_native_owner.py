@@ -27,7 +27,7 @@ def manager_source(full=False):
     source+=production[production.index('// Private native collection owner boundary.'):production.index('bool idUserInterfaceManagerLocal::DispatchApplicationActions(')]
     if full:
         source+=production[production.index('openq4::ui::TextBrokerContext UI_QueryTextContext('):production.index('// Private native collection owner boundary.')]
-        source=source.replace('private:','public:') # Test observability only, no method edits.
+        source=source.replace('private:','public:').replace('protected:','public:') # Test observability only, no method edits.
         retained=(ROOT/'src/ui/UserInterfaceRetained.cpp').read_text()
         rt=(ROOT/'src/ui/retained/Runtime.cpp').read_text()
         rtheader=(ROOT/'src/ui/retained/Runtime.h').read_text()
@@ -115,6 +115,7 @@ def main():
     parser.add_argument('--compiler',default='clang++');parser.add_argument('--sdl-source',type=Path)
     parser.add_argument('--msvc',action='store_true');parser.add_argument('--debug-crt',action='store_true')
     parser.add_argument('--sanitize',action='store_true');parser.add_argument('--no-mutations',action='store_true')
+    parser.add_argument('--publication-mutations',action='store_true',help='Run only the new publication teardown mutations; all positive assertions remain enabled')
     args=parser.parse_args()
     out=Path(tempfile.mkdtemp(prefix='managed-native-',dir=ROOT/'.tmp'))
     env={**os.environ,'TEMP':str(out),'TMP':str(out),'TMPDIR':str(out)}
@@ -207,6 +208,12 @@ int main() {
         'presence-missing-allocation-present':('return Presence::AbsentOriginal;','return Presence::PresentExact;'),
         'deferred-drops-retirement':('return backend != NULL ? backend->RetireNativeTextExact(native,owner) : false;','return false;'),
     }
+    publication_mutations={
+        'retire-during-teardown':('if(allocations[i]->nativeInputClosing || allocations[i]->nativeInputChanging)return false;','if(false)return false;'),
+        'deferred-changing-not-published':('SetNativeInputChanging(true);','SetNativeInputChanging(false);'),
+    }
+    mutations.update(publication_mutations)
+    if args.publication_mutations:mutations=publication_mutations
     try:
         objects=[]
         for unit in units:
@@ -237,7 +244,7 @@ int main() {
                 'presence-forgets-session':('current.session==owner.session &&',''),
                 'presence-forgets-control':(' && current.control==owner.control;',';'),
             }
-            for name,(old,new) in native_mutations.items():
+            for name,(old,new) in ({} if args.publication_mutations else native_mutations).items():
                 if original.count(old)!=1:raise RuntimeError('Native presence mutation anchor: '+name)
                 path=out/(name+'-Interaction.cpp');path.write_text(interaction.replace(original,original.replace(old,new)),newline='\n')
                 obj=out/(name+('.obj' if args.msvc else '.o'))

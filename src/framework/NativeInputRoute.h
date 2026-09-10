@@ -129,6 +129,9 @@ public:
     // Route eligibility only. The managed native-owner endpoint must separately
     // validate full editor/native lease and current revision before any effect.
     bool Probe(NativeInputSelection& out) noexcept;
+    // Callback-free full immutable identity comparison; no live eligibility or
+    // native authority. Original thread only, including revoked/faulted cleanup.
+    bool MatchesOriginalBinding(std::uint64_t route, const NativeInputBinding&) const noexcept;
     // Original identity proofs remain available for cleanup after a route fault.
     // They never grant live input eligibility or reactivate a revoked route.
     bool WindowCurrent(const NativeInputWindow&) noexcept;

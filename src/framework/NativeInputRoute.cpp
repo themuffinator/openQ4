@@ -69,6 +69,13 @@ struct NativeInputRoute::Guard {
 NativeInputRoute::NativeInputRoute(NativeInputRouteSource& s) noexcept : source(s), thread(std::this_thread::get_id()) {}
 NativeInputRoute::~NativeInputRoute() = default;
 bool NativeInputRoute::OnThread() const noexcept { return thread == std::this_thread::get_id(); }
+bool NativeInputRoute::MatchesOriginalBinding(std::uint64_t route, const NativeInputBinding& b) const noexcept {
+    if (!OnThread() || calling || !entry || entry->route != route) return false;
+    const auto& original = entry->binding;
+    return original.outer == b.outer && original.sessionTransition == b.sessionTransition &&
+        original.dispatchEpoch == b.dispatchEpoch && original.streamToken == b.streamToken &&
+        original.editor == b.editor && original.native == b.native && original.window == b.window;
+}
 void NativeInputRoute::Poison() noexcept {
     poisoned = true; permitSerial = 0;
     // Even repeated reentry after an earlier fault must invalidate an outer

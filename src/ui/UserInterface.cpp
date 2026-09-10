@@ -32,6 +32,7 @@ If you have questions concerning this license or the applicable additional terms
 #ifndef ID_DEDICATED
 #include "../sys/sdl3/TextClipboard.h"
 #endif
+#include "../framework/NativeInputPublications.h"
 #include "ListGUILocal.h"
 #include "DeviceContext.h"
 #include "Window.h"
@@ -61,7 +62,16 @@ idUserInterfaceManaged::idUserInterfaceManaged( bool managed ) : refs( 1 ), allo
 	}
 }
 
+void idUserInterfaceManaged::MarkNativeInputClosing() noexcept {
+    openq4::NativeInputBeforeUiChange(allocationId);
+    nativeInputClosing = true;
+}
+void idUserInterfaceManaged::SetNativeInputChanging(bool changing) noexcept {
+    openq4::NativeInputBeforeUiChange(allocationId);
+    nativeInputChanging = changing;
+}
 idUserInterfaceManaged::~idUserInterfaceManaged() {
+    MarkNativeInputClosing();
 	if ( managed ) {
 		uiManagerLocal.UnregisterGui( this );
 	}
@@ -232,9 +242,23 @@ openq4::ui::NativeTextPresence idUserInterfaceManagerLocal::NativeTextPresence(o
     return Presence::BusyOrUnknown;
 #else
     for (int i=0;i<allocations.Num();++i)
-        if (allocations[i]->allocationId==owner.allocation) return allocations[i]->QueryNativeTextPresence(native,owner);
+        if (allocations[i]->allocationId==owner.allocation) return (allocations[i]->nativeInputClosing || allocations[i]->nativeInputChanging) ? Presence::BusyOrUnknown : allocations[i]->QueryNativeTextPresence(native,owner);
     return Presence::AbsentOriginal;
 #endif
+}
+bool idUserInterfaceManagerLocal::QueryNativeInputAllocation(std::uintptr_t current,std::uint64_t& out) const noexcept {
+    if (std::this_thread::get_id()!=nativePresenceThread || nativeBoundaryActive || textBoundaryActive ||
+        clipboardBoundaryActive || applicationPumpDepth || !current) return false;
+    for (int i=0;i<allocations.Num();++i) {
+        const auto* allocation=allocations[i];
+        if (reinterpret_cast<std::uintptr_t>(allocation)==current && allocation->allocationId && !(allocation->nativeInputClosing || allocation->nativeInputChanging)) {
+            out=allocation->allocationId;return true;
+        }
+    }
+    return false;
+}
+bool openq4::UI_QueryNativeInputAllocation(std::uintptr_t current,std::uint64_t& out) noexcept {
+    return uiManagerLocal.QueryNativeInputAllocation(current,out);
 }
 bool idUserInterfaceManagerLocal::NativeTextEnter() noexcept {
     if(nativeBoundaryActive || textBoundaryActive || clipboardBoundaryActive) {
@@ -254,7 +278,7 @@ idUserInterfaceManaged* idUserInterfaceManagerLocal::NativeTextResolve(uiNativeT
     const auto route=probe(context);
     if(!route.current || !route.inputAllowed || route.window!=owner.window)return nullptr;
     for(int i=0;i<allocations.Num();++i)
-        if(allocations[i]==route.current && allocations[i]->allocationId==owner.allocation)return allocations[i];
+        if(allocations[i]==route.current && allocations[i]->allocationId==owner.allocation && !allocations[i]->nativeInputClosing && !allocations[i]->nativeInputChanging)return allocations[i];
     return nullptr;
 #endif
 }
@@ -285,6 +309,7 @@ bool idUserInterfaceManagerLocal::NativeTextPublishSettlement(uiNativeTextRouteP
 }
 bool idUserInterfaceManagerLocal::NativeTextRetireExact(openq4::ui::NativeTextIdentity native,
     const openq4::ui::TextEditorIdentity& owner) noexcept {
+    openq4::NativeInputBeforeUiChange(owner.allocation,owner.backend);
     // Retirement is permitted inside a failed boundary. Poison its in-flight
     // receipt first, then touch only the original registered lease without any
     // resource preparation, host observation or current-route requirement.
@@ -296,12 +321,16 @@ bool idUserInterfaceManagerLocal::NativeTextRetireExact(openq4::ui::NativeTextId
 #else
     if(!owner.allocation || !native.document || !native.editorLease)return false;
     for(int i=0;i<allocations.Num();++i)
-        if(allocations[i]->allocationId==owner.allocation)return allocations[i]->RetireNativeTextExact(native,owner);
+        if(allocations[i]->allocationId==owner.allocation) {
+            if(allocations[i]->nativeInputClosing || allocations[i]->nativeInputChanging)return false;
+            return allocations[i]->RetireNativeTextExact(native,owner);
+        }
     return false;
 #endif
 }
 
 bool idUserInterfaceManagerLocal::NativeTextAttach(uiNativeTextRouteProbe_t probe,void* context, const openq4::ui::TextEditorIdentity& owner, openq4::ui::NativeTextIdentity native, openq4::ui::NativeTextEditorBarrier& out, std::string& error) {
+    openq4::NativeInputBeforeUiChange(owner.allocation,owner.backend);
     if(!NativeTextEnter()){NativeOwnerDiagnostic(error,"Reentrant native GUI owner boundary");return false;}
     NativeOwnerBoundaryScope scope{nativeBoundaryActive};
     try {
@@ -886,6 +915,7 @@ void idUserInterfaceManagerLocal::RegisterDemoGui( idUserInterfaceManaged *gui )
 }
 
 void idUserInterfaceManagerLocal::UnregisterGui( idUserInterfaceManaged *gui ) {
+	openq4::NativeInputBeforeUiChange(gui->allocationId);
 	RemoveAlwaysThinkGui( gui );
 	guis.Remove( gui );
 	demoGuis.Remove( gui );

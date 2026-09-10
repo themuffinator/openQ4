@@ -1,5 +1,6 @@
 // Copyright (C) 2026 DarkMatter Productions. GPL-3.0-or-later.
 #include "../idlib/precompiled.h"
+#include "../framework/NativeInputPublications.h"
 #include "UserInterfaceDeferred.h"
 
 #include <cmath>
@@ -9,7 +10,7 @@ idUserInterfaceDeferred::idUserInterfaceDeferred() : backend( NULL ),
 	interactive( false ), interactiveSet( false ), uniqued( false ), active( false ),
 	time( 0 ), cursorX( 0 ), cursorY( 0 ) {}
 
-idUserInterfaceDeferred::~idUserInterfaceDeferred() { delete backend; }
+idUserInterfaceDeferred::~idUserInterfaceDeferred() { MarkNativeInputClosing(); delete backend; }
 
 const char *idUserInterfaceDeferred::Name() const { return backend != NULL ? backend->Name() : ""; }
 const char *idUserInterfaceDeferred::Comment() const { return backend != NULL ? backend->Comment() : ""; }
@@ -79,6 +80,11 @@ bool idUserInterfaceDeferred::InitFromFile( const char *qpath, bool rebuild, boo
 	candidate->SetUniqued( unique );
 	if ( overrideInteractive ) { candidate->SetInteractive( interactiveValue ); }
 	if ( activate ) { candidate->Activate( true, time ); }
+	SetNativeInputChanging(true);
+	struct NativeChangeGuard {
+		idUserInterfaceDeferred& owner;
+		~NativeChangeGuard() { owner.SetNativeInputChanging(false); }
+	} nativeChangeGuard{*this};
 	delete backend;
 	backend = candidate.release();
 	pendingState.Clear();

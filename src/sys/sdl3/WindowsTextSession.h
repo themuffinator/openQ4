@@ -57,6 +57,12 @@ struct WindowsTextSessionRelease {
     bool providerRetired = false, hooksRemoved = false, nativeReleased = false;
     bool associationRestored = false, graceful = false;
 };
+struct WindowsTextSessionRetirement {
+    std::uint64_t session = 0, generation = 0;
+    ui::NativeTextIdentity native;
+    WindowsTextSessionWindow window;
+    bool storeRetired = false, providerRetired = false, hooksRemoved = false, nativeReleased = false;
+};
 
 // One non-renewable native/editor/window/module lease on the creating STA.
 // Create is pure store/bridge construction. Register occurs while SDL is
@@ -110,6 +116,12 @@ public:
         ui::NativeTextCollectionFence&, WindowsTextSessionRelease& out, std::string& error);
     WindowsTextSessionRelease FaultRetirePreservingEvents() noexcept;
     Phase State() const noexcept;
+    // Copied original-controller facts only, no owner/probe/SDL/COM callback.
+    // A store query is an engine-owned callback-free method, never a GUI query.
+    // Busy/wrong-thread/mismatched lease preserves out. UI retirement is NOT
+    // inferred from ownerRetired, and provider cleanup requires its actual result.
+    bool QueryRetirement(ui::NativeTextIdentity,const ui::TextEditorIdentity&,
+        const WindowsTextSessionWindow&,WindowsTextSessionRetirement& out) const noexcept;
     // Borrow only during a live engine call; never retain through Destroy.
     ui::NativeTextCollectionStore& Collections() noexcept;
 private:

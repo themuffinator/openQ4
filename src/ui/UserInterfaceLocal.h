@@ -187,6 +187,9 @@ openq4::ui::NativeTextPresence NativeTextPresence(openq4::ui::NativeTextIdentity
 
 private:
 	bool NativeTextEnter() noexcept;
+public:
+	bool QueryNativeInputAllocation(std::uintptr_t,std::uint64_t&) const noexcept;
+private:
 	idUserInterfaceManaged* NativeTextResolve(uiNativeTextRouteProbe_t,void*,const openq4::ui::TextEditorIdentity&) const noexcept;
 	bool NativeTextCheck(uiNativeTextRouteProbe_t,void*,const openq4::ui::NativeTextEditorBarrier&) const noexcept;
 	void						RegisterAllocation( idUserInterfaceManaged *gui );

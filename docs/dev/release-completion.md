@@ -2,6 +2,10 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- Native text integration now invalidates stale menu and window ownership before
+  replacement or teardown. Live native text entry remains in development and is
+  not enabled by this checkpoint.
+
 - SYSTEM gains an editable vector scrollbar with a generous target, a narrow
   trough and a cut-corner thumb. Its range follows the actual settings content;
   deliberate scroll position survives UI-scale changes and window resizing.

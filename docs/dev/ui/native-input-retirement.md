@@ -56,6 +56,9 @@ allocation-sweep limitation. The tests bind production helpers to counted facts.
 They do not establish production publishers, terminal queue cancellation,
 held-source inhibition, native character provenance or installed IME behavior.
 Those remaining seams and the complete native activation matrix are required.
+The subsequent [ownership publication increment](native-input-publication.md)
+connects production Session/GUI/window facts and typed issued-emission inventory.
+Terminal disposition and live activation remain unfinished.
 The managed presence query passes 1,234 actual-method/model checks on all three
 compilers and 43 compiled mutations on Windows Clang, including hidden and
 generation-invalidated original models, replacement, allocation denial, busy

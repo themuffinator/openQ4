@@ -30,6 +30,7 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #include "../idlib/PrivateCommand.h"
+#include "NativeInputPublications.h"
 #include "RemoteCVarPolicy.h"
 #include "CVarDefaults.h"
 
@@ -236,6 +237,7 @@ idInternalCVar::Update
 ============
 */
 void idInternalCVar::Update( const idCVar *cvar ) {
+	if (nameString.Icmp("com_asyncInput") == 0) openq4::NativeInputBeforeInputBlockerChange();
 	const bool privateValue = ( ( flags | cvar->GetFlags() ) & CVAR_PRIVATE ) != 0;
 
 	// if this is a statically declared variable
@@ -421,6 +423,7 @@ void idInternalCVar::Set( const char *newValue, bool force, bool fromServer ) {
 		return;
 	}
 
+	if (nameString.Icmp("com_asyncInput") == 0) openq4::NativeInputBeforeInputBlockerChange();
 	CVar_AssignString( valueString, newValue, ( flags & CVAR_PRIVATE ) != 0 );
 	value = valueString.c_str();
 	UpdateValue();
@@ -435,6 +438,8 @@ idInternalCVar::Reset
 ============
 */
 void idInternalCVar::Reset( void ) {
+	if (nameString.Icmp("com_asyncInput") == 0 && valueString.Cmp(resetString.c_str()) != 0)
+		openq4::NativeInputBeforeInputBlockerChange();
 	CVar_AssignString( valueString, resetString.c_str(), ( flags & CVAR_PRIVATE ) != 0 );
 	value = valueString.c_str();
 	UpdateValue();

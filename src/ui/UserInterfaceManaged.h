@@ -72,6 +72,8 @@ public:
 	int GetRefs() const { return refs; }
 
 protected:
+	void MarkNativeInputClosing() noexcept;
+	void SetNativeInputChanging(bool changing) noexcept;
 	// Publish only after initialization has established valid metadata. Loaded
 	// and demo registries are non-owning subsets of the allocation registry.
 	void RegisterLoaded();
@@ -84,6 +86,7 @@ private:
 	int refs;
 	unsigned long long allocationId;
 	bool managed;
+	bool nativeInputClosing = false, nativeInputChanging = false;
 };
 
 // Explicit retained documents use the retained backend; stock GUI/editor
