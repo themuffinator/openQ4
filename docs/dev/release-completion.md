@@ -2,6 +2,10 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- UI authoring gains validated source edits and undo/redo that preserve existing
+  formatting, comments and extension data. The visual editor and file-save
+  workflow remain in development; this is their document-editing foundation.
+
 - Native text integration now invalidates stale menu and window ownership before
   replacement or teardown. Live native text entry remains in development and is
   not enabled by this checkpoint.

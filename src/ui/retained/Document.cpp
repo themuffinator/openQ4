@@ -1,5 +1,6 @@
 // Copyright (C) 2026 DarkMatter Productions. GPL-3.0-or-later.
 #include "Document.h"
+#include "DocumentSource.h"
 #include "State.h"
 #include <json/json.h>
 #include <algorithm>
@@ -1479,6 +1480,12 @@ std::optional<PresentationType> PresentationAliasType(const DocumentModel& model
 	if (base.type == ValueType::Colour) return PresentationType::Vector4;
 	if (base.type == ValueType::Text || base.type == ValueType::Keyword || base.type == ValueType::Font) return PresentationType::String;
 	return std::nullopt;
+}
+bool detail::ParseDocumentSource(const std::string& source, Json::Value& root, std::vector<Diagnostic>& diagnostics) {
+    return Parse(source,root,diagnostics);
+}
+const Json::Value* detail::ResolveDocumentSource(const Json::Value& root, const std::string& pointer) {
+    return Resolve(root,pointer);
 }
 struct Document::Impl { std::string source; Json::Value root; DocumentModel model; };
 Document::Document() : impl(std::make_unique<Impl>()) {}

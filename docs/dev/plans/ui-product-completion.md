@@ -152,6 +152,8 @@ The following [exact image-content](../ui/image-content-recovery.md) and [native
 
 The [authored choice scrollbar](../ui/choice-scrollbars.md) checkpoint, based on engine `fc4443cb071022e29b429c9b74731dfa9b0c3b86`, integrates all four SYSTEM dropdowns. The full build,69 UI suites,compiled behavioral mutations,Linux sanitizers and20 reviewed SP/OpenGL125% and MP/Vulkan200% gameplay/SYSTEM/popup images pass. Fitting lists hide inactive bars and scrolling leaves settings unchanged. Popup safe-area placement and source-derived framing still need refinement; physical/native input, complete settings recovery, editor and full-corpus acceptance remain required. No requirement, migration or gate acceptance changes.
 
+The [canonical document-editing foundation](../ui/document-editing.md), based on engine `1bcb4aec68fbaa3187ca5ffea30720f003f57f1f`, adds source-preserving structural/value batches and bounded undo/redo. The full build and70 UI suites pass; independent source review, integrated compiled mutations and frozen MSVC/GCC sanitizer evidence qualify this portable core. The existing strict parser is shared through narrow internal forwarding calls. The next editor increment must prepare and publish history, actual Runtime context and cached source/path metadata together, after exact native-owner retirement. Visible authoring, file-save recovery and full editor/product acceptance remain required. No requirement status or gate changes.
+
 ### Findings that block product completion
 
 The [native text owner/store checkpoint](../ui/text-input-routing.md), based on

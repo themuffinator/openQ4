@@ -4,7 +4,7 @@
   "date": "2026-09-11",
   "status": "Implementation incomplete; this register preserves full product scope and does not accept any production GUI.",
   "baseline": {
-    "engine_revision": "fc4443cb071022e29b429c9b74731dfa9b0c3b86",
+    "engine_revision": "1bcb4aec68fbaa3187ca5ffea30720f003f57f1f",
     "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
     "effective_gui_count": 271,
     "translated_or_accepted_resources": 0,
@@ -19,7 +19,7 @@
     "product": {
       "path": "docs/dev/plans/ui-product-completion.md",
       "authority": "normative completion scope, milestones and final audit",
-      "sha256": "a0ea29db0ecad1a3dcbecbd6367d4052ad25a7b17b8a8f87ee5134ec5cf30bad"
+      "sha256": "09af7182819bea5099faa75967ce7822d1c301933cd110c564f3d60e543ba7a2"
     },
     "original": {
       "path": "docs/dev/plans/idtech5-ui.md",
@@ -100,7 +100,7 @@
       "kind": "source_audit",
       "path": "docs/dev/plans/ui-product-completion.md",
       "scope": "Published audit at 80bb3939; source limitations corroborated by current Document/Runtime inspection. Historical tests and captures are not a fresh product qualification.",
-      "sha256": "a0ea29db0ecad1a3dcbecbd6367d4052ad25a7b17b8a8f87ee5134ec5cf30bad"
+      "sha256": "09af7182819bea5099faa75967ce7822d1c301933cd110c564f3d60e543ba7a2"
     },
     "document-foundation": {
       "kind": "implementation_checkpoint",
@@ -527,6 +527,16 @@
       "scope": "Four SYSTEM choices own editable vector scrollbars with fresh geometry, logical offsets, transient gestures and strict semantic presentation APIs. Full build,69 UI suites,compiled mutations,Linux sanitizers and20 reviewed windowed engine images pass. Fitting bars are hidden. Physical/native input, full popup framing/safe-area placement, editor and complete state galleries remain required.",
       "local_capture_summary": ".tmp/ui/choice-scrollbar-integration/validation-evidence.json",
       "local_capture_summary_sha256": "12d377f51a2cb3609e9975f14720ab587cddf9e64c3eb2422759a1d0bde5aefd"
+    },
+    "canonical-document-editing": {
+      "kind": "implementation_checkpoint",
+      "path": "docs/dev/ui/document-editing.md",
+      "sha256": "cf20206a3083c4f469b504a4477206b43d0c9339a318e88c009209c10846ab14",
+      "baseline_engine_revision": "1bcb4aec68fbaa3187ca5ffea30720f003f57f1f",
+      "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
+      "scope": "Validated source-preserving insert/remove/move/value batches with exact owner/revision, bounded shared history and allocation-free undo/redo. Full build and70 UI suites pass; integrated Clang364+6+2 checks and14 compiled mutants pass. Isolated MSVC and GCC sanitizer evidence covers the frozen core. No visible editor, joint canvas publication, file-save or product acceptance.",
+      "local_capture_summary": ".tmp/ui/document-edit-integration/validation-evidence.json",
+      "local_capture_summary_sha256": "809d98410f6c2ca9572ad888ef4b0f3faababa1ce4ee99c0e4d10160aed6271e"
     }
   },
   "groups": {
@@ -1485,7 +1495,8 @@
       "current_evidence": [
         "document-foundation",
         "presentation-alias-foundation",
-        "event-program-foundation"
+        "event-program-foundation",
+        "canonical-document-editing"
       ],
       "acceptance_evidence": [],
       "remaining": "Typed presentation aliases and ordered event programs extend the canonical JSONC model with stable explicit targets. Complete component/instance/constraint/editor metadata, structural reference stability and full source round trips remain."
@@ -1513,7 +1524,8 @@
         "document-foundation",
         "instance-foundation",
         "presentation-alias-foundation",
-        "event-program-foundation"
+        "event-program-foundation",
+        "canonical-document-editing"
       ],
       "acceptance_evidence": [],
       "remaining": "Alias and event compilation reject invalid names, collisions, targets, fields, types, units, expressions and structural budgets before replacing the document. Program evaluation also rejects invalid values, calls and execution budgets atomically. Validation for the complete model and editor error navigation remains unaccepted."
@@ -1588,9 +1600,11 @@
         "Valid/invalid structural edit sequences and durable reopen; source comments/unknown extensions survive; no disposable preview-only mutations."
       ],
       "status": "pending",
-      "current_evidence": [],
+      "current_evidence": [
+        "canonical-document-editing"
+      ],
       "acceptance_evidence": [],
-      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required."
+      "remaining": "Bounded source-preserving insert/remove/move/value transactions and source undo/redo now have actual shared-parser validation, exact identity and allocation-failure evidence. Complete components, duplicate/group operations, reference-aware authoring, joint Runtime publication, durable save/reopen and full editor workflow acceptance remain required."
     },
     {
       "id": "DOC-006",
@@ -5983,9 +5997,11 @@
         "Long mixed edit/undo/redo sequence comparing canonical source/IDs/extension data and runtime output at each checkpoint."
       ],
       "status": "pending",
-      "current_evidence": [],
+      "current_evidence": [
+        "canonical-document-editing"
+      ],
       "acceptance_evidence": [],
-      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required."
+      "remaining": "Immutable validated document history now restores exact source bytes through local edit/undo/redo with checked lifetime/revision and bounded source storage. Complete visible history/canvas publication, every component/path/timeline/localization authoring operation, long mixed editor workflows and runtime/source comparison remain required."
     },
     {
       "id": "ED-020",

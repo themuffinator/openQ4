@@ -432,7 +432,7 @@ if build_engine or get_option('build_native_tests')
   libtess2_project = subproject('libtess2')
   openq4_retained_library = static_library(
     'openq4-retained-ui',
-    files('src/ui/retained/Runtime.cpp', 'src/ui/retained/Document.cpp', 'src/ui/retained/Presentation.cpp', 'src/ui/retained/Behavior.cpp', 'src/ui/retained/State.cpp', 'src/ui/retained/Motion.cpp', 'src/ui/retained/Interaction.cpp', 'src/ui/retained/ValueControlView.cpp', 'src/ui/retained/NumberControlView.cpp', 'src/ui/retained/Input.cpp', 'src/ui/retained/TextInput.cpp', 'src/ui/retained/TextEdit.cpp', 'src/ui/retained/TextEditCommand.cpp', 'src/ui/retained/TextInputBroker.cpp', 'src/ui/retained/TextRun.cpp', 'src/ui/retained/Vector.cpp', 'src/ui/retained/VectorElement.cpp', 'src/ui/application/SettingsTransaction.cpp', 'src/ui/application/SettingsJournal.cpp', 'src/ui/application/SettingsEffectPlan.cpp', 'src/ui/application/SettingsDisplayController.cpp'),
+    files('src/ui/retained/Runtime.cpp', 'src/ui/retained/Document.cpp', 'src/ui/retained/DocumentEdit.cpp', 'src/ui/retained/Presentation.cpp', 'src/ui/retained/Behavior.cpp', 'src/ui/retained/State.cpp', 'src/ui/retained/Motion.cpp', 'src/ui/retained/Interaction.cpp', 'src/ui/retained/ValueControlView.cpp', 'src/ui/retained/NumberControlView.cpp', 'src/ui/retained/Input.cpp', 'src/ui/retained/TextInput.cpp', 'src/ui/retained/TextEdit.cpp', 'src/ui/retained/TextEditCommand.cpp', 'src/ui/retained/TextInputBroker.cpp', 'src/ui/retained/TextRun.cpp', 'src/ui/retained/Vector.cpp', 'src/ui/retained/VectorElement.cpp', 'src/ui/application/SettingsTransaction.cpp', 'src/ui/application/SettingsJournal.cpp', 'src/ui/application/SettingsEffectPlan.cpp', 'src/ui/application/SettingsDisplayController.cpp'),
     files('src/ui/retained/TextInputBrokerWire.cpp'),
     files('src/ui/retained/NativeTextDocument.cpp'),
     files('src/ui/retained/NativeTextEditor.cpp'),
@@ -825,6 +825,11 @@ if build_engine or get_option('build_native_tests')
       install: false,
     )
     test('openq4-ui-document', openq4_ui_document_test, timeout: 30)
+    openq4_ui_document_edit_test = executable('openq4-ui-document-edit-test',
+      files('tools/tests/native/UiDocumentEditTest.cpp'),
+      include_directories: [root_include_dir, include_directories('src/ui/retained')],
+      dependencies: openq4_retained_dep, install: false)
+    test('openq4-ui-document-edit', openq4_ui_document_edit_test, timeout: 30)
     openq4_ui_state_test = executable(
       'openq4-ui-state-test',
       files('tools/tests/native/UiStateTest.cpp'),
