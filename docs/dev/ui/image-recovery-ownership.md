@@ -34,11 +34,27 @@ unprepared restart remains available when no preparation is held.
    requires the exact successful direction/result and still-current device,
    failure sequence, policy and resource lifetime. A failed or stale receipt
    cannot discard recovery. Unloading a renderer DLL destroys its module statics.
-   The built-in GL fallback has no quiescent disposal/reset hook yet: after an
-   invalidating mutation, ordinary renderer shutdown/reinit does not clear its
-   retained CPU sets or sticky refusal. Those can remain until process exit.
-   A checked owner shutdown/disposal protocol is required before full Apply
-   activation; an epoch mismatch or empty inventory is not disposal authority.
+   The built-in GL fallback also releases retained CPU data after a complete
+   full renderer shutdown through the private owner scope described below.
+   A device restart, epoch mismatch or empty inventory alone cannot release it.
+
+The full `idRenderSystemLocal::Shutdown` method acquires a private, noncopyable
+owner scope before its first callback. An active checked image attempt or another
+thread refuses that shutdown entry. The scope excludes new initialization,
+recovery preparation, capture, cancellation and release while permitting the
+original thread's required image purges. Only the method's completion after
+`ShutdownOpenGL` can release both CPU sets and the old census. It also verifies
+that the original image manager remains current and empty; substitution or
+repopulation prevents completion. Identity, attempt and preparation counters
+remain monotonic through built-in renderer shutdown/reinitialization.
+
+Interrupted cleanup retains both sets and the old census with sticky refusal.
+Successful later full owner cleanup can release them. CPU destruction occurs
+outside the policy mutex while initialization/recovery exclusion remains held.
+This establishes the synchronous renderer-local CPU lifetime; it does not
+certify general Common/fatal teardown ordering or arbitrary legacy cleanup
+callbacks as repeatable. A full device restart remains a different operation
+and preserves prepared data for the outstanding transaction.
 
 All false-result outputs remain unchanged, including after partial native work.
 Error buffers are separate diagnostic storage and must not alias inputs or

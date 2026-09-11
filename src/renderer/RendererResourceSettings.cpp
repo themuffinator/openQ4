@@ -113,6 +113,7 @@ struct Prepared {
 // accessed while locked; foreign threads never dereference it or any resource.
 std::mutex policyMutex;
 Attempt* active = nullptr;
+const renderImageOwnerShutdown_t* fullOwnerShutdown = nullptr;
 std::thread::id rendererThread;
 uint64_t nextAttempt = 0;
 std::shared_ptr<const Baseline> recovery;
@@ -518,6 +519,7 @@ void R_ImagePolicyResourceDestroyed() noexcept { AdvanceMutationEpoch(); }
 void R_ImagePolicyLifecycleChanged() noexcept { AdvanceMutationEpoch(); }
 bool R_ImagePolicyContentMutation() {
     const std::lock_guard<std::mutex> lock(policyMutex);
+    if (fullOwnerShutdown && std::this_thread::get_id() != rendererThread) return false;
     if (active) {
         if (active->preparing) {
             AdvanceMutationEpoch(); FailLocked("Resource mutation during read-only recovery preparation"); return false;
@@ -535,10 +537,14 @@ bool R_ImagePolicyContentMutation() {
     return true;
 }
 
-void R_ImagePolicyBindRendererThread() {
+bool R_ImagePolicyBindRendererThread() {
     const std::lock_guard<std::mutex> lock(policyMutex);
+    if (fullOwnerShutdown) return false;
     if (rendererThread == std::thread::id()) rendererThread = std::this_thread::get_id();
-    else if (rendererThread != std::this_thread::get_id()) FailLocked("Renderer initialization changed threads");
+    else if (rendererThread != std::this_thread::get_id()) {
+        FailLocked("Renderer initialization changed threads"); return false;
+    }
+    return true;
 }
 bool R_ImagePolicyRendererThread() {
     const std::lock_guard<std::mutex> lock(policyMutex);
@@ -550,6 +556,7 @@ bool R_ImagePolicyActive() {
 }
 bool R_ImagePolicyOperationAllowed() {
     const std::lock_guard<std::mutex> lock(policyMutex);
+    if (fullOwnerShutdown) return false;
     if (!active) return true;
     if (active->preparing) { FailLocked("Native resource operation during recovery preparation"); return false; }
     if (std::this_thread::get_id() != rendererThread) {
@@ -727,6 +734,7 @@ bool R_TryImagePolicyRestart(const renderImagePolicyRequest_t* request, renderIm
         candidate.mutationEpoch = resourceMutationEpoch.load(std::memory_order_relaxed);
         {
             const std::lock_guard<std::mutex> lock(policyMutex);
+            if (fullOwnerShutdown) return Error(error, size, "The renderer owner is shutting down");
             if (active) { FailLocked("Reentrant image-policy request"); return Error(error, size, "A resource restart is already in progress"); }
             if (preparedRecovery) {
                 if (!SameLease(immutable.recovery,preparedRecovery->lease)||immutable.recoveryDirection<1||immutable.recoveryDirection>2||
@@ -807,6 +815,7 @@ bool PrepareRecovery(uint64_t owner,uint64_t request,const char* attempt,const r
         {
             const std::lock_guard<std::mutex> lock(policyMutex);
             if(active){FailLocked("Reentrant image preparation");return Error(error,size,"Image recovery work is already active");}
+            if(fullOwnerShutdown)return Error(error,size,"The renderer owner is shutting down");
             if(preparedRecovery||recovery||recoveryInvalidated||!a.mutationEpoch||rendererThread!=std::this_thread::get_id()||nextPreparation==UINT64_MAX)
                 return Error(error,size,"Image recovery preparation requires an idle fresh owner lifetime");
             prepared->lease={owner,request,++nextPreparation};active=&a;
@@ -854,7 +863,7 @@ bool R_CaptureImagePolicyRecovery(const renderImageRecoveryLease_t* requested,ui
     uint32_t* bytes,char* error,int size) {
     if(!requested||!output||!bytes)return Error(error,size,"Image capture output is required");
     const auto lease=*requested;const std::lock_guard<std::mutex> lock(policyMutex);
-    if(active||rendererThread!=std::this_thread::get_id()||!preparedRecovery||!SameLease(lease,preparedRecovery->lease)||direction<1||direction>2||
+    if(active||fullOwnerShutdown||rendererThread!=std::this_thread::get_id()||!preparedRecovery||!SameLease(lease,preparedRecovery->lease)||direction<1||direction>2||
         !preparedRecovery->directions[direction-1]||preparedRecovery->touched||preparedRecovery->epoch!=resourceMutationEpoch.load(std::memory_order_relaxed))
         return Error(error,size,"Image capture lease is stale");
     const auto& raw=preparedRecovery->raw[direction-1];if(raw.size()>capacity)return Error(error,size,"Image capture buffer is too small");
@@ -865,7 +874,7 @@ bool R_CancelPreparedImagePolicyRecovery(const renderImageRecoveryLease_t* reque
     const auto lease=*requested;std::unique_ptr<Prepared> retired;
     {
         const std::lock_guard<std::mutex> lock(policyMutex);
-        if(active||rendererThread!=std::this_thread::get_id()||!preparedRecovery||!SameLease(lease,preparedRecovery->lease)||preparedRecovery->touched||
+        if(active||fullOwnerShutdown||rendererThread!=std::this_thread::get_id()||!preparedRecovery||!SameLease(lease,preparedRecovery->lease)||preparedRecovery->touched||
             preparedRecovery->epoch!=resourceMutationEpoch.load(std::memory_order_relaxed)||!SamePolicy(preparedRecovery->initialPolicy,ReadPolicy()))
             return Error(error,size,"Image cancellation lease changed");
         // Failed teardown recovery remains sticky; canceling a preparation is
@@ -879,12 +888,16 @@ bool R_ReleaseCompletedImagePolicyRecovery(const renderImageRecoveryLease_t* req
     const renderImagePolicyResult_t* result,char* error,int size) {
     if(!requested||!result)return Error(error,size,"A completed image recovery receipt is required");
     const auto lease=*requested;const auto receipt=*result;
-    if(!R_ImagePolicyRendererThread())return Error(error,size,"Completed image release requires its renderer thread");
+    {
+        const std::lock_guard<std::mutex> lock(policyMutex);
+        if(fullOwnerShutdown||rendererThread!=std::this_thread::get_id())
+            return Error(error,size,"Completed image release requires its available renderer owner");
+    }
     renderDisplayPresentation_t device{};R_GetDisplayPresentation(&device);
     std::unique_ptr<Prepared> retired;
     {
         const std::lock_guard<std::mutex> lock(policyMutex);
-        if(active||!preparedRecovery||!SameLease(lease,preparedRecovery->lease)||!preparedRecovery->touched||direction<1||direction>2||
+        if(active||fullOwnerShutdown||!preparedRecovery||!SameLease(lease,preparedRecovery->lease)||!preparedRecovery->touched||direction<1||direction>2||
             direction!=preparedRecovery->completedDirection||preparedRecovery->epoch!=resourceMutationEpoch.load(std::memory_order_relaxed))
             return Error(error,size,"Completed image release ownership changed");
         const auto& exact=preparedRecovery->completed;
@@ -896,6 +909,45 @@ bool R_ReleaseCompletedImagePolicyRecovery(const renderImageRecoveryLease_t* req
             !SamePolicy(ReadPolicy(),preparedRecovery->directions[direction-1]->policy))return Error(error,size,"Completed image release receipt is stale");
         retired.swap(preparedRecovery);
     }
+    return true;
+}
+renderImageOwnerShutdown_t::renderImageOwnerShutdown_t() {
+    const std::lock_guard<std::mutex> lock(policyMutex);
+    if (active) { FailLocked("Full renderer shutdown interrupted checked image work"); return; }
+    if (fullOwnerShutdown || (rendererThread != std::thread::id() && rendererThread != std::this_thread::get_id())) return;
+    // Early startup may fail before Init bound the thread. No preparation can
+    // exist in that state; binding here permits its actual owner cleanup.
+    if (rendererThread == std::thread::id()) rendererThread = std::this_thread::get_id();
+    imageOwner = globalImages;
+    fullOwnerShutdown = this; allowed = true;
+}
+renderImageOwnerShutdown_t::~renderImageOwnerShutdown_t() {
+    const std::lock_guard<std::mutex> lock(policyMutex);
+    if (fullOwnerShutdown != this) return;
+    // Unwinding an incomplete teardown is not disposal proof. Retain both CPU
+    // directions and the old census; another complete owner shutdown may retry.
+    if (!completed) recoveryInvalidated = true;
+    fullOwnerShutdown = nullptr;
+}
+bool renderImageOwnerShutdown_t::Complete() {
+    std::unique_ptr<Prepared> retired;
+    std::shared_ptr<const Baseline> retiredBaseline;
+    {
+        const std::lock_guard<std::mutex> lock(policyMutex);
+        if (!allowed || completed || fullOwnerShutdown != this || active || rendererThread != std::this_thread::get_id()) return false;
+        // The actual full Shutdown must have emptied this original manager.
+        // A callback cannot substitute a different empty manager or repopulate
+        // the original after its Shutdown and still certify owner completion.
+        if (!globalImages || globalImages != imageOwner || globalImages->images.Num() != 0) return false;
+        retired.swap(preparedRecovery); retiredBaseline.swap(recovery);
+        recoveryInvalidated = false;
+        AdvanceMutationEpoch();
+        completed = true;
+    }
+    // Both CPU directions are now unreachable. Their callback-free allocator
+    // destruction occurs outside the mutex while this scope still excludes new
+    // preparation/initialization. Identity, attempt and preparation counters stay
+    // monotonic across built-in owner shutdown/reinitialization.
     return true;
 }
 int R_ImagePolicyBorrowPreparedContent(const idImage* image,const idBinaryImage*& output,imagePortableContent_t& descriptor) {

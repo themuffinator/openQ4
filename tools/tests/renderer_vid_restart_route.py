@@ -27,7 +27,7 @@ SUPPORT = r'''
 static bool R_ImagePolicyActive(){return false;}
 static bool R_ImagePolicyOperationAllowed(){return true;}
 static void R_ImagePolicyObserveError(const char*,int=0){}
-static void R_ImagePolicyBindRendererThread(){}
+static bool R_ImagePolicyBindRendererThread(){return true;}
 static bool R_ImagePolicyBeforeTeardown(char*,int){return true;}
 static void R_ImagePolicyBeginDeviceReload(){}
 static bool R_ImagePolicyAfterDeviceReload(char*,int){return true;}

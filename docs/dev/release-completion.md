@@ -2,6 +2,11 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- Full renderer shutdown now releases retained texture recovery data, including
+  after an invalidated quality-change attempt. Interrupted cleanup preserves the
+  recovery data until a later complete shutdown. Complete preset Apply remains
+  in development.
+
 - UI recovery development now preserves both original and requested supported
   texture data across failed quality changes. Native input retirement also checks
   actual menu and gameplay event disposal before releasing ownership. Complete

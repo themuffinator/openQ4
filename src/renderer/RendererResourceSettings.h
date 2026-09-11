@@ -70,12 +70,27 @@ bool R_ImagePolicyContentMutation();
 bool R_ImagePolicyActive();
 bool R_ImagePolicyRendererThread();
 void R_ImagePolicyObserveError(const char* reason, int32_t nativeError = 0);
-void R_ImagePolicyBindRendererThread();
+bool R_ImagePolicyBindRendererThread();
 bool R_ImagePolicyShouldReload(const class idImage* image);
 bool R_ImagePolicyBeforeTeardown(char* error, int errorSize);
 void R_ImagePolicyBeginDeviceReload();
 bool R_ImagePolicyAfterDeviceReload(char* error, int errorSize);
 bool R_ImagePolicyFinish(char* error, int errorSize);
+
+// Only the full renderer owner's Shutdown method can create/complete this
+// scope. A device restart, empty inventory or changed epoch cannot release
+// prepared CPU data. The scope excludes new recovery work through destruction.
+class renderImageOwnerShutdown_t {
+    friend class idRenderSystemLocal;
+    renderImageOwnerShutdown_t();
+    ~renderImageOwnerShutdown_t();
+    bool Allowed() const { return allowed; }
+    bool Complete();
+    renderImageOwnerShutdown_t(const renderImageOwnerShutdown_t&) = delete;
+    renderImageOwnerShutdown_t& operator=(const renderImageOwnerShutdown_t&) = delete;
+    const void* imageOwner = nullptr;
+    bool allowed = false, completed = false;
+};
 
 class idImage;
 // Every backend early return is a refusal unless explicitly completed. Native

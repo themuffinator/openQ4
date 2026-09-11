@@ -331,9 +331,9 @@ def main():
     observer = (root/names[1]).read_text()
     startup_source = (root/'src/renderer/RenderSystem_init.cpp').read_text()
     startup = method(startup_source, 'void idRenderSystemLocal::Init( void )')
-    assert startup[startup.index('{')+1:].lstrip().startswith('R_ImagePolicyBindRendererThread();')
-    assert startup.index('R_ImagePolicyBindRendererThread();') < startup.index('globalImages->Init();') < startup.index('R_InitMaterials();')
-    assert startup_source.count('R_ImagePolicyBindRendererThread();') == 2
+    assert startup[startup.index('{')+1:].lstrip().startswith('if ( !R_ImagePolicyBindRendererThread() ) return;')
+    assert startup.index('R_ImagePolicyBindRendererThread()') < startup.index('globalImages->Init();') < startup.index('R_InitMaterials();')
+    assert startup_source.count('R_ImagePolicyBindRendererThread()') == 2
     assert 'image_ignoreHighQuality.GetBool()' not in method(material, 'textureUsage_t R_ResolveMaterialHighQualityUsage(')
     assert 'R_ApplyMaterialHighQualityUsage(' not in material and 'R_ApplyMaterialNoMipFlags(' not in material
     assert material.count('R_ResolveMaterialHighQualityUsage( pd->qualityInputs,') == 6

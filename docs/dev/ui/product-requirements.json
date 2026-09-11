@@ -4,7 +4,7 @@
   "date": "2026-09-11",
   "status": "Implementation incomplete; this register preserves full product scope and does not accept any production GUI.",
   "baseline": {
-    "engine_revision": "b880d593e358d64276bccbb0ec58c3b83f5e5011",
+    "engine_revision": "7733297d306b944d4b16f9c147247712e228925c",
     "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
     "effective_gui_count": 271,
     "translated_or_accepted_resources": 0,
@@ -19,7 +19,7 @@
     "product": {
       "path": "docs/dev/plans/ui-product-completion.md",
       "authority": "normative completion scope, milestones and final audit",
-      "sha256": "fbf06669d4bd546f398922e2e4ef5b63d33762ccfaeb5e4e794045d108fc478c"
+      "sha256": "3472573171a55121b9c714e74290e07e93020c6c8d8751cfe0ae9d4c89d1c21f"
     },
     "original": {
       "path": "docs/dev/plans/idtech5-ui.md",
@@ -100,7 +100,7 @@
       "kind": "source_audit",
       "path": "docs/dev/plans/ui-product-completion.md",
       "scope": "Published audit at 80bb3939; source limitations corroborated by current Document/Runtime inspection. Historical tests and captures are not a fresh product qualification.",
-      "sha256": "fbf06669d4bd546f398922e2e4ef5b63d33762ccfaeb5e4e794045d108fc478c"
+      "sha256": "3472573171a55121b9c714e74290e07e93020c6c8d8751cfe0ae9d4c89d1c21f"
     },
     "document-foundation": {
       "kind": "implementation_checkpoint",
@@ -541,7 +541,7 @@
     "owned-image-recovery": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/image-recovery-ownership.md",
-      "sha256": "0c0a6e07da032fbc1738927078042710798082e44c728eefd107cb1081bdae5a",
+      "sha256": "b009cc32eaeb98bce3386f463135db1e5546d24345ded374ab4ea58c6e765ab3",
       "baseline_engine_revision": "b880d593e358d64276bccbb0ec58c3b83f5e5011",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "scope": "Exact whole-cohort preparation retains both immutable CPU directions before policy mutation, strict durable envelope and initialized-inventory cold reconstruction. Real coordinator/loader/module/codec/journal checks and integrated mutations pass. All-cohort reconstruction, quiescent built-in disposal, pre-first-device recovery and full mixed Apply remain required.",
@@ -557,6 +557,16 @@
       "scope": "Actual Session/poll sinks join exact owned transfers, fixed ledger schedule, held-source quarantine and checked completion/retirement. Integrated Clang16581 checks per projection,44 fatal edges and26 compiled mutants; frozen MSVC debug, sanitized GCC and SDK evidence. No live translator/bootstrap/provider activation or complete input acceptance.",
       "local_capture_summary": ".tmp/ui/runtime-ownership-integration/validation-evidence.json",
       "local_capture_summary_sha256": "d9c4fca9b14cdfad640b9ef35c5156e315f203f902e432918a4ff020a884eea9"
+    },
+    "image-owner-shutdown": {
+      "kind": "implementation_checkpoint",
+      "path": "docs/dev/ui/image-recovery-ownership.md",
+      "sha256": "b009cc32eaeb98bce3386f463135db1e5546d24345ded374ab4ea58c6e765ab3",
+      "baseline_engine_revision": "7733297d306b944d4b16f9c147247712e228925c",
+      "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
+      "scope": "Actual full renderer Shutdown admits only the idle original owner thread and releases both CPU recovery sets/census after complete original-manager cleanup. Clang, MSVC debug and sanitized GCC each pass569 checks and12 compiled mutations;77 UI suites and four passive engine images pass. General Common/fatal teardown, complete retail reconstruction and mixed Apply remain required.",
+      "local_capture_summary": ".tmp/ui/image-owner-shutdown/validation-evidence.json",
+      "local_capture_summary_sha256": "c522301a10681b9630facb6beb3b4663dfe7d06371c90159655512094ea57f4e"
     }
   },
   "groups": {
@@ -1997,7 +2007,8 @@
         "checked-image-reduction",
         "checked-upload-storage",
         "exact-image-content-recovery",
-        "owned-image-recovery"
+        "owned-image-recovery",
+        "image-owner-shutdown"
       ],
       "acceptance_evidence": [],
       "remaining": "The typed settings service and asynchronous display confirmation retain their previously qualified scopes. Local numeric drafts guard Apply, Apply and Exit, Defaults, colliding sibling edits and dismissal; Discard requires completed service cancellation and an unchanged complete local editor inventory. Queued rollback, stale callbacks and recovery preserve unfinished text. Exact typed comparison and FTZ/DAZ-independent journal number serialization now cover transaction, display validation and startup recovery, preserving observed originals while signed zeros share the canonical zero representation. Shared profile and Auto-Detect draft expansion now preserve all unrelated edits with guarded atomic publication. Complete actual audio/resource/input effects, preset execution and persistence, all dependent production controls, Defaults and the full Apply/Cancel/discard-and-exit matrix. Qualify visible focus/window-placement/fullscreen/multi-monitor failures and timeout/restart recovery across supported platforms. CVar values alone never prove device success; counted recovery and synthetic startup evidence do not qualify a power loss, actual interrupted confirmation or every persistent recovery path. Exact DDS and previously observed cache CPU reconstruction now has source-byte and canonical output evidence; decoded/program/default images, material cohorts, durable content retention, native reconstruction and full mixed-effect recovery remain required."
@@ -5073,7 +5084,8 @@
         "authored-scrollbars",
         "exact-image-content-recovery",
         "authored-choice-scrollbars",
-        "owned-image-recovery"
+        "owned-image-recovery",
+        "image-owner-shutdown"
       ],
       "acceptance_evidence": [],
       "remaining": "The production page now includes source-derived preset and Auto-Detect controls with localized flowing labels, guarded proposals, actual shared draft expansion and bounded Runtime/gameplay validation. The source-backed 31-option/53-CVar contract retains its packaged opt-in SYSTEM route and precise Brightness/Ambient Brightness fields, localized validation and local draft barriers. Exact numeric recovery and bounded full-border focus reveal extend this implementation; neither accepts the translated page. Complete every actual setting and dependent popup, display capability/resolution catalogs, native numeric text entry, complete preset/Auto-Detect effect execution and persistence, remaining effects, Defaults, full Apply/Cancel/exit behavior, source-derived visuals/transitions and the native editor round trip. Qualify normal SP/MP entry/return/reopen, failure/cancellation, complete responsive/localized state galleries and every mapped resource; historical and current bounded captures do not accept the full requirement."

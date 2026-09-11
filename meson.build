@@ -665,7 +665,7 @@ if build_engine or get_option('build_native_tests')
     test('openq4-ui-image-content', py,
       args: [meson.project_source_root() / 'tools/tests/renderer_image_content.py',
         '--compiler', ui_test_cpp.cmd_array()[-1]], timeout: 180)
-    foreach recovery_suite : ['owner', 'module', 'loader', 'codec', 'cold']
+    foreach recovery_suite : ['owner', 'module', 'loader', 'codec', 'cold', 'lifecycle']
       test('openq4-ui-image-recovery-' + recovery_suite, py,
         args: [meson.project_source_root() / ('tools/tests/renderer_image_recovery_' + recovery_suite + '.py'),
           '--compiler', ui_test_cpp.cmd_array()[-1]], timeout: 180)

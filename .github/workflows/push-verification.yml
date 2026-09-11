@@ -364,6 +364,7 @@ jobs:
             tools/tests/renderer_image_recovery_codec.py \
             tools/tests/renderer_image_recovery_cold.py \
             tools/tests/renderer_image_recovery_fixture.py \
+            tools/tests/renderer_image_recovery_lifecycle.py \
             tools/tests/renderer_image_policy_restart.py \
             tools/tests/renderer_image_policy_boundaries.py \
             tools/tests/renderer_image_policy_lifetimes.py \
@@ -650,6 +651,7 @@ jobs:
           python tools/tests/renderer_image_recovery_loader.py --mutations
           python tools/tests/renderer_image_recovery_codec.py --mutations
           python tools/tests/renderer_image_recovery_cold.py --mutations
+          python tools/tests/renderer_image_recovery_lifecycle.py --mutations
           python tools/tests/renderer_image_policy_restart.py --mutations
           python tools/tests/renderer_image_policy_boundaries.py --mutations
           python tools/tests/renderer_image_policy_lifetimes.py --mutations

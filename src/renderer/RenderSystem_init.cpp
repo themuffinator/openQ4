@@ -5398,7 +5398,7 @@ idRenderSystemLocal::Init
 ===============
 */
 void idRenderSystemLocal::Init( void ) {
-	R_ImagePolicyBindRendererThread();
+	if ( !R_ImagePolicyBindRendererThread() ) return;
 	r_initialRendererDevicePending = false;
 
 	common->Printf( "------- Initializing renderSystem --------\n" );
@@ -5469,6 +5469,8 @@ idRenderSystemLocal::Shutdown
 ===============
 */
 void idRenderSystemLocal::Shutdown( void ) {
+	renderImageOwnerShutdown_t imageOwnerShutdown;
+	if ( !imageOwnerShutdown.Allowed() ) return;
 	r_initialRendererDevicePending = false;
 	common->Printf( "idRenderSystem::Shutdown()\n" );
 	R_RendererMetrics_ResetGpuFrameTiming( "renderer shutdown" );
@@ -5517,6 +5519,7 @@ void idRenderSystemLocal::Shutdown( void ) {
 	Clear();
 
 	ShutdownOpenGL();
+	(void)imageOwnerShutdown.Complete();
 }
 
 /*
@@ -5575,7 +5578,9 @@ idRenderSystemLocal::InitOpenGL
 ========================
 */
 static bool R_InitRendererDevice( bool legacyPolicy, bool forceWindow, char *error, int errorSize ) {
-	R_ImagePolicyBindRendererThread();
+	if ( !R_ImagePolicyBindRendererThread() ) {
+		return R_RendererRestartError( error, errorSize, "Renderer initialization requires its available owner thread" );
+	}
 	// if the device isn't started, start it now
 	if ( !glConfig.isInitialized ) {
 #ifdef OPENQ4_RENDERER_VK_MODULE
