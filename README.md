@@ -92,6 +92,9 @@ supported texture directions before a quality change, while the
 [native input driver](docs/dev/ui/native-input-driver.md) connects checked event
 disposal to the engine sinks. Full preset Apply and native text activation remain
 unfinished.
+[Editor file publication](docs/dev/ui/editor-file-safety.md) can create complete
+new files without replacing a competing document. The full authoring and
+save/recovery workflows remain in development.
 [Ordered event programs](docs/dev/ui/event-programs.md) connect data, transitions
 and typed actions to normal GUI lifecycle and session delivery. Complete GUI migration,
 the full application/control contract and the visual editor remain in development.

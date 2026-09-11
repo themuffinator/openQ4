@@ -4,7 +4,7 @@
   "date": "2026-09-11",
   "status": "Implementation incomplete; this register preserves full product scope and does not accept any production GUI.",
   "baseline": {
-    "engine_revision": "7733297d306b944d4b16f9c147247712e228925c",
+    "engine_revision": "a11a00181b5997993bb9e225bad63a6422386311",
     "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
     "effective_gui_count": 271,
     "translated_or_accepted_resources": 0,
@@ -19,7 +19,7 @@
     "product": {
       "path": "docs/dev/plans/ui-product-completion.md",
       "authority": "normative completion scope, milestones and final audit",
-      "sha256": "3472573171a55121b9c714e74290e07e93020c6c8d8751cfe0ae9d4c89d1c21f"
+      "sha256": "6ebebb725e4836150ca1cbbb4e9af8c023d6b26720915738507c7743bcab7690"
     },
     "original": {
       "path": "docs/dev/plans/idtech5-ui.md",
@@ -100,7 +100,7 @@
       "kind": "source_audit",
       "path": "docs/dev/plans/ui-product-completion.md",
       "scope": "Published audit at 80bb3939; source limitations corroborated by current Document/Runtime inspection. Historical tests and captures are not a fresh product qualification.",
-      "sha256": "3472573171a55121b9c714e74290e07e93020c6c8d8751cfe0ae9d4c89d1c21f"
+      "sha256": "6ebebb725e4836150ca1cbbb4e9af8c023d6b26720915738507c7743bcab7690"
     },
     "document-foundation": {
       "kind": "implementation_checkpoint",
@@ -567,6 +567,16 @@
       "scope": "Actual full renderer Shutdown admits only the idle original owner thread and releases both CPU recovery sets/census after complete original-manager cleanup. Clang, MSVC debug and sanitized GCC each pass569 checks and12 compiled mutations;77 UI suites and four passive engine images pass. General Common/fatal teardown, complete retail reconstruction and mixed Apply remain required.",
       "local_capture_summary": ".tmp/ui/image-owner-shutdown/validation-evidence.json",
       "local_capture_summary_sha256": "c522301a10681b9630facb6beb3b4663dfe7d06371c90159655512094ea57f4e"
+    },
+    "editor-new-file": {
+      "kind": "implementation_checkpoint",
+      "path": "docs/dev/ui/editor-file-safety.md",
+      "sha256": "f230d95828b46ab05646abb602959011410a9910b30079b173e008fe8e251d31",
+      "baseline_engine_revision": "a11a00181b5997993bb9e225bad63a6422386311",
+      "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
+      "scope": "Actual native new-file publication refuses a competing creator at publication, after complete writes/sync/close. Windows Clang/MSVC340 and GCC sanitizer344 checks plus7 compiled mutants each; full build and78 UI suites pass. Save As/autosave UI, complete overwrite/conflict/crash recovery and editor acceptance remain required.",
+      "local_capture_summary": ".tmp/ui/editor-new-file/validation-evidence.json",
+      "local_capture_summary_sha256": "846413e35eb34ed965a57005aa6eb724b5c8d3dbc2fb46f65ba30711a509cc63"
     }
   },
   "groups": {
@@ -6063,7 +6073,9 @@
         "Injected save/write/rename interruption, real reopen and source comparison with nontrivial comments/extensions."
       ],
       "status": "pending",
-      "current_evidence": [],
+      "current_evidence": [
+        "editor-new-file"
+      ],
       "acceptance_evidence": [],
       "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required."
     },
@@ -6088,7 +6100,9 @@
         "Crash/interrupted-save/relaunch recovery containing expected unsaved structural/path/binding changes."
       ],
       "status": "pending",
-      "current_evidence": [],
+      "current_evidence": [
+        "editor-new-file"
+      ],
       "acceptance_evidence": [],
       "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required."
     },
@@ -6113,7 +6127,9 @@
         "Concurrent file mutation and conflict resolution scenarios preserving both versions and intentional chosen result."
       ],
       "status": "pending",
-      "current_evidence": [],
+      "current_evidence": [
+        "editor-new-file"
+      ],
       "acceptance_evidence": [],
       "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required."
     },

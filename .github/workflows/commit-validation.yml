@@ -632,7 +632,7 @@ jobs:
           python tools/tests/ui_text_owner.py
           python tools/tests/ui_system_settings_host.py
           python tools/tests/ui_settings_service.py
-          python tools/tests/durable_file.py
+          python tools/tests/durable_file.py --mutations
           python tools/tests/settings_configuration_persistence.py
           python tools/tests/sdl3_settings_placement.py
           python tools/tests/ui_system_display.py

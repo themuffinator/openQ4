@@ -8,6 +8,7 @@
 namespace openq4 {
 
 enum class DurableReadResult { Missing, Present, Failed };
+enum class DurableCreateResult { Created, Exists, Failed };
 inline constexpr std::size_t DurableFileMaxBytes = 16 * 1024 * 1024;
 
 // Exact native paths only: no VFS, package lookup, search path, or directory
@@ -30,6 +31,17 @@ DurableReadResult DurableReadExact(const std::string& absoluteUtf8Path,
 // failure may mean the new file is already visible but its durability is unknown;
 // callers must retain recovery state, not assume the old bytes are still present.
 bool DurableReplaceExact(const std::string& absoluteUtf8Path,
+    const std::string& bytes, std::string& error);
+
+// Publishes fully written new bytes only when the exact target is absent at
+// the native publication boundary. A racing creator is never overwritten.
+// Exists is an ordinary collision, clears error and makes no target mutation;
+// nonregular/inaccessible targets may instead return Failed. Failed after a
+// publication attempt can leave complete new bytes visible with durability
+// unknown, so retain recovery evidence and never retry with ReplaceExact.
+// No cross-process lease is needed to prevent creation collisions. This does
+// not protect later changes or supply editor overwrite/conflict resolution.
+DurableCreateResult DurableCreateExact(const std::string& absoluteUtf8Path,
     const std::string& bytes, std::string& error);
 
 // Idempotent exact-name removal. Windows first moves the target to an owned,
@@ -73,11 +85,16 @@ private:
 // Primary contracts:
 // https://man7.org/linux/man-pages/man2/fsync.2.html
 // https://man7.org/linux/man-pages/man2/rename.2.html
+// https://man7.org/linux/man-pages/man2/link.2.html
 // https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/fsync.2.html
 // https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-flushfilebuffers
 // https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-movefileexw
 // https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-replacefilew
 // SDL_FlushIO only promises a stream flush and SDL_RenamePath exposes no durable
 // rename flag; native handles/descriptors are necessary for this contract.
+// CreateExact uses MoveFileExW without REPLACE_EXISTING on Windows. POSIX
+// linkat publishes only this call's exclusively created, fully synced adjacent
+// temp, then removes that temp and syncs the directory. It never links an
+// existing source document or installed asset. Unsupported filesystems refuse.
 
 } // namespace openq4

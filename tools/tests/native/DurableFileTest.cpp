@@ -48,6 +48,8 @@ void RawPut(const fs::path& path, const std::string& bytes) {
     file.write(bytes.data(),static_cast<std::streamsize>(bytes.size()));
     file.close(); Check(!file.fail(),"raw fixture write");
 }
+std::string creationRacePath;
+void CreateCompetitor() { RawPut(NativePath(creationRacePath),"external racing creator"); }
 #ifndef _WIN32
 std::string mutationPath;
 void Grow() { RawPut(NativePath(mutationPath),"abcdefghijk"); }
@@ -307,6 +309,98 @@ struct Child {
     }
 };
 
+void CreateCases(const fs::path& dir) {
+    const auto path=Utf8Path(dir / NativePath("new-\xc3\xa9-\xe6\xb0\xb4.q4ui"));
+    std::string bytes(ChunkBytes*3+17,'x');
+    for(std::size_t i=0;i<bytes.size();++i)bytes[i]=static_cast<char>(i%251);
+    Reset();faults.writeChunk=7;
+    Check(DurableCreateExact(path,bytes,error)==DurableCreateResult::Created && error.empty(),"new complete Unicode/binary file published");
+    Check(Get(path)==bytes,"new multi-chunk bytes match exactly");
+    error="old";
+    Check(DurableCreateExact(path,"replacement",error)==DurableCreateResult::Exists && error.empty(),"existing file is an ordinary creation collision");
+    Check(Get(path)==bytes,"collision never overwrites existing document");
+    Check(DurableRemoveExact(path,error),"remove exact creation fixture");
+    for(const auto point:{Point::OpenTemp,Point::Write,Point::FileSync,Point::CloseWrite,Point::CreatePublication}) {
+        Arm(point);
+        Check(DurableCreateExact(path,bytes,error)==DurableCreateResult::Failed && !error.empty(),"new-file prepublication failure reported");
+        Check(!fs::exists(NativePath(path)),"no partial new file becomes visible");
+        Reset();
+    }
+    Arm(Point::Write,2);
+    Check(DurableCreateExact(path,bytes,error)==DurableCreateResult::Failed && !fs::exists(NativePath(path)),"partial new-file write remains private");
+    Reset();faults.zeroWrite=true;
+    Check(DurableCreateExact(path,bytes,error)==DurableCreateResult::Failed && !fs::exists(NativePath(path)),"zero-progress new-file write refuses");
+    Reset();
+    Check(DurableCreateExact(path,std::string(DurableFileMaxBytes+1,'z'),error)==DurableCreateResult::Failed &&
+        !fs::exists(NativePath(path)),"new-file total byte bound precedes effects");
+    Check(DurableCreateExact("relative.q4ui",bytes,error)==DurableCreateResult::Failed,"new-file path must be absolute");
+    Check(DurableCreateExact(Utf8Path(dir / "missing-parent" / "file"),bytes,error)==DurableCreateResult::Failed &&
+        !fs::exists(dir / "missing-parent"),"new-file operation never creates parent directories");
+    creationRacePath=path;faults.beforeCreatePublication=CreateCompetitor;
+    Check(DurableCreateExact(path,bytes,error)==DurableCreateResult::Exists && error.empty(),"creator after preflight wins without overwrite");
+    Check(Get(path)=="external racing creator","late external bytes remain intact");
+    Check(DurableRemoveExact(path,error),"remove late creator fixture");
+    Arm(Point::MetadataSync);
+    Check(DurableCreateExact(path,bytes,error)==DurableCreateResult::Failed && !error.empty(),"published new-file durability failure is not success");
+    Check(Get(path)==bytes,"uncertain publication retains complete new bytes");
+    Check(DurableCreateExact(path,"retry",error)==DurableCreateResult::Exists && Get(path)==bytes,"retry after uncertain publication cannot replace it");
+    Check(DurableRemoveExact(path,error),"remove uncertain new-file fixture");
+#ifndef _WIN32
+    Arm(Point::Cleanup);
+    Check(DurableCreateExact(path,bytes,error)==DurableCreateResult::Failed && !error.empty(),"published link cleanup failure is uncertain");
+    Check(Get(path)==bytes,"temporary link cleanup never removes new target");
+    Check(DurableRemoveExact(path,error),"remove cleanup-refusal fixture");
+#endif
+    Reset();
+    Check(DurableCreateExact(path,"",error)==DurableCreateResult::Created && Get(path).empty(),"empty new file publishes exactly");
+    Check(DurableRemoveExact(path,error),"remove empty new-file fixture");
+    const auto directory=dir / "create-directory";
+    Check(fs::create_directory(directory),"reserve creation directory collision");
+    Check(DurableCreateExact(Utf8Path(directory),bytes,error)!=DurableCreateResult::Created && fs::is_directory(directory),"directory collision stays intact");
+    Check(fs::remove(directory),"remove empty creation directory collision");
+    const auto target=dir / "create-link-target",link=dir / "create-link";
+    RawPut(target,"linked external work");
+    std::error_code linkError;fs::create_symlink(target,link,linkError);
+    if(!linkError) {
+        Check(DurableCreateExact(Utf8Path(link),bytes,error)!=DurableCreateResult::Created,"new-file operation refuses leaf symlink");
+        Check(Get(Utf8Path(target))=="linked external work","linked source is unchanged");
+        Check(fs::remove(link),"remove exact creation link fixture");
+    } else std::cout << "SKIP new-file symlink fixture: " << linkError.message() << '\n';
+    Check(fs::remove(target),"remove exact creation link target");
+
+    // Real concurrent native publications. No application lease or mutex
+    // serializes creators; exactly one complete payload can own the name.
+    constexpr unsigned count=8;
+    std::atomic<unsigned> waiting{0};std::atomic<bool> start{false};
+    std::vector<DurableCreateResult> results(count,DurableCreateResult::Failed);
+    std::vector<std::string> errors(count),payloads;
+    std::vector<std::thread> threads;
+    for(unsigned i=0;i<count;++i)payloads.push_back(std::string(ChunkBytes*4+11,char('A'+i)));
+    for(unsigned i=0;i<count;++i)threads.emplace_back([&,i]{
+        waiting.fetch_add(1);while(!start.load())std::this_thread::yield();
+        results[i]=DurableCreateExact(path,payloads[i],errors[i]);
+    });
+    while(waiting.load()!=count)std::this_thread::yield();
+    start.store(true);
+    for(auto& thread:threads)thread.join();
+    unsigned created=0,winner=0;
+    for(unsigned i=0;i<count;++i) {
+        Check(errors[i].empty() && (results[i]==DurableCreateResult::Created || results[i]==DurableCreateResult::Exists),"native contenders return created or collision");
+        if(results[i]==DurableCreateResult::Created){++created;winner=i;}
+    }
+    Check(created==1 && Get(path)==payloads[winner],"one native contender publishes one complete payload");
+    Check(DurableRemoveExact(path,error),"remove concurrent thread fixture");
+    // The standalone narrow-main child harness has no Windows Unicode argv
+    // adapter; Unicode paths are covered above through the actual UTF-8 API.
+    const auto processPath=Utf8Path(dir / "process-create.q4ui");
+    Child first,second;first.Start({"--create-exact",processPath,"first-process"});second.Start({"--create-exact",processPath,"second-process"});
+    const int a=first.Wait(),b=second.Wait();
+    std::cout << "Independent create results: " << a << ',' << b << '\n';
+    Check((a==0 && b==2)||(a==2 && b==0),"one independent process wins creation");
+    Check(Get(processPath)==(a==0?"first-process":"second-process"),"independent winner bytes remain exact");
+    Check(DurableRemoveExact(processPath,error),"remove independent process fixture");
+}
+
 void LeaseCases(const fs::path& dir) {
     const auto path = Utf8Path(dir / "settings-recovery.lock");
     DurableFileLease first, second;
@@ -358,6 +452,10 @@ void LeaseCases(const fs::path& dir) {
 } // namespace
 
 int main(int argc, char** argv) {
+    if (argc==4 && std::string(argv[1])=="--create-exact") {
+        const auto result=DurableCreateExact(argv[2],argv[3],error);
+        return result==DurableCreateResult::Created?0:result==DurableCreateResult::Exists?2:3;
+    }
     if (argc == 3 && std::string(argv[1]) == "--lease-probe") {
         DurableFileLease probe;
         return !probe.TryAcquire(argv[2],error) && !error.empty() ? 0 : 9;
@@ -382,7 +480,7 @@ int main(int argc, char** argv) {
     }
     Check(created,"reserve isolated test directory");
     std::cout << "DurableFileTest scratch: " << Utf8Path(dir) << '\n';
-    ReadCases(dir); ReplaceCases(dir); RemoveCases(dir); PathCases(dir); LeaseCases(dir);
+    ReadCases(dir); ReplaceCases(dir); CreateCases(dir); RemoveCases(dir); PathCases(dir); LeaseCases(dir);
     // Only exact regular files created inside this exclusive, nonrecursive test
     // directory remain (uncertain Windows tombstones). Preserve unexpected data.
     for (const auto& entry : fs::directory_iterator(dir)) {

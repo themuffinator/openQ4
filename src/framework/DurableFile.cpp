@@ -33,7 +33,7 @@ constexpr unsigned TempAttempts = 32;
 // Compile-time-only fault injection. The standalone test includes this source;
 // engine builds contain no mutable hook or alternate operating-system backend.
 enum class Point { OpenRead, Read, OpenTemp, Write, FileSync, CloseRead,
-    CloseWrite, Rename, MetadataSync, Remove, Cleanup };
+    CloseWrite, Rename, MetadataSync, Remove, Cleanup, CreatePublication };
 #ifdef OPENQ4_DURABLE_FILE_TESTING
 struct Faults {
     Point point = Point::OpenRead;
@@ -41,6 +41,7 @@ struct Faults {
     std::size_t readChunk = ChunkBytes, writeChunk = ChunkBytes;
     bool zeroRead = false, zeroWrite = false;
     void (*beforeRead)() = nullptr;
+    void (*beforeCreatePublication)() = nullptr;
 };
 thread_local Faults faults;
 bool Fail(Point point) {
@@ -422,6 +423,61 @@ bool Replace(const Path& path, const std::string& bytes, std::string& error) {
     error.clear(); return true;
 }
 
+DurableCreateResult Create(const Path& path, const std::string& bytes, std::string& error) {
+    Handle parent;
+#ifndef _WIN32
+    if (!OpenParent(path,parent,error)) return DurableCreateResult::Failed;
+#endif
+    bool missing;
+    if (!InspectTarget(path,parent.value,missing,error)) return DurableCreateResult::Failed;
+    if (!missing) { error.clear(); return DurableCreateResult::Exists; }
+    Temp temp;
+    if (!temp.Create(path,parent.value,error) || !WriteAll(temp.file.value,bytes,error) ||
+        !Sync(temp.file.value,Point::FileSync,error) || !temp.file.Close(error,Point::CloseWrite))
+        return DurableCreateResult::Failed;
+    if (Fail(Point::CreatePublication)) {
+        Error(error,"New-file publication failed (injected)"); return DurableCreateResult::Failed;
+    }
+#ifdef OPENQ4_DURABLE_FILE_TESTING
+    if (faults.beforeCreatePublication) {
+        auto callback=faults.beforeCreatePublication;faults.beforeCreatePublication=nullptr;callback();
+    }
+#endif
+    // The earlier existence check is only an optimization. The native operation
+    // itself refuses an occupied name, including one created after that check.
+#ifdef _WIN32
+    if (!MoveFileExW(temp.name.c_str(),path.full.c_str(),MOVEFILE_WRITE_THROUGH)) {
+        const auto code=GetLastError();
+        if (code==ERROR_FILE_EXISTS || code==ERROR_ALREADY_EXISTS) {
+            error.clear(); return DurableCreateResult::Exists;
+        }
+        Error(error,"New-file publication failed; publication/durability may be uncertain",code);
+        return DurableCreateResult::Failed;
+    }
+    temp.owned=false;
+    if (Fail(Point::MetadataSync)) {
+        Error(error,"New file published; namespace durability unconfirmed (injected)");
+        return DurableCreateResult::Failed;
+    }
+#else
+    if (linkat(parent.value,temp.name.c_str(),parent.value,path.leaf.c_str(),0)!=0) {
+        const auto code=errno;
+        if (code==EEXIST) { error.clear(); return DurableCreateResult::Exists; }
+        Error(error,"New-file publication failed; publication/durability may be uncertain",code);
+        return DurableCreateResult::Failed;
+    }
+    // Only our newly created temp has a second name. Never remove or replace
+    // the target on failure; it may already be visible to another process.
+    if (Fail(Point::Cleanup) || unlinkat(parent.value,temp.name.c_str(),0)!=0) {
+        Error(error,"New file published; temporary cleanup/durability unconfirmed");
+        return DurableCreateResult::Failed;
+    }
+    temp.owned=false;
+    if (!Sync(parent.value,Point::MetadataSync,error)) return DurableCreateResult::Failed;
+#endif
+    error.clear(); return DurableCreateResult::Created;
+}
+
 bool Remove(const Path& path, std::string& error) {
     Handle parent;
 #ifndef _WIN32
@@ -489,6 +545,20 @@ bool DurableReplaceExact(const std::string& path, const std::string& bytes, std:
         if (bytes.size() > DurableFileMaxBytes) return Error(error,"Replacement exceeds durable-file limit");
         return ParsePath(path,parsed,error) && Replace(parsed,bytes,error);
     } catch (const std::bad_alloc&) { return Error(error,"Durable replacement allocation failed"); }
+}
+
+DurableCreateResult DurableCreateExact(const std::string& path, const std::string& bytes, std::string& error) {
+    using namespace durable_detail;
+    try {
+        Path parsed;
+        if (bytes.size()>DurableFileMaxBytes) {
+            Error(error,"New file exceeds durable-file limit"); return DurableCreateResult::Failed;
+        }
+        if (!ParsePath(path,parsed,error)) return DurableCreateResult::Failed;
+        return Create(parsed,bytes,error);
+    } catch (const std::bad_alloc&) {
+        Error(error,"Durable new-file allocation failed"); return DurableCreateResult::Failed;
+    }
 }
 
 bool DurableRemoveExact(const std::string& path, std::string& error) {

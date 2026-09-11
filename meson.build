@@ -841,6 +841,9 @@ if build_engine or get_option('build_native_tests')
       include_directories: [root_include_dir, include_directories('src/ui/retained')],
       dependencies: openq4_retained_dep, install: false)
     test('openq4-ui-document-edit', openq4_ui_document_edit_test, timeout: 30)
+    test('openq4-ui-document-files', py,
+      args: [meson.project_source_root() / 'tools/tests/durable_file.py',
+        '--compiler', ui_test_cpp.cmd_array()[-1]], timeout: 180)
     openq4_ui_state_test = executable(
       'openq4-ui-state-test',
       files('tools/tests/native/UiStateTest.cpp'),

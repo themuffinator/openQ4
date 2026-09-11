@@ -2,6 +2,11 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- Editor save development now has a checked way to create complete new files
+  without replacing an existing document, including when another process creates
+  that name at the same time. The editor Save As and recovery workflows remain
+  in development.
+
 - Full renderer shutdown now releases retained texture recovery data, including
   after an invalidated quality-change attempt. Interrupted cleanup preserves the
   recovery data until a later complete shutdown. Complete preset Apply remains
