@@ -3,6 +3,7 @@
 
 #ifndef __RENDERMODULEAPI_H__
 #define __RENDERMODULEAPI_H__
+#include <stdint.h>
 
 /*
 ===============================================================================
@@ -63,7 +64,8 @@
 // 14 - Strict window requests/readback and private recoverable device services.
 // 15 - Private strict first-device initialization for durable display recovery.
 // 16 - Checked image/material policy restart receipt (private renderer service).
-#define RENDER_API_VERSION			16
+// 17 - Owned portable image recovery preparation/capture and checked consumption.
+#define RENDER_API_VERSION			17
 #define RENDER_API_ENTRY_POINT		"GetRenderAPI"
 
 class idSys;
@@ -352,6 +354,8 @@ typedef struct renderModuleDiagnostics_s {
 struct renderDisplayPresentation_t;
 struct renderImagePolicyRequest_t;
 struct renderImagePolicyResult_t;
+struct renderImagePolicy_t;
+struct renderImageRecoveryLease_t;
 
 typedef struct renderExport_s {
 	int										version;		// RENDER_API_VERSION
@@ -379,6 +383,11 @@ typedef struct renderExport_s {
     // False preserves output even when the failed attempt requires explicit restore.
     bool (*TryImagePolicyRestart)(const renderImagePolicyRequest_t* request,
         renderImagePolicyResult_t* output, char* error, int errorSize);
+    bool (*PrepareImagePolicyRecovery)(uint64_t,uint64_t,const char*,const renderImagePolicy_t*,renderImageRecoveryLease_t*,char*,int);
+    bool (*CaptureImagePolicyRecovery)(const renderImageRecoveryLease_t*,uint32_t,char*,uint32_t,uint32_t*,char*,int);
+    bool (*PrepareColdImagePolicyRecovery)(uint64_t,uint64_t,const char*,uint32_t,const char*,uint32_t,renderImageRecoveryLease_t*,char*,int);
+    bool (*CancelImagePolicyRecovery)(const renderImageRecoveryLease_t*,char*,int);
+    bool (*ReleaseImagePolicyRecovery)(const renderImageRecoveryLease_t*,uint32_t,const renderImagePolicyResult_t*,char*,int);
 } renderExport_t;
 
 extern "C" {

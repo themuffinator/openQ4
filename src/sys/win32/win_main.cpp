@@ -29,6 +29,8 @@ If you have questions concerning this license or the applicable additional terms
 
 
 
+#include "../../framework/NativeInputDispatch.h"
+#include <intrin.h>
 #include <errno.h>
 #include <float.h>
 #include <fcntl.h>
@@ -987,13 +989,24 @@ Show the early console as an error dialog
 =============
 */
 void Sys_Error(const char* error, ...) {
-	va_list		argptr;
-	char		text[4096];
+    // Freeze borrowed diagnostics before retirement can release their owner.
+    // Formatting touches no GUI, native window, or message-dispatch boundary.
+    va_list argptr;
+    char text[4096];
+    va_start(argptr, error);
+    idStr::vsnPrintf(text, sizeof(text), error ? error : "Unknown error", argptr);
+    va_end(argptr);
+    if (!NativeInput_FatalRetire()) {
+        // An already-fatal unresolved native lease cannot enter the console or
+        // dispatch DLL/CRT shutdown callbacks. Preserve bounded raw diagnostics.
+        const char* message = text;
+        DWORD length = 0, written = 0;
+        while (length < 2048 && message[length]) ++length;
+        (void)WriteFile(GetStdHandle(STD_ERROR_HANDLE), message, length, &written, NULL);
+        (void)TerminateProcess(GetCurrentProcess(), 1);
+        __fastfail(FAST_FAIL_FATAL_APP_EXIT);
+    }
 	MSG        msg;
-
-	va_start(argptr, error);
-	idStr::vsnPrintf(text, sizeof(text), error, argptr);
-	va_end(argptr);
 
 	Conbuf_AppendText(text);
 	Conbuf_AppendText("\n");
@@ -1580,6 +1593,12 @@ bool Sys_QueTrackedEvent(sysEvent_t& event, sysEventDispositionTag_t& tag) noexc
 }
 
 
+sysEventTransfer_t Sys_PeekEventDispositionTag(sysEventDispositionTag_t& out) noexcept {
+    if (!Sys_EventDispositionBoundThread()) return sysEventTransfer_t::Refused;
+    if (eventHead <= eventTail) return sysEventTransfer_t::Empty;
+    out = eventDispositionTags[eventTail & MASK_QUED_EVENTS];
+    return sysEventTransfer_t::Ready;
+}
 sysEventTransfer_t Sys_PeekEventForRetirement(openq4::NativeInputHead& out) noexcept {
     if (!Sys_EventDispositionBoundThread()) return sysEventTransfer_t::Refused;
     if (eventHead <= eventTail) return sysEventTransfer_t::Empty;
@@ -1625,6 +1644,7 @@ This allows windows to be moved during renderbump
 =============
 */
 void Sys_PumpEvents(void) {
+    if (NativeInput_OwnsPump()) return; // Same owner also covers support windows.
 	MSG msg;
 
 #ifdef USE_SDL3

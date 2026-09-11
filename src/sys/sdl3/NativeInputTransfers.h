@@ -59,6 +59,7 @@ public:
     bool Release() noexcept;
     bool Busy() const noexcept {return std::this_thread::get_id()!=thread || calling;}
 private:
+    friend class NativeInputDriver;
     struct Guard;
     struct Authorization;
     bool Enter(bool cleanup,std::string&) noexcept;

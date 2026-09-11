@@ -29,6 +29,7 @@ If you have questions concerning this license or the applicable additional terms
 
 
 
+#include "NativeInputDispatch.h"
 #include "Session_local.h"
 #include "NativeInputPublications.h"
 #include "../ui/Rectangle.h"
@@ -3622,7 +3623,7 @@ static const mainMenuSettingsScrollPage_t *FindMainMenuSettingsScrollPage( const
 }
 
 static bool MainMenuSetWindowVar( idUserInterface *gui, const char *stateName, const char *value ) {
-	return gui != NULL && gui->SetPresentationValue( stateName, value );
+	return NativeInput_SessionCurrent() && gui != NULL && gui->SetPresentationValue( stateName, value );
 }
 
 static int MainMenuSettingsSectionChoiceForScroll( const mainMenuSettingsScrollPage_t &page, int scrollValue ) {
@@ -3668,6 +3669,7 @@ static int MainMenuSettingsSectionChoiceForScroll( const mainMenuSettingsScrollP
 }
 
 static bool ApplyMainMenuSettingsScrollPage( idUserInterface *gui, const mainMenuSettingsScrollPage_t &page, int requestedValue, bool requireVisiblePage ) {
+    if (!NativeInput_SessionCurrent()) return false;
 	if ( gui == NULL ) {
 		return false;
 	}
@@ -3824,6 +3826,7 @@ static void SyncMainMenuSettingsScrollPages( idUserInterface *gui ) {
 }
 
 void idSessionLocal::MenuEvent( const sysEvent_t *event ) {
+    if (!NativeInput_SessionCurrent()) return;
 	const char	*menuCommand;
 
 	if ( guiActive == NULL ) {
@@ -3836,8 +3839,14 @@ void idSessionLocal::MenuEvent( const sysEvent_t *event ) {
 		}
 	}
 
+    if (!NativeInput_SessionCurrent()) return;
 	menuCommand = guiActive->HandleEvent( event, common->GetPresentationTime() );
+    if (!NativeInput_SessionCurrent()) return;
+    // Keep callback-owned command bytes alive before another callback can replace them.
+    const idStr nativeCommand = NativeInput_Inhibited() ? (menuCommand ? menuCommand : "") : "";
+    if (NativeInput_Inhibited()) menuCommand = nativeCommand.c_str();
 	SyncMainMenuSettingsScrollPages( guiActive );
+    if (!NativeInput_SessionCurrent()) return;
 
 	if ( !menuCommand || !menuCommand[0] ) {
 		// If the menu didn't handle the event, and it's a key down event for an F key, run the bind
@@ -3848,6 +3857,7 @@ void idSessionLocal::MenuEvent( const sysEvent_t *event ) {
 	}
 
 	DispatchCommand( guiActive, menuCommand );
+    if (!NativeInput_SessionCurrent()) return;
 	SyncMainMenuSettingsScrollPages( guiActive );
 }
 

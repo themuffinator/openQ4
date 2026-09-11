@@ -37,6 +37,14 @@ void R_ConsumedPolicyObserveError() {
 void idImage::InvalidateConsumedPolicy() {
     if (R_ConsumedPolicyThread()) consumedPolicy = {};
 }
+bool imageConsumedLoad_t::Prepared(const imagePortableContent_t& content) {
+    if (!observing || allocated || loaded || failed || content.version!=1 ||
+        (content.scope!=IPC_DIRECT_SOURCE && content.scope!=IPC_CACHE_PIXELS_ONLY) || content.usage!=candidate.usage) return false;
+    candidate.resolved=content.resolved;
+    candidate.reduction=content.reduction;
+    candidate.preparedContent=true;
+    return true;
+}
 bool idMaterial::GetConsumedPolicy(materialConsumedPolicy_t& output) const {
     if (!R_ImagePolicyRendererThread() || consumedParseDepth || !consumedPolicy.parsed || !consumedPolicy.revision ||
         consumedPolicy.instance != imagePolicyIdentity || consumedPolicy.revision != consumedParseRevision || !consumedPolicy.observationEpoch ||

@@ -2,6 +2,11 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- UI recovery development now preserves both original and requested supported
+  texture data across failed quality changes. Native input retirement also checks
+  actual menu and gameplay event disposal before releasing ownership. Complete
+  preset Apply and native text entry remain in development and are not enabled.
+
 - UI authoring gains validated source edits and undo/redo that preserve existing
   formatting, comments and extension data. The visual editor and file-save
   workflow remain in development; this is their document-editing foundation.

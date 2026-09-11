@@ -2,6 +2,8 @@
 """Actual Windows SDK session/store/bridge, Interaction/coordinator and owned queue.
 
 Only COM factory/SDK objects and SDL provider admission are counted doubles.
+Route-facts linkage traps the unused Driver detach edge; actual detach plus
+queues are separately exercised by native_input_driver.py.
 No CoInitialize/CoCreateInstance factory is invoked, no native HWND, SDL pump,
 OS input, live TIP, Session activation, shared engine build or game is run.
 """
@@ -130,8 +132,9 @@ def main():
                     ('missing-managed-live-gate','candidate.inputAllowed=managed && session.inputAllowed','candidate.inputAllowed=(void(managed),session.inputAllowed)'),
                     ('provider-registration-unchecked','current.registration==expected.registration','true'),
                     ('window-lifetime-unchecked','NativeWindow(Window(current))==expected','current.handle==reinterpret_cast<std::uintptr_t>(expected.hwnd)'),
-                    ('source-backlog-fabricated','candidate.backlogDisposed=inventory && inventory->MatchesBinding(*route,routeId,*binding) && inventory->BacklogDisposed();','candidate.backlogDisposed=true;'),
+                    ('source-backlog-fabricated','candidate.backlogDisposed=inventory ? inventory->MatchesBinding(*route,routeId,*binding) && inventory->BacklogDisposed() : completedInventory;','candidate.backlogDisposed=true;'),
                     ('source-release-skips-route','if(route->State()!=NativeInputRoute::Phase::Empty && !route->Release(routeId))return false;',''),
+                    ('fatal-provider-unchecked','actual.storeRetired && actual.providerRetired &&','actual.storeRetired &&'),
                     ('source-release-skips-unbind','if(!NativeInputUnbindPublications(*route,routeId))return false;',''),
                     ('source-release-loses-retry','if(!NativeInputUnbindPublications(*route,routeId))return false;','if(!NativeInputUnbindPublications(*route,routeId)){finished=true;return false;}'),
                     ('source-release-reentry-not-latched','if(releasing){(void)route->Revoke(routeId);return false;}','if(releasing)return false;'),

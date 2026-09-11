@@ -60,6 +60,16 @@ constexpr std::size_t SettingsEffectMetadataMaxEntries = 512;
 constexpr std::size_t SettingsEffectMetadataMaxBytes = 64 * 1024;
 constexpr std::size_t SettingsEffectMetadataMaxKeyBytes = 96;
 
+// Versioned image-only transport within schema 2. Each direction has at most
+// 1.5 MiB of canonical base64, split into indexed 4 KiB chunks. Other metadata
+// retains its 64 KiB budget and the complete serialized journal remains 4 MiB.
+// These helpers validate framing only; the renderer must decode/prepare the
+// full selected descriptor against current sources before any mutation.
+bool PackSettingsImageRecovery(const std::string& raw, unsigned direction,
+    const std::string& attempt, StateValues& output);
+bool UnpackSettingsImageRecovery(const StateValues& fields, unsigned direction,
+    const std::string& attempt, std::string& output);
+
 // Variant dispatch is explicit. Old DecodeSettingsJournal still rejects schema
 // 2; no map-presence inference or downgrade to the schema-1 display route occurs.
 // These new entry points preserve outputs on returned false, including caught

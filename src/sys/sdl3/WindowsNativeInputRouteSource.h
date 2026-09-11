@@ -3,6 +3,7 @@
 #if defined(_WIN32)
 #include "WindowsTextSession.h"
 #include "NativeInputEmissionInventory.h"
+#include "NativeInputDriver.h"
 #include "../../framework/NativeInputPublications.h"
 
 namespace openq4::sys {
@@ -25,7 +26,7 @@ public:
 // replacement needs a checked driver disposition seam, not a pointer overwrite.
 // BacklogDisposed requires the inventory's sealed exact terminal proof. No
 // missing-head/failed-admission inference or successful native ACK is made.
-class WindowsNativeInputRouteSource final : public NativeInputRouteSource {
+class WindowsNativeInputRouteSource final : public NativeInputRouteSource, public NativeInputDriverLifecycle {
 public:
     explicit WindowsNativeInputRouteSource(WindowsTextSession&) noexcept;
     WindowsNativeInputRouteSource(const WindowsNativeInputRouteSource&) = delete;
@@ -36,6 +37,10 @@ public:
     // Actual successful route Release and publication unbind precede dropping
     // collaborators. A failed step retains them for exact original cleanup.
     bool ReleaseRoute(std::uint64_t exactRoute) noexcept;
+    void RetirePreservingEvents() noexcept override;
+    bool DetachCompleted(NativeInputDriver&) noexcept override;
+    bool ReleaseRetired(std::uint64_t exactRoute) noexcept override {return ReleaseRoute(exactRoute);}
+    bool PumpsRetired() const noexcept override;
     bool Observe(NativeInputObservation&) const noexcept override;
     bool Retirement(std::uint64_t,const NativeInputBinding&,NativeInputRetirement&) const noexcept override;
     bool InspectIssued(std::uint64_t,const NativeInputBinding&,const sysEventDispositionTag_t&,NativeInputIssued&) const noexcept override;
@@ -47,7 +52,7 @@ private:
     NativeInputRoute* route = nullptr;
     NativeInputEmissionInventory* inventory = nullptr;
     std::uint64_t routeId = 0, controllerId = 0;
-    bool preparing = false, poisoned = false, releasing = false, finished = false;
+    bool preparing = false, poisoned = false, releasing = false, finished = false, completedInventory = false;
 };
 } // namespace openq4::sys
 #endif

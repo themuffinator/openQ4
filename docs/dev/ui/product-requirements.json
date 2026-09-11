@@ -4,7 +4,7 @@
   "date": "2026-09-11",
   "status": "Implementation incomplete; this register preserves full product scope and does not accept any production GUI.",
   "baseline": {
-    "engine_revision": "1bcb4aec68fbaa3187ca5ffea30720f003f57f1f",
+    "engine_revision": "b880d593e358d64276bccbb0ec58c3b83f5e5011",
     "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
     "effective_gui_count": 271,
     "translated_or_accepted_resources": 0,
@@ -19,7 +19,7 @@
     "product": {
       "path": "docs/dev/plans/ui-product-completion.md",
       "authority": "normative completion scope, milestones and final audit",
-      "sha256": "09af7182819bea5099faa75967ce7822d1c301933cd110c564f3d60e543ba7a2"
+      "sha256": "fbf06669d4bd546f398922e2e4ef5b63d33762ccfaeb5e4e794045d108fc478c"
     },
     "original": {
       "path": "docs/dev/plans/idtech5-ui.md",
@@ -100,7 +100,7 @@
       "kind": "source_audit",
       "path": "docs/dev/plans/ui-product-completion.md",
       "scope": "Published audit at 80bb3939; source limitations corroborated by current Document/Runtime inspection. Historical tests and captures are not a fresh product qualification.",
-      "sha256": "09af7182819bea5099faa75967ce7822d1c301933cd110c564f3d60e543ba7a2"
+      "sha256": "fbf06669d4bd546f398922e2e4ef5b63d33762ccfaeb5e4e794045d108fc478c"
     },
     "document-foundation": {
       "kind": "implementation_checkpoint",
@@ -537,6 +537,26 @@
       "scope": "Validated source-preserving insert/remove/move/value batches with exact owner/revision, bounded shared history and allocation-free undo/redo. Full build and70 UI suites pass; integrated Clang364+6+2 checks and14 compiled mutants pass. Isolated MSVC and GCC sanitizer evidence covers the frozen core. No visible editor, joint canvas publication, file-save or product acceptance.",
       "local_capture_summary": ".tmp/ui/document-edit-integration/validation-evidence.json",
       "local_capture_summary_sha256": "809d98410f6c2ca9572ad888ef4b0f3faababa1ce4ee99c0e4d10160aed6271e"
+    },
+    "owned-image-recovery": {
+      "kind": "implementation_checkpoint",
+      "path": "docs/dev/ui/image-recovery-ownership.md",
+      "sha256": "0c0a6e07da032fbc1738927078042710798082e44c728eefd107cb1081bdae5a",
+      "baseline_engine_revision": "b880d593e358d64276bccbb0ec58c3b83f5e5011",
+      "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
+      "scope": "Exact whole-cohort preparation retains both immutable CPU directions before policy mutation, strict durable envelope and initialized-inventory cold reconstruction. Real coordinator/loader/module/codec/journal checks and integrated mutations pass. All-cohort reconstruction, quiescent built-in disposal, pre-first-device recovery and full mixed Apply remain required.",
+      "local_capture_summary": ".tmp/ui/runtime-ownership-integration/validation-evidence.json",
+      "local_capture_summary_sha256": "d9c4fca9b14cdfad640b9ef35c5156e315f203f902e432918a4ff020a884eea9"
+    },
+    "native-sink-driver": {
+      "kind": "implementation_checkpoint",
+      "path": "docs/dev/ui/native-input-driver.md",
+      "sha256": "09cebf650f3b02c12f3353e3bb222e9ef1fd125db178a930ea30cfbb903f30be",
+      "baseline_engine_revision": "b880d593e358d64276bccbb0ec58c3b83f5e5011",
+      "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
+      "scope": "Actual Session/poll sinks join exact owned transfers, fixed ledger schedule, held-source quarantine and checked completion/retirement. Integrated Clang16581 checks per projection,44 fatal edges and26 compiled mutants; frozen MSVC debug, sanitized GCC and SDK evidence. No live translator/bootstrap/provider activation or complete input acceptance.",
+      "local_capture_summary": ".tmp/ui/runtime-ownership-integration/validation-evidence.json",
+      "local_capture_summary_sha256": "d9c4fca9b14cdfad640b9ef35c5156e315f203f902e432918a4ff020a884eea9"
     }
   },
   "groups": {
@@ -1976,7 +1996,8 @@
         "consumed-settings-recovery",
         "checked-image-reduction",
         "checked-upload-storage",
-        "exact-image-content-recovery"
+        "exact-image-content-recovery",
+        "owned-image-recovery"
       ],
       "acceptance_evidence": [],
       "remaining": "The typed settings service and asynchronous display confirmation retain their previously qualified scopes. Local numeric drafts guard Apply, Apply and Exit, Defaults, colliding sibling edits and dismissal; Discard requires completed service cancellation and an unchanged complete local editor inventory. Queued rollback, stale callbacks and recovery preserve unfinished text. Exact typed comparison and FTZ/DAZ-independent journal number serialization now cover transaction, display validation and startup recovery, preserving observed originals while signed zeros share the canonical zero representation. Shared profile and Auto-Detect draft expansion now preserve all unrelated edits with guarded atomic publication. Complete actual audio/resource/input effects, preset execution and persistence, all dependent production controls, Defaults and the full Apply/Cancel/discard-and-exit matrix. Qualify visible focus/window-placement/fullscreen/multi-monitor failures and timeout/restart recovery across supported platforms. CVar values alone never prove device success; counted recovery and synthetic startup evidence do not qualify a power loss, actual interrupted confirmation or every persistent recovery path. Exact DDS and previously observed cache CPU reconstruction now has source-byte and canonical output evidence; decoded/program/default images, material cohorts, durable content retention, native reconstruction and full mixed-effect recovery remain required."
@@ -3033,7 +3054,8 @@
       "status": "partial",
       "current_evidence": [
         "input-foundation",
-        "presentation-alias-foundation"
+        "presentation-alias-foundation",
+        "native-sink-driver"
       ],
       "acceptance_evidence": [],
       "remaining": "Normal semantic button dispatch now excludes ancestors marked hidden or noevents before input runs. Wheel/touch/text/composition, full widget/device behavior and projected world inputs through complete composed transforms remain."
@@ -3060,7 +3082,8 @@
       "status": "partial",
       "current_evidence": [
         "input-foundation",
-        "presentation-alias-foundation"
+        "presentation-alias-foundation",
+        "native-sink-driver"
       ],
       "acceptance_evidence": [],
       "remaining": "Native and adapter button checks cover matched releases, multiple sources and cancellation when ancestor eligibility changes. The complete widget/device matrix, including supported-host gamepad/pointer scenarios, remains unaccepted."
@@ -3128,7 +3151,8 @@
         "native-retirement-storage",
         "authored-scrollbars",
         "native-route-publication",
-        "native-terminal-transfer-disposal"
+        "native-terminal-transfer-disposal",
+        "native-sink-driver"
       ],
       "acceptance_evidence": [],
       "remaining": "The system-exit increment adds authored modal scope transitions and generation-bound queued Back routing; held-source quarantine and restoration pass bounded native/runtime and normal Session qualification. Value gestures add transient capture/preview, pending-proposal identity and popup dismissal to existing input quarantine. Loss of focus, eligibility or usable projection cancels a gesture; restoration does not replay transient edits. Complete and qualify physical-device removal/reconnect, gameplay/modal ownership and all-widget held-source behavior. The recorded normal-route Windows checks qualify semantic ownership and resource resets; physical-device qualification remains open."
@@ -3168,7 +3192,8 @@
         "native-retirement-storage",
         "authored-scrollbars",
         "native-route-publication",
-        "native-terminal-transfer-disposal"
+        "native-terminal-transfer-disposal",
+        "native-sink-driver"
       ],
       "acceptance_evidence": [],
       "remaining": "The checked Windows text-session controller now owns SDK activation/quiescence and exact final provider/ledger acknowledgement, with counted SDK evidence and production activation still disabled. Existing wheel, numeric command, checked queue-consumption and owned native-collection evidence remains bounded. Managed owner endpoints, the Windows hook-to-store bridge and explicit lifecycle reconciliation preserve exact owner, provider generation, queue continuity and copied receipt ordering without enabling a native provider. Connect this ingress to the production Session route with native provenance, actual provider activation and verified payload lifetime. Complete production wheel/touch scrolling, Unicode text/composition, keyboard/gamepad repeat/reconnect behavior, deterministic replay and the full supported-host/widget operation matrix with value, focus and scroll evidence. No physical-input or complete payload acceptance is inferred. Production ownership publishers and typed issued-emission inventory are now connected and qualified without activation. Exact typed storage transfer, terminal disposal and original-route collaborator release now have bounded actual-store qualification. Connect the normal production sinks, held-source inhibition, ordinary fence acknowledgement and successful batch turnover before native activation; complete physical/native input qualification remains required."
@@ -5047,7 +5072,8 @@
         "checked-upload-storage",
         "authored-scrollbars",
         "exact-image-content-recovery",
-        "authored-choice-scrollbars"
+        "authored-choice-scrollbars",
+        "owned-image-recovery"
       ],
       "acceptance_evidence": [],
       "remaining": "The production page now includes source-derived preset and Auto-Detect controls with localized flowing labels, guarded proposals, actual shared draft expansion and bounded Runtime/gameplay validation. The source-backed 31-option/53-CVar contract retains its packaged opt-in SYSTEM route and precise Brightness/Ambient Brightness fields, localized validation and local draft barriers. Exact numeric recovery and bounded full-border focus reveal extend this implementation; neither accepts the translated page. Complete every actual setting and dependent popup, display capability/resolution catalogs, native numeric text entry, complete preset/Auto-Detect effect execution and persistence, remaining effects, Defaults, full Apply/Cancel/exit behavior, source-derived visuals/transitions and the native editor round trip. Qualify normal SP/MP entry/return/reopen, failure/cancellation, complete responsive/localized state galleries and every mapped resource; historical and current bounded captures do not accept the full requirement."

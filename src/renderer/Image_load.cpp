@@ -628,6 +628,29 @@ void idImage::ActuallyLoadImage( bool fromBackEnd ) {
 	}
 
 	imageConsumedLoad_t consumedLoad(*this);
+    // A held recovery preparation owns complete CPU candidates read and hashed
+    // before teardown. Never fall back to a different VFS source after taking
+    // such a candidate, including on an allocation/upload refusal.
+    if (R_ImagePolicyUsesPreparedContent()) try {
+        const idBinaryImage* prepared=nullptr; imagePortableContent_t descriptor{};
+        const int selected=R_ImagePolicyBorrowPreparedContent(this,prepared,descriptor);
+        if (selected<0) return;
+        if (selected>0) {
+            if (!consumedLoad.Prepared(descriptor)) { R_ImagePolicyObserveError("Prepared image observation was refused"); return; }
+            const bimageFile_t& h=prepared->GetFileHeader();
+            opts.textureType=static_cast<textureType_t>(h.textureType);opts.format=static_cast<textureFormat_t>(h.format);
+            opts.colorFormat=static_cast<textureColor_t>(h.colorFormat);opts.width=h.width;opts.height=h.height;opts.numLevels=h.numLevels;
+            defaulted=false;
+            const auto source=descriptor.scope==IPC_DIRECT_SOURCE?ICS_DIRECT_DDS:ICS_GENERATED;
+            consumedLoad.Content(*prepared,source);
+            AllocImage();
+            for(int i=0;i<prepared->NumImages();++i){const bimageImage_t& part=prepared->GetImageHeader(i);
+                SubImageUpload(part.level,0,0,part.destZ,part.width,part.height,prepared->GetImageData(i));}
+            loadedSourceName=descriptor.file.qpath;
+            consumedLoad.Loaded(source);
+            return;
+        }
+    } catch (...) { R_ImagePolicyObserveError("Prepared CPU image publication failed"); return; }
 	const imageDownsizePolicy_t& consumedDownsize = consumedLoad.Policy();
 	imageConsumedSource_t consumedSource = ICS_UNKNOWN;
     imageReductionResult_t consumedReduction{};

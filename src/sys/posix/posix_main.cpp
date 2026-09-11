@@ -530,6 +530,12 @@ bool Sys_QueTrackedEvent(sysEvent_t& event, sysEventDispositionTag_t& tag) noexc
 }
 
 
+sysEventTransfer_t Sys_PeekEventDispositionTag(sysEventDispositionTag_t& out) noexcept {
+    if (!Sys_EventDispositionBoundThread()) return sysEventTransfer_t::Refused;
+    if (eventHead <= eventTail) return sysEventTransfer_t::Empty;
+    out = eventDispositionTags[eventTail & MASK_QUED_EVENTS];
+    return sysEventTransfer_t::Ready;
+}
 sysEventTransfer_t Sys_PeekEventForRetirement(openq4::NativeInputHead& out) noexcept {
     if (!Sys_EventDispositionBoundThread()) return sysEventTransfer_t::Refused;
     if (eventHead <= eventTail) return sysEventTransfer_t::Empty;

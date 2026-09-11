@@ -25,7 +25,7 @@ STR = r'''
 IMAGE = r'''
  bool scratchImage=false,allowDownSize=true,levelLoadReferenced=false,referencedOutsideLevelLoad=false;
  int usage=0,filter=0,repeat=0,cubeFiles=0;unsigned flags=0;unsigned texnum=1;
- const char* GetName()const{return "image";}int GetFilter()const{return filter;}int GetRepeat()const{return repeat;}
+ int GetFilter()const{return filter;}int GetRepeat()const{return repeat;}
  int GetUploadWidth()const{return opts.width;}int GetUploadHeight()const{return opts.height;}
  void ActuallyLoadImage(bool){++metadataNative;loaded=true;}
  void AllocImage(){++metadataNative;loaded=true;}void DeriveOpts(){++metadataNative;}
@@ -130,7 +130,9 @@ def unit(repository, changes=None):
         assert sources[file].count(old)==1,old
         sources[file]=sources[file].replace(old,new)
     support=base.SUPPORT.replace('struct idStr {','struct idStr {'+STR)
-    support=support.replace('enum {TT_2D,TT_CUBIC};','enum {TT_2D,TT_CUBIC};\nusing textureFilter_t=int;using textureRepeat_t=int;using textureUsage_t=int;using cubeFiles_t=int;using byte=unsigned char;\nenum{TF_LINEAR=1,TR_CLAMP=2,TR_REPEAT=0,TD_LOOKUP_TABLE_RGBA=4,CF_2D=0,LEVEL_LOAD_RESOURCE_IMAGE=0,GL_TEXTURE_CUBE_MAP_EXT=0,GL_TEXTURE_2D=1,TF_DEFAULT=0,TD_DEFAULT=0};static int metadataNative=0;')
+    anchor='enum {TT_2D=1,TT_CUBIC=2};using textureUsage_t=int;'
+    assert support.count(anchor)==1, 'Review the shared recovery fixture enum declarations'
+    support=support.replace(anchor,anchor+'\nusing textureFilter_t=int;using textureRepeat_t=int;using cubeFiles_t=int;using byte=unsigned char;\nenum{TF_LINEAR=1,TR_CLAMP=2,TR_REPEAT=0,TD_LOOKUP_TABLE_RGBA=4,CF_2D=0,LEVEL_LOAD_RESOURCE_IMAGE=0,GL_TEXTURE_CUBE_MAP_EXT=0,GL_TEXTURE_2D=1,TF_DEFAULT=0,TD_DEFAULT=0};static int metadataNative=0;')
     support=support.replace('struct idImageOpts {int width=8,height=8,numLevels=4,textureType=TT_2D;};','struct idImageOpts {int width=8,height=8,numLevels=4,textureType=TT_2D,format=0;bool isPersistant=false;bool operator==(const idImageOpts&)const=default;};')
     support=support.replace('struct idImage {','struct idImage {'+IMAGE)
     support=support.replace('bool IsFileBacked()const{return file;}','bool IsFileBacked()const{return file&&!scratchImage&&!opts.isPersistant;}')
@@ -153,6 +155,8 @@ def main():
     parser=argparse.ArgumentParser();parser.add_argument('--repository',type=Path,default=ROOT);parser.add_argument('--headers',type=Path,default=ROOT);parser.add_argument('--sanitize',action='store_true');parser.add_argument('--mutations',action='store_true');parser.add_argument('--compiler');args=parser.parse_args()
     root=args.repository.resolve();headers=args.headers.resolve()
     names=['src/renderer/RendererResourceSettings.cpp','src/renderer/RendererResourceSettings.h','src/renderer/RendererConsumedPolicy.h','src/renderer/RenderModuleAPI.h','src/renderer/DisplayPresentation.h','src/renderer/ImageManager.cpp','src/renderer/Image_intrinsic.cpp','src/renderer/Image_load.cpp','src/renderer/OpenGL/gl_Image.cpp','src/renderer/Vulkan/vk_Image.cpp','tools/tests/renderer_image_policy_metadata.py','tools/tests/renderer_image_policy_restart.py','tools/tests/renderer_image_policy_boundaries.py']
+    names+=['tools/tests/renderer_image_recovery_fixture.py','src/renderer/RendererImageRecovery.h','src/renderer/RendererImageRecovery.cpp','src/imagetools/ImageRecoveryEnvelope.h','src/imagetools/ImageContentIdentity.h','src/imagetools/ImageContentIdentity.cpp','src/idlib/CryptoHash.h','src/idlib/CryptoHash.cpp']
+    extra_sources=[str(root/name) for name in ('src/renderer/RendererImageRecovery.cpp','src/imagetools/ImageContentIdentity.cpp','src/idlib/CryptoHash.cpp')]
     def hashes():return {str(root/p):hashlib.sha256((root/p).read_bytes()).hexdigest() for p in names}
     before=hashes();cases=[('baseline',None)]
     if args.mutations:
@@ -179,9 +183,9 @@ def main():
             source=out/(tag+'.cpp');source.write_text(unit(root,change));binary=out/(tag+'.exe')
             command=[compiler,'-std=c++20','-pthread','-I',str(root/'src/renderer'),'-I',str(headers/'src/renderer')]
             if args.sanitize:command+=['-fsanitize=address,undefined','-fno-omit-frame-pointer','-g','-no-pie']
-            command += [str(source),'-o',str(binary)]
+            command += [str(source)]+extra_sources+['-o',str(binary)]
             if Path(compiler).stem.lower() in ['cl','clang-cl']:
-                command=[compiler,'/nologo','/std:c++20','/EHsc','/MTd','/D_DEBUG','/D_ITERATOR_DEBUG_LEVEL=2','/I'+str(root/'src/renderer'),'/I'+str(headers/'src/renderer'),str(source),'/Fe:'+str(binary),'/Fo:'+str(out/(tag+'.obj'))]
+                command=[compiler,'/nologo','/std:c++20','/EHsc','/MTd','/D_DEBUG','/D_ITERATOR_DEBUG_LEVEL=2','/I'+str(root/'src/renderer'),'/I'+str(headers/'src/renderer'),str(source)]+extra_sources+['/Fe:'+str(binary),'/Fo:'+str(out)+os.sep]
             for stage,call in [('compile',command),('run',[str(binary)])]:
                 result=subprocess.run(call,env=env,cwd=out,capture_output=True,text=True,timeout=90);log=out/(tag+'-'+stage+'.log');log.write_text(result.stdout+result.stderr)
                 records.append({'case':tag,'stage':stage,'command':call,'exit_code':result.returncode,'log':str(log),'log_sha256':hashlib.sha256(log.read_bytes()).hexdigest()})

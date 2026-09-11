@@ -167,6 +167,7 @@ public:
 	// Callback-free; complete observations only. False preserves output.
 	bool GetConsumedPolicy(imageConsumedPolicy_t& output) const;
     bool GetPortableContent(imagePortableContent_t& output) const;
+    imageDeclaredPolicy_t GetDeclaredPolicy() const { return {filter,repeat,usage,cubeFiles,flags,allowDownSize}; }
 	void InvalidateConsumedPolicy();
 
 	const char* GetName() const { return imgName; }

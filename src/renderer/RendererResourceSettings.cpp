@@ -4,6 +4,8 @@
 #include "tr_local.h"
 #include "RendererResourceSettings.h"
 #include "RendererConsumedPolicy.h"
+#include "RendererImageRecovery.h"
+#include "../idlib/CryptoHash.h"
 #include "DisplayPresentation.h"
 #ifdef OPENQ4_RENDERER_VK_MODULE
 #include "Vulkan/VulkanDevice.h"
@@ -70,12 +72,18 @@ struct Baseline {
     std::vector<MaterialSource> materials = std::vector<MaterialSource>(size_t{0});
 };
 struct DependencyText { std::string value{""}; };
+struct Prepared;
 struct Attempt {
     renderImagePolicyRequest_t request{};
     renderImagePolicyResult_t result{};
     uint64_t initialGeneration = 0, initialFailures = 0;
     uint64_t mutationEpoch = 0;
     bool recording = false, finished = false, mutated = false, published = false;
+    bool preparing = false;
+    Prepared* prepared = nullptr;
+    std::map<const idImage*,std::unique_ptr<idBinaryImage>> cpu;
+    std::map<const idImage*,const openq4::imageRecovery::Image*> selectedContent;
+    std::set<const idImage*> borrowed;
     std::shared_ptr<const Baseline> original;
     std::array<const idCVar*, NumDependencies> dependencies{};
     std::array<DependencyText, NumDependencies> dependencyText{};
@@ -86,6 +94,20 @@ struct Attempt {
     std::map<const idImage*, ImageProof> images;
     std::vector<MaterialSource> materials = std::vector<MaterialSource>(size_t{0});
 };
+struct Prepared {
+    renderImageRecoveryLease_t lease{};
+    uint64_t epoch=0,observationEpoch=0;
+    std::shared_ptr<const Baseline> original;
+    renderImagePolicy_t initialPolicy{};
+    renderImagePolicyResult_t completed{};
+    uint64_t completedFailures=0;
+    uint32_t completedDirection=0;
+    bool touched=false;
+    std::unique_ptr<openq4::imageRecovery::Data> directions[2];
+    std::map<const idImage*,std::unique_ptr<idBinaryImage>> cpu[2];
+    std::map<const idImage*,const openq4::imageRecovery::Image*> selected[2];
+    std::string raw[2]={std::string(""),std::string("")};
+};
 
 // No mutex is held across engine/native callbacks. The only shared pointer is
 // accessed while locked; foreign threads never dereference it or any resource.
@@ -94,6 +116,8 @@ Attempt* active = nullptr;
 std::thread::id rendererThread;
 uint64_t nextAttempt = 0;
 std::shared_ptr<const Baseline> recovery;
+std::unique_ptr<Prepared> preparedRecovery;
+uint64_t nextPreparation=0;
 constinit std::atomic<bool> recoveryInvalidated{false};
 // These primitives are safe during resource construction/static destruction;
 // they access neither policyMutex nor any renderer/engine object.
@@ -221,7 +245,7 @@ bool Preflight(Attempt& a, char* error, int errorSize) {
     const int materialCount = declManager->GetNumDecls(DECL_MATERIAL);
     if (imageCount < 0 || static_cast<size_t>(imageCount) > MaxImages || materialCount < 0 || static_cast<size_t>(materialCount) > MaxMaterials)
         return Error(error, errorSize, "Image policy resource inventory exceeds the checked budget");
-    const auto previous = recovery;
+    const auto previous = a.original ? a.original : recovery;
     for (int i = 0; i < imageCount; ++i) {
         const idImage* image = globalImages->images[i];
         if (!image || !a.images.emplace(image, ImageProof{}).second)
@@ -384,6 +408,102 @@ bool VerifyMaterialImages(Attempt& a, const idMaterial& m, char* error, int size
         if (!(ensure ? EnsureMaterialImage(a, image, error, size) : VerifyImage(a, image, error, size))) return false;
     return true;
 }
+
+namespace ir = openq4::imageRecovery;
+bool SameLease(const renderImageRecoveryLease_t& a,const renderImageRecoveryLease_t& b) {
+    return a.owner&&a.request&&a.preparation&&a.owner==b.owner&&a.request==b.request&&a.preparation==b.preparation;
+}
+bool CaptureInventory(Attempt& a,ir::Data& data,bool content,char* error,int size) {
+    if (!Check(a,error,size)) return false;
+    data.policy=ReadPolicy();
+    for(size_t n=0;n<NumDependencies;++n)data.dependencies[n].value=a.dependencyText[n].value;
+    if(globalImages->images.Num()!=int(a.images.size()))return Error(error,size,"Image inventory changed during preparation");
+    for(const auto& item:a.images){
+        const idImage* image=item.first;
+        if(!item.second.identity||image->GetImagePolicyIdentity()!=item.second.identity||image->IsDefaulted()||!image->IsFileBacked())
+            return Error(error,size,"Portable image recovery does not yet reconstruct default, procedural, scratch or persistent cohorts");
+        const auto p=image->GetDeclaredPolicy();ir::Image entry;entry.name=image->GetName();entry.filter=p.filter;entry.repeat=p.repeat;
+        entry.usage=p.usage;entry.cube=p.cube;entry.flags=p.flags;entry.allowDownSize=p.allowDownSize;entry.resident=item.second.resident;
+        if(content&&entry.resident&&!image->GetPortableContent(entry.content))return Error(error,size,"A resident image has no complete supported portable content observation");
+        data.images.push_back(entry);
+    }
+    std::sort(data.images.begin(),data.images.end(),[](const ir::Image& x,const ir::Image& y){
+        return std::tie(x.name,x.filter,x.repeat,x.usage,x.cube,x.flags,x.allowDownSize)<std::tie(y.name,y.filter,y.repeat,y.usage,y.cube,y.flags,y.allowDownSize);});
+    const int count=declManager->GetNumDecls(DECL_MATERIAL);
+    if(count<0||size_t(count)>MaxMaterials)return Error(error,size,"Material inventory exceeds recovery budget");
+    for(int n=0;n<count;++n){
+        const auto* material=static_cast<const idMaterial*>(declManager->DeclByIndex(DECL_MATERIAL,n,false));
+        if(!material||!material->GetImagePolicyIdentity()||material->GetState()==DS_DEFAULTED)return Error(error,size,"Default or missing material has no portable reconstruction");
+        ir::Material m;m.name=material->GetName();m.file=material->GetFileName();m.line=material->GetLineNum();m.state=material->GetState();m.implicit=material->IsImplicit();
+        if(m.state!=DS_UNPARSED){
+            const auto found=std::find_if(a.materials.begin(),a.materials.end(),[&](const MaterialSource& s){return s.material==material;});
+            materialConsumedPolicy_t consumed{};
+            if(found==a.materials.end()||!SourceMatches(*found)||!material->GetConsumedPolicy(consumed))return Error(error,size,"A parsed material has no observed retained-source policy");
+            m.observed=true;m.ignoreHighQuality=consumed.inputs.ignoreHighQuality;m.makingBuild=consumed.inputs.makingBuild;
+            if(m.ignoreHighQuality!=(data.policy.ignoreHighQuality!=0)||m.makingBuild!=cvarSystem->GetCVarBool("com_makingBuild"))
+                return Error(error,size,"A historical material policy requires unsupported explicit reconstruction");
+            m.sourceBytes=uint32_t(found->text.size());idCrypto::SHA256(found->text.data(),found->text.size(),m.source.bytes);
+        }
+        data.materials.push_back(m);
+        if(!Check(a,error,size))return false;
+    }
+    std::sort(data.materials.begin(),data.materials.end(),[](const ir::Material& x,const ir::Material& y){return x.name<y.name;});
+    return Check(a,error,size);
+}
+bool InventoryMatches(Attempt& a,const ir::Data& saved,char* error,int size) {
+    ir::Data current;
+    if(!CaptureInventory(a,current,false,error,size)||current.images.size()!=saved.images.size()||current.materials.size()!=saved.materials.size())
+        return Error(error,size,"Complete recovery inventory changed");
+    for(size_t n=0;n<NumDependencies;++n)if(current.dependencies[n].value!=saved.dependencies[n].value)return Error(error,size,"Inherited recovery dependency changed");
+    for(size_t n=0;n<saved.images.size();++n)if(!ir::SameImageKey(current.images[n],saved.images[n])||current.images[n].resident!=saved.images[n].resident)
+        return Error(error,size,"Declared image cohort changed");
+    for(size_t n=0;n<saved.materials.size();++n)if(!ir::SameMaterial(current.materials[n],saved.materials[n]))return Error(error,size,"Retained material source or consumed policy changed");
+    return true;
+}
+bool StageImages(Attempt& a,const ir::Data& data,char* error,int size) {
+    // CPU storage is independently bounded. The whole inventory is refused;
+    // never truncate it to fit. A source read may temporarily own one extra file.
+    constexpr uint64_t MaxStagedBytes=512ull*1024*1024,MaxSourceFileBytes=64ull*1024*1024;
+    uint64_t bytes=0;
+    struct Key {const idImage* image;ir::Image fields;};
+    std::vector<Key> keys(size_t{0});keys.reserve(a.images.size());
+    for(const auto& item:a.images){const auto p=item.first->GetDeclaredPolicy();Key key;key.image=item.first;key.fields.name=item.first->GetName();
+        key.fields.filter=p.filter;key.fields.repeat=p.repeat;key.fields.usage=p.usage;key.fields.cube=p.cube;key.fields.flags=p.flags;key.fields.allowDownSize=p.allowDownSize;keys.push_back(key);}
+    const auto less=[](const ir::Image& x,const ir::Image& y){return std::tie(x.name,x.filter,x.repeat,x.usage,x.cube,x.flags,x.allowDownSize)<std::tie(y.name,y.filter,y.repeat,y.usage,y.cube,y.flags,y.allowDownSize);};
+    std::sort(keys.begin(),keys.end(),[&](const Key& x,const Key& y){return less(x.fields,y.fields);});
+    a.selectedContent.clear();
+    for(const auto& entry:data.images)if(entry.resident){
+        if(entry.content.file.bytes>MaxSourceFileBytes||entry.content.binary.payloadBytes>MaxStagedBytes-bytes)return Error(error,size,"Prepared image CPU storage exceeds its bound");
+        bytes+=entry.content.binary.payloadBytes;
+        const auto found=std::lower_bound(keys.begin(),keys.end(),entry,[&](const Key& x,const ir::Image& y){return less(x.fields,y);});
+        if(found==keys.end()||!ir::SameImageKey(found->fields,entry)||(found+1!=keys.end()&&ir::SameImageKey((found+1)->fields,entry)))return Error(error,size,"A recovery image is absent or ambiguous");
+        const idImage* selected=found->image;
+        auto binary=std::make_unique<idBinaryImage>(entry.name.c_str());
+        if(!R_ReconstructImageContent(entry.content,*binary)||!Check(a,error,size))return Error(error,size,"Exact recovery image source or output changed");
+        a.cpu.emplace(selected,std::move(binary));
+        a.selectedContent.emplace(selected,&entry);
+    }
+    return InventoryMatches(a,data,error,size)&&Check(a,error,size);
+}
+bool PrepareTarget(Attempt& a,const ir::Data& restore,const renderImagePolicy_t& target,ir::Data& result,char* error,int size) {
+    if(target.ignoreHighQuality!=restore.policy.ignoreHighQuality||target.usePrecompressedTextures!=restore.policy.usePrecompressedTextures)
+        return Error(error,size,"Portable preparation cannot yet change material quality or source-selection policy");
+    result=restore;result.direction=2;result.policy=target;
+    imageDownsizeInputs_t inputs=R_ReadImageDownsizeInputs();
+    inputs.downSize=target.downSize;inputs.downSizeLimit=target.downSizeLimit;inputs.downSizeSpecular=target.downSizeSpecular;
+    inputs.downSizeSpecularLimit=target.downSizeSpecularLimit;inputs.downSizeBump=target.downSizeBump;inputs.downSizeBumpLimit=target.downSizeBumpLimit;
+    for(auto& entry:result.images)if(entry.resident){
+        auto& c=entry.content;
+        if(c.scope==IPC_CACHE_PIXELS_ONLY){if(!SamePolicy(target,restore.policy))return Error(error,size,"Cache pixels cannot authorize a different source policy");continue;}
+        R_ResolveImageDownsizePolicy(inputs,entry.name.c_str(),static_cast<textureUsage_t>(entry.usage),entry.allowDownSize,c.resolved);
+        idBinaryImage binary(entry.name.c_str());imageReductionResult_t reduction{};
+        if(c.file.bytes>64ull*1024*1024||!R_LoadPrecompressedDDS(c.file.qpath,binary,nullptr,static_cast<textureUsage_t>(entry.usage),c.resolved,c.mipmaps,&reduction,&c.file)||
+            !R_ImageReductionIsExact(c.resolved,reduction)||!binary.GetContentIdentity(c.binary)||!Check(a,error,size))
+            return Error(error,size,"Exact target image policy is unsupported or source content changed");
+        c.reduction=reduction;
+    }
+    return Check(a,error,size);
+}
 }
 
 uint64_t R_ImagePolicyNewResourceIdentity() noexcept {
@@ -399,6 +519,9 @@ void R_ImagePolicyLifecycleChanged() noexcept { AdvanceMutationEpoch(); }
 bool R_ImagePolicyContentMutation() {
     const std::lock_guard<std::mutex> lock(policyMutex);
     if (active) {
+        if (active->preparing) {
+            AdvanceMutationEpoch(); FailLocked("Resource mutation during read-only recovery preparation"); return false;
+        }
         if (std::this_thread::get_id() != rendererThread) {
             AdvanceMutationEpoch(); FailLocked("Content mutation crossed the renderer thread"); return false;
         }
@@ -428,6 +551,7 @@ bool R_ImagePolicyActive() {
 bool R_ImagePolicyOperationAllowed() {
     const std::lock_guard<std::mutex> lock(policyMutex);
     if (!active) return true;
+    if (active->preparing) { FailLocked("Native resource operation during recovery preparation"); return false; }
     if (std::this_thread::get_id() != rendererThread) {
         FailLocked("Image policy work crossed the renderer thread"); return false;
     }
@@ -493,7 +617,11 @@ bool R_ImagePolicyShouldReload(const idImage* image) {
     return it == a->images.end() || it->second.resident;
 }
 bool R_ImagePolicyBeforeTeardown(char* error, int size) {
-    if (Attempt* a = Current()) { a->mutated = true; return Check(*a, error, size); }
+    if (Attempt* a = Current()) {
+        a->mutated = true;
+        if(a->prepared){a->prepared->touched=true;a->prepared->completed={};a->prepared->completedDirection=0;}
+        return Check(*a, error, size);
+    }
     return true;
 }
 void R_ImagePolicyBeginDeviceReload() {
@@ -571,6 +699,21 @@ bool R_ImagePolicyFinish(char* error, int size) {
     }
     for (const MaterialSource& source : a->materials)
         if (!SourceMatches(source)) return Error(error, size, "A retained material changed after resource rebuild");
+    if(a->prepared){
+        if(a->borrowed.size()!=a->prepared->cpu[a->request.recoveryDirection-1].size()||!R_CompleteConsumedImageUploads())return Error(error,size,"Prepared image candidates did not all reach checked completion");
+        const auto& selected=*a->prepared->directions[a->request.recoveryDirection-1];
+        if(!InventoryMatches(*a,selected,error,size))return false;
+        for(const auto& proof:a->selectedContent){
+            const idImage* image=proof.first;const auto& entry=*proof.second;
+            imagePortableContent_t actual{};
+            if(!image||!image->GetPortableContent(actual)||!R_ImageFileContentEqual(actual.file,entry.content.file)||
+                !R_ImageBinaryContentEqual(actual.binary,entry.content.binary)||actual.scope!=entry.content.scope||
+                actual.resolved.maxDimension!=entry.content.resolved.maxDimension||actual.resolved.mipShift!=entry.content.resolved.mipShift||
+                actual.resolved.minDimension!=entry.content.resolved.minDimension||actual.mipmaps!=entry.content.mipmaps)
+                return Error(error,size,"Prepared image output did not preserve the exact selected descriptor");
+            if(!Check(*a,error,size,true))return false;
+        }
+    }
     if (!Check(*a, error, size, true)) return false;
     a->finished = true;
     return true;
@@ -585,6 +728,13 @@ bool R_TryImagePolicyRestart(const renderImagePolicyRequest_t* request, renderIm
         {
             const std::lock_guard<std::mutex> lock(policyMutex);
             if (active) { FailLocked("Reentrant image-policy request"); return Error(error, size, "A resource restart is already in progress"); }
+            if (preparedRecovery) {
+                if (!SameLease(immutable.recovery,preparedRecovery->lease)||immutable.recoveryDirection<1||immutable.recoveryDirection>2||
+                    !preparedRecovery->directions[immutable.recoveryDirection-1]||preparedRecovery->epoch!=candidate.mutationEpoch)
+                    return Error(error,size,"Prepared image recovery ownership or direction changed");
+                candidate.prepared=preparedRecovery.get();candidate.original=preparedRecovery->original;
+            } else if (immutable.recovery.owner||immutable.recovery.request||immutable.recovery.preparation||immutable.recoveryDirection)
+                return Error(error,size,"Prepared image recovery lease is absent");
             if (recovery && recovery->mutationEpoch != candidate.mutationEpoch) recoveryInvalidated = true;
             if (recoveryInvalidated || !candidate.mutationEpoch)
                 return Error(error, size, "Image-policy recovery was invalidated by intervening resource work; renderer lifetime must end");
@@ -607,7 +757,18 @@ bool R_TryImagePolicyRestart(const renderImagePolicyRequest_t* request, renderIm
         candidate.initialGeneration = before.generation; candidate.initialFailures = before.failureSequence;
         if (!ValidPolicy(immutable.expectedCurrent) || !SamePolicy(immutable.expectedCurrent, ReadPolicy()))
             return Error(error, size, "Image policy request does not match the current supported CVar policy");
+        candidate.preparing=candidate.prepared!=nullptr;
         if (!Preflight(candidate, error, size)) return false;
+        if (candidate.prepared) {
+            const auto& selected=*candidate.prepared->directions[immutable.recoveryDirection-1];
+            if(!SamePolicy(selected.policy,immutable.expectedCurrent))return Error(error,size,"Selected recovery policy differs from execution request");
+            candidate.preparing=true;
+            if(!InventoryMatches(candidate,selected,error,size))return false;
+            // The selected CPU set was read, hashed and retained before any
+            // caller policy write. Execution performs no VFS read or clone.
+            candidate.selectedContent=candidate.prepared->selected[immutable.recoveryDirection-1];
+            candidate.preparing=false;
+        }
         if (!R_TryFullVidRestartForImagePolicy(&candidate.request.window, error, size)) return false;
         if (!candidate.finished || !Check(candidate, error, size, true)) return false;
         // Clear only this exact verified policy. No callbacks or allocating
@@ -620,9 +781,132 @@ bool R_TryImagePolicyRestart(const renderImagePolicyRequest_t* request, renderIm
         if (candidate.failure[0]) return Error(error, size, candidate.failure);
         globalImages->ClearCheckedImagePolicyChanges();
         *output = candidate.result;
+        if(candidate.prepared){candidate.prepared->completed=candidate.result;candidate.prepared->completedDirection=immutable.recoveryDirection;candidate.prepared->completedFailures=candidate.initialFailures;}
         candidate.published = true;
         return true;
     } catch (const std::bad_alloc&) {
         return Error(error, size, "Image-policy receipt or source allocation failed");
     }
+}
+
+namespace {
+bool PrepareRecovery(uint64_t owner,uint64_t request,const char* attempt,const renderImagePolicy_t* target,
+    unsigned direction,const char* raw,uint32_t bytes,renderImageRecoveryLease_t* output,char* error,int size) {
+    if(!owner||!request||!attempt||!output)return Error(error,size,"Complete recovery owner and output are required");
+    size_t length=0;while(length<33&&attempt[length])++length;
+    if(length!=32||!ir::Attempt(std::string_view(attempt,length)))return Error(error,size,"Invalid durable recovery attempt");
+    const renderImagePolicy_t requested=target?*target:renderImagePolicy_t{};
+    try {
+        const std::string id(attempt,length);
+        // Freeze borrowed serialized input before any engine/VFS callback.
+        ir::Record decoded;std::string diagnostic(0,'\0');
+        if(!target&&(!raw||!ir::Decode(std::string_view(raw,bytes),direction,id,decoded,diagnostic)))return Error(error,size,"Invalid cold image recovery record");
+        if(target&&!ValidPolicy(requested))return Error(error,size,"Invalid target image policy");
+        Attempt a;a.preparing=true;a.request.expectedCurrent=ReadPolicy();a.mutationEpoch=resourceMutationEpoch.load(std::memory_order_relaxed);
+        auto prepared=std::make_unique<Prepared>();
+        {
+            const std::lock_guard<std::mutex> lock(policyMutex);
+            if(active){FailLocked("Reentrant image preparation");return Error(error,size,"Image recovery work is already active");}
+            if(preparedRecovery||recovery||recoveryInvalidated||!a.mutationEpoch||rendererThread!=std::this_thread::get_id()||nextPreparation==UINT64_MAX)
+                return Error(error,size,"Image recovery preparation requires an idle fresh owner lifetime");
+            prepared->lease={owner,request,++nextPreparation};active=&a;
+        }
+        struct Close {~Close(){const std::lock_guard<std::mutex> lock(policyMutex);active=nullptr;}} close;
+        renderDisplayPresentation_t before{};R_GetDisplayPresentation(&before);a.initialGeneration=before.generation;a.initialFailures=before.failureSequence;
+        if(!Preflight(a,error,size)||!R_CompleteConsumedImageUploads()||!Check(a,error,size))return Error(error,size,"Image recovery preflight or completion failed");
+        prepared->original=a.original;prepared->epoch=a.mutationEpoch;prepared->observationEpoch=R_ConsumedPolicyObservationEpoch();prepared->initialPolicy=a.request.expectedCurrent;
+        if(target){
+            prepared->directions[0]=std::make_unique<ir::Data>();auto& restore=*prepared->directions[0];restore.direction=1;restore.attempt=id;
+            if(!CaptureInventory(a,restore,true,error,size)||!StageImages(a,restore,error,size))return false;
+            prepared->cpu[0].swap(a.cpu);prepared->selected[0].swap(a.selectedContent);prepared->directions[1]=std::make_unique<ir::Data>();
+            if(!PrepareTarget(a,restore,requested,*prepared->directions[1],error,size))return false;
+            uint64_t total=0;for(unsigned n=0;n<2;++n)for(const auto& i:prepared->directions[n]->images)if(i.resident){
+                if(i.content.binary.payloadBytes>512ull*1024*1024-total)return Error(error,size,"Combined prepared CPU directions exceed their retained bound");total+=i.content.binary.payloadBytes;}
+            if(!StageImages(a,*prepared->directions[1],error,size))return false;
+            prepared->cpu[1].swap(a.cpu);
+            prepared->selected[1].swap(a.selectedContent);
+        } else {
+            prepared->directions[direction-1]=std::make_unique<ir::Data>(*decoded.Get());
+            if(!InventoryMatches(a,*prepared->directions[direction-1],error,size)||!StageImages(a,*prepared->directions[direction-1],error,size))return false;
+            prepared->cpu[direction-1].swap(a.cpu);
+            prepared->selected[direction-1].swap(a.selectedContent);
+        }
+        for(unsigned i=0;i<2;++i)if(prepared->directions[i]&&!ir::Encode(*prepared->directions[i],prepared->raw[i],diagnostic))return Error(error,size,diagnostic.c_str());
+        if(!Check(a,error,size)||prepared->observationEpoch!=R_ConsumedPolicyObservationEpoch())return Error(error,size,"Image recovery observation lifetime changed");
+        const renderImageRecoveryLease_t result=prepared->lease;
+        // No callbacks/allocating result construction after final validation.
+        const std::lock_guard<std::mutex> lock(policyMutex);
+        if(a.failure[0]||a.mutationEpoch!=resourceMutationEpoch.load(std::memory_order_relaxed))return Error(error,size,"Image preparation changed before publication");
+        preparedRecovery.swap(prepared);*output=result;return true;
+    }catch(...){return Error(error,size,"Image recovery preparation allocation or source read failed");}
+}
+}
+bool R_PrepareImagePolicyRecovery(uint64_t owner,uint64_t request,const char* attempt,const renderImagePolicy_t* target,
+    renderImageRecoveryLease_t* output,char* error,int size) {
+    if(!target)return Error(error,size,"Image target policy is required");
+    return PrepareRecovery(owner,request,attempt,target,0,nullptr,0,output,error,size);
+}
+bool R_PrepareColdImagePolicyRecovery(uint64_t owner,uint64_t request,const char* attempt,uint32_t direction,
+    const char* raw,uint32_t bytes,renderImageRecoveryLease_t* output,char* error,int size) {
+    return PrepareRecovery(owner,request,attempt,nullptr,direction,raw,bytes,output,error,size);
+}
+bool R_CaptureImagePolicyRecovery(const renderImageRecoveryLease_t* requested,uint32_t direction,char* output,uint32_t capacity,
+    uint32_t* bytes,char* error,int size) {
+    if(!requested||!output||!bytes)return Error(error,size,"Image capture output is required");
+    const auto lease=*requested;const std::lock_guard<std::mutex> lock(policyMutex);
+    if(active||rendererThread!=std::this_thread::get_id()||!preparedRecovery||!SameLease(lease,preparedRecovery->lease)||direction<1||direction>2||
+        !preparedRecovery->directions[direction-1]||preparedRecovery->touched||preparedRecovery->epoch!=resourceMutationEpoch.load(std::memory_order_relaxed))
+        return Error(error,size,"Image capture lease is stale");
+    const auto& raw=preparedRecovery->raw[direction-1];if(raw.size()>capacity)return Error(error,size,"Image capture buffer is too small");
+    std::memcpy(output,raw.data(),raw.size());*bytes=uint32_t(raw.size());return true;
+}
+bool R_CancelPreparedImagePolicyRecovery(const renderImageRecoveryLease_t* requested,char* error,int size) {
+    if(!requested)return Error(error,size,"Image cancellation lease is required");
+    const auto lease=*requested;std::unique_ptr<Prepared> retired;
+    {
+        const std::lock_guard<std::mutex> lock(policyMutex);
+        if(active||rendererThread!=std::this_thread::get_id()||!preparedRecovery||!SameLease(lease,preparedRecovery->lease)||preparedRecovery->touched||
+            preparedRecovery->epoch!=resourceMutationEpoch.load(std::memory_order_relaxed)||!SamePolicy(preparedRecovery->initialPolicy,ReadPolicy()))
+            return Error(error,size,"Image cancellation lease changed");
+        // Failed teardown recovery remains sticky; canceling a preparation is
+        // never permission to forget the original resident/default census.
+        retired.swap(preparedRecovery);
+    }
+    return true;
+}
+bool R_ImagePolicyUsesPreparedContent() {Attempt* a=Current();return a&&a->prepared;}
+bool R_ReleaseCompletedImagePolicyRecovery(const renderImageRecoveryLease_t* requested,uint32_t direction,
+    const renderImagePolicyResult_t* result,char* error,int size) {
+    if(!requested||!result)return Error(error,size,"A completed image recovery receipt is required");
+    const auto lease=*requested;const auto receipt=*result;
+    if(!R_ImagePolicyRendererThread())return Error(error,size,"Completed image release requires its renderer thread");
+    renderDisplayPresentation_t device{};R_GetDisplayPresentation(&device);
+    std::unique_ptr<Prepared> retired;
+    {
+        const std::lock_guard<std::mutex> lock(policyMutex);
+        if(active||!preparedRecovery||!SameLease(lease,preparedRecovery->lease)||!preparedRecovery->touched||direction<1||direction>2||
+            direction!=preparedRecovery->completedDirection||preparedRecovery->epoch!=resourceMutationEpoch.load(std::memory_order_relaxed))
+            return Error(error,size,"Completed image release ownership changed");
+        const auto& exact=preparedRecovery->completed;
+        if(!exact.attempt||receipt.attempt!=exact.attempt||receipt.deviceGeneration!=exact.deviceGeneration||receipt.imagesVerified!=exact.imagesVerified||
+            receipt.fileImagesVerified!=exact.fileImagesVerified||receipt.materialSourcesReparsed!=exact.materialSourcesReparsed||
+            receipt.baselineDefaultImages!=exact.baselineDefaultImages||receipt.baselineDefaultMaterials!=exact.baselineDefaultMaterials||
+            receipt.allocations!=exact.allocations||receipt.uploads!=exact.uploads||receipt.reserved!=exact.reserved||!device.available||
+            device.generation!=exact.deviceGeneration||device.failureSequence!=preparedRecovery->completedFailures||
+            !SamePolicy(ReadPolicy(),preparedRecovery->directions[direction-1]->policy))return Error(error,size,"Completed image release receipt is stale");
+        retired.swap(preparedRecovery);
+    }
+    return true;
+}
+int R_ImagePolicyBorrowPreparedContent(const idImage* image,const idBinaryImage*& output,imagePortableContent_t& descriptor) {
+    Attempt* a=Current();if(!a||!a->prepared)return 0;
+    if(!image||a->preparing||!R_ImagePolicyOperationAllowed())return -1;
+    const auto& cpu=a->prepared->cpu[a->request.recoveryDirection-1];const auto found=cpu.find(image);
+    if(found==cpu.end()||!found->second){R_ImagePolicyObserveError("An image has no prepared CPU candidate");return -1;}
+    const auto p=image->GetDeclaredPolicy();ir::Image key;key.name=image->GetName();key.filter=p.filter;key.repeat=p.repeat;
+    key.usage=p.usage;key.cube=p.cube;key.flags=p.flags;key.allowDownSize=p.allowDownSize;
+    const auto proof=a->selectedContent.find(image);
+    if(proof==a->selectedContent.end()||!ir::SameImageKey(key,*proof->second)||!proof->second->resident){R_ImagePolicyObserveError("Prepared image metadata changed before upload");return -1;}
+    if(!a->borrowed.insert(image).second){R_ImagePolicyObserveError("A prepared image was loaded twice in one attempt");return -1;}
+    descriptor=proof->second->content;output=found->second.get();return 1;
 }

@@ -525,6 +525,11 @@ renderExport_t *GetRenderAPI( renderImport_t *moduleImport ) {
 	rgm_export.GetDisplayPresentation = R_GetDisplayPresentation;
 	rgm_export.TryInitializeDisplay = R_TryInitializeDisplay;
 	rgm_export.TryImagePolicyRestart = R_TryImagePolicyRestart;
+    rgm_export.PrepareImagePolicyRecovery=R_PrepareImagePolicyRecovery;
+    rgm_export.CaptureImagePolicyRecovery=R_CaptureImagePolicyRecovery;
+    rgm_export.PrepareColdImagePolicyRecovery=R_PrepareColdImagePolicyRecovery;
+    rgm_export.CancelImagePolicyRecovery=R_CancelPreparedImagePolicyRecovery;
+    rgm_export.ReleaseImagePolicyRecovery=R_ReleaseCompletedImagePolicyRecovery;
 #ifdef OPENQ4_RENDERER_VK_MODULE
 	// the Vulkan backend keeps its bring-up diagnostics surface for the
 	// on-demand rendererVkProbe flow

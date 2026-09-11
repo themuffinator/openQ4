@@ -228,6 +228,17 @@ int main(){try{
   }TEST(R_CompleteConsumedImageUploads());if(mode==0){TEST(i.GetConsumedPolicy(out));TEST(out.reduction.status==IR_EXACT&&out.reduction.sourceWidth==16&&out.reduction.requestedWidth==4);}else Unavailable(i);
  }
  {idImage i;{imageConsumedLoad_t scope(i);imageReductionResult_t forged;forged.status=IR_EXACT;forged.sourceWidth=998;scope.Reduction(forged);Upload(i);scope.Loaded(ICS_GENERATED);}TEST(R_CompleteConsumedImageUploads());TEST(i.GetConsumedPolicy(out));TEST(out.reduction.status==IR_UNOBSERVED&&out.reduction.sourceWidth==0);}
+
+ // Prepared exact CPU output can retain a historical resolved policy while
+ // recording the current inputs separately; it still needs real completion.
+ {liveInputs={1,2,0,0,0,0,0,0,1};idImage i;i.opts.width=i.opts.height=4;i.opts.numLevels=3;
+  imagePortableContent_t saved;saved.version=1;saved.scope=IPC_DIRECT_SOURCE;saved.usage=i.usage;saved.resolved={4,0,1};saved.reduction={16,16,4,4,4,4,5,2,IR_EXACT};
+  {imageConsumedLoad_t scope(i);TEST(scope.Prepared(saved));TEST(scope.Policy().maxDimension==4);Content(i,scope);Upload(i);TEST(!scope.Prepared(saved));scope.Loaded(ICS_DIRECT_DDS);}
+  Unavailable(i);TEST(R_CompleteConsumedImageUploads());TEST(i.GetConsumedPolicy(out));TEST(out.preparedContent&&out.resolved.maxDimension==4&&out.inputs.downSizeLimit==2);
+  imagePortableContent_t portable;TEST(i.GetPortableContent(portable));TEST(portable.resolved.maxDimension==4&&portable.reduction.sourceWidth==16);
+ }
+ for(int mode=0;mode<4;++mode){idImage i;imageConsumedLoad_t scope(i);imagePortableContent_t saved;saved.version=1;saved.scope=IPC_DIRECT_SOURCE;saved.usage=i.usage;
+  if(mode==0)saved.version=2;if(mode==1)saved.scope=IPC_UNAVAILABLE;if(mode==2)++saved.usage;if(mode==3)imageConsumedLoad_t::Error();TEST(!scope.Prepared(saved));}
  NoUnsupportedHash();Portable();
  idMaterial material;materialConsumedPolicy_t materialOut;materialOut.revision=99;TEST(!material.GetConsumedPolicy(materialOut)&&materialOut.revision==99);
  image_ignoreHighQuality.value=false;com_makingBuild.value=true;
@@ -363,6 +374,9 @@ def main():
     cases = [('actual', observer, False)]
     if args.mutations:
         edits = [
+            ('prepared-policy', 'candidate.resolved=content.resolved;', '(void)content;'),
+            ('prepared-marker', 'candidate.preparedContent=true;', 'candidate.preparedContent=false;'),
+            ('prepared-late', '!observing || allocated || loaded || failed || content.version!=1', '!observing || loaded || failed || content.version!=1'),
             ('unsupported-output-hash', 'if (!R_ImageFileContentValid(file) ||', 'if (false && (!R_ImageFileContentValid(file) ||'),
             ('portable-without-completion', '!GetConsumedPolicy(actual)', '!(actual=consumedPolicy,true)'),
             ('portable-decoded-authority', 'actual.source == ICS_GENERATED && actual.fileContent.kind == IFC_OBSERVED_BIMAGE', 'true'),

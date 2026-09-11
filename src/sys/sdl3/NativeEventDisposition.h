@@ -43,6 +43,12 @@ struct NativeEmissionPlan {
     // SessionDeferred alone requires an earlier same-record KeyboardPoll ticket.
     NativeDispositionTicket trigger{};
 };
+struct NativeDispositionProgress {
+    NativeDispositionReceipt receipt{};
+    NativeDispositionPass pass = NativeDispositionPass::SessionInitial;
+    NativeDispositionTicket next{};
+    bool complete = false, inFlight = false;
+};
 struct NativeDispositionAdmission {
     NativeDispositionTicket ticket{};
     std::uint64_t serial = 0;
@@ -135,6 +141,8 @@ public:
     bool CanAdmit(NativeDispositionTicket) const noexcept;
     // Planned delivery phase/order only. Rechecked by BeginDelivery after Take.
     bool CanBeginDelivery(NativeDispositionTicket) const noexcept;
+    // Exact planned delivery cursor; no callback, allocation or advancement.
+    bool QueryProgress(NativeDispositionProgress& out) const noexcept;
     bool SealTranslation(std::string& error) noexcept;
     // Explicit checkpoint, including sealed zero-ticket passes (which do not
     // imply an uncalled Usercmd loop ran). No next pass before all its
@@ -159,6 +167,9 @@ public:
     // No Source/probe/callback/allocation; exact planned retired census.
     bool QueryRetirement(NativeDispositionRetirement& out) const noexcept;
 private:
+    friend class NativeInputDriver;
+    // Actual owned sink disposal after retirement, never an ordinary receipt.
+    bool DisposeTakenAfterRetirement(NativeDispositionTicket) noexcept;
     enum class Phase { Empty, Between, Translating, Delivering, Complete, Retired };
     struct Record { OQ4_NativeQueueRecord tag{}; bool ignored = false; };
     struct Emission {

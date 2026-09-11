@@ -29,6 +29,7 @@ If you have questions concerning this license or the applicable additional terms
 
 
 
+#include "NativeInputDispatch.h"
 #include "Session_local.h"
 #include "NativeInputPublications.h"
 #include "ArenaCampaign.h"
@@ -7004,11 +7005,13 @@ bool idSessionLocal::IsGUIActive() const {
 }
 
 bool idSessionLocal::ProcessEvent( const sysEvent_t *event ) {
+    if (!NativeInput_SessionCurrent()) return false;
 	if ( event->evType == SE_RETAINED_UI ) return RetainedUI_ProcessEvent( event );
 	// hitting escape anywhere brings up the menu
 	if ( !guiActive && !guiTest && !RetainedUI_IsOpen() && event->evType == SE_KEY && event->evValue2 == 1 &&
 		( event->evValue == K_ESCAPE || event->evValue == K_JOY7 || event->evValue == K_JOY8 ) ) {
 		console->Close();
+		if (!NativeInput_SessionCurrent()) return true;
 		if ( IsDemoPlaybackActive() ) {
 			OpenDemoMenu( false );
 			return true;
@@ -7017,6 +7020,7 @@ bool idSessionLocal::ProcessEvent( const sysEvent_t *event ) {
 			idUserInterface	*gui = NULL;
 			escReply_t		op;
 			op = game->HandleESC( &gui );
+			if (!NativeInput_SessionCurrent()) return true;
 			if ( op == ESC_IGNORE ) {
 				return true;
 			} else if ( op == ESC_GUI ) {
@@ -7030,9 +7034,11 @@ bool idSessionLocal::ProcessEvent( const sysEvent_t *event ) {
 
 	// let the pull-down console take it if desired
 	if ( console->ProcessEvent( event, false ) ) {
+        if (!NativeInput_SessionCurrent()) return true;
 		RetainedUI_FrameInput();
 		return true;
 	}
+    if (!NativeInput_SessionCurrent()) return false;
 	if ( RetainedUI_IsOpen() ) return RetainedUI_ProcessEvent( event );
 
 	// if we are testing a GUI, send all events to it
@@ -7045,9 +7051,11 @@ bool idSessionLocal::ProcessEvent( const sysEvent_t *event ) {
 		
 		static const char *cmd;
 		cmd = guiTest->HandleEvent( event, common->GetPresentationTime() );
+        if (!NativeInput_SessionCurrent()) return true;
 		if ( cmd && cmd[0] ) {
 			bool closeRequested = false;
 			if ( UI_DispatchApplicationActions( guiTest, cmd, closeRequested ) ) {
+                if (!NativeInput_SessionCurrent()) return true;
 				if ( closeRequested ) TestGUI( NULL );
 			} else common->Printf( "testGui event returned: '%s'\n", cmd );
 		}

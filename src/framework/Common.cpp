@@ -29,6 +29,7 @@ If you have questions concerning this license or the applicable additional terms
 
 
 
+#include "NativeInputDispatch.h"
 //#include "../renderer/Image.h"
 #include "../bse/BSE_API.h"
 #include "../imagetools/ImageTools.h"
@@ -363,6 +364,9 @@ static void Common_ThrottlePresentationFrame( void ) {
 }
 
 void openQ4_BeginPresentationFrame( void ) {
+    static std::uint64_t nativeInputPresentation = 0;
+    if (nativeInputPresentation != UINT64_MAX) ++nativeInputPresentation;
+    NativeInput_BeginFrame(nativeInputPresentation);
 	if ( idAsyncNetwork::serverDedicated.GetInteger() == 1 ) {
 		Common_ResetPresentationThrottle();
 	} else {

@@ -56,4 +56,7 @@ enum class sysEventTransfer_t { Ready, Empty, Refused };
 // Inputs/outputs must not alias engine queue storage. Callers must serialize
 // ordinary queue access; asyncInput=1 native activation remains unsupported.
 bool Sys_QueTrackedEvent(sysEvent_t&, sysEventDispositionTag_t&) noexcept;
+// Original thread, non-consuming head tag. Empty tag identifies a legacy prefix;
+// no native/GUI call or input authority. Refusal/Empty preserves out.
+sysEventTransfer_t Sys_PeekEventDispositionTag(sysEventDispositionTag_t& out) noexcept;
 sysEventTransfer_t Sys_TakeEventWithDisposition(sysEvent_t&, sysEventDispositionTag_t&) noexcept;

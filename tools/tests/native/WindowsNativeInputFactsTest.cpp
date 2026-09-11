@@ -70,9 +70,12 @@ static void RetirementQueries() {
     onStage=[&](Stage s){if(s==Push){WindowsTextSessionRetirement out;out.session=999;CHECK(!busy.value->QueryRetirement(b.native,b.editor,busy.probe.original,out));CHECK(out.session==999);}};
     CHECK(busy.value->Activate(busy.source,busy.closed,busy.error));onStage={};fields=nullptr;
 }
+// Completed-inventory detach is tested with actual Driver+queues in
+// native_input_driver.py. SDK lifecycle/facts tests must never enter that edge.
+bool openq4::NativeInputDriver::DetachCompletedInventory(openq4::NativeInputEmissionInventory&) noexcept {std::abort();}
 static void SourceFacts() {
     Session f;auto b=Setup(f);WindowsNativeInputRouteSource source(*f.value);std::string error;
-    CHECK(source.SetOwner(b,error));CHECK(!source.SetOwner(b,error));
+    CHECK(source.SetOwner(b,error));CHECK(!source.SetOwner(b,error));CHECK(!source.PumpsRetired());
     NativeInputRoute route(source);std::uint64_t id=0;CHECK(route.Prepare(b,id,error));CHECK(source.BindRoute(route,id));
     NativeInputObservation out;const auto callsBefore=providerCalls;
     CHECK(source.Observe(out)&&out.inputAllowed&&out.allocation==b.editor.allocation);
@@ -84,7 +87,7 @@ static void SourceFacts() {
     CHECK(providerCalls==callsBefore);
     CHECK(route.Revoke(id));NativeInputRetirement retirement;
     CHECK(source.Retirement(id,b,retirement)&&retirement.ui==NativeInputUiRetirement::Unknown);
-    f.Register();CHECK(f.value->FaultRetirePreservingEvents().nativeReleased);
+    f.Register();source.RetirePreservingEvents();CHECK(source.PumpsRetired());
     CHECK(source.Retirement(id,b,retirement));CHECK(retirement.ui==NativeInputUiRetirement::AbsentOriginal&&retirement.store==NativeInputNativeRetirement::RetiredExact&&retirement.provider==NativeInputNativeRetirement::RetiredExact);
     CHECK(retirement.hooksRemoved&&retirement.controllerReleased&&!retirement.backlogDisposed);
     CHECK(route.MarkDrainOnly(id));CHECK(!route.Release(id)); // no invented driver backlog proof
@@ -117,7 +120,18 @@ static void SourceRelease() {
         if(mode==4){const auto correct=registeredId;++registeredId;CHECK(!source.ReleaseRoute(id));registeredId=correct;}
         denyAllocations=true;CHECK(source.ReleaseRoute(id));denyAllocations=false;
         CHECK(providerCalls==nativeCalls&&!registeredRoute&&route.State()==NativeInputRoute::Phase::Empty);
+        denyAllocations=true;CHECK(source.PumpsRetired());denyAllocations=false;CHECK(providerCalls==nativeCalls);
+        std::thread wrongThread([&]{CHECK(!source.PumpsRetired());});wrongThread.join();
         CHECK(!source.ReleaseRoute(id));CHECK(!source.Retirement(id,b,facts));CHECK(!source.BindInventory(inventory));CHECK(!source.SetOwner(b,error));fields=nullptr;
     }
 }
-int main(){RetirementQueries();SourceFacts();SourceRelease();std::printf("PASS %u checks\n",checks);return 0;}
+static void PumpRetirementBoundaries() {
+ {Session f;auto b=Setup(f);WindowsNativeInputRouteSource source(*f.value);std::string error;CHECK(source.SetOwner(b,error));
+  CHECK(f.value->FaultRetirePreservingEvents().nativeReleased);CHECK(!source.PumpsRetired());fields=nullptr;} // Never registered does not prove provider retirement.
+ {Session f;auto b=Setup(f);WindowsNativeInputRouteSource source(*f.value);std::string error;CHECK(source.SetOwner(b,error));
+  NativeInputRoute route(source);std::uint64_t id=0;CHECK(route.Prepare(b,id,error));CHECK(source.BindRoute(route,id));f.Start();
+  CHECK(!source.PumpsRetired());onStage=[&](Stage){CHECK(!source.PumpsRetired());};f.Quiesce();onStage={};
+  CHECK(!source.PumpsRetired());f.Finish();const auto old=providerCalls;denyAllocations=true;CHECK(source.PumpsRetired());denyAllocations=false;CHECK(providerCalls==old);
+  registeredRoute=nullptr;registeredId=0;fields=nullptr;}
+}
+int main(){RetirementQueries();SourceFacts();SourceRelease();PumpRetirementBoundaries();std::printf("PASS %u checks\n",checks);return 0;}

@@ -447,6 +447,11 @@ def main(argv: list[str]) -> int:
         for pattern in ENGINE_SOURCE_GLOBS:
             add_globbed_sources(source_set, ordered_sources, source_root, pattern)
 
+        # The SDL client links the owned input driver explicitly in Meson.
+        # Dedicated and other platform targets use the callback-free facade.
+        if args.target_kind == "client" and args.platform_backend == "sdl3":
+            remove_source(source_set, ordered_sources, "src/framework/NativeInputDispatchDisabled.cpp")
+
         if include_game:
             for pattern in GAME_SOURCE_GLOBS:
                 add_globbed_sources(source_set, ordered_sources, source_root, pattern)

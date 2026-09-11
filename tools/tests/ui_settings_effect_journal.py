@@ -15,6 +15,7 @@ def main():
  app=ROOT/'src/ui/application';doc=ROOT/'src/ui/retained/Document.cpp';jsonroot=repo/'subprojects/jsoncpp-1.9.6'
  paths=[Path(__file__),ROOT/'tools/tests/filesystem_case_segments.py',doc]+[p for p in (ROOT/'src/ui/retained').glob('*.h')]+[app/(name+ext) for name in ('SettingsJournal','SettingsEffectPlan','SystemDisplay','SystemSettingsHost','SettingsTransaction') for ext in ('.h','.cpp')]+[app/'SettingsValue.h']+[ROOT/'tools/tests/native'/n for n in ('UiSettingsEffectJournalTest.cpp','UiSettingsJournalTest.cpp','UiSettingsJournalExactTest.cpp')]+list((ROOT/'src/renderer').glob('*.h'))
  dependencies=[p for folder in ('include','src/lib_json') for p in (jsonroot/folder).rglob('*') if p.is_file() and p.suffix in ('.h','.cpp','.inl')]
+ paths += [ROOT/'src/imagetools/ImageRecoveryEnvelope.h',ROOT/'tools/tests/native/UiSettingsImageEnvelopeTest.cpp']+[ROOT/'src'/n for n in ('renderer/RendererImageRecovery.cpp','renderer/RendererImageRecovery.h','imagetools/ImageContentIdentity.cpp','imagetools/ImageContentIdentity.h','idlib/CryptoHash.cpp','idlib/CryptoHash.h')]
  record={'passed':False,'sources':{str(p.relative_to(ROOT)):sha(p) for p in paths},'dependencies':{str(p.relative_to(repo)):sha(p) for p in dependencies},'runs':[],'mutants':{},'scope':__doc__}
  def run(name,cmd):
   p=subprocess.run([str(v) for v in cmd],cwd=out,env=env,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,encoding='utf-8',errors='replace')
@@ -57,12 +58,18 @@ def main():
   fixed += [compile_obj('json-'+name,jsonroot/'src/lib_json'/('json_'+name+'.cpp'),True) for name in ('reader','value','writer')]
   core={name:compile_obj(name,path) for name,path in [('journal',app/'SettingsJournal.cpp'),('plan',app/'SettingsEffectPlan.cpp'),('display',display_path)]}
   test=compile_obj('test',ROOT/'tools/tests/native/UiSettingsEffectJournalTest.cpp');record['positive']=link_run('positive',[test,*core.values(),*fixed])
+  envelope=compile_obj('image-envelope-test',ROOT/'tools/tests/native/UiSettingsImageEnvelopeTest.cpp')
+  image_objects=[compile_obj('image-'+Path(n).stem,ROOT/'src'/n) for n in ('renderer/RendererImageRecovery.cpp','imagetools/ImageContentIdentity.cpp','idlib/CryptoHash.cpp')]
+  record['image_envelope']=link_run('image-envelope',[envelope,*core.values(),*fixed,*image_objects])
   tx=compile_obj('transaction',app/'SettingsTransaction.cpp')
   for name in ('UiSettingsJournalTest','UiSettingsJournalExactTest'):
    t=compile_obj(name,ROOT/'tools/tests/native'/(name+'.cpp'));link_run(name,[t,tx,core['journal'],core['plan'],*fixed])
   dedicated=out/'dedicated.cpp';dedicated.write_text('#define ID_DEDICATED\n'+display+'\nint main(){openq4::ui::StateValues v;std::string error;return openq4::ui::ValidateDisplayPreserveActualPair(v,v,v,v,error)||error.empty()?1:0;}\n',encoding='utf-8')
   stub=compile_obj('dedicated',dedicated);link_run('dedicated',[stub])
   changes={
+   'image-unchecked-envelope':('journal','if (!imageRecovery::Unpack(map,direction,attempt,raw))','if (false && !imageRecovery::Unpack(map,direction,attempt,raw))'),
+   'image-direction-confused':('journal','item.map==&j.imageRestore?1u:2u','1u'),
+   'image-full-json-budget':('journal','candidate.size()>SettingsJournalMaxBytes','candidate.size()>SettingsJournalMaxBytes*2'),
    'plan-empty':('plan','if (!changed) return Fail(error,"Settings effect plan has no changed setting");','if (false && !changed) return Fail(error,"Settings effect plan has no changed setting");'),
    'plan-floating-change':('plan','!SettingsValueEqual(old->second,next->second)','old->second!=next->second'),
    'plan-display-automatic':('plan','(candidate.domainMask & 1u)?','(candidate.domainMask & 0u)?'),
@@ -89,7 +96,7 @@ def main():
     source=source.replace(old,new)
     if label=='journal-placement-catalog':source=source.replace('values.at("r_windowHeight")))','values.at("r_windowHeight"))))')
     path=out/(label+'.cpp');path.write_text(source,encoding='utf-8');obj=compile_obj(label,path)
-    link_run(label,[test,*[obj if k==unit else v for k,v in core.items()],*fixed],True)
+    link_run(label,[envelope if label.startswith('image-') else test,*[obj if k==unit else v for k,v in core.items()],*fixed,*image_objects],True)
   record['passed']=True
  finally:
   record['source_unchanged']=all(sha(ROOT/p)==digest for p,digest in record['sources'].items());record['artifacts']={str(p.relative_to(ROOT)):sha(p) for p in out.rglob('*') if p.is_file()}

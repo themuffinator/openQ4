@@ -82,6 +82,14 @@ static rendererModuleState_t rm_state;
 // their interface tables or local presentation counters are discarded.
 static uint64_t rm_displayModuleEpoch = 1;
 static const renderWindowServices_t *rm_displayVideoPin = NULL;
+// Main/video-thread synchronous code-lifetime pin. Reentrant loader work must
+// fail before unpublishing interfaces or unloading executing module code.
+static bool rm_imageServiceBusy=false,rm_imageServiceFailed=false;
+static rendererImageRecoveryLease_t rm_imageRecoveryLease{};
+static bool RM_AllowImageModuleChange() {
+    if(!rm_imageServiceBusy)return true;
+    rm_imageServiceFailed=true;return false;
+}
 static void RM_ReleaseDisplayVideoPin( void ) {
 	if ( rm_displayVideoPin != NULL ) {
 		rm_displayVideoPin->ReleaseVideoSystem();
@@ -89,6 +97,7 @@ static void RM_ReleaseDisplayVideoPin( void ) {
 	}
 }
 static void RM_AdvanceDisplayEpoch( void ) {
+    rm_imageRecoveryLease={};
 	// Exhaustion permanently disables identity-dependent observations.
 	if ( rm_displayModuleEpoch != 0 ) {
 		rm_displayModuleEpoch = rm_displayModuleEpoch == UINT64_MAX ? 0 : rm_displayModuleEpoch + 1;
@@ -505,7 +514,8 @@ static bool RM_ExportCanRender( const renderExport_t *moduleExport, const char *
 RM_UnloadModule
 ====================
 */
-static void RM_UnloadModule( void ) {
+static bool RM_UnloadModule( void ) {
+	if (!RM_AllowImageModuleChange()) return false;
 	RM_RestorePublishedInterfaces();
 	if ( rm_state.moduleExportValid && rm_state.moduleExport.Shutdown != NULL ) {
 		rm_state.moduleExport.Shutdown();
@@ -518,6 +528,7 @@ static void RM_UnloadModule( void ) {
 		Sys_DLL_Unload( rm_state.moduleHandle );
 		rm_state.moduleHandle = 0;
 	}
+    return true;
 }
 
 /*
@@ -628,6 +639,7 @@ R_RendererModule_Boot
 ====================
 */
 void R_RendererModule_Boot( void ) {
+    if(!RM_AllowImageModuleChange())return;
 	rendererModuleStatus_t &status = rm_state.status;
 
 	if ( rm_state.interfacesPublished ) {
@@ -639,7 +651,7 @@ void R_RendererModule_Boot( void ) {
 	rm_state.activationAllowed = !rm_state.everBooted;
 	rm_state.everBooted = true;
 
-	RM_UnloadModule();
+	if (!RM_UnloadModule()) return;
 	memset( &status, 0, sizeof( status ) );
 
 	const char *requestedValue = r_renderApi.GetString();
@@ -864,6 +876,7 @@ R_RendererModule_BootEarly
 ====================
 */
 void R_RendererModule_BootEarly( void ) {
+    if(!RM_AllowImageModuleChange())return;
 	RM_RegisterCommands();
 
 	char configValue[ 64 ];
@@ -882,7 +895,7 @@ R_RendererModule_Shutdown
 ====================
 */
 void R_RendererModule_Shutdown( void ) {
-	RM_UnloadModule();
+	if (!RM_UnloadModule()) return;
 	RM_ReleaseDisplayVideoPin();
 	RM_AdvanceDisplayEpoch();
 	rm_state.status.disposition = RENDER_MODULE_DISPOSITION_NONE;
@@ -990,12 +1003,17 @@ bool R_RendererModule_TryImagePolicyRestart(const renderImagePolicyRequest_t* re
     }
     // This wrapper is main/video-thread only, like module loading. Native calls
     // never run under a lock. Reject recursion before retaining video services.
-    static bool busy = false;
-    if (busy) {
+    if (rm_imageServiceBusy) {
+        rm_imageServiceFailed=true;
         if (error && errorSize > 0) idStr::Copynz(error, "image policy service is already active", errorSize);
         return false;
     }
-    struct Scope { bool& flag; explicit Scope(bool& b) : flag(b) { flag = true; } ~Scope() { flag = false; } } scope(busy);
+    struct Scope { Scope(){rm_imageServiceBusy=true;rm_imageServiceFailed=false;} ~Scope(){rm_imageServiceBusy=false;} } scope;
+    if(immutable.recovery.preparation && (rm_imageRecoveryLease.moduleEpoch!=epoch ||
+        immutable.recovery.owner!=rm_imageRecoveryLease.resources.owner || immutable.recovery.request!=rm_imageRecoveryLease.resources.request ||
+        immutable.recovery.preparation!=rm_imageRecoveryLease.resources.preparation)) {
+        if(error&&errorSize>0)idStr::Copynz(error,"image preparation belongs to another module lifetime",errorSize);return false;
+    }
     if (!rm_displayVideoPin) {
         if (!services->RetainVideoSystem()) {
             if (error && errorSize > 0) idStr::Copynz(error, "cannot retain the active video subsystem", errorSize);
@@ -1004,19 +1022,119 @@ bool R_RendererModule_TryImagePolicyRestart(const renderImagePolicyRequest_t* re
         rm_displayVideoPin = services;
     }
     rendererImagePolicyResult_t result{}; result.moduleEpoch = epoch;
-    if (epoch != rm_displayModuleEpoch || services != Sys_GetRenderWindowServices()) {
+    if (rm_imageServiceFailed || epoch != rm_displayModuleEpoch || services != Sys_GetRenderWindowServices()) {
         if (error && errorSize > 0) idStr::Copynz(error, "renderer ownership changed during video retention", errorSize);
         return false;
     }
     const bool succeeded = restart(&immutable, &result.resources, error, errorSize);
     if (succeeded || (renderSystem && renderSystem->IsOpenGLRunning())) RM_ReleaseDisplayVideoPin();
-    if (!succeeded) return false;
+    if (!succeeded || rm_imageServiceFailed) return false;
     if (epoch != rm_displayModuleEpoch || services != Sys_GetRenderWindowServices()) {
         if (error && errorSize > 0) idStr::Copynz(error, "renderer ownership changed during image policy restart", errorSize);
         return false;
     }
     *output = result;
     return true;
+}
+
+namespace {
+bool RM_ImageError(char* error,int size,const char* text){if(error&&size>0)idStr::Copynz(error,text,size);return false;}
+bool RM_ImageLeaseMatches(const rendererImageRecoveryLease_t& lease) {
+    return lease.moduleEpoch && lease.moduleEpoch==rm_displayModuleEpoch && lease.moduleEpoch==rm_imageRecoveryLease.moduleEpoch &&
+        lease.resources.owner && lease.resources.request && lease.resources.preparation &&
+        lease.resources.owner==rm_imageRecoveryLease.resources.owner && lease.resources.request==rm_imageRecoveryLease.resources.request &&
+        lease.resources.preparation==rm_imageRecoveryLease.resources.preparation;
+}
+renderExport_t RM_ImageServices() {
+    if(rm_state.interfacesPublished&&rm_state.moduleExportValid)return rm_state.moduleExport;
+    renderExport_t table{};
+#if !defined(OPENQ4_RENDERER_MODULE_ONLY) && !defined(ID_DEDICATED)
+    if(rm_state.status.disposition!=RENDER_MODULE_DISPOSITION_NONE){
+        table.PrepareImagePolicyRecovery=R_PrepareImagePolicyRecovery;table.CaptureImagePolicyRecovery=R_CaptureImagePolicyRecovery;
+        table.PrepareColdImagePolicyRecovery=R_PrepareColdImagePolicyRecovery;table.CancelImagePolicyRecovery=R_CancelPreparedImagePolicyRecovery;
+        table.ReleaseImagePolicyRecovery=R_ReleaseCompletedImagePolicyRecovery;
+    }
+#endif
+    return table;
+}
+template<class Call> bool RM_ImageCall(Call call,char* error,int size,bool afterRelease=false) {
+    if(rm_imageServiceBusy){rm_imageServiceFailed=true;return RM_ImageError(error,size,"Reentrant image recovery service");}
+    const auto* services=Sys_GetRenderWindowServices();const uint64_t epoch=rm_displayModuleEpoch;
+    if(!epoch||!renderSystem||!services||!services->RetainVideoSystem||!services->ReleaseVideoSystem||!services->ApplyScreenParmsStrict||!services->QueryWindowState)
+        return RM_ImageError(error,size,"Checked image recovery services are unavailable");
+    struct Scope {Scope(){rm_imageServiceBusy=true;rm_imageServiceFailed=false;}~Scope(){rm_imageServiceBusy=false;}} scope;
+    if(!services->RetainVideoSystem())return RM_ImageError(error,size,"Cannot retain video for image recovery");
+    bool ok=false;
+    if(!afterRelease&&!rm_imageServiceFailed&&epoch==rm_displayModuleEpoch&&services==Sys_GetRenderWindowServices()){
+        try{ok=call(RM_ImageServices(),epoch);}catch(...){ok=false;}
+    }
+    services->ReleaseVideoSystem();
+    if(afterRelease&&!rm_imageServiceFailed&&epoch==rm_displayModuleEpoch&&services==Sys_GetRenderWindowServices()){
+        try{ok=call(RM_ImageServices(),epoch);}catch(...){ok=false;}
+    }
+    if(!ok||rm_imageServiceFailed||epoch!=rm_displayModuleEpoch||services!=Sys_GetRenderWindowServices())
+        return RM_ImageError(error,size,"Image recovery service failed or its owner changed");
+    return true;
+}
+}
+bool R_RendererModule_PrepareImageRecovery(uint64_t owner,uint64_t request,const char* attempt,const renderImagePolicy_t* target,
+    rendererImageRecoveryLease_t* output,char* error,int size) {
+    if(!attempt||!target||!output)return RM_ImageError(error,size,"Image preparation input is required");
+    const auto policy=*target;char id[33]{};size_t length=0;while(length<33&&attempt[length])++length;
+    if(length!=32)return RM_ImageError(error,size,"Invalid image attempt length");std::memcpy(id,attempt,32);
+    rendererImageRecoveryLease_t candidate{};
+    const bool ok=RM_ImageCall([&](const renderExport_t& api,uint64_t epoch){
+        candidate.moduleEpoch=epoch;return api.PrepareImagePolicyRecovery&&api.PrepareImagePolicyRecovery(owner,request,id,&policy,&candidate.resources,error,size);
+    },error,size);
+    if(!ok){
+        // The module pin refused unload. Retire a preparation published before a
+        // later retention callback invalidated the call; never expose that lease.
+        if(candidate.resources.preparation&&candidate.moduleEpoch==rm_displayModuleEpoch)
+            RM_ImageCall([&](const renderExport_t& api,uint64_t){return api.CancelImagePolicyRecovery&&api.CancelImagePolicyRecovery(&candidate.resources,error,size);},error,size);
+        return false;
+    }
+    rm_imageRecoveryLease=candidate;*output=candidate;return true;
+}
+bool R_RendererModule_PrepareColdImageRecovery(uint64_t owner,uint64_t request,const char* attempt,uint32_t direction,
+    const char* raw,uint32_t bytes,rendererImageRecoveryLease_t* output,char* error,int size) {
+    if(!attempt||!raw||!output||bytes>1152u*1024u)return RM_ImageError(error,size,"Cold image recovery input exceeds its bound");
+    try{
+        size_t length=0;while(length<33&&attempt[length])++length;if(length!=32)return RM_ImageError(error,size,"Invalid image attempt length");
+        const std::string id(attempt,length),copy(raw,bytes);rendererImageRecoveryLease_t candidate{};
+        const bool ok=RM_ImageCall([&](const renderExport_t& api,uint64_t epoch){candidate.moduleEpoch=epoch;
+            return api.PrepareColdImagePolicyRecovery&&api.PrepareColdImagePolicyRecovery(owner,request,id.c_str(),direction,copy.data(),bytes,&candidate.resources,error,size);
+        },error,size);
+        if(!ok){if(candidate.resources.preparation&&candidate.moduleEpoch==rm_displayModuleEpoch)
+            RM_ImageCall([&](const renderExport_t& api,uint64_t){return api.CancelImagePolicyRecovery&&api.CancelImagePolicyRecovery(&candidate.resources,error,size);},error,size);return false;}
+        rm_imageRecoveryLease=candidate;*output=candidate;return true;
+    }catch(...){return RM_ImageError(error,size,"Cold image recovery input allocation failed");}
+}
+bool R_RendererModule_CaptureImageRecovery(const rendererImageRecoveryLease_t* requested,uint32_t direction,char* output,uint32_t capacity,
+    uint32_t* bytes,char* error,int size) {
+    if(!requested||!output||!bytes||capacity>1152u*1024u)return RM_ImageError(error,size,"Image capture output is invalid");
+    const auto lease=*requested;if(!RM_ImageLeaseMatches(lease))return RM_ImageError(error,size,"Image capture module ownership changed");
+    try{
+        std::string candidate(capacity,'\0');uint32_t length=0;
+        if(!RM_ImageCall([&](const renderExport_t& api,uint64_t){return RM_ImageLeaseMatches(lease)&&api.CaptureImagePolicyRecovery&&
+            api.CaptureImagePolicyRecovery(&lease.resources,direction,candidate.data(),capacity,&length,error,size);},error,size)||!RM_ImageLeaseMatches(lease)||length>capacity)return false;
+        std::memcpy(output,candidate.data(),length);*bytes=length;return true;
+    }catch(...){return RM_ImageError(error,size,"Image capture allocation failed");}
+}
+bool R_RendererModule_CancelImageRecovery(const rendererImageRecoveryLease_t* requested,char* error,int size) {
+    if(!requested)return RM_ImageError(error,size,"Image cancellation lease is required");
+    const auto lease=*requested;if(!RM_ImageLeaseMatches(lease))return RM_ImageError(error,size,"Image cancellation module ownership changed");
+    if(!RM_ImageCall([&](const renderExport_t& api,uint64_t){return RM_ImageLeaseMatches(lease)&&api.CancelImagePolicyRecovery&&
+        api.CancelImagePolicyRecovery(&lease.resources,error,size);},error,size,true))return false;
+    rm_imageRecoveryLease={};return true;
+}
+bool R_RendererModule_ReleaseImageRecovery(const rendererImageRecoveryLease_t* requested,uint32_t direction,
+    const rendererImagePolicyResult_t* result,char* error,int size) {
+    if(!requested||!result)return RM_ImageError(error,size,"Completed image release inputs are required");
+    const auto lease=*requested;const auto receipt=*result;
+    if(!RM_ImageLeaseMatches(lease)||receipt.moduleEpoch!=lease.moduleEpoch)return RM_ImageError(error,size,"Completed image module ownership changed");
+    if(!RM_ImageCall([&](const renderExport_t& api,uint64_t){return RM_ImageLeaseMatches(lease)&&api.ReleaseImagePolicyRecovery&&
+        api.ReleaseImagePolicyRecovery(&lease.resources,direction,&receipt.resources,error,size);},error,size,true))return false;
+    rm_imageRecoveryLease={};return true;
 }
 
 bool R_RendererModule_TryInitializeDisplay( const renderWindowRequest_t *request, char *error, int errorSize ) {
@@ -1103,6 +1221,7 @@ scoped only.
 ====================
 */
 bool R_RendererModule_RunVulkanProbe( bool verbose ) {
+    if(!RM_AllowImageModuleChange())return false;
 	char modulePath[ 1024 ];
 
 	if ( !RM_ResolveModulePath( RENDER_MODULE_API_VULKAN, modulePath, sizeof( modulePath ) ) ) {

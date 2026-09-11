@@ -292,6 +292,7 @@ jobs:
             tools/tests/native_input_facts.py \
             tools/tests/native_input_terminal.py \
             tools/tests/native_input_lifecycle.py \
+            tools/tests/native_input_driver.py \
             tools/tests/native_event_retirement.py \
             tools/tests/sdl3_clipboard_status.py \
             tools/tests/sdl3_text_provenance.py \
@@ -357,6 +358,12 @@ jobs:
             tools/tests/ui_capture_system_page.py \
             tools/tests/ui_capture_system_exit.py \
             tools/tests/renderer_vid_restart_route.py \
+            tools/tests/renderer_image_recovery_owner.py \
+            tools/tests/renderer_image_recovery_module.py \
+            tools/tests/renderer_image_recovery_loader.py \
+            tools/tests/renderer_image_recovery_codec.py \
+            tools/tests/renderer_image_recovery_cold.py \
+            tools/tests/renderer_image_recovery_fixture.py \
             tools/tests/renderer_image_policy_restart.py \
             tools/tests/renderer_image_policy_boundaries.py \
             tools/tests/renderer_image_policy_lifetimes.py \
@@ -577,6 +584,7 @@ jobs:
           python tools/tests/native_event_disposition.py
           python tools/tests/native_input_route.py
           python tools/tests/native_input_lifecycle.py
+          python tools/tests/native_input_driver.py --mutations
           python tools/tests/native_input_facts.py
           python tools/tests/native_input_terminal.py
           python tools/tests/native_event_retirement.py
@@ -637,6 +645,11 @@ jobs:
           python tools/tests/ui_capture_system_page.py
           python tools/tests/ui_capture_system_exit.py
           python tools/tests/renderer_vid_restart_route.py
+          python tools/tests/renderer_image_recovery_owner.py --mutations
+          python tools/tests/renderer_image_recovery_module.py --mutations
+          python tools/tests/renderer_image_recovery_loader.py --mutations
+          python tools/tests/renderer_image_recovery_codec.py --mutations
+          python tools/tests/renderer_image_recovery_cold.py --mutations
           python tools/tests/renderer_image_policy_restart.py --mutations
           python tools/tests/renderer_image_policy_boundaries.py --mutations
           python tools/tests/renderer_image_policy_lifetimes.py --mutations

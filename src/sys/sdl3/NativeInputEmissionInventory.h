@@ -60,6 +60,7 @@ public:
         NativeInputIssued& out) const noexcept;
 private:
     friend class NativeInputTransfers;
+    friend class NativeInputDriver;
     enum class Ownership { External, NeverTransferred, Stored, TakenForDelivery, Cancelled, Indeterminate };
     struct Entry {
         NativeTranslatedEmission emission;

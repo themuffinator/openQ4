@@ -26,6 +26,7 @@ along with Doom 3 Source Code.  If not, see <http://www.gnu.org/licenses/>.
 #define OPENQ4_SDL3_POSIX_HOST 1
 #endif
 
+#include "../../framework/NativeInputDispatch.h"
 #if defined(OPENQ4_SDL3_POSIX_HOST)
 #include "../posix/posix_public.h"
 #else
@@ -4857,6 +4858,7 @@ static bool SDL3_EventTargetsGameWindow(const SDL_Event &event) {
 }
 
 bool Sys_SDL_PumpEvents(void) {
+    if (NativeInput_OwnsPump()) return true; // Before housekeeping and both legacy Poll loops.
 #if defined(OPENQ4_SDL3_POSIX_HOST)
 	if (!Posix_IsMainThread()) {
 		// The async timer thread reaches this through Sys_PollMouseInputEvents

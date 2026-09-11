@@ -1,5 +1,6 @@
 // Copyright (C) 2026 DarkMatter Productions. GPL-3.0-or-later.
 #include "SettingsJournal.h"
+#include "../../imagetools/ImageRecoveryEnvelope.h"
 #include <charconv>
 #include <cmath>
 #include <limits>
@@ -150,6 +151,14 @@ bool EffectMap(const StateValues& map,std::string& error) {
  }
  return true;
 }
+bool ImageEffectMap(const StateValues& map,unsigned direction,const std::string& attempt,std::string& error) {
+ const auto codec=map.find("codec");
+ if (codec==map.end()) return EffectMap(map,error);
+ // A reserved codec field cannot silently fall back to the opaque legacy map.
+ std::string raw(0,'\0');
+ if (!imageRecovery::Unpack(map,direction,attempt,raw)) return Fail(error,"Invalid versioned image recovery envelope");
+ return true;
+}
 bool Placement2(const StateValues& fields,const StateValues& baseline,const StateValues& target,std::string& error) {
  if (fields.size()!=18) return Fail(error,"Settings effect placement requires exactly eighteen fields");
  for (const auto* direction:{"baseline.","target."}) {
@@ -192,7 +201,9 @@ bool Valid2(const SettingsEffectRecoveryJournal& j,const std::map<std::string,st
  for (const auto& item:metadata) {
   const bool required=(j.plan.domainMask & item.domains)!=0;
   if (required==item.map->empty()) return Fail(error,"Settings effect journal has missing or surplus domain metadata");
-  if (!EffectMap(*item.map,error)) return false;
+  if (item.map==&j.imageRestore || item.map==&j.imageTarget) {
+   if (!ImageEffectMap(*item.map,item.map==&j.imageRestore?1u:2u,j.attempt,error)) return false;
+  } else if (!EffectMap(*item.map,error)) return false;
  }
  if ((j.plan.domainMask & 19u) && !Placement2(j.placement,j.baseline,j.target,error)) return false;
  return true;
@@ -332,5 +343,11 @@ bool DecodeSettingsJournalRecord(const std::string& bytes,
   std::unique_ptr<const SettingsJournalValue> immutable=std::move(candidate);
   journal.value.swap(immutable); error.clear(); return true;
  } catch (...) { return EffectFail(error,"Settings journal record allocation failed"); }
+}
+bool PackSettingsImageRecovery(const std::string& raw,unsigned direction,const std::string& attempt,StateValues& output) {
+ return imageRecovery::Pack(raw,direction,attempt,output);
+}
+bool UnpackSettingsImageRecovery(const StateValues& fields,unsigned direction,const std::string& attempt,std::string& output) {
+ return imageRecovery::Unpack(fields,direction,attempt,output);
 }
 } // namespace openq4::ui

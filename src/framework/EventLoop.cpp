@@ -25,6 +25,7 @@ If you have questions concerning this license or the applicable additional terms
 
 ===========================================================================
 */
+#include "NativeInputDispatch.h"
 #include <cstddef>
 #include "../sys/KeyEventMetadata.h"
 #include "../sys/EventQueueContinuity.h"
@@ -302,6 +303,14 @@ bool idEventLoop::PushEventWithDisposition( sysEvent_t& event, sysEventDispositi
 	return true;
 }
 
+sysEventTransfer_t idEventLoop::PeekEventDispositionTag(sysEventDispositionTag_t& out) noexcept {
+    if (!Sys_EventDispositionBoundThread()) return sysEventTransfer_t::Refused;
+    if (com_pushedEventsHead > com_pushedEventsTail) {
+        out = com_pushedDisposition[com_pushedEventsTail & (MAX_PUSHED_EVENTS-1)];
+        return sysEventTransfer_t::Ready;
+    }
+    return Sys_PeekEventDispositionTag(out);
+}
 sysEventTransfer_t idEventLoop::TakeEventWithDisposition( sysEvent_t& event, sysEventDispositionTag_t& tag ) noexcept {
 	if ( !Sys_EventDispositionEpoch() || com_journal.GetInteger() != 0 ) return sysEventTransfer_t::Refused;
 	if ( com_pushedEventsHead > com_pushedEventsTail ) {
@@ -382,6 +391,7 @@ idEventLoop::ProcessEvent
 */
 void idEventLoop::ProcessEvent( sysEvent_t ev ) {
 	idScopedEventPayload payload( ev, true );
+    if (!NativeInput_SessionCurrent()) return;
 	// track key up / down states
 	if ( ev.evType == SE_KEY ) {
 		idKeyInput::PreliminaryKeyEvent( ev.evValue, ( ev.evValue2 != 0 ) );
@@ -394,6 +404,7 @@ void idEventLoop::ProcessEvent( sysEvent_t ev ) {
 	if ( ev.evType == SE_CONSOLE ) {
 		// from a text console outside the game window
 		cmdSystem->BufferCommandText( CMD_EXEC_APPEND, (char *)ev.evPtr );
+        if (!NativeInput_SessionCurrent()) return;
 		cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "\n" );
 	} else {
 		session->ProcessEvent( &ev );
@@ -407,6 +418,16 @@ void idEventLoop::ProcessEvent( sysEvent_t ev ) {
 idEventLoop::RunEventLoop
 ===============
 */
+void idEventLoop::ContinueNativeInput() {
+    // Input-only: no commands, getters, native pump or simulation work. A legacy
+    // prefix makes TakeDeferred stop without removing that prefix.
+    sysEvent_t event{};
+    while (NativeInput_TakeDeferredSession(event) == nativeInputSessionResult_t::Owned) {
+        try { ProcessEvent(event); }
+        catch (...) { NativeInput_AbortDelivery(); (void)NativeInput_CompleteSession(); throw; }
+        if (!NativeInput_CompleteSession()) return;
+    }
+}
 int idEventLoop::RunEventLoop( bool commandExecution ) {
 	sysEvent_t	ev;
 
@@ -417,13 +438,24 @@ int idEventLoop::RunEventLoop( bool commandExecution ) {
 			cmdSystem->ExecuteCommandBuffer();
 		}
 
-		ev = GetEvent();
+        const auto native = NativeInput_TakeSession(ev);
+        if (native == nativeInputSessionResult_t::Stop) return 0;
+        if (native == nativeInputSessionResult_t::Owned) {
+            try { ProcessEvent(ev); }
+            catch (...) { NativeInput_AbortDelivery(); (void)NativeInput_CompleteSession(); throw; }
+            if (!NativeInput_CompleteSession()) return 0;
+            continue;
+        }
+        ev = GetEvent();
 
 		// if no more events are available
 		if ( ev.evType == SE_NONE ) {
 			return 0;
 		}
-		ProcessEvent( ev );
+        NativeInput_BeginLegacySession();
+        try { ProcessEvent(ev); }
+        catch (...) { NativeInput_EndLegacySession(); throw; }
+        NativeInput_EndLegacySession();
 	}
 
 	return 0;	// never reached

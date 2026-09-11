@@ -108,6 +108,16 @@ struct rendererImagePolicyResult_t {
 // lease as display restart until success/live context or explicit restoration.
 bool R_RendererModule_TryImagePolicyRestart(const renderImagePolicyRequest_t* request,
     rendererImagePolicyResult_t* output, char* error, int errorSize);
+struct rendererImageRecoveryLease_t {uint64_t moduleEpoch=0;renderImageRecoveryLease_t resources{};};
+bool R_RendererModule_PrepareImageRecovery(uint64_t owner,uint64_t request,const char* attempt,const renderImagePolicy_t* target,
+    rendererImageRecoveryLease_t* output,char* error,int size);
+bool R_RendererModule_PrepareColdImageRecovery(uint64_t owner,uint64_t request,const char* attempt,uint32_t direction,
+    const char* raw,uint32_t bytes,rendererImageRecoveryLease_t* output,char* error,int size);
+bool R_RendererModule_CaptureImageRecovery(const rendererImageRecoveryLease_t*,uint32_t direction,char* output,uint32_t capacity,
+    uint32_t* bytes,char* error,int size);
+bool R_RendererModule_CancelImageRecovery(const rendererImageRecoveryLease_t*,char* error,int size);
+bool R_RendererModule_ReleaseImageRecovery(const rendererImageRecoveryLease_t*,uint32_t direction,
+    const rendererImagePolicyResult_t*,char* error,int size);
 // Strict first device only, after Init and before any world/UI frame. The caller
 // prepares SDL video, resolves portable monitor identity and journals before
 // calling. Failure keeps the video identity pin until explicit retry or unload;

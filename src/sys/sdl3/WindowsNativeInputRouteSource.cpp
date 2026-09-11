@@ -60,7 +60,7 @@ bool WindowsNativeInputRouteSource::BindInventory(NativeInputEmissionInventory& 
     if(std::this_thread::get_id()!=thread || preparing || poisoned || !route || inventory ||
         route->State()!=NativeInputRoute::Phase::Bound || !NativeInputPublicationsCurrent(*route,routeId) ||
         !binding || !value.MatchesBinding(*route,routeId,*binding))return false;
-    inventory=&value;return true;
+    inventory=&value;completedInventory=false;return true;
 }
 bool WindowsNativeInputRouteSource::ReleaseRoute(std::uint64_t exactRoute) noexcept {
     if(std::this_thread::get_id()!=thread || preparing || finished || !route || !binding ||
@@ -72,6 +72,28 @@ bool WindowsNativeInputRouteSource::ReleaseRoute(std::uint64_t exactRoute) noexc
     if(route->State()!=NativeInputRoute::Phase::Empty && !route->Release(routeId))return false;
     if(!NativeInputUnbindPublications(*route,routeId))return false;
     route=nullptr;inventory=nullptr;routeId=0;binding.reset();finished=true;return true;
+}
+void WindowsNativeInputRouteSource::RetirePreservingEvents() noexcept {
+    if(std::this_thread::get_id()!=thread || preparing || releasing || finished || !route || !binding)return;
+    (void)route->Revoke(routeId);
+    (void)controller.FaultRetirePreservingEvents();
+}
+bool WindowsNativeInputRouteSource::PumpsRetired() const noexcept {
+    if(std::this_thread::get_id()!=thread || preparing || releasing)return false;
+    if(finished)return true; // Exact ReleaseRoute required all these facts.
+    if(!binding || !controllerId)return false;
+    WindowsTextSessionRetirement actual;
+    const WindowsTextSessionWindow window{reinterpret_cast<HWND>(binding->window.handle),binding->window.window,
+        binding->window.lifetime,binding->window.module,binding->window.association,binding->window.registration};
+    return controller.QueryRetirement(binding->native,binding->editor,window,actual) && actual.session==controllerId &&
+        actual.native==binding->native && actual.window==window && actual.storeRetired && actual.providerRetired &&
+        actual.hooksRemoved && actual.nativeReleased;
+}
+bool WindowsNativeInputRouteSource::DetachCompleted(NativeInputDriver& driver) noexcept {
+    if(std::this_thread::get_id()!=thread || preparing || releasing || finished || poisoned || !route || !binding || !inventory ||
+        !NativeInputPublicationsCurrent(*route,routeId) || !inventory->MatchesBinding(*route,routeId,*binding))return false;
+    if(!driver.DetachCompletedInventory(*inventory))return false;
+    inventory=nullptr;completedInventory=true;return true;
 }
 bool WindowsNativeInputRouteSource::Observe(NativeInputObservation& out) const noexcept {
     if(std::this_thread::get_id()!=thread || poisoned || !Sys_EventDispositionBoundThread())return false;
@@ -109,7 +131,7 @@ bool WindowsNativeInputRouteSource::Retirement(std::uint64_t id,const NativeInpu
                 current.registration!=binding->window.registration)candidate.provider=NativeInputNativeRetirement::ClaimLost;
         }
     }
-    candidate.backlogDisposed=inventory && inventory->MatchesBinding(*route,routeId,*binding) && inventory->BacklogDisposed();
+    candidate.backlogDisposed=inventory ? inventory->MatchesBinding(*route,routeId,*binding) && inventory->BacklogDisposed() : completedInventory;
     if(!Original(id,expected))return false;
     out=candidate;return true;
 }

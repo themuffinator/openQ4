@@ -87,6 +87,11 @@ discard/apply-and-return flows with authored modal focus ownership.
 The shared [effect coordinator](docs/dev/ui/settings-effect-execution.md) adds
 automatic completion and a checked in-place audio foundation. Mixed effect
 execution, portable recovery and the complete settings page remain in development.
+[Owned image preparation](docs/dev/ui/image-recovery-ownership.md) retains both
+supported texture directions before a quality change, while the
+[native input driver](docs/dev/ui/native-input-driver.md) connects checked event
+disposal to the engine sinks. Full preset Apply and native text activation remain
+unfinished.
 [Ordered event programs](docs/dev/ui/event-programs.md) connect data, transitions
 and typed actions to normal GUI lifecycle and session delivery. Complete GUI migration,
 the full application/control contract and the visual editor remain in development.

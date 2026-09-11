@@ -312,3 +312,28 @@ bool NativeEventDispositionLedger::QueryRetirement(NativeDispositionRetirement& 
     return true;
 }
 } // namespace openq4
+
+bool openq4::NativeEventDispositionLedger::QueryProgress(NativeDispositionProgress& out) const noexcept {
+    if(std::this_thread::get_id()!=thread || calling || !planned || !translationClosed ||
+        (phase!=Phase::Delivering && phase!=Phase::Complete && !(phase==Phase::Between && passesComplete)))return false;
+    NativeDispositionProgress value;value.receipt=receipt;value.pass=currentPass;
+    value.complete=passesComplete;value.inFlight=inFlight;
+    if(!passesComplete) {
+        const auto index=NextEmission(deliveryCursor[static_cast<std::size_t>(currentPass)],currentPass);
+        if(index<emissions.size()) {
+            const auto& item=emissions[index];
+            value.next={{receipt,records[item.record].tag.queue_sequence,item.record},index+1};
+        }
+    }
+    out=value;return true;
+}
+
+bool openq4::NativeEventDispositionLedger::DisposeTakenAfterRetirement(NativeDispositionTicket ticket) noexcept {
+    if(std::this_thread::get_id()!=thread || calling || phase!=Phase::Retired || !PlannedTicketMatches(ticket))return false;
+    auto& emission=emissions[static_cast<std::size_t>(ticket.emission-1)];
+    if(emission.done || (inFlight && plannedInFlight!=ticket.emission))return false;
+    // Keep done=false: disposal after retirement cannot create an ordinary
+    // delivery/completion receipt. The driver's private inventory owns proof.
+    if(inFlight){inFlight=false;plannedInFlight=0;}
+    return true;
+}

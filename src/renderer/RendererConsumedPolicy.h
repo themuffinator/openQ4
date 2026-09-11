@@ -27,6 +27,11 @@ struct imageReductionResult_t {
     uint32_t status = IR_UNOBSERVED;
 };
 struct materialQualityInputs_t { bool ignoreHighQuality, makingBuild; };
+struct imageDeclaredPolicy_t {
+    int filter,repeat,usage,cube;
+    unsigned int flags;
+    bool allowDownSize;
+};
 struct materialConsumedPolicy_t {
     uint64_t instance = 0, revision = 0, observationEpoch = 0;
     materialQualityInputs_t inputs{};
@@ -50,6 +55,7 @@ struct imageConsumedPolicy_t {
     int usage = 0, filter = 0, repeat = 0, cube = 0;
     unsigned int flags = 0;
     bool allowDownSize = false;
+    bool preparedContent = false; // Resolved policy came from a checked historical descriptor.
     int width = 0, height = 0, levels = 0, layers = 0;
     uint32_t source = ICS_UNKNOWN, completion = ICC_UNOBSERVED;
 };
@@ -92,6 +98,9 @@ public:
     const imageDownsizePolicy_t& Policy() const { return candidate.resolved; }
     void Loaded(imageConsumedSource_t source);
     void Content(const idBinaryImage& binary, imageConsumedSource_t source);
+    // Prepared CPU restoration explicitly retains historical per-image policy;
+    // it is not recast as a policy derived from current CVars.
+    bool Prepared(const imagePortableContent_t& content);
     void Reduction(const imageReductionResult_t& value) { candidate.reduction = value; }
     static void BeforeOperation(const idImage* image);
     static bool Active(const idImage* image);

@@ -15,6 +15,7 @@ from filesystem_case_segments import function_body
 ROOT = Path(__file__).resolve().parents[2]
 
 SUPPORT = r'''
+#include "src/framework/NativeInputDispatch.h"
 #include <cassert>
 #include <cstdio>
 #include <cstring>
@@ -71,6 +72,9 @@ struct idUsercmdGenLocal {
     struct Toggle { void Clear() {} } toggled_zoom;
     struct Cmd { int impulse=0,flags=0; } cmd;
     void ResetMouseFilter() { ++filtersReset; }
+    bool nativeUnknownKeyBlocked[K_LAST_KEY]={};bool nativeSourceExhausted=false;
+    struct NativeHold{bool down=false;int key=0;} nativeHeldSources[512];
+    bool NativeKeyBlocked(int) const noexcept;
     bool Inhibited(); void Clear(); void Key(int,bool); void SetButtonAction(int,bool);
     void SetUsercmdButton(int,bool); void Joystick(); void RetainedInputChanged();
 };
@@ -373,7 +377,7 @@ def main():
         (sdl,'static void SDL3_ReleaseGamepadState('),
         (sdl,'static void SDL3_ReleaseJoystickState('),
         *[(usercmd,signature) for signature in [
-            'bool idUsercmdGenLocal::Inhibited(', 'void idUsercmdGenLocal::Clear(',
+            'bool idUsercmdGenLocal::NativeKeyBlocked(', 'bool idUsercmdGenLocal::Inhibited(', 'void idUsercmdGenLocal::Clear(',
             'void idUsercmdGenLocal::Key(', 'void idUsercmdGenLocal::SetButtonAction(',
             'void idUsercmdGenLocal::SetUsercmdButton(', 'void idUsercmdGenLocal::Joystick(',
             'void idUsercmdGenLocal::RetainedInputChanged(',
@@ -387,7 +391,7 @@ def main():
         source=Path(temp)/'input.cpp'; binary=Path(temp)/'input.exe'
         controller_stub='void SDL3_PostControllerKeyEvent(int key,bool down,int time) { assert(SDL3_QueueRetainedKey(key,down,false,2048+key,time)); }\n'
         source.write_text(key_enum+event_enum+event_struct+SUPPORT+functions+controller_stub+MAIN,encoding='utf-8')
-        subprocess.run([compiler,'-std=c++20','-I',str(ROOT),str(source),str(ROOT/'src/ui/retained/Input.cpp'),'-o',str(binary)],check=True)
+        subprocess.run([compiler,'-std=c++20','-I',str(ROOT),str(source),str(ROOT/'src/ui/retained/Input.cpp'),str(ROOT/'src/framework/NativeInputDispatchDisabled.cpp'),'-o',str(binary)],check=True)
         subprocess.run([str(binary)],check=True)
 
 

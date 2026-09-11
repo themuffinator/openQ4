@@ -221,3 +221,7 @@ bool NativeTextCollectionCoordinator::CompleteFence(NativeQueueIngress& ingress,
 	} catch (...) { return reject("Native collection fence callback failure"); }
 }
 } // namespace openq4::ui
+
+bool openq4::ui::NativeTextCollectionCoordinator::CompletionCurrent(const NativeTextCollectionCompletion& exact) const noexcept {
+    return std::this_thread::get_id()==thread && !calling && !retired && phase==Phase::AwaitingFence && completion==exact;
+}

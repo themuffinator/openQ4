@@ -64,6 +64,9 @@ public:
 	// Ready transfers payload+sidecar; refusal/empty preserves both outputs.
 	sysEventTransfer_t TakeEventWithDisposition( sysEvent_t&, sysEventDispositionTag_t& ) noexcept;
 	bool PushEventWithDisposition( sysEvent_t&, sysEventDispositionTag_t& ) noexcept;
+	sysEventTransfer_t PeekEventDispositionTag(sysEventDispositionTag_t&) noexcept;
+	// Only the installed driver may feed an exact owned deferred event here.
+	void ContinueNativeInput();
     // Aggregate retirement view/take preserves pushed-before-platform FIFO.
     sysEventTransfer_t PeekEventForRetirement(openq4::NativeInputHead&) noexcept;
     sysEventTransfer_t TakeEventForRetirement(openq4::NativeInputRoute&,

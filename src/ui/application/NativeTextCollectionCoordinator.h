@@ -111,6 +111,8 @@ public:
 	// performs no callbacks, refuses busy/retired/worker calls without changing
 	// coordinator state, and preserves out if its owned string cannot be copied.
 	bool QueryBarrier(NativeTextEditorBarrier& out, std::string& error) const noexcept;
+	// Exact already-reconciled batch observation; no callback or allocation.
+	bool CompletionCurrent(const NativeTextCollectionCompletion&) const noexcept;
 	bool NeedsRetirement() const noexcept { return std::this_thread::get_id()!=thread || phase == Phase::RetireRequired; }
 private:
 	enum class Phase { Ready, Reconciling, AwaitingFence, RetireRequired };

@@ -160,6 +160,9 @@ sysEventTransfer_t Sys_TakeEventForRetirement(openq4::NativeInputRoute&,
     const openq4::NativeInputRoute::CancellationPermit&,sysEvent_t&,sysEventDispositionTag_t&) noexcept {
     Check(false,"journal-only fixture cannot cancel platform input");return sysEventTransfer_t::Refused;
 }
+sysEventTransfer_t Sys_PeekEventDispositionTag(sysEventDispositionTag_t&) noexcept {
+    Check(false,"disabled native driver cannot inspect a journal platform head");return sysEventTransfer_t::Refused;
+}
 #include "src/framework/EventLoop.cpp"
 
 static void Reset() {

@@ -171,6 +171,7 @@ struct idStr{static void Copynz(char* out,const char* text,int n){if(n>0)std::sn
 class idRenderSystem {public:bool ready=true;bool IsOpenGLRunning()const{return ready;}} renderer;
 static idRenderSystem* renderSystem=&renderer;
 static uint64_t rm_displayModuleEpoch=1;
+static bool rm_imageServiceBusy=false,rm_imageServiceFailed=false;static rendererImageRecoveryLease_t rm_imageRecoveryLease{};
 static const renderWindowServices_t* rm_displayVideoPin=nullptr;
 static renderWindowServices_t services{},otherServices{};
 static bool available=true,retainOkay=true,restartOkay=true,throwRestart=false;
@@ -217,7 +218,7 @@ int main(){try{
  Reset();callback=[](const char* at){if(!std::strcmp(at,"restart"))++rm_displayModuleEpoch;};Run(false);TEST(calls==1&&!references);
  Reset();callback=[](const char* at){if(!std::strcmp(at,"release"))++rm_displayModuleEpoch;};Run(false);TEST(calls==1&&!references);
  Reset();callback=[](const char* at){if(!std::strcmp(at,"restart"))available=false;};Run(false);TEST(!references);
- Reset();callback=[](const char* at){if(!std::strcmp(at,"retain")){rendererImagePolicyResult_t output=sentinel;char error[128];TEST(!R_RendererModule_TryImagePolicyRestart(&request,&output,error,sizeof(error)));TEST(!std::memcmp(&output,&sentinel,sizeof(output)));}};Run(true);TEST(retains==1&&calls==1);
+ Reset();callback=[](const char* at){if(!std::strcmp(at,"retain")){rendererImagePolicyResult_t output=sentinel;char error[128];TEST(!R_RendererModule_TryImagePolicyRestart(&request,&output,error,sizeof(error)));TEST(!std::memcmp(&output,&sentinel,sizeof(output)));}};Run(false);TEST(retains==1&&calls==0&&references==1);callback={};RM_ReleaseDisplayVideoPin();
  Reset();restartOkay=false;Run(false);TEST(references==1&&!releases);restartOkay=true;Run(true);TEST(retains==1&&releases==1);
  Reset();throwRestart=true;{bool threw=false;rendererImagePolicyResult_t output=sentinel;char error[128];try{R_RendererModule_TryImagePolicyRestart(&request,&output,error,sizeof(error));}catch(...){threw=true;}TEST(threw&&!std::memcmp(&output,&sentinel,sizeof(output)));}throwRestart=false;Run(true);TEST(!references&&retains==1);
  Reset();rm_state.interfacesPublished=false;rm_state.status.disposition=RENDER_MODULE_DISPOSITION_BUILTIN;

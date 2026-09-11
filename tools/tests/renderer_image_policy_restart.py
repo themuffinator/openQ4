@@ -119,6 +119,9 @@ void VK_Device_WaitUploadBatch(){++finishes;Boundary("wait");if(!vkCtx.presentat
 bool R_TryFullVidRestartForImagePolicy(const renderWindowRequest_t*,char*,int);
 '''
 
+from renderer_image_recovery_fixture import extend_support
+SUPPORT=extend_support(SUPPORT)
+
 MAIN = r'''
 bool R_TryFullVidRestartForImagePolicy(const renderWindowRequest_t* window,char* error,int size){
  ++starts;TEST(window->parms.width==800);Boundary("restart");
@@ -305,6 +308,8 @@ def main():
         'src/renderer/RendererResourceSettings.cpp', 'src/renderer/RendererResourceSettings.h', 'src/renderer/RendererConsumedPolicy.h',
         'src/renderer/RenderModuleAPI.h', 'tools/tests/renderer_image_policy_restart.py')]
     inputs += [headers / 'src/renderer/DisplayPresentation.h']
+    inputs += [repository / n for n in ('tools/tests/renderer_image_recovery_fixture.py','src/renderer/RendererImageRecovery.h','src/renderer/RendererImageRecovery.cpp','src/imagetools/ImageRecoveryEnvelope.h','src/imagetools/ImageContentIdentity.h','src/imagetools/ImageContentIdentity.cpp','src/idlib/CryptoHash.h','src/idlib/CryptoHash.cpp')]
+    extra_sources=[str(repository / n) for n in ('src/renderer/RendererImageRecovery.cpp','src/imagetools/ImageContentIdentity.cpp','src/idlib/CryptoHash.cpp')]
     def hashes():
         return {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in inputs}
     before = hashes()
@@ -333,11 +338,11 @@ def main():
                 command += ['-DOPENQ4_RENDERER_VK_MODULE']
             if args.sanitize:
                 command += ['-fsanitize=address,undefined', '-fno-omit-frame-pointer', '-g', '-no-pie']
-            command += [str(unit), '-o', str(binary)]
+            command += [str(unit), *extra_sources, '-o', str(binary)]
             if Path(compiler).stem.lower() in ('cl', 'clang-cl'):
                 if args.sanitize:
                     raise RuntimeError('sanitizer option requires GCC/Clang Unix-style driver')
-                command = [compiler, '/nologo', '/std:c++20', '/EHsc', '/MTd', '/D_DEBUG', '/D_ITERATOR_DEBUG_LEVEL=2', '/I' + str(repository / 'src/renderer'), '/I' + str(headers / 'src/renderer'), *(['/DOPENQ4_RENDERER_VK_MODULE'] if backend == 'vk' else []), str(unit), '/Fe:' + str(binary), '/Fo:' + str(out / (tag + '.obj'))]
+                command = [compiler, '/nologo', '/std:c++20', '/EHsc', '/MTd', '/D_DEBUG', '/D_ITERATOR_DEBUG_LEVEL=2', '/I' + str(repository / 'src/renderer'), '/I' + str(headers / 'src/renderer'), *(['/DOPENQ4_RENDERER_VK_MODULE'] if backend == 'vk' else []), str(unit), *extra_sources, '/Fe:' + str(binary), '/Fo:' + str(out) + os.sep]
             for stage, call in (('compile', command), ('run', [str(binary)])):
                 result = subprocess.run(call, cwd=out, env=env, timeout=90, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
                 log = out / (tag + '-' + stage + '.log')

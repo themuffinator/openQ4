@@ -27,7 +27,7 @@ SOURCES = ["src/sys/EventDisposition.h", "src/sys/EventDisposition.cpp",
     "tools/tests/native/EventDispositionPushedTest.cpp", "tools/tests/event_disposition_storage.py",
     "tools/tests/sys_event_queue_ownership.py", "tools/tests/filesystem_case_segments.py"]
 
-SOURCES += ['src/sys/EventRetirement.h', 'src/framework/NativeInputRoute.h', 'src/framework/NativeInputRoute.cpp', 'src/ui/retained/TextInputBroker.h', 'src/ui/retained/TextInput.h', 'src/ui/retained/NativeTextDocument.h']
+SOURCES += ['src/framework/NativeInputDispatchDisabled.cpp','src/sys/EventRetirement.h', 'src/framework/NativeInputRoute.h', 'src/framework/NativeInputRoute.cpp', 'src/framework/NativeInputDispatch.h', 'src/ui/retained/TextInputBroker.h', 'src/ui/retained/TextInput.h', 'src/ui/retained/NativeTextDocument.h']
 
 def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -111,7 +111,7 @@ def main():
                 texts = {"unit": units[target], "service": service, "loop": loop}
                 if part:
                     texts[part] = replace(texts[part], old, new, count)
-                for relative in ["src/framework/EventLoop.h", "src/sys/EventDisposition.h", "src/sys/EventQueueContinuity.h", "src/sys/KeyEventMetadata.h"] + ['src/sys/EventRetirement.h', 'src/framework/NativeInputRoute.h', 'src/framework/NativeInputRoute.cpp', 'src/ui/retained/TextInputBroker.h', 'src/ui/retained/TextInput.h', 'src/ui/retained/NativeTextDocument.h']:
+                for relative in ["src/framework/EventLoop.h", "src/sys/EventDisposition.h", "src/sys/EventQueueContinuity.h", "src/sys/KeyEventMetadata.h"] + ['src/sys/EventRetirement.h', 'src/framework/NativeInputRoute.h', 'src/framework/NativeInputRoute.cpp', 'src/framework/NativeInputDispatch.h', 'src/ui/retained/TextInputBroker.h', 'src/ui/retained/TextInput.h', 'src/ui/retained/NativeTextDocument.h']:
                     destination = variant / relative
                     destination.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copyfile(ROOT / relative, destination)
@@ -123,6 +123,7 @@ def main():
                 output = variant / ("test.exe" if os.name == "nt" else "test")
                 sources = [str(variant / "unit.cpp"), str(ROOT / "src/sys/EventQueueContinuity.cpp"), str(ROOT / "src/framework/NativeInputRoute.cpp")]
                 if target == "pushed":
+                    sources.append(str(ROOT/"src/framework/NativeInputDispatchDisabled.cpp"))
                     sources.append(str(variant / "src/sys/EventDisposition.cpp"))
                 if msvc:
                     command = [compiler, "/nologo", "/std:c++20", "/EHsc", "/W4", "/WX", "/wd4100", "/MTd" if args.msvc_debug else "/MT",

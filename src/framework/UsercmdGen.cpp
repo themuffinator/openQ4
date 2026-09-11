@@ -29,6 +29,7 @@ If you have questions concerning this license or the applicable additional terms
 
 
 
+#include "NativeInputDispatch.h"
 #include "Session_local.h"
 #include "../idlib/NumericString.h"
 #include "../ui/RetainedUI.h"
@@ -360,6 +361,9 @@ public:
 
 	void			InhibitUsercmd( inhibit_t subsystem, bool inhibit );
 	void			RetainedInputChanged();
+    void NativeInputChanged() noexcept;
+    void NativeInputSource(std::uint64_t,std::uint64_t,std::uint64_t,unsigned,int,bool) noexcept;
+    bool NativeKeyBlocked(int) const noexcept;
 
 	void			UsercmdInterrupt( void );
 
@@ -405,6 +409,7 @@ private:
 	void			CmdButtons( void );
 
 	void			Mouse( void );
+    void MouseEvent(int action,int value);
 	void			Keyboard( void );
 	void			Joystick( void );
 
@@ -422,6 +427,14 @@ private:
 	int				buttonState[UB_MAX_BUTTONS];
 	bool			keyState[K_LAST_KEY];
 	bool			directButtonState[UB_MAX_BUTTONS];	// SetUsercmdButton's own held-state, see Key()'s keyState
+    bool nativeUnknownKeyBlocked[K_LAST_KEY] = {};
+    struct nativeHeldSource_t {
+        std::uint64_t route=0,window=0,device=0;
+        unsigned source=0;
+        int key=0;
+        bool down=false;
+    } nativeHeldSources[512];
+    bool nativeSourceExhausted=false;
 	bool			retainedKeyBlocked[K_LAST_KEY];
 	bool			retainedDirectBlocked[UB_MAX_BUTTONS];
 	bool			retainedAxisBlocked[MAX_JOYSTICK_AXIS];
@@ -608,7 +621,7 @@ is user cmd generation inhibited
 ================
 */
 bool idUsercmdGenLocal::Inhibited( void ) {
-	return inhibitCommands != 0 || RetainedUI_IsOpen();
+	return inhibitCommands != 0 || RetainedUI_IsOpen() || NativeInput_Inhibited();
 }
 
 /*
@@ -1395,6 +1408,11 @@ void idUsercmdGenLocal::Key( int keyNum, bool down ) {
 	if ( keyNum <= 0 || keyNum >= K_LAST_KEY ) {
 		return;
 	}
+    if (NativeInput_Inhibited()) {
+        if (!NativeInput_TypedPollDelivery() && down) nativeUnknownKeyBlocked[keyNum]=true;
+        return;
+    }
+    if (NativeKeyBlocked(keyNum)) return;
 	if ( RetainedUI_IsOpen() || retainedKeyBlocked[keyNum] ) {
 		retainedKeyBlocked[keyNum] = down;
 		return;
@@ -1478,18 +1496,12 @@ void idUsercmdGenLocal::SetUsercmdButton( int action, bool down ) {
 idUsercmdGenLocal::Mouse
 ===================
 */
-void idUsercmdGenLocal::Mouse( void ) {
-	int i, numEvents;
-
-	numEvents = Sys_PollMouseInputEvents();
-
-	if ( numEvents ) {
-		//
-	    // Study each of the buffer elements and process them.
-		//
-		for( i = 0; i < numEvents; i++ ) {
-			int action, value;
-			if ( Sys_ReturnMouseInputEvent( i, action, value ) ) {
+void idUsercmdGenLocal::MouseEvent(int action,int value) {
+    if (NativeInput_Inhibited()) {
+        if (!NativeInput_TypedPollDelivery() && action>=M_ACTION1 && action<=M_ACTION8 && value)
+            nativeUnknownKeyBlocked[K_MOUSE1+(action-M_ACTION1)]=true;
+        return;
+    }
 				if ( action >= M_ACTION1 && action <= M_ACTION8 ) {
 					mouseButton = K_MOUSE1 + ( action - M_ACTION1 );
 					mouseDown = ( value != 0 );
@@ -1516,6 +1528,30 @@ void idUsercmdGenLocal::Mouse( void ) {
 							break;
 					}
 				}
+}
+void idUsercmdGenLocal::Mouse( void ) {
+    if (NativeInput_BeginMouse()) {
+        int action=0,value=0;
+        while (NativeInput_NextMouse(action,value)) {
+            try { MouseEvent(action,value); }
+            catch (...) { NativeInput_AbortDelivery(); (void)NativeInput_CompleteMouse(); throw; }
+            if (!NativeInput_CompleteMouse()) break;
+        }
+        NativeInput_EndMouse();
+        return;
+    }
+	int i, numEvents;
+
+	numEvents = Sys_PollMouseInputEvents();
+
+	if ( numEvents ) {
+		//
+	    // Study each of the buffer elements and process them.
+		//
+		for( i = 0; i < numEvents; i++ ) {
+			int action, value;
+			if ( Sys_ReturnMouseInputEvent( i, action, value ) ) {
+                MouseEvent(action,value);
 			}
 		}
 	}
@@ -1529,6 +1565,16 @@ idUsercmdGenLocal::Keyboard
 ===============
 */
 void idUsercmdGenLocal::Keyboard( void ) {
+    if (NativeInput_BeginKeyboard()) {
+        int key=0;bool down=false;
+        while (NativeInput_NextKeyboard(key,down)) {
+            try { Key(key,down); }
+            catch (...) { NativeInput_AbortDelivery(); (void)NativeInput_CompleteKeyboard(); throw; }
+            if (!NativeInput_CompleteKeyboard()) break;
+        }
+        NativeInput_EndKeyboard();
+        return;
+    }
 
 	int numEvents = Sys_PollKeyboardInputEvents();
 
@@ -1596,6 +1642,47 @@ void idUsercmdGenLocal::RetainedInputChanged() {
 	ResetMouseFilter();
 }
 void Usercmd_RetainedInputChanged() { localUsercmdGen.RetainedInputChanged(); }
+bool idUsercmdGenLocal::NativeKeyBlocked(int key) const noexcept {
+    if(nativeSourceExhausted || nativeUnknownKeyBlocked[key])return true;
+    for(const auto& source:nativeHeldSources)if(source.down && source.key==key)return true;
+    return false;
+}
+void idUsercmdGenLocal::NativeInputSource(std::uint64_t route,std::uint64_t window,std::uint64_t device,
+    unsigned source,int key,bool down) noexcept {
+    if(!route || !window || !source || key<=0 || key>=K_LAST_KEY){nativeSourceExhausted=true;return;}
+    nativeHeldSource_t* vacant=nullptr;
+    for(auto& held:nativeHeldSources) {
+        if(held.route==route && held.window==window && held.device==device && held.source==source) {
+            if(held.key!=key){nativeSourceExhausted=true;return;}
+            const bool released=held.down && !down;held.down=down;
+            // The up-only PreliminaryKeyEvent branch changes one scalar and
+            // never dispatches commands, GUI, or input-family callbacks.
+            if(released && !NativeKeyBlocked(key) && NativeInput_HeldSourceCurrent(route,window))
+                idKeyInput::PreliminaryKeyEvent(key,false);
+            return;
+        }
+        if(!held.down && !vacant)vacant=&held;
+    }
+    // A replacement route's release cannot clear the original source hold.
+    if(down){if(vacant)*vacant={route,window,device,source,key,true};else nativeSourceExhausted=true;}
+}
+void idUsercmdGenLocal::NativeInputChanged() noexcept {
+    if(NativeInput_Inhibited()) {
+        for(int key=1;key<K_LAST_KEY;++key)
+            nativeUnknownKeyBlocked[key]=nativeUnknownKeyBlocked[key] || keyState[key] || idKeyInput::IsDown(key);
+        // Direct/axis input has no native physical-source join in this slice.
+        for(int action=0;action<UB_MAX_BUTTONS;++action)
+            retainedDirectBlocked[action]=retainedDirectBlocked[action] || directButtonState[action];
+    }
+    memset(buttonState,0,sizeof(buttonState));memset(keyState,0,sizeof(keyState));
+    memset(directButtonState,0,sizeof(directButtonState));memset(joystickAxis,0,sizeof(joystickAxis));
+    mouseDx=mouseDy=0;ResetMouseFilter();
+    // Deliberately preserve inhibitCommands, including INHIBIT_SESSION.
+}
+void Usercmd_NativeInputChanged() noexcept {localUsercmdGen.NativeInputChanged();}
+void Usercmd_NativeInputSource(std::uint64_t route,std::uint64_t window,std::uint64_t device,
+    unsigned source,int key,bool down) noexcept {localUsercmdGen.NativeInputSource(route,window,device,source,key,down);}
+
 
 /*
 ================
@@ -1706,6 +1793,7 @@ usercmd_t idUsercmdGenLocal::GetDirectUsercmd( void ) {
 
 	// process the system keyboard events
 	Keyboard();
+    NativeInput_ContinueDeferred(*eventLoop);
 
 	// process the system joystick events
 	Joystick();
