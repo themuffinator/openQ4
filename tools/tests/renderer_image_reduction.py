@@ -48,7 +48,7 @@ struct idBinaryImageData:bimageImage_t{
  void Alloc(int n){Free();dataSize=n;data=(byte*)Mem_Alloc(n);owns=true;}
  void SetExternalData(byte*p,int n){Free();data=p;dataSize=n;}
 };
-struct idBinaryImage{bimageFile_t fileData{};idList<idBinaryImageData>images;byte*loadedFileData=nullptr;
+struct idBinaryImage{bimageFile_t fileData{};idList<idBinaryImageData>images;byte*loadedFileData=nullptr;int loadedFileBytes=0;imageFileContent_t fileContent{};void ObserveFileContent(const imageFileContent_t& v){fileContent=v;}
  ~idBinaryImage(){Clear();}void Clear();
  bool Load2DFromMemory(int,int,const byte*,int,textureFormat_t&,textureColor_t&,bool,bool);
  bool LoadCubeFromMemory(int,const byte*[6],int,textureFormat_t&,bool);
@@ -173,6 +173,7 @@ def main():
  p=argparse.ArgumentParser();p.add_argument('--compiler');p.add_argument('--sanitize',action='store_true');p.add_argument('--mutations',action='store_true');a=p.parse_args()
  names=['src/renderer/RendererConsumedPolicy.h','src/renderer/Image.h','src/renderer/Image_load.cpp','src/imagetools/Image_process.cpp','src/imagetools/Image_files.cpp','src/imagetools/BinaryImage.cpp','src/imagetools/BinaryImage.h','tools/tests/renderer_image_reduction.py','tools/tests/renderer_consumed_policy.py']
  names.append('src/renderer/RenderWorld_lightgrid.cpp')
+ names += ['src/imagetools/ImageContentIdentity.h','src/imagetools/ImageContentIdentity.cpp','src/idlib/CryptoHash.h','src/idlib/CryptoHash.cpp']
  before={n:hashlib.sha256((ROOT/n).read_bytes()).hexdigest() for n in names}
  process=(ROOT/names[3]).read_text();files=(ROOT/names[4]).read_text();binary=(ROOT/names[5]).read_text();load=(ROOT/names[2]).read_text()
  cpu='\n'.join(method(process,s) for s in ['void R_ApplyImageDownsizePolicy(', 'int R_ImageDownsizePolicyMipSkip(', 'bool R_ResolveImageReduction(', 'bool R_ImageReductionIsExact(', 'byte *R_ResampleTexture('])
@@ -182,7 +183,7 @@ def main():
  # Skip top-of-file forward declarations when extracting the two reduction bodies.
  for sig in ['static void R_DownsizeLoadedImageData(', 'static bool R_DownsizeLoadedCubeImageData(']:cpu+='\n'+method(load[load.index('static byte *R_ShrinkLoadedImageData('):],sig)
  dds=files[files.index('static ID_INLINE uint32 R_ReadLittleUInt32('):files.index('static bool R_ReadDDSFileInfoUncached(')]
- dds+='\n'+method(files,'bool R_LoadPrecompressedDDS(')+'\n'+method(files,'bool R_LoadCubeImages(')
+ dds+='\n'+method(files,'bool R_LoadPrecompressedDDS(').replace('const imageFileContent_t* expected )','const imageFileContent_t* expected = nullptr )')+'\n'+method(files,'bool R_LoadCubeImages(')
  assembly='\n'.join(method(binary,s) for s in ['void idBinaryImage::Clear(', 'static void R_PadRGBAImageTo4x4Blocks(', 'static void PadImageTo4x4(', 'void idBinaryImage::Load2DFromOwnedCompressedData(', 'bool idBinaryImage::Load2DFromMemory(', 'bool idBinaryImage::LoadCubeFromMemory('])
  actual=method(load,'void idImage::ActuallyLoadImage(');assert 'consumedLoad.Reduction(consumedReduction);' in actual
  assert 'if ( !loadedPrecompressedDDS && exactDecodedReduction )' in actual
@@ -194,7 +195,8 @@ def main():
  compiler=a.compiler or shutil.which('clang++') or shutil.which('g++');assert compiler
  out=Path(tempfile.mkdtemp(prefix='image-reduction-',dir=ROOT/'.tmp'));env=dict(os.environ,TEMP=str(out),TMP=str(out),TMPDIR=str(out));
  if a.sanitize:env["ASAN_OPTIONS"]="symbolize=0"
- shutil.copyfile(ROOT/names[0],out/'RendererConsumedPolicy.h')
+ (out/'RendererConsumedPolicy.h').write_text((ROOT/names[0]).read_text().replace('../imagetools/ImageContentIdentity.h','ImageContentIdentity.h'))
+ shutil.copyfile(ROOT/'src/imagetools/ImageContentIdentity.h',out/'ImageContentIdentity.h')
  code=SUPPORT+cpu+assembly+dds+MAIN;cases=[('actual',code,False)]
  if a.mutations:
   for tag,old,new in [('impossible-authored-levels','if (authoredLevels > maxLevels) return false;','if (false) return false;'),('dds-target-twice','result.requestedWidth = width; result.requestedHeight = height;','result.requestedWidth = Max(1,width>>1); result.requestedHeight = Max(1,height>>1);'),('dds-unreached-exact','? IR_EXACT : IR_INSUFFICIENT_MIPS','? IR_EXACT : IR_EXACT'),('cube-partial-success','if (!candidates[i]) return false;','if (!candidates[i]) break;'),('cube-size-early','byte *candidates[6]{};','size = scaledSize; byte *candidates[6]{};'),('mip-leak','if (value) Mem_Free(value);','(void)value;'),('cube-partial-binary','if (!complete) image.Clear();','(void)complete;'),('resample-hidden-clamp','const size_t outputBytes =','if (outwidth > 4096) outwidth = 4096; const size_t outputBytes ='),('resample-narrow-numerator','(uint64_t(inwidth) << 16)','uint64_t(inwidth * 65536)'),('dds-output-before-read','if ( cname == NULL','if (reduction) *reduction = {}; if ( cname == NULL'),('cube-null-face',' || (pics && !pics[i])',''),('2d-mip-null','if (!shrunk) return false;','if (false) return false;'),('2d-owned-leak','if (owned) Mem_Free((void*)pic);','(void)owned;'),('2d-publish-early','fileData.format = textureFormat = FMT_RGBA8;','fileData.format = textureFormat = FMT_RGBA8; textureFormatOutput = textureFormat;')]:
@@ -203,9 +205,9 @@ def main():
  try:
   for tag,source,rejected in cases:
    cpp=out/(tag+'.cpp');cpp.write_text(source);exe=out/(tag+'.exe')
-   command=[compiler,'-std=c++20','-I',str(out),str(cpp),'-o',str(exe)]
+   command=[compiler,'-std=c++20','-I',str(out),str(cpp),str(ROOT/'src/imagetools/ImageContentIdentity.cpp'),str(ROOT/'src/idlib/CryptoHash.cpp'),'-o',str(exe)]
    if a.sanitize:command+=['-fsanitize=address,undefined','-fno-omit-frame-pointer','-g','-no-pie']
-   if Path(compiler).stem.lower() in ['cl','clang-cl']:command=[compiler,'/nologo','/std:c++20','/EHsc','/MTd','/D_DEBUG','/Zc:strictStrings-','/I'+str(out),str(cpp),'/Fe:'+str(exe),'/Fo:'+str(out)+os.sep]
+   if Path(compiler).stem.lower() in ['cl','clang-cl']:command=[compiler,'/nologo','/std:c++20','/EHsc','/MTd','/D_DEBUG','/Zc:strictStrings-','/I'+str(out),str(cpp),str(ROOT/'src/imagetools/ImageContentIdentity.cpp'),str(ROOT/'src/idlib/CryptoHash.cpp'),'/Fe:'+str(exe),'/Fo:'+str(out)+os.sep]
    for stage,cmd in [('compile',command),('run',[str(exe)])]:
     run=subprocess.run(cmd,cwd=out,env=env,capture_output=True,text=True,timeout=120);log=out/f'{tag}-{stage}.log';log.write_text(run.stdout+run.stderr);records.append({'case':tag,'stage':stage,'command':cmd,'exit_code':run.returncode,'expected_rejection':rejected and stage=='run','log':str(log),'sha256':hashlib.sha256(log.read_bytes()).hexdigest()})
     if (stage=='compile' and run.returncode) or (stage=='run' and bool(run.returncode)!=rejected):raise RuntimeError(str(log))

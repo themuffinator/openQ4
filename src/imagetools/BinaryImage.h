@@ -29,6 +29,7 @@ If you have questions concerning this license or the applicable additional terms
 #define __BINARYIMAGE_H__
 
 #include "BinaryImageData.h"
+#include "ImageContentIdentity.h"
 
 class idFile;
 
@@ -42,7 +43,7 @@ generation.
 */
 class idBinaryImage {
 public:
-	idBinaryImage( const char * name ) : imgName( name ), loadedFileData( NULL ) { }
+	idBinaryImage( const char * name ) : imgName( name ), loadedFileData( NULL ) { memset(&fileData,0,sizeof(fileData)); }
 	~idBinaryImage() { Clear(); }
 
 	const char *		GetName() const { return imgName.c_str(); }
@@ -53,6 +54,13 @@ public:
 	bool				LoadCubeFromMemory( int width, const byte * pics[6], int numLevels, textureFormat_t & textureFormat, bool gammaMips );
 
 	void				Clear();
+    bool GetContentIdentity(imageBinaryContent_t& out) const;
+    const imageFileContent_t& GetFileContent() const { return fileContent; }
+    // Internal loader publication from the SAME owned read, never a re-open.
+    void ObserveFileContent(const imageFileContent_t& value) { fileContent = value; }
+    void SwapContent(idBinaryImage& other) noexcept;
+    bool LoadExactContentFile(const imageFileContent_t& expected);
+
 	ID_TIME_T			LoadFromGeneratedFile( ID_TIME_T sourceFileTime );
 	ID_TIME_T			LoadFromGeneratedFileUnchecked();
 	ID_TIME_T			LoadFromCompactGeneratedFileUnchecked();
@@ -121,10 +129,12 @@ private:
 
 	idList< idBinaryImageData> images;
 	byte *				loadedFileData;
+    int loadedFileBytes = 0;
+    imageFileContent_t fileContent{};
 
 private:
 	void				MakeGeneratedFileName( idStr & gfn );
-	bool				LoadFromGeneratedFile( idFile * f, ID_TIME_T sourceFileTime, bool validateSourceFileTime, int dataBytes = -1 );
+	bool				LoadFromGeneratedFile( idFile * f, ID_TIME_T sourceFileTime, bool validateSourceFileTime, int dataBytes = -1, const imageFileContent_t* expected = NULL );
 };
 
 #endif // __BINARYIMAGE_H__

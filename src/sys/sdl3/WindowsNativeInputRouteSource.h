@@ -23,8 +23,8 @@ public:
 // window probe and manager owner, SetOwner before route.Prepare, then BindRoute.
 // BindInventory occurs once before translating that ledger. Subsequent batch
 // replacement needs a checked driver disposition seam, not a pointer overwrite.
-// BacklogDisposed deliberately stays false: these facts do not yet prove that
-// every owned head and reserved child reached terminal cancellation/delivery.
+// BacklogDisposed requires the inventory's sealed exact terminal proof. No
+// missing-head/failed-admission inference or successful native ACK is made.
 class WindowsNativeInputRouteSource final : public NativeInputRouteSource {
 public:
     explicit WindowsNativeInputRouteSource(WindowsTextSession&) noexcept;
@@ -33,6 +33,9 @@ public:
     bool SetOwner(const NativeInputBinding&,std::string& error) noexcept;
     bool BindRoute(NativeInputRoute&,std::uint64_t) noexcept;
     bool BindInventory(NativeInputEmissionInventory&) noexcept;
+    // Actual successful route Release and publication unbind precede dropping
+    // collaborators. A failed step retains them for exact original cleanup.
+    bool ReleaseRoute(std::uint64_t exactRoute) noexcept;
     bool Observe(NativeInputObservation&) const noexcept override;
     bool Retirement(std::uint64_t,const NativeInputBinding&,NativeInputRetirement&) const noexcept override;
     bool InspectIssued(std::uint64_t,const NativeInputBinding&,const sysEventDispositionTag_t&,NativeInputIssued&) const noexcept override;
@@ -44,7 +47,7 @@ private:
     NativeInputRoute* route = nullptr;
     NativeInputEmissionInventory* inventory = nullptr;
     std::uint64_t routeId = 0, controllerId = 0;
-    bool preparing = false, poisoned = false;
+    bool preparing = false, poisoned = false, releasing = false, finished = false;
 };
 } // namespace openq4::sys
 #endif

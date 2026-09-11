@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Compile real resolver/observer and Vulkan batch bodies with counted native doubles.
 
-No GPU, source decoding, content identity, portable recovery or engine-runtime
+No GPU, source decoding, byte hashing, cold reconstruction or engine-runtime
 qualification. Material tests compile actual parse publication boundaries around
 a counted parser continuation; separate source checks bind every parser consumer.
 """
@@ -35,12 +35,12 @@ SUPPORT = r'''
 #include <thread>
 #include "RendererConsumedPolicy.h"
 template<class T>T Max(T a,T b){return a>b?a:b;}
-enum {TD_SPECULAR,TD_DIFFUSE,TD_DEFAULT,TD_BUMP,TD_HIGH_QUALITY=15};
+enum {TD_SPECULAR,TD_DIFFUSE,TD_DEFAULT,TD_BUMP,TD_HIGH_QUALITY=15,TD_MATERIAL_DATA=30,TF_LINEAR=20,TF_NEAREST=21};
 using textureUsage_t=int;
 enum {PICMIP_FILTER_ALL=0,PICMIP_FILTER_TEXTURES=1,PICMIP_FILTER_MODELS=2,PICMIP_FILTER_OTHER=4,PICMIP_FILTER_MASK=7,IMAGEFLAG_NOMIPS=1};
 enum {TT_2D=1,TT_CUBIC=2,DS_PARSED=1,MF_DEFAULTED=1};
 struct idStr {static int Icmpn(const char* a,const char* b,int n){for(int i=0;i<n;++i){unsigned char x=a[i],y=b[i];if(x>='A'&&x<='Z')x+=32;if(y>='A'&&y<='Z')y+=32;if(x!=y||!x)return x-y;}return 0;}};
-struct idImageOpts {int width=8,height=8,numLevels=4,textureType=TT_2D;bool isPersistant=false;};
+struct idImageOpts {int width=8,height=8,numLevels=4,textureType=TT_2D,format=1,colorFormat=0;bool isPersistant=false;};
 struct renderDisplayPresentation_t {uint64_t generation=1,failureSequence=0;bool available=true;};
 extern renderDisplayPresentation_t nativeDevice;
 extern std::thread::id owner;
@@ -66,7 +66,13 @@ class idImage {public:
  idImageOpts opts;imageConsumedPolicy_t consumedPolicy{};uint64_t consumedLoadRevision=0;
  const char* GetName()const{return name;}bool IsFileBacked()const{return !scratchImage&&!opts.isPersistant;}
  bool IsLoaded()const{return loaded;}
- bool GetConsumedPolicy(imageConsumedPolicy_t&)const;void InvalidateConsumedPolicy();
+ bool GetPortableContent(imagePortableContent_t&)const;bool GetConsumedPolicy(imageConsumedPolicy_t&)const;void InvalidateConsumedPolicy();
+};
+inline int outputHashCalls=0;
+class idBinaryImage {public:
+ imageBinaryContent_t output{};imageFileContent_t file{};bool valid=true;
+ bool GetContentIdentity(imageBinaryContent_t& out)const{++outputHashCalls;if(!valid)return false;out=output;return true;}
+ const imageFileContent_t& GetFileContent()const{return file;}
 };
 class idMaterial {public:
  uint64_t imagePolicyIdentity=R_ImagePolicyNewResourceIdentity(),consumedParseRevision=0;uint32_t consumedParseDepth=0;materialConsumedPolicy_t consumedPolicy{};
@@ -103,6 +109,13 @@ imageDownsizeInputs_t R_ReadImageDownsizeInputs(){return liveInputs;}
 void GL_CheckErrors(){if(failNative)R_ConsumedPolicyObserveError();}
 void glFinish(){++nativeFinishes;if(nativeCallback)nativeCallback();}
 static void Prove(imageConsumedLoad_t& scope,idImage& image){imageReductionResult_t r;TEST(R_ResolveImageReduction(scope.Policy(),image.opts.width,image.opts.height,0,r));scope.Reduction(r);}
+static void Content(idImage& image,imageConsumedLoad_t& scope,bool cache=false){
+ idBinaryImage binary;binary.file.kind=cache?IFC_OBSERVED_BIMAGE:IFC_DIRECT_DDS;binary.file.bytes=4;
+ std::strcpy(binary.file.qpath,cache?"generated/a.bimage":"textures/a.dds");binary.file.digest.bytes[0]=1;
+ binary.output.version=1;binary.output.textureType=image.opts.textureType;binary.output.format=image.opts.format;binary.output.colorFormat=image.opts.colorFormat;
+ binary.output.width=image.opts.width;binary.output.height=image.opts.height;binary.output.levels=image.opts.numLevels;binary.output.layers=1;binary.output.payloadBytes=100;binary.output.digest.bytes[0]=2;
+ scope.Content(binary,cache?ICS_GENERATED:ICS_DIRECT_DDS);
+}
 static void Upload(idImage& image,bool omit=false,bool refuse=false){
  ++image.storageGeneration;
  imageConsumedLoad_t::Operation(&image,false,!refuse,0,0,0,0,0);
@@ -111,6 +124,48 @@ static void Upload(idImage& image,bool omit=false,bool refuse=false){
 }
 static void Load(idImage& image,bool omit=false,bool refuse=false,imageConsumedSource_t source=ICS_DECODED_2D){
  imageConsumedLoad_t scope(image);Upload(image,omit,refuse);Prove(scope,image);scope.Loaded(source);
+}
+static void PortableUnavailable(idImage& image){imagePortableContent_t p;p.version=991;TEST(!image.GetPortableContent(p));TEST(p.version==991);}
+static void NoUnsupportedHash(){
+ liveInputs={};
+ for(auto kind:{IFC_UNOBSERVED,IFC_DIRECT_DDS,IFC_OBSERVED_BIMAGE})for(auto source:{ICS_UNKNOWN,ICS_GENERATED,ICS_DECODED_2D,ICS_DECODED_CUBE,ICS_DIRECT_DDS,ICS_DEFAULT}){
+  idImage i;idBinaryImage binary;binary.file.kind=kind;binary.file.bytes=4;std::strcpy(binary.file.qpath,"a.dds");binary.file.digest.bytes[0]=1;
+  {imageConsumedLoad_t scope(i);Content(i,scope,false); // Start with a previous valid identity, then clear on refusal.
+   const int before=outputHashCalls;scope.Content(binary,source);
+   const bool supported=(source==ICS_DIRECT_DDS&&kind==IFC_DIRECT_DDS)||(source==ICS_GENERATED&&kind==IFC_OBSERVED_BIMAGE);
+   TEST(outputHashCalls==before+(supported?1:0));
+   Upload(i);scope.Loaded(ICS_GENERATED);
+  }
+  const bool supported=(source==ICS_DIRECT_DDS&&kind==IFC_DIRECT_DDS)||(source==ICS_GENERATED&&kind==IFC_OBSERVED_BIMAGE);
+  if(!supported)TEST(!R_ImageFileContentValid(i.consumedPolicy.fileContent)&&!i.consumedPolicy.binaryContent.version);
+ }
+ {idImage i;imageConsumedLoad_t scope(i);idBinaryImage binary;binary.file.kind=IFC_DIRECT_DDS;
+  const int before=outputHashCalls;scope.Content(binary,ICS_DIRECT_DDS);TEST(outputHashCalls==before);
+ }
+}
+static void Portable(){
+ liveInputs={};
+ for(auto source:{ICS_DIRECT_DDS,ICS_GENERATED,ICS_DECODED_2D,ICS_DECODED_CUBE})for(int mode=0;mode<15;++mode){
+  idImage i;imagePortableContent_t p;
+  {imageConsumedLoad_t scope(i);Upload(i,mode==1,mode==2);imageReductionResult_t reduction;
+   TEST(R_ResolveImageReduction(scope.Policy(),8,8,source==ICS_DIRECT_DDS?4:0,reduction));scope.Reduction(reduction);
+   if(mode!=3)Content(i,scope,source==ICS_GENERATED);
+   if(mode==4){idBinaryImage invalid;invalid.valid=false;invalid.file=i.consumedPolicy.fileContent;scope.Content(invalid,source);}
+   scope.Loaded(source);PortableUnavailable(i);
+  }
+  PortableUnavailable(i);TEST(R_CompleteConsumedImageUploads());
+  if(mode==5)++i.storageGeneration;if(mode==6)++i.opts.format;if(mode==7)++i.opts.colorFormat;
+  if(mode==8)i.defaulted=true;if(mode==9)i.scratchImage=true;if(mode==10)i.loaded=false;
+  if(mode==11)++nativeDevice.generation;if(mode==12)R_ConsumedPolicyInvalidateThread();
+  if(mode==13)i.consumedPolicy.fileContent.kind=IFC_UNOBSERVED;if(mode==14)i.consumedPolicy.binaryContent.version=0;
+  if(mode||source==ICS_DECODED_2D||source==ICS_DECODED_CUBE)PortableUnavailable(i);
+  else {TEST(i.GetPortableContent(p));TEST(p.version==1&&p.file.bytes==4&&p.binary.payloadBytes==100);
+   TEST(p.scope==(source==ICS_GENERATED?IPC_CACHE_PIXELS_ONLY:IPC_DIRECT_SOURCE));
+   if(source==ICS_GENERATED){TEST(!p.resolved.IsActive()&&p.resolved.minDimension==1&&!p.reduction.sourceWidth&&!p.mipmaps);}
+   else TEST(p.reduction.sourceWidth==8&&p.reduction.authoredLevels==4&&p.mipmaps);
+   i.InvalidateConsumedPolicy();PortableUnavailable(i);
+  }
+ }
 }
 static void Unavailable(idImage& image){imageConsumedPolicy_t out;out.revision=998;TEST(!image.GetConsumedPolicy(out));TEST(out.revision==998);}
 int main(){try{
@@ -173,6 +228,7 @@ int main(){try{
   }TEST(R_CompleteConsumedImageUploads());if(mode==0){TEST(i.GetConsumedPolicy(out));TEST(out.reduction.status==IR_EXACT&&out.reduction.sourceWidth==16&&out.reduction.requestedWidth==4);}else Unavailable(i);
  }
  {idImage i;{imageConsumedLoad_t scope(i);imageReductionResult_t forged;forged.status=IR_EXACT;forged.sourceWidth=998;scope.Reduction(forged);Upload(i);scope.Loaded(ICS_GENERATED);}TEST(R_CompleteConsumedImageUploads());TEST(i.GetConsumedPolicy(out));TEST(out.reduction.status==IR_UNOBSERVED&&out.reduction.sourceWidth==0);}
+ NoUnsupportedHash();Portable();
  idMaterial material;materialConsumedPolicy_t materialOut;materialOut.revision=99;TEST(!material.GetConsumedPolicy(materialOut)&&materialOut.revision==99);
  image_ignoreHighQuality.value=false;com_makingBuild.value=true;
  parserContinuation=[](idMaterial&,materialQualityInputs_t in){TEST(!in.ignoreHighQuality&&in.makingBuild);image_ignoreHighQuality.value=true;com_makingBuild.value=false;};
@@ -209,13 +265,13 @@ void VK_Device_WaitUploadBatch(){if(!vkCtx.uploadBatchInFlight||vkCtx.presentati
  if(failNative){vkCtx.presentationBlocked=true;++nativeDevice.failureSequence;return;}
  vkCtx.uploadBatchCompletedSerial=batch;vkCtx.uploadBatchInFlight=false;
 }
-static void Load(idImage& image,bool missingBatch=false){imageConsumedLoad_t scope(image);++image.storageGeneration;
+static void Load(idImage& image,bool missingBatch=false,bool portable=false){imageConsumedLoad_t scope(image);++image.storageGeneration;
  imageConsumedLoad_t::Operation(&image,false,true,0,0,0,0,0);
  for(int i=0;i<image.opts.numLevels;++i){
   VK_Device_FlushUploadBatch();VK_Device_WaitUploadBatch();
   vkCtx.uploadBatchSerial=R_ImagePolicyNewResourceIdentity();vkCtx.uploadBatchOpen=true;
   imageConsumedLoad_t::Operation(&image,true,true,i,0,Max(1,image.opts.width>>i),Max(1,image.opts.height>>i),missingBatch&&i==1?0:vkCtx.uploadBatchSerial);
- }imageReductionResult_t reduction;TEST(R_ResolveImageReduction(scope.Policy(),image.opts.width,image.opts.height,0,reduction));scope.Reduction(reduction);scope.Loaded(ICS_DECODED_2D);
+ }imageReductionResult_t reduction;TEST(R_ResolveImageReduction(scope.Policy(),image.opts.width,image.opts.height,0,reduction));scope.Reduction(reduction);if(portable)Content(image,scope,true);scope.Loaded(portable?ICS_GENERATED:ICS_DECODED_2D);
 }
 static void Unavailable(idImage& image){imageConsumedPolicy_t out;out.revision=998;TEST(!image.GetConsumedPolicy(out));TEST(out.revision==998);}
 int main(){try{
@@ -232,6 +288,11 @@ int main(){try{
  idImage failed;Load(failed);failNative=true;TEST(!R_CompleteConsumedImageUploads());Unavailable(failed);
  failNative=false;vkCtx.presentationBlocked=false;TEST(R_CompleteConsumedImageUploads());Unavailable(failed);
  idImage stale;Load(stale);++nativeDevice.generation;TEST(R_CompleteConsumedImageUploads());Unavailable(stale);
+ {idImage cache;Load(cache,false,true);imagePortableContent_t p;p.version=881;
+  TEST(!cache.GetPortableContent(p)&&p.version==881);VK_Device_FlushUploadBatch();TEST(!cache.GetPortableContent(p));VK_Device_WaitUploadBatch();
+  TEST(cache.GetPortableContent(p)&&p.scope==IPC_CACHE_PIXELS_ONLY&&!p.reduction.sourceWidth&&!p.mipmaps);
+  ++cache.storageGeneration;TEST(!cache.GetPortableContent(p));
+ }
  std::printf("consumed Vulkan policy actual observer: %d checks passed\n",checks);return 0;
 }catch(const std::exception& e){std::fprintf(stderr,"FAIL: %s\n",e.what());return 1;}}
 '''
@@ -249,6 +310,7 @@ def main():
     names = ['src/renderer/'+name for name in ['RendererConsumedPolicy.h', 'RendererConsumedPolicy.cpp', 'ImageManager.cpp', 'Image_load.cpp', 'Material.cpp', 'Material.h', 'Image.h', 'RendererResourceSettings.cpp', 'RendererResourceSettings.h', 'OpenGL/gl_Image.cpp', 'Vulkan/vk_Image.cpp', 'Vulkan/VulkanDevice.cpp', 'Vulkan/VulkanDevice.h', 'RenderSystem_init.cpp']]
     names.append('tools/tests/renderer_consumed_policy.py')
     names.append("src/imagetools/Image_process.cpp")
+    names += ["src/imagetools/ImageContentIdentity.h", "src/imagetools/ImageContentIdentity.cpp", "src/idlib/CryptoHash.h", "src/idlib/CryptoHash.cpp"]
     def hashes():
         return {name: hashlib.sha256((root/name).read_bytes()).hexdigest() for name in names}
     before = hashes()
@@ -269,6 +331,7 @@ def main():
     assert 'R_GetImageDownsizePolicy(' not in actual_load
     assert actual_load.count('flags, &consumedDownsize );') == 2
     assert 'consumedLoad.Loaded(consumedSource);' in actual_load
+    assert actual_load.index('consumedLoad.Content(im,consumedSource);') < actual_load.index('AllocImage();', actual_load.index('consumedLoad.Content(im,consumedSource);'))
     assert 'exactDecodedReduction = width == expectedWidth && height == expectedHeight;' in actual_load
     assert 'consumedLoad.Reduction(consumedReduction);' in actual_load
     extracted = '\n'.join(method(manager, sig) for sig in ['static bool R_ImagePathStartsWith(', 'static bool R_IsImageProgramNameChar(', 'static bool R_ImagePicmipFilterAllows(', 'void R_ResolveImageDownsizePolicy('])
@@ -289,7 +352,9 @@ def main():
     (out/'tr_local.h').write_text(SUPPORT)
     (out/'RendererResourceSettings.h').write_text('#pragma once\n')
     (out/'DisplayPresentation.h').write_text('#pragma once\n')
-    shutil.copyfile(root/names[0], out/'RendererConsumedPolicy.h')
+    (out/'RendererConsumedPolicy.h').write_text((root/names[0]).read_text().replace('../imagetools/ImageContentIdentity.h','ImageContentIdentity.h'))
+    shutil.copyfile(root/'src/imagetools/ImageContentIdentity.h',out/'ImageContentIdentity.h')
+    (out/'BinaryImage.h').write_text('#pragma once\n#include \"tr_local.h\"\n')
     if args.vulkan:
         (out/'Vulkan').mkdir()
         (out/'Vulkan/VulkanDevice.h').write_text(VK_HEADER)
@@ -298,6 +363,11 @@ def main():
     cases = [('actual', observer, False)]
     if args.mutations:
         edits = [
+            ('unsupported-output-hash', 'if (!R_ImageFileContentValid(file) ||', 'if (false && (!R_ImageFileContentValid(file) ||'),
+            ('portable-without-completion', '!GetConsumedPolicy(actual)', '!(actual=consumedPolicy,true)'),
+            ('portable-decoded-authority', 'actual.source == ICS_GENERATED && actual.fileContent.kind == IFC_OBSERVED_BIMAGE', 'true'),
+            ('portable-stale-format', 'actual.binaryContent.format != opts.format', 'false'),
+            ('portable-invalid-keeps-old', 'candidate.fileContent={}; candidate.binaryContent={};', '(void)0;'),
             ('early-complete', 'value.batch > completedGL', 'false'),
             ('current-policy', 'candidate.inputs = R_ReadImageDownsizeInputs();', 'candidate.inputs = {};'),
             ('missing-coverage', 'mips[layer] != expected', 'false'),
@@ -322,7 +392,9 @@ def main():
             ]
         for tag, old, new in edits:
             assert old in observer
-            cases.append((tag, observer.replace(old, new, 1), True))
+            mutated = observer.replace(old,new,1)
+            if tag == 'unsupported-output-hash': mutated=mutated.replace('file.kind == IFC_OBSERVED_BIMAGE))) return;', 'file.kind == IFC_OBSERVED_BIMAGE)))) return;',1)
+            cases.append((tag, mutated, True))
     records = []
     status = 'failed'
     try:
@@ -334,14 +406,14 @@ def main():
                 command += ['-DOPENQ4_RENDERER_VK_MODULE']
             if args.sanitize:
                 command += ['-fsanitize=address,undefined', '-fno-omit-frame-pointer', '-g', '-no-pie']
-            command += [str(source), str(out/'resolvers.cpp'), str(out/'main.cpp'), '-o', str(binary)]
+            command += [str(source), str(out/'resolvers.cpp'), str(out/'main.cpp'), str(root/'src/imagetools/ImageContentIdentity.cpp'), str(root/'src/idlib/CryptoHash.cpp'), '-o', str(binary)]
             if Path(compiler).stem.lower() in ['cl', 'clang-cl']:
                 if args.sanitize:
                     raise RuntimeError('Use GCC/Clang Unix-style driver for sanitizers')
                 command = [compiler, '/nologo', '/std:c++20', '/EHsc', '/MTd', '/D_DEBUG', '/D_ITERATOR_DEBUG_LEVEL=2', '/I'+str(out)]
                 if args.vulkan:
                     command += ['/DOPENQ4_RENDERER_VK_MODULE']
-                command += [str(source), str(out/'resolvers.cpp'), str(out/'main.cpp'), '/Fe:'+str(binary), '/Fo:'+str(out)+os.sep]
+                command += [str(source), str(out/'resolvers.cpp'), str(out/'main.cpp'), str(root/'src/imagetools/ImageContentIdentity.cpp'), str(root/'src/idlib/CryptoHash.cpp'), '/Fe:'+str(binary), '/Fo:'+str(out)+os.sep]
             for stage, call in [('compile', command), ('run', [str(binary)])]:
                 result = subprocess.run(call, cwd=out, env=env, timeout=120, capture_output=True, text=True)
                 log = out/(tag+'-'+stage+'.log'); log.write_text(result.stdout+result.stderr)

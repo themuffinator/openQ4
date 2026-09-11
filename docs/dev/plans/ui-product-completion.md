@@ -148,6 +148,8 @@ The subsequent [native ownership publication increment](../ui/native-input-publi
 
 The following [native legacy-alpha observation](../ui/legacy-import.md), based on engine `fae10f2d5bd610369b42f042780d9cd8f24aa19d`, establishes initialized zero alpha for the exact core4/hub4 stock expressions in both SP/OpenGL and MP/Vulkan. It retains source bytes, actual lookup/fixup/register/property evidence and separate material-preload logs. The complete build,65 UI suites and reviewed gameplay/restart/SYSTEM continuity checks pass. Include provenance, later scripts/timelines and source-bound retained lowering remain required; no final product or migration gate is accepted.
 
+The following [exact image-content](../ui/image-content-recovery.md) and [native terminal-disposal](../ui/native-input-publication.md) checkpoint, based on engine `2e95a66bab30b1acd3f315f86f3570f142965b1d`, adds checked per-image CPU reconstruction and actual store ownership/disposal. The full build,67 UI suites and reviewed windowed SP/OpenGL and MP/Vulkan gameplay/restart/SYSTEM checks pass. Actual loaded-image census supports the next journal sizing decision. Complete source/material cohorts,durable recovery,normal native sink scheduling,held-source inhibition,all production controls,editor and every migration/final gate remain required. No acceptance status changes.
+
 ### Findings that block product completion
 
 The [native text owner/store checkpoint](../ui/text-input-routing.md), based on

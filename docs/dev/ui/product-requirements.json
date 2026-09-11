@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "id_namespace": "openq4.ui.product",
-  "date": "2026-09-10",
+  "date": "2026-09-11",
   "status": "Implementation incomplete; this register preserves full product scope and does not accept any production GUI.",
   "baseline": {
-    "engine_revision": "fae10f2d5bd610369b42f042780d9cd8f24aa19d",
+    "engine_revision": "2e95a66bab30b1acd3f315f86f3570f142965b1d",
     "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
     "effective_gui_count": 271,
     "translated_or_accepted_resources": 0,
@@ -19,7 +19,7 @@
     "product": {
       "path": "docs/dev/plans/ui-product-completion.md",
       "authority": "normative completion scope, milestones and final audit",
-      "sha256": "339aaf735cf4f39bf5123bb8be3320e81436c79bca4244d06204dbbea9f2ced0"
+      "sha256": "ddc519d10a4d89031c2b6184aa23d89f0228051d41e9bcd60fa8c48f089709d5"
     },
     "original": {
       "path": "docs/dev/plans/idtech5-ui.md",
@@ -100,7 +100,7 @@
       "kind": "source_audit",
       "path": "docs/dev/plans/ui-product-completion.md",
       "scope": "Published audit at 80bb3939; source limitations corroborated by current Document/Runtime inspection. Historical tests and captures are not a fresh product qualification.",
-      "sha256": "339aaf735cf4f39bf5123bb8be3320e81436c79bca4244d06204dbbea9f2ced0"
+      "sha256": "ddc519d10a4d89031c2b6184aa23d89f0228051d41e9bcd60fa8c48f089709d5"
     },
     "document-foundation": {
       "kind": "implementation_checkpoint",
@@ -471,7 +471,7 @@
     "native-route-publication": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/native-input-publication.md",
-      "sha256": "fb894d9ccefa0dc153d621934bed73a411977195da62d353822b98fa01486a3f",
+      "sha256": "8ea08f8c28e74a1bda750c082c3b709bff4bfd295fe437c4ad6b5ac36287ac81",
       "baseline_engine_revision": "d16c5b9e7935a273e274ea6c5956729d0da62c85",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "scope": "Production Session/managed-GUI/SDL-window publications invalidate original ownership before mutation; exact binding and typed emission inventory retain failed-admission and deferred-child identity. Copied controller retirement facts remain separate. Full build,64 UI suites,17 adapter mutations and reviewed windowed gameplay/restart/SYSTEM captures pass. No live native activation or terminal backlog disposal is claimed.",
@@ -497,6 +497,26 @@
       "scope": "Fresh initialized native core4/hub4 instances in SP/GL and MP/Vulkan establish missing table, completed null fixup, mapped alpha register6 and actual matColor alpha0 with enabled evaluation and no dictionary. Exact root bytes and fresh token exports match; measured parser intervals are clean after separately retained material preload. Full build/stage,65 UI suites and15 integrated mutants pass. No include-closure, timeline, retained lowering or replacement acceptance.",
       "local_capture_summary": ".tmp/ui/legacy-observation-integration/validation-evidence-final.json",
       "local_capture_summary_sha256": "b5dcac65a575d0b26816dd7fcdf72df4bdbcbc8e3ad26bb17969b8ada49f3a83"
+    },
+    "exact-image-content-recovery": {
+      "kind": "implementation_checkpoint",
+      "path": "docs/dev/ui/image-content-recovery.md",
+      "sha256": "8e995ca634e353b49f4f107d7016705bb63ec2e81fbe6b0952b9c59bb9690461",
+      "baseline_engine_revision": "2e95a66bab30b1acd3f315f86f3570f142965b1d",
+      "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
+      "scope": "Exact owned DDS/cache read identity, canonical CPU mip output and failure-atomic reconstruction; existing consumed upload proof gates portable descriptors. Full engine build/stage,67 UI suites,integrated content mutants and windowed gameplay/restart/SYSTEM continuity pass. Actual listImages counts supply bounded workload evidence only; no complete cohort, durable recovery, native reconstruction or mixed Apply acceptance.",
+      "local_capture_summary": ".tmp/ui/terminal-content-integration/validation-evidence.json",
+      "local_capture_summary_sha256": "486bfaed7fdec7b9c295e8547b3151687fb8bf48696438fb7158aa95a1031112"
+    },
+    "native-terminal-transfer-disposal": {
+      "kind": "implementation_checkpoint",
+      "path": "docs/dev/ui/native-input-publication.md",
+      "sha256": "8ea08f8c28e74a1bda750c082c3b709bff4bfd295fe437c4ad6b5ac36287ac81",
+      "baseline_engine_revision": "2e95a66bab30b1acd3f315f86f3570f142965b1d",
+      "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
+      "scope": "Private typed issuance/transfer claim joins real platform,pushed,keyboard and mouse stores to actual Take/disposal state and terminal ledger census; exact head recheck after source callbacks. Checked original-route disposal/release refuses unknown,external,stored or in-flight ownership. Actual Windows/POSIX store tests and integrated compiled mutants pass; normal sink dispatch,fence turnover,held-source/native activation remain unconnected.",
+      "local_capture_summary": ".tmp/ui/terminal-content-integration/validation-evidence.json",
+      "local_capture_summary_sha256": "486bfaed7fdec7b9c295e8547b3151687fb8bf48696438fb7158aa95a1031112"
     }
   },
   "groups": {
@@ -1931,10 +1951,11 @@
         "renderer-image-recovery",
         "consumed-settings-recovery",
         "checked-image-reduction",
-        "checked-upload-storage"
+        "checked-upload-storage",
+        "exact-image-content-recovery"
       ],
       "acceptance_evidence": [],
-      "remaining": "The typed settings service and asynchronous display confirmation retain their previously qualified scopes. Local numeric drafts guard Apply, Apply and Exit, Defaults, colliding sibling edits and dismissal; Discard requires completed service cancellation and an unchanged complete local editor inventory. Queued rollback, stale callbacks and recovery preserve unfinished text. Exact typed comparison and FTZ/DAZ-independent journal number serialization now cover transaction, display validation and startup recovery, preserving observed originals while signed zeros share the canonical zero representation. Shared profile and Auto-Detect draft expansion now preserve all unrelated edits with guarded atomic publication. Complete actual audio/resource/input effects, preset execution and persistence, all dependent production controls, Defaults and the full Apply/Cancel/discard-and-exit matrix. Qualify visible focus/window-placement/fullscreen/multi-monitor failures and timeout/restart recovery across supported platforms. CVar values alone never prove device success; counted recovery and synthetic startup evidence do not qualify a power loss, actual interrupted confirmation or every persistent recovery path."
+      "remaining": "The typed settings service and asynchronous display confirmation retain their previously qualified scopes. Local numeric drafts guard Apply, Apply and Exit, Defaults, colliding sibling edits and dismissal; Discard requires completed service cancellation and an unchanged complete local editor inventory. Queued rollback, stale callbacks and recovery preserve unfinished text. Exact typed comparison and FTZ/DAZ-independent journal number serialization now cover transaction, display validation and startup recovery, preserving observed originals while signed zeros share the canonical zero representation. Shared profile and Auto-Detect draft expansion now preserve all unrelated edits with guarded atomic publication. Complete actual audio/resource/input effects, preset execution and persistence, all dependent production controls, Defaults and the full Apply/Cancel/discard-and-exit matrix. Qualify visible focus/window-placement/fullscreen/multi-monitor failures and timeout/restart recovery across supported platforms. CVar values alone never prove device success; counted recovery and synthetic startup evidence do not qualify a power loss, actual interrupted confirmation or every persistent recovery path. Exact DDS and previously observed cache CPU reconstruction now has source-byte and canonical output evidence; decoded/program/default images, material cohorts, durable content retention, native reconstruction and full mixed-effect recovery remain required."
     },
     {
       "id": "BEH-003",
@@ -3080,7 +3101,8 @@
         "native-retirement-foundations",
         "native-retirement-storage",
         "authored-scrollbars",
-        "native-route-publication"
+        "native-route-publication",
+        "native-terminal-transfer-disposal"
       ],
       "acceptance_evidence": [],
       "remaining": "The system-exit increment adds authored modal scope transitions and generation-bound queued Back routing; held-source quarantine and restoration pass bounded native/runtime and normal Session qualification. Value gestures add transient capture/preview, pending-proposal identity and popup dismissal to existing input quarantine. Loss of focus, eligibility or usable projection cancels a gesture; restoration does not replay transient edits. Complete and qualify physical-device removal/reconnect, gameplay/modal ownership and all-widget held-source behavior. The recorded normal-route Windows checks qualify semantic ownership and resource resets; physical-device qualification remains open."
@@ -3119,10 +3141,11 @@
         "native-retirement-foundations",
         "native-retirement-storage",
         "authored-scrollbars",
-        "native-route-publication"
+        "native-route-publication",
+        "native-terminal-transfer-disposal"
       ],
       "acceptance_evidence": [],
-      "remaining": "The checked Windows text-session controller now owns SDK activation/quiescence and exact final provider/ledger acknowledgement, with counted SDK evidence and production activation still disabled. Existing wheel, numeric command, checked queue-consumption and owned native-collection evidence remains bounded. Managed owner endpoints, the Windows hook-to-store bridge and explicit lifecycle reconciliation preserve exact owner, provider generation, queue continuity and copied receipt ordering without enabling a native provider. Connect this ingress to the production Session route with native provenance, actual provider activation and verified payload lifetime. Complete production wheel/touch scrolling, Unicode text/composition, keyboard/gamepad repeat/reconnect behavior, deterministic replay and the full supported-host/widget operation matrix with value, focus and scroll evidence. No physical-input or complete payload acceptance is inferred. Production ownership publishers and typed issued-emission inventory are now connected and qualified without activation. Exact terminal transfer/disposal, held-source inhibition, full sink schedules and checked collaborator release remain required."
+      "remaining": "The checked Windows text-session controller now owns SDK activation/quiescence and exact final provider/ledger acknowledgement, with counted SDK evidence and production activation still disabled. Existing wheel, numeric command, checked queue-consumption and owned native-collection evidence remains bounded. Managed owner endpoints, the Windows hook-to-store bridge and explicit lifecycle reconciliation preserve exact owner, provider generation, queue continuity and copied receipt ordering without enabling a native provider. Connect this ingress to the production Session route with native provenance, actual provider activation and verified payload lifetime. Complete production wheel/touch scrolling, Unicode text/composition, keyboard/gamepad repeat/reconnect behavior, deterministic replay and the full supported-host/widget operation matrix with value, focus and scroll evidence. No physical-input or complete payload acceptance is inferred. Production ownership publishers and typed issued-emission inventory are now connected and qualified without activation. Exact typed storage transfer, terminal disposal and original-route collaborator release now have bounded actual-store qualification. Connect the normal production sinks, held-source inhibition, ordinary fence acknowledgement and successful batch turnover before native activation; complete physical/native input qualification remains required."
     },
     {
       "id": "INP-006",
@@ -4994,7 +5017,8 @@
         "consumed-settings-recovery",
         "checked-image-reduction",
         "checked-upload-storage",
-        "authored-scrollbars"
+        "authored-scrollbars",
+        "exact-image-content-recovery"
       ],
       "acceptance_evidence": [],
       "remaining": "The production page now includes source-derived preset and Auto-Detect controls with localized flowing labels, guarded proposals, actual shared draft expansion and bounded Runtime/gameplay validation. The source-backed 31-option/53-CVar contract retains its packaged opt-in SYSTEM route and precise Brightness/Ambient Brightness fields, localized validation and local draft barriers. Exact numeric recovery and bounded full-border focus reveal extend this implementation; neither accepts the translated page. Complete every actual setting and dependent popup, display capability/resolution catalogs, native numeric text entry, complete preset/Auto-Detect effect execution and persistence, remaining effects, Defaults, full Apply/Cancel/exit behavior, source-derived visuals/transitions and the native editor round trip. Qualify normal SP/MP entry/return/reopen, failure/cancellation, complete responsive/localized state galleries and every mapped resource; historical and current bounded captures do not accept the full requirement."

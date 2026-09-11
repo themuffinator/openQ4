@@ -130,7 +130,12 @@ def main():
                     ('missing-managed-live-gate','candidate.inputAllowed=managed && session.inputAllowed','candidate.inputAllowed=(void(managed),session.inputAllowed)'),
                     ('provider-registration-unchecked','current.registration==expected.registration','true'),
                     ('window-lifetime-unchecked','NativeWindow(Window(current))==expected','current.handle==reinterpret_cast<std::uintptr_t>(expected.hwnd)'),
-                    ('source-backlog-fabricated','candidate.backlogDisposed=false;','candidate.backlogDisposed=true;'),
+                    ('source-backlog-fabricated','candidate.backlogDisposed=inventory && inventory->MatchesBinding(*route,routeId,*binding) && inventory->BacklogDisposed();','candidate.backlogDisposed=true;'),
+                    ('source-release-skips-route','if(route->State()!=NativeInputRoute::Phase::Empty && !route->Release(routeId))return false;',''),
+                    ('source-release-skips-unbind','if(!NativeInputUnbindPublications(*route,routeId))return false;',''),
+                    ('source-release-loses-retry','if(!NativeInputUnbindPublications(*route,routeId))return false;','if(!NativeInputUnbindPublications(*route,routeId)){finished=true;return false;}'),
+                    ('source-release-reentry-not-latched','if(releasing){(void)route->Revoke(routeId);return false;}','if(releasing)return false;'),
+                    ('source-inventory-unbound-accepted','!binding || !value.MatchesBinding(*route,routeId,*binding)','!binding'),
                     ('original-binding-unchecked','id==routeId && Same(expected,*binding)','id==routeId && (void(expected),Same(*binding,*binding))'),
                 ]:
                     if fact_source.count(old)!=1:raise RuntimeError('Facts mutation anchor '+name)

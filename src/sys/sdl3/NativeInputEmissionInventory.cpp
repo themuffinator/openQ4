@@ -2,9 +2,16 @@
 #include "../../idlib/precompiled.h"
 #include "NativeInputEmissionInventory.h"
 #include "../../framework/KeyInput.h"
+#include <atomic>
 
 namespace openq4 {
 namespace {
+std::atomic<std::uint64_t> inventoryHighwater{0};
+std::uint64_t NextInventory() noexcept {
+    auto previous=inventoryHighwater.load();
+    do {if(previous==UINT64_MAX)return 0;} while(!inventoryHighwater.compare_exchange_weak(previous,previous+1));
+    return previous+1;
+}
 bool InventoryError(std::string& error,const char* text) noexcept {try{error=text;}catch(...){}return false;}
 bool DeferredKey(int key) noexcept {return key==K_CTRL || key==K_ALT || key==K_RIGHT_ALT || key==K_PRINT_SCR;}
 bool ValidMouse(int action,int value) noexcept {
@@ -16,7 +23,7 @@ struct NativeInputEmissionInventory::Guard {
     NativeInputEmissionInventory& owner;
     ~Guard(){owner.calling=false;}
 };
-NativeInputEmissionInventory::NativeInputEmissionInventory():thread(std::this_thread::get_id()),entries(0){}
+NativeInputEmissionInventory::NativeInputEmissionInventory():identity(NextInventory()),thread(std::this_thread::get_id()),entries(0){}
 bool NativeInputEmissionInventory::Fail(std::string& error,const char* text) noexcept {
     retired=true;if(route)(void)route->Revoke(base.route);if(ledger)(void)ledger->Retire();
     return InventoryError(error,text);
@@ -24,6 +31,7 @@ bool NativeInputEmissionInventory::Fail(std::string& error,const char* text) noe
 bool NativeInputEmissionInventory::Enter(std::string& error) noexcept {
     if(std::this_thread::get_id()!=thread)return InventoryError(error,"Native emission inventory requires its original thread");
     if(calling)return Fail(error,"Reentrant native emission inventory");
+    if(transfers && !transferAuthorized)return Fail(error,"Native inventory belongs to its checked transfer owner");
     calling=true;return true;
 }
 bool NativeInputEmissionInventory::Current() noexcept {
@@ -34,7 +42,7 @@ bool NativeInputEmissionInventory::Current() noexcept {
 bool NativeInputEmissionInventory::Bind(NativeInputRoute& r,std::uint64_t id,const NativeInputBinding& binding,
     NativeEventDispositionLedger& l,const NativeQueueBatch& b,std::string& error) noexcept {
     if(!Enter(error))return false;Guard guard{*this};
-    if(bound || retired || !id || !binding.dispatchEpoch || !binding.streamToken || !binding.window.module ||
+    if(!identity || bound || retired || !id || !binding.dispatchEpoch || !binding.streamToken || !binding.window.module ||
         b.Status().providerEpoch!=binding.window.module || b.Status().engineToken!=binding.streamToken ||
         !b.Receipt().ingress || !b.Receipt().serial)return Fail(error,"Native emission inventory binding is invalid");
     try{
@@ -58,7 +66,7 @@ bool NativeInputEmissionInventory::Issue(NativeDispositionRecord record,NativeEm
         entries.size()==NativeEventDispositionLedger::MaxEmissions)
         return Fail(error,"Native emission has no exact live record/owner");
     // This pre-reserved trivial slot exists before real Issue can call Source.
-    entries.push_back({{},plan,sink,kind});
+    entries.push_back({{},plan,sink,kind,transfers?Ownership::NeverTransferred:Ownership::External});
     const auto index=entries.size()-1;
     entries[index].emission.value=value;
     NativeDispositionTicket ticket;
@@ -146,6 +154,58 @@ bool NativeInputEmissionInventory::Inspect(std::uint64_t id,const NativeInputBin
             !ledger->InspectIssuedForRetirement(child->emission.ticket,childActual) || childActual.trigger!=entry->emission.ticket ||
             childActual.pass!=NativeDispositionPass::SessionDeferred)return false;
     }
+    if(transfers && entry->ownership!=Ownership::Stored && !actual.terminal)return false;
     out={tag,entry->sink,entry->kind,entry->emission.value,true,actual.terminal,actual.inFlight};return true;
+}
+bool NativeInputEmissionInventory::MatchesBinding(const NativeInputRoute& r,std::uint64_t id,const NativeInputBinding& b) const noexcept {
+    return std::this_thread::get_id()==thread && !calling && bound && original && route==&r && id==base.route &&
+        b.outer==original->outer && b.sessionTransition==original->sessionTransition && b.dispatchEpoch==original->dispatchEpoch &&
+        b.streamToken==original->streamToken && b.editor==original->editor && b.native==original->native && b.window==original->window;
+}
+bool NativeInputEmissionInventory::ClaimTransfers(NativeInputTransfers& owner) noexcept {
+    if(std::this_thread::get_id()!=thread || calling || !bound || retired || transfers || !entries.empty() ||
+        !route || !original || !route->MatchesOriginalBinding(base.route,*original))return false;
+    transfers=&owner;return true;
+}
+bool NativeInputEmissionInventory::Terminal() const noexcept {
+    if(std::this_thread::get_id()!=thread || calling || !bound || !retired || !ledger ||
+        transferBusy)return false;
+    NativeDispositionRetirement census;
+    if(!ledger->QueryRetirement(census) || census.receipt.batch.ingress!=base.ingress ||
+        census.receipt.batch.serial!=base.batchSerial || census.issued!=entries.size() || census.inFlight)return false;
+    for(const auto& entry:entries) {
+        NativeIssuedEmission actual;
+        if(entry.emission.ticket.record.receipt!=census.receipt || !ledger->InspectIssuedForRetirement(entry.emission.ticket,actual) ||
+            actual.inFlight || actual.pass!=entry.plan.pass || actual.trigger!=entry.plan.trigger)return false;
+        if(entry.ownership==Ownership::Indeterminate)return false;
+        if(entry.ownership==Ownership::NeverTransferred) {
+            if(!transfers || actual.admissionSerial || actual.terminal)return false;
+        } else if(entry.ownership==Ownership::Cancelled) {
+            if(!transfers || actual.terminal)return false;
+        } else if(entry.ownership!=Ownership::TakenForDelivery || !actual.terminal)return false;
+    }
+    return true;
+}
+bool NativeInputEmissionInventory::SealDisposal(NativeInputDisposalReceipt& out,std::string& error) noexcept {
+    if(std::this_thread::get_id()!=thread)return InventoryError(error,"Native disposal requires its original thread");
+    if(sealing){(void)Retire();return InventoryError(error,"Reentrant native disposal publication");}
+    sealing=true;struct SealGuard {bool& flag;~SealGuard(){flag=false;}} guard{sealing};
+    if(!Terminal() || !route || (route->State()!=NativeInputRoute::Phase::DrainOnly && !route->MarkDrainOnly(base.route)) || !Terminal())
+        return InventoryError(error,"Native issued backlog is not completely disposed");
+    // A ledger cannot issue after retirement. Repeated sealing names the same
+    // immutable terminal inventory, never a new route or ordinary ACK.
+    disposalSerial=1;
+    NativeInputDisposalReceipt receipt;receipt.inventory=identity;receipt.route=base.route;receipt.serial=disposalSerial;
+    out=receipt;error.clear();return true;
+}
+bool NativeInputEmissionInventory::DisposalCurrent(const NativeInputDisposalReceipt& receipt) const noexcept {
+    return !sealing && disposalSerial && receipt.inventory==identity && receipt.route==base.route && receipt.serial==disposalSerial && Terminal();
+}
+bool NativeInputEmissionInventory::BacklogDisposed() const noexcept {return !sealing && disposalSerial && Terminal();}
+bool NativeInputEmissionInventory::ReleaseTransfers(NativeInputTransfers& owner) noexcept {
+    if(std::this_thread::get_id()!=thread || calling || transfers!=&owner || !BacklogDisposed() ||
+        !route || route->State()!=NativeInputRoute::Phase::Empty)return false;
+    transfers=nullptr;transferAuthorized=false;bound=false;disposalSerial=0;
+    route=nullptr;ledger=nullptr;batch=nullptr;original.reset();entries.clear();return true;
 }
 } // namespace openq4

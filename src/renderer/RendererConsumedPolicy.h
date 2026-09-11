@@ -1,8 +1,10 @@
 // Copyright (C) 2026 DarkMatter Productions. GPL-3.0-or-later.
 #pragma once
 #include <stdint.h>
+#include "../imagetools/ImageContentIdentity.h"
 
-// Process-local value observations, never portable content/recovery descriptors.
+// The consumed-policy observations below are process-local. The separately
+// named portable CPU content descriptor contains no process/device identities.
 // No record contains a native handle, pointer, CVar reference or owning string.
 struct imageDownsizeInputs_t {
     int downSize, downSizeLimit, downSizeSpecular, downSizeSpecularLimit;
@@ -43,12 +45,35 @@ struct imageConsumedPolicy_t {
     imageDownsizeInputs_t inputs{};
     imageDownsizePolicy_t resolved{};
     imageReductionResult_t reduction{};
+    imageFileContent_t fileContent{};
+    imageBinaryContent_t binaryContent{};
     int usage = 0, filter = 0, repeat = 0, cube = 0;
     unsigned int flags = 0;
     bool allowDownSize = false;
     int width = 0, height = 0, levels = 0, layers = 0;
     uint32_t source = ICS_UNKNOWN, completion = ICC_UNOBSERVED;
 };
+
+// Per-image portable CPU restoration foundation. CachePixelsOnly certifies the
+// exact previously admitted cache pixels, NEVER the original source, source
+// dimensions, or provenance of the captured requested policy. It cannot qualify
+// a different policy target. Host/journal cohort codecs and native upload remain
+// separate; never serialize this C++ struct as bytes.
+enum imagePortableContentScope_t : uint32_t { IPC_UNAVAILABLE=0, IPC_DIRECT_SOURCE=1, IPC_CACHE_PIXELS_ONLY=2 };
+struct imagePortableContent_t {
+    uint32_t version=0, scope=IPC_UNAVAILABLE;
+    imageFileContent_t file{};
+    imageBinaryContent_t binary{};
+    imageDownsizePolicy_t resolved{};
+    imageReductionResult_t reduction{};
+    int usage=0;
+    bool mipmaps=false;
+};
+class idBinaryImage;
+// Exact qpath uses normal VFS restrictions/precedence. Different selected bytes
+// at that same name refuse, even when timestamps match. No cache fallback,
+// CVar writes, GPU calls or modification of output on refusal/exception.
+bool R_ReconstructImageContent(const imagePortableContent_t&, idBinaryImage& output);
 
 imageDownsizeInputs_t R_ReadImageDownsizeInputs();
 // Renderer thread only. A bulk finish observes already issued work; no reload,
@@ -66,6 +91,7 @@ public:
     ~imageConsumedLoad_t();
     const imageDownsizePolicy_t& Policy() const { return candidate.resolved; }
     void Loaded(imageConsumedSource_t source);
+    void Content(const idBinaryImage& binary, imageConsumedSource_t source);
     void Reduction(const imageReductionResult_t& value) { candidate.reduction = value; }
     static void BeforeOperation(const idImage* image);
     static bool Active(const idImage* image);

@@ -156,18 +156,25 @@ bool NativeEventDispositionLedger::Issue(NativeDispositionRecord record, NativeE
     if (trigger) emissions[static_cast<std::size_t>(trigger - 1)].child = result.emission;
     ++issued; out = result; error.clear(); return true;
 }
+bool NativeEventDispositionLedger::AdmissionMatches(NativeDispositionTicket ticket) const noexcept {
+    if (!PlannedTicketMatches(ticket)) return false;
+    const auto& emission = emissions[static_cast<std::size_t>(ticket.emission - 1)];
+    const auto pass = static_cast<std::size_t>(emission.pass);
+    const bool deferred = emission.pass == NativeDispositionPass::SessionDeferred;
+    return !emission.admission && ticket.emission - 1 == NextEmission(admissionCursor[pass], emission.pass) &&
+        ((!deferred && phase == Phase::Translating && emission.record == next) ||
+         (deferred && phase == Phase::Delivering && translationClosed && currentPass == NativeDispositionPass::KeyboardPoll &&
+          inFlight && plannedInFlight == emission.trigger));
+}
+bool NativeEventDispositionLedger::CanAdmit(NativeDispositionTicket ticket) const noexcept {
+    return thread == std::this_thread::get_id() && !calling && AdmissionMatches(ticket);
+}
 bool NativeEventDispositionLedger::Admit(NativeDispositionTicket ticket, NativeDispositionAdmission& out, std::string& error) noexcept {
     if (!Enter(error)) return false;
     Guard guard{*this};
-    if (!PlannedTicketMatches(ticket)) return Fail(error, "Admission has no exact reserved ticket");
+    if (!AdmissionMatches(ticket)) return Fail(error, "Admission is duplicate, reordered or outside its exact source/Keyboard delivery");
     auto& emission = emissions[static_cast<std::size_t>(ticket.emission - 1)];
     const auto pass = static_cast<std::size_t>(emission.pass);
-    const bool deferred = emission.pass == NativeDispositionPass::SessionDeferred;
-    if (emission.admission || ticket.emission - 1 != NextEmission(admissionCursor[pass], emission.pass) ||
-        (!deferred && (phase != Phase::Translating || emission.record != next)) ||
-        (deferred && (phase != Phase::Delivering || !translationClosed || currentPass != NativeDispositionPass::KeyboardPoll ||
-            !inFlight || plannedInFlight != emission.trigger)))
-        return Fail(error, "Admission is duplicate, reordered or outside its exact source/Keyboard delivery");
     if (!Check(error)) return false;
     const NativeDispositionAdmission result{ticket, admissionSerial + 1};
     emission.admission = ++admissionSerial;
@@ -219,6 +226,13 @@ bool NativeEventDispositionLedger::SealRecord(NativeDispositionRecord record, Na
     if (planned) { ++next; phase = Phase::Between; }
     else { phase = Phase::Delivering; Advance(); }
     error.clear(); return true;
+}
+bool NativeEventDispositionLedger::CanBeginDelivery(NativeDispositionTicket ticket) const noexcept {
+    if (thread != std::this_thread::get_id() || calling || !planned || phase != Phase::Delivering ||
+        inFlight || !PlannedTicketMatches(ticket)) return false;
+    const auto& emission = emissions[static_cast<std::size_t>(ticket.emission - 1)];
+    return translationClosed && emission.pass == currentPass && emission.admission && !emission.done &&
+        ticket.emission - 1 == NextEmission(deliveryCursor[static_cast<std::size_t>(currentPass)], currentPass);
 }
 bool NativeEventDispositionLedger::BeginDelivery(NativeDispositionTicket ticket, std::string& error) noexcept {
     if (!Enter(error)) return false;
@@ -289,6 +303,12 @@ bool NativeEventDispositionLedger::InspectIssuedForRetirement(NativeDispositionT
     result.inFlight = inFlight && plannedInFlight == ticket.emission;
     if (emission.trigger) result.trigger = {ticket.record, emission.trigger};
     out = result;
+    return true;
+}
+bool NativeEventDispositionLedger::QueryRetirement(NativeDispositionRetirement& out) const noexcept {
+    if (thread != std::this_thread::get_id() || calling || phase != Phase::Retired || !planned ||
+        !receipt.ledger || !receipt.serial || issued != emissions.size()) return false;
+    out = {receipt, issued, inFlight ? plannedInFlight : 0};
     return true;
 }
 } // namespace openq4

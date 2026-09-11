@@ -60,6 +60,13 @@ struct NativeIssuedEmission {
     bool terminal = false, inFlight = false;
     bool operator==(const NativeIssuedEmission&) const = default;
 };
+// Retired immutable census, not a successful ordinary-batch receipt.
+struct NativeDispositionRetirement {
+    NativeDispositionReceipt receipt{};
+    std::uint64_t issued = 0, inFlight = 0;
+    bool operator==(const NativeDispositionRetirement&) const = default;
+};
+
 enum class NativeRecordDisposition {
     // The matching engine branch handled the event without a queued emission.
     Immediate,
@@ -123,6 +130,11 @@ public:
     bool Issue(NativeDispositionRecord, NativeDispositionTicket& out, std::string& error) noexcept;
     bool Issue(NativeDispositionRecord, NativeEmissionPlan, NativeDispositionTicket& out, std::string& error) noexcept;
     bool Admit(NativeDispositionTicket, NativeDispositionAdmission& out, std::string& error) noexcept;
+    // Callback-free phase/order check before actual storage admission. No owner,
+    // transfer or delivery authority; Admit rechecks after actual transfer.
+    bool CanAdmit(NativeDispositionTicket) const noexcept;
+    // Planned delivery phase/order only. Rechecked by BeginDelivery after Take.
+    bool CanBeginDelivery(NativeDispositionTicket) const noexcept;
     bool SealTranslation(std::string& error) noexcept;
     // Explicit checkpoint, including sealed zero-ticket passes (which do not
     // imply an uncalled Usercmd loop ran). No next pass before all its
@@ -144,6 +156,8 @@ public:
     // Serial Begin mode has no retained per-emission metadata and refuses.
     // False preserves output. This never changes terminal state or grants ACK.
     bool InspectIssuedForRetirement(NativeDispositionTicket, NativeIssuedEmission& out) const noexcept;
+    // No Source/probe/callback/allocation; exact planned retired census.
+    bool QueryRetirement(NativeDispositionRetirement& out) const noexcept;
 private:
     enum class Phase { Empty, Between, Translating, Delivering, Complete, Retired };
     struct Record { OQ4_NativeQueueRecord tag{}; bool ignored = false; };
@@ -162,6 +176,7 @@ private:
     bool BeginInternal(NativeQueueIngress&, NativeQueueSource&, const NativeQueueBatch&, bool,
         NativeDispositionSchedule, std::string&) noexcept;
     bool PlannedTicketMatches(NativeDispositionTicket) const noexcept;
+    bool AdmissionMatches(NativeDispositionTicket) const noexcept;
     std::size_t NextEmission(std::size_t cursor, NativeDispositionPass) const noexcept;
     void Advance() noexcept;
     const std::thread::id thread;

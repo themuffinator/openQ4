@@ -184,6 +184,14 @@
   allowing Vulkan menus to survive display reinitialization. The restart path
   reloads images once before rebuilding fonts.
 
+- Settings recovery development now checks the exact bytes of supported DDS
+  and previously loaded image-cache files before CPU reconstruction. Native
+  input development also accounts for queued event ownership through terminal
+  disposal. These are foundations for reliable settings and text entry;
+  additional settings effects, native activation and complete recovery remain
+  in development. See [image recovery](ui/image-content-recovery.md) and
+  [input ownership](ui/native-input-publication.md).
+
 - Instance development: retained documents can now keep separate data, focus,
   display scale and transitions while sharing engine services. Closing one view
   preserves its peers, and render targets cannot be resized underneath another

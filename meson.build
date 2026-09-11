@@ -651,6 +651,9 @@ if build_engine or get_option('build_native_tests')
     test('openq4-ui-image-reduction', py,
       args: [meson.project_source_root() / 'tools/tests/renderer_image_reduction.py',
         '--compiler', ui_test_cpp.cmd_array()[-1]], timeout: 180)
+    test('openq4-ui-image-content', py,
+      args: [meson.project_source_root() / 'tools/tests/renderer_image_content.py',
+        '--compiler', ui_test_cpp.cmd_array()[-1]], timeout: 180)
     test('openq4-ui-native-input-route', py,
       args: [meson.project_source_root() / 'tools/tests/native_input_route.py',
         '--compiler', ui_test_cpp.cmd_array()[-1], '--no-mutations'], timeout: 120)
@@ -1664,6 +1667,8 @@ if build_engine or get_option('build_native_tests')
       endif
       test('openq4-ui-native-input-facts', py,
         args: [meson.project_source_root() / 'tools/tests/native_input_facts.py'] + native_facts_args, timeout: 180)
+      test('openq4-ui-native-input-terminal', py,
+        args: [meson.project_source_root() / 'tools/tests/native_input_terminal.py'] + native_facts_args, timeout: 180)
       if host_system == 'windows'
         test('openq4-ui-windows-native-input-facts', py,
           args: [meson.project_source_root() / 'tools/tests/windows_text_session.py', '--route-facts'] + native_facts_args,
@@ -2012,10 +2017,12 @@ if build_engine
     endif
   endif
 
-  # The inventory calls the client owned-queue ledger. Keep it out of dedicated
+  # The inventory and transfers call the client owned-queue ledger. Keep them out of dedicated
   # sources, which deliberately do not link the client native queue library.
   if use_sdl3_backend
-    openq4_engine_sources += files('src/sys/sdl3/NativeInputEmissionInventory.cpp')
+    openq4_engine_sources += files(
+      'src/sys/sdl3/NativeInputEmissionInventory.cpp',
+      'src/sys/sdl3/NativeInputTransfers.cpp')
   endif
 
   bse_library = static_library(

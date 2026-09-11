@@ -33,7 +33,7 @@ WindowsNativeInputRouteSource::WindowsNativeInputRouteSource(WindowsTextSession&
 bool WindowsNativeInputRouteSource::SetOwner(const NativeInputBinding& requested,std::string& error) noexcept {
     if(std::this_thread::get_id()!=thread)return Error(error,"Native route facts require their original thread");
     if(preparing){poisoned=true;return Error(error,"Reentrant native route fact preparation");}
-    if(binding || route || poisoned)return Error(error,"Native route facts already own a lease");
+    if(binding || route || poisoned || finished)return Error(error,"Native route facts already own a lease");
     preparing=true;
     struct Guard{bool& flag;~Guard(){flag=false;}} guard{preparing};
     try{
@@ -58,8 +58,20 @@ bool WindowsNativeInputRouteSource::BindRoute(NativeInputRoute& r,std::uint64_t 
 }
 bool WindowsNativeInputRouteSource::BindInventory(NativeInputEmissionInventory& value) noexcept {
     if(std::this_thread::get_id()!=thread || preparing || poisoned || !route || inventory ||
-        route->State()!=NativeInputRoute::Phase::Bound || !NativeInputPublicationsCurrent(*route,routeId))return false;
+        route->State()!=NativeInputRoute::Phase::Bound || !NativeInputPublicationsCurrent(*route,routeId) ||
+        !binding || !value.MatchesBinding(*route,routeId,*binding))return false;
     inventory=&value;return true;
+}
+bool WindowsNativeInputRouteSource::ReleaseRoute(std::uint64_t exactRoute) noexcept {
+    if(std::this_thread::get_id()!=thread || preparing || finished || !route || !binding ||
+        exactRoute!=routeId || !NativeInputPublicationsCurrent(*route,routeId))return false;
+    if(releasing){(void)route->Revoke(routeId);return false;}
+    releasing=true;struct Guard {bool& flag;~Guard(){flag=false;}} guard{releasing};
+    // If successful Release was followed by an unbind refusal, retain and retry
+    // only this exact empty original slot. Never observe/adopt a replacement.
+    if(route->State()!=NativeInputRoute::Phase::Empty && !route->Release(routeId))return false;
+    if(!NativeInputUnbindPublications(*route,routeId))return false;
+    route=nullptr;inventory=nullptr;routeId=0;binding.reset();finished=true;return true;
 }
 bool WindowsNativeInputRouteSource::Observe(NativeInputObservation& out) const noexcept {
     if(std::this_thread::get_id()!=thread || poisoned || !Sys_EventDispositionBoundThread())return false;
@@ -97,8 +109,7 @@ bool WindowsNativeInputRouteSource::Retirement(std::uint64_t id,const NativeInpu
                 current.registration!=binding->window.registration)candidate.provider=NativeInputNativeRetirement::ClaimLost;
         }
     }
-    // No driver terminal-disposition proof has been implemented in this slice.
-    candidate.backlogDisposed=false;
+    candidate.backlogDisposed=inventory && inventory->MatchesBinding(*route,routeId,*binding) && inventory->BacklogDisposed();
     if(!Original(id,expected))return false;
     out=candidate;return true;
 }

@@ -1023,6 +1023,7 @@ void idImage::ActuallyLoadImage( bool fromBackEnd ) {
 		}
 	}
 
+	consumedLoad.Content(im,consumedSource);
 	{
 		idScopedImageLoadPhase uploadPhase( imageLoadPhaseTimings.uploadMsec, imageLoadPhaseTimings.uploadCount );
 		AllocImage();

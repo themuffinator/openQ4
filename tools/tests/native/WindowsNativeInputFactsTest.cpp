@@ -14,6 +14,8 @@ static bool registryAvailable=true,windowAvailable=true,slotAvailable=true;
 static openq4::NativeInputRoute* registeredRoute=nullptr;
 static std::uint64_t registeredId=0;
 static unsigned sessionQueries=0,windowQueries=0,allocationQueries=0,presenceQueries=0;
+static bool refuseUnbind=false;
+static std::function<void()> onPresence;
 bool Sys_EventDispositionBoundThread()noexcept{return std::this_thread::get_id()==engineThread;}
 std::uint64_t Sys_EventDispositionEpoch()noexcept{return Sys_EventDispositionBoundThread()?epochFact:0;}
 std::uint64_t Sys_EventQueueToken()noexcept{return streamFact;}
@@ -25,12 +27,17 @@ bool NativeInputBindPublications(NativeInputRoute& r,std::uint64_t id,const Nati
     if(!slotAvailable||registeredRoute)return false;registeredRoute=&r;registeredId=id;return true;
 }
 bool NativeInputPublicationsCurrent(NativeInputRoute& r,std::uint64_t id)noexcept{return registeredRoute==&r && id==registeredId;}
+bool NativeInputUnbindPublications(NativeInputRoute& r,std::uint64_t id)noexcept{
+    if(refuseUnbind||!NativeInputPublicationsCurrent(r,id)||r.State()!=NativeInputRoute::Phase::Empty)return false;
+    registeredRoute=nullptr;registeredId=0;return true;
+}
 }
 openq4::ui::NativeTextPresence UI_NativeTextPresence(openq4::ui::NativeTextIdentity native,const openq4::ui::TextEditorIdentity& owner)noexcept {
+    auto callback=std::move(onPresence);if(callback)callback();
     ++presenceQueries;return fields?fields->input.QueryNumberNativePresence(native,owner):NativeTextPresence::BusyOrUnknown;
 }
 static NativeInputBinding Setup(Session& f) {
-    fields=&f.editor;registryAvailable=windowAvailable=slotAvailable=true;registeredRoute=nullptr;registeredId=0;
+    fields=&f.editor;registryAvailable=windowAvailable=slotAvailable=true;registeredRoute=nullptr;registeredId=0;refuseUnbind=false;onPresence={};
     NativeInputBinding b;b.outer=0x1000;b.sessionTransition=3;b.dispatchEpoch=epochFact;b.streamToken=streamFact;
     b.editor=f.editor.barrier.editor;b.native=f.editor.barrier.native;
     b.window={reinterpret_cast<std::uintptr_t>(f.probe.original.hwnd),5,6,9,11,13};
@@ -87,4 +94,30 @@ static void SourceFacts() {
     // until it implements exact terminal backlog inventory; activation stays off.
     registeredRoute=nullptr;registeredId=0;CHECK(!source.Retirement(id,b,retirement));fields=nullptr;
 }
-int main(){RetirementQueries();SourceFacts();std::printf("PASS %u checks\n",checks);return 0;}
+struct LedgerProbe final:NativeDispositionProbe {
+    bool Current(const NativeDispositionContext& c)const noexcept override{return c.providerEpoch==9&&c.generation==generation&&c.engineToken==streamFact;}
+};
+static void SourceRelease() {
+    for(unsigned mode=0;mode<5;++mode){
+        Session f;const auto b=Setup(f);f.Register();WindowsNativeInputRouteSource source(*f.value);std::string error;
+        CHECK(source.SetOwner(b,error));NativeInputRoute route(source);std::uint64_t id=0;CHECK(route.Prepare(b,id,error));CHECK(source.BindRoute(route,id));
+        f.source.Add(SDL_EVENT_KEY_DOWN);CHECK(f.ingress.Read(f.source,f.batch,error)==NativeQueueRead::Ready);
+        LedgerProbe probe;NativeEventDispositionLedger ledger(probe);CHECK(ledger.BeginPlanned(f.ingress,f.source,*f.batch,error));
+        NativeInputEmissionInventory inventory,empty;CHECK(!source.BindInventory(empty));
+        CHECK(inventory.Bind(route,id,b,ledger,*f.batch,error));CHECK(source.BindInventory(inventory));CHECK(!source.BindInventory(inventory));
+        CHECK(!source.ReleaseRoute(id));CHECK(!source.ReleaseRoute(id+1));CHECK(registeredRoute==&route);
+        CHECK(inventory.Retire());CHECK(f.value->FaultRetirePreservingEvents().nativeReleased);
+        NativeInputDisposalReceipt receipt;CHECK(inventory.SealDisposal(receipt,error));NativeInputRetirement facts;
+        CHECK(source.Retirement(id,b,facts)&&facts.backlogDisposed&&facts.hooksRemoved&&facts.controllerReleased);
+        const auto nativeCalls=providerCalls;
+        if(mode==0){std::thread worker([&]{CHECK(!source.ReleaseRoute(id));});worker.join();}
+        if(mode==1){refuseUnbind=true;CHECK(!source.ReleaseRoute(id));CHECK(route.State()==NativeInputRoute::Phase::Empty&&registeredRoute==&route);refuseUnbind=false;}
+        if(mode==2){onPresence=[&]{CHECK(!source.ReleaseRoute(id));};CHECK(!source.ReleaseRoute(id));CHECK(registeredRoute==&route);}
+        if(mode==3){fields=nullptr;CHECK(!source.ReleaseRoute(id));CHECK(registeredRoute==&route);fields=&f.editor;}
+        if(mode==4){const auto correct=registeredId;++registeredId;CHECK(!source.ReleaseRoute(id));registeredId=correct;}
+        denyAllocations=true;CHECK(source.ReleaseRoute(id));denyAllocations=false;
+        CHECK(providerCalls==nativeCalls&&!registeredRoute&&route.State()==NativeInputRoute::Phase::Empty);
+        CHECK(!source.ReleaseRoute(id));CHECK(!source.Retirement(id,b,facts));CHECK(!source.BindInventory(inventory));CHECK(!source.SetOwner(b,error));fields=nullptr;
+    }
+}
+int main(){RetirementQueries();SourceFacts();SourceRelease();std::printf("PASS %u checks\n",checks);return 0;}

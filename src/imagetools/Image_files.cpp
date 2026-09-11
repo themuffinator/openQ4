@@ -1277,7 +1277,9 @@ bool R_ResolvePreferredDDSImageSource( const char *cname, idStr &ddsName, ID_TIM
 R_LoadPrecompressedDDS
 =============
 */
-bool R_LoadPrecompressedDDS( const char *cname, idBinaryImage &image, ID_TIME_T *timestamp, textureUsage_t usage, const imageDownsizePolicy_t &downsizePolicy, bool useMipmaps, imageReductionResult_t* reduction ) {
+bool R_LoadPrecompressedDDS( const char *cname, idBinaryImage &image, ID_TIME_T *timestamp, textureUsage_t usage, const imageDownsizePolicy_t &downsizePolicy, bool useMipmaps, imageReductionResult_t* reduction, const imageFileContent_t* expected ) {
+    const imageFileContent_t requested = expected ? *expected : imageFileContent_t{};
+    if (expected && (!R_ImageFileContentValid(requested) || requested.kind != IFC_DIRECT_DDS)) return false;
 	if ( cname == NULL || cname[0] == '\0' ) {
 		return false;
 	}
@@ -1291,6 +1293,7 @@ bool R_LoadPrecompressedDDS( const char *cname, idBinaryImage &image, ID_TIME_T 
 		return false;
 	}
 
+    if (expected && strcmp(name.c_str(),requested.qpath) != 0) return false;
 	// Read into a buffer this library owns rather than fileSystem->ReadFile: the
 	// mip payloads stay behind as views into it inside the idBinaryImage, and its
 	// eventual Mem_Free in idBinaryImage::Clear must pair with this binary's
@@ -1307,12 +1310,16 @@ bool R_LoadPrecompressedDDS( const char *cname, idBinaryImage &image, ID_TIME_T 
 		*timestamp = ddsFile->Timestamp();
 	}
 	const int fileSize = ddsFile->Length();
+    if (expected && (fileSize < 0 || std::uint64_t(fileSize) != requested.bytes)) return false;
 	byte *buffer = fileSize >= DDS_HEADER_BYTES ? (byte *)Mem_Alloc( fileSize ) : NULL;
     struct ReleaseBuffer { byte*& bytes; ~ReleaseBuffer() { if (bytes) Mem_Free(bytes); } } releaseBuffer{buffer};
 	const bool readOk = buffer != NULL && ddsFile->Read( buffer, fileSize ) == fileSize;
 	fileSystem->CloseFile( ddsFile );
     ddsFile = NULL;
 	if ( !readOk ) return false;
+    imageFileContent_t actualContent;
+    const bool contentObserved = R_MakeImageFileContent(IFC_DIRECT_DDS,name.c_str(),buffer,fileSize,actualContent);
+    if (expected && (!contentObserved || !R_ImageFileContentEqual(requested,actualContent))) return false;
 
 	bool loaded = false;
 	do {
@@ -1384,6 +1391,7 @@ bool R_LoadPrecompressedDDS( const char *cname, idBinaryImage &image, ID_TIME_T 
 		image.Load2DFromOwnedCompressedData( selectedWidth, selectedHeight, selectedLevels, textureFormat, colorFormat,
 			buffer, levelOffsets.Ptr() + firstLevel, levelSizes.Ptr() + firstLevel );
 		buffer = NULL;	// the binary image now owns the file buffer
+        if (contentObserved) image.ObserveFileContent(actualContent);
         if (reduction) *reduction = selected;
 		loaded = true;
 	} while ( false );

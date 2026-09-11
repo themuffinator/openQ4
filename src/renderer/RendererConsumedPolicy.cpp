@@ -73,6 +73,42 @@ bool idImage::GetConsumedPolicy(imageConsumedPolicy_t& output) const {
     return true;
 }
 
+bool idImage::GetPortableContent(imagePortableContent_t& output) const {
+    imageConsumedPolicy_t actual;
+    if (!GetConsumedPolicy(actual) || actual.usage < TD_SPECULAR || actual.usage > TD_MATERIAL_DATA ||
+        !R_ImageFileContentValid(actual.fileContent) ||
+        actual.binaryContent.version != 1 || actual.binaryContent.width != opts.width || actual.binaryContent.height != opts.height ||
+        actual.binaryContent.levels != opts.numLevels || actual.binaryContent.textureType != opts.textureType ||
+        actual.binaryContent.format != opts.format || actual.binaryContent.colorFormat != opts.colorFormat) return false;
+    imagePortableContent_t candidate;
+    candidate.version=1; candidate.file=actual.fileContent; candidate.binary=actual.binaryContent;
+    candidate.usage=actual.usage;
+    if (actual.source == ICS_DIRECT_DDS && actual.fileContent.kind == IFC_DIRECT_DDS &&
+        R_ImageReductionIsExact(actual.resolved,actual.reduction)) {
+        candidate.scope=IPC_DIRECT_SOURCE; candidate.resolved=actual.resolved; candidate.reduction=actual.reduction;
+        candidate.mipmaps=(actual.flags & IMAGEFLAG_NOMIPS) == 0 && actual.filter != TF_LINEAR && actual.filter != TF_NEAREST;
+    } else if (actual.source == ICS_GENERATED && actual.fileContent.kind == IFC_OBSERVED_BIMAGE) {
+        // Intentionally zero policy/reduction fields: cache restoration cannot
+        // acquire original-source policy authority from a filename or timestamp.
+        candidate.scope=IPC_CACHE_PIXELS_ONLY;
+    } else return false;
+    output=candidate; return true;
+}
+void imageConsumedLoad_t::Content(const idBinaryImage& binary, imageConsumedSource_t source) {
+    candidate.fileContent={}; candidate.binaryContent={};
+    if (!observing) return;
+    const imageFileContent_t file=binary.GetFileContent();
+    // Decoded/image-program/default output has no supported same-read source
+    // identity. Refuse before hashing potentially large unsupported payloads.
+    if (!R_ImageFileContentValid(file) ||
+        !((source == ICS_DIRECT_DDS && file.kind == IFC_DIRECT_DDS) ||
+          (source == ICS_GENERATED && file.kind == IFC_OBSERVED_BIMAGE))) return;
+    imageBinaryContent_t output;
+    if (binary.GetContentIdentity(output)) {
+        candidate.fileContent=file; candidate.binaryContent=output;
+    }
+}
+
 imageConsumedLoad_t::imageConsumedLoad_t(idImage& target) : image(target), initialExceptions(std::uncaught_exceptions()) {
     // Even an unsupported/unobserved load resolves one immutable policy for its
     // cache key and CPU reduction. Observation never changes the legacy result.

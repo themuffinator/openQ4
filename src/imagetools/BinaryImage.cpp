@@ -140,6 +140,7 @@ idBinaryImage::Clear
 ========================
 */
 void idBinaryImage::Clear() {
+    fileContent = {}; loadedFileBytes = 0;
 	images.Clear();
 	if ( loadedFileData != NULL ) {
 		Mem_Free( loadedFileData );
@@ -653,6 +654,8 @@ ID_TIME_T idBinaryImage::LoadFromGeneratedFile( ID_TIME_T sourceFileTime ) {
 	MakeGeneratedFileName( binaryFileName );
 	idFileLocal bFile = fileSystem->OpenFileRead( binaryFileName );
 	if ( bFile != NULL && LoadFromGeneratedFile( bFile, sourceFileTime, true ) ) {
+		imageFileContent_t content;
+        if (R_MakeImageFileContent(IFC_OBSERVED_BIMAGE,binaryFileName.c_str(),loadedFileData,loadedFileBytes,content)) fileContent=content;
 		return bFile->Timestamp();
 	}
 
@@ -660,6 +663,8 @@ ID_TIME_T idBinaryImage::LoadFromGeneratedFile( ID_TIME_T sourceFileTime ) {
 	R_MakeCompactBinaryImageFileName( compactFileName, GetName() );
 	idFileLocal compactFile = fileSystem->OpenFileRead( compactFileName );
 	if ( compactFile != NULL && LoadFromGeneratedFile( compactFile, sourceFileTime, true ) ) {
+		imageFileContent_t content;
+        if (R_MakeImageFileContent(IFC_OBSERVED_BIMAGE,compactFileName.c_str(),loadedFileData,loadedFileBytes,content)) fileContent=content;
 		return compactFile->Timestamp();
 	}
 	return FILE_NOT_FOUND_TIMESTAMP;
@@ -678,6 +683,8 @@ ID_TIME_T idBinaryImage::LoadFromGeneratedFileUnchecked() {
 	MakeGeneratedFileName( binaryFileName );
 	idFileLocal bFile = fileSystem->OpenFileRead( binaryFileName );
 	if ( bFile != NULL && LoadFromGeneratedFile( bFile, FILE_NOT_FOUND_TIMESTAMP, false ) ) {
+		imageFileContent_t content;
+        if (R_MakeImageFileContent(IFC_OBSERVED_BIMAGE,binaryFileName.c_str(),loadedFileData,loadedFileBytes,content)) fileContent=content;
 		return bFile->Timestamp();
 	}
 	return FILE_NOT_FOUND_TIMESTAMP;
@@ -697,6 +704,8 @@ ID_TIME_T idBinaryImage::LoadFromCompactGeneratedFileUnchecked() {
 	R_MakeCompactBinaryImageFileName( compactFileName, GetName() );
 	idFileLocal compactFile = fileSystem->OpenFileRead( compactFileName );
 	if ( compactFile != NULL && LoadFromGeneratedFile( compactFile, FILE_NOT_FOUND_TIMESTAMP, false ) ) {
+		imageFileContent_t content;
+        if (R_MakeImageFileContent(IFC_OBSERVED_BIMAGE,compactFileName.c_str(),loadedFileData,loadedFileBytes,content)) fileContent=content;
 		return compactFile->Timestamp();
 	}
 	return FILE_NOT_FOUND_TIMESTAMP;
@@ -718,7 +727,7 @@ idBinaryImage::LoadFromGeneratedFile
 Load the preprocessed image from the generated folder.
 ==========================
 */
-bool idBinaryImage::LoadFromGeneratedFile( idFile * bFile, ID_TIME_T sourceFileTime, bool validateSourceFileTime, int dataBytes ) {
+bool idBinaryImage::LoadFromGeneratedFile( idFile * bFile, ID_TIME_T sourceFileTime, bool validateSourceFileTime, int dataBytes, const imageFileContent_t* expected ) {
 	Clear();
 
 	const int fileStart = bFile->Tell();
@@ -742,6 +751,12 @@ bool idBinaryImage::LoadFromGeneratedFile( idFile * bFile, ID_TIME_T sourceFileT
 		return false;
 	}
 
+	loadedFileBytes = fileLength;
+    if (expected) {
+        imageFileContent_t actual;
+        if (!R_MakeImageFileContent(IFC_OBSERVED_BIMAGE,expected->qpath,loadedFileData,fileLength,actual) ||
+            !R_ImageFileContentEqual(*expected,actual)) { Clear(); return false; }
+    }
 	byte *cursor = loadedFileData;
 	const byte *fileEnd = loadedFileData + fileLength;
 	memcpy( &fileData, cursor, sizeof( fileData ) );
@@ -937,4 +952,49 @@ void idBinaryImage::GetGeneratedFileName( idStr & gfn, const char *name ) {
 
 	const uint32_t crc = CRC32_BlockChecksum( normalizedName.c_str(), normalizedName.Length() );
 	gfn = va( "generated/images/_programs/%s_%08x.bimage", prefix.c_str(), static_cast<unsigned int>( crc ) );
+}
+
+// Canonical identity includes every format/mip/layer field and payload. Physical
+// bimage record order and timestamp do not alter the admitted-output identity.
+bool idBinaryImage::GetContentIdentity(imageBinaryContent_t& out) const {
+    if ((fileData.textureType != TT_2D && fileData.textureType != TT_CUBIC) ||
+        fileData.format <= FMT_NONE || fileData.format > FMT_MAX_VALID ||
+        fileData.colorFormat < CFM_DEFAULT || fileData.colorFormat > CFM_GREEN_ALPHA ||
+        images.Num() < 1 || images.Num() > 6*32 ||
+        fileData.width < 1 || fileData.width > 32768 || fileData.height < 1 || fileData.height > 32768 ||
+        fileData.numLevels < 1 || fileData.numLevels > 32) return false;
+    imageBinaryContent_t header;
+    header.textureType=fileData.textureType; header.format=fileData.format; header.colorFormat=fileData.colorFormat;
+    header.width=fileData.width; header.height=fileData.height; header.levels=fileData.numLevels;
+    header.layers=fileData.textureType == TT_CUBIC ? 6 : 1;
+    imageContentMipView_t views[6*32]{};
+    for (int i=0;i<images.Num();++i) {
+        const auto& mip=images[i];
+        if (mip.width < 1 || mip.width > 32768 || mip.height < 1 || mip.height > 32768 ||
+            mip.dataSize != R_BinaryImageMinimumDataSize((textureFormat_t)fileData.format,mip.width,mip.height)) return false;
+        views[i]={mip.level,mip.destZ,mip.width,mip.height,mip.dataSize,mip.data};
+    }
+    return R_MakeImageBinaryContent(header,views,images.Num(),out);
+}
+void idBinaryImage::SwapContent(idBinaryImage& other) noexcept {
+    images.Swap(other.images);
+    idSwap(fileData,other.fileData); idSwap(loadedFileData,other.loadedFileData);
+    idSwap(loadedFileBytes,other.loadedFileBytes); idSwap(fileContent,other.fileContent);
+}
+bool idBinaryImage::LoadExactContentFile(const imageFileContent_t& requested) {
+    const imageFileContent_t expected=requested;
+    if (!R_ImageFileContentValid(expected) || expected.kind != IFC_OBSERVED_BIMAGE) return false;
+    try {
+        idBinaryImage candidate(GetName());
+        {
+        idFileLocal file(fileSystem->OpenFileRead(expected.qpath));
+        if (file == NULL || file->Length() < 0 || std::uint64_t(file->Length()) != expected.bytes ||
+            !candidate.LoadFromGeneratedFile(file,FILE_NOT_FOUND_TIMESTAMP,false,-1,&expected)) return false;
+        imageFileContent_t actual;
+        if (!R_MakeImageFileContent(IFC_OBSERVED_BIMAGE,expected.qpath,candidate.loadedFileData,
+            candidate.loadedFileBytes,actual) || !R_ImageFileContentEqual(expected,actual)) return false;
+        candidate.fileContent=actual;
+        } // Close the original VFS object before publishing CPU ownership.
+        SwapContent(candidate); return true;
+    } catch (...) { return false; }
 }
