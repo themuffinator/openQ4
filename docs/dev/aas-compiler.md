@@ -111,6 +111,24 @@ not entities, so retail's file can predate later entity edits and still validate
 The compiler reproduces the retail result from the retail seeding; it is the
 seed set that differs, not the algorithm.
 
+`game/hangar2`, the map reported on #158, compiles all five AAS types in 16
+seconds. With the map's matching `.proc` present for the brush-side clip, its
+`aas32` lands within about one percent of the retail file on every count:
+
+| | Retail `aas32` | openQ4 `aas32` |
+|---|---:|---:|
+| Map geometry CRC | 4138459670 | 4138459670 |
+| Areas | 1627 | 1616 |
+| Vertices / edges / faces | 2875 / 3727 / 9894 | 2883 / 3712 / 9820 |
+| Cluster portals | 17 | 17 |
+| Clusters | 33 | 14 |
+
+Clustering is where the two builders visibly differ. Retail's file splits the
+same 17 cluster portals into 33 clusters, 14 of which hold four areas or fewer;
+openQ4 produces 14 larger clusters covering the same 1631 reachable areas.
+Clusters are a routing partition, not a reachability limit, so this changes how
+the router caches routes rather than where AI can go.
+
 Runtime acceptance: `game/core2` loads all five compiled files with no AAS
 warnings. `aas32` and `aas48` load as real navigation, and `aas96`, `aas250` and
 `aas128` are recognised as placeholders and dropped silently. A full
