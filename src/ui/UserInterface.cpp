@@ -36,6 +36,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "ListGUILocal.h"
 #include "DeviceContext.h"
 #include "Window.h"
+#include "LegacyGuiImport.h"
 #include "UserInterfaceLocal.h"
 #include "UserInterfaceDeferred.h"
 #ifndef ID_DEDICATED
@@ -675,6 +676,7 @@ bool idUserInterfaceLocal::GetTextInputState( idRectangle &area, float &cursorOf
 
 void idUserInterfaceManagerLocal::Init() {
 	RetainedUI_Init();
+	cmdSystem->AddCommand("ui_observeLegacy",UI_ObserveLegacy,CMD_FL_SYSTEM,"observe exact legacy parse/fixup/alpha decisions without activation");
 	cmdSystem->AddCommand("chatHistory", idChatWindow::History_f, CMD_FL_SYSTEM, "browse open chat: up, down, top, bottom, status");
 	screenRect = idRectangle(0, 0, 640, 480);
 	dc.Init();
@@ -682,6 +684,7 @@ void idUserInterfaceManagerLocal::Init() {
 
 void idUserInterfaceManagerLocal::Shutdown() {
 	cmdSystem->RemoveCommand("chatHistory");
+	cmdSystem->RemoveCommand("ui_observeLegacy");
 	idChatWindow::Reset();
 	// Destruction unregisters from every list. Take one live allocation at a
 	// time instead of iterating a container that its destructor will mutate.
@@ -1035,7 +1038,7 @@ bool idUserInterfaceLocal::InitFromFile( const char *qpath, bool rebuild, bool c
 	//Load the timestamp so reload guis will work correctly
 	fileSystem->ReadFile(qpath, NULL, &timeStamp);
 
-	src.LoadFile( qpath );
+	if (!UI_LegacyObservationLoad(this,src,qpath)) src.LoadFile( qpath );
 
 	if ( src.IsLoaded() ) {
 		idToken token;
@@ -1088,6 +1091,7 @@ bool idUserInterfaceLocal::InitFromFile( const char *qpath, bool rebuild, bool c
 			desktop->SetFocus(chatWindow, false);
 		}
 	}
+	UI_LegacyObservationLoaded(this,src.IsLoaded());
 	interactive = desktop->Interactive();
 
 	RegisterLoaded();

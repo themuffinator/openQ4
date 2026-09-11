@@ -146,6 +146,8 @@ The current [scrollbar integration](../ui/scrollbars.md), beginning at engine `5
 
 The subsequent [native ownership publication increment](../ui/native-input-publication.md), based on engine `d16c5b9e7935a273e274ea6c5956729d0da62c85`, connects production Session/GUI/window facts and typed issued-emission inventory while retaining default-off activation. Conditional legacy-alpha metadata preserves original unresolved source rather than accepting incomplete migration. The full build,64 UI suites and reviewed windowed GL/SP and Vulkan/MP gameplay/restart/menu views pass. Terminal event disposal/release, live native routing and exact native expression observations remain underway. Requirement/migration counts and final gates do not change.
 
+The following [native legacy-alpha observation](../ui/legacy-import.md), based on engine `fae10f2d5bd610369b42f042780d9cd8f24aa19d`, establishes initialized zero alpha for the exact core4/hub4 stock expressions in both SP/OpenGL and MP/Vulkan. It retains source bytes, actual lookup/fixup/register/property evidence and separate material-preload logs. The complete build,65 UI suites and reviewed gameplay/restart/SYSTEM continuity checks pass. Include provenance, later scripts/timelines and source-bound retained lowering remain required; no final product or migration gate is accepted.
+
 ### Findings that block product completion
 
 The [native text owner/store checkpoint](../ui/text-input-routing.md), based on

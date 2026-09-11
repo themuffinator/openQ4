@@ -666,6 +666,9 @@ if build_engine or get_option('build_native_tests')
       lifecycle_args += ['--msvc-debug']
     endif
     test('openq4-ui-native-input-lifecycle', py, args: lifecycle_args, timeout: 180)
+    test('openq4-ui-legacy-observation', py,
+      args: [meson.project_source_root() / 'tools/tests/ui_legacy_observation.py',
+        '--compiler', ui_test_cpp.cmd_array()[-1]], timeout: 180)
     test('openq4-ui-sound-recovery', py,
       args: [meson.project_source_root() / 'tools/tests/sound_recovery.py',
         '--compiler', ui_test_cpp.cmd_array()[-1], '--no-mutations'], timeout: 180)

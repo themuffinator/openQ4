@@ -4,7 +4,7 @@
   "date": "2026-09-10",
   "status": "Implementation incomplete; this register preserves full product scope and does not accept any production GUI.",
   "baseline": {
-    "engine_revision": "d16c5b9e7935a273e274ea6c5956729d0da62c85",
+    "engine_revision": "fae10f2d5bd610369b42f042780d9cd8f24aa19d",
     "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
     "effective_gui_count": 271,
     "translated_or_accepted_resources": 0,
@@ -19,7 +19,7 @@
     "product": {
       "path": "docs/dev/plans/ui-product-completion.md",
       "authority": "normative completion scope, milestones and final audit",
-      "sha256": "e4e86a46b6706b4504bba9533e9d21bf371d44de118e622b5289bbdee83cee07"
+      "sha256": "339aaf735cf4f39bf5123bb8be3320e81436c79bca4244d06204dbbea9f2ced0"
     },
     "original": {
       "path": "docs/dev/plans/idtech5-ui.md",
@@ -34,7 +34,7 @@
     "import": {
       "path": "docs/dev/ui/legacy-import.md",
       "authority": "native import evidence and unresolved semantics",
-      "sha256": "37ddfba95dc43df8e2bd1a4b5d461c3c9ebf7ac78803f914cba7dfd5b084a5e1"
+      "sha256": "53c12297980d8de9abce17c213b756b2ae4401f40cca8ebd536dee524b5536f4"
     }
   },
   "milestones": {
@@ -100,7 +100,7 @@
       "kind": "source_audit",
       "path": "docs/dev/plans/ui-product-completion.md",
       "scope": "Published audit at 80bb3939; source limitations corroborated by current Document/Runtime inspection. Historical tests and captures are not a fresh product qualification.",
-      "sha256": "e4e86a46b6706b4504bba9533e9d21bf371d44de118e622b5289bbdee83cee07"
+      "sha256": "339aaf735cf4f39bf5123bb8be3320e81436c79bca4244d06204dbbea9f2ced0"
     },
     "document-foundation": {
       "kind": "implementation_checkpoint",
@@ -166,7 +166,7 @@
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/legacy-import.md",
       "scope": "271 native exports, 269 syntax-clean records; no semantic/behavioral/visual acceptance.",
-      "sha256": "37ddfba95dc43df8e2bd1a4b5d461c3c9ebf7ac78803f914cba7dfd5b084a5e1"
+      "sha256": "53c12297980d8de9abce17c213b756b2ae4401f40cca8ebd536dee524b5536f4"
     },
     "performance-foundation": {
       "kind": "implementation_checkpoint",
@@ -481,12 +481,22 @@
     "legacy-alpha-semantics": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/legacy-import.md",
-      "sha256": "37ddfba95dc43df8e2bd1a4b5d461c3c9ebf7ac78803f914cba7dfd5b084a5e1",
+      "sha256": "53c12297980d8de9abce17c213b756b2ae4401f40cca8ebd536dee524b5536f4",
       "baseline_engine_revision": "d16c5b9e7935a273e274ea6c5956729d0da62c85",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "scope": "Native expression/fixup methods establish conditional unbound-after-fixup zero semantics for bare-backslash alpha terms. The importer preserves unresolved source/span/diagnostic and custom fragments. Windows/Linux63 actual-method assertions with8 mutants and19 importer tests pass; exact live table/window binding and evaluated alpha remain required. No GUI acceptance or unconditional lowering.",
       "local_capture_summary": ".tmp/ui/native-publication-integration/validation-evidence.json",
       "local_capture_summary_sha256": "10dfc153acc3d0a6e26fe398cee80dc8098893e702656ca35df93e8b821bc7ae"
+    },
+    "legacy-native-alpha-observation": {
+      "kind": "implementation_checkpoint",
+      "path": "docs/dev/ui/legacy-import.md",
+      "sha256": "53c12297980d8de9abce17c213b756b2ae4401f40cca8ebd536dee524b5536f4",
+      "baseline_engine_revision": "fae10f2d5bd610369b42f042780d9cd8f24aa19d",
+      "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
+      "scope": "Fresh initialized native core4/hub4 instances in SP/GL and MP/Vulkan establish missing table, completed null fixup, mapped alpha register6 and actual matColor alpha0 with enabled evaluation and no dictionary. Exact root bytes and fresh token exports match; measured parser intervals are clean after separately retained material preload. Full build/stage,65 UI suites and15 integrated mutants pass. No include-closure, timeline, retained lowering or replacement acceptance.",
+      "local_capture_summary": ".tmp/ui/legacy-observation-integration/validation-evidence-final.json",
+      "local_capture_summary_sha256": "b5dcac65a575d0b26816dd7fcdf72df4bdbcbc8e3ad26bb17969b8ada49f3a83"
     }
   },
   "groups": {
@@ -1326,10 +1336,11 @@
       "status": "partial",
       "current_evidence": [
         "import-foundation",
-        "legacy-alpha-semantics"
+        "legacy-alpha-semantics",
+        "legacy-native-alpha-observation"
       ],
       "acceptance_evidence": [],
-      "remaining": "The structured importer preserves both bare-backslash alpha terms and explains the conditional native fallback after fixup. Qualify the exact live table/owning-window binding and evaluated alpha, then resolve all remaining native variables/game actions and incomplete source diagnostics before accepting the complete requirement."
+      "remaining": "Initialized native alpha is established as zero for both exact stock roots in SP and MP. Preserve the original source/diagnostic and qualify complete include provenance, later script/timeline effects and source-bound retained lowering before accepting this requirement; token-only imports remain conditional."
     },
     {
       "id": "INV-011",

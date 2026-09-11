@@ -119,6 +119,17 @@ static void Fragments(){for(bool split:{false,true}){idWindow w;idParser p{{"\\"
 int main(){try{Missing();Defined();OtherScopes();Table();Fragments();Check(commonObject.warnings==0,"no inferred native warning");std::cout<<"PASS "<<checks<<" native expression/fixup checks\n";return 0;}catch(const std::exception& e){std::cerr<<"FAIL "<<e.what()<<'\n';return 1;}}
 '''
 
+# No-op observation doubles keep this original semantic suite independent of
+# the opt-in receipt collector, which has a separate actual-body runner.
+OBSERVATION_STUBS=r'''
+static bool UI_LegacyObservationActive(idWindow*) noexcept {return false;}
+static void UI_LegacyObservationFixup(idWindow*,int,const char*,idWinVar*) noexcept {}
+static void UI_LegacyObservationResolved(idWindow*,int,intptr_t,intptr_t) noexcept {}
+static void UI_LegacyObservationFixed(idWindow*) noexcept {}
+static unsigned UI_LegacyObservationTerm(idWindow*,idParser*,const idToken&,int) noexcept {return 0;}
+static void UI_LegacyObservationOp(idWindow*,unsigned,int,int,int,intptr_t,intptr_t) noexcept {}
+'''
+
 def build_source():
     w=(ROOT/'src/ui/Window.cpp').read_text();h=(ROOT/'src/ui/Window.h').read_text();decl=(ROOT/'src/framework/DeclManager.cpp').read_text();winvar=(ROOT/'src/ui/Winvar.cpp').read_text();wh=(ROOT/'src/ui/Winvar.h').read_text();float_class=wh[wh.index('class idWinFloat :'):wh.index('class idWinRectangle :')]
     float_methods='\n'.join(function(float_class,s) for s in ['virtual void Init(', 'virtual void Set(', 'virtual float x('])
@@ -129,7 +140,7 @@ def build_source():
     support=SUPPORT.replace('// FLOAT_METHODS',float_methods).replace('// ENUMS',enums).replace('// FIELDS','idWinFloat '+','.join(fields)+';').replace('**=','** =').replace('*=','* =')
     # Match actual registered expression invocation (no target variable supplied).
     reg=(ROOT/'src/ui/RegExp.cpp').read_text();assert reg.count('win->ParseExpression(src, NULL)')==1 and reg.count('win->ParseExpression( src, NULL )')==1
-    return support+'\n'+function(winvar,'void idWinVar::Init(')+'\n'+function(decl,'void idDeclManagerLocal::MakeNameCanonical(')+'\n'+'\n'.join(bodies)+'\n'+TEST
+    return support+'\n'+OBSERVATION_STUBS+'\n'+function(winvar,'void idWinVar::Init(')+'\n'+function(decl,'void idDeclManagerLocal::MakeNameCanonical(')+'\n'+'\n'.join(bodies)+'\n'+TEST
 
 def main():
     ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--compiler');ap.add_argument('--mutations',action='store_true');ap.add_argument('--sanitizers',action='store_true');args=ap.parse_args()
@@ -137,7 +148,7 @@ def main():
     out=Path(tempfile.mkdtemp(prefix='legacy-alpha-',dir=ROOT/'.tmp'));sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
     deps=[ROOT/f for f in ['src/ui/Window.cpp','src/ui/Window.h','src/ui/RegExp.cpp','src/ui/Winvar.cpp','src/ui/Winvar.h','src/framework/DeclManager.cpp','tools/tests/ui_legacy_expression.py']];before={str(p):sha(p) for p in deps};source=build_source();cases=[('positive',source,None)]
     if args.mutations:
-        edits=[('null-is-one','registers[op->c] = 0.0f;','registers[op->c] = 1.0f;'),('missing-is-constant','return EmitOp(a, b, WOP_TYPE_VAR);\n\t}\n\n}', 'delete []p; return ExpressionConstant(0);\n\t}\n\n}'),('skip-fixup','if (ops[i].b == -2)', 'if (false)'),('fixup-rebinds','ops[i].b = -1;', 'ops[i].b = -2;'),('drop-table','if ( table ) {','if ( false ) {'),('lose-custom-tail','if (remainder.Length()) {','if (false) {'),('skip-immediate-init','var->Init(token, this);','/* omitted immediate variable initialization */'),('reinit-late-fixup','idWinVar *var = GetWinVarByName(p, true);','idWinVar *var = GetWinVarByName(p, true); if(var) var->Init(p,this);')]
+        edits=[('null-is-one','registers[op->c] = 0.0f;','registers[op->c] = 1.0f;'),('missing-is-constant','return emit(a, b, WOP_TYPE_VAR);\n\t}\n\n}', 'delete []p; return ExpressionConstant(0);\n\t}\n\n}'),('skip-fixup','if (ops[i].b == -2)', 'if (false)'),('fixup-rebinds','ops[i].b = -1;', 'ops[i].b = -2;'),('drop-table','if ( table ) {','if ( false ) {'),('lose-custom-tail','if (remainder.Length()) {','if (false) {'),('skip-immediate-init','var->Init(token, this);','/* omitted immediate variable initialization */'),('reinit-late-fixup','idWinVar *var = GetWinVarByName(p, true);','idWinVar *var = GetWinVarByName(p, true); if(var) var->Init(p,this);')]
         for name,old,new in edits:assert source.count(old)==1,(name,source.count(old));cases.append((name,source.replace(old,new),True))
     compiler=args.compiler or shutil.which('clang++') or shutil.which('g++');assert compiler,'C++ compiler unavailable';records=[];env=dict(os.environ,TEMP=str(out),TMP=str(out),TMPDIR=str(out))
     expected={'null-is-one':'unbound post-fixup evaluates zero','missing-is-constant':'missing name is deferred, not constant','skip-fixup':'fixup stores null pointer and completed marker','fixup-rebinds':'fixup stores null pointer and completed marker','drop-table':'decl table takes precedence over local variable','lose-custom-tail':'native rest-of-line custom value preserved','skip-immediate-init':'native immediate float Init differs from late fixup without Init','reinit-late-fixup':'native immediate float Init differs from late fixup without Init'}

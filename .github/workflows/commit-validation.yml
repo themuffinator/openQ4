@@ -370,6 +370,7 @@ jobs:
             tools/tests/ui_legacy_inventory.py \
             tools/tests/ui_legacy_import.py \
             tools/tests/ui_legacy_expression.py \
+            tools/tests/ui_legacy_observation.py \
             tools/ui/legacy_inventory.py \
             tools/ui/legacy_import.py \
             tools/ui/legacy_syntax.py \
@@ -645,6 +646,7 @@ jobs:
           python tools/tests/ui_legacy_inventory.py
           python tools/tests/ui_legacy_import.py
           python tools/tests/ui_legacy_expression.py --mutations
+          python tools/tests/ui_legacy_observation.py --mutations
           python tools/tests/ui_background_cursor.py
           python tools/tests/menu_controller_navigation.py
           python tools/tests/sdl3_multidisplay_windowing.py

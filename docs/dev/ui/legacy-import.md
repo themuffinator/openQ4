@@ -121,6 +121,97 @@ This establishes the native fallback; it does not instantiate these monitors,
 observe a live table inventory, qualify later script writes, or accept their
 replacement GUIs. Other unusual custom fields remain pending.
 
+The opt-in `ui_observeLegacy` command supplies the next, separate native
+observation boundary. Run it only in an already initialized engine, after the
+mode-specific windowed gameplay check:
+
+```text
+ui_observeLegacy "guis/monitors/strogg/core/core4.gui" "Desktop/p_scanbar/scan" "ui-import/core4-observation.json"
+ui_observeLegacy "guis/monitors/strogg/hub/hub4.gui" "Desktop/p_scanbar/scan" "ui-import/hub4-observation.json"
+```
+
+The command creates a fresh managed legacy instance. Only this diagnostic
+instance feeds a copied, bounded VFS root into the normal native parser with its
+original source name and flags. Ordinary GUI loading still calls `LoadFile`.
+The receipt preserves those exact root bytes in the same byte-preserving Latin-1
+JSON representation used by the token exporter; hash `source_bytes.encode('latin-1')`
+and match the expected source hash. A second VFS read must still agree. Native
+includes and macros use the existing parser environment. Root equality alone
+does **not** establish the complete include closure; retain the corresponding
+token export, dependency provenance and engine-log interval.
+
+The inactive hooks do not allocate or replay lookups. During the diagnostic they
+copy the original table decision, emitted operation/register, and original
+variable fixup before its temporary name is deleted. Final pointer/marker checks
+bind that lookup to its actual finalized operation. Only local window identities
+are exported; raw addresses are not. Full ancestry must resolve uniquely in the
+same instance. Parse failure, a destroyed/reused identity, overflow, wrong
+register binding or changed root prevents `structural_complete`.
+
+Natural parse-time evaluations are explicitly marked as preceding completed
+desktop fixup. After that fixup the command calls `EvalRegs(-1, true)` once on
+the exact target, without activating it, dispatching input, running timelines or
+submitting rendering. This forced diagnostic evaluation is labelled separately.
+The receipt records register mapping, enabled/evaluation/dictionary flags,
+evaluated alpha register and actual `matColor` alpha, with exact float bits.
+A disabled register can leave the property different from its expression result.
+Scope teardown invalidates the shared expression-cache entry only if it still
+points to a temporary diagnostic window; a later foreign-window cache survives.
+The entire command rejects recursive entry, including VFS callbacks.
+
+A successful observation requires the matching `UI_LEGACY_OBSERVATION_BEGIN` /
+`END observed` log interval, no parser warning/error/refusal in that interval,
+`structural_complete: true`, expected source bytes, and the expected unique
+target. The native parser has no aggregate diagnostic-status API, so an exported
+JSON file alone is insufficient. Claim the unresolved-zero cause only when the
+matching alpha term has no table, a completed null fixup, and a fresh mapped
+post-fixup evaluation; report the actual property and its binding flags separately.
+`replacement_acceptance` remains false. This observes initialized native alpha
+under the current environment, not gameplay appearance, script/timeline parity
+or retained replacement acceptance.
+
+On 11 September 2026, actual staged SP/OpenGL at 125% and MP/Vulkan at 200%
+observed both exact stock targets after gameplay. For `core4.gui:635` and
+`hub4.gui:631`, the original table lookup returned no table, the original
+variable fixup completed with null, and operation 0 produced alpha register 6.
+The fresh post-fixup register and actual `matColor.w` were both positive zero
+(`0x00000000`); the register was enabled, evaluation was enabled, and no GUI
+dictionary supplied the property. The root-byte hashes were respectively
+`7272161d1b39cbba2d7a9e74894ce76be69d7dc217730fc151df0ba447b61763`
+and `fdd917e43afd75952780dc3f5ef5d078d23ab28f7e3594f2b2d3160b28712d27`,
+matching the retained corpus and fresh native token exports in both modes.
+
+These monitors are not part of the selected test maps' ordinary precache. A
+separate first diagnostic instance therefore populates their material declarations
+and retains its own receipt and log interval. Following fresh instances have
+clean parser intervals and exactly matching alpha values and binding flags.
+Nothing suppresses the preload diagnostics: MP records 17 late material loads
+in addition to its existing 94 warnings, and SP records 15 late material loads.
+Use distinct output filenames when repeating the command; preserve the first
+receipt and qualify the subsequent clean interval. Quote every path argument
+as shown above, since the native command tokenizer otherwise splits the output
+path's punctuation.
+
+The full client/dedicated/module build, staging and 65 integrated UI suites pass,
+including the original-body observation test and 15 compiled mutation checks.
+Four reviewed engine render-target images retain gameplay/HUD and SYSTEM
+continuity after ordinary `vid_restart`. Records are under
+`.tmp/ui/legacy-observation-integration/`, with final captures in
+`sp-gl-125-preloaded/` and `mp-vulkan-200-preloaded/`. The earlier usage-only and
+late-material-warning attempts, including exact harness source versions, are
+retained separately. This qualifies initialized native alpha; token-only imports
+still preserve the unresolved term, source span and diagnostic. Complete include
+closure, later scripts/timelines and source-bound retained lowering remain open.
+
+`tools/tests/ui_legacy_observation.py` executes actual expression, fixup,
+evaluation, collector and command bodies with counted token, construction,
+register-transport and VFS doubles. It checks identity/phase/provenance refusal,
+reentry, cache retirement, allocation failure in hooks and compiled behavioral
+mutations. Full GUI `Parse`/`InitFromFile` hook placements are source checked;
+their complete bodies, real VFS resources and GPU behavior require the engine
+run above. `ui_legacy_expression.py` retains its original semantic cases through
+no-op observation doubles.
+
 The earlier lexical brace observation for `guis/maps/tram1/bridge1.gui` does
 not prevent complete preprocessed structure import. Instantiation and behavior
 of that GUI still require a gameplay baseline.
