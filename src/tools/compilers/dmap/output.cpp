@@ -654,12 +654,16 @@ void WriteOutputFile( void ) {
 
 	sprintf( qpath, "%s." PROC_FILE_EXT, dmapGlobals.mapFileBase );
 
-	common->Printf( "writing %s\n", qpath.c_str() );
 	// _D3XP used fs_cdpath
 	procFile = fileSystem->OpenFileWrite( qpath, "fs_cdpath" );
 	if ( !procFile ) {
 		common->Error( "Error opening %s", qpath.c_str() );
 	}
+
+	// dmap writes beside the engine rather than beside the .map it read, so
+	// report where the output actually landed instead of leaving map authors
+	// to hunt for it
+	common->Printf( "writing %s\n", procFile->GetFullPath() );
 // jmarshall - Quake 4 proc support
 	procFile->WriteFloatString( "%s \"%s\"\n\n", PROC_FILE_ID, PROC_FILEVERSION);
 

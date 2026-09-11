@@ -25,38 +25,38 @@ If you have questions concerning this license or the applicable additional terms
 
 ===========================================================================
 */
-
-#ifndef __COMPILER_PUBLIC_H__
-#define __COMPILER_PUBLIC_H__
+ 
+#ifndef __AASCLUSTER_H__
+#define __AASCLUSTER_H__
 
 /*
 ===============================================================================
 
-	Compilers for map, model, video etc. processing.
+	Area Clustering
 
 ===============================================================================
 */
 
-// map processing (also see SuperOptimizeOccluders in tr_local.h)
-void Dmap_f( const idCmdArgs &args );
+class idAASCluster {
 
-// bump map generation
-void RenderBump_f( const idCmdArgs &args );
-void RenderBumpFlat_f( const idCmdArgs &args );
+public:
+	bool					Build( idAASFileLocal *file );
+	bool					BuildSingleCluster( idAASFileLocal *file );
 
-// AAS file compiler
-void RunAAS_f( const idCmdArgs &args );
-void RunAASDir_f( const idCmdArgs &args );
-void RunReach_f( const idCmdArgs &args );
+private:
+	idAASFileLocal *		file;
+	bool					noFaceFlood;
 
-// Compiles every AAS type declared by the 'aas_types' entityDef for one map.
-// 'mapName' is a relative, extension-less map path such as "maps/game/hangar2";
-// 'optionArgs' is optional and supplies runAAS-style switches.  Shared by the
-// runAAS command and dmap's automatic navigation pass; the caller owns warning
-// collection and refresh state.
-bool RunAASForMap( const idStr &mapName, const idCmdArgs *optionArgs );
+private:
+	bool					UpdatePortal( int areaNum, int clusterNum );
+	bool					FloodClusterAreas_r( int areaNum, int clusterNum );
+	void					RemoveAreaClusterNumbers( void );
+	void					NumberClusterAreas( int clusterNum );
+	bool					FindClusters( void );
+	void					CreatePortals( void );
+	bool					TestPortals( void );
+	void					ReportEfficiency( void );
+	void					RemoveInvalidPortals( void );
+};
 
-// video file encoding
-void RoQFileEncode_f( const idCmdArgs &args );
-
-#endif	/* !__COMPILER_PUBLIC_H__ */
+#endif /* !__AASCLUSTER_H__ */

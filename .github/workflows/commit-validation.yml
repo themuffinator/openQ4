@@ -81,6 +81,7 @@ jobs:
             tools/validation/openq4_validate.py \
             tools/validation/stock_asset_baseline.py \
             tools/tests/renderer_validation_matrix.py \
+            tools/tests/aas_compiler_contract.py \
             tools/tests/aas_settings_contract.py \
             tools/tests/chat_gameplay_smoke.py \
             tools/tests/chat_history.py \
@@ -282,6 +283,7 @@ jobs:
           bash -n tools/validation/validate_push.sh
           bash -n tools/validation/validate_pr.sh
           python tools/validation/audit_source_provenance.py --check
+          python tools/tests/aas_compiler_contract.py
           python tools/tests/aas_settings_contract.py
           python tools/tests/chat_history.py
           python tools/tests/filesystem_find_file_contract.py

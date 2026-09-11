@@ -169,7 +169,9 @@ def validate_compiled_map_metadata() -> None:
     if "1105723392" in output or "Fake CRC" in output:
         raise AssertionError("dmap must not mark newly compiled geometry with a placeholder checksum")
     dmap = read("src/tools/compilers/dmap/dmap.cpp")
-    require(dmap, "AAS compilation is not available", "missing navigation compiler diagnostic")
+    # Navigation is now compiled alongside the geometry; tools/tests/aas_compiler_contract.py
+    # owns the AAS pass itself.
+    require(dmap, "RunAASForMap( passedName, &args )", "navigation compiler pass")
 
 
 def main() -> None:

@@ -66,9 +66,16 @@ void idAASFileLocal::Optimize( void ) {
 	newVertices.Resize( vertices.Num() );
 	newEdges.Resize( edges.Num() );
 	newEdges.SetNum( 1, false );
-	newEdgeIndex.Resize( edgeIndex.Num() );
 	newFaces.Resize( faces.Num() );
 	newFaces.SetNum( 1, false );
+
+	// Edge 0 and face 0 are dummies that nothing indexes, but SetNum() does not
+	// initialise them, so without this the compiler wrote raw allocator contents
+	// into every AAS file it optimized.
+	memset( &newEdges[0], 0, sizeof( newEdges[0] ) );
+	memset( &newFaces[0], 0, sizeof( newFaces[0] ) );
+
+	newEdgeIndex.Resize( edgeIndex.Num() );
 	newFaceIndex.Resize( faceIndex.Num() );
 
 	for ( i = 0; i < areas.Num(); i++ ) {

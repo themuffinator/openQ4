@@ -273,13 +273,16 @@ void idCollisionModelManagerLocal::WriteCollisionModelsToFile( const char *filen
 		mask += "/";
 	}
 
-	common->Printf( "writing %s\n", name.c_str() );
 	// Retail Q4 writes generated collision caches on fs_devpath.
 	fp = fileSystem->OpenFileWrite( name, "fs_devpath" );
 	if ( !fp ) {
 		common->Warning( "idCollisionModelManagerLocal::WriteCollisionModelsToFile: Error opening file %s\n", name.c_str() );
 		return;
 	}
+
+	// report where the file actually landed; fs_devpath is unset by default, so
+	// this is not necessarily the directory the .map was read from
+	common->Printf( "writing %s\n", fp->GetFullPath() );
 
 	// write file id and version
 	fp->WriteFloatString( "%s \"%s\"\n\n", CM_FILEID, CM_FILEVERSION );
@@ -322,13 +325,14 @@ bool idCollisionModelManagerLocal::WriteCollisionModelForMapEntity( const idMapE
 	name = filename;
 	name.SetFileExtension( CM_FILE_EXT );
 
-	common->Printf( "writing %s\n", name.c_str() );
 	fp = fileSystem->OpenFileWrite( name, "fs_devpath" );
 	if ( !fp ) {
 		common->Printf( "idCollisionModelManagerLocal::WriteCollisionModelForMapEntity: Error opening file %s\n", name.c_str() );
 		FreeModel( model );
 		return false;
 	}
+
+	common->Printf( "writing %s\n", fp->GetFullPath() );
 
 	// write file id and version
 	fp->WriteFloatString( "%s \"%s\"\n\n", CM_FILEID, CM_FILEVERSION );

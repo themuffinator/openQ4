@@ -4,9 +4,9 @@ This is the authoritative engineering inventory for retained id Software source 
 
 The repository-wide [GPLv3 text](../../LICENSE) remains the primary licence file. Two sets of tracked files also retain headers that expressly refer to a distinct set of Additional Terms:
 
-| Header family | Tracked files at the 2026-08-19 audit | Audited official source snapshot | Accompanying terms in this tree |
+| Header family | Tracked files at the 2026-09-11 audit | Audited official source snapshot | Accompanying terms in this tree |
 |---|---:|---|---|
-| Doom 3 GPL Source Code | 581 | [id-Software/DOOM-3 `a9c49da`](https://github.com/id-Software/DOOM-3/tree/a9c49da5afb18201d31e3f0a429a037e56ce2b9a) | [`LICENSES/DOOM-3-ADDITIONAL-TERMS.txt`](https://github.com/themuffinator/openQ4/blob/master/LICENSES/DOOM-3-ADDITIONAL-TERMS.txt) |
+| Doom 3 GPL Source Code | 595 | [id-Software/DOOM-3 `a9c49da`](https://github.com/id-Software/DOOM-3/tree/a9c49da5afb18201d31e3f0a429a037e56ce2b9a) | [`LICENSES/DOOM-3-ADDITIONAL-TERMS.txt`](https://github.com/themuffinator/openQ4/blob/master/LICENSES/DOOM-3-ADDITIONAL-TERMS.txt) |
 | Doom 3 BFG Edition GPL Source Code | 37 | [id-Software/DOOM-3-BFG `1caba19`](https://github.com/id-Software/DOOM-3-BFG/tree/1caba1979589971b5ed44e315d9ead30b278d8b4) | [`LICENSES/DOOM-3-BFG-ADDITIONAL-TERMS.txt`](https://github.com/themuffinator/openQ4/blob/master/LICENSES/DOOM-3-BFG-ADDITIONAL-TERMS.txt) |
 
 The two Additional-Terms files preserve the wording published in the corresponding official `COPYING.txt`, including upstream spelling errors; only character encoding, line endings, and insignificant trailing whitespace are normalized for the repository. They are separate because their scope and published text identify different source releases. The machine-readable audit pins the official repositories, full commit object IDs, complete upstream `COPYING.txt` hashes, and canonical UTF-8 local notice hashes in [`source-provenance-manifest.json`](https://github.com/themuffinator/openQ4/blob/master/docs/dev/source-provenance-manifest.json). The local hash normalizes CRLF/CR to LF so Git's checkout policy cannot create a false mismatch; all other text changes fail.

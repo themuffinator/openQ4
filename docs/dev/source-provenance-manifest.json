@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
-  "auditedOn": "2026-08-19",
+  "auditedOn": "2026-09-11",
   "scope": "Tracked source files under src/ whose retained id Software header identifies a covered source family",
   "textHashNormalization": "UTF-8; CRLF and CR normalized to LF",
   "families": {
     "doom3": {
       "displayName": "Doom 3 GPL Source Code",
       "headerMarker": "Doom 3 GPL Source Code",
-      "expectedFileCount": 581,
+      "expectedFileCount": 595,
       "officialRepository": "https://github.com/id-Software/DOOM-3",
       "auditedCommit": "a9c49da5afb18201d31e3f0a429a037e56ce2b9a",
       "officialCopying": "https://github.com/id-Software/DOOM-3/blob/a9c49da5afb18201d31e3f0a429a037e56ce2b9a/COPYING.txt",

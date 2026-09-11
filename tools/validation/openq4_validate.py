@@ -404,6 +404,7 @@ def validate_game_libs_repo_path(game_libs_repo: Path) -> Path:
 
 def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) -> None:
     tests = [
+        root / "tools" / "tests" / "aas_compiler_contract.py",
         root / "tools" / "tests" / "aas_settings_contract.py",
         root / "tools" / "tests" / "arena_campaign.py",
         root / "tools" / "tests" / "async_drop_client_contract.py",

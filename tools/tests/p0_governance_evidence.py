@@ -45,7 +45,7 @@ def test_provenance_inventory() -> None:
     if failures:
         raise AssertionError("provenance validation failed:\n" + "\n".join(failures))
 
-    assert report["families"]["doom3"]["count"] == 581
+    assert report["families"]["doom3"]["count"] == 595
     bfg_files = report["families"]["doom3_bfg"]["files"]
     assert len(bfg_files) == 37
     classifications: dict[str, int] = {}

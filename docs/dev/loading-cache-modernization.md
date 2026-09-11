@@ -453,7 +453,7 @@ not final-package promotion evidence.
   checks pass.
 - Native manifest-format and pipeline suites pass with MSVC and strict Clang
   C++20; the broad no-build/no-runtime validation set passes 132/132.
-- The provenance audit remains 581 Doom 3 and 37 Doom 3 BFG header-family files.
+- The provenance audit remains 595 Doom 3 and 37 Doom 3 BFG header-family files.
 - Linux ARM64 and macOS source/static/policy checks pass only. WSL runtime was
   unavailable with `E_ACCESSDENIED`, Docker was unavailable, and no Apple
   hardware runtime was available; none of those platforms is runtime-qualified

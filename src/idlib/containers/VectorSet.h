@@ -121,7 +121,8 @@ ID_INLINE int idVectorSet<type,dimension>::FindVector( const type &v, const floa
 	}
 
 	hash.Add( hashKey, idList<type>::Num() );
-	Append( v );
+	// qualify the dependent base-class call so two-phase name lookup finds it
+	idList<type>::Append( v );
 	return idList<type>::Num()-1;
 }
 

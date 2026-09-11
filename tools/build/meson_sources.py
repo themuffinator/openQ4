@@ -66,6 +66,7 @@ ENGINE_SOURCE_GLOBS = [
     "idlib/math/*.cpp",
     "renderer/*.cpp",
     "renderer/OpenGL/*.cpp",
+    "tools/compilers/aas/*.cpp",
     "tools/compilers/dmap/*.cpp",
     "sound/*.cpp",
     "sound/OpenAL/*.cpp",

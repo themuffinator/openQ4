@@ -666,7 +666,6 @@ bool idAASFileLocal::Write( const idStr &fileName, unsigned int mapFileCRC ) {
 	idReachability *reach;
 
 	common->Printf( "[Write AAS]\n" );
-	common->Printf( "writing %s\n", fileName.c_str() );
 
 	name = fileName;
 	crc = mapFileCRC;
@@ -676,6 +675,10 @@ bool idAASFileLocal::Write( const idStr &fileName, unsigned int mapFileCRC ) {
 		common->Error( "Error opening %s", fileName.c_str() );
 		return false;
 	}
+
+	// report the real destination: compiled output lands beside the engine
+	// (fs_cdpath), which is not necessarily where the .map was read from
+	common->Printf( "writing %s\n", aasFile->GetFullPath() );
 
 	aasFile->WriteFloatString( "%s \"%s\"\n\n", AAS_FILEID, AAS_FILEVERSION );
 	aasFile->WriteFloatString( "%u\n\n", mapFileCRC );
