@@ -394,4 +394,5 @@ int main() {
 	TestHost host;PaddedValueParts(host);ReadbackAndToggle(host);ProjectedDragAndHandoff(host);PopupAndPersistence(host);ScrollBodyAndFocusReveal(host);PositionedOverflowBoundaries(host);
 	Check(host.errors==0,"real Runtime/RmlUi reports no errors");
 	std::printf("Value Runtime: %u checks passed\n",checks);
+    return 0;
 }

@@ -22,7 +22,7 @@ def main():
     args=parser.parse_args();(ROOT/'.tmp').mkdir(exist_ok=True)
     out=Path(tempfile.mkdtemp(prefix='native-collection-',dir=ROOT/'.tmp'))
     env={**os.environ,'TEMP':str(out),'TMP':str(out),'TMPDIR':str(out)}
-    names=['Interaction.h','Interaction.cpp','Document.h','Document.cpp','Vector.h','TextInput.h','TextInput.cpp',
+    names=['Interaction.h','Interaction.cpp','ScrollGeometry.h','ScrollGeometry.cpp','Document.h','Document.cpp','Vector.h','TextInput.h','TextInput.cpp',
            'TextEdit.h','TextEdit.cpp','TextEditCommand.h','NativeTextDocument.h','NativeTextDocument.cpp',
            'NativeTextEditor.h','NativeTextEditor.cpp','TextInputBroker.h','Input.h','Input.cpp']
     tests=['UiNativeCollectionCoordinatorTest.cpp']
@@ -51,7 +51,7 @@ def main():
         includes=[str(ROOT),str(CORE),str(ROOT/'src/ui/application'),str(ROOT/'subprojects/packagefiles/sdl3/include'),str(sdl)]
         flags=[args.compiler,'/nologo','/std:c++20','/EHsc','/W4','/WX','/wd4458','/MTd' if args.debug_crt else '/MT']+['/I'+n for n in includes]
     if args.sanitize:flags+=['-fsanitize=address,undefined','-fno-omit-frame-pointer','-g0','-no-pie']
-    core=[str(working),str(valid)]+[str(CORE/n) for n in ['TextInput.cpp','TextEdit.cpp','NativeTextDocument.cpp','NativeTextEditor.cpp','Input.cpp']]
+    core=[str(working),str(valid)]+[str(CORE/n) for n in ['ScrollGeometry.cpp','TextInput.cpp','TextEdit.cpp','NativeTextDocument.cpp','NativeTextEditor.cpp','Input.cpp']]
     controller=out/'NativeTextCollectionCoordinator.cpp'
     controller_source=(ROOT/'src/ui/application/NativeTextCollectionCoordinator.cpp').read_text()
     controller.write_text(controller_source,encoding='utf-8',newline='\n')

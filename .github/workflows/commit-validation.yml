@@ -309,6 +309,8 @@ jobs:
             tools/tests/ui_focus_reveal.py \
             tools/tests/ui_scrollbar_interaction.py \
             tools/tests/ui_scrollbar_runtime.py \
+            tools/tests/ui_choice_scroll_interaction.py \
+            tools/tests/ui_choice_scroll_runtime.py \
             tools/tests/ui_settings_decimal_precision.py \
             tools/tests/ui_settings_exact_values.py \
             tools/tests/ui_settings_automatic.py \
@@ -615,6 +617,7 @@ jobs:
           python tools/tests/ui_retained_resource_lifecycle.py
           python tools/tests/ui_retained_adapter.py
           python tools/tests/ui_scrollbar_interaction.py --mutations
+          python tools/tests/ui_choice_scroll_interaction.py --mutations
           python tools/tests/ui_text_owner.py
           python tools/tests/ui_system_settings_host.py
           python tools/tests/ui_settings_service.py

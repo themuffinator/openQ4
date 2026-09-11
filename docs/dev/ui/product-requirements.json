@@ -4,7 +4,7 @@
   "date": "2026-09-11",
   "status": "Implementation incomplete; this register preserves full product scope and does not accept any production GUI.",
   "baseline": {
-    "engine_revision": "2e95a66bab30b1acd3f315f86f3570f142965b1d",
+    "engine_revision": "fc4443cb071022e29b429c9b74731dfa9b0c3b86",
     "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
     "effective_gui_count": 271,
     "translated_or_accepted_resources": 0,
@@ -19,7 +19,7 @@
     "product": {
       "path": "docs/dev/plans/ui-product-completion.md",
       "authority": "normative completion scope, milestones and final audit",
-      "sha256": "ddc519d10a4d89031c2b6184aa23d89f0228051d41e9bcd60fa8c48f089709d5"
+      "sha256": "a0ea29db0ecad1a3dcbecbd6367d4052ad25a7b17b8a8f87ee5134ec5cf30bad"
     },
     "original": {
       "path": "docs/dev/plans/idtech5-ui.md",
@@ -100,7 +100,7 @@
       "kind": "source_audit",
       "path": "docs/dev/plans/ui-product-completion.md",
       "scope": "Published audit at 80bb3939; source limitations corroborated by current Document/Runtime inspection. Historical tests and captures are not a fresh product qualification.",
-      "sha256": "ddc519d10a4d89031c2b6184aa23d89f0228051d41e9bcd60fa8c48f089709d5"
+      "sha256": "a0ea29db0ecad1a3dcbecbd6367d4052ad25a7b17b8a8f87ee5134ec5cf30bad"
     },
     "document-foundation": {
       "kind": "implementation_checkpoint",
@@ -517,6 +517,16 @@
       "scope": "Private typed issuance/transfer claim joins real platform,pushed,keyboard and mouse stores to actual Take/disposal state and terminal ledger census; exact head recheck after source callbacks. Checked original-route disposal/release refuses unknown,external,stored or in-flight ownership. Actual Windows/POSIX store tests and integrated compiled mutants pass; normal sink dispatch,fence turnover,held-source/native activation remain unconnected.",
       "local_capture_summary": ".tmp/ui/terminal-content-integration/validation-evidence.json",
       "local_capture_summary_sha256": "486bfaed7fdec7b9c295e8547b3151687fb8bf48696438fb7158aa95a1031112"
+    },
+    "authored-choice-scrollbars": {
+      "kind": "implementation_checkpoint",
+      "path": "docs/dev/ui/choice-scrollbars.md",
+      "sha256": "a5337ed8bd66c320a72b4dc8013dd4880a94478fdbfdde26e1f136062706691a",
+      "baseline_engine_revision": "fc4443cb071022e29b429c9b74731dfa9b0c3b86",
+      "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
+      "scope": "Four SYSTEM choices own editable vector scrollbars with fresh geometry, logical offsets, transient gestures and strict semantic presentation APIs. Full build,69 UI suites,compiled mutations,Linux sanitizers and20 reviewed windowed engine images pass. Fitting bars are hidden. Physical/native input, full popup framing/safe-area placement, editor and complete state galleries remain required.",
+      "local_capture_summary": ".tmp/ui/choice-scrollbar-integration/validation-evidence.json",
+      "local_capture_summary_sha256": "12d377f51a2cb3609e9975f14720ab587cddf9e64c3eb2422759a1d0bde5aefd"
     }
   },
   "groups": {
@@ -2311,10 +2321,11 @@
         "event-program-foundation",
         "value-controls-foundation",
         "numeric-fields",
-        "authored-scrollbars"
+        "authored-scrollbars",
+        "authored-choice-scrollbars"
       ],
       "acceptance_evidence": [],
-      "remaining": "Outer instance snapshot version3 adds role and choice-scroll records while preserving earlier button-instance formats; open popup, drag preview, pending proposal, armed input and queued actions are transient and canceled on restoration. Committed application/presentation values and motion retain their existing snapshot policy. Complete editable text, dynamic collections, legacy timers, all selection/scroll/modal/focus state and deterministic full-corpus continuation without replay. Recorded native and normal-route Windows resource-reset checks qualify the new widget subset only. Nested widget version2 now persists bounded numeric text/selection/undo/redo/baseline/conflict; native origins, composition, live editor identities and proposals are transient. Restoring preserves persistent focus until fresh layout and reconciles current host values. Full text/collection/timer/world/game-save continuation remains required. Scrollbar documents now use nested widget-table version3 with logical dp offsets, while numeric-only widget tables remain version2. Outer instance versions2/3/4 continue to follow the existing no-widget/widget/authored-modal feature rules."
+      "remaining": "Outer instance snapshot version3 adds role and choice-scroll records while preserving earlier button-instance formats; open popup, drag preview, pending proposal, armed input and queued actions are transient and canceled on restoration. Committed application/presentation values and motion retain their existing snapshot policy. Complete editable text, dynamic collections, legacy timers, all selection/scroll/modal/focus state and deterministic full-corpus continuation without replay. Recorded native and normal-route Windows resource-reset checks qualify the new widget subset only. Nested widget version2 now persists bounded numeric text/selection/undo/redo/baseline/conflict; native origins, composition, live editor identities and proposals are transient. Restoring preserves persistent focus until fresh layout and reconciles current host values. Full text/collection/timer/world/game-save continuation remains required. Scrollbar documents now use nested widget-table version3 with logical dp offsets, while numeric-only widget tables remain version2. Outer instance versions2/3/4 continue to follow the existing no-widget/widget/authored-modal feature rules. Bar-equipped choices share nested widget-table version3 logical-offset persistence, restore closed and never restore a live gesture; complete corpus persistence remains required."
     },
     {
       "id": "SAVE-003",
@@ -2343,7 +2354,8 @@
         "presentation-alias-foundation",
         "system-exit-foundation",
         "native-managed-bridge",
-        "authored-scrollbars"
+        "authored-scrollbars",
+        "authored-choice-scrollbars"
       ],
       "acceptance_evidence": [],
       "remaining": "Authored modal ownership, pending safe/return focus and fresh-source reconciliation retain their bounded snapshot/resource evidence. Shared focus reveal requests a 4dp inset within existing scroll limits. Legacy documents reveal after viewport/density changes; authored scrollbar documents restore and clamp logical dp offsets once without letting unchanged focus override deliberate scrolling. Fresh focus/navigation and validation extent changes still reveal their target. Exact native-owner retirement preserves stable local text/history instead of applying late work to a replacement instance. Complete and qualify useful focus/scroll/modal/timeline/value continuity through all viewport, monitor, font, language, renderer, world and widget changes; settings-number recovery and bounded geometry tests do not establish the full engine mutation matrix."
@@ -3366,10 +3378,11 @@
       "status": "partial",
       "current_evidence": [
         "value-controls-foundation",
-        "performance-preset-drafts"
+        "performance-preset-drafts",
+        "authored-choice-scrollbars"
       ],
       "acceptance_evidence": [],
-      "remaining": "Canonical constrained choices now have stable typed options and authored field/chevron/popup/row/label/selection/highlight parts, authoritative readback, tentative open/cancel/commit behavior and measured popup scrolling/placement. Initial post-AA selection uses the settings draft. Complete choice-popup scrollbar integration, all constrained/overflow/dynamic availability cases, focus restoration, full physical-device/accessibility behavior, reusable artwork and state-gallery acceptance. Recorded native and normal-route Windows checks qualify this initial control subset only."
+      "remaining": "Canonical constrained choices now have stable typed options and authored field/chevron/popup/row/label/selection/highlight parts, authoritative readback, tentative open/cancel/commit behavior and measured popup scrolling/placement. Initial post-AA selection uses the settings draft. Four SYSTEM choices now integrate authored popup scrollbars, measured transformed geometry and logical offsets; fitting lists hide their bar. Complete safe-area placement without footer/rail overlap, source-derived popup framing, all constrained/overflow/dynamic availability cases, focus restoration, full physical-device/accessibility behavior, reusable artwork and state-gallery acceptance. Recorded native and normal-route Windows checks qualify this initial control subset only."
     },
     {
       "id": "WID-006",
@@ -3500,10 +3513,11 @@
       ],
       "status": "partial",
       "current_evidence": [
-        "authored-scrollbars"
+        "authored-scrollbars",
+        "authored-choice-scrollbars"
       ],
       "acceptance_evidence": [],
-      "remaining": "Authored SYSTEM scrollbar now measures and paints the actual range, supports bounded semantic drag/paging/wheel/navigation and preserves logical offsets through density/layout restoration. Complete touch/physical-device routing, constrained choice-popup integration, full artwork and interaction-state galleries, editor authoring and all production screen/platform acceptance remain required."
+      "remaining": "Authored SYSTEM scrollbar now measures and paints the actual range, supports bounded semantic drag/paging/wheel/navigation and preserves logical offsets through density/layout restoration. Authored choice-popup bars now have bounded actual-Rml and engine presentation evidence. Complete touch/physical-device routing, popup safe-area placement and framing, full artwork and interaction-state galleries, editor authoring and all production screen/platform acceptance remain required."
     },
     {
       "id": "WID-011",
@@ -5018,7 +5032,8 @@
         "checked-image-reduction",
         "checked-upload-storage",
         "authored-scrollbars",
-        "exact-image-content-recovery"
+        "exact-image-content-recovery",
+        "authored-choice-scrollbars"
       ],
       "acceptance_evidence": [],
       "remaining": "The production page now includes source-derived preset and Auto-Detect controls with localized flowing labels, guarded proposals, actual shared draft expansion and bounded Runtime/gameplay validation. The source-backed 31-option/53-CVar contract retains its packaged opt-in SYSTEM route and precise Brightness/Ambient Brightness fields, localized validation and local draft barriers. Exact numeric recovery and bounded full-border focus reveal extend this implementation; neither accepts the translated page. Complete every actual setting and dependent popup, display capability/resolution catalogs, native numeric text entry, complete preset/Auto-Detect effect execution and persistence, remaining effects, Defaults, full Apply/Cancel/exit behavior, source-derived visuals/transitions and the native editor round trip. Qualify normal SP/MP entry/return/reopen, failure/cancellation, complete responsive/localized state galleries and every mapped resource; historical and current bounded captures do not accept the full requirement."

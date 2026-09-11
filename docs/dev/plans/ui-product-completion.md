@@ -150,6 +150,8 @@ The following [native legacy-alpha observation](../ui/legacy-import.md), based o
 
 The following [exact image-content](../ui/image-content-recovery.md) and [native terminal-disposal](../ui/native-input-publication.md) checkpoint, based on engine `2e95a66bab30b1acd3f315f86f3570f142965b1d`, adds checked per-image CPU reconstruction and actual store ownership/disposal. The full build,67 UI suites and reviewed windowed SP/OpenGL and MP/Vulkan gameplay/restart/SYSTEM checks pass. Actual loaded-image census supports the next journal sizing decision. Complete source/material cohorts,durable recovery,normal native sink scheduling,held-source inhibition,all production controls,editor and every migration/final gate remain required. No acceptance status changes.
 
+The [authored choice scrollbar](../ui/choice-scrollbars.md) checkpoint, based on engine `fc4443cb071022e29b429c9b74731dfa9b0c3b86`, integrates all four SYSTEM dropdowns. The full build,69 UI suites,compiled behavioral mutations,Linux sanitizers and20 reviewed SP/OpenGL125% and MP/Vulkan200% gameplay/SYSTEM/popup images pass. Fitting lists hide inactive bars and scrolling leaves settings unchanged. Popup safe-area placement and source-derived framing still need refinement; physical/native input, complete settings recovery, editor and full-corpus acceptance remain required. No requirement, migration or gate acceptance changes.
+
 ### Findings that block product completion
 
 The [native text owner/store checkpoint](../ui/text-input-routing.md), based on

@@ -388,6 +388,18 @@ public:
     std::optional<WidgetViewState> GetWidgetState(const std::string& id) const {
         const auto found=widgets.find(id); return found==widgets.end()?std::nullopt:std::optional(found->second);
     }
+    struct ChoiceCall {std::string operation,id;std::uint64_t token;ScrollStep step;double seconds;};
+    std::vector<ChoiceCall> choiceCalls;
+    bool choiceResult=true;
+    bool OpenChoicePopup(const std::string& id,double seconds) {
+        choiceCalls.push_back({"open",id,0,ScrollStep::Start,seconds});return choiceResult;
+    }
+    bool CloseChoicePopup(const std::string& id,std::uint64_t token,double seconds) {
+        choiceCalls.push_back({"close",id,token,ScrollStep::Start,seconds});return choiceResult;
+    }
+    bool ScrollChoicePopup(const std::string& id,std::uint64_t token,ScrollStep step,double seconds) {
+        choiceCalls.push_back({"scroll",id,token,step,seconds});return choiceResult;
+    }
     std::vector<std::string> timelines;
     std::vector<std::pair<std::string,double>> eligibilityQueries;
     std::set<std::string> disabledControls;
@@ -1966,6 +1978,38 @@ static void CheckNumberDraftBoundary() {
     }
     modelTemplate=original;eventPlans.clear();assert(views.empty() && service.owners.empty());
 }
+static void CheckChoiceDiagnosticBoundary() {
+    assert(views.empty());
+    idUserInterfaceRetained gui;assert(gui.InitFromFile("test.q4ui"));gui.Activate(true,0);gui.Redraw(0);
+    auto& runtime=Live();WidgetViewState widget;widget.role=ControlRole::Choice;widget.accepted=2.0;
+    widget.popupOpen=true;widget.popupToken=731;widget.popupRevision=734;widget.popupOffsetDp=42;
+    ScrollReadback scroll;scroll.geometryToken=901;scroll.available=true;scroll.dpRatio=1.25;
+    scroll.geometry={100,300,52.5,100,25,13.125,75,true};widget.scroll=scroll;
+    runtime.widgets["root"]=widget;
+    const auto diagnostic=[&](std::vector<std::string> args) {
+        args.insert(args.begin(),{"retained","choice"});return UI_RetainedDiagnostic(&gui,idCmdArgs{std::move(args)});
+    };
+    assert(diagnostic({"open","root"}));assert(runtime.choiceCalls.back().operation=="open"&&runtime.choiceCalls.back().seconds==presentationTime);
+    assert(diagnostic({"close","root"}));assert(runtime.choiceCalls.back().token==731);
+    for(const auto& [name,step]:std::map<std::string,ScrollStep>{{"line-back",ScrollStep::LineBackward},{"line-forward",ScrollStep::LineForward},
+        {"page-back",ScrollStep::PageBackward},{"page-forward",ScrollStep::PageForward},{"start",ScrollStep::Start},{"end",ScrollStep::End}}) {
+        assert(diagnostic({"scroll","root",name}));const auto& call=runtime.choiceCalls.back();
+        assert(call.operation=="scroll"&&call.id=="root"&&call.token==731&&call.step==step&&call.seconds==presentationTime);
+    }
+    const auto calls=runtime.choiceCalls.size();
+    for(const auto& args:std::vector<std::vector<std::string>>{{"open"},{"open","root","extra"},{"close","root","extra"},
+        {"scroll","root"},{"scroll","root","end","extra"},{"scroll","root","bogus"},{"accept","root"},{"open","missing"}})
+        assert(!diagnostic(args)&&runtime.choiceCalls.size()==calls);
+    gui.Activate(false,0);assert(!diagnostic({"open","root"})&&runtime.choiceCalls.size()==calls);gui.Activate(true,0);
+    gui.SetInteractive(false);assert(!diagnostic({"open","root"})&&runtime.choiceCalls.size()==calls);gui.SetInteractive(true);
+    runtime.widgets.at("root").role=ControlRole::Toggle;assert(!diagnostic({"open","root"})&&runtime.choiceCalls.size()==calls);
+    runtime.widgets.at("root").role=ControlRole::Choice;runtime.choiceResult=false;
+    assert(!diagnostic({"open","root"})&&runtime.choiceCalls.size()==calls+1);
+    commonObject.prints.clear();assert(UI_RetainedDiagnostic(&gui,idCmdArgs{{"retained","widget","root"}}));
+    assert(commonObject.prints.size()==2&&commonObject.prints.front().find("accepted=2 pending=0")!=std::string::npos);
+    assert(commonObject.prints.back()=="RETAINED_GUI_CHOICE_SCROLL id=root open=1 opening=731 revision=734 offsetDp=42 available=1 usable=1 density=1.25 viewport=100 range=300 offset=52.5 track=100 thumb=25 position=13.125 travel=75 geometry=901\n");
+    assert(runtime.widgets.at("root").accepted==widget.accepted&&!runtime.widgets.at("root").pending&&runtime.menu.empty());
+}
 static void CheckNumberDiagnosticBoundary() {
     assert(views.empty() && SettingsBoundary::service.owners.empty());
     const auto original=modelTemplate;auto& service=SettingsBoundary::service;
@@ -2309,6 +2353,7 @@ int main() {
     CheckSettingsReturnBoundary();
     CheckNumberDraftBoundary();
     CheckNumberDiagnosticBoundary();
+    CheckChoiceDiagnosticBoundary();
     CheckNumberKeys();
     std::puts("Retained adapter: Number diagnostic transport, delayed numeric identity and readback-before-acknowledgement; exactly-once Apply-and-exit receipts after complete queued batches, stationary wheel/pointer handoff, immutable value proposals/acknowledgements, authoritative settings return and authored Back, settings capability/draw ownership and state/lifecycle boundaries, ordered event/FIFO publication, restore suppression, pending dictionary, presentation delegation, framed saves, input suspension and cursor mapping passed");
 }

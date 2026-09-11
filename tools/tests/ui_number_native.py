@@ -21,7 +21,7 @@ def main():
     if msvc and args.sanitize:parser.error('Use the Clang/GCC driver for sanitizer mode')
     out=Path(tempfile.mkdtemp(prefix='number-native-',dir=ROOT/'.tmp'))
     env={**os.environ,'TEMP':str(out),'TMP':str(out),'TMPDIR':str(out)}
-    names=['Interaction.h','Interaction.cpp','Document.h','Document.cpp','Vector.h','TextInput.h','TextInput.cpp',
+    names=['Interaction.h','Interaction.cpp','ScrollGeometry.h','ScrollGeometry.cpp','Document.h','Document.cpp','Vector.h','TextInput.h','TextInput.cpp',
            'TextEdit.h','TextEdit.cpp','TextEditCommand.h','NativeTextDocument.h','NativeTextDocument.cpp',
            'NativeTextEditor.h','NativeTextEditor.cpp','TextInputBroker.h','Input.h','Input.cpp']
     tests=['UiNumberNativeTest.cpp','UiNumberDraftTest.cpp','UiNumberSnapshotTest.cpp','UiValueInteractionTest.cpp','UiModalInteractionTest.cpp']
@@ -39,7 +39,7 @@ def main():
                '/D_ITERATOR_DEBUG_LEVEL=0','/I'+str(ROOT),'/I'+str(CORE),
                '/Fo'+str(out)+os.sep,'/Fd'+str(out/'native.pdb')]
     if args.sanitize:flags+=['-fsanitize=address,undefined','-fno-omit-frame-pointer','-g0','-no-pie']
-    core=[str(working),str(valid)]+[str(CORE/n) for n in ['TextInput.cpp','TextEdit.cpp','NativeTextDocument.cpp','NativeTextEditor.cpp','Input.cpp']]
+    core=[str(working),str(valid)]+[str(CORE/n) for n in ['ScrollGeometry.cpp','TextInput.cpp','TextEdit.cpp','NativeTextDocument.cpp','NativeTextEditor.cpp','Input.cpp']]
     report={'passed':False,'scope':__doc__,'sources':before,'cases':[]}
     def run(cmd,name):
         r=subprocess.run(cmd,env=env,cwd=out,capture_output=True,text=True,encoding='utf-8',errors='replace')

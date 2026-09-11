@@ -42,7 +42,7 @@ def main():
    ('monotonic_geometry', 'r.geometryToken<previous.geometryToken ||', 'false ||'),
    ('current_geometry', 'command.geometryToken==found->second.scroll->geometryToken &&', 'true &&'),
    ('current_source', 'command.sourceToken==scrollSource &&', 'true &&'),
-   ('captured_grab', 'scrollGrabFraction=std::clamp((pointer-g.position)/g.thumb,0.0,1.0);', 'scrollGrabFraction=.5;'),
+   ('captured_grab', 'scrollGrabFraction=std::clamp((pointer-g.position)/g.thumb,0.0,1.0);dragging=id;', 'scrollGrabFraction=.5;dragging=id;'),
    ('pointer_focus', 'if(items.at(id).control.role!=ControlRole::Scrollbar) Focus(id);', 'Focus(id);'),
    ('command_grab_bounds', '||command.grabFraction<0||command.grabFraction>1', ''),
    ('held_quarantine', 'heldNavigation.insert(input);blockedNavigation.insert(input);', 'heldNavigation.insert(input);'),

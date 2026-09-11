@@ -9,10 +9,11 @@ namespace openq4::ui {
 struct PointerPartResult {
 	std::string control, option;
 	std::optional<double> fraction;
-	bool invalidProjection = false;
+	bool invalidProjection = false, choiceTrack = false, thumb = false, pendingLayout = false;
 };
-// Derived RmlUi presentation only. Canonical node IDs and source remain intact;
-// no widget readback, action, binding or persistent value is changed here.
+// Derived RmlUi presentation. Canonical source and application values remain
+// intact. Paint publishes measured local Choice scroll readback and consumes
+// its pending offset restoration; it never emits application actions.
 class ValueControlView {
 public:
 	ValueControlView();
@@ -21,10 +22,11 @@ public:
 	bool Initialize(const DocumentModel& model, Rml::ElementDocument& document,
 		std::function<std::string(const std::string&)> translate, std::string& error);
 	// Returns true when derived properties changed and another layout is needed.
-	bool Paint(const Interaction& interaction, const std::map<std::string,ControlReadback>& readbacks,
+	bool Paint(Interaction& interaction, const std::map<std::string,ControlReadback>& readbacks,
 		int width, int height, float dpRatio, const std::function<double(const std::string&)>& opacity);
 	// Use the actual clipped Rml hit, except a captured slider projects outside
 	// its track. Coordinates are the same physical viewport pixels as RmlUi.
+	bool ChoiceScrollFresh(const std::string&, const Interaction&) const;
 	PointerPartResult PointerPart(Rml::Element* actualHit, float x, float y, const Interaction& interaction) const;
 private:
 	struct Impl;

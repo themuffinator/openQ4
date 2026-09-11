@@ -114,10 +114,16 @@ struct ChoiceOption {
 	std::string labelPart, selectedPart, highlightPart;
 	std::optional<unsigned> labelIndex; // Index in a translated semicolon list; absent means the whole label.
 };
+struct ScrollSpec {
+    std::string viewport, track, thumb;
+    bool vertical = true;
+    double lineStep = 36, minimumThumb = 36; // Authored dp, converted once by layout.
+};
 struct ChoiceSpec {
 	std::string popup, viewport, content, valueText;
 	unsigned visibleRows = 8;
 	std::vector<ChoiceOption> options;
+	std::optional<ScrollSpec> scrollbar; // Local popup artwork; never a nested semantic control.
 };
 struct NumberSpec {
 	double minimum = 0, maximum = 1;
@@ -126,11 +132,6 @@ struct NumberSpec {
 	// A positioned/clipped viewport owns direct absolute text and paint parts.
 	// Their transform is shared through the viewport; validation stays outside.
 	std::string viewport, text, selection, caret, composition, validation;
-};
-struct ScrollSpec {
-    std::string viewport, track, thumb;
-    bool vertical = true;
-    double lineStep = 36, minimumThumb = 36; // Authored dp, converted once by layout.
 };
 struct Control {
 	std::string action, label;

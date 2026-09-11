@@ -171,6 +171,12 @@ public:
 	std::string FocusedControl() const;
 	std::optional<ControlState> GetControlState(const std::string& id) const;
 	std::optional<WidgetViewState> GetWidgetState(const std::string& id) const;
+    // Semantic popup presentation only. No device event, option acceptance or
+    // application action is generated. The opening identity survives layout
+    // refresh; scrolling additionally requires fresh actual popup geometry.
+    bool OpenChoicePopup(const std::string& id, double seconds);
+    bool CloseChoicePopup(const std::string& id, std::uint64_t openToken, double seconds);
+    bool ScrollChoicePopup(const std::string& id, std::uint64_t openToken, ScrollStep step, double seconds);
 	bool AcknowledgeControlProposal(const std::string& id, std::uint64_t token, bool accepted);
 	// Local edit operations require focused eligibility and the current exact
 	// edit identity. They never write an accepted setting or access a device.

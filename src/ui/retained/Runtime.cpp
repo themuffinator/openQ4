@@ -682,6 +682,13 @@ struct Runtime::Impl {
 		if (!stateError.empty()) { error = stateError; return false; }
 		UpdateInteraction(seconds); return true;
 	}
+    bool PrepareChoicePopup(double seconds) {
+        if (!canonical || !document || viewport.width <= 0 || viewport.height <= 0 ||
+            !std::isfinite(seconds) || seconds < 0) return false;
+        ReadStateSources();
+        if (!stateError.empty()) return false;
+        UpdateInteraction(seconds); return true;
+    }
 	bool RefreshNumberFocusLayout(std::string& error) {
 		if (!context || viewport.width <= 0 || viewport.height <= 0) {
 			error = "Number focus requires a usable layout viewport"; return false;
@@ -869,7 +876,7 @@ struct Runtime::Impl {
         else {
             const auto part = valueView.PointerPart(element,pointerX,pointerY,interaction);
             if (part.invalidProjection) interaction.Cancel();
-            else interaction.PointerPart(part.control.empty() ? (pointerNavigation ? hit : std::string{}) : part.control,part.fraction,part.option);
+            else if(!part.pendingLayout) interaction.PointerPart(part.control.empty() ? (pointerNavigation ? hit : std::string{}) : part.control,part.fraction,part.option,part.thumb,part.choiceTrack);
         }
         ApplyScrollCommands();
 		Feedback(time);
@@ -1163,7 +1170,7 @@ bool Runtime::RestoreSnapshot(const std::string& snapshot, std::string& error, d
 					!entry["firstVisible"].isUInt()) return reject("Invalid restored widget state");
 				ValueWidgetSnapshot::Widget widget{ControlRole(entry["role"].asUInt()),entry["firstVisible"].asUInt()};
 				if(hasScroll) {
-                    if(widget.role!=ControlRole::Scrollbar || !entry["scrollOffsetDp"].isNumeric() ||
+                    if((widget.role!=ControlRole::Scrollbar && widget.role!=ControlRole::Choice) || !entry["scrollOffsetDp"].isNumeric() ||
                         !std::isfinite(entry["scrollOffsetDp"].asDouble()) || entry["scrollOffsetDp"].asDouble()<0 || entry["scrollOffsetDp"].asDouble()>1e12)
                         return reject("Invalid restored scrollbar offset");
                     widget.scrollOffsetDp=entry["scrollOffsetDp"].asDouble();
@@ -1486,7 +1493,11 @@ void Runtime::PointerWheel(int rows, double seconds) {
 		// stationary pointer must not reselect its old row on the next frame;
 		// an actual pointer move or button event restores pointer navigation.
 		impl->pointerNavigation = false;
-		impl->interaction.NavigationPulse(rows > 0 ? MenuInput::Down : MenuInput::Up);
+        const auto* node=impl->canonical->Model().FindNode(id);
+        const auto* choice=node&&node->control?std::get_if<ChoiceSpec>(&node->control->widget):nullptr;
+        if(choice&&choice->scrollbar) {
+            if(impl->valueView.ChoiceScrollFresh(id,impl->interaction))impl->interaction.ChoiceScrollPulse(id,rows>0?ScrollStep::LineForward:ScrollStep::LineBackward);
+        } else impl->interaction.NavigationPulse(rows > 0 ? MenuInput::Down : MenuInput::Up);
 		impl->Feedback(seconds); return;
 	}
 	if (!impl->pointerPresent || !impl->context || !impl->document || impl->pointerX < 0 || impl->pointerY < 0 ||
@@ -1542,6 +1553,24 @@ std::optional<WidgetViewState> Runtime::GetWidgetState(const std::string& id) co
     auto value=impl->interaction.Widget(id);
     if(value && value->scroll && (impl->viewport.width<=0 || impl->viewport.height<=0))value->scroll->available=false;
     return value;
+}
+bool Runtime::OpenChoicePopup(const std::string& id,double seconds) {
+    if (!impl->PrepareChoicePopup(seconds)) return false;
+    const bool result = impl->interaction.OpenChoicePopup(id); impl->Feedback(seconds); return result;
+}
+bool Runtime::CloseChoicePopup(const std::string& id,std::uint64_t expected,double seconds) {
+    if (!impl->PrepareChoicePopup(seconds)) return false;
+    const bool result = impl->interaction.CloseChoicePopup(id,expected); impl->Feedback(seconds); return result;
+}
+bool Runtime::ScrollChoicePopup(const std::string& id,std::uint64_t expected,ScrollStep step,double seconds) {
+    if (!impl->PrepareChoicePopup(seconds)) return false;
+    if (!impl->valueView.ChoiceScrollFresh(id,impl->interaction)) return false;
+    const auto view = impl->interaction.Widget(id);
+    if (!view || !view->scroll) return false;
+    // A semantic line/page/end intent has no stored pointer coordinates. Bind
+    // it to fresh painted geometry and the caller's exact original opening.
+    const bool result = impl->interaction.ScrollChoicePopup(id,expected,view->scroll->geometryToken,step);
+    impl->Feedback(seconds); return result;
 }
 bool Runtime::AcknowledgeControlProposal(const std::string& id, std::uint64_t token, bool accepted) {
 	// Host-backed actions can complete between frames. Observe their actual

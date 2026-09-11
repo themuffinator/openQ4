@@ -95,6 +95,8 @@ struct WidgetViewState {
 	unsigned firstVisible = 0;
 	std::optional<NumberEditView> number;
 	std::optional<ScrollReadback> scroll;
+	std::uint64_t popupToken = 0, popupRevision = 0, revealRevision = 0;
+	double popupOffsetDp = 0;
 };
 struct NumberEditorSnapshot {
 	TextEditState state;
@@ -156,12 +158,25 @@ public:
     std::vector<ScrollCommand> TakeScrollCommands();
     bool CanDispatchScrollCommand(const ScrollCommand&) const;
     bool ScrollPulse(const std::string&, ScrollStep);
+    // Choice-owned local scrolling. Exact open/revision/geometry proof comes
+    // from fresh rendered popup layout; never enters the application queue.
+    bool SetChoiceScrollReadback(const std::string&, std::uint64_t openToken,
+        std::uint64_t revision, const ScrollReadback&, bool revealConsumed);
+    bool ChoiceScrollPulse(const std::string&, ScrollStep);
+    bool ChoiceScrollReady(const std::string&) const;
+    // Programmatic local popup state, without device events or value proposals.
+    // Open requires focused eligibility and no held/armed input. Close and
+    // scroll name the exact opening; scroll additionally binds current layout.
+    bool OpenChoicePopup(const std::string& id);
+    bool CloseChoicePopup(const std::string& id, std::uint64_t openToken);
+    bool ScrollChoicePopup(const std::string& id, std::uint64_t openToken,
+        std::uint64_t geometryToken, ScrollStep step);
 	bool SetEnabled(const std::string& id, bool enabled);
 	bool Focus(const std::string& id);
 	void Hover(const std::string& id);
 	// Layout supplies a track fraction (increasing toward maximum, including
 	// outside-track values during capture) or a stable popup option ID.
-	void PointerPart(const std::string& id, std::optional<double> trackFraction = {}, const std::string& option = {}, bool scrollThumb = false);
+	void PointerPart(const std::string& id, std::optional<double> trackFraction = {}, const std::string& option = {}, bool scrollThumb = false, bool choiceTrack = false);
 	std::string CapturedPointerControl() const { return dragging; }
 	void Pointer(bool down);
 	void Input(MenuInput input, bool down);
@@ -300,6 +315,8 @@ private:
 		std::optional<ControlReadback> readback;
 		std::optional<ScrollReadback> scroll;
 		std::optional<double> scrollRestore;
+        double choiceOffsetDp = 0;
+        std::uint64_t choiceRevision = 0, choiceReveal = 0, choiceLayoutRevision = 0;
 		std::optional<StateValue> pending, rejected;
 		std::uint64_t proposalToken = 0;
 		unsigned firstVisible = 0;
@@ -345,6 +362,9 @@ private:
 	void SliderKey(MenuInput input);
 	void ScrollKey(MenuInput input);
 	void QueueScroll(const std::string&, ScrollStep, bool drag = false);
+    bool MoveChoiceScroll(const std::string&, ScrollStep, bool drag = false);
+    void EndChoiceScrollGesture();
+    bool PopupInputIdle() const;
 	double SliderValue(const SliderSpec& spec, double fraction) const;
 	void Refresh();
 	void Queue(ControlAction action);
@@ -365,7 +385,8 @@ private:
 	std::string dragging, popup, highlight, pointerOption, armedOption;
 	std::optional<double> pointerFraction, dragPreview;
 	bool popupAcceptArm = false;
-    bool pointerScrollThumb = false;
+    bool pointerScrollThumb = false, pointerChoiceTrack = false, choiceScrollArm = false;
+    std::uint64_t popupToken = 0;
     double scrollGrabFraction = 0;
     std::uint64_t scrollSource = 0;
     std::vector<ScrollCommand> scrollCommands;

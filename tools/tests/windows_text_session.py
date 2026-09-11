@@ -24,7 +24,7 @@ def main():
     core=ROOT/'src/ui/retained';sys=ROOT/'src/sys/sdl3'
     originals=[sys/'WindowsTextSession.cpp',sys/'WindowsTextStore.cpp',sys/'WindowsTextCollectionBridge.cpp',
         sys/'NativeQueueBatch.cpp',ROOT/'src/ui/application/NativeTextCollectionCoordinator.cpp']
-    originals += [core/n for n in ['Interaction.cpp','TextInput.cpp','TextEdit.cpp','NativeTextDocument.cpp','NativeTextEditor.cpp','Input.cpp']]
+    originals += [core/n for n in ['Interaction.cpp','ScrollGeometry.cpp','TextInput.cpp','TextEdit.cpp','NativeTextDocument.cpp','NativeTextEditor.cpp','Input.cpp']]
     test=ROOT/('tools/tests/native/WindowsNativeInputFactsTest.cpp' if a.route_facts else 'tools/tests/native/WindowsTextSessionTest.cpp')
     paths=originals+[test,Path(__file__).resolve(),ROOT/'tools/tests/filesystem_case_segments.py',core/'Document.cpp']
     paths+=list((ROOT/'src').rglob('*.h'))+[ROOT/'subprojects/packagefiles/sdl3/include/SDL3/SDL_openq4_native_fence.h']

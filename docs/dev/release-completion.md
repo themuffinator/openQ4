@@ -6,6 +6,10 @@
   replacement or teardown. Live native text entry remains in development and is
   not enabled by this checkpoint.
 
+- SYSTEM dropdowns gain editable vector scrollbars for overflowing option lists.
+  Scrolling preserves the current selection and does not change a setting;
+  fitting lists hide the inert scrollbar. This remains development work on the
+  opt-in replacement UI, with complete screen and platform acceptance pending.
 - SYSTEM gains an editable vector scrollbar with a generous target, a narrow
   trough and a cut-corner thumb. Its range follows the actual settings content;
   deliberate scroll position survives UI-scale changes and window resizing.

@@ -1159,6 +1159,15 @@ bool UI_RetainedDiagnostic(idUserInterface* gui, const idCmdArgs& args) {
 			id.c_str(),static_cast<unsigned>(widget->role),static_cast<unsigned>(widget->accepted.index()),number(widget->accepted),
 			widget->pending ? 1 : 0,widget->pending ? number(*widget->pending) : 0,widget->rejected ? 1 : 0,
 			static_cast<unsigned long long>(widget->proposalToken),widget->popupOpen ? 1 : 0,widget->firstVisible);
+        if (widget->role == ControlRole::Choice) {
+            const ScrollReadback view = widget->scroll.value_or(ScrollReadback{});
+            const auto& geometry = view.geometry;
+            common->Printf("RETAINED_GUI_CHOICE_SCROLL id=%s open=%d opening=%llu revision=%llu offsetDp=%.9g available=%d usable=%d density=%.9g viewport=%.9g range=%.9g offset=%.9g track=%.9g thumb=%.9g position=%.9g travel=%.9g geometry=%llu\n",
+                id.c_str(),widget->popupOpen ? 1 : 0,static_cast<unsigned long long>(widget->popupToken),
+                static_cast<unsigned long long>(widget->popupRevision),widget->popupOffsetDp,view.available ? 1 : 0,
+                geometry.usable ? 1 : 0,view.dpRatio,geometry.viewport,geometry.range,geometry.offset,geometry.track,
+                geometry.thumb,geometry.position,geometry.travel,static_cast<unsigned long long>(view.geometryToken));
+        }
 		if (widget->number) {
 			const auto& edit = *widget->number; const auto geometry = impl.RuntimeView()->GetNumberGeometry(id);
 			common->Printf("RETAINED_GUI_NUMBER id=%s active=%d bytes=%llu anchor=%llu caret=%llu status=%u dirty=%d conflict=%d undo=%d redo=%d session=%llu revision=%llu geometry=%d\n",
@@ -1168,6 +1177,21 @@ bool UI_RetainedDiagnostic(idUserInterface* gui, const idCmdArgs& args) {
 				static_cast<unsigned long long>(edit.identity.session),static_cast<unsigned long long>(edit.identity.revision),geometry ? 1 : 0);
 		}
 		return true;
+    } else if (verb == "choice" && args.Argc() >= 4) {
+        // Direct local presentation operations; never synthesize user input.
+        if (!impl.active || !owner.IsInteractive()) return false;
+        const std::string operation(args.Argv(2)), id(args.Argv(3));
+        auto* runtime = impl.RuntimeView(); const auto widget = runtime->GetWidgetState(id);
+        if (!widget || widget->role != ControlRole::Choice) return false;
+        const auto token = widget->popupToken; const double now = RetainedUI_PresentationTime();
+        if (operation == "open" && args.Argc() == 4) okay = runtime->OpenChoicePopup(id,now);
+        else if (operation == "close" && args.Argc() == 4) okay = runtime->CloseChoicePopup(id,token,now);
+        else if (operation == "scroll" && args.Argc() == 5) {
+            const std::map<std::string,ScrollStep> steps = {{"line-back",ScrollStep::LineBackward},{"line-forward",ScrollStep::LineForward},
+                {"page-back",ScrollStep::PageBackward},{"page-forward",ScrollStep::PageForward},{"start",ScrollStep::Start},{"end",ScrollStep::End}};
+            const auto step = steps.find(args.Argv(4));
+            if (step != steps.end()) okay = runtime->ScrollChoicePopup(id,token,step->second,now);
+        }
 	} else if (verb == "number" && args.Argc() >= 4) {
 		// Semantic diagnostics use the same guarded editor operations as normal
 		// input. They do not synthesize device events or access the clipboard.

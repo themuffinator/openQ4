@@ -141,7 +141,7 @@ int main() {
     source=manager_source(True)+'\n'+(ROOT/'tools/tests/native/UiManagedNativeOwnerTest.cpp').read_text()
     core=ROOT/'src/ui/retained'
     paths=[ROOT/n for n in ['src/ui/UserInterfaceNativeText.h','src/ui/UserInterface.h','src/ui/UserInterfaceLocal.h','src/ui/UserInterface.cpp','src/ui/UserInterfaceManaged.h','src/ui/UserInterfaceDeferred.h','src/ui/UserInterfaceDeferred.cpp','src/ui/UserInterfaceRetained.h','src/ui/UserInterfaceRetained.cpp','src/ui/UserInterfaceText.h','src/ui/UserInterfaceClipboard.h','src/ui/application/ManagedNativeTextOwner.h','src/ui/application/ManagedNativeTextOwner.cpp','src/ui/application/NativeTextCollectionCoordinator.h','src/sys/sdl3/NativeQueueBatch.h','tools/tests/ui_manager_lifecycle.py','tools/tests/ui_managed_native_owner.py','tools/tests/filesystem_case_segments.py','tools/tests/native/UiManagedNativeOwnerTest.cpp','tools/tests/sdl3_clipboard_status.py','subprojects/sdl3.wrap','subprojects/packagefiles/sdl3/include/SDL3/SDL_openq4_native_fence.h']]
-    paths += [core/n for n in ['Runtime.h','Runtime.cpp','Interaction.h','Interaction.cpp','Document.h','Document.cpp','Vector.h','TextInput.h','TextInput.cpp','TextEdit.h','TextEdit.cpp','TextEditCommand.h','NativeTextDocument.h','NativeTextDocument.cpp','NativeTextEditor.h','NativeTextEditor.cpp','TextInputBroker.h','Input.h','Input.cpp']]
+    paths += [core/n for n in ['Runtime.h','Runtime.cpp','Interaction.h','Interaction.cpp','ScrollGeometry.h','ScrollGeometry.cpp','Document.h','Document.cpp','Vector.h','TextInput.h','TextInput.cpp','TextEdit.h','TextEdit.cpp','TextEditCommand.h','NativeTextDocument.h','NativeTextDocument.cpp','NativeTextEditor.h','NativeTextEditor.cpp','TextInputBroker.h','Input.h','Input.cpp']]
     import sdl3_clipboard_status as helper
     helper.ROOT=ROOT
     helper.FILES=['include/SDL3/SDL_'+n+'.h' for n in ['atomic','audio','begin_code','blendmode','camera','close_code','endian','error','events','gamepad','guid','init','iostream','joystick','keyboard','keycode','mouse','mutex','pen','pixels','platform_defines','power','properties','rect','scancode','sensor','stdinc','surface','thread','touch','video']]
@@ -157,7 +157,7 @@ int main() {
     if args.msvc:flags=[args.compiler,'/nologo','/std:c++20','/EHsc','/W3','/MTd' if args.debug_crt else '/MT']+['/I'+str(p) for p in includes]
     else:flags=[args.compiler,'-std=c++20','-I',str(ROOT),'-I',str(core),'-I',str(includes[2]),'-I',str(includes[3])]
     if args.sanitize:flags+=['-fsanitize=address,undefined','-fno-omit-frame-pointer','-g0','-no-pie']
-    units=[valid]+[core/(n+'.cpp') for n in ['Interaction','TextInput','TextEdit','NativeTextDocument','NativeTextEditor','Input']]+[ROOT/'src/ui/application/ManagedNativeTextOwner.cpp']
+    units=[valid]+[core/(n+'.cpp') for n in ['Interaction','ScrollGeometry','TextInput','TextEdit','NativeTextDocument','NativeTextEditor','Input']]+[ROOT/'src/ui/application/ManagedNativeTextOwner.cpp']
     report={'passed':False,'scope':__doc__,'sources':before,'sdl_source':provision,'sdl_headers':sdl_before,'cases':[],'objects':[],'validation_sha256':sha(valid)}
     def run(command,name,timeout=180):
         r=subprocess.run(command,cwd=out,env=env,capture_output=True,text=True,encoding='utf-8',errors='replace',timeout=timeout)

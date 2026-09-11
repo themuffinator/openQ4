@@ -795,7 +795,7 @@ private:
 			if (role == "button") Fields(control,p,{"role","action","event","label","enabled","states","navigation","extensions"});
 			else if (role == "toggle") Fields(control,p,{"role","action","label","enabled","states","navigation","value","mixed","parts","extensions"});
 			else if (role == "slider") Fields(control,p,{"role","action","label","enabled","states","navigation","value","minimum","maximum","step","decimals","orientation","parts","extensions"});
-			else if (role == "choice") Fields(control,p,{"role","action","label","enabled","states","navigation","value","parts","visibleRows","options","extensions"});
+			else if (role == "choice") Fields(control,p,{"role","action","label","enabled","states","navigation","value","parts","visibleRows","options","scrollbar","extensions"});
 			else if (role == "number") Fields(control,p,{"role","action","label","enabled","states","navigation","value","minimum","maximum","exponent","maxBytes","parts","extensions"});
 			else if (role == "scrollbar") Fields(control,p,{"role","label","enabled","states","navigation","viewport","orientation","lineStep","minimumThumb","parts","extensions"});
             else Require(false,control["role"],p+"/role","Supported roles are button, toggle, slider, choice, number and scrollbar");
@@ -882,6 +882,15 @@ private:
 					Fields(parts,at,{"popup","viewport","content","value","extensions"});
 					ChoiceSpec spec; spec.popup = Id(parts["popup"],at+"/popup"); spec.viewport = Id(parts["viewport"],at+"/viewport");
 					spec.content = Id(parts["content"],at+"/content"); spec.valueText = Id(parts["value"],at+"/value");
+					if (control.isMember("scrollbar")) {
+						const auto& bar = control["scrollbar"]; const auto where = p+"/scrollbar";
+						Fields(bar,where,{"track","thumb","lineStep","minimumThumb","extensions"});
+						ScrollSpec scroll; scroll.viewport = spec.viewport;
+						scroll.track = Id(bar["track"],where+"/track"); scroll.thumb = Id(bar["thumb"],where+"/thumb");
+						if (bar.isMember("lineStep")) scroll.lineStep = Numeric(bar["lineStep"],where+"/lineStep",1,4096);
+						if (bar.isMember("minimumThumb")) scroll.minimumThumb = Numeric(bar["minimumThumb"],where+"/minimumThumb",1,4096);
+						spec.scrollbar = std::move(scroll);
+					}
 					if (control.isMember("visibleRows")) {
 						Require(control["visibleRows"].isUInt() && control["visibleRows"].asUInt() >= 1 && control["visibleRows"].asUInt() <= 32,
 							control["visibleRows"],p+"/visibleRows","Choice visible rows must be 1..32");
@@ -1141,6 +1150,34 @@ private:
 			owned.emplace(choice->viewport,"overflow");
 			owned.emplace(choice->viewport,"clip");
 			reserve(choice->viewport,"height"); reserve(choice->content,"top"); reserve(choice->valueText,"text");
+			if (choice->scrollbar) {
+				const auto& scroll = *choice->scrollbar;
+				part(scroll.track,choice->popup,"group",path+"/scrollbar/track");
+				part(scroll.thumb,scroll.track,nullptr,path+"/scrollbar/thumb");
+				separate(scroll.track,choice->viewport);
+				const auto direct = [&](const std::string& child, const std::string& parent) {
+					const auto& children = model.FindNode(parent)->children;
+					return std::any_of(children.begin(),children.end(),[&](const Node& node) { return node.id == child; });
+				};
+				Require(direct(choice->viewport,choice->popup) && direct(scroll.track,choice->popup) && direct(scroll.thumb,scroll.track),
+					value,path,"Choice scrollbar track and viewport must be direct popup children, with a direct thumb child");
+				keyword(scroll.track,"position","absolute"); owned.emplace(scroll.track,"position");
+                reserve(scroll.track,"left");
+				keyword(scroll.thumb,"position","absolute"); owned.emplace(scroll.thumb,"position");
+				reserve(choice->viewport,"width");
+				for (const auto& id : {scroll.track,scroll.thumb}) {
+					reserve(id,"height"); reserve(id,"top");
+					const auto& properties = model.FindNode(id)->properties;
+					if (properties.contains("bottom")) keyword(id,"bottom","auto");
+					owned.emplace(id,"bottom");
+					for (const std::string prefix : {"min-","max-"}) {
+						Require(!properties.contains(prefix+"height"),value,path,"Choice scrollbar height constraints are derived from measured popup geometry");
+						owned.emplace(id,prefix+"height");
+					}
+				}
+				Require(!model.FindNode(scroll.thumb)->properties.contains("transform"),value,path,"Choice scrollbar thumb cannot have an independent transform");
+				owned.emplace(scroll.thumb,"transform");
+			}
 			for (size_t i = 0; i < choice->options.size(); ++i) {
 				const auto& option = choice->options[i]; const auto at = path+"/options/"+std::to_string(i);
 				part(option.node,choice->content,"group",at+"/node");

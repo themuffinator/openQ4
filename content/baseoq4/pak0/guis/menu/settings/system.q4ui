@@ -5004,6 +5004,26 @@
               }
             }
           ]
+        },
+        {
+          "node": "settings_postaa-popup-scroll-active",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 0
+              }
+            },
+            {
+              "atMs": 90,
+              "value": {
+                "type": "number",
+                "value": 0
+              }
+            }
+          ]
         }
       ]
     },
@@ -5014,6 +5034,26 @@
       "tracks": [
         {
           "node": "settings_postaa-focus",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 0.55
+              }
+            },
+            {
+              "atMs": 90,
+              "value": {
+                "type": "number",
+                "value": 0.55
+              }
+            }
+          ]
+        },
+        {
+          "node": "settings_postaa-popup-scroll-active",
           "property": "opacity",
           "keys": [
             {
@@ -5058,6 +5098,26 @@
               }
             }
           ]
+        },
+        {
+          "node": "settings_postaa-popup-scroll-active",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 0.85
+              }
+            },
+            {
+              "atMs": 90,
+              "value": {
+                "type": "number",
+                "value": 0.85
+              }
+            }
+          ]
         }
       ]
     },
@@ -5085,6 +5145,26 @@
               }
             }
           ]
+        },
+        {
+          "node": "settings_postaa-popup-scroll-active",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 1
+              }
+            },
+            {
+              "atMs": 45,
+              "value": {
+                "type": "number",
+                "value": 1
+              }
+            }
+          ]
         }
       ]
     },
@@ -5109,6 +5189,26 @@
               "value": {
                 "type": "number",
                 "value": 0.025
+              }
+            }
+          ]
+        },
+        {
+          "node": "settings_postaa-popup-scroll-active",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 0
+              }
+            },
+            {
+              "atMs": 90,
+              "value": {
+                "type": "number",
+                "value": 0
               }
             }
           ]
@@ -6894,6 +6994,26 @@
               }
             }
           ]
+        },
+        {
+          "node": "settings_resolution_scale-popup-scroll-active",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 0
+              }
+            },
+            {
+              "atMs": 90,
+              "value": {
+                "type": "number",
+                "value": 0
+              }
+            }
+          ]
         }
       ]
     },
@@ -6904,6 +7024,26 @@
       "tracks": [
         {
           "node": "settings_resolution_scale-focus",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 0.55
+              }
+            },
+            {
+              "atMs": 90,
+              "value": {
+                "type": "number",
+                "value": 0.55
+              }
+            }
+          ]
+        },
+        {
+          "node": "settings_resolution_scale-popup-scroll-active",
           "property": "opacity",
           "keys": [
             {
@@ -6948,6 +7088,26 @@
               }
             }
           ]
+        },
+        {
+          "node": "settings_resolution_scale-popup-scroll-active",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 0.85
+              }
+            },
+            {
+              "atMs": 90,
+              "value": {
+                "type": "number",
+                "value": 0.85
+              }
+            }
+          ]
         }
       ]
     },
@@ -6972,6 +7132,26 @@
               "value": {
                 "type": "number",
                 "value": 0.8
+              }
+            }
+          ]
+        },
+        {
+          "node": "settings_resolution_scale-popup-scroll-active",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 1
+              }
+            },
+            {
+              "atMs": 45,
+              "value": {
+                "type": "number",
+                "value": 1
               }
             }
           ]
@@ -7002,6 +7182,26 @@
               }
             }
           ]
+        },
+        {
+          "node": "settings_resolution_scale-popup-scroll-active",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 0
+              }
+            },
+            {
+              "atMs": 90,
+              "value": {
+                "type": "number",
+                "value": 0
+              }
+            }
+          ]
         }
       ]
     },
@@ -7029,6 +7229,26 @@
               }
             }
           ]
+        },
+        {
+          "node": "settings_vsync-popup-scroll-active",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 0
+              }
+            },
+            {
+              "atMs": 90,
+              "value": {
+                "type": "number",
+                "value": 0
+              }
+            }
+          ]
         }
       ]
     },
@@ -7039,6 +7259,26 @@
       "tracks": [
         {
           "node": "settings_vsync-focus",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 0.55
+              }
+            },
+            {
+              "atMs": 90,
+              "value": {
+                "type": "number",
+                "value": 0.55
+              }
+            }
+          ]
+        },
+        {
+          "node": "settings_vsync-popup-scroll-active",
           "property": "opacity",
           "keys": [
             {
@@ -7083,6 +7323,26 @@
               }
             }
           ]
+        },
+        {
+          "node": "settings_vsync-popup-scroll-active",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 0.85
+              }
+            },
+            {
+              "atMs": 90,
+              "value": {
+                "type": "number",
+                "value": 0.85
+              }
+            }
+          ]
         }
       ]
     },
@@ -7110,6 +7370,26 @@
               }
             }
           ]
+        },
+        {
+          "node": "settings_vsync-popup-scroll-active",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 1
+              }
+            },
+            {
+              "atMs": 45,
+              "value": {
+                "type": "number",
+                "value": 1
+              }
+            }
+          ]
         }
       ]
     },
@@ -7134,6 +7414,26 @@
               "value": {
                 "type": "number",
                 "value": 0.025
+              }
+            }
+          ]
+        },
+        {
+          "node": "settings_vsync-popup-scroll-active",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 0
+              }
+            },
+            {
+              "atMs": 90,
+              "value": {
+                "type": "number",
+                "value": 0
               }
             }
           ]
@@ -7534,6 +7834,26 @@
               }
             }
           ]
+        },
+        {
+          "node": "settings_preset-popup-scroll-active",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 0
+              }
+            },
+            {
+              "atMs": 90,
+              "value": {
+                "type": "number",
+                "value": 0
+              }
+            }
+          ]
         }
       ]
     },
@@ -7544,6 +7864,26 @@
       "tracks": [
         {
           "node": "settings_preset-focus",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 0.55
+              }
+            },
+            {
+              "atMs": 90,
+              "value": {
+                "type": "number",
+                "value": 0.55
+              }
+            }
+          ]
+        },
+        {
+          "node": "settings_preset-popup-scroll-active",
           "property": "opacity",
           "keys": [
             {
@@ -7588,6 +7928,26 @@
               }
             }
           ]
+        },
+        {
+          "node": "settings_preset-popup-scroll-active",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 0.85
+              }
+            },
+            {
+              "atMs": 90,
+              "value": {
+                "type": "number",
+                "value": 0.85
+              }
+            }
+          ]
         }
       ]
     },
@@ -7615,6 +7975,26 @@
               }
             }
           ]
+        },
+        {
+          "node": "settings_preset-popup-scroll-active",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 1
+              }
+            },
+            {
+              "atMs": 45,
+              "value": {
+                "type": "number",
+                "value": 1
+              }
+            }
+          ]
         }
       ]
     },
@@ -7639,6 +8019,26 @@
               "value": {
                 "type": "number",
                 "value": 0.025
+              }
+            }
+          ]
+        },
+        {
+          "node": "settings_preset-popup-scroll-active",
+          "property": "opacity",
+          "keys": [
+            {
+              "atMs": 0,
+              "value": {
+                "type": "number",
+                "value": 0
+              }
+            },
+            {
+              "atMs": 90,
+              "value": {
+                "type": "number",
+                "value": 0
               }
             }
           ]
@@ -12575,6 +12975,546 @@
                                     ]
                                   }
                                 ]
+                              },
+                              {
+                                "id": "settings_preset-popup-scroll-track",
+                                "type": "group",
+                                "properties": {
+                                  "position": {
+                                    "type": "keyword",
+                                    "value": "absolute"
+                                  },
+                                  "display": {
+                                    "type": "keyword",
+                                    "value": "block"
+                                  },
+                                  "box-sizing": {
+                                    "type": "keyword",
+                                    "value": "border-box"
+                                  },
+                                  "left": {
+                                    "type": "length",
+                                    "value": 0,
+                                    "unit": "dp"
+                                  },
+                                  "top": {
+                                    "type": "length",
+                                    "value": 0,
+                                    "unit": "dp"
+                                  },
+                                  "width": {
+                                    "type": "length",
+                                    "value": 36,
+                                    "unit": "dp"
+                                  },
+                                  "height": {
+                                    "type": "length",
+                                    "value": 36,
+                                    "unit": "dp"
+                                  },
+                                  "opacity": {
+                                    "type": "number",
+                                    "value": 1
+                                  }
+                                },
+                                "children": [
+                                  {
+                                    "id": "settings_preset-popup-scroll-trough",
+                                    "type": "vector",
+                                    "properties": {
+                                      "position": {
+                                        "type": "keyword",
+                                        "value": "absolute"
+                                      },
+                                      "display": {
+                                        "type": "keyword",
+                                        "value": "block"
+                                      },
+                                      "box-sizing": {
+                                        "type": "keyword",
+                                        "value": "border-box"
+                                      },
+                                      "left": {
+                                        "type": "length",
+                                        "value": 0,
+                                        "unit": "dp"
+                                      },
+                                      "top": {
+                                        "type": "length",
+                                        "value": 0,
+                                        "unit": "dp"
+                                      },
+                                      "width": {
+                                        "type": "length",
+                                        "value": 100,
+                                        "unit": "%"
+                                      },
+                                      "height": {
+                                        "type": "length",
+                                        "value": 100,
+                                        "unit": "%"
+                                      },
+                                      "pointer-events": {
+                                        "type": "keyword",
+                                        "value": "none"
+                                      },
+                                      "opacity": {
+                                        "type": "number",
+                                        "value": 1
+                                      }
+                                    },
+                                    "paths": [
+                                      {
+                                        "id": "outline",
+                                        "commands": [
+                                          {
+                                            "id": "point-0",
+                                            "op": "move",
+                                            "points": [
+                                              [
+                                                16,
+                                                0
+                                              ]
+                                            ]
+                                          },
+                                          {
+                                            "id": "point-1",
+                                            "op": "line",
+                                            "points": [
+                                              [
+                                                22,
+                                                0
+                                              ]
+                                            ]
+                                          },
+                                          {
+                                            "id": "point-2",
+                                            "op": "line",
+                                            "points": [
+                                              [
+                                                22,
+                                                {
+                                                  "fraction": 1,
+                                                  "dp": 0
+                                                }
+                                              ]
+                                            ]
+                                          },
+                                          {
+                                            "id": "point-3",
+                                            "op": "line",
+                                            "points": [
+                                              [
+                                                14,
+                                                {
+                                                  "fraction": 1,
+                                                  "dp": 0
+                                                }
+                                              ]
+                                            ]
+                                          },
+                                          {
+                                            "id": "point-4",
+                                            "op": "line",
+                                            "points": [
+                                              [
+                                                14,
+                                                2
+                                              ]
+                                            ]
+                                          },
+                                          {
+                                            "id": "close",
+                                            "op": "close"
+                                          }
+                                        ],
+                                        "fill": {
+                                          "type": "solid",
+                                          "color": {
+                                            "type": "color",
+                                            "value": [
+                                              0.0353,
+                                              0.0471,
+                                              0.0314,
+                                              0.95
+                                            ]
+                                          }
+                                        },
+                                        "stroke": {
+                                          "paint": {
+                                            "type": "solid",
+                                            "color": {
+                                              "type": "color",
+                                              "value": [
+                                                0.5451,
+                                                0.5882,
+                                                0.2941,
+                                                0.4
+                                              ]
+                                            }
+                                          },
+                                          "widthDp": 1,
+                                          "minimumPixels": 1,
+                                          "join": "miter"
+                                        }
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "id": "settings_preset-popup-scroll-thumb",
+                                    "type": "group",
+                                    "properties": {
+                                      "position": {
+                                        "type": "keyword",
+                                        "value": "absolute"
+                                      },
+                                      "display": {
+                                        "type": "keyword",
+                                        "value": "block"
+                                      },
+                                      "box-sizing": {
+                                        "type": "keyword",
+                                        "value": "border-box"
+                                      },
+                                      "left": {
+                                        "type": "length",
+                                        "value": 0,
+                                        "unit": "dp"
+                                      },
+                                      "top": {
+                                        "type": "length",
+                                        "value": 0,
+                                        "unit": "dp"
+                                      },
+                                      "width": {
+                                        "type": "length",
+                                        "value": 36,
+                                        "unit": "dp"
+                                      },
+                                      "height": {
+                                        "type": "length",
+                                        "value": 36,
+                                        "unit": "dp"
+                                      },
+                                      "opacity": {
+                                        "type": "number",
+                                        "value": 1
+                                      }
+                                    },
+                                    "children": [
+                                      {
+                                        "id": "settings_preset-popup-scroll-base",
+                                        "type": "vector",
+                                        "properties": {
+                                          "position": {
+                                            "type": "keyword",
+                                            "value": "absolute"
+                                          },
+                                          "display": {
+                                            "type": "keyword",
+                                            "value": "block"
+                                          },
+                                          "box-sizing": {
+                                            "type": "keyword",
+                                            "value": "border-box"
+                                          },
+                                          "left": {
+                                            "type": "length",
+                                            "value": 0,
+                                            "unit": "dp"
+                                          },
+                                          "top": {
+                                            "type": "length",
+                                            "value": 0,
+                                            "unit": "dp"
+                                          },
+                                          "width": {
+                                            "type": "length",
+                                            "value": 100,
+                                            "unit": "%"
+                                          },
+                                          "height": {
+                                            "type": "length",
+                                            "value": 100,
+                                            "unit": "%"
+                                          },
+                                          "pointer-events": {
+                                            "type": "keyword",
+                                            "value": "none"
+                                          },
+                                          "opacity": {
+                                            "type": "number",
+                                            "value": 1
+                                          }
+                                        },
+                                        "paths": [
+                                          {
+                                            "id": "outline",
+                                            "commands": [
+                                              {
+                                                "id": "point-0",
+                                                "op": "move",
+                                                "points": [
+                                                  [
+                                                    14,
+                                                    0
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-1",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    26,
+                                                    0
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-2",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    26,
+                                                    {
+                                                      "fraction": 1,
+                                                      "dp": -4
+                                                    }
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-3",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    22,
+                                                    {
+                                                      "fraction": 1,
+                                                      "dp": 0
+                                                    }
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-4",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    10,
+                                                    {
+                                                      "fraction": 1,
+                                                      "dp": 0
+                                                    }
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-5",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    10,
+                                                    4
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "close",
+                                                "op": "close"
+                                              }
+                                            ],
+                                            "fill": {
+                                              "type": "solid",
+                                              "color": {
+                                                "type": "color",
+                                                "value": [
+                                                  0.32,
+                                                  0.36,
+                                                  0.16,
+                                                  0.95
+                                                ]
+                                              }
+                                            },
+                                            "stroke": {
+                                              "paint": {
+                                                "type": "solid",
+                                                "color": {
+                                                  "type": "color",
+                                                  "value": [
+                                                    0.5451,
+                                                    0.5882,
+                                                    0.2941,
+                                                    1
+                                                  ]
+                                                }
+                                              },
+                                              "widthDp": 1,
+                                              "minimumPixels": 1,
+                                              "join": "miter"
+                                            }
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "id": "settings_preset-popup-scroll-active",
+                                        "type": "vector",
+                                        "properties": {
+                                          "position": {
+                                            "type": "keyword",
+                                            "value": "absolute"
+                                          },
+                                          "display": {
+                                            "type": "keyword",
+                                            "value": "block"
+                                          },
+                                          "box-sizing": {
+                                            "type": "keyword",
+                                            "value": "border-box"
+                                          },
+                                          "left": {
+                                            "type": "length",
+                                            "value": 0,
+                                            "unit": "dp"
+                                          },
+                                          "top": {
+                                            "type": "length",
+                                            "value": 0,
+                                            "unit": "dp"
+                                          },
+                                          "width": {
+                                            "type": "length",
+                                            "value": 100,
+                                            "unit": "%"
+                                          },
+                                          "height": {
+                                            "type": "length",
+                                            "value": 100,
+                                            "unit": "%"
+                                          },
+                                          "pointer-events": {
+                                            "type": "keyword",
+                                            "value": "none"
+                                          },
+                                          "opacity": {
+                                            "type": "number",
+                                            "value": 0
+                                          }
+                                        },
+                                        "paths": [
+                                          {
+                                            "id": "outline",
+                                            "commands": [
+                                              {
+                                                "id": "point-0",
+                                                "op": "move",
+                                                "points": [
+                                                  [
+                                                    14,
+                                                    0
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-1",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    26,
+                                                    0
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-2",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    26,
+                                                    {
+                                                      "fraction": 1,
+                                                      "dp": -4
+                                                    }
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-3",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    22,
+                                                    {
+                                                      "fraction": 1,
+                                                      "dp": 0
+                                                    }
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-4",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    10,
+                                                    {
+                                                      "fraction": 1,
+                                                      "dp": 0
+                                                    }
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-5",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    10,
+                                                    4
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "close",
+                                                "op": "close"
+                                              }
+                                            ],
+                                            "fill": {
+                                              "type": "solid",
+                                              "color": {
+                                                "type": "color",
+                                                "value": [
+                                                  0.8902,
+                                                  0.5373,
+                                                  0,
+                                                  1
+                                                ]
+                                              }
+                                            },
+                                            "stroke": {
+                                              "paint": {
+                                                "type": "solid",
+                                                "color": {
+                                                  "type": "color",
+                                                  "value": [
+                                                    0.5451,
+                                                    0.5882,
+                                                    0.2941,
+                                                    1
+                                                  ]
+                                                }
+                                              },
+                                              "widthDp": 1,
+                                              "minimumPixels": 1,
+                                              "join": "miter"
+                                            }
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                ]
                               }
                             ]
                           }
@@ -12673,7 +13613,13 @@
                                 "highlight": "settings_preset-option-5-highlight"
                               }
                             }
-                          ]
+                          ],
+                          "scrollbar": {
+                            "track": "settings_preset-popup-scroll-track",
+                            "thumb": "settings_preset-popup-scroll-thumb",
+                            "lineStep": 36,
+                            "minimumThumb": 36
+                          }
                         }
                       },
                       {
@@ -29158,6 +30104,546 @@
                                     ]
                                   }
                                 ]
+                              },
+                              {
+                                "id": "settings_postaa-popup-scroll-track",
+                                "type": "group",
+                                "properties": {
+                                  "position": {
+                                    "type": "keyword",
+                                    "value": "absolute"
+                                  },
+                                  "display": {
+                                    "type": "keyword",
+                                    "value": "block"
+                                  },
+                                  "box-sizing": {
+                                    "type": "keyword",
+                                    "value": "border-box"
+                                  },
+                                  "left": {
+                                    "type": "length",
+                                    "value": 0,
+                                    "unit": "dp"
+                                  },
+                                  "top": {
+                                    "type": "length",
+                                    "value": 0,
+                                    "unit": "dp"
+                                  },
+                                  "width": {
+                                    "type": "length",
+                                    "value": 36,
+                                    "unit": "dp"
+                                  },
+                                  "height": {
+                                    "type": "length",
+                                    "value": 36,
+                                    "unit": "dp"
+                                  },
+                                  "opacity": {
+                                    "type": "number",
+                                    "value": 1
+                                  }
+                                },
+                                "children": [
+                                  {
+                                    "id": "settings_postaa-popup-scroll-trough",
+                                    "type": "vector",
+                                    "properties": {
+                                      "position": {
+                                        "type": "keyword",
+                                        "value": "absolute"
+                                      },
+                                      "display": {
+                                        "type": "keyword",
+                                        "value": "block"
+                                      },
+                                      "box-sizing": {
+                                        "type": "keyword",
+                                        "value": "border-box"
+                                      },
+                                      "left": {
+                                        "type": "length",
+                                        "value": 0,
+                                        "unit": "dp"
+                                      },
+                                      "top": {
+                                        "type": "length",
+                                        "value": 0,
+                                        "unit": "dp"
+                                      },
+                                      "width": {
+                                        "type": "length",
+                                        "value": 100,
+                                        "unit": "%"
+                                      },
+                                      "height": {
+                                        "type": "length",
+                                        "value": 100,
+                                        "unit": "%"
+                                      },
+                                      "pointer-events": {
+                                        "type": "keyword",
+                                        "value": "none"
+                                      },
+                                      "opacity": {
+                                        "type": "number",
+                                        "value": 1
+                                      }
+                                    },
+                                    "paths": [
+                                      {
+                                        "id": "outline",
+                                        "commands": [
+                                          {
+                                            "id": "point-0",
+                                            "op": "move",
+                                            "points": [
+                                              [
+                                                16,
+                                                0
+                                              ]
+                                            ]
+                                          },
+                                          {
+                                            "id": "point-1",
+                                            "op": "line",
+                                            "points": [
+                                              [
+                                                22,
+                                                0
+                                              ]
+                                            ]
+                                          },
+                                          {
+                                            "id": "point-2",
+                                            "op": "line",
+                                            "points": [
+                                              [
+                                                22,
+                                                {
+                                                  "fraction": 1,
+                                                  "dp": 0
+                                                }
+                                              ]
+                                            ]
+                                          },
+                                          {
+                                            "id": "point-3",
+                                            "op": "line",
+                                            "points": [
+                                              [
+                                                14,
+                                                {
+                                                  "fraction": 1,
+                                                  "dp": 0
+                                                }
+                                              ]
+                                            ]
+                                          },
+                                          {
+                                            "id": "point-4",
+                                            "op": "line",
+                                            "points": [
+                                              [
+                                                14,
+                                                2
+                                              ]
+                                            ]
+                                          },
+                                          {
+                                            "id": "close",
+                                            "op": "close"
+                                          }
+                                        ],
+                                        "fill": {
+                                          "type": "solid",
+                                          "color": {
+                                            "type": "color",
+                                            "value": [
+                                              0.0353,
+                                              0.0471,
+                                              0.0314,
+                                              0.95
+                                            ]
+                                          }
+                                        },
+                                        "stroke": {
+                                          "paint": {
+                                            "type": "solid",
+                                            "color": {
+                                              "type": "color",
+                                              "value": [
+                                                0.5451,
+                                                0.5882,
+                                                0.2941,
+                                                0.4
+                                              ]
+                                            }
+                                          },
+                                          "widthDp": 1,
+                                          "minimumPixels": 1,
+                                          "join": "miter"
+                                        }
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "id": "settings_postaa-popup-scroll-thumb",
+                                    "type": "group",
+                                    "properties": {
+                                      "position": {
+                                        "type": "keyword",
+                                        "value": "absolute"
+                                      },
+                                      "display": {
+                                        "type": "keyword",
+                                        "value": "block"
+                                      },
+                                      "box-sizing": {
+                                        "type": "keyword",
+                                        "value": "border-box"
+                                      },
+                                      "left": {
+                                        "type": "length",
+                                        "value": 0,
+                                        "unit": "dp"
+                                      },
+                                      "top": {
+                                        "type": "length",
+                                        "value": 0,
+                                        "unit": "dp"
+                                      },
+                                      "width": {
+                                        "type": "length",
+                                        "value": 36,
+                                        "unit": "dp"
+                                      },
+                                      "height": {
+                                        "type": "length",
+                                        "value": 36,
+                                        "unit": "dp"
+                                      },
+                                      "opacity": {
+                                        "type": "number",
+                                        "value": 1
+                                      }
+                                    },
+                                    "children": [
+                                      {
+                                        "id": "settings_postaa-popup-scroll-base",
+                                        "type": "vector",
+                                        "properties": {
+                                          "position": {
+                                            "type": "keyword",
+                                            "value": "absolute"
+                                          },
+                                          "display": {
+                                            "type": "keyword",
+                                            "value": "block"
+                                          },
+                                          "box-sizing": {
+                                            "type": "keyword",
+                                            "value": "border-box"
+                                          },
+                                          "left": {
+                                            "type": "length",
+                                            "value": 0,
+                                            "unit": "dp"
+                                          },
+                                          "top": {
+                                            "type": "length",
+                                            "value": 0,
+                                            "unit": "dp"
+                                          },
+                                          "width": {
+                                            "type": "length",
+                                            "value": 100,
+                                            "unit": "%"
+                                          },
+                                          "height": {
+                                            "type": "length",
+                                            "value": 100,
+                                            "unit": "%"
+                                          },
+                                          "pointer-events": {
+                                            "type": "keyword",
+                                            "value": "none"
+                                          },
+                                          "opacity": {
+                                            "type": "number",
+                                            "value": 1
+                                          }
+                                        },
+                                        "paths": [
+                                          {
+                                            "id": "outline",
+                                            "commands": [
+                                              {
+                                                "id": "point-0",
+                                                "op": "move",
+                                                "points": [
+                                                  [
+                                                    14,
+                                                    0
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-1",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    26,
+                                                    0
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-2",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    26,
+                                                    {
+                                                      "fraction": 1,
+                                                      "dp": -4
+                                                    }
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-3",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    22,
+                                                    {
+                                                      "fraction": 1,
+                                                      "dp": 0
+                                                    }
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-4",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    10,
+                                                    {
+                                                      "fraction": 1,
+                                                      "dp": 0
+                                                    }
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-5",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    10,
+                                                    4
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "close",
+                                                "op": "close"
+                                              }
+                                            ],
+                                            "fill": {
+                                              "type": "solid",
+                                              "color": {
+                                                "type": "color",
+                                                "value": [
+                                                  0.32,
+                                                  0.36,
+                                                  0.16,
+                                                  0.95
+                                                ]
+                                              }
+                                            },
+                                            "stroke": {
+                                              "paint": {
+                                                "type": "solid",
+                                                "color": {
+                                                  "type": "color",
+                                                  "value": [
+                                                    0.5451,
+                                                    0.5882,
+                                                    0.2941,
+                                                    1
+                                                  ]
+                                                }
+                                              },
+                                              "widthDp": 1,
+                                              "minimumPixels": 1,
+                                              "join": "miter"
+                                            }
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "id": "settings_postaa-popup-scroll-active",
+                                        "type": "vector",
+                                        "properties": {
+                                          "position": {
+                                            "type": "keyword",
+                                            "value": "absolute"
+                                          },
+                                          "display": {
+                                            "type": "keyword",
+                                            "value": "block"
+                                          },
+                                          "box-sizing": {
+                                            "type": "keyword",
+                                            "value": "border-box"
+                                          },
+                                          "left": {
+                                            "type": "length",
+                                            "value": 0,
+                                            "unit": "dp"
+                                          },
+                                          "top": {
+                                            "type": "length",
+                                            "value": 0,
+                                            "unit": "dp"
+                                          },
+                                          "width": {
+                                            "type": "length",
+                                            "value": 100,
+                                            "unit": "%"
+                                          },
+                                          "height": {
+                                            "type": "length",
+                                            "value": 100,
+                                            "unit": "%"
+                                          },
+                                          "pointer-events": {
+                                            "type": "keyword",
+                                            "value": "none"
+                                          },
+                                          "opacity": {
+                                            "type": "number",
+                                            "value": 0
+                                          }
+                                        },
+                                        "paths": [
+                                          {
+                                            "id": "outline",
+                                            "commands": [
+                                              {
+                                                "id": "point-0",
+                                                "op": "move",
+                                                "points": [
+                                                  [
+                                                    14,
+                                                    0
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-1",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    26,
+                                                    0
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-2",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    26,
+                                                    {
+                                                      "fraction": 1,
+                                                      "dp": -4
+                                                    }
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-3",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    22,
+                                                    {
+                                                      "fraction": 1,
+                                                      "dp": 0
+                                                    }
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-4",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    10,
+                                                    {
+                                                      "fraction": 1,
+                                                      "dp": 0
+                                                    }
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-5",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    10,
+                                                    4
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "close",
+                                                "op": "close"
+                                              }
+                                            ],
+                                            "fill": {
+                                              "type": "solid",
+                                              "color": {
+                                                "type": "color",
+                                                "value": [
+                                                  0.8902,
+                                                  0.5373,
+                                                  0,
+                                                  1
+                                                ]
+                                              }
+                                            },
+                                            "stroke": {
+                                              "paint": {
+                                                "type": "solid",
+                                                "color": {
+                                                  "type": "color",
+                                                  "value": [
+                                                    0.5451,
+                                                    0.5882,
+                                                    0.2941,
+                                                    1
+                                                  ]
+                                                }
+                                              },
+                                              "widthDp": 1,
+                                              "minimumPixels": 1,
+                                              "join": "miter"
+                                            }
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                ]
                               }
                             ]
                           }
@@ -29244,7 +30730,13 @@
                                 "highlight": "settings_postaa-option-4-highlight"
                               }
                             }
-                          ]
+                          ],
+                          "scrollbar": {
+                            "track": "settings_postaa-popup-scroll-track",
+                            "thumb": "settings_postaa-popup-scroll-thumb",
+                            "lineStep": 36,
+                            "minimumThumb": 36
+                          }
                         }
                       },
                       {
@@ -37932,6 +39424,546 @@
                                     ]
                                   }
                                 ]
+                              },
+                              {
+                                "id": "settings_resolution_scale-popup-scroll-track",
+                                "type": "group",
+                                "properties": {
+                                  "position": {
+                                    "type": "keyword",
+                                    "value": "absolute"
+                                  },
+                                  "display": {
+                                    "type": "keyword",
+                                    "value": "block"
+                                  },
+                                  "box-sizing": {
+                                    "type": "keyword",
+                                    "value": "border-box"
+                                  },
+                                  "left": {
+                                    "type": "length",
+                                    "value": 0,
+                                    "unit": "dp"
+                                  },
+                                  "top": {
+                                    "type": "length",
+                                    "value": 0,
+                                    "unit": "dp"
+                                  },
+                                  "width": {
+                                    "type": "length",
+                                    "value": 36,
+                                    "unit": "dp"
+                                  },
+                                  "height": {
+                                    "type": "length",
+                                    "value": 36,
+                                    "unit": "dp"
+                                  },
+                                  "opacity": {
+                                    "type": "number",
+                                    "value": 1
+                                  }
+                                },
+                                "children": [
+                                  {
+                                    "id": "settings_resolution_scale-popup-scroll-trough",
+                                    "type": "vector",
+                                    "properties": {
+                                      "position": {
+                                        "type": "keyword",
+                                        "value": "absolute"
+                                      },
+                                      "display": {
+                                        "type": "keyword",
+                                        "value": "block"
+                                      },
+                                      "box-sizing": {
+                                        "type": "keyword",
+                                        "value": "border-box"
+                                      },
+                                      "left": {
+                                        "type": "length",
+                                        "value": 0,
+                                        "unit": "dp"
+                                      },
+                                      "top": {
+                                        "type": "length",
+                                        "value": 0,
+                                        "unit": "dp"
+                                      },
+                                      "width": {
+                                        "type": "length",
+                                        "value": 100,
+                                        "unit": "%"
+                                      },
+                                      "height": {
+                                        "type": "length",
+                                        "value": 100,
+                                        "unit": "%"
+                                      },
+                                      "pointer-events": {
+                                        "type": "keyword",
+                                        "value": "none"
+                                      },
+                                      "opacity": {
+                                        "type": "number",
+                                        "value": 1
+                                      }
+                                    },
+                                    "paths": [
+                                      {
+                                        "id": "outline",
+                                        "commands": [
+                                          {
+                                            "id": "point-0",
+                                            "op": "move",
+                                            "points": [
+                                              [
+                                                16,
+                                                0
+                                              ]
+                                            ]
+                                          },
+                                          {
+                                            "id": "point-1",
+                                            "op": "line",
+                                            "points": [
+                                              [
+                                                22,
+                                                0
+                                              ]
+                                            ]
+                                          },
+                                          {
+                                            "id": "point-2",
+                                            "op": "line",
+                                            "points": [
+                                              [
+                                                22,
+                                                {
+                                                  "fraction": 1,
+                                                  "dp": 0
+                                                }
+                                              ]
+                                            ]
+                                          },
+                                          {
+                                            "id": "point-3",
+                                            "op": "line",
+                                            "points": [
+                                              [
+                                                14,
+                                                {
+                                                  "fraction": 1,
+                                                  "dp": 0
+                                                }
+                                              ]
+                                            ]
+                                          },
+                                          {
+                                            "id": "point-4",
+                                            "op": "line",
+                                            "points": [
+                                              [
+                                                14,
+                                                2
+                                              ]
+                                            ]
+                                          },
+                                          {
+                                            "id": "close",
+                                            "op": "close"
+                                          }
+                                        ],
+                                        "fill": {
+                                          "type": "solid",
+                                          "color": {
+                                            "type": "color",
+                                            "value": [
+                                              0.0353,
+                                              0.0471,
+                                              0.0314,
+                                              0.95
+                                            ]
+                                          }
+                                        },
+                                        "stroke": {
+                                          "paint": {
+                                            "type": "solid",
+                                            "color": {
+                                              "type": "color",
+                                              "value": [
+                                                0.5451,
+                                                0.5882,
+                                                0.2941,
+                                                0.4
+                                              ]
+                                            }
+                                          },
+                                          "widthDp": 1,
+                                          "minimumPixels": 1,
+                                          "join": "miter"
+                                        }
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "id": "settings_resolution_scale-popup-scroll-thumb",
+                                    "type": "group",
+                                    "properties": {
+                                      "position": {
+                                        "type": "keyword",
+                                        "value": "absolute"
+                                      },
+                                      "display": {
+                                        "type": "keyword",
+                                        "value": "block"
+                                      },
+                                      "box-sizing": {
+                                        "type": "keyword",
+                                        "value": "border-box"
+                                      },
+                                      "left": {
+                                        "type": "length",
+                                        "value": 0,
+                                        "unit": "dp"
+                                      },
+                                      "top": {
+                                        "type": "length",
+                                        "value": 0,
+                                        "unit": "dp"
+                                      },
+                                      "width": {
+                                        "type": "length",
+                                        "value": 36,
+                                        "unit": "dp"
+                                      },
+                                      "height": {
+                                        "type": "length",
+                                        "value": 36,
+                                        "unit": "dp"
+                                      },
+                                      "opacity": {
+                                        "type": "number",
+                                        "value": 1
+                                      }
+                                    },
+                                    "children": [
+                                      {
+                                        "id": "settings_resolution_scale-popup-scroll-base",
+                                        "type": "vector",
+                                        "properties": {
+                                          "position": {
+                                            "type": "keyword",
+                                            "value": "absolute"
+                                          },
+                                          "display": {
+                                            "type": "keyword",
+                                            "value": "block"
+                                          },
+                                          "box-sizing": {
+                                            "type": "keyword",
+                                            "value": "border-box"
+                                          },
+                                          "left": {
+                                            "type": "length",
+                                            "value": 0,
+                                            "unit": "dp"
+                                          },
+                                          "top": {
+                                            "type": "length",
+                                            "value": 0,
+                                            "unit": "dp"
+                                          },
+                                          "width": {
+                                            "type": "length",
+                                            "value": 100,
+                                            "unit": "%"
+                                          },
+                                          "height": {
+                                            "type": "length",
+                                            "value": 100,
+                                            "unit": "%"
+                                          },
+                                          "pointer-events": {
+                                            "type": "keyword",
+                                            "value": "none"
+                                          },
+                                          "opacity": {
+                                            "type": "number",
+                                            "value": 1
+                                          }
+                                        },
+                                        "paths": [
+                                          {
+                                            "id": "outline",
+                                            "commands": [
+                                              {
+                                                "id": "point-0",
+                                                "op": "move",
+                                                "points": [
+                                                  [
+                                                    14,
+                                                    0
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-1",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    26,
+                                                    0
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-2",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    26,
+                                                    {
+                                                      "fraction": 1,
+                                                      "dp": -4
+                                                    }
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-3",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    22,
+                                                    {
+                                                      "fraction": 1,
+                                                      "dp": 0
+                                                    }
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-4",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    10,
+                                                    {
+                                                      "fraction": 1,
+                                                      "dp": 0
+                                                    }
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-5",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    10,
+                                                    4
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "close",
+                                                "op": "close"
+                                              }
+                                            ],
+                                            "fill": {
+                                              "type": "solid",
+                                              "color": {
+                                                "type": "color",
+                                                "value": [
+                                                  0.32,
+                                                  0.36,
+                                                  0.16,
+                                                  0.95
+                                                ]
+                                              }
+                                            },
+                                            "stroke": {
+                                              "paint": {
+                                                "type": "solid",
+                                                "color": {
+                                                  "type": "color",
+                                                  "value": [
+                                                    0.5451,
+                                                    0.5882,
+                                                    0.2941,
+                                                    1
+                                                  ]
+                                                }
+                                              },
+                                              "widthDp": 1,
+                                              "minimumPixels": 1,
+                                              "join": "miter"
+                                            }
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "id": "settings_resolution_scale-popup-scroll-active",
+                                        "type": "vector",
+                                        "properties": {
+                                          "position": {
+                                            "type": "keyword",
+                                            "value": "absolute"
+                                          },
+                                          "display": {
+                                            "type": "keyword",
+                                            "value": "block"
+                                          },
+                                          "box-sizing": {
+                                            "type": "keyword",
+                                            "value": "border-box"
+                                          },
+                                          "left": {
+                                            "type": "length",
+                                            "value": 0,
+                                            "unit": "dp"
+                                          },
+                                          "top": {
+                                            "type": "length",
+                                            "value": 0,
+                                            "unit": "dp"
+                                          },
+                                          "width": {
+                                            "type": "length",
+                                            "value": 100,
+                                            "unit": "%"
+                                          },
+                                          "height": {
+                                            "type": "length",
+                                            "value": 100,
+                                            "unit": "%"
+                                          },
+                                          "pointer-events": {
+                                            "type": "keyword",
+                                            "value": "none"
+                                          },
+                                          "opacity": {
+                                            "type": "number",
+                                            "value": 0
+                                          }
+                                        },
+                                        "paths": [
+                                          {
+                                            "id": "outline",
+                                            "commands": [
+                                              {
+                                                "id": "point-0",
+                                                "op": "move",
+                                                "points": [
+                                                  [
+                                                    14,
+                                                    0
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-1",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    26,
+                                                    0
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-2",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    26,
+                                                    {
+                                                      "fraction": 1,
+                                                      "dp": -4
+                                                    }
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-3",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    22,
+                                                    {
+                                                      "fraction": 1,
+                                                      "dp": 0
+                                                    }
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-4",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    10,
+                                                    {
+                                                      "fraction": 1,
+                                                      "dp": 0
+                                                    }
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-5",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    10,
+                                                    4
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "close",
+                                                "op": "close"
+                                              }
+                                            ],
+                                            "fill": {
+                                              "type": "solid",
+                                              "color": {
+                                                "type": "color",
+                                                "value": [
+                                                  0.8902,
+                                                  0.5373,
+                                                  0,
+                                                  1
+                                                ]
+                                              }
+                                            },
+                                            "stroke": {
+                                              "paint": {
+                                                "type": "solid",
+                                                "color": {
+                                                  "type": "color",
+                                                  "value": [
+                                                    0.5451,
+                                                    0.5882,
+                                                    0.2941,
+                                                    1
+                                                  ]
+                                                }
+                                              },
+                                              "widthDp": 1,
+                                              "minimumPixels": 1,
+                                              "join": "miter"
+                                            }
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                ]
                               }
                             ]
                           }
@@ -38066,7 +40098,13 @@
                                 "highlight": "settings_resolution_scale-option-8-highlight"
                               }
                             }
-                          ]
+                          ],
+                          "scrollbar": {
+                            "track": "settings_resolution_scale-popup-scroll-track",
+                            "thumb": "settings_resolution_scale-popup-scroll-thumb",
+                            "lineStep": 36,
+                            "minimumThumb": 36
+                          }
                         }
                       },
                       {
@@ -39940,6 +41978,546 @@
                                     ]
                                   }
                                 ]
+                              },
+                              {
+                                "id": "settings_vsync-popup-scroll-track",
+                                "type": "group",
+                                "properties": {
+                                  "position": {
+                                    "type": "keyword",
+                                    "value": "absolute"
+                                  },
+                                  "display": {
+                                    "type": "keyword",
+                                    "value": "block"
+                                  },
+                                  "box-sizing": {
+                                    "type": "keyword",
+                                    "value": "border-box"
+                                  },
+                                  "left": {
+                                    "type": "length",
+                                    "value": 0,
+                                    "unit": "dp"
+                                  },
+                                  "top": {
+                                    "type": "length",
+                                    "value": 0,
+                                    "unit": "dp"
+                                  },
+                                  "width": {
+                                    "type": "length",
+                                    "value": 36,
+                                    "unit": "dp"
+                                  },
+                                  "height": {
+                                    "type": "length",
+                                    "value": 36,
+                                    "unit": "dp"
+                                  },
+                                  "opacity": {
+                                    "type": "number",
+                                    "value": 1
+                                  }
+                                },
+                                "children": [
+                                  {
+                                    "id": "settings_vsync-popup-scroll-trough",
+                                    "type": "vector",
+                                    "properties": {
+                                      "position": {
+                                        "type": "keyword",
+                                        "value": "absolute"
+                                      },
+                                      "display": {
+                                        "type": "keyword",
+                                        "value": "block"
+                                      },
+                                      "box-sizing": {
+                                        "type": "keyword",
+                                        "value": "border-box"
+                                      },
+                                      "left": {
+                                        "type": "length",
+                                        "value": 0,
+                                        "unit": "dp"
+                                      },
+                                      "top": {
+                                        "type": "length",
+                                        "value": 0,
+                                        "unit": "dp"
+                                      },
+                                      "width": {
+                                        "type": "length",
+                                        "value": 100,
+                                        "unit": "%"
+                                      },
+                                      "height": {
+                                        "type": "length",
+                                        "value": 100,
+                                        "unit": "%"
+                                      },
+                                      "pointer-events": {
+                                        "type": "keyword",
+                                        "value": "none"
+                                      },
+                                      "opacity": {
+                                        "type": "number",
+                                        "value": 1
+                                      }
+                                    },
+                                    "paths": [
+                                      {
+                                        "id": "outline",
+                                        "commands": [
+                                          {
+                                            "id": "point-0",
+                                            "op": "move",
+                                            "points": [
+                                              [
+                                                16,
+                                                0
+                                              ]
+                                            ]
+                                          },
+                                          {
+                                            "id": "point-1",
+                                            "op": "line",
+                                            "points": [
+                                              [
+                                                22,
+                                                0
+                                              ]
+                                            ]
+                                          },
+                                          {
+                                            "id": "point-2",
+                                            "op": "line",
+                                            "points": [
+                                              [
+                                                22,
+                                                {
+                                                  "fraction": 1,
+                                                  "dp": 0
+                                                }
+                                              ]
+                                            ]
+                                          },
+                                          {
+                                            "id": "point-3",
+                                            "op": "line",
+                                            "points": [
+                                              [
+                                                14,
+                                                {
+                                                  "fraction": 1,
+                                                  "dp": 0
+                                                }
+                                              ]
+                                            ]
+                                          },
+                                          {
+                                            "id": "point-4",
+                                            "op": "line",
+                                            "points": [
+                                              [
+                                                14,
+                                                2
+                                              ]
+                                            ]
+                                          },
+                                          {
+                                            "id": "close",
+                                            "op": "close"
+                                          }
+                                        ],
+                                        "fill": {
+                                          "type": "solid",
+                                          "color": {
+                                            "type": "color",
+                                            "value": [
+                                              0.0353,
+                                              0.0471,
+                                              0.0314,
+                                              0.95
+                                            ]
+                                          }
+                                        },
+                                        "stroke": {
+                                          "paint": {
+                                            "type": "solid",
+                                            "color": {
+                                              "type": "color",
+                                              "value": [
+                                                0.5451,
+                                                0.5882,
+                                                0.2941,
+                                                0.4
+                                              ]
+                                            }
+                                          },
+                                          "widthDp": 1,
+                                          "minimumPixels": 1,
+                                          "join": "miter"
+                                        }
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "id": "settings_vsync-popup-scroll-thumb",
+                                    "type": "group",
+                                    "properties": {
+                                      "position": {
+                                        "type": "keyword",
+                                        "value": "absolute"
+                                      },
+                                      "display": {
+                                        "type": "keyword",
+                                        "value": "block"
+                                      },
+                                      "box-sizing": {
+                                        "type": "keyword",
+                                        "value": "border-box"
+                                      },
+                                      "left": {
+                                        "type": "length",
+                                        "value": 0,
+                                        "unit": "dp"
+                                      },
+                                      "top": {
+                                        "type": "length",
+                                        "value": 0,
+                                        "unit": "dp"
+                                      },
+                                      "width": {
+                                        "type": "length",
+                                        "value": 36,
+                                        "unit": "dp"
+                                      },
+                                      "height": {
+                                        "type": "length",
+                                        "value": 36,
+                                        "unit": "dp"
+                                      },
+                                      "opacity": {
+                                        "type": "number",
+                                        "value": 1
+                                      }
+                                    },
+                                    "children": [
+                                      {
+                                        "id": "settings_vsync-popup-scroll-base",
+                                        "type": "vector",
+                                        "properties": {
+                                          "position": {
+                                            "type": "keyword",
+                                            "value": "absolute"
+                                          },
+                                          "display": {
+                                            "type": "keyword",
+                                            "value": "block"
+                                          },
+                                          "box-sizing": {
+                                            "type": "keyword",
+                                            "value": "border-box"
+                                          },
+                                          "left": {
+                                            "type": "length",
+                                            "value": 0,
+                                            "unit": "dp"
+                                          },
+                                          "top": {
+                                            "type": "length",
+                                            "value": 0,
+                                            "unit": "dp"
+                                          },
+                                          "width": {
+                                            "type": "length",
+                                            "value": 100,
+                                            "unit": "%"
+                                          },
+                                          "height": {
+                                            "type": "length",
+                                            "value": 100,
+                                            "unit": "%"
+                                          },
+                                          "pointer-events": {
+                                            "type": "keyword",
+                                            "value": "none"
+                                          },
+                                          "opacity": {
+                                            "type": "number",
+                                            "value": 1
+                                          }
+                                        },
+                                        "paths": [
+                                          {
+                                            "id": "outline",
+                                            "commands": [
+                                              {
+                                                "id": "point-0",
+                                                "op": "move",
+                                                "points": [
+                                                  [
+                                                    14,
+                                                    0
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-1",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    26,
+                                                    0
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-2",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    26,
+                                                    {
+                                                      "fraction": 1,
+                                                      "dp": -4
+                                                    }
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-3",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    22,
+                                                    {
+                                                      "fraction": 1,
+                                                      "dp": 0
+                                                    }
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-4",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    10,
+                                                    {
+                                                      "fraction": 1,
+                                                      "dp": 0
+                                                    }
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-5",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    10,
+                                                    4
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "close",
+                                                "op": "close"
+                                              }
+                                            ],
+                                            "fill": {
+                                              "type": "solid",
+                                              "color": {
+                                                "type": "color",
+                                                "value": [
+                                                  0.32,
+                                                  0.36,
+                                                  0.16,
+                                                  0.95
+                                                ]
+                                              }
+                                            },
+                                            "stroke": {
+                                              "paint": {
+                                                "type": "solid",
+                                                "color": {
+                                                  "type": "color",
+                                                  "value": [
+                                                    0.5451,
+                                                    0.5882,
+                                                    0.2941,
+                                                    1
+                                                  ]
+                                                }
+                                              },
+                                              "widthDp": 1,
+                                              "minimumPixels": 1,
+                                              "join": "miter"
+                                            }
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "id": "settings_vsync-popup-scroll-active",
+                                        "type": "vector",
+                                        "properties": {
+                                          "position": {
+                                            "type": "keyword",
+                                            "value": "absolute"
+                                          },
+                                          "display": {
+                                            "type": "keyword",
+                                            "value": "block"
+                                          },
+                                          "box-sizing": {
+                                            "type": "keyword",
+                                            "value": "border-box"
+                                          },
+                                          "left": {
+                                            "type": "length",
+                                            "value": 0,
+                                            "unit": "dp"
+                                          },
+                                          "top": {
+                                            "type": "length",
+                                            "value": 0,
+                                            "unit": "dp"
+                                          },
+                                          "width": {
+                                            "type": "length",
+                                            "value": 100,
+                                            "unit": "%"
+                                          },
+                                          "height": {
+                                            "type": "length",
+                                            "value": 100,
+                                            "unit": "%"
+                                          },
+                                          "pointer-events": {
+                                            "type": "keyword",
+                                            "value": "none"
+                                          },
+                                          "opacity": {
+                                            "type": "number",
+                                            "value": 0
+                                          }
+                                        },
+                                        "paths": [
+                                          {
+                                            "id": "outline",
+                                            "commands": [
+                                              {
+                                                "id": "point-0",
+                                                "op": "move",
+                                                "points": [
+                                                  [
+                                                    14,
+                                                    0
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-1",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    26,
+                                                    0
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-2",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    26,
+                                                    {
+                                                      "fraction": 1,
+                                                      "dp": -4
+                                                    }
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-3",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    22,
+                                                    {
+                                                      "fraction": 1,
+                                                      "dp": 0
+                                                    }
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-4",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    10,
+                                                    {
+                                                      "fraction": 1,
+                                                      "dp": 0
+                                                    }
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "point-5",
+                                                "op": "line",
+                                                "points": [
+                                                  [
+                                                    10,
+                                                    4
+                                                  ]
+                                                ]
+                                              },
+                                              {
+                                                "id": "close",
+                                                "op": "close"
+                                              }
+                                            ],
+                                            "fill": {
+                                              "type": "solid",
+                                              "color": {
+                                                "type": "color",
+                                                "value": [
+                                                  0.8902,
+                                                  0.5373,
+                                                  0,
+                                                  1
+                                                ]
+                                              }
+                                            },
+                                            "stroke": {
+                                              "paint": {
+                                                "type": "solid",
+                                                "color": {
+                                                  "type": "color",
+                                                  "value": [
+                                                    0.5451,
+                                                    0.5882,
+                                                    0.2941,
+                                                    1
+                                                  ]
+                                                }
+                                              },
+                                              "widthDp": 1,
+                                              "minimumPixels": 1,
+                                              "join": "miter"
+                                            }
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                ]
                               }
                             ]
                           }
@@ -39990,7 +42568,13 @@
                                 "highlight": "settings_vsync-option-1-highlight"
                               }
                             }
-                          ]
+                          ],
+                          "scrollbar": {
+                            "track": "settings_vsync-popup-scroll-track",
+                            "thumb": "settings_vsync-popup-scroll-thumb",
+                            "lineStep": 36,
+                            "minimumThumb": 36
+                          }
                         }
                       }
                     ]

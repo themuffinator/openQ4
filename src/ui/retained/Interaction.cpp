@@ -20,6 +20,13 @@ std::uint64_t ProposalToken() {
 	}
 	return 0;
 }
+bool HasChoiceBar(const Control& control) {
+    const auto* choice = std::get_if<ChoiceSpec>(&control.widget);
+    return choice && choice->scrollbar.has_value();
+}
+bool HasScrollOffset(const Control& control) {
+    return control.role == ControlRole::Scrollbar || HasChoiceBar(control);
+}
 bool ValidNumber(const Control& control) {
 	const auto* spec = std::get_if<NumberSpec>(&control.widget);
 	return spec && control.value && control.value->type == 0 && std::isfinite(spec->minimum) &&
@@ -71,7 +78,7 @@ bool NativeUnsettled(const NativeTextEditorView& view) {
 	X(items) X(order) X(parents) X(modals) X(authoredModals) X(modalToken) X(numberEpoch) X(modalBlocked) X(focusPending) \
 	X(pendingFocus) X(heldNavigation) X(blockedNavigation) X(feedback) X(actions) X(dragging) X(popup) X(highlight) \
 	X(pointerOption) X(armedOption) X(pointerFraction) X(dragPreview) X(popupAcceptArm) X(nativeControl) \
-    X(pointerScrollThumb) X(scrollGrabFraction) X(scrollSource) X(scrollCommands)
+    X(pointerScrollThumb) X(scrollGrabFraction) X(scrollSource) X(scrollCommands) X(pointerChoiceTrack) X(choiceScrollArm) X(popupToken)
 Interaction::Interaction() : authority(ProposalToken()) {}
 Interaction::~Interaction() = default;
 Interaction::Interaction(const Interaction& other) : authority(other.authority), candidate(true) {
@@ -182,6 +189,7 @@ bool Interaction::SetReadbacks(const std::map<std::string,ControlReadback>& read
 	for (const auto& [id,value] : readbacks) {
 		auto& item = items.at(id);
 		const bool changed = !item.readback || item.readback->value != value.value;
+        if(popup==id && HasChoiceBar(item.control) && (changed || item.readback->enabledOptions!=value.enabledOptions))CancelGesture();
 		item.readback = value;
 		if (changed && item.number) item.number->draftRevision = revisions.at(id);
 		if (changed && item.number && item.number->native) DropNumberNative(id,item);
@@ -267,6 +275,76 @@ bool Interaction::ScrollPulse(const std::string& id,ScrollStep step) {
     if(step<ScrollStep::LineBackward || step>ScrollStep::End) return false;
     QueueScroll(id,step);return true;
 }
+bool Interaction::ChoiceScrollReady(const std::string& id) const {
+    const auto found=items.find(id);
+    return popupToken && popup==id && !focusPending && Eligible(id) && found!=items.end() && HasChoiceBar(found->second.control) &&
+        found->second.choiceLayoutRevision==found->second.choiceRevision && found->second.scroll &&
+        found->second.scroll->available && found->second.scroll->geometry.usable;
+}
+bool Interaction::SetChoiceScrollReadback(const std::string& id,std::uint64_t token,std::uint64_t revision,
+    const ScrollReadback& value,bool revealConsumed) {
+    const auto found=items.find(id);
+    if(found==items.end() || popup!=id || !token || token!=popupToken || revision!=found->second.choiceRevision || !HasChoiceBar(found->second.control)) return false;
+    const auto& g=value.geometry; ScrollGeometry checked;
+    if(!value.geometryToken || !std::isfinite(value.dpRatio) || value.dpRatio<=0 || !std::isfinite(value.lineStep) || value.lineStep<=0 ||
+        !MeasureScroll({g.viewport,g.viewport+g.range,g.offset,g.track,g.thumb},checked) ||
+        std::tie(g.viewport,g.range,g.offset,g.track,g.thumb,g.position,g.travel,g.usable)!=
+        std::tie(checked.viewport,checked.range,checked.offset,checked.track,checked.thumb,checked.position,checked.travel,checked.usable) ||
+        (found->second.scroll && value.geometryToken<found->second.scroll->geometryToken)) return false;
+    if(found->second.scroll && value.geometryToken==found->second.scroll->geometryToken) {
+        const auto& r=*found->second.scroll;const auto& a=r.geometry;
+        if(std::tie(g.viewport,g.range,g.offset,g.track,g.thumb,g.position,g.travel,g.usable,value.dpRatio,value.lineStep,value.available)!=
+            std::tie(a.viewport,a.range,a.offset,a.track,a.thumb,a.position,a.travel,a.usable,r.dpRatio,r.lineStep,r.available))return false;
+    }
+    auto& item=found->second;item.scroll=value;item.choiceLayoutRevision=revision;
+    if(value.available) {
+        item.choiceOffsetDp=g.offset/value.dpRatio;item.scrollRestore.reset();
+        if(revealConsumed)item.choiceReveal=0;
+    }
+    if(value.available && !g.usable && choiceScrollArm && dragging==id) EndChoiceScrollGesture();
+    return true;
+}
+void Interaction::EndChoiceScrollGesture() {
+    if(choiceScrollArm) {armed.clear();dragging.clear();armedOption.clear();pointerArm=false;choiceScrollArm=false;}
+}
+bool Interaction::MoveChoiceScroll(const std::string& id,ScrollStep step,bool drag) {
+    if(!ChoiceScrollReady(id) || (drag && (!pointerHeld || !choiceScrollArm || dragging!=id || !pointerFraction))) return false;
+    auto& item=items.at(id);const auto& r=*item.scroll;double offset=0;
+    const bool valid=drag?ScrollDragOffset(r.geometry,*pointerFraction*r.geometry.track,scrollGrabFraction,offset):
+        ScrollStepOffset(r.geometry,step,r.lineStep,offset);
+    if(!valid)return false;
+    const double dp=offset/r.dpRatio;
+    if(dp!=item.choiceOffsetDp || item.choiceReveal) {
+        const auto revision=ProposalToken();if(!revision){CancelGesture();return false;}
+        item.choiceOffsetDp=dp;item.choiceReveal=0;item.choiceRevision=revision;item.scrollRestore.reset();
+    }
+    return true;
+}
+bool Interaction::ChoiceScrollPulse(const std::string& id,ScrollStep step) {
+    return !choiceScrollArm && dragging.empty() && MoveChoiceScroll(id,step);
+}
+bool Interaction::PopupInputIdle() const {
+    return !pointerHeld && !acceptHeld && !backHeld && !pointerArm &&
+        !popupAcceptArm && !choiceScrollArm && armed.empty() && dragging.empty() && heldNavigation.empty();
+}
+bool Interaction::OpenChoicePopup(const std::string& id) {
+    const auto found = items.find(id);
+    if (focusPending || focused != id || !Eligible(id) || !popup.empty() || !PopupInputIdle() ||
+        found == items.end() || found->second.control.role != ControlRole::Choice || !found->second.readback) return false;
+    const auto& options = found->second.readback->enabledOptions;
+    if (std::none_of(options.begin(),options.end(),[](bool enabled) { return enabled; })) return false;
+    OpenPopup(id); Refresh(); return popup == id && popupToken != 0;
+}
+bool Interaction::CloseChoicePopup(const std::string& id,std::uint64_t expected) {
+    if (!expected || expected != popupToken || popup != id || !PopupInputIdle()) return false;
+    CancelGesture(); Refresh(); return true;
+}
+bool Interaction::ScrollChoicePopup(const std::string& id,std::uint64_t expected,std::uint64_t geometryToken,ScrollStep step) {
+    if (!expected || expected != popupToken || popup != id || !PopupInputIdle() || !ChoiceScrollReady(id)) return false;
+    const auto& readback = *items.at(id).scroll;
+    if (!geometryToken || geometryToken != readback.geometryToken) return false;
+    const bool result = ChoiceScrollPulse(id,step); Refresh(); return result;
+}
 void Interaction::ScrollKey(MenuInput input) {
     const auto step=input==MenuInput::Home?ScrollStep::Start:input==MenuInput::End?ScrollStep::End:
         input==MenuInput::PageUp?ScrollStep::PageBackward:input==MenuInput::PageDown?ScrollStep::PageForward:
@@ -324,8 +402,13 @@ std::optional<WidgetViewState> Interaction::Widget(const std::string& id) const 
     view.accepted = item.readback->value; view.mixed = item.readback->mixed;
 	view.pending = item.pending; view.rejected = item.rejected; view.proposalToken = item.proposalToken;
 	if (dragging == id && dragPreview) view.preview = *dragPreview;
-	view.popupOpen = popup == id; if (view.popupOpen) view.highlight = highlight;
+	view.popupOpen = popup == id; if (view.popupOpen) { view.highlight = highlight; view.popupToken = popupToken; }
 	view.firstVisible = item.firstVisible;
+    if(HasChoiceBar(item.control)) {
+        view.scroll=item.scroll;
+        view.popupRevision=item.choiceRevision;view.revealRevision=item.choiceReveal;
+        view.popupOffsetDp=item.scrollRestore.value_or(item.choiceOffsetDp);
+    }
 	if (item.number) {
 		const auto& editor = *item.number;
 		NumberEditView number;
@@ -827,7 +910,8 @@ bool Interaction::OptionEligible(const Item& item, size_t index) const {
 	return item.readback && index < item.readback->enabledOptions.size() && item.readback->enabledOptions[index];
 }
 void Interaction::OpenPopup(const std::string& id) {
-	CancelGesture(); popup = id; focused = id;
+	CancelGesture(); popupToken=ProposalToken();if(!popupToken)return;popup = id; focused = id;
+    items.at(id).choiceRevision=popupToken;items.at(id).scroll.reset();
 	const auto& item = items.at(id); const auto& options = std::get<ChoiceSpec>(item.control.widget).options;
 	for (size_t i = 0; i < options.size(); ++i) if (OptionEligible(item,i)) {
 		if (highlight.empty()) highlight = options[i].id;
@@ -838,6 +922,13 @@ void Interaction::OpenPopup(const std::string& id) {
 void Interaction::KeepHighlightVisible() {
 	if (popup.empty()) return;
 	auto& item = items.at(popup); const auto& spec = std::get<ChoiceSpec>(item.control.widget);
+    if(spec.scrollbar) {
+        if(!item.scrollRestore) {
+            const auto revision=ProposalToken();if(!revision){CancelGesture();return;}
+            item.choiceRevision=revision;item.choiceReveal=revision;
+        }
+        return;
+    }
 	const auto rows = std::min<size_t>(spec.visibleRows,spec.options.size());
 	item.firstVisible = std::min<unsigned>(item.firstVisible,static_cast<unsigned>(spec.options.size()-rows));
 	for (size_t i = 0; i < spec.options.size(); ++i) if (spec.options[i].id == highlight) {
@@ -883,8 +974,8 @@ bool Interaction::CaptureWidgets(ValueWidgetSnapshot& out, std::string& error) c
 	ValueWidgetSnapshot result;
 	for (const auto& [id,item] : items) if (item.control.role != ControlRole::Button) {
 		ValueWidgetSnapshot::Widget widget{item.control.role,item.firstVisible,{}};
-        if(item.control.role==ControlRole::Scrollbar) {
-            result.version=3;widget.scrollOffsetDp=item.scrollRestore.value_or(item.scroll?item.scroll->geometry.offset/item.scroll->dpRatio:0);
+        if(HasScrollOffset(item.control)) {
+            result.version=3;widget.scrollOffsetDp=item.scrollRestore.value_or(HasChoiceBar(item.control)?item.choiceOffsetDp:item.scroll?item.scroll->geometry.offset/item.scroll->dpRatio:0);
         }
 		if (item.number) {
 			const auto& editor = *item.number; auto history = editor.buffer.CaptureHistory();
@@ -899,7 +990,7 @@ bool Interaction::RestoreWidgets(const ValueWidgetSnapshot& snapshot, std::strin
 	error.clear();
 	std::size_t expected = 0, count = 0, bytes = 0;
 	for (const auto& [id,item] : items) if (item.control.role != ControlRole::Button) ++expected;
-	if ((snapshot.version != 1 && snapshot.version != 2 && snapshot.version != 3) || (snapshot.version==3)!=std::any_of(items.begin(),items.end(),[](const auto& entry){return entry.second.control.role==ControlRole::Scrollbar;}) || snapshot.widgets.size() != expected) { error = "Invalid widget snapshot version or count"; return false; }
+	if ((snapshot.version != 1 && snapshot.version != 2 && snapshot.version != 3) || (snapshot.version==3)!=std::any_of(items.begin(),items.end(),[](const auto& entry){return HasScrollOffset(entry.second.control);}) || snapshot.widgets.size() != expected) { error = "Invalid widget snapshot version or count"; return false; }
 	// Preflight aggregate budgets before allocating candidate editors/history.
 	for (const auto& [id,widget] : snapshot.widgets) if (widget.number) {
 		if (snapshot.version < 2 || widget.role != ControlRole::Number || ++count > ValueWidgetSnapshot::MaxNumberEditors) {
@@ -920,14 +1011,14 @@ bool Interaction::RestoreWidgets(const ValueWidgetSnapshot& snapshot, std::strin
 	for (const auto& [id,value] : snapshot.widgets) {
 		const auto found = items.find(id);
 		if (found == items.end() || value.role == ControlRole::Button || value.role != found->second.control.role) { error = "Restored widget role does not match"; return false; }
-		if (value.role==ControlRole::Scrollbar ? (snapshot.version!=3 || !value.scrollOffsetDp ||
+		if (HasScrollOffset(found->second.control) ? (snapshot.version!=3 || !value.scrollOffsetDp ||
             !std::isfinite(*value.scrollOffsetDp) || *value.scrollOffsetDp<0 || *value.scrollOffsetDp>1e12 || value.number.has_value()) : value.scrollOffsetDp.has_value()) {
             error="Invalid restored scrollbar offset or version";return false;
         }
         unsigned maximum = 0;
         if (value.role == ControlRole::Choice) {
 			const auto& spec = std::get<ChoiceSpec>(found->second.control.widget);
-			maximum = static_cast<unsigned>(spec.options.size()-std::min<size_t>(spec.visibleRows,spec.options.size()));
+			maximum = spec.scrollbar ? 0 : static_cast<unsigned>(spec.options.size()-std::min<size_t>(spec.visibleRows,spec.options.size()));
 		}
 		if (value.firstVisible > maximum) { error = "Restored widget scroll is outside its range"; return false; }
 		if (value.number) {
@@ -1027,14 +1118,15 @@ bool Interaction::Focus(const std::string& id) {
 	Refresh(); return true;
 }
 void Interaction::Hover(const std::string& id) { PointerPart(id); }
-void Interaction::PointerPart(const std::string& id, std::optional<double> fraction, const std::string& option, bool scrollThumb) {
-	pointerScrollThumb = scrollThumb;
+void Interaction::PointerPart(const std::string& id, std::optional<double> fraction, const std::string& option, bool scrollThumb, bool choiceTrack) {
+	pointerScrollThumb = scrollThumb;pointerChoiceTrack=choiceTrack;
 	hovered = !focusPending && Eligible(id) ? id : std::string{};
 	pointerFraction = fraction && std::isfinite(*fraction) ? fraction : std::nullopt;
 	pointerOption = option;
 	if (!dragging.empty() && dragging == id) {
 		if (pointerFraction) {
             if(items.at(dragging).control.role==ControlRole::Scrollbar) QueueScroll(dragging,ScrollStep::LineForward,true);
+            else if(HasChoiceBar(items.at(dragging).control)) MoveChoiceScroll(dragging,ScrollStep::LineForward,true);
             else dragPreview = SliderValue(std::get<SliderSpec>(items.at(dragging).control.widget),*pointerFraction);
         }
 		else CancelGesture(); // A lost/singular projection cannot commit a stale preview.
@@ -1042,7 +1134,7 @@ void Interaction::PointerPart(const std::string& id, std::optional<double> fract
 	if (!popup.empty() && hovered == popup && !option.empty()) {
 		const auto& item = items.at(popup); const auto& options = std::get<ChoiceSpec>(item.control.widget).options;
 		for (size_t i = 0; i < options.size(); ++i) if (options[i].id == option && OptionEligible(item,i)) {
-			highlight = option; KeepHighlightVisible(); break;
+			highlight = option; if(!HasChoiceBar(item.control)) KeepHighlightVisible(); break;
 		}
 	}
 	Refresh();
@@ -1055,7 +1147,15 @@ void Interaction::Pointer(bool down) {
 			if (hovered != popup) { CancelGesture(); Refresh(); return; }
 			if (!armed.empty()) return; // The matching keyboard release owns this arm.
 			const auto& item = items.at(popup); const auto& options = std::get<ChoiceSpec>(item.control.widget).options;
-			if (pointerOption.empty()) { armed = popup; pointerArm = true; armedOption.clear(); }
+            if(pointerChoiceTrack) {
+                if(!ChoiceScrollReady(popup) || !pointerFraction)return;
+                const auto& g=item.scroll->geometry;const double pointer=*pointerFraction*g.track;
+                choiceScrollArm=true;armed=popup;pointerArm=true;armedOption.clear();
+                if(pointerScrollThumb && pointer>=g.position && pointer<=g.position+g.thumb) {
+                    scrollGrabFraction=std::clamp((pointer-g.position)/g.thumb,0.0,1.0);dragging=popup;
+                } else MoveChoiceScroll(popup,pointer<g.position?ScrollStep::PageBackward:ScrollStep::PageForward);
+            }
+			else if (pointerOption.empty()) { armed = popup; pointerArm = true; armedOption.clear(); }
 			else for (size_t i = 0; i < options.size(); ++i) if (options[i].id == pointerOption && OptionEligible(item,i)) {
 				armed = popup; pointerArm = true; armedOption = pointerOption; break;
 			}
@@ -1082,6 +1182,7 @@ void Interaction::Pointer(bool down) {
 	} else {
 		if (!pointerHeld) return;
 		pointerHeld = false;
+        if(choiceScrollArm) {EndChoiceScrollGesture();Refresh();return;}
 		if (!dragging.empty()) {
 			const auto id = dragging; const auto value = dragPreview;
 			CancelGesture(); if (value && Eligible(id) && items.at(id).control.role==ControlRole::Slider) Propose(id,*value);
@@ -1166,7 +1267,7 @@ void Interaction::Input(MenuInput input, bool down) {
 	Refresh();
 }
 void Interaction::CancelGesture() {
-    scrollCommands.clear();scrollSource=ProposalToken();pointerScrollThumb=false;scrollGrabFraction=0;
+    scrollCommands.clear();scrollSource=ProposalToken();pointerScrollThumb=pointerChoiceTrack=choiceScrollArm=false;scrollGrabFraction=0;popupToken=0;
 	armed.clear(); dragging.clear(); dragPreview.reset(); popup.clear(); highlight.clear(); armedOption.clear(); popupAcceptArm = false;
 }
 void Interaction::Cancel() {
