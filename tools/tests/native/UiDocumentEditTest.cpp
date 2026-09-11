@@ -112,4 +112,33 @@ static void AllocationFailures(){
     CHECK(completed&&refused>100);std::printf("Allocation-denial points refused atomically: %u\n",refused);
 #endif
 }
-int main(){AtomicHistory();RepairAndRefusal();Boundaries();Budgets();ParserCompatibility();SeparatorGrammar();AllocationFailures();std::printf("PASS %u checks; actual Document/DocumentEdit JSONC source and history; no editor shell or native renderer.\n",checks);return 0;}
+static void PreparedHistory(){
+    Fixture f;const auto original=f.Text();const auto identity=f.edit.Identity();
+    const std::array<DocumentEditOperation,1> operations{InsertDocumentNode{"nest",0,NodeSource("x")}};
+    CHECK(!f.edit.PrepareEdit({identity.document,identity.revision+1},operations,f.diagnostics));
+    auto prepared=f.edit.PrepareEdit(identity,operations,f.diagnostics);CHECK(prepared&&prepared->OwnerCurrent());
+    CHECK(f.Text()==original&&f.edit.Identity()==identity&&f.edit.UndoCount()==0);
+    CHECK(prepared->Target().Model().FindNode("x")&&prepared->Receipt().after.revision==identity.revision+1);
+    CHECK(!f.edit.PrepareEdit(identity,operations,f.diagnostics));
+    CHECK(f.edit.CanPublish(*prepared));Fixture other;CHECK(!other.edit.CanPublish(*prepared));
+    DocumentEditReceipt out;deny=true;const bool published=f.edit.Publish(*prepared,out);deny=false;
+    CHECK(published&&out.after==f.edit.Identity()&&f.edit.UndoCount()==1&&!prepared->OwnerCurrent());
+    const auto prior=out;CHECK(!f.edit.Publish(*prepared,out)&&out.after==prior.after);
+    CHECK(!f.edit.PrepareUndo(f.edit.Identity(),false,f.diagnostics)); // old history still owned until disposal
+    prepared.reset();auto undo=f.edit.PrepareUndo(f.edit.Identity(),false,f.diagnostics);CHECK(undo&&undo->Target().Source()==original);
+    deny=true;const bool undone=f.edit.Publish(*undo,out);deny=false;CHECK(undone&&f.Text()==original&&f.edit.RedoCount()==1);
+    undo.reset();auto redo=f.edit.PrepareUndo(f.edit.Identity(),true,f.diagnostics);CHECK(redo&&redo->OwnerCurrent());
+    CHECK(f.edit.Redo(f.edit.Identity(),out,f.diagnostics)); // allowed direct history motion invalidates candidate
+    CHECK(!redo->OwnerCurrent()&&!f.edit.CanPublish(*redo));const auto moved=out;
+    deny=true;const bool stale=f.edit.Publish(*redo,out);deny=false;CHECK(!stale&&out.after==moved.after);redo.reset();
+    const auto live=f.edit.Identity();auto noop=f.edit.PrepareEdit(live,{},f.diagnostics);CHECK(noop&&!noop->Receipt().sourceChanged);
+    deny=true;const bool unchanged=f.edit.Publish(*noop,out);deny=false;CHECK(unchanged&&f.edit.Identity()==live&&!out.sourceChanged);
+    CHECK(!f.edit.Publish(*noop,out));noop.reset();
+    prepared=f.edit.PrepareEdit(f.edit.Identity(),{},f.diagnostics);CHECK(prepared);
+    CHECK(f.edit.Undo(f.edit.Identity(),out,f.diagnostics)&&f.edit.Redo(f.edit.Identity(),out,f.diagnostics));
+    CHECK(!f.edit.CanPublish(*prepared)&&!prepared->OwnerCurrent());prepared.reset();
+    auto owner=std::make_unique<DocumentEdit>();CHECK(owner->Open(Source(),{},f.diagnostics));
+    prepared=owner->PrepareEdit(owner->Identity(),operations,f.diagnostics);CHECK(prepared&&prepared->OwnerCurrent());owner.reset();
+    CHECK(!prepared->OwnerCurrent()&&prepared->Target().Model().FindNode("x"));prepared.reset();
+}
+int main(){AtomicHistory();RepairAndRefusal();Boundaries();Budgets();ParserCompatibility();SeparatorGrammar();PreparedHistory();AllocationFailures();std::printf("PASS %u checks; actual Document/DocumentEdit JSONC source and history; no editor shell or native renderer.\n",checks);return 0;}

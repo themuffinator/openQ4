@@ -38,7 +38,7 @@ def main():
  if args.mutations and r is not None and r.returncode==0:
   rules=[
    ('exact_identity','Current() && expected==impl->identity','Current()'),
-   ('publish_revision','++impl->cursor;++impl->identity.revision;','++impl->cursor;'),
+   ('publish_revision','data->receipt={expected,{expected.document,expected.revision+1},true,impl->cursor+1,0,bytes};','data->receipt={expected,expected,true,impl->cursor+1,0,bytes};'),
    ('history_revision','if(redo)++impl->cursor;else --impl->cursor;++impl->identity.revision;','if(redo)++impl->cursor;else --impl->cursor;'),
    ('no_op','if(source==Current()->Source())','if(false)'),
    ('document_identity','candidate->Model().id==Current()->Model().id','true'),
@@ -49,12 +49,17 @@ def main():
    ('array_trivia','Splice(source,node,{},budget);Splice(source,{comma,comma+1},{},budget);','Splice(source,{comma,node.end},{},budget);'),
    ('fragment_span','return supplied.substr(span.start,span.end-span.start);','return supplied;'),
    ('revision_exhaustion','impl->identity.revision<impl->limits.revision','true'),
+   ('prepared_origin','data.receipt.before==impl->identity','true'),
+   ('prepared_consumed','data.ready && data.owner.lock()==impl','true && data.owner.lock()==impl'),
+   ('prepared_cursor','impl->cursor=data.receipt.undo;','impl->cursor=0;'),
+   ('prepared_retention','impl->outstanding.expired()','true'),
+   ('prepared_owner_death','const auto owner=data->owner.lock();','const auto owner=data->owner.lock();if(!owner)return true;'),
   ]
   original=(core/'DocumentEdit.cpp').read_text()
   try:
    for name,old,new in rules:
-    if original.count(old)!=1:raise RuntimeError('Nonunique mutation anchor '+name)
-    altered=out/(name+'.cpp');altered.write_text(original.replace(old,new),newline='\n')
+    if original.count(old)!={'exact_identity':2,'revision_exhaustion':2,'prepared_retention':2}.get(name,1):raise RuntimeError('Nonunique mutation anchor '+name)
+    altered=out/(name+'.cpp');altered.write_text(original.replace(old,new,1),newline='\n')
     mc,m=execute(name,[altered if p==core/'DocumentEdit.cpp' else p for p in sources]);rejected=mc.returncode==0 and m is not None and m.returncode!=0 and 'FAIL ' in m.stderr
     mutations.append({'name':name,'compiled':mc.returncode==0,'rejected':rejected,'source_sha256':sha(altered)});print(('Rejected ' if rejected else 'INVALID ')+'compiled mutation '+name,flush=True)
     if not rejected:raise RuntimeError('Mutation escaped '+name)

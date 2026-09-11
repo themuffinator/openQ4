@@ -9,6 +9,7 @@
 #include "Motion.h"
 #include "Behavior.h"
 #include "Interaction.h"
+#include "DocumentEdit.h"
 
 namespace openq4::ui {
 
@@ -40,6 +41,18 @@ struct NumberEditorContext {
 	std::string control;
 	NumberEditView editor;
 	std::uint64_t modalToken = 0;
+};
+struct RuntimeCanvasIdentity {
+    std::uint64_t lifetime=0,revision=0;
+    bool operator==(const RuntimeCanvasIdentity&) const = default;
+};
+using RuntimeNativeVacancy=Interaction::DocumentVacancy;
+struct RuntimeDocumentOptions {
+    std::string sourcePath;
+    Viewport viewport;
+    double seconds=0;
+    bool reducedMotion=false;
+    StateValues application;
 };
 struct FontMetrics { float ascent = 0, descent = 0, lineSpacing = 0, xHeight = 0; };
 struct Glyph {
@@ -106,6 +119,33 @@ private:
 // Runtime contains no platform window, GL or input capture.
 class Runtime {
 public:
+    class PreparedDocument final {
+    public:
+        ~PreparedDocument();
+        PreparedDocument(const PreparedDocument&)=delete;
+        PreparedDocument& operator=(const PreparedDocument&)=delete;
+    private:
+        struct Data;
+        explicit PreparedDocument(std::shared_ptr<Data>);
+        std::shared_ptr<Data> data;
+        friend class Runtime;
+    };
+    RuntimeCanvasIdentity CanvasIdentity() const noexcept;
+    RuntimeNativeVacancy NativeVacancy() const noexcept;
+    bool HasActiveCanvasCallback() const noexcept;
+    // Registered view destruction revokes input now; resource cleanup waits
+    // until an active callback has unwound. This flag cannot be reset.
+    void RetireCanvasOwner() noexcept;
+    bool ObserveNumberNativeCandidate(NumberNativeCandidate&) const noexcept;
+    // Source/path are borrowed until any mutating operation, never native authority.
+    bool SourceMatches(const std::string&,const std::string&) const noexcept;
+    std::unique_ptr<PreparedDocument> PrepareDocument(RuntimeCanvasIdentity,
+        const DocumentEdit::Prepared&,RuntimeDocumentOptions,std::vector<Diagnostic>&) noexcept;
+    bool CanPublishDocument(const DocumentEdit&,const DocumentEdit::Prepared&,const PreparedDocument&) const noexcept;
+    bool PublishDocument(DocumentEdit&,DocumentEdit::Prepared&,PreparedDocument&,DocumentEditReceipt&) noexcept;
+    // Invalidates/cleans pending contexts before shared host resources reset.
+    // In-flight preparation is invalidated but cleanup waits for its stack.
+    bool AbortPreparedDocument() noexcept;
 	explicit Runtime(Host& host);
 	~Runtime();
 	Runtime(const Runtime&) = delete;
@@ -250,7 +290,11 @@ public:
 	bool IsLoaded() const;
 	RuntimeStatistics Statistics() const;
 private:
-	struct Impl;
+    struct Canvas;
+    std::shared_ptr<Canvas> canvas;
+    bool Mutate(bool cleanup=false) noexcept;
+    bool Layout(const Viewport&,double);
+    struct Impl;
 	std::unique_ptr<Impl> impl;
 };
 

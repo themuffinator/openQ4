@@ -9517,16 +9517,16 @@
                               },
                               "padding": {
                                 "type": "length",
-                                "value": 2,
+                                "value": 8,
                                 "unit": "dp"
                               },
                               "background-color": {
                                 "type": "color",
                                 "value": [
-                                  0.035,
-                                  0.047,
-                                  0.031,
-                                  1
+                                  0,
+                                  0,
+                                  0,
+                                  0
                                 ]
                               },
                               "font-family": {
@@ -9545,6 +9545,385 @@
                               }
                             },
                             "children": [
+                              {
+                                "id": "settings_preset-popup-frame",
+                                "type": "vector",
+                                "properties": {
+                                  "position": {
+                                    "type": "keyword",
+                                    "value": "absolute"
+                                  },
+                                  "display": {
+                                    "type": "keyword",
+                                    "value": "block"
+                                  },
+                                  "box-sizing": {
+                                    "type": "keyword",
+                                    "value": "border-box"
+                                  },
+                                  "left": {
+                                    "type": "length",
+                                    "value": 0,
+                                    "unit": "dp"
+                                  },
+                                  "top": {
+                                    "type": "length",
+                                    "value": 0,
+                                    "unit": "dp"
+                                  },
+                                  "width": {
+                                    "type": "length",
+                                    "value": 100,
+                                    "unit": "%"
+                                  },
+                                  "height": {
+                                    "type": "length",
+                                    "value": 100,
+                                    "unit": "%"
+                                  },
+                                  "pointer-events": {
+                                    "type": "keyword",
+                                    "value": "none"
+                                  },
+                                  "opacity": {
+                                    "type": "number",
+                                    "value": 1
+                                  }
+                                },
+                                "paths": [
+                                  {
+                                    "id": "outline",
+                                    "commands": [
+                                      {
+                                        "id": "point-0",
+                                        "op": "move",
+                                        "points": [
+                                          [
+                                            6,
+                                            0
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-1",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            {
+                                              "fraction": 1,
+                                              "dp": 0
+                                            },
+                                            0
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-2",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            {
+                                              "fraction": 1,
+                                              "dp": 0
+                                            },
+                                            {
+                                              "fraction": 1,
+                                              "dp": -6
+                                            }
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-3",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            {
+                                              "fraction": 1,
+                                              "dp": -6
+                                            },
+                                            {
+                                              "fraction": 1,
+                                              "dp": 0
+                                            }
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-4",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            0,
+                                            {
+                                              "fraction": 1,
+                                              "dp": 0
+                                            }
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-5",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            0,
+                                            6
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "close",
+                                        "op": "close"
+                                      }
+                                    ],
+                                    "fill": {
+                                      "type": "solid",
+                                      "color": {
+                                        "type": "color",
+                                        "value": [
+                                          0.0353,
+                                          0.0471,
+                                          0.0314,
+                                          1
+                                        ]
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "id": "outer-rail",
+                                    "commands": [
+                                      {
+                                        "id": "point-0",
+                                        "op": "move",
+                                        "points": [
+                                          [
+                                            6.5,
+                                            0.5
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-1",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            {
+                                              "fraction": 1,
+                                              "dp": -0.5
+                                            },
+                                            0.5
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-2",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            {
+                                              "fraction": 1,
+                                              "dp": -0.5
+                                            },
+                                            {
+                                              "fraction": 1,
+                                              "dp": -6.5
+                                            }
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-3",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            {
+                                              "fraction": 1,
+                                              "dp": -6.5
+                                            },
+                                            {
+                                              "fraction": 1,
+                                              "dp": -0.5
+                                            }
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-4",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            0.5,
+                                            {
+                                              "fraction": 1,
+                                              "dp": -0.5
+                                            }
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-5",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            0.5,
+                                            6.5
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "close",
+                                        "op": "close"
+                                      }
+                                    ],
+                                    "fill": {
+                                      "type": "solid",
+                                      "color": {
+                                        "type": "color",
+                                        "value": [
+                                          0,
+                                          0,
+                                          0,
+                                          0
+                                        ]
+                                      }
+                                    },
+                                    "stroke": {
+                                      "paint": {
+                                        "type": "solid",
+                                        "color": {
+                                          "type": "color",
+                                          "value": [
+                                            0.5451,
+                                            0.5882,
+                                            0.2941,
+                                            1
+                                          ]
+                                        }
+                                      },
+                                      "widthDp": 1,
+                                      "minimumPixels": 1,
+                                      "join": "miter"
+                                    }
+                                  },
+                                  {
+                                    "id": "inner-rail",
+                                    "commands": [
+                                      {
+                                        "id": "point-0",
+                                        "op": "move",
+                                        "points": [
+                                          [
+                                            7.5,
+                                            3.5
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-1",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            {
+                                              "fraction": 1,
+                                              "dp": -3.5
+                                            },
+                                            3.5
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-2",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            {
+                                              "fraction": 1,
+                                              "dp": -3.5
+                                            },
+                                            {
+                                              "fraction": 1,
+                                              "dp": -7.5
+                                            }
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-3",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            {
+                                              "fraction": 1,
+                                              "dp": -7.5
+                                            },
+                                            {
+                                              "fraction": 1,
+                                              "dp": -3.5
+                                            }
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-4",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            3.5,
+                                            {
+                                              "fraction": 1,
+                                              "dp": -3.5
+                                            }
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-5",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            3.5,
+                                            7.5
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "close",
+                                        "op": "close"
+                                      }
+                                    ],
+                                    "fill": {
+                                      "type": "solid",
+                                      "color": {
+                                        "type": "color",
+                                        "value": [
+                                          0,
+                                          0,
+                                          0,
+                                          0
+                                        ]
+                                      }
+                                    },
+                                    "stroke": {
+                                      "paint": {
+                                        "type": "solid",
+                                        "color": {
+                                          "type": "color",
+                                          "value": [
+                                            0.5451,
+                                            0.5882,
+                                            0.2941,
+                                            0.35
+                                          ]
+                                        }
+                                      },
+                                      "widthDp": 1,
+                                      "minimumPixels": 1,
+                                      "join": "miter"
+                                    }
+                                  }
+                                ]
+                              },
                               {
                                 "id": "settings_preset-viewport",
                                 "type": "group",
@@ -13516,7 +13895,110 @@
                                   }
                                 ]
                               }
-                            ]
+                            ],
+                            "mask": {
+                              "paths": [
+                                {
+                                  "id": "cut-silhouette",
+                                  "commands": [
+                                    {
+                                      "id": "point-0",
+                                      "op": "move",
+                                      "points": [
+                                        [
+                                          6,
+                                          0
+                                        ]
+                                      ]
+                                    },
+                                    {
+                                      "id": "point-1",
+                                      "op": "line",
+                                      "points": [
+                                        [
+                                          {
+                                            "fraction": 1,
+                                            "dp": 0
+                                          },
+                                          0
+                                        ]
+                                      ]
+                                    },
+                                    {
+                                      "id": "point-2",
+                                      "op": "line",
+                                      "points": [
+                                        [
+                                          {
+                                            "fraction": 1,
+                                            "dp": 0
+                                          },
+                                          {
+                                            "fraction": 1,
+                                            "dp": -6
+                                          }
+                                        ]
+                                      ]
+                                    },
+                                    {
+                                      "id": "point-3",
+                                      "op": "line",
+                                      "points": [
+                                        [
+                                          {
+                                            "fraction": 1,
+                                            "dp": -6
+                                          },
+                                          {
+                                            "fraction": 1,
+                                            "dp": 0
+                                          }
+                                        ]
+                                      ]
+                                    },
+                                    {
+                                      "id": "point-4",
+                                      "op": "line",
+                                      "points": [
+                                        [
+                                          0,
+                                          {
+                                            "fraction": 1,
+                                            "dp": 0
+                                          }
+                                        ]
+                                      ]
+                                    },
+                                    {
+                                      "id": "point-5",
+                                      "op": "line",
+                                      "points": [
+                                        [
+                                          0,
+                                          6
+                                        ]
+                                      ]
+                                    },
+                                    {
+                                      "id": "close",
+                                      "op": "close"
+                                    }
+                                  ],
+                                  "fill": {
+                                    "type": "solid",
+                                    "color": {
+                                      "type": "color",
+                                      "value": [
+                                        1,
+                                        1,
+                                        1,
+                                        1
+                                      ]
+                                    }
+                                  }
+                                }
+                              ]
+                            }
                           }
                         ],
                         "control": {
@@ -13619,7 +14101,8 @@
                             "thumb": "settings_preset-popup-scroll-thumb",
                             "lineStep": 36,
                             "minimumThumb": 36
-                          }
+                          },
+                          "placementBounds": "settings-body"
                         }
                       },
                       {
@@ -27205,16 +27688,16 @@
                               },
                               "padding": {
                                 "type": "length",
-                                "value": 2,
+                                "value": 8,
                                 "unit": "dp"
                               },
                               "background-color": {
                                 "type": "color",
                                 "value": [
-                                  0.035,
-                                  0.047,
-                                  0.031,
-                                  1
+                                  0,
+                                  0,
+                                  0,
+                                  0
                                 ]
                               },
                               "font-family": {
@@ -27233,6 +27716,385 @@
                               }
                             },
                             "children": [
+                              {
+                                "id": "settings_postaa-popup-frame",
+                                "type": "vector",
+                                "properties": {
+                                  "position": {
+                                    "type": "keyword",
+                                    "value": "absolute"
+                                  },
+                                  "display": {
+                                    "type": "keyword",
+                                    "value": "block"
+                                  },
+                                  "box-sizing": {
+                                    "type": "keyword",
+                                    "value": "border-box"
+                                  },
+                                  "left": {
+                                    "type": "length",
+                                    "value": 0,
+                                    "unit": "dp"
+                                  },
+                                  "top": {
+                                    "type": "length",
+                                    "value": 0,
+                                    "unit": "dp"
+                                  },
+                                  "width": {
+                                    "type": "length",
+                                    "value": 100,
+                                    "unit": "%"
+                                  },
+                                  "height": {
+                                    "type": "length",
+                                    "value": 100,
+                                    "unit": "%"
+                                  },
+                                  "pointer-events": {
+                                    "type": "keyword",
+                                    "value": "none"
+                                  },
+                                  "opacity": {
+                                    "type": "number",
+                                    "value": 1
+                                  }
+                                },
+                                "paths": [
+                                  {
+                                    "id": "outline",
+                                    "commands": [
+                                      {
+                                        "id": "point-0",
+                                        "op": "move",
+                                        "points": [
+                                          [
+                                            6,
+                                            0
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-1",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            {
+                                              "fraction": 1,
+                                              "dp": 0
+                                            },
+                                            0
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-2",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            {
+                                              "fraction": 1,
+                                              "dp": 0
+                                            },
+                                            {
+                                              "fraction": 1,
+                                              "dp": -6
+                                            }
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-3",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            {
+                                              "fraction": 1,
+                                              "dp": -6
+                                            },
+                                            {
+                                              "fraction": 1,
+                                              "dp": 0
+                                            }
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-4",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            0,
+                                            {
+                                              "fraction": 1,
+                                              "dp": 0
+                                            }
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-5",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            0,
+                                            6
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "close",
+                                        "op": "close"
+                                      }
+                                    ],
+                                    "fill": {
+                                      "type": "solid",
+                                      "color": {
+                                        "type": "color",
+                                        "value": [
+                                          0.0353,
+                                          0.0471,
+                                          0.0314,
+                                          1
+                                        ]
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "id": "outer-rail",
+                                    "commands": [
+                                      {
+                                        "id": "point-0",
+                                        "op": "move",
+                                        "points": [
+                                          [
+                                            6.5,
+                                            0.5
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-1",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            {
+                                              "fraction": 1,
+                                              "dp": -0.5
+                                            },
+                                            0.5
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-2",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            {
+                                              "fraction": 1,
+                                              "dp": -0.5
+                                            },
+                                            {
+                                              "fraction": 1,
+                                              "dp": -6.5
+                                            }
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-3",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            {
+                                              "fraction": 1,
+                                              "dp": -6.5
+                                            },
+                                            {
+                                              "fraction": 1,
+                                              "dp": -0.5
+                                            }
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-4",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            0.5,
+                                            {
+                                              "fraction": 1,
+                                              "dp": -0.5
+                                            }
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-5",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            0.5,
+                                            6.5
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "close",
+                                        "op": "close"
+                                      }
+                                    ],
+                                    "fill": {
+                                      "type": "solid",
+                                      "color": {
+                                        "type": "color",
+                                        "value": [
+                                          0,
+                                          0,
+                                          0,
+                                          0
+                                        ]
+                                      }
+                                    },
+                                    "stroke": {
+                                      "paint": {
+                                        "type": "solid",
+                                        "color": {
+                                          "type": "color",
+                                          "value": [
+                                            0.5451,
+                                            0.5882,
+                                            0.2941,
+                                            1
+                                          ]
+                                        }
+                                      },
+                                      "widthDp": 1,
+                                      "minimumPixels": 1,
+                                      "join": "miter"
+                                    }
+                                  },
+                                  {
+                                    "id": "inner-rail",
+                                    "commands": [
+                                      {
+                                        "id": "point-0",
+                                        "op": "move",
+                                        "points": [
+                                          [
+                                            7.5,
+                                            3.5
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-1",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            {
+                                              "fraction": 1,
+                                              "dp": -3.5
+                                            },
+                                            3.5
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-2",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            {
+                                              "fraction": 1,
+                                              "dp": -3.5
+                                            },
+                                            {
+                                              "fraction": 1,
+                                              "dp": -7.5
+                                            }
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-3",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            {
+                                              "fraction": 1,
+                                              "dp": -7.5
+                                            },
+                                            {
+                                              "fraction": 1,
+                                              "dp": -3.5
+                                            }
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-4",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            3.5,
+                                            {
+                                              "fraction": 1,
+                                              "dp": -3.5
+                                            }
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-5",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            3.5,
+                                            7.5
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "close",
+                                        "op": "close"
+                                      }
+                                    ],
+                                    "fill": {
+                                      "type": "solid",
+                                      "color": {
+                                        "type": "color",
+                                        "value": [
+                                          0,
+                                          0,
+                                          0,
+                                          0
+                                        ]
+                                      }
+                                    },
+                                    "stroke": {
+                                      "paint": {
+                                        "type": "solid",
+                                        "color": {
+                                          "type": "color",
+                                          "value": [
+                                            0.5451,
+                                            0.5882,
+                                            0.2941,
+                                            0.35
+                                          ]
+                                        }
+                                      },
+                                      "widthDp": 1,
+                                      "minimumPixels": 1,
+                                      "join": "miter"
+                                    }
+                                  }
+                                ]
+                              },
                               {
                                 "id": "settings_postaa-viewport",
                                 "type": "group",
@@ -30645,7 +31507,110 @@
                                   }
                                 ]
                               }
-                            ]
+                            ],
+                            "mask": {
+                              "paths": [
+                                {
+                                  "id": "cut-silhouette",
+                                  "commands": [
+                                    {
+                                      "id": "point-0",
+                                      "op": "move",
+                                      "points": [
+                                        [
+                                          6,
+                                          0
+                                        ]
+                                      ]
+                                    },
+                                    {
+                                      "id": "point-1",
+                                      "op": "line",
+                                      "points": [
+                                        [
+                                          {
+                                            "fraction": 1,
+                                            "dp": 0
+                                          },
+                                          0
+                                        ]
+                                      ]
+                                    },
+                                    {
+                                      "id": "point-2",
+                                      "op": "line",
+                                      "points": [
+                                        [
+                                          {
+                                            "fraction": 1,
+                                            "dp": 0
+                                          },
+                                          {
+                                            "fraction": 1,
+                                            "dp": -6
+                                          }
+                                        ]
+                                      ]
+                                    },
+                                    {
+                                      "id": "point-3",
+                                      "op": "line",
+                                      "points": [
+                                        [
+                                          {
+                                            "fraction": 1,
+                                            "dp": -6
+                                          },
+                                          {
+                                            "fraction": 1,
+                                            "dp": 0
+                                          }
+                                        ]
+                                      ]
+                                    },
+                                    {
+                                      "id": "point-4",
+                                      "op": "line",
+                                      "points": [
+                                        [
+                                          0,
+                                          {
+                                            "fraction": 1,
+                                            "dp": 0
+                                          }
+                                        ]
+                                      ]
+                                    },
+                                    {
+                                      "id": "point-5",
+                                      "op": "line",
+                                      "points": [
+                                        [
+                                          0,
+                                          6
+                                        ]
+                                      ]
+                                    },
+                                    {
+                                      "id": "close",
+                                      "op": "close"
+                                    }
+                                  ],
+                                  "fill": {
+                                    "type": "solid",
+                                    "color": {
+                                      "type": "color",
+                                      "value": [
+                                        1,
+                                        1,
+                                        1,
+                                        1
+                                      ]
+                                    }
+                                  }
+                                }
+                              ]
+                            }
                           }
                         ],
                         "control": {
@@ -30736,7 +31701,8 @@
                             "thumb": "settings_postaa-popup-scroll-thumb",
                             "lineStep": 36,
                             "minimumThumb": 36
-                          }
+                          },
+                          "placementBounds": "settings-body"
                         }
                       },
                       {
@@ -34289,16 +35255,16 @@
                               },
                               "padding": {
                                 "type": "length",
-                                "value": 2,
+                                "value": 8,
                                 "unit": "dp"
                               },
                               "background-color": {
                                 "type": "color",
                                 "value": [
-                                  0.035,
-                                  0.047,
-                                  0.031,
-                                  1
+                                  0,
+                                  0,
+                                  0,
+                                  0
                                 ]
                               },
                               "font-family": {
@@ -34317,6 +35283,385 @@
                               }
                             },
                             "children": [
+                              {
+                                "id": "settings_resolution_scale-popup-frame",
+                                "type": "vector",
+                                "properties": {
+                                  "position": {
+                                    "type": "keyword",
+                                    "value": "absolute"
+                                  },
+                                  "display": {
+                                    "type": "keyword",
+                                    "value": "block"
+                                  },
+                                  "box-sizing": {
+                                    "type": "keyword",
+                                    "value": "border-box"
+                                  },
+                                  "left": {
+                                    "type": "length",
+                                    "value": 0,
+                                    "unit": "dp"
+                                  },
+                                  "top": {
+                                    "type": "length",
+                                    "value": 0,
+                                    "unit": "dp"
+                                  },
+                                  "width": {
+                                    "type": "length",
+                                    "value": 100,
+                                    "unit": "%"
+                                  },
+                                  "height": {
+                                    "type": "length",
+                                    "value": 100,
+                                    "unit": "%"
+                                  },
+                                  "pointer-events": {
+                                    "type": "keyword",
+                                    "value": "none"
+                                  },
+                                  "opacity": {
+                                    "type": "number",
+                                    "value": 1
+                                  }
+                                },
+                                "paths": [
+                                  {
+                                    "id": "outline",
+                                    "commands": [
+                                      {
+                                        "id": "point-0",
+                                        "op": "move",
+                                        "points": [
+                                          [
+                                            6,
+                                            0
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-1",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            {
+                                              "fraction": 1,
+                                              "dp": 0
+                                            },
+                                            0
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-2",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            {
+                                              "fraction": 1,
+                                              "dp": 0
+                                            },
+                                            {
+                                              "fraction": 1,
+                                              "dp": -6
+                                            }
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-3",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            {
+                                              "fraction": 1,
+                                              "dp": -6
+                                            },
+                                            {
+                                              "fraction": 1,
+                                              "dp": 0
+                                            }
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-4",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            0,
+                                            {
+                                              "fraction": 1,
+                                              "dp": 0
+                                            }
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-5",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            0,
+                                            6
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "close",
+                                        "op": "close"
+                                      }
+                                    ],
+                                    "fill": {
+                                      "type": "solid",
+                                      "color": {
+                                        "type": "color",
+                                        "value": [
+                                          0.0353,
+                                          0.0471,
+                                          0.0314,
+                                          1
+                                        ]
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "id": "outer-rail",
+                                    "commands": [
+                                      {
+                                        "id": "point-0",
+                                        "op": "move",
+                                        "points": [
+                                          [
+                                            6.5,
+                                            0.5
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-1",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            {
+                                              "fraction": 1,
+                                              "dp": -0.5
+                                            },
+                                            0.5
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-2",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            {
+                                              "fraction": 1,
+                                              "dp": -0.5
+                                            },
+                                            {
+                                              "fraction": 1,
+                                              "dp": -6.5
+                                            }
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-3",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            {
+                                              "fraction": 1,
+                                              "dp": -6.5
+                                            },
+                                            {
+                                              "fraction": 1,
+                                              "dp": -0.5
+                                            }
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-4",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            0.5,
+                                            {
+                                              "fraction": 1,
+                                              "dp": -0.5
+                                            }
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-5",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            0.5,
+                                            6.5
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "close",
+                                        "op": "close"
+                                      }
+                                    ],
+                                    "fill": {
+                                      "type": "solid",
+                                      "color": {
+                                        "type": "color",
+                                        "value": [
+                                          0,
+                                          0,
+                                          0,
+                                          0
+                                        ]
+                                      }
+                                    },
+                                    "stroke": {
+                                      "paint": {
+                                        "type": "solid",
+                                        "color": {
+                                          "type": "color",
+                                          "value": [
+                                            0.5451,
+                                            0.5882,
+                                            0.2941,
+                                            1
+                                          ]
+                                        }
+                                      },
+                                      "widthDp": 1,
+                                      "minimumPixels": 1,
+                                      "join": "miter"
+                                    }
+                                  },
+                                  {
+                                    "id": "inner-rail",
+                                    "commands": [
+                                      {
+                                        "id": "point-0",
+                                        "op": "move",
+                                        "points": [
+                                          [
+                                            7.5,
+                                            3.5
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-1",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            {
+                                              "fraction": 1,
+                                              "dp": -3.5
+                                            },
+                                            3.5
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-2",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            {
+                                              "fraction": 1,
+                                              "dp": -3.5
+                                            },
+                                            {
+                                              "fraction": 1,
+                                              "dp": -7.5
+                                            }
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-3",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            {
+                                              "fraction": 1,
+                                              "dp": -7.5
+                                            },
+                                            {
+                                              "fraction": 1,
+                                              "dp": -3.5
+                                            }
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-4",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            3.5,
+                                            {
+                                              "fraction": 1,
+                                              "dp": -3.5
+                                            }
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-5",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            3.5,
+                                            7.5
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "close",
+                                        "op": "close"
+                                      }
+                                    ],
+                                    "fill": {
+                                      "type": "solid",
+                                      "color": {
+                                        "type": "color",
+                                        "value": [
+                                          0,
+                                          0,
+                                          0,
+                                          0
+                                        ]
+                                      }
+                                    },
+                                    "stroke": {
+                                      "paint": {
+                                        "type": "solid",
+                                        "color": {
+                                          "type": "color",
+                                          "value": [
+                                            0.5451,
+                                            0.5882,
+                                            0.2941,
+                                            0.35
+                                          ]
+                                        }
+                                      },
+                                      "widthDp": 1,
+                                      "minimumPixels": 1,
+                                      "join": "miter"
+                                    }
+                                  }
+                                ]
+                              },
                               {
                                 "id": "settings_resolution_scale-viewport",
                                 "type": "group",
@@ -39965,7 +41310,110 @@
                                   }
                                 ]
                               }
-                            ]
+                            ],
+                            "mask": {
+                              "paths": [
+                                {
+                                  "id": "cut-silhouette",
+                                  "commands": [
+                                    {
+                                      "id": "point-0",
+                                      "op": "move",
+                                      "points": [
+                                        [
+                                          6,
+                                          0
+                                        ]
+                                      ]
+                                    },
+                                    {
+                                      "id": "point-1",
+                                      "op": "line",
+                                      "points": [
+                                        [
+                                          {
+                                            "fraction": 1,
+                                            "dp": 0
+                                          },
+                                          0
+                                        ]
+                                      ]
+                                    },
+                                    {
+                                      "id": "point-2",
+                                      "op": "line",
+                                      "points": [
+                                        [
+                                          {
+                                            "fraction": 1,
+                                            "dp": 0
+                                          },
+                                          {
+                                            "fraction": 1,
+                                            "dp": -6
+                                          }
+                                        ]
+                                      ]
+                                    },
+                                    {
+                                      "id": "point-3",
+                                      "op": "line",
+                                      "points": [
+                                        [
+                                          {
+                                            "fraction": 1,
+                                            "dp": -6
+                                          },
+                                          {
+                                            "fraction": 1,
+                                            "dp": 0
+                                          }
+                                        ]
+                                      ]
+                                    },
+                                    {
+                                      "id": "point-4",
+                                      "op": "line",
+                                      "points": [
+                                        [
+                                          0,
+                                          {
+                                            "fraction": 1,
+                                            "dp": 0
+                                          }
+                                        ]
+                                      ]
+                                    },
+                                    {
+                                      "id": "point-5",
+                                      "op": "line",
+                                      "points": [
+                                        [
+                                          0,
+                                          6
+                                        ]
+                                      ]
+                                    },
+                                    {
+                                      "id": "close",
+                                      "op": "close"
+                                    }
+                                  ],
+                                  "fill": {
+                                    "type": "solid",
+                                    "color": {
+                                      "type": "color",
+                                      "value": [
+                                        1,
+                                        1,
+                                        1,
+                                        1
+                                      ]
+                                    }
+                                  }
+                                }
+                              ]
+                            }
                           }
                         ],
                         "control": {
@@ -40104,7 +41552,8 @@
                             "thumb": "settings_resolution_scale-popup-scroll-thumb",
                             "lineStep": 36,
                             "minimumThumb": 36
-                          }
+                          },
+                          "placementBounds": "settings-body"
                         }
                       },
                       {
@@ -40756,16 +42205,16 @@
                               },
                               "padding": {
                                 "type": "length",
-                                "value": 2,
+                                "value": 8,
                                 "unit": "dp"
                               },
                               "background-color": {
                                 "type": "color",
                                 "value": [
-                                  0.035,
-                                  0.047,
-                                  0.031,
-                                  1
+                                  0,
+                                  0,
+                                  0,
+                                  0
                                 ]
                               },
                               "font-family": {
@@ -40784,6 +42233,385 @@
                               }
                             },
                             "children": [
+                              {
+                                "id": "settings_vsync-popup-frame",
+                                "type": "vector",
+                                "properties": {
+                                  "position": {
+                                    "type": "keyword",
+                                    "value": "absolute"
+                                  },
+                                  "display": {
+                                    "type": "keyword",
+                                    "value": "block"
+                                  },
+                                  "box-sizing": {
+                                    "type": "keyword",
+                                    "value": "border-box"
+                                  },
+                                  "left": {
+                                    "type": "length",
+                                    "value": 0,
+                                    "unit": "dp"
+                                  },
+                                  "top": {
+                                    "type": "length",
+                                    "value": 0,
+                                    "unit": "dp"
+                                  },
+                                  "width": {
+                                    "type": "length",
+                                    "value": 100,
+                                    "unit": "%"
+                                  },
+                                  "height": {
+                                    "type": "length",
+                                    "value": 100,
+                                    "unit": "%"
+                                  },
+                                  "pointer-events": {
+                                    "type": "keyword",
+                                    "value": "none"
+                                  },
+                                  "opacity": {
+                                    "type": "number",
+                                    "value": 1
+                                  }
+                                },
+                                "paths": [
+                                  {
+                                    "id": "outline",
+                                    "commands": [
+                                      {
+                                        "id": "point-0",
+                                        "op": "move",
+                                        "points": [
+                                          [
+                                            6,
+                                            0
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-1",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            {
+                                              "fraction": 1,
+                                              "dp": 0
+                                            },
+                                            0
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-2",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            {
+                                              "fraction": 1,
+                                              "dp": 0
+                                            },
+                                            {
+                                              "fraction": 1,
+                                              "dp": -6
+                                            }
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-3",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            {
+                                              "fraction": 1,
+                                              "dp": -6
+                                            },
+                                            {
+                                              "fraction": 1,
+                                              "dp": 0
+                                            }
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-4",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            0,
+                                            {
+                                              "fraction": 1,
+                                              "dp": 0
+                                            }
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-5",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            0,
+                                            6
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "close",
+                                        "op": "close"
+                                      }
+                                    ],
+                                    "fill": {
+                                      "type": "solid",
+                                      "color": {
+                                        "type": "color",
+                                        "value": [
+                                          0.0353,
+                                          0.0471,
+                                          0.0314,
+                                          1
+                                        ]
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "id": "outer-rail",
+                                    "commands": [
+                                      {
+                                        "id": "point-0",
+                                        "op": "move",
+                                        "points": [
+                                          [
+                                            6.5,
+                                            0.5
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-1",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            {
+                                              "fraction": 1,
+                                              "dp": -0.5
+                                            },
+                                            0.5
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-2",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            {
+                                              "fraction": 1,
+                                              "dp": -0.5
+                                            },
+                                            {
+                                              "fraction": 1,
+                                              "dp": -6.5
+                                            }
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-3",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            {
+                                              "fraction": 1,
+                                              "dp": -6.5
+                                            },
+                                            {
+                                              "fraction": 1,
+                                              "dp": -0.5
+                                            }
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-4",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            0.5,
+                                            {
+                                              "fraction": 1,
+                                              "dp": -0.5
+                                            }
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-5",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            0.5,
+                                            6.5
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "close",
+                                        "op": "close"
+                                      }
+                                    ],
+                                    "fill": {
+                                      "type": "solid",
+                                      "color": {
+                                        "type": "color",
+                                        "value": [
+                                          0,
+                                          0,
+                                          0,
+                                          0
+                                        ]
+                                      }
+                                    },
+                                    "stroke": {
+                                      "paint": {
+                                        "type": "solid",
+                                        "color": {
+                                          "type": "color",
+                                          "value": [
+                                            0.5451,
+                                            0.5882,
+                                            0.2941,
+                                            1
+                                          ]
+                                        }
+                                      },
+                                      "widthDp": 1,
+                                      "minimumPixels": 1,
+                                      "join": "miter"
+                                    }
+                                  },
+                                  {
+                                    "id": "inner-rail",
+                                    "commands": [
+                                      {
+                                        "id": "point-0",
+                                        "op": "move",
+                                        "points": [
+                                          [
+                                            7.5,
+                                            3.5
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-1",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            {
+                                              "fraction": 1,
+                                              "dp": -3.5
+                                            },
+                                            3.5
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-2",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            {
+                                              "fraction": 1,
+                                              "dp": -3.5
+                                            },
+                                            {
+                                              "fraction": 1,
+                                              "dp": -7.5
+                                            }
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-3",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            {
+                                              "fraction": 1,
+                                              "dp": -7.5
+                                            },
+                                            {
+                                              "fraction": 1,
+                                              "dp": -3.5
+                                            }
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-4",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            3.5,
+                                            {
+                                              "fraction": 1,
+                                              "dp": -3.5
+                                            }
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "point-5",
+                                        "op": "line",
+                                        "points": [
+                                          [
+                                            3.5,
+                                            7.5
+                                          ]
+                                        ]
+                                      },
+                                      {
+                                        "id": "close",
+                                        "op": "close"
+                                      }
+                                    ],
+                                    "fill": {
+                                      "type": "solid",
+                                      "color": {
+                                        "type": "color",
+                                        "value": [
+                                          0,
+                                          0,
+                                          0,
+                                          0
+                                        ]
+                                      }
+                                    },
+                                    "stroke": {
+                                      "paint": {
+                                        "type": "solid",
+                                        "color": {
+                                          "type": "color",
+                                          "value": [
+                                            0.5451,
+                                            0.5882,
+                                            0.2941,
+                                            0.35
+                                          ]
+                                        }
+                                      },
+                                      "widthDp": 1,
+                                      "minimumPixels": 1,
+                                      "join": "miter"
+                                    }
+                                  }
+                                ]
+                              },
                               {
                                 "id": "settings_vsync-viewport",
                                 "type": "group",
@@ -42519,7 +44347,110 @@
                                   }
                                 ]
                               }
-                            ]
+                            ],
+                            "mask": {
+                              "paths": [
+                                {
+                                  "id": "cut-silhouette",
+                                  "commands": [
+                                    {
+                                      "id": "point-0",
+                                      "op": "move",
+                                      "points": [
+                                        [
+                                          6,
+                                          0
+                                        ]
+                                      ]
+                                    },
+                                    {
+                                      "id": "point-1",
+                                      "op": "line",
+                                      "points": [
+                                        [
+                                          {
+                                            "fraction": 1,
+                                            "dp": 0
+                                          },
+                                          0
+                                        ]
+                                      ]
+                                    },
+                                    {
+                                      "id": "point-2",
+                                      "op": "line",
+                                      "points": [
+                                        [
+                                          {
+                                            "fraction": 1,
+                                            "dp": 0
+                                          },
+                                          {
+                                            "fraction": 1,
+                                            "dp": -6
+                                          }
+                                        ]
+                                      ]
+                                    },
+                                    {
+                                      "id": "point-3",
+                                      "op": "line",
+                                      "points": [
+                                        [
+                                          {
+                                            "fraction": 1,
+                                            "dp": -6
+                                          },
+                                          {
+                                            "fraction": 1,
+                                            "dp": 0
+                                          }
+                                        ]
+                                      ]
+                                    },
+                                    {
+                                      "id": "point-4",
+                                      "op": "line",
+                                      "points": [
+                                        [
+                                          0,
+                                          {
+                                            "fraction": 1,
+                                            "dp": 0
+                                          }
+                                        ]
+                                      ]
+                                    },
+                                    {
+                                      "id": "point-5",
+                                      "op": "line",
+                                      "points": [
+                                        [
+                                          0,
+                                          6
+                                        ]
+                                      ]
+                                    },
+                                    {
+                                      "id": "close",
+                                      "op": "close"
+                                    }
+                                  ],
+                                  "fill": {
+                                    "type": "solid",
+                                    "color": {
+                                      "type": "color",
+                                      "value": [
+                                        1,
+                                        1,
+                                        1,
+                                        1
+                                      ]
+                                    }
+                                  }
+                                }
+                              ]
+                            }
                           }
                         ],
                         "control": {
@@ -42574,7 +44505,8 @@
                             "thumb": "settings_vsync-popup-scroll-thumb",
                             "lineStep": 36,
                             "minimumThumb": 36
-                          }
+                          },
+                          "placementBounds": "settings-body"
                         }
                       }
                     ]

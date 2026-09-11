@@ -84,6 +84,8 @@ The opt-in [SYSTEM page](docs/dev/ui/system-exit.md) has precise brightness
 fields, [performance preset and Auto-Detect draft controls](docs/dev/ui/performance-presets.md),
 [an authored vector scrollbar](docs/dev/ui/scrollbars.md), and guarded
 discard/apply-and-return flows with authored modal focus ownership.
+[Its dropdowns](docs/dev/ui/choice-scrollbars.md) use cut-corner vector frames
+and fit readable option lists inside the settings panel at larger UI scales.
 The shared [effect coordinator](docs/dev/ui/settings-effect-execution.md) adds
 automatic completion and a checked in-place audio foundation. Mixed effect
 execution, portable recovery and the complete settings page remain in development.
@@ -95,6 +97,8 @@ unfinished.
 [Editor file publication](docs/dev/ui/editor-file-safety.md) can create complete
 new files without replacing a competing document. The full authoring and
 save/recovery workflows remain in development.
+[Prepared canvas edits](docs/dev/ui/document-editing.md) publish validated source,
+the live document and undo history together after successful layout preparation.
 [Ordered event programs](docs/dev/ui/event-programs.md) connect data, transitions
 and typed actions to normal GUI lifecycle and session delivery. Complete GUI migration,
 the full application/control contract and the visual editor remain in development.

@@ -2,8 +2,10 @@
 #pragma once
 #include <string>
 #include <vector>
+#include "retained/DocumentEdit.h"
 
 namespace openq4::ui { class Runtime; struct Viewport; struct Diagnostic; }
+namespace openq4::ui { struct RuntimeDocumentOptions; }
 struct retainedUIView_t;
 enum class retainedUIViewEvent_t { BeforeResourceReset, Restored, Failed };
 using retainedUIViewCallback_t = void (*)(void*, retainedUIViewEvent_t);
@@ -20,6 +22,23 @@ bool RetainedUI_LoadView(retainedUIView_t* view, const std::string& source, cons
 // Prepare before calling Runtime operations. Resource changes rebuild all live
 // views together. A failed view remains registered/address-stable but unloaded.
 bool RetainedUI_PrepareView(retainedUIView_t* view);
+// Exact, process-local canvas/history publication. Prepared storage must be
+// explicitly destroyed after success/failure; no borrowed old model survives
+// successful publication. This never performs native owner retirement.
+struct retainedUIEditIdentity_t {
+    std::uint64_t view=0,revision=0,resources=0,canvasLifetime=0,canvasRevision=0;
+    bool operator==(const retainedUIEditIdentity_t&) const = default;
+};
+struct retainedUIPreparedEdit_t;
+bool RetainedUI_QueryEditIdentity(retainedUIView_t*,retainedUIEditIdentity_t&) noexcept;
+retainedUIPreparedEdit_t* RetainedUI_PrepareEdit(retainedUIView_t*,retainedUIEditIdentity_t,
+    openq4::ui::DocumentEdit&,openq4::ui::DocumentEditIdentity,std::span<const openq4::ui::DocumentEditOperation>,
+    const openq4::ui::RuntimeDocumentOptions&,std::vector<openq4::ui::Diagnostic>&);
+retainedUIPreparedEdit_t* RetainedUI_PrepareHistory(retainedUIView_t*,retainedUIEditIdentity_t,
+    openq4::ui::DocumentEdit&,openq4::ui::DocumentEditIdentity,bool redo,
+    const openq4::ui::RuntimeDocumentOptions&,std::vector<openq4::ui::Diagnostic>&);
+bool RetainedUI_PublishEdit(retainedUIView_t*,retainedUIPreparedEdit_t*,openq4::ui::DocumentEditReceipt&) noexcept;
+void RetainedUI_DestroyPreparedEdit(retainedUIPreparedEdit_t*);
 // Root/UI-viewport output only. This does not render world surfaces or permit
 // callers to reuse layer zero as an arbitrary render texture.
 bool RetainedUI_DrawViewRoot(retainedUIView_t* view, const openq4::ui::Viewport& viewport);

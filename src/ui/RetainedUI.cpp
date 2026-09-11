@@ -14,16 +14,40 @@
 #include <map>
 #include <atomic>
 #include <limits>
+#include <thread>
 #if defined(USE_SDL3)
 bool Sys_SDL_IsGameWindowFocused(void);
 #endif
 
+struct retainedUIPreparedEditData;
+struct retainedUIEditControl {
+    std::uint64_t lifetime=0,revision=1;
+    bool alive=true,destroyPending=false;
+    std::weak_ptr<retainedUIPreparedEditData> pending;
+};
 struct retainedUIView_t {
+    std::shared_ptr<retainedUIEditControl> edit;
+
 	std::unique_ptr<openq4::ui::Runtime> runtime;
 	std::string source, path;
 	retainedUIViewCallback_t callback = nullptr;
 	void* owner = nullptr;
 	bool canonical = true, failed = false;
+};
+
+struct retainedUIPreparedEditData {
+    std::shared_ptr<retainedUIEditControl> owner;
+    retainedUIEditIdentity_t expected;
+    openq4::ui::DocumentEdit* history=nullptr;
+    std::unique_ptr<openq4::ui::DocumentEdit::Prepared> source;
+    std::unique_ptr<openq4::ui::Runtime::PreparedDocument> canvas;
+    std::string text,path;
+    bool ready=true;
+};
+struct retainedUIPreparedEdit_t {
+    std::shared_ptr<retainedUIPreparedEditData> data;
+    retainedUIPreparedEdit_t* next=nullptr;
+    bool destroyPending=false;
 };
 
 namespace {
@@ -248,6 +272,59 @@ const std::chrono::steady_clock::time_point epoch = std::chrono::steady_clock::n
 struct ProfileSample { openq4::ui::RuntimeStatistics statistics; double engineMilliseconds; };
 std::vector<ProfileSample> profile;
 int profileFrames = 0;
+const std::thread::id editThread=std::this_thread::get_id();
+unsigned editWorkDepth=0,editCallDepth=0;
+bool editDraining=false,editShutdownPending=false;
+retainedUIPreparedEdit_t* editPrepared=nullptr;
+std::uint64_t editResources=1;
+std::uint64_t NextEditLifetime() noexcept {
+    static std::uint64_t next=1;
+    return next==(std::numeric_limits<std::uint64_t>::max)()?0:next++;
+}
+void TouchEdit(retainedUIView_t& view) noexcept {
+    if(view.edit->revision)view.edit->revision=view.edit->revision==(std::numeric_limits<std::uint64_t>::max)()?0:view.edit->revision+1;
+    if(auto pending=view.edit->pending.lock())pending->ready=false;
+}
+void TouchEditResources() noexcept {
+    if(editResources)editResources=editResources==(std::numeric_limits<std::uint64_t>::max)()?0:editResources+1;
+    for(auto* view:views)TouchEdit(*view);
+}
+bool BusyEditCanvas() noexcept {
+    for(const auto* view:views)if(view->runtime->HasActiveCanvasCallback())return true;
+    return false;
+}
+void DrainEditViews() {
+    if(editWorkDepth || editCallDepth || editDraining || BusyEditCanvas())return;
+    editDraining=true;
+    for(;;) {
+        auto** prepared=&editPrepared;
+        while(*prepared && !(*prepared)->destroyPending)prepared=&(*prepared)->next;
+        if(*prepared){auto* value=*prepared;*prepared=value->next;delete value;continue;}
+        const auto found=std::find_if(views.begin(),views.end(),[](const auto* view){return view->edit->destroyPending;});
+        if(found==views.end())break;
+        auto* view=*found;views.erase(found);view->edit->alive=false;delete view;
+    }
+    editDraining=false;
+    if(editShutdownPending){editShutdownPending=false;RetainedUI_Shutdown();}
+}
+// Service calls retain registered views until all nested Runtime callbacks return.
+// This is independent of EditWork: ordinary calls may still refresh resources.
+struct EditCall {
+    EditCall(){++editCallDepth;}
+    ~EditCall(){--editCallDepth;DrainEditViews();}
+};
+struct EditWork {
+    EditWork(){++editWorkDepth;}
+    ~EditWork(){--editWorkDepth;DrainEditViews();}
+};
+// These existing engine getters read cached scalar generations. They perform
+// no Host/Rml callbacks or resource work. Final mutation begins after this.
+bool EditResourcesCurrent() noexcept {
+    return renderSystem && !resourcesRefreshing && !editDraining && editResources &&
+        restartGeneration==renderSystem->GetVideoRestartCount() &&
+        languageGeneration==LangDict_GetCodePageGeneration() && loadedLanguageRevision==languageRevision;
+}
+
 
 void RecordProfile(double engineMilliseconds) {
 	if (!profileFrames) return;
@@ -342,7 +419,8 @@ bool RegisteredView(const retainedUIView_t* view) {
 	return view && std::find(views.begin(),views.end(),view) != views.end();
 }
 bool LoadViewDocument(retainedUIView_t& view, const std::string& source, const std::string& path,
-	bool canonical, std::vector<openq4::ui::Diagnostic>& diagnostics) {
+    bool canonical, std::vector<openq4::ui::Diagnostic>& diagnostics) {
+    TouchEdit(view);
 	diagnostics.clear();
 	if (canonical ? !view.runtime->LoadDocument(source,path,diagnostics) : !view.runtime->LoadMarkup(source,path)) return false;
 	view.source = source; view.path = path; view.canonical = canonical; view.failed = false;
@@ -381,6 +459,12 @@ void Close() {
 	currentPath.clear(); savedCheckpoint.clear();
 }
 bool RefreshResources() {
+    if(editWorkDepth || editDraining || BusyEditCanvas()){
+        TouchEditResources();
+        for(auto* view:views)view->runtime->AbortPreparedDocument();
+        return false;
+    }
+    DrainEditViews();
 	if (!renderSystem || resourcesRefreshing) return false;
 	if (restartGeneration == renderSystem->GetVideoRestartCount() && languageGeneration == LangDict_GetCodePageGeneration() &&
 		loadedLanguageRevision == languageRevision) return true;
@@ -393,6 +477,8 @@ bool RefreshResources() {
 		rootSubmissionPending = false;
 	}
 	resourcesRefreshing = true;
+    TouchEditResources();
+    for(auto* view:views)view->runtime->AbortPreparedDocument();
 	struct SavedView { retainedUIView_t* view; bool loaded = false, valid = true, reloaded = false; std::string snapshot; };
 	std::vector<SavedView> saved;
 	const double savedTime = PresentationTime();
@@ -590,32 +676,111 @@ void Value_f(const idCmdArgs& args) {
 }
 
 retainedUIView_t* RetainedUI_CreateView(retainedUIViewCallback_t callback, void* owner) {
+    if(std::this_thread::get_id()!=editThread || editWorkDepth || editDraining || BusyEditCanvas())return nullptr;
+    DrainEditViews();
 	if (resourcesRefreshing) { common->Warning("retained UI: cannot register a view during resource callbacks"); return nullptr; }
 	auto view = std::make_unique<retainedUIView_t>();
+    view->edit=std::make_shared<retainedUIEditControl>();view->edit->lifetime=NextEditLifetime();
+    if(!view->edit->lifetime)return nullptr;
 	view->runtime = std::make_unique<openq4::ui::Runtime>(host);
 	view->callback = callback; view->owner = owner;
 	views.push_back(view.get());
 	return view.release();
 }
 void RetainedUI_DestroyView(retainedUIView_t* view) {
-	if (!RegisteredView(view)) return;
-	if (resourcesRefreshing) { common->FatalError("Retained UI views cannot be destroyed during resource callbacks"); return; }
-	views.erase(std::find(views.begin(),views.end(),view));
-	delete view;
+    if(std::this_thread::get_id()!=editThread || !RegisteredView(view))return;
+    if(resourcesRefreshing){common->FatalError("Retained UI views cannot be destroyed during resource callbacks");return;}
+    TouchEdit(*view);view->runtime->RetireCanvasOwner();view->edit->destroyPending=true;view->failed=true;
+    // The caller may destroy its callback owner as soon as this returns.
+    view->callback=nullptr;view->owner=nullptr;
+    DrainEditViews();
 }
 openq4::ui::Runtime* RetainedUI_ViewRuntime(retainedUIView_t* view) {
-	return RegisteredView(view) ? view->runtime.get() : nullptr;
+	return RegisteredView(view) && !view->edit->destroyPending ? view->runtime.get() : nullptr;
 }
 bool RetainedUI_LoadView(retainedUIView_t* view, const std::string& source, const std::string& path,
 	std::vector<openq4::ui::Diagnostic>& diagnostics) {
 	diagnostics.clear();
-	if (!RegisteredView(view) || !RefreshResources()) {
+	if (!RegisteredView(view) || !RefreshResources() || !RegisteredView(view) || view->edit->destroyPending) {
 		diagnostics.push_back({"","Retained view is unavailable during resource lifecycle changes"}); return false;
 	}
 	return LoadViewDocument(*view,source,path,true,diagnostics);
 }
 bool RetainedUI_PrepareView(retainedUIView_t* view) {
-	return RegisteredView(view) && RefreshResources() && !view->failed && view->runtime->IsLoaded();
+	return RegisteredView(view) && RefreshResources() && RegisteredView(view) && !view->edit->destroyPending && !view->failed && view->runtime->IsLoaded();
+}
+
+bool RetainedUI_QueryEditIdentity(retainedUIView_t* view,retainedUIEditIdentity_t& out) noexcept {
+    if(std::this_thread::get_id()!=editThread || editWorkDepth || !RegisteredView(view) ||
+        !view->edit->alive || view->edit->destroyPending || !view->edit->lifetime || !view->edit->revision ||
+        !view->canonical || view->failed || !EditResourcesCurrent() || view->runtime->HasActiveCanvasCallback() || !view->runtime->IsLoaded())return false;
+    const auto canvas=view->runtime->CanvasIdentity();
+    if(!canvas.lifetime || !canvas.revision)return false;
+    out={view->edit->lifetime,view->edit->revision,editResources,canvas.lifetime,canvas.revision};return true;
+}
+namespace {
+retainedUIPreparedEdit_t* PrepareViewEdit(retainedUIView_t* view,retainedUIEditIdentity_t expected,
+    openq4::ui::DocumentEdit& history,openq4::ui::DocumentEditIdentity identity,
+    std::span<const openq4::ui::DocumentEditOperation> operations,bool travel,bool redo,
+    const openq4::ui::RuntimeDocumentOptions& supplied,std::vector<openq4::ui::Diagnostic>& diagnostics) {
+    if(std::this_thread::get_id()!=editThread)return nullptr;
+    if(editWorkDepth || editDraining){if(RegisteredView(view))TouchEdit(*view);return nullptr;}
+    retainedUIEditIdentity_t current;
+    if(!RetainedUI_QueryEditIdentity(view,current) || current!=expected)return nullptr;
+    if(!view->edit->pending.expired() || !history.Current() || history.Identity()!=identity ||
+        history.Current()->Source()!=view->source || !view->runtime->SourceMatches(view->source,view->path) ||
+        view->runtime->NativeVacancy()!=openq4::ui::RuntimeNativeVacancy::Vacant){TouchEdit(*view);return nullptr;}
+    EditWork work;
+    TouchEdit(*view);const auto revision=view->edit->revision;const auto owner=view->edit;
+    try {
+        auto options=supplied; // All caller-owned strings/maps copied before a Host call.
+        if(options.sourcePath.empty() || options.sourcePath.size()>4096 || options.sourcePath.find('\0')!=std::string::npos ||
+            options.sourcePath.find("..")!=std::string::npos || options.sourcePath.find(':')!=std::string::npos ||
+            options.sourcePath.front()=='/' || options.sourcePath.front()=='\\')return nullptr;
+        auto data=std::make_shared<retainedUIPreparedEditData>();data->owner=owner;data->history=&history;
+        data->source=travel?history.PrepareUndo(identity,redo,diagnostics):history.PrepareEdit(identity,operations,diagnostics);
+        if(!data->source)return nullptr;
+        data->text=data->source->Target().Source();data->path=options.sourcePath;
+        data->canvas=view->runtime->PrepareDocument(view->runtime->CanvasIdentity(),*data->source,std::move(options),diagnostics);
+        if(!data->canvas || !owner->alive || owner->destroyPending || owner->revision!=revision || !EditResourcesCurrent() ||
+            !data->source->OwnerCurrent() || !view->runtime->CanPublishDocument(history,*data->source,*data->canvas))return nullptr;
+        const auto canvas=view->runtime->CanvasIdentity();
+        data->expected={owner->lifetime,revision,editResources,canvas.lifetime,canvas.revision};
+        auto result=std::make_unique<retainedUIPreparedEdit_t>();result->data=data;
+        owner->pending=data;result->next=editPrepared;editPrepared=result.get();return result.release();
+    }catch(...){return nullptr;}
+}
+}
+retainedUIPreparedEdit_t* RetainedUI_PrepareEdit(retainedUIView_t* view,retainedUIEditIdentity_t expected,
+    openq4::ui::DocumentEdit& history,openq4::ui::DocumentEditIdentity identity,
+    std::span<const openq4::ui::DocumentEditOperation> operations,const openq4::ui::RuntimeDocumentOptions& options,
+    std::vector<openq4::ui::Diagnostic>& diagnostics) {
+    return PrepareViewEdit(view,expected,history,identity,operations,false,false,options,diagnostics);
+}
+retainedUIPreparedEdit_t* RetainedUI_PrepareHistory(retainedUIView_t* view,retainedUIEditIdentity_t expected,
+    openq4::ui::DocumentEdit& history,openq4::ui::DocumentEditIdentity identity,bool redo,
+    const openq4::ui::RuntimeDocumentOptions& options,std::vector<openq4::ui::Diagnostic>& diagnostics) {
+    return PrepareViewEdit(view,expected,history,identity,{},true,redo,options,diagnostics);
+}
+bool RetainedUI_PublishEdit(retainedUIView_t* view,retainedUIPreparedEdit_t* prepared,openq4::ui::DocumentEditReceipt& out) noexcept {
+    if(std::this_thread::get_id()!=editThread)return false;
+    if(editWorkDepth || editDraining){if(RegisteredView(view))TouchEdit(*view);return false;}
+    if(!prepared || !prepared->data)return false;
+    auto& data=*prepared->data;retainedUIEditIdentity_t current;
+    if(!data.ready || !data.owner->alive || !data.source->OwnerCurrent() || !RetainedUI_QueryEditIdentity(view,current) ||
+        current!=data.expected || view->edit!=data.owner || view->edit->pending.lock()!=prepared->data ||
+        view->edit->revision==(std::numeric_limits<std::uint64_t>::max)() ||
+        !view->runtime->CanPublishDocument(*data.history,*data.source,*data.canvas))return false;
+    const bool changed=data.source->Receipt().sourceChanged;
+    // Checked local primitives cannot fail or call foreign code after this.
+    if(!view->runtime->PublishDocument(*data.history,*data.source,*data.canvas,out))return false;
+    if(changed){view->source.swap(data.text);view->path.swap(data.path);view->canonical=true;view->failed=false;}
+    ++view->edit->revision;data.ready=false;return true;
+}
+void RetainedUI_DestroyPreparedEdit(retainedUIPreparedEdit_t* prepared) {
+    if(std::this_thread::get_id()!=editThread)return;
+    for(auto* item=editPrepared;item;item=item->next)if(item==prepared){item->destroyPending=true;item->data->ready=false;break;}
+    DrainEditViews();
 }
 bool RetainedUI_DefaultViewport(openq4::ui::Viewport& viewport) {
 	viewport = {};
@@ -630,6 +795,7 @@ bool RetainedUI_DefaultViewport(openq4::ui::Viewport& viewport) {
 double RetainedUI_PresentationTime() { return PresentationTime(); }
 void RetainedUI_FrameSubmitted() { rootSubmissionPending = false; }
 bool RetainedUI_DrawViewRoot(retainedUIView_t* view, const openq4::ui::Viewport& viewport) {
+    EditCall call;
 	if (!renderSystem || !renderSystem->IsOpenGLRunning() || viewport.width <= 0 || viewport.height <= 0 || !RetainedUI_PrepareView(view)) return false;
 	const int oldWidth = host.viewportWidth, oldHeight = host.viewportHeight;
 	const bool oldViewport = renderSystem->GetUseUIViewportFor2D();
@@ -667,6 +833,13 @@ void RetainedUI_Init() {
 	cmdSystem->AddCommand("ui_retainedEvents",Events_f,CMD_FL_SYSTEM,"read and drain semantic retained action requests");
 }
 void RetainedUI_Shutdown() {
+    if(editWorkDepth || editDraining || BusyEditCanvas()){
+        editShutdownPending=true;TouchEditResources();
+        for(auto* view:views)view->runtime->AbortPreparedDocument();
+        return;
+    }
+    editShutdownPending=false;
+    TouchEditResources();
 	Close();
 	// The manager normally destroys its owners first. Explicitly release any
 	// remaining registered contexts before engine resource teardown, without
@@ -707,13 +880,14 @@ void RetainedUI_Draw() {
 	if (RetainedUI_DrawViewRoot(previewView,viewport)) RecordProfile(std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-profileStart).count());
 }
 bool RetainedUI_IsOpen() { return applicationOpen.load(std::memory_order_acquire); }
-void RetainedUI_LanguageChanged() { ++languageRevision; }
+void RetainedUI_LanguageChanged() { ++languageRevision;TouchEditResources(); }
 unsigned RetainedUI_InputGeneration() { return inputGeneration; }
 void RetainedUI_Close() { Close(); }
 #if !defined(USE_SDL3)
 void RetainedUI_QueueInput(const retainedUIInput_t&, int) {}
 #endif
 void RetainedUI_FrameInput() {
+    EditCall call;
 	if (!RetainedUI_IsOpen()) return;
 	const bool ready = PreviewInputReady();
 	SuspendInput(!inputFocused || (console && console->Active()) || engineWindowState.uiViewportWidth <= 0 || engineWindowState.uiViewportHeight <= 0);
@@ -736,6 +910,7 @@ void RetainedUI_FrameInput() {
 	input.Advance(PresentationTime()); ApplyInput();
 }
 bool RetainedUI_ProcessEvent(const sysEvent_s* event) {
+    EditCall call;
 	const bool transport = event->evType == SE_RETAINED_UI;
 	// Refresh before checking transport generation, so input queued for a
 	// pre-restart view cannot be delivered after callbacks quarantine its owner.
@@ -808,6 +983,11 @@ openq4::ui::Runtime* RetainedUI_ViewRuntime(retainedUIView_t*) { return nullptr;
 bool RetainedUI_LoadView(retainedUIView_t*,const std::string&,const std::string&,std::vector<openq4::ui::Diagnostic>&) { return false; }
 bool RetainedUI_PrepareView(retainedUIView_t*) { return false; }
 bool RetainedUI_DrawViewRoot(retainedUIView_t*,const openq4::ui::Viewport&) { return false; }
+bool RetainedUI_QueryEditIdentity(retainedUIView_t*,retainedUIEditIdentity_t&) noexcept{return false;}
+retainedUIPreparedEdit_t* RetainedUI_PrepareEdit(retainedUIView_t*,retainedUIEditIdentity_t,openq4::ui::DocumentEdit&,openq4::ui::DocumentEditIdentity,std::span<const openq4::ui::DocumentEditOperation>,const openq4::ui::RuntimeDocumentOptions&,std::vector<openq4::ui::Diagnostic>&){return nullptr;}
+retainedUIPreparedEdit_t* RetainedUI_PrepareHistory(retainedUIView_t*,retainedUIEditIdentity_t,openq4::ui::DocumentEdit&,openq4::ui::DocumentEditIdentity,bool,const openq4::ui::RuntimeDocumentOptions&,std::vector<openq4::ui::Diagnostic>&){return nullptr;}
+bool RetainedUI_PublishEdit(retainedUIView_t*,retainedUIPreparedEdit_t*,openq4::ui::DocumentEditReceipt&) noexcept{return false;}
+void RetainedUI_DestroyPreparedEdit(retainedUIPreparedEdit_t*){}
 bool RetainedUI_DefaultViewport(openq4::ui::Viewport&) { return false; }
 double RetainedUI_PresentationTime() { return 0; }
 void RetainedUI_FrameSubmitted() {}

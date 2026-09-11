@@ -438,6 +438,7 @@ if build_engine or get_option('build_native_tests')
     files('src/ui/retained/NativeTextEditor.cpp'),
     files('src/ui/retained/ScrollGeometry.cpp'),
     files('src/ui/retained/ScrollbarView.cpp'),
+    files('src/ui/retained/PopupPlacement.cpp'),
     dependencies: [rmlui_project.get_variable('rmlui_dep'), jsoncpp_project.get_variable('jsoncpp_dep'), libtess2_project.get_variable('libtess2_dep')],
     pic: true,
     install: false,
@@ -841,6 +842,35 @@ if build_engine or get_option('build_native_tests')
       include_directories: [root_include_dir, include_directories('src/ui/retained')],
       dependencies: openq4_retained_dep, install: false)
     test('openq4-ui-document-edit', openq4_ui_document_edit_test, timeout: 30)
+    openq4_ui_document_canvas_test = executable('openq4-ui-document-canvas-test',
+      files('tools/tests/native/UiDocumentCanvasTest.cpp'),
+      include_directories: root_include_dir,
+      dependencies: [openq4_retained_dep, rmlui_project.get_variable('rmlui_dep'), jsoncpp_project.get_variable('jsoncpp_dep')],
+      install: false)
+    test('openq4-ui-document-canvas', openq4_ui_document_canvas_test, timeout: 120)
+    openq4_ui_document_view_methods = custom_target('openq4-ui-document-view-methods',
+      input: 'src/ui/RetainedUI.cpp', output: 'ViewMethods.inc',
+      command: [py, files('tools/tests/ui_document_view_projection.py'), '@INPUT@', '@OUTPUT@'],
+      depend_files: files('tools/tests/filesystem_case_segments.py'))
+    openq4_ui_document_view_test = executable('openq4-ui-document-view-test',
+      files('tools/tests/native/UiDocumentViewTest.cpp'), openq4_ui_document_view_methods,
+      include_directories: root_include_dir,
+      dependencies: [openq4_retained_dep, rmlui_project.get_variable('rmlui_dep'), jsoncpp_project.get_variable('jsoncpp_dep')],
+      install: false)
+    test('openq4-ui-document-view', openq4_ui_document_view_test, timeout: 120)
+    openq4_ui_popup_placement_test = executable('openq4-ui-popup-placement-test',
+      files('tools/tests/native/UiPopupPlacementTest.cpp'),
+      include_directories: [root_include_dir, include_directories('src/ui/retained')],
+      dependencies: openq4_retained_dep, install: false)
+    test('openq4-ui-popup-placement', openq4_ui_popup_placement_test, timeout: 30)
+    openq4_ui_popup_placement_runtime_test = executable('openq4-ui-popup-placement-runtime-test',
+      files('tools/tests/native/UiPopupPlacementRuntimeTest.cpp'),
+      include_directories: root_include_dir,
+      dependencies: [openq4_retained_dep, rmlui_project.get_variable('rmlui_dep'), jsoncpp_project.get_variable('jsoncpp_dep')],
+      install: false)
+    test('openq4-ui-popup-placement-runtime', openq4_ui_popup_placement_runtime_test,
+      args: [meson.project_source_root() / 'content/baseoq4/pak0/guis/menu/settings/system.q4ui',
+             meson.project_source_root() / 'content/baseoq4/pak0/strings'], timeout: 300)
     test('openq4-ui-document-files', py,
       args: [meson.project_source_root() / 'tools/tests/durable_file.py',
         '--compiler', ui_test_cpp.cmd_array()[-1]], timeout: 180)

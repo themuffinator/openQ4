@@ -10,6 +10,25 @@
 #include <tuple>
 
 namespace openq4::ui {
+Interaction::DocumentVacancy Interaction::NativeDocumentVacancy() const noexcept {
+    if(candidate || !authority)return DocumentVacancy::BusyOrUnknown;
+    if(nativeModel)return DocumentVacancy::Bound;
+    return nativeControl.empty()?DocumentVacancy::Vacant:DocumentVacancy::BusyOrUnknown;
+}
+bool Interaction::ObserveNumberNativeCandidate(NumberNativeCandidate& out) const noexcept {
+    if(candidate || !authority || nativeModel || !nativeControl.empty() || focusPending || modalBlocked || !modalToken)return false;
+    const auto found=items.find(focused);
+    if(found==items.end() || found->second.control.role!=ControlRole::Number || !found->second.number ||
+        !found->second.readback || found->second.pending)return false;
+    const auto& editor=*found->second.number;
+    if(editor.detached || editor.native || editor.conflict || editor.buffer.Composition() ||
+        !editor.identity.session || !editor.identity.revision)return false;
+    try {
+        NumberNativeCandidate copied{focused,editor.identity,modalToken};
+        static_assert(std::is_nothrow_move_assignable_v<NumberNativeCandidate>);
+        out=std::move(copied);return true;
+    }catch(...){return false;}
+}
 namespace {
 // Process-local tokens are never recycled by Reset, restore, or another GUI.
 std::uint64_t ProposalToken() {
@@ -78,7 +97,8 @@ bool NativeUnsettled(const NativeTextEditorView& view) {
 	X(items) X(order) X(parents) X(modals) X(authoredModals) X(modalToken) X(numberEpoch) X(modalBlocked) X(focusPending) \
 	X(pendingFocus) X(heldNavigation) X(blockedNavigation) X(feedback) X(actions) X(dragging) X(popup) X(highlight) \
 	X(pointerOption) X(armedOption) X(pointerFraction) X(dragPreview) X(popupAcceptArm) X(nativeControl) \
-    X(pointerScrollThumb) X(scrollGrabFraction) X(scrollSource) X(scrollCommands) X(pointerChoiceTrack) X(choiceScrollArm) X(popupToken)
+    X(pointerScrollThumb) X(scrollGrabFraction) X(scrollSource) X(scrollCommands) X(pointerChoiceTrack) X(choiceScrollArm) X(popupToken) \
+    X(popupMeasured)
 Interaction::Interaction() : authority(ProposalToken()) {}
 Interaction::~Interaction() = default;
 Interaction::Interaction(const Interaction& other) : authority(other.authority), candidate(true) {
@@ -338,6 +358,27 @@ bool Interaction::OpenChoicePopup(const std::string& id) {
 bool Interaction::CloseChoicePopup(const std::string& id,std::uint64_t expected) {
     if (!expected || expected != popupToken || popup != id || !PopupInputIdle()) return false;
     CancelGesture(); Refresh(); return true;
+}
+bool Interaction::InvalidateChoicePopup(const std::string& id,std::uint64_t expected) {
+    if (!expected || expected != popupToken || popup != id) return false;
+    CancelGesture(); pointerArm=false; Refresh(); return true;
+}
+bool Interaction::SetChoicePopupMeasured(const std::string& id,std::uint64_t expected,bool measured) noexcept {
+    if (!expected || expected != popupToken || popup != id) return false;
+    // An unmeasured opening cannot own a gesture: the press was aimed at rows
+    // whose geometry no longer describes what is on screen. Drop the gesture but
+    // keep the opening and its highlight. Held sources stay quarantined until
+    // their matching release, which then selects nothing.
+    if (!measured && popupMeasured) {
+        armed.clear(); armedOption.clear(); popupAcceptArm = false; pointerArm = false;
+        dragging.clear(); dragPreview.reset();
+        scrollCommands.clear(); scrollSource = ProposalToken();
+        pointerScrollThumb = pointerChoiceTrack = choiceScrollArm = false; scrollGrabFraction = 0;
+    }
+    popupMeasured = measured; return true;
+}
+bool Interaction::ChoicePopupMeasured(const std::string& id) const noexcept {
+    return popupToken && popup == id && popupMeasured;
 }
 bool Interaction::ScrollChoicePopup(const std::string& id,std::uint64_t expected,std::uint64_t geometryToken,ScrollStep step) {
     if (!expected || expected != popupToken || popup != id || !PopupInputIdle() || !ChoiceScrollReady(id)) return false;
@@ -912,7 +953,10 @@ bool Interaction::OptionEligible(const Item& item, size_t index) const {
 void Interaction::OpenPopup(const std::string& id) {
 	CancelGesture(); popupToken=ProposalToken();if(!popupToken)return;popup = id; focused = id;
     items.at(id).choiceRevision=popupToken;items.at(id).scroll.reset();
-	const auto& item = items.at(id); const auto& options = std::get<ChoiceSpec>(item.control.widget).options;
+	const auto& item = items.at(id); const auto& spec = std::get<ChoiceSpec>(item.control.widget); const auto& options = spec.options;
+    // A bounded opening cannot be accepted until a painted frame has measured
+    // it against its ancestor plate. Unconstrained popups keep their behavior.
+    popupMeasured = spec.placementBounds.empty();
 	for (size_t i = 0; i < options.size(); ++i) if (OptionEligible(item,i)) {
 		if (highlight.empty()) highlight = options[i].id;
 		if (options[i].value == EditingValue(item)) { highlight = options[i].id; break; }
@@ -1191,7 +1235,7 @@ void Interaction::Pointer(bool down) {
 			if (id == hovered && Eligible(id)) {
 				if (!popup.empty()) {
 					if (option.empty() && pointerOption.empty()) CancelGesture();
-					else if (!option.empty() && option == pointerOption) {
+					else if (!option.empty() && option == pointerOption && popupMeasured) {
 						const auto& item = items.at(id); const auto& options = std::get<ChoiceSpec>(item.control.widget).options;
 						for (size_t i = 0; i < options.size(); ++i) if (options[i].id == option && OptionEligible(item,i)) {
 							const auto value = options[i].value; CancelGesture(); Propose(id,value); break;
@@ -1227,7 +1271,9 @@ void Interaction::Input(MenuInput input, bool down) {
 				const auto id = armed; const auto option = armedOption; const bool choosing = popupAcceptArm;
 				armed.clear(); armedOption.clear(); popupAcceptArm = false;
 				if (id == focused && Eligible(id)) {
-					if (choosing && popup == id && option == highlight) {
+					// An opening still awaiting its first measured frame keeps its
+					// list open and accepts nothing; it never uses old row geometry.
+					if (choosing && popup == id && option == highlight && popupMeasured) {
 						const auto& item = items.at(id); const auto& options = std::get<ChoiceSpec>(item.control.widget).options;
 						for (size_t i = 0; i < options.size(); ++i) if (options[i].id == option && OptionEligible(item,i)) {
 							const auto value = options[i].value; CancelGesture(); Propose(id,value); break;
@@ -1269,6 +1315,7 @@ void Interaction::Input(MenuInput input, bool down) {
 void Interaction::CancelGesture() {
     scrollCommands.clear();scrollSource=ProposalToken();pointerScrollThumb=pointerChoiceTrack=choiceScrollArm=false;scrollGrabFraction=0;popupToken=0;
 	armed.clear(); dragging.clear(); dragPreview.reset(); popup.clear(); highlight.clear(); armedOption.clear(); popupAcceptArm = false;
+    popupMeasured = true;
 }
 void Interaction::Cancel() {
 	CancelGesture(); hovered.clear(); pointerOption.clear(); pointerFraction.reset();

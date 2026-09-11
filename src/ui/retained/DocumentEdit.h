@@ -34,6 +34,22 @@ struct DocumentEditReceipt {
 // may change. Allocator/JsonCpp process-termination limitations are not hidden.
 class DocumentEdit final {
 public:
+    class Prepared final {
+    public:
+        ~Prepared();
+        Prepared(const Prepared&)=delete;
+        Prepared& operator=(const Prepared&)=delete;
+        const Document& Target() const noexcept;
+        const DocumentEditReceipt& Receipt() const noexcept;
+        bool OwnerCurrent() const noexcept;
+    private:
+        struct Data;
+        explicit Prepared(std::shared_ptr<Data>);
+        const Document& Origin() const noexcept;
+        std::shared_ptr<Data> data;
+        friend class DocumentEdit;
+        friend class Runtime;
+    };
     DocumentEdit();
     ~DocumentEdit();
     DocumentEdit(const DocumentEdit&)=delete;
@@ -46,12 +62,20 @@ public:
     std::size_t UndoCount() const noexcept;
     std::size_t RedoCount() const noexcept;
     std::size_t HistorySourceBytes() const noexcept;
+    // At most one retained preparation per owner. Its destruction is safe after
+    // this owner dies. No callbacks, mutable target or independent authority.
+    std::unique_ptr<Prepared> PrepareEdit(DocumentEditIdentity,std::span<const DocumentEditOperation>,std::vector<Diagnostic>&) noexcept;
+    std::unique_ptr<Prepared> PrepareUndo(DocumentEditIdentity,bool redo,std::vector<Diagnostic>&) noexcept;
+    bool CanPublish(const Prepared&) const noexcept;
+    bool Publish(Prepared&,DocumentEditReceipt&) noexcept;
     bool Apply(DocumentEditIdentity,std::span<const DocumentEditOperation>,DocumentEditReceipt&,std::vector<Diagnostic>&) noexcept;
     bool Undo(DocumentEditIdentity,DocumentEditReceipt&,std::vector<Diagnostic>&) noexcept;
     bool Redo(DocumentEditIdentity,DocumentEditReceipt&,std::vector<Diagnostic>&) noexcept;
 private:
     bool Travel(DocumentEditIdentity,bool,DocumentEditReceipt&,std::vector<Diagnostic>&) noexcept;
+    void PublishPrepared(Prepared&,DocumentEditReceipt&) noexcept;
     struct Impl;
-    std::unique_ptr<Impl> impl;
+    std::shared_ptr<Impl> impl;
+    friend class Runtime;
 };
 } // namespace openq4::ui

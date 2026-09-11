@@ -124,6 +124,7 @@ struct ChoiceSpec {
 	unsigned visibleRows = 8;
 	std::vector<ChoiceOption> options;
 	std::optional<ScrollSpec> scrollbar; // Local popup artwork; never a nested semantic control.
+	std::string placementBounds; // Optional canonical proper ancestor; empty retains window placement.
 };
 struct NumberSpec {
 	double minimum = 0, maximum = 1;

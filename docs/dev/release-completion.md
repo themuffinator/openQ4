@@ -2,6 +2,16 @@
 
 ## Unreleased — `idtech5-ui` development
 
+- SYSTEM dropdowns now fit inside the settings panel with cut-corner vector
+  framing. Lists open above a control when needed, preserve readable row sizes,
+  and scroll within the available space without covering the action footer.
+  The replacement UI remains in development.
+
+- UI authoring can prepare a document and its layout before publishing the live
+  canvas and undo history together. Failed preparation preserves the current
+  document. Native editor panels and complete save/recovery workflows remain
+  in development.
+
 - Editor save development now has a checked way to create complete new files
   without replacing an existing document, including when another process creates
   that name at the same time. The editor Save As and recovery workflows remain

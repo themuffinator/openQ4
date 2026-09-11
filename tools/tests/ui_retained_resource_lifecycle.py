@@ -8,6 +8,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import os
 
 from filesystem_case_segments import function_body
 
@@ -25,6 +26,8 @@ SUPPORT = r'''
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <thread>
+#include <span>
 struct Event { std::string kind; int id; double time; };
 static std::vector<Event> events;
 static int nextId=0;
@@ -37,6 +40,10 @@ struct Input {};
 struct ControlAction {};
 struct RuntimeStatistics {};
 class Runtime;
+struct DocumentEditIdentity {};
+struct DocumentEditReceipt {};
+struct DocumentEditOperation {};
+class DocumentEdit {public:class Prepared {};};
 }
 static std::vector<openq4::ui::Runtime*> runtimes;
 class EngineHost {
@@ -49,6 +56,10 @@ public:
 namespace openq4::ui {
 class Runtime {
 public:
+    class PreparedDocument {};
+    bool AbortPreparedDocument() { return true; }
+    bool HasActiveCanvasCallback() const { return false; }
+    void RetireCanvasOwner() {}
     EngineHost& host;
     const int id=++nextId;
     bool loaded=false,failSave=false,failLoad=false,failRestore=false;
@@ -263,7 +274,7 @@ int main() {
 def main():
     source = (ROOT / 'src/ui/RetainedUI.cpp').read_text(encoding='utf-8')
     header = (ROOT / 'src/ui/RetainedUI.h').read_text(encoding='utf-8')
-    view = function_body(source, 'struct retainedUIView_t {') + ';\n'
+    view = source[source.index('struct retainedUIPreparedEditData;'):source.index('\nnamespace {')]
     globals_source = source[source.index('EngineHost host;'):source.index('void RecordProfile(')]
     signatures = (
         'double PresentationTime()',
@@ -284,7 +295,7 @@ def main():
         'bool RetainedUI_DrawViewRoot(',
         'void RetainedUI_Shutdown()',
     )
-    code = SUPPORT + header.replace('#pragma once', '') + view + globals_source + HELPERS
+    code = SUPPORT + header.replace('#pragma once', '').replace('#include "retained/DocumentEdit.h"', '') + view + globals_source + HELPERS
     code += '\n'.join(function_body(source, signature) for signature in signatures) + MAIN
     compiler = next((found for name in ('clang++', 'g++', 'c++') if (found := shutil.which(name))), None)
     if not compiler:
@@ -294,8 +305,8 @@ def main():
         test_source = Path(temp) / 'views.cpp'
         binary = Path(temp) / 'views.exe'
         test_source.write_text(code, encoding='utf-8')
-        subprocess.run([compiler, '-std=c++17', str(test_source), '-o', str(binary)], check=True)
-        subprocess.run([str(binary)], check=True)
+        subprocess.run([compiler, '-std=c++20', str(test_source), '-o', str(binary)], cwd=temp, env={**os.environ,'TEMP':temp,'TMP':temp}, check=True)
+        subprocess.run([str(binary)], cwd=temp, check=True)
 
 
 if __name__ == '__main__':

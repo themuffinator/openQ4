@@ -179,13 +179,32 @@ struct DocumentEdit::Impl {
     std::vector<std::shared_ptr<const Document>> states;
     std::size_t cursor=0,bytes=0;
     bool busy=false;
+    bool alive=true;
+    std::weak_ptr<Prepared::Data> outstanding;
     struct Guard {Impl& state;~Guard(){state.busy=false;}};
     DocumentEditReceipt Receipt(DocumentEditIdentity before,bool changed) const noexcept {
         return {before,identity,changed,cursor,states.empty()?0:states.size()-cursor-1,bytes};
     }
 };
-DocumentEdit::DocumentEdit():impl(std::make_unique<Impl>()){}
-DocumentEdit::~DocumentEdit()=default;
+struct DocumentEdit::Prepared::Data {
+    std::weak_ptr<DocumentEdit::Impl> owner;
+    std::shared_ptr<const Document> origin,target;
+    std::vector<std::shared_ptr<const Document>> states;
+    DocumentEditReceipt receipt;
+    bool ready=true,replaceHistory=false;
+};
+DocumentEdit::Prepared::Prepared(std::shared_ptr<Data> value):data(std::move(value)){}
+DocumentEdit::Prepared::~Prepared(){data->ready=false;}
+const Document& DocumentEdit::Prepared::Target() const noexcept{return *data->target;}
+const Document& DocumentEdit::Prepared::Origin() const noexcept{return *data->origin;}
+const DocumentEditReceipt& DocumentEdit::Prepared::Receipt() const noexcept{return data->receipt;}
+bool DocumentEdit::Prepared::OwnerCurrent() const noexcept {
+    const auto owner=data->owner.lock();
+    return owner && owner->alive && !owner->busy && data->ready && owner->identity==data->receipt.before &&
+        owner->outstanding.lock()==data && !owner->states.empty() && owner->states[owner->cursor]==data->origin;
+}
+DocumentEdit::DocumentEdit():impl(std::make_shared<Impl>()){}
+DocumentEdit::~DocumentEdit(){impl->alive=false;}
 DocumentEditIdentity DocumentEdit::Identity() const noexcept{return impl->identity;}
 const Document* DocumentEdit::Current() const noexcept{return impl->states.empty()?nullptr:impl->states[impl->cursor].get();}
 std::size_t DocumentEdit::UndoCount() const noexcept{return impl->cursor;}
@@ -205,29 +224,71 @@ bool DocumentEdit::Open(const std::string& source,DocumentEditLimits limits,std:
     }catch(const Refused& failure){return failure.reason?Report(diagnostics,failure.reason):false;}
     catch(...){return Report(diagnostics,"Document edit allocation or parser failure");}
 }
-bool DocumentEdit::Apply(DocumentEditIdentity expected,std::span<const DocumentEditOperation> operations,DocumentEditReceipt& out,std::vector<Diagnostic>& diagnostics) noexcept {
-    if(impl->busy)return Report(diagnostics,"Reentrant document edit refused");
+std::unique_ptr<DocumentEdit::Prepared> DocumentEdit::PrepareEdit(DocumentEditIdentity expected,std::span<const DocumentEditOperation> operations,std::vector<Diagnostic>& diagnostics) noexcept {
+    if(impl->busy){Report(diagnostics,"Reentrant document edit refused");return {};}
     impl->busy=true;Impl::Guard guard{*impl};
     try {
         diagnostics.clear();Require(Current() && expected==impl->identity,"Stale document edit identity");
+        Require(impl->outstanding.expired(),"Document edit already has a retained preparation");
         Require(operations.size()<=impl->limits.steps,"Document operation count exceeded");
         const Budget budget{impl->limits,impl->bytes};budget.Check(Current()->Source().size());
         std::string source=Current()->Source();
-        for(const auto& operation:operations)if(!Edit(source,operation,budget,diagnostics))return false;
-        if(source==Current()->Source()){out=impl->Receipt(expected,false);return true;}
+        for(const auto& operation:operations)if(!Edit(source,operation,budget,diagnostics))return {};
+        auto data=std::make_shared<Prepared::Data>();data->owner=impl;
+        data->origin=impl->states[impl->cursor];data->target=data->origin;
+        data->receipt=impl->Receipt(expected,false);
+        if(source==Current()->Source()) {
+            auto result=std::unique_ptr<Prepared>(new Prepared(data));impl->outstanding=data;return result;
+        }
         Require(impl->identity.revision<impl->limits.revision,"Document revisions exhausted");
         Require(impl->cursor+2<=impl->limits.states,"Document history state limit exceeded");
         std::size_t bytes=source.size();
         for(std::size_t i=0;i<=impl->cursor;++i)Require(Add(bytes,impl->states[i]->Source().size(),impl->limits.historyBytes),"Document history byte limit exceeded");
         budget.Check(source.size());auto candidate=std::make_shared<Document>();
-        if(!candidate->Load(source,diagnostics))return false;
+        if(!candidate->Load(source,diagnostics))return {};
         Require(candidate->Model().id==Current()->Model().id,"Document ID cannot change within an editor lifetime");
         std::vector<std::shared_ptr<const Document>> states(impl->states.begin(),impl->states.begin()+impl->cursor+1);
         states.push_back(std::move(candidate));
-        impl->states.swap(states);++impl->cursor;++impl->identity.revision;impl->bytes=bytes;
-        out=impl->Receipt(expected,true);return true;
-    }catch(const Refused& failure){return failure.reason?Report(diagnostics,failure.reason):false;}
-    catch(...){return Report(diagnostics,"Document edit allocation or parser failure");}
+        data->target=states.back();data->states.swap(states);data->replaceHistory=true;
+        data->receipt={expected,{expected.document,expected.revision+1},true,impl->cursor+1,0,bytes};
+        auto result=std::unique_ptr<Prepared>(new Prepared(data));impl->outstanding=data;return result;
+    }catch(const Refused& failure){if(failure.reason)Report(diagnostics,failure.reason);return {};}
+    catch(...){Report(diagnostics,"Document edit allocation or parser failure");return {};}
+}
+std::unique_ptr<DocumentEdit::Prepared> DocumentEdit::PrepareUndo(DocumentEditIdentity expected,bool redo,std::vector<Diagnostic>& diagnostics) noexcept {
+    if(impl->busy){Report(diagnostics,"Reentrant document edit refused");return {};}
+    impl->busy=true;Impl::Guard guard{*impl};
+    try {
+        diagnostics.clear();Require(Current() && expected==impl->identity,"Stale document edit identity");
+        Require(impl->outstanding.expired(),"Document edit already has a retained preparation");
+        Require(impl->identity.revision<impl->limits.revision,"Document revisions exhausted");
+        Require(redo?RedoCount()!=0:UndoCount()!=0,"Requested history state does not exist");
+        const auto cursor=redo?impl->cursor+1:impl->cursor-1;
+        auto data=std::make_shared<Prepared::Data>();data->owner=impl;
+        data->origin=impl->states[impl->cursor];data->target=impl->states[cursor];
+        data->receipt={expected,{expected.document,expected.revision+1},true,cursor,impl->states.size()-cursor-1,impl->bytes};
+        auto result=std::unique_ptr<Prepared>(new Prepared(data));impl->outstanding=data;return result;
+    }catch(const Refused& failure){Report(diagnostics,failure.reason);return {};}
+    catch(...){Report(diagnostics,"Document history preparation allocation failure");return {};}
+}
+bool DocumentEdit::CanPublish(const Prepared& prepared) const noexcept {
+    const auto& data=*prepared.data;
+    return impl->alive && !impl->busy && data.ready && data.owner.lock()==impl &&
+        impl->outstanding.lock()==prepared.data && data.receipt.before==impl->identity && Current()==data.origin.get();
+}
+void DocumentEdit::PublishPrepared(Prepared& prepared,DocumentEditReceipt& out) noexcept {
+    auto& data=*prepared.data;
+    if(data.replaceHistory)impl->states.swap(data.states);
+    impl->identity=data.receipt.after;impl->cursor=data.receipt.undo;impl->bytes=data.receipt.historySourceBytes;
+    data.ready=false;out=data.receipt;
+}
+bool DocumentEdit::Publish(Prepared& prepared,DocumentEditReceipt& out) noexcept {
+    if(!CanPublish(prepared))return false;
+    PublishPrepared(prepared,out);return true;
+}
+bool DocumentEdit::Apply(DocumentEditIdentity expected,std::span<const DocumentEditOperation> operations,DocumentEditReceipt& out,std::vector<Diagnostic>& diagnostics) noexcept {
+    auto prepared=PrepareEdit(expected,operations,diagnostics);
+    return prepared && Publish(*prepared,out);
 }
 bool DocumentEdit::Travel(DocumentEditIdentity expected,bool redo,DocumentEditReceipt& out,std::vector<Diagnostic>& diagnostics) noexcept {
     if(impl->busy)return Report(diagnostics,"Reentrant document edit refused");

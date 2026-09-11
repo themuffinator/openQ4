@@ -122,4 +122,40 @@ static void SemanticPopup() {
     f.input.SetBounds({});CHECK(!f.input.OpenChoicePopup("choice"));
     CHECK(f.input.TakeActions().empty()&&f.input.TakeScrollCommands().empty());
 }
-int main(){IdentityAndShape();CaptureAndHistory();SemanticPopup();std::printf("PASS %u checks; pure actual Choice Interaction and ScrollGeometry.\n",checks);return 0;}
+static void ExactInvalidation() {
+    for(bool bar:{false,true})for(int held=0;held<4;++held) {
+        Fixture f(bar);if(bar)f.Layout();const auto before=f.View();
+        if(held==0){f.input.PointerPart("choice",{},"row2");f.input.Pointer(true);}
+        else f.input.QuarantineInput(held==1?MenuInput::Accept:held==2?MenuInput::Back:MenuInput::Down,true);
+        CHECK(!f.input.CloseChoicePopup("choice",before.popupToken));
+        CHECK(!f.input.InvalidateChoicePopup("choice",0));
+        CHECK(!f.input.InvalidateChoicePopup("choice",before.popupToken+1));
+        CHECK(!f.input.InvalidateChoicePopup("missing",before.popupToken));
+        CHECK(f.View().popupToken==before.popupToken);
+        CHECK(f.input.InvalidateChoicePopup("choice",before.popupToken));
+        CHECK(!f.View().popupOpen&&f.View().accepted==before.accepted&&f.View().proposalToken==before.proposalToken&&!f.View().pending);
+        CHECK(f.input.CapturedPointerControl().empty()&&f.input.TakeActions().empty());
+        CHECK(!f.input.OpenChoicePopup("choice")); // still held, not rearmed by invalidation
+        if(held==0)f.input.Pointer(false);else f.input.QuarantineInput(held==1?MenuInput::Accept:held==2?MenuInput::Back:MenuInput::Down,false);
+        CHECK(f.input.TakeActions().empty());CHECK(f.input.OpenChoicePopup("choice"));
+        CHECK(!f.input.InvalidateChoicePopup("choice",before.popupToken));
+        CHECK(f.View().popupToken!=before.popupToken&&f.View().popupOpen);
+    }
+    Fixture f;Node number;number.id="number";number.control=f.model.root.children[0].control;
+    number.control->role=ControlRole::Number;NumberSpec spec;spec.maximum=10;number.control->widget=spec;
+    f.model.root.children.push_back(number);f.input.Reset(f.model);
+    CHECK(f.input.SetReadbacks({{"choice",{0.,false,{true,true,true,true,true,true}}},{"number",{1.}}},f.error));
+    f.input.SetBounds({{"choice",{0,0,180,40,true}},{"number",{0,50,180,40,true}}});
+    CHECK(f.input.Focus("number")&&f.input.BeginNumberEdit("number",f.error));
+    CHECK(f.input.ReplaceNumberSelection("number",f.input.Widget("number")->number->identity,"2.5",f.error));
+    CHECK(f.input.Focus("choice")&&f.input.OpenChoicePopup("choice"));const auto saved=f.input.CaptureWidgets();
+    CHECK(saved.widgets.at("number").number.has_value());
+    CHECK(f.input.InvalidateChoicePopup("choice",f.View().popupToken));
+    const auto after=f.input.CaptureWidgets();
+    const auto& a=*after.widgets.at("number").number;const auto& b=*saved.widgets.at("number").number;
+    CHECK(a.state.text==b.state.text&&a.state.anchor==b.state.anchor&&a.state.caret==b.state.caret&&a.undo.size()==b.undo.size()&&a.redo.size()==b.redo.size());
+    CHECK(a.baselineText==b.baselineText&&a.baselineValue==b.baselineValue&&a.conflict==b.conflict);
+    CHECK(f.input.TakeActions().empty());
+}
+
+int main(){ExactInvalidation();IdentityAndShape();CaptureAndHistory();SemanticPopup();std::printf("PASS %u checks; pure actual Choice Interaction and ScrollGeometry.\n",checks);return 0;}

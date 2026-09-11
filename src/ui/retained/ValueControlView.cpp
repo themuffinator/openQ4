@@ -1,11 +1,13 @@
 // Copyright (C) 2026 DarkMatter Productions. GPL-3.0-or-later.
 #include "ValueControlView.h"
+#include "PopupPlacement.h"
 #include <RmlUi/Core/Box.h>
 #include <RmlUi/Core/ComputedValues.h>
 #include <RmlUi/Core/Element.h>
 #include <RmlUi/Core/ElementDocument.h>
 #include <RmlUi/Core/ElementUtilities.h>
 #include <RmlUi/Core/Property.h>
+#include <RmlUi/Core/ElementText.h>
 #include <RmlUi/Core/StringUtilities.h>
 #include <algorithm>
 #include <cmath>
@@ -27,6 +29,30 @@ bool Within(Rml::Element* element, Rml::Element* root) {
 	for (; element; element = element->GetParentNode()) if (element == root) return true;
 	return false;
 }
+// Measure the same formatted tokens as Rml's inline layout, rather than raw
+// translated bytes. Canonical labels contain one plain ElementText child.
+// Bound intrinsic work and refuse extra content instead of undermeasuring it.
+bool LabelWidth(Rml::Element* label, float& output) {
+	if (!label) return false;
+	// An empty translation has no text node. Preserve its exact empty width;
+	// this is compatibility behavior, not proof that localization succeeded.
+	if (label->GetNumChildren() == 0 && label->GetInnerRML().empty()) { output = 0; return true; }
+	if (label->GetNumChildren() != 1) return false;
+	auto* text = dynamic_cast<Rml::ElementText*>(label->GetChild(0));
+	if (!text || !text->GetFontFaceHandle() || text->GetText().size() > 65536) return false;
+	const int length = static_cast<int>(text->GetText().size());
+	float width = 0;
+	for (int begin = 0; begin < length;) {
+		Rml::String line; int consumed = 0; float lineWidth = 0;
+		// Unlimited intrinsic line width retains explicit hard line breaks while
+		// avoiding wrapping to the old, possibly narrower popup. These flags
+		// match the first inline text box: trim prefix, decode entities, no empty wrap.
+		text->GenerateLine(line,consumed,lineWidth,begin,std::numeric_limits<float>::max(),0,true,true,false);
+		if (consumed <= 0 || consumed > length-begin || !std::isfinite(lineWidth) || lineWidth < 0) return false;
+		width = std::max(width,lineWidth); begin += consumed;
+	}
+	output = width; return true;
+}
 float CssExtent(Rml::Element* element, float borderExtent, bool vertical) {
 	if (element->GetComputedValues().box_sizing() == Rml::Style::BoxSizing::BorderBox) return std::max(0.0f,borderExtent);
 	// CSS content sizes exclude both the border and padding edges.
@@ -36,6 +62,11 @@ float CssExtent(Rml::Element* element, float borderExtent, bool vertical) {
 }
 }
 struct ValueControlView::Impl {
+	struct PlacementContext {
+		std::vector<double> geometry;
+		std::vector<std::string> transforms;
+		bool operator==(const PlacementContext&) const = default;
+	};
 	struct Entry {
 		Control control;
 		Rml::Element* anchor = nullptr;
@@ -45,9 +76,17 @@ struct ValueControlView::Impl {
         std::uint64_t scrollToken = 0, openToken = 0, revision = 0;
         bool scrollReady = false;
         bool hiddenBar = false;
+		Rml::Element* placementBounds = nullptr;
+		std::vector<Rml::Element*> placementAncestors;
+		std::optional<PlacementContext> placementContext;
+		std::vector<float> placementFingerprint;
+		std::uint64_t placementOpening = 0;
+		bool placementReady = false;
 	};
 	struct Applied { std::string requested, actual; };
 	Rml::ElementDocument* document = nullptr;
+	int width = 0, height = 0;
+	float ratio = 1;
 	std::function<std::string(const std::string&)> translate;
 	std::map<std::string,Entry> entries;
 	std::map<std::string,Rml::Element*> elements;
@@ -107,16 +146,101 @@ struct ValueControlView::Impl {
 		const auto set = [&](const std::string& key, const std::string& value) { if (!own.contains(key)) changed |= Property(choice.popup,key,value); };
 		set("font-family",computed.font_family()); set("font-size",Pixels(computed.font_size()));
 		set("line-height",Pixels(computed.line_height().value)); set("letter-spacing",Pixels(computed.letter_spacing()));
-		for (const auto* key : {"font-weight","font-style","color","text-align","white-space","word-break","direction"}) {
+		for (const auto* key : {"font-weight","font-style","color","text-align","text-transform","white-space","word-break","direction"}) {
 			if (const auto* property = entry.inheritedFrom->GetProperty(key)) set(key,property->ToString());
 		}
 		return changed;
 	}
+	std::optional<PlacementContext> Context(const Entry& entry, int w, int h, float dp) const {
+		if (!entry.placementBounds || w<=0 || h<=0 || !std::isfinite(dp) || dp<=0) return {};
+		PlacementContext result; result.geometry={double(w),double(h),double(dp)};
+		for (auto* element:{entry.placementBounds,entry.anchor}) {
+			Rml::Array<Rml::Vector2f,4> quad;
+			if (!element->IsVisible(true) || !Rml::ElementUtilities::GetBorderBoxQuad(quad,element)) return {};
+			for (const auto point:quad) {result.geometry.push_back(point.x);result.geometry.push_back(point.y);}
+		}
+		// A transform property can change before Rml updates its cached matrix.
+		// Retain exact spelling too; do not accept a prior-frame projection.
+		for (auto* element:entry.placementAncestors) {
+			for (const auto* key:{"transform","perspective","transform-origin","perspective-origin",
+                "position","display","visibility","left","top","right","bottom","width","height","min-width","max-width","min-height","max-height",
+                "padding-left","padding-right","padding-top","padding-bottom","border-left-width","border-right-width","border-top-width","border-bottom-width",
+                "margin-left","margin-right","margin-top","margin-bottom","font-size","font-family","line-height","letter-spacing","text-transform","white-space","flex-basis","flex-grow","flex-shrink","flex-direction","flex-wrap","row-gap","column-gap"}) {
+				const auto* property=element->GetLocalProperty(key);
+				result.transforms.push_back(property?property->ToString():std::string{});
+			}
+		}
+		const auto& choice=std::get<ChoiceSpec>(entry.control.widget);
+		for (const auto& option:choice.options) {
+			auto* label=Element(option.labelPart);const auto& font=label->GetComputedValues();
+			result.geometry.push_back(font.font_size());result.geometry.push_back(font.line_height().value);
+			result.geometry.push_back(font.letter_spacing());result.transforms.push_back(font.font_family());
+			result.geometry.push_back(static_cast<int>(font.text_transform()));result.geometry.push_back(static_cast<int>(font.white_space()));
+			result.transforms.push_back(label->GetInnerRML());
+			for (const auto* key:{"font-size","font-family","line-height","letter-spacing","font-style","font-weight","text-transform","white-space"}) {
+				const auto* property=label->GetLocalProperty(key);result.transforms.push_back(property?property->ToString():std::string{});
+			}
+		}
+		return result;
+	}
+	bool Region(const Entry& entry, int w, int h, float dp, PopupRegion& out, bool reserveRounding) const {
+		if (!entry.placementBounds || !entry.placementBounds->IsVisible(true)) return false;
+		Rml::Array<Rml::Vector2f,4> measured;std::array<PopupPoint,4> quad;
+		if (!Rml::ElementUtilities::GetBorderBoxQuad(measured,entry.placementBounds)) return false;
+		for (std::size_t i=0;i<quad.size();++i) quad[i]={measured[i].x,measured[i].y};
+		// Preserve four logical dp; one physical pixel additionally budgets Rml's
+		// border/translation rounding while final containment uses the full inset.
+		return MeasurePopupRegion(quad,{0,0,double(w),double(h)},4*double(dp)+(reserveRounding?1:0),out);
+	}
+	bool Contained(const Entry& entry,const ChoiceSpec& choice) const {
+		PopupRegion region;Rml::Array<Rml::Vector2f,4> quad;
+		if (!Region(entry,width,height,ratio,region,false) ||
+			!Rml::ElementUtilities::GetBorderBoxQuad(quad,Element(choice.popup))) return false;
+		for (auto point:quad) for (std::size_t i=0;i<region.count;++i) {
+			const auto& p=region.planes[i];if (p.x*point.x+p.y*point.y>p.limit+1e-4) return false;
+		}
+		std::array<PopupPoint,4> border;for(std::size_t i=0;i<4;++i)border[i]={quad[i].x,quad[i].y};
+		if (!MeasurePopupRegion(border,{0,0,double(width),double(height)},0,region)) return false;
+		std::vector<Rml::Element*> inside{Element(choice.viewport)};
+		if (choice.scrollbar && Element(choice.scrollbar->track)->IsVisible(true)) inside.push_back(Element(choice.scrollbar->track));
+		for(auto* element:inside) {
+			if(!Rml::ElementUtilities::GetBorderBoxQuad(quad,element)) return false;
+			for(auto point:quad)for(std::size_t i=0;i<region.count;++i) {
+				const auto& p=region.planes[i];if(p.x*point.x+p.y*point.y>p.limit+.01) return false;
+			}
+		}
+		return true;
+	}
+	void Validate(Interaction& interaction,int w,int h,float dp,bool painted,bool requireReady=false) const {
+		for (const auto& [id,entry]:entries) {
+			if (!entry.placementBounds) continue;
+			const auto view=interaction.Widget(id);if (!view || !view->popupOpen) continue;
+			const auto current=Context(entry,w,h,dp);
+			const auto& choice=std::get<ChoiceSpec>(entry.control.widget);
+			// The plate or the anchor is unavailable, so this exact opening can no
+			// longer be presented at all. Retire it.
+			if (!current) { interaction.InvalidateChoicePopup(id,view->popupToken); continue; }
+			// Everything else is presentation that is not measured yet rather than
+			// presentation that is wrong: an opening still awaiting its first paint,
+			// or one whose panel moved since the last one. The engine pumps pointer
+			// motion and paired key releases between paints, and revealing a focused
+			// control keeps scrolling its panel, so retiring here would close bounded
+			// lists before they could ever be seen. Popup() re-places the opening on
+			// the next paint and retires it there if it truly cannot be placed; until
+			// then the opening stays open and accepts no option.
+			const bool measured = entry.placementReady && entry.placementOpening==view->popupToken &&
+				current==entry.placementContext &&
+				(!painted || (Fingerprint(entry,choice)==entry.placementFingerprint && Contained(entry,choice)));
+			if (requireReady && !measured) interaction.SetChoicePopupMeasured(id,view->popupToken,false);
+		}
+	}
     std::vector<float> Fingerprint(const Entry& entry,const ChoiceSpec& choice) const {
         std::vector<float> values;
-        for(const auto& id:{choice.popup,choice.viewport,choice.content,choice.scrollbar->track,choice.scrollbar->thumb}) {
+		std::vector<std::string> parts{choice.popup,choice.viewport,choice.content};
+		if (choice.scrollbar) {parts.push_back(choice.scrollbar->track);parts.push_back(choice.scrollbar->thumb);}
+        for(const auto& id:parts) {
             auto* element=Element(id);Rml::Array<Rml::Vector2f,4> quad;
-            const bool bar = id == choice.scrollbar->track || id == choice.scrollbar->thumb;
+            const bool bar = choice.scrollbar && (id == choice.scrollbar->track || id == choice.scrollbar->thumb);
             if(!element || element->IsVisible(true) != !(bar && entry.hiddenBar) || !Rml::ElementUtilities::GetBorderBoxQuad(quad,element))return {};
             for(const auto& point:quad){values.push_back(point.x);values.push_back(point.y);}
             const auto at=element->GetAbsoluteOffset(Rml::BoxArea::Content),size=element->GetBox().GetSize(Rml::BoxArea::Content);
@@ -134,6 +258,9 @@ struct ValueControlView::Impl {
 	bool Popup(Entry& entry, const ChoiceSpec& choice, const WidgetViewState& view, Interaction& interaction, const std::string& id, int width, int height, float ratio,
 		const std::function<double(const std::string&)>& opacity) {
 		entry.scrollReady=false;
+		entry.placementReady=false;
+		entry.placementOpening=view.popupOpen?view.popupToken:0;
+		if (entry.placementBounds) entry.placementContext=Context(entry,width,height,ratio);
         if(choice.scrollbar && view.popupOpen && view.scroll && entry.scrollToken<std::numeric_limits<std::uint64_t>::max()) {
             auto unavailable=*view.scroll;unavailable.available=false;unavailable.geometryToken=++entry.scrollToken;
             interaction.SetChoiceScrollReadback(id,view.popupToken,view.popupRevision,unavailable,false);
@@ -141,6 +268,7 @@ struct ValueControlView::Impl {
 		bool changed = Inheritance(entry,choice);
 		changed |= Property(choice.popup,"position","absolute");
 		changed |= Property(choice.popup,"z-index","1000000");
+		if (entry.placementBounds) changed |= Property(choice.popup,"transform","none");
 		changed |= Property(choice.viewport,"overflow","hidden");
 		// Absolute row content can leave RmlUi's scroll extent equal to its
 		// client extent. This viewport still always clips its authored rows.
@@ -188,7 +316,7 @@ struct ValueControlView::Impl {
 		const float margin = std::min(4*ratio,std::min(width,height)*.1f);
 		const float viewportTop = viewport->GetAbsoluteOffset(Rml::BoxArea::Border).y-popup->GetAbsoluteOffset(Rml::BoxArea::Content).y;
         if(choice.scrollbar && (!std::isfinite(viewportTop) ||
-            viewport->GetAbsoluteOffset(Rml::BoxArea::Border).y < popup->GetAbsoluteOffset(Rml::BoxArea::Padding).y-.01f))
+            viewport->GetAbsoluteOffset(Rml::BoxArea::Border).y < popup->GetAbsoluteOffset(Rml::BoxArea::Padding).y-.01f)) 
             return Display(choice.popup,false) || changed;
 		// The local scrollbar follows the viewport padding/client clip. An
         // absolute viewport starts at its parent's padding origin, so its
@@ -201,12 +329,48 @@ struct ValueControlView::Impl {
 		const float above = std::max(0.0f,anchor.Top()-margin);
 		const bool flip = desired > below && above > below;
 		const float room = flip ? above : below;
-		const float outerHeight = std::max(0.0f,std::min(desired,room));
-		const float visibleHeight = std::max(0.0f,outerHeight-chrome);
-		const float outerWidth = std::max(0.0f,std::min(std::max(anchor.Width(),1.0f),width-2*margin));
+		float outerHeight = std::max(0.0f,std::min(desired,room));
+		float visibleHeight = std::max(0.0f,outerHeight-chrome);
+		float outerWidth = std::max(0.0f,std::min(std::max(anchor.Width(),1.0f),width-2*margin));
+		float x = std::clamp(anchor.Left(),margin,std::max(margin,width-margin-outerWidth));
+		float y = std::clamp(flip ? anchor.Top()-outerHeight : anchor.Bottom(),margin,std::max(margin,height-margin-outerHeight));
+		if (entry.placementBounds) {
+			float minimumRow=0,minimumRowWidth=36*ratio;
+			for (std::size_t i=0;i<choice.options.size();++i) {
+				const auto& option=choice.options[i];auto* row=Element(option.node);auto* label=Element(option.labelPart);
+				const auto& box=row->GetBox();
+				minimumRow=std::max(minimumRow,ends[i]-starts[i]+
+					std::max(0.f,box.GetEdge(Rml::BoxArea::Margin,Rml::BoxEdge::Top))+
+					std::max(0.f,box.GetEdge(Rml::BoxArea::Margin,Rml::BoxEdge::Bottom)));
+				// A long formatted option grows the popup or refuses its opening;
+				// reducing the readable font or clipping the option is not a fit.
+				float textWidth = 0;
+				if (!LabelWidth(label,textWidth)) {
+					interaction.InvalidateChoicePopup(id,view.popupToken);
+					return Display(choice.popup,false)||changed;
+				}
+				const float leading=label->GetAbsoluteOffset(Rml::BoxArea::Content).x-row->GetAbsoluteOffset(Rml::BoxArea::Border).x;
+				minimumRowWidth=std::max(minimumRowWidth,std::max(0.f,leading)+textWidth+
+					std::max(0.f,label->GetBox().GetEdge(Rml::BoxArea::Padding,Rml::BoxEdge::Right))+
+					std::max(0.f,box.GetEdge(Rml::BoxArea::Padding,Rml::BoxEdge::Right))+
+					std::max(0.f,box.GetEdge(Rml::BoxArea::Margin,Rml::BoxEdge::Left))+
+					std::max(0.f,box.GetEdge(Rml::BoxArea::Margin,Rml::BoxEdge::Right)));
+			}
+			const auto frame=popup->GetBox().GetFrameSize(Rml::BoxArea::Border)+popup->GetBox().GetFrameSize(Rml::BoxArea::Padding);
+			const float gutter=choice.scrollbar?Element(choice.scrollbar->track)->GetBox().GetSize(Rml::BoxArea::Border).x+8*ratio:0;
+			const float minimumWidth=std::max(AuthoredLength(choice.popup,"min-width",ratio,0),minimumRowWidth+frame.x+viewportFrame.x+gutter);
+			PopupRegion region;PopupPlacement placement;
+			if (!entry.placementContext || !Region(entry,width,height,ratio,region,true) ||
+				!PlacePopup(region,{anchor.Left(),anchor.Top(),anchor.Width(),anchor.Height()},std::max(anchor.Width(),minimumWidth),
+					minimumWidth,std::max(desired,minimumRow+chrome),minimumRow+chrome,placement)) {
+				interaction.InvalidateChoicePopup(id,view.popupToken);
+				return Display(choice.popup,false)||changed;
+			}
+			x=static_cast<float>(placement.rectangle.x);y=static_cast<float>(placement.rectangle.y);
+			outerWidth=static_cast<float>(placement.rectangle.width);outerHeight=static_cast<float>(placement.rectangle.height);
+			visibleHeight=std::max(0.f,outerHeight-chrome);
+		}
 		if (visibleHeight < 1 || outerWidth < 1) return Display(choice.popup,false) || changed;
-		const float x = std::clamp(anchor.Left(),margin,std::max(margin,width-margin-outerWidth));
-		const float y = std::clamp(flip ? anchor.Top()-outerHeight : anchor.Bottom(),margin,std::max(margin,height-margin-outerHeight));
 		float scroll = choice.scrollbar ? static_cast<float>(view.popupOffsetDp*ratio) : starts[first];
 		for (size_t i = 0; i < choice.options.size(); ++i) if ((!choice.scrollbar || view.revealRevision) && choice.options[i].id == view.highlight) {
 			if (ends[i] > scroll+visibleHeight) scroll = ends[i]-visibleHeight;
@@ -255,11 +419,23 @@ struct ValueControlView::Impl {
             if(entry.scrollToken==std::numeric_limits<std::uint64_t>::max())return changed;
             read.geometryToken=++entry.scrollToken;
             auto fingerprint=Fingerprint(entry,choice);
-            read.available=!changed && fits && !fingerprint.empty();
+            read.available=!changed && fits && !fingerprint.empty() && (!entry.placementBounds || Contained(entry,choice));
             entry.openToken=view.popupToken;entry.revision=view.popupRevision;
             entry.scrollReady=read.available;entry.scrollFingerprint=std::move(fingerprint);
             if(!interaction.SetChoiceScrollReadback(id,view.popupToken,view.popupRevision,read,view.revealRevision!=0))entry.scrollReady=false;
         }
+		if (entry.placementBounds) {
+			entry.placementFingerprint=Fingerprint(entry,choice);
+			const auto actual=popup->GetBox().GetSize(Rml::BoxArea::Border);
+			const bool frameMatches=std::abs(actual.x-outerWidth)<=.01f && std::abs(actual.y-outerHeight)<=.01f;
+			entry.placementReady=!changed && frameMatches && !entry.placementFingerprint.empty() && Contained(entry,choice);
+			if (!changed && !entry.placementReady) {
+				interaction.InvalidateChoicePopup(id,view.popupToken);return Display(choice.popup,false);
+			}
+			// A settled frame grants this exact opening the right to accept an
+			// option. An unsettled pass leaves it open and still unmeasured.
+			interaction.SetChoicePopupMeasured(id,view.popupToken,entry.placementReady);
+		}
 		return changed;
 	}
 };
@@ -282,6 +458,11 @@ bool ValueControlView::Initialize(const DocumentModel& model, Rml::ElementDocume
 		auto* popup = candidate->Element(choice->popup);
 		if (!popup || !popup->GetParentNode()) { error = "Choice popup has no derived parent"; return false; }
 		entry.inheritedFrom = popup->GetParentNode();
+		if (!choice->placementBounds.empty()) {
+			entry.placementBounds=candidate->Element(choice->placementBounds);
+			if (!entry.placementBounds) {error="Missing choice placement bounds";return false;}
+			for (auto* ancestor=entry.anchor;ancestor;ancestor=ancestor->GetParentNode()) entry.placementAncestors.push_back(ancestor);
+		}
 		for (auto* ancestor = popup; ancestor && ancestor != &document; ancestor = ancestor->GetParentNode())
 			if (candidate->authored.contains(ancestor->GetId())) entry.opacityAncestry.push_back(ancestor->GetId());
 	}
@@ -301,6 +482,8 @@ bool ValueControlView::Initialize(const DocumentModel& model, Rml::ElementDocume
 bool ValueControlView::Paint(Interaction& interaction, const std::map<std::string,ControlReadback>& readbacks,
 	int width, int height, float ratio, const std::function<double(const std::string&)>& opacity) {
 	if (!impl->document || !std::isfinite(ratio) || ratio <= 0) return false;
+	impl->Validate(interaction,width,height,ratio,false);
+	impl->width=width;impl->height=height;impl->ratio=ratio;
 	bool changed = false;
 	for (auto& [id,entry] : impl->entries) {
 		const auto readback = readbacks.find(id); const auto view = interaction.Widget(id);
@@ -343,7 +526,21 @@ bool ValueControlView::ChoiceScrollFresh(const std::string& id,const Interaction
     const auto* choice=std::get_if<ChoiceSpec>(&found->second.control.widget);const auto view=interaction.Widget(id);
     return choice && choice->scrollbar && view && view->popupOpen && found->second.scrollReady &&
         found->second.openToken==view->popupToken && found->second.revision==view->popupRevision &&
-        interaction.ChoiceScrollReady(id) && impl->Fingerprint(found->second,*choice)==found->second.scrollFingerprint;
+        interaction.ChoiceScrollReady(id) && impl->Fingerprint(found->second,*choice)==found->second.scrollFingerprint &&
+		(!found->second.placementBounds || (found->second.placementReady &&
+		 impl->Context(found->second,impl->width,impl->height,impl->ratio)==found->second.placementContext && impl->Contained(found->second,*choice)));
+}
+void ValueControlView::ValidatePlacement(Interaction& interaction,int width,int height,float ratio,bool requireReady) const {
+	if (!impl->document) return;
+	impl->Validate(interaction,width,height,ratio,true,requireReady);
+}
+bool ValueControlView::HasConstrainedPopup(const Interaction& interaction) const {
+	if (!impl->document) return false;
+	for (const auto& [id,entry]:impl->entries) {
+		if (!entry.placementBounds) continue;
+		const auto view=interaction.Widget(id);if (view && view->popupOpen) return true;
+	}
+	return false;
 }
 PointerPartResult ValueControlView::PointerPart(Rml::Element* hit, float x, float y, const Interaction& interaction) const {
 	PointerPartResult result;
@@ -378,6 +575,11 @@ PointerPartResult ValueControlView::PointerPart(Rml::Element* hit, float x, floa
             if(!captured.empty())continue;
 			const auto view = interaction.Widget(id);
 			if (!view || !view->popupOpen || !Within(hit,impl->Element(choice->popup))) continue;
+			if (entry.placementBounds && (!entry.placementReady || entry.placementOpening!=view->popupToken ||
+				impl->Context(entry,impl->width,impl->height,impl->ratio)!=entry.placementContext ||
+				impl->Fingerprint(entry,*choice)!=entry.placementFingerprint || !impl->Contained(entry,*choice))) {
+				result.control=id;result.choiceTrack=true;return result;
+			}
             if(choice->scrollbar && (!entry.scrollReady || entry.openToken!=view->popupToken || entry.revision!=view->popupRevision ||
                 impl->Fingerprint(entry,*choice)!=entry.scrollFingerprint)) {result.control=id;result.choiceTrack=true;return result;}
 			Rml::Vector2f point(x,y);

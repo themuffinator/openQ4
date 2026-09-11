@@ -81,3 +81,61 @@ changes and persistence. Host fonts/materials/render submission are counted
 doubles. These checks do not qualify native input adapters, GPU pixels, actual
 font fit, touch, accessibility, or the complete Choice/product requirements.
 Those still require their platform and gameplay evidence.
+
+## Panel bounds and vector popup framing
+
+A choice may name a proper ancestor with `placementBounds`. SYSTEM's four
+dropdowns name the settings body so their lists stay inside the panel and clear
+the action footer. The bound uses the ancestor's actual projected convex border
+quad intersected with the drawable viewport, with a 4 dp clearance. Rotated,
+skewed and perspective ancestors keep their real edge planes; an axis-aligned
+bounding box is not a substitute. Omitted bounds preserve the earlier placement
+behavior. The strict document validator rejects a missing or unrelated ancestor
+and an independently transformed popup root.
+
+Placement chooses the space below or above the control, with anchor overlap as
+a last resort. It preserves font and row size, reserves popup padding and the
+scrollbar gutter, and requires at least one complete row. Intrinsic text width
+uses Rml's actual text-line processing and font metrics, including whitespace
+handling. Unsupported canonical properties remain rejected; robustness checks
+against Rml text transforms do not add canonical `text-transform` support.
+
+After layout, the measured popup, viewport and scrollbar must fit the intended
+plate. An opening is retired only when it can no longer be presented at all:
+its plate or anchor became unavailable, or a settled paint could not place it.
+Retiring preserves the release quarantine for held input and leaves the accepted
+setting unchanged.
+
+Everything else is presentation that is not measured yet rather than
+presentation that is wrong, and an unmeasured opening stays open and accepts no
+option. This covers an opening that has not completed its first layout and one
+whose panel moved since the last paint. Both are ordinary: the engine pumps
+pointer motion and paired key releases between paints, and revealing a freshly
+focused control keeps scrolling its panel, so an opening routinely meets input
+before it has ever been painted. Retiring there would close every bounded list
+before the player could see it. The next paint re-places the opening and retires
+it only if it genuinely cannot be placed.
+
+Losing measurement also drops any gesture the opening owns, because the press
+named rows whose geometry no longer describes the screen. The matching release
+selects nothing, the list stays open, and the following painted frame makes it
+usable again. This is what prevents a rapid second acceptance from committing an
+option using old row geometry.
+
+SYSTEM now authors a dark six-dp cut-corner plate with olive outer rails, a
+subdued inner rail, a matching vector mask and eight-dp interior spacing. These
+are editable canonical vectors. The control IDs, localized options and settings
+actions retain their existing associations.
+
+The regular Meson suite runs both the pure placement solver and the actual
+Runtime/Rml test against the repository SYSTEM document and all six language
+tables. The pure runner also supports Clang, MSVC, GCC sanitizers and compiled
+behavioral mutations. The MSVC Runtime runner binds its exact source, archives,
+document and language inputs; it never silently substitutes a scratch document.
+The Runtime runner drives each production dropdown the way the engine does,
+opening it while the reveal scroll is still settling and moving the pointer
+before the first paint. `tools/ui/capture_system_page.py` then checks the same
+thing in the real client: every choice reports its popup geometry beside its
+widget record, and an open bounded popup must name a measured opening.
+These checks cover the bounded placement increment, not the complete migrated
+GUI corpus or physical-device acceptance.

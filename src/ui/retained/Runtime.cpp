@@ -14,6 +14,8 @@
 #include <RmlUi/Core/ElementUtilities.h>
 #include <json/json.h>
 #include <algorithm>
+#include <atomic>
+#include <thread>
 #include <chrono>
 #include <cmath>
 #include <cstring>
@@ -459,9 +461,16 @@ private:
 class System final : public Rml::SystemInterface {
 public:
 	explicit System(Host& h) : host(h) {}
+    const std::thread::id thread=std::this_thread::get_id();
+    bool* preparationFailure=nullptr;
+    void PreparationFault() noexcept {
+        if(preparationFailure && thread==std::this_thread::get_id())*preparationFailure=true;
+    }
 	double GetElapsedTime() override { return time; }
 	bool LogMessage(Rml::Log::Type type, const Rml::String& message) override {
-		host.Log(type == Rml::Log::LT_ERROR || type == Rml::Log::LT_ASSERT || type == Rml::Log::LT_WARNING, message);
+        const bool error=type == Rml::Log::LT_ERROR || type == Rml::Log::LT_ASSERT || type == Rml::Log::LT_WARNING;
+        if(error)PreparationFault();
+		host.Log(error, message);
 		return true;
 	}
 	int TranslateString(Rml::String& output, const Rml::String& input) override {
@@ -484,14 +493,18 @@ private:
 class Fonts final : public Rml::FontEngineInterface {
 	struct Face { std::string family; int size; Rml::FontMetrics metrics; };
 public:
-	explicit Fonts(Host& h) : host(h) {}
+	explicit Fonts(Host& h,System& s) : host(h),system(s) {}
 	Rml::FontFaceHandle GetFontFaceHandle(const Rml::String& family, Rml::Style::FontStyle, Rml::Style::FontWeight, int size) override {
 		size = std::clamp(size, 1, 512);
 		const auto key = family + ":" + std::to_string(size);
 		auto& face = faces[key];
 		if (!face) {
 			const auto metrics = host.GetFontMetrics(family, size);
-			if (metrics.lineSpacing <= 0) { faces.erase(key); return 0; }
+			if (metrics.lineSpacing <= 0) { system.PreparationFault(); faces.erase(key); return 0; }
+            if(system.preparationFailure && (!std::isfinite(metrics.ascent) || !std::isfinite(metrics.descent) ||
+                !std::isfinite(metrics.lineSpacing) || !std::isfinite(metrics.xHeight))) {
+                system.PreparationFault();faces.erase(key);return 0;
+            }
 			face = std::make_unique<Face>();
 			face->family = family;
 			face->size = size;
@@ -554,6 +567,7 @@ public:
 	void Shutdown() override { runs.Clear(); faces.clear(); }
 private:
 	Host& host;
+	System& system;
 	TextRunCache runs;
 	std::map<std::string, std::unique_ptr<Face>> faces;
 };
@@ -568,7 +582,7 @@ struct Backend {
 // File, font and element factories belong to RmlUi's process lifetime. Contexts
 // have separate renderers, state and clocks, but share the same engine host.
 struct Services {
-	Services(Host& host, LayerPool& layers) : host(host), files(host), system(host), fonts(host), layers(layers) {}
+	Services(Host& host, LayerPool& layers) : host(host), files(host), system(host), fonts(host,system), layers(layers) {}
 	Host& host;
 	Files files;
 	System system;
@@ -628,8 +642,11 @@ std::uint64_t nextContext = 0;
 struct ContextClock {
 	System& system;
 	double previous;
-	ContextClock(Services& services, double time) : system(services.system), previous(system.time) { system.time = time; }
-	~ContextClock() { system.time = previous; }
+    bool* previousFailure;
+	ContextClock(Services& services, double time,bool* failure) : system(services.system), previous(system.time),previousFailure(system.preparationFailure) {
+        system.time = time;system.preparationFailure=failure;
+    }
+	~ContextClock() { system.time = previous;system.preparationFailure=previousFailure; }
 };
 } // namespace
 
@@ -643,9 +660,18 @@ void Viewport::WindowToDocument(float x, float y, float& outX, float& outY) cons
 	outY = y * Positive(pixelDensityY) - originY;
 }
 
+struct Runtime::Canvas {
+    RuntimeCanvasIdentity identity;
+    const std::thread::id thread=std::this_thread::get_id();
+    bool alive=true,preparing=false,retiring=false;
+    std::weak_ptr<PreparedDocument::Data> pending;
+};
+
 struct Runtime::Impl {
-	explicit Impl(Host& host) : host(host) {}
+	explicit Impl(Host& host,std::shared_ptr<Canvas> owner) : host(host),ownerCanvas(std::move(owner)) {}
 	Host& host;
+    bool strictPreparation=false,preparationFailed=false;
+    std::shared_ptr<Canvas> ownerCanvas;
 	std::shared_ptr<Services> services;
 	RuntimeStatistics statistics;
 	Backend* backend = nullptr;
@@ -680,14 +706,14 @@ struct Runtime::Impl {
 		}
 		ReadStateSources();
 		if (!stateError.empty()) { error = stateError; return false; }
-		UpdateInteraction(seconds); return true;
+		return UpdateInteraction(seconds,false,true);
 	}
     bool PrepareChoicePopup(double seconds) {
         if (!canonical || !document || viewport.width <= 0 || viewport.height <= 0 ||
             !std::isfinite(seconds) || seconds < 0) return false;
         ReadStateSources();
         if (!stateError.empty()) return false;
-        UpdateInteraction(seconds); return true;
+        return UpdateInteraction(seconds,false,true);
     }
 	bool RefreshNumberFocusLayout(std::string& error) {
 		if (!context || viewport.width <= 0 || viewport.height <= 0) {
@@ -696,10 +722,10 @@ struct Runtime::Impl {
 		// A program can hide its modal and request draft focus in the same
 		// dispatch. Resolve the resulting pending focus from newly projected
 		// layout, before testing the requested field's actual eligibility.
-		ContextClock clock(*services,time);
+		ContextClock clock(*services,time,strictPreparation?&preparationFailed:nullptr);
 		ApplyMotion(); context->Update();
 		context->GetRootElement()->UpdateGeometryForProjection();
-		UpdateInteraction(-1,true); return true;
+		return UpdateInteraction(-1,true);
 	}
 	static std::optional<Value> Property(const State& state, const Motion& motion, const PropertyKey& key) {
 		const auto bound = state.Properties().find(key);
@@ -776,7 +802,7 @@ struct Runtime::Impl {
 		if (!element) return false;
 		const float margin = 4.f * viewport.DpRatio();
 		if (!std::isfinite(margin) || margin <= 0) return false;
-		ContextClock clock(*services,time);
+		ContextClock clock(*services,time,strictPreparation?&preparationFailed:nullptr);
 		context->Update();
 		context->GetRootElement()->UpdateGeometryForProjection();
 		// Measure exact corners in each ancestor's own scroll plane. A window
@@ -846,21 +872,39 @@ struct Runtime::Impl {
 	}
 	void ApplyScrollCommands() {
         if(!context)return;
-        ContextClock clock(*services,time);
+        ContextClock clock(*services,time,strictPreparation?&preparationFailed:nullptr);
         if(!scrollView.ApplyCommands(interaction))return;
         context->Update();context->GetRootElement()->UpdateGeometryForProjection();
         std::string error;scrollLayoutDirty|=scrollView.Sync(interaction,viewport.DpRatio(),false,error);
         if(!error.empty())host.Log(true,error);
     }
-    void UpdateInteraction(double seconds = -1, bool freshLayout = false) {
-		if (!document || !canonical || viewport.width<=0 || viewport.height<=0) return;
+    bool UpdateInteraction(double seconds = -1, bool freshLayout = false, bool refreshPopup = false) {
+		if (!document || viewport.width<=0 || viewport.height<=0) return false;
+        if (!canonical) return true; // Valid legacy RML has no canonical interaction work.
 		if (std::isfinite(seconds) && seconds >= 0) time = std::max(time,seconds);
+        const auto owner=ownerCanvas;
+        const auto stamp=owner->identity;
+        const bool refreshing=refreshPopup && !freshLayout && valueView.HasConstrainedPopup(interaction);
+        if(refreshing && (owner->preparing || owner->retiring || !owner->alive))return false;
+        struct Scope {std::shared_ptr<Canvas> owner;bool active;~Scope(){if(active)owner->preparing=false;}} scope{owner,refreshing};
+        if(refreshing) {
+            owner->preparing=true;
+            try {
+                ContextClock clock(*services,time,strictPreparation?&preparationFailed:nullptr);
+                if(!ApplyMotion(&stamp))return false;
+                document->UpdateDocument();
+                if(!owner->alive || owner->retiring || owner->identity!=stamp)return false;
+                context->GetRootElement()->UpdateGeometryForProjection();
+            }catch(...){return false;}
+            if(!owner->alive || owner->retiring || owner->identity!=stamp)return false;
+        }
 		SyncModals();
 		inputAllowed.clear(); CollectInputEligibility(canonical->Model().root);
         // Publish scrollbar metrics and projected bounds as one eligibility update.
         // Restored focus must never be tested against this instance's old bounds.
         std::string scrollError;scrollLayoutDirty|=scrollView.Sync(interaction,viewport.DpRatio(),freshLayout,scrollError,true);
         if(!scrollError.empty())host.Log(true,scrollError);
+        if(refreshing && (!owner->alive || owner->retiring || owner->identity!=stamp))return false;
 		std::map<std::string,ControlBounds> bounds;
 		for (const auto& id : controls) {
 			auto* element = document->GetElementById(id); Rml::Rectanglef rect;
@@ -868,6 +912,7 @@ struct Runtime::Impl {
 				bounds[id] = {rect.Left(),rect.Top(),rect.Width(),rect.Height(),true};
 		}
 		interaction.SetBounds(bounds,freshLayout);
+        valueView.ValidatePlacement(interaction,viewport.width,viewport.height,viewport.DpRatio(),refreshPopup && !freshLayout);
 		const auto hit = HitControl();
 		auto* element = pointerPresent && pointerNavigation && pointerX >= 0 && pointerY >= 0 && pointerX < viewport.width && pointerY < viewport.height ?
 			context->GetElementAtPoint({pointerX,pointerY},nullptr,document) : nullptr;
@@ -880,29 +925,137 @@ struct Runtime::Impl {
         }
         ApplyScrollCommands();
 		Feedback(time);
+        return !refreshing || (owner->alive && !owner->retiring && owner->identity==stamp);
 	}
-	void ApplyMotion() {
-		if (!document || !canonical) return;
+	bool ApplyMotion(const RuntimeCanvasIdentity* expected=nullptr) {
+        const auto current=[&]{return !expected || (ownerCanvas->alive && !ownerCanvas->retiring && ownerCanvas->identity==*expected);};
+        if (!document || !canonical || !current()) return false;
 		for (const auto& [key,animated] : motion.Values()) {
 			const auto bound = state.Properties().find(key);
 			const auto& value = bound == state.Properties().end() ? animated : bound->second;
 			const bool opacity = key.second == "opacity";
 			const auto string = opacity ? (value.data[0] < 1 ? "opacity("+value.Css()+")" : "none") :
 				value.type == ValueType::Text ? host.Translate(value.text) : value.Css();
+			if(!current())return false;
 			auto previous = applied.find(key);
 			if (previous != applied.end() && previous->second == string) continue;
 			auto* element = document->GetElementById(key.first);
 			if (!element) continue;
 			if (value.type == ValueType::Text) element->SetInnerRML(Rml::StringUtilities::EncodeRml(string));
 			else if (!element->SetProperty(opacity ? "filter" : key.second,string)) host.Log(true,"Canonical property rejected: "+key.first+"."+key.second);
+			if(!current())return false;
 			applied[key] = string;
 		}
+        return current();
 	}
 };
 
-Runtime::Runtime(Host& host) : impl(std::make_unique<Impl>(host)) {}
-Runtime::~Runtime() { Shutdown(); }
+
+struct Runtime::PreparedDocument::Data {
+    std::weak_ptr<Canvas> owner;
+    RuntimeCanvasIdentity expected;
+    std::shared_ptr<void> source;
+    std::unique_ptr<Runtime> candidate;
+    bool ready=true,noOp=false;
+};
+Runtime::PreparedDocument::PreparedDocument(std::shared_ptr<Data> value):data(std::move(value)){}
+Runtime::PreparedDocument::~PreparedDocument(){data->ready=false;}
+Runtime::Runtime(Host& host) : canvas(std::make_shared<Canvas>()),impl(std::make_unique<Impl>(host,canvas)) {
+    static std::atomic<std::uint64_t> next{1};
+    auto value=next.load(std::memory_order_relaxed);
+    while(value!=(std::numeric_limits<std::uint64_t>::max)())
+        if(next.compare_exchange_weak(value,value+1,std::memory_order_relaxed)){canvas->identity={value,1};break;}
+}
+bool Runtime::Mutate(bool cleanup) noexcept {
+    if(canvas->thread!=std::this_thread::get_id() || !canvas->alive)return false;
+    auto& revision=canvas->identity.revision;
+    if(revision)revision=revision==(std::numeric_limits<std::uint64_t>::max)()?0:revision+1;
+    return !canvas->preparing && (cleanup || (!canvas->retiring && canvas->identity.lifetime && revision));
+}
+RuntimeCanvasIdentity Runtime::CanvasIdentity() const noexcept {
+    return canvas->alive && !canvas->retiring && canvas->thread==std::this_thread::get_id()?canvas->identity:RuntimeCanvasIdentity{};
+}
+RuntimeNativeVacancy Runtime::NativeVacancy() const noexcept {
+    if(!canvas->alive || canvas->retiring || canvas->preparing || canvas->thread!=std::this_thread::get_id())return RuntimeNativeVacancy::BusyOrUnknown;
+    return impl->interaction.NativeDocumentVacancy();
+}
+bool Runtime::HasActiveCanvasCallback() const noexcept {
+    return canvas->thread!=std::this_thread::get_id() || canvas->preparing;
+}
+void Runtime::RetireCanvasOwner() noexcept {
+    if(canvas->thread!=std::this_thread::get_id())return;
+    canvas->retiring=true;Mutate(true);
+}
+bool Runtime::ObserveNumberNativeCandidate(NumberNativeCandidate& out) const noexcept {
+    if(!CanvasIdentity().revision || canvas->preparing || !impl->canonical || !impl->document)return false;
+    return impl->interaction.ObserveNumberNativeCandidate(out);
+}
+bool Runtime::SourceMatches(const std::string& source,const std::string& path) const noexcept {
+    return canvas->alive && !canvas->preparing && canvas->thread==std::this_thread::get_id() &&
+        impl->canonical && impl->canonical->Source()==source && impl->sourcePath==path;
+}
+bool Runtime::AbortPreparedDocument() noexcept {
+    if(!Mutate(true))return false;
+    if(auto pending=canvas->pending.lock()){pending->ready=false;pending->candidate.reset();}
+    return true;
+}
+std::unique_ptr<Runtime::PreparedDocument> Runtime::PrepareDocument(RuntimeCanvasIdentity expected,
+    const DocumentEdit::Prepared& source,RuntimeDocumentOptions options,std::vector<Diagnostic>& diagnostics) noexcept {
+    const bool matched=expected==CanvasIdentity();
+    if(!Mutate() || !matched || !source.OwnerCurrent() || !canvas->pending.expired() || NativeVacancy()!=RuntimeNativeVacancy::Vacant ||
+        !impl->canonical || impl->canonical->Source()!=source.Origin().Source())return {};
+    const auto origin=CanvasIdentity();canvas->preparing=true;
+    struct Guard {Canvas& owner;~Guard(){owner.preparing=false;}} guard{*canvas};
+    try {
+        if(!std::isfinite(options.seconds) || options.seconds<0 || options.viewport.width<=0 || options.viewport.height<=0 ||
+            !std::isfinite(options.viewport.displayScale) || options.viewport.displayScale<=0 ||
+            !std::isfinite(options.viewport.userScale) || options.viewport.userScale<=0 ||
+            !std::isfinite(options.viewport.pixelDensityX) || options.viewport.pixelDensityX<=0 ||
+            !std::isfinite(options.viewport.pixelDensityY) || options.viewport.pixelDensityY<=0 ||
+            !std::isfinite(options.viewport.originX) || !std::isfinite(options.viewport.originY))return {};
+        auto data=std::make_shared<PreparedDocument::Data>();data->owner=canvas;data->expected=origin;data->source=source.data;
+        data->noOp=!source.Receipt().sourceChanged;
+        if(!data->noOp) {
+            data->candidate=std::make_unique<Runtime>(impl->host);
+            auto& candidate=*data->candidate;candidate.impl->strictPreparation=true;
+            if(!candidate.LoadDocument(source.Target().Source(),options.sourcePath,diagnostics))return {};
+            std::string error;
+            if(!candidate.impl->stateError.empty() || !candidate.SetState(options.application,error,options.seconds))return {};
+            candidate.SetReducedMotion(options.reducedMotion,options.seconds);
+            if(!candidate.Layout(options.viewport,options.seconds) || !candidate.impl->stateError.empty() ||
+                candidate.NativeVacancy()!=RuntimeNativeVacancy::Vacant || candidate.impl->preparationFailed)return {};
+            candidate.impl->strictPreparation=false;
+        }
+        if(CanvasIdentity()!=origin || !canvas->alive || impl->interaction.NativeDocumentVacancy()!=RuntimeNativeVacancy::Vacant)return {};
+        auto result=std::unique_ptr<PreparedDocument>(new PreparedDocument(data));canvas->pending=data;return result;
+    }catch(...){return {};}
+}
+bool Runtime::CanPublishDocument(const DocumentEdit& history,const DocumentEdit::Prepared& source,const PreparedDocument& prepared) const noexcept {
+    const auto& data=*prepared.data;
+    return CanvasIdentity().revision && CanvasIdentity().revision!=(std::numeric_limits<std::uint64_t>::max)() &&
+        history.CanPublish(source) && data.ready && data.owner.lock()==canvas && canvas->pending.lock()==prepared.data &&
+        CanvasIdentity()==data.expected && data.source.get()==source.data.get() &&
+        NativeVacancy()==RuntimeNativeVacancy::Vacant && (data.noOp || (data.candidate &&
+            data.candidate->NativeVacancy()==RuntimeNativeVacancy::Vacant &&
+            data.candidate->impl->canonical->Source()==source.Target().Source()));
+}
+bool Runtime::PublishDocument(DocumentEdit& history,DocumentEdit::Prepared& source,PreparedDocument& prepared,DocumentEditReceipt& out) noexcept {
+    if(!CanPublishDocument(history,source,prepared)){Mutate();return false;}
+    auto& data=*prepared.data;
+    // Every test and allocation precedes this interval. Old context/history
+    // stay owned by the prepared holders until their later explicit cleanup.
+    ++canvas->identity.revision;
+    history.PublishPrepared(source,out);
+    if(!data.noOp) {
+        impl.swap(data.candidate->impl);
+        impl->ownerCanvas=canvas;data.candidate->impl->ownerCanvas=data.candidate->canvas;
+    }
+    data.ready=false;return true;
+}
+Runtime::~Runtime() { Shutdown(); canvas->alive=false; }
 bool Runtime::Initialize() {
+    if(!Mutate())return false;
+
 	if (impl->initialized) return true;
 	auto services = activeServices.lock();
 	if (services && &services->host != &impl->host) {
@@ -915,7 +1068,7 @@ bool Runtime::Initialize() {
 		activeServices = services;
 	}
 	impl->services = services;
-	ContextClock clock(*impl->services,impl->time);
+	ContextClock clock(*impl->services,impl->time,impl->strictPreparation?&impl->preparationFailed:nullptr);
 	impl->backend = impl->services->AcquireBackend();
 	impl->contextName = "openq4-retained-"+std::to_string(++nextContext);
 	impl->context = Rml::CreateContext(impl->contextName, {1280,720}, &impl->backend->renderer);
@@ -927,12 +1080,15 @@ bool Runtime::Initialize() {
 	return true;
 }
 void Runtime::Shutdown() {
+    if(!Mutate(true))return;
+    AbortPreparedDocument();
+
 	if (!impl->initialized) return;
 	impl->valueView.Reset();
 	impl->scrollView.Reset();impl->scrollLayoutDirty=impl->preserveRestoredScroll=false;
 	impl->numberView.Reset();
 	{
-		ContextClock clock(*impl->services,impl->time);
+		ContextClock clock(*impl->services,impl->time,impl->strictPreparation?&impl->preparationFailed:nullptr);
 		Rml::RemoveContext(impl->contextName);
 		impl->services->ReleaseBackend(*impl->backend);
 		impl->statistics = impl->backend->statistics;
@@ -950,6 +1106,9 @@ void Runtime::Shutdown() {
 	impl->services.reset();
 }
 void Runtime::CloseDocument() {
+    if(!Mutate(true))return;
+    AbortPreparedDocument();
+
 	impl->sourcePath.clear();
 	impl->valueView.Reset();
 	impl->scrollView.Reset();impl->scrollLayoutDirty=impl->preserveRestoredScroll=false;
@@ -958,14 +1117,16 @@ void Runtime::CloseDocument() {
 	impl->state = {}; impl->appliedStateRevision = 0; impl->stateError.clear();
 	impl->interaction.Reset({}); impl->controls.clear(); impl->pointerPresent = impl->pointerNavigation = false;
 	if (!impl->document) return;
-	ContextClock clock(*impl->services,impl->time);
+	ContextClock clock(*impl->services,impl->time,impl->strictPreparation?&impl->preparationFailed:nullptr);
 	impl->document->Close();
 	impl->document = nullptr;
 	impl->context->Update();
 }
 bool Runtime::LoadMarkup(const std::string& markup, const std::string& sourcePath) {
+    if(!Mutate())return false;
+
 	if (!Initialize()) return false;
-	ContextClock clock(*impl->services,impl->time);
+	ContextClock clock(*impl->services,impl->time,impl->strictPreparation?&impl->preparationFailed:nullptr);
 	// Keep the currently loaded document if parsing a replacement fails.
 	auto* document = impl->context->LoadDocumentFromMemory(markup, sourcePath);
 	if (!document) return false;
@@ -975,10 +1136,12 @@ bool Runtime::LoadMarkup(const std::string& markup, const std::string& sourcePat
 	return true;
 }
 bool Runtime::LoadDocument(const std::string& source, const std::string& sourcePath, std::vector<Diagnostic>& diagnostics) {
+    if(!Mutate())return false;
+
 	auto candidate = std::make_unique<Document>();
 	if (!candidate->Load(source,diagnostics)) return false;
 	if (!LoadMarkup(candidate->BuildMarkup(),sourcePath)) return false;
-	ContextClock clock(*impl->services,impl->time);
+	ContextClock clock(*impl->services,impl->time,impl->strictPreparation?&impl->preparationFailed:nullptr);
 	impl->motion.Reset(candidate->Model());
 	impl->interaction.Reset(candidate->Model());
 	std::string stateError;
@@ -997,23 +1160,27 @@ bool Runtime::LoadDocument(const std::string& source, const std::string& sourceP
 		for (const auto& child : node->children) nodes.push_back(&child);
 	}
 	if (!impl->valueView.Initialize(impl->canonical->Model(),*impl->document,
-		[&](const std::string& text) { return impl->host.Translate(text); },stateError)) {
+		[owner=impl.get()](const std::string& text) { return owner->host.Translate(text); },stateError)) {
 		diagnostics.push_back({"/root",stateError}); CloseDocument(); return false;
 	}
 	if (!impl->scrollView.Initialize(impl->canonical->Model(),*impl->document,stateError)) {
         diagnostics.push_back({"/root",stateError}); CloseDocument(); return false;
     }
     if (!impl->numberView.Initialize(impl->canonical->Model(),*impl->document,
-		[&](std::uintptr_t face,std::string_view text,float spacing) { return impl->services->fonts.QueryRun(face,text,spacing); },
-		[&](const std::string& text) { return impl->host.Translate(text); },{},stateError)) {
+		[owner=impl.get()](std::uintptr_t face,std::string_view text,float spacing) { return owner->services->fonts.QueryRun(face,text,spacing); },
+		[owner=impl.get()](const std::string& text) { return owner->host.Translate(text); },{},stateError)) {
 		diagnostics.push_back({"/root",stateError}); CloseDocument(); return false;
 	}
 	impl->ReadStateSources(); impl->Feedback(impl->time);
 	impl->ApplyMotion();
 	return true;
 }
-bool Runtime::PlayTimeline(const std::string& id, double seconds) { return impl->canonical && impl->motion.Play(id,seconds); }
+bool Runtime::PlayTimeline(const std::string& id, double seconds) {
+    if(!Mutate())return false;
+ return impl->canonical && impl->motion.Play(id,seconds); }
 bool Runtime::SetState(const StateValues& changes, std::string& error, double seconds) {
+    if(!Mutate())return false;
+
 	if (!impl->canonical) { error = "State updates require a canonical document"; return false; }
 	State candidate = impl->state;
 	if (!candidate.Set(changes,error) || !impl->ValidModals(candidate,impl->motion,error)) return false;
@@ -1128,6 +1295,8 @@ bool Runtime::SaveSnapshot(std::string& snapshot, std::string& error, double sec
 	} catch (const std::exception& problem) { error = std::string("Cannot save instance snapshot: ")+problem.what(); return false; }
 }
 bool Runtime::RestoreSnapshot(const std::string& snapshot, std::string& error, double seconds) {
+    if(!Mutate())return false;
+
 	error.clear();
 	auto reject = [&](const char* message) { error = message; return false; };
 	if (!impl->canonical || !impl->document) return reject("Snapshots require a loaded canonical document");
@@ -1323,6 +1492,8 @@ bool Runtime::GetPresentationAlias(const std::string& name, std::string& value) 
 	value = FormatPresentationValue(result); return true;
 }
 bool Runtime::SetPresentationAlias(const std::string& name, const std::string& text, bool overrideExpression, std::string& error) {
+    if(!Mutate())return false;
+
 	error.clear();
 	if (!impl->canonical) { error = "Presentation writes require a canonical document"; return false; }
 	PresentationValue current, value;
@@ -1340,6 +1511,8 @@ bool Runtime::HasEvent(const std::string& name) const {
 }
 bool Runtime::RunEvent(const std::string& name, double seconds, EventEffects& effects, std::string& error,
 	const StateValues& application, const ActionValidator& validate, size_t maxActions) {
+    if(!Mutate())return false;
+
 	error.clear();
 	if (!impl->canonical || !std::isfinite(seconds) || seconds < 0) { error = "Event requires a canonical document and valid presentation time"; return false; }
 	const auto& model = impl->canonical->Model();
@@ -1368,30 +1541,33 @@ bool Runtime::ResolveAction(const std::string& id, ActionInvocation& invocation,
 	return impl->canonical->Model().ResolveAction(id,impl->state.Variables(),invocation,error,
 		MakePresentationLookup(impl->canonical->Model(),impl->state,impl->motion),input);
 }
-void Runtime::PauseTimeline(const std::string& id, double seconds) { impl->motion.Pause(id,seconds); }
-void Runtime::ResumeTimeline(const std::string& id, double seconds) { impl->motion.Resume(id,seconds); }
-void Runtime::CancelTimeline(const std::string& id, CancelPolicy policy, double seconds) { impl->motion.Cancel(id,policy,seconds); }
-void Runtime::SetReducedMotion(bool enabled, double seconds) { impl->motion.SetReducedMotion(enabled,seconds); }
-void Runtime::Frame(const Viewport& viewport, double seconds) {
-	auto& statistics = impl->Stats();
-	const auto residentCount = statistics.residentGeometryCount, residentBytes = statistics.residentGeometryBytes;
-	statistics = {};
-	statistics.residentGeometryCount = residentCount; statistics.residentGeometryBytes = residentBytes;
-	if (!impl->context || !impl->document) return;
+void Runtime::PauseTimeline(const std::string& id, double seconds) {
+    if(!Mutate())return;
+ impl->motion.Pause(id,seconds); }
+void Runtime::ResumeTimeline(const std::string& id, double seconds) {
+    if(!Mutate())return;
+ impl->motion.Resume(id,seconds); }
+void Runtime::CancelTimeline(const std::string& id, CancelPolicy policy, double seconds) {
+    if(!Mutate())return;
+ impl->motion.Cancel(id,policy,seconds); }
+void Runtime::SetReducedMotion(bool enabled, double seconds) {
+    if(!Mutate())return;
+ impl->motion.SetReducedMotion(enabled,seconds); }
+bool Runtime::Layout(const Viewport& viewport,double seconds) {
+	if (!impl->context || !impl->document) return false;
 	if (viewport.width <= 0 || viewport.height <= 0) {
         // Keep invalid dimensions visible to input; old Rml boxes must not be
         // republished before a later valid Frame measures layout again.
         impl->viewport.width=viewport.width;impl->viewport.height=viewport.height;
-		impl->interaction.InvalidateLayout(); impl->interaction.Cancel(); impl->Feedback(seconds); return;
+		impl->interaction.InvalidateLayout(); impl->interaction.Cancel(); impl->Feedback(seconds); return false;
 	}
 	const bool viewportChanged = impl->viewport.width != viewport.width || impl->viewport.height != viewport.height ||
 		impl->viewport.DpRatio() != viewport.DpRatio();
 	impl->scrollView.PreserveDensity(viewport.DpRatio());
 	impl->viewport = viewport;
 	if (impl->pointerPresent) viewport.WindowToDocument(impl->windowPointerX,impl->windowPointerY,impl->pointerX,impl->pointerY);
-	const auto start = std::chrono::steady_clock::now();
 	if (std::isfinite(seconds)) impl->time = std::max(impl->time, seconds);
-	ContextClock clock(*impl->services,impl->time);
+	ContextClock clock(*impl->services,impl->time,impl->strictPreparation?&impl->preparationFailed:nullptr);
 	impl->ReadStateSources();
 	impl->motion.Advance(impl->time);
 	impl->ApplyMotion();
@@ -1403,7 +1579,7 @@ void Runtime::Frame(const Viewport& viewport, double seconds) {
 	for (unsigned pass = 0; pass < 3; ++pass) {
 		impl->context->GetRootElement()->UpdateGeometryForProjection();
 		const auto before = impl->interaction.Focused();
-		impl->UpdateInteraction(-1,true);
+		if(!impl->UpdateInteraction(-1,true))return false;
 		const bool focusChanged = before != impl->interaction.Focused();
 		// Preserve restored/reflowed offsets only on axes owned by authored bars.
 		// Other axes and legacy ancestors still reveal the current control.
@@ -1427,6 +1603,18 @@ void Runtime::Frame(const Viewport& viewport, double seconds) {
 		}
 	}
 	impl->preserveRestoredScroll=false;
+	return true;
+}
+void Runtime::Frame(const Viewport& viewport, double seconds) {
+    if(!Mutate())return;
+
+	auto& statistics = impl->Stats();
+	const auto residentCount = statistics.residentGeometryCount, residentBytes = statistics.residentGeometryBytes;
+	statistics = {};
+	statistics.residentGeometryCount = residentCount; statistics.residentGeometryBytes = residentBytes;
+	const auto start = std::chrono::steady_clock::now();
+	if(!Layout(viewport,seconds))return;
+	ContextClock clock(*impl->services,impl->time,impl->strictPreparation?&impl->preparationFailed:nullptr);
 	const auto updated = std::chrono::steady_clock::now();
 	impl->backend->renderer.BeginFrame(viewport.width,viewport.height);
 	impl->context->Render();
@@ -1449,17 +1637,21 @@ bool Runtime::GetBounds(const std::string& id, Bounds& bounds) const {
 	return true;
 }
 bool Runtime::SetProperty(const std::string& id, const std::string& property, const std::string& value) {
+    if(!Mutate())return false;
+
 	if (impl->canonical) return false; // Edit the canonical source transactionally.
 	auto* element = impl->document ? impl->document->GetElementById(id) : nullptr;
 	if (!element) return false;
-	ContextClock clock(*impl->services,impl->time);
+	ContextClock clock(*impl->services,impl->time,impl->strictPreparation?&impl->preparationFailed:nullptr);
 	return element->SetProperty(property,value);
 }
 bool Runtime::SetText(const std::string& id, const std::string& text) {
+    if(!Mutate())return false;
+
 	if (impl->canonical) return false;
 	auto* element = impl->document ? impl->document->GetElementById(id) : nullptr;
 	if (!element) return false;
-	ContextClock clock(*impl->services,impl->time);
+	ContextClock clock(*impl->services,impl->time,impl->strictPreparation?&impl->preparationFailed:nullptr);
 	element->SetInnerRML(Rml::StringUtilities::EncodeRml(text));
 	return true;
 }
@@ -1474,15 +1666,21 @@ RuntimeStatistics Runtime::Statistics() const {
 	return statistics;
 }
 void Runtime::PointerMove(float x, float y, double seconds) {
+    if(!Mutate())return;
+
 	impl->pointerNavigation = true;
 	impl->pointerPresent = std::isfinite(x) && std::isfinite(y);
 	impl->windowPointerX = x; impl->windowPointerY = y;
 	impl->viewport.WindowToDocument(x,y,impl->pointerX,impl->pointerY);
-	impl->UpdateInteraction(seconds); impl->Feedback(seconds);
+	if(!impl->UpdateInteraction(seconds,false,true))return; impl->Feedback(seconds);
 }
-void Runtime::PointerButton(bool down, double seconds) { impl->pointerNavigation = true; impl->UpdateInteraction(seconds); impl->interaction.Pointer(down); impl->ApplyScrollCommands(); impl->Feedback(seconds); }
+void Runtime::PointerButton(bool down, double seconds) {
+    if(!Mutate())return;
+ impl->pointerNavigation = true; if(!impl->UpdateInteraction(seconds,false,true))return; impl->interaction.Pointer(down); impl->ApplyScrollCommands(); impl->Feedback(seconds); }
 void Runtime::PointerWheel(int rows, double seconds) {
-	impl->UpdateInteraction(seconds);
+    if(!Mutate())return;
+
+	if(!impl->UpdateInteraction(seconds,false,true))return;
 	if (!rows) return;
 	for (const auto& id : impl->controls) {
 		const auto widget = impl->interaction.Widget(id);
@@ -1513,30 +1711,48 @@ void Runtime::PointerWheel(int rows, double seconds) {
     }
 }
 void Runtime::MenuAction(MenuInput input, bool down, double seconds) {
+    if(!Mutate())return;
+
     if(impl->viewport.width<=0 || impl->viewport.height<=0) {impl->interaction.QuarantineInput(input,down);return;}
 	if (down && input != MenuInput::Back && !impl->interaction.CapturedPointerControl().empty()) impl->interaction.Cancel();
 	const auto before = impl->interaction.Focused();
-	impl->pointerNavigation = false; impl->UpdateInteraction(seconds); impl->interaction.Input(input,down); impl->ApplyScrollCommands(); impl->Feedback(seconds);
+	impl->pointerNavigation = false; if(!impl->UpdateInteraction(seconds,false,true))return; impl->interaction.Input(input,down); impl->ApplyScrollCommands(); impl->Feedback(seconds);
 	if (impl->interaction.Focused() != before) impl->RevealFocus();
 }
-void Runtime::CancelInput(double seconds) { impl->pointerPresent = impl->pointerNavigation = false; impl->interaction.Cancel(); impl->Feedback(seconds); }
-void Runtime::ReleaseInputSources() { impl->interaction.ReleaseInputSources(); }
+void Runtime::CancelInput(double seconds) {
+    if(!Mutate())return;
+ impl->pointerPresent = impl->pointerNavigation = false; impl->interaction.Cancel(); impl->Feedback(seconds); }
+void Runtime::ReleaseInputSources() {
+    if(!Mutate())return;
+ impl->interaction.ReleaseInputSources(); }
 bool Runtime::FocusControl(const std::string& id, double seconds) {
+    if(!Mutate())return false;
+
 	impl->pointerNavigation = false;
-	impl->UpdateInteraction(seconds); const bool result = impl->interaction.Focus(id);
+	if(!impl->UpdateInteraction(seconds,false,true))return false; const bool result = impl->interaction.Focus(id);
 	if (result) impl->RevealFocus();
 	impl->Feedback(seconds); return result;
 }
 bool Runtime::SetControlEnabled(const std::string& id, bool enabled, double seconds) {
+    if(!Mutate())return false;
+
 	if (impl->state.Enabled().contains(id)) return false; // The binding owns this control's availability.
 	const bool result = impl->interaction.SetEnabled(id,enabled); impl->Feedback(seconds); return result;
 }
-bool Runtime::PushModal(const std::string& id, double seconds) { impl->UpdateInteraction(seconds); const bool result = impl->interaction.PushModal(id); impl->Feedback(seconds); return result; }
-bool Runtime::PopModal(double seconds) { impl->UpdateInteraction(seconds); const bool result = impl->interaction.PopModal(); impl->Feedback(seconds); return result; }
+bool Runtime::PushModal(const std::string& id, double seconds) {
+    if(!Mutate())return false;
+ if(!impl->UpdateInteraction(seconds,false,true))return false; const bool result = impl->interaction.PushModal(id); impl->Feedback(seconds); return result; }
+bool Runtime::PopModal(double seconds) {
+    if(!Mutate())return false;
+ if(!impl->UpdateInteraction(seconds,false,true))return false; const bool result = impl->interaction.PopModal(); impl->Feedback(seconds); return result; }
 bool Runtime::CanDispatchModalBack(const ControlAction& action, double seconds) {
-	impl->UpdateInteraction(seconds); return impl->interaction.CanDispatchModalBack(action);
+    if(!Mutate())return false;
+
+	if(!impl->UpdateInteraction(seconds,false,true))return false; return impl->interaction.CanDispatchModalBack(action);
 }
 bool Runtime::CanDispatchControlAction(const ControlAction& action, double seconds) {
+    if(!Mutate())return false;
+
 	if (!impl->canonical || !std::isfinite(seconds) || seconds < 0) return false;
 	// A host source may change after a proposal is queued, including between
 	// commands in one application pump. Retire stale numeric proposals before
@@ -1545,7 +1761,7 @@ bool Runtime::CanDispatchControlAction(const ControlAction& action, double secon
 		impl->ReadStateSources();
 		if (!impl->stateError.empty()) return false;
 	}
-	impl->UpdateInteraction(seconds); return impl->interaction.CanDispatchControlAction(action);
+	if(!impl->UpdateInteraction(seconds,false,true))return false; return impl->interaction.CanDispatchControlAction(action);
 }
 std::string Runtime::FocusedControl() const { return impl->interaction.Focused(); }
 std::optional<ControlState> Runtime::GetControlState(const std::string& id) const { return impl->interaction.State(id); }
@@ -1555,14 +1771,20 @@ std::optional<WidgetViewState> Runtime::GetWidgetState(const std::string& id) co
     return value;
 }
 bool Runtime::OpenChoicePopup(const std::string& id,double seconds) {
+    if(!Mutate())return false;
+
     if (!impl->PrepareChoicePopup(seconds)) return false;
     const bool result = impl->interaction.OpenChoicePopup(id); impl->Feedback(seconds); return result;
 }
 bool Runtime::CloseChoicePopup(const std::string& id,std::uint64_t expected,double seconds) {
+    if(!Mutate())return false;
+
     if (!impl->PrepareChoicePopup(seconds)) return false;
     const bool result = impl->interaction.CloseChoicePopup(id,expected); impl->Feedback(seconds); return result;
 }
 bool Runtime::ScrollChoicePopup(const std::string& id,std::uint64_t expected,ScrollStep step,double seconds) {
+    if(!Mutate())return false;
+
     if (!impl->PrepareChoicePopup(seconds)) return false;
     if (!impl->valueView.ChoiceScrollFresh(id,impl->interaction)) return false;
     const auto view = impl->interaction.Widget(id);
@@ -1573,6 +1795,8 @@ bool Runtime::ScrollChoicePopup(const std::string& id,std::uint64_t expected,Scr
     impl->Feedback(seconds); return result;
 }
 bool Runtime::AcknowledgeControlProposal(const std::string& id, std::uint64_t token, bool accepted) {
+    if(!Mutate())return false;
+
 	// Host-backed actions can complete between frames. Observe their actual
 	// readback before acknowledging a local editor, including normalization or
 	// an intervening external change; success alone cannot set accepted data.
@@ -1583,38 +1807,52 @@ bool Runtime::AcknowledgeControlProposal(const std::string& id, std::uint64_t to
 	return impl->interaction.AcknowledgeProposal(id,token,accepted);
 }
 bool Runtime::BeginNumberEdit(const std::string& id,std::string& error,double seconds) {
+    if(!Mutate())return false;
+
 	if (!impl->PrepareNumberEdit(seconds,error)) return false;
 	const bool result=impl->interaction.BeginNumberEdit(id,error); impl->Feedback(seconds); return result;
 }
 bool Runtime::SetNumberSelection(const std::string& id,NumberEditIdentity expected,std::size_t anchor,std::size_t caret,std::string& error,double seconds) {
+    if(!Mutate())return false;
+
 	if (!impl->PrepareNumberEdit(seconds,error)) return false;
 	const bool result=impl->interaction.SetNumberSelection(id,expected,anchor,caret,error); impl->Feedback(seconds); return result;
 }
 bool Runtime::ApplyNumberInput(const std::string& id,NumberEditIdentity expected,const TextInputEvent& event,std::string& error,double seconds) {
+    if(!Mutate())return false;
+
 	if (!impl->PrepareNumberEdit(seconds,error)) return false;
 	const bool result=impl->interaction.ApplyNumberInput(id,expected,event,error); impl->Feedback(seconds); return result;
 }
 bool Runtime::SetNumberNotice(const std::string& id,NumberEditIdentity expected,NumberEditNotice notice,std::string& error,double seconds) {
+    if(!Mutate())return false;
+
 	if (!impl->PrepareNumberEdit(seconds,error)) return false;
 	return impl->interaction.SetNumberNotice(id,expected,notice,error);
 }
 bool Runtime::ReplaceNumberSelection(const std::string& id,NumberEditIdentity expected,std::string_view text,std::string& error,double seconds) {
+    if(!Mutate())return false;
+
 	if (!impl->PrepareNumberEdit(seconds,error)) return false;
 	const bool result=impl->interaction.ReplaceNumberSelection(id,expected,text,error); impl->Feedback(seconds); return result;
 }
 bool Runtime::UndoNumberEdit(const std::string& id,NumberEditIdentity expected,bool redo,std::string& error,double seconds) {
+    if(!Mutate())return false;
+
 	if (!impl->PrepareNumberEdit(seconds,error)) return false;
 	const bool result=impl->interaction.UndoNumberEdit(id,expected,redo,error); impl->Feedback(seconds); return result;
 }
 bool Runtime::NumberCommand(const std::string& id,NumberEditIdentity expected,TextEditCommand command,
 	bool extendSelection,std::string& error,double seconds) {
+    if(!Mutate())return false;
+
 	if (!impl->PrepareNumberEdit(seconds,error)) return false;
 	// Update canonical styling and resolve current inherited fonts without Paint
 	// or Render. The edit buffer may have changed repeatedly since the last frame.
-	ContextClock clock(*impl->services,impl->time);
+	ContextClock clock(*impl->services,impl->time,impl->strictPreparation?&impl->preparationFailed:nullptr);
 	impl->ApplyMotion(); impl->context->Update();
 	impl->context->GetRootElement()->UpdateGeometryForProjection();
-	impl->UpdateInteraction(seconds);
+	if(!impl->UpdateInteraction(seconds,false,true))return false;
 	const auto run=impl->numberView.CommandRun(id,expected,impl->interaction,error); if (!run) return false;
 	const auto view=impl->interaction.Widget(id);
 	TextEditBoundaryMap boundaries; boundaries.text=run->text;
@@ -1628,26 +1866,38 @@ bool Runtime::NumberCommand(const std::string& id,NumberEditIdentity expected,Te
 	impl->Feedback(seconds); return result;
 }
 bool Runtime::CommitNumberEdit(const std::string& id,NumberEditIdentity expected,std::string& error,double seconds) {
+    if(!Mutate())return false;
+
 	if (!impl->PrepareNumberEdit(seconds,error)) return false;
 	const bool result=impl->interaction.CommitNumberEdit(id,expected,error); impl->Feedback(seconds); return result;
 }
 bool Runtime::ResolveNumberConflict(const std::string& id,NumberEditIdentity expected,bool keepDraft,std::string& error,double seconds) {
+    if(!Mutate())return false;
+
 	if (!impl->PrepareNumberEdit(seconds,error)) return false;
 	const bool result=impl->interaction.ResolveNumberConflict(id,expected,keepDraft,error); impl->Feedback(seconds); return result;
 }
 bool Runtime::CancelNumberEdit(const std::string& id,NumberEditIdentity expected,double seconds) {
+    if(!Mutate())return false;
+
 	std::string error; if (!impl->PrepareNumberEdit(seconds,error)) return false;
 	const bool result=impl->interaction.CancelNumberEdit(id,expected); impl->Feedback(seconds); return result;
 }
 bool Runtime::QueryNumberDrafts(NumberDraftSummary& out,std::string& error,double seconds) {
+    if(!Mutate())return false;
+
 	if (!impl->PrepareNumberEdit(seconds,error)) return false;
 	return impl->interaction.QueryNumberDrafts(out,error);
 }
 bool Runtime::DiscardNumberDrafts(const NumberDraftBarrier& expected,std::string& error,double seconds) {
+    if(!Mutate())return false;
+
 	if (!impl->PrepareNumberEdit(seconds,error)) return false;
 	const bool result=impl->interaction.DiscardNumberDrafts(expected,error); impl->Feedback(seconds); return result;
 }
 bool Runtime::FocusNumberDraft(const NumberDraftBarrier& expected,const std::string& control,std::string& error,double seconds) {
+    if(!Mutate())return false;
+
 	if (!impl->PrepareNumberEdit(seconds,error)) return false;
 	if (!impl->RefreshNumberFocusLayout(error)) return false;
 	const bool result=impl->interaction.FocusNumberDraft(expected,control,error);
@@ -1659,6 +1909,8 @@ std::optional<NumberTextGeometry> Runtime::GetNumberGeometry(const std::string& 
 	return impl->numberView.Geometry(id,impl->interaction);
 }
 std::optional<NumberEditorContext> Runtime::QueryNumberEditor(std::string& error, double seconds) {
+    if(!Mutate())return {};
+
 	error.clear();
 	if (!impl->PrepareNumberEdit(seconds,error)) return std::nullopt;
 	const auto id = impl->interaction.Focused();
@@ -1671,12 +1923,16 @@ std::optional<NumberEditorContext> Runtime::QueryNumberEditor(std::string& error
 	return NumberEditorContext{id,*view->number,modal};
 }
 bool Runtime::CanActivateControl(const std::string& id, double seconds) {
+    if(!Mutate())return false;
+
 	if (!impl->canonical || !std::isfinite(seconds) || seconds < 0) return false;
-	impl->UpdateInteraction(seconds);
+	if(!impl->UpdateInteraction(seconds,false,true))return false;
 	return impl->interaction.CanActivate(id);
 }
 bool Runtime::AttachNumberNative(const TextEditorIdentity& owner, NativeTextIdentity native,
 	NativeTextEditorBarrier& out, std::string& error, double seconds) {
+    if(!Mutate())return false;
+
 	const auto current = QueryNumberEditor(error,seconds);
 	if (!current || current->control != owner.control || current->modalToken != owner.modal ||
 		current->editor.identity.session != owner.session || current->editor.identity.revision != owner.revision) return false;
@@ -1684,6 +1940,8 @@ bool Runtime::AttachNumberNative(const TextEditorIdentity& owner, NativeTextIden
 }
 bool Runtime::RefreshNumberNative(const NativeTextEditorBarrier& expected,
 	NativeTextEditorView& out, std::string& error, double seconds) {
+    if(!Mutate())return false;
+
 	if (!impl->PrepareNumberEdit(seconds,error)) return false;
 	NativeTextEditorView candidate;
 	if (!impl->interaction.QueryNumberNative(expected.editor.control,expected.editor,candidate,error) ||
@@ -1692,6 +1950,8 @@ bool Runtime::RefreshNumberNative(const NativeTextEditorBarrier& expected,
 }
 bool Runtime::BeginNumberNativeCollection(const NativeTextEditorBarrier& expected, const NativeTextCollection& collection,
 	NativeTextEditorBarrier& out, std::string& error) {
+    if(!Mutate())return false;
+
 	return impl->canonical && impl->document && impl->interaction.BeginNumberNativeCollection(expected,collection,out,error);
 }
 bool Runtime::IsNumberNativeCurrent(const NativeTextEditorBarrier& expected) const noexcept {
@@ -1699,32 +1959,48 @@ bool Runtime::IsNumberNativeCurrent(const NativeTextEditorBarrier& expected) con
 }
 bool Runtime::ApplyNumberNative(const NativeTextEditorBarrier& expected, const NativeTextOffer& offer,
 	NativeTextEditorReceipt& out, std::string& error) {
+    if(!Mutate())return false;
+
 	return impl->canonical && impl->document && impl->interaction.ApplyNumberNative(expected,offer,out,error);
 }
 bool Runtime::CompleteNumberNativeCollection(const NativeTextEditorBarrier& expected, const NativeTextCollection& collection,
 	NativeTextEditorBarrier& out, std::string& error) {
+    if(!Mutate())return false;
+
 	return impl->canonical && impl->document && impl->interaction.CompleteNumberNativeCollection(expected,collection,out,error);
 }
 bool Runtime::SettleNumberNative(const NativeTextEditorBarrier& expected, NativeTextEditorReceipt& out, std::string& error) {
+    if(!Mutate())return false;
+
 	return impl->canonical && impl->document && impl->interaction.SettleNumberNative(expected,out,error);
 }
 std::unique_ptr<Interaction::NativeSettlement> Runtime::PrepareNumberNativeSettlement(const NativeTextEditorBarrier& expected, std::string& error) {
+    if(!Mutate())return {};
+
 	if (!impl->canonical || !impl->document) return {};
 	return impl->interaction.PrepareNumberNativeSettlement(expected,error);
 }
 bool Runtime::PublishNumberNativeSettlement(Interaction::NativeSettlement& prepared, NativeTextEditorReceipt& out) noexcept {
+    if(!Mutate())return false;
+
 	return impl->canonical && impl->document && impl->interaction.PublishNumberNativeSettlement(prepared,out);
 }
 bool Runtime::RetireNumberNative(const NativeTextEditorBarrier& expected, NativeTextEditorReceipt& out, std::string& error) {
+    if(!Mutate())return false;
+
 	return impl->canonical && impl->document && impl->interaction.RetireNumberNative(expected,out,error);
 }
 NativeTextPresence Runtime::QueryNumberNativePresence(NativeTextIdentity native, const TextEditorIdentity& owner) const noexcept {
     return impl?impl->interaction.QueryNumberNativePresence(native,owner):NativeTextPresence::BusyOrUnknown;
 }
 bool Runtime::RetireNumberNativeExact(NativeTextIdentity native, const TextEditorIdentity& owner) noexcept {
+    if(!Mutate())return false;
+
 	return impl->canonical && impl->document && impl->interaction.RetireNumberNativeExact(native,owner);
 }
 std::vector<ControlAction> Runtime::TakeActions() {
+    if(!Mutate())return {};
+
 	if (impl->interaction.Overflowed()) impl->host.Log(true,"Retained control action queue overflow");
 	return impl->interaction.TakeActions();
 }

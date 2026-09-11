@@ -63,6 +63,9 @@ namespace openq4::ui {
 // a Host which destroys its own currently executing Runtime.
 class Runtime {
 public:
+ // This fixture exercises native wrappers with an admitted canvas. The actual
+ // canvas lifetime/revision guard is covered by UiDocumentCanvas/ViewTest.
+ bool Mutate() noexcept { return true; }
  struct Impl {
     DocumentModel model;Interaction interaction;bool canonical=true,document=true,available=true;
     int prepares=0;std::function<void()> callback;

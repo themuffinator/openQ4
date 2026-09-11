@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Author editable local scrollbars for SYSTEM's choice popups.
+"""Author editable bounded Marine frames and local choice scrollbars for SYSTEM.
 
 The four choices retain their application actions and accepted-value bindings.
 Only local popup artwork and its existing feedback timelines are extended.
@@ -8,8 +8,8 @@ import argparse
 import copy
 import json
 from pathlib import Path
-from update_system_presets import ROOT, SOURCE, keyword, length, load, nodes, number
-from update_system_scrollbar import ink, edge
+from update_system_presets import ROOT, SOURCE, keyword, length, load, nodes, number, typed
+from update_system_scrollbar import ink, edge, polygon
 
 
 def compose(document):
@@ -21,6 +21,20 @@ def compose(document):
         index=nodes(choice);popup=index[control['parts']['popup']]
         ident=choice['id']+'-popup-scroll'
         olive=[0.5451,0.5882,0.2941,1]
+        control['placementBounds']='settings-body'
+        popup['properties']['padding']=length(8)
+        popup['properties']['background-color']=typed('color',[0,0,0,0])
+        # Fixed logical six-dp cuts remain editable at every popup size. The
+        # absolute plate spans the padding containing block; rows stay inset.
+        silhouette=[[6,0],[edge(),0],[edge(),edge(-6)],[edge(-6),edge()],[0,edge()],[0,6]]
+        outer=[[6.5,.5],[edge(-.5),.5],[edge(-.5),edge(-6.5)],[edge(-6.5),edge(-.5)],[.5,edge(-.5)],[.5,6.5]]
+        inner=[[7.5,3.5],[edge(-3.5),3.5],[edge(-3.5),edge(-7.5)],[edge(-7.5),edge(-3.5)],[3.5,edge(-3.5)],[3.5,7.5]]
+        frame_id=choice['id']+'-popup-frame'
+        frame=ink(frame_id,silhouette,[0.0353,0.0471,0.0314,1])
+        frame['paths'].extend([polygon('outer-rail',outer,[0,0,0,0],olive),
+                               polygon('inner-rail',inner,[0,0,0,0],[*olive[:3],.35])])
+        popup['mask']={'paths':[polygon('cut-silhouette',silhouette,[1,1,1,1])]}
+        popup['children']=[frame]+[child for child in popup['children'] if child['id']!=frame_id]
         shape=[[14,0],[26,0],[26,edge(-4)],[22,edge()],[10,edge()],[10,4]]
         thumb={'id':ident+'-thumb','type':'group','properties':{
             'position':keyword('absolute'),'display':keyword('block'),'box-sizing':keyword('border-box'),

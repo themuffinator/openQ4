@@ -36,6 +36,12 @@ struct NumberEditIdentity {
 	std::uint64_t session = 0, revision = 0;
 	bool operator==(const NumberEditIdentity&) const = default;
 };
+// Copied observation of the stored active local editor, never native authority.
+struct NumberNativeCandidate {
+    std::string control;
+    NumberEditIdentity identity;
+    std::uint64_t modalToken=0;
+};
 enum class NumberEditNotice { None, ClipboardReadFailed, ClipboardWriteFailed, ClipboardRejected };
 struct NumberEditView {
 	NumberEditNotice notice = NumberEditNotice::None;
@@ -122,6 +128,9 @@ struct ValueWidgetSnapshot {
 // supplies current projected boxes and hit IDs; this class never reads a device.
 class Interaction {
 public:
+    enum class DocumentVacancy { Vacant, Bound, BusyOrUnknown };
+    DocumentVacancy NativeDocumentVacancy() const noexcept;
+    bool ObserveNumberNativeCandidate(NumberNativeCandidate&) const noexcept;
 	Interaction();
 	~Interaction();
 	Interaction(const Interaction&);
@@ -169,6 +178,14 @@ public:
     // scroll name the exact opening; scroll additionally binds current layout.
     bool OpenChoicePopup(const std::string& id);
     bool CloseChoicePopup(const std::string& id, std::uint64_t openToken);
+    // Retire invalid presentation for this exact opening, including held input.
+    // Held sources remain quarantined until their matching release.
+    bool InvalidateChoicePopup(const std::string& id, std::uint64_t openToken);
+    // Publish whether this exact opening has a current measured presentation.
+    // An opening awaiting its first painted layout is pending, not invalid: it
+    // stays open and simply refuses to accept an option.
+    bool SetChoicePopupMeasured(const std::string& id, std::uint64_t openToken, bool measured) noexcept;
+    bool ChoicePopupMeasured(const std::string& id) const noexcept;
     bool ScrollChoicePopup(const std::string& id, std::uint64_t openToken,
         std::uint64_t geometryToken, ScrollStep step);
 	bool SetEnabled(const std::string& id, bool enabled);
@@ -386,6 +403,9 @@ private:
 	std::optional<double> pointerFraction, dragPreview;
 	bool popupAcceptArm = false;
     bool pointerScrollThumb = false, pointerChoiceTrack = false, choiceScrollArm = false;
+    // A constrained opening starts unmeasured and stays open while it awaits
+    // its first painted layout. Only a measured opening may accept an option.
+    bool popupMeasured = true;
     std::uint64_t popupToken = 0;
     double scrollGrabFraction = 0;
     std::uint64_t scrollSource = 0;

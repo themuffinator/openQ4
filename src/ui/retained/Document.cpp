@@ -796,7 +796,7 @@ private:
 			if (role == "button") Fields(control,p,{"role","action","event","label","enabled","states","navigation","extensions"});
 			else if (role == "toggle") Fields(control,p,{"role","action","label","enabled","states","navigation","value","mixed","parts","extensions"});
 			else if (role == "slider") Fields(control,p,{"role","action","label","enabled","states","navigation","value","minimum","maximum","step","decimals","orientation","parts","extensions"});
-			else if (role == "choice") Fields(control,p,{"role","action","label","enabled","states","navigation","value","parts","visibleRows","options","scrollbar","extensions"});
+			else if (role == "choice") Fields(control,p,{"role","action","label","enabled","states","navigation","value","parts","visibleRows","options","scrollbar","placementBounds","extensions"});
 			else if (role == "number") Fields(control,p,{"role","action","label","enabled","states","navigation","value","minimum","maximum","exponent","maxBytes","parts","extensions"});
 			else if (role == "scrollbar") Fields(control,p,{"role","label","enabled","states","navigation","viewport","orientation","lineStep","minimumThumb","parts","extensions"});
             else Require(false,control["role"],p+"/role","Supported roles are button, toggle, slider, choice, number and scrollbar");
@@ -883,6 +883,7 @@ private:
 					Fields(parts,at,{"popup","viewport","content","value","extensions"});
 					ChoiceSpec spec; spec.popup = Id(parts["popup"],at+"/popup"); spec.viewport = Id(parts["viewport"],at+"/viewport");
 					spec.content = Id(parts["content"],at+"/content"); spec.valueText = Id(parts["value"],at+"/value");
+					if (control.isMember("placementBounds")) spec.placementBounds = Id(control["placementBounds"],p+"/placementBounds");
 					if (control.isMember("scrollbar")) {
 						const auto& bar = control["scrollbar"]; const auto where = p+"/scrollbar";
 						Fields(bar,where,{"track","thumb","lineStep","minimumThumb","extensions"});
@@ -1148,6 +1149,14 @@ private:
 			// Portal placement and clipping are derived invariants. They have no
 			// required authored base, but cannot have a competing dynamic owner.
 			owned.emplace(choice->popup,"position"); owned.emplace(choice->popup,"z-index");
+			if (!choice->placementBounds.empty()) {
+				Require(choice->placementBounds != owner.id && model.FindNode(choice->placementBounds) &&
+					Descendant(owner.id,choice->placementBounds),value,path+"/placementBounds",
+					"Choice placement bounds must identify a canonical proper ancestor of its owner");
+				Require(!model.FindNode(choice->popup)->properties.contains("transform"),value,path,
+					"A constrained choice popup root cannot have an independent transform");
+				owned.emplace(choice->popup,"transform");
+			}
 			owned.emplace(choice->viewport,"overflow");
 			owned.emplace(choice->viewport,"clip");
 			reserve(choice->viewport,"height"); reserve(choice->content,"top"); reserve(choice->valueText,"text");

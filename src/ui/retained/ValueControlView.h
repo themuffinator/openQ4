@@ -27,6 +27,10 @@ public:
 	// Use the actual clipped Rml hit, except a captured slider projects outside
 	// its track. Coordinates are the same physical viewport pixels as RmlUi.
 	bool ChoiceScrollFresh(const std::string&, const Interaction&) const;
+	// Read-only geometry check before every input arbitration. Retires only an
+	// exact constrained opening when its previously measured placement changed.
+    void ValidatePlacement(Interaction&, int width, int height, float dpRatio, bool requireReady = false) const;
+    bool HasConstrainedPopup(const Interaction&) const;
 	PointerPartResult PointerPart(Rml::Element* actualHit, float x, float y, const Interaction& interaction) const;
 private:
 	struct Impl;

@@ -38,6 +38,8 @@ def main():
  error=None
  if args.mutations and r is not None and r.returncode==0:
   rules=[
+   ('invalidate_exact', 'if (!expected || expected != popupToken || popup != id) return false;', 'if (!expected || popup != id) return false;'),
+   ('invalidate_hold', 'if (!expected || expected != popupToken || popup != id) return false;', 'if (!expected || expected != popupToken || popup != id || !PopupInputIdle()) return false;'),
    ('semantic_focus', 'focusPending || focused != id || !Eligible(id) || !popup.empty()', 'focusPending || !Eligible(id) || !popup.empty()'),
    ('semantic_held', 'return !pointerHeld && !acceptHeld && !backHeld && !pointerArm &&', 'return !pointerHeld && !backHeld && !pointerArm &&'),
    ('semantic_close_identity', 'if (!expected || expected != popupToken || popup != id || !PopupInputIdle()) return false;', 'if (!expected || popup != id || !PopupInputIdle()) return false;'),

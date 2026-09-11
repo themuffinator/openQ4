@@ -146,18 +146,25 @@ def activate(control: str) -> list[str]:
     return [f'openq4_retainedGui focus "{control}"'] + key('accept')
 
 
+def open_choice(control: str) -> list[str]:
+    # A bounded popup accepts an option only once a painted frame has measured
+    # it inside the settings panel. A player always sees the list before
+    # choosing from it; batched console input must allow that frame too.
+    return activate(control) + ['wait 3']
+
+
 def stages() -> list[dict]:
     rows = []
 
     def add(name, commands, *, brightness=1.1, baseline=1.1, shadows=1, postaa=0,
             dirty=0, discard=0, popup=0, live=1.1, page=True, actions=(), events=(),
             screenshot=None, resets=0, opening=False, extras=EXTRA_SEED,
-            extra_baseline=EXTRA_SEED, resolution_first=0):
+            extra_baseline=EXTRA_SEED, resolution_scrolled=0):
         rows.append(dict(name=name, commands=commands, page=page,
                          values=(1, dirty, 0, dirty, 1, discard, brightness, baseline, shadows, 1, postaa, 0)
                                 +tuple(value for pair in zip(extras,extra_baseline) for value in pair),
                          popup=popup, live=live, actions=list(actions), events=list(events),
-                         screenshot=screenshot, resets=resets, opening=opening, resolution_first=resolution_first))
+                         screenshot=screenshot, resets=resets, opening=opening, resolution_scrolled=resolution_scrolled))
 
     add('open', ['openq4_system open'], brightness=1, baseline=1, live=1,
         actions=[('begin', 0)], events=[('onactivate', 1, 1)], opening=True)
@@ -173,9 +180,9 @@ def stages() -> list[dict]:
         page=False, actions=[('cancel', 0)], events=[('onback', 0, 1), ('discard', 2, 1)])
     add('reopen_discarded', ['openq4_system open'], actions=[('begin', 0)],
         events=[('onactivate', 1, 1)], opening=True)
-    add('choice_tentative', activate('settings_postaa') + key('down'), popup=1, screenshot='choice')
+    add('choice_tentative', open_choice('settings_postaa') + key('down'), popup=1, screenshot='choice')
     add('choice_cancelled', key('back'))
-    add('choice_dirty', activate('settings_postaa') + key('down') + key('down') + key('accept'),
+    add('choice_dirty', open_choice('settings_postaa') + key('down') + key('down') + key('accept'),
         postaa=2, dirty=1, actions=[('edit', 1)])
     add('choice_restored', activate('settings_back') + ['wait 3'] + activate('discard_changes'),
         page=False, actions=[('cancel', 0)], events=[('onback', 0, 1), ('discard', 2, 1)])
@@ -194,14 +201,15 @@ def stages() -> list[dict]:
         if role==1:
             extra_changed += activate(control); extra_seed += activate(control)
         else:
-            extra_changed += activate(control)+key('home')+key('down')*4+key('accept')
-            extra_seed += activate(control)+key('home')+key('down')*5+key('accept')
-    add('extras_dirty', extra_changed, extras=EXTRA_CHANGED, dirty=1, actions=[('edit',1)]*7)
+            extra_changed += open_choice(control)+key('home')+key('down')*4+key('accept')
+            extra_seed += open_choice(control)+key('home')+key('down')*5+key('accept')
+    add('extras_dirty', extra_changed, extras=EXTRA_CHANGED, dirty=1, actions=[('edit',1)]*7, resolution_scrolled=1)
     add('extras_applied', activate('settings_apply'), extras=EXTRA_CHANGED,
-        extra_baseline=EXTRA_CHANGED, actions=[('apply',0)], events=[('apply',1,0)], screenshot='extrasapplied')
+        extra_baseline=EXTRA_CHANGED, actions=[('apply',0)], events=[('apply',1,0)], screenshot='extrasapplied',
+        resolution_scrolled=1)
     add('extras_restore_draft', extra_seed, extra_baseline=EXTRA_CHANGED, dirty=1,
-        actions=[('edit',1)]*7, resolution_first=1)
-    add('extras_restored', activate('settings_apply'), actions=[('apply',0)], events=[('apply',1,0)], resolution_first=1, screenshot='extrasrestored')
+        actions=[('edit',1)]*7, resolution_scrolled=1)
+    add('extras_restored', activate('settings_apply'), actions=[('apply',0)], events=[('apply',1,0)], resolution_scrolled=1, screenshot='extrasrestored')
     add('returned', activate('settings_back'), page=False, events=[('onback', 1, 0)], screenshot='returned')
     add('reopened', ['openq4_system open'], actions=[('begin', 0)], events=[('onactivate', 1, 1)],
         opening=True, screenshot='reopened')
@@ -426,9 +434,12 @@ def qualify(log: str, mode: str) -> dict:
     route_fields = set('enabled active parent child guiTest menu map multiplayer menuSound canReturn'.split())
     widget_fields = set('id role type accepted pending proposed rejected token popup firstVisible'.split())
     report_fields = set('path focus revision active brightness shadows contexts'.split())
+    scroll_fields = set(('id open opening revision offsetDp available usable density viewport '
+                         'range offset track thumb position travel geometry').split())
     for record, stage in zip(records, expected_stages):
         at = stage['name']; lines = record['lines']
         routes, reads, widgets, reports, operations, actions, events, resources, loads, observed, dispatches = [], [], [], [], [], [], [], [], [], [], []
+        scrolls = []
         for line in lines:
             if line.startswith('OPENQ4_SYSTEM operation='):
                 operations.append(line)
@@ -438,6 +449,8 @@ def qualify(log: str, mode: str) -> dict:
                 parts = line[len('GUI_VALUE '):].split('=', 1); reads.append(parts); observed.append('read:' + parts[0])
             elif line.startswith('RETAINED_GUI_WIDGET '):
                 widgets.append(_fields(line, 'RETAINED_GUI_WIDGET ', widget_fields)); observed.append('widget')
+            elif line.startswith('RETAINED_GUI_CHOICE_SCROLL '):
+                scrolls.append(_fields(line, 'RETAINED_GUI_CHOICE_SCROLL ', scroll_fields)); observed.append('scroll')
             elif line.startswith('RETAINED_GUI path='):
                 reports.append(_fields(line, 'RETAINED_GUI ', report_fields)); observed.append('report')
             elif line.startswith('RETAINED_GUI_OPERATION '):
@@ -473,7 +486,9 @@ def qualify(log: str, mode: str) -> dict:
             if not row or any(row[key] != value for key,value in {'path':PAGE,'operation':'ui.dismiss','value':'-','shadows':'1','close':'1'}.items()) or not _number(row['brightness'],stage['live']):
                 errors.append(f'{at}: invalid direct host dismissal')
         expected_observed = ['route'] * (2 if stage['opening'] else 1)
-        if stage['page']: expected_observed += ['read:'+field for field in FIELDS] + ['widget']*len(CONTROLS) + ['report']
+        # A choice widget record is immediately followed by its popup geometry.
+        if stage['page']: expected_observed += ['read:'+field for field in FIELDS] + [
+            entry for index in range(len(CONTROLS)) for entry in (['widget','scroll'] if ROLES[index]==3 else ['widget'])] + ['report']
         if observed != expected_observed: errors.append(f'{at}: readback order/count differs from fixed script')
         for route in routes:
             expected_route = {'enabled':'1', 'active':PAGE if stage['page'] else PARENT, 'parent':PARENT if stage['page'] else '-',
@@ -490,9 +505,29 @@ def qualify(log: str, mode: str) -> dict:
                     errors.append(f'{at}: malformed widget readback'); continue
                 fixed = {'id':CONTROLS[index], 'role':str(ROLES[index]), 'type':str(TYPES[index]),
                          'pending':'0', 'rejected':'0', 'token':'0', 'popup':str(stage['popup'] if index==2 else 0),
-                         'firstVisible':str(stage['resolution_first'] if CONTROLS[index]=='settings_resolution_scale' else 0)}
+                         'firstVisible':'0'}
                 if any(widget[key] != value for key,value in fixed.items()) or not _number(widget['accepted'],values[index]) or not _number(widget['proposed'],0):
                     errors.append(f'{at}: widget accepted/pending/popup state mismatch')
+            # Every choice reports its popup geometry beside its widget record.
+            # An open bounded popup must have reached a measured frame: the
+            # engine pumps input between the opening and its first paint, and a
+            # popup that never measures is one the player can never see or use.
+            choices = [control for index,control in enumerate(CONTROLS) if ROLES[index]==3]
+            if [row['id'] if row else None for row in scrolls] != choices:
+                errors.append(f'{at}: choice popup geometry readbacks missing or reordered')
+            else:
+                for row in scrolls:
+                    open_popup = row['id']=='settings_postaa' and stage['popup']
+                    if row['open'] != ('1' if open_popup else '0'):
+                        errors.append(f'{at}: choice popup geometry disagrees with its widget record')
+                    elif open_popup and (row['available'] != '1' or row['opening'] == '0'):
+                        errors.append(f'{at}: open bounded popup never reached a measured frame')
+                    # A bar-equipped choice keeps its scroll position in offsetDp.
+                    # firstVisible belongs to the older bar-less model and stays zero.
+                    if row['id'] == 'settings_resolution_scale':
+                        scrolled = float(row['offsetDp']) > 0
+                        if scrolled != bool(stage['resolution_scrolled']) or (scrolled and row['available'] != '1'):
+                            errors.append(f'{at}: retained choice scroll offset differs from the fixed script')
             for report in reports:
                 if (not report or report['path'] != PAGE or report['active'] != '1' or report['contexts'] != '1' or
                     not re.fullmatch(r'\d+',report['revision']) or not _number(report['brightness'],stage['live']) or report['shadows'] != '1'):
