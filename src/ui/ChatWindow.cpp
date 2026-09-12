@@ -34,7 +34,7 @@ idChatWindow::idChatWindow(idDeviceContext *context, idUserInterfaceLocal *owner
     const char *definition =
         "oq4_chat { rect 0,0,640,480 text \"gui::chattext\" maxchars 128 "
         "font \"fonts/lowpixel\" textscale 0.25 textspacing -1 textstyle 1 "
-        "forecolor 1,1,1,1 hovercolor 1,1,1,1 nocursor 1 "
+        "forecolor 1,1,1,1 hovercolor 1,1,1,1 nocursor 1 noclip 1 "
         "onEnter { set \"cmd\" \"chatmessage\"; } onESC { set \"cmd\" \"close\"; } }";
     idParser parser(definition, idStr::Length(definition), "<openQ4 chat>",
         LEXFL_NOFATALERRORS | LEXFL_NOSTRINGCONCAT | LEXFL_ALLOWMULTICHARLITERALS);
@@ -224,9 +224,20 @@ void idChatWindow::Draw(int time, float x, float y) {
     const float lineHeight = Max(12.0f * scale, dc->MaxCharHeight(textScale) * 1.25f);
     const float padding = 8.0f * scale;
     const float width = ui_chatWidth.GetFloat();
+    // Both chat surfaces hug the left edge of the whole virtual screen, not of
+    // the centred 640-wide HUD canvas: on a display wider than 4:3 the canvas
+    // is pillarboxed into the middle, and a panel pinned to it would float
+    // inward. The expansion is the extra virtual width the desktop already
+    // clips to, so -xExpand/640+xExpand is the visible screen in these units.
+    float xExpand = 0.0f;
+    float yExpand = 0.0f;
+    dc->GetVirtualScreenExpansion(forceAspectWidth, forceAspectHeight, xExpand, yExpand);
+    const float screenLeft = -xExpand;
+    const float screenRight = 640.0f + xExpand;
     // The 640x480 canvas uses the engine's shared aspect correction. Reserve
     // the status/weapon region and clamp offsets so the editor stays reachable.
-    const float left = idMath::ClampFloat(4.0f, 636.0f - width, 8.0f + ui_chatOffsetX.GetFloat());
+    const float left = idMath::ClampFloat(screenLeft + 4.0f, screenRight - 4.0f - width,
+        screenLeft + 8.0f + ui_chatOffsetX.GetFloat());
     const float footerHeight = editing ? lineHeight * 2.0f : 0.0f;
     const float reserve = lineHeight * 3.0f + padding * 2.0f;
     const float bottom = idMath::ClampFloat(reserve + 4.0f, 476.0f, 372.0f + ui_chatOffsetY.GetFloat());

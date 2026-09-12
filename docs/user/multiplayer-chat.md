@@ -45,8 +45,12 @@ Settings apply immediately and are saved automatically:
 | `ui_chatOffsetX` | `0` | Horizontal offset in GUI units; positive moves right |
 | `ui_chatOffsetY` | `0` | Vertical offset in GUI units; positive moves down |
 
-Offsets are clamped to keep the panel on screen. The default position clears
-the lower HUD; custom offsets can deliberately move it over other HUD elements.
+Both the passive panel and the input line sit against the left edge of the
+whole display, not the left edge of the centred 4:3 HUD canvas, so on a wide
+monitor they stay in the corner instead of floating inward. Offsets are
+measured from that edge and clamped to keep the panel on screen, so the full
+width of the display is reachable. The default position clears the lower HUD;
+custom offsets can deliberately move it over other HUD elements.
 The input limit remains Quake 4's 128 bytes. Menu and end-of-match transcripts
 also retain more text, up to 32 KB.
 
