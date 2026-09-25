@@ -1380,7 +1380,7 @@ static bool SDL3_MapWindowMouseToRoutedCursor(float windowMouseX, float windowMo
 	return false;
 }
 
-static bool SDL3_UpdateRoutedMouseDelta(float menuMouseX, float menuMouseY, int &dx, int &dy) {
+[[maybe_unused]] static bool SDL3_UpdateRoutedMouseDelta(float menuMouseX, float menuMouseY, int &dx, int &dy) {
 	float previousX = 0.0f;
 	float previousY = 0.0f;
 
@@ -1455,17 +1455,24 @@ static bool SDL3_SetRoutedCursorFromWindowPosition(float windowMouseX, float win
 		return false;
 	}
 
+	idUserInterface *activeGui = SDL3_GetActiveMenuGui();
+	if (activeGui != NULL) {
+		activeGui->SetCursor(cursorX, cursorY);
+	}
 	if (console != NULL && console->Active()) {
 		console->SetMousePosition(cursorX, cursorY);
-	} else {
-		idUserInterface *activeGui = SDL3_GetActiveMenuGui();
-		if (activeGui != NULL) {
-			activeGui->SetCursor(cursorX, cursorY);
-		}
 	}
 
 	s_menuMouseInsideWindow = true;
-	return SDL3_UpdateRoutedMouseDelta(cursorX, cursorY, dx, dy);
+	s_menuMouseX = cursorX;
+	s_menuMouseY = cursorY;
+	s_haveMenuMousePosition = true;
+	s_menuMouseRemainderX = 0.0f;
+	s_menuMouseRemainderY = 0.0f;
+	s_haveAbsoluteMousePosition = false;
+	dx = 0;
+	dy = 0;
+	return true;
 }
 
 static void SDL3_SyncSystemMouseToActiveCursor(void) {
@@ -1480,65 +1487,54 @@ static void SDL3_SyncSystemMouseToActiveCursor(void) {
 		return;
 	}
 
-	if (console != NULL && console->Active()) {
-		float windowMouseX = 0.0f;
-		float windowMouseY = 0.0f;
-		(void)SDL_GetMouseState(&windowMouseX, &windowMouseY);
-
-		float cursorX = 0.0f;
-		float cursorY = 0.0f;
-		if (!SDL3_MapWindowMouseToConsoleCursor(windowMouseX, windowMouseY, cursorX, cursorY)) {
-			return;
-		}
-
-		console->SetMousePosition(cursorX, cursorY);
-		s_ignoreNextMenuWarpMotion = false;
-		s_menuMouseInsideWindow = true;
-		SDL3_SetMenuMouseTrackingPosition(cursorX, cursorY);
-		return;
-	}
+	float windowMouseX = 0.0f;
+	float windowMouseY = 0.0f;
+	(void)SDL_GetMouseState(&windowMouseX, &windowMouseY);
 
 	idUserInterface *activeGui = SDL3_GetActiveMenuGui();
 	if (activeGui != NULL) {
 #if defined(OPENQ4_SDL3_POSIX_HOST)
-		float windowMouseX = 0.0f;
-		float windowMouseY = 0.0f;
-		(void)SDL_GetMouseState(&windowMouseX, &windowMouseY);
-
 		float cursorX = 0.0f;
 		float cursorY = 0.0f;
-		if (!SDL3_MapWindowMouseToGuiCursor(windowMouseX, windowMouseY, cursorX, cursorY)) {
-			return;
+		if (SDL3_MapWindowMouseToGuiCursor(windowMouseX, windowMouseY, cursorX, cursorY)) {
+			activeGui->SetCursor(cursorX, cursorY);
+			s_ignoreNextMenuWarpMotion = false;
+			s_menuMouseInsideWindow = true;
+			SDL3_SetMenuMouseTrackingPosition(cursorX, cursorY);
 		}
-
-		activeGui->SetCursor(cursorX, cursorY);
-		s_ignoreNextMenuWarpMotion = false;
-		s_menuMouseInsideWindow = true;
-		SDL3_SetMenuMouseTrackingPosition(cursorX, cursorY);
-		return;
 #else
 		sdl3GuiMouseTransform_t transform;
-		if (!SDL3_BuildGuiMouseTransform(transform)) {
-			return;
+		if (SDL3_BuildGuiMouseTransform(transform)) {
+			const float cursorX = activeGui->CursorX();
+			const float cursorY = activeGui->CursorY();
+			const float drawX = (cursorX * transform.xScale) + transform.xOffset;
+			const float drawY = (cursorY * transform.yScale) + transform.yOffset;
+			const float pixelMouseX = transform.drawAreaX + drawX * (transform.drawAreaWidth / transform.guiWidth);
+			const float pixelMouseY = transform.drawAreaY + drawY * (transform.drawAreaHeight / transform.guiHeight);
+			const float windowMouseX = pixelMouseX * transform.pixelToWindowX;
+			const float windowMouseY = pixelMouseY * transform.pixelToWindowY;
+
+			SDL_WarpMouseInWindow(s_sdlWindow, windowMouseX, windowMouseY);
+			s_ignoreNextMenuWarpMotion = true;
+			s_menuWarpWindowX = windowMouseX;
+			s_menuWarpWindowY = windowMouseY;
+			s_menuMouseInsideWindow = true;
+			SDL3_SetMenuMouseTrackingPosition(cursorX, cursorY);
 		}
-
-		const float cursorX = activeGui->CursorX();
-		const float cursorY = activeGui->CursorY();
-		const float drawX = (cursorX * transform.xScale) + transform.xOffset;
-		const float drawY = (cursorY * transform.yScale) + transform.yOffset;
-		const float pixelMouseX = transform.drawAreaX + drawX * (transform.drawAreaWidth / transform.guiWidth);
-		const float pixelMouseY = transform.drawAreaY + drawY * (transform.drawAreaHeight / transform.guiHeight);
-		const float windowMouseX = pixelMouseX * transform.pixelToWindowX;
-		const float windowMouseY = pixelMouseY * transform.pixelToWindowY;
-
-		SDL_WarpMouseInWindow(s_sdlWindow, windowMouseX, windowMouseY);
-		s_ignoreNextMenuWarpMotion = true;
-		s_menuWarpWindowX = windowMouseX;
-		s_menuWarpWindowY = windowMouseY;
-		s_menuMouseInsideWindow = true;
-		SDL3_SetMenuMouseTrackingPosition(cursorX, cursorY);
-		return;
 #endif
+	}
+
+	if (console != NULL && console->Active()) {
+		float cursorX = 0.0f;
+		float cursorY = 0.0f;
+		if (SDL3_MapWindowMouseToConsoleCursor(windowMouseX, windowMouseY, cursorX, cursorY)) {
+			console->SetMousePosition(cursorX, cursorY);
+			s_ignoreNextMenuWarpMotion = false;
+			s_menuMouseInsideWindow = true;
+			if (activeGui == NULL) {
+				SDL3_SetMenuMouseTrackingPosition(cursorX, cursorY);
+			}
+		}
 	}
 }
 
@@ -5177,7 +5173,21 @@ bool Sys_SDL_PumpEvents(void) {
 						}
 
 						if (SDL3_MapWindowMouseToRoutedCursor(event.motion.x, event.motion.y, menuMouseX, menuMouseY)) {
-							(void)SDL3_UpdateRoutedMouseDelta(menuMouseX, menuMouseY, dx, dy);
+							idUserInterface *activeGui = SDL3_GetActiveMenuGui();
+							if ( activeGui ) {
+								activeGui->SetCursor( menuMouseX, menuMouseY );
+							}
+							if ( console != NULL && console->Active() ) {
+								console->SetMousePosition( menuMouseX, menuMouseY );
+							}
+							s_menuMouseX = menuMouseX;
+							s_menuMouseY = menuMouseY;
+							s_haveMenuMousePosition = true;
+							s_menuMouseRemainderX = 0.0f;
+							s_menuMouseRemainderY = 0.0f;
+							s_haveAbsoluteMousePosition = false;
+							s_menuMouseInsideWindow = true;
+							Sys_QueEvent( eventTime, SE_MOUSE, 0, 0, 0, NULL );
 						} else {
 							SDL3_ResetMenuMouseTracking();
 						}

@@ -1124,8 +1124,12 @@ const char *idUserInterfaceLocal::HandleEvent( const sysEvent_t *event, int _tim
 	}
 
 	if ( event->evType == SE_MOUSE ) {
-		SetCursor( cursorX + static_cast<float>( event->evValue ),
-			cursorY + static_cast<float>( event->evValue2 ) );
+		if ( event->evValue != 0 || event->evValue2 != 0 ) {
+			SetCursor( cursorX + static_cast<float>( event->evValue ),
+				cursorY + static_cast<float>( event->evValue2 ) );
+		} else {
+			ClampCursor();
+		}
 	}
 
 	if ( desktop ) {
@@ -1723,7 +1727,7 @@ void idUserInterfaceLocal::ClampCursor( void ) {
 		if ( ( desktop->GetFlags() & WIN_MENUGUI ) && ui_aspectCorrection.GetBool() ) {
 			float xExpand = 0.0f;
 			float yExpand = 0.0f;
-			uiManagerLocal.dc.GetVirtualScreenExpansion( maxX, maxY, xExpand, yExpand );
+			uiManagerLocal.dc.GetVirtualScreenExpansion( &xExpand, &yExpand, ui_aspectCorrection.GetBool() );
 			if ( std::isfinite( xExpand ) && xExpand >= 0.0f ) {
 				minX -= xExpand;
 				maxX += xExpand;
