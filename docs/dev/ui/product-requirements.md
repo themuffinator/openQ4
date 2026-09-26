@@ -1,11 +1,36 @@
 # UI product requirement register
 
-9 September 2026. The [machine-readable register](product-requirements.json)
-contains **227 mandatory requirements** for the complete UI product. It expands
+9 September 2026, revised 26 September 2026. The
+[machine-readable register](product-requirements.json) contains **267
+requirements** for the complete UI product: 259 that define acceptance and eight
+superseded rows kept for history. It expands
 the [completion plan](../plans/ui-product-completion.md), the
 [original delivery scope](../plans/idtech5-ui.md) and the normative
 [visual specification](../ui-visual-design.md) into implementation ownership,
 dependencies, concrete evidence and explicit unfinished work.
+
+Register schema 2 (26 September 2026) follows visual specification 1.1 and
+1.2. It records eight supersessions: `ART-003`, `ART-004` and `ART-006` by
+`ART-018` to `ART-020` for the measured alpha ladder, panel constructions and
+open-plate anatomy; `MOT-003` by `MOT-009` for the stock motion tokens; `TXT-006`
+by `TXT-010` for the stock-derived type ramp; `WID-002` and `WID-004` by `WID-017`
+and `WID-018` for the stock check mark and tick-ramp slider; and `LAY-007` by
+`LAY-013` for the 48 dp touch minimum. It appends 32 further requirements: the
+additive and darkening composition, cycling values, screen-change choreography,
+ambient loops and stock parity comparison of version 1.1, and the version 1.2
+modern direction: viewing profiles, size classes, safe areas, the accessibility
+baseline, input modality, focus memory, controller mapping and editing, touch
+rules, the prompt bar, detail area, radial wheel and on-screen keyboard, glyph
+artwork and visual refinements, Android lifecycle, first-run data setup, the
+first-party touch gameplay controls and their editor, terminal interaction,
+modern screen patterns, HUD presets, Remastered and Classic layouts, mobile
+power limits and input/device qualification. `WID-017` and `WID-018` start
+partial with the evidence their superseded rows carry; every other appended
+requirement is pending. No existing row, evidence scope or migration entry
+changed. The revision re-binds the visual specification and repairs eleven other
+source bindings: an earlier increment recorded the completion plan, the original
+delivery scope and nine evidence document hashes from working-copy bytes that
+were never committed, and they now bind the current documents.
 
 The [17 September implementation audit](masked-input-review.md) records current
 delivery gaps and the shared vector-mask input repair. `INP-007` remains partial;
@@ -324,7 +349,8 @@ The [full renderer shutdown increment](image-recovery-ownership.md), based on en
 
 The [editor file publication increment](editor-file-safety.md), based on engine `a11a00181b5997993bb9e225bad63a6422386311`, adds actual native creation of complete new files without replacing an existing or racing document. Windows Clang and MSVC each pass 340 checks, GCC with sanitizers passes 344, and all three reject seven compiled mutations. The full engine build and 78 UI suites pass. Windows symlink and DrvFS FIFO limitations are recorded. This file-only increment has no new game captures. Save As/autosave UI, live document association, overwrite/conflict handling and crash/relaunch recovery remain required. No requirement status, migration acceptance or final gate changes. Evidence: `.tmp/ui/editor-new-file/validation-evidence.json`, SHA-256 `846413e35eb34ed965a57005aa6eb724b5c8d3dbc2fb46f65ba30711a509cc63`.
 
-There are **69 partial, 157 pending and one verified requirement**. `BEH-002`
+There are **71 partial, 195 pending and one verified requirement**, counting the
+eight superseded rows at their recorded states. `BEH-002`
 remains partial for the implemented settings transaction/service boundary.
 `BEH-005` remains partial for committed action delivery and cancellation; stock
 sounds and the complete device/modal/widget behavior still require implementation
@@ -351,6 +377,13 @@ Keep IDs stable. Append requirements when new source behavior or an omitted
 normative detail is discovered. If a requirement is split or superseded, preserve
 its ID and explicitly link its successors. The specification remains normative;
 an omission in this register cannot authorize reducing scope.
+
+The `supersessions` list records each replacement. A superseded row keeps its ID,
+text, status and evidence for history but no longer defines acceptance; its
+successors carry the replacement scope, and dependencies or audit findings that
+name it resolve to them. `carried_evidence` lists the superseded row's evidence
+that still applies to a successor. Only a register revision appends requirements
+or supersessions; an implementation increment cannot.
 
 Dependencies identify capabilities needed at the stated scope. For example,
 the first settings screen needs the applicable controls and source references
@@ -384,18 +417,18 @@ complete source-bound mappings and evidence.
 | `BEH-001`–`007` | Typed operations, settings transactions, aliases/events, exactly-once actions/sounds, pause and MP authority | M1, M2, M4 |
 | `SUR-001`–`006` | Explicit output surfaces, GPU lifetime, world density/rays, HUD/aim projection and output-resolution UI | M1, M5, M6 |
 | `SAVE-001`–`004` | Versioned instance/game-save policy, full durable state and live/level restoration | M1, M5 |
-| `LAY-001`–`012` | Exact scale/spacing/target-size values, aspect expansion, compact recovery, HUD safe areas and contrast | M1–M5 |
-| `TXT-001`–`009` | Scalable typography, shaped runs, Unicode, localization, caret/selection/clipboard/IME and platform accessibility | M2, M3 |
-| `INP-001`–`008` | Input transforms, paired activation, repeat/handoff, wheel/touch/text, modal focus and authored mask-aware hits | M1, M3 |
-| `WID-001`–`016` | Every named functional widget: actions, checkbox, radio, slider, choice, text, binding, tabs, lists, scrolling, progress, tooltip, modal, status, tree and path/color controls | M2, M3 |
-| `REN-001`–`013` | Editable paths/paints/strokes/SVG, coverage/color, isolated opacity/masks/clips, composition and recovery | M3, M6 |
+| `LAY-001`–`017` | Exact scale/spacing/target-size values, aspect expansion, compact recovery, HUD safe areas, contrast, viewing profiles, size classes, safe-area gestures and the accessibility baseline | M1–M5 |
+| `TXT-001`–`010` | Scalable typography, the stock-derived type ramp, shaped runs, Unicode, localization, caret/selection/clipboard/IME and platform accessibility | M2, M3 |
+| `INP-001`–`013` | Input transforms, paired activation, repeat/handoff, wheel/touch/text, modal focus, authored mask-aware hits, modality switching, focus memory, controller mapping/editing and touch rules | M1, M3 |
+| `WID-001`–`023` | Every named functional widget: actions, checkbox, radio, slider, choice, text, binding, tabs, lists, scrolling, progress, tooltip, modal, status, tree, path/color controls, prompt bar, detail area, radial wheel, on-screen keyboard and cycling values | M2, M3, M5 |
+| `REN-001`–`014` | Editable paths/paints/strokes/SVG, coverage/color, isolated opacity/masks/clips, additive and darkening composition and recovery | M3, M6 |
 | `RES-001`–`005` | Full material/movie/model operations, generated images and actual renderer resource accounting | M3, M4 |
-| `ART-001`–`017` | Measured component/icon libraries, exact visual tokens, all eight distinct families and complex-image exceptions | M2–M5 |
-| `MOT-001`–`008` | Continuous clocks, normative timing/easing, reversal/ownership, page/modal orchestration, sound and reduced motion | M1–M3, M6 |
-| `FLOW-001`–`018` | Every menu/MP flow, HUD, communications, scope/vehicle, cinematic and scripted/world GUI | M2, M4, M5 |
+| `ART-001`–`022` | Measured component/icon libraries, exact visual tokens, panel/plate anatomy, all eight distinct families, complex-image exceptions, device glyphs and modern refinements | M2–M5 |
+| `MOT-001`–`011` | Continuous clocks, normative timing/easing, reversal/ownership, page/modal orchestration, stock choreography, sound, ambient loops/alarms and reduced motion | M1–M6 |
+| `FLOW-001`–`028` | Every menu/MP flow, HUD, communications, scope/vehicle, cinematic and scripted/world GUI; lifecycle, first-run setup, touch controls and editor, terminal input, modern screen patterns, HUD presets and layouts | M2, M4, M5 |
 | `ED-001`–`030` | Native workspace, canvas/constraints, components, vectors, motion/behavior, persistence/recovery, diagnostics and complete SP/MP delivery | M2, M3 |
-| `PERF-001`–`008` | Named optimized baselines, separate CPU/GPU telemetry, warm/cold runs, budgets, long-run plateau and measured optimization | M3, M6 |
-| `QUAL-001`–`009` | Display/text/input/refresh/language/world extremes, independent visual review, actual platforms and evidence provenance | M6 |
+| `PERF-001`–`009` | Named optimized baselines, separate CPU/GPU telemetry, warm/cold runs, budgets, long-run plateau, measured optimization and mobile power limits | M3, M6 |
+| `QUAL-001`–`011` | Display/text/input/refresh/language/world extremes, independent visual review, stock parity, input/profile/device matrix, actual platforms and evidence provenance | M6 |
 | `SHIP-001`–`006` | Complete retained routing, external-mod policy, retail-asset staging, artifact hygiene, dedicated builds and documentation | M1, M6 |
 | `GATE-001`–`007` | The seven milestone exit conditions | M0–M6 |
 | `FINAL-001`–`007` | Each numbered final product audit item | M6 |
@@ -410,8 +443,10 @@ The reusable [register validator](https://github.com/themuffinator/openQ4/blob/e
 compares an increment with its immutable Git baseline. It preserves requirement
 scope, constraints, owners, dependencies and acceptance fields, checks explicit
 pending-to-partial transitions, historical evidence, source hashes and unchanged
-migration records. It never interprets a linked test or image as product
-acceptance. Run the final audit after evidence documents and hashes are frozen:
+migration records. A hash binding matches its file in either line-ending form,
+so LF and CRLF checkouts of one commit audit alike. It never interprets a linked
+test or image as product acceptance. Run the final audit after evidence
+documents and hashes are frozen:
 
 ```powershell
 python tools/ui/validate_product_requirements.py `
@@ -420,9 +455,27 @@ python tools/ui/validate_product_requirements.py `
   --output .tmp/ui/native-output-review/register-validation-final.json
 ```
 
+A register revision is audited separately against its starting commit. The
+`--revision` mode accepts only appended requirements that continue their group's
+ID sequence, use their group's owner and references and start pending or partial
+with existing evidence, plus new supersession records whose successors were
+appended in the same revision and appended audit-finding references. Existing
+rows, evidence scope and results and the migration manifest must be unchanged;
+as in an increment, document hashes may be re-bound:
+
+```powershell
+python tools/ui/validate_product_requirements.py `
+  --baseline a1dd82db255216ef910d5fc3ba0aa422a319df6d `
+  --revision `
+  --output .tmp/ui/register-revision-2/register-validation-final.json
+```
+
 Use a new output path for each audit. The optional `--defer-hashes` preparation
 mode explicitly reports incomplete source bindings and cannot serve as the
-final audit. The native-output strict structural/source audit is recorded at
+final audit. The schema 2 revision audit is recorded at
+`.tmp/ui/register-revision-2/register-validation-final.json`, and the rejected
+candidates of its negative cases are under `.tmp/ui/register-revision-2/negative/`.
+The native-output strict structural/source audit is recorded at
 `.tmp/ui/native-output-review/register-validation-final.json`. The historical
 SYSTEM-exit strict structural/source audit is recorded at
 `.tmp/ui/system-exit-review/register-validation-final.json`. The preparation

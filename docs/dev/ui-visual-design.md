@@ -202,7 +202,7 @@ Use the inverse of the actual composed transform for hit testing.
 | Standard margins | 32 dp horizontally, 24 dp vertically; 16 dp in compact mode |
 | Content maximum | 1440 dp for forms/tables; backgrounds and structural rails stay full bleed |
 | Spacing scale | 2, 4, 8, 12, 16, 24, 32, 48 dp |
-| Minimum interactive height | 36 dp desktop; 44 dp touch presentation |
+| Minimum interactive height | 36 dp desktop; 48 dp touch presentation (section 13) |
 | Compact presentation | Available width below 960 dp or height below 600 dp; keep navigation, scroll bodies |
 | Smallest qualification viewport | 640x480 physical at 100% scale; larger scale settings remain recoverable |
 
@@ -1561,20 +1561,22 @@ Bottom band inner edge (x, y): (0, 70.5), (166.3, 70.5), (176.5, 79.6),
 | Motion | `hover.leave` cubic; `modal.enter` 180 ms with scale; `modal.leave` 120 ms | Linear `hover.leave`; stock modal choreography; stock screen choreography tokens | Stock timelines |
 | Added | — | Measured tokens and family values, composition modes, stock grid, band geometry, HUD geometry, symbol inventory, bitmap classification, stock screen reference | Survey |
 
-The [product requirement register](ui/product-requirements.json) quotes 1.0
-values in ART-004 (panel cuts and inset rail), ART-006 (button height, cut and
-label gap), WID-002 (tick) and WID-004 (slider track and thumb). Its validator
-freezes requirement text, so these rows need a recorded supersession before
-their quoted numbers are used as acceptance criteria. This version's values
-are the visual contract. Quoted values that still hold include ART-005 (panel
-header and 8 dp marker), WID-012 (tooltip timing) and LAY-005 and LAY-007
-(margins and targets). The register's hash binding to this file is re-bound at
-the next requirement audit.
+[Register schema 2](ui/product-requirements.json) records the supersessions
+this version requires: ART-003 (alpha ladder and tokens) by ART-018, ART-004
+(panel cuts and inset rail) by ART-019, ART-006 (button anatomy) by ART-020,
+MOT-003 (motion tokens) by MOT-009, TXT-006 (type ramp) by TXT-010, WID-002
+(tick) by WID-017 and WID-004 (slider track and thumb) by WID-018. It also
+appends REN-014 (additive and darkening composition), WID-023 (cycling values
+and spinners), MOT-010 (screen-change choreography), MOT-011 (ambient loops
+and alarms) and QUAL-010 (stock parity comparison). Quoted values that still
+hold include ART-005 (panel header and 8 dp marker), WID-012 (tooltip timing)
+and LAY-005 (margins).
 
 ### Version 1.2
 
-Version 1.2 adds section 13 and changes no earlier value. Section 3, section 7
-and section 11 gain cross-references and input qualification.
+Version 1.2 adds section 13. Section 3, section 7 and section 11 gain
+cross-references and input qualification, and the touch minimum in section 3
+rises from 44 dp to 48 dp to match the Android touch profiles.
 
 | Addition | Summary |
 | --- | --- |
@@ -1588,8 +1590,7 @@ and section 11 gain cross-references and input qualification.
 | HUD presets and accessibility | Classic, Remastered, Minimal, Competitive and Touch presets; the accessibility baseline |
 | Layouts | Remastered by default; Classic as the stock-parity reconstruction |
 
-The requirement register has no rows for viewing profiles, the prompt bar,
-controller glyph families, the touch gameplay overlay, first-run data setup,
-HUD presets or the Classic layout. Its validator also freezes the row count,
-so adding this scope needs the same register revision as the version 1.1
-supersessions.
+Register schema 2 supersedes LAY-007 with LAY-013 for the 48 dp touch minimum
+and appends LAY-014 to LAY-017, INP-009 to INP-013, WID-019 to WID-022, ART-021,
+ART-022, FLOW-019 to FLOW-028, PERF-009 and QUAL-011 for the section 13 scope.
+The register validator's revision mode audits such appends and supersessions.

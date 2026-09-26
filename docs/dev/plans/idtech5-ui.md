@@ -19,11 +19,10 @@ full normative scope, milestone ownership and acceptance evidence.
 [Visual specification 1.1](../ui-visual-design.md) (26 September 2026) records
 measured stock geometry, palette, type, motion and composition from the
 effective retail GUIs, and corrects plate, panel, checkbox and slider anatomy.
-Register rows ART-004, ART-006, WID-002 and WID-004 quote superseded 1.0 values
-and need a recorded supersession; see the specification's change record.
 Version 1.2 adds the modern interface direction: viewing profiles, adaptive
 layout, controller and touch input, Android lifecycle and first-run setup, and
-a first-party touch gameplay overlay. That scope has no register rows yet.
+a first-party touch gameplay overlay. [Register schema 2](../ui/product-requirements.md)
+records eight supersessions and appends 40 requirements for both versions.
 
 The [17 September implementation audit](../ui/masked-input-review.md) refreshes
 delivery priorities and repairs vector-mask pointer/focus eligibility. The

@@ -65,6 +65,17 @@ declaring that choice proven for the whole product.
 
 ### Current implementation progress
 
+The [26 September register revision](../ui/product-requirements.md) follows
+[visual specification](../ui-visual-design.md) 1.1 and 1.2. Register schema 2
+records eight supersessions and appends 40 requirements for the measured stock
+tokens and the modern direction: viewing profiles and size classes, controller,
+touch and Android support, the prompt bar and detail area, HUD presets and the
+Remastered and Classic layouts. The register now holds 267 rows, of which 259
+define acceptance; the eight superseded rows remain for history. `WID-017` and
+`WID-018` start partial with the evidence their predecessors carry. No
+requirement is accepted, and all 271 migrations and seven final gates remain
+open.
+
 The [17 September audit and masked-input repair](../ui/masked-input-review.md)
 reviews the current branch against M1–M6. It connects canonical mask coverage to
 stacking-order pointer queries, compound controls and wheel routing, and excludes

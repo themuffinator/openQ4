@@ -1,10 +1,10 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "id_namespace": "openq4.ui.product",
-  "date": "2026-09-17",
+  "date": "2026-09-26",
   "status": "Implementation incomplete; this register preserves full product scope and does not accept any production GUI.",
   "baseline": {
-    "engine_revision": "85c011754b800409e5e471b454ac4d658b6f3d00",
+    "engine_revision": "a1dd82db255216ef910d5fc3ba0aa422a319df6d",
     "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
     "effective_gui_count": 271,
     "translated_or_accepted_resources": 0,
@@ -14,17 +14,17 @@
     "visual": {
       "path": "docs/dev/ui-visual-design.md",
       "authority": "normative visual, interaction and editor contract",
-      "sha256": "6b328e2e0e5c937ae9cd3830186682d4f30a43f2e77881c00ed735f841d48348"
+      "sha256": "53d48a9325f5e6e5aa61dd866c393c47434a31a0387b5660142c8768c678af50"
     },
     "product": {
       "path": "docs/dev/plans/ui-product-completion.md",
       "authority": "normative completion scope, milestones and final audit",
-      "sha256": "58a978601d15947621192b3c0a96b36ba83ea3ed473d384bb4aa7660e53b4caf"
+      "sha256": "f1b5efbf0b321866da9c12f4e17e5fc81f20319f246e1305c3801bea0b5206bb"
     },
     "original": {
       "path": "docs/dev/plans/idtech5-ui.md",
       "authority": "original immutable scope and stage gates",
-      "sha256": "7f4e66a7887e1efdfb1ad5fae3bae38f95c830c86b40d0656caf9cb872db312e"
+      "sha256": "8bb2fb76b9d0b8724d5bd5458e618290675442f668839bbf03d138b009e8200a"
     },
     "inventory": {
       "path": "docs/dev/ui/inventory-report.md",
@@ -61,7 +61,8 @@
     "current_evidence": "IDs of scoped foundation/audit evidence; these are not automatically acceptance evidence and must be revalidated when relevant sources change.",
     "acceptance_evidence": "IDs of direct, current evidence accepted for the entire individual requirement; required for verified.",
     "constraints": "Machine-readable exact normative values where practical; preserve source-specific exceptions only with documented source rationale/review.",
-    "remaining": "Explicit unfinished scope/qualification. Missing or stale evidence always prevents completion."
+    "remaining": "Explicit unfinished scope/qualification. Missing or stale evidence always prevents completion.",
+    "supersessions": "Register revisions record replaced requirements here. A superseded row keeps its ID, text, status and evidence for history but no longer defines acceptance; its successors carry the replacement scope. Dependencies and audit-finding references to a superseded row resolve to its successors, and carried_evidence lists the superseded row's current evidence that still applies to a successor."
   },
   "evidence_policy": {
     "per_acceptance_record_required": [
@@ -86,7 +87,8 @@
       "A passing script/checker validates only its stated scope, never complete product quality by implication.",
       "A refreshed denominator follows effective source inventory changes; 271 is the current baseline, not a frozen completion target.",
       "Acceptance requires a current final audit, not the absence of observed failures.",
-      "Every requirement in this register is mandatory for final product acceptance, including those not reached by a particular final-gate dependency path. Intermediate milestone evidence cannot close a broader shared requirement."
+      "Every requirement in this register is mandatory for final product acceptance, including those not reached by a particular final-gate dependency path. Intermediate milestone evidence cannot close a broader shared requirement.",
+      "A requirement recorded in supersessions is replaced by its successors for final acceptance. Register revisions append requirements and supersessions without editing, removing or accepting existing rows."
     ]
   },
   "evidence": {
@@ -100,13 +102,13 @@
       "kind": "source_audit",
       "path": "docs/dev/plans/ui-product-completion.md",
       "scope": "Published audit at 80bb3939; source limitations corroborated by current Document/Runtime inspection. Historical tests and captures are not a fresh product qualification.",
-      "sha256": "58a978601d15947621192b3c0a96b36ba83ea3ed473d384bb4aa7660e53b4caf"
+      "sha256": "f1b5efbf0b321866da9c12f4e17e5fc81f20319f246e1305c3801bea0b5206bb"
     },
     "document-foundation": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/document-format.md",
       "scope": "Typed JSONC, stable IDs, value edits and motion only; components, structure editing and full model unfinished.",
-      "sha256": "caf58e730de9a4be19a9a8387136b43a45d62b5c0d62c9fb8ee50df090bc34cc"
+      "sha256": "74a5e636994e7858b03cf9c2ea2587e60e888601583404bbc324ee1ff5213d73"
     },
     "binding-foundation": {
       "kind": "implementation_checkpoint",
@@ -124,7 +126,7 @@
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/interaction.md",
       "scope": "Button focus/modal/navigation fixtures; authored path/mask-aware interaction and full control set unfinished.",
-      "sha256": "040685874de839d9dfe77bdaedb2373aa4817ba89b35f91031d81ff1263c6e50"
+      "sha256": "87217c6884925f17cdec807f9615450d69d4c96205e6dc794cc26fc44dea5004"
     },
     "vector-foundation": {
       "kind": "implementation_checkpoint",
@@ -148,7 +150,7 @@
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/masks.md",
       "scope": "Canonical editable alpha masks with holes and nesting; transformed overflow/input agreement and full platform/corpus evidence unfinished.",
-      "sha256": "2bb38d6ab4881795e4d30e7807d6df82d81b674411fe3fec6c2dfe63d01e9529"
+      "sha256": "7653f4c9838d9ca661387c7d04d345b51daa32b99dc4695c9bd5f76868fca9c9"
     },
     "instance-foundation": {
       "kind": "implementation_checkpoint",
@@ -212,7 +214,7 @@
     "settings-transaction-foundation": {
       "kind": "qualified_foundation_checkpoint",
       "path": "docs/dev/ui/system-settings-contract.md",
-      "sha256": "5d8cf9945a31b9e9b4637a4926b4a6450a7ff2dfee1006caabfff043d88bf75b",
+      "sha256": "f6b7a92b1c79d54d03a30bbe714fe8d0a27285739d333e3ad4f53babc1ed4de8",
       "baseline_engine_revision": "15e35beaf11a1f1942ba25e9431211f64c1ef7f1",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "local_capture_summary": ".tmp/ui/settings-review/capture-evidence.json",
@@ -290,7 +292,7 @@
     "numeric-fields": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/numeric-fields.md",
-      "sha256": "af8ff68dd153b92d292da15755cb63219465386ee9f6596fde500642d240bb65",
+      "sha256": "ac2bb793379c72fc66a387f370b6fa0d1a9c2f590695032848d5ebe50e735180",
       "baseline_engine_revision": "17b106daa1827d6e50c786f99ea5970b1e8b91cf",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "scope": "Canonical Number role with exact decimal proposals, local invalid/conflicting drafts, explicit conflict decisions, bounded undo/redo and inactive snapshot restoration. Font drawing and numeric geometry share bounded immutable unshaped scalar runs; authored selection/caret/preedit ink uses actual Rml line placement and scroll. Current host readbacks guard edits, numeric dispatch and success acknowledgement. Final Windows build and21 retained-UI suites pass. Hidden windowed SP/OpenGL125% and MP/Vulkan200% managed diagnostic fixtures after gameplay qualify the recorded semantic/rendered subset; ordinary SYSTEM regression preserves tested native UI pixels. Event-journal decoding/ownership checks retain historical native layout. No native field keyboard/clipboard/IME route, full shaping/grapheme/bidi, production precise-entry integration, editor, screen/migration or product acceptance.",
@@ -323,7 +325,7 @@
       "baseline_engine_revision": "a20fd8dde759b0f056b3f0ba438af803a272350b",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "scope": "Paired precise SYSTEM brightness fields, localized validation and checked clipboard commands; complete local draft barriers guard Apply, Defaults, colliding edits and exit. Completed cancellation precedes local Discard; Keep Editing refreshes real projected layout before resuming the field. Windows build and 32 UI suites pass, including real-Rml modal focus and growing-validation scroll regressions. SP/OpenGL at 125% and MP/Vulkan at 200% each reach gameplay, then pass 37 semantic operations with 17 reviewed engine images; notices, safe draft continuation, Apply, Discard and reopen are covered within this subset. Generated slider tick noise and very small ambient CVar readback remain open precision defects. SDL checked consumption and owned event collections plus portable multi-offer composition reconciliation are implemented; native activation remains disabled. No native character/IME, full international text, complete page/editor, platform, migration or product acceptance.",
-      "sha256": "af8ff68dd153b92d292da15755cb63219465386ee9f6596fde500642d240bb65",
+      "sha256": "ac2bb793379c72fc66a387f370b6fa0d1a9c2f590695032848d5ebe50e735180",
       "local_capture_summary": ".tmp/ui/native-editing-integration/validation-evidence.json",
       "local_capture_summary_sha256": "42a470e87f6fc1e0014c62a21cc4bb7fd4c313a697f9e5f86833420f1ab4e5f3"
     },
@@ -335,7 +337,7 @@
       "scope": "SYSTEM authored slider ticks retain clean decimal text and fixed CVar serialization preserves tested small and custom values. Windows build and 36 UI suites pass; SP/OpenGL 125% and MP/Vulkan 200% each pass 38 semantic operations with 12 reviewed engine images after gameplay. Actual Runtime/Rml owns complete native Number presentation, directed selection and all composition ranges while preserving stable local history; checked preparation precedes native synchronization and allocation-free local publication. Windows SDK collection scopes and copied SDL hooks admit exact callbacks, while the portable coordinator reconciles owned FIFO offers. Live managed/provider/Session integration remains pending and native activation is disabled. Focus reveal spacing, exact persistent recovery, actual native IME, full page/editor/platform/migration and product qualification remain open.",
       "local_capture_summary": ".tmp/ui/native-field-binding-integration/validation-evidence.json",
       "local_capture_summary_sha256": "60fcd7fdb106e2ce6c0fa27372e09a8a48ba93c06cba59a629d4fa6330582720",
-      "sha256": "af8ff68dd153b92d292da15755cb63219465386ee9f6596fde500642d240bb65"
+      "sha256": "ac2bb793379c72fc66a387f370b6fa0d1a9c2f590695032848d5ebe50e735180"
     },
     "native-managed-bridge": {
       "kind": "implementation_checkpoint",
@@ -346,7 +348,7 @@
       "qualification_status": "bounded_checkpoint_qualified",
       "local_capture_summary": ".tmp/ui/native-managed-bridge-integration/validation-evidence.json",
       "local_capture_summary_sha256": "bf2732fa8c57a7947b73af55ccc525d3856220080badd6eab1b0e1039b9f8573",
-      "sha256": "af8ff68dd153b92d292da15755cb63219465386ee9f6596fde500642d240bb65"
+      "sha256": "ac2bb793379c72fc66a387f370b6fa0d1a9c2f590695032848d5ebe50e735180"
     },
     "performance-preset-drafts": {
       "kind": "implementation_checkpoint",
@@ -902,7 +904,9 @@
       "WID-016",
       "INP-005",
       "TXT-007",
-      "TXT-008"
+      "TXT-008",
+      "WID-017",
+      "WID-018"
     ],
     "UI-04": [
       "RUN-003",
@@ -935,7 +939,8 @@
       "TXT-005",
       "TXT-006",
       "TXT-007",
-      "TXT-008"
+      "TXT-008",
+      "TXT-010"
     ],
     "UI-07": [
       "PERF-001",
@@ -957,7 +962,8 @@
       "INP-007",
       "REN-008",
       "REN-009",
-      "LAY-007"
+      "LAY-007",
+      "LAY-013"
     ],
     "UI-10": [
       "DOC-003",
@@ -985,7 +991,10 @@
       "ART-017",
       "RES-001",
       "RES-002",
-      "RES-003"
+      "RES-003",
+      "ART-018",
+      "ART-019",
+      "ART-020"
     ],
     "UI-12": [
       "LAY-003",
@@ -996,6 +1005,105 @@
       "SAVE-003"
     ]
   },
+  "supersessions": [
+    {
+      "superseded": "ART-003",
+      "successors": [
+        "ART-018"
+      ],
+      "normative_change": "Visual 1.1 section 4 replaces the 1.0 plate, rail, header-wash and separator alpha constraints with the measured stock ladder and adds the measured Marine tokens.",
+      "source_refs": [
+        "visual:4"
+      ],
+      "carried_evidence": []
+    },
+    {
+      "superseded": "ART-004",
+      "successors": [
+        "ART-019"
+      ],
+      "normative_change": "Visual 1.1 section 6 replaces equal 12/8 dp panel cuts, the 3 dp inset rail and 16-24 dp band cuts with measured card, modal and band constructions.",
+      "source_refs": [
+        "visual:6"
+      ],
+      "carried_evidence": []
+    },
+    {
+      "superseded": "ART-006",
+      "successors": [
+        "ART-020"
+      ],
+      "normative_change": "Visual 1.1 section 6 replaces the 40 dp button, 12 dp cut and 8 dp label gap with measured open-plate proportions.",
+      "source_refs": [
+        "visual:6"
+      ],
+      "carried_evidence": []
+    },
+    {
+      "superseded": "MOT-003",
+      "successors": [
+        "MOT-009"
+      ],
+      "normative_change": "Visual 1.1 section 8 makes hover.leave linear, replaces the 180/120 ms scaled modal tokens with the stock light-up choreography and adds the stock screen-change tokens.",
+      "source_refs": [
+        "visual:8"
+      ],
+      "carried_evidence": []
+    },
+    {
+      "superseded": "TXT-006",
+      "successors": [
+        "TXT-010"
+      ],
+      "normative_change": "Visual 1.1 section 5 replaces the 1.0 type sizes with the stock-derived ramp and defines tracking, case and alignment.",
+      "source_refs": [
+        "visual:5"
+      ],
+      "carried_evidence": []
+    },
+    {
+      "superseded": "WID-002",
+      "successors": [
+        "WID-017"
+      ],
+      "normative_change": "Visual 1.1 section 7 replaces the cut outline and vector tick with the stock square outline and inset filled square.",
+      "source_refs": [
+        "visual:7"
+      ],
+      "carried_evidence": [
+        "value-controls-foundation"
+      ]
+    },
+    {
+      "superseded": "WID-004",
+      "successors": [
+        "WID-018"
+      ],
+      "normative_change": "Visual 1.1 section 7 replaces the recessed track and cut thumb with the stock tick ramp and bar thumb.",
+      "source_refs": [
+        "visual:7"
+      ],
+      "carried_evidence": [
+        "value-controls-foundation",
+        "text-entry-foundation",
+        "numeric-fields",
+        "text-command-routing",
+        "system-compact-opening"
+      ]
+    },
+    {
+      "superseded": "LAY-007",
+      "successors": [
+        "LAY-013"
+      ],
+      "normative_change": "Visual 1.2 raises the touch minimum from 44 dp to 48 dp and adds touch spacing and Couch row minimums.",
+      "source_refs": [
+        "visual:3",
+        "visual:13"
+      ],
+      "carried_evidence": []
+    }
+  ],
   "requirements": [
     {
       "id": "GOV-001",
@@ -7459,6 +7567,1631 @@
       ],
       "acceptance_evidence_needed": [
         "Final independent requirement-by-requirement audit of current authoritative files, binaries, packages, runtime/editor operations, images and verified remote revisions. Intent or narrow green checks do not establish acceptance."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required."
+    },
+    {
+      "id": "LAY-013",
+      "title": "Target sizes by input and profile",
+      "milestone_owner": "M3",
+      "implementation_owner": "Retained layout and UI design",
+      "source_refs": [
+        "visual:3",
+        "visual:5",
+        "visual:9",
+        "product:2 UI-12",
+        "product:3 Text, controls and accessibility",
+        "product:5 Visual and interaction qualification",
+        "visual:13"
+      ],
+      "requirement": "Interactive targets are at least 36 dp for desktop pointers and 48 dp for touch, with 8 dp between touch targets and 44 dp rows in the Couch profile; authored hit shapes or rectangular extensions supply the size, and press animation never moves the target.",
+      "dependencies": [
+        "INP-007",
+        "LAY-014"
+      ],
+      "acceptance_evidence_needed": [
+        "Measured target bounds and hit tests per widget, input mode and viewing profile, including corner decorations and adjacent targets."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required.",
+      "constraints": {
+        "desktop_min_height_dp": 36,
+        "touch_min_dp": 48,
+        "touch_min_spacing_dp": 8,
+        "couch_row_min_dp": 44
+      }
+    },
+    {
+      "id": "LAY-014",
+      "title": "Viewing profiles",
+      "milestone_owner": "M3",
+      "implementation_owner": "Retained layout and UI design",
+      "source_refs": [
+        "visual:3",
+        "visual:5",
+        "visual:9",
+        "product:2 UI-12",
+        "product:3 Text, controls and accessibility",
+        "product:5 Visual and interaction qualification",
+        "visual:13"
+      ],
+      "requirement": "Provide Desk, Couch, Handheld, Phone and Tablet viewing profiles chosen at startup from com_platformProfile, host signals and the display and changeable in Interface settings. Each sets UI and text scale, target size and presentation defaults that player choices override; Android uses native density-independent pixels and starts text size from the system font scale, and Couch offers a calibrated 0-5% screen-edge inset.",
+      "dependencies": [
+        "LAY-002",
+        "LAY-003",
+        "LAY-004"
+      ],
+      "acceptance_evidence_needed": [
+        "Profile selection and override readback on desktop, Steam Deck, television and Android hosts, with measured default scales and body-text visual angle."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required.",
+      "constraints": {
+        "profiles": {
+          "desk": {
+            "ui_percent": 100,
+            "text_percent": 100,
+            "min_target_dp": 36
+          },
+          "couch": {
+            "ui_percent": 150,
+            "text_percent": 125,
+            "row_min_dp": 44
+          },
+          "handheld": {
+            "ui_percent": 125,
+            "text_percent": 100,
+            "touch_target_dp": 48
+          },
+          "phone": {
+            "ui_percent": 100,
+            "text_percent": 100,
+            "touch_target_dp": 48,
+            "density": "platform"
+          },
+          "tablet": {
+            "ui_percent": 100,
+            "text_percent": 100,
+            "touch_target_dp": 48,
+            "density": "platform"
+          }
+        },
+        "couch_edge_inset_percent": [
+          0,
+          5
+        ],
+        "body_em_visual_angle_arcmin": [
+          22,
+          31
+        ]
+      }
+    },
+    {
+      "id": "LAY-015",
+      "title": "Size classes and adaptive structure",
+      "milestone_owner": "M3",
+      "implementation_owner": "Retained layout and UI design",
+      "source_refs": [
+        "visual:3",
+        "visual:5",
+        "visual:9",
+        "product:2 UI-12",
+        "product:3 Text, controls and accessibility",
+        "product:5 Visual and interaction qualification",
+        "visual:13"
+      ],
+      "requirement": "Evaluate compact-height (below 600 dp tall and at least 720 dp wide), compact-width (below 960 dp), regular (960-1439 dp) and expanded (1440 dp and wider) classes on the safe area and apply their navigation, content and detail structures. Compact-height bands stay within 40 dp and 56 dp, and touch profiles reflow within a 640x360 dp minimum instead of reducing density to reach 640x480 dp.",
+      "dependencies": [
+        "LAY-006",
+        "LAY-014"
+      ],
+      "acceptance_evidence_needed": [
+        "Class transitions across window sizes, phone, tablet and handheld metrics and text scales with reachable navigation and actions and preserved state."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required.",
+      "constraints": {
+        "compact_height_below_dp": 600,
+        "compact_height_min_width_dp": 720,
+        "detail_column_min_width_dp": 840,
+        "compact_width_below_dp": 960,
+        "expanded_from_dp": 1440,
+        "compact_top_band_max_dp": 40,
+        "compact_bottom_band_max_dp": 56,
+        "touch_minimum_area_dp": [
+          640,
+          360
+        ]
+      }
+    },
+    {
+      "id": "LAY-016",
+      "title": "Safe areas and gesture margins",
+      "milestone_owner": "M3",
+      "implementation_owner": "Retained layout and UI design",
+      "source_refs": [
+        "visual:3",
+        "visual:5",
+        "visual:9",
+        "product:2 UI-12",
+        "product:3 Text, controls and accessibility",
+        "product:5 Visual and interaction qualification",
+        "visual:13"
+      ],
+      "requirement": "Keep essential content, text and targets inside the platform window safe area while bands, backdrop and imagery extend full-bleed under cutouts, rounded corners and system bars; swipe-driven controls keep 24 dp from screen edges, and folding, multi-window and orientation changes resize with state preserved.",
+      "dependencies": [
+        "LAY-002",
+        "LAY-015"
+      ],
+      "acceptance_evidence_needed": [
+        "Cutout, rounded-corner, gesture-navigation, fold and multi-window cases on physical Android devices plus desktop resize equivalents."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required.",
+      "constraints": {
+        "swipe_edge_margin_dp": 24
+      }
+    },
+    {
+      "id": "LAY-017",
+      "title": "Modern accessibility baseline",
+      "milestone_owner": "M4",
+      "implementation_owner": "Retained layout and UI design",
+      "source_refs": [
+        "visual:3",
+        "visual:5",
+        "visual:9",
+        "product:2 UI-12",
+        "product:3 Text, controls and accessibility",
+        "product:5 Visual and interaction qualification",
+        "visual:13"
+      ],
+      "requirement": "Remap every action for keyboard and mouse, controller and touch; offer hold or toggle for crouch and zoom; provide subtitle size, background and speaker options, UI scale, text size, high contrast and text backing in Interface settings, reduced flashing and camera shake where the game provides them, color-vision team and item palettes, a separate interface volume and mono audio. Menus have no timeouts except the display confirmation, which accepts Keep from any input device.",
+      "dependencies": [
+        "LAY-012",
+        "TXT-009",
+        "INP-011",
+        "MOT-005"
+      ],
+      "acceptance_evidence_needed": [
+        "Setting readback and gameplay effect for each option on every supported input device, with non-color team identification review."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required."
+    },
+    {
+      "id": "TXT-010",
+      "title": "Stock-derived type ramp and tracking",
+      "milestone_owner": "M3",
+      "implementation_owner": "Retained font/text and platform accessibility",
+      "source_refs": [
+        "visual:5",
+        "product:2 UI-06",
+        "product:3 Text, controls and accessibility"
+      ],
+      "requirement": "Apply the visual 1.1 type ramp with a 13 dp floor for essential text: screen title 18/22 dp at 50% white, primary and section navigation 24/28 and 22/26, actions and modal titles 20/24, action rows 19/23, secondary links 16/20, rows and body 17/21 (17/22 wrapped), lists 16/20, headings 14/18, metadata and tabular detail 13/16, loading 26/30 and 29/34. Use face spacing by default with the listed em tightening, upper-case navigation strings, leading-aligned labels and metric-based vertical alignment; HUD metrics remain source-derived.",
+      "dependencies": [
+        "TXT-002"
+      ],
+      "acceptance_evidence_needed": [
+        "Component type gallery with baseline and cap-height measurements against the stock textscale conversion, matrix review and localization cases."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required.",
+      "constraints": {
+        "em_dp_per_textscale": 72,
+        "ramp_dp": {
+          "screen_title": [
+            18,
+            22
+          ],
+          "primary_navigation": [
+            24,
+            28
+          ],
+          "section_navigation": [
+            22,
+            26
+          ],
+          "action_and_modal_title": [
+            20,
+            24
+          ],
+          "action_row": [
+            19,
+            23
+          ],
+          "secondary_link": [
+            16,
+            20
+          ],
+          "row_label_value_body": [
+            17,
+            21
+          ],
+          "wrapped_body": [
+            17,
+            22
+          ],
+          "list_row": [
+            16,
+            20
+          ],
+          "section_heading": [
+            14,
+            18
+          ],
+          "column_heading_metadata": [
+            13,
+            16
+          ],
+          "tabular_detail": [
+            13,
+            16
+          ],
+          "loading_level_name": [
+            26,
+            30
+          ],
+          "loading_status": [
+            29,
+            34
+          ]
+        },
+        "screen_title_alpha": 0.5,
+        "heading_alpha": 0.4,
+        "essential_text_min_dp": 13,
+        "cap_height_per_em": {
+          "marine": 0.5,
+          "lowpixel": 0.75,
+          "chain": 0.63,
+          "profont": 0.75,
+          "r_strogg": 0.67
+        },
+        "tracking_em": {
+          "default": 0,
+          "modal_title": -0.075,
+          "dense_lowpixel": -0.1,
+          "loading_level_name": -0.1
+        }
+      }
+    },
+    {
+      "id": "INP-009",
+      "title": "Input modality switching",
+      "milestone_owner": "M3",
+      "implementation_owner": "Semantic input and SDL platform integration",
+      "source_refs": [
+        "visual:3",
+        "visual:7",
+        "product:2 UI-09",
+        "product:3 Text, controls and accessibility",
+        "original:Input and application ownership",
+        "visual:13"
+      ],
+      "requirement": "The most recent input device selects the presentation: pointer hover, controller and keyboard focus with prompts, or touch press feedback. Switching is immediate, never moves focus or drops an edit, and pointer movement shows hover without clearing controller focus.",
+      "dependencies": [
+        "INP-001",
+        "INP-006"
+      ],
+      "acceptance_evidence_needed": [
+        "Mid-screen device switching across mouse, keyboard, controller and touch on every production screen type, with focus and edit preservation."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required."
+    },
+    {
+      "id": "INP-010",
+      "title": "Focus memory and navigation wrapping",
+      "milestone_owner": "M3",
+      "implementation_owner": "Semantic input and SDL platform integration",
+      "source_refs": [
+        "visual:3",
+        "visual:7",
+        "product:2 UI-09",
+        "product:3 Text, controls and accessibility",
+        "original:Input and application ownership",
+        "visual:13"
+      ],
+      "requirement": "Initial focus goes to the primary action or the last focused control; each container remembers its focus and modals return it to the invoker; spatial navigation uses authored overrides where geometry misleads; menus of up to seven items and tab strips wrap, and scrolling lists do not.",
+      "dependencies": [
+        "INP-006",
+        "INP-009"
+      ],
+      "acceptance_evidence_needed": [
+        "Navigation traces through menus, lists, tabs and modals including re-entry and restoration."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required.",
+      "constraints": {
+        "wrap_max_items": 7
+      }
+    },
+    {
+      "id": "INP-011",
+      "title": "Controller mapping and prompt glyphs",
+      "milestone_owner": "M3",
+      "implementation_owner": "Semantic input and SDL platform integration",
+      "source_refs": [
+        "visual:3",
+        "visual:7",
+        "product:2 UI-09",
+        "product:3 Text, controls and accessibility",
+        "original:Input and application ownership",
+        "visual:13"
+      ],
+      "requirement": "Map menu actions to positions: south accept, east back, west secondary, north tertiary, bumpers tabs, triggers paging and coarse steps, D-pad and left stick focus and values, right stick detail scrolling, Menu pause, Apply or resume, and View scoreboard or details. Draw SDL's printed labels, default Nintendo layouts to east confirm with a Swap Confirm and Back setting, select Xbox, PlayStation, Nintendo, Steam Deck or generic glyphs from the reported controller or the steamdeck profile, offer a Prompt Style override, and never require paddles or extra buttons in menus.",
+      "dependencies": [
+        "INP-001",
+        "INP-003",
+        "ART-021"
+      ],
+      "acceptance_evidence_needed": [
+        "Per-family controller runs covering every mapped action, glyph selection, confirm conventions and override readback, including Steam Input remapping."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required.",
+      "constraints": {
+        "south": "accept",
+        "east": "back",
+        "west": "secondary",
+        "north": "tertiary",
+        "bumpers": "tabs",
+        "triggers": "paging_and_coarse_steps",
+        "right_stick": "detail_scroll",
+        "menu": "pause_apply_resume",
+        "view": "scoreboard_or_details",
+        "glyph_families": [
+          "xbox",
+          "playstation",
+          "nintendo",
+          "steam_deck",
+          "generic"
+        ]
+      }
+    },
+    {
+      "id": "INP-012",
+      "title": "Controller editing, text entry and feedback",
+      "milestone_owner": "M3",
+      "implementation_owner": "Semantic input and SDL platform integration",
+      "source_refs": [
+        "visual:3",
+        "visual:7",
+        "product:2 UI-09",
+        "product:3 Text, controls and accessibility",
+        "original:Input and application ownership",
+        "visual:13"
+      ],
+      "requirement": "Left and right step cycling values and sliders; Accept opens lists of more than seven choices and exact numeric entry; triggers jump ten slider steps. Binding capture starts on Accept and holding Back for one second cancels so Back can be bound. Text uses the platform keyboard or openQ4's vector keyboard with fields scrolled clear. Rumble marks only slider limits, refusals and errors under the rumble settings; a controller disconnect pauses single player behind a reconnect prompt and a low battery raises a notice.",
+      "dependencies": [
+        "INP-011",
+        "WID-006",
+        "WID-007",
+        "WID-018",
+        "WID-022"
+      ],
+      "acceptance_evidence_needed": [
+        "Controller-only editing of every value control type, text entry with platform and vector keyboards, binding capture including Back, rumble on and off, disconnect and battery cases."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required.",
+      "constraints": {
+        "list_open_above_choices": 7,
+        "coarse_slider_steps": 10,
+        "binding_cancel_hold_ms": 1000
+      }
+    },
+    {
+      "id": "INP-013",
+      "title": "Touch interaction rules",
+      "milestone_owner": "M3",
+      "implementation_owner": "Semantic input and SDL platform integration",
+      "source_refs": [
+        "visual:3",
+        "visual:7",
+        "product:2 UI-09",
+        "product:3 Text, controls and accessibility",
+        "original:Input and application ownership",
+        "visual:13"
+      ],
+      "requirement": "Touch-down shows the focus and hover treatment and press inset at once; moving beyond 8 dp or lifting outside cancels and activation happens on release; a 500 ms long-press opens details; lists scroll with inertia and an edge rim light; tab strips swipe; nothing depends on hover; the input method scrolls fields clear; system Back acts as Back and opens pause in play; menus follow one touch at a time while the gameplay overlay tracks each finger; press haptics follow the system setting; play is landscape-only.",
+      "dependencies": [
+        "INP-001",
+        "INP-002",
+        "INP-005",
+        "INP-007",
+        "LAY-013"
+      ],
+      "acceptance_evidence_needed": [
+        "Physical-device touch traces for tap, cancel, long-press, scroll, swipe, input method, system Back and multi-touch on phone and tablet."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required.",
+      "constraints": {
+        "cancel_slop_dp": 8,
+        "long_press_ms": 500
+      }
+    },
+    {
+      "id": "WID-017",
+      "title": "Checkbox and exclusive box",
+      "milestone_owner": "M2",
+      "implementation_owner": "UI components and application bindings",
+      "source_refs": [
+        "visual:7",
+        "product:2 UI-03",
+        "product:3 Text, controls and accessibility",
+        "product:4 M3"
+      ],
+      "requirement": "Shared label/box target with the stock square outline (stroke 1/16 of the box) and an inset filled square (69% of the box) for set and an inset bar for mixed; checked, unchecked and mixed states and validated value binding; exclusive pairs use the same box as a radio, and settings booleans present as cycling values.",
+      "dependencies": [
+        "DOC-003",
+        "DOC-006",
+        "INP-008"
+      ],
+      "acceptance_evidence_needed": [
+        "Real value/action and state-gallery evidence for keyboard, pointer, gamepad and supported touch/text entry; include disabled, busy, invalid, cancel and focus cases as applicable. All named behavior must work through production routing."
+      ],
+      "status": "partial",
+      "current_evidence": [
+        "value-controls-foundation"
+      ],
+      "acceptance_evidence": [],
+      "remaining": "Canonical toggles bind authoritative Boolean/mixed expressions and emit typed proposals (the value-controls foundation); the authored SYSTEM control still draws the 1.0 cut outline and vector tick and must adopt the stock square outline and inset fill. Qualify every state and supported physical-device path through production routing and complete the reusable component/state gallery and artwork/accessibility acceptance.",
+      "constraints": {
+        "stroke_fraction": 0.0625,
+        "set_inset_fraction": 0.69,
+        "stock_box_dp": 18
+      }
+    },
+    {
+      "id": "WID-018",
+      "title": "Tick-ramp slider",
+      "milestone_owner": "M2",
+      "implementation_owner": "UI components and application bindings",
+      "source_refs": [
+        "visual:7",
+        "product:2 UI-03",
+        "product:3 Text, controls and accessibility",
+        "product:4 M3"
+      ],
+      "requirement": "Stock tick-ramp track with the filled span shown by dimming ticks past the thumb to 40%, a bar thumb and a numeric value in marine.value; drag, keyboard and controller increments, precise numeric entry and draft/apply semantics.",
+      "dependencies": [
+        "DOC-003",
+        "TXT-007",
+        "DOC-007"
+      ],
+      "acceptance_evidence_needed": [
+        "Real value/action and state-gallery evidence for keyboard, pointer, gamepad and supported touch/text entry; include disabled, busy, invalid, cancel and focus cases as applicable. All named behavior must work through production routing."
+      ],
+      "status": "partial",
+      "current_evidence": [
+        "value-controls-foundation",
+        "text-entry-foundation",
+        "numeric-fields",
+        "text-command-routing",
+        "system-compact-opening"
+      ],
+      "acceptance_evidence": [],
+      "remaining": "Canonical stepped sliders, drag previews, keyboard steps and exact numeric fields from the cited foundations carry over; the authored recessed track, fill and cut thumb must become the stock tick ramp and bar thumb. Precise-entry pairing with its caret, selection, clipboard and input-method path, interrupted binding/animation ownership, reusable artwork and all state and device production cases remain required.",
+      "constraints": {
+        "unfilled_tick_alpha": 0.4
+      }
+    },
+    {
+      "id": "WID-019",
+      "title": "Prompt bar",
+      "milestone_owner": "M2",
+      "implementation_owner": "UI components and application bindings",
+      "source_refs": [
+        "visual:7",
+        "product:2 UI-03",
+        "product:3 Text, controls and accessibility",
+        "product:4 M3",
+        "visual:13"
+      ],
+      "requirement": "Show the focused control's available actions as device glyph plus verb in the bottom band's raised trailing section: Back trailing in the stock Back position, the primary action beside it and contextual actions leading. Update in the focus frame, hide unavailable actions, show at most five with further actions behind More, and render controller glyphs, keycaps, clickable plates or 48 dp touch plates for the active device.",
+      "dependencies": [
+        "INP-009",
+        "INP-011",
+        "ART-021",
+        "WID-001"
+      ],
+      "acceptance_evidence_needed": [
+        "Prompt state gallery across devices and screens with same-frame updates, activation through prompts and localized verbs."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required.",
+      "constraints": {
+        "max_prompts": 5,
+        "touch_plate_dp": 48
+      }
+    },
+    {
+      "id": "WID-020",
+      "title": "Detail area",
+      "milestone_owner": "M3",
+      "implementation_owner": "UI components and application bindings",
+      "source_refs": [
+        "visual:7",
+        "product:2 UI-03",
+        "product:3 Text, controls and accessibility",
+        "product:4 M3",
+        "visual:13"
+      ],
+      "requirement": "Every setting, list row and action can show its description, current and default values, consequences, preview and refusal reason; expanded layouts dock it at the trailing edge as a card, regular layouts place it under the content and compact layouts expand it in place, and it replaces hover cards and tooltips for controller and touch users.",
+      "dependencies": [
+        "WID-012",
+        "LAY-015"
+      ],
+      "acceptance_evidence_needed": [
+        "Detail content and placement across size classes and devices on settings, lists and Match Control."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required."
+    },
+    {
+      "id": "WID-021",
+      "title": "Radial selection wheel",
+      "milestone_owner": "M5",
+      "implementation_owner": "UI components and application bindings",
+      "source_refs": [
+        "visual:7",
+        "product:2 UI-03",
+        "product:3 Text, controls and accessibility",
+        "product:4 M3",
+        "visual:13"
+      ],
+      "requirement": "A held-button radial wheel of cut segments in the HUD family shows owned weapons' icons and ammunition, dims unavailable weapons, fills and orange-marks the selection and names it at the center; either stick selects, release equips, a tap swaps to the previous weapon and gameplay continues. The same component provides localized multiplayer quick chat.",
+      "dependencies": [
+        "INP-011",
+        "INP-013",
+        "ART-009"
+      ],
+      "acceptance_evidence_needed": [
+        "Gameplay traces for weapon and chat wheels on controller and touch with correct equip and send results and no simulation pause."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required."
+    },
+    {
+      "id": "WID-022",
+      "title": "Vector on-screen keyboard",
+      "milestone_owner": "M3",
+      "implementation_owner": "UI components and application bindings",
+      "source_refs": [
+        "visual:7",
+        "product:2 UI-03",
+        "product:3 Text, controls and accessibility",
+        "product:4 M3",
+        "visual:13"
+      ],
+      "requirement": "Where no platform keyboard exists, provide a Marine-styled key grid with the current language's layout and accented characters: the D-pad or left stick moves, south types, west deletes, north adds a space, the bumpers move the caret and Menu finishes, preserving UTF-8 text and composition.",
+      "dependencies": [
+        "WID-006",
+        "INP-011",
+        "TXT-005"
+      ],
+      "acceptance_evidence_needed": [
+        "Controller-only text entry in each supported language on hosts without a platform keyboard."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required."
+    },
+    {
+      "id": "WID-023",
+      "title": "Cycling values and filter spinners",
+      "milestone_owner": "M2",
+      "implementation_owner": "UI components and application bindings",
+      "source_refs": [
+        "visual:7",
+        "product:2 UI-03",
+        "product:3 Text, controls and accessibility",
+        "product:4 M3"
+      ],
+      "requirement": "Present booleans and enumerations as values in the value column that cycle forward on activation and back on the secondary action, and filter values between previous and next arrows on dark squares, with focus, draft and readback semantics shared with the other value controls.",
+      "dependencies": [
+        "WID-005",
+        "DOC-003"
+      ],
+      "acceptance_evidence_needed": [
+        "Real value/action and state-gallery evidence for keyboard, pointer, gamepad and supported touch/text entry; include disabled, busy, invalid, cancel and focus cases as applicable. All named behavior must work through production routing."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required."
+    },
+    {
+      "id": "REN-014",
+      "title": "Additive and darkening composition",
+      "milestone_owner": "M3",
+      "implementation_owner": "Vector compiler and renderer adapters",
+      "source_refs": [
+        "visual:4",
+        "visual:6",
+        "product:2 UI-07",
+        "product:2 UI-08",
+        "product:3 Visual quality and motion",
+        "original:Stage 3"
+      ],
+      "requirement": "Provide additive and darkening (destination multiplied by the inverse source color) composition per primitive or layer on OpenGL, Vulkan and GLES; group opacity scales a layer's contribution without changing its blend equation, and light layers are never baked into opaque color.",
+      "dependencies": [
+        "REN-005",
+        "REN-006",
+        "REN-013"
+      ],
+      "acceptance_evidence_needed": [
+        "Backend parity captures of additive light bands, darkening emblems and nested group fades against reference compositions."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required."
+    },
+    {
+      "id": "ART-018",
+      "title": "Measured Marine tokens and state alpha",
+      "milestone_owner": "M2",
+      "implementation_owner": "UI art and design review",
+      "source_refs": [
+        "visual:2",
+        "visual:4",
+        "visual:6",
+        "visual:12",
+        "product:3 Visual quality and motion",
+        "original:Stage 6"
+      ],
+      "requirement": "Use the visual 1.1 Marine, surface, text, status and measured tokens with the stock alpha ladder: plates 0.40 at rest, 0.80 or 1.00 on hover or focus and 1.00 for the current page; markers 0.40, orange at 1.00 with the label; labels 0.80 white; titles 0.50; headings 0.40; cards 0.94; modal frames 0.70 over a 0.94 scrim; bands 1.00, or 0.40 in the in-game menu; table header bands 0.60. The join-card 0.62, 0.28 and 0.16 values are limited to in-game partial panels, and status colors keep icon, explanation and non-color cues.",
+      "dependencies": [
+        "ART-001",
+        "REN-005",
+        "REN-014"
+      ],
+      "acceptance_evidence_needed": [
+        "Token source comparison against the survey values plus composited contrast and all-state gallery review."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required.",
+      "constraints": {
+        "marine.olive": "#8B964B",
+        "marine.marker": "#909A49",
+        "marine.orange": "#E38900",
+        "marine.value": {
+          "color": "#FFBE23",
+          "alpha": 0.8
+        },
+        "marine.rail.dark": "#CCCC51",
+        "marine.rail.card": "#A0A040",
+        "marine.rim": {
+          "color": "#626934",
+          "alpha": [
+            0.36,
+            0
+          ]
+        },
+        "marine.glow": {
+          "color": "#616F26",
+          "applied_alpha": 0.7
+        },
+        "marine.glow.modal": "#46501B",
+        "marine.list": {
+          "color": "#FF9C00",
+          "hover_alpha": 0.16,
+          "selection_alpha": 0.42,
+          "rule_alpha": 0.5
+        },
+        "marine.list.alt": {
+          "color": "#9A9C6E",
+          "alpha": 0.29
+        },
+        "marine.check": "#586A08",
+        "marine.sort": "#9BA545",
+        "marine.plinth": {
+          "color": "#3E4A21",
+          "alpha": 0.3
+        },
+        "marine.progress": {
+          "color": "#E06C00",
+          "track_alpha": 0.3,
+          "fill_alpha": 0.5
+        },
+        "marine.scrim": {
+          "color": "#000000",
+          "alpha": 0.94
+        },
+        "surface.panel": {
+          "color": "#171C12",
+          "alpha": 0.88
+        },
+        "surface.inset": {
+          "color": "#090C08",
+          "alpha": 0.9
+        },
+        "text.primary": {
+          "color": "#FFFFFF",
+          "alpha": 0.8
+        },
+        "text.title": {
+          "color": "#FFFFFF",
+          "alpha": 0.5
+        },
+        "text.heading": {
+          "color": "#FFFFFF",
+          "alpha": 0.4
+        },
+        "text.secondary": "#B8C29E",
+        "text.tertiary": "#8C947A",
+        "text.disabled": {
+          "color": "#FFFFFF",
+          "alpha": 0.4
+        },
+        "status.warning": "#E3AD36",
+        "status.error": "#E46D56",
+        "status.success": "#B5C784",
+        "plate_alpha": {
+          "rest": 0.4,
+          "hover_primary_navigation_and_action": 0.8,
+          "hover_section_navigation_and_value_row": 1.0,
+          "current_page": 1.0
+        },
+        "marker_alpha": [
+          0.4,
+          1.0
+        ],
+        "separator_alpha": {
+          "menu_olive": [
+            0.26,
+            0.32
+          ],
+          "mp_white": [
+            0.1,
+            0.2
+          ]
+        },
+        "card_body_alpha": 0.94,
+        "modal_frame_alpha": 0.7,
+        "band_alpha": {
+          "front_end": 1.0,
+          "in_game_mp": 0.4
+        },
+        "table_header_band_alpha": 0.6,
+        "in_game_partial_panel_variant": {
+          "primary": 0.62,
+          "secondary": 0.28,
+          "header_wash": 0.16
+        }
+      }
+    },
+    {
+      "id": "ART-019",
+      "title": "Panel constructions and band silhouettes",
+      "milestone_owner": "M2",
+      "implementation_owner": "UI art and design review",
+      "source_refs": [
+        "visual:2",
+        "visual:4",
+        "visual:6",
+        "visual:12",
+        "product:3 Visual quality and motion",
+        "original:Stage 6"
+      ],
+      "requirement": "Cards use a single rail around a 0.94 black body with 12 dp cuts at the top-trailing and bottom-leading corners and 3 dp cuts at the other two, and popovers use 6 dp major cuts. Modals are a 0.70 black silhouette over an additive glow field and 0.94 scrim, with a leading tooth, a title slot recessed 17 dp across about 73% of the width, a 38 dp lower-leading chamfer, square trailing corners and no rails. Framing and loading bands follow the measured silhouettes with 45-degree flanks, fixed notch, riser and step dimensions and rim light, lengthening only straight spans.",
+      "dependencies": [
+        "ART-001",
+        "REN-001",
+        "REN-014"
+      ],
+      "acceptance_evidence_needed": [
+        "Measured geometry constraints and source-specific overlays against the stock at 4:3 and across widths and DPI; a generic beveled rectangle is insufficient."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required.",
+      "constraints": {
+        "card": {
+          "major_cut_dp": 12,
+          "minor_cut_dp": 3,
+          "rail_dp": 1.5,
+          "body_alpha": 0.94
+        },
+        "popover_major_cut_dp": 6,
+        "modal": {
+          "frame_alpha": 0.7,
+          "scrim_alpha": 0.94,
+          "leading_tooth_dp": 6,
+          "title_slot_depth_dp": 17,
+          "title_slot_width_fraction": 0.73,
+          "lower_leading_chamfer_dp": 38,
+          "stock_width_dp": 480
+        },
+        "bands": {
+          "flank_degrees": 45,
+          "notch_height_u": 9,
+          "notch_top_u": 36,
+          "notch_pitch_u": 97,
+          "top_riser_u": 35,
+          "rim_light_width_u": 18,
+          "silhouettes": "visual Appendix B.2"
+        }
+      }
+    },
+    {
+      "id": "ART-020",
+      "title": "Open plate and button anatomy",
+      "milestone_owner": "M2",
+      "implementation_owner": "UI art and design review",
+      "source_refs": [
+        "visual:2",
+        "visual:4",
+        "visual:6",
+        "visual:12",
+        "product:3 Visual quality and motion",
+        "original:Stage 6"
+      ],
+      "requirement": "Action plates are open: rails on the leading edge, lower-leading cut and bottom only, with fill and bottom rail fading toward the trailing end. Navigation plates are 37 dp visible in a 45 dp target, action buttons 35 dp in 45 dp and settings rows 29 dp in 36 dp; cuts take 47% (dark) or 56% (light) of the plate; 8-9 dp markers sit inside the label's cap band 12-14 dp after the leading rail with a 4 dp label gap; minimum width 112 dp with 16 dp before the fade. Hover, focus and press compose as one target with a 1 dp inset press independent of layout.",
+      "dependencies": [
+        "ART-001",
+        "WID-001"
+      ],
+      "acceptance_evidence_needed": [
+        "Editable plate state gallery with measured geometry against stock overlays and stable target bounds through press, focus and hover."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required.",
+      "constraints": {
+        "navigation": {
+          "visible_dp": 37,
+          "target_dp": 45,
+          "cut_fraction": 0.47,
+          "marker_dp": 9
+        },
+        "action": {
+          "visible_dp": 35,
+          "target_dp": 45,
+          "cut_fraction": 0.56,
+          "marker_dp": 8
+        },
+        "settings_row": {
+          "visible_dp": 29,
+          "pitch_dp": 36,
+          "cut_fraction": 0.56
+        },
+        "marker_leading_inset_dp": [
+          12,
+          14
+        ],
+        "label_gap_dp": 4,
+        "min_width_dp": 112,
+        "trailing_padding_dp": 16,
+        "press_inset_dp": 1,
+        "rail_dp": 1.5
+      }
+    },
+    {
+      "id": "ART-021",
+      "title": "Device glyph and keycap artwork",
+      "milestone_owner": "M3",
+      "implementation_owner": "UI art and design review",
+      "source_refs": [
+        "visual:2",
+        "visual:4",
+        "visual:6",
+        "visual:12",
+        "product:3 Visual quality and motion",
+        "original:Stage 6",
+        "visual:13"
+      ],
+      "requirement": "Author Xbox, PlayStation, Nintendo, Steam Deck and generic controller glyphs and keyboard keycaps as vector symbols in the family text color, with identity carried by shape and letter and keycaps drawn as small plates with a 45-degree cut; no font glyphs or emoji.",
+      "dependencies": [
+        "ART-001",
+        "ART-007"
+      ],
+      "acceptance_evidence_needed": [
+        "Glyph gallery review at 16, 20, 24 and 32 dp placements and in-context prompt captures for each family."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required."
+    },
+    {
+      "id": "ART-022",
+      "title": "Modern visual refinements",
+      "milestone_owner": "M4",
+      "implementation_owner": "UI art and design review",
+      "source_refs": [
+        "visual:2",
+        "visual:4",
+        "visual:6",
+        "visual:12",
+        "product:3 Visual quality and motion",
+        "original:Stage 6",
+        "visual:13"
+      ],
+      "requirement": "Shift backdrop, light, grid and frame layers by up to 6 dp with pointer, stick or tilt while content stays fixed, off under reduced motion and by default on Phone; add a soft additive focus glow about 24 dp across, replaced by a solid rail in high contrast; carry navigation labels into the screen title; extend symbols in the stock drawing style; draw tags as header-band plates; composite menus and HUD in standard range after tone mapping, with paper-white rules if display HDR output is added.",
+      "dependencies": [
+        "ART-002",
+        "REN-014",
+        "MOT-001"
+      ],
+      "acceptance_evidence_needed": [
+        "Reviewed captures with each refinement on and off, and reduced-motion and high-contrast cases."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required.",
+      "constraints": {
+        "parallax_max_dp": 6,
+        "focus_glow_dp": 24
+      }
+    },
+    {
+      "id": "MOT-009",
+      "title": "Stock-derived motion tokens",
+      "milestone_owner": "M2",
+      "implementation_owner": "Presentation motion and UI interaction",
+      "source_refs": [
+        "visual:8",
+        "product:3 Visual quality and motion",
+        "product:5 Visual and interaction qualification",
+        "original:Stage 2"
+      ],
+      "requirement": "Implement the visual 1.1 tokens: instant hover enter and 300 ms linear hover leave; press and focus; frame.dock and screen.depart at 500 ms trapezoid(150, 150); screen.return 300 ms linear; content.out 250 ms; content.in 150 ms; page.enter and page.leave for sibling pages; modal.enter 200 ms light-up without scale; modal.leave 50 + 250 ms; light.up 150 ms in and 250 ms out; row.reveal, value.change and tooltip. Preserve source story, terminal and reticle timing.",
+      "dependencies": [
+        "MOT-001"
+      ],
+      "acceptance_evidence_needed": [
+        "Authored token source plus sampled curve and duration evidence against the stock timelines and rationale for openQ4 additions."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required.",
+      "constraints": {
+        "hover.enter": {
+          "duration_ms": 0
+        },
+        "hover.leave": {
+          "duration_ms": 300,
+          "curve": "linear"
+        },
+        "press": {
+          "duration_ms": 60,
+          "curve": "ease-out",
+          "offset_dp": 1
+        },
+        "focus": {
+          "duration_ms": 80,
+          "curve": "ease-out"
+        },
+        "frame.dock": {
+          "duration_ms": 500,
+          "curve": "trapezoid",
+          "accel_ms": 150,
+          "decel_ms": 150
+        },
+        "screen.depart": {
+          "duration_ms": 500,
+          "curve": "trapezoid",
+          "accel_ms": 150,
+          "decel_ms": 150
+        },
+        "screen.return": {
+          "duration_ms": 300,
+          "curve": "linear"
+        },
+        "content.out": {
+          "duration_ms": 250,
+          "curve": "linear"
+        },
+        "content.in": {
+          "duration_ms": 150,
+          "curve": "linear"
+        },
+        "page.enter": {
+          "duration_ms": 220,
+          "curve": [
+            0.16,
+            1,
+            0.3,
+            1
+          ],
+          "slide_dp": 12
+        },
+        "page.leave": {
+          "duration_ms": 140,
+          "curve": [
+            0.4,
+            0,
+            1,
+            1
+          ],
+          "slide_dp": 8
+        },
+        "modal.enter": {
+          "duration_ms": 200,
+          "scrim_alpha": 0.94,
+          "frame_alpha": 0.7,
+          "actions_ms": 150,
+          "scale_animation": false
+        },
+        "modal.leave": {
+          "hold_ms": 50,
+          "duration_ms": 250,
+          "frame_ms": 200,
+          "actions_ms": 150
+        },
+        "light.up": {
+          "in_ms": 150,
+          "out_ms": 250
+        },
+        "row.reveal": {
+          "duration_ms": 120,
+          "stagger_ms": 15,
+          "total_stagger_cap_ms": 90
+        },
+        "value.change": {
+          "duration_ms": 100
+        },
+        "tooltip": {
+          "duration_ms": 100,
+          "initial_delay_ms": 300
+        },
+        "major_transition_normal_max_ms": 300
+      }
+    },
+    {
+      "id": "MOT-010",
+      "title": "Stock screen-change choreography",
+      "milestone_owner": "M4",
+      "implementation_owner": "Presentation motion and UI interaction",
+      "source_refs": [
+        "visual:8",
+        "product:3 Visual quality and motion",
+        "product:5 Visual and interaction qualification",
+        "original:Stage 2"
+      ],
+      "requirement": "Home-to-page and Back follow the stock sequence: content fades out, the bands dock while home content sweeps, and the page is placed at 550 ms and fades in; Back sweeps the page toward the leading edge and returns the home content once the bands settle at 500 ms. Input retargets these transitions instead of being blocked and never activates unpresented controls; reduced motion places destinations and cross-fades within 80 ms.",
+      "dependencies": [
+        "MOT-004",
+        "MOT-009",
+        "ART-019"
+      ],
+      "acceptance_evidence_needed": [
+        "Sampled timeline captures of home, page and Back sequences against the stock plus rapid-input and reduced-motion cases."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required.",
+      "constraints": {
+        "page_placed_ms": 550,
+        "bands_settle_ms": 500,
+        "reduced_motion_fade_max_ms": 80
+      }
+    },
+    {
+      "id": "MOT-011",
+      "title": "Ambient loops and alarm cadence",
+      "milestone_owner": "M5",
+      "implementation_owner": "Presentation motion and UI interaction",
+      "source_refs": [
+        "visual:8",
+        "product:3 Visual quality and motion",
+        "product:5 Visual and interaction qualification",
+        "original:Stage 2",
+        "visual:13"
+      ],
+      "requirement": "Reproduce the measured ambient loops (levelshot cross-fades, static grain, gear rotation, scanline drift, EKG scroll, idle flicker) and alarm pulses (3 Hz shimmer, 2 Hz pulse, 1 Hz notice) at or below 3 Hz with a static cue; reduced motion stops decorative loops and holds alarms steady, no loop runs on essential text, and the Phone profile starts with ambient loops off.",
+      "dependencies": [
+        "MOT-001",
+        "MOT-005"
+      ],
+      "acceptance_evidence_needed": [
+        "Measured cadence captures for each loop and alarm, and reduced-motion and profile cases."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required.",
+      "constraints": {
+        "alarm_max_hz": 3,
+        "levelshot_crossfade_ms": 2000,
+        "levelshot_interval_ms": 5000,
+        "gear_period_s": 10,
+        "idle_flicker": {
+          "hz": 3,
+          "range": [
+            0.92,
+            1.0
+          ]
+        },
+        "warning_shimmer": {
+          "hz": 3,
+          "range": [
+            0.8,
+            1.0
+          ]
+        },
+        "alarm_pulse": {
+          "hz": 2,
+          "range": [
+            0.5,
+            1.0
+          ]
+        },
+        "settings_notice": {
+          "hz": 1,
+          "range": [
+            0.5,
+            1.0
+          ]
+        }
+      }
+    },
+    {
+      "id": "FLOW-019",
+      "title": "Suspension and Android lifecycle",
+      "milestone_owner": "M4",
+      "implementation_owner": "UI migration, session and SP/MP integration",
+      "source_refs": [
+        "visual:9",
+        "visual:11",
+        "product:4 M2",
+        "product:4 M4",
+        "product:4 M5",
+        "original:Stage 5",
+        "original:Stage 6",
+        "visual:13"
+      ],
+      "requirement": "Leaving the app or suspending a handheld pauses single player, mutes audio and returns to the pause menu; multiplayer reconnects or shows connection loss; saves, drafts and edits survive backgrounding and process death; the screen stays awake in play and cinematics and may sleep in menus.",
+      "dependencies": [
+        "BEH-007",
+        "INP-004",
+        "SAVE-001"
+      ],
+      "acceptance_evidence_needed": [
+        "Physical Android and Steam Deck suspend, resume and process-death cases in menus, play, cinematics and multiplayer."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required."
+    },
+    {
+      "id": "FLOW-020",
+      "title": "First-run setup and game data import",
+      "milestone_owner": "M4",
+      "implementation_owner": "UI migration, session and SP/MP integration",
+      "source_refs": [
+        "visual:9",
+        "visual:11",
+        "product:4 M2",
+        "product:4 M4",
+        "product:4 M5",
+        "original:Stage 5",
+        "original:Stage 6",
+        "visual:13"
+      ],
+      "requirement": "A device without game data starts a guided setup that players can reopen: language with a live sample; the player's own Quake 4 1.4.2 data chosen through the system folder picker, verified against the official checksums and copied or indexed with resumable progress, with missing language or optional archives reported without blocking and every failure naming its fix; controls; and viewing profile and text size.",
+      "dependencies": [
+        "LAY-014",
+        "TXT-005",
+        "INP-013",
+        "WID-011",
+        "WID-013"
+      ],
+      "acceptance_evidence_needed": [
+        "Fresh-install runs on Android and desktop covering valid, missing, wrong-version, low-storage and interrupted imports."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required."
+    },
+    {
+      "id": "FLOW-021",
+      "title": "First-party touch gameplay controls",
+      "milestone_owner": "M5",
+      "implementation_owner": "UI migration, session and SP/MP integration",
+      "source_refs": [
+        "visual:9",
+        "visual:11",
+        "product:4 M2",
+        "product:4 M4",
+        "product:4 M5",
+        "original:Stage 5",
+        "original:Stage 6",
+        "visual:13"
+      ],
+      "requirement": "Provide a touch overlay authored in the UI system: a floating move stick, a look area with optional gyro, an 88 dp Fire that keeps turning while held, 64 dp jump and crouch, a weapon control with tap and hold-for-wheel, contextual reload and zoom, a 48 dp pause and multiplayer scoreboard and chat. It is drawn in the Marine HUD family at 35% rest and 80% pressed opacity without labels, never covers the crosshair, hides while a controller is in use and returns on touch; Fire clicks terminals as in the stock.",
+      "dependencies": [
+        "INP-013",
+        "WID-021",
+        "ART-009",
+        "LAY-016",
+        "FLOW-014"
+      ],
+      "acceptance_evidence_needed": [
+        "Physical phone and tablet gameplay through SP and MP maps with every control, multi-touch combinations and controller handoff."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required.",
+      "constraints": {
+        "fire_dp": 88,
+        "jump_crouch_dp": 64,
+        "pause_dp": 48,
+        "rest_opacity": 0.35,
+        "pressed_opacity": 0.8
+      }
+    },
+    {
+      "id": "FLOW-022",
+      "title": "Touch layout editor",
+      "milestone_owner": "M5",
+      "implementation_owner": "UI migration, session and SP/MP integration",
+      "source_refs": [
+        "visual:9",
+        "visual:11",
+        "product:4 M2",
+        "product:4 M4",
+        "product:4 M5",
+        "original:Stage 5",
+        "original:Stage 6",
+        "visual:13"
+      ],
+      "requirement": "Reachable from Settings and the pause menu, the editor moves, resizes (75-150%), fades and hides each touch control on a snapping grid, offers Default, Compact and Left-handed presets and a reset, stores layouts per device and shows labels only while editing.",
+      "dependencies": [
+        "FLOW-021",
+        "DOC-003"
+      ],
+      "acceptance_evidence_needed": [
+        "Editor sessions on physical devices with persisted layouts applied in gameplay."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required.",
+      "constraints": {
+        "resize_percent": [
+          75,
+          150
+        ]
+      }
+    },
+    {
+      "id": "FLOW-023",
+      "title": "Controller and touch terminal interaction",
+      "milestone_owner": "M5",
+      "implementation_owner": "UI migration, session and SP/MP integration",
+      "source_refs": [
+        "visual:9",
+        "visual:11",
+        "product:4 M2",
+        "product:4 M4",
+        "product:4 M5",
+        "original:Stage 5",
+        "original:Stage 6",
+        "visual:13"
+      ],
+      "requirement": "At world terminals the crosshair remains the cursor and Fire clicks; the region under the crosshair highlights and an optional assist slows the crosshair over interactive regions; a touch on the projected surface within use range activates the region under the finger, counting a region within 16 dp when no other region is closer.",
+      "dependencies": [
+        "SUR-004",
+        "FLOW-017",
+        "INP-013"
+      ],
+      "acceptance_evidence_needed": [
+        "Story-critical and ordinary terminal flows completed with controller only and with touch only."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required.",
+      "constraints": {
+        "touch_proximity_dp": 16
+      }
+    },
+    {
+      "id": "FLOW-024",
+      "title": "Title, pause, loading and notice patterns",
+      "milestone_owner": "M4",
+      "implementation_owner": "UI migration, session and SP/MP integration",
+      "source_refs": [
+        "visual:9",
+        "visual:11",
+        "product:4 M2",
+        "product:4 M4",
+        "product:4 M5",
+        "original:Stage 5",
+        "original:Stage 6",
+        "visual:13"
+      ],
+      "requirement": "Continue leads the title navigation when a save exists, with levelshot, mission, difficulty and play time in its detail; pause leads with Resume and offers mode-specific actions without pausing a multiplayer server; loading shows level identity, localized tips and a device-appropriate continue prompt; notices appear in the top band's trailing section without covering the crosshair or touch controls, and unresolved errors persist.",
+      "dependencies": [
+        "FLOW-001",
+        "FLOW-005",
+        "WID-014",
+        "WID-019"
+      ],
+      "acceptance_evidence_needed": [
+        "Normal-route title, pause, loading and notice cases on each device and profile."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required."
+    },
+    {
+      "id": "FLOW-025",
+      "title": "Settings search, markers and previews",
+      "milestone_owner": "M4",
+      "implementation_owner": "UI migration, session and SP/MP integration",
+      "source_refs": [
+        "visual:9",
+        "visual:11",
+        "product:4 M2",
+        "product:4 M4",
+        "product:4 M5",
+        "original:Stage 5",
+        "original:Stage 6",
+        "visual:13"
+      ],
+      "requirement": "Settings categories switch with bumpers or swipes; search across every category from typing, north or the search symbol shows category paths; modified rows turn their leading rail marine.value, west resets the focused row to default, restart rows carry a warning tag and costly rows a three-tick impact gauge; crosshair, HUD scale, text size, brightness and color-vision rows preview live; Apply and Discard sit in the prompt bar and display changes keep the 15-second countdown.",
+      "dependencies": [
+        "FLOW-003",
+        "WID-019",
+        "WID-020",
+        "BEH-002"
+      ],
+      "acceptance_evidence_needed": [
+        "All settings categories exercised with search, reset, markers, tags, previews and Apply/Discard on every input device."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required.",
+      "constraints": {
+        "display_confirmation_s": 15,
+        "impact_gauge_ticks": 3
+      }
+    },
+    {
+      "id": "FLOW-026",
+      "title": "List, Arena, Match Control and demo patterns",
+      "milestone_owner": "M4",
+      "implementation_owner": "UI migration, session and SP/MP integration",
+      "source_refs": [
+        "visual:9",
+        "visual:11",
+        "product:4 M2",
+        "product:4 M4",
+        "product:4 M5",
+        "original:Stage 5",
+        "original:Stage 6",
+        "visual:13"
+      ],
+      "requirement": "Server, save and demo lists use header-band filter tags, header or north sorting, a detail column and prompt-bar actions with west refresh; Arena Campaign shows a tier ladder with locked tiers and boss plates switched by bumpers; Match Control shows refusal reasons in the detail area and moves between sections with bumpers; demo playback hides its controls after 3 s and maps pause, 10 s and 30 s skips, camera, overlay and exit on controller and touch.",
+      "dependencies": [
+        "FLOW-006",
+        "FLOW-011",
+        "FLOW-012",
+        "FLOW-013",
+        "WID-009",
+        "WID-019",
+        "WID-020"
+      ],
+      "acceptance_evidence_needed": [
+        "Normal-route list, Arena, Match Control and demo cases on controller, touch and pointer."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required.",
+      "constraints": {
+        "demo_controls_hide_ms": 3000,
+        "demo_skip_s": [
+          10,
+          30
+        ]
+      }
+    },
+    {
+      "id": "FLOW-027",
+      "title": "HUD presets and HUD settings",
+      "milestone_owner": "M5",
+      "implementation_owner": "UI migration, session and SP/MP integration",
+      "source_refs": [
+        "visual:9",
+        "visual:11",
+        "product:4 M2",
+        "product:4 M4",
+        "product:4 M5",
+        "original:Stage 5",
+        "original:Stage 6",
+        "visual:13"
+      ],
+      "requirement": "Offer Classic, Remastered, Minimal, Competitive and Touch HUD presets and settings for independent HUD scale, safe inset, opacity, color vision, the crosshair editor (stock set, sizes 16-48, eight colors, live preview), multiplayer hit markers, damage direction, pickup messages and the weapon strip, with Couch and Handheld raising the default HUD scale.",
+      "dependencies": [
+        "FLOW-014",
+        "LAY-009",
+        "LAY-014"
+      ],
+      "acceptance_evidence_needed": [
+        "Each preset and setting applied in SP and MP gameplay with readback and profile defaults."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required.",
+      "constraints": {
+        "presets": [
+          "classic",
+          "remastered",
+          "minimal",
+          "competitive",
+          "touch"
+        ],
+        "crosshair_size": [
+          16,
+          48
+        ],
+        "crosshair_colors": 8
+      }
+    },
+    {
+      "id": "FLOW-028",
+      "title": "Remastered and Classic layouts",
+      "milestone_owner": "M4",
+      "implementation_owner": "UI migration, session and SP/MP integration",
+      "source_refs": [
+        "visual:9",
+        "visual:11",
+        "product:4 M2",
+        "product:4 M4",
+        "product:4 M5",
+        "original:Stage 5",
+        "original:Stage 6",
+        "visual:13"
+      ],
+      "requirement": "Remastered is the default layout; Classic keeps the stock composition, choreography and density of the Marine menus as the parity reconstruction and shares components, tokens and the input model; touch-first profiles always use Remastered compact layouts, and players choose in Interface settings.",
+      "dependencies": [
+        "FLOW-001",
+        "ART-008",
+        "LAY-015"
+      ],
+      "acceptance_evidence_needed": [
+        "Both layouts across main, settings and modal flows with controller, keyboard and pointer, and parity overlays for Classic."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required."
+    },
+    {
+      "id": "PERF-009",
+      "title": "Mobile rendering and power limits",
+      "milestone_owner": "M6",
+      "implementation_owner": "UI renderer performance and qualification",
+      "source_refs": [
+        "product:5 Performance and resource acceptance",
+        "product:5 Verification layers and reproducibility",
+        "original:Stage 8",
+        "visual:13"
+      ],
+      "requirement": "No interface element depends on post effects GLES omits; partial panels fall back to a darkening scrim and vignette where scene softening is unavailable or costly; tile-based GPUs see at most two full-screen blended layers; static menus redraw only on change at up to 30 Hz; thermal throttling reduces ambient effects before responsiveness; interface budgets use the device refresh while playing and 30 Hz for static menus.",
+      "dependencies": [
+        "PERF-004",
+        "REN-013"
+      ],
+      "acceptance_evidence_needed": [
+        "CPU, GPU and power measurements on representative Android devices for menus, HUD and the touch overlay with the GLES fallbacks."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required.",
+      "constraints": {
+        "tile_gpu_max_fullscreen_blended_layers": 2,
+        "static_menu_max_hz": 30
+      }
+    },
+    {
+      "id": "QUAL-010",
+      "title": "Stock parity comparison",
+      "milestone_owner": "M6",
+      "implementation_owner": "Test/qualification with UI owners",
+      "source_refs": [
+        "visual:11",
+        "product:5",
+        "product:4 M6",
+        "original:Stage 8"
+      ],
+      "requirement": "Compare each translated stock screen with the stock GUI at the same 4:3 output: plate bands, cuts, markers, rails, baselines and band silhouettes within 1.5 dp, flat fills within 2/255 per channel away from edges and light layers, and stock-derived timings within one frame at 60 Hz, recording each deliberate departure against its specification section.",
+      "dependencies": [
+        "QUAL-003",
+        "QUAL-006"
+      ],
+      "acceptance_evidence_needed": [
+        "Overlay and difference captures per stock screen with measured deviations and departure records."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required.",
+      "constraints": {
+        "geometry_tolerance_dp": 1.5,
+        "flat_fill_tolerance_per_channel": [
+          2,
+          255
+        ],
+        "timing_tolerance_frames_at_60hz": 1
+      }
+    },
+    {
+      "id": "QUAL-011",
+      "title": "Input, profile and Android device qualification",
+      "milestone_owner": "M6",
+      "implementation_owner": "Test/qualification with UI owners",
+      "source_refs": [
+        "visual:11",
+        "product:5",
+        "product:4 M6",
+        "original:Stage 8",
+        "visual:13"
+      ],
+      "requirement": "Qualify every screen with mouse and keyboard only, controller only and touch only, across each viewing profile and size class, every controller glyph family with its confirm convention and mid-screen device switching. Android needs physical phones and tablets for targets, the touch overlay and editor, the input method, system Back, cutouts and suspension; emulators and desktop GLES runs do not establish touch usability.",
+      "dependencies": [
+        "QUAL-002",
+        "QUAL-005",
+        "INP-011",
+        "INP-013",
+        "LAY-014"
+      ],
+      "acceptance_evidence_needed": [
+        "Recorded input-mode and profile matrix results on Windows, Linux, Steam Deck and physical Android devices."
       ],
       "status": "pending",
       "current_evidence": [],
