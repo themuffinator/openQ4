@@ -33,6 +33,8 @@ If you have questions concerning this license or the applicable additional terms
 #include "UserInterface.h"
 #include "../framework/KeyInput.h"
 
+extern idCVar ui_aspectCorrection;
+
 idVec4 idDeviceContext::colorPurple;
 idVec4 idDeviceContext::colorOrange;
 idVec4 idDeviceContext::colorYellow;
@@ -2525,11 +2527,33 @@ void idDeviceContext::CalcVirtualScaleOffset( float width, float height, float &
 	outYOffset = transform.yOffset;
 }
 
-void idDeviceContext::GetVirtualScreenExpansion( float width, float height, float &xExpand, float &yExpand ) const {
+bool idDeviceContext::GetVirtualScreenExpansion( float width, float height, float &xExpand, float &yExpand, bool forceAspectCorrect ) const {
+	xExpand = 0.0f;
+	yExpand = 0.0f;
+
+	const bool effectiveAspectCorrect = ( forceAspectCorrect || aspectCorrect ) && ui_aspectCorrection.GetBool();
+	if ( !effectiveAspectCorrect ) {
+		return false;
+	}
+
 	float windowWidth = 0.0f;
 	float windowHeight = 0.0f;
 	openQ4_GetCurrentViewportSize( windowWidth, windowHeight );
-	openQ4_CalcVirtualScreenExpansion( width, height, windowWidth, windowHeight, aspectCorrect, xExpand, yExpand );
+	openQ4_CalcVirtualScreenExpansion( width, height, windowWidth, windowHeight, effectiveAspectCorrect, xExpand, yExpand );
+	return true;
+}
+
+bool idDeviceContext::GetVirtualScreenExpansion( float *xExpand, float *yExpand, bool forceAspectCorrect ) const {
+	float localX = 0.0f;
+	float localY = 0.0f;
+	const bool active = GetVirtualScreenExpansion( static_cast<float>( VIRTUAL_WIDTH ), static_cast<float>( VIRTUAL_HEIGHT ), localX, localY, forceAspectCorrect );
+	if ( xExpand != NULL ) {
+		*xExpand = localX;
+	}
+	if ( yExpand != NULL ) {
+		*yExpand = localY;
+	}
+	return active;
 }
 
 void idDeviceContext::GetCinematic16x9Bars( float width, float height, idRectangle &topBar, idRectangle &bottomBar, idRectangle &leftBar, idRectangle &rightBar, idRectangle &visibleArea ) const {
