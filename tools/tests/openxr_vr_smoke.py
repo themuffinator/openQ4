@@ -43,6 +43,9 @@ Checks:
 - a world GUI (airdefense1's exit panel, never clicked) takes focus where the
   weapon hand points, with its cursor where the hand's ray meets it, while
   the eye's ray along the same aim passes over the panel;
+- culling hides nothing either eye shows: over open ground, with game time
+  stopped, turning r_useCulling off leaves both eyes as they were (unnormalized
+  off-axis frustum planes once culled a whole outdoor area from one eye);
 - a stick snap turn turns the body by vr_snapTurnAngle and a controller
   trigger press reaches the binding system;
 - the controller's menu button opens the pause menu on an opaque, world-locked
@@ -105,6 +108,10 @@ STICK_WALK_POSE = "10310.89 -6950.34 6.96 150.7"
 # the panel, at its centre. Nothing clicks it, since it ends the level.
 GUI_POSE = "8320 -3480.1 109.5 0"
 GUI_HAND_POSE = "0.2 0.85 -0.35 0 0 0"
+# Over the open ground past the start, looking northwest: unnormalized off-axis
+# frustum planes once culled the whole outdoor area's world model (terrain and
+# the Strogg base) from the left eye here, the right eye still drawing it.
+CULL_POSE = "10094 -6825 130 150.7"
 
 
 def read_events(path: Path) -> list[dict]:
@@ -245,6 +252,8 @@ def main(argv: list[str] | None = None) -> None:
         f"when {marker('stick_hand_stop')} stick left 0 0",
         f"when {marker('gui_point')} hand right {GUI_HAND_POSE}",
         f"when {marker('gui_done')} hand right 0.2 1.25 -0.35 0 0 0",
+        f"when {marker('cull_on')} capture {profile / 'xr_cull_on'}",
+        f"when {marker('cull_off')} capture {profile / 'xr_cull_off'}",
         f"when {marker('turn')} head 40 0 0",
         f"when {marker('turned')} capture {profile / 'xr_turned'}",
         f"when {marker('snap')} head 0 0 0",
@@ -327,6 +336,11 @@ def main(argv: list[str] | None = None) -> None:
         # does, not the eye a forearm above it
         "vr_moveDirection 0", f"setviewpos {GUI_POSE}", "condump vr_marker_gui_point.txt", "waitMsec 900",
         "echo VR_GUI_POINTED", "condump vr_marker_gui_done.txt", "waitMsec 300",
+        # culling never hides what an eye shows: in a frozen world, turning it
+        # off must leave both eyes as they were
+        "g_stopTime 1", f"setviewpos {CULL_POSE}", "waitMsec 800", "condump vr_marker_cull_on.txt", "waitMsec 500",
+        "r_useCulling 0", "waitMsec 500", "condump vr_marker_cull_off.txt", "waitMsec 500",
+        "reset r_useCulling", "g_stopTime 0",
         "noclip", f"setviewpos {STICK_WALK_POSE}", "waitMsec 500",
         "condump vr_marker_turn.txt", "waitMsec 700",
         "condump vr_marker_turned.txt", "waitMsec 700",
@@ -469,7 +483,7 @@ def main(argv: list[str] | None = None) -> None:
         if e.get("event") == "capture":
             stage = next(s for s in ("gameplay", "turned", "menu", "laser_off", "laser_dot", "laser_beam",
                                      "left_off", "left_dot", "two_off", "two_dot", "vignette", "zoom_off",
-                                     "zoom_on", "vehicle")
+                                     "zoom_on", "vehicle", "cull_on", "cull_off")
                          if f"xr_{s}_" in Path(e["path"]).name)
             captures[f"{stage}_{e['layer']}"] = e
     for name in ("gameplay_left", "gameplay_right", "gameplay_quad1", "turned_left", "turned_right", "menu_quad1",
@@ -477,7 +491,8 @@ def main(argv: list[str] | None = None) -> None:
                  "laser_beam_left", "laser_beam_right", "left_off_left", "left_off_right", "left_dot_left",
                  "left_dot_right", "two_off_left", "two_off_right", "two_dot_left",
                  "two_dot_right", "vignette_left", "vignette_right", "zoom_off_left", "zoom_on_left",
-                 "zoom_on_quad1", "vehicle_left", "vehicle_right"):
+                 "zoom_on_quad1", "vehicle_left", "vehicle_right",
+                 "cull_on_left", "cull_on_right", "cull_off_left", "cull_off_right"):
         assert name in captures and captures[name]["written"], f"missing capture {name}: {sorted(captures)}"
     for name in ("gameplay_left", "gameplay_right", "turned_left", "turned_right", "vehicle_left", "vehicle_right"):
         assert captures[name]["lit_fraction"] > 0.2, f"eye capture {name} is mostly black: {captures[name]}"
@@ -488,6 +503,15 @@ def main(argv: list[str] | None = None) -> None:
     left, right = image("xr_gameplay", "left"), image("xr_gameplay", "right")
     eye_difference = max(ImageStat.Stat(ImageChops.difference(left, right)).mean)
     assert eye_difference > 1.0, f"the eyes are identical: no parallax ({eye_difference:.3f})"
+    # culling hides nothing an eye shows: every off-axis frustum plane is a unit
+    # plane, so the radius test cannot throw away a box reaching into the eye
+    culled_away = {}
+    for eye in ("left", "right"):
+        mask = ImageChops.difference(image("xr_cull_on", eye), image("xr_cull_off", eye)).convert("L")
+        mask = mask.point(lambda v: 255 if v > 24 else 0)
+        culled_away[eye] = mask.histogram()[255] / (mask.size[0] * mask.size[1])
+        assert culled_away[eye] < 0.005, \
+            f"turning culling off changed {culled_away[eye]:.1%} of the {eye} eye: culling hid geometry the eye shows"
     turned = image("xr_turned", "left")
     turn_difference = max(ImageStat.Stat(ImageChops.difference(left, turned)).mean)
     assert turn_difference > 4.0, f"a 40 degree head turn barely changed the view ({turn_difference:.3f})"
@@ -711,7 +735,8 @@ def main(argv: list[str] | None = None) -> None:
     print(f"OpenXR VR smoke ({options.render_api}): PASS (eye difference {eye_difference:.2f}, head turn {turn_difference:.2f}, "
           f"HUD coverage {covered:.3f}, aim marker at {marker_depth:.2f} m, left hand's dot "
           f"{min(left_handed_shift):.0f} px left, stick walks {head_off:.0f} and {hand_off:.0f} degrees off the facing, "
-          f"exit panel cursor at {gui_cursor[0]:.2f},{gui_cursor[1]:.2f}, pointer at {px},{py}, "
+          f"exit panel cursor at {gui_cursor[0]:.2f},{gui_cursor[1]:.2f}, culling hid "
+          f"{culled_away['left']:.1%}/{culled_away['right']:.1%} of the eyes, pointer at {px},{py}, "
           f"walker cockpit turned {cockpit_turn:.1f}); evidence={profile}")
 
 

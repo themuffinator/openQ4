@@ -288,6 +288,9 @@ def check_engine() -> None:
     require(player, '( IsInVehicle() && !cvarSystem->GetCVarBool( "vr_vehicleStereo" ) )',
             "single player vehicles render in stereo unless vr_vehicleStereo is off")
     require(player, "seat->GetVRSeat( origin );", "a vehicle seat puts the eye on its turret's axis")
+    # an eye's off-axis culling planes are unit planes, so the radius test keeps boxes reaching into the eye
+    require(read("src/renderer/tr_main.cpp"), "\t\tfor ( i = 0; i < 4; i++ ) {\n\t\t\ttr.viewDef->frustum[i].Normal().Normalize();",
+            "the off-axis frustum's side planes are normalized")
     # world GUIs, characters and usable things answer the weapon hand where it points
     require(player, "start = GetEyePosition();\n\t// openQ4 VR: the weapon hand points at world GUIs",
             "the focus trace starts where the weapon hand aims")
