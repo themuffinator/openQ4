@@ -82,7 +82,8 @@ public:
 	void				SetSize(float width, float height);
 	void				SetAspectCorrection( bool enabled );
 	float				GetCanvasAspect() const;
-	void				GetVirtualScreenExpansion( float width, float height, float &xExpand, float &yExpand ) const;
+	bool				GetVirtualScreenExpansion( float width, float height, float &xExpand, float &yExpand, bool forceAspectCorrect = false ) const;
+	bool				GetVirtualScreenExpansion( float *xExpand, float *yExpand, bool forceAspectCorrect = false ) const;
 	void				GetCinematic16x9Bars( float width, float height, idRectangle &topBar, idRectangle &bottomBar, idRectangle &leftBar, idRectangle &rightBar, idRectangle &visibleArea ) const;
 
 	const idMaterial	*GetScrollBarImage(int index);
