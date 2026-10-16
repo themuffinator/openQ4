@@ -164,6 +164,7 @@ public:
 	void					ReadModel( idRenderModel *&model );
 // RAVEN BEGIN
 	void					ReadUserInterface( idUserInterface *&ui, const idDict *args );
+	void					ReadUserInterfaceWithLayout( idUserInterface *ui, const char *name, const char *layout );
 // bdube: material type
 	void					ReadMaterialType ( const rvDeclMatType* &matType );
 	void					ReadTable ( const idDeclTable* &table );

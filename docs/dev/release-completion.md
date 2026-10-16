@@ -2,6 +2,40 @@
 
 ## Post-0.14.000 corrections
 
+- [x] Restore v0.10-v0.13.2 (format 3) saves. 0.14.000 rewrote both player HUD
+  definitions in the change that introduced format 4, but its format-3 decoder
+  kept parsing the saved HUD window tree with the new definitions. Every format-3
+  save therefore failed part way through its player HUD, after the running map
+  had been torn down. The verbatim format-3 HUD definitions now ship under
+  `guis/savegame/v3/`, and both game libraries decode format-3 HUDs through them.
+  `savegame_gui_layout_contract.py` pins every serialized openQ4 GUI by format, so
+  an edit to one fails until it is classified.
+- [x] Stop format-4 restores depending on the writer's commit count. Builds from a
+  source archive (build 0) or shallow clone (build 1) refused their own saves in
+  preflight, and their payloads were read against the v3 liquid-field thresholds.
+  The build floor and those thresholds now apply to format 3 only.
+- [x] Keep interpolator layouts out of the save format's way. `f15a41f0` added a
+  cache flag to `idExtrapolate`/`idInterpolate`; animator joint modifiers and
+  running GUI transitions save those types as native images, so no save holding
+  a joint modifier (every player) restored on that build. A NaN cached time now
+  marks the cache stale, keeping the original layout and the negative-time fix,
+  and `static_assert`s beside both raw writes reject any future member.
+- [x] Carry HUD window values through the format-3 HUD migration: a boss bar a
+  script had shown, and its health width, survive a format-3 load.
+- [x] Add `savegame_restore_matrix.py`, an opt-in runtime check that restores
+  existing saves with a staged client, optionally under rewritten build numbers,
+  and confirms the input files are unchanged. Linux x64 results, including real
+  v0.13.2 saves that 0.14.000 cannot restore, are in
+  [Savegame Reliability](savegame-reliability.md#cross-build-restore-matrix-2026-10-13-linux-x64).
+  Windows, macOS and ARM64 restores were not run.
+
+Candidate save release wording: Saves from openQ4 0.10 through 0.13.2 load again.
+0.14.000 could not restore them, despite its upgrade note saying they would. Your
+original save files were never changed, so slots that failed in 0.14.000 work
+after updating. HUD animations that were mid-flight when such a save was made
+restart on load. Format-4 saves from 0.14.000 are unaffected. Builds compiled from
+a source archive or shallow Git clone now load their own saves.
+
 - [x] Finish The Awakening's mannable Strogg chaingun turret (m01 part 1, m04).
   The alpha shipped its model untextured (grey ambient-occlusion bakes, a black
   specular map, a placeholder drum), so it rendered as clay, and it fired the

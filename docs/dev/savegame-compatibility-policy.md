@@ -8,8 +8,8 @@ load. Reliability mechanisms and implementation detail are documented in
 
 | Save payload | Current decision |
 | --- | --- |
-| Version 4, exact wire-ABI stamp, build at or above the verified floor, valid integrity/footer | Current writer and reader; persistent Awakening status |
-| Version 3, exact wire-ABI stamp, build at or above the verified floor, valid integrity/footer | Supported format path; build/source drift is diagnostic only |
+| Version 4, exact wire-ABI stamp, valid integrity/footer | Current writer and reader; persistent Awakening status; build number is diagnostic only |
+| Version 3, exact wire-ABI stamp, build at or above the verified floor, valid integrity/footer | Supported through the v3 decoder, including its player HUD layouts; build/source drift above the floor is diagnostic only |
 | Version 3, build below the verified floor | Rejected before map teardown |
 | Version 3, different wire-ABI stamp | Rejected before map teardown |
 | Version 2, any tuple | Rejected before map teardown |
@@ -50,6 +50,37 @@ never recorded. Partial chill thaws and its current animation rates are restored
 Retch ownership and effects are rebuilt after every saved entity has restored.
 The v4 reader instead preserves the original timer, layered effects and animation
 rates. This is a bounded old-format recovery, not an exported v3 save option.
+
+### Saved GUI Layouts
+
+A saved GUI's window tree is positional. Its bytes follow the windows, defined
+variables, scripts and timeline events parsed from the `.gui` file, and the
+payload does not record which definition that was. A serialized GUI definition
+is therefore part of the wire format, exactly like a C++ field.
+
+The change that introduced v4 also rewrote openQ4's `guis/hud.gui` and
+`guis/hud_strogg.gui`. Until this was corrected, the v3 decoder read v3 HUD
+window trees with the v4 definitions, so every v3 save desynced part way through
+its player HUD, after map teardown. 0.14.000 shipped with this defect: its
+release note's promise that supported format 3 saves still load was not true.
+
+Every v3 writer used the same two earlier definitions (unchanged from June 2026
+through v0.13.2), so the payload version identifies them exactly. They ship
+unchanged as `guis/savegame/v3/hud.gui` and `guis/savegame/v3/hud_strogg.gui`.
+For a v3 payload, both game libraries ask the engine to read those HUD window
+trees through `idUserInterface::ReadFromSaveGameWithLayout`. The engine parses the
+v3 definition twice in private: one copy consumes the saved window tree with every
+normal restore check, the other shows what that definition starts with. The state
+dictionary, interaction flags and cursor move to the live HUD, and so does every
+window value the game had changed from the v3 definition, wherever the current
+definition has a window and variable of the same name and type. A boss bar a
+script had made visible, and its health width, therefore survive. Running
+transitions and timeline progress are not carried over, so mid-flight HUD
+animations restart. No other serialized openQ4 GUI changed between v3 and v4.
+
+`tools/tests/savegame_gui_layout_contract.py` pins every serialized openQ4 GUI by
+payload version and requires every openQ4 GUI to be classified as serialized or
+never serialized. Editing a pinned GUI fails until the edit is classified.
 
 Within v3, build number, generated source hash, and source-file count are recorded
 for diagnosis but do not reject a save. The policy assumes every wire-incompatible
@@ -105,6 +136,13 @@ Within version 3, support is expressed as the oldest build whose layout a
 verified decoder covers (`SESSION_OPENQ4_SAVEGAME_MINIMUM_SUPPORTED_BUILD`,
 currently 661). Payloads below it are refused during preflight.
 
+The floor and the per-field thresholds below apply to v3 payloads only. A build
+number is the engine's Git commit count, not a schema identity: a source archive
+stamps 0, a shallow clone 1, and unrelated branches can share a count. No v4
+layout depends on the writer's build, so a v4 save is never refused or decoded
+differently because of it. Before this was corrected, a v4 build without
+complete history refused its own saves during preflight.
+
 661 is where the first of the two player liquid fields entered the save. Builds
 from 661 upward restore cleanly, including the range that previously failed;
 below it the only sample available, the released v0.10 payload (build 1),
@@ -132,7 +170,8 @@ which answered "present" for every other v3 payload: every save written between
 those builds read a field its file does not contain and desynced the rest of the
 restore. Adding a field this way is still discouraged -- a version bump is
 clearer -- but when it happens the threshold must be recorded here and in both
-game trees.
+game trees. Version 4 and later payloads must not use build thresholds: commit
+counts do not identify a layout, and every v4 writer emits both fields.
 
 ## Unstamped Legacy Payloads
 
@@ -152,7 +191,9 @@ whole-file CRC/footer retroactively.
 Backward compatibility means a newer runtime reading an older save. It is
 supported only through an explicit decoder or allowlist:
 
-- current v4 and decoded v3 on the exact ABI path at or above the verified build floor;
+- current v4 on the exact ABI path, whatever build number its writer stamped;
+- decoded v3 on the exact ABI path at or above the verified build floor,
+  including its v3 player HUD layouts;
 - fields added within v3, through their recorded per-field build thresholds
   and legacy empty-physics-frame recognition;
 - the narrow same-build unstamped Windows x64 legacy path.
@@ -211,7 +252,10 @@ before merge.
 - an object/reference representation changes in a way an existing reader cannot
   preserve;
 - native structure layout or raw-write meaning changes;
-- SP and MP would otherwise interpret the same version differently; or
+- SP and MP would otherwise interpret the same version differently;
+- a serialized GUI definition (player HUD, objective, cinematic, weapon or
+  vehicle GUI) adds, removes or reorders windows, defined variables, scripts,
+  owned script values, or timeline or named events; or
 - a valid old payload would be consumed at a different offset.
 
 ### A payload-version bump is not normally required when
@@ -229,7 +273,10 @@ Every versioned change must update, in one change set:
 3. the wire-ABI/raw revision when native layout changes;
 4. footer/integrity versions when those structures change;
 5. corruption models, raw-write inventory, and ABI contracts;
-6. this policy, reliability documentation, and player-facing upgrade notes.
+6. the serialized-GUI pins, keeping every changed definition the previous
+   decoder still needs under `guis/savegame/v<N>/` and in both game libraries'
+   layout tables; and
+7. this policy, reliability documentation, and player-facing upgrade notes.
 
 The generated source hash is evidence and diagnosis for v3, not a substitute for
 this versioning decision. The v0.10 decoder above is a narrowly reviewed repair

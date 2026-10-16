@@ -884,7 +884,11 @@ static bool Session_ValidateSaveGamePayload( idFile *file, const idStr &savePath
 			common->Warning( "Savegame '%s' wire ABI '%s' is incompatible with this '%s' build",
 				savePath.c_str(), payloadWireABI.c_str(), Session_GetSaveGameWireABI() );
 			valid = false;
-		} else if ( payloadBuild < SESSION_OPENQ4_SAVEGAME_MINIMUM_SUPPORTED_BUILD ) {
+		} else if ( payloadVersion == SESSION_OPENQ4_SAVEGAME_PREVIOUS_COMPATIBILITY_VERSION &&
+				payloadBuild < SESSION_OPENQ4_SAVEGAME_MINIMUM_SUPPORTED_BUILD ) {
+			// Only v3 layouts vary with the writer's build. Build numbers are commit
+			// counts, so a v4 writer built from a source archive or shallow clone
+			// stamps 0 or 1 and must not be refused for it.
 			common->Warning( "Savegame '%s' was written by an older openQ4 (build %d, below build %d, the oldest this build can restore)",
 				savePath.c_str(), payloadBuild, SESSION_OPENQ4_SAVEGAME_MINIMUM_SUPPORTED_BUILD );
 			valid = false;

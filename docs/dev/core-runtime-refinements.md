@@ -16,8 +16,11 @@ map-compiler work in the checkout is preserved.
   prefix at every allocation increment.
 - Linear interpolation invalidates its cached sample when the start, end,
   duration or start time changes. Extrapolation caches the correct value when
-  sampling before its start. Explicit validity flags allow negative sample
-  times, including `-1`, without colliding with an invalid-cache sentinel.
+  sampling before its start. A NaN cached time marks the cache stale, so
+  negative sample times, including `-1`, are valid. A separate validity flag
+  was tried first, but saves store these interpolators as native images, and
+  the extra member broke every save holding a joint modifier or a running GUI
+  transition; see [Savegame Reliability](savegame-reliability.md#remaining-raw-serialization-raw1).
 - Accelerated linear and sine interpolation recompute velocity after endpoint
   changes. Reinitializing with a nonpositive duration clears prior phases and
   velocity; negative acceleration/deceleration durations clamp to zero.

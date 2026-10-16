@@ -7,6 +7,19 @@
 #pragma hdrstop
 
 #include "../Game_local.h"
+
+// raw1: idAnimator saves each jointMod_t as its native image, so these sizes are
+// savegame wire format. Every member is four bytes wide on supported ABIs, so a
+// type larger than its declared members has gained one. That moves every later
+// byte of every save holding a joint modifier, and needs a payload decision.
+static_assert( sizeof( idExtrapolate<idAngles> ) == sizeof( int ) + 3 * sizeof( float ) + 4 * sizeof( idAngles ),
+	"idExtrapolate<idAngles> changed size; it is saved inside jointMod_t" );
+static_assert( sizeof( idInterpolateAccelDecelLinear<idAngles> ) ==
+	4 * sizeof( float ) + 2 * sizeof( idAngles ) + sizeof( idExtrapolate<idAngles> ),
+	"idInterpolateAccelDecelLinear<idAngles> changed size; it is saved inside jointMod_t" );
+static_assert( sizeof( jointMod_t ) == 2 * sizeof( jointHandle_t ) + sizeof( idMat3 ) + sizeof( idVec3 ) +
+	2 * sizeof( jointModTransform_t ) + sizeof( idInterpolateAccelDecelLinear<idAngles> ) + sizeof( int ),
+	"jointMod_t changed size; idAnimator saves its native image" );
 #include "../../mpgame/Projectile.h"
 #include "../ai/AI.h"
 
@@ -3572,7 +3585,8 @@ void idAnimator::Restore( idRestoreGame *savefile ) {
 		savefile->Error( "idAnimator::Restore: invalid joint count %d", numJoints );
 	}
 	if ( numJoints != expectedJoints ) {
-		savefile->Error( "idAnimator::Restore: saved joint count %d does not match model joint count %d", numJoints, expectedJoints );
+		savefile->Error( "idAnimator::Restore: saved joint count %d does not match model joint count %d for model '%s' on entity '%s'",
+			numJoints, expectedJoints, modelDef ? modelDef->GetName() : "<none>", entity ? entity->GetName() : "<none>" );
 	}
 //RAVEN BEGIN
 //amccarthy: Added allocation tag

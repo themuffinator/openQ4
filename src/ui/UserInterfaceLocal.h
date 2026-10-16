@@ -77,6 +77,7 @@ public:
 	virtual void				WriteToDemoFile( class idDemoFile *f );
 	virtual bool				WriteToSaveGame( idFile *savefile ) const;
 	virtual bool				ReadFromSaveGame( idFile *savefile );
+	virtual bool				ReadFromSaveGameWithLayout( idFile *savefile, const char *layoutPath, int &restoredWindowValues );
 	virtual void				SetKeyBindingNames( void );
 	virtual bool				IsUniqued() const { return uniqued; };
 	virtual void				SetUniqued( bool b ) { uniqued = b; };

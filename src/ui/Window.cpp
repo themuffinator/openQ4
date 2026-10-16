@@ -55,6 +55,15 @@ If you have questions concerning this license or the applicable additional terms
 //  gui editor is more integrated into the window now
 #include "../tools/guied/GEWindowWrapper.h"
 
+// raw1: a running transition saves its interpolator as a native image
+// (WriteSaveGameTransition), so this size is savegame wire format. A member
+// beyond the declared ones moves every later byte of a save taken mid-transition.
+static_assert( sizeof( idExtrapolate<idVec4> ) == sizeof( int ) + 3 * sizeof( float ) + 4 * sizeof( idVec4 ),
+	"idExtrapolate<idVec4> changed size; GUI transitions save it" );
+static_assert( sizeof( idInterpolateAccelDecelLinear<idVec4> ) ==
+	4 * sizeof( float ) + 2 * sizeof( idVec4 ) + sizeof( idExtrapolate<idVec4> ),
+	"idInterpolateAccelDecelLinear<idVec4> changed size; GUI transitions save it" );
+
 namespace {
 static bool IsFullscreenBackdropRect( const idRectangle &drawRect ) {
 	const float epsilon = 0.01f;

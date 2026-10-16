@@ -2,6 +2,8 @@
 #ifndef __MATH_EXTRAPOLATE_H__
 #define __MATH_EXTRAPOLATE_H__
 
+#include <limits>
+
 /*
 ==============================================================================================
 
@@ -29,11 +31,11 @@ public:
 	type				GetCurrentValue( float time ) const;
 	type				GetCurrentSpeed( float time ) const;
 	bool				IsDone( float time ) const { return ( !( extrapolationType & EXTRAPOLATION_NOSTOP ) && time >= startTime + duration ); }
-	void				SetStartTime( float time ) { startTime = time; cacheValid = false; }
+	void				SetStartTime( float time ) { startTime = time; currentTime = CacheInvalidTime(); }
 	float				GetStartTime( void ) const { return startTime; }
 	float				GetEndTime( void ) const { return ( !( extrapolationType & EXTRAPOLATION_NOSTOP ) && duration > 0 ) ? startTime + duration : 0; }
 	float				GetDuration( void ) const { return duration; }
-	void				SetStartValue( const type &value ) { startValue = value; cacheValid = false; }
+	void				SetStartValue( const type &value ) { startValue = value; currentTime = CacheInvalidTime(); }
 	const type &		GetStartValue( void ) const { return startValue; }
 	const type &		GetBaseSpeed( void ) const { return baseSpeed; }
 	const type &		GetSpeed( void ) const { return speed; }
@@ -46,9 +48,13 @@ private:
 	type				startValue;
 	type				baseSpeed;
 	type				speed;
+	// Saves store this object's native image inside animator joint modifiers,
+	// so its layout is part of the savegame wire format. A NaN currentTime marks
+	// the cached sample stale; NaN never equals a sample time, so -1 is valid.
 	mutable float		currentTime;
 	mutable type		currentValue;
-	mutable bool		cacheValid;
+
+	static float		CacheInvalidTime( void ) { return std::numeric_limits<float>::quiet_NaN(); }
 };
 
 /*
@@ -63,8 +69,7 @@ ID_INLINE idExtrapolate<type>::idExtrapolate() {
 	memset( &startValue, 0, sizeof( startValue ) );
 	memset( &baseSpeed, 0, sizeof( baseSpeed ) );
 	memset( &speed, 0, sizeof( speed ) );
-	currentTime = -1;
-	cacheValid = false;
+	currentTime = CacheInvalidTime();
 	currentValue = startValue;
 }
 
@@ -81,8 +86,7 @@ ID_INLINE void idExtrapolate<type>::Init( const float startTime, const float dur
 	this->startValue = startValue;
 	this->baseSpeed = baseSpeed;
 	this->speed = speed;
-	currentTime = -1;
-	cacheValid = false;
+	currentTime = CacheInvalidTime();
 	currentValue = startValue;
 }
 
@@ -95,12 +99,11 @@ template< class type >
 ID_INLINE type idExtrapolate<type>::GetCurrentValue( float time ) const {
 	float deltaTime, s;
 
-	if ( cacheValid && time == currentTime ) {
+	if ( time == currentTime ) {
 		return currentValue;
 	}
 
 	currentTime = time;
-	cacheValid = true;
 
 	if ( time < startTime ) {
 		currentValue = startValue;
