@@ -57,6 +57,9 @@ Choose **Turbo Mode** on the single-player New Game page. The choice applies whe
 you start the new game; selecting Off starts a normal campaign even after a turbo
 game or a multiplayer session. Turbo increases movement speeds and removes weapon
 reloads, including the shotgun pump after each shot. Shots still use ammunition.
+Doors, platforms and elevators you operate move faster too. Machinery that the
+level's own scripts choreograph, such as the lift your squad rides in Hangar
+Perimeter, keeps its normal speed so those scenes stay in step.
 
 The console setting is `g_turboMode` (`0` off, `1` on). Enabling it during a reload
 cancels that reload; disabling it restores normal magazine and reload behavior.

@@ -375,6 +375,7 @@ jobs:
             tools/tests/renderer_vulkan_world_interaction_compatibility.py \
             tools/tests/rigid_body_recovery_diagnostics.py \
             tools/tests/savegame_corruption_contract.py \
+            tools/tests/turbo_scripted_movers.py \
             tools/tests/savegame_pointer_width_safety.py \
             tools/tests/savegame_v3_contract.py \
             tools/tests/sdl3_input_parity.py \
@@ -833,6 +834,7 @@ jobs:
           python tools/tests/renderer_vulkan_world_interaction_compatibility.py
           python tools/tests/rigid_body_recovery_diagnostics.py
           python tools/tests/savegame_corruption_contract.py
+          python tools/tests/turbo_scripted_movers.py
           python tools/tests/savegame_pointer_width_safety.py
           python tools/tests/savegame_v3_contract.py
           python tools/tests/sdl3_input_parity.py
