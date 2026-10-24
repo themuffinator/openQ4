@@ -2,7 +2,6 @@
 """Run production console input/layout with counted SDL APIs, without real input."""
 from pathlib import Path
 import argparse
-import configparser
 import re
 import shutil
 import subprocess
@@ -10,10 +9,12 @@ import sys
 import tempfile
 
 from filesystem_case_segments import function_body
+from pinned_archive_headers import pinned_include
 
 ROOT=Path(__file__).resolve().parents[2]
 SUPPORT=r'''
-// Use host SDL declarations for a host executable, then select the engine branch.
+// Use host SDL and standard library declarations for a host executable, then
+// select the engine branch. Apple's libc++ reads Android headers under __ANDROID__.
 #if defined(__ANDROID__)
 #undef __ANDROID__
 #define TEST_ANDROID 1
@@ -21,13 +22,14 @@ SUPPORT=r'''
 #define SDL_MAIN_HANDLED 1
 #define SDL_STATIC_LIB 1
 #include <SDL3/SDL.h>
+#include <cmath>
+#include <cstdio>
+#include <initializer_list>
+#include <limits>
+#include <stdexcept>
 #if defined(TEST_ANDROID)
 #define __ANDROID__ 1
 #endif
-#include <cmath>
-#include <cstdio>
-#include <limits>
-#include <stdexcept>
 #include "sys/sys_console_theme.h"
 #define USE_SDL3 1
 #undef INT_MAX
@@ -215,20 +217,17 @@ def source():
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--generate-native',type=Path)
-    parser.add_argument('--sdl-include',type=Path,help='SDL3 include directory; defaults to the pinned Meson wrap')
+    parser.add_argument('--sdl-include',type=Path,help='SDL3 include directory; defaults to the pinned Meson wrap, read from its archive when not provisioned')
     args=parser.parse_args()
     if args.generate_native:
         args.generate_native.write_text(source(),encoding='utf-8');return 0
-    sdl_include=args.sdl_include
-    if sdl_include is None:
-        wrap=configparser.ConfigParser()
-        wrap.read(ROOT/'subprojects/sdl3.wrap')
-        sdl_include=ROOT/'subprojects'/wrap['wrap-file']['directory']/'include'
-    if not (sdl_include/'SDL3/SDL.h').is_file():
-        raise RuntimeError('SDL3 headers required; prepare the pinned Meson dependency or pass --sdl-include')
     compiler=next((p for name in ('clang++','g++','c++') if (p:=shutil.which(name))),None)
     if not compiler:raise RuntimeError('C++17 compiler required')
+    (ROOT/'.tmp').mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='android-console-',dir=ROOT/'.tmp') as directory:
+        sdl_include=args.sdl_include or pinned_include('sdl3','SDL3',Path(directory))
+        if not (sdl_include/'SDL3/SDL.h').is_file():
+            raise RuntimeError(f'SDL3 headers are missing from {sdl_include}')
         cpp=Path(directory)/'console.cpp';exe=cpp.with_suffix('.exe');cpp.write_text(source(),encoding='utf-8')
         for platform in ('android','desktop'):
             defines=['-D__ANDROID__=1'] if platform=='android' else []

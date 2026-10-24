@@ -199,6 +199,7 @@ jobs:
             tools/tests/savegame_restore_recovery_runtime.py \
             tools/tests/ui_generated_image_runtime.py \
             tools/tests/filesystem_case_segments.py \
+            tools/tests/pinned_archive_headers.py \
             tools/tests/filesystem_mod_manifest.py \
             tools/tests/filesystem_write_qpath_safety.py \
             tools/tests/game_class_allocator_alignment.py \
@@ -507,6 +508,8 @@ jobs:
             tools/tests/ui_capture_system_settings.py \
             tools/tests/ui_capture_system_page.py \
             tools/tests/ui_capture_system_exit.py \
+            tools/tests/ui_capture_multiplayer_rosters.py \
+            tools/tests/ui_capture_system_refresh.py \
             tools/tests/renderer_vid_restart_route.py \
             tools/tests/renderer_image_recovery_owner.py \
             tools/tests/renderer_image_recovery_module.py \
@@ -666,6 +669,7 @@ jobs:
           python tools/tests/ui_engine_thread.py
           python tools/tests/ui_generated_images.py
           python tools/tests/filesystem_case_segments.py
+          python tools/tests/pinned_archive_headers.py
           python tools/tests/filesystem_mod_manifest.py
           python tools/tests/filesystem_write_qpath_safety.py
           python tools/tests/game_class_allocator_alignment.py
@@ -932,6 +936,8 @@ jobs:
           python tools/tests/ui_capture_system_settings.py
           python tools/tests/ui_capture_system_page.py
           python tools/tests/ui_capture_system_exit.py
+          python tools/tests/ui_capture_multiplayer_rosters.py
+          python tools/tests/ui_capture_system_refresh.py
           python tools/tests/renderer_vid_restart_route.py
           python tools/tests/renderer_image_recovery_owner.py --mutations
           python tools/tests/renderer_image_recovery_module.py --mutations

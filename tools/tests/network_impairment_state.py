@@ -30,8 +30,8 @@ int main() {
 CONTROLS = (
     ("release ignores the due time", "if ( !AtOrBefore( entries[i].due, now ) ) {\n\t\t\t\t\tcontinue;\n\t\t\t\t}", ""),
     ("no duplication", "const int copies = random.Chance( settings.duplicatePercent ) ? 2 : 1;", "const int copies = 1;"),
-    ("no jitter", "entry.due = now + settings.latencyMsec + random.UpTo( settings.jitterMsec );",
-     "entry.due = now + settings.latencyMsec;"),
+    ("no jitter", "static_cast<uint32_t>( settings.latencyMsec ) +\n\t\t\t\tstatic_cast<uint32_t>( random.UpTo( settings.jitterMsec ) ) );",
+     "static_cast<uint32_t>( settings.latencyMsec ) );"),
     ("clock wrap compared directly",
      "return static_cast<int32_t>( static_cast<uint32_t>( a ) - static_cast<uint32_t>( b ) ) <= 0;", "return a <= b;"),
     ("an oversize datagram stops the drain", "stats.discarded++;\n\t\t\t\tcontinue;", "stats.discarded++;\n\t\t\t\treturn false;"),

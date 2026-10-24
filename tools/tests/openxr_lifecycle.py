@@ -11,6 +11,7 @@ import sys
 import tempfile
 
 from filesystem_case_segments import function_body
+from pinned_archive_headers import pinned_include
 
 ROOT = Path(__file__).resolve().parents[2]
 SUPPORT = r'''
@@ -285,9 +286,10 @@ def main() -> None:
     compiler = next((p for name in ("clang++", "g++", "c++") if (p := shutil.which(name))), None)
     if not compiler:
         raise RuntimeError("C++17 compiler required")
-    headers = ROOT / "subprojects/OpenXR-SDK-release-1.1.63/include"
     (ROOT / ".tmp").mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="xr-lifecycle-", dir=ROOT / ".tmp") as directory:
+        # The script smoke job runs before Meson provisions OpenXR.
+        headers = pinned_include("openxr", "openxr", Path(directory))
         cpp, executable = Path(directory) / "test.cpp", Path(directory) / "test.exe"
         cpp.write_text(source(), encoding="utf-8")
         subprocess.run([compiler, "-std=c++17", "-I", str(headers), str(cpp), "-o", str(executable)], check=True)

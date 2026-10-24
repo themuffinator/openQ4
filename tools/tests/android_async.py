@@ -11,11 +11,21 @@ from presentation_clock_ownership import definition
 
 ROOT = Path(__file__).resolve().parents[2]
 SUPPORT = r'''
+// Use host standard library declarations, then select the engine branch.
+// Apple's libc++ reads Android headers under __ANDROID__.
+#if defined(__ANDROID__)
+#undef __ANDROID__
+#define TEST_ANDROID 1
+#endif
 #include <atomic>
 #include <cmath>
 #include <cstdio>
+#include <initializer_list>
 #include <stdexcept>
 #include <vector>
+#if defined(TEST_ANDROID)
+#define __ANDROID__ 1
+#endif
 static void require(bool value,const char* message){if(!value)throw std::runtime_error(message);}
 static int now=0,com_ticNumber=0,perCall=0,asyncCalls=0,events=0;
 static bool com_shuttingDown=false,lastTicMsecValid=true,smooth=false,stopRequested=false;

@@ -133,7 +133,9 @@ public:
 			}
 			entries.push_back( entry_t() );
 			entry_t &entry = entries.back();
-			entry.due = now + settings.latencyMsec + random.UpTo( settings.jitterMsec );
+			// The clock may wrap, so add as unsigned; signed overflow is undefined.
+			entry.due = static_cast<int32_t>( static_cast<uint32_t>( now ) + static_cast<uint32_t>( settings.latencyMsec ) +
+				static_cast<uint32_t>( random.UpTo( settings.jitterMsec ) ) );
 			entry.offer = offer;
 			entry.arrival = nextArrival++;
 			entry.address = address;

@@ -27,10 +27,11 @@ typedef idNetworkImpairment::queue_t<int> impairmentQueue_t;
 static std::vector<int> DrainImpairment( impairmentQueue_t &queue, const idNetworkImpairment::settings_t &settings,
 		const int count, const int spacingMsec, const int start, std::vector<int> *releaseTimes = nullptr ) {
 	std::vector<int> released;
-	int now = start;
 	int offered = 0;
-	for ( int step = 0; step < count * spacingMsec + 4000; step++, now++ ) {
-		while ( offered < count && now - start >= offered * spacingMsec ) {
+	for ( int step = 0; step < count * spacingMsec + 4000; step++ ) {
+		// step is the elapsed time; the clock itself may wrap past INT_MAX.
+		const int now = static_cast<int32_t>( static_cast<uint32_t>( start ) + static_cast<uint32_t>( step ) );
+		while ( offered < count && step >= offered * spacingMsec ) {
 			const unsigned char payload = static_cast<unsigned char>( offered );
 			queue.Offer( settings, now, offered, &payload, 1 );
 			offered++;
@@ -41,7 +42,7 @@ static std::vector<int> DrainImpairment( impairmentQueue_t &queue, const idNetwo
 		while ( queue.Pop( now, address, buffer, sizeof( buffer ), size ) ) {
 			released.push_back( buffer[0] );
 			if ( releaseTimes != nullptr ) {
-				releaseTimes->push_back( now - start - address * spacingMsec );
+				releaseTimes->push_back( step - address * spacingMsec );
 			}
 		}
 	}

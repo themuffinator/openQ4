@@ -14,11 +14,20 @@ from filesystem_case_segments import function_body
 
 ROOT = Path(__file__).resolve().parents[2]
 SUPPORT = r'''
+// Use host standard library declarations, then select the engine branch.
+// Apple's libc++ reads Android headers under __ANDROID__.
+#if defined(__ANDROID__)
+#undef __ANDROID__
+#define TEST_ANDROID 1
+#endif
 #include <cstdio>
 #include <cstring>
 #include <stdexcept>
 #include <string>
 #include <vector>
+#if defined(TEST_ANDROID)
+#define __ANDROID__ 1
+#endif
 #define SDLCALL
 #define USE_SDL3 1
 static void require(bool value,const char* message){if(!value)throw std::runtime_error(message);}
