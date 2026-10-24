@@ -372,7 +372,10 @@ def compile_deadline_harness() -> None:
 
     tmp_root = ROOT / ".tmp"
     tmp_root.mkdir(exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="mp-pause-contract-", dir=tmp_root) as raw:
+    # The Windows ARM64 runners refuse to delete the just-run harness executable
+    # (WinError 5) after the checks pass; a leftover file in .tmp must not turn
+    # that pass into a failure.
+    with tempfile.TemporaryDirectory(prefix="mp-pause-contract-", dir=tmp_root, ignore_cleanup_errors=True) as raw:
         temp = Path(raw)
         source = temp / "deadline_harness.cpp"
         source.write_text(
@@ -486,7 +489,10 @@ int main() {
     compiler = shutil.which("clang++") or shutil.which("g++") or shutil.which("c++")
     if compiler is None:
         raise AssertionError("client prediction clock check requires a C++ compiler")
-    with tempfile.TemporaryDirectory(prefix="mp-pause-prediction-", dir=ROOT / ".tmp") as raw:
+    # The Windows ARM64 runners refuse to delete the just-run harness executable
+    # (WinError 5) after the checks pass; a leftover file in .tmp must not turn
+    # that pass into a failure.
+    with tempfile.TemporaryDirectory(prefix="mp-pause-prediction-", dir=ROOT / ".tmp", ignore_cleanup_errors=True) as raw:
         temp = Path(raw)
         source, executable = temp / "prediction.cpp", temp / "prediction.exe"
         source.write_text(source_text, encoding="utf-8")
@@ -660,7 +666,10 @@ def compile_match_clock_harness() -> None:
 
     tmp_root = ROOT / ".tmp"
     tmp_root.mkdir(exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="mp-match-clock-", dir=tmp_root) as raw:
+    # The Windows ARM64 runners refuse to delete the just-run harness executable
+    # (WinError 5) after the checks pass; a leftover file in .tmp must not turn
+    # that pass into a failure.
+    with tempfile.TemporaryDirectory(prefix="mp-match-clock-", dir=tmp_root, ignore_cleanup_errors=True) as raw:
         temp = Path(raw)
         source = temp / "match_clock_harness.cpp"
         source.write_text(MATCH_CLOCK_HARNESS.lstrip(), encoding="utf-8", newline="\n")

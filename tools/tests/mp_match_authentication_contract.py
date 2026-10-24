@@ -486,7 +486,10 @@ def locate_msvc() -> tuple[Path, str] | None:
 def executable_contract() -> None:
     temp_root = ROOT / ".tmp"
     temp_root.mkdir(exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="match-auth-", dir=temp_root) as temp:
+    # The Windows ARM64 runners refuse to delete the just-run harness executable
+    # (WinError 5) after the checks pass; a leftover file in .tmp must not turn
+    # that pass into a failure.
+    with tempfile.TemporaryDirectory(prefix="match-auth-", dir=temp_root, ignore_cleanup_errors=True) as temp:
         temp_dir = Path(temp)
         harness = temp_dir / "match_authentication_contract.cpp"
         executable = temp_dir / "match_authentication_contract.exe"
