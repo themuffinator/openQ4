@@ -39,6 +39,7 @@ public:
 	void Trigger( int time ) override;
 	bool WriteToSaveGame( idFile *file ) const override;
 	bool ReadFromSaveGame( idFile *file ) override;
+	bool ReadFromSaveGameWithLayout( idFile *file, const char *layoutPath, int &restoredWindowValues ) override;
 	void SetKeyBindingNames() override;
 	void SetCursor( float x, float y ) override;
 	float CursorX() override;

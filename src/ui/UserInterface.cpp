@@ -52,6 +52,8 @@ If you have questions concerning this license or the applicable additional terms
 #include <limits>
 #include <cstring>
 #include <unordered_set>
+#include <functional>
+#include <typeinfo>
 #include "../idlib/ParserSourceObserver.h"
 #include "../framework/DeclReferenceObserver.h"
 
@@ -1957,6 +1959,160 @@ bool idUserInterfaceLocal::ReadFromSaveGame( idFile *savefile ) {
 	desktop->ReadFromSaveGame( savefile );
 	SetCursor( restoredCursorX, restoredCursorY );
 
+	return true;
+}
+
+namespace {
+
+struct uiSavedWindowVar_t {
+	const char *	name;
+	idWinVar *		var;
+};
+
+}
+
+bool idUserInterfaceLocal::ReadFromSaveGameWithLayout( idFile *savefile, const char *layoutPath, int &restoredWindowValues ) {
+	restoredWindowValues = 0;
+	if ( savefile == NULL || desktop == NULL || layoutPath == NULL || layoutPath[ 0 ] == '\0' ) {
+		common->Warning( "idUserInterfaceLocal::ReadFromSaveGameWithLayout: gui '%s' has no valid input file, parsed desktop or layout",
+			source.c_str() );
+		return false;
+	}
+
+	// Two private parses of the saved definition: one consumes the save with every
+	// normal check, the other shows what that definition starts with. A window
+	// value that differs between them was changed while the game ran -- a boss bar
+	// a script made visible, for example -- and is what this GUI must keep.
+	idUserInterfaceLocal saved( false );
+	idUserInterfaceLocal initial( false );
+	if ( !saved.InitFromFile( layoutPath, true, false ) || !initial.InitFromFile( layoutPath, true, false ) ||
+		 saved.desktop == NULL || initial.desktop == NULL ) {
+		common->Warning( "idUserInterfaceLocal::ReadFromSaveGameWithLayout: gui '%s' could not parse its saved layout '%s'",
+			source.c_str(), layoutPath );
+		return false;
+	}
+	if ( !saved.ReadFromSaveGame( savefile ) ) {
+		return false;
+	}
+
+	// The same window variables the window save code writes, by script name.
+	const auto windowVars = []( const drawWin_t &window, idList<uiSavedWindowVar_t> &vars ) {
+		vars.Clear();
+		if ( window.win != NULL ) {
+			idWindow *w = window.win;
+			const uiSavedWindowVar_t fixed[] = {
+				{ "notime", &w->noTime }, { "visible", &w->visible }, { "rect", &w->rect },
+				{ "backcolor", &w->backColor }, { "matcolor", &w->matColor }, { "forecolor", &w->foreColor },
+				{ "hovercolor", &w->hoverColor }, { "bordercolor", &w->borderColor }, { "textscale", &w->textScale },
+				{ "noevents", &w->noEvents }, { "rotate", &w->rotate }, { "text", &w->text },
+				{ "background", &w->backGroundName }, { "nocursor", &w->hideCursor },
+			};
+			for ( int i = 0; i < static_cast<int>( sizeof( fixed ) / sizeof( fixed[ 0 ] ) ); i++ ) {
+				vars.Append( fixed[ i ] );
+			}
+			for ( int i = 0; i < w->definedVars.Num(); i++ ) {
+				if ( w->definedVars[ i ] != NULL && w->definedVars[ i ]->GetName()[ 0 ] != '\0' ) {
+					const uiSavedWindowVar_t defined = { w->definedVars[ i ]->GetName(), w->definedVars[ i ] };
+					vars.Append( defined );
+				}
+			}
+		} else if ( window.simp != NULL ) {
+			idSimpleWindow *s = window.simp;
+			const uiSavedWindowVar_t fixed[] = {
+				{ "text", &s->text }, { "visible", &s->visible }, { "rect", &s->rect },
+				{ "backcolor", &s->backColor }, { "matcolor", &s->matColor }, { "forecolor", &s->foreColor },
+				{ "bordercolor", &s->borderColor }, { "textscale", &s->textScale }, { "rotate", &s->rotate },
+				{ "shear", &s->shear }, { "background", &s->backGroundName }, { "nocursor", &s->hideCursor },
+			};
+			for ( int i = 0; i < static_cast<int>( sizeof( fixed ) / sizeof( fixed[ 0 ] ) ); i++ ) {
+				vars.Append( fixed[ i ] );
+			}
+		}
+	};
+	const auto findVar = []( const idList<uiSavedWindowVar_t> &vars, const char *name ) -> idWinVar * {
+		for ( int i = 0; i < vars.Num(); i++ ) {
+			if ( idStr::Icmp( vars[ i ].name, name ) == 0 ) {
+				return vars[ i ].var;
+			}
+		}
+		return NULL;
+	};
+	const auto findWindow = []( idWindow *root, const char *name, drawWin_t &found ) {
+		drawWin_t *match = root->FindChildByName( name );
+		if ( match == NULL ) {
+			return false;
+		}
+		found = *match;	// FindChildByName returns a shared static for the root itself
+		return true;
+	};
+
+	int changedValues = 0;
+	idList<uiSavedWindowVar_t> savedVars, initialVars, liveVars;
+	std::function<void( const drawWin_t & )> transfer = [&]( const drawWin_t &savedWindow ) {
+		const char *windowName = savedWindow.win != NULL ? savedWindow.win->name.c_str() : savedWindow.simp->name.c_str();
+		drawWin_t initialWindow;
+		drawWin_t liveWindow;
+		if ( windowName[ 0 ] != '\0' && findWindow( initial.desktop, windowName, initialWindow ) &&
+			 findWindow( desktop, windowName, liveWindow ) &&
+			 ( initialWindow.win != NULL ) == ( savedWindow.win != NULL ) ) {
+			windowVars( savedWindow, savedVars );
+			windowVars( initialWindow, initialVars );
+			windowVars( liveWindow, liveVars );
+			for ( int i = 0; i < savedVars.Num(); i++ ) {
+				idWinVar *savedVar = savedVars[ i ].var;
+				idWinVar *initialVar = findVar( initialVars, savedVars[ i ].name );
+				idWinVar *liveVar = findVar( liveVars, savedVars[ i ].name );
+				// GUI-state-bound variables already arrived with the state dictionary.
+				if ( initialVar == NULL || liveVar == NULL || liveVar->GetDict() != NULL ||
+					 typeid( *savedVar ) != typeid( *initialVar ) || typeid( *savedVar ) != typeid( *liveVar ) ) {
+					continue;
+				}
+				// A script `set` stores its value and clears eval, so the variable no
+				// longer follows its expression (idRegister::GetFromRegs skips it). That
+				// override matters even when the value equals the definition's: carry
+				// the saved eval with the value, or the next evaluation rewrites it.
+				// A variable still following its expression keeps eval and stays live.
+				const bool valueChanged = idStr::Cmp( savedVar->c_str(), initialVar->c_str() ) != 0;
+				const bool evalChanged = savedVar->GetEval() != initialVar->GetEval();
+				if ( !valueChanged && !evalChanged ) {
+					continue;
+				}
+				common->DPrintf( "gui '%s': restored saved %s::%s '%s' eval %d (layout '%s' starts with '%s' eval %d)\n",
+					source.c_str(), windowName, savedVars[ i ].name, savedVar->c_str(), savedVar->GetEval() ? 1 : 0,
+					layoutPath, initialVar->c_str(), initialVar->GetEval() ? 1 : 0 );
+				liveVar->Set( savedVar->c_str() );
+				liveVar->SetEval( savedVar->GetEval() );
+				changedValues++;
+			}
+		}
+		if ( savedWindow.win != NULL ) {
+			for ( int i = 0; i < savedWindow.win->drawWindows.Num(); i++ ) {
+				transfer( savedWindow.win->drawWindows[ i ] );
+			}
+		}
+	};
+
+	// The Remastered peer rejoins the restored state at its next draw, as after
+	// an ordinary restore.
+	delete remastered;
+	remastered = NULL;
+	evaluatedHudValid = false;
+	state = saved.state;
+	active = saved.active;
+	interactive = saved.interactive;
+	uniqued = saved.uniqued;
+	time = saved.time;
+	activateStr = saved.activateStr;
+	pendingCmd = saved.pendingCmd;
+	returnCmd = saved.returnCmd;
+
+	drawWin_t savedDesktop;
+	savedDesktop.simp = NULL;
+	savedDesktop.win = saved.desktop;
+	transfer( savedDesktop );
+	SetCursor( saved.cursorX, saved.cursorY );
+
+	restoredWindowValues = changedValues;
 	return true;
 }
 

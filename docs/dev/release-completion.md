@@ -414,6 +414,21 @@ completed release material here and publish curated notes in `releases/`.
   credit. Distinguish its Apple Silicon/Intel Universal 2 download from our
   unsigned Apple Silicon preview packages on GitHub.
 
+- [ ] Keep HUD window state when an older save's HUD is read through its earlier
+  definition. Copying only the GUI state dictionary lost values scripts set on
+  windows: a save taken in a boss fight loaded without its boss bar, because
+  `showBossBar` sets `BossBar::visible` and restoring the boss does not replay it.
+  `idUserInterface::ReadFromSaveGameWithLayout` now carries every window value the
+  game changed from the saved definition, with whether it still follows its
+  expression, as well as the state, flags and cursor. A HUD a level script hid
+  (as `game/mcc_1` does from its start) stays hidden after loading an older save.
+- [ ] Add `savegame_gui_layout_contract.py`, which pins every serialized openQ4 GUI
+  and the `guis/savecompat/` revisions, and `savegame_restore_matrix.py`, an opt-in
+  runtime restore check whose `--self-test` runs in CI.
+
+Candidate save release wording: Older saves taken during a boss fight now load
+with the boss's health bar on screen.
+
 - [x] Add one managed audio-payload budget across CPU/OpenAL data, decoder arenas,
   streams and envelopes. Bound ordinary PCM fallback queues, decode RoQ through
   fixed input scratch and keep pressure-refused samples retryable. Stock and

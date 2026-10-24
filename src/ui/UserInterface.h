@@ -123,6 +123,13 @@ public:
 	virtual float				CursorY( void ) = 0;
 	virtual bool				GetMaxTextIndex( const char *windowName, const char *text, wrapInfo_t& wrapInfo ) const = 0;
 
+	// Restores a save written with an earlier definition of this GUI. A private
+	// parse of layoutPath consumes the saved window tree; the state dictionary,
+	// interaction flags, cursor, and every window value the save changed from that
+	// definition, together with whether it still follows its expression, move to
+	// this GUI where a same-named window and variable exist.
+	// Appended last so the vtable slots above stay where earlier modules expect.
+	virtual bool				ReadFromSaveGameWithLayout( idFile *savefile, const char *layoutPath, int &restoredWindowValues ) { restoredWindowValues = 0; return false; }
 };
 
 

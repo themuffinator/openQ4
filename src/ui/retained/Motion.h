@@ -3,6 +3,8 @@
 
 #include "Document.h"
 
+#include <cstdint>
+
 namespace openq4::ui {
 
 using PropertyKey = std::pair<std::string, std::string>;

@@ -191,6 +191,13 @@ bool idUserInterfaceDeferred::ReadFromSaveGame( idFile *file ) {
 	RefreshThinking();
 	return result;
 }
+bool idUserInterfaceDeferred::ReadFromSaveGameWithLayout( idFile *file, const char *layoutPath, int &restoredWindowValues ) {
+	restoredWindowValues = 0;
+	if ( backend == NULL ) { return false; }
+	const bool result = backend->ReadFromSaveGameWithLayout( file, layoutPath, restoredWindowValues );
+	RefreshThinking();
+	return result;
+}
 void idUserInterfaceDeferred::SetKeyBindingNames() { if ( backend != NULL ) { backend->SetKeyBindingNames(); } }
 void idUserInterfaceDeferred::SetCursor( float x, float y ) {
 	if ( backend != NULL ) { backend->SetCursor( x, y ); return; }

@@ -639,6 +639,7 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         root / "tools" / "tests" / "renderer_vulkan_world_interaction_compatibility.py",
         root / "tools" / "tests" / "rigid_body_recovery_diagnostics.py",
         root / "tools" / "tests" / "savegame_corruption_contract.py",
+        root / "tools" / "tests" / "savegame_gui_layout_contract.py",
         root / "tools" / "tests" / "savegame_pointer_width_safety.py",
         root / "tools" / "tests" / "savegame_v3_contract.py",
         root / "tools" / "tests" / "sdl3_input_parity.py",
@@ -811,6 +812,7 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         (root / "tools" / "tests" / 'vk_display_color_mapping.py', []),
         (root / "tools" / "tests" / 'vk_display_color_mapping_shader_pin.py', []),
         (root / "tools" / "tests" / 'vk_display_color_mapping_capture.py', ['--self-test']),
+        (root / "tools" / "tests" / 'savegame_restore_matrix.py', ['--self-test']),
     ]
     failures: list[str] = []
     for test_script, test_args in [(path, []) for path in tests] + argument_checks:

@@ -1006,7 +1006,23 @@ comes from an incompatible version.", and loaded the 0.12.0 checkpoint into
 Air Defense Bunker with the HUD restored through its earlier definition.
 
 The harness and fixtures live under `.tmp/savecompat/` (`load_saves.py`,
-`menu_check.py`, `restamp_save.py`, `make_save.py`). At that review, no save written by the
+`menu_check.py`, `restamp_save.py`, `make_save.py`). The in-repo
+`tools/tests/savegame_restore_matrix.py` restores a set of saves with a staged
+client, optionally restamped to other build numbers, never deletes anything and
+refuses inputs inside its output directory; `--self-test` runs in CI.
+`tools/tests/savegame_gui_layout_contract.py` pins every serialized openQ4 GUI and
+the `guis/savecompat/` revisions, so editing one fails until it is classified.
+
+GUI-revision window state, Linux x64, 2026-10-18. A v3 save from build 1109 on
+`game/mcc_1`, whose map script sends `hideHud` (`set "p_health::visible" "0"` and
+likewise for armor, overriding their expressions), was restored, armor was then
+changed and 300 frames run, with `hudGet` reading the live HUD before and after
+(`savegame_restore_matrix.py --after-load ... --expect-log ...`). Copying values
+alone left both panels visible (`= 1`) from the first update, because their
+evaluation flags stayed set and `p_armor`'s saved `0` equals its definition's.
+Carrying the flags keeps both at `0` throughout. The same build keeps
+`Bossbar::visible = 1` after 300 frames on the `game/waste` boss-fight save, and
+restores the 0.14.000 build-1574 and v0.13.2 build-878 saves. At the earlier review, no save written by the
 0.6.95, 0.8.0, 0.10.0, 0.11.0 or 0.13.0 binaries themselves was available, and
 Linux and macOS old-save restores are untested.
 

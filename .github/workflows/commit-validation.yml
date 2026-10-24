@@ -375,6 +375,7 @@ jobs:
             tools/tests/renderer_vulkan_world_interaction_compatibility.py \
             tools/tests/rigid_body_recovery_diagnostics.py \
             tools/tests/savegame_corruption_contract.py \
+            tools/tests/savegame_gui_layout_contract.py \
             tools/tests/savegame_pointer_width_safety.py \
             tools/tests/savegame_v3_contract.py \
             tools/tests/sdl3_input_parity.py \
@@ -577,6 +578,7 @@ jobs:
             tools/tests/vk_display_color_mapping.py \
             tools/tests/vk_display_color_mapping_shader_pin.py \
             tools/tests/vk_display_color_mapping_capture.py \
+            tools/tests/savegame_restore_matrix.py \
             tools/tests/vk_temporal_resolve_shader_pin.py \
             tools/tests/vscode_fast_build.py
           bash -n tools/build/meson_setup.sh
@@ -833,6 +835,7 @@ jobs:
           python tools/tests/renderer_vulkan_world_interaction_compatibility.py
           python tools/tests/rigid_body_recovery_diagnostics.py
           python tools/tests/savegame_corruption_contract.py
+          python tools/tests/savegame_gui_layout_contract.py
           python tools/tests/savegame_pointer_width_safety.py
           python tools/tests/savegame_v3_contract.py
           python tools/tests/sdl3_input_parity.py
@@ -988,6 +991,7 @@ jobs:
           python tools/tests/vk_display_color_mapping.py
           python tools/tests/vk_display_color_mapping_shader_pin.py
           python tools/tests/vk_display_color_mapping_capture.py --self-test
+          python tools/tests/savegame_restore_matrix.py --self-test
           python tools/tests/vk_temporal_resolve_shader_pin.py
           python tools/tests/vscode_fast_build.py
 

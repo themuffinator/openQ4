@@ -2181,26 +2181,21 @@ idRestoreGame::ReadUserInterfaceRevision
 
 A GUI record written for an earlier revision of its file (SaveGameReleases.h)
 follows that revision's structure, so it is read into a copy built from that
-revision. Its state carries over to the current GUI, whose windows start from
-their definition.
+revision. Its state carries over to the current GUI, and so does every window
+value the game had changed from that revision -- a boss bar a script made
+visible, for example -- where the current GUI has the same window and variable.
+Animation progress is not carried over.
 ================
 */
 void idRestoreGame::ReadUserInterfaceRevision( idUserInterface *ui, const openQ4SaveGameGuiRevision_t &revision ) {
-	idUserInterface *saved = uiManager->FindGui( revision.savedDefinition, true, true, true );
-	if ( saved == NULL ) {
-		Error( "idRestoreGame::ReadUserInterface: '%s' needs its earlier definition '%s'", revision.name, revision.savedDefinition );
+	const int offset = file->Tell();
+	int restoredWindowValues = 0;
+	if ( !ui->ReadFromSaveGameWithLayout( file, revision.savedDefinition, restoredWindowValues ) ) {
+		Error( "idRestoreGame::ReadUserInterface: '%s' at offset %d failed to read with its earlier definition '%s'",
+			revision.name, offset, revision.savedDefinition );
 	}
-	if ( saved->ReadFromSaveGame( file ) == false ) {
-		uiManager->DeAlloc( saved );
-		Error( "idSaveGame::ReadUserInterface: ui failed to read properly\n" );
-	}
-	const idDict &state = saved->State();
-	for ( int i = 0; i < state.GetNumKeyVals(); i++ ) {
-		const idKeyValue *kv = state.GetKeyVal( i );
-		ui->SetStateString( kv->GetKey(), kv->GetValue() );
-	}
-	uiManager->DeAlloc( saved );
-	common->DPrintf( "Restored '%s' from a save written for its earlier definition\n", revision.name );
+	common->DPrintf( "Restored '%s' from a save written for its earlier definition (%d changed window values)\n",
+		revision.name, restoredWindowValues );
 }
 
 // RAVEN BEGIN

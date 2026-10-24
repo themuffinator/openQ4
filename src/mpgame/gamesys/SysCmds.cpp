@@ -1015,6 +1015,28 @@ static void Cmd_Kick_f( const idCmdArgs &args ) {
 
 /*
 ==================
+Cmd_HudGet_f
+
+Prints a window variable of the local player's own HUD, such as
+p_armor::visible, after any expression evaluation it is subject to.
+==================
+*/
+static void Cmd_HudGet_f( const idCmdArgs &args ) {
+	idPlayer *player = gameLocal.GetLocalPlayer();
+	if ( args.Argc() != 2 || player == NULL || player->hud == NULL ) {
+		gameLocal.Printf( "usage: hudGet <window::variable> with a local player HUD\n" );
+		return;
+	}
+	idStr value;
+	if ( !player->hud->GetPresentationValue( args.Argv( 1 ), value ) ) {
+		gameLocal.Printf( "hudGet: unknown HUD variable '%s'\n", args.Argv( 1 ) );
+		return;
+	}
+	gameLocal.Printf( "hudGet %s = %s\n", args.Argv( 1 ), value.c_str() );
+}
+
+/*
+==================
 Cmd_GetViewpos_f
 ==================
 */
@@ -4155,6 +4177,7 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "kill",					Cmd_Kill_f,					CMD_FL_GAME,				"kills the player" );
 	cmdSystem->AddCommand( "where",					Cmd_GetViewpos_f,			CMD_FL_GAME|CMD_FL_CHEAT,	"prints the current view position" );
 	cmdSystem->AddCommand( "getviewpos",			Cmd_GetViewpos_f,			CMD_FL_GAME|CMD_FL_CHEAT,	"prints the current view position" );
+	cmdSystem->AddCommand( "hudGet",				Cmd_HudGet_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"prints a window variable of the local player's HUD" );
 	cmdSystem->AddCommand( "setviewpos",			Cmd_SetViewpos_f,			CMD_FL_GAME|CMD_FL_CHEAT,	"sets the current view position" );
 	cmdSystem->AddCommand( "gotolevelshot",			Cmd_GotoLevelshot_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"moves the view to the levelshot position" );
 	cmdSystem->AddCommand( "teleport",				Cmd_Teleport_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"teleports the player to an entity location", idGameLocal::ArgCompletion_EntityName );
