@@ -2951,6 +2951,20 @@ int idRestoreGame::GetBuildNumber( void ) {
 
 /*
 =====================
+idRestoreGame::RemainingBytes
+=====================
+*/
+int idRestoreGame::RemainingBytes( void ) const {
+	const int length = file->Length();
+	const int offset = file->Tell();
+	if ( length <= 0 || offset < 0 || offset > length ) {
+		return -1;
+	}
+	return length - offset;
+}
+
+/*
+=====================
 idRestoreGame::GetOpenQ4SaveGameCompatibilityVersion
 =====================
 */

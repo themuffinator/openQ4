@@ -119,7 +119,12 @@ void rvViewWeapon::Restore( idRestoreGame *savefile ) {
 	int i;
 	int num;
 	savefile->ReadInt ( num );
-	if ( num < 0 || num > MAX_SAVEGAME_GUI_EVENTS ) {
+	// openQ4: bounded by the bytes left, each event being at least its length,
+	// not by a fixed cap. Saves from every build hold however many events the
+	// weapon queued, and before UpdateGUI dropped them a weapon without a view
+	// GUI queued one per shot or switch, so real saves carry hundreds (#192).
+	const int remaining = savefile->RemainingBytes();
+	if ( num < 0 || ( remaining >= 0 && num > remaining / (int)sizeof( int ) ) ) {
 		savefile->Error( "rvViewWeapon::Restore: invalid pending GUI event count %d", num );
 	}
 	pendingGUIEvents.SetNum ( num );
@@ -2819,7 +2824,15 @@ void rvWeapon::UpdateGUI( void ) {
 	}
 	
 	gui = viewModel->GetRenderEntity()->gui[0];
-	if ( !gui || status == WP_HOLSTERED ) {
+	if ( !gui ) {
+		// openQ4: nothing can receive these. The blaster, gauntlet, grenade launcher,
+		// lightning gun and dark matter gun have no view GUI, and the next weapon that
+		// has one posts its own weapon_init. Retail kept them, so the queue grew with
+		// every shot and switch and was written into every save (#192).
+		viewModel->pendingGUIEvents.Clear();
+		return;
+	}
+	if ( status == WP_HOLSTERED ) {
 		return;
 	}
 	int g;

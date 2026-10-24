@@ -200,6 +200,9 @@ public:
 
 	//						Used to retrieve the saved game buildNumber from within class Restore methods
 	int						GetBuildNumber( void );
+							// Bytes left in the savegame, or -1 when the file cannot tell; bounds list counts
+							// whose entries each take at least a known number of bytes
+	int						RemainingBytes( void ) const;
 	int						GetOpenQ4SaveGameCompatibilityVersion( void ) const;
 	bool					HasOpenQ4SaveGameCompatibilityStamp( void ) const;
 	bool					IsOpenQ4SaveGameCompatible( void ) const;

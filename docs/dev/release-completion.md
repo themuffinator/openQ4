@@ -414,6 +414,22 @@ completed release material here and publish curated notes in `releases/`.
   credit. Distinguish its Apple Silicon/Intel Universal 2 download from our
   unsigned Apple Silicon preview packages on GitHub.
 
+- [ ] Keep saves loadable after long stretches with the blaster, gauntlet,
+  grenade launcher, lightning gun or dark matter gun (#192). Those weapons have
+  no view GUI, so the events every shot and weapon switch posted for it were
+  never delivered and piled up in each save; once more than 256 were queued,
+  the restore guard rejected the save ("invalid pending GUI event count 372")
+  even on the build that wrote it. `rvWeapon::UpdateGUI` now drops events no
+  GUI can take, and the restore bounds the count by the bytes left in the save
+  instead of a fixed cap, so existing saves holding such a backlog load again.
+  No save-format change. `weapon_gui_event_queue_contract.py` keeps SP and MP
+  aligned.
+
+Candidate save release wording: Saves made after firing or switching between
+weapons without an ammo display many times no longer fail to load with an
+"invalid pending GUI event count" error, and saves that already fail this way
+load again.
+
 - [x] Add one managed audio-payload budget across CPU/OpenAL data, decoder arenas,
   streams and envelopes. Bound ordinary PCM fallback queues, decode RoQ through
   fixed input scratch and keep pressure-refused samples retryable. Stock and
