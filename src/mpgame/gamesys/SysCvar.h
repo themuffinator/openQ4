@@ -143,6 +143,7 @@ extern idCVar	ai_debugHelpers;
 extern idCVar	ai_useRVMasterMove;
 //jshepard: allow old AAS files
 extern idCVar	ai_scriptedMoveTimeout;
+extern idCVar	ai_medicApproachTimeout;
 extern idCVar	ai_allowOldAAS;
 // twhitaker: debugging support for eye focus
 extern idCVar	ai_debugEyeFocus;

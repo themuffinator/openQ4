@@ -414,6 +414,20 @@ completed release material here and publish curated notes in `releases/`.
   credit. Distinguish its Apple Silicon/Intel Universal 2 download from our
   unsigned Apple Silicon preview packages on GitHub.
 
+- [ ] Stop medics and techs waiting forever for a player they cannot reach.
+  Choosing the player as a patient makes the healer passive and blind to
+  enemies, and the approach only ended beside a visible patient, so a player it
+  could see but not reach held it in place indefinitely. (#184's frozen Tech Li
+  turned out to be a Turbo-mode script race, fixed separately.)
+  `ai_medicApproachTimeout` (15 s, 0 disables) now abandons an approach that
+  makes no progress and holds back automatic heals for as long again; a heal the
+  player asks for is unaffected. No save-format change.
+  `ai_medic_approach_watchdog.py` keeps SP and MP aligned.
+
+Candidate AI release wording: Medics and techs no longer freeze in place when
+they cannot reach you to heal or repair you; after a short wait they carry on
+with their orders.
+
 - [x] Add one managed audio-payload budget across CPU/OpenAL data, decoder arenas,
   streams and envelopes. Bound ordinary PCM fallback queues, decode RoQ through
   fixed input scratch and keep pressure-refused samples retryable. Stock and

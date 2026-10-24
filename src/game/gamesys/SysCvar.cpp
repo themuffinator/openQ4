@@ -287,6 +287,7 @@ idCVar ai_disableCover(				"ai_disableCover",			"0",			CVAR_GAME | CVAR_BOOL, "d
 //cdr: use new master move functions
 idCVar ai_useRVMasterMove(			"ai_useRVMasterMove",		"0",			CVAR_GAME | CVAR_BOOL, "changes AI to use new master move function" );
 //jshepard: allow out of date AAS files to be used, for testing
+idCVar ai_medicApproachTimeout(		"ai_medicApproachTimeout",	"15",			CVAR_GAME | CVAR_FLOAT, "seconds a medic or tech may make no progress toward the player it chose to heal before it gives up and resumes its orders; 0 disables the watchdog" );
 idCVar ai_scriptedMoveTimeout(		"ai_scriptedMoveTimeout",	"30",			CVAR_GAME | CVAR_FLOAT, "seconds a scripted move may make no forward progress before it is abandoned so the map script can continue; 0 disables the watchdog" );
 idCVar ai_allowOldAAS(				"ai_allowOldAAS",			"0",			CVAR_GAME | CVAR_BOOL, "allows AI to use most recent AAS file, even if it is not up-to-date. Enable only for testing.");
 // twhitaker: debugging support for eye focus

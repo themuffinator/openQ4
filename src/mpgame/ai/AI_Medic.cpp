@@ -39,6 +39,9 @@ rvAIMedic::rvAIMedic ( void ) {
 	wasAware = false;
 	wasIgnoreEnemies = false;
 	healDebounceTime = 0;
+	approachDistance = 0.0f;
+	approachProgressTime = 0;
+	patientRetryTime = 0;
 }
 
 void rvAIMedic::InitSpawnArgsVariables( void )
@@ -143,6 +146,9 @@ void rvAIMedic::Restore( idRestoreGame *savefile ) {
 	mPostHealScript.Restore( savefile );
 
 	InitSpawnArgsVariables();
+
+	approachProgressTime = 0;
+	patientRetryTime = 0;
 }
 
 /*
@@ -282,6 +288,7 @@ void rvAIMedic::TakePatient( idPlayer* pPatient )
 	ClearEnemy();
 	lookTarget = patient;
 	healing = false;
+	approachProgressTime = 0;
 	//healedAmount = 0;
 
 	if ( pPatient && DistanceTo( pPatient ) > 250.0f && !silent ) 
@@ -444,6 +451,30 @@ bool rvAIMedic::SituationAllowsPatient( void )
 	return false;
 }
 
+/*
+================
+rvAIMedic::PatientApproachStalled
+
+True once the medic has not come closer to its patient than its best distance
+so far for ai_medicApproachTimeout seconds. Only a new best restarts the clock,
+whichever of them moved: a medic re-pathing back and forth beneath a patient it
+cannot reach keeps moving without ever closing in.
+================
+*/
+bool rvAIMedic::PatientApproachStalled( void ) {
+	const float timeoutSec = ai_medicApproachTimeout.GetFloat();
+	if ( timeoutSec <= 0.0f || !patient ) {
+		return false;
+	}
+	const float distance = DistanceTo( patient );
+	if ( approachProgressTime == 0 || distance < approachDistance - 8.0f ) {
+		approachDistance = distance;
+		approachProgressTime = gameLocal.GetTime();
+		return false;
+	}
+	return gameLocal.GetTime() - approachProgressTime > SEC2MS( timeoutSec );
+}
+
 bool rvAIMedic::AvailableToTakePatient( void )
 {
 	if ( !healDisabled )
@@ -481,7 +512,9 @@ void rvAIMedic::Think ( void ) {
 			{
 				emergencyOverride = false;
 			}
-			if ( AvailableToTakePatient() )
+			// A medic that gave up on an approach waits before it volunteers
+			// again; a heal the player asks for (TalkTo) is not held back.
+			if ( gameLocal.GetTime() >= patientRetryTime && AvailableToTakePatient() )
 			{
 				idPlayer* player = gameLocal.GetLocalPlayer();
 
@@ -616,6 +649,20 @@ stateResult_t rvAIMedic::State_Medic ( const stateParms_t& parms ) {
 
 	switch ( parms.stage ) {
 		case STAGE_MOVE:
+			// TakePatient makes the medic passive and blind to enemies, and this
+			// stage only ends on reaching the patient, so a patient it can see but
+			// never reach would hold it here for good. Give up once it stops closing
+			// the distance; the map script and its tether continue as normal.
+			if ( PatientApproachStalled() ) {
+				gameLocal.Warning( "medic '%s' made no progress toward '%s' for %g seconds (distance %.0f); giving up on the heal for now",
+					GetName(), patient->GetName(), ai_medicApproachTimeout.GetFloat(), DistanceTo( patient ) );
+				StopMove( MOVE_STATUS_DONE );
+				DropPatient();
+				patientRetryTime = gameLocal.GetTime() + SEC2MS( ai_medicApproachTimeout.GetFloat() );
+				ExecScriptFunction( mPostHealScript );
+				return SRESULT_DONE;
+			}
+
 			// Attack when we have either stopped moving or are within melee range
 			if ( move.fl.done )
 			{

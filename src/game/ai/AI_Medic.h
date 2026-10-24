@@ -69,6 +69,11 @@ private:
 	bool				wasAware;
 	bool				wasIgnoreEnemies;
 
+	// Approach watchdog. Transient: a restored medic starts measuring afresh.
+	float				approachDistance;
+	int					approachProgressTime;
+	int					patientRetryTime;
+
 	void				SetHealValues					( idPlayer* player );
  	
 	void				TakePatient						( idPlayer* pPatient );
@@ -76,6 +81,7 @@ private:
  	bool				CheckTakePatient				( idPlayer* actor );
  	bool				SituationAllowsPatient			( void );
  	bool				AvailableToTakePatient			( void );
+	bool				PatientApproachStalled			( void );
 
 	stateResult_t		State_Medic						( const stateParms_t& parms );
 	
