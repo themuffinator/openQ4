@@ -16,6 +16,7 @@ import subprocess
 import sys
 import time
 import unicodedata
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 BUILD_TOOLS_DIR = Path(__file__).resolve().parents[1] / "build"
@@ -401,6 +402,67 @@ def validate_game_libs_repo_path(game_libs_repo: Path) -> Path:
     if game_libs_repo.is_symlink():
         raise ValidationError(f"GameLibs repository must not be a symlink: {game_libs_repo}")
     return game_libs_repo.resolve()
+
+
+def python_test_jobs(args: argparse.Namespace) -> int:
+    requested = getattr(args, "python_jobs", None)
+    if requested is not None:
+        return requested
+    configured = os.environ.get("OPENQ4_PYTHON_TEST_JOBS", "").strip()
+    if configured:
+        return positive_int(configured)
+    return os.cpu_count() or 1
+
+
+def run_python_check_captured(
+    test_script: Path, test_args: list[str], root: Path, env: dict[str, str]
+) -> tuple[int, str, float]:
+    started = time.monotonic()
+    completed = subprocess.run(
+        [sys.executable, str(test_script), *test_args],
+        cwd=str(root),
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    return completed.returncode, completed.stdout, time.monotonic() - started
+
+
+def run_python_checks_parallel(
+    checks: list[tuple[Path, list[str]]], root: Path, env: dict[str, str], jobs: int
+) -> list[str]:
+    """Run independent checks concurrently, reporting each in list order.
+
+    Every check is its own interpreter writing only to fresh temporary
+    directories, so they can overlap. Output is held until a check finishes and
+    printed in the original order, so the log reads as a sequential run does.
+    """
+    # Checks put their temporary directories under .tmp without creating it; run
+    # in sequence an earlier check always had, but in parallel any can go first.
+    (root / ".tmp").mkdir(exist_ok=True)
+    print(f"\n==> Python checks: {len(checks)} with {jobs} parallel job(s)", flush=True)
+    failures: list[str] = []
+    started = time.monotonic()
+    with ThreadPoolExecutor(max_workers=jobs) as pool:
+        futures = [
+            pool.submit(run_python_check_captured, test_script, test_args, root, env)
+            for test_script, test_args in checks
+        ]
+        for (test_script, test_args), future in zip(checks, futures):
+            title = f"Python check: {rel(test_script, root)}"
+            returncode, output, seconds = future.result()
+            section(title)
+            print(format_command([sys.executable, str(test_script), *test_args]), flush=True)
+            if output:
+                print(output, end="" if output.endswith("\n") else "\n", flush=True)
+            print(f"({seconds:.1f}s)", flush=True)
+            if returncode != 0:
+                failures.append(f"{rel(test_script, root)}: {title} failed with exit code {returncode}.")
+    print(f"\n==> Python checks finished in {time.monotonic() - started:.0f}s", flush=True)
+    return failures
 
 
 def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) -> None:
@@ -813,20 +875,28 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         (root / "tools" / "tests" / 'vk_display_color_mapping_capture.py', ['--self-test']),
     ]
     failures: list[str] = []
+    checks: list[tuple[Path, list[str]]] = []
     for test_script, test_args in [(path, []) for path in tests] + argument_checks:
         if not test_script.is_file():
             failures.append(f"{rel(test_script, root)}: test script was not found")
             continue
-        try:
-            run_command(
-                [sys.executable, str(test_script), *test_args],
-                cwd=root,
-                env=env,
-                title=f"Python check: {rel(test_script, root)}",
-                dry_run=args.dry_run,
-            )
-        except ValidationError as exc:
-            failures.append(f"{rel(test_script, root)}: {exc}")
+        checks.append((test_script, test_args))
+
+    jobs = python_test_jobs(args)
+    if jobs <= 1 or args.dry_run:
+        for test_script, test_args in checks:
+            try:
+                run_command(
+                    [sys.executable, str(test_script), *test_args],
+                    cwd=root,
+                    env=env,
+                    title=f"Python check: {rel(test_script, root)}",
+                    dry_run=args.dry_run,
+                )
+            except ValidationError as exc:
+                failures.append(f"{rel(test_script, root)}: {exc}")
+    else:
+        failures += run_python_checks_parallel(checks, root, env, jobs)
 
     if failures:
         formatted = "\n".join(f"  - {failure}" for failure in failures)
@@ -2012,6 +2082,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument("--no-install", dest="install", action="store_false", help="Skip Meson install and staged payload checks.")
     parser.add_argument("--skip-python-tests", action="store_true", help="Skip lightweight Python validation tests.")
+    parser.add_argument(
+        "--python-jobs",
+        type=positive_int,
+        default=None,
+        help="Python validation checks to run at once (default: OPENQ4_PYTHON_TEST_JOBS or the CPU count; 1 runs them in sequence).",
+    )
     parser.add_argument("--skip-build", action="store_true", help="Skip Meson setup/compile/install steps.")
     parser.add_argument("--build-gamelibs", action="store_true", help="Deprecated: game modules now build with the engine.")
     parser.add_argument("--game-libs-repo", default="", help="Override the game-source root for validation fixtures; ordinary builds use this checkout.")

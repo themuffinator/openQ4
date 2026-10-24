@@ -10,6 +10,7 @@ import os
 import re
 import shutil
 import sys
+import tempfile
 import uuid
 from pathlib import Path
 from types import ModuleType
@@ -586,7 +587,7 @@ def validate_python_test_failure_aggregation() -> None:
     try:
         expect_validation_error(
             lambda: VALIDATOR.run_python_tests(
-                argparse.Namespace(dry_run=False),
+                argparse.Namespace(dry_run=False, python_jobs=1),
                 ROOT,
                 {},
             ),
@@ -595,6 +596,43 @@ def validate_python_test_failure_aggregation() -> None:
         )
     finally:
         VALIDATOR.run_command = original_run_command
+
+    # The parallel runner must aggregate the same failures from both ends.
+    original_captured = VALIDATOR.run_python_check_captured
+    parallel_observed: list[str] = []
+
+    def fake_captured(test_script, test_args, root, env):
+        parallel_observed.append(Path(test_script).name)
+        failed = Path(test_script).name in simulated_failures
+        return (1 if failed else 0), f"simulated {'failure' if failed else 'pass'}\n", 0.0
+
+    VALIDATOR.run_python_check_captured = fake_captured
+    try:
+        expect_validation_error(
+            lambda: VALIDATOR.run_python_tests(
+                argparse.Namespace(dry_run=False, python_jobs=4),
+                ROOT,
+                {},
+            ),
+            "2 Python validation check(s) failed",
+            "aggregated parallel Python validation failures",
+        )
+    finally:
+        VALIDATOR.run_python_check_captured = original_captured
+    # Checks create their temporary directories under .tmp without making it, so
+    # the parallel runner must create it before any check can start.
+    with tempfile.TemporaryDirectory(prefix="validation-hardening-tmp-", dir=ROOT / ".tmp") as fresh:
+        fresh_root = Path(fresh)
+        VALIDATOR.run_python_check_captured = lambda *args: (0, "", 0.0)
+        try:
+            VALIDATOR.run_python_checks_parallel([(fresh_root / "probe.py", [])], fresh_root, {}, 2)
+        finally:
+            VALIDATOR.run_python_check_captured = original_captured
+        if not (fresh_root / ".tmp").is_dir():
+            raise AssertionError("the parallel Python runner must create .tmp before starting checks")
+
+    if sorted(parallel_observed) != sorted(observed):
+        raise AssertionError("the parallel Python runner did not run the same checks as the sequential one")
 
     if not simulated_failures.issubset(observed):
         raise AssertionError(

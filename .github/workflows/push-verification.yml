@@ -83,6 +83,7 @@ jobs:
             tools/validation/audit_source_provenance.py \
             tools/validation/generate_pbr_fixture.py \
             tools/validation/openq4_validate.py \
+            tools/validation/run_parallel_commands.py \
             tools/validation/stock_asset_baseline.py \
             tools/tests/renderer_validation_matrix.py \
             tools/tests/aas_compiler_contract.py \
@@ -584,6 +585,9 @@ jobs:
           bash -n tools/validation/validate_macos_static.sh
           bash -n tools/validation/validate_push.sh
           bash -n tools/validation/validate_pr.sh
+          # Independent checks run concurrently; run_parallel_commands.py prints each
+          # in this order and fails the step if any fails.
+          python tools/validation/run_parallel_commands.py <<'OPENQ4_CHECKS'
           python tools/validation/audit_source_provenance.py --check
           python tools/tests/aas_compiler_contract.py
           python tools/tests/aas_settings_contract.py
@@ -990,6 +994,7 @@ jobs:
           python tools/tests/vk_display_color_mapping_capture.py --self-test
           python tools/tests/vk_temporal_resolve_shader_pin.py
           python tools/tests/vscode_fast_build.py
+          OPENQ4_CHECKS
 
       - name: Dry-run push profile
         shell: bash
