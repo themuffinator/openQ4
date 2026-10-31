@@ -6,6 +6,14 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Engine and game fixes, 31 October 2026
+
+- Multiplayer map loads no longer print five "Couldn't load AAS file ... AI
+  that uses it cannot navigate" warnings. The stock multiplayer maps ship no
+  AAS files, and multiplayer bots navigate with the runtime navigation mesh,
+  so nothing was lost; developer logs keep one informational line per size.
+  Single-player still warns, because its monsters do need those files.
+
 ## Menus at a reduced resolution scale, 31 October 2026
 
 - Menus and the HUD stay sharp and full-screen when **Resolution Scale** is
