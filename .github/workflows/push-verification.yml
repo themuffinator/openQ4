@@ -180,6 +180,7 @@ jobs:
             tools/tests/docs_link_integrity.py \
             tools/tests/dmap_render_geometry_lifecycle.py \
             tools/tests/dmap_vertex_sharing.py \
+            tools/tests/dmap_tjunction_slivers.py \
             tools/tests/fatal_error_startup_safety.py \
             tools/tests/android_build.py \
             tools/tests/android_emulator_smoke.py \
@@ -668,6 +669,7 @@ jobs:
           python tools/tests/docs_link_integrity.py
           python tools/tests/dmap_render_geometry_lifecycle.py
           python tools/tests/dmap_vertex_sharing.py
+          python tools/tests/dmap_tjunction_slivers.py
           python tools/tests/fatal_error_startup_safety.py
           python tools/tests/android_build.py
           python tools/tests/android_touch_input.py

@@ -438,6 +438,12 @@ See [release status](../../user/release-status.md) and the
   bounce, and the pack it writes, from the new bake instead of the bundled
   grid, and the bake says when the bundled copy will still load first.
 
+- Maps whose curved surfaces use fine explicit subdivision no longer compile
+  into millions of invisible triangles. The map compiler kept splitting
+  zero-width slivers, which made a modified Hub 2 too large to load
+  ([#181](https://github.com/themuffinator/openQ4/issues/181)); it now builds
+  in about two minutes and plays. Recompile affected maps.
+
 - With the experimental `com_levelLoadModernization 1`, map and model caches
   now come out the same on every load and match a load from the original files.
   Caches from earlier versions are rebuilt the first time each map loads.

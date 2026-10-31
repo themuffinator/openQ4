@@ -290,6 +290,39 @@ void FreeTJunctionHash( void ) {
 
 /*
 ==================
+TriangleIsSliver
+
+True when every corner lies within COLINEAR_EPSILON of the line through the
+longest edge, the tolerance FixTriangleAgainstHashVert uses to put a point on
+an edge. Such a triangle is nowhere wider than that tolerance, so it can hide
+no visible crack, and its edges overlap along the line: both halves of a split
+still span it, so every further hashVert on the line splits both again.
+Heavily subdivided curves multiplied single slivers into millions of
+triangles this way (issue #181).
+==================
+*/
+static bool TriangleIsSliver( const mapTri_t *a ) {
+	idVec3		edge;
+	float		lengthSqr, longestSqr;
+	float		twiceArea;
+	int			i;
+
+	longestSqr = 0;
+	for ( i = 0 ; i < 3 ; i++ ) {
+		VectorSubtract( a->v[(i+1)%3].xyz, a->v[i].xyz, edge );
+		lengthSqr = edge.LengthSqr();
+		if ( lengthSqr > longestSqr ) {
+			longestSqr = lengthSqr;
+		}
+	}
+	twiceArea = ( a->v[1].xyz - a->v[0].xyz ).Cross( a->v[2].xyz - a->v[0].xyz ).Length();
+
+	// the height above the longest edge is twiceArea / sqrt( longestSqr )
+	return twiceArea * twiceArea <= Square( COLINEAR_EPSILON ) * longestSqr;
+}
+
+/*
+==================
 FixTriangleAgainstHashVert
 
 Returns a list of two new mapTri if the hashVert is
@@ -340,6 +373,12 @@ static mapTri_t *FixTriangleAgainstHashVert( const mapTri_t *a, const hashVert_t
 		off = temp.Length();
 		if ( off <= -COLINEAR_EPSILON || off >= COLINEAR_EPSILON ) {
 			continue;
+		}
+
+		// a sliver has no area to fix, and splitting it only makes
+		// more slivers that overlap along the same line
+		if ( TriangleIsSliver( a ) ) {
+			return NULL;
 		}
 
 		// take the x/y/z from the splitter,

@@ -6,6 +6,29 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Map compiler slivers, 31 October 2026
+
+- dmap's T-junction repair no longer splits zero-area slivers. Each split of a
+  sliver left two halves spanning the same line, so every further vertex on it
+  split both again. The modified `hub2` from
+  [#181](https://github.com/themuffinator/openQ4/issues/181), whose pipes use
+  explicit 10×10 subdivision, compiled to 12,601,692 triangles, 97.6% of them
+  slivers. It now compiles in about two minutes to 298,438, and its largest
+  surface falls from 36,635,340 to 153,000 indexes. It loads into single-player
+  gameplay and saves. Stock `hub2` loses 57 triangles, 55 of them slivers.
+- `tools/tests/dmap_tjunction_slivers.py` runs the production splitter on
+  slivers and valid thin triangles; it fails on the previous code. Windows
+  Clang, MSVC and Clang sanitizer runs pass, as do the dmap and workflow
+  contract checks.
+- Not resolved: one outdoor surface of that map has about 78,000 silhouette
+  edges, above the renderer's 65,536 limit, so `developer 1` reports
+  `MAX_SIL_EDGES` and its shadow silhouette is incomplete. #181 stays open.
+  See [dmap compilation](dmap-compilation.md#sliver-multiplication-in-t-junction-repair-31-october-2026).
+
+Candidate release wording: Maps whose curved surfaces use fine explicit
+subdivision no longer compile into millions of invisible triangles, which had
+made them too large to load.
+
 ## Engine and game fixes, 31 October 2026
 
 - Multiplayer map loads no longer print five "Couldn't load AAS file ... AI
