@@ -2278,6 +2278,82 @@ Known limit: the label the home carries into a page's title, and a page's
 label carried to a sub-page's, still start from the 4:3 plate's place and
 size, since a timeline's keys cannot follow the view.
 
+## List pages in tall views (31 October 2026)
+
+In a view of 3:4 and taller the list pages kept the 4:3 composition at the
+view's width and only grew the list, so their text, plates and dialogs read
+at about half their landscape size on an upright phone. Load and Save Game,
+Demos, Create Server and Join Game now stand in one column across the canvas,
+grown to read as they do in a landscape view (visual specification 1.34):
+
+- **Load Game and Demos.** The filter plates (Demos' tags) under the top
+  band; the selected item's picture, 1.6 times its landscape size, with its
+  details and LOAD GAME and DELETE GAME (PLAY, DELETE and REFRESH) beside it;
+  then the headings and the list across the column to the bottom band. A row
+  takes two lines at 1.6 times: the save's name over its location, the demo's
+  name over its map, date and length.
+- **Save Game.** The filters, then the list in two-line rows down to the name
+  field and, under it, SAVE GAME at the column's end, 1.2 times their size so
+  that each takes a line over the bottom band.
+- **Create Server.** MAP SELECTION with the chosen map's levelshot and the map
+  list beside it, then SERVER OPTIONS across the column, ADVANCED OPTIONS and
+  CREATE SERVER, 1.45 times the landscape size.
+- **Join Game.** The mod spinner and source tags in two lines; the sort
+  headings and each server in two lines at 1.5 times (its symbols and name,
+  then its ping, players, game type and map). Under the list, 1.2 times their
+  size so each line fits: the game type spinner with the search tag, the
+  filter tags, the status with CLEAR SORTING, the scan bar, the list's
+  actions in one column with the levelshot beside them, and JOIN SERVER
+  beside ADD TO FAVORITES over the bottom band.
+- **Dialogs and backing.** Each page's confirmations and its ADVANCED SERVER
+  OPTIONS, ban list, Join IP and Find dialogs grow with the rows, up to the
+  column's width: the modal's stage scales about the view's middle, so the
+  lengths its text size binds grow with it, and a dialog placed from the
+  canvas's top (one whose height follows its text) moves to the view's middle
+  in any view taller than the canvas. The page's backing, clear on the leading
+  side where a landscape view keeps no content, gains a tall-only shade
+  across the whole width that fades with it.
+- **One band per row.** A selected row now draws only the selection's light,
+  not the hover light over it as well (Appendix B.1: one band per row, the
+  selection's first), in every view and every list built on the save rows
+  (saves, demos, servers, maps and the ban lists, including the Match Control
+  card's and the campaign skill page's), so a focused row's orange name no
+  longer sits on a doubled orange band.
+
+The layout is a pass over each fitted document (`tools/ui/retained_tall.py`):
+blocks scaled about their origin and moved into the column by bindings whose
+landscape value is the fitted document's own, so a view of 3:4 or wider
+presents exactly as before. It leaves alone what the runtime writes (now
+including a text field's text offset and paint parts, as for a number
+field), what a binding already owns and what a timeline animates.
+
+The native pages, Strogg pages, mp-pages, menus, Match Control, card,
+welcome, pointer-reach and SETTINGS groups pass, and `ui_retained_gate.py`
+passes. Captured on OpenGL at 9:16 (540x960) and 3:4 (768x1024) for the five
+pages' scenarios (55 screenshots each), and at 16:9 (1280x720) as the
+landscape regression run.
+
+Evidence: `.tmp/menus-portrait/validation-evidence.json`, SHA-256
+`3bbe4f57ae023399965a0f9bb3e7fdadb5dc9456fdb1f2438244e6da88c74aac`.
+
+Known limit: Arena, Credits, Restart Level and the multiplayer cards still
+take the narrow-view fit, the 4:3 composition at the view's width.
+
+## The menu cursor (31 October 2026)
+
+The retained menus drew a placeholder cursor, a flat triangle, and only after
+the mouse moved; a menu key hid it again, and with the OS cursor hidden over
+the menus the pointer often vanished. The adapter now draws a vector
+reconstruction of the stock `guicursor_arrow` and `guicursor_hand` bitmaps at
+the stock menus' 32 menu units: the arrow's outline, body, facet, ridge, tail
+and soft shadow, and the hand over a control a press would reach (the
+runtime's `HoveredControl`). It shows whenever the menus hold the mouse; only
+controller navigation hides it until the mouse moves again. Each layer is a
+simple polygon, ear-clipped once and drawn with the 2D pass's winding
+(`DrawStretchTri` emits its first two corners swapped, which had culled the
+placeholder). `openq4_retainedGui pointer <x> <y>` places it without a device,
+and the `cursor` capture scenario shows the arrow and the hand.
+
 ## Tall views grow the lists (25 October 2026)
 
 In a view taller than the canvas (5:4, and most of all a portrait window)

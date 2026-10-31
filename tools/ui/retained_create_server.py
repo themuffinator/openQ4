@@ -39,7 +39,7 @@ from build_retained_screens import (ACCEL, BOTTOM_TO_PAGE, CANVAS_W, CRUMB_SCALE
                                     transform, typeface, vector)
 from retained_difficulty import check_fits, primary_plate
 from retained_mp_menus import match_number_row, row_face, row_states as setting_states, value_row
-from retained_saves import PLACEHOLDER, backing, pager_row, picture_frame, row_plates, row_states, table_text
+from retained_saves import PLACEHOLDER, backing, bind_selected, pager_row, picture_frame, row_plates, row_states, table_text
 from retained_subpage import subpage_document
 
 # mp_create_val4's values in order, labelled by #str_200929's names; the
@@ -273,15 +273,14 @@ def map_row(doc: Document, index: int, row_w: float) -> dict:
     chosen = {"op": "+", "args": [{"state": "create.map_first"}, index]}
     doc.bind(f"{ident}.display", ident, "display",
              {"op": "select", "args": [{"op": "<", "args": [chosen, {"state": "create.map_count"}]}, "block", "none"]})
-    doc.bind(f"{ident}-selected.display", f"{ident}-selected", "display",
-             {"op": "select", "args": [{"op": "==", "args": [{"state": "create.map_selected"}, chosen]}, "block", "none"]})
+    bind_selected(doc, ident, {"op": "==", "args": [{"state": "create.map_selected"}, chosen]})
     event = f"mapRow{index}"
     doc.events[event] = [{"op": "if", "condition": {"op": "==", "args": [{"state": "create.map_selected"}, chosen]},
                           "then": [{"op": "focus", "control": "create_start"}],
                           "else": [{"op": "setState", "values": {"create.pick": index}}, {"op": "action", "action": "createMap"}]}]
     ids = row_states(doc, ident, (f"{ident}-name",), (tint,))
     return group(ident, {"position": keyword("relative"), "display": keyword("none"), "width": length(width), "height": length(height),
-                         "flex-shrink": number(0)}, [*row_plates(ident, width, height), name],
+                         "flex-shrink": number(0)}, [*row_plates(ident, width, height, selectable=True), name],
                  control={"role": "button", "label": PLACEHOLDER, "event": event, "states": ids})
 
 
@@ -374,15 +373,14 @@ def ban_list_modal(doc: Document, prefix: str = "create", pick_key: str | None =
             doc.bind(f"{node}.text", node, "text", {"state": f"{key}.{column}"})
         doc.bind(f"{ident}.display", ident, "display",
                  {"op": "select", "args": [{"op": "<", "args": [index, {"state": f"{prefix}.ban_count"}]}, "block", "none"]})
-        doc.bind(f"{ident}-selected.display", f"{ident}-selected", "display",
-                 {"op": "select", "args": [{"op": "==", "args": [{"state": f"{prefix}.ban_selected"}, index]}, "block", "none"]})
+        bind_selected(doc, ident, {"op": "==", "args": [{"state": f"{prefix}.ban_selected"}, index]})
         event = f"banRow{index}"
         doc.events[event] = [{"op": "if", "condition": {"op": "==", "args": [{"state": f"{prefix}.ban_selected"}, index]},
                               "then": [{"op": "focus", "control": "banModal_yes"}],
                               "else": [{"op": "setState", "values": {pick_key: index}}, {"op": "action", "action": pick_verb}]}]
         ids = row_states(doc, ident, (f"{ident}-name", f"{ident}-guid"), tints)
         rows.append(group(ident, {"position": keyword("relative"), "display": keyword("none"), "width": length(width), "height": length(height),
-                                  "flex-shrink": number(0)}, [*row_plates(ident, width, height), *cells],
+                                  "flex-shrink": number(0)}, [*row_plates(ident, width, height, selectable=True), *cells],
                           control={"role": "button", "label": PLACEHOLDER, "event": event, "states": ids}))
     column_node = group("ban-column", {"position": keyword("relative"), "display": keyword("flex"), "flex-direction": keyword("column")}, rows)
     parts.append(group("ban-list", {**absolute(left=U * left, top=U * top, width=width, height=U * list_h), "overflow": keyword("auto")},
@@ -543,5 +541,48 @@ def create_server_document() -> dict:
     back = page_prompts(doc, "create_back", action="back")
 
     modal = advanced_dialog(doc)
-    return subpage_document(doc, "create", "#str_200002", "#str_200026", "create_start",
-                            [*headings, *shot, viewport, scrollbar, column, advanced, start, back], [modal])
+    return tall_create_page(subpage_document(doc, "create", "#str_200002", "#str_200026", "create_start",
+                                             [*headings, *shot, viewport, scrollbar, column, advanced, start, back], [modal]))
+
+
+# A tall view's Create Server page (retained_tall): MAP SELECTION, the chosen
+# map's levelshot with the map list beside it, then SERVER OPTIONS with its
+# rows across the column, ADVANCED OPTIONS and CREATE SERVER, 1.45 times the
+# landscape size, which keeps CREATE SERVER above the bottom band at 3:4.
+TALL_GROW = 1.45
+
+
+def tall_create_page(result: dict) -> dict:
+    from retained_saves import BACKING_ALPHA
+    from retained_tall import CONTENT_W, MARGIN, TallLayout
+    tall = TallLayout(result)
+    tall.show("create-header", "none", "block")
+    tall.block(("create-head-maps",), (U * MAPS_HEAD[0], U * MAPS_HEAD[1]), (MARGIN + 4, 84), TALL_GROW)
+    shot_top = 84 + U * 16 * TALL_GROW + 6
+    tall.block(("create-shot-back", "create-shot", "create-shot-border"), (U * SHOT[0], U * SHOT[1]), (MARGIN, shot_top), TALL_GROW)
+    shot_w, shot_h = U * SHOT[2] * TALL_GROW, U * SHOT[3] * TALL_GROW
+    list_left = MARGIN + shot_w + 16
+    list_w = CONTENT_W - shot_w - 16 - 40
+    tall.bind("maps-list", "left", list_left)
+    tall.top("maps-list", shot_top)
+    tall.bind("maps-list", "width", list_w)
+    tall.bind("maps-list", "height", shot_h)
+    tall.grow("maps-column", TALL_GROW)
+    for ident in [f"map-{index}" for index in range(MAP_ROWS)] + ["maps-newer", "maps-older"]:
+        for node in (ident, f"{ident}-line", f"{ident}-hover", f"{ident}-selected", f"{ident}-focus"):
+            tall.set(node, "width", list_w)
+        text = f"{ident}-name" if ident.startswith("map-") else f"{ident}-label"
+        tall.set(text, "width", list_w - (U * 8 if ident.startswith("map-") else U * 18) * TALL_GROW)
+    tall.bind("maps_scroll", "left", list_left + list_w + 4)
+    tall.top("maps_scroll", shot_top)
+    tall.bind("maps_scroll", "height", shot_h)
+    options_head = shot_top + shot_h + 18
+    tall.block(("create-head-options",), (U * OPTIONS_HEAD[0], U * OPTIONS_HEAD[1]), (MARGIN + 4, options_head), TALL_GROW)
+    options_top = options_head + U * 16 * TALL_GROW + 6
+    tall.block(("create-options",), (U * OPTIONS[0], U * OPTIONS[1]), (MARGIN, options_top), TALL_GROW)
+    advanced_top = options_top + U * ROW_PITCH * 11 * TALL_GROW + 10
+    tall.block(("create_advanced",), (U * OPTIONS[0], U * ADVANCED_BUTTON_TOP - 5), (MARGIN, advanced_top), TALL_GROW)
+    tall.block(("create_start",), (U * START[0], U * START[1]), (MARGIN, advanced_top + 45 * TALL_GROW + 10), 1.3)
+    tall.dialogs(TALL_GROW)
+    tall.shade("create-backing", BACKING_ALPHA)
+    return result

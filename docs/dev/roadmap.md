@@ -974,7 +974,11 @@ archived provenance; new scheduling belongs here.
   the Objectives page and the list and form pages still keep their 100 % rows.
   In views of 3:4 and taller the same menu levels now
   [stand in one column](ui/retained-screens.md#menu-levels-in-tall-views-31-october-2026)
-  that uses the height (visual specification 1.33, `LAY-021`).
+  that uses the height (visual specification 1.33, `LAY-021`), and so do
+  [the list pages](ui/retained-screens.md#list-pages-in-tall-views-31-october-2026)
+  (Load and Save Game, Demos, Create Server and Join Game; visual
+  specification 1.34). Arena, Credits, Restart Level and the multiplayer
+  cards still take the narrow-view fit.
 - [ ] **UI-02 — P1, implementation and qualification: text, input and accessibility.**
   Finish in-field IME/composition, shaping/kerning/fallback/styles, grapheme editing,
   caret/candidate placement, binding capture, accessibility exposure and contextual

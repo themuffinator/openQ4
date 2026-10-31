@@ -268,7 +268,7 @@ def _slots(node: dict) -> int:
 def _runtime_owned(node: dict, owned: set) -> None:
     """The lengths the runtime writes in the controls under `node`, which no
     binding may own: a slider's fill and thumb, a list's popup, viewport and
-    scrollbar, a number field's text offset and paint parts."""
+    scrollbar, a number or text field's text offset and paint parts."""
     control = node.get("control") or {}
     parts = control.get("parts", {})
     if control.get("role") == "slider":
@@ -279,7 +279,7 @@ def _runtime_owned(node: dict, owned: set) -> None:
         if control.get("scrollbar"):
             owned.update((control["scrollbar"]["track"], key) for key in ("left", "top", "height", "bottom"))
             owned.update((control["scrollbar"]["thumb"], key) for key in ("top", "height", "bottom"))
-    elif control.get("role") == "number":
+    elif control.get("role") in ("number", "text"):
         owned.add((parts["text"], "left"))
         owned.update((parts[part], key) for part in ("selection", "caret", "composition") for key in ("left", "top", "width", "height"))
     for child in node.get("children", []):

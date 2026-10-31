@@ -220,13 +220,14 @@ def row_light(alpha: float, light: str = ROW_LIGHT) -> list:
     return [(0, rgb(light, 0)), (0.05, rgb(light, alpha)), (0.87, rgb(light, alpha)), (1, rgb(light, 0))]
 
 
-def row_plates(ident: str, width: float, height: float, family: Family = MARINE) -> list:
+def row_plates(ident: str, width: float, height: float, family: Family = MARINE, selectable: bool = False) -> list:
     """A list row's backgrounds (bg_line, bg_hover and bg_focus, Appendix B.1):
     the light over rows 3-60 of 64, #FF9C00 at 0.01 at rest, 0.16 under the
     pointer or focus and 0.41 while the row's save is selected, with the
     white 0.50 rule at row 62 and its ends faded the same way. The focused row
     adds the orange inset of the home plates along its leading edge and foot.
-    The Strogg family lights its rows #FF9000, ruled in #FCFFC8."""
+    The Strogg family lights its rows #FF9000, ruled in #FCFFC8. A
+    `selectable` row's hover band gives way to its selection (bind_selected)."""
     top, bottom, rule = height * 3 / 64, height * 61 / 64, height * 62.5 / 64
     band = [(0, top), ({"fraction": 1}, top), ({"fraction": 1}, bottom), (0, bottom)]
     whole = {**absolute(left=0, top=0, width=width, height=height)}
@@ -236,7 +237,8 @@ def row_plates(ident: str, width: float, height: float, family: Family = MARINE)
         vector(f"{ident}-line", {**whole, "pointer-events": keyword("none")}, [
             path("fill", band, fill=linear((0, 0), ({"fraction": 1}, 0), row_light(0.01, family.light))),
             path("rule", [(0, rule), ({"fraction": 1}, rule)], closed=False, stroke=stroke(rule_paint, 1))]),
-        vector(f"{ident}-hover", {**whole, "opacity": number(0), "pointer-events": keyword("none")}, [
+        vector(f"{ident}-hover", {**whole, **({"display": keyword("block")} if selectable else {}), "opacity": number(0),
+                                  "pointer-events": keyword("none")}, [
             path("fill", band, fill=linear((0, 0), ({"fraction": 1}, 0), row_light(0.16, family.light)))]),
         vector(f"{ident}-selected", {**whole, "display": keyword("none"), "pointer-events": keyword("none")}, [
             path("fill", band, fill=linear((0, 0), ({"fraction": 1}, 0), row_light(0.41, family.light)))]),
@@ -244,6 +246,15 @@ def row_plates(ident: str, width: float, height: float, family: Family = MARINE)
             path("inset", [(0.75, top + 1), (0.75, bottom - 1.5), (width * 0.87, bottom - 1.5)], closed=False,
                  stroke=stroke(solid(rgb(family.hot)), 1.2))]),
     ]
+
+
+def bind_selected(doc: Document, ident: str, chosen: dict) -> None:
+    """The row's selected band while `chosen` holds, in place of its hover
+    band: a row draws one band, the selection's first (Appendix B.1), so that
+    the focused row's orange text stays on the selection's light rather than
+    on the two bands together."""
+    doc.bind(f"{ident}-selected.display", f"{ident}-selected", "display", {"op": "select", "args": [chosen, "block", "none"]})
+    doc.bind(f"{ident}-hover.display", f"{ident}-hover", "display", {"op": "select", "args": [chosen, "none", "block"]})
 
 
 def row_states(doc: Document, ident: str, text_nodes: tuple, rest_colours: tuple, family: Family = MARINE) -> dict:
@@ -293,8 +304,7 @@ def save_row(doc: Document, index: int, prefix: str = "load", row_w: float = ROW
     save = {"op": "+", "args": [{"state": f"{prefix}.first"}, index]}
     doc.bind(f"{ident}.display", ident, "display",
              {"op": "select", "args": [{"op": "<", "args": [save, {"state": f"{prefix}.count"}]}, "block", "none"]})
-    doc.bind(f"{ident}-selected.display", f"{ident}-selected", "display",
-             {"op": "select", "args": [{"op": "==", "args": [{"state": f"{prefix}.selected"}, save]}, "block", "none"]})
+    bind_selected(doc, ident, {"op": "==", "args": [{"state": f"{prefix}.selected"}, save]})
     event = f"{prefix}Row{index}"
     doc.events[event] = [{"op": "if", "condition": {"op": "==", "args": [{"state": f"{prefix}.selected"}, save]},
                           "then": chosen if chosen is not None else [{"op": "action", "action": "save"}],
@@ -302,7 +312,7 @@ def save_row(doc: Document, index: int, prefix: str = "load", row_w: float = ROW
     ids = row_states(doc, ident, (f"{ident}-name", f"{ident}-location"), (name_tint, location_tint), family)
     return group(ident, {"position": keyword("relative"), "display": keyword("none"), "width": length(width), "height": length(height),
                          "flex-shrink": number(0)},
-                 [*row_plates(ident, width, height, family), name, location],
+                 [*row_plates(ident, width, height, family, selectable=True), name, location],
                  control={"role": "button", "label": PLACEHOLDER, "event": event, "states": ids,
                           **({"context": {"state": f"{key}.context"}} if guarded else {}),
                           "prompt": row_prompt(verb, {"op": "==", "args": [{"state": f"{prefix}.selected"}, save]})})
@@ -674,7 +684,140 @@ def load_game_document(family: Family = MARINE) -> dict:
     doc.events["pagedNewer"] = [{"op": "focus", "control": f"row-{ROWS - 1}"}]
     root = group("screen", {**FULL, "font-family": font("marine"), "font-size": length(16), "color": colour([1, 1, 1, 0.8])},
                  [backing(), stage, modal])
-    return fit_narrow(doc.build(root), pages=True, stretch=("load-list",))
+    return tall_load_page(fit_narrow(doc.build(root), pages=True, stretch=("load-list",)))
+
+
+# Tall views (retained_tall): the filters under the band, then on the Load
+# page the selected save's picture, its details and the LOAD GAME and DELETE
+# plates beside it, then the headings and the list across the column to the
+# bottom band. A row takes two lines there, 1.6 times the landscape size: the
+# save's name, and under it its location. The picture and details grow as
+# much, the plates 1.3 times so that they fit beside the picture. The Demos
+# page builds on the same parts.
+TALL_TOP = 80.0                                # dp: the filters, under the band
+TALL_GROW = 1.6
+TALL_PLATES = 1.3
+TALL_PLATE_PITCH = 64.0                        # dp: the plates beside the picture
+TALL_SAVE_FOOT = 1.2                           # the Save page's name and SAVE GAME
+TALL_FOOT_BOTTOM = 72.0                        # dp: SAVE GAME, over the prompt bar
+# A row's cells in a tall view, a line at a time: (cell, left, width), the
+# left and width as fractions of the list's width.
+SAVE_LINES = ((("name", 0.0, 1.0),), (("location", 0.0, 1.0),))
+
+
+def tall_list(tall, prefix: str, lines: tuple, list_w: float, heads: dict, top: float) -> float:
+    """The list's headings from `top`, a line for each of the row's lines,
+    and its rows in those lines across `list_w` dp with its scrollbar beside
+    it; returns the list's top. `heads` gives each heading's landscape place
+    (u) by cell."""
+    from retained_tall import MARGIN
+    line, head_line, inset = U * ROW_H * TALL_GROW, U * 14 * TALL_GROW, U * 4 * TALL_GROW
+    for number, cells in enumerate(lines):
+        for cell, left, width in cells:
+            ident = f"{prefix}-head-{cell}"
+            tall.block((ident,), heads[cell], (MARGIN + left * list_w, top + number * head_line), TALL_GROW)
+            tall.set(ident, "width", width * list_w - inset)
+    rule_top = top + len(lines) * head_line + 4
+    tall.bind(f"{prefix}-rule", "left", MARGIN)
+    tall.bind(f"{prefix}-rule", "top", rule_top)
+    tall.bind(f"{prefix}-rule", "width", list_w)
+    list_top = rule_top + 6
+    tall.bind(f"{prefix}-list", "left", MARGIN)
+    tall.bind(f"{prefix}-list", "top", list_top)
+    tall.bind(f"{prefix}-list", "width", list_w)
+    tall.grow(f"{prefix}-column", TALL_GROW)
+    for ident in [f"row-{index}" for index in range(ROWS)] + ["page-newer", "page-older"]:
+        if ident not in tall.nodes:
+            continue
+        row = ident.startswith("row-")
+        height = len(lines) * line if row else line
+        for node in (ident, f"{ident}-line", f"{ident}-hover", f"{ident}-selected", f"{ident}-focus"):
+            tall.set(node, "width", list_w)
+            tall.set(node, "height", height)
+        if not row:
+            tall.set(f"{ident}-label", "width", list_w - U * 18 * TALL_GROW)
+            continue
+        for number, cells in enumerate(lines):
+            for cell, left, width in cells:
+                tall.set(f"{ident}-{cell}", "left", inset + left * list_w)
+                tall.set(f"{ident}-{cell}", "top", number * line)
+                tall.set(f"{ident}-{cell}", "width", width * list_w - 2 * inset)
+    tall.bind(f"{prefix}_scroll", "left", MARGIN + list_w + 4)
+    tall.bind(f"{prefix}_scroll", "top", list_top)
+    return list_top
+
+
+def tall_filters(tall, ids: tuple, origin: tuple, room: float) -> None:
+    """The list's filter, sort or tag plates under the band, grown as the
+    rows where they fit across `room` dp, which their landscape width in u
+    (`origin`, `span`) tells."""
+    from retained_tall import MARGIN
+    tall.block(ids, (U * origin[0], U * origin[1]), (MARGIN, TALL_TOP), min(TALL_GROW, room / (U * origin[2])))
+
+
+def tall_detail(tall, prefix: str, picture: tuple, details: tuple, detail_origin: tuple, plates: tuple) -> float:
+    """The selected item's picture with its frame and error strip at the
+    column's start, its detail lines and section plates beside it; returns
+    where the picture ends."""
+    from retained_tall import MARGIN
+    picture_top = TALL_TOP + 70
+    tall.block((f"{prefix}-shot-back", f"{prefix}-shot", f"{prefix}-shot-border", f"{prefix}-error"), (U * picture[0], U * picture[1]),
+               (MARGIN, picture_top), TALL_GROW)
+    beside = MARGIN + U * picture[2] * TALL_GROW + 24
+    tall.block(details, (U * detail_origin[0], U * detail_origin[1]), (beside + 12, picture_top + 6), TALL_GROW * 0.97)
+    for index, (ident, _key, left, top, _action) in enumerate(plates):
+        tall.block((ident,), (U * left, U * top), (beside, picture_top + 100 + index * TALL_PLATE_PITCH), TALL_PLATES)
+    return picture_top + U * picture[3] * TALL_GROW
+
+
+def tall_empty(tall, prefix: str, origin: tuple, top: float, list_w: float) -> None:
+    """The empty state in the list's place, grown as the rows."""
+    from retained_tall import MARGIN
+    tall.block((f"{prefix}-empty",), (U * origin[0], U * origin[1]), (MARGIN, top), TALL_GROW)
+    for part in (f"{prefix}-empty", f"{prefix}-empty-heading", f"{prefix}-empty-text"):
+        tall.set(part, "width", list_w)
+
+
+def tall_load_page(result: dict) -> dict:
+    # retained_tall reaches this module through the settings rows.
+    from retained_tall import CONTENT_W, TallLayout
+    tall = TallLayout(result)
+    list_w = CONTENT_W - 40                      # dp: the scrollbar beside it
+    tall_filters(tall, ("browser-manual", "browser-automatic", "browser-sort"), (LIST_LEFT, 37, ROW_W), list_w)
+    below = tall_detail(tall, "load", PREVIEW, ("load-date", "load-time", "load-skill", "load-played"), (DETAIL_LEFT, DATE_TOP), PLATES)
+    heads = {"name": (U * LIST_LEFT, U * HEAD_TOP), "location": (U * (LIST_LEFT + LOCATION_X - 1), U * HEAD_TOP)}
+    list_top = tall_list(tall, "load", SAVE_LINES, list_w, heads, below + 30)
+    tall_empty(tall, "load", (LIST_LEFT, LIST_TOP), list_top, list_w)
+    tall.dialogs(TALL_GROW)
+    tall.shade("load-backing", BACKING_ALPHA)
+    return result
+
+
+def tall_save_page(result: dict) -> dict:
+    """The Save page in a tall view: the filters, the headings and the list in
+    two-line rows down to the name and, under it, SAVE GAME at the column's
+    end, over the bottom band. Those two take a line each, 1.2 times the
+    landscape size, since they no longer fit beside each other."""
+    from retained_tall import CONTENT_W, MARGIN, TallLayout
+    tall = TallLayout(result)
+    list_w = CONTENT_W - 40
+    tall_filters(tall, ("browser-manual", "browser-automatic", "browser-sort"), (SAVE_LIST_LEFT, 37, SAVE_ROW_W), list_w)
+    heads = {"name": (U * SAVE_LIST_LEFT, U * SAVE_HEAD_TOP), "location": (U * (SAVE_LIST_LEFT + LOCATION_X - 1), U * SAVE_HEAD_TOP)}
+    list_top = tall_list(tall, "save", SAVE_LINES, list_w, heads, TALL_TOP + 60)
+    tall_empty(tall, "save", (SAVE_LIST_LEFT, SAVE_LIST_TOP), list_top, list_w)
+    place = lambda ident: (tall.dp(ident, "left"), tall.dp(ident, "bottom"))  # noqa: E731
+    go_h = tall.dp("save_go", "height") * TALL_SAVE_FOOT
+    tall.block_bottom(("save_go",), place("save_go"), (CANVAS_W - MARGIN - tall.dp("save_go", "width") * TALL_SAVE_FOOT, TALL_FOOT_BOTTOM),
+                      TALL_SAVE_FOOT)
+    plate_bottom = TALL_FOOT_BOTTOM + go_h + 4
+    tall.block_bottom(("save-name-plate", "save-name"), place("save-name-plate"), (tall.dp("save-name-plate", "left"), plate_bottom),
+                      TALL_SAVE_FOOT)
+    list_foot = plate_bottom + tall.dp("save-name-plate", "height") * TALL_SAVE_FOOT + 6
+    for ident in ("save-list", "save_scroll"):
+        tall.bind(ident, "bottom", list_foot)
+    tall.dialogs(TALL_GROW)
+    tall.shade("save-backing", BACKING_ALPHA)
+    return result
 
 
 # The Save Game page: the stock p_savegame (section 9 "Save and load"). The
@@ -913,7 +1056,7 @@ def save_game_document(family: Family = MARINE) -> dict:
     doc.events["pagedNewer"] = [{"op": "focus", "control": f"row-{ROWS - 1}"}]
     root = group("screen", {**FULL, "font-family": font("marine"), "font-size": length(16), "color": colour([1, 1, 1, 0.8])},
                  [backing("save-backing"), stage, overwrite, notice])
-    return fit_narrow(doc.build(root), pages=True, stretch=("save-list",))
+    return tall_save_page(fit_narrow(doc.build(root), pages=True, stretch=("save-list",)))
 
 
 def walk(node: dict):

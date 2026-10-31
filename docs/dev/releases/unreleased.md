@@ -192,6 +192,14 @@ See [release status](../../user/release-status.md) and the
   menus in the new interface now fill the height: their buttons are larger
   and the description, hint line or mission details stand underneath instead
   of the whole menu shrinking into a strip.
+- **Saves, demos and servers on tall screens.** On a portrait or rotated
+  screen, Load Game, Save Game, Demos, Create Server and Join Game in the new
+  interface now stack into one column at a readable size: the selected save,
+  demo or map with its picture and buttons on top, then a long scrolling
+  list whose entries take two lines, and larger buttons and dialogs.
+- **Clearer list selection.** The selected save, demo, server or map in the
+  new interface's lists no longer doubles its orange highlight under the
+  pointer, so its name stays readable.
 - **Settings on tall screens, and exact values.** On a portrait or rotated
   screen, Controls, Game Options and Audio in the new interface now use the
   height: their rows stand in one larger, scrolling column instead of

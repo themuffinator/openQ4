@@ -130,6 +130,12 @@ made them too large to load.
   questions at the column's scale
   ([tall views](ui/retained-screens.md#menu-levels-in-tall-views-31-october-2026),
   visual specification 1.33).
+- [x] The list pages use a tall view's height: in views of 3:4 and taller
+  Load and Save Game, Demos, Create Server and Join Game stand in one column
+  with two-line rows, grown plates and dialogs and a full-width backing, and a
+  selected row draws one band in every view
+  ([list pages](ui/retained-screens.md#list-pages-in-tall-views-31-october-2026),
+  visual specification 1.34).
 - [ ] Bound acceptance evidence remains.
 
 ## Windows stay see-through at any distance, 29 October 2026

@@ -42,7 +42,8 @@ from build_retained_screens import (FULL, OLIVE, ORANGE, PROGRESS, U, VALUE, VER
                                     page_prompts, path, rgb, solid, stroke, text_width, track, typeface, vector)
 from retained_create_server import header_band, text_row
 from retained_difficulty import check_fits, primary_plate
-from retained_saves import ERROR, HEADING, PLACEHOLDER, pager_row, picture_frame, row_plates, row_states, table_text
+from retained_saves import (BACKING_ALPHA, ERROR, HEADING, PLACEHOLDER, bind_selected, pager_row, picture_frame, row_plates, row_states,
+                           table_text)
 from retained_subpage import subpage_document
 
 JOIN_ROWS = 64                             # RETAINED_JOIN_ROWS in the session
@@ -249,8 +250,7 @@ def server_row(doc: Document, index: int, row_w: float) -> dict:
     chosen = {"op": "+", "args": [{"state": "join.first"}, index]}
     doc.bind(f"{ident}.display", ident, "display",
              {"op": "select", "args": [{"op": "<", "args": [chosen, {"state": "join.count"}]}, "block", "none"]})
-    doc.bind(f"{ident}-selected.display", f"{ident}-selected", "display",
-             {"op": "select", "args": [{"op": "==", "args": [{"state": "join.selected"}, chosen]}, "block", "none"]})
+    bind_selected(doc, ident, {"op": "==", "args": [{"state": "join.selected"}, chosen]})
     event = f"serverRow{index}"
     doc.events[event] = [{"op": "if", "condition": {"op": "==", "args": [{"state": "join.selected"}, chosen]},
                           "then": [{"op": "focus", "control": "join_server"}],
@@ -258,7 +258,7 @@ def server_row(doc: Document, index: int, row_w: float) -> dict:
     ids = row_states(doc, ident, tuple(texts), tuple(tint for _ in texts))
     # The row's opacity rests at 1; row.reveal fades it in (rowReveal).
     return group(ident, {"position": keyword("relative"), "display": keyword("none"), "width": length(width), "height": length(height),
-                         "flex-shrink": number(0), "opacity": number(1)}, [*row_plates(ident, width, height), *cells],
+                         "flex-shrink": number(0), "opacity": number(1)}, [*row_plates(ident, width, height, selectable=True), *cells],
                  control={"role": "button", "label": PLACEHOLDER, "event": event, "states": ids, "detail": index})
 
 
@@ -841,5 +841,130 @@ def join_game_document() -> dict:
              {"op": "select", "args": [{"state": "join.favorite"}, FAVORITE_KEYS[1], FAVORITE_KEYS[0]]})
     doc.bind("join_favorite.enabled", "join_favorite", "enabled", {"op": ">=", "args": [{"state": "join.selected"}, 0]})
     back = page_prompts(doc, "join_back", action="back", verbs=(VERB_JOIN,))
-    return subpage_document(doc, "join", "#str_200002", "#str_200187", "join_newlist", [*parts, join, favorite, back, detail_card(doc)],
-                            [join_ip_modal(doc), find_modal(doc)], stretch=("servers-list",))
+    return tall_join_page(subpage_document(doc, "join", "#str_200002", "#str_200187", "join_newlist",
+                                           [*parts, join, favorite, back, detail_card(doc)],
+                                           [join_ip_modal(doc), find_modal(doc)], stretch=("servers-list",)))
+
+
+# A tall view's Join Game page (retained_tall): the mod spinner and the source
+# tags in two lines under the band, then the sort headings and the list across
+# the column, a server in two lines 1.5 times the landscape size: its symbols
+# and name, then its ping, repeater, players, game type and map. Under the
+# list, 1.2 times the landscape size so that each line fits across the column:
+# the game type spinner (with the search tag beside it) and the filter tags in
+# two lines, the status with CLEAR SORTING, the load bar, then the list's
+# actions in one column with the levelshot beside them, and JOIN SERVER with
+# ADD TO FAVORITES over the bottom band.
+TALL_GROW = 1.5
+TALL_CONTROLS = 1.3
+TALL_FOOT = 1.2
+SECOND_LINE = 279.0                        # u: where the row's second line starts (the ping's tab stop)
+FOOT_BOTTOM = 72.0                         # dp: JOIN SERVER, over the prompt bar
+FOOT_GAP = 10.0                            # dp: between the footer's lines
+
+
+def tall_join_page(result: dict) -> dict:
+    from retained_tall import CONTENT_W, MARGIN, TallLayout
+    tall = TallLayout(result)
+    list_w = CONTENT_W - 40
+    controls_h = U * 16 * TALL_CONTROLS
+    tall.block(("join-mod", "join_mod_previous", "join-mod-value", "join_mod_next"), (U * MOD[0], U * MOD[1]), (MARGIN, 80), TALL_CONTROLS)
+    tall.block(("join-source", "join_internet", "join_lan"), (U * SOURCE[0], U * SOURCE[1]), (MARGIN, 86 + controls_h), TALL_CONTROLS)
+    tall.show("join-header", "none", "block")
+    heads_top = 86 + 2 * controls_h + 14
+    head_h = U * 16 * TALL_GROW
+    list_left = U * LIST[0]
+    for column, *_rest in COLUMNS:
+        ident = f"heading-{column}"
+        left = tall.dp(ident, "left") - list_left
+        second = left >= U * SECOND_LINE - 0.5
+        tall.bind(ident, "left", MARGIN + ((left - U * SECOND_LINE + U * COLUMNS[0][3]) if second else left) * TALL_GROW)
+        tall.top(ident, heads_top + (head_h if second else 0))
+        tall.grow(ident, TALL_GROW, keep_place=True)
+    list_top = heads_top + 2 * head_h + 6
+    tall.bind("servers-list", "left", MARGIN)
+    tall.top("servers-list", list_top)
+    tall.bind("servers-list", "width", list_w)
+    tall.bind("servers_scroll", "left", MARGIN + list_w + 4)
+    tall.top("servers_scroll", list_top)
+    tall.grow("servers-column", TALL_GROW)
+    line = U * ROW_H * TALL_GROW
+    for index in range(JOIN_ROWS):
+        ident = f"server-{index}"
+        for node in (ident, f"{ident}-line", f"{ident}-hover", f"{ident}-selected", f"{ident}-focus"):
+            tall.set(node, "width", list_w)
+            tall.set(node, "height", 2 * line)
+        for child in tall.nodes[ident]["children"]:
+            node = child["id"]
+            if node.endswith(("-line", "-hover", "-selected", "-focus")):
+                continue
+            left, top = tall.dp(node, "left"), tall.dp(node, "top") or 0
+            if left >= U * SECOND_LINE - 0.5:
+                tall.set(node, "left", (left - U * SECOND_LINE + U * COLUMNS[0][3]) * TALL_GROW)
+                tall.set(node, "top", top * TALL_GROW + line)
+        for cell in ("name", "map"):
+            node = f"{ident}-{cell}"
+            start = tall.dp(node, "left") - (U * SECOND_LINE - U * COLUMNS[0][3] if cell == "map" else 0)
+            tall.set(node, "width", list_w - start * TALL_GROW - 8)
+    tall.bind("join-loading", "left", MARGIN)
+    tall.top("join-loading", list_top)
+    tall.bind("join-loading", "width", list_w)
+    empty_left = tall.dp("join-empty-heading", "left")
+    tall.block(("join-empty-heading", "join-empty", "join_emptyclear", "join_emptynew"), (empty_left, tall.canvas_top("join-empty-heading")),
+               (MARGIN + 6, list_top + 12), TALL_CONTROLS)
+    for node in ("join-empty-heading", "join-empty"):
+        tall.set(node, "width", list_w - 12)
+    tall_join_foot(tall)
+    tall.dialogs(TALL_GROW)
+    tall.shade("join-backing", BACKING_ALPHA)
+    return result
+
+
+def tall_join_foot(tall) -> None:
+    """The parts under the list in a tall view, from the bottom band up (see
+    TALL_FOOT), and the list's foot over them."""
+    from retained_tall import CANVAS_W, MARGIN
+    grown = lambda ident, prop: tall.dp(ident, prop) * TALL_FOOT  # noqa: E731
+    right = CANVAS_W - MARGIN
+
+    def foot(ids, at: tuple, factor: float = TALL_FOOT) -> None:
+        tall.block_bottom(ids, (tall.dp(ids[0], "left"), tall.dp(ids[0], "bottom")), at, factor)
+
+    server_h, favorite_h = grown("join_server", "height"), grown("join_favorite", "height")
+    if MARGIN + grown("join_server", "width") + 12 + grown("join_favorite", "width") > right:
+        raise SystemExit("JOIN SERVER and ADD TO FAVORITES do not fit across a tall view's column")
+    foot(("join_server",), (MARGIN, FOOT_BOTTOM))
+    foot(("join_favorite",), (MARGIN + grown("join_server", "width") + 12, FOOT_BOTTOM + (server_h - favorite_h) / 2))
+    actions = tuple(ident for ident, *_rest in reversed(LIST_ACTIONS))
+    actions_bottom = FOOT_BOTTOM + server_h + 14
+    foot(actions, (MARGIN, actions_bottom))
+    actions_top = actions_bottom + (tall.dp(actions[-1], "bottom") + tall.dp(actions[-1], "height") - tall.dp(actions[0], "bottom")) * TALL_FOOT
+    shot = ("join-shot-back", "join-shot", "join-shot-border")
+    scale = (actions_top - actions_bottom) / tall.dp(shot[0], "height")
+    foot(shot, (right - tall.dp(shot[0], "width") * scale, actions_bottom), scale)
+    # The load bar keeps its width across the view (its fill's length is the
+    # scan's fraction of it) and grows in height with its notice.
+    load_bottom = actions_top + FOOT_GAP
+    track_h, notice_h = grown("join-load-track", "height"), grown("join-load-notice", "height")
+    for ident in ("join-load-track", "join-load-fill"):
+        tall.bind(ident, "bottom", load_bottom)
+        tall.bind(ident, "height", track_h)
+    tall.bind("join-load-fill-tube", "height", track_h)
+    tall.bind("join-load-notice", "bottom", load_bottom + (track_h - notice_h) / 2)
+    for prop in ("height", "font-size", "line-height"):
+        tall.bind("join-load-notice", prop, grown("join-load-notice", prop))
+    status_bottom = load_bottom + track_h + FOOT_GAP
+    clear_h, status_h = grown("join_clearsort", "height"), grown("join-status", "height")
+    foot(("join_clearsort",), (right - grown("join_clearsort", "width"), status_bottom))
+    foot(("join-status",), (MARGIN + (tall.dp("join-status", "left") - tall.dp(actions[0], "left")) * TALL_FOOT,
+                            status_bottom + (clear_h - status_h) / 2))
+    filters_bottom = status_bottom + clear_h + 8
+    foot(("join_filter_full", "join_filter_empty", "join_filter_password"), (MARGIN, filters_bottom))
+    spin = ("join_gametype_previous", "join-gametype-value", "join_gametype_next")
+    spin_bottom = filters_bottom + grown(spin[0], "height") + 8
+    foot(spin, (MARGIN, spin_bottom))
+    spin_w = (tall.dp(spin[2], "left") + tall.dp(spin[2], "width") - tall.dp(spin[0], "left")) * TALL_FOOT
+    foot(("join_search",), (MARGIN + spin_w + 20, spin_bottom))
+    list_foot = spin_bottom + grown(spin[0], "height") + 14
+    for ident in ("servers-list", "servers_scroll"):
+        tall.bind(ident, "bottom", list_foot)

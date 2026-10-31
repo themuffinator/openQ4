@@ -1,6 +1,6 @@
 # openQ4 UI Visual Design
 
-Specification version 1.33, 31 October 2026 (1.29 to 1.32 earlier that day, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
+Specification version 1.34, 31 October 2026 (1.29 to 1.33 earlier that day, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
 1.9 on 29 September, 1.6 on 28 September, 1.4 and 1.5 on 27 September, 1.1 to
 1.3 on 26 September, 1.0 on 8 September 2026). Status:
 implementation target; the replacement has not shipped. Applies to every
@@ -1863,7 +1863,13 @@ and parallax off.
   header band. Sort from the column header or with north. The detail column
   shows the levelshot, players and rules; Join, Spectate and Favorite sit in
   the prompt bar; west refreshes. Empty, loading and failed states follow
-  section 7.
+  section 7. In a view of 3:4 and taller a list page stands in one column
+  across the canvas: its filters under the top band, then the selected item's
+  picture with its details and actions beside it, then the list to the bottom
+  band, each row in two lines (the name over the rest) and scrolling; the
+  parts under the list take a line each, its confirmations grow with the
+  rows, and the page's backing darkens the whole width. Create Server stands
+  its map picture and list over its options the same way.
 - **Arena Campaign.** On the Arena sub-page, tiers form a vertical ladder of
   plates in the section navigation. Locked tiers are dimmed and carry the lock
   symbol, boss matches use a larger plate, and the bumpers switch tier.
@@ -4051,6 +4057,16 @@ catalogue obligations, including `ART-035`, remain authoring/artwork requirement
 they do not authorize or require a new gameplay mode. This scope correction
 accepts no GUI, artwork, platform or behavior. Hit-feedback defaults and the other
 UI-05 qualification remain open.
+
+### Version 1.34: list pages in tall views
+
+Section 13.7's Lists pattern now says how a list page stands in a view of 3:4
+and taller: one column, the filters, the selected item's picture, details and
+actions, then the list in two-line rows down to the bottom band, the parts
+under the list a line each, its confirmations grown with the rows and its
+backing across the whole width; Create Server's map picture and list stand
+over its options. `LAY-021` already holds this scope; no requirement changes,
+and nothing is accepted.
 
 ### Version 1.33: menu levels in tall views
 

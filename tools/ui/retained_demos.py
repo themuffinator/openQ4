@@ -33,7 +33,7 @@ from build_retained_screens import (CANVAS_W, FULL, LANGUAGES, OLIVE, ORANGE, TI
                                     objectives_scrollbar, page_prompts, path, rgb, row_prompt, solid, stroke, text_width, track,
                                     typeface, vector)
 from retained_saves import (ERROR, ERROR_LINE, ERROR_STRIP, HEADING, LIST_H, LIST_LEFT, LIST_TOP, LIST_W, PLACEHOLDER, PREVIEW,
-                            ROW_H, ROW_W, RULE_Y, backing, lines_needed, pager_row, picture_frame, row_plates, row_states,
+                            ROW_H, ROW_W, RULE_Y, backing, bind_selected, lines_needed, pager_row, picture_frame, row_plates, row_states,
                             section_plate, table_text)
 
 ROWS = 64                      # RETAINED_DEMO_ROWS in the session: the demos the list holds at a time
@@ -132,8 +132,7 @@ def demo_row(doc: Document, index: int) -> dict:
     demo = {"op": "+", "args": [{"state": "demos.first"}, index]}
     doc.bind(f"{ident}.display", ident, "display",
              {"op": "select", "args": [{"op": "<", "args": [demo, {"state": "demos.count"}]}, "block", "none"]})
-    doc.bind(f"{ident}-selected.display", f"{ident}-selected", "display",
-             {"op": "select", "args": [{"op": "==", "args": [{"state": "demos.selected"}, demo]}, "block", "none"]})
+    bind_selected(doc, ident, {"op": "==", "args": [{"state": "demos.selected"}, demo]})
     event = f"demosRow{index}"
     doc.events[event] = [{"op": "if", "condition": {"op": "==", "args": [{"state": "demos.selected"}, demo]},
                           "then": [{"op": "if", "condition": {"state": "demos.canPlay"}, "then": [{"op": "action", "action": "play"}]}],
@@ -141,7 +140,7 @@ def demo_row(doc: Document, index: int) -> dict:
     ids = row_states(doc, ident, tuple(f"{ident}-{column}" for column, *_ in COLUMNS), tuple(TINTS[column] for column, *_ in COLUMNS))
     return group(ident, {"position": keyword("relative"), "display": keyword("none"), "width": length(width), "height": length(height),
                          "flex-shrink": number(0)},
-                 [*row_plates(ident, width, height), *cells],
+                 [*row_plates(ident, width, height, selectable=True), *cells],
                  control={"role": "button", "label": PLACEHOLDER, "event": event, "states": ids,
                           "prompt": row_prompt(VERB_PLAY, {"op": "&&", "args": [
                               {"op": "==", "args": [{"state": "demos.selected"}, demo]}, {"state": "demos.canPlay"}]})})
@@ -306,4 +305,28 @@ def demos_document() -> dict:
     doc.events["pagedNewer"] = [{"op": "focus", "control": f"row-{ROWS - 1}"}]
     root = group("screen", {**FULL, "font-family": font("marine"), "font-size": length(16), "color": colour([1, 1, 1, 0.8])},
                  [backing("demo-backing"), stage, modal])
-    return fit_narrow(doc.build(root), pages=True, stretch=("demo-list",))
+    return tall_demos_page(fit_narrow(doc.build(root), pages=True, stretch=("demo-list",)))
+
+
+# A tall view's Demos page (retained_tall, as the Load page's): the filter
+# tags under the band, the selected demo's picture with its kind, status and
+# detail and the PLAY, DELETE and REFRESH plates beside it, then the headings
+# and the list. A row's name takes the first line and its map, date and
+# duration the second.
+DEMO_LINES = ((("name", 0.0, 1.0),), (("map", 0.0, 0.44), ("date", 0.45, 0.3), ("length", 0.76, 0.24)))
+
+
+def tall_demos_page(result: dict) -> dict:
+    from retained_saves import BACKING_ALPHA, TALL_GROW, tall_detail, tall_empty, tall_filters, tall_list
+    from retained_tall import CONTENT_W, TallLayout
+    tall = TallLayout(result)
+    list_w = CONTENT_W - 40
+    span = sum(tag_width(key) for _, key in TAGS) + TAG_GAP * (len(TAGS) - 1)
+    tall_filters(tall, tuple(ident for ident, _key in TAGS), (LIST_LEFT, TAG_TOP, span), list_w)
+    below = tall_detail(tall, "demo", PREVIEW, ("demo-kind", "demo-status", "demo-detail"), (DETAIL_LEFT, KIND_TOP), PLATES)
+    heads = {column: (U * (LIST_LEFT + max(0.0, left - 1)), U * HEAD_TOP) for column, _key, left, _width in COLUMNS}
+    list_top = tall_list(tall, "demo", DEMO_LINES, list_w, heads, below + 30)
+    tall_empty(tall, "demo", (LIST_LEFT, LIST_TOP), list_top, list_w)
+    tall.dialogs(TALL_GROW)
+    tall.shade("demo-backing", BACKING_ALPHA)
+    return result
