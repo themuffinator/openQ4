@@ -379,7 +379,7 @@ private:
 		for (const auto& name : values.getMemberNames()) {
 			const auto p = "/state/"+PointerPart(name); const auto& v = values[name];
 			Require(Identifier(name),v,p,"Invalid state ID");
-			Fields(v,p,{"type","initial","cvar","extensions"});
+			Fields(v,p,{"type","initial","cvar","view","extensions"});
 			Require(v["type"].isString(),v,p+"/type","Expected a state type");
 			const auto type = v["type"].asString(); StateDeclaration declaration;
 			if (type == "number") declaration.initial = Numeric(v["initial"],p+"/initial",-1000000000000.0,1000000000000.0);
@@ -392,6 +392,11 @@ private:
 			} else Require(false,v["type"],p+"/type","Expected number, boolean or string state");
 			Require(ValidStateValue(declaration.initial),v["initial"],p+"/initial","Invalid state value");
 			if (v.isMember("cvar")) declaration.cvar = Id(v["cvar"],p+"/cvar");
+			if (v.isMember("view")) {
+				Require(v["view"].isString() && v["view"].asString() == "aspect",v["view"],p+"/view","Expected the view source 'aspect'");
+				Require(type == "number" && !v.isMember("cvar"),v,p,"A view source is a number state without a CVar source");
+				declaration.view = v["view"].asString();
+			}
 			model.state.emplace(name,std::move(declaration));
 		}
 	}
@@ -611,7 +616,7 @@ private:
 				Require(batch.isObject() && batch.size() <= 4096,batch,at+"/values","Expected at most 4096 application state values");
 				for (const auto& id : batch.getMemberNames()) {
 					const auto p = at+"/values/"+PointerPart(id); const auto found = model.state.find(id);
-					Require(found != model.state.end() && found->second.cvar.empty(),batch[id],p,"Event writes require declared application-owned state");
+					Require(found != model.state.end() && !found->second.HostSourced(),batch[id],p,"Event writes require declared application-owned state");
 					auto expression = ReadExpression(batch[id],p,0,true);
 					Require(expression.type == found->second.initial.index(),batch[id],p,"Event state expression has the wrong type");
 					step.values.emplace(id,std::move(expression));
@@ -1188,7 +1193,7 @@ private:
 			else if (role == "toggle") Fields(control,p,{"role","action","label","enabled","states","navigation","value","mixed","parts","extensions"});
 			else if (role == "slider") Fields(control,p,{"role","action","label","enabled","states","navigation","value","minimum","maximum","step","decimals","orientation","parts","extensions"});
 			else if (role == "choice") Fields(control,p,{"role","action","label","enabled","states","navigation","value","parts","visibleRows","options","optionCount","scrollbar","placementBounds","extensions"});
-			else if (role == "number") Fields(control,p,{"role","action","label","enabled","states","navigation","value","minimum","maximum","exponent","integer","maxBytes","parts","extensions"});
+			else if (role == "number") Fields(control,p,{"role","action","label","enabled","states","navigation","value","minimum","maximum","exponent","integer","decimals","maxBytes","parts","extensions"});
 			else if (role == "text") Fields(control,p,{"role","action","label","enabled","states","navigation","value","maxBytes","allowEmpty","masked","parts","extensions"});
 			else if (role == "scrollbar") Fields(control,p,{"role","label","enabled","states","navigation","viewport","orientation","lineStep","minimumThumb","parts","extensions"});
             else Require(false,control["role"],p+"/role","Supported roles are button, toggle, slider, choice, number, text and scrollbar");
@@ -1285,6 +1290,12 @@ private:
 						spec.integer = control["integer"].asBool();
 					}
 					Require(!spec.integer || std::ceil(spec.minimum) <= std::floor(spec.maximum),control,p,"Integer number bounds must include an integer");
+					if (control.isMember("decimals")) {
+						Require(control["decimals"].isUInt() && control["decimals"].asUInt() >= 1 && control["decimals"].asUInt() <= 6 &&
+							!spec.integer && !spec.exponent,control["decimals"],p+"/decimals",
+							"Number decimal places must be 1..6, on a field without integer or exponent policy");
+						spec.decimals = static_cast<int>(control["decimals"].asUInt());
+					}
 					if (control.isMember("maxBytes")) {
 						Require(control["maxBytes"].isUInt() && control["maxBytes"].asUInt() >= 1 && control["maxBytes"].asUInt() <= 65536,
 							control["maxBytes"],p+"/maxBytes","Number edit size must be 1..65536 bytes");

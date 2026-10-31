@@ -1425,6 +1425,7 @@
 	"#str_231547"	"Rotação do modelo"
 	"#str_231548"	"As configurações do jogador mudaram. Tente novamente."
 	"#str_231549"	"Não foi possível aplicar esta configuração do jogador."
+	"#str_231560"	"Digite um número de %s a %s."
 	"#str_230141"	"API de renderização"
 	"#str_230142"	"Dispositivo de renderização"
 	"#str_230143"	"Automático;OpenGL;Vulkan;OpenGL ES"

@@ -208,6 +208,14 @@ TextNumberStatus ParseTextNumber(std::string_view text, const TextNumberPolicy& 
 	}
 	if (at != text.size()) return TextNumberStatus::Invalid;
 	if (policy.integer && !DecimalInteger(text)) return TextNumberStatus::Invalid;
+	if (policy.decimals >= 0) {
+		// Trailing zeros add no precision: 2.50 has one decimal place.
+		if (text.find_first_of("eE") != std::string_view::npos) return TextNumberStatus::Invalid;
+		const auto point = text.find('.');
+		auto end = text.size();
+		if (point != std::string_view::npos) while (end > point+1 && text[end-1] == '0') --end;
+		if (point != std::string_view::npos && end-point-1 > static_cast<std::size_t>(policy.decimals)) return TextNumberStatus::Invalid;
+	}
 	// from_chars deliberately excludes leading '+', which the field accepts.
 	if (text.front() == '+') text.remove_prefix(1);
 	double candidate = 0;
@@ -226,8 +234,9 @@ bool FormatTextNumber(double value, const TextNumberPolicy& policy, std::string&
 	char buffer[768];
 	// Shortest round-trip form preserves the exact double without exposing
 	// unnecessary trailing digits in an editable value such as 1.1.
-	const auto result = FloatToChars(buffer,buffer+sizeof(buffer),value,
-		policy.exponent ? std::chars_format::general : std::chars_format::fixed);
+	// A field limited to decimal places shows the value to them (5.10).
+	const auto result = policy.decimals >= 0 ? FloatToChars(buffer,buffer+sizeof(buffer),value,std::chars_format::fixed,policy.decimals) :
+		FloatToChars(buffer,buffer+sizeof(buffer),value,policy.exponent ? std::chars_format::general : std::chars_format::fixed);
 	if (result.ec != std::errc{}) return Fail(error, "Cannot format the numeric edit value");
 	text.assign(buffer,result.ptr); error.clear(); return true;
 }

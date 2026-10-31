@@ -81,7 +81,11 @@ struct TestHost final:Host {
 	std::map<std::string,Material> descriptions;std::map<std::string,std::uintptr_t> handles;std::map<std::uintptr_t,Material> materials;
 	std::vector<Drawn> draws;std::map<std::uint32_t,std::vector<Drawn>> layers;std::uint32_t layer=0;std::uint64_t frame=1;unsigned errors=0;double readback=1.05;
 	bool ReadFile(const std::string&,std::string&)override{return false;}bool ReadCVar(const std::string& name,size_t type,StateValue& value)override{if(name!="r_number_test"||type!=0)return false;value=readback;return true;}
-	std::string Translate(const std::string& value)override{return value=="#str_field"?"Field":value.starts_with("#str_")?"Invalid <value> & retry":value;}
+	std::map<std::string,std::string> strings; // Keys a case translates for itself.
+	std::string Translate(const std::string& value)override{
+		if(const auto found=strings.find(value);found!=strings.end())return found->second;
+		return value=="#str_field"?"Field":value.starts_with("#str_")?"Invalid <value> & retry":value;
+	}
 	void Log(bool error,const std::string& message)override{if(error){++errors;std::fprintf(stderr,"Runtime: %s\n",message.c_str());}}
 	std::uintptr_t LoadMaterial(const std::string& name,int& w,int& h)override{
 		w=h=256;auto& handle=handles[name];if(!handle){handle=handles.size();materials[handle]=descriptions.contains(name)?descriptions.at(name):Material{name,{}};}return handle;
@@ -225,6 +229,48 @@ static void ValidationProposalsAndIdentity(){
 	Check(!view.runtime.GetNumberGeometry("number")&&!view.Widget().number,"cancellation immediately removes native geometry ownership");view.Frame();Check(!view.host.Colour(0,0,1),"canceled caret is no longer drawn");
 	Check(view.runtime.BeginNumberEdit("number",view.error,view.time),"rebegin after cancellation");Check(!view.runtime.ReplaceNumberSelection("number",stale,"2",view.error,view.time),"old edit identity cannot enter reopened field");view.Frame();
 	Check(view.Geometry().identity.session!=prior.identity.session,"fresh view geometry belongs to a new session");
+}
+// A field limited to decimal places refuses text with more and shows its
+// value to them; its message names its own range, written to those places
+// (an integer field's to whole numbers).
+static void RangeMessageAndDecimals(){
+	const auto ranged=[](const char* policy){
+		Json::Value source;Json::CharReaderBuilder reader;std::string errors;std::istringstream in(Source());
+		Check(Json::parseFromStream(reader,in,&source,&errors),"Number fixture parses");
+		auto& number=source["root"]["children"][0];auto& control=number["control"];
+		control["exponent"]=false;
+		if(std::string(policy)=="decimals"){control["minimum"]=.01;control["maximum"]=30;control["decimals"]=2;}
+		else{control["minimum"]=0;control["maximum"]=32000;control["integer"]=true;}
+		for(auto& child:number["children"])if(child["id"]=="validation")child["properties"]["text"]=Typed("text","#str_range");
+		Json::StreamWriterBuilder writer;writer["indentation"]="";writer["precision"]=17;return Json::writeString(writer,source);
+	};
+	const auto message=[](View& view){auto* text=view.Element("validation");
+		return text->IsVisible(true)&&text->GetNumChildren()==1?static_cast<Rml::ElementText*>(text->GetChild(0))->GetText():std::string("<hidden>");};
+	std::vector<Diagnostic> diagnostics;
+	{
+	View view;view.host.strings["#str_range"]="Enter a number from %s to %s.";Check(view.runtime.LoadDocument(ranged("decimals"),"number-range.q4ui",diagnostics),"a two-place field loads");view.Frame();
+	const auto shown=[&]{auto* text=view.Element("text");return text->GetNumChildren()?static_cast<Rml::ElementText*>(text->GetChild(0))->GetText():std::string();};
+	Check(shown()=="1.05","the field shows its value to its places");
+	Check(view.runtime.SetState({{"value",1.5}},view.error,view.time),"a value with one place");view.Frame();
+	Check(shown()=="1.50","and pads it to them");
+	view.Begin();view.Text("5.123");view.Frame();
+	Check(view.Widget().number->status==TextNumberStatus::Invalid&&message(view)=="Enter a number from 0.01 to 30.00.",
+		"a third place is refused, with the field's own range to its places");
+	Check(!view.runtime.CommitNumberEdit("number",view.Identity(),view.error,view.time)&&view.runtime.TakeActions().empty(),"and asks nothing");
+	view.Text("31");view.Frame();
+	Check(view.Widget().number->status==TextNumberStatus::OutOfRange&&message(view)=="Enter a number from 0.01 to 30.00.","out of range names the range");
+	view.Text("5.10");view.Frame();
+	Check(view.Widget().number->status==TextNumberStatus::Valid&&message(view)=="<hidden>","a trailing zero is no extra place");
+	Check(view.runtime.CommitNumberEdit("number",view.Identity(),view.error,view.time),"commit it");
+	const auto actions=view.runtime.TakeActions();
+	Check(actions.size()==1&&actions[0].proposal&&std::get<double>(*actions[0].proposal)==5.1,"the exact value is proposed");
+	std::string both=ranged("decimals");both.replace(both.find("\"decimals\":2"),12,"\"decimals\":2,\"integer\":true");
+	Check(!Document().Load(both,diagnostics),"decimal places and an integer policy exclude each other");
+	}
+	View whole;whole.host.strings["#str_range"]="Enter a number from %s to %s.";
+	Check(whole.runtime.LoadDocument(ranged("integer"),"number-range.q4ui",diagnostics),"a whole-number field loads");whole.Frame();
+	whole.Begin();whole.Text("1.5");whole.Frame();
+	Check(message(whole)=="Enter a number from 0 to 32000.","a whole-number field names its range in whole numbers");
 }
 static void DetachedDraftAndNativeAffinity(){
 	View view;view.Begin();view.Text("1e-");view.Selection(3,1);const auto identity=view.Identity();
@@ -513,7 +559,7 @@ static void PaddedEditingRectangles(){
 int main(int argc,char** argv){
 	PaddedEditingRectangles();
 	Check(argc<=2,"only optional authored fixture path accepted");if(argc==2)AuthoredFixture(argv[1]);
-	for(const auto& [name,test]:std::vector<std::pair<const char*,void(*)()>>{{"fractional-density",FractionalDrawingAndDensity},{"framed-transform",FramedReversedSelectionAndTransforms},{"scroll-empty-preedit",ScrollEmptyAndPreedit},{"validation-proposals",ValidationProposalsAndIdentity},{"detached-draft",DetachedDraftAndNativeAffinity},{"unavailable-layout",UnavailableLayoutHidesStaleInk},{"snapshot-recreation",SnapshotDraftsAndResourceRecreation},{"snapshot-conflict",SnapshotFreshHostConflict},{"snapshot-pending",SnapshotPendingProposalDoesNotReplay},{"host-acknowledgement",HostAcknowledgementBetweenFrames},{"host-before-dispatch",HostChangeBeforeDispatch}}){currentCase=name;test();}
+	for(const auto& [name,test]:std::vector<std::pair<const char*,void(*)()>>{{"fractional-density",FractionalDrawingAndDensity},{"framed-transform",FramedReversedSelectionAndTransforms},{"scroll-empty-preedit",ScrollEmptyAndPreedit},{"validation-proposals",ValidationProposalsAndIdentity},{"detached-draft",DetachedDraftAndNativeAffinity},{"unavailable-layout",UnavailableLayoutHidesStaleInk},{"snapshot-recreation",SnapshotDraftsAndResourceRecreation},{"snapshot-conflict",SnapshotFreshHostConflict},{"snapshot-pending",SnapshotPendingProposalDoesNotReplay},{"host-acknowledgement",HostAcknowledgementBetweenFrames},{"host-before-dispatch",HostChangeBeforeDispatch},{"range-message",RangeMessageAndDecimals}}){currentCase=name;test();}
 	currentCase="modal-draft-focus";DraftFocusAfterModalProgram();
 	currentCase="validation-scroll";GrowingValidationRevealsField();
 	currentCase="native-runtime";NativeRuntimePresentationAndSettlement();

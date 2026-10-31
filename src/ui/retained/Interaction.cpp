@@ -89,7 +89,7 @@ double SliderTickValue(const SliderSpec& spec,long double tick) {
 }
 TextNumberPolicy NumberPolicy(const Control& control) {
 	const auto& spec = std::get<NumberSpec>(control.widget);
-	return {spec.minimum,spec.maximum,spec.exponent,spec.integer};
+	return {spec.minimum,spec.maximum,spec.exponent,spec.integer,spec.decimals};
 }
 // A Number control's draft as its value: the parsed number, or for a text
 // field (role "text") the text itself, which must not be empty unless the

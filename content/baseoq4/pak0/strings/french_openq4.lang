@@ -1430,6 +1430,7 @@
 	"#str_231547"	"Rotation du modèle"
 	"#str_231548"	"Les paramètres du joueur ont changé. Réessayez."
 	"#str_231549"	"Impossible d'appliquer ce paramètre du joueur."
+	"#str_231560"	"Saisissez un nombre de %s à %s."
 	"#str_230141"	"Moteur de rendu"
 	"#str_230142"	"Périphérique de rendu"
 	"#str_230143"	"Automatique;OpenGL;Vulkan;OpenGL ES"

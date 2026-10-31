@@ -1425,6 +1425,7 @@
 	"#str_231547"	"Model rotation"
 	"#str_231548"	"Player settings changed. Please try again."
 	"#str_231549"	"Unable to apply this player setting."
+	"#str_231560"	"Enter a number from %s to %s."
 	"#str_230141"	"Rendering backend"
 	"#str_230142"	"Rendering device"
 	"#str_230143"	"Automatic;OpenGL;Vulkan;OpenGL ES"

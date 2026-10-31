@@ -315,7 +315,7 @@ bool State::WouldChange(const StateValues& changes, bool hostSources) const {
 	if (presentationDirty) return true;
 	for (const auto& [id,value] : changes) {
 		const auto declaration = declarations->find(id);
-		if (declaration == declarations->end() || declaration->second.cvar.empty() == hostSources ||
+		if (declaration == declarations->end() || !declaration->second.HostSourced() == hostSources ||
 			value.index() != declaration->second.initial.index() || !ValidStateValue(value)) return true;
 		const auto current = variables.find(id);
 		if (current == variables.end() || current->second != value) return true;
@@ -329,7 +329,7 @@ bool State::SetCombined(const StateValues& application, const StateValues& hostS
 		for (const auto& [id,value] : batch) {
 			auto declaration = declarations->find(id);
 			if (declaration == declarations->end()) { error = "Unknown state variable '"+id+"'"; return false; }
-			if (declaration->second.cvar.empty() == host) { error = "State source ownership mismatch for '"+id+"'"; return false; }
+			if (!declaration->second.HostSourced() == host) { error = "State source ownership mismatch for '"+id+"'"; return false; }
 			if (value.index() != declaration->second.initial.index() || !ValidStateValue(value)) {
 				error = "Invalid state type/value for '"+id+"'"; return false;
 			}
@@ -425,7 +425,7 @@ bool State::Restore(const StateValues& application, const StateValues& hostSourc
 	error.clear();
 	StateValues candidate;
 	for (const auto& [id,declaration] : *declarations) {
-		const auto& source = declaration.cvar.empty() ? application : hostSources;
+		const auto& source = declaration.HostSourced() ? hostSources : application;
 		const auto found = source.find(id);
 		if (found == source.end() || found->second.index() != declaration.initial.index() || !ValidStateValue(found->second)) {
 			error = "Missing or invalid restored state '"+id+"'"; return false;

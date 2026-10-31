@@ -1425,6 +1425,7 @@
 	"#str_231547"	"Model dönüşü"
 	"#str_231548"	"Oyuncu ayarları değişti. Lütfen tekrar deneyin."
 	"#str_231549"	"Bu oyuncu ayarı uygulanamadı."
+	"#str_231560"	"%s ile %s arasında bir sayı gir."
 	"#str_230141"	"İşleme arka ucu"
 	"#str_230142"	"İşleme aygıtı"
 	"#str_230143"	"Otomatik;OpenGL;Vulkan;OpenGL ES"

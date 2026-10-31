@@ -1425,6 +1425,7 @@
 	"#str_231547"	"Otočení modelu"
 	"#str_231548"	"Nastavení hráče se změnilo. Zkuste to znovu."
 	"#str_231549"	"Toto nastavení hráče nelze použít."
+	"#str_231560"	"Zadej číslo od %s do %s."
 	"#str_230141"	"Vykreslovací rozhraní"
 	"#str_230142"	"Vykreslovací zařízení"
 	"#str_230143"	"Automaticky;OpenGL;Vulkan;OpenGL ES"

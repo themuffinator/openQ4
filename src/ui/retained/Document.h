@@ -33,6 +33,10 @@ using PresentationLookup = std::function<bool(const std::string&, int, StateValu
 struct StateDeclaration {
 	StateValue initial;
 	std::string cvar; // Optional read-only host source; empty means application-owned.
+	// Optional read-only view source: "aspect" is the view's width over its
+	// height, which the runtime refreshes as it lays the document out.
+	std::string view;
+	bool HostSourced() const { return !cvar.empty() || !view.empty(); }
 };
 struct Expression {
 	std::string op, state;
@@ -179,6 +183,7 @@ struct NumberSpec {
 	double minimum = 0, maximum = 1;
 	bool exponent = true;
 	bool integer = false; // New proposals must represent an exact decimal integer.
+	int decimals = -1;    // New proposals have at most this many decimal places; -1 has no limit.
 	// A text field (role "text"): the same editor, but its value is the
 	// draft's text itself, a non-empty single line within maxBytes, and it
 	// has no numeric bounds or syntax.

@@ -957,8 +957,10 @@ archived provenance; new scheduling belongs here.
   [sub-pages of the SETTINGS page](ui/retained-screens.md#the-settings-sub-pages-31-october-2026)
   in the main menu's construction (visual specification 1.29, `FLOW-068`),
   replacing the drafted full-screen panels: sections are tabs and no tab has
-  more than two columns. The SYSTEM page is still the drafted panel, and
-  portrait views and precise slider entry remain.
+  more than two columns. The SYSTEM page is still the drafted panel.
+  Portrait views of 3:4 and taller now stand each tab in one larger,
+  scrolling column, and GAME OPTIONS' fine sliders take typed values
+  ([portrait and typed numbers](ui/retained-screens.md#portrait-views-and-typed-numbers-31-october-2026)).
 - [ ] **UI-02 — P1, implementation and qualification: text, input and accessibility.**
   Finish in-field IME/composition, shaping/kerning/fallback/styles, grapheme editing,
   caret/candidate placement, binding capture, accessibility exposure and contextual

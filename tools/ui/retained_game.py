@@ -12,19 +12,24 @@ FindPlayerSetting, which takes each stock control's range or values). The
 rows the stock page computes go through the session
 (idSessionLocal::HandleRetainedGameRequest): the gun position, the forced
 pro skins, the custom crosshair, the corpse time and the language, which
-reloads the language and the menus. BACK, or the back input, returns to the
-settings screen that opened the page."""
+reloads the language and the menus. A slider with more than a hundred steps
+(the mouse's sensitivity, CPI, acceleration and cap, the gyro and touchpad
+sensitivities, the gun's field of view and offsets) takes the value typed as
+well, in a number after it to the slider's places (retained_settings_rows.
+entry_row); the adapter acknowledges it once the CVar reads it back. BACK, or
+the back input, returns to the settings screen that opened the page."""
 from __future__ import annotations
 
 from build_retained_screens import U, Document, absolute, image, keyword, length, number
 from retained_mp_menus import value_row
-from retained_settings_rows import COLUMN_W, ROW_PITCH, heading, setting_row, settings_subpage, show_tab, value_column
+from retained_settings_rows import COLUMN_W, ROW_PITCH, entry_row, heading, setting_row, settings_subpage, show_tab, value_column
 
 PREFIX = "game"
 CROSSHAIRS = 20                            # the custom crosshairs (player_marine_mp_ui's mtr_crosshair keys)
 # The crosshair colours the stock page offers (#str_229942), as g_crosshairColor.
 CROSSHAIR_COLORS = ("1 1 1 1", "1 0 0 1", "1 0.5 0 1", "1 1 0 1", "0 1 0 1", "0 1 1 1", "0 0 1 1", "1 0 0.5 1")
 LANGUAGES = 12                             # #str_229908, in sys_lang's order (RETAINED_GAME_LANGUAGES)
+FINE_STEPS = 100                           # a slider with more steps than this takes a typed number too
 
 
 def toggle(ident: str, label: str, cvar: str) -> tuple:
@@ -216,6 +221,10 @@ def game_row(doc: Document, row: tuple, value_x: float) -> dict:
             # slider shows it to the row's places.
             scale = 10 ** decimals
             shown = {"op": "/", "args": [{"op": "round", "args": [{"op": "*", "args": [shown, scale]}]}, scale]}
+        if (maximum - minimum) / step > FINE_STEPS:
+            # Too many steps to reach a value by stepping: the row takes the
+            # value typed as well, to the slider's places.
+            return entry_row(doc, ident, label, value_x, shown, setting_action(doc, binding, "number"), (minimum, maximum, step, decimals))
         return setting_row(doc, ident, label, "slider", value_x, value=shown, action=setting_action(doc, binding, "number"),
                            slider=(minimum, maximum, step, decimals))
     if kind == "choice":
@@ -262,7 +271,8 @@ def game_document() -> dict:
                 items += [heading(heading_key), *(built[row[1]] for row in rows)]
             laid.append(items)
         tabs.append((ident, key, laid))
-    if sorted(built) != sorted(node["id"] for _ident, _key, laid in tabs for column in laid for node in column if isinstance(node, dict)):
+    if sorted(node["id"] for node in built.values()) != sorted(node["id"] for _ident, _key, laid in tabs for column in laid for node in column
+                                                              if isinstance(node, dict)):
         raise SystemExit("the GAME OPTIONS tabs must hold every row once")
     # The language reload re-activates the page (idUserInterfaceManagerLocal::
     # ReloadGuis); the session marks it, so the page returns to Language.

@@ -1425,6 +1425,7 @@
 	"#str_231547"	"Modell forgatása"
 	"#str_231548"	"A játékos beállításai megváltoztak. Próbáld újra."
 	"#str_231549"	"A játékos ezen beállítása nem alkalmazható."
+	"#str_231560"	"Adj meg egy számot %s és %s között."
 	"#str_230141"	"Renderelési háttérrendszer"
 	"#str_230142"	"Renderelő eszköz"
 	"#str_230143"	"Automatikus;OpenGL;Vulkan;OpenGL ES"

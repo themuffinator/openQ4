@@ -70,8 +70,13 @@ See [player release status](../user/release-status.md).
   session gate (descent, Back and the stock fallback at the hand-over) and
   the SYSTEM route harness pass; engine captures of every tab at 16:9
   (OpenGL, English), 4:3 (German) and 9:16.
-- [ ] The SYSTEM page as a sub-page, portrait layouts that use the height,
-  precise entry for fine sliders and bound acceptance evidence remain.
+- [x] Portrait views of 3:4 and taller stand each settings tab in one
+  scrolling column at about twice the size (the runtime's new `view.aspect`
+  source), and GAME OPTIONS' fine sliders take a typed number whose message
+  names its own range (`#str_231560` in every language, the number control's
+  new `decimals`;
+  [portrait and typed numbers](ui/retained-screens.md#portrait-views-and-typed-numbers-31-october-2026)).
+- [ ] The SYSTEM page as a sub-page and bound acceptance evidence remain.
 
 ## Windows stay see-through at any distance, 29 October 2026
 

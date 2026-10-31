@@ -174,7 +174,8 @@ Runtime and Rml document.
 ## Authoring and rendering
 
 The control requires `value`, a typed numeric `action`, finite `minimum` and
-`maximum`, optional `exponent`, `integer` and `maxBytes`, and these named `parts`:
+`maximum`, optional `exponent`, `integer`, `decimals` and `maxBytes`, and these
+named `parts`:
 
 | Part | Required relationship and purpose |
 | --- | --- |
@@ -192,6 +193,18 @@ The independent `exponent` policy still controls exponent syntax. Invalid text
 remains editable, and observed finite custom values retain their exact readback
 instead of being rounded to fit the editor. The [SYSTEM dimension fields](dimension-controls.md)
 use this policy for whole-pixel sizes.
+
+`decimals` (1 to 6, on a field without `integer` or `exponent`) limits a new
+proposal to that many decimal places, trailing zeros not counting, and shows the
+value to those places (`5.10`). Text with more places stays editable and invalid,
+as an out-of-range value does; nothing is rounded. The GAME OPTIONS page uses it
+so a typed sensitivity commits exactly the value its slider and CVar read back.
+
+The `validation` part's authored text is the message. A message may name the
+field's range: its first `%s` takes `minimum` and its second `maximum`, each
+written to the field's places where `integer` or `decimals` limits them, else in
+the shortest exact decimal. `#str_231560` ("Enter a number from %s to %s.")
+gives every field its own range in every shipped language.
 
 Focus reveal uses the complete control when it fits. When labels or validation
 make a Number control exceed an ancestor's scroll area, it prioritizes the

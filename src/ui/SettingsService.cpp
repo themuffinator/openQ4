@@ -454,7 +454,7 @@ void UI_SettingsConfirmationDocument(std::uint64_t owner, const DocumentModel& d
     const auto& schema=UI_SettingsStateSchema();
     for (const char* key:{"settings.request","settings.confirmationVisible","settings.canConfirm","settings.canRevert","settings.canRetry","settings.remaining"}) {
         const auto declaration=document.state.find(key);
-        if (declaration==document.state.end() || declaration->second.initial.index()!=schema.at(key) || !declaration->second.cvar.empty()) return;
+        if (declaration==document.state.end() || declaration->second.initial.index()!=schema.at(key) || declaration->second.HostSourced()) return;
     }
     for (const auto& [id,operation]:std::map<std::string,std::string>{{"settings_keep","settings.system.confirm"},{"settings_revert","settings.system.revert"},{"settings_retry","settings.system.retry"}}) {
         const auto* node=document.FindNode(id);

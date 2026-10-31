@@ -1978,8 +1978,7 @@ as Create Server is, and no page shows more than two columns of rows.
 GAME OPTIONS lost its Section row: the tabs do its job. After a language
 reload the page returns to GENERAL, on Language, from whichever tab was
 showing. The sliders show their value as Create Server's and the in-game
-Settings page's do; the drafts' typed number fields are gone for now, since
-their message named one fixed range whatever the row's.
+Settings page's do; the fine ones also take a typed number (below).
 
 The SETTINGS page goes one level deeper to each, as Multiplayer goes to
 Create Server (`BeginRetainedSubpage`, with the new
@@ -1999,6 +1998,51 @@ return; `openq4-ui-retained-settings` checks the SETTINGS page's deeper and
 reverse events. The gate drives the descent, the Back and the stock
 fallback at the hand-over against its doubles. The `settings-subpages`
 capture scenario walks the SETTINGS page into each sub-page and every tab.
+
+### Portrait views and typed numbers (31 October 2026)
+
+- **Portrait.** A view of 3:4 or taller rearranges each tab instead of
+  shrinking its two columns into the width (section 13.3's compact width: one
+  content column; section 13.14 rules out a portrait layout that only shrinks
+  the landscape one). The second column stands under the first in one column
+  across the content, its rows, headings and the page's note at 587/287 (about
+  2.05) times their landscape size, and the column scrolls between the tab
+  strip and the bottom band: a 9:16 view shows about twenty rows, with the
+  wheel or the focus revealing the rest. The runtime's new view source
+  (`"view": "aspect"`, [bindings](bindings.md)) makes the switch below 0.76;
+  bindings on every length in a tab's rows carry it, and the rows' vector art
+  is drawn in fractions of its box so it scales with them. The frame, the tab
+  strip and the prompt bar keep the narrow-view fit; AUDIO's header band gives
+  way and its headings stand in the column like the others. Up and Down read
+  the same order as before; Left and Right on a CONTROLS row still cross to the
+  row beside it, now in the other half of the column. Views taller than 4:3
+  also give the rows' area their extra height (`fit_narrow`'s stretch), the
+  strip and headings staying at the top.
+- **Typed numbers.** A GAME OPTIONS slider with more than a hundred steps has a
+  typed number after it (`retained_settings_rows.entry_row`): mouse
+  sensitivity, CPI, acceleration, its offset, curve and cap, the gyro and
+  touchpad sensitivities and the gun's field of view and X, Y and Z offsets. It
+  takes any value in the slider's range to the slider's places (the number
+  control's new `decimals`, or whole numbers) through the same
+  `settings.player.set` action, and the adapter acknowledges it once the CVar
+  reads it back. Text it cannot take shows the field's own range over the row's
+  label in the error colour: `#str_231560` ("Enter a number from %s to %s.") in
+  every shipped language, the runtime filling in the bounds to the field's
+  places ([numeric fields](numeric-fields.md)); generation fails if a
+  language's message would not fit the label's two lines. The number follows
+  its slider in Up and Down, and Left returns to the slider.
+</content>
+</invoke>
+
+`openq4-ui-retained-controls`, `-game` and `-audio` also check each page at
+9:16 (one column across the content, its rows taller than at 16:9, the
+focused last row scrolled into the rows' area, two columns again at 16:9),
+and the game test a typed sensitivity: a third decimal place refused, 7.25
+committed and settling once the CVar reads it back.
+`openq4-ui-retained-screens-menus` checks the view source and
+`openq4-ui-number-runtime` the decimals policy and the range message. The
+`settings-subpages` capture scenario adds the refused value and the
+controller tab's scrolled last row.
 
 ## Tall views grow the lists (25 October 2026)
 

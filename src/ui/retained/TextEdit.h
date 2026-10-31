@@ -76,11 +76,13 @@ struct TextNumberPolicy {
 	double minimum = 0, maximum = 1;
 	bool exponent = true;
 	bool integer = false;
+	int decimals = -1; // At most this many decimal places (fixed notation only); -1 has no limit.
 };
 // Locale-independent finite decimal parsing. Sign/dot/exponent prefixes remain
 // editable but cannot become proposals. Values are never clamped or quantized;
 // success preserves an in-range off-step value. Integer policy checks the
-// decimal text before binary conversion can round a fraction to an integer.
+// decimal text before binary conversion can round a fraction to an integer;
+// the decimals policy likewise counts the text's significant decimal places.
 // The caller localizes status.
 // Failure leaves value unchanged. It never changes the editor's buffer.
 TextNumberStatus ParseTextNumber(std::string_view text, const TextNumberPolicy& policy, double& value);

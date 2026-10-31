@@ -23,6 +23,14 @@ overwrite each other's variables. Missing or invalid sources retain the last
 valid host snapshot and report a diagnostic. An identical error is logged once
 until recovery or a different error. Evaluation never sets CVars or executes commands.
 
+A number state may instead declare `"view": "aspect"`, the only view source:
+the runtime sets it to the view's width over its height each time it lays the
+document out, before bindings apply, so the first frame of a new view already
+uses it. Like a CVar source it is host-owned and read-only; it cannot also name
+a CVar, and a view that has not been laid out keeps the last value (at first
+the authored `initial`). The settings sub-pages read it to arrange their rows
+in one column in views of 3:4 and taller.
+
 Numeric sources require engine numeric flags and use `GetInteger` or `GetFloat`;
 boolean sources require `CVAR_BOOL`. String sources read the current CVar string.
 This preserves engine values without depending on floating-point `from_chars`,

@@ -1,5 +1,6 @@
 // Copyright (C) 2026 DarkMatter Productions. GPL-3.0-or-later.
 #include "NumberControlView.h"
+#include "FloatChars.h"
 #include "TextRun.h"
 #include "VectorElement.h"
 #include <RmlUi/Core/Box.h>
@@ -54,6 +55,23 @@ std::optional<std::size_t> MaskOffset(const std::vector<std::size_t>& boundaries
 	const auto at=std::lower_bound(boundaries.begin(),boundaries.end(),plain);
 	if (at==boundaries.end() || *at!=plain) return {};
 	return static_cast<std::size_t>(at-boundaries.begin());
+}
+// A number field's message may name its range: the first %s takes the
+// field's minimum and the second its maximum, written to the field's decimal
+// places where it limits them (0.01 to 30.00), else in their shortest exact
+// decimals ("Enter a number from %s to %s.").
+std::string RangeText(std::string message,const NumberSpec& spec) {
+	if (spec.textField) return message;
+	for (const double bound:{spec.minimum,spec.maximum}) {
+		const auto at=message.find("%s");
+		if (at==std::string::npos) break;
+		char text[32];
+		const auto written=spec.integer || spec.decimals>=0 ?
+			FloatToChars(text,text+sizeof(text),bound,std::chars_format::fixed,spec.integer ? 0 : spec.decimals) :
+			FloatToChars(text,text+sizeof(text),bound);
+		message.replace(at,2,written.ec==std::errc{} ? std::string(text,written.ptr) : std::string());
+	}
+	return message;
 }
 }
 struct NumberControlView::Impl {
@@ -295,7 +313,7 @@ bool NumberControlView::Paint(const Interaction& interaction,float ratio,double 
 			text=std::get<std::string>(view->accepted);
 			if (text.size()>spec.maxBytes) { fail(); continue; }
 		}
-		else if (!FormatTextNumber(std::get<double>(view->accepted),{spec.minimum,spec.maximum,spec.exponent,spec.integer},text,error)) { fail(); continue; }
+		else if (!FormatTextNumber(std::get<double>(view->accepted),{spec.minimum,spec.maximum,spec.exponent,spec.integer,spec.decimals},text,error)) { fail(); continue; }
 		// A masked field presents its mask, which the run measures: every plain
 		// offset below reaches the run through `position`.
 		const std::size_t plainSize=text.size();
@@ -333,7 +351,10 @@ bool NumberControlView::Paint(const Interaction& interaction,float ratio,double 
 					edit->notice==NumberEditNotice::ClipboardMasked ? "#str_231129" : "#str_230003";
 				message=impl->translate ? impl->translate(key) : key;
 			} else if (impl->validation) message=impl->validation(spec,*edit,view->rejected.has_value());
-			else { message=impl->Authored(spec.validation).at("text").text; if (impl->translate) message=impl->translate(message); }
+			else {
+				message=impl->Authored(spec.validation).at("text").text; if (impl->translate) message=impl->translate(message);
+				message=RangeText(std::move(message),spec);
+			}
 		}
 		changed|=impl->Text(spec.validation,message); changed|=impl->Display(spec.validation,invalid);
 		const bool textChanged=impl->Text(spec.text,text); changed|=textChanged;

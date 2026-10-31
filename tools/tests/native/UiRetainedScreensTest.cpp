@@ -184,6 +184,35 @@ static void CheckSchema() {
 	Check(Near(viewport.DpRatio(),3,.001f),"display density applies without a canvas");
 }
 
+// A view source: the runtime publishes the view's width over its height as a
+// read-only number state, which a document reads to arrange itself for a tall
+// view (the settings sub-pages' single column).
+static void CheckViewSource(ScreenHost& host) {
+	const std::string root = R"({"id":"root","type":"group","children":[{"id":"tall","type":"group","properties":{"display":{"type":"keyword","value":"none"}}}]})";
+	const auto source = [&](const std::string& declaration, const std::string& extra = "") {
+		return Wrap(root,R"(,"canvas":{"height":720,"minWidth":960},"state":{"view.aspect":)"+declaration+"}"+extra);
+	};
+	const std::string aspect = R"({"type":"number","initial":1.3333,"view":"aspect"})";
+	const std::string bound = R"(,"bindings":[{"id":"tall.display","node":"tall","property":"display","value":{"op":"select","args":[{"op":"<","args":[{"state":"view.aspect"},0.8]},"block","none"]}}])";
+	Check(Loads(source(aspect,bound)),"a number state takes the view's aspect");
+	Check(!Loads(source(R"({"type":"number","initial":1,"view":"width"})")) && !Loads(source(R"({"type":"boolean","initial":false,"view":"aspect"})")) &&
+		!Loads(source(R"({"type":"number","initial":1,"view":"aspect","cvar":"ui_scale"})")),"only a number takes the aspect, never with a CVar");
+	Check(!Loads(source(aspect,R"(,"events":{"onActivate":[{"op":"setState","values":{"view.aspect":1}}]})")),"events cannot write a view source");
+	Runtime runtime(host); std::vector<Diagnostic> diagnostics; std::string error;
+	Check(runtime.Initialize() && runtime.LoadDocument(source(aspect,bound),"view-source.q4ui",diagnostics),"the view source loads");
+	Viewport viewport; viewport.canvasHeight = 720; viewport.canvasMinWidth = 960; viewport.width = 1280; viewport.height = 720;
+	runtime.Frame(viewport,0.1);
+	const auto shown = [&]() { const auto found = runtime.PresentedValue("tall","display"); return found ? found->text : std::string("?"); };
+	Check(Near(static_cast<float>(std::get<double>(runtime.GetState(true).at("view.aspect"))),1280.f/720,.0001f) && shown() == "none",
+		"a 16:9 view reads its aspect and keeps the wide arrangement");
+	viewport.width = 540; viewport.height = 960;
+	runtime.Frame(viewport,0.2);
+	Check(Near(static_cast<float>(std::get<double>(runtime.GetState(true).at("view.aspect"))),.5625f,.0001f) && shown() == "block",
+		"a 9:16 view reads its aspect and takes the tall arrangement");
+	Check(!runtime.GetState(false).contains("view.aspect") && !runtime.SetState({{"view.aspect",2.0}},error,0.3),
+		"the application neither reads back nor writes the view source");
+}
+
 static const std::set<std::string> SessionCommands = {"continue","singlePlayer","loadGame","saveGame","multiplayer","settings",
 	"mods","demos","updates","credits","quit","resume","menuResume","restartLevel","quitToMenu",
 	"loadBack","loadSelect","loadSave","loadDelete","loadNewer","loadOlder","loadNewGame",
@@ -3617,7 +3646,7 @@ static void CheckSettingsPage(ScreenHost& host, const char* path) {
 	Check(std::get<std::string>(document.Model().actions.at("back").arguments.at("command").literal) == "settingsBack" &&
 		std::get<std::string>(document.Model().actions.at("settingsDefaults").arguments.at("command").literal) == "settingsDefaults",
 		"BACK and LOAD DEFAULTS' YES reach the session");
-	for (const char* event : {"subpageentercontrols","subpageentergame","subpageenteraudio","subpagereturn","subpagereverse150","subpagereverse300"})
+	for (const char* event : {"subpageentercontrols","subpageentergame","subpageenterdisplay","subpageenteraudio","subpagereturn","subpagereverse150","subpagereverse300"})
 		Check(document.Model().events.contains(PresentationAliasKey(event)),"the page goes one level deeper to its sub-pages and back");
 	Runtime runtime(host);
 	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/settings.q4ui",diagnostics),"the page loads into a runtime");
@@ -3699,6 +3728,36 @@ static Viewport SettingsViewport(const Document& document, int width = 1280, int
 	return viewport;
 }
 
+// A settings sub-page in a 9:16 view: `above` and `below`, the last row of a
+// tab's first column and the first of its second, stand one under the other
+// in a single column across the content, at about twice the landscape size;
+// `last`, focused, scrolls into the view; a 16:9 view sets the columns side by
+// side again.
+static void CheckSettingsPortrait(Runtime& runtime, const Document& document, const char* above, const char* below, const char* last,
+	const char* rows, double at) {
+	const auto bounds = [&](const std::string& id) { Bounds b; Check(runtime.GetBounds(id,b),"a settings row is laid out"); return b; };
+	const auto wide = SettingsViewport(document), portrait = SettingsViewport(document,540,960);
+	runtime.Frame(wide,at);
+	const auto landscape = bounds(above);
+	runtime.Frame(portrait,at+0.01);
+	const auto first = bounds(above), second = bounds(below);
+	if (!(Near(second.x,first.x) && second.y >= first.y+first.height-.5f))
+		std::fprintf(stderr,"portrait %s x=%.1f y=%.1f h=%.1f, %s x=%.1f y=%.1f\n",above,first.x,first.y,first.height,below,second.x,second.y);
+	Check(Near(second.x,first.x) && second.y >= first.y+first.height-.5f,"a 9:16 view stands the columns in one column");
+	// 880 dp of content across a 960 dp view 540 pixels wide; the landscape
+	// row is 36 dp tall at 1280x720.
+	Check(first.width > 480 && first.width < 500 && first.x >= 0 && first.x+first.width <= 540.5f,"the column's rows cross the content");
+	Check(first.height > landscape.height*1.1f && first.height < landscape.height*1.25f,"its rows grow to the column's width");
+	Check(runtime.FocusControl(last,at+0.02),"focus the tab's last row");
+	runtime.Frame(portrait,at+0.03); runtime.Frame(portrait,at+0.05);
+	const auto shown = bounds(last), area = bounds(rows);
+	Check(area.y+area.height > 860 && area.y+area.height < 960,"the rows run down to the bottom band");
+	Check(shown.y >= area.y-.5f && shown.y+shown.height <= area.y+area.height+.5f,"the focused row scrolls into the view");
+	runtime.Frame(wide,at+0.06);
+	const auto left = bounds(above), right = bounds(below);
+	Check(right.x > left.x+left.width && Near(left.width,landscape.width),"a 16:9 view sets the columns side by side again");
+}
+
 // The retained CONTROLS page (tools/ui/retained_controls.py): the stock tabs
 // as the page's tabs, each in two columns; each row shows the keys the
 // session publishes for its action; Accept asks the session to wait for a
@@ -3764,6 +3823,7 @@ static void CheckControlsPage(ScreenHost& host, const char* path) {
 	const auto panel = bounds("controls-panel"), row = bounds("controls_bind_48");
 	Check(panel.x >= -.5f && panel.x+panel.width <= 540.5f && panel.y+panel.height <= 960.5f && row.x+row.width <= 540.5f,
 		"the panel fits a portrait view");
+	CheckSettingsPortrait(runtime,document,"controls_bind_42","controls_bind_43","controls_bind_48","controls-other-rows",1.1);
 }
 
 // The retained GAME OPTIONS page (tools/ui/retained_game.py): five tabs of
@@ -3852,6 +3912,36 @@ static void CheckGamePage(ScreenHost& host, const char* path) {
 	Check(runtime.FocusControl("game_msensitivity",1.2),"focus the mouse sensitivity");
 	press(MenuInput::Right,1.21);
 	Check(std::abs(std::get<double>(taken("set.sensitivity").arguments.at("value"))-5.01) < 1e-9,"Right raises the sensitivity a step");
+	// Its typed number follows it: a third decimal place is refused, a value
+	// to the slider's places sets the CVar, and it settles once the CVar
+	// reads it back, as the adapter waits for it.
+	press(MenuInput::Down,1.215);
+	Check(runtime.FocusedControl() == "game_msensitivity_number","the typed sensitivity follows its slider");
+	const auto entry = [&]() { return runtime.GetWidgetState("game_msensitivity_number")->number->identity; };
+	const auto typed = [&](const char* value, double at) {
+		const auto size = runtime.GetWidgetState("game_msensitivity_number")->number->state.text.size();
+		return runtime.SetNumberSelection("game_msensitivity_number",entry(),0,size,error,at) &&
+			runtime.ReplaceNumberSelection("game_msensitivity_number",entry(),value,error,at);
+	};
+	Check(runtime.BeginNumberEdit("game_msensitivity_number",error,1.216) && typed("7.255",1.217) &&
+		!runtime.CommitNumberEdit("game_msensitivity_number",entry(),error,1.217) && runtime.TakeActions().empty(),
+		"a third decimal place asks nothing");
+	Check(typed("7.25",1.218) && runtime.CommitNumberEdit("game_msensitivity_number",entry(),error,1.218),"type 7.25 and commit it");
+	{
+		const auto actions = runtime.TakeActions();
+		ActionInvocation invocation;
+		Check(actions.size() == 1 && actions[0].action == "set.sensitivity" && actions[0].proposal && actions[0].proposalToken &&
+			runtime.ResolveAction(actions[0].action,invocation,error,&*actions[0].proposal) &&
+			std::get<double>(invocation.arguments.at("value")) == 7.25,"the typed value sets the sensitivity");
+		host.cvars["sensitivity"] = 7.25;
+		runtime.Frame(viewport,1.219);
+		Check(runtime.AcknowledgeControlProposal(actions[0].node,actions[0].proposalToken,true),"the read-back value is acknowledged");
+		const auto settled = runtime.GetWidgetState("game_msensitivity_number");
+		Check(settled && std::get<double>(settled->accepted) == 7.25 && (!settled->number || !settled->number->conflict),
+			"and the field settles on it without a conflict");
+	}
+	press(MenuInput::Down,1.2195);
+	Check(runtime.FocusedControl() == "game_mcpi","Down goes on to the next row");
 	// HUD: the crosshair colour list reads g_crosshairColor and offers the
 	// next colour.
 	Check(runtime.RunEvent("tab_hud",1.25,effects,error),"choose the HUD tab");
@@ -3892,6 +3982,7 @@ static void CheckGamePage(ScreenHost& host, const char* path) {
 	const auto panel = bounds("game-panel"), row = bounds("game_weaponkick");
 	Check(panel.x >= -.5f && panel.x+panel.width <= 540.5f && panel.y+panel.height <= 960.5f && row.x+row.width <= 540.5f,
 		"the panel fits a portrait view");
+	CheckSettingsPortrait(runtime,document,"game_forcemodel","game_corpsesink","game_weaponkick","game-general-rows",2.2);
 	host.cvars = saved;
 }
 
@@ -3988,6 +4079,10 @@ static void CheckAudioPage(ScreenHost& host, const char* path) {
 	const auto panel = bounds("audio-panel"), last = bounds("audio_subtitle_speakers");
 	Check(panel.x >= -.5f && panel.x+panel.width <= 540.5f && panel.y+panel.height <= 960.5f && last.x+last.width <= 540.5f,
 		"the panel fits a portrait view");
+	CheckSettingsPortrait(runtime,document,"audio_device","audio_eax","audio_subtitle_speakers","audio-audio-rows",1.1);
+	runtime.Frame(portrait,1.2);
+	const auto band = runtime.PresentedValue("audio-header","display");
+	Check(band && band->text == "none","the tall column's headings stand in its rows, not the header band");
 }
 
 static void CheckCreateServerPage(ScreenHost& host, const char* path) {
@@ -4614,6 +4709,7 @@ int main(int argc, char** argv) {
 	if (runs("menus")) CheckSchema();
 	ScreenHost host;
 	if (runs("menus")) CheckTransformedClip(host);
+	if (runs("menus")) CheckViewSource(host);
 	if (runs("menus")) CheckPromptGlyphs(host,argv[1]);
 	if (runs("mp-card")) CheckCardPromptGlyphs(host,argv[7]);
 	if (runs("pages")) CheckPagePrompts(host,argv[19],"guis/menu/loadgame.q4ui","load_back","back",nullptr,true);

@@ -1425,6 +1425,7 @@
 	"#str_231547"	"Giro del modelo"
 	"#str_231548"	"Los ajustes del jugador cambiaron. Inténtalo de nuevo."
 	"#str_231549"	"No se puede aplicar este ajuste del jugador."
+	"#str_231560"	"Introduce un número de %s a %s."
 	"#str_230141"	"API de renderizado"
 	"#str_230142"	"Dispositivo de renderizado"
 	"#str_230143"	"Automático;OpenGL;Vulkan;OpenGL ES"

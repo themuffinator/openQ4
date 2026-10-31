@@ -334,7 +334,7 @@ struct idRemasteredHud::Impl {
 			}
 		}
 		for (const auto& [name,declaration]:model.state) {
-			if (!declaration.cvar.empty()) continue;
+			if (declaration.HostSourced()) continue;
 			auto& field=types[name]; field.type=declaration.initial.index()==0 ? 'n' : declaration.initial.index()==1 ? 'b' : 's';
 			const auto key=Key(name); field.icon=key.size()>=4 && key.ends_with("icon"); field.weapon=key=="weapicon";
 		}

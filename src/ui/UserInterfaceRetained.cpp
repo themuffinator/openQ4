@@ -177,7 +177,7 @@ bool ConvertState(const char* text, size_t type, StateValue& value) {
 bool ApplicationState(const DocumentModel& model, const idDict& dictionary, StateValues& result, std::string& error,
 	const std::set<std::string>* fields = nullptr) {
 	const auto read = [&](const std::string& name, const StateDeclaration& declaration) {
-		if (!declaration.cvar.empty() || name.starts_with("settings.") || NumberDraftState(name.c_str())) return true;
+		if (declaration.HostSourced() || name.starts_with("settings.") || NumberDraftState(name.c_str())) return true;
 		if (model.detail && name == model.detail->state) return true; // The runtime writes the detail subject.
 		StateValue value = declaration.initial;
 		// A key state's glyph, and the key state as its label.
@@ -525,14 +525,14 @@ bool ValidateApplication(const DocumentModel& model, std::string& error) {
 	for (const auto& [name,declaration] : model.state) {
 		if (!idStr::Icmp(name.c_str(),"name")) { error = "State ID is reserved by the GUI source contract: " + name; return false; }
 		if (names.FindKey(name.c_str())) { error = "State IDs collide in the game dictionary: " + name; return false; }
-		if (NumberDraftState(name.c_str()) && (!declaration.cvar.empty() ||
+		if (NumberDraftState(name.c_str()) && (declaration.HostSourced() ||
 			(name != NumberDraftPending && name != NumberDraftMessage) ||
 			declaration.initial.index() != (name == NumberDraftPending ? 1u : 2u))) {
 			error = "Invalid adapter-owned number draft declaration: " + name; return false;
 		}
 		if (!idStr::Icmpn(name.c_str(),"settings.",9)) {
 			const auto& schema = UI_SettingsStateSchema(); const auto field = schema.find(name);
-			if (field == schema.end() || field->second != declaration.initial.index() || !declaration.cvar.empty()) {
+			if (field == schema.end() || field->second != declaration.initial.index() || declaration.HostSourced()) {
 				error = "Invalid service-owned settings state declaration: " + name; return false;
 			}
 		}
@@ -558,7 +558,7 @@ bool ValidateApplication(const DocumentModel& model, std::string& error) {
 			const auto& key = std::get<std::string>(action.arguments.at("key").literal);
 			const auto declaration = model.state.find(key);
 			const auto event = action.arguments.find("event");
-			if (declaration == model.state.end() || !declaration->second.cvar.empty() || !idStr::Icmpn(key.c_str(),"settings.",9) ||
+			if (declaration == model.state.end() || declaration->second.HostSourced() || !idStr::Icmpn(key.c_str(),"settings.",9) ||
 				NumberDraftState(key.c_str()) || !action.inputType || *action.inputType != declaration->second.initial.index() ||
 				(event != action.arguments.end() && !model.events.contains(PresentationAliasKey(std::get<std::string>(event->second.literal))))) {
 				error = "A field state write needs the document's own state of the field's type, and its event: " + name; return false;
@@ -1628,7 +1628,14 @@ bool idUserInterfaceRetained::DispatchApplicationActions(const char* command, bo
 				accepted = cvarSystem->GetCVarFloat(cvar.c_str()) == static_cast<float>(std::get<double>(value));
 			}
 			if (!accepted) impl->Error("Player setting request was not applied: "+cvar);
-			if (pending.proposalToken) impl->RuntimeView()->AcknowledgeControlProposal(pending.control,pending.proposalToken,accepted);
+			if (pending.proposalToken) {
+				// A typed number reads back through the page's CVar state on a
+				// later frame: it waits for that, as a session's does.
+				const auto widget = impl->RuntimeView()->GetWidgetState(pending.control);
+				if (accepted && widget && widget->role == ControlRole::Number && impl->sessionNumbers.size() < 64)
+					impl->sessionNumbers.push_back({pending.control,pending.proposalToken,value,RetainedUI_PresentationTime()+1});
+				else impl->RuntimeView()->AcknowledgeControlProposal(pending.control,pending.proposalToken,accepted);
+			}
 			if (cvarSystem->GetCVarBool("ui_retainedTrace")) common->Printf("RETAINED_GUI_SETTING path=%s cvar=%s value=%s accepted=%d\n",
 				Name(),cvar.c_str(),cvarSystem->GetCVarString(cvar.c_str()),accepted ? 1 : 0);
 			continue;
@@ -1862,7 +1869,7 @@ bool UI_RetainedSettingsDocument(idUserInterface* gui) {
 	if (model.id != "openq4.system" || !model.events.contains("onactivate") || !model.events.contains("onback")) return false;
 	for (const auto& [key,type] : UI_SettingsStateSchema()) {
 		const auto declaration = model.state.find(key);
-		if (declaration == model.state.end() || declaration->second.initial.index() != type || !declaration->second.cvar.empty()) return false;
+		if (declaration == model.state.end() || declaration->second.initial.index() != type || declaration->second.HostSourced()) return false;
 	}
 	for (const auto* operation : {"settings.system.begin","settings.system.edit","settings.system.apply","settings.system.cancel"}) {
 		if (std::none_of(model.actions.begin(),model.actions.end(),[&](const auto& entry) { return entry.second.operation == operation; })) return false;

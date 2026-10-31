@@ -1837,7 +1837,7 @@ struct Runtime::Impl {
 	std::string snapshotDocumentIdentity;
 	Motion motion;
 	State state;
-	struct StateSource { std::string id, cvar; size_t type; };
+	struct StateSource { std::string id, cvar, view; size_t type; };
 	std::vector<StateSource> stateSources;
 	std::string stateError;
 	std::uint64_t appliedStateRevision = 0;
@@ -2187,7 +2187,11 @@ struct Runtime::Impl {
 		StateValues changes; std::string error;
 		for (const auto& source : stateSources) {
 			StateValue value;
-			if (!host.ReadCVar(source.cvar,source.type,value)) {
+			if (!source.view.empty()) {
+				// The view's own shape: a view not yet laid out keeps the last.
+				if (viewport.width <= 0 || viewport.height <= 0) continue;
+				value = static_cast<double>(viewport.width)/static_cast<double>(viewport.height);
+			} else if (!host.ReadCVar(source.cvar,source.type,value)) {
 				error = "Unavailable or invalid CVar source '"+source.cvar+"' for state '"+source.id+"'"; break;
 			}
 			const auto previous=state.Variables().find(source.id);
@@ -3044,8 +3048,8 @@ bool Runtime::LoadCanonical(std::unique_ptr<Document> candidate, const std::stri
 	impl->interaction.Reset(candidate->Model());
 	std::string stateError;
 	impl->state = candidate->InitialState(); // Evaluated and validated by Document::Load, from the shared model.
-	for (const auto& [id,declaration]:impl->state.Declarations()) if (!declaration.cvar.empty())
-		impl->stateSources.push_back({id,declaration.cvar,declaration.initial.index()});
+	for (const auto& [id,declaration]:impl->state.Declarations()) if (declaration.HostSourced())
+		impl->stateSources.push_back({id,declaration.cvar,declaration.view,declaration.initial.index()});
 	impl->canonical = std::move(candidate);
 	impl->sourcePath = sourcePath;
 	impl->snapshotDocumentIdentity = std::move(snapshotIdentity);
@@ -3142,7 +3146,7 @@ bool Runtime::SetState(const StateValues& changes, std::string& error, double se
 StateValues Runtime::GetState(bool includeHostSources) const {
 	StateValues values;
 	for (const auto& [id,value] : impl->state.Variables())
-		if (includeHostSources || impl->state.Declarations().at(id).cvar.empty()) values[id] = value;
+		if (includeHostSources || !impl->state.Declarations().at(id).HostSourced()) values[id] = value;
 	return values;
 }
 std::uint64_t Runtime::StateRevision() const { return impl->state.Revision(); }
@@ -3190,11 +3194,11 @@ bool Runtime::SaveSnapshot(std::string& snapshot, std::string& error, double sec
 		Json::Value root(Json::objectValue);
 		root["format"] = "openq4-ui-instance"; root["version"] = authoredModals ? 4 : widgets.widgets.empty() ? 2 : 3;
 		root["application"] = Json::Value(Json::objectValue);
-		for (const auto& [id,value] : snapshotState.Variables()) if (snapshotState.Declarations().at(id).cvar.empty())
+		for (const auto& [id,value] : snapshotState.Variables()) if (!snapshotState.Declarations().at(id).HostSourced())
 			std::visit([&](const auto& primitive) { root["application"][id] = primitive; },value);
 		if (authoredModals) {
 			root["hostSources"] = Json::Value(Json::objectValue);
-			for (const auto& [id,declaration] : snapshotState.Declarations()) if (!declaration.cvar.empty())
+			for (const auto& [id,declaration] : snapshotState.Declarations()) if (declaration.HostSourced())
 				std::visit([&](const auto& primitive) { root["hostSources"][id] = primitive; },snapshotState.Variables().at(id));
 		}
 		auto& aliasState = root["presentationState"];
@@ -3334,9 +3338,11 @@ bool Runtime::RestoreSnapshot(const std::string& snapshot, std::string& error, d
 			else if (value.isString()) values[id] = value.asString();
 			else return reject("Invalid restored application value type");
 		}
-		for (const auto& [id,declaration] : impl->state.Declarations()) if (!declaration.cvar.empty()) {
-			StateValue value;
-			if (!impl->host.ReadCVar(declaration.cvar,declaration.initial.index(),value)) { error = "Unavailable CVar source during restore: "+declaration.cvar; return false; }
+		for (const auto& [id,declaration] : impl->state.Declarations()) if (declaration.HostSourced()) {
+			StateValue value = impl->state.Variables().at(id); // A view source keeps the view it last measured.
+			if (declaration.view.empty() && !impl->host.ReadCVar(declaration.cvar,declaration.initial.index(),value)) {
+				error = "Unavailable CVar source during restore: "+declaration.cvar; return false;
+			}
 			sources.emplace(id,std::move(value));
 		}
 		State state = impl->state;
@@ -3493,7 +3499,11 @@ bool Runtime::RunEvent(const std::string& name, double seconds, EventEffects& ef
 	const auto& model = impl->canonical->Model();
 	StateValues sources;
 	for (const auto& [id,declaration] : model.state) {
-		if (declaration.cvar.empty()) continue;
+		if (declaration.cvar.empty()) {
+			// A view source enters with the view the last layout measured.
+			if (!declaration.view.empty()) sources[id] = impl->state.Variables().at(id);
+			continue;
+		}
 		StateValue value;
 		if (!impl->host.ReadCVar(declaration.cvar,declaration.initial.index(),value)) {
 			error = "Unavailable CVar source '"+declaration.cvar+"' at event entry"; return false;

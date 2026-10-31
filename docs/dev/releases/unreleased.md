@@ -174,6 +174,12 @@ See [release status](../../user/release-status.md) and the
   full-screen panels. Long pages are split into tabs (switch with Q and E,
   the shoulder buttons or a click), and no page uses more than two columns.
   Game Options' tabs replace its Section list.
+- **Settings on tall screens, and exact values.** On a portrait or rotated
+  screen, Controls, Game Options and Audio in the new interface now use the
+  height: their rows stand in one larger, scrolling column instead of
+  shrinking. Mouse sensitivity, CPI, acceleration, gyro and touchpad
+  sensitivity and the weapon's field of view and position also take a typed
+  value, and a value outside the allowed range says what that range is.
 - Player previews apply separate head skins and keep attachments aligned when
   their position changes.
 - **Clearer focus and cinematic transitions.** All three scopes keep the aim

@@ -1135,6 +1135,14 @@ SCENARIOS = {
             f'screenshot "screenshots/subpages-game-{name}.tga"')],
         'openq4_retainedGui focus game_vrsnap', 'waitMsec 100', 'openq4_retainedGui choice open game_vrsnap', 'waitMsec 400',
         'screenshot "screenshots/subpages-game-list.tga"', *menu_step('back'),
+        # A typed sensitivity with a third decimal place shows the field's own
+        # range over the row's label; the controller tab's last row scrolls
+        # into a tall view's single column.
+        'openq4_retainedGui event tab_mouse', 'waitMsec 400', 'openq4_retainedGui focus game_msensitivity_number',
+        'openq4_retainedGui number begin game_msensitivity_number', 'openq4_retainedGui number replace game_msensitivity_number "7.255"',
+        'waitMsec 300', 'openq4_retainedGui report', 'screenshot "screenshots/subpages-game-entry.tga"',
+        'openq4_retainedGui number cancel game_msensitivity_number', 'openq4_retainedGui event tab_controller', 'waitMsec 400',
+        'openq4_retainedGui focus game_swapconfirm', 'waitMsec 300', 'screenshot "screenshots/subpages-game-last.tga"',
         'openq4_retainedGui event onBack', 'waitMsec 150', 'screenshot "screenshots/subpages-game-back.tga"', 'waitMsec 1200',
         'openq4_retainedGui report', 'screenshot "screenshots/subpages-returned.tga"',
         'openq4_retainedGui focus controls', *menu_step('accept'), 'waitMsec 1500', 'openq4_retainedGui report',
