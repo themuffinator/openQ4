@@ -11,7 +11,7 @@ from build_retained_screens import fit_narrow
 from build_retained_screens import (ACCEL, BOTTOM_TO_PAGE, CANVAS_W, CRUMB_SCALE, CRUMB_SLOT, CRUMB_SPAN, FULL, PAGE_TITLE_H,
                                     PAGE_TITLE_W, SUBPAGE_SLOT, TITLE_SLOT, TOP_TO_PAGE, TOP_TO_SUBPAGE, U, Document, absolute,
                                     by_language, colour, crumb_fits, crumb_transform, framing_bands, group, keyword, label, length,
-                                    lit_field, number, page_title, track, transform, typeface)
+                                    fixed_text, lit_field, number, page_title, track, transform, typeface)
 from retained_saves import backing
 
 
@@ -42,6 +42,8 @@ def subpage_document(doc: Document, prefix: str, crumb_key: str, title_key: str,
                                        "transform": crumb_transform()})]),
         page_title("title", title_key, *SUBPAGE_SLOT),
     ])
+    # The crumb and title keep their size in the band's slots at any text size.
+    fixed_text(doc, titles)
     bands = framing_bands("band")
     page_top, sub_top = transform(*TOP_TO_PAGE), transform(*TOP_TO_SUBPAGE)
     bands[0]["properties"]["transform"] = sub_top

@@ -56,6 +56,7 @@
   "pause_completed_7": {"type": "string", "initial": ""},
   "prompt.glyphs": {"type": "number", "initial": 0},
   "prompt.swapped": {"type": "boolean", "initial": false},
+  "view.text": {"type": "number", "initial": 1, "view": "text"},
   "carry_item": {"type": "number", "initial": 0},
   "pause.released": {"type": "boolean", "initial": false},
   "notice.0.shown": {"type": "boolean", "initial": false},
@@ -935,6 +936,30 @@
      "none"
     ]
    }
+  },
+  {
+   "id": "text.objectives_back-key.font-size",
+   "node": "objectives_back-key",
+   "property": "font-size",
+   "value": {"op": "/", "args": [13, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.objectives_back-key.line-height",
+   "node": "objectives_back-key",
+   "property": "line-height",
+   "value": {"op": "/", "args": [22, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.objectives_back-label.font-size",
+   "node": "objectives_back-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [14, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.objectives_back-label.line-height",
+   "node": "objectives_back-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [22, {"state": "view.text"}]}
   },
   {
    "id": "objectives.display",

@@ -328,9 +328,13 @@ def source_contract(runtime: Path) -> dict:
 def tab_contract(model: dict, nodes: dict, tabs: dict) -> None:
     """Bind the scripts' tab switches and expected program traces to the page.
 
-    Each probed control stands on its tab's page; an opening starts on
-    GRAPHICS; a switch writes page.leaving and page.tab and runs no action; the
-    close program (onDeactivate) writes nothing and runs no action.
+    Each probed control stands in its tab's scrolling rows (the page's one
+    child, settings-<tab>-rows); an opening starts on GRAPHICS; a switch writes
+    page.leaving and page.tab and runs no action; the close program
+    (onDeactivate) writes nothing and runs no action. The captures run at a
+    chosen --text-scale: the page reads the runtime's text size (view.text),
+    standing a tab's rows in one column above 100 % that the focus scrolls to
+    each probed row.
     """
     def steps(program):
         for step in program:
@@ -340,13 +344,18 @@ def tab_contract(model: dict, nodes: dict, tabs: dict) -> None:
     body = [node.get('id') for node in nodes.get('settings-body',{}).get('children',[])]
     if model.get('state',{}).get('page.tab') != {'type':'number','initial':0} or body[:1] != ['settings-page-'+FIRST_TAB]:
         raise ValueError('Production SYSTEM first tab changed')
+    if model.get('state',{}).get('view.text') != {'type':'number','initial':1,'view':'text'}:
+        raise ValueError('Production SYSTEM no longer follows the text size')
     for control,name in tabs.items():
-        pending, found = [nodes.get('settings-page-'+name,{})], False
+        rows = nodes.get(f'settings-{name}-rows',{})
+        scrolled = ([node.get('id') for node in nodes.get('settings-page-'+name,{}).get('children',[])] == [rows.get('id')] and
+                    rows.get('properties',{}).get('overflow') == {'type':'keyword','value':'auto'})
+        pending, found = [rows], False
         while pending:
             node = pending.pop(); found |= node.get('id') == control; pending.extend(node.get('children',[]))
         program = list(steps(events.get('tab_'+name,[])))
         writes = [sorted(step.get('values',{})) for step in program if step.get('op') == 'setState']
-        if not found or writes != [['page.leaving','page.tab']] or any(step.get('op') == 'action' for step in program):
+        if not scrolled or not found or writes != [['page.leaving','page.tab']] or any(step.get('op') == 'action' for step in program):
             raise ValueError(f'Production SYSTEM tab placement or switch changed: {control}')
     closing = list(steps(events.get('onDeactivate',[])))
     if not closing or any(step.get('op') in ('action','setState','call') for step in closing):

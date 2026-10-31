@@ -176,7 +176,9 @@ See [release status](../../user/release-status.md) and the
   Game Options' tabs replace its Section list. The new Display page (opt in
   with `ui_retainedSystem 1`) follows suit: Graphics, Screen and Image Quality
   tabs, with Apply Changes and the Keep or Revert countdown working as
-  before.
+  before. At larger text sizes the settings rows now grow with the text
+  (switching to one scrolling column), and the button prompts at the bottom
+  of every menu stay on screen.
 - **Settings on tall screens, and exact values.** On a portrait or rotated
   screen, Controls, Game Options and Audio in the new interface now use the
   height: their rows stand in one larger, scrolling column instead of

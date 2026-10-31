@@ -93,10 +93,16 @@ class Presets(unittest.TestCase):
         self.assertEqual(self.page['extensions']['openq4']['presets'],system.EXTENSIONS['presets'])
     def test_graphics_tab_placement_and_order(self):
         self.assertEqual([n['id'] for n in self.nodes['settings-body']['children']],['settings-page-graphics','settings-page-screen','settings-page-image'])
+        # The column's heading leads it; the preset is the tab's first row.
         self.assertEqual([n['id'] for n in self.nodes['settings-graphics-column-0']['children']],
-                         ['settings_preset','settings_autodetect','settings_backend','settings_gpu','settings_renderer','settings_renderer-status',
-                          'settings_restart_renderer','rendering-active','rendering-notice'])
-        self.assertIn('settings-graphics-column-0',[n['id'] for n in self.nodes['settings-page-graphics']['children']])
+                         ['settings-graphics-head-0','settings_preset','settings_autodetect','settings_backend','settings_gpu','settings_renderer',
+                          'settings_renderer-status','settings_restart_renderer','rendering-active','rendering-notice'])
+        # The tab's rows scroll in one area: settings-page-graphics >
+        # settings-graphics-rows > settings-graphics-columns > its two columns.
+        self.assertEqual([n['id'] for n in self.nodes['settings-page-graphics']['children']],['settings-graphics-rows'])
+        self.assertEqual(self.nodes['settings-graphics-rows']['properties']['overflow'],{'type':'keyword','value':'auto'})
+        self.assertEqual([n['id'] for n in self.nodes['settings-graphics-rows']['children']],['settings-graphics-columns'])
+        self.assertEqual([n['id'] for n in self.nodes['settings-graphics-columns']['children']],['settings-graphics-column-0','settings-graphics-column-1'])
         self.assertEqual(self.page['state']['page.tab'],{'type':'number','initial':GRAPHICS})
         current={'op':'==','args':[{'state':'page.tab'},GRAPHICS]}
         for id in ('settings_preset','settings_autodetect','settings_backend','settings_gpu'):

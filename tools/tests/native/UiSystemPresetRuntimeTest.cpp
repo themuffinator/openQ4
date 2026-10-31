@@ -152,10 +152,9 @@ static void TextFits(View& v,const char* id){auto* e=v.Element(id);auto size=e->
 // check_system_text), as on CONTROLS, GAME OPTIONS and AUDIO: they are checked
 // at plain widths, and the +40% glyph stress is kept for text that flows
 // (lists and their options, the footer message, the dialogs, the prompt bar).
-// The rows do not yet follow the text size either: a known, recorded gap of
-// the shared settings row construction (fixed 36 dp pitch), so their text is
-// measured at 100% text and the larger sizes are kept for what flows.
-static void RowTextFits(View& v,const char* id){if(v.host.expansion==1&&v.viewport.TextRatio()==1)TextFits(v,id);}
+// The rows grow with the text size (retained_settings_rows.grown), so their
+// text is measured at every text size.
+static void RowTextFits(View& v,const char* id){if(v.host.expansion==1)TextFits(v,id);}
 static void Opening(View& v,float density,int width,int height,bool wholeFirstSetting){
  v.viewport.width=width;v.viewport.height=height;v.viewport.displayScale=density;
  Check(v.tx.Edit(View::Owner,{{"com_performancePreset",std::string("balanced")}}).code==SettingsCode::Ok,"opening default draft");v.Sync();v.Frame();
@@ -165,10 +164,15 @@ static void Opening(View& v,float density,int width,int height,bool wholeFirstSe
  auto body=v.Box("settings-body"),first=v.Box("settings_backend"),footer=v.Box("settings-footer");
  if(!inside(body,screen))std::fprintf(stderr,"body=%g,%g %gx%g viewport=%dx%d density=%g\n",body.x,body.y,body.width,body.height,width,height,density);
  Check(inside(body,screen),"the pages' bounds stay inside the viewport");
- // APPLY CHANGES and the message stand under both columns of the tab.
- for(const auto* id:{"settings-graphics-column-0","settings-graphics-column-1"}){const auto column=v.Box(id);
-  if(!(inside(column,body)&&footer.y>=column.y+column.height-.5f))std::fprintf(stderr,"%s=%g,%g %gx%g footer=%g,%g viewport=%dx%d density=%g\n",id,column.x,column.y,column.width,column.height,footer.y,footer.height,width,height,density);
-  Check(inside(column,body)&&footer.y>=column.y+column.height-.5f,"the footer stands under the tab's columns");}
+ // APPLY CHANGES and the message stand under the tab's rows, which scroll in
+ // one area (settings-<tab>-rows > -columns > -column-N); at 100% text in a
+ // wide view the tab's two columns stand side by side in it, wholly shown.
+ const auto rows=v.Box("settings-graphics-rows");
+ if(!(inside(rows,body)&&footer.y>=rows.y+rows.height-.5f))std::fprintf(stderr,"rows=%g,%g %gx%g footer=%g,%g viewport=%dx%d density=%g\n",rows.x,rows.y,rows.width,rows.height,footer.y,footer.height,width,height,density);
+ Check(inside(rows,body)&&footer.y>=rows.y+rows.height-.5f,"the footer stands under the tab's rows");
+ {const auto left=v.Box("settings-graphics-column-0"),right=v.Box("settings-graphics-column-1");
+  for(const auto& column:{left,right})if(!inside(column,rows))std::fprintf(stderr,"column=%g,%g %gx%g rows=%g,%g %gx%g viewport=%dx%d density=%g\n",column.x,column.y,column.width,column.height,rows.x,rows.y,rows.width,rows.height,width,height,density);
+  Check(inside(left,rows)&&inside(right,rows)&&right.x>=left.x+left.width-.5f&&std::abs(right.y-left.y)<.5f,"the tab's two columns stand side by side in its rows");}
  Check(inside(footer,screen),"the footer stays inside the viewport");
  // The canvas sets the dp ratio; the display density no longer does.
  const float ratio=v.viewport.DpRatio();Check(std::abs(ratio-std::min(height/720.f,width/960.f))<1e-4f,"one canvas height spans the view");

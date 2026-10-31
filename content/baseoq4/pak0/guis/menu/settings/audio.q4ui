@@ -39,6 +39,7 @@
   "page.tab": {"type": "number", "initial": 0},
   "page.leaving": {"type": "number", "initial": -1},
   "view.aspect": {"type": "number", "initial": 1.3333, "view": "aspect"},
+  "view.text": {"type": "number", "initial": 1, "view": "text"},
   "prompt.glyphs": {"type": "number", "initial": 0},
   "prompt.swapped": {"type": "boolean", "initial": false},
   "prompt.accept": {"type": "string", "initial": "#str_231042"},
@@ -374,2185 +375,4788 @@
    "id": "audio-header.display",
    "node": "audio-header",
    "property": "display",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, "none", "block"]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "||",
+      "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": ">", "args": [{"state": "view.text"}, 1]}]
+     },
+     "none",
+     "block"
+    ]
+   }
   },
   {
    "id": "tall.audio-audio-head-0.height",
    "node": "audio-audio-head-0",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 24.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "||",
+      "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": ">", "args": [{"state": "view.text"}, 1]}]
+     },
+     {
+      "op": "select",
+      "args": [
+       {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+       73.6307,
+       {"op": "*", "args": [36.0, {"state": "view.text"}]}
+      ]
+     },
+     24.0
+    ]
+   }
   },
   {
    "id": "tall.audio-audio-head-0.line-height",
    "node": "audio-audio-head-0",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 24.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "||",
+      "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": ">", "args": [{"state": "view.text"}, 1]}]
+     },
+     {
+      "op": "select",
+      "args": [
+       {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+       {"op": "/", "args": [73.6307, {"state": "view.text"}]},
+       36.0
+      ]
+     },
+     24.0
+    ]
+   }
   },
   {
    "id": "tall.audio-audio-head-0.margin-bottom",
    "node": "audio-audio-head-0",
    "property": "margin-bottom",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 0.0, 13.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "||",
+      "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": ">", "args": [{"state": "view.text"}, 1]}]
+     },
+     0,
+     13.5
+    ]
+   }
   },
   {
    "id": "tall.audio-audio-head-1.height",
    "node": "audio-audio-head-1",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 24.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "||",
+      "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": ">", "args": [{"state": "view.text"}, 1]}]
+     },
+     {
+      "op": "select",
+      "args": [
+       {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+       73.6307,
+       {"op": "*", "args": [36.0, {"state": "view.text"}]}
+      ]
+     },
+     24.0
+    ]
+   }
   },
   {
    "id": "tall.audio-audio-head-1.line-height",
    "node": "audio-audio-head-1",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 24.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "||",
+      "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": ">", "args": [{"state": "view.text"}, 1]}]
+     },
+     {
+      "op": "select",
+      "args": [
+       {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+       {"op": "/", "args": [73.6307, {"state": "view.text"}]},
+       36.0
+      ]
+     },
+     24.0
+    ]
+   }
   },
   {
    "id": "tall.audio-audio-head-1.margin-bottom",
    "node": "audio-audio-head-1",
    "property": "margin-bottom",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 0.0, 13.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "||",
+      "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": ">", "args": [{"state": "view.text"}, 1]}]
+     },
+     0,
+     13.5
+    ]
+   }
   },
   {
    "id": "audio-audio-columns.flex-direction",
    "node": "audio-audio-columns",
    "property": "flex-direction",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, "column", "row"]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "||",
+      "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": ">", "args": [{"state": "view.text"}, 1]}]
+     },
+     "column",
+     "row"
+    ]
+   }
   },
   {
    "id": "audio-audio-column-0.margin-right",
    "node": "audio-audio-column-0",
    "property": "margin-right",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 0, 19.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "||",
+      "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": ">", "args": [{"state": "view.text"}, 1]}]
+     },
+     0,
+     19.5
+    ]
+   }
   },
   {
    "id": "tall.audio-audio-column-0.width",
    "node": "audio-audio-column-0",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 880.5, 430.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     880.5,
+     {"op": "*", "args": [430.5, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio-audio-head-0.width",
    "node": "audio-audio-head-0",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 880.5, 430.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     880.5,
+     {"op": "*", "args": [430.5, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio-audio-head-0.font-size",
    "node": "audio-audio-head-0",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 28.6341, 14]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     14
+    ]
+   }
   },
   {
    "id": "tall.audio_volume.width",
    "node": "audio_volume",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 880.5, 430.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     880.5,
+     {"op": "*", "args": [430.5, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_volume.height",
    "node": "audio_volume",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_volume-focus.width",
    "node": "audio_volume-focus",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 8.1812, 4]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_volume-focus.height",
    "node": "audio_volume-focus",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_volume-head.left",
    "node": "audio_volume-head",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 42.9512, 21]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     42.9512,
+     {"op": "*", "args": [21, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_volume-head.width",
    "node": "audio_volume-head",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 247.4808, 121.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     247.4808,
+     {"op": "*", "args": [121.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_volume-head.height",
    "node": "audio_volume-head",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_volume-label.font-size",
    "node": "audio_volume-label",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 28.6341, 14]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     14
+    ]
+   }
   },
   {
    "id": "tall.audio_volume-label.line-height",
    "node": "audio_volume-label",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 26.5889, 13.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [26.5889, {"state": "view.text"}]},
+     13.0
+    ]
+   }
   },
   {
    "id": "tall.audio_volume-track.left",
    "node": "audio_volume-track",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 306.7944, 150.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     306.7944,
+     {"op": "*", "args": [150.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_volume-track.width",
    "node": "audio_volume-track",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 434.6254, 212.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     434.6254,
+     {"op": "*", "args": [212.5, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_volume-track.height",
    "node": "audio_volume-track",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 53.1777, 26.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     53.1777,
+     {"op": "*", "args": [26.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_volume-fill.top",
    "node": "audio_volume-fill",
    "property": "top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 22.4983, 11]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     22.4983,
+     {"op": "*", "args": [11, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_volume-fill.height",
    "node": "audio_volume-fill",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 8.1812, 4]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_volume-thumb.top",
    "node": "audio_volume-thumb",
    "property": "top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 10.2265, 5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     10.2265,
+     {"op": "*", "args": [5, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_volume-thumb.width",
    "node": "audio_volume-thumb",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 8.1812, 4]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_volume-thumb.height",
    "node": "audio_volume-thumb",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 32.7247, 16]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     32.7247,
+     {"op": "*", "args": [16, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_volume-value.left",
    "node": "audio_volume-value",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 757.7822, 370.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     757.7822,
+     {"op": "*", "args": [370.5, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_volume-value.width",
    "node": "audio_volume-value",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 98.1742, 48]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     98.1742,
+     {"op": "*", "args": [48, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_volume-value.height",
    "node": "audio_volume-value",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 53.1777, 26.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     53.1777,
+     {"op": "*", "args": [26.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_volume-value.font-size",
    "node": "audio_volume-value",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 30.6794, 15]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
   },
   {
    "id": "tall.audio_volume-value.line-height",
    "node": "audio_volume-value",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 53.1777, 26.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [53.1777, {"state": "view.text"}]},
+     26.0
+    ]
+   }
   },
   {
    "id": "tall.audio_music.width",
    "node": "audio_music",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 880.5, 430.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     880.5,
+     {"op": "*", "args": [430.5, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_music.height",
    "node": "audio_music",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_music-focus.width",
    "node": "audio_music-focus",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 8.1812, 4]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_music-focus.height",
    "node": "audio_music-focus",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_music-head.left",
    "node": "audio_music-head",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 42.9512, 21]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     42.9512,
+     {"op": "*", "args": [21, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_music-head.width",
    "node": "audio_music-head",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 247.4808, 121.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     247.4808,
+     {"op": "*", "args": [121.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_music-head.height",
    "node": "audio_music-head",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_music-label.font-size",
    "node": "audio_music-label",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 28.6341, 14]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     14
+    ]
+   }
   },
   {
    "id": "tall.audio_music-label.line-height",
    "node": "audio_music-label",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 26.5889, 13.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [26.5889, {"state": "view.text"}]},
+     13.0
+    ]
+   }
   },
   {
    "id": "tall.audio_music-track.left",
    "node": "audio_music-track",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 306.7944, 150.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     306.7944,
+     {"op": "*", "args": [150.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_music-track.width",
    "node": "audio_music-track",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 434.6254, 212.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     434.6254,
+     {"op": "*", "args": [212.5, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_music-track.height",
    "node": "audio_music-track",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 53.1777, 26.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     53.1777,
+     {"op": "*", "args": [26.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_music-fill.top",
    "node": "audio_music-fill",
    "property": "top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 22.4983, 11]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     22.4983,
+     {"op": "*", "args": [11, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_music-fill.height",
    "node": "audio_music-fill",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 8.1812, 4]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_music-thumb.top",
    "node": "audio_music-thumb",
    "property": "top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 10.2265, 5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     10.2265,
+     {"op": "*", "args": [5, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_music-thumb.width",
    "node": "audio_music-thumb",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 8.1812, 4]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_music-thumb.height",
    "node": "audio_music-thumb",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 32.7247, 16]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     32.7247,
+     {"op": "*", "args": [16, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_music-value.left",
    "node": "audio_music-value",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 757.7822, 370.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     757.7822,
+     {"op": "*", "args": [370.5, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_music-value.width",
    "node": "audio_music-value",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 98.1742, 48]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     98.1742,
+     {"op": "*", "args": [48, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_music-value.height",
    "node": "audio_music-value",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 53.1777, 26.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     53.1777,
+     {"op": "*", "args": [26.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_music-value.font-size",
    "node": "audio_music-value",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 30.6794, 15]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
   },
   {
    "id": "tall.audio_music-value.line-height",
    "node": "audio_music-value",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 53.1777, 26.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [53.1777, {"state": "view.text"}]},
+     26.0
+    ]
+   }
   },
   {
    "id": "tall.audio_dialogue.width",
    "node": "audio_dialogue",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 880.5, 430.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     880.5,
+     {"op": "*", "args": [430.5, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_dialogue.height",
    "node": "audio_dialogue",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_dialogue-focus.width",
    "node": "audio_dialogue-focus",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 8.1812, 4]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_dialogue-focus.height",
    "node": "audio_dialogue-focus",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_dialogue-head.left",
    "node": "audio_dialogue-head",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 42.9512, 21]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     42.9512,
+     {"op": "*", "args": [21, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_dialogue-head.width",
    "node": "audio_dialogue-head",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 247.4808, 121.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     247.4808,
+     {"op": "*", "args": [121.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_dialogue-head.height",
    "node": "audio_dialogue-head",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_dialogue-label.font-size",
    "node": "audio_dialogue-label",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 28.6341, 14]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     14
+    ]
+   }
   },
   {
    "id": "tall.audio_dialogue-label.line-height",
    "node": "audio_dialogue-label",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 26.5889, 13.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [26.5889, {"state": "view.text"}]},
+     13.0
+    ]
+   }
   },
   {
    "id": "tall.audio_dialogue-track.left",
    "node": "audio_dialogue-track",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 306.7944, 150.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     306.7944,
+     {"op": "*", "args": [150.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_dialogue-track.width",
    "node": "audio_dialogue-track",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 434.6254, 212.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     434.6254,
+     {"op": "*", "args": [212.5, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_dialogue-track.height",
    "node": "audio_dialogue-track",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 53.1777, 26.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     53.1777,
+     {"op": "*", "args": [26.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_dialogue-fill.top",
    "node": "audio_dialogue-fill",
    "property": "top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 22.4983, 11]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     22.4983,
+     {"op": "*", "args": [11, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_dialogue-fill.height",
    "node": "audio_dialogue-fill",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 8.1812, 4]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_dialogue-thumb.top",
    "node": "audio_dialogue-thumb",
    "property": "top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 10.2265, 5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     10.2265,
+     {"op": "*", "args": [5, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_dialogue-thumb.width",
    "node": "audio_dialogue-thumb",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 8.1812, 4]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_dialogue-thumb.height",
    "node": "audio_dialogue-thumb",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 32.7247, 16]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     32.7247,
+     {"op": "*", "args": [16, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_dialogue-value.left",
    "node": "audio_dialogue-value",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 757.7822, 370.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     757.7822,
+     {"op": "*", "args": [370.5, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_dialogue-value.width",
    "node": "audio_dialogue-value",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 98.1742, 48]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     98.1742,
+     {"op": "*", "args": [48, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_dialogue-value.height",
    "node": "audio_dialogue-value",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 53.1777, 26.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     53.1777,
+     {"op": "*", "args": [26.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_dialogue-value.font-size",
    "node": "audio_dialogue-value",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 30.6794, 15]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
   },
   {
    "id": "tall.audio_dialogue-value.line-height",
    "node": "audio_dialogue-value",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 53.1777, 26.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [53.1777, {"state": "view.text"}]},
+     26.0
+    ]
+   }
   },
   {
    "id": "tall.audio-audio-head-0-3.width",
    "node": "audio-audio-head-0-3",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 880.5, 430.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     880.5,
+     {"op": "*", "args": [430.5, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio-audio-head-0-3.height",
    "node": "audio-audio-head-0-3",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio-audio-head-0-3.font-size",
    "node": "audio-audio-head-0-3",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 28.6341, 14]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     14
+    ]
+   }
   },
   {
    "id": "tall.audio-audio-head-0-3.line-height",
    "node": "audio-audio-head-0-3",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [73.6307, {"state": "view.text"}]},
+     36.0
+    ]
+   }
   },
   {
    "id": "tall.audio_backend.width",
    "node": "audio_backend",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 880.5, 430.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     880.5,
+     {"op": "*", "args": [430.5, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_backend.height",
    "node": "audio_backend",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_backend-focus.width",
    "node": "audio_backend-focus",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 8.1812, 4]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_backend-focus.height",
    "node": "audio_backend-focus",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_backend-head.left",
    "node": "audio_backend-head",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 42.9512, 21]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     42.9512,
+     {"op": "*", "args": [21, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_backend-head.width",
    "node": "audio_backend-head",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 247.4808, 121.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     247.4808,
+     {"op": "*", "args": [121.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_backend-head.height",
    "node": "audio_backend-head",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_backend-label.font-size",
    "node": "audio_backend-label",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 28.6341, 14]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     14
+    ]
+   }
   },
   {
    "id": "tall.audio_backend-label.line-height",
    "node": "audio_backend-label",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 26.5889, 13.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [26.5889, {"state": "view.text"}]},
+     13.0
+    ]
+   }
   },
   {
    "id": "tall.audio_backend-value.left",
    "node": "audio_backend-value",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 306.7944, 150.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     306.7944,
+     {"op": "*", "args": [150.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_backend-value.width",
    "node": "audio_backend-value",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 520.5279, 254.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     520.5279,
+     {"op": "*", "args": [254.5, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_backend-value.height",
    "node": "audio_backend-value",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_backend-value.font-size",
    "node": "audio_backend-value",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 28.6341, 14]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     14
+    ]
+   }
   },
   {
    "id": "tall.audio_backend-value.line-height",
    "node": "audio_backend-value",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [73.6307, {"state": "view.text"}]},
+     36.0
+    ]
+   }
   },
   {
    "id": "tall.audio_backend-chevron.left",
    "node": "audio_backend-chevron",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 831.4129, 406.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     831.4129,
+     {"op": "*", "args": [406.5, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_backend-chevron.top",
    "node": "audio_backend-chevron",
    "property": "top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 30.6794, 15.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     30.6794,
+     {"op": "*", "args": [15.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_backend-chevron.width",
    "node": "audio_backend-chevron",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 24.5436, 12]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     24.5436,
+     {"op": "*", "args": [12, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_backend-chevron.height",
    "node": "audio_backend-chevron",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 12.2718, 6]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     12.2718,
+     {"op": "*", "args": [6, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_backend-viewport.margin-left",
    "node": "audio_backend-viewport",
    "property": "margin-left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 4.0906, 2]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     4.0906,
+     {"op": "*", "args": [2, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_backend-viewport.margin-top",
    "node": "audio_backend-viewport",
    "property": "margin-top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 4.0906, 2]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     4.0906,
+     {"op": "*", "args": [2, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_backend-option-0.height",
    "node": "audio_backend-option-0",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_backend-option-0-label.padding-left",
    "node": "audio_backend-option-0-label",
    "property": "padding-left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 16.3624, 8]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_backend-option-0-label.font-size",
    "node": "audio_backend-option-0-label",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 30.6794, 15]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
   },
   {
    "id": "tall.audio_backend-option-0-label.line-height",
    "node": "audio_backend-option-0-label",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
   },
   {
    "id": "tall.audio_backend-option-1.height",
    "node": "audio_backend-option-1",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_backend-option-1-label.padding-left",
    "node": "audio_backend-option-1-label",
    "property": "padding-left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 16.3624, 8]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_backend-option-1-label.font-size",
    "node": "audio_backend-option-1-label",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 30.6794, 15]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
   },
   {
    "id": "tall.audio_backend-option-1-label.line-height",
    "node": "audio_backend-option-1-label",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
   },
   {
    "id": "tall.audio_backend-scroll-track.width",
    "node": "audio_backend-scroll-track",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 16.3624, 8]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_backend-scroll-thumb.width",
    "node": "audio_backend-scroll-thumb",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 16.3624, 8]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device.width",
    "node": "audio_device",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 880.5, 430.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     880.5,
+     {"op": "*", "args": [430.5, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device.height",
    "node": "audio_device",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-focus.width",
    "node": "audio_device-focus",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 8.1812, 4]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-focus.height",
    "node": "audio_device-focus",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-head.left",
    "node": "audio_device-head",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 42.9512, 21]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     42.9512,
+     {"op": "*", "args": [21, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-head.width",
    "node": "audio_device-head",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 247.4808, 121.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     247.4808,
+     {"op": "*", "args": [121.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-head.height",
    "node": "audio_device-head",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-label.font-size",
    "node": "audio_device-label",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 28.6341, 14]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     14
+    ]
+   }
   },
   {
    "id": "tall.audio_device-label.line-height",
    "node": "audio_device-label",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 26.5889, 13.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [26.5889, {"state": "view.text"}]},
+     13.0
+    ]
+   }
   },
   {
    "id": "tall.audio_device-value.left",
    "node": "audio_device-value",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 306.7944, 150.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     306.7944,
+     {"op": "*", "args": [150.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-value.width",
    "node": "audio_device-value",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 520.5279, 254.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     520.5279,
+     {"op": "*", "args": [254.5, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-value.height",
    "node": "audio_device-value",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-value.font-size",
    "node": "audio_device-value",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 28.6341, 14]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     14
+    ]
+   }
   },
   {
    "id": "tall.audio_device-value.line-height",
    "node": "audio_device-value",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [73.6307, {"state": "view.text"}]},
+     36.0
+    ]
+   }
   },
   {
    "id": "tall.audio_device-chevron.left",
    "node": "audio_device-chevron",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 831.4129, 406.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     831.4129,
+     {"op": "*", "args": [406.5, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-chevron.top",
    "node": "audio_device-chevron",
    "property": "top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 30.6794, 15.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     30.6794,
+     {"op": "*", "args": [15.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-chevron.width",
    "node": "audio_device-chevron",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 24.5436, 12]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     24.5436,
+     {"op": "*", "args": [12, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-chevron.height",
    "node": "audio_device-chevron",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 12.2718, 6]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     12.2718,
+     {"op": "*", "args": [6, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-viewport.margin-left",
    "node": "audio_device-viewport",
    "property": "margin-left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 4.0906, 2]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     4.0906,
+     {"op": "*", "args": [2, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-viewport.margin-top",
    "node": "audio_device-viewport",
    "property": "margin-top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 4.0906, 2]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     4.0906,
+     {"op": "*", "args": [2, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-0.height",
    "node": "audio_device-option-0",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-0-label.padding-left",
    "node": "audio_device-option-0-label",
    "property": "padding-left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 16.3624, 8]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-0-label.font-size",
    "node": "audio_device-option-0-label",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 30.6794, 15]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-0-label.line-height",
    "node": "audio_device-option-0-label",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-1.height",
    "node": "audio_device-option-1",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-1-label.padding-left",
    "node": "audio_device-option-1-label",
    "property": "padding-left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 16.3624, 8]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-1-label.font-size",
    "node": "audio_device-option-1-label",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 30.6794, 15]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-1-label.line-height",
    "node": "audio_device-option-1-label",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-2.height",
    "node": "audio_device-option-2",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-2-label.padding-left",
    "node": "audio_device-option-2-label",
    "property": "padding-left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 16.3624, 8]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-2-label.font-size",
    "node": "audio_device-option-2-label",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 30.6794, 15]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-2-label.line-height",
    "node": "audio_device-option-2-label",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-3.height",
    "node": "audio_device-option-3",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-3-label.padding-left",
    "node": "audio_device-option-3-label",
    "property": "padding-left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 16.3624, 8]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-3-label.font-size",
    "node": "audio_device-option-3-label",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 30.6794, 15]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-3-label.line-height",
    "node": "audio_device-option-3-label",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-4.height",
    "node": "audio_device-option-4",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-4-label.padding-left",
    "node": "audio_device-option-4-label",
    "property": "padding-left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 16.3624, 8]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-4-label.font-size",
    "node": "audio_device-option-4-label",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 30.6794, 15]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-4-label.line-height",
    "node": "audio_device-option-4-label",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-5.height",
    "node": "audio_device-option-5",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-5-label.padding-left",
    "node": "audio_device-option-5-label",
    "property": "padding-left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 16.3624, 8]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-5-label.font-size",
    "node": "audio_device-option-5-label",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 30.6794, 15]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-5-label.line-height",
    "node": "audio_device-option-5-label",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-6.height",
    "node": "audio_device-option-6",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-6-label.padding-left",
    "node": "audio_device-option-6-label",
    "property": "padding-left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 16.3624, 8]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-6-label.font-size",
    "node": "audio_device-option-6-label",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 30.6794, 15]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-6-label.line-height",
    "node": "audio_device-option-6-label",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-7.height",
    "node": "audio_device-option-7",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-7-label.padding-left",
    "node": "audio_device-option-7-label",
    "property": "padding-left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 16.3624, 8]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-7-label.font-size",
    "node": "audio_device-option-7-label",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 30.6794, 15]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-7-label.line-height",
    "node": "audio_device-option-7-label",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-8.height",
    "node": "audio_device-option-8",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-8-label.padding-left",
    "node": "audio_device-option-8-label",
    "property": "padding-left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 16.3624, 8]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-8-label.font-size",
    "node": "audio_device-option-8-label",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 30.6794, 15]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-8-label.line-height",
    "node": "audio_device-option-8-label",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-9.height",
    "node": "audio_device-option-9",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-9-label.padding-left",
    "node": "audio_device-option-9-label",
    "property": "padding-left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 16.3624, 8]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-9-label.font-size",
    "node": "audio_device-option-9-label",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 30.6794, 15]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-9-label.line-height",
    "node": "audio_device-option-9-label",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-10.height",
    "node": "audio_device-option-10",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-10-label.padding-left",
    "node": "audio_device-option-10-label",
    "property": "padding-left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 16.3624, 8]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-10-label.font-size",
    "node": "audio_device-option-10-label",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 30.6794, 15]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-10-label.line-height",
    "node": "audio_device-option-10-label",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-11.height",
    "node": "audio_device-option-11",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-11-label.padding-left",
    "node": "audio_device-option-11-label",
    "property": "padding-left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 16.3624, 8]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-11-label.font-size",
    "node": "audio_device-option-11-label",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 30.6794, 15]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-11-label.line-height",
    "node": "audio_device-option-11-label",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-12.height",
    "node": "audio_device-option-12",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-12-label.padding-left",
    "node": "audio_device-option-12-label",
    "property": "padding-left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 16.3624, 8]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-12-label.font-size",
    "node": "audio_device-option-12-label",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 30.6794, 15]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-12-label.line-height",
    "node": "audio_device-option-12-label",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-13.height",
    "node": "audio_device-option-13",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-13-label.padding-left",
    "node": "audio_device-option-13-label",
    "property": "padding-left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 16.3624, 8]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-13-label.font-size",
    "node": "audio_device-option-13-label",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 30.6794, 15]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-13-label.line-height",
    "node": "audio_device-option-13-label",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-14.height",
    "node": "audio_device-option-14",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-14-label.padding-left",
    "node": "audio_device-option-14-label",
    "property": "padding-left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 16.3624, 8]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-14-label.font-size",
    "node": "audio_device-option-14-label",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 30.6794, 15]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-14-label.line-height",
    "node": "audio_device-option-14-label",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-15.height",
    "node": "audio_device-option-15",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-15-label.padding-left",
    "node": "audio_device-option-15-label",
    "property": "padding-left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 16.3624, 8]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-15-label.font-size",
    "node": "audio_device-option-15-label",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 30.6794, 15]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
   },
   {
    "id": "tall.audio_device-option-15-label.line-height",
    "node": "audio_device-option-15-label",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
   },
   {
    "id": "tall.audio_device-scroll-track.width",
    "node": "audio_device-scroll-track",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 16.3624, 8]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_device-scroll-thumb.width",
    "node": "audio_device-scroll-thumb",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 16.3624, 8]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio-audio-column-1.width",
    "node": "audio-audio-column-1",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 880.5, 430.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     880.5,
+     {"op": "*", "args": [430.5, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio-audio-head-1.width",
    "node": "audio-audio-head-1",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 880.5, 430.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     880.5,
+     {"op": "*", "args": [430.5, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio-audio-head-1.font-size",
    "node": "audio-audio-head-1",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 28.6341, 14]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     14
+    ]
+   }
   },
   {
    "id": "tall.audio_eax.width",
    "node": "audio_eax",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 880.5, 430.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     880.5,
+     {"op": "*", "args": [430.5, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_eax.height",
    "node": "audio_eax",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_eax-focus.width",
    "node": "audio_eax-focus",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 8.1812, 4]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_eax-focus.height",
    "node": "audio_eax-focus",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_eax-head.left",
    "node": "audio_eax-head",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 42.9512, 21]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     42.9512,
+     {"op": "*", "args": [21, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_eax-head.width",
    "node": "audio_eax-head",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 326.4272, 159.599]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     326.4272,
+     {"op": "*", "args": [159.599, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_eax-head.height",
    "node": "audio_eax-head",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_eax-label.font-size",
    "node": "audio_eax-label",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 28.6341, 14]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     14
+    ]
+   }
   },
   {
    "id": "tall.audio_eax-label.line-height",
    "node": "audio_eax-label",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 26.5889, 13.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [26.5889, {"state": "view.text"}]},
+     13.0
+    ]
+   }
   },
   {
    "id": "tall.audio_eax-box.left",
    "node": "audio_eax-box",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 385.7408, 188.599]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     385.7408,
+     {"op": "*", "args": [188.599, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_eax-box.top",
    "node": "audio_eax-box",
    "property": "top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 22.4983, 11.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     22.4983,
+     {"op": "*", "args": [11.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_eax-box.width",
    "node": "audio_eax-box",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 28.6341, 14]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {"op": "*", "args": [14, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_eax-box.height",
    "node": "audio_eax-box",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 28.6341, 14]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {"op": "*", "args": [14, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_eax-checked.left",
    "node": "audio_eax-checked",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 385.7408, 188.599]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     385.7408,
+     {"op": "*", "args": [188.599, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_eax-checked.top",
    "node": "audio_eax-checked",
    "property": "top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 22.4983, 11.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     22.4983,
+     {"op": "*", "args": [11.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_eax-checked.width",
    "node": "audio_eax-checked",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 28.6341, 14]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {"op": "*", "args": [14, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_eax-checked.height",
    "node": "audio_eax-checked",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 28.6341, 14]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {"op": "*", "args": [14, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_speakers.width",
    "node": "audio_speakers",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 880.5, 430.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     880.5,
+     {"op": "*", "args": [430.5, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_speakers.height",
    "node": "audio_speakers",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_speakers-focus.width",
    "node": "audio_speakers-focus",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 8.1812, 4]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_speakers-focus.height",
    "node": "audio_speakers-focus",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_speakers-head.left",
    "node": "audio_speakers-head",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 42.9512, 21]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     42.9512,
+     {"op": "*", "args": [21, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_speakers-head.width",
    "node": "audio_speakers-head",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 326.4272, 159.599]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     326.4272,
+     {"op": "*", "args": [159.599, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_speakers-head.height",
    "node": "audio_speakers-head",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_speakers-label.font-size",
    "node": "audio_speakers-label",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 28.6341, 14]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     14
+    ]
+   }
   },
   {
    "id": "tall.audio_speakers-label.line-height",
    "node": "audio_speakers-label",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 26.5889, 13.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [26.5889, {"state": "view.text"}]},
+     13.0
+    ]
+   }
   },
   {
    "id": "tall.audio_speakers-value.left",
    "node": "audio_speakers-value",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 385.7408, 188.599]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     385.7408,
+     {"op": "*", "args": [188.599, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_speakers-value.width",
    "node": "audio_speakers-value",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 441.5815, 215.901]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     441.5815,
+     {"op": "*", "args": [215.901, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_speakers-value.height",
    "node": "audio_speakers-value",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_speakers-value.font-size",
    "node": "audio_speakers-value",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 28.6341, 14]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     14
+    ]
+   }
   },
   {
    "id": "tall.audio_speakers-value.line-height",
    "node": "audio_speakers-value",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [73.6307, {"state": "view.text"}]},
+     36.0
+    ]
+   }
   },
   {
    "id": "tall.audio_speakers-chevron.left",
    "node": "audio_speakers-chevron",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 831.4129, 406.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     831.4129,
+     {"op": "*", "args": [406.5, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_speakers-chevron.top",
    "node": "audio_speakers-chevron",
    "property": "top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 30.6794, 15.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     30.6794,
+     {"op": "*", "args": [15.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_speakers-chevron.width",
    "node": "audio_speakers-chevron",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 24.5436, 12]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     24.5436,
+     {"op": "*", "args": [12, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_speakers-chevron.height",
    "node": "audio_speakers-chevron",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 12.2718, 6]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     12.2718,
+     {"op": "*", "args": [6, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_speakers-viewport.margin-left",
    "node": "audio_speakers-viewport",
    "property": "margin-left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 4.0906, 2]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     4.0906,
+     {"op": "*", "args": [2, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_speakers-viewport.margin-top",
    "node": "audio_speakers-viewport",
    "property": "margin-top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 4.0906, 2]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     4.0906,
+     {"op": "*", "args": [2, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_speakers-option-0.height",
    "node": "audio_speakers-option-0",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_speakers-option-0-label.padding-left",
    "node": "audio_speakers-option-0-label",
    "property": "padding-left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 16.3624, 8]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_speakers-option-0-label.font-size",
    "node": "audio_speakers-option-0-label",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 30.6794, 15]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
   },
   {
    "id": "tall.audio_speakers-option-0-label.line-height",
    "node": "audio_speakers-option-0-label",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
   },
   {
    "id": "tall.audio_speakers-option-1.height",
    "node": "audio_speakers-option-1",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_speakers-option-1-label.padding-left",
    "node": "audio_speakers-option-1-label",
    "property": "padding-left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 16.3624, 8]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_speakers-option-1-label.font-size",
    "node": "audio_speakers-option-1-label",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 30.6794, 15]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
   },
   {
    "id": "tall.audio_speakers-option-1-label.line-height",
    "node": "audio_speakers-option-1-label",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
   },
   {
    "id": "tall.audio_speakers-option-2.height",
    "node": "audio_speakers-option-2",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_speakers-option-2-label.padding-left",
    "node": "audio_speakers-option-2-label",
    "property": "padding-left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 16.3624, 8]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_speakers-option-2-label.font-size",
    "node": "audio_speakers-option-2-label",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 30.6794, 15]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
   },
   {
    "id": "tall.audio_speakers-option-2-label.line-height",
    "node": "audio_speakers-option-2-label",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
   },
   {
    "id": "tall.audio_speakers-scroll-track.width",
    "node": "audio_speakers-scroll-track",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 16.3624, 8]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_speakers-scroll-thumb.width",
    "node": "audio_speakers-scroll-thumb",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 16.3624, 8]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_hrtf.width",
    "node": "audio_hrtf",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 880.5, 430.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     880.5,
+     {"op": "*", "args": [430.5, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_hrtf.height",
    "node": "audio_hrtf",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_hrtf-focus.width",
    "node": "audio_hrtf-focus",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 8.1812, 4]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_hrtf-focus.height",
    "node": "audio_hrtf-focus",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_hrtf-head.left",
    "node": "audio_hrtf-head",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 42.9512, 21]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     42.9512,
+     {"op": "*", "args": [21, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_hrtf-head.width",
    "node": "audio_hrtf-head",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 326.4272, 159.599]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     326.4272,
+     {"op": "*", "args": [159.599, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_hrtf-head.height",
    "node": "audio_hrtf-head",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_hrtf-label.font-size",
    "node": "audio_hrtf-label",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 28.6341, 14]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     14
+    ]
+   }
   },
   {
    "id": "tall.audio_hrtf-label.line-height",
    "node": "audio_hrtf-label",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 26.5889, 13.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [26.5889, {"state": "view.text"}]},
+     13.0
+    ]
+   }
   },
   {
    "id": "tall.audio_hrtf-value.left",
    "node": "audio_hrtf-value",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 385.7408, 188.599]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     385.7408,
+     {"op": "*", "args": [188.599, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_hrtf-value.width",
    "node": "audio_hrtf-value",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 441.5815, 215.901]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     441.5815,
+     {"op": "*", "args": [215.901, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_hrtf-value.height",
    "node": "audio_hrtf-value",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_hrtf-value.font-size",
    "node": "audio_hrtf-value",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 28.6341, 14]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     14
+    ]
+   }
   },
   {
    "id": "tall.audio_hrtf-value.line-height",
    "node": "audio_hrtf-value",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [73.6307, {"state": "view.text"}]},
+     36.0
+    ]
+   }
   },
   {
    "id": "tall.audio_hrtf-chevron.left",
    "node": "audio_hrtf-chevron",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 831.4129, 406.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     831.4129,
+     {"op": "*", "args": [406.5, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_hrtf-chevron.top",
    "node": "audio_hrtf-chevron",
    "property": "top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 30.6794, 15.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     30.6794,
+     {"op": "*", "args": [15.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_hrtf-chevron.width",
    "node": "audio_hrtf-chevron",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 24.5436, 12]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     24.5436,
+     {"op": "*", "args": [12, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_hrtf-chevron.height",
    "node": "audio_hrtf-chevron",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 12.2718, 6]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     12.2718,
+     {"op": "*", "args": [6, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_hrtf-viewport.margin-left",
    "node": "audio_hrtf-viewport",
    "property": "margin-left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 4.0906, 2]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     4.0906,
+     {"op": "*", "args": [2, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_hrtf-viewport.margin-top",
    "node": "audio_hrtf-viewport",
    "property": "margin-top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 4.0906, 2]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     4.0906,
+     {"op": "*", "args": [2, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_hrtf-option-0.height",
    "node": "audio_hrtf-option-0",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_hrtf-option-0-label.padding-left",
    "node": "audio_hrtf-option-0-label",
    "property": "padding-left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 16.3624, 8]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_hrtf-option-0-label.font-size",
    "node": "audio_hrtf-option-0-label",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 30.6794, 15]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
   },
   {
    "id": "tall.audio_hrtf-option-0-label.line-height",
    "node": "audio_hrtf-option-0-label",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
   },
   {
    "id": "tall.audio_hrtf-option-1.height",
    "node": "audio_hrtf-option-1",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_hrtf-option-1-label.padding-left",
    "node": "audio_hrtf-option-1-label",
    "property": "padding-left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 16.3624, 8]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_hrtf-option-1-label.font-size",
    "node": "audio_hrtf-option-1-label",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 30.6794, 15]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
   },
   {
    "id": "tall.audio_hrtf-option-1-label.line-height",
    "node": "audio_hrtf-option-1-label",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
   },
   {
    "id": "tall.audio_hrtf-option-2.height",
    "node": "audio_hrtf-option-2",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_hrtf-option-2-label.padding-left",
    "node": "audio_hrtf-option-2-label",
    "property": "padding-left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 16.3624, 8]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_hrtf-option-2-label.font-size",
    "node": "audio_hrtf-option-2-label",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 30.6794, 15]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
   },
   {
    "id": "tall.audio_hrtf-option-2-label.line-height",
    "node": "audio_hrtf-option-2-label",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 44.9965, 22.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
   },
   {
    "id": "tall.audio_hrtf-scroll-track.width",
    "node": "audio_hrtf-scroll-track",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 16.3624, 8]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_hrtf-scroll-thumb.width",
    "node": "audio_hrtf-scroll-thumb",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 16.3624, 8]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitles.width",
    "node": "audio_subtitles",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 880.5, 430.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     880.5,
+     {"op": "*", "args": [430.5, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitles.height",
    "node": "audio_subtitles",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitles-focus.width",
    "node": "audio_subtitles-focus",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 8.1812, 4]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitles-focus.height",
    "node": "audio_subtitles-focus",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitles-head.left",
    "node": "audio_subtitles-head",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 42.9512, 21]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     42.9512,
+     {"op": "*", "args": [21, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitles-head.width",
    "node": "audio_subtitles-head",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 326.4272, 159.599]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     326.4272,
+     {"op": "*", "args": [159.599, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitles-head.height",
    "node": "audio_subtitles-head",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitles-label.font-size",
    "node": "audio_subtitles-label",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 28.6341, 14]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     14
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitles-label.line-height",
    "node": "audio_subtitles-label",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 26.5889, 13.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [26.5889, {"state": "view.text"}]},
+     13.0
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitles-box.left",
    "node": "audio_subtitles-box",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 385.7408, 188.599]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     385.7408,
+     {"op": "*", "args": [188.599, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitles-box.top",
    "node": "audio_subtitles-box",
    "property": "top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 22.4983, 11.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     22.4983,
+     {"op": "*", "args": [11.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitles-box.width",
    "node": "audio_subtitles-box",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 28.6341, 14]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {"op": "*", "args": [14, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitles-box.height",
    "node": "audio_subtitles-box",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 28.6341, 14]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {"op": "*", "args": [14, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitles-checked.left",
    "node": "audio_subtitles-checked",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 385.7408, 188.599]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     385.7408,
+     {"op": "*", "args": [188.599, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitles-checked.top",
    "node": "audio_subtitles-checked",
    "property": "top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 22.4983, 11.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     22.4983,
+     {"op": "*", "args": [11.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitles-checked.width",
    "node": "audio_subtitles-checked",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 28.6341, 14]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {"op": "*", "args": [14, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitles-checked.height",
    "node": "audio_subtitles-checked",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 28.6341, 14]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {"op": "*", "args": [14, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_size.width",
    "node": "audio_subtitle_size",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 880.5, 430.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     880.5,
+     {"op": "*", "args": [430.5, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_size.height",
    "node": "audio_subtitle_size",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_size-focus.width",
    "node": "audio_subtitle_size-focus",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 8.1812, 4]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_size-focus.height",
    "node": "audio_subtitle_size-focus",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_size-head.left",
    "node": "audio_subtitle_size-head",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 42.9512, 21]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     42.9512,
+     {"op": "*", "args": [21, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_size-head.width",
    "node": "audio_subtitle_size-head",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 326.4272, 159.599]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     326.4272,
+     {"op": "*", "args": [159.599, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_size-head.height",
    "node": "audio_subtitle_size-head",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_size-label.font-size",
    "node": "audio_subtitle_size-label",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 28.6341, 14]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     14
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_size-label.line-height",
    "node": "audio_subtitle_size-label",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 26.5889, 13.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [26.5889, {"state": "view.text"}]},
+     13.0
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_size-track.left",
    "node": "audio_subtitle_size-track",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 385.7408, 188.599]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     385.7408,
+     {"op": "*", "args": [188.599, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_size-track.width",
    "node": "audio_subtitle_size-track",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 355.679, 173.901]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     355.679,
+     {"op": "*", "args": [173.901, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_size-track.height",
    "node": "audio_subtitle_size-track",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 53.1777, 26.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     53.1777,
+     {"op": "*", "args": [26.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_size-fill.top",
    "node": "audio_subtitle_size-fill",
    "property": "top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 22.4983, 11]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     22.4983,
+     {"op": "*", "args": [11, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_size-fill.height",
    "node": "audio_subtitle_size-fill",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 8.1812, 4]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_size-thumb.top",
    "node": "audio_subtitle_size-thumb",
    "property": "top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 10.2265, 5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     10.2265,
+     {"op": "*", "args": [5, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_size-thumb.width",
    "node": "audio_subtitle_size-thumb",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 8.1812, 4]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_size-thumb.height",
    "node": "audio_subtitle_size-thumb",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 32.7247, 16]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     32.7247,
+     {"op": "*", "args": [16, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_size-value.left",
    "node": "audio_subtitle_size-value",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 757.7822, 370.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     757.7822,
+     {"op": "*", "args": [370.5, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_size-value.width",
    "node": "audio_subtitle_size-value",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 98.1742, 48]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     98.1742,
+     {"op": "*", "args": [48, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_size-value.height",
    "node": "audio_subtitle_size-value",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 53.1777, 26.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     53.1777,
+     {"op": "*", "args": [26.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_size-value.font-size",
    "node": "audio_subtitle_size-value",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 30.6794, 15]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_size-value.line-height",
    "node": "audio_subtitle_size-value",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 53.1777, 26.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [53.1777, {"state": "view.text"}]},
+     26.0
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_background.width",
    "node": "audio_subtitle_background",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 880.5, 430.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     880.5,
+     {"op": "*", "args": [430.5, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_background.height",
    "node": "audio_subtitle_background",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_background-focus.width",
    "node": "audio_subtitle_background-focus",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 8.1812, 4]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_background-focus.height",
    "node": "audio_subtitle_background-focus",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_background-head.left",
    "node": "audio_subtitle_background-head",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 42.9512, 21]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     42.9512,
+     {"op": "*", "args": [21, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_background-head.width",
    "node": "audio_subtitle_background-head",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 326.4272, 159.599]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     326.4272,
+     {"op": "*", "args": [159.599, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_background-head.height",
    "node": "audio_subtitle_background-head",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_background-label.font-size",
    "node": "audio_subtitle_background-label",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 28.6341, 14]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     14
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_background-label.line-height",
    "node": "audio_subtitle_background-label",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 26.5889, 13.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [26.5889, {"state": "view.text"}]},
+     13.0
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_background-track.left",
    "node": "audio_subtitle_background-track",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 385.7408, 188.599]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     385.7408,
+     {"op": "*", "args": [188.599, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_background-track.width",
    "node": "audio_subtitle_background-track",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 355.679, 173.901]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     355.679,
+     {"op": "*", "args": [173.901, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_background-track.height",
    "node": "audio_subtitle_background-track",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 53.1777, 26.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     53.1777,
+     {"op": "*", "args": [26.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_background-fill.top",
    "node": "audio_subtitle_background-fill",
    "property": "top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 22.4983, 11]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     22.4983,
+     {"op": "*", "args": [11, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_background-fill.height",
    "node": "audio_subtitle_background-fill",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 8.1812, 4]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_background-thumb.top",
    "node": "audio_subtitle_background-thumb",
    "property": "top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 10.2265, 5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     10.2265,
+     {"op": "*", "args": [5, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_background-thumb.width",
    "node": "audio_subtitle_background-thumb",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 8.1812, 4]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_background-thumb.height",
    "node": "audio_subtitle_background-thumb",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 32.7247, 16]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     32.7247,
+     {"op": "*", "args": [16, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_background-value.left",
    "node": "audio_subtitle_background-value",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 757.7822, 370.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     757.7822,
+     {"op": "*", "args": [370.5, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_background-value.width",
    "node": "audio_subtitle_background-value",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 98.1742, 48]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     98.1742,
+     {"op": "*", "args": [48, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_background-value.height",
    "node": "audio_subtitle_background-value",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 53.1777, 26.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     53.1777,
+     {"op": "*", "args": [26.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_background-value.font-size",
    "node": "audio_subtitle_background-value",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 30.6794, 15]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_background-value.line-height",
    "node": "audio_subtitle_background-value",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 53.1777, 26.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [53.1777, {"state": "view.text"}]},
+     26.0
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_speakers.width",
    "node": "audio_subtitle_speakers",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 880.5, 430.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     880.5,
+     {"op": "*", "args": [430.5, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_speakers.height",
    "node": "audio_subtitle_speakers",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_speakers-focus.width",
    "node": "audio_subtitle_speakers-focus",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 8.1812, 4]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_speakers-focus.height",
    "node": "audio_subtitle_speakers-focus",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_speakers-head.left",
    "node": "audio_subtitle_speakers-head",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 42.9512, 21]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     42.9512,
+     {"op": "*", "args": [21, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_speakers-head.width",
    "node": "audio_subtitle_speakers-head",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 326.4272, 159.599]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     326.4272,
+     {"op": "*", "args": [159.599, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_speakers-head.height",
    "node": "audio_subtitle_speakers-head",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 73.6307, 36.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_speakers-label.font-size",
    "node": "audio_subtitle_speakers-label",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 28.6341, 14]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     14
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_speakers-label.line-height",
    "node": "audio_subtitle_speakers-label",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 26.5889, 13.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [26.5889, {"state": "view.text"}]},
+     13.0
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_speakers-box.left",
    "node": "audio_subtitle_speakers-box",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 385.7408, 188.599]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     385.7408,
+     {"op": "*", "args": [188.599, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_speakers-box.top",
    "node": "audio_subtitle_speakers-box",
    "property": "top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 22.4983, 11.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     22.4983,
+     {"op": "*", "args": [11.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_speakers-box.width",
    "node": "audio_subtitle_speakers-box",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 28.6341, 14]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {"op": "*", "args": [14, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_speakers-box.height",
    "node": "audio_subtitle_speakers-box",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 28.6341, 14]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {"op": "*", "args": [14, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_speakers-checked.left",
    "node": "audio_subtitle_speakers-checked",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 385.7408, 188.599]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     385.7408,
+     {"op": "*", "args": [188.599, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_speakers-checked.top",
    "node": "audio_subtitle_speakers-checked",
    "property": "top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 22.4983, 11.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     22.4983,
+     {"op": "*", "args": [11.0, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_speakers-checked.width",
    "node": "audio_subtitle_speakers-checked",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 28.6341, 14]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {"op": "*", "args": [14, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "tall.audio_subtitle_speakers-checked.height",
    "node": "audio_subtitle_speakers-checked",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 28.6341, 14]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {"op": "*", "args": [14, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "prompt-231042-cap.display",
@@ -2867,6 +5471,78 @@
      "none"
     ]
    }
+  },
+  {
+   "id": "text.prompt-231042-key.font-size",
+   "node": "prompt-231042-key",
+   "property": "font-size",
+   "value": {"op": "/", "args": [13, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.prompt-231042-key.line-height",
+   "node": "prompt-231042-key",
+   "property": "line-height",
+   "value": {"op": "/", "args": [22, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.prompt-231042-verb.font-size",
+   "node": "prompt-231042-verb",
+   "property": "font-size",
+   "value": {"op": "/", "args": [14, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.prompt-231042-verb.line-height",
+   "node": "prompt-231042-verb",
+   "property": "line-height",
+   "value": {"op": "/", "args": [22, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.audio_back-key.font-size",
+   "node": "audio_back-key",
+   "property": "font-size",
+   "value": {"op": "/", "args": [13, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.audio_back-key.line-height",
+   "node": "audio_back-key",
+   "property": "line-height",
+   "value": {"op": "/", "args": [22, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.audio_back-label.font-size",
+   "node": "audio_back-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [14, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.audio_back-label.line-height",
+   "node": "audio_back-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [22, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.crumb.font-size",
+   "node": "crumb",
+   "property": "font-size",
+   "value": {"op": "/", "args": [18, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.crumb.line-height",
+   "node": "crumb",
+   "property": "line-height",
+   "value": {"op": "/", "args": [27.45, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.title.font-size",
+   "node": "title",
+   "property": "font-size",
+   "value": {"op": "/", "args": [18, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.title.line-height",
+   "node": "title",
+   "property": "line-height",
+   "value": {"op": "/", "args": [27.45, {"state": "view.text"}]}
   }
  ],
  "timelines": [

@@ -393,7 +393,8 @@ private:
 			Require(ValidStateValue(declaration.initial),v["initial"],p+"/initial","Invalid state value");
 			if (v.isMember("cvar")) declaration.cvar = Id(v["cvar"],p+"/cvar");
 			if (v.isMember("view")) {
-				Require(v["view"].isString() && v["view"].asString() == "aspect",v["view"],p+"/view","Expected the view source 'aspect'");
+				Require(v["view"].isString() && (v["view"].asString() == "aspect" || v["view"].asString() == "text"),v["view"],p+"/view",
+					"Expected the view source 'aspect' or 'text'");
 				Require(type == "number" && !v.isMember("cvar"),v,p,"A view source is a number state without a CVar source");
 				declaration.view = v["view"].asString();
 			}

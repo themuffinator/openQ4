@@ -34,7 +34,8 @@ struct StateDeclaration {
 	StateValue initial;
 	std::string cvar; // Optional read-only host source; empty means application-owned.
 	// Optional read-only view source: "aspect" is the view's width over its
-	// height, which the runtime refreshes as it lays the document out.
+	// height and "text" the text size it applies (1 to 2), both refreshed as
+	// the runtime lays the document out.
 	std::string view;
 	bool HostSourced() const { return !cvar.empty() || !view.empty(); }
 };

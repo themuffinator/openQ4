@@ -21,14 +21,16 @@ rows its height instead of shrinking the two columns into it: the columns
 stand one under the other in a single column that runs to the bottom band and
 scrolls, its rows, headings and note at the size that fills the content's
 width (CONTENT_W / COLUMN_W, about twice the landscape size), while the frame,
-strip and prompts keep their narrow-view fit. Bindings on every length in the
-tab's rows make the switch; their vector art is drawn in fractions of its box
-so it scales with them."""
+strip and prompts keep their narrow-view fit. A text size above 100 % (the
+runtime's view.text source) takes the same single column, its rows grown by
+the text size so that the text the runtime enlarges keeps its room. Bindings
+on every length in the tab's rows make the switch; their vector art is drawn
+in fractions of its box so it scales with them."""
 from __future__ import annotations
 
-from build_retained_screens import (CANVAS_W, FULL, ORANGE, OLIVE, U, VALUE, Document, absolute, colour, group, keyword, label,
-                                    length, linear, number, page_prompts, path, rgb, solid, stroke, text_width, track, typeface,
-                                    vector)
+from build_retained_screens import (CANVAS_W, FULL, ORANGE, OLIVE, TEXT_LENGTHS, TEXT_STATE, U, VALUE, Document, absolute, colour,
+                                    fixed_text, group, keyword, label, length, linear, number, page_prompts, path, rgb, solid, stroke,
+                                    text_width, track, typeface, vector)
 from retained_create_server import header_band
 from retained_mp_menus import (ERROR, KEYCAP_GAP, KEYCAP_W, PLACEHOLDER, STRIP_EDGE, TAB_FLARE, TAB_PAD, TAB_RISE, TAB_SHOULDER,
                                TAB_SIZE, any_text, label_column, row_face, row_states, tab_strip, value_row, wrapped_width)
@@ -55,6 +57,10 @@ VIEW_STATE = "view.aspect"                # the runtime's view source: the view'
 TALL_ASPECT = 0.76
 TALL_SCALE = CONTENT_W / COLUMN_W         # a column's rows across the content's width
 TALL = {"op": "<", "args": [{"state": VIEW_STATE}, TALL_ASPECT]}
+TEXT = {"state": TEXT_STATE}
+# The single column, in a tall view or at a text size above 100 %, where two
+# columns grown by the text size would not fit side by side.
+STACKED = {"op": "||", "args": [TALL, {"op": ">", "args": [TEXT, 1]}]}
 ENTRY_W = 66.0                            # dp: a fine slider's typed number
 SCROLL_GUTTER = 4.0                       # dp: the rows' area past the rows on either side
 RANGE_MESSAGE = "#str_231560"             # "Enter a number from %s to %s.", the runtime filling the field's range
@@ -299,9 +305,19 @@ def _in_fractions(node: dict, width: float, height: float) -> None:
                 paint["from"], paint["to"] = point(paint["from"]), point(paint["to"])
 
 
+def grown(value: float, text_length: bool = False):
+    """A row length in the single column: TALL_SCALE times it in a tall view,
+    the text size times it at a larger text size. The runtime itself grows a
+    font length by the text size, so a font length takes only the rest."""
+    tall = round(value * TALL_SCALE, 4)
+    if text_length:
+        return {"op": "select", "args": [TALL, {"op": "/", "args": [tall, TEXT]}, value]}
+    return {"op": "select", "args": [TALL, tall, {"op": "*", "args": [value, TEXT]}]}
+
+
 def scale_tall(doc: Document, node: dict, skip: set = frozenset()) -> None:
-    """Every dp length in `node`'s subtree takes TALL_SCALE times its value in
-    a tall view, by a binding, but for those `skip` names, the runtime writes
+    """Every dp length in `node`'s subtree grows in the single column
+    (grown()), by a binding, but for those `skip` names, the runtime writes
     or something already binds or animates; vector art whose box is known
     turns to fractions of it."""
     owned = set(skip)
@@ -321,8 +337,7 @@ def scale_tall(doc: Document, node: dict, skip: set = frozenset()) -> None:
         for key, found in props.items():
             if found.get("type") != "length" or found.get("unit") != "dp" or not found["value"] or (item["id"], key) in owned:
                 continue
-            doc.bind(f"tall.{item['id']}.{key}", item["id"], key,
-                     {"op": "select", "args": [TALL, round(found["value"] * TALL_SCALE, 4), found["value"]]})
+            doc.bind(f"tall.{item['id']}.{key}", item["id"], key, grown(found["value"], key in TEXT_LENGTHS))
         for child in item.get("children", []):
             walk(child, tuple(size))
     walk(node, (None, None))
@@ -337,7 +352,8 @@ def _lead_heading(doc: Document, ident: str, key: str, lead: float) -> dict:
     for key_ in ("left", "top"):
         node["properties"].pop(key_)
     for prop, tall, wide in (("height", ROW_PITCH, HEAD_H), ("line-height", ROW_PITCH, HEAD_H), ("margin-bottom", 0, lead - HEAD_H)):
-        doc.bind(f"tall.{ident}.{prop}", ident, prop, {"op": "select", "args": [TALL, round(U * tall * TALL_SCALE, 4), U * wide]})
+        stacked = grown(U * tall, prop in TEXT_LENGTHS) if tall else 0
+        doc.bind(f"tall.{ident}.{prop}", ident, prop, {"op": "select", "args": [STACKED, stacked, U * wide]})
     return node
 
 
@@ -381,16 +397,19 @@ def settings_subpage(doc: Document, prefix: str, title_key: str, tabs: list, *, 
         strip = tab_strip(doc, width, [(ident, key, None) for ident, key, _columns in tabs], top=0, state=TAB_STATE)
         chrome.append(group(f"{prefix}-strip", absolute(left=U * CONTENT_LEFT, top=U * STRIP_TOP, width=width, height=2 * TAB_RISE),
                             strip))
+        # The tabs keep their size in the strip's slots at any text size.
+        fixed_text(doc, chrome[-1])
     else:
         # The header band stands behind the columns' headings; the tall
         # column's headings stand in its rows instead.
         band = header_band(f"{prefix}-header", CONTENT_LEFT, STRIP_TOP, CONTENT_W, ROWS_TOP - STRIP_TOP - 4)
         if portrait:
             band["properties"]["display"] = keyword("block")
-            doc.bind(f"{prefix}-header.display", f"{prefix}-header", "display", {"op": "select", "args": [TALL, "none", "block"]})
+            doc.bind(f"{prefix}-header.display", f"{prefix}-header", "display", {"op": "select", "args": [STACKED, "none", "block"]})
         chrome.append(band)
     if portrait:
         doc.state[VIEW_STATE] = {"type": "number", "initial": round(4 / 3, 4), "view": "aspect"}
+        doc.state[TEXT_STATE] = {"type": "number", "initial": 1, "view": "text"}
     elif note is not None:
         chrome.append(heading_label(f"{prefix}-note", note, U * CONTENT_LEFT, U * HEAD_TOP, width, U * HEAD_H))
     # Each tab's rows scroll in one area from its heading line to the bottom
@@ -441,12 +460,14 @@ def settings_subpage(doc: Document, prefix: str, title_key: str, tabs: list, *, 
             # Side by side, or one under the other in a tall view.
             arranged = group(f"{prefix}-{ident}-columns", {"position": keyword("relative"), "display": keyword("flex"),
                                                            "flex-direction": keyword("row"), "align-items": keyword("flex-start")}, laid)
-            doc.bind(f"{arranged['id']}.flex-direction", arranged["id"], "flex-direction", {"op": "select", "args": [TALL, "column", "row"]})
+            doc.bind(f"{arranged['id']}.flex-direction", arranged["id"], "flex-direction",
+                     {"op": "select", "args": [STACKED, "column", "row"]})
             if not lines and not any(headed):
                 arranged["properties"]["padding-top"] = length(U * lead)
             if len(laid) == 2:
                 laid[0]["properties"]["margin-right"] = length(U * COLUMN_GAP)
-                doc.bind(f"{laid[0]['id']}.margin-right", laid[0]["id"], "margin-right", {"op": "select", "args": [TALL, 0, U * COLUMN_GAP]})
+                doc.bind(f"{laid[0]['id']}.margin-right", laid[0]["id"], "margin-right",
+                         {"op": "select", "args": [STACKED, 0, U * COLUMN_GAP]})
             scale_tall(doc, arranged)
             for line in lines:
                 scale_tall(doc, line, {(line["id"], "width")})

@@ -93,6 +93,7 @@
   "prompt.glyphs": {"type": "number", "initial": 0},
   "prompt.swapped": {"type": "boolean", "initial": false},
   "prompt.accept": {"type": "string", "initial": "#str_231042"},
+  "view.text": {"type": "number", "initial": 1, "view": "text"},
   "create.usepass": {"type": "boolean", "initial": false},
   "create.servermods": {"type": "boolean", "initial": false},
   "create.weaponstay": {"type": "boolean", "initial": false},
@@ -4206,6 +4207,54 @@
    }
   },
   {
+   "id": "text.prompt-231042-key.font-size",
+   "node": "prompt-231042-key",
+   "property": "font-size",
+   "value": {"op": "/", "args": [13, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.prompt-231042-key.line-height",
+   "node": "prompt-231042-key",
+   "property": "line-height",
+   "value": {"op": "/", "args": [22, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.prompt-231042-verb.font-size",
+   "node": "prompt-231042-verb",
+   "property": "font-size",
+   "value": {"op": "/", "args": [14, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.prompt-231042-verb.line-height",
+   "node": "prompt-231042-verb",
+   "property": "line-height",
+   "value": {"op": "/", "args": [22, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.create_back-key.font-size",
+   "node": "create_back-key",
+   "property": "font-size",
+   "value": {"op": "/", "args": [13, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.create_back-key.line-height",
+   "node": "create_back-key",
+   "property": "line-height",
+   "value": {"op": "/", "args": [22, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.create_back-label.font-size",
+   "node": "create_back-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [14, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.create_back-label.line-height",
+   "node": "create_back-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [22, {"state": "view.text"}]}
+  },
+  {
    "id": "create-password.enabled",
    "node": "create-password",
    "property": "enabled",
@@ -5074,6 +5123,30 @@
    "node": "banModal_yes",
    "property": "enabled",
    "value": {"op": ">=", "args": [{"state": "create.ban_selected"}, 0]}
+  },
+  {
+   "id": "text.crumb.font-size",
+   "node": "crumb",
+   "property": "font-size",
+   "value": {"op": "/", "args": [18, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.crumb.line-height",
+   "node": "crumb",
+   "property": "line-height",
+   "value": {"op": "/", "args": [27.45, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.title.font-size",
+   "node": "title",
+   "property": "font-size",
+   "value": {"op": "/", "args": [18, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.title.line-height",
+   "node": "title",
+   "property": "line-height",
+   "value": {"op": "/", "args": [27.45, {"state": "view.text"}]}
   },
   {
    "id": "notice-0-symbol-1.display",

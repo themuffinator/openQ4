@@ -88,6 +88,12 @@ See [player release status](../user/release-status.md).
   names its own range (`#str_231560` in every language, the number control's
   new `decimals`;
   [portrait and typed numbers](ui/retained-screens.md#portrait-views-and-typed-numbers-31-october-2026)).
+- [x] The settings rows follow the text size: above 100 % a tab stands in one
+  scrolling column whose rows grow with the text, the strip, prompt bar,
+  titles and APPLY CHANGES keep their size, and DISPLAY takes the portrait
+  column too
+  ([text size](ui/retained-screens.md#settings-rows-follow-the-text-size-31-october-2026),
+  visual specification 1.31).
 - [ ] Bound acceptance evidence remains.
 
 ## Windows stay see-through at any distance, 29 October 2026

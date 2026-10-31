@@ -3758,6 +3758,113 @@ static void CheckSettingsPortrait(Runtime& runtime, const Document& document, co
 	Check(right.x > left.x+left.width && Near(left.width,landscape.width),"a 16:9 view sets the columns side by side again");
 }
 
+// A settings sub-page at 150% and 200% text (the runtime's view.text source),
+// on 16:9, 4:3 and 9:16 views: the tab's (`page`) two columns stand one under
+// the other in its scrolling rows, every row grown by the text size outside a
+// tall view, and the focused `last` row scrolls into the view. Each text of a
+// row that shows stays in its row, a one-line text's line (at this host's
+// 0.6 em advance) inside its box. The tab strip and the prompt bar keep their
+// authored text size in their fixed slots: every tab's label in its slot,
+// every key cap, verb and BACK in the bar, all inside the screen. At 100% text
+// in a 16:9 view again, the columns stand side by side.
+static void CheckSettingsTextScale(ScreenHost& host, Runtime& runtime, const Document& document, const std::string& page, const char* above,
+	const char* below, const char* last, double at) {
+	const auto bounds = [&](const std::string& id) { Bounds b; Check(runtime.GetBounds(id,b),"a settings node is laid out"); return b; };
+	const auto inside = [](const Bounds& a, const Bounds& b) {
+		return a.x >= b.x-.5f && a.y >= b.y-.5f && a.x+a.width <= b.x+b.width+.5f && a.y+a.height <= b.y+b.height+.5f;
+	};
+	const auto shown = [&](const Node& node) { const auto display = runtime.PresentedValue(node.id,"display"); return !display || display->text != "none"; };
+	const auto authored = [&](const std::string& id, const char* property) { return document.Model().FindNode(id)->properties.at(property).data[0]; };
+	const auto font = [&](const std::string& id) {
+		const auto found = runtime.PresentedValue(id,"font-size"); Check(found.has_value(),"a text presents its font size");
+		return static_cast<float>(found->data[0]);
+	};
+	// The text nodes that show under `root` (a list's rows aside), each with
+	// `holder`, the node that must contain it. A clipped viewport (a typed
+	// number's) scrolls its text within itself: the viewport is held instead.
+	const auto texts = [&](const Node& root, std::vector<std::pair<const Node*,std::string>>& out, const std::string& holder) {
+		std::vector<const Node*> pending{&root};
+		while (!pending.empty()) {
+			const auto* node = pending.back(); pending.pop_back();
+			if (node->id.find("-popup") != std::string::npos || !shown(*node)) continue;
+			const auto overflow = node->properties.find("overflow");
+			const bool clipped = overflow != node->properties.end() && overflow->second.text == "hidden";
+			if (node->type == "text" || clipped) out.push_back({node,holder});
+			if (!clipped) for (const auto& child : node->children) pending.push_back(&child);
+		}
+	};
+	// One line of a nowrap text inside its box, at this host's glyph advance
+	// for the whole pixel size RmlUi asks the font for.
+	const auto oneLine = [&](const Node& node, const Bounds& box, float px) {
+		const auto wrap = node.properties.find("white-space");
+		if (node.type != "text" || wrap == node.properties.end() || wrap->second.text != "nowrap") return true;
+		const auto text = runtime.PresentedValue(node.id,"text");
+		std::size_t glyphs = 0;
+		for (const unsigned char c : text ? host.Translate(text->text) : std::string()) glyphs += (c & 0xC0) != 0x80;
+		if (glyphs*.6*std::floor(px+.001f) > box.width+1) std::fprintf(stderr,"%s: %zu glyphs at %.1f px in %.1f px\n",node.id.c_str(),glyphs,px,box.width);
+		return glyphs*.6*std::floor(px+.001f) <= box.width+1;
+	};
+	auto view = SettingsViewport(document);
+	runtime.Frame(view,at);
+	const auto landscape = bounds(above);
+	double time = at;
+	for (const float text : {1.5f,2.f}) for (const auto& [width,height] : {std::pair{1280,720},std::pair{960,720},std::pair{540,960}}) {
+		view = SettingsViewport(document,width,height); view.textScale = text;
+		runtime.Frame(view,time += .01);
+		const float ratio = view.DpRatio(); const bool tall = width < .76f*height;
+		const Bounds screen{0,0,float(width),float(height)};
+		const auto first = bounds(above), second = bounds(below);
+		if (!(Near(second.x,first.x) && second.y >= first.y+first.height-.5f))
+			std::fprintf(stderr,"text %.1f %dx%d %s x=%.1f y=%.1f h=%.1f, %s x=%.1f y=%.1f\n",text,width,height,above,first.x,first.y,first.height,below,second.x,second.y);
+		Check(Near(second.x,first.x) && second.y >= first.y+first.height-.5f,"a larger text size stands the columns in one column");
+		if (!tall) Check(Near(first.height,landscape.height*text*ratio,.5f) && Near(first.width,landscape.width*text*ratio,.5f),
+			"its rows grow by the text size");
+		// Each text of every row, heading and note of the tab.
+		std::vector<std::pair<const Node*,std::string>> rows;
+		for (const char* column : {"-column-0","-column-1"})
+			for (const auto& row : document.Model().FindNode(page+column)->children) if (shown(row)) texts(row,rows,row.id);
+		Check(!rows.empty(),"the tab's rows show text");
+		for (const auto& [node,holder] : rows) {
+			const auto box = bounds(node->id), owner = bounds(holder);
+			const float px = node->type == "text" ? font(node->id)*ratio*text : 0;
+			if (!inside(box,owner))
+				std::fprintf(stderr,"text %.1f %dx%d %s=%.1f,%.1f %.1fx%.1f in %s=%.1f,%.1f %.1fx%.1f\n",text,width,height,node->id.c_str(),box.x,box.y,box.width,box.height,
+					holder.c_str(),owner.x,owner.y,owner.width,owner.height);
+			Check(inside(box,owner),"each text of a row stays in its row");
+			Check(oneLine(*node,box,px),"a row's one-line text fits its box");
+		}
+		Check(runtime.FocusControl(last,time += .01),"focus the tab's last row");
+		runtime.Frame(view,time += .01); runtime.Frame(view,time += .01);
+		const auto revealed = bounds(last), area = bounds(page+"-rows");
+		Check(inside(area,screen) && revealed.y >= area.y-.5f && revealed.y+revealed.height <= area.y+area.height+.5f,
+			"the focused row scrolls into the view");
+		// The strip and the prompt bar: fixed slots, authored text size.
+		std::vector<std::pair<const Node*,std::string>> chrome;
+		if (const auto* tabs = document.Model().FindNode("tabs")) {
+			const auto strip = bounds(page.substr(0,page.find('-'))+"-strip");
+			Check(inside(strip,screen),"the tab strip stays on the screen");
+			for (const auto& slot : tabs->children) {
+				Check(inside(bounds(slot.id),strip),"every tab's slot stays in the strip");
+				texts(slot,chrome,slot.id);
+			}
+		}
+		texts(*document.Model().FindNode("prompts"),chrome,"prompts");
+		Check(inside(bounds("prompts"),screen),"the prompt bar stays on the screen");
+		for (const auto& [node,holder] : chrome) {
+			const auto box = bounds(node->id);
+			const float dp = font(node->id);
+			if (!inside(box,bounds(holder)) || !inside(box,screen) || !Near(dp*text,static_cast<float>(authored(node->id,"font-size")),.01f))
+				std::fprintf(stderr,"chrome %.1f %dx%d %s=%.1f,%.1f %.1fx%.1f font=%.2f dp\n",text,width,height,node->id.c_str(),box.x,box.y,box.width,box.height,dp);
+			Check(inside(box,bounds(holder)) && inside(box,screen),"every tab label, key cap, verb and BACK stays in its slot and on the screen");
+			Check(Near(dp*text,static_cast<float>(authored(node->id,"font-size")),.01f),"the strip and the prompt bar keep their authored text size");
+			Check(oneLine(*node,box,dp*ratio*text),"their one-line text fits its box");
+		}
+	}
+	view = SettingsViewport(document); runtime.Frame(view,time += .01);
+	const auto left = bounds(above), right = bounds(below);
+	Check(right.x > left.x+left.width && Near(left.width,landscape.width),"100% text sets the columns side by side again");
+}
+
 // The retained CONTROLS page (tools/ui/retained_controls.py): the stock tabs
 // as the page's tabs, each in two columns; each row shows the keys the
 // session publishes for its action; Accept asks the session to wait for a
@@ -3824,6 +3931,7 @@ static void CheckControlsPage(ScreenHost& host, const char* path) {
 	Check(panel.x >= -.5f && panel.x+panel.width <= 540.5f && panel.y+panel.height <= 960.5f && row.x+row.width <= 540.5f,
 		"the panel fits a portrait view");
 	CheckSettingsPortrait(runtime,document,"controls_bind_42","controls_bind_43","controls_bind_48","controls-other-rows",1.1);
+	CheckSettingsTextScale(host,runtime,document,"controls-other","controls_bind_42","controls_bind_43","controls_bind_48",1.2);
 }
 
 // The retained GAME OPTIONS page (tools/ui/retained_game.py): five tabs of
@@ -3983,6 +4091,7 @@ static void CheckGamePage(ScreenHost& host, const char* path) {
 	Check(panel.x >= -.5f && panel.x+panel.width <= 540.5f && panel.y+panel.height <= 960.5f && row.x+row.width <= 540.5f,
 		"the panel fits a portrait view");
 	CheckSettingsPortrait(runtime,document,"game_forcemodel","game_corpsesink","game_weaponkick","game-general-rows",2.2);
+	CheckSettingsTextScale(host,runtime,document,"game-general","game_forcemodel","game_corpsesink","game_weaponkick",2.3);
 	host.cvars = saved;
 }
 
@@ -4083,6 +4192,14 @@ static void CheckAudioPage(ScreenHost& host, const char* path) {
 	runtime.Frame(portrait,1.2);
 	const auto band = runtime.PresentedValue("audio-header","display");
 	Check(band && band->text == "none","the tall column's headings stand in its rows, not the header band");
+	CheckSettingsTextScale(host,runtime,document,"audio-audio","audio_device","audio_eax","audio_subtitle_speakers",1.3);
+	// The single column at a larger text size takes its headings into its rows too.
+	auto larger = SettingsViewport(document); larger.textScale = 1.5f;
+	runtime.Frame(larger,1.6);
+	const auto stacked = runtime.PresentedValue("audio-header","display");
+	runtime.Frame(SettingsViewport(document),1.61);
+	const auto wide = runtime.PresentedValue("audio-header","display");
+	Check(stacked && stacked->text == "none" && wide && wide->text == "block","from 150% text the headings stand in the rows, at 100% in the header band");
 }
 
 static void CheckCreateServerPage(ScreenHost& host, const char* path) {

@@ -196,6 +196,26 @@ def walk_nodes(node: dict):
         yield from walk_nodes(child)
 
 
+TEXT_STATE = "view.text"   # the runtime's view source: the text size it applies to font lengths, 1 to 2
+TEXT_LENGTHS = ("font-size", "line-height", "letter-spacing")   # the lengths the runtime grows by the text size itself
+
+
+def fixed_text(doc: "Document", node: dict) -> None:
+    """Text in fixed chrome (a prompt bar's key caps, a tab strip's slots, a
+    plate's label) keeps its authored size at every text size: each font
+    length under `node` divides the text size the runtime multiplies it by,
+    unless something already binds or animates it."""
+    doc.state[TEXT_STATE] = {"type": "number", "initial": 1, "view": "text"}
+    owned = {(binding["node"], binding["property"]) for binding in doc.bindings}
+    owned.update((entry["node"], entry["property"]) for timeline in doc.timelines.items for entry in timeline["tracks"])
+    for item in walk_nodes(node):
+        for key in TEXT_LENGTHS:
+            found = item.get("properties", {}).get(key)
+            if not found or found.get("type") != "length" or found.get("unit") != "dp" or (item["id"], key) in owned:
+                continue
+            doc.bind(f"text.{item['id']}.{key}", item["id"], key, {"op": "/", "args": [found["value"], {"state": TEXT_STATE}]})
+
+
 def vector(ident: str, props: dict, paths: list, children=(), **extra) -> dict:
     node = {"id": ident, "type": "vector", "properties": props, "paths": paths}
     if children:
@@ -1632,7 +1652,11 @@ def page_prompts(doc: Document, back: str | None = None, *, action: str | None =
         box.update({"left": length(50, "%"), "margin-left": length(-CANVAS_W / 2 + PAGE_BAR_LEFT)})
     if legends:
         box["pointer-events"] = keyword("none")
-    return group(ident, {**box, "opacity": number(1)}, [leading, back_node])
+    bar = group(ident, {**box, "opacity": number(1)}, [leading, back_node])
+    # The key caps and verbs keep their size in the bar's fixed slots, so BACK
+    # stays on the screen at any text size.
+    fixed_text(doc, bar)
+    return bar
 
 
 # --------------------------------------------------------------- choreography

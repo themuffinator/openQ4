@@ -215,6 +215,7 @@
   "prompt.glyphs": {"type": "number", "initial": 0},
   "prompt.swapped": {"type": "boolean", "initial": false},
   "prompt.accept": {"type": "string", "initial": "#str_231042"},
+  "view.text": {"type": "number", "initial": 1, "view": "text"},
   "overwriteModal.visible": {"type": "boolean", "initial": false},
   "overwriteModal.contents": {"type": "boolean", "initial": false},
   "soft_focus": {"type": "boolean", "initial": false, "cvar": "ui_retainedSoftFocus"},
@@ -3484,6 +3485,54 @@
      "none"
     ]
    }
+  },
+  {
+   "id": "text.prompt-231042-key.font-size",
+   "node": "prompt-231042-key",
+   "property": "font-size",
+   "value": {"op": "/", "args": [13, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.prompt-231042-key.line-height",
+   "node": "prompt-231042-key",
+   "property": "line-height",
+   "value": {"op": "/", "args": [22, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.prompt-231042-verb.font-size",
+   "node": "prompt-231042-verb",
+   "property": "font-size",
+   "value": {"op": "/", "args": [14, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.prompt-231042-verb.line-height",
+   "node": "prompt-231042-verb",
+   "property": "line-height",
+   "value": {"op": "/", "args": [22, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.save_back-key.font-size",
+   "node": "save_back-key",
+   "property": "font-size",
+   "value": {"op": "/", "args": [13, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.save_back-key.line-height",
+   "node": "save_back-key",
+   "property": "line-height",
+   "value": {"op": "/", "args": [22, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.save_back-label.font-size",
+   "node": "save_back-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [14, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.save_back-label.line-height",
+   "node": "save_back-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [22, {"state": "view.text"}]}
   },
   {
    "id": "overwriteModal.display",

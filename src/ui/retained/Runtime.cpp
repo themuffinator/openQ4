@@ -2188,9 +2188,11 @@ struct Runtime::Impl {
 		for (const auto& source : stateSources) {
 			StateValue value;
 			if (!source.view.empty()) {
-				// The view's own shape: a view not yet laid out keeps the last.
-				if (viewport.width <= 0 || viewport.height <= 0) continue;
-				value = static_cast<double>(viewport.width)/static_cast<double>(viewport.height);
+				// The text size the runtime applies to font lengths, or the view's
+				// own shape, which a view not yet laid out keeps from the last.
+				if (source.view == "text") value = static_cast<double>(viewport.TextRatio());
+				else if (viewport.width <= 0 || viewport.height <= 0) continue;
+				else value = static_cast<double>(viewport.width)/static_cast<double>(viewport.height);
 			} else if (!host.ReadCVar(source.cvar,source.type,value)) {
 				error = "Unavailable or invalid CVar source '"+source.cvar+"' for state '"+source.id+"'"; break;
 			}

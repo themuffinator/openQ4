@@ -77,7 +77,46 @@ def contract(page):
         assert (spec['minimum'],spec['maximum'],spec.get('integer'),spec['exponent'],spec['maxBytes'])==(minimum,16384,True,False,32)
         assert spec['parts']=={part:size_id+'-'+part for part in PARTS} and size_id+'-field' in nodes
         assert page['actions'][action]['arguments'][key]=={'input':'value'}
+    sized(page,nodes,bindings)
     return nodes
+
+# The view sources the rows follow: the text size (1 to 2) and the view's shape.
+VIEWS=[{'view.text':text,'view.aspect':aspect} for text in (1,1.5,2) for aspect in (4/3,9/16)]
+TALL=880.5/430.5   # retained_settings_rows.TALL_SCALE: a column's rows across the content's width
+ROW_PITCH=36.0
+NUMBER_FONT=15.0
+
+def sized(page,nodes,bindings):
+    """The typed fields grow with their rows: at every text size, and in a tall
+    view, a row is the 100% row grown (by the text size, or TALL), the
+    slider's Number and each field's viewport stay inside it, and the field's
+    text (whose size the runtime multiplies by the text size) grows with it."""
+    assert page['state']['view.text']=={'type':'number','initial':1,'view':'text'}
+    assert page['state']['view.aspect']['view']=='aspect'
+    for state in VIEWS:
+        def length(id,prop):
+            value=bindings.get((id,prop),nodes[id]['properties'][prop]['value'] if prop in nodes[id]['properties'] else 0)
+            return evaluate(value,state)
+        tall=state['view.aspect']<.76
+        def grown(row):
+            factor=length(row,'height')/ROW_PITCH
+            assert abs(factor-(TALL if tall else state['view.text']))<1e-3,(row,state)
+            return factor
+        def field(row,viewport,text,factor):
+            assert length(viewport,'top')+length(viewport,'height')<=length(row,'height')+1e-3,(viewport,state)
+            # The runtime multiplies a font length by the text size itself.
+            assert abs(length(text,'font-size')*state['view.text']-NUMBER_FONT*factor)<1e-3,(text,state)
+        for slider_id in PAIRS:
+            row,holder,number=slider_id+'_row',slider_id+'_row-controls',slider_id+'_number'
+            factor=grown(row)
+            assert length(holder,'left')>=length(slider_id,'width')-1e-3,(slider_id,state)
+            assert length(holder,'left')+length(holder,'width')<=length(row,'width')+1e-3,(slider_id,state)
+            assert abs(length(holder,'height')-length(row,'height'))<1e-3 and abs(length(slider_id,'height')-length(row,'height'))<1e-3,(slider_id,state)
+            field(holder,number+'-viewport',number+'-text',factor)
+        for size_id in SIZES:
+            factor=grown(size_id)
+            assert length(size_id+'-viewport','left')+length(size_id+'-viewport','width')<=length(size_id,'width')+1e-3,(size_id,state)
+            field(size_id,size_id+'-viewport',size_id+'-text',factor)
 
 def evaluate(expression,state):
     if not isinstance(expression,dict):return expression
@@ -88,6 +127,10 @@ def evaluate(expression,state):
     if operation=='||':return evaluate(args[0],state) or evaluate(args[1],state)
     if operation=='==':return evaluate(args[0],state)==evaluate(args[1],state)
     if operation=='select':return evaluate(args[1] if evaluate(args[0],state) else args[2],state)
+    # The view-source geometry: comparisons and the lengths' scaling.
+    if operation in ('<','>','*','/'):
+        left,right=evaluate(args[0],state),evaluate(args[1],state)
+        return {'<':lambda:left<right,'>':lambda:left>right,'*':lambda:left*right,'/':lambda:left/right}[operation]()
     raise AssertionError('Unexpected guarded expression '+operation)
 
 def execute(steps,state,events,actions):
@@ -182,7 +225,7 @@ class PairedNumbers(unittest.TestCase):
     def test_bad_source_bindings_rejected(self):
         contract(self.page)
         def binding(page,name):return next(item for item in page['bindings'] if item['id']==name)
-        for kind in ('action','binding','inventory','duplicate','order','readout','availability','motion','size'):
+        for kind in ('action','binding','inventory','duplicate','order','readout','availability','motion','size','textsource','fixedfont','ungrown','tallwidth'):
             page=copy.deepcopy(self.page);nodes=index_nodes(page['root'])
             if kind=='action':page['actions']['edit.r_brightness']['operation']='settings.brightness.set'
             elif kind=='binding':nodes['settings_brightness']['control']['value']={'state':'settings.baseline.r_brightness'}
@@ -192,7 +235,14 @@ class PairedNumbers(unittest.TestCase):
             elif kind=='readout':nodes['settings_ambient-value']['properties']['display']=keyword('block')
             elif kind=='availability':binding(page,'settings_ambient_number.enabled').update(value=True)
             elif kind=='motion':next(t for t in page['timelines'] if t['id']=='settings_brightness_number.focus')['tracks'][0]['node']='settings-title'
-            else:nodes['settings_custom_width']['control']['integer']=False
+            elif kind=='size':nodes['settings_custom_width']['control']['integer']=False
+            # The rows no longer read the text size; a field's text kept at its
+            # authored size (as fixed chrome) while its row grows; a field's
+            # holder that stays 36 dp tall; a Number past its row in a tall view.
+            elif kind=='textsource':page['state'].pop('view.text')
+            elif kind=='fixedfont':binding(page,'tall.settings_ambient_number-text.font-size').update(value={'op':'/','args':[15,{'state':'view.text'}]})
+            elif kind=='ungrown':binding(page,'tall.settings_brightness_row-controls.height').update(value=36.0)
+            else:binding(page,'tall.settings_window_width-viewport.width')['value']['args'][1]=900.0
             with self.subTest(kind=kind),self.assertRaises((AssertionError,KeyError,ValueError)):contract(page)
 
     def test_engine_owned_local_draft_declarations_and_localization(self):

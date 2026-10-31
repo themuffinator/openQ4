@@ -220,7 +220,8 @@ struct SystemHost final : Host {
 };
 static void SystemCandidate(const std::string& source) {
     // The engine lays the page out on its 720 dp canvas: the view's size sets the dp ratio.
-    for(const auto& [width,height]:{std::pair{1280,720},std::pair{1920,1080},std::pair{800,600}}) {
+    // A 9:16 view takes the tall single column, its list rows a fractional 25.3105 px.
+    for(const auto& [width,height]:{std::pair{1280,720},std::pair{1920,1080},std::pair{800,600},std::pair{540,960}}) {
         SystemHost host;Runtime runtime(host);std::vector<Diagnostic> diagnostics;std::string error;double time=1;
         Check(runtime.LoadDocument(source,"guis/menu/settings/system.q4ui",diagnostics),"SYSTEM candidate loads");
         Viewport viewport;viewport.width=width;viewport.height=height;viewport.canvasHeight=720;viewport.canvasMinWidth=960;
@@ -257,6 +258,14 @@ static void SystemCandidate(const std::string& source) {
                 Check(widget(id).popupOffsetDp!=before,"SYSTEM wheel changes actual popup offset");
             }
             Check(widget(id).accepted==accepted&&widget(id).highlight==highlight&&runtime.TakeActions().empty(),"SYSTEM popup scrolling does not draft settings");
+            // End reveals the last option, and the reveal settles with the list's
+            // scroll measured again: rows measured through the scrolled content
+            // must not move it every pass (a fractional row at a rounding edge).
+            key(MenuInput::End);frame();
+            w=widget(id);
+            if(!(w.scroll&&w.scroll->available))std::fprintf(stderr,"%dx%d %s: End's reveal left the scroll unmeasured at %s\n",width,height,id,w.highlight.c_str());
+            Check(w.scroll&&w.scroll->available,"End's reveal settles with measured scroll geometry");
+            if(w.scroll->geometry.usable)Check(Near(w.popupOffsetDp*w.scroll->dpRatio,w.scroll->geometry.range),"End's reveal scrolls the list to its last option");
             key(MenuInput::Back);frame();Check(!widget(id).popupOpen,"SYSTEM popup closes with Back");
         }
         // Resolution Scale's nine steps outgrow the eight rows a list shows: it scrolls.

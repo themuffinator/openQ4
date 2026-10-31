@@ -128,6 +128,13 @@ def number_contract_mutations(original):
         # The scripts' tab switches and expected traces bind to the page too.
         ('tab-probe-moved',lambda m:(lambda row:(node(m,'settings-image-column-0')['children'].remove(row),
                                                  node(m,'settings-graphics-column-0')['children'].append(row)))(node(m,'settings_brightness_row'))),
+        # A probed row out of its tab's scrolling rows, rows that no longer
+        # scroll, and a page that no longer follows the captures' text size.
+        ('tab-probe-unscrolled',lambda m:(lambda row:(node(m,'settings-image-column-0')['children'].remove(row),
+                                                      node(m,'settings-page-image')['children'].append(row)))(node(m,'settings_brightness_row'))),
+        ('tab-rows-unscrolled',lambda m:node(m,'settings-image-rows')['properties'].update(overflow={'type':'keyword','value':'visible'})),
+        ('text-size-ignored',lambda m:m['state'].pop('view.text')),
+        ('text-size-host-owned',lambda m:m['state']['view.text'].update(view='aspect')),
         ('tab-first-changed',lambda m:m['state']['page.tab'].update(initial=2)),
         ('tab-switch-extra-write',lambda m:m['events']['tab_image'][0]['then'][0]['then'][0]['values'].update({'page.discardVisible':False})),
         ('tab-switch-action',lambda m:m['events']['tab_image'][0]['then'][0]['then'].append({'op':'action','action':'begin'})),

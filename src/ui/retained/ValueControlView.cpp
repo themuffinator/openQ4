@@ -123,6 +123,9 @@ struct ValueControlView::Impl {
 		float widthCeiling = std::numeric_limits<float>::infinity();
 		std::uint64_t ceilingOpening = 0;
 		std::optional<PlacementContext> ceilingContext;
+		// The content offset this opening last applied (Popup).
+		float appliedScroll = 0;
+		std::uint64_t appliedOpening = 0;
 		// The options the list last painted; the rest are hidden and unmeasured.
 		std::size_t optionCount = std::numeric_limits<std::size_t>::max();
 		// What a closed choice's last paint read, and in which presentation
@@ -501,7 +504,15 @@ struct ValueControlView::Impl {
 			if (starts[i] < scroll) scroll = starts[i];
 			break;
 		}
+		// The rows are measured through the scrolled content box, so their
+		// extents carry float noise from its own offset (fractional rows, as
+		// 25.3105 px ones, show it). An offset within a hundredth of a pixel of
+		// the one this opening applied keeps that one: otherwise a reveal at a
+		// rounding edge of Pixels() moves the content every pass, the pass never
+		// settles unchanged, and the list never measures its scroll again.
+		if (entry.appliedOpening == view.popupToken && std::abs(scroll-entry.appliedScroll) < .01f) scroll = entry.appliedScroll;
         if(choice.scrollbar) scroll=std::clamp(scroll,0.0f,std::max(0.0f,next-visibleHeight));
+		entry.appliedOpening = view.popupToken; entry.appliedScroll = scroll;
 		const auto documentOffset = document->GetAbsoluteOffset(Rml::BoxArea::Padding);
 		changed |= Property(choice.popup,"left",Pixels(x-documentOffset.x-popup->GetBox().GetEdge(Rml::BoxArea::Margin,Rml::BoxEdge::Left)));
 		changed |= Property(choice.popup,"top",Pixels(y-documentOffset.y-popup->GetBox().GetEdge(Rml::BoxArea::Margin,Rml::BoxEdge::Top)));

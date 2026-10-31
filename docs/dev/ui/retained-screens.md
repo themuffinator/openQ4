@@ -2106,19 +2106,48 @@ settled and an unapplied draft, the reversal and the stock fallback) and the
 SYSTEM route harness cover it. The `system-optin` (every tab and a list
 unfolded), `system-menu-apply` and new `settings-system` (the descent and
 Back) capture scenarios pass at 16:9 (OpenGL, English), 4:3 (Vulkan, German)
-and 9:16 (OpenGL). A portrait view still scales the page's two columns down:
-it passes `portrait=False` to `settings_subpage`, keeping the layout these
-captures and tests cover, and taking the other pages' single scrolling column
-is a follow-up.
+and 9:16 (OpenGL). A portrait view first scaled the page's two columns down
+(`portrait=False`); see the next section for the single column it now takes.
 
-Remaining, shared with the other settings pages: the rows keep the 24 u
-pitch whatever the text size, so above 100 % a row's text outgrows its row
-(the drafted page grew its em-sized cards and scrolled); the dialogs, the
-message, the prompt bar and the lists do follow it. The text-scale test checks
-the rows at 100 % and the flowing parts at every size until the rows follow
-the text size too. At 200 % in a 4:3 view the shared prompt bar's Back,
-which keeps a fixed place in the bar, runs past the screen's edge on every
-page that has one.
+When this landed the rows kept the 24 u pitch whatever the text size and the
+prompt bar's Back left a 4:3 screen at 200 %; the next section closes both.
+
+## Settings rows follow the text size (31 October 2026)
+
+The settings sub-pages kept their rows on the 24 u pitch whatever the text
+size, so above 100 % the text the runtime enlarged outgrew its rows, and the
+prompt bar's BACK ran off a 4:3 screen at 200 %. Section 2's text-scale
+contract (100-200 % independently of furniture, labels and rows reflowing)
+now holds on CONTROLS, GAME OPTIONS, AUDIO and DISPLAY.
+
+- **Rows.** A new read-only view source, `{"view": "text"}`, publishes the
+  text size the runtime applies to font lengths (`Viewport::TextRatio()`,
+  1 to 2). Above 100 % a tab takes the portrait layout's single scrolling
+  column, and every length in its rows grows by the text size
+  (`retained_settings_rows.grown()`), so each row is the 100 % row scaled:
+  labels keep their two lines, values their box, sliders, check boxes,
+  lists and typed numbers their proportions. The column scrolls between the
+  strip and the bottom band; DISPLAY's message and APPLY CHANGES stay under
+  it. A tall view keeps its own size, which already exceeds 200 %.
+- **Furniture.** Text in fixed slots keeps its authored size at every text
+  size (`build_retained_screens.fixed_text()`): the prompt bar on every page
+  (so BACK stays on the screen), the settings tab strip, APPLY CHANGES' label
+  and every sub-page's crumb and title. The dialogs, the footer message and
+  the lists keep following the text size.
+- **DISPLAY in portrait.** The SYSTEM page dropped `portrait=False`: a
+  portrait view now stands each of its tabs in the single column too.
+- **Lists on scaled rows.** A list whose rows the scaling leaves a fraction
+  of a pixel tall (25.3105 px at 9:16) never settled once it scrolled: the
+  wanted offset alternated between two values that round to different
+  pixel strings, so each pass moved the content and the scroll stayed
+  unmeasured. `ValueControlView` now keeps the offset it applied for the
+  opening while a new one lies within 0.01 px of it.
+
+Captured at 200 % on OpenGL English 16:9 and Vulkan German 4:3, 150 % on
+OpenGL 9:16 and 16:9, and 100 % (every tab of the four pages, the descent
+and Back). The native page tests check every row, label, value, heading and
+note of every tab at 100, 150 and 200 %, the stacked column, the strip, the
+prompt bar and APPLY CHANGES.
 
 ## Tall views grow the lists (25 October 2026)
 

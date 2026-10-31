@@ -28,8 +28,8 @@ from __future__ import annotations
 
 import math
 
-from build_retained_screens import (OLIVE, ORANGE, U, VALUE, Document, absolute, colour, group, keyword, label, length, number, path,
-                                    rgb, solid, stroke, text_width, typeface, vector)
+from build_retained_screens import (OLIVE, ORANGE, U, VALUE, Document, absolute, colour, fixed_text, group, keyword, label, length,
+                                    number, path, rgb, solid, stroke, text_width, typeface, vector)
 from retained_difficulty import primary_plate
 from retained_mp_menus import PLACEHOLDER, any_text, choice_popup, row_face, row_states, value_row, wrapped_width
 from retained_settings_rows import (COLUMN_W, CONTENT_LEFT, CONTENT_W, ROW_PITCH, ROWS_TOP, button_row, heading, row_chrome,
@@ -700,6 +700,7 @@ def system_document() -> dict:
     apply = primary_plate(doc, "settings_apply", "#str_200241", 0, 0, apply_w, APPLY_H, event="apply",
                           label_box=(28.0, 4.0, apply_w - 32, 22.0), text=APPLY_TEXT, marker=(9.0, 8.0, 14.0))
     apply["properties"]["opacity"] = number(1)
+    fixed_text(doc, apply)   # the label keeps its size on the plate
     gate(doc, "settings_apply", CAN_APPLY)
     message_w = U * (apply_left - CONTENT_LEFT - 12)
     # The message: one line centred on APPLY CHANGES' height, more lines (a
@@ -729,8 +730,7 @@ def system_document() -> dict:
                      "else": [{"op": "if", "condition": span_shown, "then": [focus("settings_multiscreen")],
                                "else": [focus("settings_fullscreen")]}]}]
     built = settings_subpage(doc, PREFIX, "#str_229900", tabs, activate=activate, overlays=dialogs(doc), back_event="onBack",
-                             back_id="settings_back", slots=SLOTS, footer=[footer], body=BODY, first_focus={"screen": screen_first},
-                             portrait=False)
+                             back_id="settings_back", slots=SLOTS, footer=[footer], body=BODY, first_focus={"screen": screen_first})
     return finish(built)
 
 

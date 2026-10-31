@@ -1,6 +1,6 @@
 # openQ4 UI Visual Design
 
-Specification version 1.30, 31 October 2026 (1.29 earlier that day, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
+Specification version 1.31, 31 October 2026 (1.29 and 1.30 earlier that day, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
 1.9 on 29 September, 1.6 on 28 September, 1.4 and 1.5 on 27 September, 1.1 to
 1.3 on 26 September, 1.0 on 8 September 2026). Status:
 implementation target; the replacement has not shipped. Applies to every
@@ -1808,7 +1808,10 @@ and parallax off.
   headings. A tab holds at most two columns of setting rows on the stock 24 u
   pitch, never more, at most 14 rows to a column, the values lined up in one
   value column; Up and Down read down the first column and on down the
-  second, and Up from the first row reaches the tab. Search runs across every category when the player
+  second, and Up from the first row reaches the tab. Above 100 % text size
+  the columns stand one under the other in a single scrolling column whose
+  rows grow with the text (section 2's reflow), while the strip, the prompt
+  bar and the titles keep their size as furniture. Search runs across every category when the player
   types, presses north, or taps the search symbol, and each result shows its
   category path. A modified row's leading rail turns `marine.value`; the west
   button resets the focused row to its default. Rows that need a restart carry
@@ -4036,6 +4039,14 @@ catalogue obligations, including `ART-035`, remain authoring/artwork requirement
 they do not authorize or require a new gameplay mode. This scope correction
 accepts no GUI, artwork, platform or behavior. Hit-feedback defaults and the other
 UI-05 qualification remain open.
+
+### Version 1.31: settings rows follow the text size
+
+Section 13.7's Settings pattern now says how a category meets section 2's
+text-scale contract: above 100 % its columns stack into one scrolling column
+whose rows grow with the text, and the strip, prompt bar and titles keep
+their size as furniture. `FLOW-068` already holds this scope; no requirement
+changes, and nothing is accepted.
 
 ### Version 1.30: the DISPLAY category
 

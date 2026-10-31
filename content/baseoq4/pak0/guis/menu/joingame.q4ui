@@ -671,6 +671,7 @@
   "prompt.glyphs": {"type": "number", "initial": 0},
   "prompt.swapped": {"type": "boolean", "initial": false},
   "prompt.accept": {"type": "string", "initial": "#str_231042"},
+  "view.text": {"type": "number", "initial": 1, "view": "text"},
   "join.detail": {"type": "number", "initial": -1},
   "join.detail.row": {"type": "number", "initial": -1},
   "join.detail.address": {"type": "string", "initial": ""},
@@ -24686,6 +24687,54 @@
    }
   },
   {
+   "id": "text.prompt-231042-key.font-size",
+   "node": "prompt-231042-key",
+   "property": "font-size",
+   "value": {"op": "/", "args": [13, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.prompt-231042-key.line-height",
+   "node": "prompt-231042-key",
+   "property": "line-height",
+   "value": {"op": "/", "args": [22, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.prompt-231042-verb.font-size",
+   "node": "prompt-231042-verb",
+   "property": "font-size",
+   "value": {"op": "/", "args": [14, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.prompt-231042-verb.line-height",
+   "node": "prompt-231042-verb",
+   "property": "line-height",
+   "value": {"op": "/", "args": [22, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.join_back-key.font-size",
+   "node": "join_back-key",
+   "property": "font-size",
+   "value": {"op": "/", "args": [13, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.join_back-key.line-height",
+   "node": "join_back-key",
+   "property": "line-height",
+   "value": {"op": "/", "args": [22, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.join_back-label.font-size",
+   "node": "join_back-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [14, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.join_back-label.line-height",
+   "node": "join_back-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [22, {"state": "view.text"}]}
+  },
+  {
    "id": "join-detail-name.text",
    "node": "join-detail-name",
    "property": "text",
@@ -24955,6 +25004,30 @@
    "node": "findModal-glow-soft",
    "property": "display",
    "value": {"op": "select", "args": [{"state": "soft_focus"}, "block", "none"]}
+  },
+  {
+   "id": "text.crumb.font-size",
+   "node": "crumb",
+   "property": "font-size",
+   "value": {"op": "/", "args": [18, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.crumb.line-height",
+   "node": "crumb",
+   "property": "line-height",
+   "value": {"op": "/", "args": [27.45, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.title.font-size",
+   "node": "title",
+   "property": "font-size",
+   "value": {"op": "/", "args": [18, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.title.line-height",
+   "node": "title",
+   "property": "line-height",
+   "value": {"op": "/", "args": [27.45, {"state": "view.text"}]}
   },
   {
    "id": "notice-0-symbol-1.display",
