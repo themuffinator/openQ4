@@ -622,6 +622,72 @@ struct CursorTransform {
 	}
 };
 
+// The menu cursor: vector reconstructions of the stock gfx/guis/guicursor_arrow
+// and guicursor_hand bitmaps in their 32-texel box, drawn as the stock menus
+// draw them, 32 menu units square, so a texel is 1.5 dp. The arrow keeps the
+// bitmap's black outline, grey body, light facet, white ridge, darker lower
+// body and tail and its soft shadow; the hand is the bitmap's outline traced,
+// and shows over a control a press would reach, as the stock hand shows over
+// a window with an action. Each layer is a simple polygon, triangulated once.
+struct CursorPoint { float x, y; };
+struct CursorLayer {
+	float r, g, b, a, ox, oy;
+	std::vector<CursorPoint> points;
+	std::vector<int> triangles;
+};
+std::vector<int> TriangulatePolygon(const std::vector<CursorPoint>& p) {
+	float area = 0;
+	for (size_t i = 0, j = p.size()-1; i < p.size(); j = i++) area += p[j].x*p[i].y-p[i].x*p[j].y;
+	const float sign = area > 0 ? 1.f : -1.f;
+	const auto cross = [&](const CursorPoint& a, const CursorPoint& b, const CursorPoint& c) {
+		return ((b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x))*sign;
+	};
+	std::vector<int> index(p.size()), out;
+	for (size_t i = 0; i < p.size(); ++i) index[i] = static_cast<int>(i);
+	for (size_t guard = 0; index.size() > 2 && guard < p.size()*p.size(); ++guard) {
+		const size_t n = index.size();
+		for (size_t i = 0; i < n; ++i) {
+			const int a = index[(i+n-1)%n], b = index[i], c = index[(i+1)%n];
+			if (cross(p[a],p[b],p[c]) <= 1e-6f) continue;
+			bool contains = false;
+			for (const int k : index) if (k != a && k != b && k != c && cross(p[a],p[b],p[k]) >= 0 && cross(p[b],p[c],p[k]) >= 0 &&
+				cross(p[c],p[a],p[k]) >= 0) { contains = true; break; }
+			if (contains) continue;
+			// Every triangle winds as the polygon's positive form, whichever
+			// way the polygon was written.
+			if (sign > 0) out.insert(out.end(),{a,b,c}); else out.insert(out.end(),{c,b,a});
+			index.erase(index.begin()+static_cast<std::ptrdiff_t>(i));
+			break;
+		}
+	}
+	return out;
+}
+const std::vector<CursorLayer>& CursorLayers(bool hand) {
+	static const auto make = [](std::initializer_list<CursorLayer> layers) {
+		std::vector<CursorLayer> result(layers);
+		for (auto& layer : result) layer.triangles = TriangulatePolygon(layer.points);
+		return result;
+	};
+	static const std::vector<CursorPoint> arrow = {{0,0},{12.5f,12},{8,12},{9.2f,16.2f},{8.2f,17.1f},{6.3f,17.1f},{5.2f,15.8f},{5,14},{1,17},{0,17}};
+	static const std::vector<CursorLayer> arrowLayers = make({
+		{0,0,0,.12f,2,2.4f,arrow,{}}, {0,0,0,.3f,1,1.2f,arrow,{}}, {0,0,0,1,0,0,arrow,{}},
+		{.7f,.7f,.7f,1,0,0,{{1,2},{10,11},{7.5f,11},{7.2f,12},{8,14},{8.1f,15.9f},{6.1f,16},{6,14.2f},{5.2f,13.2f},{3,13.3f},{1,15.2f}},{}},
+		{.88f,.88f,.88f,1,0,0,{{1.3f,2.3f},{10,11},{5,11},{4.6f,10.4f}},{}},
+		{.58f,.58f,.58f,1,0,0,{{1,12.4f},{6.8f,11.4f},{7.2f,12},{5.2f,13.2f},{3,13.3f},{1,15.2f}},{}},
+		{.4f,.4f,.4f,1,0,0,{{6.8f,11.4f},{7.2f,12},{8,14},{8.1f,15.9f},{6.1f,16},{6,14.2f},{5.2f,13.2f}},{}},
+		{.98f,.98f,.98f,1,0,0,{{1.1f,2.1f},{1.9f,2.6f},{5.3f,11},{4.3f,11}},{}},
+	});
+	static const std::vector<CursorLayer> handLayers = make({
+		{0,0,0,1,0,0,{{5,0},{7,0},{7,1},{8,1},{8,5},{10,5},{10,6},{13,6},{13,7},{15,7},{15,8},{16,8},{16,9},{17,9},{17,16},{16,16},
+			{16,19},{15,19},{15,22},{5,22},{5,19},{4,19},{4,17},{3,17},{3,15},{2,15},{2,13},{1,13},{1,12},{0,12},{0,9},{3,9},{3,10},
+			{4,10},{4,1},{5,1}},{}},
+		{1,1,1,1,0,0,{{5,1},{7,1},{7,10},{8,10},{8,6},{10,6},{10,10},{11,10},{11,7},{13,7},{13,11},{14,11},{14,8},{15,8},{15,9},{16,9},
+			{16,16},{15,16},{15,19},{14,19},{14,21},{6,21},{6,19},{5,19},{5,17},{4,17},{4,15},{3,15},{3,13},{2,13},{2,12},{1,12},{1,10},
+			{3,10},{3,11},{4,11},{4,14},{5,14}},{}},
+	});
+	return hand ? handLayers : arrowLayers;
+}
+
 // A Unicode scalar value as UTF-8; empty for a surrogate or past U+10FFFF.
 std::string Utf8Scalar(int scalar) {
 	std::string out;
@@ -743,7 +809,10 @@ struct idUserInterfaceRetained::Impl {
 		}
 	}
 	bool interactive = true, interactiveSet = false, unique = false, active = false;
-	bool suspended = false, pointerVisible = false, close = false, worldReported = false;
+	bool suspended = false, close = false, worldReported = false;
+	// openq4_retainedGui pointer placed the cursor: it shows although the
+	// hidden capture window reads as unfocused.
+	bool pointerPlaced = false;
 	bool unavailable = false;
 	bool drawSucceeded = false;
 	bool initialized = false;
@@ -772,7 +841,7 @@ struct idUserInterfaceRetained::Impl {
 	}
 	void Quarantine(bool forget = false, bool cancelRuntime = true, bool discardPrograms = false) {
 		openq4::NativeInputBeforeUiChange(0,textBackend);
-		input.Cancel(forget); input.Take(); held.clear(); close = false; pointerVisible = false;
+		input.Cancel(forget); input.Take(); held.clear(); close = false; pointerPlaced = false;
 		routedPointerValid = false;
 		// Completed programs retain their immutable invocations through input
 		// suspension. Save/resource/source replacement explicitly discards them.
@@ -1036,8 +1105,8 @@ struct idUserInterfaceRetained::Impl {
 			if (!widget || !widget->number || !widget->number->active) return;
 		}
 		TextInputEvent input;
-		if (MakeTextInputCommit(text,input,error) && runtime->ApplyNumberInput(*id,widget->number->identity,input,error,now)) pointerVisible = false;
-		else if (cvarSystem->GetCVarBool("ui_retainedTrace")) common->Printf("RETAINED_GUI_TEXT control=%s refused=%s\n",id->c_str(),error.c_str());
+		if (!(MakeTextInputCommit(text,input,error) && runtime->ApplyNumberInput(*id,widget->number->identity,input,error,now)) &&
+			cvarSystem->GetCVarBool("ui_retainedTrace")) common->Printf("RETAINED_GUI_TEXT control=%s refused=%s\n",id->c_str(),error.c_str());
 	}
 	// Q and E, and the shoulder buttons, page a document's tabs where it
 	// declares onTabPrevious and onTabNext; the triggers page the lists within
@@ -1058,7 +1127,7 @@ struct idUserInterfaceRetained::Impl {
 		if (control || alt) return false;
 		const auto widget = RuntimeView()->GetWidgetState(RuntimeView()->FocusedControl());
 		if (widget && widget->role == ControlRole::Number && widget->number && widget->number->active) return false;
-		pointerVisible = false; RunEvent(name); return true;
+		RunEvent(name); return true;
 	}
 	bool TextCommandKey(int key, bool down, bool repeated, const openq4::KeyEventMetadata* metadata) {
 		auto* runtime = RuntimeView();
@@ -1103,7 +1172,6 @@ struct idUserInterfaceRetained::Impl {
 		const auto claim = input.ClaimTextKey(key,mapped ? identity.session : 0,down,repeated);
 		if (claim == Input::TextKey::Unclaimed) return false;
 		if (claim == Input::TextKey::Consumed || !editing || alt) return true;
-		pointerVisible = false;
 		std::string error; const double now = RetainedUI_PresentationTime();
 		// The runtime refreshes readback and validates this exact identity again.
 		// A refused edit leaves the local draft and accepted setting untouched.
@@ -1391,7 +1459,7 @@ const char* idUserInterfaceRetained::HandleEvent(const sysEvent_t* event, int ti
 	}
 	if (event->evType == SE_MOUSE) {
 		SetCursor(impl->cursorX+event->evValue,impl->cursorY+event->evValue2);
-		impl->pointerVisible = true; impl->Pointer();
+		impl->Pointer();
 	} else if (event->evType == SE_KEY && event->evValue > 0 && event->evValue < K_LAST_KEY) {
 		const int key = event->evValue; const bool down = event->evValue2 != 0;
 		openq4::KeyEventMetadata metadata;
@@ -1407,7 +1475,7 @@ const char* idUserInterfaceRetained::HandleEvent(const sysEvent_t* event, int ti
 			impl->Pointer(); impl->input.Pointer(key,down,RetainedUI_PresentationTime());
 		} else if (key == K_MWHEELUP || key == K_MWHEELDOWN) {
 			if (down && !repeated) {
-				impl->pointerVisible = true; impl->Pointer(false);
+				impl->Pointer(false);
 				impl->RuntimeView()->PointerWheel(key == K_MWHEELUP ? -1 : 1,RetainedUI_PresentationTime());
 			}
 		} else {
@@ -1453,7 +1521,7 @@ const char* idUserInterfaceRetained::HandleEvent(const sysEvent_t* event, int ti
 				}
 				default: mapped = false; break;
 			}
-			if (mapped) { impl->pointerVisible = false; impl->input.Menu(key,action,down,repeated,RetainedUI_PresentationTime()); }
+			if (mapped) { impl->input.Menu(key,action,down,repeated,RetainedUI_PresentationTime()); }
 			else if (down && !repeated) impl->TabKey(key,hasMetadata ? &metadata : nullptr);
 		}
 	} else if (event->evType == SE_CHAR) {
@@ -1521,21 +1589,36 @@ void idUserInterfaceRetained::Redraw(int time, bool useAspectCorrection) {
 		DrawCursor();
 	}
 }
+// The cursor shows whenever the menus hold the mouse, whatever was pressed
+// last, as the stock menus' does; only controller navigation hides it, as the
+// stock menus' controllerNavigation did, until the mouse moves again.
 void idUserInterfaceRetained::DrawCursor() {
-	if (!impl->pointerVisible || impl->suspended) return;
+	if ((impl->suspended && !impl->pointerPlaced) || idKeyInput::LastInputWasController()) return;
 	Viewport viewport;
 	if (!RetainedUI_DefaultViewport(viewport)) return;
 	const CursorTransform transform(viewport);
 	const float px = impl->cursorX*transform.sx+transform.ox, py = impl->cursorY*transform.sy+transform.oy;
 	if (impl->document.Model().canvasHeight > 0) viewport.canvasHeight = static_cast<float>(impl->document.Model().canvasHeight);
 	viewport.canvasMinWidth = static_cast<float>(impl->document.Model().canvasMinWidth);
-	const float size = 20.f*viewport.DpRatio();
+	// A texel of the stock cursor's 32-texel box is 1.5 dp; the 2D pass draws
+	// in the 640x480 screen the UI viewport stretches over the window.
+	const float texel = 1.5f*viewport.DpRatio();
+	const float sx = texel*640.f/viewport.width, sy = texel*480.f/viewport.height;
 	const float x = px*640.f/viewport.width, y = py*480.f/viewport.height;
-	const float dx = size*640.f/viewport.width, dy = size*480.f/viewport.height;
+	auto* runtime = impl->RuntimeView();
+	const bool hand = runtime && !runtime->HoveredControl().empty();
 	const bool oldViewport = renderSystem->GetUseUIViewportFor2D();
-	renderSystem->SetUseUIViewportFor2D(true); renderSystem->SetColor4(.8f,.95f,1.f,1.f);
+	renderSystem->SetUseUIViewportFor2D(true);
 	const auto* material = declManager->FindMaterial("_white");
-	renderSystem->DrawStretchTri(idVec2(x,y),idVec2(x+dx,y+dy),idVec2(x,y+dy*.75f),vec2_origin,vec2_origin,vec2_origin,material);
+	for (const auto& layer : CursorLayers(hand)) {
+		renderSystem->SetColor4(layer.r,layer.g,layer.b,layer.a);
+		const auto at = [&](int k) { return idVec2(x+(layer.points[k].x+layer.ox)*sx,y+(layer.points[k].y+layer.oy)*sy); };
+		// DrawStretchTri emits its first two corners swapped: passed so, each
+		// triangle faces the way the 2D pass's quads do and is not culled.
+		for (size_t t = 0; t+2 < layer.triangles.size(); t += 3)
+			renderSystem->DrawStretchTri(at(layer.triangles[t+1]),at(layer.triangles[t]),at(layer.triangles[t+2]),vec2_origin,vec2_origin,
+				vec2_origin,material);
+	}
 	renderSystem->FlushGui(); renderSystem->SetUseUIViewportFor2D(oldViewport); renderSystem->SetColor4(1,1,1,1);
 }
 
@@ -2095,6 +2178,11 @@ bool UI_RetainedDiagnostic(idUserInterface* gui, const idCmdArgs& args) {
 		if (!okay && !error.empty()) impl.Error(error);
 	} else if (verb == "focus" && args.Argc() == 3) {
 		okay = impl.RuntimeView()->FocusControl(args.Argv(2),RetainedUI_PresentationTime());
+	} else if (verb == "pointer" && args.Argc() == 4) {
+		// The cursor at a point of the 640x480 screen, as the mouse would put
+		// it, without a device: hover follows, and it shows in a capture.
+		owner.SetCursor(static_cast<float>(atof(args.Argv(2))),static_cast<float>(atof(args.Argv(3))));
+		impl.pointerPlaced = true; impl.Pointer(); okay = true;
 	} else if (verb == "menu" && args.Argc() == 4 && (!idStr::Cmp(args.Argv(3),"0") || !idStr::Cmp(args.Argv(3),"1"))) {
 		const std::map<std::string,MenuInput> inputs = {{"next",MenuInput::Next},{"previous",MenuInput::Previous},
 			{"up",MenuInput::Up},{"down",MenuInput::Down},{"left",MenuInput::Left},{"right",MenuInput::Right},{"accept",MenuInput::Accept},{"back",MenuInput::Back},

@@ -68,6 +68,9 @@ struct idKeyInput {
     static inline bool shift=false,swapped=false;
     static bool IsDown(int key) { return key==K_SHIFT && shift; }
     static int MenuControllerKey(int key) { return swapped && (key==K_JOY3 || key==K_JOY4) ? (key==K_JOY3 ? K_JOY4 : K_JOY3) : key; }
+    // The menu cursor hides while a controller drives the menus.
+    static inline bool controller=false;
+    static bool LastInputWasController() { return controller; }
     static inline int nameReads=0;
     // Prompt glyphs name keys (UserInterfaceRetained.cpp's KeyEscapeNames).
     static const char* KeyNumToString(int key,bool) { ++nameReads; static std::string name; name=key==K_JOY3 ? "JOY3" : "KEY"+std::to_string(key); return name.c_str(); }
@@ -441,6 +444,8 @@ public:
     std::set<std::string> disabledControls;
     int validations=0;
     std::string FocusedControl() const {return selected;}
+    std::string hovered;
+    std::string HoveredControl() const {return hovered;}
     std::string acceptVerb;
     std::vector<std::pair<std::string,double>> acceptQueries;
     std::string AcceptPrompt(const std::string& fallback,double seconds) {

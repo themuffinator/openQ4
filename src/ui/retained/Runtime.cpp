@@ -3889,6 +3889,7 @@ bool Runtime::CanDispatchControlAction(const ControlAction& action, double secon
 	if(!impl->UpdateInteraction(seconds,false,true))return false; return impl->interaction.CanDispatchControlAction(action);
 }
 std::string Runtime::FocusedControl() const { return impl->interaction.Focused(); }
+std::string Runtime::HoveredControl() const { return impl->interaction.Hovered(); }
 std::string Runtime::AcceptPrompt(const std::string& fallback, double seconds) {
 	const auto id = FocusedControl();
 	if (id.empty() || !CanActivateControl(id,seconds)) return {};

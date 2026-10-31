@@ -1175,6 +1175,13 @@ SCENARIOS = {
         'openq4_system report', 'openq4_retainedGui report', 'ui_retainedStatus',
         'screenshot "screenshots/settings-system-returned.tga"',
     ]),
+    # The menu cursor (section 6): the stock arrow over the title's emblem and
+    # the stock hand over SINGLE PLAYER, a control a press would reach, placed
+    # without a device (openq4_retainedGui pointer, in the 640x480 screen).
+    'cursor': (None, [
+        'waitMsec 9500', 'openq4_retainedGui pointer 470 150', 'waitMsec 300', 'screenshot "screenshots/cursor-arrow.tga"',
+        'openq4_retainedGui pointer 120 214', 'waitMsec 300', 'openq4_retainedGui report', 'screenshot "screenshots/cursor-hand.tga"',
+    ]),
     # LOAD DEFAULTS' YES restores the defaults: a changed sensitivity returns
     # to its default.
     'settings-defaults': (None, [

@@ -339,6 +339,8 @@ public:
 	// input, so that Back closes it rather than the document.
 	bool ModalOpen() const;
 	std::string FocusedControl() const;
+	// The control under the pointer that would take a press, or empty.
+	std::string HoveredControl() const;
 	// The verb a prompt bar shows for Accept (section 13.4): the focused
 	// button's prompt, `fallback` for a control that names none, or empty
 	// while nothing focused can be activated.
