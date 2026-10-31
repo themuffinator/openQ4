@@ -6,6 +6,26 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Community report and package triage, 31 October 2026
+
+- Development test packages can save again (#205). Push payloads had come from
+  single-commit checkouts, so each identified itself as build 1 and rejected the
+  saves it wrote. #203 gives all three payload jobs complete history. The
+  Windows x64 payload from push verification at `f0a86b0ec` reports build 1920.
+  In SP on `game/airdefense1`, it committed a save stamped build 1920, format 4,
+  and loaded that save back into gameplay in a fresh profile. The Linux, macOS
+  and Windows ARM64 payloads were not loaded. The replacement package was linked
+  from #168, #170, #183, #184 and #192, and the defective 26 October download
+  comments now point to it.
+- Merged #189 (medic approach watchdog) and #191 (parallel script-smoke checks)
+  with #203. Script-smoke fell from 76.8 to 20.0 minutes. Closed #180, #193 and
+  #198, whose changes had already landed in `2677fb87b`, and #201, superseded by
+  `9fe6f4d89`. Every push-verification job passed at both `b9c663758` and
+  `f0a86b0ec`.
+- No new release is claimed: 0.13.2 remains the latest available release. The
+  [roadmap](roadmap.md#report-and-contribution-traceability) records the
+  remaining reporter qualifications for #168, #170, #184 and #192.
+
 ## Settings sub-pages, 31 October 2026
 
 - [x] CONTROLS, GAME OPTIONS and AUDIO become sub-pages of the SETTINGS page
