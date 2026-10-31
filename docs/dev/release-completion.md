@@ -23,9 +23,9 @@ See [player release status](../user/release-status.md).
   icon and item name once, as before.
 - String literals are no longer converted to writable `char *` anywhere in
   the C++ sources. That removes about 1,400 `-Wwrite-strings` warnings from
-  Linux and macOS builds, and every source now compiles under MSVC's strict
-  string-literal rules. The `/Zc:strictStrings-` compatibility flag itself is
-  still set (CORE-04).
+  Linux and macOS builds, and MSVC builds now enforce the strict
+  string-literal rules: the `/Zc:strictStrings-` compatibility flag is gone
+  (CORE-04).
 
 ## Menus at a reduced resolution scale, 31 October 2026
 
@@ -5868,7 +5868,7 @@ state and older implementation boundaries do not override the current roadmap.
 - [ ] Complete competitive-match release qualification: run the staged warning-clean MP build and full automated contracts, then exercise the compact HUD/scoreboard and Match Control through windowed 16:9/4:3 keyboard/controller workflows for every supported live role, encoded recipient-redaction and camera-follow checks, supported placed-major-item pickup/respawn timing across repeated world pauses, supported-mode lifecycle edges, BO1/BO3/BO5 map/recovery paths, JSON interruption handling and playback of the linked generated MVD. Captain spectator invitations remain fail-closed. Verify the pure future-repeater policy separately for a public-only, no-item-timing result without treating it as a shipped live Q4TV/repeater transport; delayed broadcast and live multi-POV remain deferred.
 - [ ] Complete issue #99 high-refresh qualification: repeat human SP/MP feel, projectile/viewweapon, moving-platform, and cut-heavy camera checks on the final package; validate on Apple and dedicated high-refresh hardware; and decide the release scope for multiplayer actor/shadow presentation, bespoke FX/BSE owners, alternate cameras, and raw-input compensation. Remote multiplayer actors and the local body/world-weapon stencil shadows remain explicitly outside the current generic presentation pass.
 - [ ] Run macOS `Signoff -MacOSGraphicsBridge both`, complete the manual hardware checklist, then run `CollectResults -MacOSRunId <id> -MacOSGraphicsBridge both -RequireCompletedSignoffChecklist` on real Apple hardware and attach the auto-collected, auto-validated `.tmp/macos-vm/results/openq4-macos-results-<run-id>.tar.gz` evidence for input devices, audio devices, display modes, SP gameplay, MP `renderer-mp-smoke`, and in-game OpenGL/Metal renderer coverage beyond hosted CI compile/link/package checks; record the accepted archive in `docs/dev/macos-signoff-evidence.md`.
-- [ ] Replace temporary MSVC compatibility flag (`/Zc:strictStrings-`) with full strict-strings codebase compliance.
+- [x] Replace temporary MSVC compatibility flag (`/Zc:strictStrings-`) with full strict-strings codebase compliance (31 October 2026).
 
 </details>
 

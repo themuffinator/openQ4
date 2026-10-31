@@ -2741,7 +2741,6 @@ if cpp.get_argument_syntax() == 'msvc'
     '/FS',
     '/source-charset:windows-1252',
     '/execution-charset:windows-1252',
-    '/Zc:strictStrings-',
     '/we4302', # pointer truncation
     '/we4311', # pointer truncation through an integer
     '/we4312', # integer widened to a pointer

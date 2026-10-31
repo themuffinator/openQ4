@@ -141,7 +141,7 @@ Renderer backends are tiered separately from platforms. Fresh desktop configurat
 - External dependencies should be consumed via Meson dependency resolution and subprojects/wraps.
 - New build logic should be host-aware and architecture-aware, with x64 as the active compatibility baseline.
 - Meson configuration defaults to `cpp_std=vc++latest` (C++23-targeting mode on MSVC).
-- Meson currently adds `/Zc:strictStrings-` on MSVC to preserve compatibility with legacy string-literal usage while the codebase is modernized.
+- MSVC builds keep the strict string-literal rules that `/permissive-` enables: a string literal cannot initialize or convert to a writable `char *`. The former `/Zc:strictStrings-` compatibility flag was removed on 31 October 2026.
 - `tools/build/meson_setup.ps1` prefers VS 2026+ (major 18) when present; strict minimum enforcement can be enabled with `-Denforce_msvc_2026=true`.
 
 ## Platform work tracking
