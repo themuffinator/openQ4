@@ -193,33 +193,76 @@ static void ChangedRowTransform(TestHost& host) {
     view.Frame();auto w=view.Widget("choice");Check(w.scroll&&w.scroll->available&&Near(w.scroll->geometry.range+w.scroll->geometry.viewport,260),"fresh paint publishes changed transformed extent");
     view.runtime.PointerWheel(1,view.time);view.Frame();Check(view.Widget("choice").popupOffsetDp>before.popupOffsetDp,"fresh transformed extent restores local input");
 }
+// The SYSTEM page reads sys_lang for its prompt glyphs, which the value
+// fixture's host does not publish: its own counted host, otherwise alike.
+struct SystemHost final : Host {
+    unsigned errors=0; std::uint64_t frame=1;
+    bool ReadFile(const std::string&,std::string&) override{return false;}
+    bool ReadCVar(const std::string& name,size_t type,StateValue& value) override{
+        if(name=="sys_lang"&&type==2){value=std::string("english");return true;}
+        if(name=="ui_retainedSoftFocus"&&type==1){value=false;return true;}
+        return false;
+    }
+    std::string Translate(const std::string& text) override{return text;}
+    void Log(bool error,const std::string& text) override{if(error){++errors;std::fprintf(stderr,"Runtime: %s\n",text.c_str());}}
+    std::uintptr_t LoadMaterial(const std::string&,int& width,int& height) override{width=height=256;return 1;}
+    void Draw(const std::vector<Vertex>& values,const std::vector<int>& indices,std::uintptr_t) override{
+        Check(indices.size()%3==0,"triangle output");for(auto index:indices)Check(index>=0&&static_cast<size_t>(index)<values.size(),"bounded geometry indices");
+        for(auto value:values)Check(std::isfinite(value.x)&&std::isfinite(value.y),"finite widget geometry");
+    }
+    std::uint64_t RenderFrame() const override{return frame;}
+    bool BeginLayer(std::uint32_t,int,int) override{return true;}
+    void CompositeLayer(std::uint32_t,std::uint32_t,float,const Bounds&) override{}
+    void MaskLayer(std::uint32_t,std::uint32_t,const Bounds&) override{}
+    void EndLayer(std::uint32_t) override{}
+    FontMetrics GetFontMetrics(const std::string&,int size) override{return {size*.8f,size*.2f,size*1.2f,size*.5f};}
+    Glyph GetGlyph(const std::string&,int size,std::uint32_t) override{return {size*.5f,0,-size*.8f,size*.5f,float(size),0,0,1,1,"font"};}
+};
 static void SystemCandidate(const std::string& source) {
-    for(float density:{1.f,1.25f,2.f}) {
-        TestHost host;View view(host,source);view.viewport.width=1280;view.viewport.height=720;view.viewport.displayScale=density;
-        view.runtime.SetReducedMotion(true,view.time);view.State({{"settings.open",true},{"settings.phase",1.},{"settings.busy",false},{"settings.confirmationVisible",false},{"settings.renderer.available",true},
+    // The engine lays the page out on its 720 dp canvas: the view's size sets the dp ratio.
+    for(const auto& [width,height]:{std::pair{1280,720},std::pair{1920,1080},std::pair{800,600}}) {
+        SystemHost host;Runtime runtime(host);std::vector<Diagnostic> diagnostics;std::string error;double time=1;
+        Check(runtime.LoadDocument(source,"guis/menu/settings/system.q4ui",diagnostics),"SYSTEM candidate loads");
+        Viewport viewport;viewport.width=width;viewport.height=height;viewport.canvasHeight=720;viewport.canvasMinWidth=960;
+        const auto frame=[&]{time+=.01;++host.frame;runtime.Frame(viewport,time);Check(host.errors==0,"SYSTEM authored choice layout has no runtime errors");};
+        const auto key=[&](MenuInput input){runtime.MenuAction(input,true,time);runtime.MenuAction(input,false,time);};
+        const auto widget=[&](const std::string& id){auto result=runtime.GetWidgetState(id);Check(result.has_value(),"widget state available");return *result;};
+        const auto box=[&](const std::string& id){Bounds result;Check(runtime.GetBounds(id,result),"authored part has real layout bounds");return result;};
+        runtime.SetReducedMotion(true,time);
+        Check(runtime.SetState({{"settings.open",true},{"settings.phase",1.},{"settings.busy",false},{"settings.confirmationVisible",false},{"settings.renderer.available",true},
+            {"settings.render.canChoose",true},{"settings.msaaAvailable",true},
             {"settings.display.available",true},{"settings.display.spanAvailable",true},{"settings.display.count",2.},{"settings.display.optionCount",3.},
             {"settings.display.0.label",std::string("1: Primary monitor")},{"settings.display.1.label",std::string("2: Secondary monitor")},
-            {"settings.display.mode.optionCount",4.},{"settings.display.mode.selected",0.},{"settings.display.mode.0.label",std::string("Desktop Native (1920 \xC3\x97 1080)")},{"settings.display.mode.1.label",std::string("1280 \xC3\x97 720 (16:9)")},{"settings.display.mode.2.label",std::string("2560 \xC3\x97 1080 (21:9)")},{"settings.display.mode.3.label",std::string("Custom (1600 \xC3\x97 900)")},{"settings.display.refresh.optionCount",3.},{"settings.display.refresh.selected",0.},{"settings.display.refresh.0.label",std::string("Auto")},{"settings.display.refresh.1.label",std::string("60 Hz")},{"settings.display.refresh.2.label",std::string("144 Hz")}});view.Frame();
-        for(const auto* id:{"settings_preset","settings_display_device","settings_multiscreen","settings_display_mode","settings_display_refresh","settings_postaa","settings_resolution_scale","settings_vsync","settings_renderer"}) {
-            Check(view.runtime.FocusControl(id,view.time),"SYSTEM choice can receive explicit focus");view.Frame();view.Key(MenuInput::Accept);view.Frame();
-            auto w=view.Widget(id);
+            {"settings.display.mode.optionCount",4.},{"settings.display.mode.selected",0.},{"settings.display.mode.0.label",std::string("Desktop Native (1920 \xC3\x97 1080)")},{"settings.display.mode.1.label",std::string("1280 \xC3\x97 720 (16:9)")},{"settings.display.mode.2.label",std::string("2560 \xC3\x97 1080 (21:9)")},{"settings.display.mode.3.label",std::string("Custom (1600 \xC3\x97 900)")},{"settings.display.refresh.optionCount",3.},{"settings.display.refresh.selected",0.},{"settings.display.refresh.0.label",std::string("Auto")},{"settings.display.refresh.1.label",std::string("60 Hz")},{"settings.display.refresh.2.label",std::string("144 Hz")}},error,time),
+            "SYSTEM editing state and display lists");frame();
+        auto* document=Rml::GetContext(0)->GetDocument(0);
+        unsigned scrolled=0;
+        for(const auto* id:{"settings_preset","settings_backend","settings_gpu","settings_renderer","settings_ui_scale","settings_text_scale",
+                            "settings_display_device","settings_multiscreen","settings_fullscreen_policy","settings_msaa","settings_vsync","settings_display_mode","settings_display_refresh",
+                            "settings_postaa","settings_resolution_scale"}) {
+            // A row acts only while its tab is current: run the tab_<id> event of the page holding it.
+            std::string tab;for(auto* e=document->GetElementById(id);e;e=e->GetParentNode())if(e->GetId().starts_with("settings-page-")){tab=e->GetId().substr(14);break;}
+            Runtime::EventEffects effects;Check(!tab.empty()&&runtime.RunEvent("tab_"+tab,time,effects,error),"SYSTEM choice's tab shows");for(int i=0;i<10;++i)frame();
+            Check(runtime.FocusControl(id,time),"SYSTEM choice can receive explicit focus");frame();key(MenuInput::Accept);frame();
+            auto w=widget(id);
             Check(w.popupOpen&&w.scroll&&w.scroll->available,"SYSTEM authored choice has first-frame measured scroll geometry");
-            const std::string prefix=std::string(id)+"-popup-scroll";auto thumb=view.BoxOf((prefix+"-thumb").c_str());
+            const auto thumb=box(std::string(id)+"-scroll-thumb");
             Check(Near(thumb.height,w.scroll->geometry.thumb),"SYSTEM editable vector thumb follows actual layout");
-            auto* document=Rml::GetContext(0)->GetDocument(0);auto* part=document->GetElementById(prefix+"-base");
-            Check(part&&part->GetTagName()=="q4-vector","SYSTEM scrollbar uses authored vector art");
-            Check(part->IsVisible(true)==w.scroll->geometry.usable,"SYSTEM fitting lists hide inert scrollbar artwork");
+            auto* ink=document->GetElementById(std::string(id)+"-scroll-ink");
+            Check(ink&&ink->GetTagName()=="q4-vector","SYSTEM scrollbar uses authored vector art");
+            Check(!document->GetElementById(std::string(id)+"-popup-scroll-thumb")&&!document->GetElementById(std::string(id)+"-popup-scroll-base"),"the list's scrollbar is the shared list's track and thumb");
             const auto accepted=w.accepted;const auto highlight=w.highlight;
             if(w.scroll->geometry.usable) {
-                const double before=w.popupOffsetDp;view.runtime.PointerWheel(w.scroll->geometry.offset<w.scroll->geometry.range?1:-1,view.time);view.Frame();
-                Check(view.Widget(id).popupOffsetDp!=before,"SYSTEM wheel changes actual popup offset");
+                ++scrolled;const double before=w.popupOffsetDp;runtime.PointerWheel(w.scroll->geometry.offset<w.scroll->geometry.range?1:-1,time);frame();
+                Check(widget(id).popupOffsetDp!=before,"SYSTEM wheel changes actual popup offset");
             }
-            Check(view.Widget(id).accepted==accepted&&view.Widget(id).highlight==highlight&&view.runtime.TakeActions().empty(),"SYSTEM popup scrolling does not draft settings");
-            view.Key(MenuInput::Back);view.Frame();Check(!view.Widget(id).popupOpen,"SYSTEM popup closes with Back");
+            Check(widget(id).accepted==accepted&&widget(id).highlight==highlight&&runtime.TakeActions().empty(),"SYSTEM popup scrolling does not draft settings");
+            key(MenuInput::Back);frame();Check(!widget(id).popupOpen,"SYSTEM popup closes with Back");
         }
-        std::string saved,error;Check(view.runtime.SaveSnapshot(saved,error,view.time),"mixed SYSTEM numeric/generic/choice widgets save");
-        Check(view.runtime.RestoreSnapshot(saved,error,view.time),"mixed SYSTEM widget table restores atomically");view.Frame();
-        Check(host.errors==0,"SYSTEM authored choice layout has no runtime errors");
+        // Resolution Scale's nine steps outgrow the eight rows a list shows: it scrolls.
+        Check(scrolled>0,"some SYSTEM list is long enough to scroll");
+        std::string saved;Check(runtime.SaveSnapshot(saved,error,time),"mixed SYSTEM numeric/generic/choice widgets save");
+        Check(runtime.RestoreSnapshot(saved,error,time),"mixed SYSTEM widget table restores atomically");frame();
     }
 }
 static void SemanticPopupRuntime(TestHost& host) {

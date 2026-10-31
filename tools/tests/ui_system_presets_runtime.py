@@ -50,7 +50,10 @@ def main():
                  repository / 'builddir/subprojects/libtess2-8dbd6483e920311a58c9af10a10beb278efebc36/libtess2.a']
     headers = [path for base in [ROOT / 'src', rml / 'Include', rml / 'Source', json_include, tess_include]
                for path in base.rglob('*') if path.suffix in ('.h', '.hpp', '.inl', '.tpp')]
-    bound = sources + headers + libraries + [Path(__file__).resolve(), ROOT/'content/baseoq4/pak0/guis/menu/settings/system.q4ui'] + list((ROOT/'content/baseoq4/pak0/strings').glob('*_openq4.lang'))
+    # The fixture reads each locale's openQ4 table and its stock code table (the
+    # prompt bar's key names).
+    strings = ROOT/'content/baseoq4/pak0/strings'
+    bound = sources + headers + libraries + [Path(__file__).resolve(), ROOT/'content/baseoq4/pak0/guis/menu/settings/system.q4ui'] + list(strings.glob('*_openq4.lang')) + list(strings.glob('*_code.lang'))
     before = {str(path): sha(path) for path in bound}
     reused = {}
     if args.reuse:

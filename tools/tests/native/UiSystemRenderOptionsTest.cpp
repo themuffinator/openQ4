@@ -13,6 +13,14 @@ static void Inside(const Bounds& a,const Bounds& b,const char* why) {
  if(!okay)std::fprintf(stderr,"%s: %g,%g %gx%g in %g,%g %gx%g\n",why,a.x,a.y,a.width,a.height,b.x,b.y,b.width,b.height);
  Check(okay,why);
 }
+// A note follows its row down the column: directly under it, inside the
+// column and the pages' bounds.
+static void Under(View& v,const char* note,const char* row,const char* why) {
+ const auto a=v.Box(note),b=v.Box(row);
+ if(std::abs(a.y-b.y-b.height)>1||a.x<b.x-1||a.x+a.width>b.x+b.width+1)std::fprintf(stderr,"%s: %s %g,%g %gx%g under %s %g,%g %gx%g\n",why,note,a.x,a.y,a.width,a.height,row,b.x,b.y,b.width,b.height);
+ Check(std::abs(a.y-b.y-b.height)<=1&&a.x>=b.x-1&&a.x+a.width<=b.x+b.width+1,why);
+ Inside(a,v.Box("settings-body"),why);
+}
 // What the service reports about the loaded map, and the line it shows.
 struct LightGrid { bool committed,consumed,effective,pending; const char* text; };
 static const LightGrid Loaded[]={
@@ -45,7 +53,7 @@ static void Renderer(View& v) {
  Check(v.runtime.SetState({{"settings.renderer.fallback",true}},v.error,v.time),v.error.c_str());v.Frame();
  Check(Presented(v,Notice,"display")=="block"&&v.Element(Notice)->GetInnerRML()==NoticeText(v),"a reported fallback shows the notice");
  Check(v.runtime.SetState({{"settings.renderer.fallback",false}},v.error,v.time),v.error.c_str());v.Frame();
- Check(v.runtime.FocusControl(RendererRow,v.time),"the renderer choice focuses");v.Frame();
+ Check(v.Focus(RendererRow),"the renderer choice focuses");v.Frame();
  v.Key(MenuInput::Accept);v.Frame();Check(v.runtime.GetWidgetState(RendererRow)->popupOpen,"the renderer choice opens");
  v.Key(MenuInput::End);v.Frame();v.Key(MenuInput::Accept);auto actions=v.runtime.TakeActions();
  Check(actions.size()==1&&actions[0].proposal&&SettingsValueEqual(*actions[0].proposal,std::string("arb2")),"the choice proposes ARB2");
@@ -79,7 +87,7 @@ static void Renderer(View& v) {
  Check(v.tx.Edit(View::Owner,{{"r_renderer",std::string("best")}}).code==SettingsCode::Ok,"draft the applied renderer");v.Sync();
  Check(v.runtime.SetState({{"settings.renderer.fallback",true}},v.error,v.time),v.error.c_str());v.Frame();
  Check(Presented(v,Notice,"display")=="block"&&v.Element(Notice)->GetInnerRML()==NoticeText(v),"the notice reads its own text");
- Inside(v.Box(Notice),v.Box(RendererRow),"the notice sits inside the renderer card");
+ Under(v,Notice,RendererRow,"the notice follows the renderer row");
 }
 // A request the page does not offer (a retired back-end name) shows as typed,
 // selects no option and gives way to Auto.
@@ -89,7 +97,7 @@ static void Unoffered(View& v) {
  v.Sync();Check(v.runtime.SetState({{"settings.renderer.fallback",true}},v.error,v.time),v.error.c_str());v.Frame();
  Check(v.Alias("draftRenderer")=="nv20"&&v.Element("settings_renderer-value")->GetInnerRML()=="nv20","an unoffered request shows as typed");
  Check(Presented(v,Notice,"display")=="block","the notice explains the retired request");
- Check(v.runtime.FocusControl(RendererRow,v.time),"the renderer choice focuses");v.Frame();
+ Check(v.Focus(RendererRow),"the renderer choice focuses");v.Frame();
  v.Key(MenuInput::Accept);v.Frame();Check(v.runtime.GetWidgetState(RendererRow)->popupOpen,"the choice opens");
  for(const auto* part:{"settings_renderer-option-0-selected","settings_renderer-option-1-selected"})
   Check(!v.Element(part)->IsVisible(true),"no option claims the unoffered request");
@@ -104,7 +112,8 @@ static void Run(const std::string& source,const std::string& folder,const char* 
  View v(source,folder+"/"+locale+"_openq4.lang",1,1280,720,expansion,folder+"/"+locale+"_guis.lang");
  Check(Presented(v,StatusLine,"display")=="none","no loaded map shows no light-grid status");
  // The toggle proposes the preload through the ordinary edit and writes nothing.
- Check(v.runtime.FocusControl(Row,v.time),"the preload toggle focuses");v.Frame();
+ Check(v.TabOf(Row)=="image"&&v.TabOf(RendererRow)=="graphics","Preload Light Grids is on IMAGE QUALITY, Renderer Fallback on GRAPHICS");
+ Check(v.Focus(Row),"the preload toggle focuses");v.Frame();
  v.Key(MenuInput::Accept);auto actions=v.runtime.TakeActions();
  Check(actions.size()==1&&actions[0].proposal&&SettingsValueEqual(*actions[0].proposal,true),"the toggle proposes preloading");
  ActionInvocation invocation;Check(v.runtime.ResolveAction(actions[0].action,invocation,v.error,&*actions[0].proposal),"the preload action resolves");
@@ -126,23 +135,27 @@ static void Run(const std::string& source,const std::string& folder,const char* 
   std::fprintf(stderr,"Render options locale=%s expansion=%g viewport=%dx%d density=%g\n",locale,expansion,c.width,c.height,c.density);
   v.viewport.width=c.width;v.viewport.height=c.height;v.viewport.displayScale=c.density;v.viewport.FitToMinimum(640,480);v.Frame();
   for(const auto& s:Loaded) {
-   // Each status changes the card's height; focus must reveal the whole card.
-   Status(v,s);Check(v.runtime.FocusControl("settings_irradiance",v.time),"focus leaves the preload row");v.Frame();
+   // The help and the status follow the row down its column, each in its own slots.
+   Status(v,s);Check(v.Focus("settings_irradiance"),"focus leaves the preload row");v.Frame();
    Check(v.runtime.FocusControl(Row,v.time),"the preload row receives focus");v.Frame();
-   Inside(v.Box(Row),v.Box("settings-body"),"the focused preload card is revealed");
-   Inside(v.Box(Row),{0,0,float(c.width),float(c.height)},"the preload card stays inside the physical viewport");
-   TextFits(v,"settings_lightgrid_preload-label");TextFits(v,"settings_lightgrid_preload-help");TextFits(v,StatusLine);
+   Inside(v.Box(Row),v.Box("settings-body"),"the focused preload row stays in the pages' bounds");
+   Inside(v.Box(Row),{0,0,float(c.width),float(c.height)},"the preload row stays inside the physical viewport");
+   Under(v,"settings_lightgrid_preload-help",Row,"the help follows the preload row");
+   Under(v,StatusLine,"settings_lightgrid_preload-help","the status follows the help");
+   Inside(v.Box(StatusLine),{0,0,float(c.width),float(c.height)},"the status stays inside the physical viewport");
+   RowTextFits(v,"settings_lightgrid_preload-label");RowTextFits(v,"settings_lightgrid_preload-help");RowTextFits(v,StatusLine);
   }
   for(const auto* m:{"#str_230073","#str_230074","#str_230075","#str_230076"}){v.message=m;v.Sync();v.Frame();TextFits(v,"settings-message");}
   v.message="#str_230007";v.Sync();v.Frame();
-  // The renderer card, notice included, is revealed whole and fits.
+  // The renderer row and its notice fit, the notice under the row.
   Check(v.runtime.SetState({{"settings.renderer.fallback",true}},v.error,v.time),v.error.c_str());
-  Check(v.runtime.FocusControl("settings_vsync",v.time),"focus leaves the renderer row");v.Frame();
+  Check(v.Focus("settings_gpu"),"focus leaves the renderer row");v.Frame();
   Check(v.runtime.FocusControl(RendererRow,v.time),"the renderer row receives focus");v.Frame();
-  Inside(v.Box(RendererRow),v.Box("settings-body"),"the focused renderer card is revealed");
-  Inside(v.Box(RendererRow),{0,0,float(c.width),float(c.height)},"the renderer card stays inside the physical viewport");
-  Inside(v.Box(Notice),v.Box(RendererRow),"the notice stays inside the renderer card");
-  TextFits(v,"settings_renderer-label");TextFits(v,"settings_renderer-value");TextFits(v,Notice);
+  Inside(v.Box(RendererRow),v.Box("settings-body"),"the focused renderer row stays in the pages' bounds");
+  Inside(v.Box(RendererRow),{0,0,float(c.width),float(c.height)},"the renderer row stays inside the physical viewport");
+  Under(v,Notice,RendererRow,"the notice stays under the renderer row");
+  Inside(v.Box(Notice),{0,0,float(c.width),float(c.height)},"the notice stays inside the physical viewport");
+  RowTextFits(v,"settings_renderer-label");RowTextFits(v,"settings_renderer-value");RowTextFits(v,Notice);
  }
  // Recovery titles the confirmation panel for any attempt.
  Check(v.runtime.SetState({{"settings.phase",3.0},{"settings.confirmationVisible",true}},v.error,v.time),v.error.c_str());v.Frame();

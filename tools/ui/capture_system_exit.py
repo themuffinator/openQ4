@@ -33,10 +33,15 @@ SCROLL_FIELDS = set(('id open opening revision offsetDp available usable density
 SCREENSHOTS = ('discard-dialog', 'continued', 'immediate-return', 'vsync-draft', 'confirmation',
                'reverted', 'keep-return', 'reopened')
 digest, key, activate = page.digest, page.key, page.activate
+# The tab holding each probed control (page.tab_contract binds it to the page).
+TABS = {'settings_brightness': 'image', 'settings_vsync': 'screen'}
+# Activate() supplies this spelling, as it does onActivate's; a close runs it.
+CLOSED = ('onDeactivate', 0, 0)
 
 
 def stages():
     rows = []
+    tabs = page.Tabs(TABS)
     def add(name, commands, *, brightness=1.1, baseline=1.1, vsync=1,
             dirty=0, discard=0, live=1.1, child=True, opening=False,
             confirm=False, interval=1, restarts=0, actions=(), events=(),
@@ -45,28 +50,32 @@ def stages():
                   discard, brightness, baseline, vsync, 1 if vsync == 0 and dirty else vsync,
                   None if confirm else '', int(confirm), int(confirm), int(confirm), 0,
                   None if confirm else 0)
+        # Tab switches precede the stage's own programs; a close ends with onDeactivate.
+        events = tabs.take(opening) + list(events) + ([] if child else [CLOSED])
         rows.append(dict(name=name, commands=commands, values=values, child=child,
                          opening=opening, live=live, interval=interval, restarts=restarts,
-                         actions=list(actions), events=list(events), shot=shot,
+                         actions=list(actions), events=events, shot=shot,
                          display=display, exit_event=exit_event, dismiss=dismiss))
     begin = [('begin', 1, 0)]
     # Activate() supplies this spelling; control event IDs below are folded.
     onactivate = [('onActivate', 1, 1)]
     back = [('onback', 0, 1)]
     edit = [('edit', 1, 1)]
-    brightness_edit = ['openq4_retainedGui focus "settings_brightness"'] + key('right')
+    # Each edit first brings its row's tab forward (before any dialog, which
+    # blocks the tab events).
+    brightness_edit = lambda: tabs.on('settings_brightness') + ['openq4_retainedGui focus "settings_brightness"'] + key('right')
     # Home then Accept selects the authored first option (0); no physical input.
-    vsync_edit = page.open_choice('settings_vsync') + key('home') + ['wait 3'] + key('accept')
+    vsync_edit = lambda: tabs.on('settings_vsync') + page.open_choice('settings_vsync') + key('home') + ['wait 3'] + key('accept')
     add('open', ['openq4_system open'], brightness=1, baseline=1, live=1,
         opening=True, actions=begin, events=onactivate)
-    add('discard_draft', brightness_edit, baseline=1, dirty=1, live=1, actions=edit)
+    add('discard_draft', brightness_edit(), baseline=1, dirty=1, live=1, actions=edit)
     add('discard_dialog', activate('settings_back'), baseline=1, dirty=1, discard=1,
         live=1, events=back, shot='discard-dialog')
     add('discard_exit', activate('discard_changes'), child=False, live=1,
         actions=[('cancel', 0, 0)], events=[('discard', 2, 1)], dismiss=True)
     add('reopen_discard', ['openq4_system open'], brightness=1, baseline=1, live=1,
         opening=True, actions=begin, events=onactivate)
-    add('immediate_draft', brightness_edit, baseline=1, dirty=1, live=1, actions=edit)
+    add('immediate_draft', brightness_edit(), baseline=1, dirty=1, live=1, actions=edit)
     add('continue_dialog', activate('settings_back'), baseline=1, dirty=1, discard=1,
         live=1, events=back)
     # Accept the modal's safe initial focus without a diagnostic Focus command.
@@ -78,14 +87,14 @@ def stages():
         actions=[('applyExit', 0, 0)], events=[('applyexit', 1, 1)],
         exit_event=True, shot='immediate-return')
     add('reopen_immediate', ['openq4_system open'], opening=True, actions=begin, events=onactivate)
-    add('display_draft', vsync_edit, vsync=0, dirty=1, actions=edit, shot='vsync-draft')
+    add('display_draft', vsync_edit(), vsync=0, dirty=1, actions=edit, shot='vsync-draft')
     add('display_dialog', activate('settings_back'), vsync=0, dirty=1, discard=1, events=back)
     add('display_confirm', activate('discard_apply_changes'), vsync=0, dirty=1, confirm=True,
         interval=0, restarts=1, actions=[('applyExit', 4, 1)], events=[('applyexit', 1, 1)],
         display='apply', shot='confirmation')
     add('display_reverted', key('accept'), restarts=2,
         actions=[('revert', 2, 1)], display='restore', shot='reverted')
-    add('keep_draft', vsync_edit, vsync=0, dirty=1, restarts=2, actions=edit)
+    add('keep_draft', vsync_edit(), vsync=0, dirty=1, restarts=2, actions=edit)
     add('keep_dialog', activate('settings_back'), vsync=0, dirty=1, discard=1,
         restarts=2, events=back)
     add('keep_confirm', activate('discard_apply_changes'), vsync=0, dirty=1, confirm=True,
@@ -129,6 +138,7 @@ def source_contract(runtime):
         nodes[node['id']] = node
         pending.extend(node.get('children', []))
     page.number_contract(model,nodes)
+    page.tab_contract(model,nodes,TABS)
     expected = {'settings_back':('event','onBack'), 'discard_changes':('event','discard'),
                 'discard_keep_editing':('event','continueEditing'),
                 'discard_apply_changes':('event','applyExit'),
@@ -171,7 +181,10 @@ def source_contract(runtime):
 
 PATTERNS = {
     'action': r'UI_SETTINGS operation=settings.system\.(\w+) result=(\d+) phase=(\d+) owner=(\d+) dirty=([01])',
-    'journal': r'UI_SETTINGS_JOURNAL state=(pending|confirmed) durable=([01])',
+    # A display journal is written in the display schema (1; effect journals use 2).
+    'journal': r'UI_SETTINGS_JOURNAL state=(pending|confirmed) durable=([01]) schema=1',
+    # The service republishes its display catalog for each owner and after a device restart.
+    'catalog': r'UI_SETTINGS_CATALOG token=(\d+) available=([01]) displays=(\d+) devices=(\d+) modes=(\d+) refresh=(\d+)',
     'device': r'UI_SETTINGS_DEVICE restore=([01]) epoch=(\d+) generation=(\d+) submitted=(\d+) presented=(\d+) failures=(\d+) width=(\d+) height=(\d+)',
     'stage': r'UI_SETTINGS_DISPLAY stage=(\d+) owner=(\d+) request=(\d+) result=(\d+) blocked=([01]) detail=(.*)',
     'view': r'UI_SETTINGS_VIEW owner=(\d+) request=(\d+) epoch=(\d+) generation=(\d+) submitted=(\d+) presented=(\d+) failures=(\d+)',
@@ -179,7 +192,7 @@ PATTERNS = {
     'exit': r'UI_SETTINGS_EXIT owner=(\d+) request=(\d+) event=(armed|ready|consumed|canceled)',
     'adapter_exit': r'RETAINED_GUI_EXIT path=(\S+) owner=(\d+) source=applyExit',
     'event': r'RETAINED_GUI_EVENT name=(\w+) actions=(\d+) writes=(\d+)',
-    'operation': r'RETAINED_GUI_OPERATION (focus|menu|number) passed',
+    'operation': r'RETAINED_GUI_OPERATION (focus|menu|number|event) passed',
 }
 ROUTE_FIELDS = set('enabled active parent child guiTest menu map multiplayer menuSound canReturn'.split())
 WIDGET_FIELDS = set('id role type accepted pending proposed rejected token popup firstVisible'.split())
@@ -197,8 +210,10 @@ def uint(value, *, positive=False):
 def qualify(log, mode, renderer):
     errors, records, activation, completion = [], [], [], []
     current = None
+    peers = page.peer_documents(log)
     for line in log.splitlines():
         stripped = line.strip()
+        if page.peer_line(line, peers): continue
         if STAGE_MARKER in line:
             match = re.fullmatch(STAGE_MARKER+r' ([a-z_]+)', stripped)
             if not match: errors.append('Malformed stage marker'); continue
@@ -219,7 +234,7 @@ def qualify(log, mode, renderer):
     if completion != [COMPLETE]: errors.append('Missing, malformed or replayed completion')
     expected = stages()
     if [row['name'] for row in records] != [row['name'] for row in expected]: errors.append('Stage order/count differs')
-    owners, owner, display_reports, requests, devices, choice_cache = [], None, [], [], [], None
+    owners, owner, display_reports, requests, devices, choice_cache, catalogs = [], None, [], [], [], None, []
     for record, stage in zip(records,expected):
         at, lines = stage['name'], record['lines']
         def fail(detail): errors.append(at+': '+detail)
@@ -315,7 +330,7 @@ def qualify(log, mode, renderer):
                     elif row!=choice_cache: fail('Closed choice cache changed during the dirty-exit modal')
             elif scrolls != [expected_scroll]: fail('Fresh or recreated choice retained unexpected geometry')
             for report in reports:
-                if not report or any(report[key]!=value for key,value in dict(path=PAGE,active='1',contexts='1',shadows='1').items()) or uint(report['revision']) is None or not page._number(report['brightness'],stage['live']): fail('Rendered owner/live brightness differs')
+                if not report or any(report[key]!=value for key,value in dict(path=PAGE,active='1',contexts=str(1+len(peers)),shadows='1').items()) or uint(report['revision']) is None or not page._number(report['brightness'],stage['live']): fail('Rendered owner/live brightness differs')
                 if report and stage['values'][5] and report['focus']!='discard_keep_editing': fail('Dirty modal lacks its safe initial focus')
                 if report and stage['values'][11] and report['focus']!='settings_revert': fail('Confirmation modal lacks its safe initial focus')
                 if report and at=='continued' and report['focus']!='settings_back': fail('Continue failed to restore the previous page focus')
@@ -341,6 +356,11 @@ def qualify(log, mode, renderer):
             if not re.fullmatch(r'-?\d{1,10},-?\d{1,10}',row['position']): fail('Invalid observed window placement')
             if None not in numeric.values(): display_reports.append(numeric)
         display=stage['display']
+        if len(traces['catalog']) != int(stage['opening'] or display in ('apply','restore')): fail('Display catalog publication missing or replayed')
+        for row in traces['catalog']:
+            token=uint(row[1],positive=True)
+            if token is None or (catalogs and token<=catalogs[-1]) or row[2]!='1': fail('Stale or unavailable display catalog')
+            catalogs.append(token or 0)
         journal = [(row[1],row[2]) for row in traces['journal']]
         if journal != ([('pending','1')] if display=='apply' else [('confirmed','1')] if display=='keep' else []): fail('Durable journal ordering/count differs')
         if [row[1] for row in traces['stage']] != (['2','3'] if display=='apply' else ['6','0'] if display=='restore' else ['0'] if display=='keep' else []): fail('Display lifecycle stages differ')
@@ -492,6 +512,7 @@ def launch_command(args, output):
         g_autoExecAfterMapLoad='system-exit.cfg',g_autoExecAfterMapLoadDelayMs='3000',com_skipLoadingContinue='1',
         com_loadingContinueAutoAdvance='1',com_maxfps='60',ui_autoJoin='1' if args.mode=='mp' else '0',
         ui_retainedScale='1',ui_retainedDensity=str(args.density),ui_retainedTrace='1',ui_retained='0',ui_retainedSystem='1',ui_retainedReducedMotion='0')
+    values[page.MULTIPLE_INSTANCES]='1'
     executable=args.runtime.resolve()/('openQ4-client_x64.exe' if os.name=='nt' else 'openQ4-client_x64')
     command=[str(executable)]
     for key,value in values.items(): command+=['+set',key,value]

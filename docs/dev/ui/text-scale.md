@@ -101,9 +101,8 @@ fresh view does.
 Before the stale-box rule one of those openings was refused.
 
 Author the page through
-[`update_system_text_layout.py`](../../../tools/ui/update_system_text_layout.py)
-and the existing numeric component generator. Their `--check` modes verify the
-source without writing staged output. `capture_system_page.py --text-scale`
+[`retained_system.py`](../../../tools/ui/retained_system.py), which
+`build_retained_screens.py --check` verifies without writing staged output. `capture_system_page.py --text-scale`
 records the explicit text multiplier and language alongside density and exact
 source/binary bindings. Its optional `--timeout` records a longer process budget
 for slow debug builds without changing the semantic acceptance checks.

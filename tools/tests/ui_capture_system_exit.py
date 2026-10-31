@@ -41,7 +41,7 @@ def trace(mode='sp',renderer='gl'):
     lines=[f'Renderer API: requested={renderer} active={renderer}',
            'OPENQ4_MENU_ACTIVATION PASS elapsed=15ms limit=10000ms']
     if renderer=='vulkan': lines += ['GPU frame timing reset: generation=1 reason=renderer init',VK_INIT,CACHE_WARNING]
-    owner,request=0,100
+    owner,request,catalog=0,100,0
     for index,stage in enumerate(capture.stages()):
         lines += [capture.STAGE_MARKER+' '+stage['name']]
         if stage['opening']:
@@ -63,7 +63,7 @@ def trace(mode='sp',renderer='gl'):
         if stage['display']=='restore': exit_event('canceled')
         lines += [f'UI_SETTINGS operation=settings.system.{op} result=0 phase={phase} owner={owner} dirty={dirty}' for op,phase,dirty in stage['actions']]
         def display_stage(value,token): lines.append(f'UI_SETTINGS_DISPLAY stage={value} owner={owner} request={token} result=0 blocked={int(value!=0)} detail=')
-        if stage['display']=='apply': lines.append('UI_SETTINGS_JOURNAL state=pending durable=1')
+        if stage['display']=='apply': lines.append('UI_SETTINGS_JOURNAL state=pending durable=1 schema=1')
         if stage['display'] in ('apply','restore'):
             if renderer=='vulkan': lines += [f'GPU frame timing reset: generation={2+stage["restarts"]} reason=recoverable vid_restart',VK_INIT,CACHE_WARNING]
             lines.append(f'UI_SETTINGS_DEVICE restore={int(stage["display"]=="restore")} epoch=2 generation={generation} submitted={sequence} presented={sequence} failures=0 width={width} height={height}')
@@ -76,13 +76,15 @@ def trace(mode='sp',renderer='gl'):
             else:
                 display_stage(0,0); request=active_request
         if stage['display']=='keep':
-            lines.append('UI_SETTINGS_JOURNAL state=confirmed durable=1')
+            lines.append('UI_SETTINGS_JOURNAL state=confirmed durable=1 schema=1')
             exit_event('ready'); display_stage(0,0)
         if stage['exit_event']:
             exit_event('consumed',0 if stage['name']=='immediate_exit' else request)
             lines.append(f'RETAINED_GUI_EXIT path={capture.PAGE} owner={owner} source=applyExit')
         if stage['dismiss']:
             lines.append(f'RETAINED_GUI_DISPATCH path={capture.PAGE} operation=ui.dismiss value=- brightness={stage["live"]} shadows=1 close=1')
+        if stage['opening'] or stage['display'] in ('apply','restore'):
+            catalog+=1; lines.append(f'UI_SETTINGS_CATALOG token={catalog} available=1 displays=1 devices=1 modes=26 refresh=3')
         lines.append(route(stage,mode))
         if stage['child']:
             for field,value in zip(capture.FIELDS,stage['values']):
@@ -198,6 +200,17 @@ class ExitOracleTests(unittest.TestCase):
             with self.subTest(name=name):
                 self.reject(log.replace(lifecycle,lifecycle.replace('onActivate',name),1))
 
+    def test_peer_documents_hold_their_own_context(self):
+        # The classic HUD's essential document runs beside the page in gameplay.
+        peer='guis/hud/air_marine.q4ui'
+        log=trace().replace('OPENQ4_MENU_ACTIVATION ','RETAINED_GUI_LOADED '+peer+'\nOPENQ4_MENU_ACTIVATION ',1)
+        self.reject(log)
+        restored=f'RETAINED_GUI_RESOURCE path={capture.PAGE} event=restored'
+        log=log.replace('contexts=1','contexts=2').replace(restored,f'RETAINED_GUI_RESOURCE path={peer} event=restored\n'+restored)
+        self.assertTrue(capture.qualify(log,'sp','gl')['passed'],capture.qualify(log,'sp','gl')['errors'])
+        self.reject(log.replace('contexts=2','contexts=3',1))
+        self.reject(log.replace('RETAINED_GUI_LOADED '+peer+'\n','',1))
+
     def test_continue_keeps_one_focus_action_and_one_local_write(self):
         original=trace();continued='RETAINED_GUI_EVENT name=continueediting actions=1 writes=1'
         self.assertEqual(original.count(continued),1)
@@ -239,7 +252,8 @@ class ExitOracleTests(unittest.TestCase):
             ('valid=3','valid=0'),('restart=5','restart=4'),('generation=11','generation=10'),
             ('epoch=2','epoch=3'),('ready=1','ready=0'),('native=0','native=-4'),
             ('operation=report','operation=apply9605400'),('observed=1','observed=0'),
-            ('elapsed=15ms','elapsed=10001ms'),('active=gl','active=vulkan')]
+            ('elapsed=15ms','elapsed=10001ms'),('active=gl','active=vulkan'),
+            ('token=2 available','token=1 available'),('available=1 displays','available=0 displays'),('durable=1 schema=1','durable=1 schema=2')]
         for before,after in mutations:
             with self.subTest(before=before): self.reject(trace().replace(before,after,1))
 
@@ -352,8 +366,15 @@ class ExitOracleTests(unittest.TestCase):
         self.assertEqual([row for row in commands if row[0]=='rendererDisplayProbe'],[['rendererDisplayProbe','report']]*21)
         for row in commands:
             self.assertNotIn(';',' '.join(row))
-            if row[0]=='openq4_retainedGui': self.assertIn(row[1],('focus','menu','widget','report'))
+            if row[0]=='openq4_retainedGui': self.assertIn(row[1],('focus','menu','widget','report','event'))
+            if row[:2]==['openq4_retainedGui','event']: self.assertIn(row[2],('tab_screen','tab_image'))
         self.assertNotIn('testGUI',capture.script()); self.assertNotIn('vid_restart',capture.script())
+        # Every probe of a row on another tab switches first; every close deactivates.
+        rows=capture.stages()
+        self.assertEqual([(row['name'],[event for event in row['events'] if event[0].startswith('tab_')]) for row in rows if any(event[0].startswith('tab_') for event in row['events'])],
+                         [('discard_draft',[('tab_image',0,2)]),('immediate_draft',[('tab_image',0,2)]),('display_draft',[('tab_screen',0,2)])])
+        self.assertEqual([row['name'] for row in rows if row['events'][-1:]==[capture.CLOSED]],[row['name'] for row in rows if not row['child']])
+        self.assertEqual(capture.CLOSED,('onDeactivate',0,0))
         self.assertEqual(len(capture.SCREENSHOTS),8)
         self.assertEqual([row[1] for row in commands if row[0]=='screenshot'],['screenshots/system-exit-'+name+'.tga' for name in capture.SCREENSHOTS])
         vsync=next(stage for stage in capture.stages() if stage['name']=='display_draft')
@@ -407,7 +428,8 @@ class ExitOracleTests(unittest.TestCase):
                 values={command[i+1].lower():command[i+2] for i in range(len(command)-2) if command[i].lower() in ('+set','+seta')}
                 for name,value in dict(r_fullscreen='0',r_fullscreenDesktop='0',r_borderless='0',r_hiddenWindow='1',r_multiSamples='0',r_swapInterval='1',
                     in_mouse='0',in_joystick='0',in_joystickRumble='0',r_renderApi=renderer,ui_retainedSystem='1',
-                    ui_autoJoin='1' if mode=='mp' else '0',g_autoExecAfterMapLoad='system-exit.cfg',g_autoExecAfterMapLoadDelayMs='3000').items(): self.assertEqual(values[name.lower()],value)
+                    ui_autoJoin='1' if mode=='mp' else '0',g_autoExecAfterMapLoad='system-exit.cfg',g_autoExecAfterMapLoadDelayMs='3000',
+                    **{capture.page.MULTIPLE_INSTANCES:'1'}).items(): self.assertEqual(values[name.lower()],value)
                 self.assertEqual(command[-2:],gameplay); self.assertEqual(kwargs['cwd'],runtime)
                 self.assertEqual(kwargs['env']['TEMP'],str(root/'.tmp'))
                 metadata=json.loads((output/'capture.json').read_text(encoding='utf-8'))

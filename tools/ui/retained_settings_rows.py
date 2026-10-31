@@ -162,10 +162,10 @@ def entry_row(doc: Document, ident: str, label_key: str, value_x: float, value: 
                                   "height": length(row_h), "flex-shrink": number(0)}, [row, entry])
 
 
-def button_row(doc: Document, ident: str, label_key: str, value_x: float, value: dict, control: dict) -> dict:
+def button_row(doc: Document, ident: str, label_key: str, value_x: float, value: dict | None, control: dict) -> dict:
     """A row that is one button: its label as a setting row's and, in the
-    value column, the text `value` binds in a list's value face. `control`
-    names what it runs."""
+    value column, the text `value` binds in a list's value face (none
+    without one). `control` names what it runs."""
     row_h = U * ROW_PITCH
     caption = label(f"{ident}-label", label_key, {"position": keyword("relative"), "display": keyword("block"), "flex-shrink": number(1),
                     "min-width": length(0), **row_face(True, row_h), "overflow": keyword("hidden")})
@@ -173,10 +173,11 @@ def button_row(doc: Document, ident: str, label_key: str, value_x: float, value:
                                    "flex-direction": keyword("row"), "align-items": keyword("center")}, [caption])
     shown = label(f"{ident}-value", PLACEHOLDER, {**absolute(left=value_x, top=0, width=U * COLUMN_W - value_x - 12, height=row_h),
                   **typeface("lowpixel", 14, row_h, rgb(VALUE)), "white-space": keyword("nowrap"), "overflow": keyword("hidden")})
-    doc.bind(f"{ident}-value.text", f"{ident}-value", "text", value)
+    if value is not None:
+        doc.bind(f"{ident}-value.text", f"{ident}-value", "text", value)
     return group(ident, {"position": keyword("relative"), "display": keyword("block"), "width": length(U * COLUMN_W),
                          "height": length(row_h), "opacity": number(1), "flex-shrink": number(0)},
-                 [*row_chrome(ident, row_h), head, shown],
+                 [*row_chrome(ident, row_h), head, *([shown] if value is not None else [])],
                  control={"role": "button", "label": label_key, **control, "states": row_states(doc, ident)})
 
 
@@ -350,11 +351,18 @@ def _note_line(ident: str, key: str, lead: float) -> dict:
 
 
 def settings_subpage(doc: Document, prefix: str, title_key: str, tabs: list, *, note: str | None = None,
-                     activate=None, overlays: list = (), portrait: bool = True) -> dict:
+                     activate=None, overlays: list = (), back_event: str | None = None, back_id: str | None = None,
+                     slots: int = COLUMN_SLOTS, footer: list = (), body: str | None = None,
+                     first_focus: dict | None = None, portrait: bool = True) -> dict:
     """The page: `tabs` holds each tab's (id, label, columns), a column a list
     of rows, notes and headings (heading()), at most two columns a tab. One
     tab shows no strip: its columns' first headings stand in the header band.
-    `note` is a line on the heading line, for tabs without headings. Without
+    `note` is a line on the heading line, for tabs without headings. A page
+    whose Back is its own event (`back_event`, the button `back_id`) keeps
+    its onBack; `slots` caps a column shorter where `footer` parts stand
+    under the columns; `body` names a group around the pages, the bounds
+    its rows' lists unfold within; `first_focus` gives a tab whose first rows
+    may be hidden the steps that focus its first row shown. Without
     `portrait` the two columns keep their places in every view, shrinking in
     a portrait one.
     onActivate   the sub-page's arrival, then the current tab's first row
@@ -364,7 +372,8 @@ def settings_subpage(doc: Document, prefix: str, title_key: str, tabs: list, *, 
                  onTabNext wrap around the strip."""
     check_settings_text(tabs, note)
     tabbed = len(tabs) > 1
-    doc.session("back", f"{prefix}Back")
+    if back_event is None:
+        doc.session("back", f"{prefix}Back")
     doc.state.update({TAB_STATE: {"type": "number", "initial": 0}, LEAVING_STATE: {"type": "number", "initial": -1}})
     width = U * CONTENT_W
     chrome, pages, firsts = [], [], []
@@ -417,8 +426,8 @@ def settings_subpage(doc: Document, prefix: str, title_key: str, tabs: list, *, 
                 used += _slots(item)
                 if _controls(item):
                     rows.append(_controls(item))
-            if used > COLUMN_SLOTS:
-                raise SystemExit(f"{prefix}'s {ident} tab puts {used} slots in a column of {COLUMN_SLOTS}")
+            if used > slots:
+                raise SystemExit(f"{prefix}'s {ident} tab puts {used} slots in a column of {slots}")
             order.append(rows)
             if not portrait:
                 parts.append(group(f"{prefix}-{ident}-column-{side}", {
@@ -445,7 +454,7 @@ def settings_subpage(doc: Document, prefix: str, title_key: str, tabs: list, *, 
             # A gutter each side keeps the rows' outlines and focus rail inside
             # the area's clip.
             parts = [group(scrollers[-1], {**absolute(left=U * CONTENT_LEFT - SCROLL_GUTTER, top=U * flow_top, width=width + SCROLL_GUTTER,
-                                                      height=U * (lead + COLUMN_SLOTS * ROW_PITCH)),
+                                                      height=U * (lead + slots * ROW_PITCH)),
                                            "padding-left": length(SCROLL_GUTTER), "overflow": keyword("auto")}, [*lines, arranged])]
         # Up and Down read down the first column and on down the second,
         # wrapping; Left and Right cross to the row beside.
@@ -468,16 +477,21 @@ def settings_subpage(doc: Document, prefix: str, title_key: str, tabs: list, *, 
             doc.bind(f"{prefix}-page-{ident}.display", f"{prefix}-page-{ident}", "display", {"op": "select", "args": [shown, "block", "none"]})
         pages.append(group(f"{prefix}-page-{ident}", {**FULL, "display": keyword("none" if tabbed and index else "block"),
                                                       "opacity": number(1)}, parts))
+    focus = [(first_focus or {}).get(ident, [{"op": "focus", "control": first}]) for (ident, _key, _columns), first in zip(tabs, firsts)]
     if tabbed:
-        _tab_programs(doc, prefix, tabs, firsts)
-    focus_current = {"op": "focus", "control": firsts[-1]}
-    steps = [focus_current]
+        _tab_programs(doc, prefix, tabs, focus)
+    steps = list(focus[-1])
     for index in range(len(firsts) - 2, -1, -1):
         steps = [{"op": "if", "condition": {"op": "==", "args": [{"state": TAB_STATE}, index]},
-                  "then": [{"op": "focus", "control": firsts[index]}], "else": steps}]
-    doc.events["onBack"] = [{"op": "action", "action": "back"}]
-    back = page_prompts(doc, f"{prefix}_back", action="back")
-    return subpage_document(doc, prefix, CRUMB, title_key, firsts[0], [*chrome, *pages, back], list(overlays),
+                  "then": list(focus[index]), "else": steps}]
+    if back_event is None:
+        doc.events["onBack"] = [{"op": "action", "action": "back"}]
+        back = page_prompts(doc, back_id or f"{prefix}_back", action="back")
+    else:
+        back = page_prompts(doc, back_id or f"{prefix}_back", event=back_event)
+    if body is not None:
+        pages = [group(body, FULL, pages)]
+    return subpage_document(doc, prefix, CRUMB, title_key, firsts[0], [*chrome, *pages, *footer, back], list(overlays),
                             stretch=tuple(scrollers), activate=activate(steps) if activate else steps,
                             backing_node=settings_backing(f"{prefix}-backing"))
 
@@ -489,7 +503,7 @@ def show_tab(doc: Document, prefix: str, tabs: list, index: int) -> list:
             {"op": "playTimeline", "timeline": f"place-{tabs[index][0]}"}]
 
 
-def _tab_programs(doc: Document, prefix: str, tabs: list, firsts: list) -> None:
+def _tab_programs(doc: Document, prefix: str, tabs: list, focus: list) -> None:
     count = len(tabs)
     for index, (ident, _key, _columns) in enumerate(tabs):
         page = f"{prefix}-page-{ident}"
@@ -507,7 +521,7 @@ def _tab_programs(doc: Document, prefix: str, tabs: list, firsts: list) -> None:
         doc.events[f"tab_{ident}"] = [
             {"op": "if", "condition": {"op": "!=", "args": [{"state": TAB_STATE}, index]},
              "then": [{"op": "setState", "values": {LEAVING_STATE: {"state": TAB_STATE}, TAB_STATE: index}},
-                      {"op": "playTimeline", "timeline": f"show-{ident}"}, {"op": "focus", "control": firsts[index]}]},
+                      {"op": "playTimeline", "timeline": f"show-{ident}"}, *focus[index]]},
         ]
     doc.events["pageShown"] = [{"op": "setState", "values": {LEAVING_STATE: -1}}]
     for name, step in (("onTabPrevious", -1), ("onTabNext", 1)):

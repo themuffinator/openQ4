@@ -1,19 +1,83 @@
 #!/usr/bin/env python3
 """Source contracts for production SYSTEM's shared slider/Number components.
 
-Checks authoring, ownership/bindings, source preservation and responsive
+Checks authoring, ownership/bindings, source preservation and the paired row's
 constraints. This is not Rml layout, input, transaction or visual qualification.
 """
 from pathlib import Path
 import copy
-import importlib.util
 import itertools
+import json
 import re
+import sys
 import unittest
 
 ROOT=Path(__file__).resolve().parents[2]
-spec=importlib.util.spec_from_file_location('system_numbers',ROOT/'tools/ui/update_system_number_fields.py')
-component=importlib.util.module_from_spec(spec);spec.loader.exec_module(component)
+sys.path.insert(0,str(ROOT/'tools/ui'))
+import build_retained_screens as screens
+import retained_system as system
+SOURCE=screens.OUTPUTS['system']
+PAIRS={'settings_brightness':('r_brightness',.5,2),'settings_ambient':('r_forceAmbient',0,1)}
+# The typed window and custom sizes: each row is itself the Number control.
+SIZES={'settings_window_width':('r_windowWidth','edit.r_windowWidth',320),'settings_window_height':('r_windowHeight','edit.r_windowHeight',240),
+       'settings_custom_width':('r_customWidth','size.r_customWidth',320),'settings_custom_height':('r_customHeight','size.r_customHeight',240)}
+PARTS=('viewport','text','selection','caret','composition','validation')
+IMAGE=2  # page.tab of the IMAGE QUALITY tab, which holds both paired rows
+
+def load(path):
+    return json.loads('\n'.join(line for line in path.read_text(encoding='utf-8').splitlines() if not line.lstrip().startswith('//')))
+
+def index_nodes(root):
+    result={}
+    def visit(current):
+        if current['id'] in result: raise ValueError('Duplicate authored node: '+current['id'])
+        result[current['id']]=current
+        for child in current.get('children',[]): visit(child)
+    visit(root)
+    return result
+
+def controls(node):
+    """The controls a row holds in reading order, as the sub-page reads them."""
+    if 'control' in node: return [node['id']]
+    return [found for child in node.get('children',[]) for found in controls(child)]
+
+def keyword(data): return {'type':'keyword','value':data}
+
+def contract(page):
+    """The paired rows' inventory, shared proposal, reading order and parts."""
+    nodes=index_nodes(page['root'])
+    roles=lambda role:{id for id,n in nodes.items() if n.get('control',{}).get('role')==role}
+    assert roles('slider')==set(PAIRS),'Review the numeric field contract when the slider inventory changes'
+    assert roles('number')=={id+'_number' for id in PAIRS}|set(SIZES)
+    assert page['extensions']['openq4']['numberFields']['pairs']=={id:id+'_number' for id in PAIRS}
+    bindings={(b['node'],b['property']):b['value'] for b in page['bindings']}
+    timelines={t['id']:t for t in page['timelines']}
+    for slider_id,(key,minimum,maximum) in PAIRS.items():
+        number_id=slider_id+'_number';slider=nodes[slider_id]['control'];number=nodes[number_id]['control']
+        for spec in (slider,number):
+            assert spec['value']=={'state':'settings.draft.'+key} and spec['action']=='edit.'+key
+            assert (spec['minimum'],spec['maximum'])==(minimum,maximum)
+        assert page['actions']['edit.'+key]=={'input':'number','operation':'settings.system.edit','arguments':{key:{'input':'value'}}}
+        assert 'step' not in number and 'decimals' not in number
+        assert number['maxBytes']==128 and number['exponent'] is True
+        # One row: the slider, then its Number, neither row group a control.
+        row,holder=nodes[slider_id+'_row'],nodes[slider_id+'_row-controls']
+        assert 'control' not in row and 'control' not in holder
+        assert controls(row)==[slider_id,number_id]
+        assert slider['navigation']['down']==number_id and number['navigation']['up']==slider_id
+        assert nodes[slider_id+'-value']['properties']['display']==keyword('none')
+        assert bindings[(number_id,'enabled')]==bindings[(slider_id,'enabled')]
+        assert bindings[(slider_id,'enabled')]['args'][0]=={'op':'==','args':[{'state':'page.tab'},IMAGE]}
+        assert number['parts']=={part:number_id+'-'+part for part in PARTS}
+        for role in ('default','hover','focus','pressed','disabled'):
+            assert [(t['node'],t['property']) for t in timelines[number_id+'.'+role]['tracks']]==[(number_id+'-field-focus','opacity')]
+    for size_id,(key,action,minimum) in SIZES.items():
+        spec=nodes[size_id]['control']
+        assert (spec['action'],spec['value'])==(action,{'state':'settings.draft.'+key})
+        assert (spec['minimum'],spec['maximum'],spec.get('integer'),spec['exponent'],spec['maxBytes'])==(minimum,16384,True,False,32)
+        assert spec['parts']=={part:size_id+'-'+part for part in PARTS} and size_id+'-field' in nodes
+        assert page['actions'][action]['arguments'][key]=={'input':'value'}
+    return nodes
 
 def evaluate(expression,state):
     if not isinstance(expression,dict):return expression
@@ -37,20 +101,22 @@ def execute(steps,state,events,actions):
 class PairedNumbers(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.prefix,cls.page=component.load(ROOT/component.SOURCE)
-        cls.nodes=component.index_nodes(cls.page['root'])
+        cls.page=load(SOURCE)
+        cls.nodes=index_nodes(cls.page['root'])
 
-    def test_generated_page_is_idempotent(self):
-        self.assertEqual(component.compose(self.page),self.page)
+    def test_generated_page_reproduces_source(self):
+        rendered=screens.render(system.system_document())
+        self.assertEqual(SOURCE.read_bytes().decode('utf-8').replace('\r\n','\n'),rendered.replace('\r\n','\n'))
 
     def test_complete_authored_slider_inventory(self):
-        self.assertEqual({id for id,n in self.nodes.items() if n.get('control',{}).get('role')=='slider'},set(component.PAIRS))
+        contract(self.page)
+        self.assertEqual({id for id,n in self.nodes.items() if n.get('control',{}).get('role')=='slider'},set(PAIRS))
         self.assertEqual({id for id,n in self.nodes.items() if n.get('control',{}).get('role')=='number'},
-                         {id+'_number' for id in component.PAIRS} |
+                         {id+'_number' for id in PAIRS} |
                          {'settings_window_width','settings_window_height','settings_custom_width','settings_custom_height'})
 
     def test_shared_authoritative_proposal_and_finite_range(self):
-        for slider_id,(key,_) in component.PAIRS.items():
+        for slider_id,(key,_,_) in PAIRS.items():
             slider=self.nodes[slider_id]['control'];number=self.nodes[slider_id+'_number']['control']
             self.assertEqual(number['action'],slider['action']);self.assertEqual(number['value'],{'state':'settings.draft.'+key})
             self.assertEqual((number['minimum'],number['maximum']),(slider['minimum'],slider['maximum']))
@@ -60,76 +126,82 @@ class PairedNumbers(unittest.TestCase):
             self.assertNotIn('cvar',self.page['state']['settings.draft.'+key])
             self.assertIn('settings.baseline.'+key,self.page['state'])
 
-    def test_sibling_roles_focus_order_and_wrapping(self):
-        for slider_id in component.PAIRS:
-            row=self.nodes[slider_id+'_row'];controls=self.nodes[slider_id+'_row-controls'];number=self.nodes[slider_id+'_number']
-            self.assertNotIn('control',row);self.assertNotIn('control',controls)
-            self.assertEqual([n['id'] for n in controls['children']],[slider_id,slider_id+'_number'])
-            self.assertEqual(controls['properties']['flex-wrap'],component.keyword('wrap'))
-            self.assertEqual(controls['properties']['column-gap'],component.length(8))
-            self.assertEqual(self.nodes[slider_id]['properties']['min-width'],component.length(128))
-            self.assertEqual(number['properties']['min-width'],component.length(6,'em'))
-            self.assertEqual(self.nodes[number['control']['parts']['viewport']]['properties']['height'],component.length(2.25,'em'))
-            slider=self.nodes[slider_id]
-            self.assertEqual(slider['properties']['height'],component.length(2.25,'em'))
-            self.assertEqual(slider['properties']['min-height'],component.length(2.25,'em'))
-            self.assertEqual(slider['properties']['display'],component.keyword('flex'))
-            self.assertEqual(slider['properties']['flex-direction'],component.keyword('column'))
-            self.assertEqual(slider['properties']['justify-content'],component.keyword('center'))
-            self.assertEqual(self.nodes[slider['control']['parts']['track']]['properties']['flex-shrink'],component.value('number',0))
-            self.assertEqual(self.nodes[slider_id+'-label']['properties']['width'],component.length(100,'%'))
-            for owner in controls['children']:
+    def test_sibling_roles_focus_order_and_shared_row(self):
+        for slider_id in PAIRS:
+            number_id=slider_id+'_number'
+            row=self.nodes[slider_id+'_row'];controls_group=self.nodes[slider_id+'_row-controls'];number=self.nodes[number_id]
+            self.assertNotIn('control',row);self.assertNotIn('control',controls_group)
+            self.assertEqual([n['id'] for n in row['children']],[slider_id,slider_id+'_row-controls'])
+            self.assertEqual([n['id'] for n in controls_group['children']],[number_id])
+            self.assertEqual(controls(row),[slider_id,number_id])
+            self.assertEqual(self.nodes[slider_id]['control']['navigation']['down'],number_id)
+            self.assertEqual(number['control']['navigation']['up'],slider_id)
+            # The Number stands after the slider in the same row and shows the
+            # value; the slider's own readout stays hidden.
+            width=lambda node:node['properties']['width']['value']
+            left=controls_group['properties']['left']['value']
+            self.assertGreaterEqual(left,width(self.nodes[slider_id]))
+            self.assertLessEqual(left+width(controls_group),width(row))
+            self.assertEqual(controls_group['properties']['height'],row['properties']['height'])
+            self.assertEqual(self.nodes[slider_id+'-value']['properties']['display'],keyword('none'))
+            self.assertEqual(self.nodes[number['control']['parts']['validation']]['properties']['display'],keyword('none'))
+            for owner in (self.nodes[slider_id],number):
                 def scan(node):
                     for child in node.get('children',[]):
                         self.assertNotIn('control',child);scan(child)
                 scan(owner)
 
     def test_shared_editable_vector_art_and_parts(self):
-        for slider_id in component.PAIRS:
+        for slider_id in PAIRS:
             number_id=slider_id+'_number';control=self.nodes[number_id]['control'];parts=control['parts']
-            self.assertEqual(set(parts),{'viewport','text','selection','caret','composition','validation'})
+            self.assertEqual(set(parts),set(PARTS))
             viewport=self.nodes[parts['viewport']]
-            self.assertEqual(viewport['properties']['overflow'],component.keyword('hidden'))
+            self.assertEqual(viewport['properties']['overflow'],keyword('hidden'))
             direct={n['id'] for n in viewport['children']}
             self.assertNotIn(parts['validation'],direct)
             for part in ('text','selection','caret','composition'):
                 self.assertIn(parts[part],direct);self.assertNotIn('transform',self.nodes[parts[part]]['properties'])
-            self.assertEqual(self.nodes[number_id+'-plate']['paths'],self.nodes[slider_id+'-plate']['paths'])
-            self.assertEqual(self.nodes[number_id+'-focus']['paths'],self.nodes[slider_id+'-focus']['paths'])
+            # One Number field component: the pair's plate is the size rows'.
+            self.assertEqual(self.nodes[number_id+'-field']['paths'],self.nodes['settings_window_width-field']['paths'])
+            self.assertEqual(self.nodes[number_id+'-field-focus']['paths'],self.nodes['settings_ambient_number-field-focus']['paths'])
             for role in ('default','hover','focus','pressed','disabled'):
                 timeline=next(t for t in self.page['timelines'] if t['id']==number_id+'.'+role)
-                self.assertEqual([(t['node'],t['property']) for t in timeline['tracks']],[(number_id+'-focus','opacity')])
+                self.assertEqual([(t['node'],t['property']) for t in timeline['tracks']],[(number_id+'-field-focus','opacity')])
 
-    def test_unrelated_page_state_actions_events_and_aliases_preserved(self):
-        changed=component.compose(self.page)
-        for key in ('state','actions','events','aliases','presentationVariables','tokens'):
-            self.assertEqual(changed[key],self.page[key])
-        for id,node in self.nodes.items():
-            if id.startswith(('settings_brightness','settings_ambient')):continue
-            if node.get('control'):
-                self.assertEqual(component.index_nodes(changed['root'])[id],node)
+    def test_typed_sizes_are_whole_number_fields(self):
+        for size_id,(key,action,minimum) in SIZES.items():
+            spec=self.nodes[size_id]['control']
+            self.assertEqual((spec['minimum'],spec['maximum'],spec['integer'],spec['exponent']),(minimum,16384,True,False))
+            self.assertEqual(spec['parts'],{part:size_id+'-'+part for part in PARTS})
+            self.assertIn(size_id+'-field',[n['id'] for n in self.nodes[size_id]['children']])
+        # A custom size selects the custom resolution, as the stock entry did.
+        for key in ('r_customWidth','r_customHeight'):
+            self.assertEqual(self.page['actions']['size.'+key],{'input':'number','operation':'settings.system.edit',
+                                                                'arguments':{key:{'input':'value'},'r_mode':-1}})
 
-    def test_bad_source_bindings_rejected_without_mutation(self):
-        for kind in ('action','binding','inventory','duplicate'):
-            page=copy.deepcopy(self.page);nodes=component.index_nodes(page['root'])
+    def test_bad_source_bindings_rejected(self):
+        contract(self.page)
+        def binding(page,name):return next(item for item in page['bindings'] if item['id']==name)
+        for kind in ('action','binding','inventory','duplicate','order','readout','availability','motion','size'):
+            page=copy.deepcopy(self.page);nodes=index_nodes(page['root'])
             if kind=='action':page['actions']['edit.r_brightness']['operation']='settings.brightness.set'
             elif kind=='binding':nodes['settings_brightness']['control']['value']={'state':'settings.baseline.r_brightness'}
             elif kind=='inventory':nodes['settings_ambient']['control']['role']='button'
-            else:page['root']['children'].append(copy.deepcopy(nodes['settings_brightness']))
-            before=copy.deepcopy(page)
-            with self.assertRaises(ValueError):component.compose(page)
-            self.assertEqual(page,before)
-
-    def test_drifted_shared_motion_requires_review(self):
-        page=copy.deepcopy(self.page)
-        timeline=next(t for t in page['timelines'] if t['id']=='settings_brightness.focus')
-        timeline['tracks'][0]['node']='settings-title'
-        with self.assertRaises(ValueError):component.compose(page)
+            elif kind=='duplicate':page['root']['children'].append(copy.deepcopy(nodes['settings_brightness']))
+            elif kind=='order':nodes['settings_brightness_row']['children'].reverse()
+            elif kind=='readout':nodes['settings_ambient-value']['properties']['display']=keyword('block')
+            elif kind=='availability':binding(page,'settings_ambient_number.enabled').update(value=True)
+            elif kind=='motion':next(t for t in page['timelines'] if t['id']=='settings_brightness_number.focus')['tracks'][0]['node']='settings-title'
+            else:nodes['settings_custom_width']['control']['integer']=False
+            with self.subTest(kind=kind),self.assertRaises((AssertionError,KeyError,ValueError)):contract(page)
 
     def test_engine_owned_local_draft_declarations_and_localization(self):
         self.assertEqual(self.page['state']['ui.numberDraftsPending'],{'type':'boolean','initial':False})
         self.assertEqual(self.page['state']['ui.numberDraftMessage'],{'type':'string','initial':'#str_230007'})
         self.assertEqual(self.page['actions']['focusNumberDraft'],{'operation':'ui.numberDrafts.focus','arguments':{}})
+        self.assertEqual(self.page['presentationVariables']['numberDraftsPending'],
+                         {'type':'boolean','initial':False,'value':{'state':'ui.numberDraftsPending'}})
+        self.assertEqual(self.page['aliases']['numberDraftsPending'],{'variable':'numberDraftsPending'})
         for path in (ROOT/'content/baseoq4/pak0/strings').glob('*_openq4.lang'):
             text=path.read_text(encoding='utf-8')
             for key in ('#str_230004','#str_230005','#str_230006'):

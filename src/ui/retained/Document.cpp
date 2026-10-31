@@ -1912,7 +1912,9 @@ Value Value::Interpolate(const Value& other, double fraction) const {
 	for (size_t i = 0; i < data.size(); ++i) result.data[i] = data[i] + (other.data[i]-data[i])*t;
 	if (type == ValueType::Colour) for (size_t i = 0; i < 3; ++i) {
 		const double premultiplied = data[i]*data[3]*(1-t)+other.data[i]*other.data[3]*t;
-		result.data[i] = result.data[3] > 0 ? premultiplied/result.data[3] : 0;
+		// Unpremultiplying can land a rounding step past 1, which a saved
+		// presentation (a language or renderer reload mid-fade) refuses.
+		result.data[i] = result.data[3] > 0 ? std::clamp(premultiplied/result.data[3],0.0,1.0) : 0;
 	}
 	return result;
 }

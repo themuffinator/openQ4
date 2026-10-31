@@ -384,7 +384,8 @@ static const retainedSettingsSection_t RETAINED_SETTINGS_SECTIONS[] = {
 static const int RETAINED_SETTINGS_SECTION_COUNT = sizeof( RETAINED_SETTINGS_SECTIONS ) / sizeof( RETAINED_SETTINGS_SECTIONS[0] );
 // The sections that are its sub-pages (the generator's DEEPER): each's kind,
 // section, document, and the event that takes the SETTINGS page one level
-// deeper to it (BeginRetainedSubpage).
+// deeper to it (BeginRetainedSubpage). DISPLAY's is the SYSTEM page, where
+// ui_retainedSystem has it on.
 typedef struct {
 	retainedSubpage_t	kind;
 	const char *		section;
@@ -395,6 +396,7 @@ static const retainedSettingsSubpage_t RETAINED_SETTINGS_SUBPAGES[] = {
 	{ RETAINED_SUBPAGE_SETTINGS_CONTROLS,	"controls",	RETAINED_CONTROLS_GUI,	"subpageEnterControls" },
 	{ RETAINED_SUBPAGE_SETTINGS_GAME,		"game",		RETAINED_GAME_GUI,		"subpageEnterGame" },
 	{ RETAINED_SUBPAGE_SETTINGS_AUDIO,		"audio",	RETAINED_AUDIO_GUI,		"subpageEnterAudio" },
+	{ RETAINED_SUBPAGE_SETTINGS_SYSTEM,		"display",	RETAINED_SYSTEM_GUI,	"subpageEnterDisplay" },
 };
 static const retainedSettingsSubpage_t *Session_RetainedSettingsSubpage( retainedSubpage_t kind ) {
 	for ( const retainedSettingsSubpage_t &subpage : RETAINED_SETTINGS_SUBPAGES ) {
@@ -3119,11 +3121,19 @@ bool idSessionLocal::ReturnSystemSettings() {
 		child->HandleNamedEvent( "onBack" );
 		PumpApplicationActions( child );
 		systemGuiBackEvent = false;
-		return guiSystem == NULL && guiActive != child;
+		// The authored dismiss may have started the climb to the SETTINGS page.
+		return ( guiSystem == NULL && guiActive != child ) || retainedSubpageFrom == child;
 	}
 	idUserInterface *parent = guiSystemParent;
 	const HandleGuiCommand_t handler = guiSystemParentHandle;
 	if ( parent == NULL ) return false;
+	if ( guiRetainedSettingsPage != NULL && parent == guiRetainedSettingsPage ) {
+		// One level up to the SETTINGS page, onto DISPLAY: the page leaves
+		// and the SETTINGS page takes over (PresentRetainedSubpage).
+		idUserInterface *child = guiSystem;
+		BeginRetainedSubpage( child, false, RETAINED_SUBPAGE_SETTINGS_SYSTEM );
+		return guiSystem == NULL || retainedSubpageFrom == child;
+	}
 	SetGUI( parent, handler );
 	SetPlayingSoundWorld();
 	return guiActive == parent && guiSystem == NULL;
@@ -7149,7 +7159,7 @@ void idSessionLocal::DrawRetainedHome( int presentationTime ) {
 
 // The Single Player page and its Campaign and Arena sub-pages, the
 // Multiplayer page and its Create Server and Join Game sub-pages, and the
-// SETTINGS page and its CONTROLS, GAME OPTIONS and AUDIO sub-pages, are
+// SETTINGS page and its CONTROLS, GAME OPTIONS, DISPLAY and AUDIO sub-pages, are
 // documents of their own (see RETAINED_SUBPAGE_DEEPER_MSEC). When the other
 // document cannot present, its stock screen opens at once.
 void idSessionLocal::BeginRetainedSubpage( idUserInterface *gui, bool deeper, retainedSubpage_t subpage ) {
@@ -7162,7 +7172,9 @@ void idSessionLocal::BeginRetainedSubpage( idUserInterface *gui, bool deeper, re
 	const char *other = settings != NULL ? ( deeper ? settings->gui : RETAINED_SETTINGSPAGE_GUI ) :
 		create || join ? ( !deeper ? RETAINED_MPPAGE_GUI : create ? RETAINED_CREATE_SERVER_GUI : RETAINED_JOIN_GAME_GUI ) :
 		!deeper ? RETAINED_SINGLEPLAYER_GUI : arena ? RETAINED_ARENA_GUI : RETAINED_CAMPAIGNS_GUI;
-	if ( FindRetainedGui( other, true, false ) == NULL || cvarSystem->GetCVarBool( "ui_retainedReducedMotion" ) ) {
+	const bool system = subpage == RETAINED_SUBPAGE_SETTINGS_SYSTEM && deeper;
+	if ( ( system ? !RetainedSystemAvailable() : FindRetainedGui( other, true, false ) == NULL ) ||
+			cvarSystem->GetCVarBool( "ui_retainedReducedMotion" ) ) {
 		// The stock screen, or reduced motion: the other level at once.
 		PresentRetainedSubpage( deeper, subpage );
 		return;
@@ -7225,10 +7237,11 @@ void idSessionLocal::PresentRetainedSubpage( bool deeper, retainedSubpage_t subp
 	retainedSubpageKind = RETAINED_SUBPAGE_CAMPAIGN;
 	if ( const retainedSettingsSubpage_t *settings = Session_RetainedSettingsSubpage( subpage ) ) {
 		const bool controls = subpage == RETAINED_SUBPAGE_SETTINGS_CONTROLS, game = subpage == RETAINED_SUBPAGE_SETTINGS_GAME;
+		const bool system = subpage == RETAINED_SUBPAGE_SETTINGS_SYSTEM;
 		if ( deeper ) {
 			// The sub-page over the SETTINGS page, which its Back climbs to. One
 			// that cannot open now leaves the stock screen to show its panel.
-			if ( !( controls ? OpenRetainedControls() : game ? OpenRetainedGame() : OpenRetainedAudio() ) &&
+			if ( !( controls ? OpenRetainedControls() : game ? OpenRetainedGame() : system ? OpenSystemSettings() : OpenRetainedAudio() ) &&
 					guiRetainedSettingsPage != NULL && guiActive == guiRetainedSettingsPage ) {
 				for ( int i = 0; i < RETAINED_SETTINGS_SECTION_COUNT; i++ ) {
 					if ( !idStr::Icmp( RETAINED_SETTINGS_SECTIONS[ i ].section, settings->section ) ) {
@@ -7241,6 +7254,19 @@ void idSessionLocal::PresentRetainedSubpage( bool deeper, retainedSubpage_t subp
 		}
 		// Back: the SETTINGS page returns onto the section, or where it cannot,
 		// the screen that opened the sub-page returns as it was.
+		if ( system ) {
+			// Presenting another screen closes the SYSTEM page (SetGUI), its
+			// draft already settled (UI_RetainedSettingsCanReturn).
+			idUserInterface *screen = guiSystemParent;
+			const HandleGuiCommand_t handler = guiSystemParentHandle;
+			if ( OpenRetainedSettingsPage( settings->section ) ) {
+				guiActive->HandleNamedEvent( "subpageReturn" );
+				PumpApplicationActions( guiActive );
+			} else if ( screen != NULL ) {
+				SetGUI( screen, handler );
+			}
+			return;
+		}
 		idUserInterface *&parent = controls ? retainedControlsParent : game ? retainedGameParent : retainedAudioParent;
 		HandleGuiCommand_t &handle = controls ? retainedControlsParentHandle : game ? retainedGameParentHandle : retainedAudioParentHandle;
 		idUserInterface *screen = parent;
@@ -8594,9 +8620,9 @@ bool idSessionLocal::OpenRetainedSettingsPage( const char *section ) {
 idSessionLocal::HandleRetainedSettingsPageRequest
 
 The SETTINGS page's verbs. CONTROLS, GAME OPTIONS and AUDIO go one level
-deeper to their retained sub-pages (BeginRetainedSubpage), and DISPLAY opens
-the retained SYSTEM page where it is on, each returning here onto its
-section; where one cannot, the stock settings screen opens on that panel once
+deeper to their retained sub-pages (BeginRetainedSubpage), and so does
+DISPLAY to the retained SYSTEM page where it is on, each returning here onto
+its section; where one cannot, the stock settings screen opens on that panel once
 the page has left (UpdateRetainedSettingsPage). LOAD DEFAULTS' YES restores
 the defaults as the stock dialog's did. BACK returns the home, from the page
 dock as from the stock screen. A panel or a change of level under way takes
@@ -8649,10 +8675,11 @@ void idSessionLocal::HandleRetainedSettingsPageRequest( idUserInterface *gui, co
 		gui->SetStateBool( va( "from_%s", RETAINED_SETTINGS_SECTIONS[ i ].section ), &RETAINED_SETTINGS_SECTIONS[ i ] == chosen );
 	}
 	gui->StateChanged( common->GetPresentationTime() );
-	// CONTROLS, GAME OPTIONS and AUDIO go one level deeper to their pages.
+	// CONTROLS, GAME OPTIONS, DISPLAY and AUDIO go one level deeper to their pages.
 	for ( const retainedSettingsSubpage_t &subpage : RETAINED_SETTINGS_SUBPAGES ) {
 		const bool available = subpage.kind == RETAINED_SUBPAGE_SETTINGS_CONTROLS ? RetainedControlsAvailable() :
-			subpage.kind == RETAINED_SUBPAGE_SETTINGS_GAME ? RetainedGameAvailable() : RetainedAudioAvailable();
+			subpage.kind == RETAINED_SUBPAGE_SETTINGS_GAME ? RetainedGameAvailable() :
+			subpage.kind == RETAINED_SUBPAGE_SETTINGS_SYSTEM ? RetainedSystemAvailable() : RetainedAudioAvailable();
 		if ( available && !idStr::Icmp( subpage.section, chosen->section ) ) {
 			BeginRetainedSubpage( gui, true, subpage.kind );
 			return;

@@ -12,8 +12,9 @@ controls retain the typed application validation.
 The SYSTEM composition reserves a 36 dp target and an 8 dp gutter beside the
 settings body. A narrow dark trough and olive thumb preserve the Quake 4
 45-degree motif; orange ink marks hover, focus and press. The header, action
-footer and frame remain outside the scrolling body. The source generator is
-`tools/ui/update_system_scrollbar.py`; repeated generation must be idempotent.
+footer and frame remain outside the scrolling body. Since 31 October 2026 the
+SYSTEM page has no scrolling body: `tools/ui/retained_system.py` sets its
+settings on tabs of at most two columns, and only its dialogs' bodies scroll.
 The body wrapper has a zero initial height and grows into the remaining panel
 space, keeping percentage-height children from pushing the footer out of view.
 The preset band reserves room for the gutter while its labels and actions retain

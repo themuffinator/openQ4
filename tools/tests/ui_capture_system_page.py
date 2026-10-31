@@ -52,11 +52,11 @@ def trace(mode='sp', renderer='gl'):
                 lines.append(f'RETAINED_GUI_WIDGET id={control} role={capture.ROLES[i]} type={capture.TYPES[i]} accepted={values[i]} pending=0 proposed=0 rejected=0 token=0 popup={stage["popup"] if i==2 else 0} firstVisible=0')
                 if capture.ROLES[i]==3:
                     opened=bool(i==2 and stage['popup'])
-                    scrolled=bool(control=='settings_resolution_scale' and stage['resolution_scrolled'])
-                    available=opened or scrolled
+                    measured=bool(control=='settings_resolution_scale' and stage['resolution_measured'])
+                    available=opened or measured
                     lines.append(f'RETAINED_GUI_CHOICE_SCROLL id={control} open={int(opened)} opening={int(available)} revision=1 '
-                                 f'offsetDp={40 if scrolled else 0} available={int(available)} usable={int(available)} density=1 '
-                                 f'viewport=80 range=160 offset={40 if scrolled else 0} track=80 thumb=36 position=0 travel=44 geometry={int(available)}')
+                                 f'offsetDp=0 available={int(available)} usable={int(available)} density=1 '
+                                 f'viewport=176 range=22 offset=0 track=176 thumb=156 position=0 travel=20 geometry={int(available)}')
             lines.append(f'RETAINED_GUI path={capture.PAGE} focus=settings_brightness revision=7 active=1 brightness={stage["live"]} shadows=1 contexts=1')
     lines += [capture.COMPLETE]
     return '\n'.join(lines)+'\n'
@@ -119,10 +119,19 @@ def number_contract_mutations(original):
         ('number-no-exponent',lambda m:node(m,'settings_brightness_number')['control'].update(exponent=False)),
         ('number-numeric-boolean',lambda m:node(m,'settings_brightness_number')['control'].update(exponent=1)),
         ('number-unclipped',lambda m:node(m,'settings_brightness_number-viewport')['properties'].update(overflow={'type':'keyword','value':'visible'})),
-        ('number-reordered-focus',lambda m:node(m,'settings_brightness_row-controls')['children'].reverse()),
-        ('number-no-wrap',lambda m:node(m,'settings_brightness_row-controls')['properties'].update({'flex-wrap':{'type':'keyword','value':'nowrap'}})),
+        ('number-reordered-focus',lambda m:node(m,'settings_brightness_row')['children'].reverse()),
+        ('number-skipped-by-navigation',lambda m:node(m,'settings_brightness')['control']['navigation'].update(down='settings_shadows')),
+        ('number-duplicate-readout',lambda m:node(m,'settings_ambient-value')['properties'].update(display={'type':'keyword','value':'block'})),
         ('number-nested-role',lambda m:node(m,'settings_brightness_row-controls').update(control={'role':'button'})),
+        ('number-row-nested-role',lambda m:node(m,'settings_ambient_row').update(control={'role':'button'})),
         ('number-availability-bypass',lambda m:binding(m,'settings_brightness_number.enabled').update(value=True)),
+        # The scripts' tab switches and expected traces bind to the page too.
+        ('tab-probe-moved',lambda m:(lambda row:(node(m,'settings-image-column-0')['children'].remove(row),
+                                                 node(m,'settings-graphics-column-0')['children'].append(row)))(node(m,'settings_brightness_row'))),
+        ('tab-first-changed',lambda m:m['state']['page.tab'].update(initial=2)),
+        ('tab-switch-extra-write',lambda m:m['events']['tab_image'][0]['then'][0]['then'][0]['values'].update({'page.discardVisible':False})),
+        ('tab-switch-action',lambda m:m['events']['tab_image'][0]['then'][0]['then'].append({'op':'action','action':'begin'})),
+        ('close-program-action',lambda m:m['events']['onDeactivate'].append({'op':'action','action':'dismiss'})),
     ]
     for name,change in mutations:
         model=copy.deepcopy(original);change(model);yield name,model
@@ -263,8 +272,44 @@ class SystemPageOracleTests(unittest.TestCase):
         for row in commands:
             self.assertNotIn(';',' '.join(row))
             if row[0]=='wait': self.assertTrue(1<=int(row[1])<=60)
-            if row[0]=='openq4_retainedGui': self.assertIn(row[1],('focus','menu','widget','report'))
+            if row[0]=='openq4_retainedGui': self.assertIn(row[1],('focus','menu','widget','report','event'))
+            if row[:2]==['openq4_retainedGui','event']: self.assertIn(row[2],('tab_graphics','tab_screen','tab_image'))
             if row[0]=='screenshot': self.assertRegex(row[1],r'^screenshots/system-[a-z]+\.tga$')
+
+    def test_probes_switch_tabs_first_and_closes_deactivate(self):
+        current=capture.FIRST_TAB
+        for stage in capture.stages():
+            if stage['opening']: current=capture.FIRST_TAB
+            switches=[]
+            for command in stage['commands']:
+                words=shlex.split(command)
+                if words[:2]==['openq4_retainedGui','event']:
+                    current=words[2][len('tab_'):]; switches.append((words[2],0,capture.TAB_WRITES))
+                elif words[:2]==['openq4_retainedGui','focus'] and words[2] in capture.TABS:
+                    self.assertEqual(capture.TABS[words[2]],current,(stage['name'],command))
+            self.assertEqual(stage['events'][:len(switches)],switches,stage['name'])
+            self.assertEqual(stage['events'][-1:]==[capture.CLOSED],not stage['page'],stage['name'])
+        self.assertEqual(sum(stage['events'].count(capture.CLOSED) for stage in capture.stages()),5)
+
+    def test_resolution_list_stays_measured_at_the_top(self):
+        original=trace(); start=original.index(capture.STAGE_MARKER+' extras_dirty\n')
+        prefix='RETAINED_GUI_CHOICE_SCROLL id=settings_resolution_scale '
+        line=next(row for row in original[start:].splitlines() if row.startswith(prefix))
+        for before,after in (('offsetDp=0','offsetDp=22'),('available=1','available=0')):
+            self.reject(original[:start]+original[start:].replace(line,line.replace(before,after),1))
+        first=next(row for row in original.splitlines() if row.startswith(prefix))
+        self.reject(original.replace(first,first.replace('available=0','available=1'),1))
+
+    def test_peer_documents_hold_their_own_context(self):
+        # The classic HUD's essential document runs beside the page in gameplay.
+        peer='guis/hud/air_marine.q4ui'
+        log=trace().replace('OPENQ4_MENU_ACTIVATION ','RETAINED_GUI_LOADED '+peer+'\nOPENQ4_MENU_ACTIVATION ',1)
+        self.reject(log)
+        mark=capture.STAGE_MARKER+' language\n'
+        log=log.replace('contexts=1','contexts=2').replace(mark,mark+f'RETAINED_GUI_RESOURCE path={peer} event=restored\n')
+        self.assertTrue(capture.qualify(log,'sp')['passed'],capture.qualify(log,'sp')['errors'])
+        self.reject(log.replace('contexts=2','contexts=3',1))
+        self.reject(log.replace('RETAINED_GUI_LOADED '+peer+'\n','',1))
 
     def test_tga_payload_validation(self):
         good=image(); self.assertEqual(capture.tga_dimensions(good),(1280,720))
@@ -423,7 +468,8 @@ class SystemPageOracleTests(unittest.TestCase):
                 for key,value in {'r_fullscreen':'0','r_fullscreenDesktop':'0','r_borderless':'0','r_hiddenWindow':'1',
                                   'in_mouse':'0','in_joystick':'0','in_joystickRumble':'0','ui_retainedSystem':'1',
                                   'r_renderApi':renderer,'ui_autoJoin':'1' if mode=='mp' else '0','ui_retainedTextScale':'1.5','sys_lang':'french',
-                                  'g_autoExecAfterMapLoadDelayMs':'3000','g_autoExecAfterMapLoad':'system-page.cfg'}.items():
+                                  'g_autoExecAfterMapLoadDelayMs':'3000','g_autoExecAfterMapLoad':'system-page.cfg',
+                                  capture.MULTIPLE_INSTANCES:'1'}.items():
                     self.assertEqual(values[key.lower()],value)
                 for _,_,key,_,seed in capture.EXTRA_ROWS: self.assertEqual(values[key.lower()],str(seed))
                 self.assertEqual(command[-2:],gameplay); self.assertEqual(kwargs['cwd'],runtime)

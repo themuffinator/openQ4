@@ -56,6 +56,11 @@ class RefreshEvidence(unittest.TestCase):
         self.assertEqual(script.count("vid_restart\n"), 2)
         self.assertNotIn("testGUI", script)
         self.assertEqual(script.splitlines()[-1], "quit")
+        # The Number answers only on its tab: each stage that focuses it switches first.
+        for row in capture.stages():
+            focus = [i for i, command in enumerate(row["commands"]) if command.startswith("openq4_retainedGui focus")]
+            if focus:
+                self.assertEqual(row["commands"][focus[0] - 2:focus[0]], ["openq4_retainedGui event tab_image", "wait 3"])
 
     def test_effective_renderer_identity(self):
         self.assertEqual(capture.active_renderer("Renderer API: gl (module)\n"), "gl")

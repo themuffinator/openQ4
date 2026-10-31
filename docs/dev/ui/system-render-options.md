@@ -91,7 +91,7 @@ module. `settings.renderer.fallback` is set while the renderer's latest report
 says it fell back from an unavailable or retired request to its automatic
 pick. Without a report, neither is set.
 
-`tools/ui/update_system_render_options.py` owns both rows, their help, status
+`tools/ui/retained_system.py` owns both rows, their help, status
 and notice lines, the seven state declarations, the aliases, the bindings and
 the feedback timelines, together with the confirmation title's recovery
 binding. Both rows follow the page's shared editing rule (open, editing, not

@@ -1334,7 +1334,7 @@ def generate_release_docs_site(
         "subprojects/rmlui.wrap", "subprojects/packagefiles/libtess2/double-precision.patch",
         "subprojects/packagefiles/rmlui/masked-hit-test.patch",
         "subprojects/packagefiles/jsoncpp/subnormal-numbers.patch",
-        "tools/ui/update_system_text_layout.py",
+        "tools/ui/retained_system.py",
         "tools/ui/capture_legacy_baseline.py",
         "tools/ui/system_settings_probe.py",
         "tools/ui/fixtures/system-settings-smoke.q4ui",

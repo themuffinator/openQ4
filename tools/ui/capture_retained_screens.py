@@ -516,19 +516,26 @@ SCENARIOS = {
         'screenshot "screenshots/system-default.tga"',
     ]),
     # Opted into, the retained SYSTEM page opens from the SYSTEM button, its
-    # focus on the performance preset (the report's focus=).
+    # focus on the performance preset (the report's focus=) on the GRAPHICS
+    # tab; then SCREEN, IMAGE QUALITY with a list unfolded, and Back.
     'system-optin': (None, [
-        'waitMsec 4000', 'openq4_guiAction main_b_settings', 'waitMsec 1500', 'openq4_guiAction set_b_system',
+        'waitMsec 9000', 'openq4_guiAction main_b_settings', 'waitMsec 1500', 'openq4_guiAction set_b_system',
         'waitMsec 1500', 'openq4_system report', 'openq4_retainedGui report', 'ui_retainedStatus',
         'screenshot "screenshots/system-optin.tga"',
+        'openq4_retainedGui event onTabNext', 'waitMsec 400', 'openq4_retainedGui report',
+        'screenshot "screenshots/system-optin-screen.tga"',
+        'openq4_retainedGui event onTabNext', 'waitMsec 400', 'openq4_retainedGui report',
+        'screenshot "screenshots/system-optin-image.tga"',
+        'openq4_retainedGui focus settings_postaa', 'waitMsec 100', 'openq4_retainedGui choice open settings_postaa', 'waitMsec 400',
+        'screenshot "screenshots/system-optin-list.tga"', *menu_step('back'),
         'openq4_system back', 'waitMsec 1000', 'openq4_system report',
     ]),
     # Opted into, the Menu button on the SYSTEM page (section 13.5): with the
     # brightness drafted it applies the change; with another drafted, Back asks
     # to discard and Menu there continues editing, as Back does.
     'system-menu-apply': (None, [
-        'waitMsec 4000', 'openq4_guiAction main_b_settings', 'waitMsec 1500', 'openq4_guiAction set_b_system',
-        'waitMsec 1500', 'openq4_system report', 'r_brightness',
+        'waitMsec 9000', 'openq4_guiAction main_b_settings', 'waitMsec 1500', 'openq4_guiAction set_b_system',
+        'waitMsec 1500', 'openq4_system report', 'r_brightness', 'openq4_retainedGui event tab_image', 'waitMsec 400',
         'openq4_retainedGui focus settings_brightness', 'openq4_retainedGui menu right 1', 'openq4_retainedGui menu right 0',
         'waitMsec 600', 'openq4_retainedGui report', 'screenshot "screenshots/system-menu-pending.tga"',
         'openq4_retainedGui event onMenuButton', 'waitMsec 1500', 'openq4_retainedGui report', 'r_brightness',
@@ -1154,6 +1161,20 @@ SCENARIOS = {
         'openq4_retainedGui event onBack', 'waitMsec 1500', 'openq4_retainedGui report', 'ui_retainedStatus',
         'screenshot "screenshots/subpages-audio-back.tga"',
     ]),
+    # Opted into, DISPLAY on the SETTINGS page goes one level deeper to the
+    # SYSTEM page, captured mid-change and presented; its Back climbs out onto
+    # DISPLAY mid-change and at rest.
+    'settings-system': (None, [
+        'waitMsec 14000', 'openq4_retainedGui focus nav_settings', *menu_step('accept'), 'waitMsec 1200',
+        'openq4_retainedGui focus display', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
+        'waitMsec 175', 'screenshot "screenshots/settings-system-change.tga"', 'waitMsec 1200', 'ui_retainedStatus',
+        'openq4_system report', 'openq4_retainedGui report', 'screenshot "screenshots/settings-system.tga"',
+        'openq4_retainedGui event onTabNext', 'waitMsec 400', 'screenshot "screenshots/settings-system-screen.tga"',
+        'openq4_retainedGui event onTabNext', 'waitMsec 400', 'screenshot "screenshots/settings-system-image.tga"',
+        'openq4_retainedGui event onBack', 'waitMsec 150', 'screenshot "screenshots/settings-system-back.tga"', 'waitMsec 1200',
+        'openq4_system report', 'openq4_retainedGui report', 'ui_retainedStatus',
+        'screenshot "screenshots/settings-system-returned.tga"',
+    ]),
     # LOAD DEFAULTS' YES restores the defaults: a changed sensitivity returns
     # to its default.
     'settings-defaults': (None, [
@@ -1497,6 +1518,7 @@ SCENARIO_CVARS = {'mpcard-prompts': {'ui_retainedMultiplayer': '1'}, 'mpcard-tri
                   'arenapause': {'net_allowCheats': '1'}, 'system-optin': {'ui_retainedSystem': '1'}, 'fallback-system': {'ui_retainedSystem': '1'},
                   'system-mp-route': {'ui_retainedSystem': '1'}, 'fallback-system-mp': {'ui_retainedSystem': '1'},
                   'system-mp-game': {'ui_retainedSystem': '1'}, 'system-menu-apply': {'ui_retainedSystem': '1'},
+                  'settings-system': {'ui_retainedSystem': '1'},
                   'fallback-loading': {'developer': '1'}, 'subpage-reduced': {'ui_retainedReducedMotion': '1'},
                   'arenafail': {'net_port': str(SCENARIO_PORTS['arenafail']), 'net_ip': '127.0.0.1'},
                   'multiplayer': {'net_allowCheats': '1'},

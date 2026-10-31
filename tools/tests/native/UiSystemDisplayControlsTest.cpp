@@ -17,9 +17,9 @@ static void Inside(const Bounds& a,const Bounds& b,const char* why) {
 }
 static void Propose(View& v,const Field& field) {
  const auto before=v.tx.Draft();
- Check(v.runtime.FocusControl(field.id,v.time),"display control focuses");v.Frame();
+ Check(v.Focus(field.id),"display control focuses");v.Frame();
  Inside(v.Box(field.id),v.Box("settings-body"),"complete focused display control visible");
- TextFits(v,(std::string(field.id)+"-label").c_str());
+ RowTextFits(v,(std::string(field.id)+"-label").c_str());
  v.Key(MenuInput::Accept);v.Frame();
  if(v.runtime.GetWidgetState(field.id)->popupOpen) {
   v.Key(MenuInput::End);v.Frame();
@@ -69,7 +69,7 @@ static void Run(const std::string& source,const std::string& directory,const cha
   for(const auto& field:fields)Check(!v.runtime.CanActivateControl(field.id,v.time),"display operations gated during competing workflows");
   Check(v.runtime.SetState({{"page.discardVisible",false}},v.error,v.time),"clear local discard modal");
  }
- v.Sync();Check(v.runtime.FocusControl("settings_msaa",v.time),"focus available MSAA before capability loss");
+ v.Sync();Check(v.Focus("settings_msaa"),"focus available MSAA before capability loss");
  v.Key(MenuInput::Accept);v.Frame();Check(v.runtime.GetWidgetState("settings_msaa")->popupOpen,"MSAA popup starts open");
  Check(v.runtime.SetState({{"settings.msaaAvailable",false}},v.error,v.time),"unavailable renderer capability");v.Frame();
  Check(!v.runtime.CanActivateControl("settings_msaa",v.time),"MSAA disabled for unavailable backend");

@@ -14,9 +14,9 @@ through the existing draft guard.
 
 All six repository languages have labels, the reset action and an explanation
 that large sizes may be reduced to fit the window. The controls reuse the
-existing editable vector choice/button components. The authoring source is
-maintained by `tools/ui/update_system_interface_settings.py`; its `--check`
-mode composes the same document without modifying staged content.
+existing editable vector choice/button components, on the SYSTEM page's
+GRAPHICS tab. `tools/ui/retained_system.py` generates the page, and
+`build_retained_screens.py --check` compares it without writing.
 
 ## Window fitting and persistence
 

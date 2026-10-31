@@ -16,7 +16,7 @@ static void Refresh(View& v) {
  v.canApply=v.tx.Dirty();v.Sync();v.Frame();
 }
 static void Choose(View& v,const char* control,double expected,bool last) {
- Check(v.runtime.FocusControl(control,v.time),"interface choice focuses");v.Frame();
+ Check(v.Focus(control),"interface choice focuses");v.Frame();
  v.Key(MenuInput::Accept);v.Frame();auto opened=v.runtime.GetWidgetState(control);
  Check(opened&&opened->popupOpen,"interface choice opens inside actual body");
  v.Key(last?MenuInput::End:MenuInput::Home);v.Frame();
@@ -47,10 +47,10 @@ static void Run(const std::string& source,const std::string& folder,const char* 
  for(const auto c:{Case{1280,720,1},Case{1280,720,2},Case{640,480,1},Case{640,480,2}}) {
   std::fprintf(stderr,"Interface sizes locale=%s expansion=%g viewport=%dx%d density=%g UI=200 text=200\n",locale,expansion,c.width,c.height,c.density);
   v.viewport.width=c.width;v.viewport.height=c.height;v.viewport.displayScale=c.density;Refresh(v);
-  Check(v.runtime.FocusControl("settings_reset_sizes",v.time),"reset can receive ordinary focus");v.Frame();
+  Check(v.Focus("settings_reset_sizes"),"reset can receive ordinary focus");v.Frame();
   Inside(v.Box("settings_reset_sizes"),v.Box("settings-body"),"complete reset control is revealed");
   Inside(v.Box("settings_reset_sizes"),{0,0,float(c.width),float(c.height)},"reset stays inside physical viewport");
-  TextFits(v,"settings_reset_sizes-label");
+  RowTextFits(v,"settings_reset_sizes-label");
   Check(v.tx.Edit(View::Owner,{{"r_brightness",1.2}}).code==SettingsCode::Ok,"unrelated draft before reset");Refresh(v);
   const auto reset=v.Event("resetSizes");Check(reset.actions.size()==1,"guarded reset produces one transaction edit");
   Check(reset.actions[0].operation=="settings.system.edit"&&reset.actions[0].arguments==StateValues({{"ui_retainedScale",1.0},{"ui_retainedTextScale",1.0}}),"reset changes only two size fields");

@@ -194,7 +194,8 @@ typedef enum {
 	RETAINED_SUBPAGE_JOIN_GAME,		// Multiplayer's Join Game, the server browser
 	RETAINED_SUBPAGE_SETTINGS_CONTROLS,	// Settings' CONTROLS
 	RETAINED_SUBPAGE_SETTINGS_GAME,	// Settings' GAME OPTIONS
-	RETAINED_SUBPAGE_SETTINGS_AUDIO	// Settings' AUDIO
+	RETAINED_SUBPAGE_SETTINGS_AUDIO,	// Settings' AUDIO
+	RETAINED_SUBPAGE_SETTINGS_SYSTEM	// Settings' DISPLAY, the SYSTEM page
 } retainedSubpage_t;
 
 // Player- or server-supplied text for a retained screen (Session.cpp): escapes,

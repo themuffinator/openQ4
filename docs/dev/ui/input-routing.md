@@ -150,7 +150,7 @@ holds the input, the adapter keeps the button Back, which closes them
 (`Runtime::ModalOpen`, the widget's `popupOpen`), so Menu never acts behind
 a dialog. The two screens with an Apply declare it:
 
-- The opt-in SYSTEM page (`tools/ui/update_system_menu_button.py`) runs its
+- The opt-in SYSTEM page (`tools/ui/retained_system.py`) runs its
   own programs. With pending changes Menu runs `apply`, whose condition
   still decides whether Apply can run; with a typed number not yet
   committed it moves the focus to that number, as Continue Editing does,

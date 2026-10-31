@@ -173,7 +173,10 @@ See [release status](../../user/release-status.md) and the
   frame, breadcrumbs and transitions as Multiplayer's pages, instead of
   full-screen panels. Long pages are split into tabs (switch with Q and E,
   the shoulder buttons or a click), and no page uses more than two columns.
-  Game Options' tabs replace its Section list.
+  Game Options' tabs replace its Section list. The new Display page (opt in
+  with `ui_retainedSystem 1`) follows suit: Graphics, Screen and Image Quality
+  tabs, with Apply Changes and the Keep or Revert countdown working as
+  before.
 - **Settings on tall screens, and exact values.** On a portrait or rotated
   screen, Controls, Game Options and Audio in the new interface now use the
   height: their rows stand in one larger, scrolling column instead of

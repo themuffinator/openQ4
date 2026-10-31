@@ -448,7 +448,7 @@ next load, and no Keep/Revert question to answer.
   opens for one only when it needs recovery (a failed preparation or restore,
   or a save that did not finish); its title then reads Settings need
   attention (`#str_230077`) rather than the Keep question.
-  `tools/ui/update_system_render_options.py` owns that title binding.
+  `tools/ui/retained_system.py` owns that title binding.
 - **Apply and Exit.** Exit completes only when the attempt committed its
   target (`LastCommitted`); a restore cancels it.
 - **Startup.** A schema-2 deferred record replays its owned keys before the

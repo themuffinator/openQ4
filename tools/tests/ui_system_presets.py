@@ -1,16 +1,37 @@
 #!/usr/bin/env python3
 """Strict source contracts for SYSTEM presets. Runtime/layout is tested separately."""
 import copy
-import importlib.util
 import itertools
+import json
 import re
+import sys
 import unittest
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
-spec=importlib.util.spec_from_file_location('presets',ROOT/'tools/ui/update_system_presets.py')
-presets=importlib.util.module_from_spec(spec);spec.loader.exec_module(presets)
-spec=importlib.util.spec_from_file_location('numbers',ROOT/'tools/ui/update_system_number_fields.py')
-numbers=importlib.util.module_from_spec(spec);spec.loader.exec_module(numbers)
+sys.path.insert(0,str(ROOT/'tools/ui'))
+import build_retained_screens as screens
+import retained_system as system
+SOURCE=screens.OUTPUTS['system']
+PROFILES=('minimum','lowpower','performance','balanced','enhanced','quality','ultra')
+GRAPHICS=0  # page.tab of the GRAPHICS tab, which holds the preset and the renderer rows
+
+def load(path):
+    return json.loads('\n'.join(line for line in path.read_text(encoding='utf-8').splitlines() if not line.lstrip().startswith('//')))
+
+def nodes(root):
+    result={}
+    def walk(node):
+        if node['id'] in result: raise ValueError('Duplicate canonical node: '+node['id'])
+        result[node['id']]=node
+        for child in node.get('children',[]): walk(child)
+    walk(root)
+    return result
+
+def renamed(value,old,new):
+    if isinstance(value,str): return new+value[len(old):] if value.startswith(old) else value
+    if isinstance(value,list): return [renamed(item,old,new) for item in value]
+    if isinstance(value,dict): return {key:renamed(item,old,new) for key,item in value.items()}
+    return value
 
 def evaluate(value,state):
     if not isinstance(value,dict): return value
@@ -22,53 +43,81 @@ def evaluate(value,state):
     raise AssertionError('Unexpected preset guard operator '+op)
 
 def contract(page):
-    nodes=presets.nodes(page['root']); choice=nodes['settings_preset']['control']
+    index=nodes(page['root']); choice=index['settings_preset']['control']
     assert choice['role']=='choice' and choice['action']=='preset' and 'event' not in choice
     assert choice['value']=={'state':'settings.draft.com_performancePreset'}
-    assert tuple(o['value'] for o in choice['options'])==('minimum','lowpower','performance','balanced','enhanced','quality','ultra')
+    assert tuple(o['value'] for o in choice['options'])==PROFILES
     for i,o in enumerate(choice['options']):
         assert o['id']==o['node']=='settings_preset-option-'+str(i)
         assert o['label']=='#str_229977' and o['labelIndex']==i
     assert page['actions']['preset']=={'input':'string','operation':'settings.system.preset','arguments':{'name':{'input':'value'}}}
     assert page['actions']['autoDetect']=={'operation':'settings.system.autodetect','arguments':{}}
-    assert nodes['settings_autodetect']['control']['event']=='autoDetect'
+    assert index['settings_autodetect']['control']['event']=='autoDetect'
     event=page['events']['autoDetect'];assert len(event)==1 and event[0]['op']=='if'
     assert event[0]['then']==[{'op':'action','action':'autoDetect'}] and not event[0].get('else')
     conditions=[event[0]['condition']]
     for id in ('settings_preset','settings_autodetect'):
         matches=[b for b in page['bindings'] if b['node']==id and b['property']=='enabled'];assert len(matches)==1
         conditions.append(matches[0]['value'])
-    for phase in range(6):
+    # The event answers wherever it is called from; the rows also only while
+    # their GRAPHICS tab is current.
+    keys=('settings.open','settings.busy','settings.confirmationVisible','page.discardVisible','ui.numberDraftsPending','settings.render.autoDetect')
+    for phase,tab in itertools.product(range(6),range(3)):
         for bits in itertools.product((False,True),repeat=6):
             opened,busy,confirm,modal,local,detected=bits
-            state=dict(zip(('settings.open','settings.busy','settings.confirmationVisible','page.discardVisible','ui.numberDraftsPending','settings.render.autoDetect'),bits));state['settings.phase']=phase
+            state=dict(zip(keys,bits));state['settings.phase']=phase;state['page.tab']=tab
             expected=opened and phase==1 and not(busy or confirm or modal or local)
-            assert evaluate(conditions[1],state)==expected
-            assert all(evaluate(condition,state)==(expected and detected) for condition in (conditions[0],conditions[2]))
+            assert evaluate(conditions[0],state)==(expected and detected)
+            assert evaluate(conditions[1],state)==(expected and tab==GRAPHICS)
+            assert evaluate(conditions[2],state)==(expected and detected and tab==GRAPHICS)
     for prefix in ('draft','baseline'):
         alias=prefix+'Preset';assert page['aliases'][alias]=={'variable':alias}
         assert page['presentationVariables'][alias]['value']=={'state':'settings.'+prefix+'.com_performancePreset'}
 
 class Presets(unittest.TestCase):
     @classmethod
-    def setUpClass(cls):cls.prefix,cls.page=presets.load(ROOT/presets.SOURCE);cls.nodes=presets.nodes(cls.page['root'])
+    def setUpClass(cls):cls.page=load(SOURCE);cls.nodes=nodes(cls.page['root'])
     def test_contract(self):contract(self.page)
-    def test_generators_independently_idempotent(self):
-        self.assertEqual(presets.compose(self.page),self.page)
-        self.assertEqual(numbers.compose(self.page),self.page)
-        self.assertEqual(numbers.compose(presets.compose(self.page)),presets.compose(numbers.compose(self.page)))
-    def test_placement_and_existing_order(self):
-        self.assertEqual([n['id'] for n in self.nodes['settings-body']['children']],['performance-band','interface-band','display-column','dimensions-column','image-column','render-column'])
-        self.assertEqual([n['id'] for n in self.nodes['performance-band']['children']],['settings_backend','settings_gpu','settings_preset','settings_autodetect','settings_restart_renderer','rendering-active','rendering-notice'])
-        self.assertEqual(self.nodes['performance-band']['properties']['flex-wrap'],presets.keyword('wrap'))
-        for id in ('settings_preset','settings_autodetect'):
-            self.assertGreater(self.nodes[id]['properties']['flex-shrink']['value'],0)
-        self.assertNotIn('height',self.nodes['settings_preset-value']['properties'])
-        self.assertEqual(self.nodes['settings_preset-value']['properties']['white-space'],presets.keyword('normal'))
+    def test_generator_reproduces_preset_contract(self):
+        # The page is generated. Rebuilding all of it outlasts this test's 30 s
+        # meson budget, so ui_system_number_fields.py (and
+        # build_retained_screens.py --check) compares the whole document; this
+        # rebuilds the generator's preset programs and gates.
+        doc=screens.Document('openq4.system');system.page_actions(doc);system.page_events(doc)
+        for name in ('preset','autoDetect'):self.assertEqual(self.page['actions'][name],doc.actions[name])
+        self.assertEqual(self.page['events']['autoDetect'],doc.events['autoDetect'])
+        current={'op':'==','args':[{'state':'page.tab'},GRAPHICS]}
+        for id,enabled in (('settings_preset',system.QUIET),('settings_autodetect',system.both(system.QUIET,system.st('settings.render.autoDetect')))):
+            self.assertEqual(next(b['value'] for b in self.page['bindings'] if b['id']==id+'.enabled'),{'op':'&&','args':[current,enabled]})
+        self.assertEqual(tuple(system.PROFILES),PROFILES)
+        self.assertEqual(self.page['extensions']['openq4']['presets'],system.EXTENSIONS['presets'])
+    def test_graphics_tab_placement_and_order(self):
+        self.assertEqual([n['id'] for n in self.nodes['settings-body']['children']],['settings-page-graphics','settings-page-screen','settings-page-image'])
+        self.assertEqual([n['id'] for n in self.nodes['settings-graphics-column-0']['children']],
+                         ['settings_preset','settings_autodetect','settings_backend','settings_gpu','settings_renderer','settings_renderer-status',
+                          'settings_restart_renderer','rendering-active','rendering-notice'])
+        self.assertIn('settings-graphics-column-0',[n['id'] for n in self.nodes['settings-page-graphics']['children']])
+        self.assertEqual(self.page['state']['page.tab'],{'type':'number','initial':GRAPHICS})
+        current={'op':'==','args':[{'state':'page.tab'},GRAPHICS]}
+        for id in ('settings_preset','settings_autodetect','settings_backend','settings_gpu'):
+            enabled=next(b['value'] for b in self.page['bindings'] if b['id']==id+'.enabled')
+            self.assertEqual(enabled['op'],'&&');self.assertEqual(enabled['args'][0],current)
+        for id in ('settings_preset','settings_backend','settings_gpu'):
+            self.assertEqual(self.nodes[id]['control']['placementBounds'],'settings-body')
+        # The preset is the tab's first row: the strip reaches it, and both the
+        # arrival on GRAPHICS and the switch to it focus it.
+        self.assertEqual(self.nodes['settings_preset']['control']['navigation']['up'],'tab-graphics')
+        self.assertEqual(self.nodes['settings_preset']['control']['navigation']['down'],'settings_autodetect')
+        self.assertEqual(self.nodes['settings_autodetect']['control']['navigation']['up'],'settings_preset')
+        arrival=self.page['events']['onActivate'][-1]
+        self.assertEqual((arrival['condition'],arrival['then']),(current,[{'op':'focus','control':'settings_preset'}]))
+        switch=self.page['events']['tab_graphics'][0]['then'][0]['then']
+        self.assertEqual(switch[-1],{'op':'focus','control':'settings_preset'})
     def test_existing_art_is_reused(self):
-        for new,old in [('settings_preset','settings_postaa'),('settings_autodetect','settings_back')]:
-            for part in ('plate','focus'):
-                expected=presets.renamed(self.nodes[old+'-'+part],old,new)
+        # Both rows draw the stock setting row's plate, wash and focus rail.
+        for new,old in [('settings_preset','settings_postaa'),('settings_autodetect','settings_postaa')]:
+            for part in ('plate','wash','focus'):
+                expected=renamed(self.nodes[old+'-'+part],old,new)
                 self.assertEqual(self.nodes[new+'-'+part],expected)
         for id,node in self.nodes.items():
             if id.startswith(('settings_preset','settings_autodetect')):self.assertNotEqual(node['type'],'image')
@@ -86,6 +135,7 @@ class Presets(unittest.TestCase):
         self.assertEqual(self.page['events']['autoDetect'][0]['then'],[{'op':'action','action':'autoDetect'}])
         self.assertEqual(self.nodes['settings_apply']['control']['event'],'apply')
         self.assertIn({'state':'ui.numberDraftsPending'},self.page['events']['apply'][0]['condition']['args'][1]['args'])
+        self.assertEqual(self.page['extensions']['openq4']['presets']['source'],'src/framework/PerformancePreset.cpp')
     def test_mutations_refused(self):
         def reject(change):
             p=copy.deepcopy(self.page);change(p)
@@ -96,9 +146,11 @@ class Presets(unittest.TestCase):
         reject(lambda p:p['events']['autoDetect'][0]['then'].append({'op':'setState','values':{'settings.draft.com_performancePreset':'quality'}}))
         reject(lambda p:p['events']['autoDetect'][0].update(**{'else':[{'op':'action','action':'autoDetect'}]}))
         reject(lambda p:p['presentationVariables']['baselinePreset'].update(value={'state':'settings.draft.com_performancePreset'}))
-        reject(lambda p:presets.nodes(p['root'])['settings_preset']['control']['options'][2].update(value='ultra'))
+        reject(lambda p:nodes(p['root'])['settings_preset']['control']['options'][2].update(value='ultra'))
         for id in ('settings_preset','settings_autodetect'):
             reject(lambda p,id=id:next(b for b in p['bindings'] if b['id']==id+'.enabled').update(value=True))
+            # A row that answers while another tab is current.
+            reject(lambda p,id=id:(lambda b:b.update(value=b['value']['args'][1]))(next(b for b in p['bindings'] if b['id']==id+'.enabled')))
         # Missing each individual gate still fails exhaustive truth-table checks.
         def replace(value,key):
             if value=={'state':key}:return True if key=='settings.open' else False

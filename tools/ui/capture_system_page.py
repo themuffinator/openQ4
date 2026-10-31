@@ -47,6 +47,14 @@ ROLES = (2,1,3)+tuple(row[3] for row in EXTRA_ROWS)
 TYPES = tuple(1 if role==1 else 0 for role in ROLES)
 VALUE_INDICES = tuple(range(6,len(FIELDS),2))
 SCREENSHOTS = ('draft', 'applied', 'discard', 'choice', 'reloaded', 'extrasapplied', 'extrasrestored', 'returned', 'reopened')
+# The tab (the page's tab_<name> event) holding each probed control. Only the
+# current tab's rows answer, and every opening starts on GRAPHICS.
+TABS = {**{control:'image' for control in CONTROLS}, 'settings_ui_aspect':'graphics'}
+FIRST_TAB = 'graphics'
+TAB_WRITES = 2  # A switch writes page.leaving and page.tab.
+CLOSED = ('ondeactivate', 0, 0)  # Every close runs the page's onDeactivate.
+# Other sessions run clients too; a second instance otherwise exits at once.
+MULTIPLE_INSTANCES = 'win_allowMultipleInstances' if os.name == 'nt' else 'sys_allowMultipleInstances'
 
 
 def digest(path: Path) -> str:
@@ -157,25 +165,52 @@ def open_choice(control: str) -> list[str]:
     return activate(control) + ['wait 3']
 
 
+def show_tab(name: str) -> list[str]:
+    # The page's own tab event, as its strip fires it; the wait lets the page
+    # switched to lay out before one of its rows takes the focus.
+    return [f'openq4_retainedGui event tab_{name}', 'wait 3']
+
+
+class Tabs:
+    """The current tab while the fixed script runs: each probe of a control on
+    another tab switches first, and the stage expects that switch's program."""
+    def __init__(self, tabs: dict):
+        self.tabs, self.current, self.events = tabs, FIRST_TAB, []
+
+    def on(self, control: str) -> list[str]:
+        name = self.tabs[control]
+        if name == self.current: return []
+        self.current = name; self.events.append((f'tab_{name}', 0, TAB_WRITES))
+        return show_tab(name)
+
+    def take(self, opening: bool) -> list:
+        events, self.events = self.events, []
+        if opening: self.current = FIRST_TAB
+        return events
+
+
 def stages() -> list[dict]:
     rows = []
+    tabs = Tabs(TABS)
 
     def add(name, commands, *, brightness=1.1, baseline=1.1, shadows=1, postaa=0,
             dirty=0, discard=0, popup=0, live=1.1, page=True, actions=(), events=(),
             screenshot=None, resets=0, opening=False, extras=EXTRA_SEED,
-            extra_baseline=EXTRA_SEED, resolution_scrolled=0):
+            extra_baseline=EXTRA_SEED, resolution_measured=0):
+        # Tab switches precede the stage's own programs; a close ends with onDeactivate.
+        events = tabs.take(opening) + list(events) + ([] if page else [CLOSED])
         rows.append(dict(name=name, commands=commands, page=page,
                          values=(1, dirty, 0, dirty, 1, discard, brightness, baseline, shadows, 1, postaa, 0)
                                 +tuple(value for pair in zip(extras,extra_baseline) for value in pair),
-                         popup=popup, live=live, actions=list(actions), events=list(events),
-                         screenshot=screenshot, resets=resets, opening=opening, resolution_scrolled=resolution_scrolled))
+                         popup=popup, live=live, actions=list(actions), events=events,
+                         screenshot=screenshot, resets=resets, opening=opening, resolution_measured=resolution_measured))
 
     add('open', ['openq4_system open'], brightness=1, baseline=1, live=1,
         actions=[('begin', 0)], events=[('onactivate', 1, 1)], opening=True)
-    add('brightness_dirty', ['openq4_retainedGui focus "settings_brightness"'] + key('right'),
+    add('brightness_dirty', tabs.on('settings_brightness') + ['openq4_retainedGui focus "settings_brightness"'] + key('right'),
         baseline=1, dirty=1, live=1, actions=[('edit', 1)], screenshot='draft')
     add('applied', activate('settings_apply'), actions=[('apply', 0)], events=[('apply', 1, 0)], screenshot='applied')
-    add('shadow_dirty', activate('settings_shadows'), shadows=0, dirty=1, actions=[('edit', 1)])
+    add('shadow_dirty', tabs.on('settings_shadows') + activate('settings_shadows'), shadows=0, dirty=1, actions=[('edit', 1)])
     add('discard_dialog', activate('settings_back'), shadows=0, dirty=1, discard=1,
         events=[('onback', 0, 1)], screenshot='discard')
     add('keep_editing', activate('discard_keep_editing'), shadows=0, dirty=1,
@@ -184,15 +219,15 @@ def stages() -> list[dict]:
         page=False, actions=[('cancel', 0)], events=[('onback', 0, 1), ('discard', 2, 1)])
     add('reopen_discarded', ['openq4_system open'], actions=[('begin', 0)],
         events=[('onactivate', 1, 1)], opening=True)
-    add('choice_tentative', open_choice('settings_postaa') + key('down'), popup=1, screenshot='choice')
+    add('choice_tentative', tabs.on('settings_postaa') + open_choice('settings_postaa') + key('down'), popup=1, screenshot='choice')
     add('choice_cancelled', key('back'))
-    add('choice_dirty', open_choice('settings_postaa') + key('down') + key('down') + key('accept'),
+    add('choice_dirty', tabs.on('settings_postaa') + open_choice('settings_postaa') + key('down') + key('down') + key('accept'),
         postaa=2, dirty=1, actions=[('edit', 1)])
     add('choice_restored', activate('settings_back') + ['wait 3'] + activate('discard_changes'),
         page=False, actions=[('cancel', 0)], events=[('onback', 0, 1), ('discard', 2, 1)])
     add('reopen_choice', ['openq4_system open'], actions=[('begin', 0)],
         events=[('onactivate', 1, 1)], opening=True)
-    add('reload_draft', ['openq4_retainedGui focus "settings_brightness"'] + key('right'),
+    add('reload_draft', tabs.on('settings_brightness') + ['openq4_retainedGui focus "settings_brightness"'] + key('right'),
         brightness=1.2, dirty=1, actions=[('edit', 1)])
     add('language', ['reloadLanguage', 'wait 30'], brightness=1.2, dirty=1, resets=1)
     add('video', ['vid_restart windowed', 'wait 60'], brightness=1.2, dirty=1, resets=1, screenshot='reloaded')
@@ -200,20 +235,24 @@ def stages() -> list[dict]:
         page=False, actions=[('cancel', 0)], events=[('onback', 0, 1), ('discard', 2, 1)])
     add('reopen_clean', ['openq4_system open'], actions=[('begin', 0)],
         events=[('onactivate', 1, 1)], opening=True)
-    extra_changed, extra_seed = [], []
-    for control,_,_,role,_ in EXTRA_ROWS:
-        if role==1:
-            extra_changed += activate(control); extra_seed += activate(control)
-        else:
-            extra_changed += open_choice(control)+key('home')+key('down')*4+key('accept')
-            extra_seed += open_choice(control)+key('home')+key('down')*5+key('accept')
-    add('extras_dirty', extra_changed, extras=EXTRA_CHANGED, dirty=1, actions=[('edit',1)]*7, resolution_scrolled=1)
+    def extras(down):
+        commands = []
+        for control,_,_,role,_ in EXTRA_ROWS:
+            commands += tabs.on(control)
+            commands += activate(control) if role==1 else open_choice(control)+key('home')+key('down')*down+key('accept')
+        # Settle on the Resolution Scale list's tab, so the readback measures
+        # the list it inspects.
+        return commands + tabs.on('settings_resolution_scale')
+    # The list shows eight of its nine rows within the pages, so neither 85 %
+    # nor 100 % scrolls it: its kept offset stays at the top, measured.
+    add('extras_dirty', extras(4), extras=EXTRA_CHANGED, dirty=1, actions=[('edit',1)]*7, resolution_measured=1)
     add('extras_applied', activate('settings_apply'), extras=EXTRA_CHANGED,
         extra_baseline=EXTRA_CHANGED, actions=[('apply',0)], events=[('apply',1,0)], screenshot='extrasapplied',
-        resolution_scrolled=1)
-    add('extras_restore_draft', extra_seed, extra_baseline=EXTRA_CHANGED, dirty=1,
-        actions=[('edit',1)]*7, resolution_scrolled=1)
-    add('extras_restored', activate('settings_apply'), actions=[('apply',0)], events=[('apply',1,0)], resolution_scrolled=1, screenshot='extrasrestored')
+        resolution_measured=1)
+    add('extras_restore_draft', extras(5), extra_baseline=EXTRA_CHANGED, dirty=1,
+        actions=[('edit',1)]*7, resolution_measured=1)
+    add('extras_restored', activate('settings_apply'), actions=[('apply',0)], events=[('apply',1,0)], resolution_measured=1,
+        screenshot='extrasrestored')
     add('returned', activate('settings_back'), page=False, events=[('onback', 1, 0)], screenshot='returned')
     add('reopened', ['openq4_system open'], actions=[('begin', 0)], events=[('onactivate', 1, 1)],
         opening=True, screenshot='reopened')
@@ -256,6 +295,7 @@ def source_contract(runtime: Path) -> dict:
     if any(node not in nodes for node in required) or any(field not in model.get('aliases', {}) for field in FIELDS):
         raise ValueError('Production SYSTEM probe controls or readback aliases changed')
     number_contract(model,nodes)
+    tab_contract(model,nodes,TABS)
     slider = nodes['settings_brightness']['control']
     if (slider.get('role') != 'slider' or slider.get('minimum') != .5 or slider.get('maximum') != 2 or slider.get('step') != .1):
         raise ValueError('Production brightness tick contract changed')
@@ -283,6 +323,34 @@ def source_contract(runtime: Path) -> dict:
                 raise ValueError(f'Production service readback alias changed: {field}')
     return {'document':model['id'], 'source':str(source), 'staged':binding, 'sha256':digest(source),
             'normal_filesystem_path':PAGE, 'replacement_acceptance':False}
+
+
+def tab_contract(model: dict, nodes: dict, tabs: dict) -> None:
+    """Bind the scripts' tab switches and expected program traces to the page.
+
+    Each probed control stands on its tab's page; an opening starts on
+    GRAPHICS; a switch writes page.leaving and page.tab and runs no action; the
+    close program (onDeactivate) writes nothing and runs no action.
+    """
+    def steps(program):
+        for step in program:
+            yield step
+            for branch in ('then','else'): yield from steps(step.get(branch,[]))
+    events = model.get('events',{})
+    body = [node.get('id') for node in nodes.get('settings-body',{}).get('children',[])]
+    if model.get('state',{}).get('page.tab') != {'type':'number','initial':0} or body[:1] != ['settings-page-'+FIRST_TAB]:
+        raise ValueError('Production SYSTEM first tab changed')
+    for control,name in tabs.items():
+        pending, found = [nodes.get('settings-page-'+name,{})], False
+        while pending:
+            node = pending.pop(); found |= node.get('id') == control; pending.extend(node.get('children',[]))
+        program = list(steps(events.get('tab_'+name,[])))
+        writes = [sorted(step.get('values',{})) for step in program if step.get('op') == 'setState']
+        if not found or writes != [['page.leaving','page.tab']] or any(step.get('op') == 'action' for step in program):
+            raise ValueError(f'Production SYSTEM tab placement or switch changed: {control}')
+    closing = list(steps(events.get('onDeactivate',[])))
+    if not closing or any(step.get('op') in ('action','setState','call') for step in closing):
+        raise ValueError('Production SYSTEM close program changed')
 
 
 def number_contract(model: dict, nodes: dict) -> None:
@@ -368,10 +436,15 @@ def number_contract(model: dict, nodes: dict) -> None:
         direct={node.get('id') for node in viewport.get('children',[])}
         if not {parts[p] for p in ('text','selection','caret','composition')} <= direct:
             raise ValueError('Production Number paint parts no longer share a viewport')
-        row=nodes.get(slider_id+'_row-controls',{})
-        require([node['id'] for node in row.get('children',[])],[slider_id,number_id],'sibling focus order')
-        require(row.get('properties',{}).get('flex-wrap'),{'type':'keyword','value':'wrap'},'responsive paired row')
-        if 'control' in row or 'control' in nodes.get(slider_id+'_row',{}):
+        # One row reads the slider, then its Number; the Number shows the value.
+        row=nodes.get(slider_id+'_row',{})
+        def controls(node):
+            if 'control' in node: return [node.get('id')]
+            return [found for child in node.get('children',[]) for found in controls(child)]
+        require(controls(row),[slider_id,number_id],'sibling focus order')
+        require((slider.get('navigation',{}).get('down'),number.get('navigation',{}).get('up')),(number_id,slider_id),'paired navigation')
+        require(nodes.get(slider_id+'-value',{}).get('properties',{}).get('display'),{'type':'keyword','value':'none'},'single paired readout')
+        if 'control' in row or 'control' in nodes.get(slider_id+'_row-controls',{}):
             raise ValueError('Production paired numeric row acquired a nested semantic control')
         require(bindings.get((number_id,'enabled')),bindings.get((slider_id,'enabled')),'paired availability')
 
@@ -407,11 +480,28 @@ def tga_dimensions(raw: bytes, expected_size: tuple[int, int] = (1280,720)) -> t
     return size
 
 
+def peer_documents(log: str) -> set[str]:
+    """The other retained documents the session runs beside the page, such as
+    the gameplay HUD's essential document in the classic layout. Each holds a
+    context of its own; their loads and restores are not this page's evidence."""
+    prefix = 'RETAINED_GUI_LOADED '
+    return {line[len(prefix):].strip() for line in log.splitlines()
+            if line.startswith(prefix) and line[len(prefix):].strip() != PAGE}
+
+
+def peer_line(line: str, peers: set[str]) -> bool:
+    if line.startswith('RETAINED_GUI_LOADED '): return line[len('RETAINED_GUI_LOADED '):].strip() in peers
+    match = re.match(r'RETAINED_GUI_RESOURCE path=(\S+) ', line)
+    return bool(match) and match[1] in peers
+
+
 def qualify(log: str, mode: str) -> dict:
     errors, records, activation, completion = [], [], [], []
     current = None
+    peers = peer_documents(log)
     for line in log.splitlines():
         stripped = line.strip()
+        if peer_line(line, peers): continue
         if STAGE_MARKER in line:
             match = re.fullmatch(STAGE_MARKER + r' ([a-z_]+)', stripped)
             if not match:
@@ -458,7 +548,7 @@ def qualify(log: str, mode: str) -> dict:
             elif line.startswith('RETAINED_GUI path='):
                 reports.append(_fields(line, 'RETAINED_GUI ', report_fields)); observed.append('report')
             elif line.startswith('RETAINED_GUI_OPERATION '):
-                match = re.fullmatch(r'RETAINED_GUI_OPERATION (focus|menu) passed', line)
+                match = re.fullmatch(r'RETAINED_GUI_OPERATION (focus|menu|event) passed', line)
                 if not match: errors.append(f'{at}: failed or unexpected semantic operation')
                 else: events.append(('operation', match.group(1)))
             elif line.startswith('UI_SETTINGS '):
@@ -526,14 +616,14 @@ def qualify(log: str, mode: str) -> dict:
                         errors.append(f'{at}: choice popup geometry disagrees with its widget record')
                     elif open_popup and (row['available'] != '1' or row['opening'] == '0'):
                         errors.append(f'{at}: open bounded popup never reached a measured frame')
-                    # A bar-equipped choice keeps its scroll position in offsetDp.
+                    # A bar-equipped choice keeps its scroll position in offsetDp,
+                    # and a list once opened keeps its measured geometry.
                     # firstVisible belongs to the older bar-less model and stays zero.
                     if row['id'] == 'settings_resolution_scale':
-                        scrolled = float(row['offsetDp']) > 0
-                        if scrolled != bool(stage['resolution_scrolled']) or (scrolled and row['available'] != '1'):
-                            errors.append(f'{at}: retained choice scroll offset differs from the fixed script')
+                        if float(row['offsetDp']) != 0 or (row['available'] == '1') != bool(stage['resolution_measured']):
+                            errors.append(f'{at}: retained choice scroll offset or measured geometry differs from the fixed script')
             for report in reports:
-                if (not report or report['path'] != PAGE or report['active'] != '1' or report['contexts'] != '1' or
+                if (not report or report['path'] != PAGE or report['active'] != '1' or report['contexts'] != str(1+len(peers)) or
                     not re.fullmatch(r'\d+',report['revision']) or not _number(report['brightness'],stage['live']) or report['shadows'] != '1'):
                     errors.append(f'{at}: actual host/rendered owner readback mismatch')
         expected_actions = [(operation,'0','0' if operation=='cancel' else '1',str(dirty)) for operation,dirty in stage['actions']]
@@ -594,7 +684,7 @@ def capture(args) -> int:
         'com_skipLoadingContinue':'1', 'com_loadingContinueAutoAdvance':'1', 'com_maxfps':'60',
         'ui_autoJoin':'1' if args.mode=='mp' else '0', 'ui_retainedScale':'1', 'ui_retainedDensity':str(density),
         'ui_retainedTextScale':str(args.text_scale),
-        'sys_lang':args.language,
+        'sys_lang':args.language, MULTIPLE_INSTANCES:'1',
         'ui_retainedTrace':'1', 'ui_retained':'0', 'ui_retainedSystem':'1', 'ui_retainedReducedMotion':'0'}
     command = [str(executable)]
     for key,value in overrides.items(): command += ['+set',key,value]

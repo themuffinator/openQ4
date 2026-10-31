@@ -81,16 +81,13 @@ their own increment ([SYSTEM resolution rows](system-resolution-rows.md)).
 
 ## Authoring
 
-`tools/ui/update_system_display_controls.py` owns both rows: the device row is
-cloned from the post-AA choice and the span row from V-Sync, with their
+`tools/ui/retained_system.py` builds both rows (originally cloned from the
+post-AA choice and V-Sync by a patch script, since retired), with their
 `draftDisplayDevice`, `baselineDisplayDevice`, `draftMultiScreen` and
 `baselineMultiScreen` aliases, bindings and feedback timelines. The span row's
-reason line, `settings_multiscreen-status`, is cloned from the dimensions hint
-and sits under the value, as the renderer notice does. The display column
-reads `[title, device, span, fullscreen, borderless, policy, MSAA]`.
-`tools/ui/update_system_scrollbar.py` keeps the new rows' timelines with the
-other display rows'. The page grows from about 3.96 MB to 4.56 MB, most of it
-the nine device option rows.
+reason line, `settings_multiscreen-status`, is a note under the row. On the
+SCREEN tab the DISPLAY column reads `[device, span, span reason, fullscreen,
+borderless, policy, MSAA, V-Sync]`.
 
 ## Known limitations
 

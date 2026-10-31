@@ -469,7 +469,12 @@ static const char* va(const char* fmt, ...) {
     va_list args; va_start(args, fmt); std::vsnprintf(text, sizeof(buffers[0]), fmt, args); va_end(args); return text;
 }
 typedef enum { RETAINED_SUBPAGE_CAMPAIGN, RETAINED_SUBPAGE_ARENA, RETAINED_SUBPAGE_CREATE_SERVER, RETAINED_SUBPAGE_JOIN_GAME,
-    RETAINED_SUBPAGE_SETTINGS_CONTROLS, RETAINED_SUBPAGE_SETTINGS_GAME, RETAINED_SUBPAGE_SETTINGS_AUDIO } retainedSubpage_t;
+    RETAINED_SUBPAGE_SETTINGS_CONTROLS, RETAINED_SUBPAGE_SETTINGS_GAME, RETAINED_SUBPAGE_SETTINGS_AUDIO,
+    RETAINED_SUBPAGE_SETTINGS_SYSTEM } retainedSubpage_t;
+// Whether the SYSTEM page's draft lets it leave (its own compiled cases,
+// ui_system_session_route.py, cover a draft not applied).
+static bool systemCanReturn = true;
+static bool UI_RetainedSettingsCanReturn(idUserInterface*) { return systemCanReturn; }
 template<typename T> static T Max(T a, T b) { return a > b ? a : b; }
 // The server scan as the Join Game page reads and drives it: the servers it
 // found, those the filter passes in the sort's order (visible), the
@@ -730,12 +735,27 @@ public:
     std::vector<idUserInterface*> controlsPublishes; std::vector<std::string> controlsRequests;
     void PublishRetainedControls(idUserInterface* gui) { controlsPublishes.push_back(gui); }
     void HandleRetainedControlsRequest(idUserInterface*, const char* request) { controlsRequests.push_back(request); }
-    // The SETTINGS page; the retained SYSTEM page it may open has its own
-    // compiled cases (check_system_settings), here it never opens.
+    // The SETTINGS page, and the retained SYSTEM page its DISPLAY goes one
+    // level deeper to. Opening and closing that page have their own compiled
+    // cases (ui_system_session_route.py); here a counted double opens it over
+    // the screen that asks, as the production one does, while systemOpensPage
+    // holds, and SetGUI of another screen closes it. Its Back
+    // (ReturnSystemSettings) is the production one.
     idUserInterface* guiRetainedSettingsPage = nullptr; int retainedSettingsDest = 0, retainedSettingsLeft = 0, retainedSettingsAt = 0;
     idUserInterface* RetainedSettingsPage(); bool OpenRetainedSettingsPage(const char* = nullptr);
     void HandleRetainedSettingsPageRequest(idUserInterface*, const char*); void UpdateRetainedSettingsPage(); bool RetainedSettingsParent() const;
-    int systemOpens = 0; bool OpenSystemSettings() { ++systemOpens; return false; }
+    idUserInterface *guiSystem = nullptr, *guiSystemParent = nullptr; HandleGuiCommand_t guiSystemParentHandle = nullptr;
+    bool systemGuiTransition = false, systemGuiBackEvent = false, systemOpensPage = false; int systemOpens = 0, systemCloses = 0;
+    bool OpenSystemSettings() {
+        ++systemOpens;
+        if (guiSystem != nullptr) return guiActive == guiSystem;
+        if (!systemOpensPage || !RetainedSystemAvailable() || !RetainedSettingsParent() || guiMsgRestore != nullptr) return false;
+        idUserInterface* child = FindRetainedGui("guis/menu/settings/system.q4ui", false, false);
+        if (child == nullptr) return false;
+        guiSystemParent = guiActive; guiSystemParentHandle = guiHandle; guiSystem = child;
+        SetGUI(child, nullptr); return guiActive == child;
+    }
+    bool ReturnSystemSettings(); void SetPlayingSoundWorld() {}
     idUserInterface* guiRetainedJoin = nullptr; idList<int> retainedJoinServers; int retainedJoinFirst = 0, retainedJoinRevision = -1;
     idStr retainedJoinAddress, retainedJoinShotMap, retainedJoinShot; idStrList retainedJoinRowAddresses;
     idUserInterface* RetainedJoinGamePage(); void OpenRetainedJoinGame(); void PublishRetainedJoinGame(idUserInterface*);
@@ -773,7 +793,11 @@ public:
     int starts = 0;
     void SelectCampaign(const char* campaign, bool start = false) { selected.push_back(campaign); if (start) ++starts; else OpenRetainedCampaignSkill(); }
     void StartMenu() { ++menus; guiActive = guiMainMenu; }
-    void SetGUI(idUserInterface* gui, HandleGuiCommand_t handler) { guiActive = gui; guiHandle = handler; }
+    // Another screen closes the SYSTEM page (CloseSystemSettings).
+    void SetGUI(idUserInterface* gui, HandleGuiCommand_t handler) {
+        if (guiSystem != nullptr && gui != guiSystem) { guiSystem = guiSystemParent = nullptr; guiSystemParentHandle = nullptr; ++systemCloses; }
+        guiActive = gui; guiHandle = handler;
+    }
     idUserInterface* SelectRetainedLoadingGui(idUserInterface*, bool);
     idUserInterface* FindRetainedGui(const char*, bool, bool);
     idUserInterface* RetainedHomeDocument(idUserInterface*&, const char*);
@@ -824,6 +848,7 @@ static idSessionLocal Session(bool gate, bool inGame = false) {
     declManagerObject = DeclManager{}; precacheCost = 0; latePrecaches = 0;
     timeRuns.clear(); expressionWrites = 0; fileSystemObject.maps.clear();
     legacyActionAvailable = true; preview = false; ui_retained.value = gate; ui_retainedSystem.value = false; ui_retainedMultiplayer.value = false;
+    systemCanReturn = true;
     fileSystemObject.files = std::set<std::string>(std::begin(DOCUMENTS), std::end(DOCUMENTS)); arenaCampaign = ArenaCampaign{};
     fileSystemObject.gameDirFiles.clear(); fileSystemObject.opens = fileSystemObject.closes = 0; cvarSystemObject = CVarSystem{};
     fileSystemObject.activeGameDir = "baseoq4"; fileSystemObject.modList = {}; fileSystemObject.modLists = fileSystemObject.modFrees = 0;
@@ -2733,6 +2758,78 @@ int main() {
               (Stock(old) == std::vector<std::string>{"guis/menu/settings.q4ui"}));
         legacyEventsMissing.clear();
     }
+    {   // DISPLAY with the SYSTEM page on goes one level deeper to it as the
+        // other sections do, without the shared document probe (the page loads
+        // as it opens): the page plays its half and the SYSTEM page presents
+        // over it at 350 ms; Back while going deeper reverses. The SYSTEM
+        // page's Back plays its half, once its draft lets it leave, and at
+        // 300 ms the page returns onto DISPLAY, closing it. Where the SYSTEM
+        // page is off, or cannot open, the stock panel stands in, and the
+        // SYSTEM page opened over the stock settings screen returns there at once.
+        auto s = Session(true); ui_retainedSystem.value = true; s.systemOpensPage = true;
+        s.PreloadRetainedScreens(); s.UpdateRetainedHome();
+        s.HandleRetainedSessionRequest(s.guiRetainedHome, "settings"); commonObject.time += 550; s.UpdateRetainedHome(); s.UpdateRetainedPage();
+        auto* page = s.guiRetainedSettingsPage;
+        CHECK(page != nullptr && s.guiActive == page && s.RetainedSystemAvailable());
+        const size_t loads = managerObject.loads.size(), sounds = s.played.size();
+        s.HandleRetainedSessionRequest(page, "settingsDisplay");
+        CHECK(s.guiActive == page && page->named.back() == "subpageEnterDisplay" && s.retainedSubpageFrom == page && s.retainedSubpageDeeper &&
+              s.retainedSubpageKind == RETAINED_SUBPAGE_SETTINGS_SYSTEM && s.retainedSubpageUntil == commonObject.time + 350 &&
+              page->state["from_display"] == "1" && page->state["from_audio"] == "0" && s.systemOpens == 0 && s.retainedSettingsDest == 0 &&
+              managerObject.loads.size() == loads && s.played.size() == sounds + 1);
+        s.HandleRetainedSessionRequest(page, "settingsGame"); CHECK(s.retainedSubpageKind == RETAINED_SUBPAGE_SETTINGS_SYSTEM);  // nothing else meanwhile
+        commonObject.time += 350; s.UpdateRetainedSubpage();
+        auto* system = s.guiSystem;
+        CHECK(system != nullptr && s.guiActive == system && std::string(system->Name()) == "guis/menu/settings/system.q4ui" &&
+              s.guiSystemParent == page && s.systemOpens == 1 && s.retainedSubpageFrom == nullptr && s.retainedSettingsDest == 0);
+        CHECK(s.ReturnSystemSettings());
+        CHECK(s.guiActive == system && s.guiSystem == system && !system->named.empty() && system->named.back() == "subpageLeave" &&
+              s.retainedSubpageFrom == system && !s.retainedSubpageDeeper && s.retainedSubpageKind == RETAINED_SUBPAGE_SETTINGS_SYSTEM &&
+              s.retainedSubpageUntil == commonObject.time + 300 && s.systemCloses == 0);
+        commonObject.time += 300; s.UpdateRetainedSubpage();
+        CHECK(s.guiActive == page && page->named.back() == "subpageReturn" && page->state["from_display"] == "1" &&
+              page->state["from_controls"] == "0" && s.guiSystem == nullptr && s.guiSystemParent == nullptr && s.systemCloses == 1);
+        CHECK(!s.ReturnSystemSettings() && s.retainedSubpageFrom == nullptr);
+        // Back while going deeper reverses, the SYSTEM page never opening.
+        s.HandleRetainedSessionRequest(page, "settingsDisplay"); CHECK(page->named.back() == "subpageEnterDisplay");
+        sysEvent_t back; back.evType = SE_KEY; back.evValue = K_ESCAPE; back.evValue2 = 1;
+        CHECK(s.RetainedSubpageEvent(&back) && page->named.back() == "subpageReverse150" && s.retainedSubpageFrom == nullptr && s.guiActive == page);
+        commonObject.time += 350; s.UpdateRetainedSubpage(); CHECK(s.systemOpens == 1 && s.guiActive == page);
+        // A draft not applied answers Back itself (its onBack asks first); once
+        // it lets the page leave, Back climbs as before.
+        s.HandleRetainedSessionRequest(page, "settingsDisplay"); commonObject.time += 350; s.UpdateRetainedSubpage();
+        system = s.guiSystem; CHECK(system != nullptr && s.guiActive == system && s.systemOpens == 2);
+        systemCanReturn = false;
+        CHECK(!s.ReturnSystemSettings() && system->named.back() == "onBack" && s.retainedSubpageFrom == nullptr && s.guiActive == system &&
+              !s.systemGuiBackEvent);
+        systemCanReturn = true;
+        CHECK(s.ReturnSystemSettings() && system->named.back() == "subpageLeave" && s.retainedSubpageFrom == system);
+        commonObject.time += 300; s.UpdateRetainedSubpage(); CHECK(s.guiActive == page && s.guiSystem == nullptr && s.systemCloses == 2);
+        // A SYSTEM page that cannot open after the descent leaves the stock
+        // panel to stand in, at once.
+        s.systemOpensPage = false;
+        s.HandleRetainedSessionRequest(page, "settingsDisplay"); commonObject.time += 350; s.UpdateRetainedSubpage();
+        CHECK(s.systemOpens == 3 && s.guiActive == page && s.guiSystem == nullptr && s.retainedSettingsDest == 22 &&
+              s.retainedSettingsAt == commonObject.time);
+        s.UpdateRetainedSettingsPage();
+        CHECK(s.guiActive == s.guiMainMenu && legacy["desktop::dest"] == 22 && s.guiMainMenu->named.back() == "openSettingsPage");
+        // Over the stock settings screen the SYSTEM page's Back returns there
+        // at once, the SETTINGS page loaded or not.
+        s.systemOpensPage = true; const size_t played = s.played.size();
+        CHECK(s.OpenSystemSettings() && s.guiSystemParent == s.guiMainMenu);
+        system = s.guiSystem;
+        CHECK(s.ReturnSystemSettings() && s.guiActive == s.guiMainMenu && s.guiSystem == nullptr && s.retainedSubpageFrom == nullptr &&
+              system->named.empty() && s.played.size() == played && s.systemCloses == 3);
+        // With the SYSTEM page fallen back DISPLAY leaves for the stock panel
+        // as before.
+        auto stock = Session(true); ui_retainedSystem.value = true; stock.PreloadRetainedScreens(); stock.UpdateRetainedHome();
+        stock.HandleRetainedSessionRequest(stock.guiRetainedHome, "settings"); commonObject.time += 550;
+        stock.UpdateRetainedHome(); stock.UpdateRetainedPage();
+        stock.retainedStock.Append("guis/menu/settings/system.q4ui"); CHECK(!stock.RetainedSystemAvailable());
+        stock.HandleRetainedSessionRequest(stock.guiRetainedSettingsPage, "settingsDisplay");
+        CHECK(stock.guiRetainedSettingsPage->named.back() == "depart" && stock.retainedSettingsDest == 22 && stock.retainedSubpageFrom == nullptr &&
+              stock.systemOpens == 0);
+    }
     {   // The CONTROLS button opens the retained page as GAME OPTIONS does, a
         // wait for a key ended; the page's verbs reach the session only while
         // it presents; BACK returns; a page that stopped drawing opens the
@@ -4446,14 +4543,14 @@ def check_prompt_glyphs(compiler: str, directory: Path) -> None:
     # The title, both pauses, Single Player, Campaign, the campaign difficulty
     # page, Multiplayer and SETTINGS, the seven pages with their own prompt bars and the
     # Strogg pause's three, the loading screen, the Escape, Welcome and
-    # summary cards, the Arena pause card and the CONTROLS, GAME OPTIONS and
-    # AUDIO sub-pages.
-    assert documents == 26, documents
+    # summary cards, the Arena pause card and the CONTROLS, GAME OPTIONS,
+    # DISPLAY (SYSTEM) and AUDIO sub-pages.
+    assert documents == 27, documents
     # The cards' and the settings sub-pages' tab keys take the shoulders, as do
     # the Escape and Welcome cards' Tabs prompts; every Accept and Back prompt
     # follows Swap Confirm and Back.
-    assert shoulders == 14, shoulders
-    assert swapping == 51, swapping
+    assert shoulders == 16, shoulders
+    assert swapping == 53, swapping
     print(f'ui_retained gate: prompt glyphs follow the active device in {documents} documents')
 
 
@@ -5550,8 +5647,19 @@ def main() -> int:
     menu_event = function_body(menu, 'void idSessionLocal::MenuEvent(')
     assert menu_event.index('if ( RetainedSubpageEvent( event ) ) {') < menu_event.index('HandleEvent(')
     waits = {name: int(re.search(rf'static const int RETAINED_SUBPAGE_{name}_MSEC = (\d+);', menu).group(1)) for name in ('DEEPER', 'BACK')}
+    # The SETTINGS page's sub-pages are the generator's DEEPER, DISPLAY's the
+    # SYSTEM page.
+    sys.path.insert(0, str(ROOT / 'tools' / 'ui'))
+    import retained_settings_page
+    settings_subpages = re.findall(r'\{ (RETAINED_SUBPAGE_SETTINGS_[A-Z]+),\s*"([a-z]+)",\s*(RETAINED_[A-Z]+_GUI),\s*"(subpageEnter[A-Za-z]+)" \}',
+                                   re.search(r'RETAINED_SETTINGS_SUBPAGES\[\] = \{(.*?)\n\};', menu, re.S).group(1))
+    assert {section: enter for _kind, section, _gui, enter in settings_subpages} == \
+        {ident: timeline for ident, _row, _key, timeline in retained_settings_page.DEEPER} and len(settings_subpages) == 4
+    assert ('RETAINED_SUBPAGE_SETTINGS_SYSTEM', 'display', 'RETAINED_SYSTEM_GUI', 'subpageEnterDisplay') in settings_subpages
     for name, event in (('singleplayer', 'subpageEnter'), ('campaigns', 'subpageLeave'), ('multiplayer', 'subpageEnterCreate'),
-                        ('multiplayer', 'subpageEnterJoin'), ('createserver', 'subpageLeave'), ('joingame', 'subpageLeave')):
+                        ('multiplayer', 'subpageEnterJoin'), ('createserver', 'subpageLeave'), ('joingame', 'subpageLeave'),
+                        *[('settings', enter) for *_rest, enter in settings_subpages],
+                        *[(f'settings/{page}', 'subpageLeave') for page in ('controls', 'game', 'system', 'audio')]):
         text = (ROOT / f'content/baseoq4/pak0/guis/menu/{name}.q4ui').read_text(encoding='utf-8')
         document = json.loads(re.sub(r'^\s*//.*$', '', text, flags=re.M))
         timelines = {item['id']: item for item in document['timelines']}
@@ -5673,7 +5781,7 @@ def main() -> int:
         'static bool Session_RetainedMultiplayerRoutes(',
         'static void Session_RetainedSaveLabel(', 'static idStr Session_RetainedSaveShot(', 'static void Session_RetainedSaveStamp(',
         'static void Session_RetainedSaveDetails(', 'static void Session_PublishRetainedTitleState(', 'idUserInterface *idSessionLocal::FindRetainedGui(',
-        'bool idSessionLocal::RetainedSystemAvailable(', 'void idSessionLocal::OpenCampaignSelector(',
+        'bool idSessionLocal::RetainedSystemAvailable(', 'bool idSessionLocal::ReturnSystemSettings(', 'void idSessionLocal::OpenCampaignSelector(',
         'bool idSessionLocal::OpenRetainedCampaignSkill(', 'void idSessionLocal::BeginRetainedCampaignSkill(',
         'bool idSessionLocal::RetainedHomeInputBlocked(',
         'void idSessionLocal::UpdateRetainedHome(', 'idUserInterface *idSessionLocal::RetainedHomeDocument(',

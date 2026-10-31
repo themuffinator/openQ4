@@ -10,11 +10,11 @@ that label its title. It is the stock settings screen's level: its buttons
 CONTROLS, GAME OPTIONS, DISPLAY, AUDIO and LOAD DEFAULTS on the home
 navigation plates, with BACK under them. CONTROLS, GAME OPTIONS and AUDIO
 open their retained pages, and DISPLAY the retained SYSTEM page where it is
-on; each returns here onto its section. Where one cannot, the page leaves as
+on (ui_retainedSystem); each returns here onto its section. Where one cannot, the page leaves as
 the Multiplayer page does for a stock page (its plates fade over 150 ms as it
 sweeps 640 u toward the trailing edge over 300 ms) and the stock settings
 screen takes over at 500 ms on that panel; its Back returns here
-(settingsOpen). CONTROLS, GAME OPTIONS and AUDIO are sub-pages
+(settingsOpen). CONTROLS, GAME OPTIONS, DISPLAY and AUDIO are sub-pages
 (retained_settings_rows): going to one, the page goes one level deeper as
 Multiplayer's CREATE SERVER does (idSessionLocal::BeginRetainedSubpage), and
 the sub-page's Back climbs out onto its section. LOAD DEFAULTS asks first, in
@@ -41,7 +41,7 @@ DEPART_MS = 300    # the stock screen's slide; it arrives at 500 ms
 # sections, its label (which carries to the step's foot) and the name of its
 # enter timeline. The session's BeginRetainedSubpage names the same events.
 DEEPER = (("controls", 0, "#str_200083", "subpageEnterControls"), ("game", 1, "#str_200084", "subpageEnterGame"),
-          ("audio", 3, "#str_229901", "subpageEnterAudio"))
+          ("display", 2, "#str_229900", "subpageEnterDisplay"), ("audio", 3, "#str_229901", "subpageEnterAudio"))
 DETAILS = (210.0, 140.0)    # the content column's box, u
 DETAIL_TEXT, DETAIL_LINE = 18, 26
 
@@ -67,7 +67,8 @@ def settings_page_document() -> dict:
     depart       a section opens the stock screen: the plates fade over 150 ms
                  while the page sweeps 640 u toward the trailing edge over
                  300 ms, and the title and description go with them;
-    subpageEnterControls, subpageEnterGame, subpageEnterAudio  the section
+    subpageEnterControls, subpageEnterGame, subpageEnterDisplay,
+    subpageEnterAudio  the section
                  goes deeper, 350 ms: the plates fade over 150 ms while the
                  page sweeps 640 u toward the trailing edge over 300 ms;
                  SETTINGS becomes the crumb (title.crumb, 150 ms); from 50 ms

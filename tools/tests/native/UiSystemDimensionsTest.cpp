@@ -30,8 +30,8 @@ static void Pending(View& v) {
 }
 static void Propose(View& v,const Dimension& field) {
  const auto before=v.tx.Draft();
- Check(v.runtime.FocusControl(field.id,v.time),"dimension field can focus");v.Frame();
- TextFits(v,(std::string(field.id)+"-label").c_str());
+ Check(v.Focus(field.id),"dimension field can focus");v.Frame();
+ RowTextFits(v,(std::string(field.id)+"-label").c_str());
  Inside(v.Box((std::string(field.id)+"-viewport").c_str()),v.Box("settings-body"),field.id);
  Check(v.runtime.BeginNumberEdit(field.id,v.error,v.time),"dimension begins precise local edit");
  for(const auto& bad:{std::string("-"),std::to_string(int(field.minimum)-1),std::string("16385"),std::string("1280.00000000000000001"),std::string("1e3")}) {
@@ -42,7 +42,8 @@ static void Propose(View& v,const Dimension& field) {
   Inside(v.Box((std::string(field.id)+"-viewport").c_str()),v.Box("settings-body"),"validation leaves the full editing viewport visible");
   Check(v.runtime.TakeActions().empty()&&SettingsValuesEqual(v.tx.Draft(),before),"invalid dimension changes no typed draft");
   Check(v.runtime.GetWidgetState(field.id)->number->state.text==bad,"validation preserves correction text");
-  TextFits(v,(std::string(field.id)+"-validation").c_str());
+  RowTextFits(v,(std::string(field.id)+"-validation").c_str());
+  Inside(v.Box((std::string(field.id)+"-validation").c_str()),v.Box("settings-body"),"the validation under the row stays inside the pages' bounds");
  }
  Replace(v,field.id,std::to_string(int(field.target)));Pending(v);
  Check(v.runtime.CommitNumberEdit(field.id,Identity(v,field.id),v.error,v.time),"whole pixel dimension commits a proposal");
@@ -67,7 +68,7 @@ static void Run(const std::string& source,const std::string& directory,const cha
   v.viewport.width=c.width;v.viewport.height=c.height;v.viewport.displayScale=c.density;v.viewport.textScale=c.text;
   Check(v.tx.Edit(View::Owner,{{"r_windowWidth",1280.0},{"r_windowHeight",720.0},{"r_customWidth",1920.0},{"r_customHeight",1080.0},{"r_mode",3.0},{"r_fullscreen",false},{"r_fullscreenDesktop",false}}).code==SettingsCode::Ok,"seed complete dimension draft");v.Sync();v.Frame();
   for(const auto& field:dimensions)Propose(v,field);
-  Check(v.runtime.FocusControl("settings_custom_height",v.time),"custom sizing help reachable");v.Frame();TextFits(v,"dimensions-hint");
+  Check(v.runtime.FocusControl("settings_custom_height",v.time),"custom sizing help reachable");v.Frame();RowTextFits(v,"dimensions-hint");
   Check(v.tx.Edit(View::Owner,{{"r_fullscreen",true},{"r_fullscreenDesktop",true}}).code==SettingsCode::Ok,"draft dependency changes");v.Sync();v.Frame();
   for(const auto& field:dimensions) {
    Check(!v.runtime.CanActivateControl(field.id,v.time),"inactive dimension family rejects input");
@@ -80,14 +81,14 @@ static void Run(const std::string& source,const std::string& directory,const cha
   for(const auto& field:dimensions)Check(!v.runtime.CanActivateControl(field.id,v.time),"dimension edits honor modal and service ownership");
   Check(v.runtime.SetState({{"page.discardVisible",false}},v.error,v.time),"clear local modal guard");
  }
- v.Sync();v.Frame();Check(v.runtime.FocusControl("settings_window_width",v.time)&&v.runtime.BeginNumberEdit("settings_window_width",v.error,v.time),"begin unfinished size before recreation");
+ v.Sync();v.Frame();Check(v.Focus("settings_window_width")&&v.runtime.BeginNumberEdit("settings_window_width",v.error,v.time),"begin unfinished size before recreation");
  Replace(v,"settings_window_width","-");Pending(v);std::string snapshot;
  Check(v.runtime.SaveSnapshot(snapshot,v.error,v.time),"dimension document snapshot saves pending correction");
  v.runtime.CloseDocument();std::vector<Diagnostic> diagnostics;
  Check(v.runtime.LoadDocument(source,"guis/menu/settings/system.q4ui",diagnostics)&&v.runtime.RestoreSnapshot(snapshot,v.error,v.time),"dimension fields recreate from exact source");v.Sync();v.Frame();
  Check(v.runtime.GetWidgetState("settings_window_width")->number->state.text=="-"&&v.runtime.TakeActions().empty(),"recreation preserves invalid text without replaying a proposal");
  NumberDraftSummary draft;Check(v.runtime.QueryNumberDrafts(draft,v.error,v.time)&&v.runtime.DiscardNumberDrafts(draft.barrier,v.error,v.time),"explicit discard clears restored local size");v.pending=false;v.Sync();v.Frame();
- Check(v.runtime.FocusControl("settings_window_width",v.time)&&v.runtime.BeginNumberEdit("settings_window_width",v.error,v.time),"begin proposal before dependency loss");Replace(v,"settings_window_width","1920");
+ Check(v.Focus("settings_window_width")&&v.runtime.BeginNumberEdit("settings_window_width",v.error,v.time),"begin proposal before dependency loss");Replace(v,"settings_window_width","1920");
  Check(v.runtime.CommitNumberEdit("settings_window_width",Identity(v,"settings_window_width"),v.error,v.time),"queue dimension edit");auto queued=v.runtime.TakeActions();Check(queued.size()==1,"one queued dimension edit");
  Check(v.runtime.SetState({{"settings.draft.r_fullscreen",true}},v.error,v.time),"window size becomes inactive before dispatch");v.Frame();
  Check(!v.runtime.CanDispatchControlAction(queued[0],v.time),"dependency change retires stale dimension proposal");

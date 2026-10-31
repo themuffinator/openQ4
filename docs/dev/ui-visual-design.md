@@ -1,6 +1,6 @@
 # openQ4 UI Visual Design
 
-Specification version 1.29, 31 October 2026 (1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
+Specification version 1.30, 31 October 2026 (1.29 earlier that day, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
 1.9 on 29 September, 1.6 on 28 September, 1.4 and 1.5 on 27 September, 1.1 to
 1.3 on 26 September, 1.0 on 8 September 2026). Status:
 implementation target; the replacement has not shipped. Applies to every
@@ -1815,7 +1815,11 @@ and parallax off.
   a warning tag, and rows with a performance cost show a three-tick impact
   gauge drawn from the slider's tick ramp. Crosshair, HUD scale, text size,
   brightness and color-vision rows preview live. Apply and Discard live in the
-  prompt bar, and display changes keep the 15-second Keep or Revert countdown.
+  prompt bar, except on DISPLAY, whose settings apply together as one draft:
+  its rows edit the draft, APPLY CHANGES stands under the columns beside the
+  draft's status as Create Server's START does, the Menu button applies too,
+  and Back over changes not applied asks whether to apply, keep editing or
+  discard them. Display changes keep the 15-second Keep or Revert countdown.
 - **Menu levels.** Home, pages, sub-pages and detail pages (sections 8 and 9). Single Player
   is a page whose sections, Campaign and Arena, each open a sub-page: Campaign
   includes a campaign choice (Quake 4 and installed Awakening content),
@@ -4032,6 +4036,16 @@ catalogue obligations, including `ART-035`, remain authoring/artwork requirement
 they do not authorize or require a new gameplay mode. This scope correction
 accepts no GUI, artwork, platform or behavior. Hit-feedback defaults and the other
 UI-05 qualification remain open.
+
+### Version 1.30: the DISPLAY category
+
+Section 13.7's Settings pattern now covers DISPLAY, the SYSTEM page, which
+was still the drafted full-screen panel: it is a sub-page like the other
+categories, its settings on tabs of at most two columns. Because its rows edit
+one draft that the settings service applies and confirms, it keeps APPLY
+CHANGES on the page, under the columns beside the draft's status, as Create
+Server keeps START, instead of in the prompt bar. `FLOW-068` already holds
+this scope; no requirement changes, and nothing is accepted.
 
 ### Version 1.29: settings sub-pages
 

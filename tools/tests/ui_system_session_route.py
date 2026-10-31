@@ -83,7 +83,7 @@ enum {SE_NONE=0,INHIBIT_SESSION=1};
 struct sysEvent_t {int evType=SE_NONE;};
 using HandleGuiCommand_t=bool (*)(const char*);
 typedef enum {RETAINED_SUBPAGE_CAMPAIGN,RETAINED_SUBPAGE_ARENA,RETAINED_SUBPAGE_CREATE_SERVER,RETAINED_SUBPAGE_JOIN_GAME,
-    RETAINED_SUBPAGE_SETTINGS_CONTROLS,RETAINED_SUBPAGE_SETTINGS_GAME,RETAINED_SUBPAGE_SETTINGS_AUDIO} retainedSubpage_t;
+    RETAINED_SUBPAGE_SETTINGS_CONTROLS,RETAINED_SUBPAGE_SETTINGS_GAME,RETAINED_SUBPAGE_SETTINGS_AUDIO,RETAINED_SUBPAGE_SETTINGS_SYSTEM} retainedSubpage_t;
 struct Sound {
     bool paused=true;
     int unpauses=0;
@@ -169,7 +169,19 @@ struct idSessionLocal {
     // Retained home screens are outside this route: they never present in these scenarios.
     idUserInterface* guiRetainedHome=nullptr;int retainedHomeUpdates=0;
     void UpdateRetainedHome(){++retainedHomeUpdates;}void RetainedHomeFrameEvent(){CHECK(guiRetainedHome==nullptr);}
-    void UpdateRetainedSubpage(){}void UpdateRetainedPage(){}void UpdateRetainedMultiplayerPage(){}void UpdateRetainedJoinGame(){}void UpdateRetainedNotices(){}void UpdateRetainedSettingsPage(){}bool RetainedSettingsParent() const{return guiActive==guiMainMenu;}void UpdateBrowserTooltip(){}void PrecacheRetainedLevelshots(bool){}idUserInterface* guiRetainedLoad=nullptr,*guiRetainedSave=nullptr;
+    void UpdateRetainedSubpage(){}void UpdateRetainedPage(){}void UpdateRetainedMultiplayerPage(){}void UpdateRetainedJoinGame(){}void UpdateRetainedNotices(){}void UpdateRetainedSettingsPage(){}void UpdateBrowserTooltip(){}void PrecacheRetainedLevelshots(bool){}idUserInterface* guiRetainedLoad=nullptr,*guiRetainedSave=nullptr;
+    // The SETTINGS page, whose DISPLAY the page is a sub-page of, and the change
+    // of level its Back climbs out by (qualified by ui_retained_gate.py): each
+    // change is recorded, then begun (the leaving page stays until the
+    // hand-over), or with presentsAtOnce the SETTINGS page presents at once, as
+    // for the stock screen or reduced motion.
+    idUserInterface* guiRetainedSettingsPage=nullptr,*retainedSubpageFrom=nullptr;bool presentsAtOnce=false;
+    struct Subpage{idUserInterface* gui;bool deeper;retainedSubpage_t kind;};std::vector<Subpage> subpages;
+    void BeginRetainedSubpage(idUserInterface* gui,bool deeper,retainedSubpage_t kind) {
+        subpages.push_back({gui,deeper,kind});
+        if(presentsAtOnce)SetGUI(guiRetainedSettingsPage,nullptr);else retainedSubpageFrom=gui;
+    }
+    bool RetainedSettingsParent() const{return guiActive!=nullptr&&(guiActive==guiMainMenu||(guiRetainedSettingsPage!=nullptr&&guiActive==guiRetainedSettingsPage));}
     bool RetainedPageActive() const{return guiActive!=nullptr&&(guiActive==guiRetainedLoad||guiActive==guiRetainedSave);}
     // Nor does the multiplayer card, or a loading screen held over a join: these scenarios have no match.
     void UpdateRetainedMultiplayer(){}void RetainedMultiplayerFrameEvent(){}
@@ -257,6 +269,54 @@ int main(){
         CHECK(s.session.requestedSoundWorld==&s.menuSound && s.gameSound.paused && s.gameSound.unpauses==0);
         CHECK(!s.session.ReturnSystemSettings());s.session.CloseSystemSettings();CHECK(s.manager.frees==1);
         s.session.ExitMenu();CHECK(s.session.guiActive==nullptr && s.gameSound.unpauses==1 && s.session.requestedSoundWorld==&s.gameSound);
+        CHECK(s.session.subpages.empty()); // The stock settings screen's page returns at once.
+    }
+    {
+        // From the SETTINGS page's DISPLAY the page is a sub-page: Back goes one
+        // level up as the other settings pages' does. The change begins and the
+        // page stays until the hand-over, whose SetGUI of the SETTINGS page
+        // closes it.
+        Scenario s;auto* hub=s.manager.Make("guis/menu/settings.q4ui");s.parent->active=false;hub->active=true;
+        s.session.guiActive=s.session.guiRetainedSettingsPage=hub;s.session.guiHandle=nullptr;
+        CHECK(s.session.OpenSystemSettings());auto* child=s.session.guiSystem;
+        CHECK(child && child->active && !hub->active && s.session.guiSystemParent==hub && s.manager.loads==1 && s.session.subpages.empty());
+        CHECK(s.session.ReturnSystemSettings() && s.session.subpages.size()==1);
+        CHECK(s.session.subpages[0].gui==child && !s.session.subpages[0].deeper && s.session.subpages[0].kind==RETAINED_SUBPAGE_SETTINGS_SYSTEM);
+        CHECK(s.session.retainedSubpageFrom==child && s.session.guiActive==child && child->active && !child->retired && s.manager.frees==0 && !hub->active);
+        s.session.retainedSubpageFrom=nullptr;s.session.SetGUI(hub,nullptr);
+        CHECK(child->retired && s.manager.frees==1 && hub->active && s.session.guiActive==hub && !s.session.guiSystem && !s.session.guiSystemParent);
+        CHECK(!s.session.ReturnSystemSettings() && s.session.subpages.size()==1);
+        // Escape from the page climbs the same way.
+        CHECK(s.session.OpenSystemSettings());child=s.session.guiSystem;s.session.ExitMenu();
+        CHECK(s.session.subpages.size()==2 && s.session.subpages[1].gui==child && s.session.retainedSubpageFrom==child && child->active);
+    }
+    {
+        // Where the SETTINGS page presents at once (the stock screen, or reduced
+        // motion), Back's change closes the page there and then.
+        Scenario s;auto* hub=s.manager.Make("guis/menu/settings.q4ui");s.parent->active=false;hub->active=true;
+        s.session.guiActive=s.session.guiRetainedSettingsPage=hub;s.session.guiHandle=nullptr;s.session.presentsAtOnce=true;
+        CHECK(s.session.OpenSystemSettings());auto* child=s.session.guiSystem;
+        CHECK(s.session.ReturnSystemSettings() && s.session.subpages.size()==1 && !s.session.retainedSubpageFrom);
+        CHECK(child->retired && s.manager.frees==1 && hub->active && s.session.guiActive==hub && !s.session.guiSystem);
+    }
+    {
+        // A draft not applied asks first, from the SETTINGS page as from the
+        // stock screen; once settled, the authored dismiss begins the change.
+        Scenario s;auto* hub=s.manager.Make("guis/menu/settings.q4ui");s.parent->active=false;hub->active=true;
+        s.session.guiActive=s.session.guiRetainedSettingsPage=hub;s.session.guiHandle=nullptr;
+        CHECK(s.session.OpenSystemSettings());auto* child=s.session.guiSystem;child->canReturn=false;
+        child->onBack=[&]{child->close=true;};
+        CHECK(!s.session.ReturnSystemSettings() && child->backs==1 && s.session.subpages.empty() && child->active);
+        child->onBack=[&]{child->canReturn=true;child->close=true;};
+        s.session.ReturnSystemSettings();
+        CHECK(child->backs==2 && s.session.subpages.size()==1 && s.session.retainedSubpageFrom==child && !child->retired && !s.session.systemGuiBackEvent);
+    }
+    {
+        // Opened over the stock settings screen, Back returns there at once,
+        // the SETTINGS page loaded or not.
+        Scenario s;s.session.guiRetainedSettingsPage=s.manager.Make("guis/menu/settings.q4ui");
+        CHECK(s.session.OpenSystemSettings());auto* child=s.session.guiSystem;
+        CHECK(s.session.ReturnSystemSettings() && child->retired && s.parent->active && s.session.subpages.empty() && !s.session.retainedSubpageFrom);
     }
     {
         Scenario s;s.session.multiplayer=true;CHECK(s.session.OpenSystemSettings());auto* child=s.session.guiSystem;child->canReturn=false;

@@ -3,8 +3,9 @@
 Choice controls can own a local vertical scrollbar in their existing popup.
 The bar scrolls option content without changing the accepted value or emitting
 an application action. It uses editable vector parts and a stable gutter;
-Rml's native scrollbar artwork remains disabled. SYSTEM's four choice popups
-are composed by `tools/ui/update_system_choice_scrollbars.py`.
+Rml's native scrollbar artwork remains disabled. SYSTEM's choice popups come
+from the shared setting row (`retained_mp_menus.value_row`), which
+`tools/ui/retained_system.py` builds the page from.
 
 The optional `control.scrollbar` object contains `track`, `thumb`, `lineStep`
 and `minimumThumb`. Lengths are authored in dp; line step and minimum thumb are

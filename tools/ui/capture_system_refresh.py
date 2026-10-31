@@ -23,6 +23,9 @@ COMPLETE = "SYSTEM_REFRESH_COMPLETE"
 FIELDS = ("open", "dirty", "canApply", "draftPreset", "baselinePreset",
           "draftBrightness", "baselineBrightness", "message", "numberDraftsPending")
 NUMBER = "settings_brightness_number"
+# The page opens on GRAPHICS; the Number answers only on its IMAGE QUALITY tab,
+# which a pending typed number would then hold, so switch before typing.
+SHOW_NUMBER = page.show_tab(page.TABS["settings_brightness"])
 
 
 def stages():
@@ -36,7 +39,7 @@ def stages():
         row("minimum", ["applyPerformancePreset minimum"], "minimum"),
         row("restart", ["vid_restart"], "minimum"),
         row("ultra", ["applyPerformancePreset ultra"], "ultra"),
-        row("conflict", [f"openq4_retainedGui focus {NUMBER}",
+        row("conflict", [*SHOW_NUMBER, f"openq4_retainedGui focus {NUMBER}",
                          f"openq4_retainedGui number begin {NUMBER}",
                          f"openq4_retainedGui number select {NUMBER} 0 1",
                          f'openq4_retainedGui number replace {NUMBER} "1.1"',
@@ -45,7 +48,7 @@ def stages():
             baseline=1, dirty=1, message="#str_230011"),
         row("reopened", ["openq4_retainedGui event onBack", "wait 3",
                          "openq4_retainedGui event discard", "wait 6", "openq4_system open"], "balanced"),
-        row("local", [f"openq4_retainedGui focus {NUMBER}",
+        row("local", [*SHOW_NUMBER, f"openq4_retainedGui focus {NUMBER}",
                       f"openq4_retainedGui number begin {NUMBER}",
                       f"openq4_retainedGui number select {NUMBER} 0 1",
                       f'openq4_retainedGui number replace {NUMBER} "-"',
@@ -139,7 +142,8 @@ def capture(args):
         "g_autoSkipCinematics": "1", "g_autoExecAfterMapLoad": cfg.name, "g_autoExecAfterMapLoadDelayMs": "3000",
         "com_skipLoadingContinue": "1", "com_loadingContinueAutoAdvance": "1", "com_maxfps": "60",
         "ui_autoJoin": "1" if args.mode == "mp" else "0", "ui_retained": "1", "ui_retainedSystem": "1",
-        "ui_retainedTrace": "1", "ui_retainedScale": "1", "ui_retainedDensity": "1", "ui_retainedTextScale": "1"}
+        "ui_retainedTrace": "1", "ui_retainedScale": "1", "ui_retainedDensity": "1", "ui_retainedTextScale": "1",
+        page.MULTIPLE_INSTANCES: "1"}
     command = [str(executable)]
     for key, value in overrides.items():
         command += ["+set", key, value]
@@ -152,7 +156,7 @@ def capture(args):
     binaries = [executable, *runtime.glob("renderer-*.dll"), *(runtime / "baseoq4").glob("game-*.dll")]
     binding = {str(p.relative_to(runtime)): page.digest(p) for p in binaries}
     for path in binaries:
-        built = ROOT / "builddir" / path.relative_to(runtime)
+        built = getattr(args, "build", ROOT / "builddir") / path.relative_to(runtime)
         if built.is_file() and page.digest(built) != binding[str(path.relative_to(runtime))]:
             raise ValueError("Re-stage current build before capture: " + path.name)
     metadata = {"status": "running", "mode": args.mode, "renderer": args.renderer, "profile": profile["name"],
@@ -218,6 +222,8 @@ def main():
     parser.add_argument("--runtime", type=Path, default=ROOT / ".install")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--timeout", type=int, default=240)
+    parser.add_argument("--build", type=Path, default=ROOT / "builddir",
+                        help="build tree the runtime was staged from (builddir-perf for the VS Code builds)")
     args = parser.parse_args()
     if args.timeout <= 0:
         parser.error("timeout must be positive")
