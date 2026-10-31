@@ -13,6 +13,10 @@ See [player release status](../user/release-status.md).
   AAS files, and multiplayer bots navigate with the runtime navigation mesh,
   so nothing was lost; developer logs keep one informational line per size.
   Single-player still warns, because its monsters do need those files.
+- Loading the Nexus Hub (`game/hub2`) or the Makron fight in `game/core1` no
+  longer warns about unknown `recharge` and `teleport` scripts. Those are the
+  Makron's own scripts, which it reads itself; retail Quake 4 printed the
+  same false warning on every Makron spawn.
 
 ## Menus at a reduced resolution scale, 31 October 2026
 

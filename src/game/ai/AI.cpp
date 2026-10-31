@@ -5460,6 +5460,9 @@ void idAI::SetScript( const char* scriptName, const char* funcName ) {
 	} else if ( !idStr::Icmp ( scriptName, "postWeaponDestroyed" ) ) {
 		// hax: this is a Gladiator/Light Tank only script and I don't want to store it on every AI type..
 		//	I also don't want it generating the warning below in this case.
+	} else if ( !idStr::Icmp ( scriptName, "recharge" ) || !idStr::Icmp ( scriptName, "teleport" ) ) {
+		// openQ4: Makron-only scripts, read by rvMonsterBossMakron::Spawn from
+		//	its own spawnArgs. Retail warned about them on every Makron spawn.
 	} else {
 		gameLocal.Warning ( "unknown script '%s' specified on entity '%s'", scriptName, name.c_str() );
 	}
