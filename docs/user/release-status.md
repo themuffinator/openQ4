@@ -7,7 +7,7 @@ broken.** It is not an available or recommended release. Its Git tag and
 [historical notes](../dev/releases/v0.14.000.md) remain for diagnosis and
 reproducing old builds; neither means that the release is still supported.
 GitHub's latest-release link currently resolves to 0.13.2. Status checked on
-23 October 2026.
+31 October 2026.
 
 ## Installing or returning to 0.13.2
 
