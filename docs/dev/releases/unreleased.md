@@ -187,6 +187,11 @@ See [release status](../../user/release-status.md) and the
   menu buttons, titles and the button prompts keep their size so the layout
   stays intact. Player Setup and the list pages (Load Game, Join Game and the
   like) still use their normal row sizes.
+- **Menus on tall screens.** On a portrait or rotated screen, the main menu,
+  the pause menu and the Settings, Single Player, Campaign and Multiplayer
+  menus in the new interface now fill the height: their buttons are larger
+  and the description, hint line or mission details stand underneath instead
+  of the whole menu shrinking into a strip.
 - **Settings on tall screens, and exact values.** On a portrait or rotated
   screen, Controls, Game Options and Audio in the new interface now use the
   height: their rows stand in one larger, scrolling column instead of

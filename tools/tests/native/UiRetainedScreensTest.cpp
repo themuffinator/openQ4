@@ -3629,14 +3629,17 @@ static void CheckCreateServerBanList(ScreenHost& host, const char* path) {
 }
 
 // Section 2's text-scale contract on a page-level menu (title, pauses,
-// SETTINGS, Single Player, Campaign, Multiplayer; build_retained_screens.py):
-// at 150% and 200% text, on 16:9, 4:3 and 9:16 views, each shown text keeps
-// its box on the screen, and furniture text (whose font lengths fixed_text
-// divides by the text size) keeps its authored size. `content` checks the
-// page's reflowing parts at each size, 100% too, with the box of `canvas`
-// (the page's 4:3 canvas group) and its dp in pixels. Each of `dialogs` opens in turn: its title and actions
-// keep their size, its body stays in it above the actions, and it stays on
-// the screen. Back at 100% every node lies where it lay before.
+// SETTINGS, Single Player, Campaign, Multiplayer; build_retained_screens.py),
+// at 100, 150 and 200% text on 16:9 and 4:3 views and the tall 3:4 and 9:16
+// ones, where the page stands in one column: each shown text keeps its box on
+// the screen, and furniture text (whose font lengths fixed_text divides by
+// the text size) keeps one size at every text size, its authored size in a
+// view of 4:3 and wider and up to 1.6 times it in a tall view. `content`
+// checks the page's reflowing parts at each size, with the box of `canvas`
+// (the page's 4:3 canvas group, the view's height in a tall view), its dp in
+// pixels and whether the view is tall. Each of `dialogs` opens in turn: its
+// body stays in it above its actions, and it stays on the screen. Back at
+// 100% every node lies where it lay before.
 template <typename Content>
 static void CheckPageTextScale(ScreenHost& host, const char* path, const char* name, const char* canvas,
 	const std::vector<std::string>& events, const StateValues& states, const std::vector<std::string>& dialogs, Content content) {
@@ -3664,10 +3667,13 @@ static void CheckPageTextScale(ScreenHost& host, const char* path, const char* n
 		runtime.Frame(result,time += .01); runtime.Frame(result,time += 1);
 		return result;
 	};
+	// Each furniture text's presented size times the text size, by view.
+	std::map<std::string,float> furniture;
 	// Every shown text, under shown ancestors: on the screen, and furniture at
-	// its authored size.
+	// one size whatever the text size.
 	const auto texts = [&](const Viewport& at, float text) {
 		const Bounds screen{0,0,float(at.width),float(at.height)};
+		const bool tall = at.width < .76f*at.height;
 		std::vector<const Node*> pending{&document.Model().root};
 		while (!pending.empty()) {
 			const auto* node = pending.back(); pending.pop_back();
@@ -3680,11 +3686,17 @@ static void CheckPageTextScale(ScreenHost& host, const char* path, const char* n
 			Check(inside(box,screen),"each shown text of a page-level menu stays on the screen");
 			if (!fixed.contains(node->id)) continue;
 			const auto font = runtime.PresentedValue(node->id,"font-size");
-			Check(font && Near(static_cast<float>(font->data[0])*text,static_cast<float>(authored(node->id)),.01f),
-				"a title, plate, plinth, prompt and card heading keep their authored text size");
+			Check(font.has_value(),"a furniture text presents its size");
+			const float size = static_cast<float>(font->data[0])*text, stock = static_cast<float>(authored(node->id));
+			const auto [found, added] = furniture.emplace(node->id+"@"+std::to_string(at.width),size);
+			if (!added && !Near(found->second,size,.01f))
+				std::fprintf(stderr,"%s %dx%d %s furniture %.2f, before %.2f\n",name,at.width,at.height,node->id.c_str(),size,found->second);
+			Check(Near(found->second,size,.01f),"a title, plate, plinth, prompt and card heading keep their size at every text size");
+			Check(tall ? size >= stock-.01f && size <= 1.6f*stock+.01f : Near(size,stock,.01f),
+				"furniture keeps its authored size, or the tall column's scale of it");
 		}
 	};
-	const std::pair<int,int> sizes[] = {{1280,720},{960,720},{540,960}};
+	const std::pair<int,int> sizes[] = {{1280,720},{960,720},{768,1024},{540,960}};
 	// The nodes that show, under shown ancestors.
 	const auto visible = [&]() {
 		std::vector<std::string> ids;
@@ -3698,15 +3710,11 @@ static void CheckPageTextScale(ScreenHost& host, const char* path, const char* n
 		return ids;
 	};
 	std::map<std::string,Bounds> rest;
-	for (const auto& [width, height] : sizes) {
-		const auto at = view(width,height,1);
-		for (const auto& id : visible()) { Bounds b; if (runtime.GetBounds(id,b)) rest[id+"@"+std::to_string(width)] = b; }
-		content(runtime,at,1.f,bounds(canvas),at.DpRatio());
-	}
-	for (const float text : {1.5f,2.f}) for (const auto& [width, height] : sizes) {
+	for (const float text : {1.f,1.5f,2.f}) for (const auto& [width, height] : sizes) {
 		const auto at = view(width,height,text);
+		if (text <= 1) for (const auto& id : visible()) { Bounds b; if (runtime.GetBounds(id,b)) rest[id+"@"+std::to_string(width)] = b; }
 		texts(at,text);
-		content(runtime,at,text,bounds(canvas),at.DpRatio());
+		content(runtime,at,text,bounds(canvas),at.DpRatio(),width < .76f*height);
 		const Bounds screen{0,0,float(width),float(height)};
 		for (const auto& dialog : dialogs) {
 			Check(runtime.RunEvent(dialog+"Show",time,effects,error),"a page's dialog opens");
@@ -3738,15 +3746,32 @@ static void CheckPageTextScale(ScreenHost& host, const char* path, const char* n
 	}
 }
 
-// A menu level's content column (section 9) at `text`: at 100% where the
-// stock column stands, 210x140 u at 395,190 u of the canvas; above it wider,
-// to the 4:3 view's margin, and between the docked bands (60-420 u). Each
+// The tall column's room: under the band's foot (`top` dp) and over the
+// bottom band (`bottom` dp from the view's foot), in pixels.
+static bool InTallRoom(const Bounds& box, const Viewport& view, float dp, float top, float bottom) {
+	return box.y >= top*dp-.5f && box.y+box.height <= view.height-bottom*dp+.5f;
+}
+
+// A menu level's content column (section 9) at `text`. In a view of 4:3 and
+// wider: at 100% where the stock column stands, 210x140 u at 395,190 u of the
+// canvas; above it wider, to the 4:3 view's margin, and between the docked
+// bands (60-420 u). In a tall view: under the plates, from the plates' label
+// inset to the column's 66 dp margin, in the room between the bands. Each
 // description fills it.
-static void CheckContentColumn(Runtime& runtime, float text, const Bounds& canvas, float dp, std::initializer_list<const char*> labels) {
+static void CheckContentColumn(Runtime& runtime, const Viewport& view, float text, const Bounds& canvas, float dp, bool tall,
+	std::initializer_list<const char*> labels) {
 	const auto bounds = [&](const std::string& id) { Bounds b; Check(runtime.GetBounds(id,b),"a column node is laid out"); return b; };
 	const float u = 1.5f*dp;
 	const auto column = bounds("details");
-	if (text <= 1) Check(Near(column.x,canvas.x+395*u,.5f) && Near(column.y,canvas.y+190*u,.5f) && Near(column.width,210*u,.5f) &&
+	if (tall) {
+		const auto plates = bounds("navigation"), back = bounds("back-label");
+		if (!(column.y >= back.y+back.height-.5f && InTallRoom(plates,view,dp,110,100) && InTallRoom(column,view,dp,110,100)))
+			std::fprintf(stderr,"tall column %.1f %dx%d plates %.1f-%.1f, column %.1f-%.1f\n",text,view.width,view.height,plates.y,
+				plates.y+plates.height,column.y,column.y+column.height);
+		Check(column.y >= back.y+back.height-.5f && Near(column.x,back.x,1.5f) && Near(column.x+column.width,view.width-66*dp,.5f),
+			"a tall view stands the description under the plates, across the rest of the canvas");
+		Check(InTallRoom(plates,view,dp,110,100) && InTallRoom(column,view,dp,110,100),"the tall column stands between the bands");
+	} else if (text <= 1) Check(Near(column.x,canvas.x+395*u,.5f) && Near(column.y,canvas.y+190*u,.5f) && Near(column.width,210*u,.5f) &&
 		Near(column.height,140*u,.5f),"at 100% the content column stands where it stood");
 	else {
 		if (!(Near(column.width,224*u,.5f) && column.y >= canvas.y+60*u-.5f && column.y+column.height <= canvas.y+420*u+.5f))
@@ -3762,26 +3787,36 @@ static void CheckContentColumn(Runtime& runtime, float text, const Bounds& canva
 	}
 }
 
-// The title's text scale: each item's sentence on the message line starts at
-// 364 u and ends above the plinth, which stands at 403.3 u at 100% and steps
-// down only as far as the lines need, never into the prompt bar; above 100%
-// the sentence runs on to the 4:3 view's margin, and CONTINUE's save title and
-// detail stand on their own lines above the plinth. The exit question grows.
+// The title's text scale. In a view of 4:3 and wider each item's sentence on
+// the message line starts at 364 u and ends above the plinth, which stands at
+// 403.3 u at 100% and steps down only as far as the lines need, never into
+// the prompt bar, and above 100% the sentence runs on to the 4:3 view's
+// margin. In a tall view the wordmark, the plates, the message line and the
+// plinth stand in that order between the bands. Either way CONTINUE's save
+// title and detail stand on their own lines above the plinth, and the exit
+// question grows.
 static void CheckTitleTextScale(ScreenHost& host, const char* path) {
 	CheckPageTextScale(host,path,"guis/menu/title.q4ui","home-content",{"open"},
 		{{"menu_continue",true},{"menu_continue_title",std::string("Save")},{"menu_continue_detail",std::string("Level")}},{"exitModal"},
-		[](Runtime& runtime, const Viewport&, float text, const Bounds& canvas, float dp) {
+		[](Runtime& runtime, const Viewport& view, float text, const Bounds& canvas, float dp, bool tall) {
 			const auto bounds = [&](const std::string& id) { Bounds b; Check(runtime.GetBounds(id,b),"a title node is laid out"); return b; };
 			const float u = 1.5f*dp;
-			const auto plinth = bounds("plinth"), prompts = bounds("prompts");
-			if (text <= 1) Check(Near(plinth.y,canvas.y+403.3f*u,.5f),"at 100% the plinth stands where it stood");
-			Check(plinth.y+plinth.height <= prompts.y+.5f,"the plinth stays above the prompt bar");
+			const auto plinth = bounds("plinth"), prompts = bounds("prompts"), last = bounds("nav_settings");
+			if (text <= 1 && !tall) Check(Near(plinth.y,canvas.y+403.3f*u,.5f),"at 100% the plinth stands where it stood");
+			Check(plinth.y+plinth.height <= prompts.y+.5f && plinth.x+plinth.width <= view.width+.5f,
+				"the plinth stays above the prompt bar and on the screen");
+			if (tall) {
+				const auto wordmark = bounds("wordmark"), first = bounds("nav_continue");
+				Check(wordmark.y+wordmark.height <= first.y+.5f && InTallRoom(wordmark,view,dp,190,150) && InTallRoom(plinth,view,dp,190,150),
+					"a tall view stands the wordmark over the plates, the column between the bands");
+			}
 			for (const char* id : {"detail-singleplayer-text","detail-loadgame-text","detail-multiplayer-text","detail-settings-text"}) {
 				const auto box = bounds(id);
-				if (!(Near(box.y,canvas.y+364*u,.5f) && box.y+box.height <= plinth.y+.5f))
-					std::fprintf(stderr,"title %.1f %s at %.1f-%.1f, plinth %.1f\n",text,id,box.y,box.y+box.height,plinth.y);
-				Check(Near(box.y,canvas.y+364*u,.5f) && box.y+box.height <= plinth.y+.5f,"each item's sentence ends above the plinth");
-				Check(text <= 1 || Near(box.x+box.width,canvas.x+619*u,.5f),"above 100% it runs on to the 4:3 view's margin");
+				const bool placed = tall ? box.y >= last.y+last.height-.5f : Near(box.y,canvas.y+364*u,.5f);
+				if (!placed || box.y+box.height > plinth.y+.5f)
+					std::fprintf(stderr,"title %.1f %dx%d %s at %.1f-%.1f, plinth %.1f\n",text,view.width,view.height,id,box.y,box.y+box.height,plinth.y);
+				Check(placed && box.y+box.height <= plinth.y+.5f,"each item's sentence stands under the plates and ends above the plinth");
+				Check(text <= 1 || tall || Near(box.x+box.width,canvas.x+619*u,.5f),"above 100% it runs on to the 4:3 view's margin");
 			}
 			const auto title = bounds("detail-continue-title"), detail = bounds("detail-continue-detail");
 			Check(detail.y >= title.y+title.height-.5f && detail.y+detail.height <= plinth.y+.5f,
@@ -3791,13 +3826,14 @@ static void CheckTitleTextScale(ScreenHost& host, const char* path) {
 
 // A pause's text scale (`path`, either family): the level block's lines stand
 // in order inside the card, the picture above them until it gives way at
-// 190%; both questions grow.
+// 190%; in a tall view GAME PAUSED, the actions, EXIT and the card stand in
+// that order between the bands. Both questions grow.
 static void CheckPauseTextScale(ScreenHost& host, const char* path, const char* name) {
 	StateValues states{{"pause_level",std::string("Level")},{"pause_detail",std::string("Corporal")},{"pause_objective_count",3.0},
 		{"pause_stats",std::string("Stats")},{"pause_saved",std::string("Saved")}};
 	for (int row = 0; row < 3; ++row) states["pause_objective_"+std::to_string(row)] = std::string("Objective");
 	CheckPageTextScale(host,path,name,"home-content",{"open"},states,{"quitModal","exitModal"},
-		[](Runtime& runtime, const Viewport&, float text, const Bounds&, float) {
+		[](Runtime& runtime, const Viewport& view, float text, const Bounds&, float dp, bool tall) {
 			const auto bounds = [&](const std::string& id) { Bounds b; Check(runtime.GetBounds(id,b),"a level block node is laid out"); return b; };
 			const auto card = bounds("level-block");
 			Bounds last{};
@@ -3817,6 +3853,14 @@ static void CheckPauseTextScale(ScreenHost& host, const char* path, const char* 
 			if (text < 1.9f) Check(shot && shot->text != "none" && bounds("level-shot").y+bounds("level-shot").height <= bounds("level-name").y+.5f,
 				"the picture stands above the lines");
 			else Check(shot && shot->text == "none","from 190% the picture has given its room to the lines");
+			if (tall) {
+				const auto nav = bounds("nav"), plinth = bounds("plinth");
+				if (!(nav.y+nav.height <= plinth.y+.5f && plinth.y+plinth.height <= card.y+.5f && InTallRoom(card,view,dp,190,150)))
+					std::fprintf(stderr,"tall pause %dx%d nav %.1f-%.1f plinth %.1f-%.1f card %.1f-%.1f\n",view.width,view.height,nav.y,
+						nav.y+nav.height,plinth.y,plinth.y+plinth.height,card.y,card.y+card.height);
+				Check(nav.y+nav.height <= plinth.y+.5f && plinth.y+plinth.height <= card.y+.5f && InTallRoom(card,view,dp,190,150) &&
+					card.x >= -.5f && card.x+card.width <= view.width+.5f,"a tall view stands the actions, EXIT and the card in a column");
+			}
 		});
 }
 
@@ -3826,8 +3870,8 @@ static void CheckPauseTextScale(ScreenHost& host, const char* path, const char* 
 static void CheckColumnPageTextScale(ScreenHost& host, const char* path, const char* name, const StateValues& states,
 	const std::vector<std::string>& dialogs, const char* label) {
 	CheckPageTextScale(host,path,name,"content",{"onActivate"},states,dialogs,
-		[label](Runtime& runtime, const Viewport&, float text, const Bounds& canvas, float dp) {
-			CheckContentColumn(runtime,text,canvas,dp,{label});
+		[label](Runtime& runtime, const Viewport& view, float text, const Bounds& canvas, float dp, bool tall) {
+			CheckContentColumn(runtime,view,text,canvas,dp,tall,{label});
 		});
 }
 

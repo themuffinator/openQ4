@@ -279,11 +279,12 @@ def text_lines(face: str, text: str, size: float, width: float) -> int:
 
 
 def wrapped_lines(keys, face: str, size: float, width: float) -> dict:
-    """{language: {1.5: lines, 2: lines}}: the most lines any of `keys` takes
-    at `width` dp in each shipped language at 150 % and 200 % text."""
+    """{language: {1: lines, 1.5: lines, 2: lines}}: the most lines any of
+    `keys` takes at `width` dp in each shipped language at 100, 150 and 200 %
+    text."""
     texts = [merged_text(key) for key in keys]
     return {language: {scale: max(text_lines(face, found.get(language) or found["english"], size * scale, width) for found in texts)
-                       for scale in (1.5, 2)} for language in LANGUAGES}
+                       for scale in (1, 1.5, 2)} for language in LANGUAGES}
 
 
 def evaluate(expression, state: dict):
@@ -338,10 +339,197 @@ def reflow_details(doc: "Document", details: dict, keys) -> None:
         doc.bind(f"text.{ident}.height", ident, "height", {"op": "select", "args": [LARGER, tall, own["height"]["value"]]})
 
 
+# Tall views of the menu levels (sections 3 and 13.3, "adapt, don't shrink"):
+# in a view of 3:4 and taller (the runtime's view.aspect source) a page stands
+# its parts one under the other in a single column across the 960 dp canvas,
+# scaled together as large as the view's height between the bands allows, up
+# to TALL_MOST, instead of shrinking the 4:3 composition into a band.
+ASPECT_STATE = "view.aspect"
+TALL = {"op": "<", "args": [{"state": ASPECT_STATE}, 0.76]}
+TALL_MOST = 1.6                       # the wordmark and the plates' labels across the canvas
+VIEW_HEIGHT = {"op": "/", "args": [CANVAS_W, {"state": ASPECT_STATE}]}   # dp: a view narrower than 4:3 keeps the canvas 960 dp wide
+TALL_MARGIN = 66.0                    # dp: the column's trailing margin, the plates' label inset on the leading side
+
+
+def tall_source(doc: "Document") -> dict:
+    """The document's view.aspect source, declared once; the tall condition."""
+    doc.state[ASPECT_STATE] = {"type": "number", "initial": round(4 / 3, 4), "view": "aspect"}
+    return TALL
+
+
+def tall_bind(doc: "Document", node: dict, key: str, tall) -> None:
+    """`node`'s `key` in a tall view: `tall`, or `tall(value)` of what it is
+    in any other view (its binding's value, else its authored value), which
+    it keeps there."""
+    for binding in doc.bindings:
+        if binding["node"] == node["id"] and binding["property"] == key:
+            value = binding["value"]
+            if isinstance(value, dict) and value.get("op") == "select" and value["args"][0] == TALL:
+                value = value["args"][2]       # a later tall value replaces an earlier one
+            binding["value"] = {"op": "select", "args": [TALL, tall(value) if callable(tall) else tall, value]}
+            return
+    authored = node["properties"][key]["value"]
+    doc.bind(f"tall.{node['id']}.{key}", node["id"], key, {"op": "select", "args": [TALL, tall(authored) if callable(tall) else tall, authored]})
+
+
+def tall_scale(doc: "Document", node: dict, scale, own: tuple = ()) -> None:
+    """Every dp length under `node` (its descendants, and its own `own`
+    lengths) times `scale` in a tall view, text sizes included, but for those
+    a timeline animates or the runtime writes. Vector art in a dp box keeps
+    its box and takes the scale as a transform (an identity transform in any
+    other view, so its art draws exactly as before); in a box of percentages
+    its art turns to fractions of the box, to follow it."""
+    from retained_settings_rows import _runtime_owned
+    skipped = {(entry["node"], entry["property"]) for timeline in doc.timelines.items for entry in timeline["tracks"]}
+    _runtime_owned(node, skipped)
+
+    def current(item: dict, key: str):
+        return next((binding["value"] for binding in doc.bindings if binding["node"] == item["id"] and binding["property"] == key),
+                    item["properties"][key]["value"])
+
+    def tall_or(value, rest):
+        return {"op": "select", "args": [TALL, value, rest]}
+
+    def walk(item: dict, parent: tuple) -> None:
+        props = item.get("properties", {})
+        size = []
+        for key, extent in (("width", parent[0]), ("height", parent[1])):
+            found = props.get(key) or {}
+            unit = found.get("unit") if found.get("type") == "length" else None
+            size.append(found["value"] if unit == "dp" else found["value"] * extent / 100 if unit == "%" and extent else None)
+        kept = set()
+        if item is not node and item.get("type") == "vector" and size[0] and size[1]:
+            boxed = all(props[key].get("unit") == "dp" for key in ("width", "height"))
+            if boxed and "transform" not in props and (item["id"], "transform") not in skipped:
+                # Scaling acts about the box's centre: its leading and top
+                # edges stay where the scaled left and top put them.
+                half = [{"op": "*", "args": [{"op": "-", "args": [scale, 1]}, {"op": "*", "args": [0.5, current(item, key)]}]}
+                        for key in ("width", "height")]
+                props["transform"] = transform()
+                doc.bind(f"tall.{item['id']}.transform", item["id"], "transform",
+                         [tall_or(half[0], 0), tall_or(half[1], 0), tall_or(scale, 1), tall_or(scale, 1), 0])
+                kept = {"width", "height"}
+            else:
+                in_fractions(item, *size)
+        for key, found in list(props.items()):
+            if (found.get("type") == "length" and found.get("unit") == "dp" and found["value"] and (item["id"], key) not in skipped
+                    and key not in kept and (item is not node or key in own or key in TEXT_LENGTHS)):
+                tall_bind(doc, item, key, lambda value: {"op": "*", "args": [scale, value]})
+        for child in item.get("children", []):
+            walk(child, tuple(size))
+    walk(node, (None, None))
+
+
+def in_fractions(node: dict, width: float, height: float) -> None:
+    """A vector's art in fractions of its `width` x `height` box, unrounded,
+    so that it scales with the box and stands exactly where it did in it."""
+    def convert(value, extent):
+        if isinstance(value, (int, float)):
+            return {"fraction": value / extent}
+        if isinstance(value, dict) and "dp" in value:
+            return {"fraction": value.get("fraction", 0) + value["dp"] / extent}
+        return value
+
+    def point(at):
+        return [convert(at[0], width), convert(at[1], height)]
+    for drawn in node.get("paths", []):
+        for command in drawn["commands"]:
+            if "points" in command:
+                command["points"] = [point(at) for at in command["points"]]
+        for paint in (drawn.get("fill"), (drawn.get("stroke") or {}).get("paint")):
+            if paint and paint.get("type") == "linear":
+                paint["from"], paint["to"] = point(paint["from"]), point(paint["to"])
+
+
+def tall_dialog(doc: "Document", modal: dict, scale: float = TALL_MOST) -> None:
+    """A confirmation (confirmation()) in a tall view: `scale` times its size,
+    centred where it was, so it reads at the column's scale."""
+    dialog = next(node for node in walk_nodes(modal) if node["id"] == f"{modal['id']}-dialog")
+    props = dialog["properties"]
+    width, height, top = props["width"]["value"], props["height"]["value"], props["top"]["value"]
+    grown = next((binding["value"] for binding in doc.bindings if binding["node"] == dialog["id"] and binding["property"] == "height"), height)
+    tall_scale(doc, dialog, scale)
+    tall_bind(doc, dialog, "left", round((CANVAS_W - width * scale) / 2, 4))
+    tall_bind(doc, dialog, "width", round(width * scale, 4))
+    tall_bind(doc, dialog, "height", {"op": "*", "args": [scale, grown]})
+    tall_bind(doc, dialog, "top", text_sum(top + height / 2, {"op": "*", "args": [-scale / 2, grown]}))
+
+
+def tall_canvas(doc: "Document", node: dict) -> None:
+    """A canvas group that fit_narrow centres on the view's middle runs the
+    view's full height in a tall view, so its parts take view coordinates."""
+    doc.bind(f"tall.{node['id']}.margin-top", node["id"], "margin-top",
+             {"op": "select", "args": [TALL, {"op": "/", "args": [-CANVAS_W / 2, {"state": ASPECT_STATE}]}, -360]})
+    doc.bind(f"tall.{node['id']}.height", node["id"], "height", {"op": "select", "args": [TALL, VIEW_HEIGHT, 720]})
+
+
+def tall_column(doc: "Document", parts: list, top: float, bottom: float) -> tuple:
+    """The tall column: `parts` (height, node or None for a gap) stand one
+    under the other from the band's foot at `top` dp to `bottom` dp above
+    the view's foot, centred in it. Heights are in dp at 100 % scale and may
+    follow the text size and CONTINUE; the scale S is the largest, up to
+    TALL_MOST, at which the tallest of them (200 % text) fits the view, so it
+    follows the view alone. Binds each node's top; returns S and each part's
+    top, in view dp."""
+    tall_source(doc)
+    room = text_sum(VIEW_HEIGHT, -(top + bottom))
+    height = text_sum(*[part_height for part_height, _ in parts])
+    tallest = max(evaluate(height, {TEXT_STATE: 2, "menu_continue": shown}) for shown in (False, True))
+    scale = {"op": "min", "args": [TALL_MOST, {"op": "/", "args": [room, round(tallest, 4)]}]}
+    y = text_sum(top, {"op": "*", "args": [0.5, {"op": "-", "args": [room, {"op": "*", "args": [scale, height]}]}]})
+    tops = []
+    for part_height, part in parts:
+        tops.append(y)
+        if part is not None:
+            tall_bind(doc, part, "top", y)
+        y = text_sum(y, {"op": "*", "args": [scale, part_height]})
+    return scale, tops
+
+
+def tall_text_height(doc: "Document", keys, face: str, size: float, line: float, width: float):
+    """The dp a text of `keys` needs at 100 % scale in `width` dp, at the
+    running text size: the most lines any shipped language takes, at 100,
+    150 or 200 % text (a larger size's count covering the sizes below it)."""
+    counts = {scale: max(found[scale] for found in wrapped_lines(keys, face, size, width).values()) for scale in (1, 1.5, 2)}
+    lines = {"op": "select", "args": [{"op": ">", "args": [TEXT, 1.5]}, counts[2],
+                                      {"op": "select", "args": [{"op": ">", "args": [TEXT, 1]}, counts[1.5], counts[1]]}]}
+    text_source(doc)
+    return text_times({"op": "*", "args": [lines, line]})
+
+
+def tall_page(doc: "Document", canvas: dict, navigation: dict, details: dict, keys) -> None:
+    """A menu level with a content column (SETTINGS, Single Player, Campaign,
+    Multiplayer) in a tall view: its plates at the column's scale across the
+    canvas, the description under them over the rest of its width, both in
+    the room between the docked bands."""
+    tall_canvas(doc, canvas)
+    labels = [child for child in details["children"] if child.get("type") == "text"]
+    style = labels[0]["properties"]
+    face, size, line = style["font-family"]["value"], style["font-size"]["value"], style["line-height"]["value"]
+    # The description's width at the largest scale, in 100 % dp.
+    narrowest = (CANVAS_W - TALL_MARGIN * (1 + TALL_MOST)) / TALL_MOST
+    plates = sum(child["properties"]["height"]["value"] for child in navigation["children"])
+    described = tall_text_height(doc, keys, face, size, line, narrowest)
+    scale, _ = tall_column(doc, [(plates, navigation), (24, None), (described, details)], TALL_PAGE_TOP, TALL_PAGE_BOTTOM)
+    tall_scale(doc, navigation, scale)
+    tall_bind(doc, navigation, "width", {"op": "*", "args": [scale, navigation["properties"]["width"]["value"]]})
+    width = text_sum(CANVAS_W - TALL_MARGIN, {"op": "*", "args": [-TALL_MARGIN, scale]})
+    for node in [details, *labels]:
+        tall_bind(doc, node, "width", width)
+        tall_bind(doc, node, "height", {"op": "*", "args": [scale, described]})
+    tall_bind(doc, details, "left", {"op": "*", "args": [TALL_MARGIN, scale]})
+    for node in labels:
+        for key in ("font-size", "line-height"):
+            tall_bind(doc, node, key, {"op": "*", "args": [scale, node["properties"][key]["value"]]})
+
+
+TALL_PAGE_TOP, TALL_PAGE_BOTTOM = 110.0, 100.0   # dp: under the docked top band's title, over the docked bottom band
+
+
 def check_text_bindings(result: dict) -> None:
     """Fail generation unless every binding that reads the text size gives
-    its node's authored value at 100 %, in every shipped language and for
-    either value of each boolean state it reads."""
+    its node's authored value at 100 % in a view of 4:3 and wider, in every
+    shipped language and for either value of each boolean state it reads."""
     nodes = {node["id"]: node for node in walk_nodes(result["root"])}
     declared = result.get("state", {})
 
@@ -352,8 +540,18 @@ def check_text_bindings(result: dict) -> None:
             for arg in expression.get("args", []):
                 reads(arg, found)
         return found
+    def landscape(expression):
+        # The value in a view of 4:3 and wider: a tall view's branch aside.
+        if isinstance(expression, dict) and expression.get("op") == "select" and expression["args"][0] == TALL:
+            return landscape(expression["args"][2])
+        if isinstance(expression, dict) and "args" in expression:
+            return {**expression, "args": [landscape(arg) for arg in expression["args"]]}
+        if isinstance(expression, list):
+            return [landscape(arg) for arg in expression]
+        return expression
     for binding in result.get("bindings", []):
-        names = reads(binding["value"], set())
+        value = landscape(binding["value"])
+        names = reads(value, set())
         if TEXT_STATE not in names:
             continue
         authored = nodes[binding["node"]]["properties"].get(binding["property"])
@@ -365,10 +563,10 @@ def check_text_bindings(result: dict) -> None:
                 state = {name: declared[name]["initial"] for name in names if name in declared}
                 state.update({TEXT_STATE: 1, "language": language})
                 state.update({name: bool(mask >> index & 1) for index, name in enumerate(flags)})
-                value = evaluate(binding["value"], state)
+                found = evaluate(value, state)
                 expected = authored["value"]
-                if value != expected:
-                    raise SystemExit(f"{result['id']}: {binding['id']} gives {value!r} at 100 % text, not the authored {expected!r}")
+                if found != expected:
+                    raise SystemExit(f"{result['id']}: {binding['id']} gives {found!r} at 100 % text, not the authored {expected!r}")
 
 
 def vector(ident: str, props: dict, paths: list, children=(), **extra) -> dict:
@@ -959,15 +1157,16 @@ def modal_silhouette(width: float, height: float):
                 fill=solid([0, 0, 0, 0.7]))
 
 
-def from_foot(paths: list, height: float, foot: float) -> list:
+def from_foot(paths: list, height: float, foot: float, axis: int = 1) -> list:
     """`paths` with each point at or below `foot` measured from their box's
-    foot, so the shapes follow a box that grows taller; in a box `height`
-    tall every point stands where it did."""
+    foot (with `axis` 0, at or past `foot` from its trailing edge), so the
+    shapes follow a box that grows; in a box `height` tall (or wide) every
+    point stands where it did."""
     for drawn in paths:
         for command in drawn["commands"]:
             for at in command.get("points", []):
-                if isinstance(at[1], (int, float)) and at[1] >= foot:
-                    at[1] = {"fraction": 1, "dp": round(at[1] - height, 4)}
+                if isinstance(at[axis], (int, float)) and at[axis] >= foot:
+                    at[axis] = {"fraction": 1, "dp": round(at[axis] - height, 4)}
     return paths
 
 
@@ -2170,6 +2369,86 @@ def reflow_message_line(doc: Document, nav: dict, sentences: list, base: dict) -
         raise SystemExit("the home's message line would push the plinth into the prompt bar at 200 % text")
 
 
+TALL_HOME_TOP, TALL_HOME_BOTTOM = 190.0, 150.0   # dp: under the home's top band, over its bottom band
+
+
+def tall_home_plinth(doc: Document, base: dict, scale) -> None:
+    """The plinth at the column's scale: its links grow with it, and its
+    shape, drawn from its foot and trailing edge, keeps its cuts."""
+    props = base["properties"]
+    from_foot(base["paths"], props["height"]["value"], 0.001)
+    from_foot(base["paths"], props["width"]["value"], props["width"]["value"] / 2, axis=0)
+    # The running language's links (the plinth's width) must fit the canvas
+    # inside the column's margins, which a long language's do at less.
+    width = next((binding["value"] for binding in doc.bindings if binding["node"] == base["id"] and binding["property"] == "width"),
+                 props["width"]["value"])
+    fitted = {"op": "min", "args": [scale, {"op": "/", "args": [CANVAS_W - 2 * props["left"]["value"], width]}]}
+    tall_scale(doc, base, fitted, own=("left", "width", "height"))
+
+
+def tall_pause(doc: Document, home: dict, title: dict, nav: dict, block: dict, base: dict) -> None:
+    """A pause in a tall view: GAME PAUSED, the actions, EXIT on its plinth
+    and the level block under them, centred, in one column between the
+    bands."""
+    tall_canvas(doc, home)
+    plates = sum(child["properties"]["height"]["value"] for child in nav["children"])
+    card_w, card_h = block["properties"]["width"]["value"], block["properties"]["height"]["value"]
+    scale, _ = tall_column(doc, [(title["properties"]["height"]["value"], title), (6, None), (plates, nav), (6, None),
+                                 (base["properties"]["height"]["value"], base), (24, None), (card_h, block)],
+                           TALL_HOME_TOP, TALL_HOME_BOTTOM)
+    tall_scale(doc, title, scale, own=("left", "width", "height"))
+    tall_scale(doc, nav, scale, own=("width",))
+    tall_home_plinth(doc, base, scale)
+    tall_scale(doc, block, scale, own=("width", "height"))
+    tall_bind(doc, block, "left", {"op": "*", "args": [0.5, text_sum(CANVAS_W, {"op": "*", "args": [-card_w, scale]})]})
+
+
+def tall_title(doc: Document, stage: dict, home: dict, nav: dict, base: dict, sentences: list) -> None:
+    """The title in a tall view: the wordmark, the navigation plates, the
+    focused item's message line and the plinth in one column across the
+    canvas between the bands; the emblem gives way to the column."""
+    nodes = {node["id"]: node for node in walk_nodes(nav)}
+    for group_node in (stage, home):
+        tall_canvas(doc, group_node)
+    wordmark = next(child for child in stage["children"] if child["id"] == "wordmark")
+    emblem = next(child for child in stage["children"] if child["id"] == "emblem")
+    emblem["properties"]["display"] = keyword("block")
+    doc.bind("tall.emblem.display", "emblem", "display", {"op": "select", "args": [TALL, "none", "block"]})
+    # The message line's lines at the column's narrowest, in 100 % dp.
+    narrowest = (CANVAS_W - TALL_MARGIN * (1 + TALL_MOST)) / TALL_MOST
+    # Every item's sentence takes the room the longest one needs.
+    need = tall_text_height(doc, sentences, "lowpixel", 17, 22, narrowest)
+    held = text_sum(text_times(text_sum(28, text_times(-4))), text_times(text_sum(31, text_times(-7))))
+    tallest = {"op": "max", "args": [need, {"op": "select", "args": [{"state": "menu_continue"}, held, 0]}]}
+    plate = U * 30
+    rows = {"op": "select", "args": [{"state": "menu_continue"}, 5 * plate, 4 * plate]}
+    mark_w, mark_h = wordmark["properties"]["width"]["value"], wordmark["properties"]["height"]["value"]
+    scale, tops = tall_column(doc, [(mark_h, wordmark), (24, None), (rows, nav), (6, None), (tallest, None), (10, None),
+                                    (base["properties"]["height"]["value"], base)], TALL_HOME_TOP, TALL_HOME_BOTTOM)
+    tall_bind(doc, wordmark, "left", {"op": "*", "args": [0.5, text_sum(CANVAS_W, {"op": "*", "args": [-mark_w, scale]})]})
+    for key, value in (("width", mark_w), ("height", mark_h)):
+        tall_bind(doc, wordmark, key, {"op": "*", "args": [scale, value]})
+    tall_scale(doc, nav, scale, own=("width",))
+    tall_home_plinth(doc, base, scale)
+    # Each message line stands under the plates, 6 dp of the column below the
+    # last, across the rest of the canvas (its plate starts at the view's
+    # leading edge less the bleed, which the column scales too).
+    width = text_sum(CANVAS_W - TALL_MARGIN, {"op": "*", "args": [-TALL_MARGIN, scale]})
+    for index, ident in enumerate(["detail-continue", *[name[:-len("-text")] for name in nodes
+                                                         if name.startswith("detail-") and name.endswith("-text")]]):
+        below = 5 * plate - index * plate + 6 if index else 5 * plate + 6
+        tall_bind(doc, nodes[ident], "top", {"op": "*", "args": [scale, below]})
+        tall_bind(doc, nodes[ident], "width", width)
+        tall_bind(doc, nodes[ident], "height", {"op": "*", "args": [scale, held if index == 0 else need]})
+        if index:
+            text_node = nodes[f"{ident}-text"]
+            tall_bind(doc, text_node, "width", width)
+            tall_bind(doc, text_node, "height", {"op": "*", "args": [scale, need]})
+    shot_w = nodes["detail-continue-title"]["properties"]["left"]["value"]
+    for ident in ("detail-continue-title", "detail-continue-detail"):
+        tall_bind(doc, nodes[ident], "width", text_sum(width, {"op": "*", "args": [-shot_w, scale]}))
+
+
 def title_document() -> dict:
     doc = Document("openq4.title")
     doc.state.update({
@@ -2244,6 +2523,8 @@ def title_document() -> dict:
             base,
         ]),
     ])
+    tall_title(doc, stage, content["children"][0], nav, base, [row[3] for row in rows])
+    tall_dialog(doc, exit_modal)
     root = group("screen", {**FULL, "background-color": colour([0, 0, 0, 1]), "font-family": font("marine"),
                             "font-size": length(16), "color": colour([1, 1, 1, 0.8])}, [
         depth_layer(doc, "depth-backdrop", 1.0, [montage(doc)]),
@@ -2474,12 +2755,12 @@ def campaign_document(campaigns: bool) -> dict:
     details_group = group("details", {**absolute(left=U * 395, top=U * 190, width=U * 210, height=U * 140), "opacity": number(0)}, details)
     # The description grows with the text above 100 % (section 2).
     reflow_details(doc, details_group, [node["properties"]["text"]["value"] for node in details])
+    navigation = group("navigation", {**absolute(left=0, top=U * nav_top, width=U * 357), "display": keyword("flex"),
+                                      "flex-direction": keyword("column"), "opacity": number(1)}, buttons)
     content = group("content", {**absolute(top=0, width=CANVAS_W, height=720), "left": length(50, "%"), "margin-left": length(-CANVAS_W / 2),
-                                "transform": transform(), "opacity": number(1)}, [
-        group("navigation", {**absolute(left=0, top=U * nav_top, width=U * 357), "display": keyword("flex"), "flex-direction": keyword("column"),
-                             "opacity": number(1)}, buttons),
-        details_group,
-    ])
+                                "transform": transform(), "opacity": number(1)}, [navigation, details_group])
+    # A tall view stands the plates and the description in one column.
+    tall_page(doc, content, navigation, details_group, [node["properties"]["text"]["value"] for node in details])
     # The titles ride outside the sweeping content, in canvas coordinates.
     crumb_key = "#str_42000"
     if campaigns:
@@ -3688,6 +3969,10 @@ def pause_document(strogg: bool = False) -> dict:
         group("home-content", {**absolute(top=0, width=CANVAS_W, height=720), "left": length(50, "%"), "margin-left": length(-CANVAS_W / 2)},
               home_parts),
     ])
+    # A tall view stands the title, actions, EXIT and level block in one column.
+    tall_pause(doc, content["children"][0], *home_parts)
+    for modal in (quit_modal, exit_modal):
+        tall_dialog(doc, modal)
     # The paused view, softened and never dimmed (sections 9 and 13.7). The
     # specification gives scene softening no values of its own, so the pause
     # takes modal.softfocus's; it ramps in with menu.fade. With the

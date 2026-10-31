@@ -2221,6 +2221,63 @@ Campaign skill page) keep their 100 % rows at larger text sizes. Their
 confirmations' bodies grow with the shared dialog, and their titles, plinth
 links and prompt bars keep their size.
 
+## Menu levels in tall views (31 October 2026)
+
+In a portrait or rotated window the menu levels shrank the 4:3 composition
+into a narrow band, leaving most of the height empty. In a view of 3:4 and
+taller (the runtime's `view.aspect` source below 0.76) the title, both
+pauses, SETTINGS, Single Player, Campaign and Multiplayer now stand their
+parts in one column across the 960 dp canvas (visual specification 1.33):
+
+- **The column.** The parts stand one under the other between the bands
+  (`tall_column`): the home's wordmark, plates, message line and plinth; a
+  pause's GAME PAUSED, actions, EXIT and level block; a page's plates and its
+  description. The column is scaled as one, as large as the view's height
+  allows up to 1.6 times (the plates' labels and the wordmark across the
+  canvas), and centred in that room. The scale follows the view alone: it is
+  the largest at which the column fits at 200 % text, so the furniture keeps
+  one size at every text size while the content grows in the room left.
+- **Inside it.** A page's description stands under the plates from their
+  label inset to a 66 dp margin; the home's message line does too, every
+  item's sentence in the room the longest needs, and the plinth under it at
+  the column's scale or less, so a long language's links fit the canvas; the
+  level block keeps its card, centred, its picture and lines as section 2's
+  text scale leaves them. The emblem gives way to the column. Each length is
+  the landscape value times the scale (`tall_scale`), so the text-size
+  bindings carry over; vector art keeps its box and takes the scale as a
+  transform, an identity in a landscape view, so a landscape view presents
+  exactly as before (its static captures compare pixel-identical with the
+  text-size evidence). The canvas groups run the view's full height
+  (`tall_canvas`).
+- **Dialogs.** The exit, quit and LOAD DEFAULTS questions stand at 1.6 times
+  their size, centred where they were (`tall_dialog`).
+- **Generation guards it.** `check_text_bindings` judges each binding's value
+  in a landscape view (the tall branch aside), so a binding whose landscape
+  value follows another state (the message line's CONTINUE rows) is checked
+  against that value.
+
+The native page tests add 3:4 and 9:16 views: the plates and description, the
+wordmark, plates, message line and plinth, and the actions, EXIT and card
+stand in order between the bands, and furniture keeps one size at every text
+size, at most 1.6 times its authored size.
+
+Captured from a candidate runtime (65 scenario runs, 364 engine screenshots,
+every run complete): the five page-level scenarios at 200 % on 9:16 in
+German, French, Russian and Ukrainian and on 3:4 in German and Russian, at
+100 % on 9:16 in English and German and on 3:4 in English, at 150 % on 9:16
+in Hungarian and at 200 % on 9:16 with Vulkan; and landscape runs at 100 %
+16:9 English and 200 % 4:3 German, whose SETTINGS, Single Player and
+Multiplayer pages and LOAD DEFAULTS question compare pixel-identical with the
+text-size evidence (the title's montage and the pause's live view change from
+run to run).
+
+Evidence: `.tmp/page-text-scale/validation-evidence-tall.json`, SHA-256
+`c049efadccaa5a1a382aa003d05e12add1b5e4476b5fbd121bd8d90aae641aec`.
+
+Known limit: the label the home carries into a page's title, and a page's
+label carried to a sub-page's, still start from the 4:3 plate's place and
+size, since a timeline's keys cannot follow the view.
+
 ## Tall views grow the lists (25 October 2026)
 
 In a view taller than the canvas (5:4, and most of all a portrait window)

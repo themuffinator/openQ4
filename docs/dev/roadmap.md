@@ -972,6 +972,9 @@ archived provenance; new scheduling belongs here.
   [text-scale contract](ui/retained-screens.md#menu-levels-follow-the-text-size-31-october-2026)
   too (visual specification 1.32, `LAY-004`); Player Setup, the Mods dialog,
   the Objectives page and the list and form pages still keep their 100 % rows.
+  In views of 3:4 and taller the same menu levels now
+  [stand in one column](ui/retained-screens.md#menu-levels-in-tall-views-31-october-2026)
+  that uses the height (visual specification 1.33, `LAY-021`).
 - [ ] **UI-02 — P1, implementation and qualification: text, input and accessibility.**
   Finish in-field IME/composition, shaping/kerning/fallback/styles, grapheme editing,
   caret/candidate placement, binding capture, accessibility exposure and contextual

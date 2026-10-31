@@ -1,6 +1,6 @@
 # openQ4 UI Visual Design
 
-Specification version 1.32, 31 October 2026 (1.29 to 1.31 earlier that day, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
+Specification version 1.33, 31 October 2026 (1.29 to 1.32 earlier that day, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
 1.9 on 29 September, 1.6 on 28 September, 1.4 and 1.5 on 27 September, 1.1 to
 1.3 on 26 September, 1.0 on 8 September 2026). Status:
 implementation target; the replacement has not shipped. Applies to every
@@ -1837,7 +1837,13 @@ and parallax off.
   margin and rises between the docked bands as its lines need; the home's
   message line runs on to the same margin and the plinth steps down to clear
   its lines; a confirmation grows with its body; and the pause's level block
-  gives its picture's room to its growing lines inside the same card.
+  gives its picture's room to its growing lines inside the same card. In a
+  view of 3:4 and taller a menu level stands its parts in one column across
+  the canvas, scaled together as large as the height between the bands
+  allows, up to 1.6 times: the home's wordmark, plates, message line and
+  plinth, a pause's title, actions, EXIT and level block, or a page's plates
+  and description under them; its confirmations stand at 1.6 times their
+  size.
 - **Fourth level.** Every child route beneath a sub-page uses the same detail
   construction. The top band moves another 97 u, to a 517,-63 u translation;
   the bottom band remains docked. Two parent crumbs occupy the thin spans at
@@ -4045,6 +4051,14 @@ catalogue obligations, including `ART-035`, remain authoring/artwork requirement
 they do not authorize or require a new gameplay mode. This scope correction
 accepts no GUI, artwork, platform or behavior. Hit-feedback defaults and the other
 UI-05 qualification remain open.
+
+### Version 1.33: menu levels in tall views
+
+Section 13.7's Menu levels pattern now says how a menu level stands in a view
+of 3:4 and taller: one column across the canvas, scaled together to the
+height between the bands, the plates first and the description, message line
+or level block under them. `LAY-021` already holds this scope; no
+requirement changes, and nothing is accepted.
 
 ### Version 1.32: menu levels follow the text size
 

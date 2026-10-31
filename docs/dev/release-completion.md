@@ -124,6 +124,12 @@ made them too large to load.
   room the frame leaves them
   ([menu levels](ui/retained-screens.md#menu-levels-follow-the-text-size-31-october-2026),
   visual specification 1.32).
+- [x] The menu levels use a tall view's height: in views of 3:4 and taller
+  the title, both pauses, SETTINGS, Single Player, Campaign and Multiplayer
+  stand in one column scaled to the room between the bands, with their
+  questions at the column's scale
+  ([tall views](ui/retained-screens.md#menu-levels-in-tall-views-31-october-2026),
+  visual specification 1.33).
 - [ ] Bound acceptance evidence remains.
 
 ## Windows stay see-through at any distance, 29 October 2026

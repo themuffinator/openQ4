@@ -9,6 +9,7 @@
  "state": {
   "view.text": {"type": "number", "initial": 1, "view": "text"},
   "language": {"type": "string", "initial": "", "cvar": "sys_lang"},
+  "view.aspect": {"type": "number", "initial": 1.3333, "view": "aspect"},
   "from_arena": {"type": "boolean", "initial": false},
   "prompt.glyphs": {"type": "number", "initial": 0},
   "prompt.swapped": {"type": "boolean", "initial": false},
@@ -238,37 +239,169 @@
    "id": "text.campaign-label.font-size",
    "node": "campaign-label",
    "property": "font-size",
-   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+         }
+        ]
+       },
+       {"op": "/", "args": [24, {"state": "view.text"}]}
+      ]
+     },
+     {"op": "/", "args": [24, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "text.campaign-label.line-height",
    "node": "campaign-label",
    "property": "line-height",
-   "value": {"op": "/", "args": [36.6, {"state": "view.text"}]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+         }
+        ]
+       },
+       {"op": "/", "args": [36.6, {"state": "view.text"}]}
+      ]
+     },
+     {"op": "/", "args": [36.6, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "text.arena-label.font-size",
    "node": "arena-label",
    "property": "font-size",
-   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+         }
+        ]
+       },
+       {"op": "/", "args": [24, {"state": "view.text"}]}
+      ]
+     },
+     {"op": "/", "args": [24, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "text.arena-label.line-height",
    "node": "arena-label",
    "property": "line-height",
-   "value": {"op": "/", "args": [36.6, {"state": "view.text"}]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+         }
+        ]
+       },
+       {"op": "/", "args": [36.6, {"state": "view.text"}]}
+      ]
+     },
+     {"op": "/", "args": [36.6, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "text.back-label.font-size",
    "node": "back-label",
    "property": "font-size",
-   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+         }
+        ]
+       },
+       {"op": "/", "args": [24, {"state": "view.text"}]}
+      ]
+     },
+     {"op": "/", "args": [24, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "text.back-label.line-height",
    "node": "back-label",
    "property": "line-height",
-   "value": {"op": "/", "args": [36.6, {"state": "view.text"}]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+         }
+        ]
+       },
+       {"op": "/", "args": [36.6, {"state": "view.text"}]}
+      ]
+     },
+     {"op": "/", "args": [36.6, {"state": "view.text"}]}
+    ]
+   }
   },
   {
    "id": "text.details.top",
@@ -277,66 +410,173 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
      {
-      "op": "min",
+      "op": "+",
       "args": [
-       285.0,
        {
-        "op": "-",
+        "op": "+",
         "args": [
-         630.0,
+         {
+          "op": "+",
+          "args": [
+           110.0,
+           {
+            "op": "*",
+            "args": [
+             0.5,
+             {
+              "op": "-",
+              "args": [
+               {"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]},
+               {
+                "op": "*",
+                "args": [
+                 {
+                  "op": "min",
+                  "args": [
+                   1.6,
+                   {
+                    "op": "/",
+                    "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+                   }
+                  ]
+                 },
+                 {
+                  "op": "+",
+                  "args": [
+                   159.0,
+                   {
+                    "op": "*",
+                    "args": [
+                     {
+                      "op": "*",
+                      "args": [
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                         4,
+                         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 2, 2]}
+                        ]
+                       },
+                       26
+                      ]
+                     },
+                     {"state": "view.text"}
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         },
          {
           "op": "*",
           "args": [
            {
+            "op": "min",
+            "args": [
+             1.6,
+             {
+              "op": "/",
+              "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+             }
+            ]
+           },
+           135.0
+          ]
+         }
+        ]
+       },
+       {
+        "op": "*",
+        "args": [
+         {
+          "op": "min",
+          "args": [
+           1.6,
+           {
+            "op": "/",
+            "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+           }
+          ]
+         },
+         24
+        ]
+       }
+      ]
+     },
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "min",
+        "args": [
+         285.0,
+         {
+          "op": "-",
+          "args": [
+           630.0,
+           {
             "op": "*",
             "args": [
              {
-              "op": "select",
+              "op": "*",
               "args": [
-               {"op": ">", "args": [{"state": "view.text"}, 1.5]},
                {
                 "op": "select",
                 "args": [
-                 {"op": "==", "args": [{"state": "language"}, "czech"]},
-                 4,
+                 {"op": ">", "args": [{"state": "view.text"}, 1.5]},
                  {
                   "op": "select",
                   "args": [
-                   {"op": "==", "args": [{"state": "language"}, "english"]},
+                   {"op": "==", "args": [{"state": "language"}, "czech"]},
                    4,
                    {
                     "op": "select",
                     "args": [
-                     {"op": "==", "args": [{"state": "language"}, "french"]},
+                     {"op": "==", "args": [{"state": "language"}, "english"]},
                      4,
                      {
                       "op": "select",
                       "args": [
-                       {"op": "==", "args": [{"state": "language"}, "german"]},
+                       {"op": "==", "args": [{"state": "language"}, "french"]},
                        4,
                        {
                         "op": "select",
                         "args": [
-                         {"op": "==", "args": [{"state": "language"}, "italian"]},
+                         {"op": "==", "args": [{"state": "language"}, "german"]},
                          4,
                          {
                           "op": "select",
                           "args": [
-                           {"op": "==", "args": [{"state": "language"}, "polish"]},
+                           {"op": "==", "args": [{"state": "language"}, "italian"]},
                            4,
                            {
                             "op": "select",
                             "args": [
-                             {"op": "==", "args": [{"state": "language"}, "russian"]},
+                             {"op": "==", "args": [{"state": "language"}, "polish"]},
                              4,
                              {
                               "op": "select",
                               "args": [
-                               {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                               {"op": "==", "args": [{"state": "language"}, "russian"]},
                                4,
-                               {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 4, 5]}
+                               {
+                                "op": "select",
+                                "args": [
+                                 {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                                 4,
+                                 {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 4, 5]}
+                                ]
+                               }
                               ]
                              }
                             ]
@@ -350,60 +590,60 @@
                     ]
                    }
                   ]
-                 }
-                ]
-               },
-               {
-                "op": "select",
-                "args": [
-                 {"op": "==", "args": [{"state": "language"}, "brazilian"]},
-                 3,
+                 },
                  {
                   "op": "select",
                   "args": [
-                   {"op": "==", "args": [{"state": "language"}, "czech"]},
+                   {"op": "==", "args": [{"state": "language"}, "brazilian"]},
                    3,
                    {
                     "op": "select",
                     "args": [
-                     {"op": "==", "args": [{"state": "language"}, "english"]},
+                     {"op": "==", "args": [{"state": "language"}, "czech"]},
                      3,
                      {
                       "op": "select",
                       "args": [
-                       {"op": "==", "args": [{"state": "language"}, "french"]},
+                       {"op": "==", "args": [{"state": "language"}, "english"]},
                        3,
                        {
                         "op": "select",
                         "args": [
-                         {"op": "==", "args": [{"state": "language"}, "german"]},
+                         {"op": "==", "args": [{"state": "language"}, "french"]},
                          3,
                          {
                           "op": "select",
                           "args": [
-                           {"op": "==", "args": [{"state": "language"}, "italian"]},
+                           {"op": "==", "args": [{"state": "language"}, "german"]},
                            3,
                            {
                             "op": "select",
                             "args": [
-                             {"op": "==", "args": [{"state": "language"}, "polish"]},
+                             {"op": "==", "args": [{"state": "language"}, "italian"]},
                              3,
                              {
                               "op": "select",
                               "args": [
-                               {"op": "==", "args": [{"state": "language"}, "russian"]},
+                               {"op": "==", "args": [{"state": "language"}, "polish"]},
                                3,
                                {
                                 "op": "select",
                                 "args": [
-                                 {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                                 {"op": "==", "args": [{"state": "language"}, "russian"]},
                                  3,
                                  {
                                   "op": "select",
                                   "args": [
-                                   {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                                   {"op": "==", "args": [{"state": "language"}, "spanish"]},
                                    3,
-                                   {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 3, 4]}
+                                   {
+                                    "op": "select",
+                                    "args": [
+                                     {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                                     3,
+                                     {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 3, 4]}
+                                    ]
+                                   }
                                   ]
                                  }
                                 ]
@@ -423,13 +663,612 @@
                   ]
                  }
                 ]
+               },
+               26
+              ]
+             },
+             {"state": "view.text"}
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       285.0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.details.width",
+   "node": "details",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "+",
+      "args": [
+       894.0,
+       {
+        "op": "*",
+        "args": [
+         -66.0,
+         {
+          "op": "min",
+          "args": [
+           1.6,
+           {
+            "op": "/",
+            "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 336.0, 315.0]}
+    ]
+   }
+  },
+  {
+   "id": "text.details.height",
+   "node": "details",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+         }
+        ]
+       },
+       {
+        "op": "*",
+        "args": [
+         {
+          "op": "*",
+          "args": [
+           {
+            "op": "select",
+            "args": [
+             {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+             4,
+             {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 2, 2]}
+            ]
+           },
+           26
+          ]
+         },
+         {"state": "view.text"}
+        ]
+       }
+      ]
+     },
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "-",
+        "args": [
+         630.0,
+         {
+          "op": "min",
+          "args": [
+           285.0,
+           {
+            "op": "-",
+            "args": [
+             630.0,
+             {
+              "op": "*",
+              "args": [
+               {
+                "op": "*",
+                "args": [
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "czech"]},
+                     4,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "english"]},
+                       4,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "french"]},
+                         4,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "german"]},
+                           4,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "italian"]},
+                             4,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "polish"]},
+                               4,
+                               {
+                                "op": "select",
+                                "args": [
+                                 {"op": "==", "args": [{"state": "language"}, "russian"]},
+                                 4,
+                                 {
+                                  "op": "select",
+                                  "args": [
+                                   {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                                   4,
+                                   {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 4, 5]}
+                                  ]
+                                 }
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   },
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+                     3,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "czech"]},
+                       3,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "english"]},
+                         3,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "french"]},
+                           3,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "german"]},
+                             3,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "italian"]},
+                               3,
+                               {
+                                "op": "select",
+                                "args": [
+                                 {"op": "==", "args": [{"state": "language"}, "polish"]},
+                                 3,
+                                 {
+                                  "op": "select",
+                                  "args": [
+                                   {"op": "==", "args": [{"state": "language"}, "russian"]},
+                                   3,
+                                   {
+                                    "op": "select",
+                                    "args": [
+                                     {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                                     3,
+                                     {
+                                      "op": "select",
+                                      "args": [
+                                       {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                                       3,
+                                       {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 3, 4]}
+                                      ]
+                                     }
+                                    ]
+                                   }
+                                  ]
+                                 }
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 26
+                ]
+               },
+               {"state": "view.text"}
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       210.0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.description.width",
+   "node": "description",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "+",
+      "args": [
+       894.0,
+       {
+        "op": "*",
+        "args": [
+         -66.0,
+         {
+          "op": "min",
+          "args": [
+           1.6,
+           {
+            "op": "/",
+            "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 336.0, 315.0]}
+    ]
+   }
+  },
+  {
+   "id": "text.description.height",
+   "node": "description",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+         }
+        ]
+       },
+       {
+        "op": "*",
+        "args": [
+         {
+          "op": "*",
+          "args": [
+           {
+            "op": "select",
+            "args": [
+             {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+             4,
+             {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 2, 2]}
+            ]
+           },
+           26
+          ]
+         },
+         {"state": "view.text"}
+        ]
+       }
+      ]
+     },
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "-",
+        "args": [
+         630.0,
+         {
+          "op": "min",
+          "args": [
+           285.0,
+           {
+            "op": "-",
+            "args": [
+             630.0,
+             {
+              "op": "*",
+              "args": [
+               {
+                "op": "*",
+                "args": [
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "czech"]},
+                     4,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "english"]},
+                       4,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "french"]},
+                         4,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "german"]},
+                           4,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "italian"]},
+                             4,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "polish"]},
+                               4,
+                               {
+                                "op": "select",
+                                "args": [
+                                 {"op": "==", "args": [{"state": "language"}, "russian"]},
+                                 4,
+                                 {
+                                  "op": "select",
+                                  "args": [
+                                   {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                                   4,
+                                   {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 4, 5]}
+                                  ]
+                                 }
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   },
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+                     3,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "czech"]},
+                       3,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "english"]},
+                         3,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "french"]},
+                           3,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "german"]},
+                             3,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "italian"]},
+                               3,
+                               {
+                                "op": "select",
+                                "args": [
+                                 {"op": "==", "args": [{"state": "language"}, "polish"]},
+                                 3,
+                                 {
+                                  "op": "select",
+                                  "args": [
+                                   {"op": "==", "args": [{"state": "language"}, "russian"]},
+                                   3,
+                                   {
+                                    "op": "select",
+                                    "args": [
+                                     {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                                     3,
+                                     {
+                                      "op": "select",
+                                      "args": [
+                                       {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                                       3,
+                                       {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 3, 4]}
+                                      ]
+                                     }
+                                    ]
+                                   }
+                                  ]
+                                 }
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 26
+                ]
+               },
+               {"state": "view.text"}
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       210.0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.content.margin-top",
+   "node": "content",
+   "property": "margin-top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [-480.0, {"state": "view.aspect"}]},
+     -360
+    ]
+   }
+  },
+  {
+   "id": "tall.content.height",
+   "node": "content",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [960.0, {"state": "view.aspect"}]},
+     720
+    ]
+   }
+  },
+  {
+   "id": "tall.navigation.top",
+   "node": "navigation",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "+",
+      "args": [
+       110.0,
+       {
+        "op": "*",
+        "args": [
+         0.5,
+         {
+          "op": "-",
+          "args": [
+           {"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]},
+           {
+            "op": "*",
+            "args": [
+             {
+              "op": "min",
+              "args": [
+               1.6,
+               {
+                "op": "/",
+                "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
                }
               ]
              },
-             26
+             {
+              "op": "+",
+              "args": [
+               159.0,
+               {
+                "op": "*",
+                "args": [
+                 {
+                  "op": "*",
+                  "args": [
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                     4,
+                     {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 2, 2]}
+                    ]
+                   },
+                   26
+                  ]
+                 },
+                 {"state": "view.text"}
+                ]
+               }
+              ]
+             }
             ]
-           },
-           {"state": "view.text"}
+           }
           ]
          }
         ]
@@ -441,366 +1280,1902 @@
    }
   },
   {
-   "id": "text.details.width",
-   "node": "details",
-   "property": "width",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 336.0, 315.0]}
-  },
-  {
-   "id": "text.details.height",
-   "node": "details",
-   "property": "height",
+   "id": "tall.campaign.margin-left",
+   "node": "campaign",
+   "property": "margin-left",
    "value": {
     "op": "select",
     "args": [
-     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
      {
-      "op": "-",
+      "op": "*",
       "args": [
-       630.0,
        {
         "op": "min",
         "args": [
-         285.0,
+         1.6,
          {
-          "op": "-",
-          "args": [
-           630.0,
-           {
-            "op": "*",
-            "args": [
-             {
-              "op": "*",
-              "args": [
-               {
-                "op": "select",
-                "args": [
-                 {"op": ">", "args": [{"state": "view.text"}, 1.5]},
-                 {
-                  "op": "select",
-                  "args": [
-                   {"op": "==", "args": [{"state": "language"}, "czech"]},
-                   4,
-                   {
-                    "op": "select",
-                    "args": [
-                     {"op": "==", "args": [{"state": "language"}, "english"]},
-                     4,
-                     {
-                      "op": "select",
-                      "args": [
-                       {"op": "==", "args": [{"state": "language"}, "french"]},
-                       4,
-                       {
-                        "op": "select",
-                        "args": [
-                         {"op": "==", "args": [{"state": "language"}, "german"]},
-                         4,
-                         {
-                          "op": "select",
-                          "args": [
-                           {"op": "==", "args": [{"state": "language"}, "italian"]},
-                           4,
-                           {
-                            "op": "select",
-                            "args": [
-                             {"op": "==", "args": [{"state": "language"}, "polish"]},
-                             4,
-                             {
-                              "op": "select",
-                              "args": [
-                               {"op": "==", "args": [{"state": "language"}, "russian"]},
-                               4,
-                               {
-                                "op": "select",
-                                "args": [
-                                 {"op": "==", "args": [{"state": "language"}, "spanish"]},
-                                 4,
-                                 {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 4, 5]}
-                                ]
-                               }
-                              ]
-                             }
-                            ]
-                           }
-                          ]
-                         }
-                        ]
-                       }
-                      ]
-                     }
-                    ]
-                   }
-                  ]
-                 },
-                 {
-                  "op": "select",
-                  "args": [
-                   {"op": "==", "args": [{"state": "language"}, "brazilian"]},
-                   3,
-                   {
-                    "op": "select",
-                    "args": [
-                     {"op": "==", "args": [{"state": "language"}, "czech"]},
-                     3,
-                     {
-                      "op": "select",
-                      "args": [
-                       {"op": "==", "args": [{"state": "language"}, "english"]},
-                       3,
-                       {
-                        "op": "select",
-                        "args": [
-                         {"op": "==", "args": [{"state": "language"}, "french"]},
-                         3,
-                         {
-                          "op": "select",
-                          "args": [
-                           {"op": "==", "args": [{"state": "language"}, "german"]},
-                           3,
-                           {
-                            "op": "select",
-                            "args": [
-                             {"op": "==", "args": [{"state": "language"}, "italian"]},
-                             3,
-                             {
-                              "op": "select",
-                              "args": [
-                               {"op": "==", "args": [{"state": "language"}, "polish"]},
-                               3,
-                               {
-                                "op": "select",
-                                "args": [
-                                 {"op": "==", "args": [{"state": "language"}, "russian"]},
-                                 3,
-                                 {
-                                  "op": "select",
-                                  "args": [
-                                   {"op": "==", "args": [{"state": "language"}, "spanish"]},
-                                   3,
-                                   {
-                                    "op": "select",
-                                    "args": [
-                                     {"op": "==", "args": [{"state": "language"}, "turkish"]},
-                                     3,
-                                     {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 3, 4]}
-                                    ]
-                                   }
-                                  ]
-                                 }
-                                ]
-                               }
-                              ]
-                             }
-                            ]
-                           }
-                          ]
-                         }
-                        ]
-                       }
-                      ]
-                     }
-                    ]
-                   }
-                  ]
-                 }
-                ]
-               },
-               26
-              ]
-             },
-             {"state": "view.text"}
-            ]
-           }
-          ]
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
          }
         ]
-       }
+       },
+       -900.0
       ]
      },
-     210.0
+     -900.0
     ]
    }
   },
   {
-   "id": "text.description.width",
-   "node": "description",
+   "id": "tall.campaign.width",
+   "node": "campaign",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 336.0, 315.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+         }
+        ]
+       },
+       1435.5
+      ]
+     },
+     1435.5
+    ]
+   }
   },
   {
-   "id": "text.description.height",
-   "node": "description",
+   "id": "tall.campaign.height",
+   "node": "campaign",
    "property": "height",
    "value": {
     "op": "select",
     "args": [
-     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
      {
-      "op": "-",
+      "op": "*",
       "args": [
-       630.0,
        {
         "op": "min",
         "args": [
-         285.0,
+         1.6,
          {
-          "op": "-",
-          "args": [
-           630.0,
-           {
-            "op": "*",
-            "args": [
-             {
-              "op": "*",
-              "args": [
-               {
-                "op": "select",
-                "args": [
-                 {"op": ">", "args": [{"state": "view.text"}, 1.5]},
-                 {
-                  "op": "select",
-                  "args": [
-                   {"op": "==", "args": [{"state": "language"}, "czech"]},
-                   4,
-                   {
-                    "op": "select",
-                    "args": [
-                     {"op": "==", "args": [{"state": "language"}, "english"]},
-                     4,
-                     {
-                      "op": "select",
-                      "args": [
-                       {"op": "==", "args": [{"state": "language"}, "french"]},
-                       4,
-                       {
-                        "op": "select",
-                        "args": [
-                         {"op": "==", "args": [{"state": "language"}, "german"]},
-                         4,
-                         {
-                          "op": "select",
-                          "args": [
-                           {"op": "==", "args": [{"state": "language"}, "italian"]},
-                           4,
-                           {
-                            "op": "select",
-                            "args": [
-                             {"op": "==", "args": [{"state": "language"}, "polish"]},
-                             4,
-                             {
-                              "op": "select",
-                              "args": [
-                               {"op": "==", "args": [{"state": "language"}, "russian"]},
-                               4,
-                               {
-                                "op": "select",
-                                "args": [
-                                 {"op": "==", "args": [{"state": "language"}, "spanish"]},
-                                 4,
-                                 {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 4, 5]}
-                                ]
-                               }
-                              ]
-                             }
-                            ]
-                           }
-                          ]
-                         }
-                        ]
-                       }
-                      ]
-                     }
-                    ]
-                   }
-                  ]
-                 },
-                 {
-                  "op": "select",
-                  "args": [
-                   {"op": "==", "args": [{"state": "language"}, "brazilian"]},
-                   3,
-                   {
-                    "op": "select",
-                    "args": [
-                     {"op": "==", "args": [{"state": "language"}, "czech"]},
-                     3,
-                     {
-                      "op": "select",
-                      "args": [
-                       {"op": "==", "args": [{"state": "language"}, "english"]},
-                       3,
-                       {
-                        "op": "select",
-                        "args": [
-                         {"op": "==", "args": [{"state": "language"}, "french"]},
-                         3,
-                         {
-                          "op": "select",
-                          "args": [
-                           {"op": "==", "args": [{"state": "language"}, "german"]},
-                           3,
-                           {
-                            "op": "select",
-                            "args": [
-                             {"op": "==", "args": [{"state": "language"}, "italian"]},
-                             3,
-                             {
-                              "op": "select",
-                              "args": [
-                               {"op": "==", "args": [{"state": "language"}, "polish"]},
-                               3,
-                               {
-                                "op": "select",
-                                "args": [
-                                 {"op": "==", "args": [{"state": "language"}, "russian"]},
-                                 3,
-                                 {
-                                  "op": "select",
-                                  "args": [
-                                   {"op": "==", "args": [{"state": "language"}, "spanish"]},
-                                   3,
-                                   {
-                                    "op": "select",
-                                    "args": [
-                                     {"op": "==", "args": [{"state": "language"}, "turkish"]},
-                                     3,
-                                     {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 3, 4]}
-                                    ]
-                                   }
-                                  ]
-                                 }
-                                ]
-                               }
-                              ]
-                             }
-                            ]
-                           }
-                          ]
-                         }
-                        ]
-                       }
-                      ]
-                     }
-                    ]
-                   }
-                  ]
-                 }
-                ]
-               },
-               26
-              ]
-             },
-             {"state": "view.text"}
-            ]
-           }
-          ]
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+         }
+        ]
+       },
+       45.0
+      ]
+     },
+     45.0
+    ]
+   }
+  },
+  {
+   "id": "tall.campaign-plate.transform",
+   "node": "campaign-plate",
+   "property": "transform",
+   "value": [
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "*",
+       "args": [
+        {
+         "op": "-",
+         "args": [
+          {
+           "op": "min",
+           "args": [
+            1.6,
+            {
+             "op": "/",
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+            }
+           ]
+          },
+          1
+         ]
+        },
+        {"op": "*", "args": [0.5, 1435.5]}
+       ]
+      },
+      0
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "*",
+       "args": [
+        {
+         "op": "-",
+         "args": [
+          {
+           "op": "min",
+           "args": [
+            1.6,
+            {
+             "op": "/",
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+            }
+           ]
+          },
+          1
+         ]
+        },
+        {"op": "*", "args": [0.5, 45]}
+       ]
+      },
+      0
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "min",
+       "args": [
+        1.6,
+        {
+         "op": "/",
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+        }
+       ]
+      },
+      1
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "min",
+       "args": [
+        1.6,
+        {
+         "op": "/",
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+        }
+       ]
+      },
+      1
+     ]
+    },
+    0
+   ]
+  },
+  {
+   "id": "tall.campaign-focus.transform",
+   "node": "campaign-focus",
+   "property": "transform",
+   "value": [
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "*",
+       "args": [
+        {
+         "op": "-",
+         "args": [
+          {
+           "op": "min",
+           "args": [
+            1.6,
+            {
+             "op": "/",
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+            }
+           ]
+          },
+          1
+         ]
+        },
+        {"op": "*", "args": [0.5, 1435.5]}
+       ]
+      },
+      0
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "*",
+       "args": [
+        {
+         "op": "-",
+         "args": [
+          {
+           "op": "min",
+           "args": [
+            1.6,
+            {
+             "op": "/",
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+            }
+           ]
+          },
+          1
+         ]
+        },
+        {"op": "*", "args": [0.5, 45]}
+       ]
+      },
+      0
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "min",
+       "args": [
+        1.6,
+        {
+         "op": "/",
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+        }
+       ]
+      },
+      1
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "min",
+       "args": [
+        1.6,
+        {
+         "op": "/",
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+        }
+       ]
+      },
+      1
+     ]
+    },
+    0
+   ]
+  },
+  {
+   "id": "tall.campaign-marker.transform",
+   "node": "campaign-marker",
+   "property": "transform",
+   "value": [
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "*",
+       "args": [
+        {
+         "op": "-",
+         "args": [
+          {
+           "op": "min",
+           "args": [
+            1.6,
+            {
+             "op": "/",
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+            }
+           ]
+          },
+          1
+         ]
+        },
+        {"op": "*", "args": [0.5, 1435.5]}
+       ]
+      },
+      0
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "*",
+       "args": [
+        {
+         "op": "-",
+         "args": [
+          {
+           "op": "min",
+           "args": [
+            1.6,
+            {
+             "op": "/",
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+            }
+           ]
+          },
+          1
+         ]
+        },
+        {"op": "*", "args": [0.5, 45]}
+       ]
+      },
+      0
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "min",
+       "args": [
+        1.6,
+        {
+         "op": "/",
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+        }
+       ]
+      },
+      1
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "min",
+       "args": [
+        1.6,
+        {
+         "op": "/",
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+        }
+       ]
+      },
+      1
+     ]
+    },
+    0
+   ]
+  },
+  {
+   "id": "tall.campaign-marker-hot.transform",
+   "node": "campaign-marker-hot",
+   "property": "transform",
+   "value": [
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "*",
+       "args": [
+        {
+         "op": "-",
+         "args": [
+          {
+           "op": "min",
+           "args": [
+            1.6,
+            {
+             "op": "/",
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+            }
+           ]
+          },
+          1
+         ]
+        },
+        {"op": "*", "args": [0.5, 1435.5]}
+       ]
+      },
+      0
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "*",
+       "args": [
+        {
+         "op": "-",
+         "args": [
+          {
+           "op": "min",
+           "args": [
+            1.6,
+            {
+             "op": "/",
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+            }
+           ]
+          },
+          1
+         ]
+        },
+        {"op": "*", "args": [0.5, 45]}
+       ]
+      },
+      0
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "min",
+       "args": [
+        1.6,
+        {
+         "op": "/",
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+        }
+       ]
+      },
+      1
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "min",
+       "args": [
+        1.6,
+        {
+         "op": "/",
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+        }
+       ]
+      },
+      1
+     ]
+    },
+    0
+   ]
+  },
+  {
+   "id": "tall.campaign-label.left",
+   "node": "campaign-label",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+         }
+        ]
+       },
+       966.0
+      ]
+     },
+     966.0
+    ]
+   }
+  },
+  {
+   "id": "tall.campaign-label.top",
+   "node": "campaign-label",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+         }
+        ]
+       },
+       4.2
+      ]
+     },
+     4.2
+    ]
+   }
+  },
+  {
+   "id": "tall.campaign-label.width",
+   "node": "campaign-label",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+         }
+        ]
+       },
+       471.0
+      ]
+     },
+     471.0
+    ]
+   }
+  },
+  {
+   "id": "tall.campaign-label.height",
+   "node": "campaign-label",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+         }
+        ]
+       },
+       36.6
+      ]
+     },
+     36.6
+    ]
+   }
+  },
+  {
+   "id": "tall.arena.margin-left",
+   "node": "arena",
+   "property": "margin-left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+         }
+        ]
+       },
+       -900.0
+      ]
+     },
+     -900.0
+    ]
+   }
+  },
+  {
+   "id": "tall.arena.width",
+   "node": "arena",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+         }
+        ]
+       },
+       1435.5
+      ]
+     },
+     1435.5
+    ]
+   }
+  },
+  {
+   "id": "tall.arena.height",
+   "node": "arena",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+         }
+        ]
+       },
+       45.0
+      ]
+     },
+     45.0
+    ]
+   }
+  },
+  {
+   "id": "tall.arena-plate.transform",
+   "node": "arena-plate",
+   "property": "transform",
+   "value": [
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "*",
+       "args": [
+        {
+         "op": "-",
+         "args": [
+          {
+           "op": "min",
+           "args": [
+            1.6,
+            {
+             "op": "/",
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+            }
+           ]
+          },
+          1
+         ]
+        },
+        {"op": "*", "args": [0.5, 1435.5]}
+       ]
+      },
+      0
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "*",
+       "args": [
+        {
+         "op": "-",
+         "args": [
+          {
+           "op": "min",
+           "args": [
+            1.6,
+            {
+             "op": "/",
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+            }
+           ]
+          },
+          1
+         ]
+        },
+        {"op": "*", "args": [0.5, 45]}
+       ]
+      },
+      0
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "min",
+       "args": [
+        1.6,
+        {
+         "op": "/",
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+        }
+       ]
+      },
+      1
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "min",
+       "args": [
+        1.6,
+        {
+         "op": "/",
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+        }
+       ]
+      },
+      1
+     ]
+    },
+    0
+   ]
+  },
+  {
+   "id": "tall.arena-focus.transform",
+   "node": "arena-focus",
+   "property": "transform",
+   "value": [
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "*",
+       "args": [
+        {
+         "op": "-",
+         "args": [
+          {
+           "op": "min",
+           "args": [
+            1.6,
+            {
+             "op": "/",
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+            }
+           ]
+          },
+          1
+         ]
+        },
+        {"op": "*", "args": [0.5, 1435.5]}
+       ]
+      },
+      0
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "*",
+       "args": [
+        {
+         "op": "-",
+         "args": [
+          {
+           "op": "min",
+           "args": [
+            1.6,
+            {
+             "op": "/",
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+            }
+           ]
+          },
+          1
+         ]
+        },
+        {"op": "*", "args": [0.5, 45]}
+       ]
+      },
+      0
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "min",
+       "args": [
+        1.6,
+        {
+         "op": "/",
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+        }
+       ]
+      },
+      1
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "min",
+       "args": [
+        1.6,
+        {
+         "op": "/",
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+        }
+       ]
+      },
+      1
+     ]
+    },
+    0
+   ]
+  },
+  {
+   "id": "tall.arena-marker.transform",
+   "node": "arena-marker",
+   "property": "transform",
+   "value": [
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "*",
+       "args": [
+        {
+         "op": "-",
+         "args": [
+          {
+           "op": "min",
+           "args": [
+            1.6,
+            {
+             "op": "/",
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+            }
+           ]
+          },
+          1
+         ]
+        },
+        {"op": "*", "args": [0.5, 1435.5]}
+       ]
+      },
+      0
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "*",
+       "args": [
+        {
+         "op": "-",
+         "args": [
+          {
+           "op": "min",
+           "args": [
+            1.6,
+            {
+             "op": "/",
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+            }
+           ]
+          },
+          1
+         ]
+        },
+        {"op": "*", "args": [0.5, 45]}
+       ]
+      },
+      0
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "min",
+       "args": [
+        1.6,
+        {
+         "op": "/",
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+        }
+       ]
+      },
+      1
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "min",
+       "args": [
+        1.6,
+        {
+         "op": "/",
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+        }
+       ]
+      },
+      1
+     ]
+    },
+    0
+   ]
+  },
+  {
+   "id": "tall.arena-marker-hot.transform",
+   "node": "arena-marker-hot",
+   "property": "transform",
+   "value": [
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "*",
+       "args": [
+        {
+         "op": "-",
+         "args": [
+          {
+           "op": "min",
+           "args": [
+            1.6,
+            {
+             "op": "/",
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+            }
+           ]
+          },
+          1
+         ]
+        },
+        {"op": "*", "args": [0.5, 1435.5]}
+       ]
+      },
+      0
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "*",
+       "args": [
+        {
+         "op": "-",
+         "args": [
+          {
+           "op": "min",
+           "args": [
+            1.6,
+            {
+             "op": "/",
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+            }
+           ]
+          },
+          1
+         ]
+        },
+        {"op": "*", "args": [0.5, 45]}
+       ]
+      },
+      0
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "min",
+       "args": [
+        1.6,
+        {
+         "op": "/",
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+        }
+       ]
+      },
+      1
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "min",
+       "args": [
+        1.6,
+        {
+         "op": "/",
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+        }
+       ]
+      },
+      1
+     ]
+    },
+    0
+   ]
+  },
+  {
+   "id": "tall.arena-label.left",
+   "node": "arena-label",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+         }
+        ]
+       },
+       966.0
+      ]
+     },
+     966.0
+    ]
+   }
+  },
+  {
+   "id": "tall.arena-label.top",
+   "node": "arena-label",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+         }
+        ]
+       },
+       4.2
+      ]
+     },
+     4.2
+    ]
+   }
+  },
+  {
+   "id": "tall.arena-label.width",
+   "node": "arena-label",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+         }
+        ]
+       },
+       471.0
+      ]
+     },
+     471.0
+    ]
+   }
+  },
+  {
+   "id": "tall.arena-label.height",
+   "node": "arena-label",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+         }
+        ]
+       },
+       36.6
+      ]
+     },
+     36.6
+    ]
+   }
+  },
+  {
+   "id": "tall.back.margin-left",
+   "node": "back",
+   "property": "margin-left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+         }
+        ]
+       },
+       -900.0
+      ]
+     },
+     -900.0
+    ]
+   }
+  },
+  {
+   "id": "tall.back.width",
+   "node": "back",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+         }
+        ]
+       },
+       1435.5
+      ]
+     },
+     1435.5
+    ]
+   }
+  },
+  {
+   "id": "tall.back.height",
+   "node": "back",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+         }
+        ]
+       },
+       45.0
+      ]
+     },
+     45.0
+    ]
+   }
+  },
+  {
+   "id": "tall.back-plate.transform",
+   "node": "back-plate",
+   "property": "transform",
+   "value": [
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "*",
+       "args": [
+        {
+         "op": "-",
+         "args": [
+          {
+           "op": "min",
+           "args": [
+            1.6,
+            {
+             "op": "/",
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+            }
+           ]
+          },
+          1
+         ]
+        },
+        {"op": "*", "args": [0.5, 1435.5]}
+       ]
+      },
+      0
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "*",
+       "args": [
+        {
+         "op": "-",
+         "args": [
+          {
+           "op": "min",
+           "args": [
+            1.6,
+            {
+             "op": "/",
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+            }
+           ]
+          },
+          1
+         ]
+        },
+        {"op": "*", "args": [0.5, 45]}
+       ]
+      },
+      0
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "min",
+       "args": [
+        1.6,
+        {
+         "op": "/",
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+        }
+       ]
+      },
+      1
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "min",
+       "args": [
+        1.6,
+        {
+         "op": "/",
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+        }
+       ]
+      },
+      1
+     ]
+    },
+    0
+   ]
+  },
+  {
+   "id": "tall.back-focus.transform",
+   "node": "back-focus",
+   "property": "transform",
+   "value": [
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "*",
+       "args": [
+        {
+         "op": "-",
+         "args": [
+          {
+           "op": "min",
+           "args": [
+            1.6,
+            {
+             "op": "/",
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+            }
+           ]
+          },
+          1
+         ]
+        },
+        {"op": "*", "args": [0.5, 1435.5]}
+       ]
+      },
+      0
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "*",
+       "args": [
+        {
+         "op": "-",
+         "args": [
+          {
+           "op": "min",
+           "args": [
+            1.6,
+            {
+             "op": "/",
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+            }
+           ]
+          },
+          1
+         ]
+        },
+        {"op": "*", "args": [0.5, 45]}
+       ]
+      },
+      0
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "min",
+       "args": [
+        1.6,
+        {
+         "op": "/",
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+        }
+       ]
+      },
+      1
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "min",
+       "args": [
+        1.6,
+        {
+         "op": "/",
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+        }
+       ]
+      },
+      1
+     ]
+    },
+    0
+   ]
+  },
+  {
+   "id": "tall.back-marker.transform",
+   "node": "back-marker",
+   "property": "transform",
+   "value": [
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "*",
+       "args": [
+        {
+         "op": "-",
+         "args": [
+          {
+           "op": "min",
+           "args": [
+            1.6,
+            {
+             "op": "/",
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+            }
+           ]
+          },
+          1
+         ]
+        },
+        {"op": "*", "args": [0.5, 1435.5]}
+       ]
+      },
+      0
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "*",
+       "args": [
+        {
+         "op": "-",
+         "args": [
+          {
+           "op": "min",
+           "args": [
+            1.6,
+            {
+             "op": "/",
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+            }
+           ]
+          },
+          1
+         ]
+        },
+        {"op": "*", "args": [0.5, 45]}
+       ]
+      },
+      0
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "min",
+       "args": [
+        1.6,
+        {
+         "op": "/",
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+        }
+       ]
+      },
+      1
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "min",
+       "args": [
+        1.6,
+        {
+         "op": "/",
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+        }
+       ]
+      },
+      1
+     ]
+    },
+    0
+   ]
+  },
+  {
+   "id": "tall.back-marker-hot.transform",
+   "node": "back-marker-hot",
+   "property": "transform",
+   "value": [
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "*",
+       "args": [
+        {
+         "op": "-",
+         "args": [
+          {
+           "op": "min",
+           "args": [
+            1.6,
+            {
+             "op": "/",
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+            }
+           ]
+          },
+          1
+         ]
+        },
+        {"op": "*", "args": [0.5, 1435.5]}
+       ]
+      },
+      0
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "*",
+       "args": [
+        {
+         "op": "-",
+         "args": [
+          {
+           "op": "min",
+           "args": [
+            1.6,
+            {
+             "op": "/",
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+            }
+           ]
+          },
+          1
+         ]
+        },
+        {"op": "*", "args": [0.5, 45]}
+       ]
+      },
+      0
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "min",
+       "args": [
+        1.6,
+        {
+         "op": "/",
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+        }
+       ]
+      },
+      1
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {
+       "op": "min",
+       "args": [
+        1.6,
+        {
+         "op": "/",
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+        }
+       ]
+      },
+      1
+     ]
+    },
+    0
+   ]
+  },
+  {
+   "id": "tall.back-label.left",
+   "node": "back-label",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+         }
+        ]
+       },
+       966.0
+      ]
+     },
+     966.0
+    ]
+   }
+  },
+  {
+   "id": "tall.back-label.top",
+   "node": "back-label",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+         }
+        ]
+       },
+       4.2
+      ]
+     },
+     4.2
+    ]
+   }
+  },
+  {
+   "id": "tall.back-label.width",
+   "node": "back-label",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+         }
+        ]
+       },
+       471.0
+      ]
+     },
+     471.0
+    ]
+   }
+  },
+  {
+   "id": "tall.back-label.height",
+   "node": "back-label",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+         }
+        ]
+       },
+       36.6
+      ]
+     },
+     36.6
+    ]
+   }
+  },
+  {
+   "id": "tall.navigation.width",
+   "node": "navigation",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+         }
+        ]
+       },
+       535.5
+      ]
+     },
+     535.5
+    ]
+   }
+  },
+  {
+   "id": "tall.details.left",
+   "node": "details",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "*",
+      "args": [
+       66.0,
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
          }
         ]
        }
       ]
      },
-     210.0
+     592.5
+    ]
+   }
+  },
+  {
+   "id": "tall.description.font-size",
+   "node": "description",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+         }
+        ]
+       },
+       18
+      ]
+     },
+     18
+    ]
+   }
+  },
+  {
+   "id": "tall.description.line-height",
+   "node": "description",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 367.0]
+         }
+        ]
+       },
+       26
+      ]
+     },
+     26
     ]
    }
   },
@@ -6652,7 +9027,8 @@
            "top": {"type": "length", "value": 0, "unit": "dp"},
            "width": {"type": "length", "value": 1435.5, "unit": "dp"},
            "height": {"type": "length", "value": 45, "unit": "dp"},
-           "opacity": {"type": "number", "value": 0.4}
+           "opacity": {"type": "number", "value": 0.4},
+           "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
           },
           "paths": [
            {
@@ -6710,7 +9086,8 @@
            "top": {"type": "length", "value": 0, "unit": "dp"},
            "width": {"type": "length", "value": 1435.5, "unit": "dp"},
            "height": {"type": "length", "value": 45, "unit": "dp"},
-           "opacity": {"type": "number", "value": 0}
+           "opacity": {"type": "number", "value": 0},
+           "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
           },
           "paths": [
            {
@@ -6756,7 +9133,8 @@
            "top": {"type": "length", "value": 0, "unit": "dp"},
            "width": {"type": "length", "value": 1435.5, "unit": "dp"},
            "height": {"type": "length", "value": 45, "unit": "dp"},
-           "opacity": {"type": "number", "value": 0.4}
+           "opacity": {"type": "number", "value": 0.4},
+           "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
           },
           "paths": [
            {
@@ -6780,7 +9158,8 @@
            "top": {"type": "length", "value": 0, "unit": "dp"},
            "width": {"type": "length", "value": 1435.5, "unit": "dp"},
            "height": {"type": "length", "value": 45, "unit": "dp"},
-           "opacity": {"type": "number", "value": 0}
+           "opacity": {"type": "number", "value": 0},
+           "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
           },
           "paths": [
            {
@@ -6848,7 +9227,8 @@
            "top": {"type": "length", "value": 0, "unit": "dp"},
            "width": {"type": "length", "value": 1435.5, "unit": "dp"},
            "height": {"type": "length", "value": 45, "unit": "dp"},
-           "opacity": {"type": "number", "value": 0.4}
+           "opacity": {"type": "number", "value": 0.4},
+           "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
           },
           "paths": [
            {
@@ -6906,7 +9286,8 @@
            "top": {"type": "length", "value": 0, "unit": "dp"},
            "width": {"type": "length", "value": 1435.5, "unit": "dp"},
            "height": {"type": "length", "value": 45, "unit": "dp"},
-           "opacity": {"type": "number", "value": 0}
+           "opacity": {"type": "number", "value": 0},
+           "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
           },
           "paths": [
            {
@@ -6952,7 +9333,8 @@
            "top": {"type": "length", "value": 0, "unit": "dp"},
            "width": {"type": "length", "value": 1435.5, "unit": "dp"},
            "height": {"type": "length", "value": 45, "unit": "dp"},
-           "opacity": {"type": "number", "value": 0.4}
+           "opacity": {"type": "number", "value": 0.4},
+           "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
           },
           "paths": [
            {
@@ -6976,7 +9358,8 @@
            "top": {"type": "length", "value": 0, "unit": "dp"},
            "width": {"type": "length", "value": 1435.5, "unit": "dp"},
            "height": {"type": "length", "value": 45, "unit": "dp"},
-           "opacity": {"type": "number", "value": 0}
+           "opacity": {"type": "number", "value": 0},
+           "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
           },
           "paths": [
            {
@@ -7044,7 +9427,8 @@
            "top": {"type": "length", "value": 0, "unit": "dp"},
            "width": {"type": "length", "value": 1435.5, "unit": "dp"},
            "height": {"type": "length", "value": 45, "unit": "dp"},
-           "opacity": {"type": "number", "value": 0.4}
+           "opacity": {"type": "number", "value": 0.4},
+           "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
           },
           "paths": [
            {
@@ -7102,7 +9486,8 @@
            "top": {"type": "length", "value": 0, "unit": "dp"},
            "width": {"type": "length", "value": 1435.5, "unit": "dp"},
            "height": {"type": "length", "value": 45, "unit": "dp"},
-           "opacity": {"type": "number", "value": 0}
+           "opacity": {"type": "number", "value": 0},
+           "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
           },
           "paths": [
            {
@@ -7148,7 +9533,8 @@
            "top": {"type": "length", "value": 0, "unit": "dp"},
            "width": {"type": "length", "value": 1435.5, "unit": "dp"},
            "height": {"type": "length", "value": 45, "unit": "dp"},
-           "opacity": {"type": "number", "value": 0.4}
+           "opacity": {"type": "number", "value": 0.4},
+           "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
           },
           "paths": [
            {
@@ -7172,7 +9558,8 @@
            "top": {"type": "length", "value": 0, "unit": "dp"},
            "width": {"type": "length", "value": 1435.5, "unit": "dp"},
            "height": {"type": "length", "value": 45, "unit": "dp"},
-           "opacity": {"type": "number", "value": 0}
+           "opacity": {"type": "number", "value": 0},
+           "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
           },
           "paths": [
            {

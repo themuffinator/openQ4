@@ -24,7 +24,7 @@ from __future__ import annotations
 from build_retained_screens import (ACCEL, BOTTOM_TO_PAGE, CANVAS_W, CRUMB_SCALE, CRUMB_SPAN, FULL, ORANGE, PAGE_TITLE_H, PAGE_TITLE_W, fit_narrow,
                                     SUBPAGE_REVERSE_MS, SUBPAGE_SLOT, TITLE_SLOT, TOP_TO_PAGE, TOP_TO_SUBPAGE, U, Document, absolute,
                                     by_language, colour, crumb_fits, crumb_transform, fixed_text, framing_bands, group, keyword, label,
-                                    length, lit_field, navigation_plate, number, page_prompts, reflow_details, rgb, OLIVE, track, transform,
+                                    length, lit_field, navigation_plate, number, page_prompts, reflow_details, rgb, tall_page, OLIVE, track, transform,
                                     typeface, wrap_menu)
 from retained_difficulty import check_fits
 
@@ -98,11 +98,11 @@ def multiplayer_document() -> dict:
                     [description])
     # The description grows with the text above 100 % (section 2).
     reflow_details(doc, details, ("#str_231121",))
-    content = group("content", {**canvas, "transform": transform(), "opacity": number(1)}, [
-        group("navigation", {**absolute(left=0, top=U * NAV_TOP, width=U * 357), "display": keyword("flex"),
-                             "flex-direction": keyword("column"), "opacity": number(1)}, buttons),
-        details,
-    ])
+    navigation = group("navigation", {**absolute(left=0, top=U * NAV_TOP, width=U * 357), "display": keyword("flex"),
+                                      "flex-direction": keyword("column"), "opacity": number(1)}, buttons)
+    content = group("content", {**canvas, "transform": transform(), "opacity": number(1)}, [navigation, details])
+    # A tall view stands the plates and the description in one column.
+    tall_page(doc, content, navigation, details, ("#str_231121",))
     from retained_player_setup import player_setup
     content["children"].append(player_setup(doc))
     for ident in ("navigation", "details"):

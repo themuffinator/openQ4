@@ -26,7 +26,7 @@ from __future__ import annotations
 from build_retained_screens import (ACCEL, BOTTOM_TO_PAGE, CANVAS_W, CRUMB_SCALE, CRUMB_SPAN, FULL, OLIVE, ORANGE, PAGE_TITLE_H,
                                     PAGE_TITLE_W, SUBPAGE_REVERSE_MS, SUBPAGE_SLOT, TITLE_SLOT, TOP_TO_PAGE, TOP_TO_SUBPAGE, U, absolute,
                                     by_language, colour, confirmation, crumb_fits, crumb_transform, fit_narrow, fixed_text, framing_bands,
-                                    group, keyword, label, length, lit_field, navigation_plate, number, page_prompts, reflow_details, rgb,
+                                    group, keyword, label, length, lit_field, navigation_plate, number, page_prompts, reflow_details, rgb, tall_dialog, tall_page,
                                     track, transform, typeface, wrap_menu, Document)
 from retained_difficulty import check_fits
 
@@ -113,11 +113,12 @@ def settings_page_document() -> dict:
                     [description])
     # The description grows with the text above 100 % (section 2).
     reflow_details(doc, details, ("#str_231546",))
-    content = group("content", {**canvas, "transform": transform(), "opacity": number(1)}, [
-        group("navigation", {**absolute(left=0, top=U * NAV_TOP, width=U * 357), "display": keyword("flex"),
-                             "flex-direction": keyword("column"), "opacity": number(1)}, buttons),
-        details,
-    ])
+    navigation = group("navigation", {**absolute(left=0, top=U * NAV_TOP, width=U * 357), "display": keyword("flex"),
+                                      "flex-direction": keyword("column"), "opacity": number(1)}, buttons)
+    content = group("content", {**canvas, "transform": transform(), "opacity": number(1)}, [navigation, details])
+    # A tall view stands the plates and the description in one column.
+    tall_page(doc, content, navigation, details, ("#str_231546",))
+    tall_dialog(doc, defaults)
     # Going deeper, the section's label carries from its row into the slot at
     # the step's foot (title.carry, 300 ms).
     carry_starts = {ident: {"type": "transform", "unit": "dp", "value": [round(U * (44 - SUBPAGE_SLOT[0]), 3),
