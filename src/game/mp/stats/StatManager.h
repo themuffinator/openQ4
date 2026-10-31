@@ -52,7 +52,7 @@ end-game award info
 ================
 */
 struct endGameAwardInfo_t {
-	char* name;
+	const char* name;
 };
 
 /*
@@ -92,7 +92,7 @@ in-game award info
 ================
 */
 struct inGameAwardInfo_t {
-	char* name;
+	const char* name;
 };
 
 /*

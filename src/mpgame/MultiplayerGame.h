@@ -1581,8 +1581,8 @@ private:
 
 	int				GetPlayerRank( idPlayer* player, bool& isTied );
 	idPlayer*		GetRankLeader( void );
-	char*			GetPlayerRankText( idPlayer* player );
-	char*			GetPlayerRankText( int rank, bool tied, int score );
+	const char*		GetPlayerRankText( idPlayer* player );
+	const char*		GetPlayerRankText( int rank, bool tied, int score );
 
 	const char*		BuildSummaryListString( idPlayer* player, int rankedScore );
 

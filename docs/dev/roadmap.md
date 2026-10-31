@@ -2114,7 +2114,11 @@ visual editor have their own active items.
   and main-thread adoption. Do not move game callbacks, GL calls or live parsers
   onto workers without a proven lifetime and thread-safety contract.
 - [ ] **CORE-04 — P2, implementation and qualification: compiler and safety debt.**
-  Replace `/Zc:strictStrings-` with strict-string compliance; broaden sanitizer
+  Replace `/Zc:strictStrings-` with strict-string compliance (progress, 31
+  October: the sources are compliant; GCC's 335 `-Wwrite-strings` sites and the
+  Windows-only CPU, crash-mail and network tables are const-correct, and every
+  Windows-only translation unit plus the 79 with Windows-only regions pass a
+  `/Zc:strictStrings` syntax check, but the flag is still set); broaden sanitizer
   gameplay and focused fuzzing for remaining parsers, event normalization and
   geometry. Preserve existing bounds, malformed-network rejection, archive/path
   safety and source provenance. Track reproduced issues individually rather than

@@ -17,6 +17,11 @@ See [player release status](../user/release-status.md).
   longer warns about unknown `recharge` and `teleport` scripts. Those are the
   Makron's own scripts, which it reads itself; retail Quake 4 printed the
   same false warning on every Makron spawn.
+- String literals are no longer converted to writable `char *` anywhere in
+  the C++ sources. That removes about 1,400 `-Wwrite-strings` warnings from
+  Linux and macOS builds, and every source now compiles under MSVC's strict
+  string-literal rules. The `/Zc:strictStrings-` compatibility flag itself is
+  still set (CORE-04).
 
 ## Menus at a reduced resolution scale, 31 October 2026
 

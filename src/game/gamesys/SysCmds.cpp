@@ -996,7 +996,7 @@ argv(0) god
 ==================
 */
 void Cmd_God_f( const idCmdArgs &args ) {
-	char		*msg;
+	const char	*msg;
 	idPlayer	*player;
 
 	player = gameLocal.GetLocalPlayer();
@@ -1034,7 +1034,7 @@ argv(0) undying
 ==================
 */
 void Cmd_Undying_f( const idCmdArgs &args ) {
-	char		*msg;
+	const char	*msg;
 	idPlayer	*player;
 
 	player = gameLocal.GetLocalPlayer();
@@ -1063,7 +1063,7 @@ argv(0) notarget
 ==================
 */
 void Cmd_Notarget_f( const idCmdArgs &args ) {
-	char		*msg;
+	const char	*msg;
 	idPlayer	*player;
 
 	player = gameLocal.GetLocalPlayer();
@@ -1090,7 +1090,7 @@ argv(0) noclip
 ==================
 */
 void Cmd_Noclip_f( const idCmdArgs &args ) {
-	char		*msg;
+	const char	*msg;
 	idPlayer	*player;
 
 	player = gameLocal.GetLocalPlayer();

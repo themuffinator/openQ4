@@ -846,7 +846,7 @@ def main() -> None:
     require(simd, "#if defined( ID_SIMD_SSE2_AVAILABLE )", "guarded SSE2 processor selection")
     require(simd, "#define TIME_TYPE int64_t", "fixed-width SIMD benchmark clock type")
     require(simd, "TIME_TYPE baseClocks = 0;", "fixed-width SIMD benchmark baseline")
-    require(simd, "void PrintClocks( char *string, int dataCount, TIME_TYPE clocks, TIME_TYPE otherClocks = 0 )", "wide SIMD benchmark reporting")
+    require(simd, "void PrintClocks( const char *string, int dataCount, TIME_TYPE clocks, TIME_TYPE otherClocks = 0 )", "wide SIMD benchmark reporting")
     reject(simd, "long baseClocks", "LP64-dependent SIMD benchmark baseline")
     reject(simd, "#define TIME_TYPE int\n", "truncated SIMD benchmark clock type")
 

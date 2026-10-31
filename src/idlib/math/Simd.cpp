@@ -266,7 +266,7 @@ static TIME_TYPE Sys_SimdMonotonicNanoseconds( void ) {
 PrintClocks
 ============
 */
-void PrintClocks( char *string, int dataCount, TIME_TYPE clocks, TIME_TYPE otherClocks = 0 ) {
+void PrintClocks( const char *string, int dataCount, TIME_TYPE clocks, TIME_TYPE otherClocks = 0 ) {
 	int i;
 
 	idLib::common->Printf( "%s", string );

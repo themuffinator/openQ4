@@ -26254,7 +26254,7 @@ bool idMultiplayerGame::PickMap( idStr gameType, bool checkOnly ) {
 idMultiplayerGame::GetPlayerRankText
 ===============
 */
-char* idMultiplayerGame::GetPlayerRankText( int rank, bool tied, int score ) {
+const char* idMultiplayerGame::GetPlayerRankText( int rank, bool tied, int score ) {
 	if ( rank < 0 ) {
 		return "";
 	}
@@ -26287,7 +26287,7 @@ char* idMultiplayerGame::GetPlayerRankText( int rank, bool tied, int score ) {
 idMultiplayerGame::GetPlayerRankText
 ===============
 */
-char* idMultiplayerGame::GetPlayerRankText( idPlayer* player ) {
+const char* idMultiplayerGame::GetPlayerRankText( idPlayer* player ) {
 	if( player == NULL ) {
 		return "";
 	}

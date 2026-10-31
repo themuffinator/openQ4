@@ -515,7 +515,7 @@ idImage *idMaterial::GetEditorImage( void ) const {
 
 // info parms
 typedef struct {
-	char	*name;
+	const char	*name;
 	int		clearSolid, surfaceFlags, contents;
 } infoParm_t;
 
@@ -4255,7 +4255,7 @@ bool idMaterial::Validate( const char *psText, int iTextLength, idStr &strReport
 idMaterial::Print
 ===================
 */
-char *opNames[] = {
+const char *opNames[] = {
 	"OP_TYPE_ADD",
 	"OP_TYPE_SUBTRACT",
 	"OP_TYPE_MULTIPLY",

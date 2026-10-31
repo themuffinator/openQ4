@@ -8047,7 +8047,7 @@ void idPlayer::UpdateFocus( void ) {
 		gameLocal.TracePoint( this, trace, start, end, MASK_SHOT_BOUNDINGBOX, this );
 		// no aim text if player is invisible
  		if ( ( trace.fraction < 1.0f ) && ( trace.c.entityNum < MAX_CLIENTS ) && ( !((idPlayer*)gameLocal.entities[ trace.c.entityNum ])->PowerUpActive( POWERUP_INVISIBILITY ) ) ) {
-			char* teammateHealth = "";
+			const char* teammateHealth = "";
 			idPlayer* p = static_cast<idPlayer*>(gameLocal.entities[ trace.c.entityNum ]);			
 			
 			if( trace.c.entityNum != aimClientNum ) {
