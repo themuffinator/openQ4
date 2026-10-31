@@ -967,6 +967,11 @@ archived provenance; new scheduling belongs here.
   Portrait views of 3:4 and taller now stand each tab in one larger,
   scrolling column, and GAME OPTIONS' fine sliders take typed values
   ([portrait and typed numbers](ui/retained-screens.md#portrait-views-and-typed-numbers-31-october-2026)).
+  The menu levels (title, pauses, SETTINGS, Single Player, Campaign and
+  Multiplayer) then met the
+  [text-scale contract](ui/retained-screens.md#menu-levels-follow-the-text-size-31-october-2026)
+  too (visual specification 1.32, `LAY-004`); Player Setup, the Mods dialog,
+  the Objectives page and the list and form pages still keep their 100 % rows.
 - [ ] **UI-02 — P1, implementation and qualification: text, input and accessibility.**
   Finish in-field IME/composition, shaping/kerning/fallback/styles, grapheme editing,
   caret/candidate placement, binding capture, accessibility exposure and contextual

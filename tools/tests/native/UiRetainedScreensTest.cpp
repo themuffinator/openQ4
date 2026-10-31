@@ -3627,6 +3627,210 @@ static void CheckCreateServerBanList(ScreenHost& host, const char* path) {
 	Check(text("banModal","display") == "none" && text("advancedModal","display") == "block" && runtime.FocusedControl() == "create-banlist",
 		"closing the list returns to the row that opened it, the dialog still open");
 }
+
+// Section 2's text-scale contract on a page-level menu (title, pauses,
+// SETTINGS, Single Player, Campaign, Multiplayer; build_retained_screens.py):
+// at 150% and 200% text, on 16:9, 4:3 and 9:16 views, each shown text keeps
+// its box on the screen, and furniture text (whose font lengths fixed_text
+// divides by the text size) keeps its authored size. `content` checks the
+// page's reflowing parts at each size, 100% too, with the box of `canvas`
+// (the page's 4:3 canvas group) and its dp in pixels. Each of `dialogs` opens in turn: its title and actions
+// keep their size, its body stays in it above the actions, and it stays on
+// the screen. Back at 100% every node lies where it lay before.
+template <typename Content>
+static void CheckPageTextScale(ScreenHost& host, const char* path, const char* name, const char* canvas,
+	const std::vector<std::string>& events, const StateValues& states, const std::vector<std::string>& dialogs, Content content) {
+	const auto source = Read(path);
+	Document document; std::vector<Diagnostic> diagnostics;
+	Check(document.Load(source,diagnostics) && diagnostics.empty(),"a page-level menu validates for its text scale");
+	Runtime runtime(host);
+	Check(runtime.Initialize() && runtime.LoadDocument(source,name,diagnostics),"a page-level menu loads for its text scale");
+	std::string error; Runtime::EventEffects effects; double time = .1;
+	if (!states.empty()) Check(runtime.SetState(states,error,time),"the page's state is set");
+	for (const auto& event : events) Check(runtime.RunEvent(event,time,effects,error),"the page opens");
+	std::set<std::string> fixed;
+	for (const auto& binding : document.Model().bindings)
+		if (binding.property == "font-size" && binding.id.starts_with("text.") && !binding.values.empty() && binding.values[0].op == "/")
+			fixed.insert(binding.node);
+	const auto bounds = [&](const std::string& id) { Bounds b; Check(runtime.GetBounds(id,b),"a page node is laid out"); return b; };
+	const auto inside = [](const Bounds& a, const Bounds& b) {
+		return a.x >= b.x-.5f && a.y >= b.y-.5f && a.x+a.width <= b.x+b.width+.5f && a.y+a.height <= b.y+b.height+.5f;
+	};
+	const auto shown = [&](const Node& node) { const auto display = runtime.PresentedValue(node.id,"display"); return !display || display->text != "none"; };
+	const auto authored = [&](const std::string& id) { return document.Model().FindNode(id)->properties.at("font-size").data[0]; };
+	const auto view = [&](int width, int height, float text) {
+		Viewport result; result.canvasHeight = document.Model().canvasHeight; result.canvasMinWidth = document.Model().canvasMinWidth;
+		result.width = width; result.height = height; result.textScale = text;
+		runtime.Frame(result,time += .01); runtime.Frame(result,time += 1);
+		return result;
+	};
+	// Every shown text, under shown ancestors: on the screen, and furniture at
+	// its authored size.
+	const auto texts = [&](const Viewport& at, float text) {
+		const Bounds screen{0,0,float(at.width),float(at.height)};
+		std::vector<const Node*> pending{&document.Model().root};
+		while (!pending.empty()) {
+			const auto* node = pending.back(); pending.pop_back();
+			if (!shown(*node)) continue;
+			for (const auto& child : node->children) pending.push_back(&child);
+			if (node->type != "text") continue;
+			const auto box = bounds(node->id);
+			if (!inside(box,screen))
+				std::fprintf(stderr,"%s %.1f %dx%d %s=%.1f,%.1f %.1fx%.1f\n",name,text,at.width,at.height,node->id.c_str(),box.x,box.y,box.width,box.height);
+			Check(inside(box,screen),"each shown text of a page-level menu stays on the screen");
+			if (!fixed.contains(node->id)) continue;
+			const auto font = runtime.PresentedValue(node->id,"font-size");
+			Check(font && Near(static_cast<float>(font->data[0])*text,static_cast<float>(authored(node->id)),.01f),
+				"a title, plate, plinth, prompt and card heading keep their authored text size");
+		}
+	};
+	const std::pair<int,int> sizes[] = {{1280,720},{960,720},{540,960}};
+	// The nodes that show, under shown ancestors.
+	const auto visible = [&]() {
+		std::vector<std::string> ids;
+		std::vector<const Node*> pending{&document.Model().root};
+		while (!pending.empty()) {
+			const auto* node = pending.back(); pending.pop_back();
+			if (!shown(*node)) continue;
+			ids.push_back(node->id);
+			for (const auto& child : node->children) pending.push_back(&child);
+		}
+		return ids;
+	};
+	std::map<std::string,Bounds> rest;
+	for (const auto& [width, height] : sizes) {
+		const auto at = view(width,height,1);
+		for (const auto& id : visible()) { Bounds b; if (runtime.GetBounds(id,b)) rest[id+"@"+std::to_string(width)] = b; }
+		content(runtime,at,1.f,bounds(canvas),at.DpRatio());
+	}
+	for (const float text : {1.5f,2.f}) for (const auto& [width, height] : sizes) {
+		const auto at = view(width,height,text);
+		texts(at,text);
+		content(runtime,at,text,bounds(canvas),at.DpRatio());
+		const Bounds screen{0,0,float(width),float(height)};
+		for (const auto& dialog : dialogs) {
+			Check(runtime.RunEvent(dialog+"Show",time,effects,error),"a page's dialog opens");
+			view(width,height,text); view(width,height,text);
+			texts(at,text);
+			const auto frame = bounds(dialog+"-dialog"), body = bounds(dialog+"-body");
+			Check(inside(frame,screen) && inside(body,frame),"the dialog and its body stay on the screen");
+			for (const char* action : {"_yes","_no"}) {
+				const auto plate = bounds(dialog+action);
+				if (body.y+body.height > plate.y+.5f)
+					std::fprintf(stderr,"%s %.1f %dx%d %s body ends %.1f, %s at %.1f\n",name,text,width,height,dialog.c_str(),body.y+body.height,action,plate.y);
+				Check(inside(plate,frame) && body.y+body.height <= plate.y+.5f,"its body ends above its actions, inside it");
+			}
+			Check(runtime.RunEvent(dialog+"Hide",time,effects,error),"a page's dialog closes");
+			view(width,height,text);
+		}
+	}
+	for (const auto& [width, height] : sizes) {
+		view(width,height,1);
+		for (const auto& id : visible()) {
+			Bounds b; const auto found = rest.find(id+"@"+std::to_string(width));
+			if (found == rest.end() || !runtime.GetBounds(id,b)) continue;
+			if (!Near(b.x,found->second.x,.01f) || !Near(b.y,found->second.y,.01f) || !Near(b.width,found->second.width,.01f) ||
+				!Near(b.height,found->second.height,.01f))
+				std::fprintf(stderr,"%s %dx%d %s moved at 100%%: %.2f,%.2f %.2fx%.2f\n",name,width,height,id.c_str(),b.x,b.y,b.width,b.height);
+			Check(Near(b.x,found->second.x,.01f) && Near(b.y,found->second.y,.01f) && Near(b.width,found->second.width,.01f) &&
+				Near(b.height,found->second.height,.01f),"back at 100% text every node lies where it did");
+		}
+	}
+}
+
+// A menu level's content column (section 9) at `text`: at 100% where the
+// stock column stands, 210x140 u at 395,190 u of the canvas; above it wider,
+// to the 4:3 view's margin, and between the docked bands (60-420 u). Each
+// description fills it.
+static void CheckContentColumn(Runtime& runtime, float text, const Bounds& canvas, float dp, std::initializer_list<const char*> labels) {
+	const auto bounds = [&](const std::string& id) { Bounds b; Check(runtime.GetBounds(id,b),"a column node is laid out"); return b; };
+	const float u = 1.5f*dp;
+	const auto column = bounds("details");
+	if (text <= 1) Check(Near(column.x,canvas.x+395*u,.5f) && Near(column.y,canvas.y+190*u,.5f) && Near(column.width,210*u,.5f) &&
+		Near(column.height,140*u,.5f),"at 100% the content column stands where it stood");
+	else {
+		if (!(Near(column.width,224*u,.5f) && column.y >= canvas.y+60*u-.5f && column.y+column.height <= canvas.y+420*u+.5f))
+			std::fprintf(stderr,"column %.1f at %.1f,%.1f %.1fx%.1f, canvas y %.1f dp %.3f\n",text,column.x,column.y,column.width,column.height,canvas.y,dp);
+		Check(Near(column.x,canvas.x+395*u,.5f) && Near(column.width,224*u,.5f) && column.y >= canvas.y+60*u-.5f &&
+			column.y <= canvas.y+190*u+.5f && column.y+column.height <= canvas.y+420*u+.5f,
+			"a larger text widens the column to the margin, between the docked bands");
+	}
+	for (const char* label : labels) {
+		const auto box = bounds(label);
+		Check(Near(box.x,column.x,.5f) && Near(box.y,column.y,.5f) && Near(box.width,column.width,.5f) && Near(box.height,column.height,.5f),
+			"each description fills the column");
+	}
+}
+
+// The title's text scale: each item's sentence on the message line starts at
+// 364 u and ends above the plinth, which stands at 403.3 u at 100% and steps
+// down only as far as the lines need, never into the prompt bar; above 100%
+// the sentence runs on to the 4:3 view's margin, and CONTINUE's save title and
+// detail stand on their own lines above the plinth. The exit question grows.
+static void CheckTitleTextScale(ScreenHost& host, const char* path) {
+	CheckPageTextScale(host,path,"guis/menu/title.q4ui","home-content",{"open"},
+		{{"menu_continue",true},{"menu_continue_title",std::string("Save")},{"menu_continue_detail",std::string("Level")}},{"exitModal"},
+		[](Runtime& runtime, const Viewport&, float text, const Bounds& canvas, float dp) {
+			const auto bounds = [&](const std::string& id) { Bounds b; Check(runtime.GetBounds(id,b),"a title node is laid out"); return b; };
+			const float u = 1.5f*dp;
+			const auto plinth = bounds("plinth"), prompts = bounds("prompts");
+			if (text <= 1) Check(Near(plinth.y,canvas.y+403.3f*u,.5f),"at 100% the plinth stands where it stood");
+			Check(plinth.y+plinth.height <= prompts.y+.5f,"the plinth stays above the prompt bar");
+			for (const char* id : {"detail-singleplayer-text","detail-loadgame-text","detail-multiplayer-text","detail-settings-text"}) {
+				const auto box = bounds(id);
+				if (!(Near(box.y,canvas.y+364*u,.5f) && box.y+box.height <= plinth.y+.5f))
+					std::fprintf(stderr,"title %.1f %s at %.1f-%.1f, plinth %.1f\n",text,id,box.y,box.y+box.height,plinth.y);
+				Check(Near(box.y,canvas.y+364*u,.5f) && box.y+box.height <= plinth.y+.5f,"each item's sentence ends above the plinth");
+				Check(text <= 1 || Near(box.x+box.width,canvas.x+619*u,.5f),"above 100% it runs on to the 4:3 view's margin");
+			}
+			const auto title = bounds("detail-continue-title"), detail = bounds("detail-continue-detail");
+			Check(detail.y >= title.y+title.height-.5f && detail.y+detail.height <= plinth.y+.5f,
+				"CONTINUE's save stands on its own lines above the plinth");
+		});
+}
+
+// A pause's text scale (`path`, either family): the level block's lines stand
+// in order inside the card, the picture above them until it gives way at
+// 190%; both questions grow.
+static void CheckPauseTextScale(ScreenHost& host, const char* path, const char* name) {
+	StateValues states{{"pause_level",std::string("Level")},{"pause_detail",std::string("Corporal")},{"pause_objective_count",3.0},
+		{"pause_stats",std::string("Stats")},{"pause_saved",std::string("Saved")}};
+	for (int row = 0; row < 3; ++row) states["pause_objective_"+std::to_string(row)] = std::string("Objective");
+	CheckPageTextScale(host,path,name,"home-content",{"open"},states,{"quitModal","exitModal"},
+		[](Runtime& runtime, const Viewport&, float text, const Bounds&, float) {
+			const auto bounds = [&](const std::string& id) { Bounds b; Check(runtime.GetBounds(id,b),"a level block node is laid out"); return b; };
+			const auto card = bounds("level-block");
+			Bounds last{};
+			bool first = true;
+			for (const char* id : {"level-name","level-detail","level-objectives-head","level-objective-0","level-objective-1","level-objective-2",
+				"level-stats-rule","level-stats","level-saved"}) {
+				const auto box = bounds(id);
+				const bool inCard = box.x >= card.x-.5f && box.y >= card.y-.5f && box.x+box.width <= card.x+card.width+.5f &&
+					box.y+box.height <= card.y+card.height+.5f;
+				if (!inCard || (!first && box.y < last.y+last.height-.5f))
+					std::fprintf(stderr,"level block %.1f %s at %.1f-%.1f after %.1f, card %.1f-%.1f\n",text,id,box.y,box.y+box.height,
+						last.y+last.height,card.y,card.y+card.height);
+				Check(inCard && (first || box.y >= last.y+last.height-.5f),"the level block's lines stand in order inside the card");
+				last = box; first = false;
+			}
+			const auto shot = runtime.PresentedValue("level-shot","display");
+			if (text < 1.9f) Check(shot && shot->text != "none" && bounds("level-shot").y+bounds("level-shot").height <= bounds("level-name").y+.5f,
+				"the picture stands above the lines");
+			else Check(shot && shot->text == "none","from 190% the picture has given its room to the lines");
+		});
+}
+
+// The text scale of the menu levels with a content column: Single Player,
+// Campaign (its available note), Multiplayer and SETTINGS (whose question
+// grows).
+static void CheckColumnPageTextScale(ScreenHost& host, const char* path, const char* name, const StateValues& states,
+	const std::vector<std::string>& dialogs, const char* label) {
+	CheckPageTextScale(host,path,name,"content",{"onActivate"},states,dialogs,
+		[label](Runtime& runtime, const Viewport&, float text, const Bounds& canvas, float dp) {
+			CheckContentColumn(runtime,text,canvas,dp,{label});
+		});
+}
+
 // The retained SETTINGS page (tools/ui/retained_settings_page.py): the stock
 // settings screen's buttons on the home plates, each asking the session for
 // its page; LOAD DEFAULTS asks first; a return lands on its section.
@@ -4768,6 +4972,7 @@ int main(int argc, char** argv) {
  }
  if (argc == 3 && std::string(argv[1]) == "--settings") {
      ScreenHost host; CheckSettingsPage(host,argv[2]);
+     CheckColumnPageTextScale(host,argv[2],"guis/menu/settings.q4ui",{},{"defaultsModal"},"description");
      std::printf("retained SETTINGS page: %d checks passed\n",checks); return 0;
  }
  if (argc == 3 && std::string(argv[1]) == "--controls") {
@@ -4848,6 +5053,11 @@ int main(int argc, char** argv) {
 		std::pair{13,"guis/menu/campaign_skill.q4ui"},std::pair{26,"guis/menu/multiplayer.q4ui"}})
 		if (runs(page == 26 ? "mp-pages" : "pages")) CheckPagePrompts(host,argv[page],name,"",nullptr,nullptr,true);
 	if (runs("menus")) CheckMenuWrap(host,argv[1],argv[2],argv[21]);
+	if (runs("menus")) CheckTitleTextScale(host,argv[1]);
+	if (runs("menus")) CheckPauseTextScale(host,argv[2],"guis/menu/pause.q4ui");
+	if (runs("menus")) CheckPauseTextScale(host,argv[4],"guis/menu/pause_strogg.q4ui");
+	if (runs("menus")) CheckColumnPageTextScale(host,argv[5],"guis/menu/singleplayer.q4ui",{},{},"description");
+	if (runs("menus")) CheckColumnPageTextScale(host,argv[6],"guis/menu/campaigns.q4ui",{{"awakening_ready",true}},{},"available");
 	// Title: canvas scaling, the lit field, the multiplied emblem and CONTINUE.
 	if (runs("menus")) {
 		const auto source = Read(argv[1]);
@@ -6041,6 +6251,7 @@ int main(int argc, char** argv) {
 	if (runs("pages")) CheckCreditsPage(host,argv[24]);
 	if (runs("pages")) CheckArenaPage(host,argv[5],argv[25]);
 	if (runs("mp-pages")) CheckMultiplayerPage(host,argv[26]);
+	if (runs("mp-pages")) CheckColumnPageTextScale(host,argv[26],"guis/menu/multiplayer.q4ui",{},{},"description");
 	if (runs("mp-pages")) CheckCreateServerPage(host,argv[27]);
 	if (runs("mp-pages")) CheckCreateServerBanList(host,argv[27]);
 	if (runs("mp-pages")) CheckJoinGamePage(host,argv[28]);

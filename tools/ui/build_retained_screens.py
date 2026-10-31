@@ -216,6 +216,161 @@ def fixed_text(doc: "Document", node: dict) -> None:
             doc.bind(f"text.{item['id']}.{key}", item["id"], key, {"op": "/", "args": [found["value"], {"state": TEXT_STATE}]})
 
 
+# Section 2's text-scale contract on the page-level menus: titles and the
+# labels of plates, plinths, prompt bars and card headings name furniture and
+# keep their size (fixed_text); descriptions, message lines, dialog bodies and
+# a card's details are content, whose boxes grow with the text above 100 %.
+# Every binding below gives its node's authored value at 100 %, so those
+# documents present as they did (check_text_bindings).
+TEXT = {"state": TEXT_STATE}
+LARGER = {"op": ">", "args": [TEXT, 1]}
+
+
+def text_source(doc: "Document") -> dict:
+    """The document's view.text source, declared once; its value."""
+    doc.state[TEXT_STATE] = {"type": "number", "initial": 1, "view": "text"}
+    return TEXT
+
+
+def text_times(value):
+    """`value` (dp, or an expression) times the text size."""
+    return {"op": "*", "args": [value, TEXT]}
+
+
+def text_sum(*terms):
+    """The sum of numbers and expressions, the numbers folded into one."""
+    constant = sum(term for term in terms if isinstance(term, (int, float)))
+    parts = [term for term in terms if not isinstance(term, (int, float))]
+    result = constant if not parts or constant else None
+    for part in parts:
+        result = part if result is None else {"op": "+", "args": [result, part]}
+    return result
+
+
+def text_buckets(values: dict) -> dict:
+    """A text size's value from `values` {1.5: a, 2: b}: a up to 150 %, b
+    above it, the larger size's line counts covering every size between."""
+    return {"op": "select", "args": [{"op": ">", "args": [TEXT, 1.5]}, values[2], values[1.5]]}
+
+
+def per_language(doc: "Document", values: dict):
+    """`values[language]` for the running language (sys_lang), the largest
+    of them for any other, as the plinth's width is chosen."""
+    if "language" not in doc.state:
+        doc.state["language"] = {"type": "string", "initial": "", "cvar": "sys_lang"}
+    widest = max(values.values())
+    result = widest
+    for language in sorted(values, reverse=True):
+        if values[language] != widest:
+            result = {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, language]}, values[language], result]}
+    return result
+
+
+def text_lines(face: str, text: str, size: float, width: float) -> int:
+    """Lines `text` takes at `width` dp, broken at spaces as the host breaks it."""
+    lines, current = 1, ""
+    for word in text.split(" "):
+        candidate = f"{current} {word}" if current else word
+        if current and text_width(face, candidate, size) > width:
+            lines, current = lines + 1, word
+        else:
+            current = candidate
+    return lines
+
+
+def wrapped_lines(keys, face: str, size: float, width: float) -> dict:
+    """{language: {1.5: lines, 2: lines}}: the most lines any of `keys` takes
+    at `width` dp in each shipped language at 150 % and 200 % text."""
+    texts = [merged_text(key) for key in keys]
+    return {language: {scale: max(text_lines(face, found.get(language) or found["english"], size * scale, width) for found in texts)
+                       for scale in (1.5, 2)} for language in LANGUAGES}
+
+
+def evaluate(expression, state: dict):
+    """A binding expression's value for `state` (check_text_bindings)."""
+    if not isinstance(expression, dict):
+        return expression
+    if "state" in expression:
+        return state[expression["state"]]
+    args = [evaluate(arg, state) for arg in expression["args"]]
+    op = expression["op"]
+    if op == "select":
+        return args[1] if args[0] else args[2]
+    operations = {"+": lambda a, b: a + b, "-": lambda a, b: a - b, "*": lambda a, b: a * b, "/": lambda a, b: a / b,
+                  "min": min, "max": max, "==": lambda a, b: a == b, "!=": lambda a, b: a != b, "<": lambda a, b: a < b,
+                  "<=": lambda a, b: a <= b, ">": lambda a, b: a > b, ">=": lambda a, b: a >= b,
+                  "&&": lambda a, b: a and b, "||": lambda a, b: a or b}
+    return operations[op](*args)
+
+
+DETAIL_CEILING = 60.0    # u: a page's content column rises no higher, under the docked top band
+DETAIL_FLOOR = 420.0     # u: and runs down to here, over the docked bottom band's edge
+DETAIL_WIDE = 224.0      # u: from 395 u to the 4:3 view's 32 dp margin
+
+
+def reflow_details(doc: "Document", details: dict, keys) -> None:
+    """A page's content column (section 9) above 100 % text: its description
+    (each of `details`' labels, one of `keys` showing) widens to the 4:3
+    view's margin and its lines grow with the text. The column keeps its
+    place beside the first plate while its lines fit above the docked bottom
+    band, and otherwise rises as far as the running language needs, never
+    past the docked top band. Generation fails where a shipped language's
+    description would outgrow that."""
+    props = details["properties"]
+    top, width, height = props["top"]["value"], props["width"]["value"], props["height"]["value"]
+    labels = [child for child in details["children"] if child.get("type") == "text"]
+    style = labels[0]["properties"]
+    face, size, line = style["font-family"]["value"], style["font-size"]["value"], style["line-height"]["value"]
+    wide, floor, ceiling = U * DETAIL_WIDE, U * DETAIL_FLOOR, U * DETAIL_CEILING
+    counts = wrapped_lines(keys, face, size, wide)
+    for language, found in counts.items():
+        if found[2] * line * 2 > floor - ceiling:
+            raise SystemExit(f"{doc.ident}: a description in {language} needs {found[2]} lines at 200 % text, more than the column holds")
+    lines = text_buckets({scale: per_language(doc, {language: found[scale] for language, found in counts.items()}) for scale in (1.5, 2)})
+    text_source(doc)
+    risen = {"op": "min", "args": [top, {"op": "-", "args": [floor, text_times({"op": "*", "args": [lines, line]})]}]}
+    tall = {"op": "-", "args": [floor, risen]}
+    for node in [details, *labels]:
+        ident, own = node["id"], node["properties"]
+        if node is details:
+            doc.bind(f"text.{ident}.top", ident, "top", {"op": "select", "args": [LARGER, risen, own["top"]["value"]]})
+        doc.bind(f"text.{ident}.width", ident, "width", {"op": "select", "args": [LARGER, wide, own["width"]["value"]]})
+        doc.bind(f"text.{ident}.height", ident, "height", {"op": "select", "args": [LARGER, tall, own["height"]["value"]]})
+
+
+def check_text_bindings(result: dict) -> None:
+    """Fail generation unless every binding that reads the text size gives
+    its node's authored value at 100 %, in every shipped language and for
+    either value of each boolean state it reads."""
+    nodes = {node["id"]: node for node in walk_nodes(result["root"])}
+    declared = result.get("state", {})
+
+    def reads(expression, found: set) -> set:
+        if isinstance(expression, dict):
+            if "state" in expression:
+                found.add(expression["state"])
+            for arg in expression.get("args", []):
+                reads(arg, found)
+        return found
+    for binding in result.get("bindings", []):
+        names = reads(binding["value"], set())
+        if TEXT_STATE not in names:
+            continue
+        authored = nodes[binding["node"]]["properties"].get(binding["property"])
+        if authored is None:
+            raise SystemExit(f"{result['id']}: {binding['id']} binds {binding['property']} without an authored value")
+        flags = sorted(name for name in names if declared.get(name, {}).get("type") == "boolean")
+        for language in LANGUAGES:
+            for mask in range(1 << len(flags)):
+                state = {name: declared[name]["initial"] for name in names if name in declared}
+                state.update({TEXT_STATE: 1, "language": language})
+                state.update({name: bool(mask >> index & 1) for index, name in enumerate(flags)})
+                value = evaluate(binding["value"], state)
+                expected = authored["value"]
+                if value != expected:
+                    raise SystemExit(f"{result['id']}: {binding['id']} gives {value!r} at 100 % text, not the authored {expected!r}")
+
+
 def vector(ident: str, props: dict, paths: list, children=(), **extra) -> dict:
     node = {"id": ident, "type": "vector", "properties": props, "paths": paths}
     if children:
@@ -485,6 +640,9 @@ def navigation_plate(doc: Document, ident: str, key: str, *, action: str | None 
         control["action"] = action
     else:
         control["event"] = event
+    # The label keeps its size in the plate's band on the stock 30 u pitch
+    # at any text size, as the title it carries into does.
+    fixed_text(doc, text_node)
     return group(ident, {"position": keyword("relative"), "display": keyword("block"),
                          "margin-left": length(-lead), "width": length(width), "height": length(30 * U)},
                  parts, control=control)
@@ -498,15 +656,15 @@ def message_line(ident: str, offset_u: float, children: list) -> dict:
                          "opacity": number(0), "pointer-events": keyword("none")}, children)
 
 
-def link(doc: Document, ident: str, key: str, *, action: str | None = None, event: str | None = None) -> dict:
-    """A secondary link on the plinth (section 9): Marine 16 dp at 0.50 behind
-    a 4.5 u marker at 0.40; hover and focus turn both orange."""
+def link(doc: Document, ident: str, key: str, *, action: str | None = None, event: str | None = None, size: float = 16) -> dict:
+    """A secondary link on the plinth (section 9): Marine 16 dp (or `size`) at
+    0.50 behind a 4.5 u marker at 0.40; hover and focus turn both orange."""
     marker = vector(f"{ident}-marker", {**absolute(left=0, top=0, width=U * 7, height=U * 17), "opacity": number(0.4)}, [
         marker_path("mark", 0, U * 7.25, U * 4.5, rgb(MARKER))])
     hot = vector(f"{ident}-marker-hot", {**absolute(left=0, top=0, width=U * 7, height=U * 17), "opacity": number(0)}, [
         marker_path("mark", 0, U * 7.25, U * 4.5, rgb(ORANGE))])
     text_node = label(f"{ident}-label", key, {"position": keyword("relative"), "display": keyword("block"),
-        "margin-left": length(U * 7), **typeface("marine", 16, U * 17, [1, 1, 1, 0.5]), "white-space": keyword("nowrap")})
+        "margin-left": length(U * 7), **typeface("marine", size, U * 17, [1, 1, 1, 0.5]), "white-space": keyword("nowrap")})
     ids = doc.states(ident, {
         "default": [(f"{ident}-marker", "opacity", number(0.4)), (f"{ident}-marker-hot", "opacity", number(0)), (f"{ident}-label", "color", colour([1, 1, 1, 0.5]))],
         "hover": [(f"{ident}-marker", "opacity", number(0)), (f"{ident}-marker-hot", "opacity", number(1)), (f"{ident}-label", "color", colour(rgb(ORANGE)))],
@@ -519,6 +677,7 @@ def link(doc: Document, ident: str, key: str, *, action: str | None = None, even
         control["action"] = action
     else:
         control["event"] = event
+    fixed_text(doc, text_node)   # the link keeps its size on the plinth
     return group(ident, {"position": keyword("relative"), "display": keyword("block"),
                          "height": length(U * 17), "margin-right": length(U * 14)},
                  [marker, hot, text_node], control=control)
@@ -800,6 +959,18 @@ def modal_silhouette(width: float, height: float):
                 fill=solid([0, 0, 0, 0.7]))
 
 
+def from_foot(paths: list, height: float, foot: float) -> list:
+    """`paths` with each point at or below `foot` measured from their box's
+    foot, so the shapes follow a box that grows taller; in a box `height`
+    tall every point stands where it did."""
+    for drawn in paths:
+        for command in drawn["commands"]:
+            for at in command.get("points", []):
+                if isinstance(at[1], (int, float)) and at[1] >= foot:
+                    at[1] = {"fraction": 1, "dp": round(at[1] - height, 4)}
+    return paths
+
+
 def confirmation(doc: Document, ident: str, title_key: str, body_key: str, yes_action: str | None,
                  frame_leave_ms: float = 250, dim: tuple = (), *, yes_event: str | None = None,
                  no_event: str | None = None, close_key: str | None = None, wide_title: bool = False,
@@ -973,9 +1144,36 @@ def confirmation(doc: Document, ident: str, title_key: str, body_key: str, yes_a
         doc.timelines.add(f"{ident}Runes", 1, translation.reset_tracks())
         doc.events[show].append({"op": "playTimeline", "timeline": f"{ident}Runes"})
         doc.events[shown].append({"op": "playTimeline", "timeline": f"{ident}Translate"})
+    # Section 2's text scale: the title and the actions' labels keep their
+    # size in their slot and plates. A body of known text grows with the
+    # text, and the dialog with it: the frame, glows and actions move down by
+    # what its lines need past the stock box, the dialog staying centred.
+    for part in title:
+        fixed_text(doc, part)
+    for plate in actions:
+        fixed_text(doc, plate)
     shown_contents = group(f"{ident}-contents", {**FULL, "display": keyword("none")}, [*title, *body, *actions])
     dialog = group(f"{ident}-dialog", absolute(left=left, top=top, width=width, height=height),
                    [glow, soft_glow, frame, shown_contents])
+    if body_nodes is None and body_key.startswith("#str_") and body_key != "#str_230030":
+        box = body[0]["properties"]
+        body_face, body_size = box["font-family"]["value"], box["font-size"]["value"]
+        body_line, body_h = box["line-height"]["value"], box["height"]["value"]
+        counts = wrapped_lines((body_key,), body_face, body_size, box["width"]["value"])
+        lines = text_buckets({scale: per_language(doc, {language: found[scale] for language, found in counts.items()}) for scale in (1.5, 2)})
+        text_source(doc)
+        extra = {"op": "select", "args": [LARGER, {"op": "max", "args": [0, text_sum(text_times({"op": "*", "args": [lines, body_line]}),
+                                                                                        -body_h)]}, 0]}
+        if 2 * body_line * max(found[2] for found in counts.values()) - body_h > 720 - height - 2 * U * 12:
+            raise SystemExit(f"{ident}: the body {body_key} would outgrow the view at 200 % text")
+        from_foot(frame["paths"], height, height / 2)
+        grown = lambda node, key: doc.bind(f"text.{node['id']}.{key}", node["id"], key, text_sum(node["properties"][key]["value"], extra))
+        for node in (dialog, frame, glow, soft_glow, body[0]):
+            grown(node, "height")
+        for plate in actions:
+            grown(plate, "top")
+        doc.bind(f"text.{dialog['id']}.top", dialog["id"], "top",
+                 text_sum(dialog["properties"]["top"]["value"], {"op": "*", "args": [extra, -0.5]}))
     stage = group(f"{ident}-stage", {**absolute(top=0, width=CANVAS_W, height=720), "left": length(50, "%"),
                                      "margin-left": length(-CANVAS_W / 2)}, [dialog])
     # The soft focus is the first layer's backdrop filter, so it softens
@@ -1519,8 +1717,11 @@ def prompt_bar(doc: Document, prompts: list, cap_tint: list[float] | None = None
         verb_node = label(f"prompt-{name}-verb", verb, {"position": keyword("relative"), "display": keyword("block"),
             "margin-right": length(22), **typeface(face, size, 22, verb_tint), "white-space": keyword("nowrap")})
         items += [glyph, verb_node]
-    return group("prompts", {**absolute(top=U * 447, height=22, right=U * 12), "opacity": number(1), "pointer-events": keyword("none"),
-                             "display": keyword("flex"), "flex-direction": keyword("row"), "align-items": keyword("center")}, items)
+    bar = group("prompts", {**absolute(top=U * 447, height=22, right=U * 12), "opacity": number(1), "pointer-events": keyword("none"),
+                            "display": keyword("flex"), "flex-direction": keyword("row"), "align-items": keyword("center")}, items)
+    # As on a page's bar, the key caps and verbs keep their size.
+    fixed_text(doc, bar)
+    return bar
 
 
 # A page's prompt bar (section 13.4) in the docked bottom band's raised
@@ -1771,12 +1972,15 @@ def title_carry(doc: Document, items: list, continue_rows: bool = False, face: s
             steps.append({"op": "playTimeline", "timeline": plain})
         doc.events[f"carry_{request}"] = steps
     doc.bind("title-carry.text", "title-carry", "text", text_value)
-    return group("carry", {**absolute(top=0, width=CANVAS_W, height=720), "left": length(50, "%"),
-                           "margin-left": length(-CANVAS_W / 2), "pointer-events": keyword("none")}, [
+    carry = group("carry", {**absolute(top=0, width=CANVAS_W, height=720), "left": length(50, "%"),
+                            "margin-left": length(-CANVAS_W / 2), "pointer-events": keyword("none")}, [
         label("title-carry", items[-1][1], {**absolute(left=U * TITLE_SLOT[0], top=U * TITLE_SLOT[1], width=width, height=height),
               **typeface(face, 24, height, rgb(tint)), "white-space": keyword("nowrap"), "opacity": number(0),
               "transform": transform()}),
     ])
+    # The label travels from its plate to the title slot, furniture at both.
+    fixed_text(doc, carry)
+    return carry
 
 
 def hide_carry_at_home(doc: Document) -> None:
@@ -1905,6 +2109,67 @@ def montage(doc: Document) -> dict:
     return group("shots", dict(FULL), shots)
 
 
+MESSAGE_TOP = 364.0     # u: the message line (message_line)
+MESSAGE_END = 619.0     # u: above 100 % text it runs on to the 4:3 view's 32 dp margin
+
+
+def reflow_message_line(doc: Document, nav: dict, sentences: list, base: dict) -> None:
+    """Section 2's text scale on the home's message line: above 100 % each
+    item's sentence runs on to the 4:3 view's margin and its lines grow with
+    the text, and CONTINUE's save title and detail stand on lines grown with
+    theirs, a little tighter. Where the running language's lines would reach
+    the plinth, the plinth steps down to clear them, toward the prompt bar;
+    at 100 % nothing moves."""
+    nodes = {node["id"]: node for node in walk_nodes(nav)}
+    text_source(doc)
+    wide = U * (MESSAGE_END - 44)
+    needs, deepest = [], 0.0
+    for key in sentences:
+        ident = [name for name in nodes if name.startswith("detail-") and name.endswith("-text") and
+                 nodes[name]["properties"]["text"]["value"] == key][0]
+        line = nodes[ident]["properties"]["line-height"]["value"]
+        counts = wrapped_lines((key,), "lowpixel", nodes[ident]["properties"]["font-size"]["value"], wide)
+        lines = text_buckets({scale: per_language(doc, {language: found[scale] for language, found in counts.items()}) for scale in (1.5, 2)})
+        need = text_times({"op": "*", "args": [lines, line]})
+        needs.append(need)
+        deepest = max(deepest, 2 * line * max(found[2] for found in counts.values()))
+        for part in (ident, ident[:-len("-text")]):
+            own = nodes[part]["properties"]
+            doc.bind(f"text.{part}.width", part, "width", {"op": "select", "args": [LARGER, wide, own["width"]["value"]]})
+            doc.bind(f"text.{part}.height", part, "height", {"op": "select", "args": [LARGER, need, own["height"]["value"]]})
+    # CONTINUE: the title's 24 dp line tightens to 20 dp and the detail's to
+    # 17 dp of the text size by 200 % (34 and 28 dp type on 40 and 34 dp).
+    title_line, detail_line = text_sum(28, text_times(-4)), text_sum(31, text_times(-7))
+    title_h, detail_h = text_times(title_line), text_times(detail_line)
+    shot_w = nodes["detail-continue-title"]["properties"]["left"]["value"]
+    for ident, top, line, height in (("detail-continue-title", 0, title_line, title_h),
+                                     ("detail-continue-detail", title_h, detail_line, detail_h)):
+        own = nodes[ident]["properties"]
+        doc.bind(f"text.{ident}.width", ident, "width", {"op": "select", "args": [LARGER, wide - shot_w, own["width"]["value"]]})
+        doc.bind(f"text.{ident}.line-height", ident, "line-height", line)
+        doc.bind(f"text.{ident}.height", ident, "height", height)
+        if top:
+            doc.bind(f"text.{ident}.top", ident, "top", top)
+        # The save's name and description are the player's and the game's,
+        # unmeasured here: past the margin they end in an ellipsis.
+        own.update({"overflow": keyword("visible"), "text-overflow": keyword("clip")})
+        doc.bind(f"text.{ident}.overflow", ident, "overflow", {"op": "select", "args": [LARGER, "hidden", "visible"]})
+        doc.bind(f"text.{ident}.text-overflow", ident, "text-overflow", {"op": "select", "args": [LARGER, "ellipsis", "clip"]})
+    held = text_sum(title_h, detail_h)
+    own = nodes["detail-continue"]["properties"]
+    doc.bind("text.detail-continue.width", "detail-continue", "width", {"op": "select", "args": [LARGER, wide, own["width"]["value"]]})
+    doc.bind("text.detail-continue.height", "detail-continue", "height", {"op": "select", "args": [LARGER, held, own["height"]["value"]]})
+    # The plinth clears the tallest message, 3 dp under it.
+    tallest = {"op": "select", "args": [{"state": "menu_continue"}, held, 0]}
+    for need in needs:
+        tallest = {"op": "max", "args": [need, tallest]}
+    rest = base["properties"]["top"]["value"]
+    doc.bind("text.plinth.top", "plinth", "top",
+             {"op": "select", "args": [LARGER, {"op": "max", "args": [rest, text_sum(U * MESSAGE_TOP + 3, tallest)]}, rest]})
+    if U * MESSAGE_TOP + 3 + deepest + base["properties"]["height"]["value"] > U * 447:
+        raise SystemExit("the home's message line would push the plinth into the prompt bar at 200 % text")
+
+
 def title_document() -> dict:
     doc = Document("openq4.title")
     doc.state.update({
@@ -1971,10 +2236,12 @@ def title_document() -> dict:
         picture("wordmark", "gfx/guis/mainmenu/q4text", {**absolute(left=U * 6, top=U * 119, width=U * 376, height=U * 92),
                                                           "image-blend": keyword("additive"), "image-color": colour([1, 1, 1, 1])}, fit="fill"),
     ])
+    base = plinth(doc, links, ("#str_200010", "#str_41500", "#str_200011", "#str_200012", "#str_200013"))
+    reflow_message_line(doc, nav, [row[3] for row in rows], base)
     content = group("home", {**FULL, "transform": transform(), "opacity": number(1)}, [
         group("home-content", {**absolute(top=0, width=CANVAS_W, height=720), "left": length(50, "%"), "margin-left": length(-CANVAS_W / 2)}, [
             nav,
-            plinth(doc, links, ("#str_200010", "#str_41500", "#str_200011", "#str_200012", "#str_200013")),
+            base,
         ]),
     ])
     root = group("screen", {**FULL, "background-color": colour([0, 0, 0, 1]), "font-family": font("marine"),
@@ -2204,11 +2471,14 @@ def campaign_document(campaigns: bool) -> dict:
     bands[0]["properties"]["transform"] = top_rest
     bands[1]["properties"]["transform"] = transform(*BOTTOM_TO_PAGE)
     nav_top = 190.0
+    details_group = group("details", {**absolute(left=U * 395, top=U * 190, width=U * 210, height=U * 140), "opacity": number(0)}, details)
+    # The description grows with the text above 100 % (section 2).
+    reflow_details(doc, details_group, [node["properties"]["text"]["value"] for node in details])
     content = group("content", {**absolute(top=0, width=CANVAS_W, height=720), "left": length(50, "%"), "margin-left": length(-CANVAS_W / 2),
                                 "transform": transform(), "opacity": number(1)}, [
         group("navigation", {**absolute(left=0, top=U * nav_top, width=U * 357), "display": keyword("flex"), "flex-direction": keyword("column"),
                              "opacity": number(1)}, buttons),
-        group("details", {**absolute(left=U * 395, top=U * 190, width=U * 210, height=U * 140), "opacity": number(0)}, details),
+        details_group,
     ])
     # The titles ride outside the sweeping content, in canvas coordinates.
     crumb_key = "#str_42000"
@@ -2237,6 +2507,8 @@ def campaign_document(campaigns: bool) -> dict:
         ]
     titles_group = group("titles", {**absolute(top=0, width=CANVAS_W, height=720), "left": length(50, "%"), "margin-left": length(-CANVAS_W / 2),
                                     "pointer-events": keyword("none")}, titles)
+    # The titles keep their size in the top band's slots at any text size.
+    fixed_text(doc, titles_group)
 
     page_top, sub_top = transform(*TOP_TO_PAGE), transform(*TOP_TO_SUBPAGE)
     identity = transform()
@@ -2479,6 +2751,100 @@ def level_block(doc: Document) -> dict:
                                        "block", "none"]})
     return group("level-block", absolute(left=x, top=y, width=w, height=h),
                  [frame, shot, shot_frame, heading, name, detail, objectives_head, objectives, *rows, *foot])
+
+
+LEVEL_PICTURE_GONE = 1.9   # text size from which the level block's picture has given all its room to the lines
+
+
+def reflow_level_block(doc: Document, block: dict, strogg: bool = False) -> None:
+    """Section 2's text scale in the level block (either family's): the
+    header, the level and the objectives heading keep their size in the
+    card's slots, while the difficulty, the objectives and the time lines
+    grow with the text. Above 100 % the picture gives its room to them,
+    shrinking to nothing at 200 % (hidden from 190 %), the lines stand in
+    their place under the header, and the time in the mission wraps onto a
+    second line over the newest save's age; the card keeps its size."""
+    nodes = {node["id"]: node for node in walk_nodes(block)}
+    card_h = block["properties"]["height"]["value"]
+
+    def authored(ident: str, key: str) -> float:
+        return nodes[ident]["properties"][key]["value"]
+
+    def bind(ident: str, key: str, larger) -> None:
+        doc.bind(f"text.{ident}.{key}", ident, key, {"op": "select", "args": [LARGER, larger, authored(ident, key)]})
+    text_source(doc)
+    for ident in ("level-heading", "level-name", "level-objectives-head"):
+        for part in (ident, f"{ident}-rune"):
+            if part in nodes:
+                fixed_text(doc, nodes[part])
+    shot_top = authored("level-shot", "top")
+    picture = {"op": "max", "args": [0, text_sum(266, text_times(-133))]}   # 133 dp at 100 %, nothing at 200 %
+    hidden = {"op": "select", "args": [{"op": ">", "args": [TEXT, LEVEL_PICTURE_GONE]}, "none", "block"]}
+    for ident in ("level-shot", "level-shot-frame"):
+        bind(ident, "height", picture)
+        nodes[ident]["properties"]["display"] = keyword("block")
+        doc.bind(f"text.{ident}.display", ident, "display", hidden)
+    # Under the picture (shot_top + its height + 10 dp): the level (fixed),
+    # 2 dp, the difficulty, 8 dp, the objectives heading (fixed), 4 dp, then
+    # the objectives' rows.
+    below = text_sum(shot_top + 10, picture)
+    name_h, head_h = authored("level-name", "height"), authored("level-objectives-head", "height")
+    detail_h, row_h = authored("level-detail", "height"), authored("level-objective-0", "height")
+    detail_top = text_sum(below, name_h + 2)
+    head_top = text_sum(below, name_h + 10, text_times(detail_h))
+    rows_top = text_sum(below, name_h + 10 + head_h + 4, text_times(detail_h))
+    rune_rises = {}
+    if strogg:
+        rune_rises = {ident: round(authored(ident, "top") - authored(f"{ident}-rune", "top"), 4)
+                      for ident in ("level-detail", "level-objective-0-text")}
+    bind("level-name", "top", below)
+    bind("level-detail", "top", detail_top)
+    bind("level-detail", "height", text_times(detail_h))
+    bind("level-objectives-head", "top", head_top)
+    if strogg:
+        bind("level-name-rune", "top", text_sum(below, authored("level-name-rune", "top") - authored("level-name", "top")))
+        bind("level-detail-rune", "top", text_sum(detail_top, text_times(-rune_rises["level-detail"])))
+        bind("level-detail-rune", "height", text_times(detail_h))
+        bind("level-objectives-head-rune", "top",
+             text_sum(head_top, authored("level-objectives-head-rune", "top") - authored("level-objectives-head", "top")))
+    # The foot: its rule, the time in the mission on two lines and the save's
+    # age on one, 10.5 dp of the text size above the card's foot.
+    line_h = authored("level-stats", "height")
+    rule = text_sum(card_h, text_times(-(10.5 + 3 * line_h + 3)))
+    bind("level-stats-rule", "top", rule)
+    bind("level-stats", "top", text_sum(card_h, text_times(-(10.5 + 3 * line_h))))
+    bind("level-stats", "height", text_times(2 * line_h))
+    nodes["level-stats"]["properties"]["white-space"] = keyword("nowrap")
+    doc.bind("text.level-stats.white-space", "level-stats", "white-space", {"op": "select", "args": [LARGER, "normal", "nowrap"]})
+    bind("level-saved", "top", text_sum(card_h, text_times(-(10.5 + line_h))))
+    bind("level-saved", "height", text_times(line_h))
+    bind("level-objectives", "top", rows_top)
+    bind("level-objectives", "height", {"op": "-", "args": [{"op": "-", "args": [rule, rows_top]}, 3]})
+    for index in range(OBJECTIVE_ROWS):
+        ident = f"level-objective-{index}"
+        bind(ident, "top", text_sum(rows_top, text_times(index * row_h)))
+        bind(ident, "height", text_times(row_h))
+        bind(f"{ident}-text", "height", text_times(row_h))
+        # The marker and the check stay centred on the row's line.
+        for mark in (f"{ident}-mark", f"{ident}-check"):
+            bind(mark, "top", text_sum(authored(mark, "top") - row_h / 2, text_times(row_h / 2)))
+        if strogg:
+            bind(f"{ident}-text-rune", "top", text_times(-rune_rises["level-objective-0-text"]))
+            bind(f"{ident}-text-rune", "height", text_times(row_h))
+    # Generation fails where a shipped language's time lines would not fit:
+    # the mission's and the run's time (hours to two digits) in two lines,
+    # the save's age in one.
+    width = authored("level-stats", "width")
+    joined, mission, total = merged_text("#str_231533"), merged_text("#str_231532"), merged_text("#str_231524")
+    ages = [merged_text(key) for key in ("#str_230050", "#str_230048", "#str_230049")]
+    face = "lowpixel"
+    size = nodes["level-stats"]["properties"]["font-size"]["value"]
+    for language in LANGUAGES:
+        pick = lambda found: found.get(language) or found["english"]
+        stats = pick(joined).replace("%s", pick(mission).replace("%s", "10:00:00"), 1).replace("%s", pick(total).replace("%s", "10:00:00"), 1)
+        if text_lines(face, stats, 2 * size, width) > 2 or any(text_width(face, pick(age).replace("%d", "59"), 2 * size) > width
+                                                               for age in ages):
+            raise SystemExit(f"the level block's time lines do not fit at 200 % text in {language}")
 
 
 # ----------------------------------------------------------- the Strogg pause
@@ -2765,6 +3131,7 @@ def strogg_navigation_plate(doc: Document, ident: str, key: str, translation: Tr
     bar = scan_bar(f"{ident}-scan", U * 15, {**absolute(left=0, top=0, height=line_height), "right": length(0),
                                              "pointer-events": keyword("none")})
     fit = group(f"{ident}-fit", {**absolute(left=x0 + U * 30, top=top, height=line_height)}, [bar, rune, latin])
+    fixed_text(doc, fit)   # the label and its runes keep their size on the plate
     translation.add(ident, 120 + 45 * index, 200)
     slide = 300
     bar_rest, bar_start = length(0, "%"), length(100, "%")
@@ -2826,6 +3193,8 @@ def strogg_link(doc: Document, ident: str, key: str, translation: Translation, d
                                         **typeface("strogg", round(16 * RUNE_SCALE, 3), U * 17, [*rgb(ST_SELECT)[:3], 0]),
                                         "white-space": keyword("nowrap"), "transform": transform(), "pointer-events": keyword("none")})
     translation.add(ident, delay, 200)
+    fixed_text(doc, rune)        # EXIT and its runes keep their size on the plinth
+    fixed_text(doc, text_node)
     rest, lit = colour(rgb(ST_READ, 0.5)), colour(rgb(ST_SELECT))
     ids = doc.states(ident, {
         "default": [(f"{ident}-marker", "opacity", number(0.4)), (f"{ident}-marker-hot", "opacity", number(0)), (f"{ident}-label", "color", rest)],
@@ -3312,6 +3681,9 @@ def pause_document(strogg: bool = False) -> dict:
         home_parts = [label("paused-title", "#str_230031", {**absolute(left=U * 44, top=U * 134, width=U * 330, height=U * 24),
                             **typeface("marine", 18, U * 24, [1, 1, 1, 0.5]), "white-space": keyword("nowrap")}),
                       nav, level_block(doc), plinth(doc, [exit_link])]
+    # GAME PAUSED is the screen's title; the level block's details grow.
+    fixed_text(doc, home_parts[0])
+    reflow_level_block(doc, home_parts[2], strogg)
     content = group("home", {**FULL, "transform": transform(), "opacity": number(1)}, [
         group("home-content", {**absolute(top=0, width=CANVAS_W, height=720), "left": length(50, "%"), "margin-left": length(-CANVAS_W / 2)},
               home_parts),
@@ -3890,6 +4262,8 @@ def main() -> int:
     # loading screen, the Strogg family's pages and the multiplayer cards.
     for name in NOTICE_DOCUMENTS:
         documents[name] = with_notices(documents[name])
+    for document in documents.values():
+        check_text_bindings(document)
     stale = []
     for name, document in documents.items():
         output = OUTPUTS[name]

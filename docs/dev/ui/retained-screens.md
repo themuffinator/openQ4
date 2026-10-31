@@ -2149,6 +2149,78 @@ and Back). The native page tests check every row, label, value, heading and
 note of every tab at 100, 150 and 200 %, the stacked column, the strip, the
 prompt bar and APPLY CHANGES.
 
+## Menu levels follow the text size (31 October 2026)
+
+The page-level menus still overflowed above 100 % text: at 200 % the home
+navigation plates' labels outgrew the plates, the content column's
+description ran past the docked bottom band, page titles clipped in the top
+band's slot, the title's plinth links ran into one another and the
+confirmations' bodies ran under their actions (the 4:3 German SETTINGS page
+showed most of these at once). Section 2's text-scale contract now holds on
+the title, both pauses, SETTINGS, Single Player, Campaign and Multiplayer
+(visual specification 1.32).
+
+- **Furniture keeps its size.** Text that names a slot of the frame keeps its
+  authored size at every text size (`build_retained_screens.fixed_text()`):
+  the navigation plates' labels on the stock 30 u pitch (Marine and Strogg),
+  which also carry into the title slot; every page title, crumb and carried
+  label; the plinth's links; every prompt bar, the title's and the pauses'
+  too; a confirmation's title and its action plates; the level block's
+  header, level name and objectives heading; and the session's notice plates.
+- **Content reflows.** Above 100 % a content column's description widens to
+  the 4:3 view's 32 dp margin (224 u from 395 u) and its lines grow with the
+  text; the column keeps its place beside the first plate while the running
+  language's lines fit above the docked bottom band (420 u) and otherwise
+  rises as far as they need, never past the docked top band (60 u). The
+  home's message line runs on to the same margin; where the running
+  language's sentence needs a second line, or CONTINUE's save title and
+  detail (on lines tightened from 24 to 20 and 17 dp of the text size, a
+  long one ending in an ellipsis at the margin) need the room, the plinth
+  steps down to clear them, short of the prompt bar. A
+  confirmation's body of known text grows the dialog by what its lines need
+  past the stock box: the frame, the glows and the actions move with it and
+  the dialog stays centred. In the level block the picture gives its room to
+  the lines (it shrinks to nothing at 200 % and is hidden from 190 %), the
+  difficulty, objectives and time lines grow, and the time in the mission
+  wraps onto a second line over the save's age; the card keeps its size.
+- **Generation guards it.** Every binding that reads the text size must give
+  its node's authored value at 100 % in every shipped language
+  (`check_text_bindings`), so the 100 % documents present as before; it
+  caught the Arena's RESET PROGRESS link, whose label was resized after its
+  plate was built (`link()` now takes the size). Generation also fails where
+  a shipped language's description, message line, dialog body or time lines
+  would outgrow its room at 200 %.
+
+The native page tests (`CheckPageTextScale`) check, at 100, 150 and 200 % on
+16:9, 4:3 and 9:16 views, that every shown text of each of the seven
+documents stays on the screen, that furniture keeps its authored size, the
+content column's box and descriptions, the title's message lines above the
+plinth and the plinth above the prompt bar, the level block's lines in order
+inside the card, and the exit, quit and LOAD DEFAULTS questions with their
+bodies above their actions; and that every node lies where it did once the
+text returns to 100 %.
+
+Captured from a candidate runtime (114 scenario runs, 658 engine
+screenshots, every run complete): the title, SETTINGS, Multiplayer and
+Single Player scenarios at 200 % on 4:3 in all twelve shipped languages; the
+pause at 200 % 4:3 in English, French, German, Hungarian and Russian; all
+five at 200 % on 16:9 with Vulkan (English, German, Russian) and on 9:16
+(English, French, Ukrainian); 150 % in Hungarian on 4:3, 16:9 and 9:16 and in
+English on 16:9; 100 % in English on 16:9 and German on 4:3; and CONTINUE at
+200 % 4:3 in English and French, where a long save description ends in an
+ellipsis at the margin and the French plinth steps down for its two-line
+Multiplayer sentence.
+
+Evidence: `.tmp/page-text-scale/validation-evidence.json`, SHA-256
+`3f5d2df857c0b4b7511ca509bbe68a4ede7bbff0c151b83579ff9ece2ea7faed`.
+
+Not covered: the Multiplayer page's PLAYER SETUP editor, the Mods dialog's
+list, the pause's Objectives page and the list and form pages (Load and Save
+Game, Restart Level, Demos, Credits, Arena, Create Server, Join Game and the
+Campaign skill page) keep their 100 % rows at larger text sizes. Their
+confirmations' bodies grow with the shared dialog, and their titles, plinth
+links and prompt bars keep their size.
+
 ## Tall views grow the lists (25 October 2026)
 
 In a view taller than the canvas (5:4, and most of all a portrait window)

@@ -24928,6 +24928,138 @@
    "value": {"state": "join.clientip"}
   },
   {
+   "id": "text.joinIpModal-title-outline-1.font-size",
+   "node": "joinIpModal-title-outline-1",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.joinIpModal-title-outline-1.line-height",
+   "node": "joinIpModal-title-outline-1",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.joinIpModal-title-outline-2.font-size",
+   "node": "joinIpModal-title-outline-2",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.joinIpModal-title-outline-2.line-height",
+   "node": "joinIpModal-title-outline-2",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.joinIpModal-title-outline-3.font-size",
+   "node": "joinIpModal-title-outline-3",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.joinIpModal-title-outline-3.line-height",
+   "node": "joinIpModal-title-outline-3",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.joinIpModal-title-outline-4.font-size",
+   "node": "joinIpModal-title-outline-4",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.joinIpModal-title-outline-4.line-height",
+   "node": "joinIpModal-title-outline-4",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.joinIpModal-title-outline-5.font-size",
+   "node": "joinIpModal-title-outline-5",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.joinIpModal-title-outline-5.line-height",
+   "node": "joinIpModal-title-outline-5",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.joinIpModal-title-outline-6.font-size",
+   "node": "joinIpModal-title-outline-6",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.joinIpModal-title-outline-6.line-height",
+   "node": "joinIpModal-title-outline-6",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.joinIpModal-title-outline-7.font-size",
+   "node": "joinIpModal-title-outline-7",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.joinIpModal-title-outline-7.line-height",
+   "node": "joinIpModal-title-outline-7",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.joinIpModal-title-outline-8.font-size",
+   "node": "joinIpModal-title-outline-8",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.joinIpModal-title-outline-8.line-height",
+   "node": "joinIpModal-title-outline-8",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.joinIpModal-title.font-size",
+   "node": "joinIpModal-title",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.joinIpModal-title.line-height",
+   "node": "joinIpModal-title",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.joinIpModal_yes-label.font-size",
+   "node": "joinIpModal_yes-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.joinIpModal_yes-label.line-height",
+   "node": "joinIpModal_yes-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [45, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.joinIpModal_no-label.font-size",
+   "node": "joinIpModal_no-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.joinIpModal_no-label.line-height",
+   "node": "joinIpModal_no-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [45, {"state": "view.text"}]}
+  },
+  {
    "id": "joinIpModal.display",
    "node": "joinIpModal",
    "property": "display",
@@ -24968,6 +25100,138 @@
    "node": "joinIpModal_yes",
    "property": "enabled",
    "value": {"op": "!=", "args": [{"state": "join.address"}, ""]}
+  },
+  {
+   "id": "text.findModal-title-outline-1.font-size",
+   "node": "findModal-title-outline-1",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.findModal-title-outline-1.line-height",
+   "node": "findModal-title-outline-1",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.findModal-title-outline-2.font-size",
+   "node": "findModal-title-outline-2",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.findModal-title-outline-2.line-height",
+   "node": "findModal-title-outline-2",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.findModal-title-outline-3.font-size",
+   "node": "findModal-title-outline-3",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.findModal-title-outline-3.line-height",
+   "node": "findModal-title-outline-3",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.findModal-title-outline-4.font-size",
+   "node": "findModal-title-outline-4",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.findModal-title-outline-4.line-height",
+   "node": "findModal-title-outline-4",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.findModal-title-outline-5.font-size",
+   "node": "findModal-title-outline-5",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.findModal-title-outline-5.line-height",
+   "node": "findModal-title-outline-5",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.findModal-title-outline-6.font-size",
+   "node": "findModal-title-outline-6",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.findModal-title-outline-6.line-height",
+   "node": "findModal-title-outline-6",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.findModal-title-outline-7.font-size",
+   "node": "findModal-title-outline-7",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.findModal-title-outline-7.line-height",
+   "node": "findModal-title-outline-7",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.findModal-title-outline-8.font-size",
+   "node": "findModal-title-outline-8",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.findModal-title-outline-8.line-height",
+   "node": "findModal-title-outline-8",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.findModal-title.font-size",
+   "node": "findModal-title",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.findModal-title.line-height",
+   "node": "findModal-title",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.findModal_yes-label.font-size",
+   "node": "findModal_yes-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.findModal_yes-label.line-height",
+   "node": "findModal_yes-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [45, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.findModal_no-label.font-size",
+   "node": "findModal_no-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.findModal_no-label.line-height",
+   "node": "findModal_no-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [45, {"state": "view.text"}]}
   },
   {
    "id": "findModal.display",
@@ -25061,6 +25325,30 @@
    "value": {"op": "select", "args": [{"state": "notice.0.shown"}, "block", "none"]}
   },
   {
+   "id": "text.notice-0-text.font-size",
+   "node": "notice-0-text",
+   "property": "font-size",
+   "value": {"op": "/", "args": [14.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.notice-0-text.line-height",
+   "node": "notice-0-text",
+   "property": "line-height",
+   "value": {"op": "/", "args": [30.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.notice-0-action-label.font-size",
+   "node": "notice-0-action-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [14.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.notice-0-action-label.line-height",
+   "node": "notice-0-action-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [22.0, {"state": "view.text"}]}
+  },
+  {
    "id": "notice-1-symbol-1.display",
    "node": "notice-1-symbol-1",
    "property": "display",
@@ -25092,6 +25380,30 @@
    "value": {"op": "select", "args": [{"state": "notice.1.shown"}, "block", "none"]}
   },
   {
+   "id": "text.notice-1-text.font-size",
+   "node": "notice-1-text",
+   "property": "font-size",
+   "value": {"op": "/", "args": [14.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.notice-1-text.line-height",
+   "node": "notice-1-text",
+   "property": "line-height",
+   "value": {"op": "/", "args": [30.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.notice-1-action-label.font-size",
+   "node": "notice-1-action-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [14.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.notice-1-action-label.line-height",
+   "node": "notice-1-action-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [22.0, {"state": "view.text"}]}
+  },
+  {
    "id": "notice-2-symbol-1.display",
    "node": "notice-2-symbol-1",
    "property": "display",
@@ -25121,6 +25433,30 @@
    "node": "notice-2",
    "property": "display",
    "value": {"op": "select", "args": [{"state": "notice.2.shown"}, "block", "none"]}
+  },
+  {
+   "id": "text.notice-2-text.font-size",
+   "node": "notice-2-text",
+   "property": "font-size",
+   "value": {"op": "/", "args": [14.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.notice-2-text.line-height",
+   "node": "notice-2-text",
+   "property": "line-height",
+   "value": {"op": "/", "args": [30.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.notice-2-action-label.font-size",
+   "node": "notice-2-action-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [14.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.notice-2-action-label.line-height",
+   "node": "notice-2-action-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [22.0, {"state": "view.text"}]}
   }
  ],
  "detail": {"state": "join.detail", "card": "join-detail", "none": -1},

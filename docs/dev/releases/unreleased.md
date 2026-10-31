@@ -179,6 +179,14 @@ See [release status](../../user/release-status.md) and the
   before. At larger text sizes the settings rows now grow with the text
   (switching to one scrolling column), and the button prompts at the bottom
   of every menu stay on screen.
+- **Larger text across the menus.** With a larger text size (up to 200 %),
+  the main menu, the pause menu and the Settings, Single Player, Campaign and
+  Multiplayer menus in the new interface now keep everything readable and on
+  screen: descriptions, the main menu's hint line, the pause menu's mission
+  details and confirmation messages grow and make room for themselves, while
+  menu buttons, titles and the button prompts keep their size so the layout
+  stays intact. Player Setup and the list pages (Load Game, Join Game and the
+  like) still use their normal row sizes.
 - **Settings on tall screens, and exact values.** On a portrait or rotated
   screen, Controls, Game Options and Audio in the new interface now use the
   height: their rows stand in one larger, scrolling column instead of

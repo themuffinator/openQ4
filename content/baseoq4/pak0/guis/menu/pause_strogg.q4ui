@@ -20,6 +20,8 @@
   "quitModal.visible": {"type": "boolean", "initial": false},
   "quitModal.contents": {"type": "boolean", "initial": false},
   "soft_focus": {"type": "boolean", "initial": false, "cvar": "ui_retainedSoftFocus"},
+  "view.text": {"type": "number", "initial": 1, "view": "text"},
+  "language": {"type": "string", "initial": "", "cvar": "sys_lang"},
   "exitModal.visible": {"type": "boolean", "initial": false},
   "exitModal.contents": {"type": "boolean", "initial": false},
   "objectives.visible": {"type": "boolean", "initial": false},
@@ -56,7 +58,6 @@
   "pause_completed_7": {"type": "string", "initial": ""},
   "prompt.glyphs": {"type": "number", "initial": 0},
   "prompt.swapped": {"type": "boolean", "initial": false},
-  "view.text": {"type": "number", "initial": 1, "view": "text"},
   "carry_item": {"type": "number", "initial": 0},
   "pause.released": {"type": "boolean", "initial": false}
  },
@@ -147,6 +148,1532 @@
  },
  "bindings": [
   {
+   "id": "text.quitModal-title-rune.font-size",
+   "node": "quitModal-title-rune",
+   "property": "font-size",
+   "value": {"op": "/", "args": [16.292, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.quitModal-title-rune.line-height",
+   "node": "quitModal-title-rune",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.quitModal-title-outline-1.font-size",
+   "node": "quitModal-title-outline-1",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.quitModal-title-outline-1.line-height",
+   "node": "quitModal-title-outline-1",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.quitModal-title-outline-2.font-size",
+   "node": "quitModal-title-outline-2",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.quitModal-title-outline-2.line-height",
+   "node": "quitModal-title-outline-2",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.quitModal-title-outline-3.font-size",
+   "node": "quitModal-title-outline-3",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.quitModal-title-outline-3.line-height",
+   "node": "quitModal-title-outline-3",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.quitModal-title-outline-4.font-size",
+   "node": "quitModal-title-outline-4",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.quitModal-title-outline-4.line-height",
+   "node": "quitModal-title-outline-4",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.quitModal-title-outline-5.font-size",
+   "node": "quitModal-title-outline-5",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.quitModal-title-outline-5.line-height",
+   "node": "quitModal-title-outline-5",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.quitModal-title-outline-6.font-size",
+   "node": "quitModal-title-outline-6",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.quitModal-title-outline-6.line-height",
+   "node": "quitModal-title-outline-6",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.quitModal-title-outline-7.font-size",
+   "node": "quitModal-title-outline-7",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.quitModal-title-outline-7.line-height",
+   "node": "quitModal-title-outline-7",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.quitModal-title-outline-8.font-size",
+   "node": "quitModal-title-outline-8",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.quitModal-title-outline-8.line-height",
+   "node": "quitModal-title-outline-8",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.quitModal-title.font-size",
+   "node": "quitModal-title",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.quitModal-title.line-height",
+   "node": "quitModal-title",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.quitModal_yes-rune.font-size",
+   "node": "quitModal_yes-rune",
+   "property": "font-size",
+   "value": {"op": "/", "args": [16.292, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.quitModal_yes-rune.line-height",
+   "node": "quitModal_yes-rune",
+   "property": "line-height",
+   "value": {"op": "/", "args": [45, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.quitModal_yes-label.font-size",
+   "node": "quitModal_yes-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.quitModal_yes-label.line-height",
+   "node": "quitModal_yes-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [45, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.quitModal_no-rune.font-size",
+   "node": "quitModal_no-rune",
+   "property": "font-size",
+   "value": {"op": "/", "args": [16.292, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.quitModal_no-rune.line-height",
+   "node": "quitModal_no-rune",
+   "property": "line-height",
+   "value": {"op": "/", "args": [45, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.quitModal_no-label.font-size",
+   "node": "quitModal_no-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.quitModal_no-label.line-height",
+   "node": "quitModal_no-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [45, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.quitModal-dialog.height",
+   "node": "quitModal-dialog",
+   "property": "height",
+   "value": {
+    "op": "+",
+    "args": [
+     204.0,
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "max",
+        "args": [
+         0,
+         {
+          "op": "+",
+          "args": [
+           -73,
+           {
+            "op": "*",
+            "args": [
+             {
+              "op": "*",
+              "args": [
+               {
+                "op": "select",
+                "args": [
+                 {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+                   3,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "czech"]},
+                     3,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "english"]},
+                       3,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "german"]},
+                         3,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                           3,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "italian"]},
+                             3,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "polish"]},
+                               3,
+                               {
+                                "op": "select",
+                                "args": [
+                                 {"op": "==", "args": [{"state": "language"}, "russian"]},
+                                 2,
+                                 {
+                                  "op": "select",
+                                  "args": [
+                                   {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                                   3,
+                                   {
+                                    "op": "select",
+                                    "args": [
+                                     {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                                     3,
+                                     {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 3, 4]}
+                                    ]
+                                   }
+                                  ]
+                                 }
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "czech"]},
+                   2,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "english"]},
+                     2,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                       2,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "italian"]},
+                         2,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "polish"]},
+                           2,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "russian"]},
+                             2,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                               2,
+                               {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 2, 3]}
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               },
+               22
+              ]
+             },
+             {"state": "view.text"}
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.quitModal-frame.height",
+   "node": "quitModal-frame",
+   "property": "height",
+   "value": {
+    "op": "+",
+    "args": [
+     204.0,
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "max",
+        "args": [
+         0,
+         {
+          "op": "+",
+          "args": [
+           -73,
+           {
+            "op": "*",
+            "args": [
+             {
+              "op": "*",
+              "args": [
+               {
+                "op": "select",
+                "args": [
+                 {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+                   3,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "czech"]},
+                     3,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "english"]},
+                       3,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "german"]},
+                         3,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                           3,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "italian"]},
+                             3,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "polish"]},
+                               3,
+                               {
+                                "op": "select",
+                                "args": [
+                                 {"op": "==", "args": [{"state": "language"}, "russian"]},
+                                 2,
+                                 {
+                                  "op": "select",
+                                  "args": [
+                                   {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                                   3,
+                                   {
+                                    "op": "select",
+                                    "args": [
+                                     {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                                     3,
+                                     {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 3, 4]}
+                                    ]
+                                   }
+                                  ]
+                                 }
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "czech"]},
+                   2,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "english"]},
+                     2,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                       2,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "italian"]},
+                         2,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "polish"]},
+                           2,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "russian"]},
+                             2,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                               2,
+                               {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 2, 3]}
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               },
+               22
+              ]
+             },
+             {"state": "view.text"}
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.quitModal-glow.height",
+   "node": "quitModal-glow",
+   "property": "height",
+   "value": {
+    "op": "+",
+    "args": [
+     496.5,
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "max",
+        "args": [
+         0,
+         {
+          "op": "+",
+          "args": [
+           -73,
+           {
+            "op": "*",
+            "args": [
+             {
+              "op": "*",
+              "args": [
+               {
+                "op": "select",
+                "args": [
+                 {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+                   3,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "czech"]},
+                     3,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "english"]},
+                       3,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "german"]},
+                         3,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                           3,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "italian"]},
+                             3,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "polish"]},
+                               3,
+                               {
+                                "op": "select",
+                                "args": [
+                                 {"op": "==", "args": [{"state": "language"}, "russian"]},
+                                 2,
+                                 {
+                                  "op": "select",
+                                  "args": [
+                                   {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                                   3,
+                                   {
+                                    "op": "select",
+                                    "args": [
+                                     {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                                     3,
+                                     {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 3, 4]}
+                                    ]
+                                   }
+                                  ]
+                                 }
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "czech"]},
+                   2,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "english"]},
+                     2,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                       2,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "italian"]},
+                         2,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "polish"]},
+                           2,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "russian"]},
+                             2,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                               2,
+                               {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 2, 3]}
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               },
+               22
+              ]
+             },
+             {"state": "view.text"}
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.quitModal-glow-soft.height",
+   "node": "quitModal-glow-soft",
+   "property": "height",
+   "value": {
+    "op": "+",
+    "args": [
+     284.0,
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "max",
+        "args": [
+         0,
+         {
+          "op": "+",
+          "args": [
+           -73,
+           {
+            "op": "*",
+            "args": [
+             {
+              "op": "*",
+              "args": [
+               {
+                "op": "select",
+                "args": [
+                 {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+                   3,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "czech"]},
+                     3,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "english"]},
+                       3,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "german"]},
+                         3,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                           3,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "italian"]},
+                             3,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "polish"]},
+                               3,
+                               {
+                                "op": "select",
+                                "args": [
+                                 {"op": "==", "args": [{"state": "language"}, "russian"]},
+                                 2,
+                                 {
+                                  "op": "select",
+                                  "args": [
+                                   {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                                   3,
+                                   {
+                                    "op": "select",
+                                    "args": [
+                                     {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                                     3,
+                                     {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 3, 4]}
+                                    ]
+                                   }
+                                  ]
+                                 }
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "czech"]},
+                   2,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "english"]},
+                     2,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                       2,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "italian"]},
+                         2,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "polish"]},
+                           2,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "russian"]},
+                             2,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                               2,
+                               {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 2, 3]}
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               },
+               22
+              ]
+             },
+             {"state": "view.text"}
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.quitModal-body.height",
+   "node": "quitModal-body",
+   "property": "height",
+   "value": {
+    "op": "+",
+    "args": [
+     73,
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "max",
+        "args": [
+         0,
+         {
+          "op": "+",
+          "args": [
+           -73,
+           {
+            "op": "*",
+            "args": [
+             {
+              "op": "*",
+              "args": [
+               {
+                "op": "select",
+                "args": [
+                 {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+                   3,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "czech"]},
+                     3,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "english"]},
+                       3,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "german"]},
+                         3,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                           3,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "italian"]},
+                             3,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "polish"]},
+                               3,
+                               {
+                                "op": "select",
+                                "args": [
+                                 {"op": "==", "args": [{"state": "language"}, "russian"]},
+                                 2,
+                                 {
+                                  "op": "select",
+                                  "args": [
+                                   {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                                   3,
+                                   {
+                                    "op": "select",
+                                    "args": [
+                                     {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                                     3,
+                                     {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 3, 4]}
+                                    ]
+                                   }
+                                  ]
+                                 }
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "czech"]},
+                   2,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "english"]},
+                     2,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                       2,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "italian"]},
+                         2,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "polish"]},
+                           2,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "russian"]},
+                             2,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                               2,
+                               {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 2, 3]}
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               },
+               22
+              ]
+             },
+             {"state": "view.text"}
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.quitModal_yes.top",
+   "node": "quitModal_yes",
+   "property": "top",
+   "value": {
+    "op": "+",
+    "args": [
+     144.0,
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "max",
+        "args": [
+         0,
+         {
+          "op": "+",
+          "args": [
+           -73,
+           {
+            "op": "*",
+            "args": [
+             {
+              "op": "*",
+              "args": [
+               {
+                "op": "select",
+                "args": [
+                 {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+                   3,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "czech"]},
+                     3,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "english"]},
+                       3,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "german"]},
+                         3,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                           3,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "italian"]},
+                             3,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "polish"]},
+                               3,
+                               {
+                                "op": "select",
+                                "args": [
+                                 {"op": "==", "args": [{"state": "language"}, "russian"]},
+                                 2,
+                                 {
+                                  "op": "select",
+                                  "args": [
+                                   {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                                   3,
+                                   {
+                                    "op": "select",
+                                    "args": [
+                                     {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                                     3,
+                                     {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 3, 4]}
+                                    ]
+                                   }
+                                  ]
+                                 }
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "czech"]},
+                   2,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "english"]},
+                     2,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                       2,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "italian"]},
+                         2,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "polish"]},
+                           2,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "russian"]},
+                             2,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                               2,
+                               {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 2, 3]}
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               },
+               22
+              ]
+             },
+             {"state": "view.text"}
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.quitModal_no.top",
+   "node": "quitModal_no",
+   "property": "top",
+   "value": {
+    "op": "+",
+    "args": [
+     144.0,
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "max",
+        "args": [
+         0,
+         {
+          "op": "+",
+          "args": [
+           -73,
+           {
+            "op": "*",
+            "args": [
+             {
+              "op": "*",
+              "args": [
+               {
+                "op": "select",
+                "args": [
+                 {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+                   3,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "czech"]},
+                     3,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "english"]},
+                       3,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "german"]},
+                         3,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                           3,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "italian"]},
+                             3,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "polish"]},
+                               3,
+                               {
+                                "op": "select",
+                                "args": [
+                                 {"op": "==", "args": [{"state": "language"}, "russian"]},
+                                 2,
+                                 {
+                                  "op": "select",
+                                  "args": [
+                                   {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                                   3,
+                                   {
+                                    "op": "select",
+                                    "args": [
+                                     {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                                     3,
+                                     {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 3, 4]}
+                                    ]
+                                   }
+                                  ]
+                                 }
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "czech"]},
+                   2,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "english"]},
+                     2,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                       2,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "italian"]},
+                         2,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "polish"]},
+                           2,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "russian"]},
+                             2,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                               2,
+                               {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 2, 3]}
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               },
+               22
+              ]
+             },
+             {"state": "view.text"}
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.quitModal-dialog.top",
+   "node": "quitModal-dialog",
+   "property": "top",
+   "value": {
+    "op": "+",
+    "args": [
+     232.5,
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1]},
+         {
+          "op": "max",
+          "args": [
+           0,
+           {
+            "op": "+",
+            "args": [
+             -73,
+             {
+              "op": "*",
+              "args": [
+               {
+                "op": "*",
+                "args": [
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+                     3,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "czech"]},
+                       3,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "english"]},
+                         3,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "german"]},
+                           3,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                             3,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "italian"]},
+                               3,
+                               {
+                                "op": "select",
+                                "args": [
+                                 {"op": "==", "args": [{"state": "language"}, "polish"]},
+                                 3,
+                                 {
+                                  "op": "select",
+                                  "args": [
+                                   {"op": "==", "args": [{"state": "language"}, "russian"]},
+                                   2,
+                                   {
+                                    "op": "select",
+                                    "args": [
+                                     {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                                     3,
+                                     {
+                                      "op": "select",
+                                      "args": [
+                                       {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                                       3,
+                                       {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 3, 4]}
+                                      ]
+                                     }
+                                    ]
+                                   }
+                                  ]
+                                 }
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   },
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "czech"]},
+                     2,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "english"]},
+                       2,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                         2,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "italian"]},
+                           2,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "polish"]},
+                             2,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "russian"]},
+                               2,
+                               {
+                                "op": "select",
+                                "args": [
+                                 {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                                 2,
+                                 {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 2, 3]}
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 22
+                ]
+               },
+               {"state": "view.text"}
+              ]
+             }
+            ]
+           }
+          ]
+         },
+         0
+        ]
+       },
+       -0.5
+      ]
+     }
+    ]
+   }
+  },
+  {
    "id": "quitModal.display",
    "node": "quitModal",
    "property": "display",
@@ -183,6 +1710,916 @@
    "value": {"op": "select", "args": [{"state": "soft_focus"}, "block", "none"]}
   },
   {
+   "id": "text.exitModal-title-rune.font-size",
+   "node": "exitModal-title-rune",
+   "property": "font-size",
+   "value": {"op": "/", "args": [16.292, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-title-rune.line-height",
+   "node": "exitModal-title-rune",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-title-outline-1.font-size",
+   "node": "exitModal-title-outline-1",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-title-outline-1.line-height",
+   "node": "exitModal-title-outline-1",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-title-outline-2.font-size",
+   "node": "exitModal-title-outline-2",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-title-outline-2.line-height",
+   "node": "exitModal-title-outline-2",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-title-outline-3.font-size",
+   "node": "exitModal-title-outline-3",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-title-outline-3.line-height",
+   "node": "exitModal-title-outline-3",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-title-outline-4.font-size",
+   "node": "exitModal-title-outline-4",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-title-outline-4.line-height",
+   "node": "exitModal-title-outline-4",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-title-outline-5.font-size",
+   "node": "exitModal-title-outline-5",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-title-outline-5.line-height",
+   "node": "exitModal-title-outline-5",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-title-outline-6.font-size",
+   "node": "exitModal-title-outline-6",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-title-outline-6.line-height",
+   "node": "exitModal-title-outline-6",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-title-outline-7.font-size",
+   "node": "exitModal-title-outline-7",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-title-outline-7.line-height",
+   "node": "exitModal-title-outline-7",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-title-outline-8.font-size",
+   "node": "exitModal-title-outline-8",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-title-outline-8.line-height",
+   "node": "exitModal-title-outline-8",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-title.font-size",
+   "node": "exitModal-title",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-title.line-height",
+   "node": "exitModal-title",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal_yes-rune.font-size",
+   "node": "exitModal_yes-rune",
+   "property": "font-size",
+   "value": {"op": "/", "args": [16.292, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal_yes-rune.line-height",
+   "node": "exitModal_yes-rune",
+   "property": "line-height",
+   "value": {"op": "/", "args": [45, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal_yes-label.font-size",
+   "node": "exitModal_yes-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal_yes-label.line-height",
+   "node": "exitModal_yes-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [45, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal_no-rune.font-size",
+   "node": "exitModal_no-rune",
+   "property": "font-size",
+   "value": {"op": "/", "args": [16.292, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal_no-rune.line-height",
+   "node": "exitModal_no-rune",
+   "property": "line-height",
+   "value": {"op": "/", "args": [45, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal_no-label.font-size",
+   "node": "exitModal_no-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal_no-label.line-height",
+   "node": "exitModal_no-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [45, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-dialog.height",
+   "node": "exitModal-dialog",
+   "property": "height",
+   "value": {
+    "op": "+",
+    "args": [
+     204.0,
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "max",
+        "args": [
+         0,
+         {
+          "op": "+",
+          "args": [
+           -73,
+           {
+            "op": "*",
+            "args": [
+             {
+              "op": "*",
+              "args": [
+               {
+                "op": "select",
+                "args": [
+                 {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "czech"]},
+                   2,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "german"]},
+                     2,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                       2,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "italian"]},
+                         2,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "russian"]},
+                           2,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                             2,
+                             {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 2, 3]}
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 2
+                ]
+               },
+               22
+              ]
+             },
+             {"state": "view.text"}
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.exitModal-frame.height",
+   "node": "exitModal-frame",
+   "property": "height",
+   "value": {
+    "op": "+",
+    "args": [
+     204.0,
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "max",
+        "args": [
+         0,
+         {
+          "op": "+",
+          "args": [
+           -73,
+           {
+            "op": "*",
+            "args": [
+             {
+              "op": "*",
+              "args": [
+               {
+                "op": "select",
+                "args": [
+                 {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "czech"]},
+                   2,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "german"]},
+                     2,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                       2,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "italian"]},
+                         2,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "russian"]},
+                           2,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                             2,
+                             {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 2, 3]}
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 2
+                ]
+               },
+               22
+              ]
+             },
+             {"state": "view.text"}
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.exitModal-glow.height",
+   "node": "exitModal-glow",
+   "property": "height",
+   "value": {
+    "op": "+",
+    "args": [
+     496.5,
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "max",
+        "args": [
+         0,
+         {
+          "op": "+",
+          "args": [
+           -73,
+           {
+            "op": "*",
+            "args": [
+             {
+              "op": "*",
+              "args": [
+               {
+                "op": "select",
+                "args": [
+                 {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "czech"]},
+                   2,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "german"]},
+                     2,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                       2,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "italian"]},
+                         2,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "russian"]},
+                           2,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                             2,
+                             {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 2, 3]}
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 2
+                ]
+               },
+               22
+              ]
+             },
+             {"state": "view.text"}
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.exitModal-glow-soft.height",
+   "node": "exitModal-glow-soft",
+   "property": "height",
+   "value": {
+    "op": "+",
+    "args": [
+     284.0,
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "max",
+        "args": [
+         0,
+         {
+          "op": "+",
+          "args": [
+           -73,
+           {
+            "op": "*",
+            "args": [
+             {
+              "op": "*",
+              "args": [
+               {
+                "op": "select",
+                "args": [
+                 {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "czech"]},
+                   2,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "german"]},
+                     2,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                       2,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "italian"]},
+                         2,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "russian"]},
+                           2,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                             2,
+                             {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 2, 3]}
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 2
+                ]
+               },
+               22
+              ]
+             },
+             {"state": "view.text"}
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.exitModal-body.height",
+   "node": "exitModal-body",
+   "property": "height",
+   "value": {
+    "op": "+",
+    "args": [
+     73,
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "max",
+        "args": [
+         0,
+         {
+          "op": "+",
+          "args": [
+           -73,
+           {
+            "op": "*",
+            "args": [
+             {
+              "op": "*",
+              "args": [
+               {
+                "op": "select",
+                "args": [
+                 {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "czech"]},
+                   2,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "german"]},
+                     2,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                       2,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "italian"]},
+                         2,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "russian"]},
+                           2,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                             2,
+                             {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 2, 3]}
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 2
+                ]
+               },
+               22
+              ]
+             },
+             {"state": "view.text"}
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.exitModal_yes.top",
+   "node": "exitModal_yes",
+   "property": "top",
+   "value": {
+    "op": "+",
+    "args": [
+     144.0,
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "max",
+        "args": [
+         0,
+         {
+          "op": "+",
+          "args": [
+           -73,
+           {
+            "op": "*",
+            "args": [
+             {
+              "op": "*",
+              "args": [
+               {
+                "op": "select",
+                "args": [
+                 {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "czech"]},
+                   2,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "german"]},
+                     2,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                       2,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "italian"]},
+                         2,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "russian"]},
+                           2,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                             2,
+                             {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 2, 3]}
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 2
+                ]
+               },
+               22
+              ]
+             },
+             {"state": "view.text"}
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.exitModal_no.top",
+   "node": "exitModal_no",
+   "property": "top",
+   "value": {
+    "op": "+",
+    "args": [
+     144.0,
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "max",
+        "args": [
+         0,
+         {
+          "op": "+",
+          "args": [
+           -73,
+           {
+            "op": "*",
+            "args": [
+             {
+              "op": "*",
+              "args": [
+               {
+                "op": "select",
+                "args": [
+                 {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "czech"]},
+                   2,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "german"]},
+                     2,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                       2,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "italian"]},
+                         2,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "russian"]},
+                           2,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                             2,
+                             {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 2, 3]}
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 2
+                ]
+               },
+               22
+              ]
+             },
+             {"state": "view.text"}
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.exitModal-dialog.top",
+   "node": "exitModal-dialog",
+   "property": "top",
+   "value": {
+    "op": "+",
+    "args": [
+     232.5,
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1]},
+         {
+          "op": "max",
+          "args": [
+           0,
+           {
+            "op": "+",
+            "args": [
+             -73,
+             {
+              "op": "*",
+              "args": [
+               {
+                "op": "*",
+                "args": [
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "czech"]},
+                     2,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "german"]},
+                       2,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                         2,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "italian"]},
+                           2,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "russian"]},
+                             2,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                               2,
+                               {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 2, 3]}
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   },
+                   2
+                  ]
+                 },
+                 22
+                ]
+               },
+               {"state": "view.text"}
+              ]
+             }
+            ]
+           }
+          ]
+         },
+         0
+        ]
+       },
+       -0.5
+      ]
+     }
+    ]
+   }
+  },
+  {
    "id": "exitModal.display",
    "node": "exitModal",
    "property": "display",
@@ -217,6 +2654,198 @@
    "node": "exitModal-glow-soft",
    "property": "display",
    "value": {"op": "select", "args": [{"state": "soft_focus"}, "block", "none"]}
+  },
+  {
+   "id": "text.nav_resume-rune.font-size",
+   "node": "nav_resume-rune",
+   "property": "font-size",
+   "value": {"op": "/", "args": [19.551, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.nav_resume-rune.line-height",
+   "node": "nav_resume-rune",
+   "property": "line-height",
+   "value": {"op": "/", "args": [36.6, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.nav_resume-label.font-size",
+   "node": "nav_resume-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [24.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.nav_resume-label.line-height",
+   "node": "nav_resume-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [36.6, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.nav_savegame-rune.font-size",
+   "node": "nav_savegame-rune",
+   "property": "font-size",
+   "value": {"op": "/", "args": [19.551, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.nav_savegame-rune.line-height",
+   "node": "nav_savegame-rune",
+   "property": "line-height",
+   "value": {"op": "/", "args": [36.6, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.nav_savegame-label.font-size",
+   "node": "nav_savegame-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [24.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.nav_savegame-label.line-height",
+   "node": "nav_savegame-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [36.6, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.nav_loadgame-rune.font-size",
+   "node": "nav_loadgame-rune",
+   "property": "font-size",
+   "value": {"op": "/", "args": [19.551, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.nav_loadgame-rune.line-height",
+   "node": "nav_loadgame-rune",
+   "property": "line-height",
+   "value": {"op": "/", "args": [36.6, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.nav_loadgame-label.font-size",
+   "node": "nav_loadgame-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [24.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.nav_loadgame-label.line-height",
+   "node": "nav_loadgame-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [36.6, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.nav_restart-rune.font-size",
+   "node": "nav_restart-rune",
+   "property": "font-size",
+   "value": {"op": "/", "args": [19.551, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.nav_restart-rune.line-height",
+   "node": "nav_restart-rune",
+   "property": "line-height",
+   "value": {"op": "/", "args": [36.6, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.nav_restart-label.font-size",
+   "node": "nav_restart-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [24.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.nav_restart-label.line-height",
+   "node": "nav_restart-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [36.6, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.nav_objectives-rune.font-size",
+   "node": "nav_objectives-rune",
+   "property": "font-size",
+   "value": {"op": "/", "args": [19.551, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.nav_objectives-rune.line-height",
+   "node": "nav_objectives-rune",
+   "property": "line-height",
+   "value": {"op": "/", "args": [36.6, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.nav_objectives-label.font-size",
+   "node": "nav_objectives-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [24.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.nav_objectives-label.line-height",
+   "node": "nav_objectives-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [36.6, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.nav_settings-rune.font-size",
+   "node": "nav_settings-rune",
+   "property": "font-size",
+   "value": {"op": "/", "args": [19.551, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.nav_settings-rune.line-height",
+   "node": "nav_settings-rune",
+   "property": "line-height",
+   "value": {"op": "/", "args": [36.6, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.nav_settings-label.font-size",
+   "node": "nav_settings-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [24.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.nav_settings-label.line-height",
+   "node": "nav_settings-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [36.6, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.nav_quit-rune.font-size",
+   "node": "nav_quit-rune",
+   "property": "font-size",
+   "value": {"op": "/", "args": [19.551, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.nav_quit-rune.line-height",
+   "node": "nav_quit-rune",
+   "property": "line-height",
+   "value": {"op": "/", "args": [36.6, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.nav_quit-label.font-size",
+   "node": "nav_quit-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [24.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.nav_quit-label.line-height",
+   "node": "nav_quit-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [36.6, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.link_exit-rune.font-size",
+   "node": "link_exit-rune",
+   "property": "font-size",
+   "value": {"op": "/", "args": [13.034, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.link_exit-rune.line-height",
+   "node": "link_exit-rune",
+   "property": "line-height",
+   "value": {"op": "/", "args": [25.5, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.link_exit-label.font-size",
+   "node": "link_exit-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [16, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.link_exit-label.line-height",
+   "node": "link_exit-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [25.5, {"state": "view.text"}]}
   },
   {
    "id": "level-objective-0-text.text",
@@ -554,6 +3183,808 @@
      },
      "block",
      "none"
+    ]
+   }
+  },
+  {
+   "id": "text.paused-title-rune.font-size",
+   "node": "paused-title-rune",
+   "property": "font-size",
+   "value": {"op": "/", "args": [15.07, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.paused-title-rune.line-height",
+   "node": "paused-title-rune",
+   "property": "line-height",
+   "value": {"op": "/", "args": [36.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.paused-title.font-size",
+   "node": "paused-title",
+   "property": "font-size",
+   "value": {"op": "/", "args": [18.5, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.paused-title.line-height",
+   "node": "paused-title",
+   "property": "line-height",
+   "value": {"op": "/", "args": [36.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.level-heading.font-size",
+   "node": "level-heading",
+   "property": "font-size",
+   "value": {"op": "/", "args": [15, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.level-heading.line-height",
+   "node": "level-heading",
+   "property": "line-height",
+   "value": {"op": "/", "args": [40.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.level-heading-rune.font-size",
+   "node": "level-heading-rune",
+   "property": "font-size",
+   "value": {"op": "/", "args": [12.219, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.level-heading-rune.line-height",
+   "node": "level-heading-rune",
+   "property": "line-height",
+   "value": {"op": "/", "args": [40.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.level-name.font-size",
+   "node": "level-name",
+   "property": "font-size",
+   "value": {"op": "/", "args": [21, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.level-name.line-height",
+   "node": "level-name",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.level-name-rune.font-size",
+   "node": "level-name-rune",
+   "property": "font-size",
+   "value": {"op": "/", "args": [17.107, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.level-name-rune.line-height",
+   "node": "level-name-rune",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.level-objectives-head.font-size",
+   "node": "level-objectives-head",
+   "property": "font-size",
+   "value": {"op": "/", "args": [14.5, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.level-objectives-head.line-height",
+   "node": "level-objectives-head",
+   "property": "line-height",
+   "value": {"op": "/", "args": [18, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.level-objectives-head-rune.font-size",
+   "node": "level-objectives-head-rune",
+   "property": "font-size",
+   "value": {"op": "/", "args": [11.812, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.level-objectives-head-rune.line-height",
+   "node": "level-objectives-head-rune",
+   "property": "line-height",
+   "value": {"op": "/", "args": [18, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.level-shot.height",
+   "node": "level-shot",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {"op": "max", "args": [0, {"op": "+", "args": [266, {"op": "*", "args": [-133, {"state": "view.text"}]}]}]},
+     165.0
+    ]
+   }
+  },
+  {
+   "id": "text.level-shot.display",
+   "node": "level-shot",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1.9]}, "none", "block"]}
+  },
+  {
+   "id": "text.level-shot-frame.height",
+   "node": "level-shot-frame",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {"op": "max", "args": [0, {"op": "+", "args": [266, {"op": "*", "args": [-133, {"state": "view.text"}]}]}]},
+     165.0
+    ]
+   }
+  },
+  {
+   "id": "text.level-shot-frame.display",
+   "node": "level-shot-frame",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1.9]}, "none", "block"]}
+  },
+  {
+   "id": "text.level-name.top",
+   "node": "level-name",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {
+      "op": "+",
+      "args": [
+       62.0,
+       {"op": "max", "args": [0, {"op": "+", "args": [266, {"op": "*", "args": [-133, {"state": "view.text"}]}]}]}
+      ]
+     },
+     227.0
+    ]
+   }
+  },
+  {
+   "id": "text.level-detail.top",
+   "node": "level-detail",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {
+      "op": "+",
+      "args": [
+       26,
+       {
+        "op": "+",
+        "args": [
+         62.0,
+         {"op": "max", "args": [0, {"op": "+", "args": [266, {"op": "*", "args": [-133, {"state": "view.text"}]}]}]}
+        ]
+       }
+      ]
+     },
+     253.0
+    ]
+   }
+  },
+  {
+   "id": "text.level-detail.height",
+   "node": "level-detail",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, {"op": "*", "args": [20, {"state": "view.text"}]}, 20]
+   }
+  },
+  {
+   "id": "text.level-objectives-head.top",
+   "node": "level-objectives-head",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {
+      "op": "+",
+      "args": [
+       {
+        "op": "+",
+        "args": [
+         34,
+         {
+          "op": "+",
+          "args": [
+           62.0,
+           {"op": "max", "args": [0, {"op": "+", "args": [266, {"op": "*", "args": [-133, {"state": "view.text"}]}]}]}
+          ]
+         }
+        ]
+       },
+       {"op": "*", "args": [20, {"state": "view.text"}]}
+      ]
+     },
+     281.0
+    ]
+   }
+  },
+  {
+   "id": "text.level-name-rune.top",
+   "node": "level-name-rune",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {
+      "op": "+",
+      "args": [
+       -2.0430000000000064,
+       {
+        "op": "+",
+        "args": [
+         62.0,
+         {"op": "max", "args": [0, {"op": "+", "args": [266, {"op": "*", "args": [-133, {"state": "view.text"}]}]}]}
+        ]
+       }
+      ]
+     },
+     224.957
+    ]
+   }
+  },
+  {
+   "id": "text.level-detail-rune.top",
+   "node": "level-detail-rune",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {
+      "op": "+",
+      "args": [
+       {
+        "op": "+",
+        "args": [
+         26,
+         {
+          "op": "+",
+          "args": [
+           62.0,
+           {"op": "max", "args": [0, {"op": "+", "args": [266, {"op": "*", "args": [-133, {"state": "view.text"}]}]}]}
+          ]
+         }
+        ]
+       },
+       {"op": "*", "args": [-1.654, {"state": "view.text"}]}
+      ]
+     },
+     251.346
+    ]
+   }
+  },
+  {
+   "id": "text.level-detail-rune.height",
+   "node": "level-detail-rune",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, {"op": "*", "args": [20, {"state": "view.text"}]}, 20]
+   }
+  },
+  {
+   "id": "text.level-objectives-head-rune.top",
+   "node": "level-objectives-head-rune",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {
+      "op": "+",
+      "args": [
+       -1.410000000000025,
+       {
+        "op": "+",
+        "args": [
+         {
+          "op": "+",
+          "args": [
+           34,
+           {
+            "op": "+",
+            "args": [
+             62.0,
+             {"op": "max", "args": [0, {"op": "+", "args": [266, {"op": "*", "args": [-133, {"state": "view.text"}]}]}]}
+            ]
+           }
+          ]
+         },
+         {"op": "*", "args": [20, {"state": "view.text"}]}
+        ]
+       }
+      ]
+     },
+     279.59
+    ]
+   }
+  },
+  {
+   "id": "text.level-stats-rule.top",
+   "node": "level-stats-rule",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {"op": "+", "args": [405.0, {"op": "*", "args": [-58.5, {"state": "view.text"}]}]},
+     361.5
+    ]
+   }
+  },
+  {
+   "id": "text.level-stats.top",
+   "node": "level-stats",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {"op": "+", "args": [405.0, {"op": "*", "args": [-55.5, {"state": "view.text"}]}]},
+     364.5
+    ]
+   }
+  },
+  {
+   "id": "text.level-stats.height",
+   "node": "level-stats",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, {"op": "*", "args": [30.0, {"state": "view.text"}]}, 15.0]
+   }
+  },
+  {
+   "id": "text.level-stats.white-space",
+   "node": "level-stats",
+   "property": "white-space",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "normal", "nowrap"]}
+  },
+  {
+   "id": "text.level-saved.top",
+   "node": "level-saved",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {"op": "+", "args": [405.0, {"op": "*", "args": [-25.5, {"state": "view.text"}]}]},
+     379.5
+    ]
+   }
+  },
+  {
+   "id": "text.level-saved.height",
+   "node": "level-saved",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, {"op": "*", "args": [15.0, {"state": "view.text"}]}, 15.0]
+   }
+  },
+  {
+   "id": "text.level-objectives.top",
+   "node": "level-objectives",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {
+      "op": "+",
+      "args": [
+       {
+        "op": "+",
+        "args": [
+         56,
+         {
+          "op": "+",
+          "args": [
+           62.0,
+           {"op": "max", "args": [0, {"op": "+", "args": [266, {"op": "*", "args": [-133, {"state": "view.text"}]}]}]}
+          ]
+         }
+        ]
+       },
+       {"op": "*", "args": [20, {"state": "view.text"}]}
+      ]
+     },
+     303.0
+    ]
+   }
+  },
+  {
+   "id": "text.level-objectives.height",
+   "node": "level-objectives",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {
+      "op": "-",
+      "args": [
+       {
+        "op": "-",
+        "args": [
+         {"op": "+", "args": [405.0, {"op": "*", "args": [-58.5, {"state": "view.text"}]}]},
+         {
+          "op": "+",
+          "args": [
+           {
+            "op": "+",
+            "args": [
+             56,
+             {
+              "op": "+",
+              "args": [
+               62.0,
+               {"op": "max", "args": [0, {"op": "+", "args": [266, {"op": "*", "args": [-133, {"state": "view.text"}]}]}]}
+              ]
+             }
+            ]
+           },
+           {"op": "*", "args": [20, {"state": "view.text"}]}
+          ]
+         }
+        ]
+       },
+       3
+      ]
+     },
+     55.5
+    ]
+   }
+  },
+  {
+   "id": "text.level-objective-0.top",
+   "node": "level-objective-0",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {
+      "op": "+",
+      "args": [
+       {
+        "op": "+",
+        "args": [
+         {
+          "op": "+",
+          "args": [
+           56,
+           {
+            "op": "+",
+            "args": [
+             62.0,
+             {"op": "max", "args": [0, {"op": "+", "args": [266, {"op": "*", "args": [-133, {"state": "view.text"}]}]}]}
+            ]
+           }
+          ]
+         },
+         {"op": "*", "args": [20, {"state": "view.text"}]}
+        ]
+       },
+       {"op": "*", "args": [0.0, {"state": "view.text"}]}
+      ]
+     },
+     303.0
+    ]
+   }
+  },
+  {
+   "id": "text.level-objective-0.height",
+   "node": "level-objective-0",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {"op": "*", "args": [18.75, {"state": "view.text"}]},
+     18.75
+    ]
+   }
+  },
+  {
+   "id": "text.level-objective-0-text.height",
+   "node": "level-objective-0-text",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {"op": "*", "args": [18.75, {"state": "view.text"}]},
+     18.75
+    ]
+   }
+  },
+  {
+   "id": "text.level-objective-0-mark.top",
+   "node": "level-objective-0-mark",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {"op": "+", "args": [-5.375, {"op": "*", "args": [9.375, {"state": "view.text"}]}]},
+     4
+    ]
+   }
+  },
+  {
+   "id": "text.level-objective-0-check.top",
+   "node": "level-objective-0-check",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {"op": "+", "args": [-7.375, {"op": "*", "args": [9.375, {"state": "view.text"}]}]},
+     2
+    ]
+   }
+  },
+  {
+   "id": "text.level-objective-0-text-rune.top",
+   "node": "level-objective-0-text-rune",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {"op": "*", "args": [-1.556, {"state": "view.text"}]},
+     -1.556
+    ]
+   }
+  },
+  {
+   "id": "text.level-objective-0-text-rune.height",
+   "node": "level-objective-0-text-rune",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {"op": "*", "args": [18.75, {"state": "view.text"}]},
+     18.75
+    ]
+   }
+  },
+  {
+   "id": "text.level-objective-1.top",
+   "node": "level-objective-1",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {
+      "op": "+",
+      "args": [
+       {
+        "op": "+",
+        "args": [
+         {
+          "op": "+",
+          "args": [
+           56,
+           {
+            "op": "+",
+            "args": [
+             62.0,
+             {"op": "max", "args": [0, {"op": "+", "args": [266, {"op": "*", "args": [-133, {"state": "view.text"}]}]}]}
+            ]
+           }
+          ]
+         },
+         {"op": "*", "args": [20, {"state": "view.text"}]}
+        ]
+       },
+       {"op": "*", "args": [18.75, {"state": "view.text"}]}
+      ]
+     },
+     321.75
+    ]
+   }
+  },
+  {
+   "id": "text.level-objective-1.height",
+   "node": "level-objective-1",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {"op": "*", "args": [18.75, {"state": "view.text"}]},
+     18.75
+    ]
+   }
+  },
+  {
+   "id": "text.level-objective-1-text.height",
+   "node": "level-objective-1-text",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {"op": "*", "args": [18.75, {"state": "view.text"}]},
+     18.75
+    ]
+   }
+  },
+  {
+   "id": "text.level-objective-1-mark.top",
+   "node": "level-objective-1-mark",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {"op": "+", "args": [-5.375, {"op": "*", "args": [9.375, {"state": "view.text"}]}]},
+     4
+    ]
+   }
+  },
+  {
+   "id": "text.level-objective-1-check.top",
+   "node": "level-objective-1-check",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {"op": "+", "args": [-7.375, {"op": "*", "args": [9.375, {"state": "view.text"}]}]},
+     2
+    ]
+   }
+  },
+  {
+   "id": "text.level-objective-1-text-rune.top",
+   "node": "level-objective-1-text-rune",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {"op": "*", "args": [-1.556, {"state": "view.text"}]},
+     -1.556
+    ]
+   }
+  },
+  {
+   "id": "text.level-objective-1-text-rune.height",
+   "node": "level-objective-1-text-rune",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {"op": "*", "args": [18.75, {"state": "view.text"}]},
+     18.75
+    ]
+   }
+  },
+  {
+   "id": "text.level-objective-2.top",
+   "node": "level-objective-2",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {
+      "op": "+",
+      "args": [
+       {
+        "op": "+",
+        "args": [
+         {
+          "op": "+",
+          "args": [
+           56,
+           {
+            "op": "+",
+            "args": [
+             62.0,
+             {"op": "max", "args": [0, {"op": "+", "args": [266, {"op": "*", "args": [-133, {"state": "view.text"}]}]}]}
+            ]
+           }
+          ]
+         },
+         {"op": "*", "args": [20, {"state": "view.text"}]}
+        ]
+       },
+       {"op": "*", "args": [37.5, {"state": "view.text"}]}
+      ]
+     },
+     340.5
+    ]
+   }
+  },
+  {
+   "id": "text.level-objective-2.height",
+   "node": "level-objective-2",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {"op": "*", "args": [18.75, {"state": "view.text"}]},
+     18.75
+    ]
+   }
+  },
+  {
+   "id": "text.level-objective-2-text.height",
+   "node": "level-objective-2-text",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {"op": "*", "args": [18.75, {"state": "view.text"}]},
+     18.75
+    ]
+   }
+  },
+  {
+   "id": "text.level-objective-2-mark.top",
+   "node": "level-objective-2-mark",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {"op": "+", "args": [-5.375, {"op": "*", "args": [9.375, {"state": "view.text"}]}]},
+     4
+    ]
+   }
+  },
+  {
+   "id": "text.level-objective-2-check.top",
+   "node": "level-objective-2-check",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {"op": "+", "args": [-7.375, {"op": "*", "args": [9.375, {"state": "view.text"}]}]},
+     2
+    ]
+   }
+  },
+  {
+   "id": "text.level-objective-2-text-rune.top",
+   "node": "level-objective-2-text-rune",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {"op": "*", "args": [-1.556, {"state": "view.text"}]},
+     -1.556
+    ]
+   }
+  },
+  {
+   "id": "text.level-objective-2-text-rune.height",
+   "node": "level-objective-2-text-rune",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {"op": "*", "args": [18.75, {"state": "view.text"}]},
+     18.75
     ]
    }
   },
@@ -1365,6 +4796,54 @@
    }
   },
   {
+   "id": "text.prompt-231042-key.font-size",
+   "node": "prompt-231042-key",
+   "property": "font-size",
+   "value": {"op": "/", "args": [13, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.prompt-231042-key.line-height",
+   "node": "prompt-231042-key",
+   "property": "line-height",
+   "value": {"op": "/", "args": [22, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.prompt-231042-verb.font-size",
+   "node": "prompt-231042-verb",
+   "property": "font-size",
+   "value": {"op": "/", "args": [14, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.prompt-231042-verb.line-height",
+   "node": "prompt-231042-verb",
+   "property": "line-height",
+   "value": {"op": "/", "args": [22, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.prompt-200381-key.font-size",
+   "node": "prompt-200381-key",
+   "property": "font-size",
+   "value": {"op": "/", "args": [13, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.prompt-200381-key.line-height",
+   "node": "prompt-200381-key",
+   "property": "line-height",
+   "value": {"op": "/", "args": [22, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.prompt-200381-verb.font-size",
+   "node": "prompt-200381-verb",
+   "property": "font-size",
+   "value": {"op": "/", "args": [14, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.prompt-200381-verb.line-height",
+   "node": "prompt-200381-verb",
+   "property": "line-height",
+   "value": {"op": "/", "args": [22, {"state": "view.text"}]}
+  },
+  {
    "id": "title-carry.text",
    "node": "title-carry",
    "property": "text",
@@ -1390,6 +4869,18 @@
      }
     ]
    }
+  },
+  {
+   "id": "text.title-carry.font-size",
+   "node": "title-carry",
+   "property": "font-size",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.title-carry.line-height",
+   "node": "title-carry",
+   "property": "line-height",
+   "value": {"op": "/", "args": [36.6, {"state": "view.text"}]}
   },
   {
    "id": "chrome.display",
@@ -14423,7 +17914,8 @@
              "left": {"type": "length", "value": 15, "unit": "dp"},
              "top": {"type": "length", "value": 52.0, "unit": "dp"},
              "width": {"type": "length", "value": 363.0, "unit": "dp"},
-             "height": {"type": "length", "value": 165.0, "unit": "dp"}
+             "height": {"type": "length", "value": 165.0, "unit": "dp"},
+             "display": {"type": "keyword", "value": "block"}
             }
            },
            {
@@ -14434,7 +17926,8 @@
              "left": {"type": "length", "value": 15, "unit": "dp"},
              "top": {"type": "length", "value": 52.0, "unit": "dp"},
              "width": {"type": "length", "value": 363.0, "unit": "dp"},
-             "height": {"type": "length", "value": 165.0, "unit": "dp"}
+             "height": {"type": "length", "value": 165.0, "unit": "dp"},
+             "display": {"type": "keyword", "value": "block"}
             },
             "paths": [
              {
@@ -20033,9 +23526,9 @@
                {"id": "p3", "op": "line", "points": [[334.306, 20.562]]},
                {"id": "p4", "op": "line", "points": [[363.75, 3.562]]},
                {"id": "p5", "op": "line", "points": [[473.438, 3.562]]},
-               {"id": "p6", "op": "line", "points": [[473.438, 198.656]]},
-               {"id": "p7", "op": "line", "points": [[44.562, 198.656]]},
-               {"id": "p8", "op": "line", "points": [[6.562, 176.716]]},
+               {"id": "p6", "op": "line", "points": [[473.438, {"fraction": 1, "dp": -5.344}]]},
+               {"id": "p7", "op": "line", "points": [[44.562, {"fraction": 1, "dp": -5.344}]]},
+               {"id": "p8", "op": "line", "points": [[6.562, {"fraction": 1, "dp": -27.284}]]},
                {"id": "close", "op": "close"}
               ],
               "fill": {"type": "solid", "color": {"type": "color", "value": [0.0392, 0.0196, 0.0118, 0.85]}}
@@ -20049,9 +23542,9 @@
                {"id": "p3", "op": "line", "points": [[334.306, 20.562]]},
                {"id": "p4", "op": "line", "points": [[363.75, 3.562]]},
                {"id": "p5", "op": "line", "points": [[473.438, 3.562]]},
-               {"id": "p6", "op": "line", "points": [[473.438, 198.656]]},
-               {"id": "p7", "op": "line", "points": [[44.562, 198.656]]},
-               {"id": "p8", "op": "line", "points": [[6.562, 176.716]]},
+               {"id": "p6", "op": "line", "points": [[473.438, {"fraction": 1, "dp": -5.344}]]},
+               {"id": "p7", "op": "line", "points": [[44.562, {"fraction": 1, "dp": -5.344}]]},
+               {"id": "p8", "op": "line", "points": [[6.562, {"fraction": 1, "dp": -27.284}]]},
                {"id": "close", "op": "close"}
               ],
               "stroke": {
@@ -20938,9 +24431,9 @@
                {"id": "p3", "op": "line", "points": [[334.306, 20.562]]},
                {"id": "p4", "op": "line", "points": [[363.75, 3.562]]},
                {"id": "p5", "op": "line", "points": [[473.438, 3.562]]},
-               {"id": "p6", "op": "line", "points": [[473.438, 198.656]]},
-               {"id": "p7", "op": "line", "points": [[44.562, 198.656]]},
-               {"id": "p8", "op": "line", "points": [[6.562, 176.716]]},
+               {"id": "p6", "op": "line", "points": [[473.438, {"fraction": 1, "dp": -5.344}]]},
+               {"id": "p7", "op": "line", "points": [[44.562, {"fraction": 1, "dp": -5.344}]]},
+               {"id": "p8", "op": "line", "points": [[6.562, {"fraction": 1, "dp": -27.284}]]},
                {"id": "close", "op": "close"}
               ],
               "fill": {"type": "solid", "color": {"type": "color", "value": [0.0392, 0.0196, 0.0118, 0.85]}}
@@ -20954,9 +24447,9 @@
                {"id": "p3", "op": "line", "points": [[334.306, 20.562]]},
                {"id": "p4", "op": "line", "points": [[363.75, 3.562]]},
                {"id": "p5", "op": "line", "points": [[473.438, 3.562]]},
-               {"id": "p6", "op": "line", "points": [[473.438, 198.656]]},
-               {"id": "p7", "op": "line", "points": [[44.562, 198.656]]},
-               {"id": "p8", "op": "line", "points": [[6.562, 176.716]]},
+               {"id": "p6", "op": "line", "points": [[473.438, {"fraction": 1, "dp": -5.344}]]},
+               {"id": "p7", "op": "line", "points": [[44.562, {"fraction": 1, "dp": -5.344}]]},
+               {"id": "p8", "op": "line", "points": [[6.562, {"fraction": 1, "dp": -27.284}]]},
                {"id": "close", "op": "close"}
               ],
               "stroke": {

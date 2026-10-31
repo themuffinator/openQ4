@@ -1,6 +1,6 @@
 # openQ4 UI Visual Design
 
-Specification version 1.31, 31 October 2026 (1.29 and 1.30 earlier that day, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
+Specification version 1.32, 31 October 2026 (1.29 to 1.31 earlier that day, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
 1.9 on 29 September, 1.6 on 28 September, 1.4 and 1.5 on 27 September, 1.1 to
 1.3 on 26 September, 1.0 on 8 September 2026). Status:
 implementation target; the replacement has not shipped. Applies to every
@@ -1831,7 +1831,13 @@ and parallax off.
   server browser), Create Server and Demos (the demo list) open sub-pages too,
   and Player Setup edits in place. A section that leads deeper summarizes itself
   in the content column, with a levelshot where one fits, until Accept opens it.
-  Back always climbs one level.
+  Back always climbs one level. At a text size above 100 % (section 2) the
+  plates' labels, titles, plinth links and prompt bar keep their size as
+  furniture, while the content column's description widens to the 4:3 view's
+  margin and rises between the docked bands as its lines need; the home's
+  message line runs on to the same margin and the plinth steps down to clear
+  its lines; a confirmation grows with its body; and the pause's level block
+  gives its picture's room to its growing lines inside the same card.
 - **Fourth level.** Every child route beneath a sub-page uses the same detail
   construction. The top band moves another 97 u, to a 517,-63 u translation;
   the bottom band remains docked. Two parent crumbs occupy the thin spans at
@@ -4039,6 +4045,15 @@ catalogue obligations, including `ART-035`, remain authoring/artwork requirement
 they do not authorize or require a new gameplay mode. This scope correction
 accepts no GUI, artwork, platform or behavior. Hit-feedback defaults and the other
 UI-05 qualification remain open.
+
+### Version 1.32: menu levels follow the text size
+
+Section 13.7's Menu levels pattern now says how the home, pause and page
+levels meet section 2's text-scale contract: plate labels, titles, plinth
+links, prompt bars and card headings keep their size as furniture; content
+columns, the message line, confirmation bodies and the level block's details
+grow with the text in the room the frame leaves them. `LAY-004` already holds
+this scope; no requirement changes, and nothing is accepted.
 
 ### Version 1.31: settings rows follow the text size
 

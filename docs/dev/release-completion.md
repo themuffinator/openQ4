@@ -117,6 +117,13 @@ made them too large to load.
   column too
   ([text size](ui/retained-screens.md#settings-rows-follow-the-text-size-31-october-2026),
   visual specification 1.31).
+- [x] The menu levels follow the text size: on the title, both pauses,
+  SETTINGS, Single Player, Campaign and Multiplayer the plates, titles,
+  plinth links and prompt bars keep their size, while descriptions, the
+  message line, confirmation bodies and the level block's details grow in the
+  room the frame leaves them
+  ([menu levels](ui/retained-screens.md#menu-levels-follow-the-text-size-31-october-2026),
+  visual specification 1.32).
 - [ ] Bound acceptance evidence remains.
 
 ## Windows stay see-through at any distance, 29 October 2026

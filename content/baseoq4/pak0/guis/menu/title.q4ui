@@ -14,6 +14,8 @@
   "exitModal.visible": {"type": "boolean", "initial": false},
   "exitModal.contents": {"type": "boolean", "initial": false},
   "soft_focus": {"type": "boolean", "initial": false, "cvar": "ui_retainedSoftFocus"},
+  "view.text": {"type": "number", "initial": 1, "view": "text"},
+  "language": {"type": "string", "initial": "", "cvar": "sys_lang"},
   "mods.count": {"type": "number", "initial": 0},
   "mods.selected": {"type": "number", "initial": -1},
   "mods.pick": {"type": "number", "initial": -1},
@@ -88,7 +90,6 @@
   "modsModal.visible": {"type": "boolean", "initial": false},
   "modsModal.contents": {"type": "boolean", "initial": false},
   "motion_reduced": {"type": "boolean", "initial": false, "cvar": "ui_retainedReducedMotion"},
-  "language": {"type": "string", "initial": "", "cvar": "sys_lang"},
   "pointer_x": {"type": "number", "initial": 0},
   "pointer_y": {"type": "number", "initial": 0},
   "prompt.glyphs": {"type": "number", "initial": 0},
@@ -628,6 +629,544 @@
   "noticeRest2": [{"op": "playTimeline", "timeline": "noticeRest2"}]
  },
  "bindings": [
+  {
+   "id": "text.exitModal-title-outline-1.font-size",
+   "node": "exitModal-title-outline-1",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-title-outline-1.line-height",
+   "node": "exitModal-title-outline-1",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-title-outline-2.font-size",
+   "node": "exitModal-title-outline-2",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-title-outline-2.line-height",
+   "node": "exitModal-title-outline-2",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-title-outline-3.font-size",
+   "node": "exitModal-title-outline-3",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-title-outline-3.line-height",
+   "node": "exitModal-title-outline-3",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-title-outline-4.font-size",
+   "node": "exitModal-title-outline-4",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-title-outline-4.line-height",
+   "node": "exitModal-title-outline-4",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-title-outline-5.font-size",
+   "node": "exitModal-title-outline-5",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-title-outline-5.line-height",
+   "node": "exitModal-title-outline-5",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-title-outline-6.font-size",
+   "node": "exitModal-title-outline-6",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-title-outline-6.line-height",
+   "node": "exitModal-title-outline-6",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-title-outline-7.font-size",
+   "node": "exitModal-title-outline-7",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-title-outline-7.line-height",
+   "node": "exitModal-title-outline-7",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-title-outline-8.font-size",
+   "node": "exitModal-title-outline-8",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-title-outline-8.line-height",
+   "node": "exitModal-title-outline-8",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-title.font-size",
+   "node": "exitModal-title",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-title.line-height",
+   "node": "exitModal-title",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal_yes-label.font-size",
+   "node": "exitModal_yes-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal_yes-label.line-height",
+   "node": "exitModal_yes-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [45, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal_no-label.font-size",
+   "node": "exitModal_no-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal_no-label.line-height",
+   "node": "exitModal_no-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [45, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.exitModal-dialog.height",
+   "node": "exitModal-dialog",
+   "property": "height",
+   "value": {
+    "op": "+",
+    "args": [
+     204.0,
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "max",
+        "args": [
+         0,
+         {
+          "op": "+",
+          "args": [
+           -73,
+           {
+            "op": "*",
+            "args": [
+             {
+              "op": "*",
+              "args": [
+               {
+                "op": "select",
+                "args": [
+                 {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                 2,
+                 {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "hungarian"]}, 1, 2]}
+                ]
+               },
+               22
+              ]
+             },
+             {"state": "view.text"}
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.exitModal-frame.height",
+   "node": "exitModal-frame",
+   "property": "height",
+   "value": {
+    "op": "+",
+    "args": [
+     204.0,
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "max",
+        "args": [
+         0,
+         {
+          "op": "+",
+          "args": [
+           -73,
+           {
+            "op": "*",
+            "args": [
+             {
+              "op": "*",
+              "args": [
+               {
+                "op": "select",
+                "args": [
+                 {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                 2,
+                 {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "hungarian"]}, 1, 2]}
+                ]
+               },
+               22
+              ]
+             },
+             {"state": "view.text"}
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.exitModal-glow.height",
+   "node": "exitModal-glow",
+   "property": "height",
+   "value": {
+    "op": "+",
+    "args": [
+     496.5,
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "max",
+        "args": [
+         0,
+         {
+          "op": "+",
+          "args": [
+           -73,
+           {
+            "op": "*",
+            "args": [
+             {
+              "op": "*",
+              "args": [
+               {
+                "op": "select",
+                "args": [
+                 {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                 2,
+                 {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "hungarian"]}, 1, 2]}
+                ]
+               },
+               22
+              ]
+             },
+             {"state": "view.text"}
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.exitModal-glow-soft.height",
+   "node": "exitModal-glow-soft",
+   "property": "height",
+   "value": {
+    "op": "+",
+    "args": [
+     284.0,
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "max",
+        "args": [
+         0,
+         {
+          "op": "+",
+          "args": [
+           -73,
+           {
+            "op": "*",
+            "args": [
+             {
+              "op": "*",
+              "args": [
+               {
+                "op": "select",
+                "args": [
+                 {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                 2,
+                 {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "hungarian"]}, 1, 2]}
+                ]
+               },
+               22
+              ]
+             },
+             {"state": "view.text"}
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.exitModal-body.height",
+   "node": "exitModal-body",
+   "property": "height",
+   "value": {
+    "op": "+",
+    "args": [
+     73,
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "max",
+        "args": [
+         0,
+         {
+          "op": "+",
+          "args": [
+           -73,
+           {
+            "op": "*",
+            "args": [
+             {
+              "op": "*",
+              "args": [
+               {
+                "op": "select",
+                "args": [
+                 {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                 2,
+                 {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "hungarian"]}, 1, 2]}
+                ]
+               },
+               22
+              ]
+             },
+             {"state": "view.text"}
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.exitModal_yes.top",
+   "node": "exitModal_yes",
+   "property": "top",
+   "value": {
+    "op": "+",
+    "args": [
+     144.0,
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "max",
+        "args": [
+         0,
+         {
+          "op": "+",
+          "args": [
+           -73,
+           {
+            "op": "*",
+            "args": [
+             {
+              "op": "*",
+              "args": [
+               {
+                "op": "select",
+                "args": [
+                 {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                 2,
+                 {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "hungarian"]}, 1, 2]}
+                ]
+               },
+               22
+              ]
+             },
+             {"state": "view.text"}
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.exitModal_no.top",
+   "node": "exitModal_no",
+   "property": "top",
+   "value": {
+    "op": "+",
+    "args": [
+     144.0,
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "max",
+        "args": [
+         0,
+         {
+          "op": "+",
+          "args": [
+           -73,
+           {
+            "op": "*",
+            "args": [
+             {
+              "op": "*",
+              "args": [
+               {
+                "op": "select",
+                "args": [
+                 {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                 2,
+                 {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "hungarian"]}, 1, 2]}
+                ]
+               },
+               22
+              ]
+             },
+             {"state": "view.text"}
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.exitModal-dialog.top",
+   "node": "exitModal-dialog",
+   "property": "top",
+   "value": {
+    "op": "+",
+    "args": [
+     232.5,
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1]},
+         {
+          "op": "max",
+          "args": [
+           0,
+           {
+            "op": "+",
+            "args": [
+             -73,
+             {
+              "op": "*",
+              "args": [
+               {
+                "op": "*",
+                "args": [
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                   2,
+                   {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "hungarian"]}, 1, 2]}
+                  ]
+                 },
+                 22
+                ]
+               },
+               {"state": "view.text"}
+              ]
+             }
+            ]
+           }
+          ]
+         },
+         0
+        ]
+       },
+       -0.5
+      ]
+     }
+    ]
+   }
+  },
   {
    "id": "exitModal.display",
    "node": "exitModal",
@@ -1442,6 +1981,138 @@
    "value": {"state": "mods.directory"}
   },
   {
+   "id": "text.modsModal-title-outline-1.font-size",
+   "node": "modsModal-title-outline-1",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.modsModal-title-outline-1.line-height",
+   "node": "modsModal-title-outline-1",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.modsModal-title-outline-2.font-size",
+   "node": "modsModal-title-outline-2",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.modsModal-title-outline-2.line-height",
+   "node": "modsModal-title-outline-2",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.modsModal-title-outline-3.font-size",
+   "node": "modsModal-title-outline-3",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.modsModal-title-outline-3.line-height",
+   "node": "modsModal-title-outline-3",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.modsModal-title-outline-4.font-size",
+   "node": "modsModal-title-outline-4",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.modsModal-title-outline-4.line-height",
+   "node": "modsModal-title-outline-4",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.modsModal-title-outline-5.font-size",
+   "node": "modsModal-title-outline-5",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.modsModal-title-outline-5.line-height",
+   "node": "modsModal-title-outline-5",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.modsModal-title-outline-6.font-size",
+   "node": "modsModal-title-outline-6",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.modsModal-title-outline-6.line-height",
+   "node": "modsModal-title-outline-6",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.modsModal-title-outline-7.font-size",
+   "node": "modsModal-title-outline-7",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.modsModal-title-outline-7.line-height",
+   "node": "modsModal-title-outline-7",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.modsModal-title-outline-8.font-size",
+   "node": "modsModal-title-outline-8",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.modsModal-title-outline-8.line-height",
+   "node": "modsModal-title-outline-8",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.modsModal-title.font-size",
+   "node": "modsModal-title",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.modsModal-title.line-height",
+   "node": "modsModal-title",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.modsModal_yes-label.font-size",
+   "node": "modsModal_yes-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.modsModal_yes-label.line-height",
+   "node": "modsModal_yes-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [45, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.modsModal_no-label.font-size",
+   "node": "modsModal_no-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [20, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.modsModal_no-label.line-height",
+   "node": "modsModal_no-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [45, {"state": "view.text"}]}
+  },
+  {
    "id": "modsModal.display",
    "node": "modsModal",
    "property": "display",
@@ -1502,10 +2173,34 @@
    "value": {"state": "menu_continue_detail"}
   },
   {
+   "id": "text.nav_continue-label.font-size",
+   "node": "nav_continue-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.nav_continue-label.line-height",
+   "node": "nav_continue-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [36.6, {"state": "view.text"}]}
+  },
+  {
    "id": "detail-singleplayer.top",
    "node": "detail-singleplayer",
    "property": "top",
    "value": {"op": "select", "args": [{"state": "menu_continue"}, 182.7, 227.7]}
+  },
+  {
+   "id": "text.nav_singleplayer-label.font-size",
+   "node": "nav_singleplayer-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.nav_singleplayer-label.line-height",
+   "node": "nav_singleplayer-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [36.6, {"state": "view.text"}]}
   },
   {
    "id": "detail-loadgame.top",
@@ -1514,10 +2209,34 @@
    "value": {"op": "select", "args": [{"state": "menu_continue"}, 137.7, 182.7]}
   },
   {
+   "id": "text.nav_loadgame-label.font-size",
+   "node": "nav_loadgame-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.nav_loadgame-label.line-height",
+   "node": "nav_loadgame-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [36.6, {"state": "view.text"}]}
+  },
+  {
    "id": "detail-multiplayer.top",
    "node": "detail-multiplayer",
    "property": "top",
    "value": {"op": "select", "args": [{"state": "menu_continue"}, 92.7, 137.7]}
+  },
+  {
+   "id": "text.nav_multiplayer-label.font-size",
+   "node": "nav_multiplayer-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.nav_multiplayer-label.line-height",
+   "node": "nav_multiplayer-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [36.6, {"state": "view.text"}]}
   },
   {
    "id": "detail-settings.top",
@@ -1526,10 +2245,82 @@
    "value": {"op": "select", "args": [{"state": "menu_continue"}, 47.7, 92.7]}
   },
   {
+   "id": "text.nav_settings-label.font-size",
+   "node": "nav_settings-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.nav_settings-label.line-height",
+   "node": "nav_settings-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [36.6, {"state": "view.text"}]}
+  },
+  {
    "id": "nav_continue.display",
    "node": "nav_continue",
    "property": "display",
    "value": {"op": "select", "args": [{"state": "menu_continue"}, "block", "none"]}
+  },
+  {
+   "id": "text.link_mods-label.font-size",
+   "node": "link_mods-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [16, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.link_mods-label.line-height",
+   "node": "link_mods-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [25.5, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.link_demos-label.font-size",
+   "node": "link_demos-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [16, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.link_demos-label.line-height",
+   "node": "link_demos-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [25.5, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.link_updates-label.font-size",
+   "node": "link_updates-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [16, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.link_updates-label.line-height",
+   "node": "link_updates-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [25.5, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.link_credits-label.font-size",
+   "node": "link_credits-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [16, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.link_credits-label.line-height",
+   "node": "link_credits-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [25.5, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.link_exit-label.font-size",
+   "node": "link_exit-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [16, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.link_exit-label.line-height",
+   "node": "link_exit-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [25.5, {"state": "view.text"}]}
   },
   {
    "id": "emblem-glint.display",
@@ -1589,6 +2380,743 @@
        }
       ]
      }
+    ]
+   }
+  },
+  {
+   "id": "text.detail-singleplayer-text.width",
+   "node": "detail-singleplayer-text",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 862.5, 649.5]}
+  },
+  {
+   "id": "text.detail-singleplayer-text.height",
+   "node": "detail-singleplayer-text",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "*",
+        "args": [{"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1.5]}, 1, 1]}, 22]
+       },
+       {"state": "view.text"}
+      ]
+     },
+     49.5
+    ]
+   }
+  },
+  {
+   "id": "text.detail-singleplayer.width",
+   "node": "detail-singleplayer",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 862.5, 649.5]}
+  },
+  {
+   "id": "text.detail-singleplayer.height",
+   "node": "detail-singleplayer",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "*",
+        "args": [{"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1.5]}, 1, 1]}, 22]
+       },
+       {"state": "view.text"}
+      ]
+     },
+     49.5
+    ]
+   }
+  },
+  {
+   "id": "text.detail-loadgame-text.width",
+   "node": "detail-loadgame-text",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 862.5, 649.5]}
+  },
+  {
+   "id": "text.detail-loadgame-text.height",
+   "node": "detail-loadgame-text",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "*",
+        "args": [{"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1.5]}, 1, 1]}, 22]
+       },
+       {"state": "view.text"}
+      ]
+     },
+     49.5
+    ]
+   }
+  },
+  {
+   "id": "text.detail-loadgame.width",
+   "node": "detail-loadgame",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 862.5, 649.5]}
+  },
+  {
+   "id": "text.detail-loadgame.height",
+   "node": "detail-loadgame",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "*",
+        "args": [{"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1.5]}, 1, 1]}, 22]
+       },
+       {"state": "view.text"}
+      ]
+     },
+     49.5
+    ]
+   }
+  },
+  {
+   "id": "text.detail-multiplayer-text.width",
+   "node": "detail-multiplayer-text",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 862.5, 649.5]}
+  },
+  {
+   "id": "text.detail-multiplayer-text.height",
+   "node": "detail-multiplayer-text",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "*",
+        "args": [
+         {
+          "op": "select",
+          "args": [
+           {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "language"}, "czech"]},
+             1,
+             {
+              "op": "select",
+              "args": [
+               {"op": "==", "args": [{"state": "language"}, "english"]},
+               1,
+               {
+                "op": "select",
+                "args": [
+                 {"op": "==", "args": [{"state": "language"}, "polish"]},
+                 1,
+                 {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "turkish"]}, 1, 2]}
+                ]
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+             1,
+             {
+              "op": "select",
+              "args": [
+               {"op": "==", "args": [{"state": "language"}, "czech"]},
+               1,
+               {
+                "op": "select",
+                "args": [
+                 {"op": "==", "args": [{"state": "language"}, "english"]},
+                 1,
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "german"]},
+                   1,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                     1,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "italian"]},
+                       1,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "polish"]},
+                         1,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "russian"]},
+                           1,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                             1,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                               1,
+                               {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 1, 2]}
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         },
+         22
+        ]
+       },
+       {"state": "view.text"}
+      ]
+     },
+     49.5
+    ]
+   }
+  },
+  {
+   "id": "text.detail-multiplayer.width",
+   "node": "detail-multiplayer",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 862.5, 649.5]}
+  },
+  {
+   "id": "text.detail-multiplayer.height",
+   "node": "detail-multiplayer",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "*",
+        "args": [
+         {
+          "op": "select",
+          "args": [
+           {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "language"}, "czech"]},
+             1,
+             {
+              "op": "select",
+              "args": [
+               {"op": "==", "args": [{"state": "language"}, "english"]},
+               1,
+               {
+                "op": "select",
+                "args": [
+                 {"op": "==", "args": [{"state": "language"}, "polish"]},
+                 1,
+                 {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "turkish"]}, 1, 2]}
+                ]
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+             1,
+             {
+              "op": "select",
+              "args": [
+               {"op": "==", "args": [{"state": "language"}, "czech"]},
+               1,
+               {
+                "op": "select",
+                "args": [
+                 {"op": "==", "args": [{"state": "language"}, "english"]},
+                 1,
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "german"]},
+                   1,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                     1,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "italian"]},
+                       1,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "polish"]},
+                         1,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "russian"]},
+                           1,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                             1,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                               1,
+                               {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 1, 2]}
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         },
+         22
+        ]
+       },
+       {"state": "view.text"}
+      ]
+     },
+     49.5
+    ]
+   }
+  },
+  {
+   "id": "text.detail-settings-text.width",
+   "node": "detail-settings-text",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 862.5, 649.5]}
+  },
+  {
+   "id": "text.detail-settings-text.height",
+   "node": "detail-settings-text",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "*",
+        "args": [{"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1.5]}, 1, 1]}, 22]
+       },
+       {"state": "view.text"}
+      ]
+     },
+     49.5
+    ]
+   }
+  },
+  {
+   "id": "text.detail-settings.width",
+   "node": "detail-settings",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 862.5, 649.5]}
+  },
+  {
+   "id": "text.detail-settings.height",
+   "node": "detail-settings",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "*",
+        "args": [{"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1.5]}, 1, 1]}, 22]
+       },
+       {"state": "view.text"}
+      ]
+     },
+     49.5
+    ]
+   }
+  },
+  {
+   "id": "text.detail-continue-title.width",
+   "node": "detail-continue-title",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 766.5, 553.5]}
+  },
+  {
+   "id": "text.detail-continue-title.line-height",
+   "node": "detail-continue-title",
+   "property": "line-height",
+   "value": {"op": "+", "args": [28, {"op": "*", "args": [-4, {"state": "view.text"}]}]}
+  },
+  {
+   "id": "text.detail-continue-title.height",
+   "node": "detail-continue-title",
+   "property": "height",
+   "value": {
+    "op": "*",
+    "args": [{"op": "+", "args": [28, {"op": "*", "args": [-4, {"state": "view.text"}]}]}, {"state": "view.text"}]
+   }
+  },
+  {
+   "id": "text.detail-continue-title.overflow",
+   "node": "detail-continue-title",
+   "property": "overflow",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "hidden", "visible"]}
+  },
+  {
+   "id": "text.detail-continue-title.text-overflow",
+   "node": "detail-continue-title",
+   "property": "text-overflow",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
+  },
+  {
+   "id": "text.detail-continue-detail.width",
+   "node": "detail-continue-detail",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 766.5, 553.5]}
+  },
+  {
+   "id": "text.detail-continue-detail.line-height",
+   "node": "detail-continue-detail",
+   "property": "line-height",
+   "value": {"op": "+", "args": [31, {"op": "*", "args": [-7, {"state": "view.text"}]}]}
+  },
+  {
+   "id": "text.detail-continue-detail.height",
+   "node": "detail-continue-detail",
+   "property": "height",
+   "value": {
+    "op": "*",
+    "args": [{"op": "+", "args": [31, {"op": "*", "args": [-7, {"state": "view.text"}]}]}, {"state": "view.text"}]
+   }
+  },
+  {
+   "id": "text.detail-continue-detail.top",
+   "node": "detail-continue-detail",
+   "property": "top",
+   "value": {
+    "op": "*",
+    "args": [{"op": "+", "args": [28, {"op": "*", "args": [-4, {"state": "view.text"}]}]}, {"state": "view.text"}]
+   }
+  },
+  {
+   "id": "text.detail-continue-detail.overflow",
+   "node": "detail-continue-detail",
+   "property": "overflow",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "hidden", "visible"]}
+  },
+  {
+   "id": "text.detail-continue-detail.text-overflow",
+   "node": "detail-continue-detail",
+   "property": "text-overflow",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
+  },
+  {
+   "id": "text.detail-continue.width",
+   "node": "detail-continue",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 862.5, 649.5]}
+  },
+  {
+   "id": "text.detail-continue.height",
+   "node": "detail-continue",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {
+      "op": "+",
+      "args": [
+       {
+        "op": "*",
+        "args": [{"op": "+", "args": [28, {"op": "*", "args": [-4, {"state": "view.text"}]}]}, {"state": "view.text"}]
+       },
+       {
+        "op": "*",
+        "args": [{"op": "+", "args": [31, {"op": "*", "args": [-7, {"state": "view.text"}]}]}, {"state": "view.text"}]
+       }
+      ]
+     },
+     49.5
+    ]
+   }
+  },
+  {
+   "id": "text.plinth.top",
+   "node": "plinth",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {
+      "op": "max",
+      "args": [
+       604.95,
+       {
+        "op": "+",
+        "args": [
+         549.0,
+         {
+          "op": "max",
+          "args": [
+           {
+            "op": "*",
+            "args": [
+             {
+              "op": "*",
+              "args": [{"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1.5]}, 1, 1]}, 22]
+             },
+             {"state": "view.text"}
+            ]
+           },
+           {
+            "op": "max",
+            "args": [
+             {
+              "op": "*",
+              "args": [
+               {
+                "op": "*",
+                "args": [
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "czech"]},
+                     1,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "english"]},
+                       1,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "polish"]},
+                         1,
+                         {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "turkish"]}, 1, 2]}
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   },
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+                     1,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "czech"]},
+                       1,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "english"]},
+                         1,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "german"]},
+                           1,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                             1,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "italian"]},
+                               1,
+                               {
+                                "op": "select",
+                                "args": [
+                                 {"op": "==", "args": [{"state": "language"}, "polish"]},
+                                 1,
+                                 {
+                                  "op": "select",
+                                  "args": [
+                                   {"op": "==", "args": [{"state": "language"}, "russian"]},
+                                   1,
+                                   {
+                                    "op": "select",
+                                    "args": [
+                                     {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                                     1,
+                                     {
+                                      "op": "select",
+                                      "args": [
+                                       {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                                       1,
+                                       {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 1, 2]}
+                                      ]
+                                     }
+                                    ]
+                                   }
+                                  ]
+                                 }
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 22
+                ]
+               },
+               {"state": "view.text"}
+              ]
+             },
+             {
+              "op": "max",
+              "args": [
+               {
+                "op": "*",
+                "args": [
+                 {
+                  "op": "*",
+                  "args": [{"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1.5]}, 1, 1]}, 22]
+                 },
+                 {"state": "view.text"}
+                ]
+               },
+               {
+                "op": "max",
+                "args": [
+                 {
+                  "op": "*",
+                  "args": [
+                   {
+                    "op": "*",
+                    "args": [{"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1.5]}, 1, 1]}, 22]
+                   },
+                   {"state": "view.text"}
+                  ]
+                 },
+                 {
+                  "op": "select",
+                  "args": [
+                   {"state": "menu_continue"},
+                   {
+                    "op": "+",
+                    "args": [
+                     {
+                      "op": "*",
+                      "args": [{"op": "+", "args": [28, {"op": "*", "args": [-4, {"state": "view.text"}]}]}, {"state": "view.text"}]
+                     },
+                     {
+                      "op": "*",
+                      "args": [{"op": "+", "args": [31, {"op": "*", "args": [-7, {"state": "view.text"}]}]}, {"state": "view.text"}]
+                     }
+                    ]
+                   },
+                   0
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     604.95
     ]
    }
   },
@@ -1913,6 +3441,54 @@
    }
   },
   {
+   "id": "text.prompt-231042-key.font-size",
+   "node": "prompt-231042-key",
+   "property": "font-size",
+   "value": {"op": "/", "args": [13, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.prompt-231042-key.line-height",
+   "node": "prompt-231042-key",
+   "property": "line-height",
+   "value": {"op": "/", "args": [22, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.prompt-231042-verb.font-size",
+   "node": "prompt-231042-verb",
+   "property": "font-size",
+   "value": {"op": "/", "args": [14, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.prompt-231042-verb.line-height",
+   "node": "prompt-231042-verb",
+   "property": "line-height",
+   "value": {"op": "/", "args": [22, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.prompt-200013-key.font-size",
+   "node": "prompt-200013-key",
+   "property": "font-size",
+   "value": {"op": "/", "args": [13, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.prompt-200013-key.line-height",
+   "node": "prompt-200013-key",
+   "property": "line-height",
+   "value": {"op": "/", "args": [22, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.prompt-200013-verb.font-size",
+   "node": "prompt-200013-verb",
+   "property": "font-size",
+   "value": {"op": "/", "args": [14, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.prompt-200013-verb.line-height",
+   "node": "prompt-200013-verb",
+   "property": "line-height",
+   "value": {"op": "/", "args": [22, {"state": "view.text"}]}
+  },
+  {
    "id": "title-carry.text",
    "node": "title-carry",
    "property": "text",
@@ -1931,6 +3507,18 @@
      }
     ]
    }
+  },
+  {
+   "id": "text.title-carry.font-size",
+   "node": "title-carry",
+   "property": "font-size",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.title-carry.line-height",
+   "node": "title-carry",
+   "property": "line-height",
+   "value": {"op": "/", "args": [36.6, {"state": "view.text"}]}
   },
   {
    "id": "notice-0-symbol-1.display",
@@ -1964,6 +3552,30 @@
    "value": {"op": "select", "args": [{"state": "notice.0.shown"}, "block", "none"]}
   },
   {
+   "id": "text.notice-0-text.font-size",
+   "node": "notice-0-text",
+   "property": "font-size",
+   "value": {"op": "/", "args": [14.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.notice-0-text.line-height",
+   "node": "notice-0-text",
+   "property": "line-height",
+   "value": {"op": "/", "args": [30.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.notice-0-action-label.font-size",
+   "node": "notice-0-action-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [14.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.notice-0-action-label.line-height",
+   "node": "notice-0-action-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [22.0, {"state": "view.text"}]}
+  },
+  {
    "id": "notice-1-symbol-1.display",
    "node": "notice-1-symbol-1",
    "property": "display",
@@ -1995,6 +3607,30 @@
    "value": {"op": "select", "args": [{"state": "notice.1.shown"}, "block", "none"]}
   },
   {
+   "id": "text.notice-1-text.font-size",
+   "node": "notice-1-text",
+   "property": "font-size",
+   "value": {"op": "/", "args": [14.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.notice-1-text.line-height",
+   "node": "notice-1-text",
+   "property": "line-height",
+   "value": {"op": "/", "args": [30.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.notice-1-action-label.font-size",
+   "node": "notice-1-action-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [14.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.notice-1-action-label.line-height",
+   "node": "notice-1-action-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [22.0, {"state": "view.text"}]}
+  },
+  {
    "id": "notice-2-symbol-1.display",
    "node": "notice-2-symbol-1",
    "property": "display",
@@ -2024,6 +3660,30 @@
    "node": "notice-2",
    "property": "display",
    "value": {"op": "select", "args": [{"state": "notice.2.shown"}, "block", "none"]}
+  },
+  {
+   "id": "text.notice-2-text.font-size",
+   "node": "notice-2-text",
+   "property": "font-size",
+   "value": {"op": "/", "args": [14.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.notice-2-text.line-height",
+   "node": "notice-2-text",
+   "property": "line-height",
+   "value": {"op": "/", "args": [30.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.notice-2-action-label.font-size",
+   "node": "notice-2-action-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [14.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.notice-2-action-label.line-height",
+   "node": "notice-2-action-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [22.0, {"state": "view.text"}]}
   }
  ],
  "timelines": [
@@ -17017,7 +18677,9 @@
                "font-size": {"type": "length", "value": 17, "unit": "dp"},
                "line-height": {"type": "length", "value": 24.0, "unit": "dp"},
                "color": {"type": "color", "value": [1, 1, 1, 0.8]},
-               "white-space": {"type": "keyword", "value": "nowrap"}
+               "white-space": {"type": "keyword", "value": "nowrap"},
+               "overflow": {"type": "keyword", "value": "visible"},
+               "text-overflow": {"type": "keyword", "value": "clip"}
               }
              },
              {
@@ -17034,7 +18696,9 @@
                "font-size": {"type": "length", "value": 14, "unit": "dp"},
                "line-height": {"type": "length", "value": 24.0, "unit": "dp"},
                "color": {"type": "color", "value": [0.72, 0.76, 0.62, 1]},
-               "white-space": {"type": "keyword", "value": "nowrap"}
+               "white-space": {"type": "keyword", "value": "nowrap"},
+               "overflow": {"type": "keyword", "value": "visible"},
+               "text-overflow": {"type": "keyword", "value": "clip"}
               }
              }
             ]
@@ -19983,9 +21647,9 @@
              {"id": "p3", "op": "line", "points": [[346.75, 20.562]]},
              {"id": "p4", "op": "line", "points": [[363.75, 3.562]]},
              {"id": "p5", "op": "line", "points": [[473.438, 3.562]]},
-             {"id": "p6", "op": "line", "points": [[473.438, 198.656]]},
-             {"id": "p7", "op": "line", "points": [[44.562, 198.656]]},
-             {"id": "p8", "op": "line", "points": [[6.562, 160.656]]},
+             {"id": "p6", "op": "line", "points": [[473.438, {"fraction": 1, "dp": -5.344}]]},
+             {"id": "p7", "op": "line", "points": [[44.562, {"fraction": 1, "dp": -5.344}]]},
+             {"id": "p8", "op": "line", "points": [[6.562, {"fraction": 1, "dp": -43.344}]]},
              {"id": "close", "op": "close"}
             ],
             "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.7]}}

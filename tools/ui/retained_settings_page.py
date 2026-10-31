@@ -25,9 +25,9 @@ from __future__ import annotations
 
 from build_retained_screens import (ACCEL, BOTTOM_TO_PAGE, CANVAS_W, CRUMB_SCALE, CRUMB_SPAN, FULL, OLIVE, ORANGE, PAGE_TITLE_H,
                                     PAGE_TITLE_W, SUBPAGE_REVERSE_MS, SUBPAGE_SLOT, TITLE_SLOT, TOP_TO_PAGE, TOP_TO_SUBPAGE, U, absolute,
-                                    by_language, colour, confirmation, crumb_fits, crumb_transform, fit_narrow, framing_bands, group,
-                                    keyword, label, length, lit_field, navigation_plate, number, page_prompts, rgb, track, transform,
-                                    typeface, wrap_menu, Document)
+                                    by_language, colour, confirmation, crumb_fits, crumb_transform, fit_narrow, fixed_text, framing_bands,
+                                    group, keyword, label, length, lit_field, navigation_plate, number, page_prompts, reflow_details, rgb,
+                                    track, transform, typeface, wrap_menu, Document)
 from retained_difficulty import check_fits
 
 NAV_TOP = 181.0    # the Multiplayer page's first plate, on the same level
@@ -109,11 +109,14 @@ def settings_page_document() -> dict:
     bands[0]["properties"]["transform"] = page_top
     bands[1]["properties"]["transform"] = transform(*BOTTOM_TO_PAGE)
     canvas = {**absolute(top=0, width=CANVAS_W, height=720), "left": length(50, "%"), "margin-left": length(-CANVAS_W / 2)}
+    details = group("details", {**absolute(left=U * 395, top=U * 190, width=U * DETAILS[0], height=U * DETAILS[1]), "opacity": number(0)},
+                    [description])
+    # The description grows with the text above 100 % (section 2).
+    reflow_details(doc, details, ("#str_231546",))
     content = group("content", {**canvas, "transform": transform(), "opacity": number(1)}, [
         group("navigation", {**absolute(left=0, top=U * NAV_TOP, width=U * 357), "display": keyword("flex"),
                              "flex-direction": keyword("column"), "opacity": number(1)}, buttons),
-        group("details", {**absolute(left=U * 395, top=U * 190, width=U * DETAILS[0], height=U * DETAILS[1]), "opacity": number(0)},
-              [description]),
+        details,
     ])
     # Going deeper, the section's label carries from its row into the slot at
     # the step's foot (title.carry, 300 ms).
@@ -132,6 +135,8 @@ def settings_page_document() -> dict:
                 **typeface("marine", 24, carry_h, rgb(ORANGE)), "white-space": keyword("nowrap"), "opacity": number(0),
                 "transform": carry_starts[ident], "pointer-events": keyword("none")}) for ident, _row, key, _timeline in DEEPER],
     ])
+    # The title and the carried labels keep their size in the top band's slots.
+    fixed_text(doc, titles)
     white = lambda alpha: colour([1, 1, 1, alpha])
     orange = colour(rgb(ORANGE))
     identity, swept = transform(), transform(640 * U, 0)

@@ -14,8 +14,8 @@ retained menu once the document is built, so the stack follows the player
 from page to page."""
 from __future__ import annotations
 
-from build_retained_screens import (EASE_OUT, OLIVE, ORANGE, Document, absolute, colour, group, keyword, label, linear, number,
-                                    path, rgb, solid, stroke, text_width, track, transform, typeface, vector)
+from build_retained_screens import (EASE_OUT, OLIVE, ORANGE, TEXT_STATE, Document, absolute, colour, fixed_text, group, keyword, label,
+                                    linear, number, path, rgb, solid, stroke, text_width, track, transform, typeface, vector)
 from retained_saves import PLACEHOLDER, table_text
 
 SLOTS = 3
@@ -55,7 +55,9 @@ def with_notices(result: dict) -> dict:
     for key in ("state", "actions", "events"):
         if fragment.get(key):
             merged = result.get(key, {})
-            assert not set(merged) & set(fragment[key]), (result["id"], key)
+            # Only the text size's view source may be declared by both.
+            shared = set(merged) & set(fragment[key])
+            assert all(name == TEXT_STATE and merged[name] == fragment[key][name] for name in shared), (result["id"], key)
             result[key] = {**merged, **fragment[key]}
     result["bindings"] = result.get("bindings", []) + fragment.get("bindings", [])
     result["timelines"] = result.get("timelines", []) + fragment["timelines"]
@@ -133,6 +135,9 @@ def notice_stack(doc: Document, prefix: str, verb: str, symbols: list, action_ke
                              "display": keyword("none"), "opacity": number(1), "transform": transform()},
                      [plate, *marks, text, action])
         doc.bind(f"{ident}.display", ident, "display", {"op": "select", "args": [{"state": f"{key}.shown"}, "block", "none"]})
+        # A header-band plate: its text and action keep their size at any
+        # text size, the text ending in an ellipsis as it does at 100 %.
+        fixed_text(doc, node)
         slots.append(node)
         # notice.enter, notice.leave and the rest a departure leaves; each
         # track holds its start from its first millisecond, since a track runs

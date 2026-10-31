@@ -7,12 +7,12 @@
  "id": "openq4.singleplayer",
  "canvas": {"height": 720, "minWidth": 960},
  "state": {
-  "from_arena": {"type": "boolean", "initial": false},
+  "view.text": {"type": "number", "initial": 1, "view": "text"},
   "language": {"type": "string", "initial": "", "cvar": "sys_lang"},
+  "from_arena": {"type": "boolean", "initial": false},
   "prompt.glyphs": {"type": "number", "initial": 0},
   "prompt.swapped": {"type": "boolean", "initial": false},
   "prompt.accept": {"type": "string", "initial": "#str_231042"},
-  "view.text": {"type": "number", "initial": 1, "view": "text"},
   "notice.0.shown": {"type": "boolean", "initial": false},
   "notice.0.text": {"type": "string", "initial": ""},
   "notice.0.kind": {"type": "number", "initial": 0},
@@ -234,6 +234,612 @@
   "noticeRest2": [{"op": "playTimeline", "timeline": "noticeRest2"}]
  },
  "bindings": [
+  {
+   "id": "text.campaign-label.font-size",
+   "node": "campaign-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.campaign-label.line-height",
+   "node": "campaign-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [36.6, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.arena-label.font-size",
+   "node": "arena-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.arena-label.line-height",
+   "node": "arena-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [36.6, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.back-label.font-size",
+   "node": "back-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.back-label.line-height",
+   "node": "back-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [36.6, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.details.top",
+   "node": "details",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {
+      "op": "min",
+      "args": [
+       285.0,
+       {
+        "op": "-",
+        "args": [
+         630.0,
+         {
+          "op": "*",
+          "args": [
+           {
+            "op": "*",
+            "args": [
+             {
+              "op": "select",
+              "args": [
+               {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+               {
+                "op": "select",
+                "args": [
+                 {"op": "==", "args": [{"state": "language"}, "czech"]},
+                 4,
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "english"]},
+                   4,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "french"]},
+                     4,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "german"]},
+                       4,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "italian"]},
+                         4,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "polish"]},
+                           4,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "russian"]},
+                             4,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                               4,
+                               {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 4, 5]}
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               },
+               {
+                "op": "select",
+                "args": [
+                 {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+                 3,
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "czech"]},
+                   3,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "english"]},
+                     3,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "french"]},
+                       3,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "german"]},
+                         3,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "italian"]},
+                           3,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "polish"]},
+                             3,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "russian"]},
+                               3,
+                               {
+                                "op": "select",
+                                "args": [
+                                 {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                                 3,
+                                 {
+                                  "op": "select",
+                                  "args": [
+                                   {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                                   3,
+                                   {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 3, 4]}
+                                  ]
+                                 }
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             },
+             26
+            ]
+           },
+           {"state": "view.text"}
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     285.0
+    ]
+   }
+  },
+  {
+   "id": "text.details.width",
+   "node": "details",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 336.0, 315.0]}
+  },
+  {
+   "id": "text.details.height",
+   "node": "details",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {
+      "op": "-",
+      "args": [
+       630.0,
+       {
+        "op": "min",
+        "args": [
+         285.0,
+         {
+          "op": "-",
+          "args": [
+           630.0,
+           {
+            "op": "*",
+            "args": [
+             {
+              "op": "*",
+              "args": [
+               {
+                "op": "select",
+                "args": [
+                 {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "czech"]},
+                   4,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "english"]},
+                     4,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "french"]},
+                       4,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "german"]},
+                         4,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "italian"]},
+                           4,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "polish"]},
+                             4,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "russian"]},
+                               4,
+                               {
+                                "op": "select",
+                                "args": [
+                                 {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                                 4,
+                                 {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 4, 5]}
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+                   3,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "czech"]},
+                     3,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "english"]},
+                       3,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "french"]},
+                         3,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "german"]},
+                           3,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "italian"]},
+                             3,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "polish"]},
+                               3,
+                               {
+                                "op": "select",
+                                "args": [
+                                 {"op": "==", "args": [{"state": "language"}, "russian"]},
+                                 3,
+                                 {
+                                  "op": "select",
+                                  "args": [
+                                   {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                                   3,
+                                   {
+                                    "op": "select",
+                                    "args": [
+                                     {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                                     3,
+                                     {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 3, 4]}
+                                    ]
+                                   }
+                                  ]
+                                 }
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               },
+               26
+              ]
+             },
+             {"state": "view.text"}
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     210.0
+    ]
+   }
+  },
+  {
+   "id": "text.description.width",
+   "node": "description",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 336.0, 315.0]}
+  },
+  {
+   "id": "text.description.height",
+   "node": "description",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {
+      "op": "-",
+      "args": [
+       630.0,
+       {
+        "op": "min",
+        "args": [
+         285.0,
+         {
+          "op": "-",
+          "args": [
+           630.0,
+           {
+            "op": "*",
+            "args": [
+             {
+              "op": "*",
+              "args": [
+               {
+                "op": "select",
+                "args": [
+                 {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "czech"]},
+                   4,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "english"]},
+                     4,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "french"]},
+                       4,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "german"]},
+                         4,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "italian"]},
+                           4,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "polish"]},
+                             4,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "russian"]},
+                               4,
+                               {
+                                "op": "select",
+                                "args": [
+                                 {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                                 4,
+                                 {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 4, 5]}
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+                   3,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "czech"]},
+                     3,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "english"]},
+                       3,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "french"]},
+                         3,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "german"]},
+                           3,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "italian"]},
+                             3,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "polish"]},
+                               3,
+                               {
+                                "op": "select",
+                                "args": [
+                                 {"op": "==", "args": [{"state": "language"}, "russian"]},
+                                 3,
+                                 {
+                                  "op": "select",
+                                  "args": [
+                                   {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                                   3,
+                                   {
+                                    "op": "select",
+                                    "args": [
+                                     {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                                     3,
+                                     {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 3, 4]}
+                                    ]
+                                   }
+                                  ]
+                                 }
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               },
+               26
+              ]
+             },
+             {"state": "view.text"}
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     210.0
+    ]
+   }
+  },
+  {
+   "id": "text.title.font-size",
+   "node": "title",
+   "property": "font-size",
+   "value": {"op": "/", "args": [18, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.title.line-height",
+   "node": "title",
+   "property": "line-height",
+   "value": {"op": "/", "args": [27.45, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.subpage-carry.font-size",
+   "node": "subpage-carry",
+   "property": "font-size",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.subpage-carry.line-height",
+   "node": "subpage-carry",
+   "property": "line-height",
+   "value": {"op": "/", "args": [36.6, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.arena-carry.font-size",
+   "node": "arena-carry",
+   "property": "font-size",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.arena-carry.line-height",
+   "node": "arena-carry",
+   "property": "line-height",
+   "value": {"op": "/", "args": [36.6, {"state": "view.text"}]}
+  },
   {
    "id": "prompt-231042-cap.display",
    "node": "prompt-231042-cap",
@@ -628,6 +1234,30 @@
    "value": {"op": "select", "args": [{"state": "notice.0.shown"}, "block", "none"]}
   },
   {
+   "id": "text.notice-0-text.font-size",
+   "node": "notice-0-text",
+   "property": "font-size",
+   "value": {"op": "/", "args": [14.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.notice-0-text.line-height",
+   "node": "notice-0-text",
+   "property": "line-height",
+   "value": {"op": "/", "args": [30.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.notice-0-action-label.font-size",
+   "node": "notice-0-action-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [14.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.notice-0-action-label.line-height",
+   "node": "notice-0-action-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [22.0, {"state": "view.text"}]}
+  },
+  {
    "id": "notice-1-symbol-1.display",
    "node": "notice-1-symbol-1",
    "property": "display",
@@ -659,6 +1289,30 @@
    "value": {"op": "select", "args": [{"state": "notice.1.shown"}, "block", "none"]}
   },
   {
+   "id": "text.notice-1-text.font-size",
+   "node": "notice-1-text",
+   "property": "font-size",
+   "value": {"op": "/", "args": [14.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.notice-1-text.line-height",
+   "node": "notice-1-text",
+   "property": "line-height",
+   "value": {"op": "/", "args": [30.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.notice-1-action-label.font-size",
+   "node": "notice-1-action-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [14.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.notice-1-action-label.line-height",
+   "node": "notice-1-action-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [22.0, {"state": "view.text"}]}
+  },
+  {
    "id": "notice-2-symbol-1.display",
    "node": "notice-2-symbol-1",
    "property": "display",
@@ -688,6 +1342,30 @@
    "node": "notice-2",
    "property": "display",
    "value": {"op": "select", "args": [{"state": "notice.2.shown"}, "block", "none"]}
+  },
+  {
+   "id": "text.notice-2-text.font-size",
+   "node": "notice-2-text",
+   "property": "font-size",
+   "value": {"op": "/", "args": [14.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.notice-2-text.line-height",
+   "node": "notice-2-text",
+   "property": "line-height",
+   "value": {"op": "/", "args": [30.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.notice-2-action-label.font-size",
+   "node": "notice-2-action-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [14.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.notice-2-action-label.line-height",
+   "node": "notice-2-action-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [22.0, {"state": "view.text"}]}
   }
  ],
  "timelines": [

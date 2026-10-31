@@ -374,8 +374,7 @@ def progress(doc: Document) -> list:
     complete["properties"]["display"] = keyword("none")
     doc.bind("arena-complete.display", "arena-complete", "display", shown({"state": "arena_campaignComplete"}))
     doc.session("reset", "arenaReset")
-    reset = link(doc, "arena_reset", "#str_42011", action="reset")
-    next(child for child in reset["children"] if child["id"] == "arena_reset-label")["properties"]["font-size"] = length(RESET_TEXT)
+    reset = link(doc, "arena_reset", "#str_42011", action="reset", size=RESET_TEXT)
     doc.bind("arena_reset.enabled", "arena_reset", "enabled",
              {"op": "&&", "args": [{"state": "arena_canReset"}, OPEN]})
     reset_row = group("arena-reset-row", {**absolute(left=U * left, top=U * (PROGRESS_TOP + 40), width=U * width, height=U * 17)}, [reset])
