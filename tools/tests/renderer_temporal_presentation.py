@@ -186,13 +186,15 @@ def main() -> int:
         raise AssertionError("Vulkan dynamic timing must not use WAIT_BIT")
 
     render_system = read(RENDERER / "RenderSystem.cpp")
-    begin_frame = function_body(render_system, "idRenderSystemLocal::BeginFrame(")
+    legacy_crop = function_body(
+        render_system, "bool idRenderSystemLocal::PushSceneResolutionScale("
+    )
     for token in (
-        "!R_TemporalPresentation_DynamicResolutionRequested()",
-        "!R_TemporalPresentation_TemporalAARequested()",
-        "screenFraction < 100 && r_resolutionScaleMode.GetInteger() == 0",
+        "R_TemporalPresentation_DynamicResolutionRequested()",
+        "R_TemporalPresentation_TemporalAARequested()",
+        "const bool legacyCrop = r_resolutionScaleMode.GetInteger() == 0;",
     ):
-        require(begin_frame, token, "legacy-crop temporal bypass")
+        require(legacy_crop, token, "legacy-crop temporal bypass")
     enqueue = function_body(
         render_system, "bool idRenderSystemLocal::ResolveTemporalPresentation("
     )

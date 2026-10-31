@@ -1506,29 +1506,17 @@ void idRenderSystemLocal::BeginFrame( int windowWidth, int windowHeight ) {
 	renderCrops[0].height = windowHeight;
 	currentRenderCrop = 0;
 
-	// screenFraction mode 0 keeps the legacy cropped-viewport behavior used for
-	// quick fill-rate testing below native resolution. Supersampling above native
-	// is handled by the main-scene render target path so the back buffer stays at
-	// the display size.
-	//
-	// Modes 1 and 2 on ES are NOT applied here. A crop pushed in BeginFrame is the
-	// whole frame's coordinate system -- menu, HUD and scene alike -- so scaling it
-	// costs the UI its native resolution, which is the one part of a phone frame
-	// that cannot afford to be soft. PushSceneResolutionScale wraps the world
-	// render instead; see idRenderWorldLocal::RenderScene.
+	// No resolution-scale crop is pushed here, in any r_resolutionScaleMode. A
+	// crop pushed in BeginFrame is the whole frame's coordinate system -- menu,
+	// HUD and scene alike -- so it costs the UI its native resolution; the legacy
+	// mode 0 crop drew the menu into the bottom-left corner this way (#169).
+	// PushSceneResolutionScale wraps the world render instead; see
+	// idRenderWorldLocal::RenderScene. Supersampling above native is handled by
+	// the main-scene render target path so the back buffer stays at the display
+	// size.
 	resolutionScaleCropActive = false;
 	resolutionScaleWidth = 0;
 	resolutionScaleHeight = 0;
-	const int screenFraction = idMath::ClampInt( 10, 200, r_screenFraction.GetInteger() );
-	if ( !vrPresenting
-			&& !R_TemporalPresentation_DynamicResolutionRequested()
-			&& !R_TemporalPresentation_TemporalAARequested()
-			&& !R_TemporalPresentation_ScreenSpaceEffectsRequested()
-			&& screenFraction < 100 && r_resolutionScaleMode.GetInteger() == 0 ) {
-		int	w = SCREEN_WIDTH * screenFraction / 100.0f;
-		int h = SCREEN_HEIGHT * screenFraction / 100.0f;
-		CropRenderSize( w, h );
-	}
 
 
 	// this is the ONLY place this is modified
@@ -1735,13 +1723,17 @@ menus at native resolution. A crop pushed in BeginFrame reaches
 idGuiModel::EmitFullScreen too, and every fullscreen 2D draw in the frame lands
 inside it.
 
+Mode 0, the legacy crop for fill-rate testing, is pushed here on every profile
+and nothing resolves it: a world drawn straight to the back buffer stays in its
+bottom-left corner, as it always has, while the 2D drawn after it keeps the
+whole display. Modes 1 to 3 crop here only on ES; desktop GL and Vulkan scale
+the scene through their own scene targets instead.
+
 Returns whether a crop was pushed; the caller must pop exactly when it did.
 ================
 */
-bool idRenderSystemLocal::PushSceneResolutionScale( void ) {
+bool idRenderSystemLocal::PushSceneResolutionScale( const renderView_t &renderView ) {
 	resolutionScaleCropActive = false;
-	resolutionScaleWidth = 0;
-	resolutionScaleHeight = 0;
 
 	if ( !glConfig.isInitialized ) {
 		return false;
@@ -1752,23 +1744,31 @@ bool idRenderSystemLocal::PushSceneResolutionScale( void ) {
 		return false;
 	}
 
-	// Mode 0 is the legacy whole-frame crop, still pushed in BeginFrame, and it
-	// deliberately has no upscale. Modes 1 and 2 are implemented in
-	// draw_common.cpp for the desktop path; this is the ES half of them.
-	if ( r_resolutionScaleMode.GetInteger() == 0 ) {
-		return false;
-	}
-	if ( glConfig.backendCaps.profile != RENDERER_CONTEXT_PROFILE_ES ) {
-		return false;
-	}
+	const bool legacyCrop = r_resolutionScaleMode.GetInteger() == 0;
+	if ( legacyCrop ) {
+		// VR and the temporal paths own the scene extent themselves, and the
+		// automatic temporal AA already stands down for mode 0.
+		if ( vrFrame.active
+				|| R_TemporalPresentation_DynamicResolutionRequested()
+				|| R_TemporalPresentation_TemporalAARequested()
+				|| R_TemporalPresentation_ScreenSpaceEffectsRequested() ) {
+			return false;
+		}
+	} else {
+		// Modes 1 to 3 are implemented in draw_common.cpp and the Vulkan
+		// executor for the desktop paths; this is the ES half of them.
+		if ( glConfig.backendCaps.profile != RENDERER_CONTEXT_PROFILE_ES ) {
+			return false;
+		}
 
-	// the back end has told us it cannot resolve the crop on this context
-	if ( resolutionScaleSuppressed ) {
-		return false;
+		// the back end has told us it cannot resolve the crop on this context
+		if ( resolutionScaleSuppressed ) {
+			return false;
+		}
 	}
 
 	// Something else already owns the frame's coordinate system -- a levelshot,
-	// or the legacy mode 0 crop. Do not layer a second one under it.
+	// or a game render-to-texture capture. Do not layer a second one under it.
 	if ( currentRenderCrop != 0 ) {
 		return false;
 	}
@@ -1780,6 +1780,25 @@ bool idRenderSystemLocal::PushSceneResolutionScale( void ) {
 	// the display shows.
 	if ( tiledViewport[0] > glConfig.vidWidth || tiledViewport[1] > glConfig.vidHeight ) {
 		return false;
+	}
+
+	// Only a view that fills the display is the scene. A GUI renderDef draws a
+	// model into one rectangle of a menu that is itself at native resolution;
+	// cropping it would move the model away from its frame, and on ES the
+	// resolve would then stretch the display's corner over the whole menu.
+	idScreenRect fullViewport;
+	RenderViewToViewport( &renderView, &fullViewport );
+	if ( fullViewport.x1 > 0 || fullViewport.y1 > 0
+			|| fullViewport.x2 < renderCrops[0].width - 1
+			|| fullViewport.y2 < renderCrops[0].height - 1 ) {
+		return false;
+	}
+
+	if ( legacyCrop ) {
+		CropRenderSize( SCREEN_WIDTH * screenFraction / 100.0f, SCREEN_HEIGHT * screenFraction / 100.0f );
+		// resolutionScaleWidth stays 0: there is nothing for a back end to resolve
+		resolutionScaleCropActive = true;
+		return true;
 	}
 
 	// The scene may be rendering into an offscreen target rather than the back

@@ -477,7 +477,7 @@ Changes take effect immediately without reconnecting.
 | Setting | Default | What it does |
 |---|---:|---|
 | `r_screenFraction` | `100` | Main-scene resolution scale percentage (`10..200`). Values below `100` reduce scene resolution for performance; values above `100` supersample the scene before resolving it back to the native back buffer. |
-| `r_resolutionScaleMode` | `1` | How a scene below `100%` is stretched to your screen: `1` smooth (bilinear), `2` sharpened, `3` nearest-neighbour, a crisp pixelated look, or `0` the legacy cropped viewport for fill-rate testing. The HUD and menus stay at native resolution in every mode. |
+| `r_resolutionScaleMode` | `1` | How a scene below `100%` is stretched to your screen: `1` smooth (bilinear), `2` sharpened, `3` nearest-neighbour, a crisp pixelated look, or `0` the legacy cropped viewport for fill-rate testing, which draws the world in the bottom-left corner without stretching it in multiplayer (the campaign stretches its scene to fill the screen). The HUD and menus stay at native resolution in every mode. |
 | `r_resolutionScaleSharpness` | `0.4` | Sharpening strength for mode `2` (`0..1.5`). |
 
 The Display menu exposes curated presets: `10%`, `25%`, `50%`, `75%`, `85%`, `100%`, `125%`, `150%`, and `200%`.

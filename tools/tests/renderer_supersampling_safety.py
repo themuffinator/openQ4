@@ -23,14 +23,27 @@ def test_cvar_and_menu_expose_safe_supersampling_range():
 
 def test_legacy_crop_does_not_run_above_native():
     render_system = read_repo_file(Path("src") / "renderer" / "RenderSystem.cpp")
+    push = render_system[render_system.index("bool idRenderSystemLocal::PushSceneResolutionScale( const renderView_t &renderView ) {"):]
+    push = push[: push.index("\n}\n")]
 
-    # Upstream guards this branch with the temporal-presentation checks too, so
-    # match the two conditions that carry the meaning rather than the whole line.
+    # The legacy mode 0 crop wraps the world render only, after the native and
+    # temporal-presentation checks, so it never runs at or above native.
     assert_true(
-        "&& screenFraction < 100 && r_resolutionScaleMode.GetInteger() == 0 ) {" in render_system,
+        push.index("if ( screenFraction >= 100 ) {") < push.index("const bool legacyCrop = r_resolutionScaleMode.GetInteger() == 0;"),
         "legacy crop mode should only run below native resolution",
     )
+    for token in (
+        "R_TemporalPresentation_DynamicResolutionRequested()",
+        "R_TemporalPresentation_TemporalAARequested()",
+        "R_TemporalPresentation_ScreenSpaceEffectsRequested()",
+        "vrFrame.active",
+    ):
+        assert_true(token in push, f"legacy crop should stand down for {token}")
     assert_true("Supersampling above native" in render_system, "BeginFrame should document that supersampling is handled offscreen")
+    # Issue #169: a crop pushed in BeginFrame drew the menu into the corner.
+    begin_frame = render_system[render_system.index("void idRenderSystemLocal::BeginFrame("):]
+    begin_frame = begin_frame[: begin_frame.index("\n}\n")]
+    assert_true("CropRenderSize(" not in begin_frame, "BeginFrame must not crop the whole frame, menu included")
 
 
 def test_es_resolution_scale_is_scoped_to_the_scene():
@@ -43,13 +56,26 @@ def test_es_resolution_scale_is_scoped_to_the_scene():
     # too. Scoping the crop to RenderScene is what keeps 2D at native
     # resolution, and it is the whole point of the feature.
     assert_true(
-        "tr.PushSceneResolutionScale()" in render_world and "tr.PopSceneResolutionScale()" in render_world,
+        "tr.PushSceneResolutionScale( parms->renderView )" in render_world and "tr.PopSceneResolutionScale()" in render_world,
         "the ES resolution scale should wrap the world render, not the frame",
     )
     assert_true(
         "glConfig.backendCaps.profile != RENDERER_CONTEXT_PROFILE_ES" in render_system
         and "r_resolutionScaleMode.GetInteger() == 0" in render_system,
-        "the scene crop should be limited to ES and to the non-legacy scale modes",
+        "the resolved scene crop should be limited to ES; mode 0 crops without a resolve",
+    )
+    # A GUI renderDef draws a model into part of a native-resolution menu. It
+    # must neither be cropped nor trigger the ES resolve, which would stretch
+    # the display's corner over the whole menu.
+    assert_true(
+        "RenderViewToViewport( &renderView, &fullViewport );" in render_system
+        and "fullViewport.x2 < renderCrops[0].width - 1" in render_system,
+        "only a view that fills the display should be cropped",
+    )
+    assert_true(
+        "parms->sceneResolutionScaled = sceneResolutionScaled;" in render_world
+        and "!backEnd.viewDef->sceneResolutionScaled" in gles_backend,
+        "the ES resolve should lift out only views that were rendered into the crop",
     )
     assert_true(
         "resolutionScaleWidth = renderCrops[currentRenderCrop].width" in render_system,

@@ -289,6 +289,13 @@ void RB_GLES_ResolveSceneResolutionScale( void ) {
 		return;
 	}
 
+	// A view the front end left uncropped -- a GUI renderDef drawing a model
+	// into part of a menu -- has nothing in the corner to lift out. Resolving
+	// after it would stretch whatever the corner holds over the whole display.
+	if ( !backEnd.viewDef->sceneResolutionScaled ) {
+		return;
+	}
+
 	// A portal sky is NOT a subview. The game emits it as its own top-level
 	// RenderScene, with its own crop, into the same target immediately before the
 	// view it backs -- so it arrives here looking exactly like a main view.

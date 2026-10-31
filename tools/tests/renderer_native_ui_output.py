@@ -307,8 +307,12 @@ def main() -> None:
     view = method(draw, "void\tRB_STD_DrawView( void )")
     if not (view.index("RB_BeginDrawingView();") < view.index("RB_RestoreSceneScaling( sceneScaleState );") < view.index("RB_PresentSceneRenderTargetToBackBuffer( sceneScaleState );")):
         raise AssertionError("world resolve must remain after drawing and native-coordinate restoration")
-    crop = method(render, "void idRenderSystemLocal::BeginFrame(")
-    for required in ("screenFraction < 100 && r_resolutionScaleMode.GetInteger() == 0", "CropRenderSize( w, h );"):
+    # The legacy mode 0 crop wraps only the world render (#169). A crop pushed in
+    # BeginFrame is the whole frame's coordinate system and puts the menu in it.
+    if "CropRenderSize(" in method(render, "void idRenderSystemLocal::BeginFrame("):
+        raise AssertionError("BeginFrame must not crop the whole frame, menu included")
+    crop = method(render, "bool idRenderSystemLocal::PushSceneResolutionScale( const renderView_t &renderView )")
+    for required in ("const bool legacyCrop = r_resolutionScaleMode.GetInteger() == 0;", "if ( legacyCrop ) {\n\t\tCropRenderSize("):
         if required not in crop:
             raise AssertionError("explicit legacy mode0 crop was changed")
     method(gles, "void RB_ApplyResolutionScaleToBackBuffer( void )")

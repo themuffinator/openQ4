@@ -6,6 +6,21 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Menus at a reduced resolution scale, 31 October 2026
+
+- Menus and the HUD stay sharp and full-screen when **Resolution Scale** is
+  below 100% with the legacy `r_resolutionScaleMode 0` (#169). That mode used
+  to shrink the whole frame into the bottom-left corner, menu included; now
+  only the 3D world is cropped. Multiplayer keeps the world-in-corner view for
+  fill-rate testing, and the campaign stretches its scene to fill the screen.
+  The default mode 1 was already unaffected.
+- On Windows x64 at 25%, OpenGL and Vulkan, the retained and stock title menus
+  (also after `vid_restart`), the campaign pause menu and the campaign and
+  multiplayer HUDs match their 100% captures. A model drawn inside a menu is no
+  longer treated as the world view, which on OpenGL ES could have stretched
+  the corner of the screen over the whole menu; that ES change was not tested
+  on a device.
+
 ## Community report and package triage, 31 October 2026
 
 - Development test packages can save again (#205). Push payloads had come from

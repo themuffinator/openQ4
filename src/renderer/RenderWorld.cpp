@@ -996,13 +996,15 @@ void idRenderWorldLocal::RenderScene( const renderView_t *renderView, int render
 		parms->renderView.forceUpdate = true;
 	}
 
-	// r_screenFraction below native on ES: render the world into a smaller rect
-	// and let the back end blit it back out to the view's native extents before
-	// any 2D is drawn, so the HUD and menus keep their own resolution. Everything
-	// derived from the viewport below -- this view's scissor, and the viewports of
-	// any mirror or portal subviews R_RenderView spawns from it -- picks the
-	// smaller space up from the crop automatically.
-	const bool sceneResolutionScaled = !independent && tr.PushSceneResolutionScale();
+	// r_screenFraction below native on ES, or the legacy mode 0 crop anywhere:
+	// render the world into a smaller rect before any 2D is drawn, so the HUD and
+	// menus keep their own resolution. On ES the back end blits it back out to the
+	// view's native extents. Everything derived from the viewport below -- this
+	// view's scissor, and the viewports of any mirror or portal subviews
+	// R_RenderView spawns from it -- picks the smaller space up from the crop
+	// automatically.
+	const bool sceneResolutionScaled = !independent && tr.PushSceneResolutionScale( parms->renderView );
+	parms->sceneResolutionScaled = sceneResolutionScaled;
 
 	// set up viewport, adjusted for resolution and OpenGL style 0 at the bottom
 	tr.RenderViewToViewport( &parms->renderView, &parms->viewport );

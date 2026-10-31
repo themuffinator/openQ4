@@ -393,6 +393,10 @@ typedef struct viewDef_s {
 
 	bool				isEditor;
 
+	// rendered into idRenderSystemLocal::PushSceneResolutionScale's crop; the
+	// ES resolve lifts only these views back out to the full display
+	bool				sceneResolutionScaled;
+
 	bool				skipDrawSurfAreaResolve;
 	// drawSurf->area is only consumed by the light-grid indirect pass and
 	// scene-packet capture; when neither can use it this view, R_AddDrawSurf
@@ -1035,18 +1039,18 @@ public:
 	renderCrop_t			renderCrops[MAX_RENDER_CROPS];
 	int						currentRenderCrop;
 
-	// r_screenFraction below native, on a back end that can upscale the finished
-	// frame. BeginFrame pushes a crop the whole frame renders into, and the back
-	// end blits that corner out to the full back buffer before the swap.
-	// Zero means no scaling crop is live this frame.
+	// r_screenFraction below native, scoped to the world render: RenderScene
+	// pushes a crop around a full-display view and pops it before any 2D. On ES
+	// the back end blits that corner back out to the view's extents; the legacy
+	// mode 0 crop is never resolved. resolutionScaleWidth/Height are the crop an
+	// ES back end resolves this frame, zero when there is none.
 	bool					resolutionScaleCropActive;
 	int						resolutionScaleWidth;
 	int						resolutionScaleHeight;
-	// latched once the game routes a frame through an offscreen scene target,
-	// where a whole-frame crop cannot be resolved back to full screen
+	// set once the ES back end finds it cannot resolve the crop on this context
 	bool					resolutionScaleSuppressed;
 
-	bool					PushSceneResolutionScale( void );
+	bool					PushSceneResolutionScale( const renderView_t &renderView );
 	void					PopSceneResolutionScale( void );
 
 	// GUI drawing variables for surface creation
