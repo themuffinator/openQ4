@@ -17,6 +17,10 @@ See [player release status](../user/release-status.md).
   longer warns about unknown `recharge` and `teleport` scripts. Those are the
   Makron's own scripts, which it reads itself; retail Quake 4 printed the
   same false warning on every Makron spawn.
+- Developer logs for `game/core1` and `game/process2` no longer report
+  `idDict::FindKey: empty key`. An inventory item without a loading-screen
+  icon was looked up under an empty name; the loading screen still shows each
+  icon and item name once, as before.
 - String literals are no longer converted to writable `char *` anywhere in
   the C++ sources. That removes about 1,400 `-Wwrite-strings` warnings from
   Linux and macOS builds, and every source now compiles under MSVC's strict

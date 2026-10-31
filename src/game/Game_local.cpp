@@ -6893,6 +6893,7 @@ void idGameLocal::SpawnMapEntities( int instance, unsigned short* entityNumIn, u
 	int			numEntities;
 	idDict		args;
 	idDict		items;
+	bool		itemWithoutIconSeen = false;
 	const bool profileMapSpawn = cvarSystem->GetCVarBool( "com_showLevelLoadTimes" );
 	idTimer mapSpawnTimer;
 	idTimer mapCopyTimer;
@@ -7021,10 +7022,19 @@ void idGameLocal::SpawnMapEntities( int instance, unsigned short* entityNumIn, u
 		if ( !inhibitSpawn ) {
 
 			if( args.GetBool( "inv_item" ) ) {
-				if( !items.GetBool( args.GetString( "inv_icon" ) ) ) {
-					networkSystem->AddLoadingIcon( args.GetString( "inv_icon" ) );
+				// openQ4: an item with no inv_icon was looked up and stored under an
+				// empty key, a developer warning on core1 and process2. Track it
+				// apart, keeping retail's once-per-icon loading text.
+				const char *invIcon = args.GetString( "inv_icon" );
+				const bool iconSeen = invIcon[ 0 ] ? items.GetBool( invIcon ) : itemWithoutIconSeen;
+				if( !iconSeen ) {
+					networkSystem->AddLoadingIcon( invIcon );
 					networkSystem->SetLoadingText( common->GetLocalizedString( args.GetString( "inv_name" ) ) );
-					items.SetBool( args.GetString( "inv_icon" ), true );
+					if ( invIcon[ 0 ] ) {
+						items.SetBool( invIcon, true );
+					} else {
+						itemWithoutIconSeen = true;
+					}
 				}
 			}
 
