@@ -1,179 +1,276 @@
-"""The settings pages' construction (docs/dev/ui-visual-design.md section 7;
-UI-01), taken from the SYSTEM document itself
-(guis/menu/settings/system.q4ui): its panel, header and rail, scrolling body
-and footer, a section column and heading, and a slider, a toggle and a choice
-row as templates, each cloned under a page's own ids with its state
-timelines. The AUDIO and GAME pages are built from these, so a change to
-those SYSTEM parts regenerates them."""
+"""The settings pages' construction (docs/dev/ui-visual-design.md sections 7,
+9 and 13.7; UI-01): CONTROLS, GAME OPTIONS and AUDIO are sub-pages of the
+SETTINGS page in the main menu's frame, built as Create Server is
+(retained_subpage): the top band one notch on, SETTINGS as the crumb and the
+page's title at the step's foot, over a backing that darkens the content.
+
+A page's sections are tabs (section 13.7) in the Escape card's strip (section
+14.18) across the content's top, which Q and E, the shoulder buttons, the
+strip's keycaps or a click switch; a page short enough for one screen has no
+strip, only Create Server's header band with its columns' headings. Under it
+each tab holds at most two columns of section 7 setting rows on the stock
+24 u pitch (retained_mp_menus.value_row), every row's value in one value
+column, its label taking two lines where a language needs them. Up and Down
+read the rows down the first column and on down the second, then wrap; Up
+from the first row reaches the tab, and Left and Right cross between the
+columns where the row has no value to change. The prompt bar holds Select and
+Back, Back the page's button."""
 from __future__ import annotations
 
-import copy
-import json
-import re
+from build_retained_screens import (CANVAS_W, FULL, ORANGE, OLIVE, U, VALUE, Document, absolute, group, keyword, label, length,
+                                    linear, number, page_prompts, path, rgb, solid, stroke, text_width, track, typeface, vector)
+from retained_create_server import header_band
+from retained_mp_menus import (KEYCAP_GAP, KEYCAP_W, PLACEHOLDER, STRIP_EDGE, TAB_FLARE, TAB_PAD, TAB_RISE, TAB_SHOULDER, TAB_SIZE,
+                               any_text, label_column, row_face, row_states, tab_strip, value_row, wrapped_width)
+from retained_subpage import subpage_document
 
-from build_retained_screens import PAK0, Document
-
-SYSTEM = PAK0 / "guis" / "menu" / "settings" / "system.q4ui"
-OPTION_H = 36.0                            # dp: a choice's option row, as the SYSTEM page sets them
-
-
-def system_document() -> dict:
-    text = SYSTEM.read_text(encoding="utf-8")
-    return json.loads(re.sub(r"^\s*//.*$", "", text, flags=re.M))
-
-
-def find(node: dict, wanted: str) -> dict:
-    if node.get("id") == wanted:
-        return node
-    for child in node.get("children", []):
-        found = find(child, wanted)
-        if found is not None:
-            return found
-    return None
-
-
-def renamed(value, old: str, new: str):
-    """A deep copy of `value` with every id, part and timeline name that
-    starts with `old` starting with `new` instead."""
-    text = json.dumps(value)
-    text = text.replace(f'"{old}', f'"{new}')
-    return json.loads(text)
+CRUMB = "#str_200009"                     # SETTINGS, the parent page's title
+CONTENT_LEFT, CONTENT_W = 44.0, 587.0     # u: Create Server's header band
+STRIP_TOP = 46.0                          # u: the tab strip's top, or the header band's, clear of the stepped band
+HEAD_TOP, HEAD_H = STRIP_TOP + 24, 16.0   # u: the heading line under the strip
+BAND_HEAD_TOP = STRIP_TOP + 16            # u: a heading in the header band, as Create Server's
+ROWS_TOP, ROW_PITCH = STRIP_TOP + 41, 24.0   # u: the rows, on the stock settings pitch
+COLUMN_GAP = 13.0                         # u
+COLUMN_W = (CONTENT_W - COLUMN_GAP) / 2   # u: two columns at most
+COLUMN_SLOTS = 14                         # rows and inline headings a column holds above the bottom band
+VALUE_MIN = 150.0                         # dp: the value column never starts nearer the row's start
+BACKING_ALPHA = 0.6                       # the stock page backing's
+BACKING_STOPS = ((4.0, 0.0), (40.0, 1.0), (636.0, 1.0), (660.0, 0.0))   # u on the canvas
+TAB_STATE, LEAVING_STATE = "page.tab", "page.leaving"   # "settings." states belong to the settings service
+TAB_FADE_MS = 150                         # the Escape card's page cross-fade
+HEADING_FACE = ("lowpixel", 14, [1, 1, 1, 0.4])   # Create Server's headings
 
 
-class Templates:
-    """The SYSTEM document's parts the settings pages are built from."""
-
-    def __init__(self) -> None:
-        self.system = system_document()
-        self.timelines = {timeline["id"]: timeline for timeline in self.system["timelines"]}
-
-    def node(self, ident: str) -> dict:
-        found = find(self.system["root"], ident)
-        if found is None:
-            raise SystemExit(f"the SYSTEM page no longer has {ident}, which the settings pages are built from")
-        return copy.deepcopy(found)
-
-    def states(self, doc: Document, control: str, old: str, new: str) -> dict:
-        """The control's state timelines, cloned under the new ids."""
-        ids = {}
-        for state in ("default", "hover", "focus", "pressed", "disabled"):
-            timeline = self.timelines.get(f"{control}.{state}")
-            if timeline is None:
-                raise SystemExit(f"the SYSTEM page's {control} has no {state} timeline")
-            clone = renamed(timeline, old, new)
-            doc.timelines.items.append(clone)
-            ids[state] = clone["id"]
-        return ids
+def heading(key: str) -> tuple:
+    """A section heading among a column's rows."""
+    return ("heading", key)
 
 
-def text_node(node: dict, key) -> None:
-    node["properties"]["text"] = {"type": "text", "value": key} if isinstance(key, str) else key
+def value_column(labels) -> float:
+    """The value column (dp from the row's start) that leaves every label,
+    in every language, two lines before it."""
+    return max(VALUE_MIN, label_column(labels))
 
 
-def slider_row(doc: Document, tpl: Templates, prefix: str, ident: str, label_key: str, action: str, state: str, bounds: tuple,
-               decimals: int = 0, max_bytes: int = 3, integer: bool | None = None) -> dict:
-    """The SYSTEM page's brightness row: the label over a slider and its
-    number field, both of which request `action` with the new value.
-    `integer` marks a number field that takes whole numbers only."""
-    minimum, maximum, step = bounds
-    row = renamed(renamed(tpl.node("settings_brightness_row"), "settings_brightness", ident), "settings-", f"{prefix}-")
-    text_node(find(row, f"{ident}-label"), label_key)
-    slider = find(row, ident)
-    slider["control"].update({"label": label_key, "action": action, "value": {"state": state}, "minimum": minimum,
-                              "maximum": maximum, "step": step, "decimals": decimals,
-                              "states": tpl.states(doc, "settings_brightness", "settings_brightness", ident)})
-    number = find(row, f"{ident}_number")
-    number["control"].update({"label": label_key, "action": action, "value": {"state": state}, "minimum": minimum,
-                              "maximum": maximum, "exponent": False, "maxBytes": max_bytes,
-                              "states": tpl.states(doc, "settings_brightness_number", "settings_brightness", ident)})
-    if integer is not None:
-        number["control"]["integer"] = integer
-    return row
+def setting_row(doc: Document, ident: str, label_key: str, kind: str, value_x: float, **more) -> dict:
+    """A section 7 setting row of the column's width on the stock pitch, its
+    list unfolding within the screen. Every settings label takes the 14 dp
+    face that wraps to a second line, so a page's labels share one size
+    whichever of them a language needs two lines for."""
+    return value_row(doc, ident, label_key, kind, U * COLUMN_W, value_x, row_h=U * ROW_PITCH, placement="screen", wrap=True, **more)
 
 
-def toggle_row(doc: Document, tpl: Templates, prefix: str, ident: str, label_key: str, action: str, state: str) -> dict:
-    """The SYSTEM page's shadows row: the label and its check box."""
-    row = renamed(renamed(tpl.node("settings_shadows"), "settings_shadows", ident), "settings-", f"{prefix}-")
-    text_node(find(row, f"{ident}-label"), label_key)
-    row["control"].update({"label": label_key, "action": action, "value": {"state": state},
-                           "states": tpl.states(doc, "settings_shadows", "settings_shadows", ident)})
-    return row
+def row_chrome(ident: str, row_h: float) -> list:
+    """A setting row's plate, its hover and focus wash and its focus rail, as
+    value_row draws them, for a row that builds its own content."""
+    shape = [(6, 1), ({"fraction": 1}, 1), ({"fraction": 1}, {"fraction": 1, "dp": -1}), (0, {"fraction": 1, "dp": -1}), (0, 7)]
+    return [
+        vector(f"{ident}-plate", FULL, [path("plate", shape, fill=solid(rgb(OLIVE, 0.12)), stroke=stroke(solid(rgb(OLIVE, 0.32)), 1))]),
+        vector(f"{ident}-wash", {**FULL, "opacity": number(0)}, [
+            path("wash", shape, fill=linear((0, 0), ({"fraction": 1}, 0), [(0, rgb(OLIVE, 0.45)), (1, rgb(OLIVE, 0.1))]))]),
+        vector(f"{ident}-focus", {**absolute(left=0, top=0, width=4, height=row_h), "opacity": number(0)}, [
+            path("rail", [(0, 7), (6, 1), (6, row_h - 1), (0, row_h - 1)], fill=solid(rgb(ORANGE)))]),
+    ]
 
 
-def choice_row(doc: Document, tpl: Templates, prefix: str, ident: str, label_key: str, action: str, state: str, options: list,
-               count: dict | None = None) -> dict:
-    """The SYSTEM page's display row: the label, the chosen value in orange
-    and its chevron, and the list it unfolds. `options` are (label, value,
-    label index or None, enabled or None)."""
-    row = renamed(renamed(tpl.node("settings_display_device"), "settings_display_device", ident), "settings-", f"{prefix}-")
-    text_node(find(row, f"{ident}-label"), label_key)
-    content = find(row, f"{ident}-content")
-    template = copy.deepcopy(content["children"][0])
-    old_option = template["id"]
-    content["children"] = []
-    specs = []
-    for index, (option_label, value, label_index, enabled) in enumerate(options):
-        node_id = f"{ident}-option-{index}"
-        node = renamed(template, old_option, node_id)
-        # A row the session fills keeps the template's text; its option's
-        # label names what it shows, as the SYSTEM page's display list does.
-        option_text = find(node, f"{node_id}-label")
-        if option_text is not None and isinstance(option_label, str):
-            text_node(option_text, option_label)
-        content["children"].append(node)
-        spec = {"id": node_id, "node": node_id, "label": option_label, "value": value,
-                "parts": {"label": f"{node_id}-label", "selected": f"{node_id}-selected", "highlight": f"{node_id}-highlight"}}
-        if label_index is not None:
-            spec["labelIndex"] = label_index
-        if enabled is not None:
-            spec["enabled"] = enabled
-        specs.append(spec)
-    visible = min(8, len(options))
-    for part in (f"{ident}-popup", f"{ident}-viewport"):
-        find(row, part)["properties"]["height"] = {"type": "length", "value": OPTION_H * visible, "unit": "dp"}
-    row["control"].update({"label": label_key, "action": action, "value": {"state": state}, "visibleRows": visible, "options": specs,
-                           "states": tpl.states(doc, "settings_display_device", "settings_display_device", ident)})
-    # A list the session fills says how many of its rows hold an option.
-    row["control"].pop("optionCount", None)
-    if count is not None:
-        row["control"]["optionCount"] = count
-    return row
+def button_row(doc: Document, ident: str, label_key: str, value_x: float, value: dict, control: dict) -> dict:
+    """A row that is one button: its label as a setting row's and, in the
+    value column, the text `value` binds in a list's value face. `control`
+    names what it runs."""
+    row_h = U * ROW_PITCH
+    caption = label(f"{ident}-label", label_key, {"position": keyword("relative"), "display": keyword("block"), "flex-shrink": number(1),
+                    "min-width": length(0), **row_face(True, row_h), "overflow": keyword("hidden")})
+    head = group(f"{ident}-head", {**absolute(left=21, top=0, width=value_x - 29, height=row_h), "display": keyword("flex"),
+                                   "flex-direction": keyword("row"), "align-items": keyword("center")}, [caption])
+    shown = label(f"{ident}-value", PLACEHOLDER, {**absolute(left=value_x, top=0, width=U * COLUMN_W - value_x - 12, height=row_h),
+                  **typeface("lowpixel", 14, row_h, rgb(VALUE)), "white-space": keyword("nowrap"), "overflow": keyword("hidden")})
+    doc.bind(f"{ident}-value.text", f"{ident}-value", "text", value)
+    return group(ident, {"position": keyword("relative"), "display": keyword("block"), "width": length(U * COLUMN_W),
+                         "height": length(row_h), "opacity": number(1), "flex-shrink": number(0)},
+                 [*row_chrome(ident, row_h), head, shown],
+                 control={"role": "button", "label": label_key, **control, "states": row_states(doc, ident)})
 
 
-def section_column(tpl: Templates, prefix: str, section: str, heading_key: str, children: list) -> dict:
-    """A section: the SYSTEM page's column with its heading over the rows."""
-    column = renamed(tpl.node("image-column"), "image-column", f"{prefix}-{section}-column")
-    heading = renamed(tpl.node("image-heading"), "image-heading", f"{prefix}-{section}-heading")
-    text_node(heading, heading_key)
-    column["children"] = [heading, *children]
-    return column
+def check_settings_text(tabs: list, note: str | None) -> None:
+    """Every shipped language's text fits: the tabs in the strip between its
+    keycaps, each heading in its column, the note on the heading line, and
+    each label in two lines in its row's label box (before its value
+    column)."""
+    over = {}
+    if len(tabs) > 1:
+        room = U * CONTENT_W - 2 * (STRIP_EDGE + KEYCAP_W + KEYCAP_GAP)
+        totals = {}
+        for _ident, key, _columns in tabs:
+            for language, text in any_text(key).items():
+                totals[language] = totals.get(language, 0) + text_width("marine", text, TAB_SIZE) + TAB_FLARE + 2 * TAB_PAD + TAB_SHOULDER
+        over.update({("tabs", language): round(total) for language, total in totals.items() if total > room})
+    face, size, _tint = HEADING_FACE
+    for _ident, _key, columns in tabs:
+        for column in columns:
+            for item in column:
+                if isinstance(item, tuple):
+                    for language, text in any_text(item[1]).items():
+                        if text_width(face, text, size) > U * COLUMN_W - 8:
+                            over[(item[1], language)] = round(text_width(face, text, size))
+                elif item.get("control", {}).get("label"):
+                    key = item["control"]["label"]
+                    head = next(child for child in item["children"] if child["id"] == f"{item['id']}-head")
+                    for language, text in any_text(key).items():
+                        if wrapped_width(text) > head["properties"]["width"]["value"]:
+                            over[(key, language)] = round(wrapped_width(text))
+    if note is not None:
+        for language, text in any_text(note).items():
+            if text_width(face, text, size) > U * CONTENT_W:
+                over[(note, language)] = round(text_width(face, text, size))
+    if over:
+        raise SystemExit(f"settings page text past its room: {over}")
 
 
-def settings_page(doc: Document, tpl: Templates, prefix: str, title_key: str, columns: list, first: str,
-                  activate: list | None = None) -> dict:
-    """The frame: the SYSTEM page's panel, header and rail, scrolling body
-    and footer, with BACK alone in the footer. The page opens on `first`, or
-    runs `activate`; BACK and the back input run the document's back action."""
-    panel = renamed(tpl.node("settings-panel"), "settings", prefix)
-    panel = renamed(panel, "settings_", f"{prefix}_")
-    header_body = find(panel, f"{prefix}-header-body")
-    title = find(header_body, f"{prefix}-title")
-    text_node(title, title_key)
-    header_body["children"] = [title]
-    body = find(panel, f"{prefix}-body")
-    body["children"] = columns
-    actions = find(panel, f"{prefix}-actions")
-    back = find(actions, f"{prefix}_back")
-    actions["children"] = [back]
-    actions["properties"]["width"] = {"type": "length", "value": 160, "unit": "dp"}
-    for control, old in ((f"{prefix}_back", "settings_back"), (f"{prefix}_header_scrollbar", "settings_header_scrollbar"),
-                         (f"{prefix}_body_scrollbar", "settings_body_scrollbar")):
-        node = find(panel, control)
-        node["control"]["states"] = tpl.states(doc, old, old, control)
-    root = renamed({key: value for key, value in tpl.system["root"].items() if key != "children"}, "settings", prefix)
-    root["children"] = [panel]
-    doc.events["onActivate"] = activate or [{"op": "focus", "control": first}]
+def settings_backing(ident: str) -> dict:
+    """The page backing (section 9) across both columns: black at the stock
+    0.6, faded in over the leading margin and out past the content's end, the
+    stops on the canvas wherever the view centres it."""
+    first, last = BACKING_STOPS[0][0], BACKING_STOPS[-1][0]
+    stops = [(round((u - first) / (last - first), 4), [0, 0, 0, round(BACKING_ALPHA * alpha, 4)]) for u, alpha in BACKING_STOPS]
+    at = lambda u: {"fraction": 0.5, "dp": round(U * u - CANVAS_W / 2, 4)}
+    whole = [(0, 0), ({"fraction": 1}, 0), ({"fraction": 1}, {"fraction": 1}), (0, {"fraction": 1})]
+    return vector(ident, {**FULL, "opacity": number(1), "pointer-events": keyword("none")}, [
+        path("backing", whole, fill=linear((at(first), 0), (at(last), 0), stops))])
+
+
+def heading_label(ident: str, key: str, left: float, top: float, width: float, height: float) -> dict:
+    face, size, tint = HEADING_FACE
+    return label(ident, key, {**absolute(left=left, top=top, width=width, height=height), **typeface(face, size, height, tint),
+                              "white-space": keyword("nowrap"), "overflow": keyword("hidden"), "pointer-events": keyword("none")})
+
+
+def _enable_while(doc: Document, control: str, current: dict) -> None:
+    """The control answers only while its tab is current, and whatever else
+    already decides that still does."""
+    for binding in doc.bindings:
+        if binding["node"] == control and binding["property"] == "enabled":
+            binding["value"] = {"op": "&&", "args": [current, binding["value"]]}
+            return
+    doc.bind(f"{control}.enabled", control, "enabled", current)
+
+
+def settings_subpage(doc: Document, prefix: str, title_key: str, tabs: list, *, note: str | None = None,
+                     activate=None, overlays: list = ()) -> dict:
+    """The page: `tabs` holds each tab's (id, label, columns), a column a list
+    of rows and headings (heading()), at most two columns a tab. One tab
+    shows no strip: its columns' first headings stand in the header band.
+    `note` is a line on the heading line, for tabs without headings.
+    onActivate   the sub-page's arrival, then the current tab's first row
+                 takes the focus: the steps `activate` makes of those;
+    tab_<id>     switches to a tab at once, cross-fades the pages over 150 ms
+                 and focuses the tab's first row; onTabPrevious and
+                 onTabNext wrap around the strip."""
+    check_settings_text(tabs, note)
+    tabbed = len(tabs) > 1
+    doc.session("back", f"{prefix}Back")
+    doc.state.update({TAB_STATE: {"type": "number", "initial": 0}, LEAVING_STATE: {"type": "number", "initial": -1}})
+    width = U * CONTENT_W
+    chrome, pages, firsts = [], [], []
+    if tabbed:
+        strip = tab_strip(doc, width, [(ident, key, None) for ident, key, _columns in tabs], top=0, state=TAB_STATE)
+        chrome.append(group(f"{prefix}-strip", absolute(left=U * CONTENT_LEFT, top=U * STRIP_TOP, width=width, height=2 * TAB_RISE),
+                            strip))
+    else:
+        chrome.append(header_band(f"{prefix}-header", CONTENT_LEFT, STRIP_TOP, CONTENT_W, ROWS_TOP - STRIP_TOP - 4))
+    if note is not None:
+        chrome.append(heading_label(f"{prefix}-note", note, U * CONTENT_LEFT, U * HEAD_TOP, width, U * HEAD_H))
+    for index, (ident, _key, columns) in enumerate(tabs):
+        if len(columns) > 2:
+            raise SystemExit(f"{prefix}'s {ident} tab has {len(columns)} columns; a settings tab holds two at most")
+        current = {"op": "==", "args": [{"state": TAB_STATE}, index]}
+        parts, order = [], []
+        for side, column in enumerate(columns):
+            left = U * (CONTENT_LEFT + side * (COLUMN_W + COLUMN_GAP))
+            items = list(column)
+            if items and isinstance(items[0], tuple):
+                top = BAND_HEAD_TOP if not tabbed else HEAD_TOP
+                parts.append(heading_label(f"{prefix}-{ident}-head-{side}", items.pop(0)[1], left, U * top, U * COLUMN_W, U * HEAD_H))
+            flow, rows = [], []
+            for position, item in enumerate(items):
+                if isinstance(item, tuple):
+                    flow.append(heading_label(f"{prefix}-{ident}-head-{side}-{position}", item[1], 0, 0, U * COLUMN_W, U * ROW_PITCH))
+                    flow[-1]["properties"].update({"position": keyword("relative"), "display": keyword("block"),
+                                                   "flex-shrink": number(0)})
+                    continue
+                flow.append(item)
+                rows.append(item)
+            if len(flow) > COLUMN_SLOTS:
+                raise SystemExit(f"{prefix}'s {ident} tab puts {len(flow)} slots in a column of {COLUMN_SLOTS}")
+            parts.append(group(f"{prefix}-{ident}-column-{side}", {**absolute(left=left, top=U * ROWS_TOP, width=U * COLUMN_W,
+                                                                             height=U * ROW_PITCH * len(flow)),
+                                                                 "display": keyword("flex"), "flex-direction": keyword("column")}, flow))
+            order.append(rows)
+        # Up and Down read down the first column and on down the second,
+        # wrapping; Left and Right cross to the row beside.
+        sequence = [row["id"] for rows in order for row in rows]
+        for position, control in enumerate(sequence):
+            node = next(row for rows in order for row in rows if row["id"] == control)
+            navigation = node["control"].setdefault("navigation", {})
+            navigation["down"] = sequence[(position + 1) % len(sequence)]
+            navigation["up"] = sequence[position - 1] if position else (f"tab-{ident}" if tabbed else sequence[-1])
+        if len(order) == 2 and order[1]:
+            for side, rows in enumerate(order):
+                other = order[1 - side]
+                for slot, row in enumerate(rows):
+                    row["control"]["navigation"]["right" if side == 0 else "left"] = other[min(slot, len(other) - 1)]["id"]
+        firsts.append(sequence[0])
+        if tabbed:
+            for control in sequence:
+                _enable_while(doc, control, current)
+            shown = {"op": "||", "args": [current, {"op": "==", "args": [{"state": LEAVING_STATE}, index]}]}
+            doc.bind(f"{prefix}-page-{ident}.display", f"{prefix}-page-{ident}", "display", {"op": "select", "args": [shown, "block", "none"]})
+        pages.append(group(f"{prefix}-page-{ident}", {**FULL, "display": keyword("none" if tabbed and index else "block"),
+                                                      "opacity": number(1)}, parts))
+    if tabbed:
+        _tab_programs(doc, prefix, tabs, firsts)
+    focus_current = {"op": "focus", "control": firsts[-1]}
+    steps = [focus_current]
+    for index in range(len(firsts) - 2, -1, -1):
+        steps = [{"op": "if", "condition": {"op": "==", "args": [{"state": TAB_STATE}, index]},
+                  "then": [{"op": "focus", "control": firsts[index]}], "else": steps}]
     doc.events["onBack"] = [{"op": "action", "action": "back"}]
-    result = doc.build(root)
-    result.pop("canvas", None)
-    return result
+    back = page_prompts(doc, f"{prefix}_back", action="back")
+    return subpage_document(doc, prefix, CRUMB, title_key, firsts[0], [*chrome, *pages, back], list(overlays),
+                            activate=activate(steps) if activate else steps, backing_node=settings_backing(f"{prefix}-backing"))
+
+
+def show_tab(doc: Document, prefix: str, tabs: list, index: int) -> list:
+    """Steps that make tab `index` current at once, without the cross-fade:
+    for an arrival that must land on a row in another tab."""
+    return [{"op": "setState", "values": {TAB_STATE: index, LEAVING_STATE: -1}},
+            {"op": "playTimeline", "timeline": f"place-{tabs[index][0]}"}]
+
+
+def _tab_programs(doc: Document, prefix: str, tabs: list, firsts: list) -> None:
+    count = len(tabs)
+    for index, (ident, _key, _columns) in enumerate(tabs):
+        page = f"{prefix}-page-{ident}"
+        others = [f"{prefix}-page-{other}" for other, _k, _c in tabs if other != ident]
+        # The page arriving fades in from nothing; every other page fades from
+        # where it stands to nothing, which leaves hidden pages at 0.
+        doc.timelines.add(f"show-{ident}", TAB_FADE_MS, [
+            track(page, "opacity", [(0, number(0)), (1, number(0)), (TAB_FADE_MS, number(1))]),
+            *[track(other, "opacity", [(0, number(1)), (TAB_FADE_MS, number(0))]) for other in others],
+        ], complete="pageShown")
+        doc.timelines.add(f"place-{ident}", 1, [
+            track(page, "opacity", [(0, number(1)), (1, number(1))]),
+            *[track(other, "opacity", [(0, number(0)), (1, number(0))]) for other in others],
+        ])
+        doc.events[f"tab_{ident}"] = [
+            {"op": "if", "condition": {"op": "!=", "args": [{"state": TAB_STATE}, index]},
+             "then": [{"op": "setState", "values": {LEAVING_STATE: {"state": TAB_STATE}, TAB_STATE: index}},
+                      {"op": "playTimeline", "timeline": f"show-{ident}"}, {"op": "focus", "control": firsts[index]}]},
+        ]
+    doc.events["pageShown"] = [{"op": "setState", "values": {LEAVING_STATE: -1}}]
+    for name, step in (("onTabPrevious", -1), ("onTabNext", 1)):
+        steps: list = []
+        for index in reversed(range(count)):
+            target = tabs[(index + step) % count][0]
+            steps = [{"op": "if", "condition": {"op": "==", "args": [{"state": TAB_STATE}, index]},
+                      "then": [{"op": "call", "event": f"tab_{target}"}], **({"else": steps} if steps else {})}]
+        doc.events[name] = steps

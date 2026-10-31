@@ -1043,21 +1043,23 @@ SCENARIOS = {
         'screenshot "screenshots/audio-back.tga"',
     ]),
     # The retained GAME OPTIONS page (UI-01): the GAME OPTIONS button opens it
-    # on the Section row; Section jumps to Crosshair; the custom crosshair turns
-    # on and steps to the next one; the gun position and a mouse row apply; the
-    # language list switches to German, which reloads the language and the
-    # menus; Back returns to the settings screen.
+    # on GENERAL's first row; the HUD tab's custom crosshair turns on and steps
+    # to the next one; the gun position and a mouse row apply; the language
+    # list switches to German, which reloads the language and the menus; Back
+    # returns to the settings screen.
     'game': (None, [
         'waitMsec 4000', 'openq4_guiAction main_b_settings', 'waitMsec 1500', 'openq4_guiAction set_b_gameoptions',
         'waitMsec 1500', 'ui_retainedStatus', 'openq4_retainedGui report', 'screenshot "screenshots/game.tga"',
-        *menu_step('accept'), *menu_step('down'), *menu_step('down'), *menu_step('down'), *menu_step('accept'),
-        'waitMsec 600', 'screenshot "screenshots/game-section.tga"',
+        'openq4_retainedGui event tab_hud', 'waitMsec 600', 'openq4_retainedGui report', 'screenshot "screenshots/game-section.tga"',
         'g_crosshairCustom', 'openq4_retainedGui focus game_customcrosshair', *menu_step('accept'), *menu_step('down'),
         *menu_step('accept'), 'g_crosshairCustom', 'openq4_retainedGui focus game_crosshair', *menu_step('right'),
         'g_crosshairCustomFile', 'waitMsec 400', 'screenshot "screenshots/game-crosshair.tga"',
+        'openq4_retainedGui event tab_general', 'waitMsec 400',
         'openq4_retainedGui focus game_gunposition', *menu_step('accept'), *menu_step('down'), *menu_step('accept'), 'g_gunY',
+        'openq4_retainedGui event tab_mouse', 'waitMsec 400',
         'sensitivity', 'openq4_retainedGui focus game_msensitivity', *menu_step('right'), 'sensitivity',
         'screenshot "screenshots/game-mouse.tga"',
+        'openq4_retainedGui event tab_general', 'waitMsec 400',
         'openq4_retainedGui focus game_language', *menu_step('accept'), *[step for _ in range(6) for step in menu_step('down')],
         *menu_step('accept'), 'waitMsec 3000', 'sys_lang', 'openq4_retainedGui report', 'ui_retainedStatus',
         'screenshot "screenshots/game-language.tga"',
@@ -1093,6 +1095,7 @@ SCENARIOS = {
         'testControlsKey f', 'waitMsec 400', 'bind f', 'screenshot "screenshots/controls-bound.tga"',
         *menu_step('accept'), 'testControlsKey ESCAPE', 'waitMsec 300', 'bind ESCAPE', 'bind f',
         'testControlsKey DEL', 'waitMsec 400', 'bind f', 'bind w', 'screenshot "screenshots/controls-cleared.tga"',
+        'openq4_retainedGui event tab_other', 'waitMsec 400',
         'openq4_retainedGui focus controls_bind_48', 'waitMsec 400', 'screenshot "screenshots/controls-other.tga"',
         'openq4_retainedGui event onBack', 'waitMsec 1500', 'ui_retainedStatus', 'openq4_guiGet p_settings_ctrls::visible',
         'screenshot "screenshots/controls-back.tga"',
@@ -1116,6 +1119,32 @@ SCENARIOS = {
         'openq4_retainedGui focus defaultsModal_no', *menu_step('accept'), 'waitMsec 600', 'openq4_retainedGui report',
         'openq4_retainedGui event onBack', 'waitMsec 1500', 'ui_retainedStatus', 'openq4_retainedGui report',
         'screenshot "screenshots/settings-page-back.tga"',
+    ]),
+    # The settings sub-pages (sections 9 and 13.7): GAME OPTIONS on the SETTINGS
+    # page goes one level deeper, captured mid-change and presented; each of
+    # its five tabs, a list unfolded on the last; Back climbs out onto GAME
+    # OPTIONS mid-change and at rest; CONTROLS and its next tab; AUDIO and its
+    # Back.
+    'settings-subpages': (None, [
+        'waitMsec 9500', 'openq4_retainedGui focus nav_settings', *menu_step('accept'), 'waitMsec 1200',
+        'openq4_retainedGui focus game', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
+        'waitMsec 175', 'screenshot "screenshots/subpages-game-change.tga"', 'waitMsec 1200', 'ui_retainedStatus',
+        'openq4_retainedGui report', 'screenshot "screenshots/subpages-game.tga"',
+        *[step for name in ('mouse', 'controller', 'hud', 'vr') for step in (
+            'openq4_retainedGui event onTabNext', 'waitMsec 400', 'openq4_retainedGui report',
+            f'screenshot "screenshots/subpages-game-{name}.tga"')],
+        'openq4_retainedGui focus game_vrsnap', 'waitMsec 100', 'openq4_retainedGui choice open game_vrsnap', 'waitMsec 400',
+        'screenshot "screenshots/subpages-game-list.tga"', *menu_step('back'),
+        'openq4_retainedGui event onBack', 'waitMsec 150', 'screenshot "screenshots/subpages-game-back.tga"', 'waitMsec 1200',
+        'openq4_retainedGui report', 'screenshot "screenshots/subpages-returned.tga"',
+        'openq4_retainedGui focus controls', *menu_step('accept'), 'waitMsec 1500', 'openq4_retainedGui report',
+        'screenshot "screenshots/subpages-controls.tga"',
+        'openq4_retainedGui event onTabNext', 'waitMsec 400', 'screenshot "screenshots/subpages-controls-weapons.tga"',
+        'openq4_retainedGui event onBack', 'waitMsec 1500',
+        'openq4_retainedGui focus audio', *menu_step('accept'), 'waitMsec 1500', 'openq4_retainedGui report',
+        'screenshot "screenshots/subpages-audio.tga"',
+        'openq4_retainedGui event onBack', 'waitMsec 1500', 'openq4_retainedGui report', 'ui_retainedStatus',
+        'screenshot "screenshots/subpages-audio-back.tga"',
     ]),
     # LOAD DEFAULTS' YES restores the defaults: a changed sensitivity returns
     # to its default.

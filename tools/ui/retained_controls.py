@@ -1,8 +1,8 @@
 """The retained CONTROLS settings page (docs/dev/ui-visual-design.md
-section 7; UI-01): the stock page's key bindings
-(guis/menu/settings/controls.gui) in the SYSTEM page's construction
-(retained_settings_rows), its four tabs as sections: movement, weapons,
-attack and look, and other.
+sections 7, 9 and 13.7; UI-01): the stock page's key bindings
+(guis/menu/settings/controls.gui) in the settings sub-page
+(retained_settings_rows), the stock page's four tabs as its tabs: movement,
+weapons, attack and look, and other, each in two columns.
 
 Each row names an action and the keys bound to it, which the session
 publishes (controls.<row>.keys) as the language's key names. Accept asks the
@@ -10,12 +10,13 @@ session to wait for a key (controlsBind); the session takes the next key as
 the stock binding field does: Escape, Start or Back cancel, Backspace or
 Delete clear, any other key binds (idSessionLocal::RetainedControlsKey).
 Delete, Backspace or the west face button on a row clears it
-(controlsClear). The session reads the row from the focused control. BACK,
-or the back input, returns to the settings screen that opened the page."""
+(controlsClear). The session reads the row from the focused control. How to
+change a binding stands on the heading line. BACK, or the back input,
+returns to the settings screen that opened the page."""
 from __future__ import annotations
 
 from build_retained_screens import Document
-from retained_settings_rows import Templates, find, renamed, section_column, settings_page, text_node
+from retained_settings_rows import button_row, settings_subpage, value_column
 
 PREFIX = "controls"
 # Each section: its id, heading (the stock tab) and rows (label, binding), in
@@ -49,46 +50,25 @@ SECTIONS = (
 BINDINGS = tuple(binding for _section, _heading, rows in SECTIONS for _label, binding in rows)
 
 
-def binding_row(doc: Document, tpl: Templates, row: int, label_key: str) -> dict:
-    """The SYSTEM page's check box row as a button: the action's name over
-    the keys bound to it, in the orange of a list's value."""
-    ident = f"controls_bind_{row}"
-    node = renamed(renamed(tpl.node("settings_shadows"), "settings_shadows", ident), "settings-", f"{PREFIX}-")
-    node["properties"]["padding-right"] = {"type": "length", "value": 12, "unit": "dp"}
-    label = find(node, f"{ident}-label")
-    text_node(label, label_key)
-    keys = renamed(tpl.node("settings_display_device-value"), "settings_display_device-value", f"{ident}-keys")
-    keys["properties"]["padding-right"] = {"type": "length", "value": 0, "unit": "dp"}
-    doc.bind(f"{ident}-keys.text", f"{ident}-keys", "text", {"state": f"controls.{row}.keys"})
-    node["children"] = [child for child in node["children"] if child["id"] in (f"{ident}-plate", f"{ident}-focus")] + [label, keys]
-    node["control"] = {"role": "button", "label": label_key, "action": "controlsBind",
-                       "states": tpl.states(doc, "settings_shadows", "settings_shadows", ident)}
-    return node
-
-
 def controls_document() -> dict:
-    tpl = Templates()
     doc = Document("openq4.controls")
     doc.state["controls.capture"] = {"type": "number", "initial": -1}
     for row in range(len(BINDINGS)):
         doc.state[f"controls.{row}.keys"] = {"type": "string", "initial": ""}
     doc.session("controlsBind", "controlsBind")
     doc.session("controlsClear", "controlsClear")
-    doc.session("back", "controlsBack")
-    columns, row = [], 0
+    tabs, row = [], 0
     for section, heading_key, rows in SECTIONS:
-        children = []
-        if section == "move":
-            # How to change and clear a binding, as the stock page's hint said.
-            hint = renamed(tpl.node("settings_shadows-label"), "settings_shadows-label", "controls-hint")
-            text_node(hint, "#str_231545")
-            hint["properties"]["color"] = {"type": "color", "value": [1, 1, 1, 0.6]}
-            hint["properties"]["margin-bottom"] = {"type": "length", "value": 12, "unit": "dp"}
-            children.append(hint)
+        # A tab's keys start where its own labels allow: the keys bound to an
+        # action are what the page is for.
+        value_x = value_column([label_key for label_key, _binding in rows])
+        built = []
         for label_key, _binding in rows:
-            children.append(binding_row(doc, tpl, row, label_key))
+            built.append(button_row(doc, f"controls_bind_{row}", label_key, value_x, {"state": f"controls.{row}.keys"},
+                                    {"action": "controlsBind"}))
             row += 1
-        columns.append(section_column(tpl, PREFIX, section, heading_key, children))
+        half = (len(built) + 1) // 2
+        tabs.append((section, heading_key, [built[:half], built[half:]]))
     # The west face button clears the focused row, as Delete does.
     doc.events["onSecondary"] = [{"op": "action", "action": "controlsClear"}]
-    return settings_page(doc, tpl, PREFIX, "#str_200083", columns, "controls_bind_0")
+    return settings_subpage(doc, PREFIX, "#str_200083", tabs, note="#str_231545")

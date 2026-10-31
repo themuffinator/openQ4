@@ -845,7 +845,7 @@ statuses, every migration record and every gate. Earlier Vulkan front-end runs
 with unexpected early exits remain failed evidence; both cases subsequently
 pass in a coordinated runtime window without establishing the earlier cause.
 
-There are **121 partial, 229 pending and 0 verified requirements**, counting the
+There are **121 partial, 230 pending and 0 verified requirements**, counting the
 39 superseded rows at their recorded states. `BEH-002`
 remains partial for the implemented settings transaction/service boundary.
 `BEH-005` remains partial for committed action delivery and cancellation; stock

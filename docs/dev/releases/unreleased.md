@@ -168,6 +168,12 @@ See [release status](../../user/release-status.md) and the
   fourth menu level with matching breadcrumbs and smooth Back transitions.
   The Settings hub includes a confirmation before restoring defaults and
   returns to the correct Marine or Strogg pause screen.
+- **Settings pages that match the menus.** In the new interface, Controls,
+  Game Options and Audio open as pages of the Settings menu, with the same
+  frame, breadcrumbs and transitions as Multiplayer's pages, instead of
+  full-screen panels. Long pages are split into tabs (switch with Q and E,
+  the shoulder buttons or a click), and no page uses more than two columns.
+  Game Options' tabs replace its Section list.
 - Player previews apply separate head skins and keep attachments aligned when
   their position changes.
 - **Clearer focus and cinematic transitions.** All three scopes keep the aim

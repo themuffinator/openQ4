@@ -16,11 +16,13 @@ from retained_saves import backing
 
 
 def subpage_document(doc: Document, prefix: str, crumb_key: str, title_key: str, focus: str, panel_parts: list,
-                     overlays: list, stretch: tuple = ()) -> dict:
+                     overlays: list, stretch: tuple = (), activate: list | None = None, backing_node: dict | None = None) -> dict:
     """The sub-page around `panel_parts` (its content, in `{prefix}-panel`)
-    with `overlays` (its dialogs) over everything.
+    with `overlays` (its dialogs) over everything, over the stock page
+    backing or `backing_node` (`{prefix}-backing`).
     onActivate    every arrival: the content and backing fade in over 150 ms
-                  (content.in) and `focus` takes the focus;
+                  (content.in) and `focus` takes the focus, or `activate`
+                  runs in its place;
     subpageLeave  Back, 300 ms: its title drops at once, it sweeps 640 u toward
                   the leading edge with its content fading over 250 ms, the
                   top band steps back at once and the crumb returns to the
@@ -81,9 +83,9 @@ def subpage_document(doc: Document, prefix: str, crumb_key: str, title_key: str,
         doc.timelines.add(f"crumbRest{suffix}", 1, [track("crumb", "transform", [(0, fitted), (1, fitted)])])
         doc.timelines.add(f"crumbReturn{suffix}", 300, [track("crumb", "transform", [(0, fitted), (150, fitted), (300, identity)])])
     doc.events["onActivate"] = [*by_language(doc, "crumbRest", fits), {"op": "playTimeline", "timeline": "arrive"},
-                                {"op": "focus", "control": focus}]
+                                *(activate or [{"op": "focus", "control": focus}])]
     doc.events["onDeactivate"] = [{"op": "playTimeline", "timeline": "rest"}, *by_language(doc, "crumbRest", fits)]
     doc.events["subpageLeave"] = [{"op": "playTimeline", "timeline": "subpageLeave"}, *by_language(doc, "crumbReturn", fits)]
     return fit_narrow(doc.build(group("screen", {**FULL, "background-color": colour([0, 0, 0, 1])}, [
-        *lit_field("field", 0.7), *bands, backing(backing_id), content, titles, *overlays,
+        *lit_field("field", 0.7), *bands, backing_node or backing(backing_id), content, titles, *overlays,
     ])), pages=True, stretch=stretch)

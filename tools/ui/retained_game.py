@@ -1,7 +1,9 @@
 """The retained GAME OPTIONS settings page (docs/dev/ui-visual-design.md
-section 7; UI-01): the stock page's rows (guis/menu/settings/game.gui) in
-the SYSTEM page's construction (retained_settings_rows), in eight sections:
-general, mouse, controller, crosshair, HUD, gameplay, view weapon and VR.
+sections 7, 9 and 13.7; UI-01): the stock page's rows
+(guis/menu/settings/game.gui) in the settings sub-page
+(retained_settings_rows), its eight sections on five tabs of at most two
+columns: GENERAL (general | gameplay and view weapon), MOUSE INPUT,
+CONTROLLER, HUD (HUD | crosshair) and VIRTUAL REALITY.
 
 Each row applies at once, as the stock page's controls do. A row that names
 a CVar reads it back through the page's CVar state and sets it with the
@@ -10,13 +12,13 @@ FindPlayerSetting, which takes each stock control's range or values). The
 rows the stock page computes go through the session
 (idSessionLocal::HandleRetainedGameRequest): the gun position, the forced
 pro skins, the custom crosshair, the corpse time and the language, which
-reloads the language and the menus. The Section row at the top moves the
-focus to a section's first row. BACK, or the back input, returns to the
+reloads the language and the menus. BACK, or the back input, returns to the
 settings screen that opened the page."""
 from __future__ import annotations
 
-from build_retained_screens import Document, image
-from retained_settings_rows import Templates, choice_row, find, section_column, settings_page, slider_row, toggle_row
+from build_retained_screens import U, Document, absolute, image, keyword, length, number
+from retained_mp_menus import value_row
+from retained_settings_rows import COLUMN_W, ROW_PITCH, heading, setting_row, settings_subpage, show_tab, value_column
 
 PREFIX = "game"
 CROSSHAIRS = 20                            # the custom crosshairs (player_marine_mp_ui's mtr_crosshair keys)
@@ -169,94 +171,104 @@ def setting_action(doc: Document, cvar: str, kind: str) -> str:
     return action
 
 
-def number_bytes(minimum: float, maximum: float, decimals: int) -> int:
-    """The longest text a number field holds for this range."""
-    return max(len(f"{value:.{decimals}f}") for value in (minimum, maximum))
+# The tabs (section 13.7): each its id, label and two columns, a column
+# whole sections under their headings, or a run of one section's rows
+# (section, first, end) where the tab is that section alone.
+TABS = (
+    ("general", "#str_231542", (("general",), ("gameplay", "viewweapon"))),
+    ("mouse", "#str_229935", (("mouse", 0, 5), ("mouse", 5, None))),
+    ("controller", "#str_229924", (("controller", 0, 9), ("controller", 9, None))),
+    ("hud", "#str_231235", (("hud",), ("crosshair",))),
+    ("vr", "#str_230120", (("vr", 0, 6), ("vr", 6, None))),
+)
 
 
-def crosshair_row(doc: Document, tpl: Templates, ident: str, label: str, verb: str) -> dict:
+def crosshair_row(doc: Document, ident: str, label: str, verb: str, value_x: float) -> dict:
     """The custom crosshair: a slider over the crosshairs, its number and the
     crosshair it names, which the session publishes (game.crosshairImage);
     usable while the custom crosshair is on, as on the stock page."""
-    row = slider_row(doc, tpl, PREFIX, ident, label, verb, "game.crosshair", (1, CROSSHAIRS, 1), max_bytes=2, integer=True)
-    controls = find(row, f"{ident}_row-controls")
-    size = {"type": "length", "value": 36, "unit": "dp"}
-    controls["children"].append({"id": f"{ident}-preview", "type": "image", "properties": {
-        "image": image(""), "image-fit": {"type": "keyword", "value": "contain"}, "width": size, "height": size,
-        "min-width": size, "flex-shrink": {"type": "number", "value": 0}}})
+    row_h, width, size = U * ROW_PITCH, U * COLUMN_W, 26.0
+    # The slider gives the picture its room at the row's end.
+    row = value_row(doc, ident, label, "slider", width - size - 6, value_x, value={"state": "game.crosshair"}, action=verb,
+                    slider=(1, CROSSHAIRS, 1, 0), row_h=row_h, placement="screen", wrap=True)
+    row["properties"]["width"] = length(width)
+    row["children"].append({"id": f"{ident}-preview", "type": "image", "properties": {
+        **absolute(left=width - 12 - size, top=(row_h - size) / 2, width=size, height=size), "image": image(""),
+        "image-fit": keyword("contain"), "pointer-events": keyword("none")}})
     doc.bind(f"{ident}-preview.image", f"{ident}-preview", "image", {"state": "game.crosshairImage"})
     custom = {"op": "==", "args": [{"state": "cvar.g_crosshairCustom"}, "1"]}
-    for control in (ident, f"{ident}_number"):
-        doc.bind(f"{control}.enabled", control, "enabled", custom)
+    doc.bind(f"{ident}.enabled", ident, "enabled", custom)
+    doc.bind(f"{ident}.opacity", ident, "opacity", {"op": "select", "args": [custom, 1, 0.38]})
     return row
 
 
+def game_row(doc: Document, row: tuple, value_x: float) -> dict:
+    """One of SECTIONS' rows as a setting row."""
+    kind, ident, label, binding, extra = row
+    if kind == "toggle":
+        return setting_row(doc, ident, label, "toggle", value_x, value=cvar_state(doc, binding, "boolean"),
+                           action=setting_action(doc, binding, "boolean"))
+    if kind == "slider":
+        minimum, maximum, step, decimals = extra
+        shown = cvar_state(doc, binding, "number")
+        if decimals:
+            # A float CVar reads back inexactly (5.01 as 5.010000228): the
+            # slider shows it to the row's places.
+            scale = 10 ** decimals
+            shown = {"op": "/", "args": [{"op": "round", "args": [{"op": "*", "args": [shown, scale]}]}, scale]}
+        return setting_row(doc, ident, label, "slider", value_x, value=shown, action=setting_action(doc, binding, "number"),
+                           slider=(minimum, maximum, step, decimals))
+    if kind == "choice":
+        key, values = extra
+        kind_of = "string" if isinstance(values[0], str) else "number"
+        return setting_row(doc, ident, label, "choice", value_x, value=cvar_state(doc, binding, kind_of),
+                           action=setting_action(doc, binding, kind_of),
+                           entries=[((key, index), value) for index, value in enumerate(values)])
+    if kind == "verb_choice":
+        key, count, enabled = extra
+        state = {"gameGunPosition": "game.gunPosition", "gameCorpseTime": "game.corpseTime", "gameLanguage": "game.language"}[binding]
+        entries = [((key, index), index, *([False] if enabled is not None and index >= enabled else [])) for index in range(count)]
+        return setting_row(doc, ident, label, "choice", value_x, value={"state": state}, action=binding, entries=entries)
+    if kind == "verb_toggle":
+        return setting_row(doc, ident, label, "toggle", value_x, value={"state": "game.forceModel"}, action=binding)
+    return crosshair_row(doc, ident, label, binding, value_x)
+
+
 def game_document() -> dict:
-    tpl = Templates()
     doc = Document("openq4.game")
     doc.state.update({
         "game.gunPosition": {"type": "number", "initial": -1}, "game.forceModel": {"type": "boolean", "initial": False},
         "game.crosshair": {"type": "number", "initial": 1}, "game.crosshairImage": {"type": "string", "initial": ""},
         "game.corpseTime": {"type": "number", "initial": 0}, "game.language": {"type": "number", "initial": 0},
-        "game.section": {"type": "number", "initial": 0}, "game.languageReloaded": {"type": "boolean", "initial": False},
+        "game.languageReloaded": {"type": "boolean", "initial": False},
     })
     for verb in VERBS:
         doc.actions[verb] = {"operation": "session.menuValue", "input": "boolean" if verb == "gameForceModel" else "number",
                              "arguments": {"command": verb, "value": {"input": "value"}}}
-    doc.session("back", "gameBack")
-
-    columns, firsts = [], []
-    for section, heading_key, rows in SECTIONS:
-        children = []
-        for kind, ident, label, binding, extra in rows:
-            if kind == "toggle":
-                node = toggle_row(doc, tpl, PREFIX, ident, label, setting_action(doc, binding, "boolean"),
-                                  cvar_state(doc, binding, "boolean")["state"])
-            elif kind == "slider":
-                minimum, maximum, step, decimals = extra
-                state = cvar_state(doc, binding, "number")
-                node = slider_row(doc, tpl, PREFIX, ident, label, setting_action(doc, binding, "number"), state["state"],
-                                  (minimum, maximum, step), decimals, number_bytes(minimum, maximum, decimals), integer=decimals == 0)
-                if decimals:
-                    # A float CVar reads back inexactly (5.01 as 5.010000228):
-                    # the slider and its number show it to the row's places.
-                    scale = 10 ** decimals
-                    shown = {"op": "/", "args": [{"op": "round", "args": [{"op": "*", "args": [state, scale]}]}, scale]}
-                    for control in (ident, f"{ident}_number"):
-                        find(node, control)["control"]["value"] = shown
-            elif kind == "choice":
-                key, values = extra
-                kind_of = "string" if isinstance(values[0], str) else "number"
-                node = choice_row(doc, tpl, PREFIX, ident, label, setting_action(doc, binding, kind_of),
-                                  cvar_state(doc, binding, kind_of)["state"],
-                                  [(key, value, index, None) for index, value in enumerate(values)])
-            elif kind == "verb_choice":
-                key, count, enabled = extra
-                state = {"gameGunPosition": "game.gunPosition", "gameCorpseTime": "game.corpseTime", "gameLanguage": "game.language"}[binding]
-                node = choice_row(doc, tpl, PREFIX, ident, label, binding, state,
-                                  [(key, index, index, False if enabled is not None and index >= enabled else None) for index in range(count)])
-            elif kind == "verb_toggle":
-                node = toggle_row(doc, tpl, PREFIX, ident, label, binding, "game.forceModel")
-            else:
-                node = crosshair_row(doc, tpl, ident, label, binding)
-            children.append(node)
-        firsts.append(rows[0][1])
-        columns.append((section, heading_key, children))
-
-    # The Section row: choosing a section moves the focus to its first row.
-    doc.actions["gameSection"] = {"operation": "ui.state.set", "input": "number",
-                                  "arguments": {"key": "game.section", "value": {"input": "value"}, "event": "gameSectionChosen"}}
-    steps = [{"op": "focus", "control": firsts[-1]}]
-    for index in range(len(firsts) - 2, -1, -1):
-        steps = [{"op": "if", "condition": {"op": "==", "args": [{"state": "game.section"}, index]},
-                  "then": [{"op": "focus", "control": firsts[index]}], "else": steps}]
-    doc.events["gameSectionChosen"] = steps
-    jump = choice_row(doc, tpl, PREFIX, "game_section", "#str_229959", "gameSection", "game.section",
-                      [("#str_229960", index, index, None) for index in range(len(SECTIONS))])
-    sections = [section_column(tpl, PREFIX, section, heading_key, [jump, *children] if section == "general" else children)
-                for section, heading_key, children in columns]
+    sections = {section: (heading_key, rows) for section, heading_key, rows in SECTIONS}
+    value_x = value_column([row[2] for _section, _heading, rows in SECTIONS for row in rows])
+    built = {row[1]: game_row(doc, row, value_x) for _section, _heading, rows in SECTIONS for row in rows}
+    tabs = []
+    for ident, key, columns in TABS:
+        laid = []
+        for column in columns:
+            if len(column) == 3 and isinstance(column[1], int):
+                section, first, end = column
+                laid.append([built[row[1]] for row in sections[section][1][first:end]])
+                continue
+            items = []
+            for section in column:
+                heading_key, rows = sections[section]
+                items += [heading(heading_key), *(built[row[1]] for row in rows)]
+            laid.append(items)
+        tabs.append((ident, key, laid))
+    if sorted(built) != sorted(node["id"] for _ident, _key, laid in tabs for column in laid for node in column if isinstance(node, dict)):
+        raise SystemExit("the GAME OPTIONS tabs must hold every row once")
     # The language reload re-activates the page (idUserInterfaceManagerLocal::
-    # ReloadGuis); the session marks it, so the focus stays on Language.
-    activate = [{"op": "if", "condition": {"state": "game.languageReloaded"}, "then": [{"op": "focus", "control": "game_language"}],
-                 "else": [{"op": "focus", "control": "game_section"}]}]
-    return settings_page(doc, tpl, PREFIX, "#str_200084", sections, "game_section", activate)
+    # ReloadGuis); the session marks it, so the page returns to Language.
+    language_tab = next(index for index, (_ident, _key, laid) in enumerate(tabs)
+                        if any(isinstance(node, dict) and node["id"] == "game_language" for column in laid for node in column))
+    activate = lambda focus: [{"op": "if", "condition": {"state": "game.languageReloaded"},
+                               "then": [*show_tab(doc, "game", tabs, language_tab), {"op": "focus", "control": "game_language"}],
+                               "else": focus}]
+    return settings_subpage(doc, PREFIX, "#str_200084", tabs, activate=activate)

@@ -82,6 +82,8 @@ struct CVar {bool value=false;bool GetBool() const{return value;}} ui_retainedSy
 enum {SE_NONE=0,INHIBIT_SESSION=1};
 struct sysEvent_t {int evType=SE_NONE;};
 using HandleGuiCommand_t=bool (*)(const char*);
+typedef enum {RETAINED_SUBPAGE_CAMPAIGN,RETAINED_SUBPAGE_ARENA,RETAINED_SUBPAGE_CREATE_SERVER,RETAINED_SUBPAGE_JOIN_GAME,
+    RETAINED_SUBPAGE_SETTINGS_CONTROLS,RETAINED_SUBPAGE_SETTINGS_GAME,RETAINED_SUBPAGE_SETTINGS_AUDIO} retainedSubpage_t;
 struct Sound {
     bool paused=true;
     int unpauses=0;

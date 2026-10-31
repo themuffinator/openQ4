@@ -247,14 +247,15 @@ def keycap(ident: str, key: str, *, fixed: bool = False, event: str | None = Non
     return group(ident, props, children, control={"role": "button", "label": key, "event": event, "states": ids})
 
 
-def tab(doc: Document, index: int, ident: str, key: str) -> dict:
+def tab(doc: Document, index: int, ident: str, key: str, state: str = "card.tab") -> dict:
     """One tab of the strip: its label in flow, padded to hold the leading
     flare and the trailing shoulder, so the tab is as wide as its label in
     the running language plus its share of the strip's remainder. The active tab rises 30 dp with a 3 dp leading
     flare and an 18 dp 45-degree trailing shoulder, filled #5A652A from 1.00
     at the top to 0.60 at the baseline inside a white outline, and erases the
     strip's baseline beneath it. Inactive labels sit at 0.55 and rise to 0.85
-    on hover; the active label is white, and focus turns a label orange."""
+    on hover; the active label is white, and focus turns a label orange.
+    `state` holds the current tab's index."""
     node = f"tab-{ident}"
     h = TAB_RISE
     right = {"fraction": 1}
@@ -279,7 +280,7 @@ def tab(doc: Document, index: int, ident: str, key: str) -> dict:
         "pressed": [(f"{node}-label", "color", colour(rgb(ORANGE)))],
         "disabled": [(f"{node}-label", "color", colour([1, 1, 1, 0.3]))],
     })
-    active = {"op": "==", "args": [{"state": "card.tab"}, index]}
+    active = {"op": "==", "args": [{"state": state}, index]}
     doc.bind(f"{node}-active.display", f"{node}-active", "display", {"op": "select", "args": [active, "block", "none"]})
     doc.bind(f"{node}-lit.display", f"{node}-lit", "display", {"op": "select", "args": [active, "block", "none"]})
     return group(node, {"position": keyword("relative"), "display": keyword("block"), "height": length(h),
@@ -289,22 +290,23 @@ def tab(doc: Document, index: int, ident: str, key: str) -> dict:
                  control={"role": "button", "label": key, "event": f"tab_{ident}", "states": ids})
 
 
-def tab_strip(doc: Document, width: float, tabs: list) -> list:
+def tab_strip(doc: Document, width: float, tabs: list, top: float = TAB_TOP, state: str = "card.tab") -> list:
     """The strip under the header (section 14.18): Q and E keycaps at its
     ends run the previous and next tab; the tabs share the width between
     them; the baseline runs under all of them, broken under the active tab,
-    and a #5A652A wash fades below it over one tab height."""
+    and a #5A652A wash fades below it over one tab height. The strip stands
+    `top` dp down its container; `state` holds the current tab's index."""
     inner_left = STRIP_EDGE + KEYCAP_W + KEYCAP_GAP
     inner_width = width - 2 * inner_left
-    slots = [tab(doc, index, ident, key) for index, (ident, key, _window) in enumerate(tabs)]
-    keys_top = TAB_TOP + (TAB_RISE - PROMPT_H) / 2
+    slots = [tab(doc, index, ident, key, state) for index, (ident, key, _window) in enumerate(tabs)]
+    keys_top = top + (TAB_RISE - PROMPT_H) / 2
     previous = keycap("tab-previous", KEY_PREVIOUS, fixed=True, event="onTabPrevious", doc=doc)
     following = keycap("tab-next", KEY_NEXT, fixed=True, event="onTabNext", doc=doc)
     previous["properties"].update(absolute(left=STRIP_EDGE, top=keys_top))
     following["properties"].update(absolute(left=width - STRIP_EDGE - KEYCAP_W, top=keys_top))
-    row = group("tabs", {**absolute(left=inner_left, top=TAB_TOP, width=inner_width, height=TAB_RISE),
+    row = group("tabs", {**absolute(left=inner_left, top=top, width=inner_width, height=TAB_RISE),
                          "display": keyword("flex"), "flex-direction": keyword("row"), "align-items": keyword("flex-end")}, slots)
-    baseline_y = TAB_TOP + TAB_RISE
+    baseline_y = top + TAB_RISE
     baseline = vector("tab-baseline", absolute(left=STRIP_EDGE, top=baseline_y - 1.5, width=width - 2 * STRIP_EDGE, height=2), [
         path("rail", [(0, 0.75), ({"fraction": 1}, 0.75)], closed=False, stroke=stroke(solid([1, 1, 1, 0.75]), 1.5))])
     wash = vector("tab-wash", absolute(left=STRIP_EDGE, top=baseline_y, width=width - 2 * STRIP_EDGE, height=TAB_RISE), [
@@ -1310,9 +1312,11 @@ def choice_popup(ident: str, entries: list, width: float) -> tuple[dict, list]:
     scrollable popup with the stock dropdown's black body, its #B2CD43 1 dp
     border at 20 % and 22 dp rows). `entries` hold each row's label (a
     string key, a key with the index into its stock list, or {"state": key}
-    for a label the game publishes) and value."""
+    for a label the game publishes) and value, and may add whether the
+    option can be chosen (False, or an expression): one that cannot still
+    shows."""
     options, rows = [], []
-    for index, (text, value) in enumerate(entries):
+    for index, (text, value, *enabled) in enumerate(entries):
         option = f"{ident}-option-{index}"
         band = lambda node, tint: vector(node, {**FULL, "display": keyword("none")}, [
             path("band", [(0, 0), ({"fraction": 1}, 0), ({"fraction": 1}, {"fraction": 1}), (0, {"fraction": 1})], fill=solid(tint))])
@@ -1329,6 +1333,8 @@ def choice_popup(ident: str, entries: list, width: float) -> tuple[dict, list]:
                  "parts": {"label": f"{option}-label", "selected": f"{option}-selected", "highlight": f"{option}-highlight"}}
         if isinstance(text, tuple):
             entry["labelIndex"] = text[1]
+        if enabled:
+            entry["enabled"] = enabled[0]
         options.append(entry)
     view_h = min(VOTE_VISIBLE_ROWS, len(entries)) * VOTE_OPTION_H
     frame = vector(f"{ident}-popup-frame", FULL, [

@@ -1,6 +1,6 @@
 # openQ4 UI Visual Design
 
-Specification version 1.28, 26 October 2026 (1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
+Specification version 1.29, 31 October 2026 (1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
 1.9 on 29 September, 1.6 on 28 September, 1.4 and 1.5 on 27 September, 1.1 to
 1.3 on 26 September, 1.0 on 8 September 2026). Status:
 implementation target; the replacement has not shipped. Applies to every
@@ -1798,8 +1798,17 @@ and parallax off.
     type and map, then the score with the paused clock in `marine.value`.
     Restart Match and Leave Match ask first in the stock modal. Settings opens
     the settings pages over the paused match and returns to this menu.
-- **Settings.** Categories are tabs switched with the bumpers or a swipe, and
-  sections keep their picker. Search runs across every category when the player
+- **Settings.** The SETTINGS page holds the categories on the home
+  navigation plates, and each category is a sub-page built as Create Server
+  is: SETTINGS as the crumb, the category's title at the step's foot and the
+  content over a backing that darkens all of it. A category's sections are
+  tabs in the Escape card's strip (section 14.18) across the content's top,
+  switched with Q and E, the bumpers, a swipe or a click; a category that fits
+  one screen has no strip, only the header band carrying its columns'
+  headings. A tab holds at most two columns of setting rows on the stock 24 u
+  pitch, never more, at most 14 rows to a column, the values lined up in one
+  value column; Up and Down read down the first column and on down the
+  second, and Up from the first row reaches the tab. Search runs across every category when the player
   types, presses north, or taps the search symbol, and each result shows its
   category path. A modified row's leading rail turns `marine.value`; the west
   button resets the focused row to its default. Rows that need a restart carry
@@ -4023,6 +4032,17 @@ catalogue obligations, including `ART-035`, remain authoring/artwork requirement
 they do not authorize or require a new gameplay mode. This scope correction
 accepts no GUI, artwork, platform or behavior. Hit-feedback defaults and the other
 UI-05 qualification remain open.
+
+### Version 1.29: settings sub-pages
+
+The user asked for the settings pages to fit the main menu's design rather
+than the drafted full-screen panels, which filled a wide view with as many
+columns of large cards as it held, and for long pages to be broken up by
+tabs. Section 13.7's Settings pattern now makes each category a sub-page of
+the SETTINGS page in Create Server's construction, its sections tabs in the
+Escape card's strip, and allows at most two columns of setting rows. Register
+revision 21 appends `FLOW-068` for this scope; no existing requirement
+changes, and nothing is accepted.
 
 ### Version 1.28: objective points of interest
 

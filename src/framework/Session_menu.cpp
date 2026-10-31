@@ -382,6 +382,28 @@ static const retainedSettingsSection_t RETAINED_SETTINGS_SECTIONS[] = {
 	{ "settingsAudio",		"audio",	36 },
 };
 static const int RETAINED_SETTINGS_SECTION_COUNT = sizeof( RETAINED_SETTINGS_SECTIONS ) / sizeof( RETAINED_SETTINGS_SECTIONS[0] );
+// The sections that are its sub-pages (the generator's DEEPER): each's kind,
+// section, document, and the event that takes the SETTINGS page one level
+// deeper to it (BeginRetainedSubpage).
+typedef struct {
+	retainedSubpage_t	kind;
+	const char *		section;
+	const char *		gui;
+	const char *		enter;
+} retainedSettingsSubpage_t;
+static const retainedSettingsSubpage_t RETAINED_SETTINGS_SUBPAGES[] = {
+	{ RETAINED_SUBPAGE_SETTINGS_CONTROLS,	"controls",	RETAINED_CONTROLS_GUI,	"subpageEnterControls" },
+	{ RETAINED_SUBPAGE_SETTINGS_GAME,		"game",		RETAINED_GAME_GUI,		"subpageEnterGame" },
+	{ RETAINED_SUBPAGE_SETTINGS_AUDIO,		"audio",	RETAINED_AUDIO_GUI,		"subpageEnterAudio" },
+};
+static const retainedSettingsSubpage_t *Session_RetainedSettingsSubpage( retainedSubpage_t kind ) {
+	for ( const retainedSettingsSubpage_t &subpage : RETAINED_SETTINGS_SUBPAGES ) {
+		if ( subpage.kind == kind ) {
+			return &subpage;
+		}
+	}
+	return NULL;
+}
 
 // "mpMatchRuleValue <value>": a whole number from 0 to the largest value a
 // Match Control rule takes, in at most five digits.
@@ -2431,13 +2453,19 @@ void idSessionLocal::OpenRetainedAudioRoute() {
 ===============
 idSessionLocal::ReturnRetainedAudio
 
-BACK, or the back input, returns to the settings screen that opened the page.
+BACK, or the back input, returns to the settings screen that opened the page:
+to the SETTINGS page one level up (BeginRetainedSubpage), else at once.
 ===============
 */
 void idSessionLocal::ReturnRetainedAudio() {
 	if ( guiRetainedAudio == NULL || guiActive != guiRetainedAudio || retainedAudioParent == NULL ) {
 		return;
 	}
+	if ( guiRetainedSettingsPage != NULL && retainedAudioParent == guiRetainedSettingsPage ) {
+		BeginRetainedSubpage( guiRetainedAudio, false, RETAINED_SUBPAGE_SETTINGS_AUDIO );
+		return;
+	}
+	HandleMainMenuCommands( "play main_menu_selection" );
 	idUserInterface *parent = retainedAudioParent;
 	const HandleGuiCommand_t handler = retainedAudioParentHandle;
 	retainedAudioParent = NULL;
@@ -2517,7 +2545,6 @@ returns to the settings screen.
 void idSessionLocal::HandleRetainedAudioRequest( idUserInterface *gui, const char *request ) {
 #ifndef ID_DEDICATED
 	if ( !idStr::Icmp( request, "audioBack" ) ) {
-		HandleMainMenuCommands( "play main_menu_selection" );
 		ReturnRetainedAudio();
 		return;
 	}
@@ -2664,13 +2691,19 @@ void idSessionLocal::OpenRetainedGameRoute( bool fromMultiplayer ) {
 ===============
 idSessionLocal::ReturnRetainedGame
 
-BACK, or the back input, returns to the settings screen that opened the page.
+BACK, or the back input, returns to the settings screen that opened the page:
+to the SETTINGS page one level up (BeginRetainedSubpage), else at once.
 ===============
 */
 void idSessionLocal::ReturnRetainedGame() {
 	if ( guiRetainedGame == NULL || guiActive != guiRetainedGame || retainedGameParent == NULL ) {
 		return;
 	}
+	if ( guiRetainedSettingsPage != NULL && retainedGameParent == guiRetainedSettingsPage ) {
+		BeginRetainedSubpage( guiRetainedGame, false, RETAINED_SUBPAGE_SETTINGS_GAME );
+		return;
+	}
+	HandleMainMenuCommands( "play main_menu_selection" );
 	idUserInterface *parent = retainedGameParent;
 	const HandleGuiCommand_t handler = retainedGameParentHandle;
 	retainedGameParent = NULL;
@@ -2754,7 +2787,6 @@ returns to the settings screen.
 void idSessionLocal::HandleRetainedGameRequest( idUserInterface *gui, const char *request ) {
 #ifndef ID_DEDICATED
 	if ( !idStr::Icmp( request, "gameBack" ) ) {
-		HandleMainMenuCommands( "play main_menu_selection" );
 		ReturnRetainedGame();
 		return;
 	}
@@ -2913,13 +2945,19 @@ void idSessionLocal::OpenRetainedControlsRoute( bool fromMultiplayer ) {
 ===============
 idSessionLocal::ReturnRetainedControls
 
-BACK, or the back input, returns to the settings screen that opened the page.
+BACK, or the back input, returns to the settings screen that opened the page:
+to the SETTINGS page one level up (BeginRetainedSubpage), else at once.
 ===============
 */
 void idSessionLocal::ReturnRetainedControls() {
 	if ( guiRetainedControls == NULL || guiActive != guiRetainedControls || retainedControlsParent == NULL ) {
 		return;
 	}
+	if ( guiRetainedSettingsPage != NULL && retainedControlsParent == guiRetainedSettingsPage ) {
+		BeginRetainedSubpage( guiRetainedControls, false, RETAINED_SUBPAGE_SETTINGS_CONTROLS );
+		return;
+	}
+	HandleMainMenuCommands( "play main_menu_selection" );
 	idUserInterface *parent = retainedControlsParent;
 	const HandleGuiCommand_t handler = retainedControlsParentHandle;
 	retainedControlsParent = NULL;
@@ -2979,7 +3017,6 @@ Delete does. BACK returns to the settings screen.
 void idSessionLocal::HandleRetainedControlsRequest( idUserInterface *gui, const char *request ) {
 #ifndef ID_DEDICATED
 	if ( !idStr::Icmp( request, "controlsBack" ) ) {
-		HandleMainMenuCommands( "play main_menu_selection" );
 		ReturnRetainedControls();
 		return;
 	}
@@ -7110,8 +7147,9 @@ void idSessionLocal::DrawRetainedHome( int presentationTime ) {
 	guiRetainedHome->Redraw( presentationTime );
 }
 
-// The Single Player page and its Campaign and Arena sub-pages, and the
-// Multiplayer page and its Create Server and Join Game sub-pages, are
+// The Single Player page and its Campaign and Arena sub-pages, the
+// Multiplayer page and its Create Server and Join Game sub-pages, and the
+// SETTINGS page and its CONTROLS, GAME OPTIONS and AUDIO sub-pages, are
 // documents of their own (see RETAINED_SUBPAGE_DEEPER_MSEC). When the other
 // document cannot present, its stock screen opens at once.
 void idSessionLocal::BeginRetainedSubpage( idUserInterface *gui, bool deeper, retainedSubpage_t subpage ) {
@@ -7120,15 +7158,17 @@ void idSessionLocal::BeginRetainedSubpage( idUserInterface *gui, bool deeper, re
 	HandleMainMenuCommands( "play main_menu_selection" );
 	const bool create = subpage == RETAINED_SUBPAGE_CREATE_SERVER, join = subpage == RETAINED_SUBPAGE_JOIN_GAME;
 	const bool arena = subpage == RETAINED_SUBPAGE_ARENA;
-	const char *other = create || join ? ( !deeper ? RETAINED_MPPAGE_GUI : create ? RETAINED_CREATE_SERVER_GUI : RETAINED_JOIN_GAME_GUI ) :
+	const retainedSettingsSubpage_t *settings = Session_RetainedSettingsSubpage( subpage );
+	const char *other = settings != NULL ? ( deeper ? settings->gui : RETAINED_SETTINGSPAGE_GUI ) :
+		create || join ? ( !deeper ? RETAINED_MPPAGE_GUI : create ? RETAINED_CREATE_SERVER_GUI : RETAINED_JOIN_GAME_GUI ) :
 		!deeper ? RETAINED_SINGLEPLAYER_GUI : arena ? RETAINED_ARENA_GUI : RETAINED_CAMPAIGNS_GUI;
 	if ( FindRetainedGui( other, true, false ) == NULL || cvarSystem->GetCVarBool( "ui_retainedReducedMotion" ) ) {
 		// The stock screen, or reduced motion: the other level at once.
 		PresentRetainedSubpage( deeper, subpage );
 		return;
 	}
-	gui->HandleNamedEvent( !deeper ? "subpageLeave" : create ? "subpageEnterCreate" : join ? "subpageEnterJoin" :
-		arena ? "subpageEnterArena" : "subpageEnter" );
+	gui->HandleNamedEvent( !deeper ? "subpageLeave" : settings != NULL ? settings->enter : create ? "subpageEnterCreate" :
+		join ? "subpageEnterJoin" : arena ? "subpageEnterArena" : "subpageEnter" );
 	PumpApplicationActions( gui );
 	retainedSubpageFrom = gui;
 	retainedSubpageDeeper = deeper;
@@ -7176,12 +7216,48 @@ void idSessionLocal::UpdateRetainedSubpage() {
 
 // The other level presents: Campaign (or the stock selector), the Arena
 // campaign's browser (the Arena page where it can), Create Server, Join Game,
-// or the page coming back: Single Player, onto ARENA from Arena, or
-// Multiplayer onto CREATE SERVER or JOIN GAME.
+// a settings sub-page, or the page coming back: Single Player, onto ARENA
+// from Arena, Multiplayer onto CREATE SERVER or JOIN GAME, or SETTINGS onto
+// the sub-page's section.
 void idSessionLocal::PresentRetainedSubpage( bool deeper, retainedSubpage_t subpage ) {
 #ifndef ID_DEDICATED
 	const bool arena = subpage == RETAINED_SUBPAGE_ARENA;
 	retainedSubpageKind = RETAINED_SUBPAGE_CAMPAIGN;
+	if ( const retainedSettingsSubpage_t *settings = Session_RetainedSettingsSubpage( subpage ) ) {
+		const bool controls = subpage == RETAINED_SUBPAGE_SETTINGS_CONTROLS, game = subpage == RETAINED_SUBPAGE_SETTINGS_GAME;
+		if ( deeper ) {
+			// The sub-page over the SETTINGS page, which its Back climbs to. One
+			// that cannot open now leaves the stock screen to show its panel.
+			if ( !( controls ? OpenRetainedControls() : game ? OpenRetainedGame() : OpenRetainedAudio() ) &&
+					guiRetainedSettingsPage != NULL && guiActive == guiRetainedSettingsPage ) {
+				for ( int i = 0; i < RETAINED_SETTINGS_SECTION_COUNT; i++ ) {
+					if ( !idStr::Icmp( RETAINED_SETTINGS_SECTIONS[ i ].section, settings->section ) ) {
+						retainedSettingsDest = RETAINED_SETTINGS_SECTIONS[ i ].dest;
+						retainedSettingsAt = common->GetPresentationTime();
+					}
+				}
+			}
+			return;
+		}
+		// Back: the SETTINGS page returns onto the section, or where it cannot,
+		// the screen that opened the sub-page returns as it was.
+		idUserInterface *&parent = controls ? retainedControlsParent : game ? retainedGameParent : retainedAudioParent;
+		HandleGuiCommand_t &handle = controls ? retainedControlsParentHandle : game ? retainedGameParentHandle : retainedAudioParentHandle;
+		idUserInterface *screen = parent;
+		const HandleGuiCommand_t handler = handle;
+		parent = NULL;
+		handle = NULL;
+		if ( controls ) {
+			retainedControlsCapture = -1;
+		}
+		if ( OpenRetainedSettingsPage( settings->section ) ) {
+			guiActive->HandleNamedEvent( "subpageReturn" );
+			PumpApplicationActions( guiActive );
+		} else if ( screen != NULL ) {
+			SetGUI( screen, handler );
+		}
+		return;
+	}
 	if ( subpage == RETAINED_SUBPAGE_CREATE_SERVER || subpage == RETAINED_SUBPAGE_JOIN_GAME ) {
 		const bool create = subpage == RETAINED_SUBPAGE_CREATE_SERVER;
 		if ( deeper && create ) {
@@ -8517,18 +8593,19 @@ bool idSessionLocal::OpenRetainedSettingsPage( const char *section ) {
 ===============
 idSessionLocal::HandleRetainedSettingsPageRequest
 
-The SETTINGS page's verbs. CONTROLS, GAME OPTIONS and AUDIO open their
-retained pages, and DISPLAY the retained SYSTEM page where it is on, each
-returning here onto its section; where one cannot, the stock settings screen
-opens on that panel once the page has left (UpdateRetainedSettingsPage).
-LOAD DEFAULTS' YES restores the defaults as the stock dialog's did. BACK
-returns the home, from the page dock as from the stock screen. A panel under
-way takes no further request.
+The SETTINGS page's verbs. CONTROLS, GAME OPTIONS and AUDIO go one level
+deeper to their retained sub-pages (BeginRetainedSubpage), and DISPLAY opens
+the retained SYSTEM page where it is on, each returning here onto its
+section; where one cannot, the stock settings screen opens on that panel once
+the page has left (UpdateRetainedSettingsPage). LOAD DEFAULTS' YES restores
+the defaults as the stock dialog's did. BACK returns the home, from the page
+dock as from the stock screen. A panel or a change of level under way takes
+no further request.
 ===============
 */
 void idSessionLocal::HandleRetainedSettingsPageRequest( idUserInterface *gui, const char *request ) {
 #ifndef ID_DEDICATED
-	if ( retainedSettingsDest != 0 || guiMainMenu == NULL ) {
+	if ( retainedSettingsDest != 0 || retainedSubpageFrom != NULL || guiMainMenu == NULL ) {
 		return;
 	}
 	if ( !idStr::Icmp( request, "settingsBack" ) ) {
@@ -8572,6 +8649,15 @@ void idSessionLocal::HandleRetainedSettingsPageRequest( idUserInterface *gui, co
 		gui->SetStateBool( va( "from_%s", RETAINED_SETTINGS_SECTIONS[ i ].section ), &RETAINED_SETTINGS_SECTIONS[ i ] == chosen );
 	}
 	gui->StateChanged( common->GetPresentationTime() );
+	// CONTROLS, GAME OPTIONS and AUDIO go one level deeper to their pages.
+	for ( const retainedSettingsSubpage_t &subpage : RETAINED_SETTINGS_SUBPAGES ) {
+		const bool available = subpage.kind == RETAINED_SUBPAGE_SETTINGS_CONTROLS ? RetainedControlsAvailable() :
+			subpage.kind == RETAINED_SUBPAGE_SETTINGS_GAME ? RetainedGameAvailable() : RetainedAudioAvailable();
+		if ( available && !idStr::Icmp( subpage.section, chosen->section ) ) {
+			BeginRetainedSubpage( gui, true, subpage.kind );
+			return;
+		}
+	}
 	HandleMainMenuCommands( "play main_menu_selection" );
 	const bool opened = chosen->dest == 4 ? OpenRetainedControls() : chosen->dest == 21 ? OpenRetainedGame() :
 		chosen->dest == 36 ? OpenRetainedAudio() : RetainedSystemAvailable() && OpenSystemSettings();

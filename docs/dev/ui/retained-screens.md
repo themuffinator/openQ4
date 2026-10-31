@@ -1731,12 +1731,14 @@ The settings screen's CONTROLS button, and the multiplayer menu's Controls
 hand-off (`fromMp_toControls`, routed as GAME OPTIONS' is), open a retained
 CONTROLS page built like the other settings pages
 (`tools/ui/retained_controls.py`, `guis/menu/settings/controls.q4ui`). It
-carries the stock page's 49 bindings in its order, its four tabs as sections
-(MOVEMENT, WEAPONS, ATTACK/LOOK and OTHER). Each row names the action over
+carries the stock page's 49 bindings in its order, its four tabs as the
+page's tabs (MOVEMENT, WEAPONS, ATTACK/LOOK and OTHER); see
+[the settings sub-pages](#the-settings-sub-pages-31-october-2026) for its
+layout. Each row names the action over
 the keys bound to it, which the session publishes as the language names the
 keys and joins a list (`Session_RetainedList`), or the stock page's word for
-none. A hint above the rows (`#str_231545`, in every language) says how to
-change one.
+none. A hint on the heading line (`#str_231545`, in every language) says
+how to change one.
 
 Accept on a row waits for a key, the row saying so (`#str_07000`), and the
 session takes the next key before the page sees it
@@ -1771,16 +1773,15 @@ the fallback.
 
 The settings screen's GAME OPTIONS button opens a retained page while the
 retained screens are on, built as the AUDIO page is:
-`tools/ui/retained_game.py` builds `guis/menu/settings/game.q4ui` from the
-SYSTEM page's construction, which `tools/ui/retained_settings_rows.py` now
-shares between the settings pages. It carries every row of the stock page,
-in the stock order and text, in eight sections: GENERAL, MOUSE INPUT,
-CONTROLLER, CROSSHAIR, HUD, GAMEPLAY, VIEW WEAPON and VIRTUAL REALITY. The
-three headings the stock page lacked (`#str_231542` to `#str_231544`) are
-each language's own section names from its Section list, in capitals. The
-Section row at the top moves the focus to a section's first row, as the
-stock list scrolled to it, and in a portrait window the sections stack in
-one column.
+`tools/ui/retained_game.py` builds `guis/menu/settings/game.q4ui` in the
+settings sub-page that `tools/ui/retained_settings_rows.py` shares between
+the settings pages. It carries every row of the stock page, in the stock
+order and text, in eight sections: GENERAL, MOUSE INPUT, CONTROLLER,
+CROSSHAIR, HUD, GAMEPLAY, VIEW WEAPON and VIRTUAL REALITY. The three headings
+the stock page lacked (`#str_231542` to `#str_231544`) are each language's
+own section names from its Section list, in capitals. The sections stand on
+five tabs, which took the place of the Section row on 31 October; see
+[the settings sub-pages](#the-settings-sub-pages-31-october-2026).
 
 The 73 rows that name a CVar read it back through the page's CVar state and
 set it with `settings.player.set`, which the adapter allows for exactly what
@@ -1810,8 +1811,8 @@ button keeps the retained page while it is available. Captured from the menu
 event, on a listen server through the in-game menu's own GAME OPTIONS button,
 and with a broken page.
 
-`openq4-ui-retained-game` checks the document's rows and verbs, the Section
-jump, CVar rows setting their CVars, a colour list's stock value, the custom
+`openq4-ui-retained-game` checks the document's rows and verbs, the tabs and
+their columns, CVar rows setting their CVars, a colour list's stock value, the custom
 crosshair's lock, Custom never offered, the focus after a language reload,
 Back and a portrait fit. The gate compiles the route against its doubles and
 pins each computed row to its stock choice, the language list to the stock
@@ -1823,10 +1824,10 @@ the language to German on the way.
 
 The settings screen's AUDIO button opens a retained AUDIO page while the
 retained screens are on. `tools/ui/retained_audio.py` builds
-`guis/menu/settings/audio.q4ui` from the SYSTEM page's construction (its
-panel, header, scrolling body, section headings, slider, check box and list
-rows and footer), so the page adds no art and no strings. It carries every row
-of the stock page, in the stock order and with the stock text:
+`guis/menu/settings/audio.q4ui` in the settings sub-page (see
+[the settings sub-pages](#the-settings-sub-pages-31-october-2026)), so the
+page adds no art and no strings. It carries every row of the stock page, in
+the stock order and with the stock text:
 
 | Section | Rows |
 | --- | --- |
@@ -1872,7 +1873,7 @@ column saying what the page is for (`#str_231546`, in every language).
 
 | Button | Opens |
 | --- | --- |
-| CONTROLS, GAME OPTIONS, AUDIO | Their retained pages; Back returns here onto the button |
+| CONTROLS, GAME OPTIONS, AUDIO | Their retained sub-pages, one level deeper; Back climbs out onto the button |
 | DISPLAY | The retained SYSTEM page where it is on, otherwise the stock screen on its DISPLAY panel |
 | LOAD DEFAULTS | The stock dialog's question in its words; YES restores the defaults as the stock YES did, NO closes it |
 | BACK, the back input | The title or the pause, as it was |
@@ -1928,6 +1929,76 @@ All output comes from registered engine `screenshot` commands in hidden,
 windowed processes with mouse/controller input disabled. No host input or OS
 screen capture was used. Evidence is under `.tmp/retained-ui-completion/`;
 this is a bounded working-copy checkpoint, with no product acceptance.
+
+## The settings sub-pages (31 October 2026)
+
+CONTROLS, GAME OPTIONS and AUDIO were drafted as full-screen panels that
+filled the view with as many columns of large cards as it held. They now
+follow the main menu's design: each is a sub-page of the SETTINGS page, built
+as Create Server is, and no page shows more than two columns of rows.
+
+- **Frame.** `tools/ui/retained_settings_rows.py` puts each page in the
+  sub-page frame (`retained_subpage.py`): the top band one notch on, SETTINGS
+  as the crumb in the band's thin span, the page's title at the step's foot,
+  and the bottom band docked with the prompt bar's Select and Back. A backing
+  at the stock page backing's 0.6 darkens both columns, faded in over the
+  leading margin. AUDIO's title is now the SETTINGS page's own AUDIO label,
+  so the label that carries matches it.
+- **Tabs.** A page's sections are tabs (section 13.7) in the Escape card's
+  strip (section 14.18) across the content's top, from 44 u and 46 u down,
+  clear of the stepped band: the active
+  tab's rise, flare and shoulder, the broken baseline and its wash, and the
+  Q and E keycaps at its ends, which show the shoulder buttons for a
+  controller. Q, E, the shoulder buttons or a click switch tabs, wrapping at
+  the ends; the pages cross-fade over 150 ms and the new tab's first row
+  takes the focus. Rows on other tabs take no input. A page short enough for
+  one screen has no strip, only Create Server's header band with its
+  columns' headings.
+- **Columns.** Each tab holds at most two columns of 287 u, 13 u apart, of
+  section 7 setting rows (`retained_mp_menus.value_row`, as Create Server's)
+  on the stock 24 u pitch from 87 u, at most 14 to a column. The values line
+  up in one value column, placed so that every label fits in two lines in
+  every shipped language: one for all of GAME OPTIONS, one per tab on
+  CONTROLS (the keys bound to an action get the room its labels leave) and
+  one per column on AUDIO (the device names get theirs). A label that a
+  language needs two lines for takes the 14 dp face. The generator fails when
+  a tab label, heading or row label would not fit, or a column would
+  overflow.
+- **Navigation.** Up and Down read down the first column and on down the
+  second, then wrap; Up from the first row reaches the tab. Left and Right
+  cross to the row beside on a row with no value to change (sliders and lists
+  keep them).
+
+| Page | Tabs and columns |
+| --- | --- |
+| CONTROLS | MOVEMENT, WEAPONS, ATTACK/LOOK, OTHER; each tab's bindings split over two columns, the key hint on the heading line |
+| GAME OPTIONS | GENERAL (general / gameplay and view weapon), MOUSE INPUT, CONTROLLER (sticks and look / rumble, gyro, touch and prompts), HUD (HUD / crosshair), VIRTUAL REALITY |
+| AUDIO | No tabs: LEVELS and DEVICES / EFFECTS |
+
+GAME OPTIONS lost its Section row: the tabs do its job. After a language
+reload the page returns to GENERAL, on Language, from whichever tab was
+showing. The sliders show their value as Create Server's and the in-game
+Settings page's do; the drafts' typed number fields are gone for now, since
+their message named one fixed range whatever the row's.
+
+The SETTINGS page goes one level deeper to each, as Multiplayer goes to
+Create Server (`BeginRetainedSubpage`, with the new
+`RETAINED_SUBPAGE_SETTINGS_*` kinds): its plates fade and sweep, SETTINGS
+becomes the crumb, the band steps one notch and the section's label carries
+to the step's foot, where the sub-page presents at 350 ms. Back plays the
+sub-page's leave and the SETTINGS page returns onto the section at 300 ms;
+Back while it goes deeper reverses the change. Reduced motion places each
+level at once. A sub-page that cannot open at the hand-over leaves the stock
+settings screen to show its panel, as before. From the stock settings screen
+and the multiplayer menu's routes the pages still open and close at once.
+
+`openq4-ui-retained-controls`, `-game` and `-audio` check the canvas, the
+tabs, the columns, the column-major navigation and Up to the tab, a tab's
+rows refusing focus while another is current, and the language reload's
+return; `openq4-ui-retained-settings` checks the SETTINGS page's deeper and
+reverse events. The gate drives the descent, the Back and the stock
+fallback at the hand-over against its doubles. The `settings-subpages`
+capture scenario walks the SETTINGS page into each sub-page and every tab.
 
 ## Tall views grow the lists (25 October 2026)
 

@@ -3617,6 +3617,8 @@ static void CheckSettingsPage(ScreenHost& host, const char* path) {
 	Check(std::get<std::string>(document.Model().actions.at("back").arguments.at("command").literal) == "settingsBack" &&
 		std::get<std::string>(document.Model().actions.at("settingsDefaults").arguments.at("command").literal) == "settingsDefaults",
 		"BACK and LOAD DEFAULTS' YES reach the session");
+	for (const char* event : {"subpageentercontrols","subpageentergame","subpageenteraudio","subpagereturn","subpagereverse150","subpagereverse300"})
+		Check(document.Model().events.contains(PresentationAliasKey(event)),"the page goes one level deeper to its sub-pages and back");
 	Runtime runtime(host);
 	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/settings.q4ui",diagnostics),"the page loads into a runtime");
 	Viewport viewport; viewport.canvasHeight = document.Model().canvasHeight; viewport.canvasMinWidth = document.Model().canvasMinWidth;
@@ -3689,15 +3691,24 @@ static void CheckSettingsPage(ScreenHost& host, const char* path) {
 	}
 }
 
-// The retained CONTROLS page (tools/ui/retained_controls.py): each row shows
-// the keys the session publishes for its action; Accept asks the session to
-// wait for a key, the west face button to clear the focused row.
+// The settings sub-pages (tools/ui/retained_settings_rows.py) lay out on the
+// 4:3 canvas as Create Server does; a 16:9 view of it.
+static Viewport SettingsViewport(const Document& document, int width = 1280, int height = 720) {
+	Viewport viewport; viewport.canvasHeight = document.Model().canvasHeight; viewport.canvasMinWidth = document.Model().canvasMinWidth;
+	viewport.width = width; viewport.height = height;
+	return viewport;
+}
+
+// The retained CONTROLS page (tools/ui/retained_controls.py): the stock tabs
+// as the page's tabs, each in two columns; each row shows the keys the
+// session publishes for its action; Accept asks the session to wait for a
+// key, the west face button to clear the focused row.
 static void CheckControlsPage(ScreenHost& host, const char* path) {
 	const auto source = Read(path);
 	Document document; std::vector<Diagnostic> diagnostics;
 	if (!document.Load(source,diagnostics)) for (const auto& d : diagnostics) std::fprintf(stderr,"%u:%u %s %s\n",unsigned(d.line),unsigned(d.column),d.pointer.c_str(),d.message.c_str());
-	Check(diagnostics.empty() && document.Model().id == "openq4.controls" && document.Model().canvasHeight == 0,
-		"the CONTROLS page validates, laid out on the view as the SYSTEM page is");
+	Check(diagnostics.empty() && document.Model().id == "openq4.controls" && document.Model().canvasHeight == 720,
+		"the CONTROLS page validates on the 4:3 canvas");
 	CheckSessionActions(document);
 	for (int row = 0; row < 49; ++row) {
 		const auto* node = document.Model().FindNode("controls_bind_"+std::to_string(row));
@@ -3705,9 +3716,10 @@ static void CheckControlsPage(ScreenHost& host, const char* path) {
 			"each binding row asks the session to wait for a key");
 	}
 	Check(!document.Model().FindNode("controls_bind_49"),"the stock page's 49 bindings, no more");
+	for (const char* tab : {"tab-move","tab-weapons","tab-attack","tab-other"}) Check(document.Model().FindNode(tab) != nullptr,"the stock tabs");
 	Runtime runtime(host);
 	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/settings/controls.q4ui",diagnostics),"the page loads into a runtime");
-	Viewport viewport; std::string error; Runtime::EventEffects effects;
+	auto viewport = SettingsViewport(document); std::string error; Runtime::EventEffects effects;
 	const auto press = [&](MenuInput input, double at) { runtime.MenuAction(input,true,at); runtime.MenuAction(input,false,at+.01); };
 	const auto text = [&](const std::string& node, const char* property) {
 		const auto found = runtime.PresentedValue(node,property); return found ? found->text : std::string("?");
@@ -3717,8 +3729,11 @@ static void CheckControlsPage(ScreenHost& host, const char* path) {
 		"the session publishes the keys");
 	Check(runtime.RunEvent("onActivate",0.2,effects,error),"the page arrives");
 	runtime.Frame(viewport,0.5);
-	Check(runtime.FocusedControl() == "controls_bind_0" && text("controls_bind_0-keys","text") == "W, UPARROW",
+	Check(runtime.FocusedControl() == "controls_bind_0" && text("controls_bind_0-value","text") == "W, UPARROW",
 		"the page opens on Move Forward, showing its keys");
+	// Two columns: Move Forward leads the first, the sixth row the second.
+	const auto first = bounds("controls_bind_0"), second = bounds("controls_bind_5");
+	Check(second.x > first.x+first.width && std::abs(second.y-first.y) < .5f,"the tab's rows stand in two columns");
 	runtime.TakeActions();
 	press(MenuInput::Accept,0.6);
 	{
@@ -3727,25 +3742,40 @@ static void CheckControlsPage(ScreenHost& host, const char* path) {
 	}
 	Check(runtime.RunEvent("onSecondary",0.7,effects,error) && effects.actions.size() == 1 &&
 		std::get<std::string>(effects.actions[0].arguments.at("command")) == "controlsClear","the west face button clears the row");
-	Check(runtime.RunEvent("onBack",0.8,effects,error) && effects.actions.size() == 1 &&
+	// Down reads the first column, then on down the second.
+	Check(runtime.FocusControl("controls_bind_4",0.71),"focus the first column's last row");
+	press(MenuInput::Down,0.72);
+	Check(runtime.FocusedControl() == "controls_bind_5","Down goes on to the second column");
+	// The next tab: Weapons, its first row focused; Movement's rows rest.
+	Check(runtime.RunEvent("onTabNext",0.75,effects,error),"the next tab");
+	runtime.Frame(viewport,0.76);
+	Check(std::get<double>(runtime.GetState().at("page.tab")) == 1 && runtime.FocusedControl() == "controls_bind_10",
+		"the next tab opens on its first row");
+	Check(!runtime.FocusControl("controls_bind_0",0.77),"another tab's rows take no focus");
+	Check(runtime.RunEvent("onTabPrevious",0.78,effects,error) && runtime.RunEvent("onTabPrevious",0.79,effects,error),"back past the first tab");
+	runtime.Frame(viewport,0.8);
+	Check(std::get<double>(runtime.GetState().at("page.tab")) == 3 && runtime.FocusedControl() == "controls_bind_36",
+		"the tabs wrap to the last");
+	Check(text("controls_bind_48-value","text") == "V","the last tab shows its keys");
+	Check(runtime.RunEvent("onBack",0.9,effects,error) && effects.actions.size() == 1 &&
 		std::get<std::string>(effects.actions[0].arguments.at("command")) == "controlsBack","Back asks the session to return");
-	Viewport portrait; portrait.width = 540; portrait.height = 960;
+	const auto portrait = SettingsViewport(document,540,960);
 	runtime.Frame(portrait,1.0);
-	const auto panel = bounds("controls-panel"), row = bounds("controls_bind_0");
+	const auto panel = bounds("controls-panel"), row = bounds("controls_bind_48");
 	Check(panel.x >= -.5f && panel.x+panel.width <= 540.5f && panel.y+panel.height <= 960.5f && row.x+row.width <= 540.5f,
 		"the panel fits a portrait view");
 }
 
-// The retained GAME OPTIONS page (tools/ui/retained_game.py): a row naming a
-// CVar reads it back and sets it with settings.player.set; the rows the stock
-// page computes ask the session; the Section row moves the focus to a
-// section's first row; the custom crosshair follows Crosshair's setting.
+// The retained GAME OPTIONS page (tools/ui/retained_game.py): five tabs of
+// at most two columns; a row naming a CVar reads it back and sets it with
+// settings.player.set; the rows the stock page computes ask the session; the
+// custom crosshair follows Crosshair's setting.
 static void CheckGamePage(ScreenHost& host, const char* path) {
 	const auto source = Read(path);
 	Document document; std::vector<Diagnostic> diagnostics;
 	if (!document.Load(source,diagnostics)) for (const auto& d : diagnostics) std::fprintf(stderr,"%u:%u %s %s\n",unsigned(d.line),unsigned(d.column),d.pointer.c_str(),d.message.c_str());
-	Check(diagnostics.empty() && document.Model().id == "openq4.game" && document.Model().canvasHeight == 0,
-		"the GAME page validates, laid out on the view as the SYSTEM page is");
+	Check(diagnostics.empty() && document.Model().id == "openq4.game" && document.Model().canvasHeight == 720,
+		"the GAME page validates on the 4:3 canvas");
 	CheckSessionActions(document);
 	const std::pair<const char*,const char*> settings[] = {{"game_freelook","in_freeLook"},{"game_msensitivity","sensitivity"},
 		{"game_invertmouse","m_pitch"},{"game_promptstyle","in_promptStyle"},{"game_crosshaircolor","g_crosshairColor"},
@@ -3763,6 +3793,7 @@ static void CheckGamePage(ScreenHost& host, const char* path) {
 			std::get<std::string>(found->second.arguments.at("command").literal) == verb,"a computed row asks the session");
 	}
 	Check(std::get<std::string>(document.Model().actions.at("back").arguments.at("command").literal) == "gameBack","BACK asks the session to return");
+	Check(!document.Model().FindNode("game_section"),"tabs take the Section row's place");
 	// Every row's CVar, at its type's initial value but for these.
 	const auto saved = host.cvars;
 	host.cvars.insert({{"in_freeLook",true},{"sensitivity",5.0},{"m_pitch",std::string("0.022")},{"g_crosshairCustom",std::string("0")},
@@ -3771,9 +3802,10 @@ static void CheckGamePage(ScreenHost& host, const char* path) {
 		if (!declaration.cvar.empty()) host.cvars.emplace(declaration.cvar,declaration.initial);
 	Runtime runtime(host);
 	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/settings/game.q4ui",diagnostics),"the page loads into a runtime");
-	Viewport viewport; std::string error; Runtime::EventEffects effects;
+	auto viewport = SettingsViewport(document); std::string error; Runtime::EventEffects effects;
 	const auto press = [&](MenuInput input, double at) { runtime.MenuAction(input,true,at); runtime.MenuAction(input,false,at+.01); };
 	const auto bounds = [&](const std::string& id) { Bounds b; Check(runtime.GetBounds(id,b),"a GAME page node is laid out"); return b; };
+	const auto tab = [&]() { return std::get<double>(runtime.GetState().at("page.tab")); };
 	// The one action a control queued, resolved through its descriptor.
 	const auto taken = [&](const char* action) {
 		const auto actions = runtime.TakeActions();
@@ -3794,28 +3826,37 @@ static void CheckGamePage(ScreenHost& host, const char* path) {
 		"the session publishes the computed rows");
 	Check(runtime.RunEvent("onActivate",0.2,effects,error),"the page arrives");
 	runtime.Frame(viewport,0.5);
-	Check(runtime.FocusedControl() == "game_section","the page opens on the Section row");
-	// The Section row: choosing Crosshair writes the page's state and its
-	// event moves the focus to that section's first row.
-	press(MenuInput::Accept,0.6); runtime.Frame(viewport,0.65);
-	Check(runtime.GetWidgetState("game_section") && runtime.GetWidgetState("game_section")->popupOpen,"the Section row unfolds");
-	for (int i = 0; i < 3; ++i) press(MenuInput::Down,0.7+i*.05);
-	press(MenuInput::Accept,0.9);
-	auto invocation = taken("gameSection");
-	Check(invocation.operation == "ui.state.set" && std::get<double>(invocation.arguments.at("value")) == 3,"Section asks for its fourth section");
-	Check(runtime.SetState({{"game.section",3.0}},error,0.95) && runtime.RunEvent("gameSectionChosen",0.95,effects,error),"the adapter writes it");
-	runtime.Frame(viewport,1.0);
-	Check(runtime.FocusedControl() == "game_customcrosshair","the focus moves to Crosshair's first row");
-	// A setting row sets its CVar: Free Look off, a sensitivity step.
-	Check(runtime.FocusControl("game_freelook",1.1),"focus Free Look");
-	press(MenuInput::Accept,1.11);
-	invocation = taken("set.in_freeLook");
+	Check(tab() == 0 && runtime.FocusedControl() == "game_freelook","the page opens on GENERAL's first row");
+	// GENERAL: its own rows in the first column, GAMEPLAY and VIEW WEAPON in
+	// the second; Down from the first column's last row goes on to the second,
+	// and Up from the first row reaches the tab.
+	const auto general = bounds("game_freelook"), gameplay = bounds("game_corpsesink");
+	Check(gameplay.x > general.x+general.width,"the sections stand in two columns");
+	Check(runtime.FocusControl("game_forcemodel",0.51),"focus the first column's last row");
+	press(MenuInput::Down,0.52);
+	Check(runtime.FocusedControl() == "game_corpsesink","Down goes on to the second column");
+	Check(runtime.FocusControl("game_freelook",0.53),"focus the first row");
+	press(MenuInput::Up,0.54);
+	Check(runtime.FocusedControl() == "tab-general","Up from the first row reaches the tab");
+	// A setting row sets its CVar: Free Look off.
+	Check(runtime.FocusControl("game_freelook",0.55),"focus Free Look");
+	press(MenuInput::Accept,0.56);
+	auto invocation = taken("set.in_freeLook");
 	Check(std::get<std::string>(invocation.arguments.at("cvar")) == "in_freeLook" && !std::get<bool>(invocation.arguments.at("value")),
 		"Accept turns Free Look off");
+	// MOUSE INPUT: a sensitivity step.
+	Check(runtime.RunEvent("onTabNext",0.6,effects,error),"the next tab");
+	runtime.Frame(viewport,0.61);
+	Check(tab() == 1 && runtime.FocusedControl() == "game_invertmouse","MOUSE INPUT opens on its first row");
+	Check(!runtime.FocusControl("game_freelook",0.62),"GENERAL's rows rest while another tab is current");
 	Check(runtime.FocusControl("game_msensitivity",1.2),"focus the mouse sensitivity");
 	press(MenuInput::Right,1.21);
 	Check(std::abs(std::get<double>(taken("set.sensitivity").arguments.at("value"))-5.01) < 1e-9,"Right raises the sensitivity a step");
-	// The crosshair colour list reads g_crosshairColor and offers the next colour.
+	// HUD: the crosshair colour list reads g_crosshairColor and offers the
+	// next colour.
+	Check(runtime.RunEvent("tab_hud",1.25,effects,error),"choose the HUD tab");
+	runtime.Frame(viewport,1.26);
+	Check(tab() == 3 && runtime.FocusedControl() == "game_hudlayout","HUD opens on its first row");
 	Check(runtime.FocusControl("game_crosshaircolor",1.3),"focus the crosshair colour");
 	press(MenuInput::Accept,1.31); runtime.Frame(viewport,1.35);
 	press(MenuInput::Down,1.4); press(MenuInput::Accept,1.45);
@@ -3829,37 +3870,41 @@ static void CheckGamePage(ScreenHost& host, const char* path) {
 	press(MenuInput::Right,1.62);
 	Check(std::get<double>(taken("gameCrosshair").arguments.at("value")) == 4,"Right asks the session for the next crosshair");
 	// Corpse Time shows Custom but never offers it.
+	Check(runtime.RunEvent("tab_general",1.65,effects,error),"back to GENERAL");
+	runtime.Frame(viewport,1.66);
 	Check(runtime.FocusControl("game_corpsetime",1.7),"focus Corpse Time");
 	press(MenuInput::Accept,1.71); runtime.Frame(viewport,1.75);
 	press(MenuInput::Down,1.8); runtime.Frame(viewport,1.85);
 	Check(runtime.GetWidgetState("game_corpsetime")->highlight != "game_corpsetime-option-7","Custom cannot be highlighted");
 	press(MenuInput::Back,1.9); runtime.Frame(viewport,1.95); runtime.TakeActions();
 	// The language reload re-activates the page, which the session marks:
-	// the focus returns to Language.
+	// the page returns to GENERAL, focused on Language, from any tab.
+	Check(runtime.RunEvent("tab_vr",1.955,effects,error),"choose VIRTUAL REALITY");
+	runtime.Frame(viewport,1.958);
 	Check(runtime.SetState({{"game.languageReloaded",true}},error,1.96) && runtime.RunEvent("onActivate",1.97,effects,error),"reload");
 	runtime.Frame(viewport,1.98);
-	Check(runtime.FocusedControl() == "game_language","after a language reload the page returns to Language");
+	Check(tab() == 0 && runtime.FocusedControl() == "game_language","after a language reload the page returns to Language");
 	// The back input asks the session to return.
 	Check(runtime.RunEvent("onBack",2.0,effects,error) && effects.actions.size() == 1 &&
 		std::get<std::string>(effects.actions[0].arguments.at("command")) == "gameBack","Back asks the session to return");
-	Viewport portrait; portrait.width = 540; portrait.height = 960;
+	const auto portrait = SettingsViewport(document,540,960);
 	runtime.Frame(portrait,2.1);
-	const auto panel = bounds("game-panel"), row = bounds("game_msensitivity");
+	const auto panel = bounds("game-panel"), row = bounds("game_weaponkick");
 	Check(panel.x >= -.5f && panel.x+panel.width <= 540.5f && panel.y+panel.height <= 960.5f && row.x+row.width <= 540.5f,
 		"the panel fits a portrait view");
 	host.cvars = saved;
 }
 
 // The retained AUDIO settings page (tools/ui/retained_audio.py): the stock
-// page's rows in the SYSTEM page's construction, each asking the session for
-// its new value with its own verb, the session's readback setting what they
-// show; BACK and the back input ask the session to return.
+// page's rows in the settings sub-page, one screen with no tabs, each asking
+// the session for its new value with its own verb, the session's readback
+// setting what they show; BACK and the back input ask the session to return.
 static void CheckAudioPage(ScreenHost& host, const char* path) {
 	const auto source = Read(path);
 	Document document; std::vector<Diagnostic> diagnostics;
 	if (!document.Load(source,diagnostics)) for (const auto& d : diagnostics) std::fprintf(stderr,"%u:%u %s %s\n",unsigned(d.line),unsigned(d.column),d.pointer.c_str(),d.message.c_str());
-	Check(diagnostics.empty() && document.Model().id == "openq4.audio" && document.Model().canvasHeight == 0,
-		"the AUDIO page validates, laid out on the view as the SYSTEM page is");
+	Check(diagnostics.empty() && document.Model().id == "openq4.audio" && document.Model().canvasHeight == 720,
+		"the AUDIO page validates on the 4:3 canvas");
 	CheckSessionActions(document);
 	const std::pair<const char*,const char*> rows[] = {{"audio_volume","audioVolume"},{"audio_music","audioMusic"},
 		{"audio_dialogue","audioDialogue"},{"audio_backend","audioBackend"},{"audio_device","audioDevice"},{"audio_eax","audioEax"},
@@ -3876,13 +3921,11 @@ static void CheckAudioPage(ScreenHost& host, const char* path) {
 	const auto back = document.Model().actions.find("back");
 	Check(back != document.Model().actions.end() && std::get<std::string>(back->second.arguments.at("command").literal) == "audioBack",
 		"BACK asks the session to return");
+	Check(!document.Model().FindNode("tab-audio"),"one screen of rows has no tab strip");
 	Runtime runtime(host);
 	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/settings/audio.q4ui",diagnostics),"the page loads into a runtime");
-	Viewport viewport; std::string error; Runtime::EventEffects effects;
+	auto viewport = SettingsViewport(document); std::string error; Runtime::EventEffects effects;
 	const auto press = [&](MenuInput input, double at) { runtime.MenuAction(input,true,at); runtime.MenuAction(input,false,at+.01); };
-	const auto text = [&](const std::string& node, const char* property) {
-		const auto found = runtime.PresentedValue(node,property); return found ? found->text : std::string("?");
-	};
 	const auto bounds = [&](const std::string& id) { Bounds b; Check(runtime.GetBounds(id,b),"an AUDIO page node is laid out"); return b; };
 	// The one action a control queued, resolved through its descriptor.
 	const auto taken = [&](const char* action) {
@@ -3911,6 +3954,9 @@ static void CheckAudioPage(ScreenHost& host, const char* path) {
 	Check(runtime.FocusedControl() == "audio_volume","the first row takes the focus");
 	const auto track = bounds("audio_volume-track"), fill = bounds("audio_volume-fill");
 	Check(fill.width > track.width*.6f && fill.width < track.width*.8f,"the volume's fill runs to 70%");
+	// LEVELS and DEVICES lead; EFFECTS stands in the second column.
+	const auto volume = bounds("audio_volume"), eax = bounds("audio_eax");
+	Check(eax.x > volume.x+volume.width && std::abs(eax.y-volume.y) < .5f,"EFFECTS stands beside LEVELS");
 	// The device row unfolds its list; Back folds it without asking anything.
 	Check(runtime.FocusControl("audio_device",0.51),"focus the device");
 	press(MenuInput::Accept,0.52); runtime.Frame(viewport,0.55);
@@ -3937,10 +3983,10 @@ static void CheckAudioPage(ScreenHost& host, const char* path) {
 	Check(runtime.RunEvent("onBack",0.8,effects,error) && effects.actions.size() == 1 &&
 		std::get<std::string>(effects.actions[0].arguments.at("command")) == "audioBack","Back asks the session to return");
 	// A portrait view: the panel and its rows stay inside the view.
-	Viewport portrait; portrait.width = 540; portrait.height = 960;
+	const auto portrait = SettingsViewport(document,540,960);
 	runtime.Frame(portrait,1.0);
-	const auto panel = bounds("audio-panel"), volume = bounds("audio_volume");
-	Check(panel.x >= -.5f && panel.x+panel.width <= 540.5f && panel.y+panel.height <= 960.5f && volume.x+volume.width <= 540.5f,
+	const auto panel = bounds("audio-panel"), last = bounds("audio_subtitle_speakers");
+	Check(panel.x >= -.5f && panel.x+panel.width <= 540.5f && panel.y+panel.height <= 960.5f && last.x+last.width <= 540.5f,
 		"the panel fits a portrait view");
 }
 

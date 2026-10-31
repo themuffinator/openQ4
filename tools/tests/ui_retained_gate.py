@@ -468,7 +468,8 @@ static const char* va(const char* fmt, ...) {
     static char buffers[8][1024]; static int index = 0; char* text = buffers[index++ & 7];
     va_list args; va_start(args, fmt); std::vsnprintf(text, sizeof(buffers[0]), fmt, args); va_end(args); return text;
 }
-typedef enum { RETAINED_SUBPAGE_CAMPAIGN, RETAINED_SUBPAGE_ARENA, RETAINED_SUBPAGE_CREATE_SERVER, RETAINED_SUBPAGE_JOIN_GAME } retainedSubpage_t;
+typedef enum { RETAINED_SUBPAGE_CAMPAIGN, RETAINED_SUBPAGE_ARENA, RETAINED_SUBPAGE_CREATE_SERVER, RETAINED_SUBPAGE_JOIN_GAME,
+    RETAINED_SUBPAGE_SETTINGS_CONTROLS, RETAINED_SUBPAGE_SETTINGS_GAME, RETAINED_SUBPAGE_SETTINGS_AUDIO } retainedSubpage_t;
 template<typename T> static T Max(T a, T b) { return a > b ? a : b; }
 // The server scan as the Join Game page reads and drives it: the servers it
 // found, those the filter passes in the sort's order (visible), the
@@ -2612,8 +2613,11 @@ int main() {
         CHECK(boxed.guiMainMenu->named.back() == "fromMp_toGameoptionsStock" && boxed.guiMainMenu->state["retainedGame"] != "0");
     }
     {   // The SETTINGS page: SETTINGS hands off to it from the title, which
-        // carries its label; CONTROLS, GAME OPTIONS and AUDIO open their
-        // retained pages over it, each returning onto its section; DISPLAY,
+        // carries its label; CONTROLS, GAME OPTIONS and AUDIO go one level
+        // deeper to their retained sub-pages, the page playing its half and
+        // the sub-page presenting over it at 350 ms, and each sub-page's Back
+        // plays its half and returns the page onto its section at 300 ms;
+        // DISPLAY,
         // with the SYSTEM page off, sends it away and at 500 ms the stock
         // settings screen arrives on its panel (openSettingsPage), whose Back
         // returns the page (settingsOpen); LOAD DEFAULTS' YES runs the stock
@@ -2629,16 +2633,32 @@ int main() {
         commonObject.time += 550; s.UpdateRetainedHome(); s.UpdateRetainedPage();
         CHECK(s.guiActive == page && s.RetainedPageActive() && s.retainedPageHome == title);
         s.HandleRetainedSessionRequest(page, "settingsControls");
-        CHECK(s.guiActive == s.guiRetainedControls && s.retainedControlsParent == page && page->state["from_controls"] == "1" &&
-              page->state["from_game"] == "0");
-        s.ReturnRetainedControls(); CHECK(s.guiActive == page);
+        CHECK(s.guiActive == page && page->named.back() == "subpageEnterControls" && s.retainedSubpageFrom == page &&
+              s.retainedSubpageKind == RETAINED_SUBPAGE_SETTINGS_CONTROLS && s.retainedSubpageUntil == commonObject.time + 350 &&
+              page->state["from_controls"] == "1" && page->state["from_game"] == "0");
+        s.HandleRetainedSessionRequest(page, "settingsGame"); CHECK(s.retainedSubpageKind == RETAINED_SUBPAGE_SETTINGS_CONTROLS);  // nothing else meanwhile
+        commonObject.time += 350; s.UpdateRetainedSubpage();
+        CHECK(s.guiActive == s.guiRetainedControls && s.guiActive != nullptr && s.retainedControlsParent == page && s.retainedSubpageFrom == nullptr);
+        auto* controls = s.guiActive;
+        s.ReturnRetainedControls();
+        CHECK(s.guiActive == controls && !controls->named.empty() && controls->named.back() == "subpageLeave" &&
+              s.retainedSubpageFrom == controls);
+        commonObject.time += 300; s.UpdateRetainedSubpage();
+        CHECK(s.guiActive == page && page->named.back() == "subpageReturn" && s.retainedControlsParent == nullptr &&
+              page->state["from_controls"] == "1");
         s.HandleRetainedSessionRequest(page, "settingsGame");
-        CHECK(s.guiActive == s.guiRetainedGame && s.retainedGameParent == page && page->state["from_game"] == "1" &&
-              page->state["from_controls"] == "0");
-        s.ReturnRetainedGame(); CHECK(s.guiActive == page);
+        CHECK(page->named.back() == "subpageEnterGame" && page->state["from_game"] == "1" && page->state["from_controls"] == "0");
+        commonObject.time += 350; s.UpdateRetainedSubpage();
+        CHECK(s.guiActive == s.guiRetainedGame && s.retainedGameParent == page);
+        s.ReturnRetainedGame();
+        CHECK(s.guiActive == s.guiRetainedGame && !s.guiActive->named.empty() && s.guiActive->named.back() == "subpageLeave");
+        commonObject.time += 300; s.UpdateRetainedSubpage(); CHECK(s.guiActive == page && s.retainedGameParent == nullptr);
         s.HandleRetainedSessionRequest(page, "settingsAudio");
-        CHECK(s.guiActive == s.guiRetainedAudio && s.retainedAudioParent == page && page->state["from_audio"] == "1");
-        s.ReturnRetainedAudio(); CHECK(s.guiActive == page);
+        CHECK(page->named.back() == "subpageEnterAudio" && page->state["from_audio"] == "1");
+        commonObject.time += 350; s.UpdateRetainedSubpage();
+        CHECK(s.guiActive == s.guiRetainedAudio && s.retainedAudioParent == page);
+        s.ReturnRetainedAudio(); commonObject.time += 300; s.UpdateRetainedSubpage();
+        CHECK(s.guiActive == page && page->named.back() == "subpageReturn" && s.retainedAudioParent == nullptr);
         const size_t sounds = s.played.size();
         s.HandleRetainedSessionRequest(page, "settingsDisplay");
         CHECK(s.systemOpens == 0 && page->named.back() == "depart" && s.retainedSettingsDest == 22 && page->state["from_display"] == "1" &&
@@ -2692,9 +2712,12 @@ int main() {
         auto broken = Session(true); broken.PreloadRetainedScreens(); broken.UpdateRetainedHome();
         broken.HandleRetainedSessionRequest(broken.guiRetainedHome, "settings"); commonObject.time += 550;
         broken.UpdateRetainedHome(); broken.UpdateRetainedPage();
-        broken.HandleRetainedSessionRequest(broken.guiRetainedSettingsPage, "settingsControls"); broken.ReturnRetainedControls();
+        broken.HandleRetainedSessionRequest(broken.guiRetainedSettingsPage, "settingsControls"); commonObject.time += 350;
+        broken.UpdateRetainedSubpage(); broken.ReturnRetainedControls(); commonObject.time += 300; broken.UpdateRetainedSubpage();
+        CHECK(broken.guiActive == broken.guiRetainedSettingsPage && broken.guiRetainedControls != nullptr);
         broken.guiRetainedControls->failed = true;
-        broken.HandleRetainedSessionRequest(broken.guiRetainedSettingsPage, "settingsControls");
+        broken.HandleRetainedSessionRequest(broken.guiRetainedSettingsPage, "settingsControls"); commonObject.time += 350;
+        broken.UpdateRetainedSubpage();
         CHECK(broken.retainedSettingsDest == 4 && broken.guiActive == broken.guiRetainedSettingsPage);
         // Where the page cannot present, SETTINGS runs the stock button: the
         // gate off, or a main menu without the route (quietly).
@@ -4423,13 +4446,14 @@ def check_prompt_glyphs(compiler: str, directory: Path) -> None:
     # The title, both pauses, Single Player, Campaign, the campaign difficulty
     # page, Multiplayer and SETTINGS, the seven pages with their own prompt bars and the
     # Strogg pause's three, the loading screen, the Escape, Welcome and
-    # summary cards and the Arena pause card.
-    assert documents == 23, documents
-    # The cards' tab keys take the shoulders, as do the Escape and Welcome
-    # cards' Tabs prompts; every Accept and Back prompt follows Swap Confirm
-    # and Back.
-    assert shoulders == 10, shoulders
-    assert swapping == 45, swapping
+    # summary cards, the Arena pause card and the CONTROLS, GAME OPTIONS and
+    # AUDIO sub-pages.
+    assert documents == 26, documents
+    # The cards' and the settings sub-pages' tab keys take the shoulders, as do
+    # the Escape and Welcome cards' Tabs prompts; every Accept and Back prompt
+    # follows Swap Confirm and Back.
+    assert shoulders == 14, shoulders
+    assert swapping == 51, swapping
     print(f'ui_retained gate: prompt glyphs follow the active device in {documents} documents')
 
 
@@ -5261,7 +5285,7 @@ def main() -> int:
     assert set(adapter_audio) == set(audio_verbs) and len(adapter_audio) == len(audio_verbs) == 12
     assert [verb for _section, _heading, rows in retained_audio.SECTIONS for _kind, _ident, _label, verb, _state, _extra in rows] == audio_verbs
     audio_document = json.loads(re.sub(r'^\s*//.*$', '', (ROOT / 'content/baseoq4/pak0/guis/menu/settings/audio.q4ui').read_text(encoding='utf-8'), flags=re.M))
-    assert 'canvas' not in audio_document and audio_document['actions']['back'] == {'operation': 'session.menu', 'arguments': {'command': 'audioBack'}}
+    assert audio_document['canvas']['height'] == 720 and audio_document['actions']['back'] == {'operation': 'session.menu', 'arguments': {'command': 'audioBack'}}
     for verb in audio_verbs:
         assert audio_document['actions'][verb]['operation'] == 'session.menuValue' and \
             audio_document['actions'][verb]['arguments'] == {'command': verb, 'value': {'input': 'value'}}, verb
@@ -5290,7 +5314,7 @@ def main() -> int:
     adapter_game = [verb for verb in cpp_allowlist(adapter, 'bool SessionMenuValueCommand(') if verb.startswith('game')]
     assert game_verbs == list(retained_game.VERBS) and sorted(adapter_game) == sorted(game_verbs)
     game_document = json.loads(re.sub(r'^\s*//.*$', '', (ROOT / 'content/baseoq4/pak0/guis/menu/settings/game.q4ui').read_text(encoding='utf-8'), flags=re.M))
-    assert 'canvas' not in game_document and game_document['actions']['back'] == {'operation': 'session.menu', 'arguments': {'command': 'gameBack'}}
+    assert game_document['canvas']['height'] == 720 and game_document['actions']['back'] == {'operation': 'session.menu', 'arguments': {'command': 'gameBack'}}
     for verb in game_verbs:
         assert game_document['actions'][verb]['arguments'] == {'command': verb, 'value': {'input': 'value'}}, verb
     game_request = function_body(menu, 'void idSessionLocal::HandleRetainedGameRequest(')

@@ -14,6 +14,7 @@
   "from_game": {"type": "boolean", "initial": false},
   "from_display": {"type": "boolean", "initial": false},
   "from_audio": {"type": "boolean", "initial": false},
+  "language": {"type": "string", "initial": "", "cvar": "sys_lang"},
   "prompt.glyphs": {"type": "number", "initial": 0},
   "prompt.swapped": {"type": "boolean", "initial": false},
   "prompt.accept": {"type": "string", "initial": "#str_231042"},
@@ -54,6 +55,10 @@
   "defaultsModalHidden": [{"op": "setState", "values": {"defaultsModal.visible": false}}],
   "defaultsConfirmed": [{"op": "call", "event": "defaultsModalHide"}, {"op": "action", "action": "settingsDefaults"}],
   "onBack": [{"op": "action", "action": "back"}],
+  "subpageReverse150": [{"op": "playTimeline", "timeline": "subpageReverse150"}],
+  "subpageReverse200": [{"op": "playTimeline", "timeline": "subpageReverse200"}],
+  "subpageReverse250": [{"op": "playTimeline", "timeline": "subpageReverse250"}],
+  "subpageReverse300": [{"op": "playTimeline", "timeline": "subpageReverse300"}],
   "onActivate": [
    {"op": "playTimeline", "timeline": "arrive"},
    {"op": "focus", "control": "controls"},
@@ -64,6 +69,265 @@
   ],
   "onDeactivate": [{"op": "playTimeline", "timeline": "rest"}],
   "depart": [{"op": "playTimeline", "timeline": "depart"}],
+  "subpageEnterControls": [
+   {"op": "playTimeline", "timeline": "subpageEnterControls"},
+   {
+    "op": "if",
+    "condition": {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+    "then": [{"op": "playTimeline", "timeline": "crumbEnter-brazilian"}],
+    "else": [
+     {
+      "op": "if",
+      "condition": {"op": "==", "args": [{"state": "language"}, "czech"]},
+      "then": [{"op": "playTimeline", "timeline": "crumbEnter-czech"}],
+      "else": [
+       {
+        "op": "if",
+        "condition": {"op": "==", "args": [{"state": "language"}, "english"]},
+        "then": [{"op": "playTimeline", "timeline": "crumbEnter-english"}],
+        "else": [
+         {
+          "op": "if",
+          "condition": {"op": "==", "args": [{"state": "language"}, "french"]},
+          "then": [{"op": "playTimeline", "timeline": "crumbEnter-french"}],
+          "else": [
+           {
+            "op": "if",
+            "condition": {"op": "==", "args": [{"state": "language"}, "german"]},
+            "then": [{"op": "playTimeline", "timeline": "crumbEnter-german"}],
+            "else": [
+             {
+              "op": "if",
+              "condition": {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+              "then": [{"op": "playTimeline", "timeline": "crumbEnter-hungarian"}],
+              "else": [
+               {
+                "op": "if",
+                "condition": {"op": "==", "args": [{"state": "language"}, "italian"]},
+                "then": [{"op": "playTimeline", "timeline": "crumbEnter-italian"}],
+                "else": [
+                 {
+                  "op": "if",
+                  "condition": {"op": "==", "args": [{"state": "language"}, "polish"]},
+                  "then": [{"op": "playTimeline", "timeline": "crumbEnter-polish"}],
+                  "else": [
+                   {
+                    "op": "if",
+                    "condition": {"op": "==", "args": [{"state": "language"}, "russian"]},
+                    "then": [{"op": "playTimeline", "timeline": "crumbEnter-russian"}],
+                    "else": [
+                     {
+                      "op": "if",
+                      "condition": {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                      "then": [{"op": "playTimeline", "timeline": "crumbEnter-spanish"}],
+                      "else": [
+                       {
+                        "op": "if",
+                        "condition": {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                        "then": [{"op": "playTimeline", "timeline": "crumbEnter-turkish"}],
+                        "else": [
+                         {
+                          "op": "if",
+                          "condition": {"op": "==", "args": [{"state": "language"}, "ukrainian"]},
+                          "then": [{"op": "playTimeline", "timeline": "crumbEnter-ukrainian"}],
+                          "else": [{"op": "playTimeline", "timeline": "crumbEnter"}]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ],
+  "subpageEnterGame": [
+   {"op": "playTimeline", "timeline": "subpageEnterGame"},
+   {
+    "op": "if",
+    "condition": {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+    "then": [{"op": "playTimeline", "timeline": "crumbEnter-brazilian"}],
+    "else": [
+     {
+      "op": "if",
+      "condition": {"op": "==", "args": [{"state": "language"}, "czech"]},
+      "then": [{"op": "playTimeline", "timeline": "crumbEnter-czech"}],
+      "else": [
+       {
+        "op": "if",
+        "condition": {"op": "==", "args": [{"state": "language"}, "english"]},
+        "then": [{"op": "playTimeline", "timeline": "crumbEnter-english"}],
+        "else": [
+         {
+          "op": "if",
+          "condition": {"op": "==", "args": [{"state": "language"}, "french"]},
+          "then": [{"op": "playTimeline", "timeline": "crumbEnter-french"}],
+          "else": [
+           {
+            "op": "if",
+            "condition": {"op": "==", "args": [{"state": "language"}, "german"]},
+            "then": [{"op": "playTimeline", "timeline": "crumbEnter-german"}],
+            "else": [
+             {
+              "op": "if",
+              "condition": {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+              "then": [{"op": "playTimeline", "timeline": "crumbEnter-hungarian"}],
+              "else": [
+               {
+                "op": "if",
+                "condition": {"op": "==", "args": [{"state": "language"}, "italian"]},
+                "then": [{"op": "playTimeline", "timeline": "crumbEnter-italian"}],
+                "else": [
+                 {
+                  "op": "if",
+                  "condition": {"op": "==", "args": [{"state": "language"}, "polish"]},
+                  "then": [{"op": "playTimeline", "timeline": "crumbEnter-polish"}],
+                  "else": [
+                   {
+                    "op": "if",
+                    "condition": {"op": "==", "args": [{"state": "language"}, "russian"]},
+                    "then": [{"op": "playTimeline", "timeline": "crumbEnter-russian"}],
+                    "else": [
+                     {
+                      "op": "if",
+                      "condition": {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                      "then": [{"op": "playTimeline", "timeline": "crumbEnter-spanish"}],
+                      "else": [
+                       {
+                        "op": "if",
+                        "condition": {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                        "then": [{"op": "playTimeline", "timeline": "crumbEnter-turkish"}],
+                        "else": [
+                         {
+                          "op": "if",
+                          "condition": {"op": "==", "args": [{"state": "language"}, "ukrainian"]},
+                          "then": [{"op": "playTimeline", "timeline": "crumbEnter-ukrainian"}],
+                          "else": [{"op": "playTimeline", "timeline": "crumbEnter"}]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ],
+  "subpageEnterAudio": [
+   {"op": "playTimeline", "timeline": "subpageEnterAudio"},
+   {
+    "op": "if",
+    "condition": {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+    "then": [{"op": "playTimeline", "timeline": "crumbEnter-brazilian"}],
+    "else": [
+     {
+      "op": "if",
+      "condition": {"op": "==", "args": [{"state": "language"}, "czech"]},
+      "then": [{"op": "playTimeline", "timeline": "crumbEnter-czech"}],
+      "else": [
+       {
+        "op": "if",
+        "condition": {"op": "==", "args": [{"state": "language"}, "english"]},
+        "then": [{"op": "playTimeline", "timeline": "crumbEnter-english"}],
+        "else": [
+         {
+          "op": "if",
+          "condition": {"op": "==", "args": [{"state": "language"}, "french"]},
+          "then": [{"op": "playTimeline", "timeline": "crumbEnter-french"}],
+          "else": [
+           {
+            "op": "if",
+            "condition": {"op": "==", "args": [{"state": "language"}, "german"]},
+            "then": [{"op": "playTimeline", "timeline": "crumbEnter-german"}],
+            "else": [
+             {
+              "op": "if",
+              "condition": {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+              "then": [{"op": "playTimeline", "timeline": "crumbEnter-hungarian"}],
+              "else": [
+               {
+                "op": "if",
+                "condition": {"op": "==", "args": [{"state": "language"}, "italian"]},
+                "then": [{"op": "playTimeline", "timeline": "crumbEnter-italian"}],
+                "else": [
+                 {
+                  "op": "if",
+                  "condition": {"op": "==", "args": [{"state": "language"}, "polish"]},
+                  "then": [{"op": "playTimeline", "timeline": "crumbEnter-polish"}],
+                  "else": [
+                   {
+                    "op": "if",
+                    "condition": {"op": "==", "args": [{"state": "language"}, "russian"]},
+                    "then": [{"op": "playTimeline", "timeline": "crumbEnter-russian"}],
+                    "else": [
+                     {
+                      "op": "if",
+                      "condition": {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                      "then": [{"op": "playTimeline", "timeline": "crumbEnter-spanish"}],
+                      "else": [
+                       {
+                        "op": "if",
+                        "condition": {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                        "then": [{"op": "playTimeline", "timeline": "crumbEnter-turkish"}],
+                        "else": [
+                         {
+                          "op": "if",
+                          "condition": {"op": "==", "args": [{"state": "language"}, "ukrainian"]},
+                          "then": [{"op": "playTimeline", "timeline": "crumbEnter-ukrainian"}],
+                          "else": [{"op": "playTimeline", "timeline": "crumbEnter"}]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ],
+  "subpageReturn": [{"op": "playTimeline", "timeline": "subpageReturn"}],
   "noticeEnter0": [{"op": "playTimeline", "timeline": "noticeEnter0"}],
   "noticeLeave0": [{"op": "playTimeline", "timeline": "noticeLeave0"}],
   "noticeRest0": [{"op": "playTimeline", "timeline": "noticeRest0"}],
@@ -2957,9 +3221,88 @@
      ]
     },
     {
+     "node": "title",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "title-clip",
+     "property": "width",
+     "keys": [
+      {"atMs": 0, "value": {"type": "length", "value": 450.0, "unit": "dp"}},
+      {"atMs": 1, "value": {"type": "length", "value": 450.0, "unit": "dp"}}
+     ]
+    },
+    {
      "node": "prompts",
      "property": "opacity",
      "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 1, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "controls-carry",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 1, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "controls-carry",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [-138.0, 247.2, 1, 1, 0]}},
+      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [-138.0, 247.2, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "controls-carry",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    },
+    {
+     "node": "game-carry",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 1, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "game-carry",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [-138.0, 292.2, 1, 1, 0]}},
+      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [-138.0, 292.2, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "game-carry",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    },
+    {
+     "node": "audio-carry",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 1, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "audio-carry",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [-138.0, 382.2, 1, 1, 0]}},
+      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [-138.0, 382.2, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "audio-carry",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
     }
    ]
   },
@@ -2995,6 +3338,830 @@
     },
     {
      "node": "prompts",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}},
+      {"atMs": 150, "value": {"type": "number", "value": 0}},
+      {"atMs": 300, "value": {"type": "number", "value": 0}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "subpageEnterControls",
+   "durationMs": 350,
+   "tracks": [
+    {
+     "node": "content",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}},
+      {"atMs": 150, "value": {"type": "number", "value": 0}},
+      {"atMs": 350, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "content",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 300, "value": {"type": "transform", "unit": "dp", "value": [960.0, 0, 1, 1, 0]}},
+      {"atMs": 350, "value": {"type": "transform", "unit": "dp", "value": [960.0, 0, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "title",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.5]}},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.4]}},
+      {"atMs": 350, "value": {"type": "color", "value": [1, 1, 1, 0.4]}}
+     ]
+    },
+    {
+     "node": "title-clip",
+     "property": "width",
+     "keys": [
+      {"atMs": 0, "value": {"type": "length", "value": 450.0, "unit": "dp"}},
+      {"atMs": 150, "value": {"type": "length", "value": 124.5, "unit": "dp"}},
+      {"atMs": 350, "value": {"type": "length", "value": 124.5, "unit": "dp"}}
+     ]
+    },
+    {
+     "node": "band-top",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [484.5, -94.5, 1, 1, 0]}},
+      {
+       "atMs": 50,
+       "value": {"type": "transform", "unit": "dp", "value": [484.5, -94.5, 1, 1, 0]},
+       "easing": [0.455, 0.03, 0.515, 0.955]
+      },
+      {"atMs": 350, "value": {"type": "transform", "unit": "dp", "value": [630.0, -94.5, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "controls-carry",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}},
+      {"atMs": 1, "value": {"type": "number", "value": 1}},
+      {"atMs": 350, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "controls-carry",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [-138.0, 247.2, 1, 1, 0]}},
+      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [-138.0, 247.2, 1, 1, 0]}},
+      {
+       "atMs": 50,
+       "value": {"type": "transform", "unit": "dp", "value": [-138.0, 247.2, 1, 1, 0]},
+       "easing": [0.455, 0.03, 0.515, 0.955]
+      },
+      {"atMs": 350, "value": {"type": "transform", "unit": "dp", "value": [-58.875, -4.575, 0.75, 0.75, 0]}}
+     ]
+    },
+    {
+     "node": "controls-carry",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {
+       "atMs": 50,
+       "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]},
+       "easing": [0.455, 0.03, 0.515, 0.955]
+      },
+      {"atMs": 350, "value": {"type": "color", "value": [1, 1, 1, 0.5]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "subpageEnterGame",
+   "durationMs": 350,
+   "tracks": [
+    {
+     "node": "content",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}},
+      {"atMs": 150, "value": {"type": "number", "value": 0}},
+      {"atMs": 350, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "content",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 300, "value": {"type": "transform", "unit": "dp", "value": [960.0, 0, 1, 1, 0]}},
+      {"atMs": 350, "value": {"type": "transform", "unit": "dp", "value": [960.0, 0, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "title",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.5]}},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.4]}},
+      {"atMs": 350, "value": {"type": "color", "value": [1, 1, 1, 0.4]}}
+     ]
+    },
+    {
+     "node": "title-clip",
+     "property": "width",
+     "keys": [
+      {"atMs": 0, "value": {"type": "length", "value": 450.0, "unit": "dp"}},
+      {"atMs": 150, "value": {"type": "length", "value": 124.5, "unit": "dp"}},
+      {"atMs": 350, "value": {"type": "length", "value": 124.5, "unit": "dp"}}
+     ]
+    },
+    {
+     "node": "band-top",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [484.5, -94.5, 1, 1, 0]}},
+      {
+       "atMs": 50,
+       "value": {"type": "transform", "unit": "dp", "value": [484.5, -94.5, 1, 1, 0]},
+       "easing": [0.455, 0.03, 0.515, 0.955]
+      },
+      {"atMs": 350, "value": {"type": "transform", "unit": "dp", "value": [630.0, -94.5, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "game-carry",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}},
+      {"atMs": 1, "value": {"type": "number", "value": 1}},
+      {"atMs": 350, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "game-carry",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [-138.0, 292.2, 1, 1, 0]}},
+      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [-138.0, 292.2, 1, 1, 0]}},
+      {
+       "atMs": 50,
+       "value": {"type": "transform", "unit": "dp", "value": [-138.0, 292.2, 1, 1, 0]},
+       "easing": [0.455, 0.03, 0.515, 0.955]
+      },
+      {"atMs": 350, "value": {"type": "transform", "unit": "dp", "value": [-58.875, -4.575, 0.75, 0.75, 0]}}
+     ]
+    },
+    {
+     "node": "game-carry",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {
+       "atMs": 50,
+       "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]},
+       "easing": [0.455, 0.03, 0.515, 0.955]
+      },
+      {"atMs": 350, "value": {"type": "color", "value": [1, 1, 1, 0.5]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "subpageEnterAudio",
+   "durationMs": 350,
+   "tracks": [
+    {
+     "node": "content",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}},
+      {"atMs": 150, "value": {"type": "number", "value": 0}},
+      {"atMs": 350, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "content",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 300, "value": {"type": "transform", "unit": "dp", "value": [960.0, 0, 1, 1, 0]}},
+      {"atMs": 350, "value": {"type": "transform", "unit": "dp", "value": [960.0, 0, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "title",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.5]}},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.4]}},
+      {"atMs": 350, "value": {"type": "color", "value": [1, 1, 1, 0.4]}}
+     ]
+    },
+    {
+     "node": "title-clip",
+     "property": "width",
+     "keys": [
+      {"atMs": 0, "value": {"type": "length", "value": 450.0, "unit": "dp"}},
+      {"atMs": 150, "value": {"type": "length", "value": 124.5, "unit": "dp"}},
+      {"atMs": 350, "value": {"type": "length", "value": 124.5, "unit": "dp"}}
+     ]
+    },
+    {
+     "node": "band-top",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [484.5, -94.5, 1, 1, 0]}},
+      {
+       "atMs": 50,
+       "value": {"type": "transform", "unit": "dp", "value": [484.5, -94.5, 1, 1, 0]},
+       "easing": [0.455, 0.03, 0.515, 0.955]
+      },
+      {"atMs": 350, "value": {"type": "transform", "unit": "dp", "value": [630.0, -94.5, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "audio-carry",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}},
+      {"atMs": 1, "value": {"type": "number", "value": 1}},
+      {"atMs": 350, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "audio-carry",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [-138.0, 382.2, 1, 1, 0]}},
+      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [-138.0, 382.2, 1, 1, 0]}},
+      {
+       "atMs": 50,
+       "value": {"type": "transform", "unit": "dp", "value": [-138.0, 382.2, 1, 1, 0]},
+       "easing": [0.455, 0.03, 0.515, 0.955]
+      },
+      {"atMs": 350, "value": {"type": "transform", "unit": "dp", "value": [-58.875, -4.575, 0.75, 0.75, 0]}}
+     ]
+    },
+    {
+     "node": "audio-carry",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {
+       "atMs": 50,
+       "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]},
+       "easing": [0.455, 0.03, 0.515, 0.955]
+      },
+      {"atMs": 350, "value": {"type": "color", "value": [1, 1, 1, 0.5]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "crumbEnter",
+   "durationMs": 350,
+   "tracks": [
+    {
+     "node": "title",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 150, "value": {"type": "transform", "unit": "dp", "value": [-45.0, -13.245, 0.8, 0.8, 0]}},
+      {"atMs": 350, "value": {"type": "transform", "unit": "dp", "value": [-45.0, -13.245, 0.8, 0.8, 0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "crumbEnter-english",
+   "durationMs": 350,
+   "tracks": [
+    {
+     "node": "title",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 150, "value": {"type": "transform", "unit": "dp", "value": [-45.0, -13.245, 0.8, 0.8, 0]}},
+      {"atMs": 350, "value": {"type": "transform", "unit": "dp", "value": [-45.0, -13.245, 0.8, 0.8, 0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "crumbEnter-french",
+   "durationMs": 350,
+   "tracks": [
+    {
+     "node": "title",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 150, "value": {"type": "transform", "unit": "dp", "value": [-45.0, -13.245, 0.8, 0.8, 0]}},
+      {"atMs": 350, "value": {"type": "transform", "unit": "dp", "value": [-45.0, -13.245, 0.8, 0.8, 0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "crumbEnter-german",
+   "durationMs": 350,
+   "tracks": [
+    {
+     "node": "title",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 150, "value": {"type": "transform", "unit": "dp", "value": [-62.5, -14.312, 0.7222, 0.7222, 0]}},
+      {"atMs": 350, "value": {"type": "transform", "unit": "dp", "value": [-62.5, -14.312, 0.7222, 0.7222, 0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "crumbEnter-italian",
+   "durationMs": 350,
+   "tracks": [
+    {
+     "node": "title",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 150, "value": {"type": "transform", "unit": "dp", "value": [-56.814, -13.966, 0.7475, 0.7475, 0]}},
+      {"atMs": 350, "value": {"type": "transform", "unit": "dp", "value": [-56.814, -13.966, 0.7475, 0.7475, 0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "crumbEnter-polish",
+   "durationMs": 350,
+   "tracks": [
+    {
+     "node": "title",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 150, "value": {"type": "transform", "unit": "dp", "value": [-45.0, -13.245, 0.8, 0.8, 0]}},
+      {"atMs": 350, "value": {"type": "transform", "unit": "dp", "value": [-45.0, -13.245, 0.8, 0.8, 0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "crumbEnter-russian",
+   "durationMs": 350,
+   "tracks": [
+    {
+     "node": "title",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 150, "value": {"type": "transform", "unit": "dp", "value": [-45.0, -13.245, 0.8, 0.8, 0]}},
+      {"atMs": 350, "value": {"type": "transform", "unit": "dp", "value": [-45.0, -13.245, 0.8, 0.8, 0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "crumbEnter-spanish",
+   "durationMs": 350,
+   "tracks": [
+    {
+     "node": "title",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 150, "value": {"type": "transform", "unit": "dp", "value": [-45.0, -13.245, 0.8, 0.8, 0]}},
+      {"atMs": 350, "value": {"type": "transform", "unit": "dp", "value": [-45.0, -13.245, 0.8, 0.8, 0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "crumbEnter-brazilian",
+   "durationMs": 350,
+   "tracks": [
+    {
+     "node": "title",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 150, "value": {"type": "transform", "unit": "dp", "value": [-62.5, -14.312, 0.7222, 0.7222, 0]}},
+      {"atMs": 350, "value": {"type": "transform", "unit": "dp", "value": [-62.5, -14.312, 0.7222, 0.7222, 0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "crumbEnter-czech",
+   "durationMs": 350,
+   "tracks": [
+    {
+     "node": "title",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 150, "value": {"type": "transform", "unit": "dp", "value": [-45.0, -13.245, 0.8, 0.8, 0]}},
+      {"atMs": 350, "value": {"type": "transform", "unit": "dp", "value": [-45.0, -13.245, 0.8, 0.8, 0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "crumbEnter-hungarian",
+   "durationMs": 350,
+   "tracks": [
+    {
+     "node": "title",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 150, "value": {"type": "transform", "unit": "dp", "value": [-45.0, -13.245, 0.8, 0.8, 0]}},
+      {"atMs": 350, "value": {"type": "transform", "unit": "dp", "value": [-45.0, -13.245, 0.8, 0.8, 0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "crumbEnter-turkish",
+   "durationMs": 350,
+   "tracks": [
+    {
+     "node": "title",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 150, "value": {"type": "transform", "unit": "dp", "value": [-45.0, -13.245, 0.8, 0.8, 0]}},
+      {"atMs": 350, "value": {"type": "transform", "unit": "dp", "value": [-45.0, -13.245, 0.8, 0.8, 0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "crumbEnter-ukrainian",
+   "durationMs": 350,
+   "tracks": [
+    {
+     "node": "title",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 150, "value": {"type": "transform", "unit": "dp", "value": [-49.726, -13.533, 0.779, 0.779, 0]}},
+      {"atMs": 350, "value": {"type": "transform", "unit": "dp", "value": [-49.726, -13.533, 0.779, 0.779, 0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "subpageReturn",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "content",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 150, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "content",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 150, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "details",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 150, "value": {"type": "number", "value": 1}}]
+    }
+   ]
+  },
+  {
+   "id": "subpageReverse150",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "content",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 150, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "content",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 150, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "title",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 150, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "title",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.4]}},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.5]}}
+     ]
+    },
+    {
+     "node": "title-clip",
+     "property": "width",
+     "keys": [
+      {"atMs": 0, "value": {"type": "length", "value": 124.5, "unit": "dp"}},
+      {"atMs": 150, "value": {"type": "length", "value": 450.0, "unit": "dp"}}
+     ]
+    },
+    {
+     "node": "band-top",
+     "property": "transform",
+     "keys": [
+      {
+       "atMs": 0,
+       "value": {"type": "transform", "unit": "dp", "value": [630.0, -94.5, 1, 1, 0]},
+       "easing": [0.455, 0.03, 0.515, 0.955]
+      },
+      {"atMs": 150, "value": {"type": "transform", "unit": "dp", "value": [484.5, -94.5, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "controls-carry",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}},
+      {"atMs": 75, "value": {"type": "number", "value": 0}},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "game-carry",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}},
+      {"atMs": 75, "value": {"type": "number", "value": 0}},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "audio-carry",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}},
+      {"atMs": 75, "value": {"type": "number", "value": 0}},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "subpageReverse200",
+   "durationMs": 200,
+   "tracks": [
+    {
+     "node": "content",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 200, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "content",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 200, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "title",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 200, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "title",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.4]}},
+      {"atMs": 200, "value": {"type": "color", "value": [1, 1, 1, 0.5]}}
+     ]
+    },
+    {
+     "node": "title-clip",
+     "property": "width",
+     "keys": [
+      {"atMs": 0, "value": {"type": "length", "value": 124.5, "unit": "dp"}},
+      {"atMs": 200, "value": {"type": "length", "value": 450.0, "unit": "dp"}}
+     ]
+    },
+    {
+     "node": "band-top",
+     "property": "transform",
+     "keys": [
+      {
+       "atMs": 0,
+       "value": {"type": "transform", "unit": "dp", "value": [630.0, -94.5, 1, 1, 0]},
+       "easing": [0.455, 0.03, 0.515, 0.955]
+      },
+      {"atMs": 200, "value": {"type": "transform", "unit": "dp", "value": [484.5, -94.5, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "controls-carry",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}},
+      {"atMs": 100, "value": {"type": "number", "value": 0}},
+      {"atMs": 200, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "game-carry",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}},
+      {"atMs": 100, "value": {"type": "number", "value": 0}},
+      {"atMs": 200, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "audio-carry",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}},
+      {"atMs": 100, "value": {"type": "number", "value": 0}},
+      {"atMs": 200, "value": {"type": "number", "value": 0}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "subpageReverse250",
+   "durationMs": 250,
+   "tracks": [
+    {
+     "node": "content",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 250, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "content",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 250, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "title",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 250, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "title",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.4]}},
+      {"atMs": 250, "value": {"type": "color", "value": [1, 1, 1, 0.5]}}
+     ]
+    },
+    {
+     "node": "title-clip",
+     "property": "width",
+     "keys": [
+      {"atMs": 0, "value": {"type": "length", "value": 124.5, "unit": "dp"}},
+      {"atMs": 250, "value": {"type": "length", "value": 450.0, "unit": "dp"}}
+     ]
+    },
+    {
+     "node": "band-top",
+     "property": "transform",
+     "keys": [
+      {
+       "atMs": 0,
+       "value": {"type": "transform", "unit": "dp", "value": [630.0, -94.5, 1, 1, 0]},
+       "easing": [0.455, 0.03, 0.515, 0.955]
+      },
+      {"atMs": 250, "value": {"type": "transform", "unit": "dp", "value": [484.5, -94.5, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "controls-carry",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}},
+      {"atMs": 125, "value": {"type": "number", "value": 0}},
+      {"atMs": 250, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "game-carry",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}},
+      {"atMs": 125, "value": {"type": "number", "value": 0}},
+      {"atMs": 250, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "audio-carry",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}},
+      {"atMs": 125, "value": {"type": "number", "value": 0}},
+      {"atMs": 250, "value": {"type": "number", "value": 0}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "subpageReverse300",
+   "durationMs": 300,
+   "tracks": [
+    {
+     "node": "content",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "content",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 300, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "title",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 300, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "title",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.4]}},
+      {"atMs": 300, "value": {"type": "color", "value": [1, 1, 1, 0.5]}}
+     ]
+    },
+    {
+     "node": "title-clip",
+     "property": "width",
+     "keys": [
+      {"atMs": 0, "value": {"type": "length", "value": 124.5, "unit": "dp"}},
+      {"atMs": 300, "value": {"type": "length", "value": 450.0, "unit": "dp"}}
+     ]
+    },
+    {
+     "node": "band-top",
+     "property": "transform",
+     "keys": [
+      {
+       "atMs": 0,
+       "value": {"type": "transform", "unit": "dp", "value": [630.0, -94.5, 1, 1, 0]},
+       "easing": [0.455, 0.03, 0.515, 0.955]
+      },
+      {"atMs": 300, "value": {"type": "transform", "unit": "dp", "value": [484.5, -94.5, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "controls-carry",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}},
+      {"atMs": 150, "value": {"type": "number", "value": 0}},
+      {"atMs": 300, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "game-carry",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}},
+      {"atMs": 150, "value": {"type": "number", "value": 0}},
+      {"atMs": 300, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "audio-carry",
      "property": "opacity",
      "keys": [
       {"atMs": 0, "value": {"type": "number", "value": 1}},
@@ -7863,6 +9030,66 @@
         }
        }
       ]
+     },
+     {
+      "id": "controls-carry",
+      "type": "text",
+      "properties": {
+       "text": {"type": "text", "value": "#str_200083"},
+       "position": {"type": "keyword", "value": "absolute"},
+       "left": {"type": "length", "value": 204.0, "unit": "dp"},
+       "top": {"type": "length", "value": 28.5, "unit": "dp"},
+       "width": {"type": "length", "value": 471.0, "unit": "dp"},
+       "height": {"type": "length", "value": 36.6, "unit": "dp"},
+       "font-family": {"type": "font", "value": "marine"},
+       "font-size": {"type": "length", "value": 24, "unit": "dp"},
+       "line-height": {"type": "length", "value": 36.6, "unit": "dp"},
+       "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]},
+       "white-space": {"type": "keyword", "value": "nowrap"},
+       "opacity": {"type": "number", "value": 0},
+       "transform": {"type": "transform", "unit": "dp", "value": [-138.0, 247.2, 1, 1, 0]},
+       "pointer-events": {"type": "keyword", "value": "none"}
+      }
+     },
+     {
+      "id": "game-carry",
+      "type": "text",
+      "properties": {
+       "text": {"type": "text", "value": "#str_200084"},
+       "position": {"type": "keyword", "value": "absolute"},
+       "left": {"type": "length", "value": 204.0, "unit": "dp"},
+       "top": {"type": "length", "value": 28.5, "unit": "dp"},
+       "width": {"type": "length", "value": 471.0, "unit": "dp"},
+       "height": {"type": "length", "value": 36.6, "unit": "dp"},
+       "font-family": {"type": "font", "value": "marine"},
+       "font-size": {"type": "length", "value": 24, "unit": "dp"},
+       "line-height": {"type": "length", "value": 36.6, "unit": "dp"},
+       "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]},
+       "white-space": {"type": "keyword", "value": "nowrap"},
+       "opacity": {"type": "number", "value": 0},
+       "transform": {"type": "transform", "unit": "dp", "value": [-138.0, 292.2, 1, 1, 0]},
+       "pointer-events": {"type": "keyword", "value": "none"}
+      }
+     },
+     {
+      "id": "audio-carry",
+      "type": "text",
+      "properties": {
+       "text": {"type": "text", "value": "#str_229901"},
+       "position": {"type": "keyword", "value": "absolute"},
+       "left": {"type": "length", "value": 204.0, "unit": "dp"},
+       "top": {"type": "length", "value": 28.5, "unit": "dp"},
+       "width": {"type": "length", "value": 471.0, "unit": "dp"},
+       "height": {"type": "length", "value": 36.6, "unit": "dp"},
+       "font-family": {"type": "font", "value": "marine"},
+       "font-size": {"type": "length", "value": 24, "unit": "dp"},
+       "line-height": {"type": "length", "value": 36.6, "unit": "dp"},
+       "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]},
+       "white-space": {"type": "keyword", "value": "nowrap"},
+       "opacity": {"type": "number", "value": 0},
+       "transform": {"type": "transform", "unit": "dp", "value": [-138.0, 382.2, 1, 1, 0]},
+       "pointer-events": {"type": "keyword", "value": "none"}
+      }
      }
     ]
    },

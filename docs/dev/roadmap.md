@@ -952,6 +952,12 @@ archived provenance; new scheduling belongs here.
   GL/Vulkan gameplay pose captures pass, including Vulkan resource resets;
   late fixture precache warnings and broader lifecycle/visual gates remain.
   Player Setup itself is still outstanding.
+  Progress, 31 October: CONTROLS, GAME OPTIONS and AUDIO are now
+  [sub-pages of the SETTINGS page](ui/retained-screens.md#the-settings-sub-pages-31-october-2026)
+  in the main menu's construction (visual specification 1.29, `FLOW-068`),
+  replacing the drafted full-screen panels: sections are tabs and no tab has
+  more than two columns. The SYSTEM page is still the drafted panel, and
+  portrait views and precise slider entry remain.
 - [ ] **UI-02 — P1, implementation and qualification: text, input and accessibility.**
   Finish in-field IME/composition, shaping/kerning/fallback/styles, grapheme editing,
   caret/candidate placement, binding capture, accessibility exposure and contextual

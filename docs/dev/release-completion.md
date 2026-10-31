@@ -6,6 +6,21 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Settings sub-pages, 31 October 2026
+
+- [x] CONTROLS, GAME OPTIONS and AUDIO become sub-pages of the SETTINGS page
+  in the main menu's construction, replacing the drafted full-screen panels:
+  the SETTINGS crumb and the one-level descent and climb, sections as tabs in
+  the Escape card's strip, at most two columns of setting rows
+  ([settings sub-pages](ui/retained-screens.md#the-settings-sub-pages-31-october-2026),
+  visual specification 1.29, register revision 21 appending `FLOW-068`).
+- [x] Native page tests for the three pages and the SETTINGS page, the
+  session gate (descent, Back and the stock fallback at the hand-over) and
+  the SYSTEM route harness pass; engine captures of every tab at 16:9
+  (OpenGL, English), 4:3 (German) and 9:16.
+- [ ] The SYSTEM page as a sub-page, portrait layouts that use the height,
+  precise entry for fine sliders and bound acceptance evidence remain.
+
 ## Windows stay see-through at any distance, 29 October 2026
 
 - Windows and open doorways no longer turn opaque once you step back from

@@ -1,10 +1,9 @@
-"""The retained AUDIO settings page (docs/dev/ui-visual-design.md section 7;
-UI-01): the stock page's rows (guis/menu/settings/audio.gui), LEVELS,
-DEVICES and EFFECTS, in the SYSTEM page's construction, which it takes from
-the SYSTEM document itself (guis/menu/settings/system.q4ui): its panel,
-header and rail, scrolling body and footer, and a slider, a toggle and a
-choice row as templates, each cloned under its own ids with its state
-timelines. A change to those SYSTEM parts regenerates this page.
+"""The retained AUDIO settings page (docs/dev/ui-visual-design.md sections 7,
+9 and 13.7; UI-01): the stock page's rows (guis/menu/settings/audio.gui),
+LEVELS, DEVICES and EFFECTS, in the settings sub-page
+(retained_settings_rows). They fit one screen, so the page has no tabs:
+LEVELS and DEVICES in the first column, EFFECTS in the second, under Create
+Server's header band.
 
 The page applies each change at once, as the stock page does, through the
 session (session.menuValue verbs, idSessionLocal::HandleRetainedAudioRequest):
@@ -18,7 +17,7 @@ screen that opened it."""
 from __future__ import annotations
 
 from build_retained_screens import Document
-from retained_settings_rows import Templates, choice_row, section_column, settings_page, slider_row, toggle_row
+from retained_settings_rows import heading, setting_row, settings_subpage, value_column
 
 DEVICES = 16                               # the device list's rows (BuildMainMenuAudioDeviceChoices)
 
@@ -49,8 +48,11 @@ SECTIONS = (
 VERBS = tuple(row[3] for _section, _heading, rows in SECTIONS for row in rows)
 
 
+# The columns: the sections each holds, by their place in SECTIONS.
+COLUMNS = ((0, 1), (2,))
+
+
 def audio_document() -> dict:
-    tpl = Templates()
     doc = Document("openq4.audio")
     doc.state.update({
         "audio.volume": {"type": "number", "initial": 0}, "audio.music": {"type": "number", "initial": 0},
@@ -68,23 +70,29 @@ def audio_document() -> dict:
             boolean = kind == "toggle"
             doc.actions[verb] = {"operation": "session.menuValue", "input": "boolean" if boolean else "number",
                                  "arguments": {"command": verb, "value": {"input": "value"}}}
-    doc.session("back", "audioBack")
-    first = None
+    count = {"state": "audio.device.count"}
     columns = []
-    for section, heading_key, rows in SECTIONS:
-        children = []
-        for kind, ident, label_key, verb, state, extra in rows:
-            if kind == "slider":
-                node = slider_row(doc, tpl, "audio", ident, label_key, verb, state, extra)
-            elif kind == "toggle":
-                node = toggle_row(doc, tpl, "audio", ident, label_key, verb, state)
-            elif kind == "choice":
-                node = choice_row(doc, tpl, "audio", ident, label_key, verb, state, [(key, value, index, None) for key, value, index in extra])
-            else:
-                options = [({"state": f"audio.device.{row}.label"}, row, None,
-                            {"op": "<", "args": [row, {"state": "audio.device.count"}]}) for row in range(DEVICES)]
-                node = choice_row(doc, tpl, "audio", ident, label_key, verb, state, options, {"state": "audio.device.count"})
-            first = first or ident
-            children.append(node)
-        columns.append(section_column(tpl, "audio", section, heading_key, children))
-    return settings_page(doc, tpl, "audio", "#str_200151", columns, first)
+    for sections in COLUMNS:
+        # Each column's values start where its own labels allow, which leaves
+        # the device names their room.
+        value_x = value_column([row[2] for place in sections for row in SECTIONS[place][2]])
+        items = []
+        for place in sections:
+            _section, heading_key, rows = SECTIONS[place]
+            items.append(heading(heading_key))
+            for kind, ident, label_key, verb, state, extra in rows:
+                value = {"state": state}
+                if kind == "slider":
+                    items.append(setting_row(doc, ident, label_key, "slider", value_x, value=value, action=verb, slider=(*extra, 0)))
+                elif kind == "toggle":
+                    items.append(setting_row(doc, ident, label_key, "toggle", value_x, value=value, action=verb))
+                elif kind == "choice":
+                    items.append(setting_row(doc, ident, label_key, "choice", value_x, value=value, action=verb,
+                                             entries=[((key, index), option) for key, option, index in extra]))
+                else:
+                    # The sound system's devices, as many as it lists.
+                    entries = [({"state": f"audio.device.{row}.label"}, row, {"op": "<", "args": [row, count]}) for row in range(DEVICES)]
+                    items.append(setting_row(doc, ident, label_key, "choice", value_x, value=value, action=verb, entries=entries,
+                                             count=count))
+        columns.append(items)
+    return settings_subpage(doc, "audio", "#str_229901", [("audio", "#str_229901", columns)])
