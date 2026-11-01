@@ -181,6 +181,7 @@ jobs:
             tools/tests/dmap_render_geometry_lifecycle.py \
             tools/tests/dmap_vertex_sharing.py \
             tools/tests/dmap_tjunction_slivers.py \
+            tools/tests/dmap_optimizer_zero_area.py \
             tools/tests/renderer_silhouette_edges.py \
             tools/tests/fatal_error_startup_safety.py \
             tools/tests/android_build.py \
@@ -671,6 +672,7 @@ jobs:
           python tools/tests/dmap_render_geometry_lifecycle.py
           python tools/tests/dmap_vertex_sharing.py
           python tools/tests/dmap_tjunction_slivers.py
+          python tools/tests/dmap_optimizer_zero_area.py
           python tools/tests/renderer_silhouette_edges.py
           python tools/tests/fatal_error_startup_safety.py
           python tools/tests/android_build.py
