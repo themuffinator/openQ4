@@ -124,6 +124,35 @@ into 36 triangles. Both GitHub validation workflows and the local validation
 runner include it. `--production <file>` runs it against another revision of
 `tritjunction.cpp`.
 
+The slivers come from the optimizer. `RegenerateTriangles` discards a
+regenerated triangle that faces away from its group's plane, but a zero-area
+triangle has no plane: `idPlane::FromPoints` returns false and
+`FixDegenerateNormal` has already turned the zero normal into (0, 0, -1). On a
+downward-facing group that passes the facing test, so the optimizer kept the
+sliver and T-junction repair then met it. The optimizer now discards a
+regenerated triangle with no area before the facing test. Measured with
+`dmap noAAS noCM` on Linux x64 (GCC 16, debugoptimized):
+
+| | Before | After |
+|---|---|---|
+| Supplied map triangles | 298,498 | 298,446 |
+| Supplied map zero-area triangles | 58 | 6 |
+| Stock `hub2` triangles | 118,336 | 118,318 |
+| Stock `hub2` zero-area triangles | 24 | 6 |
+
+The largest surface is unchanged. The same six zero-area triangles remain in
+both maps, four in `func_static` pipe models and two in world surfaces. Their
+corners lie on the 1/32-unit T-junction grid, so they arise after regeneration.
+A Windows x64 build of the same change left none.
+
+`python tools/tests/dmap_optimizer_zero_area.py` compiles the production
+`RegenerateTriangles` with idlib's plane, normal and area code. Facing
+triangles are kept and backwards ones dropped with their warning on upward,
+downward and tilted planes, and zero-area triangles, including the logged
+`hub2` seam, are dropped on all three. A mutant without the area check must
+fail. `--production <file>` runs it against another revision of
+`optimize.cpp`; the revision before this change fails it.
+
 ## Silhouette edges on large surfaces (1 November 2026)
 
 Every triangle the renderer loads contributes its edges to a silhouette edge
