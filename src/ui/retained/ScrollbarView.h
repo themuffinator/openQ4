@@ -13,6 +13,9 @@ public:
     bool Initialize(const DocumentModel&,Rml::ElementDocument&,std::string& error);
     bool HasScrollbars() const noexcept;
     bool OwnsAxis(const Rml::Element* viewport,bool vertical) const noexcept;
+    // Whether element shares ancestry with a scrolling area (inside it, or
+    // enclosing it): animating it can move scroll geometry the bars read back.
+    bool Affects(const Rml::Element* element) const noexcept;
     void PreserveDensity(double nextRatio);
     // deferRefresh requires the caller to publish matching bounds immediately.
     bool Sync(Interaction&,double ratio,bool freshLayout,std::string& error,bool deferRefresh = false);
