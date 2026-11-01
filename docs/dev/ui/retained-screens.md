@@ -2381,9 +2381,52 @@ vote/match, welcome, pointer-reach and SETTINGS groups pass, and
 Level, the campaign's difficulty and its CHAPTERS, Arena pause and the
 restart screen), at 9:16 (Credits) and at 16:9 (CHAPTERS, unchanged).
 
-Known limit: the Arena page keeps the narrow-view fit; its three columns
-need a tall design of their own. The multiplayer cards already span the
-view's width.
+Known limit: the Arena page kept the narrow-view fit here; it stands in
+[a tall arrangement of its own](#the-arena-page-in-tall-views-1-november-2026)
+since. The multiplayer cards already span the view's width.
+
+## The Arena page in tall views (1 November 2026)
+
+The Arena page was the last list page on the narrow-view fit: on a portrait
+or rotated screen its three columns (the tier ladder and progress, the
+matches and briefing, the chosen match's detail) shrank into a band. Stacked
+one under another they take about 1430 dp at the landscape size, more than a
+3:4 view holds between the bands, so a plain stack cannot grow, and a
+scrolling column would leave START MATCH out of sight. In a view of 3:4 and
+taller the page now stands in two blocks, one under the other, each a column
+of plates with what they choose beside it (visual specification 1.35):
+
+- **Tiers.** The five tiers keep their vertical ladder; beside it the chosen
+  tier's briefing runs on to the column's margin, and CAMPAIGN PROGRESS, its
+  bar as wide, CAMPAIGN COMPLETE and RESET PROGRESS stand at the ladder's
+  foot.
+- **Matches.** Under the ladder the chosen tier's qualifiers and boss match,
+  with DIFFICULTY and START MATCH under them, and beside them the chosen
+  match's levelshot with its best result, its name, description, map, game
+  type, roster, limits and skill.
+- **Size.** The ladder, the matches and the briefing grow 1.4 times, the
+  detail as far as the room beside the matches allows (1.29 times) and the
+  difficulty and START MATCH to the matches' width (1.25 times). A 3:4 view
+  holds the page between the bands; a taller one centres it there.
+- **Focus.** The plates, the difficulty's - step and START MATCH run down one
+  line: Down from the last open match reaches the step and Up from START
+  MATCH returns to it, by authored moves that the landscape geometry already
+  made, so landscape focus is unchanged in every lock state. With no column
+  of plates beside them, Left and Right from the plates move to the nearest
+  control that way: the - step, the last tier or RESET PROGRESS.
+- **Ledger, question and entrance.** The result ledger and RESET PROGRESS's
+  question grow as the list pages' confirmations do, up to the column's width
+  (1.49 and 1.6 times), the entrance's card as far as the column takes it
+  (1.19 times), and the backing gains the full-width shade.
+
+`tall_arena_page` in `tools/ui/retained_arena.py` is a `TallLayout` pass over
+the fitted document, and the progress bar's fill takes the wider bar's
+twentieths. With every tall binding taken wide, the document presents as
+before at 16:9, 4:3, 5:4 and 4:5.
+
+The native pages and menus groups pass, and `ui_retained_gate.py` passes.
+Captured on OpenGL at 9:16 (540x960), 3:4 (768x1024) and 16:9 (1280x720)
+for the `arena`, `arenamatch` and `arenaresult` scenarios.
 
 ## The menu cursor (31 October 2026)
 

@@ -335,8 +335,13 @@ def ladder(doc: Document) -> list:
                               "then": [{"op": "if", "condition": {"state": "arena_canStart"}, "then": [{"op": "action", "action": "start"}]}],
                               "else": [{"op": "action", "action": f"match{index}"}]}]
         boss = index == BOSS
-        nodes.append(arena_plate(doc, f"match-{index}", key, left, BOSS_TOP if boss else top + pitch * index, width,
-                                 BOSS_H if boss else height, f"arena_match{index}", event, size=BOSS_TEXT if boss else MATCH_TEXT, boss=boss))
+        plate = arena_plate(doc, f"match-{index}", key, left, BOSS_TOP if boss else top + pitch * index, width,
+                            BOSS_H if boss else height, f"arena_match{index}", event, size=BOSS_TEXT if boss else MATCH_TEXT, boss=boss)
+        # Down runs on through the matches to the difficulty's - step, past a
+        # locked one, as the landscape geometry does; a tall view stands the
+        # step off the matches' line, under them (tall_arena_page).
+        plate["control"]["navigation"] = {"down": "arena_easier" if boss else f"match-{index + 1}"}
+        nodes.append(plate)
     return nodes
 
 
@@ -435,6 +440,7 @@ def detail(doc: Document) -> list:
         stepper(doc, "arena_harder", "#str_42021", x + width - 20, steps_top, "harder", {"op": "<", "args": [{"state": "arena_difficulty"}, 5]}),
     ]
     start = primary_plate(doc, "arena_start", "#str_42010", x, START_TOP, width, 43.0, action="start", label_box=(28.0, 6.0, 194.0, 25.0))
+    start["control"]["navigation"] = {"up": "arena_easier"}
     doc.bind("arena_start.enabled", "arena_start", "enabled", {"op": "&&", "args": [{"state": "arena_canStart"}, OPEN]})
     nodes.append(start)
     return nodes
@@ -783,4 +789,76 @@ def arena_document() -> dict:
     root = group("screen", {**FULL, "background-color": colour([0, 0, 0, 1]), "font-family": font("marine"), "font-size": length(16),
                             "color": colour([1, 1, 1, 0.8])},
                  [*lit_field("field", 0.7), *bands, backing_node, content, titles, launch, result, reset, curtain])
-    return fit_narrow(doc.build(root), pages=True)
+    return tall_arena_page(fit_narrow(doc.build(root), pages=True))
+
+
+# A tall view's Arena page (retained_tall): the three columns become two
+# blocks, one under the other, each a column of plates with what they choose
+# beside it, so the plates and START MATCH run down one line for the focus.
+# First the tier ladder, with the chosen tier's briefing beside it and the
+# campaign's progress at the ladder's foot; then the chosen tier's matches,
+# with DIFFICULTY and START MATCH under them, and the chosen match's
+# levelshot, name, description and rules beside them. The page grows 1.4
+# times (the detail as much as the room beside the matches allows, the
+# difficulty and START MATCH to the matches' width), which a view of 3:4
+# holds between the bands, and stands centred there in taller views. The
+# ledger and the reset question grow as the list pages' confirmations do, and
+# the entrance's card as far as the column takes it.
+TALL_GROW = 1.4
+TALL_DIALOGS = 1.6
+TALL_TOP, TALL_BOTTOM = 80.0, 72.0             # dp: under the top band; over the prompt bar
+TALL_BESIDE = 24.0                             # dp: from a column of plates to what stands beside it
+TALL_BLOCKS = 30.0                             # dp: between the tiers' block and the matches'
+
+
+def tall_arena_page(result: dict) -> dict:
+    from build_retained_screens import TALL
+    from retained_saves import BACKING_ALPHA
+    from retained_tall import CONTENT_W, MARGIN, TallLayout
+    tall = TallLayout(result)
+    right = CANVAS_W - MARGIN
+    grow = TALL_GROW
+    span = lambda first, last: tall.canvas_top(last) + tall.dp(last, "height") - tall.canvas_top(first)  # noqa: E731
+    ladder_w = U * LADDER[2] * grow
+    ladder_h = span("arena-tiers-head", f"tier-{TIERS - 1}") * grow
+    matches_w = U * COLUMN[2] * grow
+    matches_h = span("arena-matches-head", f"match-{MATCHES - 1}") * grow
+    detail_x = MARGIN + matches_w + TALL_BESIDE
+    detail = min(grow, (right - detail_x) / (U * DETAIL_W))
+    detail_h = span("arena-shot-back", f"arena-{INFO[-1][0]}") * detail
+    steps = matches_w / (U * DETAIL_W)
+    steps_h = span("arena-difficulty-label", "arena_start") * steps
+    height = ladder_h + TALL_BLOCKS + max(matches_h + TALL_BESIDE + steps_h, detail_h)
+    # The shortest tall view's height less the bands.
+    room = CANVAS_W / TALL["args"][1] - TALL_TOP - TALL_BOTTOM
+    if height > room:
+        raise SystemExit(f"the Arena page needs {height:.0f} dp of a tall view's {room:.0f}")
+    shift = tall.centred(height, TALL_TOP, TALL_BOTTOM)
+    top = TALL_TOP
+    tall.block(("arena-tiers-head", *(f"tier-{index}" for index in range(TIERS))), (U * LADDER[0], U * HEAD_TOP), (MARGIN, top), grow, shift)
+    # Beside the ladder the briefing runs on to the column's margin, and the
+    # progress stands at the ladder's foot, its bar as wide.
+    beside = MARGIN + ladder_w + TALL_BESIDE
+    beside_w = right - beside
+    briefing_ids = ("arena-briefing-head", "arena-tier-name", "arena-tier-description", "arena-tier-path", "arena-tier-rule")
+    tall.block(briefing_ids, (U * (COLUMN[0] + 4), U * BRIEFING_TOP), (beside, top), grow, shift)
+    progress_ids = ("arena-progress", "arena-progress-track", "arena-progress-fill", "arena-complete", "arena-reset-row")
+    progress_h = span("arena-progress", "arena-reset-row") * grow
+    tall.block(progress_ids, (U * (LADDER[0] + 4), U * PROGRESS_TOP), (beside, top + ladder_h - progress_h), grow, shift)
+    for ident in (*briefing_ids, "arena-progress", "arena-progress-track", "arena-complete"):
+        tall.set(ident, "width", beside_w)
+    fill = next(binding for binding in tall.bindings if binding["id"] == "arena-progress-fill.width")
+    bar_w = tall.dp("arena-progress-track", "width")
+    fill["value"] = {"op": "select", "args": [TALL, {"op": "*", "args": [round(beside_w / bar_w, 4), fill["value"]]}, fill["value"]]}
+    top += ladder_h + TALL_BLOCKS
+    tall.block(("arena-matches-head", *(f"match-{index}" for index in range(MATCHES))), (U * COLUMN[0], U * HEAD_TOP), (MARGIN, top), grow,
+               shift)
+    detail_ids = ("arena-shot-back", "arena-shot", "arena-best", "arena-shot-border", "arena-match-title", "arena-title-rule",
+                  "arena-match-description", *(f"arena-{ident}{part}" for ident, *_rest in INFO for part in ("-label", "")))
+    tall.block(detail_ids, (U * DETAIL_X, U * SHOT_TOP), (detail_x, top), detail, shift)
+    tall.block(("arena-difficulty-label", "arena_easier", "arena-difficulty", "arena_harder", "arena_start"), (U * DETAIL_X, U * DIFFICULTY_TOP),
+               (MARGIN, top + matches_h + TALL_BESIDE), steps, shift)
+    tall.dialogs(TALL_DIALOGS)
+    tall.scale("launch-stage", round(min(TALL_DIALOGS, CONTENT_W / tall.dp("launch-card", "width")), 4))
+    tall.shade("arena-backing", BACKING_ALPHA)
+    return result

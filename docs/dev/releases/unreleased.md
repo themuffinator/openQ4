@@ -198,7 +198,10 @@ See [release status](../../user/release-status.md) and the
   demo or map with its picture and buttons on top, then a long scrolling
   list whose entries take two lines, and larger buttons and dialogs. Restart
   Level, the campaign difficulty choice, the Arena pause menu, the restart
-  screen and the credits fill the height the same way.
+  screen and the credits fill the height the same way. The Arena campaign's
+  page shows the tiers with their briefing and progress, then the matches
+  with the difficulty and START MATCH, the chosen match's picture and details
+  beside them, all larger.
 - **Clearer list selection.** The selected save, demo, server or map in the
   new interface's lists no longer doubles its orange highlight under the
   pointer, so its name stays readable.

@@ -1,6 +1,6 @@
 # openQ4 UI Visual Design
 
-Specification version 1.34, 31 October 2026 (1.29 to 1.33 earlier that day, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
+Specification version 1.35, 1 November 2026 (1.29 to 1.34 on 31 October, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
 1.9 on 29 September, 1.6 on 28 September, 1.4 and 1.5 on 27 September, 1.1 to
 1.3 on 26 September, 1.0 on 8 September 2026). Status:
 implementation target; the replacement has not shipped. Applies to every
@@ -1872,7 +1872,12 @@ and parallax off.
   its map picture and list over its options the same way.
 - **Arena Campaign.** On the Arena sub-page, tiers form a vertical ladder of
   plates in the section navigation. Locked tiers are dimmed and carry the lock
-  symbol, boss matches use a larger plate, and the bumpers switch tier.
+  symbol, boss matches use a larger plate, and the bumpers switch tier. In a
+  view of 3:4 and taller the page stands in two blocks, one under the other:
+  the ladder with the chosen tier's briefing beside it and the progress at its
+  foot, then the tier's matches with the difficulty and Start Match under
+  them and the chosen match's levelshot and details beside them, grown
+  together as far as the column's width allows.
 - **Match Control.** Keep its contract: unavailable actions stay visible, and
   the refusal reason shows in the detail area. The bumpers move between
   sections, and destructive actions use the stock modal.
@@ -4057,6 +4062,16 @@ catalogue obligations, including `ART-035`, remain authoring/artwork requirement
 they do not authorize or require a new gameplay mode. This scope correction
 accepts no GUI, artwork, platform or behavior. Hit-feedback defaults and the other
 UI-05 qualification remain open.
+
+### Version 1.35: the Arena page in tall views
+
+Section 13.7's Arena Campaign pattern now says how the Arena page stands in a
+view of 3:4 and taller. Its three columns stacked would not grow there, so
+the page keeps two blocks of a column of plates with what they choose beside
+it: the tier ladder with the briefing and progress, then the matches with the
+difficulty and Start Match under them and the match's levelshot and details
+beside them. The tiers stay a vertical ladder. `LAY-021` already holds this
+scope; no requirement changes, and nothing is accepted.
 
 ### Version 1.34: list pages in tall views
 

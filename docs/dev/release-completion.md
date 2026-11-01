@@ -138,8 +138,13 @@ made them too large to load.
   visual specification 1.34).
 - [x] Restart Level, the campaign's difficulty, Arena pause, the restart
   screen and Credits stand in one column in views of 3:4 and taller
-  ([more pages](ui/retained-screens.md#more-pages-in-tall-views-1-november-2026));
-  the Arena page keeps the narrow-view fit.
+  ([more pages](ui/retained-screens.md#more-pages-in-tall-views-1-november-2026)).
+- [x] The Arena page uses a tall view's height: the tier ladder with its
+  briefing and progress, then the matches with the difficulty and START
+  MATCH under them and the match's levelshot and details beside them, 1.4
+  times the landscape size, with its ledger and question grown
+  ([Arena page](ui/retained-screens.md#the-arena-page-in-tall-views-1-november-2026),
+  visual specification 1.35).
 - [ ] Bound acceptance evidence remains.
 
 ## Windows stay see-through at any distance, 29 October 2026

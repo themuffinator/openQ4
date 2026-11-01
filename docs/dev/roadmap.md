@@ -978,8 +978,10 @@ archived provenance; new scheduling belongs here.
   [the list pages](ui/retained-screens.md#list-pages-in-tall-views-31-october-2026)
   (Load and Save Game, Demos, Create Server and Join Game; visual
   specification 1.34) and
-  [the remaining pages](ui/retained-screens.md#more-pages-in-tall-views-1-november-2026)
-  but the Arena, which still takes the narrow-view fit.
+  [the remaining pages](ui/retained-screens.md#more-pages-in-tall-views-1-november-2026),
+  the Arena page in
+  [two blocks of its own](ui/retained-screens.md#the-arena-page-in-tall-views-1-november-2026)
+  (visual specification 1.35).
 - [ ] **UI-02 — P1, implementation and qualification: text, input and accessibility.**
   Finish in-field IME/composition, shaping/kerning/fallback/styles, grapheme editing,
   caret/candidate placement, binding capture, accessibility exposure and contextual
