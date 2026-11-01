@@ -1095,6 +1095,13 @@ static	void	RegenerateTriangles( optIsland_t *island ) {
 		tri->v[1] = optTri->v[1]->v;
 		tri->v[2] = optTri->v[2]->v;
 
+		// a triangle with no area has no plane: FromPoints() fixes its zero
+		// normal up to an axis, which can pass the facing test below
+		if ( MapTriArea( tri ) <= 0.0f ) {
+			FreeTri( tri );
+			continue;
+		}
+
 		idPlane plane;
 		PlaneForTri( tri, plane );
 		if ( plane.Normal() * dmapGlobals.mapPlanes[ island->group->planeNum ].Normal() <= 0 ) {

@@ -6954,6 +6954,33 @@ void idSessionLocal::BeginRetainedCampaignSkill( idUserInterface *from, const ch
 #endif
 }
 
+/*
+===============
+idSessionLocal::MenuInputGUI
+
+The GUI that HandleMenuEvent delivers input to. While the retained home screen
+covers the main menu, or the retained multiplayer card covers the game's menu,
+that screen owns input and keeps its own cursor, so platform cursor routing has
+to follow it rather than guiActive.
+===============
+*/
+idUserInterface *idSessionLocal::MenuInputGUI() const {
+	if ( guiTest != NULL ) {
+		return guiTest;
+	}
+	if ( guiRetainedHome != NULL && guiActive != NULL && guiActive == guiMainMenu ) {
+		return guiRetainedHome;
+	}
+	if ( RetainedMultiplayerCovers() && guiRetainedMultiplayer != NULL ) {
+		return guiRetainedMultiplayer;
+	}
+	return guiActive;
+}
+
+idUserInterface *Session_MenuInputGUI( void ) {
+	return sessLocal.MenuInputGUI();
+}
+
 bool idSessionLocal::RetainedHomeInputBlocked() const {
 	return guiRetainedHome != NULL && common->GetPresentationTime() < retainedHandoffUntil;
 }

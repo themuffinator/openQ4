@@ -104,6 +104,16 @@ bool ScrollbarView::OwnsAxis(const Rml::Element* viewport,bool vertical) const n
     for(const auto& [id,e]:impl->entries)if(e.viewport==viewport && e.spec.vertical==vertical)return true;
     return false;
 }
+bool ScrollbarView::Affects(const Rml::Element* element) const noexcept {
+    if(!element)return !impl->entries.empty();
+    const auto related=[element](const Rml::Element* part) {
+        for(auto* e=element;e;e=e->GetParentNode())if(e==part)return true;
+        for(auto* e=part;e;e=e->GetParentNode())if(e==element)return true;
+        return false;
+    };
+    for(const auto& [id,e]:impl->entries)if(related(e.owner)||related(e.viewport))return true;
+    return false;
+}
 void ScrollbarView::PreserveDensity(double next) {
     if(!std::isfinite(next)||next<=0||impl->ratio<=0||impl->ratio==next)return;
     for(auto& [id,e]:impl->entries)if(!e.densityOffset)e.densityOffset=Impl::Offset(e)/impl->ratio;

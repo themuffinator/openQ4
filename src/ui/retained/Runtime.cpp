@@ -2888,11 +2888,13 @@ struct Runtime::Impl {
 			const bool opacity = key.second == "opacity";
 			// A decorative leaf beside canonical buttons can replay its isolated
 			// fade. Owned widgets, interactive ancestry and compound groups keep
-			// their ordinary style/layout update and filter preparation.
+			// their ordinary style/layout update and filter preparation; widgets
+			// in a closed dialog are not shown, as frame replay also finds.
 			auto* opacityElement=opacity ? (input.element ? input.element : CanonicalElement(key.first)) : nullptr;
 			const bool paintOpacity=opacityElement && incremental && !presentationDirty &&
-				!scrollView.HasScrollbars() && ((controls.empty() && !interaction.HasAuthoredModals() && !pointerPresent) ||
-				(layoutWidgets.empty() && !interactionAncestors.count(opacityElement) && static_cast<VectorElement*>(opacityElement)->ReplayOpacity()));
+				!scrollView.Affects(opacityElement) && ((controls.empty() && !interaction.HasAuthoredModals() && !pointerPresent) ||
+				(!interactionAncestors.count(opacityElement) && static_cast<VectorElement*>(opacityElement)->ReplayOpacity() &&
+				 std::none_of(layoutWidgets.begin(),layoutWidgets.end(),[](const auto* widget){return widget->IsVisible(true);})));
 			if (opacity) {
 				auto* element=opacityElement;
 				if (!element) { complete=false; return true; }
@@ -2908,11 +2910,13 @@ struct Runtime::Impl {
 			}
 			// Decorative transforms affect projection, not box layout. Resolve
 			// the typed value directly; Render updates inherited matrices in
-			// parent order. Controls, modals and scrolling retain full layout.
+			// parent order. Controls, modals and scrolling areas retain full
+			// layout; a scrollbar elsewhere in the document (a closed dialog's)
+			// does not hold back decoration that cannot reach it.
 			if (incremental && !presentationDirty && key.second=="transform" &&
-				value.type==ValueType::Transform && !scrollView.HasScrollbars()) {
+				value.type==ValueType::Transform) {
 				auto* element=input.element ? input.element : CanonicalElement(key.first);
-				if (element && !interactionAncestors.count(element)) {
+				if (element && !interactionAncestors.count(element) && !scrollView.Affects(element)) {
 					if (!static_cast<VectorElement*>(element)->SetPresentationTransform(value,viewport.DpRatio(),
 						{float(viewport.width),float(viewport.height)})) {
 						host.Log(true,"Canonical transform rejected: "+key.first); paintDirty=true;
