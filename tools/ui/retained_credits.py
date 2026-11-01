@@ -306,4 +306,34 @@ def credits_document() -> dict:
     panel = group("credits-panel", {**FULL, "opacity": number(0)}, [
         backing, group("credits-stage", canvas, [logo, *screens]), group("credits-chrome", canvas, [title, back])])
     root = group("screen", {**FULL, "font-family": font("marine"), "font-size": length(16), "color": colour([1, 1, 1, 0.8])}, [panel])
-    return fit_narrow(doc.build(root), pages=True)
+    return tall_credits_page(fit_narrow(doc.build(root), pages=True))
+
+
+# A tall view's Credits page (retained_tall): the screens' names, which stand
+# left of the canvas's middle (about 100 to 560 dp) since the stock page
+# showed its art beside them, grow 1.6 times and move to the column's middle;
+# the Raven logo grows 1.3 times where it stands; the backing darkens the
+# whole width. Each screen's own transform carries its animation, so the
+# screens scale as one group about the view's middle.
+TALL_TEXT = 1.6
+TALL_TEXT_SHIFT = 240.0                      # dp: the names' middle (330 dp) onto the canvas's (480 dp) at that scale
+TALL_LOGO = 1.3
+
+
+def tall_credits_page(result: dict) -> dict:
+    from retained_tall import TALL, TallLayout
+    tall = TallLayout(result)
+    stage = tall.nodes["credits-stage"]
+    screens = [child for child in stage["children"] if child["id"].startswith("p_screen")]
+    names = group("credits-names", {**FULL, "transform": transform(), "pointer-events": keyword("none")}, screens)
+    stage["children"] = [child for child in stage["children"] if child not in screens] + [names]
+    tall.nodes["credits-names"] = names
+    sized = {"op": "select", "args": [TALL, TALL_TEXT, 1]}
+    tall.bindings.append({"id": "tall.credits-names.transform", "node": "credits-names", "property": "transform",
+                          "value": [{"op": "select", "args": [TALL, TALL_TEXT_SHIFT, 0]}, 0, sized, sized, 0]})
+    logo = tall.nodes["raven"]
+    logo["properties"]["transform"] = transform()
+    grown = {"op": "select", "args": [TALL, TALL_LOGO, 1]}
+    tall.bindings.append({"id": "tall.raven.transform", "node": "raven", "property": "transform", "value": [0, 0, grown, grown, 0]})
+    tall.shade("credits-backing", max(alpha for _, alpha in BACKING_STOPS))
+    return result

@@ -92,6 +92,23 @@ def match_block(doc: Document) -> dict:
                  [frame, shot, shot_frame, heading, name, mode, where, rule, score_label, clock, score])
 
 
+def tall_arena_pause(doc: Document, home: dict, title: dict, nav: dict, block: dict, modals: tuple) -> None:
+    """The pause in a tall view, as the single-player pause's column: ARENA
+    PAUSED, the actions and the match block under them, centred between the
+    bands at the column's scale, and its questions at 1.6 times their size."""
+    b.tall_canvas(doc, home)
+    plates = sum(child["properties"]["height"]["value"] for child in nav["children"])
+    card_w, card_h = block["properties"]["width"]["value"], block["properties"]["height"]["value"]
+    scale, _ = b.tall_column(doc, [(title["properties"]["height"]["value"], title), (6, None), (plates, nav), (24, None), (card_h, block)],
+                             b.TALL_HOME_TOP, b.TALL_HOME_BOTTOM)
+    b.tall_scale(doc, title, scale, own=("left", "width", "height"))
+    b.tall_scale(doc, nav, scale, own=("width",))
+    b.tall_scale(doc, block, scale, own=("width", "height"))
+    b.tall_bind(doc, block, "left", {"op": "*", "args": [0.5, b.text_sum(CANVAS_W, {"op": "*", "args": [-card_w, scale]})]})
+    for modal in modals:
+        b.tall_dialog(doc, modal)
+
+
 def arena_pause_document() -> dict:
     doc = Document("openq4.arena_pause")
     doc.state.update({key: {"type": "string", "initial": ""} for key in STATE_KEYS})
@@ -112,10 +129,11 @@ def arena_pause_document() -> dict:
                         "flex-direction": keyword("column")}, plates)
     title = label("paused-title", TITLE_KEY, {**absolute(left=U * 44, top=U * TITLE_TOP_U, width=U * 330, height=U * 24),
                   **typeface("marine", 18, U * 24, [1, 1, 1, 0.5]), "white-space": keyword("nowrap")})
-    content = group("home", {**FULL, "transform": transform(), "opacity": number(1)}, [
-        group("home-content", {**absolute(top=0, width=CANVAS_W, height=720), "left": length(50, "%"), "margin-left": length(-CANVAS_W / 2)},
-              [title, nav, match_block(doc)]),
-    ])
+    block = match_block(doc)
+    home = group("home-content", {**absolute(top=0, width=CANVAS_W, height=720), "left": length(50, "%"), "margin-left": length(-CANVAS_W / 2)},
+                 [title, nav, block])
+    content = group("home", {**FULL, "transform": transform(), "opacity": number(1)}, [home])
+    tall_arena_pause(doc, home, title, nav, block, (restart_modal, leave_modal))
     # The paused match, softened and never dimmed, as the single-player pause
     # shows its level (sections 9 and 13.7); the scrim stands in where the
     # view cannot soften (section 13.6).

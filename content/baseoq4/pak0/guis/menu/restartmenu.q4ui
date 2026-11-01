@@ -12,6 +12,7 @@
   "soft_focus": {"type": "boolean", "initial": false, "cvar": "ui_retainedSoftFocus"},
   "view.text": {"type": "number", "initial": 1, "view": "text"},
   "language": {"type": "string", "initial": "", "cvar": "sys_lang"},
+  "view.aspect": {"type": "number", "initial": 1.3333, "view": "aspect"},
   "notice.0.shown": {"type": "boolean", "initial": false},
   "notice.0.text": {"type": "string", "initial": ""},
   "notice.0.kind": {"type": "number", "initial": 0},
@@ -631,6 +632,30 @@
    "node": "exitModal-glow-soft",
    "property": "display",
    "value": {"op": "select", "args": [{"state": "soft_focus"}, "block", "none"]}
+  },
+  {
+   "id": "tall.death-stage.transform",
+   "node": "death-stage",
+   "property": "transform",
+   "value": [
+    0,
+    0,
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
+    0
+   ]
+  },
+  {
+   "id": "tall.exitModal-stage.transform",
+   "node": "exitModal-stage",
+   "property": "transform",
+   "value": [
+    0,
+    0,
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
+    0
+   ]
   },
   {
    "id": "notice-0-symbol-1.display",
@@ -3268,7 +3293,8 @@
      "height": {"type": "length", "value": 720, "unit": "dp"},
      "left": {"type": "length", "value": 50, "unit": "%"},
      "margin-left": {"type": "length", "value": -480.0, "unit": "dp"},
-     "margin-top": {"type": "length", "value": -360, "unit": "dp"}
+     "margin-top": {"type": "length", "value": -360, "unit": "dp"},
+     "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
     },
     "children": [
      {
@@ -4232,7 +4258,8 @@
        "height": {"type": "length", "value": 720, "unit": "dp"},
        "left": {"type": "length", "value": 50, "unit": "%"},
        "margin-left": {"type": "length", "value": -480.0, "unit": "dp"},
-       "margin-top": {"type": "length", "value": -360, "unit": "dp"}
+       "margin-top": {"type": "length", "value": -360, "unit": "dp"},
+       "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
       },
       "children": [
        {

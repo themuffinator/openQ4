@@ -196,7 +196,9 @@ See [release status](../../user/release-status.md) and the
   screen, Load Game, Save Game, Demos, Create Server and Join Game in the new
   interface now stack into one column at a readable size: the selected save,
   demo or map with its picture and buttons on top, then a long scrolling
-  list whose entries take two lines, and larger buttons and dialogs.
+  list whose entries take two lines, and larger buttons and dialogs. Restart
+  Level, the campaign difficulty choice, the Arena pause menu, the restart
+  screen and the credits fill the height the same way.
 - **Clearer list selection.** The selected save, demo, server or map in the
   new interface's lists no longer doubles its orange highlight under the
   pointer, so its name stays readable.

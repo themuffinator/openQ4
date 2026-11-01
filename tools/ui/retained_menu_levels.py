@@ -226,4 +226,37 @@ def skill_document(ui):
         # Its parents' legends (section 13.4), since its own BACK is in the content.
         ui.page_prompts(doc,in_canvas=False)])))
     result['canvas']['minWidth']=960
+    return tall_skill_page(ui,result)
+
+# A tall view's difficulty (retained_tall), as the menu levels' column: the
+# plates 1.6 times their size with TURBO's value on its plate, the chosen
+# difficulty's description under them from the plates' label inset to the
+# column's margin, centred between the docked bands. The content keeps its
+# centred 720 dp box, so the parts move by the column's place less the box's
+# top; CHAPTERS keeps its 4:3 composition in that box.
+TALL_SKILL_GROW=1.6
+TALL_SKILL_TOP,TALL_SKILL_BOTTOM=110.0,100.0   # dp: under the docked top band's title, over the docked bottom band
+TALL_SKILL_PLATE=30.0                           # u: a navigation plate's pitch
+
+def tall_skill_page(ui,result):
+    from retained_difficulty import DIFFICULTIES
+    from retained_saves import lines_needed,table_text
+    from retained_tall import VIEW_HEIGHT,TallLayout
+    U,grow=ui.U,TALL_SKILL_GROW
+    tall=TallLayout(result)
+    navigation=tall.nodes['navigation']
+    plates_h=U*TALL_SKILL_PLATE*len(navigation['children'])*grow
+    width=ui.CANVAS_W-ui.TALL_MARGIN*(1+grow)
+    style=tall.nodes['description']['properties']
+    size,line=style['font-size']['value'],style['line-height']['value']
+    lines=max(lines_needed('lowpixel',text,size,width/grow) for _,key in DIFFICULTIES for text in table_text(key).values())
+    described=lines*line*grow
+    box_top={'op':'-','args':[{'op':'/','args':[VIEW_HEIGHT,2]},360]}
+    shift={'op':'-','args':[tall.centred(plates_h+24+described,TALL_SKILL_TOP,TALL_SKILL_BOTTOM),box_top]}
+    origin=(0,tall.dp('navigation','top'))
+    tall.block(('navigation','turbo-value'),origin,(0,TALL_SKILL_TOP),grow,shift)
+    tall.block(('description',),(tall.dp('description','left'),tall.dp('description','top')),
+               (ui.TALL_MARGIN*grow,TALL_SKILL_TOP+plates_h+24),grow,shift)
+    tall.set('description','width',width)
+    tall.set('description','height',described)
     return result

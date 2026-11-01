@@ -977,8 +977,9 @@ archived provenance; new scheduling belongs here.
   that uses the height (visual specification 1.33, `LAY-021`), and so do
   [the list pages](ui/retained-screens.md#list-pages-in-tall-views-31-october-2026)
   (Load and Save Game, Demos, Create Server and Join Game; visual
-  specification 1.34). Arena, Credits, Restart Level and the multiplayer
-  cards still take the narrow-view fit.
+  specification 1.34) and
+  [the remaining pages](ui/retained-screens.md#more-pages-in-tall-views-1-november-2026)
+  but the Arena, which still takes the narrow-view fit.
 - [ ] **UI-02 — P1, implementation and qualification: text, input and accessibility.**
   Finish in-field IME/composition, shaping/kerning/fallback/styles, grapheme editing,
   caret/candidate placement, binding capture, accessibility exposure and contextual

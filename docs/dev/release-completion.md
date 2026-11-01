@@ -136,6 +136,10 @@ made them too large to load.
   selected row draws one band in every view
   ([list pages](ui/retained-screens.md#list-pages-in-tall-views-31-october-2026),
   visual specification 1.34).
+- [x] Restart Level, the campaign's difficulty, Arena pause, the restart
+  screen and Credits stand in one column in views of 3:4 and taller
+  ([more pages](ui/retained-screens.md#more-pages-in-tall-views-1-november-2026));
+  the Arena page keeps the narrow-view fit.
 - [ ] Bound acceptance evidence remains.
 
 ## Windows stay see-through at any distance, 29 October 2026

@@ -2339,6 +2339,48 @@ Evidence: `.tmp/menus-portrait/validation-evidence.json`, SHA-256
 Known limit: Arena, Credits, Restart Level and the multiplayer cards still
 take the narrow-view fit, the 4:3 composition at the view's width.
 
+## More pages in tall views (1 November 2026)
+
+The pages that still took the narrow-view fit now stand in one column in a
+view of 3:4 and taller as well, at the menu levels' 1.6 times
+([menu levels in tall views](#menu-levels-in-tall-views-31-october-2026)):
+
+- **Restart Level** (and its Strogg form): the five difficulty plates, the
+  chosen difficulty's description under them from the plates' label inset to
+  the column's margin, and RESTART LEVEL under that, centred between the
+  docked bands, over a full-width shade.
+- **The campaign's difficulty**: its plates with TURBO's value on its plate
+  and the description under them, centred the same way. The content keeps its
+  centred 720 dp box (so CHAPTERS keeps its 4:3 composition in it) and the
+  parts move by the column's place less the box's top.
+- **Arena pause**: MATCH PAUSED, the actions and the match block under them,
+  as the single-player pause's column (`tall_column` and `tall_scale` at its
+  scale), and its RESTART MATCH and LEAVE MATCH questions at 1.6 times
+  (`tall_dialog`).
+- **The restart screen**: the wordmark and its card 1.6 times their size
+  about the view's middle, and EXIT GAME's question with them.
+- **Credits**: the screens' names, which stand left of the canvas's middle
+  beside where the stock page showed its art, grow 1.6 times and move to the
+  column's middle as one group (each screen's own transform carries its
+  animation); the Raven logo grows 1.3 times; an opaque shade takes the whole
+  width, as the backing does its trailing side.
+
+A dialog placed from the canvas's top moves to the view's middle only on a
+page whose modal stage runs the view's height; on a page the narrow-view fit
+centres, its stage already holds the dialog there. `TallLayout.grow` wraps a
+length that follows the text size rather than leaving it, so a grown label
+keeps its text-size step.
+
+The native menus, pages, Strogg pages, mp-pages, Match Control, card,
+vote/match, welcome, pointer-reach and SETTINGS groups pass, and
+`ui_retained_gate.py` passes. Captured on OpenGL at 9:16 and 3:4 (Restart
+Level, the campaign's difficulty, Arena pause and the restart screen) and at
+9:16 (Credits).
+
+Known limit: the Arena page keeps the narrow-view fit; its three columns
+need a tall design of their own. The multiplayer cards already span the
+view's width.
+
 ## The menu cursor (31 October 2026)
 
 The retained menus drew a placeholder cursor, a flat triangle, and only after

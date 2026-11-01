@@ -16,6 +16,8 @@ something already binds or animates, are left alone; vector art takes
 fractions of its box so that it scales with it."""
 from __future__ import annotations
 
+import json
+
 from build_retained_screens import ASPECT_STATE, CANVAS_W, TALL, U, VIEW_HEIGHT
 from retained_settings_rows import _in_fractions, _runtime_owned
 
@@ -47,6 +49,9 @@ class TallLayout:
                 self.owned.update((control["parts"]["thumb"], key) for key in ("top", "height", "left", "width"))
         self.owned.update((binding["node"], binding["property"]) for binding in self.bindings)
         self.owned.update((entry["node"], entry["property"]) for timeline in result.get("timelines", []) for entry in timeline["tracks"])
+        # Lengths that follow the text size grow by wrapping their binding.
+        self.sized = {(binding["node"], binding["property"]): binding for binding in self.bindings
+                      if '"view.text"' in json.dumps(binding["value"])}
 
     def dp(self, ident: str, prop: str) -> float | None:
         found = self.nodes[ident].get("properties", {}).get(prop)
@@ -67,14 +72,16 @@ class TallLayout:
                               "value": {"op": "select", "args": [TALL, round(tall, 4) if isinstance(tall, (int, float)) else tall,
                                                                  landscape]}})
 
-    def top(self, ident: str, tall: float) -> None:
-        """`ident` stands `tall` dp below the view's top edge in a tall view:
-        its top where the narrow-view fit keeps the view's top, else its
-        margin from the middle where the fit centres it."""
+    def top(self, ident: str, tall, shift: dict | None = None) -> None:
+        """`ident` stands `tall` dp (plus the expression `shift`) below the
+        view's top edge in a tall view: its top where the narrow-view fit
+        keeps the view's top, else its margin from the middle where the fit
+        centres it."""
+        tall = round(tall, 4) if shift is None else {"op": "+", "args": [round(tall, 4), shift]}
         if self.dp(ident, "top") is not None:
             self.bind(ident, "top", tall)
         elif self.dp(ident, "margin-top") is not None:
-            self.bind(ident, "margin-top", {"op": "-", "args": [round(tall, 4), {"op": "/", "args": [VIEW_HEIGHT, 2]}]})
+            self.bind(ident, "margin-top", {"op": "-", "args": [tall, {"op": "/", "args": [VIEW_HEIGHT, 2]}]})
         else:
             raise SystemExit(f"{ident} has neither a dp top nor a centred margin for the tall layout to set")
 
@@ -111,7 +118,7 @@ class TallLayout:
         parent = next(node for node in self.nodes.values() if any(child["id"] == backing for child in node.get("children", [])))
         ident = f"{backing}-tall"
         whole = [(0, 0), ({"fraction": 1}, 0), ({"fraction": 1}, {"fraction": 1}), (0, {"fraction": 1})]
-        opacity = self.nodes[backing]["properties"]["opacity"]["value"]
+        opacity = self.nodes[backing]["properties"].get("opacity", {}).get("value", 1)
         node = vector(ident, {**FULL, "display": keyword("none"), "opacity": number(opacity), "pointer-events": keyword("none")},
                       [path("shade", whole, fill=solid([0, 0, 0, alpha]))])
         siblings = parent["children"]
@@ -141,6 +148,10 @@ class TallLayout:
                     continue
                 if root and keep_place and key in ("left", "top", "right", "bottom", "margin-top", "margin-left"):
                     continue
+                sized = self.sized.pop((node["id"], key), None)
+                if sized is not None:
+                    sized["value"] = {"op": "select", "args": [TALL, {"op": "*", "args": [factor, sized["value"]]}, sized["value"]]}
+                    continue
                 if (node["id"], key) in self.owned:
                     continue
                 self.bind(node["id"], key, found["value"] * factor)
@@ -148,25 +159,43 @@ class TallLayout:
                 walk(child, tuple(size), False)
         walk(self.nodes[ident], (None, None), True)
 
-    def block(self, ids, origin: tuple, at: tuple, factor: float) -> None:
+    def block(self, ids, origin: tuple, at: tuple, factor: float, shift: dict | None = None) -> None:
         """The absolutely placed parts `ids`, of one coordinate frame, scaled
         `factor` times about `origin` and moved so that it lands on `at`
-        (canvas dp) in a tall view."""
+        (canvas dp, its top plus `shift`) in a tall view."""
         for ident in ids:
             wide = self.dp(ident, "left")
             if wide is None:
                 raise SystemExit(f"{ident} has no dp left for the tall layout to move")
             self.bind(ident, "left", at[0] + (wide - origin[0]) * factor)
-            self.top(ident, at[1] + (self.canvas_top(ident) - origin[1]) * factor)
+            self.top(ident, at[1] + (self.canvas_top(ident) - origin[1]) * factor, shift)
             self.grow(ident, factor, keep_place=True)
+
+    @staticmethod
+    def centred(height: float, top: float, bottom: float) -> dict:
+        """The shift that centres a column `height` dp tall, laid out from
+        `top`, in the room between `top` and `bottom` dp above the view's
+        foot (none where the room is short)."""
+        return {"op": "max", "args": [0, {"op": "/", "args": [{"op": "-", "args": [VIEW_HEIGHT, round(top + bottom + height, 4)]}, 2]}]}
+
+    def scale(self, ident: str, factor: float) -> None:
+        """`ident` and everything in it `factor` times larger about its
+        middle in a tall view, by a transform (an identity in other views)."""
+        if (ident, "transform") in self.owned or "transform" in self.nodes[ident].get("properties", {}):
+            raise SystemExit(f"the tall layout cannot scale {ident}: it has its own transform")
+        self.nodes[ident]["properties"]["transform"] = {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+        self.owned.add((ident, "transform"))
+        sized = {"op": "select", "args": [TALL, factor, 1]}
+        self.bindings.append({"id": f"tall.{ident}.transform", "node": ident, "property": "transform", "value": [0, 0, sized, sized, 0]})
 
     def dialogs(self, factor: float) -> None:
         """Every modal's dialog `factor` times larger in a tall view, or as
         large as the column takes: its stage scales about the view's middle,
         so that the dialog grows as one with the lengths its text size
-        already binds. A dialog placed from the canvas's top (one whose height
-        follows its text) moves down with the stage in any view taller than
-        the canvas, to the view's middle where a centred dialog stands."""
+        already binds. On a page whose stage runs the view's height, a dialog
+        placed from the canvas's top (one whose height follows its text)
+        moves down with the stage in any view taller than the canvas, to the
+        view's middle where a centred dialog stands."""
         for node in list(self.nodes.values()):
             if not node.get("modal"):
                 continue
@@ -179,7 +208,11 @@ class TallLayout:
             self.owned.add((stage["id"], "transform"))
             sized = {"op": "select", "args": [TALL, scale, 1]}
             shift = 0
-            if self.dp(dialog["id"], "top") is not None:
+            # A stage the narrow-view fit centres (720 dp tall) holds its
+            # dialog at the view's middle already; one that runs the view's
+            # height holds a dialog placed from the canvas's top above it.
+            full = (stage["properties"].get("height") or {}).get("unit") == "%"
+            if full and self.dp(dialog["id"], "top") is not None:
                 below = {"op": "-", "args": [{"op": "/", "args": [VIEW_HEIGHT, 2]}, 360]}
                 shift = {"op": "*", "args": [sized, {"op": "max", "args": [0, below]}]}
             self.bindings.append({"id": f"tall.{stage['id']}.transform", "node": stage["id"], "property": "transform",

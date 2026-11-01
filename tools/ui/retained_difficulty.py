@@ -200,5 +200,38 @@ def restart_level_document(family: Family = MARINE) -> dict:
     doc.events["onDeactivate"] = [{"op": "playTimeline", "timeline": "rest"}]
     root = group("screen", {**FULL, "font-family": font("marine"), "font-size": length(16), "color": colour([1, 1, 1, 0.8])},
                  [backing("restart-backing"), stage])
-    return fit_narrow(doc.build(root), pages=True)
+    return tall_restart_page(fit_narrow(doc.build(root), pages=True), family)
+
+
+# A tall view's Restart Level page (retained_tall), as the menu levels'
+# column: the five plates, the chosen difficulty's description under them
+# from the plates' label inset to the column's margin and RESTART LEVEL under
+# that, 1.6 times the landscape size, centred between the docked bands.
+TALL_GROW = 1.6
+TALL_TOP, TALL_BOTTOM = 110.0, 100.0        # dp: under the docked top band's title, over the docked bottom band
+
+
+def tall_restart_page(result: dict, family: Family) -> dict:
+    from build_retained_screens import TALL_MARGIN
+    from retained_saves import BACKING_ALPHA
+    from retained_tall import MARGIN, TallLayout
+    tall = TallLayout(result)
+    # The description takes the lines its longest text needs in its width.
+    width = CANVAS_W - TALL_MARGIN * (1 + TALL_GROW)
+    lines = max(lines_needed("lowpixel", text, DESCRIPTION_TEXT, width / TALL_GROW)
+                for _, key in DIFFICULTIES for text in table_text(key).values())
+    plates_h = U * (PLATES[-1][1] - PLATES[0][1] + 30) * TALL_GROW
+    description_h = lines * DESCRIPTION_LINE * TALL_GROW
+    go_h = U * PRIMARY[3] * TALL_GROW
+    shift = tall.centred(plates_h + 24 + description_h + 24 + go_h, TALL_TOP, TALL_BOTTOM)
+    origin = (U * min(left for left, _ in PLATES), U * PLATES[0][1])
+    tall.block(tuple(f"skill-{index}" for index in range(len(PLATES))), origin, (origin[0], TALL_TOP), TALL_GROW, shift)
+    description_top = TALL_TOP + plates_h + 24
+    tall.block(("restart-description",), (U * DESCRIPTION[0], U * DESCRIPTION[1]), (TALL_MARGIN * TALL_GROW, description_top), TALL_GROW,
+               shift)
+    tall.set("restart-description", "width", width)
+    tall.set("restart-description", "height", description_h)
+    tall.block(("restart_go",), (U * PRIMARY[0], U * PRIMARY[1]), (MARGIN, description_top + description_h + 24), TALL_GROW, shift)
+    tall.shade("restart-backing", BACKING_ALPHA)
+    return result
 

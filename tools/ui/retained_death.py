@@ -91,4 +91,18 @@ def restart_menu_document() -> dict:
     doc.events["onBack"] = [{"op": "focus", "control": "death_restart"}]
     root = group("screen", {**FULL, "background-color": colour([0, 0, 0, 0.94]), "font-family": font("marine"), "font-size": length(16),
                             "color": colour([1, 1, 1, 0.8])}, [stage, exit_modal])
-    return fit_narrow(doc.build(root))
+    return tall_restart_menu(fit_narrow(doc.build(root)))
+
+
+TALL_GROW = 1.6       # the menu levels' column scale
+
+
+def tall_restart_menu(result: dict) -> dict:
+    """The screen in a tall view: the wordmark and the card 1.6 times their
+    size about the view's middle, as the menu levels' column, and EXIT GAME's
+    question with them."""
+    from retained_tall import TallLayout
+    tall = TallLayout(result)
+    tall.scale("death-stage", TALL_GROW)
+    tall.dialogs(TALL_GROW)
+    return result
