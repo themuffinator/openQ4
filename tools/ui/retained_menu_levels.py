@@ -233,7 +233,10 @@ def skill_document(ui):
 # difficulty's description under them from the plates' label inset to the
 # column's margin, centred between the docked bands. The content keeps its
 # centred 720 dp box, so the parts move by the column's place less the box's
-# top; CHAPTERS keeps its 4:3 composition in that box.
+# top. CHAPTERS stands as the Load Game page does: the chosen level's
+# picture with START CHAPTER and BACK beside it, its name and explanation
+# under it across the column, then LEVEL and STATUS and the levels in
+# two-line rows down to the bottom band.
 TALL_SKILL_GROW=1.6
 TALL_SKILL_TOP,TALL_SKILL_BOTTOM=110.0,100.0   # dp: under the docked top band's title, over the docked bottom band
 TALL_SKILL_PLATE=30.0                           # u: a navigation plate's pitch
@@ -259,4 +262,33 @@ def tall_skill_page(ui,result):
                (ui.TALL_MARGIN*grow,TALL_SKILL_TOP+plates_h+24),grow,shift)
     tall.set('description','width',width)
     tall.set('description','height',described)
+    tall_chapters(ui,tall,{'op':'-','args':[0,box_top]})
     return result
+
+TALL_CHAPTER_DETAIL_LINES=3   # the explanation's lines across the column (four fit its 200 u in landscape)
+
+def tall_chapters(ui,tall,shift):
+    from retained_saves import SAVE_LINES,TALL_GROW,TALL_PLATE_PITCH,TALL_PLATES,tall_list
+    from retained_tall import CONTENT_W,MARGIN,VIEW_HEIGHT
+    U=ui.U;left,top,width,height=CHAPTER_PICTURE
+    picture_top=TALL_SKILL_TOP
+    tall.block(('chapter-shot-back','chapter-shot','chapter-shot-border'),(U*left,U*top),(MARGIN,picture_top),TALL_GROW,shift)
+    beside=MARGIN+U*width*TALL_GROW+24
+    for index,ident in enumerate(('chapter_start','chapter_back')):
+        tall.block((ident,),(tall.dp(ident,'left'),tall.dp(ident,'top')),(beside,picture_top+40+index*TALL_PLATE_PITCH),TALL_PLATES,shift)
+    name_top=picture_top+U*height*TALL_GROW+12
+    tall.block(('chapter-name',),(U*left,U*(top+height+5)),(MARGIN,name_top),TALL_GROW,shift)
+    detail_top=name_top+U*18*TALL_GROW+4
+    tall.block(('chapter-detail',),(U*left,U*(top+height+26)),(MARGIN,detail_top),TALL_GROW,shift)
+    detail_h=TALL_CHAPTER_DETAIL_LINES*tall.dp('chapter-detail','line-height')*TALL_GROW
+    for ident in ('chapter-name','chapter-detail'):
+        tall.set(ident,'width',CONTENT_W)
+    tall.set('chapter-detail','height',detail_h)
+    list_w=CONTENT_W-40
+    heads={'name':(tall.dp('chapter-head-level','left'),tall.dp('chapter-head-level','top')),
+           'location':(tall.dp('chapter-head-status','left'),tall.dp('chapter-head-status','top'))}
+    heads_top=detail_top+detail_h+24
+    # The list runs to the prompt bar over the bottom band, its top in view dp.
+    lines=len(SAVE_LINES);list_top=heads_top+lines*U*14*TALL_GROW+10
+    height={'op':'-','args':[VIEW_HEIGHT,round(list_top+TALL_SKILL_BOTTOM,4)]}
+    tall_list(tall,'chapter',SAVE_LINES,list_w,heads,heads_top,shift,height,{'name':'chapter-head-level','location':'chapter-head-status'})

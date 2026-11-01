@@ -214,6 +214,9 @@ SCENARIOS = {
         'openq4_retainedGui focus quake4', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
         'waitMsec 1200', 'ui_retainedStatus', 'openq4_retainedGui report', 'openq4_retainedGui inspect "prompts"',
         'screenshot "screenshots/campaignskill.tga"',
+        # CHAPTERS opens the campaign's levels in the difficulty's place.
+        'openq4_retainedGui event openChapters', 'waitMsec 800', 'screenshot "screenshots/campaignskill-chapters.tga"',
+        'openq4_retainedGui event closeChapters', 'waitMsec 400',
         'openq4_retainedGui focus back', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
         'waitMsec 1200', 'ui_retainedStatus', 'screenshot "screenshots/campaignskill-back.tga"',
     ]),

@@ -705,26 +705,32 @@ TALL_FOOT_BOTTOM = 72.0                        # dp: SAVE GAME, over the prompt 
 SAVE_LINES = ((("name", 0.0, 1.0),), (("location", 0.0, 1.0),))
 
 
-def tall_list(tall, prefix: str, lines: tuple, list_w: float, heads: dict, top: float) -> float:
+def tall_list(tall, prefix: str, lines: tuple, list_w: float, heads: dict, top: float, shift: dict | None = None,
+              height: dict | None = None, head_ids: dict | None = None) -> float:
     """The list's headings from `top`, a line for each of the row's lines,
     and its rows in those lines across `list_w` dp with its scrollbar beside
     it; returns the list's top. `heads` gives each heading's landscape place
-    (u) by cell."""
+    (u) by cell, `head_ids` the headings' ids where they are not
+    {prefix}-head-{cell}. `shift` moves the tops (block()), and a list whose
+    viewport does not stretch with the view takes `height`."""
     from retained_tall import MARGIN
     line, head_line, inset = U * ROW_H * TALL_GROW, U * 14 * TALL_GROW, U * 4 * TALL_GROW
     for number, cells in enumerate(lines):
         for cell, left, width in cells:
-            ident = f"{prefix}-head-{cell}"
-            tall.block((ident,), heads[cell], (MARGIN + left * list_w, top + number * head_line), TALL_GROW)
+            ident = (head_ids or {}).get(cell, f"{prefix}-head-{cell}")
+            tall.block((ident,), heads[cell], (MARGIN + left * list_w, top + number * head_line), TALL_GROW, shift)
             tall.set(ident, "width", width * list_w - inset)
     rule_top = top + len(lines) * head_line + 4
     tall.bind(f"{prefix}-rule", "left", MARGIN)
-    tall.bind(f"{prefix}-rule", "top", rule_top)
+    tall.top(f"{prefix}-rule", rule_top, shift)
     tall.bind(f"{prefix}-rule", "width", list_w)
     list_top = rule_top + 6
     tall.bind(f"{prefix}-list", "left", MARGIN)
-    tall.bind(f"{prefix}-list", "top", list_top)
+    tall.top(f"{prefix}-list", list_top, shift)
     tall.bind(f"{prefix}-list", "width", list_w)
+    if height is not None:
+        tall.bind(f"{prefix}-list", "height", height)
+        tall.bind(f"{prefix}_scroll", "height", height)
     tall.grow(f"{prefix}-column", TALL_GROW)
     for ident in [f"row-{index}" for index in range(ROWS)] + ["page-newer", "page-older"]:
         if ident not in tall.nodes:
@@ -743,7 +749,7 @@ def tall_list(tall, prefix: str, lines: tuple, list_w: float, heads: dict, top: 
                 tall.set(f"{ident}-{cell}", "top", number * line)
                 tall.set(f"{ident}-{cell}", "width", width * list_w - 2 * inset)
     tall.bind(f"{prefix}_scroll", "left", MARGIN + list_w + 4)
-    tall.bind(f"{prefix}_scroll", "top", list_top)
+    tall.top(f"{prefix}_scroll", list_top, shift)
     return list_top
 
 

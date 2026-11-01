@@ -2351,8 +2351,12 @@ view of 3:4 and taller as well, at the menu levels' 1.6 times
   docked bands, over a full-width shade.
 - **The campaign's difficulty**: its plates with TURBO's value on its plate
   and the description under them, centred the same way. The content keeps its
-  centred 720 dp box (so CHAPTERS keeps its 4:3 composition in it) and the
-  parts move by the column's place less the box's top.
+  centred 720 dp box and the parts move by the column's place less the box's
+  top. CHAPTERS stands as the Load Game page does: the chosen level's picture
+  with START CHAPTER and BACK beside it, its name and explanation under it
+  across the column, then LEVEL and STATUS and the levels in two-line rows
+  (name over status) down to the bottom band, the list's height following
+  the view. The `campaignskill` capture scenario adds a CHAPTERS shot.
 - **Arena pause**: MATCH PAUSED, the actions and the match block under them,
   as the single-player pause's column (`tall_column` and `tall_scale` at its
   scale), and its RESTART MATCH and LEAVE MATCH questions at 1.6 times
@@ -2374,8 +2378,8 @@ keeps its text-size step.
 The native menus, pages, Strogg pages, mp-pages, Match Control, card,
 vote/match, welcome, pointer-reach and SETTINGS groups pass, and
 `ui_retained_gate.py` passes. Captured on OpenGL at 9:16 and 3:4 (Restart
-Level, the campaign's difficulty, Arena pause and the restart screen) and at
-9:16 (Credits).
+Level, the campaign's difficulty and its CHAPTERS, Arena pause and the
+restart screen), at 9:16 (Credits) and at 16:9 (CHAPTERS, unchanged).
 
 Known limit: the Arena page keeps the narrow-view fit; its three columns
 need a tall design of their own. The multiplayer cards already span the
