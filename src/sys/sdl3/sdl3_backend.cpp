@@ -446,6 +446,7 @@ static bool s_menuMouseRouteActive = false;
 static idUserInterface *s_trackedMenuGui = NULL;
 static bool s_trackedConsoleActive = false;
 static bool s_haveMenuMousePosition = false;
+static idUserInterface *s_menuMouseGui = NULL;	// the menu GUI the tracked position belongs to
 static float s_menuMouseX = 0.0f;
 static float s_menuMouseY = 0.0f;
 static float s_menuMouseRemainderX = 0.0f;
@@ -1082,7 +1083,9 @@ static bool SDL3_ShouldRouteMenuMouse(void) {
 
 static idUserInterface *SDL3_GetActiveMenuGui(void) {
 	if (RetainedUI_IsOpen()) return NULL;
-	return ( session != NULL ) ? session->GetActiveGUI() : NULL;
+	// The GUI that receives menu input, which may be a retained screen covering
+	// the active one (the main menu's home screen); its cursor is the one drawn.
+	return ( session != NULL ) ? Session_MenuInputGUI() : NULL;
 }
 
 static bool SDL3_IsMouseCaptured(void) {
@@ -1152,6 +1155,7 @@ static void SDL3_ResetMenuMouseTracking(void) {
 
 static void SDL3_SetMenuMouseTrackingPosition(float cursorX, float cursorY) {
 	s_haveMenuMousePosition = true;
+	s_menuMouseGui = SDL3_GetActiveMenuGui();
 	s_menuMouseX = cursorX;
 	s_menuMouseY = cursorY;
 	s_menuMouseRemainderX = 0.0f;
@@ -1443,21 +1447,25 @@ static bool SDL3_MapWindowMouseToRoutedCursor(float windowMouseX, float windowMo
 }
 
 static bool SDL3_UpdateRoutedMouseDelta(float menuMouseX, float menuMouseY, int &dx, int &dy) {
+	// When the menu GUI changes (a retained screen opens centred over the main
+	// menu), its cursor is not where the pointer is. Take the first step from
+	// that cursor so it lands on the pointer; otherwise the offset was kept for
+	// good and the drawn cursor stopped short of an edge until the user swung
+	// back the other way. Later steps come from our own tracking: several motion
+	// events can arrive before the GUI applies any of them.
+	idUserInterface *activeGui = SDL3_GetActiveMenuGui();
+	if (activeGui != NULL && (!s_haveMenuMousePosition || activeGui != s_menuMouseGui)) {
+		SDL3_SetMenuMouseTrackingPosition(activeGui->CursorX(), activeGui->CursorY());
+	}
+
 	float previousX = 0.0f;
 	float previousY = 0.0f;
-
-	if (s_haveMenuMousePosition) {
-		previousX = s_menuMouseX;
-		previousY = s_menuMouseY;
-	} else {
-		idUserInterface *activeGui = SDL3_GetActiveMenuGui();
-		if (activeGui == NULL) {
-			SDL3_SetMenuMouseTrackingPosition(menuMouseX, menuMouseY);
-			return true;
-		}
-		previousX = activeGui->CursorX();
-		previousY = activeGui->CursorY();
+	if (!s_haveMenuMousePosition) {
+		SDL3_SetMenuMouseTrackingPosition(menuMouseX, menuMouseY);
+		return true;
 	}
+	previousX = s_menuMouseX;
+	previousY = s_menuMouseY;
 
 	dx = SDL3_ConsumeMouseDelta(menuMouseX - previousX, s_menuMouseRemainderX);
 	dy = SDL3_ConsumeMouseDelta(menuMouseY - previousY, s_menuMouseRemainderY);
