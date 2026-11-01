@@ -2446,12 +2446,38 @@ activated where it was released. Now (section 13.6, INP-014; the routing in
 - **A moved touch is not a tap.** Past 8 dp in any direction the press no
   longer activates on release. Sliders and scrollbar thumbs keep their own
   drag, and a mouse keeps the desktop rules.
+- **Pressed at once.** Touch-down lights the control's pressed treatment in
+  the same input, with no tap delay, and a finger that moves on drops it.
+- **Lists keep going.** A drag released at speed carries on with the
+  finger's velocity and slows over about a third of a second; a finger that
+  rests before lifting stops the list where it is, and a new touch,
+  navigation or a dialog stops a moving one.
+- **The ends light up.** Pulled past its first or last row, a list stays put
+  and the rim light at that end brightens with the pull (`marine.rim`, 19 u
+  deep, fully lit at 64 dp); a fling that reaches an end lights it by its
+  speed, and the light fades over 250 ms once nothing holds it.
+- **Swipe between tabs.** A swipe 48 dp across a tab strip (the settings
+  pages, the multiplayer card and its summary) shows the next tab, swiping
+  toward the leading edge, or the previous one, as Q and E do.
+- **Long-press for details.** A finger resting 500 ms on a control that has
+  a detail (Join Game's servers) opens its detail card under it instead of
+  choosing it; the card stays after the finger lifts, until the next touch.
+
+The real menus had not been receiving any of this: only the
+`ui_retainedOpen` preview told the runtime that the pointer was a finger, and
+a finger's movement reached a menu only where it lifted. The menus' adapter
+now names the source and moves the pointer out after a lift, and the SDL
+layer queues a pointer event for each finger motion.
 
 The scrollbar runtime test adds the gestures (a tap under 8 dp, a sideways
 move, a drag that the content follows, a finger on the thumb, a mouse that
-does not drag); the input, adapter and contract harnesses take the new
-pointer source. Not yet: inertia, the rim light at a list's ends, long-press
-details, tab-strip swipes, press haptics and qualification on a device.
+does not drag) and the rest of the rules: the press at touch-down, inertia
+and what stops it, the rim light at both ends and from a fling, long-press
+details (with a lift after 500 ms and no frame between), tab-strip swipes
+and what is not one. The adapter harness checks the source, the lift and the
+swipe events; the input and contract harnesses take the new pointer source.
+Not yet: press haptics, which need Android's touch-feedback path, and
+qualification on a device.
 
 **Touch target sizes.** Measured in a 9:16 view, most targets are 44 dp of
 the canvas or more (rows 96, plates about 58), but a few stay small: the

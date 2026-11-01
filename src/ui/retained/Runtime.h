@@ -324,9 +324,16 @@ public:
 	void PointerButton(bool down, double monotonicSeconds);
 	void PointerWheel(int rows, double monotonicSeconds);
 	// Whether the pointer is a finger (section 13.6): a touch that moves past
-	// 8 dp is no longer a tap, so its release activates nothing, and in a
-	// scrolling container it drags the content.
+	// 8 dp is no longer a tap, so its release activates nothing. In a
+	// scrolling container it drags the content, which keeps its release
+	// velocity and lights the list's rim at either end; across a tab strip it
+	// swipes; resting 500 ms on a button that names a detail it opens that
+	// detail instead of activating.
 	void SetTouchPointer(bool touch);
+	// The document events touch gestures asked for, oldest first: a swipe
+	// across a tab strip asks for onTabPrevious or onTabNext. The adapter
+	// runs them as it runs Q and E.
+	std::vector<std::string> TakeGestureEvents();
 	void MenuAction(MenuInput input, bool down, double monotonicSeconds);
 	void CancelInput(double monotonicSeconds);
 	// After successful RestoreSnapshot: quarantine adapter sources with

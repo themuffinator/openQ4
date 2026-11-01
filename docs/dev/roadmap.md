@@ -988,8 +988,10 @@ archived provenance; new scheduling belongs here.
   (visual specification 1.36). On a touchscreen the menus' lists now
   [drag with the finger](ui/retained-screens.md#touch-in-the-menus-1-november-2026),
   a moved touch is no longer a tap and a finger leaves no cursor or hover
-  behind (`INP-014` partial; inertia, long-press, swipes, haptics, the safe
-  area and device qualification remain).
+  behind; a press lights at touch-down, a released list keeps going as
+  inertia and lights its rim at either end, a swipe across a tab strip
+  changes tab and a 500 ms long-press opens a button's detail (`INP-014`
+  partial; haptics, the safe area and device qualification remain).
 - [ ] **UI-02 — P1, implementation and qualification: text, input and accessibility.**
   Finish in-field IME/composition, shaping/kerning/fallback/styles, grapheme editing,
   caret/candidate placement, binding capture, accessibility exposure and contextual

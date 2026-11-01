@@ -2515,7 +2515,12 @@ static void SDL3_HandleFingerEvent(const SDL_TouchFingerEvent &event, int eventT
 	int dy = 0;
 	const bool routed = SDL3_ShouldRouteMenuMouse() && SDL3_SetRoutedCursorFromWindowPosition(windowMouseX, windowMouseY, dx, dy);
 
-	(void)motion;
+	// The routed GUI took the finger's position above. A zero-delta pointer
+	// event lets a retained menu follow the finger as it moves (a list drag, a
+	// tab-strip swipe), not only where it pressed and lifted.
+	if (motion && routed && !RetainedUI_IsOpen() && !(console && console->Active())) {
+		Sys_QueEvent(eventTime, SE_MOUSE, 0, 0, 0, NULL);
+	}
 	if (down || up) {
 		const bool acceptsLoadingInput = openQ4_AcceptingLoadingContinueInput();
 		if (routed || acceptsLoadingInput) {

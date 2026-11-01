@@ -215,8 +215,10 @@ made them too large to load.
 - [x] Touch in the menus: lists drag with a finger, a touch moved past 8 dp
   is no longer a tap, and a finger leaves no cursor or hover behind
   ([touch](ui/retained-screens.md#touch-in-the-menus-1-november-2026), INP-014
-  partial); inertia, long-press, swipes, haptics, the safe area and device
-  qualification remain.
+  partial). A press lights at once, a released list keeps going and lights
+  its rim at either end, a swipe across a tab strip changes tab and a
+  long-press opens Join Game's server details; the real menus now receive the
+  finger as it moves. Haptics, the safe area and device qualification remain.
 - [ ] Bound acceptance evidence remains.
 
 ## Windows stay see-through at any distance, 29 October 2026

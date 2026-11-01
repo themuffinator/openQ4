@@ -12,6 +12,7 @@
 #include <fstream>
 #include <limits>
 #include <sstream>
+#include <tuple>
 using namespace openq4::ui;
 static unsigned checks=0;
 static void Check(bool value,const char* why){++checks;if(!value){std::fprintf(stderr,"FAIL %s\n",why);std::exit(1);}}
@@ -136,13 +137,117 @@ static void TouchDrag(){for(float ratio:{1.f,2.f}){
   Check(v.Offset()==0&&v.runtime.TakeActions().empty(),"a touch moved 20 dp across the button is no longer a tap, nor a scroll");
   press(v);v.runtime.PointerMove(centre.x,centre.y-100*ratio,v.time);v.Frame();Check(Near(v.Offset(),100*ratio),"the dragged content follows the finger");
   v.runtime.PointerMove(centre.x,centre.y-140*ratio,v.time);v.Frame();Check(Near(v.Offset(),140*ratio),"and keeps following it");
-  v.runtime.PointerButton(false,v.time);v.Frame();Check(v.runtime.TakeActions().empty()&&Near(v.Offset(),140*ratio),"a drag's release activates nothing and leaves the content there");}
+  v.time+=.15;v.runtime.PointerMove(centre.x,centre.y-140*ratio,v.time);
+  v.runtime.PointerButton(false,v.time);v.Frame();Check(v.runtime.TakeActions().empty()&&Near(v.Offset(),140*ratio),"a resting drag's release activates nothing and leaves the content there");}
  {View thumb(ratio);thumb.runtime.SetTouchPointer(true);thumb.Move(.03);thumb.runtime.PointerButton(true,thumb.time);thumb.Move(.5);thumb.Frame();
   Check(thumb.Offset()>0,"a finger on the thumb drags the bar");thumb.runtime.PointerButton(false,thumb.time);thumb.NoActions();}
  {View mouse(ratio);open(mouse);press(mouse);mouse.runtime.PointerMove(centre.x,centre.y-100*ratio,mouse.time);mouse.Frame();
   Check(mouse.Offset()==0,"a mouse does not drag content");mouse.runtime.PointerButton(false,mouse.time);mouse.Frame();mouse.NoActions();
   press(mouse);mouse.runtime.PointerMove(centre.x+20*ratio,centre.y,mouse.time);mouse.runtime.PointerButton(false,mouse.time);mouse.Frame();
   Check(mouse.runtime.TakeActions().size()==1,"a mouse released on the button it pressed still activates it");}}}
+// The rest of section 13.6's touch rules. The source without the test
+// modal's box, and a finger pressed at `from` and moved by `by` every 16 ms.
+static Json::Value TouchSource(){auto source=Source();Json::Value kept(Json::arrayValue);for(const auto& child:Frame(source)["children"])if(child["id"]!="modal")kept.append(child);Frame(source)["children"]=kept;return source;}
+static void Load(View& at,const Json::Value& source,const char* path){at.runtime.CloseDocument();std::vector<Diagnostic> ds;const bool ok=at.runtime.LoadDocument(Encode(source),path,ds);for(auto& d:ds)std::fprintf(stderr,"%s %s\n",d.pointer.c_str(),d.message.c_str());Check(ok,path);at.Frame();}
+static Rml::Vector2f Centre(Rml::Element* e){return e->GetAbsoluteOffset(Rml::BoxArea::Border)+e->GetBox().GetSize(Rml::BoxArea::Border)*.5f;}
+static void Stroke(View& v,Rml::Vector2f from,Rml::Vector2f by,int steps,bool lift=true){v.runtime.SetTouchPointer(true);v.runtime.PointerMove(from.x,from.y,v.time);v.runtime.PointerButton(true,v.time);
+ for(int i=1;i<=steps;++i){v.time+=.016;v.runtime.PointerMove(from.x+by.x*i,from.y+by.y*i,v.time);}if(lift)v.runtime.PointerButton(false,v.time);}
+static void Leave(View& v){v.runtime.PointerMove(std::numeric_limits<float>::quiet_NaN(),0,v.time);}
+// Touch-down shows the pressed treatment (hover and focus with the press
+// inset) in the same input, though the pointer presentation shows no focus
+// otherwise; a finger moved past 8 dp drops it and a lifted one leaves the
+// control unlit.
+static void TouchPress(){View v;Load(v,TouchSource(),"press.q4ui");const auto at=Centre(v.Element("first"));
+ v.runtime.SetTouchPointer(true);v.runtime.PointerMove(at.x,at.y,v.time);v.runtime.PointerButton(true,v.time);
+ Check(v.runtime.GetControlState("first")==ControlState::Pressed&&v.runtime.FocusedControl()=="first","touch-down presses and focuses the control before any frame");
+ v.runtime.PointerMove(at.x,at.y-12,v.time);Check(v.runtime.GetControlState("first")!=ControlState::Pressed,"a finger moved past 8 dp drops the press");
+ v.runtime.PointerButton(false,v.time);Leave(v);v.Frame();v.runtime.TakeActions();
+ v.runtime.PointerMove(at.x,at.y,v.time);v.runtime.PointerButton(true,v.time);v.Frame();Check(v.runtime.GetControlState("first")==ControlState::Pressed,"a resting finger keeps the press");
+ v.runtime.PointerButton(false,v.time);Leave(v);v.Frame();Check(v.runtime.TakeActions().size()==1&&v.runtime.GetControlState("first")==ControlState::Default,"a tap activates and leaves the control unlit");}
+// A released drag keeps its velocity and slows over its 325 ms decay until
+// it stops; a resting finger leaves none, and a new touch, a focus move or a
+// modal stops it at once.
+static void TouchInertia(){for(float ratio:{1.f,2.f}){View v(ratio);auto* viewport=v.Element("viewport");const auto centre=Centre(viewport);
+ // 20 dp every 16 ms: 1250 dp a second.
+ Stroke(v,centre,{0,-20*ratio},5);const double released=v.Offset();Check(Near(released,100*ratio),"the drag follows the finger to its release");
+ v.Frame();double step=v.Offset()-released,last=v.Offset();Check(step>10*ratio,"a released drag keeps moving");
+ for(int i=0;i<200;++i){v.Frame();const double moved=v.Offset()-last;Check(moved>=0&&moved<=step+1.01,"inertia slows down");last=v.Offset();if(moved>0)step=moved;}
+ // v·τ = 1250 dp/s × 0.325 s, less the 6.5 dp left below 20 dp a second.
+ Check(Near(v.Offset()-released,400*ratio,24*ratio),"inertia carries the release velocity over its decay");
+ viewport->SetScrollTop(0);v.Frame();Stroke(v,centre,{0,-20*ratio},5,false);v.time+=.15;v.runtime.PointerMove(centre.x,centre.y-100*ratio,v.time);v.runtime.PointerButton(false,v.time);
+ const auto held=v.Offset();v.Frame();v.Frame();Check(v.Offset()==held,"a finger that rests before lifting leaves no inertia");
+ const auto stops=[&](const char* why,auto interrupt){viewport->SetScrollTop(0);v.Frame();Stroke(v,centre,{0,-20*ratio},5);v.Frame();Check(v.Offset()>100*ratio,"the list flings");
+  interrupt();const auto at=v.Offset();v.Frame();v.Frame();Check(v.Offset()==at,why);};
+ stops("a new touch stops inertia",[&]{v.runtime.PointerMove(centre.x,centre.y,v.time);v.runtime.PointerButton(true,v.time);v.runtime.PointerButton(false,v.time);Leave(v);});
+ stops("a modal stops inertia",[&]{Check(v.runtime.PushModal("modal",v.time),"a modal opens over the flinging list");});Check(v.runtime.PopModal(v.time),"the modal closes");
+ stops("a focus move stops inertia",[&]{Check(v.runtime.FocusControl("bar",v.time),"focus moves to the bar");});
+ v.NoActions();}}
+// At either end a list's rim light brightens with the pull, the content
+// staying put, and fades over 250 ms once the finger lifts; a fling that
+// reaches an end lights it by the speed it arrives with.
+static void TouchRim(){for(float ratio:{1.f,2.f}){const auto lit=[&](Rml::Element* rim){return rim->GetComputedValues().display()!=Rml::Style::Display::None;};
+ {View v(ratio);auto* viewport=v.Element("viewport");const auto centre=Centre(viewport);
+ const auto top=viewport->GetAbsoluteOffset(Rml::BoxArea::Padding);const float client=viewport->GetClientHeight();
+ Stroke(v,centre,{0,8*ratio},4,false);v.Frame();auto* rim=v.Element("q4-touch-rim");
+ Check(v.Offset()==0,"the content does not stretch past its start");Check(lit(rim)&&Near(rim->GetComputedValues().opacity(),.5,.02),"a 32 dp pull lights the start's rim at half strength");
+ auto at=rim->GetAbsoluteOffset(Rml::BoxArea::Border);const auto size=rim->GetBox().GetSize(Rml::BoxArea::Border);
+ Check(Near(at.x,top.x)&&Near(at.y,top.y)&&Near(size.x,viewport->GetClientWidth())&&Near(size.y,28.5*ratio),"the rim spans the list's start, 19 u deep");
+ v.runtime.PointerMove(centre.x,centre.y+90*ratio,v.time);v.Frame();Check(Near(rim->GetComputedValues().opacity(),1,.01)&&v.Offset()==0,"a 64 dp pull lights it fully");
+ v.runtime.PointerButton(false,v.time);Leave(v);v.Frame();Check(Near(rim->GetComputedValues().opacity(),1-.02/.25,.02),"let go, it fades");
+ for(int i=0;i<13;++i)v.Frame();Check(!lit(rim),"over 250 ms");
+ viewport->SetScrollTop(1e5f);v.Frame();const double range=v.Offset();Check(range>500*ratio,"the list reaches its end");
+ Stroke(v,centre,{0,-12*ratio},4,false);v.Frame();at=rim->GetAbsoluteOffset(Rml::BoxArea::Border);
+ Check(Near(v.Offset(),range),"nor past its end");Check(lit(rim)&&Near(at.y,top.y+client-28.5*ratio)&&Near(rim->GetComputedValues().opacity(),.75,.02),"a 48 dp pull past the end lights the end's rim");
+ v.runtime.PointerButton(false,v.time);Leave(v);for(int i=0;i<15;++i)v.Frame();Check(!lit(rim)&&Near(v.Offset(),range),"a drag held against its end leaves no inertia and its rim fades");
+ viewport->SetScrollTop(static_cast<float>(range-300*ratio));v.Frame();Stroke(v,centre,{0,-20*ratio},5);Leave(v);
+ for(int i=0;i<100&&!lit(rim);++i)v.Frame();
+ // About 635 dp a second remains of 1250 after 200 dp: a third of full strength.
+ Check(Near(v.Offset(),range)&&lit(rim)&&rim->GetComputedValues().opacity()>.2f&&rim->GetComputedValues().opacity()<.45f,"a fling reaching the end lights its rim by its speed");
+ for(int i=0;i<15;++i)v.Frame();Check(!lit(rim),"which fades in turn");}
+ {View mouse(ratio);auto* list=mouse.Element("viewport");const auto c=Centre(list);mouse.runtime.PointerMove(c.x,c.y,mouse.time);mouse.runtime.PointerButton(true,mouse.time);mouse.runtime.PointerMove(c.x,c.y+90*ratio,mouse.time);mouse.Frame();
+  mouse.runtime.PointerButton(false,mouse.time);mouse.Frame();auto* document=Rml::GetContext(0)->GetDocument(0);Check(!document->GetElementById("q4-touch-rim"),"a mouse lights no rim");}}}
+// A finger resting 500 ms on a button that names a detail opens that detail
+// instead of activating it, and the card stays, placed as for focus, after
+// the finger lifts, until the next press. A tap, a drag, a button without a
+// detail and a mouse keep their rules.
+static void TouchLongPress(){for(float ratio:{1.f,2.f}){auto source=TouchSource();
+ source["state"]["detail"]["type"]="number";source["state"]["detail"]["initial"]=-1;source["detail"]["state"]="detail";source["detail"]["card"]="card";
+ Frame(source)["children"][0]["children"][0]["children"][0]["control"]["detail"]=3;
+ auto plain=Box("plain",500,100,80,32);plain["control"]["role"]="button";plain["control"]["action"]="button";plain["control"]["label"]="#str_test";Feedback(source,plain);
+ source["root"]["children"].append(plain);source["root"]["children"].append(Box("card",500,400,100,40));
+ View v(ratio);Load(v,source,"detail.q4ui");auto* first=v.Element("first");const auto at=Centre(first),other=Centre(v.Element("plain"));
+ const auto detail=[&]{StateValue value;Check(v.runtime.GetStateValue("detail",value),"detail state");return std::get<double>(value);};
+ const auto hold=[&](Rml::Vector2f point,int frames){v.runtime.PointerMove(point.x,point.y,v.time);v.runtime.PointerButton(true,v.time);for(int i=0;i<frames;++i)v.Frame();v.runtime.PointerButton(false,v.time);Leave(v);v.Frame();};
+ v.runtime.SetTouchPointer(true);hold(at,5);Check(v.runtime.TakeActions().size()==1&&detail()==-1,"a 100 ms tap activates and leaves no detail");
+ hold(at,30);Check(v.runtime.TakeActions().empty(),"a 500 ms long-press activates nothing");Check(detail()==3,"it opens the button's detail, which stays after the finger lifts");
+ auto* card=v.Element("card");const auto below=first->GetAbsoluteOffset(Rml::BoxArea::Border).y+first->GetBox().GetSize(Rml::BoxArea::Border).y+6*ratio;
+ Check(Near(card->GetAbsoluteOffset(Rml::BoxArea::Border).y,below),"the card stands 6 dp under the button, as for focus");
+ v.runtime.PointerMove(other.x,other.y,v.time);v.runtime.PointerButton(true,v.time);v.Frame();Check(detail()==-1,"the next press closes it");v.runtime.PointerButton(false,v.time);Leave(v);v.Frame();v.runtime.TakeActions();
+ v.runtime.PointerMove(at.x,at.y,v.time);v.runtime.PointerButton(true,v.time);v.time+=.55;v.runtime.PointerButton(false,v.time);Leave(v);v.Frame();
+ Check(v.runtime.TakeActions().empty()&&detail()==3,"a lift 500 ms after the press long-presses with no frame between");
+ v.Key(MenuInput::Down);v.Frame();Check(detail()==(v.runtime.FocusedControl()=="first"?3:-1),"navigation hands the detail back to focus");
+ v.runtime.SetTouchPointer(true);hold(at,30);v.runtime.TakeActions();const auto offset=v.Offset();
+ v.runtime.PointerMove(at.x,at.y,v.time);v.runtime.PointerButton(true,v.time);for(int i=0;i<30;++i)v.Frame();v.runtime.PointerMove(at.x,at.y-60*ratio,v.time);v.Frame();
+ Check(v.Offset()==offset,"a finger moving after its long-press drags nothing");v.runtime.PointerButton(false,v.time);Leave(v);v.Frame();Check(v.runtime.TakeActions().empty(),"nor activates");
+ Stroke(v,at,{0,-10*ratio},5,false);for(int i=0;i<30;++i)v.Frame();Check(detail()==-1,"a dragging finger hovers nothing and long-presses nothing");v.runtime.PointerButton(false,v.time);Leave(v);v.Frame();
+ hold(other,30);Check(v.runtime.TakeActions().size()==1,"a button without a detail keeps its tap however long the press");
+ v.Element("viewport")->SetScrollTop(0);v.Frame();v.runtime.SetTouchPointer(false);v.runtime.PointerMove(at.x,at.y,v.time);v.runtime.PointerButton(true,v.time);for(int i=0;i<30;++i)v.Frame();v.runtime.PointerButton(false,v.time);v.Frame();
+ Check(v.runtime.TakeActions().size()==1,"a mouse never long-presses");v.runtime.PointerMove(other.x,other.y,v.time);v.Frame();Check(detail()==-1,"its hover card follows the mouse");}}
+// A swipe 48 dp across a tab strip asks for the next tab (toward the leading
+// edge) or the previous one, as Q and E do, and activates nothing; a shorter
+// or upright one, one off the strip and a mouse ask for nothing.
+static void TouchSwipe(){for(float ratio:{1.f,2.f}){auto source=TouchSource();source["state"]["tab"]["type"]="number";source["state"]["tab"]["initial"]=0;
+ for(const auto& [name,value]:std::vector<std::pair<const char*,int>>{{"onTabPrevious",0},{"onTabNext",1},{"tab_a",0},{"tab_b",1}}){Json::Value op;op["op"]="setState";op["values"]["tab"]=value;source["events"][name].append(op);}
+ for(const auto& [id,event,left]:std::vector<std::tuple<const char*,const char*,double>>{{"tab-a","tab_a",480},{"tab-b","tab_b",620}}){auto tab=Box(id,left,20,120,36);tab["control"]["role"]="button";tab["control"]["event"]=event;tab["control"]["label"]="#str_test";Feedback(source,tab);source["root"]["children"].append(tab);}
+ View v(ratio);Load(v,source,"tabs.q4ui");const auto a=Centre(v.Element("tab-a")),row=Centre(v.Element("first"));
+ const auto events=[&]{return v.runtime.TakeGestureEvents();};using Events=std::vector<std::string>;
+ Stroke(v,a,{-12*ratio,0},5);Check(events()==Events{"onTabNext"}&&v.runtime.TakeActions().empty(),"a 60 dp swipe toward the leading edge asks for the next tab and activates nothing");
+ Stroke(v,a,{12*ratio,0},5);Check(events()==Events{"onTabPrevious"}&&v.runtime.TakeActions().empty(),"and toward the trailing edge the previous one");
+ Stroke(v,a,{-8*ratio,0},4);Check(events().empty()&&v.runtime.TakeActions().empty(),"a 32 dp swipe asks for nothing and is no tap");
+ Stroke(v,a,{2*ratio,-12*ratio},5);Check(events().empty(),"an upright move on the strip is no swipe");
+ Stroke(v,row,{-12*ratio,0},5);Check(events().empty()&&v.runtime.TakeActions().empty(),"a swipe off the strip asks for nothing");
+ v.runtime.SetTouchPointer(false);v.runtime.PointerMove(a.x,a.y,v.time);v.runtime.PointerButton(true,v.time);v.runtime.PointerMove(a.x-60*ratio,a.y,v.time);v.runtime.PointerButton(false,v.time);
+ Check(events().empty(),"a mouse never swipes");}}
 static void SystemCandidate(const std::string& text){Document document;std::vector<Diagnostic> ds;Check(document.Load(text,ds),"actual SYSTEM candidate parses");State state;std::string error;Check(state.Reset(document.Model(),error),"SYSTEM candidate typed state resets");
  std::string message;for(int i=0;i<40;++i)message+="The display change waits for your answer before it reverts by itself. ";
  // The engine lays the page out on its 720 dp canvas: the view's size sets the dp ratio.
@@ -169,5 +274,5 @@ static void SystemCandidate(const std::string& text){Document document;std::vect
  Check(host.softened==1&&runtime.Statistics().backdropComposites==0,"a closed SYSTEM dialog softens nothing");host.softFocus=false;
  }
  }}
-int main(int argc,char** argv){Schema();Gestures();DensityKeepsContentFocus();MixedViewportReveal();Persistence();Lifecycle();TwoAxes();ThumbFrames();TouchDrag();if(argc>1){std::ifstream file(argv[1],std::ios::binary);std::string text{std::istreambuf_iterator<char>(file),{}};SystemCandidate(text);}
+int main(int argc,char** argv){Schema();Gestures();DensityKeepsContentFocus();MixedViewportReveal();Persistence();Lifecycle();TwoAxes();ThumbFrames();TouchDrag();TouchPress();TouchInertia();TouchRim();TouchLongPress();TouchSwipe();if(argc>1){std::ifstream file(argv[1],std::ios::binary);std::string text{std::istreambuf_iterator<char>(file),{}};SystemCandidate(text);}
  std::printf("PASS %u checks; actual canonical schema/Interaction/Runtime/Rml layout; counted host, no native input or GPU qualification.\n",checks);}

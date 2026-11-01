@@ -1855,10 +1855,34 @@ struct Runtime::Impl {
 	float pointerX = 0, pointerY = 0;
 	float windowPointerX = 0, windowPointerY = 0;
 	bool pointerPresent = false;
-	// A touch drag of a scrolling container's content (section 13.6): where
-	// the finger pressed and the container's offset then, by its ID.
+	// A touch press (section 13.6) and what it becomes: a tap while it stays
+	// within 8 dp; past that, a drag of the scrolling container it pressed in
+	// (moved more up or down than across) or a swipe across the tab strip it
+	// pressed on (more across); a long-press once it rests 500 ms on a button
+	// that names a detail. Where and when it pressed, the container's offset
+	// then, and the finger's recent heights for its release velocity.
 	bool touchPointer = false;
-	struct ContentDrag { bool pressed = false, active = false; float x = 0, y = 0, offset = 0; std::string container; } contentDrag;
+	struct Touch {
+		bool pressed = false, moved = false, dragging = false, swiping = false, strip = false;
+		float x = 0, y = 0, offset = 0; double at = 0;
+		std::string container, detail;
+		std::vector<std::pair<double,float>> samples;
+	} touch;
+	// A released drag's inertia: its container, the offset it has reached and
+	// its velocity in pixels a second, when it last advanced, and the focus and
+	// modal it began under, either of which moving stops it.
+	struct Fling { std::string container, focus, modal; double offset = 0, velocity = 0, at = 0; } fling;
+	// The rim light at one end of a list (section 13.6): its container and
+	// end, and its brightness, held by a finger pulling past that end or else
+	// fading from `from` since `fadeAt`. The runtime draws it in its own
+	// element over the document, which closing the document destroys.
+	struct Rim { std::string container; bool end = false, fading = false; float strength = 0, from = 0; double fadeAt = 0; } rim;
+	Rml::Element* rimElement = nullptr;
+	bool rimElementEnd = false;
+	// A long-pressed button whose detail stays shown until the next press,
+	// navigation or mouse movement.
+	std::string detailPin;
+	std::vector<std::string> gestureEvents;
 	bool pointerNavigation = false;
 	// Which device leads (section 13.4): the pointer once it moves or
 	// presses, the keyboard or controller once a menu input or a program's
@@ -2079,7 +2103,7 @@ struct Runtime::Impl {
 	// Focus a program asked for: now, when the control can take it, else
 	// after the next frame's layout.
 	void RequestFocus(const std::string& id) {
-		SetPointerNavigation(false);
+		SetPointerNavigation(false); fling = {}; detailPin.clear();
 		if (interaction.Focus(id)) { pendingFocus.clear(); RevealFocus(); }
 		else pendingFocus = id;
 	}
@@ -2227,11 +2251,15 @@ struct Runtime::Impl {
 	bool UpdateDetailSubject() {
 		if (!canonical || !canonical->Model().detail) return false;
 		const auto& spec = *canonical->Model().detail;
-		std::string subject = pointerNavigation ? (pointerPresent ? interaction.Hovered() : std::string{}) : interaction.Focused();
+		// A long-pressed button keeps its detail, placed as for focus, while it
+		// can still take input.
+		if (!detailPin.empty() && !interaction.CanActivate(detailPin)) detailPin.clear();
+		const bool byPointer = pointerNavigation && detailPin.empty();
+		std::string subject = !detailPin.empty() ? detailPin : byPointer ? (pointerPresent ? interaction.Hovered() : std::string{}) : interaction.Focused();
 		const auto* node = subject.empty() ? nullptr : canonical->Model().FindNode(subject);
 		if (!node || !node->control || !node->control->detail) subject.clear();
-		if (subject != detailSubject || pointerNavigation != detailByPointer) detailPlaced = false;
-		detailSubject = subject; detailByPointer = pointerNavigation;
+		if (subject != detailSubject || byPointer != detailByPointer) detailPlaced = false;
+		detailSubject = subject; detailByPointer = byPointer;
 		const StateValues change{{spec.state, subject.empty() ? spec.none : *node->control->detail}};
 		if (!state.WouldChange(change)) return false;
 		State candidate = state; std::string error;
@@ -2436,39 +2464,210 @@ struct Runtime::Impl {
 		RememberFocusLayout();
 		return changed;
 	}
-	// A touch press (section 13.6): where it landed, and the scrolling
-	// container whose content it may drag, unless the press captured a value
-	// control (a slider, a scrollbar) or a choice popup is open, whose own
-	// gestures own the finger.
-	void BeginContentDrag() {
-		contentDrag = {};
+	// Touch thresholds (section 13.6), in dp and seconds: the slop a tap
+	// keeps, the travel that makes a swipe, the rest that makes a long-press
+	// and the span the release velocity is measured over.
+	static constexpr float TouchSlop = 8, SwipeTravel = 48;
+	static constexpr double LongPressSeconds = .5, VelocityWindow = .1;
+	// Inertia: a drag released faster than 50 dp a second keeps going, at
+	// most 8000, slowing exponentially over 325 ms until under 20.
+	static constexpr double FlingMinimum = 50, FlingMaximum = 8000, FlingStop = 20, FlingDecay = .325;
+	// The rim light reaches 19 u (28.5 dp) in from the list's edge. A 64 dp
+	// pull past the end, or a fling arriving at 2000 dp a second, lights it
+	// fully; let go, it fades over 250 ms.
+	static constexpr float RimReach = 28.5f, RimPull = 64, RimSpeed = 2000;
+	static constexpr double RimFade = .25;
+	// A touch press (section 13.6): where and when it landed, the scrolling
+	// container whose content it may drag, whether it is on a tab strip and
+	// the button whose detail a long-press opens, unless the press captured a
+	// value control (a slider, a scrollbar) or a choice popup is open, whose
+	// own gestures own the finger.
+	void BeginTouch() {
+		touch = {};
 		if (!touchPointer || !interaction.CapturedPointerControl().empty()) return;
 		for (const auto& id : controls) if (const auto widget = interaction.Widget(id); widget && widget->popupOpen) return;
-		contentDrag = {true,false,pointerX,pointerY,0,{}};
+		touch.pressed = true; touch.x = pointerX; touch.y = pointerY; touch.at = time;
+		touch.samples.emplace_back(time,pointerY);
+		const auto pressed = interaction.Hovered();
+		const auto* node = pressed.empty() || !canonical ? nullptr : canonical->Model().FindNode(pressed);
+		if (node && node->control && node->control->role == ControlRole::Button) {
+			const auto& control = *node->control;
+			if (control.detail && canonical->Model().detail) touch.detail = pressed;
+			// A tab strip's tabs run its `tab_` programs, and its ends the
+			// previous and next tab.
+			const auto& events = canonical->Model().events;
+			touch.strip = (control.event.starts_with("tab_") || control.event == "ontabprevious" || control.event == "ontabnext") &&
+				(events.contains("ontabprevious") || events.contains("ontabnext"));
+		}
 		auto* hit = HitElement();
 		auto* scroll = hit ? hit->GetClosestScrollableContainer() : nullptr;
 		if (!scroll || scroll->GetId().empty() || !interaction.AllowsNode(scroll->GetId()) ||
 			scroll->GetScrollHeight() <= scroll->GetClientHeight()) return;
-		contentDrag.offset = scroll->GetScrollTop(); contentDrag.container = scroll->GetId();
+		touch.offset = scroll->GetScrollTop(); touch.container = scroll->GetId();
+	}
+	// The finger's heights over the velocity span (at least the latest), and
+	// its velocity over them in pixels a second.
+	void SampleTouch() {
+		auto& samples = touch.samples;
+		samples.emplace_back(time,pointerY);
+		while (samples.size() > 1 && samples.front().first < time-VelocityWindow) samples.erase(samples.begin());
+	}
+	double TouchVelocity() const {
+		const auto& samples = touch.samples;
+		const double span = samples.size() > 1 ? samples.back().first-samples.front().first : 0;
+		return span > 1e-3 ? (samples.back().second-samples.front().second)/span : 0;
 	}
 	// A touch that moves past 8 dp is no longer a tap (INP-002): the arm is
 	// cancelled, so the release activates nothing. Moved more up or down than
-	// across in a scrolling container, it drags the content with the finger.
-	void DragContent() {
-		if (!contentDrag.pressed) return;
-		if (!pointerPresent) { contentDrag = {}; return; }
-		const float dx = pointerX-contentDrag.x, dy = pointerY-contentDrag.y;
-		if (!contentDrag.active) {
-			if (std::max(std::abs(dx),std::abs(dy)) <= 8*viewport.DpRatio()) return;
-			interaction.Cancel();
-			if (contentDrag.container.empty() || std::abs(dy) < std::abs(dx)) { contentDrag = {}; return; }
-			contentDrag.active = true;
+	// across in a scrolling container, it drags the content with the finger;
+	// past either end the content stays and that end's rim light brightens
+	// with the pull. Moved more across on a tab strip, it is a swipe, which
+	// the release decides.
+	void MoveTouch() {
+		if (!touch.pressed) return;
+		if (!pointerPresent) { EndTouch(); return; }
+		SampleTouch();
+		const float dp = viewport.DpRatio(), dx = pointerX-touch.x, dy = pointerY-touch.y;
+		if (!touch.moved) {
+			if (LongPress()) return;
+			if (std::max(std::abs(dx),std::abs(dy)) <= TouchSlop*dp) return;
+			interaction.Cancel(); touch.moved = true;
+			touch.dragging = !touch.container.empty() && std::abs(dy) >= std::abs(dx);
+			touch.swiping = touch.strip && std::abs(dx) > std::abs(dy);
+			if (!touch.dragging && !touch.swiping) { touch = {}; return; }
 		}
-		auto* scroll = CanonicalElement(contentDrag.container);
-		if (!scroll || !interaction.AllowsNode(contentDrag.container)) { contentDrag = {}; return; }
-		scroll->SetScrollTop(contentDrag.offset-dy);
+		if (!touch.dragging) return;
+		auto* scroll = CanonicalElement(touch.container);
+		if (!scroll || !interaction.AllowsNode(touch.container)) { EndTouch(); return; }
+		const float wanted = touch.offset-dy, range = std::max(0.f,scroll->GetScrollHeight()-scroll->GetClientHeight());
+		scroll->SetScrollTop(wanted);
+		const float pull = wanted < 0 ? -wanted : wanted > range ? wanted-range : 0;
+		if (pull > 0) rim = {touch.container,wanted > range,false,std::min(1.f,pull/(RimPull*dp)),0,0};
+		else if (rim.container == touch.container && !rim.fading) rim = {};
 		focusLayoutVisible = false; presentationDirty = true;
 	}
+	// A lifted finger: a resting one long-presses; a swipe 48 dp across a tab
+	// strip asks for the previous or next tab (a finger moving toward the
+	// leading edge brings the next one in); a drag keeps its release velocity
+	// unless it holds its content against that end.
+	void ReleaseTouch() {
+		if (!touch.pressed) return;
+		SampleTouch();
+		if (!touch.moved && LongPress()) return;
+		const float dp = viewport.DpRatio(), dx = pointerX-touch.x, dy = pointerY-touch.y;
+		if (touch.swiping && pointerPresent && std::abs(dx) >= SwipeTravel*dp && std::abs(dx) > std::abs(dy) && gestureEvents.size() < 16 &&
+			canonical->Model().events.contains(dx < 0 ? "ontabnext" : "ontabprevious")) gestureEvents.push_back(dx < 0 ? "onTabNext" : "onTabPrevious");
+		auto* scroll = touch.dragging ? CanonicalElement(touch.container) : nullptr;
+		if (scroll && interaction.AllowsNode(touch.container)) {
+			const double velocity = std::clamp(-TouchVelocity(),-FlingMaximum*dp,FlingMaximum*dp);
+			const double offset = scroll->GetScrollTop(), range = std::max(0.f,scroll->GetScrollHeight()-scroll->GetClientHeight());
+			if (std::abs(velocity) >= FlingMinimum*dp && (velocity > 0 ? offset < range : offset > 0))
+				fling = {touch.container,interaction.Focused(),interaction.Modal(),offset,velocity,time};
+		}
+		EndTouch();
+	}
+	void EndTouch() { touch = {}; FadeRim(); }
+	// A finger resting 500 ms on a button that names a detail opens that
+	// detail: the press is cancelled, so its release activates nothing, and
+	// the card stays beside the button after the finger lifts.
+	bool LongPress() {
+		if (touch.detail.empty() || time-touch.at < LongPressSeconds || !interaction.CanActivate(touch.detail)) return false;
+		detailPin = touch.detail; touch = {};
+		interaction.Cancel(); presentationDirty = true;
+		return true;
+	}
+	// Inertia, advanced each frame: the content keeps the release velocity
+	// as it decays. A new press, a focus move or a modal stops it; reaching
+	// an end stops it there and lights that end's rim by the speed it arrived
+	// with.
+	void AdvanceFling() {
+		if (fling.container.empty()) return;
+		auto* scroll = CanonicalElement(fling.container);
+		if (!scroll || interaction.Focused() != fling.focus || interaction.Modal() != fling.modal || !interaction.AllowsNode(fling.container)) { fling = {}; return; }
+		const double elapsed = time-fling.at;
+		if (elapsed <= 0) return;
+		const double decay = std::exp(-elapsed/FlingDecay), range = std::max(0.f,scroll->GetScrollHeight()-scroll->GetClientHeight());
+		const double offset = fling.offset+fling.velocity*FlingDecay*(1-decay);
+		fling.velocity *= decay; fling.at = time;
+		scroll->SetScrollTop(static_cast<float>(std::clamp(offset,0.0,range)));
+		focusLayoutVisible = false; presentationDirty = true;
+		const float dp = viewport.DpRatio();
+		if (offset < 0 || offset > range) {
+			const float strength = static_cast<float>(std::min(1.0,std::abs(fling.velocity)/(RimSpeed*dp)));
+			rim = {fling.container,offset > range,true,strength,strength,time};
+			fling = {};
+		} else if (std::abs(fling.velocity) < FlingStop*dp) fling = {};
+		else fling.offset = offset;
+	}
+	void FadeRim() {
+		if (!rim.container.empty() && !rim.fading) { rim.fading = true; rim.from = rim.strength; rim.fadeAt = time; }
+	}
+	// The rim light's artwork (marine.rim): #626934 falling linearly to
+	// nothing across its height from the list's edge, at twice the framing
+	// bands' 0.37 when fully lit.
+	static Node RimNode(bool end) {
+		Node node; node.id = "q4-touch-rim"; node.type = "vector";
+		const auto corner = [](double x, double y) { PathPoint point; point.x.fraction = x; point.y.fraction = y; return point; };
+		VectorPath path; path.id = "rim"; path.antialias = false;
+		for (const auto& point : {corner(0,0),corner(1,0),corner(1,1),corner(0,1)}) {
+			PathCommand command; command.op = path.commands.empty() ? PathOperation::Move : PathOperation::Line;
+			command.points[0] = point; path.commands.push_back(command);
+		}
+		PathCommand close; close.op = PathOperation::Close; path.commands.push_back(close);
+		const VectorColour lit{98/255.,105/255.,52/255.,.74}, dark{98/255.,105/255.,52/255.,0};
+		path.fill.type = PaintType::Linear; path.fill.from = corner(0,0); path.fill.to = corner(0,1);
+		path.fill.stops = {{0,end ? dark : lit},{1,end ? lit : dark}};
+		node.paths.push_back(std::move(path));
+		return node;
+	}
+	// Fades the rim light and lays its element over the list's end: the
+	// list's client width, 19 u deep (at most half the list), at the rim's
+	// strength. The element takes no input.
+	struct RimPlacement { float left = 0, top = 0, width = 0, height = 0, opacity = 0; bool operator==(const RimPlacement&) const = default; } rimPlaced;
+	void AdvanceRim() {
+		if (rim.fading) rim.strength = rim.from*static_cast<float>(std::max(0.0,1-(time-rim.fadeAt)/RimFade));
+		auto* scroll = rim.container.empty() ? nullptr : CanonicalElement(rim.container);
+		if (rim.strength <= 0 || !scroll || !scroll->IsVisible(true) || !interaction.AllowsNode(rim.container)) rim = {};
+		RimPlacement placement;
+		if (!rim.container.empty()) {
+			const auto origin = document->GetAbsoluteOffset(Rml::BoxArea::Padding), at = scroll->GetAbsoluteOffset(Rml::BoxArea::Padding);
+			const float height = std::min(RimReach*viewport.DpRatio(),scroll->GetClientHeight()*.5f);
+			placement = {at.x-origin.x,at.y-origin.y+(rim.end ? scroll->GetClientHeight()-height : 0),scroll->GetClientWidth(),height,rim.strength};
+		}
+		if (placement == rimPlaced && (rim.container.empty() || rimElementEnd == rim.end)) return;
+		if (!rimElement) {
+			auto element = Rml::Factory::InstanceElement(document,"q4-vector","q4-vector",Rml::XMLAttributes());
+			if (!element) return;
+			rimElement = document->AppendChild(std::move(element));
+			rimElement->SetId("q4-touch-rim");
+			rimElement->SetProperty("position","absolute"); rimElement->SetProperty("pointer-events","none");
+			auto* vector = static_cast<VectorElement*>(rimElement);
+			vector->Configure(RimNode(rim.end),host,Stats());
+			if (backend) { vector->SetImageSamplingInterface(&backend->renderer); vector->SetLinearMaskInterface(&backend->renderer); }
+			rimElementEnd = rim.end;
+		} else if (!rim.container.empty() && rimElementEnd != rim.end) {
+			static_cast<VectorElement*>(rimElement)->Configure(RimNode(rim.end),host,Stats());
+			rimElementEnd = rim.end;
+		}
+		rimPlaced = placement;
+		rimElement->SetProperty("display",placement.opacity > 0 ? "block" : "none");
+		rimElement->SetProperty(Rml::PropertyId::Left,Rml::Property(placement.left,Rml::Unit::PX));
+		rimElement->SetProperty(Rml::PropertyId::Top,Rml::Property(placement.top,Rml::Unit::PX));
+		rimElement->SetProperty(Rml::PropertyId::Width,Rml::Property(placement.width,Rml::Unit::PX));
+		rimElement->SetProperty(Rml::PropertyId::Height,Rml::Property(placement.height,Rml::Unit::PX));
+		rimElement->SetProperty(Rml::PropertyId::Opacity,Rml::Property(placement.opacity,Rml::Unit::NUMBER));
+		presentationDirty = true;
+	}
+	// Frame work of touch gestures: a resting finger's long-press, inertia
+	// and the rim light.
+	void AdvanceTouch() {
+		if (!document || !canonical) return;
+		if (touch.pressed && !touch.moved) LongPress();
+		AdvanceFling(); AdvanceRim();
+	}
+	// Stops every touch transient: the gesture, inertia, a long-pressed
+	// detail and the rim light, whose element the next frame hides.
+	void ResetTouch() { touch = {}; fling = {}; rim = {}; detailPin.clear(); gestureEvents.clear(); }
 	Rml::Element* HitElement() const {
 		if (!pointerPresent || !context || !document || pointerX < 0 || pointerY < 0 || pointerX >= viewport.width || pointerY >= viewport.height) return nullptr;
 		const Rml::Vector2f point(pointerX,pointerY);
@@ -2553,7 +2752,8 @@ struct Runtime::Impl {
 		}
 		interaction.SetBounds(bounds,freshLayout);
         valueView.ValidatePlacement(interaction,viewport.width,viewport.height,viewport.DpRatio(),refreshPopup && !freshLayout);
-		auto* element = pointerNavigation ? HitElement() : nullptr;
+		// A finger dragging content or swiping a tab strip hovers nothing.
+		auto* element = pointerNavigation && !touch.dragging && !touch.swiping ? HitElement() : nullptr;
 		const auto hit = HitControl(element);
 		const auto scrollbar=scrollView.PointerPart(element,pointerX,pointerY,interaction);
         if(!scrollbar.control.empty()) interaction.PointerPart(scrollbar.control,scrollbar.invalidProjection?std::nullopt:scrollbar.fraction,{},scrollbar.thumb);
@@ -3000,6 +3200,7 @@ void Runtime::Shutdown() {
 	impl->state = {}; impl->stateSources.clear(); impl->appliedStateRevision = 0; impl->stateError.clear();
 	impl->interaction.Reset({}); impl->controls.clear(); impl->pointerPresent = impl->pointerNavigation = false;
 	impl->pendingFocus.clear();
+	impl->ResetTouch(); impl->rimElement = nullptr; impl->rimPlaced = {};
 	impl->initialized = false;
 	impl->time = 0;
 	impl->contextName.clear();
@@ -3026,6 +3227,8 @@ void Runtime::CloseDocument() {
 	impl->state = {}; impl->stateSources.clear(); impl->appliedStateRevision = 0; impl->stateError.clear();
 	impl->interaction.Reset({}); impl->controls.clear(); impl->pointerPresent = impl->pointerNavigation = false;
 	impl->pendingFocus.clear();
+	// Closing the document destroys the rim light's element with it.
+	impl->ResetTouch(); impl->rimElement = nullptr; impl->rimPlaced = {};
 	if (!impl->document) return;
 	ContextClock clock(*impl->services,impl->time,impl->strictPreparation?&impl->preparationFailed:nullptr);
 	impl->document->Close();
@@ -3494,7 +3697,7 @@ bool Runtime::RestoreSnapshot(const std::string& snapshot, std::string& error, d
 		impl->state = std::move(state); impl->motion = std::move(motion);
 		impl->time = now; impl->pointerPresent = impl->pointerNavigation = false; impl->documentFontCss.clear(); impl->inlineAuthored=false; impl->inlineOverridden.clear();
 		impl->appliedInputs.clear(); impl->deferredInputs.clear(); impl->inputKeys.clear(); impl->indexedKeys = nullptr;
-		impl->pendingFocus.clear();
+		impl->pendingFocus.clear(); impl->ResetTouch();
         impl->preserveRestoredScroll=widgets.version==3;
 		// The restored modals are open already: their saved scroll offsets stand.
 		impl->openModals = modalRoots;
@@ -3618,6 +3821,7 @@ bool Runtime::Layout(const Viewport& viewport,double seconds) {
 	if (impl->pointerPresent) viewport.WindowToDocument(impl->windowPointerX,impl->windowPointerY,impl->pointerX,impl->pointerY);
 	if (std::isfinite(seconds)) impl->time = std::max(impl->time, seconds);
 	ContextClock clock(*impl->services,impl->time,impl->strictPreparation?&impl->preparationFailed:nullptr);
+	impl->AdvanceTouch();
 	const auto presentationStart=impl->Stats().Now();
 	impl->ReadStateSources();
 	const auto sourcesEnd=impl->Stats().Now();
@@ -3823,18 +4027,27 @@ void Runtime::PointerMove(float x, float y, double seconds) {
 	impl->pointerPresent = std::isfinite(x) && std::isfinite(y);
 	impl->windowPointerX = x; impl->windowPointerY = y;
 	impl->viewport.WindowToDocument(x,y,impl->pointerX,impl->pointerY);
-	impl->DragContent();
+	// A mouse that moves ends a long-pressed detail: hover leads again.
+	if (!impl->touchPointer && impl->pointerPresent) impl->detailPin.clear();
+	if (std::isfinite(seconds) && seconds >= 0) impl->time = std::max(impl->time,seconds);
+	impl->MoveTouch();
 	if(!impl->UpdateInteraction(seconds,false,true))return; impl->Feedback(seconds);
 }
 void Runtime::PointerButton(bool down, double seconds) {
     if(!Mutate())return;
- impl->SetPointerNavigation(true); if(!impl->UpdateInteraction(seconds,false,true))return; impl->interaction.Pointer(down); impl->ApplyScrollCommands();
- if(down) { impl->RememberFocusLayout(); impl->BeginContentDrag(); } else impl->contentDrag = {};
+ impl->SetPointerNavigation(true); if(!impl->UpdateInteraction(seconds,false,true))return;
+ // A press stops inertia and closes a long-pressed detail; a lifted finger
+ // settles its gesture before the release can activate anything.
+ if(down) { impl->fling = {}; impl->detailPin.clear(); } else impl->ReleaseTouch();
+ impl->interaction.Pointer(down); impl->ApplyScrollCommands();
+ if(down) { impl->RememberFocusLayout(); impl->BeginTouch(); }
  impl->Feedback(seconds); }
-void Runtime::SetTouchPointer(bool touch) { impl->touchPointer = touch; if (!touch) impl->contentDrag = {}; }
+void Runtime::SetTouchPointer(bool touch) { impl->touchPointer = touch; if (!touch && impl->touch.pressed) impl->EndTouch(); }
+std::vector<std::string> Runtime::TakeGestureEvents() { std::vector<std::string> result; result.swap(impl->gestureEvents); return result; }
 void Runtime::PointerWheel(int rows, double seconds) {
     if(!Mutate())return;
 
+	impl->fling = {};
 	if(!impl->UpdateInteraction(seconds,false,true))return;
 	if (!rows) return;
 	for (const auto& id : impl->controls) {
@@ -3874,7 +4087,7 @@ void Runtime::MenuAction(MenuInput input, bool down, double seconds) {
 
     if(impl->viewport.width<=0 || impl->viewport.height<=0) {impl->interaction.QuarantineInput(input,down);return;}
 	if (down && input != MenuInput::Back && !impl->interaction.CapturedPointerControl().empty()) impl->interaction.Cancel();
-	if (down) impl->pendingFocus.clear();
+	if (down) { impl->pendingFocus.clear(); impl->fling = {}; impl->detailPin.clear(); }
 	const auto before = impl->interaction.Focused();
 	impl->SetPointerNavigation(false); if(!impl->UpdateInteraction(seconds,false,true))return;
 	if (!down || !impl->PageList(input)) impl->interaction.Input(input,down);
@@ -3883,14 +4096,15 @@ void Runtime::MenuAction(MenuInput input, bool down, double seconds) {
 }
 void Runtime::CancelInput(double seconds) {
     if(!Mutate())return;
- impl->contentDrag = {}; impl->pointerPresent = false; impl->SetPointerNavigation(false); impl->interaction.Cancel(); impl->Feedback(seconds); }
+ impl->EndTouch(); impl->fling = {}; impl->detailPin.clear();
+ impl->pointerPresent = false; impl->SetPointerNavigation(false); impl->interaction.Cancel(); impl->Feedback(seconds); }
 void Runtime::ReleaseInputSources() {
     if(!Mutate())return;
  impl->interaction.ReleaseInputSources(); }
 bool Runtime::FocusControl(const std::string& id, double seconds) {
     if(!Mutate())return false;
 
-	impl->SetPointerNavigation(false); impl->pendingFocus.clear();
+	impl->SetPointerNavigation(false); impl->pendingFocus.clear(); impl->fling = {}; impl->detailPin.clear();
 	if(!impl->UpdateInteraction(seconds,false,true))return false; const bool result = impl->interaction.Focus(id);
 	if (result) impl->RevealFocus();
 	impl->Feedback(seconds); return result;

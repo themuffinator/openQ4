@@ -849,8 +849,13 @@ pass in a coordinated runtime window without establishing the earlier cause.
 moves `INP-014` from pending to partial: a touch that moves past 8 dp is no
 longer a tap, one moved up or down in a scrolling container drags its
 content, and a finger leaves no cursor or hover behind. `WID-010` gains the
-touch drag. The press inset, long-press, inertia, the rim light, swipes,
-haptics, the safe area and device acceptance remain.
+touch drag. The rest of section 13.6's menu rules then narrow `INP-014`
+further: the pressed treatment shows at touch-down, a released drag keeps
+going as inertia, a list's rim light brightens at either end instead of the
+content stretching, a swipe across a tab strip changes tab and a 500 ms
+long-press opens a button's detail; the real menus' adapter now receives the
+finger as it moves. `WID-010` gains the inertia and the rim light. Haptics,
+the safe area and device acceptance remain.
 
 There are **122 partial, 229 pending and 0 verified requirements**, counting the
 39 superseded rows at their recorded states. `BEH-002`

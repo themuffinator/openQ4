@@ -1457,6 +1457,12 @@ const char* idUserInterfaceRetained::HandleEvent(const sysEvent_t* event, int ti
 		if (event->evType == SE_KEY && !event->evValue2) impl->input.ReleaseQuarantined(event->evValue);
 		return "";
 	}
+	// A finger drags lists, swipes tab strips and long-presses for details
+	// (section 13.6); a mouse keeps the desktop rules. A lifted finger leaves
+	// no pointer behind, so the control it touched does not stay lit.
+	bool lifted = false;
+	if (event->evType == SE_MOUSE || (event->evType == SE_KEY && event->evValue == K_MOUSE1))
+		impl->RuntimeView()->SetTouchPointer(idKeyInput::LastPointerWasTouch());
 	if (event->evType == SE_MOUSE) {
 		SetCursor(impl->cursorX+event->evValue,impl->cursorY+event->evValue2);
 		impl->Pointer();
@@ -1473,6 +1479,7 @@ const char* idUserInterfaceRetained::HandleEvent(const sysEvent_t* event, int ti
 			// The source remains bound to its original editor until release.
 		} else if (key == K_MOUSE1) {
 			impl->Pointer(); impl->input.Pointer(key,down,RetainedUI_PresentationTime());
+			lifted = !down && idKeyInput::LastPointerWasTouch();
 		} else if (key == K_MWHEELUP || key == K_MWHEELDOWN) {
 			if (down && !repeated) {
 				impl->Pointer(false);
@@ -1527,7 +1534,15 @@ const char* idUserInterfaceRetained::HandleEvent(const sysEvent_t* event, int ti
 	} else if (event->evType == SE_CHAR) {
 		impl->TypeCharacter(event->evValue);
 	}
-	impl->input.Advance(RetainedUI_PresentationTime()); impl->ApplyInput(); impl->CollectActions();
+	impl->input.Advance(RetainedUI_PresentationTime()); impl->ApplyInput();
+	if (lifted) {
+		impl->RuntimeView()->PointerMove(std::numeric_limits<float>::quiet_NaN(),0,RetainedUI_PresentationTime());
+		impl->routedPointerValid = false;
+	}
+	// A swipe across a tab strip runs onTabPrevious or onTabNext, as Q and E do.
+	for (const auto& name : impl->RuntimeView()->TakeGestureEvents())
+		if (impl->RuntimeView()->HasEvent(name)) impl->RunEvent(name);
+	impl->CollectActions();
 	if (updateVisuals) *updateVisuals = true;
 	return impl->close || !impl->actions.empty() ? ActionMarker : "";
 }

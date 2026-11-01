@@ -209,9 +209,12 @@ See [release status](../../user/release-status.md) and the
   frame shows the Quake 4 art instead of an empty black box.
 - **Menus on a touchscreen.** On a touchscreen (a phone, a tablet or the
   Steam Deck's screen), you can drag the lists of saves, demos, servers,
-  chapters and settings with your finger; sliding your finger no longer
-  presses the button where you let go; and the menus no longer show a mouse
-  cursor or leave a button lit where you touched.
+  chapters and settings with your finger, and a flicked list keeps going and
+  glows at its top or bottom when you reach the end; sliding your finger no
+  longer presses the button where you let go; a swipe across the settings or
+  multiplayer tabs changes tab; holding your finger on a server in Join Game
+  shows its details; and the menus no longer show a mouse cursor or leave a
+  button lit where you touched.
 - **Clearer list selection.** The selected save, demo, server or map in the
   new interface's lists no longer doubles its orange highlight under the
   pointer, so its name stays readable.

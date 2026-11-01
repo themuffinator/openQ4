@@ -41,9 +41,9 @@ revision; the parity test checks the pinned files as well as the working tree.
 | Escape / gamepad East (South while swapped), Start, Back | Pop the current modal scope, then close the root menu |
 | Gamepad Menu (Start) | The document's `onMenuButton` where it declares it ([Menu button](#menu-button-24-october-2026)), once per press; otherwise, and while a dialog or an open list holds the input, as Back |
 | Gamepad View (Back) | The document's `onViewButton` where it declares it ([View button](#view-button-24-october-2026)), once per press; otherwise, and while a dialog or an open list holds the input, as Back |
-| Primary pointer | Focus, arm and release the hit button; a finger that moves past 8 dp is no longer a tap, and in a scrolling list drags its content ([touch](#touch-in-the-menus-1-november-2026)) |
+| Primary pointer | Focus, arm and release the hit button; a finger that moves past 8 dp is no longer a tap, in a scrolling list drags its content with inertia and a rim light at its ends, and across a tab strip swipes to the previous or next tab; a finger resting 500 ms on a button that names a detail opens it ([touch](#touch-in-the-menus-1-november-2026)) |
 | Movement stick | Dominant-axis spatial navigation after neutral |
-| Q / E, gamepad shoulders | The document's previous / next tab (`onTabPrevious`, `onTabNext`) where it declares them; not while a field is being edited, nor with Ctrl or Alt |
+| Q / E, gamepad shoulders | The document's previous / next tab (`onTabPrevious`, `onTabNext`) where it declares them; not while a field is being edited, nor with Ctrl or Alt; a finger's swipe across a tab strip runs them too |
 | Gamepad triggers | The document's previous / next section (`onSectionPrevious`, `onSectionNext`), on the same terms; where it declares neither, PageUp / PageDown ([list paging](#list-paging-24-october-2026)) |
 | Gamepad West / North | The document's secondary / tertiary action (`onSecondary`, `onTertiary`), on the same terms |
 
@@ -59,16 +59,59 @@ a finger, or the mouse once it moves or presses. While a finger leads, the
 menus draw no cursor, the retained one or the stock GUIs' (section 13.6:
 nothing depends on hover), and a lifted finger queues a pointer leave after
 its release, so the control it touched does not stay lit as a hovered one.
-The retained adapter tells the runtime before each input
-(`Runtime::SetTouchPointer`): a touch press records where it landed; past
-8 dp in any direction it is no longer a tap, the arm is cancelled and the
-release activates nothing (INP-014); moved more up or down than across in a
-scrolling container, it drags the content with the finger. A press that
-captured a value control (a slider, a scrollbar's thumb) or lands while a
-choice popup is open keeps that control's own gesture. A mouse keeps the
-desktop rules: its release on the button it pressed activates it, and it
-never drags content. Inertia, the rim light at a list's ends, long-press
-details and tab-strip swipes remain open.
+Both retained adapters, the menus' (`idUserInterfaceRetained`) and the
+`ui_retainedOpen` preview's, tell the runtime before each pointer input
+(`Runtime::SetTouchPointer`), and the menus' adapter moves the pointer out
+after a lifted finger's release. A routed finger moves the menu cursor
+directly, so the SDL layer also queues a zero-delta pointer event for each
+finger motion: a retained menu follows the finger as it moves, not only
+where it pressed and lifted. A mouse keeps the desktop rules: its release on
+the button it pressed activates it, and it never drags, swipes or
+long-presses. A touch press records where and when it landed, and becomes
+(INP-014):
+
+- **A tap** while it stays within 8 dp. Touch-down presents the pressed
+  state in the same input, with no tap delay: the control takes focus and
+  arms at once, so its pressed treatment as the document authors it (the
+  focus look with section 8's 1 dp `press` inset) shows while the finger
+  rests. Past 8 dp in any direction
+  it is no longer a tap: the arm is cancelled and the release activates
+  nothing.
+- **A drag** when it moves more up or down than across in a scrolling
+  container: the content follows the finger, and the finger hovers nothing
+  while it drags. Pulled past either end, the content stays and that end's
+  rim light brightens with the pull, fully at 64 dp. Released faster than
+  50 dp a second (measured over its last 100 ms, at most 8000), the content
+  keeps that velocity and slows exponentially over 325 ms until under 20 dp a
+  second; a finger that rests before lifting leaves none. A new press, a
+  focus move (navigation, a program's focus, `FocusControl`), a modal, the
+  wheel or a cancellation stops it. A fling reaching an end stops there and
+  lights that end's rim by the speed it arrives with, fully at 2000 dp a
+  second. Let go, a rim light fades over 250 ms. The rim light is
+  `marine.rim`, `#626934` falling linearly to nothing across 19 u from the
+  list's edge, at twice the framing bands' 0.37 when fully lit; the runtime
+  draws it in an element of its own over the document, which takes no input.
+- **A swipe** when it is pressed on a tab strip and moves more across than up
+  or down. A tab strip is a button that runs a `tab_` program, or the
+  strip's previous or next control, in a document that declares
+  `onTabPrevious` or `onTabNext`. Released 48 dp or more across, it asks for
+  `onTabNext` (moving toward the leading edge) or `onTabPrevious`; the
+  adapter takes them from `Runtime::TakeGestureEvents` and runs them as it
+  runs Q and E. Shorter, it asks for nothing and is no tap.
+- **A long-press** when it rests 500 ms within 8 dp on a button that names a
+  detail (section 13.4's detail area; DocumentModel's `detail`). The press is
+  cancelled, so its release activates nothing, and the detail card stays
+  beside the button, placed as for focus, after the finger lifts, until the
+  next press, navigation, focus request or mouse movement. A lift 500 ms
+  after the press long-presses even with no frame between. Once long-pressed,
+  the finger drags and swipes nothing. A button without a detail keeps its
+  tap however long the press.
+
+A press that captured a value control (a slider, a scrollbar's thumb) or
+lands while a choice popup is open keeps that control's own gesture. A light
+haptic tick on press remains open: it must follow the system's
+touch-feedback setting, which Android applies to the activity's
+`performHapticFeedback` and SDL's haptic API does not read.
 
 **Swap Confirm and Back.** Nintendo layouts confirm on the east button,
 where their A sits, and go back on the south button (section 13.5). The

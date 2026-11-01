@@ -601,6 +601,12 @@ public:
     }
     void PointerMove(float x,float y,double) { pointerX=x; pointerY=y; pointerMoves.emplace_back(x,y); pointerTransport.push_back("move"); }
     void PointerWheel(int rows,double) { wheels.push_back(rows); pointerTransport.push_back(rows>0?"wheel-down":"wheel-up"); }
+    // Touch gestures (section 13.6): the pointer's source, and the document
+    // events a swipe asks for, which the adapter runs as Q and E.
+    std::vector<bool> touchPointers;
+    std::vector<std::string> gestureEvents;
+    void SetTouchPointer(bool touch) { touchPointers.push_back(touch); }
+    std::vector<std::string> TakeGestureEvents() { std::vector<std::string> result; result.swap(gestureEvents); return result; }
     bool PlayTimeline(const std::string& name,double) { timelines.push_back(name); return name=="slide"; }
     bool PopModal(double) { if(!modals)return false; --modals; return true; }
     bool CanDispatchModalBack(const ControlAction& action,double) {
@@ -2545,6 +2551,37 @@ static void CheckTabKeys() {
     runtime.modalOpen=true;pulse(K_JOY8);runtime.modalOpen=false;
     assert((runtime.menu==Pulses{{MenuInput::Back,true},{MenuInput::Back,false}}));
 }
+// A finger in the menus (section 13.6): the adapter names each pointer
+// input's source to the runtime, a lifted finger leaves no pointer behind,
+// and the events a swipe asks for run as Q and E do where the document
+// declares them; a mouse keeps the desktop rules.
+static void CheckTouch() {
+    assert(views.empty());cvars=CVars{};consoleObject.open=false;windowFocused=true;
+    eventPlans={};eventHistory.clear();
+    {
+        idUserInterfaceRetained gui;assert(gui.InitFromFile("test.q4ui"));gui.Activate(true,0);gui.Redraw(0);
+        auto& runtime=Live();gui.SetCursor(100,100);
+        const auto left=[&]{return !runtime.pointerMoves.empty() && std::isnan(runtime.pointerMoves.back().first);};
+        sysEvent_t motion{SE_MOUSE,0,0};
+        idKeyInput::touch=false;
+        gui.HandleEvent(&motion,0,nullptr);Key(gui,K_MOUSE1,true);Key(gui,K_MOUSE1,false);
+        assert((runtime.touchPointers==std::vector<bool>{false,false,false}) && !left());
+        Key(gui,'q',true);Key(gui,'q',false);
+        assert(runtime.touchPointers.size()==3);
+        idKeyInput::touch=true;
+        gui.HandleEvent(&motion,0,nullptr);Key(gui,K_MOUSE1,true);
+        assert(runtime.touchPointers.back() && !left());
+        Key(gui,K_MOUSE1,false);
+        assert(runtime.touchPointers.back() && left());
+        runtime.gestureEvents={"onTabNext","onTabPrevious"};gui.HandleEvent(&motion,0,nullptr);
+        assert(eventHistory.empty() && runtime.gestureEvents.empty());
+        eventPlans["ontabprevious"]={};eventPlans["ontabnext"]={};
+        runtime.gestureEvents={"onTabNext","onTabPrevious"};gui.HandleEvent(&motion,0,nullptr);
+        assert((eventHistory==std::vector<std::string>{"ontabnext","ontabprevious"}));
+        idKeyInput::touch=false;
+    }
+    assert(views.empty());
+}
 // A document that declares prompt.glyphs gets RetainedUI_PromptGlyphs as
 // each frame draws, once per change, and the session's state pushes carry
 // the adapter's value; a document that does not declare it never gets it.
@@ -2943,6 +2980,7 @@ int main() {
     CheckNumberKeys();
     CheckTypedCharacters();
     CheckTabKeys();
+    CheckTouch();
     CheckPromptGlyphs();
     CheckPromptSwapped();
     CheckPromptAccept();

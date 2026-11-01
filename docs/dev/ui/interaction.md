@@ -122,13 +122,21 @@ constrains pointer targeting to positive geometric alpha from the control's own
 and ancestor masks. Empty or fully transparent masks remove their subtrees from
 focus; full control/mask intersection for directional focus remains unfinished.
 
-A touch pointer (`Runtime::SetTouchPointer`, which the adapter sets from the
-platform's pointer source) follows section 13.6: a press that moves past 8 dp
-is cancelled as an arm, and one that moves more up or down than across inside
-a scrolling container sets that container's offset with the finger
-([input routing](input-routing.md#touch-in-the-menus-1-november-2026)). It
-starts only where no value control captured the press and no choice popup is
-open, and ends on release, cancellation or a pointer leave.
+A touch pointer (`Runtime::SetTouchPointer`, which the adapters set from the
+platform's pointer source) follows section 13.6
+([input routing](input-routing.md#touch-in-the-menus-1-november-2026)). A
+press arms its control at once, so the pressed treatment shows at
+touch-down. Moved past 8 dp it is cancelled as an arm. Moved more up or down
+than across inside a scrolling container, it sets that container's offset
+with the finger, hovering nothing, and lights the rim at an end it pulls
+past; its release velocity carries on as inertia, which `Runtime::Frame`
+advances and a new press, a focus move or a modal stops. Moved more across
+on a tab strip, its release asks for `onTabPrevious` or `onTabNext`
+(`Runtime::TakeGestureEvents`). Resting 500 ms on a button that names a
+detail, it cancels the arm and pins that detail until the next press,
+navigation, focus request or mouse movement. A gesture starts only where no
+value control captured the press and no choice popup is open, and ends on
+release, cancellation or a pointer leave.
 
 An activation requires a matching release on the armed, still-eligible control.
 Repeated accept-down/pointer-down events cannot duplicate activation. Dragging
