@@ -3459,7 +3459,7 @@ Cmd_BotList_f
 ==================
 */
 void Cmd_BotList_f( const idCmdArgs &args ) {
-	botManager.ListBots();
+	botManager.ListBots( args.Argc() > 1 && !idStr::Icmp( args.Argv( 1 ), "weapons" ) );
 }
 
 /*
@@ -4401,7 +4401,7 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "addbot",				Cmd_AddBot_f,				CMD_FL_GAME,				"addbot [name] [skill] [exact] - add a bot; exact requires that named character" );
 	cmdSystem->AddCommand( "removebot",				Cmd_RemoveBot_f,			CMD_FL_GAME,				"remove a bot from the match, optionally by name" );
 	cmdSystem->AddCommand( "kickbots",				Cmd_KickBots_f,				CMD_FL_GAME,				"remove every bot from the match" );
-	cmdSystem->AddCommand( "botlist",				Cmd_BotList_f,				CMD_FL_GAME,				"list the bots in the match and the state of the navmesh" );
+	cmdSystem->AddCommand( "botlist",				Cmd_BotList_f,				CMD_FL_GAME,				"botlist [weapons] - list the bots, their match statistics and the state of the navmesh; weapons adds each bot's per-weapon shots, hits and kills" );
 	cmdSystem->AddCommand( "botcharacters",			Cmd_BotCharacters_f,		CMD_FL_GAME,				"list the loaded bot characters, their play style and their skill band" );
 	cmdSystem->AddCommand( "botreload",				Cmd_BotReload_f,			CMD_FL_GAME,				"re-read the bot style and character files without a map change" );
 	cmdSystem->AddCommand( "navmesh",				Cmd_NavMesh_f,				CMD_FL_GAME,				"navmesh <build|info|probe x y z [radius]> - generate, report or probe the bot navigation mesh" );

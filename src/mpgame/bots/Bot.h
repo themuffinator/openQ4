@@ -512,7 +512,7 @@ public:
 								bool requireExactCharacter = false );
 	bool					RemoveBot( const char *name );
 	void					RemoveAll( void );
-	void					ListBots( void ) const;
+	void					ListBots( bool weaponDetail = false ) const;
 	// Local cheat diagnostic, restricted to one bot and the local observer.
 	bool					ProbeTraversal( int clientNum, const idVec3 &origin, const idVec3 &velocity,
 											const idVec3 &landing, navTravelType_t travel, idEntity *pad = NULL, bool dodge = false,

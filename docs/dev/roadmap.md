@@ -1772,8 +1772,12 @@ claim peer combinations that have not been tested.
   slew that pursues the aim point, a relative hold-fire gate and long bursts at
   skills 4-5 fix it. Skill 5 against skill 1 went from 216 to 446 damage per
   bot-minute and from 7:3 to 17:5 cross kills; 5 beats 3 (20:9) and 3 beats 1
-  (17:5) ([evidence](mp-bots.md#combat-strength-1-november-2026)). Remaining:
-  play against people, and retuning the curve from what that shows.
+  (17:5) ([evidence](mp-bots.md#combat-strength-1-november-2026)).
+  Later on 1 November: a five-level round robin (22 matches, 6,362 kills)
+  found skill 2 too far above skill 1 (steps 99, 56, 57, 60). Skill 2's row
+  now sits 60% of the way from skill 1's, giving 83 ± 11, 72 ± 14, 57 ± 9 and
+  60 ± 10, consistent with even spacing ([evidence](mp-bots.md#skill-levels-1-november-2026)).
+  Remaining: play against people, and retuning the curve from what that shows.
 
 ## Audio and voice
 

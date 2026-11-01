@@ -780,8 +780,12 @@ The point of the curve is that the levels differ in kind, not only in degree.
   18.2 degree cone and 96 ms settle instead of waiting so long for bad aim to
   settle that it barely fires; the extra attacks remain inaccurate. It barely
   leads a projectile and gets roughly one combat decision in two wrong.
-- **2** is a distracted human. It reacts in about 0.35 s, tracks better, still
-  overshoots, and still sprays.
+- **2** is a distracted human. It notices you at 1500 units inside a 139
+  degree cone, reacts in about 0.37 s, tracks better, still overshoots, and
+  still sprays. Its row sits 60 % of the way from skill 1's to where it used
+  to be: as authored, skill 2 stood a much bigger step above skill 1 than any
+  other level above the one below it (see the levelling evidence under
+  Testing).
 - **3** is the default and is meant to read as a competent regular: about 310 ms
   on a fresh sighting, 215 ms on a re-peek, 2.1 degrees of tremor, a 7 degree
   effective cone it settles into for about 140 ms before shooting, and
@@ -1275,7 +1279,7 @@ restricts delivery by the team field.
 | `addbot [name] [skill] [exact]` | Add one bot. Picks an unused name and character if none is given. The optional skill is a per-bot override that bypasses `bot_skill` and `bot_skillVariance`; `exact` requires the named character and is intended for authored matches. Builds the navmesh on first use. |
 | `removebot [name]` | Remove one bot, by name or the last one added. |
 | `kickbots` | Remove every bot. |
-| `botlist` | List the bots with their character, style and effective skill, the match statistics behind how well each one fights (kills, deaths, hits and shots over every weapon, accuracy and damage given since the map started), and the state of the navmesh. |
+| `botlist [weapons]` | List the bots with their character, style and effective skill, the match statistics behind how well each one fights (kills, deaths, hits and shots over every weapon, accuracy and damage given since the map started), and the state of the navmesh. `weapons` adds a line per weapon each bot has used with its hits, shots and kills. |
 | `botcharacters` | List every loaded character with its style, skill band and which bot currently has it. |
 | `botreload` | Re-read style, character and chat files without a map change. Bots keep the character they are wearing where the name survives. |
 | `navmesh build` | Rebuild the navmesh, picking up a changed `bot_navCellSize`. |
@@ -1443,6 +1447,54 @@ result-flow pass for that mode.
   team switch kills and respawns the player.
 
 ## Testing
+
+### Skill levels, 1 November 2026
+
+Once the aim fix had given every level a real fight, the question was whether
+the five levels are evenly spaced. `mp_bot_skill_ladder.py --skills 1,2,3,4,5`
+put every level in each match on the plain curve: q4dm1, q4dm2, q4dm7 and
+q4dm8 for ten minutes each per round, two or three bots per level. One
+Bradley-Terry fit pooled all 22 matches (6,362 kills between levels). Each
+level kept a separate rating for every revision of its row, and the spreads
+come from resampling whole matches.
+
+As committed with the aim fix, the steps were 99, 56, 57 and 60 rating points:
+skills 2 to 5 were evenly spaced, and skill 2 stood far above skill 1. The
+rating does not follow a row's interpolation linearly. Moving skill 2 a
+quarter of the way toward skill 1 changed nothing measurable; nor did lifting
+skill 1 a third of the way toward skill 2. Moving skill 3 a quarter of the way
+toward skill 2 cost it 38 points, and moving skill 2 40 % of the way toward
+skill 1 cost it 16. So each candidate was measured rather than predicted. One
+round planned from a prediction was stopped and replanned, and a single round
+of 1,153 kills put the skill 3 to 4 step at 17 points against a pooled 57.
+
+Shipped: skill 2's row sits 60 % of the way from skill 1's to where it was;
+skills 1, 3, 4 and 5 are unchanged.
+
+| Step | As committed | Now |
+| --- | --- | --- |
+| 1 → 2 | 99 | 83 ± 11 |
+| 2 → 3 | 56 | 72 ± 14 |
+| 3 → 4 | 57 | 57 ± 9 |
+| 4 → 5 | 60 | 60 ± 10 |
+
+Every step is within 1.4 spreads of the 68-point mean, which is consistent
+with even spacing, and the largest step is now 1.45 times the smallest (it was
+1.77). Relative to skill 1 the levels rate 0, 83, 155, 212 and 272: skill 5
+takes 59 % of the kills between it and skill 4, and 83 % of those between it
+and skill 1. The confirming round on the shipped curve alone (1,857 kills, 15
+bots a match) gave steps of 89, 69, 65 and 60, with:
+
+| Skill | Kills : deaths | Accuracy | Median damage per bot-minute |
+| --- | --- | --- | --- |
+| 1 | 128 : 396 (0.32) | 21% | 227 |
+| 2 | 213 : 373 (0.57) | 23% | 307 |
+| 3 | 291 : 309 (0.94) | 39% | 376 |
+| 4 | 425 : 287 (1.48) | 54% | 528 |
+| 5 | 533 : 225 (2.37) | 68% | 659 |
+
+These are bot-against-bot ratings. How far apart the levels feel against a
+person is a separate qualification.
 
 ### Combat strength, 1 November 2026
 
@@ -1651,14 +1703,28 @@ The report also keeps the final team scores (CTF captures, DeadZone points)
 and every bot's score.
 
 **Skill ladder.** `tools/tests/mp_bot_skill_ladder.py --basepath <retail-install>`
-measures what a skill level is worth in a fight. A hidden listen server runs
-a free-for-all between two groups of bots (`--per-group`, default three) that
-differ only in skill (`--high-skill`, `--low-skill`), with `bot_characters 0`
-so no style or character separates them. It reports the cross kills - how
-often each group killed the other - and each group's accuracy and damage per
-bot-minute, differenced from `botlist` at the start and end of the window.
-`--min-cross-ratio` turns the high group's margin into a gate; one skill on
-both sides gives an absolute figure for that level.
+measures what each skill level is worth in a fight. A hidden listen server
+runs a free-for-all between groups of bots that differ only in skill, with
+`bot_characters 0` so no style or character separates them. `--skills` names
+one group per entry (default `5,1`; `1,2,3,4,5` puts the whole curve in one
+match, so every level fights every other under the same conditions) and
+`--per-group` sets its size (default two). Each `--map` is a separate match;
+they run at the same time and pool. From the kill matrix between groups the
+report fits a Bradley-Terry rating per group on the Elo scale - the chance a
+kill between two groups goes to the first is `r1 / (r1 + r2)`, and 400 points
+is ten to one - and prints the step between adjacent levels. It also reports
+each group's accuracy, per-weapon shots, hits and kills, and median damage per
+bot-minute, all differenced from `botlist weapons` at the start and end of the
+window (the median because the statistics count damage before it is clamped
+to the victim's health, so one telefrag adds about ten thousand).
+`--require-ordered` fails unless every level outrates every level below it and
+`--min-step <points>` unless every adjacent step reaches that size. Kills
+cluster within a match - who spawned where, which fights a map makes - so with
+three or more matches the report gives each step a spread from resampling
+whole matches, and `--pool <report.json>` adds an earlier run of the same
+`--skills` to the ratings. Counting noise alone understates it: two rounds of
+about 1,200 kills each disagreed on one step by 40 points. The levelling
+evidence below pooled 22 matches.
 
 **Impulse-exclusion policy (decided 21 October 2026).** The traversal gate
 counts navigation and control deaths. `--classify-impulses` (with

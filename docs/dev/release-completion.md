@@ -21,7 +21,17 @@ See [player release status](../user/release-status.md).
   gate measures the view's slew relative to the target's.
 - Skills 4 and 5 hold an automatic weapon's trigger for as long as they are on
   target (450-1200 ms bursts and 60 ms rests at skill 5, previously 140-300 ms
-  and 80 ms). Skills 1-3 are unchanged.
+  and 80 ms). Skills 1-3 keep their short bursts.
+- The five levels are now evenly spaced. A round robin with every level in each
+  match (22 matches, 6,362 kills between levels, four maps) put the committed
+  curve's steps at 99, 56, 57 and 60 rating points: skill 2 stood too far
+  above skill 1. Skill 2's row now sits 60% of the way from skill 1's, and the
+  steps are 83 ± 11, 72 ± 14, 57 ± 9 and 60 ± 10, consistent with even
+  spacing. Skill 5 takes 59% of the kills between it and skill 4, and 83% of
+  those between it and skill 1.
+- `mp_bot_skill_ladder.py --skills 1,2,3,4,5` rates every level from one match
+  or several maps at once, with a spread from resampling whole matches, and
+  `botlist weapons` adds each bot's per-weapon hits, shots and kills.
 - `botlist` now prints each bot's kills, deaths, hits, shots, accuracy and
   damage from the match statistics. `tools/tests/mp_bot_skill_ladder.py` runs
   a free-for-all between two skill levels on the plain skill curve and reports
@@ -41,7 +51,8 @@ See [player release status](../user/release-status.md).
 
 Candidate release wording: Bots fight much harder at the top skill levels.
 They now track and lead moving targets instead of trailing them, so skill 5 is
-a genuine threat; skill 1 stays beginner-friendly.
+a genuine threat; skill 1 stays beginner-friendly, and each level in between
+is an even step up from the one below.
 
 ## Silhouette edges on large surfaces, 1 November 2026
 

@@ -8691,7 +8691,7 @@ bool rvBotManager::SetProbeHealth( int clientNum, int health, int knockbackMsec 
 rvBotManager::ListBots
 ================
 */
-void rvBotManager::ListBots( void ) const {
+void rvBotManager::ListBots( bool weaponDetail ) const {
 	int count = 0;
 
 	// The match's own statistics, the ones the end-of-game screen shows, so
@@ -8726,6 +8726,22 @@ void rvBotManager::ListBots( void ) const {
 						  hits, shots,
 						  shots > 0 ? ( hits * 100 ) / shots : 0,
 						  stat ? stat->damageGiven : 0 );
+
+		// Which guns the skill went into: a shotgun counts every pellet and a
+		// lightning gun every tick, so the totals above mix very different rates.
+		const idEntity *ent = gameLocal.entities[i];
+		if ( weaponDetail && stat && ent && ent->IsType( idPlayer::GetClassType() ) ) {
+			for ( int w = 0; w < MAX_WEAPONS; w++ ) {
+				if ( stat->weaponShots[w] <= 0 && stat->weaponKills[w] <= 0 ) {
+					continue;
+				}
+				gameLocal.Printf( "      weapon %-24s %6d/%-6d %3d%% %5d kills\n",
+								  ent->spawnArgs.GetString( va( "def_weapon%d", w ), "?" ),
+								  stat->weaponHits[w], stat->weaponShots[w],
+								  stat->weaponShots[w] > 0 ? ( stat->weaponHits[w] * 100 ) / stat->weaponShots[w] : 0,
+								  stat->weaponKills[w] );
+			}
+		}
 		count++;
 	}
 

@@ -75,86 +75,86 @@ typedef struct botTraitDef_s {
 
 static const botTraitDef_t botTraitTable[] = {
 	// -- vision and reaction --
-	BOTTRAIT( sightRange,			128.0f,		8192.0f,	1200.0f,	1700.0f,	2200.0f,	2600.0f,	3000.0f ),
-	BOTTRAIT( fov,					60.0f,		360.0f,		130.0f,		145.0f,		155.0f,		170.0f,		180.0f ),
-	BOTTRAIT( reactionMsec,			0.0f,		2000.0f,	460.0f,		390.0f,		320.0f,		220.0f,		140.0f ),
-	BOTTRAIT( reactionVarianceMsec,	0.0f,		1000.0f,	180.0f,		150.0f,		120.0f,		80.0f,		45.0f ),
-	BOTTRAIT( reacquireMsec,		0.0f,		4000.0f,	150.0f,		250.0f,		400.0f,		550.0f,		700.0f ),
-	BOTTRAIT( reacquireFraction,	0.0f,		1.0f,		1.00f,		0.85f,		0.70f,		0.55f,		0.40f ),
-	BOTTRAIT( peripheralAngle,		5.0f,		180.0f,		60.0f,		65.0f,		70.0f,		75.0f,		80.0f ),
-	BOTTRAIT( peripheralPenaltyMsec,0.0f,		2000.0f,	340.0f,		290.0f,		240.0f,		160.0f,		90.0f ),
+	BOTTRAIT( sightRange,			128.0f,		8192.0f,	1200.0f,	1500.0f,	2200.0f,	2600.0f,	3000.0f ),
+	BOTTRAIT( fov,					60.0f,		360.0f,		130.0f,		139.0f,		155.0f,		170.0f,		180.0f ),
+	BOTTRAIT( reactionMsec,			0.0f,		2000.0f,	460.0f,		418.0f,		320.0f,		220.0f,		140.0f ),
+	BOTTRAIT( reactionVarianceMsec,	0.0f,		1000.0f,	180.0f,		162.0f,		120.0f,		80.0f,		45.0f ),
+	BOTTRAIT( reacquireMsec,		0.0f,		4000.0f,	150.0f,		210.0f,		400.0f,		550.0f,		700.0f ),
+	BOTTRAIT( reacquireFraction,	0.0f,		1.0f,		1.00f,		0.91f,		0.70f,		0.55f,		0.40f ),
+	BOTTRAIT( peripheralAngle,		5.0f,		180.0f,		60.0f,		63.0f,		70.0f,		75.0f,		80.0f ),
+	BOTTRAIT( peripheralPenaltyMsec,0.0f,		2000.0f,	340.0f,		310.0f,		240.0f,		160.0f,		90.0f ),
 
 	// -- aim --
-	BOTTRAIT( turnSpeed,			20.0f,		2000.0f,	170.0f,		280.0f,		420.0f,		640.0f,		900.0f ),
-	BOTTRAIT( turnAccel,			50.0f,		40000.0f,	750.0f,		1350.0f,	2400.0f,	4800.0f,	9000.0f ),
-	BOTTRAIT( turnDamping,			0.1f,		3.0f,		0.42f,		0.55f,		0.70f,		0.90f,		1.10f ),
-	BOTTRAIT( aimTrackTimeConst,	0.01f,		2.0f,		0.40f,		0.30f,		0.22f,		0.14f,		0.08f ),
+	BOTTRAIT( turnSpeed,			20.0f,		2000.0f,	170.0f,		236.0f,		420.0f,		640.0f,		900.0f ),
+	BOTTRAIT( turnAccel,			50.0f,		40000.0f,	750.0f,		1110.0f,	2400.0f,	4800.0f,	9000.0f ),
+	BOTTRAIT( turnDamping,			0.1f,		3.0f,		0.42f,		0.50f,		0.70f,		0.90f,		1.10f ),
+	BOTTRAIT( aimTrackTimeConst,	0.01f,		2.0f,		0.40f,		0.34f,		0.22f,		0.14f,		0.08f ),
 	// A pure lag trails a target moving at a steady speed by speed times the
 	// time constant, for ever: 26 units at skill 5 and 320 units a second,
 	// which is off a 32-unit hull, so the best bot could not hit anyone
 	// running in a straight line.  This is how much of the motion it has
 	// perceived the aim carries forward instead; what is left still trails.
-	BOTTRAIT( aimAnticipation,		0.0f,		1.0f,		0.50f,		0.72f,		0.85f,		0.92f,		0.97f ),
-	BOTTRAIT( aimTremorDeg,			0.0f,		30.0f,		4.2f,		3.0f,		2.1f,		1.2f,		0.5f ),
-	BOTTRAIT( aimTremorRateHz,		0.05f,		10.0f,		0.6f,		0.8f,		1.1f,		1.4f,		1.8f ),
-	BOTTRAIT( aimTrackError,		0.0f,		20.0f,		2.8f,		2.1f,		1.5f,		0.8f,		0.3f ),
-	BOTTRAIT( aimSettleMsec,		0.0f,		2000.0f,	240.0f,		200.0f,		170.0f,		110.0f,		60.0f ),
+	BOTTRAIT( aimAnticipation,		0.0f,		1.0f,		0.50f,		0.63f,		0.85f,		0.92f,		0.97f ),
+	BOTTRAIT( aimTremorDeg,			0.0f,		30.0f,		4.2f,		3.5f,		2.1f,		1.2f,		0.5f ),
+	BOTTRAIT( aimTremorRateHz,		0.05f,		10.0f,		0.6f,		0.72f,		1.1f,		1.4f,		1.8f ),
+	BOTTRAIT( aimTrackError,		0.0f,		20.0f,		2.8f,		2.4f,		1.5f,		0.8f,		0.3f ),
+	BOTTRAIT( aimSettleMsec,		0.0f,		2000.0f,	240.0f,		216.0f,		170.0f,		110.0f,		60.0f ),
 	// Both are fractions of the computed lead.  A lead past 1.0 aims ahead of
 	// where the target will be, and an error past 1.0 lets the per-burst roll
 	// go negative, so the clamps stop at the header's documented 0..1.
-	BOTTRAIT( aimLead,				0.0f,		1.0f,		0.10f,		0.35f,		0.60f,		0.82f,		0.97f ),
-	BOTTRAIT( aimLeadError,			0.0f,		1.0f,		0.45f,		0.32f,		0.20f,		0.11f,		0.05f ),
+	BOTTRAIT( aimLead,				0.0f,		1.0f,		0.10f,		0.25f,		0.60f,		0.82f,		0.97f ),
+	BOTTRAIT( aimLeadError,			0.0f,		1.0f,		0.45f,		0.37f,		0.20f,		0.11f,		0.05f ),
 
 	// -- trigger --
-	BOTTRAIT( fireConeDeg,			0.25f,		45.0f,		14.0f,		10.0f,		6.5f,		4.0f,		2.0f ),
-	BOTTRAIT( holdFireTurnRate,		10.0f,		4000.0f,	1000.0f,	700.0f,		500.0f,		340.0f,		220.0f ),
+	BOTTRAIT( fireConeDeg,			0.25f,		45.0f,		14.0f,		11.6f,		6.5f,		4.0f,		2.0f ),
+	BOTTRAIT( holdFireTurnRate,		10.0f,		4000.0f,	1000.0f,	820.0f,		500.0f,		340.0f,		220.0f ),
 	// Long and short at both ends, for opposite reasons.  A novice holds the
 	// trigger down whether or not it is on target; a strong player holds it
 	// for as long as it is, and the cone gate ends the burst the moment the
 	// aim leaves.  The pause is what skill buys down: every one costs the
 	// rest and then a fresh settle before the next round.
-	BOTTRAIT( burstMinMsec,			30.0f,		4000.0f,	480.0f,		380.0f,		300.0f,		320.0f,		450.0f ),
-	BOTTRAIT( burstMaxMsec,			30.0f,		8000.0f,	1400.0f,	1000.0f,	700.0f,		900.0f,		1200.0f ),
-	BOTTRAIT( burstPauseMsec,		0.0f,		2000.0f,	220.0f,		180.0f,		140.0f,		100.0f,		60.0f ),
+	BOTTRAIT( burstMinMsec,			30.0f,		4000.0f,	480.0f,		420.0f,		300.0f,		320.0f,		450.0f ),
+	BOTTRAIT( burstMaxMsec,			30.0f,		8000.0f,	1400.0f,	1160.0f,	700.0f,		900.0f,		1200.0f ),
+	BOTTRAIT( burstPauseMsec,		0.0f,		2000.0f,	220.0f,		196.0f,		140.0f,		100.0f,		60.0f ),
 
 	// -- mistakes --
-	BOTTRAIT( mistakeChance,		0.0f,		1.0f,		0.45f,		0.32f,		0.20f,		0.10f,		0.03f ),
-	BOTTRAIT( mistakeMsec,			50.0f,		5000.0f,	900.0f,		750.0f,		600.0f,		450.0f,		300.0f ),
+	BOTTRAIT( mistakeChance,		0.0f,		1.0f,		0.45f,		0.37f,		0.20f,		0.10f,		0.03f ),
+	BOTTRAIT( mistakeMsec,			50.0f,		5000.0f,	900.0f,		810.0f,		600.0f,		450.0f,		300.0f ),
 
 	// -- movement and engagement --
-	BOTTRAIT( strafeChance,			0.0f,		1.0f,		0.15f,		0.30f,		0.45f,		0.58f,		0.70f ),
-	BOTTRAIT( dodgeReactMsec,		0.0f,		3000.0f,	900.0f,		700.0f,		500.0f,		320.0f,		180.0f ),
-	BOTTRAIT( jumpChance,			0.0f,		1.0f,		0.05f,		0.12f,		0.22f,		0.34f,		0.45f ),
+	BOTTRAIT( strafeChance,			0.0f,		1.0f,		0.15f,		0.24f,		0.45f,		0.58f,		0.70f ),
+	BOTTRAIT( dodgeReactMsec,		0.0f,		3000.0f,	900.0f,		780.0f,		500.0f,		320.0f,		180.0f ),
+	BOTTRAIT( jumpChance,			0.0f,		1.0f,		0.05f,		0.09f,		0.22f,		0.34f,		0.45f ),
 	BOTTRAIT( combatRange,			32.0f,		4096.0f,	500.0f,		500.0f,		500.0f,		500.0f,		500.0f ),
-	BOTTRAIT( rangeDiscipline,		0.0f,		1.0f,		0.20f,		0.35f,		0.50f,		0.68f,		0.85f ),
+	BOTTRAIT( rangeDiscipline,		0.0f,		1.0f,		0.20f,		0.29f,		0.50f,		0.68f,		0.85f ),
 	BOTTRAIT( aggression,			0.0f,		1.0f,		0.50f,		0.50f,		0.50f,		0.50f,		0.50f ),
 	BOTTRAIT( patience,				0.0f,		1.0f,		0.50f,		0.50f,		0.50f,		0.50f,		0.50f ),
-	BOTTRAIT( retreatHealth,		0.0f,		1.0f,		0.15f,		0.20f,		0.25f,		0.30f,		0.35f ),
-	BOTTRAIT( pursuit,				0.0f,		2.0f,		0.30f,		0.42f,		0.55f,		0.68f,		0.80f ),
-	BOTTRAIT( itemFocus,			0.0f,		2.0f,		0.25f,		0.38f,		0.50f,		0.65f,		0.80f ),
+	BOTTRAIT( retreatHealth,		0.0f,		1.0f,		0.15f,		0.18f,		0.25f,		0.30f,		0.35f ),
+	BOTTRAIT( pursuit,				0.0f,		2.0f,		0.30f,		0.37f,		0.55f,		0.68f,		0.80f ),
+	BOTTRAIT( itemFocus,			0.0f,		2.0f,		0.25f,		0.33f,		0.50f,		0.65f,		0.80f ),
 
 	// -- tactical personality --
 	// Most stay flat because they decide what kind of fight a character creates,
 	// not whether it has the mechanical skill to win it.  initiative and
 	// suppression deliberately favor the low end: novices shoot imperfectly
 	// and waste rounds through a doorway instead of waiting themselves silent.
-	BOTTRAIT( initiative,			0.0f,		1.0f,		0.80f,		0.70f,		0.58f,		0.50f,		0.50f ),
+	BOTTRAIT( initiative,			0.0f,		1.0f,		0.80f,		0.74f,		0.58f,		0.50f,		0.50f ),
 	BOTTRAIT( targetStickiness,	0.0f,		1.0f,		0.50f,		0.50f,		0.50f,		0.50f,		0.50f ),
 	BOTTRAIT( opportunism,			0.0f,		1.0f,		1.00f,		1.00f,		1.00f,		1.00f,		1.00f ),
 	BOTTRAIT( vengefulness,		0.0f,		1.0f,		0.00f,		0.00f,		0.00f,		0.00f,		0.00f ),
-	BOTTRAIT( suppressionMsec,		0.0f,		2000.0f,	1200.0f,	700.0f,		250.0f,		0.0f,		0.0f ),
+	BOTTRAIT( suppressionMsec,		0.0f,		2000.0f,	1200.0f,	900.0f,		250.0f,		0.0f,		0.0f ),
 	BOTTRAIT( strafeRhythmMsec,	100.0f,		3000.0f,	400.0f,		400.0f,		400.0f,		400.0f,		400.0f ),
 	BOTTRAIT( strafeRhythmVarianceMsec,0.0f,	3000.0f,	800.0f,		800.0f,		800.0f,		800.0f,		800.0f ),
 	BOTTRAIT( weaponSwitchMsec,	100.0f,		3000.0f,	500.0f,		500.0f,		500.0f,		500.0f,		500.0f ),
 	BOTTRAIT( aimHeight,			-0.4f,		0.4f,		0.00f,		0.00f,		0.00f,		0.00f,		0.00f ),
 
 	// -- decision quality --
-	BOTTRAIT( weaponSkill,			0.0f,		1.0f,		0.20f,		0.38f,		0.55f,		0.75f,		0.92f ),
-	BOTTRAIT( targetSelection,		0.0f,		1.0f,		0.25f,		0.40f,		0.55f,		0.72f,		0.88f ),
+	BOTTRAIT( weaponSkill,			0.0f,		1.0f,		0.20f,		0.31f,		0.55f,		0.75f,		0.92f ),
+	BOTTRAIT( targetSelection,		0.0f,		1.0f,		0.25f,		0.34f,		0.55f,		0.72f,		0.88f ),
 	// Awareness is competence: a novice does not turn toward gunfire behind it
 	// and has no idea when the mega health comes back; a strong player does both.
-	BOTTRAIT( hearing,				0.0f,		2.0f,		0.45f,		0.60f,		0.75f,		0.90f,		1.00f ),
-	BOTTRAIT( itemTiming,			0.0f,		1.0f,		0.05f,		0.25f,		0.50f,		0.75f,		0.92f ),
+	BOTTRAIT( hearing,				0.0f,		2.0f,		0.45f,		0.54f,		0.75f,		0.90f,		1.00f ),
+	BOTTRAIT( itemTiming,			0.0f,		1.0f,		0.05f,		0.17f,		0.50f,		0.75f,		0.92f ),
 
 	// -- chat --
 	// combatRange, aggression, patience, most tactical-personality traits and
