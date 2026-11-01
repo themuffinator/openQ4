@@ -183,4 +183,8 @@ public:
 
 extern	idSession *	session;
 
+// Engine-only: the GUI that menu input is routed to, which can be a retained
+// screen covering GetActiveGUI(). Platform cursor code follows this one.
+idUserInterface *	Session_MenuInputGUI( void );
+
 #endif /* !__SESSION_H__ */

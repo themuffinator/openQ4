@@ -489,6 +489,9 @@ public:
 	// while it is open over a match; the game keeps the menu, its state and
 	// its commands, and publishes the card's mp.* keys.
 	bool				RetainedMultiplayerCovers() const;
+	// The menu GUI that ProcessEvent actually delivers input to (a retained
+	// screen covering guiActive receives it instead of guiActive).
+	idUserInterface *	MenuInputGUI() const;
 	void				UpdateRetainedMultiplayer();
 	void				RetainedMultiplayerFrameEvent();
 	void				RetireRetainedMultiplayer( bool release );
