@@ -280,10 +280,16 @@ def validation_source():
     production=(ROOT/'src/ui/retained/NumberControlView.cpp').read_text(encoding='utf-8')
     start=production.index('\t\tconst bool invalid=');end=production.index('\t\tconst bool textChanged=',start)
     body=production[start:end]
+    # The authored fallback names the field's range through RangeText since 920cf3a4.
+    range_text=function_body(production,'std::string RangeText(')
     return r"""
 #include "src/ui/retained/Interaction.h"
+#include "src/ui/retained/FloatChars.h"
 #include <cassert>
 #include <cstdio>
+namespace openq4::ui {
+"""+range_text+r"""
+}
 using namespace openq4::ui;
 struct Mock {
     struct String {std::string text;};
@@ -310,7 +316,10 @@ int main(){
     widget.number->notice=NumberEditNotice::None;widget.number->status=TextNumberStatus::Invalid;
     assert(Paint(widget) && mock.text=="translated:#str_authored" && mock.visible);
     widget.number->status=TextNumberStatus::Valid;assert(Paint(widget) && !mock.visible && mock.text.empty());
-    std::puts("Actual Number view feedback block: fixed localized clipboard categories, stable repeated paint, authored numeric fallback and clear passed");
+    mock.authored["validation"]["text"].text="#str_range %s %s";widget.number->status=TextNumberStatus::Invalid;
+    assert(Paint(widget) && mock.text=="translated:#str_range 0 1" && mock.visible);
+    widget.number->status=TextNumberStatus::Valid;assert(Paint(widget) && !mock.visible);
+    std::puts("Actual Number view feedback block: fixed localized clipboard categories, stable repeated paint, authored numeric fallback with range and clear passed");
 }
 """
 
