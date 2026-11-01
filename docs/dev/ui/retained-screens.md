@@ -2487,7 +2487,7 @@ Arena's difficulty steps (34). The 960 dp canvas spans a phone's width, so a
 physical 48 dp target is about 110 canvas dp on a portrait phone; reaching it
 takes the Phone viewing profile's interface scale (section 13.2), not more
 growth in these layouts. The window's safe area (a camera cutout, the status
-and gesture bars) is not yet read either.
+and gesture bars) is read since; see [the window's safe area](#the-windows-safe-area-1-november-2026).
 
 ## Every portrait view and other aspect ratios (1 November 2026)
 
@@ -2528,6 +2528,63 @@ The native groups pass, the menu levels' text-scale check adding a 0.78 view
 `ui_retained_gate.py` passes. Captured on OpenGL at 4:5 and 0.95 (title,
 Multiplayer, SETTINGS, the pause, the campaign's difficulty, Restart Level,
 Credits, the restart screen, Arena pause) and at 16:9 (Join Game).
+
+## The window's safe area (1 November 2026)
+
+A phone draws the menus under its status bar, camera cutout and gesture bar,
+and its rounded corners cut the view's corners: the top band's titles and
+crumbs (10-30 dp from the top), the notices and the prompt bars sat under the
+system's own interface. Now (section 13.3, LAY-016):
+
+- **Inside the safe area.** Every retained menu keeps its text and controls
+  in the window's safe area: titles and crumbs, notices, columns, lists,
+  prompt bars, the bottom band's actions, dialogs, detail cards and opened
+  lists. The bands, backdrop, montage, scrims and soft focus still reach the
+  view's edges, under the cutout and the bars.
+- **The platform.** The SDL layer reads `SDL_GetWindowSafeArea` whenever the
+  window's UI viewport changes and on `SDL_EVENT_WINDOW_SAFE_AREA_CHANGED` (a
+  rotation, a bar shown or hidden, a fold), as framebuffer-pixel insets
+  (`engineWindowState.safeArea*`, rounded outward), and
+  `RetainedUI_DefaultViewport` takes the part inside the UI viewport into
+  `Viewport::safeLeft`, `safeTop`, `safeRight` and `safeBottom`.
+- **The runtime.** A view-height canvas fits the safe area: `DpRatio`
+  measures it, as section 13.3's size classes do, so the 960x720 dp canvas
+  spans the safe area's width or height. `view.aspect` reads the safe area's
+  shape, and four new read-only view sources, `safeLeft`, `safeTop`,
+  `safeRight` and `safeBottom`, give its insets in dp
+  ([document format](document-format.md#the-windows-safe-area)). A detail
+  card keeps 16 dp inside the safe area, and an opened list, bounded or
+  not, opens within it 4 dp clear.
+- **The documents.** The generator's last pass (`safe_frame` in
+  `build_retained_screens.py`) makes each document's root the safe area,
+  anchoring its four edges to the sources, and anchors every backdrop that
+  fills the root back out by the same insets: a vector, picture, painted
+  group or soft focus that fills it through groups that fill it (the lit
+  field, the backings and their tall shades, the title's montage, the pause
+  screen's scrim and soft focus, each dialog's scrim and soft focus, the
+  fades and curtains). A band is drawn 400 dp past its box, so it covers the
+  insets already and its edge follows the safe area, carrying its title. A
+  root's own backing moves to a node that reaches out (`screen-backing`). The
+  tall layouts need nothing more: their view height is the safe area's.
+- **Desktop windows.** A desktop window reports the whole window as safe:
+  no inset, and every box is where it was. `ui_retainedSafeArea` ("left top
+  right bottom" in pixels, unarchived) sets test insets on a desktop; the
+  window's own still apply where they reach further.
+
+`openq4-ui-retained-safe-area` lays out the title, the pause screen, the
+loading screen, Single Player, the campaign's difficulty, Load Game, Demos,
+Credits, the Arena, Join Game, the Welcome card, SETTINGS and GAME OPTIONS at
+540x1170 with insets of 6, 72, 6 and 36 px and at 1170x540 with 72, 0, 30 and
+24 px, with a notice showing and up to two dialogs open in turn: every text
+and control that shows (but the plates that run off the view's edge, whose
+labels count) stands in the safe area, the backdrops fill the view, the
+canvas fits the safe area and the sources read its insets in dp. With no
+inset the root and backdrops fill the view and the sources read nothing, and
+a view that loses its insets lays every part out where it stood.
+`openq4-ui-retained-screens-menus` checks the sources' schema. Not yet: the
+HUD keeps its own Safe Area Inset setting and reads no platform insets, the
+stock GUIs ignore them, swipe controls do not yet keep 24 dp from the edges,
+and no device has qualified it.
 
 ## The menu cursor (31 October 2026)
 

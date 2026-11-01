@@ -218,7 +218,12 @@ made them too large to load.
   partial). A press lights at once, a released list keeps going and lights
   its rim at either end, a swipe across a tab strip changes tab and a
   long-press opens Join Game's server details; the real menus now receive the
-  finger as it moves. Haptics, the safe area and device qualification remain.
+  finger as it moves. Haptics and device qualification remain.
+- [x] The window's safe area: the retained menus keep their text and
+  controls inside it while bands and backdrops run full-bleed
+  ([safe area](ui/retained-screens.md#the-windows-safe-area-1-november-2026),
+  LAY-016 partial); the HUD, the stock GUIs, swipe edge margins and
+  device qualification remain.
 - [ ] Bound acceptance evidence remains.
 
 ## Windows stay see-through at any distance, 29 October 2026

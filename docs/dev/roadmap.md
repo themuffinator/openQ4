@@ -896,6 +896,11 @@ Sources: [Android build and packaging](android-build.md),
   Qualify touch targets, keyboard entry, safe areas, HUD/menu scaling, bindings and
   overlay configuration. Select mobile presets from device results; explicitly
   handle GLES feature limits rather than assuming desktop temporal/post parity.
+  The retained menus now keep their text and controls inside the window's
+  [safe area](ui/retained-screens.md#the-windows-safe-area-1-november-2026)
+  while their bands and backdrops run full-bleed (`LAY-016` partial);
+  cutout, gesture-bar, fold and multi-window qualification on devices
+  remains.
 - [ ] **AND-05 — P2, integration and qualification: standalone Quest.** After
   VR-01/AND-01, qualify real installation, assets, stereo gameplay, controller/UI
   interaction, comfort, session recovery and sustained refresh/thermal budgets.
@@ -991,7 +996,7 @@ archived provenance; new scheduling belongs here.
   behind; a press lights at touch-down, a released list keeps going as
   inertia and lights its rim at either end, a swipe across a tab strip
   changes tab and a 500 ms long-press opens a button's detail (`INP-014`
-  partial; haptics, the safe area and device qualification remain).
+  partial; haptics and device qualification remain).
 - [ ] **UI-02 — P1, implementation and qualification: text, input and accessibility.**
   Finish in-field IME/composition, shaping/kerning/fallback/styles, grapheme editing,
   caret/candidate placement, binding capture, accessibility exposure and contextual

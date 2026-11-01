@@ -32,6 +32,9 @@ public:
 	bool Paint(Interaction& interaction, const std::map<std::string,ControlReadback>& readbacks,
 		int width, int height, float dpRatio, const std::function<double(const std::string&)>& opacity,
 		std::uint64_t presentationPass = 0);
+	// The window's safe area as pixel insets from the view's edges: a popup
+	// opens within it, 4 dp clear, as it otherwise does within the view.
+	void SetSafeArea(float left, float top, float right, float bottom);
 	// Use the actual clipped Rml hit, except a captured slider projects outside
 	// its track. Coordinates are the same physical viewport pixels as RmlUi.
 	bool ChoiceScrollFresh(const std::string&, const Interaction&) const;

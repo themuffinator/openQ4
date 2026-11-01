@@ -69,6 +69,8 @@ idCVar ui_retainedTextScale("ui_retainedTextScale", "1", CVAR_GUI | CVAR_FLOAT |
 // so joining or hosting a server without cheats does not reset them.
 idCVar ui_retainedDensity("ui_retainedDensity", "0", CVAR_GUI | CVAR_FLOAT | CVAR_NOCHEAT,
 	"retained UI test density override; zero uses the window display scale", 0.f, 8.f);
+idCVar ui_retainedSafeArea("ui_retainedSafeArea", "", CVAR_GUI | CVAR_NOCHEAT,
+	"retained UI test safe area: 'left top right bottom' pixel insets the menus keep clear, at least the window's own");
 idCVar ui_retainedReducedMotion("ui_retainedReducedMotion", "0", CVAR_GUI | CVAR_BOOL | CVAR_ARCHIVE,
 	"reduce decorative motion in the retained UI preview");
 idCVar ui_retainedTrace("ui_retainedTrace", "0", CVAR_GUI | CVAR_BOOL | CVAR_NOCHEAT,
@@ -1814,6 +1816,20 @@ bool RetainedUI_DefaultViewport(openq4::ui::Viewport& viewport) {
 	viewport.FitToMinimum(640, 480);
 	viewport.pixelDensityX = engineWindowState.pixelDensityX; viewport.pixelDensityY = engineWindowState.pixelDensityY;
 	viewport.originX = static_cast<float>(engineWindowState.uiViewportX); viewport.originY = static_cast<float>(engineWindowState.uiViewportY);
+	// The window's safe area within the UI viewport (which may itself lie
+	// inside the framebuffer), or the test insets where they reach further.
+	float test[4] = {};
+	if (ui_retainedSafeArea.GetString()[0] && sscanf(ui_retainedSafeArea.GetString(),"%f %f %f %f",&test[0],&test[1],&test[2],&test[3]) != 4)
+		test[0] = test[1] = test[2] = test[3] = 0;
+	const auto inset = [](float window, float test, float clear) {
+		return (std::max)({0.f,window-(std::max)(clear,0.f),std::isfinite(test) ? test : 0.f});
+	};
+	viewport.safeLeft = inset(engineWindowState.safeAreaLeft,test[0],viewport.originX);
+	viewport.safeTop = inset(engineWindowState.safeAreaTop,test[1],viewport.originY);
+	viewport.safeRight = inset(engineWindowState.safeAreaRight,test[2],
+		static_cast<float>(engineWindowState.vidWidth-engineWindowState.uiViewportX-viewport.width));
+	viewport.safeBottom = inset(engineWindowState.safeAreaBottom,test[3],
+		static_cast<float>(engineWindowState.vidHeight-engineWindowState.uiViewportY-viewport.height));
 	return viewport.width > 0 && viewport.height > 0;
 }
 double RetainedUI_PresentationTime() { return PresentationTime(); }

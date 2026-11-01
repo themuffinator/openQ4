@@ -440,6 +440,12 @@ typedef struct engineWindowState_s {
 	float		displayScale;     // physical pixels per density-independent UI unit
 	float		pixelDensityX;   // window-coordinate to framebuffer conversion
 	float		pixelDensityY;
+	// The window's safe area (clear of camera cutouts, rounded corners and
+	// system bars) as framebuffer-pixel insets from each framebuffer edge.
+	int			safeAreaLeft;
+	int			safeAreaTop;
+	int			safeAreaRight;
+	int			safeAreaBottom;
 } engineWindowState_t;
 
 extern engineWindowState_t engineWindowState;

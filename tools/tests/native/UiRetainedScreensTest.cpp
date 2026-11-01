@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
+#include <functional>
 #include <iterator>
 #include <map>
 #include <set>
@@ -180,8 +181,20 @@ static void CheckSchema() {
 	Check(Near(viewport.DpRatio(),.75f,.001f),"portrait fits the center screen's width without stretching");
 	viewport.width = 2560; viewport.height = 1080;
 	Check(Near(viewport.DpRatio(),1.5f,.001f),"wide views keep the center screen's height");
-	viewport.canvasHeight = 0;
+	// The window's safe area (section 13.3): the canvas fits what the insets
+	// leave, and a malformed inset cannot collapse it.
+	viewport.canvasHeight = 720; viewport.width = 1920; viewport.height = 1080; viewport.safeBottom = 60; viewport.safeLeft = 90;
+	Check(Near(viewport.SafeWidth(),1830,.001f) && Near(viewport.SafeHeight(),1020,.001f) && Near(viewport.DpRatio(),1020.f/720,.001f),
+		"a wide view's canvas fits the safe area's height");
+	viewport.width = 1080; viewport.height = 2340; viewport.safeLeft = 0; viewport.safeTop = 140; viewport.safeBottom = 80;
+	Check(Near(viewport.DpRatio(),1080.f/960,.001f),"a portrait canvas keeps the safe area's width");
+	viewport.safeLeft = 600; viewport.safeRight = 600;
+	Check(Near(viewport.SafeWidth(),1,.001f) && viewport.DpRatio() > 0,"insets wider than the view leave a pixel");
+	viewport.safeLeft = viewport.safeRight = viewport.safeTop = viewport.safeBottom = 0;
+	viewport.canvasHeight = 0; viewport.width = 1920; viewport.height = 1080;
 	Check(Near(viewport.DpRatio(),3,.001f),"display density applies without a canvas");
+	viewport.safeTop = 100;
+	Check(Near(viewport.DpRatio(),3,.001f),"display density ignores the safe area");
 }
 
 // A view source: the runtime publishes the view's width over its height as a
@@ -211,6 +224,29 @@ static void CheckViewSource(ScreenHost& host) {
 		"a 9:16 view reads its aspect and takes the tall arrangement");
 	Check(!runtime.GetState(false).contains("view.aspect") && !runtime.SetState({{"view.aspect",2.0}},error,0.3),
 		"the application neither reads back nor writes the view source");
+	// The safe area's insets in dp, one source per edge, and its shape.
+	const auto sourced = [&](const std::string& states) {
+		return Wrap(root,R"(,"canvas":{"height":720,"minWidth":960},"state":{)"+states+"}");
+	};
+	const std::string insets = R"("left":{"type":"number","initial":0,"view":"safeLeft"},"top":{"type":"number","initial":0,"view":"safeTop"},)"
+		R"("right":{"type":"number","initial":0,"view":"safeRight"},"bottom":{"type":"number","initial":0,"view":"safeBottom"})";
+	Check(Loads(sourced(insets)),"a number state takes each safe inset");
+	Check(!Loads(sourced(R"("top":{"type":"boolean","initial":false,"view":"safeTop"})")) &&
+		!Loads(sourced(R"("top":{"type":"number","initial":0,"view":"safe"})")) &&
+		!Loads(sourced(R"("top":{"type":"number","initial":0,"view":"safeTop","cvar":"ui_scale"})")),
+		"only a number takes an inset, by its edge's name, never with a CVar");
+	Runtime safe(host);
+	Check(safe.Initialize() && safe.LoadDocument(sourced(insets+R"(,"aspect":{"type":"number","initial":1.3333,"view":"aspect"})"),
+		"safe-source.q4ui",diagnostics),"the safe sources load");
+	const auto read = [&](const char* id) { return static_cast<float>(std::get<double>(safe.GetState(true).at(id))); };
+	viewport.width = 540; viewport.height = 1170; viewport.safeTop = 72; viewport.safeBottom = 36;
+	safe.Frame(viewport,0.4);
+	Check(Near(read("top"),72/.5625f,.01f) && Near(read("bottom"),36/.5625f,.01f) && read("left") == 0 && read("right") == 0 &&
+		Near(read("aspect"),540.f/1062,.0001f),"the insets read in dp and the aspect is the safe area's");
+	viewport.safeTop = viewport.safeBottom = 0;
+	safe.Frame(viewport,0.5);
+	Check(read("top") == 0 && read("bottom") == 0 && Near(read("aspect"),540.f/1170,.0001f),"a view without insets reads none");
+	Check(!safe.SetState({{"top",1.0}},error,0.6),"the application cannot write a safe inset");
 }
 
 static const std::set<std::string> SessionCommands = {"continue","singlePlayer","loadGame","saveGame","multiplayer","settings",
@@ -4925,6 +4961,213 @@ static void CheckMenusPointerReach(ScreenHost& host, char** argv) {
 	host.recordDraws = true;
 }
 
+// The window's safe area (section 13.3) on a phone, upright and turned: the
+// insets of a status bar and camera cutout, a gesture bar and rounded
+// corners. The root is the safe area and the canvas fits it, so every text
+// and control that shows (inside the lists that clip it) stands in the safe
+// area, as do the page's dialogs, while the backdrops, scrims and soft focus
+// still fill the view. With no inset the root and backdrops fill the view
+// and the sources read nothing, and a view that loses its insets lays every
+// part out as a twin that never had them, driven alike.
+struct SafeShape { int width, height; float left, top, right, bottom; };
+static void CheckSafeArea(ScreenHost& host, const char* path, const StateValues& values, size_t dialogs = 1) {
+	std::string name = path;
+	std::replace(name.begin(),name.end(),'\\','/');
+	name = name.substr(name.rfind("guis/"));
+	Document document; std::vector<Diagnostic> diagnostics;
+	Check(document.Load(Read(path),diagnostics),"a menu loads for the safe-area probe");
+	const auto& model = document.Model();
+	Check(model.canvasHeight == 720 && model.canvasMinWidth > 0,"a safe-area menu keeps a view-height canvas");
+	const std::string root = model.root.id;
+	for (const char* view : {"safeLeft","safeTop","safeRight","safeBottom"}) {
+		const auto found = model.state.find(std::string("view.")+view);
+		Check(found != model.state.end() && found->second.view == view,"each safe inset is a view source");
+	}
+	// The backdrops that reach back out: every node but the root that the
+	// generator anchored to the insets.
+	std::vector<std::string> bleeds;
+	bool framed = false;
+	for (const auto& binding : model.bindings) {
+		if (binding.id != "safe."+binding.node+".left") continue;
+		if (binding.node == root) framed = true; else bleeds.push_back(binding.node);
+	}
+	Check(framed && !bleeds.empty(),"the root is the safe area and the backdrops reach out");
+	std::vector<std::string> ancestors, clips; std::vector<ReachTarget> controls, texts;
+	std::map<std::string,std::vector<std::string>> lineage;   // each node's ancestors
+	ReachTargets(model.root,ancestors,clips,controls);
+	const std::function<void(const Node&)> collect = [&](const Node& node) {
+		if (node.type == "text") texts.push_back({node.id,ancestors,clips});
+		lineage[node.id] = ancestors;
+		const auto overflow = node.properties.find("overflow");
+		const bool clipping = overflow != node.properties.end() && overflow->second.text != "visible";
+		ancestors.push_back(node.id);
+		if (clipping) clips.push_back(node.id);
+		for (const auto& child : node.children) collect(child);
+		if (clipping) clips.pop_back();
+		ancestors.pop_back();
+	};
+	collect(model.root);
+	// Each CVar source at its initial value, unless the host has the CVar.
+	const auto savedCVars = host.cvars;
+	for (const auto& [id,declaration] : model.state)
+		if (!declaration.cvar.empty()) host.cvars.emplace(declaration.cvar,declaration.initial);
+	// `runtime` takes the insets; `twin` is driven alike and never has them.
+	Runtime runtime(host), twin(host); std::string error; Runtime::EventEffects effects;
+	Check(runtime.Initialize() && runtime.LoadDocument(document,name,diagnostics) && twin.Initialize() && twin.LoadDocument(document,name,diagnostics),
+		"the menu loads into a runtime and its twin for the safe-area probe");
+	double now = 1;
+	StateValues published = values;
+	if (model.state.contains("notice.0.shown"))   // the top band's notices
+		published.insert({{"notice.0.shown",true},{"notice.0.text",std::string("Saved")},{"notice.0.kind",1.0}});
+	Check(published.empty() || (runtime.SetState(published,error,now) && twin.SetState(published,error,now)),"publish the menu for the safe-area probe");
+	Viewport viewport; viewport.canvasHeight = static_cast<float>(model.canvasHeight); viewport.canvasMinWidth = static_cast<float>(model.canvasMinWidth);
+	const auto frame = [&](double seconds) {
+		Viewport plain = viewport; plain.safeLeft = plain.safeTop = plain.safeRight = plain.safeBottom = 0;
+		runtime.Frame(viewport,seconds); twin.Frame(plain,seconds);
+	};
+	const auto run = [&](const std::string& event, double seconds) {
+		return runtime.RunEvent(event,seconds,effects,error) && twin.RunEvent(event,seconds,effects,error);
+	};
+	const auto hidden = [](Runtime& view, const std::string& id) {
+		const auto display = view.PresentedValue(id,"display");
+		const auto opacity = view.PresentedValue(id,"opacity");
+		return (display && display->text == "none") || (opacity && opacity->type == ValueType::Number && opacity->data[0] <= 0);
+	};
+	const auto concealed = [&](Runtime& view, const std::string& id, const std::vector<std::string>& over) {
+		return hidden(view,id) || std::any_of(over.begin(),over.end(),[&](const auto& parent) { return hidden(view,parent); });
+	};
+	// What shows of `target`: its box inside every clipping group over it.
+	const auto shown = [&](Runtime& view, const ReachTarget& target, Bounds& box) {
+		if (concealed(view,target.id,target.ancestors) || !view.GetBounds(target.id,box)) return false;
+		float left = box.x, top = box.y, right = box.x+box.width, bottom = box.y+box.height;
+		for (const auto& clip : target.clips) {
+			Bounds frame;
+			if (!view.GetBounds(clip,frame)) return false;
+			left = std::max(left,frame.x); top = std::max(top,frame.y);
+			right = std::min(right,frame.x+frame.width); bottom = std::min(bottom,frame.y+frame.height);
+		}
+		box = {left,top,right-left,bottom-top};
+		return box.width >= 1 && box.height >= 1;
+	};
+	const auto filled = [&](const std::string& id, float x, float y, float width, float height) {
+		Bounds box;
+		return runtime.GetBounds(id,box) && Near(box.x,x,1) && Near(box.y,y,1) && Near(box.width,width,1) && Near(box.height,height,1);
+	};
+	// A backdrop reaches every edge of the view (a montage under its parallax
+	// transform reaches past them).
+	const auto covers = [&](const std::string& id, float width, float height) {
+		Bounds box;
+		const bool reached = concealed(runtime,id,lineage.at(id)) ||
+			(runtime.GetBounds(id,box) && box.x <= 1 && box.y <= 1 && box.x+box.width >= width-1 && box.y+box.height >= height-1);
+		if (!reached) std::fprintf(stderr,"%s %gx%g: %s at %.1f,%.1f %.1fx%.1f does not reach the view's edges\n",name.c_str(),width,height,
+			id.c_str(),box.x,box.y,box.width,box.height);
+		return reached;
+	};
+	const auto source = [&](const char* id) {
+		const auto state = runtime.GetState(true); const auto found = state.find(id);
+		return found != state.end() && std::holds_alternative<double>(found->second) ? static_cast<float>(std::get<double>(found->second)) : NAN;
+	};
+	// A document that does not arrange itself by its shape declares no aspect.
+	const bool shaped = model.state.contains("view.aspect");
+	// Every text and every control that shows, inside the safe area. A plate
+	// that runs off the view's edge (the navigation plates) has its label
+	// checked instead.
+	const auto inside = [&](const char* when) {
+		const float left = viewport.safeLeft-1, top = viewport.safeTop-1;
+		const float right = viewport.width-viewport.safeRight+1, bottom = viewport.height-viewport.safeBottom+1;
+		bool all = true;
+		for (const auto* list : {&texts,&controls}) for (const auto& target : *list) {
+			Bounds box, whole;
+			if (!shown(runtime,target,box) || !runtime.GetBounds(target.id,whole)) continue;
+			if (list == &controls && (whole.x < -.5f || whole.y < -.5f || whole.x+whole.width > viewport.width+.5f ||
+				whole.y+whole.height > viewport.height+.5f)) continue;
+			if (box.x >= left && box.y >= top && box.x+box.width <= right && box.y+box.height <= bottom) continue;
+			std::fprintf(stderr,"%s %dx%d %s: %s at %.1f,%.1f %.1fx%.1f leaves the safe area %.0f,%.0f-%.0f,%.0f\n",name.c_str(),viewport.width,
+				viewport.height,when,target.id.c_str(),box.x,box.y,box.width,box.height,left+1,top+1,right-1,bottom-1);
+			all = false;
+		}
+		return all;
+	};
+	const auto snapshot = [&](Runtime& view) {
+		std::map<std::string,Bounds> boxes;
+		for (const auto* list : {&texts,&controls}) for (const auto& target : *list) {
+			Bounds box;
+			if (shown(view,target,box)) boxes[target.id] = box;
+		}
+		return boxes;
+	};
+	for (const char* arrive : {"open","onActivate"}) if (runtime.HasEvent(arrive)) { Check(run(arrive,now += .1),"the menu arrives"); break; }
+	for (const auto& shape : {SafeShape{540,1170,6,72,6,36},SafeShape{1170,540,72,0,30,24}}) {
+		viewport.width = shape.width; viewport.height = shape.height;
+		viewport.safeLeft = viewport.safeTop = viewport.safeRight = viewport.safeBottom = 0;
+		frame(now += 1);   // every arrival settles within a second
+		const float w = static_cast<float>(shape.width), h = static_cast<float>(shape.height);
+		Check(Near(viewport.DpRatio(),std::min(h/720,w/static_cast<float>(model.canvasMinWidth)),.0001f),"with no inset the canvas fits the view");
+		Check(filled(root,0,0,w,h),"with no inset the root fills the view");
+		Check(std::all_of(bleeds.begin(),bleeds.end(),[&](const auto& id) { return covers(id,w,h); }),"with no inset the backdrops fill the view");
+		Check(source("view.safeLeft") == 0 && source("view.safeTop") == 0 && source("view.safeRight") == 0 && source("view.safeBottom") == 0 &&
+			(!shaped || Near(source("view.aspect"),w/h,.0001f)),"with no inset the sources read nothing and the view's aspect");
+		viewport.safeLeft = shape.left; viewport.safeTop = shape.top; viewport.safeRight = shape.right; viewport.safeBottom = shape.bottom;
+		frame(now += 1);
+		const float safeWidth = w-shape.left-shape.right, safeHeight = h-shape.top-shape.bottom, dp = viewport.DpRatio();
+		Check(Near(dp,std::min(safeHeight/720,safeWidth/static_cast<float>(model.canvasMinWidth)),.0001f),"the canvas fits the safe area");
+		Check(Near(source("view.safeLeft"),shape.left/dp,.01f) && Near(source("view.safeTop"),shape.top/dp,.01f) &&
+			Near(source("view.safeRight"),shape.right/dp,.01f) && Near(source("view.safeBottom"),shape.bottom/dp,.01f) &&
+			(!shaped || Near(source("view.aspect"),safeWidth/safeHeight,.0001f)),"the sources read the insets in dp and the safe area's aspect");
+		Check(filled(root,shape.left,shape.top,safeWidth,safeHeight),"the root is the safe area");
+		Check(std::all_of(bleeds.begin(),bleeds.end(),[&](const auto& id) { return covers(id,w,h); }),"the backdrops still fill the view");
+		Check(inside("page"),"every text and control stands in the safe area");
+		size_t shownDialogs = 0;
+		for (const auto& [event,program] : model.events) {
+			if (shownDialogs == dialogs || !event.ends_with("modalshow")) continue;
+			++shownDialogs;
+			Check(run(event,now += .1),"a dialog shows");
+			frame(now += 1);
+			Check(inside(event.c_str()),"a dialog stands in the safe area");
+			Check(std::all_of(bleeds.begin(),bleeds.end(),[&](const auto& id) { return covers(id,w,h); }),"a dialog's scrim fills the view");
+			const auto hide = event.substr(0,event.size()-4)+"hide";
+			if (runtime.HasEvent(hide)) { Check(run(hide,now += .1),"a dialog hides"); frame(now += 1); }
+		}
+		viewport.safeLeft = viewport.safeTop = viewport.safeRight = viewport.safeBottom = 0;
+		frame(now += 1);
+		const auto after = snapshot(runtime), still = snapshot(twin);
+		for (const auto& [id,box] : after) if (!still.contains(id)) std::fprintf(stderr,"%s %dx%d: %s shows only after the insets\n",name.c_str(),
+			shape.width,shape.height,id.c_str());
+		Check(!still.empty() && after.size() == still.size() && std::all_of(still.begin(),still.end(),[&](const auto& entry) {
+			const auto found = after.find(entry.first);
+			const Bounds box = found != after.end() ? found->second : Bounds{-1,-1,-1,-1};
+			const bool same = Near(box.x,entry.second.x,.5f) && Near(box.y,entry.second.y,.5f) && Near(box.width,entry.second.width,.5f) &&
+				Near(box.height,entry.second.height,.5f);
+			if (!same) std::fprintf(stderr,"%s %dx%d: %s stands at %.1f,%.1f %.1fx%.1f, not at %.1f,%.1f %.1fx%.1f\n",name.c_str(),shape.width,
+				shape.height,entry.first.c_str(),box.x,box.y,box.width,box.height,entry.second.x,entry.second.y,entry.second.width,entry.second.height);
+			return same;
+		}),"a view that loses its insets lays every part out as one that never had them");
+	}
+	Check(host.errors == 0,"no safe-area diagnostics");
+	host.cvars = savedCVars;
+}
+
+// The menus under the safe-area probe: a menu level and its dialogs (the
+// title), the pause screen's chrome, a column page, a list page, a fixed
+// page, the Arena, a settings hub and sub-page, a multiplayer card and the
+// loading screen.
+static void CheckSafeAreas(ScreenHost& host, char** paths, int count) {
+	host.recordDraws = false;
+	for (int i = 0; i < count; ++i) {
+		const std::string path = paths[i];
+		const auto named = [&](const char* file) { return path.ends_with(file); };
+		StateValues values;
+		if (named("title.q4ui")) values = {{"menu_continue",true}};
+		else if (named("loadgame.q4ui")) values = {{"load.count",1.0},{"load.first",0.0},{"load.selected",0.0}};
+		else if (named("demos.q4ui")) values = {{"demos.count",1.0},{"demos.first",0.0},{"demos.selected",0.0},{"demos.canPlay",true},{"demos.canDelete",true}};
+		else if (named("arena.q4ui")) values = {{"arena_loaded",true},{"arena_canStart",true},{"arena_difficulty",3.0},{"arenaCampaignProgress",5.0},
+			{"arena_canReset",true}};
+		else if (named("joingame.q4ui")) values = {{"join.count",3.0},{"join.first",0.0},{"join.selected",0.0},{"join.listed",3.0}};
+		CheckSafeArea(host,paths[i],values);
+	}
+	host.recordDraws = true;
+}
+
 #include "UiStatusBarChecks.inl"
 
 #include "UiHudChecks.inl"
@@ -5035,6 +5278,10 @@ int main(int argc, char** argv) {
  if (argc == 3 && std::string(argv[1]) == "--audio") {
      ScreenHost host; CheckAudioPage(host,argv[2]);
      std::printf("retained AUDIO page: %d checks passed\n",checks); return 0;
+ }
+ if (argc >= 3 && std::string(argv[1]) == "--safe-area") {
+     ScreenHost host; CheckSafeAreas(host,argv+2,argc-2);
+     std::printf("retained safe area: %d checks passed\n",checks); return 0;
  }
  if (argc == 3 && std::string(argv[1]) == "--quick-chat") {
      ScreenHost host; CheckQuickChat(host,argv[2]);

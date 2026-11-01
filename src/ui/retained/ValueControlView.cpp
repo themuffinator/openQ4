@@ -139,6 +139,12 @@ struct ValueControlView::Impl {
 	Rml::ElementDocument* document = nullptr;
 	int width = 0, height = 0;
 	float ratio = 1;
+	// The window's safe area as pixel insets: popups open within it.
+	float safeLeft = 0, safeTop = 0, safeRight = 0, safeBottom = 0;
+	PopupRect Safe(int w, int h) const {
+		const double left = std::min<double>(safeLeft,w), top = std::min<double>(safeTop,h);
+		return {left,top,std::max(0.0,w-left-safeRight),std::max(0.0,h-top-safeBottom)};
+	}
 	std::function<std::string(const std::string&)> translate;
 	std::map<std::string,Entry> entries;
 	// Every node's element and authored values, by the model's node IDs; the
@@ -226,7 +232,7 @@ struct ValueControlView::Impl {
 	}
 	std::optional<PlacementContext> Context(const Entry& entry, int w, int h, float dp) const {
 		if (!entry.placementBounds || w<=0 || h<=0 || !std::isfinite(dp) || dp<=0) return {};
-		PlacementContext result; result.geometry={double(w),double(h),double(dp)};
+		PlacementContext result; result.geometry={double(w),double(h),double(dp),safeLeft,safeTop,safeRight,safeBottom};
 		for (auto* element:{entry.placementBounds,entry.anchor}) {
 			Rml::Array<Rml::Vector2f,4> quad;
 			if (!element->IsVisible(true) || !Rml::ElementUtilities::GetBorderBoxQuad(quad,element)) return {};
@@ -265,7 +271,7 @@ struct ValueControlView::Impl {
 		for (std::size_t i=0;i<quad.size();++i) quad[i]={measured[i].x,measured[i].y};
 		// Preserve four logical dp; one physical pixel additionally budgets Rml's
 		// border/translation rounding while final containment uses the full inset.
-		return MeasurePopupRegion(quad,{0,0,double(w),double(h)},4*double(dp)+(reserveRounding?1:0),out);
+		return MeasurePopupRegion(quad,Safe(w,h),4*double(dp)+(reserveRounding?1:0),out);
 	}
 	bool Contained(const Entry& entry,const ChoiceSpec& choice) const {
 		PopupRegion region;Rml::Array<Rml::Vector2f,4> quad;
@@ -275,7 +281,7 @@ struct ValueControlView::Impl {
 			const auto& p=region.planes[i];if (p.x*point.x+p.y*point.y>p.limit+1e-4) return false;
 		}
 		std::array<PopupPoint,4> border;for(std::size_t i=0;i<4;++i)border[i]={quad[i].x,quad[i].y};
-		if (!MeasurePopupRegion(border,{0,0,double(width),double(height)},0,region)) return false;
+		if (!MeasurePopupRegion(border,Safe(width,height),0,region)) return false;
 		std::vector<Rml::Element*> inside{Element(choice.viewport)};
 		if (choice.scrollbar && Element(choice.scrollbar->track)->IsVisible(true)) inside.push_back(Element(choice.scrollbar->track));
 		for(auto* element:inside) {
@@ -407,7 +413,10 @@ struct ValueControlView::Impl {
 		const size_t last = std::min(starts.size(),first+choice.visibleRows)-1;
 		const auto popupFrame = popup->GetBox().GetFrameSize(Rml::BoxArea::Border);
 		const auto viewportFrame = viewport->GetBox().GetFrameSize(Rml::BoxArea::Border);
-		const float margin = std::min(4*ratio,std::min(width,height)*.1f);
+		const auto safe = Safe(width,height);
+		const float safeX = static_cast<float>(safe.x), safeY = static_cast<float>(safe.y);
+		const float safeWidth = static_cast<float>(safe.width), safeHeight = static_cast<float>(safe.height);
+		const float margin = std::min(4*ratio,std::min(safeWidth,safeHeight)*.1f);
 		const float viewportTop = viewport->GetAbsoluteOffset(Rml::BoxArea::Border).y-popup->GetAbsoluteOffset(Rml::BoxArea::Content).y;
         if(choice.scrollbar && (!std::isfinite(viewportTop) ||
             viewport->GetAbsoluteOffset(Rml::BoxArea::Border).y < popup->GetAbsoluteOffset(Rml::BoxArea::Padding).y-.01f))
@@ -419,15 +428,15 @@ struct ValueControlView::Impl {
             popup->GetBox().GetFrameSize(Rml::BoxArea::Padding).y+viewportFrame.y+viewportTop) :
             std::max(0.0f,popupFrame.y+viewportFrame.y+std::max(0.0f,viewportTop));
 		const float desired = ends[last]-(choice.scrollbar?0:starts[first])+chrome;
-		const float below = std::max(0.0f,height-margin-anchor.Bottom());
-		const float above = std::max(0.0f,anchor.Top()-margin);
+		const float below = std::max(0.0f,safeY+safeHeight-margin-anchor.Bottom());
+		const float above = std::max(0.0f,anchor.Top()-margin-safeY);
 		const bool flip = desired > below && above > below;
 		const float room = flip ? above : below;
 		float outerHeight = std::max(0.0f,std::min(desired,room));
 		float visibleHeight = std::max(0.0f,outerHeight-chrome);
-		float outerWidth = std::max(0.0f,std::min(std::max(anchor.Width(),1.0f),width-2*margin));
-		float x = std::clamp(anchor.Left(),margin,std::max(margin,width-margin-outerWidth));
-		float y = std::clamp(flip ? anchor.Top()-outerHeight : anchor.Bottom(),margin,std::max(margin,height-margin-outerHeight));
+		float outerWidth = std::max(0.0f,std::min(std::max(anchor.Width(),1.0f),safeWidth-2*margin));
+		float x = std::clamp(anchor.Left(),safeX+margin,std::max(safeX+margin,safeX+safeWidth-margin-outerWidth));
+		float y = std::clamp(flip ? anchor.Top()-outerHeight : anchor.Bottom(),safeY+margin,std::max(safeY+margin,safeY+safeHeight-margin-outerHeight));
 		if (entry.placementBounds) {
 			float minimumRow=0,minimumRowWidth=36*ratio,naturalRowWidth=36*ratio;
 			for (std::size_t i=0;i<starts.size();++i) {
@@ -615,6 +624,10 @@ bool ValueControlView::Initialize(std::shared_ptr<const DocumentModel> model, Rm
 		candidate->Display(choice->popup,false);
 	}
 	impl = std::move(candidate); return true;
+}
+void ValueControlView::SetSafeArea(float left, float top, float right, float bottom) {
+	const auto inset = [](float value) { return std::isfinite(value) ? std::max(value,0.f) : 0.f; };
+	impl->safeLeft = inset(left); impl->safeTop = inset(top); impl->safeRight = inset(right); impl->safeBottom = inset(bottom);
 }
 bool ValueControlView::Paint(Interaction& interaction, const std::map<std::string,ControlReadback>& readbacks,
 	int width, int height, float ratio, const std::function<double(const std::string&)>& opacity, std::uint64_t pass) {

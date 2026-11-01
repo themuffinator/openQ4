@@ -33,9 +33,11 @@ using PresentationLookup = std::function<bool(const std::string&, int, StateValu
 struct StateDeclaration {
 	StateValue initial;
 	std::string cvar; // Optional read-only host source; empty means application-owned.
-	// Optional read-only view source: "aspect" is the view's width over its
-	// height and "text" the text size it applies (1 to 2), both refreshed as
-	// the runtime lays the document out.
+	// Optional read-only view source: "aspect" is the window safe area's width
+	// over its height (the view's, without insets), "text" the text size it
+	// applies (1 to 2) and "safeLeft", "safeTop", "safeRight" and "safeBottom"
+	// the safe area's insets from the view's edges in dp, all refreshed as the
+	// runtime lays the document out.
 	std::string view;
 	bool HostSourced() const { return !cvar.empty() || !view.empty(); }
 };

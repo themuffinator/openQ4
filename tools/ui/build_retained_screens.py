@@ -1052,6 +1052,85 @@ def fit_narrow(result: dict, pages: bool = False, stretch: tuple = ()) -> dict:
     return result
 
 
+# The window's safe area (section 13.3): the runtime's safe view sources give
+# its insets from the view's edges in dp, and fits the canvas to it.
+SAFE_EDGES = (("left", "view.safeLeft", "safeLeft"), ("top", "view.safeTop", "safeTop"),
+              ("right", "view.safeRight", "safeRight"), ("bottom", "view.safeBottom", "safeBottom"))
+PAINT = ("background-color", "backdrop-blur", "backdrop-saturate", "backdrop-streak")
+
+
+def safe_frame(result: dict) -> dict:
+    """Section 13.3: essential content, text and targets stay inside the
+    window's safe area, while bands, backdrop and imagery run full-bleed under
+    cutouts, rounded corners and system bars. The root becomes the safe area,
+    which the runtime's canvas already fits, so every part placed in it keeps
+    clear of the insets: titles and crumbs, notices, columns, lists, prompt
+    bars and dialogs. A backdrop that fills the root (a vector, picture,
+    painted group or soft focus filling it through groups that fill it)
+    reaches back out to the view's edges, and a band, drawn past its box,
+    already covers them. The root's own backing moves to a node that reaches
+    out. With no inset (every desktop window) every box is where it was."""
+    def value(props: dict, key: str):
+        found = props.get(key)
+        return (found.get("value"), found.get("unit")) if isinstance(found, dict) else None
+
+    def fills(node: dict) -> bool:
+        props = node.get("properties", {})
+        return (value(props, "left") == (0, "dp") and value(props, "top") == (0, "dp") and value(props, "width") == (100, "%") and
+                value(props, "height") == (100, "%") and not any(key in props for key in ("right", "bottom", "margin-left", "margin-top")))
+
+    def drawn_past(node: dict) -> bool:
+        """A vector drawn above its box's top or below its foot: a band."""
+        for drawn in node.get("paths", []):
+            for command in drawn["commands"]:
+                for at in command.get("points", []):
+                    y = at[1]
+                    if (isinstance(y, (int, float)) and y < 0) or (isinstance(y, dict) and y.get("fraction", 0) >= 1 and y.get("dp", 0) > 0):
+                        return True
+        return False
+
+    owned = {(binding["node"], binding["property"]) for binding in result.get("bindings", [])}
+    owned |= {(entry["node"], entry["property"]) for timeline in result.get("timelines", []) for entry in timeline["tracks"]}
+    bindings = result.setdefault("bindings", [])
+    state = result.setdefault("state", {})
+    for _, ident, view in SAFE_EDGES:
+        state[ident] = {"type": "number", "initial": 0, "view": view}
+
+    def anchor(node: dict, sign: int) -> None:
+        props = node["properties"]
+        for key in ("left", "top", "width", "height"):
+            if (node["id"], key) in owned:
+                raise SystemExit(f"the safe area cannot place {node['id']}.{key}: something else owns it")
+        props.pop("width")
+        props.pop("height")
+        for key, ident, _ in SAFE_EDGES:
+            props[key] = length(0)
+            inset = {"state": ident} if sign > 0 else {"op": "-", "args": [0, {"state": ident}]}
+            bindings.append({"id": f"safe.{node['id']}.{key}", "node": node["id"], "property": key, "value": inset})
+
+    def reach(node: dict) -> None:
+        for child in node.get("children", []):
+            if not fills(child):
+                continue
+            props = child.get("properties", {})
+            if child["type"] == "image" or (child["type"] == "vector" and not drawn_past(child)) or any(key in props for key in PAINT):
+                anchor(child, -1)
+            elif child["type"] == "group":
+                reach(child)
+
+    root = result["root"]
+    if not fills(root):
+        raise SystemExit(f"{result['id']}'s root does not fill the view")
+    backing = root["properties"].pop("background-color", None)
+    reach(root)
+    anchor(root, 1)
+    if backing is not None:
+        node = group(f"{root['id']}-backing", {**FULL, "background-color": backing, "pointer-events": keyword("none")})
+        root.setdefault("children", []).insert(0, node)
+        anchor(node, -1)
+    return result
+
+
 def wrap_menu(column: list, row: list = ()) -> None:
     """Section 13.4: a menu of up to seven items wraps. Up and Down step
     through `column` (its controls top to bottom) and on to the plinth's
@@ -4578,6 +4657,7 @@ def main() -> int:
     for name in NOTICE_DOCUMENTS:
         documents[name] = with_notices(documents[name])
     for document in documents.values():
+        safe_frame(document)
         check_text_bindings(document)
     stale = []
     for name, document in documents.items():

@@ -33,6 +33,13 @@ struct Viewport {
 	// display density and user scale. Typography keeps its own text scale.
 	float canvasHeight = 0;
 	float canvasMinWidth = 0;
+	// The window's safe area as physical-pixel insets from the view's edges
+	// (camera cutouts, rounded corners, status and gesture bars). A view-height
+	// canvas fits the safe area, and documents read the insets in dp through
+	// the safe view sources; nothing else moves.
+	float safeLeft = 0, safeTop = 0, safeRight = 0, safeBottom = 0;
+	float SafeWidth() const;
+	float SafeHeight() const;
 	float DpRatio() const;
 	float TextRatio() const;
 	void FitToMinimum(float widthDp, float heightDp);

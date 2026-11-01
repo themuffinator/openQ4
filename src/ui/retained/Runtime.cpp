@@ -1782,13 +1782,22 @@ struct Host::Shared { LayerPool layers; };
 Host::Host() = default;
 Host::~Host() = default;
 
+// The safe area's size: the view less its insets, never less than a pixel,
+// so a malformed inset cannot collapse the canvas.
+static float SafeExtent(int extent, float lead, float trail) {
+	const auto inset = [](float value) { return std::isfinite(value) ? std::max(value,0.f) : 0.f; };
+	return extent > 0 ? std::max(static_cast<float>(extent)-inset(lead)-inset(trail),std::min(static_cast<float>(extent),1.f)) : 0.f;
+}
+float Viewport::SafeWidth() const { return SafeExtent(width,safeLeft,safeRight); }
+float Viewport::SafeHeight() const { return SafeExtent(height,safeTop,safeBottom); }
 float Viewport::DpRatio() const {
 	// A view-height canvas follows the view like the HUD's center screen; the
 	// 4:3 stock composition always fills the height and widens with the aspect.
+	// Like section 13.3's size classes, it measures the safe area.
 	if (canvasHeight > 0 && std::isfinite(canvasHeight) && height > 0) {
-		const float scale = static_cast<float>(height) / canvasHeight;
+		const float scale = SafeHeight() / canvasHeight;
 		return canvasMinWidth > 0 && std::isfinite(canvasMinWidth) && width > 0 ?
-			std::min(scale,static_cast<float>(width) / canvasMinWidth) : scale;
+			std::min(scale,SafeWidth() / canvasMinWidth) : scale;
 	}
 	return Positive(displayScale) * std::clamp(Positive(userScale), .75f, 2.f) * std::min(Positive(fitScale), 1.f);
 }
@@ -2216,11 +2225,18 @@ struct Runtime::Impl {
 		for (const auto& source : stateSources) {
 			StateValue value;
 			if (!source.view.empty()) {
-				// The text size the runtime applies to font lengths, or the view's
-				// own shape, which a view not yet laid out keeps from the last.
+				// The text size the runtime applies to font lengths, or the safe
+				// area's shape or an inset to it in dp, which a view not yet laid
+				// out keeps from the last.
 				if (source.view == "text") value = static_cast<double>(viewport.TextRatio());
 				else if (viewport.width <= 0 || viewport.height <= 0) continue;
-				else value = static_cast<double>(viewport.width)/static_cast<double>(viewport.height);
+				else if (source.view == "aspect") value = static_cast<double>(viewport.SafeWidth())/static_cast<double>(viewport.SafeHeight());
+				else {
+					const float inset = source.view == "safeLeft" ? viewport.safeLeft : source.view == "safeTop" ? viewport.safeTop :
+						source.view == "safeRight" ? viewport.safeRight : viewport.safeBottom;
+					const float extent = source.view == "safeLeft" || source.view == "safeRight" ? viewport.width : viewport.height;
+					value = static_cast<double>(std::isfinite(inset) ? std::clamp(inset,0.f,extent) : 0.f)/viewport.DpRatio();
+				}
 			} else if (!host.ReadCVar(source.cvar,source.type,value)) {
 				error = "Unavailable or invalid CVar source '"+source.cvar+"' for state '"+source.id+"'"; break;
 			}
@@ -2278,20 +2294,23 @@ struct Runtime::Impl {
 		auto* parent = card->GetOffsetParent();
 		const auto origin = parent ? parent->GetAbsoluteOffset(Rml::BoxArea::Padding) : Rml::Vector2f{};
 		const float dp = viewport.DpRatio(), gap = 6*dp, edge = 16*dp;
-		const float viewWidth = static_cast<float>(viewport.width), viewHeight = static_cast<float>(viewport.height);
+		// The card keeps 16 dp inside the window's safe area.
+		const auto inset = [](float value) { return std::isfinite(value) ? std::max(value,0.f) : 0.f; };
+		const float leading = inset(viewport.safeLeft)+edge, top0 = inset(viewport.safeTop)+edge;
+		const float trailing = viewport.width-inset(viewport.safeRight)-edge, foot = viewport.height-inset(viewport.safeBottom)-edge;
 		float x = 0, y = 0;
 		if (detailByPointer) {
 			x = pointerX-origin.x > 555*dp ? pointerX+28*dp-size.x : pointerX+gap;
 			y = pointerY+gap;
-			if (y+size.y > viewHeight-edge) y = pointerY-gap-size.y;
+			if (y+size.y > foot) y = pointerY-gap-size.y;
 		} else {
 			const auto at = subject->GetAbsoluteOffset(Rml::BoxArea::Border);
 			const auto box = subject->GetBox().GetSize(Rml::BoxArea::Border);
 			x = at.x; y = at.y+box.y+gap;
-			if (y+size.y > viewHeight-edge) y = at.y-gap-size.y;
+			if (y+size.y > foot) y = at.y-gap-size.y;
 		}
-		x = std::clamp(x,edge,std::max(edge,viewWidth-edge-size.x));
-		y = std::clamp(y,edge,std::max(edge,viewHeight-edge-size.y));
+		x = std::clamp(x,leading,std::max(leading,trailing-size.x));
+		y = std::clamp(y,top0,std::max(top0,foot-size.y));
 		const float left = x-origin.x, top = y-origin.y;
 		if (detailPlaced && std::abs(left-detailLeft) < .25f && std::abs(top-detailTop) < .25f) return false;
 		detailLeft = left; detailTop = top; detailPlaced = true;
@@ -3101,6 +3120,10 @@ std::unique_ptr<Runtime::PreparedDocument> Runtime::PrepareDocument(RuntimeCanva
             !std::isfinite(options.viewport.fitScale) || options.viewport.fitScale<=0 ||
             !std::isfinite(options.viewport.canvasHeight) || options.viewport.canvasHeight<0 ||
             !std::isfinite(options.viewport.canvasMinWidth) || options.viewport.canvasMinWidth<0 ||
+            !std::isfinite(options.viewport.safeLeft) || options.viewport.safeLeft<0 ||
+            !std::isfinite(options.viewport.safeTop) || options.viewport.safeTop<0 ||
+            !std::isfinite(options.viewport.safeRight) || options.viewport.safeRight<0 ||
+            !std::isfinite(options.viewport.safeBottom) || options.viewport.safeBottom<0 ||
             !std::isfinite(options.viewport.pixelDensityX) || options.viewport.pixelDensityX<=0 ||
             !std::isfinite(options.viewport.pixelDensityY) || options.viewport.pixelDensityY<=0 ||
             !std::isfinite(options.viewport.originX) || !std::isfinite(options.viewport.originY))return {};
@@ -3322,6 +3345,7 @@ bool Runtime::LoadCanonical(std::unique_ptr<Document> candidate, const std::stri
 		[owner=impl.get()](const std::string& id) { return owner->CanonicalElement(id); })) {
 		diagnostics.push_back({"/root",stateError}); CloseDocument(); return false;
 	}
+	impl->valueView.SetSafeArea(impl->viewport.safeLeft,impl->viewport.safeTop,impl->viewport.safeRight,impl->viewport.safeBottom);
 	if (!impl->scrollView.Initialize(impl->canonical->Model(),*impl->document,stateError)) {
         diagnostics.push_back({"/root",stateError}); CloseDocument(); return false;
     }
@@ -3815,9 +3839,12 @@ bool Runtime::Layout(const Viewport& viewport,double seconds) {
 	}
 	const bool textScaleChanged = impl->viewport.TextRatio() != viewport.TextRatio();
 	const bool viewportChanged = impl->viewport.width != viewport.width || impl->viewport.height != viewport.height ||
-		impl->viewport.DpRatio() != viewport.DpRatio() || textScaleChanged;
+		impl->viewport.DpRatio() != viewport.DpRatio() || textScaleChanged ||
+		impl->viewport.safeLeft != viewport.safeLeft || impl->viewport.safeTop != viewport.safeTop ||
+		impl->viewport.safeRight != viewport.safeRight || impl->viewport.safeBottom != viewport.safeBottom;
 	impl->scrollView.PreserveDensity(viewport.DpRatio());
 	impl->viewport = viewport;
+	impl->valueView.SetSafeArea(viewport.safeLeft,viewport.safeTop,viewport.safeRight,viewport.safeBottom);
 	if (impl->pointerPresent) viewport.WindowToDocument(impl->windowPointerX,impl->windowPointerY,impl->pointerX,impl->pointerY);
 	if (std::isfinite(seconds)) impl->time = std::max(impl->time, seconds);
 	ContextClock clock(*impl->services,impl->time,impl->strictPreparation?&impl->preparationFailed:nullptr);

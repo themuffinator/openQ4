@@ -854,10 +854,19 @@ further: the pressed treatment shows at touch-down, a released drag keeps
 going as inertia, a list's rim light brightens at either end instead of the
 content stretching, a swipe across a tab strip changes tab and a 500 ms
 long-press opens a button's detail; the real menus' adapter now receives the
-finger as it moves. `WID-010` gains the inertia and the rim light. Haptics,
-the safe area and device acceptance remain.
+finger as it moves. `WID-010` gains the inertia and the rim light. Haptics
+and device acceptance remain.
 
-There are **122 partial, 229 pending and 0 verified requirements**, counting the
+[The window's safe area](retained-screens.md#the-windows-safe-area-1-november-2026)
+moves `LAY-016` from pending to partial: the retained menus keep their text
+and controls inside the platform window's safe area (a view-height canvas
+fits it, four read-only view sources give its insets, the generated menus
+make their root the safe area and reach their backdrops back out to the
+view's edges, and detail cards and opened lists stay inside it), with
+native tests at phone shapes. The HUD, the stock GUIs, swipe controls' 24 dp
+edge margin, fold and multi-window resizes and device acceptance remain.
+
+There are **123 partial, 228 pending and 0 verified requirements**, counting the
 39 superseded rows at their recorded states. `BEH-002`
 remains partial for the implemented settings transaction/service boundary.
 `BEH-005` remains partial for committed action delivery and cancellation; stock

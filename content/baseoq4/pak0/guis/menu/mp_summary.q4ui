@@ -1627,7 +1627,11 @@
   "mp.players.s31.ping_ms": {"type": "number", "initial": 0},
   "prompt.glyphs": {"type": "number", "initial": 0},
   "mp.summary.channels": {"type": "boolean", "initial": false},
-  "soft_focus": {"type": "boolean", "initial": false, "cvar": "ui_retainedSoftFocus"}
+  "soft_focus": {"type": "boolean", "initial": false, "cvar": "ui_retainedSoftFocus"},
+  "view.safeLeft": {"type": "number", "initial": 0, "view": "safeLeft"},
+  "view.safeTop": {"type": "number", "initial": 0, "view": "safeTop"},
+  "view.safeRight": {"type": "number", "initial": 0, "view": "safeRight"},
+  "view.safeBottom": {"type": "number", "initial": 0, "view": "safeBottom"}
  },
  "actions": {
   "mpClose": {"operation": "session.menu", "arguments": {"command": "mpClose"}},
@@ -50691,7 +50695,59 @@
    "node": "scrim",
    "property": "display",
    "value": {"op": "select", "args": [{"state": "soft_focus"}, "none", "block"]}
-  }
+  },
+  {
+   "id": "safe.scene-softfocus.left",
+   "node": "scene-softfocus",
+   "property": "left",
+   "value": {"op": "-", "args": [0, {"state": "view.safeLeft"}]}
+  },
+  {
+   "id": "safe.scene-softfocus.top",
+   "node": "scene-softfocus",
+   "property": "top",
+   "value": {"op": "-", "args": [0, {"state": "view.safeTop"}]}
+  },
+  {
+   "id": "safe.scene-softfocus.right",
+   "node": "scene-softfocus",
+   "property": "right",
+   "value": {"op": "-", "args": [0, {"state": "view.safeRight"}]}
+  },
+  {
+   "id": "safe.scene-softfocus.bottom",
+   "node": "scene-softfocus",
+   "property": "bottom",
+   "value": {"op": "-", "args": [0, {"state": "view.safeBottom"}]}
+  },
+  {
+   "id": "safe.scrim.left",
+   "node": "scrim",
+   "property": "left",
+   "value": {"op": "-", "args": [0, {"state": "view.safeLeft"}]}
+  },
+  {
+   "id": "safe.scrim.top",
+   "node": "scrim",
+   "property": "top",
+   "value": {"op": "-", "args": [0, {"state": "view.safeTop"}]}
+  },
+  {
+   "id": "safe.scrim.right",
+   "node": "scrim",
+   "property": "right",
+   "value": {"op": "-", "args": [0, {"state": "view.safeRight"}]}
+  },
+  {
+   "id": "safe.scrim.bottom",
+   "node": "scrim",
+   "property": "bottom",
+   "value": {"op": "-", "args": [0, {"state": "view.safeBottom"}]}
+  },
+  {"id": "safe.screen.left", "node": "screen", "property": "left", "value": {"state": "view.safeLeft"}},
+  {"id": "safe.screen.top", "node": "screen", "property": "top", "value": {"state": "view.safeTop"}},
+  {"id": "safe.screen.right", "node": "screen", "property": "right", "value": {"state": "view.safeRight"}},
+  {"id": "safe.screen.bottom", "node": "screen", "property": "bottom", "value": {"state": "view.safeBottom"}}
  ],
  "timelines": [
   {
@@ -61989,11 +62045,11 @@
    "position": {"type": "keyword", "value": "absolute"},
    "left": {"type": "length", "value": 0, "unit": "dp"},
    "top": {"type": "length", "value": 0, "unit": "dp"},
-   "width": {"type": "length", "value": 100, "unit": "%"},
-   "height": {"type": "length", "value": 100, "unit": "%"},
    "font-family": {"type": "font", "value": "marine"},
    "font-size": {"type": "length", "value": 16, "unit": "dp"},
-   "color": {"type": "color", "value": [1, 1, 1, 0.8]}
+   "color": {"type": "color", "value": [1, 1, 1, 0.8]},
+   "right": {"type": "length", "value": 0, "unit": "dp"},
+   "bottom": {"type": "length", "value": 0, "unit": "dp"}
   },
   "children": [
    {
@@ -62003,11 +62059,11 @@
      "position": {"type": "keyword", "value": "absolute"},
      "left": {"type": "length", "value": 0, "unit": "dp"},
      "top": {"type": "length", "value": 0, "unit": "dp"},
-     "width": {"type": "length", "value": 100, "unit": "%"},
-     "height": {"type": "length", "value": 100, "unit": "%"},
      "display": {"type": "keyword", "value": "none"},
      "backdrop-blur": {"type": "length", "value": 7.5, "unit": "dp"},
-     "backdrop-saturate": {"type": "number", "value": 0.8}
+     "backdrop-saturate": {"type": "number", "value": 0.8},
+     "right": {"type": "length", "value": 0, "unit": "dp"},
+     "bottom": {"type": "length", "value": 0, "unit": "dp"}
     }
    },
    {
@@ -62017,10 +62073,10 @@
      "position": {"type": "keyword", "value": "absolute"},
      "left": {"type": "length", "value": 0, "unit": "dp"},
      "top": {"type": "length", "value": 0, "unit": "dp"},
-     "width": {"type": "length", "value": 100, "unit": "%"},
-     "height": {"type": "length", "value": 100, "unit": "%"},
      "display": {"type": "keyword", "value": "block"},
-     "opacity": {"type": "number", "value": 1}
+     "opacity": {"type": "number", "value": 1},
+     "right": {"type": "length", "value": 0, "unit": "dp"},
+     "bottom": {"type": "length", "value": 0, "unit": "dp"}
     },
     "paths": [
      {

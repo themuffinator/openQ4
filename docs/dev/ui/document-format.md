@@ -298,6 +298,42 @@ receive translated, encoded content through the same runtime text path. The
 current engine font backend and its limitations are recorded in the
 [renderer checkpoint](runtime-spike.md).
 
+## The window's safe area
+
+A root `canvas` (`{"height": 720, "minWidth": 960}`) makes a view-height
+canvas: one `height` of dp spans the view's height, and a view narrower than
+`minWidth` dp at that scale spans its width instead. The canvas measures the
+window's safe area, not the whole view (section 13.3 of the
+[visual specification](../ui-visual-design.md)): the platform reports the area
+clear of camera cutouts, rounded corners and status and gesture bars as pixel
+insets (`Viewport::safeLeft`, `safeTop`, `safeRight`, `safeBottom`), and the
+canvas fits what they leave. A desktop window has no insets.
+
+The layout itself still fills the view, so that bands, backdrops and imagery
+can run full-bleed. A document reads the insets through read-only view
+sources, number states that name a `view` instead of a `cvar`
+([bindings](bindings.md)):
+
+| `view` | Value |
+| --- | --- |
+| `aspect` | The safe area's width over its height (the view's, without insets) |
+| `text` | The text size the runtime applies to font lengths, 1 to 2 |
+| `safeLeft`, `safeTop`, `safeRight`, `safeBottom` | The inset from that edge of the view to the safe area, in the document's dp |
+
+The generated menus (`safe_frame` in `tools/ui/build_retained_screens.py`)
+anchor the root's four edges to the inset sources, so the root is the safe
+area and everything placed in it keeps clear of the insets, and anchor each
+backdrop that fills the root back out by the negated insets:
+
+```json
+{"id":"safe.screen.top", "node":"screen", "property":"top", "value":{"state":"view.safeTop"}},
+{"id":"safe.field-light.top", "node":"field-light", "property":"top",
+ "value":{"op":"-", "args":[0, {"state":"view.safeTop"}]}}
+```
+
+The runtime keeps its own placements inside the safe area too: a detail card
+16 dp in, an opened list 4 dp in.
+
 ## Lossless edits
 
 `Document::Load` builds a candidate model and only replaces the active source

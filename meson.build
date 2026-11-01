@@ -1459,6 +1459,16 @@ if build_engine or get_option('build_native_tests')
       test('openq4-ui-retained-screens-' + group, openq4_ui_retained_screens_test,
         args: retained_screens_documents + [group], timeout: timeout)
     endforeach
+    # The menus inside the window's safe area (ui-visual-design.md 13.3), in
+    # two groups that run side by side.
+    test('openq4-ui-retained-safe-area-menus', openq4_ui_retained_screens_test,
+      args: ['--safe-area', retained_screens_documents[0], retained_screens_documents[1], retained_screens_documents[2],
+        retained_screens_documents[4], retained_screens_documents[12], retained_screens_documents[7],
+        meson.project_source_root() / 'content/baseoq4/pak0/guis/menu/settings.q4ui'], timeout: 120)
+    test('openq4-ui-retained-safe-area-pages', openq4_ui_retained_screens_test,
+      args: ['--safe-area', retained_screens_documents[18], retained_screens_documents[21], retained_screens_documents[23],
+        retained_screens_documents[24], retained_screens_documents[27],
+        meson.project_source_root() / 'content/baseoq4/pak0/guis/menu/settings/game.q4ui'], timeout: 120)
     test('openq4-ui-view-effects', openq4_ui_retained_screens_test,
       args: ['--view-effects', meson.project_source_root() / 'content/baseoq4/pak0/guis/hud/view_effects.q4ui'], timeout: 60)
     test('openq4-ui-subtitles', openq4_ui_retained_screens_test,

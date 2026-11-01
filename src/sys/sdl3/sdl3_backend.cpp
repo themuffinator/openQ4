@@ -4290,11 +4290,31 @@ static int SDL3_ClampViewportPixel(double value, int minValue, int maxValue) {
 	return static_cast<int>(value);
 }
 
+// The window's safe area (SDL_GetWindowSafeArea, in window coordinates) as
+// framebuffer-pixel insets. Desktop windows report the whole window: no inset.
+static void SDL3_RefreshSafeArea( void ) {
+	engineWindowState.safeAreaLeft = engineWindowState.safeAreaTop = 0;
+	engineWindowState.safeAreaRight = engineWindowState.safeAreaBottom = 0;
+	int width = 0, height = 0, pixelWidth = 0, pixelHeight = 0;
+	SDL_Rect safe;
+	if (!s_sdlWindow || !SDL_GetWindowSize(s_sdlWindow, &width, &height) || !SDL_GetWindowSizeInPixels(s_sdlWindow, &pixelWidth, &pixelHeight) ||
+		width <= 0 || height <= 0 || pixelWidth <= 0 || pixelHeight <= 0 || !SDL_GetWindowSafeArea(s_sdlWindow, &safe) || safe.w <= 0 || safe.h <= 0) {
+		return;
+	}
+	const double scaleX = static_cast<double>(pixelWidth) / width, scaleY = static_cast<double>(pixelHeight) / height;
+	// Round each inset outward so the safe area never reaches into the unsafe edge.
+	engineWindowState.safeAreaLeft = SDL3_ClampViewportPixel(std::ceil(safe.x * scaleX), 0, pixelWidth);
+	engineWindowState.safeAreaTop = SDL3_ClampViewportPixel(std::ceil(safe.y * scaleY), 0, pixelHeight);
+	engineWindowState.safeAreaRight = SDL3_ClampViewportPixel(pixelWidth - std::floor((static_cast<double>(safe.x) + safe.w) * scaleX), 0, pixelWidth);
+	engineWindowState.safeAreaBottom = SDL3_ClampViewportPixel(pixelHeight - std::floor((static_cast<double>(safe.y) + safe.h) * scaleY), 0, pixelHeight);
+}
+
 static void SDL3_SetUIViewport( int x, int y, int width, int height ) {
 	engineWindowState.uiViewportX = x;
 	engineWindowState.uiViewportY = y;
 	engineWindowState.uiViewportWidth = width;
 	engineWindowState.uiViewportHeight = height;
+	SDL3_RefreshSafeArea();
 #ifndef OPENQ4_RENDERER_MODULE_ONLY
 	// mirrored for the statically linked renderer; module renderers poll
 	// this state through the window services each present
@@ -5128,6 +5148,11 @@ static void SDL3_HandleWindowEvent(const SDL_WindowEvent &event, int eventTime) 
 			// Query the drawable size directly to avoid stale/asymmetric event payloads.
 			SDL3_RefreshWindowPlacement();
 			SDL3_InvalidateMenuMouseRouting();
+			break;
+
+		case SDL_EVENT_WINDOW_SAFE_AREA_CHANGED:
+			// A rotation, a shown or hidden system bar, a fold.
+			SDL3_RefreshSafeArea();
 			break;
 
 		case SDL_EVENT_WINDOW_MOUSE_ENTER:
