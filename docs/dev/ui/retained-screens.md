@@ -2428,6 +2428,46 @@ The native pages and menus groups pass, and `ui_retained_gate.py` passes.
 Captured on OpenGL at 9:16 (540x960), 3:4 (768x1024) and 16:9 (1280x720)
 for the `arena`, `arenamatch` and `arenaresult` scenarios.
 
+## Every portrait view and other aspect ratios (1 November 2026)
+
+A survey at 32:9, 21:9, 5:4, 1:1, 4:5 and 9:21 found every page on the screen
+and readable; ultrawide views keep the 4:3 composition centred under the
+full-width bands, as designed. The gap was the band between 3:4 and square: a
+4:5 window or an unfolded foldable showed the menu levels' 4:3 composition
+between two empty bands, since the column waited for 3:4. Now (visual
+specification 1.36):
+
+- **A column wherever it reads at its landscape size.** A menu level's column
+  scales to the room between the bands, so each document takes its own tall
+  condition (`tall_condition`): `tall_column` raises it from 3:4 to the
+  aspect at which the column's scale reaches 1 (`tall_fits`), at most a
+  square view. The title, Single Player, Campaign, Multiplayer and SETTINGS
+  take any portrait view, Arena pause one below 0.97 and the pause one below
+  0.83, where its actions, EXIT and level card no longer stand smaller than
+  in landscape. The pages that grow a fixed amount declare the room they need
+  (`TallLayout.fits`): Restart Level and the restart screen take any portrait
+  view, the campaign's difficulty (with CHAPTERS' three rows) one below 0.89,
+  Credits one below 0.85. The list pages and the Arena keep 3:4. One
+  condition object per document, so every binding of it moves together;
+  `check_text_bindings` and `tall_bind` know a tall branch by its form.
+- **Focus in tall views.** A walk of every control's Up, Down, Left and Right
+  on the tall pages at 9:16 and 16:9 (the harness's semantic menu verb)
+  found Up and Down following each column, disabled controls skipped as
+  meant. Left and Right still take the runtime's nearest control off the
+  line in both views (on Create Server an option's Right reaches the prompt
+  bar at 16:9 and the map list at 9:16); a narrower geometric rule would
+  change landscape moves the Arena's authored moves were proven against, so
+  it stays as it is.
+- **Join Game's levelshot frame.** With no server chosen the frame showed an
+  empty black square; it now shows the generic art, as Demos' does with no
+  demo chosen (the gate's session check expects it).
+
+The native groups pass, the menu levels' text-scale check adding a 0.78 view
+(each menu level stands in its column there, `TallMenuLevel`), and
+`ui_retained_gate.py` passes. Captured on OpenGL at 4:5 and 0.95 (title,
+Multiplayer, SETTINGS, the pause, the campaign's difficulty, Restart Level,
+Credits, the restart screen, Arena pause) and at 16:9 (Join Game).
+
 ## The menu cursor (31 October 2026)
 
 The retained menus drew a placeholder cursor, a flat triangle, and only after

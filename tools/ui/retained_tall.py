@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import json
 
-from build_retained_screens import ASPECT_STATE, CANVAS_W, TALL, U, VIEW_HEIGHT
+from build_retained_screens import ASPECT_STATE, CANVAS_W, PORTRAIT_ASPECT, TALL_ASPECT, U, VIEW_HEIGHT
 from retained_settings_rows import _in_fractions, _runtime_owned
 
 MARGIN = U * 25                       # dp: the column's leading edge, a picture's own landscape inset
@@ -32,6 +32,10 @@ class TallLayout:
     def __init__(self, result: dict):
         self.result = result
         result.setdefault("state", {})[ASPECT_STATE] = {"type": "number", "initial": round(4 / 3, 4), "view": "aspect"}
+        # The tall condition, every binding's one object: 3:4 and taller,
+        # until fits() lets a column that fits a shorter view take it.
+        self.condition = {"op": "<", "args": [{"state": ASPECT_STATE}, TALL_ASPECT]}
+        self.fitted: list = []
         self.bindings = result.setdefault("bindings", [])
         self.nodes: dict = {}
 
@@ -53,6 +57,13 @@ class TallLayout:
         self.sized = {(binding["node"], binding["property"]): binding for binding in self.bindings
                       if '"view.text"' in json.dumps(binding["value"])}
 
+    def fits(self, height: float) -> None:
+        """The arrangement needs a view `height` dp tall, bands included: it
+        takes any portrait view that tall (one of 3:4 and taller in any case),
+        the least of what its parts need."""
+        self.fitted.append(CANVAS_W / height)
+        self.condition["args"][1] = round(max(TALL_ASPECT, min(PORTRAIT_ASPECT, *self.fitted)), 4)
+
     def dp(self, ident: str, prop: str) -> float | None:
         found = self.nodes[ident].get("properties", {}).get(prop)
         if isinstance(found, dict) and found.get("type") == "length" and found.get("unit") == "dp":
@@ -69,7 +80,7 @@ class TallLayout:
             raise SystemExit(f"{ident}.{prop} has no dp length for the tall layout to keep in landscape views")
         self.owned.add((ident, prop))
         self.bindings.append({"id": f"tall.{ident}.{prop}", "node": ident, "property": prop,
-                              "value": {"op": "select", "args": [TALL, round(tall, 4) if isinstance(tall, (int, float)) else tall,
+                              "value": {"op": "select", "args": [self.condition, round(tall, 4) if isinstance(tall, (int, float)) else tall,
                                                                  landscape]}})
 
     def top(self, ident: str, tall, shift: dict | None = None) -> None:
@@ -107,7 +118,7 @@ class TallLayout:
         # A bound property needs its base value in the document.
         self.nodes[ident].setdefault("properties", {}).setdefault("display", {"type": "keyword", "value": wide})
         self.bindings.append({"id": f"tall.{ident}.display", "node": ident, "property": "display",
-                              "value": {"op": "select", "args": [TALL, tall, wide]}})
+                              "value": {"op": "select", "args": [self.condition, tall, wide]}})
 
     def shade(self, backing: str, alpha: float) -> None:
         """A tall view darkens the view's whole width at `alpha` behind the
@@ -150,7 +161,7 @@ class TallLayout:
                     continue
                 sized = self.sized.pop((node["id"], key), None)
                 if sized is not None:
-                    sized["value"] = {"op": "select", "args": [TALL, {"op": "*", "args": [factor, sized["value"]]}, sized["value"]]}
+                    sized["value"] = {"op": "select", "args": [self.condition, {"op": "*", "args": [factor, sized["value"]]}, sized["value"]]}
                     continue
                 if (node["id"], key) in self.owned:
                     continue
@@ -185,7 +196,7 @@ class TallLayout:
             raise SystemExit(f"the tall layout cannot scale {ident}: it has its own transform")
         self.nodes[ident]["properties"]["transform"] = {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
         self.owned.add((ident, "transform"))
-        sized = {"op": "select", "args": [TALL, factor, 1]}
+        sized = {"op": "select", "args": [self.condition, factor, 1]}
         self.bindings.append({"id": f"tall.{ident}.transform", "node": ident, "property": "transform", "value": [0, 0, sized, sized, 0]})
 
     def dialogs(self, factor: float) -> None:
@@ -206,7 +217,7 @@ class TallLayout:
             scale = round(min(factor, CONTENT_W / self.dp(dialog["id"], "width")), 4)
             stage["properties"].setdefault("transform", {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]})
             self.owned.add((stage["id"], "transform"))
-            sized = {"op": "select", "args": [TALL, scale, 1]}
+            sized = {"op": "select", "args": [self.condition, scale, 1]}
             shift = 0
             # A stage the narrow-view fit centres (720 dp tall) holds its
             # dialog at the view's middle already; one that runs the view's

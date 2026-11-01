@@ -318,22 +318,26 @@ def credits_document() -> dict:
 TALL_TEXT = 1.6
 TALL_TEXT_SHIFT = 240.0                      # dp: the names' middle (330 dp) onto the canvas's (480 dp) at that scale
 TALL_LOGO = 1.3
+TALL_TEXT_REACH = 285.0                      # dp: the names' farthest line from the canvas's middle (79.5 to 649.5 dp)
+TALL_BANDS = 110.0                           # dp: the docked top band's title, the deeper of the bands
 
 
 def tall_credits_page(result: dict) -> dict:
-    from retained_tall import TALL, TallLayout
+    from retained_tall import TallLayout
     tall = TallLayout(result)
+    # The names, about the view's middle, stand clear of the docked bands.
+    tall.fits(2 * (TALL_TEXT * TALL_TEXT_REACH + TALL_BANDS))
     stage = tall.nodes["credits-stage"]
     screens = [child for child in stage["children"] if child["id"].startswith("p_screen")]
     names = group("credits-names", {**FULL, "transform": transform(), "pointer-events": keyword("none")}, screens)
     stage["children"] = [child for child in stage["children"] if child not in screens] + [names]
     tall.nodes["credits-names"] = names
-    sized = {"op": "select", "args": [TALL, TALL_TEXT, 1]}
+    sized = {"op": "select", "args": [tall.condition, TALL_TEXT, 1]}
     tall.bindings.append({"id": "tall.credits-names.transform", "node": "credits-names", "property": "transform",
-                          "value": [{"op": "select", "args": [TALL, TALL_TEXT_SHIFT, 0]}, 0, sized, sized, 0]})
+                          "value": [{"op": "select", "args": [tall.condition, TALL_TEXT_SHIFT, 0]}, 0, sized, sized, 0]})
     logo = tall.nodes["raven"]
     logo["properties"]["transform"] = transform()
-    grown = {"op": "select", "args": [TALL, TALL_LOGO, 1]}
+    grown = {"op": "select", "args": [tall.condition, TALL_LOGO, 1]}
     tall.bindings.append({"id": "tall.raven.transform", "node": "raven", "property": "transform", "value": [0, 0, grown, grown, 0]})
     tall.shade("credits-backing", max(alpha for _, alpha in BACKING_STOPS))
     return result

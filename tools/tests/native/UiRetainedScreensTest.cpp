@@ -3628,18 +3628,23 @@ static void CheckCreateServerBanList(ScreenHost& host, const char* path) {
 		"closing the list returns to the row that opened it, the dialog still open");
 }
 
+// A menu level stands in its column in a portrait view its column fills at
+// its landscape size or more: the pause's from 0.827, the others' from a
+// square view, so each in the 0.78 view the text-scale checks add.
+static bool TallMenuLevel(int width, int height) { return width < .82f*height; }
+
 // Section 2's text-scale contract on a page-level menu (title, pauses,
 // SETTINGS, Single Player, Campaign, Multiplayer; build_retained_screens.py),
-// at 100, 150 and 200% text on 16:9 and 4:3 views and the tall 3:4 and 9:16
-// ones, where the page stands in one column: each shown text keeps its box on
-// the screen, and furniture text (whose font lengths fixed_text divides by
-// the text size) keeps one size at every text size, its authored size in a
-// view of 4:3 and wider and up to 1.6 times it in a tall view. `content`
-// checks the page's reflowing parts at each size, with the box of `canvas`
-// (the page's 4:3 canvas group, the view's height in a tall view), its dp in
-// pixels and whether the view is tall. Each of `dialogs` opens in turn: its
-// body stays in it above its actions, and it stays on the screen. Back at
-// 100% every node lies where it lay before.
+// at 100, 150 and 200% text on 16:9 and 4:3 views and the tall 0.78, 3:4 and
+// 9:16 ones, where the page stands in one column (TallMenuLevel): each shown
+// text keeps its box on the screen, and furniture text (whose font lengths
+// fixed_text divides by the text size) keeps one size at every text size, its
+// authored size in a view of 4:3 and wider and up to 1.6 times it in a tall
+// view. `content` checks the page's reflowing parts at each size, with the box
+// of `canvas` (the page's 4:3 canvas group, the view's height in a tall view),
+// its dp in pixels and whether the view is tall. Each of `dialogs` opens in
+// turn: its body stays in it above its actions, and it stays on the screen.
+// Back at 100% every node lies where it lay before.
 template <typename Content>
 static void CheckPageTextScale(ScreenHost& host, const char* path, const char* name, const char* canvas,
 	const std::vector<std::string>& events, const StateValues& states, const std::vector<std::string>& dialogs, Content content) {
@@ -3673,7 +3678,7 @@ static void CheckPageTextScale(ScreenHost& host, const char* path, const char* n
 	// one size whatever the text size.
 	const auto texts = [&](const Viewport& at, float text) {
 		const Bounds screen{0,0,float(at.width),float(at.height)};
-		const bool tall = at.width < .76f*at.height;
+		const bool tall = TallMenuLevel(at.width,at.height);
 		std::vector<const Node*> pending{&document.Model().root};
 		while (!pending.empty()) {
 			const auto* node = pending.back(); pending.pop_back();
@@ -3696,7 +3701,7 @@ static void CheckPageTextScale(ScreenHost& host, const char* path, const char* n
 				"furniture keeps its authored size, or the tall column's scale of it");
 		}
 	};
-	const std::pair<int,int> sizes[] = {{1280,720},{960,720},{768,1024},{540,960}};
+	const std::pair<int,int> sizes[] = {{1280,720},{960,720},{840,1080},{768,1024},{540,960}};
 	// The nodes that show, under shown ancestors.
 	const auto visible = [&]() {
 		std::vector<std::string> ids;
@@ -3714,7 +3719,7 @@ static void CheckPageTextScale(ScreenHost& host, const char* path, const char* n
 		const auto at = view(width,height,text);
 		if (text <= 1) for (const auto& id : visible()) { Bounds b; if (runtime.GetBounds(id,b)) rest[id+"@"+std::to_string(width)] = b; }
 		texts(at,text);
-		content(runtime,at,text,bounds(canvas),at.DpRatio(),width < .76f*height);
+		content(runtime,at,text,bounds(canvas),at.DpRatio(),TallMenuLevel(width,height));
 		const Bounds screen{0,0,float(width),float(height)};
 		for (const auto& dialog : dialogs) {
 			Check(runtime.RunEvent(dialog+"Show",time,effects,error),"a page's dialog opens");

@@ -9328,7 +9328,8 @@ void idSessionLocal::PublishRetainedJoinGame( idUserInterface *gui ) {
 		gui->SetStateString( va( "join.row%d.map", row ), map.c_str() );
 	}
 	// The chosen server's levelshot, looked up again only when its map
-	// changes; a map path the browser may not look up shows the generic art.
+	// changes; a map path the browser may not look up shows the generic art,
+	// as does the frame while no server is chosen (Demos' empty choice too).
 	const int chosen = selected >= 0 ? retainedJoinServers[ selected ] : -1;
 	const char *chosenMap = chosen >= 0 ? servers[ chosen ].serverInfo.GetString( "si_map" ) : "";
 	if ( chosen < 0 ) {
@@ -9339,7 +9340,7 @@ void idSessionLocal::PublishRetainedJoinGame( idUserInterface *gui ) {
 		retainedJoinShot = idServerScan::ValidMapPath( chosenMap ) ? RetainedPauseShot( chosenMap ) : idStr( "gfx/guis/loadscreens/generic" );
 		UI_RetainedPrecacheImage( retainedJoinShot.c_str() );
 	}
-	gui->SetStateString( "join.shot", retainedJoinShot.c_str() );
+	gui->SetStateString( "join.shot", chosen >= 0 ? retainedJoinShot.c_str() : RETAINED_LOAD_GENERIC_SHOT );
 	gui->SetStateBool( "join.favorite", chosen >= 0 && servers.IsFavoriteServer( chosen ) );
 	gui->SetStateString( "join.mod", guiMainMenu != NULL ?
 		Session_RetainedPlayerText( guiMainMenu->State().GetString( "filterMod" ), 64, 1 ).c_str() : "" );

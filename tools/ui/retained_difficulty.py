@@ -223,7 +223,9 @@ def tall_restart_page(result: dict, family: Family) -> dict:
     plates_h = U * (PLATES[-1][1] - PLATES[0][1] + 30) * TALL_GROW
     description_h = lines * DESCRIPTION_LINE * TALL_GROW
     go_h = U * PRIMARY[3] * TALL_GROW
-    shift = tall.centred(plates_h + 24 + description_h + 24 + go_h, TALL_TOP, TALL_BOTTOM)
+    column = plates_h + 24 + description_h + 24 + go_h
+    tall.fits(TALL_TOP + column + TALL_BOTTOM)
+    shift = tall.centred(column, TALL_TOP, TALL_BOTTOM)
     origin = (U * min(left for left, _ in PLATES), U * PLATES[0][1])
     tall.block(tuple(f"skill-{index}" for index in range(len(PLATES))), origin, (origin[0], TALL_TOP), TALL_GROW, shift)
     description_top = TALL_TOP + plates_h + 24

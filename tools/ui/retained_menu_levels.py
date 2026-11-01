@@ -255,6 +255,7 @@ def tall_skill_page(ui,result):
     lines=max(lines_needed('lowpixel',text,size,width/grow) for _,key in DIFFICULTIES for text in table_text(key).values())
     described=lines*line*grow
     box_top={'op':'-','args':[{'op':'/','args':[VIEW_HEIGHT,2]},360]}
+    tall.fits(TALL_SKILL_TOP+plates_h+24+described+TALL_SKILL_BOTTOM)
     shift={'op':'-','args':[tall.centred(plates_h+24+described,TALL_SKILL_TOP,TALL_SKILL_BOTTOM),box_top]}
     origin=(0,tall.dp('navigation','top'))
     tall.block(('navigation','turbo-value'),origin,(0,TALL_SKILL_TOP),grow,shift)
@@ -266,9 +267,10 @@ def tall_skill_page(ui,result):
     return result
 
 TALL_CHAPTER_DETAIL_LINES=3   # the explanation's lines across the column (four fit its 200 u in landscape)
+TALL_CHAPTER_ROWS=3           # the levels the list shows at least
 
 def tall_chapters(ui,tall,shift):
-    from retained_saves import SAVE_LINES,TALL_GROW,TALL_PLATE_PITCH,TALL_PLATES,tall_list
+    from retained_saves import ROW_H,SAVE_LINES,TALL_GROW,TALL_PLATE_PITCH,TALL_PLATES,tall_list
     from retained_tall import CONTENT_W,MARGIN,VIEW_HEIGHT
     U=ui.U;left,top,width,height=CHAPTER_PICTURE
     picture_top=TALL_SKILL_TOP
@@ -292,3 +294,5 @@ def tall_chapters(ui,tall,shift):
     lines=len(SAVE_LINES);list_top=heads_top+lines*U*14*TALL_GROW+10
     height={'op':'-','args':[VIEW_HEIGHT,round(list_top+TALL_SKILL_BOTTOM,4)]}
     tall_list(tall,'chapter',SAVE_LINES,list_w,heads,heads_top,shift,height,{'name':'chapter-head-level','location':'chapter-head-status'})
+    # The list shows three levels at least.
+    tall.fits(list_top+TALL_CHAPTER_ROWS*lines*U*ROW_H*TALL_GROW+TALL_SKILL_BOTTOM)

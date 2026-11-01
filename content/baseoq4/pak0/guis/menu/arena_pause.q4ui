@@ -108,7 +108,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [20, {"state": "view.text"}]}]},
      {"op": "/", "args": [20, {"state": "view.text"}]}
     ]
@@ -121,7 +121,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [24, {"state": "view.text"}]}]},
      {"op": "/", "args": [24, {"state": "view.text"}]}
     ]
@@ -134,7 +134,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [20, {"state": "view.text"}]}]},
      {"op": "/", "args": [20, {"state": "view.text"}]}
     ]
@@ -147,7 +147,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [24, {"state": "view.text"}]}]},
      {"op": "/", "args": [24, {"state": "view.text"}]}
     ]
@@ -160,7 +160,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [20, {"state": "view.text"}]}]},
      {"op": "/", "args": [20, {"state": "view.text"}]}
     ]
@@ -173,7 +173,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [24, {"state": "view.text"}]}]},
      {"op": "/", "args": [24, {"state": "view.text"}]}
     ]
@@ -186,7 +186,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [20, {"state": "view.text"}]}]},
      {"op": "/", "args": [20, {"state": "view.text"}]}
     ]
@@ -199,7 +199,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [24, {"state": "view.text"}]}]},
      {"op": "/", "args": [24, {"state": "view.text"}]}
     ]
@@ -212,7 +212,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [20, {"state": "view.text"}]}]},
      {"op": "/", "args": [20, {"state": "view.text"}]}
     ]
@@ -225,7 +225,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [24, {"state": "view.text"}]}]},
      {"op": "/", "args": [24, {"state": "view.text"}]}
     ]
@@ -238,7 +238,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [20, {"state": "view.text"}]}]},
      {"op": "/", "args": [20, {"state": "view.text"}]}
     ]
@@ -251,7 +251,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [24, {"state": "view.text"}]}]},
      {"op": "/", "args": [24, {"state": "view.text"}]}
     ]
@@ -264,7 +264,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [20, {"state": "view.text"}]}]},
      {"op": "/", "args": [20, {"state": "view.text"}]}
     ]
@@ -277,7 +277,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [24, {"state": "view.text"}]}]},
      {"op": "/", "args": [24, {"state": "view.text"}]}
     ]
@@ -290,7 +290,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [20, {"state": "view.text"}]}]},
      {"op": "/", "args": [20, {"state": "view.text"}]}
     ]
@@ -303,7 +303,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [24, {"state": "view.text"}]}]},
      {"op": "/", "args": [24, {"state": "view.text"}]}
     ]
@@ -316,7 +316,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [20, {"state": "view.text"}]}]},
      {"op": "/", "args": [20, {"state": "view.text"}]}
     ]
@@ -329,7 +329,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [24, {"state": "view.text"}]}]},
      {"op": "/", "args": [24, {"state": "view.text"}]}
     ]
@@ -342,7 +342,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [20, {"state": "view.text"}]}]},
      {"op": "/", "args": [20, {"state": "view.text"}]}
     ]
@@ -355,7 +355,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [45, {"state": "view.text"}]}]},
      {"op": "/", "args": [45, {"state": "view.text"}]}
     ]
@@ -368,7 +368,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [20, {"state": "view.text"}]}]},
      {"op": "/", "args": [20, {"state": "view.text"}]}
     ]
@@ -381,7 +381,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [45, {"state": "view.text"}]}]},
      {"op": "/", "args": [45, {"state": "view.text"}]}
     ]
@@ -394,7 +394,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -861,7 +861,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -1052,7 +1052,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -1243,7 +1243,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -1434,7 +1434,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "+",
       "args": [
@@ -1673,7 +1673,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [20, {"state": "view.text"}]}]},
      {"op": "/", "args": [20, {"state": "view.text"}]}
     ]
@@ -1686,7 +1686,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [24, {"state": "view.text"}]}]},
      {"op": "/", "args": [24, {"state": "view.text"}]}
     ]
@@ -1699,7 +1699,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [20, {"state": "view.text"}]}]},
      {"op": "/", "args": [20, {"state": "view.text"}]}
     ]
@@ -1712,7 +1712,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [24, {"state": "view.text"}]}]},
      {"op": "/", "args": [24, {"state": "view.text"}]}
     ]
@@ -1725,7 +1725,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [20, {"state": "view.text"}]}]},
      {"op": "/", "args": [20, {"state": "view.text"}]}
     ]
@@ -1738,7 +1738,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [24, {"state": "view.text"}]}]},
      {"op": "/", "args": [24, {"state": "view.text"}]}
     ]
@@ -1751,7 +1751,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [20, {"state": "view.text"}]}]},
      {"op": "/", "args": [20, {"state": "view.text"}]}
     ]
@@ -1764,7 +1764,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [24, {"state": "view.text"}]}]},
      {"op": "/", "args": [24, {"state": "view.text"}]}
     ]
@@ -1777,7 +1777,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [20, {"state": "view.text"}]}]},
      {"op": "/", "args": [20, {"state": "view.text"}]}
     ]
@@ -1790,7 +1790,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [24, {"state": "view.text"}]}]},
      {"op": "/", "args": [24, {"state": "view.text"}]}
     ]
@@ -1803,7 +1803,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [20, {"state": "view.text"}]}]},
      {"op": "/", "args": [20, {"state": "view.text"}]}
     ]
@@ -1816,7 +1816,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [24, {"state": "view.text"}]}]},
      {"op": "/", "args": [24, {"state": "view.text"}]}
     ]
@@ -1829,7 +1829,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [20, {"state": "view.text"}]}]},
      {"op": "/", "args": [20, {"state": "view.text"}]}
     ]
@@ -1842,7 +1842,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [24, {"state": "view.text"}]}]},
      {"op": "/", "args": [24, {"state": "view.text"}]}
     ]
@@ -1855,7 +1855,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [20, {"state": "view.text"}]}]},
      {"op": "/", "args": [20, {"state": "view.text"}]}
     ]
@@ -1868,7 +1868,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [24, {"state": "view.text"}]}]},
      {"op": "/", "args": [24, {"state": "view.text"}]}
     ]
@@ -1881,7 +1881,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [20, {"state": "view.text"}]}]},
      {"op": "/", "args": [20, {"state": "view.text"}]}
     ]
@@ -1894,7 +1894,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [24, {"state": "view.text"}]}]},
      {"op": "/", "args": [24, {"state": "view.text"}]}
     ]
@@ -1907,7 +1907,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [20, {"state": "view.text"}]}]},
      {"op": "/", "args": [20, {"state": "view.text"}]}
     ]
@@ -1920,7 +1920,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [45, {"state": "view.text"}]}]},
      {"op": "/", "args": [45, {"state": "view.text"}]}
     ]
@@ -1933,7 +1933,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [20, {"state": "view.text"}]}]},
      {"op": "/", "args": [20, {"state": "view.text"}]}
     ]
@@ -1946,7 +1946,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "*", "args": [1.6, {"op": "/", "args": [45, {"state": "view.text"}]}]},
      {"op": "/", "args": [45, {"state": "view.text"}]}
     ]
@@ -1959,7 +1959,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -2881,7 +2881,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -3254,7 +3254,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -3627,7 +3627,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -4000,7 +4000,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "+",
       "args": [
@@ -4421,7 +4421,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -4449,7 +4449,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -4477,7 +4477,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -4505,7 +4505,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -4533,7 +4533,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -4561,7 +4561,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -4589,7 +4589,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -4617,7 +4617,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -4663,7 +4663,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "/", "args": [-480.0, {"state": "view.aspect"}]},
      -360
     ]
@@ -4676,7 +4676,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {"op": "/", "args": [960.0, {"state": "view.aspect"}]},
      720
     ]
@@ -4689,7 +4689,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "+",
       "args": [
@@ -4735,7 +4735,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "+",
       "args": [
@@ -4823,7 +4823,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "+",
       "args": [
@@ -4953,7 +4953,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -4981,7 +4981,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -5009,7 +5009,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -5037,7 +5037,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -5065,7 +5065,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -5093,7 +5093,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -5121,7 +5121,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -5149,7 +5149,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -5177,7 +5177,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -5206,7 +5206,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -5235,7 +5235,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -5264,7 +5264,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -5281,7 +5281,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -5306,7 +5306,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -5335,7 +5335,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -5364,7 +5364,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -5381,7 +5381,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -5406,7 +5406,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -5435,7 +5435,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -5464,7 +5464,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -5481,7 +5481,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -5506,7 +5506,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -5535,7 +5535,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -5564,7 +5564,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -5581,7 +5581,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -5605,7 +5605,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -5633,7 +5633,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -5661,7 +5661,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -5689,7 +5689,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -5717,7 +5717,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -5745,7 +5745,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -5773,7 +5773,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -5802,7 +5802,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -5831,7 +5831,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -5860,7 +5860,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -5877,7 +5877,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -5902,7 +5902,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -5931,7 +5931,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -5960,7 +5960,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -5977,7 +5977,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -6002,7 +6002,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -6031,7 +6031,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -6060,7 +6060,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -6077,7 +6077,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -6102,7 +6102,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -6131,7 +6131,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -6160,7 +6160,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -6177,7 +6177,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -6201,7 +6201,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -6229,7 +6229,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -6257,7 +6257,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -6285,7 +6285,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -6313,7 +6313,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -6341,7 +6341,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -6369,7 +6369,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -6398,7 +6398,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -6427,7 +6427,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -6456,7 +6456,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -6473,7 +6473,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -6498,7 +6498,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -6527,7 +6527,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -6556,7 +6556,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -6573,7 +6573,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -6598,7 +6598,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -6627,7 +6627,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -6656,7 +6656,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -6673,7 +6673,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -6698,7 +6698,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -6727,7 +6727,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -6756,7 +6756,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -6773,7 +6773,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -6797,7 +6797,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -6825,7 +6825,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -6853,7 +6853,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -6881,7 +6881,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -6909,7 +6909,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -6937,7 +6937,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -6965,7 +6965,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -6994,7 +6994,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -7023,7 +7023,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -7052,7 +7052,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -7069,7 +7069,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -7094,7 +7094,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -7123,7 +7123,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -7152,7 +7152,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -7169,7 +7169,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -7194,7 +7194,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -7223,7 +7223,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -7252,7 +7252,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -7269,7 +7269,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -7294,7 +7294,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -7323,7 +7323,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -7352,7 +7352,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -7369,7 +7369,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -7393,7 +7393,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -7421,7 +7421,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -7449,7 +7449,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -7477,7 +7477,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -7505,7 +7505,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -7533,7 +7533,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -7562,7 +7562,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -7591,7 +7591,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -7620,7 +7620,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -7637,7 +7637,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -7661,7 +7661,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -7689,7 +7689,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -7717,7 +7717,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -7745,7 +7745,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -7774,7 +7774,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -7803,7 +7803,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -7832,7 +7832,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -7849,7 +7849,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -7873,7 +7873,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -7901,7 +7901,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -7929,7 +7929,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -7957,7 +7957,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -7985,7 +7985,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -8013,7 +8013,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -8041,7 +8041,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -8069,7 +8069,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -8097,7 +8097,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -8125,7 +8125,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -8153,7 +8153,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -8181,7 +8181,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -8209,7 +8209,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -8237,7 +8237,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -8265,7 +8265,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -8293,7 +8293,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -8321,7 +8321,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -8349,7 +8349,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -8377,7 +8377,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -8405,7 +8405,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -8433,7 +8433,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -8461,7 +8461,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -8489,7 +8489,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -8517,7 +8517,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -8545,7 +8545,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -8574,7 +8574,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -8603,7 +8603,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -8632,7 +8632,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -8649,7 +8649,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "min",
        "args": [
@@ -8673,7 +8673,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -8701,7 +8701,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -8729,7 +8729,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -8757,7 +8757,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -8785,7 +8785,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -8813,7 +8813,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -8841,7 +8841,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -8869,7 +8869,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -8897,7 +8897,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -8925,7 +8925,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -8953,7 +8953,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -8981,7 +8981,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -9009,7 +9009,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -9037,7 +9037,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -9065,7 +9065,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -9093,7 +9093,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -9121,7 +9121,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -9149,7 +9149,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -9177,7 +9177,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -9205,7 +9205,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -9233,7 +9233,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
      {
       "op": "*",
       "args": [
@@ -9274,7 +9274,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 480.0]}]},
       0
      ]
@@ -9282,7 +9282,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -9385,8 +9385,8 @@
       0
      ]
     },
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
     0
    ]
   },
@@ -9396,7 +9396,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, -130.5]}, -130.5]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, -130.5]}, -130.5]
    }
   },
   {
@@ -9407,7 +9407,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 512.0]}]},
       0
      ]
@@ -9415,7 +9415,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -9518,8 +9518,8 @@
       0
      ]
     },
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
     0
    ]
   },
@@ -9529,7 +9529,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, -16.0]}, -16.0]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, -16.0]}, -16.0]
    }
   },
   {
@@ -9538,7 +9538,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, -40.0]}, -40.0]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, -40.0]}, -40.0]
    }
   },
   {
@@ -9549,7 +9549,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 480.0]}]},
       0
      ]
@@ -9557,7 +9557,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -9660,8 +9660,8 @@
       0
      ]
     },
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
     0
    ]
   },
@@ -9671,7 +9671,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 27.125]}, 27.125]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 27.125]}, 27.125]
    }
   },
   {
@@ -9680,7 +9680,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, -7.0]}, -7.0]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, -7.0]}, -7.0]
    }
   },
   {
@@ -9689,7 +9689,7 @@
    "property": "width",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 443.312]}, 443.312]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 443.312]}, 443.312]
    }
   },
   {
@@ -9698,7 +9698,7 @@
    "property": "height",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 30.0]}, 30.0]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 30.0]}, 30.0]
    }
   },
   {
@@ -9707,7 +9707,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 2.0]}, 2.0]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 2.0]}, 2.0]
    }
   },
   {
@@ -9716,7 +9716,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 3.0]}, 3.0]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 3.0]}, 3.0]
    }
   },
   {
@@ -9725,7 +9725,7 @@
    "property": "width",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 437.312]}, 437.312]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 437.312]}, 437.312]
    }
   },
   {
@@ -9734,7 +9734,7 @@
    "property": "height",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 24]}, 24]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 24]}, 24]
    }
   },
   {
@@ -9743,7 +9743,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 4.0]}, 4.0]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 4.0]}, 4.0]
    }
   },
   {
@@ -9752,7 +9752,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 3.0]}, 3.0]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 3.0]}, 3.0]
    }
   },
   {
@@ -9761,7 +9761,7 @@
    "property": "width",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 437.312]}, 437.312]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 437.312]}, 437.312]
    }
   },
   {
@@ -9770,7 +9770,7 @@
    "property": "height",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 24]}, 24]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 24]}, 24]
    }
   },
   {
@@ -9779,7 +9779,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 3.0]}, 3.0]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 3.0]}, 3.0]
    }
   },
   {
@@ -9788,7 +9788,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 2.0]}, 2.0]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 2.0]}, 2.0]
    }
   },
   {
@@ -9797,7 +9797,7 @@
    "property": "width",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 437.312]}, 437.312]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 437.312]}, 437.312]
    }
   },
   {
@@ -9806,7 +9806,7 @@
    "property": "height",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 24]}, 24]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 24]}, 24]
    }
   },
   {
@@ -9815,7 +9815,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 3.0]}, 3.0]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 3.0]}, 3.0]
    }
   },
   {
@@ -9824,7 +9824,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 4.0]}, 4.0]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 4.0]}, 4.0]
    }
   },
   {
@@ -9833,7 +9833,7 @@
    "property": "width",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 437.312]}, 437.312]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 437.312]}, 437.312]
    }
   },
   {
@@ -9842,7 +9842,7 @@
    "property": "height",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 24]}, 24]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 24]}, 24]
    }
   },
   {
@@ -9851,7 +9851,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 2.293]}, 2.293]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 2.293]}, 2.293]
    }
   },
   {
@@ -9860,7 +9860,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 2.293]}, 2.293]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 2.293]}, 2.293]
    }
   },
   {
@@ -9869,7 +9869,7 @@
    "property": "width",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 437.312]}, 437.312]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 437.312]}, 437.312]
    }
   },
   {
@@ -9878,7 +9878,7 @@
    "property": "height",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 24]}, 24]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 24]}, 24]
    }
   },
   {
@@ -9887,7 +9887,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 3.707]}, 3.707]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 3.707]}, 3.707]
    }
   },
   {
@@ -9896,7 +9896,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 2.293]}, 2.293]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 2.293]}, 2.293]
    }
   },
   {
@@ -9905,7 +9905,7 @@
    "property": "width",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 437.312]}, 437.312]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 437.312]}, 437.312]
    }
   },
   {
@@ -9914,7 +9914,7 @@
    "property": "height",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 24]}, 24]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 24]}, 24]
    }
   },
   {
@@ -9923,7 +9923,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 2.293]}, 2.293]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 2.293]}, 2.293]
    }
   },
   {
@@ -9932,7 +9932,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 3.707]}, 3.707]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 3.707]}, 3.707]
    }
   },
   {
@@ -9941,7 +9941,7 @@
    "property": "width",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 437.312]}, 437.312]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 437.312]}, 437.312]
    }
   },
   {
@@ -9950,7 +9950,7 @@
    "property": "height",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 24]}, 24]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 24]}, 24]
    }
   },
   {
@@ -9959,7 +9959,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 3.707]}, 3.707]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 3.707]}, 3.707]
    }
   },
   {
@@ -9968,7 +9968,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 3.707]}, 3.707]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 3.707]}, 3.707]
    }
   },
   {
@@ -9977,7 +9977,7 @@
    "property": "width",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 437.312]}, 437.312]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 437.312]}, 437.312]
    }
   },
   {
@@ -9986,7 +9986,7 @@
    "property": "height",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 24]}, 24]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 24]}, 24]
    }
   },
   {
@@ -9995,7 +9995,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 30.125]}, 30.125]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 30.125]}, 30.125]
    }
   },
   {
@@ -10004,7 +10004,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, -4]}, -4]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, -4]}, -4]
    }
   },
   {
@@ -10013,7 +10013,7 @@
    "property": "width",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 437.312]}, 437.312]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 437.312]}, 437.312]
    }
   },
   {
@@ -10022,7 +10022,7 @@
    "property": "height",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 24]}, 24]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 24]}, 24]
    }
   },
   {
@@ -10031,7 +10031,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 33]}, 33]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 33]}, 33]
    }
   },
   {
@@ -10040,7 +10040,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 71]}, 71]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 71]}, 71]
    }
   },
   {
@@ -10049,7 +10049,7 @@
    "property": "width",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 414.0]}, 414.0]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 414.0]}, 414.0]
    }
   },
   {
@@ -10058,7 +10058,7 @@
    "property": "font-size",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 17]}, 17]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 17]}, 17]
    }
   },
   {
@@ -10067,7 +10067,7 @@
    "property": "line-height",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 22]}, 22]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 22]}, 22]
    }
   },
   {
@@ -10076,7 +10076,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 30]}, 30]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 30]}, 30]
    }
   },
   {
@@ -10085,7 +10085,7 @@
    "property": "width",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 180]}, 180]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 180]}, 180]
    }
   },
   {
@@ -10094,7 +10094,7 @@
    "property": "height",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 45]}, 45]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 45]}, 45]
    }
   },
   {
@@ -10105,7 +10105,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 180]}]},
       0
      ]
@@ -10113,13 +10113,13 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 45]}]},
       0
      ]
     },
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
     0
    ]
   },
@@ -10131,7 +10131,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 180]}]},
       0
      ]
@@ -10139,13 +10139,13 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 45]}]},
       0
      ]
     },
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
     0
    ]
   },
@@ -10157,7 +10157,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 8]}]},
       0
      ]
@@ -10165,13 +10165,13 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 8]}]},
       0
      ]
     },
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
     0
    ]
   },
@@ -10181,7 +10181,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 14]}, 14]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 14]}, 14]
    }
   },
   {
@@ -10190,7 +10190,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 14]}, 14]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 14]}, 14]
    }
   },
   {
@@ -10201,7 +10201,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 8]}]},
       0
      ]
@@ -10209,13 +10209,13 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 8]}]},
       0
      ]
     },
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
     0
    ]
   },
@@ -10225,7 +10225,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 14]}, 14]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 14]}, 14]
    }
   },
   {
@@ -10234,7 +10234,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 14]}, 14]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 14]}, 14]
    }
   },
   {
@@ -10243,7 +10243,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 26]}, 26]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 26]}, 26]
    }
   },
   {
@@ -10252,7 +10252,7 @@
    "property": "width",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 150]}, 150]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 150]}, 150]
    }
   },
   {
@@ -10261,7 +10261,7 @@
    "property": "height",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 45]}, 45]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 45]}, 45]
    }
   },
   {
@@ -10270,7 +10270,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 267.0]}, 267.0]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 267.0]}, 267.0]
    }
   },
   {
@@ -10279,7 +10279,7 @@
    "property": "width",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 180]}, 180]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 180]}, 180]
    }
   },
   {
@@ -10288,7 +10288,7 @@
    "property": "height",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 45]}, 45]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 45]}, 45]
    }
   },
   {
@@ -10299,7 +10299,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 180]}]},
       0
      ]
@@ -10307,13 +10307,13 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 45]}]},
       0
      ]
     },
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
     0
    ]
   },
@@ -10325,7 +10325,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 180]}]},
       0
      ]
@@ -10333,13 +10333,13 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 45]}]},
       0
      ]
     },
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
     0
    ]
   },
@@ -10351,7 +10351,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 8]}]},
       0
      ]
@@ -10359,13 +10359,13 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 8]}]},
       0
      ]
     },
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
     0
    ]
   },
@@ -10375,7 +10375,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 14]}, 14]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 14]}, 14]
    }
   },
   {
@@ -10384,7 +10384,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 14]}, 14]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 14]}, 14]
    }
   },
   {
@@ -10395,7 +10395,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 8]}]},
       0
      ]
@@ -10403,13 +10403,13 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 8]}]},
       0
      ]
     },
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
     0
    ]
   },
@@ -10419,7 +10419,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 14]}, 14]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 14]}, 14]
    }
   },
   {
@@ -10428,7 +10428,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 14]}, 14]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 14]}, 14]
    }
   },
   {
@@ -10437,7 +10437,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 26]}, 26]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 26]}, 26]
    }
   },
   {
@@ -10446,7 +10446,7 @@
    "property": "width",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 150]}, 150]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 150]}, 150]
    }
   },
   {
@@ -10455,20 +10455,20 @@
    "property": "height",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 45]}, 45]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 45]}, 45]
    }
   },
   {
    "id": "tall.restartModal-dialog.left",
    "node": "restartModal-dialog",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 96.0, 240.0]}
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 96.0, 240.0]}
   },
   {
    "id": "tall.restartModal-dialog.width",
    "node": "restartModal-dialog",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 768.0, 480.0]}
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 768.0, 480.0]}
   },
   {
    "id": "tall.leaveModal-glow.transform",
@@ -10478,7 +10478,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 480.0]}]},
       0
      ]
@@ -10486,7 +10486,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -10680,8 +10680,8 @@
       0
      ]
     },
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
     0
    ]
   },
@@ -10691,7 +10691,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, -130.5]}, -130.5]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, -130.5]}, -130.5]
    }
   },
   {
@@ -10702,7 +10702,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 512.0]}]},
       0
      ]
@@ -10710,7 +10710,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -10904,8 +10904,8 @@
       0
      ]
     },
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
     0
    ]
   },
@@ -10915,7 +10915,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, -16.0]}, -16.0]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, -16.0]}, -16.0]
    }
   },
   {
@@ -10924,7 +10924,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, -40.0]}, -40.0]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, -40.0]}, -40.0]
    }
   },
   {
@@ -10935,7 +10935,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 480.0]}]},
       0
      ]
@@ -10943,7 +10943,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {
        "op": "*",
        "args": [
@@ -11137,8 +11137,8 @@
       0
      ]
     },
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
     0
    ]
   },
@@ -11148,7 +11148,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 27.125]}, 27.125]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 27.125]}, 27.125]
    }
   },
   {
@@ -11157,7 +11157,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, -7.0]}, -7.0]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, -7.0]}, -7.0]
    }
   },
   {
@@ -11166,7 +11166,7 @@
    "property": "width",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 443.312]}, 443.312]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 443.312]}, 443.312]
    }
   },
   {
@@ -11175,7 +11175,7 @@
    "property": "height",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 30.0]}, 30.0]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 30.0]}, 30.0]
    }
   },
   {
@@ -11184,7 +11184,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 2.0]}, 2.0]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 2.0]}, 2.0]
    }
   },
   {
@@ -11193,7 +11193,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 3.0]}, 3.0]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 3.0]}, 3.0]
    }
   },
   {
@@ -11202,7 +11202,7 @@
    "property": "width",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 437.312]}, 437.312]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 437.312]}, 437.312]
    }
   },
   {
@@ -11211,7 +11211,7 @@
    "property": "height",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 24]}, 24]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 24]}, 24]
    }
   },
   {
@@ -11220,7 +11220,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 4.0]}, 4.0]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 4.0]}, 4.0]
    }
   },
   {
@@ -11229,7 +11229,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 3.0]}, 3.0]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 3.0]}, 3.0]
    }
   },
   {
@@ -11238,7 +11238,7 @@
    "property": "width",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 437.312]}, 437.312]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 437.312]}, 437.312]
    }
   },
   {
@@ -11247,7 +11247,7 @@
    "property": "height",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 24]}, 24]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 24]}, 24]
    }
   },
   {
@@ -11256,7 +11256,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 3.0]}, 3.0]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 3.0]}, 3.0]
    }
   },
   {
@@ -11265,7 +11265,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 2.0]}, 2.0]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 2.0]}, 2.0]
    }
   },
   {
@@ -11274,7 +11274,7 @@
    "property": "width",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 437.312]}, 437.312]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 437.312]}, 437.312]
    }
   },
   {
@@ -11283,7 +11283,7 @@
    "property": "height",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 24]}, 24]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 24]}, 24]
    }
   },
   {
@@ -11292,7 +11292,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 3.0]}, 3.0]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 3.0]}, 3.0]
    }
   },
   {
@@ -11301,7 +11301,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 4.0]}, 4.0]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 4.0]}, 4.0]
    }
   },
   {
@@ -11310,7 +11310,7 @@
    "property": "width",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 437.312]}, 437.312]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 437.312]}, 437.312]
    }
   },
   {
@@ -11319,7 +11319,7 @@
    "property": "height",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 24]}, 24]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 24]}, 24]
    }
   },
   {
@@ -11328,7 +11328,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 2.293]}, 2.293]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 2.293]}, 2.293]
    }
   },
   {
@@ -11337,7 +11337,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 2.293]}, 2.293]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 2.293]}, 2.293]
    }
   },
   {
@@ -11346,7 +11346,7 @@
    "property": "width",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 437.312]}, 437.312]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 437.312]}, 437.312]
    }
   },
   {
@@ -11355,7 +11355,7 @@
    "property": "height",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 24]}, 24]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 24]}, 24]
    }
   },
   {
@@ -11364,7 +11364,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 3.707]}, 3.707]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 3.707]}, 3.707]
    }
   },
   {
@@ -11373,7 +11373,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 2.293]}, 2.293]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 2.293]}, 2.293]
    }
   },
   {
@@ -11382,7 +11382,7 @@
    "property": "width",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 437.312]}, 437.312]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 437.312]}, 437.312]
    }
   },
   {
@@ -11391,7 +11391,7 @@
    "property": "height",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 24]}, 24]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 24]}, 24]
    }
   },
   {
@@ -11400,7 +11400,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 2.293]}, 2.293]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 2.293]}, 2.293]
    }
   },
   {
@@ -11409,7 +11409,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 3.707]}, 3.707]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 3.707]}, 3.707]
    }
   },
   {
@@ -11418,7 +11418,7 @@
    "property": "width",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 437.312]}, 437.312]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 437.312]}, 437.312]
    }
   },
   {
@@ -11427,7 +11427,7 @@
    "property": "height",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 24]}, 24]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 24]}, 24]
    }
   },
   {
@@ -11436,7 +11436,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 3.707]}, 3.707]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 3.707]}, 3.707]
    }
   },
   {
@@ -11445,7 +11445,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 3.707]}, 3.707]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 3.707]}, 3.707]
    }
   },
   {
@@ -11454,7 +11454,7 @@
    "property": "width",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 437.312]}, 437.312]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 437.312]}, 437.312]
    }
   },
   {
@@ -11463,7 +11463,7 @@
    "property": "height",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 24]}, 24]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 24]}, 24]
    }
   },
   {
@@ -11472,7 +11472,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 30.125]}, 30.125]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 30.125]}, 30.125]
    }
   },
   {
@@ -11481,7 +11481,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, -4]}, -4]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, -4]}, -4]
    }
   },
   {
@@ -11490,7 +11490,7 @@
    "property": "width",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 437.312]}, 437.312]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 437.312]}, 437.312]
    }
   },
   {
@@ -11499,7 +11499,7 @@
    "property": "height",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 24]}, 24]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 24]}, 24]
    }
   },
   {
@@ -11508,7 +11508,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 33]}, 33]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 33]}, 33]
    }
   },
   {
@@ -11517,7 +11517,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 71]}, 71]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 71]}, 71]
    }
   },
   {
@@ -11526,7 +11526,7 @@
    "property": "width",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 414.0]}, 414.0]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 414.0]}, 414.0]
    }
   },
   {
@@ -11535,7 +11535,7 @@
    "property": "font-size",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 17]}, 17]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 17]}, 17]
    }
   },
   {
@@ -11544,7 +11544,7 @@
    "property": "line-height",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 22]}, 22]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 22]}, 22]
    }
   },
   {
@@ -11553,7 +11553,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 30]}, 30]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 30]}, 30]
    }
   },
   {
@@ -11562,7 +11562,7 @@
    "property": "width",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 180]}, 180]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 180]}, 180]
    }
   },
   {
@@ -11571,7 +11571,7 @@
    "property": "height",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 45]}, 45]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 45]}, 45]
    }
   },
   {
@@ -11582,7 +11582,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 180]}]},
       0
      ]
@@ -11590,13 +11590,13 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 45]}]},
       0
      ]
     },
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
     0
    ]
   },
@@ -11608,7 +11608,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 180]}]},
       0
      ]
@@ -11616,13 +11616,13 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 45]}]},
       0
      ]
     },
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
     0
    ]
   },
@@ -11634,7 +11634,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 8]}]},
       0
      ]
@@ -11642,13 +11642,13 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 8]}]},
       0
      ]
     },
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
     0
    ]
   },
@@ -11658,7 +11658,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 14]}, 14]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 14]}, 14]
    }
   },
   {
@@ -11667,7 +11667,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 14]}, 14]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 14]}, 14]
    }
   },
   {
@@ -11678,7 +11678,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 8]}]},
       0
      ]
@@ -11686,13 +11686,13 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 8]}]},
       0
      ]
     },
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
     0
    ]
   },
@@ -11702,7 +11702,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 14]}, 14]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 14]}, 14]
    }
   },
   {
@@ -11711,7 +11711,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 14]}, 14]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 14]}, 14]
    }
   },
   {
@@ -11720,7 +11720,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 26]}, 26]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 26]}, 26]
    }
   },
   {
@@ -11729,7 +11729,7 @@
    "property": "width",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 150]}, 150]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 150]}, 150]
    }
   },
   {
@@ -11738,7 +11738,7 @@
    "property": "height",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 45]}, 45]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 45]}, 45]
    }
   },
   {
@@ -11747,7 +11747,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 267.0]}, 267.0]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 267.0]}, 267.0]
    }
   },
   {
@@ -11756,7 +11756,7 @@
    "property": "width",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 180]}, 180]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 180]}, 180]
    }
   },
   {
@@ -11765,7 +11765,7 @@
    "property": "height",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 45]}, 45]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 45]}, 45]
    }
   },
   {
@@ -11776,7 +11776,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 180]}]},
       0
      ]
@@ -11784,13 +11784,13 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 45]}]},
       0
      ]
     },
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
     0
    ]
   },
@@ -11802,7 +11802,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 180]}]},
       0
      ]
@@ -11810,13 +11810,13 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 45]}]},
       0
      ]
     },
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
     0
    ]
   },
@@ -11828,7 +11828,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 8]}]},
       0
      ]
@@ -11836,13 +11836,13 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 8]}]},
       0
      ]
     },
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
     0
    ]
   },
@@ -11852,7 +11852,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 14]}, 14]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 14]}, 14]
    }
   },
   {
@@ -11861,7 +11861,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 14]}, 14]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 14]}, 14]
    }
   },
   {
@@ -11872,7 +11872,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 8]}]},
       0
      ]
@@ -11880,13 +11880,13 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.9687]},
       {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 8]}]},
       0
      ]
     },
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 1.6, 1]},
     0
    ]
   },
@@ -11896,7 +11896,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 14]}, 14]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 14]}, 14]
    }
   },
   {
@@ -11905,7 +11905,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 14]}, 14]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 14]}, 14]
    }
   },
   {
@@ -11914,7 +11914,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 26]}, 26]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 26]}, 26]
    }
   },
   {
@@ -11923,7 +11923,7 @@
    "property": "width",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 150]}, 150]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 150]}, 150]
    }
   },
   {
@@ -11932,20 +11932,20 @@
    "property": "height",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, {"op": "*", "args": [1.6, 45]}, 45]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, {"op": "*", "args": [1.6, 45]}, 45]
    }
   },
   {
    "id": "tall.leaveModal-dialog.left",
    "node": "leaveModal-dialog",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 96.0, 240.0]}
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 96.0, 240.0]}
   },
   {
    "id": "tall.leaveModal-dialog.width",
    "node": "leaveModal-dialog",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 768.0, 480.0]}
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.9687]}, 768.0, 480.0]}
   },
   {
    "id": "scene-softfocus.display",

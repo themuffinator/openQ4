@@ -982,7 +982,10 @@ archived provenance; new scheduling belongs here.
   [the remaining pages](ui/retained-screens.md#more-pages-in-tall-views-1-november-2026),
   the Arena page in
   [two blocks of its own](ui/retained-screens.md#the-arena-page-in-tall-views-1-november-2026)
-  (visual specification 1.35).
+  (visual specification 1.35). Menu levels and the fixed-growth pages then
+  took their column in
+  [every portrait view that holds it](ui/retained-screens.md#every-portrait-view-and-other-aspect-ratios-1-november-2026)
+  (visual specification 1.36).
 - [ ] **UI-02 — P1, implementation and qualification: text, input and accessibility.**
   Finish in-field IME/composition, shaping/kerning/fallback/styles, grapheme editing,
   caret/candidate placement, binding capture, accessibility exposure and contextual

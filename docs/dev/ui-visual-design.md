@@ -1,6 +1,6 @@
 # openQ4 UI Visual Design
 
-Specification version 1.35, 1 November 2026 (1.29 to 1.34 on 31 October, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
+Specification version 1.36, 1 November 2026 (1.35 earlier that day, 1.29 to 1.34 on 31 October, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
 1.9 on 29 September, 1.6 on 28 September, 1.4 and 1.5 on 27 September, 1.1 to
 1.3 on 26 September, 1.0 on 8 September 2026). Status:
 implementation target; the replacement has not shipped. Applies to every
@@ -1838,12 +1838,15 @@ and parallax off.
   message line runs on to the same margin and the plinth steps down to clear
   its lines; a confirmation grows with its body; and the pause's level block
   gives its picture's room to its growing lines inside the same card. In a
-  view of 3:4 and taller a menu level stands its parts in one column across
-  the canvas, scaled together as large as the height between the bands
-  allows, up to 1.6 times: the home's wordmark, plates, message line and
-  plinth, a pause's title, actions, EXIT and level block, or a page's plates
-  and description under them; its confirmations stand at 1.6 times their
-  size.
+  portrait view tall enough for the column to read at least at its landscape
+  size (a view of 3:4 and taller in any case) a menu level stands its parts
+  in one column across the canvas, scaled together as large as the height
+  between the bands allows, up to 1.6 times: the home's wordmark, plates,
+  message line and plinth, a pause's title, actions, EXIT and level block, or
+  a page's plates and description under them; its confirmations stand at 1.6
+  times their size. A page that grows a fixed amount (Restart Level, the
+  campaign's difficulty, the restart screen, Credits) takes its column in a
+  portrait view that holds it; the list pages and the Arena keep 3:4.
 - **Fourth level.** Every child route beneath a sub-page uses the same detail
   construction. The top band moves another 97 u, to a 517,-63 u translation;
   the bottom band remains docked. Two parent crumbs occupy the thin spans at
@@ -4062,6 +4065,18 @@ catalogue obligations, including `ART-035`, remain authoring/artwork requirement
 they do not authorize or require a new gameplay mode. This scope correction
 accepts no GUI, artwork, platform or behavior. Hit-feedback defaults and the other
 UI-05 qualification remain open.
+
+### Version 1.36: the column in every portrait view that holds it
+
+Section 13.7's Menu levels pattern no longer waits for 3:4: a menu level, whose
+column scales to the room between the bands, stands in it in any portrait view
+in which it reads at least at its landscape size, so a 4:5 window or an
+unfolded foldable shows the column instead of the 4:3 composition between
+empty bands. Each document finds that aspect from its own column (the pause
+from about 0.83, the others from a square view); the pages that grow a fixed
+amount take theirs from the room they need, and the list pages and the Arena
+keep 3:4. `LAY-021` already holds this scope; no requirement changes, and
+nothing is accepted.
 
 ### Version 1.35: the Arena page in tall views
 

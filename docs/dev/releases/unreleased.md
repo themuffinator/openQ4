@@ -201,7 +201,12 @@ See [release status](../../user/release-status.md) and the
   screen and the credits fill the height the same way. The Arena campaign's
   page shows the tiers with their briefing and progress, then the matches
   with the difficulty and START MATCH, the chosen match's picture and details
-  beside them, all larger.
+  beside them, all larger. The main and pause menus, Settings, Single Player,
+  Campaign and Multiplayer take this layout on any portrait screen that has
+  room for it, so a nearly square window or an unfolded foldable no longer
+  shows the menu in a strip between empty bands.
+- **Join Game picture.** Before you choose a server, Join Game's picture
+  frame shows the Quake 4 art instead of an empty black box.
 - **Clearer list selection.** The selected save, demo, server or map in the
   new interface's lists no longer doubles its orange highlight under the
   pointer, so its name stays readable.

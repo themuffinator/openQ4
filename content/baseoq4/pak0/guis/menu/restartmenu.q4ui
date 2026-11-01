@@ -640,8 +640,8 @@
    "value": [
     0,
     0,
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 1.6, 1]},
     0
    ]
   },
@@ -652,8 +652,8 @@
    "value": [
     0,
     0,
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
-    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 1.6, 1]},
     0
    ]
   },

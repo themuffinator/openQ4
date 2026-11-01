@@ -170,6 +170,11 @@ made them too large to load.
   times the landscape size, with its ledger and question grown
   ([Arena page](ui/retained-screens.md#the-arena-page-in-tall-views-1-november-2026),
   visual specification 1.35).
+- [x] Menu levels and the fixed-growth pages take their column in every
+  portrait view tall enough for it, not only from 3:4, and Join Game's empty
+  levelshot frame shows the generic art
+  ([every portrait view](ui/retained-screens.md#every-portrait-view-and-other-aspect-ratios-1-november-2026),
+  visual specification 1.36).
 - [ ] Bound acceptance evidence remains.
 
 ## Windows stay see-through at any distance, 29 October 2026

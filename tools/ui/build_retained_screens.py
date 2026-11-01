@@ -340,21 +340,49 @@ def reflow_details(doc: "Document", details: dict, keys) -> None:
 
 
 # Tall views of the menu levels (sections 3 and 13.3, "adapt, don't shrink"):
-# in a view of 3:4 and taller (the runtime's view.aspect source) a page stands
-# its parts one under the other in a single column across the 960 dp canvas,
-# scaled together as large as the view's height between the bands allows, up
-# to TALL_MOST, instead of shrinking the 4:3 composition into a band.
+# in a tall view (the runtime's view.aspect source) a page stands its parts
+# one under the other in a single column across the 960 dp canvas, scaled
+# together as large as the view's height between the bands allows, up to
+# TALL_MOST, instead of shrinking the 4:3 composition into a band. TALL is the
+# 3:4 condition of the arrangements that grow a fixed amount; a menu level's
+# column, which scales to the room, takes its own condition (tall_condition):
+# any portrait view in which the column reads at least at its landscape size.
 ASPECT_STATE = "view.aspect"
-TALL = {"op": "<", "args": [{"state": ASPECT_STATE}, 0.76]}
+TALL_ASPECT, PORTRAIT_ASPECT = 0.76, 1.0
+TALL = {"op": "<", "args": [{"state": ASPECT_STATE}, TALL_ASPECT]}
 TALL_MOST = 1.6                       # the wordmark and the plates' labels across the canvas
 VIEW_HEIGHT = {"op": "/", "args": [CANVAS_W, {"state": ASPECT_STATE}]}   # dp: a view narrower than 4:3 keeps the canvas 960 dp wide
 TALL_MARGIN = 66.0                    # dp: the column's trailing margin, the plates' label inset on the leading side
 
 
 def tall_source(doc: "Document") -> dict:
-    """The document's view.aspect source, declared once; the tall condition."""
+    """The document's view.aspect source, declared once; its tall condition."""
     doc.state[ASPECT_STATE] = {"type": "number", "initial": round(4 / 3, 4), "view": "aspect"}
-    return TALL
+    return tall_condition(doc)
+
+
+def tall_condition(doc: "Document") -> dict:
+    """The document's own tall condition, every binding's one object: 3:4 and
+    taller until tall_column raises it (tall_fits)."""
+    if getattr(doc, "tall", None) is None:
+        doc.tall = {"op": "<", "args": [{"state": ASPECT_STATE}, TALL_ASPECT]}
+        doc.tall_fits = []
+    return doc.tall
+
+
+def tall_fits(doc: "Document", height: float) -> None:
+    """A column `height` dp tall, bands included, at its landscape size: the
+    document stands in its column in any portrait view tall enough for that
+    (a view of 3:4 and taller in any case), the least of its columns'."""
+    condition = tall_condition(doc)
+    doc.tall_fits.append(CANVAS_W / height)
+    condition["args"][1] = round(max(TALL_ASPECT, min(PORTRAIT_ASPECT, *doc.tall_fits)), 4)
+
+
+def is_tall(condition) -> bool:
+    """A tall view's condition, the fixed 3:4 one or a document's own."""
+    return (isinstance(condition, dict) and condition.get("op") == "<" and len(condition.get("args", ())) == 2 and
+            condition["args"][0] == {"state": ASPECT_STATE})
 
 
 def tall_bind(doc: "Document", node: dict, key: str, tall) -> None:
@@ -364,12 +392,13 @@ def tall_bind(doc: "Document", node: dict, key: str, tall) -> None:
     for binding in doc.bindings:
         if binding["node"] == node["id"] and binding["property"] == key:
             value = binding["value"]
-            if isinstance(value, dict) and value.get("op") == "select" and value["args"][0] == TALL:
+            if isinstance(value, dict) and value.get("op") == "select" and is_tall(value["args"][0]):
                 value = value["args"][2]       # a later tall value replaces an earlier one
-            binding["value"] = {"op": "select", "args": [TALL, tall(value) if callable(tall) else tall, value]}
+            binding["value"] = {"op": "select", "args": [tall_condition(doc), tall(value) if callable(tall) else tall, value]}
             return
     authored = node["properties"][key]["value"]
-    doc.bind(f"tall.{node['id']}.{key}", node["id"], key, {"op": "select", "args": [TALL, tall(authored) if callable(tall) else tall, authored]})
+    doc.bind(f"tall.{node['id']}.{key}", node["id"], key,
+             {"op": "select", "args": [tall_condition(doc), tall(authored) if callable(tall) else tall, authored]})
 
 
 def tall_scale(doc: "Document", node: dict, scale, own: tuple = ()) -> None:
@@ -388,7 +417,7 @@ def tall_scale(doc: "Document", node: dict, scale, own: tuple = ()) -> None:
                     item["properties"][key]["value"])
 
     def tall_or(value, rest):
-        return {"op": "select", "args": [TALL, value, rest]}
+        return {"op": "select", "args": [tall_condition(doc), value, rest]}
 
     def walk(item: dict, parent: tuple) -> None:
         props = item.get("properties", {})
@@ -459,8 +488,8 @@ def tall_canvas(doc: "Document", node: dict) -> None:
     """A canvas group that fit_narrow centres on the view's middle runs the
     view's full height in a tall view, so its parts take view coordinates."""
     doc.bind(f"tall.{node['id']}.margin-top", node["id"], "margin-top",
-             {"op": "select", "args": [TALL, {"op": "/", "args": [-CANVAS_W / 2, {"state": ASPECT_STATE}]}, -360]})
-    doc.bind(f"tall.{node['id']}.height", node["id"], "height", {"op": "select", "args": [TALL, VIEW_HEIGHT, 720]})
+             {"op": "select", "args": [tall_condition(doc), {"op": "/", "args": [-CANVAS_W / 2, {"state": ASPECT_STATE}]}, -360]})
+    doc.bind(f"tall.{node['id']}.height", node["id"], "height", {"op": "select", "args": [tall_condition(doc), VIEW_HEIGHT, 720]})
 
 
 def tall_column(doc: "Document", parts: list, top: float, bottom: float) -> tuple:
@@ -475,6 +504,7 @@ def tall_column(doc: "Document", parts: list, top: float, bottom: float) -> tupl
     room = text_sum(VIEW_HEIGHT, -(top + bottom))
     height = text_sum(*[part_height for part_height, _ in parts])
     tallest = max(evaluate(height, {TEXT_STATE: 2, "menu_continue": shown}) for shown in (False, True))
+    tall_fits(doc, tallest + top + bottom)
     scale = {"op": "min", "args": [TALL_MOST, {"op": "/", "args": [room, round(tallest, 4)]}]}
     y = text_sum(top, {"op": "*", "args": [0.5, {"op": "-", "args": [room, {"op": "*", "args": [scale, height]}]}]})
     tops = []
@@ -542,7 +572,7 @@ def check_text_bindings(result: dict) -> None:
         return found
     def landscape(expression):
         # The value in a view of 4:3 and wider: a tall view's branch aside.
-        if isinstance(expression, dict) and expression.get("op") == "select" and expression["args"][0] == TALL:
+        if isinstance(expression, dict) and expression.get("op") == "select" and is_tall(expression["args"][0]):
             return landscape(expression["args"][2])
         if isinstance(expression, dict) and "args" in expression:
             return {**expression, "args": [landscape(arg) for arg in expression["args"]]}
@@ -2413,7 +2443,7 @@ def tall_title(doc: Document, stage: dict, home: dict, nav: dict, base: dict, se
     wordmark = next(child for child in stage["children"] if child["id"] == "wordmark")
     emblem = next(child for child in stage["children"] if child["id"] == "emblem")
     emblem["properties"]["display"] = keyword("block")
-    doc.bind("tall.emblem.display", "emblem", "display", {"op": "select", "args": [TALL, "none", "block"]})
+    doc.bind("tall.emblem.display", "emblem", "display", {"op": "select", "args": [tall_condition(doc), "none", "block"]})
     # The message line's lines at the column's narrowest, in 100 % dp.
     narrowest = (CANVAS_W - TALL_MARGIN * (1 + TALL_MOST)) / TALL_MOST
     # Every item's sentence takes the room the longest one needs.

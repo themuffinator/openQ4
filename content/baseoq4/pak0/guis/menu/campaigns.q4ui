@@ -497,7 +497,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -525,7 +525,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -553,7 +553,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -581,7 +581,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -610,7 +610,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -638,7 +638,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -698,7 +698,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "+",
       "args": [
@@ -961,7 +961,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "+",
       "args": [
@@ -995,7 +995,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -1198,7 +1198,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "+",
       "args": [
@@ -1232,7 +1232,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -1435,7 +1435,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "+",
       "args": [
@@ -1469,7 +1469,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -1672,7 +1672,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "+",
       "args": [
@@ -1706,7 +1706,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -1909,7 +1909,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {"op": "/", "args": [-480.0, {"state": "view.aspect"}]},
      -360
     ]
@@ -1922,7 +1922,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {"op": "/", "args": [960.0, {"state": "view.aspect"}]},
      720
     ]
@@ -1935,7 +1935,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "+",
       "args": [
@@ -2006,7 +2006,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -2034,7 +2034,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -2062,7 +2062,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -2091,7 +2091,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "*",
        "args": [
@@ -2120,7 +2120,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "*",
        "args": [
@@ -2149,7 +2149,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "min",
        "args": [
@@ -2166,7 +2166,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "min",
        "args": [
@@ -2191,7 +2191,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "*",
        "args": [
@@ -2220,7 +2220,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "*",
        "args": [
@@ -2249,7 +2249,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "min",
        "args": [
@@ -2266,7 +2266,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "min",
        "args": [
@@ -2291,7 +2291,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "*",
        "args": [
@@ -2320,7 +2320,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "*",
        "args": [
@@ -2349,7 +2349,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "min",
        "args": [
@@ -2366,7 +2366,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "min",
        "args": [
@@ -2391,7 +2391,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "*",
        "args": [
@@ -2420,7 +2420,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "*",
        "args": [
@@ -2449,7 +2449,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "min",
        "args": [
@@ -2466,7 +2466,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "min",
        "args": [
@@ -2490,7 +2490,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -2518,7 +2518,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -2546,7 +2546,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -2574,7 +2574,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -2602,7 +2602,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -2630,7 +2630,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -2658,7 +2658,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -2687,7 +2687,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "*",
        "args": [
@@ -2716,7 +2716,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "*",
        "args": [
@@ -2745,7 +2745,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "min",
        "args": [
@@ -2762,7 +2762,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "min",
        "args": [
@@ -2787,7 +2787,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "*",
        "args": [
@@ -2816,7 +2816,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "*",
        "args": [
@@ -2845,7 +2845,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "min",
        "args": [
@@ -2862,7 +2862,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "min",
        "args": [
@@ -2887,7 +2887,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "*",
        "args": [
@@ -2916,7 +2916,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "*",
        "args": [
@@ -2945,7 +2945,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "min",
        "args": [
@@ -2962,7 +2962,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "min",
        "args": [
@@ -2987,7 +2987,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "*",
        "args": [
@@ -3016,7 +3016,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "*",
        "args": [
@@ -3045,7 +3045,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "min",
        "args": [
@@ -3062,7 +3062,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "min",
        "args": [
@@ -3086,7 +3086,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -3114,7 +3114,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -3142,7 +3142,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -3170,7 +3170,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -3198,7 +3198,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -3226,7 +3226,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -3254,7 +3254,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -3283,7 +3283,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "*",
        "args": [
@@ -3312,7 +3312,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "*",
        "args": [
@@ -3341,7 +3341,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "min",
        "args": [
@@ -3358,7 +3358,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "min",
        "args": [
@@ -3383,7 +3383,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "*",
        "args": [
@@ -3412,7 +3412,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "*",
        "args": [
@@ -3441,7 +3441,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "min",
        "args": [
@@ -3458,7 +3458,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "min",
        "args": [
@@ -3483,7 +3483,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "*",
        "args": [
@@ -3512,7 +3512,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "*",
        "args": [
@@ -3541,7 +3541,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "min",
        "args": [
@@ -3558,7 +3558,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "min",
        "args": [
@@ -3583,7 +3583,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "*",
        "args": [
@@ -3612,7 +3612,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "*",
        "args": [
@@ -3641,7 +3641,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "min",
        "args": [
@@ -3658,7 +3658,7 @@
     {
      "op": "select",
      "args": [
-      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
       {
        "op": "min",
        "args": [
@@ -3682,7 +3682,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -3710,7 +3710,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -3738,7 +3738,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -3766,7 +3766,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -3794,7 +3794,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -3822,7 +3822,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -3850,7 +3850,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -3878,7 +3878,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -3906,7 +3906,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -3934,7 +3934,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -3962,7 +3962,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [
@@ -3990,7 +3990,7 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
       "op": "*",
       "args": [

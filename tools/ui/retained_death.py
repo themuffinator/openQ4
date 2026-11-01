@@ -95,6 +95,7 @@ def restart_menu_document() -> dict:
 
 
 TALL_GROW = 1.6       # the menu levels' column scale
+TALL_MARGIN = 60.0    # dp: the grown card's least distance from the view's top and foot
 
 
 def tall_restart_menu(result: dict) -> dict:
@@ -103,6 +104,10 @@ def tall_restart_menu(result: dict) -> dict:
     question with them."""
     from retained_tall import TallLayout
     tall = TallLayout(result)
+    # The wordmark's top and the card's foot stand as far from the view's
+    # middle as the grown stage puts them, with a margin to the view's edges.
+    reach = max(360 - tall.canvas_top("wordmark"), tall.canvas_top("death-dialog") + tall.dp("death-dialog", "height") - 360)
+    tall.fits(2 * (reach * TALL_GROW + TALL_MARGIN))
     tall.scale("death-stage", TALL_GROW)
     tall.dialogs(TALL_GROW)
     return result

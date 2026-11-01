@@ -1790,11 +1790,11 @@ int main() {
               Session_NetworkQualityBars(10, 1.9f) == 4 && Session_NetworkQualityBars(10, 2.0f) == 3 && Session_NetworkQualityBars(10, 6.0f) == 1 &&
               Session_NetworkQualityBars(500, 20.0f) == 1);
         // The dedicated server's and the repeater's symbols; the mod filter as
-        // the scan wrote it, read as players' text; nothing chosen, so no
-        // levelshot and no favorite.
+        // the scan wrote it, read as players' text; nothing chosen, so the
+        // generic art in the levelshot's frame and no favorite.
         CHECK(join->state["join.row1.ded"] == "1" && join->state["join.row0.ded"] == "0" && join->state["join.row0.rep"] == "1" &&
               join->state["join.row1.rep"] == "0" && join->state["join.row3.ded"] == "0" && join->state["join.mod"] == "All" &&
-              join->state["join.shot"] == "" && join->state["join.favorite"] == "0");
+              join->state["join.shot"] == "gfx/guis/loadscreens/generic" && join->state["join.favorite"] == "0");
         // Nothing chosen: nothing to join.
         const size_t buffered = commands.buffered.size();
         s.HandleRetainedSessionRequest(join, "joinServer"); CHECK(commands.buffered.size() == buffered);
