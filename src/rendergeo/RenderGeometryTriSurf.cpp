@@ -118,12 +118,14 @@ is highly uneven.
 // instead of using the texture T vector, cross the normal and S vector for an orthogonal axis
 #define DERIVE_UNSMOOTHED_BITANGENT
 
-const int MAX_SIL_EDGES			= 0x10000;
+// the silhouette edge scratch rests at this size and grows for larger surfaces
+const int MIN_SIL_EDGES			= 0x10000;
 const int SILEDGE_HASH_SIZE		= 1024;
 
 static int			numSilEdges;
+static int			maxSilEdges;
 static silEdge_t *	silEdges;
-static idHashIndex	silEdgeHash( SILEDGE_HASH_SIZE, MAX_SIL_EDGES );
+static idHashIndex	silEdgeHash( SILEDGE_HASH_SIZE, MIN_SIL_EDGES );
 static int			numPlanes;
 static int			triSurfReferenceId;
 static bool			triSurfDataInitialized;
@@ -165,6 +167,23 @@ static idDynamicAlloc<float, 1<<16, 1<<10>				skinToModelTransformAllocator;
 
 /*
 ===============
+R_SetSilEdgeCapacity
+
+Sizes the silhouette edge scratch and its hash. The scratch used to be a fixed
+65536 edges, and a larger surface lost every edge past that with only a
+developer warning, leaving its shadow silhouette incomplete (issue #181). The
+hash grows with it, so its chains stay as short as the fixed table's.
+===============
+*/
+static void R_SetSilEdgeCapacity( const int capacity ) {
+	R_StaticFree( silEdges );
+	silEdges = (silEdge_t *)R_StaticAlloc( (size_t)capacity * sizeof( silEdges[0] ) );
+	maxSilEdges = capacity;
+	silEdgeHash.Clear( Max( SILEDGE_HASH_SIZE, capacity / ( MIN_SIL_EDGES / SILEDGE_HASH_SIZE ) ), capacity );
+}
+
+/*
+===============
 R_InitTriSurfData
 ===============
 */
@@ -173,7 +192,7 @@ void R_InitTriSurfData( void ) {
 		return;
 	}
 
-	silEdges = (silEdge_t *)R_StaticAlloc( MAX_SIL_EDGES * sizeof( silEdges[0] ) );
+	R_SetSilEdgeCapacity( MIN_SIL_EDGES );
 
 	// initialize allocators for triangle surfaces
 	triVertexAllocator.Init();
@@ -223,6 +242,7 @@ void R_ShutdownTriSurfData( void ) {
 
 	R_StaticFree( silEdges );
 	silEdges = NULL;
+	maxSilEdges = 0;
 	silEdgeHash.Free();
 	srfTrianglesAllocator.Shutdown();
 	triVertexAllocator.Shutdown();
@@ -1233,7 +1253,7 @@ static void R_DefineEdge( int v1, int v2, int planeNum ) {
 	}
 	hashKey = silEdgeHash.GenerateKey( v1, v2 );
 	// search for a matching other side
-	for ( i = silEdgeHash.First( hashKey ); i >= 0 && i < MAX_SIL_EDGES; i = silEdgeHash.Next( i ) ) {
+	for ( i = silEdgeHash.First( hashKey ); i >= 0 && i < numSilEdges; i = silEdgeHash.Next( i ) ) {
 		if ( silEdges[i].v1 == v1 && silEdges[i].v2 == v2 ) {
 			c_duplicatedEdges++;
 			// allow it to still create a new edge
@@ -1253,7 +1273,7 @@ static void R_DefineEdge( int v1, int v2, int planeNum ) {
 	}
 
 	// define the new edge
-	if ( numSilEdges == MAX_SIL_EDGES ) {
+	if ( numSilEdges == maxSilEdges ) {
 		common->DWarning( "MAX_SIL_EDGES" );
 		return;
 	}
@@ -1308,6 +1328,11 @@ void R_IdentifySilEdges( srfTriangles_t *tri, bool omitCoplanarEdges ) {
 	omitCoplanarEdges = false;	// optimization doesn't work for some reason
 
 	numTris = tri->numIndexes / 3;
+
+	// every triangle defines at most three edges
+	if ( tri->numIndexes > maxSilEdges ) {
+		R_SetSilEdgeCapacity( tri->numIndexes );
+	}
 
 	numSilEdges = 0;
 	silEdgeHash.Clear();
@@ -1420,6 +1445,11 @@ void R_IdentifySilEdges( srfTriangles_t *tri, bool omitCoplanarEdges ) {
 	tri->silEdges = triSilEdgeAllocator.Alloc( numSilEdges );
 	if ( numSilEdges > 0 ) {
 		memcpy( tri->silEdges, silEdges, numSilEdges * sizeof( tri->silEdges[0] ) );
+	}
+
+	// give back what a large surface needed
+	if ( maxSilEdges > MIN_SIL_EDGES ) {
+		R_SetSilEdgeCapacity( MIN_SIL_EDGES );
 	}
 }
 

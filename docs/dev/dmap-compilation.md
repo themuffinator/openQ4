@@ -112,10 +112,9 @@ supplied map, with collision and all five navigation files, takes 127 seconds.
 The result loads into single-player gameplay without
 `R_ParseModel: bad surface counts` and saves normally.
 
-One limit remains. The outdoor `_area0` pipe surface has 51,000 genuine
-triangles and about 78,000 silhouette edges, above the renderer's 65,536-edge
-working limit. Loading with `developer 1` reports `MAX_SIL_EDGES`, and that
-surface's shadow silhouette is incomplete. Keep #181 open for that limit.
+One limit remained: the `_area0` pipe surface was above the renderer's
+65,536-edge working limit. See
+[Silhouette edges on large surfaces](#silhouette-edges-on-large-surfaces-1-november-2026).
 
 `python tools/tests/dmap_tjunction_slivers.py` compiles the production splitter
 against a minimal geometry shim. A real triangle still splits at its
@@ -124,3 +123,46 @@ and three slivers pass through unsplit; the previous splitter turns one of them
 into 36 triangles. Both GitHub validation workflows and the local validation
 runner include it. `--production <file>` runs it against another revision of
 `tritjunction.cpp`.
+
+## Silhouette edges on large surfaces (1 November 2026)
+
+Every triangle the renderer loads contributes its edges to a silhouette edge
+list, which stencil shadow volumes extrude. The scratch that builds the list
+held 65,536 edges. A larger surface lost every edge past that, reported only
+by `developer 1` warnings. The supplied map's `_area0` pipe surface
+(153,000 indexes) has 78,794 edges by the renderer's own matching rule, and
+loading it printed 25,951 `MAX_SIL_EDGES` warnings.
+
+`R_IdentifySilEdges` now sizes the scratch to the surface: a triangle defines at
+most three edges, so the index count bounds them. The edge hash grows by the
+same factor, so its chains stay as short as the fixed table's. After a large
+surface both return to their usual size. Surfaces of up to 65,536 indexes use
+exactly the old scratch, so their edges are unchanged. The two turbo shadow
+builders kept their extruded side walls in a stack buffer of six indexes per
+edge, which the old limit had kept near 1.5 MiB. Larger buffers now go on the
+heap through `OPENQ4_ALLOC16_SCRATCH`. Silhouette edges are stored in generated
+render-world and static-model caches, so their parser versions were raised to 4
+and `0x00010004`. Any cache written with a cut-off list is rebuilt.
+
+No stock content reached the limit. The largest stock map surface has 33,696
+indexes, the largest static model 15,104 triangles, and the largest animated
+mesh at most 39,804 edges.
+
+The supplied map, rebuilt with the fixed dmap, now loads into single-player
+gameplay and saves with no `MAX_SIL_EDGES` warnings. The same load with the
+previous renderer still prints 25,951. Views of the pipe room with
+`r_useOptimizedShadows 0` and `r_useShadowMap 0` render its runtime stencil
+volumes normally. Animated lights and screens changed more between two runs of
+the same build than between the builds, so the screenshots show no visible
+difference either way.
+
+`python tools/tests/renderer_silhouette_edges.py` compiles the production edge
+builder with the real `idHashIndex` and compares it with a direct
+implementation of id's matching rule. It covers a small closed mesh, an open
+grid of 120,400 edges, a closed torus of 120,000 edges and a tangled surface
+with duplicated and tripled edges. It also checks that the scratch and hash
+return to their usual size. On the previous code the open grid stops at the
+limit. Windows Clang, MSVC, Clang sanitizers and Linux GCC with sanitizers pass.
+Both GitHub validation workflows and the local validation runner include it.
+`--production <file>` runs it against another revision of
+`RenderGeometryTriSurf.cpp`.

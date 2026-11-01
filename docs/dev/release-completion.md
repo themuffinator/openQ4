@@ -6,6 +6,32 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Silhouette edges on large surfaces, 1 November 2026
+
+- The renderer's silhouette edge scratch now grows to fit each surface instead
+  of stopping at 65,536 edges, and its hash grows with it. The modified `hub2`
+  from [#181](https://github.com/themuffinator/openQ4/issues/181) has a pipe
+  surface of 78,794 edges. With the previous renderer it loaded with 25,951
+  `MAX_SIL_EDGES` warnings and an incomplete edge list. It now loads into
+  single-player gameplay and saves with none. No stock map surface, static
+  model or animated mesh reaches the old limit, so stock edge lists are
+  unchanged.
+- The turbo shadow builders move their side-wall buffer to the heap once it
+  reaches 256 KiB, since the edge count no longer caps it. Generated world
+  and static-model cache parser versions rise to 4 and `0x00010004`, so caches
+  holding a cut-off edge list are rebuilt.
+- `tools/tests/renderer_silhouette_edges.py` builds edges with the production
+  code and the real `idHashIndex`, and compares them with a direct
+  implementation of the matching rule on surfaces of up to 120,400 edges. It
+  fails on the previous code. Windows Clang, MSVC, Clang sanitizers and Linux
+  GCC with sanitizers pass, as do the renderer, cache and workflow contract
+  checks. #181 now waits only on the reporter's retest. See
+  [dmap compilation](dmap-compilation.md#silhouette-edges-on-large-surfaces-1-november-2026).
+
+Candidate release wording: Very detailed surfaces in custom maps and models now
+keep their whole shadow outline; the renderer used to drop every shadow edge
+past 65,536 per surface.
+
 ## Map compiler slivers, 31 October 2026
 
 - dmap's T-junction repair no longer splits zero-area slivers. Each split of a
@@ -20,10 +46,9 @@ See [player release status](../user/release-status.md).
   slivers and valid thin triangles; it fails on the previous code. Windows
   Clang, MSVC and Clang sanitizer runs pass, as do the dmap and workflow
   contract checks.
-- Not resolved: one outdoor surface of that map has about 78,000 silhouette
-  edges, above the renderer's 65,536 limit, so `developer 1` reports
-  `MAX_SIL_EDGES` and its shadow silhouette is incomplete. #181 stays open.
-  See [dmap compilation](dmap-compilation.md#sliver-multiplication-in-t-junction-repair-31-october-2026).
+- Not resolved then: one surface of that map had more silhouette edges than
+  the renderer's 65,536 limit; fixed the next day (above). See
+  [dmap compilation](dmap-compilation.md#sliver-multiplication-in-t-junction-repair-31-october-2026).
 
 Candidate release wording: Maps whose curved surfaces use fine explicit
 subdivision no longer compile into millions of invisible triangles, which had

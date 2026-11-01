@@ -474,6 +474,11 @@ See [release status](../../user/release-status.md) and the
   ([#181](https://github.com/themuffinator/openQ4/issues/181)); it now builds
   in about two minutes and plays. Recompile affected maps.
 
+- Very detailed surfaces in custom maps and models now keep their whole
+  shadow outline. The renderer used to stop at 65,536 shadow edges per surface
+  and drop the rest, so such surfaces could cast broken stencil shadows. No
+  stock map or model came near that limit.
+
 - With the experimental `com_levelLoadModernization 1`, map and model caches
   now come out the same on every load and match a load from the original files.
   Caches from earlier versions are rebuilt the first time each map loads.

@@ -428,7 +428,7 @@ void R_WriteGeneratedRenderModelCache( const idRenderModel &model, const char *s
 namespace {
 	static const unsigned int STATIC_MODEL_CACHE_MAGIC = 0x5334514fU; // "OQ4S"
 	static const int STATIC_MODEL_CACHE_VERSION = 2;
-	static const unsigned int STATIC_MODEL_GENERATED_CACHE_PARSER_VERSION = 0x00010003U;	// bump when R_BuildDeformInfo's derivation changes: cache hits no longer cross-check against a fresh rebuild; 3: back-side surface ids were uninitialised before
+	static const unsigned int STATIC_MODEL_GENERATED_CACHE_PARSER_VERSION = 0x00010004U;	// bump when R_BuildDeformInfo's derivation changes: cache hits no longer cross-check against a fresh rebuild; 3: back-side surface ids were uninitialised before; 4: silhouette edges stopped at 65536
 	static const int MODEL_CACHE_MAX_NAME = 4096;
 	static const int MODEL_CACHE_MAX_MATERIAL = 4096;
 	static const int MODEL_CACHE_MAX_SURFACES = 65536;

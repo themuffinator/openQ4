@@ -243,6 +243,14 @@ match a parsed one. The bumped versions make those payloads miss.
 `level_load_cache.py` fails any `modelSurface_t` in `src/renderer` or `src/bse`
 that starts uninitialised.
 
+Both payloads also store each surface's silhouette edges. Before world parser
+version 4 and static parser version `0x00010004`, the renderer kept at most
+65,536 per surface and dropped the rest, so a cache written then holds an
+incomplete edge list for any larger surface
+([#181](https://github.com/themuffinator/openQ4/issues/181)). No stock map
+surface or model reaches that limit, so stock payloads rebuild with the same
+edges.
+
 ### Collision models
 
 The collision payload stores pointer-free model vertices, edges, polygons,

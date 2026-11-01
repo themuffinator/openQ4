@@ -451,7 +451,7 @@ namespace {
 	// openQ4-specific.
 	static const unsigned int RENDER_WORLD_CACHE_MAGIC = 0x5734514fU; // "OQ4W"
 	static const int RENDER_WORLD_CACHE_VERSION = 2;
-	static const unsigned int RENDER_WORLD_CACHE_PARSER_VERSION = 3u;	// bump when the parsed models change; 3: surface ids were uninitialised before
+	static const unsigned int RENDER_WORLD_CACHE_PARSER_VERSION = 4u;	// bump when the parsed models change; 3: surface ids were uninitialised before; 4: silhouette edges stopped at 65536
 	static const unsigned int RENDER_WORLD_CACHE_FLAGS = 0u;
 	static const unsigned int RENDER_WORLD_SHADOW_CACHE_MAGIC = 0x4834514fU; // "OQ4H"
 	static const int RENDER_WORLD_SHADOW_CACHE_VERSION = 1;
