@@ -6,6 +6,43 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Bot combat strength, 1 November 2026
+
+- Multiplayer bots now aim ahead of a moving target instead of trailing it.
+  Their aim used to follow a lag with no anticipation: a skill 5 bot trailed
+  anyone running at 320 units a second by 26 units, which is off a 32-unit
+  hull, and its turn trailed anything crossing the view by a fifth of a second
+  more. Its 2 degree fire cone then held the trigger, so the top skill fired
+  rarely and dealt about as much damage as skill 1. A new `aimAnticipation`
+  trait (0.50 at skill 1 to 0.97 at skill 5) carries the motion the bot has
+  registered forward; that motion catches up with a change of direction in
+  about half a reaction time, so juking still beats it. The turn follows the
+  aim point instead of being damped against standing still, and the hold-fire
+  gate measures the view's slew relative to the target's.
+- Skills 4 and 5 hold an automatic weapon's trigger for as long as they are on
+  target (450-1200 ms bursts and 60 ms rests at skill 5, previously 140-300 ms
+  and 80 ms). Skills 1-3 are unchanged.
+- `botlist` now prints each bot's kills, deaths, hits, shots, accuracy and
+  damage from the match statistics. `tools/tests/mp_bot_skill_ladder.py` runs
+  a free-for-all between two skill levels on the plain skill curve and reports
+  cross kills, accuracy and damage per group.
+- Measured on q4dm1, three bots a side for 180 s: skill 5 against skill 1 went
+  from 216 to 446 damage per bot-minute and from 51% to 68% accuracy, with
+  cross kills from 7:3 to 17:5; skill 1 itself stayed near 200. A skill 5
+  mirror match went from 169 to 487 damage per bot-minute and from 25 to 60
+  kills. Skill 5 beat skill 3 by 20:9 and skill 3 beat skill 1 by 17:5
+  (439/362 and 368/250 damage per bot-minute). An offline model of the aim
+  puts skill 5 on a steady strafer at 600 units for 56% of frames, against 3%
+  before, and on a fast juker for 32%.
+  The asset-free bot contracts and both native bot fixture suites pass. Not
+  done: qualification against human players. See
+  [the aim model](mp-bots.md#the-aim-model) and
+  [combat strength](mp-bots.md#combat-strength-1-november-2026).
+
+Candidate release wording: Bots fight much harder at the top skill levels.
+They now track and lead moving targets instead of trailing them, so skill 5 is
+a genuine threat; skill 1 stays beginner-friendly.
+
 ## Silhouette edges on large surfaces, 1 November 2026
 
 - The renderer's silhouette edge scratch now grows to fit each surface instead

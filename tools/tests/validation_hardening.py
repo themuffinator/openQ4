@@ -827,6 +827,9 @@ def validate_validation_wiring() -> None:
         "awakening_status_runtime.py",
         "monster_hit_materials.py",
         "mp_bot_audit.py",
+        # Skill-ladder matches launch a staged MP server on retail assets;
+        # the workflows py_compile it.
+        "mp_bot_skill_ladder.py",
         # Isolated bot jump replays launch a staged MP server and client.
         "mp_bot_jump_replay.py",
         # Impulse-death replays launch a staged MP server and client; their

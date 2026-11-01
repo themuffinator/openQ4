@@ -157,6 +157,15 @@ static float BotWeaponSplashRadius( idPlayer *self );
 // the tracking error would read as noise rather than as lag.
 static const float	BOT_ANGVEL_FILTER		= 0.25f;
 
+// How long, as a share of the reaction time, a target's change of velocity
+// takes to register in the aim.  The aim carries the registered velocity
+// forward, so a reversal is trailed for about this long at every skill.
+static const float	BOT_AIM_PERCEIVE_FRACTION	= 0.55f;
+
+// The aim point crossing the view faster than this in one frame has jumped -
+// a new target, a new route corner - rather than moved, and is not pursued.
+static const float	BOT_AIM_RATE_JUMP		= 720.0f;
+
 // The turn is integrated explicitly, and content can ask for a high turnAccel
 // with a low turnSpeed, which makes the natural frequency arbitrarily large.
 // Past roughly this much phase per frame an explicit integrator diverges, and
@@ -637,10 +646,12 @@ rvBot::rvBot( void ) {
 	aimRate.Zero();
 	aimBelief.Zero();
 	aimBeliefValid		= false;
+	aimPerceivedVelocity.Zero();
 	aimPoint.Zero();
 	aimPointValid		= false;
 	aimTrackAngles.Zero();
 	aimTrackValid		= false;
+	aimTargetRate.Zero();
 	aimAngVel			= 0.0f;
 	aimLeadRoll			= 1.0f;
 	idleScan			= false;
@@ -972,8 +983,10 @@ void rvBot::OnSpawn( void ) {
 
 	aimRate.Zero();
 	aimBeliefValid		= false;
+	aimPerceivedVelocity.Zero();
 	aimPointValid		= false;
 	aimTrackValid		= false;
+	aimTargetRate.Zero();
 	aimAngVel			= 0.0f;
 	aimLeadRoll			= 1.0f;
 	idleScan			= false;
@@ -6107,8 +6120,24 @@ void rvBot::UpdateAim( idPlayer *self, usercmd_t &cmd ) {
 				aimBelief = enemyLastSeenOrigin;
 				aimBelief.z += ( bounds[1].z - bounds[0].z ) * BOT_AIM_CHEST_FRACTION;
 			}
+			// Where someone is registers on sight; how they are moving takes a
+			// moment longer to read.
+			aimPerceivedVelocity.Zero();
 			aimBeliefValid	= true;
 		} else if ( foeVisible && !MistakeActive( BOTMISTAKE_LOSETRACK ) ) {
+			// A lag on its own trails a steady runner by speed times the time
+			// constant for as long as the run lasts - which put even skill 5
+			// off the hull of anyone moving.  The motion the bot has registered
+			// carries the belief forward first, by aimAnticipation, and the lag
+			// then corrects whatever that got wrong.  The registered velocity
+			// catches up with a change of direction in about half a reaction,
+			// so a target that reverses is trailed for a moment at every skill:
+			// that is the miss a juking player earns.
+			const float perceive = Max( MS2SEC( traits.reactionMsec ) * BOT_AIM_PERCEIVE_FRACTION, 0.01f );
+			aimPerceivedVelocity += ( foe->GetPhysics()->GetLinearVelocity() - aimPerceivedVelocity ) *
+									( 1.0f - idMath::Exp( -dt / perceive ) );
+			aimBelief += aimPerceivedVelocity * ( traits.aimAnticipation * dt );
+
 			const float alpha = 1.0f - idMath::Exp( -dt / Max( traits.aimTrackTimeConst, 0.01f ) );
 
 			aimBelief += ( truePos - aimBelief ) * alpha;
@@ -6128,7 +6157,9 @@ void rvBot::UpdateAim( idPlayer *self, usercmd_t &cmd ) {
 		const float speed = ProjectileSpeed( self );
 
 		if ( speed > 0.0f ) {
-			const idVec3 foeVel = foeVisible ? foe->GetPhysics()->GetLinearVelocity() : enemyLastSeenVelocity;
+			// Led with the motion the bot has registered, not the live one, so a
+			// rocket fired just after a reversal goes where the target was going.
+			const idVec3 foeVel = foeVisible ? aimPerceivedVelocity : enemyLastSeenVelocity;
 			const idVec3 ownVel = self->GetPhysics()->GetLinearVelocity();
 			const idVec3 gravity = ProjectileGravity( self );
 
@@ -6184,12 +6215,23 @@ void rvBot::UpdateAim( idPlayer *self, usercmd_t &cmd ) {
 
 		aimAngVel += ( mag / dt - aimAngVel ) * BOT_ANGVEL_FILTER;
 
+		// What the slew pursues.  A swing past BOT_AIM_RATE_JUMP in one frame is
+		// a new aim point, not motion, and pursuing it would fling the view.
+		if ( mag / dt > BOT_AIM_RATE_JUMP ) {
+			aimTargetRate.Zero();
+		} else {
+			aimTargetRate.pitch	+= ( dp / dt - aimTargetRate.pitch ) * BOT_ANGVEL_FILTER;
+			aimTargetRate.yaw	+= ( dy / dt - aimTargetRate.yaw ) * BOT_ANGVEL_FILTER;
+		}
+
 		if ( foe && mag > idMath::FLOAT_EPSILON ) {
 			const float lag = traits.aimTrackError * aimAngVel * 0.01f;
 
 			errPitch	= -( dp / mag ) * lag;
 			errYaw		= -( dy / mag ) * lag;
 		}
+	} else {
+		aimTargetRate.Zero();
 	}
 
 	aimTrackAngles	= pointAngles;
@@ -6219,9 +6261,18 @@ void rvBot::UpdateAim( idPlayer *self, usercmd_t &cmd ) {
 	// integrator cannot represent, and the failure mode is a spinning view.
 	wn = Min( wn, BOT_TURN_STABLE_WN / dt );
 
+	// In a fight the damping acts on the view's speed relative to the aim
+	// point's, not on its speed at all.  Damped against standing still, the
+	// slew trailed anything crossing the view by 2 x damping / wn seconds of
+	// its motion - a fifth of a second at skill 5, two body widths on a
+	// strafer at 600 units - and the cone gate refused every shot it would
+	// have missed.  Following the point is smooth pursuit; skill is in how well
+	// the point itself is placed, and in the overshoot of the corrections.
+	const idAngles pursuitRate = foe ? aimTargetRate : ang_zero;
+
 	for ( int i = 0; i < 2; i++ ) {
 		const float err		= idMath::AngleDelta( desired[i], aimAngles[i] );
-		const float accel	= wn * wn * err - 2.0f * traits.turnDamping * wn * aimRate[i];
+		const float accel	= wn * wn * err - 2.0f * traits.turnDamping * wn * ( aimRate[i] - pursuitRate[i] );
 
 		aimRate[i]		= idMath::ClampFloat( -traits.turnSpeed, traits.turnSpeed, aimRate[i] + accel * dt );
 		aimAngles[i]	= idMath::AngleNormalize180( aimAngles[i] + aimRate[i] * dt );
@@ -6616,7 +6667,13 @@ void rvBot::UpdateFire( idPlayer *self, usercmd_t &cmd ) {
 	}
 
 	const float angle			= RAD2DEG( idMath::ACos( idMath::ClampFloat( -1.0f, 1.0f, dir * aimAngles.ToForward() ) ) );
-	const float turnRate		= idMath::Sqrt( aimRate.pitch * aimRate.pitch + aimRate.yaw * aimRate.yaw );
+	// The slew that matters is the view's speed relative to the aim point's.
+	// A view tracking a strafer at close range turns faster than the hold rate
+	// while sitting on it - 230 degrees a second at 80 units - and an absolute
+	// gate refused exactly the shots a tracking player takes.
+	const float slewPitch		= aimRate.pitch - aimTargetRate.pitch;
+	const float slewYaw			= aimRate.yaw - aimTargetRate.yaw;
+	const float turnRate		= idMath::Sqrt( slewPitch * slewPitch + slewYaw * slewYaw );
 	const float fireCone		= traits.fireConeDeg * ( 0.5f + traits.initiative );
 	const float holdTurnRate	= traits.holdFireTurnRate * ( 0.5f + traits.initiative );
 	// The settle shrinks with initiative but never to nothing: at 1.0 the old
@@ -8637,7 +8694,10 @@ rvBotManager::ListBots
 void rvBotManager::ListBots( void ) const {
 	int count = 0;
 
-	gameLocal.Printf( "  cl  name             character        style        skill\n" );
+	// The match's own statistics, the ones the end-of-game screen shows, so
+	// how well each bot fights can be read off a running server: every round
+	// it fired, every one that hit, and the damage that did.
+	gameLocal.Printf( "  cl  name             character        style        skill  kills deaths   hits/shots  acc  damage\n" );
 
 	for ( int i = 0; i < MAX_CLIENTS; i++ ) {
 		if ( !bots[i].IsActive() ) {
@@ -8645,13 +8705,27 @@ void rvBotManager::ListBots( void ) const {
 		}
 
 		const rvBotCharacter *character = bots[i].GetCharacter();
+		const rvPlayerStat *stat = statManager ? statManager->GetPlayerStat( i ) : NULL;
+		int shots = 0;
+		int hits = 0;
+		if ( stat ) {
+			for ( int w = 0; w < MAX_WEAPONS; w++ ) {
+				shots += stat->weaponShots[w];
+				hits += stat->weaponHits[w];
+			}
+		}
 
-		gameLocal.Printf( "  %2d  %-16s %-16s %-12s %.1f\n",
+		gameLocal.Printf( "  %2d  %-16s %-16s %-12s %.1f  %5d %6d %6d/%-6d %3d%% %7d\n",
 						  i,
 						  bots[i].GetName(),
 						  character ? character->GetName() : "-",
 						  character ? character->GetStyleName() : "-",
-						  bots[i].GetEffectiveSkill() );
+						  bots[i].GetEffectiveSkill(),
+						  stat ? stat->kills : 0,
+						  stat ? stat->deaths : 0,
+						  hits, shots,
+						  shots > 0 ? ( hits * 100 ) / shots : 0,
+						  stat ? stat->damageGiven : 0 );
 		count++;
 	}
 

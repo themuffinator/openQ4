@@ -724,7 +724,7 @@ dead.
 `src/mpgame/bots/BotCharacter.{h,cpp}`. Difficulty used to be five numbers on a
 straight line, which made every bot at a given `bot_skill` identical and every
 match feel the same. It is now three layers of content that resolve, once per
-spawn, into one flat `botTraits_t` — 50 floats that are the only thing the
+spawn, into one flat `botTraits_t` — 51 floats that are the only thing the
 per-frame combat code reads:
 
 1. **Skill level, 1 to 5.** The baseline curve. Every trait has a value at every
@@ -772,8 +772,9 @@ The point of the curve is that the levels differ in kind, not only in degree.
 - **1** is genuinely poor and should be beatable by someone who has never played
   the map. It notices you inside a 130 degree cone at 1200 units, takes about
   390 ± 150 ms to react (a raw 460 ± 180 shortened by its eagerness, below),
-  and pays all of that again every time you break line of sight. Its aim trails
-  the truth by 0.4 seconds, carries 4.2 degrees of wandering tremor, and swings
+  and pays all of that again every time you break line of sight. Its aim
+  carries only half of your motion forward and trails the rest by 0.4 seconds,
+  carries 4.2 degrees of wandering tremor, and swings
   at 170 deg/s on an underdamped slew that still overshoots and hunts. Its 0.80
   initiative turns the raw 14 degree / 240 ms trigger values into an effective
   18.2 degree cone and 96 ms settle instead of waiting so long for bad aim to
@@ -786,23 +787,31 @@ The point of the curve is that the levels differ in kind, not only in degree.
   effective cone it settles into for about 140 ms before shooting, and
   projectiles led at about 60 % correctness.
 - **4** punishes standing still. It notices you at 2600 units across a 170
-  degree cone, reacts in 220 ms, holds a 4 degree cone, and leads well enough
-  that walking in a straight line at range is fatal.
+  degree cone, reacts in 220 ms, holds a 4 degree cone, tracks 92 % of your
+  motion, and leads well enough that running in a straight line at range is
+  fatal.
 - **5** is sharp but deliberately not an aimbot: 140 ± 45 ms reaction that it
-  still re-pays at 40 % on a re-peek, a 0.08 s tracking lag, half a degree of
+  still re-pays at 40 % on a re-peek, 97 % of your motion tracked with a
+  0.08 s lag on the rest, a reversal trailed for about 75 ms, half a degree of
   tremor it can never switch off, a 2 degree cone it refuses to shoot outside
-  of, and 97 % lead correctness with a 5 % random error — so a strafing target
-  at range still survives the occasional rocket.
+  of, and 97 % lead correctness with a 5 % random error. A steady strafe at
+  mid range is hit about half the time; unpredictable direction changes are
+  what still beat it.
 
 Awareness climbs with the same curve. `hearing` scales how far a bot hears
 fire, footsteps and pickups - 45% of the nominal range at skill 1, all of it at
 skill 5 - and `itemTiming` is how well it keeps a respawn timer it witnessed,
 from barely at all at skill 1 (0.05) to within a few percent at skill 5 (0.92).
 
-Note the trigger duty cycle runs the other way from intuition: skill 1 holds the
-trigger down about 81 % of an engagement and skill 5 about 73 %. Low skill
-*fires more* and hits far less. That is the intended read — spray and pray, not
-a nerfed rate of fire.
+The trigger duty cycle of an automatic weapon is long at both ends, for
+opposite reasons. Skill 1 holds the trigger down about 81 % of an engagement
+whether or not it is on target - spray and pray, not a nerfed rate of fire. The
+middle levels tap (skill 3 about 78 %). Skills 4 and 5 hold it for 86 % and
+93 % of the time they are on target, as a strong player does: the cone gate
+ends a burst the moment the aim leaves, and every pause costs the rest and a
+fresh settle before the next round. Before 1 November skill 5 tapped 140-300 ms
+bursts with 80 ms rests, about 60 % of its time on target once the settle is
+counted.
 
 `initiative` is taste, so it is allowed to bend competence only a little. It
 scales the reaction by a quarter at most (0.75 at 1.0, 1.25 at 0.0), widens the
@@ -825,10 +834,21 @@ high-skill bots default to waiting for a visible, settled shot.
 Skill is legible in play because it is spent on the *shape* of the aim rather
 than on a hidden accuracy roll.
 
-- **Belief.** The bot aims at where it *thinks* you are, a first-order lag
-  behind where you actually are, with a time constant of 0.4 s at skill 1 and
-  0.08 s at skill 5. On a fresh acquisition the belief snaps to the truth, so
-  an engagement never opens with the bot aiming at the last fight. Out of
+- **Belief.** The bot aims at where it *thinks* you are. Each frame the belief
+  first moves on by `aimAnticipation` of the velocity the bot has registered
+  for you - 0.50 at skill 1, 0.97 at skill 5 - and a first-order lag then pulls
+  it toward where you actually are, with a time constant of 0.4 s at skill 1
+  and 0.08 s at skill 5. The registered velocity follows your real one with a
+  time constant of 55% of the bot's reaction time (about 75 ms at skill 5,
+  250 ms at skill 1), so a change of direction is trailed for a moment at every
+  skill: that is the miss a juking player earns, and against a steady runner
+  only the unanticipated share of the motion trails. A lag alone trails a
+  steady runner by speed times the time constant for as long as the run lasts:
+  26 units at skill 5 and 320 units a second, off a 32-unit hull, so before
+  1 November no bot could keep its aim on anyone running in a straight line,
+  and the better the bot the more surely it missed. On a fresh
+  acquisition the belief snaps to the truth with no registered motion, so an
+  engagement never opens with the bot aiming at the last fight. Out of
   sight, the belief coasts on the last seen velocity for a moment, at no more
   than the speed it saw: `pursuit` runs to 2 for how long a chase lasts, and as
   a gain on that extrapolation it stops at 1.
@@ -840,6 +860,8 @@ than on a hidden accuracy roll.
   flight-time iterations combine target velocity, the bot's own velocity and
   gravity compensation, so rockets, nails, grenades and napalm receive the same
   physically consistent lead instead of treating ballistic weapons as linear.
+  The target velocity is the registered one, so a rocket fired just after a
+  reversal goes where the target was going.
 - **Tracking error.** A lag *across* the view rather than noise: the faster you
   cross the bot's screen, the further behind its aim sits.
 - **Tremor.** Two slow sine octaves, phase-seeded from the client number so no
@@ -847,7 +869,15 @@ than on a hidden accuracy roll.
   rather than as white noise, which is what the old 400 ms step offset read as.
 - **Turn.** A damped second-order slew driven by `turnSpeed`, `turnAccel` and
   `turnDamping`. Under-damping at low skill is what produces the visible
-  overshoot-and-hunt; skill 5 settles cleanly.
+  overshoot-and-hunt; skill 5 settles cleanly. In a fight the damping acts on
+  the view's speed relative to the aim point's angular speed, which is smooth
+  pursuit: the view follows a point crossing it and corrects around that.
+  Damped against standing still, as it was before 1 November, the slew trailed
+  anything crossing the view by `2 x turnDamping / natural frequency` seconds
+  of its motion - 0.22 s at skill 5, two body widths on a strafer at 600 units.
+  A point that jumps by more than 720 degrees a second in one frame (a new
+  target, a new route corner) is not pursued. With nobody to shoot at, the
+  view slews as before.
 - **Reaction.** Computed once per acquisition, never per frame, and it now
   includes a peripheral penalty scaled by how far off centre you were when the
   bot first saw you. A re-acquisition inside `reacquireMsec` still pays
@@ -860,6 +890,9 @@ than on a hidden accuracy roll.
   is released. The cone is measured against the same point the bot is aiming at,
   including the lead — a gate that tests the target centre while the aim sits on
   the lead point produces a bot that aims correctly and then refuses to shoot.
+  The slew is measured relative to the aim point's own angular speed: a view
+  tracking a strafer 80 units away turns at about 230 degrees a second while
+  sitting on it, and the absolute gate refused exactly those shots.
 - **Mistakes.** Rolled on acquisition and periodically while engaged. One of:
   lose tracking, mistime a shot, keep the wrong weapon, dodge late. A mistake is
   a bounded, readable failure rather than a silent accuracy penalty.
@@ -1242,7 +1275,7 @@ restricts delivery by the team field.
 | `addbot [name] [skill] [exact]` | Add one bot. Picks an unused name and character if none is given. The optional skill is a per-bot override that bypasses `bot_skill` and `bot_skillVariance`; `exact` requires the named character and is intended for authored matches. Builds the navmesh on first use. |
 | `removebot [name]` | Remove one bot, by name or the last one added. |
 | `kickbots` | Remove every bot. |
-| `botlist` | List the bots with their character, style and effective skill, and the state of the navmesh. |
+| `botlist` | List the bots with their character, style and effective skill, the match statistics behind how well each one fights (kills, deaths, hits and shots over every weapon, accuracy and damage given since the map started), and the state of the navmesh. |
 | `botcharacters` | List every loaded character with its style, skill band and which bot currently has it. |
 | `botreload` | Re-read style, character and chat files without a map change. Bots keep the character they are wearing where the name survives. |
 | `navmesh build` | Rebuild the navmesh, picking up a changed `bot_navCellSize`. |
@@ -1411,6 +1444,58 @@ result-flow pass for that mode.
 
 ## Testing
 
+### Combat strength, 1 November 2026
+
+The top skill level was easy, and the cause was structural rather than a
+tuning number. The aim had no anticipation at all. The belief trailed a target
+moving at a steady speed by speed times `aimTrackTimeConst` for as long as it
+kept moving: 26 units at skill 5 for a 320 unit/s runner, outside a 32-unit
+hull. On top of that, the slew was damped against standing still, so it trailed
+anything crossing the view by `2 x turnDamping / natural frequency` of its
+motion: 0.22 s at skill 5, two body widths on a strafer at 600 units. The
+tighter a level's fire cone, the more of those misses it refused. Skill 5
+therefore fired rarely and dealt about as much damage as skill 1, which
+sprayed. The fix is the anticipation, pursuit and relative-slew gate in
+[the aim model](#the-aim-model), plus long bursts for skills 4 and 5.
+
+An offline model of `UpdateAim` and the trigger gates, run against a
+320 unit/s target with multiplayer acceleration and friction, gives the share
+of frames on which a hitscan weapon's view ray is inside the hull and the
+trigger is open:
+
+| Skill | Steady runner, 600 u | Strafer, 250 u | Strafer, 600 u | Juker, 600 u |
+| --- | --- | --- | --- | --- |
+| 1 | 2.5% → 7.9% | 7.4% → 6.8% | 7.8% → 7.3% | 17.3% → 16.1% |
+| 3 | 0.7% → 33.3% | 3.3% → 12.4% | 8.0% → 16.7% | 19.2% → 13.6% |
+| 4 | 0.0% → 56.9% | 1.3% → 30.6% | 4.9% → 35.6% | 15.1% → 16.1% |
+| 5 | 0.0% → 86.3% | 1.0% → 49.4% | 2.6% → 56.4% | 7.7% → 31.5% |
+
+The strafer reverses every 400-1200 ms and the juker every 250-600 ms. Before
+the fix the lag met a reversing target only as it swung back through it, so
+the worst bots hit jukers most often.
+
+`mp_bot_skill_ladder.py` on q4dm1, three bots a side for 180 s, plain skill
+curve, with only the MP module swapped in one runtime (`.install` as staged at
+18:35, main `f62e521ea`):
+
+| Match | Module | Cross kills high:low | Damage per bot-minute, high / low | Accuracy, high / low |
+| --- | --- | --- | --- | --- |
+| 5 vs 1 | before | 7:3 | 216 / 199 | 51% / 12% |
+| 5 vs 1 | after | 17:5 | 446 / 224 | 68% / 19% |
+| 5 vs 5 | before | - | 169 (both groups) | 42% |
+| 5 vs 5 | after | - | 487 (both groups) | 63% |
+| 5 vs 3 | after | 20:9 | 439 / 362 | 71% / 31% |
+| 3 vs 1 | after | 17:5 | 368 / 250 | 32% / 17% |
+
+Before, skill 5 fired 278 rounds in the 5 vs 1 window against skill 1's
+1,037; after, 525 against 761. The skill 5 mirror went from 25 kills to 60.
+Each level now beats the one below it. These are single short matches, so the
+ratios are noisy; the damage and accuracy columns are the steadier figures.
+The asset-free bot contracts and the native bot fixtures
+(`mp_bot_regressions.py`, `mp_bot_jump_trajectories.py`) pass. Not measured:
+play against people, which is the qualification that matters for how hard
+skill 5 feels.
+
 ### Unpressed WALK falls and timing evidence, 28 October 2026
 
 The five-minute six-bot DM8 audit in
@@ -1564,6 +1649,16 @@ Timed rates retain their measurement window; warmup and complete-run world
 deaths are separate report fields and both contribute to the safety gate.
 The report also keeps the final team scores (CTF captures, DeadZone points)
 and every bot's score.
+
+**Skill ladder.** `tools/tests/mp_bot_skill_ladder.py --basepath <retail-install>`
+measures what a skill level is worth in a fight. A hidden listen server runs
+a free-for-all between two groups of bots (`--per-group`, default three) that
+differ only in skill (`--high-skill`, `--low-skill`), with `bot_characters 0`
+so no style or character separates them. It reports the cross kills - how
+often each group killed the other - and each group's accuracy and damage per
+bot-minute, differenced from `botlist` at the start and end of the window.
+`--min-cross-ratio` turns the high group's margin into a gate; one skill on
+both sides gives an absolute figure for that level.
 
 **Impulse-exclusion policy (decided 21 October 2026).** The traversal gate
 counts navigation and control deaths. `--classify-impulses` (with

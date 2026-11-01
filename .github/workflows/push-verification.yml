@@ -131,6 +131,7 @@ jobs:
             tools/tests/mp_match_flow_smoke.py \
             tools/tests/mp_bot_gameplay_smoke.py \
             tools/tests/mp_bot_audit.py \
+            tools/tests/mp_bot_skill_ladder.py \
             tools/tests/mp_bot_impulse_replay.py \
             tools/tests/mp_bot_drop_replay.py \
             tools/tests/mp_bot_rim_replay.py \

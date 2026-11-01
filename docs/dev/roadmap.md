@@ -1748,6 +1748,21 @@ claim peer combinations that have not been tested.
   ([evidence](mp-network-qualification.md#congestion-rate-control-and-burst-loss-24-october-2026)).
   Whether the server should adapt its rate on its own is a design decision;
   the networking guide tells players to lower `net_clientMaxRate`.
+- [ ] **MP-09 — P1, implementation and qualification: bot combat strength.**
+  Each skill level fights as [its description](mp-bots.md#what-each-skill-level-feels-like)
+  says, and skill 5 threatens a strong player. Gates: on the plain skill curve,
+  `mp_bot_skill_ladder.py` shows every level beating the one below it on cross
+  kills and damage, with skill 1 still beatable. Then play against people
+  confirms skill 5 is hard but beatable by movement.
+  Progress, 1 November: skill 5 was easy because the aim had no anticipation.
+  It trailed a steady runner by 26 units, off the hull, and the turn trailed
+  anything crossing the view by 0.22 s. The tight cone then held the trigger,
+  so skill 5 dealt about skill 1's damage. A new `aimAnticipation` trait, a
+  slew that pursues the aim point, a relative hold-fire gate and long bursts at
+  skills 4-5 fix it. Skill 5 against skill 1 went from 216 to 446 damage per
+  bot-minute and from 7:3 to 17:5 cross kills; 5 beats 3 (20:9) and 3 beats 1
+  (17:5) ([evidence](mp-bots.md#combat-strength-1-november-2026)). Remaining:
+  play against people, and retuning the curve from what that shows.
 
 ## Audio and voice
 

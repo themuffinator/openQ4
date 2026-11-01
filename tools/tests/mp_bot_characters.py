@@ -66,6 +66,7 @@ TRAIT_DIRECTION = {
     "turnAccel": +1,
     "turnDamping": +1,
     "aimTrackTimeConst": -1,
+    "aimAnticipation": +1,
     "aimTremorDeg": -1,
     "aimTrackError": -1,
     "aimSettleMsec": -1,

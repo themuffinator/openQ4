@@ -60,7 +60,10 @@ IMPULSE = re.compile(
     r"kick=(\S+) (\S+) (\S+) velocity=(\S+) (\S+) (\S+) def=(\S+)(?: health=(-?\d+))?(?: knock=(\d+))?", re.M)
 WORLD_DEATH = re.compile(r"^(\S+) (?:was killed by world|died|drowned|dissolved in slime|burned in lava)$", re.M)
 WORLD_HIT = re.compile(r"^bot (\S+): hit by world for \d+ at (\S+) (\S+) (\S+) .*\(time (\d+)\)$", re.M)
-ROSTER = re.compile(r"^\s*(\d+)\s+(\S+)\s+\S+\s+\S+\s+[\d.]+\s*$", re.M)
+# `botlist` rows: client, name, character, style, skill, then (since the combat
+# columns) kills, deaths, hits/shots, accuracy and damage.
+ROSTER = re.compile(r"^\s*(\d+)\s+(\S+)\s+\S+\s+\S+\s+[\d.]+"
+                    r"(?:\s+\d+\s+\d+\s+\d+/\d+\s+\d+%\s+\d+)?\s*$", re.M)
 
 
 def strip_colours(text: str) -> str:

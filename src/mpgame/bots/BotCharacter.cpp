@@ -89,6 +89,12 @@ static const botTraitDef_t botTraitTable[] = {
 	BOTTRAIT( turnAccel,			50.0f,		40000.0f,	750.0f,		1350.0f,	2400.0f,	4800.0f,	9000.0f ),
 	BOTTRAIT( turnDamping,			0.1f,		3.0f,		0.42f,		0.55f,		0.70f,		0.90f,		1.10f ),
 	BOTTRAIT( aimTrackTimeConst,	0.01f,		2.0f,		0.40f,		0.30f,		0.22f,		0.14f,		0.08f ),
+	// A pure lag trails a target moving at a steady speed by speed times the
+	// time constant, for ever: 26 units at skill 5 and 320 units a second,
+	// which is off a 32-unit hull, so the best bot could not hit anyone
+	// running in a straight line.  This is how much of the motion it has
+	// perceived the aim carries forward instead; what is left still trails.
+	BOTTRAIT( aimAnticipation,		0.0f,		1.0f,		0.50f,		0.72f,		0.85f,		0.92f,		0.97f ),
 	BOTTRAIT( aimTremorDeg,			0.0f,		30.0f,		4.2f,		3.0f,		2.1f,		1.2f,		0.5f ),
 	BOTTRAIT( aimTremorRateHz,		0.05f,		10.0f,		0.6f,		0.8f,		1.1f,		1.4f,		1.8f ),
 	BOTTRAIT( aimTrackError,		0.0f,		20.0f,		2.8f,		2.1f,		1.5f,		0.8f,		0.3f ),
@@ -102,9 +108,14 @@ static const botTraitDef_t botTraitTable[] = {
 	// -- trigger --
 	BOTTRAIT( fireConeDeg,			0.25f,		45.0f,		14.0f,		10.0f,		6.5f,		4.0f,		2.0f ),
 	BOTTRAIT( holdFireTurnRate,		10.0f,		4000.0f,	1000.0f,	700.0f,		500.0f,		340.0f,		220.0f ),
-	BOTTRAIT( burstMinMsec,			30.0f,		4000.0f,	480.0f,		380.0f,		300.0f,		210.0f,		140.0f ),
-	BOTTRAIT( burstMaxMsec,			30.0f,		8000.0f,	1400.0f,	1000.0f,	700.0f,		460.0f,		300.0f ),
-	BOTTRAIT( burstPauseMsec,		0.0f,		2000.0f,	220.0f,		180.0f,		140.0f,		110.0f,		80.0f ),
+	// Long and short at both ends, for opposite reasons.  A novice holds the
+	// trigger down whether or not it is on target; a strong player holds it
+	// for as long as it is, and the cone gate ends the burst the moment the
+	// aim leaves.  The pause is what skill buys down: every one costs the
+	// rest and then a fresh settle before the next round.
+	BOTTRAIT( burstMinMsec,			30.0f,		4000.0f,	480.0f,		380.0f,		300.0f,		320.0f,		450.0f ),
+	BOTTRAIT( burstMaxMsec,			30.0f,		8000.0f,	1400.0f,	1000.0f,	700.0f,		900.0f,		1200.0f ),
+	BOTTRAIT( burstPauseMsec,		0.0f,		2000.0f,	220.0f,		180.0f,		140.0f,		100.0f,		60.0f ),
 
 	// -- mistakes --
 	BOTTRAIT( mistakeChance,		0.0f,		1.0f,		0.45f,		0.32f,		0.20f,		0.10f,		0.03f ),

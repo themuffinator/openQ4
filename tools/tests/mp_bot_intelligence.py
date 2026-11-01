@@ -575,6 +575,34 @@ def validate_weapons_aim_and_fire(bot: str, combat: str) -> None:
         r"flight\s*=.*?gravityCompensation",
         "rvBot::UpdateAim iterative ballistic flight solution",
     )
+    # A pure lag trails a steady runner by speed x time constant forever, and
+    # a slew damped against standing still trails anything crossing the view:
+    # together they kept skill 5 off the hull of every moving target.  The
+    # belief carries the registered motion forward, and the slew is damped
+    # relative to the aim point's own angular rate.
+    require_all(
+        update_aim,
+        (
+            "aimPerceivedVelocity += ( foe->GetPhysics()->GetLinearVelocity() - aimPerceivedVelocity )",
+            "aimBelief += aimPerceivedVelocity * ( traits.aimAnticipation * dt )",
+            "const idVec3 foeVel = foeVisible ? aimPerceivedVelocity : enemyLastSeenVelocity",
+            "mag / dt > BOT_AIM_RATE_JUMP",
+            "const idAngles pursuitRate = foe ? aimTargetRate : ang_zero",
+            "( aimRate[i] - pursuitRate[i] )",
+        ),
+        "rvBot::UpdateAim motion anticipation and smooth pursuit",
+    )
+    require_before(
+        update_aim,
+        "aimBelief += aimPerceivedVelocity * ( traits.aimAnticipation * dt )",
+        "aimBelief += ( truePos - aimBelief ) * alpha",
+        "rvBot::UpdateAim anticipation before the lag correction",
+    )
+    # A fresh belief starts with no registered motion: velocity takes a
+    # moment to read, which is part of every reaction.
+    fresh_belief = update_aim[update_aim.index("if ( !aimBeliefValid )") :]
+    fresh_belief = fresh_belief[: fresh_belief.index("aimBeliefValid	= true;")]
+    require(fresh_belief, "aimPerceivedVelocity.Zero()", "rvBot::UpdateAim fresh belief")
 
     fire = function_body(bot, "void rvBot::UpdateFire", "rvBot::UpdateFire")
     require_all(
@@ -598,6 +626,11 @@ def validate_weapons_aim_and_fire(bot: str, combat: str) -> None:
             "const idVec3 firePoint = eye + aimAngles.ToForward() * shotRange;",
             "BotCombatLineOfFireIsSafe( self, foe, eye, firePoint, splashRadius,",
             "!suppressing",
+            # The hold-fire slew is the view's speed relative to the aim
+            # point's: tracking a close strafer turns faster than the hold
+            # rate while sitting on target.
+            "const float slewPitch		= aimRate.pitch - aimTargetRate.pitch;",
+            "const float slewYaw			= aimRate.yaw - aimTargetRate.yaw;",
         ),
         "rvBot::UpdateFire settle, cadence and safety gates",
     )

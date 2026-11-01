@@ -402,7 +402,8 @@ private:
 
 	// -- aim --
 	// The bot aims at where it BELIEVES the target is, which trails where the
-	// target actually is by aimTrackTimeConst.  aimPoint is that belief plus
+	// target actually is by aimTrackTimeConst, less the share of its perceived
+	// motion aimAnticipation carries forward.  aimPoint is that belief plus
 	// the projectile lead, and it is what both the view and the fire cone are
 	// measured against - if the two disagreed the bot would aim at the lead
 	// point and then refuse to shoot because the centre was outside the cone.
@@ -410,10 +411,12 @@ private:
 	idAngles				aimRate;			// degrees/second, the slew's own velocity
 	idVec3					aimBelief;
 	bool					aimBeliefValid;
+	idVec3					aimPerceivedVelocity;	// the target's velocity as the bot has registered it
 	idVec3					aimPoint;
 	bool					aimPointValid;
 	idAngles				aimTrackAngles;		// last frame's angles to the aim point
 	bool					aimTrackValid;
+	idAngles				aimTargetRate;		// degrees/second, low passed: how fast the aim point crosses the view
 	float					aimAngVel;			// degrees/second, low passed
 	float					aimLeadRoll;		// this burst's lead error multiplier
 	float					tremorPhase[4];		// seeded from clientNum so no two bots shake in step

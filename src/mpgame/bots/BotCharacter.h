@@ -121,6 +121,7 @@ typedef struct botTraits_s {
 	float			turnAccel;				// degrees/second^2; low values make the view lag and then overshoot
 	float			turnDamping;			// damping ratio of the slew; below 1.0 overshoots and hunts, 1.0 settles cleanly
 	float			aimTrackTimeConst;		// seconds; first-order lag of the believed target position behind the real one
+	float			aimAnticipation;		// 0..1, share of the target's perceived motion the aim follows instead of trailing
 	float			aimTremorDeg;			// degrees, amplitude of the continuous hand tremor
 	float			aimTremorRateHz;		// Hz, how fast that tremor wanders; low and wide reads as an unsteady hand
 	float			aimTrackError;			// degrees of cross-view lag per 100 degrees/second of target angular rate
