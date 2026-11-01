@@ -1,9 +1,10 @@
 # Content pack distribution
 
-> **Status:** proposal, 1 November 2026. Nothing here is scheduled. Adopting it means
-> copying the work items at the end into the [roadmap](roadmap.md), which stays the
-> only scheduling authority. Measurements are from main at `f62e521ea` and the
-> published 0.12.0 to 0.13.2 packages.
+> **Status:** adopted 1 November 2026 as roadmap items PKG-01 to PKG-06 under
+> [desktop platforms and packaging](roadmap.md#desktop-platforms-and-packaging). The
+> roadmap holds their priorities and exit conditions; this page keeps the
+> measurements, constraints and design behind them. Measurements are from main at
+> `f62e521ea` and the published 0.12.0 to 0.13.2 packages.
 
 Every openQ4 release is a full download, and almost all of it is `baseoq4/pak1.pk4`, a
 pack that changes in fewer than half of the releases. This page records the
@@ -185,55 +186,16 @@ Estimates for the Windows x64 package; other platforms differ by a few megabytes
 | Update after a deliberate rebake | 890 MB | 45 MB plus pak1 | 45 MB plus only the rebaked pack |
 | Dedicated server | 890 MB | 840 MB | about 45 MB |
 
-## Proposed work items
+## Work items
 
-These would join "Desktop platforms and packaging" in the roadmap; their numbering is
-provisional.
+The strategy is tracked in the [roadmap](roadmap.md#desktop-platforms-and-packaging),
+which states each item's scope and exit condition:
 
-- [ ] **PKG-01 (P1, implementation): update archives and content-pack status in every
-  release.** No engine change. Each release publishes, beside the full packages, a
-  per-platform update archive with everything except the bulk pack(s), and moves the
-  Windows PDBs into a symbols asset as Linux and macOS already do. Release notes state
-  each content pack's status ("unchanged since 0.13.0" or "changed: N MB"). The
-  missing- or mismatched-pack startup error names the content pack and where to get it
-  through a localised string. Policy: a patch release does not touch bulk content.
-  Exit: the release verifier proves that the previous full package plus the new update
-  archive is byte-identical to the new full package, and that every platform package
-  carries the same bulk-pack bytes.
-- [ ] **PKG-02 (P1, implementation): split pak1 by change rate and audience.** Move the
-  gameplay files to pak0; create pak1 (light grids) and pak2 (loadscreens); generate
-  the pack table and drive validation, the pure list, the dedicated server's optional
-  packs, the packager, the verifiers and Android packaging from it. Build each content
-  pack once, keyed by a hash of its source manifest, and reuse the published file when
-  the hash is unchanged, which also removes the per-platform repack. The transition
-  release is a full download; the installer and update notes delete the retired pack.
-  Exit: two consecutive release candidates with unchanged content produce identical
-  content packs on every platform; a dedicated server starts and hosts without pak1 and
-  pak2; a client keeps its loadscreens and light grids on a pure server without them.
-- [ ] **PKG-03 (P1, decision and implementation): ship only what the runtime reads.**
-  Drop atlas TGAs for maps whose `.lightgridpack` is valid (-170 MB), after a load test
-  of every shipped map proves each pack is accepted, and bake a pack for `waste`.
-  Decide the loadscreen format as above. Exit: every shipped map and loadscreen renders
-  identically before and after, on each renderer, from release packs alone.
-- [ ] **PKG-04 (P2, implementation): overlay packs.** Release tooling builds an overlay
-  from the files changed since the last content generation, enforces a size budget
-  beyond which it proposes a new generation instead, and folds overlays when the
-  generation is bumped. Exit: a one-file content fix ships as an overlay under 5 MB and
-  validates like any other pack.
-- [ ] **PKG-05 (P2, implementation): delta-aware channels.** AppImages carry update
-  information (`gh-releases-zsync|themuffinator|openQ4|latest|<pattern>.zsync`) and
-  publish `.zsync` files, so AppImageUpdate fetches only changed blocks. The Windows
-  installer checks each content pack's SHA-256 (`GetSHA256OfFile`) and, when a pack is
-  missing or different, downloads it from a release URL and digest compiled into the
-  installer (`DownloadTemporaryFile` with a required SHA-256), so a small installer
-  updates an existing install. Optionally, an itch.io channel pushed with butler, whose
-  app applies binary patches automatically. Exit: measured update downloads for one
-  release on each channel.
-- [ ] **PKG-06 (P3, decision): in-game updater and content storage.** A built-in
-  updater needs an HTTPS client, a signed manifest, atomic replacement of locked files,
-  elevation for system-wide installs and a security review against the rule above.
-  Decide only after PKG-01 to PKG-05 show what remains. In the same decision: whether a
-  signed macOS app keeps content packs outside the bundle (or uses Sparkle deltas),
-  Android asset delivery, and whether the 2.8 GB of baked sources under
-  `content/baseoq4/pak1` (2.93 GB of a 3.1 GB checkout) should leave Git for published,
-  digest-pinned artifacts that the build fetches.
+| Item | Priority | Rule it delivers |
+| --- | --- | --- |
+| PKG-01: update archives and content-pack status | P1 | 2, 3 (no engine change) |
+| PKG-02: split pak1 by change rate and audience | P1 | 1, 2, 3 |
+| PKG-03: ship only what the runtime reads | P1 | 4, and the loadscreen format decision |
+| PKG-04: overlay packs | P2 | 5 |
+| PKG-05: delta-aware channels | P2 | 6 |
+| PKG-06: in-game updater and content storage | P3 decision | Keeps the "No updater" constraint's download rule |

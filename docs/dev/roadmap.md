@@ -110,7 +110,7 @@ release. GitHub remains the source for subsequent discussion and PR/check state.
 | 2. Close product gaps — in progress | UI-01/UI-02 plus the first UI-06 editor round trip, UI-07 measurements and UI-09 toolkit work, then UI-03/UI-04 at accepted scope; Q4-02 through Q4-05/Q4-07, MP-01 through MP-08, AUD-01; selected VR-01/VR-06 and AND-01/AND-03 scope | Required player flows work through the intended UI and runtime; remaining unsupported cases are explicit and fail safely. |
 | 3. Improve motion and rendering | HF-03 through HF-08, VK-01 through VK-07, REN-01 through REN-08 | Visible gameplay meets declared correctness, latency and frame-time budgets with rollback paths intact. |
 | 4. Complete tools and broader quality | Remaining UI-06 scope, CORE-01 through CORE-06, remaining P2 items; TOOL-01 through TOOL-04 only when the paused map-editor work resumes | Authoring and runtime workloads meet their stated completion gates; optimizations are justified by measurements. |
-| 5. Qualify packages and promote scope | PLAT-01 through PLAT-05, REL-01 through REL-04, UI-07/UI-08/UI-11, VR-02, AND-02 and selected AND-05 scope | Exact release packages pass the selected platform, device, gameplay, visual and human acceptance matrix. |
+| 5. Qualify packages and promote scope | PLAT-01 through PLAT-05, PKG-01 through PKG-05, REL-01 through REL-04, UI-07/UI-08/UI-11, VR-02, AND-02 and selected AND-05 scope | Exact release packages pass the selected platform, device, gameplay, visual and human acceptance matrix. |
 
 Independent workstreams may proceed together. GPU/renderer optimization depends on
 the current timing and workload baseline; UI cutover depends on its complete
@@ -128,6 +128,7 @@ to a final project-wide phase. Important dependencies are:
 | Vulkan/Quest VR integration | VR-06 fault-safe lifecycle and current renderer/module contracts; Android variants also need AND-01 packaging/verifier work. Existing GL headset qualification can proceed independently. |
 | Android sustained operation | AND-02 includes AUD-03/CORE-03 aggregate memory and cancellation behavior, not only renderer FPS. |
 | Modern-renderer promotion | Each REN-01 shared-domain gate is separate from REN-02 aggregate visible-lighting ownership. Keep their defaults and rollback decisions independent. |
+| Content pack split, trim and overlays (PKG-02 through PKG-04) | PKG-01's verifier first proves identical bulk-pack bytes across platforms and consecutive candidates. Client-only packs need their pure-server exemption before the dedicated server drops them. |
 
 ## Governance and baseline evidence
 
@@ -2066,7 +2067,8 @@ Sources: [audio implementation and remaining limits](audio-modernization.md),
 
 Sources: [platform support](platform-support.md), [Deck QA](steam-deck-qa.md),
 [Linux ARM64 evidence](linux-arm64-signoff-evidence.md),
-[macOS policy](macos-support-matrix-policy.md), [macOS evidence](macos-signoff-evidence.md).
+[macOS policy](macos-support-matrix-policy.md), [macOS evidence](macos-signoff-evidence.md),
+[content pack distribution](content-pack-distribution.md).
 
 - [ ] **PLAT-01 — P1, qualification: Linux x64 and Steam Deck hardware breadth.**
   Broaden physical GNOME/KWin/wlroots/SteamOS, Wayland/XWayland, audio/input hotplug,
@@ -2099,6 +2101,56 @@ Sources: [platform support](platform-support.md), [Deck QA](steam-deck-qa.md),
   Intel/universal2/Rosetta publication, removing the Metal-bridge package, native
   Metal and retiring comparison backends require explicit policy and evidence
   decisions; an old plan is not authorization to change the current release matrix.
+- [ ] **PKG-01 — P1, implementation: update archives and content-pack status.**
+  Every package carries the whole `pak1.pk4` (798 MB on main, 88% of the 0.13.2
+  Windows zip), although its sources changed in only 6 of the last 15 release
+  intervals. Beside each full package, publish a per-platform update archive with
+  everything except the bulk pack(s), and move the Windows PDBs into a symbols asset
+  as Linux and macOS already do. Release notes state each content pack's status, and
+  the missing- or mismatched-pack startup error names the pack and where to get it
+  through a localised string. Patch releases do not change bulk content. Exit: the
+  release verifier proves that the previous full package plus the update archive is
+  byte-identical to the new full package, and that every platform package carries
+  the same bulk-pack bytes.
+- [ ] **PKG-02 — P1, implementation: split pak1 by change rate and audience.** Move
+  the `liquid_lab` map and the script overrides to pak0, light grids to pak1 and
+  loadscreens to pak2. A generated pack table (name, digest, size, client-only)
+  drives `ValidateOpenQ4Paks`, `IsOpenQ4PurePack`, the dedicated server's optional
+  packs, the packager, the archive verifiers and Android packaging. Build each
+  content pack once, keyed by its source-manifest hash, and reuse the published file
+  while that hash is unchanged. Client-only packs leave the server's pure list. The
+  transition release is a full download, and the installer deletes the retired pack.
+  Exit: consecutive candidates with unchanged content produce identical content
+  packs on every platform; a dedicated server starts and hosts without pak1 and
+  pak2; a client keeps its loadscreens and light grids on a pure server without them.
+- [ ] **PKG-03 — P1, decision and implementation: ship only what the runtime reads.**
+  Drop light-grid atlas TGAs for maps with a valid `.lightgridpack` (170 MB) once a
+  load test of every shipped map accepts each pack, and bake a pack for `waste`.
+  Decide the loadscreen format: DDS only saves 455 MB but needs every loadscreen
+  path on GL, Vulkan and GLES, at every texture-quality setting, to read the DDS, and
+  a visual review of DXT1 on large displays. Exit: every shipped map's lighting is
+  unchanged and every loadscreen shows in the approved format on each renderer, from
+  release packs alone.
+- [ ] **PKG-04 — P2, implementation: overlay packs.** Ship a content fix between
+  content generations as `pak3.pk4` to `pak9.pk4`; numbered packs load by number but
+  wider numerals load first, so `pak10.pk4` would lose to `pak9.pk4`. Release
+  tooling builds the overlay from the files changed since the generation, enforces a
+  size budget beyond which it proposes a new generation, and folds overlays when the
+  generation is bumped. Exit: a one-file content fix ships as a validated overlay
+  under 5 MB.
+- [ ] **PKG-05 — P2, implementation: delta-aware channels.** AppImages carry
+  `gh-releases-zsync` update information and publish `.zsync` files. The Windows
+  installer checks each content pack's SHA-256 and downloads only a missing or
+  different pack, from a release URL and digest compiled into the installer.
+  Optionally publish an itch.io channel with butler. Exit: measured update downloads
+  for one release on each channel.
+- [ ] **PKG-06 — P3, decision: in-game updater and content storage.** A built-in
+  updater needs an HTTPS client (current builds have none), a signed manifest,
+  atomic replacement of locked files, elevation for system-wide installs and a
+  security review; a network reply must never choose what is downloaded. Decide
+  after PKG-01 through PKG-05, together with content packs outside a signed macOS app
+  (or Sparkle deltas), Android asset delivery, and whether the 2.8 GB of baked
+  sources under `content/baseoq4/pak1` leave Git for digest-pinned artifacts.
 
 ## Engine loading safety and developer tools
 
