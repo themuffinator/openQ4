@@ -1593,7 +1593,7 @@ void idUserInterfaceRetained::Redraw(int time, bool useAspectCorrection) {
 // last, as the stock menus' does; only controller navigation hides it, as the
 // stock menus' controllerNavigation did, until the mouse moves again.
 void idUserInterfaceRetained::DrawCursor() {
-	if ((impl->suspended && !impl->pointerPlaced) || idKeyInput::LastInputWasController()) return;
+	if ((impl->suspended && !impl->pointerPlaced) || idKeyInput::LastInputWasController() || idKeyInput::LastPointerWasTouch()) return;
 	Viewport viewport;
 	if (!RetainedUI_DefaultViewport(viewport)) return;
 	const CursorTransform transform(viewport);

@@ -2497,6 +2497,7 @@ static void SDL3_HandleFingerEvent(const SDL_TouchFingerEvent &event, int eventT
 	} else if (!s_touchscreenFingerActive || event.fingerID != s_touchscreenFingerId || event.touchID != s_touchscreenDeviceId) {
 		return;
 	}
+	idKeyInput::NotePointerSource(true);
 
 	int windowWidth = SCREEN_WIDTH;
 	int windowHeight = SCREEN_HEIGHT;
@@ -2520,6 +2521,12 @@ static void SDL3_HandleFingerEvent(const SDL_TouchFingerEvent &event, int eventT
 		if (routed || acceptsLoadingInput) {
 			SDL3_QueueMouseButtonEvent(K_MOUSE1, down, eventTime, routed);
 		}
+	}
+	// A lifted finger leaves no pointer behind in the retained menus, so the
+	// control it touched does not stay lit as a hovered one (section 13.6).
+	if (up && routed && RetainedUI_IsOpen() && !(console && console->Active())) {
+		retainedUIInput_t leave; leave.kind = retainedUIInput_t::POINTER_LEAVE;
+		RetainedUI_QueueInput(leave,eventTime);
 	}
 
 	if (up) {
@@ -5469,6 +5476,8 @@ bool Sys_SDL_PumpEvents(void) {
 
 			case SDL_EVENT_MOUSE_MOTION:
 			{
+				// Touch synthesises no mouse events (SDL_HINT_TOUCH_MOUSE_EVENTS 0).
+				idKeyInput::NotePointerSource(false);
 				if (RetainedUI_IsOpen() && !(console && console->Active())) {
 					if (SDL3_ShouldRouteMenuMouse() && !SDL3_IsMouseCaptured())
 						SDL3_QueueRetainedPointer(event.motion.x,event.motion.y,eventTime);
@@ -5542,6 +5551,7 @@ bool Sys_SDL_PumpEvents(void) {
 
 			case SDL_EVENT_MOUSE_BUTTON_DOWN:
 			case SDL_EVENT_MOUSE_BUTTON_UP: {
+				idKeyInput::NotePointerSource(false);
 				const bool routedMouseInput = SDL3_IsMouseCaptured() || SDL3_ShouldRouteMenuMouse();
 				if (RetainedUI_IsOpen() && !(console && console->Active()) && SDL3_ShouldRouteMenuMouse())
 					SDL3_QueueRetainedPointer(event.button.x,event.button.y,eventTime);

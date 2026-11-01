@@ -70,7 +70,7 @@ struct CVars {
     void SetCVarBool(const char* n,bool v){SetCVarInteger(n,v);}
     void SetCVarFloat(const char* n,float v){values[n]=std::to_string(v);}
 } vars, *cvarSystem=&vars;
-struct idKeyInput {static bool controller;static bool LastInputWasController(){return controller;}};
+struct idKeyInput {static bool controller;static bool LastInputWasController(){return controller;}static bool LastPointerWasTouch(){return false;}};
 bool idKeyInput::controller=false;
 struct CVar {float v=0; bool GetBool()const{return v!=0;} float GetFloat()const{return v;}};
 CVar g_turboMode, in_angleSpeedKey{1.5f}, in_yawSpeed{140}, in_pitchSpeed{140};

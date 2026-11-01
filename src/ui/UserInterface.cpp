@@ -1479,6 +1479,10 @@ void idUserInterfaceLocal::DrawCursor() {
 	if ( controllerNavigation ) {
 		return;
 	}
+	// A finger points for itself: touch draws no cursor (section 13.6).
+	if ( idKeyInput::LastPointerWasTouch() ) {
+		return;
+	}
 	if ( !desktop || desktop->GetFlags() & WIN_MENUGUI ) {
 		uiManagerLocal.dc.DrawCursor(&cursorX, &cursorY, 32.0f );
 	} else {

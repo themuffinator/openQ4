@@ -4353,6 +4353,7 @@ static int glyphFamily=0; // what the HUD's family function returns
 int Sys_SDL_GamepadGlyphFamily(int faceLabels[4]){for(int i=0;i<4;++i)faceLabels[i]=0;return glyphFamily;}
 struct idKeyInput {
     static inline bool controller=false;static bool LastInputWasController(){return controller;}
+    static inline bool touch=false;static bool LastPointerWasTouch(){return touch;}
     static bool MenuConfirmSwapped(void);static int MenuControllerKey(int keynum);
 };
 enum {K_JOY3=3,K_JOY4=4};

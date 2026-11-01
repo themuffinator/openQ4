@@ -212,6 +212,11 @@ made them too large to load.
   levelshot frame shows the generic art
   ([every portrait view](ui/retained-screens.md#every-portrait-view-and-other-aspect-ratios-1-november-2026),
   visual specification 1.36).
+- [x] Touch in the menus: lists drag with a finger, a touch moved past 8 dp
+  is no longer a tap, and a finger leaves no cursor or hover behind
+  ([touch](ui/retained-screens.md#touch-in-the-menus-1-november-2026), INP-014
+  partial); inertia, long-press, swipes, haptics, the safe area and device
+  qualification remain.
 - [ ] Bound acceptance evidence remains.
 
 ## Windows stay see-through at any distance, 29 October 2026

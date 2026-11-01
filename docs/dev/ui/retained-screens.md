@@ -2428,6 +2428,41 @@ The native pages and menus groups pass, and `ui_retained_gate.py` passes.
 Captured on OpenGL at 9:16 (540x960), 3:4 (768x1024) and 16:9 (1280x720)
 for the `arena`, `arenamatch` and `arenaresult` scenarios.
 
+## Touch in the menus (1 November 2026)
+
+A finger in the menus acted as a mouse: the new cursor stood where it last
+touched, the control under it stayed lit after the finger lifted, a list
+scrolled only by its 24 dp scrollbar, and a touch that slid off-line still
+activated where it was released. Now (section 13.6, INP-014; the routing in
+[input routing](input-routing.md#touch-in-the-menus-1-november-2026)):
+
+- **No cursor and no leftover hover.** While a finger leads, the menus draw
+  no cursor (the retained adapter's and the stock GUIs'), and a lifted finger
+  leaves no pointer behind, so nothing stays lit where it was.
+- **Lists follow the finger.** A touch pressed in a scrolling list (Load and
+  Save Game, Demos, Join Game's servers, CHAPTERS, the settings pages' rows)
+  drags its content once it moves past 8 dp, more up or down than across; the
+  press is cancelled, so the row under the finger is not chosen.
+- **A moved touch is not a tap.** Past 8 dp in any direction the press no
+  longer activates on release. Sliders and scrollbar thumbs keep their own
+  drag, and a mouse keeps the desktop rules.
+
+The scrollbar runtime test adds the gestures (a tap under 8 dp, a sideways
+move, a drag that the content follows, a finger on the thumb, a mouse that
+does not drag); the input, adapter and contract harnesses take the new
+pointer source. Not yet: inertia, the rim light at a list's ends, long-press
+details, tab-strip swipes, press haptics and qualification on a device.
+
+**Touch target sizes.** Measured in a 9:16 view, most targets are 44 dp of
+the canvas or more (rows 96, plates about 58), but a few stay small: the
+notices' actions (22), Join Game's footer filters and spinner (29), its sort
+headings, Demos' tags and the bottom band's REFRESH LIST (33-36) and the
+Arena's difficulty steps (34). The 960 dp canvas spans a phone's width, so a
+physical 48 dp target is about 110 canvas dp on a portrait phone; reaching it
+takes the Phone viewing profile's interface scale (section 13.2), not more
+growth in these layouts. The window's safe area (a camera cutout, the status
+and gesture bars) is not yet read either.
+
 ## Every portrait view and other aspect ratios (1 November 2026)
 
 A survey at 32:9, 21:9, 5:4, 1:1, 4:5 and 9:21 found every page on the screen

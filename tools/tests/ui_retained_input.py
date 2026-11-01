@@ -52,6 +52,8 @@ struct RadialCvars {
 } radialCvars,*cvarSystem=&radialCvars;
 struct idKeyInput {
     static inline bool swapped=false;
+    static inline bool touch=false;
+    static bool LastPointerWasTouch() { return touch; }
     static int MenuControllerKey(int key) { return swapped && (key==K_JOY3 || key==K_JOY4) ? (key==K_JOY3 ? K_JOY4 : K_JOY3) : key; }
     static inline bool held[K_LAST_KEY]={};
     static inline int bindings[K_LAST_KEY]={};
@@ -99,6 +101,8 @@ struct FakeRuntime {
     void CancelInput(double) { ++cancels; }
     void PointerButton(bool down,double) { received.push_back({openq4::ui::RoutedInput::Kind::PointerButton,openq4::ui::MenuInput::Accept,down}); }
     void PointerMove(float a,float b,double) { x=a;y=b; }
+    bool touchPointer=false;
+    void SetTouchPointer(bool touch) { touchPointer=touch; }
     void MenuAction(openq4::ui::MenuInput menu,bool down,double) {
         received.push_back({openq4::ui::RoutedInput::Kind::Menu,menu,down});
         if(menu==openq4::ui::MenuInput::Back && down) actions.push_back({openq4::ui::ControlAction::Kind::Back,"doc","",""});

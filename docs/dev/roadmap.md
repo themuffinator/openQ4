@@ -985,7 +985,11 @@ archived provenance; new scheduling belongs here.
   (visual specification 1.35). Menu levels and the fixed-growth pages then
   took their column in
   [every portrait view that holds it](ui/retained-screens.md#every-portrait-view-and-other-aspect-ratios-1-november-2026)
-  (visual specification 1.36).
+  (visual specification 1.36). On a touchscreen the menus' lists now
+  [drag with the finger](ui/retained-screens.md#touch-in-the-menus-1-november-2026),
+  a moved touch is no longer a tap and a finger leaves no cursor or hover
+  behind (`INP-014` partial; inertia, long-press, swipes, haptics, the safe
+  area and device qualification remain).
 - [ ] **UI-02 — P1, implementation and qualification: text, input and accessibility.**
   Finish in-field IME/composition, shaping/kerning/fallback/styles, grapheme editing,
   caret/candidate placement, binding capture, accessibility exposure and contextual

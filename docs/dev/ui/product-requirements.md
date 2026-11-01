@@ -845,7 +845,14 @@ statuses, every migration record and every gate. Earlier Vulkan front-end runs
 with unexpected early exits remain failed evidence; both cases subsequently
 pass in a coordinated runtime window without establishing the earlier cause.
 
-There are **121 partial, 230 pending and 0 verified requirements**, counting the
+[Touch in the menus](retained-screens.md#touch-in-the-menus-1-november-2026)
+moves `INP-014` from pending to partial: a touch that moves past 8 dp is no
+longer a tap, one moved up or down in a scrolling container drags its
+content, and a finger leaves no cursor or hover behind. `WID-010` gains the
+touch drag. The press inset, long-press, inertia, the rim light, swipes,
+haptics, the safe area and device acceptance remain.
+
+There are **122 partial, 229 pending and 0 verified requirements**, counting the
 39 superseded rows at their recorded states. `BEH-002`
 remains partial for the implemented settings transaction/service boundary.
 `BEH-005` remains partial for committed action delivery and cancellation; stock

@@ -1855,6 +1855,10 @@ struct Runtime::Impl {
 	float pointerX = 0, pointerY = 0;
 	float windowPointerX = 0, windowPointerY = 0;
 	bool pointerPresent = false;
+	// A touch drag of a scrolling container's content (section 13.6): where
+	// the finger pressed and the container's offset then, by its ID.
+	bool touchPointer = false;
+	struct ContentDrag { bool pressed = false, active = false; float x = 0, y = 0, offset = 0; std::string container; } contentDrag;
 	bool pointerNavigation = false;
 	// Which device leads (section 13.4): the pointer once it moves or
 	// presses, the keyboard or controller once a menu input or a program's
@@ -2431,6 +2435,39 @@ struct Runtime::Impl {
 		}
 		RememberFocusLayout();
 		return changed;
+	}
+	// A touch press (section 13.6): where it landed, and the scrolling
+	// container whose content it may drag, unless the press captured a value
+	// control (a slider, a scrollbar) or a choice popup is open, whose own
+	// gestures own the finger.
+	void BeginContentDrag() {
+		contentDrag = {};
+		if (!touchPointer || !interaction.CapturedPointerControl().empty()) return;
+		for (const auto& id : controls) if (const auto widget = interaction.Widget(id); widget && widget->popupOpen) return;
+		contentDrag = {true,false,pointerX,pointerY,0,{}};
+		auto* hit = HitElement();
+		auto* scroll = hit ? hit->GetClosestScrollableContainer() : nullptr;
+		if (!scroll || scroll->GetId().empty() || !interaction.AllowsNode(scroll->GetId()) ||
+			scroll->GetScrollHeight() <= scroll->GetClientHeight()) return;
+		contentDrag.offset = scroll->GetScrollTop(); contentDrag.container = scroll->GetId();
+	}
+	// A touch that moves past 8 dp is no longer a tap (INP-002): the arm is
+	// cancelled, so the release activates nothing. Moved more up or down than
+	// across in a scrolling container, it drags the content with the finger.
+	void DragContent() {
+		if (!contentDrag.pressed) return;
+		if (!pointerPresent) { contentDrag = {}; return; }
+		const float dx = pointerX-contentDrag.x, dy = pointerY-contentDrag.y;
+		if (!contentDrag.active) {
+			if (std::max(std::abs(dx),std::abs(dy)) <= 8*viewport.DpRatio()) return;
+			interaction.Cancel();
+			if (contentDrag.container.empty() || std::abs(dy) < std::abs(dx)) { contentDrag = {}; return; }
+			contentDrag.active = true;
+		}
+		auto* scroll = CanonicalElement(contentDrag.container);
+		if (!scroll || !interaction.AllowsNode(contentDrag.container)) { contentDrag = {}; return; }
+		scroll->SetScrollTop(contentDrag.offset-dy);
+		focusLayoutVisible = false; presentationDirty = true;
 	}
 	Rml::Element* HitElement() const {
 		if (!pointerPresent || !context || !document || pointerX < 0 || pointerY < 0 || pointerX >= viewport.width || pointerY >= viewport.height) return nullptr;
@@ -3786,13 +3823,15 @@ void Runtime::PointerMove(float x, float y, double seconds) {
 	impl->pointerPresent = std::isfinite(x) && std::isfinite(y);
 	impl->windowPointerX = x; impl->windowPointerY = y;
 	impl->viewport.WindowToDocument(x,y,impl->pointerX,impl->pointerY);
+	impl->DragContent();
 	if(!impl->UpdateInteraction(seconds,false,true))return; impl->Feedback(seconds);
 }
 void Runtime::PointerButton(bool down, double seconds) {
     if(!Mutate())return;
  impl->SetPointerNavigation(true); if(!impl->UpdateInteraction(seconds,false,true))return; impl->interaction.Pointer(down); impl->ApplyScrollCommands();
- if(down) impl->RememberFocusLayout();
+ if(down) { impl->RememberFocusLayout(); impl->BeginContentDrag(); } else impl->contentDrag = {};
  impl->Feedback(seconds); }
+void Runtime::SetTouchPointer(bool touch) { impl->touchPointer = touch; if (!touch) impl->contentDrag = {}; }
 void Runtime::PointerWheel(int rows, double seconds) {
     if(!Mutate())return;
 
@@ -3844,7 +3883,7 @@ void Runtime::MenuAction(MenuInput input, bool down, double seconds) {
 }
 void Runtime::CancelInput(double seconds) {
     if(!Mutate())return;
- impl->pointerPresent = false; impl->SetPointerNavigation(false); impl->interaction.Cancel(); impl->Feedback(seconds); }
+ impl->contentDrag = {}; impl->pointerPresent = false; impl->SetPointerNavigation(false); impl->interaction.Cancel(); impl->Feedback(seconds); }
 void Runtime::ReleaseInputSources() {
     if(!Mutate())return;
  impl->interaction.ReleaseInputSources(); }

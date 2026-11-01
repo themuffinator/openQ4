@@ -207,6 +207,11 @@ See [release status](../../user/release-status.md) and the
   shows the menu in a strip between empty bands.
 - **Join Game picture.** Before you choose a server, Join Game's picture
   frame shows the Quake 4 art instead of an empty black box.
+- **Menus on a touchscreen.** On a touchscreen (a phone, a tablet or the
+  Steam Deck's screen), you can drag the lists of saves, demos, servers,
+  chapters and settings with your finger; sliding your finger no longer
+  presses the button where you let go; and the menus no longer show a mouse
+  cursor or leave a button lit where you touched.
 - **Clearer list selection.** The selected save, demo, server or map in the
   new interface's lists no longer doubles its orange highlight under the
   pointer, so its name stays readable.

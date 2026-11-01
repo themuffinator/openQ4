@@ -206,6 +206,7 @@ enum keyInputFamily_t {
 };
 
 static keyInputFamily_t key_lastInputFamily = KEY_INPUT_FAMILY_DESKTOP;
+static bool key_lastPointerTouch = false;
 
 static bool Key_IsValidKeyNum( int keynum ) {
 	return keys != NULL && keynum >= 0 && keynum < MAX_KEYS;
@@ -323,6 +324,22 @@ prompts that show the active device's glyphs.
 */
 bool idKeyInput::LastInputWasController( void ) {
 	return key_lastInputFamily == KEY_INPUT_FAMILY_CONTROLLER;
+}
+
+/*
+===================
+idKeyInput::NotePointerSource / LastPointerWasTouch
+
+The platform layer names each pointer input's source: a finger routed as the
+primary pointer, or a mouse.
+===================
+*/
+void idKeyInput::NotePointerSource( bool touch ) {
+	key_lastPointerTouch = touch;
+}
+
+bool idKeyInput::LastPointerWasTouch( void ) {
+	return key_lastPointerTouch;
 }
 
 /*

@@ -323,6 +323,10 @@ public:
 	void PointerMove(float windowX, float windowY, double monotonicSeconds);
 	void PointerButton(bool down, double monotonicSeconds);
 	void PointerWheel(int rows, double monotonicSeconds);
+	// Whether the pointer is a finger (section 13.6): a touch that moves past
+	// 8 dp is no longer a tap, so its release activates nothing, and in a
+	// scrolling container it drags the content.
+	void SetTouchPointer(bool touch);
 	void MenuAction(MenuInput input, bool down, double monotonicSeconds);
 	void CancelInput(double monotonicSeconds);
 	// After successful RestoreSnapshot: quarantine adapter sources with

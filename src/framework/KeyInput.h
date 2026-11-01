@@ -203,6 +203,11 @@ public:
 	static void			PreliminaryJoystickEvent( int value );
 	static bool			IsDown( int keyNum );
 	static bool			LastInputWasController( void );
+	// Whether the latest pointer input was a touch (a finger the platform
+	// routes as the primary pointer) rather than a mouse: menus then draw no
+	// cursor and leave nothing lit where the finger lifted (section 13.6).
+	static void			NotePointerSource( bool touch );
+	static bool			LastPointerWasTouch( void );
 	// Menus on a controller (section 13.5): whether east confirms and south
 	// goes back, as Nintendo layouts do by default and in_swapConfirmBack can
 	// force either way, and a menu key with that swap applied.

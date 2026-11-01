@@ -41,7 +41,7 @@ revision; the parity test checks the pinned files as well as the working tree.
 | Escape / gamepad East (South while swapped), Start, Back | Pop the current modal scope, then close the root menu |
 | Gamepad Menu (Start) | The document's `onMenuButton` where it declares it ([Menu button](#menu-button-24-october-2026)), once per press; otherwise, and while a dialog or an open list holds the input, as Back |
 | Gamepad View (Back) | The document's `onViewButton` where it declares it ([View button](#view-button-24-october-2026)), once per press; otherwise, and while a dialog or an open list holds the input, as Back |
-| Primary pointer | Focus, arm and release the hit button |
+| Primary pointer | Focus, arm and release the hit button; a finger that moves past 8 dp is no longer a tap, and in a scrolling list drags its content ([touch](#touch-in-the-menus-1-november-2026)) |
 | Movement stick | Dominant-axis spatial navigation after neutral |
 | Q / E, gamepad shoulders | The document's previous / next tab (`onTabPrevious`, `onTabNext`) where it declares them; not while a field is being edited, nor with Ctrl or Alt |
 | Gamepad triggers | The document's previous / next section (`onSectionPrevious`, `onSectionNext`), on the same terms; where it declares neither, PageUp / PageDown ([list paging](#list-paging-24-october-2026)) |
@@ -49,6 +49,26 @@ revision; the parity test checks the pinned files as well as the working tree.
 
 SDL's gamepad South/East buttons map to engine `K_JOY3`/`K_JOY4` and West/North
 to `K_JOY6`/`K_JOY5`; the shoulders are distinct.
+
+### Touch in the menus (1 November 2026)
+
+A touchscreen (`in_touchscreen`) routes one finger as the primary pointer;
+SDL's touch-to-mouse synthesis stays off, so every mouse event is a mouse.
+The SDL layer names each pointer input's source (`idKeyInput::NotePointerSource`):
+a finger, or the mouse once it moves or presses. While a finger leads, the
+menus draw no cursor, the retained one or the stock GUIs' (section 13.6:
+nothing depends on hover), and a lifted finger queues a pointer leave after
+its release, so the control it touched does not stay lit as a hovered one.
+The retained adapter tells the runtime before each input
+(`Runtime::SetTouchPointer`): a touch press records where it landed; past
+8 dp in any direction it is no longer a tap, the arm is cancelled and the
+release activates nothing (INP-014); moved more up or down than across in a
+scrolling container, it drags the content with the finger. A press that
+captured a value control (a slider, a scrollbar's thumb) or lands while a
+choice popup is open keeps that control's own gesture. A mouse keeps the
+desktop rules: its release on the button it pressed activates it, and it
+never drags content. Inertia, the rim light at a list's ends, long-press
+details and tab-strip swipes remain open.
 
 **Swap Confirm and Back.** Nintendo layouts confirm on the east button,
 where their A sits, and go back on the south button (section 13.5). The

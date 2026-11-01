@@ -71,6 +71,9 @@ struct idKeyInput {
     // The menu cursor hides while a controller drives the menus.
     static inline bool controller=false;
     static bool LastInputWasController() { return controller; }
+    // Nor does it show where a finger lifted.
+    static inline bool touch=false;
+    static bool LastPointerWasTouch() { return touch; }
     static inline int nameReads=0;
     // Prompt glyphs name keys (UserInterfaceRetained.cpp's KeyEscapeNames).
     static const char* KeyNumToString(int key,bool) { ++nameReads; static std::string name; name=key==K_JOY3 ? "JOY3" : "KEY"+std::to_string(key); return name.c_str(); }

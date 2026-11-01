@@ -117,6 +117,32 @@ static void TwoAxes(){View v;auto source=Source();auto horizontal=Source(true);a
 static void ThumbFrames(){for(float ratio:{1.f,1.25f,2.f})for(bool contentBox:{false,true}){View v(ratio,false,true,true);auto source=Source(false,true,true);auto& props=Bar(source)["children"][0]["children"][0]["properties"];props["box-sizing"]=Typed("keyword",contentBox?"content-box":"border-box");props["border-width"]=Typed("length",20,"dp");props["padding-top"]=Typed("length",10,"dp");props["padding-bottom"]=Typed("length",10,"dp");v.runtime.CloseDocument();std::vector<Diagnostic> ds;Check(v.runtime.LoadDocument(Encode(source),"thumb-frames.q4ui",ds),"authored thumb border and padding source accepts");v.Frame();auto read=v.Read();Check(read.available&&Near(read.geometry.thumb,60*ratio,.01),"actual thumb frame is minimum measured border extent");v.Geometry();Check(v.runtime.FocusControl("bar",v.time),"framed thumb bar focus");v.Key(MenuInput::End);v.Frame();v.Geometry();Check(Near(v.Read().geometry.position+v.Read().geometry.thumb,v.Read().geometry.track,.01),"framed thumb ends at real track edge");v.Key(MenuInput::Home);v.Frame();auto g=v.Read().geometry;v.Move(g.thumb*.2/g.track);v.runtime.PointerButton(true,v.time);v.Move(.6);v.Frame();double expected=0;g=v.Read().geometry;Check(ScrollDragOffset(g,g.track*.6,.2,expected)&&Near(v.Offset(),expected),"thumb-frame drag uses actual measured extent");
  auto* thumb=v.Element("thumb");Check(thumb->SetProperty("border-width","100dp"),"thumb frame exceeds real track");v.Frame();Check(!v.Read().available&&!v.runtime.CanActivateControl("bar",v.time),"oversized thumb frame is inert");const auto offset=v.Offset();v.Move(.9);v.runtime.PointerButton(false,v.time);v.Frame();Check(v.Offset()==offset,"oversized frame cancels drag before next movement");Check(thumb->SetProperty("border-width","20dp"),"thumb frame fits again");v.Frame();Check(v.Read().available,"fitting thumb frame recovers");v.Geometry();v.NoActions();}}
 // The SYSTEM page holds its rows on tabs without a scrolling body; its dialogs' bodies scroll a text that outgrows them.
+// A finger pressed on the viewport's content drags it once it moves past 8 dp
+// (section 13.6): the content follows and the release activates nothing. A
+// shorter move is still a tap, a sideways one past 8 dp no longer is, a finger
+// on the thumb drags the bar as a mouse does, and a mouse never drags content.
+static void TouchDrag(){for(float ratio:{1.f,2.f}){
+ // The fixture finds elements in the first context: one view at a time, each
+ // without the test modal's box, which lies over the first button.
+ const auto open=[](View& at){auto source=Source();Json::Value kept(Json::arrayValue);for(const auto& child:Frame(source)["children"])if(child["id"]!="modal")kept.append(child);
+  Frame(source)["children"]=kept;at.runtime.CloseDocument();std::vector<Diagnostic> ds;Check(at.runtime.LoadDocument(Encode(source),"touch.q4ui",ds),"touch source loads");at.Frame();};
+ Rml::Vector2f centre;
+ const auto press=[&](View& at){at.runtime.PointerMove(centre.x,centre.y,at.time);at.Frame();at.runtime.PointerButton(true,at.time);};
+ {View v(ratio);open(v);auto* first=v.Element("first");
+  centre=first->GetAbsoluteOffset(Rml::BoxArea::Border)+first->GetBox().GetSize(Rml::BoxArea::Border)*.5f;
+  v.runtime.SetTouchPointer(true);press(v);v.runtime.PointerMove(centre.x,centre.y-6*ratio,v.time);v.runtime.PointerButton(false,v.time);v.Frame();
+  Check(v.Offset()==0&&v.runtime.TakeActions().size()==1,"a touch that moves under 8 dp is a tap");
+  press(v);v.runtime.PointerMove(centre.x+20*ratio,centre.y,v.time);v.runtime.PointerButton(false,v.time);v.Frame();
+  Check(v.Offset()==0&&v.runtime.TakeActions().empty(),"a touch moved 20 dp across the button is no longer a tap, nor a scroll");
+  press(v);v.runtime.PointerMove(centre.x,centre.y-100*ratio,v.time);v.Frame();Check(Near(v.Offset(),100*ratio),"the dragged content follows the finger");
+  v.runtime.PointerMove(centre.x,centre.y-140*ratio,v.time);v.Frame();Check(Near(v.Offset(),140*ratio),"and keeps following it");
+  v.runtime.PointerButton(false,v.time);v.Frame();Check(v.runtime.TakeActions().empty()&&Near(v.Offset(),140*ratio),"a drag's release activates nothing and leaves the content there");}
+ {View thumb(ratio);thumb.runtime.SetTouchPointer(true);thumb.Move(.03);thumb.runtime.PointerButton(true,thumb.time);thumb.Move(.5);thumb.Frame();
+  Check(thumb.Offset()>0,"a finger on the thumb drags the bar");thumb.runtime.PointerButton(false,thumb.time);thumb.NoActions();}
+ {View mouse(ratio);open(mouse);press(mouse);mouse.runtime.PointerMove(centre.x,centre.y-100*ratio,mouse.time);mouse.Frame();
+  Check(mouse.Offset()==0,"a mouse does not drag content");mouse.runtime.PointerButton(false,mouse.time);mouse.Frame();mouse.NoActions();
+  press(mouse);mouse.runtime.PointerMove(centre.x+20*ratio,centre.y,mouse.time);mouse.runtime.PointerButton(false,mouse.time);mouse.Frame();
+  Check(mouse.runtime.TakeActions().size()==1,"a mouse released on the button it pressed still activates it");}}}
 static void SystemCandidate(const std::string& text){Document document;std::vector<Diagnostic> ds;Check(document.Load(text,ds),"actual SYSTEM candidate parses");State state;std::string error;Check(state.Reset(document.Model(),error),"SYSTEM candidate typed state resets");
  std::string message;for(int i=0;i<40;++i)message+="The display change waits for your answer before it reverts by itself. ";
  // The engine lays the page out on its 720 dp canvas: the view's size sets the dp ratio.
@@ -143,5 +169,5 @@ static void SystemCandidate(const std::string& text){Document document;std::vect
  Check(host.softened==1&&runtime.Statistics().backdropComposites==0,"a closed SYSTEM dialog softens nothing");host.softFocus=false;
  }
  }}
-int main(int argc,char** argv){Schema();Gestures();DensityKeepsContentFocus();MixedViewportReveal();Persistence();Lifecycle();TwoAxes();ThumbFrames();if(argc>1){std::ifstream file(argv[1],std::ios::binary);std::string text{std::istreambuf_iterator<char>(file),{}};SystemCandidate(text);}
+int main(int argc,char** argv){Schema();Gestures();DensityKeepsContentFocus();MixedViewportReveal();Persistence();Lifecycle();TwoAxes();ThumbFrames();TouchDrag();if(argc>1){std::ifstream file(argv[1],std::ios::binary);std::string text{std::istreambuf_iterator<char>(file),{}};SystemCandidate(text);}
  std::printf("PASS %u checks; actual canonical schema/Interaction/Runtime/Rml layout; counted host, no native input or GPU qualification.\n",checks);}

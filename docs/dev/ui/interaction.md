@@ -122,6 +122,14 @@ constrains pointer targeting to positive geometric alpha from the control's own
 and ancestor masks. Empty or fully transparent masks remove their subtrees from
 focus; full control/mask intersection for directional focus remains unfinished.
 
+A touch pointer (`Runtime::SetTouchPointer`, which the adapter sets from the
+platform's pointer source) follows section 13.6: a press that moves past 8 dp
+is cancelled as an arm, and one that moves more up or down than across inside
+a scrolling container sets that container's offset with the finger
+([input routing](input-routing.md#touch-in-the-menus-1-november-2026)). It
+starts only where no value control captured the press and no choice popup is
+open, and ends on release, cancellation or a pointer leave.
+
 An activation requires a matching release on the armed, still-eligible control.
 Repeated accept-down/pointer-down events cannot duplicate activation. Dragging
 off the button, navigating to another control, disabling it, losing valid output,

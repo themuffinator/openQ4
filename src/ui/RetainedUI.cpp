@@ -2080,6 +2080,8 @@ bool RetainedUI_ProcessEvent(const sysEvent_s* event) {
 	if (decoded.kind == retainedUIInput_t::CANCEL) { CancelInput(); return true; }
 	RetainedUI_FrameInput();
 	if (inputSuspended || inputResourceSuspended) { ReleaseQuarantinedInput(decoded); return true; }
+	// A finger may drag a list's content (section 13.6); a mouse does not.
+	runtime->SetTouchPointer(idKeyInput::LastPointerWasTouch());
 	if (decoded.kind == retainedUIInput_t::KEY) {
 		if (decoded.key <= 0 || decoded.key >= K_LAST_KEY || decoded.source < 0 || decoded.source > 65535) return true;
 		if (decoded.down && !decoded.repeated && inputKeys.size() < 1024) inputKeys[decoded.source] = decoded.key;
