@@ -10,7 +10,7 @@ def main():
     parser.add_argument('--test-source',type=Path);parser.add_argument('--reuse',type=Path);parser.add_argument('--view',action='store_true');parser.add_argument('--arg',action='append',default=[]);parser.add_argument('--bind-file',action='append',type=Path,default=[])
     args=parser.parse_args();repo=args.repository.resolve();scratch=ROOT/'.tmp';scratch.mkdir(exist_ok=True)
     out=Path(tempfile.mkdtemp(prefix='document-canvas-',dir=scratch));env=os.environ.copy();env['TEMP']=env['TMP']=str(out)
-    rml=repo/'subprojects/RmlUi-6.3';jsonroot=repo/'subprojects/jsoncpp-1.9.6';tess=repo/'subprojects/libtess2-8dbd6483e920311a58c9af10a10beb278efebc36'
+    rml=repo/'subprojects/RmlUi-6.3';jsonroot=repo/'subprojects/jsoncpp-1.9.8';tess=repo/'subprojects/libtess2-8dbd6483e920311a58c9af10a10beb278efebc36'
     extra=[]
     if args.view:
         original=ROOT/'src/ui/RetainedUI.cpp';source=original.read_text(encoding='utf-8')
@@ -18,7 +18,7 @@ def main():
         extra=[original,ROOT/'src/ui/RetainedUI.h',ROOT/'tools/tests/native/UiDocumentCanvasTest.cpp',ROOT/'tools/tests/filesystem_case_segments.py',ROOT/'tools/tests/ui_document_view_projection.py',generated]
     sources=sorted((ROOT/'src/ui/retained').glob('*.cpp'))+[rml/'Source/Core/ElementUtilities.cpp',args.test_source.resolve() if args.test_source else ROOT/('tools/tests/native/UiDocumentViewTest.cpp' if args.view else 'tools/tests/native/UiDocumentCanvasTest.cpp')]
     includes=[ROOT,out,ROOT/'src/ui/retained',rml/'Include',rml/'Source/Core',jsonroot/'include',tess/'Include']
-    libraries=[repo/'builddir/subprojects/RmlUi-6.3/librmlui-core.a',repo/'builddir/subprojects/jsoncpp-1.9.6/libjsoncpp.a',repo/'builddir/subprojects'/tess.name/'libtess2.a']
+    libraries=[repo/'builddir/subprojects/RmlUi-6.3/librmlui-core.a',repo/'builddir/subprojects/jsoncpp-1.9.8/libjsoncpp.a',repo/'builddir/subprojects'/tess.name/'libtess2.a']
     headers=[p for base in [ROOT/'src',rml/'Include',rml/'Source',jsonroot/'include',tess/'Include'] for p in base.rglob('*') if p.suffix in ('.h','.hpp','.inl','.tpp')]
     bound=sources+headers+libraries+[Path(__file__).resolve(),ROOT/'tools/tests/native/UiDocumentPopupFixture.h']+extra+[p.resolve() for p in args.bind_file];before={str(p):sha(p) for p in bound};reused={}
     if args.reuse:

@@ -129,8 +129,9 @@ bool Utf8(std::string_view text, size_t& bad) {
 	}
 	return true;
 }
-// JsonCpp 1.9.6 is permissive about numeric spellings, raw string controls
-// and surrogate pairs. Enforce JSON's lexical forms before its DOM parser.
+// JsonCpp is permissive about numeric spellings and surrogate pairs (and,
+// before 1.9.8, raw string controls). Enforce JSON's lexical forms before its
+// DOM parser.
 // `treeCheck` is set when a token could parse to a value the parsed tree
 // must still be checked for: a number whose magnitude may overflow a double
 // (its integer digits and exponent reach 309) or a NUL escape. Every other

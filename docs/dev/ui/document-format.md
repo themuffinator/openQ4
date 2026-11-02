@@ -436,9 +436,9 @@ documents are recreated after video/font-language generation changes; active
 playback is cancelled and explicit replay is needed. These are development
 commands, with no host-input capture.
 
-[JsonCpp 1.9.6](https://github.com/open-source-parsers/jsoncpp/tree/1.9.6) is pinned
+[JsonCpp 1.9.8](https://github.com/open-source-parsers/jsoncpp/tree/1.9.8) is pinned
 through Meson under its MIT licensing option. The archive SHA-256 is
-`f93b6dd7ce796b13d02c108bc9f79812245a82e577581c4c9aabe57075c90ea2`.
+`51828cf3574281d2b79ec2a1c56a9e4c20cc1103711321ea96384cffb8d2d904`.
 The [upstream notice](../../../LICENSES/JsonCpp.txt) is retained and installed into
 `licenses/`. README credits its authors. The three implementation files form a
 static dependency isolated from engine headers. Dedicated binaries do not link

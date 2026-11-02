@@ -4,7 +4,7 @@
   "date": "2026-10-31",
   "status": "Implementation incomplete; this register preserves full product scope and does not accept any production GUI.",
   "baseline": {
-    "engine_revision": "f6139fa2e78ffd34701d54b5fbf1699ce23bd95e",
+    "engine_revision": "6dd7ddbc53a21e8174d3fd1934e490ebcfbc3071",
     "companion_revision": "18f000a7ff3b99f1da25a73282a0eca1dc1244f0",
     "effective_gui_count": 358,
     "translated_or_accepted_resources": 0,
@@ -108,7 +108,7 @@
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/document-format.md",
       "scope": "Typed JSONC, stable IDs, value edits and motion only; components, structure editing and full model unfinished.",
-      "sha256": "a5bc60c2f57a31f5ed336dd23bf6eec4ac04407859fb25f48515f67c028b4a12"
+      "sha256": "f6ce46d8bd9699b790e796d1c77ee55ee16a234773db553ede6d2c793086424f"
     },
     "binding-foundation": {
       "kind": "implementation_checkpoint",
@@ -1464,7 +1464,7 @@
       "path": "docs/dev/ui/document-format.md",
       "baseline_engine_revision": "52d4c3616eb391fa52c913f4cfc8274746b789ae",
       "scope": "UI-01/UI-09/INV-013 bounded working-copy foundation: typed model scenes, native root/head/weapon output, per-part skins, bounded private targets and built-in coverage resolve. Seven native UI suites and 36 actual Vulkan compiler cases pass; GL/Vulkan gameplay pose captures pass, including Vulkan resource resets. Failed fixture views and late precache warnings are preserved. Player Setup, both production previews, live animation/native skin/composition/turnover/map/module/failure/platform qualification remain. No product acceptance.",
-      "sha256": "a5bc60c2f57a31f5ed336dd23bf6eec4ac04407859fb25f48515f67c028b4a12",
+      "sha256": "f6ce46d8bd9699b790e796d1c77ee55ee16a234773db553ede6d2c793086424f",
       "local_capture_summary": ".tmp/retained-ui-completion/models/validation-evidence.json",
       "local_capture_summary_sha256": "e0880d83ed28986859c01471736decddb6d0e1502a3f15b73d735faf65e97fbf"
     }

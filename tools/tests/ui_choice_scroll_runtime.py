@@ -45,11 +45,11 @@ def main():
     geometry = rml / 'Source/Core/ElementUtilities.cpp'
     test = args.test_source.resolve() if args.test_source else ROOT / 'tools/tests/native/UiChoiceScrollRuntimeTest.cpp'
     sources += [geometry, test]
-    json_include = repository / 'subprojects/jsoncpp-1.9.6/include'
+    json_include = repository / 'subprojects/jsoncpp-1.9.8/include'
     tess_include = repository / 'subprojects/libtess2-8dbd6483e920311a58c9af10a10beb278efebc36/Include'
     includes = [ROOT, ROOT / 'src/ui/retained', rml / 'Include', rml / 'Source/Core', json_include, tess_include]
     libraries = [repository / 'builddir/subprojects/RmlUi-6.3/librmlui-core.a',
-                 repository / 'builddir/subprojects/jsoncpp-1.9.6/libjsoncpp.a',
+                 repository / 'builddir/subprojects/jsoncpp-1.9.8/libjsoncpp.a',
                  repository / 'builddir/subprojects/libtess2-8dbd6483e920311a58c9af10a10beb278efebc36/libtess2.a']
     headers = [path for base in [ROOT / 'src', rml / 'Include', rml / 'Source', json_include, tess_include]
                for path in base.rglob('*') if path.suffix in ('.h', '.hpp', '.inl', '.tpp')]

@@ -1,8 +1,8 @@
 [wrap-file]
-directory = jsoncpp-1.9.6
-source_url = https://codeload.github.com/open-source-parsers/jsoncpp/tar.gz/refs/tags/1.9.6
-source_filename = jsoncpp-1.9.6.tar.gz
-source_hash = f93b6dd7ce796b13d02c108bc9f79812245a82e577581c4c9aabe57075c90ea2
+directory = jsoncpp-1.9.8
+source_url = https://codeload.github.com/open-source-parsers/jsoncpp/tar.gz/refs/tags/1.9.8
+source_filename = jsoncpp-1.9.8.tar.gz
+source_hash = 51828cf3574281d2b79ec2a1c56a9e4c20cc1103711321ea96384cffb8d2d904
 patch_directory = jsoncpp
 diff_files = jsoncpp/subnormal-numbers.patch, jsoncpp/fast-double.patch
 

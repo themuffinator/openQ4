@@ -1,8 +1,8 @@
 diff --git a/src/lib_json/json_reader.cpp b/src/lib_json/json_reader.cpp
-index b97fc179a..6245a7388 100644
+index 1bf92f3..ce841fb 100644
 --- a/src/lib_json/json_reader.cpp
 +++ b/src/lib_json/json_reader.cpp
-@@ -22,6 +22,17 @@
+@@ -23,6 +23,17 @@
  #include <set>
  #include <sstream>
  #include <utility>
@@ -19,8 +19,8 @@ index b97fc179a..6245a7388 100644
 +#endif
  
  #include <cstdio>
- #if __cplusplus >= 201103L
-@@ -1638,6 +1649,20 @@ bool OurReader::decodeDouble(Token& token) {
+ 
+@@ -1647,6 +1658,20 @@ bool OurReader::decodeDouble(Token& token) {
  
  bool OurReader::decodeDouble(Token& token, Value& decoded) {
    double value = 0;
@@ -39,5 +39,5 @@ index b97fc179a..6245a7388 100644
 +  }
 +#endif
    IStringStream is(String(token.start_, token.end_));
+   is.imbue(std::locale::classic());
    if (!(is >> value)) {
-     if (value == std::numeric_limits<double>::max())

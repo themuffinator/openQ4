@@ -20,8 +20,8 @@ def main():
   expected=record['artifacts'].get(str(obj.relative_to(base))) if obj.is_relative_to(base) else record['sources'].get(str(obj))
   if not expected or sha(obj)!=expected:raise RuntimeError('Unbound object: '+str(obj))
   objects[unit]=obj
- rml=repo/'subprojects/RmlUi-6.3';jsonroot=repo/'subprojects/jsoncpp-1.9.6';tess=repo/'subprojects/libtess2-8dbd6483e920311a58c9af10a10beb278efebc36'
- libs=[repo/'builddir/subprojects/RmlUi-6.3/librmlui-core.a',repo/'builddir/subprojects/jsoncpp-1.9.6/libjsoncpp.a',repo/'builddir/subprojects'/tess.name/'libtess2.a']
+ rml=repo/'subprojects/RmlUi-6.3';jsonroot=repo/'subprojects/jsoncpp-1.9.8';tess=repo/'subprojects/libtess2-8dbd6483e920311a58c9af10a10beb278efebc36'
+ libs=[repo/'builddir/subprojects/RmlUi-6.3/librmlui-core.a',repo/'builddir/subprojects/jsoncpp-1.9.8/libjsoncpp.a',repo/'builddir/subprojects'/tess.name/'libtess2.a']
  cases=[]
  for method in ['FocusControl','CancelInput','SetState','TakeActions','SetPresentationAlias','PointerWheel','BeginNumberNativeCollection','RestoreSnapshot','Frame']:
   body=function_body(runtime.read_text(),'Runtime::'+method+'(')
