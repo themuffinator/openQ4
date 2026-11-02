@@ -56,6 +56,7 @@ class TallLayout:
         # Lengths that follow the text size grow by wrapping their binding.
         self.sized = {(binding["node"], binding["property"]): binding for binding in self.bindings
                       if '"view.text"' in json.dumps(binding["value"])}
+        self.text_sized = set(self.sized)
 
     def fits(self, height: float) -> None:
         """The arrangement needs a view `height` dp tall, bands included: it
@@ -74,6 +75,14 @@ class TallLayout:
         """`ident`'s `prop` is `tall` dp in a tall view, its fitted value (or
         `wide`) otherwise."""
         if (ident, prop) in self.owned:
+            if (ident, prop) in self.text_sized and wide is None:
+                # A length that follows the text size keeps doing so in any
+                # other view; a tall view places it.
+                for binding in self.bindings:
+                    if binding["node"] == ident and binding["property"] == prop:
+                        value = round(tall, 4) if isinstance(tall, (int, float)) else tall
+                        binding["value"] = {"op": "select", "args": [self.condition, value, binding["value"]]}
+                        return
             raise SystemExit(f"the tall layout cannot place {ident}.{prop}: something else owns it")
         landscape = self.dp(ident, prop) if wide is None else wide
         if landscape is None:
@@ -101,12 +110,23 @@ class TallLayout:
         top = self.dp(ident, "top")
         return top if top is not None else self.dp(ident, "margin-top") + 360
 
-    def set(self, ident: str, prop: str, tall: float) -> None:
-        """`ident`'s `prop` is `tall` dp in a tall view, replacing what this
-        layout gave it before (a grown length a block rearranges)."""
+    def set(self, ident: str, prop: str, tall) -> None:
+        """`ident`'s `prop` is `tall` dp (or that expression) in a tall view,
+        replacing what this layout gave it before (a grown length a block
+        rearranges, or one that follows the text size, which grow() wrapped
+        in the tall condition)."""
+        tall = round(tall, 4) if isinstance(tall, (int, float)) else tall
         for binding in self.bindings:
-            if binding["id"] == f"tall.{ident}.{prop}":
-                binding["value"]["args"][1] = round(tall, 4)
+            value = binding["value"]
+            if binding["id"] == f"tall.{ident}.{prop}" or (
+                    binding["node"] == ident and binding["property"] == prop and isinstance(value, dict) and
+                    value.get("op") == "select" and value["args"][0] is self.condition):
+                value["args"][1] = tall
+                return
+            if binding["node"] == ident and binding["property"] == prop and (ident, prop) in self.text_sized:
+                # A length that follows the text size and that grow() left
+                # alone takes its tall value now, keeping its own elsewhere.
+                binding["value"] = {"op": "select", "args": [self.condition, tall, value]}
                 return
         self.bind(ident, prop, tall)
 

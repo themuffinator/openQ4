@@ -6,6 +6,28 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## List pages follow the text size, 2 November 2026
+
+- Above 100 % text the list pages' rows kept their 20 u pitch while the
+  runtime enlarged their text, cutting names off and running the selected
+  item's details together. `retained_saves.grow_rows` now grows each row,
+  its cells, lights and rule by the text size on Load and Save Game (both
+  families), Demos, Join Game and Create Server, with an ellipsis for values
+  past their column above 100 %; `grow_details` stacks Load's and Demos'
+  detail lines over a picture that shrinks to make room; `grow_empty` grows
+  the empty states' sentences. Headings, filters, plates, Save Game's name
+  field and, on Join Game and Create Server, every other control keep their
+  size (`fixed_text`). In tall views the rows keep growing and the details
+  keep the tall size.
+- At 100 % every property of the seven documents evaluates as before in
+  landscape and tall views, and the Demos captures compare pixel-identical.
+  The native pages, Strogg pages, mp-pages, mp-card, menus, pointer-reach,
+  safe-area and settings groups (with a new `CheckListTextScale` for Load
+  Game and Demos at 100-200 %), `ui_retained_gate.py` and OpenGL captures at
+  200 % (16:9 and 9:16) pass. Player Setup, the Mods dialog, the Objectives
+  page, Create Server's options, Join Game's other controls, Restart Level,
+  Credits, Arena and the campaign skill page still keep their 100 % rows.
+
 ## Demos as a Multiplayer sub-page, 2 November 2026
 
 - Section 9 of the visual specification makes the demo library a Multiplayer

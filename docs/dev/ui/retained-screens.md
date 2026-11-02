@@ -2279,6 +2279,61 @@ Campaign skill page) keep their 100 % rows at larger text sizes. Their
 confirmations' bodies grow with the shared dialog, and their titles, plinth
 links and prompt bars keep their size.
 
+## List pages follow the text size (2 November 2026)
+
+At a text size above 100 % the list pages' rows kept their 20 u pitch while
+the runtime enlarged their text, so a save's or a server's name sat half
+outside its row and was cut off, and the selected save's or demo's details
+ran into one another and into the plates under them. Section 2's text-scale
+contract now holds for the lists of Load and Save Game (Marine and Strogg),
+Demos, Join Game and Create Server (`LAY-004`):
+
+- **Rows.** Each row, pager row included, is its 100 % height times the text
+  size, with its cells, lights and rule (`retained_saves.grow_rows`), so the
+  enlarged text keeps its line and the list scrolls through fewer rows at a
+  time. A pager row's marker keeps its size, centred. Above 100 % a name,
+  location, map or date past its column ends in an ellipsis (section 2:
+  metadata may truncate) instead of being cut.
+- **Details.** On Load Game and Demos the selected item's lines under the
+  picture stand each on a line of its own above 100 % (Load's time moves
+  under its date) at the lines' pitch times the text size, their foot kept
+  over the section plates, and end in an ellipsis where a value runs past
+  the column. The picture gives them its room, shrinking about its top
+  leading corner with its aspect kept, and the error strip stays on its foot
+  and grows upward (`grow_details`), as the pause's level block does.
+- **Empty states.** The sentence takes the lines the running language's
+  longest sentence needs at the running size, never less than its box, and
+  NEW GAME or CLEAR FILTERS moves down by what it grew (`grow_empty`).
+- **Furniture.** The list headings, the filter tags and the sort and refresh
+  buttons, the section plates (LOAD GAME, DELETE GAME, PLAY, DELETE, REFRESH,
+  SAVE GAME), the empty states' headings and actions, and Save Game's name
+  field keep their size (`fixed_text`). On Join Game and Create Server
+  everything but the list's rows keeps its size for now: Join Game's
+  sources, mod and game type spinners, filters, status, actions and details
+  card, and Create Server's headings, options, ADVANCED OPTIONS and CREATE
+  SERVER.
+- **Tall views.** The rows keep growing with the text in a view of 3:4 and
+  taller, two lines each; the selected item's lines beside the picture keep
+  the tall view's own size there, as the settings rows do, since the plates
+  under them leave no room to grow.
+- **At 100 %** every property of the seven documents evaluates exactly as
+  before in landscape and tall views (English and German checked), and the
+  Demos captures compare pixel-identical with the previous build's.
+
+The native pages group checks Load Game and Demos at 100, 150 and 200 % on
+16:9 and 4:3 (`CheckListTextScale`): rows and their cells at the 100 % row
+times the text size, the cells' ellipsis, the detail lines in order under
+the picture and above the first plate's band, the picture's aspect,
+furniture at its authored size, every shown text on the screen, and every
+node back in place at 100 %. Engine captures on OpenGL at 200 %: 16:9 for
+Load Game (with its filtered empty state), Save Game, Demos, Join Game and
+Create Server, and 9:16 for Load Game.
+
+Not covered: Player Setup, the Mods dialog, the pause's Objectives page,
+Create Server's options and Join Game's other controls (which keep their
+size), Restart Level, Credits, the Arena page and the campaign skill page
+keep their 100 % rows; the scrollbar's wheel step stays one 100 % row.
+
 ## Menu levels in tall views (31 October 2026)
 
 In a portrait or rotated window the menu levels shrank the 4:3 composition

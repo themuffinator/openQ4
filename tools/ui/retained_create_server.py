@@ -39,7 +39,7 @@ from build_retained_screens import (ACCEL, BOTTOM_TO_PAGE, CANVAS_W, CRUMB_SCALE
                                     transform, typeface, vector)
 from retained_difficulty import check_fits, primary_plate
 from retained_mp_menus import match_number_row, row_face, row_states as setting_states, value_row
-from retained_saves import PLACEHOLDER, backing, bind_selected, pager_row, picture_frame, row_plates, row_states, table_text
+from retained_saves import PLACEHOLDER, backing, bind_selected, grow_rows, pager_row, picture_frame, row_plates, row_states, table_text
 from retained_subpage import subpage_document
 
 # mp_create_val4's values in order, labelled by #str_200929's names; the
@@ -512,6 +512,8 @@ def create_server_document() -> dict:
                       row_w=row_w)
     maps = group("maps-column", {"position": keyword("relative"), "display": keyword("flex"), "flex-direction": keyword("column")},
                  [newer, *[map_row(doc, index, row_w) for index in range(MAP_ROWS)], older])
+    # Above 100 % text the maps' rows grow with it (section 2's reflow).
+    grow_rows(doc, maps)
     viewport = group("maps-list", {**absolute(left=U * left, top=U * top, width=U * row_w, height=U * list_h), "overflow": keyword("auto")},
                      [maps])
     scrollbar = objectives_scrollbar(doc, "maps_scroll", "maps-list", OLIVE, ORANGE, U * (left + list_w) - 16, U * top, U * list_h,
@@ -541,6 +543,11 @@ def create_server_document() -> dict:
     back = page_prompts(doc, "create_back", action="back")
 
     modal = advanced_dialog(doc)
+    # Above 100 % text only the maps' rows grow for now (grow_rows); the
+    # headings, the options, ADVANCED OPTIONS and CREATE SERVER keep their size.
+    from build_retained_screens import fixed_text
+    for node in [*headings, *shot, scrollbar, column, advanced, start]:
+        fixed_text(doc, node)
     return tall_create_page(subpage_document(doc, "create", "#str_200002", "#str_200026", "create_start",
                                              [*headings, *shot, viewport, scrollbar, column, advanced, start, back], [modal]))
 

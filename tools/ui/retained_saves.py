@@ -49,7 +49,8 @@ from dataclasses import dataclass
 from build_retained_screens import fit_narrow
 from build_retained_screens import (CANVAS_W, CLOSE_W, FULL, LANGUAGES, MARKER, OLIVE, ORANGE, PICTURE, RAIL_DARK, ST_FILL, ST_LINE,
                                     ST_OBJ_FRAME, PAGE_BAR_LEFT, ST_READ, ST_SELECT, STRINGS, U, VERB_DELETE, VERB_LOAD, VERB_SAVE,
-                                    Document, absolute, action_plate, colour, confirmation, font, group, keyword, label, length,
+                                    Document, absolute, action_plate, colour, confirmation, fixed_text, font, group, keyword, label,
+                                    length,
                                     linear, localized, marker_path, number, objectives_scrollbar, page_prompts, path, picture, rgb,
                                     row_prompt, solid, stroke, text_width, track, transform, typeface, vector)
 
@@ -246,6 +247,126 @@ def row_plates(ident: str, width: float, height: float, family: Family = MARINE,
             path("inset", [(0.75, top + 1), (0.75, bottom - 1.5), (width * 0.87, bottom - 1.5)], closed=False,
                  stroke=stroke(solid(rgb(family.hot)), 1.2))]),
     ]
+
+
+def grow_rows(doc: Document, column: dict) -> None:
+    """A list's rows follow the text size (section 2's reflow): above 100 %
+    each row is its 100 % height times the text size, its cells, lights and
+    rule with it, so the enlarged text keeps its line in its row and the list
+    scrolls through fewer rows at a time. A pager row's marker keeps its
+    size, centred in the grown row. Every binding gives the authored value at
+    100 % (check_text_bindings)."""
+    from build_retained_screens import TEXT, in_fractions, text_source, text_sum, text_times
+    text_source(doc)
+    for row in column["children"]:
+        height = row["properties"]["height"]["value"]
+        doc.bind(f"text.{row['id']}.height", row["id"], "height", text_times(height))
+        for child in row.get("children", []):
+            props = child.get("properties", {})
+            found = props.get("height") or {}
+            if found.get("unit") != "dp" or found.get("value") != height:
+                continue
+            if child["id"].endswith("-marker"):
+                doc.bind(f"text.{child['id']}.top", child["id"], "top",
+                         text_sum(props["top"]["value"], {"op": "*", "args": [height / 2, {"op": "-", "args": [TEXT, 1]}]}))
+                continue
+            if child.get("type") == "vector":
+                # The lights and the rule are drawn in fractions of the row.
+                in_fractions(child, props["width"]["value"], height)
+            elif child.get("type") == "text" and "row-" in child["id"]:
+                # A name or map past its column ends in an ellipsis.
+                props["text-overflow"] = keyword("clip")
+                doc.bind(f"text.{child['id']}.text-overflow", child["id"], "text-overflow",
+                         {"op": "select", "args": [{"op": ">", "args": [TEXT, 1]}, "ellipsis", "clip"]})
+            doc.bind(f"text.{child['id']}.height", child["id"], "height", text_times(height))
+
+
+def grow_details(doc: Document, parts: list, shot: str, error: str, lines: tuple) -> None:
+    """The selected item's detail lines under its picture follow the text
+    size, as the pause's level block's do. `lines` are the lines at 100 %,
+    each a tuple of the ids that share it (Load's date and time); above it
+    every id stands on a line of its own at the lines' pitch times the text
+    size, from the leading edge across the detail column, ending in an
+    ellipsis where a value runs past it, and the lines' foot stays over the
+    section plates. The picture gives them its room, shrinking about its top
+    leading corner, its aspect kept, to end where the first line starts; the
+    error strip stays on its foot and grows upward with its lines. Every
+    binding gives the authored value at 100 % (check_text_bindings). `parts`
+    holds those nodes."""
+    from build_retained_screens import LARGER, text_source, text_sum, text_times
+    text_source(doc)
+    nodes = {node["id"]: node for part in parts for node in walk(part)}
+
+    def prop(ident: str, key: str) -> float:
+        return nodes[ident]["properties"][key]["value"]
+
+    def larger(grown, authored):
+        return {"op": "select", "args": [LARGER, grown, authored]}
+    stacked = [ident for line in lines for ident in line]
+    pitch = prop(lines[1][0], "top") - prop(lines[0][0], "top")
+    foot = max(prop(ident, "top") + prop(ident, "height") for ident in stacked)
+    left = min(prop(ident, "left") for ident in stacked)
+    width = max(prop(ident, "left") + prop(ident, "width") for ident in stacked) - left
+    count = len(stacked)
+    for index, ident in enumerate(stacked):
+        height = prop(ident, "height")
+        # Line `index` of `count` above the foot, at the pitch the text sets.
+        doc.bind(f"text.{ident}.top", ident, "top", larger(text_sum(foot, text_times(-(height + (count - 1 - index) * pitch))),
+                                                           prop(ident, "top")))
+        doc.bind(f"text.{ident}.height", ident, "height", text_times(height))
+        if prop(ident, "left") != left:
+            doc.bind(f"text.{ident}.left", ident, "left", larger(left, prop(ident, "left")))
+        if prop(ident, "width") != width:
+            doc.bind(f"text.{ident}.width", ident, "width", larger(width, prop(ident, "width")))
+        doc.bind(f"text.{ident}.text-overflow", ident, "text-overflow", larger("ellipsis", "clip"))
+        nodes[ident]["properties"]["text-overflow"] = keyword("clip")
+    # The first line's top above 100 %, where the picture ends.
+    first = text_sum(foot, text_times(-(prop(stacked[0], "height") + (count - 1) * pitch)))
+    shot_top, shot_h = prop(f"{shot}-back", "top"), prop(f"{shot}-back", "height")
+    height = {"op": "max", "args": [0, text_sum(-shot_top, first)]}
+    scale = {"op": "/", "args": [height, shot_h]}
+    for ident in (f"{shot}-back", shot, f"{shot}-border"):
+        inset = shot_h - prop(ident, "height")          # the picture inside the frame's 1 u border
+        doc.bind(f"text.{ident}.height", ident, "height",
+                 larger({"op": "max", "args": [0, text_sum(-inset, height)]}, prop(ident, "height")))
+        doc.bind(f"text.{ident}.width", ident, "width",
+                 larger({"op": "max", "args": [0, text_sum(-inset, {"op": "*", "args": [prop(f"{shot}-back", "width"), scale]})]},
+                        prop(ident, "width")))
+    strip, reason = nodes[error]["properties"], nodes[f"{error}-text"]["properties"]
+    strip_h = strip["height"]["value"]
+    doc.bind(f"text.{error}.top", error, "top", larger(text_sum(shot_top, height, text_times(-strip_h)), strip["top"]["value"]))
+    doc.bind(f"text.{error}.height", error, "height", text_times(strip_h))
+    doc.bind(f"text.{error}-text.height", f"{error}-text", "height", text_times(reason["height"]["value"]))
+
+
+def grow_empty(doc: Document, empty: dict, keys: tuple, actions: tuple) -> None:
+    """An empty state's sentence (`{empty}-text`, one of `keys`) follows the
+    text size: its box takes the lines the running language's longest
+    sentence needs at the running size, never less than its authored box, and
+    its action plates (`actions`) move down by what it grew; its heading and
+    the plates' labels are furniture and keep their size."""
+    from build_retained_screens import (TEXT, fixed_text, per_language, text_buckets, text_source, text_sum, text_times,
+                                        wrapped_lines)
+    text_source(doc)
+    nodes = {node["id"]: node for node in walk(empty)}
+    sentence = nodes[f"{empty['id']}-text"]["properties"]
+    face, size, line = sentence["font-family"]["value"], sentence["font-size"]["value"], sentence["line-height"]["value"]
+    authored = sentence["height"]["value"]
+    counts = wrapped_lines(keys, face, size, sentence["width"]["value"])
+    lines = text_buckets({scale: per_language(doc, {language: found[scale] for language, found in counts.items()}) for scale in (1.5, 2)})
+    larger = {"op": ">", "args": [TEXT, 1]}
+    needed = {"op": "max", "args": [authored, text_times({"op": "*", "args": [lines, line]})]}
+    grown = {"op": "select", "args": [larger, needed, authored]}
+    doc.bind(f"text.{empty['id']}-text.height", f"{empty['id']}-text", "height", grown)
+    for ident in actions:
+        top = nodes[ident]["properties"]["top"]["value"]
+        doc.bind(f"text.{ident}.top", ident, "top", {"op": "select", "args": [larger, text_sum(top - authored, needed), top]})
+    fixed_text(doc, nodes[f"{empty['id']}-heading"])
+    for ident in actions:
+        fixed_text(doc, nodes[ident])
+    height = empty["properties"]["height"]["value"]
+    doc.bind(f"text.{empty['id']}.height", empty["id"], "height", {"op": "select", "args": [larger, text_sum(height - authored, needed),
+                                                                                               height]})
 
 
 def bind_selected(doc: Document, ident: str, chosen: dict) -> None:
@@ -629,6 +750,11 @@ def load_game_document(family: Family = MARINE) -> dict:
                       family=family)
     column = group("load-column", {"position": keyword("relative"), "display": keyword("flex"), "flex-direction": keyword("column")},
                    [newer, *rows, older])
+    # Above 100 % text the rows grow with it (section 2's reflow); the
+    # headings, plates and filters are furniture and keep their size.
+    grow_rows(doc, column)
+    for node in [*headings, *plates]:
+        fixed_text(doc, node)
     viewport = group("load-list", {**absolute(left=U * LIST_LEFT, top=U * LIST_TOP, width=U * ROW_W, height=U * LIST_H),
                                    "overflow": keyword("auto")}, [column])
     # The bar's trough sits in the list's last 16 u, where the stock bar ran.
@@ -649,10 +775,15 @@ def load_game_document(family: Family = MARINE) -> dict:
     ])
     doc.bind("load-empty.display", "load-empty", "display",
              {"op": "select", "args": [{"op": "==", "args": [{"state": "load.count"}, 0]}, "block", "none"]})
+    grow_empty(doc, empty, ("#str_231101", "#str_231424"), ("load_newgame", "load-empty-clear"))
+    grow_details(doc, [*shot_parts, error, date, time_node, skill, played], "load-shot", "load-error",
+                 (("load-date", "load-time"), ("load-skill",), ("load-played",)))
     doc.bind("load_newgame.display", "load_newgame", "display", {"op": "select", "args": [
         {"op":"||", "args":[{"state":"load.ingame"},{"op":"!=", "args":[{"state":"browser.filter"},0]}]}, "none", "block"]})
 
     toolbar = save_browser(doc, "load", LIST_LEFT, ROW_W, family)
+    for node in toolbar:
+        fixed_text(doc, node)
     back = page_prompts(doc, "load_back", action="back", verbs=(VERB_LOAD, VERB_DELETE), **family.prompts())
     # The plates show at once, under the title the home carried; the panel
     # and the backing fade in over 150 ms (content.in), as a stock page's do.
@@ -713,6 +844,7 @@ def tall_list(tall, prefix: str, lines: tuple, list_w: float, heads: dict, top: 
     (u) by cell, `head_ids` the headings' ids where they are not
     {prefix}-head-{cell}. `shift` moves the tops (block()), and a list whose
     viewport does not stretch with the view takes `height`."""
+    from build_retained_screens import text_times
     from retained_tall import MARGIN
     line, head_line, inset = U * ROW_H * TALL_GROW, U * 14 * TALL_GROW, U * 4 * TALL_GROW
     for number, cells in enumerate(lines):
@@ -737,16 +869,22 @@ def tall_list(tall, prefix: str, lines: tuple, list_w: float, heads: dict, top: 
             continue
         row = ident.startswith("row-")
         height = len(lines) * line if row else line
+        # Rows that follow the text size (grow_rows) keep following it here.
+        grown = (lambda length: text_times(round(length, 4))) if (ident, "height") in tall.text_sized else (lambda length: length)
         for node in (ident, f"{ident}-line", f"{ident}-hover", f"{ident}-selected", f"{ident}-focus"):
             tall.set(node, "width", list_w)
-            tall.set(node, "height", height)
+            tall.set(node, "height", grown(height))
         if not row:
             tall.set(f"{ident}-label", "width", list_w - U * 18 * TALL_GROW)
+            if (f"{ident}-marker", "top") in tall.text_sized:
+                # The grown marker stays centred in the grown row.
+                tall.set(f"{ident}-marker", "top", {"op": "*", "args": [round(line / 2, 4),
+                                                                        {"op": "-", "args": [{"state": "view.text"}, 1]}]})
             continue
         for number, cells in enumerate(lines):
             for cell, left, width in cells:
                 tall.set(f"{ident}-{cell}", "left", inset + left * list_w)
-                tall.set(f"{ident}-{cell}", "top", number * line)
+                tall.set(f"{ident}-{cell}", "top", grown(number * line) if number else number * line)
                 tall.set(f"{ident}-{cell}", "width", width * list_w - 2 * inset)
     tall.bind(f"{prefix}_scroll", "left", MARGIN + list_w + 4)
     tall.top(f"{prefix}_scroll", list_top, shift)
@@ -770,7 +908,32 @@ def tall_detail(tall, prefix: str, picture: tuple, details: tuple, detail_origin
     tall.block((f"{prefix}-shot-back", f"{prefix}-shot", f"{prefix}-shot-border", f"{prefix}-error"), (U * picture[0], U * picture[1]),
                (MARGIN, picture_top), TALL_GROW)
     beside = MARGIN + U * picture[2] * TALL_GROW + 24
-    tall.block(details, (U * detail_origin[0], U * detail_origin[1]), (beside + 12, picture_top + 6), TALL_GROW * 0.97)
+    factor = TALL_GROW * 0.97
+    tall.block(details, (U * detail_origin[0], U * detail_origin[1]), (beside + 12, picture_top + 6), factor)
+    if (details[0], "top") in tall.text_sized:
+        # Lines that follow the text size in other views (grow_details) keep
+        # the tall view's own size here, beside the picture, as the settings
+        # rows do: the plates under them leave no room to grow.
+        from build_retained_screens import TEXT
+        def kept(ident: str, key: str, value: float) -> None:
+            tall.set(ident, key, value)
+        def lettered(ident: str, scale: float = factor) -> None:
+            for key in ("font-size", "line-height"):
+                tall.set(ident, key, {"op": "/", "args": [round(tall.dp(ident, key) * scale, 4), TEXT]})
+        for ident in details:
+            kept(ident, "top", picture_top + 6 + (tall.dp(ident, "top") - U * detail_origin[1]) * factor)
+            kept(ident, "left", beside + 12 + (tall.dp(ident, "left") - U * detail_origin[0]) * factor)
+            for key in ("width", "height"):
+                kept(ident, key, tall.dp(ident, key) * factor)
+            lettered(ident)
+        for ident in (f"{prefix}-shot-back", f"{prefix}-shot", f"{prefix}-shot-border"):
+            for key in ("width", "height"):
+                kept(ident, key, tall.dp(ident, key) * TALL_GROW)
+        error = f"{prefix}-error"
+        kept(error, "top", picture_top + (tall.dp(error, "top") - U * picture[1]) * TALL_GROW)
+        kept(error, "height", tall.dp(error, "height") * TALL_GROW)
+        kept(f"{error}-text", "height", tall.dp(f"{error}-text", "height") * TALL_GROW)
+        lettered(f"{error}-text", TALL_GROW)
     for index, (ident, _key, left, top, _action) in enumerate(plates):
         tall.block((ident,), (U * left, U * top), (beside, picture_top + 100 + index * TALL_PLATE_PITCH), TALL_PLATES)
     return picture_top + U * picture[3] * TALL_GROW
@@ -1007,6 +1170,9 @@ def save_game_document(family: Family = MARINE) -> dict:
                       family=family)
     column = group("save-column", {"position": keyword("relative"), "display": keyword("flex"), "flex-direction": keyword("column")},
                    [newer, *rows, older])
+    # Above 100 % text the rows grow with it (section 2's reflow); the
+    # headings, filters and SAVE GAME are furniture and keep their size.
+    grow_rows(doc, column)
     viewport = group("save-list", {**absolute(left=U * SAVE_LIST_LEFT, top=U * SAVE_LIST_TOP, width=U * SAVE_ROW_W, height=U * SAVE_LIST_H),
                                    "overflow": keyword("auto")}, [column])
     scrollbar = objectives_scrollbar(doc, "save_scroll", "save-list", family.rule, family.hot, U * (SAVE_LIST_LEFT + SAVE_ROW_W + 8) - 18,
@@ -1023,6 +1189,7 @@ def save_game_document(family: Family = MARINE) -> dict:
     ])
     doc.bind("save-empty.display", "save-empty", "display",
              {"op": "select", "args": [{"op": "==", "args": [{"state": "save.count"}, 0]}, "block", "none"]})
+    grow_empty(doc, empty, ("#str_231101", "#str_231424"), ("save-empty-clear",))
 
     # Under the list: the name on its plate, then SAVE GAME, which needs a
     # name, entered or typed.
@@ -1032,6 +1199,9 @@ def save_game_document(family: Family = MARINE) -> dict:
              {"op": "||", "args": [{"op": "!=", "args": [{"state": "save.name"}, ""]}, {"state": "ui.numberDraftsPending"}]})
     field = name_field(doc, family)
     toolbar = save_browser(doc, "save", SAVE_LIST_LEFT, SAVE_ROW_W, family)
+    # The name field keeps its size on its plate, under the list.
+    for node in [*headings, save_plate, field, *toolbar]:
+        fixed_text(doc, node)
     back = page_prompts(doc, "save_back", action="back", verbs=(VERB_SAVE,), **family.prompts())
     # SAVE GAME follows the panel, whose full-size box would take its hits.
     panel = group("save-panel", {**FULL, "opacity": number(1)}, [*headings, viewport, scrollbar, empty, name_plate(family), field, back, *toolbar])

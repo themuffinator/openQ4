@@ -3670,6 +3670,80 @@ static void CheckCreateServerBanList(ScreenHost& host, const char* path) {
 // square view, so each in the 0.78 view the text-scale checks add.
 static bool TallMenuLevel(int width, int height) { return width < .82f*height; }
 
+// A list page at 100, 150 and 200 % text (section 2's reflow, LAY-004): its
+// rows, their cells and lights are the 100 % row times the text size, so the
+// enlarged text keeps its line; the selected item's detail lines stand in
+// order on their own lines above the first section plate, the picture ending
+// over the first; furniture (headings, tags, plates' labels, the prompt bar)
+// keeps its size; every shown text stays on the screen; and at 100 % again
+// every node is where it was.
+static void CheckListTextScale(ScreenHost& host, const char* path, const char* name, const StateValues& states, const char* list,
+	const std::vector<std::string>& details, const char* picture, const char* plate) {
+	const auto source = Read(path);
+	Document document; std::vector<Diagnostic> diagnostics;
+	Check(document.Load(source,diagnostics) && diagnostics.empty(),"a list page validates for its text scale");
+	Runtime runtime(host);
+	Check(runtime.Initialize() && runtime.LoadDocument(source,name,diagnostics),"a list page loads for its text scale");
+	std::string error; Runtime::EventEffects effects; double time = .1;
+	Check(runtime.SetState(states,error,time) && runtime.RunEvent("onActivate",time,effects,error),"the list page opens with its rows");
+	std::set<std::string> fixed;
+	for (const auto& binding : document.Model().bindings)
+		if (binding.property == "font-size" && binding.id.starts_with("text.") && !binding.values.empty() && binding.values[0].op == "/")
+			fixed.insert(binding.node);
+	Check(!fixed.empty(),"the page names its furniture");
+	const auto bounds = [&](const std::string& id) { Bounds b; Check(runtime.GetBounds(id,b),"a list page node is laid out"); return b; };
+	const auto shown = [&](const Node& node) { const auto display = runtime.PresentedValue(node.id,"display"); return !display || display->text != "none"; };
+	const auto font = [&](const std::string& id) { const auto value = runtime.PresentedValue(id,"font-size"); return value ? float(value->data[0]) : -1.f; };
+	const auto authored = [&](const std::string& id) { return float(document.Model().FindNode(id)->properties.at("font-size").data[0]); };
+	std::map<std::string,Bounds> rest;
+	for (const auto& [width, height] : {std::pair{1280,720},std::pair{960,720}}) for (const float text : {1.f,1.5f,2.f,1.f}) {
+		Viewport view; view.canvasHeight = document.Model().canvasHeight; view.width = width; view.height = height; view.textScale = text;
+		runtime.Frame(view,time += .01); runtime.Frame(view,time += 1);
+		const float dp = view.DpRatio();
+		// The rows: the 100 % row (20 u) times the text size, cells and lights alike.
+		const auto row = bounds("row-0"), next = bounds("row-1");
+		Check(Near(row.height,20*1.5f*dp*text,.6f) && Near(next.y-row.y,row.height,.6f),"each row is its 100 % height times the text size");
+		for (const auto& child : document.Model().FindNode("row-0")->children) {
+			if (child.id.ends_with("-marker") || child.id.ends_with("-focus") || !shown(child)) continue;
+			const auto box = bounds(child.id);
+			Check(Near(box.height,row.height,.6f),"a row's cells and lights grow with it");
+		}
+		const auto overflow = runtime.PresentedValue(document.Model().FindNode("row-0")->children.back().id,"text-overflow");
+		Check(overflow && overflow->text == (text > 1 ? "ellipsis" : "clip"),"above 100 % a cell's value past its column ends in an ellipsis");
+		// The details: in order, each on its own line, above the first plate,
+		// under the picture, which keeps its aspect.
+		const auto shot = bounds(picture);
+		float last = shot.y + shot.height - .6f;
+		for (const auto& id : details) {
+			const auto line = bounds(id);
+			Check(text <= 1 || line.y >= last - .6f,"above 100 % each detail line stands under the one before it, the first under the picture");
+			last = text <= 1 ? last : line.y + line.height*15.f/16.f;
+		}
+		Check(text <= 1 || last <= bounds(plate).y + 5*1.5f*dp + .6f,"the detail lines end over the first section plate's band");
+		Check(Near(shot.width/shot.height,183.f/137.f,.02f) || shot.height < 1,"the picture keeps its aspect");
+		// Furniture keeps its size; every shown text stays on the screen.
+		const Bounds screen{0,0,float(width),float(height)};
+		std::vector<const Node*> pending{&document.Model().root};
+		while (!pending.empty()) {
+			const auto* node = pending.back(); pending.pop_back();
+			if (!shown(*node)) continue;
+			for (const auto& child : node->children) pending.push_back(&child);
+			if (node->type != "text") continue;
+			const auto box = bounds(node->id);
+			Check(box.x >= -.5f && box.y >= -.5f && box.x+box.width <= screen.width+.5f && box.y+box.height <= screen.height+.5f,
+				"each shown text of a list page stays on the screen");
+			if (fixed.contains(node->id)) Check(Near(font(node->id)*text,authored(node->id),.01f),"furniture keeps its authored size");
+		}
+		// At 100 % again every node stands where it did.
+		for (const auto& id : {std::string(list),std::string("row-0"),std::string(picture),details.front(),details.back()}) {
+			const auto box = bounds(id); const auto key = id+"@"+std::to_string(width);
+			if (text <= 1 && !rest.contains(key)) rest[key] = box;
+			else if (text <= 1) Check(Near(box.x,rest[key].x,.01f) && Near(box.y,rest[key].y,.01f) && Near(box.height,rest[key].height,.01f),
+				"at 100 % again a list page is as it was");
+		}
+	}
+}
+
 // Section 2's text-scale contract on a page-level menu (title, pauses,
 // SETTINGS, Single Player, Campaign, Multiplayer; build_retained_screens.py),
 // at 100, 150 and 200% text on 16:9 and 4:3 views and the tall 0.78, 3:4 and
@@ -6544,6 +6618,21 @@ int main(int argc, char** argv) {
 	if (runs("strogg-pages")) CheckSavePage(host,StroggPage(argv[20]).c_str(),true);
 	if (runs("strogg-pages")) CheckRestartPage(host,StroggPage(argv[21]).c_str(),true);
 	if (runs("pages")) CheckDemosPage(host,argv[22]);
+	if (runs("pages")) {
+		// The list pages at larger text, with two rows and a selection.
+		StateValues load{{"load.count",2.0},{"load.first",0.0},{"load.selected",0.0},{"load.date",std::string("11/02/2026")},
+			{"load.time",std::string("09:26am")},{"load.skill",std::string("CORPORAL")},{"load.played",std::string("0:03:13 played")},
+			{"load.row0.name",std::string("Medic")},{"load.row0.location",std::string("AIR DEFENSE BUNKER")},
+			{"load.row1.name",std::string("Bunker door")},{"load.row1.location",std::string("AIR DEFENSE BUNKER")}};
+		CheckListTextScale(host,argv[19],"guis/menu/loadgame.q4ui",load,"load-list",{"load-date","load-time","load-skill","load-played"},
+			"load-shot-back","load_go-plate");
+		StateValues demos{{"demos.count",2.0},{"demos.first",0.0},{"demos.selected",0.0},{"demos.kind",std::string("Render demo v10")},
+			{"demos.status",std::string("Playable")},{"demos.detail",std::string("Fixed recorded camera")},{"demos.playable",true},
+			{"demos.row0.name",std::string("newer")},{"demos.row0.map",std::string("-")},{"demos.row0.date",std::string("11/02/2026")},
+			{"demos.row0.length",std::string("--:--")},{"demos.row1.name",std::string("older")},{"demos.row1.length",std::string("--:--")}};
+		CheckListTextScale(host,argv[22],"guis/menu/demos.q4ui",demos,"demo-list",{"demo-kind","demo-status","demo-detail"},
+			"demo-shot-back","demo_play-plate");
+	}
 	if (runs("menus")) CheckModsDialog(host,argv[1]);
 	if (runs("pages")) CheckRestartMenu(host,argv[23]);
 	if (runs("pages")) CheckCreditsPage(host,argv[24]);

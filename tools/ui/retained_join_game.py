@@ -42,8 +42,8 @@ from build_retained_screens import (FULL, OLIVE, ORANGE, PROGRESS, U, VALUE, VER
                                     page_prompts, path, rgb, solid, stroke, text_width, track, typeface, vector)
 from retained_create_server import header_band, text_row
 from retained_difficulty import check_fits, primary_plate
-from retained_saves import (BACKING_ALPHA, ERROR, HEADING, PLACEHOLDER, bind_selected, pager_row, picture_frame, row_plates, row_states,
-                           table_text)
+from retained_saves import (BACKING_ALPHA, ERROR, HEADING, PLACEHOLDER, bind_selected, grow_rows, pager_row, picture_frame, row_plates,
+                           row_states, table_text)
 from retained_subpage import subpage_document
 
 JOIN_ROWS = 64                             # RETAINED_JOIN_ROWS in the session
@@ -754,6 +754,8 @@ def join_game_document() -> dict:
                       row_w=row_w)
     servers = group("servers-column", {"position": keyword("relative"), "display": keyword("flex"), "flex-direction": keyword("column")},
                     [newer, *[server_row(doc, index, row_w) for index in range(JOIN_ROWS)], older])
+    # Above 100 % text the servers' rows grow with it (section 2's reflow).
+    grow_rows(doc, servers)
     parts.append(group("servers-list", {**absolute(left=U * left, top=U * top, width=U * row_w, height=U * list_h),
                                         "overflow": keyword("auto")}, [servers]))
     parts.append(objectives_scrollbar(doc, "servers_scroll", "servers-list", OLIVE, ORANGE, U * (left + list_w) - 16, U * top, U * list_h,
@@ -841,8 +843,15 @@ def join_game_document() -> dict:
              {"op": "select", "args": [{"state": "join.favorite"}, FAVORITE_KEYS[1], FAVORITE_KEYS[0]]})
     doc.bind("join_favorite.enabled", "join_favorite", "enabled", {"op": ">=", "args": [{"state": "join.selected"}, 0]})
     back = page_prompts(doc, "join_back", action="back", verbs=(VERB_JOIN,))
+    detail = detail_card(doc)
+    # Above 100 % text only the servers' rows grow for now (grow_rows); the
+    # filters, headings, status, actions and details card keep their size.
+    from build_retained_screens import fixed_text
+    for node in [*parts, join, favorite, detail]:
+        if node["id"] != "servers-list":
+            fixed_text(doc, node)
     return tall_join_page(subpage_document(doc, "join", "#str_200002", "#str_200187", "join_newlist",
-                                           [*parts, join, favorite, back, detail_card(doc)],
+                                           [*parts, join, favorite, back, detail],
                                            [join_ip_modal(doc), find_modal(doc)], stretch=("servers-list",)))
 
 

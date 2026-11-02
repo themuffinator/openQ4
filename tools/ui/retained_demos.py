@@ -29,11 +29,11 @@ DEMOS carried to the step's foot, and Back climbing out onto DEMOS.
 from __future__ import annotations
 
 from build_retained_screens import (LANGUAGES, OLIVE, ORANGE, U, VERB_DELETE, VERB_PLAY, Document, absolute, action_plate, colour,
-                                    confirmation, group, keyword, label, length, number, objectives_scrollbar, page_prompts, path, rgb,
-                                    row_prompt, solid, stroke, text_width, typeface, vector)
+                                    confirmation, fixed_text, group, keyword, label, length, number, objectives_scrollbar, page_prompts,
+                                    path, rgb, row_prompt, solid, stroke, text_width, typeface, vector)
 from retained_saves import (ERROR, ERROR_LINE, ERROR_STRIP, HEADING, LIST_H, LIST_LEFT, LIST_TOP, LIST_W, PLACEHOLDER, PREVIEW,
-                            ROW_H, ROW_W, RULE_Y, bind_selected, lines_needed, pager_row, picture_frame, row_plates, row_states,
-                            section_plate, table_text)
+                            ROW_H, ROW_W, RULE_Y, bind_selected, grow_details, grow_empty, grow_rows, lines_needed, pager_row,
+                            picture_frame, row_plates, row_states, section_plate, table_text)
 from retained_subpage import subpage_document
 
 ROWS = 64                      # RETAINED_DEMO_ROWS in the session: the demos the list holds at a time
@@ -252,6 +252,14 @@ def demos_document() -> dict:
                       {"op": "<", "args": [{"op": "+", "args": [{"state": "demos.first"}, ROWS]}, {"state": "demos.count"}]})
     column = group("demo-column", {"position": keyword("relative"), "display": keyword("flex"), "flex-direction": keyword("column")},
                    [newer, *rows, older])
+    # Above 100 % text the rows and the selected demo's lines grow with it
+    # (section 2's reflow); the headings, tags and plates are furniture and
+    # keep their size.
+    grow_rows(doc, column)
+    grow_details(doc, [*shot_parts, error, kind, status, note], "demo-shot", "demo-error",
+                 (("demo-kind",), ("demo-status",), ("demo-detail",)))
+    for node in [*headings, *tags, *plates]:
+        fixed_text(doc, node)
     viewport = group("demo-list", {**absolute(left=U * LIST_LEFT, top=U * LIST_TOP, width=U * ROW_W, height=U * LIST_H),
                                    "overflow": keyword("auto")}, [column])
     scrollbar = objectives_scrollbar(doc, "demo_scroll", "demo-list", OLIVE, ORANGE, U * (LIST_LEFT + ROW_W + 8) - 18, U * LIST_TOP,
@@ -276,6 +284,7 @@ def demos_document() -> dict:
              {"op": "select", "args": [{"op": "==", "args": [{"state": "demos.count"}, 0]}, "block", "none"]})
     doc.bind("demo-empty-text.text", "demo-empty-text", "text",
              {"op": "select", "args": [{"op": "==", "args": [{"state": "demos.filter"}, 0]}, "#str_231115", "#str_231118"]})
+    grow_empty(doc, empty, ("#str_231115", "#str_231118"), ("demo_emptyclear",))
 
     back = page_prompts(doc, "demo_back", action="back", verbs=(VERB_PLAY, VERB_DELETE))
     modal = confirmation(doc, "deleteModal", "#str_41556", PLACEHOLDER, None, yes_event="deleteConfirmed")

@@ -1006,6 +1006,13 @@ archived provenance; new scheduling belongs here.
   The Multiplayer page also gained DEMOS, which opens the
   [Demos page as a sub-page](ui/retained-screens.md#demos-as-a-multiplayer-sub-page-2-november-2026)
   (`FLOW-050`); the title's plinth keeps MODS, UPDATES, CREDITS and EXIT.
+  The same day the list pages' rows began to
+  [follow the text size](ui/retained-screens.md#list-pages-follow-the-text-size-2-november-2026)
+  (Load and Save Game, Demos, Join Game and Create Server's maps), with Load
+  Game's and Demos' details stacked over a shrinking picture and their
+  furniture at its size (`LAY-004` partial). Player Setup, the Mods dialog,
+  the Objectives page, Create Server's options, Join Game's other controls,
+  Restart Level, Credits, Arena and the campaign skill page remain.
 - [ ] **UI-02 — P1, implementation and qualification: text, input and accessibility.**
   Finish in-field IME/composition, shaping/kerning/fallback/styles, grapheme editing,
   caret/candidate placement, binding capture, accessibility exposure and contextual

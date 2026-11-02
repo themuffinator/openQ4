@@ -185,8 +185,11 @@ See [release status](../../user/release-status.md) and the
   screen: descriptions, the main menu's hint line, the pause menu's mission
   details and confirmation messages grow and make room for themselves, while
   menu buttons, titles and the button prompts keep their size so the layout
-  stays intact. Player Setup and the list pages (Load Game, Join Game and the
-  like) still use their normal row sizes.
+  stays intact. The lists of saves, demos, servers and maps now grow their
+  rows with the text too, so names stay whole in their rows (a name too long
+  for its column ends in "…"), and the selected save's or demo's details
+  stand one under another above a smaller picture. Player Setup, Create
+  Server's options and a few other pages still use their normal sizes.
 - **Menus on tall screens.** On a portrait or rotated screen, the main menu,
   the pause menu and the Settings, Single Player, Campaign and Multiplayer
   menus in the new interface now fill the height: their buttons are larger
