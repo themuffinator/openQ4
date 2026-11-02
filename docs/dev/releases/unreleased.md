@@ -354,6 +354,9 @@ See [release status](../../user/release-status.md) and the
   better with broken API-layer registry entries on Windows. The Vulkan
   headers and memory allocator, the shader compiler and the JSON parser
   are current too. Replace the whole package as usual.
+- The experimental Android build now uses OpenAL Soft 1.25.2, the same audio
+  library release as the desktop packages, built with the current Android
+  NDK (r30).
 - Multiplayer bots on Linux and macOS no longer risk a crash when a player
   slot is empty. The bot code checked for a missing player in a way those
   systems' compilers are allowed to skip.

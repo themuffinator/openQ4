@@ -373,7 +373,8 @@ class AndroidBuildTests(unittest.TestCase):
                 openal / "CMakeLists.txt": "# OpenAL\n",
                 openal / "COPYING": "OpenAL notice\n",
                 openal / "LICENSE-pffft": "PFFFT notice\n",
-                openal / "fmt-11.1.3/LICENSE": "fmt notice\n",
+                openal / "fmt-11.2.0/LICENSE": "fmt notice\n",
+                openal / "gsl/LICENSE": "GSL notice\n",
             }
             for path, contents in sources.items():
                 path.parent.mkdir(parents=True, exist_ok=True)
@@ -406,6 +407,7 @@ class AndroidBuildTests(unittest.TestCase):
                     "licenses/openal-soft/COPYING": "OpenAL notice\n",
                     "licenses/openal-soft/LICENSE-fmt": "fmt notice\n",
                     "licenses/openal-soft/LICENSE-pffft": "PFFFT notice\n",
+                    "licenses/openal-soft/LICENSE-gsl": "GSL notice\n",
                     "licenses/android-ndk/NOTICE.toolchain": "C++ runtime notice\n",
                 }.items():
                     self.assertEqual((prefix / relative).read_text(encoding="utf-8"), expected)

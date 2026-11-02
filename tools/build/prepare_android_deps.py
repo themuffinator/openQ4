@@ -30,9 +30,12 @@ def dependency_notices(ndk: Path, sdl_source: Path, openal_source: Path) -> list
                 notices.append((path, Path("licenses") / label / name))
             elif name in required:
                 raise ValueError(f"Missing required dependency notice: {path}")
-    # OpenAL 1.24 keeps the bundled fmt notice in its source subdirectory.
+    # OpenAL 1.24 and later keep the bundled fmt notice, and 1.25 the bundled
+    # Microsoft GSL notice, in their source subdirectories.
     for path in openal_source.glob("fmt-*/LICENSE"):
         notices.append((path, Path("licenses/openal-soft/LICENSE-fmt")))
+    if (openal_source / "gsl/LICENSE").is_file():
+        notices.append((openal_source / "gsl/LICENSE", Path("licenses/openal-soft/LICENSE-gsl")))
     return notices
 
 

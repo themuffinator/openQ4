@@ -16,10 +16,10 @@ python -m mesonbuild.mesonmain subprojects download sdl3
 sdl_dir="$(python -c 'import configparser; c=configparser.ConfigParser(); c.read("subprojects/sdl3.wrap"); print(c["wrap-file"]["directory"])')"
 sdl_source="${project_root}/subprojects/${sdl_dir}"
 
-# Retain the qualified Android OpenAL version: 1.25.2 requires libc++ ranges
-# missing in NDK r27d. Ship the exact source alongside the APK (LGPL).
-openal_version=1.24.3
-openal_sha256=7e1fecdeb45e7f78722b776c5cf30bd33934b961d7fd2a11e0494e064cc631ce
+# The desktop OpenAL Soft release; it needs NDK r30's libc++ (r27d lacked the
+# ranges support it uses). Ship the exact source alongside the APK (LGPL).
+openal_version=1.25.2
+openal_sha256=fb27e5839aa11f0e5b9d33756965291fad5d6909ab928ea1f796f4a1a6877894
 openal_archive="${task_root}/sources/openal-soft-${openal_version}.tar.gz"
 curl --fail --location --retry 3 \
     "https://github.com/kcat/openal-soft/archive/refs/tags/${openal_version}.tar.gz" -o "${openal_archive}"

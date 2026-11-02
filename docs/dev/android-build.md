@@ -36,15 +36,15 @@ input. Historical Android integration revisions are recorded in the
 [integration evidence](android-gles-integration.md).
 
 Use the [Android NDK](https://developer.android.com/ndk/downloads), Python 3,
-Meson 1.6 or newer, Ninja and CMake. NDK r27d is the initial cross-build baseline.
+Meson 1.6 or newer, Ninja and CMake. The cross build uses NDK r30 (30.0.16248370).
 The cross-file generator follows Android's
 [other build systems guidance](https://developer.android.com/ndk/guides/other_build_systems):
 it invokes Clang directly with the target/API instead of Windows `.cmd` wrappers.
 All native libraries must use the same NDK, ABI, API and shared C++ runtime.
 
 Obtain SDL3 3.4.18 sources (the repository's pinned subproject, including its
-patches) and OpenAL Soft 1.24.3 sources separately. OpenAL 1.25.2 does not compile
-with NDK r27d's libc++ ranges support. SDL is zlib licensed; OpenAL Soft is LGPL licensed.
+patches) and OpenAL Soft 1.25.2 sources separately; OpenAL Soft 1.25 needs NDK r30's
+libc++, as r27d lacked the ranges support it uses. SDL is zlib licensed; OpenAL Soft is LGPL licensed.
 These are the existing engine dependencies, built for the target. Preserve their
 license notices when distributing the libraries, and satisfy OpenAL Soft's
 source/relinking requirements. See [SDL](https://github.com/libsdl-org/SDL) and
@@ -57,8 +57,8 @@ it neither replaces the engine's Meson build nor downloads sources implicitly.
 From the repository root on Windows, for example:
 
 ```powershell
-python tools/build/prepare_android_deps.py --ndk E:/_SOURCE/_CODE/android-ndk-r27d --sdl-source subprojects/SDL3-3.4.18 --openal-source E:/_SOURCE/_CODE/openal-soft-1.24.3 --prefix .tmp/android-build/deps --build-root .tmp/android-build/dependency-builds-1243
-python tools/build/android_cross.py --ndk E:/_SOURCE/_CODE/android-ndk-r27d --api 24 --out .tmp/android-build/arm64.ini
+python tools/build/prepare_android_deps.py --ndk E:/_SOURCE/_CODE/android-ndk-r30 --sdl-source subprojects/SDL3-3.4.18 --openal-source E:/_SOURCE/_CODE/openal-soft-1.25.2 --prefix .tmp/android-build/deps --build-root .tmp/android-build/dependency-builds-1252
+python tools/build/android_cross.py --ndk E:/_SOURCE/_CODE/android-ndk-r30 --api 24 --out .tmp/android-build/arm64.ini
 powershell -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 setup builddir/android-arm64 --cross-file .tmp/android-build/arm64.ini -Dandroid_deps_root=E:/Repositories/openQ4/.tmp/android-build/deps -Dbuildtype=release
 powershell -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 compile -C builddir/android-arm64 -j 8
 powershell -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 install -C builddir/android-arm64 --no-rebuild --skip-subprojects
@@ -116,8 +116,8 @@ separate from the experimental ARM64 release. Keep its dependency prefix,
 native build and stage separate:
 
 ```powershell
-python tools/build/prepare_android_deps.py --ndk E:/_SOURCE/_CODE/android-ndk-r27d --abi x86_64 --api 24 --sdl-source subprojects/SDL3-3.4.18 --openal-source E:/_SOURCE/_CODE/openal-soft-1.24.3 --prefix .tmp/android-emulator/deps --build-root .tmp/android-emulator/dependency-builds
-python tools/build/android_cross.py --ndk E:/_SOURCE/_CODE/android-ndk-r27d --abi x86_64 --api 24 --out .tmp/android-emulator/x64.ini
+python tools/build/prepare_android_deps.py --ndk E:/_SOURCE/_CODE/android-ndk-r30 --abi x86_64 --api 24 --sdl-source subprojects/SDL3-3.4.18 --openal-source E:/_SOURCE/_CODE/openal-soft-1.25.2 --prefix .tmp/android-emulator/deps --build-root .tmp/android-emulator/dependency-builds
+python tools/build/android_cross.py --ndk E:/_SOURCE/_CODE/android-ndk-r30 --abi x86_64 --api 24 --out .tmp/android-emulator/x64.ini
 $dependencyPrefix = (Resolve-Path .tmp/android-emulator/deps).Path
 & tools/build/meson_setup.ps1 setup builddir/android-x64 --cross-file .tmp/android-emulator/x64.ini "-Dandroid_deps_root=$dependencyPrefix" --buildtype=release
 & tools/build/meson_setup.ps1 compile -C builddir/android-x64 -j 4

@@ -6,6 +6,38 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Android NDK r30 and OpenAL Soft 1.25.2, 2 November 2026
+
+- The Android release workflow (`android-build.yml`) and the local build
+  instructions move from NDK r27d (27.3.13750724) to NDK r30 (30.0.16248370),
+  and Android's OpenAL Soft from 1.24.3 to 1.25.2, the release the desktop
+  packages already use. OpenAL Soft 1.25 needs the newer NDK's libc++: r27d
+  lacked the ranges support it uses. AGP 8.7.3, Gradle 8.12, SDK and target
+  API 35 and build-tools 35.0.0 are unchanged.
+- OpenAL Soft 1.25 bundles Microsoft GSL, with its notice in `gsl/LICENSE`.
+  `prepare_android_deps.py` now ships it as `licenses/openal-soft/LICENSE-gsl`
+  beside `COPYING`, `LICENSE-pffft` and `LICENSE-fmt`; without that the APK
+  would have omitted it. `android_build.py` checks the notice.
+- Validation: the steps of `build_android_release.sh` with the Linux NDK r30
+  in WSL Ubuntu 24.04 (the CI runner's release), for arm64-v8a and x86_64:
+  dependencies, cross file, Meson build and install, strip and
+  `android_elf.py` (all seven libraries target API 24 with 16 KiB load
+  alignment). Gradle assembled the arm64 release APK, which was aligned,
+  signed with a key made for the run and accepted by `verify_android_apk.py`;
+  the x86_64 debug APK passed `--variant emulator`. On the AOSP API 35 x86_64
+  emulator (SwiftShader), started with cfg files and no input,
+  game/airdefense1, game/hangar1 and an auto-joined mp/q4dm1 listen server
+  reached gameplay, with OpenAL Soft 1.25.2 mixing 8 to 10 voices through
+  Android's OpenSL output. The emulator had no host audio, so nothing was
+  heard. All 19 Android host tests pass.
+- Single-player view weapons are not drawn on the emulator, while
+  multiplayer draws them. A same-source x86_64 build with NDK r27d and
+  OpenAL Soft 1.24.3 gives the identical frame and log, so this predates the
+  NDK move; it stays an open emulator finding.
+- Not checked: a Windows-hosted NDK r30 build (the local recipe in
+  `docs/dev/android-build.md`), a physical device and the signed CI release
+  run.
+
 ## Save durability, restore safety and effect parity, 2 November 2026
 
 - **Saves survive a crash or power cut at the moment of saving.** Each step
@@ -111,12 +143,11 @@ See [player release status](../user/release-status.md).
 - Left for a project decision:
   - MoltenVK stays at v1.4.1: v1.4.2 needs macOS 12, and openQ4 still targets
     macOS 11.
-  - Android keeps NDK r27d, AGP 8.7.3, Gradle 8.12, SDK and target API 35,
-    build-tools 35.0.0 and OpenAL Soft 1.24.3. The newest are NDK r30,
-    AGP 9.5, Gradle 9.8 and API 37. AGP 9 is a breaking major release, a
-    higher target API changes app behaviour, and OpenAL Soft 1.25 needs a
-    newer NDK's libc++, so they move together after a decision and an Android
-    build.
+  - Android keeps AGP 8.7.3, Gradle 8.12, SDK and target API 35 and
+    build-tools 35.0.0. The newest are AGP 9.5, Gradle 9.8 and API 37; AGP 9
+    is a breaking major release and a higher target API changes app
+    behaviour. (NDK r30 and OpenAL Soft 1.25.2 followed the same day; see
+    the Android section above.)
   - IJG jpeg-6: replacing id's modified release-6 decoder with libjpeg 9 or
     libjpeg-turbo would change the decoder used for stock textures.
 - Validation on Windows: a debugoptimized `builddir` build staged to

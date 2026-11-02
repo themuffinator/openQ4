@@ -174,10 +174,9 @@ No SDL template source is copied into this repository.
 ## Release automation and signing
 
 `.github/workflows/android-build.yml` can build the APK independently and is
-also required by Manual Releases. It uses NDK r27d, Java 17, Gradle 8.12 and SDK
-35. SDL comes from the repository's checksum-pinned wrap with its patches;
-OpenAL Soft remains at the qualified Android 1.24.3 baseline because 1.25.2
-does not compile with NDK r27d's libc++ ranges support. The dependency source download
+also required by Manual Releases. It uses NDK r30, Java 17, Gradle 8.12 and SDK
+35. SDL comes from the repository's checksum-pinned wrap with its patches, and
+OpenAL Soft is the same 1.25.2 release the desktop packages use. The dependency source download
 contains the actual patched SDL tree, the exact OpenAL archive and build
 recipes. [SDL](https://github.com/libsdl-org/SDL) retains its zlib license and
 [OpenAL Soft](https://github.com/kcat/openal-soft) its LGPL terms. Both libraries

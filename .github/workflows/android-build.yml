@@ -32,7 +32,7 @@ jobs:
     timeout-minutes: 90
     env:
       OPENQ4_ANDROID_VERSION: ${{ inputs.version }}
-      ANDROID_NDK_VERSION: 27.3.13750724
+      ANDROID_NDK_VERSION: 30.0.16248370
       GRADLE_USER_HOME: ${{ github.workspace }}/.tmp/android-release/gradle-home
     steps:
       - name: Checkout immutable candidate
