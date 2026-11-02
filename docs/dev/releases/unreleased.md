@@ -337,6 +337,13 @@ See [release status](../../user/release-status.md) and the
 
 ## Change Log
 
+- The bundled libraries are updated to their latest releases. SDL 3.4.18
+  adds support for the Flydigi Apex 6 controller, stops the Keychron Q6
+  System Control from appearing as a gamepad, and fixes a startup crash on
+  PCs with a broken EZFRD64.DLL installed. The OpenXR loader 1.1.65 copes
+  better with broken API-layer registry entries on Windows. The Vulkan
+  headers and memory allocator, the shader compiler and the JSON parser
+  are current too. Replace the whole package as usual.
 - Multiplayer bots on Linux and macOS no longer risk a crash when a player
   slot is empty. The bot code checked for a missing player in a way those
   systems' compilers are allowed to skip.

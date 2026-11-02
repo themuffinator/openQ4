@@ -6,6 +6,60 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Third-party library updates, 2 November 2026
+
+- Moved to the newest stable upstream releases:
+  - SDL 3.4.16 to 3.4.18 (archive hash checked against the release asset's
+    published digest). openQ4's five SDL patches apply unchanged: the eight
+    files they touch are identical upstream, and the include closure of
+    `SDL_events.h` and `SDL_init.h` that the native-input tests whitelist is
+    the same. 3.4.18 makes `SDL_SetWindowBordered` fail on video drivers
+    without border control (Android, KMSDRM, offscreen, dummy) even when
+    nothing would change, which would have failed every strict video restart
+    on Android. `SDL3_SetWindowBorderedCompat` now asks SDL only for a real
+    change, and `sdl3_strict_window` models such a driver.
+  - glslang 15.1.0 to 16.6.0. The overlay's source list is unchanged (16.0
+    dropped the SPIR-V remapper, which openQ4 never built), and
+    `LICENSES/glslang.txt` follows upstream's shortened licence text.
+  - JsonCpp 1.9.6 to 1.9.8. `fast-double.patch` is rebased (upstream removed
+    the `sscanf` block above its anchor); `subnormal-numbers.patch` applies
+    unchanged. 1.9.8 lowers the default nesting limit from 1000 to 256 and
+    rejects raw control characters in strings. The retained document reader
+    sets its own limits and rejects those characters before JsonCpp sees
+    them, and every tracked JSON file still parses under strict rules.
+  - OpenXR SDK 1.1.63 to 1.1.65. The loader's source list is unchanged;
+    upstream removed its pre-C++17 filesystem fallback.
+  - Vulkan headers and volk from Vulkan SDK 1.4.363.0, Vulkan Memory
+    Allocator 3.4.0 to 3.5.0, and the Khronos OpenGL ES headers regenerated
+    on 3 August 2026 (additions only).
+  - CI: `actions/setup-java` v4 to v6 in the push, commit and macOS
+    workflows, matching the Android workflow.
+- Already current: RmlUi 6.3, GLEW 2.3.1, stb_vorbis 1.22, libtess2 (upstream
+  head), OpenAL Soft 1.25.2 for the Windows source build, the bundled headers
+  and macOS (the NuGet fallback's 1.23.1 is NuGet's newest), linuxdeploy
+  1-alpha-20251107-1, appimagetool 1.9.1, the SMAA lookup textures and the
+  other GitHub actions.
+- Left for a project decision:
+  - MoltenVK stays at v1.4.1: v1.4.2 needs macOS 12, and openQ4 still targets
+    macOS 11.
+  - Android keeps NDK r27d, AGP 8.7.3, Gradle 8.12, SDK and target API 35,
+    build-tools 35.0.0 and OpenAL Soft 1.24.3. The newest are NDK r30,
+    AGP 9.5, Gradle 9.8 and API 37. AGP 9 is a breaking major release, a
+    higher target API changes app behaviour, and OpenAL Soft 1.25 needs a
+    newer NDK's libc++, so they move together after a decision and an Android
+    build.
+  - IJG jpeg-6: replacing id's modified release-6 decoder with libjpeg 9 or
+    libjpeg-turbo would change the decoder used for stock textures.
+- Validation on Windows: a debugoptimized `builddir` build staged to
+  `.install`; all 307 native Meson tests; the push-verification script-smoke
+  list (419 commands); the UI register validator after the rebind. The
+  staged client, with no input, loaded game/airdefense1 and an auto-joined
+  mp/q4dm1 listen server on OpenGL and on Vulkan (RTX 4060). Every run
+  reached gameplay with no errors or warnings, and OpenAL Soft was playing
+  14 to 15 voices in single player (ambience, gunfire, streamed Ogg dialogue)
+  and 1 to 3 in multiplayer. Linux, macOS and Android were not built or run
+  here.
+
 ## General fixes round, 2 November 2026
 
 - Push Verification on main was red from the menus' safe-area change
