@@ -193,6 +193,48 @@ void RemoveCases(const fs::path& dir) {
     Check(DurableRemoveExact(path,error),"already missing removal succeeds");
 }
 
+void MoveCases(const fs::path& dir) {
+    const auto source = Utf8Path(dir / NativePath("slot-\xc3\xa9.save.tmp"));
+    const auto target = Utf8Path(dir / NativePath("slot-\xc3\xa9.save"));
+    bool moved = true;
+    Put(source,"new payload");
+    Check(DurableMoveExact(source,target,moved,error) && moved && error.empty(),"move publishes to an absent name");
+    Check(Get(target) == "new payload" && !fs::exists(NativePath(source)),"moved bytes exist only at the new name");
+    Put(source,"second payload");
+    Check(!DurableMoveExact(source,target,moved,error) && !moved && !error.empty(),"occupied destination refused");
+    Check(Get(target) == "new payload" && Get(source) == "second payload","refused move changes neither name");
+    Check(DurableRemoveExact(target,error),"clear move target");
+    Arm(Point::Rename);
+    Check(!DurableMoveExact(source,target,moved,error) && !moved && !error.empty(),"pre-rename failure reported as unmoved");
+    Check(Get(source) == "second payload" && !fs::exists(NativePath(target)),"pre-rename failure leaves the source");
+    Arm(Point::MetadataSync);
+    Check(!DurableMoveExact(source,target,moved,error) && moved && faults.calls == 1 &&
+        error.find("durability") != std::string::npos,"post-rename barrier failure reports the completed move");
+    Check(Get(target) == "second payload" && !fs::exists(NativePath(source)),"unconfirmed move follows the namespace");
+    Check(!DurableMoveExact(source,target,moved,error) && !moved,"missing source refused");
+    Check(Get(target) == "second payload","missing-source refusal preserves the target");
+    const auto other = dir / "move-other";
+    Check(fs::create_directory(other),"second directory fixture");
+    const auto elsewhere = Utf8Path(other / "slot.save");
+    Check(!DurableMoveExact(target,elsewhere,moved,error) && !moved,"cross-directory move refused");
+    Check(Get(target) == "second payload" && !fs::exists(NativePath(elsewhere)),"cross-directory refusal changes nothing");
+    Check(fs::remove(other),"remove second directory fixture");
+    const auto directory = dir / "move-directory";
+    Check(fs::create_directory(directory),"directory source fixture");
+    Check(!DurableMoveExact(Utf8Path(directory),source,moved,error) && !moved && fs::is_directory(directory),
+        "directory source refused");
+    Check(fs::remove(directory),"remove directory source fixture");
+    const auto linked = dir / "move-link";
+    std::error_code linkError;
+    fs::create_symlink(NativePath(target),linked,linkError);
+    if (!linkError) {
+        Check(!DurableMoveExact(Utf8Path(linked),source,moved,error) && !moved,"leaf symlink source refused");
+        Check(fs::remove(linked),"remove move link fixture");
+    } else std::cout << "SKIP move symlink fixture: " << linkError.message() << '\n';
+    Check(!DurableMoveExact("relative.save",target,moved,error) && !moved,"move path must be absolute");
+    Check(DurableRemoveExact(target,error),"remove move fixture");
+}
+
 void PathCases(const fs::path& dir) {
     std::string output = "unchanged";
     const auto good = Utf8Path(dir / "path.json");
@@ -483,7 +525,7 @@ int main(int argc, char** argv) {
     }
     Check(created,"reserve isolated test directory");
     std::cout << "DurableFileTest scratch: " << Utf8Path(dir) << '\n';
-    ReadCases(dir); ReplaceCases(dir); CreateCases(dir); RemoveCases(dir); PathCases(dir); LeaseCases(dir);
+    ReadCases(dir); ReplaceCases(dir); CreateCases(dir); MoveCases(dir); RemoveCases(dir); PathCases(dir); LeaseCases(dir);
     // Only exact regular files created inside this exclusive, nonrecursive test
     // directory remain (uncertain Windows tombstones). Preserve unexpected data.
     for (const auto& entry : fs::directory_iterator(dir)) {

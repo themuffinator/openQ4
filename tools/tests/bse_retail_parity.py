@@ -26,6 +26,9 @@ effects look or sound, with no warning anywhere:
   * Looping ambient effects start with two loops of history, effects are
     submitted farthest first, and spawning looks 0.016 s ahead.
   * Spawn domains use retail's cube-face order and model-to-effect axes.
+  * Model particles transform only vertex positions.  Retail rvModelParticle::Render
+    (0x101c8d90) and rvPrimBatch::TransformVerts copy the model's normals and
+    tangents unrotated; the ETQW-derived source rotated them.
 """
 
 from __future__ import annotations
@@ -137,6 +140,15 @@ def validate_vertex_colour() -> None:
     require(tint, "GetAdditive() ? 1.0f : effect->GetAlpha()", "rvParticle::HandleTint")
 
 
+def validate_model_particle_vertices() -> None:
+    particle = read("src", "bse", "BSE_Particle.cpp")
+    render = body_of(particle, "bool rvModelParticle::Render(", "BSE_Particle.cpp")
+    require(render, "dst = src->verts[i];", "rvModelParticle::Render")
+    for needle in ("dst.normal = ", "dst.tangents[0] = ", "dst.tangents[1] = "):
+        forbid(render, needle, "rvModelParticle::Render",
+               "retail keeps model-particle normals and tangents as copied from the model")
+
+
 def validate_effect_timing_and_order() -> None:
     effect = read("src", "bse", "BSE_Effect.cpp")
     segments = body_of(effect, "void rvBSE::UpdateSegments(float time)", "BSE_Effect.cpp")
@@ -180,6 +192,7 @@ def main() -> int:
         validate_sound_segment_diversity()
         validate_envelope_rate()
         validate_vertex_colour()
+        validate_model_particle_vertices()
         validate_effect_timing_and_order()
         validate_spawn_domains()
         validate_manager_surface()

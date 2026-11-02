@@ -462,6 +462,30 @@ static const char *Session_GetSaveGameWireABI( void ) {
 }
 #endif
 
+// Every slot rename is a write-through/directory-synced step, so the commit
+// order survives a power loss: backups before publication, payload last. A
+// filesystem that cannot confirm the barrier still gets the rename; the caller
+// is told the weaker guarantee instead of rolling back a completed move. Runs
+// on the checkpoint worker too: no console, VFS, game or CVar access. Inline:
+// dedicated builds compile the commit operations but never call them.
+static inline bool Session_MoveSaveFileDurably( const std::string &from, const std::string &to,
+	std::string &durabilityUnconfirmed, std::string &error ) {
+	// fs_savepath may be relative to the working directory.
+	const auto native = []( const std::string &path ) {
+		std::error_code code;
+		const auto absolute = std::filesystem::absolute( std::filesystem::u8path( path ), code );
+		if ( code ) return path;
+		const auto bytes = absolute.lexically_normal().u8string();
+		return std::string( reinterpret_cast<const char *>( bytes.data() ), bytes.size() );
+	};
+	bool moved = false;
+	if ( openq4::DurableMoveExact( native( from ), native( to ), moved, error ) ) return true;
+	if ( !moved ) return false;
+	durabilityUnconfirmed = error;
+	error.clear();
+	return true;
+}
+
 #ifndef ID_DEDICATED
 static bool Session_IsSafeSaveMaterialPath( const idStr &path ) {
 	if ( path.IsEmpty() ) {
@@ -1200,10 +1224,24 @@ static void Session_RemoveRelativeSaveFile( const idStr &relativePath ) {
 	fileSystem->RemoveExplicitFile( osPath.c_str() );
 }
 
+static void Session_WarnSaveDurabilityUnconfirmed( const std::string &reason ) {
+	static bool warned = false;
+	if ( !warned ) {
+		warned = true;
+		common->Warning( "Saved files were renamed, but this filesystem did not confirm the change is on disk: %s", reason.c_str() );
+	}
+}
+
 static bool Session_RenameRelativeSaveFile( const idStr &from, const idStr &to ) {
 	idStr fromOSPath = fileSystem->RelativePathToOSPath( from.c_str(), "fs_savepath" );
 	idStr toOSPath = fileSystem->RelativePathToOSPath( to.c_str(), "fs_savepath" );
-	return rename( fromOSPath.c_str(), toOSPath.c_str() ) == 0;
+	std::string unconfirmed, error;
+	if ( !Session_MoveSaveFileDurably( fromOSPath.c_str(), toOSPath.c_str(), unconfirmed, error ) ) {
+		common->DPrintf( "Save rename '%s' -> '%s' failed: %s\n", from.c_str(), to.c_str(), error.c_str() );
+		return false;
+	}
+	if ( !unconfirmed.empty() ) Session_WarnSaveDurabilityUnconfirmed( unconfirmed );
+	return true;
 }
 
 static bool Session_AppendSaveGameIntegrityTrailer( const idStr &relativePath ) {
@@ -1444,6 +1482,12 @@ static bool Session_RecoverInterruptedSaveFiles( const idStr &gameFile, const id
 		return true;
 	}
 
+	// A commit starts only once every component is staged, and it backs up each
+	// existing final before publishing any temporary. With no backups, a payload
+	// final beside its own temporary therefore proves no commit began: the save
+	// was interrupted while staging, and a sidecar temporary that was never
+	// written must not be mistaken for one already published.
+	const bool commitMayHavePublished = anyBackupExists || !Session_RelativeSaveFileExists( gameFile );
 	bool recovered = true;
 	for ( int i = 0; i < 3; i++ ) {
 		const bool tempExists = Session_RelativeSaveFileExists( files[i].tempName );
@@ -1455,7 +1499,7 @@ static bool Session_RecoverInterruptedSaveFiles( const idStr &gameFile, const id
 					files[i].backupName.c_str(), files[i].finalName.c_str() );
 				recovered = false;
 			}
-		} else if ( ( tempGameExists && !tempExists ) || ( !tempGameExists && anyBackupExists ) ) {
+		} else if ( ( tempGameExists && !tempExists && commitMayHavePublished ) || ( !tempGameExists && anyBackupExists ) ) {
 			// This component was committed without replacing an older file.
 			Session_RemoveRelativeSaveFile( files[i].finalName );
 		}
@@ -7956,10 +8000,13 @@ struct sessionSaveStorageJob_t {
 	std::unique_ptr<idJobList> jobs;
 };
 
-// No game, VFS, console or CVar calls are made by commit workers. SDL's exact
-// rename/remove operations are thread-safe; metadata inspection also rejects
-// nonregular leaf paths and distinguishes a missing file from an access error.
+// No game, VFS, console or CVar calls are made by commit workers. Renames are
+// durable (see Session_MoveSaveFileDurably) and SDL's exact remove is
+// thread-safe; metadata inspection also rejects nonregular leaf paths and
+// distinguishes a missing file from an access error.
 struct sessionSaveCommitFileOps_t {
+	// Set when a rename happened but its durability barrier was not confirmed.
+	std::string durabilityUnconfirmed;
 	bool Exists( const std::string& path, bool& exists, std::string& error ) {
 		std::error_code code;
 		const auto status = std::filesystem::symlink_status( std::filesystem::u8path( path ), code );
@@ -7972,19 +8019,7 @@ struct sessionSaveCommitFileOps_t {
 		return true;
 	}
 	bool Move( const std::string& from, const std::string& to, std::string& error ) {
-		bool source = false, destination = false;
-		if ( !Exists( from, source, error ) || !Exists( to, destination, error ) ) return false;
-		if ( !source || destination ) { error = "save rename source missing or destination occupied"; return false; }
-#if defined( USE_SDL3 )
-		if ( SDL_RenamePath( from.c_str(), to.c_str() ) ) return true;
-		error = SDL_GetError();
-#else
-		std::error_code code;
-		std::filesystem::rename( std::filesystem::u8path( from ), std::filesystem::u8path( to ), code );
-		if ( !code ) return true;
-		error = code.message();
-#endif
-		return false;
+		return Session_MoveSaveFileDurably( from, to, durabilityUnconfirmed, error );
 	}
 	bool Remove( const std::string& path, std::string& error ) {
 		bool exists = false;
@@ -8006,6 +8041,7 @@ struct sessionSaveCommitFileOps_t {
 struct sessionSaveCommitJob_t {
 	std::array<openq4::SaveGameTransactionFile, 3> files;
 	openq4::SaveGameTransactionResult result;
+	std::string durabilityUnconfirmed;
 	bool removePreview = false;
 	double msec = 0.0;
 	// Join before releasing any strings/state read by the worker.
@@ -8019,6 +8055,7 @@ static void Session_CommitCheckpointFiles( const idJobContext& context ) {
 	try {
 		sessionSaveCommitFileOps_t ops;
 		commit.result = openq4::CommitSaveGame( commit.files, ops, commit.removePreview );
+		commit.durabilityUnconfirmed = ops.durabilityUnconfirmed;
 	} catch ( const std::exception& error ) {
 		// The exact paths and recovery sentinels must survive an interrupted job.
 		commit.result.recoveryNeeded = true;
@@ -8607,6 +8644,7 @@ bool idSessionLocal::SaveGame( const char *saveName, saveType_t saveType ) {
 					return false;
 				}
 				if ( !commit->result.cleanupComplete ) common->Warning( "Checkpoint cleanup deferred: %s", commit->result.error.c_str() );
+				if ( !commit->durabilityUnconfirmed.empty() ) Session_WarnSaveDurabilityUnconfirmed( commit->durabilityUnconfirmed );
 			}
 			if ( !previewReady && !commit ) Session_RemoveRelativeSaveFile( previewFile );
 			if ( com_saveGameProfile.GetInteger() >= 3 ) profile.Mark( "commit-preview" );

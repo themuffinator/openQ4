@@ -980,17 +980,22 @@ void idEntity::Restore( idRestoreGame *savefile ) {
 		signals = new signalList_t;
 		for( i = 0; i < NUM_SIGNALS; i++ ) {
 			savefile->ReadInt( num );
-			if ( num < 0 || num > MAX_SAVEGAME_ENTITY_REFS ) {
+			// SetSignal never holds more than MAX_SIGNAL_THREADS, and Signal()
+			// copies a list into that many slots.
+			if ( num < 0 || num > MAX_SIGNAL_THREADS ) {
 				savefile->Error( "idEntity::Restore: invalid signal count %d for signal %d on entity '%s'", num, i, name.c_str() );
 			}
-			signals->signal[ i ].SetNum( num );
+			// Failed-load teardown still raises SIG_REMOVED, so the list may hold
+			// only entries whose function resolved.
 			for( j = 0; j < num; j++ ) {
-				savefile->ReadInt( signals->signal[ i ][ j ].threadnum );
+				signal_t sig;
+				savefile->ReadInt( sig.threadnum );
 				savefile->ReadString( funcname );
-				signals->signal[ i ][ j ].function = gameLocal.program.FindFunction( funcname );
-				if ( !signals->signal[ i ][ j ].function ) {
+				sig.function = gameLocal.program.FindFunction( funcname );
+				if ( !sig.function ) {
 					savefile->Error( "Function '%s' not found", funcname.c_str() );
 				}
+				signals->signal[ i ].Append( sig );
 			}
 		}
 	}
@@ -3692,6 +3697,11 @@ idEntity::RestorePhysics
 */
 void idEntity::RestorePhysics( idPhysics *phys ) {
 	assert( phys != NULL );
+	// A restored physics object belongs to the entity restoring it. The saved
+	// owner pointer is never trusted: a damaged one would let teardown reach
+	// another, possibly deleted, entity. idItem and the default physics already
+	// re-attached themselves this way.
+	phys->SetSelf( this );
 	// restore physics pointer
 	physics = phys;
 }

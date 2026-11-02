@@ -745,8 +745,9 @@ void rvVehiclePosition::Restore ( idRestoreGame* savefile ) {
 	if ( num < 0 || num > MAX_SAVEGAME_VEHICLE_PARTS ) {
 		savefile->Error( "rvVehiclePosition::Restore: invalid part count %d", num );
 	}
+	// The destructor deletes every listed part: append each one only once it
+	// is fully restored, so a failed read never leaves unset pointers.
 	mParts.Clear ( );
-	mParts.SetNum ( num );	
 	for ( i = 0; i < num; i ++ ) {
 		idStr			spawnclass;
 		rvVehiclePart*	part;
@@ -763,7 +764,7 @@ void rvVehiclePosition::Restore ( idRestoreGame* savefile ) {
 		
 		part = static_cast<rvVehiclePart*>(typeInfo->CreateInstance ( ));
 		savefile->ReadStaticObject ( *part );
-		mParts[i] = part;
+		mParts.Append ( part );
 	}
 
 	savefile->ReadInt ( num );
@@ -771,7 +772,6 @@ void rvVehiclePosition::Restore ( idRestoreGame* savefile ) {
 		savefile->Error( "rvVehiclePosition::Restore: invalid weapon count %d", num );
 	}
 	mWeapons.Clear ( );
-	mWeapons.SetNum ( num );	
 	for ( i = 0; i < num; i ++ ) {
 		idStr			spawnclass;
 		rvVehiclePart*	part;
@@ -788,7 +788,7 @@ void rvVehiclePosition::Restore ( idRestoreGame* savefile ) {
 		
 		part = static_cast<rvVehiclePart*>(typeInfo->CreateInstance ( ));
 		savefile->ReadStaticObject ( *part );
-		mWeapons[i] = part;
+		mWeapons.Append ( part );
 	}
 	
 	savefile->ReadVec3 ( mEyeOrigin );

@@ -21,6 +21,9 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#if defined(__linux__) && !defined(__ANDROID__)
+#include <sys/syscall.h>
+#endif
 #endif
 
 namespace openq4 {
@@ -521,6 +524,66 @@ bool Remove(const Path& path, std::string& error) {
     error.clear(); return true;
 }
 
+#ifndef _WIN32
+// Refuses an occupied destination atomically where the kernel and filesystem
+// can. Android's app seccomp policy predates renameat2, so it is never called
+// there; filesystems without an exclusive rename fall back to renameat after
+// the caller's absence check.
+bool RenameNoReplace(Native parent, const std::string& from, const std::string& to, std::string& error) {
+#if defined(__linux__) && !defined(__ANDROID__) && defined(SYS_renameat2)
+    constexpr unsigned renameNoReplace = 1;
+    if (syscall(SYS_renameat2,parent,from.c_str(),parent,to.c_str(),renameNoReplace) == 0) return true;
+    if (errno == EEXIST) return Error(error,"Move destination is occupied");
+    if (errno != EINVAL && errno != ENOSYS && errno != ENOTSUP && errno != EOPNOTSUPP)
+        return Error(error,"Move rename failed",errno);
+#elif defined(__APPLE__)
+    if (renameatx_np(parent,from.c_str(),parent,to.c_str(),RENAME_EXCL) == 0) return true;
+    if (errno == EEXIST) return Error(error,"Move destination is occupied");
+    if (errno != EINVAL && errno != ENOTSUP) return Error(error,"Move rename failed",errno);
+#endif
+    if (renameat(parent,from.c_str(),parent,to.c_str()) != 0) return Error(error,"Move rename failed",errno);
+    return true;
+}
+#endif
+
+bool Move(const Path& from, const Path& to, bool& moved, std::string& error) {
+    moved = false;
+    // Callers derive both names from one directory; a differently spelled
+    // parent refuses rather than guessing at case or link equivalence.
+    if (from.parent != to.parent) return Error(error,"Durable move must stay within one directory");
+    Handle parent;
+#ifndef _WIN32
+    if (!OpenParent(from,parent,error)) return false;
+#endif
+    bool missing;
+    if (!InspectTarget(from,parent.value,missing,error)) return false;
+    if (missing) return Error(error,"Move source is missing");
+    if (!InspectTarget(to,parent.value,missing,error)) return false;
+    if (!missing) return Error(error,"Move destination is occupied");
+    if (Fail(Point::Rename)) return Error(error,"Move rename failed (injected)");
+#ifdef _WIN32
+    // Without REPLACE_EXISTING the native operation refuses an occupied name.
+    if (!MoveFileExW(from.full.c_str(),to.full.c_str(),MOVEFILE_WRITE_THROUGH)) {
+        const auto code = GetLastError();
+        if (code == ERROR_FILE_EXISTS || code == ERROR_ALREADY_EXISTS) return Error(error,"Move destination is occupied");
+        if (MissingError(code)) return Error(error,"Move source is missing",code);
+        // A failed write-through move can still have renamed the file.
+        bool sourceMissing = false, targetMissing = true;
+        std::string ignored;
+        moved = InspectTarget(from,Invalid,sourceMissing,ignored) && sourceMissing &&
+            InspectTarget(to,Invalid,targetMissing,ignored) && !targetMissing;
+        return Error(error,"Move rename failed; namespace durability may be uncertain",code);
+    }
+    moved = true;
+    if (Fail(Point::MetadataSync)) return Error(error,"Moved; namespace durability unconfirmed (injected)");
+#else
+    if (!RenameNoReplace(parent.value,from.leaf,to.leaf,error)) return false;
+    moved = true;
+    if (!Sync(parent.value,Point::MetadataSync,error)) return false;
+#endif
+    error.clear(); return true;
+}
+
 } // namespace durable_detail
 
 DurableReadResult DurableReadExact(const std::string& path, std::size_t maxBytes,
@@ -559,6 +622,16 @@ DurableCreateResult DurableCreateExact(const std::string& path, const std::strin
     } catch (const std::bad_alloc&) {
         Error(error,"Durable new-file allocation failed"); return DurableCreateResult::Failed;
     }
+}
+
+bool DurableMoveExact(const std::string& from, const std::string& to, bool& moved, std::string& error) {
+    using namespace durable_detail;
+    moved = false;
+    try {
+        Path source, destination;
+        return ParsePath(from,source,error) && ParsePath(to,destination,error) &&
+            Move(source,destination,moved,error);
+    } catch (const std::bad_alloc&) { return Error(error,"Durable move allocation failed"); }
 }
 
 bool DurableRemoveExact(const std::string& path, std::string& error) {

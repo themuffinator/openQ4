@@ -127,30 +127,45 @@ def main() -> int:
                 break
         if status == 0 and args.mutations:
             original = SOURCES[1].read_text(encoding='utf-8')
-            begin = original.index('DurableCreateResult Create(')
-            end = original.index('\nbool Remove(', begin)
-            body = original[begin:end]
-            native_before = ('MoveFileExW(temp.name.c_str(),path.full.c_str(),MOVEFILE_WRITE_THROUGH)' if os.name == 'nt' else
+            windows = os.name == 'nt'
+            # Each mutation edits one function: (start marker, end marker, edits).
+            create = ('DurableCreateResult Create(', '\nbool Remove(')
+            move = ('bool Move(', '\n} // namespace durable_detail')
+            native_before = ('MoveFileExW(temp.name.c_str(),path.full.c_str(),MOVEFILE_WRITE_THROUGH)' if windows else
                              'linkat(parent.value,temp.name.c_str(),parent.value,path.leaf.c_str(),0)')
-            native_after = ('MoveFileExW(temp.name.c_str(),path.full.c_str(),MOVEFILE_WRITE_THROUGH | MOVEFILE_REPLACE_EXISTING)' if os.name == 'nt' else
+            native_after = ('MoveFileExW(temp.name.c_str(),path.full.c_str(),MOVEFILE_WRITE_THROUGH | MOVEFILE_REPLACE_EXISTING)' if windows else
                             'renameat(parent.value,temp.name.c_str(),parent.value,path.leaf.c_str())')
             cases = {
-                'overwrite-racing-creator': (native_before, native_after),
-                'collision-as-created': ('if (!missing) { error.clear(); return DurableCreateResult::Exists; }',
-                                         'if (!missing) { error.clear(); return DurableCreateResult::Created; }'),
-                'omit-payload': ('!WriteAll(temp.file.value,bytes,error)', '(static_cast<void>(bytes), false)'),
-                'omit-file-sync': ('!Sync(temp.file.value,Point::FileSync,error)', 'false'),
-                'omit-close-check': ('!temp.file.Close(error,Point::CloseWrite)', '(temp.file.Close(error,Point::CloseWrite), false)'),
-                'omit-native-failure': ('if (Fail(Point::CreatePublication))', 'if (false && Fail(Point::CreatePublication))'),
-                'omit-namespace-sync': (('if (Fail(Point::MetadataSync))' if os.name == 'nt' else '!Sync(parent.value,Point::MetadataSync,error)'),
-                                        ('if (false && Fail(Point::MetadataSync))' if os.name == 'nt' else 'false')),
+                'overwrite-racing-creator': (create, [(native_before, native_after)]),
+                'collision-as-created': (create, [('if (!missing) { error.clear(); return DurableCreateResult::Exists; }',
+                                                   'if (!missing) { error.clear(); return DurableCreateResult::Created; }')]),
+                'omit-payload': (create, [('!WriteAll(temp.file.value,bytes,error)', '(static_cast<void>(bytes), false)')]),
+                'omit-file-sync': (create, [('!Sync(temp.file.value,Point::FileSync,error)', 'false')]),
+                'omit-close-check': (create, [('!temp.file.Close(error,Point::CloseWrite)', '(temp.file.Close(error,Point::CloseWrite), false)')]),
+                'omit-native-failure': (create, [('if (Fail(Point::CreatePublication))', 'if (false && Fail(Point::CreatePublication))')]),
+                'omit-namespace-sync': (create, [(('if (Fail(Point::MetadataSync))' if windows else '!Sync(parent.value,Point::MetadataSync,error)'),
+                                                  ('if (false && Fail(Point::MetadataSync))' if windows else 'false'))]),
+                'move-replaces-occupied': (move, [
+                    ('if (!missing) return Error(error,"Move destination is occupied");', ''),
+                    (('MOVEFILE_WRITE_THROUGH)) {', 'MOVEFILE_WRITE_THROUGH | MOVEFILE_REPLACE_EXISTING)) {') if windows else
+                     ('!RenameNoReplace(parent.value,from.leaf,to.leaf,error)',
+                      'renameat(parent.value,from.leaf.c_str(),parent.value,to.leaf.c_str()) != 0'))]),
+                'move-omits-namespace-sync': (move, [(('if (Fail(Point::MetadataSync))' if windows else '!Sync(parent.value,Point::MetadataSync,error)'),
+                                                      ('if (false && Fail(Point::MetadataSync))' if windows else 'false'))]),
+                'move-hides-completed-rename': (move, [(('moved = true;\n    if (Fail(' if windows else 'moved = true;\n    if (!Sync('),
+                                                        ('moved = false;\n    if (Fail(' if windows else 'moved = false;\n    if (!Sync('))]),
             }
-            for name, (before, after) in cases.items():
-                assert body.count(before) == 1, (name, body.count(before))
+            for name, ((start, stop), edits) in cases.items():
+                begin = original.index(start)
+                end = original.index(stop, begin)
+                body = original[begin:end]
+                for before, after in edits:
+                    assert body.count(before) == 1, (name, before, body.count(before))
+                    body = body.replace(before, after)
                 overlay = scratch / name
                 changed = overlay / 'src/framework/DurableFile.cpp'
                 changed.parent.mkdir(parents=True)
-                changed.write_text(original[:begin] + body.replace(before, after) + original[end:], encoding='utf-8')
+                changed.write_text(original[:begin] + body + original[end:], encoding='utf-8')
                 shutil.copyfile(SOURCES[0], changed.with_suffix('.h'))
                 binary = overlay / executable.name
                 record = {'name': name, 'commands': [], 'expected_rejection': False}
