@@ -2609,10 +2609,10 @@ The pull-down console draws the same pointer in the UI viewport its mouse
 maps to, at its text's scale (a texel is 1/480 of the viewport height). Over
 the edit line, where a click places the caret, or during a selection begun
 there, it is the I-beam; the console no longer loads
-`gfx/guis/guicursor_arrow`. It keeps June's hotspot shift, drawing the pointer
-a text row above the mouse position its clicks use, although its rows now
-match their hit rectangles: with `conPointerTest` on the edit row the I-beam
-draws over the log line above. That shift needs a check with a real mouse.
+`gfx/guis/guicursor_arrow`. The pointer's hotspot is the mouse position its
+clicks use. June's shift, which drew the pointer a text row above it, is gone:
+the console's rows match their hit rectangles, and with the shift a pointer
+on the edit row drew over the log line above.
 `conPointerTest <x> <y>` (cheat) opens the console with its mouse at a point
 of the 640x480 screen without a device. `screenshot` puts the console away,
 so the console's pointer was checked from window captures; the `cursor`

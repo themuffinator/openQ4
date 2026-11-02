@@ -57,8 +57,6 @@ void SCR_DrawTextRightAlign( float &y, const char *text, ... ) id_attribute((for
 #define CON_COMPLETION_MAX_FUZZY_MATCHES	oq4completion::MAX_FUZZY_MATCHES
 #define CON_COMPLETION_MAX_VISIBLE		8
 #define CON_TEXT_DRAG_THRESHOLD			4.0f
-#define CON_MOUSE_CURSOR_HOTSPOT_X		0.0f
-#define CON_MOUSE_CURSOR_HOTSPOT_Y		static_cast<float>( SMALLCHAR_HEIGHT )
 
 #define	COMMAND_HISTORY			64
 static const char *kConsoleHistoryFileName = "consolehistory.dat";
@@ -4805,10 +4803,10 @@ void idConsoleLocal::DrawMouseCursor( void ) {
 
 	EnsureMouseInitialized();
 
-	// The menus' pointer, in the UI viewport the console's mouse maps to and at
-	// the console text's scale. Over the edit line, where a click places the
-	// caret, or while a selection that started there is under way, it is the
-	// I-beam.
+	// The menus' pointer, its hotspot at the point clicks use, in the UI
+	// viewport the console's mouse maps to and at the console text's scale.
+	// Over the edit line, where a click places the caret, or while a selection
+	// that started there is under way, it is the I-beam.
 	float inputX, inputY, inputW, inputH;
 	const bool overInput = inputSelecting || ( GetInputAreaRect( inputX, inputY, inputW, inputH ) &&
 		mouseY >= inputY && mouseY <= inputY + inputH && mouseX >= 0.0f && mouseX <= SCREEN_WIDTH );
@@ -4821,7 +4819,7 @@ void idConsoleLocal::DrawMouseCursor( void ) {
 	const bool oldViewport = renderSystem->GetUseUIViewportFor2D();
 	renderSystem->SetUseUIViewportFor2D( true );
 	UI_DrawPointerCursor( overInput ? POINTER_TEXT : POINTER_ARROW,
-		( mouseX - CON_MOUSE_CURSOR_HOTSPOT_X ) * width / SCREEN_WIDTH, ( mouseY - CON_MOUSE_CURSOR_HOTSPOT_Y ) * height / SCREEN_HEIGHT,
+		mouseX * width / SCREEN_WIDTH, mouseY * height / SCREEN_HEIGHT,
 		width, height, height / SCREEN_HEIGHT );
 	renderSystem->FlushGui();
 	renderSystem->SetUseUIViewportFor2D( oldViewport );
