@@ -367,7 +367,7 @@ if get_option('build_native_tests')
     command: [py, files('tools/tests/generate_checkpoint_commit_test.py'), '@INPUT@', '@OUTPUT0@', '@OUTPUT1@', '@OUTPUT2@'],
   )
   checkpoint_commit_test = executable(
-    'openq4-checkpoint-commit-test', [files('tools/tests/native/CheckpointCommitTest.cpp'), checkpoint_commit_source],
+    'openq4-checkpoint-commit-test', [files('tools/tests/native/CheckpointCommitTest.cpp', 'src/framework/DurableFile.cpp'), checkpoint_commit_source],
     include_directories: root_include_dir, install: false,
   )
   test('openq4-checkpoint-commit', checkpoint_commit_test,
@@ -1690,6 +1690,11 @@ if build_engine or get_option('build_native_tests')
     durable_file_timeout = host_machine.system() == 'windows' ? 900 : 180
     test('openq4-ui-document-files', py,
       args: [meson.project_source_root() / 'tools/tests/durable_file.py',
+        '--compiler', ui_test_cpp.cmd_array()[-1]], timeout: durable_file_timeout)
+    # Each CI platform's own filesystem: save-slot commit and recovery across
+    # killed processes.
+    test('openq4-savegame-durability', py,
+      args: [meson.project_source_root() / 'tools/tests/savegame_durability.py',
         '--compiler', ui_test_cpp.cmd_array()[-1]], timeout: durable_file_timeout)
     openq4_ui_state_test = executable(
       'openq4-ui-state-test',

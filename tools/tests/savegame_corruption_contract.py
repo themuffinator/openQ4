@@ -1709,6 +1709,39 @@ def validate_minigame_restore_contract() -> None:
         raise AssertionError("SSD pool restores must stamp each restored pool object's saved id")
 
 
+def validate_restore_teardown_lists() -> None:
+    """Restored owner lists must stay safe for failed-load teardown.
+
+    Destructors delete every listed pointer and raise SIG_REMOVED, so a read that
+    fails part way must leave only complete entries, never a list sized over
+    unset pointers or unresolved signal functions. Restored physics objects are
+    attached to the entity restoring them instead of a saved owner pointer.
+    """
+    for module in ("game", "mpgame"):
+        entity = read_game_libs(f"src/{module}/Entity.cpp")
+        signals = entity[entity.index("bool readsignals;"):entity.index("savefile->ReadInt( mpGUIState );")]
+        require(signals, "num > MAX_SIGNAL_THREADS", f"{module} signal count bound")
+        require(signals, "signals->signal[ i ].Append( sig );", f"{module} complete signal entries")
+        if "SetNum( num )" in signals:
+            raise AssertionError(f"{module} signal restore sizes the list before reading its entries")
+        restore_physics = entity[entity.index("void idEntity::RestorePhysics( idPhysics *phys ) {"):]
+        restore_physics = restore_physics[:restore_physics.index("\n}")]
+        require(restore_physics, "phys->SetSelf( this );", f"{module} RestorePhysics owner")
+
+        for relative, needles, forbidden in (
+            ("vehicle/VehiclePosition.cpp", ("mParts.Append ( part );", "mWeapons.Append ( part );"),
+             ("mParts.SetNum", "mWeapons.SetNum")),
+            ("anim/Anim_Blend.cpp", ("jointMods.Append( new jointMod_t );",), ("jointMods.SetNum",)),
+            ("BrittleFracture.cpp", ("shards[i]->decals.Append( new idFixedWinding );",), ("decals.SetNum",)),
+        ):
+            source = read_game_libs(f"src/{module}/{relative}")
+            for needle in needles:
+                require(source, needle, f"{module} {relative} append-only restore")
+            for token in forbidden:
+                if token in source:
+                    raise AssertionError(f"{module} {relative} sizes an owning list with {token}")
+
+
 def validate_validation_wiring() -> None:
     for relative_path in (
         "tools/validation/openq4_validate.py",
@@ -1728,6 +1761,7 @@ def main() -> None:
     validate_gui_winvar_initialization_contract()
     validate_gui_stream_alignment_contract()
     validate_minigame_restore_contract()
+    validate_restore_teardown_lists()
     validate_validation_wiring()
     print("savegame_corruption_contract: ok")
 

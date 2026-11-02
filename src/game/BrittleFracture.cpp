@@ -203,13 +203,16 @@ void idBrittleFracture::Restore( idRestoreGame *savefile ) {
 		if ( j < 0 || j > MAX_SAVEGAME_BRITTLE_DECALS_PER_SHARD ) {
 			savefile->Error( "idBrittleFracture::Restore: invalid decal count %d for shard %d", j, i );
 		}
-		shards[i]->decals.SetNum( j );
-		for ( j = 0; j < shards[i]->decals.Num(); j++ ) {
+		// The destructor deletes every listed decal, so list each one as it is
+		// allocated rather than sizing the list over unset pointers.
+		const int numDecals = j;
+		shards[i]->decals.Clear();
+		for ( j = 0; j < numDecals; j++ ) {
 // RAVEN BEGIN
 // mwhitlock: Dynamic memory consolidation
 			RV_PUSH_HEAP_MEM(this);
 // RAVEN END
-			shards[i]->decals[j] = new idFixedWinding;
+			shards[i]->decals.Append( new idFixedWinding );
 // RAVEN BEGIN
 // mwhitlock: Dynamic memory consolidation
 			RV_POP_HEAP();

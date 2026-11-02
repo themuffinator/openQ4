@@ -1275,6 +1275,18 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   trails, child effects, collision, stops/deletes, owner changes, subviews,
   high-refresh and demo/save lifecycle. Preserve intentional safety and
   presentation differences; BSE stays in-tree and linked into the client.
+  Progress, 2 November: both audit questions are settled from retail
+  `Quake4.exe`. Retail `rvModelParticle::Render` (0x101c8d90) and
+  `rvPrimBatch::TransformVerts` transform only vertex positions and keep model
+  normals and tangents. openQ4 rotated them, a leftover of the ETQW-derived
+  source, and now matches retail, pinned by `bse_retail_parity.py`. Lit stages
+  rebuild normals and tangents anyway, so only unlit stages that read normals
+  can change. Retail `rvLightParticle::InitLight` (0x101bf190) places a new
+  light at the effect's original origin and axis plus its current-frame offset,
+  but `rvBSE::Service` (0x101b9f80) runs `PresentLight` with the current
+  transform in the same call, so the first placement never renders. openQ4's
+  current-transform placement matches what retail renders and is kept. The
+  runtime qualification list above remains open.
 - [ ] **Q4-04 — P1, qualification: Awakening campaign closure.** Play all thirteen
   maps and restore saves during unique weapon/status/vehicle/boss states; qualify
   freeze persistence, damage gates, animation speed, and turret effects. Recheck
@@ -1324,6 +1336,16 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   GUI required by the save. Windows/Linux native, 259-test Windows suite and
   GL/Vulkan recovery/reload checks pass. Other owning-graph and
   partial-constructor qualification remains open.
+  Progress, 2 November: a failed-load teardown audit fixed
+  [four restore paths](savegame-reliability.md#owner-lists-and-physics-links-during-failed-load-teardown)
+  in both libraries without changing save bytes. Signal lists are bounded to the
+  16 entries `Signal()` copies and hold only resolved functions. Vehicle parts
+  and weapons, animator joint modifiers and brittle-fracture decals are appended
+  as they are read instead of sized over unset pointers. Restored physics is
+  attached to its own entity rather than a saved owner pointer. The audit's other
+  reported hazards (unwinding errors, articulated-figure and animator owners,
+  vehicle occupants, client-entity binds, raw entity numbers) are listed there
+  and remain open.
 - [ ] **Q4-06 — P3, decision: portable saves.** `raw1` native aggregates are not
   cross-platform saves. Inventory and normalize game plus GUI/interpolator raw
   blocks before introducing a versioned portable format and ABI/architecture
@@ -1345,12 +1367,33 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   control reaches a GUI child-identity mismatch. Its writer is fingerprinted
   0.10.0; historical reporter confirmation and corrections to prior assumptions
   are preserved. This current failure and the other target ABIs keep Q4-07 open.
+  Progress, 2 November: [no engine path omits](savegame-reliability.md#issue-123)
+  the missing `mon4.gui` leaf. The retail file has no includes or conditionals,
+  and both the 0.10.0 and current parsers keep every window. The reporter's log
+  searches a loose HiDef folder ahead of the retail paks, so the fixture now
+  waits on their copy of `mon4.gui` or a window-by-window comparison of the
+  attachment. The cited `.tmp/stage-two/` evidence directories are gone from the
+  checkout; their recorded hashes remain.
 - [ ] **Q4-08 — P2, investigation and qualification: save cost and durability.**
   Measure large-save CRC/sync time and fault behavior across target filesystems.
   Directory metadata is not synced and full power-loss atomicity is not established.
   Define any stronger durability guarantee before implementing it; qualify partial
   writes, replace failures, process interruption and preservation of the last valid
   save independently from object-restore recovery in Q4-05.
+  Progress, 2 November: the [guarantee](savegame-reliability.md#durability-guarantee)
+  is defined and implemented. Every slot rename is a no-replace,
+  write-through (Windows) or directory-synced (Linux, macOS) step, so a reported
+  save survives an OS crash or power loss as far as the device acknowledges
+  writes, and the commit order holds on disk. Qualification found and fixed a
+  recovery defect: a crash while the payload was staged deleted the previous
+  save's description. `savegame_durability.py` runs the production commit,
+  recovery and CRC against real files, kills 56 child processes across every
+  commit step and staging point, and fails a locked old payload on Windows.
+  Every case recovers to one whole save on NTFS, Linux ext4 and the WSL 9p
+  mount. Measured costs up to the 512 MiB cap are recorded; the durable commit
+  adds about 1 ms on NTFS and 7 ms on ext4. Remaining: macOS APFS (the new
+  native test runs there in CI), removable and network filesystems, and any
+  power-cut test.
 
 ## Multiplayer bots Arena and demos
 

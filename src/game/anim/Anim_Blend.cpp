@@ -3628,9 +3628,11 @@ void idAnimator::Restore( idRestoreGame *savefile ) {
 	if ( num < 0 || num > maxSaveGameAnimatorItems ) {
 		savefile->Error( "idAnimator::Restore: invalid joint modification count %d", num );
 	}
-	jointMods.SetNum( num );
+	// FreeData deletes every listed modifier, so list each record as soon as
+	// it is allocated rather than sizing the list over unset pointers.
+	jointMods.Clear();
 	for( i = 0; i < num; i++ ) {
-		jointMods[ i ] = new jointMod_t;
+		jointMods.Append( new jointMod_t );
 		Anim_ReadSavedJointMod( savefile, *jointMods[ i ] );
 	}
 	

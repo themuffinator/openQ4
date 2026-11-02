@@ -2,7 +2,7 @@
 from pathlib import Path
 import sys
 source=Path(sys.argv[1]).read_text(encoding='utf-8')
-groups=[('struct sessionSaveCommitFileOps_t {','struct sessionSaveCommitJob_t {','static void Session_CommitCheckpointFiles(','static bool Session_QueueCheckpointCommit('),('struct sessionRecoverSaveFile_t {','static void Session_InitRecoverSaveFile(','static bool Session_RecoverInterruptedSaveFiles('),('bool idSessionLocal::FinishPendingSave(', 'class sessionSaveOperationGuard_t {')]
+groups=[('static inline bool Session_MoveSaveFileDurably(','struct sessionSaveCommitFileOps_t {','struct sessionSaveCommitJob_t {','static void Session_CommitCheckpointFiles(','static bool Session_QueueCheckpointCommit('),('struct sessionRecoverSaveFile_t {','static void Session_InitRecoverSaveFile(','static bool Session_RecoverInterruptedSaveFiles('),('bool idSessionLocal::FinishPendingSave(', 'class sessionSaveOperationGuard_t {')]
 for names,out in zip(groups,sys.argv[2:]):
  blocks=[]
  for sig in names:

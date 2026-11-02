@@ -1,5 +1,6 @@
 // Production transaction/recovery plus queue/lifetime/polling, with failures at
 // every namespace operation and recovery of every interrupted state.
+#include "src/framework/DurableFile.h"
 #include "src/framework/SaveGameTransaction.h"
 #include <chrono>
 #include <cstdio>
@@ -92,6 +93,20 @@ static void TransactionCases() {
     Ops marker;marker.disk=Fixture(7);marker.disk["slot1.tmp"]="delete-preview";f=Files();result=openq4::CommitSaveGame(f,marker,true);
     Check(result.committed && result.cleanupComplete && !marker.disk.count("slot1"));
 }
+static void StagingCases() {
+    // A crash while a save is being staged leaves temporaries but no backups.
+    // Recovery must keep the previous slot whole: payload with or without its
+    // sidecars, or nothing.
+    for(int existing:{0,4,5,6,7}) for(int staged=0;staged<8;++staged) {
+        Disk d;
+        for(int i=0;i<3;++i) {
+            const auto key="slot"+std::to_string(i);
+            if(existing&(1<<i))d[key]="old"+std::to_string(i);
+            if(staged&(1<<i))d[key+".tmp"]="new"+std::to_string(i);
+        }
+        RecoverAndCheck(d,existing);
+    }
+}
 struct idJobContext {void* data;};
 enum class idJobPriority {LOW};
 enum class idJobSubmitResult {ACCEPTED,EXECUTED_SYNCHRONOUSLY,QUEUE_FULL};
@@ -170,6 +185,9 @@ static void NativeCases(const fs::path& root){
     Populate(root);sessionSaveCommitFileOps_t ops;std::string error;bool exists=false;
     Check(!ops.Exists(Utf8(root),exists,error)); // never treat a directory as a missing/regular file
     const auto f=NativeFiles(root);Check(!ops.Move(f[0].temporary,f[0].final,error));Check(Get(fs::u8path(f[0].final))=="old0");
+    // fs_savepath may be relative to the working directory.
+    const auto relativeTemp=fs::relative(fs::u8path(f[2].temporary)),relativeBackup=fs::relative(fs::u8path(f[2].backup));
+    if(!relativeTemp.empty()){std::string unconfirmed;Check(Session_MoveSaveFileDurably(Utf8(relativeTemp),Utf8(relativeBackup),unconfirmed,error));Check(Get(fs::u8path(f[2].backup))=="new2");}
     for(bool wait:{false,true}){
         Populate(root);schedule=Schedule::Deferred;int completions=0;idSessionLocal session;
         sessionPendingCheckpoint=[&](){
@@ -187,6 +205,6 @@ static void NativeCases(const fs::path& root){
 int main(int argc,char** argv){
     Check(argc==2);const auto root=fs::u8path(argv[1]);Check(root.is_absolute() && root.filename()=="checkpoint-commit-test" && root.parent_path().filename()==".tmp");
     Check(!fs::is_symlink(fs::symlink_status(root)));fs::create_directories(root);
-    TransactionCases();GuardCases();NativeCases(root);Check(fs::is_empty(root));fs::remove(root);
+    TransactionCases();StagingCases();GuardCases();NativeCases(root);Check(fs::is_empty(root));fs::remove(root);
     std::printf("Checkpoint commit: %d publication/rollback/recovery, native path, scheduler and two-stage polling checks passed\n",checks);
 }

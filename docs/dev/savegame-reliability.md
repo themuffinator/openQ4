@@ -104,12 +104,13 @@ The old slot is not replaced while a new payload is still being constructed.
 Saving uses same-directory `.tmp` staging paths and `.prev` backups:
 
 1. Recover or roll back any interrupted earlier transaction for the slot.
-2. Write and sync the description, then validate its bounded fields and slot
-   identity.
-3. Write and sync the `.save` header and GameLib payload.
-4. Calculate and append the v3 integrity trailer, sync it, reopen the staged
+2. Write and sync the `.save` header and GameLib payload. The description is
+   prepared in memory beforehand; checkpoint previews are captured first.
+3. Calculate and append the v3 integrity trailer, sync it, reopen the staged
    `.save`, and validate the complete header, compatibility block, CRC, and
    footer.
+4. Write and sync the description, then validate its bounded fields and slot
+   identity.
 5. Validate and sync the preview. If the slot must have no preview, stage a
    synced `OQ4D` preview-deletion marker instead of leaving the old preview
    ambiguous.
@@ -126,12 +127,13 @@ attempt, and clears temporary files. The preview-deletion marker lets recovery
 distinguish “the new slot intentionally has no preview” from “preview capture did
 not finish,” preventing a stale image from being resurrected.
 
-This is a practical same-filesystem recovery protocol. File contents are synced
-with `fflush` plus `_commit` on Windows or `fsync` on POSIX before promotion.
-Rename/removal directory metadata and the parent directory are not separately
-synced, and rollback after a rename failure is best effort. The code therefore
-does not claim database-style ACID behavior or a fully power-loss-atomic/durable
-three-file commit across every filesystem.
+A commit begins only once all three components are staged, and it backs up
+every existing final before publishing anything. Recovery uses that to tell a
+crash while staging from one during the commit: with no backups, a payload
+final beside its own temporary proves no commit began, so nothing in the
+previous slot is touched. Before 2 November 2026 recovery treated a sidecar
+temporary that had not yet been written as already published, so a crash while
+the payload was being staged deleted the previous save's description.
 
 The GameLib serializer closes successful writes explicitly. Its destructor does
 not attempt to finish serialization: a gameplay error may unwind the save only
@@ -139,6 +141,63 @@ after map shutdown has begun, when the registered object pointers are no longer
 safe to visit. This keeps the original diagnostic intact and prevents a second
 access violation from masking it. `Close()` is also harmless when called again
 after a completed write.
+
+### Durability guarantee
+
+Defined 2 November 2026 (Q4-08). File contents are synced with `fflush` plus
+`_commit` on Windows or `fsync` on POSIX before promotion. Every slot rename
+then goes through `DurableMoveExact`, which never replaces an occupied name and
+returns only once the rename is on disk: Windows uses `MoveFileExW` with
+`MOVEFILE_WRITE_THROUGH`; Linux renames with `RENAME_NOREPLACE` where the
+filesystem supports it and macOS with `RENAME_EXCL`, falling back to a checked
+rename, and both then sync the parent directory (macOS also issues
+`F_FULLFSYNC`). The guarantee is:
+
+- At any interruption, the slot is either the previous save or the new one
+  after recovery, never a mixture, and the previous save survives every failure
+  before the commit point.
+- Once a save reports success, its payload commit is on disk as far as the
+  operating system and storage device acknowledge write-through or directory
+  sync. Hardware that acknowledges writes it has not stored can still lose it.
+- Each step is ordered on disk, so backups precede publication and the payload
+  rename comes last even on filesystems that do not order metadata updates.
+
+Backup removal after the commit is not synced; recovery finishes it if a crash
+interrupts it. If a filesystem renames the file but cannot confirm the barrier,
+the save continues with the weaker guarantee and logs one warning per session
+rather than rolling back a completed move. Rollback after a failed rename is
+best effort and leaves recovery evidence when it cannot finish. This is not
+database-style ACID, and no power-cut test has been performed.
+
+`tools/tests/savegame_durability.py` compiles the production commit, recovery
+and CRC-32 against real files. It kills a child process after every namespace
+step of a commit, for each combination of existing slot components, and at five
+staging points including half-written payloads, then requires recovery to leave
+one whole save. On Windows it also holds the old payload open without delete
+sharing so the backup rename fails and the commit rolls back. 56 interrupted
+processes recover correctly on NTFS (Windows 11, NVMe), Linux ext4 and the WSL
+9p mount (WSL2 kernel 6.6). The same run against the previous recovery rule
+fails at a crash midway through the payload, deleting the old description.
+`durable_file.py` exercises `DurableMoveExact` with fault injection on each
+platform and rejects three move mutations: replacing an occupied name, skipping
+the namespace sync, and hiding a completed rename.
+
+`savegame_durability.py --benchmark` times each phase (median of three runs,
+2 November 2026, Windows 11 with Defender active, Linux in WSL2):
+
+| Payload | Filesystem | Write | Sync | Each CRC scan | Durable commit | Previous plain-rename commit |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| 16 MiB | NTFS, Samsung 990 EVO | 4.2 ms | 15.4 ms | 15-25 ms | 1.5 ms | 0.6 ms |
+| 512 MiB | NTFS, Samsung 990 EVO | 873 ms | 15.2 ms | 765-783 ms | 6.7 ms | 4.1 ms |
+| 16 MiB | ext4 (WSL2) | 5.7 ms | 6.1 ms | 4.4-4.9 ms | 6.6 ms | 0.1 ms |
+| 512 MiB | ext4 (WSL2) | 189 ms | 175 ms | 149-156 ms | 7.8 ms | 0.1 ms |
+
+The largest local single-player saves are about 14 MB, so a typical save pays
+about 1 ms (NTFS) to 7 ms (ext4) for the durable commit. A synchronous save
+scans the payload twice and a load once; at the 512 MiB cap those scans cost
+about 1.5 s on Windows. An earlier run on the Micron 3400 system drive gave
+similar figures. Removable FAT/exFAT media, network shares, macOS APFS and
+physical Linux disks have not been measured.
 
 ## Load Preflight Before Map Teardown
 
@@ -784,6 +843,60 @@ and missing test-mod manifest as harness failures. The corrected APK has not yet
 been installed or tested physically because ADB is disconnected. Broader
 owning-graph, historical-corpus and Android gates remain open.
 
+### Owner lists and physics links during failed-load teardown
+
+A 2 November 2026 audit of failed-load teardown (Q4-05) followed what runs after
+a restore throws: `~idRestoreGame` calls `MapShutdown`, which detaches bind,
+team, mover and owned-thread links, deletes client entities and entities in
+index order, then deletes orphaned restore objects. Destructors still delete
+every pointer in their owning lists and still raise `SIG_REMOVED`. Four restore
+paths could hand them unset or unsafe state. All four are fixed in both game
+libraries, with no change to save bytes:
+
+- **Entity signal lists.** Restore accepted up to `MAX_SAVEGAME_ENTITY_REFS`
+  entries per signal, but `SetSignal` never holds more than
+  `MAX_SIGNAL_THREADS` (16) and `Signal()` copies a list into 16 stack slots,
+  so a larger saved count overflowed the stack on any later signal. A function
+  name that failed to resolve also left a NULL entry, followed by unset ones,
+  for teardown's `SIG_REMOVED` to call. The bound is now 16, and an entry joins
+  the list only after its function resolves.
+- **Vehicle position parts and weapons, animator joint modifiers and
+  brittle-fracture decals.** Each list was sized to the saved count before its
+  entries were read, so a failed read (for example a part class the running
+  build does not know) left unset pointers for the destructor to delete. Each
+  entry is now appended once it exists.
+- **Physics owners.** A physics object's owning entity came from the save, so a
+  damaged pointer let a physics destructor call into another entity, possibly
+  already deleted. `idEntity::RestorePhysics` now attaches the physics object to
+  the entity restoring it, as `idItem` and the default physics already did.
+  Valid saves always record that entity, so they restore unchanged.
+
+`savegame_corruption_contract.py` pins the signal bound, the append-only lists
+in both trees and the physics re-attachment.
+
+The same audit reported further teardown hazards that these changes do not
+address. They are not yet reproduced or fixed:
+
+- A second error during unwinding still terminates the process. `~idEntity`
+  raises `SIG_REMOVED`, `~rvVehicle` runs driver exit scripts and `~idActor`
+  posts events; restoring every static object also posts `EV_PostRestore`, so
+  a saved event queue near `MAX_EVENTS` can fail once at restore and again in
+  teardown.
+- `idAF` and `idAnimator` read their owning entity from the save; the
+  articulated-figure path can reach a NULL animator or another entity's physics.
+  Articulated constraints read raw body indexes.
+- Vehicle occupants (driver, position index and count) are not cross-checked.
+- Client-entity bind masters and joints are unchecked, and restored client
+  models do not reattach their list nodes, so a load-then-save can write a
+  mismatched count.
+- `idTarget_SetInfluence` indexes the entity table with saved numbers, and
+  Awakening's `FireDOTEntity` reads an unbounded joint count.
+- An object missing from its master table accepts any saved number, and a few
+  restore paths leak clip models or dictionaries when a read fails.
+
+These require a CRC-valid save whose contents are wrong, from tampering or a
+writer defect. They remain Q4-05 work.
+
 ## Remaining Raw Serialization (`raw1`)
 
 Many high-risk scalars, flags, vectors, references, and arrays now use explicit
@@ -870,8 +983,11 @@ CRC work remains linear below that ceiling: a maximum-size successful v3 save ma
 still scan almost 512 MiB twice, and load preflight may scan it once.
 
 The extra sequential scans, file syncs, and renames are deliberate reliability
-costs. They should be measured on representative large SP saves before changing
-the transaction or integrity model.
+costs. Their measured cost, up to the 512 MiB cap, is in the
+[durability guarantee](#durability-guarantee); re-measure there before changing
+the transaction or integrity model. Checkpoint saves of 16 MiB or less persist
+and read back their payload on a job worker; the experimental
+`com_saveGameCommitOnWorker 1` also moves their three-file commit there.
 
 ## Issue #84
 
@@ -941,6 +1057,22 @@ its unmodified save is
 `afb39c3dde68fa267b9720bbdfd6b8287a3fdcf8f317605237ef0df4fae6e58e`.
 Attachment URLs, map/model identities, runtime hashes and the reporter's
 clarification are retained beside the logs.
+
+A source and asset review on 2 November 2026 found no engine path that omits
+the leaf. Retail `guis/monitors/marine/mon4.gui` is in `pak001.pk4` only. It
+has no `#include`, `#define` or `#if`, and `squares` is a plain leaf, the last
+child of `template`. The 0.10.0 parser adds every `windowDef` as a child, its
+writer saves every child, and the current parser is the same. No openQ4
+content in any release overrides the file. The reporter's posted 0.12.0 log
+searches a loose `hidef2kbc72` folder, a third-party pk4 and loose
+`baseoq4`/`q4base` folders before the retail paks, and reads other files from
+the HiDef folder. A saved graph that is retail minus one leaf therefore points to
+a different `mon4.gui` in that installation, not to an engine defect. Closing
+the fixture needs the reporter to look for `mon4.gui` in those locations, or a
+window-by-window comparison of the attachment's record with a fresh retail
+save. A reader that skips windows absent from a save stays rejected. The
+`.tmp/stage-two/` evidence directories cited in this section are no longer in
+the checkout; their recorded SHA-256 identities remain the reference.
 
 An independent current-source Windows x64 run created a fresh save on
 `game/airdefense2`, reloaded it through `Game Map Init SaveGame`, captured an

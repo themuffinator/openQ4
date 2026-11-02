@@ -1318,9 +1318,8 @@ bool rvModelParticle::Render(const rvBSE* effect, rvParticleTemplate* pt, const 
 		p.z *= size[2];
 		dst.xyz = position + p;
 
-		dst.normal = transform * dst.normal;
-		dst.tangents[0] = transform * dst.tangents[0];
-		dst.tangents[1] = transform * dst.tangents[1];
+		// Retail rvModelParticle::Render (0x101c8d90) transforms only xyz and
+		// keeps the model's normal and tangents as copied above.
 		dst.color[0] = rgbaBytes[0];
 		dst.color[1] = rgbaBytes[1];
 		dst.color[2] = rgbaBytes[2];

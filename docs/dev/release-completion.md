@@ -6,6 +6,31 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Save durability, restore safety and effect parity, 2 November 2026
+
+- **Saves survive a crash or power cut at the moment of saving.** Each step
+  that replaces a save slot now waits until the change is on disk, so a save
+  the game reported as complete stays complete, and an interrupted save leaves
+  the previous one intact. A typical save takes about 1 ms longer on Windows
+  and 7 ms longer on Linux.
+- **Quitting or crashing while a save is being written no longer damages the
+  previous save.** Before this fix, interrupting the save at that point removed
+  the old save's description file, so the slot lost its menu label.
+- **A damaged or incompatible save fails cleanly instead of crashing.** Four
+  load paths could leave half-read lists or links behind for the game to clean
+  up when a load was refused; they now keep only complete data. Normal saves
+  load exactly as before.
+- **Model particles match the original game.** Effect particles drawn as
+  models no longer rotate the model's surface normals, matching Quake 4 1.4.2.
+  Lit surfaces rebuild their normals anyway, so only unlit surfaces that read
+  them can look different.
+- Evidence: `savegame_durability.py` (killed-process recovery on NTFS, Linux
+  ext4 and the WSL 9p mount, plus timings up to 512 MiB), `durable_file.py`
+  with three new mutations, the checkpoint commit test's staging cases,
+  `savegame_corruption_contract.py` and `bse_retail_parity.py`. See
+  [savegame reliability](savegame-reliability.md#durability-guarantee) and
+  roadmap Q4-03, Q4-05, Q4-07 and Q4-08.
+
 ## Third-party library updates, 2 November 2026
 
 - Moved to the newest stable upstream releases:

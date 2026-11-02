@@ -44,6 +44,16 @@ bool DurableReplaceExact(const std::string& absoluteUtf8Path,
 DurableCreateResult DurableCreateExact(const std::string& absoluteUtf8Path,
     const std::string& bytes, std::string& error);
 
+// Renames one regular file to an absent name in the same directory, then makes
+// the namespace change durable before reporting success. An occupied
+// destination is never replaced. On failure, moved reports whether the file is
+// already at its new name: true means only the durability barrier failed, so
+// callers must follow the namespace rather than assume the old name survived.
+// Linux/macOS use an exclusive rename where the filesystem offers one, and
+// otherwise a checked rename that relies on the caller serializing the names.
+bool DurableMoveExact(const std::string& fromUtf8Path, const std::string& toUtf8Path,
+    bool& moved, std::string& error);
+
 // Idempotent exact-name removal. Windows first moves the target to an owned,
 // inert .openq4-durable-*.tmp tombstone with MOVEFILE_WRITE_THROUGH. Its subsequent
 // deletion is checked; a crash can leave an inert tombstone, never a journal at
