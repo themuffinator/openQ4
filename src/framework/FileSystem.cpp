@@ -4387,7 +4387,11 @@ static bool FS_ParseopenQ4BaseVersion( const char *version, openQ4BaseVersion_t 
 		return false;
 	}
 
+	// hand-edited manifests often carry a stray space inside the quotes
 	const char *cursor = version;
+	while ( *cursor == ' ' || *cursor == '\t' ) {
+		++cursor;
+	}
 	for ( int part = 0; part < 3; ++part ) {
 		if ( *cursor < '0' || *cursor > '9' ) {
 			return false;
@@ -4409,6 +4413,9 @@ static bool FS_ParseopenQ4BaseVersion( const char *version, openQ4BaseVersion_t 
 		}
 	}
 
+	while ( *cursor == ' ' || *cursor == '\t' ) {
+		++cursor;
+	}
 	if ( *cursor != '\0' ) {
 		return false;
 	}

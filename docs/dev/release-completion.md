@@ -6,6 +6,15 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Mod manifest version spacing, 2 November 2026
+
+- A mod whose `mod.json` has a stray space or tab around its
+  `requiredopenQ4Version` value, such as `"0.13.2 "`, now loads instead of
+  being skipped as invalid. A hand-edited manifest in #181 hit this. Other
+  malformed values, and mods that need a newer openQ4, are still skipped.
+  Checked on the staged client with two test mods: `"0.13.2 "` loaded and
+  `"0.14.0"` was still skipped.
+
 ## Bot combat strength, 1 November 2026
 
 - Multiplayer bots now aim ahead of a moving target instead of trailing it.
