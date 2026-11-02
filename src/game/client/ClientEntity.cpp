@@ -18,6 +18,14 @@ rvClientEntity::rvClientEntity
 ================
 */
 rvClientEntity::rvClientEntity( void ) {
+	// Restore constructs client entities without Spawn(). Their nodes join the
+	// spawned and bind lists during load, and those lists are walked through
+	// node owners: a NULL owner ends the per-frame Think loop and makes
+	// idEntity::Save write fewer bound objects than its count.
+	spawnNode.SetOwner( this );
+	bindNode.SetOwner( this );
+	presentationNode.SetOwner( this );
+
 	bindMaster = NULL;
 	entityNumber = -1;
 

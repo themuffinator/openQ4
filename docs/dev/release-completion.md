@@ -96,6 +96,13 @@ demos from ordinary servers can be paused and slowed again.
   load paths could leave half-read lists or links behind for the game to clean
   up when a load was refused; they now keep only complete data. Normal saves
   load exactly as before.
+- **Saves made after a level change load again.** If a radio message had played
+  on the previous level, a save made on the next level could be refused with
+  "could not restore saved state" (first seen on the level after the second
+  Air Defense map). Those saves, including ones already written, now load.
+- **Client-side models and debris keep working after a load.** A save holding
+  them restored them half-linked, which could stop client-side objects from
+  updating and make the next save fail to load.
 - **Model particles match the original game.** Effect particles drawn as
   models no longer rotate the model's surface normals, matching Quake 4 1.4.2.
   Lit surfaces rebuild their normals anyway, so only unlit surfaces that read

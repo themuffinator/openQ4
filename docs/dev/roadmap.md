@@ -1283,6 +1283,14 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   on supported render paths. Test SP/MP and campaign switches with original assets;
   classify expected warnings individually. Map initialization or a single capture
   is insufficient evidence of playable progression.
+  Progress, 2 November: a hidden [campaign transition chain](retail-baseline-ledger.md#campaign-transition-chain-2-november-2026)
+  saves, restores and fires each map's own end-level trigger across all 31
+  stock stages, airdefense1 to core2's end of game, on OpenGL and Vulkan with
+  retail assets.
+  It passes after fixing a save that could not be loaded after a level change
+  (radio-chatter reference, see Q4-05), and its 96 warning kinds are classified.
+  This covers level changes, persistent state and save/restore at map start, not
+  the gameplay between triggers; full playthroughs on each render path remain.
 - [ ] **Q4-03 — P1, investigation and qualification: remaining BSE/effect parity.**
   Resolve initial-light current-versus-spawn transform and rotated model-particle
   normal/tangent questions from the October audit. Qualify light/sound/decal,
@@ -1307,6 +1315,16 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   transient corpse pin loss on restore as a bounded limitation. Verify base/Arena/
   MP isolation after restart. Keep the completed classes, gameplay and turret work;
   no expansion MP module or resurrection of obsolete companion-layer architecture.
+  Progress, 2 November: freeze persistence passes one save/restore case. On
+  `game/m01_stranarus_trench2` a spawned Strogg marine hit by the freeze gun
+  reports "frozen solid" at 5888 ms, the game saves and restores, the marine
+  chooses no action afterwards, and it shatters at exactly 9888 ms, the 4000 ms
+  shatter delay measured from its saved freeze time (hidden, input-free,
+  `fs_awakeningpath` pointing at the Awakening content). Vehicle and boss
+  probes need the maps' own entry sequences: the developer `script` command
+  cannot be used before saving, because restore recompiles its "console"
+  source name and fails, as retail's restore would. The other unique states,
+  corpse-pin loss and base/Arena/MP isolation remain to qualify.
 - [ ] **Q4-05 — P1, decision and implementation: save failure recovery.** Preserve
   approved v2/v3/v4 readers and current corruption checks. Design safe recovery for
   object-restore failure after map teardown; evaluate staged-world rollback versus
@@ -1351,15 +1369,21 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   GL/Vulkan recovery/reload checks pass. Other owning-graph and
   partial-constructor qualification remains open.
   Progress, 2 November: a failed-load teardown audit fixed
-  [four restore paths](savegame-reliability.md#owner-lists-and-physics-links-during-failed-load-teardown)
+  [several restore paths](savegame-reliability.md#owner-lists-and-physics-links-during-failed-load-teardown)
   in both libraries without changing save bytes. Signal lists are bounded to the
   16 entries `Signal()` copies and hold only resolved functions. Vehicle parts
   and weapons, animator joint modifiers and brittle-fracture decals are appended
   as they are read instead of sized over unset pointers. Restored physics is
-  attached to its own entity rather than a saved owner pointer. The audit's other
+  attached to its own entity rather than a saved owner pointer. Restored client
+  models and moveables now have list-node owners; without them the client-entity
+  think loop could stop after a load and a later save could be misaligned. The audit's other
   reported hazards (unwinding errors, articulated-figure and animator owners,
   vehicle occupants, client-entity binds, raw entity numbers) are listed there
-  and remain open.
+  and remain open. The Q4-02 chain also found that the typed spawn-reference
+  check refused saves made after a level change: the static
+  [radio-chatter reference](savegame-reliability.md#typed-spawn-references-during-restore)
+  carried the previous map's spawn id into the next. It is now cleared with its
+  chatter and restored only when it names one, so those saves load again.
 - [ ] **Q4-06 — P3, decision: portable saves.** `raw1` native aggregates are not
   cross-platform saves. Inventory and normalize game plus GUI/interpolator raw
   blocks before introducing a versioned portable format and ABI/architecture

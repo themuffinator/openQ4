@@ -635,6 +635,22 @@ The source/runtime/native/asset binding against `3bd58aa0` is
 `.tmp/stage-two/save-spawn-refs-evidence.json`, SHA-256
 `dd77220c06c40e7a183e4c0faa8d4999bb51c50bdb660ecdcfac1eede39cb110`.
 
+**Radio chatter across level changes (2 November 2026).** A hidden campaign
+chain (Q4-02) saved on `game/hangar1` after reaching it through
+`game/airdefense2`, then could not load that save:
+`idEntityPtr::Restore: entity 1090 has type 'idSound', expected
+'idFuncRadioChatter'`. `idFuncRadioChatter::lastRadioChatter` is static, so it
+kept the previous level's chatter. Spawn ids restart with each map and follow
+spawn order, so that stale id usually names a live entity of the same number on
+the next map. The typed check above turned the alias into a refused save; before
+it, the alias loaded and "repeat last radio message" would have run chatter code
+on an unrelated entity. Each radio chatter now clears the static when it is
+destroyed, so it never crosses a level change, and its restore keeps the saved
+reference only when it names a radio chatter, without changing the saved bytes.
+The refused save then loads into gameplay. Both libraries are fixed and
+`savegame_corruption_contract.py` pins both parts. Saves written before the fix
+that carry such a reference load again.
+
 ### Mover activation chains during restore
 
 Door/platform activation chains are separate from entity physics teams. Their
@@ -849,9 +865,9 @@ A 2 November 2026 audit of failed-load teardown (Q4-05) followed what runs after
 a restore throws: `~idRestoreGame` calls `MapShutdown`, which detaches bind,
 team, mover and owned-thread links, deletes client entities and entities in
 index order, then deletes orphaned restore objects. Destructors still delete
-every pointer in their owning lists and still raise `SIG_REMOVED`. Four restore
-paths could hand them unset or unsafe state. All four are fixed in both game
-libraries, with no change to save bytes:
+every pointer in their owning lists and still raise `SIG_REMOVED`. The restore
+paths below could hand them, or later frames, unset or unsafe state. All are
+fixed in both game libraries, with no change to save bytes:
 
 - **Entity signal lists.** Restore accepted up to `MAX_SAVEGAME_ENTITY_REFS`
   entries per signal, but `SetSignal` never holds more than
@@ -870,9 +886,17 @@ libraries, with no change to save bytes:
   already deleted. `idEntity::RestorePhysics` now attaches the physics object to
   the entity restoring it, as `idItem` and the default physics already did.
   Valid saves always record that entity, so they restore unchanged.
+- **Client-entity list owners.** This one affects valid saves. Restore builds
+  client entities without `Spawn()`, and only `Spawn()` set their list-node
+  owners. `rvClientEffect` calls `Spawn()` from its constructor, but restored
+  `rvClientModel` and `rvClientMoveable` objects kept NULL owners. The lists
+  are walked through those owners, so after such a load the per-frame
+  client-entity `Think` loop stopped at the first of them, and saving again
+  wrote an entity's bound client-entity count without the objects. The base
+  constructor now sets the owners.
 
 `savegame_corruption_contract.py` pins the signal bound, the append-only lists
-in both trees and the physics re-attachment.
+in both trees, the physics re-attachment and the client-entity node owners.
 
 The same audit reported further teardown hazards that these changes do not
 address. They are not yet reproduced or fixed:
@@ -886,9 +910,8 @@ address. They are not yet reproduced or fixed:
   articulated-figure path can reach a NULL animator or another entity's physics.
   Articulated constraints read raw body indexes.
 - Vehicle occupants (driver, position index and count) are not cross-checked.
-- Client-entity bind masters and joints are unchecked, and restored client
-  models do not reattach their list nodes, so a load-then-save can write a
-  mismatched count.
+- Client-entity bind masters and joints are unchecked, and an entity's bound
+  list is not cross-checked against those masters.
 - `idTarget_SetInfluence` indexes the entity table with saved numbers, and
   Awakening's `FireDOTEntity` reads an unbounded joint count.
 - An object missing from its master table accepts any saved number, and a few
@@ -988,6 +1011,16 @@ costs. Their measured cost, up to the 512 MiB cap, is in the
 the transaction or integrity model. Checkpoint saves of 16 MiB or less persist
 and read back their payload on a job worker; the experimental
 `com_saveGameCommitOnWorker 1` also moves their three-file commit there.
+
+## Developer console scripts
+
+A save made after the developer `script` console command cannot be restored.
+The command compiles its text under the source name "console", which joins the
+script program's file list; the save records that list and restore recompiles
+each name, failing with `Couldn't load console`. Retail's `idProgram::Restore`
+recompiles saved file names the same way. Players cannot reach this without
+cheats, but test harnesses must enter states through map triggers, spawn
+arguments or test commands instead of `script` before saving.
 
 ## Issue #84
 

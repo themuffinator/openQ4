@@ -194,6 +194,40 @@ The existing report schema records the complete dirty-source and package identit
 | `.tmp/stage-two/cmdargs-negative.log` | `3704ea1626d27dd4d69ee27873c15498e0908b92287f08b2db9c716782ad6dd4` |
 | `.tmp/stage-two/cmdargs-linux.log` | `56f3ae643db14849a59652dacdfb8acb46f378b678d39e4cede3234372ca3486` |
 
+## Campaign transition chain, 2 November 2026
+
+Q4-02 transition, save and restore evidence for the whole stock campaign, not
+playable-progression evidence. One hidden client (Windows x64, NVIDIA RTX 4060
+Laptop GPU, build `0.13.2-nightly+gf5a64d5b.dirty` with the fixes below, retail
+Steam assets, no input) walks the retail chain from `game/airdefense1` to
+`game/core2`. On each map it saves, loads that save, then fires the map's own
+`target_endlevel` (names taken from the retail `.map` files) so the session
+performs the real level change with persistent player state and entity filter.
+
+- All 31 stages pass on OpenGL (622 seconds, radio-chatter fix) and on Vulkan
+  (565 seconds, also with the client-entity owner fix), including the first and
+  second visits to `storage1` and `process1`. Each run makes 62 map loads in the
+  expected order (each map by level change, then by restoring its save) and
+  ends with `core2`'s `endGame`, with no errors.
+- The first run stopped at `game/hangar1`: its save, made after a radio message
+  on `game/airdefense2`, was refused with `idEntityPtr::Restore: entity 1090 has
+  type 'idSound', expected 'idFuncRadioChatter'`. The static last-radio-chatter
+  reference carried the previous map's spawn id; see
+  [savegame reliability](savegame-reliability.md#typed-spawn-references-during-restore).
+  It is fixed, and that save now loads into gameplay.
+- 393 warnings of 96 kinds remain on OpenGL (395 of 97 on Vulkan), classified
+  by kind. Expected retail or
+  authored-content conditions: `mcc_1.aas48` and `tram1b.aas32` are refused as
+  invalid data, as retail's loader also refuses them; `process2.reverb` lists
+  areas beyond the map's 96; entities and rigid bodies start in solid,
+  articulated-figure joints are outside their bodies, unhidden AI is placed in
+  maps, and `idTrigger_Timer` has `random >= wait`. Engine diagnostics: decls
+  loaded without precache (crosshairs, `_tracemodel`, sequence sounds).
+
+The end triggers skip everything between them: scripted sequences, AI, bosses,
+vehicles and terminals were not played, and saves made mid-sequence and other
+platforms were not covered.
+
 ## File-by-file overlay disposition
 
 [retail-overlay-audit.csv](retail-overlay-audit.csv) lists every one of the 165

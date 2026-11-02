@@ -4094,7 +4094,27 @@ idFuncRadioChatter::Restore
 void idFuncRadioChatter::Restore( idRestoreGame *savefile ) {
 	savefile->ReadFloat( time );
 	savefile->ReadBool( isActive ); // cnicholson: Added unrestored var
-	lastRadioChatter.Restore ( savefile );
+	// Saves before the destructor below could record the previous level's
+	// chatter. Spawn ids restart with each map, so that id can name an
+	// unrelated entity here; keep only a reference to a radio chatter.
+	idEntityPtr<idEntity> saved;
+	saved.Restore( savefile );
+	idEntity *entity = saved.GetEntity();
+	lastRadioChatter = ( entity != NULL && entity->IsType( idFuncRadioChatter::GetClassType() ) ) ?
+		static_cast<idFuncRadioChatter *>( entity ) : NULL;
+}
+
+/*
+===============
+idFuncRadioChatter::~idFuncRadioChatter
+===============
+*/
+idFuncRadioChatter::~idFuncRadioChatter() {
+	// lastRadioChatter is static: map teardown must not leave it holding a spawn
+	// id that the next level reuses for another entity.
+	if ( lastRadioChatter.GetEntity() == this ) {
+		lastRadioChatter = NULL;
+	}
 }
 
 /*

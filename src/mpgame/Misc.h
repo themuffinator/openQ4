@@ -931,6 +931,7 @@ public:
 	CLASS_PROTOTYPE( idFuncRadioChatter );
 
 						idFuncRadioChatter();
+						~idFuncRadioChatter();
 
 	void				Spawn( void );
 

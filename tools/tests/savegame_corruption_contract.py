@@ -1741,6 +1741,23 @@ def validate_restore_teardown_lists() -> None:
                 if token in source:
                     raise AssertionError(f"{module} {relative} sizes an owning list with {token}")
 
+        client_entity = read_game_libs(f"src/{module}/client/ClientEntity.cpp")
+        constructor = client_entity[client_entity.index("rvClientEntity::rvClientEntity( void ) {"):]
+        constructor = constructor[:constructor.index("\n}")]
+        for node in ("spawnNode", "bindNode", "presentationNode"):
+            require(constructor, f"{node}.SetOwner( this );", f"{module} restored client entity {node} owner")
+
+        # lastRadioChatter is static: it must not carry a spawn id into the next
+        # level, and saves that did so must restore without a typed-reference error.
+        misc = read_game_libs(f"src/{module}/Misc.cpp")
+        destructor = misc[misc.index("idFuncRadioChatter::~idFuncRadioChatter() {"):]
+        require(destructor[:destructor.index("\n}")], "lastRadioChatter = NULL;", f"{module} radio chatter reset")
+        restore = misc[misc.index("void idFuncRadioChatter::Restore( idRestoreGame *savefile ) {"):]
+        restore = restore[:restore.index("\n}")]
+        require(restore, "idEntityPtr<idEntity> saved;", f"{module} radio chatter tolerant restore")
+        if "lastRadioChatter.Restore" in restore:
+            raise AssertionError(f"{module} radio chatter restores its static through a typed reference")
+
 
 def validate_validation_wiring() -> None:
     for relative_path in (
