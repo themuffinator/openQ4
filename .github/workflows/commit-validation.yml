@@ -28,7 +28,7 @@ jobs:
           python-version: "3.x"
 
       - name: Setup Java for Android host storage validation
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "17"
@@ -1070,7 +1070,7 @@ jobs:
           python-version: "3.x"
 
       - name: Setup Java for Android host storage validation
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "17"
@@ -1165,7 +1165,7 @@ jobs:
           python-version: "3.x"
 
       - name: Setup Java for Android host storage validation
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "17"
@@ -1378,7 +1378,7 @@ jobs:
           python-version: "3.x"
 
       - name: Setup Java for Android host storage validation
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "17"
@@ -1607,7 +1607,7 @@ jobs:
           python-version: "3.x"
 
       - name: Setup Java for Android host storage validation
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "17"
@@ -1858,7 +1858,7 @@ jobs:
           python-version: "3.x"
 
       - name: Setup Java for Android host storage validation
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "17"
