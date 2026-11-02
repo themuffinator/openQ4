@@ -207,6 +207,13 @@ See [release status](../../user/release-status.md) and the
   shows the menu in a strip between empty bands.
 - **Join Game picture.** Before you choose a server, Join Game's picture
   frame shows the Quake 4 art instead of an empty black box.
+- **Demos under Multiplayer.** In the new interface, DEMOS is now a section of
+  the Multiplayer menu: it opens your recordings one level deeper, with the
+  same breadcrumb and transitions as Join Game and Create Server, and Back
+  returns to it. The title screen's bottom links are now Mods, Updates,
+  Credits and Exit. Player Setup, also on the Multiplayer menu, edits your
+  name, clan tag, model and rail colour in place beside a turning preview of
+  your player, and each change applies at once.
 - **Menus on a touchscreen.** On a touchscreen (a phone, a tablet or the
   Steam Deck's screen), you can drag the lists of saves, demos, servers,
   chapters and settings with your finger, and a flicked list keeps going and

@@ -6,6 +6,28 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Demos as a Multiplayer sub-page, 2 November 2026
+
+- Section 9 of the visual specification makes the demo library a Multiplayer
+  section opening a sub-page, and section 13.7 keeps the title's plinth to
+  MODS, UPDATES, CREDITS and EXIT. The retained Multiplayer page now holds
+  JOIN GAME, CREATE SERVER, DEMOS and PLAYER SETUP (description
+  `#str_231550` in all twelve languages); DEMOS goes deeper through the shared
+  change of level (`RETAINED_SUBPAGE_DEMOS`) to the Demos page, now built in
+  the sub-page frame under the MULTIPLAYER crumb, and Back returns onto DEMOS.
+  The title drops its DEMOS link and the session its `demos` home request.
+  During playback, or where the sub-page cannot present, DEMOS opens the
+  legacy demo browser over the Multiplayer page.
+- Player Setup has edited in place on the Multiplayer page since 28 October;
+  an engine capture now qualifies it (a typed name, the next model, a rail
+  colour and a turned preview, each read back from its CVar, then CLOSE onto
+  PLAYER SETUP), and the roadmap and screen record no longer list it as
+  outstanding. Its text size and tall-view behaviour remain.
+- `ui_retained_gate.py` (route, publication while leaving, Back, paging,
+  legacy fallbacks, the session-verb allowlist), the native screens' pages,
+  mp-pages, menus, pointer-reach and safe-area groups, and OpenGL 16:9
+  captures (`demos`, `demosback`, `multiplayer`, `playersetup`) pass.
+
 ## Third-party library updates, 2 November 2026
 
 - Moved to the newest stable upstream releases:

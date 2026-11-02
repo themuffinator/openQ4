@@ -1425,6 +1425,7 @@
 	"#str_231547"	"Model rotation"
 	"#str_231548"	"Player settings changed. Please try again."
 	"#str_231549"	"Unable to apply this player setting."
+	"#str_231550"	"Join a match on a server, host your own, watch your demos or set up your player."
 	"#str_231560"	"Enter a number from %s to %s."
 	"#str_230141"	"Rendering backend"
 	"#str_230142"	"Rendering device"

@@ -818,10 +818,36 @@ SCENARIOS = {
         'waitMsec 1500', 'openq4_retainedGui report',
         'openq4_retainedGui focus setup', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
         'waitMsec 1500', 'screenshot "screenshots/multiplayer-setup.tga"',
-        'openq4_guiAction mp_b_set_back', 'waitMsec 1500', 'openq4_retainedGui report',
+        'openq4_retainedGui focus "setup-close"', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
+        'waitMsec 1500', 'openq4_retainedGui report',
         'openq4_retainedGui focus back', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
         'waitMsec 250', 'screenshot "screenshots/multiplayer-back.tga"', 'waitMsec 1000', 'ui_retainedStatus',
         'screenshot "screenshots/multiplayer-title.tga"',
+    ]),
+    # Player Setup edits in place on the Multiplayer page (FLOW-050): the
+    # sections give way to the editor and its model preview. A typed name,
+    # the next model, a rail colour and a turn of the preview apply at once
+    # (each CVar read back), and CLOSE returns the sections with the focus on
+    # PLAYER SETUP.
+    'playersetup': (None, [
+        'waitMsec 7000',
+        'openq4_retainedGui focus nav_multiplayer', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
+        'waitMsec 1500', 'openq4_retainedGui focus setup', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
+        'waitMsec 2000', 'ui_retainedStatus', 'openq4_retainedGui report', 'screenshot "screenshots/playersetup.tga"',
+        'openq4_retainedGui focus "setup-name"', 'openq4_retainedGui number begin "setup-name"',
+        'openq4_retainedGui number input "setup-name" "Kane"', 'openq4_retainedGui number commit "setup-name"', 'waitMsec 600', 'ui_name',
+        'openq4_retainedGui focus "setup-model"', 'waitMsec 100', 'openq4_retainedGui choice open "setup-model"', 'waitMsec 500',
+        'screenshot "screenshots/playersetup-models.tga"',
+        'openq4_retainedGui menu down 1', 'openq4_retainedGui menu down 0', 'openq4_retainedGui menu accept 1',
+        'openq4_retainedGui menu accept 0', 'waitMsec 2000', 'ui_model', 'openq4_retainedGui report',
+        'screenshot "screenshots/playersetup-model.tga"',
+        'openq4_retainedGui focus "setup-rail-3"', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
+        'waitMsec 600', 'ui_hitscanTint',
+        'openq4_retainedGui focus "setup-rotation"', 'openq4_retainedGui menu right 1', 'openq4_retainedGui menu right 0',
+        'openq4_retainedGui menu right 1', 'openq4_retainedGui menu right 0', 'waitMsec 800', 'openq4_retainedGui report',
+        'screenshot "screenshots/playersetup-turned.tga"',
+        'openq4_retainedGui focus "setup-close"', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
+        'waitMsec 1200', 'openq4_retainedGui report', 'screenshot "screenshots/playersetup-closed.tga"',
     ]),
     # The Create Server sub-page (FLOW-050), the default: CREATE SERVER on the
     # Multiplayer page goes deeper and the sub-page presents at 350 ms under
@@ -1412,17 +1438,19 @@ SCENARIOS = {
         'openq4_retainedGui focus modsModal_no', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
         'waitMsec 600', 'openq4_retainedGui report', 'screenshot "screenshots/mods-closed.tga"',
     ]),
-    # The Demos page (FLOW-013): two render demos recorded in the level, then
-    # the title's DEMOS hands off and the page presents at 550 ms with the
-    # newest selected. A filter that hides both shows the filtered empty
-    # state and clears again; DELETE asks naming the demo, and YES deletes it
-    # and selects the older one; PLAY plays it (8 s long, shot 2.5 s in), and
-    # demoStop ends playback.
+    # The Demos sub-page (FLOW-013, FLOW-050): two render demos recorded in
+    # the level, then the title's MULTIPLAYER and the page's DEMOS go deeper
+    # and the sub-page presents at 350 ms with the newest selected. A filter
+    # that hides both shows the filtered empty state and clears again; DELETE
+    # asks naming the demo, and YES deletes it and selects the older one;
+    # PLAY plays it (8 s long, shot 2.5 s in), and demoStop ends playback.
+    # The title then reopens on the Multiplayer page's DEMOS through Back.
     'demos': ('game/airdefense1', [
         'waitMsec 1000', 'recordDemo retainedolder', 'waitMsec 8000', 'stopRecording', 'waitMsec 500',
         'recordDemo retainednewer', 'waitMsec 2500', 'stopRecording', 'waitMsec 500', 'disconnect', 'waitMsec 4000',
-        'openq4_retainedGui focus link_demos', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
-        'waitMsec 250', 'screenshot "screenshots/demos-handoff.tga"', 'waitMsec 900', 'ui_retainedStatus',
+        'openq4_retainedGui focus nav_multiplayer', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
+        'waitMsec 1500', 'openq4_retainedGui focus demos', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
+        'waitMsec 175', 'screenshot "screenshots/demos-handoff.tga"', 'waitMsec 1200', 'ui_retainedStatus',
         'openq4_retainedGui report', 'screenshot "screenshots/demos.tga"',
         'openq4_retainedGui focus "tag-mvd"', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
         'waitMsec 300', 'openq4_retainedGui inspect "demo_emptyclear"', 'screenshot "screenshots/demos-filtered.tga"',
@@ -1436,6 +1464,17 @@ SCENARIOS = {
         'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0', 'waitMsec 2500', 'ui_retainedStatus',
         'screenshot "screenshots/demos-playing.tga"', 'demoStop', 'waitMsec 3000', 'ui_retainedStatus',
         'screenshot "screenshots/demos-stopped.tga"',
+    ]),
+    # Back from the Demos sub-page climbs out onto the Multiplayer page's
+    # DEMOS: the sub-page sweeps away over 300 ms and the page fades back in.
+    'demosback': (None, [
+        'waitMsec 7000',
+        'openq4_retainedGui focus nav_multiplayer', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
+        'waitMsec 1500', 'openq4_retainedGui focus demos', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
+        'waitMsec 1500', 'ui_retainedStatus', 'openq4_retainedGui report', 'screenshot "screenshots/demosback-empty.tga"',
+        'openq4_retainedGui focus demo_back', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
+        'waitMsec 150', 'screenshot "screenshots/demosback-leaving.tga"', 'waitMsec 1200', 'ui_retainedStatus',
+        'openq4_retainedGui report', 'screenshot "screenshots/demosback-returned.tga"',
     ]),
     # The Restart Level page (FLOW-001): the pause's RESTART LEVEL hands off to
     # it at the level's difficulty. A plate chooses another, which the page

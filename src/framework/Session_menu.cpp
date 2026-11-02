@@ -6643,7 +6643,6 @@ static const retainedHandoff_t RETAINED_HANDOFFS[] = {
 	{ "multiplayer",	"main_b_multiplayer",	RETAINED_HANDOFF_PAGE },
 	{ "settings",		"main_b_settings",		RETAINED_HANDOFF_PAGE },
 	{ "credits",		"main_b_credits",		RETAINED_HANDOFF_PAGE },
-	{ "demos",			"main_b_demos",			RETAINED_HANDOFF_PAGE },
 	{ "restartLevel",	"main_b_difficulty",	RETAINED_HANDOFF_PAGE },
 	{ "mods",			"main_b_mods",			RETAINED_HANDOFF_POPUP },
 	// The update check opens no pop-up: its answer comes as a message box
@@ -7185,7 +7184,7 @@ void idSessionLocal::DrawRetainedHome( int presentationTime ) {
 }
 
 // The Single Player page and its Campaign and Arena sub-pages, the
-// Multiplayer page and its Create Server and Join Game sub-pages, and the
+// Multiplayer page and its Create Server, Join Game and Demos sub-pages, and the
 // SETTINGS page and its CONTROLS, GAME OPTIONS, DISPLAY and AUDIO sub-pages, are
 // documents of their own (see RETAINED_SUBPAGE_DEEPER_MSEC). When the other
 // document cannot present, its stock screen opens at once.
@@ -7194,10 +7193,12 @@ void idSessionLocal::BeginRetainedSubpage( idUserInterface *gui, bool deeper, re
 	retainedDetailTarget = 0;
 	HandleMainMenuCommands( "play main_menu_selection" );
 	const bool create = subpage == RETAINED_SUBPAGE_CREATE_SERVER, join = subpage == RETAINED_SUBPAGE_JOIN_GAME;
+	const bool demos = subpage == RETAINED_SUBPAGE_DEMOS;
 	const bool arena = subpage == RETAINED_SUBPAGE_ARENA;
 	const retainedSettingsSubpage_t *settings = Session_RetainedSettingsSubpage( subpage );
 	const char *other = settings != NULL ? ( deeper ? settings->gui : RETAINED_SETTINGSPAGE_GUI ) :
-		create || join ? ( !deeper ? RETAINED_MPPAGE_GUI : create ? RETAINED_CREATE_SERVER_GUI : RETAINED_JOIN_GAME_GUI ) :
+		create || join || demos ? ( !deeper ? RETAINED_MPPAGE_GUI : create ? RETAINED_CREATE_SERVER_GUI :
+			join ? RETAINED_JOIN_GAME_GUI : RETAINED_DEMOS_GUI ) :
 		!deeper ? RETAINED_SINGLEPLAYER_GUI : arena ? RETAINED_ARENA_GUI : RETAINED_CAMPAIGNS_GUI;
 	const bool system = subpage == RETAINED_SUBPAGE_SETTINGS_SYSTEM && deeper;
 	if ( ( system ? !RetainedSystemAvailable() : FindRetainedGui( other, true, false ) == NULL ) ||
@@ -7207,7 +7208,7 @@ void idSessionLocal::BeginRetainedSubpage( idUserInterface *gui, bool deeper, re
 		return;
 	}
 	gui->HandleNamedEvent( !deeper ? "subpageLeave" : settings != NULL ? settings->enter : create ? "subpageEnterCreate" :
-		join ? "subpageEnterJoin" : arena ? "subpageEnterArena" : "subpageEnter" );
+		join ? "subpageEnterJoin" : demos ? "subpageEnterDemos" : arena ? "subpageEnterArena" : "subpageEnter" );
 	PumpApplicationActions( gui );
 	retainedSubpageFrom = gui;
 	retainedSubpageDeeper = deeper;
@@ -7255,9 +7256,9 @@ void idSessionLocal::UpdateRetainedSubpage() {
 
 // The other level presents: Campaign (or the stock selector), the Arena
 // campaign's browser (the Arena page where it can), Create Server, Join Game,
-// a settings sub-page, or the page coming back: Single Player, onto ARENA
-// from Arena, Multiplayer onto CREATE SERVER or JOIN GAME, or SETTINGS onto
-// the sub-page's section.
+// Demos, a settings sub-page, or the page coming back: Single Player, onto
+// ARENA from Arena, Multiplayer onto CREATE SERVER, JOIN GAME or DEMOS, or
+// SETTINGS onto the sub-page's section.
 void idSessionLocal::PresentRetainedSubpage( bool deeper, retainedSubpage_t subpage ) {
 #ifndef ID_DEDICATED
 	const bool arena = subpage == RETAINED_SUBPAGE_ARENA;
@@ -7311,13 +7312,15 @@ void idSessionLocal::PresentRetainedSubpage( bool deeper, retainedSubpage_t subp
 		}
 		return;
 	}
-	if ( subpage == RETAINED_SUBPAGE_CREATE_SERVER || subpage == RETAINED_SUBPAGE_JOIN_GAME ) {
-		const bool create = subpage == RETAINED_SUBPAGE_CREATE_SERVER;
+	if ( subpage == RETAINED_SUBPAGE_CREATE_SERVER || subpage == RETAINED_SUBPAGE_JOIN_GAME || subpage == RETAINED_SUBPAGE_DEMOS ) {
+		const bool create = subpage == RETAINED_SUBPAGE_CREATE_SERVER, demos = subpage == RETAINED_SUBPAGE_DEMOS;
 		if ( deeper && create ) {
 			OpenRetainedCreateServer();
+		} else if ( deeper && demos ) {
+			OpenRetainedDemos();
 		} else if ( deeper ) {
 			OpenRetainedJoinGame();
-		} else if ( OpenRetainedMultiplayerPage( create ? "create" : "join" ) ) {
+		} else if ( OpenRetainedMultiplayerPage( create ? "create" : demos ? "demos" : "join" ) ) {
 			guiActive->HandleNamedEvent( "subpageReturn" );
 			PumpApplicationActions( guiActive );
 		} else if ( guiMainMenu != NULL ) {
@@ -7634,10 +7637,11 @@ void idSessionLocal::HandleRetainedSessionRequest( idUserInterface *gui, const c
 		}
 		return;
 	}
-	// LOAD GAME, SAVE GAME, RESTART LEVEL and DEMOS open their retained pages
-	// where those can present; else the stock pages below.
+	// LOAD GAME, SAVE GAME, RESTART LEVEL, CREDITS, MULTIPLAYER and SETTINGS
+	// open their retained pages where those can present; else the stock pages
+	// below.
 	if ( ( !idStr::Icmp( request, "loadGame" ) || !idStr::Icmp( request, "saveGame" ) || !idStr::Icmp( request, "restartLevel" ) ||
-			!idStr::Icmp( request, "demos" ) || !idStr::Icmp( request, "credits" ) || !idStr::Icmp( request, "multiplayer" ) ||
+			!idStr::Icmp( request, "credits" ) || !idStr::Icmp( request, "multiplayer" ) ||
 			!idStr::Icmp( request, "settings" ) ) && BeginRetainedPage( request ) ) {
 		return;
 	}
@@ -7686,14 +7690,13 @@ page then opens as before.
 bool idSessionLocal::BeginRetainedPage( const char *request ) {
 #ifndef ID_DEDICATED
 	const bool saving = !idStr::Icmp( request, "saveGame" ), restarting = !idStr::Icmp( request, "restartLevel" );
-	const bool demos = !idStr::Icmp( request, "demos" ), credits = !idStr::Icmp( request, "credits" );
+	const bool credits = !idStr::Icmp( request, "credits" );
 	const bool multiplayer = !idStr::Icmp( request, "multiplayer" ), settings = !idStr::Icmp( request, "settings" );
 	const bool strogg = !settings && guiRetainedHome != NULL && guiRetainedHome == guiRetainedPauseStrogg;
-	if ( ( !saving && !restarting && !demos && !credits && !multiplayer && !settings && idStr::Icmp( request, "loadGame" ) ) ||
+	if ( ( !saving && !restarting && !credits && !multiplayer && !settings && idStr::Icmp( request, "loadGame" ) ) ||
 			guiRetainedHome == NULL ||
 			guiActive != guiMainMenu || ( ( credits || multiplayer ) && mapSpawned ) ||
-			( ( saving || restarting ) && ( !mapSpawned || IsMultiplayer() ) ) ||
-			( demos && ( mapSpawned || IsDemoPlaybackActive() ) ) ) {
+			( ( saving || restarting ) && ( !mapSpawned || IsMultiplayer() ) ) ) {
 		return false;
 	}
 	if ( retainedPagePending != NULL ) {
@@ -7703,10 +7706,10 @@ bool idSessionLocal::BeginRetainedPage( const char *request ) {
 	// gate came on after startup. A view that stopped drawing after a renderer
 	// or language change hands the page back to the stock one for good.
 	idUserInterface *&loaded = strogg ? ( saving ? guiRetainedSaveStrogg : restarting ? guiRetainedRestartStrogg : guiRetainedLoadStrogg ) :
-		saving ? guiRetainedSave : restarting ? guiRetainedRestart : demos ? guiRetainedDemos :
+		saving ? guiRetainedSave : restarting ? guiRetainedRestart :
 		credits ? guiRetainedCredits : multiplayer ? guiRetainedMpPage : settings ? guiRetainedSettingsPage : guiRetainedLoad;
 	const char *path = strogg ? ( saving ? RETAINED_SAVEGAME_STROGG_GUI : restarting ? RETAINED_RESTART_STROGG_GUI : RETAINED_LOADGAME_STROGG_GUI ) :
-		saving ? RETAINED_SAVEGAME_GUI : restarting ? RETAINED_RESTART_GUI : demos ? RETAINED_DEMOS_GUI :
+		saving ? RETAINED_SAVEGAME_GUI : restarting ? RETAINED_RESTART_GUI :
 		credits ? RETAINED_CREDITS_GUI : multiplayer ? RETAINED_MPPAGE_GUI : settings ? RETAINED_SETTINGSPAGE_GUI : RETAINED_LOADGAME_GUI;
 	if ( loaded != NULL && UI_RetainedViewFailed( loaded ) ) {
 		common->Warning( "retained UI: '%s' stopped drawing; the stock screen presents instead", path );
@@ -7722,7 +7725,7 @@ bool idSessionLocal::BeginRetainedPage( const char *request ) {
 		return false;
 	}
 	loaded = page;
-	if ( saving || ( !restarting && !credits && !multiplayer && !settings && !demos ) ) {
+	if ( saving || ( !restarting && !credits && !multiplayer && !settings ) ) {
 		page->SetStateInt( "browser.sort", 0 );
 		page->SetStateInt( "browser.filter", 0 );
 	}
@@ -7745,6 +7748,7 @@ bool idSessionLocal::BeginRetainedPage( const char *request ) {
 		// From the title the page starts on its primary action.
 		page->SetStateBool( "from_create", false );
 		page->SetStateBool( "from_join", false );
+		page->SetStateBool( "from_demos", false );
 		page->SetStateBool( "from_setup", false );
 		page->StateChanged( common->GetPresentationTime() );
 	} else if ( settings ) {
@@ -7754,10 +7758,6 @@ bool idSessionLocal::BeginRetainedPage( const char *request ) {
 			page->SetStateBool( va( "from_%s", RETAINED_SETTINGS_SECTIONS[ i ].section ), false );
 		}
 		page->StateChanged( common->GetPresentationTime() );
-	} else if ( demos ) {
-		// Each arrival shows every demo, the newest selected.
-		retainedDemoFilter = 0;
-		PublishRetainedDemosPage( page, NULL, 0, NULL );
 	} else {
 		PublishRetainedLoadPage( page, 0, NULL );
 	}
@@ -7775,7 +7775,7 @@ bool idSessionLocal::BeginRetainedPage( const char *request ) {
 
 bool idSessionLocal::RetainedPageActive() const {
 	return guiActive != NULL && ( IsRetainedLoadPage( guiActive ) || IsRetainedSavePage( guiActive ) || IsRetainedRestartPage( guiActive ) ||
-		guiActive == guiRetainedDemos || guiActive == guiRetainedCredits || guiActive == guiRetainedMpPage ||
+		guiActive == guiRetainedCredits || guiActive == guiRetainedMpPage ||
 		( guiRetainedSettingsPage != NULL && guiActive == guiRetainedSettingsPage ) );
 }
 
@@ -8457,7 +8457,8 @@ idUserInterface *idSessionLocal::RetainedMultiplayerPage() {
 idSessionLocal::OpenRetainedMultiplayerPage
 
 Back from a stock Multiplayer page, or from a sub-page onto its section
-(`section`: "create" from Create Server, "join" from Join Game): the
+(`section`: "create" from Create Server, "join" from Join Game, "demos" from
+Demos): the
 retained page presents at once, its arrival bringing its plates and
 description back. False when it cannot present: the stock Multiplayer page
 opens instead.
@@ -8474,6 +8475,7 @@ bool idSessionLocal::OpenRetainedMultiplayerPage( const char *section ) {
 	// The activation reads them.
 	page->SetStateBool( "from_create", section != NULL && !idStr::Icmp( section, "create" ) );
 	page->SetStateBool( "from_join", section != NULL && !idStr::Icmp( section, "join" ) );
+	page->SetStateBool( "from_demos", section != NULL && !idStr::Icmp( section, "demos" ) );
 	page->SetStateBool( "from_setup", section != NULL && !idStr::Icmp( section, "setup" ) );
 	page->StateChanged( common->GetPresentationTime() );
 	SetGUI( page, NULL );
@@ -8487,12 +8489,14 @@ bool idSessionLocal::OpenRetainedMultiplayerPage( const char *section ) {
 ===============
 idSessionLocal::HandleRetainedMultiplayerPageRequest
 
-The Multiplayer page's verbs. PLAYER SETUP opens the stock Settings page
-once the page has left (UpdateRetainedMultiplayerPage); JOIN GAME and CREATE
-SERVER go deeper to the retained Join Game and Create Server sub-pages where
-they can present, else they open the stock browser and Create Server pages
-the same way; BACK returns the title, from the page dock as from a stock
-page. A page or a change of level under way takes no further request.
+The Multiplayer page's verbs. PLAYER SETUP edits in place, and opens the
+stock Settings page once the page has left where its editor cannot present
+(UpdateRetainedMultiplayerPage); JOIN GAME and CREATE SERVER go deeper to the
+retained Join Game and Create Server sub-pages where they can present, else
+they open the stock browser and Create Server pages the same way; DEMOS goes
+deeper to the retained Demos sub-page, else the legacy demo browser opens over
+the page and returns to it; BACK returns the title, from the page dock as from
+a stock page. A page or a change of level under way takes no further request.
 ===============
 */
 void idSessionLocal::HandleRetainedMultiplayerPageRequest( idUserInterface *gui, const char *request ) {
@@ -8521,6 +8525,19 @@ void idSessionLocal::HandleRetainedMultiplayerPageRequest( idUserInterface *gui,
 	}
 	if ( !idStr::Icmp( request, "multiplayerJoin" ) && RetainedJoinGamePage() != NULL ) {
 		BeginRetainedSubpage( gui, true, RETAINED_SUBPAGE_JOIN_GAME );
+		return;
+	}
+	if ( !idStr::Icmp( request, "multiplayerDemos" ) ) {
+		if ( idUserInterface *demos = RetainedDemosPage() ) {
+			// Each arrival shows every demo, the newest selected, published
+			// while the page leaves.
+			retainedDemoFilter = 0;
+			PublishRetainedDemosPage( demos, NULL, 0, NULL );
+			BeginRetainedSubpage( gui, true, RETAINED_SUBPAGE_DEMOS );
+		} else {
+			HandleMainMenuCommands( "play main_menu_selection" );
+			OpenDemoMenu( true );
+		}
 		return;
 	}
 	if ( !idStr::Icmp( request, "multiplayerBack" ) ) {
@@ -9929,6 +9946,57 @@ void idSessionLocal::SelectRetainedMod( idUserInterface *gui, int row ) {
 
 /*
 ===============
+idSessionLocal::RetainedDemosPage
+
+Multiplayer's retained Demos sub-page where it can present: NULL in a game,
+during playback, or when the page is not installed, cannot load or stopped
+drawing.
+===============
+*/
+idUserInterface *idSessionLocal::RetainedDemosPage() {
+#ifndef ID_DEDICATED
+	// A view that stopped drawing hands the page back for good.
+	if ( guiRetainedDemos != NULL && UI_RetainedViewFailed( guiRetainedDemos ) ) {
+		common->Warning( "retained UI: '%s' stopped drawing; the stock screen presents instead", RETAINED_DEMOS_GUI );
+		retainedStock.AddUnique( RETAINED_DEMOS_GUI );
+		guiRetainedDemos = NULL;
+	}
+	if ( !Session_RetainedScreensEnabled() || mapSpawned || IsDemoPlaybackActive() ) {
+		return NULL;
+	}
+	if ( guiRetainedDemos == NULL ) {
+		guiRetainedDemos = FindRetainedGui( RETAINED_DEMOS_GUI, true, false );
+	}
+	return guiRetainedDemos;
+#else
+	return NULL;
+#endif
+}
+
+/*
+===============
+idSessionLocal::OpenRetainedDemos
+
+The Demos sub-page presents with the library DEMOS published as the
+Multiplayer page left. Where it cannot, the legacy demo browser opens over
+the Multiplayer page instead.
+===============
+*/
+void idSessionLocal::OpenRetainedDemos() {
+#ifndef ID_DEDICATED
+	idUserInterface *page = RetainedDemosPage();
+	if ( page == NULL ) {
+		if ( guiRetainedMpPage != NULL && guiActive == guiRetainedMpPage ) {
+			OpenDemoMenu( true );
+		}
+		return;
+	}
+	SetGUI( page, NULL );
+#endif
+}
+
+/*
+===============
 idSessionLocal::PublishRetainedDemosPage
 
 The Demos page's library: every recording, rescanned, that its filter shows,
@@ -10031,7 +10099,7 @@ void idSessionLocal::HandleRetainedDemosRequest( idUserInterface *gui, const cha
 	const bool chosen = retainedDemoSelected >= 0 && retainedDemoSelected < count;
 	const idStr selectedPath = chosen ? demoLibrary[ retainedDemoRows[ retainedDemoSelected ] ].path : idStr();
 	if ( !idStr::Icmp( request, "demosBack" ) ) {
-		ReturnRetainedPage();
+		BeginRetainedSubpage( gui, false, RETAINED_SUBPAGE_DEMOS );
 		return;
 	}
 	if ( !idStr::Icmp( request, "demosSelect" ) ) {

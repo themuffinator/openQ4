@@ -999,6 +999,13 @@ archived provenance; new scheduling belongs here.
   inertia and lights its rim at either end, a swipe across a tab strip
   changes tab and a 500 ms long-press opens a button's detail (`INP-014`
   partial; haptics and device qualification remain).
+  Progress, 2 November: Player Setup has
+  [edited in place](ui/retained-screens.md#player-setup-edits-in-place-2-november-2026)
+  on the Multiplayer page since 28 October; an engine capture now confirms
+  each change applies and reads back. Its text size and tall views remain.
+  The Multiplayer page also gained DEMOS, which opens the
+  [Demos page as a sub-page](ui/retained-screens.md#demos-as-a-multiplayer-sub-page-2-november-2026)
+  (`FLOW-050`); the title's plinth keeps MODS, UPDATES, CREDITS and EXIT.
 - [ ] **UI-02 — P1, implementation and qualification: text, input and accessibility.**
   Finish in-field IME/composition, shaping/kerning/fallback/styles, grapheme editing,
   caret/candidate placement, binding capture, accessibility exposure and contextual

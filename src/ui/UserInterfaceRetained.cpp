@@ -214,7 +214,7 @@ bool ApplicationState(const DocumentModel& model, const idDict& dictionary, Stat
 // operations, never console commands; the session maps each one explicitly.
 bool SessionMenuCommand(const std::string& command) {
 	static const std::set<std::string> commands = {"continue","singlePlayer","loadGame","saveGame","multiplayer","settings",
-		"mods","demos","updates","credits","quit","resume","menuResume","restartLevel","quitToMenu",
+		"mods","updates","credits","quit","resume","menuResume","restartLevel","quitToMenu",
         "campaigns","campaignQuake4","campaignAwakening","campaignArena","campaignBack","campaignHome",
         "campaignSkill0","campaignSkill1","campaignSkill2","campaignSkill3","campaignSkill4",
         "campaignSkillTurbo","campaignSkillStart","campaignSkillBack","campaignChapterSelect","campaignChapterStart",
@@ -226,7 +226,7 @@ bool SessionMenuCommand(const std::string& command) {
         "arenaBack","arenaTier0","arenaTier1","arenaTier2","arenaTier3","arenaTier4","arenaMatch0","arenaMatch1",
         "arenaMatch2","arenaMatch3","arenaTierPrevious","arenaTierNext","arenaEasier","arenaHarder","arenaStart",
         "arenaReset","arenaResetConfirm","arenaResetCancel","arenaRetry","arenaDismiss",
-        "multiplayerJoin","multiplayerCreate","multiplayerSetup","multiplayerBack","playerSetupClose",
+        "multiplayerJoin","multiplayerCreate","multiplayerDemos","multiplayerSetup","multiplayerBack","playerSetupClose",
         "createBack","createMap","createStart","createName","createMapCycle","createPassword","createRconPassword",
         "createMapsNewer","createMapsOlder","createBanList","createBanPick","createBanRemove",
         "joinBack","joinPick","joinServer","joinNewer","joinOlder","joinRefresh","joinNewList","joinSourceInternet",

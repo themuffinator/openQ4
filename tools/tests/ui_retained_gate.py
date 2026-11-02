@@ -469,7 +469,7 @@ static const char* va(const char* fmt, ...) {
     va_list args; va_start(args, fmt); std::vsnprintf(text, sizeof(buffers[0]), fmt, args); va_end(args); return text;
 }
 typedef enum { RETAINED_SUBPAGE_CAMPAIGN, RETAINED_SUBPAGE_ARENA, RETAINED_SUBPAGE_CREATE_SERVER, RETAINED_SUBPAGE_JOIN_GAME,
-    RETAINED_SUBPAGE_SETTINGS_CONTROLS, RETAINED_SUBPAGE_SETTINGS_GAME, RETAINED_SUBPAGE_SETTINGS_AUDIO,
+    RETAINED_SUBPAGE_DEMOS, RETAINED_SUBPAGE_SETTINGS_CONTROLS, RETAINED_SUBPAGE_SETTINGS_GAME, RETAINED_SUBPAGE_SETTINGS_AUDIO,
     RETAINED_SUBPAGE_SETTINGS_SYSTEM } retainedSubpage_t;
 // Whether the SYSTEM page's draft lets it leave (its own compiled cases,
 // ui_system_session_route.py, cover a draft not applied).
@@ -676,6 +676,9 @@ public:
         return true;
     }
     bool IsDemoPlaybackActive() const { return demoPlaying; }
+    // The Demos sub-page, and the legacy demo browser where it cannot present.
+    idUserInterface* RetainedDemosPage(); void OpenRetainedDemos();
+    std::vector<bool> demoMenus; void OpenDemoMenu(bool browser) { demoMenus.push_back(browser); }
     // The title's MODS dialog.
     idList<idModInfo> modsList; int retainedModSelected = -1;
     void PublishRetainedMods(idUserInterface*); void SelectRetainedMod(idUserInterface*, int);
@@ -1294,12 +1297,13 @@ int main() {
         s.HandleRetainedSessionRequest(page, "unknown");
         CHECK(commonObject.warnings.size() == 1 && commonObject.warnings[0].find("Restart Level") != std::string::npos);
     }
-    {   // The Demos page (FLOW-013): the title's DEMOS hands off to it as LOAD GAME
-        // does. The library newest first under its filter, the newest selected;
-        // the verbs select, page, play, delete, refresh and filter.
+    {   // The Demos sub-page (FLOW-013, FLOW-050): the Multiplayer page's DEMOS
+        // goes deeper to it as CREATE SERVER does. The library newest first
+        // under its filter, the newest selected; the verbs select, page, play,
+        // delete, refresh and filter; Back climbs out onto DEMOS.
         auto s = Session(true); s.PreloadRetainedScreens(); s.UpdateRetainedHome();
-        auto* title = s.guiRetainedHome; auto* page = s.guiRetainedDemos;
-        CHECK(title && page && std::string(page->Name()) == "guis/menu/demos.q4ui");
+        auto* title = s.guiRetainedHome; auto* page = s.guiRetainedDemos; auto* mp = s.guiRetainedMpPage;
+        CHECK(title && mp && page && std::string(page->Name()) == "guis/menu/demos.q4ui" && s.RetainedDemosPage() == page);
         auto demo = [](const char* name, demoLibraryType_t type, bool playable, const char* map = "") {
             demoLibraryEntry_t e; e.path = std::string("demos/") + name; e.displayName = name; e.type = type; e.playable = playable;
             e.capabilities = (playable ? DEMO_CAP_PLAY : 0) | DEMO_CAP_DELETE; e.mapName = map; e.status = playable ? "Playable" : "Unsupported";
@@ -1307,13 +1311,22 @@ int main() {
         };
         s.demoFiles = {demo("newest", DEMO_LIBRARY_RENDER, true), demo("middle", DEMO_LIBRARY_MVD, false, "mp/q4dm1"),
                        demo("oldest", DEMO_LIBRARY_RENDER, true)};
+        // The title offers no DEMOS of its own: it is a Multiplayer section.
         s.HandleRetainedSessionRequest(title, "demos");
-        CHECK(legacyActions.empty() && s.retainedPagePending == page && title->named.back() == "depart");
+        CHECK(legacyActions.empty() && s.retainedPagePending == nullptr && !s.BeginRetainedPage("demos") &&
+              commonObject.warnings.back().find("unhandled session request 'demos'") != std::string::npos);
+        s.HandleRetainedSessionRequest(title, "multiplayer"); commonObject.time += 550; s.UpdateRetainedHome(); s.UpdateRetainedPage();
+        CHECK(s.guiActive == mp);
+        s.HandleRetainedSessionRequest(mp, "multiplayerDemos");
+        CHECK(legacyActions.empty() && s.retainedSubpageFrom == mp && mp->named.back() == "subpageEnterDemos" && s.retainedSubpageDeeper &&
+              s.retainedSubpageKind == RETAINED_SUBPAGE_DEMOS && s.retainedSubpageUntil == commonObject.time + 350 && s.demoMenus.empty());
+        // The library is published while the page leaves.
         CHECK(page->state["demos.count"] == "3" && page->state["demos.selected"] == "0" && page->state["demos.filter"] == "0" &&
               page->state["demos.row0.name"] == "newest" && page->state["demos.row2.name"] == "oldest" &&
               page->state["demos.row3.name"].empty() && page->state["demos.canPlay"] == "1" && page->state["demos.kind"] == "Render demo");
-        commonObject.time += 550; s.UpdateRetainedHome(); s.UpdateRetainedPage();
-        CHECK(s.guiActive == page && s.retainedPageHome == title && s.RetainedPageActive());
+        s.HandleRetainedSessionRequest(mp, "multiplayerCreate"); CHECK(s.retainedSubpageKind == RETAINED_SUBPAGE_DEMOS);  // nothing else meanwhile
+        commonObject.time += 350; s.UpdateRetainedSubpage();
+        CHECK(s.guiActive == page && s.retainedSubpageFrom == nullptr && !s.RetainedPageActive());
         // A row selects its demo, which brings its map's picture and status.
         page->state["demos.pick"] = "1"; s.HandleRetainedSessionRequest(page, "demosSelect");
         CHECK(page->state["demos.selected"] == "1" && page->state["demos.canPlay"] == "0" && page->state["demos.playable"] == "0" &&
@@ -1353,16 +1366,20 @@ int main() {
         CHECK((s.playedDemos == std::vector<std::string>{"demos/fresh"}) && s.guiActive == page && page->state["demos.error"] == "#str_231120");
         s.playRefuses = false; s.HandleRetainedSessionRequest(page, "demosPlay");
         CHECK(s.playedDemos.size() == 2 && s.guiActive == nullptr);
-        // Back returns the title with the bands.
-        s.guiActive = page; s.HandleRetainedSessionRequest(page, "demosBack");
-        CHECK(s.guiActive == s.guiMainMenu && title->named.back() == "returnHome");
         s.guiActive = page; s.HandleRetainedSessionRequest(page, "unknown");
         CHECK(!commonObject.warnings.empty() && commonObject.warnings.back().find("Demos") != std::string::npos);
+        // Back climbs out: at 300 ms the Multiplayer page returns onto DEMOS.
+        s.HandleRetainedSessionRequest(page, "demosBack");
+        CHECK(s.retainedSubpageFrom == page && page->named.back() == "subpageLeave" && !s.retainedSubpageDeeper &&
+              s.retainedSubpageKind == RETAINED_SUBPAGE_DEMOS && s.retainedSubpageUntil == commonObject.time + 300);
+        commonObject.time += 300; s.UpdateRetainedSubpage();
+        CHECK(s.guiActive == mp && mp->state["from_demos"] == "1" && mp->state["from_join"] == "0" && mp->state["from_create"] == "0" &&
+              mp->named.back() == "subpageReturn");
         // Pages of 64: more demos page through, selecting the first of the older
         // page or the last of the newer one.
-        s.guiActive = s.guiMainMenu; s.UpdateRetainedHome(); s.demoFiles.clear();
+        s.demoFiles.clear();
         for (int i = 0; i < 70; ++i) s.demoFiles.push_back(demo(("d" + std::to_string(i)).c_str(), DEMO_LIBRARY_RENDER, true));
-        s.HandleRetainedSessionRequest(s.guiRetainedHome, "demos"); commonObject.time += 550; s.UpdateRetainedHome(); s.UpdateRetainedPage();
+        s.HandleRetainedSessionRequest(mp, "multiplayerDemos"); commonObject.time += 350; s.UpdateRetainedSubpage();
         CHECK(s.guiActive == page && page->state["demos.count"] == "70" && page->state["demos.first"] == "0");
         s.HandleRetainedSessionRequest(page, "demosOlder");
         CHECK(page->state["demos.first"] == "64" && page->state["demos.selected"] == "64" && page->state["demos.row5.name"] == "d69" &&
@@ -1371,18 +1388,28 @@ int main() {
         s.HandleRetainedSessionRequest(page, "demosNewer");
         CHECK(page->state["demos.first"] == "0" && page->state["demos.selected"] == "63" && page->named.back() == "pagedNewer");
     }
-    {   // DEMOS keeps the stock browser in game, during playback, with the gate
-        // off and when the page is not installed.
-        auto ingame = Session(true, true); ingame.PreloadRetainedScreens(); ingame.UpdateRetainedHome();
-        CHECK(!ingame.BeginRetainedPage("demos") && ingame.retainedPagePending == nullptr);
-        auto playing = Session(true); playing.PreloadRetainedScreens(); playing.UpdateRetainedHome(); playing.demoPlaying = true;
-        playing.HandleRetainedSessionRequest(playing.guiRetainedHome, "demos");
-        CHECK(legacyActions.back() == "main_b_demos" && playing.retainedPagePending == nullptr);
+    {   // DEMOS opens the legacy demo browser over the Multiplayer page, which
+        // it returns to, during playback, in game and when the sub-page is not
+        // installed.
+        auto playing = Session(true); playing.PreloadRetainedScreens(); playing.UpdateRetainedHome();
+        playing.HandleRetainedSessionRequest(playing.guiRetainedHome, "multiplayer"); commonObject.time += 550;
+        playing.UpdateRetainedHome(); playing.UpdateRetainedPage(); CHECK(playing.guiActive == playing.guiRetainedMpPage);
+        playing.demoPlaying = true; CHECK(playing.RetainedDemosPage() == nullptr);
+        playing.HandleRetainedSessionRequest(playing.guiRetainedMpPage, "multiplayerDemos");
+        CHECK(playing.retainedSubpageFrom == nullptr && (playing.demoMenus == std::vector<bool>{true}) &&
+              playing.played.back() == "play main_menu_selection");
+        playing.demoPlaying = false; playing.mapSpawned = true; CHECK(playing.RetainedDemosPage() == nullptr); playing.mapSpawned = false;
         auto missing = Session(true); fileSystemObject.files.erase("guis/menu/demos.q4ui");
         missing.PreloadRetainedScreens(); missing.UpdateRetainedHome();
-        missing.HandleRetainedSessionRequest(missing.guiRetainedHome, "demos");
-        CHECK(missing.guiRetainedDemos == nullptr && legacyActions.back() == "main_b_demos" &&
+        missing.HandleRetainedSessionRequest(missing.guiRetainedHome, "multiplayer"); commonObject.time += 550;
+        missing.UpdateRetainedHome(); missing.UpdateRetainedPage(); CHECK(missing.guiActive == missing.guiRetainedMpPage);
+        missing.HandleRetainedSessionRequest(missing.guiRetainedMpPage, "multiplayerDemos");
+        CHECK(missing.guiRetainedDemos == nullptr && missing.retainedSubpageFrom == nullptr && (missing.demoMenus == std::vector<bool>{true}) &&
               (Stock(missing) == std::vector<std::string>{"guis/menu/demos.q4ui"}));
+        // Where it stops presenting between the choice and the hand-over, the
+        // legacy browser opens over the Multiplayer page in its place.
+        missing.guiActive = missing.guiRetainedMpPage; missing.OpenRetainedDemos();
+        CHECK((missing.demoMenus == std::vector<bool>{true, true}));
     }
     {   // MODS opens the title's own dialog with the installed mods, the current
         // game's selected; a row selects its mod and LOAD MOD restarts into it.
@@ -1486,12 +1513,13 @@ int main() {
         auto s = Session(true); s.PreloadRetainedScreens(); s.UpdateRetainedHome();
         auto* title = s.guiRetainedHome; auto* page = s.guiRetainedMpPage;
         CHECK(page && std::string(page->Name()) == "guis/menu/multiplayer.q4ui" && s.RetainedMultiplayerPage() == page);
-        page->state["from_create"] = page->state["from_join"] = page->state["from_setup"] = "1";
+        page->state["from_create"] = page->state["from_join"] = page->state["from_demos"] = page->state["from_setup"] = "1";
         s.HandleRetainedSessionRequest(title, "multiplayer");
         CHECK(legacyActions.empty() && s.retainedPagePending == page && title->named.back() == "depart" &&
               title->named[title->named.size() - 2] == "carry_multiplayer");
         // From the title the page starts on its primary action: no section to return onto.
-        CHECK(page->state["from_create"] == "0" && page->state["from_join"] == "0" && page->state["from_setup"] == "0");
+        CHECK(page->state["from_create"] == "0" && page->state["from_join"] == "0" && page->state["from_demos"] == "0" &&
+              page->state["from_setup"] == "0");
         commonObject.time += 550; s.UpdateRetainedHome(); s.UpdateRetainedPage();
         CHECK(s.guiActive == page && s.RetainedPageActive() && s.retainedPageHome == title);
         s.HandleRetainedSessionRequest(page, "unknown"); CHECK(s.guiActive == page && s.retainedMpPageDest == 0);
@@ -2272,11 +2300,11 @@ int main() {
     }
     {   // A main menu without every page the home screens hand off to keeps its own
         // home screen, as a mod's own menu would; the loading screens still present.
-        auto s = Session(true); legacyMissing = {"main_b_demos"};
+        auto s = Session(true); legacyMissing = {"main_b_credits"};
         s.PreloadRetainedScreens(); s.UpdateRetainedHome(); s.mapSpawned = true; s.UpdateRetainedHome();
         CHECK(s.guiRetainedHome == nullptr && managerObject.loads.empty() && commonObject.warnings.empty());
         CHECK((Stock(s) == std::vector<std::string>{"guis/menu/title.q4ui", "guis/menu/pause.q4ui"}));
-        CHECK(commonObject.developer.size() == 2 && commonObject.developer[0].find("'main_b_demos'") != std::string::npos);
+        CHECK(commonObject.developer.size() == 2 && commonObject.developer[0].find("'main_b_credits'") != std::string::npos);
         idUserInterface generic("guis/loading/generic.gui");
         CHECK(s.SelectRetainedLoadingGui(&generic, false) != &generic);
     }
@@ -5658,7 +5686,8 @@ def main() -> int:
         {ident: timeline for ident, _row, _key, timeline in retained_settings_page.DEEPER} and len(settings_subpages) == 4
     assert ('RETAINED_SUBPAGE_SETTINGS_SYSTEM', 'display', 'RETAINED_SYSTEM_GUI', 'subpageEnterDisplay') in settings_subpages
     for name, event in (('singleplayer', 'subpageEnter'), ('campaigns', 'subpageLeave'), ('multiplayer', 'subpageEnterCreate'),
-                        ('multiplayer', 'subpageEnterJoin'), ('createserver', 'subpageLeave'), ('joingame', 'subpageLeave'),
+                        ('multiplayer', 'subpageEnterJoin'), ('multiplayer', 'subpageEnterDemos'), ('createserver', 'subpageLeave'),
+                        ('joingame', 'subpageLeave'), ('demos', 'subpageLeave'),
                         *[('settings', enter) for *_rest, enter in settings_subpages],
                         *[(f'settings/{page}', 'subpageLeave') for page in ('controls', 'game', 'system', 'audio')]):
         text = (ROOT / f'content/baseoq4/pak0/guis/menu/{name}.q4ui').read_text(encoding='utf-8')
@@ -5800,7 +5829,8 @@ def main() -> int:
         'void idSessionLocal::HandleRetainedLoadRequest(', 'bool idSessionLocal::RetainedPageActive(',
         'void idSessionLocal::PublishRetainedSavePage(', 'void idSessionLocal::PublishRetainedSaveSelection(',
         'bool idSessionLocal::RetainedSaveGame(', 'void idSessionLocal::HandleRetainedSaveRequest(',
-        'void idSessionLocal::HandleRetainedRestartRequest(', 'void idSessionLocal::PublishRetainedDemosPage(',
+        'void idSessionLocal::HandleRetainedRestartRequest(', 'idUserInterface *idSessionLocal::RetainedDemosPage(',
+        'void idSessionLocal::OpenRetainedDemos(', 'void idSessionLocal::PublishRetainedDemosPage(',
         'void idSessionLocal::PublishRetainedDemoRows(', 'void idSessionLocal::PublishRetainedDemoSelection(',
         'void idSessionLocal::HandleRetainedDemosRequest(', 'void idSessionLocal::PublishRetainedMods(',
         'void idSessionLocal::SelectRetainedMod(', 'void idSessionLocal::OpenRestartMenu(',

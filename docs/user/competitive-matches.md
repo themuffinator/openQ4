@@ -611,7 +611,8 @@ Use Match Control's **Evidence** tab to distinguish
 initialized, recording, finalized and persisted state. A displayed qpath is not
 by itself proof that promotion succeeded.
 
-Completed `.mvd` files appear in the main-menu **Demos** library and can be
+Completed `.mvd` files appear in the **Demos** library (Multiplayer > Demos on
+the main menu) and can be
 validated and played with the controls in
 [Demo Playback and Multi-View Demo Architecture](../dev/multiview-demos.md#current-operator-interface).
 A `.mvd.part` is a recoverable incomplete stream, not a completed match artifact.

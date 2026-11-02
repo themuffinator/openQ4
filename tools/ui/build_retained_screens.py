@@ -2572,7 +2572,6 @@ def title_document() -> dict:
     doc.session("multiplayer", "multiplayer")
     doc.session("settings", "settings")
     doc.session("mods", "mods")
-    doc.session("demos", "demos")
     doc.session("updates", "updates")
     doc.session("credits", "credits")
     doc.session("quit", "quit")
@@ -2614,9 +2613,10 @@ def title_document() -> dict:
     nav = group("nav", {**absolute(left=0, top=U * nav_top, width=U * 413), "display": keyword("flex"),
                         "flex-direction": keyword("column")}, buttons)
     doc.bind("nav_continue.display", "nav_continue", "display", {"op": "select", "args": [{"state": "menu_continue"}, "block", "none"]})
-    links = [link(doc, "link_mods", "#str_200010", action="mods"), link(doc, "link_demos", "#str_41500", action="demos"),
-             link(doc, "link_updates", "#str_200011", action="updates"), link(doc, "link_credits", "#str_200012", action="credits"),
-             link(doc, "link_exit", "#str_200013", event="exitModalShow")]
+    # The plinth's secondary links (section 13.7); DEMOS is a Multiplayer
+    # section (section 9).
+    links = [link(doc, "link_mods", "#str_200010", action="mods"), link(doc, "link_updates", "#str_200011", action="updates"),
+             link(doc, "link_credits", "#str_200012", action="credits"), link(doc, "link_exit", "#str_200013", event="exitModalShow")]
     wrap_menu(buttons, links)
     stage = group("home-stage", {**absolute(top=0, width=CANVAS_W, height=720), "left": length(50, "%"), "margin-left": length(-CANVAS_W / 2),
                                  "opacity": number(1)}, [
@@ -2624,7 +2624,7 @@ def title_document() -> dict:
         picture("wordmark", "gfx/guis/mainmenu/q4text", {**absolute(left=U * 6, top=U * 119, width=U * 376, height=U * 92),
                                                           "image-blend": keyword("additive"), "image-color": colour([1, 1, 1, 1])}, fit="fill"),
     ])
-    base = plinth(doc, links, ("#str_200010", "#str_41500", "#str_200011", "#str_200012", "#str_200013"))
+    base = plinth(doc, links, ("#str_200010", "#str_200011", "#str_200012", "#str_200013"))
     reflow_message_line(doc, nav, [row[3] for row in rows], base)
     content = group("home", {**FULL, "transform": transform(), "opacity": number(1)}, [
         group("home-content", {**absolute(top=0, width=CANVAS_W, height=720), "left": length(50, "%"), "margin-left": length(-CANVAS_W / 2)}, [

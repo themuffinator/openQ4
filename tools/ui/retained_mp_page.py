@@ -8,16 +8,18 @@ guis/menu/multiplayer.q4ui as LOAD GAME does to its page
 its label into the title slot, and at 550 ms the page presents in the page
 state Single Player holds, that label its title. It is the stock Multiplayer
 page's level: its sections are the stock page's GAME BROWSER (as JOIN GAME),
-CREATE SERVER and SETTINGS (as PLAYER SETUP, section 13.7's name, which keeps
-it apart from the title's SETTINGS) on the home navigation plates from 181 u,
-with BACK under them, and the stock FRIENDS LIST, hidden in the stock menu and
-handled by nothing, is gone. PLAYER SETUP opens its stock page for now: the
-page leaves as the stock Multiplayer page leaves for one (its plates fade over
-150 ms as it sweeps 640 u toward the trailing edge over 300 ms) and the stock
-page takes over at 500 ms; its Back returns here (multiplayerOpen). JOIN GAME
-and CREATE SERVER go one level deeper to their retained sub-pages where the
-session offers them, as Single Player's CAMPAIGN does, and open their stock
-pages as PLAYER SETUP does where it does not. BACK returns the title.
+CREATE SERVER, DEMOS (the demo library, which section 9 puts here) and
+SETTINGS (as PLAYER SETUP, section 13.7's name, which keeps it apart from the
+title's SETTINGS) on the home navigation plates from 181 u, with BACK under
+them, and the stock FRIENDS LIST, hidden in the stock menu and handled by
+nothing, is gone. JOIN GAME, CREATE SERVER and DEMOS go one level deeper to
+their retained sub-pages where the session offers them, as Single Player's
+CAMPAIGN does; where it does not, JOIN GAME and CREATE SERVER open their stock
+pages (the page leaves as the stock Multiplayer page leaves for one, its plates
+fading over 150 ms as it sweeps 640 u toward the trailing edge over 300 ms,
+and the stock page takes over at 500 ms; its Back returns here,
+multiplayerOpen) and DEMOS opens the legacy demo browser over the page.
+PLAYER SETUP edits in place (retained_player_setup). BACK returns the title.
 """
 from __future__ import annotations
 
@@ -30,13 +32,15 @@ from retained_difficulty import check_fits
 
 NAV_TOP = 181.0    # the stock Multiplayer page's first button (mp_b1)
 SECTIONS = (("join", "#str_200187", "multiplayerJoin"), ("create", "#str_200026", "multiplayerCreate"),
-            ("setup", "#str_231122", "multiplayerSetup"))
+            ("demos", "#str_41500", "multiplayerDemos"), ("setup", "#str_231122", "multiplayerSetup"))
+DESCRIPTION = "#str_231550"    # the page's description, naming its four sections
 DEPART_MS = 300    # the stock page's slide; the stock page arrives at 500 ms
 DETAILS = (210.0, 140.0)    # the content column's box, u
 DETAIL_TEXT, DETAIL_LINE = 18, 26
 # The sections that go deeper: each's place among the sections, its label
 # (which carries to the step's foot) and the name of its enter timeline.
-DEEPER = (("create", 1, "#str_200026", "subpageEnterCreate"), ("join", 0, "#str_200187", "subpageEnterJoin"))
+DEEPER = (("create", 1, "#str_200026", "subpageEnterCreate"), ("join", 0, "#str_200187", "subpageEnterJoin"),
+          ("demos", 2, "#str_41500", "subpageEnterDemos"))
 
 
 def check_multiplayer_fits() -> None:
@@ -46,7 +50,7 @@ def check_multiplayer_fits() -> None:
     labels = [key for _, key, _ in SECTIONS] + ["#str_230045"]
     check_fits(tuple((key, "marine", 24, U * 314 / 1.03) for key in labels) +
                (("#str_200002", "marine", 18, U * PAGE_TITLE_W),),
-               (("#str_231121", "lowpixel", DETAIL_TEXT, U * DETAILS[0], int(U * DETAILS[1] // DETAIL_LINE)),))
+               ((DESCRIPTION, "lowpixel", DETAIL_TEXT, U * DETAILS[0], int(U * DETAILS[1] // DETAIL_LINE)),))
 
 
 def multiplayer_document() -> dict:
@@ -56,12 +60,13 @@ def multiplayer_document() -> dict:
     at 395,190 u, over the lit field; the prompt bar's Select and Back.
     onActivate   every arrival: the plates at once, the description fading in
                  over 150 ms (content.in) and the focus on JOIN GAME; back
-                 from a section (the session sets from_create, from_join or
-                 from_setup first) the focus is on that section;
+                 from a section (the session sets from_create, from_join,
+                 from_demos or from_setup first) the focus is on that section;
     depart       a section opens its stock page: the plates fade over 150 ms
                  while the page sweeps 640 u toward the trailing edge over
                  300 ms, and the title and description go with them;
-    subpageEnterCreate, subpageEnterJoin  CREATE SERVER or JOIN GAME goes
+    subpageEnterCreate, subpageEnterJoin, subpageEnterDemos  CREATE SERVER,
+                 JOIN GAME or DEMOS goes
                  deeper, 350 ms: the plates fade over 150 ms while the page
                  sweeps 640 u toward the trailing edge over 300 ms;
                  MULTIPLAYER becomes the crumb (title.crumb, 150 ms); from
@@ -87,7 +92,7 @@ def multiplayer_document() -> dict:
         buttons.append(navigation_plate(doc, ident, key, action=action))
     buttons.append(navigation_plate(doc, "back", "#str_230045", action="back"))
     wrap_menu(buttons)
-    description = label("description", "#str_231121", {**absolute(left=0, top=0, width=U * DETAILS[0], height=U * DETAILS[1]),
+    description = label("description", DESCRIPTION, {**absolute(left=0, top=0, width=U * DETAILS[0], height=U * DETAILS[1]),
                                                        **typeface("lowpixel", DETAIL_TEXT, DETAIL_LINE, rgb(OLIVE))})
     bands = framing_bands("band")
     page_top, sub_top = transform(*TOP_TO_PAGE), transform(*TOP_TO_SUBPAGE)
@@ -97,12 +102,12 @@ def multiplayer_document() -> dict:
     details = group("details", {**absolute(left=U * 395, top=U * 190, width=U * DETAILS[0], height=U * DETAILS[1]), "opacity": number(0)},
                     [description])
     # The description grows with the text above 100 % (section 2).
-    reflow_details(doc, details, ("#str_231121",))
+    reflow_details(doc, details, (DESCRIPTION,))
     navigation = group("navigation", {**absolute(left=0, top=U * NAV_TOP, width=U * 357), "display": keyword("flex"),
                                       "flex-direction": keyword("column"), "opacity": number(1)}, buttons)
     content = group("content", {**canvas, "transform": transform(), "opacity": number(1)}, [navigation, details])
     # A tall view stands the plates and the description in one column.
-    tall_page(doc, content, navigation, details, ("#str_231121",))
+    tall_page(doc, content, navigation, details, (DESCRIPTION,))
     from retained_player_setup import player_setup
     content["children"].append(player_setup(doc))
     for ident in ("navigation", "details"):

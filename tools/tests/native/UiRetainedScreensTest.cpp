@@ -250,14 +250,14 @@ static void CheckViewSource(ScreenHost& host) {
 }
 
 static const std::set<std::string> SessionCommands = {"continue","singlePlayer","loadGame","saveGame","multiplayer","settings",
-	"mods","demos","updates","credits","quit","resume","menuResume","restartLevel","quitToMenu",
+	"mods","updates","credits","quit","resume","menuResume","restartLevel","quitToMenu",
 	"loadBack","loadSelect","loadSave","loadDelete","loadNewer","loadOlder","loadNewGame",
 	"saveListRefresh","saveListSort","saveListFilterManual","saveListFilterAuto","saveListClear",
 	"saveBack","saveSelect","saveSave","saveOverwrite","saveNewer","saveOlder","restartBack","restartGo",
 	"demosBack","demosSelect","demosPlay","demosDelete","demosRefresh","demosFilter","demosNewer","demosOlder","modsSelect","modsLoad","deathRestart","deathLoad","deathMenu","creditsBack",
 	"arenaBack","arenaTier0","arenaTier1","arenaTier2","arenaTier3","arenaTier4","arenaMatch0","arenaMatch1","arenaMatch2","arenaMatch3",
 	"arenaTierPrevious","arenaTierNext","arenaEasier","arenaHarder","arenaStart","arenaReset","arenaResetConfirm","arenaResetCancel","arenaRetry","arenaDismiss",
-	"multiplayerJoin","multiplayerCreate","multiplayerSetup","multiplayerBack","playerSetupClose",
+	"multiplayerJoin","multiplayerCreate","multiplayerDemos","multiplayerSetup","multiplayerBack","playerSetupClose",
 	"createBack","createMap","createStart","createName","createMapCycle","createPassword","createRconPassword","createMapsNewer",
 	"createMapsOlder","createBanList","createBanPick","createBanRemove",
 	"joinBack","joinPick","joinServer","joinNewer","joinOlder","joinRefresh","joinNewList","joinSourceInternet","joinSourceLan",
@@ -2468,9 +2468,10 @@ static void CheckRestartPage(ScreenHost& host, const char* path, bool strogg = f
 	Check(first.y+36*u > second.y && runtime.GetControlState("skill-0") == ControlState::Hover,"the foot of PRIVATE's band is PRIVATE's");
 }
 
-// The Demos page (FLOW-013): the library under its filter tags, the selected
-// demo's picture and lines, PLAY, DELETE and REFRESH, the confirmation that
-// names the demo, and the empty states. The session's verbs run through the
+// The Demos sub-page (FLOW-013, FLOW-050): the library under its filter tags,
+// the selected demo's picture and lines, PLAY, DELETE and REFRESH, the
+// confirmation that names the demo, and the empty states, in the sub-page
+// frame under the MULTIPLAYER crumb. The session's verbs run through the
 // runtime.
 static void CheckDemosPage(ScreenHost& host, const char* path) {
 	const auto source = Read(path);
@@ -2485,8 +2486,8 @@ static void CheckDemosPage(ScreenHost& host, const char* path) {
 		Check(found != document.Model().actions.end() && std::get<std::string>(found->second.arguments.at("command").literal) == command,
 			"each of the page's actions asks the session");
 	}
-	Check(!document.Model().FindNode("band-top") && document.Model().FindNode("demo-title"),
-		"the page is its content and its own title: the home that handed off draws the frame behind it");
+	Check(document.Model().FindNode("band-top") && document.Model().FindNode("crumb") && document.Model().FindNode("title") &&
+		!document.Model().FindNode("demo-title"),"the sub-page draws its own frame: the MULTIPLAYER crumb and its title at the step's foot");
 	Runtime runtime(host);
 	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/demos.q4ui",diagnostics),"the page loads into a runtime");
 	Viewport viewport; viewport.canvasHeight = 720; viewport.width = 1280; viewport.height = 720;
@@ -2542,7 +2543,7 @@ static void CheckDemosPage(ScreenHost& host, const char* path) {
 		"no empty state, failure or pager");
 	Check(text("tag-mvd-plate","display") == "block" && text("tag-mvd-plate-set","display") == "none" && text("tag-mvd-cross","display") == "none",
 		"no filter is set");
-	// Arriving: the panel and its title fade in over 150 ms and the newest demo has focus.
+	// Arriving: the panel fades in over 150 ms and the newest demo has focus.
 	Check(runtime.RunEvent("onActivate",2,effects,error),"the page arrives");
 	runtime.Frame(viewport,2.001);
 	Check(number("demo-panel","opacity") < .05f,"the panel starts out");
@@ -3030,8 +3031,8 @@ static void CheckArenaPage(ScreenHost& host, const char* pagePath, const char* p
 }
 
 // The Multiplayer page (FLOW-050): the stock Multiplayer page's level in the
-// page state. JOIN GAME, CREATE SERVER and PLAYER SETUP ask the session for
-// their stock pages and BACK for the title; a section's choice sends the page
+// page state. JOIN GAME, CREATE SERVER, DEMOS and PLAYER SETUP ask the session
+// for their pages and BACK for the title; a section's choice sends the page
 // away as the stock page leaves for one (its plates fade over 150 ms while it
 // sweeps 640 u toward the trailing edge over 300 ms), and hidden it rests.
 static void CheckMultiplayerPage(ScreenHost& host, const char* path) {
@@ -3041,7 +3042,7 @@ static void CheckMultiplayerPage(ScreenHost& host, const char* path) {
 	Check(diagnostics.empty() && document.Model().id == "openq4.multiplayer" && document.Model().canvasHeight == 720,"the Multiplayer page validates");
 	CheckSessionActions(document);
 	const std::pair<const char*,const char*> verbs[] = {{"back","multiplayerBack"},{"multiplayerJoin","multiplayerJoin"},
-		{"multiplayerCreate","multiplayerCreate"},{"multiplayerSetup","multiplayerSetup"}};
+		{"multiplayerCreate","multiplayerCreate"},{"multiplayerDemos","multiplayerDemos"},{"multiplayerSetup","multiplayerSetup"}};
 	for (const auto& [action, command] : verbs) {
 		const auto found = document.Model().actions.find(action);
 		Check(found != document.Model().actions.end() && std::get<std::string>(found->second.arguments.at("command").literal) == command,
@@ -3061,9 +3062,9 @@ static void CheckMultiplayerPage(ScreenHost& host, const char* path) {
 	runtime.Frame(viewport,0.5);
 	// The 4:3 canvas at 1280x720: x = 160 dp, 1 u = 1.5 dp.
 	const float x0 = 160, u = 1.5f;
-	const char* const rows[] = {"join","create","setup","back"};
-	const char* const keys[] = {"#str_200187","#str_200026","#str_231122","#str_230045"};
-	for (int row = 0; row < 4; ++row) {
+	const char* const rows[] = {"join","create","demos","setup","back"};
+	const char* const keys[] = {"#str_200187","#str_200026","#str_41500","#str_231122","#str_230045"};
+	for (int row = 0; row < 5; ++row) {
 		const std::string label = std::string(rows[row]) + "-label";
 		const auto box = bounds(label);
 		Check(Near(box.x,x0+44*u) && Near(box.y,(181+30*row+2.8f)*u,.05f) && text(label,"text") == keys[row],
@@ -3071,7 +3072,7 @@ static void CheckMultiplayerPage(ScreenHost& host, const char* path) {
 	}
 	const auto title = bounds("title"), details = bounds("details");
 	Check(Near(title.x,x0+39*u,1) && Near(title.y,19*u,1) && text("title","text") == "#str_200002","MULTIPLAYER titles the page in the top band's slot");
-	Check(Near(details.x,x0+395*u) && Near(details.y,190*u) && text("description","text") == "#str_231121",
+	Check(Near(details.x,x0+395*u) && Near(details.y,190*u) && text("description","text") == "#str_231550",
 		"the description stands in the content column");
 	Check(Near(value("band-top","transform",0),323*u,.05f) && Near(value("band-top","transform",1),-63*u,.05f),"the top band is docked");
 	// Arriving: the plates at once, the description fading in over 150 ms.

@@ -192,6 +192,7 @@ typedef enum {
 	RETAINED_SUBPAGE_ARENA,			// Single Player's Arena
 	RETAINED_SUBPAGE_CREATE_SERVER,	// Multiplayer's Create Server
 	RETAINED_SUBPAGE_JOIN_GAME,		// Multiplayer's Join Game, the server browser
+	RETAINED_SUBPAGE_DEMOS,			// Multiplayer's Demos, the demo library
 	RETAINED_SUBPAGE_SETTINGS_CONTROLS,	// Settings' CONTROLS
 	RETAINED_SUBPAGE_SETTINGS_GAME,	// Settings' GAME OPTIONS
 	RETAINED_SUBPAGE_SETTINGS_AUDIO,	// Settings' AUDIO
@@ -407,6 +408,8 @@ public:
 	void				PublishRetainedDemoRows( idUserInterface *gui );
 	void				PublishRetainedDemoSelection( idUserInterface *gui, const char *error );
 	void				HandleRetainedDemosRequest( idUserInterface *gui, const char *request );
+	idUserInterface *	RetainedDemosPage();
+	void				OpenRetainedDemos();
 	// The Arena page's verbs, which run the Arena campaign's own commands.
 	void				HandleRetainedArenaRequest( idUserInterface *gui, const char *request );
 	// The retained Multiplayer page (guis/menu/multiplayer.q4ui), which the

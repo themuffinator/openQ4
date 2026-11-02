@@ -9,7 +9,8 @@ switch between active players or use a free camera.
 
 openQ4 also has one **Demos** library for native MVDs, openQ4 render demos,
 developer command demos, unsupported retail recordings, and incomplete files.
-Choose **Demos** on the main menu, or enter `demoMenu` in the console. The
+Choose **Multiplayer > Demos** on the main menu (with the classic menus,
+**Demos** on the main menu), or enter `demoMenu` in the console. The
 browser can filter **All**, **Multi-view**, **Render**, **Legacy**, and
 **Incomplete** entries and shows the detected type, map, date, duration, and
 playback status.

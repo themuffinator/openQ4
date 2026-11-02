@@ -1,5 +1,6 @@
-"""The retained Demos page (docs/dev/ui-visual-design.md sections 9 and 13.13,
-FLOW-013): the title's DEMOS opens it as LOAD GAME opens its page.
+"""The retained Demos sub-page (docs/dev/ui-visual-design.md sections 9 and
+13.13, FLOW-013, FLOW-050): DEMOS on the Multiplayer page goes one level
+deeper to it, as CREATE SERVER and JOIN GAME do to theirs.
 
 Built by tools/ui/build_retained_screens.py, which writes and checks it with
 the other retained screens. The page is the Load Game page's construction for
@@ -22,22 +23,21 @@ With no demos the list's place is the empty state of section 13.13: a heading
 and one sentence, which says so when a filter hides every demo and then offers
 CLEAR FILTERS, the action that fixes it.
 
-The page title, DEMOS, fades in with the panel (content.in), as a stock page's
-own title does when nothing carried it.
+It stands in the sub-page frame (retained_subpage): MULTIPLAYER as the crumb,
+DEMOS carried to the step's foot, and Back climbing out onto DEMOS.
 """
 from __future__ import annotations
 
-from build_retained_screens import fit_narrow
-from build_retained_screens import (CANVAS_W, FULL, LANGUAGES, OLIVE, ORANGE, TITLE_SLOT, U, VERB_DELETE, VERB_PLAY,
-                                    Document, absolute, action_plate, colour, confirmation, font, group, keyword, label, length, number,
-                                    objectives_scrollbar, page_prompts, path, rgb, row_prompt, solid, stroke, text_width, track,
-                                    typeface, vector)
+from build_retained_screens import (LANGUAGES, OLIVE, ORANGE, U, VERB_DELETE, VERB_PLAY, Document, absolute, action_plate, colour,
+                                    confirmation, group, keyword, label, length, number, objectives_scrollbar, page_prompts, path, rgb,
+                                    row_prompt, solid, stroke, text_width, typeface, vector)
 from retained_saves import (ERROR, ERROR_LINE, ERROR_STRIP, HEADING, LIST_H, LIST_LEFT, LIST_TOP, LIST_W, PLACEHOLDER, PREVIEW,
-                            ROW_H, ROW_W, RULE_Y, backing, bind_selected, lines_needed, pager_row, picture_frame, row_plates, row_states,
+                            ROW_H, ROW_W, RULE_Y, bind_selected, lines_needed, pager_row, picture_frame, row_plates, row_states,
                             section_plate, table_text)
+from retained_subpage import subpage_document
 
 ROWS = 64                      # RETAINED_DEMO_ROWS in the session: the demos the list holds at a time
-TITLE = "#str_41500"           # DEMOS, the plinth link that opens the page
+TITLE = "#str_41500"           # DEMOS, the Multiplayer page's section that opens the sub-page
 DETAIL_LEFT, DETAIL_W, KIND_TOP, STATUS_TOP, NOTE_TOP = 37.0, 165.0, 215.0, 230.0, 245.0
 # The plates and headings in capitals, as Join Game's and the save pages'
 # are (RmlUi's text-transform changes ASCII letters only): the pages' PLAY
@@ -278,34 +278,21 @@ def demos_document() -> dict:
              {"op": "select", "args": [{"op": "==", "args": [{"state": "demos.filter"}, 0]}, "#str_231115", "#str_231118"]})
 
     back = page_prompts(doc, "demo_back", action="back", verbs=(VERB_PLAY, VERB_DELETE))
-    title = label("demo-title", TITLE, {**absolute(left=U * TITLE_SLOT[0], top=U * TITLE_SLOT[1], width=U * 300, height=U * 24.4 * 0.75),
-                  **typeface("marine", 18, U * 24.4 * 0.75, [1, 1, 1, 0.5]), "white-space": keyword("nowrap")})
-    # The plates show at once; the title, the panel and the backing fade in
-    # over 150 ms (content.in), as a stock page's do. The plates follow the
-    # panel, whose full-size box would take their hits.
-    panel = group("demo-panel", {**FULL, "opacity": number(1)}, [title, *shot_parts, error, kind, status, note, *tags, *headings,
-                                                                  viewport, scrollbar, empty, back])
-    stage = group("demo-stage", {**absolute(top=0, width=CANVAS_W, height=720), "left": length(50, "%"), "margin-left": length(-CANVAS_W / 2)},
-                  [panel, *plates])
-
     modal = confirmation(doc, "deleteModal", "#str_41556", PLACEHOLDER, None, yes_event="deleteConfirmed")
     doc.bind("deleteModal-body.text", "deleteModal-body", "text", {"state": "demos.confirm"})
     doc.events["deleteConfirmed"] = [{"op": "call", "event": "deleteModalHide"}, {"op": "action", "action": "delete"}]
 
-    doc.timelines.add("arrive", 150, [track(node, "opacity", [(0, number(0)), (1, number(0)), (150, number(1))])
-                                      for node in ("demo-panel", "demo-backing")])
-    doc.timelines.add("rest", 1, [track(node, "opacity", [(0, number(0)), (1, number(0))]) for node in ("demo-panel", "demo-backing")])
     # Each arrival focuses the first row (the newest demo, selected), else
     # REFRESH; the last request wins.
     focus = [{"op": "focus", "control": "demo_refresh"},
              {"op": "if", "condition": {"op": ">", "args": [{"state": "demos.count"}, 0]}, "then": [{"op": "focus", "control": "row-0"}]}]
-    doc.events["onActivate"] = [{"op": "playTimeline", "timeline": "arrive"}, *focus]
-    doc.events["onDeactivate"] = [{"op": "playTimeline", "timeline": "rest"}]
     doc.events["pagedOlder"] = [{"op": "focus", "control": "row-0"}]
     doc.events["pagedNewer"] = [{"op": "focus", "control": f"row-{ROWS - 1}"}]
-    root = group("screen", {**FULL, "font-family": font("marine"), "font-size": length(16), "color": colour([1, 1, 1, 0.8])},
-                 [backing("demo-backing"), stage, modal])
-    return tall_demos_page(fit_narrow(doc.build(root), pages=True, stretch=("demo-list",)))
+    # The plates come after the panel's other parts, so its full-size box
+    # never takes their hits.
+    return tall_demos_page(subpage_document(doc, "demo", "#str_200002", TITLE, "demo_refresh",
+                                            [*shot_parts, error, kind, status, note, *tags, *headings, viewport, scrollbar, empty,
+                                             back, *plates], [modal], stretch=("demo-list",), activate=focus))
 
 
 # A tall view's Demos page (retained_tall, as the Load page's): the filter
