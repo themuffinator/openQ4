@@ -9,17 +9,17 @@ static Viewport RemasteredViewport(int width, int height) {
 	return viewport;
 }
 
-// The engine peer's layout values for a viewport (RetainedHud.cpp).
+// The engine peer's layout values for a viewport and the window's safe-area
+// insets it carries (RetainedHud.cpp, through the shared HudLayoutFor).
+static StateValues RemasteredLayout(const Viewport& viewport, float scale = 1, float insetPercent = 0, int hudWidth = 1) {
+	const auto layout = HudLayoutFor(float(viewport.width),float(viewport.height),viewport.DpRatio(),
+		{viewport.safeLeft,viewport.safeTop,viewport.safeRight,viewport.safeBottom},hudWidth,insetPercent,scale);
+	return {{"hud.width",double(layout.width)},{"hud.height",double(layout.height)},{"hud.left",double(layout.left)},
+		{"hud.right",double(layout.right)},{"hud.top",double(layout.top)},{"hud.bottom",double(layout.bottom)},
+		{"hud.scale",double(layout.scale)},{"hud.centerScale",double(layout.centerScale)}};
+}
 static StateValues RemasteredLayout(int width, int height, float scale = 1, float insetPercent = 0, int hudWidth = 1) {
-	const float ratio = std::min(height/720.f,width/960.f);
-	const float w = width/ratio, h = height/ratio;
-	const float cap = hudWidth == 0 ? 1280.f : hudWidth == 1 ? 720.f*64.f/27.f : w;
-	const float side = std::max(0.f,(w-std::min(w,cap))*.5f);
-	const float inset = insetPercent*.01f;
-	const float span = w-2*(side+inset*w);
-	return {{"hud.width",double(w)},{"hud.height",double(h)},{"hud.left",double(side+inset*w)},{"hud.right",double(side+inset*w)},
-		{"hud.top",double(inset*h)},{"hud.bottom",double(inset*h)},{"hud.scale",double(scale)},
-		{"hud.centerScale",double(std::min(scale,std::max(.25f,span/690.f)))}};
+	return RemasteredLayout(RemasteredViewport(width,height),scale,insetPercent,hudWidth);
 }
 
 // The HUD layout preference the documents read (ui_hudLayout: 1 Remastered, 2 Minimal).
@@ -28,6 +28,221 @@ static void RemasteredLayoutPreference(ScreenHost& host, double layout) { host.c
 static bool Shown(const Runtime& runtime, const std::string& id) {
 	const auto value = runtime.PresentedValue(id,"display");
 	return value && value->text != "none";
+}
+
+// Section 13.3 and LAY-016 on the HUD, with the window's safe-area insets of
+// a phone in portrait and in landscape. Every node placed on an edge anchor
+// (its box follows hud.left, hud.top, hud.right or hud.bottom) keeps those
+// edges inside the safe area, and so does everything a readout on one draws
+// (each text, vector and picture under it that shows). A draw belongs to the
+// readout whose box holds all of it, since boxes run wider than their words
+// and art. What a twin without insets draws past an edge of the view (the
+// objectives bar, art past the stock canvas) may run under that edge's inset;
+// what it keeps on the screen must stay in the safe area. The root, and every
+// full-screen effect filling it, still fills the view, and a view that loses
+// its insets lays out as the twin.
+static void CheckRemasteredHudSafeArea(ScreenHost& host, const char* path) {
+	const auto source = Read(path);
+	Document document; std::vector<Diagnostic> diagnostics;
+	Check(document.Load(source,diagnostics),"a Remastered HUD loads for the safe-area probe");
+	const auto& model = document.Model();
+	std::string name = path;
+	std::replace(name.begin(),name.end(),'\\','/');
+	name = name.substr(name.rfind("guis/"));
+	const std::function<bool(const Expression&)> edge = [&](const Expression& expression) {
+		return expression.state == "hud.left" || expression.state == "hud.top" || expression.state == "hud.right" ||
+			expression.state == "hud.bottom" || std::any_of(expression.args.begin(),expression.args.end(),edge);
+	};
+	std::map<std::string,std::set<std::string>> placed;   // each edge-placed node's anchored edges
+	for (const auto& binding : model.bindings)
+		if ((binding.property == "left" || binding.property == "top" || binding.property == "right" || binding.property == "bottom") &&
+			std::any_of(binding.values.begin(),binding.values.end(),edge)) placed[binding.node].insert(binding.property);
+	struct Readout { std::string id; std::vector<std::string> ancestors, clips; };
+	std::vector<Readout> readouts, fills;
+	std::vector<std::string> ancestors, clips;
+	const auto full = [](const Node& node) {
+		const auto length = [&](const char* key, double value, const char* unit) {
+			const auto found = node.properties.find(key);
+			return found != node.properties.end() && found->second.data[0] == value && found->second.unit == unit;
+		};
+		return length("left",0,"dp") && length("top",0,"dp") && length("width",100,"%") && length("height",100,"%");
+	};
+	const std::function<void(const Node&,bool,bool)> collect = [&](const Node& node, bool on, bool filling) {
+		on = on || placed.contains(node.id);
+		filling = filling && (node.id == model.root.id || full(node));
+		if (on && node.type != "group") readouts.push_back({node.id,ancestors,clips});
+		if (filling && node.id != model.root.id) fills.push_back({node.id,ancestors,clips});
+		// A clipping group or a mask bounds what shows of its subtree.
+		const auto overflow = node.properties.find("overflow");
+		const bool clipping = node.mask.has_value() || (overflow != node.properties.end() && overflow->second.text != "visible");
+		ancestors.push_back(node.id);
+		if (clipping) clips.push_back(node.id);
+		for (const auto& child : node.children) collect(child,on,filling);
+		if (clipping) clips.pop_back();
+		ancestors.pop_back();
+	};
+	collect(model.root,false,true);
+	const auto savedCVars = host.cvars;
+	RemasteredLayoutPreference(host,1);
+	// `runtime` takes the insets; `twin` is driven alike and never has them.
+	Runtime runtime(host), twin(host); std::string error; Runtime::EventEffects effects;
+	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/hud/safe-area.q4ui",diagnostics) && twin.Initialize() &&
+		twin.LoadDocument(source,"guis/hud/safe-area.q4ui",diagnostics),"the HUD loads into a runtime and its twin for the safe-area probe");
+	StateValues values;
+	for (const auto& [key,value] : StateValues{{"player_health",100.0},{"player_healthpct",1.0},{"player_armor",57.0},{"player_armorpct",.57},
+		{"player_ammo",36.0},{"player_totalammo",50.0},{"player_clip_size",50.0},{"player_ammopct",.72},{"player_weapon",5.0},
+		{"ammoIcon",std::string("item_nailgun")},{"weapicon",std::string("gun_nailgun")},{"weapon0",true},{"weapon5",true},
+		{"weapon5_index",1.0},{"weapon5_ammo",86.0},{"weaponcount",2.0},{"player_idealweapon",5.0},{"weaponname",std::string("NAILGUN")},
+		{"itemtext",std::string("Armor Shard")},{"itemicon",std::string("item_armorshard")},{"vehicle_health",1.0}})
+		if (model.state.contains(key)) values[key] = value;
+	const auto both = [&](const StateValues& state, double now) {
+		return runtime.SetState(state,error,now) && twin.SetState(state,error,now);
+	};
+	const auto run = [&](const std::string& event, double now) {
+		return runtime.RunEvent(event,now,effects,error) && twin.RunEvent(event,now,effects,error);
+	};
+	double now = 0;
+	Check(both(values,now) && run("hudJoin",now),"the HUD joins for the safe-area probe");
+	// Everything that comes up, at once, for each shape: notices, pickups, the
+	// strip, the transmission display, boss bars, warnings and messages. The
+	// interactive brackets follow their target in the world: no readout.
+	const auto raises = [](const std::string& event) {
+		if (event.find("Brackets") != std::string::npos) return false;
+		for (const char* prefix : {"hide","fade","clear","oq4_close","leave","hudJoin","onInit"}) if (event.starts_with(prefix)) return false;
+		for (const char* suffix : {"Done","done","Down","_off","Off","Out","Hide","Clear"}) if (event.ends_with(suffix)) return false;
+		return true;
+	};
+	std::vector<std::string> raised;
+	for (const auto& [event,program] : model.events) if (raises(event)) raised.push_back(event);
+	const auto hidden = [](Runtime& view, const std::string& id) {
+		const auto display = view.PresentedValue(id,"display");
+		const auto opacity = view.PresentedValue(id,"opacity");
+		return (display && display->text == "none") || (opacity && opacity->type == ValueType::Number && opacity->data[0] <= 0);
+	};
+	const auto concealed = [&](Runtime& view, const Readout& readout) {
+		return hidden(view,readout.id) || std::any_of(readout.ancestors.begin(),readout.ancestors.end(),[&](const auto& id) { return hidden(view,id); });
+	};
+	// What shows of a readout: its box inside every clipping group over it.
+	const auto shown = [&](Runtime& view, const Readout& readout, Bounds& box) {
+		if (concealed(view,readout) || !view.GetBounds(readout.id,box)) return false;
+		float left = box.x, top = box.y, right = box.x+box.width, bottom = box.y+box.height;
+		for (const auto& clip : readout.clips) {
+			Bounds frame;
+			if (!view.GetBounds(clip,frame)) return false;
+			left = std::max(left,frame.x); top = std::max(top,frame.y);
+			right = std::min(right,frame.x+frame.width); bottom = std::min(bottom,frame.y+frame.height);
+		}
+		box = {left,top,right-left,bottom-top};
+		return box.width >= 1 && box.height >= 1;
+	};
+	const auto snapshot = [&](Runtime& view) {
+		std::map<std::string,Bounds> boxes;
+		for (const auto& readout : readouts) {
+			Bounds box;
+			if (shown(view,readout,box)) boxes[readout.id] = box;
+		}
+		return boxes;
+	};
+	// Each readout's drawing: the lit extent of every draw its box holds whole
+	// (the smallest box holding it wins).
+	struct Extent { float x0 = 1e9f, y0 = 1e9f, x1 = -1e9f, y1 = -1e9f; };
+	const auto drawings = [&](Runtime& view) {
+		std::vector<std::pair<const Readout*,Bounds>> regions;
+		for (const auto& readout : readouts) {
+			Bounds box;
+			if (!concealed(view,readout) && view.GetBounds(readout.id,box) && box.width > 0 && box.height > 0) regions.push_back({&readout,box});
+		}
+		std::map<std::string,std::vector<Extent>> result;
+		for (const auto& draw : host.draws) {
+			Extent lit;
+			for (const auto& vertex : draw.vertices) if (vertex.a > 0) {
+				lit.x0 = std::min(lit.x0,vertex.x); lit.y0 = std::min(lit.y0,vertex.y); lit.x1 = std::max(lit.x1,vertex.x); lit.y1 = std::max(lit.y1,vertex.y);
+			}
+			if (lit.x1 < lit.x0) continue;
+			const Readout* owner = nullptr; float area = 0;
+			for (const auto& [readout,box] : regions)
+				if (lit.x0 >= box.x-1 && lit.y0 >= box.y-1 && lit.x1 <= box.x+box.width+1 && lit.y1 <= box.y+box.height+1 &&
+					(!owner || box.width*box.height < area)) owner = readout, area = box.width*box.height;
+			if (owner) result[owner->id].push_back(lit);
+		}
+		return result;
+	};
+	for (const auto& shape : {SafeShape{1080,2400,0,96,0,48},SafeShape{2400,1080,96,0,24,40}}) {
+		const Viewport plain = RemasteredViewport(shape.width,shape.height);
+		Check(both(RemasteredLayout(plain),now += .1),"the HUD takes a view without insets");
+		for (const auto& event : raised) Check(run(event,now += .001),"a HUD event runs for the safe-area probe");
+		runtime.Frame(plain,now += .5); twin.Frame(plain,now);
+		Viewport viewport = plain;
+		viewport.safeLeft = shape.left; viewport.safeTop = shape.top; viewport.safeRight = shape.right; viewport.safeBottom = shape.bottom;
+		const auto inset = RemasteredLayout(viewport);
+		Check(runtime.SetState(inset,error,now += .1),error.c_str());
+		host.draws.clear();
+		runtime.Frame(viewport,now += .5);
+		const auto drawn = drawings(runtime);
+		host.draws.clear();
+		twin.Frame(plain,now);
+		const auto unset = drawings(twin);
+		const float w = float(shape.width), h = float(shape.height), dp = viewport.DpRatio();
+		Check(Near(dp,std::min((h-shape.top-shape.bottom)/720,(w-shape.left-shape.right)/960),.0001f),"the HUD canvas fits the safe area");
+		Check(Near(float(std::get<double>(inset.at("hud.top"))*dp),shape.top,.01f) &&
+			Near(float(std::get<double>(inset.at("hud.bottom"))*dp),shape.bottom,.01f) &&
+			float(std::get<double>(inset.at("hud.left"))*dp) >= shape.left-.01f && float(std::get<double>(inset.at("hud.right"))*dp) >= shape.right-.01f,
+			"each edge anchor keeps at least the window's inset");
+		const auto fillsView = [&](const std::string& id) {
+			Bounds box;
+			const bool filled = runtime.GetBounds(id,box) && Near(box.x,0,1) && Near(box.y,0,1) && Near(box.width,w,1) && Near(box.height,h,1);
+			if (!filled) std::fprintf(stderr,"%s %gx%g: %s at %.1f,%.1f %.1fx%.1f does not fill the view\n",name.c_str(),w,h,id.c_str(),
+				box.x,box.y,box.width,box.height);
+			return filled;
+		};
+		Check(fillsView(model.root.id) && std::all_of(fills.begin(),fills.end(),[&](const auto& fill) { return concealed(runtime,fill) || fillsView(fill.id); }),
+			"the HUD root and the full-screen effects filling it stay full-bleed");
+		const float left = shape.left-1, top = shape.top-1, right = w-shape.right+1, bottom = h-shape.bottom+1;
+		size_t outside = 0;
+		for (const auto& [id,edges] : placed) {
+			Bounds box;
+			if (!runtime.GetBounds(id,box) || (box.width <= 0 && box.height <= 0)) continue;
+			if ((!edges.contains("left") || box.x >= left) && (!edges.contains("top") || box.y >= top) &&
+				(!edges.contains("right") || box.x+box.width <= right) && (!edges.contains("bottom") || box.y+box.height <= bottom)) continue;
+			std::fprintf(stderr,"%s %dx%d: %s at %.1f,%.1f %.1fx%.1f puts an anchored edge outside the safe area %.0f,%.0f-%.0f,%.0f\n",
+				name.c_str(),shape.width,shape.height,id.c_str(),box.x,box.y,box.width,box.height,left+1,top+1,right-1,bottom-1);
+			++outside;
+		}
+		size_t owned = 0;
+		for (const auto& [id,extents] : drawn) {
+			// The edges past which the twin draws this readout off the screen.
+			bool offLeft = false, offTop = false, offRight = false, offBottom = false;
+			if (const auto found = unset.find(id); found != unset.end()) for (const auto& lit : found->second) {
+				offLeft = offLeft || lit.x0 < -1; offTop = offTop || lit.y0 < -1; offRight = offRight || lit.x1 > w+1; offBottom = offBottom || lit.y1 > h+1;
+			}
+			for (const auto& lit : extents) {
+				++owned;
+				if ((offLeft || lit.x0 >= left) && (offTop || lit.y0 >= top) && (offRight || lit.x1 <= right) && (offBottom || lit.y1 <= bottom)) continue;
+				std::fprintf(stderr,"%s %dx%d: %s draws at %.1f,%.1f-%.1f,%.1f, outside the safe area %.0f,%.0f-%.0f,%.0f\n",name.c_str(),shape.width,
+					shape.height,id.c_str(),lit.x0,lit.y0,lit.x1,lit.y1,left+1,top+1,right-1,bottom-1);
+				++outside;
+			}
+		}
+		Check(placed.empty() || owned > 0,"the safe-area probe sees readouts drawn on the edge anchors");
+		Check(outside == 0,"every edge anchor and every readout on one stands in the safe area");
+		// The insets go: every readout returns to where the twin has it.
+		Check(runtime.SetState(RemasteredLayout(plain),error,now += .1),error.c_str());
+		runtime.Frame(plain,now += .5); twin.Frame(plain,now);
+		const auto after = snapshot(runtime), still = snapshot(twin);
+		Check(after.size() == still.size() && std::all_of(still.begin(),still.end(),[&](const auto& entry) {
+			const auto found = after.find(entry.first);
+			const Bounds box = found != after.end() ? found->second : Bounds{-1,-1,-1,-1};
+			const bool same = Near(box.x,entry.second.x,.01f) && Near(box.y,entry.second.y,.01f) && Near(box.width,entry.second.width,.01f) &&
+				Near(box.height,entry.second.height,.01f);
+			if (!same) std::fprintf(stderr,"%s %dx%d: %s stands at %.1f,%.1f %.1fx%.1f, not at %.1f,%.1f %.1fx%.1f\n",name.c_str(),shape.width,
+				shape.height,entry.first.c_str(),box.x,box.y,box.width,box.height,entry.second.x,entry.second.y,entry.second.width,entry.second.height);
+			return same;
+		}),"a HUD that loses its insets lays every readout out as one that never had them");
+	}
+	std::printf("%s: %zu edge-placed nodes, %zu readouts, %zu full-screen layers, %zu events raised\n",name.c_str(),placed.size(),readouts.size(),
+		fills.size(),raised.size());
+	Check(host.errors == 0,"no HUD safe-area diagnostics");
+	host.cvars = savedCVars;
 }
 
 // Grain must cover the full swept area, including the instant either side

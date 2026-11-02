@@ -138,6 +138,47 @@ stock layout, drawn through the [HUD presentation bridge](hud-coverage.md).
 Settings > Game Options > HUD sets all four (HUD Layout, HUD Size, HUD Width
 and Safe Area Inset); see the [settings structure](../settings-menu-structure.md).
 
+### The window's safe area (2 November 2026)
+
+On a phone, or any window that draws under a camera cutout, rounded corners,
+a status bar or a gesture bar, the Remastered and Minimal readouts keep clear
+of them (visual specification section 13.3, `LAY-016`). The platform reports
+the clear area as the window's safe area
+([retained screens](retained-screens.md#the-windows-safe-area-1-november-2026));
+each edge anchor takes the larger of its own distance (the side screen beyond
+the HUD Width cap plus the player's Safe Area Inset) and the window's inset on
+that edge. A cutout inside an empty side screen therefore moves nothing, and a
+deeper Safe Area Inset keeps its place. The HUD documents' 720 dp canvas fits
+the safe area, as the menus' does, and the engine peer measures its anchors
+with that same ratio (`HudLayoutFor` in `src/ui/retained/Hud.h`). The root
+still fills the window, so the crosshair and the other center-anchor groups
+stay on the true projection center and every layer that fills the root stays
+full-bleed. The view effects and weapon scopes are documents of their own that
+fill the window and take no inset. The status bar's narrow-view fit
+measures the span between the deeper side anchor and its mirror, so a
+one-sided cutout cannot push the centered bar under it.
+
+Desktop windows report no inset, so every layout presents as before.
+`ui_retainedSafeArea "left top right bottom"` (pixels, unarchived) sets test
+insets on a desktop. Classic keeps the stock layout and reads no inset, and
+multiplayer objective markers keep their own Safe Area Inset margin.
+The center-left and center-right anchors stay centered on the view's height,
+so unequal top and bottom insets shift their canvas by half the difference
+toward the deeper inset; at the phone shapes below, only art that was already
+off the screen reaches it. The center anchor never moves.
+
+`openq4-ui-hud` checks the anchors at every view, scale, inset and width with
+and without window insets. `openq4-ui-remastered-hud` lays out every Remastered
+document at 1080x2400 (insets 0, 96, 0 and 48 px) and 2400x1080 (96, 0, 24
+and 40 px) with every event that raises something run at once. Each edge
+anchor's anchored edges stand inside the safe area, and so does everything
+each text, vector and picture on one draws; a draw belongs to the readout
+whose box holds it whole, since text and vector boxes run wider than their
+words and art. Art that a twin without insets already draws off the screen
+(the objectives bar, the vehicles' electric warning below the stock canvas)
+may run under that edge's inset. The root and the layers filling it fill the
+view, and a view that loses its insets lays every readout out as the twin.
+
 Classic suppresses legacy edge expansion for the stock HUD families and keeps
 their centered 4:3 canvas. Its vector catalog has separate beveled Marine and
 Strogg fills, armor cells, measured traces clipped to the plate, and an inner

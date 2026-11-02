@@ -507,18 +507,17 @@ bool idRemasteredHud::Draw(const idUserInterfaceLocal& legacy,int time) {
 	}
 	// The layout of section 14.4 in canvas dp: the 720 dp high (960 dp wide
 	// below 4:3) canvas, its side screens capped by the HUD width setting, the
-	// safe inset on every edge and the independent HUD scale.
+	// safe inset or the window's safe area on every edge and the independent
+	// HUD scale. The canvas fits the safe area, as the document's runtime does.
 	openq4::ui::Viewport viewport;
 	if (!RetainedUI_DefaultViewport(viewport)) return false;
-	const float ratio=Min(viewport.height/720.f,viewport.width/960.f);
+	viewport.canvasHeight=720; viewport.canvasMinWidth=960; viewport.fitScale=1;
+	const float ratio=viewport.DpRatio();
 	if (!(ratio>0)) return false;
-	const float width=viewport.width/ratio,height=viewport.height/ratio;
-	const float cap=ui_hudWidth.GetInteger()==0 ? 1280.f : ui_hudWidth.GetInteger()==1 ? 720.f*64.f/27.f : width;
-	const float side=Max(0.f,(width-Min(width,cap))*.5f);
-	const float inset=idMath::ClampFloat(0,10,cvarSystem->GetCVarFloat("ui_hudSafeInset"))*.01f;
-	const float scale=idMath::ClampFloat(.5f,2.f,cvarSystem->GetCVarFloat("ui_hudScale"));
-	const float span=width-2*(side+inset*width);
-	float top=inset*height;
+	const auto layout=openq4::ui::HudLayoutFor(float(viewport.width),float(viewport.height),ratio,
+		{viewport.safeLeft,viewport.safeTop,viewport.safeRight,viewport.safeBottom},ui_hudWidth.GetInteger(),
+		cvarSystem->GetCVarFloat("ui_hudSafeInset"),cvarSystem->GetCVarFloat("ui_hudScale"));
+	float top=layout.top;
 #if defined(__ANDROID__)
 	// Touch plates span the SDL window; the HUD may occupy an inset, scaled
 	// drawable viewport. Keep top readouts below the active targets without
@@ -526,16 +525,14 @@ bool idRemasteredHud::Draw(const idUserInterfaceLocal& legacy,int time) {
 	const float touchTop=AndroidTouchControls_HudTop()*viewport.pixelDensityY;
 	top=Max(top,Max(0.f,touchTop-viewport.originY)/ratio);
 #endif
-	impl->gui->SetStateFloat("hud.width",width);
-	impl->gui->SetStateFloat("hud.height",height);
-	impl->gui->SetStateFloat("hud.left",side+inset*width);
-	impl->gui->SetStateFloat("hud.right",side+inset*width);
+	impl->gui->SetStateFloat("hud.width",layout.width);
+	impl->gui->SetStateFloat("hud.height",layout.height);
+	impl->gui->SetStateFloat("hud.left",layout.left);
+	impl->gui->SetStateFloat("hud.right",layout.right);
 	impl->gui->SetStateFloat("hud.top",top);
-	impl->gui->SetStateFloat("hud.bottom",inset*height);
-	impl->gui->SetStateFloat("hud.scale",scale);
-	// Narrow views fit the center column (the 438 u status bar and its strip)
-	// without changing the saved preference.
-	impl->gui->SetStateFloat("hud.centerScale",Min(scale,Max(.25f,span/690.f)));
+	impl->gui->SetStateFloat("hud.bottom",layout.bottom);
+	impl->gui->SetStateFloat("hud.scale",layout.scale);
+	impl->gui->SetStateFloat("hud.centerScale",layout.centerScale);
 	const idDict& state=legacy.State();
 	if (impl->types.contains("player_totalammo")) {
 		using namespace openq4::ui;

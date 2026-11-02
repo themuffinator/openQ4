@@ -259,8 +259,13 @@ made them too large to load.
 - [x] The window's safe area: the retained menus keep their text and
   controls inside it while bands and backdrops run full-bleed
   ([safe area](ui/retained-screens.md#the-windows-safe-area-1-november-2026),
-  LAY-016 partial); the HUD, the stock GUIs, swipe edge margins and
-  device qualification remain.
+  LAY-016 partial); the stock GUIs, swipe edge margins and device
+  qualification remain.
+- [x] The Remastered HUD's edge readouts keep inside the window's safe area
+  too, each edge taking the larger of the player's Safe Area Inset and the
+  window's inset, while the root and full-screen effects stay full-bleed and
+  desktop layouts are unchanged
+  ([HUD safe area](ui/remastered-hud.md#the-windows-safe-area-2-november-2026)).
 - [ ] Bound acceptance evidence remains.
 
 ## Windows stay see-through at any distance, 29 October 2026

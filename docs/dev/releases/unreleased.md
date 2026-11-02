@@ -215,10 +215,13 @@ See [release status](../../user/release-status.md) and the
   multiplayer tabs changes tab; holding your finger on a server in Join Game
   shows its details; and the menus no longer show a mouse cursor or leave a
   button lit where you touched.
-- **Menus clear of the notch and system bars.** On a phone or tablet whose
-  screen has a camera cutout, rounded corners or status and gesture bars,
-  the new menus keep their titles, buttons, lists and prompts clear of
-  them, while their backgrounds still fill the whole screen.
+- **Menus and HUD clear of the notch and system bars.** On a phone or tablet
+  whose screen has a camera cutout, rounded corners or status and gesture
+  bars, the new menus keep their titles, buttons, lists and prompts clear of
+  them, while their backgrounds still fill the whole screen. The Remastered
+  and Minimal HUDs keep their readouts clear of them too, while scopes and
+  other full-screen effects still cover the whole screen; your Safe Area
+  Inset still applies where it reaches further.
 - **Clearer list selection.** The selected save, demo, server or map in the
   new interface's lists no longer doubles its orange highlight under the
   pointer, so its name stays readable.

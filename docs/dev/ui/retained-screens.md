@@ -2581,10 +2581,11 @@ labels count) stands in the safe area, the backdrops fill the view, the
 canvas fits the safe area and the sources read its insets in dp. With no
 inset the root and backdrops fill the view and the sources read nothing, and
 a view that loses its insets lays every part out where it stood.
-`openq4-ui-retained-screens-menus` checks the sources' schema. Not yet: the
-HUD keeps its own Safe Area Inset setting and reads no platform insets, the
-stock GUIs ignore them, swipe controls do not yet keep 24 dp from the edges,
-and no device has qualified it.
+`openq4-ui-retained-screens-menus` checks the sources' schema. The Remastered
+HUD's edge anchors have followed the insets since 2 November
+([Remastered HUD](remastered-hud.md#the-windows-safe-area-2-november-2026)).
+Not yet: the stock GUIs ignore them, swipe controls do not yet keep 24 dp from
+the edges, and no device has qualified it.
 
 ## The pointer redrawn (2 November 2026)
 

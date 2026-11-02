@@ -898,7 +898,9 @@ Sources: [Android build and packaging](android-build.md),
   handle GLES feature limits rather than assuming desktop temporal/post parity.
   The retained menus now keep their text and controls inside the window's
   [safe area](ui/retained-screens.md#the-windows-safe-area-1-november-2026)
-  while their bands and backdrops run full-bleed (`LAY-016` partial);
+  while their bands and backdrops run full-bleed (`LAY-016` partial), and
+  the Remastered HUD's edge readouts follow the same
+  [safe area](ui/remastered-hud.md#the-windows-safe-area-2-november-2026);
   cutout, gesture-bar, fold and multi-window qualification on devices
   remains.
 - [ ] **AND-05 — P2, integration and qualification: standalone Quest.** After

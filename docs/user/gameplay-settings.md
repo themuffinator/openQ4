@@ -452,7 +452,7 @@ same settings are console variables, saved automatically:
 | `ui_hudLayout` | `1` | `0`–`3` | `1` Remastered layout, `2` Minimal (health, armor, ammunition and the crosshair, keeping prompts, chat and votes), `3` Competitive (multiplayer: a match bar at the top with both sides' scores, the timer and network quality, your team's health and armor at the left edge and a larger status bar), `0` Classic (the original Quake 4 positions) |
 | `ui_hudWidth` | `1` | `0`–`2` | How far edge HUD items spread on wide screens: `0` 16:9, `1` 21:9, `2` the full width |
 | `ui_hudScale` | `1` (`1.25` on Steam Deck and with the [Couch profile](display-settings.md#television-viewing-couch-profile)) | `0.5`–`2` | HUD size, independent of menu size |
-| `ui_hudSafeInset` | `0` | `0`–`10` | Distance inward, as a percentage of the viewport |
+| `ui_hudSafeInset` | `0` | `0`–`10` | Distance inward, as a percentage of the viewport; on a screen with a camera cutout or system bars, the HUD also keeps clear of them |
 | `g_objectivesToggle` | `0` | `0`–`1` | Toggle Objectives: `0` shows the objectives while the scores button is held, `1` opens and closes them with each press (the Remastered display then shows a Close prompt) |
 | `ui_hudOpacity` | `1` | `0.25`–`1` | HUD Opacity: fades the whole HUD |
 | `ui_hudDamageDirection` | `1` | `0`–`1` | Damage Direction: `0` hides the indicator pointing toward damage |

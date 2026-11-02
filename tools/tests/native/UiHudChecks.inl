@@ -1,4 +1,72 @@
 // Copyright (C) 2026 DarkMatter Productions. GPL-3.0-or-later.
+// The Remastered HUD's anchors (HudLayoutFor, published by RetainedHud.cpp):
+// with no window inset they are the layout from before the window's safe area
+// counted, at every view, scale, inset and width setting; with insets each edge
+// keeps the larger of the player's distance and the window's, so readouts on
+// the edge anchors stand in the safe rectangle and the center column fits it.
+static void CheckHudLayout() {
+	const auto ratio=[](int width,int height,const std::array<float,4>& safe) {
+		Viewport viewport; viewport.width=width; viewport.height=height; viewport.canvasHeight=720; viewport.canvasMinWidth=960;
+		viewport.safeLeft=safe[0]; viewport.safeTop=safe[1]; viewport.safeRight=safe[2]; viewport.safeBottom=safe[3];
+		return viewport.DpRatio();
+	};
+	// The player's anchors (section 14.4) at a canvas ratio, without the window.
+	const auto player=[](int width,int height,float ratio,float scale,float percent,int hudWidth) {
+		const float w=width/ratio,h=height/ratio;
+		const float cap=hudWidth==0 ? 1280.f : hudWidth==1 ? 720.f*64.f/27.f : w;
+		const float side=std::max(0.f,(w-std::min(w,cap))*.5f);
+		const float inset=percent*.01f;
+		const float span=w-2*(side+inset*w);
+		return HudLayout{w,h,side+inset*w,inset*h,side+inset*w,inset*h,scale,std::min(scale,std::max(.25f,span/690.f))};
+	};
+	const auto same=[](const HudLayout& a,const HudLayout& b) {
+		return Near(a.width,b.width,1e-3f) && Near(a.height,b.height,1e-3f) && Near(a.left,b.left,1e-3f) && Near(a.top,b.top,1e-3f) &&
+			Near(a.right,b.right,1e-3f) && Near(a.bottom,b.bottom,1e-3f) && Near(a.scale,b.scale,1e-6f) && Near(a.centerScale,b.centerScale,1e-6f);
+	};
+	const std::pair<int,int> views[]={{1280,720},{1920,1080},{2520,1080},{3840,1080},{1024,768},{960,720},{1280,1024},{720,1280},{1080,2400},{2400,1080}};
+	for (const auto& [width,height]:views) for (float scale:{.5f,1.f,1.5f,2.f}) for (float percent:{0.f,2.5f,10.f}) for (int hudWidth:{0,1,2}) {
+		const float plain=ratio(width,height,{});
+		Check(plain==std::min(height/720.f,width/960.f),"with no window inset the HUD canvas fills the view");
+		Check(same(HudLayoutFor(float(width),float(height),plain,{0,0,0,0},hudWidth,percent,scale),player(width,height,plain,scale,percent,hudWidth)),
+			"with no window inset the HUD anchors are the player's alone");
+	}
+	struct Shape { int width,height; std::array<float,4> safe; };
+	// A phone in portrait (status bar and cutout, gesture bar), in landscape
+	// (leading cutout, trailing rounded corner, gesture bar) and rounded corners.
+	for (const Shape& shape:{Shape{1080,2400,{0,96,0,48}},Shape{2400,1080,{96,0,24,40}},Shape{1280,720,{24,24,24,24}}})
+		for (float percent:{0.f,2.5f,10.f}) for (int hudWidth:{0,1,2}) for (float scale:{1.f,2.f}) {
+			const float dp=ratio(shape.width,shape.height,shape.safe);
+			const auto layout=HudLayoutFor(float(shape.width),float(shape.height),dp,shape.safe,hudWidth,percent,scale);
+			const auto own=player(shape.width,shape.height,dp,scale,percent,hudWidth);
+			Check(Near(layout.width*dp,float(shape.width),.01f) && Near(layout.height*dp,float(shape.height),.01f),
+				"the HUD's view stays the whole window, so full-screen effects stay full-bleed");
+			Check(Near(layout.left,std::max(own.left,shape.safe[0]/dp),1e-3f) && Near(layout.top,std::max(own.top,shape.safe[1]/dp),1e-3f) &&
+				Near(layout.right,std::max(own.right,shape.safe[2]/dp),1e-3f) && Near(layout.bottom,std::max(own.bottom,shape.safe[3]/dp),1e-3f),
+				"each edge anchor keeps the larger of the player's distance and the window's inset");
+			Check(layout.left*dp>=shape.safe[0]-.01f && layout.top*dp>=shape.safe[1]-.01f && layout.right*dp>=shape.safe[2]-.01f &&
+				layout.bottom*dp>=shape.safe[3]-.01f,"the edge anchors stand in the safe rectangle");
+			// The 690 dp center column, centered on the view, fits between the
+			// side anchors unless the narrowest scale already applies.
+			const float half=345*layout.centerScale;
+			Check(layout.centerScale<=.25f || (layout.width/2-half>=layout.left-1e-3f && layout.width/2+half<=layout.width-layout.right+1e-3f),
+				"the center column fits the safe width");
+		}
+	// The 16:9 width cap's side screen already clears a leading cutout: nothing moves.
+	{
+		const float dp=ratio(2400,1080,{96,0,0,0});
+		const auto layout=HudLayoutFor(2400,1080,dp,{96,0,0,0},0,0,1);
+		Check(Near(layout.left,160,1e-3f) && Near(layout.right,160,1e-3f),"a cutout inside the capped side screen moves no anchor");
+	}
+	// A larger Safe Area Inset wins over the window's.
+	{
+		const float dp=ratio(1080,2400,{0,96,0,48});
+		const auto layout=HudLayoutFor(1080,2400,dp,{0,96,0,48},1,10,1);
+		Check(Near(layout.top,.1f*layout.height,1e-3f) && Near(layout.bottom,.1f*layout.height,1e-3f),"a deeper Safe Area Inset keeps its place");
+	}
+	// An inset that is not a distance counts as none.
+	Check(same(HudLayoutFor(1280,720,1,{-20,NAN,INFINITY,0},1,0,1),HudLayoutFor(1280,720,1,{0,0,0,0},1,0,1)),"a malformed window inset counts as none");
+}
+
 static void CheckHud(const char* path) {
 	const HudAmmoReadout loaded{"machinegun",30,90,true}, fired{"machinegun",29,90,true}, reloaded{"machinegun",40,80,true};
 	Check(HudAmmoGains({},loaded)==0,"joining does not count the initial ammunition as a gain");
@@ -8,6 +76,7 @@ static void CheckHud(const char* path) {
 	Check(HudAmmoGains(loaded,{"shotgun",50,150,true})==0,"switching weapon cannot look like an ammunition gain");
 	Check(HudAmmoGains({"blaster",-1,-1,false},{"blaster",-1,100,false})==0,"unlimited ammunition is not a numeric gain");
 	Check(HudAmmoGains({"railgun",-1,20,false},{"railgun",-1,30,false})==HudAmmoGainTotal,"a clipless or MP weapon pops its total");
+	CheckHudLayout();
 	const auto source=Read(path); Document doc; std::vector<Diagnostic> diagnostics;
 	if (!doc.Load(source,diagnostics)) for (const auto& d:diagnostics) std::fprintf(stderr,"%s\n",d.message.c_str());
 	Check(diagnostics.empty(),"HUD artwork validates as an editable canonical document");
