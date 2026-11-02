@@ -162,17 +162,20 @@ Desktop windows report no inset, so every layout presents as before.
 `ui_retainedSafeArea "left top right bottom"` (pixels, unarchived) sets test
 insets on a desktop. Classic keeps the stock layout and reads no inset, and
 multiplayer objective markers keep their own Safe Area Inset margin.
-The center-left and center-right anchors stay centered on the view's height,
-so unequal top and bottom insets shift their canvas by half the difference
-toward the deeper inset; at the phone shapes below, only art that was already
-off the screen reaches it. The center anchor never moves.
+The center-left and center-right anchors center on the safe area's height
+rather than the view's: unequal top and bottom anchors (a status bar without
+a gesture bar, or Android's touch controls lowering the top) move them by
+half the difference, so their canvas never reaches into the deeper inset. On
+desktop the two anchors are equal and nothing moves. The center anchor never
+moves.
 
 `openq4-ui-hud` checks the anchors at every view, scale, inset and width with
 and without window insets. `openq4-ui-remastered-hud` lays out every Remastered
 document at 1080x2400 (insets 0, 96, 0 and 48 px) and 2400x1080 (96, 0, 24
 and 40 px) with every event that raises something run at once. Each edge
-anchor's anchored edges stand inside the safe area, and so does everything
-each text, vector and picture on one draws; a draw belongs to the readout
+anchor's anchored edges stand inside the safe area and the edge midpoints
+center on its height. Everything each text, vector and picture on an edge
+anchor draws stands inside it too; a draw belongs to the readout
 whose box holds it whole, since text and vector boxes run wider than their
 words and art. Art that a twin without insets already draws off the screen
 (the objectives bar, the vehicles' electric warning below the stock canvas)

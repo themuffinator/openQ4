@@ -869,13 +869,13 @@ edge margin, fold and multi-window resizes and device acceptance remain.
 [The HUD's safe area](remastered-hud.md#the-windows-safe-area-2-november-2026)
 narrows `LAY-016`: each Remastered HUD edge anchor takes the larger of the
 player's Safe Area Inset and the window's inset, measured on the canvas
-ratio the HUD documents' runtime uses, while the root and the layers that fill
-it stay full-bleed and a window without insets lays out as before. Native
-tests check the anchors and every Remastered document at portrait and
+ratio the HUD documents' runtime uses, and the center-left and center-right
+anchors center on the safe area's height, while the root and the layers that
+fill it stay full-bleed and a window without insets lays out as before.
+Native tests check the anchors and every Remastered document at portrait and
 landscape phone shapes, binding no evidence record. The stock GUIs (Classic
-included), multiplayer objective markers, the HUD's center-left and
-center-right anchors under unequal top and bottom insets, swipe controls'
-24 dp edge margin, fold and multi-window resizes and device acceptance remain.
+included), multiplayer objective markers, swipe controls' 24 dp edge margin,
+fold and multi-window resizes and device acceptance remain.
 
 There are **123 partial, 228 pending and 0 verified requirements**, counting the
 39 superseded rows at their recorded states. `BEH-002`

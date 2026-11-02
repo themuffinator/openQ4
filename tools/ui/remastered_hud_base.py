@@ -367,6 +367,12 @@ def anchor(doc: HudDocument, key: str, children: list, *, scale="hud.scale", ide
     else:
         props["top"] = ui.length(50, "%")
         props["margin-top"] = ui.length(-360)
+        if h != "c":
+            # An edge midpoint centres on the safe area's height (13.3), which
+            # unequal top and bottom insets move off the view's; the center
+            # anchor stays on the true projection center.
+            doc.bind(ident + ".middle", ident, "margin-top",
+                     op("+", -360, op("*", 0.5, op("-", S("hud.top"), S("hud.bottom")))))
     # Scale about the stock anchor point: t = (a - c)(1 - s), c the box centre.
     s = S(scale) if isinstance(scale, str) else scale
     one_minus = op("-", 1, s)

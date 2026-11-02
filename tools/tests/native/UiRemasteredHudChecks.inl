@@ -33,14 +33,15 @@ static bool Shown(const Runtime& runtime, const std::string& id) {
 // Section 13.3 and LAY-016 on the HUD, with the window's safe-area insets of
 // a phone in portrait and in landscape. Every node placed on an edge anchor
 // (its box follows hud.left, hud.top, hud.right or hud.bottom) keeps those
-// edges inside the safe area, and so does everything a readout on one draws
-// (each text, vector and picture under it that shows). A draw belongs to the
-// readout whose box holds all of it, since boxes run wider than their words
-// and art. What a twin without insets draws past an edge of the view (the
-// objectives bar, art past the stock canvas) may run under that edge's inset;
-// what it keeps on the screen must stay in the safe area. The root, and every
-// full-screen effect filling it, still fills the view, and a view that loses
-// its insets lays out as the twin.
+// edges inside the safe area, an edge midpoint (its margin follows them)
+// centres on the safe area's height, and everything a readout on one draws
+// (each text, vector and picture under it that shows) stays inside it. A
+// draw belongs to the readout whose box holds all of it, since boxes run
+// wider than their words and art. What a twin without insets draws past an
+// edge of the view (the objectives bar, art past the stock canvas) may run
+// under that edge's inset; what it keeps on the screen must stay in the safe
+// area. The root, and every full-screen effect filling it, still fills the
+// view, and a view that loses its insets lays out as the twin.
 static void CheckRemasteredHudSafeArea(ScreenHost& host, const char* path) {
 	const auto source = Read(path);
 	Document document; std::vector<Diagnostic> diagnostics;
@@ -55,8 +56,9 @@ static void CheckRemasteredHudSafeArea(ScreenHost& host, const char* path) {
 	};
 	std::map<std::string,std::set<std::string>> placed;   // each edge-placed node's anchored edges
 	for (const auto& binding : model.bindings)
-		if ((binding.property == "left" || binding.property == "top" || binding.property == "right" || binding.property == "bottom") &&
-			std::any_of(binding.values.begin(),binding.values.end(),edge)) placed[binding.node].insert(binding.property);
+		if ((binding.property == "left" || binding.property == "top" || binding.property == "right" || binding.property == "bottom" ||
+			binding.property == "margin-top") && std::any_of(binding.values.begin(),binding.values.end(),edge))
+			placed[binding.node].insert(binding.property);
 	struct Readout { std::string id; std::vector<std::string> ancestors, clips; };
 	std::vector<Readout> readouts, fills;
 	std::vector<std::string> ancestors, clips;
@@ -198,16 +200,23 @@ static void CheckRemasteredHudSafeArea(ScreenHost& host, const char* path) {
 		Check(fillsView(model.root.id) && std::all_of(fills.begin(),fills.end(),[&](const auto& fill) { return concealed(runtime,fill) || fillsView(fill.id); }),
 			"the HUD root and the full-screen effects filling it stay full-bleed");
 		const float left = shape.left-1, top = shape.top-1, right = w-shape.right+1, bottom = h-shape.bottom+1;
-		size_t outside = 0;
+		size_t outside = 0, middles = 0;
+		const float middle = shape.top+(h-shape.top-shape.bottom)/2;
 		for (const auto& [id,edges] : placed) {
 			Bounds box;
 			if (!runtime.GetBounds(id,box) || (box.width <= 0 && box.height <= 0)) continue;
+			middles += edges.contains("margin-top");
 			if ((!edges.contains("left") || box.x >= left) && (!edges.contains("top") || box.y >= top) &&
-				(!edges.contains("right") || box.x+box.width <= right) && (!edges.contains("bottom") || box.y+box.height <= bottom)) continue;
-			std::fprintf(stderr,"%s %dx%d: %s at %.1f,%.1f %.1fx%.1f puts an anchored edge outside the safe area %.0f,%.0f-%.0f,%.0f\n",
-				name.c_str(),shape.width,shape.height,id.c_str(),box.x,box.y,box.width,box.height,left+1,top+1,right-1,bottom-1);
+				(!edges.contains("right") || box.x+box.width <= right) && (!edges.contains("bottom") || box.y+box.height <= bottom) &&
+				(!edges.contains("margin-top") || Near(box.y+box.height/2,middle,1))) continue;
+			std::fprintf(stderr,"%s %dx%d: %s at %.1f,%.1f %.1fx%.1f leaves the safe area %.0f,%.0f-%.0f,%.0f or its middle %.1f\n",
+				name.c_str(),shape.width,shape.height,id.c_str(),box.x,box.y,box.width,box.height,left+1,top+1,right-1,bottom-1,middle);
 			++outside;
 		}
+		const bool sides = model.state.contains("hud.top") && std::any_of(placed.begin(),placed.end(),[](const auto& entry) {
+			return entry.first == "anchor-cl" || entry.first == "anchor-cr";
+		});
+		Check(!sides || middles > 0,"the edge midpoints centre on the safe area");
 		size_t owned = 0;
 		for (const auto& [id,extents] : drawn) {
 			// The edges past which the twin draws this readout off the screen.
