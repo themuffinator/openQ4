@@ -6,6 +6,23 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Menu pointer reach, 2 November 2026
+
+- The SDL3 backend drives a menu GUI's cursor with deltas between successive
+  pointer positions. A GUI that ignored some (its view still loading, a
+  retained hand-off, input paused) or clamped them (the pointer outside the
+  UI viewport) kept the loss as an offset, so the drawn pointer's reach was a
+  rectangle short of the screen until a clamp on the opposite side absorbed
+  it. Commit fe6476036 recovered only a change of GUI. Now, once the event
+  queue is empty (`Sys_HasQueuedEvents`), a cursor more than a step's
+  rounding from the backend's tracking takes the next step from where it is,
+  so it lands on the pointer.
+- `tools/tests/ui_background_cursor.py` compiles the production routing
+  functions and replays ignored steps, edge clamps, several motions per
+  delivery, sub-unit motion and the console's own tracking; the same
+  scenarios fail with the recovery removed. Not checked by hand in a running
+  client: openQ4 tooling never synthesises mouse input.
+
 ## Mod manifest version spacing, 2 November 2026
 
 - A mod whose `mod.json` has a stray space or tab around its

@@ -332,6 +332,12 @@ See [release status](../../user/release-status.md) and the
 
 ## Change Log
 
+- The menu pointer reaches every edge of the screen again. Moving the mouse
+  while a menu screen was still opening, or out past the edge of the window,
+  could leave the pointer stopping short of the far edges until you swept it
+  hard against the opposite side; it now catches up with the mouse on its
+  next move.
+
 - The Awakening's freeze gun now works on one-health enemies and respects boss
   invulnerability. Saving preserves frozen enemies and their shatter timer;
   thawing keeps the Pain Lord's enraged speed. Retch buffs survive chilling

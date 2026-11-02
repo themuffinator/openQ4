@@ -1757,6 +1757,15 @@ sysEvent_t Sys_GetEvent(void) {
 	return ev;
 }
 
+/*
+================
+Sys_HasQueuedEvents
+================
+*/
+bool Sys_HasQueuedEvents(void) {
+	return eventHead > eventTail;
+}
+
 //================================================================
 
 /*

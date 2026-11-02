@@ -598,6 +598,15 @@ sysEvent_t Sys_GetEvent(void) {
 
 /*
 ================
+Sys_HasQueuedEvents
+================
+*/
+bool Sys_HasQueuedEvents(void) {
+	return eventHead > eventTail;
+}
+
+/*
+================
 Sys_ClearEvents
 ================
 */

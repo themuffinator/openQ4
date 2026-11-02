@@ -80,6 +80,74 @@ int main() {
 '''
 
 
+TRACKING_SUPPORT = r'''
+#include <cassert>
+#include <cmath>
+#include <cstdio>
+#include <vector>
+struct idMath { static float ClampFloat(float a, float b, float v) { return v < a ? a : v > b ? b : v; } };
+static const int SDL3_MAX_MOUSE_DELTA_PER_EVENT = 32767;
+// A menu GUI as the retained and stock ones behave: it adds each delta it
+// accepts and clamps its cursor to the 640x480 screen it was given.
+struct idUserInterface {
+    float x = 320, y = 240; bool accepting = true;
+    float CursorX() { return x; } float CursorY() { return y; }
+    void Step(int dx, int dy) {
+        if (!accepting) return;
+        x = idMath::ClampFloat(0, 640, x + dx); y = idMath::ClampFloat(0, 480, y + dy);
+    }
+} gui;
+idUserInterface* SDL3_GetActiveMenuGui() { return &gui; }
+struct Console { bool active = false; bool Active() { return active; } } consoleObject;
+Console* console = &consoleObject;
+struct Delta { int dx, dy; };
+std::vector<Delta> queue;
+bool Sys_HasQueuedEvents() { return !queue.empty(); }
+static bool s_haveAbsoluteMousePosition = false;
+static bool s_haveMenuMousePosition = false;
+static idUserInterface *s_menuMouseGui = NULL;
+static float s_menuMouseX = 0, s_menuMouseY = 0, s_menuMouseRemainderX = 0, s_menuMouseRemainderY = 0;
+'''
+
+TRACKING_MAIN = r'''
+// The pointer moves to (x, y) of the GUI's screen: one SDL motion event.
+void Motion(float x, float y) {
+    int dx = 0, dy = 0;
+    SDL3_UpdateRoutedMouseDelta(x, y, dx, dy);
+    if (dx || dy) queue.push_back({dx, dy});
+}
+// The event loop delivers everything queued.
+void Drain() { for (const auto& d : queue) gui.Step(d.dx, d.dy); queue.clear(); }
+bool At(float x, float y) { return std::fabs(gui.x - x) <= 1 && std::fabs(gui.y - y) <= 1; }
+void Settle(float x, float y) { Motion(x, y); Drain(); }
+
+int main() {
+    // A screen opens centred: the first step lands the cursor on the pointer.
+    Settle(100, 100); Settle(102, 101); assert(At(102, 101));
+    // Several motion events before the GUI applies any count once each.
+    Motion(110, 105); Motion(120, 110); Motion(130, 115); Drain(); assert(At(130, 115));
+    // Steps the GUI ignored (its view loading, a hand-off) are not lost for
+    // good: the next step after delivery lands on the pointer.
+    gui.accepting = false;
+    Settle(200, 150); Settle(260, 190);
+    gui.accepting = true;
+    Settle(262, 191); assert(At(262, 191));
+    // The pointer leaves the screen and comes back: the clamp is not kept as
+    // an offset short of the far edge.
+    Settle(600, 191); Settle(700, 191); assert(At(640, 191));
+    Settle(630, 191); assert(At(630, 191));
+    Settle(630, 470); Settle(630, 560); Settle(630, 475); assert(At(630, 475));
+    // Sub-unit motion never builds drift or jitters the cursor.
+    for (int i = 0; i < 400; ++i) { const float t = 300 + i * 0.37f; Settle(t, t * 0.5f + 0.2f); assert(At(t, t * 0.5f + 0.2f)); }
+    // The console keeps its own tracking: the GUI cursor never takes it over.
+    consoleObject.active = true; gui.accepting = false; gui.x = 10;
+    const float trackedX = s_menuMouseX;
+    Settle(trackedX + 5, s_menuMouseY); assert(std::fabs(s_menuMouseX - (trackedX + 5)) < 0.01f);
+    std::puts("background cursor: routed menu steps the GUI ignored or clamped are recovered on the next step");
+}
+'''
+
+
 def main():
     source = (ROOT / 'src/sys/sdl3/sdl3_backend.cpp').read_text(encoding='utf-8')
     functions = '\n'.join(function_body(source, signature) for signature in (
@@ -99,6 +167,27 @@ def main():
             flags = ['-DOPENQ4_SDL3_POSIX_HOST'] if host == 'posix' else []
             subprocess.run([compiler, '-std=c++17', *flags, str(test_source), '-o', str(binary)], check=True)
             subprocess.run([str(binary)], check=True)
+
+        tracking = '\n'.join(function_body(source, signature) for signature in (
+            'static int SDL3_ConsumeMouseDelta(',
+            'static void SDL3_SetMenuMouseTrackingPosition(',
+            'static bool SDL3_MenuCursorMissedSteps(',
+            'static bool SDL3_UpdateRoutedMouseDelta(',
+        ))
+        resync = 'SDL3_MenuCursorMissedSteps(activeGui)'
+        if resync not in tracking:
+            raise AssertionError('routed menu steps must check the GUI cursor for missed steps')
+        # The scenarios must catch tracking that keeps a missed step as an offset.
+        for name, body, passes in (('tracking', tracking, True), ('tracking-kept-offset', tracking.replace(resync, 'false'), False)):
+            test_source = Path(temp) / f'{name}.cpp'
+            binary = Path(temp) / f'{name}.exe'
+            test_source.write_text(TRACKING_SUPPORT + body + TRACKING_MAIN, encoding='utf-8')
+            subprocess.run([compiler, '-std=c++17', str(test_source), '-o', str(binary)], check=True)
+            result = subprocess.run([str(binary)], capture_output=True, text=True)
+            if (result.returncode == 0) != passes:
+                raise AssertionError(f'{name}: expected {"pass" if passes else "failure"}, got exit {result.returncode}\n{result.stdout}{result.stderr}')
+            if passes:
+                print(result.stdout.strip())
 
 
 if __name__ == '__main__':

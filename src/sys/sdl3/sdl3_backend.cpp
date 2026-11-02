@@ -1446,15 +1446,29 @@ static bool SDL3_MapWindowMouseToRoutedCursor(float windowMouseX, float windowMo
 	return false;
 }
 
+// The same menu GUI can also miss steps: it ignores input while its view loads
+// or while one screen hands off to the next, and it clamps its cursor while the
+// pointer is outside the UI viewport. Once the event queue is empty every step
+// sent so far has been delivered, so a cursor more than a step's rounding away
+// from our tracking lost some.
+static bool SDL3_MenuCursorMissedSteps(idUserInterface *gui) {
+	if (!s_haveMenuMousePosition || (console != NULL && console->Active()) || Sys_HasQueuedEvents()) {
+		return false;
+	}
+	return fabsf(gui->CursorX() - s_menuMouseX) > 1.5f || fabsf(gui->CursorY() - s_menuMouseY) > 1.5f;
+}
+
 static bool SDL3_UpdateRoutedMouseDelta(float menuMouseX, float menuMouseY, int &dx, int &dy) {
 	// When the menu GUI changes (a retained screen opens centred over the main
-	// menu), its cursor is not where the pointer is. Take the first step from
-	// that cursor so it lands on the pointer; otherwise the offset was kept for
-	// good and the drawn cursor stopped short of an edge until the user swung
-	// back the other way. Later steps come from our own tracking: several motion
-	// events can arrive before the GUI applies any of them.
+	// menu), or it missed steps, its cursor is not where the pointer is. Take the
+	// next step from that cursor so it lands on the pointer; otherwise the offset
+	// was kept for good and the drawn cursor's reach was a rectangle short of the
+	// screen's edges until the user swung against the other side. Later steps
+	// come from our own tracking: several motion events can arrive before the
+	// GUI applies any of them.
 	idUserInterface *activeGui = SDL3_GetActiveMenuGui();
-	if (activeGui != NULL && (!s_haveMenuMousePosition || activeGui != s_menuMouseGui)) {
+	if (activeGui != NULL && (!s_haveMenuMousePosition || activeGui != s_menuMouseGui ||
+			SDL3_MenuCursorMissedSteps(activeGui))) {
 		SDL3_SetMenuMouseTrackingPosition(activeGui->CursorX(), activeGui->CursorY());
 	}
 
