@@ -19,7 +19,7 @@
 #endif
 
 /* VOLK_GENERATE_VERSION_DEFINE */
-#define VOLK_HEADER_VERSION 357
+#define VOLK_HEADER_VERSION 363
 /* VOLK_GENERATE_VERSION_DEFINE */
 
 #ifndef VK_NO_PROTOTYPES
@@ -315,6 +315,11 @@ struct VolkInstanceTable
 #else
 	PFN_vkVoidFunction padding_61710136[1];
 #endif /* defined(VK_EXT_calibrated_timestamps) */
+#if defined(VK_EXT_cooperative_matrix_maintenance1)
+	PFN_vkGetPhysicalDeviceCooperativeMatrixProperties2EXT vkGetPhysicalDeviceCooperativeMatrixProperties2EXT;
+#else
+	PFN_vkVoidFunction padding_c8d35e9d[1];
+#endif /* defined(VK_EXT_cooperative_matrix_maintenance1) */
 #if defined(VK_EXT_debug_report)
 	PFN_vkCreateDebugReportCallbackEXT vkCreateDebugReportCallbackEXT;
 	PFN_vkDebugReportMessageEXT vkDebugReportMessageEXT;
@@ -2155,6 +2160,9 @@ extern PFN_vkGetRandROutputDisplayEXT vkGetRandROutputDisplayEXT;
 #if defined(VK_EXT_calibrated_timestamps)
 extern PFN_vkGetPhysicalDeviceCalibrateableTimeDomainsEXT vkGetPhysicalDeviceCalibrateableTimeDomainsEXT;
 #endif /* defined(VK_EXT_calibrated_timestamps) */
+#if defined(VK_EXT_cooperative_matrix_maintenance1)
+extern PFN_vkGetPhysicalDeviceCooperativeMatrixProperties2EXT vkGetPhysicalDeviceCooperativeMatrixProperties2EXT;
+#endif /* defined(VK_EXT_cooperative_matrix_maintenance1) */
 #if defined(VK_EXT_debug_report)
 extern PFN_vkCreateDebugReportCallbackEXT vkCreateDebugReportCallbackEXT;
 extern PFN_vkDebugReportMessageEXT vkDebugReportMessageEXT;
