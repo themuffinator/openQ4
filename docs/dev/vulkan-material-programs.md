@@ -12,7 +12,7 @@ broader language and state coverage.
 
 `src/renderer/materialprogram/GLSLCompiler.cpp` accepts a vertex/fragment source
 pair and explicit, case-sensitive material parameter and texture bindings. It
-uses the pinned glslang 15.1.0 compiler in process, through a static library built
+uses the pinned glslang 16.6.0 compiler in process, through a static library built
 by the project's native Meson subproject. It does not invoke an installed SDK
 executable, perform file access, or create GPU resources. Source inputs are
 limited to one MiB each; empty and embedded-NUL inputs are rejected. Compilation
@@ -411,12 +411,12 @@ fails on three point-stencil background pixels; and a mod-content corpus.
 
 ## Dependency provenance
 
-[glslang 15.1.0](https://github.com/KhronosGroup/glslang/tree/15.1.0) is pinned by
+[glslang 16.6.0](https://github.com/KhronosGroup/glslang/tree/16.6.0) is pinned by
 archive SHA-256 in `subprojects/glslang.wrap`. Its BSD, MIT, Apache-2.0, GPLv3 with
 Bison exception and permissive preprocessor notices were reviewed for this
 GPLv3 repository before incorporation. The native Meson overlay selects the
 upstream compiler/SPIR-V/resource-limit sources, without changing their source
-or notices. Optional HLSL, SPIRV-Tools, remapper and upstream test dependencies
+or notices. Optional HLSL, SPIRV-Tools and upstream test dependencies
 are excluded. The complete upstream license is retained in
 `LICENSES/glslang.txt` and included in the staging manifest under
 `licenses/`; the README credits the original project.

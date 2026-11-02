@@ -198,7 +198,7 @@ Developers can also find advanced configuration and file layout in [TECHNICAL.md
 - **Chris Robinson and the [OpenAL Soft](https://openal-soft.org/) contributors** - cross-platform OpenAL runtime bundled in macOS packages
 - **Sam Lantinga and the [SDL contributors](https://github.com/libsdl-org/SDL/tree/release-3.4.18)** - cross-platform window, input and microphone support, including the dummy audio driver used in automated voice tests; SDL uses the zlib licence
 - **Sean Barrett and the [stb_vorbis contributors](https://github.com/nothings/stb/blob/master/stb_vorbis.c)** - MIT/public-domain Vorbis decoding; openQ4 adds a virtual-filesystem callback path for bounded compressed streaming
-- **The Khronos Group and [glslang contributors](https://github.com/KhronosGroup/glslang/tree/15.1.0)** - GLSL-to-SPIR-V compiler used by the Vulkan renderer; its complete licence ships under `licenses/`
+- **The Khronos Group and [glslang contributors](https://github.com/KhronosGroup/glslang/tree/16.6.0)** - GLSL-to-SPIR-V compiler used by the Vulkan renderer; its complete licence ships under `licenses/`
 - **[The Khronos Group, Valve Corporation and LunarG](https://github.com/KhronosGroup/OpenXR-SDK/tree/release-1.1.63)** - Apache-2.0 OpenXR loader and headers behind [VR mode](docs/user/vr.md); [licence notice](LICENSES/openxr-sdk.txt)
 - **[The Khronos Group](https://github.com/KhronosGroup/OpenGL-Registry)** - MIT-licensed OpenGL ES API headers, with their original notices retained
 - **akacross** (Discord user) - Thorough playtesting on Linux and Windows, a huge help moving the project forward!

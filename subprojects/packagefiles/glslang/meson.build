@@ -1,8 +1,8 @@
 # Copyright (C) 2026 DarkMatter Productions
-# Native Meson overlay for the pinned glslang 15.1.0 compiler. The source
+# Native Meson overlay for the pinned glslang 16.6.0 compiler. The source
 # selection follows upstream glslang/CMakeLists.txt and SPIRV/CMakeLists.txt;
 # no upstream sources or notices are changed. See README credits and LICENSE.txt.
-project('glslang', 'cpp', version: '15.1.0', default_options: ['cpp_std=c++17'])
+project('glslang', 'cpp', version: '16.6.0', default_options: ['cpp_std=c++17'])
 
 subdir('glslang')
 glslang_sources = files(
